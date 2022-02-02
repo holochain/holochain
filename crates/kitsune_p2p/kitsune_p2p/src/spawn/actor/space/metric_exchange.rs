@@ -3,12 +3,22 @@ use crate::wire::MetricExchangeMsg;
 use kitsune_p2p_types::config::KitsuneP2pTuningParams;
 use kitsune_p2p_types::dht_arc::DhtArcSet;
 
-const EXTRAP_COV_CHECK_FREQ_MS: u128 = 1000 * 60; // update once per minute
-const METRIC_EXCHANGE_FREQ_MS: u128 = 1000 * 60; // exchange once per minute
+// update once per minute
+const EXTRAP_COV_CHECK_FREQ_US: i64 = 1000 * 1000 * 60;
+
+// exchange once per minute
+const METRIC_EXCHANGE_FREQ_US: i64 = 1000 * 1000 * 60;
+
+fn get_runtime_micros() -> i64 {
+    use tokio::time::Instant;
+    use once_cell::sync::Lazy;
+    static MARKER: Lazy<Instant> = Lazy::new(Instant::now);
+    MARKER.elapsed().as_micros() as i64
+}
 
 struct RemoteRef {
     con: Tx2ConHnd<wire::Wire>,
-    last_sync: tokio::time::Instant,
+    last_sync: i64,
 }
 
 pub(crate) struct MetricExchange {
@@ -45,8 +55,9 @@ impl MetricExchange {
 
     pub fn tick(&mut self) {
         for (_, r) in self.remote_refs.iter_mut() {
-            if r.last_sync.elapsed().as_millis() > METRIC_EXCHANGE_FREQ_MS {
-                r.last_sync = tokio::time::Instant::now();
+            let now = get_runtime_micros();
+            if now - r.last_sync > METRIC_EXCHANGE_FREQ_US {
+                r.last_sync = now;
                 let space = self.space.clone();
                 let timeout = self.tuning_params.implicit_timeout();
                 let con = r.con.clone();
@@ -75,9 +86,7 @@ impl MetricExchange {
             Vacant(e) => {
                 e.insert(RemoteRef {
                     con,
-                    last_sync: tokio::time::Instant::now()
-                        .checked_sub(std::time::Duration::from_secs(60 * 60))
-                        .unwrap(),
+                    last_sync: get_runtime_micros() - METRIC_EXCHANGE_FREQ_US * 2,
                 });
             }
             Occupied(mut e) => {
@@ -138,16 +147,15 @@ impl MetricExchangeSync {
         {
             let mx = out.clone();
             tokio::task::spawn(async move {
-                let mut last_extrap_cov = tokio::time::Instant::now()
-                    .checked_sub(std::time::Duration::from_secs(60 * 60))
-                    .unwrap();
+                let mut last_extrap_cov = get_runtime_micros() - EXTRAP_COV_CHECK_FREQ_US * 2;
 
                 loop {
                     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 
-                    if last_extrap_cov.elapsed().as_millis() > EXTRAP_COV_CHECK_FREQ_MS {
+                    let now = get_runtime_micros();
+                    if now - last_extrap_cov > EXTRAP_COV_CHECK_FREQ_US {
                         let arc_set = mx.read().arc_set.clone();
-                        last_extrap_cov = tokio::time::Instant::now();
+                        last_extrap_cov = now;
                         if let Ok(KGenRes::PeerExtrapCov(res)) = evt_sender
                             .k_gen_req(KGenReq::PeerExtrapCov {
                                 space: space.clone(),
