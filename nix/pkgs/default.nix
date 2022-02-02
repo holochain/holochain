@@ -16,6 +16,7 @@ let
     shift
 
     binary=$(cargo build \
+      --locked \
       --target-dir=''${NIX_ENV_PREFIX:-?}/target/hc-run-crate \
       --manifest-path=${hcToplevelDir}/crates/$crate/Cargo.toml \
       --bin=$crate --message-format=json | \
@@ -35,6 +36,7 @@ let
     crate=''${1:?The first argument needs to define the crate name}
 
     echo $(cargo build \
+      --locked \
       --target-dir=''${NIX_ENV_PREFIX:-?}/target/hc-run-crate \
       --manifest-path=${hcToplevelDir}/crates/$crate/Cargo.toml \
       --bin=$crate --message-format=json | \
