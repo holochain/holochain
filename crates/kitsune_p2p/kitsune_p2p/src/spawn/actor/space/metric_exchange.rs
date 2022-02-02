@@ -2,7 +2,7 @@ use super::*;
 use crate::wire::MetricExchangeMsg;
 use kitsune_p2p_types::config::KitsuneP2pTuningParams;
 use kitsune_p2p_types::dht_arc::DhtArcSet;
-use tokio::time::Instant;
+use tokio::time::{Duration, Instant};
 
 struct ShouldTrigger {
     last_sync: Option<Instant>,
@@ -32,8 +32,11 @@ impl ShouldTrigger {
     }
 }
 
-const EXTRAP_COV_CHECK_FREQ_MS: u128 = 1000 * 60; // update once per minute
-const METRIC_EXCHANGE_FREQ_MS: u128 = 1000 * 60; // exchange once per minute
+// update once per minute
+const EXTRAP_COV_CHECK_FREQ: Duration = Duration::from_millis(1000 * 60);
+
+// exchange once per minute
+const METRIC_EXCHANGE_FREQ: Duration = Duration::from_millis(1000 * 60);
 
 struct RemoteRef {
     con: Tx2ConHnd<wire::Wire>,
@@ -103,7 +106,7 @@ impl MetricExchange {
             Vacant(e) => {
                 e.insert(RemoteRef {
                     con,
-                    last_sync: ShouldTrigger::new(METRIC_EXCHANGE_FREQ_MS),
+                    last_sync: ShouldTrigger::new(METRIC_EXCHANGE_FREQ),
                 });
             }
             Occupied(mut e) => {
@@ -164,7 +167,7 @@ impl MetricExchangeSync {
         {
             let mx = out.clone();
             tokio::task::spawn(async move {
-                let mut last_extrap_cov = ShouldTrigger::new(EXTRAP_COV_CHECK_FREQ_MS);
+                let mut last_extrap_cov = ShouldTrigger::new(EXTRAP_COV_CHECK_FREQ);
 
                 loop {
                     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
