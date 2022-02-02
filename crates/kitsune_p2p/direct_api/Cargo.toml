@@ -13,6 +13,6 @@ edition = "2018"
 [dependencies]
 arrayref = "0.3.6"
 base64 = "0.13"
-kitsune_p2p_dht_arc = { version = "0.0.8-dev.0", path = "../dht_arc" }
+kitsune_p2p_dht_arc = { version = "0.0.8", path = "../dht_arc" }
 serde = { version = "1", features = ["derive", "rc"] }
 serde_json = { version = "1", features = ["preserve_order"] }
