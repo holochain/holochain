@@ -6,11 +6,11 @@ use tokio::time::Instant;
 
 struct ShouldTrigger {
     last_sync: Option<Instant>,
-    freq: u128,
+    freq: Duration,
 }
 
 impl ShouldTrigger {
-    pub fn new(freq: u128) -> Self {
+    pub fn new(freq: Duration) -> Self {
         Self {
             last_sync: None,
             freq,
@@ -21,7 +21,7 @@ impl ShouldTrigger {
         let now = Instant::now();
         if self
             .last_sync
-            .map(|s| now.saturating_duration_since(s).as_millis() > self.freq)
+            .map(|s| now.saturating_duration_since(s) > self.freq)
             .unwrap_or(true)
         {
             self.last_sync = Some(now);
