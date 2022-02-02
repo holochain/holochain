@@ -10,8 +10,8 @@ const EXTRAP_COV_CHECK_FREQ_US: i64 = 1000 * 1000 * 60;
 const METRIC_EXCHANGE_FREQ_US: i64 = 1000 * 1000 * 60;
 
 fn get_runtime_micros() -> i64 {
-    use tokio::time::Instant;
     use once_cell::sync::Lazy;
+    use tokio::time::Instant;
     static MARKER: Lazy<Instant> = Lazy::new(Instant::now);
     MARKER.elapsed().as_micros() as i64
 }
