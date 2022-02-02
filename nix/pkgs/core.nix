@@ -35,9 +35,9 @@ rec {
     export RUST_BACKTRACE=1
 
     # make sure the binary is built
-    cargo build --manifest-path=crates/release-automation/Cargo.toml
+    cargo build --locked --manifest-path=crates/release-automation/Cargo.toml
     # run the release-automation tests
-    cargo test --manifest-path=crates/release-automation/Cargo.toml ''${@}
+    cargo test --locked --manifest-path=crates/release-automation/Cargo.toml ''${@}
   '';
 
   hcReleaseAutomationTestRepo =
