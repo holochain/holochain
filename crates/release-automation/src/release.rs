@@ -711,29 +711,36 @@ impl PublishError {
 pub(crate) mod crates_index_helper {
     use super::*;
 
-    static CRATES_IO_INDEX: OnceCell<crates_index::Index> = OnceCell::new();
+    static CRATES_IO_INDEX: OnceCell<Mutex<crates_index::Index>> = OnceCell::new();
 
-    pub(crate) fn index(update: bool) -> Fallible<&'static crates_index::Index> {
+    pub(crate) fn index(update: bool) -> Fallible<&'static Mutex<crates_index::Index>> {
         let first_run = CRATES_IO_INDEX.get().is_none();
 
         let crates_io_index = CRATES_IO_INDEX.get_or_try_init(|| -> Fallible<_> {
-            let index = crates_index::Index::new_cargo_default();
+            let mut index = crates_index::Index::new_cargo_default()?;
             trace!("Using crates index at {:?}", index.path());
 
-            index.retrieve_or_update()?;
+            index.update()?;
 
-            Ok(index)
+            Ok(Mutex::new(index))
         })?;
 
         if !first_run && update {
-            crates_io_index.update()?;
+            crates_io_index
+                .lock()
+                .map_err(|e| anyhow::anyhow!("failed to lock the index: {}", e))?
+                .update()?;
         }
 
         Ok(crates_io_index)
     }
 
     pub(crate) fn is_version_published(crt: &Crate, update: bool) -> Fallible<bool> {
-        Ok(index(update)?
+        let index_lock = index(update)?
+            .lock()
+            .map_err(|e| anyhow::anyhow!("failed to lock the index: {}", e))?;
+
+        Ok(index_lock
             .crate_(&crt.name())
             .map(|indexed_crate| -> bool {
                 indexed_crate
