@@ -13,7 +13,7 @@ use holochain_wasm_test_utils::TestWasm;
 use std::time::Duration;
 use tempdir::TempDir;
 
-#[path = "../tests/test_utils.rs"]
+#[path = "../tests/test_utils/mod.rs"]
 mod test_utils;
 
 use test_utils::*;

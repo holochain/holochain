@@ -10,8 +10,7 @@ use lair_keystore_api::mem_store::*;
 use lair_keystore_api::prelude::*;
 use std::sync::Arc;
 
-mod test_utils;
-use test_utils::*;
+use super::test_utils::*;
 
 const ADMIN_PORT: u16 = 12909;
 
