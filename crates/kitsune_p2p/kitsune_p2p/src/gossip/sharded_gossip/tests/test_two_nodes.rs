@@ -308,7 +308,7 @@ async fn bloom_response_finishes() {
     .await;
 
     // - Send the final ops bloom message.
-    let incoming = ShardedGossipWire::Ops(Ops {
+    let incoming = ShardedGossipWire::OpBlooms(OpBlooms {
         missing_hashes: empty_bloom(),
         finished: true,
     });
@@ -358,7 +358,7 @@ async fn bloom_response_doesnt_finish_outstanding_incoming() {
     .await;
 
     // - Send the final ops bloom message.
-    let incoming = ShardedGossipWire::Ops(Ops {
+    let incoming = ShardedGossipWire::OpBlooms(OpBlooms {
         missing_hashes: empty_bloom(),
         finished: true,
     });
@@ -435,7 +435,7 @@ async fn no_data_still_finishes() {
     .await;
 
     // - Send the final ops bloom message to alice.
-    let incoming = ShardedGossipWire::Ops(Ops {
+    let incoming = ShardedGossipWire::OpBlooms(OpBlooms {
         missing_hashes: empty_bloom(),
         finished: true,
     });

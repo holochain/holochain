@@ -18,6 +18,8 @@ use derivative::Derivative;
     derive_more::Add,
     derive_more::Display,
     derive_more::From,
+    serde::Serialize,
+    serde::Deserialize,
 )]
 pub struct SpaceCoord(u32);
 
@@ -42,6 +44,8 @@ impl SpaceCoord {
     derive_more::Add,
     derive_more::Display,
     derive_more::From,
+    serde::Serialize,
+    serde::Deserialize,
 )]
 pub struct TimeCoord(u32);
 
@@ -255,7 +259,7 @@ impl Topology {
 
 /// A type which generates a list of exponentially expanding time windows, as per
 /// this document: https://hackmd.io/@hololtd/r1IAIbr5Y
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Derivative)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Derivative, serde::Serialize, serde::Deserialize)]
 #[derivative(PartialOrd, Ord)]
 pub struct TelescopingTimes {
     time: TimeCoord,

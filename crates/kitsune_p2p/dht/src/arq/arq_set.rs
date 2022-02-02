@@ -20,6 +20,8 @@ pub type ArqBoundsSet = ArqSetImpl<ArqBounds>;
     derive_more::IntoIterator,
     derive_more::Index,
     derive_more::IndexMut,
+    serde::Serialize,
+    serde::Deserialize,
 )]
 pub struct ArqSetImpl<A: ArqBounded> {
     #[into_iterator]
@@ -27,6 +29,7 @@ pub struct ArqSetImpl<A: ArqBounded> {
     #[deref_mut]
     #[index]
     #[index_mut]
+    #[serde(bound(deserialize = "A: serde::de::DeserializeOwned"))]
     pub(crate) arqs: Vec<A>,
     power: u8,
 }

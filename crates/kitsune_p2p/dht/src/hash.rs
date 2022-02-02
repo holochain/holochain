@@ -21,7 +21,15 @@ pub struct OpHash(pub Hash32);
 pub struct AgentKey(pub Hash32);
 
 #[derive(
-    Copy, Clone, PartialEq, Eq, derive_more::Constructor, derive_more::Deref, derive_more::DerefMut,
+    Copy,
+    Clone,
+    PartialEq,
+    Eq,
+    derive_more::Constructor,
+    derive_more::Deref,
+    derive_more::DerefMut,
+    serde::Serialize,
+    serde::Deserialize,
 )]
 pub struct RegionHash(Hash32);
 

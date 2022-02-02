@@ -9,7 +9,7 @@ use crate::{
 
 use super::{Region, RegionCoords, RegionData};
 
-#[derive(Debug, PartialEq, Eq, derive_more::Constructor)]
+#[derive(Debug, PartialEq, Eq, derive_more::Constructor, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "testing", derive(Clone))]
 pub struct RegionCoordSetXtcs {
     times: TelescopingTimes,
@@ -98,7 +98,7 @@ impl<D: TreeDataConstraints> RegionSet<D> {
 /// The coordinates for the regions are specified by a few values.
 /// The data to match the coordinates are specified in a 2D vector which must
 /// correspond to the generated coordinates.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "testing", derive(Clone))]
 pub struct RegionSetXtcs<D: TreeDataConstraints = RegionData> {
     /// The generator for the coordinates
@@ -106,6 +106,7 @@ pub struct RegionSetXtcs<D: TreeDataConstraints = RegionData> {
 
     /// The outer vec corresponds to the spatial segments;
     /// the inner vecs are the time segments.
+    #[serde(bound(deserialize = "D: serde::de::DeserializeOwned"))]
     pub(crate) data: Vec<Vec<D>>,
 }
 

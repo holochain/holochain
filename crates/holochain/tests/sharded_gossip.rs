@@ -399,7 +399,7 @@ async fn mock_network_sharded_gossip() {
                                             dna: dna.clone(),
                                             module: module.clone(),
                                             gossip: GossipProtocol::Sharded(
-                                                ShardedGossipWire::ops(filter, true),
+                                                ShardedGossipWire::op_blooms(filter, true),
                                             ),
                                         };
                                         channel.send(msg.addressed((*agent).clone())).await;
@@ -416,7 +416,10 @@ async fn mock_network_sharded_gossip() {
                                             channel.send(msg.addressed((*agent).clone())).await;
                                         }
                                     }
-                                    ShardedGossipWire::Ops(Ops { missing_hashes, .. }) => {
+                                    ShardedGossipWire::OpBlooms(OpBlooms {
+                                        missing_hashes,
+                                        ..
+                                    }) => {
                                         // We have received an ops bloom so we can respond with any missing
                                         // hashes if there are nay.
                                         let this_agent_hashes = data.hashes_authority_for(&agent);
@@ -923,7 +926,7 @@ async fn mock_network_sharding() {
                                             dna: dna.clone(),
                                             module: module.clone(),
                                             gossip: GossipProtocol::Sharded(
-                                                ShardedGossipWire::ops(filter, true),
+                                                ShardedGossipWire::op_blooms(filter, true),
                                             ),
                                         };
                                         channel.send(msg.addressed((*agent).clone())).await;
@@ -944,7 +947,10 @@ async fn mock_network_sharding() {
                                             channel.send(msg.addressed((*agent).clone())).await;
                                         }
                                     }
-                                    ShardedGossipWire::Ops(Ops { missing_hashes, .. }) => {
+                                    ShardedGossipWire::OpBlooms(OpBlooms {
+                                        missing_hashes,
+                                        ..
+                                    }) => {
                                         // We have received an ops bloom so we can respond with any missing
                                         // hashes if there are nay.
                                         let this_agent_hashes = data.hashes_authority_for(&agent);

@@ -14,6 +14,7 @@ use governor::RateLimiter;
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::codec::Codec;
 use kitsune_p2p_types::config::*;
+use kitsune_p2p_types::dht::region::RegionSetXtcs;
 use kitsune_p2p_types::dht_arc::{ArcInterval, DhtArcSet};
 use kitsune_p2p_types::metrics::*;
 use kitsune_p2p_types::tx2::tx2_api::*;
@@ -665,7 +666,7 @@ impl ShardedGossipLocal {
                 }
                 Vec::with_capacity(0)
             }
-            ShardedGossipWire::Ops(Ops {
+            ShardedGossipWire::OpBlooms(OpBlooms {
                 missing_hashes,
                 finished,
             }) => {
@@ -698,7 +699,7 @@ impl ShardedGossipLocal {
                     None => Vec::with_capacity(0),
                 }
             }
-            ShardedGossipWire::OpsBatchReceived(_) => match self.get_state(&cert)? {
+            ShardedGossipWire::OpBloomsBatchReceived(_) => match self.get_state(&cert)? {
                 Some(state) => {
                     // The last ops batch has been received by the
                     // remote node so now send the next batch.
@@ -710,16 +711,19 @@ impl ShardedGossipLocal {
                 }
                 None => Vec::with_capacity(0),
             },
+            ShardedGossipWire::OpRegions(OpRegions { regions }) => {
+                todo!("implement region set gossip")
+            }
             ShardedGossipWire::MissingOps(MissingOps { ops, finished }) => {
                 let mut gossip = Vec::with_capacity(0);
                 let finished = MissingOpsStatus::try_from(finished)?;
                 let state = match finished {
                     // This is a single chunk of ops. No need to reply.
                     MissingOpsStatus::ChunkComplete => self.get_state(&cert)?,
-                    // This is the last chunk in the batch. Reply with [`OpsBatchReceived`]
+                    // This is the last chunk in the batch. Reply with [`OpBloomsBatchReceived`]
                     // to get the next batch of missing ops.
                     MissingOpsStatus::BatchComplete => {
-                        gossip = vec![ShardedGossipWire::ops_batch_received()];
+                        gossip = vec![ShardedGossipWire::op_blooms_batch_received()];
                         self.get_state(&cert)?
                     }
                     // All the batches of missing ops for the bloom this node sent
@@ -886,7 +890,7 @@ pub enum MissingOpsStatus {
     /// There are more chunks in this batch to come. No reply is needed.
     ChunkComplete = 0,
     /// This chunk is done but there are more batches
-    /// to come and you should reply with [`OpsBatchReceived`]
+    /// to come and you should reply with [`OpBloomsBatchReceived`]
     /// when you are ready to get the next batch.
     BatchComplete = 1,
     /// This is the final batch of missing ops and there
@@ -929,12 +933,18 @@ kitsune_p2p_types::write_codec_enum! {
             agents.0: Vec<Arc<AgentInfoSigned>>,
         },
 
-        /// Send Ops Bloom
-        Ops(0x50) {
+        /// Send Op Bloom filters
+        OpBlooms(0x50) {
             /// The bloom filter for op data
             missing_hashes.0: EncodedTimedBloomFilter,
             /// Is this the last bloom to be sent?
             finished.1: bool,
+        },
+
+        /// Send Op region hashes
+        OpRegions(0x51) {
+            /// The region hashes for all common ops
+            regions.0: RegionSetXtcs,
         },
 
         /// Any ops that were missing from the remote bloom.
@@ -946,14 +956,14 @@ kitsune_p2p_types::write_codec_enum! {
             /// If the amount of missing ops is larger then the
             /// [`ShardedGossipLocal::UPPER_BATCH_BOUND`] then the set of
             /// missing ops chunks will be sent in batches.
-            /// Each batch will require a reply message of [`OpsBatchReceived`]
+            /// Each batch will require a reply message of [`OpBloomsBatchReceived`]
             /// in order to get the next batch.
             /// This is to prevent overloading the receiver with too much
             /// incoming data.
             ///
             /// 0: There is more chunks in this batch to come. No reply is needed.
             /// 1: This chunk is done but there is more batches
-            /// to come and you should reply with [`OpsBatchReceived`]
+            /// to come and you should reply with [`OpBloomsBatchReceived`]
             /// when you are ready to get the next batch.
             /// 2: This is the final missing ops and there
             /// are no more ops to come. No reply is needed.
@@ -987,7 +997,7 @@ kitsune_p2p_types::write_codec_enum! {
         /// I have received a complete batch of
         /// missing ops and I am ready to receive the
         /// next batch.
-        OpsBatchReceived(0x13) {
+        OpBloomsBatchReceived(0x13) {
         },
     }
 }

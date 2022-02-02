@@ -26,7 +26,7 @@ pub fn pow2f(p: u8) -> f64 {
     2f64.powf(p as f64)
 }
 
-pub trait ArqBounded: Sized {
+pub trait ArqBounded: Sized + serde::Serialize + serde::de::DeserializeOwned {
     fn to_interval(&self) -> ArcInterval;
 
     fn length(&self) -> u64;
@@ -61,7 +61,7 @@ pub trait ArqBounded: Sized {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Arq {
     /// Location around which this coverage is centered
     center: Loc,
@@ -277,7 +277,7 @@ impl ArqBounded for Arq {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ArqBounds {
     offset: SpaceCoord,
     power: u8,

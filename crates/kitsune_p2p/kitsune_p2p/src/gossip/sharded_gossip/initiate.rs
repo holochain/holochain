@@ -244,7 +244,7 @@ impl ShardedGossipLocal {
         // If no blooms were found for this time window then return a no overlap.
         if blooms.is_empty() {
             // Check if this is the final time window.
-            gossip.push(ShardedGossipWire::ops(
+            gossip.push(ShardedGossipWire::op_blooms(
                 EncodedTimedBloomFilter::NoOverlap,
                 true,
             ));
@@ -272,9 +272,9 @@ impl ShardedGossipLocal {
 
             // Check if this is the final time window and the final bloom for this window.
             if i == len - 1 && state.bloom_batch_cursor.is_none() {
-                gossip.push(ShardedGossipWire::ops(bloom, true));
+                gossip.push(ShardedGossipWire::op_blooms(bloom, true));
             } else {
-                gossip.push(ShardedGossipWire::ops(bloom, false));
+                gossip.push(ShardedGossipWire::op_blooms(bloom, false));
             }
         }
 

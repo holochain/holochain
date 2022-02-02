@@ -38,7 +38,7 @@ impl From<OpHash> for RegionHash {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct RegionData {
     pub hash: RegionHash,
     pub size: u32,

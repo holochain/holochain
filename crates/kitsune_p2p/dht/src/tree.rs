@@ -6,11 +6,25 @@ use sparse_fenwick::Fenwick2;
 use crate::{coords::*, op::*, region::*};
 
 pub trait TreeDataConstraints:
-    Eq + Zero + AddAssign + Sub<Output = Self> + Copy + std::fmt::Debug
+    Eq
+    + Zero
+    + AddAssign
+    + Sub<Output = Self>
+    + Copy
+    + std::fmt::Debug
+    + serde::Serialize
+    + serde::de::DeserializeOwned
 {
 }
 impl<T> TreeDataConstraints for T where
-    T: Eq + Zero + AddAssign + Sub<Output = T> + Copy + std::fmt::Debug
+    T: Eq
+        + Zero
+        + AddAssign
+        + Sub<Output = T>
+        + Copy
+        + std::fmt::Debug
+        + serde::Serialize
+        + serde::de::DeserializeOwned
 {
 }
 

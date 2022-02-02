@@ -3319,6 +3319,7 @@ dependencies = [
  "pretty_assertions 0.7.2",
  "proptest",
  "rand 0.8.4",
+ "serde",
  "sparse-fenwick",
  "statrs",
  "tracing",
