@@ -416,7 +416,7 @@ mod tests {
                     QueryOpHashes { respond, .. } => {
                         respond.r(Ok(async move { Ok(None) }.boxed().into()));
                     }
-                    evt => println!("unhandled: {:?}", evt),
+                    evt => tracing::trace!("unhandled: {:?}", evt),
                 }
             }
         });
