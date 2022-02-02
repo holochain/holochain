@@ -20,6 +20,7 @@ mock = ["hdk_derive/mock", "mockall"]
 encoding = ["holo_hash/encoding"]
 fixturators = [ "holochain_zome_types/fixturators", "holo_hash/fixturators" ]
 test_utils = [ "fixturators", "holochain_zome_types/test_utils", "holo_hash/test_utils" ]
+properties = [ "holochain_zome_types/properties" ]
 
 [dependencies]
 hdk_derive = { version = "0.0.22", path = "../hdk_derive" }

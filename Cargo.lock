@@ -2802,12 +2802,8 @@ dependencies = [
 name = "holochain_wasm_test_utils"
 version = "0.0.24"
 dependencies = [
- "fixt",
- "holo_hash",
  "holochain_types",
  "holochain_util",
- "holochain_zome_types",
- "rand 0.7.3",
  "strum",
  "strum_macros",
  "toml",
@@ -2914,6 +2910,7 @@ dependencies = [
  "rusqlite",
  "serde",
  "serde_bytes",
+ "serde_yaml",
  "shrinkwraprs",
  "strum",
  "subtle",

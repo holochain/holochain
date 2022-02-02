@@ -265,7 +265,7 @@ pub mod test_utils {
 
         (
             Arc::new(envs.into_tempdir()),
-            RealAppInterfaceApi::new(conductor_handle, Default::default()),
+            RealAppInterfaceApi::new(conductor_handle),
             handle,
         )
     }

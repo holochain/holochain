@@ -202,7 +202,7 @@ async fn run(
                         error => error,
                     };
                     error!("Shutting down conductor due to unrecoverable error: {:?}\nContext: {}", error, context);
-                    return Err(TaskManagerError::Unrecoverable(error));
+                    return Err(TaskManagerError::Unrecoverable(Box::new(error)));
                 },
                 Some(TaskOutcome::StopApps(cell_id, error, context)) => {
                     tracing::error!("About to automatically stop apps");
@@ -395,13 +395,18 @@ mod test {
         let mock_handle = MockConductorHandleT::new();
         let (send_task_handle, main_task) = spawn_task_manager(Arc::new(mock_handle));
         let handle = tokio::spawn(async {
-            Err(ConductorError::Other(anyhow::anyhow!("This task gotta die").into()).into())
+            Err(Box::new(ConductorError::Other(
+                anyhow::anyhow!("This task gotta die").into(),
+            ))
+            .into())
         });
         let handle = ManagedTaskAdd::generic(
             handle,
             Box::new(|result| match result {
                 Ok(_) => panic!("Task should have died"),
-                Err(ManagedTaskError::Conductor(ConductorError::Other(_))) => {
+                Err(ManagedTaskError::Conductor(err))
+                    if matches!(*err, ConductorError::Other(_)) =>
+                {
                     let handle = tokio::spawn(async { Ok(()) });
                     let handle = ManagedTaskAdd::ignore(handle, "respawned task");
                     TaskOutcome::NewTask(handle)
@@ -441,10 +446,10 @@ mod test {
             .send(ManagedTaskAdd::unrecoverable(
                 tokio::spawn(async {
                     tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-                    Err(
-                        ConductorError::Other(anyhow::anyhow!("Unrecoverable task failed").into())
-                            .into(),
-                    )
+                    Err(Box::new(ConductorError::Other(
+                        anyhow::anyhow!("Unrecoverable task failed").into(),
+                    ))
+                    .into())
                 }),
                 "",
             ))

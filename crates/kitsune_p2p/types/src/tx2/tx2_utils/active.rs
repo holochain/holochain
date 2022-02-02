@@ -81,6 +81,9 @@ impl Active {
         let cb: CB = Arc::new(cb);
         for i in self.0.iter() {
             let cb = cb.clone();
+            // This needs to be in a closure because it's an Arc<dyn Fn() + 'static + Send + Sync>
+            // but clippy doesn't get it.
+            #[allow(clippy::redundant_closure)]
             i.register_kill_cb(move || cb());
         }
     }
