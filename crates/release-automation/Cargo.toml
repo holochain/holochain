@@ -38,7 +38,7 @@ thiserror = "1"
 regex = "1.5"
 crates_io_api = "0.7"
 holochain_util = { path = "../holochain_util" }
-crates-index = "0.16"
+crates-index = "0.18"
 
 # used for the example clippy fix-json
 rustfix = "0.6"
