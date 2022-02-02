@@ -4,16 +4,7 @@
 use holochain_serialized_bytes::prelude::*;
 
 /// A type to allow json values to be used as [SerializedBytes]
-#[derive(
-    Debug,
-    Clone,
-    PartialEq,
-    Eq,
-    derive_more::From,
-    serde::Serialize,
-    serde::Deserialize,
-    SerializedBytes,
-)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct YamlProperties(serde_yaml::Value);
 
 impl YamlProperties {
@@ -26,11 +17,22 @@ impl YamlProperties {
     pub fn empty() -> Self {
         Self(serde_yaml::Value::Null)
     }
+
+    /// Consumes struct into inner value.
+    pub fn into_inner(self) -> serde_yaml::Value {
+        self.0
+    }
 }
 
 impl From<()> for YamlProperties {
     fn from(_: ()) -> Self {
         Self::empty()
+    }
+}
+
+impl From<serde_yaml::Value> for YamlProperties {
+    fn from(v: serde_yaml::Value) -> Self {
+        Self(v)
     }
 }
 
