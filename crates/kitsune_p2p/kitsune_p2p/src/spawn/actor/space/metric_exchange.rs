@@ -2,23 +2,42 @@ use super::*;
 use crate::wire::MetricExchangeMsg;
 use kitsune_p2p_types::config::KitsuneP2pTuningParams;
 use kitsune_p2p_types::dht_arc::DhtArcSet;
+use tokio::time::Instant;
 
-// update once per minute
-const EXTRAP_COV_CHECK_FREQ_US: i64 = 1000 * 1000 * 60;
-
-// exchange once per minute
-const METRIC_EXCHANGE_FREQ_US: i64 = 1000 * 1000 * 60;
-
-fn get_runtime_micros() -> i64 {
-    use once_cell::sync::Lazy;
-    use tokio::time::Instant;
-    static MARKER: Lazy<Instant> = Lazy::new(Instant::now);
-    MARKER.elapsed().as_micros() as i64
+struct ShouldTrigger {
+    last_sync: Option<Instant>,
+    freq: u128,
 }
+
+impl ShouldTrigger {
+    pub fn new(freq: u128) -> Self {
+        Self {
+            last_sync: None,
+            freq,
+        }
+    }
+
+    pub fn should_trigger(&mut self) -> bool {
+        let now = Instant::now();
+        if self
+            .last_sync
+            .map(|s| now.saturating_duration_since(s).as_millis() > self.freq)
+            .unwrap_or(true)
+        {
+            self.last_sync = Some(now);
+            true
+        } else {
+            false
+        }
+    }
+}
+
+const EXTRAP_COV_CHECK_FREQ_MS: u128 = 1000 * 60; // update once per minute
+const METRIC_EXCHANGE_FREQ_MS: u128 = 1000 * 60; // exchange once per minute
 
 struct RemoteRef {
     con: Tx2ConHnd<wire::Wire>,
-    last_sync: i64,
+    last_sync: ShouldTrigger,
 }
 
 pub(crate) struct MetricExchange {
@@ -55,9 +74,7 @@ impl MetricExchange {
 
     pub fn tick(&mut self) {
         for (_, r) in self.remote_refs.iter_mut() {
-            let now = get_runtime_micros();
-            if now - r.last_sync > METRIC_EXCHANGE_FREQ_US {
-                r.last_sync = now;
+            if r.last_sync.should_trigger() {
                 let space = self.space.clone();
                 let timeout = self.tuning_params.implicit_timeout();
                 let con = r.con.clone();
@@ -86,7 +103,7 @@ impl MetricExchange {
             Vacant(e) => {
                 e.insert(RemoteRef {
                     con,
-                    last_sync: get_runtime_micros() - METRIC_EXCHANGE_FREQ_US * 2,
+                    last_sync: ShouldTrigger::new(METRIC_EXCHANGE_FREQ_MS),
                 });
             }
             Occupied(mut e) => {
@@ -147,15 +164,13 @@ impl MetricExchangeSync {
         {
             let mx = out.clone();
             tokio::task::spawn(async move {
-                let mut last_extrap_cov = get_runtime_micros() - EXTRAP_COV_CHECK_FREQ_US * 2;
+                let mut last_extrap_cov = ShouldTrigger::new(EXTRAP_COV_CHECK_FREQ_MS);
 
                 loop {
                     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 
-                    let now = get_runtime_micros();
-                    if now - last_extrap_cov > EXTRAP_COV_CHECK_FREQ_US {
+                    if last_extrap_cov.should_trigger() {
                         let arc_set = mx.read().arc_set.clone();
-                        last_extrap_cov = now;
                         if let Ok(KGenRes::PeerExtrapCov(res)) = evt_sender
                             .k_gen_req(KGenReq::PeerExtrapCov {
                                 space: space.clone(),
