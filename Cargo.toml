@@ -41,10 +41,11 @@ members = [
   "crates/release-automation",
 ]
 
-exclude = [
-  "crates/diagnostics",
-  "crates/release-automation",
-]
+exclude = ["crates/diagnostics", "crates/release-automation"]
+
+[profile.test.package."*"]
+opt-level = 3
+debug = false
 
 [patch.crates-io]
 # holochain_wasmer_guest = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "wasmer-patch" }

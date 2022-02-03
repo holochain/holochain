@@ -1,11 +1,11 @@
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
+use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
 use std::sync::Arc;
 use tracing::error;
-use crate::core::ribosome::RibosomeError;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn accept_countersigning_preflight_request<'a>(
@@ -92,11 +92,14 @@ pub fn accept_countersigning_preflight_request<'a>(
                 ))
             })
         }
-        _ => Err(WasmError::Host(RibosomeError::HostFnPermissions(
+        _ => Err(WasmError::Host(
+            RibosomeError::HostFnPermissions(
                 call_context.zome.zome_name().clone(),
                 call_context.function_name().clone(),
-                "accept_countersigning_preflight_request".into()
-            ).to_string()))
+                "accept_countersigning_preflight_request".into(),
+            )
+            .to_string(),
+        )),
     }
 }
 
@@ -254,27 +257,16 @@ pub mod wasm_test {
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "slow_tests")]
     async fn lock_chain() {
+        use crate::sweettest::SweetAgents;
+
         observability::test_run().ok();
         let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning])
             .await
             .unwrap();
 
-        let alice_pubkey = fixt!(AgentPubKey, Predictable, 0);
-        let bob_pubkey = fixt!(AgentPubKey, Predictable, 1);
+        let mut conductor = SweetConductor::from_standard_config().await;
 
-        let mut dna_store = MockDnaStore::new();
-        dna_store.expect_add_dnas::<Vec<_>>().return_const(());
-        dna_store.expect_add_entry_defs::<Vec<_>>().return_const(());
-        dna_store.expect_add_dna().return_const(());
-        dna_store
-            .expect_get()
-            .return_const(Some(dna_file.clone().into()));
-        dna_store
-            .expect_get_entry_def()
-            .return_const(EntryDef::default_with_id("thing"));
-
-        let mut conductor =
-            SweetConductor::from_builder(ConductorBuilder::with_mock_dna_store(dna_store)).await;
+        let (alice_pubkey, bob_pubkey) = SweetAgents::two(conductor.keystore()).await;
 
         let apps = conductor
             .setup_app_for_agents(
@@ -411,7 +403,7 @@ pub mod wasm_test {
                 payload: ExternIO::encode(()).unwrap(),
             })
             .await;
-        tokio::time::sleep(std::time::Duration::from_millis(4000)).await;
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
 
         expect_chain_locked(thing_fail_create_alice);
 
@@ -451,10 +443,8 @@ pub mod wasm_test {
                 vec![alice_response, bob_response],
             )
             .await;
-        tokio::time::sleep(std::time::Duration::from_millis(4000)).await;
         let _: HeaderHash = conductor.call(&alice, "create_a_thing", ()).await;
         let _: HeaderHash = conductor.call(&bobbo, "create_a_thing", ()).await;
-        tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
 
         // Header get must not error.
         let countersigned_header_bob: SignedHeaderHashed = conductor
