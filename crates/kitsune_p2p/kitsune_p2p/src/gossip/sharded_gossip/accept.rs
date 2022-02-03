@@ -58,7 +58,7 @@ impl ShardedGossipLocal {
 
         // Generate the bloom filters and new state.
         let state = self
-            .generate_blooms(
+            .generate_blooms_or_regions(
                 remote_agent_list.clone(),
                 local_agent_arcs,
                 remote_arc_set,

@@ -480,6 +480,8 @@ pub struct RoundState {
     last_touch: Instant,
     /// Amount of time before a round is considered expired.
     round_timeout: std::time::Duration,
+    /// The RegionSet we sent to our gossip partner
+    region_set_sent: Option<RegionSetXtcs>,
 }
 
 impl ShardedGossipLocal {
@@ -527,6 +529,7 @@ impl ShardedGossipLocal {
             ops_batch_queue: OpsBatchQueue::new(),
             last_touch: Instant::now(),
             round_timeout: ROUND_TIMEOUT,
+            region_set_sent: None,
         })
     }
 

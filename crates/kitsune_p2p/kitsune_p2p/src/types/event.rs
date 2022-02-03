@@ -2,7 +2,10 @@
 
 use crate::types::agent_store::AgentInfoSigned;
 use kitsune_p2p_timestamp::Timestamp;
-use kitsune_p2p_types::dht_arc::{DhtArcSet, DhtLocation};
+use kitsune_p2p_types::{
+    dht::region::RegionSetXtcs,
+    dht_arc::{DhtArcSet, DhtLocation},
+};
 use std::{collections::HashSet, sync::Arc};
 
 /// Gather a list of op-hashes from our implementor that meet criteria.
@@ -228,6 +231,15 @@ pub enum KGenReq {
         /// The records to record
         records: Vec<MetricRecord>,
     },
+
+    /// Query Region hashes for gossip
+    QueryRegionSet {
+        /// The space to query regions for
+        space: Arc<super::KitsuneSpace>,
+
+        /// Storage arcs of joined agents
+        dht_arc_set: DhtArcSet,
+    },
 }
 
 /// Generic Kitsune Respons from the imlementor
@@ -236,6 +248,8 @@ pub enum KGenRes {
     PeerExtrapCov(Vec<f64>),
     /// Record a set of metric records
     RecordMetrics(()),
+    /// Query Region hashes for gossip
+    QueryRegionSet(RegionSetXtcs),
 }
 
 type KSpace = Arc<super::KitsuneSpace>;

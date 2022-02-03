@@ -631,6 +631,14 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                     .boxed()
                     .into()));
                 }
+                KGenReq::QueryRegionSet { space, dht_arc_set } => {
+                    respond.respond(Ok(async move {
+                        let regions = todo!("query region set");
+                        Ok(KGenRes::QueryRegionSet(regions))
+                    }
+                    .boxed()
+                    .into()));
+                }
             },
             PutAgentInfoSigned {
                 peer_data, respond, ..

@@ -5,10 +5,12 @@ use std::ops::ControlFlow;
 use std::{collections::HashSet, sync::Arc};
 
 use crate::event::{
-    PutAgentInfoSignedEvt, QueryAgentsEvt, QueryOpHashesEvt, TimeWindow, TimeWindowInclusive,
+    KGenReq, KGenRes, PutAgentInfoSignedEvt, QueryAgentsEvt, QueryOpHashesEvt, TimeWindow,
+    TimeWindowInclusive,
 };
 use crate::types::event::KitsuneP2pEventSender;
 use kitsune_p2p_timestamp::Timestamp;
+use kitsune_p2p_types::dht::region::RegionSetXtcs;
 use kitsune_p2p_types::{
     agent_info::AgentInfoSigned,
     bin_types::{KitsuneAgent, KitsuneOpHash, KitsuneSpace},
@@ -256,6 +258,26 @@ pub(super) fn hash_chunks_query(
         },
     );
     Box::pin(f)
+}
+
+pub(super) async fn region_set_query(
+    evt_sender: &EventSender,
+    space: &Arc<KitsuneSpace>,
+    common_arc_set: &DhtArcSet,
+) -> KitsuneResult<RegionSetXtcs> {
+    let req = KGenReq::QueryRegionSet {
+        space: space.clone(),
+        dht_arc_set: common_arc_set.clone(),
+    };
+    if let KGenRes::QueryRegionSet(regions) = evt_sender
+        .k_gen_req(req)
+        .await
+        .map_err(KitsuneError::other)?
+    {
+        Ok(regions)
+    } else {
+        unreachable!()
+    }
 }
 
 /// Add new agent info to the p2p store.

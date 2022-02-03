@@ -46,6 +46,7 @@ impl WrapEvtSender {
         let dna_hash = match &arg {
             KGenReq::PeerExtrapCov { space, .. } => DnaHash::from_kitsune(space),
             KGenReq::RecordMetrics { space, .. } => DnaHash::from_kitsune(space),
+            KGenReq::QueryRegionSet { space, .. } => DnaHash::from_kitsune(space),
         };
         timing_trace!(
             { self.0.k_gen_req(dna_hash, arg) },

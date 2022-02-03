@@ -143,7 +143,7 @@ impl ShardedGossipLocal {
 
         // Generate the bloom filters and new state.
         let state = self
-            .generate_blooms(
+            .generate_blooms_or_regions(
                 remote_agent_list.clone(),
                 local_arcs,
                 remote_arc_set,
@@ -183,7 +183,7 @@ impl ShardedGossipLocal {
     /// - Agent bloom is only generated if this is a `Recent` gossip type.
     /// - Empty blooms are not created.
     /// - A new state is created for this round.
-    pub(super) async fn generate_blooms(
+    pub(super) async fn generate_blooms_or_regions(
         &self,
         remote_agent_list: Vec<AgentInfoSigned>,
         local_arcs: Vec<ArcInterval>,
@@ -205,9 +205,21 @@ impl ShardedGossipLocal {
                 let bloom = encode_bloom_filter(&bloom);
                 gossip.push(ShardedGossipWire::agents(bloom));
             }
+            self.next_bloom_batch(state, gossip).await
+        } else {
+            self.generate_region_set(state, gossip).await
         }
+    }
 
-        self.next_bloom_batch(state, gossip).await
+    pub(super) async fn generate_region_set(
+        &self,
+        mut state: RoundState,
+        gossip: &mut Vec<ShardedGossipWire>,
+    ) -> KitsuneResult<RoundState> {
+        let regions =
+            store::region_set_query(&self.evt_sender, &self.space, &state.common_arc_set).await?;
+        state.region_set_sent = Some(regions);
+        Ok(state)
     }
 
     /// Generate the next batch of blooms from this state.

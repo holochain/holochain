@@ -148,6 +148,7 @@ async fn partial_missing_doesnt_finish() {
                     round_timeout: std::time::Duration::MAX,
                     bloom_batch_cursor: None,
                     ops_batch_queue: OpsBatchQueue::new(),
+                    region_set_sent: None,
                 }
             }
             .into(),
@@ -196,6 +197,7 @@ async fn missing_ops_finishes() {
                     round_timeout: std::time::Duration::MAX,
                     bloom_batch_cursor: None,
                     ops_batch_queue: OpsBatchQueue::new(),
+                    region_set_sent: None,
                 }
             }
             .into(),
@@ -245,6 +247,7 @@ async fn missing_ops_doesnt_finish_awaiting_bloom_responses() {
                     round_timeout: std::time::Duration::MAX,
                     bloom_batch_cursor: None,
                     ops_batch_queue: OpsBatchQueue::new(),
+                    region_set_sent: None,
                 }
             }
             .into(),
@@ -294,6 +297,7 @@ async fn bloom_response_finishes() {
                     round_timeout: std::time::Duration::MAX,
                     bloom_batch_cursor: None,
                     ops_batch_queue: OpsBatchQueue::new(),
+                    region_set_sent: None,
                 }
             }
             .into(),
@@ -343,6 +347,7 @@ async fn bloom_response_doesnt_finish_outstanding_incoming() {
                     round_timeout: std::time::Duration::MAX,
                     bloom_batch_cursor: None,
                     ops_batch_queue: OpsBatchQueue::new(),
+                    region_set_sent: None,
                 }
             }
             .into(),
@@ -395,6 +400,7 @@ async fn no_data_still_finishes() {
                     round_timeout: std::time::Duration::MAX,
                     bloom_batch_cursor: None,
                     ops_batch_queue: OpsBatchQueue::new(),
+                    region_set_sent: None,
                 }
             }
             .into(),
@@ -418,6 +424,7 @@ async fn no_data_still_finishes() {
                     round_timeout: std::time::Duration::MAX,
                     bloom_batch_cursor: None,
                     ops_batch_queue: OpsBatchQueue::new(),
+                    region_set_sent: None,
                 }
             }
             .into(),
