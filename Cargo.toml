@@ -57,8 +57,9 @@ incremental = false
 codegen-units = 16
 
 [patch.crates-io]
-# holochain_wasmer_guest = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "wasmer-patch" }
-# holochain_wasmer_host = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "wasmer-patch" }
+# holochain_wasmer_guest = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "pr/bump-serde" }
+# holochain_wasmer_host = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "pr/bump-serde" }
+# holochain_wasmer_common = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "pr/bump-serde" }
 # holochain_serialized_bytes = { git = "https://github.com/holochain/holochain-serialization.git", branch = "develop" }
 # holochain_serialized_bytes_derive = { git = "https://github.com/holochain/holochain-serialization.git", branch = "develop" }
 # observability = { git = "https://github.com/freesig/observability.git", branch = "main" }
