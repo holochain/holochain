@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased](https://github.com/holochain/holochain/compare/hdk-v0.0.100...HEAD)
 
+## 0.0.121
+
 ## 0.0.120
 
 - docs: Add introduction to front-page and move example section up [1172](https://github.com/holochain/holochain/pull/1172)

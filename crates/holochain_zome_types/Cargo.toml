@@ -1,6 +1,6 @@
 [package]
 name = "holochain_zome_types"
-version = "0.0.22"
+version = "0.0.23"
 description = "Holochain zome types"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -14,7 +14,7 @@ edition = "2018"
 [dependencies]
 chrono = "0.4.6"
 kitsune_p2p_timestamp = { version = "0.0.5", path = "../kitsune_p2p/timestamp" }
-holo_hash = { version = "0.0.17", path = "../holo_hash" }
+holo_hash = { version = "0.0.18", path = "../holo_hash" }
 holochain_serialized_bytes = "=0.0.51"
 paste = "=1.0.5"
 serde = { version = "1.0", features = [ "derive" ] }
