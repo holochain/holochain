@@ -11,7 +11,7 @@ use holochain_types::prelude::write_fake_dna_file;
 use holochain_util::tokio_helper;
 use holochain_wasm_test_utils::TestWasm;
 use std::time::Duration;
-use tempdir::TempDir;
+use tempfile::TempDir;
 
 #[path = "../tests/test_utils/mod.rs"]
 mod test_utils;
@@ -41,11 +41,7 @@ pub fn websocket_concurrent_install(c: &mut Criterion) {
                     tokio_helper::block_forever_on(async {
                         let admin_port =
                             admin_port.fetch_add(1, std::sync::atomic::Ordering::SeqCst) as u16;
-                        let tmp_dir = TempDir::new(&format!(
-                            "websocket_concurrent_install_{}",
-                            bench_id.clone()
-                        ))
-                        .unwrap();
+                        let tmp_dir = tempfile::tempdir().unwrap();
 
                         let path = tmp_dir.path().to_path_buf();
                         let environment_path = path.clone();

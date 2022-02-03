@@ -227,7 +227,7 @@ pub mod test_utils {
     use holochain_state::prelude::*;
     use holochain_types::prelude::*;
     use std::sync::Arc;
-    use tempdir::TempDir;
+    use tempfile::TempDir;
 
     /// One of various ways to setup an app, used somewhere...
     pub async fn setup_app(
@@ -309,7 +309,7 @@ pub mod test {
     use observability;
     use std::collections::{HashMap, HashSet};
     use std::convert::TryInto;
-    use tempdir::TempDir;
+    use tempfile::TempDir;
     use uuid::Uuid;
 
     #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]

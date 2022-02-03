@@ -17,7 +17,7 @@ const ADMIN_PORT: u16 = 12909;
 #[tokio::test(flavor = "multi_thread")]
 async fn test_new_lair_conductor_integration() {
     // working temp dir
-    let tmp = tempdir::TempDir::new("new-lair-integration").unwrap();
+    let tmp = tempfile::tempdir().unwrap();
 
     // set up new lair keystore config
     let passphrase = sodoken::BufRead::from(&b"passphrase"[..]);

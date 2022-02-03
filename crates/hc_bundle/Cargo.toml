@@ -35,4 +35,4 @@ tokio = { version = "1.11", features = [ "full" ] }
 assert_cmd = "1.0"
 matches = "0.1"
 predicates = "1.0"
-tempdir = "0.3"
+tempfile = "3"

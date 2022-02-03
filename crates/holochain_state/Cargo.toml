@@ -37,7 +37,7 @@ tracing-futures = "0.2.5"
 cron = "0.9"
 async-recursion = "0.3"
 
-tempdir = { version = "0.3", optional = true }
+tempfile = { version = "3.3", optional = true }
 base64 = {version = "0.13", optional = true}
 
 # contrafact
@@ -52,7 +52,7 @@ matches = "0.1.8"
 observability = "0.1.3"
 pretty_assertions = "0.6.1"
 
-tempdir = "0.3"
+tempfile = "3.3"
 
 [features]
 default = ["test_utils"]
@@ -62,5 +62,5 @@ test_utils = [
     "holochain_zome_types/test_utils",
     "base64",
     "contrafact",
-    "tempdir",
+    "tempfile",
 ]
