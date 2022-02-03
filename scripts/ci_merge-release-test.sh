@@ -6,5 +6,6 @@
 #! nix-shell -i bash
 set +e
 git diff --exit-code
+git fetch --tags
 hc-ra --log-level=debug --workspace-path=$PWD crate apply-dev-versions --commit
 hc-release-test
