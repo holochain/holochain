@@ -82,6 +82,7 @@ pub fn test_p2p_metrics_env() -> TestEnv<DbKindP2pMetrics> {
 fn test_env<Kind: DbKindT>(kind: Kind) -> TestEnv<Kind> {
     let tmpdir = tempfile::Builder::new()
         .prefix("holochain-test-environments")
+        .suffix(&nanoid::nanoid!())
         .tempdir()
         .unwrap();
     TestEnv {
@@ -94,6 +95,7 @@ fn test_env<Kind: DbKindT>(kind: Kind) -> TestEnv<Kind> {
 pub fn test_envs_with_keystore(keystore: MetaLairClient) -> TestEnvs {
     let tempdir = tempfile::Builder::new()
         .prefix("holochain-test-environments")
+        .suffix(&nanoid::nanoid!())
         .tempdir()
         .unwrap();
     TestEnvs::with_keystore(tempdir, keystore)
@@ -103,6 +105,7 @@ pub fn test_envs_with_keystore(keystore: MetaLairClient) -> TestEnvs {
 pub fn test_environments() -> TestEnvs {
     let tempdir = tempfile::Builder::new()
         .prefix("holochain-test-environments")
+        .suffix(&nanoid::nanoid!())
         .tempdir()
         .unwrap();
     TestEnvs::new(tempdir)

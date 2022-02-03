@@ -2700,6 +2700,7 @@ dependencies = [
  "kitsune_p2p",
  "matches",
  "mockall",
+ "nanoid 0.3.0",
  "observability",
  "one_err",
  "parking_lot 0.10.2",
