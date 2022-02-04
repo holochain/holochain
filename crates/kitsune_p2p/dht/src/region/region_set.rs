@@ -219,11 +219,10 @@ mod tests {
 
     #[test]
     fn test_regions() {
-        // (-512, 512)
         let pow = 8;
         let arq = Arq::new(0.into(), pow, 4).to_bounds();
-        assert_eq!(arq.left() as i32, -512);
-        assert_eq!(arq.right(), 511 as u32);
+        assert_eq!(arq.left() as i32, 0);
+        assert_eq!(arq.right(), 1023 as u32);
 
         let topo = Topology::identity(Timestamp::from_micros(1000));
         let mut store = OpStore::new(topo.clone(), GossipParams::zero());
@@ -287,7 +286,8 @@ mod tests {
 
     #[test]
     fn test_diff() {
-        let arq = Arq::new(0.into(), 8, 4).to_bounds();
+        let arq = Arq::new(Loc::from(-(2i32.pow(8) * 2) as u32), 8, 4).to_bounds();
+        dbg!(&arq);
         let topo = Topology::identity_zero();
 
         let mut store1 = OpStore::new(topo.clone(), GossipParams::zero());

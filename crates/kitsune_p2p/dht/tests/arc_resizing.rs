@@ -167,11 +167,10 @@ fn test_degenerate_asymmetrical_coverage() {
     let view = PeerViewQ::new(strat, others);
 
     let arq = Arq::new(
-        Loc::from(0x100 / 2),
+        Loc::from(0),
         4, // log2 of 0x10
         0x10,
     );
-    assert_eq!(arq.to_interval(), ArcInterval::new(0, 0x100 - 1));
 
     let extrapolated = view.extrapolated_coverage(&arq.to_bounds());
     assert_eq!(extrapolated, 5.0);

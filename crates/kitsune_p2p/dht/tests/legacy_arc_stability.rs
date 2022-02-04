@@ -1,5 +1,5 @@
 #![cfg(feature = "testing")]
-// #![cfg(feature = "NORUN")]
+#![cfg(feature = "NORUN")]
 
 mod common;
 

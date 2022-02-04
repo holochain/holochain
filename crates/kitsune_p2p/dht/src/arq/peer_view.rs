@@ -399,12 +399,13 @@ mod tests {
     #[test]
     fn test_filtered_arqs() {
         let pow = 25;
+        let s = pow2(pow);
         let a = make_arq(pow, 0, 0x20);
         let b = make_arq(pow, 0x10, 0x30);
         let c = make_arq(pow, 0x20, 0x40);
-        assert_eq!(a.center, Loc::from(pow2(pow) * 0x10 - 1));
-        assert_eq!(b.center, Loc::from(pow2(pow) * 0x20 - 1));
-        assert_eq!(c.center, Loc::from(pow2(pow) * 0x30 - 1));
+        assert_eq!(a.center, Loc::from(s * 0x0 + s / 2));
+        assert_eq!(b.center, Loc::from(s * 0x10 + s / 2));
+        assert_eq!(c.center, Loc::from(s * 0x20 + s / 2));
         let arqs = vec![a, b, c];
         print_arqs(&arqs, 64);
         let view = PeerViewQ::new(Default::default(), arqs);

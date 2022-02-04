@@ -146,20 +146,7 @@ impl Arq {
         let s = self.spacing();
         // the offset of the central chunk
         let center = self.center.as_u32() / s;
-        let left_oriented = (*self.center - Wrapping(center * s)) < Wrapping(s / 2);
-        let offset = if left_oriented {
-            if sequence % 2 == 1 {
-                center.wrapping_sub(sequence / 2 + 1)
-            } else {
-                center.wrapping_add(sequence / 2)
-            }
-        } else {
-            if sequence % 2 == 1 {
-                center.wrapping_add(sequence / 2 + 1)
-            } else {
-                center.wrapping_sub(sequence / 2)
-            }
-        };
+        let offset = center.wrapping_add(sequence);
         SpaceSegment::new(self.power.into(), offset)
     }
 
@@ -174,13 +161,7 @@ impl Arq {
             let c = self.chunk_at(0);
             Some((c.clone(), c))
         } else {
-            let a = self.chunk_at(self.count - 2);
-            let b = self.chunk_at(self.count - 1);
-            if a.offset < b.offset {
-                Some((a, b))
-            } else {
-                Some((b, a))
-            }
+            Some((self.chunk_at(0), self.chunk_at(self.count - 1)))
         }
     }
 
@@ -232,21 +213,8 @@ impl ArqBounded for Arq {
         let s = self.spacing();
         let c = self.center.as_u32();
         let center_offset = c / s;
-        let left_oriented = c - center_offset * s < s / 2;
-        let wing = if left_oriented {
-            self.count / 2
-        } else {
-            (self.count.saturating_sub(1)) / 2
-        };
-        let offset = if self.count == 0 {
-            center_offset
-        } else if center_offset >= wing {
-            center_offset - wing
-        } else {
-            (2u64.pow(32 - self.power as u32) - wing as u64 + center_offset as u64) as u32
-        };
         ArqBounds {
-            offset: offset.into(),
+            offset: center_offset.into(),
             power: self.power,
             count: self.count,
         }
@@ -437,12 +405,13 @@ impl ArqBounds {
     /// Obviously these pseudo-centerpoints are not evenly distributed, so
     /// be careful where you use them.
     pub fn pseudocenter(&self) -> Loc {
-        let left = self.left() as u64;
-        let mut right = self.right() as u64;
-        if right < left {
-            right += 2u64.pow(32);
-        }
-        Loc::from(((right + left) / 2) as u32)
+        let s = self.spacing();
+        let center = (s * self.offset.inner()).wrapping_add(s / 2);
+        Loc::from(center as u32)
+    }
+
+    pub fn spacing(&self) -> u32 {
+        2u32.pow(self.power as u32)
     }
 
     /// Get a reference to the arq bounds's count.
@@ -567,124 +536,9 @@ mod tests {
         };
 
         assert_eq!(c.chunk_at(0).offset, 16);
-        assert_eq!(c.chunk_at(1).offset, 15);
-        assert_eq!(c.chunk_at(2).offset, 17);
-        assert_eq!(c.chunk_at(3).offset, 14);
-    }
-
-    /// A function to help make it clearer how an expected ArcInterval
-    /// is being constructed:
-    /// - p: the power
-    /// - e: the left edge of the center chunk
-    /// - l: how many chunks are to the left of `e`
-    /// - r: how many chunks are to the right of `e`
-    fn arc_interval_helper(p: u8, e: u32, l: u32, r: u32) -> ArcInterval {
-        ArcInterval::new(
-            e.wrapping_sub(2u32.pow(p as u32) * l),
-            e.wrapping_add(2u32.pow(p as u32) * r).wrapping_sub(1),
-        )
-    }
-
-    #[test]
-    fn test_interval_progression_left_oriented() {
-        let power = 2;
-        let mut a = Arq {
-            center: Loc::from(41),
-            power,
-            count: 0,
-        };
-
-        let ih = |e, l, r| arc_interval_helper(power, e, l, r);
-
-        assert_eq!(a.to_interval(), ArcInterval::Empty);
-
-        a.count = 1;
-        assert_eq!(a.to_interval(), ih(40, 0, 1));
-
-        a.count = 2;
-        assert_eq!(a.to_interval(), ih(40, 1, 1));
-
-        a.count = 3;
-        assert_eq!(a.to_interval(), ih(40, 1, 2));
-
-        a.count = 4;
-        assert_eq!(a.to_interval(), ih(40, 2, 2));
-
-        a.count = 5;
-        assert_eq!(a.to_interval(), ih(40, 2, 3));
-
-        a.count = 33;
-        // the left edge overflows
-        assert_eq!(a.to_interval(), ih(40, 16, 17));
-
-        let c = u32::MAX - 41 + 1;
-        let r = u32::MAX - 44 + 1;
-        // the right edge overflows
-        a.center = Loc::from(c);
-        assert_eq!(a.to_interval(), ih(r, 16, 17));
-    }
-
-    #[test]
-    fn test_interval_progression_right_oriented() {
-        let power = 2;
-        let mut a = Arq {
-            center: Loc::from(42),
-            power,
-            count: 0,
-        };
-
-        let ih = |e, l, r| arc_interval_helper(power, e, l, r);
-
-        assert_eq!(a.to_interval(), ArcInterval::Empty);
-
-        a.count = 1;
-        assert_eq!(a.to_interval(), ih(40, 0, 1));
-
-        a.count = 2;
-        assert_eq!(a.to_interval(), ih(40, 0, 2));
-
-        a.count = 3;
-        assert_eq!(a.to_interval(), ih(40, 1, 2));
-
-        a.count = 4;
-        assert_eq!(a.to_interval(), ih(40, 1, 3));
-
-        a.count = 5;
-        assert_eq!(a.to_interval(), ih(40, 2, 3));
-
-        a.count = 33;
-        // the left edge overflows
-        assert_eq!(a.to_interval(), ih(40, 16, 17));
-
-        let c = u32::MAX - 42 + 1;
-        let r = u32::MAX - 44 + 1;
-        // the right edge overflows
-        a.center = Loc::from(c);
-        assert_eq!(a.to_interval(), ih(r, 16, 17));
-    }
-
-    #[test]
-    fn arq_center_parity() {
-        // An odd chunk count leads to the same number of chunks around the central chunk.
-        let mut c = Arq {
-            center: Loc::from(42),
-            power: 2,
-            count: 5,
-        };
-
-        let ih = |e, l, r| arc_interval_helper(2, e, l, r);
-
-        assert_eq!(c.to_interval(), ih(40, 2, 3));
-
-        // An even chunk count leads to the new chunk being added to the right
-        // in this case, since 42 is closer to the right edge of its containing
-        // chunk (43) than to the left edge (40)
-        c.count = 6;
-        assert_eq!(c.to_interval(), ih(40, 2, 4));
-
-        // If the center is shifted by 1, then the opposite is true.
-        c.center = Loc::from(*c.center - Wrapping(1));
-        assert_eq!(c.to_interval(), ih(40, 3, 3));
+        assert_eq!(c.chunk_at(1).offset, 17);
+        assert_eq!(c.chunk_at(2).offset, 18);
+        assert_eq!(c.chunk_at(3).offset, 19);
     }
 
     #[test]
@@ -720,31 +574,16 @@ mod tests {
     fn to_bounds() {
         let pow: u8 = 4;
         {
-            let a = Arq::new((8 * 2u32.pow(pow.into())).into(), pow, 16);
+            let a = Arq::new((2u32.pow(pow.into()) - 1).into(), pow, 16);
             let b = a.to_bounds();
             assert_eq!(b.offset(), SpaceCoord::from(0));
             assert_eq!(b.count(), 16);
         }
         {
-            let a = Arq::new((8 * 2u32.pow(pow.into())).into(), pow, 18);
+            let a = Arq::new(4.into(), pow, 18);
             let b = a.to_bounds();
-            dbg!(b);
-            assert_eq!(
-                b.offset().exp(pow),
-                (a.center().as_i32() - 9 * 2i32.pow(pow.into())) as u32
-            );
             assert_eq!(b.count(), 18);
         }
-    }
-
-    #[test]
-    fn to_bounds_regression() {
-        // 3264675840 -> 3264675840
-        // 3264708608 -> 3264675840
-        let a1 = Arq::new(3264675840u32.into(), 16, 6);
-        // let a2 = Arq::new((3264675840u32 + 3000).into(), 16, 6);
-        let a2 = Arq::new(3264708608u32.into(), 16, 6);
-        assert_eq!(a1.to_bounds().offset + 1.into(), a2.to_bounds().offset);
     }
 
     #[test]

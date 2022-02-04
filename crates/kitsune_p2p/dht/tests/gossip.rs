@@ -22,8 +22,8 @@ fn test_basic() {
     let gopa = GossipParams::new(1.into(), 0);
     let ts = |t: u32| TimeCoord::from(t).to_timestamp(&topo);
 
-    let alice_arq = Arq::new(0.into(), 8, 4);
-    let bobbo_arq = Arq::new(128.into(), 8, 4);
+    let alice_arq = Arq::new((-128i32 as u32).into(), 8, 4);
+    let bobbo_arq = Arq::new(0.into(), 8, 4);
     let mut alice = TestNode::new(topo.clone(), gopa, alice_arq);
     let mut bobbo = TestNode::new(topo.clone(), gopa, bobbo_arq);
 

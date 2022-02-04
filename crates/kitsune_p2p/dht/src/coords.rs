@@ -192,9 +192,9 @@ impl Dimension {
             // so at a target coverage of 100, each arc will be ~430,000 in length
             // which divided by 16 is ~2700, which is about 2^15.
             // So, we'll go down to 2^12.
-            // This means we only need 24 bits to represent any location.
+            // This means we only need 20 bits to represent any location.
             quantum: 2u32.pow(quantum_power),
-            bit_depth: 24,
+            bit_depth: 20,
         }
     }
 
