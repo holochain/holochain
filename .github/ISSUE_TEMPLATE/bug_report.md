@@ -8,7 +8,7 @@ assignees: ''
 ---
 
 **Describe the bug**
-A clear and concise description of what the bug is.
+A clear and concise description of what the bug is, how you encountered it, and the text of any error you received.
 
 **Steps to reproduce**
 - Create a minimal reproduction project using the scaffolding tool: `npm init @holochain`
