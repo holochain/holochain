@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+- Bump `holochain_wasmer_*` crates to v0.0.77 which relaxes the version requirements on `serde`. [#1204](https://github.com/holochain/holochain/pull/1204)
+
 # 20220202.112225
 
 ## [holochain-0.0.125](crates/holochain/CHANGELOG.md#0.0.125)
