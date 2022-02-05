@@ -481,7 +481,7 @@ pub struct RoundState {
     /// Amount of time before a round is considered expired.
     round_timeout: std::time::Duration,
     /// The RegionSet we sent to our gossip partner
-    region_set_sent: Option<RegionSetXtcs>,
+    region_set_sent: RegionSetXtcs,
 }
 
 impl ShardedGossipLocal {
@@ -712,8 +712,15 @@ impl ShardedGossipLocal {
                 }
                 None => Vec::with_capacity(0),
             },
-            ShardedGossipWire::OpRegions(OpRegions { regions }) => {
-                todo!("implement region set gossip")
+            ShardedGossipWire::OpRegions(OpRegions { region_set }) => {
+                if let Some(state) = self.get_state(&cert)? {
+                    let sent = state.region_set_sent;
+                    let regions = sent.diff(region_set)?;
+                    todo!("ensure that different region sets can be diffed.");
+                    todo!("lookup regions, send missing ops.");
+                } else {
+                    vec![]
+                }
             }
             ShardedGossipWire::MissingOps(MissingOps { ops, finished }) => {
                 let mut gossip = Vec::with_capacity(0);
@@ -945,7 +952,7 @@ kitsune_p2p_types::write_codec_enum! {
         /// Send Op region hashes
         OpRegions(0x51) {
             /// The region hashes for all common ops
-            regions.0: RegionSetXtcs,
+            region_set.0: RegionSetXtcs,
         },
 
         /// Any ops that were missing from the remote bloom.
