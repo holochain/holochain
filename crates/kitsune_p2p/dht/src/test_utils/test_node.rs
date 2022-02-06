@@ -46,7 +46,7 @@ impl TestNode {
                     .collect::<Vec<_>>()
             })
             .collect::<Vec<_>>();
-        RegionSetXtcs { coords, data }.into()
+        RegionSetXtcs::from_data(coords, data).into()
     }
 
     pub fn ascii_arq_and_ops(&self, i: usize, len: usize) -> String {
@@ -147,6 +147,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(obsolete)]
     fn gossip_regression() {
         let topo = Topology::identity_zero();
         let gopa = GossipParams::zero();

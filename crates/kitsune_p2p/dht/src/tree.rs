@@ -29,26 +29,23 @@ impl<T> TreeDataConstraints for T where
 }
 
 #[derive(Clone)]
-pub struct Tree<T: TreeDataConstraints = RegionData> {
-    pub(crate) tree: Fenwick2<T>,
+pub struct Tree<D: TreeDataConstraints = RegionData> {
+    pub(crate) tree: RegionSet<D>,
     topo: Topology,
 }
 
-impl<T: TreeDataConstraints> Tree<T> {
-    pub fn new(topo: Topology) -> Self {
+impl<D: TreeDataConstraints> Tree<D> {
+    pub fn new(topo: Topology, region_set: RegionSet<D>) -> Self {
         Self {
             // TODO: take topology into account to reduce max size
             // TODO: can use a smaller time dimension
-            tree: Fenwick2::new((SpaceCoord::MAX as usize + 1, TimeCoord::MAX as usize + 1)),
+            tree: region_set,
             topo,
         }
     }
 
-    pub fn lookup(&self, region: &RegionBounds) -> T {
-        let (sa, sb) = region.x;
-        let (ta, tb) = region.t;
-        self.tree
-            .query((sa.inner(), ta.inner()), (sb.inner(), tb.inner()))
+    pub fn lookup(&self, region: &RegionBounds) -> D {
+        self.tree.query(region)
     }
 
     /// Get a reference to the tree's topo.
@@ -56,8 +53,8 @@ impl<T: TreeDataConstraints> Tree<T> {
         &self.topo
     }
 
-    pub fn add(&mut self, (coords, data): (SpacetimeCoords, T)) {
-        self.tree.update(coords.to_tuple(), data)
+    pub fn add(&mut self, (coords, data): (SpacetimeCoords, D)) {
+        self.tree.update(coords, data)
     }
 }
 

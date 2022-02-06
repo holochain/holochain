@@ -50,7 +50,7 @@ pub trait AccessOpStore<D: TreeDataConstraints = RegionData, O: OpRegion<D> = Op
                     .collect::<Vec<_>>()
             })
             .collect::<Vec<_>>();
-        RegionSetXtcs { coords, data }.into()
+        RegionSetXtcs::from_data(coords, data).into()
     }
 }
 

@@ -19,7 +19,7 @@ impl<D: TreeDataConstraints, O: OpRegion<D>> OpStore<D, O> {
     pub fn new(topo: Topology, gossip_params: GossipParams) -> Self {
         Self {
             ops: Default::default(),
-            tree: Tree::new(topo),
+            tree: Tree::new(topo, todo!()),
             gossip_params,
         }
     }

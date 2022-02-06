@@ -1,3 +1,5 @@
+use once_cell::sync::OnceCell;
+
 use crate::{
     arq::*,
     coords::*,
@@ -6,8 +8,9 @@ use crate::{
     op::OpRegion,
     tree::TreeDataConstraints,
 };
+use derivative::Derivative;
 
-use super::{Region, RegionCoords, RegionData};
+use super::{Region, RegionBounds, RegionCoords, RegionData};
 
 #[derive(Debug, PartialEq, Eq, derive_more::Constructor, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "testing", derive(Clone))]
@@ -79,6 +82,14 @@ impl<D: TreeDataConstraints> RegionSet<D> {
         }
     }
 
+    pub fn query(&self, bounds: &RegionBounds) -> ! {
+        todo!()
+    }
+
+    pub fn update(&self, c: SpacetimeCoords, d: D) -> ! {
+        todo!()
+    }
+
     /// Find a set of Regions which represents the intersection of the two
     /// input RegionSets.
     pub fn diff(self, other: Self) -> GossipResult<Vec<Region<D>>> {
@@ -98,11 +109,17 @@ impl<D: TreeDataConstraints> RegionSet<D> {
 /// The coordinates for the regions are specified by a few values.
 /// The data to match the coordinates are specified in a 2D vector which must
 /// correspond to the generated coordinates.
-#[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Derivative)]
+#[derivative(PartialEq, Eq)]
 #[cfg_attr(feature = "testing", derive(Clone))]
 pub struct RegionSetXtcs<D: TreeDataConstraints = RegionData> {
     /// The generator for the coordinates
     pub(crate) coords: RegionCoordSetXtcs,
+
+    /// the actual coordinates as generated
+    #[derivative(PartialEq = "ignore")]
+    #[serde(skip)]
+    pub(crate) region_coords: OnceCell<Vec<RegionCoords>>,
 
     /// The outer vec corresponds to the spatial segments;
     /// the inner vecs are the time segments.
@@ -115,10 +132,19 @@ impl<D: TreeDataConstraints> RegionSetXtcs<D> {
         Self {
             coords: RegionCoordSetXtcs::empty(),
             data: vec![],
+            region_coords: OnceCell::new(),
         }
     }
 
-    pub fn new<O: OpRegion<D>, S: AccessOpStore<D, O>>(
+    pub fn from_data(coords: RegionCoordSetXtcs, data: Vec<Vec<D>>) -> Self {
+        Self {
+            coords,
+            data,
+            region_coords: OnceCell::new(),
+        }
+    }
+
+    pub fn from_store<O: OpRegion<D>, S: AccessOpStore<D, O>>(
         store: &S,
         coords: RegionCoordSetXtcs,
     ) -> Self {
@@ -130,7 +156,11 @@ impl<D: TreeDataConstraints> RegionSetXtcs<D> {
                     .collect()
             })
             .collect();
-        Self { coords, data }
+        Self {
+            coords,
+            data,
+            region_coords: OnceCell::new(),
+        }
     }
 
     pub fn count(&self) -> usize {
@@ -242,7 +272,7 @@ mod tests {
         // since the arq covers exactly half of the ops
         let times = TelescopingTimes::new(TimeCoord::from(11000));
         let coords = RegionCoordSetXtcs::new(times, ArqBoundsSet::single(arq));
-        let rset = RegionSetXtcs::new(&store, coords);
+        let rset = RegionSetXtcs::from_store(&store, coords);
         assert_eq!(
             rset.data.concat().iter().map(|r| r.count).sum::<u32>() as usize,
             nx * nt / 2
@@ -261,8 +291,8 @@ mod tests {
         let coords_a = RegionCoordSetXtcs::new(tt_a, ArqBoundsSet::single(arq.clone()));
         let coords_b = RegionCoordSetXtcs::new(tt_b, ArqBoundsSet::single(arq.clone()));
 
-        let mut rset_a = RegionSetXtcs::new(&store, coords_a);
-        let mut rset_b = RegionSetXtcs::new(&store, coords_b);
+        let mut rset_a = RegionSetXtcs::from_store(&store, coords_a);
+        let mut rset_b = RegionSetXtcs::from_store(&store, coords_b);
         assert_ne!(rset_a.data, rset_b.data);
 
         rset_a.rectify(&mut rset_b).unwrap();
@@ -309,8 +339,8 @@ mod tests {
             ArqBoundsSet::single(arq.clone()),
         );
 
-        let rset_a = RegionSetXtcs::new(&store1, coords_a);
-        let rset_b = RegionSetXtcs::new(&store2, coords_b);
+        let rset_a = RegionSetXtcs::from_store(&store1, coords_a);
+        let rset_b = RegionSetXtcs::from_store(&store2, coords_b);
         assert_ne!(rset_a.data, rset_b.data);
 
         let diff = rset_a.clone().diff(rset_b.clone()).unwrap();
