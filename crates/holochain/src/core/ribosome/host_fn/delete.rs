@@ -23,11 +23,11 @@ pub fn delete<'a>(
             ..
         } => {
             let DeleteInput {
-                deletes_header_address,
+                deletes_header_hash,
                 chain_top_ordering,
             } = input;
             let deletes_entry_address =
-                get_original_address(call_context.clone(), deletes_header_address.clone())?;
+                get_original_address(call_context.clone(), deletes_header_hash.clone())?;
 
             let host_access = call_context.host_context();
 
@@ -39,7 +39,7 @@ pub fn delete<'a>(
                     .as_ref()
                     .expect("Must have source chain if write_workspace access is given");
                 let header_builder = builder::Delete {
-                    deletes_address: deletes_header_address,
+                    deletes_address: deletes_header_hash,
                     deletes_entry_address,
                 };
                 let header_hash = source_chain
@@ -56,11 +56,14 @@ pub fn delete<'a>(
                 Ok(header_hash)
             })
         }
-        _ => Err(WasmError::Host(RibosomeError::HostFnPermissions(
-            call_context.zome.zome_name().clone(),
-            call_context.function_name().clone(),
-            "delete".into()
-        ).to_string()))
+        _ => Err(WasmError::Host(
+            RibosomeError::HostFnPermissions(
+                call_context.zome.zome_name().clone(),
+                call_context.function_name().clone(),
+                "delete".into(),
+            )
+            .to_string(),
+        )),
     }
 }
 

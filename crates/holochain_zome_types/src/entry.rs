@@ -324,7 +324,7 @@ impl UpdateInput {
 #[derive(PartialEq, Debug, Deserialize, Serialize, Clone)]
 pub struct DeleteInput {
     /// Header of the element being deleted.
-    pub deletes_header_address: holo_hash::HeaderHash,
+    pub deletes_header_hash: holo_hash::HeaderHash,
     /// Chain top ordering behaviour for the delete.
     pub chain_top_ordering: ChainTopOrdering,
 }
@@ -332,20 +332,20 @@ pub struct DeleteInput {
 impl DeleteInput {
     /// Constructor.
     pub fn new(
-        deletes_header_address: holo_hash::HeaderHash,
+        deletes_header_hash: holo_hash::HeaderHash,
         chain_top_ordering: ChainTopOrdering,
     ) -> Self {
         Self {
-            deletes_header_address,
+            deletes_header_hash,
             chain_top_ordering,
         }
     }
 }
 
 impl From<holo_hash::HeaderHash> for DeleteInput {
-    fn from(deletes_header_address: holo_hash::HeaderHash) -> Self {
+    fn from(deletes_header_hash: holo_hash::HeaderHash) -> Self {
         Self {
-            deletes_header_address,
+            deletes_header_hash,
             chain_top_ordering: ChainTopOrdering::default(),
         }
     }
