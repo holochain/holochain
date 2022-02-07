@@ -341,3 +341,12 @@ impl DeleteInput {
         }
     }
 }
+
+impl From<holo_hash::HeaderHash> for DeleteInput {
+    fn from(deletes_header_address: holo_hash::HeaderHash) -> Self {
+        Self {
+            deletes_header_address,
+            chain_top_ordering: ChainTopOrdering::default(),
+        }
+    }
+}
