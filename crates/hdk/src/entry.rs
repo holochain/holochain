@@ -447,7 +447,7 @@ macro_rules! app_entry {
             fn try_from(element: &$crate::prelude::Element) -> Result<Self, Self::Error> {
                 Ok(match element.entry() {
                     ElementEntry::Present(entry) => Self::try_from(entry)?,
-                    _ => return Err(Self::Error::Guest(format!("Tried to deserialize an element, expecting it to contain entry data, but there was none. Element HeaderHash: {}", element.header_hashed().as_hash()))),
+                    _ => return Err(Self::Error::Guest(format!("Tried to deserialize an element, expecting it to contain entry data, but there was none. Element HeaderHash: {}", element.header_address()))),
                 })
             }
         }

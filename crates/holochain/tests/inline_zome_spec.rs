@@ -679,7 +679,7 @@ async fn insert_source_chain() {
 }
 
 async fn make_element(keystore: &MetaLairClient, header: Header) -> Element {
-    let shh = SignedHeaderHashed::new(
+    let shh = SignedHeaderHashed::sign(
         keystore,
         HeaderHashed::from_content_sync(header.clone().into()),
     )
