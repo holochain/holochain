@@ -24,9 +24,6 @@ use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentResult;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
-use crate::core::ribosome::guest_callback::validate_link::ValidateLinkHostAccess;
-use crate::core::ribosome::guest_callback::validate_link::ValidateLinkInvocation;
-use crate::core::ribosome::guest_callback::validate_link::ValidateLinkResult;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageInvocation;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
 use crate::core::ribosome::guest_callback::CallIterator;
@@ -103,7 +100,6 @@ pub enum HostContext {
     Init(InitHostAccess),
     MigrateAgent(MigrateAgentHostAccess),
     PostCommit(PostCommitHostAccess), // MAYBE: add emit_signal access here?
-    ValidateCreateLink(ValidateLinkHostAccess),
     Validate(ValidateHostAccess),
     ValidationPackage(ValidationPackageHostAccess),
     ZomeCall(ZomeCallHostAccess),
@@ -115,7 +111,6 @@ impl From<&HostContext> for HostFnAccess {
             HostContext::ZomeCall(access) => access.into(),
             HostContext::GenesisSelfCheck(access) => access.into(),
             HostContext::Validate(access) => access.into(),
-            HostContext::ValidateCreateLink(access) => access.into(),
             HostContext::Init(access) => access.into(),
             HostContext::EntryDefs(access) => access.into(),
             HostContext::MigrateAgent(access) => access.into(),
@@ -134,8 +129,7 @@ impl HostContext {
             | Self::MigrateAgent(MigrateAgentHostAccess { workspace, .. })
             | Self::PostCommit(PostCommitHostAccess { workspace, .. }) => workspace.into(),
             Self::ValidationPackage(ValidationPackageHostAccess { workspace, .. })
-            | Self::Validate(ValidateHostAccess { workspace, .. })
-            | Self::ValidateCreateLink(ValidateLinkHostAccess { workspace, .. }) => workspace,
+            | Self::Validate(ValidateHostAccess { workspace, .. }) => workspace,
             _ => panic!(
                 "Gave access to a host function that uses the workspace without providing a workspace"
             ),
@@ -174,8 +168,7 @@ impl HostContext {
             | Self::Init(InitHostAccess { network, .. })
             | Self::PostCommit(PostCommitHostAccess { network, .. })
             | Self::ValidationPackage(ValidationPackageHostAccess { network, .. })
-            | Self::Validate(ValidateHostAccess { network, .. })
-            | Self::ValidateCreateLink(ValidateLinkHostAccess { network, .. }) => network,
+            | Self::Validate(ValidateHostAccess { network, .. }) => network,
             _ => panic!(
                 "Gave access to a host function that uses the network without providing a network"
             ),
@@ -251,6 +244,7 @@ impl FnComponents {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(test, derive(arbitrary::Arbitrary))]
 pub enum ZomesToInvoke {
     All,
     One(Zome),
@@ -560,12 +554,6 @@ pub trait RibosomeT: Sized + std::fmt::Debug {
         access: ValidateHostAccess,
         invocation: ValidateInvocation,
     ) -> RibosomeResult<ValidateResult>;
-
-    fn run_validate_link<I: Invocation + 'static>(
-        &self,
-        access: ValidateLinkHostAccess,
-        invocation: ValidateLinkInvocation<I>,
-    ) -> RibosomeResult<ValidateLinkResult>;
 
     /// Runs the specified zome fn. Returns the cursor used by HDK,
     /// so that it can be passed on to source chain manager for transactional writes

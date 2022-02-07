@@ -37,6 +37,7 @@ pub mod link;
 pub mod metadata;
 #[allow(missing_docs)]
 pub mod migrate_agent;
+pub mod op;
 pub mod prelude;
 pub mod query;
 pub mod request;
@@ -48,8 +49,6 @@ pub use kitsune_p2p_timestamp as timestamp;
 pub mod trace;
 #[allow(missing_docs)]
 pub mod validate;
-#[allow(missing_docs)]
-pub mod validate_link;
 /// Tracking versions between the WASM host and guests and other interfaces.
 ///
 /// Needed to ensure compatibility as code develops.

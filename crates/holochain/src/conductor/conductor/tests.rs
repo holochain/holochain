@@ -19,6 +19,7 @@ use holochain_state::prelude::*;
 use holochain_types::test_utils::fake_cell_id;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::WebsocketSender;
+use holochain_zome_types::op::Op;
 use kitsune_p2p_types::dependencies::lair_keystore_api_0_0::LairError;
 use maplit::hashset;
 use matches::assert_matches;
@@ -698,12 +699,11 @@ However, when wasm panics, it returns an error anyway, so the other similar test
 which tests for validation errors should be sufficient."]
 async fn test_cells_disable_on_validation_panic() {
     observability::test_run().ok();
-    let bad_zome =
-        InlineZome::new_unique(Vec::new()).callback("validate", |_api, _data: ValidateData| {
-            panic!("intentional panic during validation");
-            #[allow(unreachable_code)]
-            Ok(ValidateResult::Valid)
-        });
+    let bad_zome = InlineZome::new_unique(Vec::new()).callback("validate", |_api, _data: Op| {
+        panic!("intentional panic during validation");
+        #[allow(unreachable_code)]
+        Ok(ValidateResult::Valid)
+    });
     let mut conductor = SweetConductor::from_standard_config().await;
 
     // This may be an error, depending on if validation runs before or after
@@ -752,10 +752,11 @@ async fn test_bad_entry_validation_after_genesis_returns_zome_call_error() {
     observability::test_run().ok();
     let unit_entry_def = EntryDef::default_with_id("unit");
     let bad_zome = InlineZome::new_unique(vec![unit_entry_def.clone()])
-        .callback("validate_create_entry", |_api, _data: ValidateData| {
-            Ok(ValidateResult::Invalid(
-                "intentional invalid result for testing".into(),
-            ))
+        .callback("validate", |_api, op: Op| match op {
+            Op::StoreEntry { header, .. } if header.header.app_entry_type().is_some() => Ok(
+                ValidateResult::Invalid("intentional invalid result for testing".into()),
+            ),
+            _ => Ok(ValidateResult::Valid),
         })
         .callback("create", move |api, ()| {
             let entry_def_id: EntryDefId = unit_entry_def.id.clone();
@@ -797,7 +798,7 @@ async fn test_bad_entry_validation_after_genesis_returns_zome_call_error() {
 //   Otherwise, we have to devise a way to discover whether a panic happened
 //   during genesis or not.
 // NOTE: we need a test with a failure during a validation callback that happens
-//       *inline*. It's not enough to have a failing validate_create_entry for
+//       *inline*. It's not enough to have a failing validate for
 //       instance, because that failure will be returned by the zome call.
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "need to figure out how to write this test"]
@@ -807,10 +808,15 @@ async fn test_apps_disable_on_panic_after_genesis() {
     let bad_zome = InlineZome::new_unique(vec![unit_entry_def.clone()])
         // We need a different validation callback that doesn't happen inline
         // so we can cause failure in it. But it must also be after genesis.
-        .callback("validate_create_entry", |_api, _data: ValidateData| {
-            // Trigger a deserialization error
-            let _: Entry = SerializedBytes::try_from(())?.try_into()?;
-            Ok(ValidateResult::Valid)
+        .callback("validate", |_api, op: Op| {
+            match op {
+                Op::StoreEntry { header, .. } if header.header.app_entry_type().is_some() => {
+                    // Trigger a deserialization error
+                    let _: Entry = SerializedBytes::try_from(())?.try_into()?;
+                    Ok(ValidateResult::Valid)
+                }
+                _ => Ok(ValidateResult::Valid),
+            }
         })
         .callback("create", move |api, ()| {
             let entry_def_id: EntryDefId = unit_entry_def.id.clone();
