@@ -250,18 +250,14 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
             Ok(_) => (),
             // These are the two errors that can
             // occur if the database is not valid.
-            err
-            @
-            Err(Error::SqliteFailure(
+            err @ Err(Error::SqliteFailure(
                 rusqlite::ffi::Error {
                     code: ErrorCode::DatabaseCorrupt,
                     ..
                 },
                 ..,
             ))
-            | err
-            @
-            Err(Error::SqliteFailure(
+            | err @ Err(Error::SqliteFailure(
                 rusqlite::ffi::Error {
                     code: ErrorCode::NotADatabase,
                     ..
