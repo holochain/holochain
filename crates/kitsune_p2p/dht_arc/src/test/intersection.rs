@@ -40,7 +40,6 @@ fn test_intersection_at_limits() {
 }
 
 #[test]
-// @maackle Can we delete this if we don't care about edge case?
 #[ignore = "This test should pass, but doesn't.
 It seems to highlight a weird edge case in the underlying `intervallum` crate,
 but shouldn't have an impact on our use"]

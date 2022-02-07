@@ -41,43 +41,6 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    // @neonphog Is this test of any use?
-    #[ignore] // david.b disabled while we're full sync, not actually making
-              //         get requests
-    async fn test_transport_multi_coms() -> Result<(), KitsuneP2pError> {
-        observability::test_run().ok();
-        let (harness, _evt) = spawn_test_harness_mem().await?;
-
-        let space = harness.add_space().await?;
-        let (a1, p2p1) = harness.add_direct_agent("one".into()).await?;
-        let (a2, _p2p2) = harness.add_direct_agent("two".into()).await?;
-        let (a3, _p2p3) = harness.add_direct_agent("tre".into()).await?;
-
-        // needed until we have some way of bootstrapping
-        harness.magic_peer_info_exchange().await?;
-
-        let mut input = actor::RpcMulti::new(
-            &Default::default(),
-            space,
-            TestVal::test_val(),
-            b"test-multi-request".to_vec(),
-        );
-        input.max_remote_agent_count = 5;
-        input.max_timeout = kitsune_p2p_types::KitsuneTimeout::from_millis(200);
-        let res = p2p1.rpc_multi(input).await.unwrap();
-
-        assert_eq!(3, res.len());
-        for r in res {
-            let data = String::from_utf8_lossy(&r.response);
-            assert_eq!("echo: test-multi-request", &data);
-            assert!(r.agent == a1 || r.agent == a2 || r.agent == a3);
-        }
-
-        harness.ghost_actor_shutdown().await?;
-        Ok(())
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
     async fn test_peer_info_store() -> Result<(), KitsuneP2pError> {
         observability::test_run().ok();
 
