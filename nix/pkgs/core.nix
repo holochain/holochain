@@ -27,7 +27,7 @@ rec {
     cargo test --workspace --exclude holochain --exclude release-automation --lib --tests --profile fast-test -- --nocapture
     # run all the wasm tests (within wasm) with the conductor mocked
     cargo check --all-targets --lib --manifest-path=crates/test_utils/wasm/wasm_workspace/Cargo.toml --all-features
-    cargo test --lib --manifest-path=crates/test_utils/wasm/wasm_workspace/Cargo.toml --all-features --profile fast-test -- --nocapture
+    cargo test --lib --manifest-path=crates/test_utils/wasm/wasm_workspace/Cargo.toml --all-features -- --nocapture
   '';
 
   hcReleaseAutomationTest = writeShellScriptBin "hc-release-automation-test" ''
