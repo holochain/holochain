@@ -22,6 +22,7 @@ sparse-fenwick = { path = "/home/michael/Holo/sparse-fenwick" }
 # sparse-fenwick = { path = "/home/michael/Holo/sparse-fenwick" }
 # sparse-fenwick = { git = "https://github.com/holochain/sparse-fenwick-rs.git", branch = "fenwick" }
 statrs = "0.15"
+thiserror = "1.0"
 tracing = "0.1.29"
 
 [dev-dependencies]
