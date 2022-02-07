@@ -11,7 +11,7 @@ mod app_bundle;
 mod app_manifest;
 mod dna_gamut;
 pub mod error;
-use crate::{dna::DnaBundle, properties::YamlProperties};
+use crate::dna::DnaBundle;
 pub use app_bundle::*;
 pub use app_manifest::app_manifest_validated::*;
 pub use app_manifest::*;

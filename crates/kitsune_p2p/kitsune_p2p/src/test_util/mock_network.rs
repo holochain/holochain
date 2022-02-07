@@ -183,6 +183,9 @@ pub fn mock_network(
         response_map,
     };
     let network = Arc::new(network);
+    mock_network
+        .expect_local_cert()
+        .returning(move || vec![0; 32].into());
     mock_network.expect_bind().returning(move |local_addr, _| {
         let network = network.clone();
         async move {
@@ -378,6 +381,8 @@ async fn new_incoming(network: Arc<MockNetwork>, connection: Arc<MockInConnectio
             async move { Ok(out) }.boxed()
         }
     });
+    m.expect_close()
+        .returning(move |_, _| async move {}.boxed());
     let con: Arc<dyn ConAdapt> = Arc::new(m);
     (con, in_chan)
 }

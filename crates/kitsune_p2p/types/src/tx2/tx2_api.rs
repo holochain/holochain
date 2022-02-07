@@ -208,6 +208,7 @@ fn rmap_insert<C: Codec + 'static + Send + Unpin>(
 pub struct Tx2ConHnd<C: Codec + 'static + Send + Unpin> {
     local_cert: Tx2Cert,
     con: ConHnd,
+    #[allow(dead_code)]
     url: TxUrl,
     rmap: ShareRMap<C>,
     metrics: Arc<Tx2ApiMetrics>,

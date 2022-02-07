@@ -40,8 +40,7 @@ async fn call_admin() {
     // NOTE: This is a full integration test that
     // actually runs the holochain binary
 
-    // MAYBE: B-01453: can we make this port 0 and find out the dynamic port later?
-    let port = 9909;
+    let port = 0;
 
     let tmp_dir = TempDir::new("conductor_cfg").unwrap();
     let path = tmp_dir.path().to_path_buf();
@@ -55,14 +54,15 @@ async fn call_admin() {
         vec![(TestWasm::Foo.into(), TestWasm::Foo.into())],
     );
 
-    let _holochain = start_holochain(config_path.clone()).await;
+    let (_holochain, port) = start_holochain(config_path.clone()).await;
+    let port = port.await.unwrap();
 
     let (mut client, _) = websocket_client_by_port(port).await.unwrap();
 
     let original_dna_hash = dna.dna_hash().clone();
 
     // Make properties
-    let properties = holochain_types::properties::YamlProperties::new(
+    let properties = holochain_zome_types::properties::YamlProperties::new(
         serde_yaml::from_str(
             r#"
 test: "example"
@@ -112,9 +112,7 @@ async fn call_zome() {
     // NOTE: This is a full integration test that
     // actually runs the holochain binary
 
-    // MAYBE: B-01453: can we make this port 0 and find out the dynamic port later?
-    let admin_port = 9910;
-    let app_port = 9913;
+    let admin_port = 0;
 
     let tmp_dir = TempDir::new("conductor_cfg_2").unwrap();
     let path = tmp_dir.path().to_path_buf();
@@ -122,7 +120,8 @@ async fn call_zome() {
     let config = create_config(admin_port, environment_path);
     let config_path = write_config(path, &config);
 
-    let holochain = start_holochain(config_path.clone()).await;
+    let (holochain, admin_port) = start_holochain(config_path.clone()).await;
+    let admin_port = admin_port.await.unwrap();
 
     let (mut client, _) = websocket_client_by_port(admin_port).await.unwrap();
     let (_, receiver2) = websocket_client_by_port(admin_port).await.unwrap();
@@ -164,8 +163,7 @@ async fn call_zome() {
     assert_matches!(response, AdminResponse::AppEnabled { .. });
 
     // Attach App Interface
-    let app_port_rcvd = attach_app_interface(&mut client, Some(app_port)).await;
-    assert_eq!(app_port, app_port_rcvd);
+    let app_port = attach_app_interface(&mut client, None).await;
 
     // Call Zome
     tracing::info!("Calling zome");
@@ -187,9 +185,20 @@ async fn call_zome() {
 
     // Call zome after restart
     tracing::info!("Restarting conductor");
-    let _holochain = start_holochain(config_path).await;
+    let (_holochain, admin_port) = start_holochain(config_path).await;
+    let admin_port = admin_port.await.unwrap();
+
+    let (mut client, _) = websocket_client_by_port(admin_port).await.unwrap();
 
     tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
+
+    let request = AdminRequest::ListAppInterfaces;
+    let response = client.request(request);
+    let response = check_timeout(response, 3000).await;
+    let app_port = match response {
+        AdminResponse::AppInterfacesListed(ports) => *ports.first().unwrap(),
+        _ => panic!("Unexpected response"),
+    };
 
     // Call Zome again on the existing app interface port
     tracing::info!("Calling zome again");
@@ -260,8 +269,7 @@ async fn emit_signals() {
     // NOTE: This is a full integration test that
     // actually runs the holochain binary
 
-    // MAYBE: B-01453: can we make this port 0 and find out the dynamic port later?
-    let admin_port = 9911;
+    let admin_port = 0;
 
     let tmp_dir = TempDir::new("conductor_cfg_emit_signals").unwrap();
     let path = tmp_dir.path().to_path_buf();
@@ -269,7 +277,8 @@ async fn emit_signals() {
     let config = create_config(admin_port, environment_path);
     let config_path = write_config(path, &config);
 
-    let _holochain = start_holochain(config_path.clone()).await;
+    let (_holochain, admin_port) = start_holochain(config_path.clone()).await;
+    let admin_port = admin_port.await.unwrap();
 
     let (mut admin_tx, _) = websocket_client_by_port(admin_port).await.unwrap();
 
@@ -510,9 +519,7 @@ async fn concurrent_install_dna() {
     // NOTE: This is a full integration test that
     // actually runs the holochain binary
 
-    // MAYBE: B-01453: can we make this port 0 and find out the dynamic port later?
-    let admin_port = 9912;
-    // let app_port = 9914;
+    let admin_port = 0;
 
     let tmp_dir = TempDir::new("conductor_cfg_concurrent_install_dna").unwrap();
     let path = tmp_dir.path().to_path_buf();
@@ -520,7 +527,8 @@ async fn concurrent_install_dna() {
     let config = create_config(admin_port, environment_path);
     let config_path = write_config(path, &config);
 
-    let _holochain = start_holochain(config_path.clone()).await;
+    let (_holochain, admin_port) = start_holochain(config_path.clone()).await;
+    let admin_port = admin_port.await.unwrap();
 
     let (client, _) = websocket_client_by_port(admin_port).await.unwrap();
 
