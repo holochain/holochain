@@ -33,7 +33,7 @@ proptest = "1"
 rand = "0.8"
 
 # TODO: remove when integrating
-[workspace]
+# [workspace]
 
 [features]
 testing = [

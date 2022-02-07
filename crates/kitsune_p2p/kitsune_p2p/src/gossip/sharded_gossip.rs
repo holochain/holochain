@@ -480,8 +480,9 @@ pub struct RoundState {
     last_touch: Instant,
     /// Amount of time before a round is considered expired.
     round_timeout: std::time::Duration,
-    /// The RegionSet we sent to our gossip partner
-    region_set_sent: RegionSetXtcs,
+    /// The RegionSet we will send to our gossip partner during Historical
+    /// gossip (will be None for Recent).
+    region_set_sent: Option<RegionSetXtcs>,
 }
 
 impl ShardedGossipLocal {
@@ -519,6 +520,7 @@ impl ShardedGossipLocal {
         &self,
         remote_agent_list: Vec<AgentInfoSigned>,
         common_arc_set: Arc<DhtArcSet>,
+        region_set_sent: Option<RegionSetXtcs>,
     ) -> KitsuneResult<RoundState> {
         Ok(RoundState {
             remote_agent_list,
@@ -529,7 +531,7 @@ impl ShardedGossipLocal {
             ops_batch_queue: OpsBatchQueue::new(),
             last_touch: Instant::now(),
             round_timeout: ROUND_TIMEOUT,
-            region_set_sent: None,
+            region_set_sent,
         })
     }
 
@@ -714,10 +716,16 @@ impl ShardedGossipLocal {
             },
             ShardedGossipWire::OpRegions(OpRegions { region_set }) => {
                 if let Some(state) = self.get_state(&cert)? {
-                    let sent = state.region_set_sent;
-                    let regions = sent.diff(region_set)?;
-                    todo!("ensure that different region sets can be diffed.");
-                    todo!("lookup regions, send missing ops.");
+                    if let Some(sent) = state.region_set_sent {
+                        let regions = sent.diff(region_set).map_err(KitsuneError::other)?;
+                        todo!("ensure that different region sets can be diffed.");
+                        todo!("lookup regions, send missing ops.")
+                    } else {
+                        tracing::error!(
+                            "We received OpRegions gossip without sending any ourselves"
+                        );
+                        vec![]
+                    }
                 } else {
                     vec![]
                 }

@@ -216,20 +216,11 @@ pub enum KitsuneErrorKind {
 
 impl PartialEq for KitsuneErrorKind {
     fn eq(&self, oth: &Self) -> bool {
-        match self {
-            Self::TimedOut => {
-                if let Self::TimedOut = oth {
-                    return true;
-                }
-            }
-            Self::Closed => {
-                if let Self::Closed = oth {
-                    return true;
-                }
-            }
-            _ => (),
+        match (self, oth) {
+            (Self::TimedOut, Self::TimedOut) => true,
+            (Self::Closed, Self::Closed) => true,
+            _ => false,
         }
-        false
     }
 }
 

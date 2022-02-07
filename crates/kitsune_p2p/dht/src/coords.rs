@@ -436,7 +436,7 @@ mod tests {
     fn test_telescoping_times_first_16() {
         let ts = TimeCoord::from;
 
-                                                                    // n+1
+                                                             // n+1
         assert_eq!(lengths(ts(0)),  Vec::<u32>::new());      // 0001
         assert_eq!(lengths(ts(1)),  vec![1]);                // 0010
         assert_eq!(lengths(ts(2)),  vec![1, 1]);             // 0011

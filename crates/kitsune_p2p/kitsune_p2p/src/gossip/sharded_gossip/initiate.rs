@@ -195,8 +195,14 @@ impl ShardedGossipLocal {
         let remote_arc_set: DhtArcSet = remote_arc_set.into();
         let common_arc_set = Arc::new(arc_set.intersection(&remote_arc_set));
 
+        let region_set = if let GossipType::Historical = self.gossip_type {
+            Some(store::region_set_query(&self.evt_sender, &self.space, &common_arc_set).await?)
+        } else {
+            None
+        };
+
         // Generate the new state.
-        let state = self.new_state(remote_agent_list, common_arc_set)?;
+        let state = self.new_state(remote_agent_list, common_arc_set, region_set)?;
 
         // Generate the agent bloom.
         if let GossipType::Recent = self.gossip_type {
