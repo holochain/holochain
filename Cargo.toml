@@ -43,9 +43,16 @@ members = [
 
 exclude = ["crates/diagnostics", "crates/release-automation"]
 
-[profile.test.package."*"]
+[profile.fast-test]
+inherits = "dev"
+
+[profile.fast-test.package."*"]
 opt-level = 3
-debug = false
+debug = true 
+debug-assertions = false
+overflow-checks = false
+incremental = false
+codegen-units = 16
 
 [patch.crates-io]
 # holochain_wasmer_guest = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "wasmer-patch" }
