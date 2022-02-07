@@ -571,10 +571,10 @@ pub mod wasm_test {
     use crate::sweettest::SweetConductor;
     use crate::sweettest::SweetDnaFile;
     use crate::sweettest::SweetZome;
+    use crate::test_utils::host_fn_caller::HostFnCaller;
     use core::time::Duration;
     use holo_hash::AgentPubKey;
     use holochain_wasm_test_utils::TestWasm;
-    use crate::test_utils::host_fn_caller::HostFnCaller;
     // use crate::conductor::Conductor;
     // use holochain_types::prelude::*;
 
@@ -625,19 +625,13 @@ pub mod wasm_test {
 
             let ((alice,), (bob,)) = apps.into_tuples();
 
-            let alice_host_fn_caller = HostFnCaller::create_for_zome(
-                alice.cell_id(),
-                &conductor.handle(),
-                &dna_file,
-                0
-            ).await;
+            let alice_host_fn_caller =
+                HostFnCaller::create_for_zome(alice.cell_id(), &conductor.handle(), &dna_file, 0)
+                    .await;
 
-            let bob_host_fn_caller = HostFnCaller::create_for_zome(
-                bob.cell_id(),
-                &conductor.handle(),
-                &dna_file,
-                0
-            ).await;
+            let bob_host_fn_caller =
+                HostFnCaller::create_for_zome(bob.cell_id(), &conductor.handle(), &dna_file, 0)
+                    .await;
 
             let alice = alice.zome(test_wasm);
             let bob = bob.zome(test_wasm);

@@ -126,6 +126,8 @@ pub mod test {
     use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use crate::test_entry_impl;
     use unwrap_to::unwrap_to;
+    use holochain_types::prelude::*;
+    use holochain_state::prelude::*;
 
     /// Mimics inside the must_get wasm.
     #[derive(serde::Serialize, serde::Deserialize, SerializedBytes, Debug, PartialEq)]
@@ -182,10 +184,28 @@ pub mod test {
 
         let header_dangling_header_hash = alice_host_fn_caller.commit_entry(Entry::try_from(bad_header_reference).unwrap(), HEADER_REFERENCE_ENTRY_DEF_ID).await;
 
+        let dht_env = conductor.inner_handle().get_dht_env(alice.cell_id().dna_hash()).unwrap();
+
+        // When we first get these they will return because we haven't yet set
+        // the validation status.
         let must_get_header: Result<SignedHeaderHashed, _> = conductor.call_fallible(&alice, "must_get_header", header_dangling_header_hash.clone()).await;
-        let must_get_valid_element: Result<Element, _> = conductor.call_fallible(&bob, "must_get_valid_element", header_dangling_header_hash).await;
+        let must_get_valid_element: Result<Element, _> = conductor.call_fallible(&bob, "must_get_valid_element", header_dangling_header_hash.clone()).await;
+        let element = must_get_valid_element.unwrap();
+
+        let state = DhtOpHashed::from_content_sync(DhtOp::StoreElement(
+            element.signature().clone(),
+            element.header().clone(),
+            element.entry().as_option().cloned().map(|entry| Box::new(entry)),
+        ));
+        dht_env.conn().unwrap().with_commit_sync(|txn| {
+            set_validation_status(txn, state.as_hash().clone(), ValidationStatus::Rejected)
+        }).unwrap();
 
         dbg!(&must_get_header);
+        dbg!(&element);
+
+        let must_get_valid_element: Result<Element, _> = conductor.call_fallible(&bob, "must_get_valid_element", header_dangling_header_hash).await;
+        assert!(must_get_valid_element.is_err());
         dbg!(&must_get_valid_element);
 
             // let entry = ThisWasmEntry::NeverValidates;
