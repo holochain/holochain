@@ -108,7 +108,7 @@
 //! ```
 //! and the examples.
 
-use holochain_cli_bundle as hc_bundle;
+pub use holochain_cli_bundle as hc_bundle;
 use holochain_cli_sandbox as hc_sandbox;
 use structopt::StructOpt;
 

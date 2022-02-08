@@ -197,8 +197,14 @@ async fn test_network_inner<F>(
 where
     F: Fn(&HolochainP2pEvent) -> bool + Send + 'static,
 {
+    let mut config = holochain_p2p::kitsune_p2p::KitsuneP2pConfig::default();
+    let mut tuning =
+        kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
+    tuning.tx2_implicit_timeout_ms = 500;
+    config.tuning_params = std::sync::Arc::new(tuning);
+
     let (network, mut recv) = spawn_holochain_p2p(
-        holochain_p2p::kitsune_p2p::KitsuneP2pConfig::default(),
+        config,
         holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_proxy::TlsConfig::new_ephemeral()
             .await
             .unwrap(),
@@ -476,7 +482,7 @@ fn get_published_ops<Db: ReadAccess<DbKindAuthored>>(
         txn.prepare(
             "
             SELECT
-            DhtOp.blob
+            DhtOp.type, Header.hash, Header.blob
             FROM DhtOp
             JOIN
             Header ON DhtOp.header_hash = Header.hash
@@ -491,7 +497,12 @@ fn get_published_ops<Db: ReadAccess<DbKindAuthored>>(
                 ":store_entry": DhtOpType::StoreEntry,
                 ":author": author,
             },
-            |row| from_blob(row.get("blob")?),
+            |row| {
+                let op_type: DhtOpType = row.get("type")?;
+                let hash: HeaderHash = row.get("hash")?;
+                let header: Header = from_blob(row.get("blob")?)?;
+                Ok(DhtOpLight::from_type(op_type, hash, &header)?)
+            },
         )
         .unwrap()
         .collect::<StateQueryResult<_>>()

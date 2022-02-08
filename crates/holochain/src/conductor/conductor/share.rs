@@ -10,6 +10,15 @@ impl<T> Clone for RwShare<T> {
     }
 }
 
+impl<T> Default for RwShare<T>
+where
+    T: Default,
+{
+    fn default() -> Self {
+        Self(Default::default())
+    }
+}
+
 impl<T> RwShare<T> {
     /// Create a new shareable lock
     pub fn new(value: T) -> Self {

@@ -535,6 +535,7 @@ async fn mock_network_sharded_gossip() {
                         }
                     }
                     HolochainP2pMockMsg::Failure(reason) => panic!("Failure: {}", reason),
+                    HolochainP2pMockMsg::PublishedAgentInfo { .. } => todo!(),
                 }
             }
         }
@@ -1030,6 +1031,7 @@ async fn mock_network_sharding() {
                     }
                     HolochainP2pMockMsg::Failure(reason) => panic!("Failure: {}", reason),
                     HolochainP2pMockMsg::MetricExchange(_) => (),
+                    HolochainP2pMockMsg::PublishedAgentInfo { .. } => todo!(),
                 }
             }
         }

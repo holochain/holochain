@@ -73,7 +73,10 @@ async fn rand_insert(
 #[tokio::test(flavor = "multi_thread")]
 #[allow(unused_assignments)]
 async fn test_p2p_agent_store_extrapolated_coverage() {
-    let tmp_dir = tempdir::TempDir::new("p2p_agent_store_extrapolated_coverage").unwrap();
+    let tmp_dir = tempfile::Builder::new()
+        .prefix("p2p_agent_store_extrapolated_coverage")
+        .tempdir()
+        .unwrap();
 
     let space = rand_space();
 
@@ -111,7 +114,10 @@ async fn test_p2p_agent_store_extrapolated_coverage() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_p2p_agent_store_gossip_query_sanity() {
-    let tmp_dir = tempdir::TempDir::new("p2p_agent_store_gossip_query_sanity").unwrap();
+    let tmp_dir = tempfile::Builder::new()
+        .prefix("p2p_agent_store_gossip_query_sanity")
+        .tempdir()
+        .unwrap();
 
     let space = rand_space();
 

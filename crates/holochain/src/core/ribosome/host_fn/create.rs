@@ -33,7 +33,11 @@ pub fn create<'a>(
                         .source_chain()
                         .as_ref()
                         .expect("Must have source chain if write_workspace access is given")
-                        .put_countersigned(Some(call_context.zome.clone()), input.into_entry(), chain_top_ordering)
+                        .put_countersigned(
+                            Some(call_context.zome.clone()),
+                            input.into_entry(),
+                            chain_top_ordering,
+                        )
                         .await
                         .map_err(|source_chain_error| {
                             WasmError::Host(source_chain_error.to_string())
@@ -85,7 +89,12 @@ pub fn create<'a>(
                             .source_chain()
                             .as_ref()
                             .expect("Must have source chain if write_workspace access is given")
-                            .put(Some(call_context.zome.clone()), header_builder, Some(input.into_entry()), chain_top_ordering)
+                            .put(
+                                Some(call_context.zome.clone()),
+                                header_builder,
+                                Some(input.into_entry()),
+                                chain_top_ordering,
+                            )
                             .await
                             .map_err(|source_chain_error| {
                                 WasmError::Host(source_chain_error.to_string())
@@ -94,11 +103,14 @@ pub fn create<'a>(
                 }
             }
         }
-        _ => Err(WasmError::Host(RibosomeError::HostFnPermissions(
-            call_context.zome.zome_name().clone(),
-            call_context.function_name().clone(),
-            "create".into()
-        ).to_string()))
+        _ => Err(WasmError::Host(
+            RibosomeError::HostFnPermissions(
+                call_context.zome.zome_name().clone(),
+                call_context.function_name().clone(),
+                "create".into(),
+            )
+            .to_string(),
+        )),
     }
 }
 
@@ -145,17 +157,14 @@ pub fn extract_entry_def(
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
     use super::create;
-    use crate::conductor::api::ZomeCall;
     use crate::fixt::*;
-    use crate::test_utils::setup_app;
+    use crate::sweettest::*;
     use ::fixt::prelude::*;
     use hdk::prelude::*;
     use holo_hash::AnyDhtHash;
     use holo_hash::EntryHash;
     use holochain_state::source_chain::SourceChainResult;
     use holochain_types::prelude::*;
-    use holochain_types::test_utils::fake_agent_pubkey_1;
-    use holochain_types::test_utils::fake_agent_pubkey_2;
     use holochain_wasm_test_utils::TestWasm;
     use observability;
     use std::sync::Arc;
@@ -240,115 +249,37 @@ pub mod wasm_test {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    #[ignore = "david.b (this test is flaky)"]
+    // TODO: rewrite with sweettest and check if still flaky.
     // maackle: this consistently passes for me with n = 37
     //          but starts to randomly lock up at n = 38,
     //          and fails consistently for higher values
     async fn multiple_create_entry_limit_test() {
+        const N: u32 = 50;
+
         observability::test_run().unwrap();
-        let dna_file = DnaFile::new(
-            DnaDef {
-                name: "create_multi_test".to_string(),
-                uid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
-                properties: SerializedBytes::try_from(()).unwrap(),
-                zomes: vec![TestWasm::MultipleCalls.into()].into(),
-            },
-            vec![TestWasm::MultipleCalls.into()],
-        )
-        .await
-        .unwrap();
-
-        // //////////
-        // END DNA
-        // //////////
-
-        // ///////////
-        // START ALICE
-        // ///////////
-
-        let alice_agent_id = fake_agent_pubkey_1();
-        let alice_cell_id = CellId::new(dna_file.dna_hash().to_owned(), alice_agent_id.clone());
-        let alice_installed_cell = InstalledCell::new(alice_cell_id.clone(), "alice_handle".into());
-
-        // /////////
-        // END ALICE
-        // /////////
-
-        // /////////
-        // START BOB
-        // /////////
-
-        let bob_agent_id = fake_agent_pubkey_2();
-        let bob_cell_id = CellId::new(dna_file.dna_hash().to_owned(), bob_agent_id.clone());
-        let bob_installed_cell = InstalledCell::new(bob_cell_id.clone(), "bob_handle".into());
-
-        // ///////
-        // END BOB
-        // ///////
-
-        // ///////////////
-        // START CONDUCTOR
-        // ///////////////
-
-        let (_tmpdir, _app_api, handle) = setup_app(
-            vec![(
-                "APPropriated",
-                vec![(alice_installed_cell, None), (bob_installed_cell, None)],
-            )],
-            vec![dna_file.clone()],
-        )
-        .await;
-
-        // /////////////
-        // END CONDUCTOR
-        // /////////////
-
-        // ALICE DOING A CALL
-
-        let n = 50_u32;
-
-        // alice create a bunch of entries
-        let output = handle
-            .call_zome(ZomeCall {
-                cell_id: alice_cell_id.clone(),
-                zome_name: TestWasm::MultipleCalls.into(),
-                cap_secret: None,
-                fn_name: "create_entry_multiple".into(),
-                payload: ExternIO::encode(n).unwrap(),
-                provenance: alice_agent_id.clone(),
-            })
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let (dna, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::MultipleCalls])
             .await
-            .unwrap()
-            .unwrap();
-        assert_eq!(output, ZomeCallResponse::Ok(ExternIO::encode(()).unwrap()));
-
-        // bob get the entries
-        let output = handle
-            .call_zome(ZomeCall {
-                cell_id: alice_cell_id,
-                zome_name: TestWasm::MultipleCalls.into(),
-                cap_secret: None,
-                fn_name: "get_entry_multiple".into(),
-                payload: ExternIO::encode(n).unwrap(),
-                provenance: alice_agent_id,
-            })
-            .await
-            .unwrap()
             .unwrap();
 
-        // check the vals
-        let mut expected = vec![];
-        for i in 0..n {
-            expected.append(&mut i.to_le_bytes().to_vec());
-        }
-        assert_eq!(
-            output,
-            ZomeCallResponse::Ok(ExternIO::encode(expected).unwrap())
-        );
+        let app = conductor.setup_app("app", &[dna]).await.unwrap();
+        let (cell,) = app.into_tuple();
 
-        let shutdown = handle.take_shutdown_handle().unwrap();
-        handle.shutdown();
-        shutdown.await.unwrap().unwrap();
+        let _: () = conductor
+            .call(
+                &cell.zome(TestWasm::MultipleCalls),
+                "create_entry_multiple",
+                N,
+            )
+            .await;
+
+        let output: holochain_zome_types::bytes::Bytes = conductor
+            .call(&cell.zome(TestWasm::MultipleCalls), "get_entry_multiple", N)
+            .await;
+
+        let expected: Vec<u8> = (0..N).flat_map(|i| i.to_le_bytes()).collect();
+
+        assert_eq!(output.into_vec(), expected);
     }
 
     #[tokio::test(flavor = "multi_thread")]

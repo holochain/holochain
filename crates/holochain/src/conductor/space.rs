@@ -2,14 +2,14 @@
 //! at the level of a [`DnaHash`] space.
 //! Multiple [`Cell`]'s could share the same space.
 
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, ops::RangeInclusive, sync::Arc};
 
-use holo_hash::{DhtOpHash, DnaHash};
+use holo_hash::{AgentPubKey, DhtOpHash, DnaHash};
 use holochain_conductor_api::conductor::EnvironmentRootPath;
 use holochain_p2p::dht_arc::{ArcInterval, DhtArcSet};
 use holochain_sqlite::{
     conn::{DbSyncLevel, DbSyncStrategy},
-    db::{DbKindAuthored, DbKindCache, DbKindDht, DbWrite},
+    db::{DbKindAuthored, DbKindCache, DbKindDht, DbRead, DbWrite, ReadAccess},
     prelude::DatabaseResult,
 };
 use holochain_state::prelude::{from_blob, StateQueryResult};
@@ -23,6 +23,7 @@ use crate::core::{
     queue_consumer::QueueConsumerMap,
     workflow::{
         countersigning_workflow::{incoming_countersigning, CountersigningWorkspace},
+        error::{WorkflowError, WorkflowResult},
         incoming_dht_ops_workflow::{
             incoming_dht_ops_workflow, IncomingOpHashes, IncomingOpsBatch,
         },
@@ -31,6 +32,9 @@ use crate::core::{
 
 use super::{conductor::RwShare, error::ConductorResult};
 use std::convert::TryInto;
+
+#[cfg(test)]
+mod cache_tests;
 
 #[derive(Clone)]
 /// This is the set of all current
@@ -65,6 +69,9 @@ pub struct Space {
     /// There is one per unique Dna.
     pub dht_env: DbWrite<DbKindDht>,
 
+    /// A cache for slow database queries.
+    pub dht_query_cache: DhtDbQueryCache,
+
     /// Countersigning workspace that is shared across this cell.
     pub countersigning_workspace: CountersigningWorkspace,
 
@@ -75,6 +82,375 @@ pub struct Space {
     pub incoming_ops_batch: IncomingOpsBatch,
 }
 
+#[derive(Clone)]
+/// This cache allows us to track selected database queries that
+/// are too slow to run frequently.
+/// The queries are lazily evaluated and cached.
+/// Then the cache is updated in memory without needing to
+/// go to the database.
+pub struct DhtDbQueryCache {
+    /// The database this is caching queries for.
+    dht_env: DbRead<DbKindDht>,
+    /// The cache of agent activity queries.
+    activity: Arc<tokio::sync::OnceCell<ActivityCache>>,
+}
+
+type ActivityCache = RwShare<HashMap<Arc<AgentPubKey>, ActivityState>>;
+
+#[derive(Default, Debug, Clone, Copy)]
+/// The state of an agent's activity.
+struct ActivityBounds {
+    /// The highest agent activity header sequence that is already integrated.
+    integrated: Option<u32>,
+    /// The highest consecutive header sequence number that is ready to integrate.
+    ready_to_integrate: Option<u32>,
+}
+
+#[derive(Default, Debug, Clone)]
+struct ActivityState {
+    bounds: ActivityBounds,
+    out_of_order: Vec<u32>,
+}
+
+impl std::ops::Deref for ActivityState {
+    type Target = ActivityBounds;
+
+    fn deref(&self) -> &Self::Target {
+        &self.bounds
+    }
+}
+
+impl DhtDbQueryCache {
+    /// Create a new cache for dht database queries.
+    pub fn new(dht_env: DbRead<DbKindDht>) -> Self {
+        Self {
+            dht_env,
+            activity: Default::default(),
+        }
+    }
+
+    /// Lazily initiate the activity cache.
+    async fn get_or_try_init(&self) -> DatabaseResult<&ActivityCache> {
+        self.activity
+            .get_or_try_init(|| {
+                let env = self.dht_env.clone();
+                async move {
+                    let (activity_integrated, mut all_activity) = env
+                        .async_reader(|txn| {
+                            // Get the highest integrated sequence number for each agent.
+                            let activity_integrated: Vec<(AgentPubKey, u32)> = txn
+                            .prepare_cached(
+                                holochain_sqlite::sql::sql_cell::ACTIVITY_INTEGRATED_UPPER_BOUND,
+                            )?
+                            .query_map(
+                                named_params! {
+                                    ":register_activity": DhtOpType::RegisterAgentActivity,
+                                },
+                                |row| {
+                                    Ok((
+                                        row.get::<_, Option<AgentPubKey>>(0)?,
+                                        row.get::<_, Option<u32>>(1)?,
+                                    ))
+                                },
+                            )?
+                            .filter_map(|r| match r {
+                                Ok((a, seq)) => Some(Ok((a?, seq?))),
+                                Err(e) => Some(Err(e)),
+                            })
+                            .collect::<rusqlite::Result<Vec<_>>>()?;
+
+                            // // Get the highest ready to integrate sequence number for each agent.
+                            // let activity_ready: Vec<(AgentPubKey, u32)> = txn
+                            // .prepare_cached(
+                            //     holochain_sqlite::sql::sql_cell::ACTIVITY_MISSING_DEP_UPPER_BOUND,
+                            // )?
+                            // .query_map(
+                            //     named_params! {
+                            //         ":register_activity": DhtOpType::RegisterAgentActivity,
+                            //     },
+                            //     |row| {
+                            //         Ok((
+                            //             row.get::<_, Option<AgentPubKey>>(0)?,
+                            //             row.get::<_, Option<u32>>(1)?,
+                            //         ))
+                            //     },
+                            // )?
+                            // .filter_map(|r| match r {
+                            //     Ok((a, seq)) => Some(Ok((a?, seq?))),
+                            //     Err(e) => Some(Err(e)),
+                            // })
+                            // .collect::<rusqlite::Result<Vec<_>>>()?;
+
+                            // dbg!(&activity_ready);
+
+                            // Get all agents that have any activity.
+                            // This is needed for agents that have activity but it's not integrated or
+                            // ready to be integrated yet.
+                            let all_activity_agents: Vec<Arc<AgentPubKey>> = txn
+                                .prepare_cached(
+                                    holochain_sqlite::sql::sql_cell::ALL_ACTIVITY_AUTHORS,
+                                )?
+                                .query_map(
+                                    named_params! {
+                                        ":register_activity": DhtOpType::RegisterAgentActivity,
+                                    },
+                                    |row| Ok(Arc::new(row.get::<_, AgentPubKey>(0)?)),
+                                )?
+                                .collect::<rusqlite::Result<Vec<_>>>()?;
+
+                            // Any agent activity that is currently ready to be integrated.
+                            let mut any_ready_activity: HashMap<Arc<AgentPubKey>, ActivityState> =
+                                HashMap::with_capacity(all_activity_agents.len());
+                            let mut stmt = txn.prepare_cached(
+                                holochain_sqlite::sql::sql_cell::ALL_READY_ACTIVITY,
+                            )?;
+
+                            for author in all_activity_agents {
+                                let out_of_order = stmt
+                                    .query_map(
+                                        named_params! {
+                                            ":register_activity": DhtOpType::RegisterAgentActivity,
+                                            ":author": author,
+                                        },
+                                        |row| row.get::<_, u32>(0),
+                                    )?
+                                    .collect::<rusqlite::Result<Vec<_>>>()?;
+                                let state = ActivityState {
+                                    out_of_order,
+                                    ..Default::default()
+                                };
+                                any_ready_activity.insert(author, state);
+                            }
+
+                            DatabaseResult::Ok((activity_integrated, any_ready_activity))
+                        })
+                        .await?;
+
+                    // Update the activity with the integrated sequence numbers.
+                    for (agent, i) in activity_integrated {
+                        let state = all_activity.entry(Arc::new(agent)).or_default();
+                        state.bounds.integrated = Some(i);
+                    }
+
+                    for ActivityState {
+                        bounds,
+                        out_of_order,
+                    } in all_activity.values_mut()
+                    {
+                        // This vec is ordered in the query from lowest to highest header seq.
+                        let last_consecutive_pos = out_of_order
+                            .iter()
+                            .zip(out_of_order.iter().skip(1))
+                            .position(|(n, delta)| {
+                                delta
+                                    .checked_sub(1)
+                                    .map(|delta_sub_1| delta_sub_1 != *n)
+                                    .unwrap_or(true)
+                            });
+                        if let Some(pos) = last_consecutive_pos {
+                            // Drop the consecutive seqs.
+                            drop(out_of_order.drain(..=pos));
+                            out_of_order.shrink_to_fit();
+                            bounds.ready_to_integrate = Some(pos as u32);
+                        }
+                    }
+
+                    Ok(RwShare::new(all_activity))
+                }
+            })
+            .await
+    }
+
+    /// Get any activity that is ready to be integrated.
+    /// This returns a range of activity that is ready to be integrated
+    /// for each agent.
+    pub async fn get_activity_to_integrate(
+        &self,
+    ) -> DatabaseResult<Vec<(Arc<AgentPubKey>, RangeInclusive<u32>)>> {
+        Ok(self.get_or_try_init().await?.share_ref(|activity| {
+            activity
+                .iter()
+                .filter_map(|(agent, ActivityState { bounds, .. })| {
+                    let ready_to_integrate = bounds.ready_to_integrate?;
+                    let start = bounds
+                        .integrated
+                        .map(|i| i + 1)
+                        .filter(|i| *i <= ready_to_integrate)
+                        .unwrap_or(ready_to_integrate);
+                    Some((agent.clone(), start..=ready_to_integrate))
+                })
+                .collect()
+        }))
+    }
+
+    /// Is the SourceChain empty for this [`AgentPubKey`]?
+    pub async fn is_chain_empty(&self, author: &AgentPubKey) -> DatabaseResult<bool> {
+        Ok(self.get_or_try_init().await?.share_ref(|activity| {
+            activity
+                .get(author)
+                .map_or(true, |state| state.bounds.integrated.is_none())
+        }))
+    }
+
+    /// Mark agent activity as actually integrated.
+    pub async fn set_all_activity_to_integrated(
+        &self,
+        integrated_activity: Vec<(Arc<AgentPubKey>, RangeInclusive<u32>)>,
+    ) -> WorkflowResult<()> {
+        self.get_or_try_init().await?.share_mut(|activity| {
+            let mut new_bounds = ActivityBounds::default();
+            for (author, seq_range) in integrated_activity {
+                let prev_bounds = activity.get_mut(author.as_ref()).map(|s| &mut s.bounds);
+                new_bounds.integrated = Some(*seq_range.start());
+                if !update_activity_check(prev_bounds.as_deref(), &new_bounds) {
+                    return Err(WorkflowError::ActivityOutOfOrder(
+                        prev_bounds.and_then(|p| p.integrated).unwrap_or(0),
+                        new_bounds.integrated.unwrap_or(0),
+                    ));
+                }
+                new_bounds.integrated = Some(*seq_range.end());
+                match prev_bounds {
+                    Some(prev_bounds) => update_activity_inner(prev_bounds, &new_bounds)?,
+                    None => {
+                        activity.insert(
+                            author,
+                            ActivityState {
+                                bounds: new_bounds,
+                                ..Default::default()
+                            },
+                        );
+                    }
+                }
+            }
+            Ok(())
+        })
+    }
+
+    /// Set activity to ready to integrate.
+    pub async fn set_activity_ready_to_integrate(
+        &self,
+        agent: &AgentPubKey,
+        header_sequence: u32,
+    ) -> WorkflowResult<()> {
+        self.new_activity_inner(
+            agent,
+            ActivityBounds {
+                ready_to_integrate: Some(header_sequence),
+                ..Default::default()
+            },
+        )
+        .await
+    }
+
+    /// Set activity to to integrated.
+    pub async fn set_activity_to_integrated(
+        &self,
+        agent: &AgentPubKey,
+        header_sequence: u32,
+    ) -> WorkflowResult<()> {
+        self.new_activity_inner(
+            agent,
+            ActivityBounds {
+                integrated: Some(header_sequence),
+                ..Default::default()
+            },
+        )
+        .await
+    }
+
+    /// Add an authors activity.
+    async fn new_activity_inner(
+        &self,
+        agent: &AgentPubKey,
+        new_bounds: ActivityBounds,
+    ) -> WorkflowResult<()> {
+        self.get_or_try_init()
+            .await?
+            .share_mut(|activity| update_activity(activity, agent, &new_bounds))
+    }
+}
+
+fn update_activity_check(
+    prev_bounds: Option<&ActivityBounds>,
+    new_bounds: &ActivityBounds,
+) -> bool {
+    prev_is_empty_new_is_zero(prev_bounds, new_bounds)
+        && integrated_is_consecutive(prev_bounds, new_bounds)
+}
+
+/// Prev integrated is empty and new integrated is empty or set to zero
+fn prev_is_empty_new_is_zero(
+    prev_bounds: Option<&ActivityBounds>,
+    new_bounds: &ActivityBounds,
+) -> bool {
+    prev_bounds.map_or(false, |p| p.integrated.is_some())
+        || new_bounds.integrated.map_or(true, |i| i == 0)
+}
+
+/// If there's already activity marked integrated
+/// then only + 1 sequence number can be integrated.
+fn integrated_is_consecutive(
+    prev_bounds: Option<&ActivityBounds>,
+    new_bounds: &ActivityBounds,
+) -> bool {
+    prev_bounds
+        .and_then(|p| p.integrated)
+        .zip(new_bounds.integrated)
+        .map_or(true, |(p, n)| {
+            p.checked_add(1).map(|p1| n == p1).unwrap_or(false)
+        })
+}
+
+fn update_activity(
+    activity: &mut HashMap<Arc<AgentPubKey>, ActivityState>,
+    agent: &AgentPubKey,
+    new_bounds: &ActivityBounds,
+) -> WorkflowResult<()> {
+    let prev_bounds = activity.get_mut(agent);
+    if !update_activity_check(prev_bounds.as_deref(), new_bounds) {
+        return Err(WorkflowError::ActivityOutOfOrder(
+            prev_bounds.and_then(|p| p.integrated).unwrap_or(0),
+            new_bounds.integrated.unwrap_or(0),
+        ));
+    }
+    match prev_bounds {
+        Some(prev_bounds) => update_activity_inner(prev_bounds, new_bounds)?,
+        None => {
+            activity.insert(Arc::new(agent.clone()), *new_bounds);
+        }
+    }
+    WorkflowResult::Ok(())
+}
+
+fn update_activity_inner(
+    prev_bounds: &mut ActivityBounds,
+    new_bounds: &ActivityBounds,
+) -> WorkflowResult<()> {
+    if new_bounds.integrated.is_some() {
+        prev_bounds.integrated = new_bounds.integrated;
+
+        // If the "ready to integrate" sequence number was just
+        // integrated then we can remove it.
+        if prev_bounds
+            .ready_to_integrate
+            .and_then(|ready| prev_bounds.integrated.map(|integrated| integrated == ready))
+            .unwrap_or(false)
+        {
+            prev_bounds.ready_to_integrate = None;
+        }
+    }
+
+    // If there's already activity marked ready to integrate
+    // we want to take the maximum of the two.
+    if let Some(new_ready) = new_bounds.ready_to_integrate {
+        prev_bounds.ready_to_integrate = Some(
+            prev_bounds
+                .ready_to_integrate
+                .map_or(new_ready, |prev_ready| std::cmp::max(prev_ready, new_ready)),
+        );
+    }
+    WorkflowResult::Ok(())
+}
 #[cfg(test)]
 pub struct TestSpaces {
     pub spaces: Spaces,
@@ -84,7 +460,7 @@ pub struct TestSpaces {
 #[cfg(test)]
 pub struct TestSpace {
     pub space: Space,
-    _temp_dir: tempdir::TempDir,
+    _temp_dir: tempfile::TempDir,
 }
 
 impl Spaces {
@@ -391,6 +767,7 @@ impl Space {
         let countersigning_workspace = CountersigningWorkspace::new();
         let incoming_op_hashes = IncomingOpHashes::default();
         let incoming_ops_batch = IncomingOpsBatch::default();
+        let dht_query_cache = DhtDbQueryCache::new(dht_env.clone().into());
         let r = Self {
             dna_hash,
             cache,
@@ -399,8 +776,21 @@ impl Space {
             countersigning_workspace,
             incoming_op_hashes,
             incoming_ops_batch,
+            dht_query_cache,
         };
         Ok(r)
+    }
+}
+
+impl From<DbRead<DbKindDht>> for DhtDbQueryCache {
+    fn from(db: DbRead<DbKindDht>) -> Self {
+        Self::new(db)
+    }
+}
+
+impl From<DbWrite<DbKindDht>> for DhtDbQueryCache {
+    fn from(db: DbWrite<DbKindDht>) -> Self {
+        Self::new(db.into())
     }
 }
 
@@ -415,12 +805,14 @@ impl TestSpaces {
         dna_hashes: impl IntoIterator<Item = DnaHash>,
         queue_consumer_map: QueueConsumerMap,
     ) -> Self {
-        use tempdir::TempDir;
         let mut test_spaces: HashMap<DnaHash, _> = HashMap::new();
         for hash in dna_hashes.into_iter() {
             test_spaces.insert(hash.clone(), TestSpace::new(hash));
         }
-        let temp_dir = TempDir::new("holochain-test-environments").unwrap();
+        let temp_dir = tempfile::Builder::new()
+            .prefix("holochain-test-environments")
+            .tempdir()
+            .unwrap();
         let spaces = Spaces::new(
             temp_dir.path().to_path_buf().into(),
             Default::default(),
@@ -444,9 +836,10 @@ impl TestSpaces {
 #[cfg(test)]
 impl TestSpace {
     pub fn new(dna_hash: DnaHash) -> Self {
-        use tempdir::TempDir;
-
-        let temp_dir = TempDir::new("holochain-test-environments").unwrap();
+        let temp_dir = tempfile::Builder::new()
+            .prefix("holochain-test-environments")
+            .tempdir()
+            .unwrap();
 
         Self {
             space: Space::new(

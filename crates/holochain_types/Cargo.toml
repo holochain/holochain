@@ -46,7 +46,7 @@ serde_yaml = "0.8"
 shrinkwraprs = "0.3.0"
 strum = "0.18.0"
 strum_macros = "0.18.0"
-tempdir = "0.3.7"
+tempfile = "3"
 thiserror = "1.0.22"
 tokio = { version = "1.11", features = [ "rt" ] }
 holochain_util = { version = "0.0.6", path = "../holochain_util", features = ["backtrace"] }

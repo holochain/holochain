@@ -102,6 +102,9 @@ pub enum WorkflowError {
     /// Other
     #[error("Other: {0}")]
     Other(Box<dyn std::error::Error + Send + Sync>),
+
+    #[error("Tried to integrate activity {1} after {0} but agent activity must be in order")]
+    ActivityOutOfOrder(u32, u32),
 }
 
 impl WorkflowError {

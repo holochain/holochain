@@ -103,13 +103,13 @@ fn batch_process_entry(
         } else {
             // Check if we should set receipt to send.
             if request_validation_receipt {
-                set_send_receipt(txn, hash.clone())?;
+                set_send_receipt(txn, &hash)?;
             }
         }
     }
 
     tracing::debug!("Inserting {} ops", to_pending.len());
-    add_to_pending(txn, to_pending, request_validation_receipt)?;
+    add_to_pending(txn, &to_pending, request_validation_receipt)?;
 
     Ok(())
 }
@@ -132,6 +132,7 @@ pub async fn incoming_dht_ops_workflow(
     } = space;
     let mut filter_ops = Vec::new();
     let mut hashes_to_remove = Vec::with_capacity(ops.len());
+    // let mut new_activity = Vec::new();
 
     // Filter out ops that are already being tracked, so we don't do duplicate work
     {
@@ -140,6 +141,10 @@ pub async fn incoming_dht_ops_workflow(
         for (hash, op) in ops {
             if !set.contains(&hash) {
                 set.insert(hash.clone());
+                // if let DhtOp::RegisterAgentActivity(_, h) = &op {
+                //     // Inserting a new agent activity op, we need to track this in the cache.
+                //     new_activity.push(h.author().clone());
+                // }
                 hashes_to_remove.push(hash.clone());
                 o.push((hash, op));
             }
@@ -174,43 +179,45 @@ pub async fn incoming_dht_ops_workflow(
         batch_check_insert(incoming_ops_batch, request_validation_receipt, filter_ops);
 
     let incoming_ops_batch = incoming_ops_batch.clone();
-    let dht_env = dht_env.clone();
     if maybe_batch.is_some() {
         // there was no already running batch task, so spawn one:
-        tokio::task::spawn(async move {
-            while let Some(entries) = maybe_batch {
-                let senders = Arc::new(parking_lot::Mutex::new(Vec::new()));
-                let senders2 = senders.clone();
-                if let Err(err) = dht_env
-                    .async_commit(move |txn| {
-                        for entry in entries {
-                            let InOpBatchEntry {
-                                snd,
-                                request_validation_receipt,
-                                ops,
-                            } = entry;
-                            let res = batch_process_entry(txn, request_validation_receipt, ops);
+        tokio::task::spawn({
+            let dht_env = dht_env.clone();
+            async move {
+                while let Some(entries) = maybe_batch {
+                    let senders = Arc::new(parking_lot::Mutex::new(Vec::new()));
+                    let senders2 = senders.clone();
+                    if let Err(err) = dht_env
+                        .async_commit(move |txn| {
+                            for entry in entries {
+                                let InOpBatchEntry {
+                                    snd,
+                                    request_validation_receipt,
+                                    ops,
+                                } = entry;
+                                let res = batch_process_entry(txn, request_validation_receipt, ops);
 
-                            // we can't send the results here...
-                            // we haven't comitted
-                            senders2.lock().push((snd, res));
-                        }
+                                // we can't send the results here...
+                                // we haven't comitted
+                                senders2.lock().push((snd, res));
+                            }
 
-                        WorkflowResult::Ok(())
-                    })
-                    .await
-                {
-                    tracing::error!(?err, "incoming_dht_ops_workflow error");
+                            WorkflowResult::Ok(())
+                        })
+                        .await
+                    {
+                        tracing::error!(?err, "incoming_dht_ops_workflow error");
+                    }
+
+                    for (snd, res) in senders.lock().drain(..) {
+                        let _ = snd.send(res);
+                    }
+
+                    // trigger validation of queued ops
+                    sys_validation_trigger.trigger();
+
+                    maybe_batch = batch_check_end(&incoming_ops_batch);
                 }
-
-                for (snd, res) in senders.lock().drain(..) {
-                    let _ = snd.send(res);
-                }
-
-                // trigger validation of queued ops
-                sys_validation_trigger.trigger();
-
-                maybe_batch = batch_check_end(&incoming_ops_batch);
             }
         });
     }
@@ -225,6 +232,10 @@ pub async fn incoming_dht_ops_workflow(
             set.remove(&hash);
         }
     }
+    // for author in new_activity {
+    //     // Record the new activity for the author in the query cache.
+    //     dht_query_cache.new_activity(author).await?;
+    // }
     r
 }
 
@@ -238,13 +249,12 @@ async fn should_keep(op: &DhtOp) -> WorkflowResult<()> {
 
 fn add_to_pending(
     txn: &mut rusqlite::Transaction<'_>,
-    ops: Vec<DhtOpHashed>,
+    ops: &[DhtOpHashed],
     request_validation_receipt: bool,
 ) -> StateMutationResult<()> {
     for op in ops {
-        let op_hash = op.as_hash().clone();
         insert_op(txn, op)?;
-        set_require_receipt(txn, op_hash, request_validation_receipt)?;
+        set_require_receipt(txn, op.as_hash(), request_validation_receipt)?;
     }
     StateMutationResult::Ok(())
 }
@@ -287,7 +297,7 @@ pub async fn filter_existing_ops(
 
 fn set_send_receipt(
     txn: &mut rusqlite::Transaction<'_>,
-    hash: DhtOpHash,
+    hash: &DhtOpHash,
 ) -> StateMutationResult<()> {
     set_require_receipt(txn, hash, true)?;
     StateMutationResult::Ok(())
