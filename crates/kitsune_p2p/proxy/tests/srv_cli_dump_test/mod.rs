@@ -1,14 +1,9 @@
 use std::io::Read;
 
 fn run_srv() -> (String, std::process::Child) {
-    let mut cmd = std::process::Command::new("cargo");
-    let mut cmd = cmd
-        .arg("run")
-        .arg("--bin")
-        .arg("kitsune-p2p-proxy")
-        .stdout(std::process::Stdio::piped())
-        .spawn()
-        .unwrap();
+    let path = env!("CARGO_BIN_EXE_kitsune-p2p-proxy");
+    let mut cmd = std::process::Command::new(path);
+    let mut cmd = cmd.stdout(std::process::Stdio::piped()).spawn().unwrap();
     let mut stdout = cmd.stdout.take().unwrap();
     let mut buf = [0_u8; 4096];
     let mut out_str = String::new();
@@ -24,11 +19,9 @@ fn run_srv() -> (String, std::process::Child) {
 }
 
 fn run_cli(proxy: &str) -> (String, std::process::Child) {
-    let mut cmd = std::process::Command::new("cargo");
+    let path = env!("CARGO_BIN_EXE_proxy-cli");
+    let mut cmd = std::process::Command::new(path);
     let mut cmd = cmd
-        .arg("run")
-        .arg("--bin")
-        .arg("proxy-cli")
         .arg(proxy)
         .stdout(std::process::Stdio::piped())
         .spawn()

@@ -24,7 +24,7 @@ use matches::assert_matches;
 use observability;
 use std::sync::Arc;
 use std::time::Duration;
-use tempdir::TempDir;
+use tempfile::TempDir;
 use tokio_stream::StreamExt;
 use tracing::*;
 use url2::prelude::*;

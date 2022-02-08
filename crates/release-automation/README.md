@@ -22,12 +22,23 @@ It would be nice to eventually consolidate this project with an already existing
 
 There's a related issue on cargo tracking: [cargo publish multiplate packages at once](https://github.com/rust-lang/cargo/issues/1169).
 
-## Repository Requirements
+## Requirements
+
+### Repository
 
 * Toplevel _Cargo.toml_ manifest with a `[workspace]` declaration
 * Toplevel _CHANGELOG.md_ file
 * Member crates in the _crates_ directory with a valid `Cargo.toml` manifest with a `[package]` declaration
 * One _CHANGELOG.md_ file per crate
+
+### Release machine
+
+* Linux or macOS with Nix installed
+* SSH key with write permissions to these GitHub repositories:
+  * holochain/holochain
+  * holochain/holochain-nixpkgs
+  * holochain/holonix
+* Credentials at _~/.cargo/credentials_ with publish permissions for all existing holochain crates
 
 ## Installation
 
@@ -139,7 +150,7 @@ Automated steps still require running the tool manually ;-).
       '
     ```
 
-    If this succeeds, repeat the command without the `--dry-run` to perform the changes.
+    If these succeed, repeat the last command without the `--dry-run` to perform the changes.
 
     ***NOTE***: If at any point after this any changes need to be made to the code for this release, please come back here and follow these steps:
 
@@ -276,6 +287,12 @@ Automated steps still require running the tool manually ;-).
 
 0. _[A]_ Publish all the bumped crates to crates.io.
 
+    0. Copy the cargo credentials into the repository
+
+        ```sh
+        cp ~/.cargo/credentials .cargo/credentials
+        ```
+
     0. Run a variation of `cargo publish --dry-run` for all bumped crates.
        Expected errors, such as missing dependencies of new crate versions, will be detected and tolerated.
 
@@ -359,7 +376,7 @@ Automated steps still require running the tool manually ;-).
     ```
 
 0. _[M]_ [Draft and create a GitHub release](https://github.com/holochain/holochain/releases/new) from the new holochain tag on holochain/holochain.
-    
+
     1. Select the new holochain tag via the _Choose a tag_ button.
     2. Choose the title: _holochain `<VERSION>`_
     3. Set the description according to this template:
@@ -369,7 +386,7 @@ Automated steps still require running the tool manually ;-).
 
         ---
 
-        ***Please read [this release's top-level CHANGELOG](https://github.com/holochain/holochain/blob/main/CHANGELOG.md#<RELEASE_TIMESTAMP>) for details and changes in all crates in this repo.***
+        ***Please read [this release's top-level CHANGELOG](https://github.com/holochain/holochain/blob/main/CHANGELOG.md#<RELEASE_TIMESTAMP>) to see the full list of crates that were released together.***
         ```
     0. Push the _Publish release_ button \o/
 

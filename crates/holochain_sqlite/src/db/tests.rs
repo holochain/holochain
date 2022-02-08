@@ -1,4 +1,4 @@
-use tempdir::TempDir;
+use tempfile::TempDir;
 
 use crate::prelude::DatabaseResult;
 

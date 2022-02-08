@@ -9,8 +9,11 @@ name = "test_wasm_sys_time"
 crate-type = [ "cdylib", "rlib" ]
 
 [dependencies]
-hdk = { path = "../../../../hdk", features = ["fixturators"] }
+hdk = { path = "../../../../hdk" }
 serde = "1.0"
+
+[dev-dependencies]
+hdk = { path = "../../../../hdk", features = ["fixturators"] }
 
 [features]
 default = []
