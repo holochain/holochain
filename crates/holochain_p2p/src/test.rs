@@ -369,12 +369,15 @@ mod tests {
 
         let (dna, a1, a2, _a3) = test_setup();
 
-        let (p2p, mut evt) = spawn_holochain_p2p(
-            KitsuneP2pConfig::default(),
-            TlsConfig::new_ephemeral().await.unwrap(),
-        )
-        .await
-        .unwrap();
+        let cert = TlsConfig::new_ephemeral().await.unwrap();
+
+        let mut params =
+            kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
+        params.default_rpc_multi_remote_agent_count = 1;
+        params.default_rpc_multi_remote_request_grace_ms = 100;
+        let mut config = KitsuneP2pConfig::default();
+        config.tuning_params = Arc::new(params);
+        let (p2p, mut evt) = spawn_holochain_p2p(config, cert).await.unwrap();
 
         let test_1 = WireOps::Element(WireElementOps {
             header: Some(Judged::valid(SignedHeader(fixt!(Header), fixt!(Signature)))),
@@ -416,7 +419,7 @@ mod tests {
                     QueryOpHashes { respond, .. } => {
                         respond.r(Ok(async move { Ok(None) }.boxed().into()));
                     }
-                    evt => println!("unhandled: {:?}", evt),
+                    evt => tracing::trace!("unhandled: {:?}", evt),
                 }
             }
         });
@@ -455,12 +458,16 @@ mod tests {
     async fn test_get_links_workflow() {
         let (dna, a1, a2, _) = test_setup();
 
-        let (p2p, mut evt) = spawn_holochain_p2p(
-            KitsuneP2pConfig::default(),
-            TlsConfig::new_ephemeral().await.unwrap(),
-        )
-        .await
-        .unwrap();
+        let mut params =
+            kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
+        params.default_rpc_multi_remote_agent_count = 1;
+        params.default_rpc_multi_remote_request_grace_ms = 100;
+        let mut config = KitsuneP2pConfig::default();
+        config.tuning_params = Arc::new(params);
+
+        let (p2p, mut evt) = spawn_holochain_p2p(config, TlsConfig::new_ephemeral().await.unwrap())
+            .await
+            .unwrap();
 
         let test_1 = WireLinkOps {
             creates: vec![WireCreateLink::condense(

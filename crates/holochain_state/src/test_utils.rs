@@ -13,7 +13,7 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
-use tempdir::TempDir;
+use tempfile::TempDir;
 
 use crate::prelude::Store;
 use crate::prelude::Txn;
@@ -80,7 +80,11 @@ pub fn test_p2p_metrics_env() -> TestEnv<DbKindP2pMetrics> {
 }
 
 fn test_env<Kind: DbKindT>(kind: Kind) -> TestEnv<Kind> {
-    let tmpdir = TempDir::new("holochain-test-environments").unwrap();
+    let tmpdir = tempfile::Builder::new()
+        .prefix("holochain-test-environments")
+        .suffix(&nanoid::nanoid!())
+        .tempdir()
+        .unwrap();
     TestEnv {
         env: DbWrite::test(&tmpdir, kind).expect("Couldn't create test database"),
         tmpdir,
@@ -89,13 +93,21 @@ fn test_env<Kind: DbKindT>(kind: Kind) -> TestEnv<Kind> {
 
 /// Create a fresh set of test environments with a new TempDir and custom MetaLairClient
 pub fn test_envs_with_keystore(keystore: MetaLairClient) -> TestEnvs {
-    let tempdir = TempDir::new("holochain-test-environments").unwrap();
+    let tempdir = tempfile::Builder::new()
+        .prefix("holochain-test-environments")
+        .suffix(&nanoid::nanoid!())
+        .tempdir()
+        .unwrap();
     TestEnvs::with_keystore(tempdir, keystore)
 }
 
 /// Create a fresh set of test environments with a new TempDir
 pub fn test_environments() -> TestEnvs {
-    let tempdir = TempDir::new("holochain-test-environments").unwrap();
+    let tempdir = tempfile::Builder::new()
+        .prefix("holochain-test-environments")
+        .suffix(&nanoid::nanoid!())
+        .tempdir()
+        .unwrap();
     TestEnvs::new(tempdir)
 }
 

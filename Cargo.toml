@@ -41,16 +41,14 @@ members = [
   "crates/release-automation",
 ]
 
-exclude = [
-  "crates/diagnostics",
-  "crates/release-automation",
-]
+exclude = ["crates/diagnostics", "crates/release-automation"]
 
-# These are the default params for RELEASE target
-# Setting these for all dependencies... we'll only debug our own code
-[profile.dev.package."*"]
+[profile.fast-test]
+inherits = "dev"
+
+[profile.fast-test.package."*"]
 opt-level = 3
-debug = false
+debug = true 
 debug-assertions = false
 overflow-checks = false
 incremental = false
