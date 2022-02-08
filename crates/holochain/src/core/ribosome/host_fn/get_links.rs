@@ -66,40 +66,19 @@ pub fn get_links<'a>(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod slow_tests {
-    use crate::sweettest::SweetAgents;
-    use crate::sweettest::SweetConductor;
-    use crate::sweettest::SweetDnaFile;
-    use crate::test_utils::conductor_setup::ConductorTestData;
-    use crate::test_utils::new_zome_call;
     use crate::test_utils::wait_for_integration_1m;
     use crate::test_utils::WaitOps;
     use hdk::prelude::*;
     use holochain_test_wasm_common::*;
     use holochain_wasm_test_utils::TestWasm;
-    use matches::assert_matches;
+    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_entry_hash_path_children() {
         observability::test_run().ok();
-        let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::HashPath])
-            .await
-            .unwrap();
-
-        let mut conductor = SweetConductor::from_standard_config().await;
-        let (alice_pubkey, bob_pubkey) = SweetAgents::two(conductor.keystore()).await;
-
-        let apps = conductor
-            .setup_app_for_agents(
-                "app-",
-                &[alice_pubkey.clone(), bob_pubkey.clone()],
-                &[dna_file.into()],
-            )
-            .await
-            .unwrap();
-
-        let ((alice,), (bobbo,)) = apps.into_tuples();
-        let alice = alice.zome(TestWasm::HashPath);
-        let _bobbo = bobbo.zome(TestWasm::HashPath);
+        let RibosomeTestFixture {
+            conductor, alice, ..
+        } = RibosomeTestFixture::new(TestWasm::HashPath).await;
 
         // ensure foo.bar twice to ensure idempotency
         for _ in 0..2 {
@@ -136,25 +115,9 @@ pub mod slow_tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn hash_path_anchor_list_anchors() {
         observability::test_run().ok();
-        let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Anchor])
-            .await
-            .unwrap();
-
-        let mut conductor = SweetConductor::from_standard_config().await;
-        let (alice_pubkey, bob_pubkey) = SweetAgents::two(conductor.keystore()).await;
-
-        let apps = conductor
-            .setup_app_for_agents(
-                "app-",
-                &[alice_pubkey.clone(), bob_pubkey.clone()],
-                &[dna_file.into()],
-            )
-            .await
-            .unwrap();
-
-        let ((alice,), (bobbo,)) = apps.into_tuples();
-        let alice = alice.zome(TestWasm::Anchor);
-        let _bobbo = bobbo.zome(TestWasm::Anchor);
+        let RibosomeTestFixture {
+            conductor, alice, ..
+        } = RibosomeTestFixture::new(TestWasm::Anchor).await;
 
         // anchor foo bar
         let anchor_address_one: EntryHash = conductor
@@ -234,25 +197,9 @@ pub mod slow_tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn multi_get_links() {
         observability::test_run().ok();
-        let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Link])
-            .await
-            .unwrap();
-
-        let mut conductor = SweetConductor::from_standard_config().await;
-        let (alice_pubkey, bob_pubkey) = SweetAgents::two(conductor.keystore()).await;
-
-        let apps = conductor
-            .setup_app_for_agents(
-                "app-",
-                &[alice_pubkey.clone(), bob_pubkey.clone()],
-                &[dna_file.into()],
-            )
-            .await
-            .unwrap();
-
-        let ((alice,), (bobbo,)) = apps.into_tuples();
-        let alice = alice.zome(TestWasm::Link);
-        let _bobbo = bobbo.zome(TestWasm::Link);
+        let RibosomeTestFixture {
+            conductor, alice, ..
+        } = RibosomeTestFixture::new(TestWasm::Link).await;
 
         let _: HeaderHash = conductor.call(&alice, "create_link", ()).await;
         let _: HeaderHash = conductor.call(&alice, "create_back_link", ()).await;
@@ -278,49 +225,21 @@ pub mod slow_tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn dup_path_test() {
         observability::test_run().ok();
-        let zomes = vec![TestWasm::Link];
-        let mut conductor_test = ConductorTestData::two_agents(zomes, false).await;
-        let handle = conductor_test.handle();
-        let alice_call_data = &conductor_test.alice_call_data();
+        let RibosomeTestFixture {
+            conductor, alice, alice_host_fn_caller, ..
+        } = RibosomeTestFixture::new(TestWasm::Link).await;
 
-        let invocation = new_zome_call(
-            &alice_call_data.cell_id,
-            "commit_existing_path",
-            (),
-            TestWasm::Link,
-        )
-        .unwrap();
-        let result = handle.call_zome(invocation).await.unwrap().unwrap();
-        assert_matches!(result, ZomeCallResponse::Ok(_));
-        let invocation = new_zome_call(
-            &alice_call_data.cell_id,
-            "commit_existing_path",
-            (),
-            TestWasm::Link,
-        )
-        .unwrap();
-        let result = handle.call_zome(invocation).await.unwrap().unwrap();
-        assert_matches!(result, ZomeCallResponse::Ok(_));
+        for _ in 0..2 {
+            let _result: () = conductor.call(&alice, "commit_existing_path", ()).await;
+        }
 
         let mut expected_count = WaitOps::start() + WaitOps::path(1);
         // Plus one length path for the commit existing.
         expected_count += WaitOps::ENTRY + WaitOps::LINK;
 
-        wait_for_integration_1m(&alice_call_data.dht_env, expected_count).await;
+        wait_for_integration_1m(&alice_host_fn_caller.dht_env, expected_count).await;
 
-        let invocation = new_zome_call(
-            &alice_call_data.cell_id,
-            "get_long_path",
-            (),
-            TestWasm::Link,
-        )
-        .unwrap();
-
-        let result = handle.call_zome(invocation).await.unwrap().unwrap();
-        let links: Vec<hdk::prelude::Link> = unwrap_to::unwrap_to!(result => ZomeCallResponse::Ok)
-            .decode()
-            .unwrap();
+        let links: Vec<hdk::prelude::Link> = conductor.call(&alice, "get_long_path", ()).await;
         assert_eq!(links.len(), 1);
-        conductor_test.shutdown_conductor().await;
     }
 }

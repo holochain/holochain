@@ -31,32 +31,14 @@ pub fn zome_info(
 pub mod test {
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::prelude::*;
-    use crate::sweettest::SweetDnaFile;
-    use crate::sweettest::SweetConductor;
-    use crate::sweettest::SweetAgents;
+    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn zome_info_test() {
         observability::test_run().ok();
-        let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::EntryDefs])
-            .await
-            .unwrap();
-
-        let mut conductor = SweetConductor::from_standard_config().await;
-        let (alice_pubkey, bob_pubkey) = SweetAgents::two(conductor.keystore()).await;
-
-        let apps = conductor
-            .setup_app_for_agents(
-                "app-",
-                &[alice_pubkey.clone(), bob_pubkey.clone()],
-                &[dna_file.into()],
-            )
-            .await
-            .unwrap();
-
-        let ((alice,), (bobbo,)) = apps.into_tuples();
-        let alice = alice.zome(TestWasm::EntryDefs);
-        let _bobbo = bobbo.zome(TestWasm::EntryDefs);
+        let RibosomeTestFixture {
+            conductor, alice, ..
+        } = RibosomeTestFixture::new(TestWasm::EntryDefs).await;
 
         let zome_info: ZomeInfo = conductor.call(&alice, "zome_info", ()).await;
         assert_eq!(zome_info.name, "entry_defs".into());

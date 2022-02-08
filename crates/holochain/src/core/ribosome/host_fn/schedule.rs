@@ -41,62 +41,24 @@ pub fn schedule(
 
 #[cfg(test)]
 pub mod tests {
-    use crate::conductor::ConductorBuilder;
-    use crate::core::ribosome::MockDnaStore;
-    use crate::sweettest::SweetConductor;
-    use crate::sweettest::SweetDnaFile;
-    use ::fixt::prelude::*;
     use hdk::prelude::*;
     use holochain_state::prelude::schedule_fn;
     use holochain_state::prelude::*;
     use holochain_state::schedule::fn_is_scheduled;
     use holochain_state::schedule::live_scheduled_fns;
-    use holochain_types::prelude::AgentPubKeyFixturator;
     use holochain_wasm_test_utils::TestWasm;
     use rusqlite::Transaction;
+    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
 
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "test_utils")]
     async fn schedule_test_low_level() -> anyhow::Result<()> {
         observability::test_run().ok();
-        let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Schedule])
-            .await
-            .unwrap();
+        let RibosomeTestFixture {
+            alice_pubkey, alice_host_fn_caller, ..
+        } = RibosomeTestFixture::new(TestWasm::Schedule).await;
 
-        let alice_pubkey = fixt!(AgentPubKey, Predictable, 0);
-        let bob_pubkey = fixt!(AgentPubKey, Predictable, 1);
-
-        let mut dna_store = MockDnaStore::new();
-        dna_store.expect_add_dnas::<Vec<_>>().return_const(());
-        dna_store.expect_add_entry_defs::<Vec<_>>().return_const(());
-        dna_store.expect_add_dna().return_const(());
-        dna_store
-            .expect_get()
-            .return_const(Some(dna_file.clone().into()));
-        dna_store
-            .expect_get_entry_def()
-            .return_const(EntryDef::default_with_id("thing"));
-
-        let mut conductor =
-            SweetConductor::from_builder(ConductorBuilder::with_mock_dna_store(dna_store)).await;
-
-        let _apps = conductor
-            .setup_app_for_agents(
-                "app-",
-                &[alice_pubkey.clone(), bob_pubkey.clone()],
-                &[dna_file.into()],
-            )
-            .await
-            .unwrap();
-
-        let cell_id = conductor.handle().list_cell_ids(None)[0].clone();
-        let cell_env = conductor
-            .handle()
-            .get_authored_env(cell_id.dna_hash())
-            .unwrap();
-        let author = cell_id.agent_pubkey().clone();
-
-        cell_env
+        alice_host_fn_caller.authored_env
             .async_commit(move |txn: &mut Transaction| {
                 let now = Timestamp::now();
                 let the_past = (now - std::time::Duration::from_millis(1)).unwrap();
@@ -109,48 +71,48 @@ pub mod tests {
 
                 schedule_fn(
                     txn,
-                    &author,
+                    &alice_pubkey,
                     persisted_scheduled_fn.clone(),
                     Some(persisted_schedule.clone()),
                     now,
                 )
                 .unwrap();
-                schedule_fn(txn, &author, ephemeral_scheduled_fn.clone(), None, now).unwrap();
+                schedule_fn(txn, &alice_pubkey, ephemeral_scheduled_fn.clone(), None, now).unwrap();
 
-                assert!(fn_is_scheduled(txn, persisted_scheduled_fn.clone(), &author).unwrap());
-                assert!(fn_is_scheduled(txn, ephemeral_scheduled_fn.clone(), &author).unwrap());
+                assert!(fn_is_scheduled(txn, persisted_scheduled_fn.clone(), &alice_pubkey).unwrap());
+                assert!(fn_is_scheduled(txn, ephemeral_scheduled_fn.clone(), &alice_pubkey).unwrap());
 
                 // Deleting live ephemeral scheduled fns from now should delete.
-                delete_live_ephemeral_scheduled_fns(txn, now, &author).unwrap();
-                assert!(!fn_is_scheduled(txn, ephemeral_scheduled_fn.clone(), &author,).unwrap());
-                assert!(fn_is_scheduled(txn, persisted_scheduled_fn.clone(), &author,).unwrap());
+                delete_live_ephemeral_scheduled_fns(txn, now, &alice_pubkey).unwrap();
+                assert!(!fn_is_scheduled(txn, ephemeral_scheduled_fn.clone(), &alice_pubkey,).unwrap());
+                assert!(fn_is_scheduled(txn, persisted_scheduled_fn.clone(), &alice_pubkey,).unwrap());
 
-                schedule_fn(txn, &author, ephemeral_scheduled_fn.clone(), None, now).unwrap();
-                assert!(fn_is_scheduled(txn, ephemeral_scheduled_fn.clone(), &author,).unwrap());
-                assert!(fn_is_scheduled(txn, persisted_scheduled_fn.clone(), &author,).unwrap());
+                schedule_fn(txn, &alice_pubkey, ephemeral_scheduled_fn.clone(), None, now).unwrap();
+                assert!(fn_is_scheduled(txn, ephemeral_scheduled_fn.clone(), &alice_pubkey,).unwrap());
+                assert!(fn_is_scheduled(txn, persisted_scheduled_fn.clone(), &alice_pubkey,).unwrap());
 
                 // Deleting live ephemeral fns from a past time should do nothing.
-                delete_live_ephemeral_scheduled_fns(txn, the_past, &author).unwrap();
-                assert!(fn_is_scheduled(txn, ephemeral_scheduled_fn.clone(), &author,).unwrap());
-                assert!(fn_is_scheduled(txn, persisted_scheduled_fn.clone(), &author,).unwrap());
+                delete_live_ephemeral_scheduled_fns(txn, the_past, &alice_pubkey).unwrap();
+                assert!(fn_is_scheduled(txn, ephemeral_scheduled_fn.clone(), &alice_pubkey,).unwrap());
+                assert!(fn_is_scheduled(txn, persisted_scheduled_fn.clone(), &alice_pubkey,).unwrap());
 
                 // Deleting live ephemeral fns from the future should delete.
-                delete_live_ephemeral_scheduled_fns(txn, the_future, &author).unwrap();
-                assert!(!fn_is_scheduled(txn, ephemeral_scheduled_fn.clone(), &author,).unwrap());
-                assert!(fn_is_scheduled(txn, persisted_scheduled_fn.clone(), &author,).unwrap());
+                delete_live_ephemeral_scheduled_fns(txn, the_future, &alice_pubkey).unwrap();
+                assert!(!fn_is_scheduled(txn, ephemeral_scheduled_fn.clone(), &alice_pubkey,).unwrap());
+                assert!(fn_is_scheduled(txn, persisted_scheduled_fn.clone(), &alice_pubkey,).unwrap());
 
                 // Deleting all ephemeral fns should delete.
-                schedule_fn(txn, &author, ephemeral_scheduled_fn.clone(), None, now).unwrap();
-                assert!(fn_is_scheduled(txn, ephemeral_scheduled_fn.clone(), &author,).unwrap());
-                delete_all_ephemeral_scheduled_fns(txn, &author).unwrap();
-                assert!(!fn_is_scheduled(txn, ephemeral_scheduled_fn.clone(), &author,).unwrap());
-                assert!(fn_is_scheduled(txn, persisted_scheduled_fn.clone(), &author,).unwrap());
+                schedule_fn(txn, &alice_pubkey, ephemeral_scheduled_fn.clone(), None, now).unwrap();
+                assert!(fn_is_scheduled(txn, ephemeral_scheduled_fn.clone(), &alice_pubkey,).unwrap());
+                delete_all_ephemeral_scheduled_fns(txn, &alice_pubkey).unwrap();
+                assert!(!fn_is_scheduled(txn, ephemeral_scheduled_fn.clone(), &alice_pubkey,).unwrap());
+                assert!(fn_is_scheduled(txn, persisted_scheduled_fn.clone(), &alice_pubkey,).unwrap());
 
                 let ephemeral_future_schedule =
                     Schedule::Ephemeral(std::time::Duration::from_millis(1001));
                 schedule_fn(
                     txn,
-                    &author,
+                    &alice_pubkey,
                     ephemeral_scheduled_fn.clone(),
                     Some(ephemeral_future_schedule.clone()),
                     now,
@@ -161,14 +123,14 @@ pub mod tests {
                         persisted_scheduled_fn.clone(),
                         Some(persisted_schedule.clone())
                     )],
-                    live_scheduled_fns(txn, the_future, &author,).unwrap(),
+                    live_scheduled_fns(txn, the_future, &alice_pubkey,).unwrap(),
                 );
                 assert_eq!(
                     vec![
                         (persisted_scheduled_fn, Some(persisted_schedule)),
                         (ephemeral_scheduled_fn, Some(ephemeral_future_schedule)),
                     ],
-                    live_scheduled_fns(txn, the_distant_future, &author,).unwrap(),
+                    live_scheduled_fns(txn, the_distant_future, &alice_pubkey,).unwrap(),
                 );
 
                 Result::<(), DatabaseError>::Ok(())
@@ -182,39 +144,9 @@ pub mod tests {
     #[cfg(feature = "test_utils")]
     async fn schedule_test() -> anyhow::Result<()> {
         observability::test_run().ok();
-        let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Schedule])
-            .await
-            .unwrap();
-
-        let alice_pubkey = fixt!(AgentPubKey, Predictable, 0);
-        let bob_pubkey = fixt!(AgentPubKey, Predictable, 1);
-
-        let mut dna_store = MockDnaStore::new();
-        dna_store.expect_add_dnas::<Vec<_>>().return_const(());
-        dna_store.expect_add_entry_defs::<Vec<_>>().return_const(());
-        dna_store.expect_add_dna().return_const(());
-        dna_store
-            .expect_get()
-            .return_const(Some(dna_file.clone().into()));
-        dna_store
-            .expect_get_entry_def()
-            .return_const(EntryDef::default_with_id("thing"));
-
-        let mut conductor =
-            SweetConductor::from_builder(ConductorBuilder::with_mock_dna_store(dna_store)).await;
-
-        let apps = conductor
-            .setup_app_for_agents(
-                "app-",
-                &[alice_pubkey.clone(), bob_pubkey.clone()],
-                &[dna_file.into()],
-            )
-            .await
-            .unwrap();
-
-        let ((alice,), (bobbo,)) = apps.into_tuples();
-        let alice = alice.zome(TestWasm::Schedule);
-        let bobbo = bobbo.zome(TestWasm::Schedule);
+        let RibosomeTestFixture {
+            conductor, alice, bob, ..
+        } = RibosomeTestFixture::new(TestWasm::Schedule).await;
 
         // Let's just drive alice to exhaust all ticks.
         let _schedule: () = conductor.call(&alice, "schedule", ()).await;
@@ -234,12 +166,12 @@ pub mod tests {
         // If Bob does a few ticks and then calls `start_scheduler` the
         // ephemeral scheduled task will be flushed so the ticks will not be
         // exhaused until the function is rescheduled.
-        let _shedule: () = conductor.call(&bobbo, "schedule", ()).await;
+        let _shedule: () = conductor.call(&bob, "schedule", ()).await;
         conductor.handle().dispatch_scheduled_fns().await;
-        let query1: Vec<Element> = conductor.call(&bobbo, "query_tick", ()).await;
+        let query1: Vec<Element> = conductor.call(&bob, "query_tick", ()).await;
         assert_eq!(query1.len(), 1);
         conductor.handle().dispatch_scheduled_fns().await;
-        let query2: Vec<Element> = conductor.call(&bobbo, "query_tick", ()).await;
+        let query2: Vec<Element> = conductor.call(&bob, "query_tick", ()).await;
         assert_eq!(query2.len(), query1.len() + 1);
 
         // With a fast scheduler bob should clear everything out.
@@ -249,16 +181,16 @@ pub mod tests {
             .await;
 
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-        let q: Vec<Element> = conductor.call(&bobbo, "query_tick", ()).await;
+        let q: Vec<Element> = conductor.call(&bob, "query_tick", ()).await;
         assert_eq!(q.len(), query2.len());
 
         // Rescheduling will allow bob catch up to alice.
-        let _shedule: () = conductor.call(&bobbo, "schedule", ()).await;
+        let _shedule: () = conductor.call(&bob, "schedule", ()).await;
 
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;
         let q2: Vec<Element> = conductor
             .call(
-                &bobbo,
+                &bob,
                 "query_tick",
                 ()
             )
