@@ -76,11 +76,12 @@ impl ValidationReceipt {
         let signatures = if signatures.iter().any(Result::is_ok) {
             signatures.into_iter().filter_map(Result::ok).collect()
         } else {
-            return Err(signatures
-                .into_iter()
-                .filter_map(Result::err)
-                .next()
-                .expect("Must contain at least one error if there is no success"));
+            let r = match signatures.into_iter().filter_map(Result::err).next() {
+                Some(err) => Err(err),
+                // Weird that we got to here with no errors but seems to be happening in production.
+                None => Ok(None),
+            };
+            return r;
         };
         Ok(Some(SignedValidationReceipt {
             receipt: self,
