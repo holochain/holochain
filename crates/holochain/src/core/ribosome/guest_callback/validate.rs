@@ -76,7 +76,6 @@ impl Invocation for ValidateInvocation {
             }
             _ => {}
         }
-        dbg!(&fns);
         fns.into()
     }
     fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
@@ -104,8 +103,7 @@ impl From<Vec<(ZomeName, ValidateCallbackResult)>> for ValidateResult {
     /// It drops the irrelevant zome names and falls back to the conversion from
     /// a Vec<ValidateCallbackResults> -> ValidateResult
     fn from(a: Vec<(ZomeName, ValidateCallbackResult)>) -> Self {
-        dbg!(&a);
-        dbg!(a.into_iter().map(|(_, v)| v).collect::<Vec<_>>().into())
+        a.into_iter().map(|(_, v)| v).collect::<Vec<_>>().into()
     }
 }
 

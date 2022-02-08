@@ -52,8 +52,6 @@ pub mod wasm_test {
             ..
         } = RibosomeTestFixture::new(TestWasm::Sign).await;
 
-        dbg!(&alice_pubkey);
-
         // signatures should not change for a given pubkey
         for (k, data, expect) in vec![
             (
