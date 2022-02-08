@@ -109,16 +109,6 @@ pub fn must_get_entry<'a>(
 
 #[cfg(test)]
 pub mod test {
-    // use crate::core::ribosome::guest_callback::validate::ValidateResult;
-    // use crate::core::ribosome::RibosomeError;
-    // use crate::core::ribosome::RibosomeT;
-    // use crate::core::ribosome::ZomesToInvoke;
-    // use crate::fixt::curve::Zomes;
-    // use crate::fixt::RealRibosomeFixturator;
-    // use crate::fixt::ValidateHostAccessFixturator;
-    // use crate::fixt::ValidateInvocationFixturator;
-    // use ::fixt::prelude::fixt;
-    // use ::fixt::prelude::*;
     use hdk::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
     // use std::sync::Arc;
