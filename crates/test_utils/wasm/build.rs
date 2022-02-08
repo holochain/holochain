@@ -42,9 +42,13 @@ fn main() {
     let cargo_command = std::env::var_os("CARGO");
     let cargo_command = cargo_command.as_deref().unwrap_or_else(|| "cargo".as_ref());
     let mut cmd = std::process::Command::new(cargo_command);
+    cmd.env_remove("RUSTFLAGS");
+    cmd.env_remove("CARGO_BUILD_RUSTFLAGS");
+    cmd.env_remove("CARGO_ENCODED_RUSTFLAGS");
     if should_build {
         cmd.stdout(Stdio::piped());
         cmd.stderr(Stdio::piped());
+        cmd.env("RUSTFLAGS", "-C opt-level=z");
         cmd.arg("build")
             .arg("--manifest-path")
             .arg("wasm_workspace/Cargo.toml")

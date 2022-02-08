@@ -35,7 +35,7 @@ pub mod validation_query;
 
 const NUM_CONCURRENT_OPS: usize = 50;
 
-#[cfg(todo_redo_old_tests)]
+#[cfg(test)]
 mod chain_test;
 #[cfg(test)]
 mod test_ideas;

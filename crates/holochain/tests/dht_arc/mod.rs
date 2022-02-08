@@ -24,6 +24,7 @@ async fn get_peers(num: usize, half_lens: &[u32], keystore: MetaLairClient) -> V
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "Not using alpha strategy anymore, todo: change to new strategy"]
 // This test shows that we can handle maintaining our [`MINIMUM_REDUNDANCY`]
 // through 1000 trials. If this test ever fails it's not flakey. Instead that means
 // we can't actually maintain the [`MIN_REDUNDANCY`] and will need raise the [`REDUNDANCY_TARGET`].
