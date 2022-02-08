@@ -84,7 +84,6 @@ pub use std::collections::HashSet;
 pub use std::convert::TryFrom;
 pub use tracing;
 pub use tracing::{debug, error, info, instrument, trace, warn};
-pub use tracing_subscriber;
 
 #[cfg(feature = "mock")]
 pub use mockall;

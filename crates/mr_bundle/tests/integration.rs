@@ -45,7 +45,7 @@ struct Thing(String);
 
 #[tokio::test]
 async fn resource_resolution() {
-    let dir = tempdir::TempDir::new("mr_bundle").unwrap();
+    let dir = tempfile::tempdir().unwrap();
 
     // Write a ResourceBytes to disk
     let local_thing = Thing("local".into());
@@ -123,7 +123,7 @@ async fn resource_resolution() {
 #[cfg(feature = "packing")]
 #[tokio::test]
 async fn unpack_roundtrip() {
-    let dir = tempdir::TempDir::new("mr_bundle").unwrap();
+    let dir = tempfile::tempdir().unwrap();
 
     // Write a ResourceBytes to disk
     let local_thing = Thing("local".into());
