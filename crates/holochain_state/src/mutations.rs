@@ -222,7 +222,7 @@ pub fn insert_wasm(txn: &mut Transaction, wasm: DnaWasmHashed) -> StateMutationR
     let (wasm, hash) = wasm.into_inner();
     sql_insert!(txn, Wasm, {
         "hash": hash,
-        "blob": to_blob(wasm)?,
+        "blob": wasm.code.as_ref(),
     })?;
     Ok(())
 }

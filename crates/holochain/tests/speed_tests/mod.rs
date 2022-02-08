@@ -31,6 +31,7 @@ use holochain::conductor::config::InterfaceDriver;
 use holochain::conductor::ConductorBuilder;
 use holochain::conductor::ConductorHandle;
 
+use super::test_utils::*;
 use holochain::sweettest::*;
 use holochain_state::{prelude::test_environments, test_utils::TestEnvs};
 use holochain_test_wasm_common::AnchorInput;
@@ -41,10 +42,7 @@ use holochain_websocket::WebsocketSender;
 use matches::assert_matches;
 use observability;
 use test_case::test_case;
-use test_utils::*;
 use tracing::instrument;
-
-mod test_utils;
 
 const DEFAULT_NUM: usize = 2000;
 

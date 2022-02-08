@@ -250,18 +250,14 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
             Ok(_) => (),
             // These are the two errors that can
             // occur if the database is not valid.
-            err
-            @
-            Err(Error::SqliteFailure(
+            err @ Err(Error::SqliteFailure(
                 rusqlite::ffi::Error {
                     code: ErrorCode::DatabaseCorrupt,
                     ..
                 },
                 ..,
             ))
-            | err
-            @
-            Err(Error::SqliteFailure(
+            | err @ Err(Error::SqliteFailure(
                 rusqlite::ffi::Error {
                     code: ErrorCode::NotADatabase,
                     ..
@@ -319,7 +315,7 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
     /// Create a unique db in a temp dir with no static management of the
     /// connection pool, useful for testing.
     #[cfg(any(test, feature = "test_utils"))]
-    pub fn test(tmpdir: &tempdir::TempDir, kind: Kind) -> DatabaseResult<Self> {
+    pub fn test(tmpdir: &tempfile::TempDir, kind: Kind) -> DatabaseResult<Self> {
         Self::new(tmpdir.path(), kind, DbSyncLevel::default())
     }
 

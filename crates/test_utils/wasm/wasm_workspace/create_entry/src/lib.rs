@@ -184,3 +184,31 @@ fn call_create_entry_remotely(agent: AgentPubKey) -> ExternResult<HeaderHash> {
         ))),
     }
 }
+
+#[hdk_extern]
+/// Same as above but doesn't recurse on network errors.
+fn call_create_entry_remotely_no_rec(agent: AgentPubKey) -> ExternResult<HeaderHash> {
+    let zome_call_response: ZomeCallResponse = call_remote(
+        agent.clone(),
+        "create_entry".to_string().into(),
+        "create_entry".to_string().into(),
+        None,
+        &(),
+    )?;
+
+    match zome_call_response {
+        ZomeCallResponse::Ok(v) => Ok(v.decode()?),
+        ZomeCallResponse::Unauthorized(cell_id, zome_name, function_name, agent_pubkey) => {
+            Err(WasmError::Guest(format!(
+                "Unauthorized: {} {} {} {}",
+                cell_id, zome_name, function_name, agent_pubkey
+            )))
+        }
+        // Unbounded recursion.
+        ZomeCallResponse::NetworkError(e) => Err(WasmError::Guest(format!("Network Error: {}", e))),
+        ZomeCallResponse::CountersigningSession(e) => Err(WasmError::Guest(format!(
+            "Countersigning session failed: {}",
+            e
+        ))),
+    }
+}

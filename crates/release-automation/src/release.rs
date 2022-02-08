@@ -5,6 +5,7 @@ use super::*;
 use anyhow::bail;
 use anyhow::Context;
 use bstr::ByteSlice;
+use cargo::util::VersionExt;
 use chrono::TimeZone;
 use chrono::Utc;
 use cli::ReleaseArgs;
@@ -28,6 +29,7 @@ use std::{
 use structopt::StructOpt;
 
 use crate::changelog::{Changelog, WorkspaceCrateReleaseHeading};
+use crate::crate_::increment_patch;
 use crate::crate_selection::Crate;
 pub(crate) use crate_selection::{ReleaseWorkspace, SelectionCriteria};
 
@@ -242,7 +244,7 @@ fn bump_release_versions<'a>(
             }
 
             // todo(backlog): support configurable major/minor/patch/rc? version bumps
-            previous_release_version.increment_patch();
+            increment_patch(&mut previous_release_version);
 
             previous_release_version
         } else {
@@ -251,7 +253,7 @@ fn bump_release_versions<'a>(
 
             if new_version.is_prerelease() {
                 // todo(backlog): support configurable major/minor/patch/rc? version bumps
-                new_version.increment_patch();
+                increment_patch(&mut new_version);
             }
 
             new_version
@@ -810,7 +812,7 @@ fn publish_paths_to_crates_io(
         let manifest_path = crt.manifest_path();
         let cargo_target_dir_string = cargo_target_dir
             .as_ref()
-            .map(|target_dir| format!("--target-dir={}", target_dir.to_string_lossy().to_string()));
+            .map(|target_dir| format!("--target-dir={}", target_dir.to_string_lossy()));
 
         let mut cmd = std::process::Command::new("cargo");
         cmd.args(

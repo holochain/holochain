@@ -123,6 +123,7 @@ async fn many_agents_can_reach_consistency_normal_links() {
 
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "test_utils")]
+// This could become a bench.
 #[ignore = "Slow test for CI that is only useful for timing"]
 async fn stuck_conductor_wasm_calls() -> anyhow::Result<()> {
     observability::test_run().ok();
