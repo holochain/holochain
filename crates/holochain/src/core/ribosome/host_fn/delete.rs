@@ -116,7 +116,7 @@ pub mod wasm_test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_delete_entry_test<'a>() {
-        observability::test_run().ok();
+        // observability::test_run().ok();
         let host_access = fixt!(ZomeCallHostAccess, Predictable);
 
         let thing_a: HeaderHash =
@@ -130,7 +130,8 @@ pub mod wasm_test {
         }
 
         let _: HeaderHash =
-            crate::call_test_ribosome!(host_access, TestWasm::Crd, "delete", thing_a).unwrap();
+            crate::call_test_ribosome!(host_access, TestWasm::Crd, "delete_via_hash", thing_a)
+                .unwrap();
 
         let get_thing: Option<Element> =
             crate::call_test_ribosome!(host_access, TestWasm::Crd, "reed", thing_a).unwrap();
