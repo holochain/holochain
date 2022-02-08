@@ -575,11 +575,6 @@ pub mod wasm_test {
     use core::time::Duration;
     use holo_hash::AgentPubKey;
     use holochain_wasm_test_utils::TestWasm;
-    // use crate::conductor::Conductor;
-    // use holochain_types::prelude::*;
-
-    // use crate::core::ribosome::test_keystore;
-    // use holochain_types::test_utils::test_keystore;
 
     pub fn now() -> Duration {
         std::time::SystemTime::now()

@@ -106,17 +106,12 @@ pub mod wasm_test {
     use crate::conductor::api::error::ConductorApiError;
     use crate::conductor::api::ZomeCall;
     use crate::conductor::CellError;
-    use crate::conductor::ConductorBuilder;
     use crate::core::ribosome::error::RibosomeError;
-    use crate::core::ribosome::MockDnaStore;
     use crate::core::workflow::error::WorkflowError;
-    use crate::sweettest::SweetConductor;
-    use crate::sweettest::SweetDnaFile;
-    use ::fixt::prelude::*;
     use hdk::prelude::*;
     use holochain_state::source_chain::SourceChainError;
-    use holochain_types::prelude::AgentPubKeyFixturator;
     use holochain_wasm_test_utils::TestWasm;
+    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
 
     /// Allow ChainLocked error, panic on anything else
     fn expect_chain_locked(
@@ -137,39 +132,14 @@ pub mod wasm_test {
     #[cfg(feature = "slow_tests")]
     async fn unlock_invalid_session() {
         observability::test_run().ok();
-        let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning])
-            .await
-            .unwrap();
-
-        let alice_pubkey = fixt!(AgentPubKey, Predictable, 0);
-        let bob_pubkey = fixt!(AgentPubKey, Predictable, 1);
-
-        let mut dna_store = MockDnaStore::new();
-        dna_store.expect_add_dnas::<Vec<_>>().return_const(());
-        dna_store.expect_add_entry_defs::<Vec<_>>().return_const(());
-        dna_store.expect_add_dna().return_const(());
-        dna_store
-            .expect_get()
-            .return_const(Some(dna_file.clone().into()));
-        dna_store
-            .expect_get_entry_def()
-            .return_const(EntryDef::default_with_id("thing"));
-
-        let mut conductor =
-            SweetConductor::from_builder(ConductorBuilder::with_mock_dna_store(dna_store)).await;
-
-        let apps = conductor
-            .setup_app_for_agents(
-                "app-",
-                &[alice_pubkey.clone(), bob_pubkey.clone()],
-                &[dna_file.into()],
-            )
-            .await
-            .unwrap();
-
-        let ((alice,), (bobbo,)) = apps.into_tuples();
-        let alice = alice.zome(TestWasm::CounterSigning);
-        let bobbo = bobbo.zome(TestWasm::CounterSigning);
+        let RibosomeTestFixture {
+            conductor,
+            alice,
+            alice_pubkey,
+            bob,
+            bob_pubkey,
+            ..
+        } = RibosomeTestFixture::new(TestWasm::CounterSigning).await;
 
         // Before preflight Alice can commit
         let _: HeaderHash = conductor.call(&alice, "create_a_thing", ()).await;
@@ -206,7 +176,7 @@ pub mod wasm_test {
         // Bob can also accept the preflight request.
         let bob_acceptance: PreflightRequestAcceptance = conductor
             .call(
-                &bobbo,
+                &bob,
                 "accept_countersigning_preflight_request",
                 preflight_request.clone(),
             )
@@ -255,39 +225,14 @@ pub mod wasm_test {
     #[cfg(feature = "slow_tests")]
     async fn lock_chain() {
         observability::test_run().ok();
-        let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning])
-            .await
-            .unwrap();
-
-        let alice_pubkey = fixt!(AgentPubKey, Predictable, 0);
-        let bob_pubkey = fixt!(AgentPubKey, Predictable, 1);
-
-        let mut dna_store = MockDnaStore::new();
-        dna_store.expect_add_dnas::<Vec<_>>().return_const(());
-        dna_store.expect_add_entry_defs::<Vec<_>>().return_const(());
-        dna_store.expect_add_dna().return_const(());
-        dna_store
-            .expect_get()
-            .return_const(Some(dna_file.clone().into()));
-        dna_store
-            .expect_get_entry_def()
-            .return_const(EntryDef::default_with_id("thing"));
-
-        let mut conductor =
-            SweetConductor::from_builder(ConductorBuilder::with_mock_dna_store(dna_store)).await;
-
-        let apps = conductor
-            .setup_app_for_agents(
-                "app-",
-                &[alice_pubkey.clone(), bob_pubkey.clone()],
-                &[dna_file.into()],
-            )
-            .await
-            .unwrap();
-
-        let ((alice,), (bobbo,)) = apps.into_tuples();
-        let alice = alice.zome(TestWasm::CounterSigning);
-        let bobbo = bobbo.zome(TestWasm::CounterSigning);
+        let RibosomeTestFixture {
+            conductor,
+            alice,
+            alice_pubkey,
+            bob,
+            bob_pubkey,
+            ..
+        } = RibosomeTestFixture::new(TestWasm::CounterSigning).await;
 
         // Before the preflight creation of things should work.
         let _: HeaderHash = conductor.call(&alice, "create_a_thing", ()).await;
@@ -352,7 +297,7 @@ pub mod wasm_test {
         // Bob can also accept the preflight request.
         let bob_acceptance: PreflightRequestAcceptance = conductor
             .call(
-                &bobbo,
+                &bob,
                 "accept_countersigning_preflight_request",
                 preflight_request.clone(),
             )
@@ -381,8 +326,8 @@ pub mod wasm_test {
         let thing_fail_create_bob = conductor
             .handle()
             .call_zome(ZomeCall {
-                cell_id: bobbo.cell_id().clone(),
-                zome_name: bobbo.name().clone(),
+                cell_id: bob.cell_id().clone(),
+                zome_name: bob.name().clone(),
                 fn_name: "create_a_thing".into(),
                 cap_secret: None,
                 provenance: bob_pubkey.clone(),
@@ -433,8 +378,8 @@ pub mod wasm_test {
         let thing_fail_create_bob = conductor
             .handle()
             .call_zome(ZomeCall {
-                cell_id: bobbo.cell_id().clone(),
-                zome_name: bobbo.name().clone(),
+                cell_id: bob.cell_id().clone(),
+                zome_name: bob.name().clone(),
                 fn_name: "create_a_thing".into(),
                 cap_secret: None,
                 provenance: bob_pubkey.clone(),
@@ -446,20 +391,20 @@ pub mod wasm_test {
         // After bob commits the same countersigned entry he can unlock his chain.
         let countersigned_header_hash_bob: HeaderHash = conductor
             .call(
-                &bobbo,
+                &bob,
                 "create_a_countersigned_thing",
                 vec![alice_response, bob_response],
             )
             .await;
         tokio::time::sleep(std::time::Duration::from_millis(4000)).await;
         let _: HeaderHash = conductor.call(&alice, "create_a_thing", ()).await;
-        let _: HeaderHash = conductor.call(&bobbo, "create_a_thing", ()).await;
+        let _: HeaderHash = conductor.call(&bob, "create_a_thing", ()).await;
         tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
 
         // Header get must not error.
         let countersigned_header_bob: SignedHeaderHashed = conductor
             .call(
-                &bobbo,
+                &bob,
                 "must_get_header",
                 countersigned_header_hash_bob.clone(),
             )
@@ -477,7 +422,7 @@ pub mod wasm_test {
             countersigned_header_bob.header().entry_data()
         {
             let _countersigned_entry_bob: EntryHashed = conductor
-                .call(&bobbo, "must_get_entry", countersigned_entry_hash_bob)
+                .call(&bob, "must_get_entry", countersigned_entry_hash_bob)
                 .await;
         } else {
             unreachable!();
@@ -486,7 +431,7 @@ pub mod wasm_test {
         // Element get must not error.
         let _countersigned_element_bob: Element = conductor
             .call(
-                &bobbo,
+                &bob,
                 "must_get_valid_element",
                 countersigned_header_hash_bob,
             )
@@ -511,7 +456,7 @@ pub mod wasm_test {
 
         let bob_activity: AgentActivity = conductor
             .call(
-                &bobbo,
+                &bob,
                 "get_agent_activity",
                 GetAgentActivityInput {
                     agent_pubkey: bob_pubkey.clone(),
