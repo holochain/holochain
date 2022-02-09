@@ -107,7 +107,7 @@ pub mod test {
             .expect_delete()
             .with(hdk::prelude::mockall::predicate::eq(DeleteInput::new(
                 input_header_hash.clone(),
-                ChainTopOrdering::default(),
+                ChainTopOrdering::Relaxed,
             )))
             .times(1)
             .return_once(move |_| Ok(output_header_hash_closure));
