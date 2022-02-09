@@ -1,0 +1,218 @@
+name: release holochain
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_branch:
+        description: "Source branch for the release"
+        required: false
+        default: "develop"
+        type: string
+      dry_run:
+        description: "Dry run"
+        required: false
+        default: "false"
+        type: boolean
+      debug_post_prepare:
+        description: "Stop for debugging after preparing hte release"
+        required: false
+        default: "false"
+        type: boolean
+
+jobs:
+  prepare-release:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.write-env-and-tag.outputs.tag }}
+      version: ${{ steps.write-env-and-tag.outputs.version }}
+      version_compat: ${{ steps.write-env-and-tag.outputs.version_compat }}
+      release_branch: ${{ steps.write-env-and-tag.outputs.release_branch }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2.4.0
+      - name: Install nix
+        uses: cachix/install-nix-action@v16
+      - name: Setup cachix
+        uses: cachix/cachix-action@v10
+        # Don't replace <YOUR_CACHIX_NAME> here!
+        if: ${{ matrix.cachixName != '<YOUR_CACHIX_NAME>' }}
+        with:
+          name: ${{ matrix.cachixName }}
+          signingKey: "${{ secrets.CACHIX_SIGNING_KEY }}"
+          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
+      - name: Set NIX_PATH (FIXME)
+        run: echo NIX_PATH=nixpkgs=$(./scripts/nix_path.sh) >> $GITHUB_ENV
+
+      - name: Cache cargo related build files
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            .cargo/bin/
+            .cargo/registry/index/
+            .cargo/registry/cache/
+            .cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Fetch git tags
+        run: git fetch --all --tags
+
+      - name: Prepare an environment file
+        run: |
+          cat <<EOF > ~/.holochain_release.sh
+          export HOLOCHAIN_NIXPKGS_URL="git@github.com:holochain/holochain-nixkpgs.git"
+          export HOLONIX_URL="git@github.com:holochain/holonix.git"
+
+          export HOLOCHAIN_REPO=$PWD
+          export HOLOCHAIN_NIXPKGS_REPO=$(mktemp -d)
+          export HOLONIX_REPO=$(mktemp -d)
+          EOF
+
+      - name: Create release branch and bump versions
+        run: |
+          nix-shell --run '
+            hc-ra \
+              --workspace-path=$PWD \
+              --log-level=info \
+              release \
+                --steps=CreateReleaseBranch
+            '
+
+          nix-shell --run '
+            hc-ra \
+              --workspace-path=$PWD \
+              crate apply-dev-versions --commit
+            '
+
+          nix-shell --run '
+            hc-ra \
+              --workspace-path=$PWD \
+              --log-level=info \
+              release \
+                --match-filter="^(holochain|holochain_cli|kitsune_p2p_proxy)$" \
+                --disallowed-version-reqs=">=0.1" \
+                --steps=BumpReleaseVersions
+            '
+
+      - name: Write environment file and set outputs
+        id: write-env-and-tag
+        run: |
+          cat <<EOF >> ~/.holochain_release.sh
+          export TAG=$(git tag --list | grep holochain- | tail -n1)
+          export VERSION=\${TAG/holochain-/}
+          export VERSION_COMPAT="v\${VERSION//./_}"
+          export RELEASE_BRANCH=$(git branch --show-current)
+          EOF
+
+          source ~/.holochain_release.sh
+
+          echo "::set-output name=tag::${TAG}"
+          echo "::set-output name=version::${VERSION}"
+          echo "::set-output name=version_compat::${VERSION_COMPAT}"
+          echo "::set-output name=release_branch::${RELEASE_BRANCH}"
+
+      - name: Push branch and tag
+        if: ${{ inputs.dry_run == false }}
+        run: |
+          source ~/.holochain_release.sh
+          git push -u origin $(git branch --show-current)
+          git push origin "${TAG}"
+
+      - name: Setup upterm session
+        uses: lhotari/action-upterm@v1
+        if: ${{ failure() || inputs.debug_post_prepare }}
+        with:
+          ## limits ssh access and adds the ssh public key for the user which triggered the workflow
+          limit-access-to-actor: true
+          ## limits ssh access and adds the ssh public keys of the listed GitHub users
+          limit-access-to-users: steveeJ,jost-s,freesig,neonphog,thedavidmeister,maackle
+
+  test-release:
+    if: ${{ inputs.dry_run == false }}
+    needs: prepare-release
+    strategy:
+      fail-fast: true
+      matrix:
+        platform:
+          - ubuntu-latest
+          - macos-latest
+        cachixName:
+          - holochain-ci
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2.4.0
+        with:
+          ref: ""
+      - name: Install nix
+        uses: cachix/install-nix-action@v16
+      - name: Setup cachix
+        uses: cachix/cachix-action@v10
+        # Don't replace <YOUR_CACHIX_NAME> here!
+        if: ${{ matrix.cachixName != '<YOUR_CACHIX_NAME>' }}
+        with:
+          name: ${{ matrix.cachixName }}
+          signingKey: "${{ secrets.CACHIX_SIGNING_KEY }}"
+          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
+      - name: Set NIX_PATH (FIXME)
+        run: echo NIX_PATH=nixpkgs=$(./scripts/nix_path.sh) >> $GITHUB_ENV
+
+      - name: Cache cargo related build files
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            .cargo/bin/
+            .cargo/registry/index/
+            .cargo/registry/cache/
+            .cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Run the regular tests
+        # if: ${{ matrix.platform != "macos-latest "}}
+        run: nix-shell --fallback --pure --argstr flavor "coreDev" --run hc-merge-test
+
+      - name: Run the holochain-nixpkgs build
+        run: exit 1
+      - name: Run the holonix build
+        run: exit 1
+
+      - name: Delete tag on failure
+        uses: dev-drprasad/delete-tag-and-release@v0.2.0
+        if: failure()
+        with:
+          delete_release: true # default: false
+          tag_name: ${{ steps.write-env-and-tag.outputs.tag }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup upterm session
+        uses: lhotari/action-upterm@v1
+        if: failure()
+        with:
+          ## limits ssh access and adds the ssh public key for the user which triggered the workflow
+          limit-access-to-actor: true
+          ## limits ssh access and adds the ssh public keys of the listed GitHub users
+          limit-access-to-users: steveeJ,jost-s,freesig,neonphog,thedavidmeister,maackle
+
+      - name: Delete tag on failure
+        uses: dev-drprasad/delete-tag-and-release@v0.2.0
+        if: failure()
+        with:
+          delete_release: true # default: false
+          tag_name: ${{ steps.write-env-and-tag.outputs.tag }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
