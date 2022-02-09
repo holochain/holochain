@@ -1,12 +1,16 @@
-name: release and merge tests
+name: merge tests
 
 on:
-  pull_request: {}
+  # pull_request: {}
+  # push:
+  #   branches:
+  #     - main
+  #     - develop
+  #     - staging
+
   push:
     branches:
-      - main
-      - develop
-      - staging
+      - disable
 
 jobs:
   can_release:
