@@ -178,20 +178,17 @@ mod test {
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
-    use crate::conductor::ConductorBuilder;
     use crate::core::ribosome::guest_callback::entry_defs::EntryDefsHostAccess;
     use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
     use crate::core::ribosome::RibosomeT;
     use crate::fixt::curve::Zomes;
     use crate::fixt::EntryDefsInvocationFixturator;
     use crate::fixt::RealRibosomeFixturator;
-    use crate::sweettest::SweetConductor;
-    use crate::sweettest::SweetDnaFile;
-    use ::fixt::prelude::*;
     use holochain_types::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
     pub use holochain_zome_types::entry_def::EntryVisibility;
     use std::collections::BTreeMap;
+    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_entry_defs_unimplemented() {
@@ -211,39 +208,9 @@ mod slow_tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn test_entry_defs_index_lookup() {
         observability::test_run().ok();
-        let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::EntryDefs])
-            .await
-            .unwrap();
-
-        let alice_pubkey = fixt!(AgentPubKey, Predictable, 0);
-        let bob_pubkey = fixt!(AgentPubKey, Predictable, 1);
-
-        let mut dna_store = MockDnaStore::new();
-        dna_store.expect_add_dnas::<Vec<_>>().return_const(());
-        dna_store.expect_add_entry_defs::<Vec<_>>().return_const(());
-        dna_store.expect_add_dna().return_const(());
-        dna_store
-            .expect_get()
-            .return_const(Some(dna_file.clone().into()));
-        dna_store
-            .expect_get_entry_def()
-            .return_const(EntryDef::default_with_id("post"));
-
-        let mut conductor =
-            SweetConductor::from_builder(ConductorBuilder::with_mock_dna_store(dna_store)).await;
-
-        let apps = conductor
-            .setup_app_for_agents(
-                "app-",
-                &[alice_pubkey.clone(), bob_pubkey.clone()],
-                &[dna_file.into()],
-            )
-            .await
-            .unwrap();
-
-        let ((alice,), (bobbo,)) = apps.into_tuples();
-        let alice = alice.zome(TestWasm::EntryDefs);
-        let _bobbo = bobbo.zome(TestWasm::EntryDefs);
+        let RibosomeTestFixture {
+            conductor, alice, ..
+        } = RibosomeTestFixture::new(TestWasm::EntryDefs).await;
 
         let _: () = conductor.call(&alice, "assert_indexes", ()).await;
     }

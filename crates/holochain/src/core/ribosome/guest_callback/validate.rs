@@ -292,14 +292,12 @@ mod slow_tests {
     use crate::core::ribosome::ZomesToInvoke;
     use crate::fixt::curve::Zomes;
     use crate::fixt::*;
-    use crate::sweettest::SweetAgents;
-    use crate::sweettest::SweetConductor;
-    use crate::sweettest::SweetDnaFile;
     use ::fixt::prelude::*;
     use holo_hash::fixt::AgentPubKeyFixturator;
     use holochain_types::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
     use std::sync::Arc;
+    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_validate_unimplemented() {
@@ -378,25 +376,9 @@ mod slow_tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn pass_validate_test() {
         observability::test_run().ok();
-        let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Validate])
-            .await
-            .unwrap();
-
-        let mut conductor = SweetConductor::from_standard_config().await;
-        let (alice_pubkey, bob_pubkey) = SweetAgents::two(conductor.keystore()).await;
-
-        let apps = conductor
-            .setup_app_for_agents(
-                "app-",
-                &[alice_pubkey.clone(), bob_pubkey.clone()],
-                &[dna_file.into()],
-            )
-            .await
-            .unwrap();
-
-        let ((alice,), (bobbo,)) = apps.into_tuples();
-        let alice = alice.zome(TestWasm::Validate);
-        let _bobbo = bobbo.zome(TestWasm::Validate);
+        let RibosomeTestFixture {
+            conductor, alice, ..
+        } = RibosomeTestFixture::new(TestWasm::Validate).await;
 
         let output: HeaderHash = conductor.call(&alice, "always_validates", ()).await;
         let _output_element: Element = conductor
