@@ -28,8 +28,8 @@ fn delete_via_input(delete_input: DeleteInput) -> ExternResult<HeaderHash> {
 
 #[cfg(test)]
 pub mod test {
-    use fixt::prelude::*;
     use hdk::prelude::*;
+    use ::fixt::prelude::*;
 
     #[test]
     fn create_smoke() {
