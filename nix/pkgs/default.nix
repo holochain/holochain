@@ -17,7 +17,7 @@ let
 
     binary=$(cargo build \
       --locked \
-      --target-dir=''${NIX_ENV_PREFIX:-?}/target/hc-run-crate \
+      --target-dir=''${NIX_ENV_PREFIX:-?}/target \
       --manifest-path=${hcToplevelDir}/crates/$crate/Cargo.toml \
       --bin=$crate --message-format=json | \
         ${jq}/bin/jq \
@@ -37,7 +37,7 @@ let
 
     echo $(cargo build \
       --locked \
-      --target-dir=''${NIX_ENV_PREFIX:-?}/target/hc-run-crate \
+      --target-dir=''${NIX_ENV_PREFIX:-?}/target \
       --manifest-path=${hcToplevelDir}/crates/$crate/Cargo.toml \
       --bin=$crate --message-format=json | \
         ${jq}/bin/jq \
