@@ -42,6 +42,8 @@ rec {
       ++ (with holonix.pkgs;[
         sqlcipher
         gdb
+        gh
+        nixpkgs-fmt
       ]);
   };
 
