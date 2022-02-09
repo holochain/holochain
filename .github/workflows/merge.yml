@@ -1,4 +1,4 @@
-name: release and merge tests
+name: merge tests
 
 on:
   pull_request: {}
