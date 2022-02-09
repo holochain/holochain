@@ -288,6 +288,7 @@ mod test {
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
     use super::ValidateResult;
+    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use crate::core::ribosome::RibosomeT;
     use crate::core::ribosome::ZomesToInvoke;
     use crate::fixt::curve::Zomes;
@@ -297,7 +298,6 @@ mod slow_tests {
     use holochain_types::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
     use std::sync::Arc;
-    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_validate_unimplemented() {

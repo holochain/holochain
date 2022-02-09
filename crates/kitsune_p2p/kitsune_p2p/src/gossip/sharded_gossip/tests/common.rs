@@ -1,5 +1,3 @@
-use kitsune_p2p_types::{agent_info::AgentInfoInner, dht_arc::DhtArc};
-
 pub use crate::test_util::spawn_handler;
 
 use super::*;
@@ -91,12 +89,6 @@ pub async fn setup_empty_player(
     ShardedGossipLocal::test(GossipType::Historical, evt_sender, state)
 }
 
-pub fn agents(num_agents: usize) -> Vec<Arc<KitsuneAgent>> {
-    std::iter::repeat_with(|| Arc::new(fixt!(KitsuneAgent)))
-        .take(num_agents)
-        .collect()
-}
-
 pub async fn agents_with_infos(num_agents: usize) -> Vec<(Arc<KitsuneAgent>, AgentInfoSigned)> {
     let mut out = Vec::with_capacity(num_agents);
     for agent in std::iter::repeat_with(|| Arc::new(fixt!(KitsuneAgent))).take(num_agents) {
@@ -136,27 +128,6 @@ pub fn cert_from_info(info: AgentInfoSigned) -> Tx2Cert {
         .unwrap()
         .digest();
     Tx2Cert::from(digest)
-}
-
-/// Create an AgentInfoSigned with arbitrary agent and arc.
-/// DANGER: the DhtArc may *mismatch* with the agent! This is wrong in general,
-/// but OK for some test situations, and a necessary evil when carefully
-/// constructing a particular test case with particular DHT locations.
-pub fn dangerous_fake_agent_info_with_arc(
-    space: Arc<KitsuneSpace>,
-    agent: Arc<KitsuneAgent>,
-    storage_arc: DhtArc,
-) -> AgentInfoSigned {
-    AgentInfoSigned(Arc::new(AgentInfoInner {
-        space,
-        agent,
-        storage_arc,
-        url_list: vec![],
-        signed_at_ms: 0,
-        expires_at_ms: 0,
-        signature: Arc::new(fixt!(KitsuneSignature)),
-        encoded_bytes: Box::new([0]),
-    }))
 }
 
 pub fn empty_bloom() -> EncodedTimedBloomFilter {

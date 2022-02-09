@@ -19,6 +19,7 @@ use tokio::sync::Notify;
 
 /// Configuration for MemBackendAdapt
 #[non_exhaustive]
+#[derive(Default)]
 pub struct ProxyConfig {
     /// Tuning Params
     /// Default: None = default.
@@ -37,16 +38,6 @@ pub struct ProxyConfig {
     pub client_of_remote_proxy: Option<ProxyUrl>,
 }
 
-impl Default for ProxyConfig {
-    fn default() -> Self {
-        Self {
-            tuning_params: None,
-            allow_proxy_fwd: false,
-            client_of_remote_proxy: None,
-        }
-    }
-}
-
 impl ProxyConfig {
     /// into inner contents with default application
     pub fn split(self) -> KitsuneResult<(KitsuneP2pTuningParams, bool, Option<ProxyUrl>)> {
@@ -56,7 +47,7 @@ impl ProxyConfig {
             client_of_remote_proxy,
         } = self;
 
-        let tuning_params = tuning_params.unwrap_or_else(KitsuneP2pTuningParams::default);
+        let tuning_params = tuning_params.unwrap_or_default();
 
         Ok((tuning_params, allow_proxy_fwd, client_of_remote_proxy))
     }
@@ -949,7 +940,7 @@ mod tests {
         let f = tx2_mem_adapter(MemConfig::default()).await.unwrap();
         let f = tx2_pool_promote(f, Default::default());
 
-        let mut conf = ProxyConfig::default();
+        let mut conf = super::ProxyConfig::default();
         conf.allow_proxy_fwd = true;
         let f = tx2_proxy(f, conf).unwrap();
 

@@ -18,6 +18,7 @@ use std::sync::atomic;
 
 /// Configuration for MemBackendAdapt
 #[non_exhaustive]
+#[derive(Default)]
 pub struct MemConfig {
     /// Tls config
     /// Default: None = ephemeral.
@@ -26,15 +27,6 @@ pub struct MemConfig {
     /// Tuning Params
     /// Default: None = default.
     pub tuning_params: Option<KitsuneP2pTuningParams>,
-}
-
-impl Default for MemConfig {
-    fn default() -> Self {
-        Self {
-            tls: None,
-            tuning_params: None,
-        }
-    }
 }
 
 impl MemConfig {
@@ -47,7 +39,7 @@ impl MemConfig {
             Some(tls) => tls,
         };
 
-        let tuning_params = tuning_params.unwrap_or_else(KitsuneP2pTuningParams::default);
+        let tuning_params = tuning_params.unwrap_or_default();
 
         Ok((tls, tuning_params))
     }
@@ -413,7 +405,7 @@ impl BindAdapt for MemBackendAdapt {
         let local_cert = self.0.clone();
         timeout
             .mix(async move {
-                let id = NEXT_MEM_ID.fetch_add(1, atomic::Ordering::Relaxed);
+                let id = NEXT_MEM_ID.fetch_add(1, atomic::Ordering::SeqCst);
                 let (c_send, c_recv) = t_chan(32);
                 let (ep, ep_active) = MemEndpointAdapt::new(c_send.clone(), id, local_cert.clone());
                 MEM_ENDPOINTS

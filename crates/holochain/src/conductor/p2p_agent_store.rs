@@ -5,8 +5,8 @@ use holo_hash::DnaHash;
 use holochain_conductor_api::AgentInfoDump;
 use holochain_conductor_api::P2pAgentsDump;
 use holochain_p2p::dht_arc::DhtArc;
-use holochain_p2p::dht_arc::DhtArcBucket;
-use holochain_p2p::dht_arc::PeerDensity;
+use holochain_p2p::dht_arc::PeerStratBeta;
+use holochain_p2p::dht_arc::PeerViewBeta;
 use holochain_p2p::kitsune_p2p::agent_store::AgentInfoSigned;
 use holochain_p2p::AgentPubKeyExt;
 use holochain_sqlite::prelude::*;
@@ -56,14 +56,14 @@ pub async fn p2p_put_all_batch(
         let mut responses = Vec::with_capacity(batch.len());
         let (tx, rx) = tokio::sync::oneshot::channel();
         let result = env
-            .async_commit(move |mut txn| {
+            .async_commit(move |txn| {
                 'batch: for P2pBatch {
                     peer_data: batch,
                     result_sender: response,
                 } in batch
                 {
                     for info in batch {
-                        match p2p_put_single(&mut txn, &info) {
+                        match p2p_put_single(txn, &info) {
                             Ok(_) => (),
                             Err(e) => {
                                 responses.push((Err(e), response));
@@ -196,10 +196,10 @@ pub async fn query_peer_density(
     env: DbRead<DbKindP2pAgentStore>,
     kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
     dht_arc: DhtArc,
-) -> ConductorResult<PeerDensity> {
+) -> ConductorResult<PeerViewBeta> {
     let now = now();
     let arcs = run_query(env, move |mut conn| Ok(conn.p2p_list_agents()?)).await?;
-    let arcs = arcs
+    let arcs: Vec<_> = arcs
         .into_iter()
         .filter_map(|v| {
             if dht_arc.contains(v.agent.get_loc()) {
@@ -215,9 +215,7 @@ pub async fn query_peer_density(
         .collect();
 
     // contains is already checked in the iterator
-    let bucket = DhtArcBucket::new_unchecked(dht_arc, arcs);
-
-    Ok(bucket.density())
+    Ok(PeerStratBeta::default().view_unchecked(dht_arc, arcs.as_slice()))
 }
 
 /// Put single agent info into store

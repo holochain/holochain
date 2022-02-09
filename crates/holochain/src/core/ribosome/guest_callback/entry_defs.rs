@@ -180,6 +180,7 @@ mod test {
 mod slow_tests {
     use crate::core::ribosome::guest_callback::entry_defs::EntryDefsHostAccess;
     use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
+    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use crate::core::ribosome::RibosomeT;
     use crate::fixt::curve::Zomes;
     use crate::fixt::EntryDefsInvocationFixturator;
@@ -188,7 +189,6 @@ mod slow_tests {
     use holochain_wasm_test_utils::TestWasm;
     pub use holochain_zome_types::entry_def::EntryVisibility;
     use std::collections::BTreeMap;
-    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_entry_defs_unimplemented() {

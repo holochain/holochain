@@ -293,6 +293,7 @@ mod test {
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
     use super::ValidateLinkResult;
+    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use crate::core::ribosome::RibosomeT;
     use crate::fixt::curve::Zomes;
     use crate::fixt::*;
@@ -300,7 +301,6 @@ mod slow_tests {
     use holo_hash::HeaderHash;
     use holochain_types::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
-    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_validate_link_add_unimplemented() {

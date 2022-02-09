@@ -180,6 +180,7 @@ mod test {
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
+    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use crate::core::ribosome::RibosomeT;
     use crate::fixt::curve::Zomes;
     use crate::fixt::PostCommitHostAccessFixturator;
@@ -187,7 +188,6 @@ mod slow_tests {
     use crate::fixt::RealRibosomeFixturator;
     use hdk::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
-    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_post_commit_unimplemented() {
@@ -228,11 +228,16 @@ mod slow_tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "flakey. Sometimes fails the second last assert with 3 instead of 5"]
     #[cfg(feature = "test_utils")]
     async fn post_commit_test_volley() -> anyhow::Result<()> {
         observability::test_run().ok();
         let RibosomeTestFixture {
-            conductor, alice, bob, bob_pubkey, ..
+            conductor,
+            alice,
+            bob,
+            bob_pubkey,
+            ..
         } = RibosomeTestFixture::new(TestWasm::PostCommitVolley).await;
 
         let _set_access: () = conductor.call::<_, (), _>(&alice, "set_access", ()).await;

@@ -2,14 +2,22 @@
 //! call. This is about as close as we can get to a true mock which would allow
 //! tweaking individual handlers, hence why this is a "crude" mock.
 
+use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
+use ghost_actor::dependencies::futures::FutureExt;
+use kitsune_p2p_types::dependencies::lair_keystore_api::lair_client::traits::AsLairClient;
+use kitsune_p2p_types::dependencies::lair_keystore_api::prelude::{LairApiEnum, LairClient};
+use kitsune_p2p_types::dependencies::lair_keystore_api::LairResult;
+
+use crate::keystore_actor::KeystoreApiResult;
 use crate::lair_keystore_api_0_0::{actor::*, internal::*, *};
 
+use crate::test_keystore::spawn_test_keystore;
 use crate::MetaLairClient;
 
 /// Spawn a test keystore which always returns the same LairError for every call.
-pub async fn spawn_crude_mock_keystore<F>(err_fn: F) -> LairResult<MetaLairClient>
+pub async fn spawn_crude_mock_keystore<F>(err_fn: F) -> KeystoreApiResult<MetaLairClient>
 where
     F: Fn() -> LairError + Send + 'static,
 {
@@ -20,18 +28,102 @@ where
         .create_channel::<LairClientApi>()
         .await?;
 
-    tokio::task::spawn(builder.spawn(CrudeMockKeystore(Box::new(err_fn))));
+    tokio::task::spawn(builder.spawn(CrudeLegacyMockKeystore(Box::new(err_fn))));
 
     Ok(MetaLairClient::Legacy(sender))
 }
 
+/// Spawn a test keystore that can switch between mocked and real.
+/// It starts off as real and can be switched to the given callback mock
+/// using the [`MockLairControl`].
+pub async fn spawn_real_or_mock_keystore<F>(
+    func: F,
+) -> LairResult<(MetaLairClient, MockLairControl)>
+where
+    F: Fn(LairApiEnum) -> LairResult<LairApiEnum> + Send + Sync + 'static,
+{
+    let real = spawn_test_keystore().await?;
+    let use_mock = Arc::new(AtomicBool::new(false));
+    let mock = RealOrMockKeystore {
+        mock: Box::new(func),
+        real,
+        use_mock: use_mock.clone(),
+    };
+
+    let control = MockLairControl(use_mock);
+
+    Ok((MetaLairClient::NewLair(LairClient(Arc::new(mock))), control))
+}
 /// A keystore which always returns the same LairError for every call.
-struct CrudeMockKeystore(Box<dyn Fn() -> LairError + Send + 'static>);
+struct RealOrMockKeystore {
+    mock: Box<dyn Fn(LairApiEnum) -> LairResult<LairApiEnum> + Send + Sync + 'static>,
+    real: MetaLairClient,
+    use_mock: Arc<AtomicBool>,
+}
 
-impl ghost_actor::GhostControlHandler for CrudeMockKeystore {}
-impl ghost_actor::GhostHandler<LairClientApi> for CrudeMockKeystore {}
+/// Control if a mocked lair keystore is using
+/// the real keystore or the mock callback.
+pub struct MockLairControl(Arc<AtomicBool>);
 
-impl LairClientApiHandler for CrudeMockKeystore {
+impl MockLairControl {
+    /// Use the mock callback.
+    pub fn use_mock(&self) {
+        self.0.store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    /// Use the real test keystore.
+    pub fn use_real(&self) {
+        self.0.store(false, std::sync::atomic::Ordering::SeqCst);
+    }
+}
+/// A keystore which always returns the same LairError for every call.
+struct CrudeLegacyMockKeystore(Box<dyn Fn() -> LairError + Send + 'static>);
+
+impl AsLairClient for RealOrMockKeystore {
+    fn get_enc_ctx_key(&self) -> sodoken::BufReadSized<32> {
+        match &self.real {
+            MetaLairClient::NewLair(client) => client.get_enc_ctx_key(),
+            MetaLairClient::Legacy(_) => unreachable!(),
+        }
+    }
+
+    fn get_dec_ctx_key(&self) -> sodoken::BufReadSized<32> {
+        match &self.real {
+            MetaLairClient::NewLair(client) => client.get_dec_ctx_key(),
+            MetaLairClient::Legacy(_) => unreachable!(),
+        }
+    }
+
+    fn shutdown(
+        &self,
+    ) -> ghost_actor::dependencies::futures::future::BoxFuture<'static, LairResult<()>> {
+        match &self.real {
+            MetaLairClient::NewLair(client) => client.shutdown().boxed(),
+            MetaLairClient::Legacy(_) => unreachable!(),
+        }
+    }
+
+    fn request(
+        &self,
+        request: LairApiEnum,
+    ) -> ghost_actor::dependencies::futures::future::BoxFuture<'static, LairResult<LairApiEnum>>
+    {
+        if self.use_mock.load(std::sync::atomic::Ordering::SeqCst) {
+            let r = (self.mock)(request);
+            async move { r }.boxed()
+        } else {
+            match &self.real {
+                MetaLairClient::NewLair(client) => client.0.request(request),
+                MetaLairClient::Legacy(_) => unreachable!(),
+            }
+        }
+    }
+}
+
+impl ghost_actor::GhostControlHandler for CrudeLegacyMockKeystore {}
+impl ghost_actor::GhostHandler<LairClientApi> for CrudeLegacyMockKeystore {}
+
+impl LairClientApiHandler for CrudeLegacyMockKeystore {
     fn handle_lair_get_server_info(&mut self) -> LairClientApiHandlerResult<LairServerInfo> {
         Err(self.0())
     }

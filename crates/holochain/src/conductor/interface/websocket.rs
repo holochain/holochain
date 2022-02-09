@@ -227,7 +227,7 @@ pub mod test_utils {
     use holochain_state::prelude::*;
     use holochain_types::prelude::*;
     use std::sync::Arc;
-    use tempdir::TempDir;
+    use tempfile::TempDir;
 
     /// One of various ways to setup an app, used somewhere...
     pub async fn setup_app(
@@ -265,7 +265,7 @@ pub mod test_utils {
 
         (
             Arc::new(envs.into_tempdir()),
-            RealAppInterfaceApi::new(conductor_handle, Default::default()),
+            RealAppInterfaceApi::new(conductor_handle),
             handle,
         )
     }
@@ -309,7 +309,7 @@ pub mod test {
     use observability;
     use std::collections::{HashMap, HashSet};
     use std::convert::TryInto;
-    use tempdir::TempDir;
+    use tempfile::TempDir;
     use uuid::Uuid;
 
     #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
@@ -413,14 +413,6 @@ pub mod test {
         let msg = (msg, respond);
         handle_incoming_message(msg, admin_api).await.unwrap();
         conductor_handle.shutdown();
-    }
-
-    #[ignore = "stub"]
-    #[tokio::test(flavor = "multi_thread")]
-    async fn deserialization_failure() {
-        // TODO: B-01440: this can't be done easily yet
-        // because we can't serialize something that
-        // doesn't deserialize
     }
 
     #[tokio::test(flavor = "multi_thread")]
