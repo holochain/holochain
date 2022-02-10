@@ -128,9 +128,7 @@ pub mod wasm_test {
             None => unreachable!(),
         }
 
-        let _: HeaderHash =
-            crate::call_test_ribosome!(host_access, TestWasm::Crd, "delete_via_hash", thing_a)
-                .unwrap();
+        let _: HeaderHash = conductor.call(&alice, "delete_via_hash", thing_a.clone()).await;
 
         let get_thing: Option<Element> = conductor.call(&alice, "reed", thing_a).await;
         match get_thing {

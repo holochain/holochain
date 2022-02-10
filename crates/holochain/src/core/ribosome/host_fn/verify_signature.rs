@@ -41,8 +41,6 @@ pub mod wasm_test {
     use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use hdk::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::test_utils::fake_agent_pubkey_1;
-    use holochain_zome_types::test_utils::fake_agent_pubkey_2;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_verify_signature_raw_test() {
