@@ -40,56 +40,73 @@ rec {
     cargo test --manifest-path=crates/release-automation/Cargo.toml ''${@}
   '';
 
-  hcReleaseAutomationTestRepo = let
-    crateCmd = logLevel: ''
-      ${releaseAutomation} \
-          --workspace-path=${hcToplevelDir} \
-          --log-level=${logLevel} \
-        crate \
-          apply-dev-versions \
-            --dry-run
-    '';
-    releaseCmd = logLevel: ''
-      ${releaseAutomation} \
-          --workspace-path=${hcToplevelDir} \
-          --log-level=${logLevel} \
-        release \
-          --dry-run \
-          --disallowed-version-reqs=">=0.1" \
-          --allowed-matched-blockers=UnreleasableViaChangelogFrontmatter \
-          --match-filter="^(holochain|holochain_cli|kitsune_p2p_proxy)$" \
-          --steps=BumpReleaseVersions
-    '';
-    in writeShellScriptBin "hc-release-automation-test-repo" ''
-    set -euxo pipefail
+  hcReleaseAutomationTestRepo =
+    let
+      prepareWorkspaceCmd = ''
+        rm -rf ''${TEST_WORKSPACE:?}
+        git clone $PWD ''${TEST_WORKSPACE:?}
+      '';
 
-    # check the state of the repository
-    (
-      ${crateCmd "debug"}
-      ${releaseCmd "debug"}
-    ) || (
-      ${crateCmd "trace"}
-      ${releaseCmd "trace"}
-    )
-  '';
+      crateCmd = logLevel: ''
+        ${releaseAutomation} \
+            --workspace-path=''${TEST_WORKSPACE:?} \
+            --log-level=${logLevel} \
+          crate \
+            apply-dev-versions \
+            --commit \
+            --no-verify
+      '';
+      releaseCmd = logLevel: ''
+        ${releaseAutomation} \
+            --workspace-path=''${TEST_WORKSPACE:?} \
+            --log-level=${logLevel} \
+          release \
+            --no-verify-pre \
+            --force-branch-creation \
+            --disallowed-version-reqs=">=0.1" \
+            --allowed-matched-blockers=UnreleasableViaChangelogFrontmatter \
+            --match-filter="^(holochain|holochain_cli|kitsune_p2p_proxy)$" \
+            --steps=CreateReleaseBranch,BumpReleaseVersions
+      '';
+    in
+    writeShellScriptBin "hc-release-automation-test-repo" ''
+      set -euxo pipefail
 
-  hcStaticChecks = let
+      export TEST_WORKSPACE=$(mktemp -d)
+      trap "rm -rf ''${TEST_WORKSPACE:?}" EXIT
+
+      # check the state of the repository
+      (
+        ${prepareWorkspaceCmd}
+        ${crateCmd "debug"}
+        ${releaseCmd "debug"}
+      ) || (
+        ${prepareWorkspaceCmd}
+        ${crateCmd "trace"}
+        ${releaseCmd "trace"}
+      )
+    '';
+
+  hcStaticChecks =
+    let
       pathPrefix = lib.makeBinPath
-        (builtins.attrValues { inherit (holonix.pkgs)
-          hnRustClippy
-          hnRustFmtCheck
-          hnRustFmtFmt
-          ;
+        (builtins.attrValues {
+          inherit (holonix.pkgs)
+            hnRustClippy
+            hnRustFmtCheck
+            hnRustFmtFmt
+            ;
         })
       ;
-    in writeShellScriptBin "hc-static-checks" ''
-    export PATH=${pathPrefix}:$PATH
+    in
+    writeShellScriptBin "hc-static-checks" ''
+      export PATH=${pathPrefix}:$PATH
 
-    set -euxo pipefail
-    export RUST_BACKTRACE=1
-    hn-rust-fmt-check
-    hn-rust-clippy
-  '';
+      set -euxo pipefail
+      export RUST_BACKTRACE=1
+      hn-rust-fmt-check
+      hn-rust-clippy
+    '';
 
   hcMergeTest = writeShellScriptBin "hc-merge-test" ''
     set -euxo pipefail
