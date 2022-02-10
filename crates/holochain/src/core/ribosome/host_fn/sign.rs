@@ -37,21 +37,25 @@ pub fn sign(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
-    use crate::fixt::ZomeCallHostAccessFixturator;
-    use ::fixt::prelude::*;
+    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use hdk::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::test_utils::fake_agent_pubkey_1;
-    use holochain_zome_types::test_utils::fake_agent_pubkey_2;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_sign_test() {
-        let host_access = fixt!(ZomeCallHostAccess, Predictable);
+        observability::test_run().ok();
+        let RibosomeTestFixture {
+            conductor,
+            alice,
+            alice_pubkey,
+            bob_pubkey,
+            ..
+        } = RibosomeTestFixture::new(TestWasm::Sign).await;
 
         // signatures should not change for a given pubkey
         for (k, data, expect) in vec![
             (
-                fake_agent_pubkey_1(),
+                alice_pubkey.clone(),
                 vec![100_u8, 200_u8, 50_u8],
                 vec![
                     240, 134, 114, 170, 178, 165, 117, 201, 98, 239, 41, 23, 223, 162, 103, 77, 44,
@@ -61,7 +65,7 @@ pub mod wasm_test {
                 ],
             ),
             (
-                fake_agent_pubkey_2(),
+                bob_pubkey.clone(),
                 vec![100_u8, 200_u8, 50_u8],
                 vec![
                     93, 140, 255, 162, 86, 19, 120, 119, 201, 40, 251, 109, 22, 239, 184, 86, 55,
@@ -71,7 +75,7 @@ pub mod wasm_test {
                 ],
             ),
             (
-                fake_agent_pubkey_1(),
+                alice_pubkey,
                 vec![1_u8, 2_u8, 3_u8],
                 vec![
                     162, 153, 68, 223, 254, 0, 113, 83, 152, 176, 155, 176, 198, 196, 59, 220, 199,
@@ -81,7 +85,7 @@ pub mod wasm_test {
                 ],
             ),
             (
-                fake_agent_pubkey_2(),
+                bob_pubkey,
                 vec![1_u8, 2_u8, 3_u8],
                 vec![
                     83, 13, 130, 229, 254, 5, 115, 44, 148, 20, 3, 224, 231, 240, 8, 36, 28, 157,
@@ -92,13 +96,9 @@ pub mod wasm_test {
             ),
         ] {
             for _ in 0..2 {
-                let output: Signature = crate::call_test_ribosome!(
-                    host_access,
-                    TestWasm::Sign,
-                    "sign",
-                    Sign::new_raw(k.clone(), data.clone())
-                )
-                .unwrap();
+                let output: Signature = conductor
+                    .call(&alice, "sign", Sign::new_raw(k.clone(), data.clone()))
+                    .await;
 
                 assert_eq!(expect, output.as_ref().to_vec());
             }

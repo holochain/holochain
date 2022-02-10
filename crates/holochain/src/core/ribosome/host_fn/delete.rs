@@ -109,32 +109,28 @@ pub(crate) fn get_original_address<'a>(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
-    use crate::fixt::ZomeCallHostAccessFixturator;
-    use ::fixt::prelude::*;
+    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use hdk::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_delete_entry_test<'a>() {
-        // observability::test_run().ok();
-        let host_access = fixt!(ZomeCallHostAccess, Predictable);
+        observability::test_run().ok();
+        let RibosomeTestFixture {
+            conductor, alice, ..
+        } = RibosomeTestFixture::new(TestWasm::Crd).await;
 
-        let thing_a: HeaderHash =
-            crate::call_test_ribosome!(host_access, TestWasm::Crd, "create", ()).unwrap();
-        let get_thing: Option<Element> =
-            crate::call_test_ribosome!(host_access, TestWasm::Crd, "reed", thing_a).unwrap();
+        let thing_a: HeaderHash = conductor.call(&alice, "create", ()).await;
+        let get_thing: Option<Element> = conductor.call(&alice, "reed", thing_a.clone()).await;
         match get_thing {
             Some(element) => assert!(element.entry().as_option().is_some()),
 
             None => unreachable!(),
         }
 
-        let _: HeaderHash =
-            crate::call_test_ribosome!(host_access, TestWasm::Crd, "delete_via_hash", thing_a)
-                .unwrap();
+        let _: HeaderHash = conductor.call(&alice, "delete_via_hash", thing_a.clone()).await;
 
-        let get_thing: Option<Element> =
-            crate::call_test_ribosome!(host_access, TestWasm::Crd, "reed", thing_a).unwrap();
+        let get_thing: Option<Element> = conductor.call(&alice, "reed", thing_a).await;
         match get_thing {
             None => {
                 // this is what we want, deletion => None for a get

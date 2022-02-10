@@ -38,23 +38,27 @@ pub fn verify_signature(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
-    use crate::fixt::ZomeCallHostAccessFixturator;
-    use ::fixt::prelude::*;
+    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use hdk::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::test_utils::fake_agent_pubkey_1;
-    use holochain_zome_types::test_utils::fake_agent_pubkey_2;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_verify_signature_raw_test() {
-        let host_access = fixt!(ZomeCallHostAccess, Predictable);
+        observability::test_run().ok();
+        let RibosomeTestFixture {
+            conductor,
+            alice,
+            alice_pubkey,
+            bob_pubkey,
+            ..
+        } = RibosomeTestFixture::new(TestWasm::Sign).await;
 
         // signatures should not change for a given pubkey
         for (name, expect, k, sig, data) in vec![
             (
                 "first bit corrupted to a zero",
                 false,
-                fake_agent_pubkey_1(),
+                alice_pubkey.clone(),
                 [
                     0, 134, 114, 170, 178, 165, 117, 201, 98, 239, 41, 23, 223, 162, 103, 77, 44,
                     26, 215, 100, 248, 162, 55, 133, 60, 166, 234, 160, 229, 233, 46, 124, 6, 20,
@@ -66,7 +70,7 @@ pub mod wasm_test {
             (
                 "valid sig",
                 true,
-                fake_agent_pubkey_1(),
+                alice_pubkey.clone(),
                 [
                     240, 134, 114, 170, 178, 165, 117, 201, 98, 239, 41, 23, 223, 162, 103, 77, 44,
                     26, 215, 100, 248, 162, 55, 133, 60, 166, 234, 160, 229, 233, 46, 124, 6, 20,
@@ -78,7 +82,7 @@ pub mod wasm_test {
             (
                 "valid sig",
                 true,
-                fake_agent_pubkey_2(),
+                bob_pubkey.clone(),
                 [
                     93, 140, 255, 162, 86, 19, 120, 119, 201, 40, 251, 109, 22, 239, 184, 86, 55,
                     163, 10, 71, 223, 44, 197, 150, 179, 218, 5, 192, 116, 18, 235, 36, 203, 21,
@@ -90,7 +94,7 @@ pub mod wasm_test {
             (
                 "last bit corrupted to zero",
                 false,
-                fake_agent_pubkey_2(),
+                bob_pubkey.clone(),
                 [
                     93, 140, 255, 162, 86, 19, 120, 119, 201, 40, 251, 109, 22, 239, 184, 86, 55,
                     163, 10, 71, 223, 44, 197, 150, 179, 218, 5, 192, 116, 18, 235, 36, 203, 21,
@@ -102,7 +106,7 @@ pub mod wasm_test {
             (
                 "first bit corrupted to a zero",
                 false,
-                fake_agent_pubkey_1(),
+                alice_pubkey.clone(),
                 [
                     0, 153, 68, 223, 254, 0, 113, 83, 152, 176, 155, 176, 198, 196, 59, 220, 199,
                     27, 215, 203, 8, 89, 108, 127, 130, 63, 45, 229, 225, 65, 127, 147, 207, 5, 52,
@@ -114,7 +118,7 @@ pub mod wasm_test {
             (
                 "valid sig",
                 true,
-                fake_agent_pubkey_1(),
+                alice_pubkey,
                 [
                     162, 153, 68, 223, 254, 0, 113, 83, 152, 176, 155, 176, 198, 196, 59, 220, 199,
                     27, 215, 203, 8, 89, 108, 127, 130, 63, 45, 229, 225, 65, 127, 147, 207, 5, 52,
@@ -126,7 +130,7 @@ pub mod wasm_test {
             (
                 "valid sig",
                 true,
-                fake_agent_pubkey_2(),
+                bob_pubkey.clone(),
                 [
                     83, 13, 130, 229, 254, 5, 115, 44, 148, 20, 3, 224, 231, 240, 8, 36, 28, 157,
                     16, 198, 86, 50, 129, 223, 66, 106, 78, 212, 110, 74, 214, 170, 106, 84, 55, 6,
@@ -138,7 +142,7 @@ pub mod wasm_test {
             (
                 "last bit corrupted to zero",
                 false,
-                fake_agent_pubkey_2(),
+                bob_pubkey,
                 [
                     83, 13, 130, 229, 254, 5, 115, 44, 148, 20, 3, 224, 231, 240, 8, 36, 28, 157,
                     16, 198, 86, 50, 129, 223, 66, 106, 78, 212, 110, 74, 214, 170, 106, 84, 55, 6,
@@ -149,27 +153,31 @@ pub mod wasm_test {
             ),
         ] {
             for _ in 0..2_usize {
-                let output_raw: bool = crate::call_test_ribosome!(
-                    host_access,
-                    TestWasm::Sign,
-                    "verify_signature_raw",
-                    VerifySignature::new_raw(k.clone(), sig.clone().into(), data.clone())
-                )
-                .unwrap();
+                let output_raw: bool = conductor
+                    .call(
+                        &alice,
+                        "verify_signature_raw",
+                        VerifySignature::new_raw(k.clone(), sig.clone().into(), data.clone()),
+                    )
+                    .await;
 
-                assert_eq!(expect, output_raw, "raw: {}", name);
+                assert_eq!(expect, output_raw, "raw: {}, {}", name, k);
             }
         }
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_verify_signature_test() {
-        let _nothing: () = crate::call_test_ribosome!(
-            fixt!(ZomeCallHostAccess, Predictable),
-            TestWasm::Sign,
-            "verify_signature",
-            fixt!(AgentPubKey, Predictable, 0)
-        )
-        .unwrap();
+        observability::test_run().ok();
+        let RibosomeTestFixture {
+            conductor,
+            alice,
+            alice_pubkey,
+            ..
+        } = RibosomeTestFixture::new(TestWasm::Sign).await;
+
+        let _nothing: () = conductor
+            .call(&alice, "verify_signature", alice_pubkey)
+            .await;
     }
 }
