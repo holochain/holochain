@@ -3318,7 +3318,6 @@ dependencies = [
  "proptest",
  "rand 0.8.4",
  "serde",
- "sparse-fenwick",
  "statrs",
  "thiserror",
  "tracing",
@@ -6311,15 +6310,6 @@ dependencies = [
  "one_err",
  "parking_lot 0.11.2",
  "tokio",
-]
-
-[[package]]
-name = "sparse-fenwick"
-version = "0.1.0"
-dependencies = [
- "ahash 0.7.6",
- "num-traits",
- "once_cell",
 ]
 
 [[package]]

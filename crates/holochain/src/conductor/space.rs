@@ -4,16 +4,20 @@
 
 use std::{collections::HashMap, sync::Arc};
 
-use holo_hash::{DhtOpHash, DnaHash};
+use holo_hash::{AgentPubKey, DhtOpHash, DnaHash};
 use holochain_conductor_api::conductor::EnvironmentRootPath;
 use holochain_p2p::{
-    dht::region::{RegionCoordSetXtcs, RegionData},
+    dht::{
+        coords::Topology,
+        hash::RegionHash,
+        region::{RegionCoordSetXtcs, RegionData},
+    },
     dht_arc::{ArcInterval, DhtArcSet},
 };
 use holochain_sqlite::{
     conn::{DbSyncLevel, DbSyncStrategy},
     db::{DbKindAuthored, DbKindCache, DbKindDht, DbWrite},
-    prelude::DatabaseResult,
+    prelude::{DatabaseError, DatabaseResult},
 };
 use holochain_state::prelude::{from_blob, StateQueryResult};
 use holochain_types::dht_op::{DhtOp, DhtOpType};
@@ -32,7 +36,10 @@ use crate::core::{
     },
 };
 
-use super::{conductor::RwShare, error::ConductorResult};
+use super::{
+    conductor::RwShare,
+    error::{ConductorError, ConductorResult},
+};
 use std::convert::TryInto;
 
 #[derive(Clone)]
@@ -76,6 +83,9 @@ pub struct Space {
 
     /// Incoming ops batch for this space.
     pub incoming_ops_batch: IncomingOpsBatch,
+
+    /// The topology of this Space(time), determines quantization parameters.
+    pub topology: Topology,
 }
 
 #[cfg(test)]
@@ -128,6 +138,7 @@ impl Spaces {
                             Arc::new(dna_hash.clone()),
                             &self.root_env_dir,
                             self.db_sync_level,
+                            todo!("provide topology"),
                         )?;
 
                         let r = f(&space);
@@ -251,9 +262,51 @@ impl Spaces {
     pub async fn handle_fetch_op_regions(
         &self,
         dna_hash: &DnaHash,
+        author: AgentPubKey,
         regions: RegionCoordSetXtcs,
     ) -> ConductorResult<Vec<Vec<RegionData>>> {
-        todo!("DB query to build region data")
+        let sql = holochain_sqlite::sql::sql_cell::FETCH_OP_REGION;
+        let topology = self
+            .map
+            .share_ref(|m| Some(m.get(dna_hash)?.topology.clone()))
+            .ok_or_else(|| ConductorError::other("Space missing".to_string()))?;
+        let data = self
+            .dht_env(dna_hash)?
+            .async_reader(move |txn| {
+                let mut stmt = txn.prepare_cached(sql).map_err(DatabaseError::from)?;
+                regions
+                    .region_coords_nested()
+                    .map(|column| {
+                        column
+                            .map(|(_, coords)| {
+                                let bounds = coords.to_bounds();
+                                let (x0, x1) = bounds.x;
+                                let (t0, t1) = bounds.t;
+                                stmt.query_row(
+                                    named_params! {
+                                        ":storage_start_loc": x0.to_loc(&topology),
+                                        ":storage_end_loc": x1.to_loc(&topology),
+                                        ":timestamp_min": t0.to_timestamp(&topology),
+                                        ":timestamp_max": t1.to_timestamp(&topology),
+                                        ":author": &author,
+                                    },
+                                    |row| {
+                                        Ok(RegionData {
+                                            hash: RegionHash::from_vec(row.get("hash")?)
+                                                .expect("region hash must be 32 bytes"),
+                                            size: row.get("size")?,
+                                            count: row.get("count")?,
+                                        })
+                                    },
+                                )
+                            })
+                            .collect::<Result<Vec<RegionData>, rusqlite::Error>>()
+                            .map_err(DatabaseError::from)
+                    })
+                    .collect::<Result<Vec<Vec<RegionData>>, DatabaseError>>()
+            })
+            .await?;
+        Ok(data)
     }
 
     #[instrument(skip(self, op_hashes))]
@@ -378,6 +431,7 @@ impl Space {
         dna_hash: Arc<DnaHash>,
         root_env_dir: &EnvironmentRootPath,
         db_sync_strategy: DbSyncStrategy,
+        topology: Topology,
     ) -> ConductorResult<Self> {
         let cache = DbWrite::open_with_sync_level(
             root_env_dir.as_ref(),
@@ -411,6 +465,7 @@ impl Space {
             countersigning_workspace,
             incoming_op_hashes,
             incoming_ops_batch,
+            topology,
         };
         Ok(r)
     }
@@ -465,6 +520,7 @@ impl TestSpace {
                 Arc::new(dna_hash),
                 &temp_dir.path().to_path_buf().into(),
                 Default::default(),
+                Topology::standard(Timestamp::now()),
             )
             .unwrap(),
             _temp_dir: temp_dir,
