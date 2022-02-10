@@ -693,6 +693,9 @@ fixturator!(
         properties: SerializedBytesFixturator::new_indexed(Empty, get_fixt_index!())
             .next()
             .unwrap(),
+        origin_time: TimestampFixturator::new_indexed(Empty, get_fixt_index!())
+            .next()
+            .unwrap(),
         zomes: ZomesFixturator::new_indexed(Empty, get_fixt_index!())
             .next()
             .unwrap(),
@@ -708,6 +711,9 @@ fixturator!(
         properties: SerializedBytesFixturator::new_indexed(Unpredictable, get_fixt_index!())
             .next()
             .unwrap(),
+        origin_time: TimestampFixturator::new_indexed(Empty, get_fixt_index!())
+            .next()
+            .unwrap(),
         zomes: ZomesFixturator::new_indexed(Unpredictable, get_fixt_index!())
             .next()
             .unwrap(),
@@ -721,6 +727,9 @@ fixturator!(
             .next()
             .unwrap(),
         properties: SerializedBytesFixturator::new_indexed(Predictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+        origin_time: TimestampFixturator::new_indexed(Empty, get_fixt_index!())
             .next()
             .unwrap(),
         zomes: ZomesFixturator::new_indexed(Predictable, get_fixt_index!())

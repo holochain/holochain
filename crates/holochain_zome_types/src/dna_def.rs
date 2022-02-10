@@ -42,6 +42,11 @@ pub struct DnaDef {
     #[cfg_attr(feature = "full-dna-def", builder(default = "().try_into().unwrap()"))]
     pub properties: SerializedBytes,
 
+    /// The time used to denote the origin of the network, used to calculate
+    /// time windows during gossip.
+    /// All Header timestamps must come after this time.
+    pub origin_time: Timestamp,
+
     /// A vector of zomes associated with your DNA.
     pub zomes: Zomes,
 }

@@ -40,9 +40,10 @@ impl DnaManifest {
         name: String,
         uid: Option<String>,
         properties: Option<YamlProperties>,
+        origin_time: Timestamp,
         zomes: Vec<ZomeManifest>,
     ) -> Self {
-        DnaManifestCurrent::new(name, uid, properties, zomes).into()
+        DnaManifestCurrent::new(name, uid, properties, origin_time, zomes).into()
     }
 
     /// Getter for properties
