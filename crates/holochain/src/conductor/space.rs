@@ -6,7 +6,10 @@ use std::{collections::HashMap, sync::Arc};
 
 use holo_hash::{DhtOpHash, DnaHash};
 use holochain_conductor_api::conductor::EnvironmentRootPath;
-use holochain_p2p::dht_arc::{ArcInterval, DhtArcSet};
+use holochain_p2p::{
+    dht::region::{RegionCoordSetXtcs, RegionData},
+    dht_arc::{ArcInterval, DhtArcSet},
+};
 use holochain_sqlite::{
     conn::{DbSyncLevel, DbSyncStrategy},
     db::{DbKindAuthored, DbKindCache, DbKindDht, DbWrite},
@@ -242,6 +245,15 @@ impl Spaces {
             .await?;
 
         Ok(results)
+    }
+
+    /// The network module needs info about various groupings ("regions") of ops
+    pub async fn handle_fetch_op_regions(
+        &self,
+        dna_hash: &DnaHash,
+        regions: RegionCoordSetXtcs,
+    ) -> ConductorResult<Vec<Vec<RegionData>>> {
+        todo!("DB query to build region data")
     }
 
     #[instrument(skip(self, op_hashes))]

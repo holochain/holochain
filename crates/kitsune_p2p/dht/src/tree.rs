@@ -1,7 +1,6 @@
 use std::ops::{AddAssign, Sub};
 
 use num_traits::Zero;
-use sparse_fenwick::Fenwick2;
 
 use crate::{coords::*, op::*, region::*};
 

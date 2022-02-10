@@ -7,8 +7,6 @@ mod strat;
 #[cfg(feature = "testing")]
 pub mod ascii;
 
-use std::num::Wrapping;
-
 pub use arq_set::*;
 
 pub use peer_view::*;

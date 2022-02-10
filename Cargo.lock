@@ -2658,6 +2658,7 @@ dependencies = [
  "lazy_static",
  "must_future",
  "nanoid 0.3.0",
+ "num-traits",
  "num_cpus",
  "observability",
  "once_cell",

@@ -31,7 +31,13 @@ pub struct AgentKey(pub Hash32);
     serde::Serialize,
     serde::Deserialize,
 )]
-pub struct RegionHash(Hash32);
+pub struct RegionHash(pub Hash32);
+
+impl RegionHash {
+    pub fn from_vec(v: Vec<u8>) -> Option<Self> {
+        v.try_into().map(|a| Self(a)).ok()
+    }
+}
 
 impl std::fmt::Debug for OpHash {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
