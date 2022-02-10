@@ -1,5 +1,5 @@
+use crate as zt;
 use crate::cell::CellId;
-use crate::prelude as zt;
 use crate::zome::FunctionName;
 use crate::zome::ZomeName;
 use holo_hash::AgentPubKey;

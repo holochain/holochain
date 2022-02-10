@@ -23,11 +23,11 @@ pub fn delete<'a>(
             ..
         } => {
             let DeleteInput {
-                deletes_header_address,
+                deletes_header_hash,
                 chain_top_ordering,
             } = input;
             let deletes_entry_address =
-                get_original_address(call_context.clone(), deletes_header_address.clone())?;
+                get_original_address(call_context.clone(), deletes_header_hash.clone())?;
 
             let host_access = call_context.host_context();
 
@@ -39,7 +39,7 @@ pub fn delete<'a>(
                     .as_ref()
                     .expect("Must have source chain if write_workspace access is given");
                 let header_builder = builder::Delete {
-                    deletes_address: deletes_header_address,
+                    deletes_address: deletes_header_hash,
                     deletes_entry_address,
                 };
                 let header_hash = source_chain
@@ -128,7 +128,9 @@ pub mod wasm_test {
             None => unreachable!(),
         }
 
-        let _: HeaderHash = conductor.call(&alice, "delete", thing_a.clone()).await;
+        let _: HeaderHash =
+            crate::call_test_ribosome!(host_access, TestWasm::Crd, "delete_via_hash", thing_a)
+                .unwrap();
 
         let get_thing: Option<Element> = conductor.call(&alice, "reed", thing_a).await;
         match get_thing {

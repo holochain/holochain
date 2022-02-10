@@ -142,8 +142,12 @@ pub fn create_cap_grant(cap_grant_entry: CapGrantEntry) -> ExternResult<HeaderHa
 ///
 /// The input to [ `delete_cap_grant` ] is the [ `HeaderHash` ] of the [ `CapGrant` ] element to delete.
 /// Deletes can reference both [ `CapGrant` ] creates and updates.
-pub fn delete_cap_grant(hash: HeaderHash) -> ExternResult<HeaderHash> {
-    delete(hash)
+pub fn delete_cap_grant<I, E>(delete_input: I) -> ExternResult<HeaderHash>
+where
+    DeleteInput: TryFrom<I, Error = E>,
+    WasmError: From<E>,
+{
+    delete(delete_input)
 }
 
 /// Generate secrets for capability grants.

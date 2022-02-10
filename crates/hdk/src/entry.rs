@@ -36,13 +36,12 @@ pub fn update(hash: HeaderHash, create_input: CreateInput) -> ExternResult<Heade
 ///
 /// Usually you don't need to use this function directly; it is the most general way to update an
 /// entry and standardises the internals of higher level create functions.
-pub fn delete(deletes_header_address: HeaderHash) -> ExternResult<HeaderHash> {
-    HDK.with(|h| {
-        h.borrow().delete(DeleteInput::new(
-            deletes_header_address,
-            ChainTopOrdering::default(),
-        ))
-    })
+pub fn delete<I, E>(delete_input: I) -> ExternResult<HeaderHash>
+where
+    DeleteInput: TryFrom<I, Error = E>,
+    WasmError: From<E>,
+{
+    HDK.with(|h| h.borrow().delete(DeleteInput::try_from(delete_input)?))
 }
 
 /// Create an app entry.
@@ -78,8 +77,12 @@ where
 /// ```ignore
 /// delete_entry(entry_hash(foo_entry)?)?;
 /// ```
-pub fn delete_entry(hash: HeaderHash) -> ExternResult<HeaderHash> {
-    delete(hash)
+pub fn delete_entry<I, E>(delete_input: I) -> ExternResult<HeaderHash>
+where
+    DeleteInput: TryFrom<I, Error = E>,
+    WasmError: From<E>,
+{
+    delete(delete_input)
 }
 
 /// Hash anything that that implements [ `TryInto<Entry>` ].
