@@ -1,6 +1,6 @@
-use holo_hash::HeaderHash;
-use holo_hash::EntryHash;
 use crate::prelude::*;
+use holo_hash::EntryHash;
+use holo_hash::HeaderHash;
 
 pub struct Hash256Bits([u8; 32]);
 crate::secure_primitive!(Hash256Bits, 32);
