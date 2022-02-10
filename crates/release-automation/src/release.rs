@@ -211,7 +211,7 @@ fn bump_release_versions<'a>(
     }
 
     // run the checks to ensure the repo is in a consistent state to begin with
-    if !cmd_args.no_verify {
+    if !cmd_args.no_verify && !cmd_args.no_verify_pre {
         info!("running consistency checks before changing the versions...");
         publish_paths_to_crates_io(
             &selection,
@@ -230,7 +230,10 @@ fn bump_release_versions<'a>(
         let maybe_previous_release_version = crt
             .changelog()
             .ok_or_else(|| {
-                anyhow::anyhow!("[{}] cannot determine most recent release: missing changelog")
+                anyhow::anyhow!(
+                    "[{}] cannot determine most recent release: missing changelog",
+                    crt.name()
+                )
             })?
             .topmost_release()?
             .map(|change| semver::Version::parse(change.title()))
@@ -304,7 +307,7 @@ fn bump_release_versions<'a>(
 
     ws.update_lockfile(cmd_args.dry_run)?;
 
-    if !cmd_args.no_verify {
+    if !cmd_args.no_verify && !cmd_args.no_verify_post {
         info!("running consistency checks after changing the versions...");
         publish_paths_to_crates_io(
             &selection,
@@ -313,7 +316,9 @@ fn bump_release_versions<'a>(
             &cmd_args.allowed_missing_dependencies,
             &cmd_args.cargo_target_dir,
         )
-        .context("consistency checks failed")?;
+        .context("cargo publish dry-run failed")?;
+
+        ws.cargo_check(true).context("cargo check failed")?;
     }
 
     // ## for the workspace release:
