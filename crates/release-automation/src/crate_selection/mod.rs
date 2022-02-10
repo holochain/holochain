@@ -1035,7 +1035,13 @@ impl<'a> ReleaseWorkspace<'a> {
             .current_dir(self.root())
             .args(
                 &[
-                    vec!["check", "--workspace", "--all-targets", "--all-features"],
+                    vec![
+                        "check",
+                        "--workspace",
+                        "--all-targets",
+                        "--all-features",
+                        "--release",
+                    ],
                     if offline { vec!["--offline"] } else { vec![] },
                 ]
                 .concat(),

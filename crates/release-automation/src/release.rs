@@ -833,6 +833,7 @@ fn publish_paths_to_crates_io(
                     "check",
                     "--locked",
                     "--verbose",
+                    "--release",
                     &format!("--manifest-path={}", manifest_path.to_string_lossy()),
                 ],
                 if let Some(target_dir) = cargo_target_dir_string.as_ref() {
