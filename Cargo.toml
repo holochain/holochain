@@ -38,7 +38,6 @@ members = [
 
   "crates/test_utils/wasm",
   "crates/test_utils/wasm_common",
-  "crates/release-automation",
 ]
 
 exclude = ["crates/diagnostics", "crates/release-automation"]
@@ -48,7 +47,7 @@ inherits = "dev"
 
 [profile.fast-test.package."*"]
 opt-level = 3
-debug = true 
+debug = true
 debug-assertions = false
 overflow-checks = false
 incremental = false
