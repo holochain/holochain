@@ -78,12 +78,16 @@ where
 /// specify the [`ChainTopOrdering`]. Refer to [`DeleteInput`] for details.
 ///
 /// ```ignore
-/// delete_entry(entry_hash(foo_entry)?)?;
+/// #[hdk_entry(id = "foo")]
+/// struct Foo(u32);
+///
+/// let header_hash = create_entry(Foo(50))?;
+/// let delete_entry_header_hash = delete_entry(header_hash.clone());
 /// ```
 ///
 /// with a specific [`ChainTopOrdering`]:
 /// ```ignore
-/// delete_entry(DeleteInput::new(entry_hash(foo_entry)?, ChainTopOrdering::Relaxed)?;
+/// delete_entry(DeleteInput::new(header_hash.clone(), ChainTopOrdering::Relaxed)?;
 /// ```
 pub fn delete_entry<I, E>(delete_input: I) -> ExternResult<HeaderHash>
 where
