@@ -86,7 +86,6 @@ async fn check_valid_if_dna_test() {
     );
     let mut header = fixt!(Dna);
 
-    dna_def.origin_time = Timestamp::MIN;
     assert_matches!(
         check_valid_if_dna(&header.clone().into(), &workspace).await,
         Ok(())
