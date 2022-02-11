@@ -7,7 +7,7 @@ enum TemperatureUnit {
     Celcius,
 }
 
-#[hdk_entry(id="temperature")]
+#[hdk_entry(id = "temperature")]
 struct Temperature(u32, TemperatureUnit);
 
 entry_defs![Temperature::entry_def()];
@@ -39,8 +39,8 @@ fn hash_entry(entry: Entry) -> ExternResult<EntryHash> {
 
 #[cfg(test)]
 pub mod tests {
+    use fixt::prelude::*;
     use hdk::prelude::*;
-    use ::fixt::prelude::*;
 
     #[test]
     fn hash_entry_smoke() {
@@ -49,22 +49,18 @@ pub mod tests {
         let input_entry = fixt!(Entry);
         let output_hash = fixt!(EntryHash);
         let output_hash_closure = output_hash.clone();
-        mock_hdk.expect_hash_entry()
-            .with(hdk::prelude::mockall::predicate::eq(
-                input_entry.clone()
-            ))
+        mock_hdk
+            .expect_hash()
+            .with(hdk::prelude::mockall::predicate::eq(HashInput::Entry(
+                input_entry.clone(),
+            )))
             .times(1)
-            .return_once(move |_| Ok(output_hash_closure));
+            .return_once(move |_| Ok(HashOutput::Entry(output_hash_closure)));
 
         hdk::prelude::set_hdk(mock_hdk);
 
         let result = super::hash_entry(input_entry);
 
-        assert_eq!(
-            result,
-            Ok(
-                output_hash
-            )
-        )
+        assert_eq!(result, Ok(HashOutput::Entry(output_hash)))
     }
 }
