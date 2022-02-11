@@ -706,7 +706,7 @@ pub mod wasm_test {
         dna_store.expect_add_entry_defs::<Vec<_>>().return_const(());
         dna_store.expect_add_dna().return_const(());
         dna_store
-            .expect_get()
+            .expect_get_dna_file()
             .return_const(Some(dna_file.clone().into()));
 
         let mut conductor =

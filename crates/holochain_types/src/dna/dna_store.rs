@@ -17,8 +17,10 @@ pub trait DnaStore: Default + Send + Sync {
     /// List all DNAs in the store
     // TODO: FAST: Make this return an iterator to avoid allocating
     fn list(&self) -> Vec<DnaHash>;
+    /// Get a particular DnaDef
+    fn get_dna_def(&self, hash: &DnaHash) -> Option<DnaDef>;
     /// Get a particular DnaFile
-    fn get(&self, hash: &DnaHash) -> Option<DnaFile>;
+    fn get_dna_file(&self, hash: &DnaHash) -> Option<DnaFile>;
     /// Get a particular EntryDef
     fn get_entry_def(&self, k: &EntryDefBufferKey) -> Option<EntryDef>;
 }
@@ -27,8 +29,10 @@ pub trait DnaStore: Default + Send + Sync {
 pub trait DnaStoreRead: Default + Send + Sync {
     /// List all DNAs in the store
     fn list(&self) -> Vec<DnaHash>;
+    /// Get a particular DnaDef
+    fn get_dna_def(&self, hash: &DnaHash) -> Option<DnaDef>;
     /// Get a particular DnaFile
-    fn get(&self, hash: &DnaHash) -> Option<DnaFile>;
+    fn get_dna_file(&self, hash: &DnaHash) -> Option<DnaFile>;
 }
 
 impl<DS: DnaStore> DnaStoreRead for DS {
@@ -36,8 +40,12 @@ impl<DS: DnaStore> DnaStoreRead for DS {
         DS::list(self)
     }
 
-    fn get(&self, hash: &DnaHash) -> Option<DnaFile> {
-        DS::get(self, hash)
+    fn get_dna_def(&self, hash: &DnaHash) -> Option<DnaDef> {
+        DS::get_dna_def(self, hash)
+    }
+
+    fn get_dna_file(&self, hash: &DnaHash) -> Option<DnaFile> {
+        DS::get_dna_file(self, hash)
     }
 }
 

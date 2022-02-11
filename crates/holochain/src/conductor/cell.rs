@@ -178,7 +178,7 @@ impl Cell {
     {
         // get the dna
         let dna_file = conductor_handle
-            .get_dna(id.dna_hash())
+            .get_dna_file(id.dna_hash())
             .ok_or_else(|| DnaError::DnaMissing(id.dna_hash().to_owned()))?;
 
         let conductor_api = CellConductorApi::new(conductor_handle.clone(), id.clone());
@@ -792,6 +792,16 @@ impl Cell {
 
         let keystore = self.conductor_api.keystore().clone();
 
+        let conductor_handle = self.conductor_handle.clone();
+        let signal_tx = self.signal_broadcaster().await;
+        let ribosome = self.get_ribosome().await?;
+        let invocation =
+            ZomeCallInvocation::try_from_interface_call(self.conductor_api.clone(), call).await?;
+
+        let dna_def = conductor_handle
+            .get_dna_def(self.id.dna_hash())
+            .ok_or_else(|| DnaError::DnaMissing(self.id.dna_hash().to_owned()))?;
+
         // If there is no existing zome call then this is the root zome call
         let is_root_zome_call = workspace_lock.is_none();
         let workspace_lock = match workspace_lock {
@@ -803,16 +813,11 @@ impl Cell {
                     self.cache().clone(),
                     keystore.clone(),
                     self.id.agent_pubkey().clone(),
+                    Arc::new(dna_def),
                 )
                 .await?
             }
         };
-
-        let conductor_handle = self.conductor_handle.clone();
-        let signal_tx = self.signal_broadcaster().await;
-        let ribosome = self.get_ribosome().await?;
-        let invocation =
-            ZomeCallInvocation::try_from_interface_call(self.conductor_api.clone(), call).await?;
 
         let args = CallZomeWorkflowArgs {
             cell_id: self.id.clone(),
@@ -849,6 +854,11 @@ impl Cell {
         let keystore = self.conductor_api.keystore().clone();
         let id = self.id.clone();
         let conductor_handle = self.conductor_handle.clone();
+
+        let dna_def = conductor_handle
+            .get_dna_def(self.id.dna_hash())
+            .ok_or_else(|| DnaError::DnaMissing(self.id.dna_hash().to_owned()))?;
+
         // Create the workspace
         let workspace = SourceChainWorkspace::new(
             self.authored_env().clone(),
@@ -856,6 +866,7 @@ impl Cell {
             self.cache().clone(),
             keystore.clone(),
             id.agent_pubkey().clone(),
+            Arc::new(dna_def),
         )
         .await?;
 
@@ -867,7 +878,7 @@ impl Cell {
 
         // get the dna
         let dna_file = conductor_handle
-            .get_dna(id.dna_hash())
+            .get_dna_file(id.dna_hash())
             .ok_or_else(|| DnaError::DnaMissing(id.dna_hash().to_owned()))?;
         let dna_def = dna_file.dna_def().clone();
 

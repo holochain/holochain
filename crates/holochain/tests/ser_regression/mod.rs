@@ -94,7 +94,7 @@ async fn ser_regression_test() {
 
     let mut dna_store = MockDnaStore::new();
 
-    dna_store.expect_get().return_const(Some(dna_file.clone()));
+    dna_store.expect_get_dna_file().return_const(Some(dna_file.clone()));
     dna_store
         .expect_add_dnas::<Vec<_>>()
         .times(2)

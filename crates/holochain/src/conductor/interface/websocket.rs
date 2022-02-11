@@ -436,7 +436,7 @@ pub mod test {
         let mut dna_store = MockDnaStore::new();
 
         dna_store
-            .expect_get()
+            .expect_get_dna_file()
             .with(predicate::eq(dna_hash))
             .returning(move |_| Some(dna.clone()));
         dna_store
@@ -500,7 +500,7 @@ pub mod test {
             .collect::<Vec<_>>();
         let mut dna_store = MockDnaStore::new();
         dna_store
-            .expect_get()
+            .expect_get_dna_file()
             .returning(move |hash| dna_map.get(&hash).cloned());
         dna_store
             .expect_add_dnas::<Vec<_>>()
@@ -642,7 +642,9 @@ pub mod test {
         let cell_id = CellId::from((dna.dna_hash().clone(), fake_agent_pubkey_1()));
 
         let mut dna_store = MockDnaStore::new();
-        dna_store.expect_get().returning(move |_| Some(dna.clone()));
+        dna_store
+            .expect_get_dna_file()
+            .returning(move |_| Some(dna.clone()));
         dna_store
             .expect_add_dnas::<Vec<_>>()
             .times(1)

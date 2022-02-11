@@ -150,18 +150,21 @@ pub mod tests {
             .await
             .unwrap();
 
+        let dna_def = DnaDefFixturator::new(Unpredictable).next().unwrap();
+        let dna_def_hashed = DnaDefHashed::from_content_sync(dna_def.clone());
+
         let workspace = SourceChainWorkspace::new(
             env.clone(),
             test_dht.env(),
             test_cache.env(),
             keystore,
             author.clone(),
+            Arc::new(dna_def.clone()),
         )
         .await
         .unwrap();
         let mut ribosome = MockRibosomeT::new();
-        let dna_def = DnaDefFixturator::new(Unpredictable).next().unwrap();
-        let dna_def_hashed = DnaDefHashed::from_content_sync(dna_def.clone());
+
         // Setup the ribosome mock
         ribosome
             .expect_run_init()

@@ -42,14 +42,14 @@ pub fn dna_info(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod test {
+    use crate::conductor::ConductorBuilder;
+    use crate::core::ribosome::MockDnaStore;
+    use crate::sweettest::SweetConductor;
+    use crate::sweettest::SweetDnaFile;
+    use crate::sweettest::SweetZome;
+    use ::fixt::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::prelude::*;
-    use ::fixt::prelude::*;
-    use crate::sweettest::SweetConductor;
-    use crate::sweettest::SweetZome;
-    use crate::sweettest::SweetDnaFile;
-    use crate::core::ribosome::MockDnaStore;
-    use crate::conductor::ConductorBuilder;
 
     async fn test_conductor(properties: SerializedBytes) -> (SweetConductor, SweetZome) {
         let (dna_file, _) =
@@ -65,7 +65,7 @@ pub mod test {
         dna_store.expect_add_entry_defs::<Vec<_>>().return_const(());
         dna_store.expect_add_dna().return_const(());
         dna_store
-            .expect_get()
+            .expect_get_dna_file()
             .return_const(Some(dna_file.clone().into()));
         dna_store
             .expect_get_entry_def()

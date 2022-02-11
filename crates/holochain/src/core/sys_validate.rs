@@ -179,7 +179,11 @@ pub async fn check_valid_if_dna(
 ) -> SysValidationResult<()> {
     match header {
         Header::Dna(_) => {
-            if workspace.is_chain_empty(header.author().clone()).await? {
+            let chain_empty = workspace.is_chain_empty(header.author().clone()).await?;
+            // If the Dna timestamp is ahead of the origin time, every other header
+            // will be inductively so also due to the prev_header check
+            let timestamp_valid = header.timestamp() >= workspace.dna_def().origin_time;
+            if chain_empty && timestamp_valid {
                 Ok(())
             } else {
                 Err(PrevHeaderError::InvalidRoot).map_err(|e| ValidationOutcome::from(e).into())
@@ -262,7 +266,7 @@ pub async fn check_app_entry_type(
     // We want to be careful about holding locks open to the conductor api
     // so calls are made in blocks
     let dna_file = conductor
-        .get_dna(dna_hash)
+        .get_dna_file(dna_hash)
         .ok_or_else(|| SysValidationError::DnaMissing(dna_hash.clone()))?;
 
     // Check if the zome is found
