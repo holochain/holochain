@@ -40,7 +40,7 @@ impl DnaManifest {
         name: String,
         uid: Option<String>,
         properties: Option<YamlProperties>,
-        origin_time: Timestamp,
+        origin_time: HumanTimestamp,
         zomes: Vec<ZomeManifest>,
     ) -> Self {
         DnaManifestCurrent::new(name, uid, properties, origin_time, zomes).into()

@@ -127,7 +127,7 @@ impl DnaBundle {
                     properties: SerializedBytes::try_from(
                         manifest.properties.clone().unwrap_or_default(),
                     )?,
-                    origin_time: manifest.origin_time,
+                    origin_time: manifest.origin_time.into(),
                     zomes,
                 };
 
@@ -197,7 +197,7 @@ impl DnaBundle {
                     e
                 ))
             })?),
-            origin_time: dna_def.origin_time,
+            origin_time: dna_def.origin_time.into(),
             zomes,
         }
         .into())
@@ -222,7 +222,7 @@ mod tests {
             name: "name".into(),
             uid: Some("original uid".to_string()),
             properties: Some(serde_yaml::Value::Null.into()),
-            origin_time: Timestamp::now(),
+            origin_time: Timestamp::now().into(),
             zomes: vec![
                 ZomeManifest {
                     name: "zome1".into(),
