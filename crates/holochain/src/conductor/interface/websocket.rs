@@ -485,9 +485,13 @@ pub mod test {
             .map(|hash| (CellId::from((hash, agent_key.clone())), None))
             .collect::<Vec<_>>();
         let mut dna_store = MockDnaStore::new();
+        let dna_map_clone = dna_map.clone();
         dna_store
             .expect_get_dna_file()
-            .returning(move |hash| dna_map.get(&hash).cloned());
+            .returning(move |hash| dna_map_clone.get(&hash).cloned());
+        dna_store
+            .expect_get_dna_def()
+            .returning(move |hash| dna_map.get(&hash).map(|d| d.dna_def()).cloned());
         dna_store
             .expect_add_dnas::<Vec<_>>()
             .times(1)
