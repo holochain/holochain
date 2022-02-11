@@ -16,7 +16,7 @@ pub fn create(create_input: CreateInput) -> ExternResult<HeaderHash> {
 /// General function that can update any entry type.
 ///
 /// This is used under the hood by [`update_entry`], [`update_cap_grant`] and `update_cap_claim`.
-/// 
+///
 /// @todo implement update_cap_claim
 ///
 /// The host builds an [`Update`] header for the passed entry value and commits a new update to the
@@ -31,7 +31,7 @@ pub fn update(hash: HeaderHash, create_input: CreateInput) -> ExternResult<Heade
 /// General function that can delete any entry type.
 ///
 /// This is used under the hood by [`delete_entry`], [`delete_cap_grant`] and `delete_cap_claim`.
-/// 
+///
 /// @todo implement delete_cap_claim
 ///
 /// The host builds a [`Delete`] header for the passed entry and commits a new element to the chain.
@@ -80,7 +80,7 @@ where
 /// ```ignore
 /// delete_entry(entry_hash(foo_entry)?)?;
 /// ```
-/// 
+///
 /// with a specific [`ChainTopOrdering`]:
 /// ```ignore
 /// delete_entry(DeleteInput::new(entry_hash(foo_entry)?, ChainTopOrdering::Relaxed)?;
@@ -111,7 +111,7 @@ where
 /// more efficient than hashing headers ad-hoc as hashing always needs to be done at the database
 /// layer, so we want to re-use that as much as possible.
 /// The header hash can be extracted from the Element as `element.header_hashed().as_hash()`.
-/// 
+///
 /// @todo is there any use-case that can't be satisfied by the `header_hashed` approach?
 ///
 /// Anything that is annotated with #[hdk_entry( .. )] or entry_def!( .. ) implements this so is
@@ -142,7 +142,7 @@ where
 }
 
 /// Update an app entry. Also see [`update`].
-/// 
+///
 /// The hash is the [`HeaderHash`] of the deleted element, the input is a [`TryInto<CreateInput>`].
 ///
 /// Updates can reference Elements which contain Entry data -- namely, Creates and other Updates -- but
