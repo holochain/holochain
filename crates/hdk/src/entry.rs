@@ -340,9 +340,9 @@ pub fn must_get_valid_element(header_hash: HeaderHash) -> ExternResult<Element> 
     })
 }
 
-/// Get an element from the hash AND the details for the entry or header hash passed in.
+/// Get an element and its details for the entry or header hash passed in.
 /// Returns [ `None` ] if the entry/header does not exist.
-/// The details returned are a contextual mix of elements and header hashes, see below.
+/// The details returned are a contextual mix of elements and header hashes.
 ///
 /// Note: The return details will be inferred by the hash type passed in, be careful to pass in the
 ///       correct hash type for the details you want.
