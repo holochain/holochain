@@ -880,14 +880,12 @@ impl Cell {
         let dna_file = conductor_handle
             .get_dna_file(id.dna_hash())
             .ok_or_else(|| DnaError::DnaMissing(id.dna_hash().to_owned()))?;
-        let dna_def = dna_file.dna_def().clone();
 
         // Get the ribosome
         let ribosome = RealRibosome::new(dna_file);
 
         // Run the workflow
         let args = InitializeZomesWorkflowArgs {
-            dna_def,
             ribosome,
             conductor_handle,
         };

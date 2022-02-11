@@ -98,7 +98,9 @@ async fn check_valid_if_dna_test() {
     workspace.dna_def = Arc::new(dna_def);
     assert_matches!(
         check_valid_if_dna(&header.clone().into(), &workspace).await,
-        Ok(())
+        Err(SysValidationError::ValidationOutcome(
+            ValidationOutcome::PrevHeaderError(PrevHeaderError::InvalidRootOriginTime)
+        ))
     );
     workspace.dna_def = dna_def_original;
 

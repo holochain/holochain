@@ -19,9 +19,17 @@ pub struct InitializeZomesWorkflowArgs<Ribosome>
 where
     Ribosome: RibosomeT + Send + 'static,
 {
-    pub dna_def: DnaDef,
     pub ribosome: Ribosome,
     pub conductor_handle: ConductorHandle,
+}
+
+impl<Ribosome> InitializeZomesWorkflowArgs<Ribosome>
+where
+    Ribosome: RibosomeT + Send + 'static,
+{
+    pub fn dna_def(&self) -> &DnaDef {
+        self.ribosome.dna_def().as_content()
+    }
 }
 
 #[instrument(skip(network, keystore, workspace, args))]
@@ -67,8 +75,8 @@ async fn initialize_zomes_workflow_inner<Ribosome>(
 where
     Ribosome: RibosomeT + Send + 'static,
 {
+    let dna_def = args.dna_def().clone();
     let InitializeZomesWorkflowArgs {
-        dna_def,
         ribosome,
         conductor_handle,
     } = args;
@@ -159,7 +167,7 @@ pub mod tests {
             test_cache.env(),
             keystore,
             author.clone(),
-            Arc::new(dna_def.clone()),
+            Arc::new(dna_def),
         )
         .await
         .unwrap();
@@ -174,7 +182,6 @@ pub mod tests {
         let conductor_handle = Arc::new(MockConductorHandleT::new());
         let args = InitializeZomesWorkflowArgs {
             ribosome,
-            dna_def,
             conductor_handle,
         };
         let keystore = fixt!(MetaLairClient);

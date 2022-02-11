@@ -179,14 +179,15 @@ pub async fn check_valid_if_dna(
 ) -> SysValidationResult<()> {
     match header {
         Header::Dna(_) => {
-            let chain_empty = workspace.is_chain_empty(header.author().clone()).await?;
-            // If the Dna timestamp is ahead of the origin time, every other header
-            // will be inductively so also due to the prev_header check
-            let timestamp_valid = header.timestamp() >= workspace.dna_def().origin_time;
-            if chain_empty && timestamp_valid {
-                Ok(())
-            } else {
+            if !workspace.is_chain_empty(header.author().clone()).await? {
                 Err(PrevHeaderError::InvalidRoot).map_err(|e| ValidationOutcome::from(e).into())
+            } else if header.timestamp() < workspace.dna_def().origin_time {
+                // If the Dna timestamp is ahead of the origin time, every other header
+                // will be inductively so also due to the prev_header check
+                Err(PrevHeaderError::InvalidRootOriginTime)
+                    .map_err(|e| ValidationOutcome::from(e).into())
+            } else {
+                Ok(())
             }
         }
         _ => Ok(()),
