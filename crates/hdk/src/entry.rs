@@ -70,7 +70,7 @@ where
     create(CreateInput::try_from(input)?)
 }
 
-/// Alias to delete
+/// Alias to [`delete`]
 ///
 /// Takes the [ `HeaderHash` ] of the element to delete.
 ///
