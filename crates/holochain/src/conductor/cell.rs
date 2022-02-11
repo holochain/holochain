@@ -798,7 +798,7 @@ impl Cell {
         let invocation =
             ZomeCallInvocation::try_from_interface_call(self.conductor_api.clone(), call).await?;
 
-        let dna_def = ribosome.dna_def.as_content().clone();
+        let dna_def = ribosome.dna_def().as_content().clone();
 
         // If there is no existing zome call then this is the root zome call
         let is_root_zome_call = workspace_lock.is_none();
