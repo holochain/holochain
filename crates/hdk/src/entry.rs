@@ -13,7 +13,7 @@ pub fn create(create_input: CreateInput) -> ExternResult<HeaderHash> {
     HDK.with(|h| h.borrow().create(create_input))
 }
 
-/// Update any entry type.
+/// General function that can update any entry type.
 ///
 /// This is used under the hood by [ `update_entry` ], [ `update_cap_grant` ] and `update_cap_claim`.
 /// @todo implement update_cap_claim
