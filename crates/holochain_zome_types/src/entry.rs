@@ -343,7 +343,7 @@ impl DeleteInput {
 }
 
 impl From<holo_hash::HeaderHash> for DeleteInput {
-    /// Sets [`ChainTopOrdering`] to `default` when created from a hash.
+    /// Sets [`ChainTopOrdering`] to `default` = `Strict` when created from a hash.
     fn from(deletes_header_hash: holo_hash::HeaderHash) -> Self {
         Self {
             deletes_header_hash,

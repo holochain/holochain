@@ -82,7 +82,7 @@ where
 /// ```
 /// 
 /// with a specific [`ChainTopOrdering`]:
-/// /// ```ignore
+/// ```ignore
 /// delete_entry(DeleteInput::new(entry_hash(foo_entry)?, ChainTopOrdering::Relaxed)?;
 /// ```
 pub fn delete_entry<I, E>(delete_input: I) -> ExternResult<HeaderHash>
