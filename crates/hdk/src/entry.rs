@@ -8,7 +8,7 @@ use crate::prelude::*;
 /// chain.
 ///
 /// Usually you don't need to use this function directly; it is the most general way to create an
-/// entry and standardises the internals of higher level create functions.
+/// entry and standardizes the internals of higher level create functions.
 pub fn create(create_input: CreateInput) -> ExternResult<HeaderHash> {
     HDK.with(|h| h.borrow().create(create_input))
 }
@@ -16,13 +16,14 @@ pub fn create(create_input: CreateInput) -> ExternResult<HeaderHash> {
 /// General function that can update any entry type.
 ///
 /// This is used under the hood by [ `update_entry` ], [ `update_cap_grant` ] and `update_cap_claim`.
+/// 
 /// @todo implement update_cap_claim
 ///
 /// The host builds an [ `Update` ] header for the passed entry value and commits a new update to the
 /// chain.
 ///
 /// Usually you don't need to use this function directly; it is the most general way to update an
-/// entry and standardises the internals of higher level create functions.
+/// entry and standardizes the internals of higher level update functions.
 pub fn update(hash: HeaderHash, create_input: CreateInput) -> ExternResult<HeaderHash> {
     HDK.with(|h| h.borrow().update(UpdateInput::new(hash, create_input)))
 }
@@ -30,12 +31,13 @@ pub fn update(hash: HeaderHash, create_input: CreateInput) -> ExternResult<Heade
 /// General function that can delete any entry type.
 ///
 /// This is used under the hood by [ `delete_entry` ], [ `delete_cap_grant` ] and `delete_cap_claim`.
+/// 
 /// @todo implement delete_cap_claim
 ///
 /// The host builds a [ `Delete` ] header for the passed entry and commits a new element to the chain.
 ///
-/// Usually you don't need to use this function directly; it is the most general way to update an
-/// entry and standardises the internals of higher level create functions.
+/// Usually you don't need to use this function directly; it is the most general way to delete an
+/// entry and standardizes the internals of higher level delete functions.
 pub fn delete<I, E>(delete_input: I) -> ExternResult<HeaderHash>
 where
     DeleteInput: TryFrom<I, Error = E>,
@@ -44,7 +46,7 @@ where
     HDK.with(|h| h.borrow().delete(DeleteInput::try_from(delete_input)?))
 }
 
-/// Create an app entry.
+/// Create an app entry. Also see [`create`].
 ///
 /// Apps define app entries by registering entry def ids with the `entry_defs` callback and serialize the
 /// entry content when committing to the source chain.
@@ -70,12 +72,18 @@ where
     create(CreateInput::try_from(input)?)
 }
 
-/// Alias to [`delete`]
+/// Delete an app entry. Also see [`delete`].
 ///
-/// Takes the [ `HeaderHash` ] of the element to delete.
+/// This function accepts the [`HeaderHash`] of the element to delete and optionally an argument to
+/// specify the [`ChainTopOrdering`]. Refer to [`DeleteInput`] for details.
 ///
 /// ```ignore
 /// delete_entry(entry_hash(foo_entry)?)?;
+/// ```
+/// 
+/// with a specific [`ChainTopOrdering`]:
+/// /// ```ignore
+/// delete_entry(DeleteInput::new(entry_hash(foo_entry)?, ChainTopOrdering::Relaxed)?;
 /// ```
 pub fn delete_entry<I, E>(delete_input: I) -> ExternResult<HeaderHash>
 where
@@ -85,9 +93,9 @@ where
     delete(delete_input)
 }
 
-/// Hash anything that that implements [ `TryInto<Entry>` ].
+/// Hash anything that implements [ `TryInto<Entry>` ].
 ///
-/// Hashes are typed in holochain, e.g. [ `HeaderHash` ] and [ `EntryHash` ] are different and yield different
+/// Hashes are typed in Holochain, e.g. [ `HeaderHash` ] and [ `EntryHash` ] are different and yield different
 /// bytes for a given value. This ensures correctness and allows type based dispatch in various
 /// areas of the codebase.
 ///
@@ -103,6 +111,7 @@ where
 /// more efficient than hashing headers ad-hoc as hashing always needs to be done at the database
 /// layer, so we want to re-use that as much as possible.
 /// The header hash can be extracted from the Element as `element.header_hashed().as_hash()`.
+/// 
 /// @todo is there any use-case that can't be satisfied by the `header_hashed` approach?
 ///
 /// Anything that is annotated with #[hdk_entry( .. )] or entry_def!( .. ) implements this so is
@@ -132,11 +141,12 @@ where
     HDK.with(|h| h.borrow().hash_entry(Entry::try_from(input)?))
 }
 
-/// Thin wrapper around update for app entries.
+/// Update an app entry. Also see [`update`].
+/// 
 /// The hash is the [ `HeaderHash` ] of the deleted element, the input is a [ `TryInto<CreateInput>` ].
 ///
 /// Updates can reference Elements which contain Entry data -- namely, Creates and other Updates -- but
-/// not Deletes or system Elements
+/// not Deletes or system Elements.
 ///
 /// As updates can reference elements on other agent's source chains across unpredictable network
 /// topologies, they are treated as a tree structure.
