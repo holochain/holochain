@@ -82,7 +82,7 @@ where
 /// struct Foo(u32);
 ///
 /// let header_hash = create_entry(Foo(50))?;
-/// let delete_entry_header_hash = delete_entry(header_hash.clone());
+/// let delete_entry_header_hash = delete_entry(header_hash.clone())?;
 /// ```
 ///
 /// with a specific [`ChainTopOrdering`]:
