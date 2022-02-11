@@ -4,7 +4,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased](https://github.com/holochain/holochain/holochain_zome_types-v0.0.2-alpha.1...HEAD)
 
-- BREAKING CHANGE: Many hashing algorithms can now be specified although none of them do anything yet [#1222](https://github.com/holochain/holochain/pull/1222)
+- BREAKING CHANGE: Many hashing algorithms can now be specified although only the `Entry` hash type does anything yet [#1222](https://github.com/holochain/holochain/pull/1222)
 
 ## 0.0.23
 
