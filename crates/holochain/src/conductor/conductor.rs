@@ -494,10 +494,11 @@ where
 
     /// Instantiate a Ribosome for use with a DNA
     pub(crate) fn get_ribosome(&self, dna_hash: &DnaHash) -> ConductorResult<RealRibosome> {
-        self.dna_store.share_ref(|d| match d.get_dna_file(dna_hash) {
-            Some(dna) => Ok(RealRibosome::new(dna)),
-            None => Err(DnaError::DnaMissing(dna_hash.to_owned()).into()),
-        })
+        self.dna_store
+            .share_ref(|d| match d.get_dna_file(dna_hash) {
+                Some(dna) => Ok(RealRibosome::new(dna)),
+                None => Err(DnaError::DnaMissing(dna_hash.to_owned()).into()),
+            })
     }
 
     /// Get a dna space or create it if one doesn't exist.
