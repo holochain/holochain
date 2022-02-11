@@ -43,6 +43,7 @@ pub struct DnaDef {
     /// The time used to denote the origin of the network, used to calculate
     /// time windows during gossip.
     /// All Header timestamps must come after this time.
+    #[builder(default = "Timestamp::now()")]
     pub origin_time: Timestamp,
 
     /// A vector of zomes associated with your DNA.
