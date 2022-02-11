@@ -25,6 +25,37 @@ pub trait DnaStore: Default + Send + Sync {
     fn get_entry_def(&self, k: &EntryDefBufferKey) -> Option<EntryDef>;
 }
 
+impl MockDnaStore {
+    /// Construct the most common mock which has a single DnaFile
+    pub fn single_dna<T>(dna_file: DnaFile, add_dnas_calls: T, add_entry_defs_calls: T) -> Self
+    where
+        T: Into<::mockall::TimesRange>,
+    {
+        let dna_def = dna_file.dna_def().clone();
+        let dna_hash = dna_file.dna_hash().clone();
+        let mut dna_store = MockDnaStore::new();
+
+        dna_store
+            .expect_get_dna_def()
+            .with(mockall::predicate::eq(dna_hash.clone()))
+            .returning(move |_| Some(dna_def.clone()));
+        dna_store
+            .expect_get_dna_file()
+            .with(mockall::predicate::eq(dna_hash))
+            .returning(move |_| Some(dna_file.clone()));
+        dna_store
+            .expect_add_dnas::<Vec<_>>()
+            .times(add_dnas_calls)
+            .return_const(());
+        dna_store
+            .expect_add_entry_defs::<Vec<_>>()
+            .times(add_entry_defs_calls)
+            .return_const(());
+
+        dna_store
+    }
+}
+
 /// Read-only access to a DnaStore, and only for DNAs
 pub trait DnaStoreRead: Default + Send + Sync {
     /// List all DNAs in the store
