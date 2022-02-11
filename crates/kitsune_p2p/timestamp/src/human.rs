@@ -2,9 +2,10 @@ use crate::{DateTime, Timestamp};
 use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
 
-/// A human-readable timestamp which is serialized as an RFC3339 when possible,
-/// and a microsecond integer count otherwise
-#[derive(Clone, Copy, Debug, Hash, Deserialize, Serialize)]
+/// A human-readable timestamp which is represented/serialized as an RFC3339
+/// when possible, and a microsecond integer count otherwise.
+/// Both representations can be deserialized to this type.
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum HumanTimestamp {
     Micros(Timestamp),
