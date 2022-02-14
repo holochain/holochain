@@ -36,6 +36,7 @@ fn pass_redundancy(stats: &Stats, redundancy_target: f64) -> bool {
 }
 
 #[test]
+#[ignore = "Not suitable for ci"]
 fn single_agent_convergence_debug() {
     std::env::set_var("RUST_LOG", "debug");
     observability::test_run().ok();
@@ -172,6 +173,7 @@ fn parameterized_battery() {
 
 /// Equilibrium test for a single distribution
 #[test]
+#[ignore = "Not suitable for ci"]
 fn parameterized_stability_test() {
     std::env::set_var("RUST_LOG", "debug");
     observability::test_run().ok();
@@ -208,6 +210,7 @@ fn parameterized_stability_test() {
 
 /// Equilibrium test for a single distribution
 #[test]
+#[ignore = "Not suitable for ci"]
 fn test_peer_view_beta() {
     observability::test_run().ok();
 

@@ -1,6 +1,6 @@
 [package]
 name = "release-automation"
-version = "0.2.0-alpha.0"
+version = "0.2.0-alpha.1"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 edition = "2018"
 documentation = "https://docs.rs/release-automation"
@@ -13,11 +13,11 @@ yaml-rust = "0.4.5"
 structopt = "0.3"
 pulldown-cmark = "0.8"
 bstr = "0.2"
-cargo = "0.53"
+cargo = "0.58"
 once_cell = "1.7"
 anyhow = "1.0"
 # needs to be in sync with what cargo is using
-semver = "0.10"
+semver = "1.0.3"
 serde = "1.0"
 serde_yaml = "0.8"
 educe = "0.4"
@@ -37,8 +37,8 @@ toml_edit = "0.2"
 thiserror = "1"
 regex = "1.5"
 crates_io_api = "0.7"
-holochain_util = { path = "../holochain_util" ,version = "0.0.6"}
-crates-index = "0.16"
+holochain_util = { path = "../holochain_util" }
+crates-index = "0.18"
 
 # used for the example clippy fix-json
 rustfix = "0.6"

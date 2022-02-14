@@ -3,6 +3,7 @@
 use futures::StreamExt;
 use holo_hash::AgentPubKey;
 use holochain_keystore::MetaLairClient;
+use holochain_types::prelude::*;
 
 /// Provides simple methods for generating collections of AgentPubKeys for use in tests
 pub struct SweetAgents;
@@ -34,6 +35,11 @@ impl SweetAgents {
     pub async fn two(keystore: MetaLairClient) -> (AgentPubKey, AgentPubKey) {
         let mut agents = Self::get(keystore, 2).await;
         (agents.pop().unwrap(), agents.pop().unwrap())
+    }
+
+    /// Get the same two AgentPubKeys every time
+    pub fn alice_and_bob() -> (AgentPubKey, AgentPubKey) {
+        (fake_agent_pubkey_1(), fake_agent_pubkey_2())
     }
 
     /// Get three AgentPubKeys

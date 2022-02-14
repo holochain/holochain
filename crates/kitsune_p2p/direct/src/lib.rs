@@ -52,6 +52,3 @@ pub mod prelude {
 }
 
 use prelude::*;
-
-#[cfg(test)]
-mod test;

@@ -216,7 +216,10 @@ async fn test_concurrency() {
 async fn publish_loop() {
     let mut u = arbitrary::Unstructured::new(&[0; 1000]);
     let kind = DbKindAuthored(Arc::new(DnaHash::arbitrary(&mut u).unwrap()));
-    let tmpdir = tempdir::TempDir::new("holochain-test-environments").unwrap();
+    let tmpdir = tempfile::Builder::new()
+        .prefix("holochain-test-environments")
+        .tempdir()
+        .unwrap();
     let env = DbWrite::test(&tmpdir, kind).expect("Couldn't create test database");
     let header = Header::arbitrary(&mut u).unwrap();
     let author = header.author().clone();

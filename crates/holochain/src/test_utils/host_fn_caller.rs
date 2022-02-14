@@ -179,7 +179,6 @@ impl HostFnCaller {
             network,
             signal_tx,
             call_zome_handle,
-            cell_id.clone(),
         );
         let ribosome = Arc::new(ribosome);
         let zome = ribosome.dna_def().get_zome(&zome_name).unwrap();
@@ -365,6 +364,7 @@ impl HostFnCaller {
     }
 }
 
+#[macro_export]
 macro_rules! test_entry_impl {
     ($type:ident) => {
         impl TryFrom<$type> for Entry {

@@ -12,7 +12,7 @@ use holochain_types::{
     env::DbWrite,
 };
 use holochain_zome_types::{Header, Signature};
-use tempdir::TempDir;
+use tempfile::TempDir;
 
 #[tokio::test(flavor = "multi_thread")]
 /// Checks a corrupt cache will be wiped on load.
@@ -67,7 +67,10 @@ fn corrupt_db(path: &Path) {
 
 /// Creates a db with some data in it then corrupts the db.
 fn create_corrupt_db<Kind: DbKindT>(kind: Kind, u: &mut arbitrary::Unstructured) -> TempDir {
-    let testdir = tempdir::TempDir::new("corrupt_source_chain").unwrap();
+    let testdir = tempfile::Builder::new()
+        .prefix("corrupt_source_chain")
+        .tempdir()
+        .unwrap();
     let path = testdir.path().join(kind.filename());
     std::fs::create_dir_all(path.parent().unwrap()).unwrap();
     let mut conn = Connection::open(&path).unwrap();

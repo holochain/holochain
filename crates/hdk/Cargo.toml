@@ -1,6 +1,6 @@
 [package]
 name = "hdk"
-version = "0.0.120"
+version = "0.0.122"
 description = "The Holochain HDK"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain/tree/develop/crates/hdk"
@@ -23,12 +23,12 @@ test_utils = [ "fixturators", "holochain_zome_types/test_utils", "holo_hash/test
 properties = [ "holochain_zome_types/properties" ]
 
 [dependencies]
-hdk_derive = { version = "0.0.22", path = "../hdk_derive" }
-holo_hash = { version = "0.0.17", path = "../holo_hash" }
-holochain_wasmer_guest = "=0.0.76"
+hdk_derive = { version = "0.0.24", path = "../hdk_derive" }
+holo_hash = { version = "0.0.19", path = "../holo_hash" }
+holochain_wasmer_guest = "=0.0.77"
 # it's important that we depend on holochain_zome_types with no default
 # features, both here AND in hdk_derive, to reduce code bloat
-holochain_zome_types = { version = "0.0.22", path = "../holochain_zome_types", default-features = false }
+holochain_zome_types = { version = "0.0.24", path = "../holochain_zome_types", default-features = false }
 paste = "=1.0.5"
 serde = "1.0"
 serde_bytes = "0.11"
@@ -37,9 +37,6 @@ tracing = "0.1"
 tracing-core = "0.1"
 mockall = { version = "0.10.2", optional = true }
 
-[dependencies.tracing-subscriber]
-version = "0.2"
-features = []
 
 [dev-dependencies]
 fixt = { path = "../fixt" ,version = "0.0.8"}

@@ -268,6 +268,14 @@ pub(crate) mod cli {
         /// Don't run consistency verification checks.
         #[structopt(long)]
         pub(crate) no_verify: bool,
+
+        /// Don't run consistency verification pre-change.
+        #[structopt(long)]
+        pub(crate) no_verify_pre: bool,
+
+        /// Don't run consistency verification post-change.
+        #[structopt(long)]
+        pub(crate) no_verify_post: bool,
     }
 
     /// Parses a commad separated input string to a set of strings.

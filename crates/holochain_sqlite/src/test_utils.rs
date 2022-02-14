@@ -11,7 +11,7 @@ use crate::db::DbWrite;
 use holochain_zome_types::fake_dna_hash;
 use shrinkwraprs::Shrinkwrap;
 use std::sync::Arc;
-use tempdir::TempDir;
+use tempfile::TempDir;
 
 /// Create a [TestDb] of [`DbKindAuthored`], backed by a temp directory.
 pub fn test_authored_db() -> TestDb<DbKindAuthored> {
@@ -20,7 +20,10 @@ pub fn test_authored_db() -> TestDb<DbKindAuthored> {
 }
 
 fn test_db<Kind: DbKindT + Send + Sync + 'static>(kind: Kind) -> TestDb<Kind> {
-    let tmpdir = TempDir::new("holochain-test-environments").unwrap();
+    let tmpdir = tempfile::Builder::new()
+        .prefix("holochain-test-environments")
+        .tempdir()
+        .unwrap();
     TestDb {
         db: DbWrite::new(tmpdir.path(), kind, crate::conn::DbSyncLevel::default())
             .expect("Couldn't create test database"),
@@ -30,7 +33,10 @@ fn test_db<Kind: DbKindT + Send + Sync + 'static>(kind: Kind) -> TestDb<Kind> {
 
 /// Create a fresh set of test environments with a new TempDir
 pub fn test_dbs() -> TestDbs {
-    let tempdir = TempDir::new("holochain-test-environments").unwrap();
+    let tempdir = tempfile::Builder::new()
+        .prefix("holochain-test-environments")
+        .tempdir()
+        .unwrap();
     TestDbs::new(tempdir)
 }
 

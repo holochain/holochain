@@ -10,15 +10,14 @@ use lair_keystore_api::mem_store::*;
 use lair_keystore_api::prelude::*;
 use std::sync::Arc;
 
-mod test_utils;
-use test_utils::*;
+use super::test_utils::*;
 
 const ADMIN_PORT: u16 = 12909;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_new_lair_conductor_integration() {
     // working temp dir
-    let tmp = tempdir::TempDir::new("new-lair-integration").unwrap();
+    let tmp = tempfile::tempdir().unwrap();
 
     // set up new lair keystore config
     let passphrase = sodoken::BufRead::from(&b"passphrase"[..]);
