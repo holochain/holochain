@@ -11,9 +11,9 @@ use holochain_serialized_bytes::prelude::*;
 /// HeaderHash returns an Element.
 /// EntryHash returns an Entry.
 pub enum Details {
-    /// Variant asking for a specific element
+    /// Variant holding for a specific element. Returned when [`get_details`] was passed a header hash.
     Element(ElementDetails),
-    /// Variant asking for any information on data
+    /// Variant holding all information on element.   Returned when [`get_details`] was passed an entry hash.
     Entry(EntryDetails),
 }
 

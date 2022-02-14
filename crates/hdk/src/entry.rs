@@ -351,9 +351,9 @@ pub fn must_get_valid_element(header_hash: HeaderHash) -> ExternResult<Element> 
 /// Note: The return details will be inferred by the hash type passed in, be careful to pass in the
 ///       correct hash type for the details you want.
 ///
-/// Note: If a header hash is passed in the element returned is the specified element.
+/// Note: If a header hash is passed in the element returned (via the [`ElementDetails`] variant) is the specified element.
 ///       If an entry hash is passed in all the headers (so implicitly all the elements) are
-///       returned for the entry that matches that hash.
+///       returned (via the [`EntryDetails`] variant) for the entry that matches that hash using the .
 ///       See [`get`] for more information about what "oldest live" means.
 ///
 /// The details returned include relevant creates, updates and deletes for the hash passed in.
@@ -367,11 +367,11 @@ pub fn must_get_valid_element(header_hash: HeaderHash) -> ExternResult<Element> 
 /// Full elements are returned for direct references to the passed hash.
 /// Header hashes are returned for references to references to the passed hash.
 ///
-/// [`Details`] for a header hash return:
+/// [`Details::Element`] for a header hash return:
 /// - the element for this header hash if it exists
 /// - all update and delete _elements_ that reference that specified header
 ///
-/// [`Details`] for an entry hash return:
+/// [`Details::Entry`] for an entry hash return:
 /// - all creates, updates and delete _elements_ that reference that entry hash
 /// - all update and delete _elements_ that reference the elements that reference the entry hash
 ///
