@@ -13,7 +13,7 @@ use holochain_serialized_bytes::prelude::*;
 pub enum Details {
     /// Variant holding for a specific element. Returned when [`get_details`] was passed a header hash.
     Element(ElementDetails),
-    /// Variant holding all information on element.   Returned when [`get_details`] was passed an entry hash.
+    /// Variant holding all information on an element.   Returned when [`get_details`] was passed an entry hash.
     Entry(EntryDetails),
 }
 
