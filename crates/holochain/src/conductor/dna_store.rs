@@ -23,7 +23,11 @@ impl DnaStore for RealDnaStore {
         self.dnas.keys().cloned().collect()
     }
     #[instrument]
-    fn get(&self, hash: &DnaHash) -> Option<DnaFile> {
+    fn get_dna_def(&self, hash: &DnaHash) -> Option<DnaDef> {
+        self.dnas.get(hash).map(|d| d.dna_def()).cloned()
+    }
+    #[instrument]
+    fn get_dna_file(&self, hash: &DnaHash) -> Option<DnaFile> {
         self.dnas.get(hash).cloned()
     }
     fn add_entry_def(&mut self, k: EntryDefBufferKey, entry_def: EntryDef) {

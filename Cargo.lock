@@ -2823,6 +2823,7 @@ dependencies = [
  "holochain_serialized_bytes",
  "rusqlite",
  "serde",
+ "serde_yaml",
  "thiserror",
 ]
 

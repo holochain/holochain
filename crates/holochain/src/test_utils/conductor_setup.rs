@@ -170,6 +170,7 @@ impl ConductorTestData {
                 name: "conductor_test".to_string(),
                 uid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
                 properties: SerializedBytes::try_from(()).unwrap(),
+                origin_time: Timestamp::now(),
                 zomes: zomes.clone().into_iter().map(Into::into).collect(),
             },
             zomes.into_iter().map(Into::into),

@@ -9,6 +9,7 @@ use holochain_sqlite::db::DbKindDht;
 use holochain_sqlite::db::ReadAccess;
 use holochain_types::env::DbRead;
 use holochain_types::env::DbWrite;
+use holochain_zome_types::DnaDef;
 use holochain_zome_types::SignedHeaderHashed;
 
 use crate::prelude::SourceChain;
@@ -26,6 +27,7 @@ pub struct HostFnWorkspace<
     authored: DbRead<DbKindAuthored>,
     dht: DbRead<DbKindDht>,
     cache: DbWrite<DbKindCache>,
+    dna_def: Arc<DnaDef>,
 }
 
 #[derive(Clone, shrinkwraprs::Shrinkwrap)]
@@ -54,6 +56,11 @@ impl HostFnWorkspace {
             None => Ok(Vec::with_capacity(0)),
         }
     }
+
+    /// Get a reference to the host fn workspace's dna def.
+    pub fn dna_def(&self) -> Arc<DnaDef> {
+        self.dna_def.clone()
+    }
 }
 
 impl SourceChainWorkspace {
@@ -63,10 +70,11 @@ impl SourceChainWorkspace {
         cache: DbWrite<DbKindCache>,
         keystore: MetaLairClient,
         author: AgentPubKey,
+        dna_def: Arc<DnaDef>,
     ) -> SourceChainResult<Self> {
         let source_chain =
             SourceChain::new(authored.clone(), dht.clone(), keystore, author).await?;
-        Self::new_inner(authored, dht, cache, source_chain).await
+        Self::new_inner(authored, dht, cache, source_chain, dna_def).await
     }
 
     /// Create a source chain with a blank chain head.
@@ -79,10 +87,11 @@ impl SourceChainWorkspace {
         cache: DbWrite<DbKindCache>,
         keystore: MetaLairClient,
         author: AgentPubKey,
+        dna_def: Arc<DnaDef>,
     ) -> SourceChainResult<Self> {
         let source_chain =
             SourceChain::raw_empty(authored.clone(), dht.clone(), keystore, author).await?;
-        Self::new_inner(authored, dht, cache, source_chain).await
+        Self::new_inner(authored, dht, cache, source_chain, dna_def).await
     }
 
     async fn new_inner(
@@ -90,12 +99,14 @@ impl SourceChainWorkspace {
         dht: DbWrite<DbKindDht>,
         cache: DbWrite<DbKindCache>,
         source_chain: SourceChain,
+        dna_def: Arc<DnaDef>,
     ) -> SourceChainResult<Self> {
         Ok(Self {
             inner: HostFnWorkspace {
                 source_chain: Some(source_chain.clone()),
                 authored: authored.into(),
                 dht: dht.into(),
+                dna_def,
                 cache,
             },
             source_chain,
@@ -114,6 +125,7 @@ where
         cache: DbWrite<DbKindCache>,
         keystore: MetaLairClient,
         author: Option<AgentPubKey>,
+        dna_def: Arc<DnaDef>,
     ) -> SourceChainResult<Self> {
         let source_chain = match author {
             Some(author) => {
@@ -126,6 +138,7 @@ where
             authored: authored.into(),
             dht: dht.into(),
             cache,
+            dna_def,
         })
     }
     pub fn source_chain(&self) -> &Option<SourceChain<SourceChainDb, SourceChainDht>> {
@@ -169,6 +182,7 @@ impl From<HostFnWorkspace> for HostFnWorkspaceRead {
             authored: workspace.authored,
             dht: workspace.dht,
             cache: workspace.cache,
+            dna_def: workspace.dna_def,
         }
     }
 }
@@ -186,6 +200,7 @@ impl From<SourceChainWorkspace> for HostFnWorkspaceRead {
             authored: workspace.inner.authored,
             dht: workspace.inner.dht,
             cache: workspace.inner.cache,
+            dna_def: workspace.inner.dna_def,
         }
     }
 }

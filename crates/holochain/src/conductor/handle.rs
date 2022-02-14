@@ -60,6 +60,7 @@ use crate::conductor::p2p_agent_store::P2pBatch;
 use crate::core::queue_consumer::QueueConsumerMap;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitArgs;
 use crate::core::ribosome::real_ribosome::RealRibosome;
+use crate::core::ribosome::RibosomeT;
 use crate::core::workflow::ZomeCallResult;
 use derive_more::From;
 use futures::future::FutureExt;
@@ -142,8 +143,11 @@ pub trait ConductorHandleT: Send + Sync {
     /// Get the list of hashes of installed Dnas in this Conductor
     fn list_dnas(&self) -> Vec<DnaHash>;
 
-    /// Get a [Dna] from the [DnaStore]
-    fn get_dna(&self, hash: &DnaHash) -> Option<DnaFile>;
+    /// Get a [DnaDef] from the [DnaStore]
+    fn get_dna_def(&self, hash: &DnaHash) -> Option<DnaDef>;
+
+    /// Get a [DnaFile] from the [DnaStore]
+    fn get_dna_file(&self, hash: &DnaHash) -> Option<DnaFile>;
 
     /// Get an instance of a [RealRibosome] for the DnaHash
     fn get_ribosome(&self, dna_hash: &DnaHash) -> ConductorResult<RealRibosome>;
@@ -572,8 +576,16 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         self.conductor.dna_store().share_ref(|ds| ds.list())
     }
 
-    fn get_dna(&self, hash: &DnaHash) -> Option<DnaFile> {
-        self.conductor.dna_store().share_ref(|ds| ds.get(hash))
+    fn get_dna_def(&self, hash: &DnaHash) -> Option<DnaDef> {
+        self.conductor
+            .dna_store()
+            .share_ref(|ds| ds.get_dna_def(hash))
+    }
+
+    fn get_dna_file(&self, hash: &DnaHash) -> Option<DnaFile> {
+        self.conductor
+            .dna_store()
+            .share_ref(|ds| ds.get_dna_file(hash))
     }
 
     fn get_ribosome(&self, dna_hash: &DnaHash) -> ConductorResult<RealRibosome> {
@@ -1300,6 +1312,12 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
 
         // Validate the elements.
         if validate {
+            // Create the ribosome.
+            let ribosome = self
+                .get_dna_file(cell_id.dna_hash())
+                .map(RealRibosome::new)
+                .ok_or_else(|| DnaError::DnaMissing(cell_id.dna_hash().to_owned()))?;
+
             // Create a raw source chain to validate against because
             // genesis may not have been run yet.
             let workspace = SourceChainWorkspace::raw_empty(
@@ -1308,14 +1326,9 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                 space.cache.clone(),
                 self.keystore.clone(),
                 cell_id.agent_pubkey().clone(),
+                Arc::new(ribosome.dna_def().as_content().clone()),
             )
             .await?;
-
-            // Create the ribosome.
-            let ribosome = self
-                .get_dna(cell_id.dna_hash())
-                .map(RealRibosome::new)
-                .ok_or_else(|| DnaError::DnaMissing(cell_id.dna_hash().to_owned()))?;
 
             let sc = workspace.source_chain();
 
