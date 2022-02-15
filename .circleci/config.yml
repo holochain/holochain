@@ -133,7 +133,7 @@ workflows:
       jobs:
          - merge-release-test
          # - merge-release-test-mac
-         - merge-test
+         - standard-test
          # - merge-test-mac
 
    docker-builds:
