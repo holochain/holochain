@@ -119,7 +119,11 @@ pub fn blake2b_n(data: &[u8], length: usize) -> Result<Vec<u8>, HoloHashError> {
     if length < 1 || blake2b_simd::OUTBYTES < length {
         return Err(HoloHashError::BadHashSize);
     }
-    Ok(blake2b_simd::Params::new().hash_length(length).hash(data).as_bytes().to_vec())
+    Ok(blake2b_simd::Params::new()
+        .hash_length(length)
+        .hash(data)
+        .as_bytes()
+        .to_vec())
 }
 
 /// internal compute a 32 byte blake2b hash
