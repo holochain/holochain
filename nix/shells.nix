@@ -46,6 +46,7 @@ rec {
       gdb
       gh
       nixpkgs-fmt
+      niv
     ]);
   };
 
