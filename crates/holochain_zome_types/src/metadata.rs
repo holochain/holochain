@@ -33,7 +33,7 @@ pub struct ElementDetails {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, SerializedBytes)]
-/// An Entry with all it's metadata.
+/// An Entry with all its metadata.
 pub struct EntryDetails {
     /// The data
     pub entry: Entry,
