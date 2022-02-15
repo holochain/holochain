@@ -39,7 +39,7 @@ fn hash_entry(entry: Entry) -> ExternResult<EntryHash> {
 
 #[cfg(test)]
 pub mod tests {
-    use fixt::prelude::*;
+    use ::fixt::prelude::*;
     use hdk::prelude::*;
 
     #[test]
