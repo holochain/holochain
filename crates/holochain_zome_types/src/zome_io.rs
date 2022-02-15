@@ -138,8 +138,8 @@ wasm_io_types! {
     // Attempt to get a live entry from the cascade.
     fn get (Vec<zt::entry::GetInput>) -> Vec<Option<zt::element::Element>>;
 
-    // Hash an entry on the host.
-    fn hash_entry (zt::entry::Entry) -> holo_hash::EntryHash;
+    // Hash data on the host.
+    fn hash (zt::hash::HashInput) -> zt::hash::HashOutput;
 
     // Retreive an element from the DHT or short circuit.
     fn must_get_valid_element (zt::entry::MustGetValidElementInput) -> zt::element::Element;

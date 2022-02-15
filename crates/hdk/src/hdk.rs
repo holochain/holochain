@@ -37,7 +37,7 @@ pub trait HdkT: Send + Sync {
     fn create(&self, create_input: CreateInput) -> ExternResult<HeaderHash>;
     fn update(&self, update_input: UpdateInput) -> ExternResult<HeaderHash>;
     fn delete(&self, delete_input: DeleteInput) -> ExternResult<HeaderHash>;
-    fn hash_entry(&self, entry: Entry) -> ExternResult<EntryHash>;
+    fn hash(&self, hash_input: HashInput) -> ExternResult<HashOutput>;
     fn get(&self, get_input: Vec<GetInput>) -> ExternResult<Vec<Option<Element>>>;
     fn get_details(&self, get_input: Vec<GetInput>) -> ExternResult<Vec<Option<Details>>>;
     fn must_get_entry(&self, must_get_entry_input: MustGetEntryInput) -> ExternResult<EntryHashed>;
@@ -135,7 +135,7 @@ impl HdkT for ErrHdk {
     fn delete(&self, _: DeleteInput) -> ExternResult<HeaderHash> {
         Self::err()
     }
-    fn hash_entry(&self, _: Entry) -> ExternResult<EntryHash> {
+    fn hash(&self, _: HashInput) -> ExternResult<HashOutput> {
         Self::err()
     }
     fn get(&self, _: Vec<GetInput>) -> ExternResult<Vec<Option<Element>>> {
@@ -282,8 +282,8 @@ impl HdkT for HostHdk {
     fn delete(&self, hash: DeleteInput) -> ExternResult<HeaderHash> {
         host_call::<DeleteInput, HeaderHash>(__delete, hash)
     }
-    fn hash_entry(&self, entry: Entry) -> ExternResult<EntryHash> {
-        host_call::<Entry, EntryHash>(__hash_entry, entry)
+    fn hash(&self, hash_input: HashInput) -> ExternResult<HashOutput> {
+        host_call::<HashInput, HashOutput>(__hash, hash_input)
     }
     fn get(&self, get_inputs: Vec<GetInput>) -> ExternResult<Vec<Option<Element>>> {
         host_call::<Vec<GetInput>, Vec<Option<Element>>>(__get, get_inputs)

@@ -142,7 +142,10 @@ where
     Entry: TryFrom<I, Error = E>,
     WasmError: From<E>,
 {
-    HDK.with(|h| h.borrow().hash_entry(Entry::try_from(input)?))
+    match HDK.with(|h| h.borrow().hash(HashInput::Entry(Entry::try_from(input)?)))? {
+        HashOutput::Entry(entry_hash) => Ok(entry_hash),
+        _ => unreachable!(),
+    }
 }
 
 /// Update an app entry. Also see [`update`].
