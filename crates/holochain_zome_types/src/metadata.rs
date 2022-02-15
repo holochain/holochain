@@ -18,7 +18,7 @@ pub enum Details {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, SerializedBytes)]
-/// A specific Element with any deletes
+/// A specific Element with any updates and deletes.
 /// This is all the metadata available for an element.
 pub struct ElementDetails {
     /// The specific element.
