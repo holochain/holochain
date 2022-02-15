@@ -88,7 +88,7 @@ jobs:
               name: Set up Nix cache
               command: $(nix-build . --fallback --no-link -A pkgs.ci.ciSetupNixConf)/bin/hc-ci-setup-nix-conf.sh
          - run:
-              name: Run the standard tests
+              name: Run the static checks
               no_output_timeout: 30m
               command: nix-shell --fallback --pure --argstr flavor "coreDev" --run hc-static-checks
 
@@ -134,7 +134,7 @@ jobs:
               name: Set up Nix cache
               command: $(nix-build . --fallback --no-link -A pkgs.ci.ciSetupNixConf)/bin/hc-ci-setup-nix-conf.sh
          - run:
-              name: Run the standard tests
+              name: Run the slow tests
               no_output_timeout: 30m
               command: nix-shell --fallback --pure --argstr flavor "coreDev" --run hc-slow-test
 
@@ -157,7 +157,7 @@ jobs:
               name: Set up Nix cache
               command: $(nix-build . --fallback --no-link -A pkgs.ci.ciSetupNixConf)/bin/hc-ci-setup-nix-conf.sh
          - run:
-              name: Run the standard tests
+              name: Run the wasm tests
               no_output_timeout: 30m
               command: nix-shell --fallback --pure --argstr flavor "coreDev" --run hc-wasm-test
 
