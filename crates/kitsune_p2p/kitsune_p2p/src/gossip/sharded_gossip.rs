@@ -938,7 +938,7 @@ kitsune_p2p_types::write_codec_enum! {
         /// Any ops that were missing from the remote bloom.
         MissingOps(0x60) {
             /// The missing ops
-            ops.0: Vec<(Arc<KitsuneOpHash>, Vec<u8>)>,
+            ops.0: Vec<KOp>,
             /// Ops that are missing from a bloom that you have sent.
             /// These will be chunked into a maximum size of about 16MB.
             /// If the amount of missing ops is larger then the

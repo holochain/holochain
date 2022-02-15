@@ -32,23 +32,24 @@ async fn standard_responses(
         });
 
     if with_data {
-        evt_handler.expect_handle_query_op_hashes().returning(|_| {
-            Ok(async {
-                Ok(Some((
-                    vec![Arc::new(KitsuneOpHash(vec![0; 36]))],
-                    full_time_window_inclusive(),
-                )))
-            }
-            .boxed()
-            .into())
-        });
-        evt_handler.expect_handle_fetch_op_data().returning(|_| {
-            Ok(
-                async { Ok(vec![(Arc::new(KitsuneOpHash(vec![0; 36])), vec![0])]) }
+        evt_handler
+            .expect_handle_query_op_hashes()
+            .returning(move |_| {
+                let hash = Arc::new(KitsuneOpHash(vec![0; 36]));
+                Ok(
+                    async { Ok(Some((vec![hash], full_time_window_inclusive()))) }
+                        .boxed()
+                        .into(),
+                )
+            });
+        evt_handler
+            .expect_handle_fetch_op_data()
+            .returning(move |_| {
+                let hash = Arc::new(KitsuneOpHash(vec![0; 36]));
+                Ok(async { Ok(vec![(hash, KitsuneOpData::new(vec![0]))]) }
                     .boxed()
-                    .into(),
-            )
-        });
+                    .into())
+            });
     } else {
         evt_handler
             .expect_handle_query_op_hashes()

@@ -5,6 +5,7 @@
 use std::sync::Arc;
 
 use crate::event::*;
+use crate::test_util::hash_op_data;
 use crate::types::event::{KitsuneP2pEvent, KitsuneP2pEventHandler, KitsuneP2pEventHandlerResult};
 use kitsune_p2p_types::bin_types::*;
 use kitsune_p2p_types::*;
@@ -129,15 +130,17 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
     fn handle_gossip(
         &mut self,
         _space: Arc<KitsuneSpace>,
-        ops: Vec<(Arc<KitsuneOpHash>, Vec<u8>)>,
+        ops: Vec<KOp>,
     ) -> KitsuneP2pEventHandlerResult<()> {
         ok_fut(Ok(self.sb.share(|sb| {
             let node = sb.nodes.get_mut(&self.node).unwrap();
-            for (hash, op_data) in ops {
-                let loc8 = hash.get_loc().as_loc8();
+            for op in ops {
+                // This location is wrong from Holochain's perspective, but
+                // for this dummy implementation it doesn't matter.
+                let loc = hash_op_data(&op.0).get_loc().as_loc8();
                 // TODO: allow setting integration status
                 node.ops.insert(
-                    loc8,
+                    loc,
                     NodeOpEntry {
                         is_integrated: true,
                     },
@@ -194,13 +197,13 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
     fn handle_fetch_op_data(
         &mut self,
         FetchOpDataEvt { space, op_hashes }: FetchOpDataEvt,
-    ) -> KitsuneP2pEventHandlerResult<Vec<(Arc<KitsuneOpHash>, Vec<u8>)>> {
+    ) -> KitsuneP2pEventHandlerResult<Vec<(Arc<KitsuneOpHash>, KOp)>> {
         ok_fut(Ok(self.sb.share(|sb| {
             op_hashes
                 .into_iter()
                 .map(|hash| {
                     let e: &OpEntry = sb.ops.get(&hash.get_loc().as_loc8()).unwrap();
-                    (e.hash.to_owned(), e.data.to_owned())
+                    (e.hash.to_owned(), KitsuneOpData::new(vec![]))
                 })
                 .collect()
         })))

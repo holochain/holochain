@@ -2,7 +2,10 @@
 
 use crate::types::agent_store::AgentInfoSigned;
 use kitsune_p2p_timestamp::Timestamp;
-use kitsune_p2p_types::dht_arc::{DhtArcSet, DhtLocation};
+use kitsune_p2p_types::{
+    bin_types::{KOp, KitsuneOpData},
+    dht_arc::{DhtArcSet, DhtLocation},
+};
 use std::{collections::HashSet, sync::Arc};
 
 /// Gather a list of op-hashes from our implementor that meet criteria.
@@ -242,7 +245,7 @@ type KSpace = Arc<super::KitsuneSpace>;
 type KAgent = Arc<super::KitsuneAgent>;
 type KOpHash = Arc<super::KitsuneOpHash>;
 type Payload = Vec<u8>;
-type Ops = Vec<(KOpHash, Payload)>;
+type Ops = Vec<KOp>;
 
 ghost_actor::ghost_chan! {
     /// The KitsuneP2pEvent stream allows handling events generated from the
@@ -278,7 +281,7 @@ ghost_actor::ghost_chan! {
         fn query_op_hashes(input: QueryOpHashesEvt) -> Option<(Vec<KOpHash>, TimeWindowInclusive)>;
 
         /// Gather all op-hash data for a list of op-hashes from our implementor.
-        fn fetch_op_data(input: FetchOpDataEvt) -> Vec<(KOpHash, Vec<u8>)>;
+        fn fetch_op_data(input: FetchOpDataEvt) -> Vec<(KOpHash, KOp)>;
 
         /// Request that our implementor sign some data on behalf of an agent.
         fn sign_network_data(input: SignNetworkDataEvt) -> super::KitsuneSignature;

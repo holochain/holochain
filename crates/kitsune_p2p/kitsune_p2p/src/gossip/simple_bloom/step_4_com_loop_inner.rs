@@ -171,8 +171,8 @@ pub(crate) async fn step_4_com_loop_inner_incoming(
                 let mut to_send_peer_data = Vec::new();
                 for chunk in &chunks {
                     match &**chunk {
-                        MetaOpData::Op(key, data) => {
-                            to_send_ops.push((key.clone(), data.clone()));
+                        MetaOpData::Op(_, data) => {
+                            to_send_ops.push(data.clone());
                         }
                         MetaOpData::Agent(agent_info_signed) => {
                             // TODO - we actually only need to do this

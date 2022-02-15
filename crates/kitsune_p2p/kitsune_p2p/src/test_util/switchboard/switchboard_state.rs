@@ -421,7 +421,7 @@ impl SwitchboardState {
                 loc8,
                 OpEntry {
                     hash,
-                    data: vec![],
+                    data: (),
                     timestamp,
                 },
             ) {
@@ -661,7 +661,7 @@ pub struct OpEntry {
     /// for convenience since there is no one-step way to go from Loc8 -> KitsuneOpHash
     pub hash: KOpHash,
     /// The opaque data for the op. Probably doesn't matter and can be removed.
-    pub data: Vec<u8>,
+    pub data: (),
     /// The timestamp associated with this op. Same for all agents, intrinsic to the
     /// op itself.
     pub timestamp: Timestamp,

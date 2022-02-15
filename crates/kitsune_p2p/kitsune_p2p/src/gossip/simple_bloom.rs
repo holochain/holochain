@@ -63,7 +63,7 @@ pub enum MetaOpKey {
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum MetaOpData {
     /// data chunk type
-    Op(Arc<KitsuneOpHash>, Vec<u8>),
+    Op(Arc<KitsuneOpHash>, KOp),
 
     /// agent chunk type
     Agent(AgentInfoSigned),
@@ -72,7 +72,7 @@ pub enum MetaOpData {
 impl MetaOpData {
     fn byte_count(&self) -> usize {
         match self {
-            MetaOpData::Op(h, d) => (**h).len() + d.len(),
+            MetaOpData::Op(h, d) => (**h).len() + d.size(),
             MetaOpData::Agent(a) => {
                 let h = (**a.agent).len();
                 let s = (**a.signature).len();
