@@ -1,25 +1,26 @@
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holo_hash::HasHash;
-use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
 use std::sync::Arc;
+use holochain_zome_types::prelude::*;
 
-pub fn hash_entry(
+pub fn hash(
     _ribosome: Arc<impl RibosomeT>,
     _call_context: Arc<CallContext>,
-    input: Entry,
-) -> Result<EntryHash, WasmError> {
-    let entry_hash = holochain_zome_types::entry::EntryHashed::from_content_sync(input).into_hash();
-
-    Ok(entry_hash)
+    input: HashInput
+) -> Result<HashOutput, WasmError> {
+    Ok(match input {
+        HashInput::Entry(entry) => HashOutput::Entry(holochain_zome_types::entry::EntryHashed::from_content_sync(entry).into_hash()),
+        _ => return Err(WasmError::Host(format!("Unimplemented hashing algorithm {:?}", input))),
+    })
 }
 
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
     use super::*;
-    use crate::core::ribosome::host_fn::hash_entry::hash_entry;
+    use crate::core::ribosome::host_fn::hash::hash;
 
     use crate::fixt::CallContextFixturator;
     use crate::fixt::EntryFixturator;
@@ -33,17 +34,20 @@ pub mod wasm_test {
 
     #[tokio::test(flavor = "multi_thread")]
     /// we can get an entry hash out of the fn directly
-    async fn hash_entry_test() {
+    async fn hash_test() {
         let ribosome = RealRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![]))
             .next()
             .unwrap();
         let call_context = CallContextFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();
-        let input = EntryFixturator::new(::fixt::Predictable).next().unwrap();
+        let input = HashInput::Entry(EntryFixturator::new(::fixt::Predictable).next().unwrap());
 
         let output: EntryHash =
-            hash_entry(Arc::new(ribosome), Arc::new(call_context), input).unwrap();
+            match hash(Arc::new(ribosome), Arc::new(call_context), input).unwrap() {
+                HashOutput::Entry(output) => output,
+                _ => unreachable!(),
+            };
 
         assert_eq!(*output.hash_type(), holo_hash::hash_type::Entry);
     }
