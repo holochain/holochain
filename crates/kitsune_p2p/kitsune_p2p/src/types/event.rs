@@ -3,7 +3,7 @@
 use crate::types::agent_store::AgentInfoSigned;
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::{
-    bin_types::{KOp, KitsuneOpData},
+    bin_types::KOp,
     dht_arc::{DhtArcSet, DhtLocation},
 };
 use std::{collections::HashSet, sync::Arc};

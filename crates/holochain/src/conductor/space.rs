@@ -17,6 +17,7 @@ use holochain_types::dht_op::{DhtOp, DhtOpType};
 use holochain_zome_types::{Entry, EntryVisibility, SignedHeader, Timestamp};
 use kitsune_p2p::event::{TimeWindow, TimeWindowInclusive};
 use rusqlite::named_params;
+use tokio::task::yield_now;
 use tracing::instrument;
 
 use crate::core::{
@@ -325,8 +326,16 @@ impl Spaces {
         dna_hash: &DnaHash,
         request_validation_receipt: bool,
         countersigning_session: bool,
-        ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
+        ops: Vec<holochain_types::dht_op::DhtOp>,
     ) -> ConductorResult<()> {
+        use futures::StreamExt;
+        let ops = futures::stream::iter(ops.into_iter().map(|op| {
+            let hash = DhtOpHash::with_data_sync(&op);
+            (hash, op)
+        }))
+        .collect()
+        .await;
+
         // If this is a countersigning session then
         // send it to the countersigning workflow otherwise
         // send it to the incoming ops workflow.

@@ -830,9 +830,11 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
         let ops = ops
             .into_iter()
             .map(|op_data| {
-                let op = crate::wire::WireDhtOpData::decode(op_data)
-                    .map_err(HolochainP2pError::from)?
-                    .op_data;
+                let op = crate::wire::WireDhtOpData::decode(todo!(
+                    "take out the clone: op_data.0.clone()"
+                ))
+                .map_err(HolochainP2pError::from)?
+                .op_data;
                 Ok(op)
             })
             .collect::<Result<_, HolochainP2pError>>()?;
@@ -1024,7 +1026,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
         request_validation_receipt: bool,
         countersigning_session: bool,
         dht_hash: holo_hash::AnyDhtHash,
-        ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
+        ops: Vec<holochain_types::dht_op::DhtOp>,
         timeout_ms: Option<u64>,
     ) -> HolochainP2pHandlerResult<()> {
         use kitsune_p2p_types::KitsuneTimeout;

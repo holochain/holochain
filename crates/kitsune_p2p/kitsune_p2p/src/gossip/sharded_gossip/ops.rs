@@ -1,4 +1,4 @@
-use kitsune_p2p_types::{combinators::second, dht_arc::DhtLocation};
+use kitsune_p2p_types::combinators::second;
 
 use super::*;
 
