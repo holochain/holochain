@@ -68,7 +68,7 @@ jobs:
               no_output_timeout: 30m
               command: |
                 ./scripts/ci_merge-release-test.sh
-   merge-test:
+   standard-test:
       docker:
          - image: holochain/holochain:circle.build.develop
            auth:
@@ -87,9 +87,9 @@ jobs:
               name: Set up Nix cache
               command: $(nix-build . --fallback --no-link -A pkgs.ci.ciSetupNixConf)/bin/hc-ci-setup-nix-conf.sh
          - run:
-              name: Run the merge tests
+              name: Run the standard tests
               no_output_timeout: 30m
-              command: nix-shell --fallback --pure --argstr flavor "coreDev" --run hc-merge-test
+              command: nix-shell --fallback --pure --argstr flavor "coreDev" --run hc-standard-test
 
    merge-test-mac:
       macos:
