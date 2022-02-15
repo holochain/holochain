@@ -204,7 +204,7 @@ workflows:
          - merge-release-test
          # - merge-release-test-mac
          - standard-test
-         - static-test
+         - hc-static-checks
          - slow-test
          - wasm-test
          # - merge-test-mac

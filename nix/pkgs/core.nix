@@ -28,7 +28,7 @@ rec {
     export CARGO_BUILD_JOBS=8
 
     # run all the non-slow cargo tests
-    cargo check --all-features --all-targets --workspace --exclude holochain --exclude release-automation
+    # cargo check --all-features --all-targets --workspace --exclude holochain --exclude release-automation
     cargo test --workspace --exclude holochain --exclude release-automation --lib --tests --profile fast-test -- --nocapture
   '';
 
@@ -42,7 +42,7 @@ rec {
 
     # alas, we cannot specify --features in the virtual workspace
     # run the specific slow tests in the holochain crate
-    cargo check --all-features --all-targets --manifest-path=crates/holochain/Cargo.toml
+    # cargo check --all-features --all-targets --manifest-path=crates/holochain/Cargo.toml
     cargo test --manifest-path=crates/holochain/Cargo.toml --features slow_tests,test_utils,build_wasms,db-encryption --profile fast-test -- --nocapture
   '';
 
@@ -55,7 +55,7 @@ rec {
     export CARGO_BUILD_JOBS=8
 
     # run all the wasm tests (within wasm) with the conductor mocked
-    cargo check --all-targets --lib --manifest-path=crates/test_utils/wasm/wasm_workspace/Cargo.toml --all-features
+    # cargo check --all-targets --lib --manifest-path=crates/test_utils/wasm/wasm_workspace/Cargo.toml --all-features
     cargo test --lib --manifest-path=crates/test_utils/wasm/wasm_workspace/Cargo.toml --all-features -- --nocapture
   '';
 
