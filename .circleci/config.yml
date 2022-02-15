@@ -69,7 +69,7 @@ jobs:
               command: |
                 ./scripts/ci_merge-release-test.sh
 
-   static-test:
+   hc-static-checks:
       docker:
          - image: holochain/holochain:circle.build.develop
            auth:
@@ -90,7 +90,7 @@ jobs:
          - run:
               name: Run the standard tests
               no_output_timeout: 30m
-              command: nix-shell --fallback --pure --argstr flavor "coreDev" --run hc-static-test
+              command: nix-shell --fallback --pure --argstr flavor "coreDev" --run hc-static-checks
 
    standard-test:
       docker:
