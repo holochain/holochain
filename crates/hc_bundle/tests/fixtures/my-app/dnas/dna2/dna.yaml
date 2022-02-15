@@ -3,7 +3,6 @@ manifest_version: "1"
 name: another dna
 uid: 00000000-0000-0000-0000-000000000000
 properties: ~
-origin_time: 2022-02-11T23:29:00.789576Z
 zomes:
   - name: zome1
     bundled: ./zome1.wasm
