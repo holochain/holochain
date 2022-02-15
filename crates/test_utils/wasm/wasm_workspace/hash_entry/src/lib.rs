@@ -61,6 +61,6 @@ pub mod tests {
 
         let result = super::hash_entry(input_entry);
 
-        assert_eq!(result, Ok(HashOutput::Entry(output_hash)))
+        assert_eq!(result, Ok(output_hash))
     }
 }
