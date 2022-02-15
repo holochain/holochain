@@ -29,6 +29,7 @@ rec {
 
     # run all the non-slow cargo tests
     # cargo check --all-features --all-targets --workspace --exclude holochain --exclude release-automation
+    cargo build --features 'build_wasms' --manifest-path=crates/holochain/Cargo.toml
     cargo test --workspace --exclude holochain --exclude release-automation --lib --tests --profile fast-test -- --nocapture
   '';
 
