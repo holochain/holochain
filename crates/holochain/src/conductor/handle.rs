@@ -644,12 +644,15 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                     .into()));
                 }
                 KGenReq::QueryRegionSet { space, dht_arc_set } => {
-                    respond.respond(Ok(async move {
-                        let regions = todo!("query region set");
-                        Ok(KGenRes::QueryRegionSet(regions))
-                    }
-                    .boxed()
-                    .into()));
+                    let dna_hash = DnaHash::from_kitsune(&space);
+                    let res = self
+                        .conductor
+                        .spaces
+                        .handle_fetch_op_regions(&dna_hash, dht_arc_set)
+                        .await
+                        .map_err(holochain_p2p::HolochainP2pError::other)
+                        .map(KGenRes::QueryRegionSet);
+                    respond.respond(Ok(async move { res }.boxed().into()));
                 }
             },
             PutAgentInfoSigned {

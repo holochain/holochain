@@ -4,13 +4,15 @@
 
 use std::{collections::HashMap, sync::Arc};
 
-use holo_hash::{AgentPubKey, DhtOpHash, DnaHash};
+use holo_hash::{DhtOpHash, DnaHash};
 use holochain_conductor_api::conductor::EnvironmentRootPath;
 use holochain_p2p::{
     dht::{
-        coords::Topology,
+        arq::{power_and_count_from_length, ArqBoundsSet},
+        coords::{TelescopingTimes, TimeCoord, Topology},
         hash::RegionHash,
-        region::{RegionCoordSetXtcs, RegionData},
+        region::{RegionCoordSetXtcs, RegionData, RegionSetXtcs},
+        ArqBounds, ArqStrat,
     },
     dht_arc::{ArcInterval, DhtArcSet},
 };
@@ -273,19 +275,36 @@ impl<DS: DnaStore> Spaces<DS> {
     pub async fn handle_fetch_op_regions(
         &self,
         dna_hash: &DnaHash,
-        author: AgentPubKey,
-        regions: RegionCoordSetXtcs,
-    ) -> ConductorResult<Vec<Vec<RegionData>>> {
+        // author: AgentPubKey,
+        dht_arc_set: DhtArcSet,
+    ) -> ConductorResult<RegionSetXtcs> {
         let sql = holochain_sqlite::sql::sql_cell::FETCH_OP_REGION;
         let topology = self
             .map
             .share_ref(|m| Some(m.get(dna_hash)?.topology.clone()))
             .ok_or_else(|| ConductorError::other("Space missing".to_string()))?;
+        let max_chunks = ArqStrat::default().max_chunks();
+        let arq_set = ArqBoundsSet::new(
+            dht_arc_set
+                .intervals()
+                .into_iter()
+                .map(|i| {
+                    let len = i.length();
+                    let (pow, _) = power_and_count_from_length(len, max_chunks);
+                    ArqBounds::from_interval_rounded(pow, i)
+                })
+                .collect(),
+        );
+        // TODO: This should be behind the current moment by however much Recent gossip covers.
+        let current = Timestamp::now();
+        let times = TelescopingTimes::new(TimeCoord::from_timestamp(&topology, current));
+        let coords = RegionCoordSetXtcs::new(times, arq_set);
+        let coords_clone = coords.clone();
         let data = self
-            .dht_env(dna_hash)?
+            .authored_env(dna_hash)?
             .async_reader(move |txn| {
                 let mut stmt = txn.prepare_cached(sql).map_err(DatabaseError::from)?;
-                regions
+                coords_clone
                     .region_coords_nested()
                     .map(|column| {
                         column
@@ -299,7 +318,7 @@ impl<DS: DnaStore> Spaces<DS> {
                                         ":storage_end_loc": x1.to_loc(&topology),
                                         ":timestamp_min": t0.to_timestamp(&topology),
                                         ":timestamp_max": t1.to_timestamp(&topology),
-                                        ":author": &author,
+                                        // ":author": &author, // TODO: unneeded for authored table?
                                     },
                                     |row| {
                                         Ok(RegionData {
@@ -317,7 +336,7 @@ impl<DS: DnaStore> Spaces<DS> {
                     .collect::<Result<Vec<Vec<RegionData>>, DatabaseError>>()
             })
             .await?;
-        Ok(data)
+        Ok(RegionSetXtcs::from_data(coords, data))
     }
 
     #[instrument(skip(self, op_hashes))]

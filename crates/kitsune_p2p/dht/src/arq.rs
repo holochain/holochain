@@ -462,6 +462,19 @@ pub fn power_upshift(power: u8, count: u32) -> Option<(u8, u32)> {
     }
 }
 
+pub fn power_and_count_from_length(len: u64, max_chunks: u32) -> (u8, u32) {
+    let mut power = 0;
+    let mut count = len as f64;
+    let max = max_chunks as f64;
+
+    while count.round() > max {
+        power += 1;
+        count /= 2.0;
+    }
+    let count = count.round() as u32;
+    (power, count)
+}
+
 /// Given a center and a length, give Arq which matches most closely given the provided strategy
 pub fn approximate_arq(strat: &ArqStrat, center: Loc, len: u64) -> Arq {
     if len == 2u64.pow(32) {
@@ -469,17 +482,10 @@ pub fn approximate_arq(strat: &ArqStrat, center: Loc, len: u64) -> Arq {
     } else if len == 0 {
         Arq::new(center, strat.min_power, 0)
     } else {
-        let mut power = 0;
-        let mut count = len as f64;
+        let (power, count) = power_and_count_from_length(len, strat.max_chunks());
 
         let min = strat.min_chunks() as f64;
         let max = strat.max_chunks() as f64;
-
-        while count.round() > max {
-            power += 1;
-            count /= 2.0;
-        }
-        let count = count.round() as u32;
 
         debug_assert!(
             power == 0 || count >= min as u32,
