@@ -1,6 +1,8 @@
 use super::*;
+use crate::conductor::conductor::RwShare;
 use crate::conductor::handle::MockConductorHandleT;
 use crate::conductor::space::TestSpaces;
+use crate::fixt::DnaFileFixturator;
 use crate::test_utils::fake_genesis;
 use ::fixt::prelude::*;
 use error::SysValidationError;
@@ -409,9 +411,11 @@ async fn check_entry_not_private_test() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn incoming_ops_filters_private_entry() {
-    let dna = fixt!(DnaHash);
-    let spaces = TestSpaces::new([dna.clone()]);
-    let space = Arc::new(spaces.test_spaces[&dna].space.clone());
+    let dna = fixt!(DnaFile);
+    let dna_hash = dna.dna_hash().clone();
+    let ds = MockDnaStore::single_dna(dna, 1, 1);
+    let spaces = TestSpaces::new([dna_hash.clone()], RwShare::new(ds));
+    let space = Arc::new(spaces.test_spaces[&dna_hash].space.clone());
     let vault = space.dht_env.clone();
     let keystore = test_keystore();
     let (tx, _rx) = TriggerSender::new();

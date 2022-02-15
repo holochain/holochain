@@ -20,7 +20,10 @@ use holochain_sqlite::{
     prelude::{DatabaseError, DatabaseResult},
 };
 use holochain_state::prelude::{from_blob, StateQueryResult};
-use holochain_types::dht_op::{DhtOp, DhtOpType};
+use holochain_types::{
+    dht_op::{DhtOp, DhtOpType},
+    prelude::{DnaError, DnaStore},
+};
 use holochain_zome_types::{Entry, EntryVisibility, SignedHeader, Timestamp};
 use kitsune_p2p::event::{TimeWindow, TimeWindowInclusive};
 use rusqlite::named_params;
@@ -46,10 +49,11 @@ use std::convert::TryInto;
 /// This is the set of all current
 /// [`DnaHash`] spaces for all cells
 /// installed on this conductor.
-pub struct Spaces {
+pub struct Spaces<DS: DnaStore> {
     map: RwShare<HashMap<DnaHash, Space>>,
     root_env_dir: Arc<EnvironmentRootPath>,
     db_sync_level: DbSyncStrategy,
+    dna_store: RwShare<DS>,
     /// The map of running queue consumer workflows.
     queue_consumer_map: QueueConsumerMap,
 }
@@ -89,8 +93,8 @@ pub struct Space {
 }
 
 #[cfg(test)]
-pub struct TestSpaces {
-    pub spaces: Spaces,
+pub struct TestSpaces<DS: DnaStore> {
+    pub spaces: Spaces<DS>,
     pub test_spaces: HashMap<DnaHash, TestSpace>,
     pub queue_consumer_map: QueueConsumerMap,
 }
@@ -100,17 +104,19 @@ pub struct TestSpace {
     _temp_dir: tempfile::TempDir,
 }
 
-impl Spaces {
+impl<DS: DnaStore> Spaces<DS> {
     /// Create a new empty set of [`DnaHash`] spaces.
     pub fn new(
         root_env_dir: EnvironmentRootPath,
         db_sync_level: DbSyncStrategy,
+        dna_store: RwShare<DS>,
         queue_consumer_map: QueueConsumerMap,
     ) -> Self {
         Spaces {
             map: RwShare::new(HashMap::new()),
             root_env_dir: Arc::new(root_env_dir),
             db_sync_level,
+            dna_store,
             queue_consumer_map,
         }
     }
@@ -134,11 +140,16 @@ impl Spaces {
                 .share_mut(|spaces| match spaces.entry(dna_hash.clone()) {
                     std::collections::hash_map::Entry::Occupied(entry) => Ok(f(entry.get())),
                     std::collections::hash_map::Entry::Vacant(entry) => {
+                        let dna_def = self.dna_store.share_ref(|s| {
+                            s.get_dna_def(dna_hash)
+                                .ok_or_else(|| DnaError::DnaMissing(dna_hash.clone()))
+                        })?;
+                        let topology = Topology::standard(dna_def.origin_time.into());
                         let space = Space::new(
                             Arc::new(dna_hash.clone()),
                             &self.root_env_dir,
                             self.db_sync_level,
-                            todo!("provide topology"),
+                            topology,
                         )?;
 
                         let r = f(&space);
@@ -417,7 +428,7 @@ impl Spaces {
             {
                 Some(t) => t,
                 // If the workflow has not been spawned yet we can't handle incoming messages.
-                // Not this is not an error because only a validation receipt is proof of a publish.
+                // Note this is not an error because only a validation receipt is proof of a publish.
                 None => return Ok(()),
             };
             incoming_dht_ops_workflow(&space, trigger, ops, request_validation_receipt).await?;
@@ -472,14 +483,15 @@ impl Space {
 }
 
 #[cfg(test)]
-impl TestSpaces {
-    pub fn new(dna_hashes: impl IntoIterator<Item = DnaHash>) -> Self {
+impl<DS: DnaStore> TestSpaces<DS> {
+    pub fn new(dna_hashes: impl IntoIterator<Item = DnaHash>, dna_store: RwShare<DS>) -> Self {
         let queue_consumer_map = QueueConsumerMap::new();
-        Self::with_queue_consumer(dna_hashes, queue_consumer_map)
+        Self::with_queue_consumer(dna_hashes, dna_store, queue_consumer_map)
     }
 
     pub fn with_queue_consumer(
         dna_hashes: impl IntoIterator<Item = DnaHash>,
+        dna_store: RwShare<DS>,
         queue_consumer_map: QueueConsumerMap,
     ) -> Self {
         let mut test_spaces: HashMap<DnaHash, _> = HashMap::new();
@@ -493,6 +505,7 @@ impl TestSpaces {
         let spaces = Spaces::new(
             temp_dir.path().to_path_buf().into(),
             Default::default(),
+            dna_store,
             queue_consumer_map.clone(),
         );
         spaces.map.share_mut(|map| {

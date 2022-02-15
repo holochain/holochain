@@ -1,3 +1,4 @@
+use crate::conductor::conductor::RwShare;
 use crate::conductor::manager::spawn_task_manager;
 use crate::conductor::space::TestSpaces;
 use crate::core::ribosome::guest_callback::genesis_self_check::GenesisSelfCheckResult;
@@ -19,11 +20,12 @@ async fn test_cell_handle_publish() {
 
     let agent_key = keystore.new_sign_keypair_random().await.unwrap();
     let dna_file = fixt!(DnaFile);
+    let ds = MockDnaStore::single_dna(dna_file.clone(), 1, 1);
     let cell_id = CellId::new(dna_file.dna_hash().clone(), agent_key);
     let dna = cell_id.dna_hash().clone();
     let agent = cell_id.agent_pubkey().clone();
 
-    let spaces = TestSpaces::new([dna.clone()]);
+    let spaces = TestSpaces::new([dna.clone()], RwShare::new(ds));
     let env = spaces.test_spaces[&dna].space.authored_env.clone();
     let dht_env = spaces.test_spaces[&dna].space.dht_env.clone();
 

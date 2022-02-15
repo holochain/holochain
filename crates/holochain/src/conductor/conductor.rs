@@ -146,7 +146,7 @@ where
     wasm_env: DbWrite<DbKindWasm>,
 
     /// The map of dna hash spaces.
-    pub(super) spaces: Spaces,
+    pub(super) spaces: Spaces<DS>,
 
     /// Set to true when `conductor.shutdown()` has been called, so that other
     /// tasks can check on the shutdown status
@@ -1281,12 +1281,14 @@ where
         post_commit: tokio::sync::mpsc::Sender<PostCommitArgs>,
     ) -> ConductorResult<Self> {
         let queue_consumer_map = QueueConsumerMap::new();
+        let dna_store = RwShare::new(dna_store);
         Ok(Self {
             conductor_env,
             wasm_env,
             spaces: Spaces::new(
                 root_env_dir.clone(),
                 db_sync_level,
+                dna_store.clone(),
                 queue_consumer_map.clone(),
             ),
             cells: RwShare::new(HashMap::new()),
@@ -1294,7 +1296,7 @@ where
             app_interfaces: RwShare::new(HashMap::new()),
             task_manager: RwShare::new(None),
             admin_websocket_ports: RwShare::new(Vec::new()),
-            dna_store: RwShare::new(dna_store),
+            dna_store,
             keystore,
             root_env_dir,
             holochain_p2p,
