@@ -350,18 +350,18 @@ pub fn must_get_valid_element(header_hash: HeaderHash) -> ExternResult<Element> 
 ///
 /// Note: The return details will be inferred by the hash type passed in, be careful to pass in the
 ///       correct hash type for the details you want.
-/// 
+///
 /// This is implemented in the [`ElementDetails`] variants:
-/// 
+///
 /// [`Details::Element`] for a header hash returns:
 /// - the element for this header hash if it exists
 /// - all update and delete _elements_ that reference that specified header
-/// 
+///
 /// [`Details::Entry`] for an entry hash returns:
 /// - all creates, updates and delete _elements_ that reference that entry hash
 /// - all update and delete _elements_ that reference the elements that reference the entry hash
-/// 
-/// If a header hash is passed in, the header's element will be returned. 
+///
+/// If a header hash is passed in, the header's element will be returned.
 /// If an entry hash is passed in, all the headers and elements for that entry are returned.
 /// The details returned include relevant creates, updates and deletes for the hash passed in.
 ///
