@@ -305,7 +305,10 @@ fn bump_release_versions<'a>(
         }
     }
 
-    ws.update_lockfile(cmd_args.dry_run)?;
+    ws.update_lockfile(
+        cmd_args.dry_run,
+        cmd_args.additional_manifests.iter().map(|mp| mp.as_str()),
+    )?;
 
     if !cmd_args.no_verify && !cmd_args.no_verify_post {
         info!("running consistency checks after changing the versions...");
