@@ -17,7 +17,6 @@ use holochain_types::dht_op::{DhtOp, DhtOpType};
 use holochain_zome_types::{Entry, EntryVisibility, SignedHeader, Timestamp};
 use kitsune_p2p::event::{TimeWindow, TimeWindowInclusive};
 use rusqlite::named_params;
-use tokio::task::yield_now;
 use tracing::instrument;
 
 use crate::core::{

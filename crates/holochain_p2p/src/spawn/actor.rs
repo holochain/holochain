@@ -830,11 +830,9 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
         let ops = ops
             .into_iter()
             .map(|op_data| {
-                let op = crate::wire::WireDhtOpData::decode(todo!(
-                    "take out the clone: op_data.0.clone()"
-                ))
-                .map_err(HolochainP2pError::from)?
-                .op_data;
+                let op = crate::wire::WireDhtOpData::decode(op_data.0.clone())
+                    .map_err(HolochainP2pError::from)?
+                    .op_data;
                 Ok(op)
             })
             .collect::<Result<_, HolochainP2pError>>()?;
