@@ -1013,6 +1013,15 @@ impl<'a> ReleaseWorkspace<'a> {
                 if dry_run { vec!["--dry-run"] } else { vec![] },
             ]
             .concat(),
+            if dry_run {
+                vec![]
+            } else {
+                vec![
+                    "generate-lockfile",
+                    "--offline",
+                    "--manifest-path=crates/release-automation/Cargo.toml",
+                ]
+            },
         ] {
             let mut cmd = std::process::Command::new("cargo");
             cmd.current_dir(self.root()).args(&args);
