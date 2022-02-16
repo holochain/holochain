@@ -113,7 +113,7 @@ jobs:
          - run:
               name: Run the standard tests
               no_output_timeout: 30m
-              command: nix-shell --fallback --pure --argstr flavor "coreDev" --run hc-test-test
+              command: nix-shell --fallback --pure --argstr flavor "coreDev" --run hc-test-standard
 
    slow-test:
       docker:
@@ -136,7 +136,7 @@ jobs:
          - run:
               name: Run the slow tests
               no_output_timeout: 30m
-              command: nix-shell --fallback --pure --argstr flavor "coreDev" --run hc-slow-test
+              command: nix-shell --fallback --pure --argstr flavor "coreDev" --run hc-test-slow
 
    wasm-test:
       docker:
@@ -159,7 +159,7 @@ jobs:
          - run:
               name: Run the wasm tests
               no_output_timeout: 30m
-              command: nix-shell --fallback --pure --argstr flavor "coreDev" --run hc-wasm-test
+              command: nix-shell --fallback --pure --argstr flavor "coreDev" --run hc-test-wasm
 
    merge-test-mac:
       macos:
