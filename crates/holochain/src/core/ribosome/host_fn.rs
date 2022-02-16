@@ -118,8 +118,8 @@ host_fn_api_impls! {
 
     fn get_link_details (Vec<zt::link::GetLinksInput>) -> Vec<zt::link::LinkDetails>;
 
-    // Hash an entry on the host.
-    fn hash_entry (zt::entry::Entry) -> holo_hash::EntryHash;
+    // Hash data on the host.
+    fn hash (zt::hash::HashInput) -> zt::hash::HashOutput;
 
     // Retreive an element from the DHT or short circuit.
     fn must_get_valid_element (zt::entry::MustGetValidElementInput) -> Element;

@@ -23,11 +23,11 @@ pub fn delete<'a>(
             ..
         } => {
             let DeleteInput {
-                deletes_header_address,
+                deletes_header_hash,
                 chain_top_ordering,
             } = input;
             let deletes_entry_address =
-                get_original_address(call_context.clone(), deletes_header_address.clone())?;
+                get_original_address(call_context.clone(), deletes_header_hash.clone())?;
 
             let host_access = call_context.host_context();
 
@@ -39,7 +39,7 @@ pub fn delete<'a>(
                     .as_ref()
                     .expect("Must have source chain if write_workspace access is given");
                 let header_builder = builder::Delete {
-                    deletes_address: deletes_header_address,
+                    deletes_address: deletes_header_hash,
                     deletes_entry_address,
                 };
                 let header_hash = source_chain
@@ -56,11 +56,14 @@ pub fn delete<'a>(
                 Ok(header_hash)
             })
         }
-        _ => Err(WasmError::Host(RibosomeError::HostFnPermissions(
-            call_context.zome.zome_name().clone(),
-            call_context.function_name().clone(),
-            "delete".into()
-        ).to_string()))
+        _ => Err(WasmError::Host(
+            RibosomeError::HostFnPermissions(
+                call_context.zome.zome_name().clone(),
+                call_context.function_name().clone(),
+                "delete".into(),
+            )
+            .to_string(),
+        )),
     }
 }
 
@@ -106,31 +109,28 @@ pub(crate) fn get_original_address<'a>(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
-    use crate::fixt::ZomeCallHostAccessFixturator;
-    use ::fixt::prelude::*;
+    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use hdk::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_delete_entry_test<'a>() {
         observability::test_run().ok();
-        let host_access = fixt!(ZomeCallHostAccess, Predictable);
+        let RibosomeTestFixture {
+            conductor, alice, ..
+        } = RibosomeTestFixture::new(TestWasm::Crd).await;
 
-        let thing_a: HeaderHash =
-            crate::call_test_ribosome!(host_access, TestWasm::Crd, "create", ()).unwrap();
-        let get_thing: Option<Element> =
-            crate::call_test_ribosome!(host_access, TestWasm::Crd, "reed", thing_a).unwrap();
+        let thing_a: HeaderHash = conductor.call(&alice, "create", ()).await;
+        let get_thing: Option<Element> = conductor.call(&alice, "reed", thing_a.clone()).await;
         match get_thing {
             Some(element) => assert!(element.entry().as_option().is_some()),
 
             None => unreachable!(),
         }
 
-        let _: HeaderHash =
-            crate::call_test_ribosome!(host_access, TestWasm::Crd, "delete", thing_a).unwrap();
+        let _: HeaderHash = conductor.call(&alice, "delete_via_hash", thing_a.clone()).await;
 
-        let get_thing: Option<Element> =
-            crate::call_test_ribosome!(host_access, TestWasm::Crd, "reed", thing_a).unwrap();
+        let get_thing: Option<Element> = conductor.call(&alice, "reed", thing_a).await;
         match get_thing {
             None => {
                 // this is what we want, deletion => None for a get

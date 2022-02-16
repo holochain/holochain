@@ -288,13 +288,13 @@ mod test {
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
     use super::ValidateResult;
+    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use crate::core::ribosome::RibosomeT;
     use crate::core::ribosome::ZomesToInvoke;
     use crate::fixt::curve::Zomes;
     use crate::fixt::*;
     use ::fixt::prelude::*;
     use holo_hash::fixt::AgentPubKeyFixturator;
-    use holochain_state::source_chain::SourceChainResult;
     use holochain_types::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
     use std::sync::Arc;
@@ -374,52 +374,19 @@ mod slow_tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn pass_validate_test<'a>() {
-        let host_access = fixt!(ZomeCallHostAccess, Predictable);
+    async fn pass_validate_test() {
+        observability::test_run().ok();
+        let RibosomeTestFixture {
+            conductor, alice, ..
+        } = RibosomeTestFixture::new(TestWasm::Validate).await;
 
-        let output: HeaderHash =
-            crate::call_test_ribosome!(host_access, TestWasm::Validate, "always_validates", ())
-                .unwrap();
+        let output: HeaderHash = conductor.call(&alice, "always_validates", ()).await;
+        let _output_element: Element = conductor
+            .call(&alice, "must_get_valid_element", output)
+            .await;
 
-        // the chain head should be the committed entry header
-        let chain_head = tokio_helper::block_forever_on(async move {
-            SourceChainResult::Ok(
-                host_access
-                    .workspace
-                    .source_chain()
-                    .as_ref()
-                    .unwrap()
-                    .chain_head()?
-                    .0,
-            )
-        })
-        .unwrap();
-
-        assert_eq!(chain_head, output);
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    async fn fail_validate_test<'a>() {
-        let host_access = fixt!(ZomeCallHostAccess, Predictable);
-
-        let output: HeaderHash =
-            crate::call_test_ribosome!(host_access, TestWasm::Validate, "never_validates", ())
-                .unwrap();
-
-        // the chain head should be the committed entry header
-        let chain_head = tokio_helper::block_forever_on(async move {
-            SourceChainResult::Ok(
-                host_access
-                    .workspace
-                    .source_chain()
-                    .as_ref()
-                    .unwrap()
-                    .chain_head()?
-                    .0,
-            )
-        })
-        .unwrap();
-
-        assert_eq!(chain_head, output);
+        let invalid_output: Result<HeaderHash, _> =
+            conductor.call_fallible(&alice, "never_validates", ()).await;
+        assert!(invalid_output.is_err());
     }
 }

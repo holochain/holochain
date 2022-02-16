@@ -114,7 +114,7 @@ mod tests {
 
     #[test]
     fn test_valid_chain_fact() {
-        let mut u = Unstructured::new(&NOISE);
+        let mut u = Unstructured::new(&crate::NOISE);
 
         let chain = build_seq(&mut u, 5, valid_chain());
         check_seq(chain.as_slice(), valid_chain()).unwrap();

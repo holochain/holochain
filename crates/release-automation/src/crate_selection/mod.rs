@@ -1006,21 +1006,24 @@ impl<'a> ReleaseWorkspace<'a> {
     }
 
     pub(crate) fn update_lockfile(&'a self, dry_run: bool) -> Fallible<()> {
-        let mut cmd = std::process::Command::new("cargo");
-        cmd.current_dir(self.root()).args(
-            &[
+        for args in [
+            vec!["fetch", "--verbose"],
+            [
                 vec!["update", "--workspace", "--offline", "--verbose"],
                 if dry_run { vec!["--dry-run"] } else { vec![] },
             ]
             .concat(),
-        );
-        debug!("running command: {:?}", cmd);
+        ] {
+            let mut cmd = std::process::Command::new("cargo");
+            cmd.current_dir(self.root()).args(&args);
+            debug!("running command: {:?}", cmd);
 
-        if !dry_run {
-            let mut cmd = cmd.spawn()?;
-            let cmd_status = cmd.wait()?;
-            if !cmd_status.success() {
-                bail!("running {:?} failed: \n{:?}", cmd, cmd.stderr);
+            if !dry_run {
+                let mut cmd = cmd.spawn()?;
+                let cmd_status = cmd.wait()?;
+                if !cmd_status.success() {
+                    bail!("running {:?} failed: \n{:?}", cmd, cmd.stderr);
+                }
             }
         }
 

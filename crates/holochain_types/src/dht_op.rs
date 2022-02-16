@@ -14,6 +14,7 @@ use error::DhtOpResult;
 use holo_hash::*;
 use holochain_sqlite::rusqlite::types::FromSql;
 use holochain_sqlite::rusqlite::ToSql;
+use holochain_zome_types::header;
 use holochain_zome_types::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
