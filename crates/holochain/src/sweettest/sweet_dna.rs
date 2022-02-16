@@ -38,10 +38,12 @@ impl SweetDnaFile {
         uid: String,
         zomes: Vec<(ZomeName, ZomeDef)>,
         wasms: Vec<wasm::DnaWasm>,
+        properties: SerializedBytes,
     ) -> DnaResult<(DnaFile, Vec<Zome>)> {
         let dna_def = DnaDefBuilder::default()
             .uid(uid)
             .zomes(zomes.clone())
+            .properties(properties.clone())
             .build()
             .unwrap();
 
@@ -56,20 +58,21 @@ impl SweetDnaFile {
         zomes: Vec<(ZomeName, ZomeDef)>,
         wasms: Vec<wasm::DnaWasm>,
     ) -> DnaResult<(DnaFile, Vec<Zome>)> {
-        Self::from_zomes(random_uid(), zomes, wasms).await
+        Self::from_zomes(random_uid(), zomes, wasms, SerializedBytes::default()).await
     }
 
     /// Create a DnaFile from a collection of TestWasm
     pub async fn from_test_wasms<W>(
         uid: String,
         test_wasms: Vec<W>,
+        properties: SerializedBytes,
     ) -> DnaResult<(DnaFile, Vec<Zome>)>
     where
         W: Into<(ZomeName, ZomeDef)> + Into<wasm::DnaWasm> + Clone,
     {
         let zomes = test_wasms.clone().into_iter().map(Into::into).collect();
         let wasms = test_wasms.into_iter().map(Into::into).collect();
-        Self::from_zomes(uid, zomes, wasms).await
+        Self::from_zomes(uid, zomes, wasms, properties).await
     }
 
     /// Create a DnaFile from a collection of TestWasm
@@ -78,7 +81,7 @@ impl SweetDnaFile {
     where
         W: Into<(ZomeName, ZomeDef)> + Into<wasm::DnaWasm> + Clone,
     {
-        Self::from_test_wasms(random_uid(), test_wasms).await
+        Self::from_test_wasms(random_uid(), test_wasms, SerializedBytes::default()).await
     }
 
     /// Create a DnaFile from a collection of InlineZomes (no Wasm)
@@ -93,6 +96,7 @@ impl SweetDnaFile {
                 .map(|(n, z)| (n.into(), z.into()))
                 .collect(),
             Vec::new(),
+            SerializedBytes::default(),
         )
         .await
     }

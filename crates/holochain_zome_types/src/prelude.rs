@@ -37,6 +37,8 @@ pub use crate::zome::*;
 pub use crate::zome_io::ExternIO;
 pub use crate::zome_io::*;
 pub use crate::*;
+#[cfg(feature = "properties")]
+pub use properties::*;
 pub use x_salsa20_poly1305::data::*;
 pub use x_salsa20_poly1305::encrypted_data::*;
 pub use x_salsa20_poly1305::key_ref::*;

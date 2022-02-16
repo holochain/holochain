@@ -427,8 +427,6 @@ mod test {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    #[should_panic]
-    #[ignore = "panics in tokio break other tests"]
     async fn unrecoverable_error() {
         observability::test_run().ok();
         let (_tx, rx) = tokio::sync::broadcast::channel(1);
@@ -456,12 +454,14 @@ mod test {
             .await
             .unwrap();
 
-        handle_shutdown(main_task.await);
+        main_task
+            .await
+            .expect("Failed to join the main task")
+            .expect_err("The main task should return an error");
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    #[should_panic]
-    #[ignore = "panics in tokio break other tests"]
+    #[ignore = "panics in tokio break other tests, this test is here to confirm behavior but cannot be run on ci"]
     async fn unrecoverable_panic() {
         observability::test_run().ok();
         let (_tx, rx) = tokio::sync::broadcast::channel(1);

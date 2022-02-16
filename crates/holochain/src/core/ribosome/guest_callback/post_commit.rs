@@ -232,6 +232,7 @@ mod slow_tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "flakey. Sometimes fails the second last assert with 3 instead of 5"]
     #[cfg(feature = "test_utils")]
     async fn post_commit_test_volley() -> anyhow::Result<()> {
         observability::test_run().ok();

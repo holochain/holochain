@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use anyhow::bail;
+use cargo::util::VersionExt;
 use log::{debug, info, warn};
 use semver::Version;
 use structopt::StructOpt;
@@ -198,7 +199,7 @@ pub(crate) fn apply_dev_vesrions_to_selection<'a>(
             continue;
         }
 
-        version.increment_patch();
+        increment_patch(&mut version);
         version = semver::Version::parse(&format!("{}-{}", version, dev_suffix))?;
 
         debug!(
@@ -223,6 +224,12 @@ pub(crate) fn apply_dev_vesrions_to_selection<'a>(
     }
 
     Ok(msg)
+}
+
+pub(crate) fn increment_patch(v: &mut semver::Version) {
+    v.patch += 1;
+    v.pre = semver::Prerelease::EMPTY;
+    v.build = semver::BuildMetadata::EMPTY;
 }
 
 pub(crate) fn fixup_releases<'a>(
