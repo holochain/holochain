@@ -360,12 +360,15 @@ pub fn check_update_reference(
 
 /// Validate a chain of headers with an optional starting point.
 pub fn validate_chain<'iter>(
-    mut headers: impl Iterator<Item = (&'iter HeaderHash, &'iter Header)>,
+    mut headers: impl Iterator<Item = &'iter HeaderHashed>,
     persisted_chain_head: &Option<(HeaderHash, u32)>,
 ) -> SysValidationResult<()> {
     // Check the chain starts in a valid way.
     let mut last_item = match headers.next() {
-        Some((hash, header)) => {
+        Some(HeaderHashed {
+            hash,
+            content: header,
+        }) => {
             match persisted_chain_head {
                 Some((prev_hash, prev_seq)) => {
                     check_prev_header_chain(prev_hash, *prev_seq, header)
@@ -385,7 +388,11 @@ pub fn validate_chain<'iter>(
         None => return Ok(()),
     };
 
-    for (hash, header) in headers {
+    for HeaderHashed {
+        hash,
+        content: header,
+    } in headers
+    {
         // Check each item of the chain is valid.
         check_prev_header_chain(last_item.0, last_item.1, header)
             .map_err(ValidationOutcome::from)?;

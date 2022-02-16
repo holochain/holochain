@@ -9,10 +9,13 @@ use crate::signature::Signature;
 use crate::Entry;
 use crate::Header;
 use holo_hash::hash_type;
+use holo_hash::hash_type::HashTypeSync;
 use holo_hash::HashableContent;
 use holo_hash::HashableContentBytes;
 use holo_hash::HeaderHash;
+use holo_hash::HoloHashOf;
 use holo_hash::HoloHashed;
+use holo_hash::PrimitiveHashType;
 use holochain_serialized_bytes::prelude::*;
 
 #[cfg(feature = "test_utils")]
@@ -37,7 +40,7 @@ impl Element {
     /// This may be useful for tests that rely heavily on mocked and fixturated data.
     #[cfg(feature = "test_utils")]
     pub fn as_header_mut(&mut self) -> &mut Header {
-        &mut self.signed_header.header
+        &mut self.signed_header.hashed.content
     }
 
     /// Mutable reference to the ElementEntry.
@@ -118,11 +121,8 @@ impl Element {
     }
 
     /// Access the HeaderHashed from this element's signed header portion
-    pub fn to_header_hashed(&self) -> HeaderHashed {
-        HeaderHashed::with_pre_hashed(
-            self.signed_header.header.clone(),
-            self.signed_header.hash.clone(),
-        )
+    pub fn header_hashed(&self) -> &HeaderHashed {
+        &self.signed_header.hashed
     }
 
     /// Access the Entry portion of this element as an ElementEntry,
@@ -240,51 +240,29 @@ impl HashableContent for SignedHeader {
 pub type SignedHeaderHashed = SignedHashed<Header>;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "test_utils", derive(arbitrary::Arbitrary))]
 /// A type that can be hashed and signed equivalently to a [`Header`].
 /// For example it is possible to hash and sign a [`Create`] by
 /// serializing it in a way that produces the same bytes as if
 /// it was serialized as a [`Header::Create`].
 pub struct SignedHashed<T>
 where
-    T: HashableContent<HashType = holo_hash::hash_type::Header>,
+    T: HashableContent,
 {
-    /// The hash of this header.
-    pub hash: HeaderHash,
-    /// The data that can be serialized, hashed and signed
-    /// as a [`Header`].
-    pub header: T,
+    /// The hashed content.
+    pub hashed: HoloHashed<T>,
     /// The signature of the header.
     pub signature: Signature,
 }
 
 impl<T> SignedHashed<T>
 where
-    T: HashableContent<HashType = holo_hash::hash_type::Header>,
+    T: HashableContent,
+    <T as holo_hash::HashableContent>::HashType: HashTypeSync,
 {
     /// Create a new signed and hashed header by hashing the header.
-    pub fn new(header: T, signature: Signature) -> Self {
-        let (header, hash) = HoloHashed::from_content_sync(header).into_inner();
-        Self {
-            hash,
-            header,
-            signature,
-        }
-    }
-}
-
-impl<T> SignedHashed<T>
-where
-    T: HashableContent<HashType = holo_hash::hash_type::Header>,
-    Header: From<T>,
-{
-    /// Convert a `SignedHeader<T>` to a [`SignedHeaderHashed`]
-    pub fn into_shh(self) -> SignedHeaderHashed {
-        SignedHeaderHashed {
-            hash: self.hash,
-            header: self.header.into(),
-            signature: self.signature,
-        }
+    pub fn new(content: T, signature: Signature) -> Self {
+        let hashed = HoloHashed::from_content_sync(content);
+        Self { hashed, signature }
     }
 }
 
@@ -295,43 +273,18 @@ impl std::hash::Hash for SignedHeaderHashed {
     }
 }
 
-impl SignedHeaderHashed {
-    /// Unwrap the complete contents of this "Hashed" wrapper.
-    pub fn into_inner(self) -> (SignedHeader, HeaderHash) {
-        ((self.header, self.signature).into(), self.hash)
-    }
-
+impl<T> SignedHashed<T>
+where
+    T: HashableContent,
+{
     /// Access the already-calculated hash stored in this wrapper type.
-    pub fn as_hash(&self) -> &HeaderHash {
-        &self.hash
+    pub fn as_hash(&self) -> &HoloHashOf<T> {
+        &self.hashed.hash
     }
 
     /// Create with an existing signature.
-    pub fn with_presigned(header: HeaderHashed, signature: Signature) -> Self {
-        let (header, hash) = header.into_inner();
-        Self {
-            hash,
-            header,
-            signature,
-        }
-    }
-
-    /// Break apart into a HeaderHashed and a Signature
-    pub fn into_header_and_signature(self) -> (HeaderHashed, Signature) {
-        (
-            HeaderHashed::with_pre_hashed(self.header, self.hash),
-            self.signature,
-        )
-    }
-
-    /// Access the Header Hash.
-    pub fn header_address(&self) -> &HeaderHash {
-        &self.hash
-    }
-
-    /// Access the Header portion.
-    pub fn header(&self) -> &Header {
-        &self.header
+    pub fn with_presigned(hashed: HoloHashed<T>, signature: Signature) -> Self {
+        Self { hashed, signature }
     }
 
     /// Access the signature portion.
@@ -340,9 +293,37 @@ impl SignedHeaderHashed {
     }
 }
 
-impl From<SignedHeaderHashed> for HeaderHashed {
-    fn from(signed_header_hashed: SignedHeaderHashed) -> HeaderHashed {
-        signed_header_hashed.into_header_and_signature().0
+impl SignedHeaderHashed {
+    /// Unwrap the complete contents of this "Hashed" wrapper.
+    pub fn into_inner(self) -> (SignedHeader, HeaderHash) {
+        (
+            (self.hashed.content, self.signature).into(),
+            self.hashed.hash,
+        )
+    }
+
+    /// Break apart into a HeaderHashed and a Signature
+    pub fn into_header_and_signature(self) -> (HeaderHashed, Signature) {
+        (self.hashed, self.signature)
+    }
+
+    /// Access the Header Hash.
+    pub fn header_address(&self) -> &HeaderHash {
+        &self.hashed.hash
+    }
+
+    /// Access the Header portion.
+    pub fn header(&self) -> &Header {
+        &self.hashed.content
+    }
+}
+
+impl<T> From<SignedHashed<T>> for HoloHashed<T>
+where
+    T: HashableContent,
+{
+    fn from(sh: SignedHashed<T>) -> HoloHashed<T> {
+        sh.hashed
     }
 }
 
@@ -374,11 +355,8 @@ impl From<HoloHashed<SignedHeader>> for SignedHeaderHashed {
     fn from(hashed: HoloHashed<SignedHeader>) -> SignedHeaderHashed {
         let (signed_header, hash) = hashed.into_inner();
         let SignedHeader(header, signature) = signed_header;
-        SignedHeaderHashed {
-            hash,
-            header,
-            signature,
-        }
+        let hashed = HeaderHashed::with_pre_hashed(header, hash);
+        SignedHeaderHashed { hashed, signature }
     }
 }
 
@@ -425,5 +403,20 @@ impl TryFrom<Element> for DeleteLink {
             .0
             .into_content()
             .try_into()
+    }
+}
+
+#[cfg(feature = "test_utils")]
+impl<'a, T> arbitrary::Arbitrary<'a> for SignedHashed<T>
+where
+    T: HashableContent,
+    T: arbitrary::Arbitrary<'a>,
+    <T as holo_hash::HashableContent>::HashType: PrimitiveHashType,
+{
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        Ok(Self {
+            hashed: HoloHashed::<T>::arbitrary(u)?,
+            signature: Signature::arbitrary(u)?,
+        })
     }
 }

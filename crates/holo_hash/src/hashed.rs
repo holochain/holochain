@@ -15,9 +15,9 @@ use crate::PrimitiveHashType;
 #[cfg_attr(feature = "serialization", derive(Debug, Serialize, Deserialize))]
 pub struct HoloHashed<C: HashableContent> {
     /// Whatever type C is as data.
-    pub(crate) content: C,
+    pub content: C,
     /// The hash of the content C.
-    pub(crate) hash: HoloHashOf<C>,
+    pub hash: HoloHashOf<C>,
 }
 
 impl<C: HashableContent> HasHash<C::HashType> for HoloHashed<C> {

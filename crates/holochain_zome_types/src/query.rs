@@ -294,7 +294,7 @@ impl ChainQueryFilter {
         let headers = self.filter_headers(
             elements
                 .iter()
-                .map(|element| element.to_header_hashed())
+                .map(|element| element.header_hashed().clone())
                 .collect(),
         );
         let header_hashset = headers

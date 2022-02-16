@@ -1313,7 +1313,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
 
             // Validate the chain.
             crate::core::validate_chain(
-                elements.iter().map(|e| (e.header_address(), e.header())),
+                elements.iter().map(|e| e.header_hashed()),
                 &persisted_chain_head.clone().filter(|_| !truncate),
             )
             .map_err(|e| SourceChainError::InvalidCommit(e.to_string()))?;
@@ -1337,6 +1337,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                 workspace.clone(),
                 network.clone(),
                 self.clone(),
+                None,
                 ribosome,
             )
             .await
