@@ -53,7 +53,7 @@ async fn gen_node() -> Tx2EpHnd<Wire> {
                         panic!("unexpected: {:?}", data);
                     }
                 }
-                evt => println!("unhandled: {:?}", evt),
+                evt => observability::tracing::trace!("unhandled: {:?}", evt),
             }
         })
         .await;

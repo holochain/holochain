@@ -90,77 +90,77 @@ pub fn delete_link<'a>(
                 Ok(header_hash)
             })
         }
-        _ => Err(WasmError::Host(RibosomeError::HostFnPermissions(
-            call_context.zome.zome_name().clone(),
-            call_context.function_name().clone(),
-            "delete_link".into()
-        ).to_string()))
+        _ => Err(WasmError::Host(
+            RibosomeError::HostFnPermissions(
+                call_context.zome.zome_name().clone(),
+                call_context.function_name().clone(),
+                "delete_link".into(),
+            )
+            .to_string(),
+        )),
     }
 }
 
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod slow_tests {
+    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use hdk::prelude::*;
-    use crate::fixt::ZomeCallHostAccessFixturator;
-    use ::fixt::prelude::*;
     use holo_hash::HeaderHash;
     use holochain_wasm_test_utils::TestWasm;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_delete_link_add_remove() {
-        let host_access = fixt!(ZomeCallHostAccess, Predictable);
+        observability::test_run().ok();
+        let RibosomeTestFixture {
+            conductor, alice, ..
+        } = RibosomeTestFixture::new(TestWasm::Link).await;
 
         // links should start empty
-        let links: Vec<Vec<Link>> = crate::call_test_ribosome!(host_access, TestWasm::Link, "get_links", ()).unwrap();
+        let links: Vec<Vec<Link>> = conductor.call(&alice, "get_links", ()).await;
 
         assert!(links.len() == 0);
 
         // add a couple of links
-        let link_one: HeaderHash =
-            crate::call_test_ribosome!(host_access, TestWasm::Link, "create_link", ()).unwrap();
+        let mut link_headers: Vec<HeaderHash> = Vec::new();
+        for _ in 0..2 {
+            link_headers.push(conductor.call(&alice, "create_link", ()).await)
+        }
 
-        // add a couple of links
-        let link_two: HeaderHash =
-            crate::call_test_ribosome!(host_access, TestWasm::Link, "create_link", ()).unwrap();
-
-        let links: Vec<Link> = crate::call_test_ribosome!(host_access, TestWasm::Link, "get_links", ()).unwrap();
+        let links: Vec<Link> = conductor.call(&alice, "get_links", ()).await;
 
         assert!(links.len() == 2);
 
         // remove a link
-        let _: HeaderHash =
-            crate::call_test_ribosome!(host_access, TestWasm::Link, "delete_link", link_one)
-                .unwrap();
+        let _: HeaderHash = conductor
+            .call(&alice, "delete_link", link_headers[0].clone())
+            .await;
 
-        let links: Vec<Link> = crate::call_test_ribosome!(host_access, TestWasm::Link, "get_links", ()).unwrap();
+        let links: Vec<Link> = conductor.call(&alice, "get_links", ()).await;
 
         assert!(links.len() == 1);
 
         // remove a link
-        let _: HeaderHash =
-            crate::call_test_ribosome!(host_access, TestWasm::Link, "delete_link", link_two)
-                .unwrap();
+        let _: HeaderHash = conductor
+            .call(&alice, "delete_link", link_headers[1].clone())
+            .await;
 
-        let links: Vec<Link> = crate::call_test_ribosome!(host_access, TestWasm::Link, "get_links", ()).unwrap();
+        let links: Vec<Link> = conductor.call(&alice, "get_links", ()).await;
 
         assert!(links.len() == 0);
 
         // Add some links then delete them all
-        let _h: HeaderHash =
-            crate::call_test_ribosome!(host_access, TestWasm::Link, "create_link", ()).unwrap();
-        let _h: HeaderHash =
-            crate::call_test_ribosome!(host_access, TestWasm::Link, "create_link", ()).unwrap();
+        let _h: HeaderHash = conductor.call(&alice, "create_link", ()).await;
+        let _h: HeaderHash = conductor.call(&alice, "create_link", ()).await;
 
-        let links: Vec<Link> = crate::call_test_ribosome!(host_access, TestWasm::Link, "get_links", ()).unwrap();
+        let links: Vec<Link> = conductor.call(&alice, "get_links", ()).await;
 
         assert!(links.len() == 2);
 
-        let _: () = crate::call_test_ribosome!(host_access, TestWasm::Link, "delete_all_links", ())
-            .unwrap();
+        let _: () = conductor.call(&alice, "delete_all_links", ()).await;
 
         // Should be no links left
-        let links: Vec<Link> = crate::call_test_ribosome!(host_access, TestWasm::Link, "get_links", ()).unwrap();
+        let links: Vec<Link> = conductor.call(&alice, "get_links", ()).await;
 
         assert!(links.len() == 0);
     }

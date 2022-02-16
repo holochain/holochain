@@ -37,26 +37,6 @@ async fn check_hashed_type() {
     );
 }
 
-#[test]
-#[ignore = "TODO"]
-fn check_serialized_bytes() {
-    let h: HeaderHash =
-        HeaderHash::try_from("uhCkkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm").unwrap();
-
-    let h: SerializedBytes = h.try_into().unwrap();
-
-    assert_eq!(
-            "{\"type\":\"HeaderHash\",\"hash\":[88,43,0,130,130,164,145,252,50,36,8,37,143,125,49,95,241,139,45,95,183,5,123,133,203,141,250,107,100,170,165,193,48,200,28,230]}",
-            &format!("{:?}", h),
-        );
-
-    let h = HeaderHash::try_from(h).unwrap();
-
-    assert_eq!(
-        "HeaderHash(uhCkkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm)",
-        &format!("{:?}", h),
-    );
-}
 
 #[test]
 fn holo_hash_parse() {

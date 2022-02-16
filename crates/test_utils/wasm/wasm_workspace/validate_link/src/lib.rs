@@ -26,6 +26,11 @@ fn validate_create_link(
 }
 
 #[hdk_extern]
+fn must_get_valid_element(header_hash: HeaderHash) -> ExternResult<Element> {
+    hdk::prelude::must_get_valid_element(header_hash)
+}
+
+#[hdk_extern]
 fn add_valid_link(_: ()) -> ExternResult<HeaderHash> {
     add_valid_link_inner()
 }

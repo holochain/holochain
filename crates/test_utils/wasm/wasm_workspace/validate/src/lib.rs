@@ -96,6 +96,11 @@ entry_defs![
 ];
 
 #[hdk_extern]
+fn must_get_valid_element(header_hash: HeaderHash) -> ExternResult<Element> {
+    hdk::prelude::must_get_valid_element(header_hash)
+}
+
+#[hdk_extern]
 fn validate(data: ValidateData) -> ExternResult<ValidateCallbackResult> {
     let element = data.element;
     let entry_type = element.header().entry_type().cloned();

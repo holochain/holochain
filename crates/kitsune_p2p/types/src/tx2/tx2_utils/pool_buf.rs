@@ -195,6 +195,7 @@ impl PoolBuf {
         inner.1.extend_from_slice(src);
     }
 
+    #[allow(clippy::uninit_vec)]
     /// Ensure we have enough front space to prepend the given byte count.
     /// If not, shift all data over to the right, making more prepend space.
     pub fn reserve_front(&mut self, mut len: usize) {

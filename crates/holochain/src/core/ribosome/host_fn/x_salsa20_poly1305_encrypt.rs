@@ -1,4 +1,6 @@
 use crate::core::ribosome::CallContext;
+use crate::core::ribosome::HostFnAccess;
+use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
@@ -7,8 +9,6 @@ use std::convert::TryInto;
 use std::sync::Arc;
 use xsalsa20poly1305::aead::{generic_array::GenericArray, Aead, NewAead};
 use xsalsa20poly1305::XSalsa20Poly1305;
-use crate::core::ribosome::HostFnAccess;
-use crate::core::ribosome::RibosomeError;
 
 pub fn x_salsa20_poly1305_encrypt(
     _ribosome: Arc<impl RibosomeT>,
@@ -16,7 +16,10 @@ pub fn x_salsa20_poly1305_encrypt(
     input: XSalsa20Poly1305Encrypt,
 ) -> Result<XSalsa20Poly1305EncryptedData, WasmError> {
     match HostFnAccess::from(&call_context.host_context()) {
-        HostFnAccess{ keystore: Permission::Allow, .. } => {
+        HostFnAccess {
+            keystore: Permission::Allow,
+            ..
+        } => {
             let system_random = ring::rand::SystemRandom::new();
             let mut nonce_bytes = [0; holochain_zome_types::x_salsa20_poly1305::nonce::NONCE_BYTES];
             system_random
@@ -43,12 +46,15 @@ pub fn x_salsa20_poly1305_encrypt(
                     lib_encrypted_data,
                 ),
             )
-        },
-        _ => Err(WasmError::Host(RibosomeError::HostFnPermissions(
-            call_context.zome.zome_name().clone(),
-            call_context.function_name().clone(),
-            "x_salsa20_poly1305_encrypt".into()
-        ).to_string()))
+        }
+        _ => Err(WasmError::Host(
+            RibosomeError::HostFnPermissions(
+                call_context.zome.zome_name().clone(),
+                call_context.function_name().clone(),
+                "x_salsa20_poly1305_encrypt".into(),
+            )
+            .to_string(),
+        )),
     }
 }
 
@@ -56,14 +62,18 @@ pub fn x_salsa20_poly1305_encrypt(
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
 
-    use crate::fixt::ZomeCallHostAccessFixturator;
-    use ::fixt::prelude::*;
     use hdk::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
+    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
 
     #[tokio::test(flavor = "multi_thread")]
+    #[cfg(feature = "test_utils")]
     async fn invoke_import_xsalsa20_poly1305_encrypt_test() {
-        let host_access = fixt!(ZomeCallHostAccess, Predictable);
+        observability::test_run().ok();
+        let RibosomeTestFixture {
+            conductor, alice, ..
+        } = RibosomeTestFixture::new(TestWasm::XSalsa20Poly1305).await;
+
         let key_ref = XSalsa20Poly1305KeyRef::from(
             [1; holochain_zome_types::x_salsa20_poly1305::key_ref::KEY_REF_BYTES],
         );
@@ -72,33 +82,33 @@ pub mod wasm_test {
             key_ref,
             data.clone(),
         );
-        let output: XSalsa20Poly1305EncryptedData = crate::call_test_ribosome!(
-            host_access,
-            TestWasm::XSalsa20Poly1305,
-            "x_salsa20_poly1305_encrypt",
-            input
-        ).unwrap();
-        let decrypt_output: Option<XSalsa20Poly1305Data> = crate::call_test_ribosome!(
-            host_access,
-            TestWasm::XSalsa20Poly1305,
-            "x_salsa20_poly1305_decrypt",
-            holochain_zome_types::x_salsa20_poly1305::XSalsa20Poly1305Decrypt::new(
-                key_ref,
-                output.clone(),
+        let output: XSalsa20Poly1305EncryptedData = conductor
+            .call(&alice, "x_salsa20_poly1305_encrypt", input)
+            .await;
+
+        let decrypt_output: Option<XSalsa20Poly1305Data> = conductor
+            .call(
+                &alice,
+                "x_salsa20_poly1305_decrypt",
+                holochain_zome_types::x_salsa20_poly1305::XSalsa20Poly1305Decrypt::new(
+                    key_ref,
+                    output.clone(),
+                ),
             )
-        ).unwrap();
+            .await;
         assert_eq!(&decrypt_output, &Some(data),);
 
         let bad_key_ref = XSalsa20Poly1305KeyRef::from([2; 32]);
-        let bad_output: Option<XSalsa20Poly1305Data> = crate::call_test_ribosome!(
-            host_access,
-            TestWasm::XSalsa20Poly1305,
-            "x_salsa20_poly1305_decrypt",
-            holochain_zome_types::x_salsa20_poly1305::XSalsa20Poly1305Decrypt::new(
-                bad_key_ref,
-                output
+        let bad_output: Option<XSalsa20Poly1305Data> = conductor
+            .call(
+                &alice,
+                "x_salsa20_poly1305_decrypt",
+                holochain_zome_types::x_salsa20_poly1305::XSalsa20Poly1305Decrypt::new(
+                    bad_key_ref,
+                    output,
+                ),
             )
-        ).unwrap();
+            .await;
         assert_eq!(None, bad_output);
     }
 }
