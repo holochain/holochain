@@ -51,6 +51,9 @@ where
     }
 }
 
-pub fn hash_header(input: Vec<u8>, output_len: u8) -> ExternResult<Vec<u8>> {
-    match HDK.with(|h| h.borrow().hash(Hash))
+pub fn hash_header(input: Header) -> ExternResult<HeaderHash> {
+    match HDK.with(|h| h.borrow().hash(HashInput::Header(input)))? {
+        HashOutput::Header(header_hash) => Ok(header_hash),
+        _ => unreachable!(),
+    }
 }
