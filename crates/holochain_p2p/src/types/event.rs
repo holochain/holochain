@@ -3,7 +3,7 @@
 
 use crate::*;
 use holochain_zome_types::signature::Signature;
-use kitsune_p2p::{agent_store::AgentInfoSigned, event::*};
+use kitsune_p2p::{agent_store::AgentInfoSigned, dht_arc::DhtLocation, event::*};
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 /// The data required for a get request.
@@ -98,6 +98,21 @@ impl From<&actor::GetActivityOptions> for GetActivityOptions {
             include_full_headers: a.include_full_headers,
         }
     }
+}
+
+/// Multiple ways to fetch op data
+#[derive(Debug, derive_more::From)]
+pub enum FetchOpDataQuery {
+    /// Fetch all ops with the hashes specified
+    Hashes(Vec<holo_hash::DhtOpHash>),
+    /// Fetch all ops within the time and space bounds specified
+    Region {
+        /// The min and max timestamp to fetch
+        time_bounds: (Timestamp, Timestamp),
+        /// The min and max DhtLocation to fetch
+        // TODO: make an ArcInterval or something
+        location_bounds: (DhtLocation, DhtLocation),
+    },
 }
 
 ghost_actor::ghost_chan! {
@@ -215,7 +230,7 @@ ghost_actor::ghost_chan! {
         /// The p2p module needs access to the content for a given set of DhtOpHashes.
         fn fetch_op_data(
             dna_hash: DnaHash,
-            op_hashes: Vec<holo_hash::DhtOpHash>,
+            query: FetchOpDataQuery,
         ) -> Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>;
 
         /// P2p operations require cryptographic signatures and validation.
