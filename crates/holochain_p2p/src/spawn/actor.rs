@@ -6,6 +6,8 @@ use crate::*;
 use futures::future::FutureExt;
 use kitsune_p2p::actor::BroadcastTo;
 use kitsune_p2p::event::*;
+use kitsune_p2p::KOp;
+use kitsune_p2p::KitsuneOpData;
 
 use crate::types::AgentPubKeyExt;
 
@@ -174,7 +176,7 @@ impl WrapEvtSender {
         dna_hash: DnaHash,
         request_validation_receipt: bool,
         countersigning_session: bool,
-        ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
+        ops: Vec<holochain_types::dht_op::DhtOp>,
     ) -> impl Future<Output = HolochainP2pResult<()>> + 'static + Send {
         let op_count = ops.len();
         timing_trace!({
@@ -489,7 +491,7 @@ impl HolochainP2pActor {
         dna_hash: DnaHash,
         request_validation_receipt: bool,
         countersigning_session: bool,
-        ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
+        ops: Vec<holochain_types::dht_op::DhtOp>,
     ) -> kitsune_p2p::actor::KitsuneP2pHandlerResult<()> {
         let evt_sender = self.evt_sender.clone();
         Ok(async move {
@@ -821,17 +823,16 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
     fn handle_gossip(
         &mut self,
         space: Arc<kitsune_p2p::KitsuneSpace>,
-        ops: Vec<(Arc<kitsune_p2p::KitsuneOpHash>, Vec<u8>)>,
+        ops: Vec<KOp>,
     ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<()> {
         let space = DnaHash::from_kitsune(&space);
         let ops = ops
             .into_iter()
-            .map(|(op_hash, op_data)| {
-                let op_hash = DhtOpHash::from_kitsune(&op_hash);
-                let op_data = crate::wire::WireDhtOpData::decode(op_data)
+            .map(|op_data| {
+                let op = crate::wire::WireDhtOpData::decode(op_data.0.clone())
                     .map_err(HolochainP2pError::from)?
                     .op_data;
-                Ok((op_hash, op_data))
+                Ok(op)
             })
             .collect::<Result<_, HolochainP2pError>>()?;
         self.handle_incoming_publish(space, false, false, ops)
@@ -869,9 +870,8 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
     fn handle_fetch_op_data(
         &mut self,
         input: kitsune_p2p::event::FetchOpDataEvt,
-    ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<
-        Vec<(Arc<kitsune_p2p::KitsuneOpHash>, Vec<u8>)>,
-    > {
+    ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<Vec<(Arc<kitsune_p2p::KitsuneOpHash>, KOp)>>
+    {
         let kitsune_p2p::event::FetchOpDataEvt { space, op_hashes } = input;
         let space = DnaHash::from_kitsune(&space);
         let op_hashes = op_hashes
@@ -889,9 +889,11 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
             {
                 out.push((
                     op_hash.into_kitsune(),
-                    crate::wire::WireDhtOpData { op_data: dht_op }
-                        .encode()
-                        .map_err(kitsune_p2p::KitsuneP2pError::other)?,
+                    KitsuneOpData::new(
+                        crate::wire::WireDhtOpData { op_data: dht_op }
+                            .encode()
+                            .map_err(kitsune_p2p::KitsuneP2pError::other)?,
+                    ),
                 ));
             }
             Ok(out)
@@ -1021,7 +1023,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
         request_validation_receipt: bool,
         countersigning_session: bool,
         dht_hash: holo_hash::AnyDhtHash,
-        ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
+        ops: Vec<holochain_types::dht_op::DhtOp>,
         timeout_ms: Option<u64>,
     ) -> HolochainP2pHandlerResult<()> {
         use kitsune_p2p_types::KitsuneTimeout;

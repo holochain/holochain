@@ -118,8 +118,8 @@ impl Inner {
                             data_map_get(evt_sender, space, old_agent, data_map, old_key).await?;
 
                         match &*op_data {
-                            MetaOpData::Op(key, data) => {
-                                to_send.push((key.clone(), data.clone()));
+                            MetaOpData::Op(_, data) => {
+                                to_send.push(data.clone());
                             }
                             // this should be impossible right now
                             // due to the shared agent store

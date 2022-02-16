@@ -641,7 +641,7 @@ impl KitsuneP2pEventHandler for KitsuneP2pActor {
     fn handle_gossip(
         &mut self,
         space: Arc<KitsuneSpace>,
-        ops: Vec<(Arc<KitsuneOpHash>, Vec<u8>)>,
+        ops: Vec<KOp>,
     ) -> KitsuneP2pEventHandlerResult<()> {
         Ok(self.evt_sender.gossip(space, ops))
     }
@@ -649,7 +649,7 @@ impl KitsuneP2pEventHandler for KitsuneP2pActor {
     fn handle_fetch_op_data(
         &mut self,
         input: FetchOpDataEvt,
-    ) -> KitsuneP2pEventHandlerResult<Vec<(Arc<KitsuneOpHash>, Vec<u8>)>> {
+    ) -> KitsuneP2pEventHandlerResult<Vec<(Arc<KitsuneOpHash>, KOp)>> {
         Ok(self.evt_sender.fetch_op_data(input))
     }
 
@@ -930,7 +930,7 @@ mockall::mock! {
         fn handle_gossip(
             &mut self,
             space: Arc<KitsuneSpace>,
-            ops: Vec<(Arc<KitsuneOpHash>, Vec<u8>)>,
+            ops: Vec<KOp>,
         ) -> KitsuneP2pEventHandlerResult<()>;
 
         fn handle_query_op_hashes(
@@ -941,7 +941,7 @@ mockall::mock! {
         fn handle_fetch_op_data(
             &mut self,
             input: FetchOpDataEvt,
-        ) -> KitsuneP2pEventHandlerResult<Vec<(Arc<KitsuneOpHash>, Vec<u8>)>> ;
+        ) -> KitsuneP2pEventHandlerResult<Vec<(Arc<KitsuneOpHash>, KOp)>> ;
 
         fn handle_sign_network_data(
             &mut self,

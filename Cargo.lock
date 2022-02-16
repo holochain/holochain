@@ -2626,6 +2626,7 @@ dependencies = [
  "arbitrary",
  "arrayref",
  "base64",
+ "blake2b_simd",
  "bloomfilter",
  "contrafact",
  "derive_more",
