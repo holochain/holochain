@@ -93,6 +93,7 @@ rec {
             --disallowed-version-reqs=">=0.1" \
             --allowed-matched-blockers=UnreleasableViaChangelogFrontmatter \
             --match-filter="^(holochain|holochain_cli|kitsune_p2p_proxy)$" \
+            --additional-manifests=''${TEST_WORKSPACE}/crates/release-automation/Cargo.toml \
             --steps=CreateReleaseBranch,BumpReleaseVersions
       '';
     in
