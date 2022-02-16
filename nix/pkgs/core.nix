@@ -28,7 +28,7 @@ rec {
     export CARGO_BUILD_JOBS=8
 
     # run all the non-slow cargo tests
-    cargo build --features 'build_wasms' -p holochain_wasm_test_utils
+    cargo build --features 'build' -p holochain_wasm_test_utils
     cargo test --workspace --exclude holochain --exclude release-automation --lib --tests --profile fast-test -- --nocapture
   '';
 
