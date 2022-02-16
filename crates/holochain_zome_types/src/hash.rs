@@ -7,7 +7,7 @@ crate::secure_primitive!(Hash256Bits, 32);
 pub struct Hash512Bits([u8; 64]);
 crate::secure_primitive!(Hash512Bits, 64);
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum HashInput {
     /// Hash an Entry.

@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - Adds header hashing to `hash` host fn [1227](https://github.com/holochain/holochain/pull/1227)
 
+## 0.0.126
+
 ## 0.0.125
 
 ## 0.0.124

@@ -39,7 +39,7 @@ fn hash_entry(entry: Entry) -> ExternResult<EntryHash> {
 
 #[cfg(test)]
 pub mod tests {
-    use fixt::prelude::*;
+    use ::fixt::prelude::*;
     use hdk::prelude::*;
 
     #[test]
@@ -61,6 +61,6 @@ pub mod tests {
 
         let result = super::hash_entry(input_entry);
 
-        assert_eq!(result, Ok(HashOutput::Entry(output_hash)))
+        assert_eq!(result, Ok(output_hash))
     }
 }

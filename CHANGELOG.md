@@ -6,7 +6,65 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
-- Bump `holochain_wasmer_*` crates to v0.0.77 which relaxes the version requirements on `serde`. [#1204](https://github.com/holochain/holochain/pull/1204)
+# 20220211.091841
+
+- Bump `holochain_wasmer_*` crates to v0.0.77 which relaxes the version requirements on `serde`. [\#1204](https://github.com/holochain/holochain/pull/1204)
+
+## [holochain-0.0.126](crates/holochain/CHANGELOG.md#0.0.126)
+
+## [kitsune\_p2p\_bootstrap-0.0.2](crates/kitsune_p2p_bootstrap/CHANGELOG.md#0.0.2)
+
+## [holochain\_test\_wasm\_common-0.0.22](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.22)
+
+## [holochain\_cascade-0.0.26](crates/holochain_cascade/CHANGELOG.md#0.0.26)
+
+## [holochain\_cli-0.0.27](crates/holochain_cli/CHANGELOG.md#0.0.27)
+
+## [holochain\_cli\_sandbox-0.0.23](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.23)
+
+## [holochain\_websocket-0.0.26](crates/holochain_websocket/CHANGELOG.md#0.0.26)
+
+## [holochain\_conductor\_api-0.0.26](crates/holochain_conductor_api/CHANGELOG.md#0.0.26)
+
+## [holochain\_state-0.0.26](crates/holochain_state/CHANGELOG.md#0.0.26)
+
+## [holochain\_wasm\_test\_utils-0.0.26](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.26)
+
+## [holochain\_p2p-0.0.26](crates/holochain_p2p/CHANGELOG.md#0.0.26)
+
+## [holochain\_cli\_bundle-0.0.22](crates/holochain_cli_bundle/CHANGELOG.md#0.0.22)
+
+## [holochain\_types-0.0.26](crates/holochain_types/CHANGELOG.md#0.0.26)
+
+## [holochain\_keystore-0.0.26](crates/holochain_keystore/CHANGELOG.md#0.0.26)
+
+## [holochain\_sqlite-0.0.26](crates/holochain_sqlite/CHANGELOG.md#0.0.26)
+
+## [kitsune\_p2p-0.0.23](crates/kitsune_p2p/CHANGELOG.md#0.0.23)
+
+- Fixes D-01415 holochain panic on startup [\#1206](https://github.com/holochain/holochain/pull/1206)
+
+## [kitsune\_p2p\_proxy-0.0.17](crates/kitsune_p2p_proxy/CHANGELOG.md#0.0.17)
+
+## [kitsune\_p2p\_transport\_quic-0.0.17](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.0.17)
+
+## [kitsune\_p2p\_types-0.0.17](crates/kitsune_p2p_types/CHANGELOG.md#0.0.17)
+
+## [mr\_bundle-0.0.7](crates/mr_bundle/CHANGELOG.md#0.0.7)
+
+## [holochain\_util-0.0.7](crates/holochain_util/CHANGELOG.md#0.0.7)
+
+## [hdk-0.0.122](crates/hdk/CHANGELOG.md#0.0.122)
+
+- hdk: `delete`, `delete_entry`, and `delete_cap_grant` can all now take a `DeleteInput` as an argument to be able specify `ChainTopOrdering`, congruent with `create` and `update`. This change is backward compatible: a plain `HeaderHash` can still be used as input to `delete`.
+
+## [hdk\_derive-0.0.24](crates/hdk_derive/CHANGELOG.md#0.0.24)
+
+## [holochain\_zome\_types-0.0.24](crates/holochain_zome_types/CHANGELOG.md#0.0.24)
+
+## [holo\_hash-0.0.19](crates/holo_hash/CHANGELOG.md#0.0.19)
+
+## [kitsune\_p2p\_dht\_arc-0.0.9](crates/kitsune_p2p_dht_arc/CHANGELOG.md#0.0.9)
 
 # 20220202.112225
 
