@@ -113,7 +113,7 @@ jobs:
          - run:
               name: Run the standard tests
               no_output_timeout: 30m
-              command: nix-shell --fallback --pure --argstr flavor "coreDev" --run hc-standard-test
+              command: nix-shell --fallback --pure --argstr flavor "coreDev" --run hc-test-test
 
    slow-test:
       docker:

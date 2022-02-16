@@ -14,12 +14,12 @@ rec {
     set -euxo pipefail
     export RUST_BACKTRACE=1
 
-    hc-standard-test
-    hc-slow-test
-    hc-wasm-test
+    hc-test-standard
+    hc-test-slow
+    hc-test-wasm
   '';
 
-  hcStandardTests = writeShellScriptBin "hc-standard-test" ''
+  hcStandardTests = writeShellScriptBin "hc-test-standard" ''
     set -euxo pipefail
     export RUST_BACKTRACE=1
 
@@ -32,7 +32,7 @@ rec {
     cargo test --workspace --exclude holochain --exclude release-automation --lib --tests --profile fast-test -- --nocapture
   '';
 
-  hcSlowTests = writeShellScriptBin "hc-slow-test" ''
+  hcSlowTests = writeShellScriptBin "hc-test-slow" ''
     set -euxo pipefail
     export RUST_BACKTRACE=1
 
@@ -45,7 +45,7 @@ rec {
     cargo test --manifest-path=crates/holochain/Cargo.toml --features slow_tests,test_utils,build_wasms,db-encryption --profile fast-test -- --nocapture
   '';
 
-  hcWasmTests = writeShellScriptBin "hc-wasm-test" ''
+  hcWasmTests = writeShellScriptBin "hc-test-wasm" ''
     set -euxo pipefail
     export RUST_BACKTRACE=1
 
