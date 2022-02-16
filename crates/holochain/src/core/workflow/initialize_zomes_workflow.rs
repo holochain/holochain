@@ -89,7 +89,6 @@ where
             network.clone(),
             signal_tx,
             call_zome_handle,
-            cell_id,
         );
         let invocation = InitInvocation { dna_def };
         ribosome.run_init(host_access, invocation)?
