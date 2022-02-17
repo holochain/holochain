@@ -42,6 +42,8 @@ impl ShardedGossipLocal {
             .check_ops_bloom((*state.common_arc_set).clone(), &remote_bloom)
             .await?;
 
+        // dbg!(&missing_hashes);
+
         let missing_hashes = match missing_hashes {
             bloom::Batch::Complete(hashes) => hashes,
             bloom::Batch::Partial { cursor, data } => {
