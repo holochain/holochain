@@ -14,7 +14,8 @@ edition = "2018"
 
 [dependencies]
 
-chrono = "0.4.6"
+chrono = { version = "0.4.6", features = ["serde"] }
+derive_more = "0.99"
 serde = { version = "1.0", features = [ "derive" ] }
 thiserror = "1"
 
@@ -26,6 +27,7 @@ rusqlite = { version = "0.26", optional = true }
 
 [dev-dependencies]
 holochain_serialized_bytes = "=0.0.51"
+serde_yaml = "0.8"
 
 [features]
 now = []
