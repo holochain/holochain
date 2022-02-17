@@ -106,6 +106,11 @@ async fn test_rpc_multi_logic_mocked() {
         }
         Ok(async move { Ok(out) }.boxed().into())
     });
+
+    // @maackle: this suddenly became necessary, I wonder why?
+    m.expect_handle_k_gen_req()
+        .returning(|_| Ok(async move { Ok(KGenRes::RecordMetrics(())) }.boxed().into()));
+
     let evt_sender = build_event_handler(m).await;
 
     let config = Arc::new(KitsuneP2pConfig::default());
