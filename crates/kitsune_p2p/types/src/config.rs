@@ -117,7 +117,7 @@ pub mod tuning_params_struct {
         gossip_local_sync_delay_ms: u32 = 1000 * 60,
 
         /// Should gossip dynamically resize storage arcs?
-        gossip_dynamic_arcs: bool = false,
+        gossip_dynamic_arcs: bool = true,
 
         /// Allow only the first agent to join the space to
         /// have a sized storage arc. [Default: false]
