@@ -236,21 +236,18 @@ impl HashableContent for SignedHeader {
     }
 }
 
-/// The header and the signature that signed it
+/// The hashed header and the signature that signed it
 pub type SignedHeaderHashed = SignedHashed<Header>;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-/// A type that can be hashed and signed equivalently to a [`Header`].
-/// For example it is possible to hash and sign a [`Create`] by
-/// serializing it in a way that produces the same bytes as if
-/// it was serialized as a [`Header::Create`].
+/// Any content that has been hashed and signed.
 pub struct SignedHashed<T>
 where
     T: HashableContent,
 {
     /// The hashed content.
     pub hashed: HoloHashed<T>,
-    /// The signature of the header.
+    /// The signature of the content.
     pub signature: Signature,
 }
 
@@ -259,14 +256,17 @@ where
     T: HashableContent,
     <T as holo_hash::HashableContent>::HashType: HashTypeSync,
 {
-    /// Create a new signed and hashed header by hashing the header.
+    /// Create a new signed and hashed content by hashing the content.
     pub fn new(content: T, signature: Signature) -> Self {
         let hashed = HoloHashed::from_content_sync(content);
         Self { hashed, signature }
     }
 }
 
-impl std::hash::Hash for SignedHeaderHashed {
+impl<T> std::hash::Hash for SignedHashed<T>
+where
+    T: HashableContent,
+{
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.signature.hash(state);
         self.as_hash().hash(state);
