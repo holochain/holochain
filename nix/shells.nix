@@ -18,15 +18,17 @@ let
 
       holonix.main
 
-      { shellHook = ''
-        echo Using "$NIX_ENV_PREFIX" as target prefix...
+      {
+        shellHook = ''
+          echo Using "$NIX_ENV_PREFIX" as target prefix...
 
-        export HC_TEST_WASM_DIR="$CARGO_TARGET_DIR/.wasm_target"
-        mkdir -p $HC_TEST_WASM_DIR
+          export HC_TEST_WASM_DIR="$CARGO_TARGET_DIR/.wasm_target"
+          mkdir -p $HC_TEST_WASM_DIR
 
-        export HC_WASM_CACHE_PATH="$CARGO_TARGET_DIR/.wasm_cache"
-        mkdir -p $HC_WASM_CACHE_PATH
-      ''; }
+          export HC_WASM_CACHE_PATH="$CARGO_TARGET_DIR/.wasm_cache"
+          mkdir -p $HC_WASM_CACHE_PATH
+        '';
+      }
 
       input
     ];
@@ -40,9 +42,12 @@ rec {
   coreDev = hcMkShell {
     nativeBuildInputs = builtins.attrValues (pkgs.core)
       ++ (with holonix.pkgs;[
-        sqlcipher
-        gdb
-      ]);
+      sqlcipher
+      gdb
+      gh
+      nixpkgs-fmt
+      niv
+    ]);
   };
 
   ci = hcMkShell {
@@ -58,11 +63,11 @@ rec {
     ];
     nativeBuildInputs = builtins.attrValues pkgs.happ
       ++ (with holonix.pkgs; [
-        sqlcipher
-        binaryen
-        gdb
-      ])
-      ;
+      sqlcipher
+      binaryen
+      gdb
+    ])
+    ;
   };
 
   coreDevRustup = coreDev.overrideAttrs (attrs: {

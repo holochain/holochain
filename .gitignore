@@ -4,6 +4,7 @@ target/
 *~
 .wasm_cache
 .wasm_target
+sweep.timestamp
 
 flamegraph.svg
 perf.data
@@ -19,3 +20,5 @@ result
 test_cert
 
 .vscode
+
+.my-shell.nix

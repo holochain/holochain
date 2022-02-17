@@ -28,6 +28,11 @@ pub struct HostFnWorkspace<
     dht: DbRead<DbKindDht>,
     cache: DbWrite<DbKindCache>,
     dna_def: Arc<DnaDef>,
+    /// Did the root call that started this call chain
+    /// come from an init callback.
+    /// This is needed so that we don't run init recursively inside
+    /// init calls.
+    init_is_root: bool,
 }
 
 #[derive(Clone, shrinkwraprs::Shrinkwrap)]
@@ -74,7 +79,21 @@ impl SourceChainWorkspace {
     ) -> SourceChainResult<Self> {
         let source_chain =
             SourceChain::new(authored.clone(), dht.clone(), keystore, author).await?;
-        Self::new_inner(authored, dht, cache, source_chain, dna_def).await
+        Self::new_inner(authored, dht, cache, source_chain, dna_def, false).await
+    }
+
+    /// Create a source chain workspace where the root caller is the init callback.
+    pub async fn init_as_root(
+        authored: DbWrite<DbKindAuthored>,
+        dht: DbWrite<DbKindDht>,
+        cache: DbWrite<DbKindCache>,
+        keystore: MetaLairClient,
+        author: AgentPubKey,
+        dna_def: Arc<DnaDef>,
+    ) -> SourceChainResult<Self> {
+        let source_chain =
+            SourceChain::new(authored.clone(), dht.clone(), keystore, author).await?;
+        Self::new_inner(authored, dht, cache, source_chain, dna_def, true).await
     }
 
     /// Create a source chain with a blank chain head.
@@ -91,7 +110,7 @@ impl SourceChainWorkspace {
     ) -> SourceChainResult<Self> {
         let source_chain =
             SourceChain::raw_empty(authored.clone(), dht.clone(), keystore, author).await?;
-        Self::new_inner(authored, dht, cache, source_chain, dna_def).await
+        Self::new_inner(authored, dht, cache, source_chain, dna_def, false).await
     }
 
     async fn new_inner(
@@ -100,6 +119,7 @@ impl SourceChainWorkspace {
         cache: DbWrite<DbKindCache>,
         source_chain: SourceChain,
         dna_def: Arc<DnaDef>,
+        init_is_root: bool,
     ) -> SourceChainResult<Self> {
         Ok(Self {
             inner: HostFnWorkspace {
@@ -108,9 +128,16 @@ impl SourceChainWorkspace {
                 dht: dht.into(),
                 dna_def,
                 cache,
+                init_is_root,
             },
             source_chain,
         })
+    }
+
+    /// Did this zome call chain originate from within
+    /// an init callback.
+    pub fn called_from_init(&self) -> bool {
+        self.inner.init_is_root
     }
 }
 
@@ -139,6 +166,7 @@ where
             dht: dht.into(),
             cache,
             dna_def,
+            init_is_root: false,
         })
     }
     pub fn source_chain(&self) -> &Option<SourceChain<SourceChainDb, SourceChainDht>> {
@@ -183,6 +211,7 @@ impl From<HostFnWorkspace> for HostFnWorkspaceRead {
             dht: workspace.dht,
             cache: workspace.cache,
             dna_def: workspace.dna_def,
+            init_is_root: workspace.init_is_root,
         }
     }
 }
@@ -201,6 +230,7 @@ impl From<SourceChainWorkspace> for HostFnWorkspaceRead {
             dht: workspace.inner.dht,
             cache: workspace.inner.cache,
             dna_def: workspace.inner.dna_def,
+            init_is_root: workspace.inner.init_is_root,
         }
     }
 }

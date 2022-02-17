@@ -380,7 +380,7 @@ fixturator!(
 
 fixturator!(
     InitHostAccess;
-    constructor fn new(HostFnWorkspace, MetaLairClient, HolochainP2pDna);
+    constructor fn new(HostFnWorkspace, MetaLairClient, HolochainP2pDna, SignalBroadcaster, CellConductorReadHandle);
 );
 
 fixturator!(
