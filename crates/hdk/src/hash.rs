@@ -51,6 +51,16 @@ where
     }
 }
 
+/// Hash a `Header` into a `HeaderHash`.
+///
+/// [`hash_entry`] has more of a discussion around different hash types and how
+/// they are used within the HDK.
+///
+/// It is strongly recommended to use [`hash_header`] to calculate the hash rather than hand rolling an in-wasm solution.
+/// Any inconsistencies in serialization or hash handling will result in dangling references to things due to a "corrupt" hash.
+///
+/// Note that usually relevant HDK functions return a [`HeaderHashed`] or [`SignedHeaderHashed`] which already has associated methods to access the `HeaderHash` of the inner `Header`.
+/// In normal usage it is unlikely to be required to separately hash a [`Header`] like this.
 pub fn hash_header(input: Header) -> ExternResult<HeaderHash> {
     match HDK.with(|h| h.borrow().hash(HashInput::Header(input)))? {
         HashOutput::Header(header_hash) => Ok(header_hash),
