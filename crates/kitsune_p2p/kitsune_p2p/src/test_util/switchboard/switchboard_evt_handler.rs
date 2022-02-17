@@ -5,7 +5,6 @@
 use std::sync::Arc;
 
 use crate::event::*;
-use crate::test_util::hash_op_data;
 use crate::types::event::{KitsuneP2pEvent, KitsuneP2pEventHandler, KitsuneP2pEventHandlerResult};
 use kitsune_p2p_types::bin_types::*;
 use kitsune_p2p_types::*;
@@ -135,9 +134,17 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
         ok_fut(Ok(self.sb.share(|sb| {
             let node = sb.nodes.get_mut(&self.node).unwrap();
             for op in ops {
-                // This location is wrong from Holochain's perspective, but
-                // for this dummy implementation it doesn't matter.
-                let loc = hash_op_data(&op.0).get_loc().as_loc8();
+                // As a hack, we just set the first bytes of the op data to the
+                // loc8 location. This mimics the real world usage, where the
+                // location would be able to be extracted from the real op data,
+                // but is just a hack here since we're not even bothering to
+                // deserialize.
+                //
+                // NB: this may be problematic on the receiving end because we
+                // actually care whether this Loc8 is interpreted as u8 or i8,
+                // and we lose that information here.
+                let loc = (op.0[0] as u8 as i8).into();
+
                 // TODO: allow setting integration status
                 node.ops.insert(
                     loc,
@@ -161,16 +168,20 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
     ) -> KitsuneP2pEventHandlerResult<Option<(Vec<Arc<KitsuneOpHash>>, TimeWindowInclusive)>> {
         ok_fut(Ok(self.sb.share(|sb| {
             let (ops, timestamps): (Vec<_>, Vec<_>) = sb
-                .ops
+                .get_ops_loc8(&self.node)
                 .iter()
-                .filter(|(op_loc8, op)| {
-                    // Does the op fall within the time window?
-                    window.contains(&op.timestamp)
-                    // Does the op fall within one of the specified arcsets
-                    // with the correct integration/limbo criteria?
-                        && arc_set.contains((**op_loc8).into())
+                .filter_map(|op_loc8| {
+                    let op = sb.ops.get(op_loc8).unwrap();
+                    (
+                        // Does the op fall within the time window?
+                        window.contains(&op.timestamp)
+                        // Does the op fall within one of the specified arcsets
+                        // with the correct integration/limbo criteria?
+                        && arc_set.contains((*op_loc8).into())
+                    )
+                    .then(|| op)
                 })
-                .map(|(_, op)| (op.hash.clone(), op.timestamp))
+                .map(|op| (op.hash.clone(), op.timestamp))
                 .take(max_ops)
                 .unzip();
 
@@ -202,8 +213,9 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
             op_hashes
                 .into_iter()
                 .map(|hash| {
-                    let e: &OpEntry = sb.ops.get(&hash.get_loc().as_loc8()).unwrap();
-                    (e.hash.to_owned(), KitsuneOpData::new(vec![]))
+                    let loc = hash.get_loc().as_loc8();
+                    let e: &OpEntry = sb.ops.get(&loc).unwrap();
+                    (e.hash.to_owned(), KitsuneOpData::new(vec![loc.as_u8()]))
                 })
                 .collect()
         })))

@@ -72,11 +72,11 @@ async fn sharded_3way_recent() {
         sb.add_local_agent(&n2, &a2);
         sb.add_local_agent(&n3, &a3);
 
-        sb.print_ascii_arcs(128, true);
-
         sb.add_ops_now(&n1, true, [10, 20, 30, 40, 50, 60, 70, 80]);
         sb.add_ops_now(&n2, true, [-10, -20, -30, -40, -50, -60, -70, -80]);
         sb.add_ops_now(&n3, true, [90, 120, -120, -90]);
+
+        sb.print_ascii_arcs(64, true);
 
         sb.exchange_all_peer_info();
     });
@@ -85,7 +85,7 @@ async fn sharded_3way_recent() {
     tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
 
     sb.share(|sb| {
-        sb.print_ascii_arcs(128, true);
+        sb.print_ascii_arcs(64, true);
         assert_eq!(
             (
                 sb.get_ops_loc8(&n1),
