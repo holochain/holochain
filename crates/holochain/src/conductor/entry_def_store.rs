@@ -30,7 +30,7 @@ pub(crate) async fn get_entry_def(
     let entry_def = conductor_handle.get_entry_def(&key);
     let dna_hash = dna_def.as_hash();
     let dna_file = conductor_handle
-        .get_dna(dna_hash)
+        .get_dna_file(dna_hash)
         .ok_or_else(|| EntryDefStoreError::DnaFileMissing(dna_hash.clone()))?;
 
     // If it's not found run the ribosome and get the entry defs
