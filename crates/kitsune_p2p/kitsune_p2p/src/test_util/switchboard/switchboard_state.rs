@@ -544,7 +544,6 @@ impl SwitchboardAgent {
         let lo: Loc8 = lo.into();
         let hi: Loc8 = hi.into();
         let initial_arc = ArcInterval::Bounded(lo, hi);
-        dbg!(&lo, &hi, &initial_arc);
         let loc8 = initial_arc.clone().canonical().center_loc().as_loc8();
 
         Self {

@@ -131,7 +131,6 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
         _space: Arc<KitsuneSpace>,
         ops: Vec<KOp>,
     ) -> KitsuneP2pEventHandlerResult<()> {
-        dbg!(&ops);
         ok_fut(Ok(self.sb.share(|sb| {
             let node = sb.nodes.get_mut(&self.node).unwrap();
             for op in ops {
@@ -144,8 +143,7 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
                 // NB: this may be problematic on the receiving end because we
                 // actually care whether this Loc8 is interpreted as u8 or i8,
                 // and we lose that information here.
-                let loc = (op.0[0] as i8).into();
-                dbg!(&loc);
+                let loc = (op.0[0] as u8 as i8).into();
 
                 // TODO: allow setting integration status
                 node.ops.insert(
@@ -170,16 +168,20 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
     ) -> KitsuneP2pEventHandlerResult<Option<(Vec<Arc<KitsuneOpHash>>, TimeWindowInclusive)>> {
         ok_fut(Ok(self.sb.share(|sb| {
             let (ops, timestamps): (Vec<_>, Vec<_>) = sb
-                .ops
+                .get_ops_loc8(&self.node)
                 .iter()
-                .filter(|(op_loc8, op)| {
-                    // Does the op fall within the time window?
-                    window.contains(&op.timestamp)
-                    // Does the op fall within one of the specified arcsets
-                    // with the correct integration/limbo criteria?
-                        && arc_set.contains((**op_loc8).into())
+                .filter_map(|op_loc8| {
+                    let op = sb.ops.get(op_loc8).unwrap();
+                    (
+                        // Does the op fall within the time window?
+                        window.contains(&op.timestamp)
+                        // Does the op fall within one of the specified arcsets
+                        // with the correct integration/limbo criteria?
+                        && arc_set.contains((*op_loc8).into())
+                    )
+                    .then(|| op)
                 })
-                .map(|(_, op)| (op.hash.clone(), op.timestamp))
+                .map(|op| (op.hash.clone(), op.timestamp))
                 .take(max_ops)
                 .unzip();
 
@@ -212,7 +214,6 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
                 .into_iter()
                 .map(|hash| {
                     let loc = hash.get_loc().as_loc8();
-                    dbg!(&loc);
                     let e: &OpEntry = sb.ops.get(&loc).unwrap();
                     (e.hash.to_owned(), KitsuneOpData::new(vec![loc.as_u8()]))
                 })
