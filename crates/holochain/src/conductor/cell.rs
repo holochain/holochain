@@ -787,8 +787,15 @@ impl Cell {
         call: ZomeCall,
         workspace_lock: Option<SourceChainWorkspace>,
     ) -> CellResult<ZomeCallResult> {
-        // Check if init has run if not run it
-        self.check_or_run_zome_init().await?;
+        // Only check if init has run if this call is not coming from
+        // an already running init call.
+        if workspace_lock
+            .as_ref()
+            .map_or(true, |w| !w.called_from_init())
+        {
+            // Check if init has run if not run it
+            self.check_or_run_zome_init().await?;
+        }
 
         let keystore = self.conductor_api.keystore().clone();
 
@@ -849,8 +856,9 @@ impl Cell {
         let keystore = self.conductor_api.keystore().clone();
         let id = self.id.clone();
         let conductor_handle = self.conductor_handle.clone();
+        let signal_tx = self.signal_broadcaster().await;
         // Create the workspace
-        let workspace = SourceChainWorkspace::new(
+        let workspace = SourceChainWorkspace::init_as_root(
             self.authored_env().clone(),
             self.dht_env().clone(),
             self.cache().clone(),
@@ -879,6 +887,8 @@ impl Cell {
             dna_def,
             ribosome,
             conductor_handle,
+            signal_tx,
+            cell_id: self.id.clone(),
         };
         let init_result =
             initialize_zomes_workflow(workspace, self.holochain_p2p_cell.clone(), keystore, args)
