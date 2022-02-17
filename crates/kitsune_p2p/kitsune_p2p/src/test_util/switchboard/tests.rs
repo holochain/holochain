@@ -1,7 +1,6 @@
-#[cfg(test)]
-use contrafact::Fact;
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::{config::KitsuneP2pTuningParams, dht_arc::loc8::Loc8};
+use rand::Rng;
 
 use crate::{
     gossip::sharded_gossip::GossipType, test_util::switchboard::switchboard_state::SwitchboardAgent,
@@ -240,9 +239,7 @@ async fn sharded_4way_recent() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn sharded_4way_historical() {
-    observability::test_run().ok();
-    let mut u = arbitrary::Unstructured::new(&crate::NOISE);
-
+    // observability::test_run().ok();
     let sb = Switchboard::new(GossipType::Historical);
 
     let [n1, n2, n3, n4] = sb.add_nodes(tuning_params()).await;
@@ -252,6 +249,7 @@ async fn sharded_4way_historical() {
     let a3 = SwitchboardAgent::from_center_and_half_len(128, 68);
     let a4 = SwitchboardAgent::from_center_and_half_len(192, 68);
 
+    let now = Timestamp::now().as_micros();
     let ops_only: Vec<_> = (0..256).step_by(8).map(|u| Loc8::from(u)).collect();
     let ops_timed: Vec<_> = ops_only
         .clone()
@@ -259,10 +257,7 @@ async fn sharded_4way_historical() {
         .map(|o| {
             (
                 o,
-                contrafact::brute("timestamp is in the past", |t: &Timestamp| {
-                    *t < Timestamp::now()
-                })
-                .build(&mut u),
+                Timestamp::from_micros(rand::thread_rng().gen_range(0, now)),
             )
         })
         .collect();
