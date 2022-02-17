@@ -2785,9 +2785,11 @@ version = "0.0.5"
 dependencies = [
  "arbitrary",
  "chrono",
+ "derive_more",
  "holochain_serialized_bytes",
  "rusqlite",
  "serde",
+ "serde_yaml",
  "thiserror",
 ]
 

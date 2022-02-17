@@ -22,11 +22,19 @@ pub struct InitializeZomesWorkflowArgs<Ribosome>
 where
     Ribosome: RibosomeT + Send + 'static,
 {
-    pub dna_def: DnaDef,
     pub ribosome: Ribosome,
     pub conductor_handle: ConductorHandle,
     pub signal_tx: SignalBroadcaster,
     pub cell_id: CellId,
+}
+
+impl<Ribosome> InitializeZomesWorkflowArgs<Ribosome>
+where
+    Ribosome: RibosomeT + Send + 'static,
+{
+    pub fn dna_def(&self) -> &DnaDef {
+        self.ribosome.dna_def().as_content()
+    }
 }
 
 #[instrument(skip(network, keystore, workspace, args))]
@@ -72,8 +80,8 @@ async fn initialize_zomes_workflow_inner<Ribosome>(
 where
     Ribosome: RibosomeT + Send + 'static,
 {
+    let dna_def = args.dna_def().clone();
     let InitializeZomesWorkflowArgs {
-        dna_def,
         ribosome,
         conductor_handle,
         signal_tx,
@@ -165,18 +173,21 @@ pub mod tests {
             .await
             .unwrap();
 
+        let dna_def = DnaDefFixturator::new(Unpredictable).next().unwrap();
+        let dna_def_hashed = DnaDefHashed::from_content_sync(dna_def.clone());
+
         let workspace = SourceChainWorkspace::new(
             env.clone(),
             test_dht.env(),
             test_cache.env(),
             keystore,
             author.clone(),
+            Arc::new(dna_def),
         )
         .await
         .unwrap();
         let mut ribosome = MockRibosomeT::new();
-        let dna_def = DnaDefFixturator::new(Unpredictable).next().unwrap();
-        let dna_def_hashed = DnaDefHashed::from_content_sync(dna_def.clone());
+
         // Setup the ribosome mock
         ribosome
             .expect_run_init()
@@ -188,7 +199,6 @@ pub mod tests {
         let conductor_handle = Arc::new(MockConductorHandleT::new());
         let args = InitializeZomesWorkflowArgs {
             ribosome,
-            dna_def,
             conductor_handle,
             signal_tx: SignalBroadcaster::noop(),
             cell_id: CellId::new(dna_def_hashed.to_hash(), author.clone()),

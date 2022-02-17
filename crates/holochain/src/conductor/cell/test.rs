@@ -32,7 +32,10 @@ async fn test_cell_handle_publish() {
 
     let mut mock_handle = crate::conductor::handle::MockConductorHandleT::new();
     mock_handle
-        .expect_get_dna()
+        .expect_get_dna_def()
+        .return_const(Some(dna_file.dna_def().clone()));
+    mock_handle
+        .expect_get_dna_file()
         .return_const(Some(dna_file.clone()));
     mock_handle
         .expect_get_queue_consumer_workflows()

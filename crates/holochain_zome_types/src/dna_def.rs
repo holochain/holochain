@@ -19,10 +19,8 @@ pub type Uid = String;
 /// Historical note: This struct was written before `DnaManifest` appeared.
 /// It is included as part of a `DnaFile`. There is still a lot of code that uses
 /// this type, but in function, it has mainly been superseded by `DnaManifest`.
-///
-/// TODO: after removing the `InstallApp` admin method, we can remove the Serialize
-///       impl on this type, and document it/rename it to show that it is
-///       basically a fully validated, normalized DnaManifest
+/// Hence, this type can basically be thought of as a fully validated, normalized
+/// `DnaManifest`
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, SerializedBytes)]
 #[cfg_attr(feature = "full-dna-def", derive(derive_builder::Builder))]
 #[cfg_attr(feature = "full-dna-def", builder(public))]
@@ -41,6 +39,12 @@ pub struct DnaDef {
     /// Any arbitrary application properties can be included in this object.
     #[cfg_attr(feature = "full-dna-def", builder(default = "().try_into().unwrap()"))]
     pub properties: SerializedBytes,
+
+    /// The time used to denote the origin of the network, used to calculate
+    /// time windows during gossip.
+    /// All Header timestamps must come after this time.
+    #[cfg_attr(feature = "full-dna-def", builder(default = "Timestamp::now()"))]
+    pub origin_time: Timestamp,
 
     /// A vector of zomes associated with your DNA.
     pub zomes: Zomes,
