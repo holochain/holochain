@@ -113,7 +113,7 @@ impl HarnessAgentControlHandler for AgentHarness {
         &mut self,
         data: String,
     ) -> HarnessAgentControlHandlerResult<Arc<KitsuneOpHash>> {
-        let op_hash: Arc<KitsuneOpHash> = TestVal::test_val();
+        let op_hash: Arc<KitsuneOpHash> = hash_op_data(data.as_bytes());
         self.gossip_store.insert(op_hash.clone(), data);
         Ok(async move { Ok(op_hash) }.boxed().into())
     }
@@ -256,6 +256,7 @@ impl KitsuneP2pEventHandler for AgentHarness {
         ops: Vec<KOp>,
     ) -> KitsuneP2pEventHandlerResult<()> {
         for op_data in ops {
+            // TODO: check that we're handling string data uniformly in both directions
             let op_data = String::from_utf8_lossy(&op_data.0).to_string();
             let op_hash = hash_op_data(op_data.as_bytes());
             self.harness_chan.publish(HarnessEventType::Gossip {
