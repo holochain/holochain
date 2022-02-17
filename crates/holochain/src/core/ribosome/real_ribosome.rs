@@ -46,7 +46,7 @@ use crate::core::ribosome::host_fn::get::get;
 use crate::core::ribosome::host_fn::get_details::get_details;
 use crate::core::ribosome::host_fn::get_link_details::get_link_details;
 use crate::core::ribosome::host_fn::get_links::get_links;
-use crate::core::ribosome::host_fn::hash_entry::hash_entry;
+use crate::core::ribosome::host_fn::hash::hash;
 use crate::core::ribosome::host_fn::must_get_entry::must_get_entry;
 use crate::core::ribosome::host_fn::must_get_header::must_get_header;
 use crate::core::ribosome::host_fn::must_get_valid_element::must_get_valid_element;
@@ -372,7 +372,7 @@ impl RealRibosome {
 
         host_fn_builder
             .with_host_function(&mut ns, "__trace", trace)
-            .with_host_function(&mut ns, "__hash_entry", hash_entry)
+            .with_host_function(&mut ns, "__hash", hash)
             .with_host_function(&mut ns, "__version", version)
             .with_host_function(&mut ns, "__verify_signature", verify_signature)
             .with_host_function(&mut ns, "__sign", sign)

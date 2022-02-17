@@ -1,4 +1,7 @@
 use super::error::WorkflowResult;
+use crate::conductor::api::CellConductorApi;
+use crate::conductor::api::CellConductorApiT;
+use crate::conductor::interface::SignalBroadcaster;
 use crate::conductor::ConductorHandle;
 use crate::core::ribosome::guest_callback::init::InitHostAccess;
 use crate::core::ribosome::guest_callback::init::InitInvocation;
@@ -22,6 +25,8 @@ where
     pub dna_def: DnaDef,
     pub ribosome: Ribosome,
     pub conductor_handle: ConductorHandle,
+    pub signal_tx: SignalBroadcaster,
+    pub cell_id: CellId,
 }
 
 #[instrument(skip(network, keystore, workspace, args))]
@@ -71,10 +76,20 @@ where
         dna_def,
         ribosome,
         conductor_handle,
+        signal_tx,
+        cell_id,
     } = args;
+    let call_zome_handle =
+        CellConductorApi::new(conductor_handle.clone(), cell_id.clone()).into_call_zome_handle();
     // Call the init callback
     let result = {
-        let host_access = InitHostAccess::new(workspace.clone().into(), keystore, network.clone());
+        let host_access = InitHostAccess::new(
+            workspace.clone().into(),
+            keystore,
+            network.clone(),
+            signal_tx,
+            call_zome_handle,
+        );
         let invocation = InitInvocation { dna_def };
         ribosome.run_init(host_access, invocation)?
     };
@@ -166,13 +181,17 @@ pub mod tests {
         ribosome
             .expect_run_init()
             .returning(move |_workspace, _invocation| Ok(InitResult::Pass));
-        ribosome.expect_dna_def().return_const(dna_def_hashed);
+        ribosome
+            .expect_dna_def()
+            .return_const(dna_def_hashed.clone());
 
         let conductor_handle = Arc::new(MockConductorHandleT::new());
         let args = InitializeZomesWorkflowArgs {
             ribosome,
             dna_def,
             conductor_handle,
+            signal_tx: SignalBroadcaster::noop(),
+            cell_id: CellId::new(dna_def_hashed.to_hash(), author.clone()),
         };
         let keystore = fixt!(MetaLairClient);
         let network = fixt!(HolochainP2pDna);

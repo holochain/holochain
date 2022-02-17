@@ -134,10 +134,11 @@ pub fn call(
 
 #[cfg(test)]
 pub mod wasm_test {
+    use crate::sweettest::SweetConductor;
+    use crate::sweettest::SweetDnaFile;
     use hdk::prelude::AgentInfo;
     use holo_hash::HeaderHash;
     use holochain_state::prelude::fresh_reader_test;
-    use holochain_types::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::ZomeCallResponse;
     use matches::assert_matches;
@@ -147,48 +148,22 @@ pub mod wasm_test {
     use crate::test_utils::conductor_setup::ConductorTestData;
     use crate::test_utils::new_zome_call;
 
-    use crate::conductor::ConductorBuilder;
-    use crate::sweettest::SweetConductor;
-    use crate::sweettest::SweetDnaFile;
-    use ::fixt::prelude::*;
+    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn call_test() {
         observability::test_run().ok();
-        let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::WhoAmI])
-            .await
-            .unwrap();
+        let RibosomeTestFixture {
+            conductor,
+            alice,
+            bob,
+            bob_pubkey,
+            ..
+        } = RibosomeTestFixture::new(TestWasm::WhoAmI).await;
 
-        let alice_pubkey = fixt!(AgentPubKey, Predictable, 0);
-        let bob_pubkey = fixt!(AgentPubKey, Predictable, 1);
-
-        let mut dna_store = MockDnaStore::new();
-        dna_store.expect_add_dnas::<Vec<_>>().return_const(());
-        dna_store.expect_add_entry_defs::<Vec<_>>().return_const(());
-        dna_store.expect_add_dna().return_const(());
-        dna_store
-            .expect_get()
-            .return_const(Some(dna_file.clone().into()));
-
-        let mut conductor =
-            SweetConductor::from_builder(ConductorBuilder::with_mock_dna_store(dna_store)).await;
-
-        let apps = conductor
-            .setup_app_for_agents(
-                "app-",
-                &[alice_pubkey.clone(), bob_pubkey.clone()],
-                &[dna_file.into()],
-            )
-            .await
-            .unwrap();
-
-        let ((alice_cell,), (bobbo_cell,)) = apps.into_tuples();
-        let alice = alice_cell.zome(TestWasm::WhoAmI);
-        let bobbo = bobbo_cell.zome(TestWasm::WhoAmI);
-
-        let _: () = conductor.call(&bobbo, "set_access", ()).await;
+        let _: () = conductor.call(&bob, "set_access", ()).await;
         let agent_info: AgentInfo = conductor
-            .call(&alice, "who_are_they_local", bobbo_cell.cell_id())
+            .call(&alice, "who_are_they_local", bob.cell_id())
             .await;
         assert_eq!(agent_info.agent_initial_pubkey, bob_pubkey);
         assert_eq!(agent_info.agent_latest_pubkey, bob_pubkey);
@@ -287,38 +262,15 @@ pub mod wasm_test {
     /// we can call a fn on a remote
     async fn call_remote_test() {
         observability::test_run().ok();
-        let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::WhoAmI])
-            .await
-            .unwrap();
+        let RibosomeTestFixture {
+            conductor,
+            alice,
+            bob,
+            bob_pubkey,
+            ..
+        } = RibosomeTestFixture::new(TestWasm::WhoAmI).await;
 
-        let alice_pubkey = fixt!(AgentPubKey, Predictable, 0);
-        let bob_pubkey = fixt!(AgentPubKey, Predictable, 1);
-
-        let mut dna_store = MockDnaStore::new();
-        dna_store.expect_add_dnas::<Vec<_>>().return_const(());
-        dna_store.expect_add_entry_defs::<Vec<_>>().return_const(());
-        dna_store.expect_add_dna().return_const(());
-        dna_store
-            .expect_get()
-            .return_const(Some(dna_file.clone().into()));
-
-        let mut conductor =
-            SweetConductor::from_builder(ConductorBuilder::with_mock_dna_store(dna_store)).await;
-
-        let apps = conductor
-            .setup_app_for_agents(
-                "app-",
-                &[alice_pubkey.clone(), bob_pubkey.clone()],
-                &[dna_file.into()],
-            )
-            .await
-            .unwrap();
-
-        let ((alice_cell,), (bobbo_cell,)) = apps.into_tuples();
-        let alice = alice_cell.zome(TestWasm::WhoAmI);
-        let bobbo = bobbo_cell.zome(TestWasm::WhoAmI);
-
-        let _: () = conductor.call(&bobbo, "set_access", ()).await;
+        let _: () = conductor.call(&bob, "set_access", ()).await;
         let agent_info: AgentInfo = conductor
             .call(&alice, "whoarethey", bob_pubkey.clone())
             .await;

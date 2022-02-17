@@ -8,13 +8,16 @@ use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
 
 pub fn emit_signal(
-    _ribosome: Arc<impl RibosomeT>,
+    ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: AppSignal,
 ) -> Result<(), WasmError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess{ write_workspace: Permission::Allow, .. } => {
-            let cell_id = call_context.host_context().cell_id().clone();
+            let cell_id = CellId::new(
+                ribosome.dna_def().as_hash().clone(),
+                call_context.host_context.workspace().source_chain().as_ref().expect("Must have a source chain to emit signals").agent_pubkey().clone(),
+            );
             let signal = Signal::App(cell_id, input);
             call_context.host_context().signal_tx().send(signal).map_err(|interface_error| WasmError::Host(interface_error.to_string()))?;
             Ok(())

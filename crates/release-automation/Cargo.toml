@@ -1,6 +1,6 @@
 [package]
 name = "release-automation"
-version = "0.2.0-alpha.0"
+version = "0.2.0-alpha.1"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 edition = "2018"
 documentation = "https://docs.rs/release-automation"
@@ -37,8 +37,8 @@ toml_edit = "0.2"
 thiserror = "1"
 regex = "1.5"
 crates_io_api = "0.7"
-holochain_util = { path = "../holochain_util" ,version = "0.0.6"}
-crates-index = "0.16"
+holochain_util = { path = "../holochain_util" }
+crates-index = "0.18"
 
 # used for the example clippy fix-json
 rustfix = "0.6"
