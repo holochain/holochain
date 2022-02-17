@@ -51,7 +51,6 @@ impl MockDnaStore {
             .expect_add_entry_defs::<Vec<_>>()
             .times(add_entry_defs_calls)
             .return_const(());
-
         dna_store
     }
 }

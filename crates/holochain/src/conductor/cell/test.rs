@@ -20,7 +20,7 @@ async fn test_cell_handle_publish() {
 
     let agent_key = keystore.new_sign_keypair_random().await.unwrap();
     let dna_file = fixt!(DnaFile);
-    let ds = MockDnaStore::single_dna(dna_file.clone(), 1, 1);
+    let ds = MockDnaStore::single_dna(dna_file.clone(), 0, 0);
     let cell_id = CellId::new(dna_file.dna_hash().clone(), agent_key);
     let dna = cell_id.dna_hash().clone();
     let agent = cell_id.agent_pubkey().clone();
