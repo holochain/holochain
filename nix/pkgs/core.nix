@@ -62,9 +62,9 @@ rec {
     export RUST_BACKTRACE=1
 
     # make sure the binary is built
-    cargo build --manifest-path=crates/release-automation/Cargo.toml
+    cargo build --locked --manifest-path=crates/release-automation/Cargo.toml
     # run the release-automation tests
-    cargo test --manifest-path=crates/release-automation/Cargo.toml ''${@}
+    cargo test --locked --manifest-path=crates/release-automation/Cargo.toml ''${@}
   '';
 
   hcReleaseAutomationTestRepo =
@@ -93,6 +93,7 @@ rec {
             --disallowed-version-reqs=">=0.1" \
             --allowed-matched-blockers=UnreleasableViaChangelogFrontmatter \
             --match-filter="^(holochain|holochain_cli|kitsune_p2p_proxy)$" \
+            --additional-manifests=''${TEST_WORKSPACE}/crates/release-automation/Cargo.toml \
             --steps=CreateReleaseBranch,BumpReleaseVersions
       '';
     in
