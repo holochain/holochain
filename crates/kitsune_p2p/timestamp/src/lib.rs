@@ -176,6 +176,8 @@ impl<D: Into<core::time::Duration>> Sub<D> for &Timestamp {
 }
 
 impl Timestamp {
+    /// The Timestamp corresponding to the UNIX epoch
+    pub const ZERO: Timestamp = Timestamp(0);
     /// The smallest possible Timestamp
     pub const MIN: Timestamp = Timestamp(i64::MIN);
     /// The largest possible Timestamp
