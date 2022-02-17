@@ -14,7 +14,7 @@ impl SimpleBloomMod {
                 .local_data_map
                 .values()
                 .filter_map(|v| {
-                    if let MetaOpData::Agent(agent_info_signed) = &**v {
+                    if let MetaOpData::Agent(agent_info_signed) = v {
                         // this is for remote gossip, we've already sync local agents
                         if inner.local_agents.contains(&agent_info_signed.agent) {
                             return None;

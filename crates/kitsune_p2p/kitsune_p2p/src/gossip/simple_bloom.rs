@@ -82,18 +82,18 @@ impl MetaOpData {
         }
     }
 
-    fn key(&self) -> Arc<MetaOpKey> {
+    fn key(&self) -> MetaOpKey {
         let key = match self {
             MetaOpData::Op(key, _) => MetaOpKey::Op(key.clone()),
             MetaOpData::Agent(s) => MetaOpKey::Agent(s.agent.clone(), s.signed_at_ms),
         };
-        Arc::new(key)
+        key
     }
 }
 
-type KeySet = HashSet<Arc<MetaOpKey>>;
-type DataMap = HashMap<Arc<MetaOpKey>, Arc<MetaOpData>>;
-pub type BloomFilter = bloomfilter::Bloom<Arc<MetaOpKey>>;
+type KeySet = HashSet<MetaOpKey>;
+type DataMap = HashMap<MetaOpKey, MetaOpData>;
+pub type BloomFilter = bloomfilter::Bloom<MetaOpKey>;
 
 pub(crate) fn encode_bloom_filter(bloom: &BloomFilter) -> PoolBuf {
     let bitmap: Vec<u8> = bloom.bitmap();
@@ -161,7 +161,7 @@ kitsune_p2p_types::write_codec_enum! {
         Chunk(0x30) {
             agents.0: HashSet<Arc<KitsuneAgent>>,
             finished.1: bool,
-            chunks.2: Vec<Arc<MetaOpData>>,
+            chunks.2: Vec<MetaOpData>,
         },
     }
 }

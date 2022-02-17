@@ -5,7 +5,6 @@
 use std::sync::Arc;
 
 use crate::event::*;
-use crate::test_util::hash_op_data;
 use crate::types::event::{KitsuneP2pEvent, KitsuneP2pEventHandler, KitsuneP2pEventHandlerResult};
 use kitsune_p2p_types::bin_types::*;
 use kitsune_p2p_types::*;
@@ -132,12 +131,22 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
         _space: Arc<KitsuneSpace>,
         ops: Vec<KOp>,
     ) -> KitsuneP2pEventHandlerResult<()> {
+        dbg!(&ops);
         ok_fut(Ok(self.sb.share(|sb| {
             let node = sb.nodes.get_mut(&self.node).unwrap();
             for op in ops {
-                // This location is wrong from Holochain's perspective, but
-                // for this dummy implementation it doesn't matter.
-                let loc = hash_op_data(&op.0).get_loc().as_loc8();
+                // As a hack, we just set the first bytes of the op data to the
+                // loc8 location. This mimics the real world usage, where the
+                // location would be able to be extracted from the real op data,
+                // but is just a hack here since we're not even bothering to
+                // deserialize.
+                //
+                // NB: this may be problematic on the receiving end because we
+                // actually care whether this Loc8 is interpreted as u8 or i8,
+                // and we lose that information here.
+                let loc = (op.0[0] as i8).into();
+                dbg!(&loc);
+
                 // TODO: allow setting integration status
                 node.ops.insert(
                     loc,
@@ -202,8 +211,10 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
             op_hashes
                 .into_iter()
                 .map(|hash| {
-                    let e: &OpEntry = sb.ops.get(&hash.get_loc().as_loc8()).unwrap();
-                    (e.hash.to_owned(), KitsuneOpData::new(vec![]))
+                    let loc = hash.get_loc().as_loc8();
+                    dbg!(&loc);
+                    let e: &OpEntry = sb.ops.get(&loc).unwrap();
+                    (e.hash.to_owned(), KitsuneOpData::new(vec![loc.as_u8()]))
                 })
                 .collect()
         })))

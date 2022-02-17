@@ -139,7 +139,9 @@ These metadata "Operations" each also have unique OpHashes."#,
 }
 
 /// The op data with its location
-#[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, derive_more::Deref)]
+#[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[repr(transparent)]
+#[serde(transparent)]
 pub struct KitsuneOpData(
     /// The op bytes
     #[serde(with = "serde_bytes")]

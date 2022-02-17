@@ -56,7 +56,7 @@ impl Inner {
                 .await
             {
                 for op in ops {
-                    let key = Arc::new(MetaOpKey::Op(op));
+                    let key = MetaOpKey::Op(op);
                     has_map
                         .entry(agent.clone())
                         .or_insert_with(HashSet::new)
@@ -83,7 +83,7 @@ impl Inner {
             .await
         {
             for agent_info in agent_infos {
-                let data = Arc::new(MetaOpData::Agent(agent_info));
+                let data = MetaOpData::Agent(agent_info);
                 let key = data.key();
                 data_map.insert(key.clone(), data);
                 for (_agent, has) in has_map.iter_mut() {
@@ -117,7 +117,7 @@ impl Inner {
                         let op_data =
                             data_map_get(evt_sender, space, old_agent, data_map, old_key).await?;
 
-                        match &*op_data {
+                        match op_data {
                             MetaOpData::Op(_, data) => {
                                 to_send.push(data.clone());
                             }
@@ -184,13 +184,13 @@ async fn data_map_get(
     space: &Arc<KitsuneSpace>,
     _agent: &Arc<KitsuneAgent>,
     map: &mut DataMap,
-    key: &Arc<MetaOpKey>,
-) -> KitsuneResult<Arc<MetaOpData>> {
+    key: &MetaOpKey,
+) -> KitsuneResult<MetaOpData> {
     use crate::event::*;
     if let Some(data) = map.get(key) {
         return Ok(data.clone());
     }
-    match &**key {
+    match key {
         MetaOpKey::Op(key) => {
             let mut op = evt_sender
                 .fetch_op_data(FetchOpDataEvt {
@@ -205,8 +205,8 @@ async fn data_map_get(
             }
 
             let (key, data) = op.remove(0);
-            let data = Arc::new(MetaOpData::Op(key.clone(), data));
-            let key = Arc::new(MetaOpKey::Op(key));
+            let data = MetaOpData::Op(key.clone(), data);
+            let key = MetaOpKey::Op(key);
 
             map.insert(key, data.clone());
             Ok(data)
