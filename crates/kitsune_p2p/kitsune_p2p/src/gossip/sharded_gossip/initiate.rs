@@ -196,7 +196,10 @@ impl ShardedGossipLocal {
         let common_arc_set = Arc::new(arc_set.intersection(&remote_arc_set));
 
         let region_set = if let GossipType::Historical = self.gossip_type {
-            Some(store::region_set_query(&self.evt_sender, &self.space, &common_arc_set).await?)
+            let region_set =
+                store::region_set_query(&self.evt_sender, &self.space, &common_arc_set).await?;
+            gossip.push(ShardedGossipWire::op_regions(region_set.clone()));
+            Some(region_set)
         } else {
             None
         };
@@ -213,19 +216,10 @@ impl ShardedGossipLocal {
             }
             self.next_bloom_batch(state, gossip).await
         } else {
-            self.generate_region_set(state, gossip).await
+            // Everything has already been taken care of for Historical
+            // gossip already
+            Ok(state)
         }
-    }
-
-    pub(super) async fn generate_region_set(
-        &self,
-        mut state: RoundState,
-        gossip: &mut Vec<ShardedGossipWire>,
-    ) -> KitsuneResult<RoundState> {
-        let regions =
-            store::region_set_query(&self.evt_sender, &self.space, &state.common_arc_set).await?;
-        state.region_set_sent = Some(regions);
-        Ok(state)
     }
 
     /// Generate the next batch of blooms from this state.

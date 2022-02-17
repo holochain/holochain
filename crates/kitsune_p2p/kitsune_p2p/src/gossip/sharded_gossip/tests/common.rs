@@ -64,6 +64,12 @@ async fn standard_responses(
     evt_handler
         .expect_handle_gossip()
         .returning(|_, _| Ok(async { Ok(()) }.boxed().into()));
+    evt_handler.expect_handle_k_gen_req().returning(|r| {
+        ok_fut(Ok(match r {
+            KGenReq::QueryRegionSet { .. } => KGenRes::QueryRegionSet(RegionSetXtcs::empty()),
+            _ => unreachable!("other KGenReqs not handled"),
+        }))
+    });
     evt_handler
 }
 

@@ -476,8 +476,8 @@ async fn no_data_still_finishes() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-/// This test checks that when two players concurrently
-/// initiate a round it is handle correctly.
+/// This test checks that when two players simultaneously
+/// initiate a round it is handled correctly.
 async fn double_initiate_is_handled() {
     let agents = agents_with_infos(2).await;
     // - Set up two players with themselves as local agents.
