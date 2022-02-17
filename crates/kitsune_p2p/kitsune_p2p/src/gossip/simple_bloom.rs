@@ -83,11 +83,10 @@ impl MetaOpData {
     }
 
     fn key(&self) -> MetaOpKey {
-        let key = match self {
+        match self {
             MetaOpData::Op(key, _) => MetaOpKey::Op(key.clone()),
             MetaOpData::Agent(s) => MetaOpKey::Agent(s.agent.clone(), s.signed_at_ms),
-        };
-        key
+        }
     }
 }
 
