@@ -29,11 +29,17 @@ pub struct DnaManifestV1 {
     /// The time used to denote the origin of the network, used to calculate
     /// time windows during gossip.
     /// All Header timestamps must come after this time.
+    #[serde(default = "default_origin_time")]
     pub origin_time: HumanTimestamp,
 
     /// An array of zomes associated with your DNA.
     /// The order is significant: it determines initialization order.
     pub zomes: Vec<ZomeManifest>,
+}
+
+fn default_origin_time() -> HumanTimestamp {
+    // Jan 1, 2022, 12:00:00 AM UTC
+    Timestamp::from_micros(1640995200000000).into()
 }
 
 /// Manifest for an individual Zome

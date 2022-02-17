@@ -1005,17 +1005,35 @@ impl<'a> ReleaseWorkspace<'a> {
         self.changelog.as_ref()
     }
 
-    pub(crate) fn update_lockfile(&'a self, dry_run: bool) -> Fallible<()> {
+    pub(crate) fn update_lockfile<T>(
+        &'a self,
+        dry_run: bool,
+        additional_manifests: T,
+    ) -> Fallible<()>
+    where
+        T: Iterator<Item = &'a str>,
+    {
         for args in [
-            vec!["fetch", "--verbose"],
-            [
-                vec!["update", "--workspace", "--offline", "--verbose"],
-                if dry_run { vec!["--dry-run"] } else { vec![] },
-            ]
-            .concat(),
-        ] {
+            vec![
+                vec!["fetch", "--verbose"],
+                [
+                    vec!["update", "--workspace", "--offline", "--verbose"],
+                    if dry_run { vec!["--dry-run"] } else { vec![] },
+                ]
+                .concat(),
+            ],
+            if dry_run {
+                vec![]
+            } else {
+                additional_manifests
+                    .map(|mp| vec!["generate-lockfile", "--offline", "--manifest-path", mp])
+                    .collect::<Vec<_>>()
+            },
+        ]
+        .concat()
+        {
             let mut cmd = std::process::Command::new("cargo");
-            cmd.current_dir(self.root()).args(&args);
+            cmd.current_dir(self.root()).args(args);
             debug!("running command: {:?}", cmd);
 
             if !dry_run {
@@ -1035,7 +1053,13 @@ impl<'a> ReleaseWorkspace<'a> {
             .current_dir(self.root())
             .args(
                 &[
-                    vec!["check", "--workspace", "--all-targets", "--all-features"],
+                    vec![
+                        "check",
+                        "--workspace",
+                        "--all-targets",
+                        "--all-features",
+                        "--release",
+                    ],
                     if offline { vec!["--offline"] } else { vec![] },
                 ]
                 .concat(),

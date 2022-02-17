@@ -4,9 +4,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
-- BREAKING: The DNA manifest now requires an `origin_time` Timestamp field, which will be used in the forthcoming gossip optimization.
+- The DNA manifest now requires an `origin_time` Timestamp field, which will be used in the forthcoming gossip optimization.
   - There is a new system validation rule that all Header timestamps (including the initial Dna header) must come after the DNA's `origin_time` field.
   - `hc dna init` injects the current system time as *microseconds* for the `origin_time` field of the DNA manifest
+  - Since this field is not actually hooked up to anything at the moment, if the field is not present in a DNA manifest, a default `origin_time` of `January 1, 2022 12:00:00 AM` will be used instead. Once the new gossip algorithm lands, this default will be removed, and this will become a breaking change for DNA manifests which have not yet added an `origin_time`.
 
 ## 0.0.22
 
