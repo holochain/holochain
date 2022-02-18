@@ -108,7 +108,8 @@
 //! ```
 //! and the examples.
 
-use holochain_cli_bundle as hc_bundle;
+// Useful to have this public when using this as a library.
+pub use holochain_cli_bundle as hc_bundle;
 use holochain_cli_sandbox as hc_sandbox;
 use structopt::StructOpt;
 

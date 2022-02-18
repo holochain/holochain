@@ -93,6 +93,7 @@ pub(super) async fn get_as_author(
                 cache,
                 conductor_handle.keystore().clone(),
                 Some(header.author().clone()),
+                Arc::new(ribosome.dna_def().as_content().clone()),
             )
             .await?;
             let result =

@@ -79,12 +79,12 @@ impl CellConductorApiT for CellConductorApi {
     }
 
     fn get_dna(&self, dna_hash: &DnaHash) -> Option<DnaFile> {
-        self.conductor_handle.get_dna(dna_hash)
+        self.conductor_handle.get_dna_file(dna_hash)
     }
 
     fn get_this_dna(&self) -> ConductorApiResult<DnaFile> {
         self.conductor_handle
-            .get_dna(self.cell_id.dna_hash())
+            .get_dna_file(self.cell_id.dna_hash())
             .ok_or_else(|| ConductorApiError::DnaMissing(self.cell_id.dna_hash().clone()))
     }
 

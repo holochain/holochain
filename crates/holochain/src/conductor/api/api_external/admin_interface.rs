@@ -91,12 +91,13 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                                     .to_string(),
                             ));
                         }
-                        let mut dna = self.conductor_handle.get_dna(hash).ok_or_else(|| {
-                            ConductorApiError::DnaReadError(format!(
-                                "Unable to create derived Dna: {} not registered",
-                                hash
-                            ))
-                        })?;
+                        let mut dna =
+                            self.conductor_handle.get_dna_file(hash).ok_or_else(|| {
+                                ConductorApiError::DnaReadError(format!(
+                                    "Unable to create derived Dna: {} not registered",
+                                    hash
+                                ))
+                            })?;
                         if let Some(props) = properties {
                             let properties = SerializedBytes::try_from(props)
                                 .map_err(SerializationError::from)?;
