@@ -905,9 +905,7 @@ async fn handle_fetch_op_data(
     kdirect: Arc<Kd1>,
     input: FetchOpDataEvt,
 ) -> KdResult<Vec<(Arc<KitsuneOpHash>, KOp)>> {
-    let FetchOpDataEvt {
-        space, op_hashes, ..
-    } = input;
+    let FetchOpDataEvt { space, query, .. } = input;
 
     let mut out = Vec::new();
     let root = KdHash::from_kitsune_space(&space);
@@ -918,21 +916,26 @@ async fn handle_fetch_op_data(
         .await
         .map_err(KdError::other)?;
 
-    for op_hash in op_hashes {
-        for info in &agent_info_list {
-            let agent = info.agent().clone();
-            let hash = KdHash::from_kitsune_op_hash(&op_hash);
-            if let Ok(entry) = kdirect
-                .persist
-                .get_entry(root.clone(), agent.clone(), hash)
-                .await
-            {
-                out.push((
-                    op_hash.clone(),
-                    KitsuneOpData::new(entry.as_wire_data_ref().to_vec()),
-                ));
+    match query {
+        FetchOpDataEvtQuery::Hashes(hashes) => {
+            for op_hash in hashes {
+                for info in &agent_info_list {
+                    let agent = info.agent().clone();
+                    let hash = KdHash::from_kitsune_op_hash(&op_hash);
+                    if let Ok(entry) = kdirect
+                        .persist
+                        .get_entry(root.clone(), agent.clone(), hash)
+                        .await
+                    {
+                        out.push((
+                            op_hash.clone(),
+                            KitsuneOpData::new(entry.as_wire_data_ref().to_vec()),
+                        ));
+                    }
+                }
             }
         }
+        FetchOpDataEvtQuery::Regions(_coords) => todo!("implement"),
     }
 
     Ok(out)

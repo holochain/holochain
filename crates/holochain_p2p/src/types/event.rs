@@ -3,7 +3,9 @@
 
 use crate::*;
 use holochain_zome_types::signature::Signature;
-use kitsune_p2p::{agent_store::AgentInfoSigned, dht_arc::DhtLocation, event::*};
+use kitsune_p2p::{
+    agent_store::AgentInfoSigned, dht::region::RegionBoundsMapped, dht_arc::DhtLocation, event::*,
+};
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 /// The data required for a get request.
@@ -106,13 +108,22 @@ pub enum FetchOpDataQuery {
     /// Fetch all ops with the hashes specified
     Hashes(Vec<holo_hash::DhtOpHash>),
     /// Fetch all ops within the time and space bounds specified
-    Region {
-        /// The min and max timestamp to fetch
-        time_bounds: (Timestamp, Timestamp),
-        /// The min and max DhtLocation to fetch
-        // TODO: make an ArcInterval or something
-        location_bounds: (DhtLocation, DhtLocation),
-    },
+    Regions(Vec<RegionBoundsMapped>),
+}
+
+impl FetchOpDataQuery {
+    /// Convert from the kitsune form of this query
+    pub fn from_kitsune(kit: FetchOpDataEvtQuery) -> Self {
+        match kit {
+            FetchOpDataEvtQuery::Hashes(hashes) => Self::Hashes(
+                hashes
+                    .into_iter()
+                    .map(|h| DhtOpHash::from_kitsune(&h))
+                    .collect::<Vec<_>>(),
+            ),
+            FetchOpDataEvtQuery::Regions(_coords) => todo!("implement"),
+        }
+    }
 }
 
 ghost_actor::ghost_chan! {

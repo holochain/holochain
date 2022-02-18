@@ -288,11 +288,16 @@ impl KitsuneP2pEventHandler for AgentHarness {
         input: FetchOpDataEvt,
     ) -> KitsuneP2pEventHandlerResult<Vec<(Arc<super::KitsuneOpHash>, KOp)>> {
         let mut out = Vec::new();
-        for hash in input.op_hashes {
-            if let Some(op) = self.gossip_store.get(&hash) {
-                let data = KitsuneOpData::new(op.clone().into_bytes());
-                out.push((hash.clone(), data));
+        match input.query {
+            FetchOpDataEvtQuery::Hashes(hashes) => {
+                for hash in hashes {
+                    if let Some(op) = self.gossip_store.get(&hash) {
+                        let data = KitsuneOpData::new(op.clone().into_bytes());
+                        out.push((hash.clone(), data));
+                    }
+                }
             }
+            FetchOpDataEvtQuery::Regions(coords) => todo!("implement"),
         }
         Ok(async move { Ok(out) }.boxed().into())
     }

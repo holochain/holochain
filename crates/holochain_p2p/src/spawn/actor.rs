@@ -870,21 +870,14 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
         input: kitsune_p2p::event::FetchOpDataEvt,
     ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<Vec<(Arc<kitsune_p2p::KitsuneOpHash>, KOp)>>
     {
-        let kitsune_p2p::event::FetchOpDataEvt { space, op_hashes } = input;
+        let kitsune_p2p::event::FetchOpDataEvt { space, query } = input;
         let space = DnaHash::from_kitsune(&space);
-        let op_hashes = op_hashes
-            .into_iter()
-            .map(|h| DhtOpHash::from_kitsune(&h))
-            // the allowance of clippy::needless_collect refers to the following call
-            .collect::<Vec<_>>();
+        let query = FetchOpDataQuery::from_kitsune(query);
 
         let evt_sender = self.evt_sender.clone();
         Ok(async move {
             let mut out = vec![];
-            for (op_hash, dht_op) in evt_sender
-                .fetch_op_data(space.clone(), op_hashes.clone().into())
-                .await?
-            {
+            for (op_hash, dht_op) in evt_sender.fetch_op_data(space.clone(), query).await? {
                 out.push((
                     op_hash.into_kitsune(),
                     KitsuneOpData::new(

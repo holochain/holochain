@@ -718,8 +718,18 @@ impl ShardedGossipLocal {
                 if let Some(state) = self.get_state(&cert)? {
                     if let Some(sent) = state.region_set_sent {
                         let regions = sent.diff(region_set).map_err(KitsuneError::other)?;
-                        todo!("ensure that different region sets can be diffed.");
-                        todo!("lookup regions, send missing ops.")
+                        let topo = todo!("get topology");
+                        let bounds = regions
+                            .into_iter()
+                            .map(|r| r.coords.to_bounds().to_mapped(&topo))
+                            .collect();
+                        // TODO: make region set diffing more robust to different times / arc power levels.
+
+                        self.evt_sender.fetch_op_data(FetchOpDataEvt {
+                            space: self.space.clone(),
+                            query: FetchOpDataEvtQuery::Regions(bounds),
+                        });
+                        vec![todo!()]
                     } else {
                         tracing::error!(
                             "We received OpRegions gossip without sending any ourselves"

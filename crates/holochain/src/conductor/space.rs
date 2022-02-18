@@ -352,7 +352,7 @@ impl<DS: DnaStore> Spaces<DS> {
                 self.handle_fetch_op_data_by_hashes(dna_hash, op_hashes)
                     .await
             }
-            FetchOpDataQuery::Region { .. } => {
+            FetchOpDataQuery::Regions(coords) => {
                 self.handle_fetch_op_data_by_region(dna_hash, ()).await
             }
         }
