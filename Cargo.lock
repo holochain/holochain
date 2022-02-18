@@ -2027,6 +2027,7 @@ name = "holochain_p2p"
 version = "0.0.26"
 dependencies = [
  "async-trait",
+ "derive_more",
  "fixt",
  "futures",
  "ghost_actor 0.3.0-alpha.4",

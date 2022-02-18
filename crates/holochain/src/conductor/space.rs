@@ -15,6 +15,7 @@ use holochain_p2p::{
         ArqBounds, ArqStrat,
     },
     dht_arc::{ArcInterval, DhtArcSet},
+    event::FetchOpDataQuery,
 };
 use holochain_sqlite::{
     conn::{DbSyncLevel, DbSyncStrategy},
@@ -339,9 +340,38 @@ impl<DS: DnaStore> Spaces<DS> {
         Ok(RegionSetXtcs::from_data(coords, data))
     }
 
-    #[instrument(skip(self, op_hashes))]
+    #[instrument(skip(self, query))]
     /// The network module is requesting the content for dht ops
     pub async fn handle_fetch_op_data(
+        &self,
+        dna_hash: &DnaHash,
+        query: FetchOpDataQuery,
+    ) -> ConductorResult<Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>> {
+        match query {
+            FetchOpDataQuery::Hashes(op_hashes) => {
+                self.handle_fetch_op_data_by_hashes(dna_hash, op_hashes)
+                    .await
+            }
+            FetchOpDataQuery::Region { .. } => {
+                self.handle_fetch_op_data_by_region(dna_hash, ()).await
+            }
+        }
+    }
+
+    #[instrument(skip(self, _region))]
+    /// The network module is requesting the content for dht ops
+    pub async fn handle_fetch_op_data_by_region(
+        &self,
+        dna_hash: &DnaHash,
+        // This type will become something real.
+        _region: (),
+    ) -> ConductorResult<Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>> {
+        unimplemented!("Will be implemented as part of quantized-gossip")
+    }
+
+    #[instrument(skip(self, op_hashes))]
+    /// The network module is requesting the content for dht ops
+    pub async fn handle_fetch_op_data_by_hashes(
         &self,
         dna_hash: &DnaHash,
         op_hashes: Vec<holo_hash::DhtOpHash>,

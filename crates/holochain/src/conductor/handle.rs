@@ -801,7 +801,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             }
             FetchOpData {
                 respond,
-                op_hashes,
+                query,
                 dna_hash,
                 ..
             } => {
@@ -809,7 +809,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                     let res = self
                         .conductor
                         .spaces
-                        .handle_fetch_op_data(&dna_hash, op_hashes)
+                        .handle_fetch_op_data(&dna_hash, query)
                         .await
                         .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
