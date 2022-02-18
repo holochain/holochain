@@ -19,3 +19,4 @@ result
 test_cert
 
 .vscode
+.my-shell.nix

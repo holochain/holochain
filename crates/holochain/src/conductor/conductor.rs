@@ -957,7 +957,7 @@ where
                 }
 
                 for (key, entry_def) in zome_defs.clone() {
-                    holochain_state::entry_def::put(txn, key, entry_def)?;
+                    holochain_state::entry_def::put(txn, key, &entry_def)?;
                 }
 
                 if !holochain_state::dna_def::contains(txn, dna.dna_hash())? {

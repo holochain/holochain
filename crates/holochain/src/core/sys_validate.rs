@@ -179,7 +179,7 @@ pub async fn check_valid_if_dna(
 ) -> SysValidationResult<()> {
     match header {
         Header::Dna(_) => {
-            if workspace.is_chain_empty(header.author().clone()).await? {
+            if workspace.is_chain_empty(header.author()).await? {
                 Ok(())
             } else {
                 Err(PrevHeaderError::InvalidRoot).map_err(|e| ValidationOutcome::from(e).into())

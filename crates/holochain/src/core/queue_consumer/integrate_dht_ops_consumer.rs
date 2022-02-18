@@ -2,16 +2,17 @@
 
 use super::*;
 use crate::conductor::manager::ManagedTaskResult;
+use crate::conductor::space::DhtDbQueryCache;
 use crate::core::workflow::integrate_dht_ops_workflow::integrate_dht_ops_workflow;
 use tokio::task::JoinHandle;
 use tracing::*;
 
 /// Spawn the QueueConsumer for DhtOpIntegration workflow
-#[instrument(skip(env, stop, trigger_receipt, network))]
+#[instrument(skip(env, stop, trigger_receipt, network, dht_query_cache))]
 pub fn spawn_integrate_dht_ops_consumer(
     dna_hash: Arc<DnaHash>,
     env: DbWrite<DbKindDht>,
-    cell_id: CellId,
+    dht_query_cache: DhtDbQueryCache,
     mut stop: sync::broadcast::Receiver<()>,
     trigger_receipt: TriggerSender,
     network: HolochainP2pDna,
@@ -29,8 +30,13 @@ pub fn spawn_integrate_dht_ops_consumer(
             }
 
             // Run the workflow
-            match integrate_dht_ops_workflow(env.clone(), trigger_receipt.clone(), network.clone())
-                .await
+            match integrate_dht_ops_workflow(
+                env.clone(),
+                &dht_query_cache,
+                trigger_receipt.clone(),
+                network.clone(),
+            )
+            .await
             {
                 Ok(WorkComplete::Incomplete) => trigger_self.trigger(),
                 Err(err) => handle_workflow_error(err)?,

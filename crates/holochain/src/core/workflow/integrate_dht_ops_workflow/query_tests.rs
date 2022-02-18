@@ -110,7 +110,7 @@ async fn integrate_query() {
     // dump_tmp(&env.env());
     let test_network = test_network(None, None).await;
     let holochain_p2p_cell = test_network.dna_network();
-    integrate_dht_ops_workflow(env.env().into(), qt, holochain_p2p_cell)
+    integrate_dht_ops_workflow(env.env().into(), &env.env().into(), qt, holochain_p2p_cell)
         .await
         .unwrap();
     let hashes = env
@@ -209,19 +209,14 @@ fn create_and_insert_op(
         .unwrap()
         .with_commit_sync(|txn| {
             let hash = state.as_hash().clone();
-            insert_op(txn, state.clone()).unwrap();
-            set_validation_status(txn, hash.clone(), ValidationStatus::Valid).unwrap();
+            insert_op(txn, &state).unwrap();
+            set_validation_status(txn, &hash, ValidationStatus::Valid).unwrap();
             if facts.integrated {
-                set_when_integrated(txn, hash.clone(), holochain_zome_types::Timestamp::now())
-                    .unwrap();
+                set_when_integrated(txn, &hash, holochain_zome_types::Timestamp::now()).unwrap();
             }
             if facts.awaiting_integration {
-                set_validation_stage(
-                    txn,
-                    hash.clone(),
-                    ValidationLimboStatus::AwaitingIntegration,
-                )
-                .unwrap();
+                set_validation_stage(txn, &hash, ValidationLimboStatus::AwaitingIntegration)
+                    .unwrap();
             }
             DatabaseResult::Ok(())
         })

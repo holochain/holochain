@@ -13,7 +13,7 @@ WHERE
     FROM
       Header
     WHERE
-      seq > :activity_integrated
-      AND seq < :activity_missing
+      seq >= :seq_start
+      AND seq <= :seq_end
       AND author = :author
   )

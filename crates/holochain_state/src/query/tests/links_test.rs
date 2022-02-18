@@ -176,7 +176,7 @@ impl TestData {
         self.env
             .conn()
             .unwrap()
-            .with_commit_test(|txn| insert_valid_integrated_op(txn, op).unwrap())
+            .with_commit_test(|txn| insert_valid_integrated_op(txn, &op).unwrap())
             .unwrap();
     }
     fn add_link_scratch(&mut self) {
@@ -195,7 +195,7 @@ impl TestData {
         self.env
             .conn()
             .unwrap()
-            .with_commit_test(|txn| insert_valid_integrated_op(txn, op).unwrap())
+            .with_commit_test(|txn| insert_valid_integrated_op(txn, &op).unwrap())
             .unwrap();
     }
     fn delete_link_scratch(&mut self) {
