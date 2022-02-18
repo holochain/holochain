@@ -82,7 +82,10 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_roundtrip() {
-        let tmpdir = tempdir::TempDir::new("hc-bundle-test").unwrap();
+        let tmpdir = tempfile::Builder::new()
+            .prefix("hc-bundle-test")
+            .tempdir()
+            .unwrap();
         let dir = tmpdir.path().join("test-dna");
         std::fs::create_dir(&dir).unwrap();
 
@@ -91,6 +94,7 @@ mod tests {
 manifest_version: "1"
 name: test_dna
 uid: blablabla
+origin_time: 2022-02-11T23:29:00.789576Z
 properties:
   some: 42
   props: yay

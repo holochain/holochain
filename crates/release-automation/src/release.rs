@@ -5,6 +5,7 @@ use super::*;
 use anyhow::bail;
 use anyhow::Context;
 use bstr::ByteSlice;
+use cargo::util::VersionExt;
 use chrono::TimeZone;
 use chrono::Utc;
 use cli::ReleaseArgs;
@@ -28,6 +29,7 @@ use std::{
 use structopt::StructOpt;
 
 use crate::changelog::{Changelog, WorkspaceCrateReleaseHeading};
+use crate::crate_::increment_patch;
 use crate::crate_selection::Crate;
 pub(crate) use crate_selection::{ReleaseWorkspace, SelectionCriteria};
 
@@ -209,7 +211,7 @@ fn bump_release_versions<'a>(
     }
 
     // run the checks to ensure the repo is in a consistent state to begin with
-    if !cmd_args.no_verify {
+    if !cmd_args.no_verify && !cmd_args.no_verify_pre {
         info!("running consistency checks before changing the versions...");
         publish_paths_to_crates_io(
             &selection,
@@ -228,7 +230,10 @@ fn bump_release_versions<'a>(
         let maybe_previous_release_version = crt
             .changelog()
             .ok_or_else(|| {
-                anyhow::anyhow!("[{}] cannot determine most recent release: missing changelog")
+                anyhow::anyhow!(
+                    "[{}] cannot determine most recent release: missing changelog",
+                    crt.name()
+                )
             })?
             .topmost_release()?
             .map(|change| semver::Version::parse(change.title()))
@@ -242,7 +247,7 @@ fn bump_release_versions<'a>(
             }
 
             // todo(backlog): support configurable major/minor/patch/rc? version bumps
-            previous_release_version.increment_patch();
+            increment_patch(&mut previous_release_version);
 
             previous_release_version
         } else {
@@ -251,7 +256,7 @@ fn bump_release_versions<'a>(
 
             if new_version.is_prerelease() {
                 // todo(backlog): support configurable major/minor/patch/rc? version bumps
-                new_version.increment_patch();
+                increment_patch(&mut new_version);
             }
 
             new_version
@@ -300,9 +305,12 @@ fn bump_release_versions<'a>(
         }
     }
 
-    ws.update_lockfile(cmd_args.dry_run)?;
+    ws.update_lockfile(
+        cmd_args.dry_run,
+        cmd_args.additional_manifests.iter().map(|mp| mp.as_str()),
+    )?;
 
-    if !cmd_args.no_verify {
+    if !cmd_args.no_verify && !cmd_args.no_verify_post {
         info!("running consistency checks after changing the versions...");
         publish_paths_to_crates_io(
             &selection,
@@ -311,7 +319,9 @@ fn bump_release_versions<'a>(
             &cmd_args.allowed_missing_dependencies,
             &cmd_args.cargo_target_dir,
         )
-        .context("consistency checks failed")?;
+        .context("cargo publish dry-run failed")?;
+
+        ws.cargo_check(true).context("cargo check failed")?;
     }
 
     // ## for the workspace release:
@@ -711,29 +721,36 @@ impl PublishError {
 pub(crate) mod crates_index_helper {
     use super::*;
 
-    static CRATES_IO_INDEX: OnceCell<crates_index::Index> = OnceCell::new();
+    static CRATES_IO_INDEX: OnceCell<Mutex<crates_index::Index>> = OnceCell::new();
 
-    pub(crate) fn index(update: bool) -> Fallible<&'static crates_index::Index> {
+    pub(crate) fn index(update: bool) -> Fallible<&'static Mutex<crates_index::Index>> {
         let first_run = CRATES_IO_INDEX.get().is_none();
 
         let crates_io_index = CRATES_IO_INDEX.get_or_try_init(|| -> Fallible<_> {
-            let index = crates_index::Index::new_cargo_default();
+            let mut index = crates_index::Index::new_cargo_default()?;
             trace!("Using crates index at {:?}", index.path());
 
-            index.retrieve_or_update()?;
+            index.update()?;
 
-            Ok(index)
+            Ok(Mutex::new(index))
         })?;
 
         if !first_run && update {
-            crates_io_index.update()?;
+            crates_io_index
+                .lock()
+                .map_err(|e| anyhow::anyhow!("failed to lock the index: {}", e))?
+                .update()?;
         }
 
         Ok(crates_io_index)
     }
 
     pub(crate) fn is_version_published(crt: &Crate, update: bool) -> Fallible<bool> {
-        Ok(index(update)?
+        let index_lock = index(update)?
+            .lock()
+            .map_err(|e| anyhow::anyhow!("failed to lock the index: {}", e))?;
+
+        Ok(index_lock
             .crate_(&crt.name())
             .map(|indexed_crate| -> bool {
                 indexed_crate
@@ -810,7 +827,7 @@ fn publish_paths_to_crates_io(
         let manifest_path = crt.manifest_path();
         let cargo_target_dir_string = cargo_target_dir
             .as_ref()
-            .map(|target_dir| format!("--target-dir={}", target_dir.to_string_lossy().to_string()));
+            .map(|target_dir| format!("--target-dir={}", target_dir.to_string_lossy()));
 
         let mut cmd = std::process::Command::new("cargo");
         cmd.args(
@@ -819,6 +836,7 @@ fn publish_paths_to_crates_io(
                     "check",
                     "--locked",
                     "--verbose",
+                    "--release",
                     &format!("--manifest-path={}", manifest_path.to_string_lossy()),
                 ],
                 if let Some(target_dir) = cargo_target_dir_string.as_ref() {

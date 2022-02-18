@@ -307,7 +307,7 @@ impl MetricTaskCounter {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore] // david.b this seems to be flakey now...
+#[ignore = "flakey. https://app.circleci.com/jobs/github/holochain/holochain/12604"]
 async fn test_metric_task() {
     for _ in 0..20 {
         metric_task(async move {
@@ -316,7 +316,7 @@ async fn test_metric_task() {
         });
     }
     let gt_task_count = TASK_COUNT.load(Ordering::Relaxed);
-    tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
     let lt_task_count = TASK_COUNT.load(Ordering::Relaxed);
     assert!(lt_task_count < gt_task_count);
 }

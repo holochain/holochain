@@ -1,6 +1,6 @@
 [package]
 name = "holochain_zome_types"
-version = "0.0.22"
+version = "0.0.24"
 description = "Holochain zome types"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -14,15 +14,16 @@ edition = "2018"
 [dependencies]
 chrono = "0.4.6"
 kitsune_p2p_timestamp = { version = "0.0.5", path = "../kitsune_p2p/timestamp" }
-holo_hash = { version = "0.0.17", path = "../holo_hash" }
+holo_hash = { version = "0.0.19", path = "../holo_hash" }
 holochain_serialized_bytes = "=0.0.51"
 paste = "=1.0.5"
 serde = { version = "1.0", features = [ "derive" ] }
 serde_bytes = "0.11"
+serde_yaml = { version = "0.8", optional = true }
 subtle = "2"
 thiserror = "1.0.22"
 tracing = "0.1"
-holochain_wasmer_common = "=0.0.76"
+holochain_wasmer_common = "=0.0.77"
 
 # fixturator dependencies
 fixt = { version = "0.0.8", path = "../fixt", optional = true }
@@ -59,9 +60,11 @@ default = ["full-dna-def", "fixturators", "test_utils", "subtle-encoding"]
 # but used in Holochain
 full-dna-def = ["derive_builder", "nanoid", "shrinkwraprs"]
 
-full = ["default", "rusqlite", "num_enum", "kitsune_p2p_timestamp/full"]
+full = ["default", "rusqlite", "num_enum", "kitsune_p2p_timestamp/full", "properties"]
 
 fixturators = ["fixt", "rand", "strum", "holo_hash/fixturators", ]
+
+properties = ["serde_yaml"]
 
 test_utils = [
   "arbitrary",

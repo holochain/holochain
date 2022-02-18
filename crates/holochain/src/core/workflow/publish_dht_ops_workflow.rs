@@ -308,7 +308,7 @@ mod tests {
             let env = test_env.env();
 
             // Setup
-            let (_network, dna_network, author, recv_task, _) =
+            let (_network, dna_network, author, _, _) =
                 setup(env.clone(), num_agents, num_hash, true).await;
 
             // Update the authored to have complete receipts
@@ -328,11 +328,6 @@ mod tests {
                 std::cmp::min(50, std::cmp::max(2000, 10 * num_agents * num_hash)).into(),
             ))
             .await;
-
-            // Shutdown
-            tokio::time::timeout(Duration::from_secs(10), recv_task)
-                .await
-                .ok();
         });
     }
 
@@ -544,7 +539,7 @@ mod tests {
                 let mut recv_count: u32 = 0;
 
                 // Receive events and increment count
-                let recv_task = tokio::task::spawn({
+                tokio::task::spawn({
                     async move {
                         let mut tx_complete = Some(tx_complete);
                         while let Some(evt) = recv.recv().await {
@@ -622,11 +617,6 @@ mod tests {
                     num_agents * 2,
                     register_agent_activity_count.load(Ordering::SeqCst)
                 );
-
-                // Shutdown
-                tokio::time::timeout(Duration::from_secs(10), recv_task)
-                    .await
-                    .ok();
             }
             .instrument(debug_span!("private_entries")),
         );

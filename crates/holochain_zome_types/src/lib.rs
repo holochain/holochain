@@ -26,6 +26,8 @@ pub mod entry;
 pub mod entry_def;
 pub mod genesis;
 #[allow(missing_docs)]
+pub mod hash;
+#[allow(missing_docs)]
 pub mod header;
 #[allow(missing_docs)]
 pub mod info;
@@ -38,6 +40,8 @@ pub mod metadata;
 #[allow(missing_docs)]
 pub mod migrate_agent;
 pub mod prelude;
+#[cfg(feature = "properties")]
+pub mod properties;
 pub mod query;
 pub mod request;
 /// Schedule functions to run outside a direct zome call.

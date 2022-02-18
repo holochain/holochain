@@ -29,27 +29,19 @@ pub fn zome_info(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod test {
-    use crate::fixt::ZomeCallHostAccessFixturator;
-    use ::fixt::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::prelude::*;
+    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn invoke_import_zome_info_test() {
-        let host_access = fixt!(ZomeCallHostAccess, Predictable);
-        let zome_info: ZomeInfo =
-            crate::call_test_ribosome!(host_access, TestWasm::ZomeInfo, "zome_info", ()).unwrap();
-        assert_eq!(zome_info.name, "zome_info".into());
-    }
+    async fn zome_info_test() {
+        observability::test_run().ok();
+        let RibosomeTestFixture {
+            conductor, alice, ..
+        } = RibosomeTestFixture::new(TestWasm::EntryDefs).await;
 
-    #[tokio::test(flavor = "multi_thread")]
-    async fn zome_info() {
-        let host_access = fixt!(ZomeCallHostAccess, Predictable);
-        let zome_info: ZomeInfo = crate::call_test_ribosome!(host_access, TestWasm::EntryDefs, "zome_info", ()).unwrap();
-        assert_eq!(
-            zome_info.name,
-            ZomeName::new("entry_defs"),
-        );
+        let zome_info: ZomeInfo = conductor.call(&alice, "zome_info", ()).await;
+        assert_eq!(zome_info.name, "entry_defs".into());
         assert_eq!(
             zome_info.id,
             ZomeId::new(0)

@@ -227,7 +227,7 @@ pub mod test_utils {
     use holochain_state::prelude::*;
     use holochain_types::prelude::*;
     use std::sync::Arc;
-    use tempdir::TempDir;
+    use tempfile::TempDir;
 
     /// One of various ways to setup an app, used somewhere...
     pub async fn setup_app(
@@ -305,11 +305,10 @@ pub mod test {
     use kitsune_p2p::fixt::AgentInfoSignedFixturator;
     use kitsune_p2p::{KitsuneAgent, KitsuneSpace};
     use matches::assert_matches;
-    use mockall::predicate;
     use observability;
     use std::collections::{HashMap, HashSet};
     use std::convert::TryInto;
-    use tempdir::TempDir;
+    use tempfile::TempDir;
     use uuid::Uuid;
 
     #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
@@ -415,14 +414,6 @@ pub mod test {
         conductor_handle.shutdown();
     }
 
-    #[ignore = "stub"]
-    #[tokio::test(flavor = "multi_thread")]
-    async fn deserialization_failure() {
-        // TODO: B-01440: this can't be done easily yet
-        // because we can't serialize something that
-        // doesn't deserialize
-    }
-
     #[tokio::test(flavor = "multi_thread")]
     async fn websocket_call_zome_function() {
         observability::test_run().ok();
@@ -441,20 +432,7 @@ pub mod test {
         let cell_id = CellId::from((dna_hash.clone(), fake_agent_pubkey_1()));
         let installed_cell = InstalledCell::new(cell_id.clone(), "handle".into());
 
-        let mut dna_store = MockDnaStore::new();
-
-        dna_store
-            .expect_get()
-            .with(predicate::eq(dna_hash))
-            .returning(move |_| Some(dna.clone()));
-        dna_store
-            .expect_add_dnas::<Vec<_>>()
-            .times(1)
-            .return_const(());
-        dna_store
-            .expect_add_entry_defs::<Vec<_>>()
-            .times(1)
-            .return_const(());
+        let dna_store = MockDnaStore::single_dna(dna, 1, 1);
 
         let (_tmpdir, app_api, handle) = setup_app(vec![(installed_cell, None)], dna_store).await;
         let mut request: ZomeCall =
@@ -507,9 +485,13 @@ pub mod test {
             .map(|hash| (CellId::from((hash, agent_key.clone())), None))
             .collect::<Vec<_>>();
         let mut dna_store = MockDnaStore::new();
+        let dna_map_clone = dna_map.clone();
         dna_store
-            .expect_get()
-            .returning(move |hash| dna_map.get(&hash).cloned());
+            .expect_get_dna_file()
+            .returning(move |hash| dna_map_clone.get(&hash).cloned());
+        dna_store
+            .expect_get_dna_def()
+            .returning(move |hash| dna_map.get(&hash).map(|d| d.dna_def()).cloned());
         dna_store
             .expect_add_dnas::<Vec<_>>()
             .times(1)
@@ -649,16 +631,7 @@ pub mod test {
         );
         let cell_id = CellId::from((dna.dna_hash().clone(), fake_agent_pubkey_1()));
 
-        let mut dna_store = MockDnaStore::new();
-        dna_store.expect_get().returning(move |_| Some(dna.clone()));
-        dna_store
-            .expect_add_dnas::<Vec<_>>()
-            .times(1)
-            .return_const(());
-        dna_store
-            .expect_add_entry_defs::<Vec<_>>()
-            .times(1)
-            .return_const(());
+        let dna_store = MockDnaStore::single_dna(dna, 1, 1);
 
         let (_tmpdir, conductor_handle) =
             setup_admin_fake_cells(vec![(cell_id.clone(), None)], dna_store).await;
@@ -693,6 +666,7 @@ pub mod test {
                 name: "conductor_test".to_string(),
                 uid: uid.to_string(),
                 properties: SerializedBytes::try_from(()).unwrap(),
+                origin_time: Timestamp::now(),
                 zomes: zomes.clone().into_iter().map(Into::into).collect(),
             },
             zomes.into_iter().map(Into::into),

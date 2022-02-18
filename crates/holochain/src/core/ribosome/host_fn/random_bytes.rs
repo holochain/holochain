@@ -43,6 +43,7 @@ pub mod wasm_test {
     use holochain_wasm_test_utils::TestWasm;
     use std::sync::Arc;
     use crate::core::ribosome::HostContext;
+    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
 
     #[tokio::test(flavor = "multi_thread")]
     /// we can get some random data out of the fn directly
@@ -67,10 +68,12 @@ pub mod wasm_test {
     #[tokio::test(flavor = "multi_thread")]
     /// we can get some random data out of the fn via. a wasm call
     async fn ribosome_random_bytes_test() {
+        observability::test_run().ok();
+        let RibosomeTestFixture {
+            conductor, alice, ..
+        } = RibosomeTestFixture::new(TestWasm::RandomBytes).await;
         const LEN: u32 = 5;
-        let host_access = fixt!(ZomeCallHostAccess, Predictable);
-        let output: hdk::prelude::Bytes =
-            crate::call_test_ribosome!(host_access, TestWasm::RandomBytes, "random_bytes", LEN).unwrap();
+        let output: hdk::prelude::Bytes = conductor.call(&alice, "random_bytes", LEN).await;
 
         assert_ne!(&vec![0; LEN as usize], &output.to_vec());
     }
