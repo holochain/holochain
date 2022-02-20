@@ -46,9 +46,17 @@ rec {
       gdb
       gh
       nixpkgs-fmt
-      niv
     ]);
   };
+
+  release = coreDev.overrideAttrs (attrs: {
+    nativeBuildInputs = attrs.nativeBuildInputs ++ (with holonix.pkgs; [
+      niv
+      cargo-sweep
+    ]);
+  });
+
+
 
   ci = hcMkShell {
     inputsFrom = [
