@@ -123,9 +123,27 @@ pub(crate) mod cli {
         pub(crate) output_path: PathBuf,
     }
 
+    /// Generate the release notes for a given release.
+    #[derive(StructOpt, Debug)]
+    pub(crate) struct ChangelogReleaseNotesArgs {
+        /// Name of the release for which to generate the release notes.
+        /// Defaults to the latest release.
+        // #[structopt(long)]
+        // pub(crate) release_name: Option<String>,
+
+        //
+
+        /// Where to output the release notes.
+        /// If a path is given at which a file exists it will be overwritten.
+        /// Defaults to stdout.
+        #[structopt(long)]
+        pub(crate) output: Option<PathBuf>,
+    }
+
     #[derive(Debug, StructOpt)]
     pub(crate) enum ChangelogCommands {
         Aggregate(ChangelogAggregateArgs),
+        ReleaseNotes(ChangelogReleaseNotesArgs),
     }
 
     #[derive(StructOpt, Debug)]

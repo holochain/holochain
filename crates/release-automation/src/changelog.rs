@@ -966,6 +966,10 @@ impl<'a> ChangelogT<'a, WorkspaceChangelog> {
 
         Ok(())
     }
+
+    fn release_notes(&'a self, _title: &'a str) -> Fallible<String> {
+        Ok("this doesn't yet work".to_string())
+    }
 }
 
 fn get_nested_text<'a>(node: &'a comrak::arena_tree::Node<'a, RefCell<Ast>>) -> String {
@@ -1061,6 +1065,31 @@ pub(crate) fn cmd(
             .changelog()
             .ok_or_else(|| anyhow::anyhow!("workspace doesn't have a changelog"))?
             .aggregate(ws.members()?)?,
+
+        crate::cli::ChangelogCommands::ReleaseNotes(release_notes_args) => {
+            let changelog = ws
+                .changelog()
+                .ok_or_else(|| anyhow::anyhow!("workspace doesn't have a changelog"))?;
+
+            let topmost_release = changelog
+                .topmost_release()?
+                .ok_or_else(|| anyhow::anyhow!("no topmost release found"))?;
+
+            let title = match topmost_release {
+                ReleaseChange::WorkspaceReleaseChange(title, ..) => title,
+                _ => bail!("topmost release is not a workspace release"),
+            };
+
+            let release_notes = changelog.release_notes(&title)?;
+
+            let mut output_path: Box<dyn Write> = match &release_notes_args.output {
+                None => Box::new(std::io::stdout()),
+                Some(path) => Box::new(std::fs::File::create(path)?),
+            };
+
+            output_path.write_all(release_notes.as_bytes())?;
+            output_path.flush()?;
+        }
     };
 
     Ok(())
@@ -1358,5 +1387,16 @@ mod tests {
             ],
             changes
         );
+    }
+
+    #[test]
+    fn generate_release_notes() {
+        let workspace_mocker = example_workspace_1().unwrap();
+
+        let changelog_path = workspace_mocker.root().join("CHANGELOG.md");
+        let changelog = ChangelogT::<WorkspaceChangelog>::at_path(&changelog_path);
+        // let changes = changelog.changes().unwrap();
+
+        let expected_release_notes = "TODO";
     }
 }
