@@ -239,7 +239,7 @@ impl HashableContent for SignedHeader {
 /// The hashed header and the signature that signed it
 pub type SignedHeaderHashed = SignedHashed<Header>;
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, Serialize, Deserialize)]
 /// Any content that has been hashed and signed.
 pub struct SignedHashed<T>
 where
@@ -270,6 +270,15 @@ where
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.signature.hash(state);
         self.as_hash().hash(state);
+    }
+}
+
+impl<T> std::cmp::PartialEq for SignedHashed<T>
+where
+    T: HashableContent,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.hashed == other.hashed && self.signature == other.signature
     }
 }
 
