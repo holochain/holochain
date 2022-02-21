@@ -2699,6 +2699,7 @@ name = "holochain_state"
 version = "0.0.25"
 dependencies = [
  "anyhow",
+ "arbitrary",
  "async-recursion",
  "base64",
  "byteorder",
@@ -2780,6 +2781,7 @@ dependencies = [
  "must_future",
  "nanoid 0.3.0",
  "observability",
+ "parking_lot 0.10.2",
  "rand 0.7.3",
  "regex",
  "rusqlite",
@@ -2792,6 +2794,7 @@ dependencies = [
  "strum",
  "strum_macros",
  "tempfile",
+ "test-case",
  "thiserror",
  "tokio",
  "tracing",

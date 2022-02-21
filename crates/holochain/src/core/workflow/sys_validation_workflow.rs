@@ -3,7 +3,6 @@
 
 use super::*;
 use crate::conductor::handle::ConductorHandleT;
-use crate::conductor::space::DhtDbQueryCache;
 use crate::conductor::space::Space;
 use crate::conductor::ConductorHandle;
 use crate::core::queue_consumer::TriggerSender;
@@ -21,6 +20,7 @@ use holochain_state::host_fn_workspace::HostFnStores;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::prelude::*;
 use holochain_state::scratch::SyncScratch;
+use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::prelude::*;
 use holochain_zome_types::Entry;
 use holochain_zome_types::ValidationStatus;

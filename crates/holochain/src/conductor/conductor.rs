@@ -79,11 +79,10 @@ use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use tokio::sync::mpsc::error::SendError;
 use tracing::*;
+pub use holochain_types::share;
 
 #[cfg(feature = "test_utils")]
 use super::handle::MockConductorHandleT;
-
-mod share;
 
 /// The status of an installed Cell, which captures different phases of its lifecycle
 #[derive(Debug, Clone, PartialEq, Eq)]

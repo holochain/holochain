@@ -1,3 +1,4 @@
+//! A sync RwLock that uses closures to avoid deadlocks.
 use std::sync::Arc;
 
 /// A clonable thread safe read write lock designed to make it hard to create dead locks

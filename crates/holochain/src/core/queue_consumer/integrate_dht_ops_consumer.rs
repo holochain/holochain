@@ -2,8 +2,8 @@
 
 use super::*;
 use crate::conductor::manager::ManagedTaskResult;
-use crate::conductor::space::DhtDbQueryCache;
 use crate::core::workflow::integrate_dht_ops_workflow::integrate_dht_ops_workflow;
+use holochain_types::db_cache::DhtDbQueryCache;
 use tokio::task::JoinHandle;
 use tracing::*;
 

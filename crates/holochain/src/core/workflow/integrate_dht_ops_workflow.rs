@@ -1,13 +1,13 @@
 //! The workflow and queue consumer for DhtOp integration
 
 use super::*;
-use crate::conductor::space::DhtDbQueryCache;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::queue_consumer::WorkComplete;
 use error::WorkflowResult;
 use holochain_p2p::HolochainP2pDna;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_state::prelude::*;
+use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::prelude::*;
 
 use tracing::*;
