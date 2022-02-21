@@ -161,6 +161,26 @@ impl KitsuneP2pActor {
                         bootstrap_url,
                         fallback_proxy_url,
                     };
+                    conf.proxy_from_bootstrap_cb = Arc::new(|bootstrap_url| {
+                        Box::pin(async move {
+                            match bootstrap::proxy_list(bootstrap_url.into()).await {
+                                Ok(mut proxy_list) => {
+                                    if proxy_list.is_empty() {
+                                        return None;
+                                    }
+                                    use rand::Rng;
+                                    Some(
+                                        proxy_list
+                                            .remove(
+                                                rand::thread_rng().gen_range(0, proxy_list.len()),
+                                            )
+                                            .into(),
+                                    )
+                                }
+                                _ => None,
+                            }
+                        })
+                    });
                 }
             }
             let f = tx2_proxy(f, conf)?;
