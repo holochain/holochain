@@ -24,12 +24,12 @@ rec {
     export RUST_BACKTRACE=1
 
     # limit parallel jobs to reduce memory consumption
-    export NUM_JOBS=8
-    export CARGO_BUILD_JOBS=8
+    export NUM_JOBS=''${NUM_JOBS:-8}
+    export CARGO_BUILD_JOBS=''${CARGO_BUILD_JOBS:-8}
 
     # run all the non-slow cargo tests
     cargo build --features 'build' -p holochain_wasm_test_utils
-    cargo test --workspace --exclude holochain --exclude release-automation --lib --tests --profile fast-test -- --nocapture
+    cargo test ''${CARGO_TEST_ARGS:-} --workspace --features test_utils --exclude holochain --exclude release-automation --lib --tests --profile fast-test -- --nocapture
   '';
 
   hcSlowTests = writeShellScriptBin "hc-test-slow" ''
@@ -37,12 +37,12 @@ rec {
     export RUST_BACKTRACE=1
 
     # limit parallel jobs to reduce memory consumption
-    export NUM_JOBS=8
-    export CARGO_BUILD_JOBS=8
+    export NUM_JOBS=''${NUM_JOBS:-8}
+    export CARGO_BUILD_JOBS=''${CARGO_BUILD_JOBS:-8}
 
     # alas, we cannot specify --features in the virtual workspace
     # run the specific slow tests in the holochain crate
-    cargo test --manifest-path=crates/holochain/Cargo.toml --features slow_tests,test_utils,build_wasms,db-encryption --profile fast-test -- --nocapture
+    cargo test ''${CARGO_TEST_ARGS:-} --manifest-path=crates/holochain/Cargo.toml --features slow_tests,test_utils,build_wasms,db-encryption --profile fast-test -- --nocapture
   '';
 
   hcWasmTests = writeShellScriptBin "hc-test-wasm" ''
@@ -50,11 +50,11 @@ rec {
     export RUST_BACKTRACE=1
 
     # limit parallel jobs to reduce memory consumption
-    export NUM_JOBS=8
-    export CARGO_BUILD_JOBS=8
+    export NUM_JOBS=''${NUM_JOBS:-8}
+    export CARGO_BUILD_JOBS=''${CARGO_BUILD_JOBS:-8}
 
     # run all the wasm tests (within wasm) with the conductor mocked
-    cargo test --lib --manifest-path=crates/test_utils/wasm/wasm_workspace/Cargo.toml --all-features -- --nocapture
+    cargo test ''${CARGO_TEST_ARGS:-} --lib --manifest-path=crates/test_utils/wasm/wasm_workspace/Cargo.toml --all-features -- --nocapture
   '';
 
   hcReleaseAutomationTest = writeShellScriptBin "hc-release-automation-test" ''
@@ -64,7 +64,7 @@ rec {
     # make sure the binary is built
     cargo build --locked --manifest-path=crates/release-automation/Cargo.toml
     # run the release-automation tests
-    cargo test --locked --manifest-path=crates/release-automation/Cargo.toml ''${@}
+    cargo test ''${CARGO_TEST_ARGS:-} --locked --manifest-path=crates/release-automation/Cargo.toml ''${@}
   '';
 
   hcReleaseAutomationTestRepo =

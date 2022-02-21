@@ -89,7 +89,7 @@ async fn test_rpc_multi_logic_mocked() {
     let mut m = MockSpaceInternalHandler::new();
     // just make is_agent_local always return false
     m.expect_handle_is_agent_local()
-        .returning(|_| Ok(async move { Ok(false) }.boxed().into()));
+        .returning(|_| ok_fut(Ok(false)));
     let i_s = build_space_internal(m).await;
 
     // build our "KitsuneP2pEvent" sender
@@ -104,13 +104,10 @@ async fn test_rpc_multi_logic_mocked() {
             out.push(A3.clone());
             out.push(A4.clone());
         }
-        Ok(async move { Ok(out) }.boxed().into())
+        ok_fut(Ok(out))
     });
-
-    // @maackle: this suddenly became necessary, I wonder why?
     m.expect_handle_k_gen_req()
-        .returning(|_| Ok(async move { Ok(KGenRes::RecordMetrics(())) }.boxed().into()));
-
+        .returning(move |_| ok_fut(Ok(KGenRes::RecordMetrics(()))));
     let evt_sender = build_event_handler(m).await;
 
     let config = Arc::new(KitsuneP2pConfig::default());
