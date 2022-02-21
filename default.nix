@@ -16,9 +16,10 @@ let
   # point this to your local config.nix file for this project
   # example.config.nix shows and documents a lot of the options
   config = import ./config.nix;
+  sources = import ./nix/sources.nix;
 
   # START HOLONIX IMPORT BOILERPLATE
-  holonixPath = config.holonix.pathFn {};
+  holonixPath = config.holonix.pathFn { };
   holonix = config.holonix.importFn holonixArgs;
   # END HOLONIX IMPORT BOILERPLATE
 
@@ -44,7 +45,10 @@ let
           export NIX_ENV_PREFIX="$(${self.coreutils}/bin/mktemp -d)"
         fi
       '';
+
+      crate2nix = import sources.crate2nix.outPath { };
     })
+
   ];
 
   nixpkgs' = import (nixpkgs.path or holonix.pkgs.path) { inherit overlays; };
@@ -54,6 +58,7 @@ let
 in
 {
   inherit
+    nixpkgs'
     holonix
     pkgs
     ;
