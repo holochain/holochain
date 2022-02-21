@@ -185,7 +185,9 @@ impl HostContext {
     /// Get the signal broadcaster, panics if none was provided
     pub fn signal_tx(&mut self) -> &mut SignalBroadcaster {
         match self {
-            Self::ZomeCall(ZomeCallHostAccess { signal_tx, .. }) => signal_tx,
+            Self::ZomeCall(ZomeCallHostAccess { signal_tx, .. })
+            | Self::Init(InitHostAccess { signal_tx, .. })
+            => signal_tx,
             _ => panic!(
                 "Gave access to a host function that uses the signal broadcaster without providing one"
             ),
@@ -197,7 +199,9 @@ impl HostContext {
         match self {
             Self::ZomeCall(ZomeCallHostAccess {
                 call_zome_handle, ..
-            }) => call_zome_handle,
+            })
+            | Self::Init(InitHostAccess { call_zome_handle, .. })
+            => call_zome_handle,
             _ => panic!(
                 "Gave access to a host function that uses the call zome handle without providing a call zome handle"
             ),

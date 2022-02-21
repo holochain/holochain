@@ -241,7 +241,7 @@ async fn validate_op(
 
     // Get the dna file
     let dna_file = conductor_handle
-        .get_dna(dna_hash.as_ref())
+        .get_dna_file(dna_hash.as_ref())
         .ok_or_else(|| AppValidationError::DnaMissing((*dna_hash).clone()))?;
 
     // Get the EntryDefId associated with this Element if there is one
@@ -921,6 +921,7 @@ pub struct AppValidationWorkspace {
     dht_env: DbWrite<DbKindDht>,
     cache: DbWrite<DbKindCache>,
     keystore: MetaLairClient,
+    dna_def: Arc<DnaDef>,
 }
 
 impl AppValidationWorkspace {
@@ -929,12 +930,14 @@ impl AppValidationWorkspace {
         dht_env: DbWrite<DbKindDht>,
         cache: DbWrite<DbKindCache>,
         keystore: MetaLairClient,
+        dna_def: Arc<DnaDef>,
     ) -> Self {
         Self {
             authored_env,
             dht_env,
             cache,
             keystore,
+            dna_def,
         }
     }
 
@@ -945,6 +948,7 @@ impl AppValidationWorkspace {
             self.cache.clone(),
             self.keystore.clone(),
             None,
+            self.dna_def.clone(),
         )
         .await?)
     }

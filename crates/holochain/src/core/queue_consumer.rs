@@ -158,6 +158,10 @@ pub async fn spawn_queue_consumer_tasks(
             .expect("Failed to manage workflow handle");
     }
 
+    let dna_def = conductor_handle
+        .get_dna_def(&*dna_hash)
+        .expect("Dna must be in store");
+
     // App validation
     // One per space.
     let (tx_app, handle) = queue_consumer_map.spawn_once_app_validation(dna_hash.clone(), || {
@@ -168,6 +172,7 @@ pub async fn spawn_queue_consumer_tasks(
                 dht_env.clone(),
                 cache.clone(),
                 keystore.clone(),
+                Arc::new(dna_def),
             ),
             conductor_handle.clone(),
             stop.subscribe(),
@@ -186,6 +191,10 @@ pub async fn spawn_queue_consumer_tasks(
             .expect("Failed to manage workflow handle");
     }
 
+    let dna_def = conductor_handle
+        .get_dna_def(&*dna_hash)
+        .expect("Dna must be in store");
+
     // Sys validation
     // One per space.
     let (tx_sys, handle) = queue_consumer_map.spawn_once_sys_validation(dna_hash.clone(), || {
@@ -194,6 +203,7 @@ pub async fn spawn_queue_consumer_tasks(
                 authored_env.clone().into(),
                 dht_env.clone().into(),
                 cache.clone(),
+                Arc::new(dna_def),
             ),
             space.clone(),
             conductor_handle.clone(),
