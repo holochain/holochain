@@ -4,7 +4,7 @@ use crate::types::agent_store::AgentInfoSigned;
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::{
     bin_types::KOp,
-    dht::region::{RegionBoundsMapped, RegionSetXtcs},
+    dht::region::{RegionBounds, RegionSetXtcs},
     dht_arc::{DhtArcSet, DhtLocation},
 };
 use std::{collections::HashSet, sync::Arc};
@@ -41,7 +41,7 @@ pub enum FetchOpDataEvtQuery {
     /// Fetch all ops with the hashes specified
     Hashes(Vec<KOpHash>),
     /// Fetch all ops within the time and space bounds specified
-    Regions(Vec<RegionBoundsMapped>),
+    Regions(Vec<RegionBounds>),
 }
 
 /// Request that our implementor sign some data on behalf of an agent.

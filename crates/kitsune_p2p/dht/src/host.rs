@@ -21,13 +21,13 @@ use crate::{
 pub trait AccessOpStore<D: TreeDataConstraints = RegionData, O: OpRegion<D> = OpData> {
     fn query_op_data(&self, region: &RegionBounds) -> Vec<Arc<O>>;
     fn query_ops_by_coords(&self, region: &RegionCoords) -> Vec<Arc<O>> {
-        self.query_op_data(&region.to_bounds())
+        self.query_op_data(&region.to_bounds(self.topo()))
     }
 
     fn query_region(&self, region: &RegionBounds) -> D;
 
     fn query_region_coords(&self, region: &RegionCoords) -> D {
-        self.query_region(&region.to_bounds())
+        self.query_region(&region.to_bounds(self.topo()))
     }
 
     fn integrate_ops<Ops: Clone + Iterator<Item = Arc<O>>>(&mut self, ops: Ops);

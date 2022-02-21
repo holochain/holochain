@@ -720,9 +720,9 @@ impl ShardedGossipLocal {
                     if let Some(sent) = state.region_set_sent {
                         let regions = sent.diff(region_set).map_err(KitsuneError::other)?;
                         let topo = todo!("get topology");
-                        let bounds = regions
+                        let bounds: Vec<_> = regions
                             .into_iter()
-                            .map(|r| r.coords.to_bounds().to_mapped(&topo))
+                            .map(|r| r.coords.to_bounds(&topo))
                             .collect();
                         // TODO: make region set diffing more robust to different times / arc power levels.
 

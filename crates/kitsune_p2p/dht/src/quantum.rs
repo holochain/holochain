@@ -1,7 +1,8 @@
-use std::{marker::PhantomData, num::Wrapping, ops::AddAssign};
+use std::{marker::PhantomData, ops::AddAssign};
 
 use crate::op::{Loc, Timestamp};
 use derivative::Derivative;
+use num_traits::Num;
 
 /// Represents some number of space quanta. The actual DhtLocation that this
 /// coordinate corresponds to depends upon the space quantum size specified
@@ -24,8 +25,9 @@ use derivative::Derivative;
 pub struct SpaceQuantum(u32);
 
 impl SpaceQuantum {
-    pub fn to_loc(&self, topo: &Topology) -> Loc {
-        Loc::from(Wrapping(self.0) * Wrapping(topo.space.quantum))
+    pub fn to_loc_bounds(&self, topo: &Topology) -> (Loc, Loc) {
+        let (a, b) = bounds(self.0, topo.space.quantum);
+        (Loc::from(a), Loc::from(b))
     }
 }
 
@@ -54,16 +56,22 @@ impl TimeQuantum {
         topo.time_coord(timestamp)
     }
 
-    pub fn to_timestamp(&self, topo: &Topology) -> Timestamp {
-        let t = self.0 as i64 * topo.time.quantum as i64;
-        Timestamp::from_micros(t + topo.time_origin.as_micros())
+    pub fn to_timestamp_bounds(&self, topo: &Topology) -> (Timestamp, Timestamp) {
+        let (a, b) = bounds(self.0 as i64, topo.time.quantum as i64);
+        (
+            Timestamp::from_micros(a + topo.time_origin.as_micros()),
+            Timestamp::from_micros(b + topo.time_origin.as_micros()),
+        )
     }
 }
 
 pub trait Quantum: From<u32> + PartialEq + Eq + PartialOrd + Ord + std::fmt::Debug {
     const MAX: u32 = u32::MAX;
+    type Target;
 
     fn inner(&self) -> u32;
+
+    fn size(topo: &Topology) -> u32;
 
     fn exp(&self, pow: u8) -> u32 {
         self.inner() * 2u32.pow(pow as u32)
@@ -83,14 +91,26 @@ pub trait Quantum: From<u32> + PartialEq + Eq + PartialOrd + Ord + std::fmt::Deb
 }
 
 impl Quantum for SpaceQuantum {
+    type Target = Loc;
+
     fn inner(&self) -> u32 {
         self.0
+    }
+
+    fn size(topo: &Topology) -> u32 {
+        topo.space.quantum
     }
 }
 
 impl Quantum for TimeQuantum {
+    type Target = Timestamp;
+
     fn inner(&self) -> u32 {
         self.0
+    }
+
+    fn size(topo: &Topology) -> u32 {
+        topo.time.quantum
     }
 }
 
@@ -105,19 +125,29 @@ impl SpacetimeCoords {
     }
 }
 
+fn bounds<
+    N: Copy + Num + num_traits::WrappingAdd + num_traits::WrappingSub + num_traits::WrappingMul,
+>(
+    offset: N,
+    length: N,
+) -> (N, N) {
+    let m = offset.wrapping_mul(&length);
+    (m, m.wrapping_add(&length).wrapping_sub(&N::one()))
+}
+
 /// Any interval in space or time is represented by a node in a tree, so our
 /// way of describing intervals uses tree coordinates as well:
 /// The length of an interval is 2^(power), and the position of its left edge
 /// is at (offset * length).
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub struct Segment<C: Quantum> {
+pub struct Segment<Q: Quantum> {
     // TODO: make `u8`?
     pub power: u32,
     pub offset: u32,
-    phantom: PhantomData<C>,
+    phantom: PhantomData<Q>,
 }
 
-impl<C: Quantum> Segment<C> {
+impl<Q: Quantum> Segment<Q> {
     pub fn new(power: u32, offset: u32) -> Self {
         Self {
             power,
@@ -131,14 +161,14 @@ impl<C: Quantum> Segment<C> {
         2u64.pow(self.power)
     }
 
-    pub fn bounds(&self) -> (C, C) {
-        let l = self.length();
-        let o = self.offset as u64;
-        (C::from((o * l) as u32), C::from((o * l + l - 1) as u32))
+    /// Get the quanta which bound this segment
+    pub fn quantum_bounds(&self) -> (Q, Q) {
+        let (a, b) = bounds(self.offset, self.length() as u32);
+        (Q::from(a), Q::from(b))
     }
 
-    pub fn contains(&self, coord: C) -> bool {
-        let (lo, hi) = self.bounds();
+    pub fn contains(&self, coord: Q) -> bool {
+        let (lo, hi) = self.quantum_bounds();
         if lo <= hi {
             lo <= coord && coord <= hi
         } else {
@@ -159,6 +189,22 @@ impl<C: Quantum> Segment<C> {
                 Segment::new(power, self.offset * 2 + 1),
             ))
         }
+    }
+}
+
+impl SpaceSegment {
+    pub fn loc_bounds(&self, topo: &Topology) -> (Loc, Loc) {
+        let sz = SpaceQuantum::size(topo);
+        let (a, b) = bounds(self.offset, (self.length() as u32).wrapping_mul(sz));
+        (Loc::from(a), Loc::from(b))
+    }
+}
+
+impl TimeSegment {
+    pub fn timestamp_bounds(&self, topo: &Topology) -> (Timestamp, Timestamp) {
+        let sz = TimeQuantum::size(topo) as i64;
+        let (a, b) = bounds(self.offset as i64, (self.length() as i64).wrapping_mul(sz));
+        (Timestamp::from_micros(a), Timestamp::from_micros(b))
     }
 }
 
@@ -400,7 +446,7 @@ mod tests {
     #[test]
     fn test_contains() {
         let s = TimeSegment::new(31, 0);
-        assert_eq!(s.bounds(), (0.into(), (u32::MAX / 2).into()));
+        assert_eq!(s.quantum_bounds(), (0.into(), (u32::MAX / 2).into()));
         assert!(s.contains(0.into()));
         assert!(!s.contains((u32::MAX / 2 + 2).into()));
     }
@@ -490,7 +536,7 @@ mod tests {
         fn telescoping_times_cover_total_time_span(now in 0u32..u32::MAX) {
             let ts = TelescopingTimes::new(now.into()).segments();
             let total = ts.iter().fold(0u64, |len, t| {
-                assert_eq!(t.bounds().0.inner(), len as u32, "t = {:?}, len = {}", t, len);
+                assert_eq!(t.quantum_bounds().0.inner(), len as u32, "t = {:?}, len = {}", t, len);
                 len + t.length()
             });
             assert_eq!(total, now as u64);

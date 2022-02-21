@@ -1,9 +1,7 @@
-use std::ops::RangeBounds;
-
 use kitsune_p2p_dht_arc::ArcInterval;
 use kitsune_p2p_timestamp::Timestamp;
 
-use crate::quantum::{SpaceQuantum, SpaceSegment, SpacetimeCoords, TimeQuantum, TimeSegment};
+use crate::quantum::{SpaceSegment, SpacetimeCoords, TimeSegment, Topology};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, derive_more::Constructor)]
 pub struct RegionCoords {
@@ -14,10 +12,12 @@ pub struct RegionCoords {
 impl RegionCoords {
     /// TODO: does this need to map to the actual absolute values, i.e. undergo
     /// topological transformation, or is this correct?
-    pub fn to_bounds(&self) -> RegionBounds {
+    pub fn to_bounds(&self, topo: &Topology) -> RegionBounds {
+        let (x0, x1) = self.space.loc_bounds(topo);
+        let (t0, t1) = self.time.timestamp_bounds(topo);
         RegionBounds {
-            x: self.space.bounds(),
-            t: self.time.bounds(),
+            x: ArcInterval::new(x0, x1),
+            t: t0..t1,
         }
     }
 
@@ -28,12 +28,6 @@ impl RegionCoords {
 
 #[derive(Debug)]
 pub struct RegionBounds {
-    pub x: (SpaceQuantum, SpaceQuantum),
-    pub t: (TimeQuantum, TimeQuantum),
-}
-
-#[derive(Debug)]
-pub struct RegionBoundsMapped {
     pub x: ArcInterval,
     pub t: std::ops::Range<Timestamp>,
 }

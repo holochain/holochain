@@ -27,20 +27,23 @@ impl<D: TreeDataConstraints, O: OpRegion<D>> OpStore<D, O> {
 
 impl<D: TreeDataConstraints, O: OpRegion<D>> AccessOpStore<D, O> for OpStore<D, O> {
     fn query_op_data(&self, region: &RegionBounds) -> Vec<Arc<O>> {
-        let (x0, x1) = region.x;
-        let (t0, t1) = region.t;
-        let topo = self.topo();
-        let loc0 = x0.to_loc(topo);
-        let loc1 = x1.to_loc(topo);
-        let ts0 = t0.to_timestamp(topo);
-        let ts1 = t1.to_timestamp(topo);
-        let op0 = O::bound(ts0, loc0);
-        let op1 = O::bound(ts1, loc1);
-        self.ops
-            .range((Bound::Included(op0), Bound::Included(op1)))
-            .filter(|o| loc0 <= o.loc() && o.loc() <= loc1)
-            .cloned()
-            .collect()
+        use std::ops::RangeBounds;
+        if let (Some((x0, x1)), Bound::Included(&t0), Bound::Excluded(&t1)) = (
+            region.x.to_bounds_grouped(),
+            region.t.start_bound(),
+            region.t.end_bound(),
+        ) {
+            let topo = self.topo();
+            let op0 = O::bound(t0, x0);
+            let op1 = O::bound(t1, x0);
+            self.ops
+                .range((Bound::Included(op0), Bound::Included(op1)))
+                .filter(|o| x0 <= o.loc() && o.loc() <= x1)
+                .cloned()
+                .collect()
+        } else {
+            vec![]
+        }
     }
 
     fn query_region(&self, region: &RegionBounds) -> D {

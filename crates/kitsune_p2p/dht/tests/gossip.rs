@@ -20,7 +20,7 @@ use rand::Rng;
 fn test_basic() {
     let topo = Topology::identity_zero();
     let gopa = GossipParams::new(1.into(), 0);
-    let ts = |t: u32| TimeQuantum::from(t).to_timestamp(&topo);
+    let ts = |t: u32| TimeQuantum::from(t).to_timestamp_bounds(&topo).0;
 
     let alice_arq = Arq::new((-128i32 as u32).into(), 8, 4);
     let bobbo_arq = Arq::new(0.into(), 8, 4);
@@ -61,7 +61,7 @@ fn gossip_scenario_full_sync() {
         ..Default::default()
     };
 
-    let max_time = TimeQuantum::from(525600 / 12).to_timestamp(&topo); // 1 year
+    let max_time = TimeQuantum::from(525600 / 12).to_timestamp_bounds(&topo).0; // 1 year
 
     let arqs = generate_ideal_coverage(&mut rng, &strat, None, n as u32, 0.0);
     let mut nodes: Vec<_> = arqs
@@ -83,10 +83,11 @@ fn gossip_scenario_full_sync() {
         nodes[i % n].integrate_op(op);
     }
 
-    let full_region = RegionBounds {
-        x: (0.into(), u32::MAX.into()),
-        t: (0.into(), u32::MAX.into()),
-    };
+    let full_region = RegionCoords {
+        space: SpaceSegment::new(32, 0),
+        time: TimeSegment::new(32, 0),
+    }
+    .to_bounds(&topo);
 
     // Assert that each node has the expected number of ops to start with,
     // and print each arq at the same time.
