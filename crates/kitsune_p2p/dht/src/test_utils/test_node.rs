@@ -1,10 +1,10 @@
 use crate::{
     agent::AgentInfo,
     arq::{ascii::add_location_ascii, *},
-    coords::{GossipParams, TelescopingTimes, TimeCoord, Topology},
     hash::{fake_hash, AgentKey},
     host::{AccessOpStore, AccessPeerStore},
     op::Op,
+    quantum::{GossipParams, TelescopingTimes, TimeQuantum, Topology},
     region::*,
 };
 
@@ -36,7 +36,7 @@ impl TestNode {
     }
 
     /// Get the RegionSet for this node, suitable for gossiping
-    pub fn region_set(&self, arq_set: ArqBoundsSet, now: TimeCoord) -> RegionSet {
+    pub fn region_set(&self, arq_set: ArqBoundsSet, now: TimeQuantum) -> RegionSet {
         let coords = RegionCoordSetXtcs::new(TelescopingTimes::new(now), arq_set);
         let data = coords
             .region_coords_nested()

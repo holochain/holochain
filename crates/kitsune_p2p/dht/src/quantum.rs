@@ -21,9 +21,9 @@ use derivative::Derivative;
     serde::Serialize,
     serde::Deserialize,
 )]
-pub struct SpaceCoord(u32);
+pub struct SpaceQuantum(u32);
 
-impl SpaceCoord {
+impl SpaceQuantum {
     pub fn to_loc(&self, topo: &Topology) -> Loc {
         Loc::from(Wrapping(self.0) * Wrapping(topo.space.quantum))
     }
@@ -47,9 +47,9 @@ impl SpaceCoord {
     serde::Serialize,
     serde::Deserialize,
 )]
-pub struct TimeCoord(u32);
+pub struct TimeQuantum(u32);
 
-impl TimeCoord {
+impl TimeQuantum {
     pub fn from_timestamp(topo: &Topology, timestamp: Timestamp) -> Self {
         topo.time_coord(timestamp)
     }
@@ -60,7 +60,7 @@ impl TimeCoord {
     }
 }
 
-pub trait Coord: From<u32> + PartialEq + Eq + PartialOrd + Ord + std::fmt::Debug {
+pub trait Quantum: From<u32> + PartialEq + Eq + PartialOrd + Ord + std::fmt::Debug {
     const MAX: u32 = u32::MAX;
 
     fn inner(&self) -> u32;
@@ -82,21 +82,21 @@ pub trait Coord: From<u32> + PartialEq + Eq + PartialOrd + Ord + std::fmt::Debug
     }
 }
 
-impl Coord for SpaceCoord {
+impl Quantum for SpaceQuantum {
     fn inner(&self) -> u32 {
         self.0
     }
 }
 
-impl Coord for TimeCoord {
+impl Quantum for TimeQuantum {
     fn inner(&self) -> u32 {
         self.0
     }
 }
 
 pub struct SpacetimeCoords {
-    pub space: SpaceCoord,
-    pub time: TimeCoord,
+    pub space: SpaceQuantum,
+    pub time: TimeQuantum,
 }
 
 impl SpacetimeCoords {
@@ -110,14 +110,14 @@ impl SpacetimeCoords {
 /// The length of an interval is 2^(power), and the position of its left edge
 /// is at (offset * length).
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub struct Segment<C: Coord> {
+pub struct Segment<C: Quantum> {
     // TODO: make `u8`?
     pub power: u32,
     pub offset: u32,
     phantom: PhantomData<C>,
 }
 
-impl<C: Coord> Segment<C> {
+impl<C: Quantum> Segment<C> {
     pub fn new(power: u32, offset: u32) -> Self {
         Self {
             power,
@@ -162,8 +162,8 @@ impl<C: Coord> Segment<C> {
     }
 }
 
-pub type SpaceSegment = Segment<SpaceCoord>;
-pub type TimeSegment = Segment<TimeCoord>;
+pub type SpaceSegment = Segment<SpaceQuantum>;
+pub type TimeSegment = Segment<TimeQuantum>;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Dimension {
@@ -247,11 +247,11 @@ impl Topology {
         }
     }
 
-    pub fn space_coord(&self, x: Loc) -> SpaceCoord {
+    pub fn space_coord(&self, x: Loc) -> SpaceQuantum {
         (x.as_u32() / self.space.quantum).into()
     }
 
-    pub fn time_coord(&self, t: Timestamp) -> TimeCoord {
+    pub fn time_coord(&self, t: Timestamp) -> TimeQuantum {
         let t = (t.as_micros() - self.time_origin.as_micros()).max(0);
         ((t / self.time.quantum as i64) as u32).into()
     }
@@ -262,7 +262,7 @@ impl Topology {
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Derivative, serde::Serialize, serde::Deserialize)]
 #[derivative(PartialOrd, Ord)]
 pub struct TelescopingTimes {
-    time: TimeCoord,
+    time: TimeQuantum,
 
     #[derivative(PartialOrd = "ignore")]
     #[derivative(Ord = "ignore")]
@@ -277,7 +277,7 @@ impl TelescopingTimes {
         }
     }
 
-    pub fn new(time: TimeCoord) -> Self {
+    pub fn new(time: TimeQuantum) -> Self {
         Self { time, limit: None }
     }
 
@@ -372,7 +372,7 @@ pub struct GossipParams {
     ///
     /// This, along with `max_space_power_offset`, determines what range of
     /// region resolution gets stored in the 2D Fenwick tree
-    pub max_time_offset: TimeCoord,
+    pub max_time_offset: TimeQuantum,
 
     /// What difference in power will you accept for other agents' Arqs?
     /// e.g. if the power I use in my arq is 22, and this offset is 2,
@@ -411,7 +411,7 @@ mod tests {
         assert_eq!(s.length(), 2u64.pow(31));
     }
 
-    fn lengths(t: TimeCoord) -> Vec<u32> {
+    fn lengths(t: TimeQuantum) -> Vec<u32> {
         TelescopingTimes::new(t)
             .segments()
             .into_iter()
@@ -434,7 +434,7 @@ mod tests {
     #[test]
     #[rustfmt::skip]
     fn test_telescoping_times_first_16() {
-        let ts = TimeCoord::from;
+        let ts = TimeQuantum::from;
 
                                                              // n+1
         assert_eq!(lengths(ts(0)),  Vec::<u32>::new());      // 0001

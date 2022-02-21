@@ -2,7 +2,7 @@ use once_cell::sync::OnceCell;
 
 use crate::{
     arq::*,
-    coords::*,
+    quantum::*,
     error::{GossipError, GossipResult},
     host::AccessOpStore,
     op::OpRegion,
@@ -270,7 +270,7 @@ mod tests {
         // Calculate region data for all ops.
         // The total count should be half of what's in the op store,
         // since the arq covers exactly half of the ops
-        let times = TelescopingTimes::new(TimeCoord::from(11000));
+        let times = TelescopingTimes::new(TimeQuantum::from(11000));
         let coords = RegionCoordSetXtcs::new(times, ArqBoundsSet::single(arq));
         let rset = RegionSetXtcs::from_store(&store, coords);
         assert_eq!(
@@ -286,8 +286,8 @@ mod tests {
         let mut store = OpStore::new(topo.clone(), GossipParams::zero());
         store.integrate_ops(op_grid(&arq, 10..20).into_iter());
 
-        let tt_a = TelescopingTimes::new(TimeCoord::from(20));
-        let tt_b = TelescopingTimes::new(TimeCoord::from(30));
+        let tt_a = TelescopingTimes::new(TimeQuantum::from(20));
+        let tt_b = TelescopingTimes::new(TimeQuantum::from(30));
         let coords_a = RegionCoordSetXtcs::new(tt_a, ArqBoundsSet::single(arq.clone()));
         let coords_b = RegionCoordSetXtcs::new(tt_b, ArqBoundsSet::single(arq.clone()));
 
@@ -331,11 +331,11 @@ mod tests {
         store2.integrate_ops(extra_ops.clone().into_iter());
 
         let coords_a = RegionCoordSetXtcs::new(
-            TelescopingTimes::new(TimeCoord::from(20)),
+            TelescopingTimes::new(TimeQuantum::from(20)),
             ArqBoundsSet::single(arq.clone()),
         );
         let coords_b = RegionCoordSetXtcs::new(
-            TelescopingTimes::new(TimeCoord::from(21)),
+            TelescopingTimes::new(TimeQuantum::from(21)),
             ArqBoundsSet::single(arq.clone()),
         );
 

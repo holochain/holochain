@@ -2,9 +2,9 @@
 
 use kitsune_p2p_dht::{
     arq::*,
-    coords::*,
     host::*,
     op::*,
+    quantum::*,
     region::*,
     test_utils::{
         generate_ideal_coverage,
@@ -20,7 +20,7 @@ use rand::Rng;
 fn test_basic() {
     let topo = Topology::identity_zero();
     let gopa = GossipParams::new(1.into(), 0);
-    let ts = |t: u32| TimeCoord::from(t).to_timestamp(&topo);
+    let ts = |t: u32| TimeQuantum::from(t).to_timestamp(&topo);
 
     let alice_arq = Arq::new((-128i32 as u32).into(), 8, 4);
     let bobbo_arq = Arq::new(0.into(), 8, 4);
@@ -30,8 +30,8 @@ fn test_basic() {
     alice.integrate_op(OpData::fake(0.into(), ts(10), 4321));
     bobbo.integrate_op(OpData::fake(128.into(), ts(20), 1234));
 
-    let ta = TimeCoord::from(30);
-    let tb = TimeCoord::from(31);
+    let ta = TimeQuantum::from(30);
+    let tb = TimeQuantum::from(31);
     let nta = TelescopingTimes::new(ta).segments().len() as u32;
     let ntb = TelescopingTimes::new(tb).segments().len() as u32;
 
@@ -61,7 +61,7 @@ fn gossip_scenario_full_sync() {
         ..Default::default()
     };
 
-    let max_time = TimeCoord::from(525600 / 12).to_timestamp(&topo); // 1 year
+    let max_time = TimeQuantum::from(525600 / 12).to_timestamp(&topo); // 1 year
 
     let arqs = generate_ideal_coverage(&mut rng, &strat, None, n as u32, 0.0);
     let mut nodes: Vec<_> = arqs

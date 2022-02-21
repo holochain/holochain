@@ -1,13 +1,13 @@
 use crate::{
-    coords::{Coord, TimeCoord},
     error::{GossipError, GossipResult},
     host::HostAccess,
+    quantum::{Quantum, TimeQuantum},
 };
 
 pub fn gossip_direct_at<Peer: HostAccess>(
     left: &mut Peer,
     right: &mut Peer,
-    now: TimeCoord,
+    now: TimeQuantum,
 ) -> GossipResult<TestNodeGossipRoundStats> {
     gossip_direct((left, now), (right, now))
 }
@@ -15,8 +15,8 @@ pub fn gossip_direct_at<Peer: HostAccess>(
 /// Quick 'n dirty simulation of a gossip round. Mutates both nodes as if
 /// they were exchanging gossip messages, without the rigmarole of a real protocol
 pub fn gossip_direct<Peer: HostAccess>(
-    (left, time_left): (&mut Peer, TimeCoord),
-    (right, time_right): (&mut Peer, TimeCoord),
+    (left, time_left): (&mut Peer, TimeQuantum),
+    (right, time_right): (&mut Peer, TimeQuantum),
 ) -> GossipResult<TestNodeGossipRoundStats> {
     let mut stats = TestNodeGossipRoundStats::default();
 

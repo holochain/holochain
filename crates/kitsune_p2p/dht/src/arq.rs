@@ -14,7 +14,7 @@ pub use strat::*;
 
 use kitsune_p2p_dht_arc::{ArcInterval, DhtArc};
 
-use crate::{coords::*, op::Loc};
+use crate::{op::Loc, quantum::*};
 
 pub fn pow2(p: u8) -> u32 {
     2u32.pow(p as u32)
@@ -245,7 +245,7 @@ impl ArqBounded for Arq {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ArqBounds {
-    offset: SpaceCoord,
+    offset: SpaceQuantum,
     power: u8,
     count: u32,
 }
@@ -295,7 +295,7 @@ impl ArqBounds {
         Self::from_interval_inner(power, interval, false)
     }
 
-    pub fn from_parts(power: u8, offset: SpaceCoord, count: u32) -> Self {
+    pub fn from_parts(power: u8, offset: SpaceQuantum, count: u32) -> Self {
         Self {
             power,
             offset,
@@ -418,7 +418,7 @@ impl ArqBounds {
     }
 
     /// Get a reference to the arq bounds's offset.
-    pub fn offset(&self) -> SpaceCoord {
+    pub fn offset(&self) -> SpaceQuantum {
         self.offset
     }
 }
@@ -580,7 +580,7 @@ mod tests {
         {
             let a = Arq::new((2u32.pow(pow.into()) - 1).into(), pow, 16);
             let b = a.to_bounds();
-            assert_eq!(b.offset(), SpaceCoord::from(0));
+            assert_eq!(b.offset(), SpaceQuantum::from(0));
             assert_eq!(b.count(), 16);
         }
         {

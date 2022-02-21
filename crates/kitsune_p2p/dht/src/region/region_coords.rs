@@ -3,7 +3,7 @@ use std::ops::RangeBounds;
 use kitsune_p2p_dht_arc::ArcInterval;
 use kitsune_p2p_timestamp::Timestamp;
 
-use crate::coords::{SpaceCoord, SpaceSegment, SpacetimeCoords, TimeCoord, TimeSegment};
+use crate::quantum::{SpaceQuantum, SpaceSegment, SpacetimeCoords, TimeQuantum, TimeSegment};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, derive_more::Constructor)]
 pub struct RegionCoords {
@@ -28,8 +28,8 @@ impl RegionCoords {
 
 #[derive(Debug)]
 pub struct RegionBounds {
-    pub x: (SpaceCoord, SpaceCoord),
-    pub t: (TimeCoord, TimeCoord),
+    pub x: (SpaceQuantum, SpaceQuantum),
+    pub t: (TimeQuantum, TimeQuantum),
 }
 
 #[derive(Debug)]

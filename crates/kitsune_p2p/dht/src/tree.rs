@@ -2,7 +2,7 @@ use std::ops::{AddAssign, Sub};
 
 use num_traits::Zero;
 
-use crate::{coords::*, op::*, region::*};
+use crate::{op::*, quantum::*, region::*};
 
 pub trait TreeDataConstraints:
     Eq

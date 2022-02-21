@@ -1,9 +1,9 @@
 use std::{collections::BTreeSet, ops::Bound, sync::Arc};
 
 use crate::{
-    coords::{GossipParams, Topology},
     host::AccessOpStore,
     op::{OpData, OpRegion},
+    quantum::{GossipParams, Topology},
     region::{RegionBounds, RegionData},
     tree::{Tree, TreeDataConstraints},
 };

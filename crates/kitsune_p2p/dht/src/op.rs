@@ -1,8 +1,8 @@
 use std::{borrow::Borrow, sync::Arc};
 
 use crate::{
-    coords::{SpacetimeCoords, Topology},
     hash::OpHash,
+    quantum::{SpacetimeCoords, Topology},
     region::RegionData,
 };
 

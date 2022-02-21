@@ -1,10 +1,10 @@
 pub mod agent;
 pub mod arq;
-pub mod coords;
 pub mod error;
 pub mod hash;
 pub mod host;
 pub mod op;
+pub mod quantum;
 pub mod region;
 pub mod tree;
 

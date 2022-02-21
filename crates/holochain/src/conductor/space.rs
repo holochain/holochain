@@ -9,7 +9,7 @@ use holochain_conductor_api::conductor::EnvironmentRootPath;
 use holochain_p2p::{
     dht::{
         arq::{power_and_count_from_length, ArqBoundsSet},
-        coords::{TelescopingTimes, TimeCoord, Topology},
+        quantum::{TelescopingTimes, TimeQuantum, Topology},
         hash::RegionHash,
         region::{RegionCoordSetXtcs, RegionData, RegionSetXtcs},
         ArqBounds, ArqStrat,
@@ -298,7 +298,7 @@ impl<DS: DnaStore> Spaces<DS> {
         );
         // TODO: This should be behind the current moment by however much Recent gossip covers.
         let current = Timestamp::now();
-        let times = TelescopingTimes::new(TimeCoord::from_timestamp(&topology, current));
+        let times = TelescopingTimes::new(TimeQuantum::from_timestamp(&topology, current));
         let coords = RegionCoordSetXtcs::new(times, arq_set);
         let coords_clone = coords.clone();
         let data = self
