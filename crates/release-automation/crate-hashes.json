@@ -1,0 +1,5 @@
+{
+  "cargo-test-macro 0.1.0 (git+https://github.com/rust-lang/cargo?branch=rust-1.53.0#4369396ce7d270972955d876eaa4954bea56bcd9)": "1yy1y1d523xdzwg1gc77pigbcwsbawmy4b7vw8v21m7q957sk0c4",
+  "cargo-test-support 0.1.0 (git+https://github.com/rust-lang/cargo?branch=rust-1.53.0#4369396ce7d270972955d876eaa4954bea56bcd9)": "1yy1y1d523xdzwg1gc77pigbcwsbawmy4b7vw8v21m7q957sk0c4",
+  "cargo-util 0.1.0 (git+https://github.com/rust-lang/cargo?branch=rust-1.53.0#4369396ce7d270972955d876eaa4954bea56bcd9)": "1yy1y1d523xdzwg1gc77pigbcwsbawmy4b7vw8v21m7q957sk0c4"
+}

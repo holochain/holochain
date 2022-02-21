@@ -89,6 +89,7 @@ impl Drop for ReverseSemaphorePermit {
 mod tests {
     use super::*;
 
+    // @maackle: note, this is flaky, it has failed for me locally once
     #[tokio::test(flavor = "multi_thread")]
     async fn test_reverse_semaphore() {
         let rs = ReverseSemaphore::new();

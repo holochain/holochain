@@ -500,8 +500,8 @@ async fn double_initiate_is_handled() {
     .await;
 
     // - Both players try to initiate and only have the other as a remote agent.
-    let (alice_cert, _, alice_initiate) = alice.try_initiate().await.unwrap().unwrap();
-    let (bob_cert, _, bob_initiate) = bob.try_initiate().await.unwrap().unwrap();
+    let (bob_cert, _, alice_initiate) = alice.try_initiate().await.unwrap().unwrap();
+    let (alice_cert, _, bob_initiate) = bob.try_initiate().await.unwrap().unwrap();
 
     // - Both players process the initiate.
     let alice_outgoing = alice
