@@ -22,9 +22,6 @@ use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentResult;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
-use crate::core::ribosome::guest_callback::validate_link::ValidateLinkHostAccess;
-use crate::core::ribosome::guest_callback::validate_link::ValidateLinkInvocation;
-use crate::core::ribosome::guest_callback::validate_link::ValidateLinkResult;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageInvocation;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
 use crate::core::ribosome::guest_callback::CallIterator;
@@ -628,14 +625,6 @@ impl RibosomeT for RealRibosome {
         invocation: ValidateInvocation,
     ) -> RibosomeResult<ValidateResult> {
         do_callback!(self, host_access, invocation, ValidateCallbackResult)
-    }
-
-    fn run_validate_link<I: Invocation + 'static>(
-        &self,
-        host_access: ValidateLinkHostAccess,
-        invocation: ValidateLinkInvocation<I>,
-    ) -> RibosomeResult<ValidateLinkResult> {
-        do_callback!(self, host_access, invocation, ValidateLinkCallbackResult)
     }
 
     fn run_init(
