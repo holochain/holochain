@@ -44,6 +44,7 @@ impl SweetDnaFile {
             .uid(uid)
             .zomes(zomes.clone())
             .properties(properties.clone())
+            .origin_time(Timestamp::now())
             .build()
             .unwrap();
 

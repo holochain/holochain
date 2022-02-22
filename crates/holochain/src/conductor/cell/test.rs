@@ -32,7 +32,10 @@ async fn test_cell_handle_publish() {
 
     let mut mock_handle = crate::conductor::handle::MockConductorHandleT::new();
     mock_handle
-        .expect_get_dna()
+        .expect_get_dna_def()
+        .return_const(Some(dna_file.dna_def().clone()));
+    mock_handle
+        .expect_get_dna_file()
         .return_const(Some(dna_file.clone()));
     mock_handle
         .expect_get_queue_consumer_workflows()
@@ -76,7 +79,7 @@ async fn test_cell_handle_publish() {
         hash: dna.clone(),
     });
     let hh = HeaderHashed::from_content_sync(header.clone());
-    let shh = SignedHeaderHashed::new(&keystore, hh).await.unwrap();
+    let shh = SignedHeaderHashed::sign(&keystore, hh).await.unwrap();
     let op = DhtOp::StoreElement(shh.signature().clone(), header.clone(), None);
     let op_hash = DhtOpHashed::from_content_sync(op.clone()).into_hash();
 

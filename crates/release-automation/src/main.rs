@@ -276,6 +276,10 @@ pub(crate) mod cli {
         /// Don't run consistency verification post-change.
         #[structopt(long)]
         pub(crate) no_verify_post: bool,
+
+        /// Paths to manifest that will also be considered when updating the Cargo.lock files
+        #[structopt(long)]
+        pub(crate) additional_manifests: Vec<String>,
     }
 
     /// Parses a commad separated input string to a set of strings.

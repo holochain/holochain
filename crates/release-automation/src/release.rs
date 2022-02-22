@@ -305,7 +305,10 @@ fn bump_release_versions<'a>(
         }
     }
 
-    ws.update_lockfile(cmd_args.dry_run)?;
+    ws.update_lockfile(
+        cmd_args.dry_run,
+        cmd_args.additional_manifests.iter().map(|mp| mp.as_str()),
+    )?;
 
     if !cmd_args.no_verify && !cmd_args.no_verify_post {
         info!("running consistency checks after changing the versions...");
@@ -833,6 +836,7 @@ fn publish_paths_to_crates_io(
                     "check",
                     "--locked",
                     "--verbose",
+                    "--release",
                     &format!("--manifest-path={}", manifest_path.to_string_lossy()),
                 ],
                 if let Some(target_dir) = cargo_target_dir_string.as_ref() {

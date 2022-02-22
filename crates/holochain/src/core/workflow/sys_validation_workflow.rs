@@ -801,6 +801,7 @@ pub struct SysValidationWorkspace {
     authored_env: DbRead<DbKindAuthored>,
     dht_env: DbRead<DbKindDht>,
     cache: DbWrite<DbKindCache>,
+    pub(crate) dna_def: Arc<DnaDef>,
 }
 
 impl SysValidationWorkspace {
@@ -808,11 +809,13 @@ impl SysValidationWorkspace {
         authored_env: DbRead<DbKindAuthored>,
         dht_env: DbRead<DbKindDht>,
         cache: DbWrite<DbKindCache>,
+        dna_def: Arc<DnaDef>,
     ) -> Self {
         Self {
             authored_env,
             dht_env,
             cache,
+            dna_def,
             scratch: None,
         }
     }
@@ -929,6 +932,11 @@ impl SysValidationWorkspace {
     fn dna_hash(&self) -> &DnaHash {
         self.dht_env.kind().dna_hash()
     }
+
+    /// Get a reference to the sys validation workspace's dna def.
+    pub fn dna_def(&self) -> Arc<DnaDef> {
+        self.dna_def.clone()
+    }
 }
 
 fn put_validation_limbo(
@@ -976,6 +984,7 @@ impl From<&HostFnWorkspace> for SysValidationWorkspace {
             authored_env: authored,
             dht_env: dht,
             cache,
+            dna_def: h.dna_def(),
         }
     }
 }

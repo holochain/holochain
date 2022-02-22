@@ -94,6 +94,7 @@ dependencies = [
  "libc",
  "num-integer",
  "num-traits",
+ "serde",
  "time",
  "winapi",
 ]
@@ -294,7 +295,7 @@ checksum = "ab5ef0d4909ef3724cc8cce6ccc8572c5c817592e9285f5464f8e86f8bd3726e"
 
 [[package]]
 name = "hdk"
-version = "0.0.121"
+version = "0.0.122"
 dependencies = [
  "hdk_derive",
  "holo_hash",
@@ -311,7 +312,7 @@ dependencies = [
 
 [[package]]
 name = "hdk_derive"
-version = "0.0.23"
+version = "0.0.24"
 dependencies = [
  "holochain_zome_types",
  "paste",
@@ -331,7 +332,7 @@ dependencies = [
 
 [[package]]
 name = "holo_hash"
-version = "0.0.18"
+version = "0.0.19"
 dependencies = [
  "base64",
  "blake2b_simd",
@@ -374,7 +375,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_test_wasm_common"
-version = "0.0.21"
+version = "0.0.22"
 dependencies = [
  "hdk",
  "serde",
@@ -407,7 +408,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_zome_types"
-version = "0.0.23"
+version = "0.0.24"
 dependencies = [
  "chrono",
  "fixt",
@@ -466,7 +467,7 @@ checksum = "1aab8fc367588b89dcee83ab0fd66b72b50b72fa1904d7095045ace2b0c81c35"
 
 [[package]]
 name = "kitsune_p2p_dht_arc"
-version = "0.0.8"
+version = "0.0.9"
 dependencies = [
  "derive_more",
  "gcollections",
@@ -480,6 +481,7 @@ name = "kitsune_p2p_timestamp"
 version = "0.0.5"
 dependencies = [
  "chrono",
+ "derive_more",
  "serde",
  "thiserror",
 ]
