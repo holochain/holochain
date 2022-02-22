@@ -68,7 +68,6 @@ pub fn hash_header(input: Header) -> ExternResult<HeaderHash> {
     }
 }
 
-
 /// Hash arbitrary bytes using BLAKE2b.
 /// This is the same algorithm used by holochain for typed hashes.
 /// Notably the output hash length is configurable.
