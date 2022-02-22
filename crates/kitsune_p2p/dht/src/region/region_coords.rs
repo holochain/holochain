@@ -11,14 +11,12 @@ pub struct RegionCoords {
 }
 
 impl RegionCoords {
-    /// TODO: does this need to map to the actual absolute values, i.e. undergo
-    /// topological transformation, or is this correct?
+    /// Map the quantized coordinates into the actual Timestamp and DhtLocation
+    /// bounds specifying the region
     pub fn to_bounds(&self, topo: &Topology) -> RegionBounds {
-        let (x0, x1) = self.space.loc_bounds(topo);
-        let (t0, t1) = self.time.timestamp_bounds(topo);
         RegionBounds {
-            x: ArcInterval::new(x0, x1),
-            t: t0..t1,
+            x: self.space.loc_bounds(topo),
+            t: self.time.timestamp_bounds(topo),
         }
     }
 
@@ -29,15 +27,20 @@ impl RegionCoords {
 
 #[derive(Debug)]
 pub struct RegionBounds {
-    pub x: ArcInterval,
-    pub t: std::ops::Range<Timestamp>,
+    pub x: (Loc, Loc),
+    pub t: (Timestamp, Timestamp),
 }
 
 impl RegionBounds {
-    pub fn new((x0, x1): (Loc, Loc), (t0, t1): (Timestamp, Timestamp)) -> Self {
-        Self {
-            x: ArcInterval::new(x0, x1),
-            t: t0..t1,
-        }
+    pub fn new(x: (Loc, Loc), t: (Timestamp, Timestamp)) -> Self {
+        Self { x, t }
+    }
+
+    pub fn arc_interval(&self) -> ArcInterval {
+        ArcInterval::new(self.x.0, self.x.1)
+    }
+
+    pub fn time_range(&self) -> std::ops::RangeInclusive<Timestamp> {
+        self.t.0..=self.t.1
     }
 }

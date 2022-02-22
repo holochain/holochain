@@ -310,7 +310,7 @@ impl<DS: DnaStore> Spaces<DS> {
                     .map(|column| {
                         column
                             .map(|(_, coords)| {
-                                let bounds = coords.to_bounds();
+                                let bounds = coords.to_bounds(&topology);
                                 let (x0, x1) = bounds.x;
                                 let (t0, t1) = bounds.t;
                                 stmt.query_row(

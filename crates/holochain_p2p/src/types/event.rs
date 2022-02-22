@@ -4,7 +4,7 @@
 use crate::*;
 use holochain_zome_types::signature::Signature;
 use kitsune_p2p::{
-    agent_store::AgentInfoSigned, dht::region::RegionBoundsMapped, dht_arc::DhtLocation, event::*,
+    agent_store::AgentInfoSigned, dht::region::RegionBounds, dht_arc::DhtLocation, event::*,
 };
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
@@ -108,7 +108,7 @@ pub enum FetchOpDataQuery {
     /// Fetch all ops with the hashes specified
     Hashes(Vec<holo_hash::DhtOpHash>),
     /// Fetch all ops within the time and space bounds specified
-    Regions(Vec<RegionBoundsMapped>),
+    Regions(Vec<RegionBounds>),
 }
 
 impl FetchOpDataQuery {
