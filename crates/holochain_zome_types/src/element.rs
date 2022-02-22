@@ -9,7 +9,6 @@ use crate::signature::Signature;
 use crate::Entry;
 use crate::Header;
 use holo_hash::hash_type;
-use holo_hash::hash_type::HashTypeSync;
 use holo_hash::HashableContent;
 use holo_hash::HashableContentBytes;
 use holo_hash::HeaderHash;
@@ -250,10 +249,11 @@ where
     pub signature: Signature,
 }
 
+#[cfg(feature = "test_utils")]
 impl<T> SignedHashed<T>
 where
     T: HashableContent,
-    <T as holo_hash::HashableContent>::HashType: HashTypeSync,
+    <T as holo_hash::HashableContent>::HashType: holo_hash::hash_type::HashTypeSync,
 {
     /// Create a new signed and hashed content by hashing the content.
     pub fn new(content: T, signature: Signature) -> Self {
