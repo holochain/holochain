@@ -218,8 +218,7 @@ async fn run_test(
 
     // Integration should have 3 ops in it
     // StoreEntry should be invalid.
-    // RegisterAgentActivity doesn't run app validation
-    // So they will be valid.
+    // RegisterAgentActivity will be valid.
     let expected_count = 3 + expected_count;
     let alice_env = conductors[0]
         .get_dht_env(&alice_cell_id.dna_hash())
@@ -236,6 +235,7 @@ async fn run_test(
             &invalid_header_hash,
             &invalid_entry_hash
         ));
+        // Expect having one invalid op for the store entry.
         assert_eq!(num_valid(&txn), expected_count - 1);
     });
 
@@ -260,6 +260,7 @@ async fn run_test(
             &invalid_header_hash,
             &invalid_entry_hash
         ));
+        // Expect having one invalid op for the store entry.
         assert_eq!(num_valid(&txn), expected_count - 1);
     });
 
@@ -289,6 +290,7 @@ async fn run_test(
             &invalid_entry_hash
         ));
         assert!(expected_invalid_link(&txn, &invalid_link_hash));
+        // Expect having two invalid ops for the two store entries.
         assert_eq!(num_valid(&txn), expected_count - 2);
     });
 
@@ -319,6 +321,7 @@ async fn run_test(
             &invalid_entry_hash
         ));
         assert!(expected_invalid_link(&txn, &invalid_link_hash));
+        // Expect having two invalid ops for the two store entries.
         assert_eq!(num_valid(&txn), expected_count - 2);
     });
 
@@ -399,6 +402,7 @@ async fn run_test_entry_def_id(
             &invalid_header_hash,
             &invalid_entry_hash
         ));
+        // Expect having two invalid ops for the two store entries plus the 3 from the previous test.
         assert_eq!(num_valid(&txn), expected_count - 5);
     });
 }

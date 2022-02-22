@@ -26,6 +26,7 @@
 //! This is where you can implement your own logic for checking
 //! that it is valid to store an [`Entry`].
 //! You can think of this as the "Create" from the CRUD acronym.
+//!
 //! ##### Metadata
 //! The entry authority is also responsible for storing the metadata for each entry.
 //! They receive the [`Op::RegisterUpdate`] and [`Op::RegisterDelete`].
