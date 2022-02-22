@@ -4,9 +4,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 - Init functions can now make zome calls. [#1186](https://github.com/holochain/holochain/pull/1186)
-
 - Adds header hashing to `hash` host fn [1227](https://github.com/holochain/holochain/pull/1227)
 - Adds blake2b hashing to `hash` host fn [1228](https://github.com/holochain/holochain/pull/1228)
+- Proxy server chosen from bootstrap server proxy_list [1242](https://github.com/holochain/holochain/pull/1242)
+
+```yaml
+network:
+  transport_pool:
+    - type: proxy
+      proxy_config:
+        type: remote_proxy_client_from_bootstrap
+        bootstrap_url: https://bootstrap.holo.host
+        fallback_proxy_url: ~
+```
 
 ## 0.0.126
 
