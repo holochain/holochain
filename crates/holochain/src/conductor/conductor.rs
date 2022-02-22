@@ -73,6 +73,7 @@ use holochain_state::prelude::from_blob;
 use holochain_state::prelude::StateMutationResult;
 use holochain_state::prelude::StateQueryResult;
 use holochain_types::prelude::*;
+pub use holochain_types::share;
 use rusqlite::{OptionalExtension, Transaction};
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::AtomicBool;
@@ -82,8 +83,6 @@ use tracing::*;
 
 #[cfg(feature = "test_utils")]
 use super::handle::MockConductorHandleT;
-
-mod share;
 
 /// The status of an installed Cell, which captures different phases of its lifecycle
 #[derive(Debug, Clone, PartialEq, Eq)]
