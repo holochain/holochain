@@ -717,9 +717,11 @@ async fn test_bad_entry_validation_after_genesis_returns_zome_call_error() {
     let unit_entry_def = EntryDef::default_with_id("unit");
     let bad_zome = InlineZome::new_unique(vec![unit_entry_def.clone()])
         .callback("validate", |_api, op: Op| match op {
-            Op::StoreEntry { header, .. } if header.header.app_entry_type().is_some() => Ok(
-                ValidateResult::Invalid("intentional invalid result for testing".into()),
-            ),
+            Op::StoreEntry { header, .. } if header.hashed.content.app_entry_type().is_some() => {
+                Ok(ValidateResult::Invalid(
+                    "intentional invalid result for testing".into(),
+                ))
+            }
             _ => Ok(ValidateResult::Valid),
         })
         .callback("create", move |api, ()| {
@@ -774,7 +776,9 @@ async fn test_apps_disable_on_panic_after_genesis() {
         // so we can cause failure in it. But it must also be after genesis.
         .callback("validate", |_api, op: Op| {
             match op {
-                Op::StoreEntry { header, .. } if header.header.app_entry_type().is_some() => {
+                Op::StoreEntry { header, .. }
+                    if header.hashed.content.app_entry_type().is_some() =>
+                {
                     // Trigger a deserialization error
                     let _: Entry = SerializedBytes::try_from(())?.try_into()?;
                     Ok(ValidateResult::Valid)
