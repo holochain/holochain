@@ -14,7 +14,7 @@ use crate::PrimitiveHashType;
 // MAYBE: consider making lazy with OnceCell
 #[cfg_attr(feature = "serialization", derive(Debug, Serialize, Deserialize))]
 pub struct HoloHashed<C: HashableContent> {
-    /// Whatever type C is as data.
+    /// The content which is hashed of type C.
     pub content: C,
     /// The hash of the content C.
     pub hash: HoloHashOf<C>,
