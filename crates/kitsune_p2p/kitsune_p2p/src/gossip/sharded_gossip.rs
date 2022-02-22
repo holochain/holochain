@@ -50,7 +50,8 @@ mod store;
 mod bandwidth;
 mod next_target;
 
-#[cfg(all(test, feature = "test_utils"))]
+#[cfg(feature = "test_utils")]
+#[allow(missing_docs)]
 pub(crate) mod tests;
 
 /// max send buffer size (keep it under 16384 with a little room for overhead)

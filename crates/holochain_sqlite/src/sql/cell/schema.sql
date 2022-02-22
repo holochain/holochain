@@ -112,8 +112,6 @@ CREATE TABLE IF NOT EXISTS DhtOp (
     receipts_complete   INTEGER     NULL,     -- BOOLEAN
     last_publish_time   INTEGER     NULL,   -- UNIX TIMESTAMP SECONDS
 
-    blob             BLOB           NOT NULL,
-
     -- 0: Awaiting System Validation Dependencies.
     -- 1: Successfully System Validated (And ready for app validation).
     -- 2: Awaiting App Validation Dependencies.

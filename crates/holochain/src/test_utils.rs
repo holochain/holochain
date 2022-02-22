@@ -482,7 +482,7 @@ fn get_published_ops<Db: ReadAccess<DbKindAuthored>>(
         txn.prepare(
             "
             SELECT
-            DhtOp.blob
+            DhtOp.type, Header.hash, Header.blob
             FROM DhtOp
             JOIN
             Header ON DhtOp.header_hash = Header.hash
@@ -497,7 +497,12 @@ fn get_published_ops<Db: ReadAccess<DbKindAuthored>>(
                 ":store_entry": DhtOpType::StoreEntry,
                 ":author": author,
             },
-            |row| from_blob(row.get("blob")?),
+            |row| {
+                let op_type: DhtOpType = row.get("type")?;
+                let hash: HeaderHash = row.get("hash")?;
+                let header: Header = from_blob(row.get("blob")?)?;
+                Ok(DhtOpLight::from_type(op_type, hash, &header)?)
+            },
         )
         .unwrap()
         .collect::<StateQueryResult<_>>()
