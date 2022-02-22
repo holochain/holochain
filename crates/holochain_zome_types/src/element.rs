@@ -15,7 +15,6 @@ use holo_hash::HashableContentBytes;
 use holo_hash::HeaderHash;
 use holo_hash::HoloHashOf;
 use holo_hash::HoloHashed;
-use holo_hash::PrimitiveHashType;
 use holochain_serialized_bytes::prelude::*;
 
 #[cfg(feature = "test_utils")]
@@ -420,7 +419,7 @@ impl<'a, T> arbitrary::Arbitrary<'a> for SignedHashed<T>
 where
     T: HashableContent,
     T: arbitrary::Arbitrary<'a>,
-    <T as holo_hash::HashableContent>::HashType: PrimitiveHashType,
+    <T as holo_hash::HashableContent>::HashType: holo_hash::PrimitiveHashType,
 {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         Ok(Self {
