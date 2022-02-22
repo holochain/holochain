@@ -335,7 +335,7 @@ struct ProxyEpHnd {
     local_cert: Tx2Cert,
     logic_hnd: LogicChanHandle<EpEvent>,
     inner: Share<ProxyEpInner>,
-    cur_proxy_url: Arc<parking_lot::RwLock<Option<ProxyUrl>>>,
+    cur_proxy_url: Share<Option<ProxyUrl>>,
 }
 
 async fn get_con_hnd(
@@ -366,7 +366,7 @@ impl ProxyEpHnd {
         sub_ep_hnd: EpHnd,
         logic_hnd: LogicChanHandle<EpEvent>,
         backoff: Backoff,
-        cur_proxy_url: Arc<parking_lot::RwLock<Option<ProxyUrl>>>,
+        cur_proxy_url: Share<Option<ProxyUrl>>,
     ) -> KitsuneResult<Arc<ProxyEpHnd>> {
         let local_cert = sub_ep_hnd.local_cert();
         Ok(Arc::new(ProxyEpHnd {
@@ -414,7 +414,7 @@ impl AsEpHnd for ProxyEpHnd {
     }
 
     fn local_addr(&self) -> KitsuneResult<TxUrl> {
-        if let Some(proxy_url) = self.cur_proxy_url.read().clone() {
+        if let Ok(Some(proxy_url)) = self.cur_proxy_url.share_ref(|r| Ok(r.clone())) {
             let proxy_addr: TxUrl = ProxyUrl::new(
                 proxy_url.as_base().as_str(),
                 self.local_cert.as_digest().clone(),
@@ -502,7 +502,7 @@ async fn incoming_evt_logic(
     sub_ep: Ep,
     hnd: Arc<ProxyEpHnd>,
     logic_hnd: LogicChanHandle<EpEvent>,
-    cur_proxy_url: Arc<parking_lot::RwLock<Option<ProxyUrl>>>,
+    cur_proxy_url: Share<Option<ProxyUrl>>,
 ) {
     let local_cert = sub_ep.handle().local_cert();
     let local_cert = &local_cert;
@@ -534,7 +534,7 @@ async fn ensure_proxy_register(
     logic_hnd: &LogicChanHandle<EpEvent>,
     local_cert: &Tx2Cert,
     sub_con: ConHnd,
-    cur_proxy_url: &parking_lot::RwLock<Option<ProxyUrl>>,
+    cur_proxy_url: &Share<Option<ProxyUrl>>,
 ) -> KitsuneResult<()> {
     // first make sure we are not connecting to ourselves
     // (or some node that somehow insecurely is using the same cert)
@@ -583,7 +583,7 @@ async fn incoming_evt_handle(
     local_cert: Tx2Cert,
     hnd: &Arc<ProxyEpHnd>,
     logic_hnd: &LogicChanHandle<EpEvent>,
-    cur_proxy_url: &parking_lot::RwLock<Option<ProxyUrl>>,
+    cur_proxy_url: &Share<Option<ProxyUrl>>,
 ) {
     //println!("EVT: {:?}", evt);
     use EpEvent::*;
@@ -763,7 +763,7 @@ async fn write_to_sub_con(
     sub_con: ConHnd,
     msg_id: MsgId,
     data: PoolBuf,
-    cur_proxy_url: &parking_lot::RwLock<Option<ProxyUrl>>,
+    cur_proxy_url: &Share<Option<ProxyUrl>>,
 ) -> KitsuneResult<()> {
     let t = tuning_params.implicit_timeout();
     if let Err(e) = sub_con.write(msg_id, data, t).await {
@@ -780,7 +780,7 @@ async fn close_connection(
     sub_con: ConHnd,
     code: u32,
     reason: &str,
-    cur_proxy_url: &parking_lot::RwLock<Option<ProxyUrl>>,
+    cur_proxy_url: &Share<Option<ProxyUrl>>,
 ) {
     let c_fut = sub_con.close(code, reason);
     close_connection_inner(inner, logic_hnd, sub_con, code, reason, cur_proxy_url).await;
@@ -793,7 +793,7 @@ async fn close_connection_inner(
     sub_con: ConHnd,
     code: u32,
     reason: &str,
-    cur_proxy_url: &parking_lot::RwLock<Option<ProxyUrl>>,
+    cur_proxy_url: &Share<Option<ProxyUrl>>,
 ) {
     let peer_dir = sub_con.dir();
     let peer_cert = sub_con.peer_cert();
@@ -814,7 +814,7 @@ async fn close_connection_inner(
 
     let kill_cons = match inner_res {
         Ok((backoff, kill_cons)) => {
-            if let Some(proxy_url) = cur_proxy_url.read().clone() {
+            if let Ok(Some(proxy_url)) = cur_proxy_url.share_ref(|r| Ok(r.clone())) {
                 let proxy_cert = Tx2Cert::from(proxy_url.digest());
                 if proxy_cert == peer_cert {
                     // reset our client proxy connection check timer
@@ -865,7 +865,7 @@ impl ProxyEp {
         // so technically, it only really would need to be 2.
         const LOGIC_CHAN_LIMIT: usize = 32;
 
-        let cur_proxy_url = Arc::new(parking_lot::RwLock::new(None));
+        let cur_proxy_url = Share::new(None);
 
         let logic_chan = LogicChan::new(LOGIC_CHAN_LIMIT);
         let logic_hnd = logic_chan.handle().clone();
@@ -897,7 +897,10 @@ impl ProxyEp {
                 .get_proxy_url(proxy_from_bootstrap_cb.clone())
                 .await
             {
-                *cur_proxy_url.write() = Some(ProxyUrl::from(proxy_url.as_str()));
+                let _ = cur_proxy_url.share_mut(|r, _| {
+                    *r = Some(ProxyUrl::from(proxy_url.as_str()));
+                    Ok(())
+                });
                 let timeout = tuning_params.implicit_timeout();
                 let hnd = hnd.clone();
                 tokio::task::spawn(async move {
@@ -918,7 +921,10 @@ impl ProxyEp {
                             .get_proxy_url(proxy_from_bootstrap_cb.clone())
                             .await
                         {
-                            *cur_proxy_url.write() = Some(ProxyUrl::from(proxy_url.as_str()));
+                            let _ = cur_proxy_url.share_mut(|r, _| {
+                                *r = Some(ProxyUrl::from(proxy_url.as_str()));
+                                Ok(())
+                            });
                             let timeout = tuning_params.implicit_timeout();
                             let _ = hnd.get_connection(proxy_url, timeout).await;
                         }

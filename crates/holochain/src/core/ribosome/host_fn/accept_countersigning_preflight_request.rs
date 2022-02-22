@@ -453,7 +453,7 @@ pub mod wasm_test {
         assert_eq!(alice_activity.valid_activity.len(), 8);
         assert_eq!(
             &alice_activity.valid_activity[6].1,
-            countersigned_header_alice.header_hashed().as_hash(),
+            countersigned_header_alice.header_address(),
         );
 
         let bob_activity: AgentActivity = conductor
@@ -470,7 +470,7 @@ pub mod wasm_test {
         assert_eq!(bob_activity.valid_activity.len(), 6);
         assert_eq!(
             &bob_activity.valid_activity[4].1,
-            countersigned_header_bob.header_hashed().as_hash(),
+            countersigned_header_bob.header_address(),
         );
     }
 }
