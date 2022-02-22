@@ -77,3 +77,33 @@ pub fn hash_blake2b(input: Vec<u8>, output_len: u8) -> ExternResult<Vec<u8>> {
         _ => unreachable!(),
     }
 }
+
+/// @todo - not implemented on the host
+pub fn hash_sha256(input: Vec<u8>) -> ExternResult<Vec<u8>> {
+    match HDK.with(|h| h.borrow().hash(HashInput::Sha256(input)))? {
+        HashOutput::Sha256(hash) => Ok(hash.as_ref().to_vec()),
+        _ => unreachable!(),
+    }
+}
+
+/// @todo - not implemented on the host
+pub fn hash_sha512(input: Vec<u8>) -> ExternResult<Vec<u8>> {
+    match HDK.with(|h| h.borrow().hash(HashInput::Sha512(input)))? {
+        HashOutput::Sha512(hash) => Ok(hash.as_ref().to_vec()),
+        _ => unreachable!(),
+    }
+}
+
+pub fn hash_keccak256(input: Vec<u8>) -> ExternResult<Vec<u8>> {
+    match HDK.with(|h| h.borrow().hash(HashInput::Keccak256(input)))? {
+        HashOutput::Keccak256(hash) => Ok(hash.as_ref().to_vec()),
+        _ => unreachable!(),
+    }
+}
+
+pub fn hash_sha3(input: Vec<u8>) -> ExternResult<Vec<u8>> {
+    match HDK.with(|h| h.borrow().hash(HashInput::Sha3256(input)))? {
+        HashOutput::Sha3256(hash) => Ok(hash.as_ref().to_vec()),
+        _ => unreachable!(),
+    }
+}
