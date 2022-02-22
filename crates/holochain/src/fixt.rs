@@ -240,7 +240,14 @@ fixturator!(
         let keystore = holochain_state::test_utils::test_keystore();
         tokio_helper::block_forever_on(async {
             fake_genesis(authored_env.env(), dht_env.env(), keystore.clone()).await.unwrap();
-            HostFnWorkspace::new(authored_env.env(), dht_env.env(), cache.env(), keystore, Some(fixt!(AgentPubKey, Predictable, get_fixt_index!()))).await.unwrap()
+            HostFnWorkspace::new(
+                authored_env.env(),
+                dht_env.env(),
+                cache.env(),
+                keystore,
+                Some(fixt!(AgentPubKey, Predictable, get_fixt_index!())),
+                Arc::new(fixt!(DnaDef))
+            ).await.unwrap()
         })
     };
     curve Unpredictable {
@@ -250,7 +257,14 @@ fixturator!(
         let keystore = holochain_state::test_utils::test_keystore();
         tokio_helper::block_forever_on(async {
             fake_genesis(authored_env.env(), dht_env.env(), keystore.clone()).await.unwrap();
-            HostFnWorkspace::new(authored_env.env(), dht_env.env(), cache.env(), keystore, Some(fixt!(AgentPubKey, Predictable, get_fixt_index!()))).await.unwrap()
+            HostFnWorkspace::new(
+                authored_env.env(),
+                dht_env.env(),
+                cache.env(),
+                keystore,
+                Some(fixt!(AgentPubKey, Predictable, get_fixt_index!())),
+                Arc::new(fixt!(DnaDef))
+            ).await.unwrap()
         })
     };
     curve Predictable {
@@ -261,7 +275,14 @@ fixturator!(
         let keystore = holochain_state::test_utils::test_keystore();
         tokio_helper::block_forever_on(async {
             crate::test_utils::fake_genesis_for_agent(authored_env.env(), dht_env.env(), agent.clone(), keystore.clone()).await.unwrap();
-            HostFnWorkspace::new(authored_env.env(), dht_env.env(), cache.env(), keystore, Some(agent)).await.unwrap()
+            HostFnWorkspace::new(
+                authored_env.env(),
+                dht_env.env(),
+                cache.env(),
+                keystore,
+                Some(agent),
+                Arc::new(fixt!(DnaDef))
+            ).await.unwrap()
         })
     };
 );
@@ -275,7 +296,14 @@ fixturator!(
         let keystore = holochain_state::test_utils::test_keystore();
         tokio_helper::block_forever_on(async {
             fake_genesis(authored_env.env(), dht_env.env(), keystore.clone()).await.unwrap();
-            HostFnWorkspaceRead::new(authored_env.env().into(), dht_env.env().into(), cache.env(), keystore, Some(fixt!(AgentPubKey, Predictable, get_fixt_index!()))).await.unwrap()
+            HostFnWorkspaceRead::new(
+                authored_env.env().into(),
+                dht_env.env().into(),
+                cache.env(),
+                keystore,
+                Some(fixt!(AgentPubKey, Predictable, get_fixt_index!())),
+                Arc::new(fixt!(DnaDef))
+            ).await.unwrap()
         })
     };
     curve Unpredictable {
@@ -285,7 +313,14 @@ fixturator!(
         let keystore = holochain_state::test_utils::test_keystore();
         tokio_helper::block_forever_on(async {
             fake_genesis(authored_env.env(), dht_env.env(), keystore.clone()).await.unwrap();
-            HostFnWorkspaceRead::new(authored_env.env().into(), dht_env.env().into(), cache.env(), keystore, Some(fixt!(AgentPubKey, Predictable, get_fixt_index!()))).await.unwrap()
+            HostFnWorkspaceRead::new(
+                authored_env.env().into(),
+                dht_env.env().into(),
+                cache.env(),
+                keystore,
+                Some(fixt!(AgentPubKey, Predictable, get_fixt_index!())),
+                Arc::new(fixt!(DnaDef))
+            ).await.unwrap()
         })
     };
     curve Predictable {
@@ -296,7 +331,14 @@ fixturator!(
         let keystore = holochain_state::test_utils::test_keystore();
         tokio_helper::block_forever_on(async {
             crate::test_utils::fake_genesis_for_agent(authored_env.env(), dht_env.env(), agent.clone(), keystore.clone()).await.unwrap();
-            HostFnWorkspaceRead::new(authored_env.env().into(), dht_env.env().into(), cache.env(), keystore, Some(agent)).await.unwrap()
+            HostFnWorkspaceRead::new(
+                authored_env.env().into(),
+                dht_env.env().into(),
+                cache.env(),
+                keystore,
+                Some(agent),
+                Arc::new(fixt!(DnaDef))
+            ).await.unwrap()
         })
     };
 );
@@ -313,7 +355,7 @@ fixturator!(
 
 fixturator!(
     ZomeCallHostAccess;
-    constructor fn new(HostFnWorkspace, MetaLairClient, HolochainP2pDna, SignalBroadcaster, CellConductorReadHandle, CellId);
+    constructor fn new(HostFnWorkspace, MetaLairClient, HolochainP2pDna, SignalBroadcaster, CellConductorReadHandle);
 );
 
 fixturator!(
@@ -333,7 +375,7 @@ fixturator!(
 
 fixturator!(
     InitHostAccess;
-    constructor fn new(HostFnWorkspace, MetaLairClient, HolochainP2pDna);
+    constructor fn new(HostFnWorkspace, MetaLairClient, HolochainP2pDna, SignalBroadcaster, CellConductorReadHandle);
 );
 
 fixturator!(

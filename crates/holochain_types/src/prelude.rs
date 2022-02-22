@@ -27,7 +27,6 @@ pub use crate::env::*;
 pub use crate::header::*;
 pub use crate::link::*;
 pub use crate::metadata::*;
-pub use crate::properties::*;
 pub use crate::signal::*;
 pub use crate::validate::*;
 

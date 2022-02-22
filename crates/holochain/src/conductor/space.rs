@@ -84,7 +84,7 @@ pub struct TestSpaces {
 #[cfg(test)]
 pub struct TestSpace {
     pub space: Space,
-    _temp_dir: tempdir::TempDir,
+    _temp_dir: tempfile::TempDir,
 }
 
 impl Spaces {
@@ -113,7 +113,7 @@ impl Spaces {
     {
         match self
             .map
-            .share_ref(|spaces| spaces.get(dna_hash).map(|s| f(s)))
+            .share_ref(|spaces| spaces.get(dna_hash).map(&mut f))
         {
             Some(r) => Ok(r),
             None => self
@@ -415,12 +415,14 @@ impl TestSpaces {
         dna_hashes: impl IntoIterator<Item = DnaHash>,
         queue_consumer_map: QueueConsumerMap,
     ) -> Self {
-        use tempdir::TempDir;
         let mut test_spaces: HashMap<DnaHash, _> = HashMap::new();
         for hash in dna_hashes.into_iter() {
             test_spaces.insert(hash.clone(), TestSpace::new(hash));
         }
-        let temp_dir = TempDir::new("holochain-test-environments").unwrap();
+        let temp_dir = tempfile::Builder::new()
+            .prefix("holochain-test-environments")
+            .tempdir()
+            .unwrap();
         let spaces = Spaces::new(
             temp_dir.path().to_path_buf().into(),
             Default::default(),
@@ -444,9 +446,10 @@ impl TestSpaces {
 #[cfg(test)]
 impl TestSpace {
     pub fn new(dna_hash: DnaHash) -> Self {
-        use tempdir::TempDir;
-
-        let temp_dir = TempDir::new("holochain-test-environments").unwrap();
+        let temp_dir = tempfile::Builder::new()
+            .prefix("holochain-test-environments")
+            .tempdir()
+            .unwrap();
 
         Self {
             space: Space::new(

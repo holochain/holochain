@@ -36,9 +36,6 @@ mod network_call_tests;
 #[cfg(test)]
 mod tests;
 
-#[cfg(test)]
-mod validation_tests;
-
 mod error;
 mod types;
 pub mod validation_package;
@@ -140,7 +137,7 @@ async fn app_validation_workflow_inner(
         );
         let (t, a, r) = workspace
             .dht_env
-            .async_commit(move |mut txn| {
+            .async_commit(move |txn| {
                 let mut total = 0;
                 let mut awaiting = 0;
                 let mut rejected = 0;
@@ -159,23 +156,23 @@ async fn app_validation_workflow_inner(
                         Outcome::Accepted => {
                             total += 1;
                             if let Dependency::Null = dependency {
-                                put_integrated(&mut txn, op_hash, ValidationStatus::Valid)?;
+                                put_integrated(txn, op_hash, ValidationStatus::Valid)?;
                             } else {
-                                put_integration_limbo(&mut txn, op_hash, ValidationStatus::Valid)?;
+                                put_integration_limbo(txn, op_hash, ValidationStatus::Valid)?;
                             }
                         }
                         Outcome::AwaitingDeps(deps) => {
                             awaiting += 1;
                             let status = ValidationLimboStatus::AwaitingAppDeps(deps);
-                            put_validation_limbo(&mut txn, op_hash, status)?;
+                            put_validation_limbo(txn, op_hash, status)?;
                         }
                         Outcome::Rejected(_) => {
                             rejected += 1;
                             tracing::warn!("Received invalid op! Warrants aren't implemented yet, so we can't do anything about this right now, but be warned that somebody on the network has maliciously hacked their node.\nOp: {:?}", op_light);
                             if let Dependency::Null = dependency {
-                                put_integrated(&mut txn, op_hash, ValidationStatus::Rejected)?;
+                                put_integrated(txn, op_hash, ValidationStatus::Rejected)?;
                             } else {
-                                put_integration_limbo(&mut txn, op_hash, ValidationStatus::Rejected)?;
+                                put_integration_limbo(txn, op_hash, ValidationStatus::Rejected)?;
                             }
                         }
                     }
@@ -242,14 +239,28 @@ pub async fn element_to_op(
 pub fn op_to_element(op: Op, activity_entry: Option<Entry>) -> Element {
     match op {
         Op::StoreElement { element } => element,
-        Op::StoreEntry { header, entry } => Element::new(header.into_shh(), Some(entry)),
+        Op::StoreEntry { header, entry } => {
+            Element::new(SignedHeaderHashed::raw_from_same_hash(header), Some(entry))
+        }
         Op::RegisterUpdate {
             update, new_entry, ..
-        } => Element::new(update.into_shh(), Some(new_entry)),
-        Op::RegisterDelete { delete, .. } => Element::new(delete.into_shh(), None),
-        Op::RegisterAgentActivity { header } => Element::new(header.into_shh(), activity_entry),
-        Op::RegisterCreateLink { create_link, .. } => Element::new(create_link.into_shh(), None),
-        Op::RegisterDeleteLink { delete_link, .. } => Element::new(delete_link.into_shh(), None),
+        } => Element::new(
+            SignedHeaderHashed::raw_from_same_hash(update),
+            Some(new_entry),
+        ),
+        Op::RegisterDelete { delete, .. } => {
+            Element::new(SignedHeaderHashed::raw_from_same_hash(delete), None)
+        }
+        Op::RegisterAgentActivity { header } => Element::new(
+            SignedHeaderHashed::raw_from_same_hash(header),
+            activity_entry,
+        ),
+        Op::RegisterCreateLink { create_link, .. } => {
+            Element::new(SignedHeaderHashed::raw_from_same_hash(create_link), None)
+        }
+        Op::RegisterDeleteLink { delete_link, .. } => {
+            Element::new(SignedHeaderHashed::raw_from_same_hash(delete_link), None)
+        }
     }
 }
 
@@ -376,7 +387,7 @@ async fn validate_op_outer(
 
     // Get the dna file
     let dna_file = conductor_handle
-        .get_dna(dna_hash.as_ref())
+        .get_dna_file(dna_hash.as_ref())
         .ok_or_else(|| AppValidationError::DnaMissing((*dna_hash).clone()))?;
 
     // Create the ribosome
@@ -393,7 +404,14 @@ pub async fn validate_op(
     let zomes_to_invoke = match op {
         Op::RegisterAgentActivity { .. } | Op::StoreElement { .. } => ZomesToInvoke::All,
         Op::StoreEntry {
-            header: SignedHashed { header, .. },
+            header:
+                SignedHashed {
+                    hashed:
+                        HoloHashed {
+                            content: header, ..
+                        },
+                    ..
+                },
             ..
         } => entry_creation_zomes_to_invoke(header, ribosome.dna_def())?,
         Op::RegisterUpdate {
@@ -403,7 +421,14 @@ pub async fn validate_op(
             original_header, ..
         } => entry_creation_zomes_to_invoke(original_header, ribosome.dna_def())?,
         Op::RegisterCreateLink {
-            create_link: SignedHashed { header, .. },
+            create_link:
+                SignedHashed {
+                    hashed:
+                        HoloHashed {
+                            content: header, ..
+                        },
+                    ..
+                },
             ..
         } => create_link_zomes_to_invoke(header, ribosome.dna_def())?,
         Op::RegisterDeleteLink {
@@ -477,6 +502,7 @@ pub struct AppValidationWorkspace {
     dht_env: DbWrite<DbKindDht>,
     cache: DbWrite<DbKindCache>,
     keystore: MetaLairClient,
+    dna_def: Arc<DnaDef>,
 }
 
 impl AppValidationWorkspace {
@@ -485,12 +511,14 @@ impl AppValidationWorkspace {
         dht_env: DbWrite<DbKindDht>,
         cache: DbWrite<DbKindCache>,
         keystore: MetaLairClient,
+        dna_def: Arc<DnaDef>,
     ) -> Self {
         Self {
             authored_env,
             dht_env,
             cache,
             keystore,
+            dna_def,
         }
     }
 
@@ -501,6 +529,7 @@ impl AppValidationWorkspace {
             self.cache.clone(),
             self.keystore.clone(),
             None,
+            self.dna_def.clone(),
         )
         .await?)
     }

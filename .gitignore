@@ -4,6 +4,7 @@ target/
 *~
 .wasm_cache
 .wasm_target
+sweep.timestamp
 
 flamegraph.svg
 perf.data

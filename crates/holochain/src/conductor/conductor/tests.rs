@@ -15,6 +15,7 @@ use ::fixt::prelude::*;
 use holochain_conductor_api::InstalledAppInfoStatus;
 use holochain_conductor_api::{AdminRequest, AdminResponse, AppRequest, AppResponse, ZomeCall};
 use holochain_keystore::crude_mock_keystore::spawn_crude_mock_keystore;
+use holochain_keystore::crude_mock_keystore::spawn_real_or_mock_keystore;
 use holochain_state::prelude::*;
 use holochain_types::test_utils::fake_cell_id;
 use holochain_wasm_test_utils::TestWasm;
@@ -525,16 +526,13 @@ async fn make_signing_call(client: &mut WebsocketSender, cell: &SweetCell) -> Ap
 /// not seem to be an issue, therefore I'm not putting the effort into fixing it
 /// right now.
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "we need a better mock keystore in order to implement this test"]
-#[allow(unreachable_code, unused_variables, unused_mut)]
 async fn test_signing_error_during_genesis_doesnt_bork_interfaces() {
     observability::test_run().ok();
-    let good_keystore = spawn_test_keystore().await.unwrap();
-    let bad_keystore = spawn_crude_mock_keystore(|| LairError::other("test error"))
+    let (keystore, keystore_control) = spawn_real_or_mock_keystore(|_| Err("test error".into()))
         .await
         .unwrap();
 
-    let envs = test_envs_with_keystore(good_keystore.clone());
+    let envs = test_envs_with_keystore(keystore.clone());
     let config = standard_config();
     let mut conductor = SweetConductor::new(
         SweetConductor::handle_from_existing(&envs, &config, &[]).await,
@@ -543,7 +541,7 @@ async fn test_signing_error_during_genesis_doesnt_bork_interfaces() {
     )
     .await;
 
-    let (agent1, agent2, agent3) = SweetAgents::three(good_keystore.clone()).await;
+    let (agent1, agent2, agent3) = SweetAgents::three(keystore.clone()).await;
 
     let (dna, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Sign])
         .await
@@ -567,7 +565,7 @@ async fn test_signing_error_during_genesis_doesnt_bork_interfaces() {
     let (mut admin_client, _) = conductor.admin_ws_client().await;
 
     // Now use the bad keystore to cause a signing error on the next zome call
-    todo!("switch keystore to always-erroring mode");
+    keystore_control.use_mock();
 
     let response: AdminResponse = admin_client
         .request(AdminRequest::InstallApp(Box::new(InstallAppPayload {
@@ -588,18 +586,13 @@ async fn test_signing_error_during_genesis_doesnt_bork_interfaces() {
     assert_matches!(response, AppResponse::Error(_));
 
     // Go back to the good keystore, see if we can proceed
-    todo!("switch keystore to always-correct mode");
+    keystore_control.use_real();
 
     let response = make_signing_call(&mut app_client, &cell2).await;
     assert_matches!(response, AppResponse::ZomeCall(_));
 
     let response = make_signing_call(&mut app_client, &cell1).await;
     assert_matches!(response, AppResponse::ZomeCall(_));
-
-    // conductor
-    //     .setup_app_for_agent("app3", agent3, &[dna.clone()])
-    //     .await
-    //     .unwrap();
 }
 
 pub(crate) fn simple_create_entry_zome() -> InlineZome {
@@ -693,35 +686,6 @@ async fn test_reenable_app() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "Causing a tokio thread to panic is problematic.
-This is supposed to emulate a panic in a wasm validation callback, but it's not the same.
-However, when wasm panics, it returns an error anyway, so the other similar test
-which tests for validation errors should be sufficient."]
-async fn test_cells_disable_on_validation_panic() {
-    observability::test_run().ok();
-    let bad_zome = InlineZome::new_unique(Vec::new()).callback("validate", |_api, _data: Op| {
-        panic!("intentional panic during validation");
-        #[allow(unreachable_code)]
-        Ok(ValidateResult::Valid)
-    });
-    let mut conductor = SweetConductor::from_standard_config().await;
-
-    // This may be an error, depending on if validation runs before or after
-    // the app is enabled. Proceed in either case.
-    let _ = common_genesis_test_app(&mut conductor, bad_zome).await;
-
-    // - Ensure that the app was disabled because one Cell panicked during validation
-    //   (while publishing genesis elements)
-    assert_eq_retry_10s!(
-        {
-            let state = conductor.get_state_from_handle().await.unwrap();
-            (state.enabled_apps().count(), state.stopped_apps().count())
-        },
-        (0, 1)
-    );
-}
-
-#[tokio::test(flavor = "multi_thread")]
 async fn test_installation_fails_if_genesis_self_check_is_invalid() {
     observability::test_run().ok();
     let bad_zome = InlineZome::new_unique(Vec::new()).callback(
@@ -801,7 +765,7 @@ async fn test_bad_entry_validation_after_genesis_returns_zome_call_error() {
 //       *inline*. It's not enough to have a failing validate for
 //       instance, because that failure will be returned by the zome call.
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "need to figure out how to write this test"]
+#[ignore = "need to figure out how to write this test, i.e. to make genesis panic"]
 async fn test_apps_disable_on_panic_after_genesis() {
     observability::test_run().ok();
     let unit_entry_def = EntryDef::default_with_id("unit");

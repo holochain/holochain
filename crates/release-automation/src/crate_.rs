@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use anyhow::bail;
+use cargo::util::VersionExt;
 use log::{debug, info, warn};
 use semver::Version;
 use structopt::StructOpt;
@@ -34,6 +35,9 @@ pub(crate) struct CrateApplyDevVersionsArgs {
 
     #[structopt(long)]
     pub(crate) commit: bool,
+
+    #[structopt(long)]
+    pub(crate) no_verify: bool,
 }
 
 #[derive(Debug)]
@@ -77,6 +81,15 @@ pub(crate) struct CrateFixupReleases {
 
     #[structopt(long)]
     pub(crate) commit: bool,
+
+    #[structopt(long)]
+    pub(crate) no_verify: bool,
+}
+
+#[derive(Debug, StructOpt)]
+pub(crate) struct CrateCheckArgs {
+    #[structopt(long)]
+    offline: bool,
 }
 
 #[derive(Debug, StructOpt)]
@@ -86,6 +99,8 @@ pub(crate) enum CrateCommands {
 
     /// check the latest (or given) release for crates that aren't published, remove their tags, and bump their version.
     FixupReleases(CrateFixupReleases),
+
+    Check(CrateCheckArgs),
 }
 
 pub(crate) fn cmd(args: &crate::cli::Args, cmd_args: &CrateArgs) -> CommandResult {
@@ -109,6 +124,7 @@ pub(crate) fn cmd(args: &crate::cli::Args, cmd_args: &CrateArgs) -> CommandResul
             &subcmd_args.dev_suffix,
             subcmd_args.dry_run,
             subcmd_args.commit,
+            subcmd_args.no_verify,
         ),
 
         CrateCommands::FixupReleases(subcmd_args) => fixup_releases(
@@ -117,7 +133,14 @@ pub(crate) fn cmd(args: &crate::cli::Args, cmd_args: &CrateArgs) -> CommandResul
             &subcmd_args.fixup_releases,
             subcmd_args.dry_run,
             subcmd_args.commit,
+            subcmd_args.no_verify,
         ),
+
+        CrateCommands::Check(subcmd_args) => {
+            ws.cargo_check(subcmd_args.offline)?;
+
+            Ok(())
+        }
     }
 }
 
@@ -137,6 +160,7 @@ pub(crate) fn apply_dev_versions<'a>(
     dev_suffix: &str,
     dry_run: bool,
     commit: bool,
+    no_verify: bool,
 ) -> Fallible<()> {
     let applicable_crates = ws
         .members()?
@@ -161,7 +185,9 @@ pub(crate) fn apply_dev_versions<'a>(
 
         if !dry_run {
             // this checks consistency and also updates the Cargo.lock file(s)
-            ws.cargo_check(false)?;
+            if !no_verify {
+                ws.cargo_check(false)?;
+            }
 
             if commit {
                 ws.git_add_all_and_commit(&commit_msg, None)?;
@@ -198,7 +224,7 @@ pub(crate) fn apply_dev_vesrions_to_selection<'a>(
             continue;
         }
 
-        version.increment_patch();
+        increment_patch(&mut version);
         version = semver::Version::parse(&format!("{}-{}", version, dev_suffix))?;
 
         debug!(
@@ -225,12 +251,19 @@ pub(crate) fn apply_dev_vesrions_to_selection<'a>(
     Ok(msg)
 }
 
+pub(crate) fn increment_patch(v: &mut semver::Version) {
+    v.patch += 1;
+    v.pre = semver::Prerelease::EMPTY;
+    v.build = semver::BuildMetadata::EMPTY;
+}
+
 pub(crate) fn fixup_releases<'a>(
     ws: &'a ReleaseWorkspace<'a>,
     dev_suffix: &str,
     fixup: &FixupReleases,
     dry_run: bool,
     commit: bool,
+    no_verify: bool,
 ) -> Fallible<()> {
     let mut unpublished_crates: std::collections::BTreeMap<
         String,
@@ -314,7 +347,9 @@ pub(crate) fn fixup_releases<'a>(
 
         if !dry_run {
             // this checks consistency and also updates the Cargo.lock file(s)
-            ws.cargo_check(false)?;
+            if !no_verify {
+                ws.cargo_check(false)?;
+            };
 
             if commit {
                 ws.git_add_all_and_commit(&commit_msg, None)?;

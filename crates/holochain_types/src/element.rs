@@ -348,8 +348,10 @@ pub trait SignedHeaderHashedExt {
     fn from_content_sync(signed_header: SignedHeader) -> SignedHeaderHashed;
     /// Sign some content
     #[allow(clippy::new_ret_no_self)]
-    async fn sign(keystore: &MetaLairClient, header: HeaderHashed)
-        -> LairResult<SignedHeaderHashed>;
+    async fn sign(
+        keystore: &MetaLairClient,
+        header: HeaderHashed,
+    ) -> LairResult<SignedHeaderHashed>;
     /// Validate the data
     async fn validate(&self) -> Result<(), KeystoreError>;
 }

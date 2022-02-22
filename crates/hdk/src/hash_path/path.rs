@@ -3,8 +3,8 @@ use crate::hash_path::shard::SHARDEND;
 use crate::prelude::*;
 use holochain_wasmer_guest::*;
 use holochain_zome_types::link::LinkTag;
+use holochain_zome_types::validate::RequiredValidationType;
 use std::str::FromStr;
-use validate::RequiredValidationType;
 
 /// Allows for "foo.bar.baz" to automatically move to/from ["foo", "bar", "baz"] components.
 /// Technically it's moving each string component in as bytes.

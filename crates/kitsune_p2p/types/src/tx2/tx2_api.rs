@@ -1,4 +1,4 @@
-#![allow(clippy::mem_discriminant_non_enum)] // these actually *are* enums...
+#![allow(enum_intrinsics_non_enums)] // these actually *are* enums...
 //! Usability api for tx2 kitsune transports.
 
 use crate::codec::*;
@@ -208,6 +208,7 @@ fn rmap_insert<C: Codec + 'static + Send + Unpin>(
 pub struct Tx2ConHnd<C: Codec + 'static + Send + Unpin> {
     local_cert: Tx2Cert,
     con: ConHnd,
+    #[allow(dead_code)]
     url: TxUrl,
     rmap: ShareRMap<C>,
     metrics: Arc<Tx2ApiMetrics>,

@@ -186,7 +186,7 @@ impl HashableContent for Entry {
     }
 }
 
-/// Data to create an entry.
+/// Zome input to create an entry.
 #[derive(PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct CreateInput {
     /// EntryDefId for the created entry.
@@ -234,7 +234,7 @@ impl AsRef<crate::EntryDefId> for CreateInput {
     }
 }
 
-/// Zome IO for get and get_details calls.
+/// Zome input for get and get_details calls.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct GetInput {
     /// Any DHT hash to pass to get or get_details.
@@ -253,7 +253,7 @@ impl GetInput {
     }
 }
 
-/// Zome IO for must_get_valid_element.
+/// Zome input for must_get_valid_element.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct MustGetValidElementInput(HeaderHash);
 
@@ -269,7 +269,7 @@ impl MustGetValidElementInput {
     }
 }
 
-/// Zome IO for must_get_entry.
+/// Zome input for must_get_entry.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct MustGetEntryInput(EntryHash);
 
@@ -285,7 +285,7 @@ impl MustGetEntryInput {
     }
 }
 
-/// Zome IO for must_get_header.
+/// Zome input for must_get_header.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct MustGetHeaderInput(HeaderHash);
 
@@ -301,7 +301,7 @@ impl MustGetHeaderInput {
     }
 }
 
-/// Zome IO inner for update.
+/// Zome input type for all update operations.
 #[derive(PartialEq, Debug, Deserialize, Serialize, Clone)]
 pub struct UpdateInput {
     /// Header of the element being updated.
@@ -320,11 +320,11 @@ impl UpdateInput {
     }
 }
 
-/// Zome IO inner for delete.
+/// Zome input for all delete operations.
 #[derive(PartialEq, Debug, Deserialize, Serialize, Clone)]
 pub struct DeleteInput {
     /// Header of the element being deleted.
-    pub deletes_header_address: holo_hash::HeaderHash,
+    pub deletes_header_hash: holo_hash::HeaderHash,
     /// Chain top ordering behaviour for the delete.
     pub chain_top_ordering: ChainTopOrdering,
 }
@@ -332,12 +332,22 @@ pub struct DeleteInput {
 impl DeleteInput {
     /// Constructor.
     pub fn new(
-        deletes_header_address: holo_hash::HeaderHash,
+        deletes_header_hash: holo_hash::HeaderHash,
         chain_top_ordering: ChainTopOrdering,
     ) -> Self {
         Self {
-            deletes_header_address,
+            deletes_header_hash,
             chain_top_ordering,
+        }
+    }
+}
+
+impl From<holo_hash::HeaderHash> for DeleteInput {
+    /// Sets [`ChainTopOrdering`] to `default` = `Strict` when created from a hash.
+    fn from(deletes_header_hash: holo_hash::HeaderHash) -> Self {
+        Self {
+            deletes_header_hash,
+            chain_top_ordering: ChainTopOrdering::default(),
         }
     }
 }

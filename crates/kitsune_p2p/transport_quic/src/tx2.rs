@@ -14,6 +14,7 @@ use std::sync::Arc;
 
 /// Configuration for QuicBackendAdapt
 #[non_exhaustive]
+#[derive(Default)]
 pub struct QuicConfig {
     /// Tls config
     /// Default: None = ephemeral.
@@ -22,15 +23,6 @@ pub struct QuicConfig {
     /// Tuning Params
     /// Default: None = default.
     pub tuning_params: Option<KitsuneP2pTuningParams>,
-}
-
-impl Default for QuicConfig {
-    fn default() -> Self {
-        Self {
-            tls: None,
-            tuning_params: None,
-        }
-    }
 }
 
 impl QuicConfig {
@@ -43,7 +35,7 @@ impl QuicConfig {
             Some(tls) => tls,
         };
 
-        let tuning_params = tuning_params.unwrap_or_else(KitsuneP2pTuningParams::default);
+        let tuning_params = tuning_params.unwrap_or_default();
 
         Ok((tls, tuning_params))
     }

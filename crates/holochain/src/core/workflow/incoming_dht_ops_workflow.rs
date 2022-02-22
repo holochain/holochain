@@ -32,18 +32,10 @@ struct InOpBatchEntry {
 #[derive(Clone)]
 pub struct IncomingOpsBatch(RwShare<InOpBatch>);
 
+#[derive(Default)]
 struct InOpBatch {
     is_running: bool,
     pending: Vec<InOpBatchEntry>,
-}
-
-impl Default for InOpBatch {
-    fn default() -> Self {
-        Self {
-            is_running: false,
-            pending: Vec::new(),
-        }
-    }
 }
 
 impl Default for IncomingOpsBatch {
