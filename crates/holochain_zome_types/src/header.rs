@@ -98,6 +98,24 @@ pub enum Header {
     Delete(Delete),
 }
 
+#[derive(Clone, Debug, Serialize, PartialEq, Eq, Hash)]
+#[serde(tag = "type")]
+/// This allows header types to be serialized to bytes without requiring
+/// an owned value. This produces the same bytes as if they were
+/// serialized with the [`Header`] type.
+pub(crate) enum HeaderRef<'a> {
+    Dna(&'a Dna),
+    AgentValidationPkg(&'a AgentValidationPkg),
+    InitZomesComplete(&'a InitZomesComplete),
+    CreateLink(&'a CreateLink),
+    DeleteLink(&'a DeleteLink),
+    OpenChain(&'a OpenChain),
+    CloseChain(&'a CloseChain),
+    Create(&'a Create),
+    Update(&'a Update),
+    Delete(&'a Delete),
+}
+
 pub type HeaderHashed = HoloHashed<Header>;
 
 /// a utility wrapper to write intos for our data types
@@ -121,7 +139,7 @@ macro_rules! write_into_header {
 
         impl std::fmt::Display for HeaderType {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                writeln!(
+                write!(
                     f,
                     "{}",
                     match self {
@@ -345,6 +363,41 @@ impl Header {
 }
 
 impl_hashable_content!(Header, Header);
+
+/// Allows the internal header types to produce
+/// a [`HeaderHash`] from a reference to themselves.
+macro_rules! impl_hashable_content_for_ref {
+    ($n: ident) => {
+        impl HashableContent for $n {
+            type HashType = holo_hash::hash_type::Header;
+
+            fn hash_type(&self) -> Self::HashType {
+                use holo_hash::PrimitiveHashType;
+                holo_hash::hash_type::Header::new()
+            }
+
+            fn hashable_content(&self) -> holo_hash::HashableContentBytes {
+                let h = HeaderRef::$n(self);
+                let sb = SerializedBytes::from(UnsafeBytes::from(
+                    holochain_serialized_bytes::encode(&h)
+                        .expect("Could not serialize HashableContent"),
+                ));
+                holo_hash::HashableContentBytes::Content(sb)
+            }
+        }
+    };
+}
+
+impl_hashable_content_for_ref!(Dna);
+impl_hashable_content_for_ref!(AgentValidationPkg);
+impl_hashable_content_for_ref!(InitZomesComplete);
+impl_hashable_content_for_ref!(CreateLink);
+impl_hashable_content_for_ref!(DeleteLink);
+impl_hashable_content_for_ref!(CloseChain);
+impl_hashable_content_for_ref!(OpenChain);
+impl_hashable_content_for_ref!(Create);
+impl_hashable_content_for_ref!(Update);
+impl_hashable_content_for_ref!(Delete);
 
 /// this id is an internal reference, which also serves as a canonical ordering
 /// for zome initialization.  The value should be auto-generated from the Zome Bundle def
@@ -619,13 +672,14 @@ impl_to_sql_via_display!(EntryType);
 pub struct AppEntryType {
     /// u8 identifier of what entry type this is
     /// this needs to match the position of the entry type returned by entry defs
-    pub(crate) id: EntryDefIndex,
+    pub id: EntryDefIndex,
     /// u8 identifier of what zome this is for
     /// this needs to be shared across the dna
     /// comes from the numeric index position of a zome in dna config
-    pub(crate) zome_id: ZomeId,
+    pub zome_id: ZomeId,
     // @todo don't do this, use entry defs instead
-    pub(crate) visibility: EntryVisibility,
+    /// The visibility of this app entry.
+    pub visibility: EntryVisibility,
 }
 
 impl AppEntryType {

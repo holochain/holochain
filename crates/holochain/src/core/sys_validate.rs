@@ -370,9 +370,10 @@ pub fn validate_chain<'iter>(
 ) -> SysValidationResult<()> {
     // Check the chain starts in a valid way.
     let mut last_item = match headers.next() {
-        Some(hh) => {
-            let header = hh.as_content();
-            let hash = hh.as_hash();
+        Some(HeaderHashed {
+            hash,
+            content: header,
+        }) => {
             match persisted_chain_head {
                 Some((prev_hash, prev_seq)) => {
                     check_prev_header_chain(prev_hash, *prev_seq, header)
@@ -392,9 +393,11 @@ pub fn validate_chain<'iter>(
         None => return Ok(()),
     };
 
-    for hh in headers {
-        let header = hh.as_content();
-        let hash = hh.as_hash();
+    for HeaderHashed {
+        hash,
+        content: header,
+    } in headers
+    {
         // Check each item of the chain is valid.
         check_prev_header_chain(last_item.0, last_item.1, header)
             .map_err(ValidationOutcome::from)?;
