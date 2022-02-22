@@ -110,7 +110,7 @@ async fn integrate_query() {
     // dump_tmp(&env.env());
     let test_network = test_network(None, None).await;
     let holochain_p2p_cell = test_network.dna_network();
-    integrate_dht_ops_workflow(env.env().into(), qt, holochain_p2p_cell)
+    integrate_dht_ops_workflow(env.env().into(), &env.env().into(), qt, holochain_p2p_cell)
         .await
         .unwrap();
     let hashes = env
@@ -216,7 +216,7 @@ fn create_and_insert_op(
             }
             if facts.awaiting_integration {
                 set_validation_stage(txn, &hash, ValidationLimboStatus::AwaitingIntegration)
-                .unwrap();
+                    .unwrap();
             }
             DatabaseResult::Ok(())
         })

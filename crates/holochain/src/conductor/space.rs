@@ -9,11 +9,14 @@ use holochain_conductor_api::conductor::EnvironmentRootPath;
 use holochain_p2p::dht_arc::{ArcInterval, DhtArcSet};
 use holochain_sqlite::{
     conn::{DbSyncLevel, DbSyncStrategy},
-    db::{DbKindAuthored, DbKindCache, DbKindDht, DbWrite},
+    db::{DbKindAuthored, DbKindCache, DbKindDht, DbWrite, ReadAccess},
     prelude::DatabaseResult,
 };
 use holochain_state::prelude::{from_blob, StateQueryResult};
-use holochain_types::dht_op::{DhtOp, DhtOpType};
+use holochain_types::{
+    db_cache::DhtDbQueryCache,
+    dht_op::{DhtOp, DhtOpType},
+};
 use holochain_zome_types::{Entry, EntryVisibility, SignedHeader, Timestamp};
 use kitsune_p2p::event::{TimeWindow, TimeWindowInclusive};
 use rusqlite::named_params;
@@ -64,6 +67,9 @@ pub struct Space {
     /// The dht databases. These are shared across cells.
     /// There is one per unique Dna.
     pub dht_env: DbWrite<DbKindDht>,
+
+    /// A cache for slow database queries.
+    pub dht_query_cache: DhtDbQueryCache,
 
     /// Countersigning workspace that is shared across this cell.
     pub countersigning_workspace: CountersigningWorkspace,
@@ -391,6 +397,7 @@ impl Space {
         let countersigning_workspace = CountersigningWorkspace::new();
         let incoming_op_hashes = IncomingOpHashes::default();
         let incoming_ops_batch = IncomingOpsBatch::default();
+        let dht_query_cache = DhtDbQueryCache::new(dht_env.clone().into());
         let r = Self {
             dna_hash,
             cache,
@@ -399,6 +406,7 @@ impl Space {
             countersigning_workspace,
             incoming_op_hashes,
             incoming_ops_batch,
+            dht_query_cache,
         };
         Ok(r)
     }

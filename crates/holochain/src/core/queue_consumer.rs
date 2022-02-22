@@ -85,6 +85,7 @@ pub async fn spawn_queue_consumer_tasks(
         authored_env,
         dht_env,
         cache,
+        dht_query_cache,
         ..
     } = space;
 
@@ -140,7 +141,7 @@ pub async fn spawn_queue_consumer_tasks(
             spawn_integrate_dht_ops_consumer(
                 dna_hash.clone(),
                 dht_env.clone(),
-                cell_id.clone(),
+                dht_query_cache.clone(),
                 stop.subscribe(),
                 tx_receipt.clone(),
                 network.clone(),
@@ -202,6 +203,7 @@ pub async fn spawn_queue_consumer_tasks(
             SysValidationWorkspace::new(
                 authored_env.clone().into(),
                 dht_env.clone().into(),
+                dht_query_cache.clone(),
                 cache.clone(),
                 Arc::new(dna_def),
             ),

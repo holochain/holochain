@@ -20,6 +20,7 @@ use holochain_state::host_fn_workspace::HostFnStores;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::prelude::*;
 use holochain_state::scratch::SyncScratch;
+use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::prelude::*;
 use holochain_zome_types::Entry;
 use holochain_zome_types::ValidationStatus;
@@ -104,7 +105,19 @@ async fn sys_validation_workflow_inner(
             async move {
                 let (op, op_hash) = so.into_inner();
                 let op_type = op.get_type();
-                let dependency = get_dependency(op_type, &op.header());
+                let header = op.header();
+
+                let dependency = get_dependency(op_type, &header);
+
+                // If this is agent activity, track it for the cache.
+                let activity = matches!(op_type, DhtOpType::RegisterAgentActivity).then(|| {
+                    (
+                        header.author().clone(),
+                        header.header_seq(),
+                        matches!(dependency, Dependency::Null),
+                    )
+                });
+
                 let r = validate_op(
                     &op,
                     &(*workspace),
@@ -113,7 +126,7 @@ async fn sys_validation_workflow_inner(
                     Some(incoming_dht_ops_sender),
                 )
                 .await;
-                r.map(|o| (op_hash, o, dependency))
+                r.map(|o| (op_hash, o, dependency, activity))
             }
         }
     });
@@ -150,15 +163,21 @@ async fn sys_validation_workflow_inner(
     while let Some(chunk) = iter.next().await {
         let num_ops: usize = chunk.iter().map(|c| c.len()).sum();
         tracing::debug!("Committing {} ops", num_ops);
-        let (t, a, m, r) = space
+        let (t, a, m, r, activity) = space
             .dht_env
             .async_commit(move |txn| {
                 let mut total = 0;
                 let mut awaiting = 0;
                 let mut missing = 0;
                 let mut rejected = 0;
+                let mut agent_activity = Vec::new();
                 for outcome in chunk.into_iter().flatten() {
-                    let (op_hash, outcome, dependency) = outcome?;
+                    let (op_hash, outcome, dependency, activity) = outcome?;
+                    // Collect all agent activity.
+                    if let Some(activity) = activity {
+                        agent_activity.push(activity);
+                    }
+
                     match outcome {
                         Outcome::Accepted => {
                             total += 1;
@@ -205,9 +224,27 @@ async fn sys_validation_workflow_inner(
                         }
                     }
                 }
-                WorkflowResult::Ok((total, awaiting, missing, rejected))
+                WorkflowResult::Ok((total, awaiting, missing, rejected, agent_activity))
             })
             .await?;
+
+        // Once the database transaction is committed, add agent activity to the cache
+        // that is ready for integration.
+        for (author, seq, has_no_dependency) in activity {
+            // Any activity with no dependency is integrated in this workflow.
+            // TODO: This will no longer be true when [#1212](https://github.com/holochain/holochain/pull/1212) lands.
+            if has_no_dependency {
+                space
+                    .dht_query_cache
+                    .set_activity_to_integrated(&author, seq)
+                    .await?;
+            } else {
+                space
+                    .dht_query_cache
+                    .set_activity_ready_to_integrate(&author, seq)
+                    .await?;
+            }
+        }
         total += t;
         if let (Some(start), Some(round_time)) = (start, &mut round_time) {
             let round_el = round_time.elapsed();
@@ -800,6 +837,7 @@ pub struct SysValidationWorkspace {
     scratch: Option<SyncScratch>,
     authored_env: DbRead<DbKindAuthored>,
     dht_env: DbRead<DbKindDht>,
+    dht_query_cache: Option<DhtDbQueryCache>,
     cache: DbWrite<DbKindCache>,
     pub(crate) dna_def: Arc<DnaDef>,
 }
@@ -808,21 +846,32 @@ impl SysValidationWorkspace {
     pub fn new(
         authored_env: DbRead<DbKindAuthored>,
         dht_env: DbRead<DbKindDht>,
+        dht_query_cache: DhtDbQueryCache,
         cache: DbWrite<DbKindCache>,
         dna_def: Arc<DnaDef>,
     ) -> Self {
         Self {
             authored_env,
             dht_env,
+            dht_query_cache: Some(dht_query_cache),
             cache,
             dna_def,
             scratch: None,
         }
     }
 
-    pub async fn is_chain_empty(&self, author: AgentPubKey) -> SourceChainResult<bool> {
+    pub async fn is_chain_empty(&self, author: &AgentPubKey) -> SourceChainResult<bool> {
+        // If we have a query cache then this is an authority node and
+        // we can quickly check if the chain is empty from the cache.
+        if let Some(c) = &self.dht_query_cache {
+            return Ok(c.is_chain_empty(author).await?);
+        }
+
+        // Otherwise we need to check this is an author node and
+        // we need to check the author db.
+        let author = author.clone();
         let chain_not_empty = self
-            .dht_env
+            .authored_env
             .async_reader(move |txn| {
                 let mut stmt = txn.prepare(
                     "
@@ -983,6 +1032,7 @@ impl From<&HostFnWorkspace> for SysValidationWorkspace {
             scratch,
             authored_env: authored,
             dht_env: dht,
+            dht_query_cache: None,
             cache,
             dna_def: h.dna_def(),
         }

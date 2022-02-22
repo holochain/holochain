@@ -76,6 +76,7 @@ async fn check_valid_if_dna_test() {
     let mut workspace = SysValidationWorkspace::new(
         env.clone().into(),
         tmp_dht.env().into(),
+        tmp_dht.env().into(),
         tmp_cache.env(),
         Arc::new(dna_def.clone()),
     );
