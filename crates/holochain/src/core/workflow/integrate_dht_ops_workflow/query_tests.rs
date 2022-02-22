@@ -216,7 +216,7 @@ fn create_and_insert_op(
             }
             if facts.awaiting_integration {
                 set_validation_stage(txn, &hash, ValidationLimboStatus::AwaitingIntegration)
-                .unwrap();
+                    .unwrap();
             }
             DatabaseResult::Ok(())
         })
