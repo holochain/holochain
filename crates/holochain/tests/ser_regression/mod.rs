@@ -52,6 +52,7 @@ async fn ser_regression_test() {
             name: "ser_regression_test".to_string(),
             uid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
             properties: SerializedBytes::try_from(()).unwrap(),
+            origin_time: Timestamp::now(),
             zomes: vec![TestWasm::SerRegression.into()].into(),
         },
         vec![TestWasm::SerRegression.into()],
@@ -91,17 +92,7 @@ async fn ser_regression_test() {
     // START CONDUCTOR
     // ///////////////
 
-    let mut dna_store = MockDnaStore::new();
-
-    dna_store.expect_get().return_const(Some(dna_file.clone()));
-    dna_store
-        .expect_add_dnas::<Vec<_>>()
-        .times(2)
-        .return_const(());
-    dna_store
-        .expect_add_entry_defs::<Vec<_>>()
-        .times(2)
-        .return_const(());
+    let mut dna_store = MockDnaStore::single_dna(dna_file, 2, 2);
     dna_store.expect_get_entry_def().return_const(None);
 
     let (_tmpdir, app_api, handle) = setup_app(

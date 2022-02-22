@@ -1,4 +1,16 @@
 {
+    "crate2nix": {
+        "branch": "master",
+        "description": "nix build file generator for rust crates",
+        "homepage": "",
+        "owner": "kolloch",
+        "repo": "crate2nix",
+        "rev": "7178e530f7d617ac0b61a6e53c7f3b28710fb6cf",
+        "sha256": "1mqm530ff8dyx05dnf8aw6an01x5n26ahdb1wrp77cgjbwqsrr3p",
+        "type": "tarball",
+        "url": "https://github.com/kolloch/crate2nix/archive/7178e530f7d617ac0b61a6e53c7f3b28710fb6cf.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
     "holonix": {
         "branch": "develop",
         "description": "NixOS && Holochain",
