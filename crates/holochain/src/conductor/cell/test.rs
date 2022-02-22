@@ -85,7 +85,7 @@ async fn test_cell_handle_publish() {
 
     spaces
         .spaces
-        .handle_publish(&dna, true, false, vec![(op_hash.clone(), op.clone())])
+        .handle_publish(&dna, true, false, vec![op.clone()])
         .await
         .unwrap();
 

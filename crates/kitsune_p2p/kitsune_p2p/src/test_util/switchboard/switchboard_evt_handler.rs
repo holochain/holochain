@@ -129,15 +129,25 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
     fn handle_gossip(
         &mut self,
         _space: Arc<KitsuneSpace>,
-        ops: Vec<(Arc<KitsuneOpHash>, Vec<u8>)>,
+        ops: Vec<KOp>,
     ) -> KitsuneP2pEventHandlerResult<()> {
         ok_fut(Ok(self.sb.share(|sb| {
             let node = sb.nodes.get_mut(&self.node).unwrap();
-            for (hash, op_data) in ops {
-                let loc8 = hash.get_loc().as_loc8();
+            for op in ops {
+                // As a hack, we just set the first bytes of the op data to the
+                // loc8 location. This mimics the real world usage, where the
+                // location would be able to be extracted from the real op data,
+                // but is just a hack here since we're not even bothering to
+                // deserialize.
+                //
+                // NB: this may be problematic on the receiving end because we
+                // actually care whether this Loc8 is interpreted as u8 or i8,
+                // and we lose that information here.
+                let loc = (op.0[0] as u8 as i8).into();
+
                 // TODO: allow setting integration status
                 node.ops.insert(
-                    loc8,
+                    loc,
                     NodeOpEntry {
                         is_integrated: true,
                     },
@@ -198,13 +208,14 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
     fn handle_fetch_op_data(
         &mut self,
         FetchOpDataEvt { space, op_hashes }: FetchOpDataEvt,
-    ) -> KitsuneP2pEventHandlerResult<Vec<(Arc<KitsuneOpHash>, Vec<u8>)>> {
+    ) -> KitsuneP2pEventHandlerResult<Vec<(Arc<KitsuneOpHash>, KOp)>> {
         ok_fut(Ok(self.sb.share(|sb| {
             op_hashes
                 .into_iter()
                 .map(|hash| {
-                    let e: &OpEntry = sb.ops.get(&hash.get_loc().as_loc8()).unwrap();
-                    (e.hash.to_owned(), e.data.to_owned())
+                    let loc = hash.get_loc().as_loc8();
+                    let e: &OpEntry = sb.ops.get(&loc).unwrap();
+                    (e.hash.to_owned(), KitsuneOpData::new(vec![loc.as_u8()]))
                 })
                 .collect()
         })))
