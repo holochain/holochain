@@ -403,7 +403,6 @@ fixturator!(
     constructor fn one(Zome);
 );
 
-
 fixturator!(
     ValidateHostAccess;
     constructor fn new(HostFnWorkspace, HolochainP2pDna);

@@ -363,7 +363,7 @@ async fn dhtop_to_op(op: DhtOp, cascade: &mut Cascade) -> AppValidationOutcome<O
                 .await?
                 .and_then(|e| {
                     let sh = e.into_inner().0;
-                    CreateLink::try_from(sh.0).ok().map(|h| h.into())
+                    CreateLink::try_from(sh.0).ok()
                 })
                 .ok_or_else(|| Outcome::awaiting(&delete_link.link_add_address))?;
             Op::RegisterDeleteLink {
