@@ -294,8 +294,7 @@ impl ChainQueryFilter {
         let headers = self.filter_headers(
             elements
                 .iter()
-                .map(|element| element.header_hashed())
-                .cloned()
+                .map(|element| element.header_hashed().clone())
                 .collect(),
         );
         let header_hashset = headers
@@ -304,7 +303,7 @@ impl ChainQueryFilter {
             .collect::<HashSet<HeaderHash>>();
         elements
             .into_iter()
-            .filter(|element| header_hashset.contains(element.header_hashed().as_hash()))
+            .filter(|element| header_hashset.contains(element.header_address()))
             .collect()
     }
 }

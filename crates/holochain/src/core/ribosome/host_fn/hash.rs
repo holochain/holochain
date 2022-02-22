@@ -12,6 +12,7 @@ pub fn hash(
 ) -> Result<HashOutput, WasmError> {
     Ok(match input {
         HashInput::Entry(entry) => HashOutput::Entry(holochain_zome_types::entry::EntryHashed::from_content_sync(entry).into_hash()),
+        HashInput::Header(header) => HashOutput::Header(holochain_zome_types::header::HeaderHashed::from_content_sync(header).into_hash()),
         _ => return Err(WasmError::Host(format!("Unimplemented hashing algorithm {:?}", input))),
     })
 }
@@ -22,6 +23,7 @@ pub mod wasm_test {
     use super::*;
     use crate::core::ribosome::host_fn::hash::hash;
 
+    use ::fixt::prelude::*;
     use crate::fixt::CallContextFixturator;
     use crate::fixt::EntryFixturator;
     use crate::fixt::RealRibosomeFixturator;
@@ -35,21 +37,30 @@ pub mod wasm_test {
     #[tokio::test(flavor = "multi_thread")]
     /// we can get an entry hash out of the fn directly
     async fn hash_test() {
-        let ribosome = RealRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![]))
+        let ribosome = Arc::new(RealRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![]))
             .next()
-            .unwrap();
-        let call_context = CallContextFixturator::new(::fixt::Unpredictable)
+            .unwrap());
+        let call_context = Arc::new(CallContextFixturator::new(::fixt::Unpredictable)
             .next()
-            .unwrap();
-        let input = HashInput::Entry(EntryFixturator::new(::fixt::Predictable).next().unwrap());
+            .unwrap());
+        let entry_input = HashInput::Entry(EntryFixturator::new(::fixt::Predictable).next().unwrap());
 
-        let output: EntryHash =
-            match hash(Arc::new(ribosome), Arc::new(call_context), input).unwrap() {
+        let entry_output: EntryHash =
+            match hash(Arc::clone(&ribosome), Arc::clone(&call_context), entry_input).unwrap() {
                 HashOutput::Entry(output) => output,
                 _ => unreachable!(),
             };
 
-        assert_eq!(*output.hash_type(), holo_hash::hash_type::Entry);
+        assert_eq!(*entry_output.hash_type(), holo_hash::hash_type::Entry);
+
+        let header_input = HashInput::Header(fixt!(Header));
+
+        let header_output: HeaderHash = match hash(Arc::clone(&ribosome), Arc::clone(&call_context), header_input).unwrap() {
+            HashOutput::Header(output) => output,
+            _ => unreachable!(),
+        };
+
+        assert_eq!(*header_output.hash_type(), holo_hash::hash_type::Header);
     }
 
     #[tokio::test(flavor = "multi_thread")]
