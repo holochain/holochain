@@ -152,7 +152,7 @@ impl SourceChain {
     ) -> SourceChainResult<HeaderHash> {
         let header = HeaderHashed::from_content_sync(header);
         let hash = header.as_hash().clone();
-        let header = SignedHeaderHashed::new(&self.keystore, header).await?;
+        let header = SignedHeaderHashed::sign(&self.keystore, header).await?;
         let element = Element::new(header, maybe_entry);
         self.scratch
             .apply(|scratch| insert_element_scratch(scratch, zome, element, chain_top_ordering))?;
@@ -899,7 +899,7 @@ async fn rebase_headers_on(
         rebase_timestamp = header.timestamp();
         let hh = HeaderHashed::from_content_sync(header);
         rebase_header = hh.as_hash().clone();
-        let new_shh = SignedHeaderHashed::new(keystore, hh).await?;
+        let new_shh = SignedHeaderHashed::sign(keystore, hh).await?;
         *shh = new_shh;
     }
     Ok(zomed_headers)
@@ -919,7 +919,7 @@ pub async fn genesis(
         hash: dna_hash,
     });
     let dna_header = HeaderHashed::from_content_sync(dna_header);
-    let dna_header = SignedHeaderHashed::new(&keystore, dna_header).await?;
+    let dna_header = SignedHeaderHashed::sign(&keystore, dna_header).await?;
     let dna_header_address = dna_header.as_hash().clone();
     let element = Element::new(dna_header, None);
     let dna_ops = produce_op_lights_from_elements(vec![&element])?;
@@ -935,7 +935,7 @@ pub async fn genesis(
     });
     let agent_validation_header = HeaderHashed::from_content_sync(agent_validation_header);
     let agent_validation_header =
-        SignedHeaderHashed::new(&keystore, agent_validation_header).await?;
+        SignedHeaderHashed::sign(&keystore, agent_validation_header).await?;
     let avh_addr = agent_validation_header.as_hash().clone();
     let element = Element::new(agent_validation_header, None);
     let avh_ops = produce_op_lights_from_elements(vec![&element])?;
@@ -951,7 +951,7 @@ pub async fn genesis(
         entry_hash: agent_pubkey.clone().into(),
     });
     let agent_header = HeaderHashed::from_content_sync(agent_header);
-    let agent_header = SignedHeaderHashed::new(&keystore, agent_header).await?;
+    let agent_header = SignedHeaderHashed::sign(&keystore, agent_header).await?;
     let element = Element::new(agent_header, Some(Entry::Agent(agent_pubkey)));
     let agent_ops = produce_op_lights_from_elements(vec![&element])?;
     let (agent_header, agent_entry) = element.into_inner();
@@ -1081,7 +1081,7 @@ async fn _put_db<H: HeaderInner, B: HeaderBuilder<H>>(
     };
     let header = header_builder.build(common).into();
     let header = HeaderHashed::from_content_sync(header);
-    let header = SignedHeaderHashed::new(keystore, header).await?;
+    let header = SignedHeaderHashed::sign(keystore, header).await?;
     let element = Element::new(header, maybe_entry);
     let ops = produce_op_lights_from_elements(vec![&element])?;
     let (header, entry) = element.into_inner();

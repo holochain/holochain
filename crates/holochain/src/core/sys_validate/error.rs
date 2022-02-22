@@ -156,6 +156,8 @@ pub enum PrevHeaderError {
     HashMismatch,
     #[error("Root of source chain must be Dna")]
     InvalidRoot,
+    #[error("Root of source chain must have a timestamp greater than the Dna's origin_time")]
+    InvalidRootOriginTime,
     #[error("Previous header sequence number {1} != ({0} - 1)")]
     InvalidSeq(u32, u32),
     #[error("Previous header was missing from the metadata store")]

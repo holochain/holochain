@@ -1,3 +1,5 @@
+use crate::conductor::api::CellConductorReadHandle;
+use crate::conductor::interface::SignalBroadcaster;
 use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostContext;
 use crate::core::ribosome::Invocation;
@@ -27,6 +29,8 @@ pub struct InitHostAccess {
     pub workspace: HostFnWorkspace,
     pub keystore: MetaLairClient,
     pub network: HolochainP2pDna,
+    pub signal_tx: SignalBroadcaster,
+    pub call_zome_handle: CellConductorReadHandle,
 }
 
 impl From<InitHostAccess> for HostContext {
