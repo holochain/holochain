@@ -892,6 +892,20 @@ impl ProxyEp {
         l_hnd.capture_logic(logic).await?;
 
         {
+            // try to get our proxy addy inline, but fail silently
+            if let Some(proxy_url) = client_of_remote_proxy
+                .get_proxy_url(proxy_from_bootstrap_cb.clone())
+                .await
+            {
+                *cur_proxy_url.write() = Some(ProxyUrl::from(proxy_url.as_str()));
+                let timeout = tuning_params.implicit_timeout();
+                let hnd = hnd.clone();
+                tokio::task::spawn(async move {
+                    let _ = hnd.get_connection(proxy_url, timeout).await;
+                });
+            }
+
+            // set up the logic loop that keeps us connected to a proxy
             let hnd = hnd.clone();
             l_hnd
                 .capture_logic(async move {

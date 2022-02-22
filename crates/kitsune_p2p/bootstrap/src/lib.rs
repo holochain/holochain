@@ -12,9 +12,9 @@ static PUT: AtomicUsize = AtomicUsize::new(0);
 
 mod clear;
 mod now;
+mod proxy_list;
 mod put;
 mod random;
-mod proxy_list;
 mod store;
 
 /// No reason to accept a peer data bigger then 1KB.

@@ -79,7 +79,6 @@ ghost_actor::ghost_chan! {
 
 pub(crate) async fn spawn_space(
     space: Arc<KitsuneSpace>,
-    this_addr: url2::Url2,
     ep_hnd: Tx2EpHnd<wire::Wire>,
     config: Arc<KitsuneP2pConfig>,
     bandwidth_throttles: BandwidthThrottles,
@@ -105,7 +104,6 @@ pub(crate) async fn spawn_space(
 
     tokio::task::spawn(builder.spawn(Space::new(
         space,
-        this_addr,
         i_s.clone(),
         evt_send,
         ep_hnd,
@@ -152,7 +150,7 @@ impl SpaceInternalHandler for Space {
             let arc = self.get_agent_arc(&agent);
             agent_list.push((agent, arc));
         }
-        let bound_url = self.this_addr.clone();
+        let ep_hnd = self.ro_inner.ep_hnd.clone();
         let evt_sender = self.evt_sender.clone();
         let bootstrap_service = self.config.bootstrap_service.clone();
         let expires_after = self.config.tuning_params.agent_info_expires_after_ms as u64;
@@ -163,7 +161,7 @@ impl SpaceInternalHandler for Space {
             .gossip_single_storage_arc_per_space;
         let internal_sender = self.i_s.clone();
         Ok(async move {
-            let urls = vec![bound_url.into()];
+            let urls = vec![ep_hnd.local_addr()?];
             let mut peer_data = Vec::with_capacity(agent_list.len());
             for (agent, arc) in agent_list {
                 let input = UpdateAgentInfoInput {
@@ -201,7 +199,7 @@ impl SpaceInternalHandler for Space {
         let space = self.space.clone();
         let mut mdns_handles = self.mdns_handles.clone();
         let network_type = self.config.network_type.clone();
-        let bound_url = self.this_addr.clone();
+        let ep_hnd = self.ro_inner.ep_hnd.clone();
         let evt_sender = self.evt_sender.clone();
         let internal_sender = self.i_s.clone();
         let bootstrap_service = self.config.bootstrap_service.clone();
@@ -214,7 +212,7 @@ impl SpaceInternalHandler for Space {
         let arc = self.get_agent_arc(&agent);
 
         Ok(async move {
-            let urls = vec![bound_url.into()];
+            let urls = vec![ep_hnd.local_addr()?];
             let input = UpdateAgentInfoInput {
                 expires_after,
                 space: space.clone(),
@@ -1050,7 +1048,6 @@ impl KitsuneP2pHandler for Space {
 pub(crate) struct SpaceReadOnlyInner {
     pub(crate) space: Arc<KitsuneSpace>,
     #[allow(dead_code)]
-    pub(crate) this_addr: url2::Url2,
     pub(crate) i_s: ghost_actor::GhostSender<SpaceInternal>,
     pub(crate) evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
     pub(crate) ep_hnd: Tx2EpHnd<wire::Wire>,
@@ -1066,7 +1063,6 @@ pub(crate) struct SpaceReadOnlyInner {
 pub(crate) struct Space {
     pub(crate) ro_inner: Arc<SpaceReadOnlyInner>,
     pub(crate) space: Arc<KitsuneSpace>,
-    pub(crate) this_addr: url2::Url2,
     pub(crate) i_s: ghost_actor::GhostSender<SpaceInternal>,
     pub(crate) evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
     pub(crate) local_joined_agents: HashSet<Arc<KitsuneAgent>>,
@@ -1082,7 +1078,6 @@ impl Space {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         space: Arc<KitsuneSpace>,
-        this_addr: url2::Url2,
         i_s: ghost_actor::GhostSender<SpaceInternal>,
         evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
         ep_hnd: Tx2EpHnd<wire::Wire>,
@@ -1242,7 +1237,6 @@ impl Space {
 
         let ro_inner = Arc::new(SpaceReadOnlyInner {
             space: space.clone(),
-            this_addr: this_addr.clone(),
             i_s: i_s.clone(),
             evt_sender: evt_sender.clone(),
             ep_hnd,
@@ -1255,7 +1249,6 @@ impl Space {
         Self {
             ro_inner,
             space,
-            this_addr,
             i_s,
             evt_sender,
             local_joined_agents: HashSet::new(),

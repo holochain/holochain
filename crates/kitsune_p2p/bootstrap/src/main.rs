@@ -4,7 +4,9 @@ async fn main() {
         ([0, 0, 0, 0], 0),
         // TODO - get from argv
         vec![],
-    ).await {
+    )
+    .await
+    {
         Ok((driver, addr)) => {
             println!("http://{}", addr);
             driver.await;
