@@ -120,7 +120,7 @@ async fn app_validation_ops() {
             }
         }
 
-        fn expect(agent: &'static str, header_type: HeaderType, seq: u32) -> Self {
+        fn expected(agent: &'static str, header_type: HeaderType, seq: u32) -> Self {
             Self {
                 agent,
                 header_type: header_type.to_string(),
@@ -144,12 +144,12 @@ async fn app_validation_ops() {
                     },
                     Op::StoreEntry { header, .. } => {
                         let (with_zome_index, with_entry_def_index) =
-                            match header.header.app_entry_type().cloned() {
+                            match header.hashed.content.app_entry_type().cloned() {
                                 Some(AppEntryType { id, zome_id, .. }) => (Some(zome_id), Some(id)),
                                 _ => (None, None),
                             };
                         Event {
-                            header: HeaderLocation::new(header.header.clone(), &agents),
+                            header: HeaderLocation::new(header.hashed.content.clone(), &agents),
                             op_type: DhtOpType::StoreEntry,
                             called_zome: zome,
                             with_zome_index,
@@ -167,7 +167,7 @@ async fn app_validation_ops() {
                                 _ => (None, None),
                             };
                         Event {
-                            header: HeaderLocation::new(update.header.clone(), &agents),
+                            header: HeaderLocation::new(update.hashed.content.clone(), &agents),
                             op_type: DhtOpType::RegisterUpdatedContent,
                             called_zome: zome,
                             with_zome_index,
@@ -185,7 +185,7 @@ async fn app_validation_ops() {
                                 _ => (None, None),
                             };
                         Event {
-                            header: HeaderLocation::new(delete.header.clone(), &agents),
+                            header: HeaderLocation::new(delete.hashed.content.clone(), &agents),
                             op_type: DhtOpType::RegisterDeletedBy,
                             called_zome: zome,
                             with_zome_index,
@@ -200,17 +200,17 @@ async fn app_validation_ops() {
                         with_entry_def_index: None,
                     },
                     Op::RegisterCreateLink { create_link, .. } => Event {
-                        header: HeaderLocation::new(create_link.header.clone(), &agents),
+                        header: HeaderLocation::new(create_link.hashed.content.clone(), &agents),
                         op_type: DhtOpType::RegisterAddLink,
                         called_zome: zome,
-                        with_zome_index: Some(create_link.header.zome_id),
+                        with_zome_index: Some(create_link.hashed.content.zome_id),
                         with_entry_def_index: None,
                     },
                     Op::RegisterDeleteLink {
                         create_link,
                         delete_link,
                     } => Event {
-                        header: HeaderLocation::new(delete_link.header.clone(), &agents),
+                        header: HeaderLocation::new(delete_link.hashed.content.clone(), &agents),
                         op_type: DhtOpType::RegisterRemoveLink,
                         called_zome: zome,
                         with_zome_index: Some(create_link.zome_id),
@@ -336,19 +336,19 @@ async fn app_validation_ops() {
 
         fn genesis(&mut self, agent: &'static str, zomes: &[&'static str]) {
             let event = Event {
-                header: HeaderLocation::expect(agent, HeaderType::Dna, 0),
+                header: HeaderLocation::expected(agent, HeaderType::Dna, 0),
                 ..Default::default()
             };
             self.activity_and_element_for_zomes(event.clone(), zomes);
 
             let event = Event {
-                header: HeaderLocation::expect(agent, HeaderType::AgentValidationPkg, 1),
+                header: HeaderLocation::expected(agent, HeaderType::AgentValidationPkg, 1),
                 ..Default::default()
             };
             self.activity_and_element_for_zomes(event.clone(), zomes);
 
             let mut event = Event {
-                header: HeaderLocation::expect(agent, HeaderType::Create, 2),
+                header: HeaderLocation::expected(agent, HeaderType::Create, 2),
                 ..Default::default()
             };
             self.activity_and_element_for_zomes(event.clone(), zomes);
@@ -359,7 +359,7 @@ async fn app_validation_ops() {
 
         fn init(&mut self, agent: &'static str) {
             let event = Event {
-                header: HeaderLocation::expect(agent, HeaderType::InitZomesComplete, 3),
+                header: HeaderLocation::expected(agent, HeaderType::InitZomesComplete, 3),
                 ..Default::default()
             };
             self.activity_and_element_all_zomes(event.clone());
@@ -373,7 +373,7 @@ async fn app_validation_ops() {
     expected.init(ALICE);
 
     let mut event = Event {
-        header: HeaderLocation::expect(ALICE, HeaderType::Create, 4),
+        header: HeaderLocation::expected(ALICE, HeaderType::Create, 4),
         ..Default::default()
     };
     expected.activity_and_element_all_zomes(event.clone());
