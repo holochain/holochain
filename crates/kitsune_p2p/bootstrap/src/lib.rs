@@ -14,6 +14,7 @@ mod clear;
 mod now;
 mod put;
 mod random;
+mod proxy_list;
 mod store;
 
 /// No reason to accept a peer data bigger then 1KB.
@@ -27,8 +28,9 @@ pub type BootstrapDriver = futures::future::BoxFuture<'static, ()>;
 
 pub async fn run(
     addr: impl Into<SocketAddr> + 'static,
+    proxy_list: Vec<String>,
 ) -> Result<(BootstrapDriver, SocketAddr), String> {
-    let store = Store::new();
+    let store = Store::new(proxy_list);
     {
         let store = store.clone();
         tokio::task::spawn(async move {
@@ -41,6 +43,7 @@ pub async fn run(
     let boot = now::now()
         .or(put::put(store.clone()))
         .or(random::random(store.clone()))
+        .or(proxy_list::proxy_list(store.clone()))
         .or(clear::clear(store));
     match warp::serve(boot).try_bind_ephemeral(addr) {
         Ok((addr, server)) => {

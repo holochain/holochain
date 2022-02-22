@@ -1127,7 +1127,7 @@ async fn mock_network_sharding() {
 #[cfg(feature = "test_utils")]
 async fn run_bootstrap(peer_data: impl Iterator<Item = AgentInfoSigned>) -> Url2 {
     let mut url = url2::url2!("http://127.0.0.1:0");
-    let (driver, addr) = kitsune_p2p_bootstrap::run(([127, 0, 0, 1], 0))
+    let (driver, addr) = kitsune_p2p_bootstrap::run(([127, 0, 0, 1], 0), vec![])
         .await
         .unwrap();
     tokio::spawn(driver);

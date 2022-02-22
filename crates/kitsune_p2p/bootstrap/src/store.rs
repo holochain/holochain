@@ -13,11 +13,15 @@ type AgentMap = HashMap<Arc<KitsuneAgent>, AgentInfoSigned>;
 type SpaceMap = HashMap<Arc<KitsuneSpace>, AgentMap>;
 
 #[derive(Clone, Debug)]
-pub(crate) struct Store(Arc<RwLock<SpaceMap>>);
+pub(crate) struct Store(Arc<RwLock<SpaceMap>>, Arc<Vec<String>>);
 
 impl Store {
-    pub fn new() -> Self {
-        Self(Arc::new(RwLock::new(HashMap::new())))
+    pub fn new(proxy_list: Vec<String>) -> Self {
+        Self(Arc::new(RwLock::new(HashMap::new())), Arc::new(proxy_list))
+    }
+
+    pub fn proxy_list(&self) -> Arc<Vec<String>> {
+        self.1.clone()
     }
 
     pub fn prune(&self) {

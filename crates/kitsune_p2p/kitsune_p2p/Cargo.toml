@@ -47,6 +47,7 @@ maplit = { version = "1", optional = true }
 mockall = { version = "0.10.2", optional = true }
 
 [dev-dependencies]
+kitsune_p2p_bootstrap = { version = "0.0.2", path = "../bootstrap" }
 tokio = { version = "1.11", features = ["full", "test-util"] }
 contrafact = { version = "0.1.0-dev.1" }
 maplit = "1"
