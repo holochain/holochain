@@ -1,3 +1,4 @@
+use crate::Loc;
 use kitsune_p2p_dht_arc::ArcInterval;
 use kitsune_p2p_timestamp::Timestamp;
 
@@ -30,4 +31,13 @@ impl RegionCoords {
 pub struct RegionBounds {
     pub x: ArcInterval,
     pub t: std::ops::Range<Timestamp>,
+}
+
+impl RegionBounds {
+    pub fn new((x0, x1): (Loc, Loc), (t0, t1): (Timestamp, Timestamp)) -> Self {
+        Self {
+            x: ArcInterval::new(x0, x1),
+            t: t0..t1,
+        }
+    }
 }

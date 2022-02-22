@@ -121,26 +121,26 @@ mod tests {
             .into_iter(),
         );
         {
-            let data = node.query_region(&RegionBounds {
-                x: (0.into(), 100.into()),
-                t: (0.into(), 20.into()),
-            });
+            let data = node.query_region(&RegionBounds::new(
+                (0.into(), 100.into()),
+                (Timestamp::from_micros(0), Timestamp::from_micros(20)),
+            ));
             assert_eq!(data.count, 1);
             assert_eq!(data.size, 1234);
         }
         {
-            let data = node.query_region(&RegionBounds {
-                x: (0.into(), 1001.into()),
-                t: (0.into(), 21.into()),
-            });
+            let data = node.query_region(&RegionBounds::new(
+                (0.into(), 1001.into()),
+                (Timestamp::from_micros(0), Timestamp::from_micros(21)),
+            ));
             assert_eq!(data.count, 2);
             assert_eq!(data.size, 1234 + 2345);
         }
         {
-            let data = node.query_region(&RegionBounds {
-                x: (1000.into(), 1001.into()),
-                t: (0.into(), 20.into()),
-            });
+            let data = node.query_region(&RegionBounds::new(
+                (1000.into(), 1001.into()),
+                (Timestamp::from_micros(0), Timestamp::from_micros(20)),
+            ));
             assert_eq!(data.count, 1);
             assert_eq!(data.size, 2345);
         }
