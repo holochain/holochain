@@ -67,3 +67,14 @@ pub fn hash_header(input: Header) -> ExternResult<HeaderHash> {
         _ => unreachable!(),
     }
 }
+
+
+/// Hash arbitrary bytes using BLAKE2b.
+/// This is the same algorithm used by holochain for typed hashes.
+/// Notably the output hash length is configurable.
+pub fn hash_blake2b(input: Vec<u8>, output_len: u8) -> ExternResult<Vec<u8>> {
+    match HDK.with(|h| h.borrow().hash(HashInput::Blake2B(input, output_len)))? {
+        HashOutput::Blake2B(vec) => Ok(vec),
+        _ => unreachable!(),
+    }
+}
