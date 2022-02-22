@@ -345,23 +345,22 @@ impl Db {
                         Db::Integrated(op) => {
                             let op = DhtOpHashed::from_content_sync(op.clone());
                             let hash = op.as_hash().clone();
-                            mutations::insert_op(txn, op).unwrap();
-                            mutations::set_when_integrated(txn, hash.clone(), Timestamp::now())
-                                .unwrap();
-                            mutations::set_validation_status(txn, hash, ValidationStatus::Valid)
+                            mutations::insert_op(txn, &op).unwrap();
+                            mutations::set_when_integrated(txn, &hash, Timestamp::now()).unwrap();
+                            mutations::set_validation_status(txn, &hash, ValidationStatus::Valid)
                                 .unwrap();
                         }
                         Db::IntQueue(op) => {
                             let op = DhtOpHashed::from_content_sync(op.clone());
                             let hash = op.as_hash().clone();
-                            mutations::insert_op(txn, op).unwrap();
+                            mutations::insert_op(txn, &op).unwrap();
                             mutations::set_validation_stage(
                                 txn,
-                                hash.clone(),
+                                &hash,
                                 ValidationLimboStatus::AwaitingIntegration,
                             )
                             .unwrap();
-                            mutations::set_validation_status(txn, hash, ValidationStatus::Valid)
+                            mutations::set_validation_status(txn, &hash, ValidationStatus::Valid)
                                 .unwrap();
                         }
                         _ => {
@@ -379,7 +378,7 @@ async fn call_workflow<'env>(env: DbWrite<DbKindDht>) {
     let (qt, _rx) = TriggerSender::new();
     let test_network = test_network(None, None).await;
     let holochain_p2p_cell = test_network.dna_network();
-    integrate_dht_ops_workflow(env.clone(), qt, holochain_p2p_cell)
+    integrate_dht_ops_workflow(env.clone(), &env.clone().into(), qt, holochain_p2p_cell)
         .await
         .unwrap();
 }

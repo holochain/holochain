@@ -85,7 +85,7 @@ pub(crate) fn search_and_discover_peer_connect(
                                 return peer_connect(inner, &agent_info_signed, timeout).await;
                             }
                             peer_resp => {
-                                tracing::warn!(?peer_resp, "unexpected peer resp");
+                                tracing::warn!(?peer_resp, "unexpected peer resp 1");
                             }
                         }
                     }
@@ -218,7 +218,7 @@ pub(crate) fn search_remotes_covering_basis(
                             break;
                         }
                         peer_resp => {
-                            tracing::warn!(?peer_resp, "unexpected peer resp");
+                            tracing::warn!(?peer_resp, "unexpected peer resp 2");
                         }
                     }
                 }

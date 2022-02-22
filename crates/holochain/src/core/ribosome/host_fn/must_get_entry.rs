@@ -138,7 +138,9 @@ pub mod test {
         } = RibosomeTestFixture::new(TestWasm::MustGet).await;
 
         let entry = Entry::try_from(Something(vec![1, 2, 3])).unwrap();
-        let header_hash = alice_host_fn_caller.commit_entry(entry.clone(), ENTRY_DEF_ID).await;
+        let header_hash = alice_host_fn_caller
+            .commit_entry(entry.clone(), ENTRY_DEF_ID)
+            .await;
 
         let dht_env = conductor
             .inner_handle()
@@ -172,17 +174,9 @@ pub mod test {
             .conn()
             .unwrap()
             .with_commit_sync(|txn| {
-                set_validation_status(
-                    txn,
-                    element_state.as_hash().clone(),
-                    ValidationStatus::Rejected,
-                )
-                .unwrap();
-                set_validation_status(
-                    txn,
-                    entry_state.as_hash().clone(),
-                    ValidationStatus::Rejected,
-                )
+                set_validation_status(txn, element_state.as_hash(), ValidationStatus::Rejected)
+                    .unwrap();
+                set_validation_status(txn, entry_state.as_hash(), ValidationStatus::Rejected)
             })
             .unwrap();
 
@@ -191,20 +185,14 @@ pub mod test {
         let must_get_entry: EntryHashed = conductor
             .call(&bob, "must_get_entry", header.entry_hash().clone())
             .await;
-        assert_eq!(
-            Entry::from(must_get_entry),
-            entry,
-        );
+        assert_eq!(Entry::from(must_get_entry), entry,);
 
         // Must get header returns the header if it exists regardless of the
         // validation status.
         let must_get_header: SignedHeaderHashed = conductor
             .call(&bob, "must_get_header", header_hash.clone())
             .await;
-        assert_eq!(
-            must_get_header.header(),
-            &header,
-        );
+        assert_eq!(must_get_header.header(), &header,);
 
         // Must get VALID element ONLY returns the element if it is valid.
         let must_get_valid_element: Result<Element, _> = conductor
@@ -213,11 +201,15 @@ pub mod test {
         assert!(must_get_valid_element.is_err());
 
         let bad_entry_hash = EntryHash::from_raw_32(vec![1; 32]);
-        let bad_must_get_entry: Result<EntryHashed, _> = conductor.call_fallible(&bob, "must_get_entry", bad_entry_hash).await;
+        let bad_must_get_entry: Result<EntryHashed, _> = conductor
+            .call_fallible(&bob, "must_get_entry", bad_entry_hash)
+            .await;
         assert!(bad_must_get_entry.is_err());
 
         let bad_header_hash = HeaderHash::from_raw_32(vec![2; 32]);
-        let bad_must_get_header: Result<SignedHeaderHashed, _> = conductor.call_fallible(&bob, "must_get_header", bad_header_hash).await;
+        let bad_must_get_header: Result<SignedHeaderHashed, _> = conductor
+            .call_fallible(&bob, "must_get_header", bad_header_hash)
+            .await;
         assert!(bad_must_get_header.is_err());
     }
 }

@@ -209,18 +209,13 @@ fn create_and_insert_op(
         .unwrap()
         .with_commit_sync(|txn| {
             let hash = state.as_hash().clone();
-            insert_op(txn, state.clone()).unwrap();
-            set_validation_status(txn, hash.clone(), ValidationStatus::Valid).unwrap();
+            insert_op(txn, &state).unwrap();
+            set_validation_status(txn, &hash, ValidationStatus::Valid).unwrap();
             if facts.integrated {
-                set_when_integrated(txn, hash.clone(), holochain_zome_types::Timestamp::now())
-                    .unwrap();
+                set_when_integrated(txn, &hash, holochain_zome_types::Timestamp::now()).unwrap();
             }
             if facts.awaiting_integration {
-                set_validation_stage(
-                    txn,
-                    hash.clone(),
-                    ValidationLimboStatus::AwaitingIntegration,
-                )
+                set_validation_stage(txn, &hash, ValidationLimboStatus::AwaitingIntegration)
                 .unwrap();
             }
             DatabaseResult::Ok(())

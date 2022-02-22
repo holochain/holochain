@@ -103,9 +103,15 @@ impl Databases {
     }
 }
 
-pub(crate) fn new_connection_pool(path: &Path, synchronous_level: DbSyncLevel) -> ConnectionPool {
+pub(crate) fn new_connection_pool(
+    path: Option<&Path>,
+    synchronous_level: DbSyncLevel,
+) -> ConnectionPool {
     use r2d2_sqlite::SqliteConnectionManager;
-    let manager = SqliteConnectionManager::file(path);
+    let manager = match path {
+        Some(path) => SqliteConnectionManager::file(path),
+        None => SqliteConnectionManager::memory(),
+    };
     let customizer = Box::new(ConnCustomizer { synchronous_level });
     // We need the same amount of connections as reader threads plus one for the writer thread.
     let max_cons = num_read_threads() + 1;
