@@ -10,6 +10,8 @@ use std::collections::HashMap;
 use std::ops::RangeInclusive;
 use std::sync::Arc;
 
+#[cfg(test)]
+mod tests;
 
 #[allow(missing_docs)]
 pub mod error;
