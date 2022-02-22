@@ -93,7 +93,13 @@ fn create_priv_msg(_: ()) -> ExternResult<HeaderHash> {
 fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     let this_zome = zome_info()?;
     if let Op::StoreEntry {
-        header: SignedHashed { header, .. },
+        header:
+            SignedHashed {
+                hashed: HoloHashed {
+                    content: header, ..
+                },
+                ..
+            },
         entry,
     } = op
     {

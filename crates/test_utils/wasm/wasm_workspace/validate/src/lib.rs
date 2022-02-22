@@ -99,7 +99,14 @@ entry_defs![
 fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op {
         Op::StoreEntry {
-            header: SignedHashed { header, .. },
+            header:
+                SignedHashed {
+                    hashed:
+                        HoloHashed {
+                            content: header, ..
+                        },
+                    ..
+                },
             entry,
         } => match header.app_entry_type() {
             Some(app_entry_type) => {
