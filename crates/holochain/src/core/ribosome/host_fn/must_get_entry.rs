@@ -100,279 +100,114 @@ pub fn must_get_entry<'a>(
 
 #[cfg(test)]
 pub mod test {
-    use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
-    use crate::core::ribosome::guest_callback::validate::ValidateResult;
-    use crate::core::ribosome::RibosomeError;
-    use crate::core::ribosome::RibosomeT;
-    use crate::core::ribosome::ZomesToInvoke;
-    use crate::fixt::curve::Zomes;
-    use crate::fixt::RealRibosomeFixturator;
-    use crate::fixt::ValidateHostAccessFixturator;
-    use crate::fixt::ZomeCallHostAccessFixturator;
-    use ::fixt::prelude::fixt;
-    use ::fixt::prelude::*;
+    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
+    use crate::test_entry_impl;
     use hdk::prelude::*;
+    use holochain_state::prelude::*;
+    use holochain_types::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::op::Op;
+    use unwrap_to::unwrap_to;
 
     /// Mimics inside the must_get wasm.
     #[derive(serde::Serialize, serde::Deserialize, SerializedBytes, Debug, PartialEq)]
     struct Something(#[serde(with = "serde_bytes")] Vec<u8>);
 
+    test_entry_impl!(Something);
+
+    const ENTRY_DEF_ID: &str = "something";
+
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_must_get_entry_test<'a>() {
         observability::test_run().ok();
-        let author = fixt!(AgentPubKey, Predictable, 0);
-        let mut host_access = fixt!(ZomeCallHostAccess, Predictable);
+        let RibosomeTestFixture {
+            conductor,
+            alice,
+            bob,
+            alice_host_fn_caller,
+            ..
+        } = RibosomeTestFixture::new(TestWasm::MustGet).await;
 
-        // get the result of a commit entry
-        let (header_hash, header_reference_hash, element_reference_hash, entry_reference_hash): (
-            HeaderHash,
-            HeaderHash,
-            HeaderHash,
-            HeaderHash,
-        ) = crate::call_test_ribosome!(host_access, TestWasm::MustGet, "create_entry", ()).unwrap();
+        let entry = Entry::try_from(Something(vec![1, 2, 3])).unwrap();
+        let header_hash = alice_host_fn_caller
+            .commit_entry(entry.clone(), ENTRY_DEF_ID)
+            .await;
 
-        let round_element: Element = crate::call_test_ribosome!(
-            host_access,
-            TestWasm::MustGet,
-            "must_get_valid_element",
-            header_hash
-        )
-        .unwrap();
+        let dht_env = conductor
+            .inner_handle()
+            .get_dht_env(alice.cell_id().dna_hash())
+            .unwrap();
 
-        let header_reference_element: Element = crate::call_test_ribosome!(
-            host_access,
-            TestWasm::MustGet,
-            "must_get_valid_element",
-            header_reference_hash
-        )
-        .unwrap();
-        let element_reference_element: Element = crate::call_test_ribosome!(
-            host_access,
-            TestWasm::MustGet,
-            "must_get_valid_element",
-            element_reference_hash
-        )
-        .unwrap();
-        let entry_reference_element: Element = crate::call_test_ribosome!(
-            host_access,
-            TestWasm::MustGet,
-            "must_get_valid_element",
-            entry_reference_hash
-        )
-        .unwrap();
+        // When we first get the element it will return because we haven't yet
+        // set the validation status.
+        let element: Element = conductor
+            .call(&bob, "must_get_valid_element", header_hash.clone())
+            .await;
 
-        let (header_dangling_header_hash, element_dangling_header_hash, entry_dangling_header_hash): (HeaderHash, HeaderHash, HeaderHash) = crate::call_test_ribosome!(host_access, TestWasm::MustGet, "create_dangling_references", ()).unwrap();
-        let header_dangling_element: Element = crate::call_test_ribosome!(
-            host_access,
-            TestWasm::MustGet,
-            "must_get_valid_element",
-            header_dangling_header_hash
-        )
-        .unwrap();
-        let element_dangling_element: Element = crate::call_test_ribosome!(
-            host_access,
-            TestWasm::MustGet,
-            "must_get_valid_element",
-            element_dangling_header_hash
-        )
-        .unwrap();
-        let entry_dangling_element: Element = crate::call_test_ribosome!(
-            host_access,
-            TestWasm::MustGet,
-            "must_get_valid_element",
-            entry_dangling_header_hash
-        )
-        .unwrap();
-
-        let round_entry = round_element
+        let signature = element.signature().clone();
+        let header = element.header().clone();
+        let maybe_entry_box: Option<Box<Entry>> = element
             .entry()
-            .to_app_option::<Something>()
+            .as_option()
+            .cloned()
+            .map(|entry| Box::new(entry));
+        let entry_state = DhtOpHashed::from_content_sync(DhtOp::StoreEntry(
+            signature.clone(),
+            NewEntryHeader::try_from(header.clone()).unwrap(),
+            maybe_entry_box.clone().unwrap(),
+        ));
+        let element_state = DhtOpHashed::from_content_sync(DhtOp::StoreElement(
+            signature,
+            header.clone(),
+            maybe_entry_box,
+        ));
+        dht_env
+            .conn()
             .unwrap()
+            .with_commit_sync(|txn| {
+                set_validation_status(
+                    txn,
+                    element_state.as_hash().clone(),
+                    ValidationStatus::Rejected,
+                )
+                .unwrap();
+                set_validation_status(
+                    txn,
+                    entry_state.as_hash().clone(),
+                    ValidationStatus::Rejected,
+                )
+            })
             .unwrap();
 
-        assert_eq!(&round_entry, &Something(vec![1, 2, 3]));
+        // Must get entry returns the entry if it exists regardless of the
+        // validation status.
+        let must_get_entry: EntryHashed = conductor
+            .call(&bob, "must_get_entry", header.entry_hash().clone())
+            .await;
+        assert_eq!(Entry::from(must_get_entry), entry,);
 
-        let fail_header_hash = HeaderHash::from_raw_32([0; 32].to_vec());
+        // Must get header returns the header if it exists regardless of the
+        // validation status.
+        let must_get_header: SignedHeaderHashed = conductor
+            .call(&bob, "must_get_header", header_hash.clone())
+            .await;
+        assert_eq!(must_get_header.header(), &header,);
 
-        let element_fail: Result<Element, RibosomeError> = crate::call_test_ribosome!(
-            host_access,
-            TestWasm::MustGet,
-            "must_get_valid_element",
-            fail_header_hash
-        );
+        // Must get VALID element ONLY returns the element if it is valid.
+        let must_get_valid_element: Result<Element, _> = conductor
+            .call_fallible(&bob, "must_get_valid_element", header_hash)
+            .await;
+        assert!(must_get_valid_element.is_err());
 
-        match element_fail {
-            Err(RibosomeError::WasmError(WasmError::Host(e))) => assert_eq!(
-                "Failed to get Element uhCkkAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACZ9h_C",
-                e,
-            ),
-            _ => unreachable!(),
-        };
+        let bad_entry_hash = EntryHash::from_raw_32(vec![1; 32]);
+        let bad_must_get_entry: Result<EntryHashed, _> = conductor
+            .call_fallible(&bob, "must_get_entry", bad_entry_hash)
+            .await;
+        assert!(bad_must_get_entry.is_err());
 
-        let signed_header: SignedHeaderHashed = crate::call_test_ribosome!(
-            host_access,
-            TestWasm::MustGet,
-            "must_get_header",
-            header_hash
-        )
-        .unwrap();
-
-        assert_eq!(&signed_header, round_element.signed_header(),);
-
-        let header_fail: Result<SignedHeaderHashed, RibosomeError> = crate::call_test_ribosome!(
-            host_access,
-            TestWasm::MustGet,
-            "must_get_header",
-            fail_header_hash
-        );
-
-        match header_fail {
-            Err(RibosomeError::WasmError(WasmError::Host(e))) => assert_eq!(
-                "Failed to get SignedHeaderHashed uhCkkAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACZ9h_C",
-                e,
-            ),
-            _ => unreachable!(),
-        }
-
-        let entry_hash = match signed_header.header() {
-            Header::Create(create) => create.entry_hash.clone(),
-            _ => unreachable!(),
-        };
-
-        let entry: EntryHashed = crate::call_test_ribosome!(
-            host_access,
-            TestWasm::MustGet,
-            "must_get_entry",
-            entry_hash
-        )
-        .unwrap();
-
-        assert_eq!(
-            &ElementEntry::Present(entry.as_content().clone()),
-            round_element.entry(),
-        );
-
-        let fail_entry_hash = EntryHash::from_raw_32(vec![0; 32]);
-
-        let entry_fail: Result<EntryHashed, RibosomeError> = crate::call_test_ribosome!(
-            host_access,
-            TestWasm::MustGet,
-            "must_get_entry",
-            fail_entry_hash
-        );
-
-        match entry_fail {
-            Err(RibosomeError::WasmError(WasmError::Host(e))) => assert_eq!(
-                "Failed to get EntryHashed uhCEkAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACZ9h_C",
-                e,
-            ),
-            _ => unreachable!(),
-        }
-
-        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::MustGet]))
-            .next()
-            .unwrap();
-        let test_network = crate::test_utils::test_network(
-            Some(ribosome.dna_def().as_hash().clone()),
-            Some(author),
-        )
-        .await;
-        let dna_network = test_network.dna_network();
-        host_access.network = dna_network;
-
-        let create_op = |element: &Element| Op::StoreEntry {
-            header: SignedHashed {
-                hash: element.header_address().clone(),
-                header: element.header().clone().try_into().unwrap(),
-                signature: element.signature().clone(),
-            },
-            entry: element.entry().as_option().cloned().unwrap(),
-        };
-
-        let op = create_op(&header_reference_element);
-        let zomes_to_invoke = ZomesToInvoke::One(TestWasm::MustGet.into());
-        let validate_invocation = ValidateInvocation::new(zomes_to_invoke.clone(), &op).unwrap();
-
-        let mut validate_host_access = fixt!(ValidateHostAccess);
-        validate_host_access.network = host_access.network.clone();
-        validate_host_access.workspace = host_access.workspace.clone().into();
-
-        let header_reference_validate_result = ribosome
-            .run_validate(validate_host_access.clone(), validate_invocation.clone())
-            .unwrap();
-
-        assert_eq!(ValidateResult::Valid, header_reference_validate_result);
-
-        let op = create_op(&element_reference_element);
-        let validate_invocation = ValidateInvocation::new(zomes_to_invoke.clone(), &op).unwrap();
-
-        let element_reference_validate_result = ribosome
-            .run_validate(validate_host_access.clone(), validate_invocation.clone())
-            .unwrap();
-
-        assert_eq!(ValidateResult::Valid, element_reference_validate_result);
-
-        let op = create_op(&entry_reference_element);
-        let validate_invocation = ValidateInvocation::new(zomes_to_invoke.clone(), &op).unwrap();
-
-        let entry_reference_validate_result = ribosome
-            .run_validate(validate_host_access.clone(), validate_invocation.clone())
-            .unwrap();
-
-        assert_eq!(ValidateResult::Valid, entry_reference_validate_result);
-
-        let op = create_op(&header_dangling_element);
-        let validate_invocation = ValidateInvocation::new(zomes_to_invoke.clone(), &op).unwrap();
-
-        let header_dangling_validate_result = ribosome
-            .run_validate(validate_host_access.clone(), validate_invocation.clone())
-            .unwrap();
-
-        assert_eq!(
-            ValidateResult::UnresolvedDependencies(vec![fail_header_hash.clone().into()]),
-            header_dangling_validate_result,
-        );
-
-        let op = create_op(&element_dangling_element);
-        let validate_invocation = ValidateInvocation::new(zomes_to_invoke.clone(), &op).unwrap();
-
-        let element_dangling_validate_result = ribosome
-            .run_validate(validate_host_access.clone(), validate_invocation.clone())
-            .unwrap();
-
-        assert_eq!(
-            ValidateResult::UnresolvedDependencies(vec![fail_header_hash.clone().into()]),
-            element_dangling_validate_result,
-        );
-
-        let op = create_op(&entry_dangling_element);
-        let validate_invocation = ValidateInvocation::new(zomes_to_invoke.clone(), &op).unwrap();
-
-        let entry_dangling_validate_result = ribosome
-            .run_validate(validate_host_access.clone(), validate_invocation.clone())
-            .unwrap();
-
-        assert_eq!(
-            ValidateResult::UnresolvedDependencies(vec![fail_entry_hash.clone().into()]),
-            entry_dangling_validate_result,
-        );
-
-        // A garbage entry should fail to deserialize and return Ok(ValidateCallbackResult::Invalid) not Err(WasmError).
-        let garbage_entry = fixt!(Entry, Predictable, 1);
-        let mut garbage_element: Element = entry_dangling_element.clone();
-        *garbage_element.as_entry_mut() = ElementEntry::Present(garbage_entry);
-
-        let op = create_op(&garbage_element);
-        let validate_invocation = ValidateInvocation::new(zomes_to_invoke.clone(), &op).unwrap();
-
-        let garbage_entry_validate_result =
-            ribosome.run_validate(validate_host_access.clone(), validate_invocation.clone());
-
-        assert_eq!(
-            garbage_entry_validate_result.unwrap(),
-            ValidateResult::Invalid("Serialize(Deserialize(\"invalid type: boolean `false`, expected a HoloHash of primitive hash_type\"))".into())
-        );
+        let bad_header_hash = HeaderHash::from_raw_32(vec![2; 32]);
+        let bad_must_get_header: Result<SignedHeaderHashed, _> = conductor
+            .call_fallible(&bob, "must_get_header", bad_header_hash)
+            .await;
+        assert!(bad_must_get_header.is_err());
     }
 }

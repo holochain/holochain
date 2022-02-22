@@ -202,7 +202,7 @@ async fn run(
                         error => error,
                     };
                     error!("Shutting down conductor due to unrecoverable error: {:?}\nContext: {}", error, context);
-                    return Err(TaskManagerError::Unrecoverable(error));
+                    return Err(TaskManagerError::Unrecoverable(Box::new(error)));
                 },
                 Some(TaskOutcome::StopApps(cell_id, error, context)) => {
                     tracing::error!("About to automatically stop apps");
@@ -395,13 +395,18 @@ mod test {
         let mock_handle = MockConductorHandleT::new();
         let (send_task_handle, main_task) = spawn_task_manager(Arc::new(mock_handle));
         let handle = tokio::spawn(async {
-            Err(ConductorError::Other(anyhow::anyhow!("This task gotta die").into()).into())
+            Err(Box::new(ConductorError::Other(
+                anyhow::anyhow!("This task gotta die").into(),
+            ))
+            .into())
         });
         let handle = ManagedTaskAdd::generic(
             handle,
             Box::new(|result| match result {
                 Ok(_) => panic!("Task should have died"),
-                Err(ManagedTaskError::Conductor(ConductorError::Other(_))) => {
+                Err(ManagedTaskError::Conductor(err))
+                    if matches!(*err, ConductorError::Other(_)) =>
+                {
                     let handle = tokio::spawn(async { Ok(()) });
                     let handle = ManagedTaskAdd::ignore(handle, "respawned task");
                     TaskOutcome::NewTask(handle)
@@ -422,8 +427,6 @@ mod test {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    #[should_panic]
-    #[ignore = "panics in tokio break other tests"]
     async fn unrecoverable_error() {
         observability::test_run().ok();
         let (_tx, rx) = tokio::sync::broadcast::channel(1);
@@ -441,22 +444,24 @@ mod test {
             .send(ManagedTaskAdd::unrecoverable(
                 tokio::spawn(async {
                     tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-                    Err(
-                        ConductorError::Other(anyhow::anyhow!("Unrecoverable task failed").into())
-                            .into(),
-                    )
+                    Err(Box::new(ConductorError::Other(
+                        anyhow::anyhow!("Unrecoverable task failed").into(),
+                    ))
+                    .into())
                 }),
                 "",
             ))
             .await
             .unwrap();
 
-        handle_shutdown(main_task.await);
+        main_task
+            .await
+            .expect("Failed to join the main task")
+            .expect_err("The main task should return an error");
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    #[should_panic]
-    #[ignore = "panics in tokio break other tests"]
+    #[ignore = "panics in tokio break other tests, this test is here to confirm behavior but cannot be run on ci"]
     async fn unrecoverable_panic() {
         observability::test_run().ok();
         let (_tx, rx) = tokio::sync::broadcast::channel(1);

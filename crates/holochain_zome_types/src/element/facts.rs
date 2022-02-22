@@ -58,7 +58,7 @@ mod tests {
 
     #[test]
     fn test_header_and_entry_match() {
-        let mut uu = Unstructured::new(&NOISE);
+        let mut uu = Unstructured::new(&crate::NOISE);
         let u = &mut uu;
 
         let e = Entry::arbitrary(u).unwrap();

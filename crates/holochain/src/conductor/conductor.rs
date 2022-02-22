@@ -176,9 +176,6 @@ where
     /// Handle to the network actor.
     holochain_p2p: holochain_p2p::HolochainP2pRef,
 
-    /// Database sync strategy
-    db_sync_level: DbSyncStrategy,
-
     /// The map of running queue consumer workflows.
     queue_consumer_map: QueueConsumerMap,
 
@@ -391,7 +388,7 @@ where
         };
         let port = interface_id.port();
         tracing::debug!("Attaching interface {}", port);
-        let app_api = RealAppInterfaceApi::new(handle, interface_id.clone());
+        let app_api = RealAppInterfaceApi::new(handle);
         // This receiver is thrown away because we can produce infinite new
         // receivers from the Sender
         let (signal_tx, _r) = tokio::sync::broadcast::channel(SIGNAL_BUFFER_SIZE);
@@ -497,10 +494,11 @@ where
 
     /// Instantiate a Ribosome for use with a DNA
     pub(crate) fn get_ribosome(&self, dna_hash: &DnaHash) -> ConductorResult<RealRibosome> {
-        self.dna_store.share_ref(|d| match d.get(dna_hash) {
-            Some(dna) => Ok(RealRibosome::new(dna)),
-            None => Err(DnaError::DnaMissing(dna_hash.to_owned()).into()),
-        })
+        self.dna_store
+            .share_ref(|d| match d.get_dna_file(dna_hash) {
+                Some(dna) => Ok(RealRibosome::new(dna)),
+                None => Err(DnaError::DnaMissing(dna_hash.to_owned()).into()),
+            })
     }
 
     /// Get a dna space or create it if one doesn't exist.
@@ -796,7 +794,7 @@ where
             })
             .await?;
         let child_dna = dna_store.share_ref(|ds| {
-            ds.get(&parent_dna_hash)
+            ds.get_dna_file(&parent_dna_hash)
                 .ok_or(DnaError::DnaMissing(parent_dna_hash))?
                 .modify_phenotype(random_uid(), properties)
         })?;
@@ -1300,7 +1298,6 @@ where
             keystore,
             root_env_dir,
             holochain_p2p,
-            db_sync_level,
             queue_consumer_map,
             post_commit,
         })

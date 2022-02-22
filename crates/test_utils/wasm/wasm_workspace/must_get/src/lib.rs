@@ -4,39 +4,7 @@ use hdk::prelude::*;
 #[derive(Clone)]
 struct Something(#[serde(with = "serde_bytes")] Vec<u8>);
 
-#[hdk_entry(id = "entry_reference")]
-struct EntryReference(EntryHash);
-
-impl EntryReference {
-    fn into_inner(self) -> EntryHash {
-        self.0
-    }
-}
-
-#[hdk_entry(id = "header_reference")]
-struct HeaderReference(HeaderHash);
-
-impl HeaderReference {
-    fn into_inner(self) -> HeaderHash {
-        self.0
-    }
-}
-
-#[hdk_entry(id = "element_reference")]
-struct ElementReference(HeaderHash);
-
-impl ElementReference {
-    fn into_inner(self) -> HeaderHash {
-        self.0
-    }
-}
-
-entry_defs![
-    Something::entry_def(),
-    EntryReference::entry_def(),
-    HeaderReference::entry_def(),
-    ElementReference::entry_def()
-];
+entry_defs![Something::entry_def()];
 
 #[hdk_extern]
 fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {

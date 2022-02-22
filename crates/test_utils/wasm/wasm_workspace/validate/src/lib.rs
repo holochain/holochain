@@ -136,6 +136,11 @@ fn _commit_validate(to_commit: ThisWasmEntry) -> ExternResult<HeaderHash> {
 }
 
 #[hdk_extern]
+fn must_get_valid_element(header_hash: HeaderHash) -> ExternResult<Element> {
+    hdk::prelude::must_get_valid_element(header_hash)
+}
+
+#[hdk_extern]
 fn always_validates(_: ()) -> ExternResult<HeaderHash> {
     _commit_validate(ThisWasmEntry::AlwaysValidates)
 }
