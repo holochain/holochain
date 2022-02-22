@@ -1,5 +1,9 @@
 use crate::core::ribosome::CallContext;
+use crate::core::ribosome::HostFnAccess;
+use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
+use futures::future::join_all;
+use holochain_cascade::Cascade;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
 use std::sync::Arc;
@@ -8,62 +12,67 @@ use std::sync::Arc;
 pub fn get_details<'a>(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
-    input: GetInput,
-) -> Result<Option<Details>, WasmError> {
-    let GetInput {
-        any_dht_hash,
-        get_options,
-    } = input;
-
-    // Get the network from the context
-    let network = call_context.host_access.network().clone();
-
-    // timeouts must be handled by the network
-    tokio_helper::block_forever_on(async move {
-        let maybe_details = call_context
-            .host_access
-            .workspace()
-            .write()
-            .await
-            .cascade(network)
-            .get_details(any_dht_hash, get_options)
-            .await
-            .map_err(|cascade_error| WasmError::Host(cascade_error.to_string()))?;
-        Ok(maybe_details)
-    })
+    inputs: Vec<GetInput>,
+) -> Result<Vec<Option<Details>>, WasmError> {
+    match HostFnAccess::from(&call_context.host_context()) {
+        HostFnAccess {
+            read_workspace: Permission::Allow,
+            ..
+        } => {
+            let results: Vec<Result<Option<Details>, _>> =
+                tokio_helper::block_forever_on(async move {
+                    join_all(inputs.into_iter().map(|input| async {
+                        let GetInput {
+                            any_dht_hash,
+                            get_options,
+                        } = input;
+                        Cascade::from_workspace_network(
+                            &call_context.host_context.workspace(),
+                            call_context.host_context.network().to_owned(),
+                        )
+                        .get_details(any_dht_hash, get_options)
+                        .await
+                    }))
+                    .await
+                });
+            let results: Result<Vec<_>, _> = results
+                .into_iter()
+                .map(|result| {
+                    result.map_err(|cascade_error| WasmError::Host(cascade_error.to_string()))
+                })
+                .collect();
+            Ok(results?)
+        }
+        _ => Err(WasmError::Host(
+            RibosomeError::HostFnPermissions(
+                call_context.zome.zome_name().clone(),
+                call_context.function_name().clone(),
+                "get_details".into(),
+            )
+            .to_string(),
+        )),
+    }
 }
 
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
-    use crate::core::workflow::CallZomeWorkspace;
-    use crate::fixt::ZomeCallHostAccessFixturator;
-    use ::fixt::prelude::*;
     use hdk::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
+    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn ribosome_get_details_test<'a>() {
+    async fn ribosome_get_details_test() {
         observability::test_run().ok();
-
-        let test_env = holochain_lmdb::test_utils::test_cell_env();
-        let env = test_env.env();
-        let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
-
-        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
-            .await
-            .unwrap();
-
-        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
-
-        let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace_lock.clone();
+        let RibosomeTestFixture {
+            conductor, alice, ..
+        } = RibosomeTestFixture::new(TestWasm::Crud).await;
 
         // simple replica of the internal type for the TestWasm::Crud entry
         #[derive(Clone, Copy, Serialize, Deserialize, SerializedBytes, Debug, PartialEq)]
         struct CounTree(u32);
 
-        let check = |details: Option<Details>, count, delete| match details {
+        let check = |details: &Option<Details>, count, delete| match details {
             Some(Details::Element(ref element_details)) => {
                 match element_details.element.entry().to_app_option::<CounTree>() {
                     Ok(Some(CounTree(u))) => assert_eq!(u, count),
@@ -74,7 +83,7 @@ pub mod wasm_test {
             _ => panic!("no element"),
         };
 
-        let check_entry = |details: Option<Details>, count, update, delete, line| match details {
+        let check_entry = |details: &Option<Details>, count, update, delete, line| match details {
             Some(Details::Entry(ref entry_details)) => {
                 match entry_details.entry {
                     Entry::App(ref eb) => {
@@ -92,152 +101,88 @@ pub mod wasm_test {
             _ => panic!("no entry"),
         };
 
-        let zero_hash: EntryHash =
-            crate::call_test_ribosome!(host_access, TestWasm::Crud, "entry_hash", CounTree(0));
-        let one_hash: EntryHash =
-            crate::call_test_ribosome!(host_access, TestWasm::Crud, "entry_hash", CounTree(1));
-        let two_hash: EntryHash =
-            crate::call_test_ribosome!(host_access, TestWasm::Crud, "entry_hash", CounTree(2));
+        let zero_hash: EntryHash = conductor.call(&alice, "entry_hash", CounTree(0)).await;
+        let one_hash: EntryHash = conductor.call(&alice, "entry_hash", CounTree(1)).await;
+        let two_hash: EntryHash = conductor.call(&alice, "entry_hash", CounTree(2)).await;
 
-        let zero_a: HeaderHash = crate::call_test_ribosome!(host_access, TestWasm::Crud, "new", ());
-        check(
-            crate::call_test_ribosome!(host_access, TestWasm::Crud, "header_details", zero_a),
-            0,
-            0,
-        );
-        check_entry(
-            crate::call_test_ribosome!(host_access, TestWasm::Crud, "entry_details", zero_hash),
-            0,
-            0,
-            0,
-            line!(),
-        );
+        let zero_a: HeaderHash = conductor.call(&alice, "new", ()).await;
+        let header_details_0: Vec<Option<Details>> = conductor
+            .call(&alice, "header_details", vec![zero_a.clone()])
+            .await;
+        let entry_details_0: Vec<Option<Details>> = conductor
+            .call(&alice, "entry_details", vec![zero_hash.clone()])
+            .await;
+        check(&header_details_0[0], 0, 0);
+        check_entry(&entry_details_0[0], 0, 0, 0, line!());
 
-        let one_a: HeaderHash =
-            crate::call_test_ribosome!(host_access, TestWasm::Crud, "inc", zero_a);
-        check(
-            crate::call_test_ribosome!(host_access, TestWasm::Crud, "header_details", zero_a),
-            0,
-            0,
-        );
-        check(
-            crate::call_test_ribosome!(host_access, TestWasm::Crud, "header_details", one_a),
-            1,
-            0,
-        );
-        check_entry(
-            crate::call_test_ribosome!(host_access, TestWasm::Crud, "entry_details", zero_hash),
-            0,
-            1,
-            0,
-            line!(),
-        );
-        check_entry(
-            crate::call_test_ribosome!(host_access, TestWasm::Crud, "entry_details", one_hash),
-            1,
-            0,
-            0,
-            line!(),
-        );
+        let one_a: HeaderHash = conductor.call(&alice, "inc", zero_a.clone()).await;
+        let header_details_1: Vec<Option<Details>> = conductor
+            .call(
+                &alice,
+                "header_details",
+                vec![zero_a.clone(), one_a.clone()],
+            )
+            .await;
+        let entry_details_1: Vec<Option<Details>> = conductor
+            .call(
+                &alice,
+                "entry_details",
+                vec![zero_hash.clone(), one_hash.clone()],
+            )
+            .await;
+        check(&header_details_1[0], 0, 0);
+        check(&header_details_1[1], 1, 0);
+        check_entry(&entry_details_1[0], 0, 1, 0, line!());
+        check_entry(&entry_details_1[1], 1, 0, 0, line!());
 
-        let one_b: HeaderHash =
-            crate::call_test_ribosome!(host_access, TestWasm::Crud, "inc", zero_a);
-        check(
-            crate::call_test_ribosome!(host_access, TestWasm::Crud, "header_details", zero_a),
-            0,
-            0,
-        );
-        check(
-            crate::call_test_ribosome!(host_access, TestWasm::Crud, "header_details", one_b),
-            1,
-            0,
-        );
-        check_entry(
-            crate::call_test_ribosome!(host_access, TestWasm::Crud, "entry_details", zero_hash),
-            0,
-            2,
-            0,
-            line!(),
-        );
-        check_entry(
-            crate::call_test_ribosome!(host_access, TestWasm::Crud, "entry_details", one_hash),
-            1,
-            0,
-            0,
-            line!(),
-        );
+        let one_b: HeaderHash = conductor.call(&alice, "inc", zero_a.clone()).await;
+        let header_details_2: Vec<Option<Details>> = conductor
+            .call(&alice, "header_details", vec![zero_a.clone(), one_b.clone()])
+            .await;
+        let entry_details_2: Vec<Option<Details>> = conductor
+            .call(
+                &alice,
+                "entry_details",
+                vec![zero_hash.clone(), one_hash.clone()],
+            )
+            .await;
+        check(&header_details_2[0], 0, 0);
+        check(&header_details_2[1], 1, 0);
+        check_entry(&entry_details_2[0], 0, 2, 0, line!());
+        check_entry(&entry_details_2[1], 1, 0, 0, line!());
 
-        let two: HeaderHash = crate::call_test_ribosome!(host_access, TestWasm::Crud, "inc", one_b);
-        check(
-            crate::call_test_ribosome!(host_access, TestWasm::Crud, "header_details", one_b),
-            1,
-            0,
-        );
-        check(
-            crate::call_test_ribosome!(host_access, TestWasm::Crud, "header_details", two),
-            2,
-            0,
-        );
-        check_entry(
-            crate::call_test_ribosome!(host_access, TestWasm::Crud, "entry_details", zero_hash),
-            0,
-            2,
-            0,
-            line!(),
-        );
-        check_entry(
-            crate::call_test_ribosome!(host_access, TestWasm::Crud, "entry_details", one_hash),
-            1,
-            1,
-            0,
-            line!(),
-        );
-        check_entry(
-            crate::call_test_ribosome!(host_access, TestWasm::Crud, "entry_details", two_hash),
-            2,
-            0,
-            0,
-            line!(),
-        );
+        let two: HeaderHash = conductor.call(&alice, "inc", one_b.clone()).await;
+        let header_details_3: Vec<Option<Details>> = conductor
+            .call(&alice, "header_details", vec![one_b.clone(), two])
+            .await;
+        let entry_details_3: Vec<Option<Details>> = conductor
+            .call(
+                &alice,
+                "entry_details",
+                vec![zero_hash.clone(), one_hash.clone(), two_hash.clone()],
+            )
+            .await;
+        check(&header_details_3[0], 1, 0);
+        check(&header_details_3[1], 2, 0);
+        check_entry(&entry_details_3[0], 0, 2, 0, line!());
+        check_entry(&entry_details_3[1], 1, 1, 0, line!());
+        check_entry(&entry_details_3[2], 2, 0, 0, line!());
 
-        let zero_b: HeaderHash =
-            crate::call_test_ribosome!(host_access, TestWasm::Crud, "dec", one_a);
-        check(
-            crate::call_test_ribosome!(host_access, TestWasm::Crud, "header_details", one_a),
-            1,
-            1,
-        );
-        check(
-            crate::call_test_ribosome!(host_access, TestWasm::Crud, "header_details", one_b),
-            1,
-            0,
-        );
-        check_entry(
-            crate::call_test_ribosome!(host_access, TestWasm::Crud, "entry_details", zero_hash),
-            0,
-            2,
-            0,
-            line!(),
-        );
-        check_entry(
-            crate::call_test_ribosome!(host_access, TestWasm::Crud, "entry_details", one_hash),
-            1,
-            1,
-            1,
-            line!(),
-        );
-        check_entry(
-            crate::call_test_ribosome!(host_access, TestWasm::Crud, "entry_details", two_hash),
-            2,
-            0,
-            0,
-            line!(),
-        );
+        let zero_b: HeaderHash = conductor.call(&alice, "dec", one_a.clone()).await;
+        let header_details_4: Vec<Option<Details>> = conductor
+            .call(&alice, "header_details", vec![one_a, one_b, zero_b])
+            .await;
+        let entry_details_4: Vec<Option<Details>> = conductor
+            .call(&alice, "entry_details", vec![zero_hash, one_hash, two_hash])
+            .await;
+        check(&header_details_4[0], 1, 1);
+        check(&header_details_4[1], 1, 0);
+        check_entry(&entry_details_4[0], 0, 2, 0, line!());
+        check_entry(&entry_details_4[1], 1, 1, 1, line!());
+        check_entry(&entry_details_4[2], 2, 0, 0, line!());
 
-        let zero_b_details: Option<Details> =
-            crate::call_test_ribosome!(host_access, TestWasm::Crud, "header_details", zero_b);
-        match zero_b_details {
-            Some(Details::Element(element_details)) => {
+        match header_details_4[2] {
+            Some(Details::Element(ref element_details)) => {
                 match element_details.element.entry().as_option() {
                     None => {
                         // this is the delete so it should be none

@@ -5,19 +5,98 @@ use crate::header::WireHeaderStatus;
 use crate::header::WireNewEntryHeader;
 use crate::header::WireUpdateRelationship;
 use crate::prelude::*;
-use crate::EntryHashed;
 use error::ElementGroupError;
 use error::ElementGroupResult;
 use holochain_keystore::KeystoreError;
+use holochain_keystore::LairResult;
+use holochain_keystore::MetaLairClient;
 use holochain_serialized_bytes::prelude::*;
+use holochain_zome_types::entry::EntryHashed;
 use std::borrow::Cow;
 use std::collections::BTreeSet;
 
 #[allow(missing_docs)]
 pub mod error;
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes, Default)]
+/// A condensed version of get element request.
+/// This saves bandwidth by removing duplicated and implied data.
+pub struct WireElementOps {
+    /// The header this request was for.
+    pub header: Option<Judged<SignedHeader>>,
+    /// Any deletes on the header.
+    pub deletes: Vec<Judged<WireDelete>>,
+    /// Any updates on the header.
+    pub updates: Vec<Judged<WireUpdateRelationship>>,
+    /// The entry if there is one.
+    pub entry: Option<Entry>,
+}
+
+impl WireElementOps {
+    /// Create an empty set of wire element ops.
+    pub fn new() -> Self {
+        Self::default()
+    }
+    /// Render these ops to their full types.
+    pub fn render(self) -> DhtOpResult<RenderedOps> {
+        let Self {
+            header,
+            deletes,
+            updates,
+            entry,
+        } = self;
+        let mut ops = Vec::with_capacity(1 + deletes.len() + updates.len());
+        if let Some(header) = header {
+            let status = header.validation_status();
+            let SignedHeader(header, signature) = header.data;
+            // TODO: If they only need the metadata because they already have
+            // the content we could just send the entry hash instead of the
+            // SignedHeader.
+            let entry_hash = header.entry_hash().cloned();
+            ops.push(RenderedOp::new(
+                header,
+                signature,
+                status,
+                DhtOpType::StoreElement,
+            )?);
+            if let Some(entry_hash) = entry_hash {
+                for op in deletes {
+                    let status = op.validation_status();
+                    let op = op.data;
+                    let signature = op.signature;
+                    let header = Header::Delete(op.delete);
+
+                    ops.push(RenderedOp::new(
+                        header,
+                        signature,
+                        status,
+                        DhtOpType::RegisterDeletedBy,
+                    )?);
+                }
+                for op in updates {
+                    let status = op.validation_status();
+                    let SignedHeader(header, signature) =
+                        op.data.into_signed_header(entry_hash.clone());
+
+                    ops.push(RenderedOp::new(
+                        header,
+                        signature,
+                        status,
+                        DhtOpType::RegisterUpdatedElement,
+                    )?);
+                }
+            }
+        }
+        Ok(RenderedOps {
+            entry: entry.map(EntryHashed::from_content_sync),
+            ops,
+        })
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
 /// Element without the hashes for sending across the network
+/// TODO: Remove this as it's no longer needed.
 pub struct WireElement {
     /// The signed header for this element
     signed_header: SignedHeader,
@@ -110,7 +189,7 @@ impl<'a> ElementGroup<'a> {
         let iter = headers_iter.into_iter();
         let mut valid = Vec::with_capacity(iter.size_hint().0);
         let mut rejected = Vec::with_capacity(iter.size_hint().0);
-        let entry = EntryHashed::from_content_sync(entry);
+        let entry = entry.into_hashed();
         let entry_hash = entry.as_hash().clone();
         let entry = Cow::Owned(entry);
         for wire in iter {
@@ -269,10 +348,10 @@ pub trait SignedHeaderHashedExt {
     fn from_content_sync(signed_header: SignedHeader) -> SignedHeaderHashed;
     /// Sign some content
     #[allow(clippy::new_ret_no_self)]
-    async fn new(
-        keystore: &KeystoreSender,
+    async fn sign(
+        keystore: &MetaLairClient,
         header: HeaderHashed,
-    ) -> Result<SignedHeaderHashed, KeystoreError>;
+    ) -> LairResult<SignedHeaderHashed>;
     /// Validate the data
     async fn validate(&self) -> Result<(), KeystoreError>;
 }
@@ -285,10 +364,10 @@ impl SignedHeaderHashedExt for SignedHeaderHashed {
         Self: Sized,
     {
         let (header, signature) = signed_header.into();
-        Self::with_presigned(HeaderHashed::from_content_sync(header), signature)
+        Self::with_presigned(header.into_hashed(), signature)
     }
     /// SignedHeader constructor
-    async fn new(keystore: &KeystoreSender, header: HeaderHashed) -> Result<Self, KeystoreError> {
+    async fn sign(keystore: &MetaLairClient, header: HeaderHashed) -> LairResult<Self> {
         let signature = header.author().sign(keystore, &*header).await?;
         Ok(Self::with_presigned(header, signature))
     }
@@ -299,7 +378,7 @@ impl SignedHeaderHashedExt for SignedHeaderHashed {
             .header()
             .author()
             .verify_signature(self.signature(), self.header())
-            .await?
+            .await
         {
             return Err(KeystoreError::InvalidSignature(
                 self.signature().clone(),

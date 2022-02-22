@@ -41,9 +41,9 @@ fixturator!(
 // of random length between 1 and 32 bytes long
 // This version of Bytes is never empty.
 fixturator!(
-    BytesNotEmpty,
-    vec![0u8],
-    {
+    BytesNotEmpty;
+    curve Empty vec![0u8];
+    curve Unpredictable {
         let mut rng = crate::rng();
         let len = rng.gen_range(1, UNPREDICTABLE_MAX_LEN);
         let mut u8_fixturator = U8Fixturator::new(Unpredictable);
@@ -52,8 +52,8 @@ fixturator!(
             bytes.push(u8_fixturator.next().unwrap());
         }
         bytes
-    },
-    {
+    };
+    curve Predictable {
         let mut index = get_fixt_index!();
         let mut u8_fixturator = U8Fixturator::new_indexed(Predictable, index);
         let mut bytes = vec![];
@@ -63,7 +63,7 @@ fixturator!(
         index += 1;
         set_fixt_index!(index);
         bytes
-    }
+    };
 );
 
 /// A type alias for a Vec<u8> whose fixturator is expected to only return
@@ -74,16 +74,16 @@ pub type ThirtySixBytes = Vec<u8>;
 fixturator!(
     ThirtySixBytes;
     curve Empty [0; 36].to_vec();
-    curve Predictable {
-        let mut u8_fixturator = U8Fixturator::new(Predictable);
+    curve Unpredictable {
+        let mut u8_fixturator = U8Fixturator::new(Unpredictable);
         let mut bytes = vec![];
         for _ in 0..36 {
             bytes.push(u8_fixturator.next().unwrap());
         }
         bytes
     };
-    curve Unpredictable {
-        let mut u8_fixturator = U8Fixturator::new_indexed(Unpredictable, get_fixt_index!());
+    curve Predictable {
+        let mut u8_fixturator = U8Fixturator::new_indexed(Predictable, get_fixt_index!());
         let mut bytes = vec![];
         for _ in 0..36 {
             bytes.push(u8_fixturator.next().unwrap());

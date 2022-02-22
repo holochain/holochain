@@ -9,10 +9,12 @@ name = "test_wasm_zome_info"
 crate-type = [ "cdylib", "rlib" ]
 
 [dependencies]
-hdk = { path = "../../../../hdk" }
+hdk = { path = "../../../../hdk", features = ["properties"] }
 serde = "1.0"
+serde_yaml = "0.8"
 
 [dev-dependencies]
+hdk = { path = "../../../../hdk", features = ["fixturators", "properties"] }
 fixt = { path = "../../../../fixt" }
 
 [features]

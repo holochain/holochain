@@ -1,5 +1,8 @@
-use ffs::IoError;
+#![allow(missing_docs)]
 
+use holochain_util::ffs::IoError;
+
+/// Any error which can occur in this crate
 #[derive(Debug, thiserror::Error)]
 pub enum MrBundleError {
     #[error(transparent)]
@@ -30,6 +33,7 @@ pub enum MrBundleError {
 }
 pub type MrBundleResult<T> = Result<T, MrBundleError>;
 
+/// Errors which can occur while constructing a Bundle
 #[derive(Debug, PartialEq, Eq, thiserror::Error)]
 pub enum BundleError {
     #[error(
@@ -48,6 +52,7 @@ pub enum BundleError {
 }
 pub type BundleResult<T> = Result<T, BundleError>;
 
+/// Errors which can occur while unpacking resources from a Bundle
 #[cfg(feature = "packing")]
 #[derive(Debug, thiserror::Error)]
 pub enum UnpackingError {
@@ -73,6 +78,7 @@ pub enum UnpackingError {
 #[cfg(feature = "packing")]
 pub type UnpackingResult<T> = Result<T, UnpackingError>;
 
+/// Errors which can occur while packing resources into a Bundle
 #[cfg(feature = "packing")]
 #[derive(Debug, thiserror::Error)]
 pub enum PackingError {

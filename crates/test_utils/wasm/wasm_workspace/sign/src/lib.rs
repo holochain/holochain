@@ -2,7 +2,7 @@ use hdk::prelude::*;
 
 #[hdk_extern]
 fn sign(sign_input: Sign) -> ExternResult<Signature> {
-    Ok(hdk::prelude::sign_raw(sign_input.key, sign_input.data.to_vec())?)
+    hdk::prelude::sign_raw(sign_input.key, sign_input.data.to_vec())
 }
 
 #[hdk_extern]
@@ -95,7 +95,7 @@ fn verify_signature(
 #[cfg(test)]
 pub mod tests {
     use hdk::prelude::*;
-    use ::fixt::prelude::{paste, fixt, Unpredictable, Predictable};
+    use ::fixt::prelude::{fixt, Predictable};
 
     #[test]
     fn sign_ephemeral_smoke() {

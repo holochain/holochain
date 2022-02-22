@@ -1,14 +1,10 @@
 //! Some common testing helpers.
 
-use crate::dna::zome::WasmZome;
-use crate::dna::DnaDef;
-use crate::dna::DnaFile;
-use crate::dna::YamlProperties;
+use crate::dna::wasm::DnaWasm;
 use crate::element::SignedHeaderHashedExt;
 use crate::fixt::*;
 use crate::prelude::*;
-use crate::timestamp;
-use crate::{dna::wasm::DnaWasm, EntryHashed};
+use holochain_keystore::MetaLairClient;
 use std::path::PathBuf;
 
 pub use holochain_zome_types::test_utils::*;
@@ -18,24 +14,30 @@ struct FakeProperties {
     test: String,
 }
 
-/// simple DnaWasm fixture
-pub fn fake_dna_wasm() -> DnaWasm {
-    DnaWasm::from(vec![0_u8])
+/// A fixture example dna for unit testing.
+pub fn fake_dna_file(uid: &str) -> DnaFile {
+    fake_dna_file_named(uid, "test")
+}
+
+/// A named dna for unit testing.
+pub fn fake_dna_file_named(uid: &str, name: &str) -> DnaFile {
+    fake_dna_zomes_named(uid, name, vec![(name.into(), vec![].into())])
 }
 
 /// A fixture example dna for unit testing.
-pub fn fake_dna_file(uuid: &str) -> DnaFile {
-    fake_dna_zomes(uuid, vec![("test".into(), vec![].into())])
+pub fn fake_dna_zomes(uid: &str, zomes: Vec<(ZomeName, DnaWasm)>) -> DnaFile {
+    fake_dna_zomes_named(uid, "test", zomes)
 }
 
-/// A fixture example dna for unit testing.
-pub fn fake_dna_zomes(uuid: &str, zomes: Vec<(ZomeName, DnaWasm)>) -> DnaFile {
+/// A named dna for unit testing.
+pub fn fake_dna_zomes_named(uid: &str, name: &str, zomes: Vec<(ZomeName, DnaWasm)>) -> DnaFile {
     let mut dna = DnaDef {
-        name: "test".to_string(),
+        name: name.to_string(),
         properties: YamlProperties::new(serde_yaml::from_str("p: hi").unwrap())
             .try_into()
             .unwrap(),
-        uuid: uuid.to_string(),
+        uid: uid.to_string(),
+        origin_time: Timestamp::now(),
         zomes: Vec::new(),
     };
     tokio_helper::block_forever_on(async move {
@@ -43,7 +45,8 @@ pub fn fake_dna_zomes(uuid: &str, zomes: Vec<(ZomeName, DnaWasm)>) -> DnaFile {
         for (zome_name, wasm) in zomes {
             let wasm = crate::dna::wasm::DnaWasmHashed::from_content(wasm).await;
             let (wasm, wasm_hash) = wasm.into_inner();
-            dna.zomes.push((zome_name, WasmZome { wasm_hash }.into()));
+            dna.zomes
+                .push((zome_name, ZomeDef::Wasm(WasmZome { wasm_hash })));
             wasm_code.push(wasm);
         }
         DnaFile::new(dna, wasm_code).await
@@ -52,9 +55,12 @@ pub fn fake_dna_zomes(uuid: &str, zomes: Vec<(ZomeName, DnaWasm)>) -> DnaFile {
 }
 
 /// Save a Dna to a file and return the path and tempdir that contains it
-pub async fn write_fake_dna_file(dna: DnaFile) -> anyhow::Result<(PathBuf, tempdir::TempDir)> {
+pub async fn write_fake_dna_file(dna: DnaFile) -> anyhow::Result<(PathBuf, tempfile::TempDir)> {
     let bundle = DnaBundle::from_dna_file(dna).await?;
-    let tmp_dir = tempdir::TempDir::new("fake_dna")?;
+    let tmp_dir = tempfile::Builder::new()
+        .prefix("fake_dna")
+        .tempdir()
+        .unwrap();
     let mut path: PathBuf = tmp_dir.path().into();
     path.push("test-dna.dna");
     bundle.write_to_file(&path).await?;
@@ -84,17 +90,17 @@ pub fn fake_cap_secret() -> CapSecret {
 
 /// Create a fake SignedHeaderHashed and EntryHashed pair with random content
 pub async fn fake_unique_element(
-    keystore: &KeystoreSender,
+    keystore: &MetaLairClient,
     agent_key: AgentPubKey,
     visibility: EntryVisibility,
 ) -> anyhow::Result<(SignedHeaderHashed, EntryHashed)> {
     let content: SerializedBytes =
         UnsafeBytes::from(nanoid::nanoid!().as_bytes().to_owned()).into();
-    let entry = EntryHashed::from_content_sync(Entry::App(content.try_into().unwrap()));
+    let entry = Entry::App(content.try_into().unwrap()).into_hashed();
     let app_entry_type = AppEntryTypeFixturator::new(visibility).next().unwrap();
     let header_1 = Header::Create(Create {
         author: agent_key,
-        timestamp: timestamp::now(),
+        timestamp: Timestamp::now(),
         header_seq: 0,
         prev_header: fake_header_hash(1),
 
@@ -103,7 +109,22 @@ pub async fn fake_unique_element(
     });
 
     Ok((
-        SignedHeaderHashed::new(&keystore, HeaderHashed::from_content_sync(header_1)).await?,
+        SignedHeaderHashed::sign(keystore, header_1.into_hashed()).await?,
         entry,
     ))
+}
+
+/// Generate a test keystore pre-populated with a couple test keypairs.
+pub fn test_keystore() -> holochain_keystore::MetaLairClient {
+    tokio_helper::block_on(
+        async move {
+            let keystore = holochain_keystore::test_keystore::spawn_test_keystore()
+                .await
+                .unwrap();
+
+            keystore
+        },
+        std::time::Duration::from_secs(1),
+    )
+    .expect("timeout elapsed")
 }

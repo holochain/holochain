@@ -9,18 +9,18 @@ use hdk::prelude::*;
 use holochain_types::prelude::*;
 use unwrap_to::unwrap_to;
 
-/// A wrapper around ConductorHandle with more convenient methods for testing
+/// A wrapper around ConductorHandle with more convenient methods for testing.
 #[derive(Clone, shrinkwraprs::Shrinkwrap, derive_more::From)]
 pub struct TestConductorHandle(pub(crate) ConductorHandle);
 
 impl TestConductorHandle {
     /// Opinionated app setup. Creates one app per agent, using the given DnaFiles.
     ///
-    /// All InstalledAppIds and CellNicks are auto-generated. In tests driven directly
+    /// All InstalledAppIds and AppRoleIds are auto-generated. In tests driven directly
     /// by Rust, you typically won't care what these values are set to, but in case you
     /// do, they are set as so:
     /// - InstalledAppId: {app_id_prefix}-{agent_pub_key}
-    /// - CellNick: {dna_hash}
+    /// - AppRoleId: {dna_hash}
     ///
     /// Returns the list of generated InstalledAppIds, in the same order as Agents passed in.
     pub async fn setup_app_for_agents_with_no_membrane_proof(
@@ -100,10 +100,10 @@ macro_rules! destructure_test_cells {
             .map(|(_, v)| {
                 v.into_iter()
                     .collect_tuple()
-                    .expect("Can't destructure more than 4 DNAs")
+                    .expect("Wrong number of DNAs in destructuring pattern, or too many (must be 4 or less)")
             })
             .collect_tuple()
-            .expect("Can't destructure more than 4 Agents")
+            .expect("Wrong number of Agents in destructuring pattern, or too many (must be 4 or less)")
     }};
 }
 #[macro_export]
@@ -114,7 +114,7 @@ macro_rules! destructure_test_cell_vec {
         vec.into_iter()
             .map(|blob| destructure_test_cells!(blob))
             .collect_tuple()
-            .expect("Can't destructure more than 4 Conductors")
+            .expect("Wrong number of Conductors in destructuring pattern, or too many (must be 4 or less)")
     }};
 }
 
@@ -142,7 +142,7 @@ impl TestConductorHandle {
         cell_id: &CellId,
         zome_name: Z,
         fn_name: F,
-        cap: Option<CapSecret>,
+        cap_secret: Option<CapSecret>,
         provenance: Option<AgentPubKey>,
         payload: I,
     ) -> O
@@ -158,7 +158,7 @@ impl TestConductorHandle {
             cell_id: cell_id.clone(),
             zome_name: zome_name.into(),
             fn_name: fn_name.into(),
-            cap,
+            cap_secret,
             provenance,
             payload,
         };
@@ -186,7 +186,7 @@ where
     /// This can be `None` and still succeed in the case where the function
     /// in the zome being called has been given an Unrestricted status
     /// via a `CapGrant`. Otherwise, it will be necessary to provide a `CapSecret` for every call.
-    pub cap: Option<CapSecret>,
+    pub cap_secret: Option<CapSecret>,
     /// The name of the Zome function to call
     pub fn_name: F,
     /// The data to be serialized and passed as an argument to the Zome call
@@ -205,7 +205,7 @@ where
             cell_id,
             zome,
             fn_name,
-            cap,
+            cap_secret,
             provenance,
             payload,
         } = tzci;
@@ -215,7 +215,7 @@ where
             cell_id: cell_id.clone(),
             zome: zome.clone(),
             fn_name: fn_name.into(),
-            cap,
+            cap_secret,
             provenance,
             payload,
         }

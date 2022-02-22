@@ -8,8 +8,8 @@ use super::*;
 use crate::HoloHash;
 use crate::{error::HoloHashResult, HashType};
 
-/// A wrapper around HoloHash to denote that deserialization should use
-/// base-64 strings rather than raw byte arrays
+/// A wrapper around HoloHash that `Serialize`s into a base64 string
+/// rather than a raw byte array.
 #[derive(
     Debug,
     Clone,
@@ -42,6 +42,13 @@ impl<T: HashType> serde::Serialize for HoloHashB64<T> {
         S: serde::Serializer,
     {
         serializer.serialize_str(&holo_hash_encode(self.0.get_raw_39()))
+    }
+}
+
+#[cfg(feature = "arbitrary")]
+impl<'a, P: PrimitiveHashType> arbitrary::Arbitrary<'a> for HoloHashB64<P> {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        Ok(HoloHash::arbitrary(u)?.into())
     }
 }
 

@@ -108,23 +108,26 @@
 //! ```
 //! and the examples.
 
-use holochain_cli_bundle as hc_bundle;
+// Useful to have this public when using this as a library.
+pub use holochain_cli_bundle as hc_bundle;
 use holochain_cli_sandbox as hc_sandbox;
 use structopt::StructOpt;
 
 /// Holochain CLI
 ///
-/// Work with DNA and hApp bundle files, set up sandbox environments for testing
+/// Work with DNA, hApp and web-hApp bundle files, set up sandbox environments for testing
 /// and development purposes, make direct admin calls to running conductors,
 /// and more.
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, StructOpt)]
 #[structopt(setting = structopt::clap::AppSettings::InferSubcommands)]
 pub enum Opt {
-    /// Work with hApp bundles
-    App(hc_bundle::HcAppBundle),
     /// Work with DNA bundles
     Dna(hc_bundle::HcDnaBundle),
+    /// Work with hApp bundles
+    App(hc_bundle::HcAppBundle),
+    /// Work with Web-hApp bundles
+    WebApp(hc_bundle::HcWebAppBundle),
     /// Work with sandboxed environments for testing and development
     Sandbox(hc_sandbox::HcSandbox),
 }
@@ -133,8 +136,9 @@ impl Opt {
     /// Run this command
     pub async fn run(self) -> anyhow::Result<()> {
         match self {
-            Self::App(cmd) => cmd.run().await?,
             Self::Dna(cmd) => cmd.run().await?,
+            Self::App(cmd) => cmd.run().await?,
+            Self::WebApp(cmd) => cmd.run().await?,
             Self::Sandbox(cmd) => cmd.run().await?,
         }
         Ok(())

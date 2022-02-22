@@ -18,8 +18,9 @@ async fn direct_validation_test() {
     let dna_file = DnaFile::new(
         DnaDef {
             name: "direct_validation_test".to_string(),
-            uuid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
+            uid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
             properties: SerializedBytes::try_from(()).unwrap(),
+            origin_time: Timestamp::now(),
             zomes: vec![TestWasm::Update.into()].into(),
         },
         vec![TestWasm::Update.into()],
@@ -39,8 +40,8 @@ async fn direct_validation_test() {
 
     run_test(alice_cell_id, handle.clone()).await;
 
-    let shutdown = handle.take_shutdown_handle().await.unwrap();
-    handle.shutdown().await;
+    let shutdown = handle.take_shutdown_handle().unwrap();
+    handle.shutdown();
     shutdown.await.unwrap().unwrap();
 }
 

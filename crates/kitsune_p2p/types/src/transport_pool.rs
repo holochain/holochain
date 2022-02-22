@@ -9,12 +9,14 @@ use ghost_actor::dependencies::tracing;
 use ghost_actor::GhostControlSender;
 use std::collections::HashMap;
 
+type SubListener = ghost_actor::GhostSender<TransportListener>;
+
 ghost_actor::ghost_chan! {
     /// Additional control functions for a transport pool
     pub chan TransportPool<TransportError> {
         /// Push a new sub-transport listener into the pool
         fn push_sub_transport(
-            sub_listener: ghost_actor::GhostSender<TransportListener>,
+            sub_listener: SubListener,
             sub_event: TransportEventReceiver,
         ) -> ();
     }
@@ -51,7 +53,7 @@ ghost_actor::ghost_chan! {
     chan InnerChan<TransportError> {
         fn inject_listener(
             scheme: String,
-            sub_listener: ghost_actor::GhostSender<TransportListener>,
+            sub_listener: SubListener,
         ) -> ();
     }
 }
@@ -184,7 +186,7 @@ impl TransportListenerHandler for Inner {
         url: url2::Url2,
     ) -> TransportListenerHandlerResult<(url2::Url2, TransportChannelWrite, TransportChannelRead)>
     {
-        // TODO - right now requiring sub transport scheme to create channel
+        // NOTE - right now requiring sub transport scheme to create channel
         //        would be nice to also accept a pool url && prioritize the
         //        sub-scheme.
         let scheme = url.scheme().to_string();

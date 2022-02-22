@@ -1,14 +1,16 @@
 use super::*;
-use crate::conductor::api::error::ConductorApiError;
-use crate::conductor::api::MockCellConductorApi;
-use crate::meta_mock;
+use crate::conductor::handle::MockConductorHandleT;
+use crate::conductor::space::TestSpaces;
+use crate::test_utils::fake_genesis;
 use ::fixt::prelude::*;
 use error::SysValidationError;
 
 use holochain_keystore::AgentPubKeyExt;
-use holochain_lmdb::env::EnvironmentRead;
-use holochain_lmdb::test_utils::test_cell_env;
 use holochain_serialized_bytes::SerializedBytes;
+use holochain_state::prelude::fresh_reader_test;
+use holochain_state::prelude::test_authored_env;
+use holochain_state::prelude::test_cache_env;
+use holochain_state::prelude::test_dht_env;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::Header;
 use matches::assert_matches;
@@ -17,7 +19,7 @@ use std::convert::TryFrom;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn verify_header_signature_test() {
-    let keystore = holochain_lmdb::test_utils::test_keystore();
+    let keystore = holochain_state::test_utils::test_keystore();
     let author = fake_agent_pubkey_1();
     let mut header = fixt!(CreateLink);
     header.author = author.clone();
@@ -27,12 +29,14 @@ async fn verify_header_signature_test() {
 
     assert_matches!(
         verify_header_signature(&wrong_signature, &header).await,
-        Ok(false)
+        Err(SysValidationError::ValidationOutcome(
+            ValidationOutcome::Counterfeit(_, _)
+        ))
     );
 
     assert_matches!(
         verify_header_signature(&real_signature, &header).await,
-        Ok(true)
+        Ok(())
     );
 }
 
@@ -56,31 +60,63 @@ async fn check_previous_header() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn check_valid_if_dna_test() {
-    let env: EnvironmentRead = test_cell_env().env().into();
+    let tmp = test_authored_env();
+    let tmp_dht = test_dht_env();
+    let tmp_cache = test_cache_env();
+    let keystore = test_keystore();
+    let env = tmp.env();
     // Test data
-    let activity_return = vec![fixt!(HeaderHash)];
+    let _activity_return = vec![fixt!(HeaderHash)];
+
+    let mut dna_def = fixt!(DnaDef);
+    dna_def.origin_time = Timestamp::MIN;
 
     // Empty store not dna
     let header = fixt!(CreateLink);
-    let mut metadata = meta_mock!();
-    metadata.expect_env().return_const(env.clone());
-
-    assert_matches!(
-        check_valid_if_dna(&header.clone().into(), &metadata).await,
-        Ok(())
-    );
-    let header = fixt!(Dna);
-    let mut metadata = meta_mock!(expect_get_activity);
-    metadata.expect_env().return_const(env.clone());
-    assert_matches!(
-        check_valid_if_dna(&header.clone().into(), &metadata).await,
-        Ok(())
+    let mut workspace = SysValidationWorkspace::new(
+        env.clone().into(),
+        tmp_dht.env().into(),
+        tmp_cache.env(),
+        Arc::new(dna_def.clone()),
     );
 
-    let mut metadata = meta_mock!(expect_get_activity, activity_return);
-    metadata.expect_env().return_const(env);
     assert_matches!(
-        check_valid_if_dna(&header.clone().into(), &metadata).await,
+        check_valid_if_dna(&header.clone().into(), &workspace).await,
+        Ok(())
+    );
+    let mut header = fixt!(Dna);
+
+    assert_matches!(
+        check_valid_if_dna(&header.clone().into(), &workspace).await,
+        Ok(())
+    );
+
+    // - Test that an origin_time in the future leads to invalid Dna header commit
+    let dna_def_original = workspace.dna_def();
+    dna_def.origin_time = Timestamp::MAX;
+    workspace.dna_def = Arc::new(dna_def);
+    assert_matches!(
+        check_valid_if_dna(&header.clone().into(), &workspace).await,
+        Err(SysValidationError::ValidationOutcome(
+            ValidationOutcome::PrevHeaderError(PrevHeaderError::InvalidRootOriginTime)
+        ))
+    );
+    workspace.dna_def = dna_def_original;
+
+    fake_genesis(env.clone().into(), tmp_dht.env(), keystore)
+        .await
+        .unwrap();
+    tmp_dht
+        .env()
+        .conn()
+        .unwrap()
+        .execute("UPDATE DhtOp SET when_integrated = 0", [])
+        .unwrap();
+
+    header.author = fake_agent_pubkey_1();
+
+    assert_matches!(
+        check_valid_if_dna(&header.clone().into(), &workspace).await,
         Err(SysValidationError::ValidationOutcome(
             ValidationOutcome::PrevHeaderError(PrevHeaderError::InvalidRoot)
         ))
@@ -91,7 +127,7 @@ async fn check_valid_if_dna_test() {
 async fn check_previous_timestamp() {
     let mut header = fixt!(CreateLink);
     let mut prev_header = fixt!(CreateLink);
-    header.timestamp = timestamp::now().into();
+    header.timestamp = Timestamp::now().into();
     let before = chrono::Utc::now() - chrono::Duration::weeks(1);
     let after = chrono::Utc::now() + chrono::Duration::weeks(1);
 
@@ -124,32 +160,26 @@ async fn check_previous_seq() {
     prev_header.header_seq = 2;
     assert_matches!(
         check_prev_seq(&header.clone().into(), &prev_header.clone().into()),
-        Err(
-            SysValidationError::ValidationOutcome(
-                ValidationOutcome::PrevHeaderError(PrevHeaderError::InvalidSeq(_, _)),
-            ),
-        )
+        Err(SysValidationError::ValidationOutcome(
+            ValidationOutcome::PrevHeaderError(PrevHeaderError::InvalidSeq(_, _)),
+        ),)
     );
 
     prev_header.header_seq = 3;
     assert_matches!(
         check_prev_seq(&header.clone().into(), &prev_header.clone().into()),
-        Err(
-            SysValidationError::ValidationOutcome(
-                ValidationOutcome::PrevHeaderError(PrevHeaderError::InvalidSeq(_, _)),
-            ),
-        )
+        Err(SysValidationError::ValidationOutcome(
+            ValidationOutcome::PrevHeaderError(PrevHeaderError::InvalidSeq(_, _)),
+        ),)
     );
 
     header.header_seq = 0;
     prev_header.header_seq = 0;
     assert_matches!(
         check_prev_seq(&header.clone().into(), &prev_header.clone().into()),
-        Err(
-            SysValidationError::ValidationOutcome(
-                ValidationOutcome::PrevHeaderError(PrevHeaderError::InvalidSeq(_, _)),
-            ),
-        )
+        Err(SysValidationError::ValidationOutcome(
+            ValidationOutcome::PrevHeaderError(PrevHeaderError::InvalidSeq(_, _)),
+        ),)
     );
 }
 
@@ -202,7 +232,9 @@ async fn check_entry_hash_test() {
     assert_matches!(check_entry_hash(&eh, &entry).await, Ok(()));
     assert_matches!(
         check_new_entry_header(&fixt!(CreateLink).into()),
-        Err(SysValidationError::ValidationOutcome(ValidationOutcome::NotNewEntry(_)))
+        Err(SysValidationError::ValidationOutcome(
+            ValidationOutcome::NotNewEntry(_)
+        ))
     );
 }
 
@@ -242,7 +274,9 @@ async fn check_update_reference_test() {
 
     assert_matches!(
         check_update_reference(&eu, &NewEntryHeaderRef::from(&ec)),
-        Err(SysValidationError::ValidationOutcome(ValidationOutcome::UpdateTypeMismatch(_, _)))
+        Err(SysValidationError::ValidationOutcome(
+            ValidationOutcome::UpdateTypeMismatch(_, _)
+        ))
     );
 
     // Different entry type
@@ -250,20 +284,27 @@ async fn check_update_reference_test() {
 
     assert_matches!(
         check_update_reference(&eu, &NewEntryHeaderRef::from(&ec)),
-        Err(SysValidationError::ValidationOutcome(ValidationOutcome::UpdateTypeMismatch(_, _)))
+        Err(SysValidationError::ValidationOutcome(
+            ValidationOutcome::UpdateTypeMismatch(_, _)
+        ))
     );
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn check_link_tag_size_test() {
     let tiny = LinkTag(vec![0; 1]);
-    let bytes = (0..401).map(|_| 0u8).into_iter().collect::<Vec<_>>();
+    let bytes = (0..super::MAX_TAG_SIZE + 1)
+        .map(|_| 0u8)
+        .into_iter()
+        .collect::<Vec<_>>();
     let huge = LinkTag(bytes);
     assert_matches!(check_tag_size(&tiny), Ok(()));
 
     assert_matches!(
         check_tag_size(&huge),
-        Err(SysValidationError::ValidationOutcome(ValidationOutcome::TagTooLarge(_, _)))
+        Err(SysValidationError::ValidationOutcome(
+            ValidationOutcome::TagTooLarge(_, _)
+        ))
     );
 }
 
@@ -274,8 +315,9 @@ async fn check_app_entry_type_test() {
     let dna_file = DnaFile::new(
         DnaDef {
             name: "app_entry_type_test".to_string(),
-            uuid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
+            uid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
             properties: SerializedBytes::try_from(()).unwrap(),
+            origin_time: Timestamp::now(),
             zomes: vec![TestWasm::EntryDefs.into()].into(),
         },
         vec![TestWasm::EntryDefs.into()],
@@ -287,63 +329,67 @@ async fn check_app_entry_type_test() {
     entry_def.visibility = EntryVisibility::Public;
 
     // Setup mock conductor
-    let mut conductor_api = MockCellConductorApi::new();
-    conductor_api.expect_cell_id().return_const(fixt!(CellId));
+    let mut conductor_handle = MockConductorHandleT::new();
     // # No dna or entry def
-    conductor_api.expect_sync_get_entry_def().return_const(None);
-    conductor_api.expect_sync_get_dna().return_const(None);
-    conductor_api
-        .expect_sync_get_this_dna()
-        .returning(move || Err(ConductorApiError::DnaMissing(dna_hash.clone())));
+    conductor_handle.expect_get_entry_def().return_const(None);
+    conductor_handle.expect_get_dna_file().return_const(None);
 
     // ## Dna is missing
     let aet = AppEntryType::new(0.into(), 0.into(), EntryVisibility::Public);
     assert_matches!(
-        check_app_entry_type(&aet, &conductor_api).await,
-        Err(SysValidationError::ConductorApiError(e))
-        if matches!(*e, ConductorApiError::DnaMissing(_))
+        check_app_entry_type(&dna_hash, &aet, &conductor_handle).await,
+        Err(SysValidationError::DnaMissing(_))
     );
 
     // # Dna but no entry def in buffer
     // ## ZomeId out of range
-    conductor_api.checkpoint();
-    conductor_api.expect_sync_get_entry_def().return_const(None);
-    conductor_api
-        .expect_sync_get_dna()
+    conductor_handle.checkpoint();
+    conductor_handle.expect_get_entry_def().return_const(None);
+    conductor_handle
+        .expect_get_dna_file()
         .return_const(Some(dna_file.clone()));
-    conductor_api
-        .expect_sync_get_this_dna()
-        .returning(move || Ok(dna_file.clone()));
     let aet = AppEntryType::new(0.into(), 1.into(), EntryVisibility::Public);
     assert_matches!(
-        check_app_entry_type(&aet, &conductor_api).await,
-        Err(SysValidationError::ValidationOutcome(ValidationOutcome::ZomeId(_)))
+        check_app_entry_type(&dna_hash, &aet, &conductor_handle).await,
+        Err(SysValidationError::ValidationOutcome(
+            ValidationOutcome::ZomeId(_)
+        ))
     );
 
     // ## EntryId is out of range
     let aet = AppEntryType::new(10.into(), 0.into(), EntryVisibility::Public);
     assert_matches!(
-        check_app_entry_type(&aet, &conductor_api).await,
-        Err(SysValidationError::ValidationOutcome(ValidationOutcome::EntryDefId(_)))
+        check_app_entry_type(&dna_hash, &aet, &conductor_handle).await,
+        Err(SysValidationError::ValidationOutcome(
+            ValidationOutcome::EntryDefId(_)
+        ))
     );
 
     // ## EntryId is in range for dna
     let aet = AppEntryType::new(0.into(), 0.into(), EntryVisibility::Public);
-    assert_matches!(check_app_entry_type(&aet, &conductor_api).await, Ok(_));
+    assert_matches!(
+        check_app_entry_type(&dna_hash, &aet, &conductor_handle).await,
+        Ok(_)
+    );
     let aet = AppEntryType::new(0.into(), 0.into(), EntryVisibility::Private);
     assert_matches!(
-        check_app_entry_type(&aet, &conductor_api).await,
-        Err(SysValidationError::ValidationOutcome(ValidationOutcome::EntryVisibility(_)))
+        check_app_entry_type(&dna_hash, &aet, &conductor_handle).await,
+        Err(SysValidationError::ValidationOutcome(
+            ValidationOutcome::EntryVisibility(_)
+        ))
     );
 
     // # Add an entry def to the buffer
-    conductor_api
-        .expect_sync_get_entry_def()
+    conductor_handle
+        .expect_get_entry_def()
         .return_const(Some(entry_def));
 
     // ## Can get the entry from the entry def
     let aet = AppEntryType::new(0.into(), 0.into(), EntryVisibility::Public);
-    assert_matches!(check_app_entry_type(&aet, &conductor_api).await, Ok(_));
+    assert_matches!(
+        check_app_entry_type(&dna_hash, &aet, &conductor_handle).await,
+        Ok(_)
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -359,4 +405,181 @@ async fn check_entry_not_private_test() {
             ValidationOutcome::PrivateEntry
         ))
     );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn incoming_ops_filters_private_entry() {
+    let dna = fixt!(DnaHash);
+    let spaces = TestSpaces::new([dna.clone()]);
+    let space = Arc::new(spaces.test_spaces[&dna].space.clone());
+    let vault = space.dht_env.clone();
+    let keystore = test_keystore();
+    let (tx, _rx) = TriggerSender::new();
+
+    let private_entry = fixt!(Entry);
+    let mut create = fixt!(Create);
+    let author = keystore.new_sign_keypair_random().await.unwrap();
+    let aet = AppEntryType::new(0.into(), 0.into(), EntryVisibility::Private);
+    create.entry_type = EntryType::App(aet);
+    create.entry_hash = EntryHash::with_data_sync(&private_entry);
+    create.author = author.clone();
+    let header = Header::Create(create);
+    let signature = author.sign(&keystore, &header).await.unwrap();
+
+    let shh =
+        SignedHeaderHashed::with_presigned(HeaderHashed::from_content_sync(header), signature);
+    let el = Element::new(shh, Some(private_entry));
+
+    let ops_sender = IncomingDhtOpSender::new(space.clone(), tx.clone());
+    ops_sender.send_store_entry(el.clone()).await.unwrap();
+    let num_ops: usize = fresh_reader_test(vault.clone(), |txn| {
+        txn.query_row("SELECT COUNT(rowid) FROM DhtOp", [], |row| row.get(0))
+            .unwrap()
+    });
+    assert_eq!(num_ops, 0);
+
+    let ops_sender = IncomingDhtOpSender::new(space.clone(), tx.clone());
+    ops_sender.send_store_element(el.clone()).await.unwrap();
+    let num_ops: usize = fresh_reader_test(vault.clone(), |txn| {
+        txn.query_row("SELECT COUNT(rowid) FROM DhtOp", [], |row| row.get(0))
+            .unwrap()
+    });
+    assert_eq!(num_ops, 1);
+    let num_entries: usize = fresh_reader_test(vault.clone(), |txn| {
+        txn.query_row("SELECT COUNT(rowid) FROM Entry", [], |row| row.get(0))
+            .unwrap()
+    });
+    assert_eq!(num_entries, 0);
+}
+
+#[test]
+/// Test the chain validation works.
+fn valid_chain_test() {
+    let author = fixt!(AgentPubKey);
+    // Create a valid chain.
+    let mut headers = vec![];
+    headers.push(HeaderHashed::from_content_sync(Header::Dna(Dna {
+        author: author.clone(),
+        timestamp: Timestamp::from_micros(0),
+        hash: fixt!(DnaHash),
+    })));
+    headers.push(HeaderHashed::from_content_sync(Header::Create(Create {
+        author: author.clone(),
+        timestamp: Timestamp::from_micros(1),
+        header_seq: 1,
+        prev_header: headers[0].to_hash(),
+        entry_type: fixt!(EntryType),
+        entry_hash: fixt!(EntryHash),
+    })));
+    headers.push(HeaderHashed::from_content_sync(Header::Create(Create {
+        author: author.clone(),
+        timestamp: Timestamp::from_micros(2),
+        header_seq: 2,
+        prev_header: headers[1].to_hash(),
+        entry_type: fixt!(EntryType),
+        entry_hash: fixt!(EntryHash),
+    })));
+    // Valid chain passes.
+    validate_chain(headers.iter(), &None).expect("Valid chain");
+
+    // Create a forked chain.
+    let mut fork = headers.clone();
+    fork.push(HeaderHashed::from_content_sync(Header::Create(Create {
+        author: author.clone(),
+        timestamp: Timestamp::from_micros(10),
+        header_seq: 1,
+        prev_header: headers[0].to_hash(),
+        entry_type: fixt!(EntryType),
+        entry_hash: fixt!(EntryHash),
+    })));
+    let err = validate_chain(fork.iter(), &None).expect_err("Forked chain");
+    assert!(matches!(
+        err,
+        SysValidationError::ValidationOutcome(ValidationOutcome::PrevHeaderError(
+            PrevHeaderError::HashMismatch
+        ))
+    ));
+
+    // Test a chain with the wrong seq.
+    let mut wrong_seq = headers.clone();
+    *wrong_seq[2].as_content_mut().header_seq_mut().unwrap() = 3;
+    let err = validate_chain(wrong_seq.iter(), &None).expect_err("Wrong seq");
+    assert!(matches!(
+        err,
+        SysValidationError::ValidationOutcome(ValidationOutcome::PrevHeaderError(
+            PrevHeaderError::InvalidSeq(_, _)
+        ))
+    ));
+
+    // Test a wrong root gets rejected.
+    let mut wrong_root = headers.clone();
+    wrong_root[0] = HeaderHashed::from_content_sync(Header::Create(Create {
+        author: author.clone(),
+        timestamp: Timestamp::from_micros(0),
+        header_seq: 0,
+        prev_header: headers[0].to_hash(),
+        entry_type: fixt!(EntryType),
+        entry_hash: fixt!(EntryHash),
+    }));
+    let err = validate_chain(wrong_root.iter(), &None).expect_err("Wrong root");
+    assert!(matches!(
+        err,
+        SysValidationError::ValidationOutcome(ValidationOutcome::PrevHeaderError(
+            PrevHeaderError::InvalidRoot
+        ))
+    ));
+
+    // Test without dna at root gets rejected.
+    let mut dna_not_at_root = headers.clone();
+    dna_not_at_root.push(headers[0].clone());
+    let err = validate_chain(dna_not_at_root.iter(), &None).expect_err("Dna not at root");
+    assert!(matches!(
+        err,
+        SysValidationError::ValidationOutcome(ValidationOutcome::PrevHeaderError(
+            PrevHeaderError::InvalidRoot
+        ))
+    ));
+
+    // Test if there is a existing head that a dna in the new chain is rejected.
+    let err =
+        validate_chain(headers.iter(), &Some((fixt!(HeaderHash), 0))).expect_err("Dna not at root");
+    assert!(matches!(
+        err,
+        SysValidationError::ValidationOutcome(ValidationOutcome::PrevHeaderError(
+            PrevHeaderError::InvalidRoot
+        ))
+    ));
+
+    // Check a sequence that is broken gets rejected.
+    let mut wrong_seq = headers[1..].to_vec();
+    *wrong_seq[0].as_content_mut().header_seq_mut().unwrap() = 3;
+    *wrong_seq[1].as_content_mut().header_seq_mut().unwrap() = 4;
+    let err = validate_chain(
+        wrong_seq.iter(),
+        &Some((wrong_seq[0].prev_header().unwrap().clone(), 0)),
+    )
+    .expect_err("Wrong seq");
+    assert!(matches!(
+        err,
+        SysValidationError::ValidationOutcome(ValidationOutcome::PrevHeaderError(
+            PrevHeaderError::InvalidSeq(_, _)
+        ))
+    ));
+
+    // Check the correct sequence gets accepted with a root.
+    let correct_seq = headers[1..].to_vec();
+    validate_chain(
+        correct_seq.iter(),
+        &Some((correct_seq[0].prev_header().unwrap().clone(), 0)),
+    )
+    .expect("Correct seq");
+
+    let err = validate_chain(correct_seq.iter(), &Some((fixt!(HeaderHash), 0)))
+        .expect_err("Hash is wrong");
+    assert!(matches!(
+        err,
+        SysValidationError::ValidationOutcome(ValidationOutcome::PrevHeaderError(
+            PrevHeaderError::HashMismatch
+        ))
+    ));
 }

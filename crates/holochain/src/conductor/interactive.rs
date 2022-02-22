@@ -36,17 +36,17 @@ pub fn ask_yn(prompt: String, default_yes: Option<bool>) -> std::io::Result<bool
             return Ok(false);
         } else {
             match default_yes {
-                Some(answer) if input == "" => return Ok(answer),
+                Some(answer) if input.is_empty() => return Ok(answer),
                 _ => println!("Invalid answer."),
             }
         }
     }
 }
 
-/// Prompts user to enter an LMDB environment path
-pub fn prompt_for_environment_dir(path: &Path) -> std::io::Result<()> {
+/// Prompts user to enter a database path
+pub fn prompt_for_database_dir(path: &Path) -> std::io::Result<()> {
     let prompt = format!(
-        "There is no database environment set at the path specified ({})\nWould you like to create one now?",
+        "There is no database at the path specified ({})\nWould you like to create one now?",
         path.display()
     );
     if ask_yn(prompt, Some(true))? {
@@ -55,7 +55,7 @@ pub fn prompt_for_environment_dir(path: &Path) -> std::io::Result<()> {
     } else {
         Err(std::io::Error::new(
             std::io::ErrorKind::Other,
-            "Cannot continue without LMDB environment created.",
+            "Cannot continue without database.",
         ))
     }
 }
@@ -100,11 +100,9 @@ fn save_default_config_yaml(path: &Path) -> ConductorResult<ConductorConfig> {
 mod tests {
     use super::save_default_config_yaml;
     use crate::conductor::config::ConductorConfig;
-    use tempdir::TempDir;
-
     #[test]
     fn test_save_default_config() {
-        let tmp = TempDir::new("test").unwrap();
+        let tmp = tempfile::tempdir().unwrap();
         let config_path = tmp.path().join("config.yaml");
         save_default_config_yaml(&config_path).unwrap();
         let config = ConductorConfig::load_yaml(config_path.as_ref()).unwrap();

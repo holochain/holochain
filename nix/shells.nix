@@ -5,7 +5,6 @@
 , coreutils
 
 , holonix
-, hcRustPlatform
 , hcToplevelDir
 , nixEnvPrefixEval
 , pkgs
@@ -17,17 +16,19 @@ let
     inputsFrom = lib.reverseList [
       { shellHook = nixEnvPrefixEval; }
 
-      holonix.shell
+      holonix.main
 
-      { shellHook = ''
-        echo Using "$NIX_ENV_PREFIX" as target prefix...
+      {
+        shellHook = ''
+          echo Using "$NIX_ENV_PREFIX" as target prefix...
 
-        export HC_TEST_WASM_DIR="$CARGO_TARGET_DIR/.wasm_target"
-        mkdir -p $HC_TEST_WASM_DIR
+          export HC_TEST_WASM_DIR="$CARGO_TARGET_DIR/.wasm_target"
+          mkdir -p $HC_TEST_WASM_DIR
 
-        export HC_WASM_CACHE_PATH="$CARGO_TARGET_DIR/.wasm_cache"
-        mkdir -p $HC_WASM_CACHE_PATH
-      ''; }
+          export HC_WASM_CACHE_PATH="$CARGO_TARGET_DIR/.wasm_cache"
+          mkdir -p $HC_WASM_CACHE_PATH
+        '';
+      }
 
       input
     ];
@@ -39,8 +40,25 @@ rec {
   # * everything needed to compile this repos' crates
   # * CI scripts
   coreDev = hcMkShell {
-    nativeBuildInputs = builtins.attrValues (pkgs.core);
+    nativeBuildInputs = builtins.attrValues (pkgs.core)
+      ++ (with holonix.pkgs;[
+      sqlcipher
+      gdb
+      gh
+      nixpkgs-fmt
+      cargo-sweep
+    ]);
   };
+
+  release = coreDev.overrideAttrs (attrs: {
+    nativeBuildInputs = attrs.nativeBuildInputs ++ (with holonix.pkgs; [
+      niv
+      crate2nix
+      (import ../crates/release-automation/default.nix { })
+    ]);
+  });
+
+
 
   ci = hcMkShell {
     inputsFrom = [
@@ -53,7 +71,13 @@ rec {
     inputsFrom = [
       (builtins.removeAttrs coreDev [ "shellHook" ])
     ];
-    nativeBuildInputs = builtins.attrValues pkgs.happ;
+    nativeBuildInputs = builtins.attrValues pkgs.happ
+      ++ (with holonix.pkgs; [
+      sqlcipher
+      binaryen
+      gdb
+    ])
+    ;
   };
 
   coreDevRustup = coreDev.overrideAttrs (attrs: {

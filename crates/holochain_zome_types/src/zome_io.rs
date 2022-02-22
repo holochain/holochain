@@ -1,5 +1,5 @@
+use crate as zt;
 use crate::cell::CellId;
-use crate::prelude as zt;
 use crate::zome::FunctionName;
 use crate::zome::ZomeName;
 use holo_hash::AgentPubKey;
@@ -46,14 +46,14 @@ impl ExternIO {
     where
         O: serde::de::DeserializeOwned + std::fmt::Debug,
     {
-        Ok(holochain_serialized_bytes::decode(&self.0)?)
+        holochain_serialized_bytes::decode(&self.0)
     }
 
     pub fn into_vec(self) -> Vec<u8> {
         self.into()
     }
     pub fn as_bytes(&self) -> &[u8] {
-        &self.as_ref()
+        self.as_ref()
     }
 }
 
@@ -81,11 +81,11 @@ wasm_io_types! {
     // These definitions can be copy-pasted into the ribosome's HostFnApi
     // when updated
 
+    // Attempt to accept a preflight request.
+    fn accept_countersigning_preflight_request(zt::countersigning::PreflightRequest) -> zt::countersigning::PreflightRequestAcceptance;
+
     // Info about the calling agent.
     fn agent_info (()) -> zt::info::AgentInfo;
-
-    // @todo
-    fn app_info (()) -> zt::info::AppInfo;
 
     // @todo
     fn dna_info (()) -> zt::info::DnaInfo;
@@ -93,10 +93,7 @@ wasm_io_types! {
     // @todo
     fn call_info (()) -> zt::info::CallInfo;
 
-    // Header hash of the DeleteLink element.
-    fn call_remote (zt::call_remote::CallRemote) -> zt::ZomeCallResponse;
-
-    fn call (zt::call::Call) -> zt::ZomeCallResponse;
+    fn call (Vec<zt::call::Call>) -> Vec<zt::ZomeCallResponse>;
 
     // @todo List all the local capability claims.
     fn capability_claims (()) -> ();
@@ -107,23 +104,23 @@ wasm_io_types! {
     // @todo Get the capability for the current zome call.
     fn capability_info (()) -> ();
 
+    // Returns HeaderHash of the newly created element.
+    fn create (zt::entry::CreateInput) -> holo_hash::HeaderHash;
+
     // Create a link between two entries.
     fn create_link (zt::link::CreateLinkInput) -> holo_hash::HeaderHash;
 
     fn create_x25519_keypair(()) -> zt::x_salsa20_poly1305::x25519::X25519PubKey;
-
-    // Returns HeaderHash of the newly created element.
-    fn create (zt::entry::EntryWithDefId) -> holo_hash::HeaderHash;
 
     // The debug host import takes a TraceMsg to output wherever the host wants to display it.
     // TraceMsg includes line numbers. so the wasm tells the host about it's own code structure.
     fn trace (zt::trace::TraceMsg) -> ();
 
     // Header hash of the CreateLink element.
-    fn delete_link (holo_hash::HeaderHash) -> holo_hash::HeaderHash;
+    fn delete_link (zt::link::DeleteLinkInput) -> holo_hash::HeaderHash;
 
     // Delete an element.
-    fn delete (holo_hash::HeaderHash) -> holo_hash::HeaderHash;
+    fn delete (zt::entry::DeleteInput) -> holo_hash::HeaderHash;
 
     // Header hash of the newly committed element.
     // Emit a Signal::App to subscribers on the interface
@@ -131,18 +128,27 @@ wasm_io_types! {
 
     fn get_agent_activity (zt::agent_activity::GetAgentActivityInput) -> zt::query::AgentActivity;
 
-    fn get_details (zt::entry::GetInput) -> Option<zt::metadata::Details>;
+    fn get_details (Vec<zt::entry::GetInput>) -> Vec<Option<zt::metadata::Details>>;
 
-    fn get_link_details (zt::link::GetLinksInput) -> zt::link::LinkDetails;
+    fn get_link_details (Vec<zt::link::GetLinksInput>) -> Vec<zt::link::LinkDetails>;
 
     // Get links by entry hash from the cascade.
-    fn get_links (zt::link::GetLinksInput) -> zt::link::Links;
+    fn get_links (Vec<zt::link::GetLinksInput>) -> Vec<Vec<zt::link::Link>>;
 
     // Attempt to get a live entry from the cascade.
-    fn get (zt::entry::GetInput) -> Option<zt::element::Element>;
+    fn get (Vec<zt::entry::GetInput>) -> Vec<Option<zt::element::Element>>;
 
-    // Hash an entry on the host.
-    fn hash_entry (zt::entry::Entry) -> holo_hash::EntryHash;
+    // Hash data on the host.
+    fn hash (zt::hash::HashInput) -> zt::hash::HashOutput;
+
+    // Retreive an element from the DHT or short circuit.
+    fn must_get_valid_element (zt::entry::MustGetValidElementInput) -> zt::element::Element;
+
+    // Retreive a entry from the DHT or short circuit.
+    fn must_get_entry (zt::entry::MustGetEntryInput) -> zt::entry::EntryHashed;
+
+    // Retrieve a header from the DHT or short circuit.
+    fn must_get_header (zt::entry::MustGetHeaderInput) -> zt::SignedHeaderHashed;
 
     // Query the source chain for data.
     fn query (zt::query::ChainQueryFilter) -> Vec<crate::Element>;
@@ -156,8 +162,8 @@ wasm_io_types! {
     // // @todo
     // fn send (()) -> ();
 
-    // @todo
-    fn schedule (core::time::Duration) -> ();
+    // Schedule a schedulable function if it is not already.
+    fn schedule (String) -> ();
 
     // @todo
     fn sleep (core::time::Duration) -> ();
@@ -171,12 +177,8 @@ wasm_io_types! {
 
     fn sign_ephemeral (zt::signature::SignEphemeral) -> zt::signature::EphemeralSignatures;
 
-    // Current system time, in the opinion of the host, as a `Duration`.
-    fn sys_time (()) -> core::time::Duration;
-
-    // There's nothing to go in or out of a noop.
-    // Used to "defuse" host functions when side effects are not allowed.
-    fn unreachable (()) -> ();
+    // Current system time, in the opinion of the host, as a `Timestamp`.
+    fn sys_time (()) -> zt::timestamp::Timestamp;
 
     // Same as  but also takes the HeaderHash of the updated element.
     fn update (zt::entry::UpdateInput) -> holo_hash::HeaderHash;
@@ -222,4 +224,6 @@ pub enum ZomeCallResponse {
     /// This was a zome call made remotely but
     /// something has failed on the network
     NetworkError(String),
+    /// A countersigning session has failed to start.
+    CountersigningSession(String),
 }

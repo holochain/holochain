@@ -1,4 +1,5 @@
 use crate::element::SignedHeaderHashed;
+use crate::ChainTopOrdering;
 use holo_hash::HeaderHash;
 use holochain_serialized_bytes::prelude::*;
 
@@ -16,6 +17,7 @@ use holochain_serialized_bytes::prelude::*;
     Eq,
     SerializedBytes,
 )]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct LinkTag(#[serde(with = "serde_bytes")] pub Vec<u8>);
 
 impl LinkTag {
@@ -25,6 +27,10 @@ impl LinkTag {
         T: Into<Vec<u8>>,
     {
         Self(t.into())
+    }
+
+    pub fn into_inner(self) -> Vec<u8> {
+        self.0
     }
 }
 
@@ -75,6 +81,7 @@ pub struct CreateLinkInput {
     pub base_address: holo_hash::EntryHash,
     pub target_address: holo_hash::EntryHash,
     pub tag: LinkTag,
+    pub chain_top_ordering: ChainTopOrdering,
 }
 
 impl CreateLinkInput {
@@ -82,11 +89,30 @@ impl CreateLinkInput {
         base_address: holo_hash::EntryHash,
         target_address: holo_hash::EntryHash,
         tag: LinkTag,
+        chain_top_ordering: ChainTopOrdering,
     ) -> Self {
         Self {
             base_address,
             target_address,
             tag,
+            chain_top_ordering,
+        }
+    }
+}
+
+#[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub struct DeleteLinkInput {
+    /// Address of the link being deleted.
+    pub address: holo_hash::HeaderHash,
+    /// Chain top ordering rules for writes.
+    pub chain_top_ordering: ChainTopOrdering,
+}
+
+impl DeleteLinkInput {
+    pub fn new(address: holo_hash::HeaderHash, chain_top_ordering: ChainTopOrdering) -> Self {
+        Self {
+            address,
+            chain_top_ordering,
         }
     }
 }
@@ -106,27 +132,6 @@ impl GetLinksInput {
             base_address,
             tag_prefix,
         }
-    }
-}
-
-#[derive(serde::Serialize, serde::Deserialize, SerializedBytes, PartialEq, Clone, Debug)]
-pub struct Links(Vec<Link>);
-
-impl From<Vec<Link>> for Links {
-    fn from(v: Vec<Link>) -> Self {
-        Self(v)
-    }
-}
-
-impl From<Links> for Vec<Link> {
-    fn from(links: Links) -> Self {
-        links.0
-    }
-}
-
-impl Links {
-    pub fn into_inner(self) -> Vec<Link> {
-        self.into()
     }
 }
 
@@ -151,5 +156,12 @@ impl From<LinkDetails> for CreateLinkWithDeleteLinks {
 impl LinkDetails {
     pub fn into_inner(self) -> CreateLinkWithDeleteLinks {
         self.into()
+    }
+}
+
+#[cfg(feature = "full")]
+impl rusqlite::ToSql for LinkTag {
+    fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput> {
+        Ok(rusqlite::types::ToSqlOutput::Borrowed((&self.0[..]).into()))
     }
 }

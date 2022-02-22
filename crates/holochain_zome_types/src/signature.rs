@@ -56,6 +56,15 @@ impl Sign {
 #[allow(clippy::derive_hash_xor_eq)]
 pub struct Signature(pub [u8; SIGNATURE_BYTES]);
 
+#[cfg(feature = "arbitrary")]
+impl<'a> arbitrary::Arbitrary<'a> for Signature {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        let mut buf = [0; SIGNATURE_BYTES];
+        u.fill_buffer(&mut buf)?;
+        Ok(Signature(buf))
+    }
+}
+
 // This is more for convenience/convention that being worried
 // about things like constant time equality.
 // Signature verification should always defer to the host.
@@ -141,17 +150,17 @@ impl AsRef<holo_hash::AgentPubKey> for VerifySignature {
 impl VerifySignature {
     /// Alias for as_ref for data.
     pub fn as_data_ref(&self) -> &[u8] {
-        &self.data.as_ref()
+        self.data.as_ref()
     }
 
     /// Alias for as_ref for signature.
     pub fn as_signature_ref(&self) -> &Signature {
-        &self.as_ref()
+        self.as_ref()
     }
 
     /// Alias for as_ref for agent key.
     pub fn as_key_ref(&self) -> &holo_hash::AgentPubKey {
-        &self.as_ref()
+        self.as_ref()
     }
 
     /// construct a new VerifySignature struct.

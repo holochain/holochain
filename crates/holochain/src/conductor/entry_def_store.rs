@@ -6,103 +6,16 @@ use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
 use crate::core::ribosome::real_ribosome::RealRibosome;
 use crate::core::ribosome::RibosomeT;
 
-use super::api::CellConductorApiT;
 use error::EntryDefStoreError;
 use error::EntryDefStoreResult;
-use fallible_iterator::FallibleIterator;
 use holo_hash::*;
-use holochain_lmdb::buffer::KvBufFresh;
-use holochain_lmdb::error::DatabaseError;
-use holochain_lmdb::error::DatabaseResult;
-use holochain_lmdb::prelude::*;
 use holochain_serialized_bytes::prelude::*;
-use holochain_serialized_bytes::SerializedBytes;
 use holochain_types::prelude::*;
 use std::collections::HashMap;
-use std::convert::TryInto;
+
+use super::handle::ConductorHandleT;
 
 pub mod error;
-
-/// This is where entry defs live
-pub struct EntryDefBuf(KvBufFresh<EntryDefStoreKey, EntryDef>);
-
-#[derive(Debug, Clone, Hash, Eq, PartialEq, PartialOrd, Ord)]
-struct EntryDefStoreKey(SerializedBytes);
-
-impl AsRef<[u8]> for EntryDefStoreKey {
-    fn as_ref(&self) -> &[u8] {
-        self.0.bytes()
-    }
-}
-
-impl BufKey for EntryDefStoreKey {
-    fn from_key_bytes_or_friendly_panic(bytes: &[u8]) -> Self {
-        Self(UnsafeBytes::from(bytes.to_vec()).into())
-    }
-}
-
-impl From<EntryDefBufferKey> for EntryDefStoreKey {
-    fn from(a: EntryDefBufferKey) -> Self {
-        Self(
-            a.try_into()
-                .expect("EntryDefStoreKey serialization cannot fail"),
-        )
-    }
-}
-
-impl From<&[u8]> for EntryDefStoreKey {
-    fn from(bytes: &[u8]) -> Self {
-        Self(UnsafeBytes::from(bytes.to_vec()).into())
-    }
-}
-
-impl From<EntryDefStoreKey> for EntryDefBufferKey {
-    fn from(a: EntryDefStoreKey) -> Self {
-        a.0.try_into()
-            .expect("Database corruption when retrieving EntryDefBufferKeys")
-    }
-}
-
-impl EntryDefBuf {
-    /// Create a new buffer
-    pub fn new(env: EnvironmentRead, entry_def_store: SingleStore) -> DatabaseResult<Self> {
-        Ok(Self(KvBufFresh::new(env, entry_def_store)))
-    }
-
-    /// Get an entry def
-    pub fn get(&self, k: EntryDefBufferKey) -> DatabaseResult<Option<EntryDef>> {
-        self.0.get(&k.into())
-    }
-
-    /// Store an entry def
-    pub fn put(&mut self, k: EntryDefBufferKey, entry_def: EntryDef) -> DatabaseResult<()> {
-        self.0.put(k.into(), entry_def)
-    }
-
-    /// Get all the entry defs in the database
-    pub fn get_all<'r, R: Readable>(
-        &self,
-        r: &'r R,
-    ) -> DatabaseResult<
-        Box<dyn FallibleIterator<Item = (EntryDefBufferKey, EntryDef), Error = DatabaseError> + 'r>,
-    > {
-        Ok(Box::new(
-            self.0
-                .store()
-                .iter(r)?
-                .map(|(k, v)| Ok((EntryDefStoreKey::from(k).into(), v))),
-        ))
-    }
-}
-
-impl BufferedStore for EntryDefBuf {
-    type Error = DatabaseError;
-
-    fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> DatabaseResult<()> {
-        self.0.flush_to_txn_ref(writer)?;
-        Ok(())
-    }
-}
 
 /// Get an [EntryDef] from the entry def store
 /// or fallback to running the zome
@@ -110,15 +23,14 @@ pub(crate) async fn get_entry_def(
     entry_def_index: EntryDefIndex,
     zome: ZomeDef,
     dna_def: &DnaDefHashed,
-    conductor_api: &impl CellConductorApiT,
+    conductor_handle: &dyn ConductorHandleT,
 ) -> EntryDefStoreResult<Option<EntryDef>> {
     // Try to get the entry def from the entry def store
     let key = EntryDefBufferKey::new(zome, entry_def_index);
-    let entry_def = conductor_api.get_entry_def(&key).await;
+    let entry_def = conductor_handle.get_entry_def(&key);
     let dna_hash = dna_def.as_hash();
-    let dna_file = conductor_api
-        .get_dna(dna_hash)
-        .await
+    let dna_file = conductor_handle
+        .get_dna_file(dna_hash)
         .ok_or_else(|| EntryDefStoreError::DnaFileMissing(dna_hash.clone()))?;
 
     // If it's not found run the ribosome and get the entry defs
@@ -134,11 +46,11 @@ pub(crate) async fn get_entry_def_from_ids(
     zome_id: ZomeId,
     entry_def_index: EntryDefIndex,
     dna_def: &DnaDefHashed,
-    conductor_api: &impl CellConductorApiT,
+    conductor_handle: &dyn ConductorHandleT,
 ) -> EntryDefStoreResult<Option<EntryDef>> {
     match dna_def.zomes.get(zome_id.index()) {
         Some((_, zome)) => {
-            get_entry_def(entry_def_index, zome.clone(), dna_def, conductor_api).await
+            get_entry_def(entry_def_index, zome.clone(), dna_def, conductor_handle).await
         }
         None => Ok(None),
     }
@@ -147,7 +59,7 @@ pub(crate) async fn get_entry_def_from_ids(
 #[tracing::instrument(skip(dna))]
 /// Get all the [EntryDef] for this dna
 pub(crate) fn get_entry_defs(
-    dna: DnaFile, // TODO: make generic
+    dna: DnaFile,
 ) -> EntryDefStoreResult<Vec<(EntryDefBufferKey, EntryDef)>> {
     let invocation = EntryDefsInvocation;
 
@@ -203,9 +115,7 @@ mod tests {
     use super::EntryDefBufferKey;
     use crate::conductor::Conductor;
     use holo_hash::HasHash;
-    use holochain_lmdb::test_utils::test_environments;
-    use holochain_types::dna::wasm::DnaWasmHashed;
-    use holochain_types::dna::zome::ZomeDef;
+    use holochain_state::prelude::test_environments;
     use holochain_types::prelude::*;
     use holochain_types::test_utils::fake_dna_zomes;
     use holochain_wasm_test_utils::TestWasm;
@@ -216,7 +126,7 @@ mod tests {
 
         // all the stuff needed to have a WasmBuf
         let envs = test_environments();
-        let handle = Conductor::builder().test(&envs).await.unwrap();
+        let handle = Conductor::builder().test(&envs, &[]).await.unwrap();
 
         let dna = fake_dna_zomes(
             "",
@@ -253,23 +163,20 @@ mod tests {
 
         handle.register_dna(dna).await.unwrap();
         // Check entry defs are here
+        assert_eq!(handle.get_entry_def(&post_def_key), Some(post_def.clone()));
         assert_eq!(
-            handle.get_entry_def(&post_def_key).await,
-            Some(post_def.clone())
-        );
-        assert_eq!(
-            handle.get_entry_def(&comment_def_key).await,
+            handle.get_entry_def(&comment_def_key),
             Some(comment_def.clone())
         );
 
         std::mem::drop(handle);
 
         // Restart conductor and check defs are still here
-        let handle = Conductor::builder().test(&envs).await.unwrap();
+        let handle = Conductor::builder().test(&envs.into(), &[]).await.unwrap();
 
-        assert_eq!(handle.get_entry_def(&post_def_key).await, Some(post_def));
+        assert_eq!(handle.get_entry_def(&post_def_key), Some(post_def));
         assert_eq!(
-            handle.get_entry_def(&comment_def_key).await,
+            handle.get_entry_def(&comment_def_key),
             Some(comment_def.clone())
         );
     }

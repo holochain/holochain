@@ -1,15 +1,15 @@
-use crate::conductor::p2p_store::AgentKv;
-use crate::conductor::p2p_store::AgentKvKey;
+use crate::conductor::handle::DevSettingsDelta;
+use crate::sweettest::*;
 use crate::test_utils::conductor_setup::ConductorTestData;
+use crate::test_utils::consistency_10s;
+use crate::test_utils::consistency_envs;
+use crate::test_utils::inline_zomes::simple_create_read_zome;
 use crate::test_utils::new_zome_call;
-use crate::test_utils::wait_for_integration;
-use fallible_iterator::FallibleIterator;
 use hdk::prelude::*;
-use holochain_lmdb::buffer::KvStoreT;
-use holochain_lmdb::fresh_reader_test;
+use holochain_sqlite::prelude::*;
+use holochain_state::prelude::fresh_reader_test;
 use holochain_test_wasm_common::AnchorInput;
 use holochain_wasm_test_utils::TestWasm;
-use kitsune_p2p::KitsuneBinType;
 use kitsune_p2p::KitsuneP2pConfig;
 use matches::assert_matches;
 
@@ -45,18 +45,22 @@ async fn gossip_test() {
     let bob_cell_id = &bob_call_data.cell_id;
 
     // Give gossip some time to finish
-    const NUM_ATTEMPTS: usize = 100;
+    const NUM_ATTEMPTS: usize = 200;
     const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_millis(100);
 
-    // 13 ops per anchor plus 7 for genesis + 2 for init + 2 for cap
-    let expected_count = NUM * 13 + 7 * 2 + 2 + 2;
-    wait_for_integration(
-        &bob_call_data.env,
-        expected_count,
-        NUM_ATTEMPTS,
-        DELAY_PER_ATTEMPT.clone(),
-    )
-    .await;
+    let all_cell_envs = vec![
+        (
+            bob_call_data.cell_id.agent_pubkey(),
+            &bob_call_data.authored_env,
+            &bob_call_data.dht_env,
+        ),
+        (
+            conductor_test.alice_call_data().cell_id.agent_pubkey(),
+            &conductor_test.alice_call_data().authored_env,
+            &conductor_test.alice_call_data().dht_env,
+        ),
+    ];
+    consistency_envs(&all_cell_envs, NUM_ATTEMPTS, DELAY_PER_ATTEMPT).await;
 
     // Bob list anchors
     let invocation = new_zome_call(
@@ -93,74 +97,36 @@ async fn signature_smoke_test() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "Conductors are not currently talking to each other"]
 async fn agent_info_test() {
     observability::test_run().ok();
-    let mut network_config = KitsuneP2pConfig::default();
-    network_config.transport_pool = vec![kitsune_p2p::TransportConfig::Mem {}];
-    let zomes = vec![TestWasm::Anchor];
-    let mut conductor_test =
-        ConductorTestData::with_network_config(zomes.clone(), false, network_config.clone()).await;
-    let handle = conductor_test.handle();
-    let alice_call_data = &conductor_test.alice_call_data();
-    let alice_cell_id = &alice_call_data.cell_id;
-    let alice_agent_id = alice_cell_id.agent_pubkey();
+    let mut conductors = SweetConductorBatch::from_standard_config(2).await;
 
-    // Kitsune types
-    let dna_kit = kitsune_p2p::KitsuneSpace::new(
-        alice_call_data
-            .ribosome
-            .dna_file
-            .dna_hash()
-            .get_raw_36()
-            .to_vec(),
-    );
+    for c in conductors.iter() {
+        c.update_dev_settings(DevSettingsDelta {
+            publish: Some(false),
+            ..Default::default()
+        });
+    }
+    let (dna_file, _) = SweetDnaFile::unique_from_inline_zome("zome1", simple_create_read_zome())
+        .await
+        .unwrap();
 
-    let alice_kit = kitsune_p2p::KitsuneAgent::new(alice_agent_id.get_raw_36().to_vec());
+    let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
+    let ((cell_1,), (cell_2,)) = apps.into_tuples();
+    conductors.exchange_peer_info().await;
 
-    let p2p_env = handle.get_p2p_env().await;
-    let p2p_kv = AgentKv::new(p2p_env.clone().into()).unwrap();
+    let p2p_envs: Vec<_> = conductors
+        .iter()
+        .filter_map(|c| {
+            let lock = c.envs().p2p();
+            let env = lock.lock().values().cloned().next();
+            env
+        })
+        .collect();
 
-    let alice_key: AgentKvKey = (&dna_kit, &alice_kit).into();
-
-    let (agent_info, len) = fresh_reader_test!(p2p_env, |r| {
-        let agent_info = p2p_kv.as_store_ref().get(&r, &alice_key).unwrap();
-        let len = p2p_kv.as_store_ref().iter(&r).unwrap().count().unwrap();
-        (agent_info, len)
-    });
-    tracing::debug!(?agent_info);
-    assert_matches!(agent_info, Some(_));
-    // Expecting one agent info in the peer store
-    assert_eq!(len, 1);
-
-    // Bring Bob online
-    let mut bob_conductor =
-        ConductorTestData::with_network_config(zomes, true, network_config.clone()).await;
-    let bob_agent_id = bob_conductor
-        .bob_call_data()
-        .unwrap()
-        .cell_id
-        .agent_pubkey();
-    let bob_kit = kitsune_p2p::KitsuneAgent::new(bob_agent_id.get_raw_36().to_vec());
-    let bob_key: AgentKvKey = (&dna_kit, &bob_kit).into();
-
-    // Give publish time to finish
-    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-
-    let p2p_kv = AgentKv::new(p2p_env.clone().into()).unwrap();
-    let (alice_agent_info, bob_agent_info, len) = fresh_reader_test!(p2p_env, |r| {
-        let alice_agent_info = p2p_kv.as_store_ref().get(&r, &alice_key).unwrap();
-        let bob_agent_info = p2p_kv.as_store_ref().get(&r, &bob_key).unwrap();
-        let len = p2p_kv.as_store_ref().iter(&r).unwrap().count().unwrap();
-        (alice_agent_info, bob_agent_info, len)
-    });
-    tracing::debug!(?alice_agent_info);
-    tracing::debug!(?bob_agent_info);
-    assert_matches!(alice_agent_info, Some(_));
-    assert_matches!(bob_agent_info, Some(_));
-    // Expecting one agent info in the peer store
-    assert_eq!(len, 2);
-
-    conductor_test.shutdown_conductor().await;
-    bob_conductor.shutdown_conductor().await;
+    consistency_10s(&[&cell_1, &cell_2]).await;
+    for p2p_env in &p2p_envs {
+        let len = fresh_reader_test(p2p_env.clone(), |txn| txn.p2p_list_agents().unwrap().len());
+        assert_eq!(len, 2);
+    }
 }

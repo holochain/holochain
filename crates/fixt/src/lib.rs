@@ -85,7 +85,7 @@ macro_rules! basic_test {
         basic_test!($type, $empty_expected, $predictable_expected, true);
     };
     ( $type:ty, $empty_expected:expr, $predictable_expected:expr, $test_unpredictable:literal ) => {
-        paste! {
+        $crate::prelude::paste! {
             #[test]
             #[cfg(test)]
             fn [<$type:lower _empty>] () {
@@ -98,11 +98,11 @@ macro_rules! basic_test {
             }
         }
 
-        paste! {
+        $crate::prelude::paste! {
             #[test]
             #[cfg(test)]
             fn [<$type:lower _predictable>] () {
-                let predictables = [<$type:camel Fixturator>]::new(Predictable);
+                let predictables = [<$type:camel Fixturator>]::new($crate::prelude::Predictable);
                 // we can predict some vector of values from the Predictable curve
                 assert_eq!(
                     $predictable_expected,
@@ -111,13 +111,13 @@ macro_rules! basic_test {
             }
         }
 
-        paste! {
+        $crate::prelude::paste! {
             #[test]
             #[cfg(test)]
             fn [<$type:lower _unpredictable>] () {
                 if $test_unpredictable {
                     let empties = [<$type:camel Fixturator>]::new(Empty);
-                    let unpredictables = [<$type:camel Fixturator>]::new(Unpredictable);
+                    let unpredictables = [<$type:camel Fixturator>]::new($crate::prelude::Unpredictable);
 
                     // the Unpredictable curve is not Empty
                     assert_ne!(
@@ -125,8 +125,8 @@ macro_rules! basic_test {
                         unpredictables.take(100).collect::<Vec<$type>>(),
                     );
 
-                    let predictables = [<$type:camel Fixturator>]::new(Predictable);
-                    let unpredictables = [<$type:camel Fixturator>]::new(Unpredictable);
+                    let predictables = [<$type:camel Fixturator>]::new($crate::prelude::Predictable);
+                    let unpredictables = [<$type:camel Fixturator>]::new($crate::prelude::Unpredictable);
 
                     // the Unpredictable curve is not Predictable
                     assert_ne!(
@@ -153,6 +153,47 @@ macro_rules! basic_test {
 /// and Predictable, in order
 #[macro_export]
 macro_rules! fixturator {
+    (
+        with_vec $min:literal $max:literal;
+        $type:tt;
+        $($munch:tt)*
+    ) => {
+        $crate::prelude::paste! {
+            pub type [<$type:camel Vec>] = Vec<$type>;
+            fixturator!(
+                [<$type:camel Vec>];
+                curve Empty vec![];
+                curve Unpredictable {
+                    let mut index = get_fixt_index!();
+                    let mut rng = $crate::rng();
+                    let len = rng.gen_range($min, $max);
+                    let mut fixturator = [<$type:camel Fixturator>]::new_indexed($crate::prelude::Unpredictable, index);
+                    let mut v = vec![];
+                    for _ in 0..len {
+                        v.push(fixturator.next().unwrap());
+                    }
+                    index += 1;
+                    set_fixt_index!(index);
+                    v
+                };
+                curve Predictable {
+                    let mut index = get_fixt_index!();
+                    let mut fixturator = [<$type:camel Fixturator>]::new_indexed($crate::prelude::Predictable, index);
+                    let mut v = vec![];
+                    let min = $min;
+                    let max = (index % ($max - min)) + min;
+                    for _ in min..max {
+                        v.push(fixturator.next().unwrap());
+                    }
+                    index += 1;
+                    set_fixt_index!(index);
+                    v
+                };
+            );
+        }
+        fixturator!($type; $($munch)*);
+    };
+
     // for an enum Foo with variants with a single inner type
     //
     // fixturator!(Foo; variants [ A(String) B(bool) ];);
@@ -168,26 +209,26 @@ macro_rules! fixturator {
             $type;
             enum [ $( $variant )* ];
 
-            curve Empty paste! { match [<$type:camel Variant>]::random() {
+            curve Empty $crate::prelude::paste! { match [<$type:camel Variant>]::random() {
                 $(
                     [<$type:camel Variant>]::$variant => $type::$variant(
-                        [<$variant_inner:camel Fixturator>]::new_indexed(Empty, get_fixt_index!()).next().unwrap().into()
+                        [<$variant_inner:camel Fixturator>]::new_indexed($crate::prelude::Empty, get_fixt_index!()).next().unwrap().into()
                     ),
                 )*
             }};
 
-            curve Unpredictable paste! { match [<$type:camel Variant>]::random() {
+            curve Unpredictable $crate::prelude::paste! { match [<$type:camel Variant>]::random() {
                 $(
                     [<$type:camel Variant>]::$variant => $type::$variant(
-                        [<$variant_inner:camel Fixturator>]::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap().into()
+                        [<$variant_inner:camel Fixturator>]::new_indexed($crate::prelude::Unpredictable, get_fixt_index!()).next().unwrap().into()
                     ),
                 )*
             }};
 
-            curve Predictable paste! { match [<$type:camel Variant>]::nth(get_fixt_index!()) {
+            curve Predictable $crate::prelude::paste! { match [<$type:camel Variant>]::nth(get_fixt_index!()) {
                 $(
                     [<$type:camel Variant>]::$variant => $type::$variant(
-                        [<$variant_inner:camel Fixturator>]::new_indexed(Predictable, get_fixt_index!()).next().unwrap().into()
+                        [<$variant_inner:camel Fixturator>]::new_indexed($crate::prelude::Predictable, get_fixt_index!()).next().unwrap().into()
                     ),
                 )*
             }};
@@ -211,14 +252,14 @@ macro_rules! fixturator {
             $type;
             enum [ $( $variant )* ];
             curve Empty {
-                paste! { $type::$empty }
+                $crate::prelude::paste! { $type::$empty }
             };
-            curve Unpredictable paste! { match [<$type:camel Variant>]::random() {
+            curve Unpredictable $crate::prelude::paste! { match [<$type:camel Variant>]::random() {
                 $(
                         [<$type:camel Variant>]::$variant => $type::$variant,
                 )*
             }};
-            curve Predictable paste! {{
+            curve Predictable $crate::prelude::paste! {{
                 match [<$type:camel Variant>]::nth(get_fixt_index!()) {
                 $(
                     [<$type:camel Variant>]::$variant => $type::$variant,
@@ -246,7 +287,7 @@ macro_rules! fixturator {
             enum [ $( $variant:tt )* ];
             $($munch:tt)*
         ) => {
-            paste! {
+            $crate::prelude::paste! {
                 #[derive($crate::prelude::strum_macros::EnumIter)]
                 enum [<$type:camel Variant>] {
                     $( $variant ),*
@@ -257,7 +298,7 @@ macro_rules! fixturator {
                         [<$type:camel Variant>]::iter().choose(&mut $crate::rng()).unwrap()
                     }
                     fn nth(index: usize) -> Self {
-                        paste! {
+                        $crate::prelude::paste! {
                             [<$type:camel Variant>]::iter().cycle().nth(index).unwrap()
                         }
                     }
@@ -278,22 +319,22 @@ macro_rules! fixturator {
 
             curve Empty {
                 $type::from(
-                    paste! {
-                        [< $from:camel Fixturator >]::new_indexed(Empty, get_fixt_index!()).next().unwrap()
+                    $crate::prelude::paste! {
+                        [< $from:camel Fixturator >]::new_indexed($crate::prelude::Empty, get_fixt_index!()).next().unwrap()
                     }
                 )
             };
             curve Unpredictable {
                 $type::from(
-                    paste! {
-                        [< $from:camel Fixturator >]::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap()
+                    $crate::prelude::paste! {
+                        [< $from:camel Fixturator >]::new_indexed($crate::prelude::Unpredictable, get_fixt_index!()).next().unwrap()
                     }
                 )
             };
             curve Predictable {
                 $type::from(
-                    paste! {
-                        [< $from:camel Fixturator >]::new_indexed(Predictable, get_fixt_index!()).next().unwrap()
+                    $crate::prelude::paste! {
+                        [< $from:camel Fixturator >]::new_indexed($crate::prelude::Predictable, get_fixt_index!()).next().unwrap()
                     }
                 )
             };
@@ -314,8 +355,8 @@ macro_rules! fixturator {
                 let index = get_fixt_index!();
                 $type::$fn(
                     $(
-                        paste! {
-                            [< $newtype:camel Fixturator >]::new_indexed(Empty, index).next().unwrap().into()
+                        $crate::prelude::paste! {
+                            [< $newtype:camel Fixturator >]::new_indexed($crate::prelude::Empty, index).next().unwrap().into()
                         }
                     ),*
                 )
@@ -325,8 +366,8 @@ macro_rules! fixturator {
                 let index = get_fixt_index!();
                 $type::$fn(
                     $(
-                        paste! {
-                            [< $newtype:camel Fixturator >]::new_indexed(Unpredictable, index).next().unwrap().into()
+                        $crate::prelude::paste! {
+                            [< $newtype:camel Fixturator >]::new_indexed($crate::prelude::Unpredictable, index).next().unwrap().into()
                         }
                     ),*
                 )
@@ -335,8 +376,8 @@ macro_rules! fixturator {
                 let index = get_fixt_index!();
                 $type::$fn(
                     $(
-                        paste! {
-                            [< $newtype:camel Fixturator >]::new_indexed(Predictable, index).next().unwrap().into()
+                        $crate::prelude::paste! {
+                            [< $newtype:camel Fixturator >]::new_indexed($crate::prelude::Predictable, index).next().unwrap().into()
                         }
                     ),*
                 )
@@ -359,8 +400,8 @@ macro_rules! fixturator {
             curve Empty {
                 $fn(
                     $(
-                        paste! {
-                            [< $newtype:camel Fixturator >]::new_indexed(Empty, get_fixt_index!()).next().unwrap().into()
+                        $crate::prelude::paste! {
+                            [< $newtype:camel Fixturator >]::new_indexed($crate::prelude::Empty, get_fixt_index!()).next().unwrap().into()
                         }
                     ),*
                 )
@@ -369,8 +410,8 @@ macro_rules! fixturator {
             curve Unpredictable {
                 $fn(
                     $(
-                        paste! {
-                            [< $newtype:camel Fixturator >]::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap().into()
+                        $crate::prelude::paste! {
+                            [< $newtype:camel Fixturator >]::new_indexed($crate::prelude::Unpredictable, get_fixt_index!()).next().unwrap().into()
                         }
                     ),*
                 )
@@ -378,8 +419,8 @@ macro_rules! fixturator {
             curve Predictable {
                 $fn(
                     $(
-                        paste! {
-                            [< $newtype:camel Fixturator >]::new_indexed(Predictable, get_fixt_index!()).next().unwrap().into()
+                        $crate::prelude::paste! {
+                            [< $newtype:camel Fixturator >]::new_indexed($crate::prelude::Predictable, get_fixt_index!()).next().unwrap().into()
                         }
                     ),*
                 )
@@ -413,7 +454,7 @@ macro_rules! fixturator {
     // intended to be the TT munch endpoint for all patterns in this macro
     // See https://danielkeep.github.io/tlborm/book/pat-incremental-tt-munchers.html
     ( $type:ident; $($munch:tt)* ) => {
-        paste! {
+        $crate::prelude::paste! {
             #[allow(missing_docs)]
             pub struct [<$type:camel Fixturator>]<Curve>(Fixturator<$type, Curve>);
 
@@ -487,7 +528,7 @@ macro_rules! get_fixt_curve {
 /// incremented by 1 automatically by the macro
 macro_rules! curve {
     ( $type:ident, $curve:ident, $e:expr ) => {
-        paste! {
+        $crate::prelude::paste! {
             #[allow(missing_docs)]
             impl Iterator for [< $type:camel Fixturator >]<$curve> {
                 type Item = $type;
@@ -516,11 +557,14 @@ macro_rules! curve {
 /// c.f. fixt!(Foo) vs. FooFixturator::new(Unpredictable).next().unwrap();
 macro_rules! fixt {
     ( $name:tt ) => {
-        fixt!($name, Unpredictable)
+        $crate::fixt!($name, $crate::prelude::Unpredictable)
     };
     ( $name:tt, $curve:expr ) => {
-        paste! { [< $name:camel Fixturator>]::new($curve).next().unwrap() }
+        $crate::fixt!($name, $curve, 0)
     };
+    ( $name:tt, $curve:expr, $index:expr ) => {
+        $crate::prelude::paste! { [< $name:camel Fixturator>]::new_indexed($curve, $index).next().unwrap() }
+    }
 }
 
 /// represents an unpredictable curve
@@ -586,7 +630,7 @@ macro_rules! newtype_fixturator {
                 let vec_len = rng.gen_range(0, 5);
                 let mut ret = vec![];
                 let mut inner_fixturator =
-                    paste! { [<$inner:camel Fixturator>]::new_indexed(Unpredictable, get_fixt_index!()) };
+                    $crate::prelude::paste! { [<$inner:camel Fixturator>]::new_indexed($crate::prelude::Unpredictable, get_fixt_index!()) };
                 for _ in 0..vec_len {
                     ret.push(inner_fixturator.next().unwrap());
                 }
@@ -598,7 +642,7 @@ macro_rules! newtype_fixturator {
                 let vec_len = rng.gen_range(0, 5);
                 let mut ret = vec![];
                 let mut inner_fixturator =
-                    paste! { [<$inner:camel Fixturator>]::new_indexed(Predictable, get_fixt_index!()) };
+                    $crate::prelude::paste! { [<$inner:camel Fixturator>]::new_indexed($crate::prelude::Predictable, get_fixt_index!()) };
                 for _ in 0..vec_len {
                     ret.push(inner_fixturator.next().unwrap());
                 }
@@ -613,7 +657,7 @@ macro_rules! newtype_fixturator {
             {
                 let mut index = get_fixt_index!();
                 let mut fixturator =
-                    paste! { [<$inner:camel Fixturator>]::new_indexed(Empty, index) };
+                    $crate::prelude::paste! { [<$inner:camel Fixturator>]::new_indexed($crate::prelude::Empty, index) };
                 index += 1;
                 set_fixt_index!(index);
                 $outer(fixturator.next().unwrap())
@@ -621,7 +665,7 @@ macro_rules! newtype_fixturator {
             {
                 let mut index = get_fixt_index!();
                 let mut fixturator =
-                    paste! { [<$inner:camel Fixturator>]::new_indexed(Unpredictable, index) };
+                    $crate::prelude::paste! { [<$inner:camel Fixturator>]::new_indexed($crate::prelude::Unpredictable, index) };
                 index += 1;
                 set_fixt_index!(index);
                 $outer(fixturator.next().unwrap())
@@ -629,7 +673,7 @@ macro_rules! newtype_fixturator {
             {
                 let mut index = get_fixt_index!();
                 let mut fixturator =
-                    paste! { [<$inner:camel Fixturator>]::new_indexed(Predictable, index) };
+                    $crate::prelude::paste! { [<$inner:camel Fixturator>]::new_indexed($crate::prelude::Predictable, index) };
                 index += 1;
                 set_fixt_index!(index);
                 $outer(fixturator.next().unwrap())
@@ -647,19 +691,19 @@ macro_rules! wasm_io_fixturator {
             $outer,
             {
                 let mut fixturator =
-                    paste! { [<$inner:camel Fixturator>]::new_indexed(Empty, get_fixt_index!()) };
+                    $crate::prelude::paste! { [<$inner:camel Fixturator>]::new_indexed($crate::prelude::Empty, get_fixt_index!()) };
                 set_fixt_index!(get_fixt_index!() + 1);
                 $outer::new(fixturator.next().unwrap())
             },
             {
                 let mut fixturator =
-                    paste! { [<$inner:camel Fixturator>]::new_indexed(Unpredictable, get_fixt_index!()) };
+                    $crate::prelude::paste! { [<$inner:camel Fixturator>]::new_indexed($crate::prelude::Unpredictable, get_fixt_index!()) };
                 set_fixt_index!(get_fixt_index!() + 1);
                 $outer::new(fixturator.next().unwrap())
             },
             {
                 let mut fixturator =
-                    paste! { [<$inner:camel Fixturator>]::new_indexed(Predictable, get_fixt_index!()) };
+                    $crate::prelude::paste! { [<$inner:camel Fixturator>]::new_indexed($crate::prelude::Predictable, get_fixt_index!()) };
                 set_fixt_index!(get_fixt_index!() + 1);
                 $outer::new(fixturator.next().unwrap())
             }
@@ -675,7 +719,7 @@ macro_rules! wasm_io_fixturator {
 macro_rules! enum_fixturator {
     ( $enum:ident, $empty:expr ) => {
         use rand::seq::IteratorRandom;
-        use $crate::prelude::strum::IntoEnumIterator;
+        use $crate::prelude::IntoEnumIterator;
         fixturator!(
             $enum,
             $empty,

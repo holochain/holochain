@@ -6,9 +6,9 @@ pub struct CapFor(CapSecret, AgentPubKey);
 #[hdk_extern]
 fn init(_: ()) -> ExternResult<InitCallbackResult> {
     // grant unrestricted access to accept_cap_claim so other agents can send us claims
-    let mut functions: GrantedFunctions = HashSet::new();
-    functions.insert((zome_info()?.zome_name, "accept_cap_claim".into()));
-    // functions.insert((zome_info()?.zome_name, "needs_cap_claim".into()));
+    let mut functions: GrantedFunctions = BTreeSet::new();
+    functions.insert((zome_info()?.name, "accept_cap_claim".into()));
+    functions.insert((zome_info()?.name, "another_cap_claim".into()));
     create_cap_grant(CapGrantEntry {
         tag: "".into(),
         // empty access converts to unrestricted
@@ -25,8 +25,8 @@ pub fn cap_secret(_: ()) -> ExternResult<CapSecret> {
 }
 
 fn cap_grant_entry(secret: CapSecret) -> ExternResult<CapGrantEntry> {
-    let mut functions: GrantedFunctions = HashSet::new();
-    let this_zome = zome_info()?.zome_name;
+    let mut functions: GrantedFunctions = BTreeSet::new();
+    let this_zome = zome_info()?.name;
     functions.insert((this_zome, "needs_cap_claim".into()));
     Ok(CapGrantEntry {
         tag: "".into(),
@@ -56,6 +56,11 @@ fn get_entry(header_hash: HeaderHash) -> ExternResult<Option<Element>> {
     get(header_hash, GetOptions::latest())
 }
 
+#[hdk_extern]
+fn another_cap_grant(_: ()) -> ExternResult<()> {
+    Ok(())
+}
+
 /// accepts a cap claim and commits it to the local chain
 /// intended to
 #[hdk_extern]
@@ -70,13 +75,13 @@ fn needs_cap_claim(_: ()) -> ExternResult<()> {
 
 #[hdk_extern]
 fn try_cap_claim(cap_for: crate::CapFor) -> ExternResult<ZomeCallResponse> {
-    Ok(call_remote(
+    call_remote(
         cap_for.1,
-        zome_info()?.zome_name,
+        zome_info()?.name,
         "needs_cap_claim".to_string().into(),
         Some(cap_for.0),
         &(),
-    )?)
+    )
 }
 
 #[hdk_extern]
@@ -87,8 +92,8 @@ fn send_assigned_cap_claim(agent: AgentPubKey) -> ExternResult<()> {
     let secret = CapSecret::try_from_random()?;
 
     // grant the secret as assigned (can only be used by the intended agent)
-    let mut functions: GrantedFunctions = HashSet::new();
-    let this_zome = zome_info()?.zome_name;
+    let mut functions: GrantedFunctions = BTreeSet::new();
+    let this_zome = zome_info()?.name;
     functions.insert((this_zome.clone(), "needs_cap_claim".into()));
     create_cap_grant(CapGrantEntry {
         access: (secret, agent.clone()).into(),

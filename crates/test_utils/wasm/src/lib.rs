@@ -9,6 +9,7 @@ pub enum TestWasm {
     Anchor,
     Bench,
     Capability,
+    CounterSigning,
     Create,
     Crd,
     Crud,
@@ -17,6 +18,8 @@ pub enum TestWasm {
     EmitSignal,
     HashEntry,
     Foo,
+    GenesisSelfCheckInvalid,
+    GenesisSelfCheckValid,
     HashPath,
     HdkExtern,
     InitFail,
@@ -25,10 +28,12 @@ pub enum TestWasm {
     MigrateAgentFail,
     MigrateAgentPass,
     MultipleCalls,
-    PostCommitFail,
+    MustGet,
     PostCommitSuccess,
+    PostCommitVolley,
     Query,
     RandomBytes,
+    Schedule,
     XSalsa20Poly1305,
     SerRegression,
     Sign,
@@ -53,6 +58,7 @@ impl From<TestWasm> for ZomeName {
             TestWasm::Anchor => "anchor",
             TestWasm::Bench => "bench",
             TestWasm::Capability => "capability",
+            TestWasm::CounterSigning => "countersigning",
             TestWasm::Create => "create_entry",
             TestWasm::Crd => "crd",
             TestWasm::Crud => "crud",
@@ -61,6 +67,8 @@ impl From<TestWasm> for ZomeName {
             TestWasm::EmitSignal => "emit_signal",
             TestWasm::HashEntry => "hash_entry",
             TestWasm::Foo => "foo",
+            TestWasm::GenesisSelfCheckInvalid => "genesis_self_check_invalid",
+            TestWasm::GenesisSelfCheckValid => "genesis_self_check_valid",
             TestWasm::HashPath => "hash_path",
             TestWasm::HdkExtern => "hdk_extern",
             TestWasm::InitFail => "init_fail",
@@ -69,10 +77,12 @@ impl From<TestWasm> for ZomeName {
             TestWasm::MigrateAgentFail => "migrate_agent_fail",
             TestWasm::MigrateAgentPass => "migrate_agent_pass",
             TestWasm::MultipleCalls => "multiple_calls",
-            TestWasm::PostCommitFail => "post_commit_fail",
+            TestWasm::MustGet => "must_get",
             TestWasm::PostCommitSuccess => "post_commit_success",
+            TestWasm::PostCommitVolley => "post_commit_volley",
             TestWasm::Query => "query",
             TestWasm::RandomBytes => "random_bytes",
+            TestWasm::Schedule => "schedule",
             TestWasm::XSalsa20Poly1305 => "x_salsa20_poly1305",
             TestWasm::SerRegression => "ser_regression",
             TestWasm::Sign => "sign",
@@ -103,6 +113,9 @@ impl From<TestWasm> for DnaWasm {
             TestWasm::Capability => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_capability.wasm")
             }
+            TestWasm::CounterSigning => {
+                get_code("wasm32-unknown-unknown/release/test_wasm_countersigning.wasm")
+            }
             TestWasm::Create => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_create_entry.wasm")
             }
@@ -119,6 +132,12 @@ impl From<TestWasm> for DnaWasm {
                 get_code("wasm32-unknown-unknown/release/test_wasm_hash_entry.wasm")
             }
             TestWasm::Foo => get_code("wasm32-unknown-unknown/release/test_wasm_foo.wasm"),
+            TestWasm::GenesisSelfCheckInvalid => {
+                get_code("wasm32-unknown-unknown/release/test_wasm_genesis_self_check_invalid.wasm")
+            }
+            TestWasm::GenesisSelfCheckValid => {
+                get_code("wasm32-unknown-unknown/release/test_wasm_genesis_self_check_valid.wasm")
+            }
             TestWasm::HashPath => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_hash_path.wasm")
             }
@@ -141,15 +160,19 @@ impl From<TestWasm> for DnaWasm {
             TestWasm::MultipleCalls => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_multiple_calls.wasm")
             }
-            TestWasm::PostCommitFail => {
-                get_code("wasm32-unknown-unknown/release/test_wasm_post_commit_fail.wasm")
-            }
+            TestWasm::MustGet => get_code("wasm32-unknown-unknown/release/test_wasm_must_get.wasm"),
             TestWasm::PostCommitSuccess => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_post_commit_success.wasm")
+            }
+            TestWasm::PostCommitVolley => {
+                get_code("wasm32-unknown-unknown/release/test_wasm_post_commit_volley.wasm")
             }
             TestWasm::Query => get_code("wasm32-unknown-unknown/release/test_wasm_query.wasm"),
             TestWasm::RandomBytes => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_random_bytes.wasm")
+            }
+            TestWasm::Schedule => {
+                get_code("wasm32-unknown-unknown/release/test_wasm_schedule.wasm")
             }
             TestWasm::XSalsa20Poly1305 => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_x_salsa20_poly1305.wasm")
@@ -221,7 +244,7 @@ impl From<TestWasm> for ZomeDef {
             let (_, wasm_hash) = holochain_types::dna::wasm::DnaWasmHashed::from_content(dna_wasm)
                 .await
                 .into_inner();
-            WasmZome { wasm_hash }.into()
+            ZomeDef::Wasm(WasmZome { wasm_hash })
         })
     }
 }

@@ -1,11 +1,3 @@
-use fallible_iterator::FallibleIterator;
-use holochain_lmdb::buffer::CasBufFreshSync;
-use holochain_lmdb::env::EnvironmentRead;
-use holochain_lmdb::error::DatabaseError;
-use holochain_lmdb::error::DatabaseResult;
-use holochain_lmdb::exports::SingleStore;
-use holochain_lmdb::fresh_reader;
-use holochain_lmdb::prelude::*;
 use holochain_types::prelude::*;
 use holochain_zome_types::entry_def::EntryDef;
 use std::collections::HashMap;
@@ -16,10 +8,6 @@ use tracing::*;
 pub struct RealDnaStore {
     dnas: HashMap<DnaHash, DnaFile>,
     entry_defs: HashMap<EntryDefBufferKey, EntryDef>,
-}
-
-pub struct DnaDefBuf {
-    dna_defs: CasBufFreshSync<DnaDef>,
 }
 
 impl DnaStore for RealDnaStore {
@@ -35,7 +23,11 @@ impl DnaStore for RealDnaStore {
         self.dnas.keys().cloned().collect()
     }
     #[instrument]
-    fn get(&self, hash: &DnaHash) -> Option<DnaFile> {
+    fn get_dna_def(&self, hash: &DnaHash) -> Option<DnaDef> {
+        self.dnas.get(hash).map(|d| d.dna_def()).cloned()
+    }
+    #[instrument]
+    fn get_dna_file(&self, hash: &DnaHash) -> Option<DnaFile> {
         self.dnas.get(hash).cloned()
     }
     fn add_entry_def(&mut self, k: EntryDefBufferKey, entry_def: EntryDef) {
@@ -58,38 +50,5 @@ impl RealDnaStore {
             dnas: HashMap::new(),
             entry_defs: HashMap::new(),
         }
-    }
-}
-
-impl DnaDefBuf {
-    pub fn new(env: EnvironmentRead, dna_def_store: SingleStore) -> DatabaseResult<Self> {
-        Ok(Self {
-            dna_defs: CasBufFreshSync::new(env, dna_def_store),
-        })
-    }
-
-    pub async fn get(&self, dna_hash: &DnaHash) -> DatabaseResult<Option<DnaDefHashed>> {
-        self.dna_defs.get(dna_hash)
-    }
-
-    pub async fn put(&mut self, dna_def: DnaDef) -> DatabaseResult<()> {
-        self.dna_defs.put(DnaDefHashed::from_content_sync(dna_def));
-        Ok(())
-    }
-
-    pub fn get_all(&self) -> DatabaseResult<Vec<DnaDefHashed>> {
-        fresh_reader!(self.dna_defs.env(), |r| self
-            .dna_defs
-            .iter_fail(&r)?
-            .collect())
-    }
-}
-
-impl BufferedStore for DnaDefBuf {
-    type Error = DatabaseError;
-
-    fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> DatabaseResult<()> {
-        self.dna_defs.flush_to_txn_ref(writer)?;
-        Ok(())
     }
 }

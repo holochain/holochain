@@ -6,8 +6,6 @@
 
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 
-Current version: 0.0.1
-
 Utilities to create DNA and hApp bundle files from a source working directory, and vice-versa.
 This crate defines two separate subcommands for the `hc` CLI tool, one for each type of bundle.
 Both subcommands are very similar and have identical interfaces.
@@ -19,7 +17,7 @@ Usage instructions from the `-h` flag:
 ```sh
 $ hc dna -h
 
-hc-dna 0.1.0
+hc-dna 0.0.1
 Work with DNA bundles
 
 USAGE:

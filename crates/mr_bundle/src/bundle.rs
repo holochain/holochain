@@ -4,6 +4,7 @@ use crate::{
     manifest::Manifest,
     resource::ResourceBytes,
 };
+use holochain_util::ffs;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{
     borrow::Cow,
@@ -19,6 +20,7 @@ pub type ResourceMap = HashMap<PathBuf, ResourceBytes>;
 ///
 /// The manifest may describe locations of resources not included in the Bundle.
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct Bundle<M>
 where
     M: Manifest,
@@ -58,7 +60,7 @@ where
     /// this is not a valid bundle.
     ///
     /// A base directory must also be supplied so that relative paths can be
-    /// resolved into absolute ones
+    /// resolved into absolute ones.
     pub fn new<R: IntoIterator<Item = (PathBuf, ResourceBytes)>>(
         manifest: M,
         resources: R,
@@ -67,7 +69,7 @@ where
         Self::from_parts(manifest, resources, Some(root_dir))
     }
 
-    /// Create a bundle, but without
+    /// Create a bundle, asserting that all paths in the Manifest are absolute.
     pub fn new_unchecked<R: IntoIterator<Item = (PathBuf, ResourceBytes)>>(
         manifest: M,
         resources: R,
@@ -75,7 +77,7 @@ where
         Self::from_parts(manifest, resources, None)
     }
 
-    pub fn from_parts<R: IntoIterator<Item = (PathBuf, ResourceBytes)>>(
+    fn from_parts<R: IntoIterator<Item = (PathBuf, ResourceBytes)>>(
         manifest: M,
         resources: R,
         root_dir: Option<PathBuf>,
@@ -105,18 +107,29 @@ where
         })
     }
 
+    /// Accessor for the Manifest
     pub fn manifest(&self) -> &M {
         &self.manifest
     }
 
+    /// Return a new Bundle with an updated manifest, subject to the same
+    /// validation constraints as creating a new Bundle from scratch.
+    pub fn update_manifest(self, manifest: M) -> MrBundleResult<Self> {
+        Self::from_parts(manifest, self.resources, self.root_dir)
+    }
+
+    /// Load a Bundle into memory from a file
     pub async fn read_from_file(path: &Path) -> MrBundleResult<Self> {
         Ok(Self::decode(&ffs::read(path).await?)?)
     }
 
+    /// Write a Bundle to a file
     pub async fn write_to_file(&self, path: &Path) -> MrBundleResult<()> {
         Ok(ffs::write(path, &self.encode()?).await?)
     }
 
+    /// Retrieve the bytes for a resource at a Location, downloading it if
+    /// necessary
     pub async fn resolve(&self, location: &Location) -> MrBundleResult<Cow<'_, ResourceBytes>> {
         let bytes = match &location.normalize(self.root_dir.as_ref())? {
             Location::Bundled(path) => Cow::Borrowed(
@@ -166,7 +179,7 @@ where
         crate::encode(self)
     }
 
-    /// Decode bytes produced by `encode`
+    /// Decode bytes produced by [`encode`](Bundle::encode)
     pub fn decode(bytes: &[u8]) -> MrBundleResult<Self> {
         crate::decode(bytes)
     }

@@ -1,6 +1,7 @@
 #![deny(missing_docs)]
 //! This module is used to configure the conductor
 
+use holochain_types::env::DbSyncStrategy;
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use serde::Serialize;
@@ -9,7 +10,7 @@ mod admin_interface_config;
 mod dpki_config;
 #[allow(missing_docs)]
 mod error;
-mod passphrase_service_config;
+mod keystore_config;
 pub mod paths;
 //mod logger_config;
 //mod signal_config;
@@ -19,62 +20,40 @@ pub use super::*;
 pub use dpki_config::DpkiConfig;
 //pub use logger_config::LoggerConfig;
 pub use error::*;
-pub use passphrase_service_config::PassphraseServiceConfig;
+pub use keystore_config::KeystoreConfig;
 //pub use signal_config::SignalConfig;
 use std::path::Path;
-use std::path::PathBuf;
 
 // TODO change types from "stringly typed" to Url2
 /// All the config information for the conductor
 #[derive(Clone, Deserialize, Serialize, Default, Debug, PartialEq)]
 pub struct ConductorConfig {
-    /// The path to the LMDB environment for this conductor.
+    /// The path to the database for this conductor.
     /// If omitted, chooses a default path.
     pub environment_path: EnvironmentRootPath,
 
-    /// Enabling this will use a test keystore instead of lair.
-    /// This generates publicly accessible private keys.
-    /// DO NOT USE THIS IN PRODUCTION!
+    /// Define how Holochain conductor will connect to a keystore.
     #[serde(default)]
-    pub use_dangerous_test_keystore: bool,
-
-    /// Optional URI for a websocket connection to an outsourced signing service.
-    /// Bootstrapping step for Holo closed-alpha.
-    /// If set, all agents with holo_remote_key = true will be emulated by asking for signatures
-    /// over this websocket.
-    pub signing_service_uri: Option<String>,
-
-    /// Optional URI for a websocket connection to an outsourced encryption service.
-    /// Bootstrapping step for Holo closed-alpha.
-    /// If set, all agents with holo_remote_key = true will be emulated by asking for signatures
-    /// over this websocket.
-    pub encryption_service_uri: Option<String>,
-
-    /// Optional URI for a websocket connection to an outsourced decryption service.
-    /// Bootstrapping step for Holo closed-alpha.
-    /// If set, all agents with holo_remote_key = true will be emulated by asking for signatures
-    /// over this websocket.
-    pub decryption_service_uri: Option<String>,
+    pub keystore: KeystoreConfig,
 
     /// Optional DPKI configuration if conductor is using a DPKI app to initalize and manage
     /// keys for new instances
     pub dpki: Option<DpkiConfig>,
-
-    /// Optional path for keystore directory.  If not specified will use the default provided
-    /// by the [ConfigBuilder]()https://docs.rs/lair_keystore_api/0.0.1-alpha.4/lair_keystore_api/struct.ConfigBuilder.html)
-    pub keystore_path: Option<PathBuf>,
-
-    /// Configure how the conductor should prompt the user for the passphrase to lock/unlock keystores.
-    /// The conductor is independent of the specialized implementation of the trait
-    /// PassphraseService. It just needs something to provide a passphrase when needed.
-    /// This config setting selects one of the available services (i.e. CLI prompt, IPC, FromConfig)
-    pub passphrase_service: Option<PassphraseServiceConfig>,
 
     /// Setup admin interfaces to control this conductor through a websocket connection
     pub admin_interfaces: Option<Vec<AdminInterfaceConfig>>,
 
     /// Config options for the network module. Optional.
     pub network: Option<holochain_p2p::kitsune_p2p::KitsuneP2pConfig>,
+
+    #[serde(default)]
+    /// Override the default database synchronous strategy.
+    /// See [sqlite documentation](https://www.sqlite.org/pragma.html#pragma_synchronous)
+    /// for information about database sync levels.
+    /// See [`DbSyncStrategy`] for details.
+    /// This is best left at it's default value unless you know what you
+    /// are doing.
+    pub db_sync_strategy: DbSyncStrategy,
     //
     //
     // /// Which signals to emit
@@ -133,8 +112,8 @@ pub mod tests {
         let yaml = r#"---
     environment_path: /path/to/env
 
-    passphrase_service:
-      type: cmd
+    keystore:
+      type: danger_test_keystore_legacy_deprecated
     "#;
         let result: ConductorConfig = config_from_yaml(yaml).unwrap();
         assert_eq!(
@@ -142,14 +121,10 @@ pub mod tests {
             ConductorConfig {
                 environment_path: PathBuf::from("/path/to/env").into(),
                 network: None,
-                signing_service_uri: None,
-                encryption_service_uri: None,
-                decryption_service_uri: None,
                 dpki: None,
-                passphrase_service: Some(PassphraseServiceConfig::Cmd),
-                keystore_path: None,
+                keystore: KeystoreConfig::DangerTestKeystoreLegacyDeprecated,
                 admin_interfaces: None,
-                use_dangerous_test_keystore: false,
+                db_sync_strategy: DbSyncStrategy::default(),
             }
         );
     }
@@ -160,13 +135,13 @@ pub mod tests {
 
         let yaml = r#"---
     environment_path: /path/to/env
-    use_dangerous_test_keystore: true
     signing_service_uri: ws://localhost:9001
     encryption_service_uri: ws://localhost:9002
     decryption_service_uri: ws://localhost:9003
 
-    passphrase_service:
-      type: cmd
+    keystore:
+      type: lair_server_legacy_deprecated
+      danger_passphrase_insecure_from_config: "test-passphrase"
 
     dpki:
       instance_id: some_id
@@ -189,16 +164,16 @@ pub mod tests {
             proxy_accept_config: reject_all
       tuning_params:
         gossip_loop_iteration_delay_ms: 42
-        default_notify_remote_agent_count: 42
-        default_notify_timeout_ms: 42
         default_rpc_single_timeout_ms: 42
         default_rpc_multi_remote_agent_count: 42
-        default_rpc_multi_timeout_ms: 42
+        default_rpc_multi_remote_request_grace_ms: 42
         agent_info_expires_after_ms: 42
         tls_in_mem_session_storage: 42
         proxy_keepalive_ms: 42
         proxy_to_expire_ms: 42
       network_type: quic_bootstrap
+
+    db_sync_strategy: Fast
     "#;
         let result: ConductorConfigResult<ConductorConfig> = config_from_yaml(yaml);
         use holochain_p2p::kitsune_p2p::*;
@@ -215,13 +190,11 @@ pub mod tests {
             },
         });
         let mut tuning_params =
-            kitsune_p2p::dependencies::kitsune_p2p_types::config::KitsuneP2pTuningParams::default();
+            kitsune_p2p::dependencies::kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
         tuning_params.gossip_loop_iteration_delay_ms = 42;
-        tuning_params.default_notify_remote_agent_count = 42;
-        tuning_params.default_notify_timeout_ms = 42;
         tuning_params.default_rpc_single_timeout_ms = 42;
         tuning_params.default_rpc_multi_remote_agent_count = 42;
-        tuning_params.default_rpc_multi_timeout_ms = 42;
+        tuning_params.default_rpc_multi_remote_request_grace_ms = 42;
         tuning_params.agent_info_expires_after_ms = 42;
         tuning_params.tls_in_mem_session_storage = 42;
         tuning_params.proxy_keepalive_ms = 42;
@@ -231,34 +204,33 @@ pub mod tests {
             result.unwrap(),
             ConductorConfig {
                 environment_path: PathBuf::from("/path/to/env").into(),
-                use_dangerous_test_keystore: true,
-                signing_service_uri: Some("ws://localhost:9001".into()),
-                encryption_service_uri: Some("ws://localhost:9002".into()),
-                decryption_service_uri: Some("ws://localhost:9003".into()),
                 dpki: Some(DpkiConfig {
                     instance_id: "some_id".into(),
                     init_params: "some_params".into()
                 }),
-                passphrase_service: Some(PassphraseServiceConfig::Cmd),
-                keystore_path: None,
+                keystore: KeystoreConfig::LairServerLegacyDeprecated {
+                    keystore_path: None,
+                    danger_passphrase_insecure_from_config: "test-passphrase".to_string(),
+                },
                 admin_interfaces: Some(vec![AdminInterfaceConfig {
                     driver: InterfaceDriver::Websocket { port: 1234 }
                 }]),
                 network: Some(network_config),
+                db_sync_strategy: DbSyncStrategy::Fast,
             }
         );
     }
 
+    /* TODO uncomment when lair_keystore_api initialization is implemented
     #[test]
-    fn test_config_keystore() {
+    fn test_config_new_lair_keystore() {
         let yaml = r#"---
     environment_path: /path/to/env
-    use_dangerous_test_keystore: true
     keystore_path: /path/to/keystore
 
-    passphrase_service:
-      type: fromconfig
-      passphrase: foobar
+    keystore:
+      type: lair_server
+      connection_url: "unix:///var/run/lair-keystore/socket?k=EcRDnP3xDIZ9Rk_1E-egPE0mGZi5CcszeRxVkb2QXXQ"
     "#;
         let result: ConductorConfigResult<ConductorConfig> = config_from_yaml(yaml);
         assert_eq!(
@@ -266,17 +238,14 @@ pub mod tests {
             ConductorConfig {
                 environment_path: PathBuf::from("/path/to/env").into(),
                 network: None,
-                signing_service_uri: None,
-                encryption_service_uri: None,
-                decryption_service_uri: None,
                 dpki: None,
-                passphrase_service: Some(PassphraseServiceConfig::FromConfig {
-                    passphrase: "foobar".into()
-                }),
-                keystore_path: Some(PathBuf::from("/path/to/keystore").into()),
+                keystore: KeystoreConfig::LairServer {
+                    connection_url: url2::url2!("unix:///var/run/lair-keystore/socket?k=EcRDnP3xDIZ9Rk_1E-egPE0mGZi5CcszeRxVkb2QXXQ").into(),
+                },
                 admin_interfaces: None,
-                use_dangerous_test_keystore: true,
+                db_sync_level: DbSyncLevel::default(),
             }
         );
     }
+    */
 }

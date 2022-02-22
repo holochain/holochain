@@ -2,6 +2,7 @@ use crate::*;
 
 /// Configuration struct for spawn_transport_listener_quic()
 #[non_exhaustive]
+#[derive(Default)]
 pub struct ConfigListenerQuic {
     /// To which network interface / port should we bind?
     /// Default: "kitsune-quic://0.0.0.0:0".
@@ -21,20 +22,9 @@ pub struct ConfigListenerQuic {
     /// Tls config
     /// Default: None = ephemeral.
     pub tls: Option<(
-        lair_keystore_api::actor::Cert,
-        lair_keystore_api::actor::CertPrivKey,
+        lair_keystore_api_0_0::actor::Cert,
+        lair_keystore_api_0_0::actor::CertPrivKey,
     )>,
-}
-
-impl Default for ConfigListenerQuic {
-    fn default() -> Self {
-        Self {
-            bind_to: None,
-            override_host: None,
-            override_port: None,
-            tls: None,
-        }
-    }
 }
 
 impl ConfigListenerQuic {
@@ -60,8 +50,8 @@ impl ConfigListenerQuic {
     pub fn set_tls(
         mut self,
         tls: Option<(
-            lair_keystore_api::actor::Cert,
-            lair_keystore_api::actor::CertPrivKey,
+            lair_keystore_api_0_0::actor::Cert,
+            lair_keystore_api_0_0::actor::CertPrivKey,
         )>,
     ) -> Self {
         self.tls = tls;

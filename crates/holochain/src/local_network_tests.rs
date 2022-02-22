@@ -1,89 +1,72 @@
 use std::convert::TryFrom;
 use std::sync::Arc;
 
-use hdk::prelude::CellId;
-use hdk::prelude::WasmError;
-use holo_hash::AgentPubKey;
-use holo_hash::HeaderHash;
-use holochain_keystore::AgentPubKeyExt;
-use holochain_lmdb::env::EnvironmentWrite;
-use holochain_serialized_bytes::SerializedBytes;
-use holochain_types::prelude::*;
-use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::ZomeCallResponse;
-use kitsune_p2p::KitsuneP2pConfig;
-use matches::assert_matches;
-use tempdir::TempDir;
-use tracing::debug_span;
-
-use crate::conductor::p2p_store::all_agent_infos;
-use crate::conductor::p2p_store::exchange_peer_info;
+use crate::conductor::p2p_agent_store::all_agent_infos;
+use crate::conductor::p2p_agent_store::exchange_peer_info;
 use crate::conductor::ConductorHandle;
-use crate::core::ribosome::error::RibosomeError;
-use crate::core::ribosome::error::RibosomeResult;
+use crate::sweettest::*;
 use crate::test_utils::host_fn_caller::Post;
 use crate::test_utils::install_app;
 use crate::test_utils::new_zome_call;
 use crate::test_utils::setup_app_with_network;
 use crate::test_utils::wait_for_integration_with_others;
+use futures::StreamExt;
+use hdk::prelude::CellId;
+use holo_hash::AgentPubKey;
+use holo_hash::HeaderHash;
+use holochain_keystore::AgentPubKeyExt;
+use holochain_p2p::DnaHashExt;
+use holochain_serialized_bytes::SerializedBytes;
+use holochain_state::prelude::TestEnvs;
+use holochain_types::prelude::*;
+use holochain_wasm_test_utils::TestWasm;
+use holochain_zome_types::ZomeCallResponse;
+use kitsune_p2p::KitsuneP2pConfig;
+use matches::assert_matches;
 use shrinkwraprs::Shrinkwrap;
 use test_case::test_case;
-
-const TIMEOUT_ERROR: &'static str = "inner function \'call_create_entry_remotely\' failed: ZomeCallNetworkError(\"Other: timeout\")";
+use tokio_helper;
+use tracing::debug_span;
 
 #[test_case(2)]
-#[test_case(5)]
-// #[test_case(10)] 10 works but might be too slow for our regular test run
-fn conductors_call_remote(num_conductors: usize) {
-    let f = async move {
-        observability::test_run().ok();
+#[test_case(4)]
+#[tokio::test(flavor = "multi_thread")]
+async fn conductors_call_remote(num_conductors: usize) {
+    observability::test_run().ok();
+    let (dna, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create])
+        .await
+        .unwrap();
+    let mut conductors = SweetConductorBatch::from_standard_config(num_conductors).await;
+    let apps = conductors.setup_app("app", &[dna]).await.unwrap();
+    let cells: Vec<_> = apps
+        .into_inner()
+        .into_iter()
+        .map(|c| c.into_cells().into_iter().next().unwrap())
+        .collect();
+    conductors.exchange_peer_info().await;
 
-        let uuid = nanoid::nanoid!().to_string();
-        let zomes = vec![TestWasm::Create];
-        let mut network = KitsuneP2pConfig::default();
-        network.transport_pool = vec![kitsune_p2p::TransportConfig::Quic {
-            bind_to: None,
-            override_host: None,
-            override_port: None,
-        }];
-        let handles = setup(zomes, Some(network), num_conductors, uuid).await;
+    let agents: Vec<_> = cells.iter().map(|c| c.agent_pubkey().clone()).collect();
 
-        init_all(&handles[..]).await;
-
-        // 50 ms should be enough time to hit another conductor locally
-        let results = call_each_other(&handles[..], 50).await;
-        for (_, _, result) in results {
-            match result {
-                Some(r) => match r {
-                    Err(RibosomeError::WasmError(WasmError::Guest(e))) => {
-                        assert_eq!(e, TIMEOUT_ERROR)
+    let iter = cells.into_iter().zip(conductors.into_inner().into_iter());
+    futures::stream::iter(iter)
+        .for_each_concurrent(20, |(cell, conductor)| {
+            let agents = agents.clone();
+            async move {
+                for agent in agents {
+                    if agent == *cell.agent_pubkey() {
+                        continue;
                     }
-                    _ => unreachable!(),
-                },
-                // None also means a timeout which is what we want before the
-                // agent info is shared
-                None => {}
+                    let _: HeaderHash = conductor
+                        .call(
+                            &cell.zome(TestWasm::Create),
+                            "call_create_entry_remotely_no_rec",
+                            agent,
+                        )
+                        .await;
+                }
             }
-        }
-
-        // Let the remote messages be dropped
-        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-
-        let mut envs = Vec::with_capacity(handles.len());
-        for h in &handles {
-            envs.push(h.get_p2p_env().await);
-        }
-
-        exchange_peer_info(envs);
-
-        // Give a little longer timeout here because they must find each other to pass the test
-        let results = call_each_other(&handles[..], 500).await;
-        for (_, _, result) in results {
-            self::assert_matches!(result, Some(Ok(ZomeCallResponse::Ok(_))));
-        }
-        shutdown(handles).await;
-    };
-    tokio_helper::block_forever_on(f);
+        })
+        .await;
 }
 
 #[test_case(2, 1, 1)]
@@ -267,14 +250,14 @@ async fn conductors_gossip_inner(
     share_peers: bool,
 ) {
     observability::test_run().ok();
-    let uuid = nanoid::nanoid!().to_string();
+    let uid = nanoid::nanoid!().to_string();
 
     let zomes = vec![TestWasm::Create];
     let handles = setup(
         zomes.clone(),
         Some(network.clone()),
         num_committers,
-        uuid.clone(),
+        uid.clone(),
     )
     .await;
 
@@ -284,17 +267,18 @@ async fn conductors_gossip_inner(
         zomes.clone(),
         Some(network.clone()),
         num_conductors,
-        uuid.clone(),
+        uid.clone(),
     )
     .await;
 
     let mut envs = Vec::with_capacity(handles.len() + second_handles.len());
     for h in handles.iter().chain(second_handles.iter()) {
-        envs.push(h.get_p2p_env().await);
+        let space = h.cell_id.dna_hash().to_kitsune();
+        envs.push(h.get_p2p_env(space));
     }
 
     if share_peers {
-        exchange_peer_info(envs.clone());
+        exchange_peer_info(envs.clone()).await;
     }
 
     // for _ in 0..600 {
@@ -317,15 +301,16 @@ async fn conductors_gossip_inner(
 
     shutdown(handles).await;
 
-    let third_handles = setup(zomes.clone(), Some(network.clone()), new_conductors, uuid).await;
+    let third_handles = setup(zomes.clone(), Some(network.clone()), new_conductors, uid).await;
 
     let mut envs = Vec::with_capacity(third_handles.len() + second_handles.len());
     for h in third_handles.iter().chain(second_handles.iter()) {
-        envs.push(h.get_p2p_env().await);
+        let space = h.cell_id.dna_hash().to_kitsune();
+        envs.push(h.get_p2p_env(space));
     }
 
     if share_peers {
-        exchange_peer_info(envs.clone());
+        exchange_peer_info(envs.clone()).await;
     }
 
     let all_handles = third_handles
@@ -379,52 +364,6 @@ async fn init_all(handles: &[TestHandle]) -> Vec<HeaderHash> {
     headers
 }
 
-async fn call_remote(a: TestHandle, b: TestHandle) -> RibosomeResult<ZomeCallResponse> {
-    let invocation = new_zome_call(
-        &a.cell_id,
-        "call_create_entry_remotely",
-        b.cell_id.agent_pubkey().clone(),
-        TestWasm::Create,
-    )
-    .unwrap();
-    a.call_zome(invocation).await.unwrap()
-}
-
-async fn call_each_other(
-    handles: &[TestHandle],
-    timeout: u64,
-) -> Vec<(usize, usize, Option<RibosomeResult<ZomeCallResponse>>)> {
-    let mut results = Vec::with_capacity(handles.len() * 2);
-    for (i, a) in handles.iter().cloned().enumerate() {
-        let mut futures = Vec::with_capacity(handles.len());
-        for (j, b) in handles.iter().cloned().enumerate() {
-            // Don't call self
-            if i == j {
-                continue;
-            }
-            let f = {
-                let a = a.clone();
-                async move {
-                    let f = call_remote(a, b);
-                    // We don't want to wait the maximum network timeout
-                    // in this test as it's a controlled local network
-                    match tokio::time::timeout(std::time::Duration::from_millis(timeout), f).await {
-                        Ok(r) => (i, j, Some(r)),
-                        Err(_) => (i, j, None),
-                    }
-                }
-            };
-            // Run a set of call remotes in parallel.
-            // Can't run everything in parallel or we get chain moved.
-            futures.push(tokio::task::spawn(f));
-        }
-        for f in futures {
-            results.push(f.await.unwrap());
-        }
-    }
-    results
-}
-
 async fn check_gossip(
     handle: &TestHandle,
     all_handles: &[&TestHandle],
@@ -438,13 +377,13 @@ async fn check_gossip(
 
     let mut others = Vec::with_capacity(all_handles.len());
     for other in all_handles {
-        let other = other.get_cell_env(&other.cell_id).await.unwrap();
+        let other = other.get_dht_env(other.cell_id.dna_hash()).unwrap().into();
         others.push(other);
     }
     let others_ref = others.iter().collect::<Vec<_>>();
 
     wait_for_integration_with_others(
-        &handle.get_cell_env(&handle.cell_id).await.unwrap(),
+        &handle.get_dht_env(handle.cell_id.dna_hash()).unwrap(),
         &others_ref,
         expected_count,
         NUM_ATTEMPTS,
@@ -468,13 +407,13 @@ async fn check_gossip(
 }
 
 #[tracing::instrument(skip(envs))]
-fn check_peers(envs: Vec<EnvironmentWrite>) {
+async fn check_peers(envs: Vec<DbWrite<DbKindP2pAgentStore>>) {
     for (i, a) in envs.iter().enumerate() {
-        let peers = all_agent_infos(a.clone().into()).unwrap();
+        let peers = all_agent_infos(a.clone().into()).await.unwrap();
         let num_peers = peers.len();
         let peers = peers
             .into_iter()
-            .map(|a| a.into_agent())
+            .map(|a| a.agent.clone())
             .collect::<Vec<_>>();
         tracing::debug!(?i, ?num_peers, ?peers);
     }
@@ -485,13 +424,13 @@ struct TestHandle {
     #[shrinkwrap(main_field)]
     handle: ConductorHandle,
     cell_id: CellId,
-    __tmpdir: Arc<TempDir>,
+    _envs: Arc<TestEnvs>,
 }
 
 impl TestHandle {
     async fn shutdown(self) {
-        let shutdown = self.handle.take_shutdown_handle().await.unwrap();
-        self.handle.shutdown().await;
+        let shutdown = self.handle.take_shutdown_handle().unwrap();
+        self.handle.shutdown();
         shutdown.await.unwrap().unwrap();
     }
 }
@@ -506,13 +445,14 @@ async fn setup(
     zomes: Vec<TestWasm>,
     network: Option<KitsuneP2pConfig>,
     num_conductors: usize,
-    uuid: String,
+    uid: String,
 ) -> Vec<TestHandle> {
     let dna_file = DnaFile::new(
         DnaDef {
             name: "conductor_test".to_string(),
-            uuid,
+            uid,
             properties: SerializedBytes::try_from(()).unwrap(),
+            origin_time: Timestamp::now(),
             zomes: zomes.clone().into_iter().map(Into::into).collect(),
         },
         zomes.into_iter().map(Into::into),
@@ -523,17 +463,15 @@ async fn setup(
     let mut handles = Vec::with_capacity(num_conductors);
     for _ in 0..num_conductors {
         let dnas = vec![dna_file.clone()];
-        let (__tmpdir, _, handle) =
+        let (_envs, _, handle) =
             setup_app_with_network(vec![], vec![], network.clone().unwrap_or_default()).await;
 
-        let agent_key = AgentPubKey::new_from_pure_entropy(handle.keystore())
-            .await
-            .unwrap();
+        let agent_key = AgentPubKey::new_random(handle.keystore()).await.unwrap();
         let cell_id = CellId::new(dna_file.dna_hash().to_owned(), agent_key.clone());
         let app = InstalledCell::new(cell_id.clone(), "cell_handle".into());
         install_app("test_app", vec![(app, None)], dnas.clone(), handle.clone()).await;
         handles.push(TestHandle {
-            __tmpdir,
+            _envs: Arc::new(_envs),
             cell_id,
             handle,
         });

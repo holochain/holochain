@@ -4,22 +4,27 @@ use super::*;
 
 use crate::conductor::manager::ManagedTaskResult;
 use crate::core::workflow::publish_dht_ops_workflow::publish_dht_ops_workflow;
-use crate::core::workflow::publish_dht_ops_workflow::PublishDhtOpsWorkspace;
-use holochain_lmdb::env::EnvironmentWrite;
-
 use tokio::task::JoinHandle;
 use tracing::*;
 
 /// Spawn the QueueConsumer for Publish workflow
-#[instrument(skip(env, stop, cell_network))]
+#[instrument(skip(env, conductor_handle, stop, network))]
 pub fn spawn_publish_dht_ops_consumer(
-    env: EnvironmentWrite,
+    agent: AgentPubKey,
+    env: DbWrite<DbKindAuthored>,
+    conductor_handle: ConductorHandle,
     mut stop: sync::broadcast::Receiver<()>,
-    mut cell_network: HolochainP2pCell,
+    network: Box<dyn HolochainP2pDnaT + Send + Sync>,
 ) -> (TriggerSender, JoinHandle<ManagedTaskResult>) {
-    let (tx, mut rx) = TriggerSender::new();
-    let mut trigger_self = tx.clone();
+    // Create a trigger with an exponential back off starting at 1 minute
+    // and maxing out at 5 minutes.
+    // The back off is reset any time the trigger is called (when new data is committed)
+
+    let (tx, mut rx) =
+        TriggerSender::new_with_loop(Duration::from_secs(60)..Duration::from_secs(60 * 5), true);
+    let trigger_self = tx.clone();
     let handle = tokio::spawn(async move {
+        let network = network;
         loop {
             // Wait for next job
             if let Job::Shutdown = next_job_or_exit(&mut rx, &mut stop).await {
@@ -29,15 +34,25 @@ pub fn spawn_publish_dht_ops_consumer(
                 break;
             }
 
-            // Run the workflow
-            let workspace = PublishDhtOpsWorkspace::new(env.clone().into())
-                .expect("Could not create Workspace");
-            if let WorkComplete::Incomplete =
-                publish_dht_ops_workflow(workspace, env.clone().into(), &mut cell_network)
-                    .await
-                    .expect("Error running Workflow")
+            #[cfg(any(test, feature = "test_utils"))]
             {
-                trigger_self.trigger()
+                if !conductor_handle.dev_settings().publish {
+                    continue;
+                }
+            }
+
+            // Run the workflow
+            match publish_dht_ops_workflow(
+                env.clone(),
+                network.as_ref(),
+                &trigger_self,
+                agent.clone(),
+            )
+            .await
+            {
+                Ok(WorkComplete::Incomplete) => trigger_self.trigger(),
+                Err(err) => handle_workflow_error(err)?,
+                _ => (),
             };
         }
         Ok(())

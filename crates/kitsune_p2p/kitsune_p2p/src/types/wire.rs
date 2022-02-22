@@ -1,17 +1,36 @@
 //! KitsuneP2p Wire Protocol Encoding Decoding
 
+use crate::actor::BroadcastTo;
 use crate::agent_store::AgentInfoSigned;
-use crate::types::gossip::{OpConsistency, OpCount};
 use crate::types::*;
 use derive_more::*;
-use kitsune_p2p_types::dht_arc::DhtArc;
+use kitsune_p2p_types::dht_arc::DhtLocation;
 use std::sync::Arc;
 
 /// Type used for content data of wire messages.
 #[derive(
-    Debug, Clone, PartialEq, Deref, AsRef, From, Into, serde::Serialize, serde::Deserialize,
+    Debug, Clone, PartialEq, Eq, Deref, AsRef, From, Into, serde::Serialize, serde::Deserialize,
 )]
 pub struct WireData(#[serde(with = "serde_bytes")] pub Vec<u8>);
+
+/// Enum containing the individual metric exchange messages used by clients
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum MetricExchangeMsg {
+    /// To start off, let's use a naive single message sending
+    /// everything we care about.
+    V1UniBlast {
+        /// The extrapolated coverage calculated by this node
+        /// note this is NOT the aggregate the node has collected,
+        /// just the direct extrapolation based on known peer infos.
+        extrap_cov_f32_le: WireData,
+    },
+
+    /// Future proof by having an unknown message catch-all variant
+    /// that we can ignore for any future variants that are added
+    #[serde(other)]
+    UnknownMessage,
+}
 
 kitsune_p2p_types::write_codec_enum! {
     /// KitsuneP2p Wire Protocol Top-Level Enum.
@@ -24,9 +43,8 @@ kitsune_p2p_types::write_codec_enum! {
         /// "Call" to the remote.
         Call(0x010) {
             space.0: Arc<KitsuneSpace>,
-            from_agent.1: Arc<KitsuneAgent>,
-            to_agent.2: Arc<KitsuneAgent>,
-            data.3: WireData,
+            to_agent.1: Arc<KitsuneAgent>,
+            data.2: WireData,
         },
 
         /// "Call" response from the remote.
@@ -34,74 +52,72 @@ kitsune_p2p_types::write_codec_enum! {
             data.0: WireData,
         },
 
-        /// "Notify" the remote.
-        Notify(0x20) {
+        /// "DelegateBroadcast" to the remote.
+        /// Remote should in turn connect to nodes in neighborhood,
+        /// and call "Notify" per broadcast algorithm.
+        /// uses low-level notify, not request
+        DelegateBroadcast(0x22) {
             space.0: Arc<KitsuneSpace>,
-            from_agent.1: Arc<KitsuneAgent>,
+            basis.1: Arc<KitsuneBasis>,
             to_agent.2: Arc<KitsuneAgent>,
+
+            /// If `tgt_agent.get_loc() % mod_cnt == mod_idx`,
+            /// we are responsible for broadcasting to tgt_agent.
+            mod_idx.3: u32,
+
+            /// see mod_idx description
+            mod_cnt.4: u32,
+
+            destination.5: BroadcastTo,
+
+            data.6: WireData,
+        },
+
+        /// Fire-and-forget broadcast message.
+        /// uses low-level notify, not request
+        Broadcast(0x23) {
+            space.0: Arc<KitsuneSpace>,
+            to_agent.1: Arc<KitsuneAgent>,
+            destination.2: BroadcastTo,
             data.3: WireData,
         },
 
-        /// "Notify" response from the remote.
-        NotifyResp(0x21) {
-        },
-
-        /// Fetch DhtOp and Agent Hashes with Constraints
-        FetchOpHashes(0x31) {
+        /// Gossip op with opaque data section,
+        /// to be forwarded to gossip module.
+        /// uses low-level notify, not request
+        Gossip(0x42) {
             space.0: Arc<KitsuneSpace>,
-            from_agent.1: Arc<KitsuneAgent>,
-            to_agent.2: Arc<KitsuneAgent>,
-            dht_arc.3: DhtArc,
-            since_utc_epoch_s.4: i64,
-            until_utc_epoch_s.5: i64,
-            last_count.6: OpCount,
+            data.1: WireData,
+            module.2: gossip::GossipModuleType,
         },
 
-        /// List of hashes response to FetchOpHashes
-        FetchOpHashesResponse(0x32) {
-            hashes.0: OpConsistency,
-            peer_hashes.1: Vec<(Arc<KitsuneAgent>, u64)>,
-        },
-
-        /// Fetch DhtOp data and AgentInfo for hashes lists
-        FetchOpData(0x33) {
+        /// Ask a remote node if they know about a specific agent
+        PeerGet(0x50) {
             space.0: Arc<KitsuneSpace>,
-            from_agent.1: Arc<KitsuneAgent>,
-            to_agent.2: Arc<KitsuneAgent>,
-            op_hashes.3: Vec<Arc<KitsuneOpHash>>,
-            peer_hashes.4: Vec<Arc<KitsuneAgent>>,
+            agent.1: Arc<KitsuneAgent>,
         },
 
-        /// Lists of data in response to FetchOpData
-        FetchOpDataResponse(0x34) {
-            op_data.0: Vec<(Arc<KitsuneOpHash>, WireData)>,
-            agent_infos.1: Vec<AgentInfoSigned>,
+        /// Response to a peer get
+        PeerGetResp(0x51) {
+            agent_info_signed.0: AgentInfoSigned,
         },
 
-        /// Query Agent data from a remote node
-        AgentInfoQuery(0x40) {
+        /// Query a remote node for peers holding
+        /// or nearest to holding a u32 location.
+        PeerQuery(0x52) {
             space.0: Arc<KitsuneSpace>,
-            to_agent.1: Arc<KitsuneAgent>,
-            by_agent.2: Option<Arc<KitsuneAgent>>,
-            by_basis_arc.3: Option<(Arc<KitsuneBasis>, DhtArc)>,
+            basis_loc.1: DhtLocation,
         },
 
-        /// Response type for agent info query
-        AgentInfoQueryResp(0x41) {
-            agent_infos.0: Vec<AgentInfoSigned>,
+        /// Response to a peer query
+        PeerQueryResp(0x53) {
+            peer_list.0: Vec<AgentInfoSigned>,
         },
 
-        /// Fetch DhtOp data and AgentInfo for hashes lists
-        Gossip(0x50) {
+        /// MetricsExchangeMessage
+        MetricExchange(0xa0) {
             space.0: Arc<KitsuneSpace>,
-            from_agent.1: Arc<KitsuneAgent>,
-            to_agent.2: Arc<KitsuneAgent>,
-            ops.3: Vec<(Arc<KitsuneOpHash>, WireData)>,
-            agents.4: Vec<AgentInfoSigned>,
-        },
-
-        /// Lists of data in response to FetchOpData
-        GossipResp(0x51) {
+            msgs.1: Vec<MetricExchangeMsg>,
         },
     }
 }

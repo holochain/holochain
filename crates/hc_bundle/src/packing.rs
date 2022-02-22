@@ -3,6 +3,7 @@
 //! Defines the CLI commands for packing/unpacking both DNA and hApp bundles
 
 use crate::error::{HcBundleError, HcBundleResult};
+use holochain_util::ffs;
 use mr_bundle::{Bundle, Manifest};
 use std::path::Path;
 use std::path::PathBuf;
@@ -81,7 +82,10 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_roundtrip() {
-        let tmpdir = tempdir::TempDir::new("hc-bundle-test").unwrap();
+        let tmpdir = tempfile::Builder::new()
+            .prefix("hc-bundle-test")
+            .tempdir()
+            .unwrap();
         let dir = tmpdir.path().join("test-dna");
         std::fs::create_dir(&dir).unwrap();
 
@@ -89,7 +93,8 @@ mod tests {
 ---
 manifest_version: "1"
 name: test_dna
-uuid: blablabla
+uid: blablabla
+origin_time: 2022-02-11T23:29:00.789576Z
 properties:
   some: 42
   props: yay
@@ -132,11 +137,9 @@ zomes:
                 false
             )
             .await,
-            Err(
-                HcBundleError::MrBundleError(
-                    MrBundleError::UnpackingError(UnpackingError::DirectoryExists(_)),
-                ),
-            )
+            Err(HcBundleError::MrBundleError(MrBundleError::UnpackingError(
+                UnpackingError::DirectoryExists(_)
+            ),),)
         );
         // Now unpack with forcing to overwrite original directory
         unpack::<DnaManifest>(
@@ -150,12 +153,11 @@ zomes:
 
         let (bundle_path, bundle) = pack::<DnaManifest>(
             &dir,
-            Some(dbg!(dir.parent().unwrap().to_path_buf())),
+            Some(dir.parent().unwrap().to_path_buf()),
             "test_dna".to_string(),
         )
         .await
         .unwrap();
-        dbg!(&bundle_path);
 
         // Now remove the directory altogether, unpack again, and check that
         // all of the same files are present

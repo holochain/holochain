@@ -6,26 +6,24 @@
 //! but if you want more control use [`CmdRunner::command`].
 use std::path::Path;
 use std::path::PathBuf;
-use std::{collections::HashSet, convert::TryInto};
 
 use anyhow::anyhow;
 use anyhow::bail;
 use anyhow::ensure;
-use holochain_conductor_api::AdminInterfaceConfig;
 use holochain_conductor_api::AdminRequest;
 use holochain_conductor_api::AdminResponse;
+use holochain_conductor_api::AppStatusFilter;
 use holochain_conductor_api::InterfaceDriver;
-use holochain_p2p::kitsune_p2p;
+use holochain_conductor_api::{AdminInterfaceConfig, InstalledAppInfo};
 use holochain_p2p::kitsune_p2p::agent_store::AgentInfoSigned;
-use holochain_types::prelude::DnaSource;
+use holochain_types::prelude::DnaHash;
 use holochain_types::prelude::InstallAppDnaPayload;
 use holochain_types::prelude::InstallAppPayload;
-use holochain_types::prelude::InstalledCell;
 use holochain_types::prelude::RegisterDnaPayload;
 use holochain_types::prelude::YamlProperties;
 use holochain_types::prelude::{AgentPubKey, AppBundleSource};
 use holochain_types::prelude::{CellId, InstallAppBundlePayload};
-use holochain_types::prelude::{DnaHash, InstalledApp};
+use holochain_types::prelude::{DnaSource, Uid};
 use std::convert::TryFrom;
 
 use crate::cmds::Existing;
@@ -60,6 +58,8 @@ pub enum AdminRequestCli {
     RegisterDna(RegisterDna),
     InstallApp(InstallApp),
     InstallAppBundle(InstallAppBundle),
+    /// Calls AdminRequest::UninstallApp.
+    UninstallApp(UninstallApp),
     /// Calls AdminRequest::ListAppInterfaces.
     ListAppWs,
     /// Calls AdminRequest::ListDnas.
@@ -70,8 +70,10 @@ pub enum AdminRequestCli {
     ListCells,
     /// Calls AdminRequest::ListActiveApps.
     ListActiveApps,
-    ActivateApp(ActivateApp),
-    DeactivateApp(DeactivateApp),
+    /// Calls AdminRequest::ListApps.
+    ListApps(ListApps),
+    EnableApp(EnableApp),
+    DisableApp(DisableApp),
     DumpState(DumpState),
     /// Calls AdminRequest::AddAgentInfo.
     /// [Unimplemented].
@@ -101,8 +103,8 @@ pub struct AddAppWs {
 /// and registers a Dna. You can only use a path or a hash not both.
 pub struct RegisterDna {
     #[structopt(short, long)]
-    /// UUID to override when installing this Dna
-    pub uuid: Option<String>,
+    /// UID to override when installing this Dna
+    pub uid: Option<String>,
     #[structopt(short, long)]
     /// Properties to override when installing this Dna
     pub properties: Option<PathBuf>,
@@ -120,7 +122,7 @@ pub struct RegisterDna {
 ///
 /// Setting properties and membrane proofs is not
 /// yet supported.
-/// CellNicks are set to `my-app-0`, `my-app-1` etc.
+/// AppRoleIds are set to `my-app-0`, `my-app-1` etc.
 pub struct InstallApp {
     #[structopt(short, long, default_value = "test-app")]
     /// Sets the InstalledAppId.
@@ -141,7 +143,7 @@ pub struct InstallApp {
 ///
 /// Setting properties and membrane proofs is not
 /// yet supported.
-/// CellNicks are set to `my-app-0`, `my-app-1` etc.
+/// AppRoleIds are set to `my-app-0`, `my-app-1` etc.
 pub struct InstallAppBundle {
     #[structopt(short, long)]
     /// Sets the InstalledAppId.
@@ -156,21 +158,32 @@ pub struct InstallAppBundle {
     #[structopt(required = true)]
     /// Location of the *.happ bundle file to install.
     pub path: PathBuf,
+
+    /// Optional UID override for every DNA in this app
+    pub uid: Option<Uid>,
 }
 
 #[derive(Debug, StructOpt, Clone)]
-/// Calls AdminRequest::ActivateApp
+/// Calls AdminRequest::UninstallApp
+/// and uninstalls the specified app.
+pub struct UninstallApp {
+    /// The InstalledAppId to uninstall.
+    pub app_id: String,
+}
+
+#[derive(Debug, StructOpt, Clone)]
+/// Calls AdminRequest::EnableApp
 /// and activates the installed app.
-pub struct ActivateApp {
+pub struct EnableApp {
     /// The InstalledAppId to activate.
     pub app_id: String,
 }
 
 #[derive(Debug, StructOpt, Clone)]
-/// Calls AdminRequest::DeactivateApp
-/// and deactivates the installed app.
-pub struct DeactivateApp {
-    /// The InstalledAppId to deactivate.
+/// Calls AdminRequest::DisableApp
+/// and disables the installed app.
+pub struct DisableApp {
+    /// The InstalledAppId to disable.
     pub app_id: String,
 }
 
@@ -201,6 +214,16 @@ pub struct ListAgents {
     pub dna: Option<DnaHash>,
 }
 
+#[derive(Debug, StructOpt, Clone)]
+/// Calls AdminRequest::ListApps
+/// and pretty prints the list of apps
+/// installed in this conductor.
+pub struct ListApps {
+    #[structopt(short, long, parse(try_from_str = parse_status_filter))]
+    /// Optionally request agent info for a particular cell id.
+    pub status: Option<AppStatusFilter>,
+}
+
 #[doc(hidden)]
 pub async fn call(holochain_path: &Path, req: Call) -> anyhow::Result<()> {
     let Call {
@@ -221,7 +244,9 @@ pub async fn call(holochain_path: &Path, req: Call) -> anyhow::Result<()> {
                 Ok(cmd) => cmds.push((cmd, None)),
                 Err(e) => {
                     if let holochain_websocket::WebsocketError::Io(e) = &e {
-                        if let std::io::ErrorKind::ConnectionRefused = e.kind() {
+                        if let std::io::ErrorKind::ConnectionRefused
+                        | std::io::ErrorKind::AddrNotAvailable = e.kind()
+                        {
                             let (port, holochain) = run_async(holochain_path, path, None).await?;
                             cmds.push((CmdRunner::new(port).await, Some(holochain)));
                             continue;
@@ -268,17 +293,17 @@ async fn call_inner(cmd: &mut CmdRunner, call: AdminRequestCli) -> anyhow::Resul
         }
         AdminRequestCli::InstallApp(args) => {
             let app_id = args.app_id.clone();
-            let cells = install_app(cmd, args).await?;
-            msg!("Installed App: {} with cells {:?}", app_id, cells);
+            let _ = install_app(cmd, args).await?;
+            msg!("Installed App: {}", app_id);
         }
         AdminRequestCli::InstallAppBundle(args) => {
             let app = install_app_bundle(cmd, args).await?;
-            let cells: Vec<_> = app.all_cells().collect();
-            msg!(
-                "Installed App: {} with cells {:?}",
-                app.installed_app_id(),
-                cells
-            );
+            msg!("Installed App: {}", app.installed_app_id,);
+        }
+        AdminRequestCli::UninstallApp(args) => {
+            let app_id = args.app_id.clone();
+            uninstall_app(cmd, args).await?;
+            msg!("Uninstalled App: {}", app_id,);
         }
         AdminRequestCli::ListDnas => {
             let dnas = list_dnas(cmd).await?;
@@ -293,17 +318,21 @@ async fn call_inner(cmd: &mut CmdRunner, call: AdminRequestCli) -> anyhow::Resul
             msg!("Cell Ids: {:?}", cells);
         }
         AdminRequestCli::ListActiveApps => {
-            let apps = list_active_apps(cmd).await?;
+            let apps = list_running_apps(cmd).await?;
             msg!("Active Apps: {:?}", apps);
         }
-        AdminRequestCli::ActivateApp(args) => {
+        AdminRequestCli::ListApps(args) => {
+            let apps = list_apps(cmd, args).await?;
+            msg!("List Apps: {:?}", apps);
+        }
+        AdminRequestCli::EnableApp(args) => {
             let app_id = args.app_id.clone();
-            activate_app(cmd, args).await?;
+            enable_app(cmd, args).await?;
             msg!("Activated app: {:?}", app_id);
         }
-        AdminRequestCli::DeactivateApp(args) => {
+        AdminRequestCli::DisableApp(args) => {
             let app_id = args.app_id.clone();
-            deactivate_app(cmd, args).await?;
+            disable_app(cmd, args).await?;
             msg!("Deactivated app: {:?}", app_id);
         }
         AdminRequestCli::DumpState(args) => {
@@ -329,20 +358,22 @@ async fn call_inner(cmd: &mut CmdRunner, call: AdminRequestCli) -> anyhow::Resul
                     .map(|d| (d.clone(), holochain_p2p::space_holo_to_kit(d)))
                     .collect::<Vec<_>>();
 
-                let info: kitsune_p2p::agent_store::AgentInfo = (&info).try_into().unwrap();
-                let this_agent = agents.iter().find(|a| *info.as_agent_ref() == a.1);
-                let this_dna = dnas.iter().find(|d| *info.as_space_ref() == d.1).unwrap();
+                let this_agent = agents.iter().find(|a| *info.agent == a.1);
+                let this_dna = dnas.iter().find(|d| *info.space == d.1).unwrap();
                 if let Some(this_agent) = this_agent {
                     writeln!(out, "This Agent {:?} is {:?}", this_agent.0, this_agent.1)?;
                 }
                 writeln!(out, "This DNA {:?} is {:?}", this_dna.0, this_dna.1)?;
 
                 use chrono::{DateTime, Duration, NaiveDateTime, Utc};
-                let duration = Duration::milliseconds(info.signed_at_ms() as i64);
+                let duration = Duration::milliseconds(info.signed_at_ms as i64);
                 let s = duration.num_seconds() as i64;
                 let n = duration.clone().to_std().unwrap().subsec_nanos();
                 let dt = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(s, n), Utc);
-                let exp = dt + Duration::milliseconds(info.expires_after_ms() as i64);
+                let duration = Duration::milliseconds(info.expires_at_ms as i64);
+                let s = duration.num_seconds() as i64;
+                let n = duration.clone().to_std().unwrap().subsec_nanos();
+                let exp = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(s, n), Utc);
                 let now = Utc::now();
 
                 writeln!(out, "signed at {}", dt)?;
@@ -352,9 +383,9 @@ async fn call_inner(cmd: &mut CmdRunner, call: AdminRequestCli) -> anyhow::Resul
                     exp,
                     (exp - now).num_minutes()
                 )?;
-                writeln!(out, "space: {:?}", info.as_space_ref())?;
-                writeln!(out, "agent: {:?}", info.as_agent_ref())?;
-                writeln!(out, "urls: {:?}", info.as_urls_ref())?;
+                writeln!(out, "space: {:?}", info.space)?;
+                writeln!(out, "agent: {:?}", info.agent)?;
+                writeln!(out, "urls: {:?}", info.url_list)?;
                 msg!("{}\n", out);
             }
         }
@@ -384,7 +415,7 @@ pub async fn add_admin_interface(cmd: &mut CmdRunner, args: AddAdminWs) -> anyho
 /// Calls [`AdminRequest::RegisterDna`] and registers dna.
 pub async fn register_dna(cmd: &mut CmdRunner, args: RegisterDna) -> anyhow::Result<DnaHash> {
     let RegisterDna {
-        uuid,
+        uid,
         properties,
         path,
         hash,
@@ -401,7 +432,7 @@ pub async fn register_dna(cmd: &mut CmdRunner, args: RegisterDna) -> anyhow::Res
         _ => unreachable!("Can't have hash and path for dna source"),
     };
     let dna = RegisterDnaPayload {
-        uuid,
+        uid,
         properties,
         source,
     };
@@ -419,7 +450,7 @@ pub async fn register_dna(cmd: &mut CmdRunner, args: RegisterDna) -> anyhow::Res
 pub async fn install_app(
     cmd: &mut CmdRunner,
     args: InstallApp,
-) -> anyhow::Result<HashSet<InstalledCell>> {
+) -> anyhow::Result<InstalledAppInfo> {
     let InstallApp {
         app_id,
         agent_key,
@@ -446,28 +477,26 @@ pub async fn install_app(
     let installed_app = cmd.command(r).await?;
     let installed_app =
         expect_match!(installed_app => AdminResponse::AppInstalled, "Failed to install app");
-    activate_app(
+    enable_app(
         cmd,
-        ActivateApp {
-            app_id: installed_app.installed_app_id().clone(),
+        EnableApp {
+            app_id: installed_app.installed_app_id.clone(),
         },
     )
     .await?;
-    Ok(installed_app
-        .provisioned_cells()
-        .map(|(n, c)| InstalledCell::new(c.clone(), n.clone()))
-        .collect())
+    Ok(installed_app)
 }
 
 /// Calls [`AdminRequest::InstallApp`] and installs a new app.
 pub async fn install_app_bundle(
     cmd: &mut CmdRunner,
     args: InstallAppBundle,
-) -> anyhow::Result<InstalledApp> {
+) -> anyhow::Result<InstalledAppInfo> {
     let InstallAppBundle {
         app_id,
         agent_key,
         path,
+        uid,
     } = args;
 
     let bundle = AppBundleSource::Path(path).resolve().await?;
@@ -482,20 +511,36 @@ pub async fn install_app_bundle(
         agent_key,
         source: AppBundleSource::Bundle(bundle),
         membrane_proofs: Default::default(),
+        uid,
     };
 
     let r = AdminRequest::InstallAppBundle(Box::new(payload));
     let installed_app = cmd.command(r).await?;
     let installed_app =
         expect_match!(installed_app => AdminResponse::AppBundleInstalled, "Failed to install app");
-    activate_app(
+    enable_app(
         cmd,
-        ActivateApp {
-            app_id: installed_app.installed_app_id().clone(),
+        EnableApp {
+            app_id: installed_app.installed_app_id.clone(),
         },
     )
     .await?;
     Ok(installed_app)
+}
+
+/// Calls [`AdminRequest::UninstallApp`] and uninstalls the installed app.
+pub async fn uninstall_app(cmd: &mut CmdRunner, args: UninstallApp) -> anyhow::Result<()> {
+    let resp = cmd
+        .command(AdminRequest::UninstallApp {
+            installed_app_id: args.app_id,
+        })
+        .await?;
+
+    assert!(
+        matches!(resp, AdminResponse::AppUninstalled),
+        "Failed to uninstall app"
+    );
+    Ok(())
 }
 
 /// Calls [`AdminRequest::ListAppInterfaces`].
@@ -525,36 +570,45 @@ pub async fn list_cell_ids(cmd: &mut CmdRunner) -> anyhow::Result<Vec<CellId>> {
 }
 
 /// Calls [`AdminRequest::ListActiveApps`].
-pub async fn list_active_apps(cmd: &mut CmdRunner) -> anyhow::Result<Vec<String>> {
+pub async fn list_running_apps(cmd: &mut CmdRunner) -> anyhow::Result<Vec<String>> {
     let resp = cmd.command(AdminRequest::ListActiveApps).await?;
     Ok(expect_match!(resp => AdminResponse::ActiveAppsListed, "Failed to list active apps"))
 }
 
-/// Calls [`AdminRequest::ActivateApp`] and activates the installed app.
-pub async fn activate_app(cmd: &mut CmdRunner, args: ActivateApp) -> anyhow::Result<()> {
+/// Calls [`AdminRequest::ListApps`].
+pub async fn list_apps(
+    cmd: &mut CmdRunner,
+    args: ListApps,
+) -> anyhow::Result<Vec<InstalledAppInfo>> {
     let resp = cmd
-        .command(AdminRequest::ActivateApp {
+        .command(AdminRequest::ListApps {
+            status_filter: args.status,
+        })
+        .await?;
+    Ok(expect_match!(resp => AdminResponse::AppsListed, "Failed to list apps"))
+}
+
+/// Calls [`AdminRequest::EnableApp`] and activates the installed app.
+pub async fn enable_app(cmd: &mut CmdRunner, args: EnableApp) -> anyhow::Result<()> {
+    let resp = cmd
+        .command(AdminRequest::EnableApp {
             installed_app_id: args.app_id,
         })
         .await?;
-    ensure!(
-        matches!(resp, AdminResponse::AppActivated),
-        "Failed to activate app, got: {:?}",
-        resp
-    );
+    assert!(matches!(resp, AdminResponse::AppEnabled { .. }));
     Ok(())
 }
 
-/// Calls [`AdminRequest::DeactivateApp`] and deactivates the installed app.
-pub async fn deactivate_app(cmd: &mut CmdRunner, args: DeactivateApp) -> anyhow::Result<()> {
+/// Calls [`AdminRequest::DisableApp`] and disables the installed app.
+pub async fn disable_app(cmd: &mut CmdRunner, args: DisableApp) -> anyhow::Result<()> {
     let resp = cmd
-        .command(AdminRequest::DeactivateApp {
+        .command(AdminRequest::DisableApp {
             installed_app_id: args.app_id,
         })
         .await?;
     ensure!(
-        matches!(resp, AdminResponse::AppDeactivated),
-        "Failed to deactivate app, got: {:?}",
+        matches!(resp, AdminResponse::AppDisabled),
+        "Failed to disable app, got: {:?}",
         resp
     );
     Ok(())
@@ -622,10 +676,21 @@ fn parse_dna_hash(arg: &str) -> anyhow::Result<DnaHash> {
     DnaHash::try_from(arg).map_err(|e| anyhow::anyhow!("{:?}", e))
 }
 
+fn parse_status_filter(arg: &str) -> anyhow::Result<AppStatusFilter> {
+    match arg {
+        "active" => Ok(AppStatusFilter::Enabled),
+        "inactive" => Ok(AppStatusFilter::Disabled),
+        _ => Err(anyhow::anyhow!(
+            "Bad app status filter value: {}, only 'active' and 'inactive' are possible",
+            arg
+        )),
+    }
+}
+
 impl From<CellId> for DumpState {
     fn from(cell_id: CellId) -> Self {
         let (dna, agent_key) = cell_id.into_dna_and_agent();
-        Self { agent_key, dna }
+        Self { dna, agent_key }
     }
 }
 

@@ -12,15 +12,19 @@
 // We have a lot of usages of type aliases to `&String`, which clippy objects to.
 #![allow(clippy::ptr_arg)]
 
+pub mod access;
 pub mod activity;
 pub mod app;
 pub mod autonomic;
 pub mod chain;
+pub mod combinators;
 pub mod db;
 pub mod dht_op;
 pub mod dna;
 pub mod element;
 pub mod entry;
+#[allow(missing_docs)]
+pub mod env;
 pub mod fixt;
 pub mod header;
 pub mod link;
@@ -28,11 +32,9 @@ mod macros;
 pub mod metadata;
 pub mod prelude;
 pub mod signal;
-pub mod timestamp;
 pub mod validate;
+pub mod web_app;
 
-// #[cfg(test)]
 pub mod test_utils;
 
-pub use entry::EntryHashed;
-pub use timestamp::{Timestamp, TimestampKey};
+pub use holochain_zome_types::entry::EntryHashed;

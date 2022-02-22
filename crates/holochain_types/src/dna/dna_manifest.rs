@@ -1,3 +1,4 @@
+use crate::prelude::*;
 use std::path::PathBuf;
 mod dna_manifest_v1;
 
@@ -6,8 +7,6 @@ mod dna_manifest_v1;
 pub use dna_manifest_v1::{
     DnaManifestV1 as DnaManifestCurrent, DnaManifestV1Builder as DnaManifestCurrentBuilder, *,
 };
-
-use super::YamlProperties;
 
 /// The enum which encompasses all versions of the DNA manifest, past and present.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, derive_more::From)]
@@ -39,11 +38,12 @@ impl DnaManifest {
     /// Be sure to update this function when creating a new version.
     pub fn current(
         name: String,
-        uuid: Option<String>,
+        uid: Option<String>,
         properties: Option<YamlProperties>,
+        origin_time: HumanTimestamp,
         zomes: Vec<ZomeManifest>,
     ) -> Self {
-        DnaManifestCurrent::new(name, uuid, properties, zomes).into()
+        DnaManifestCurrent::new(name, uid, properties, origin_time, zomes).into()
     }
 
     /// Getter for properties
@@ -53,10 +53,10 @@ impl DnaManifest {
         }
     }
 
-    /// Getter for uuid
-    pub fn uuid(&self) -> Option<String> {
+    /// Getter for uid
+    pub fn uid(&self) -> Option<String> {
         match self {
-            DnaManifest::V1(manifest) => manifest.uuid.clone(),
+            DnaManifest::V1(manifest) => manifest.uid.clone(),
         }
     }
 

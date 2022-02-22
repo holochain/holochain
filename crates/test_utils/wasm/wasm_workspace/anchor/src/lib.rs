@@ -9,8 +9,12 @@ fn anchor(input: AnchorInput) -> ExternResult<EntryHash> {
 }
 
 #[hdk_extern]
-fn get_anchor(address: EntryHash) -> ExternResult<Option<Anchor>> {
-    hdk::prelude::get_anchor(address)
+fn anchor_many(inputs: ManyAnchorInput) -> ExternResult<Vec<EntryHash>> {
+    let mut out = Vec::with_capacity(inputs.0.len());
+    for input in inputs.0 {
+        out.push(hdk::prelude::anchor(input.0, input.1)?);
+    }
+    Ok(out)
 }
 
 #[hdk_extern]

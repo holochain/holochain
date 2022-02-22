@@ -2,8 +2,10 @@ use std::io::Write;
 use std::{io, path::PathBuf};
 
 use holochain_types::prelude::{
-    AppBundle, AppManifest, AppManifestCurrentBuilder, AppSlotManifest, DnaBundle, DnaManifest,
+    AppBundle, AppManifest, AppManifestCurrentBuilder, AppRoleManifest, DnaBundle, DnaManifest,
+    Timestamp,
 };
+use holochain_types::web_app::{WebAppBundle, WebAppManifest};
 
 fn readline(prompt: Option<&str>) -> io::Result<Option<String>> {
     let mut input = String::new();
@@ -13,7 +15,7 @@ fn readline(prompt: Option<&str>) -> io::Result<Option<String>> {
     }
     io::stdin().read_line(&mut input)?;
     let input = input.trim();
-    Ok(if input == "" {
+    Ok(if input.is_empty() {
         None
     } else {
         Some(input.to_owned())
@@ -27,7 +29,7 @@ fn prompt_default<S: Into<String>>(prompt: &str, default: S) -> io::Result<Strin
 }
 
 fn prompt_optional(prompt: &str) -> io::Result<Option<String>> {
-    Ok(readline(Some(prompt))?)
+    readline(Some(prompt))
 }
 
 fn prompt_required(prompt: &str) -> io::Result<String> {
@@ -40,25 +42,34 @@ fn prompt_required(prompt: &str) -> io::Result<String> {
 
 fn prompt_dna_init(root_dir: PathBuf) -> anyhow::Result<DnaBundle> {
     let name = prompt_required("name:")?;
-    let uuid = Some(prompt_default(
-        "uuid:",
+    let uid = Some(prompt_default(
+        "uid:",
         "00000000-0000-0000-0000-000000000000",
     )?);
-    let manifest = DnaManifest::current(name, uuid, None, vec![]);
+    let manifest = DnaManifest::current(name, uid, None, Timestamp::now().into(), vec![]);
     Ok(DnaBundle::new(manifest, vec![], root_dir)?)
 }
 
 fn prompt_app_init(root_dir: PathBuf) -> anyhow::Result<AppBundle> {
     let name = prompt_required("name:")?;
     let description = prompt_optional("description:")?;
-    let slot = AppSlotManifest::sample("sample-slot".into());
+    let role = AppRoleManifest::sample("sample-role".into());
     let manifest: AppManifest = AppManifestCurrentBuilder::default()
         .name(name)
         .description(description)
-        .slots(vec![slot])
+        .roles(vec![role])
         .build()
         .unwrap()
         .into();
+
+    Ok(mr_bundle::Bundle::new(manifest, vec![], root_dir)?.into())
+}
+
+fn prompt_web_app_init(root_dir: PathBuf) -> anyhow::Result<WebAppBundle> {
+    let name = prompt_required("name:")?;
+
+    let manifest = WebAppManifest::current(name);
+
     Ok(mr_bundle::Bundle::new(manifest, vec![], root_dir)?.into())
 }
 
@@ -74,18 +85,15 @@ pub async fn init_app(target: PathBuf) -> anyhow::Result<()> {
     Ok(())
 }
 
+pub async fn init_web_app(target: PathBuf) -> anyhow::Result<()> {
+    let bundle = prompt_web_app_init(target.to_owned())?;
+    bundle.unpack_yaml(&target, false).await?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
 
     // TODO: make these functions able to take an arbitrary stream so that
     //       they can be tested
-
-    // use super::*;
-
-    // #[tokio::test]
-    // async fn can_init_dna() {
-    //     let tmpdir = tempdir::TempDir::new("hc_bundle").unwrap();
-    //     init_dna(tmpdir.path().join("app")).await.unwrap();
-    //     init_dna(tmpdir.path().join("app/n")).await.unwrap();
-    // }
 }

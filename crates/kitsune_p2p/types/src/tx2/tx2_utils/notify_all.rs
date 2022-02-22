@@ -146,9 +146,10 @@ mod tests {
             });
             let c3 = count.clone();
             let not = n.wait();
-            let t = tokio::task::spawn(async move {
+            let t = metric_task(async move {
                 not.await;
                 c3.fetch_add(1, atomic::Ordering::Relaxed);
+                KitsuneResult::Ok(())
             });
 
             tokio::time::sleep(std::time::Duration::from_millis(10)).await;
@@ -158,7 +159,7 @@ mod tests {
             t
         };
 
-        t.await.unwrap();
+        t.await.unwrap().unwrap();
 
         assert_eq!(2, count.load(atomic::Ordering::Relaxed));
     }
@@ -193,9 +194,10 @@ mod tests {
         for _ in 0..10 {
             let not = n.wait();
             let count = count.clone();
-            all.push(tokio::task::spawn(async move {
+            all.push(metric_task(async move {
                 not.await;
                 count.fetch_add(1, atomic::Ordering::Relaxed);
+                KitsuneResult::Ok(())
             }));
         }
 

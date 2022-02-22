@@ -16,26 +16,27 @@
 //! The App Manifest is such a specification. Rather than specify a fixed list
 //! of Cells (which would be impossible because each user will be using different
 //! Agents and potentially even different versions of a DNA), the manifest
-//! is mainly defined by a collection of "slots",
+//! is mainly defined by a collection of "roles",
 //! each of which may be populated with Cells (instances of DNA) either during
-//! app installation or during runtime. Aside from the slot definitions, an
+//! app installation or during runtime. Aside from the role definitions, an
 //! app also has a `name`, which is used as the `installed_app_id` and must be
 //! globally unique, as well as a `description`, which is intended for humans only.
 //!
-//! Each Slot definition specifies what kind of Cell can occupy it.
-//! You can think of a Slot as a declaration of some piece of functionality
+//! Each Role definition specifies what kind of Cell can occupy it.
+//! You can think of a Role as a declaration of some piece of functionality
 //! that an app needs in order to function, which will be provided by some Cell
 //! in a flexible manner depending on the state of the conductor at the time of
 //! installation.
 //!
-//! Each Slot definition is made up of:
-//! - a SlotId, which only needs to be unique within this App
+//! Each Role definition is made up of:
+//! - a RoleId, which only needs to be unique within this App
 //! - a provisioning strategy, [`CellProvisioning`], which describes if and how a Cell
 //!   should be created freshly for this app, or whether an existing Cell should
-//!   occupy this slot
-//! - a DNA descriptor, [`AppSlotDnaManifest`], which describes where to find the DNA,
+//!   occupy this role
+//! - a DNA descriptor, [`AppRoleDnaManifest`], which describes where to find the DNA,
 //!   the acceptable range of versions, and the cloning limitations.
 
+use holochain_zome_types::Uid;
 use mr_bundle::{Location, Manifest};
 use std::path::PathBuf;
 
@@ -44,7 +45,7 @@ pub mod app_manifest_validated;
 mod current;
 mod error;
 
-pub use app_manifest_v1::{AppSlotDnaManifest, CellProvisioning};
+pub use app_manifest_v1::{AppRoleDnaManifest, CellProvisioning};
 pub use current::*;
 pub use error::*;
 
@@ -65,9 +66,9 @@ impl Manifest for AppManifest {
     fn locations(&self) -> Vec<Location> {
         match self {
             AppManifest::V1(m) => m
-                .slots
+                .roles
                 .iter()
-                .filter_map(|slot| slot.dna.location.clone())
+                .filter_map(|role| role.dna.location.clone())
                 .collect(),
         }
     }
@@ -94,5 +95,59 @@ impl AppManifest {
         match self {
             Self::V1(manifest) => manifest.validate(),
         }
+    }
+
+    /// Update the UID for all DNAs used in Create-provisioned Cells.
+    /// Cells with other provisioning strategies are not affected.
+    pub fn set_uid(&mut self, uid: Uid) {
+        match self {
+            Self::V1(manifest) => manifest.set_uid(uid),
+        }
+    }
+
+    /// Returns the list of app roles that this manifest declares
+    pub fn app_roles(&self) -> Vec<AppRoleManifest> {
+        match self {
+            Self::V1(manifest) => manifest.roles.clone(),
+        }
+    }
+}
+
+#[cfg(test)]
+pub mod tests {
+
+    use mr_bundle::Manifest;
+
+    use crate::app::app_manifest::{AppManifest, AppManifestV1Builder, AppRoleManifest};
+
+    #[test]
+    /// Replicate this test for any new version of the manifest that gets created
+    fn app_manifest_v1_helper_functions() {
+        let app_name = String::from("sample-app");
+
+        let role_id = String::from("sample-dna");
+        let role_manifest = AppRoleManifest::sample(role_id);
+
+        let sample_app_manifest_v1 = AppManifestV1Builder::default()
+            .name(app_name.clone())
+            .description(Some(String::from("Some description")))
+            .roles(vec![role_manifest.clone()])
+            .build()
+            .unwrap();
+        let sample_app_manifest = AppManifest::V1(sample_app_manifest_v1.clone());
+
+        assert_eq!(app_name, sample_app_manifest.app_name());
+        assert_eq!(vec![role_manifest], sample_app_manifest.app_roles());
+        assert_eq!(
+            vec![sample_app_manifest_v1
+                .roles
+                .get(0)
+                .unwrap()
+                .dna
+                .location
+                .clone()
+                .unwrap()],
+            sample_app_manifest.locations()
+        );
     }
 }

@@ -1,4 +1,13 @@
-{ nixpkgs ? null }:
+{ nixpkgs ? null
+, rustVersion ? {
+    track = "stable";
+    version = "1.58.1";
+  }
+
+, holonixArgs ? {
+    inherit rustVersion;
+  }
+}:
 
 # This is an example of what downstream consumers of holonix should do
 # This is also used to dogfood as many commands as possible for holonix
@@ -7,19 +16,11 @@ let
   # point this to your local config.nix file for this project
   # example.config.nix shows and documents a lot of the options
   config = import ./config.nix;
+  sources = import ./nix/sources.nix;
 
   # START HOLONIX IMPORT BOILERPLATE
-  holonixPath = if ! config.holonix.use-github
-   then config.holonix.local.path
-   else fetchTarball {
-    url = "https://github.com/${config.holonix.github.owner}/${config.holonix.github.repo}/tarball/${config.holonix.github.ref}";
-    sha256 = config.holonix.github.sha256;
-   }
-   ;
-  holonix = import (holonixPath) {
-    inherit config;
-    includeHolochainBinaries = config.includeHolochainBinaries or false;
-  };
+  holonixPath = config.holonix.pathFn { };
+  holonix = config.holonix.importFn holonixArgs;
   # END HOLONIX IMPORT BOILERPLATE
 
   overlays = [
@@ -32,6 +33,8 @@ let
         if [[ -n "$NIX_ENV_PREFIX" ]]; then
           # don't touch it
           :
+        elif test -w "$PWD"; then
+          export NIX_ENV_PREFIX="$PWD"
         elif test -d "${builtins.toString self.hcToplevelDir}" &&
             test -w "${builtins.toString self.hcToplevelDir}"; then
           export NIX_ENV_PREFIX="${builtins.toString self.hcToplevelDir}"
@@ -43,8 +46,9 @@ let
         fi
       '';
 
-      inherit (holonix.pkgs.callPackage ./nix/rust.nix { }) hcRustPlatform;
+      crate2nix = import sources.crate2nix.outPath { };
     })
+
   ];
 
   nixpkgs' = import (nixpkgs.path or holonix.pkgs.path) { inherit overlays; };
@@ -54,6 +58,7 @@ let
 in
 {
   inherit
+    nixpkgs'
     holonix
     pkgs
     ;

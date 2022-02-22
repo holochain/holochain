@@ -1,9 +1,9 @@
 use crate::crdt::CrdtType;
 use crate::validate::RequiredValidationType;
-use crate::zome_io::ExternIO;
 use crate::CallbackResult;
 use crate::EntryDefIndex;
 use holochain_serialized_bytes::prelude::*;
+use holochain_wasmer_common::WasmError;
 
 const DEFAULT_REQUIRED_VALIDATIONS: u8 = 5;
 
@@ -27,6 +27,7 @@ impl From<&str> for EntryDefId {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Copy, Hash)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum EntryVisibility {
     Public,
     Private,
@@ -110,7 +111,7 @@ impl EntryDef {
 }
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct EntryDefs(Vec<EntryDef>);
+pub struct EntryDefs(pub Vec<EntryDef>);
 
 impl EntryDefs {
     pub fn entry_def_index_from_id(&self, entry_def_id: EntryDefId) -> Option<EntryDefIndex> {
@@ -145,7 +146,6 @@ impl From<Vec<EntryDef>> for EntryDefs {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
 pub enum EntryDefsCallbackResult {
     Defs(EntryDefs),
-    Err(String),
 }
 
 impl From<Vec<EntryDef>> for EntryDefsCallbackResult {
@@ -154,46 +154,12 @@ impl From<Vec<EntryDef>> for EntryDefsCallbackResult {
     }
 }
 
-impl From<ExternIO> for EntryDefsCallbackResult {
-    fn from(callback_guest_output: ExternIO) -> Self {
-        match callback_guest_output.decode() {
-            Ok(v) => v,
-            Err(e) => Self::Err(format!("{:?}", e)),
-        }
-    }
-}
-
 impl CallbackResult for EntryDefsCallbackResult {
     fn is_definitive(&self) -> bool {
-        match self {
-            EntryDefsCallbackResult::Defs(_) => false,
-            EntryDefsCallbackResult::Err(_) => true,
-        }
+        false
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::EntryDef;
-    use super::EntryDefsCallbackResult;
-    use super::EntryVisibility;
-    use crate::crdt::CrdtType;
-    use crate::validate::RequiredValidationType;
-    use crate::zome_io::ExternIO;
-
-    #[test]
-    fn from_guest_output_test() {
-        let defs_callback_result = EntryDefsCallbackResult::Defs(
-            vec![EntryDef {
-                id: "bar".into(),
-                visibility: EntryVisibility::Public,
-                crdt_type: CrdtType,
-                required_validations: 5.into(),
-                required_validation_type: RequiredValidationType::default(),
-            }]
-            .into(),
-        );
-        let guest_output = ExternIO::encode(&defs_callback_result).unwrap();
-        assert_eq!(defs_callback_result, guest_output.into(),);
+    fn try_from_wasm_error(wasm_error: WasmError) -> Result<Self, WasmError> {
+        // There is no concept of entry defs failing, other than normal error handling.
+        Err(wasm_error)
     }
 }

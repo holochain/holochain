@@ -4,21 +4,30 @@ use super::*;
 use crate::conductor::manager::ManagedTaskResult;
 use crate::core::workflow::sys_validation_workflow::sys_validation_workflow;
 use crate::core::workflow::sys_validation_workflow::SysValidationWorkspace;
-use holochain_lmdb::env::EnvironmentWrite;
 use tokio::task::JoinHandle;
 use tracing::*;
 
 /// Spawn the QueueConsumer for SysValidation workflow
-#[instrument(skip(env, stop, trigger_app_validation, network, conductor_api))]
+#[instrument(skip(
+    workspace,
+    space,
+    conductor_handle,
+    stop,
+    trigger_app_validation,
+    network,
+))]
 pub fn spawn_sys_validation_consumer(
-    env: EnvironmentWrite,
+    workspace: SysValidationWorkspace,
+    space: Space,
+    conductor_handle: ConductorHandle,
     mut stop: sync::broadcast::Receiver<()>,
-    mut trigger_app_validation: TriggerSender,
-    network: HolochainP2pCell,
-    conductor_api: impl CellConductorApiT + 'static,
+    trigger_app_validation: TriggerSender,
+    network: HolochainP2pDna,
 ) -> (TriggerSender, JoinHandle<ManagedTaskResult>) {
     let (tx, mut rx) = TriggerSender::new();
-    let mut trigger_self = tx.clone();
+    let trigger_self = tx.clone();
+    let workspace = Arc::new(workspace);
+    let space = Arc::new(space);
     let handle = tokio::spawn(async move {
         loop {
             // Wait for next job
@@ -30,20 +39,19 @@ pub fn spawn_sys_validation_consumer(
             }
 
             // Run the workflow
-            let workspace = SysValidationWorkspace::new(env.clone().into())
-                .expect("Could not create Workspace");
-            if let WorkComplete::Incomplete = sys_validation_workflow(
-                workspace,
-                env.clone().into(),
-                &mut trigger_app_validation,
+            match sys_validation_workflow(
+                workspace.clone(),
+                space.clone(),
+                trigger_app_validation.clone(),
                 trigger_self.clone(),
                 network.clone(),
-                conductor_api.clone(),
+                conductor_handle.clone(),
             )
             .await
-            .expect("Error running Workflow")
             {
-                trigger_self.trigger()
+                Ok(WorkComplete::Incomplete) => trigger_self.trigger(),
+                Err(err) => handle_workflow_error(err)?,
+                _ => (),
             };
         }
         Ok(())

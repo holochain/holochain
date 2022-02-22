@@ -41,11 +41,10 @@ pub mod wasm_test {
 
     use crate::fixt::CallContextFixturator;
     use crate::fixt::RealRibosomeFixturator;
-    use crate::fixt::ZomeCallHostAccessFixturator;
-    use ::fixt::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::prelude::*;
     use std::sync::Arc;
+    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
 
     /// we can get an entry hash out of the fn directly
     #[tokio::test(flavor = "multi_thread")]
@@ -68,21 +67,11 @@ pub mod wasm_test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn wasm_trace_test() {
-        let test_env = holochain_lmdb::test_utils::test_cell_env();
-        let env = test_env.env();
-        let mut workspace =
-            crate::core::workflow::CallZomeWorkspace::new(env.clone().into()).unwrap();
+        observability::test_run().ok();
+        let RibosomeTestFixture {
+            conductor, alice, ..
+        } = RibosomeTestFixture::new(TestWasm::Debug).await;
 
-        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
-            .await
-            .unwrap();
-
-        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
-        let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace_lock;
-
-        // this shows that we can get line numbers out of wasm
-        let output: () = crate::call_test_ribosome!(host_access, TestWasm::Debug, "debug", ());
-        assert_eq!(output, ());
+        let _: () = conductor.call(&alice, "debug", ()).await;
     }
 }

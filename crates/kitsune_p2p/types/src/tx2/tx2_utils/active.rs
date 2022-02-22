@@ -81,6 +81,9 @@ impl Active {
         let cb: CB = Arc::new(cb);
         for i in self.0.iter() {
             let cb = cb.clone();
+            // This needs to be in a closure because it's an Arc<dyn Fn() + 'static + Send + Sync>
+            // but clippy doesn't get it.
+            #[allow(clippy::redundant_closure)]
             i.register_kill_cb(move || cb());
         }
     }
@@ -160,22 +163,24 @@ mod tests {
             tokio::time::sleep(std::time::Duration::from_millis(100)).await;
             Ok(())
         });
-        let t1 = tokio::task::spawn(async move {
+        let t1 = metric_task(async move {
             assert!(f1.await.is_ok());
+            KitsuneResult::Ok(())
         });
 
         let f2 = mix.fut(async move {
             tokio::time::sleep(std::time::Duration::from_millis(200)).await;
             Ok(())
         });
-        let t2 = tokio::task::spawn(async move {
+        let t2 = metric_task(async move {
             assert!(f2.await.is_err());
+            KitsuneResult::Ok(())
         });
 
         tokio::time::sleep(std::time::Duration::from_millis(120)).await;
         a3.kill();
 
-        t1.await.unwrap();
-        t2.await.unwrap();
+        t1.await.unwrap().unwrap();
+        t2.await.unwrap().unwrap();
     }
 }

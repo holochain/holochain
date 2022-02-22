@@ -2,55 +2,61 @@
 
 use crate::conductor::api::RealAppInterfaceApi;
 use crate::conductor::api::ZomeCall;
+use crate::conductor::conductor::CellStatus;
 use crate::conductor::config::AdminInterfaceConfig;
 use crate::conductor::config::ConductorConfig;
 use crate::conductor::config::InterfaceDriver;
-use crate::conductor::p2p_store;
+use crate::conductor::p2p_agent_store;
 use crate::conductor::ConductorBuilder;
 use crate::conductor::ConductorHandle;
+use crate::core::queue_consumer::TriggerSender;
 use crate::core::ribosome::ZomeCallInvocation;
-use crate::core::workflow::incoming_dht_ops_workflow::IncomingDhtOpsWorkspace;
-use crate::core::workflow::integrate_dht_ops_workflow;
 use ::fixt::prelude::*;
-use fallible_iterator::FallibleIterator;
 use hdk::prelude::ZomeName;
 use holo_hash::fixt::*;
 use holo_hash::*;
-use holochain_cascade::Cascade;
-use holochain_cascade::DbPair;
 use holochain_conductor_api::IntegrationStateDump;
 use holochain_conductor_api::IntegrationStateDumps;
-use holochain_lmdb::env::EnvironmentWrite;
-use holochain_lmdb::fresh_reader_test;
-use holochain_lmdb::test_utils::test_environments;
-use holochain_lmdb::test_utils::TestEnvironments;
-use holochain_p2p::actor::HolochainP2pRefToCell;
+use holochain_keystore::MetaLairClient;
+use holochain_p2p::actor::HolochainP2pRefToDna;
+use holochain_p2p::dht_arc::DhtArc;
+use holochain_p2p::dht_arc::PeerViewBeta;
 use holochain_p2p::event::HolochainP2pEvent;
 use holochain_p2p::spawn_holochain_p2p;
-use holochain_p2p::HolochainP2pCell;
+use holochain_p2p::HolochainP2pDna;
 use holochain_p2p::HolochainP2pRef;
 use holochain_p2p::HolochainP2pSender;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_serialized_bytes::SerializedBytesError;
-use holochain_state::metadata::MetadataBuf;
-use holochain_state::{element_buf::ElementBuf, prelude::SourceChain};
+use holochain_sqlite::prelude::DatabaseResult;
+use holochain_state::prelude::from_blob;
+use holochain_state::prelude::test_environments;
+use holochain_state::prelude::SourceChainResult;
+use holochain_state::prelude::StateQueryResult;
+use holochain_state::source_chain;
+use holochain_state::test_utils::fresh_reader_test;
+use holochain_state::test_utils::TestEnvs;
 use holochain_types::prelude::*;
 
+use holochain_p2p::DnaHashExt;
 use holochain_wasm_test_utils::TestWasm;
 use kitsune_p2p::KitsuneP2pConfig;
-use std::collections::HashSet;
-use std::sync::Arc;
+use rusqlite::named_params;
 use std::time::Duration;
-use tempdir::TempDir;
 use tokio::sync::mpsc;
 
 pub use itertools;
 
-use self::sweetest::SweetCell;
+use crate::sweettest::SweetCell;
 
 pub mod conductor_setup;
+pub mod consistency;
 pub mod host_fn_caller;
-pub mod sweetest;
+pub mod inline_zomes;
+pub mod network_simulation;
+
+mod wait_for_any;
+pub use wait_for_any::*;
 
 /// Produce file and line number info at compile-time
 #[macro_export]
@@ -118,7 +124,7 @@ macro_rules! meta_mock {
 pub struct TestNetwork {
     network: Option<HolochainP2pRef>,
     respond_task: Option<tokio::task::JoinHandle<()>>,
-    cell_network: HolochainP2pCell,
+    dna_network: HolochainP2pDna,
 }
 
 impl TestNetwork {
@@ -126,12 +132,12 @@ impl TestNetwork {
     pub fn new(
         network: HolochainP2pRef,
         respond_task: tokio::task::JoinHandle<()>,
-        cell_network: HolochainP2pCell,
+        dna_network: HolochainP2pDna,
     ) -> Self {
         Self {
             network: Some(network),
             respond_task: Some(respond_task),
-            cell_network,
+            dna_network,
         }
     }
 
@@ -144,8 +150,8 @@ impl TestNetwork {
     }
 
     /// Get the cell network
-    pub fn cell_network(&self) -> HolochainP2pCell {
-        self.cell_network.clone()
+    pub fn dna_network(&self) -> HolochainP2pDna {
+        self.dna_network.clone()
     }
 }
 
@@ -191,8 +197,14 @@ async fn test_network_inner<F>(
 where
     F: Fn(&HolochainP2pEvent) -> bool + Send + 'static,
 {
+    let mut config = holochain_p2p::kitsune_p2p::KitsuneP2pConfig::default();
+    let mut tuning =
+        kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
+    tuning.tx2_implicit_timeout_ms = 500;
+    config.tuning_params = std::sync::Arc::new(tuning);
+
     let (network, mut recv) = spawn_holochain_p2p(
-        holochain_p2p::kitsune_p2p::KitsuneP2pConfig::default(),
+        config,
         holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_proxy::TlsConfig::new_ephemeral()
             .await
             .unwrap(),
@@ -220,6 +232,18 @@ where
                 QueryAgentInfoSigned { respond, .. } => {
                     respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
                 }
+                QueryPeerDensity { respond, .. } => {
+                    respond.r(Ok(async move {
+                        Ok(PeerViewBeta::new(
+                            Default::default(),
+                            DhtArc::full(0),
+                            1.0,
+                            1,
+                        ))
+                    }
+                    .boxed()
+                    .into()));
+                }
                 _ => {}
             }
         }
@@ -227,9 +251,9 @@ where
     let dna = dna_hash.unwrap_or_else(|| fixt!(DnaHash));
     let mut key_fixt = AgentPubKeyFixturator::new(Predictable);
     let agent_key = agent_key.unwrap_or_else(|| key_fixt.next().unwrap());
-    let cell_network = network.to_cell(dna.clone(), agent_key.clone());
+    let dna_network = network.to_dna(dna.clone());
     network.join(dna.clone(), agent_key).await.unwrap();
-    TestNetwork::new(network, respond_task, cell_network)
+    TestNetwork::new(network, respond_task, dna_network)
 }
 
 /// Do what's necessary to install an app
@@ -249,11 +273,15 @@ pub async fn install_app(
         .unwrap();
 
     conductor_handle
-        .activate_app(name.to_string())
+        .clone()
+        .enable_app(name.to_string())
         .await
         .unwrap();
 
-    let errors = conductor_handle.setup_cells().await.unwrap();
+    let errors = conductor_handle
+        .reconcile_cell_status_with_app_status()
+        .await
+        .unwrap();
 
     assert!(errors.is_empty(), "{:?}", errors);
 }
@@ -266,7 +294,7 @@ pub type InstalledCellsWithProofs = Vec<(InstalledCell, Option<SerializedBytes>)
 pub async fn setup_app(
     apps_data: Vec<(&str, InstalledCellsWithProofs)>,
     dnas: Vec<DnaFile>,
-) -> (Arc<TempDir>, RealAppInterfaceApi, ConductorHandle) {
+) -> (TestEnvs, RealAppInterfaceApi, ConductorHandle) {
     setup_app_inner(test_environments(), apps_data, dnas, None).await
 }
 
@@ -276,17 +304,17 @@ pub async fn setup_app_with_network(
     apps_data: Vec<(&str, InstalledCellsWithProofs)>,
     dnas: Vec<DnaFile>,
     network: KitsuneP2pConfig,
-) -> (Arc<TempDir>, RealAppInterfaceApi, ConductorHandle) {
+) -> (TestEnvs, RealAppInterfaceApi, ConductorHandle) {
     setup_app_inner(test_environments(), apps_data, dnas, Some(network)).await
 }
 
 /// Setup an app with full configurability
 pub async fn setup_app_inner(
-    envs: TestEnvironments,
+    envs: TestEnvs,
     apps_data: Vec<(&str, InstalledCellsWithProofs)>,
     dnas: Vec<DnaFile>,
     network: Option<KitsuneP2pConfig>,
-) -> (Arc<TempDir>, RealAppInterfaceApi, ConductorHandle) {
+) -> (TestEnvs, RealAppInterfaceApi, ConductorHandle) {
     let conductor_handle = ConductorBuilder::new()
         .config(ConductorConfig {
             admin_interfaces: Some(vec![AdminInterfaceConfig {
@@ -295,7 +323,7 @@ pub async fn setup_app_inner(
             network,
             ..Default::default()
         })
-        .test(&envs)
+        .test(&envs, &[])
         .await
         .unwrap();
 
@@ -305,11 +333,7 @@ pub async fn setup_app_inner(
 
     let handle = conductor_handle.clone();
 
-    (
-        envs.tempdir(),
-        RealAppInterfaceApi::new(conductor_handle, Default::default()),
-        handle,
-    )
+    (envs, RealAppInterfaceApi::new(conductor_handle), handle)
 }
 
 /// If HC_WASM_CACHE_PATH is set warm the cache
@@ -370,99 +394,36 @@ pub async fn consistency_10s(all_cells: &[&SweetCell]) {
 /// Wait for all cells to reach consistency
 #[tracing::instrument(skip(all_cells))]
 pub async fn consistency(all_cells: &[&SweetCell], num_attempts: usize, delay: Duration) {
-    let all_cell_envs: Vec<_> = all_cells.iter().map(|c| c.env()).collect();
+    let all_cell_envs: Vec<(AgentPubKey, DbRead<DbKindAuthored>, DbRead<DbKindDht>)> = all_cells
+        .iter()
+        .map(|c| {
+            (
+                c.agent_pubkey().clone(),
+                c.authored_env().clone().into(),
+                c.dht_env().clone().into(),
+            )
+        })
+        .collect();
+    let all_cell_envs: Vec<_> = all_cell_envs.iter().map(|c| (&c.0, &c.1, &c.2)).collect();
     consistency_envs(&all_cell_envs[..], num_attempts, delay).await
 }
 
 /// Wait for all cell envs to reach consistency
-pub async fn consistency_envs(
-    all_cell_envs: &[&EnvironmentWrite],
+pub async fn consistency_envs<AuthorDb, DhtDb>(
+    all_cell_envs: &[(&AgentPubKey, &AuthorDb, &DhtDb)],
     num_attempts: usize,
     delay: Duration,
-) {
+) where
+    AuthorDb: ReadAccess<DbKindAuthored>,
+    DhtDb: ReadAccess<DbKindDht>,
+{
     let mut expected_count = 0;
-    for &env in all_cell_envs.iter() {
-        let count = get_authored_ops(env).len();
+    for (author, env) in all_cell_envs.iter().map(|(author, a, _)| (author, a)) {
+        let count = get_published_ops(*env, *author).len();
         expected_count += count;
     }
-    for &env in all_cell_envs.iter() {
+    for &env in all_cell_envs.iter().map(|(_, _, d)| d) {
         wait_for_integration(env, expected_count, num_attempts, delay).await
-    }
-}
-
-#[macro_export]
-macro_rules! wait_for_any {
-    ($wait:expr, $test:expr, $check:expr, $assert:expr) => {{
-        loop {
-            let o = $test;
-            if !$wait.wait_any().await || $check(&o) {
-                $assert(o);
-                break;
-            }
-        }
-    }};
-}
-
-#[macro_export]
-macro_rules! wait_for_any_10s {
-    ($test:expr, $check:expr, $assert:expr) => {
-        let mut wait_for = $crate::test_utils::WaitForAny::ten_s();
-        $crate::wait_for_any!(wait_for, $test, $check, $assert)
-    };
-}
-
-#[macro_export]
-macro_rules! wait_for_any_1m {
-    ($test:expr, $check:expr, $assert:expr) => {
-        let mut wait_for = $crate::test_utils::WaitForAny::one_m();
-        $crate::wait_for_any!(wait_for, $test, $check, $assert)
-    };
-}
-
-#[derive(Debug, Clone)]
-/// Generic waiting for some test property to
-/// be true. This allows early exit from waiting when
-/// the condition becomes true but will wait up to a
-/// maximum if the condition is not true.
-pub struct WaitForAny {
-    num_attempts: usize,
-    attempt: usize,
-    delay: Duration,
-}
-
-impl WaitForAny {
-    /// Create a new wait for from a number of attempts and delay in between attempts
-    pub fn new(num_attempts: usize, delay: Duration) -> Self {
-        Self {
-            num_attempts,
-            attempt: 0,
-            delay,
-        }
-    }
-
-    /// Wait for 10s checking every 100ms.
-    pub fn ten_s() -> Self {
-        const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_millis(100);
-        Self::new(100, DELAY_PER_ATTEMPT)
-    }
-
-    /// Wait for 1 minute checking every 500ms.
-    pub fn one_m() -> Self {
-        const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_millis(500);
-        Self::new(120, DELAY_PER_ATTEMPT)
-    }
-
-    /// Wait for some time before trying again.
-    /// Will return false when you should stop waiting.
-    #[tracing::instrument(skip(self))]
-    pub async fn wait_any(&mut self) -> bool {
-        if self.attempt >= self.num_attempts {
-            return false;
-        }
-        self.attempt += 1;
-        tracing::debug!(attempt = ?self.attempt, out_of = ?self.num_attempts, delaying_for = ?self.delay);
-        tokio::time::sleep(self.delay).await;
-        true
     }
 }
 
@@ -477,61 +438,76 @@ pub async fn consistency_10s_others(all_cells: &[&SweetCell]) {
 /// Wait for all cells to reach consistency
 #[tracing::instrument(skip(all_cells))]
 pub async fn consistency_others(all_cells: &[&SweetCell], num_attempts: usize, delay: Duration) {
-    let all_cell_envs: Vec<_> = all_cells.iter().map(|c| c.env()).collect();
+    let all_cell_envs: Vec<(AgentPubKey, DbRead<DbKindAuthored>, DbRead<DbKindDht>)> = all_cells
+        .iter()
+        .map(|c| {
+            (
+                c.agent_pubkey().clone(),
+                c.authored_env().clone().into(),
+                c.dht_env().clone().into(),
+            )
+        })
+        .collect();
+    let all_cell_envs: Vec<_> = all_cell_envs.iter().map(|c| (&c.0, &c.1, &c.2)).collect();
     consistency_envs_others(&all_cell_envs[..], num_attempts, delay).await
 }
 
-async fn consistency_envs_others(
-    all_cell_envs: &[&EnvironmentWrite],
+async fn consistency_envs_others<AuthorDb, DhtDb>(
+    all_cell_envs: &[(&AgentPubKey, &AuthorDb, &DhtDb)],
     num_attempts: usize,
     delay: Duration,
-) {
+) where
+    AuthorDb: ReadAccess<DbKindAuthored>,
+    DhtDb: ReadAccess<DbKindDht>,
+{
     let mut expected_count = 0;
-    for &env in all_cell_envs.iter() {
-        let count = get_authored_ops(env).len();
+    for (author, env) in all_cell_envs.iter().map(|(author, a, _)| (author, a)) {
+        let count = get_published_ops(*env, *author).len();
         expected_count += count;
     }
     let start = Some(std::time::Instant::now());
-    for (i, &env) in all_cell_envs.iter().enumerate() {
-        let mut others = all_cell_envs.to_vec();
+    for (i, &env) in all_cell_envs.iter().map(|(_, _, d)| d).enumerate() {
+        let mut others: Vec<_> = all_cell_envs.iter().map(|(_, _, d)| *d).collect();
         others.remove(i);
         wait_for_integration_with_others(env, &others, expected_count, num_attempts, delay, start)
             .await
     }
 }
 
-fn get_authored_ops(env: &EnvironmentWrite) -> Vec<DhtOpLight> {
-    let query = ChainQueryFilter::new().include_entries(true);
-    let chain = SourceChain::new(env.clone().into()).unwrap();
-    let elements = chain.query(&query).unwrap();
-    let elements = elements.iter().collect::<Vec<_>>();
-    let private = elements
-        .iter()
-        .filter(|el| {
-            el.header()
-                .entry_type()
-                .map(|e| *e.visibility() == EntryVisibility::Private)
-                .unwrap_or(false)
-        })
-        .map(|el| el.header_address().clone())
-        .collect::<HashSet<_>>();
-    produce_op_lights_from_elements(elements)
+fn get_published_ops<Db: ReadAccess<DbKindAuthored>>(
+    env: &Db,
+    author: &AgentPubKey,
+) -> Vec<DhtOpLight> {
+    fresh_reader_test(env.clone(), |txn| {
+        txn.prepare(
+            "
+            SELECT
+            DhtOp.blob
+            FROM DhtOp
+            JOIN
+            Header ON DhtOp.header_hash = Header.hash
+            WHERE
+            Header.author = :author
+            AND (DhtOp.type != :store_entry OR Header.private_entry = 0)
+        ",
+        )
         .unwrap()
-        .into_iter()
-        .filter(|op| {
-            if let DhtOpLight::StoreEntry(_, _, _) = &op {
-                if private.contains(op.header_hash()) {
-                    return false;
-                }
-            }
-            true
-        })
-        .collect()
+        .query_and_then(
+            named_params! {
+                ":store_entry": DhtOpType::StoreEntry,
+                ":author": author,
+            },
+            |row| from_blob(row.get("blob")?),
+        )
+        .unwrap()
+        .collect::<StateQueryResult<_>>()
+        .unwrap()
+    })
 }
 
 /// Same as wait_for_integration but with a default wait time of 10 seconds
 #[tracing::instrument(skip(env))]
-pub async fn wait_for_integration_1m(env: &EnvironmentWrite, expected_count: usize) {
+pub async fn wait_for_integration_1m<Db: ReadAccess<DbKindDht>>(env: &Db, expected_count: usize) {
     const NUM_ATTEMPTS: usize = 120;
     const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_millis(500);
     wait_for_integration(env, expected_count, NUM_ATTEMPTS, DELAY_PER_ATTEMPT).await
@@ -540,8 +516,8 @@ pub async fn wait_for_integration_1m(env: &EnvironmentWrite, expected_count: usi
 /// Exit early if the expected number of ops
 /// have been integrated or wait for num_attempts * delay
 #[tracing::instrument(skip(env))]
-pub async fn wait_for_integration(
-    env: &EnvironmentWrite,
+pub async fn wait_for_integration<Db: ReadAccess<DbKindDht>>(
+    env: &Db,
     expected_count: usize,
     num_attempts: usize,
     delay: Duration,
@@ -552,29 +528,16 @@ pub async fn wait_for_integration(
             return;
         } else {
             let total_time_waited = delay * i as u32;
-            tracing::debug!(?count, ?total_time_waited);
+            tracing::debug!(?count, ?total_time_waited, counts = ?query_integration(env).await);
         }
         tokio::time::sleep(delay).await;
     }
 }
 
-fn int_ops(env: &EnvironmentWrite) -> Vec<DhtOpLight> {
-    let workspace = IncomingDhtOpsWorkspace::new(env.clone().into()).unwrap();
-    fresh_reader_test!(env, |r| {
-        workspace
-            .integrated_dht_ops
-            .iter(&r)
-            .unwrap()
-            .map(|(_, v)| Ok(v.op))
-            .collect()
-            .unwrap()
-    })
-}
-
 /// Same as wait for integration but can print other states at the same time
-pub async fn wait_for_integration_with_others_10s(
-    env: &EnvironmentWrite,
-    others: &[&EnvironmentWrite],
+pub async fn wait_for_integration_with_others_10s<Db: ReadAccess<DbKindDht>>(
+    env: &Db,
+    others: &[&Db],
     expected_count: usize,
     start: Option<std::time::Instant>,
 ) {
@@ -593,9 +556,9 @@ pub async fn wait_for_integration_with_others_10s(
 
 #[tracing::instrument(skip(env, others, start))]
 /// Same as wait for integration but can print other states at the same time
-pub async fn wait_for_integration_with_others(
-    env: &EnvironmentWrite,
-    others: &[&EnvironmentWrite],
+pub async fn wait_for_integration_with_others<Db: ReadAccess<DbKindDht>>(
+    env: &Db,
+    others: &[&Db],
     expected_count: usize,
     num_attempts: usize,
     delay: Duration,
@@ -604,8 +567,8 @@ pub async fn wait_for_integration_with_others(
     let mut last_total = 0;
     let this_start = std::time::Instant::now();
     for _ in 0..num_attempts {
-        let count = count_integration(env).await;
-        let counts = get_counts(others).await;
+        let count = query_integration(env).await;
+        let counts = get_integration_dumps(others).await;
         let total: usize = counts.0.clone().into_iter().map(|i| i.integrated).sum();
         let num_conductors = counts.0.len() + 1;
         let total_expected = num_conductors * expected_count;
@@ -647,156 +610,61 @@ pub async fn wait_for_integration_with_others(
 
 #[tracing::instrument(skip(envs))]
 /// Show authored data for each cell environment
-pub fn show_authored(envs: &[&EnvironmentWrite]) {
+pub fn show_authored<Db: ReadAccess<DbKindAuthored>>(envs: &[&Db]) {
     for (i, &env) in envs.iter().enumerate() {
-        let chain = SourceChain::new(env.clone().into()).unwrap();
-        let mut items = chain.iter_back().collect::<Vec<_>>().unwrap();
-        items.reverse();
-        for item in items {
-            let header = item.header();
-            let seq_num = header.header_seq();
-            let header_type = header.header_type();
-            let entry = header
-                .entry_hash()
-                .and_then(|e| chain.get_entry(e).unwrap());
-            tracing::debug!(chain = %i, %seq_num, ?header_type, ?entry);
-        }
+        fresh_reader_test(env.clone(), |txn| {
+            txn.prepare("SELECT DISTINCT Header.seq, Header.type, Header.entry_hash FROM Header JOIN DhtOp ON Header.hash = DhtOp.hash")
+            .unwrap()
+            .query_map([], |row| {
+                let header_type: String = row.get("type")?;
+                let seq: u32 = row.get("seq")?;
+                let entry: Option<EntryHash> = row.get("entry_hash")?;
+                Ok((header_type, seq, entry))
+            })
+            .unwrap()
+            .for_each(|r|{
+                let (header_type, seq, entry) = r.unwrap();
+                tracing::debug!(chain = %i, %seq, ?header_type, ?entry);
+            });
+        });
     }
 }
 
-#[tracing::instrument(skip(envs))]
-/// Show authored op data for each cell environment
-pub async fn show_authored_ops(envs: &[&EnvironmentWrite]) {
-    let mut all_auth = Vec::new();
-    for (i, env) in envs.iter().enumerate() {
-        let auth = get_authored_ops(env);
-        all_auth.extend(auth.clone());
-        for (j, op) in auth.iter().enumerate() {
-            tracing::debug!(chain = %i, op_num = %j, ?op);
-        }
-    }
-    for (i, env) in envs.iter().enumerate() {
-        let int = int_ops(env);
-        for op in &all_auth {
-            if int.iter().find(|&a| a == op).is_none() {
-                tracing::warn!(is_missing = ?op, for_env = %i);
-                show_data(env, op).await;
-            }
-        }
-    }
-}
-
-async fn show_data(env: &EnvironmentWrite, op: &DhtOpLight) {
-    let element_integrated = ElementBuf::vault(env.clone().into(), true).unwrap();
-    let meta_integrated = MetadataBuf::vault(env.clone().into()).unwrap();
-    let element_authored = ElementBuf::authored(env.clone().into(), true).unwrap();
-    let meta_authored = MetadataBuf::authored(env.clone().into()).unwrap();
-    let element_rejected = ElementBuf::rejected(env.clone().into()).unwrap();
-    let meta_rejected = MetadataBuf::rejected(env.clone().into()).unwrap();
-    let mut cascade = Cascade::empty()
-        .with_integrated(DbPair::new(&element_integrated, &meta_integrated))
-        .with_authored(DbPair::new(&element_authored, &meta_authored))
-        .with_rejected(DbPair::new(&element_rejected, &meta_rejected));
-    if let Some(el) = cascade
-        .retrieve(op.header_hash().clone().into(), Default::default())
-        .await
-        .unwrap()
-    {
-        let header = el.header();
-        let entry = format!("{:?}", el.entry());
-        tracing::debug!(seq_num = %header.header_seq(), header_type = ?header.header_type(), op_type = %op.to_string(), ?entry);
-    }
-}
-
-async fn get_counts(envs: &[&EnvironmentWrite]) -> IntegrationStateDumps {
+async fn get_integration_dumps<Db: ReadAccess<DbKindDht>>(envs: &[&Db]) -> IntegrationStateDumps {
     let mut output = Vec::new();
     for env in envs {
         let env = *env;
-        output.push(count_integration(env).await);
+        output.push(query_integration(env).await);
     }
     IntegrationStateDumps(output)
 }
 
-async fn count_integration(env: &EnvironmentWrite) -> IntegrationStateDump {
-    integrate_dht_ops_workflow::dump_state(env.clone().into()).unwrap()
+/// Show the current db state.
+pub async fn query_integration<Db: ReadAccess<DbKindDht>>(env: &Db) -> IntegrationStateDump {
+    crate::conductor::integration_dump(&env.clone().into())
+        .await
+        .unwrap()
 }
 
-async fn display_integration(env: &EnvironmentWrite) -> usize {
-    let workspace = IncomingDhtOpsWorkspace::new(env.clone().into()).unwrap();
-
-    let val_limbo: Vec<_> = fresh_reader_test!(env, |r| {
-        workspace
-            .validation_limbo
-            .iter(&r)
-            .unwrap()
-            .map(|(_, v)| Ok(v))
-            .collect()
-            .unwrap()
-    });
-    tracing::debug!(?val_limbo);
-
-    let int_limbo: Vec<_> = fresh_reader_test!(env, |r| {
-        workspace
-            .integration_limbo
-            .iter(&r)
-            .unwrap()
-            .map(|(_, v)| Ok(v))
-            .collect()
-            .unwrap()
-    });
-    tracing::debug!(?int_limbo);
-
-    let int: Vec<_> = fresh_reader_test!(env, |r| {
-        workspace
-            .integrated_dht_ops
-            .iter(&r)
-            .unwrap()
-            .map(|(_, v)| Ok(v))
-            .collect()
-            .unwrap()
-    });
-    let count = int.len();
-
-    {
-        let s = tracing::trace_span!("wait_for_integration_deep");
-        let _g = s.enter();
-        let element_integrated = ElementBuf::vault(env.clone().into(), false).unwrap();
-        let meta_integrated = MetadataBuf::vault(env.clone().into()).unwrap();
-        let element_rejected = ElementBuf::rejected(env.clone().into()).unwrap();
-        let meta_rejected = MetadataBuf::rejected(env.clone().into()).unwrap();
-        let mut cascade = Cascade::empty()
-            .with_integrated(DbPair::new(&element_integrated, &meta_integrated))
-            .with_rejected(DbPair::new(&element_rejected, &meta_rejected));
-        let mut headers_to_display = Vec::with_capacity(int.len());
-        for iv in int {
-            let el = cascade
-                .retrieve(iv.op.header_hash().clone().into(), Default::default())
-                .await
-                .unwrap()
-                .unwrap();
-            tracing::trace!(op = ?iv.op, ?el);
-            let header = el.header();
-            let entry = format!("{:?}", el.entry());
-            headers_to_display.push((
-                header.header_seq(),
-                header.header_type(),
-                iv.op.to_string(),
-                entry,
-            ))
-        }
-        headers_to_display.sort_by_key(|i| i.0);
-        for (i, h) in headers_to_display.into_iter().enumerate() {
-            tracing::debug!(?i, seq_num = %h.0, header_type = ?h.1, op_type = %h.2, entry = ?h.3);
-        }
-    }
-    count
+async fn display_integration<Db: ReadAccess<DbKindDht>>(env: &Db) -> usize {
+    fresh_reader_test(env.clone(), |txn| {
+        txn.query_row(
+            "SELECT COUNT(hash) FROM DhtOp WHERE DhtOp.when_integrated IS NOT NULL",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap()
+    })
 }
 
 /// Helper for displaying agent infos stored on a conductor
 pub async fn display_agent_infos(conductor: &ConductorHandle) {
-    let env = conductor.get_p2p_env().await;
-    for cell_id in conductor.list_cell_ids().await.unwrap() {
-        let info = p2p_store::dump_state(env.clone().into(), Some(cell_id)).unwrap();
+    for cell_id in conductor.list_cell_ids(Some(CellStatus::Joined)) {
+        let space = cell_id.dna_hash().to_kitsune();
+        let env = conductor.get_p2p_env(space);
+        let info = p2p_agent_store::dump_state(env.into(), Some(cell_id))
+            .await
+            .unwrap();
         tracing::debug!(%info);
     }
 }
@@ -814,7 +682,7 @@ where
     Ok(ZomeCall {
         cell_id: cell_id.clone(),
         zome_name: zome.into(),
-        cap: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
+        cap_secret: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
         fn_name: func.into(),
         payload: ExternIO::encode(payload)?,
         provenance: cell_id.agent_pubkey().clone(),
@@ -834,7 +702,7 @@ where
     Ok(ZomeCallInvocation {
         cell_id: cell_id.clone(),
         zome: zome.into(),
-        cap: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
+        cap_secret: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
         fn_name: func.into(),
         payload: ExternIO::encode(payload)?,
         provenance: cell_id.agent_pubkey().clone(),
@@ -842,6 +710,45 @@ where
 }
 
 /// A fixture example dna for unit testing.
-pub fn fake_valid_dna_file(uuid: &str) -> DnaFile {
-    fake_dna_zomes(uuid, vec![(TestWasm::Foo.into(), TestWasm::Foo.into())])
+pub fn fake_valid_dna_file(uid: &str) -> DnaFile {
+    fake_dna_zomes(uid, vec![(TestWasm::Foo.into(), TestWasm::Foo.into())])
+}
+
+/// Run genesis on the source chain for testing.
+pub async fn fake_genesis(
+    vault: DbWrite<DbKindAuthored>,
+    dht_env: DbWrite<DbKindDht>,
+    keystore: MetaLairClient,
+) -> SourceChainResult<()> {
+    fake_genesis_for_agent(vault, dht_env, fake_agent_pubkey_1(), keystore).await
+}
+
+/// Run genesis on the source chain for a specific agent for testing.
+pub async fn fake_genesis_for_agent(
+    vault: DbWrite<DbKindAuthored>,
+    dht_env: DbWrite<DbKindDht>,
+    agent: AgentPubKey,
+    keystore: MetaLairClient,
+) -> SourceChainResult<()> {
+    let dna = fake_dna_file("cool dna");
+    let dna_hash = dna.dna_hash().clone();
+
+    source_chain::genesis(vault, dht_env, keystore, dna_hash, agent, None).await
+}
+
+/// Force all dht ops without enough validation receipts to be published.
+pub async fn force_publish_dht_ops(
+    vault: &DbWrite<DbKindAuthored>,
+    publish_trigger: &mut TriggerSender,
+) -> DatabaseResult<()> {
+    vault
+        .async_commit(|txn| {
+            DatabaseResult::Ok(txn.execute(
+                "UPDATE DhtOp SET last_publish_time = NULL WHERE receipts_complete IS NULL",
+                [],
+            )?)
+        })
+        .await?;
+    publish_trigger.trigger();
+    Ok(())
 }

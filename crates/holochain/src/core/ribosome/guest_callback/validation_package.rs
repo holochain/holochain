@@ -1,12 +1,13 @@
 use crate::core::ribosome::FnComponents;
-use crate::core::ribosome::HostAccess;
+use crate::core::ribosome::HostContext;
 use crate::core::ribosome::Invocation;
+use crate::core::ribosome::InvocationAuth;
 use crate::core::ribosome::ZomesToInvoke;
-use crate::core::workflow::CallZomeWorkspaceLock;
 use derive_more::Constructor;
 use holo_hash::AnyDhtHash;
-use holochain_p2p::HolochainP2pCell;
+use holochain_p2p::HolochainP2pDna;
 use holochain_serialized_bytes::prelude::*;
+use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
 use holochain_types::prelude::*;
 
 #[derive(Clone)]
@@ -26,11 +27,11 @@ impl ValidationPackageInvocation {
 
 #[derive(Clone, Constructor)]
 pub struct ValidationPackageHostAccess {
-    pub workspace: CallZomeWorkspaceLock,
-    pub network: HolochainP2pCell,
+    pub workspace: HostFnWorkspaceRead,
+    pub network: HolochainP2pDna,
 }
 
-impl From<ValidationPackageHostAccess> for HostAccess {
+impl From<ValidationPackageHostAccess> for HostContext {
     fn from(validation_package_host_access: ValidationPackageHostAccess) -> Self {
         Self::ValidationPackage(validation_package_host_access)
     }
@@ -39,7 +40,7 @@ impl From<ValidationPackageHostAccess> for HostAccess {
 impl From<&ValidationPackageHostAccess> for HostFnAccess {
     fn from(_: &ValidationPackageHostAccess) -> Self {
         let mut access = Self::none();
-        access.read_workspace = Permission::Allow;
+        access.read_workspace_deterministic = Permission::Allow;
         access.agent_info = Permission::Allow;
         access
     }
@@ -60,6 +61,9 @@ impl Invocation for ValidationPackageInvocation {
     }
     fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
         ExternIO::encode(self.app_entry_type)
+    }
+    fn auth(&self) -> InvocationAuth {
+        InvocationAuth::LocalCallback
     }
 }
 
@@ -122,7 +126,7 @@ mod test {
     use crate::core::ribosome::ZomesToInvoke;
     use crate::fixt::ValidationPackageHostAccessFixturator;
     use crate::fixt::ValidationPackageInvocationFixturator;
-    use holochain_types::dna::zome::HostFnAccess;
+    use holochain_types::prelude::*;
     use holochain_zome_types::validate::ValidationPackage;
     use holochain_zome_types::validate::ValidationPackageCallbackResult;
     use holochain_zome_types::ExternIO;
@@ -170,7 +174,7 @@ mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn validation_package_invocation_allow_side_effects() {
-        use holochain_types::dna::zome::Permission::*;
+        use holochain_types::access::Permission::*;
         let validation_package_host_access =
             ValidationPackageHostAccessFixturator::new(::fixt::Unpredictable)
                 .next()
@@ -179,12 +183,15 @@ mod test {
             HostFnAccess::from(&validation_package_host_access),
             HostFnAccess {
                 agent_info: Allow,
-                read_workspace: Allow,
+                read_workspace: Deny,
+                read_workspace_deterministic: Allow,
                 write_workspace: Deny,
                 write_network: Deny,
-                dna_bindings: Deny,
+                bindings: Deny,
+                bindings_deterministic: Deny,
                 non_determinism: Deny,
                 keystore: Deny,
+                keystore_deterministic: Deny,
             }
         );
     }

@@ -1,12 +1,13 @@
 use crate::core::ribosome::FnComponents;
-use crate::core::ribosome::HostAccess;
+use crate::core::ribosome::HostContext;
 use crate::core::ribosome::Invocation;
+use crate::core::ribosome::InvocationAuth;
 use crate::core::ribosome::ZomesToInvoke;
-use crate::core::workflow::CallZomeWorkspaceLock;
 use derive_more::Constructor;
 use holo_hash::AnyDhtHash;
-use holochain_p2p::HolochainP2pCell;
+use holochain_p2p::HolochainP2pDna;
 use holochain_serialized_bytes::prelude::*;
+use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
 use holochain_types::prelude::*;
 use std::sync::Arc;
 
@@ -75,11 +76,11 @@ impl From<ValidateDeleteLinkInvocation> for ValidateDeleteLinkData {
 }
 #[derive(Clone, Constructor)]
 pub struct ValidateLinkHostAccess {
-    pub workspace: CallZomeWorkspaceLock,
-    pub network: HolochainP2pCell,
+    pub workspace: HostFnWorkspaceRead,
+    pub network: HolochainP2pDna,
 }
 
-impl From<ValidateLinkHostAccess> for HostAccess {
+impl From<ValidateLinkHostAccess> for HostContext {
     fn from(validate_link_add_host_access: ValidateLinkHostAccess) -> Self {
         Self::ValidateCreateLink(validate_link_add_host_access)
     }
@@ -88,8 +89,9 @@ impl From<ValidateLinkHostAccess> for HostAccess {
 impl From<&ValidateLinkHostAccess> for HostFnAccess {
     fn from(_: &ValidateLinkHostAccess) -> Self {
         let mut access = Self::none();
-        access.read_workspace = Permission::Allow;
-        access.dna_bindings = Permission::Allow;
+        access.keystore_deterministic = Permission::Allow;
+        access.read_workspace_deterministic = Permission::Allow;
+        access.bindings_deterministic = Permission::Allow;
         access
     }
 }
@@ -107,6 +109,9 @@ where
     fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
         self.invocation.host_input()
     }
+    fn auth(&self) -> InvocationAuth {
+        InvocationAuth::LocalCallback
+    }
 }
 
 impl Invocation for ValidateCreateLinkInvocation {
@@ -122,6 +127,9 @@ impl Invocation for ValidateCreateLinkInvocation {
     fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
         ExternIO::encode(ValidateCreateLinkData::from(self))
     }
+    fn auth(&self) -> InvocationAuth {
+        InvocationAuth::LocalCallback
+    }
 }
 
 impl Invocation for ValidateDeleteLinkInvocation {
@@ -136,6 +144,9 @@ impl Invocation for ValidateDeleteLinkInvocation {
     }
     fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
         ExternIO::encode(ValidateDeleteLinkData::from(self))
+    }
+    fn auth(&self) -> InvocationAuth {
+        InvocationAuth::LocalCallback
     }
 }
 
@@ -177,8 +188,8 @@ mod test {
     use crate::core::ribosome::ZomesToInvoke;
     use crate::fixt::*;
     use ::fixt::prelude::*;
-    use holochain_types::dna::zome::HostFnAccess;
-    use holochain_types::dna::zome::Permission;
+    use holochain_types::access::Permission;
+    use holochain_types::prelude::*;
     use holochain_zome_types::validate_link::ValidateCreateLinkData;
     use holochain_zome_types::validate_link::ValidateLinkCallbackResult;
     use holochain_zome_types::ExternIO;
@@ -224,8 +235,9 @@ mod test {
                 .next()
                 .unwrap();
         let mut access = HostFnAccess::none();
-        access.read_workspace = Permission::Allow;
-        access.dna_bindings = Permission::Allow;
+        access.read_workspace_deterministic = Permission::Allow;
+        access.bindings_deterministic = Permission::Allow;
+        access.keystore_deterministic = Permission::Allow;
         assert_eq!(HostFnAccess::from(&validate_link_add_host_access), access,);
     }
 
@@ -281,14 +293,13 @@ mod test {
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
     use super::ValidateLinkResult;
+    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use crate::core::ribosome::RibosomeT;
-    use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
     use crate::fixt::curve::Zomes;
     use crate::fixt::*;
     use ::fixt::prelude::*;
     use holo_hash::HeaderHash;
-    use holochain_state::source_chain::SourceChainResult;
-    use holochain_types::dna::zome::Zome;
+    use holochain_types::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
 
     #[tokio::test(flavor = "multi_thread")]
@@ -350,72 +361,19 @@ mod slow_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn pass_validate_link_add_test<'a>() {
-        // test workspace boilerplate
-        let test_env = holochain_lmdb::test_utils::test_cell_env();
-        let env = test_env.env();
-        let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
+        observability::test_run().ok();
+        let RibosomeTestFixture {
+            conductor, alice, ..
+        } = RibosomeTestFixture::new(TestWasm::ValidateLink).await;
 
-        // commits fail validation if we don't do genesis
-        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
-            .await
-            .unwrap();
+        let output: HeaderHash = conductor.call(&alice, "add_valid_link", ()).await;
+        let _element: Element = conductor
+            .call(&alice, "must_get_valid_element", output)
+            .await;
 
-        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
-        let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace_lock.clone();
-
-        let output: HeaderHash =
-            crate::call_test_ribosome!(host_access, TestWasm::ValidateLink, "add_valid_link", ());
-
-        // the chain head should be the committed entry header
-        let chain_head = tokio_helper::block_forever_on(async move {
-            SourceChainResult::Ok(
-                workspace_lock
-                    .read()
-                    .await
-                    .source_chain
-                    .chain_head()?
-                    .to_owned(),
-            )
-        })
-        .unwrap();
-
-        assert_eq!(chain_head, output,);
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    async fn fail_validate_link_add_test<'a>() {
-        // test workspace boilerplate
-        let test_env = holochain_lmdb::test_utils::test_cell_env();
-        let env = test_env.env();
-        let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
-
-        // commits fail validation if we don't do genesis
-        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
-            .await
-            .unwrap();
-
-        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
-
-        let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace_lock.clone();
-
-        let output: HeaderHash =
-            crate::call_test_ribosome!(host_access, TestWasm::ValidateLink, "add_invalid_link", ());
-
-        // the chain head should be the committed entry header
-        let chain_head = tokio_helper::block_forever_on(async move {
-            SourceChainResult::Ok(
-                workspace_lock
-                    .read()
-                    .await
-                    .source_chain
-                    .chain_head()?
-                    .to_owned(),
-            )
-        })
-        .unwrap();
-
-        assert_eq!(chain_head, output,);
+        let invalid_output: Result<HeaderHash, _> = conductor
+            .call_fallible(&alice, "add_invalid_link", ())
+            .await;
+        assert!(invalid_output.is_err());
     }
 }

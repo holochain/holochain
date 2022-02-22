@@ -1,6 +1,8 @@
-use std::{collections::BTreeMap, path::PathBuf};
+use std::{
+    collections::BTreeMap,
+    path::{Path, PathBuf},
+};
 
-use super::{DnaDef, DnaFile, WasmMap};
 use crate::prelude::*;
 use holo_hash::*;
 use mr_bundle::Location;
@@ -28,17 +30,30 @@ impl DnaBundle {
         Ok(mr_bundle::Bundle::new(manifest, resources, root_dir)?.into())
     }
 
-    /// Convert to a DnaFile
-    pub async fn into_dna_file(self) -> DnaResult<DnaFile> {
+    /// Convert to a DnaFile, and return what the hash of the Dna *would* have
+    /// been without the provided phenotype overrides
+    pub async fn into_dna_file(
+        self,
+        uid: Option<Uid>,
+        properties: Option<YamlProperties>,
+    ) -> DnaResult<(DnaFile, DnaHash)> {
         let (zomes, wasms) = self.inner_maps().await?;
-        let dna_def = self.to_dna_def(zomes)?;
+        let (dna_def, original_hash) = self.to_dna_def(zomes, uid, properties)?;
 
-        Ok(DnaFile::from_parts(dna_def, wasms))
+        Ok((DnaFile::from_parts(dna_def, wasms), original_hash))
     }
 
     /// Construct from raw bytes
     pub fn decode(bytes: &[u8]) -> DnaResult<Self> {
         mr_bundle::Bundle::decode(bytes)
+            .map(Into::into)
+            .map_err(Into::into)
+    }
+
+    /// Read from a bundle file
+    pub async fn read_from_file(path: &Path) -> DnaResult<Self> {
+        mr_bundle::Bundle::read_from_file(path)
+            .await
             .map(Into::into)
             .map_err(Into::into)
     }
@@ -64,7 +79,7 @@ impl DnaBundle {
 
         let data = futures::future::join_all(intermediate.into_iter().map(
             |(zome_name, expected_hash, wasm)| async {
-                let hash = WasmHash::with_data(&wasm).await;
+                let hash = wasm.to_hash().await;
                 if let Some(expected) = expected_hash {
                     if hash != expected {
                         return Err(DnaError::WasmHashMismatch(expected, hash));
@@ -98,22 +113,44 @@ impl DnaBundle {
     }
 
     /// Convert to a DnaDef
-    pub fn to_dna_def(&self, zomes: Zomes) -> DnaResult<DnaDefHashed> {
+    pub fn to_dna_def(
+        &self,
+        zomes: Zomes,
+        uid: Option<Uid>,
+        properties: Option<YamlProperties>,
+    ) -> DnaResult<(DnaDefHashed, DnaHash)> {
         match self.manifest() {
             DnaManifest::V1(manifest) => {
-                let properties: SerializedBytes = manifest
-                    .properties
-                    .as_ref()
-                    .map(SerializedBytes::try_from)
-                    .unwrap_or_else(|| SerializedBytes::try_from(()))?;
-                let dna_def = DnaDef {
+                let mut dna_def = DnaDef {
                     name: manifest.name.clone(),
-                    uuid: manifest.uuid.clone().unwrap_or_default(),
-                    properties,
+                    uid: manifest.uid.clone().unwrap_or_default(),
+                    properties: SerializedBytes::try_from(
+                        manifest.properties.clone().unwrap_or_default(),
+                    )?,
+                    origin_time: manifest.origin_time.into(),
                     zomes,
                 };
 
-                Ok(DnaDefHashed::from_content_sync(dna_def))
+                if uid.is_none() && properties.is_none() {
+                    // If no phenotype overrides, then the original hash is the same as the current hash
+                    let ddh = DnaDefHashed::from_content_sync(dna_def);
+                    let original_hash = ddh.as_hash().clone();
+                    Ok((ddh, original_hash))
+                } else {
+                    // Otherwise, record the original hash first, for version comparisons.
+                    let original_hash = DnaHash::with_data_sync(&dna_def);
+
+                    let properties: SerializedBytes = properties
+                        .as_ref()
+                        .or_else(|| manifest.properties.as_ref())
+                        .map(SerializedBytes::try_from)
+                        .unwrap_or_else(|| SerializedBytes::try_from(()))?;
+                    let uid = uid.or_else(|| manifest.uid.clone()).unwrap_or_default();
+
+                    dna_def.uid = uid;
+                    dna_def.properties = properties;
+                    Ok((DnaDefHashed::from_content_sync(dna_def), original_hash))
+                }
             }
         }
     }
@@ -153,13 +190,14 @@ impl DnaBundle {
             .collect();
         Ok(DnaManifestCurrent {
             name: dna_def.name,
-            uuid: Some(dna_def.uuid),
+            uid: Some(dna_def.uid),
             properties: Some(dna_def.properties.try_into().map_err(|e| {
                 DnaError::DnaFileToBundleConversionError(format!(
                     "DnaDef properties were not YAML-deserializable: {}",
                     e
                 ))
             })?),
+            origin_time: dna_def.origin_time.into(),
             zomes,
         }
         .into())
@@ -171,7 +209,6 @@ mod tests {
     use std::path::PathBuf;
 
     use super::*;
-    use crate::prelude::ZomeManifest;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn dna_bundle_to_dna_file() {
@@ -179,12 +216,13 @@ mod tests {
         let path2 = PathBuf::from("2");
         let wasm1 = vec![1, 2, 3];
         let wasm2 = vec![4, 5, 6];
-        let hash1 = WasmHash::with_data(&DnaWasm::from(wasm1.clone())).await;
-        let hash2 = WasmHash::with_data(&DnaWasm::from(wasm2.clone())).await;
+        let hash1 = DnaWasm::from(wasm1.clone()).to_hash().await;
+        let hash2 = DnaWasm::from(wasm2.clone()).to_hash().await;
         let mut manifest = DnaManifestCurrent {
             name: "name".into(),
-            uuid: None,
-            properties: None,
+            uid: Some("original uid".to_string()),
+            properties: Some(serde_yaml::Value::Null.into()),
+            origin_time: Timestamp::now().into(),
             zomes: vec![
                 ZomeManifest {
                     name: "zome1".into(),
@@ -201,24 +239,41 @@ mod tests {
         };
         let resources = vec![(path1, wasm1), (path2, wasm2)];
 
-        // Show that conversion fails due to hash mismatch
+        // - Show that conversion fails due to hash mismatch
         let bad_bundle: DnaBundle =
             mr_bundle::Bundle::new_unchecked(manifest.clone().into(), resources.clone())
                 .unwrap()
                 .into();
         matches::assert_matches!(
-            bad_bundle.into_dna_file().await,
+            bad_bundle.into_dna_file(None, None).await,
             Err(DnaError::WasmHashMismatch(h1, h2))
             if h1 == hash1 && h2 == hash2
         );
 
-        // Correct the hash and try again
+        // - Correct the hash and try again
         manifest.zomes[1].hash = Some(hash2.into());
+        let bundle: DnaBundle =
+            mr_bundle::Bundle::new_unchecked(manifest.clone().into(), resources.clone())
+                .unwrap()
+                .into();
+        let dna_file: DnaFile = bundle.into_dna_file(None, None).await.unwrap().0;
+        assert_eq!(dna_file.dna_def().zomes.len(), 2);
+        assert_eq!(dna_file.code().len(), 2);
+
+        // - Check that properties and UUID can be overridden
+        let properties: YamlProperties = serde_yaml::Value::from(42).into();
         let bundle: DnaBundle = mr_bundle::Bundle::new_unchecked(manifest.into(), resources)
             .unwrap()
             .into();
-        let dna_file: DnaFile = bundle.into_dna_file().await.unwrap();
-        assert_eq!(dna_file.dna_def().zomes.len(), 2);
-        assert_eq!(dna_file.code().len(), 2);
+        let dna_file: DnaFile = bundle
+            .into_dna_file(Some("uid".into()), Some(properties.clone()))
+            .await
+            .unwrap()
+            .0;
+        assert_eq!(dna_file.dna.uid, "uid".to_string());
+        assert_eq!(
+            dna_file.dna.properties,
+            SerializedBytes::try_from(properties).unwrap()
+        );
     }
 }

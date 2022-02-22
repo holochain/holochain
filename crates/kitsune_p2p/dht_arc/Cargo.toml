@@ -1,0 +1,33 @@
+[package]
+name = "kitsune_p2p_dht_arc"
+version = "0.0.9"
+description = "Kitsune P2p Dht Arc Utils"
+license = "Apache-2.0"
+homepage = "https://github.com/holochain/holochain"
+documentation = "https://docs.rs/kitsune_p2p_dht_arc"
+authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
+keywords = [ "holochain", "holo", "p2p", "dht", "networking" ]
+categories = [ "network-programming" ]
+edition = "2018"
+
+[dependencies]
+derive_more = "0.99"
+gcollections = "1.5.0"
+intervallum = "1.4.0"
+num-traits = "0.2"
+serde = {version = "1.0", features = ["derive"]}
+
+rusqlite = { version = "0.26", optional = true }
+
+[dev-dependencies]
+maplit = "1"
+observability = "0.1"
+pretty_assertions = "0.7.2"
+rand = "0.8"
+statrs = "0.15"
+tracing = "0.1"
+
+[features]
+sqlite = ["rusqlite"]
+slow_tests = []
+test_utils = []

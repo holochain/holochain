@@ -12,7 +12,7 @@ use crate::prelude::*;
 /// - cap_secret: The capability secret if required.
 /// - payload: The arguments to the function you are calling.
 pub fn call<I>(
-    to_cell: Option<CellId>,
+    to_cell: CallTargetCell,
     zome_name: ZomeName,
     fn_name: FunctionName,
     cap_secret: Option<CapSecret>,
@@ -21,18 +21,19 @@ pub fn call<I>(
 where
     I: serde::Serialize + std::fmt::Debug,
 {
-    // @todo is this secure to set this in the wasm rather than have the host inject it?
-    let provenance = agent_info()?.agent_latest_pubkey;
-    HDK.with(|h| {
-        h.borrow().call(Call::new(
-            to_cell,
-            zome_name,
-            fn_name,
-            cap_secret,
-            ExternIO::encode(payload)?,
-            provenance,
-        ))
-    })
+    Ok(HDK
+        .with(|h| {
+            h.borrow().call(vec![Call::new(
+                CallTarget::ConductorCell(to_cell),
+                zome_name,
+                fn_name,
+                cap_secret,
+                ExternIO::encode(payload)?,
+            )])
+        })?
+        .into_iter()
+        .next()
+        .unwrap())
 }
 
 /// Wrapper for __call_remote host function.
@@ -68,15 +69,19 @@ pub fn call_remote<I>(
 where
     I: serde::Serialize + std::fmt::Debug,
 {
-    HDK.with(|h| {
-        h.borrow().call_remote(CallRemote::new(
-            agent,
-            zome,
-            fn_name,
-            cap_secret,
-            ExternIO::encode(payload)?,
-        ))
-    })
+    Ok(HDK
+        .with(|h| {
+            h.borrow().call(vec![Call::new(
+                CallTarget::NetworkAgent(agent),
+                zome,
+                fn_name,
+                cap_secret,
+                ExternIO::encode(payload)?,
+            )])
+        })?
+        .into_iter()
+        .next()
+        .unwrap())
 }
 
 /// Emit an app-defined Signal.

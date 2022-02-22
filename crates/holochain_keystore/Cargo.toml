@@ -1,24 +1,32 @@
 [package]
 name = "holochain_keystore"
-version = "0.0.1"
+version = "0.0.26"
 description = "keystore for libsodium keypairs"
 license-file = "LICENSE_CAL-1.0"
 homepage = "https://github.com/holochain/holochain"
-documentation = "https://github.com/holochain/holochain"
+documentation = "https://docs.rs/holochain_keystore"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 keywords = [ "holochain", "holo", "nacl", "libsodium", "cryptography" ]
 categories = [ "cryptography" ]
 edition = "2018"
 
 [dependencies]
-ghost_actor = "0.3.0-alpha.1"
-holo_hash = { version = "^0.0.2-alpha.1", path = "../holo_hash", features = ["full"] }
-holochain_serialized_bytes = "=0.0.50"
-holochain_zome_types = { path = "../holochain_zome_types" }
-lair_keystore_api = "=0.0.1-alpha.11"
-lair_keystore_client = "=0.0.1-alpha.11"
+base64 = "0.13.0"
+ghost_actor = "=0.3.0-alpha.4"
+holo_hash = { version = "0.0.19", path = "../holo_hash", features = ["full"] }
+holochain_serialized_bytes = "=0.0.51"
+holochain_zome_types = { path = "../holochain_zome_types", version = "0.0.24"}
+kitsune_p2p_types = { version = "0.0.17", path = "../kitsune_p2p/types" }
+lair_keystore_client_0_0 = { version = "=0.0.9", package = "lair_keystore_client" }
+nanoid = "0.4.0"
+one_err = "0.0.5"
 serde = { version = "1.0", features = [ "derive" ] }
 serde_bytes = "0.11"
+sodoken = "=0.0.1"
 thiserror = "1.0.22"
-tokio = { version = "1.3", features = [ "full" ] }
+tokio = { version = "1.11", features = [ "full" ] }
 tracing = "0.1"
+
+# This is a redundant dependency.
+# It's included only to set the proper feature flag for database encryption.
+holochain_sqlite = { version = "0.0.26", path = "../holochain_sqlite" }

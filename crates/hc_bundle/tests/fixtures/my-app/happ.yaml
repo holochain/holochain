@@ -4,23 +4,23 @@ manifest_version: "1"
 name: fixture-app
 description: it's an app
 
-slots:
-  - id: slot-1
+roles:
+  - id: role-1
     provisioning:
       strategy: create
       deferred: false
     dna:
       bundled: dnas/dna1/a dna.dna
-      uuid: 0123456
+      uid: 0123456
       properties: ~
       clone_limit: 0
-  - id: slot-2
+  - id: role-2
     provisioning:
       strategy: create
       deferred: true
     dna:
       bundled: dnas/dna2/another dna.dna
-      uuid: ~
+      uid: ~
       properties:
         foo: 1111
         bar: it could be anything

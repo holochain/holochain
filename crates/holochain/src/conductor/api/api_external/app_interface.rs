@@ -4,7 +4,6 @@ use crate::conductor::api::error::ExternalApiWireError;
 use crate::conductor::api::error::SerializationError;
 use crate::conductor::interface::error::InterfaceError;
 use crate::conductor::interface::error::InterfaceResult;
-use crate::conductor::state::AppInterfaceId;
 use crate::conductor::ConductorHandle;
 
 use holochain_serialized_bytes::prelude::*;
@@ -26,12 +25,14 @@ pub trait AppInterfaceApi: 'static + Send + Sync + Clone {
 
     /// Deal with error cases produced by `handle_app_request_inner`
     async fn handle_app_request(&self, request: AppRequest) -> AppResponse {
-        let res = self.handle_app_request_inner(request).await;
+        tracing::debug!("app request: {:?}", request);
 
-        match res {
+        let res = match self.handle_app_request_inner(request).await {
             Ok(response) => response,
             Err(e) => AppResponse::Error(e.into()),
-        }
+        };
+        tracing::debug!("app response: {:?}", res);
+        res
     }
 }
 
@@ -40,16 +41,12 @@ pub trait AppInterfaceApi: 'static + Send + Sync + Clone {
 #[derive(Clone)]
 pub struct RealAppInterfaceApi {
     conductor_handle: ConductorHandle,
-    interface_id: AppInterfaceId,
 }
 
 impl RealAppInterfaceApi {
     /// Create a new instance from a shared Conductor reference
-    pub fn new(conductor_handle: ConductorHandle, interface_id: AppInterfaceId) -> Self {
-        Self {
-            conductor_handle,
-            interface_id,
-        }
+    pub fn new(conductor_handle: ConductorHandle) -> Self {
+        Self { conductor_handle }
     }
 }
 
@@ -87,13 +84,19 @@ impl AppInterfaceApi for RealAppInterfaceApi {
                     Ok(ZomeCallResponse::Unauthorized(_, _, _, _)) => Ok(AppResponse::Error(
                         ExternalApiWireError::ZomeCallUnauthorized(format!(
                             "No capabilities grant has been committed that allows the CapSecret {:?} to call the function {} in zome {}",
-                            call.cap, call.fn_name, call.zome_name
+                            call.cap_secret, call.fn_name, call.zome_name
                         )),
                     )),
                     Ok(ZomeCallResponse::NetworkError(e)) => unreachable!(
                         "Interface zome calls should never be routed to the network. This is a bug. Got {}",
                         e
                     ),
+                    Ok(ZomeCallResponse::CountersigningSession(e)) => Ok(AppResponse::Error(
+                        ExternalApiWireError::CountersigningSessionError(format!(
+                            "A countersigning session has failed to start on this zome call because: {}",
+                            e
+                        )),
+                    )),
                     Err(e) => Ok(AppResponse::Error(e.into())),
                 }
             }
@@ -114,7 +117,6 @@ impl InterfaceApi for RealAppInterfaceApi {
         {
             self.conductor_handle
                 .check_running()
-                .await
                 .map_err(Box::new)
                 .map_err(InterfaceError::RequestHandler)?;
         }

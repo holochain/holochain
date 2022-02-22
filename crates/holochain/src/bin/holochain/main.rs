@@ -5,7 +5,12 @@ use holochain::conductor::paths::ConfigFilePath;
 use holochain::conductor::Conductor;
 use holochain::conductor::ConductorHandle;
 use holochain_conductor_api::conductor::ConductorConfigError;
+use holochain_conductor_api::config::conductor::KeystoreConfig;
+use holochain_util::tokio_helper;
+use kitsune_p2p_types::dependencies::lair_keystore_api::LairResult;
 use observability::Output;
+#[cfg(unix)]
+use sd_notify::{notify, NotifyState};
 use std::path::PathBuf;
 use structopt::StructOpt;
 use tracing::*;
@@ -35,6 +40,14 @@ struct Opt {
     )]
     config_path: Option<PathBuf>,
 
+    /// Instead of the normal "interactive" method of passphrase
+    /// retreival, read the passphrase from stdin. Be careful
+    /// how you make use of this, as it could be less secure,
+    /// for example, make sure it is not saved in your
+    /// `~/.bash_history`.
+    #[structopt(short = "p", long)]
+    pub piped: bool,
+
     #[structopt(
         short = "i",
         long,
@@ -42,6 +55,12 @@ struct Opt {
     useful when running a conductor for the first time"
     )]
     interactive: bool,
+
+    #[structopt(
+        long,
+        help = "Display version information such as git revision and HDK version"
+    )]
+    build_info: bool,
 }
 
 fn main() {
@@ -56,11 +75,18 @@ async fn async_main() {
     human_panic::setup_panic!();
 
     let opt = Opt::from_args();
-    observability::init_fmt(opt.structured).expect("Failed to start contextual logging");
+
+    if opt.build_info {
+        println!("{}", option_env!("BUILD_INFO").unwrap_or("{}"));
+        return;
+    }
+
+    observability::init_fmt(opt.structured.clone()).expect("Failed to start contextual logging");
     debug!("observability initialized");
 
-    let conductor =
-        conductor_handle_from_config_path(opt.config_path.clone(), opt.interactive).await;
+    kitsune_p2p_types::metrics::init_sys_info_poll();
+
+    let conductor = conductor_handle_from_config_path(&opt).await;
 
     info!("Conductor successfully initialized.");
 
@@ -69,11 +95,16 @@ async fn async_main() {
     // interfaces are running, and can be connected to.
     println!("{}", MAGIC_CONDUCTOR_READY_STRING);
 
+    // Lets systemd units know that holochain is ready via sd_notify socket
+    // Requires NotifyAccess=all and Type=notify attributes on holochain systemd unit
+    // and NotifyAccess=all on dependant systemd unit
+    #[cfg(unix)]
+    let _ = notify(true, &[NotifyState::Ready]);
+
     // Await on the main JoinHandle, keeping the process alive until all
     // Conductor activity has ceased
     let result = conductor
         .take_shutdown_handle()
-        .await
         .expect("The shutdown handle has already been taken.")
         .await;
 
@@ -83,15 +114,86 @@ async fn async_main() {
     // conductor.kill().await
 }
 
-async fn conductor_handle_from_config_path(
-    config_path: Option<PathBuf>,
-    interactive: bool,
-) -> ConductorHandle {
+fn vec_to_locked(mut pass_tmp: Vec<u8>) -> LairResult<sodoken::BufRead> {
+    match sodoken::BufWrite::new_mem_locked(pass_tmp.len()) {
+        Err(e) => {
+            pass_tmp.fill(0);
+            Err(e)
+        }
+        Ok(p) => {
+            {
+                let mut lock = p.write_lock();
+                lock.copy_from_slice(&pass_tmp);
+                pass_tmp.fill(0);
+            }
+            Ok(p.to_read())
+        }
+    }
+}
+
+async fn read_interactive_passphrase(prompt: &str) -> LairResult<sodoken::BufRead> {
+    let prompt = prompt.to_owned();
+    let pass_tmp = tokio::task::spawn_blocking(move || {
+        LairResult::Ok(
+            rpassword::read_password_from_tty(Some(&prompt))
+                .map_err(one_err::OneErr::new)?
+                .into_bytes(),
+        )
+    })
+    .await
+    .map_err(one_err::OneErr::new)??;
+
+    vec_to_locked(pass_tmp)
+}
+
+async fn read_piped_passphrase() -> LairResult<sodoken::BufRead> {
+    use std::io::Read;
+    Ok(tokio::task::spawn_blocking(move || {
+        let stdin = std::io::stdin();
+        let mut stdin = stdin.lock();
+        let passphrase = <sodoken::BufWriteSized<512>>::new_mem_locked()?;
+        let mut next_char = 0;
+        loop {
+            let mut lock = passphrase.write_lock();
+            let done = match stdin.read_exact(&mut lock[next_char..next_char + 1]) {
+                Ok(_) => {
+                    if lock[next_char] == 10 {
+                        true
+                    } else {
+                        next_char += 1;
+                        false
+                    }
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => true,
+                Err(e) => return Err(e),
+            };
+            if done {
+                if next_char == 0 {
+                    return Ok(sodoken::BufWrite::new_no_lock(0).to_read());
+                }
+                if lock[next_char - 1] == 13 {
+                    next_char -= 1;
+                }
+                let out = sodoken::BufWrite::new_mem_locked(next_char)?;
+                {
+                    let mut out_lock = out.write_lock();
+                    out_lock.copy_from_slice(&lock[..next_char]);
+                }
+                return Ok(out.to_read());
+            }
+        }
+    })
+    .await
+    .map_err(one_err::OneErr::new)??)
+}
+
+async fn conductor_handle_from_config_path(opt: &Opt) -> ConductorHandle {
+    let config_path = opt.config_path.clone();
     let config_path_default = config_path.is_none();
     let config_path: ConfigFilePath = config_path.map(Into::into).unwrap_or_default();
     debug!("config_path: {}", config_path);
 
-    let config: ConductorConfig = if interactive {
+    let config: ConductorConfig = if opt.interactive {
         // Load config, offer to create default config if missing
         interactive::load_config_or_prompt_for_default(config_path)
             .expect("Could not load conductor config")
@@ -103,19 +205,37 @@ async fn conductor_handle_from_config_path(
         load_config(&config_path, config_path_default)
     };
 
-    // Check if LMDB env dir is present
+    // read the passphrase to prepare for usage,
+    // but we don't have any keystore config types that use this yet.
+    let passphrase = match &config.keystore {
+        KeystoreConfig::DangerTestKeystoreLegacyDeprecated => None,
+        KeystoreConfig::LairServerLegacyDeprecated { .. } => None,
+        _ => {
+            if opt.piped {
+                Some(read_piped_passphrase().await.unwrap())
+            } else {
+                Some(
+                    read_interactive_passphrase("\n# passphrase> ")
+                        .await
+                        .unwrap(),
+                )
+            }
+        }
+    };
+
+    // Check if database is present
     // In interactive mode give the user a chance to create it, otherwise create it automatically
     let env_path = PathBuf::from(config.environment_path.clone());
     if !env_path.is_dir() {
-        let result = if interactive {
-            interactive::prompt_for_environment_dir(&env_path)
+        let result = if opt.interactive {
+            interactive::prompt_for_database_dir(&env_path)
         } else {
             std::fs::create_dir_all(&env_path)
         };
         match result {
-            Ok(()) => println!("Created LMDB environment at {}.", env_path.display()),
+            Ok(()) => println!("Created database at {}.", env_path.display()),
             Err(e) => {
-                println!("Couldn't create LMDB environment: {}", e);
+                println!("Couldn't create database: {}", e);
                 std::process::exit(ERROR_CODE);
             }
         }
@@ -124,6 +244,7 @@ async fn conductor_handle_from_config_path(
     // Initialize the Conductor
     Conductor::builder()
         .config(config)
+        .passphrase(passphrase)
         .build()
         .await
         .expect("Could not initialize Conductor from configuration")

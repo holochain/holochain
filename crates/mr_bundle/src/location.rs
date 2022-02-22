@@ -2,15 +2,17 @@ use crate::{
     error::{BundleError, MrBundleResult},
     ResourceBytes,
 };
+use holochain_util::ffs;
 use std::path::{Path, PathBuf};
 
-/// Where to find a file.
+/// Where to find a Resource.
 ///
 /// This representation, with named fields, is chosen so that in the yaml config
 /// either "path", "url", or "bundled" can be specified due to this field
 /// being flattened.
 #[derive(Clone, Debug, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[allow(missing_docs)]
 pub enum Location {
     /// Expect file to be part of this bundle
@@ -24,6 +26,7 @@ pub enum Location {
 }
 
 impl Location {
+    /// Make a relative Path absolute if possible, given the `root_dir`
     pub fn normalize(&self, root_dir: Option<&PathBuf>) -> MrBundleResult<Location> {
         if let Location::Path(path) = self {
             if path.is_relative() {
@@ -81,12 +84,12 @@ mod tests {
     fn location_flattening() {
         use serde_yaml::Value;
 
-        let r = TunaSalad {
+        let tuna = TunaSalad {
             celery: vec![Location::Bundled("b".into()), Location::Path("p".into())],
             mayo: Location::Url("http://r.co".into()),
         };
-        let val = serde_yaml::to_value(&r).unwrap();
-        println!("yaml produced:\n{}", serde_yaml::to_string(&r).unwrap());
+        let val = serde_yaml::to_value(&tuna).unwrap();
+        println!("yaml produced:\n{}", serde_yaml::to_string(&tuna).unwrap());
 
         assert_eq!(val["celery"][0]["bundled"], Value::from("b"));
         assert_eq!(val["celery"][1]["path"], Value::from("p"));

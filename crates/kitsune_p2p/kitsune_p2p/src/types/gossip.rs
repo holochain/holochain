@@ -1,97 +1,97 @@
-//! # Gossip Event Types
+use crate::metrics::*;
+use crate::types::*;
+use kitsune_p2p_types::config::*;
+use kitsune_p2p_types::tx2::tx2_api::*;
+use kitsune_p2p_types::tx2::tx2_utils::TxUrl;
+use kitsune_p2p_types::*;
+use std::sync::Arc;
 
-use kitsune_p2p_types::dht_arc::DhtArc;
-
-use crate::agent_store::AgentInfoSigned;
-
-use super::*;
-
-#[derive(Debug, derive_more::Constructor)]
-/// Request dht op hashes and
-/// agent store information from an agent.
-/// This is the lightweight hashes only call.
-pub struct ReqOpHashesEvt {
-    /// Agent Requesting the ops.
-    pub from_agent: Arc<KitsuneAgent>,
-    /// The agent you are requesting ops from.
-    pub to_agent: Arc<KitsuneAgent>,
-    /// The arc on the dht that you want ops from.
-    pub dht_arc: DhtArc,
-    /// Get ops from this time.
-    pub since_utc_epoch_s: i64,
-    /// Get ops till this time.
-    pub until_utc_epoch_s: i64,
-    /// Count of the hashes from the requesting agent
-    pub op_count: OpCount,
+#[derive(Clone, Debug, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
+/// The type of gossip module running this gossip.
+pub enum GossipModuleType {
+    /// Simple bloom.
+    Simple,
+    /// Recent sharded gossip.
+    ShardedRecent,
+    /// Historical sharded gossip.
+    ShardedHistorical,
 }
 
-#[derive(Debug, derive_more::Constructor)]
-/// Request dht ops from an agent.
-pub struct ReqOpDataEvt {
-    /// Agent Requesting the ops.
-    pub from_agent: Arc<KitsuneAgent>,
-    /// The agent you are requesting ops from.
-    pub to_agent: Arc<KitsuneAgent>,
-    /// The hashes of the ops you want.
-    pub op_hashes: Vec<Arc<KitsuneOpHash>>,
-    /// The hashes of the agent store information you want.
-    pub peer_hashes: Vec<Arc<KitsuneAgent>>,
+/// Represents an interchangeable gossip strategy module
+pub trait AsGossipModule: 'static + Send + Sync {
+    fn close(&self);
+    fn incoming_gossip(
+        &self,
+        con: Tx2ConHnd<wire::Wire>,
+        remote_url: TxUrl,
+        gossip_data: Box<[u8]>,
+    ) -> KitsuneResult<()>;
+    fn local_agent_join(&self, a: Arc<KitsuneAgent>);
+    fn local_agent_leave(&self, a: Arc<KitsuneAgent>);
+    fn new_integrated_data(&self) {}
 }
 
-#[derive(Debug, derive_more::Constructor)]
-/// Request dht ops from an agent.
-pub struct GossipEvt {
-    /// Agent sending gossip.
-    pub from_agent: Arc<KitsuneAgent>,
-    /// The agent receiving gossip.
-    pub to_agent: Arc<KitsuneAgent>,
-    /// The ops being send in this gossip.
-    pub ops: Vec<(Arc<KitsuneOpHash>, Vec<u8>)>,
-    /// The agent info in this gossip.
-    pub agents: Vec<AgentInfoSigned>,
+#[derive(Clone)]
+pub struct GossipModule(pub Arc<dyn AsGossipModule>);
+
+impl GossipModule {
+    pub fn close(&self) {
+        self.0.close()
+    }
+
+    pub fn incoming_gossip(
+        &self,
+        con: Tx2ConHnd<wire::Wire>,
+        remote_url: TxUrl,
+        gossip_data: Box<[u8]>,
+    ) -> KitsuneResult<()> {
+        self.0.incoming_gossip(con, remote_url, gossip_data)
+    }
+
+    pub fn local_agent_join(&self, a: Arc<KitsuneAgent>) {
+        self.0.local_agent_join(a);
+    }
+
+    pub fn local_agent_leave(&self, a: Arc<KitsuneAgent>) {
+        self.0.local_agent_leave(a);
+    }
+
+    /// New data has been integrated and is ready for gossiping.
+    pub fn new_integrated_data(&self) {
+        self.0.new_integrated_data();
+    }
 }
 
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-/// Type for responding to a request for dht op hashes.
-/// If the count hasn't changed then the hashes are consistent
-/// otherwise there is a change in the data and new hashes are sent.
-pub enum OpConsistency {
-    /// There is new hashes since last gossip request.
-    Variance(OpHashes),
-    /// Gossip is consistent since the last call.
-    Consistent,
+impl std::fmt::Debug for GossipModule {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("GossipModule").finish()
+    }
 }
 
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-/// The count of ops last seen from the requester.
-/// If the requester has a variance then the
-/// responder needs to reply with hashes.
-pub enum OpCount {
-    /// Requestor has a variance since they last
-    /// gossiped to this agent.
-    Variance,
-    /// Requestor is consistent since last gossip
-    /// and this is the count they saw from
-    /// this agent.
-    Consistent(u64),
+/// Represents an interchangeable gossip strategy module factory
+pub trait AsGossipModuleFactory: 'static + Send + Sync {
+    fn spawn_gossip_task(
+        &self,
+        tuning_params: KitsuneP2pTuningParams,
+        space: Arc<KitsuneSpace>,
+        ep_hnd: Tx2EpHnd<wire::Wire>,
+        evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
+        metrics: MetricsSync,
+    ) -> GossipModule;
 }
 
-/// Dht Op hashes that an agent holds
-pub type OpHashes = Vec<Arc<KitsuneOpHash>>;
+pub struct GossipModuleFactory(pub Arc<dyn AsGossipModuleFactory>);
 
-/// Dht op and agent hashes that the agent has information on.
-pub type OpHashesAgentHashes = (OpConsistency, Vec<(Arc<KitsuneAgent>, u64)>);
-
-/// Dht op and agent hashes that the agent has information on.
-/// Same as [OpHashesAgentHashes] but without consistency information.
-pub type LocalOpHashesAgentHashes = (OpHashes, Vec<(Arc<KitsuneAgent>, u64)>);
-/// The Dht op data and agent store information
-pub type OpDataAgentInfo = (Vec<(Arc<KitsuneOpHash>, Vec<u8>)>, Vec<AgentInfoSigned>);
-/// Local and remote neighbors.
-pub type ListNeighborAgents = (Vec<Arc<KitsuneAgent>>, Vec<Arc<KitsuneAgent>>);
-
-impl Default for OpCount {
-    fn default() -> Self {
-        OpCount::Variance
+impl GossipModuleFactory {
+    pub fn spawn_gossip_task(
+        &self,
+        tuning_params: KitsuneP2pTuningParams,
+        space: Arc<KitsuneSpace>,
+        ep_hnd: Tx2EpHnd<wire::Wire>,
+        evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
+        metrics: MetricsSync,
+    ) -> GossipModule {
+        self.0
+            .spawn_gossip_task(tuning_params, space, ep_hnd, evt_sender, metrics)
     }
 }

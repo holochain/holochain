@@ -69,7 +69,8 @@ pub(crate) type RxFromWebsocket = tokio_stream::wrappers::ReceiverStream<Incomin
 #[derive(Debug)]
 /// When dropped both to / from socket tasks are shutdown.
 pub struct PairShutdown {
-    close_from_socket: Trigger,
+    /// This is here for it's drop impl so it's not actually dead code.
+    _close_from_socket: Trigger,
     close_to_socket: TxToWebsocket,
 }
 
@@ -146,7 +147,7 @@ impl Websocket {
         let (close_from_socket, pair_shutdown) = Valve::new();
         let pair_shutdown_handle = PairShutdown {
             close_to_socket: tx_to_websocket.clone(),
-            close_from_socket,
+            _close_from_socket: close_from_socket,
         };
         // Only shutdown if both trigger arcs are dropped
         let pair_shutdown_handle = Arc::new(pair_shutdown_handle);
@@ -664,13 +665,13 @@ impl Websocket {
             Ok(_) => {
                 // We are done responding, nothing
                 // else to do in this loop so continue.
-                return Task::cont();
+                Task::cont()
             }
             Err(e) => {
                 // Failed to handle the response so we need to
                 // shutdown.
                 tracing::error!(handle_response_error = ?e);
-                return Task::exit();
+                Task::exit()
             }
         }
     }
@@ -801,7 +802,7 @@ mod tests {
 
         let msg = SerializedBytes::from(UnsafeBytes::from(vec![0u8]));
         sender
-            .request_timeout::<_, SerializedBytes, _, _>(msg, std::time::Duration::from_secs(1))
+            .request_timeout::<_, SerializedBytes>(msg, std::time::Duration::from_secs(1))
             .await
             .ok();
         tokio::time::sleep(std::time::Duration::from_secs(1)).await;

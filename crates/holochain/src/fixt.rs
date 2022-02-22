@@ -23,22 +23,20 @@ use crate::core::ribosome::guest_callback::validation_package::ValidationPackage
 use crate::core::ribosome::real_ribosome::RealRibosome;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::FnComponents;
-use crate::core::ribosome::HostAccess;
+use crate::core::ribosome::HostContext;
+use crate::core::ribosome::InvocationAuth;
 use crate::core::ribosome::ZomeCallHostAccess;
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::ribosome::ZomesToInvoke;
-use crate::core::workflow::CallZomeWorkspace;
-use crate::core::workflow::CallZomeWorkspaceLock;
+use crate::test_utils::fake_genesis;
 use ::fixt::prelude::*;
 pub use holo_hash::fixt::*;
-use holo_hash::EntryHash;
-use holo_hash::HeaderHash;
 use holo_hash::WasmHash;
-use holochain_keystore::keystore_actor::KeystoreSender;
-use holochain_lmdb::test_utils::test_keystore;
-use holochain_p2p::HolochainP2pCellFixturator;
-use holochain_state::metadata::LinkMetaVal;
-use holochain_types::fixt::TimestampFixturator;
+use holochain_keystore::MetaLairClient;
+use holochain_p2p::HolochainP2pDnaFixturator;
+use holochain_state::host_fn_workspace::HostFnWorkspace;
+use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
+use holochain_state::test_utils::test_keystore;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 use rand::seq::IteratorRandom;
@@ -133,16 +131,14 @@ fixturator!(
 );
 
 fixturator!(
-    DnaFile,
-    {
+    DnaFile;
+    curve Empty {
         DnaFile::from_parts(
-            tokio_helper::block_forever_on(async move {
-                DnaDefHashed::from_content_sync(DnaDefFixturator::new(Empty).next().unwrap())
-            }),
+            DnaDefFixturator::new(Empty).next().unwrap().into_hashed(),
             WasmMapFixturator::new(Empty).next().unwrap(),
         )
-    },
-    {
+    };
+    curve Unpredictable {
         // align the wasm hashes across the file and def
         let mut zome_name_fixturator = ZomeNameFixturator::new(Unpredictable);
         let wasms = WasmMapFixturator::new(Unpredictable).next().unwrap();
@@ -150,19 +146,17 @@ fixturator!(
         for (hash, _) in wasms {
             zomes.push((
                 zome_name_fixturator.next().unwrap(),
-                WasmZome {
+                ZomeDef::Wasm(WasmZome {
                     wasm_hash: hash.to_owned(),
-                }
-                .into(),
+                }),
             ));
         }
         let mut dna_def = DnaDefFixturator::new(Unpredictable).next().unwrap();
         dna_def.zomes = zomes;
-        let dna =
-            tokio_helper::block_forever_on(async move { DnaDefHashed::from_content_sync(dna_def) });
+        let dna = dna_def.into_hashed();
         DnaFile::from_parts(dna, WasmMapFixturator::new(Unpredictable).next().unwrap())
-    },
-    {
+    };
+    curve Predictable {
         // align the wasm hashes across the file and def
         let mut zome_name_fixturator =
             ZomeNameFixturator::new_indexed(Predictable, get_fixt_index!());
@@ -173,69 +167,42 @@ fixturator!(
         for (hash, _) in wasms {
             zomes.push((
                 zome_name_fixturator.next().unwrap(),
-                WasmZome {
+                ZomeDef::Wasm(WasmZome {
                     wasm_hash: hash.to_owned(),
-                }
-                .into(),
+                }),
             ));
         }
         let mut dna_def = DnaDefFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap();
         dna_def.zomes = zomes;
-        let dna =
-            tokio_helper::block_forever_on(async move { DnaDefHashed::from_content_sync(dna_def) });
+        let dna = dna_def.into_hashed();
         DnaFile::from_parts(
             dna,
             WasmMapFixturator::new_indexed(Predictable, get_fixt_index!())
                 .next()
                 .unwrap(),
         )
-    }
+    };
 );
 
-fixturator!(
-    LinkMetaVal;
-    constructor fn new(HeaderHash, EntryHash, Timestamp, u8, LinkTag);
-);
+// fixturator!(
+//     LinkMetaVal;
+//     constructor fn new(HeaderHash, EntryHash, Timestamp, u8, LinkTag);
+// );
 
-impl Iterator for LinkMetaValFixturator<(EntryHash, LinkTag)> {
-    type Item = LinkMetaVal;
-    fn next(&mut self) -> Option<Self::Item> {
-        let mut f = fixt!(LinkMetaVal);
-        f.target = self.0.curve.0.clone();
-        f.tag = self.0.curve.1.clone();
-        Some(f)
-    }
-}
-
-fixturator!(
-    HeaderHashes,
-    vec![].into(),
-    {
-        let mut rng = rand::thread_rng();
-        let number_of_hashes = rng.gen_range(0, 5);
-
-        let mut hashes: Vec<HeaderHash> = vec![];
-        let mut header_hash_fixturator = HeaderHashFixturator::new(Unpredictable);
-        for _ in 0..number_of_hashes {
-            hashes.push(header_hash_fixturator.next().unwrap());
-        }
-        hashes.into()
-    },
-    {
-        let mut hashes: Vec<HeaderHash> = vec![];
-        let mut header_hash_fixturator =
-            HeaderHashFixturator::new_indexed(Predictable, get_fixt_index!());
-        for _ in 0..3 {
-            hashes.push(header_hash_fixturator.next().unwrap());
-        }
-        hashes.into()
-    }
-);
+// impl Iterator for LinkMetaValFixturator<(EntryHash, LinkTag)> {
+//     type Item = LinkMetaVal;
+//     fn next(&mut self) -> Option<Self::Item> {
+//         let mut f = fixt!(LinkMetaVal);
+//         f.target = self.0.curve.0.clone();
+//         f.tag = self.0.curve.1.clone();
+//         Some(f)
+//     }
+// }
 
 fixturator!(
-    KeystoreSender;
+    MetaLairClient;
     curve Empty {
         tokio_helper::block_forever_on(async {
             // an empty keystore
@@ -265,28 +232,121 @@ fixturator!(
     };
 );
 
+// XXX: This may not be great to just grab an environment for this purpose.
+//      It is assumed that this value is never really used in any "real"
+//      way, because previously, it was implemented as a null pointer
+//      wrapped in an UnsafeZomeCallWorkspace
 fixturator!(
-    CallZomeWorkspaceLock;
+    HostFnWorkspace;
     curve Empty {
-        // XXX: This may not be great to just grab an environment for this purpose.
-        //      It is assumed that this value is never really used in any "real"
-        //      way, because previously, it was implemented as a null pointer
-        //      wrapped in an UnsafeZomeCallWorkspace
-        let env = holochain_lmdb::test_utils::test_cell_env();
-        CallZomeWorkspaceLock::new(CallZomeWorkspace::new(env.env().into()).unwrap())
+        let authored_env = holochain_state::test_utils::test_authored_env_with_id(get_fixt_index!() as u8);
+        let dht_env = holochain_state::test_utils::test_dht_env_with_id(get_fixt_index!() as u8);
+        let cache = holochain_state::test_utils::test_cache_env();
+        let keystore = holochain_state::test_utils::test_keystore();
+        tokio_helper::block_forever_on(async {
+            fake_genesis(authored_env.env(), dht_env.env(), keystore.clone()).await.unwrap();
+            HostFnWorkspace::new(
+                authored_env.env(),
+                dht_env.env(),
+                cache.env(),
+                keystore,
+                Some(fixt!(AgentPubKey, Predictable, get_fixt_index!())),
+                Arc::new(fixt!(DnaDef))
+            ).await.unwrap()
+        })
     };
     curve Unpredictable {
-        CallZomeWorkspaceLockFixturator::new(Empty)
-            .next()
-            .unwrap()
+        let authored_env = holochain_state::test_utils::test_authored_env_with_id(get_fixt_index!() as u8);
+        let dht_env = holochain_state::test_utils::test_dht_env_with_id(get_fixt_index!() as u8);
+        let cache = holochain_state::test_utils::test_cache_env();
+        let keystore = holochain_state::test_utils::test_keystore();
+        tokio_helper::block_forever_on(async {
+            fake_genesis(authored_env.env(), dht_env.env(), keystore.clone()).await.unwrap();
+            HostFnWorkspace::new(
+                authored_env.env(),
+                dht_env.env(),
+                cache.env(),
+                keystore,
+                Some(fixt!(AgentPubKey, Predictable, get_fixt_index!())),
+                Arc::new(fixt!(DnaDef))
+            ).await.unwrap()
+        })
     };
     curve Predictable {
-        CallZomeWorkspaceLockFixturator::new(Empty)
-            .next()
-            .unwrap()
+        let authored_env = holochain_state::test_utils::test_authored_env_with_id(get_fixt_index!() as u8);
+        let dht_env = holochain_state::test_utils::test_dht_env_with_id(get_fixt_index!() as u8);
+        let cache = holochain_state::test_utils::test_cache_env_with_id(get_fixt_index!() as u8);
+        let agent = fixt!(AgentPubKey, Predictable, get_fixt_index!());
+        let keystore = holochain_state::test_utils::test_keystore();
+        tokio_helper::block_forever_on(async {
+            crate::test_utils::fake_genesis_for_agent(authored_env.env(), dht_env.env(), agent.clone(), keystore.clone()).await.unwrap();
+            HostFnWorkspace::new(
+                authored_env.env(),
+                dht_env.env(),
+                cache.env(),
+                keystore,
+                Some(agent),
+                Arc::new(fixt!(DnaDef))
+            ).await.unwrap()
+        })
     };
 );
 
+fixturator!(
+    HostFnWorkspaceRead;
+    curve Empty {
+        let authored_env = holochain_state::test_utils::test_authored_env_with_id(get_fixt_index!() as u8);
+        let dht_env = holochain_state::test_utils::test_dht_env_with_id(get_fixt_index!() as u8);
+        let cache = holochain_state::test_utils::test_cache_env();
+        let keystore = holochain_state::test_utils::test_keystore();
+        tokio_helper::block_forever_on(async {
+            fake_genesis(authored_env.env(), dht_env.env(), keystore.clone()).await.unwrap();
+            HostFnWorkspaceRead::new(
+                authored_env.env().into(),
+                dht_env.env().into(),
+                cache.env(),
+                keystore,
+                Some(fixt!(AgentPubKey, Predictable, get_fixt_index!())),
+                Arc::new(fixt!(DnaDef))
+            ).await.unwrap()
+        })
+    };
+    curve Unpredictable {
+        let authored_env = holochain_state::test_utils::test_authored_env_with_id(get_fixt_index!() as u8);
+        let dht_env = holochain_state::test_utils::test_dht_env_with_id(get_fixt_index!() as u8);
+        let cache = holochain_state::test_utils::test_cache_env();
+        let keystore = holochain_state::test_utils::test_keystore();
+        tokio_helper::block_forever_on(async {
+            fake_genesis(authored_env.env(), dht_env.env(), keystore.clone()).await.unwrap();
+            HostFnWorkspaceRead::new(
+                authored_env.env().into(),
+                dht_env.env().into(),
+                cache.env(),
+                keystore,
+                Some(fixt!(AgentPubKey, Predictable, get_fixt_index!())),
+                Arc::new(fixt!(DnaDef))
+            ).await.unwrap()
+        })
+    };
+    curve Predictable {
+        let authored_env = holochain_state::test_utils::test_authored_env_with_id(get_fixt_index!() as u8);
+        let dht_env = holochain_state::test_utils::test_dht_env_with_id(get_fixt_index!() as u8);
+        let cache = holochain_state::test_utils::test_cache_env_with_id(get_fixt_index!() as u8);
+        let agent = fixt!(AgentPubKey, Predictable, get_fixt_index!());
+        let keystore = holochain_state::test_utils::test_keystore();
+        tokio_helper::block_forever_on(async {
+            crate::test_utils::fake_genesis_for_agent(authored_env.env(), dht_env.env(), agent.clone(), keystore.clone()).await.unwrap();
+            HostFnWorkspaceRead::new(
+                authored_env.env().into(),
+                dht_env.env().into(),
+                cache.env(),
+                keystore,
+                Some(agent),
+                Arc::new(fixt!(DnaDef))
+            ).await.unwrap()
+        })
+    };
+);
 fn make_call_zome_handle(cell_id: CellId) -> CellConductorReadHandle {
     let handle = Arc::new(MockConductorHandleT::new());
     let cell_conductor_api = CellConductorApi::new(handle, cell_id);
@@ -300,7 +360,7 @@ fixturator!(
 
 fixturator!(
     ZomeCallHostAccess;
-    constructor fn new(CallZomeWorkspaceLock, KeystoreSender, HolochainP2pCell, SignalBroadcaster, CellConductorReadHandle, CellId);
+    constructor fn new(HostFnWorkspace, MetaLairClient, HolochainP2pDna, SignalBroadcaster, CellConductorReadHandle);
 );
 
 fixturator!(
@@ -320,7 +380,7 @@ fixturator!(
 
 fixturator!(
     InitHostAccess;
-    constructor fn new(CallZomeWorkspaceLock, KeystoreSender, HolochainP2pCell);
+    constructor fn new(HostFnWorkspace, MetaLairClient, HolochainP2pDna, SignalBroadcaster, CellConductorReadHandle);
 );
 
 fixturator!(
@@ -330,17 +390,17 @@ fixturator!(
 
 fixturator!(
     MigrateAgentHostAccess;
-    constructor fn new(CallZomeWorkspaceLock);
+    constructor fn new(HostFnWorkspace);
 );
 
 fixturator!(
     PostCommitInvocation;
-    constructor fn new(Zome, HeaderHashes);
+    constructor fn new(Zome, SignedHeaderHashedVec);
 );
 
 fixturator!(
     PostCommitHostAccess;
-    constructor fn new(CallZomeWorkspaceLock, KeystoreSender, HolochainP2pCell);
+    constructor fn new(HostFnWorkspace, MetaLairClient, HolochainP2pDna);
 );
 
 fixturator!(
@@ -400,12 +460,12 @@ fixturator!(
 
 fixturator!(
     ValidateLinkHostAccess;
-    constructor fn new(CallZomeWorkspaceLock, HolochainP2pCell);
+    constructor fn new(HostFnWorkspace, HolochainP2pDna);
 );
 
 fixturator!(
     ValidateHostAccess;
-    constructor fn new(CallZomeWorkspaceLock, HolochainP2pCell);
+    constructor fn new(HostFnWorkspace, HolochainP2pDna);
 );
 
 fixturator!(
@@ -415,11 +475,11 @@ fixturator!(
 
 fixturator!(
     ValidationPackageHostAccess;
-    constructor fn new(CallZomeWorkspaceLock, HolochainP2pCell);
+    constructor fn new(HostFnWorkspace, HolochainP2pDna);
 );
 
 fixturator!(
-    HostAccess;
+    HostContext;
     variants [
         ZomeCall(ZomeCallHostAccess)
         Validate(ValidateHostAccess)
@@ -432,8 +492,13 @@ fixturator!(
 );
 
 fixturator!(
+    InvocationAuth;
+    constructor fn new(AgentPubKey, CapSecret);
+);
+
+fixturator!(
     CallContext;
-    constructor fn new(Zome, HostAccess);
+    constructor fn new(Zome, FunctionName, HostContext, InvocationAuth);
 );
 
 fixturator!(
@@ -441,7 +506,7 @@ fixturator!(
     curve Empty ZomeCallInvocation {
         cell_id: CellIdFixturator::new(Empty).next().unwrap(),
         zome: ZomeFixturator::new(Empty).next().unwrap(),
-        cap: Some(CapSecretFixturator::new(Empty).next().unwrap()),
+        cap_secret: Some(CapSecretFixturator::new(Empty).next().unwrap()),
         fn_name: FunctionNameFixturator::new(Empty).next().unwrap(),
         payload: ExternIoFixturator::new(Empty).next().unwrap(),
         provenance: AgentPubKeyFixturator::new(Empty).next().unwrap(),
@@ -449,7 +514,7 @@ fixturator!(
     curve Unpredictable ZomeCallInvocation {
         cell_id: CellIdFixturator::new(Unpredictable).next().unwrap(),
         zome: ZomeFixturator::new(Unpredictable).next().unwrap(),
-        cap: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
+        cap_secret: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
         fn_name: FunctionNameFixturator::new(Unpredictable).next().unwrap(),
         payload: ExternIoFixturator::new(Unpredictable).next().unwrap(),
         provenance: AgentPubKeyFixturator::new(Unpredictable).next().unwrap(),
@@ -461,7 +526,7 @@ fixturator!(
         zome: ZomeFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap(),
-        cap: Some(CapSecretFixturator::new_indexed(Predictable, get_fixt_index!())
+        cap_secret: Some(CapSecretFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap()),
         fn_name: FunctionNameFixturator::new_indexed(Predictable, get_fixt_index!())
@@ -487,13 +552,13 @@ impl Iterator for ZomeCallInvocationFixturator<NamedInvocation> {
             .next()
             .unwrap();
         ret.cell_id = self.0.curve.0.clone();
-        ret.zome = self.0.curve.1.clone().into();
+        ret.zome = self.0.curve.1.into();
         ret.fn_name = self.0.curve.2.clone().into();
         ret.payload = self.0.curve.3.clone();
 
         // simulate a local transaction by setting the cap to empty and matching the provenance of
         // the call to the cell id
-        ret.cap = None;
+        ret.cap_secret = None;
         ret.provenance = ret.cell_id.agent_pubkey().clone();
 
         Some(ret)

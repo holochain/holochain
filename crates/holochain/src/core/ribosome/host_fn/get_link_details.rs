@@ -1,7 +1,10 @@
 use crate::core::ribosome::CallContext;
+use crate::core::ribosome::HostFnAccess;
+use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
+use futures::future::join_all;
+use holochain_cascade::Cascade;
 use holochain_p2p::actor::GetLinksOptions;
-use holochain_state::metadata::LinkMetaKey;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
 use std::sync::Arc;
@@ -10,122 +13,99 @@ use std::sync::Arc;
 pub fn get_link_details<'a>(
     ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
-    input: GetLinksInput,
-) -> Result<LinkDetails, WasmError> {
-    let GetLinksInput {
-        base_address,
-        tag_prefix,
-    } = input;
-
-    // Get zome id
-    let zome_id = ribosome
-        .zome_to_id(&call_context.zome)
-        .expect("Failed to get ID for current zome.");
-
-    // Get the network from the context
-    let network = call_context.host_access.network().clone();
-
-    tokio_helper::block_forever_on(async move {
-        // Create the key
-        let key = match tag_prefix.as_ref() {
-            Some(tag_prefix) => LinkMetaKey::BaseZomeTag(&base_address, zome_id, tag_prefix),
-            None => LinkMetaKey::BaseZome(&base_address, zome_id),
-        };
-
-        // Get the links from the dht
-        let link_details = LinkDetails::from(
-            call_context
-                .host_access
-                .workspace()
-                .write()
+    inputs: Vec<GetLinksInput>,
+) -> Result<Vec<LinkDetails>, WasmError> {
+    match HostFnAccess::from(&call_context.host_context()) {
+        HostFnAccess {
+            read_workspace: Permission::Allow,
+            ..
+        } => {
+            let results: Vec<Result<Vec<_>, _>> = tokio_helper::block_forever_on(async move {
+                join_all(inputs.into_iter().map(|input| async {
+                    let GetLinksInput {
+                        base_address,
+                        tag_prefix,
+                    } = input;
+                    let zome_id = ribosome
+                        .zome_to_id(&call_context.zome)
+                        .expect("Failed to get ID for current zome.");
+                    let key = WireLinkKey {
+                        base: base_address,
+                        zome_id,
+                        tag: tag_prefix,
+                    };
+                    Cascade::from_workspace_network(
+                        &call_context.host_context.workspace(),
+                        call_context.host_context.network().to_owned(),
+                    )
+                    .get_link_details(key, GetLinksOptions::default())
+                    .await
+                }))
                 .await
-                .cascade(network)
-                .get_link_details(&key, GetLinksOptions::default())
-                .await
-                .map_err(|cascade_error| WasmError::Host(cascade_error.to_string()))?,
-        );
-
-        Ok(link_details)
-    })
+            });
+            let results: Result<Vec<_>, _> = results
+                .into_iter()
+                .map(|result| match result {
+                    Ok(v) => Ok(v.into()),
+                    Err(cascade_error) => Err(WasmError::Host(cascade_error.to_string())),
+                })
+                .collect();
+            Ok(results?)
+        }
+        _ => Err(WasmError::Host(
+            RibosomeError::HostFnPermissions(
+                call_context.zome.zome_name().clone(),
+                call_context.function_name().clone(),
+                "get_link_details".into(),
+            )
+            .to_string(),
+        )),
+    }
 }
 
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod slow_tests {
-    use crate::fixt::ZomeCallHostAccessFixturator;
-    use ::fixt::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::element::SignedHeaderHashed;
     use holochain_zome_types::Header;
+    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_entry_hash_path_children_details() {
-        let test_env = holochain_lmdb::test_utils::test_cell_env();
-        let env = test_env.env();
-
-        let mut workspace =
-            crate::core::workflow::CallZomeWorkspace::new(env.clone().into()).unwrap();
-
-        // commits fail validation if we don't do genesis
-        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
-            .await
-            .unwrap();
-
-        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
-        let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace_lock;
+        observability::test_run().ok();
+        let RibosomeTestFixture {
+            conductor, alice, ..
+        } = RibosomeTestFixture::new(TestWasm::HashPath).await;
 
         // ensure foo.bar twice to ensure idempotency
-        let _: () = crate::call_test_ribosome!(
-            host_access,
-            TestWasm::HashPath,
-            "ensure",
-            "foo.bar".to_string()
-        );
-        let _: () = crate::call_test_ribosome!(
-            host_access,
-            TestWasm::HashPath,
-            "ensure",
-            "foo.bar".to_string()
-        );
+        let _: () = conductor
+            .call(&alice, "ensure", "foo.bar".to_string())
+            .await;
+        let _: () = conductor
+            .call(&alice, "ensure", "foo.bar".to_string())
+            .await;
 
         // ensure foo.baz
-        let _: () = crate::call_test_ribosome!(
-            host_access,
-            TestWasm::HashPath,
-            "ensure",
-            "foo.baz".to_string()
-        );
+        let _: () = conductor
+            .call(&alice, "ensure", "foo.baz".to_string())
+            .await;
 
-        let exists_output: bool = crate::call_test_ribosome!(
-            host_access,
-            TestWasm::HashPath,
-            "exists",
-            "foo".to_string()
-        );
+        let exists_output: bool = conductor.call(&alice, "exists", "foo".to_string()).await;
 
         assert_eq!(true, exists_output,);
 
-        let _foo_bar: holo_hash::EntryHash = crate::call_test_ribosome!(
-            host_access,
-            TestWasm::HashPath,
-            "hash",
-            "foo.bar".to_string()
-        );
+        let _foo_bar: holo_hash::EntryHash = conductor
+            .call(&alice, "path_entry_hash", "foo.bar".to_string())
+            .await;
 
-        let _foo_baz: holo_hash::EntryHash = crate::call_test_ribosome!(
-            host_access,
-            TestWasm::HashPath,
-            "hash",
-            "foo.baz".to_string()
-        );
+        let _foo_baz: holo_hash::EntryHash = conductor
+            .call(&alice, "path_entry_hash", "foo.baz".to_string())
+            .await;
 
-        let children_details_output: holochain_zome_types::link::LinkDetails = crate::call_test_ribosome!(
-            host_access,
-            TestWasm::HashPath,
-            "children_details",
-            "foo".to_string()
-        );
+        let children_details_output: holochain_zome_types::link::LinkDetails = conductor
+            .call(&alice, "children_details", "foo".to_string())
+            .await;
 
         let link_details = children_details_output.into_inner();
 
@@ -133,19 +113,12 @@ pub mod slow_tests {
 
         let to_remove_hash = to_remove.as_hash().clone();
 
-        let _remove_hash: holo_hash::HeaderHash = crate::call_test_ribosome!(
-            host_access,
-            TestWasm::HashPath,
-            "delete_link",
-            to_remove_hash
-        );
+        let _remove_hash: holo_hash::HeaderHash =
+            conductor.call(&alice, "delete_link", to_remove_hash.clone()).await;
 
-        let children_details_output_2: holochain_zome_types::link::LinkDetails = crate::call_test_ribosome!(
-            host_access,
-            TestWasm::HashPath,
-            "children_details",
-            "foo".to_string()
-        );
+        let children_details_output_2: holochain_zome_types::link::LinkDetails = conductor
+            .call(&alice, "children_details", "foo".to_string())
+            .await;
 
         let children_details_output_2_vec = children_details_output_2.into_inner();
         assert_eq!(2, children_details_output_2_vec.len());

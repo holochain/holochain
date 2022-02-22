@@ -3,10 +3,9 @@ use hdk::prelude::Element;
 use hdk::prelude::EntryType;
 use hdk::prelude::ValidationPackage;
 use holo_hash::HeaderHash;
-use holochain_lmdb::env::EnvironmentRead;
-use holochain_lmdb::fresh_reader_test;
 use holochain_p2p::actor::GetActivityOptions;
-use holochain_p2p::HolochainP2pCellT;
+use holochain_p2p::HolochainP2pDnaT;
+use holochain_sqlite::fresh_reader_test;
 use holochain_test_wasm_common::AgentActivitySearch;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
@@ -551,7 +550,7 @@ async fn get_custom_package_test() {
         .unwrap();
 
     {
-        let env: EnvironmentRead = bob_call_data.env.clone().into();
+        let env: DbRead = bob_call_data.env.clone().into();
         let element_integrated = ElementBuf::vault(env.clone(), false).unwrap();
         let meta_integrated = MetadataBuf::vault(env.clone()).unwrap();
         let mut element_cache = ElementBuf::cache(env.clone()).unwrap();
@@ -693,144 +692,4 @@ async fn check_cascade(
         .await
         .unwrap();
     validation_package
-}
-
-#[tokio::test(flavor = "multi_thread")]
-#[ignore = "Only shows a potential problem, doesn't prove something is correct"]
-/// This test shows a potential slow read issue.
-/// The exact same code running here in this test is 10x
-/// faster then when it is run by the cell
-///
-/// This may not turn out to be a real issue, but this illustrates a way to reproduce this behavior,
-/// and may be something we want to investigate more in the future.
-async fn slow_lmdb_reads_test() {
-    let num_commits = std::env::var_os("SLOW_LMDB_COMMITS")
-        .and_then(|s| s.into_string().ok()?.parse::<usize>().ok())
-        .unwrap_or(10);
-    observability::test_run().ok();
-    let zomes = vec![TestWasm::Create];
-    let mut conductor_test = ConductorTestData::two_agents(zomes, false).await;
-    let handle = conductor_test.handle();
-    let alice_call_data = conductor_test.alice_call_data_mut();
-    let alice_env = alice_call_data.env.clone();
-
-    // Commit some data to put some load on the network
-    let mut invocations = vec![];
-    invocations.push(
-        new_zome_call(
-            &alice_call_data.cell_id,
-            "create_entry",
-            (),
-            TestWasm::Create,
-        )
-        .unwrap(),
-    );
-    invocations
-        .push(new_zome_call(&alice_call_data.cell_id, "create_msg", (), TestWasm::Create).unwrap());
-    invocations.push(
-        new_zome_call(
-            &alice_call_data.cell_id,
-            "create_priv_msg",
-            (),
-            TestWasm::Create,
-        )
-        .unwrap(),
-    );
-    for i in 0..num_commits {
-        for invocation in &invocations {
-            let r = handle.call_zome(invocation.clone()).await.unwrap().unwrap();
-            assert_matches!(r, ZomeCallResponse::Ok(_));
-        }
-        let invocation = new_zome_call(
-            &alice_call_data.cell_id,
-            "create_post",
-            Post(format!("{}", i)),
-            TestWasm::Create,
-        )
-        .unwrap();
-        let r = handle.call_zome(invocation.clone()).await.unwrap().unwrap();
-        assert_matches!(r, ZomeCallResponse::Ok(_));
-    }
-
-    let expected_count = 9 + 3 * 3 * num_commits + 2 * num_commits;
-    wait_for_integration(
-        &alice_call_data.env,
-        expected_count,
-        NUM_ATTEMPTS,
-        DELAY_PER_ATTEMPT.clone(),
-    )
-    .await;
-    // Get the source chain hashes
-    let alice_source_chain = SourceChain::new(alice_env.clone().into()).unwrap();
-    let hashes: Vec<_> = alice_source_chain
-        .iter_back()
-        .map(|shh| Ok(shh.header_address().clone()))
-        .collect()
-        .unwrap();
-    let num_headers = hashes.len();
-
-    // Time how long it takes to get the headers
-    let expected_count = 9 + 3 * 2 * num_commits + 2 * num_commits;
-    wait_for_integration(
-        &alice_call_data.env,
-        expected_count,
-        NUM_ATTEMPTS,
-        DELAY_PER_ATTEMPT.clone(),
-    )
-    .await;
-
-    alice_call_data
-        .network
-        .get_agent_activity(
-            alice_call_data.cell_id.agent_pubkey().clone(),
-            ChainQueryFilter::new(),
-            GetActivityOptions {
-                timeout_ms: Some(GET_AGENT_ACTIVITY_TIMEOUT_MS),
-                ..Default::default()
-            },
-        )
-        .await
-        .unwrap();
-
-    let mut low = u128::MAX;
-    let mut high = 0;
-    let mut average = 0;
-    let runs = 1000;
-    for _ in 0..runs {
-        let element_integrated = ElementBuf::vault(alice_env.clone().into(), false).unwrap();
-        let meta_integrated = MetadataBuf::vault(alice_env.clone().into()).unwrap();
-        fresh_reader_test!(alice_env, |r| {
-            let now = std::time::Instant::now();
-            let hashes = meta_integrated
-                .get_activity_sequence(
-                    &r,
-                    ChainItemKey::AgentStatus(
-                        alice_call_data.cell_id.agent_pubkey().clone(),
-                        ValidationStatus::Valid,
-                    ),
-                )
-                .unwrap()
-                .collect::<Vec<_>>()
-                .unwrap();
-            for hash in &hashes {
-                element_integrated.get_header(&hash.1).unwrap();
-            }
-            let elapsed = now.elapsed().as_micros();
-            if elapsed < low {
-                low = elapsed;
-            }
-            if elapsed > high {
-                high = elapsed;
-            }
-            average += elapsed;
-        });
-    }
-    average = average / runs;
-    println!("Average time to get {} headers {}us", num_headers, average);
-    println!("{} us per header", average / num_headers as u128);
-    println!("low {}", low / num_headers as u128);
-    println!("high {}", high / num_headers as u128);
-    println!("num commits {}", num_commits);
-
-    conductor_test.shutdown_conductor().await;
 }

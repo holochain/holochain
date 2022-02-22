@@ -3,7 +3,7 @@ use super::{entry_def_store::error::EntryDefStoreError, state::AppInterfaceId};
 use crate::conductor::cell::error::CellError;
 use crate::core::workflow::error::WorkflowError;
 use holochain_conductor_api::conductor::ConductorConfigError;
-use holochain_lmdb::error::DatabaseError;
+use holochain_sqlite::error::DatabaseError;
 use holochain_types::prelude::*;
 use holochain_zome_types::cell::CellId;
 use thiserror::Error;
@@ -48,14 +48,14 @@ pub enum ConductorError {
     #[error("Attempted to call into the conductor while it is shutting down")]
     ShuttingDown,
 
-    #[error("Miscellaneous error: {0}")]
-    Todo(String),
-
     #[error("Error while performing IO for the Conductor: {0}")]
     IoError(#[from] std::io::Error),
 
     #[error("Error while trying to send a task to the task manager: {0}")]
     SubmitTaskError(String),
+
+    #[error("ZomeError: {0}")]
+    ZomeError(#[from] holochain_zome_types::zome::error::ZomeError),
 
     #[error("DnaError: {0}")]
     DnaError(#[from] holochain_types::dna::DnaError),
@@ -70,9 +70,6 @@ pub enum ConductorError {
     #[error(transparent)]
     InterfaceError(#[from] Box<InterfaceError>),
 
-    #[error(transparent)]
-    CreateAppFailed(#[from] CreateAppError),
-
     #[error("Failed to run genesis on the following cells in the app: {errors:?}")]
     GenesisFailed { errors: Vec<CellError> },
 
@@ -82,14 +79,14 @@ pub enum ConductorError {
     #[error("Wasm code was not found in the wasm store")]
     WasmMissing,
 
-    #[error("Tried to activate an app that was not installed: {0}")]
+    #[error("Tried to access an app that was not installed: {0}")]
     AppNotInstalled(InstalledAppId),
 
     #[error("Tried to install an app using an already-used InstalledAppId: {0}")]
     AppAlreadyInstalled(InstalledAppId),
 
-    #[error("Tried to perform an operation on an app that was not active: {0}")]
-    AppNotActive(InstalledAppId),
+    #[error("Tried to perform an operation on an app that was not running: {0}")]
+    AppNotRunning(InstalledAppId),
 
     #[error(transparent)]
     HolochainP2pError(#[from] holochain_p2p::HolochainP2pError),
@@ -105,20 +102,33 @@ pub enum ConductorError {
 
     #[error(transparent)]
     MrBundleError(#[from] mr_bundle::error::MrBundleError),
+
+    #[error(transparent)]
+    StateQueryError(#[from] holochain_state::query::StateQueryError),
+
+    #[error(transparent)]
+    StateMutationError(#[from] holochain_state::mutations::StateMutationError),
+
+    #[error(transparent)]
+    JoinError(#[from] tokio::task::JoinError),
+
+    #[error(transparent)]
+    RusqliteError(#[from] rusqlite::Error),
+
+    /// Other
+    #[error("Other: {0}")]
+    Other(Box<dyn std::error::Error + Send + Sync>),
 }
 
-#[derive(Error, Debug)]
-pub enum CreateAppError {
-    #[error("Failed to create the following cells in the {installed_app_id} app: {errors:?}")]
-    Failed {
-        installed_app_id: InstalledAppId,
-        errors: Vec<CellError>,
-    },
+impl ConductorError {
+    /// promote a custom error type to a ConductorError
+    pub fn other(e: impl Into<Box<dyn std::error::Error + Send + Sync>>) -> Self {
+        Self::Other(e.into())
+    }
 }
 
-// TODO: can this be removed?
-impl From<String> for ConductorError {
-    fn from(s: String) -> Self {
-        ConductorError::Todo(s)
+impl From<one_err::OneErr> for ConductorError {
+    fn from(e: one_err::OneErr) -> Self {
+        Self::other(e)
     }
 }

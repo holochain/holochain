@@ -1,15 +1,18 @@
 use hdk::prelude::*;
 
-entry_defs![Path::entry_def()];
+entry_defs![
+    Path::entry_def(),
+    PathEntry::entry_def()
+];
 
 #[hdk_extern]
-fn hash(path_string: String) -> ExternResult<EntryHash> {
-    Path::from(path_string).hash()
+fn path_entry_hash(path_string: String) -> ExternResult<EntryHash> {
+    Path::from(path_string).path_entry_hash()
 }
 
 #[hdk_extern]
 fn exists(path_string: String) -> ExternResult<bool> {
-    Ok(Path::from(path_string).exists()?)
+    Path::from(path_string).exists()
 }
 
 #[hdk_extern]
@@ -23,7 +26,7 @@ fn delete_link(delete_link: HeaderHash) -> ExternResult<HeaderHash> {
 }
 
 #[hdk_extern]
-fn children(path_string: String) -> ExternResult<Links> {
+fn children(path_string: String) -> ExternResult<Vec<Link>> {
     Path::from(path_string).children()
 }
 

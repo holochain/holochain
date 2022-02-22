@@ -1,0 +1,18 @@
+[package]
+name = "kitsune_p2p_direct_api"
+version = "0.0.1"
+description = "Kitsune P2p Direct Application Framework Test Harness Common API Types"
+license = "Apache-2.0"
+homepage = "https://github.com/holochain/holochain"
+documentation = "https://docs.rs/kitsune_p2p_direct_api"
+authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
+keywords = [ "holochain", "holo", "p2p", "dht", "networking" ]
+categories = [ "network-programming" ]
+edition = "2018"
+
+[dependencies]
+arrayref = "0.3.6"
+base64 = "0.13"
+kitsune_p2p_dht_arc = { version = "0.0.9", path = "../dht_arc" }
+serde = { version = "1", features = ["derive", "rc"] }
+serde_json = { version = "1", features = ["preserve_order"] }

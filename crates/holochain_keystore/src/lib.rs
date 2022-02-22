@@ -1,7 +1,7 @@
 #![deny(missing_docs)]
 #![allow(clippy::needless_doctest_main)]
-//! A Keystore is a secure repository of private keys. KeystoreSender is a
-//! reference to a Keystore. KeystoreSender allows async generation of keypairs,
+//! A Keystore is a secure repository of private keys. MetaLairClient is a
+//! reference to a Keystore. MetaLairClient allows async generation of keypairs,
 //! and usage of those keypairs, reference by the public AgentPubKey.
 //!
 //! # Example
@@ -15,7 +15,7 @@
 //! async fn main() {
 //!     tokio::task::spawn(async move {
 //!         let keystore = test_keystore::spawn_test_keystore().await.unwrap();
-//!         let agent_pubkey = AgentPubKey::new_from_pure_entropy(&keystore).await.unwrap();
+//!         let agent_pubkey = AgentPubKey::new_random(&keystore).await.unwrap();
 //!
 //!         #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 //!         struct MyData(Vec<u8>);
@@ -33,8 +33,13 @@
 
 use holochain_serialized_bytes::prelude::*;
 
+use kitsune_p2p_types::dependencies::lair_keystore_api_0_0;
+
 mod error;
 pub use error::*;
+
+mod meta_lair_client;
+pub use meta_lair_client::*;
 
 pub mod keystore_actor;
 pub use keystore_actor::KeystoreSender;
@@ -44,5 +49,6 @@ use keystore_actor::*;
 mod agent_pubkey_ext;
 pub use agent_pubkey_ext::*;
 
+pub mod crude_mock_keystore;
 pub mod lair_keystore;
 pub mod test_keystore;

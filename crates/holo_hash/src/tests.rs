@@ -37,26 +37,6 @@ async fn check_hashed_type() {
     );
 }
 
-#[test]
-#[ignore = "TODO"]
-fn check_serialized_bytes() {
-    let h: HeaderHash =
-        HeaderHash::try_from("uhCkkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm").unwrap();
-
-    let h: SerializedBytes = h.try_into().unwrap();
-
-    assert_eq!(
-            "{\"type\":\"HeaderHash\",\"hash\":[88,43,0,130,130,164,145,252,50,36,8,37,143,125,49,95,241,139,45,95,183,5,123,133,203,141,250,107,100,170,165,193,48,200,28,230]}",
-            &format!("{:?}", h),
-        );
-
-    let h = HeaderHash::try_from(h).unwrap();
-
-    assert_eq!(
-        "HeaderHash(uhCkkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm)",
-        &format!("{:?}", h),
-    );
-}
 
 #[test]
 fn holo_hash_parse() {
@@ -131,7 +111,7 @@ fn agent_id_try_parse() {
 #[tokio::test(flavor = "multi_thread")]
 async fn agent_id_debug() {
     tokio::task::spawn(async move {
-        let agent_id = HeaderHash::with_data_sync(&TestHeader("hi".to_string()));
+        let agent_id = TestHeader("hi".to_string()).to_hash();
         assert_eq!(
             "HeaderHash(uhCkkdwAAuHr_AKFTzF2vjvVzlkWTOxdAhqZ00jcBe9GZQs77BSjQ)",
             &format!("{:?}", agent_id),
@@ -144,7 +124,7 @@ async fn agent_id_debug() {
 #[tokio::test(flavor = "multi_thread")]
 async fn agent_id_display() {
     tokio::task::spawn(async move {
-        let agent_id = HeaderHash::with_data_sync(&TestHeader("hi".to_string()));
+        let agent_id = TestHeader("hi".to_string()).to_hash();
         assert_eq!(
             "uhCkkdwAAuHr_AKFTzF2vjvVzlkWTOxdAhqZ00jcBe9GZQs77BSjQ",
             &format!("{}", agent_id.to_string()),
@@ -157,7 +137,7 @@ async fn agent_id_display() {
 #[tokio::test(flavor = "multi_thread")]
 async fn agent_id_loc() {
     tokio::task::spawn(async move {
-        let agent_id = HeaderHash::with_data_sync(&TestHeader("hi".to_string()));
+        let agent_id = TestHeader("hi".to_string()).to_hash();
         assert_eq!(3_492_283_899, agent_id.get_loc());
     })
     .await

@@ -23,11 +23,15 @@
 //!
 //! The complete 39 bytes together are known as the "full" hash
 
-use crate::encode;
+use kitsune_p2p_dht_arc::DhtLocation;
+
 use crate::error::HoloHashResult;
 use crate::has_hash::HasHash;
 use crate::HashType;
 use crate::PrimitiveHashType;
+
+#[cfg(feature = "hashing")]
+use crate::encode;
 
 /// Length of the prefix bytes (3)
 pub const HOLO_HASH_PREFIX_LEN: usize = 3;
@@ -67,6 +71,20 @@ macro_rules! assert_length {
 pub struct HoloHash<T: HashType> {
     hash: Vec<u8>,
     hash_type: T,
+}
+
+#[cfg(feature = "arbitrary")]
+impl<'a, P: PrimitiveHashType> arbitrary::Arbitrary<'a> for HoloHash<P> {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        let mut buf = [0; HOLO_HASH_FULL_LEN];
+        buf[0..HOLO_HASH_PREFIX_LEN].copy_from_slice(P::static_prefix());
+        buf[HOLO_HASH_PREFIX_LEN..]
+            .copy_from_slice(u.bytes(HOLO_HASH_FULL_LEN - HOLO_HASH_PREFIX_LEN)?);
+        Ok(HoloHash {
+            hash: buf.to_vec(),
+            hash_type: P::new(),
+        })
+    }
 }
 
 impl<T: HashType> HoloHash<T> {
@@ -128,8 +146,10 @@ impl<T: HashType> HoloHash<T> {
     }
 
     /// Fetch the holo dht location for this hash
-    pub fn get_loc(&self) -> u32 {
-        bytes_to_loc(&self.hash[HOLO_HASH_FULL_LEN - HOLO_HASH_LOC_LEN..])
+    pub fn get_loc(&self) -> DhtLocation {
+        DhtLocation::new(bytes_to_loc(
+            &self.hash[HOLO_HASH_FULL_LEN - HOLO_HASH_LOC_LEN..],
+        ))
     }
 
     /// consume into the inner byte vector
@@ -139,6 +159,7 @@ impl<T: HashType> HoloHash<T> {
     }
 }
 
+#[cfg(feature = "hashing")]
 impl<T: HashType> HoloHash<T> {
     /// Construct a HoloHash from a 32-byte hash.
     /// The 3 prefix bytes will be added based on the provided HashType,
@@ -163,6 +184,8 @@ impl<P: PrimitiveHashType> HoloHash<P> {
         assert_length!(HOLO_HASH_UNTYPED_LEN, &hash);
         Self::from_raw_36_and_type(hash, P::new())
     }
+
+    #[cfg(feature = "hashing")]
     /// Construct a HoloHash from a prehashed raw 32-byte slice.
     /// The location bytes will be calculated.
     pub fn from_raw_32(hash: Vec<u8>) -> Self {
@@ -177,6 +200,22 @@ impl<T: HashType> AsRef<[u8]> for HoloHash<T> {
     }
 }
 
+#[cfg(feature = "rusqlite")]
+impl<T: HashType> rusqlite::ToSql for HoloHash<T> {
+    fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'_>> {
+        Ok(rusqlite::types::ToSqlOutput::Borrowed(self.as_ref().into()))
+    }
+}
+
+#[cfg(feature = "rusqlite")]
+impl<T: HashType> rusqlite::types::FromSql for HoloHash<T> {
+    fn column_result(value: rusqlite::types::ValueRef<'_>) -> rusqlite::types::FromSqlResult<Self> {
+        Vec::<u8>::column_result(value).and_then(|bytes| {
+            Self::from_raw_39(bytes).map_err(|_| rusqlite::types::FromSqlError::InvalidType)
+        })
+    }
+}
+
 impl<T: HashType> IntoIterator for HoloHash<T> {
     type Item = u8;
     type IntoIter = std::vec::IntoIter<Self::Item>;
@@ -188,7 +227,7 @@ impl<T: HashType> IntoIterator for HoloHash<T> {
 
 impl<T: HashType> HasHash<T> for HoloHash<T> {
     fn as_hash(&self) -> &HoloHash<T> {
-        &self
+        self
     }
     fn into_hash(self) -> HoloHash<T> {
         self
@@ -215,7 +254,7 @@ fn bytes_to_loc(bytes: &[u8]) -> u32 {
 mod tests {
     use crate::*;
 
-    #[cfg(not(feature = "string-encoding"))]
+    #[cfg(not(feature = "encoding"))]
     fn assert_type<T: HashType>(t: &str, h: HoloHash<T>) {
         assert_eq!(3_688_618_971, h.get_loc());
         assert_eq!(
@@ -225,7 +264,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(feature = "string-encoding"))]
+    #[cfg(not(feature = "encoding"))]
     fn test_enum_types() {
         assert_type(
             "DnaHash",

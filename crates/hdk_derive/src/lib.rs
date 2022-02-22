@@ -94,9 +94,9 @@ impl Parse for EntryDef {
         }
         Ok(EntryDef(holochain_zome_types::entry_def::EntryDef {
             id,
-            required_validations,
             visibility,
             crdt_type,
+            required_validations,
             required_validation_type,
         }))
     }
@@ -204,7 +204,7 @@ pub fn hdk_entry(attrs: TokenStream, code: TokenStream) -> TokenStream {
 }
 
 #[proc_macro_attribute]
-pub fn hdk_extern(_attrs: TokenStream, item: TokenStream) -> TokenStream {
+pub fn hdk_extern(attrs: TokenStream, item: TokenStream) -> TokenStream {
     // extern mapping is only valid for functions
     let item_fn = syn::parse_macro_input!(item as syn::ItemFn);
 
@@ -219,14 +219,22 @@ pub fn hdk_extern(_attrs: TokenStream, item: TokenStream) -> TokenStream {
     let output_type = if let syn::ReturnType::Type(_, ref ty) = item_fn.sig.output {
         ty.clone()
     } else {
-        unreachable!();
+        Box::new(syn::Type::Verbatim(quote::quote! { () }))
     };
 
     let internal_fn_ident = external_fn_ident.clone();
 
-    (quote::quote! {
-        map_extern!(#external_fn_ident, #internal_fn_ident, #input_type, #output_type);
-        #item_fn
-    })
-    .into()
+    if attrs.to_string() == "infallible" {
+        (quote::quote! {
+            map_extern_infallible!(#external_fn_ident, #internal_fn_ident, #input_type, #output_type);
+            #item_fn
+        })
+        .into()
+    } else {
+        (quote::quote! {
+            map_extern!(#external_fn_ident, #internal_fn_ident, #input_type, #output_type);
+            #item_fn
+        })
+        .into()
+    }
 }

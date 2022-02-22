@@ -2,15 +2,9 @@
 
 #![allow(missing_docs)]
 
-use crate::dna::zome::HostFnAccess;
-use crate::dna::zome::Permission;
-use crate::dna::zome::Zome;
-use crate::dna::zome::ZomeDef;
-use crate::dna::DnaDef;
-use crate::dna::Zomes;
 use crate::header::NewEntryHeader;
+use crate::prelude::*;
 use ::fixt::prelude::*;
-use holochain_zome_types::prelude::*;
 use rand::seq::IteratorRandom;
 use std::iter::Iterator;
 
@@ -23,35 +17,12 @@ fixturator!(
 
 fixturator!(
     HostFnAccess;
-    constructor fn new(Permission, Permission, Permission, Permission, Permission, Permission, Permission);
+    constructor fn new(Permission, Permission, Permission, Permission, Permission, Permission, Permission, Permission, Permission, Permission);
 );
 
 fixturator!(
     CellId;
     constructor fn new(DnaHash, AgentPubKey);
-);
-
-fixturator!(
-    Zome;
-    constructor fn new(ZomeName, ZomeDef);
-);
-
-fixturator!(
-    Zomes;
-    curve Empty Vec::new();
-    curve Unpredictable {
-        // @todo implement unpredictable zomes
-        ZomesFixturator::new(Empty).next().unwrap()
-    };
-    curve Predictable {
-        // @todo implement predictable zomes
-        ZomesFixturator::new(Empty).next().unwrap()
-    };
-);
-
-fixturator!(
-    ZomeDef;
-    constructor fn from_hash(WasmHash);
 );
 
 fixturator!(
@@ -85,7 +56,7 @@ fixturator!(
 
 fn new_entry_element(entry: Entry, header_type: HeaderType, index: usize) -> Element {
     let et = match entry {
-        Entry::App(_) => EntryType::App(
+        Entry::App(_) | Entry::CounterSign(_, _) => EntryType::App(
             AppEntryTypeFixturator::new_indexed(Unpredictable, index)
                 .next()
                 .unwrap(),
@@ -127,7 +98,7 @@ fixturator!(
     };
     curve Entry {
         let et = match get_fixt_curve!() {
-            Entry::App(_) => EntryType::App(AppEntryTypeFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap()),
+            Entry::App(_) | Entry::CounterSign(_, _) => EntryType::App(AppEntryTypeFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap()),
             Entry::Agent(_) => EntryType::AgentPubKey,
             Entry::CapClaim(_) => EntryType::CapClaim,
             Entry::CapGrant(_) => EntryType::CapGrant,
@@ -142,49 +113,6 @@ fixturator!(
 );
 
 fixturator!(
-    DnaDef;
-    curve Empty DnaDef {
-        name: StringFixturator::new_indexed(Empty, get_fixt_index!())
-            .next()
-            .unwrap(),
-        uuid: StringFixturator::new_indexed(Empty, get_fixt_index!())
-            .next()
-            .unwrap(),
-        properties: SerializedBytesFixturator::new_indexed(Empty, get_fixt_index!())
-            .next()
-            .unwrap(),
-        zomes: ZomesFixturator::new_indexed(Empty, get_fixt_index!())
-            .next()
-            .unwrap(),
-    };
-
-    curve Unpredictable DnaDef {
-        name: StringFixturator::new_indexed(Unpredictable, get_fixt_index!())
-            .next()
-            .unwrap(),
-        uuid: StringFixturator::new_indexed(Unpredictable, get_fixt_index!())
-            .next()
-            .unwrap(),
-        properties: SerializedBytesFixturator::new_indexed(Unpredictable, get_fixt_index!())
-            .next()
-            .unwrap(),
-        zomes: ZomesFixturator::new_indexed(Unpredictable, get_fixt_index!())
-            .next()
-            .unwrap(),
-    };
-
-    curve Predictable DnaDef {
-        name: StringFixturator::new_indexed(Predictable, get_fixt_index!())
-            .next()
-            .unwrap(),
-        uuid: StringFixturator::new_indexed(Predictable, get_fixt_index!())
-            .next()
-            .unwrap(),
-        properties: SerializedBytesFixturator::new_indexed(Predictable, get_fixt_index!())
-            .next()
-            .unwrap(),
-        zomes: ZomesFixturator::new_indexed(Predictable, get_fixt_index!())
-            .next()
-            .unwrap(),
-    };
+    ValidateData;
+    constructor fn new_element_only (Element);
 );

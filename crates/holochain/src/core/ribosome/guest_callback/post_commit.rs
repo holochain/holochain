@@ -1,34 +1,41 @@
+use crate::conductor::ConductorHandle;
 use crate::core::ribosome::FnComponents;
-use crate::core::ribosome::HostAccess;
+use crate::core::ribosome::HostContext;
 use crate::core::ribosome::Invocation;
+use crate::core::ribosome::InvocationAuth;
 use crate::core::ribosome::ZomesToInvoke;
-use crate::core::workflow::CallZomeWorkspaceLock;
 use derive_more::Constructor;
-use holochain_keystore::KeystoreSender;
-use holochain_p2p::HolochainP2pCell;
+use holochain_keystore::MetaLairClient;
+use holochain_p2p::HolochainP2pDna;
 use holochain_serialized_bytes::prelude::*;
+use holochain_state::host_fn_workspace::HostFnWorkspace;
+use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_types::prelude::*;
+use itertools::Itertools;
+
+pub const POST_COMMIT_CHANNEL_BOUND: usize = 100;
+pub const POST_COMMIT_CONCURRENT_LIMIT: usize = 5;
 
 #[derive(Clone)]
 pub struct PostCommitInvocation {
     zome: Zome,
-    headers: HeaderHashes,
+    headers: Vec<SignedHeaderHashed>,
 }
 
 impl PostCommitInvocation {
-    pub fn new(zome: Zome, headers: HeaderHashes) -> Self {
+    pub fn new(zome: Zome, headers: Vec<SignedHeaderHashed>) -> Self {
         Self { zome, headers }
     }
 }
 
 #[derive(Clone, Constructor)]
 pub struct PostCommitHostAccess {
-    pub workspace: CallZomeWorkspaceLock,
-    pub keystore: KeystoreSender,
-    pub network: HolochainP2pCell,
+    pub workspace: HostFnWorkspace,
+    pub keystore: MetaLairClient,
+    pub network: HolochainP2pDna,
 }
 
-impl From<PostCommitHostAccess> for HostAccess {
+impl From<PostCommitHostAccess> for HostContext {
     fn from(post_commit_host_access: PostCommitHostAccess) -> Self {
         Self::PostCommit(post_commit_host_access)
     }
@@ -36,7 +43,13 @@ impl From<PostCommitHostAccess> for HostAccess {
 
 impl From<&PostCommitHostAccess> for HostFnAccess {
     fn from(_: &PostCommitHostAccess) -> Self {
-        Self::all()
+        let mut access = Self::all();
+        // Post commit happens after all workspace writes are complete.
+        // Writing more to the workspace becomes circular.
+        // If you need to trigger some more writes, try a `call_remote` back
+        // into the current cell.
+        access.write_workspace = Permission::Deny;
+        access
     }
 }
 
@@ -50,6 +63,9 @@ impl Invocation for PostCommitInvocation {
     fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
         ExternIO::encode(self.headers)
     }
+    fn auth(&self) -> InvocationAuth {
+        InvocationAuth::LocalCallback
+    }
 }
 
 impl TryFrom<PostCommitInvocation> for ExternIO {
@@ -59,99 +75,70 @@ impl TryFrom<PostCommitInvocation> for ExternIO {
     }
 }
 
-#[derive(PartialEq, Debug)]
-pub enum PostCommitResult {
-    Success,
-    Fail(HeaderHashes, String),
-}
-
-impl From<Vec<(ZomeName, PostCommitCallbackResult)>> for PostCommitResult {
-    fn from(a: Vec<(ZomeName, PostCommitCallbackResult)>) -> Self {
-        a.into_iter().map(|(_, v)| v).collect::<Vec<_>>().into()
-    }
-}
-
-impl From<Vec<PostCommitCallbackResult>> for PostCommitResult {
-    fn from(callback_results: Vec<PostCommitCallbackResult>) -> Self {
-        // this is an optional callback so defaults to success
-        callback_results.into_iter().fold(Self::Success, |acc, x| {
-            match x {
-                // fail overrides everything
-                PostCommitCallbackResult::Fail(header_hashes, fail_string) => {
-                    Self::Fail(header_hashes, fail_string)
-                }
-                // success allows acc to continue
-                PostCommitCallbackResult::Success => acc,
-            }
+pub async fn send_post_commit(
+    conductor_handle: ConductorHandle,
+    workspace: SourceChainWorkspace,
+    network: HolochainP2pDna,
+    keystore: MetaLairClient,
+    zomed_headers: Vec<(Option<Zome>, SignedHeaderHashed)>,
+) -> Result<(), tokio::sync::mpsc::error::SendError<()>> {
+    let cell_id = workspace.source_chain().cell_id();
+    let groups = zomed_headers
+        .iter()
+        .group_by(|(zome, _shh)| zome.clone())
+        .into_iter()
+        .map(|(maybe_zome, group)| {
+            (
+                maybe_zome,
+                group.map(|(_maybe_zome, shh)| shh.clone()).collect(),
+            )
         })
+        .collect::<Vec<(Option<Zome>, Vec<SignedHeaderHashed>)>>();
+
+    for (maybe_zome, headers) in groups {
+        if let Some(zome) = maybe_zome {
+            let zome = zome.clone();
+            conductor_handle
+                .post_commit_permit()
+                .await?
+                .send(PostCommitArgs {
+                    host_access: PostCommitHostAccess {
+                        workspace: workspace.clone().into(),
+                        keystore: keystore.clone(),
+                        network: network.clone(),
+                    },
+                    invocation: PostCommitInvocation::new(zome, headers),
+                    cell_id: cell_id.clone(),
+                });
+        }
     }
+    Ok(())
+}
+
+#[derive(Clone)]
+pub struct PostCommitArgs {
+    pub host_access: PostCommitHostAccess,
+    pub invocation: PostCommitInvocation,
+    pub cell_id: CellId,
 }
 
 #[cfg(test)]
 mod test {
-    use super::PostCommitResult;
     use crate::core::ribosome::Invocation;
     use crate::core::ribosome::ZomesToInvoke;
-    use crate::fixt::HeaderHashesFixturator;
     use crate::fixt::PostCommitHostAccessFixturator;
     use crate::fixt::PostCommitInvocationFixturator;
-    use ::fixt::prelude::*;
-    use holochain_types::dna::zome::HostFnAccess;
-    use holochain_zome_types::post_commit::PostCommitCallbackResult;
+    use holochain_types::prelude::*;
     use holochain_zome_types::ExternIO;
-
-    #[test]
-    fn post_commit_callback_result_fold() {
-        let mut rng = ::fixt::rng();
-
-        let result_success = || PostCommitResult::Success;
-        let result_fail = || {
-            PostCommitResult::Fail(
-                HeaderHashesFixturator::new(::fixt::Empty).next().unwrap(),
-                StringFixturator::new(::fixt::Empty).next().unwrap(),
-            )
-        };
-
-        let cb_success = || PostCommitCallbackResult::Success;
-        let cb_fail = || {
-            PostCommitCallbackResult::Fail(
-                HeaderHashesFixturator::new(::fixt::Empty).next().unwrap(),
-                StringFixturator::new(::fixt::Empty).next().unwrap(),
-            )
-        };
-
-        for (mut results, expected) in vec![
-            (vec![], result_success()),
-            (vec![cb_success()], result_success()),
-            (vec![cb_fail()], result_fail()),
-            (vec![cb_fail(), cb_success()], result_fail()),
-        ] {
-            // order of the results should not change the final result
-            results.shuffle(&mut rng);
-
-            // number of times a callback result appears should not change the final result
-            let number_of_extras = rng.gen_range(0, 5);
-            for _ in 0..number_of_extras {
-                let maybe_extra = results.choose(&mut rng).cloned();
-                match maybe_extra {
-                    Some(extra) => results.push(extra),
-                    _ => {}
-                };
-            }
-
-            assert_eq!(expected, results.into(),);
-        }
-    }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn post_commit_invocation_access() {
         let post_commit_host_access = PostCommitHostAccessFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();
-        assert_eq!(
-            HostFnAccess::from(&post_commit_host_access),
-            HostFnAccess::all()
-        );
+        let mut expected = HostFnAccess::all();
+        expected.write_workspace = Permission::Deny;
+        assert_eq!(HostFnAccess::from(&post_commit_host_access), expected);
     }
 
     #[test]
@@ -185,7 +172,7 @@ mod test {
 
         assert_eq!(
             host_input,
-            ExternIO::encode(HeaderHashesFixturator::new(::fixt::Empty).next().unwrap()).unwrap(),
+            ExternIO::encode(HeaderHashVecFixturator::new(::fixt::Empty).next().unwrap()).unwrap(),
         );
     }
 }
@@ -193,13 +180,13 @@ mod test {
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
-    use super::PostCommitResult;
+    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use crate::core::ribosome::RibosomeT;
     use crate::fixt::curve::Zomes;
     use crate::fixt::PostCommitHostAccessFixturator;
     use crate::fixt::PostCommitInvocationFixturator;
     use crate::fixt::RealRibosomeFixturator;
-    use holo_hash::fixt::HeaderHashFixturator;
+    use hdk::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
 
     #[tokio::test(flavor = "multi_thread")]
@@ -218,7 +205,7 @@ mod slow_tests {
         let result = ribosome
             .run_post_commit(host_access, post_commit_invocation)
             .unwrap();
-        assert_eq!(result, PostCommitResult::Success,);
+        assert_eq!(result, ());
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -237,35 +224,38 @@ mod slow_tests {
         let result = ribosome
             .run_post_commit(host_access, post_commit_invocation)
             .unwrap();
-        assert_eq!(result, PostCommitResult::Success,);
+        assert_eq!(result, ());
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn test_post_commit_implemented_fail() {
-        let host_access = PostCommitHostAccessFixturator::new(::fixt::Unpredictable)
-            .next()
-            .unwrap();
-        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::PostCommitFail]))
-            .next()
-            .unwrap();
-        let mut post_commit_invocation = PostCommitInvocationFixturator::new(::fixt::Empty)
-            .next()
-            .unwrap();
-        post_commit_invocation.zome = TestWasm::PostCommitFail.into();
+    #[ignore = "flakey. Sometimes fails the second last assert with 3 instead of 5"]
+    #[cfg(feature = "test_utils")]
+    async fn post_commit_test_volley() -> anyhow::Result<()> {
+        observability::test_run().ok();
+        let RibosomeTestFixture {
+            conductor,
+            alice,
+            bob,
+            bob_pubkey,
+            ..
+        } = RibosomeTestFixture::new(TestWasm::PostCommitVolley).await;
 
-        let result = ribosome
-            .run_post_commit(host_access, post_commit_invocation)
-            .unwrap();
-        assert_eq!(
-            result,
-            PostCommitResult::Fail(
-                vec![HeaderHashFixturator::new(::fixt::Empty)
-                    .next()
-                    .unwrap()
-                    .into()]
-                .into(),
-                "empty header fail".into()
-            ),
-        );
+        let _set_access: () = conductor.call::<_, (), _>(&alice, "set_access", ()).await;
+
+        let _set_access: () = conductor.call::<_, (), _>(&bob, "set_access", ()).await;
+
+        let _ping: HeaderHash = conductor.call(&alice, "ping", bob_pubkey).await;
+
+        tokio::time::sleep(std::time::Duration::from_millis(600)).await;
+
+        let alice_query: Vec<Element> = conductor.call(&alice, "query", ()).await;
+
+        assert_eq!(alice_query.len(), 5);
+
+        let bob_query: Vec<Element> = conductor.call(&bob, "query", ()).await;
+
+        assert_eq!(bob_query.len(), 4);
+
+        Ok(())
     }
 }

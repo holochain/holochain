@@ -4,6 +4,7 @@ members = [
     "anchor",
     "bench",
     "capability",
+    "countersigning",
     "create_entry",
     "crd",
     "crud",
@@ -12,6 +13,8 @@ members = [
     "entry_defs",
     "hash_entry",
     "foo",
+    "genesis_self_check_invalid",
+    "genesis_self_check_valid",
     "hash_path",
     "hdk_extern",
     "init_fail",
@@ -20,10 +23,12 @@ members = [
     "migrate_agent_fail",
     "migrate_agent_pass",
     "multiple_calls",
-    "post_commit_fail",
+    "must_get",
     "post_commit_success",
+    "post_commit_volley",
     "query",
     "random_bytes",
+    "schedule",
     "x_salsa20_poly1305",
     "ser_regression",
     "sign",
@@ -46,8 +51,9 @@ opt-level = "z"
 
 
 [patch.crates-io]
-# holochain_wasmer_common = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "bump-serde" }
-# holochain_wasmer_guest = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "bump-serde" }
+# holochain_wasmer_common = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "develop" }
+# holochain_wasmer_guest = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "2021-04-27-singlepass" }
+# holochain_wasmer_host = { path = "../../../../../holochain-wasmer/crates/host" }
 # holochain_wasmer_host = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "bump-serde" }
-# holochain_serialized_bytes = { git = "https://github.com/holochain/holochain-serialization.git", branch = "bump-serde" }
-# holochain_serialized_bytes_derive = { git = "https://github.com/holochain/holochain-serialization.git", branch = "bump-serde" }
+# holochain_serialized_bytes = { git = "https://github.com/holochain/holochain-serialization.git", branch = "arbitrary" }
+# holochain_serialized_bytes_derive = { git = "https://github.com/holochain/holochain-serialization.git", branch = "arbitrary" }

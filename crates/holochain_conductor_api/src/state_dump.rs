@@ -1,14 +1,23 @@
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
 use holochain_state::source_chain::SourceChainJsonDump;
+use holochain_types::dht_op::DhtOp;
 use serde::Deserialize;
 use serde::Serialize;
+use std::sync::Arc;
 
 #[derive(Serialize, Deserialize)]
 pub struct JsonDump {
-    pub peer_dump: P2pStateDump,
+    pub peer_dump: P2pAgentsDump,
     pub source_chain_dump: SourceChainJsonDump,
     pub integration_dump: IntegrationStateDump,
+}
+
+#[derive(Serialize, Clone, Debug, Deserialize)]
+pub struct FullStateDump {
+    pub peer_dump: P2pAgentsDump,
+    pub source_chain_dump: SourceChainJsonDump,
+    pub integration_dump: FullIntegrationStateDump,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -33,8 +42,30 @@ pub struct IntegrationStateDump {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+/// A full view of the DHT shard of the Cell.
+/// Ops start in the validation limbo then proceed
+/// to the integration limbo then finally are integrated.
+pub struct FullIntegrationStateDump {
+    /// Ops in validation limbo awaiting sys
+    /// or app validation.
+    pub validation_limbo: Vec<DhtOp>,
+
+    /// Ops waiting to be integrated.
+    pub integration_limbo: Vec<DhtOp>,
+
+    /// Ops that are integrated.
+    /// This includes rejected.
+    pub integrated: Vec<DhtOp>,
+
+    /// RowId for the latest DhtOp that we have seen
+    /// Useful for subsequent calls to `FullStateDump`
+    /// to return only what they haven't seen
+    pub dht_ops_cursor: u64,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 /// State dump of all the peer info
-pub struct P2pStateDump {
+pub struct P2pAgentsDump {
     /// The info of this agents cell.
     pub this_agent_info: Option<AgentInfoDump>,
     /// The dna as a [`DnaHash`] and [`kitsune_p2p::KitsuneSpace`].
@@ -50,26 +81,20 @@ pub struct P2pStateDump {
 /// space, signed time, expires in and
 /// urls printed in a pretty way.
 pub struct AgentInfoDump {
-    pub kitsune_agent: kitsune_p2p::KitsuneAgent,
-    pub kitsune_space: kitsune_p2p::KitsuneSpace,
+    pub kitsune_agent: Arc<kitsune_p2p::KitsuneAgent>,
+    pub kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
     pub dump: String,
 }
 
 impl std::fmt::Display for JsonDump {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let num_other_peers = self.peer_dump.peers.len();
-        let int = &self.integration_dump;
         let s = &self.source_chain_dump;
         writeln!(f, "--- Cell State Dump Summary ---")?;
         writeln!(
             f,
             "Number of other peers in p2p store: {},",
             num_other_peers
-        )?;
-        writeln!(
-            f,
-            "Ops: Limbo (validation: {} integration: {}) Integrated: {}",
-            int.validation_limbo, int.integration_limbo, int.integrated
         )?;
         writeln!(
             f,
@@ -94,7 +119,7 @@ impl std::fmt::Display for IntegrationStateDump {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(
             f,
-            "({},{},{})",
+            "({:?},{:?},{:?})",
             self.validation_limbo, self.integration_limbo, self.integrated
         )
     }
@@ -107,7 +132,7 @@ impl std::fmt::Display for AgentInfoDump {
         writeln!(f, "{}", self.dump)
     }
 }
-impl std::fmt::Display for P2pStateDump {
+impl std::fmt::Display for P2pAgentsDump {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(this_agent) = &self.this_agent {
             writeln!(f, "This Agent {:?} is {:?}", this_agent.0, this_agent.1)?;

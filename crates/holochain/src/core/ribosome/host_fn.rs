@@ -45,13 +45,10 @@ host_fn_api_impls! {
     // ------------------------------------------------------------------
     // These definitions are copy-pasted from
     // holochain_zome_types::zome_io
-    // TODO: is there a way to unhygienically import this code in both places?
+    // MAYBE: is there a way to unhygienically import this code in both places?
 
     // Info about the calling agent.
     fn agent_info (()) -> zt::info::AgentInfo;
-
-    // @todo
-    fn app_info (()) -> zt::info::AppInfo;
 
     // @todo
     fn dna_info (()) -> zt::info::DnaInfo;
@@ -59,10 +56,7 @@ host_fn_api_impls! {
     // @todo
     fn call_info (()) -> zt::info::CallInfo;
 
-    fn call (zt::call::Call) -> zt::ZomeCallResponse;
-
-    // Header hash of the DeleteLink element.
-    fn call_remote (zt::call_remote::CallRemote) -> zt::ZomeCallResponse;
+    fn call (Vec<zt::call::Call>) -> Vec<zt::ZomeCallResponse>;
 
     // @todo List all the local capability claims.
     fn capability_claims (()) -> ();
@@ -77,7 +71,7 @@ host_fn_api_impls! {
     // CapGrant and CapClaim are handled natively.
     // App entries are referenced by entry defs then SerializedBytes stuffed into an Entry::App.
     // Returns HeaderHash of the newly created element.
-    fn create (zt::entry::EntryWithDefId) -> holo_hash::HeaderHash;
+    fn create (zt::entry::CreateInput) -> holo_hash::HeaderHash;
 
     fn create_x25519_keypair(()) -> holochain_zome_types::x_salsa20_poly1305::x25519::X25519PubKey;
 
@@ -99,10 +93,10 @@ host_fn_api_impls! {
     fn create_link (zt::link::CreateLinkInput) -> holo_hash::HeaderHash;
 
     // Delete an entry.
-    fn delete (holo_hash::HeaderHash) -> holo_hash::HeaderHash;
+    fn delete (zt::entry::DeleteInput) -> holo_hash::HeaderHash;
 
-    // Header hash of the CreateLink element.
-    fn delete_link (holo_hash::HeaderHash) -> holo_hash::HeaderHash;
+    // Delete a CreateLink element.
+    fn delete_link (zt::link::DeleteLinkInput) -> holo_hash::HeaderHash;
 
     // Header hash of the newly committed element.
     // Emit a Signal::App to subscribers on the interface
@@ -113,19 +107,31 @@ host_fn_api_impls! {
     fn trace (zt::trace::TraceMsg) -> ();
 
     // Attempt to get a live entry from the cascade.
-    fn get (zt::entry::GetInput) -> Option<zt::element::Element>;
+    fn get (Vec<zt::entry::GetInput>) -> Vec<Option<zt::element::Element>>;
 
     fn get_agent_activity (zt::agent_activity::GetAgentActivityInput) -> zt::query::AgentActivity;
 
-    fn get_details (zt::entry::GetInput) -> Option<zt::metadata::Details>;
+    fn get_details (Vec<zt::entry::GetInput>) -> Vec<Option<zt::metadata::Details>>;
 
     // Get links by entry hash from the cascade.
-    fn get_links (zt::link::GetLinksInput) -> zt::link::Links;
+    fn get_links (Vec<zt::link::GetLinksInput>) -> Vec<Vec<zt::link::Link>>;
 
-    fn get_link_details (zt::link::GetLinksInput) -> zt::link::LinkDetails;
+    fn get_link_details (Vec<zt::link::GetLinksInput>) -> Vec<zt::link::LinkDetails>;
 
-    // Hash an entry on the host.
-    fn hash_entry (zt::entry::Entry) -> holo_hash::EntryHash;
+    // Hash data on the host.
+    fn hash (zt::hash::HashInput) -> zt::hash::HashOutput;
+
+    // Retreive an element from the DHT or short circuit.
+    fn must_get_valid_element (zt::entry::MustGetValidElementInput) -> Element;
+
+    // Retreive a entry from the DHT or short circuit.
+    fn must_get_entry (zt::entry::MustGetEntryInput) -> EntryHashed;
+
+    // Retrieve a header from the DHT or short circuit.
+    fn must_get_header (zt::entry::MustGetHeaderInput) -> SignedHeaderHashed;
+
+    // Attempt to accept a preflight request.
+    fn accept_countersigning_preflight_request(zt::countersigning::PreflightRequest) -> zt::countersigning::PreflightRequestAcceptance;
 
     // Query the source chain for data.
     fn query (zt::query::ChainQueryFilter) -> Vec<Element>;
@@ -140,7 +146,7 @@ host_fn_api_impls! {
     // fn send (()) -> ();
 
     // @todo
-    fn schedule (core::time::Duration) -> ();
+    fn schedule (String) -> ();
 
     // @todo
     fn sleep (core::time::Duration) -> ();
@@ -156,16 +162,12 @@ host_fn_api_impls! {
     fn sign_ephemeral (zt::signature::SignEphemeral) -> zt::signature::EphemeralSignatures;
 
     // Current system time, in the opinion of the host, as a `Duration`.
-    fn sys_time (()) -> core::time::Duration;
+    fn sys_time (()) -> zt::timestamp::Timestamp;
 
     // Same as  but also takes the HeaderHash of the updated element.
     fn update (zt::entry::UpdateInput) -> holo_hash::HeaderHash;
 
     fn verify_signature (zt::signature::VerifySignature) -> bool;
-
-    // There's nothing to go in or out of a noop.
-    // Used to "defuse" host functions when side effects are not allowed.
-    fn unreachable (()) -> ();
 
     // The zome and agent info are constants specific to the current zome and chain.
     // All the information is provided by core so there is no input value.
