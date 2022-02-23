@@ -37,7 +37,7 @@ pub fn fake_dna_zomes_named(uid: &str, name: &str, zomes: Vec<(ZomeName, DnaWasm
             .try_into()
             .unwrap(),
         uid: uid.to_string(),
-        origin_time: Timestamp::now(),
+        origin_time: Timestamp::HOLOCHAIN_EPOCH,
         zomes: Vec::new(),
     };
     tokio_helper::block_forever_on(async move {
