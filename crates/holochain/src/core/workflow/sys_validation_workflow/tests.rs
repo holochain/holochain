@@ -91,7 +91,7 @@ async fn run_test(
             .unwrap()
     };
 
-    holochain_state::prelude::dump_tmp(&alice_dht_env);
+    // holochain_state::prelude::dump_tmp(&alice_dht_env);
     // Validation should be empty
     fresh_reader_test(alice_dht_env, |txn| {
         let limbo = show_limbo(&txn);
@@ -175,8 +175,8 @@ async fn run_test(
 
     dodgy_bob(&bob_cell_id, &conductors[1].handle(), &dna_file).await;
 
-    // Integration should have new 4 ops in it
-    let expected_count = 4 + expected_count;
+    // Integration should have new 5 ops in it
+    let expected_count = 5 + expected_count;
 
     let alice_env = conductors[0].get_dht_env(alice_cell_id.dna_hash()).unwrap();
     wait_for_integration(
@@ -211,7 +211,7 @@ async fn run_test(
                 num_limbo_ops
             })
         },
-        2
+        1
     );
 }
 

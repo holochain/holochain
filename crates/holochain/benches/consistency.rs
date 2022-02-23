@@ -170,7 +170,6 @@ async fn setup() -> (Producer, Consumer, Others) {
         let mut tuning =
             kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
         tuning.gossip_strategy = "sharded-gossip".to_string();
-        // tuning.gossip_strategy = "simple-bloom".to_string();
 
         let mut network = KitsuneP2pConfig::default();
         network.transport_pool = vec![kitsune_p2p::TransportConfig::Quic {

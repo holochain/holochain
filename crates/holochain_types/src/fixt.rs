@@ -111,8 +111,3 @@ fixturator!(
         new_entry_element(get_fixt_curve!().0, get_fixt_curve!().1, get_fixt_index!())
     };
 );
-
-fixturator!(
-    ValidateData;
-    constructor fn new_element_only (Element);
-);

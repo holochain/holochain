@@ -3,7 +3,7 @@
 #![warn(missing_docs)]
 
 use crate::agent_store::AgentInfoSigned;
-use crate::gossip::simple_bloom::{decode_bloom_filter, encode_bloom_filter};
+use crate::gossip::{decode_bloom_filter, encode_bloom_filter};
 use crate::types::event::*;
 use crate::types::gossip::*;
 use crate::types::*;
@@ -31,7 +31,7 @@ use self::ops::OpsBatchQueue;
 use self::state_map::RoundStateMap;
 use crate::metrics::MetricsSync;
 
-use super::simple_bloom::{HowToConnect, MetaOpKey};
+use super::{HowToConnect, MetaOpKey};
 
 pub use bandwidth::BandwidthThrottles;
 

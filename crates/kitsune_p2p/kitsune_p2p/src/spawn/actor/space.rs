@@ -1122,10 +1122,6 @@ impl Space {
             .gossip_strategy
             .split(',')
             .flat_map(|module| match module {
-                "simple-bloom" => vec![(
-                    GossipModuleType::Simple,
-                    crate::gossip::simple_bloom::factory(),
-                )],
                 "sharded-gossip" => vec![
                     (
                         GossipModuleType::ShardedRecent,
