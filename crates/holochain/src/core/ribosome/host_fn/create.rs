@@ -190,6 +190,7 @@ pub mod wasm_test {
 
         // the chain head should be the committed entry header
         let chain_head = tokio_helper::block_forever_on(async move {
+            let _ = &host_access_2;
             SourceChainResult::Ok(
                 host_access_2
                     .workspace

@@ -1350,7 +1350,6 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                 workspace.clone(),
                 network.clone(),
                 self.clone(),
-                None,
                 ribosome,
             )
             .await

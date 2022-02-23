@@ -2,7 +2,7 @@
 name = "holochain_wasm_test_utils"
 version = "0.0.26"
 authors = [ "thedavidmeister", "thedavidmeister@gmail.com" ]
-edition = "2018"
+edition = "2021"
 description = "Utilities for Wasm testing for Holochain"
 license = "Apache-2.0"
 documentation = "https://docs.rs/holochain_wasm_test_utils"

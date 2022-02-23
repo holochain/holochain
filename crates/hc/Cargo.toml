@@ -6,7 +6,7 @@ documentation = "https://docs.rs/holochain_cli"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 keywords = [ "holochain", "holo" ]
 categories = [ "command-line-utilities", "development-tools::build-utils", "filesystem" ]
-edition = "2018"
+edition = "2021"
 license = "Apache-2.0"
 description = "Provides the `hc` binary, a helpful CLI tool for working with Holochain."
 

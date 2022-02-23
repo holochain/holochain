@@ -1,8 +1,11 @@
 use hdk::prelude::*;
 
 #[hdk_extern]
-pub fn validate_create_link(_: ValidateCreateLinkData) -> ExternResult<ValidateLinkCallbackResult> {
-    Ok(ValidateLinkCallbackResult::Invalid(
-        "esoteric edge case (link version)".into(),
-    ))
+pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
+    match op {
+        Op::RegisterCreateLink { .. } => Ok(ValidateCallbackResult::Invalid(
+            "esoteric edge case (link version)".into(),
+        )),
+        _ => Ok(ValidateCallbackResult::Valid),
+    }
 }
