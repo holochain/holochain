@@ -51,90 +51,8 @@ impl AsRef<Tx2Cert> for GossipTgt {
 /// with the constant in PoolBuf which cannot be set at runtime)
 const MAX_SEND_BUF_BYTES: usize = 16000;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-pub enum MetaOpKey {
-    /// data key type
-    Op(Arc<KitsuneOpHash>),
-
-    /// agent key type
-    Agent(Arc<KitsuneAgent>, u64),
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub enum MetaOpData {
-    /// data chunk type
-    Op(Arc<KitsuneOpHash>, Vec<u8>),
-
-    /// agent chunk type
-    Agent(AgentInfoSigned),
-}
-
-impl MetaOpData {
-    fn byte_count(&self) -> usize {
-        match self {
-            MetaOpData::Op(h, d) => (**h).len() + d.len(),
-            MetaOpData::Agent(a) => {
-                let h = (**a.agent).len();
-                let s = (**a.signature).len();
-                let d = a.encoded_bytes.len();
-                h + s + d
-            }
-        }
-    }
-
-    fn key(&self) -> Arc<MetaOpKey> {
-        let key = match self {
-            MetaOpData::Op(key, _) => MetaOpKey::Op(key.clone()),
-            MetaOpData::Agent(s) => MetaOpKey::Agent(s.agent.clone(), s.signed_at_ms),
-        };
-        Arc::new(key)
-    }
-}
-
 type KeySet = HashSet<Arc<MetaOpKey>>;
 type DataMap = HashMap<Arc<MetaOpKey>, Arc<MetaOpData>>;
-pub type BloomFilter = bloomfilter::Bloom<Arc<MetaOpKey>>;
-
-pub(crate) fn encode_bloom_filter(bloom: &BloomFilter) -> PoolBuf {
-    let bitmap: Vec<u8> = bloom.bitmap();
-    let bitmap_bits: u64 = bloom.number_of_bits();
-    let k_num: u32 = bloom.number_of_hash_functions();
-    let sip_keys = bloom.sip_keys();
-    let k1: u64 = sip_keys[0].0;
-    let k2: u64 = sip_keys[0].1;
-    let k3: u64 = sip_keys[1].0;
-    let k4: u64 = sip_keys[1].1;
-
-    let size = bitmap.len()
-        + 8 // bitmap bits
-        + 4 // k_num
-        + (8 * 4) // k1-4
-        ;
-
-    let mut buf = PoolBuf::new();
-    buf.reserve(size);
-
-    buf.extend_from_slice(&bitmap_bits.to_le_bytes());
-    buf.extend_from_slice(&k_num.to_le_bytes());
-    buf.extend_from_slice(&k1.to_le_bytes());
-    buf.extend_from_slice(&k2.to_le_bytes());
-    buf.extend_from_slice(&k3.to_le_bytes());
-    buf.extend_from_slice(&k4.to_le_bytes());
-    buf.extend_from_slice(&bitmap);
-
-    buf
-}
-
-pub(crate) fn decode_bloom_filter(bloom: &[u8]) -> BloomFilter {
-    let bitmap_bits = u64::from_le_bytes(*arrayref::array_ref![bloom, 0, 8]);
-    let k_num = u32::from_le_bytes(*arrayref::array_ref![bloom, 8, 4]);
-    let k1 = u64::from_le_bytes(*arrayref::array_ref![bloom, 12, 8]);
-    let k2 = u64::from_le_bytes(*arrayref::array_ref![bloom, 20, 8]);
-    let k3 = u64::from_le_bytes(*arrayref::array_ref![bloom, 28, 8]);
-    let k4 = u64::from_le_bytes(*arrayref::array_ref![bloom, 36, 8]);
-    let sip_keys = [(k1, k2), (k3, k4)];
-    bloomfilter::Bloom::from_existing(&bloom[44..], bitmap_bits, k_num, sip_keys)
-}
 
 mod step_1_check_inner;
 mod step_2_local_sync_inner;
@@ -169,14 +87,6 @@ kitsune_p2p_types::write_codec_enum! {
 struct NodeInfo {
     last_touch: tokio::time::Instant,
     was_err: bool,
-}
-
-#[derive(Clone, Debug)]
-pub(crate) enum HowToConnect {
-    /// The connection handle and the url that this handle has been connected to.
-    /// If the connection handle closes the url can change so we need to track it.
-    Con(Tx2ConHnd<wire::Wire>, TxUrl),
-    Url(TxUrl),
 }
 
 pub(crate) struct SimpleBloomModInner {
