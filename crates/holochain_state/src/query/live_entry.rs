@@ -124,7 +124,10 @@ impl Query for GetLiveEntryQuery {
         });
         let is_authored = authored_header.is_some();
         // If there is no authored header, choose an arbitrary header.
-        let header = authored_header.or_else(|| { let _ = &state; state.creates.into_iter().map(|(_, v)| v).next() });
+        let header = authored_header.or_else(|| {
+            let _ = &state;
+            state.creates.into_iter().map(|(_, v)| v).next()
+        });
         match header {
             Some(header) => {
                 let entry_hash = header
