@@ -1,6 +1,8 @@
 //! Module for items related to aggregating validation_receipts
 
+use futures::Stream;
 use futures::StreamExt;
+use futures::TryStreamExt;
 use holo_hash::AgentPubKey;
 use holo_hash::DhtOpHash;
 use holochain_keystore::AgentPubKeyExt;
@@ -69,25 +71,25 @@ impl ValidationReceipt {
                 async move { validator.sign(&keystore, this).await }
             })
             .collect::<Vec<_>>();
-        let signatures = futures::stream::iter(futures)
-            .buffer_unordered(10)
-            .collect::<Vec<_>>()
-            .await;
-        let signatures = if signatures.iter().any(Result::is_ok) {
-            signatures.into_iter().filter_map(Result::ok).collect()
-        } else {
-            let r = match signatures.into_iter().filter_map(Result::err).next() {
-                Some(err) => Err(err),
-                // Weird that we got to here with no errors but seems to be happening in production.
-                None => Ok(None),
-            };
-            return r;
-        };
+        let stream = futures::stream::iter(futures);
+        let signatures = try_stream_of_results(stream).await?;
+        if signatures.is_empty() {
+            return Ok(None);
+        }
         Ok(Some(SignedValidationReceipt {
             receipt: self,
             validators_signatures: signatures,
         }))
     }
+}
+
+/// Try to collect a stream of futures that return results into a vec.
+async fn try_stream_of_results<T, U, E>(stream: U) -> Result<Vec<T>, E>
+where
+    U: Stream,
+    <U as Stream>::Item: futures::Future<Output = Result<T, E>>,
+{
+    stream.buffer_unordered(10).map(|r| r).try_collect().await
 }
 
 /// A full, signed validation receipt.
@@ -227,5 +229,31 @@ mod tests {
             assert_eq!(expects, list);
         });
         Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_try_stream_of_results() {
+        let iter: Vec<futures::future::Ready<Result<i32, String>>> = vec![];
+        let stream = futures::stream::iter(iter);
+        assert_eq!(Ok(vec![]), try_stream_of_results(stream).await);
+
+        let iter = vec![async move { Result::<_, String>::Ok(0) }];
+        let stream = futures::stream::iter(iter);
+        assert_eq!(Ok(vec![0]), try_stream_of_results(stream).await);
+
+        let iter = (0..10).map(|i| async move { Result::<_, String>::Ok(i) });
+        let stream = futures::stream::iter(iter);
+        assert_eq!(
+            Ok((0..10).collect::<Vec<_>>()),
+            try_stream_of_results(stream).await
+        );
+
+        let iter = vec![async move { Result::<i32, String>::Err("test".to_string()) }];
+        let stream = futures::stream::iter(iter);
+        assert_eq!(Err("test".to_string()), try_stream_of_results(stream).await);
+
+        let iter = (0..10).map(|_| async move { Result::<i32, String>::Err("test".to_string()) });
+        let stream = futures::stream::iter(iter);
+        assert_eq!(Err("test".to_string()), try_stream_of_results(stream).await);
     }
 }
