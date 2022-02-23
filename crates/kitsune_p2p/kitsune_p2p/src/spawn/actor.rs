@@ -11,7 +11,6 @@ use crate::*;
 use futures::future::FutureExt;
 use futures::stream::StreamExt;
 use kitsune_p2p_proxy::tx2::*;
-use kitsune_p2p_proxy::ProxyUrl;
 use kitsune_p2p_transport_quic::tx2::*;
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use kitsune_p2p_types::async_lazy::AsyncLazy;
@@ -149,9 +148,20 @@ impl KitsuneP2pActor {
         let f = if !is_mock {
             let mut conf = kitsune_p2p_proxy::tx2::ProxyConfig::default();
             conf.tuning_params = Some(config.tuning_params.clone());
-            if let Some(use_proxy) = &tx2_conf.use_proxy {
-                let proxy_url = ProxyUrl::from(use_proxy.as_str());
-                conf.client_of_remote_proxy = Some(proxy_url);
+            match tx2_conf.use_proxy {
+                KitsuneP2pTx2ProxyConfig::NoProxy => (),
+                KitsuneP2pTx2ProxyConfig::Specific(proxy_url) => {
+                    conf.client_of_remote_proxy = ProxyRemoteType::Specific(proxy_url);
+                }
+                KitsuneP2pTx2ProxyConfig::Bootstrap {
+                    bootstrap_url,
+                    fallback_proxy_url,
+                } => {
+                    conf.client_of_remote_proxy = ProxyRemoteType::Bootstrap {
+                        bootstrap_url,
+                        fallback_proxy_url,
+                    };
+                }
             }
             let f = tx2_proxy(f, conf)?;
             f

@@ -18,9 +18,19 @@ pub(crate) enum KitsuneP2pTx2Backend {
     Mock { mock_network: AdapterFactory },
 }
 
+pub(crate) enum KitsuneP2pTx2ProxyConfig {
+    NoProxy,
+    Specific(TxUrl),
+    Bootstrap {
+        #[allow(dead_code)]
+        bootstrap_url: TxUrl,
+        fallback_proxy_url: Option<TxUrl>,
+    },
+}
+
 pub(crate) struct KitsuneP2pTx2Config {
     pub backend: KitsuneP2pTx2Backend,
-    pub use_proxy: Option<TxUrl>,
+    pub use_proxy: KitsuneP2pTx2ProxyConfig,
 }
 
 /// Configure the kitsune actor
@@ -64,6 +74,7 @@ impl KitsuneP2pConfig {
     /// so, convert a bunch of the options from the previous transport
     /// paradigm into that pattern.
     pub(crate) fn to_tx2(&self) -> KitsuneResult<KitsuneP2pTx2Config> {
+        use KitsuneP2pTx2ProxyConfig::*;
         match self.transport_pool.get(0) {
             Some(TransportConfig::Proxy {
                 sub_transport,
@@ -78,8 +89,17 @@ impl KitsuneP2pConfig {
                     _ => return Err("kitsune tx2 backend must be mem or quic".into()),
                 };
                 let use_proxy = match proxy_config {
-                    ProxyConfig::RemoteProxyClient { proxy_url } => Some(proxy_url.clone().into()),
-                    ProxyConfig::LocalProxyServer { .. } => None,
+                    ProxyConfig::RemoteProxyClient { proxy_url } => {
+                        Specific(proxy_url.clone().into())
+                    }
+                    ProxyConfig::RemoteProxyClientFromBootstrap {
+                        bootstrap_url,
+                        fallback_proxy_url,
+                    } => Bootstrap {
+                        bootstrap_url: bootstrap_url.clone().into(),
+                        fallback_proxy_url: fallback_proxy_url.clone().map(Into::into),
+                    },
+                    ProxyConfig::LocalProxyServer { .. } => NoProxy,
                 };
                 Ok(KitsuneP2pTx2Config { backend, use_proxy })
             }
@@ -87,18 +107,18 @@ impl KitsuneP2pConfig {
                 let bind_to = cnv_bind_to(bind_to);
                 Ok(KitsuneP2pTx2Config {
                     backend: KitsuneP2pTx2Backend::Quic { bind_to },
-                    use_proxy: None,
+                    use_proxy: NoProxy,
                 })
             }
             Some(TransportConfig::Mock { mock_network }) => Ok(KitsuneP2pTx2Config {
                 backend: KitsuneP2pTx2Backend::Mock {
                     mock_network: mock_network.0.clone(),
                 },
-                use_proxy: None,
+                use_proxy: NoProxy,
             }),
             None | Some(TransportConfig::Mem {}) => Ok(KitsuneP2pTx2Config {
                 backend: KitsuneP2pTx2Backend::Mem,
-                use_proxy: None,
+                use_proxy: NoProxy,
             }),
         }
     }
@@ -179,6 +199,17 @@ pub enum ProxyConfig {
     RemoteProxyClient {
         /// The remote proxy url to be hosted at
         proxy_url: Url2,
+    },
+
+    /// We want to be hosted at a remote proxy location.
+    /// We'd like to fetch a proxy list from a bootstrap server,
+    /// with an optional fallback to a specific proxy.
+    RemoteProxyClientFromBootstrap {
+        /// The bootstrap server from which to fetch the proxy_list
+        bootstrap_url: Url2,
+
+        /// The optional fallback specific proxy server
+        fallback_proxy_url: Option<Url2>,
     },
 
     /// We want to be a proxy server for others.
