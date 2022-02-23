@@ -26,6 +26,8 @@ pub mod entry;
 pub mod entry_def;
 pub mod genesis;
 #[allow(missing_docs)]
+pub mod hash;
+#[allow(missing_docs)]
 pub mod header;
 #[allow(missing_docs)]
 pub mod info;
@@ -37,6 +39,7 @@ pub mod link;
 pub mod metadata;
 #[allow(missing_docs)]
 pub mod migrate_agent;
+pub mod op;
 pub mod prelude;
 #[cfg(feature = "properties")]
 pub mod properties;
@@ -50,8 +53,6 @@ pub use kitsune_p2p_timestamp as timestamp;
 pub mod trace;
 #[allow(missing_docs)]
 pub mod validate;
-#[allow(missing_docs)]
-pub mod validate_link;
 /// Tracking versions between the WASM host and guests and other interfaces.
 ///
 /// Needed to ensure compatibility as code develops.

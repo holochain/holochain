@@ -17,28 +17,44 @@ use holochain_zome_types::ZomeName;
 #[serde(rename_all = "snake_case")]
 pub struct DnaManifestV1 {
     /// The friendly "name" of a Holochain DNA.
-    pub(crate) name: String,
+    pub name: String,
 
     /// A UID for uniquifying this Dna.
     // TODO: consider Vec<u8> instead (https://github.com/holochain/holochain/pull/86#discussion_r412689085)
-    pub(crate) uid: Option<String>,
+    pub uid: Option<String>,
 
     /// Any arbitrary application properties can be included in this object.
-    pub(crate) properties: Option<YamlProperties>,
+    pub properties: Option<YamlProperties>,
+
+    /// The time used to denote the origin of the network, used to calculate
+    /// time windows during gossip.
+    /// All Header timestamps must come after this time.
+    #[serde(default = "default_origin_time")]
+    pub origin_time: HumanTimestamp,
 
     /// An array of zomes associated with your DNA.
     /// The order is significant: it determines initialization order.
-    pub(crate) zomes: Vec<ZomeManifest>,
+    pub zomes: Vec<ZomeManifest>,
+}
+
+fn default_origin_time() -> HumanTimestamp {
+    // Jan 1, 2022, 12:00:00 AM UTC
+    Timestamp::HOLOCHAIN_EPOCH.into()
 }
 
 /// Manifest for an individual Zome
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub struct ZomeManifest {
-    pub(crate) name: ZomeName,
-    pub(crate) hash: Option<WasmHashB64>,
+    /// Just a friendly name, no semantic meaning.
+    pub name: ZomeName,
+
+    /// The hash of the wasm which defines this zome
+    pub hash: Option<WasmHashB64>,
+
+    /// The location of the wasm for this zome
     #[serde(flatten)]
-    pub(crate) location: ZomeLocation,
+    pub location: ZomeLocation,
 }
 
 /// Alias for a suitable representation of zome location

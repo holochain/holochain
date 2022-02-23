@@ -2,6 +2,9 @@
 
 #[allow(missing_docs)]
 mod error;
+mod human;
+
+pub use human::*;
 
 use std::{
     convert::TryFrom,
@@ -41,6 +44,8 @@ pub struct Timestamp(
     i64, // microseconds from UNIX Epoch, positive or negative
 );
 
+pub(crate) type DateTime = chrono::DateTime<chrono::Utc>;
+
 /// Display as RFC3339 Date+Time for sane value ranges (0000-9999AD).  Beyond that, format
 /// as (seconds, nanoseconds) tuple (output and parsing of large +/- years is unreliable).
 impl fmt::Display for Timestamp {
@@ -67,14 +72,14 @@ impl fmt::Debug for Timestamp {
     }
 }
 
-impl From<chrono::DateTime<chrono::Utc>> for Timestamp {
-    fn from(t: chrono::DateTime<chrono::Utc>) -> Self {
+impl From<DateTime> for Timestamp {
+    fn from(t: DateTime) -> Self {
         std::convert::From::from(&t)
     }
 }
 
-impl From<&chrono::DateTime<chrono::Utc>> for Timestamp {
-    fn from(t: &chrono::DateTime<chrono::Utc>) -> Self {
+impl From<&DateTime> for Timestamp {
+    fn from(t: &DateTime) -> Self {
         let t = t.naive_utc();
         Timestamp(t.timestamp() * MM + t.timestamp_subsec_nanos() as i64 / 1000)
     }
@@ -84,7 +89,7 @@ impl From<&chrono::DateTime<chrono::Utc>> for Timestamp {
 // may panic in from_timestamp due to out-of-range secs or nsecs, making all code using/displaying a
 // Timestamp this way dangerously fragile!  Use try_from, and handle any failures.
 
-impl TryFrom<Timestamp> for chrono::DateTime<chrono::Utc> {
+impl TryFrom<Timestamp> for DateTime {
     type Error = TimestampError;
 
     fn try_from(t: Timestamp) -> Result<Self, Self::Error> {
@@ -92,7 +97,7 @@ impl TryFrom<Timestamp> for chrono::DateTime<chrono::Utc> {
     }
 }
 
-impl TryFrom<&Timestamp> for chrono::DateTime<chrono::Utc> {
+impl TryFrom<&Timestamp> for DateTime {
     type Error = TimestampError;
 
     fn try_from(t: &Timestamp) -> Result<Self, Self::Error> {
@@ -180,6 +185,8 @@ impl Timestamp {
     pub const MIN: Timestamp = Timestamp(i64::MIN);
     /// The largest possible Timestamp
     pub const MAX: Timestamp = Timestamp(i64::MAX);
+    /// Jan 1, 2022, 12:00:00 AM UTC
+    pub const HOLOCHAIN_EPOCH: Timestamp = Timestamp(1640995200000000);
 
     /// Returns the current system time as a Timestamp.
     ///

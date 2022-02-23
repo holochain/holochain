@@ -307,6 +307,7 @@ impl MetricTaskCounter {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "flakey. https://app.circleci.com/jobs/github/holochain/holochain/12604"]
 async fn test_metric_task() {
     for _ in 0..20 {
         metric_task(async move {

@@ -693,6 +693,7 @@ fixturator!(
         properties: SerializedBytesFixturator::new_indexed(Empty, get_fixt_index!())
             .next()
             .unwrap(),
+        origin_time: Timestamp::HOLOCHAIN_EPOCH,
         zomes: ZomesFixturator::new_indexed(Empty, get_fixt_index!())
             .next()
             .unwrap(),
@@ -708,6 +709,7 @@ fixturator!(
         properties: SerializedBytesFixturator::new_indexed(Unpredictable, get_fixt_index!())
             .next()
             .unwrap(),
+        origin_time: Timestamp::HOLOCHAIN_EPOCH,
         zomes: ZomesFixturator::new_indexed(Unpredictable, get_fixt_index!())
             .next()
             .unwrap(),
@@ -723,6 +725,7 @@ fixturator!(
         properties: SerializedBytesFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap(),
+        origin_time: Timestamp::HOLOCHAIN_EPOCH,
         zomes: ZomesFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap(),

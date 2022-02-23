@@ -1,11 +1,12 @@
 use hdk::prelude::*;
 
 #[hdk_extern]
-fn validate_agent(_: Element) -> ExternResult<ValidateCallbackResult> {
-    Ok(ValidateCallbackResult::Valid)
-}
-
-#[hdk_extern]
-fn validate(_: ValidateData) -> ExternResult<ValidateCallbackResult> {
-    Ok(ValidateCallbackResult::Invalid("esoteric edge case".into()))
+fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
+    match op {
+        Op::StoreEntry {
+            entry: Entry::Agent(_),
+            ..
+        } => Ok(ValidateCallbackResult::Valid),
+        _ => Ok(ValidateCallbackResult::Invalid("esoteric edge case".into())),
+    }
 }

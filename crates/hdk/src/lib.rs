@@ -291,6 +291,8 @@ pub mod countersigning;
 /// For example, an agent could choose to 'block' another agent and ignore all their updates.
 pub mod entry;
 
+pub mod hash;
+
 /// Distributed Hash Tables (DHTs) are fundamentally all key/value stores (content addressable).
 ///
 /// This has lots of benefits but can make discoverability difficult.

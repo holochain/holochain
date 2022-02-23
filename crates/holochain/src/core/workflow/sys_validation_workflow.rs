@@ -168,14 +168,6 @@ async fn sys_validation_workflow_inner(
                                 ValidationLimboStatus::SysValidated,
                             )?;
                         }
-                        Outcome::SkipAppValidation => {
-                            total += 1;
-                            if let Dependency::Null = dependency {
-                                put_integrated(txn, op_hash, ValidationStatus::Valid)?;
-                            } else {
-                                put_integration_limbo(txn, op_hash, ValidationStatus::Valid)?;
-                            }
-                        }
                         Outcome::AwaitingOpDep(missing_dep) => {
                             awaiting += 1;
                             // TODO: Try and get this dependency to add to limbo
@@ -248,12 +240,7 @@ async fn validate_op(
     )
     .await
     {
-        Ok(_) => match op {
-            // TODO: Check strict mode where store element
-            // is also run through app validation
-            DhtOp::RegisterAgentActivity(_, _) => Ok(Outcome::SkipAppValidation),
-            _ => Ok(Outcome::Accepted),
-        },
+        Ok(_) => Ok(Outcome::Accepted),
         // Handle the errors that result in pending or awaiting deps
         Err(SysValidationError::ValidationOutcome(e)) => {
             info!(
@@ -801,6 +788,7 @@ pub struct SysValidationWorkspace {
     authored_env: DbRead<DbKindAuthored>,
     dht_env: DbRead<DbKindDht>,
     cache: DbWrite<DbKindCache>,
+    pub(crate) dna_def: Arc<DnaDef>,
 }
 
 impl SysValidationWorkspace {
@@ -808,11 +796,13 @@ impl SysValidationWorkspace {
         authored_env: DbRead<DbKindAuthored>,
         dht_env: DbRead<DbKindDht>,
         cache: DbWrite<DbKindCache>,
+        dna_def: Arc<DnaDef>,
     ) -> Self {
         Self {
             authored_env,
             dht_env,
             cache,
+            dna_def,
             scratch: None,
         }
     }
@@ -929,6 +919,11 @@ impl SysValidationWorkspace {
     fn dna_hash(&self) -> &DnaHash {
         self.dht_env.kind().dna_hash()
     }
+
+    /// Get a reference to the sys validation workspace's dna def.
+    pub fn dna_def(&self) -> Arc<DnaDef> {
+        self.dna_def.clone()
+    }
 }
 
 fn put_validation_limbo(
@@ -976,6 +971,7 @@ impl From<&HostFnWorkspace> for SysValidationWorkspace {
             authored_env: authored,
             dht_env: dht,
             cache,
+            dna_def: h.dna_def(),
         }
     }
 }

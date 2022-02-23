@@ -129,6 +129,7 @@ async fn speed_test(n: Option<usize>) -> TestEnvs {
             name: "need_for_speed_test".to_string(),
             uid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
             properties: SerializedBytes::try_from(()).unwrap(),
+            origin_time: Timestamp::HOLOCHAIN_EPOCH,
             zomes: vec![TestWasm::Anchor.into()].into(),
         },
         vec![TestWasm::Anchor.into()],
@@ -168,17 +169,7 @@ async fn speed_test(n: Option<usize>) -> TestEnvs {
     // START CONDUCTOR
     // ///////////////
 
-    let mut dna_store = MockDnaStore::new();
-
-    dna_store.expect_get().return_const(Some(dna_file.clone()));
-    dna_store
-        .expect_add_dnas::<Vec<_>>()
-        .times(2)
-        .return_const(());
-    dna_store
-        .expect_add_entry_defs::<Vec<_>>()
-        .times(2)
-        .return_const(());
+    let mut dna_store = MockDnaStore::single_dna(dna_file, 2, 2);
     dna_store.expect_get_entry_def().return_const(None);
 
     let (test_env, _app_api, handle) = setup_app(

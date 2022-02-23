@@ -68,20 +68,40 @@ async fn check_valid_if_dna_test() {
     // Test data
     let _activity_return = vec![fixt!(HeaderHash)];
 
+    let mut dna_def = fixt!(DnaDef);
+    dna_def.origin_time = Timestamp::MIN;
+
     // Empty store not dna
     let header = fixt!(CreateLink);
-    let workspace =
-        SysValidationWorkspace::new(env.clone().into(), tmp_dht.env().into(), tmp_cache.env());
+    let mut workspace = SysValidationWorkspace::new(
+        env.clone().into(),
+        tmp_dht.env().into(),
+        tmp_cache.env(),
+        Arc::new(dna_def.clone()),
+    );
 
     assert_matches!(
         check_valid_if_dna(&header.clone().into(), &workspace).await,
         Ok(())
     );
     let mut header = fixt!(Dna);
+
     assert_matches!(
         check_valid_if_dna(&header.clone().into(), &workspace).await,
         Ok(())
     );
+
+    // - Test that an origin_time in the future leads to invalid Dna header commit
+    let dna_def_original = workspace.dna_def();
+    dna_def.origin_time = Timestamp::MAX;
+    workspace.dna_def = Arc::new(dna_def);
+    assert_matches!(
+        check_valid_if_dna(&header.clone().into(), &workspace).await,
+        Err(SysValidationError::ValidationOutcome(
+            ValidationOutcome::PrevHeaderError(PrevHeaderError::InvalidRootOriginTime)
+        ))
+    );
+    workspace.dna_def = dna_def_original;
 
     fake_genesis(env.clone().into(), tmp_dht.env(), keystore)
         .await
@@ -297,6 +317,7 @@ async fn check_app_entry_type_test() {
             name: "app_entry_type_test".to_string(),
             uid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
             properties: SerializedBytes::try_from(()).unwrap(),
+            origin_time: Timestamp::HOLOCHAIN_EPOCH,
             zomes: vec![TestWasm::EntryDefs.into()].into(),
         },
         vec![TestWasm::EntryDefs.into()],
@@ -311,7 +332,7 @@ async fn check_app_entry_type_test() {
     let mut conductor_handle = MockConductorHandleT::new();
     // # No dna or entry def
     conductor_handle.expect_get_entry_def().return_const(None);
-    conductor_handle.expect_get_dna().return_const(None);
+    conductor_handle.expect_get_dna_file().return_const(None);
 
     // ## Dna is missing
     let aet = AppEntryType::new(0.into(), 0.into(), EntryVisibility::Public);
@@ -325,7 +346,7 @@ async fn check_app_entry_type_test() {
     conductor_handle.checkpoint();
     conductor_handle.expect_get_entry_def().return_const(None);
     conductor_handle
-        .expect_get_dna()
+        .expect_get_dna_file()
         .return_const(Some(dna_file.clone()));
     let aet = AppEntryType::new(0.into(), 1.into(), EntryVisibility::Public);
     assert_matches!(

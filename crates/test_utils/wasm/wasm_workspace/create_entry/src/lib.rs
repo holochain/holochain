@@ -90,17 +90,32 @@ fn create_priv_msg(_: ()) -> ExternResult<HeaderHash> {
 }
 
 #[hdk_extern]
-fn validate_create_entry_post(
-    validation_data: ValidateData,
-) -> ExternResult<ValidateCallbackResult> {
-    let element = validation_data.element;
-    let r = match element.entry().to_app_option::<Post>() {
-        Ok(Some(post)) if &post.0 == "Banana" => {
-            ValidateCallbackResult::Invalid("No Bananas!".to_string())
+fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
+    let this_zome = zome_info()?;
+    if let Op::StoreEntry {
+        header:
+            SignedHashed {
+                hashed: HoloHashed {
+                    content: header, ..
+                },
+                ..
+            },
+        entry,
+    } = op
+    {
+        if header
+            .app_entry_type()
+            .filter(|app_entry_type| {
+                this_zome.matches_entry_def_id(app_entry_type, Post::entry_def_id())
+            })
+            .map_or(Ok(false), |_| {
+                Post::try_from(entry).map(|post| &post.0 == "Banana")
+            })?
+        {
+            return Ok(ValidateCallbackResult::Invalid("No Bananas!".to_string()));
         }
-        _ => ValidateCallbackResult::Valid,
-    };
-    Ok(r)
+    }
+    Ok(ValidateCallbackResult::Valid)
 }
 
 #[hdk_extern]
@@ -186,7 +201,12 @@ fn call_create_entry_remotely(agent: AgentPubKey) -> ExternResult<HeaderHash> {
 }
 
 #[hdk_extern]
+fn must_get_valid_element(header_hash: HeaderHash) -> ExternResult<Element> {
+    hdk::prelude::must_get_valid_element(header_hash)
+}
+
 /// Same as above but doesn't recurse on network errors.
+#[hdk_extern]
 fn call_create_entry_remotely_no_rec(agent: AgentPubKey) -> ExternResult<HeaderHash> {
     let zome_call_response: ZomeCallResponse = call_remote(
         agent.clone(),

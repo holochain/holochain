@@ -48,7 +48,7 @@ impl From<&ThisWasmEntry> for EntryDef {
 }
 
 impl TryFrom<&Entry> for ThisWasmEntry {
-    type Error = EntryError;
+    type Error = WasmError;
     fn try_from(entry: &Entry) -> Result<Self, Self::Error> {
         match entry {
             Entry::App(eb) => Ok(Self::try_from(SerializedBytes::from(eb.to_owned()))?),
@@ -96,33 +96,55 @@ entry_defs![
 ];
 
 #[hdk_extern]
-fn validate(data: ValidateData) -> ExternResult<ValidateCallbackResult> {
-    let element = data.element;
-    let entry_type = element.header().entry_type().cloned();
-    let entry = element.into_inner().1;
-    let entry = match entry {
-        ElementEntry::Present(e) => e,
-        _ => return Ok(ValidateCallbackResult::Valid),
-    };
-
-    if let Entry::App(_) = &entry {
-        Ok(match ThisWasmEntry::try_from(&entry) {
-            Ok(ThisWasmEntry::AlwaysValidates) => ValidateCallbackResult::Valid,
-            Ok(ThisWasmEntry::NeverValidates) => {
-                ValidateCallbackResult::Invalid("NeverValidates never validates".to_string())
+fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
+    match op {
+        Op::StoreEntry {
+            header:
+                SignedHashed {
+                    hashed:
+                        HoloHashed {
+                            content: header, ..
+                        },
+                    ..
+                },
+            entry,
+        } => match header.app_entry_type() {
+            Some(app_entry_type) => {
+                let this_zome = zome_info()?;
+                let matches_entry_def = this_zome
+                    .matches_entry_def_id(app_entry_type, (&ThisWasmEntry::AlwaysValidates).into())
+                    || this_zome.matches_entry_def_id(
+                        app_entry_type,
+                        (&ThisWasmEntry::NeverValidates).into(),
+                    );
+                if matches_entry_def {
+                    let entry = ThisWasmEntry::try_from(&entry)?;
+                    match entry {
+                        ThisWasmEntry::AlwaysValidates => Ok(ValidateCallbackResult::Valid),
+                        ThisWasmEntry::NeverValidates => Ok(ValidateCallbackResult::Invalid(
+                            "NeverValidates never validates".to_string(),
+                        )),
+                    }
+                } else {
+                    Ok(ValidateCallbackResult::Invalid(format!(
+                        "Not a ThisWasmEntry but a {:?}",
+                        header.entry_type()
+                    )))
+                }
             }
-            _ => ValidateCallbackResult::Invalid(format!(
-                "Not a ThisWasmEntry but a {:?}",
-                entry_type
-            )),
-        })
-    } else {
-        Ok(ValidateCallbackResult::Valid)
+            None => Ok(ValidateCallbackResult::Valid),
+        },
+        _ => Ok(ValidateCallbackResult::Valid),
     }
 }
 
 fn _commit_validate(to_commit: ThisWasmEntry) -> ExternResult<HeaderHash> {
     create_entry(&to_commit)
+}
+
+#[hdk_extern]
+fn must_get_valid_element(header_hash: HeaderHash) -> ExternResult<Element> {
+    hdk::prelude::must_get_valid_element(header_hash)
 }
 
 #[hdk_extern]
