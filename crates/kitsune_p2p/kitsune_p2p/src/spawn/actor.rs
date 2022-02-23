@@ -440,6 +440,7 @@ impl ghost_actor::GhostControlHandler for KitsuneP2pActor {
         use futures::sink::SinkExt;
         use ghost_actor::GhostControlSender;
         async move {
+            let _ = &self;
             // this is a curtesy, ok if fails
             let _ = self.evt_sender.close().await;
             self.ep_hnd.close(500, "").await;

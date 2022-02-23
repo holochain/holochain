@@ -402,6 +402,7 @@ impl SweetConductor {
             futures::stream::iter(iter)
                 .then(|f| f)
                 .for_each(|(env, mut triggers)| async move {
+                    let _ = &triggers;
                     crate::test_utils::force_publish_dht_ops(&env, &mut triggers.publish_dht_ops)
                         .await
                         .unwrap();

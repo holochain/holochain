@@ -8,7 +8,7 @@ documentation = "https://docs.rs/holochain_keystore"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 keywords = [ "holochain", "holo", "nacl", "libsodium", "cryptography" ]
 categories = [ "cryptography" ]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 base64 = "0.13.0"

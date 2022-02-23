@@ -18,8 +18,21 @@ impl From<Thing> for ValidateCallbackResult {
 entry_defs![Thing::entry_def()];
 
 #[hdk_extern]
-fn validate(data: ValidateData) -> ExternResult<ValidateCallbackResult> {
-    Ok(Thing::try_from(data.element)?.into())
+fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
+    let this_zome = zome_info()?;
+    match op {
+        Op::StoreElement { element }
+            if element.header().entry_type().map_or(false, |et| match et {
+                EntryType::App(app_entry_type) => {
+                    this_zome.matches_entry_def_id(app_entry_type, Thing::entry_def_id())
+                }
+                _ => false,
+            }) =>
+        {
+            Ok(Thing::try_from(element)?.into())
+        }
+        _ => Ok(ValidateCallbackResult::Valid),
+    }
 }
 
 #[hdk_extern]

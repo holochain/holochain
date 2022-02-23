@@ -13,11 +13,6 @@ use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentInvocation
 use crate::core::ribosome::guest_callback::post_commit::PostCommitHostAccess;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateHostAccess;
-use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
-use crate::core::ribosome::guest_callback::validate_link::ValidateCreateLinkInvocation;
-use crate::core::ribosome::guest_callback::validate_link::ValidateDeleteLinkInvocation;
-use crate::core::ribosome::guest_callback::validate_link::ValidateLinkHostAccess;
-use crate::core::ribosome::guest_callback::validate_link::ValidateLinkInvocation;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageHostAccess;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageInvocation;
 use crate::core::ribosome::real_ribosome::RealRibosome;
@@ -406,61 +401,6 @@ fixturator!(
 fixturator!(
     ZomesToInvoke;
     constructor fn one(Zome);
-);
-
-fn make_validate_invocation(
-    zomes_to_invoke: ZomesToInvoke,
-    element: Element,
-) -> ValidateInvocation {
-    ValidateInvocation {
-        zomes_to_invoke,
-        element: Arc::new(element),
-        validation_package: None,
-        entry_def_id: None,
-    }
-}
-
-fixturator!(
-    ValidateInvocation;
-    vanilla fn make_validate_invocation(ZomesToInvoke, Element);
-);
-
-fixturator!(
-    ValidateCreateLinkInvocation;
-    constructor fn new(Zome, CreateLink, Entry, Entry);
-);
-
-fixturator!(
-    ValidateDeleteLinkInvocation;
-    constructor fn new(Zome, DeleteLink);
-);
-
-/// Macros don't get along with generics.
-type ValidateLinkInvocationCreate = ValidateLinkInvocation<ValidateCreateLinkInvocation>;
-
-fixturator!(
-    ValidateLinkInvocationCreate;
-    constructor fn new(ValidateCreateLinkInvocation);
-    curve Zome {
-        let mut c = ValidateCreateLinkInvocationFixturator::new(Empty)
-            .next()
-            .unwrap();
-        c.zome = get_fixt_curve!();
-        ValidateLinkInvocationCreate::new(c)
-    };
-);
-
-/// Macros don't get along with generics.
-type ValidateLinkInvocationDelete = ValidateLinkInvocation<ValidateDeleteLinkInvocation>;
-
-fixturator!(
-    ValidateLinkInvocationDelete;
-    constructor fn new(ValidateDeleteLinkInvocation);
-);
-
-fixturator!(
-    ValidateLinkHostAccess;
-    constructor fn new(HostFnWorkspace, HolochainP2pDna);
 );
 
 fixturator!(

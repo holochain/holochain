@@ -8,7 +8,7 @@ documentation = "https://docs.rs/holochain_p2p"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 keywords = [ "holochain", "holo", "p2p", "dht", "networking" ]
 categories = [ "network-programming" ]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 async-trait = "0.1"

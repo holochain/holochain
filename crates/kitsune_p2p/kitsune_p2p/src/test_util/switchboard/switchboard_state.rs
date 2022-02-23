@@ -92,7 +92,6 @@ impl Switchboard {
         &self,
         tuning_params: KitsuneP2pTuningParams,
     ) -> [NodeEp; N] {
-        use std::convert::TryInto;
         let mut nodes = vec![];
         for _ in 0..N {
             nodes.push(self.add_node(tuning_params.clone()).await);
