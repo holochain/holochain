@@ -6,6 +6,77 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20220223.053502
+
+## [holochain-0.0.127](crates/holochain/CHANGELOG.md#0.0.127)
+
+- **BREAKING CHANGE** App validation callbacks are now run per `Op`. There is now only a single validation callback `fn validate(op: Op) -> ExternResult<ValidateCallbackResult>` that is called for each `Op`. See the documentation for `Op` for more details on what data is passed to the callback. There are example use cases in `crates/test_utils/wasm/wasm_workspace/`. For example in the `validate` test wasm. To update an existing app, you to this version all `validate_*` callbacks including `validate_create_link` must be changed to the new `validate(..)` callback. [\#1212](https://github.com/holochain/holochain/pull/1212).
+
+- `RegisterAgentActivity` ops are now validated by app validation.
+
+- Init functions can now make zome calls. [\#1186](https://github.com/holochain/holochain/pull/1186)
+
+- Adds header hashing to `hash` host fn [1227](https://github.com/holochain/holochain/pull/1227)
+
+- Adds blake2b hashing to `hash` host fn [1228](https://github.com/holochain/holochain/pull/1228)
+
+## [kitsune\_p2p\_bootstrap-0.0.3](crates/kitsune_p2p_bootstrap/CHANGELOG.md#0.0.3)
+
+## [holochain\_test\_wasm\_common-0.0.23](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.23)
+
+## [holochain\_cascade-0.0.27](crates/holochain_cascade/CHANGELOG.md#0.0.27)
+
+## [holochain\_cli-0.0.28](crates/holochain_cli/CHANGELOG.md#0.0.28)
+
+## [holochain\_cli\_sandbox-0.0.24](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.24)
+
+## [holochain\_websocket-0.0.27](crates/holochain_websocket/CHANGELOG.md#0.0.27)
+
+## [holochain\_conductor\_api-0.0.27](crates/holochain_conductor_api/CHANGELOG.md#0.0.27)
+
+## [holochain\_state-0.0.27](crates/holochain_state/CHANGELOG.md#0.0.27)
+
+## [holochain\_wasm\_test\_utils-0.0.27](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.27)
+
+## [holochain\_p2p-0.0.27](crates/holochain_p2p/CHANGELOG.md#0.0.27)
+
+## [holochain\_cli\_bundle-0.0.23](crates/holochain_cli_bundle/CHANGELOG.md#0.0.23)
+
+- The DNA manifest now requires an `origin_time` Timestamp field, which will be used in the forthcoming gossip optimization.
+  - There is a new system validation rule that all Header timestamps (including the initial Dna header) must come after the DNA’s `origin_time` field.
+  - `hc dna init` injects the current system time as *microseconds* for the `origin_time` field of the DNA manifest
+  - Since this field is not actually hooked up to anything at the moment, if the field is not present in a DNA manifest, a default `origin_time` of `January 1, 2022 12:00:00 AM` will be used instead. Once the new gossip algorithm lands, this default will be removed, and this will become a breaking change for DNA manifests which have not yet added an `origin_time`.
+
+## [holochain\_types-0.0.27](crates/holochain_types/CHANGELOG.md#0.0.27)
+
+## [holochain\_keystore-0.0.27](crates/holochain_keystore/CHANGELOG.md#0.0.27)
+
+## [holochain\_sqlite-0.0.27](crates/holochain_sqlite/CHANGELOG.md#0.0.27)
+
+## [kitsune\_p2p-0.0.24](crates/kitsune_p2p/CHANGELOG.md#0.0.24)
+
+## [kitsune\_p2p\_proxy-0.0.18](crates/kitsune_p2p_proxy/CHANGELOG.md#0.0.18)
+
+## [kitsune\_p2p\_transport\_quic-0.0.18](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.0.18)
+
+## [kitsune\_p2p\_types-0.0.18](crates/kitsune_p2p_types/CHANGELOG.md#0.0.18)
+
+- Sharded DHT arcs is on by default. This means that once the network reaches a certain size, it will split into multiple shards.
+
+## [hdk-0.0.123](crates/hdk/CHANGELOG.md#0.0.123)
+
+## [hdk\_derive-0.0.25](crates/hdk_derive/CHANGELOG.md#0.0.25)
+
+## [holochain\_zome\_types-0.0.25](crates/holochain_zome_types/CHANGELOG.md#0.0.25)
+
+- Adds the `Op` type which is used in the validation callback. [\#1212](https://github.com/holochain/holochain/pull/1212)
+- Adds the `SignedHashed<T>` type for any data that can be signed and hashed.
+- BREAKING CHANGE: Many hashing algorithms can now be specified although only the `Entry` hash type does anything yet [\#1222](https://github.com/holochain/holochain/pull/1222)
+
+## [kitsune\_p2p\_timestamp-0.0.6](crates/kitsune_p2p_timestamp/CHANGELOG.md#0.0.6)
+
+## [holo\_hash-0.0.20](crates/holo_hash/CHANGELOG.md#0.0.20)
+
 # 20220211.091841
 
 - Bump `holochain_wasmer_*` crates to v0.0.77 which relaxes the version requirements on `serde`. [\#1204](https://github.com/holochain/holochain/pull/1204)
