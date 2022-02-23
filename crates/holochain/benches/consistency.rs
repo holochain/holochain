@@ -68,6 +68,7 @@ fn consistency(bench: &mut Criterion) {
         });
     });
     runtime.block_on(async move {
+        let _ = &others;
         consumer.conductor.shutdown_and_wait().await;
         drop(consumer);
         for c in others.conductors {

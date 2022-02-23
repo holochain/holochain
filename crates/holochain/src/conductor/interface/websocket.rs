@@ -666,7 +666,7 @@ pub mod test {
                 name: "conductor_test".to_string(),
                 uid: uid.to_string(),
                 properties: SerializedBytes::try_from(()).unwrap(),
-                origin_time: Timestamp::now(),
+                origin_time: Timestamp::HOLOCHAIN_EPOCH,
                 zomes: zomes.clone().into_iter().map(Into::into).collect(),
             },
             zomes.into_iter().map(Into::into),

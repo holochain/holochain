@@ -43,7 +43,7 @@ impl Outcome {
     }
 }
 
-/// Turn the OutcomeOrError into an Outcome or and Error
+/// Turn the OutcomeOrError into an Outcome or an Error
 impl<E> TryFrom<OutcomeOrError<Outcome, E>> for Outcome {
     type Error = E;
 

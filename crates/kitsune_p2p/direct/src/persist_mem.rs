@@ -393,7 +393,7 @@ impl AsKdPersist for PersistMem {
         });
         async move {
             let store = match store {
-                Err(_) => return Err("root not found".into()),
+                Err(_) => return Ok(PeerStratBeta::default().view_unchecked(dht_arc, &[])),
                 Ok(store) => store,
             };
             let arcs: Vec<_> = store

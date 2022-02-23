@@ -67,6 +67,7 @@ struct Inner {
 impl ghost_actor::GhostControlHandler for Inner {
     fn handle_ghost_actor_shutdown(mut self) -> MustBoxFuture<'static, ()> {
         async move {
+            let _ = &self;
             for (_, sub) in self.sub_listeners {
                 let _ = sub.ghost_actor_shutdown().await;
             }

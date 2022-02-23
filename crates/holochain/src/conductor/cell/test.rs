@@ -81,7 +81,7 @@ async fn test_cell_handle_publish() {
         hash: dna.clone(),
     });
     let hh = HeaderHashed::from_content_sync(header.clone());
-    let shh = SignedHeaderHashed::new(&keystore, hh).await.unwrap();
+    let shh = SignedHeaderHashed::sign(&keystore, hh).await.unwrap();
     let op = DhtOp::StoreElement(shh.signature().clone(), header.clone(), None);
     let op_hash = DhtOpHashed::from_content_sync(op.clone()).into_hash();
 

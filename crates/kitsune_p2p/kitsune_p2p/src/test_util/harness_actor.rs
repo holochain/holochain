@@ -160,6 +160,7 @@ impl ghost_actor::GhostControlHandler for HarnessActor {
     ) -> ghost_actor::dependencies::must_future::MustBoxFuture<'static, ()> {
         use ghost_actor::GhostControlSender;
         async move {
+            let _ = &self;
             self.harness_chan.close();
             for (_, (p2p, ctrl)) in self.agents.iter() {
                 let _ = p2p.ghost_actor_shutdown().await;

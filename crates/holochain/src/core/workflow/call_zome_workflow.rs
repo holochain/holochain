@@ -1,4 +1,5 @@
 use super::app_validation_workflow;
+use super::app_validation_workflow::AppValidationError;
 use super::app_validation_workflow::Outcome;
 use super::error::WorkflowResult;
 use super::sys_validation_workflow::sys_validate_element;
@@ -7,16 +8,12 @@ use crate::conductor::api::CellConductorApiT;
 use crate::conductor::interface::SignalBroadcaster;
 use crate::conductor::ConductorHandle;
 use crate::core::queue_consumer::TriggerSender;
-use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::guest_callback::post_commit::send_post_commit;
 use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCallHostAccess;
 use crate::core::ribosome::ZomeCallInvocation;
-use crate::core::ribosome::ZomesToInvoke;
 use crate::core::workflow::error::WorkflowError;
-use either::Either;
-use holochain_cascade::Cascade;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::HolochainP2pDna;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
@@ -25,7 +22,6 @@ use holochain_state::source_chain::SourceChainError;
 use holochain_zome_types::element::Element;
 
 use holochain_types::prelude::*;
-use std::sync::Arc;
 use tracing::instrument;
 
 #[cfg(test)]
@@ -130,7 +126,6 @@ where
 
     let call_zome_handle =
         CellConductorApi::new(conductor_handle.clone(), cell_id).into_call_zome_handle();
-    let zome = invocation.zome.clone();
 
     tracing::trace!("Before zome call");
     let host_access = ZomeCallHostAccess::new(
@@ -144,14 +139,8 @@ where
         call_zome_function_authorized(ribosome, host_access, invocation).await?;
     tracing::trace!("After zome call");
 
-    let validation_result = inline_validation(
-        workspace.clone(),
-        network,
-        conductor_handle,
-        Some(zome),
-        ribosome,
-    )
-    .await;
+    let validation_result =
+        inline_validation(workspace.clone(), network, conductor_handle, ribosome).await;
     if matches!(
         validation_result,
         Err(WorkflowError::SourceChainError(
@@ -215,7 +204,6 @@ pub async fn inline_validation<Ribosome>(
     workspace: SourceChainWorkspace,
     network: HolochainP2pDna,
     conductor_handle: ConductorHandle,
-    zome: Option<Zome>,
     ribosome: Ribosome,
 ) -> WorkflowResult<()>
 where
@@ -239,145 +227,52 @@ where
         to_app_validate
     };
 
-    {
-        for chain_element in to_app_validate {
-            let zome = match zome.clone() {
-                Some(zome) => ZomesToInvoke::One(zome),
-                None => {
-                    get_zome(
-                        &chain_element,
-                        &workspace,
-                        network.clone(),
-                        ribosome.dna_def(),
-                    )
-                    .await?
-                }
-            };
-            let outcome = match chain_element.header() {
-                Header::Dna(_)
-                | Header::AgentValidationPkg(_)
-                | Header::OpenChain(_)
-                | Header::CloseChain(_)
-                | Header::InitZomesComplete(_) => {
-                    // These headers don't get validated
-                    continue;
-                }
-                Header::CreateLink(link_add) => {
-                    let (base, target) = {
-                        let mut cascade = holochain_cascade::Cascade::from_workspace_network(
-                            &workspace,
-                            network.clone(),
-                        );
-                        let base_address = &link_add.base_address;
-                        let base = cascade
-                            .retrieve_entry(base_address.clone(), Default::default())
-                            .await
-                            .map_err(RibosomeError::from)?
-                            .ok_or_else(|| RibosomeError::ElementDeps(base_address.clone().into()))?
-                            .into_content();
-                        let base = Arc::new(base);
+    let mut cascade =
+        holochain_cascade::Cascade::from_workspace_network(&workspace, network.clone());
+    for mut chain_element in to_app_validate {
+        for op_type in header_to_op_types(chain_element.header()) {
+            let op =
+                app_validation_workflow::element_to_op(chain_element, op_type, &mut cascade).await;
 
-                        let target_address = &link_add.target_address;
-                        let target = cascade
-                            .retrieve_entry(target_address.clone(), Default::default())
-                            .await
-                            .map_err(RibosomeError::from)?
-                            .ok_or_else(|| {
-                                RibosomeError::ElementDeps(target_address.clone().into())
-                            })?
-                            .into_content();
-                        let target = Arc::new(target);
-                        (base, target)
-                    };
-                    let link_add = Arc::new(link_add.clone());
-
-                    Either::Left(
-                        app_validation_workflow::run_create_link_validation_callback(
-                            app_validation_workflow::to_single_zome(zome)?,
-                            link_add,
-                            base,
-                            target,
-                            &ribosome,
-                            workspace.clone(),
-                            network.clone(),
-                        )?,
-                    )
-                }
-                Header::DeleteLink(delete_link) => Either::Left(
-                    app_validation_workflow::run_delete_link_validation_callback(
-                        app_validation_workflow::to_single_zome(zome)?,
-                        delete_link.clone(),
-                        &ribosome,
-                        workspace.clone(),
-                        network.clone(),
-                    )?,
-                ),
-                Header::Create(_) | Header::Update(_) | Header::Delete(_) => Either::Right(
-                    app_validation_workflow::run_validation_callback_direct(
-                        zome,
-                        chain_element,
-                        &ribosome,
-                        workspace.clone(),
-                        network.clone(),
-                        &conductor_handle,
-                    )
-                    .await?,
-                ),
+            let (op, activity_entry) = match op {
+                Ok(op) => op,
+                Err(outcome_or_err) => return map_outcome(Outcome::try_from(outcome_or_err)),
             };
+
+            let outcome = app_validation_workflow::validate_op(
+                &op,
+                workspace.clone().into(),
+                &network,
+                &ribosome,
+            )
+            .await;
+            let outcome = outcome.or_else(Outcome::try_from);
             map_outcome(outcome)?;
+            chain_element = app_validation_workflow::op_to_element(op, activity_entry);
         }
     }
+
     Ok(())
 }
 
-fn map_outcome(outcome: Either<app_validation_workflow::Outcome, Outcome>) -> WorkflowResult<()> {
-    match outcome {
-        Either::Left(outcome) => match outcome {
-            app_validation_workflow::Outcome::Accepted => {}
-            app_validation_workflow::Outcome::Rejected(reason) => {
-                return Err(SourceChainError::InvalidLink(reason).into());
-            }
-            app_validation_workflow::Outcome::AwaitingDeps(hashes) => {
-                return Err(SourceChainError::InvalidCommit(format!("{:?}", hashes)).into());
-            }
-        },
-        Either::Right(outcome) => match outcome {
-            app_validation_workflow::Outcome::Accepted => {}
-            app_validation_workflow::Outcome::Rejected(reason) => {
-                return Err(SourceChainError::InvalidCommit(reason).into());
-            }
-            // when the wasm is being called directly in a zome invocation any
-            // state other than valid is not allowed for new entries
-            // e.g. we require that all dependencies are met when committing an
-            // entry to a local source chain
-            // this is different to the case where we are validating data coming in
-            // from the network where unmet dependencies would need to be
-            // rescheduled to attempt later due to partitions etc.
-            app_validation_workflow::Outcome::AwaitingDeps(hashes) => {
-                return Err(SourceChainError::InvalidCommit(format!("{:?}", hashes)).into());
-            }
-        },
-    }
-    Ok(())
-}
-async fn get_zome(
-    element: &Element,
-    workspace: &SourceChainWorkspace,
-    network: HolochainP2pDna,
-    dna_def: &DnaDefHashed,
-) -> WorkflowResult<crate::core::ribosome::ZomesToInvoke> {
-    let mut cascade = Cascade::from_workspace_network(workspace, network);
-    let result = app_validation_workflow::get_zomes_to_invoke(element, dna_def, &mut cascade).await;
-    match result {
-        Ok(zomes) => Ok(zomes),
-        Err(outcome_or_err) => {
-            let outcome = outcome_or_err.try_into()?;
-            match outcome {
-                app_validation_workflow::Outcome::AwaitingDeps(hashes) => {
-                    return Err(SourceChainError::InvalidCommit(format!("{:?}", hashes)).into());
-                }
-                _ => unreachable!("get_zomes_to_invoke only returns success, error or await"),
-            }
+fn map_outcome(
+    outcome: Result<app_validation_workflow::Outcome, AppValidationError>,
+) -> WorkflowResult<()> {
+    match outcome.map_err(SourceChainError::other)? {
+        app_validation_workflow::Outcome::Accepted => {}
+        app_validation_workflow::Outcome::Rejected(reason) => {
+            return Err(SourceChainError::InvalidCommit(reason).into());
+        }
+        // when the wasm is being called directly in a zome invocation any
+        // state other than valid is not allowed for new entries
+        // e.g. we require that all dependencies are met when committing an
+        // entry to a local source chain
+        // this is different to the case where we are validating data coming in
+        // from the network where unmet dependencies would need to be
+        // rescheduled to attempt later due to partitions etc.
+        app_validation_workflow::Outcome::AwaitingDeps(hashes) => {
+            return Err(SourceChainError::InvalidCommit(format!("{:?}", hashes)).into());
         }
     }
+    Ok(())
 }

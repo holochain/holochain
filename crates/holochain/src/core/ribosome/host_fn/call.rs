@@ -17,6 +17,7 @@ pub fn call(
     let results: Vec<Result<ZomeCallResponse, WasmError>> =
         tokio_helper::block_forever_on(async move {
             join_all(inputs.into_iter().map(|input| async {
+                let _ = &input;
                 let Call {
                     target,
                     zome_name,

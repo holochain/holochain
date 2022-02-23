@@ -16,6 +16,7 @@ async fn main() {
     config.periodic_agent_hook_interval_ms = Some(1000);
     config.periodic_agent_hook = Box::new(|input| {
         async move {
+            let _ = &input;
             let AgentHookInput {
                 root,
                 app_entry_hash,
