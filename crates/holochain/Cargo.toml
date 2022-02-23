@@ -6,7 +6,7 @@ license-file = "LICENSE_CAL-1.0"
 homepage = "https://github.com/holochain/holochain"
 documentation = "https://docs.rs/holochain"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 anyhow = "1.0.26"
@@ -74,6 +74,7 @@ url_serde = "0.2.0"
 uuid = { version = "0.7", features = [ "serde", "v4" ] }
 xsalsa20poly1305 = "0.6.0"
 holochain_wasm_test_utils = { version = "0.0.26", path = "../test_utils/wasm" }
+tiny-keccak = { version = "2.0.2", features = ["keccak", "sha3"] }
 
 # Dependencies for test_utils: keep in sync with below
 hdk = { version = "0.0.122", path = "../hdk", optional = true }

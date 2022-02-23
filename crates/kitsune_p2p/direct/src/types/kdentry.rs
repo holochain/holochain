@@ -79,6 +79,7 @@ impl KdEntrySignedExt for KdEntrySigned {
         let binary_len = binary.len();
         let data_to_sign = content.to_data_to_sign(binary.to_vec());
         async move {
+            let _ = &content;
             let data_to_sign = data_to_sign?;
             let hash = KdHash::from_data(&data_to_sign).await?;
             let signature = persist

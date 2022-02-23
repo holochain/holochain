@@ -6,7 +6,7 @@ license-file = "LICENSE_CAL-1.0"
 homepage = "https://github.com/holochain/holochain"
 documentation = "https://docs.rs/holochain_cascade"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 derive_more = "0.99.3"

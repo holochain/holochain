@@ -111,7 +111,7 @@ impl EntryDef {
 }
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct EntryDefs(Vec<EntryDef>);
+pub struct EntryDefs(pub Vec<EntryDef>);
 
 impl EntryDefs {
     pub fn entry_def_index_from_id(&self, entry_def_id: EntryDefId) -> Option<EntryDefIndex> {

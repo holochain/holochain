@@ -176,6 +176,7 @@ mod tests {
     use ::fixt::prelude::*;
     use futures::future::FutureExt;
     use ghost_actor::GhostControlSender;
+    use kitsune_p2p::dht_arc::PeerStratBeta;
 
     use crate::HolochainP2pSender;
     use holochain_zome_types::ValidationStatus;
@@ -231,6 +232,15 @@ mod tests {
                     }
                     PutAgentInfoSigned { respond, .. } => {
                         respond.r(Ok(async move { Ok(()) }.boxed().into()));
+                    }
+                    QueryPeerDensity { respond, .. } => {
+                        let view = kitsune_p2p_types::dht_arc::PeerViewBeta::new(
+                            PeerStratBeta::default(),
+                            dht_arc::DhtArc::full(0),
+                            1.0,
+                            2,
+                        );
+                        respond.r(Ok(async move { Ok(view) }.boxed().into()));
                     }
                     _ => {}
                 }
@@ -289,6 +299,15 @@ mod tests {
                     PutAgentInfoSigned { respond, .. } => {
                         respond.r(Ok(async move { Ok(()) }.boxed().into()));
                     }
+                    QueryPeerDensity { respond, .. } => {
+                        let view = kitsune_p2p_types::dht_arc::PeerViewBeta::new(
+                            PeerStratBeta::default(),
+                            dht_arc::DhtArc::full(0),
+                            1.0,
+                            2,
+                        );
+                        respond.r(Ok(async move { Ok(view) }.boxed().into()));
+                    }
                     _ => {}
                 }
             }
@@ -336,6 +355,15 @@ mod tests {
                     }
                     QueryAgentInfoSigned { respond, .. } => {
                         respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
+                    }
+                    QueryPeerDensity { respond, .. } => {
+                        let view = kitsune_p2p_types::dht_arc::PeerViewBeta::new(
+                            PeerStratBeta::default(),
+                            dht_arc::DhtArc::full(0),
+                            1.0,
+                            2,
+                        );
+                        respond.r(Ok(async move { Ok(view) }.boxed().into()));
                     }
                     _ => {}
                 }
@@ -419,6 +447,15 @@ mod tests {
                     QueryOpHashes { respond, .. } => {
                         respond.r(Ok(async move { Ok(None) }.boxed().into()));
                     }
+                    QueryPeerDensity { respond, .. } => {
+                        let view = kitsune_p2p_types::dht_arc::PeerViewBeta::new(
+                            PeerStratBeta::default(),
+                            dht_arc::DhtArc::full(0),
+                            1.0,
+                            2,
+                        );
+                        respond.r(Ok(async move { Ok(view) }.boxed().into()));
+                    }
                     evt => tracing::trace!("unhandled: {:?}", evt),
                 }
             }
@@ -497,6 +534,15 @@ mod tests {
                     }
                     PutAgentInfoSigned { respond, .. } => {
                         respond.r(Ok(async move { Ok(()) }.boxed().into()));
+                    }
+                    QueryPeerDensity { respond, .. } => {
+                        let view = kitsune_p2p_types::dht_arc::PeerViewBeta::new(
+                            PeerStratBeta::default(),
+                            dht_arc::DhtArc::full(0),
+                            1.0,
+                            2,
+                        );
+                        respond.r(Ok(async move { Ok(view) }.boxed().into()));
                     }
                     _ => {}
                 }
