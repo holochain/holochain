@@ -236,10 +236,11 @@ mod tests {
                     QueryPeerDensity { respond, .. } => {
                         let view = kitsune_p2p_types::dht_arc::PeerViewBeta::new(
                             PeerStratBeta::default(),
-                            dht_arc::DhtArc::full(0),
+                            dht_arc::DhtArc::full(0u32),
                             1.0,
                             2,
-                        );
+                        )
+                        .into();
                         respond.r(Ok(async move { Ok(view) }.boxed().into()));
                     }
                     _ => {}
@@ -302,10 +303,11 @@ mod tests {
                     QueryPeerDensity { respond, .. } => {
                         let view = kitsune_p2p_types::dht_arc::PeerViewBeta::new(
                             PeerStratBeta::default(),
-                            dht_arc::DhtArc::full(0),
+                            dht_arc::DhtArc::full(0u32),
                             1.0,
                             2,
-                        );
+                        )
+                        .into();
                         respond.r(Ok(async move { Ok(view) }.boxed().into()));
                     }
                     _ => {}
@@ -359,10 +361,11 @@ mod tests {
                     QueryPeerDensity { respond, .. } => {
                         let view = kitsune_p2p_types::dht_arc::PeerViewBeta::new(
                             PeerStratBeta::default(),
-                            dht_arc::DhtArc::full(0),
+                            dht_arc::DhtArc::full(0u32),
                             1.0,
                             2,
-                        );
+                        )
+                        .into();
                         respond.r(Ok(async move { Ok(view) }.boxed().into()));
                     }
                     _ => {}
@@ -450,10 +453,11 @@ mod tests {
                     QueryPeerDensity { respond, .. } => {
                         let view = kitsune_p2p_types::dht_arc::PeerViewBeta::new(
                             PeerStratBeta::default(),
-                            dht_arc::DhtArc::full(0),
+                            dht_arc::DhtArc::full(0u32),
                             1.0,
                             2,
-                        );
+                        )
+                        .into();
                         respond.r(Ok(async move { Ok(view) }.boxed().into()));
                     }
                     evt => tracing::trace!("unhandled: {:?}", evt),
@@ -538,10 +542,11 @@ mod tests {
                     QueryPeerDensity { respond, .. } => {
                         let view = kitsune_p2p_types::dht_arc::PeerViewBeta::new(
                             PeerStratBeta::default(),
-                            dht_arc::DhtArc::full(0),
+                            dht_arc::DhtArc::full(0u32),
                             1.0,
                             2,
-                        );
+                        )
+                        .into();
                         respond.r(Ok(async move { Ok(view) }.boxed().into()));
                     }
                     _ => {}

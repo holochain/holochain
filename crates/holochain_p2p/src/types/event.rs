@@ -3,9 +3,7 @@
 
 use crate::*;
 use holochain_zome_types::signature::Signature;
-use kitsune_p2p::{
-    agent_store::AgentInfoSigned, dht::region::RegionBounds, dht_arc::DhtLocation, event::*,
-};
+use kitsune_p2p::{agent_store::AgentInfoSigned, dht::region::RegionBounds, event::*};
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 /// The data required for a get request.

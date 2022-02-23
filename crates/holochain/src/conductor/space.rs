@@ -9,8 +9,8 @@ use holochain_conductor_api::conductor::EnvironmentRootPath;
 use holochain_p2p::{
     dht::{
         arq::{power_and_count_from_length, ArqBoundsSet},
-        quantum::{TelescopingTimes, TimeQuantum, Topology},
         hash::RegionHash,
+        quantum::{TelescopingTimes, TimeQuantum, Topology},
         region::{RegionCoordSetXtcs, RegionData, RegionSetXtcs},
         ArqBounds, ArqStrat,
     },
@@ -315,10 +315,10 @@ impl<DS: DnaStore> Spaces<DS> {
                                 let (t0, t1) = bounds.t;
                                 stmt.query_row(
                                     named_params! {
-                                        ":storage_start_loc": x0.to_loc(&topology),
-                                        ":storage_end_loc": x1.to_loc(&topology),
-                                        ":timestamp_min": t0.to_timestamp(&topology),
-                                        ":timestamp_max": t1.to_timestamp(&topology),
+                                        ":storage_start_loc": x0,
+                                        ":storage_end_loc": x1,
+                                        ":timestamp_min": t0,
+                                        ":timestamp_max": t1,
                                         // ":author": &author, // TODO: unneeded for authored table?
                                     },
                                     |row| {
