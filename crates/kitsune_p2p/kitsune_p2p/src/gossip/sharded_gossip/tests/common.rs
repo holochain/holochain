@@ -19,14 +19,12 @@ async fn standard_responses(
     evt_handler
         .expect_handle_get_agent_info_signed()
         .returning({
-            let infos = infos.clone();
             move |input| {
-                let infos = infos.clone();
                 let agent = infos
-                    .iter()
+                    .clone()
+                    .into_iter()
                     .find(|a| a.agent == input.agent)
-                    .unwrap()
-                    .clone();
+                    .unwrap();
                 Ok(async move { Ok(Some(agent)) }.boxed().into())
             }
         });
