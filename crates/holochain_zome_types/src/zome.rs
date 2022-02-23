@@ -24,6 +24,7 @@ use std::sync::Arc;
 /// A Holochain Zome. Includes the ZomeDef as well as the name of the Zome.
 #[derive(Serialize, Deserialize, Hash, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[cfg_attr(feature = "full-dna-def", derive(shrinkwraprs::Shrinkwrap))]
+#[cfg_attr(feature = "test_utils", derive(arbitrary::Arbitrary))]
 pub struct Zome {
     name: ZomeName,
     #[cfg_attr(feature = "full-dna-def", shrinkwrap(main_field))]
@@ -144,10 +145,18 @@ impl ZomeDef {
     }
 }
 
+#[cfg(feature = "test_utils")]
+impl<'a> arbitrary::Arbitrary<'a> for ZomeDef {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        Ok(Self::Wasm(WasmZome::arbitrary(u)?))
+    }
+}
+
 /// A zome defined by Wasm bytecode
 #[derive(
     Serialize, Deserialize, Hash, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, SerializedBytes,
 )]
+#[cfg_attr(feature = "test_utils", derive(arbitrary::Arbitrary))]
 pub struct WasmZome {
     /// The WasmHash representing the WASM byte code for this zome.
     pub wasm_hash: holo_hash::WasmHash,
