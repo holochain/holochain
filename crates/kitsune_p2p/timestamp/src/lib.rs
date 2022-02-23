@@ -187,6 +187,8 @@ impl Timestamp {
     pub const MIN: Timestamp = Timestamp(i64::MIN);
     /// The largest possible Timestamp
     pub const MAX: Timestamp = Timestamp(i64::MAX);
+    /// Jan 1, 2022, 12:00:00 AM UTC
+    pub const HOLOCHAIN_EPOCH: Timestamp = Timestamp(1640995200000000);
 
     /// Returns the current system time as a Timestamp.
     ///

@@ -635,11 +635,14 @@ async fn gather_published_data(
     let iter = iter.map(|stores| async move {
         let published_hashes = request_published_ops(&stores.authored_env).await?;
         let storage_arc = request_arc(&stores.p2p_env, (*stores.agent).clone()).await?;
-        Ok(storage_arc.map(|storage_arc| { let _ = &stores; PublishedData {
-            agent: stores.agent,
-            storage_arc,
-            published_hashes,
-        } }))
+        Ok(storage_arc.map(|storage_arc| {
+            let _ = &stores;
+            PublishedData {
+                agent: stores.agent,
+                storage_arc,
+                published_hashes,
+            }
+        }))
     });
     futures::stream::iter(iter)
         .buffer_unordered(concurrency)
