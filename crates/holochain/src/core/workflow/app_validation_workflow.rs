@@ -36,6 +36,9 @@ mod network_call_tests;
 #[cfg(test)]
 mod tests;
 
+#[cfg(test)]
+mod validation_tests;
+
 mod error;
 mod types;
 pub mod validation_package;
