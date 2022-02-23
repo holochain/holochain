@@ -222,7 +222,7 @@ mod tests {
             name: "name".into(),
             uid: Some("original uid".to_string()),
             properties: Some(serde_yaml::Value::Null.into()),
-            origin_time: Timestamp::now().into(),
+            origin_time: Timestamp::HOLOCHAIN_EPOCH.into(),
             zomes: vec![
                 ZomeManifest {
                     name: "zome1".into(),
