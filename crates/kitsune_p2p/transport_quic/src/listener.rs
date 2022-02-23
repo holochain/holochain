@@ -73,6 +73,7 @@ impl ghost_actor::GhostControlHandler for TransportListenerQuic {
         mut self,
     ) -> ghost_actor::dependencies::must_future::MustBoxFuture<'static, ()> {
         async move {
+            let _ = &self;
             // Note: it's easiest to just blanket shut everything down.
             // If we wanted to be more graceful, we'd need to plumb
             // in some signals to start rejecting incoming connections,
