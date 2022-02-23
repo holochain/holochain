@@ -15,6 +15,154 @@ use crate::{
     test_utils::consistency_10s,
 };
 
+const ZOME_A_0: &'static str = "ZOME_A_0";
+const ZOME_A_1: &'static str = "ZOME_A_1";
+const ZOME_B_0: &'static str = "ZOME_B_0";
+const ZOME_B_1: &'static str = "ZOME_B_1";
+
+const ALICE: &'static str = "ALICE";
+const BOB: &'static str = "BOB";
+
+#[derive(Debug, Hash, PartialEq, Eq, Clone)]
+struct Event {
+    header: HeaderLocation,
+    op_type: DhtOpType,
+    called_zome: &'static str,
+    with_zome_index: Option<ZomeId>,
+    with_entry_def_index: Option<EntryDefIndex>,
+}
+
+impl Default for Event {
+    fn default() -> Self {
+        Self {
+            header: Default::default(),
+            op_type: DhtOpType::RegisterAgentActivity,
+            called_zome: Default::default(),
+            with_zome_index: Default::default(),
+            with_entry_def_index: Default::default(),
+        }
+    }
+}
+
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Default)]
+struct HeaderLocation {
+    agent: &'static str,
+    header_type: String,
+    seq: u32,
+}
+
+impl std::fmt::Display for Event {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match (&self.with_zome_index, &self.with_entry_def_index) {
+            (Some(z), None) => write!(
+                f,
+                "{}:{}:{}:zome_id({})",
+                self.called_zome, self.op_type, self.header, z
+            ),
+            (Some(z), Some(e)) => write!(
+                f,
+                "{}:{}:{}:zome_id({}):entry_id({})",
+                self.called_zome, self.op_type, self.header, z, e.0
+            ),
+            _ => write!(f, "{}:{}:{}", self.called_zome, self.op_type, self.header),
+        }
+    }
+}
+
+impl std::fmt::Display for HeaderLocation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}:{}:{}", self.agent, self.header_type, self.seq)
+    }
+}
+
+impl HeaderLocation {
+    fn new(header: impl Into<Header>, agents: &HashMap<AgentPubKey, &'static str>) -> Self {
+        let header = header.into();
+        Self {
+            agent: agents.get(header.author()).unwrap(),
+            header_type: header.header_type().to_string(),
+            seq: header.header_seq(),
+        }
+    }
+
+    fn expected(agent: &'static str, header_type: HeaderType, seq: u32) -> Self {
+        Self {
+            agent,
+            header_type: header_type.to_string(),
+            seq,
+        }
+    }
+}
+struct Expected(HashSet<Event>);
+
+impl Expected {
+    fn all_zomes(&mut self, mut event: Event) {
+        event.called_zome = ZOME_A_0;
+        self.0.insert(event.clone());
+        event.called_zome = ZOME_A_1;
+        self.0.insert(event.clone());
+        event.called_zome = ZOME_B_0;
+        self.0.insert(event.clone());
+        event.called_zome = ZOME_B_1;
+        self.0.insert(event);
+    }
+
+    fn activity_and_element_all_zomes(&mut self, mut event: Event) {
+        event.op_type = DhtOpType::RegisterAgentActivity;
+        self.all_zomes(event.clone());
+        event.op_type = DhtOpType::StoreElement;
+        self.all_zomes(event.clone());
+    }
+
+    fn zomes(&mut self, mut event: Event, zomes: &[&'static str]) {
+        for zome in zomes {
+            event.called_zome = *zome;
+            self.0.insert(event.clone());
+        }
+    }
+
+    fn activity_and_element_for_zomes(&mut self, mut event: Event, zomes: &[&'static str]) {
+        event.op_type = DhtOpType::RegisterAgentActivity;
+
+        self.zomes(event.clone(), zomes);
+
+        event.op_type = DhtOpType::StoreElement;
+
+        self.zomes(event.clone(), zomes);
+    }
+
+    fn genesis(&mut self, agent: &'static str, zomes: &[&'static str]) {
+        let event = Event {
+            header: HeaderLocation::expected(agent, HeaderType::Dna, 0),
+            ..Default::default()
+        };
+        self.activity_and_element_for_zomes(event.clone(), zomes);
+
+        let event = Event {
+            header: HeaderLocation::expected(agent, HeaderType::AgentValidationPkg, 1),
+            ..Default::default()
+        };
+        self.activity_and_element_for_zomes(event.clone(), zomes);
+
+        let mut event = Event {
+            header: HeaderLocation::expected(agent, HeaderType::Create, 2),
+            ..Default::default()
+        };
+        self.activity_and_element_for_zomes(event.clone(), zomes);
+
+        event.op_type = DhtOpType::StoreEntry;
+        self.zomes(event.clone(), zomes);
+    }
+
+    fn init(&mut self, agent: &'static str) {
+        let event = Event {
+            header: HeaderLocation::expected(agent, HeaderType::InitZomesComplete, 3),
+            ..Default::default()
+        };
+        self.activity_and_element_all_zomes(event.clone());
+    }
+}
+
 #[tokio::test(flavor = "multi_thread")]
 /// Test that all ops are created and the correct zomes
 /// are called for each op.
@@ -50,84 +198,6 @@ async fn app_validation_ops() {
     };
 
     let (events_tx, mut events_rx) = tokio::sync::mpsc::channel(100);
-    const ZOME_A_0: &'static str = "ZOME_A_0";
-    const ZOME_A_1: &'static str = "ZOME_A_1";
-    const ZOME_B_0: &'static str = "ZOME_B_0";
-    const ZOME_B_1: &'static str = "ZOME_B_1";
-
-    const ALICE: &'static str = "ALICE";
-    const BOB: &'static str = "BOB";
-
-    #[derive(Debug, Hash, PartialEq, Eq, Clone)]
-    struct Event {
-        header: HeaderLocation,
-        op_type: DhtOpType,
-        called_zome: &'static str,
-        with_zome_index: Option<ZomeId>,
-        with_entry_def_index: Option<EntryDefIndex>,
-    }
-
-    impl Default for Event {
-        fn default() -> Self {
-            Self {
-                header: Default::default(),
-                op_type: DhtOpType::RegisterAgentActivity,
-                called_zome: Default::default(),
-                with_zome_index: Default::default(),
-                with_entry_def_index: Default::default(),
-            }
-        }
-    }
-
-    #[derive(Debug, Hash, PartialEq, Eq, Clone, Default)]
-    struct HeaderLocation {
-        agent: &'static str,
-        header_type: String,
-        seq: u32,
-    }
-
-    impl std::fmt::Display for Event {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            match (&self.with_zome_index, &self.with_entry_def_index) {
-                (Some(z), None) => write!(
-                    f,
-                    "{}:{}:{}:zome_id({})",
-                    self.called_zome, self.op_type, self.header, z
-                ),
-                (Some(z), Some(e)) => write!(
-                    f,
-                    "{}:{}:{}:zome_id({}):entry_id({})",
-                    self.called_zome, self.op_type, self.header, z, e.0
-                ),
-                _ => write!(f, "{}:{}:{}", self.called_zome, self.op_type, self.header),
-            }
-        }
-    }
-
-    impl std::fmt::Display for HeaderLocation {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            write!(f, "{}:{}:{}", self.agent, self.header_type, self.seq)
-        }
-    }
-
-    impl HeaderLocation {
-        fn new(header: impl Into<Header>, agents: &HashMap<AgentPubKey, &'static str>) -> Self {
-            let header = header.into();
-            Self {
-                agent: agents.get(header.author()).unwrap(),
-                header_type: header.header_type().to_string(),
-                seq: header.header_seq(),
-            }
-        }
-
-        fn expected(agent: &'static str, header_type: HeaderType, seq: u32) -> Self {
-            Self {
-                agent,
-                header_type: header_type.to_string(),
-                seq,
-            }
-        }
-    }
 
     let validation_callback =
         |zome: &'static str,
@@ -296,75 +366,6 @@ async fn app_validation_ops() {
 
     consistency_10s(&[&alice, &bob]).await;
 
-    struct Expected(HashSet<Event>);
-
-    impl Expected {
-        fn all_zomes(&mut self, mut event: Event) {
-            event.called_zome = ZOME_A_0;
-            self.0.insert(event.clone());
-            event.called_zome = ZOME_A_1;
-            self.0.insert(event.clone());
-            event.called_zome = ZOME_B_0;
-            self.0.insert(event.clone());
-            event.called_zome = ZOME_B_1;
-            self.0.insert(event);
-        }
-
-        fn activity_and_element_all_zomes(&mut self, mut event: Event) {
-            event.op_type = DhtOpType::RegisterAgentActivity;
-            self.all_zomes(event.clone());
-            event.op_type = DhtOpType::StoreElement;
-            self.all_zomes(event.clone());
-        }
-
-        fn zomes(&mut self, mut event: Event, zomes: &[&'static str]) {
-            for zome in zomes {
-                event.called_zome = *zome;
-                self.0.insert(event.clone());
-            }
-        }
-
-        fn activity_and_element_for_zomes(&mut self, mut event: Event, zomes: &[&'static str]) {
-            event.op_type = DhtOpType::RegisterAgentActivity;
-
-            self.zomes(event.clone(), zomes);
-
-            event.op_type = DhtOpType::StoreElement;
-
-            self.zomes(event.clone(), zomes);
-        }
-
-        fn genesis(&mut self, agent: &'static str, zomes: &[&'static str]) {
-            let event = Event {
-                header: HeaderLocation::expected(agent, HeaderType::Dna, 0),
-                ..Default::default()
-            };
-            self.activity_and_element_for_zomes(event.clone(), zomes);
-
-            let event = Event {
-                header: HeaderLocation::expected(agent, HeaderType::AgentValidationPkg, 1),
-                ..Default::default()
-            };
-            self.activity_and_element_for_zomes(event.clone(), zomes);
-
-            let mut event = Event {
-                header: HeaderLocation::expected(agent, HeaderType::Create, 2),
-                ..Default::default()
-            };
-            self.activity_and_element_for_zomes(event.clone(), zomes);
-
-            event.op_type = DhtOpType::StoreEntry;
-            self.zomes(event.clone(), zomes);
-        }
-
-        fn init(&mut self, agent: &'static str) {
-            let event = Event {
-                header: HeaderLocation::expected(agent, HeaderType::InitZomesComplete, 3),
-                ..Default::default()
-            };
-            self.activity_and_element_all_zomes(event.clone());
-        }
-    }
     let mut expected = Expected(HashSet::new());
 
     expected.genesis(ALICE, &[ZOME_B_0, ZOME_B_1]);
