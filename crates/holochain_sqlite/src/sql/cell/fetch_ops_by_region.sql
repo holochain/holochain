@@ -1,14 +1,14 @@
 SELECT
-  COUNT() AS count,
-  SUM(LENGTH(Header.blob) + LENGTH(Entry.blob)) AS blobsize,
-  REDUCE_XOR(hash) AS xor_hash,
+  DhtOp.hash,
+  DhtOp.type,
+  Header.blob AS header_blob,
+  Entry.blob AS entry_blob
 FROM
   DhtOp
   JOIN Header ON DhtOp.header_hash = Header.hash
   LEFT JOIN Entry ON Header.entry_hash = Entry.hash
 WHERE
-  author = :author -- op location is within location bounds
-  AND (
+  (
     (
       -- non-wrapping case: everything within the given range
       :storage_start_loc <= :storage_end_loc

@@ -2,10 +2,10 @@ use once_cell::sync::OnceCell;
 
 use crate::{
     arq::*,
-    quantum::*,
     error::{GossipError, GossipResult},
     host::AccessOpStore,
     op::OpRegion,
+    quantum::*,
     tree::TreeDataConstraints,
 };
 use derivative::Derivative;
@@ -83,11 +83,11 @@ impl<D: TreeDataConstraints> RegionSet<D> {
     }
 
     pub fn query(&self, bounds: &RegionBounds) -> ! {
-        todo!()
+        unimplemented!("only implement after trying naive database-only approach")
     }
 
     pub fn update(&self, c: SpacetimeCoords, d: D) -> ! {
-        todo!()
+        unimplemented!("only implement after trying naive database-only approach")
     }
 
     /// Find a set of Regions which represents the intersection of the two
@@ -119,7 +119,7 @@ pub struct RegionSetXtcs<D: TreeDataConstraints = RegionData> {
     /// the actual coordinates as generated
     #[derivative(PartialEq = "ignore")]
     #[serde(skip)]
-    pub(crate) region_coords: OnceCell<Vec<RegionCoords>>,
+    pub(crate) _region_coords: OnceCell<Vec<RegionCoords>>,
 
     /// The outer vec corresponds to the spatial segments;
     /// the inner vecs are the time segments.
@@ -132,7 +132,7 @@ impl<D: TreeDataConstraints> RegionSetXtcs<D> {
         Self {
             coords: RegionCoordSetXtcs::empty(),
             data: vec![],
-            region_coords: OnceCell::new(),
+            _region_coords: OnceCell::new(),
         }
     }
 
@@ -140,7 +140,7 @@ impl<D: TreeDataConstraints> RegionSetXtcs<D> {
         Self {
             coords,
             data,
-            region_coords: OnceCell::new(),
+            _region_coords: OnceCell::new(),
         }
     }
 
@@ -159,7 +159,7 @@ impl<D: TreeDataConstraints> RegionSetXtcs<D> {
         Self {
             coords,
             data,
-            region_coords: OnceCell::new(),
+            _region_coords: OnceCell::new(),
         }
     }
 

@@ -11,7 +11,7 @@ use holochain_p2p::{
         arq::{power_and_count_from_length, ArqBoundsSet},
         hash::RegionHash,
         quantum::{TelescopingTimes, TimeQuantum, Topology},
-        region::{RegionCoordSetXtcs, RegionData, RegionSetXtcs},
+        region::{RegionBounds, RegionCoordSetXtcs, RegionData, RegionSetXtcs},
         ArqBounds, ArqStrat,
     },
     dht_arc::{ArcInterval, DhtArcSet},
@@ -22,7 +22,10 @@ use holochain_sqlite::{
     db::{DbKindAuthored, DbKindCache, DbKindDht, DbWrite},
     prelude::{DatabaseError, DatabaseResult},
 };
-use holochain_state::prelude::{from_blob, StateQueryResult};
+use holochain_state::{
+    prelude::{from_blob, StateQueryResult},
+    query::{map_sql_dht_op_common, StateQueryError},
+};
 use holochain_types::{
     dht_op::{DhtOp, DhtOpType},
     prelude::{DnaError, DnaStore},
@@ -352,21 +355,56 @@ impl<DS: DnaStore> Spaces<DS> {
                 self.handle_fetch_op_data_by_hashes(dna_hash, op_hashes)
                     .await
             }
-            FetchOpDataQuery::Regions(coords) => {
-                self.handle_fetch_op_data_by_region(dna_hash, ()).await
+            FetchOpDataQuery::Regions(regions) => {
+                self.handle_fetch_op_data_by_regions(dna_hash, regions)
+                    .await
             }
         }
     }
 
-    #[instrument(skip(self, _region))]
+    #[instrument(skip(self, regions))]
     /// The network module is requesting the content for dht ops
-    pub async fn handle_fetch_op_data_by_region(
+    pub async fn handle_fetch_op_data_by_regions(
         &self,
         dna_hash: &DnaHash,
-        // This type will become something real.
-        _region: (),
+        regions: Vec<RegionBounds>,
     ) -> ConductorResult<Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>> {
-        unimplemented!("Will be implemented as part of quantized-gossip")
+        let sql = holochain_sqlite::sql::sql_cell::FETCH_OPS_BY_REGION;
+        Ok(self
+            .authored_env(dna_hash)?
+            .async_reader(move |txn| {
+                let mut stmt = txn.prepare_cached(sql).map_err(StateQueryError::from)?;
+                StateQueryResult::Ok(
+                    regions
+                        .into_iter()
+                        .map(|bounds| {
+                            let (x0, x1) = bounds.x;
+                            let (t0, t1) = bounds.t;
+                            stmt.query_and_then(
+                                named_params! {
+                                    ":storage_start_loc": x0,
+                                    ":storage_end_loc": x1,
+                                    ":timestamp_min": t0,
+                                    ":timestamp_max": t1,
+                                    // ":author": &author, // TODO: unneeded for authored table?
+                                },
+                                |row| {
+                                    let hash: DhtOpHash =
+                                        row.get("hash").map_err(StateQueryError::from)?;
+                                    Ok(map_sql_dht_op_common(row)?.map(|op| (hash, op)))
+                                },
+                            )
+                            .map_err(StateQueryError::from)?
+                            .collect::<Result<Vec<Option<_>>, StateQueryError>>()
+                        })
+                        .collect::<Result<Vec<Vec<Option<_>>>, _>>()?
+                        .into_iter()
+                        .flatten()
+                        .filter_map(|x| x)
+                        .collect(),
+                )
+            })
+            .await?)
     }
 
     #[instrument(skip(self, op_hashes))]
