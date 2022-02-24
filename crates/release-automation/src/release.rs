@@ -11,6 +11,7 @@ use chrono::Utc;
 use cli::ReleaseArgs;
 use comrak::{format_commonmark, parse_document, Arena, ComrakOptions};
 use enumflags2::{bitflags, BitFlags};
+use linked_hash_set::LinkedHashSet;
 use log::{debug, error, info, trace, warn};
 use once_cell::sync::OnceCell;
 use std::convert::TryInto;
@@ -780,7 +781,7 @@ fn publish_paths_to_crates_io(
     static USER_AGENT: &str = "Holochain_Core_Dev_Team (devcore@holochain.org)";
     static CRATES_IO_CLIENT: OnceCell<crates_io_api::AsyncClient> = OnceCell::new();
 
-    let crate_names: HashSet<String> = crates.iter().map(|crt| crt.name()).collect();
+    let crate_names: LinkedHashSet<String> = crates.iter().map(|crt| crt.name()).collect();
 
     debug!("attempting to publish {:?}", crate_names);
 
@@ -814,6 +815,8 @@ fn publish_paths_to_crates_io(
                 Ok(())
             }
         };
+
+    let mut published_dry_run = LinkedHashSet::new();
 
     while let Some(crt) = queue.pop_front() {
         if !crt.state().changed() && crates_index_helper::is_version_published(crt, false)? {
@@ -908,7 +911,7 @@ fn publish_paths_to_crates_io(
                 PublishError::PackageNotFound { dependency, .. }
                 | PublishError::PackageVersionNotFound { dependency, .. } => {
                     !dry_run
-                        || !(crate_names.contains(dependency)
+                        || !(published_dry_run.contains(dependency)
                             || allowed_missing_dependencies.contains(dependency))
                 }
                 PublishError::AlreadyUploaded { version, .. } => {
@@ -925,10 +928,12 @@ fn publish_paths_to_crates_io(
             } {
                 errors.push(error);
             } else {
+                published_dry_run.insert(crt.name());
                 tolerated_cntr += 1;
-                trace!("tolerating error: '{:#?}'", &error);
+                debug!("tolerating error: '{:#?}'", &error);
             }
         } else if dry_run {
+            published_dry_run.insert(crt.name());
             publish_cntr += 1;
         } else {
             // wait until the published version is live
