@@ -124,7 +124,12 @@ impl Query for GetLiveEntryQuery {
         });
         let is_authored = authored_header.is_some();
         // If there is no authored header, choose an arbitrary header.
-        let header = authored_header.or_else(|| state.creates.into_iter().map(|(_, v)| v).next());
+        let header = authored_header.or_else(|| {
+            // The line below was added when migrating to rust edition 2021, per
+            // https://doc.rust-lang.org/edition-guide/rust-2021/disjoint-capture-in-closures.html#migration
+            let _ = &state;
+            state.creates.into_iter().map(|(_, v)| v).next()
+        });
         match header {
             Some(header) => {
                 let entry_hash = header

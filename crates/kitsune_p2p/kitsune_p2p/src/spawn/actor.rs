@@ -450,6 +450,9 @@ impl ghost_actor::GhostControlHandler for KitsuneP2pActor {
         use futures::sink::SinkExt;
         use ghost_actor::GhostControlSender;
         async move {
+            // The line below was added when migrating to rust edition 2021, per
+            // https://doc.rust-lang.org/edition-guide/rust-2021/disjoint-capture-in-closures.html#migration
+            let _ = &self;
             // this is a curtesy, ok if fails
             let _ = self.evt_sender.close().await;
             self.ep_hnd.close(500, "").await;
