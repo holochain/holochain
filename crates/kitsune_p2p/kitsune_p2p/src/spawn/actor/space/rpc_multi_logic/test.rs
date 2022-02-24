@@ -83,7 +83,6 @@ async fn test_rpc_multi_logic_mocked() {
     tokio::time::pause();
 
     let space = Arc::new(KitsuneSpace(vec![0; 36]));
-    let this_addr = url2::url2!("fake://");
 
     // build our "SpaceInternal" sender
     let mut m = MockSpaceInternalHandler::new();
@@ -240,7 +239,6 @@ async fn test_rpc_multi_logic_mocked() {
     // build up the ro_inner that discover calls expect
     let ro_inner = Arc::new(SpaceReadOnlyInner {
         space: space.clone(),
-        this_addr,
         i_s,
         evt_sender,
         ep_hnd,
