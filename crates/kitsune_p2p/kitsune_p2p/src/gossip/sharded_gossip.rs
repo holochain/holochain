@@ -6,7 +6,7 @@ use crate::agent_store::AgentInfoSigned;
 use crate::gossip::{decode_bloom_filter, encode_bloom_filter};
 use crate::types::event::*;
 use crate::types::gossip::*;
-use crate::types::*;
+use crate::{types::*, HostApi};
 use ghost_actor::dependencies::tracing;
 use governor::clock::DefaultClock;
 use governor::state::{InMemoryState, NotKeyed};
@@ -151,6 +151,7 @@ impl ShardedGossip {
         space: Arc<KitsuneSpace>,
         ep_hnd: Tx2EpHnd<wire::Wire>,
         evt_sender: EventSender,
+        host: HostApi,
         gossip_type: GossipType,
         bandwidth: Arc<BandwidthThrottle>,
         metrics: MetricsSync,
@@ -162,6 +163,7 @@ impl ShardedGossip {
                 tuning_params,
                 space,
                 evt_sender,
+                host,
                 inner: Share::new(ShardedGossipLocalState::new(metrics)),
                 gossip_type,
                 closing: AtomicBool::new(false),
@@ -342,6 +344,7 @@ pub struct ShardedGossipLocal {
     tuning_params: KitsuneP2pTuningParams,
     space: Arc<KitsuneSpace>,
     evt_sender: EventSender,
+    host: HostApi,
     inner: Share<ShardedGossipLocalState>,
     closing: AtomicBool,
 }
@@ -1080,6 +1083,7 @@ impl AsGossipModuleFactory for ShardedRecentGossipFactory {
         space: Arc<KitsuneSpace>,
         ep_hnd: Tx2EpHnd<wire::Wire>,
         evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
+        host: HostApi,
         metrics: MetricsSync,
     ) -> GossipModule {
         GossipModule(ShardedGossip::new(
@@ -1087,6 +1091,7 @@ impl AsGossipModuleFactory for ShardedRecentGossipFactory {
             space,
             ep_hnd,
             evt_sender,
+            host,
             GossipType::Recent,
             self.bandwidth.clone(),
             metrics,
@@ -1111,6 +1116,7 @@ impl AsGossipModuleFactory for ShardedHistoricalGossipFactory {
         space: Arc<KitsuneSpace>,
         ep_hnd: Tx2EpHnd<wire::Wire>,
         evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
+        host: HostApi,
         metrics: MetricsSync,
     ) -> GossipModule {
         GossipModule(ShardedGossip::new(
@@ -1118,6 +1124,7 @@ impl AsGossipModuleFactory for ShardedHistoricalGossipFactory {
             space,
             ep_hnd,
             evt_sender,
+            host,
             GossipType::Historical,
             self.bandwidth.clone(),
             metrics,

@@ -1,5 +1,6 @@
 use crate::test_util::hash_op_data;
 pub use crate::test_util::spawn_handler;
+use crate::HostStub;
 
 use super::*;
 
@@ -72,7 +73,7 @@ pub async fn setup_player(
 ) -> ShardedGossipLocal {
     let evt_handler = standard_responses(agents, with_data).await;
     let (evt_sender, _) = spawn_handler(evt_handler).await;
-    ShardedGossipLocal::test(GossipType::Historical, evt_sender, state)
+    ShardedGossipLocal::test(GossipType::Historical, evt_sender, HostStub::new(), state)
 }
 
 pub async fn setup_standard_player(
@@ -88,7 +89,7 @@ pub async fn setup_empty_player(
 ) -> ShardedGossipLocal {
     let evt_handler = standard_responses(agents, false).await;
     let (evt_sender, _) = spawn_handler(evt_handler).await;
-    ShardedGossipLocal::test(GossipType::Historical, evt_sender, state)
+    ShardedGossipLocal::test(GossipType::Historical, evt_sender, HostStub::new(), state)
 }
 
 pub async fn agents_with_infos(num_agents: usize) -> Vec<(Arc<KitsuneAgent>, AgentInfoSigned)> {

@@ -8,6 +8,7 @@ use actor::*;
 pub async fn spawn_holochain_p2p(
     config: kitsune_p2p::KitsuneP2pConfig,
     tls_config: kitsune_p2p::dependencies::kitsune_p2p_types::tls::TlsConfig,
+    // host: kitsune_p2p::HostApi,
 ) -> HolochainP2pResult<(
     ghost_actor::GhostSender<HolochainP2p>,
     HolochainP2pEventReceiver,
@@ -21,7 +22,16 @@ pub async fn spawn_holochain_p2p(
     let sender = channel_factory.create_channel::<HolochainP2p>().await?;
 
     tokio::task::spawn(
-        builder.spawn(HolochainP2pActor::new(config, tls_config, channel_factory, evt_send).await?),
+        builder.spawn(
+            HolochainP2pActor::new(
+                config,
+                tls_config,
+                channel_factory,
+                evt_send,
+                kitsune_p2p::HostStub::new(),
+            )
+            .await?,
+        ),
     );
 
     Ok((sender, evt_recv))

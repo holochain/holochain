@@ -80,6 +80,7 @@ pub(crate) struct KitsuneP2pActor {
     internal_sender: ghost_actor::GhostSender<Internal>,
     evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
     ep_hnd: Tx2EpHnd<wire::Wire>,
+    host: HostApi,
     #[allow(clippy::type_complexity)]
     spaces: HashMap<
         Arc<KitsuneSpace>,
@@ -100,6 +101,7 @@ impl KitsuneP2pActor {
         channel_factory: ghost_actor::actor_builder::GhostActorChannelFactory<Self>,
         internal_sender: ghost_actor::GhostSender<Internal>,
         evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
+        host: HostApi,
     ) -> KitsuneP2pResult<Self> {
         crate::types::metrics::init();
 
@@ -450,6 +452,7 @@ impl KitsuneP2pActor {
             internal_sender,
             evt_sender,
             ep_hnd,
+            host,
             spaces: HashMap::new(),
             config: Arc::new(config),
             bandwidth_throttles,
@@ -711,6 +714,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         let internal_sender = self.internal_sender.clone();
         let space2 = space.clone();
         let ep_hnd = self.ep_hnd.clone();
+        let host = self.host.clone();
         let config = Arc::clone(&self.config);
         let bandwidth_throttles = self.bandwidth_throttles.clone();
         let parallel_notify_permit = self.parallel_notify_permit.clone();
@@ -720,6 +724,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
                 let (send, send_inner, evt_recv) = spawn_space(
                     space2,
                     ep_hnd,
+                    host,
                     config,
                     bandwidth_throttles,
                     parallel_notify_permit,

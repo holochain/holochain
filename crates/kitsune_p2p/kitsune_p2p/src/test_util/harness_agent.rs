@@ -34,11 +34,13 @@ pub(crate) async fn spawn_test_agent(
     ),
     KitsuneP2pError,
 > {
+    let host = HostStub::new();
     let (p2p, evt) = spawn_kitsune_p2p(
         config,
         kitsune_p2p_types::tls::TlsConfig::new_ephemeral()
             .await
             .unwrap(),
+            host,
     )
     .await?;
 

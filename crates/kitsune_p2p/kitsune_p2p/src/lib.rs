@@ -22,6 +22,9 @@ pub use config::*;
 mod spawn;
 pub use spawn::*;
 
+mod host_logic;
+pub use host_logic::*;
+
 #[allow(missing_docs)]
 #[cfg(any(test, feature = "test_utils"))]
 pub mod test_util;

@@ -354,10 +354,11 @@ impl HolochainP2pActor {
         tls_config: kitsune_p2p::dependencies::kitsune_p2p_types::tls::TlsConfig,
         channel_factory: ghost_actor::actor_builder::GhostActorChannelFactory<Self>,
         evt_sender: futures::channel::mpsc::Sender<HolochainP2pEvent>,
+        host: kitsune_p2p::HostApi,
     ) -> HolochainP2pResult<Self> {
         let tuning_params = config.tuning_params.clone();
         let (kitsune_p2p, kitsune_p2p_events) =
-            kitsune_p2p::spawn_kitsune_p2p(config, tls_config).await?;
+            kitsune_p2p::spawn_kitsune_p2p(config, tls_config, host).await?;
 
         channel_factory.attach_receiver(kitsune_p2p_events).await?;
 

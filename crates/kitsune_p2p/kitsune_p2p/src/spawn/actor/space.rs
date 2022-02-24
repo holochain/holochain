@@ -80,6 +80,7 @@ ghost_actor::ghost_chan! {
 pub(crate) async fn spawn_space(
     space: Arc<KitsuneSpace>,
     ep_hnd: Tx2EpHnd<wire::Wire>,
+    host: HostApi,
     config: Arc<KitsuneP2pConfig>,
     bandwidth_throttles: BandwidthThrottles,
     parallel_notify_permit: Arc<tokio::sync::Semaphore>,
@@ -106,6 +107,7 @@ pub(crate) async fn spawn_space(
         space,
         i_s.clone(),
         evt_send,
+        host,
         ep_hnd,
         config,
         bandwidth_throttles,
@@ -1083,6 +1085,7 @@ impl Space {
         space: Arc<KitsuneSpace>,
         i_s: ghost_actor::GhostSender<SpaceInternal>,
         evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
+        host: HostApi,
         ep_hnd: Tx2EpHnd<wire::Wire>,
         config: Arc<KitsuneP2pConfig>,
         bandwidth_throttles: BandwidthThrottles,
@@ -1150,6 +1153,7 @@ impl Space {
                         space.clone(),
                         ep_hnd.clone(),
                         evt_sender.clone(),
+                        host.clone(),
                         metrics.clone(),
                     ),
                 )
