@@ -311,6 +311,12 @@ fn bump_release_versions<'a>(
         cmd_args.additional_manifests.iter().map(|mp| mp.as_str()),
     )?;
 
+    ws.cargo_check(
+        true,
+        cmd_args.additional_manifests.iter().map(|mp| mp.as_str()),
+    )
+    .context("cargo check failed")?;
+
     if !cmd_args.no_verify && !cmd_args.no_verify_post {
         info!("running consistency checks after changing the versions...");
         publish_paths_to_crates_io(
@@ -321,8 +327,6 @@ fn bump_release_versions<'a>(
             &cmd_args.cargo_target_dir,
         )
         .context("cargo publish dry-run failed")?;
-
-        ws.cargo_check(true).context("cargo check failed")?;
     }
 
     // ## for the workspace release:

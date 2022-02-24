@@ -1120,28 +1120,50 @@ impl<'a> ReleaseWorkspace<'a> {
         Ok(())
     }
 
-    pub(crate) fn cargo_check(&'a self, offline: bool) -> Fallible<()> {
-        let mut cmd = std::process::Command::new("cargo")
-            .current_dir(self.root())
-            .args(
-                &[
+    pub(crate) fn cargo_check<T>(&'a self, offline: bool, additional_manifests: T) -> Fallible<()>
+    where
+        T: Iterator<Item = &'a str>,
+    {
+        for args in [
+            vec![vec![
+                vec![
+                    "check",
+                    "--workspace",
+                    "--all-targets",
+                    "--all-features",
+                    "--release",
+                ],
+                if offline { vec!["--offline"] } else { vec![] },
+            ]
+            .concat()],
+            additional_manifests
+                .map(|mp| -> Vec<&str> {
                     vec![
-                        "check",
-                        "--workspace",
-                        "--all-targets",
-                        "--all-features",
-                        "--release",
-                    ],
-                    if offline { vec!["--offline"] } else { vec![] },
-                ]
-                .concat(),
-            )
-            .spawn()?;
+                        vec![
+                            "check",
+                            "--all-targets",
+                            "--all-features",
+                            "--release",
+                            "--manifest-path",
+                            mp,
+                        ],
+                        if offline { vec!["--offline"] } else { vec![] },
+                    ]
+                    .concat()
+                })
+                .collect::<Vec<_>>(),
+        ]
+        .concat()
+        {
+            let mut cmd = std::process::Command::new("cargo");
+            cmd.current_dir(self.root()).args(args);
+            debug!("running command: {:?}", cmd);
 
-        let cmd_status = cmd.wait()?;
-
-        if !cmd_status.success() {
-            bail!("running {:?} failed: \n{:?}", cmd, cmd.stderr);
+            let mut cmd = cmd.spawn()?;
+            let cmd_status = cmd.wait()?;
+            if !cmd_status.success() {
+                bail!("running {:?} failed: \n{:?}", cmd, cmd.stderr);
+            }
         }
 
         Ok(())
