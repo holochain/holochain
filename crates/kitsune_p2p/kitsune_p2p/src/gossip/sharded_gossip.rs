@@ -35,7 +35,7 @@ use super::{HowToConnect, MetaOpKey};
 
 pub use bandwidth::BandwidthThrottles;
 
-#[cfg(feature = "test_utils")]
+#[cfg(any(test, feature = "test_utils"))]
 #[allow(missing_docs)]
 pub mod test_utils;
 
@@ -50,7 +50,13 @@ mod store;
 mod bandwidth;
 mod next_target;
 
-#[cfg(all(test, feature = "test_utils"))]
+// dead_code and unused_imports are allowed here because when compiling this
+// code path due to test_utils, the helper functions defined in this module
+// are not used due to the tests themselves not being compiled, so it's easier
+// to do this than to annotate each function as `#[cfg(test)]`
+#[cfg(any(test, feature = "test_utils"))]
+#[allow(dead_code)]
+#[allow(unused_imports)]
 pub(crate) mod tests;
 
 /// max send buffer size (keep it under 16384 with a little room for overhead)
@@ -64,7 +70,7 @@ const MAX_SEND_BUF_BYTES: usize = 16_000_000;
 /// The timeout for a gossip round if there is no contact. One minute.
 const ROUND_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60);
 
-type BloomFilter = bloomfilter::Bloom<Arc<MetaOpKey>>;
+type BloomFilter = bloomfilter::Bloom<MetaOpKey>;
 type EventSender = futures::channel::mpsc::Sender<event::KitsuneP2pEvent>;
 
 #[derive(Debug)]
@@ -938,7 +944,7 @@ kitsune_p2p_types::write_codec_enum! {
         /// Any ops that were missing from the remote bloom.
         MissingOps(0x60) {
             /// The missing ops
-            ops.0: Vec<(Arc<KitsuneOpHash>, Vec<u8>)>,
+            ops.0: Vec<KOp>,
             /// Ops that are missing from a bloom that you have sent.
             /// These will be chunked into a maximum size of about 16MB.
             /// If the amount of missing ops is larger then the

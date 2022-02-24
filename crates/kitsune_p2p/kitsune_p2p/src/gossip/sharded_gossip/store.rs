@@ -11,7 +11,7 @@ use crate::types::event::KitsuneP2pEventSender;
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::{
     agent_info::AgentInfoSigned,
-    bin_types::{KitsuneAgent, KitsuneOpHash, KitsuneSpace},
+    bin_types::{KOp, KitsuneAgent, KitsuneOpHash, KitsuneSpace},
     dht_arc::{ArcInterval, DhtArcSet},
     KitsuneError, KitsuneResult,
 };
@@ -279,7 +279,7 @@ pub(super) async fn put_agent_info(
 pub(super) async fn put_ops(
     evt_sender: &EventSender,
     space: &Arc<KitsuneSpace>,
-    ops: Vec<(Arc<KitsuneOpHash>, Vec<u8>)>,
+    ops: Vec<KOp>,
 ) -> KitsuneResult<()> {
     evt_sender
         .gossip(space.clone(), ops)

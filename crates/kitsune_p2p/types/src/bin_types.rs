@@ -138,6 +138,31 @@ These metadata "Operations" each also have unique OpHashes."#,
     KitsuneOpHash,
 }
 
+/// The op data with its location
+#[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[repr(transparent)]
+#[serde(transparent)]
+pub struct KitsuneOpData(
+    /// The op bytes
+    #[serde(with = "serde_bytes")]
+    pub Vec<u8>,
+);
+
+impl KitsuneOpData {
+    /// Constructor
+    pub fn new(op: Vec<u8>) -> KOp {
+        KOp::new(Self(op))
+    }
+
+    /// Size in bytes of this Op
+    pub fn size(&self) -> usize {
+        self.0.len()
+    }
+}
+
+/// Convenience type
+pub type KOp = std::sync::Arc<KitsuneOpData>;
+
 /// A cryptographic signature.
 #[derive(
     Clone,

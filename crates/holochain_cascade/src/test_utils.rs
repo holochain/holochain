@@ -195,7 +195,7 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         _request_validation_receipt: bool,
         _countersigning_session: bool,
         _dht_hash: holo_hash::AnyDhtHash,
-        _ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
+        _ops: Vec<holochain_types::dht_op::DhtOp>,
         _timeout_ms: Option<u64>,
     ) -> actor::HolochainP2pResult<()> {
         todo!()
@@ -369,7 +369,7 @@ impl HolochainP2pDnaT for MockNetwork {
         _request_validation_receipt: bool,
         _countersigning_session: bool,
         _dht_hash: holo_hash::AnyDhtHash,
-        _ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
+        _ops: Vec<holochain_types::dht_op::DhtOp>,
         _timeout_ms: Option<u64>,
     ) -> actor::HolochainP2pResult<()> {
         todo!()
