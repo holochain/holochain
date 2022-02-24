@@ -49,6 +49,8 @@ mockall = { version = "0.10.2", optional = true }
 [dev-dependencies]
 tokio = { version = "1.11", features = ["full", "test-util"] }
 contrafact = { version = "0.1.0-dev.1" }
+kitsune_p2p_timestamp = { version = "0.0.6", path = "../timestamp", features = ["now", "arbitrary"] }
+kitsune_p2p_types = { version = "0.0.18", path = "../types", features = ["test_utils"] }
 maplit = "1"
 mockall = "0.10.2"
 pretty_assertions = "0.7"
@@ -63,7 +65,6 @@ test_utils = [
   "kitsune_p2p_types/test_utils",
   "maplit",
   "mockall",
-  "kitsune_p2p_timestamp/now",
   "kitsune_p2p_timestamp/arbitrary",
 ]
 mock_network = [

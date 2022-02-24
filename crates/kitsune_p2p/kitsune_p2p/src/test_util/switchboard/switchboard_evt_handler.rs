@@ -158,16 +158,20 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
     ) -> KitsuneP2pEventHandlerResult<Option<(Vec<Arc<KitsuneOpHash>>, TimeWindowInclusive)>> {
         ok_fut(Ok(self.sb.share(|sb| {
             let (ops, timestamps): (Vec<_>, Vec<_>) = sb
-                .ops
+                .get_ops_loc8(&self.node)
                 .iter()
-                .filter(|(op_loc8, op)| {
-                    // Does the op fall within the time window?
-                    window.contains(&op.timestamp)
-                    // Does the op fall within one of the specified arcsets
-                    // with the correct integration/limbo criteria?
-                        && arc_set.contains((**op_loc8).into())
+                .filter_map(|op_loc8| {
+                    let op = sb.ops.get(op_loc8).unwrap();
+                    (
+                        // Does the op fall within the time window?
+                        window.contains(&op.timestamp)
+                        // Does the op fall within one of the specified arcsets
+                        // with the correct integration/limbo criteria?
+                        && arc_set.contains((*op_loc8).into())
+                    )
+                    .then(|| op)
                 })
-                .map(|(_, op)| (op.hash.clone(), op.timestamp))
+                .map(|op| (op.hash.clone(), op.timestamp))
                 .take(max_ops)
                 .unzip();
 

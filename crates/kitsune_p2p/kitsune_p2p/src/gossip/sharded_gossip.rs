@@ -35,7 +35,7 @@ use super::{HowToConnect, MetaOpKey};
 
 pub use bandwidth::BandwidthThrottles;
 
-#[cfg(feature = "test_utils")]
+#[cfg(any(test, feature = "test_utils"))]
 #[allow(missing_docs)]
 pub mod test_utils;
 
@@ -50,7 +50,13 @@ mod store;
 mod bandwidth;
 mod next_target;
 
-#[cfg(all(test, feature = "test_utils"))]
+// dead_code and unused_imports are allowed here because when compiling this
+// code path due to test_utils, the helper functions defined in this module
+// are not used due to the tests themselves not being compiled, so it's easier
+// to do this than to annotate each function as `#[cfg(test)]`
+#[cfg(any(test, feature = "test_utils"))]
+#[allow(dead_code)]
+#[allow(unused_imports)]
 pub(crate) mod tests;
 
 /// max send buffer size (keep it under 16384 with a little room for overhead)
