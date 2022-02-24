@@ -2,4 +2,6 @@
 
 // pub mod quantized_gossip;
 pub mod sharded_gossip;
-pub mod simple_bloom;
+
+mod common;
+pub use common::*;

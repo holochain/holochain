@@ -564,6 +564,8 @@ use ghost_actor::dependencies::must_future::MustBoxFuture;
 impl ghost_actor::GhostControlHandler for Space {
     fn handle_ghost_actor_shutdown(mut self) -> MustBoxFuture<'static, ()> {
         async move {
+            // The line below was added when migrating to rust edition 2021, per
+            // https://doc.rust-lang.org/edition-guide/rust-2021/disjoint-capture-in-closures.html#migration
             let _ = &self;
             self.ro_inner.metric_exchange.write().shutdown();
 
@@ -1128,10 +1130,6 @@ impl Space {
             .gossip_strategy
             .split(',')
             .flat_map(|module| match module {
-                "simple-bloom" => vec![(
-                    GossipModuleType::Simple,
-                    crate::gossip::simple_bloom::factory(),
-                )],
                 "sharded-gossip" => vec![
                     (
                         GossipModuleType::ShardedRecent,
