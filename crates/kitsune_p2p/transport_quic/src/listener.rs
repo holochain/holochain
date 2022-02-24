@@ -73,6 +73,8 @@ impl ghost_actor::GhostControlHandler for TransportListenerQuic {
         mut self,
     ) -> ghost_actor::dependencies::must_future::MustBoxFuture<'static, ()> {
         async move {
+            // The line below was added when migrating to rust edition 2021, per
+            // https://doc.rust-lang.org/edition-guide/rust-2021/disjoint-capture-in-closures.html#migration
             let _ = &self;
             // Note: it's easiest to just blanket shut everything down.
             // If we wanted to be more graceful, we'd need to plumb

@@ -34,9 +34,9 @@ async fn get_ops_to_validate(
         Entry.blob as entry_blob,
         DhtOp.type as dht_type,
         DhtOp.hash as dht_hash
-        FROM Header
+        FROM DhtOp 
         JOIN
-        DhtOp ON DhtOp.header_hash = Header.hash
+        Header ON DhtOp.header_hash = Header.hash
         LEFT JOIN
         Entry ON Header.entry_hash = Entry.hash
         "
@@ -45,14 +45,24 @@ async fn get_ops_to_validate(
         sql.push_str(
             "
             WHERE
-            (DhtOp.validation_status IS NULL OR DhtOp.validation_stage = 0)
+            DhtOp.when_integrated IS NULL
+            AND DhtOp.validation_status IS NULL
+            AND (
+                DhtOp.validation_stage IS NULL
+                OR DhtOp.validation_stage = 0
+            )
             ",
         );
     } else {
         sql.push_str(
             "
             WHERE
-            (DhtOp.validation_stage = 1 OR DhtOp.validation_stage = 2)
+            DhtOp.when_integrated IS NULL
+            AND DhtOp.validation_status IS NULL
+            AND (
+                DhtOp.validation_stage = 1
+                OR DhtOp.validation_stage = 2
+            )
             ",
         );
     }
@@ -92,8 +102,11 @@ async fn get_ops_to_validate(
 
 #[cfg(test)]
 mod tests {
+    use arbitrary::Arbitrary;
+    use arbitrary::Unstructured;
     use fixt::prelude::*;
     use holo_hash::HasHash;
+    use holo_hash::HashableContentExtSync;
     use holochain_sqlite::db::WriteManager;
     use holochain_sqlite::prelude::DatabaseResult;
     use holochain_state::prelude::*;
@@ -101,7 +114,10 @@ mod tests {
     use holochain_types::dht_op::DhtOpHashed;
     use holochain_types::dht_op::OpOrder;
     use holochain_zome_types::fixt::*;
+    use holochain_zome_types::Header;
+    use holochain_zome_types::Signature;
     use holochain_zome_types::ValidationStatus;
+    use holochain_zome_types::NOISE;
 
     use super::*;
 
@@ -200,5 +216,49 @@ mod tests {
         }
 
         Expected { results }
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    /// Make sure both workflows can't pull in the same ops.
+    async fn workflows_are_exclusive() {
+        observability::test_run().ok();
+        let mut u = Unstructured::new(&NOISE);
+
+        let env = test_dht_env();
+        let env = env.env();
+        let op = DhtOpHashed::from_content_sync(DhtOp::RegisterAgentActivity(
+            Signature::arbitrary(&mut u).unwrap(),
+            Header::arbitrary(&mut u).unwrap(),
+        ));
+
+        env.async_commit(|txn| {
+            insert_op(txn, op)?;
+            StateMutationResult::Ok(())
+        })
+        .await
+        .unwrap();
+
+        let read: DbRead<_> = env.clone().into();
+        let mut read_ops = std::collections::HashSet::new();
+        let hashes: Vec<_> = get_ops_to_app_validate(&read)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|op| op.to_hash())
+            .collect();
+        for h in &hashes {
+            read_ops.insert(h.clone());
+        }
+        let hashes: Vec<_> = get_ops_to_sys_validate(&read)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|op| op.to_hash())
+            .collect();
+        for h in &hashes {
+            if !read_ops.insert(h.clone()) {
+                panic!("Duplicate op");
+            }
+        }
     }
 }
