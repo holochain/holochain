@@ -416,14 +416,7 @@ impl SwitchboardState {
 
         // Update node-wide op store with data and timestamp
         for (loc8, hash, timestamp) in ops {
-            if let Some(existing) = self.ops.insert(
-                loc8,
-                OpEntry {
-                    hash,
-                    data: vec![],
-                    timestamp,
-                },
-            ) {
+            if let Some(existing) = self.ops.insert(loc8, OpEntry { hash, timestamp }) {
                 tracing::warn!(
                     "inserted same op twice. this could be significant if dealing with custom timestamps. {:?}",
                     existing
@@ -653,13 +646,17 @@ pub struct NodeOpEntry {
 }
 
 /// The value of the SwitchboardSpace::ops hashmap
+///
+/// Note that in a real implementation, the op store would include the actual
+/// op data. Since op data is opaque to kitsune, we don't need to actually store
+/// it for these tests and can just use dummy values. *Actually*, we take
+/// take advantage of that fact by hijacking the op data to include a single
+/// byte which represents the Loc8 location of this op.
 #[derive(Debug, Clone)]
 pub struct OpEntry {
     /// Not strictly necessary as it can be computed from the Loc8 key, but here
-    /// for convenience since there is no one-step way to go from Loc8 -> KitsuneOpHash
+    /// for convenience
     pub hash: KOpHash,
-    /// The opaque data for the op. Probably doesn't matter and can be removed.
-    pub data: Vec<u8>,
     /// The timestamp associated with this op. Same for all agents, intrinsic to the
     /// op itself.
     pub timestamp: Timestamp,

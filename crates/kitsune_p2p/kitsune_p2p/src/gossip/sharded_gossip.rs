@@ -70,7 +70,7 @@ const MAX_SEND_BUF_BYTES: usize = 16_000_000;
 /// The timeout for a gossip round if there is no contact. One minute.
 const ROUND_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60);
 
-type BloomFilter = bloomfilter::Bloom<Arc<MetaOpKey>>;
+type BloomFilter = bloomfilter::Bloom<MetaOpKey>;
 type EventSender = futures::channel::mpsc::Sender<event::KitsuneP2pEvent>;
 
 #[derive(Debug)]
@@ -944,7 +944,7 @@ kitsune_p2p_types::write_codec_enum! {
         /// Any ops that were missing from the remote bloom.
         MissingOps(0x60) {
             /// The missing ops
-            ops.0: Vec<(Arc<KitsuneOpHash>, Vec<u8>)>,
+            ops.0: Vec<KOp>,
             /// Ops that are missing from a bloom that you have sent.
             /// These will be chunked into a maximum size of about 16MB.
             /// If the amount of missing ops is larger then the

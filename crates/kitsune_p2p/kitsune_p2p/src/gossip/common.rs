@@ -5,7 +5,7 @@ use kitsune_p2p_types::tx2::tx2_utils::*;
 use std::sync::Arc;
 
 /// A bloom filter of Kitsune hash types
-pub type BloomFilter = bloomfilter::Bloom<Arc<MetaOpKey>>;
+pub type BloomFilter = bloomfilter::Bloom<MetaOpKey>;
 
 #[derive(Clone, Debug)]
 pub(crate) enum HowToConnect {
