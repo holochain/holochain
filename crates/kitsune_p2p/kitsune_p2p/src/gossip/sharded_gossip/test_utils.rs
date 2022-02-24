@@ -6,7 +6,7 @@ use kitsune_p2p_types::{
     tx2::tx2_utils::PoolBuf,
 };
 
-use crate::gossip::simple_bloom::{decode_bloom_filter, encode_bloom_filter, MetaOpKey};
+use crate::gossip::{decode_bloom_filter, encode_bloom_filter, MetaOpKey};
 
 use super::EncodedTimedBloomFilter;
 

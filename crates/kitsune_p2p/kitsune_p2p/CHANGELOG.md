@@ -4,6 +4,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+- Removed the unmaintained "simple-bloom" gossip module in favor of "sharded-gossip"
+
+## 0.0.24
+
 ## 0.0.23
 
 - Fixes D-01415 holochain panic on startup [\#1206](https://github.com/holochain/holochain/pull/1206)
