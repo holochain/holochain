@@ -111,10 +111,13 @@ pub(crate) fn blake2b_32(data: &[u8]) -> Vec<u8> {
 impl QuicConAdapt {
     pub fn new(con: quinn::Connection, dir: Tx2ConDir) -> KitsuneResult<Self> {
         let peer_cert: Tx2Cert = match con.peer_identity() {
-            None => return Err("invalid peer certificate".into()),
-            Some(chain) => match chain.iter().next() {
-                None => return Err("invalid peer certificate".into()),
-                Some(cert) => blake2b_32(cert.as_ref()).into(),
+            None => return Err("invalid peer certificate (none)".into()),
+            Some(any) => match any.downcast::<Vec<rustls::Certificate>>() {
+                Err(_) => return Err("invalid peer certificate (type)".into()),
+                Ok(chain) => match chain.iter().next() {
+                    None => return Err("invalid peer certificate (chain empty)".into()),
+                    Some(cert) => blake2b_32(cert.as_ref()).into(),
+                },
             },
         };
         Ok(Self(
@@ -340,7 +343,7 @@ impl EndpointAdapt for QuicEndpointAdapt {
                 let addr = crate::url_to_addr(url.as_url2(), crate::SCHEME)
                     .await
                     .map_err(KitsuneError::other)?;
-                let con = ep.connect(&addr, "stub.stub").map_err(KitsuneError::other);
+                let con = ep.connect(addr, "stub.stub").map_err(KitsuneError::other);
                 match connecting(con?, local_cert, Tx2ConDir::Outgoing).await {
                     Ok(con) => Ok(con),
                     Err(err) => {
@@ -389,9 +392,7 @@ impl QuicBackendAdapt {
         let mut transport = quinn::TransportConfig::default();
 
         // We don't use bidi streams in kitsune - only uni streams
-        transport
-            .max_concurrent_bidi_streams(0)
-            .map_err(KitsuneError::other)?;
+        transport.max_concurrent_bidi_streams(0_u8.into());
 
         // We don't use "Application" datagrams in kitsune -
         // only bidi streams.
@@ -406,19 +407,15 @@ impl QuicBackendAdapt {
         transport
             .max_idle_timeout(Some(std::time::Duration::from_millis(
                 tuning_params.tx2_quic_max_idle_timeout_ms as u64,
-            )))
-            .unwrap();
+            ).try_into().map_err(KitsuneError::other)?));
 
         let transport = Arc::new(transport);
 
-        let mut quic_srv = quinn::ServerConfig::default();
+        let mut quic_srv = quinn::ServerConfig::with_crypto(tls_srv);
         quic_srv.transport = transport.clone();
-        quic_srv.crypto = tls_srv;
 
-        let quic_cli = quinn::ClientConfig {
-            transport,
-            crypto: tls_cli,
-        };
+        let mut quic_cli = quinn::ClientConfig::new(tls_cli);
+        quic_cli.transport = transport;
 
         tracing::debug!(?quic_srv, ?quic_cli, "build quinn configs");
 
@@ -439,15 +436,14 @@ impl BindAdapt for QuicBackendAdapt {
         let quic_cli = self.quic_cli.clone();
         timeout
             .mix(async move {
-                let mut builder = quinn::Endpoint::builder();
-                builder.listen(quic_srv);
-                builder.default_client_config(quic_cli);
-
                 let addr = crate::url_to_addr(url.as_url2(), crate::SCHEME)
                     .await
                     .map_err(KitsuneError::other)?;
 
-                let (ep, inc) = builder.bind(&addr).map_err(KitsuneError::other)?;
+                let (mut ep, inc) = quinn::Endpoint::server(quic_srv, addr)
+                    .map_err(KitsuneError::other)?;
+
+                ep.set_default_client_config(quic_cli);
 
                 let ep: Arc<dyn EndpointAdapt> =
                     Arc::new(QuicEndpointAdapt::new(ep, local_cert.clone()));

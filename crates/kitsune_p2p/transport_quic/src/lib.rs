@@ -7,9 +7,9 @@ pub mod dependencies {
     pub use ::quinn;
 }
 
-use kitsune_p2p_types::dependencies::lair_keystore_api_0_0;
+//use kitsune_p2p_types::dependencies::lair_keystore_api_0_0;
 use kitsune_p2p_types::dependencies::url2::*;
-use kitsune_p2p_types::metrics::metric_task;
+//use kitsune_p2p_types::metrics::metric_task;
 use kitsune_p2p_types::transport::TransportResult;
 use std::net::SocketAddr;
 
@@ -50,12 +50,12 @@ pub(crate) async fn url_to_addr(url: &Url2, scheme: &str) -> TransportResult<Soc
     Err(format!("could not parse '{}', as 'host:port'", rendered).into())
 }
 
-mod config;
-pub use config::*;
+//mod config;
+//pub use config::*;
 
-mod listener;
-pub use listener::*;
+//mod listener;
+//pub use listener::*;
 
-mod test;
+//mod test;
 
 pub mod tx2;
