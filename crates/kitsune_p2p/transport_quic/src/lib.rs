@@ -7,16 +7,14 @@ pub mod dependencies {
     pub use ::quinn;
 }
 
-//use kitsune_p2p_types::dependencies::lair_keystore_api_0_0;
 use kitsune_p2p_types::dependencies::url2::*;
-//use kitsune_p2p_types::metrics::metric_task;
-use kitsune_p2p_types::transport::TransportResult;
+use kitsune_p2p_types::*;
 use std::net::SocketAddr;
 
 const SCHEME: &str = "kitsune-quic";
 
 /// internal helper convert urls to socket addrs for binding / connection
-pub(crate) async fn url_to_addr(url: &Url2, scheme: &str) -> TransportResult<SocketAddr> {
+pub(crate) async fn url_to_addr(url: &Url2, scheme: &str) -> KitsuneResult<SocketAddr> {
     if url.scheme() != scheme || url.host_str().is_none() || url.port().is_none() {
         return Err(format!(
             "invalid input. got: '{}', expected: '{}://host:port'",
@@ -49,13 +47,5 @@ pub(crate) async fn url_to_addr(url: &Url2, scheme: &str) -> TransportResult<Soc
 
     Err(format!("could not parse '{}', as 'host:port'", rendered).into())
 }
-
-//mod config;
-//pub use config::*;
-
-//mod listener;
-//pub use listener::*;
-
-//mod test;
 
 pub mod tx2;

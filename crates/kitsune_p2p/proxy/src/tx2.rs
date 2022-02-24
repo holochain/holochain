@@ -12,7 +12,6 @@ use kitsune_p2p_types::tx2::tx2_adapter::*;
 use kitsune_p2p_types::tx2::tx2_pool::*;
 use kitsune_p2p_types::tx2::tx2_utils::*;
 use kitsune_p2p_types::tx2::*;
-use kitsune_p2p_types::*;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use tokio::sync::Notify;

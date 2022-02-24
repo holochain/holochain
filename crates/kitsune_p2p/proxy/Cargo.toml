@@ -34,9 +34,5 @@ criterion = "0.3.4"
 crossterm = "0.19"
 
 [[bench]]
-name = "old_proxy_thru"
-harness = false
-
-[[bench]]
 name = "thru"
 harness = false

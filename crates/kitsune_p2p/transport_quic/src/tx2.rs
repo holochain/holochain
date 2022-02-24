@@ -404,10 +404,11 @@ impl QuicBackendAdapt {
 
         // see also `keep_alive_interval`.
         // right now keep_alive_interval is None,
-        transport
-            .max_idle_timeout(Some(std::time::Duration::from_millis(
-                tuning_params.tx2_quic_max_idle_timeout_ms as u64,
-            ).try_into().map_err(KitsuneError::other)?));
+        transport.max_idle_timeout(Some(
+            std::time::Duration::from_millis(tuning_params.tx2_quic_max_idle_timeout_ms as u64)
+                .try_into()
+                .map_err(KitsuneError::other)?,
+        ));
 
         let transport = Arc::new(transport);
 
@@ -440,8 +441,8 @@ impl BindAdapt for QuicBackendAdapt {
                     .await
                     .map_err(KitsuneError::other)?;
 
-                let (mut ep, inc) = quinn::Endpoint::server(quic_srv, addr)
-                    .map_err(KitsuneError::other)?;
+                let (mut ep, inc) =
+                    quinn::Endpoint::server(quic_srv, addr).map_err(KitsuneError::other)?;
 
                 ep.set_default_client_config(quic_cli);
 

@@ -64,8 +64,7 @@ pub fn gen_tls_configs(
         .with_single_cert(vec![cert.clone()], cert_priv_key.clone())
         .map_err(KitsuneError::other)?;
 
-    tls_server_config.ticketer = rustls::Ticketer::new()
-        .map_err(KitsuneError::other)?;
+    tls_server_config.ticketer = rustls::Ticketer::new().map_err(KitsuneError::other)?;
     tls_server_config.session_storage = rustls::server::ServerSessionMemoryCache::new(
         tuning_params.tls_in_mem_session_storage as usize,
     );

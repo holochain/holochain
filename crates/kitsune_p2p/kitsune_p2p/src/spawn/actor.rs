@@ -97,7 +97,7 @@ pub(crate) struct KitsuneP2pActor {
 impl KitsuneP2pActor {
     pub async fn new(
         config: KitsuneP2pConfig,
-        tls_config: kitsune_p2p_proxy::TlsConfig,
+        tls_config: kitsune_p2p_types::tls::TlsConfig,
         channel_factory: ghost_actor::actor_builder::GhostActorChannelFactory<Self>,
         internal_sender: ghost_actor::GhostSender<Internal>,
         evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,

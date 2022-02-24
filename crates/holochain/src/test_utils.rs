@@ -205,9 +205,10 @@ where
 
     let (network, mut recv) = spawn_holochain_p2p(
         config,
-        holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_proxy::TlsConfig::new_ephemeral()
-            .await
-            .unwrap(),
+        holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_types::tls::TlsConfig::new_ephemeral(
+        )
+        .await
+        .unwrap(),
     )
     .await
     .unwrap();
