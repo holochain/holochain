@@ -104,13 +104,13 @@ impl Spaces {
     /// Create a new empty set of [`DnaHash`] spaces.
     pub fn new(
         root_env_dir: EnvironmentRootPath,
-        db_sync_level: DbSyncStrategy,
+        db_sync_strategy: DbSyncStrategy,
         queue_consumer_map: QueueConsumerMap,
     ) -> Self {
         Spaces {
             map: RwShare::new(HashMap::new()),
             root_env_dir: Arc::new(root_env_dir),
-            db_sync_strategy: db_sync_level,
+            db_sync_strategy,
             queue_consumer_map,
         }
     }
