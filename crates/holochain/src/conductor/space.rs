@@ -9,7 +9,7 @@ use holochain_conductor_api::conductor::EnvironmentRootPath;
 use holochain_p2p::dht_arc::{ArcInterval, DhtArcSet};
 use holochain_sqlite::{
     conn::{DbSyncLevel, DbSyncStrategy},
-    db::{DbKindAuthored, DbKindCache, DbKindDht, DbWrite},
+    db::{DbKindAuthored, DbKindCache, DbKindDht, DbKindP2pAgentStore, DbKindP2pMetrics, DbWrite},
     prelude::DatabaseResult,
 };
 use holochain_state::prelude::{from_blob, StateQueryResult};
@@ -29,7 +29,11 @@ use crate::core::{
     },
 };
 
-use super::{conductor::RwShare, error::ConductorResult};
+use super::{
+    conductor::RwShare,
+    error::ConductorResult,
+    p2p_agent_store::{self, P2pBatch},
+};
 use std::convert::TryInto;
 
 #[derive(Clone)]
@@ -39,7 +43,7 @@ use std::convert::TryInto;
 pub struct Spaces {
     map: RwShare<HashMap<DnaHash, Space>>,
     root_env_dir: Arc<EnvironmentRootPath>,
-    db_sync_level: DbSyncStrategy,
+    pub(crate) db_sync_strategy: DbSyncStrategy,
     /// The map of running queue consumer workflows.
     queue_consumer_map: QueueConsumerMap,
 }
@@ -64,6 +68,15 @@ pub struct Space {
     /// The dht databases. These are shared across cells.
     /// There is one per unique Dna.
     pub dht_env: DbWrite<DbKindDht>,
+
+    /// The database for storing AgentInfoSigned
+    pub p2p_env: DbWrite<DbKindP2pAgentStore>,
+
+    /// The database for storing p2p MetricDatum(s)
+    pub p2p_metrics_env: DbWrite<DbKindP2pMetrics>,
+
+    /// The batch sender for writes to the p2p database.
+    pub p2p_batch_sender: tokio::sync::mpsc::Sender<P2pBatch>,
 
     /// Countersigning workspace that is shared across this cell.
     pub countersigning_workspace: CountersigningWorkspace,
@@ -97,9 +110,15 @@ impl Spaces {
         Spaces {
             map: RwShare::new(HashMap::new()),
             root_env_dir: Arc::new(root_env_dir),
-            db_sync_level,
+            db_sync_strategy: db_sync_level,
             queue_consumer_map,
         }
+    }
+
+    /// Get something from every space
+    pub fn get_from_spaces<R, F: FnMut(&Space) -> R>(&self, f: F) -> Vec<R> {
+        self.map
+            .share_ref(|spaces| spaces.values().map(f).collect())
     }
 
     /// Get the space if it exists or create it if it doesn't.
@@ -124,7 +143,7 @@ impl Spaces {
                         let space = Space::new(
                             Arc::new(dna_hash.clone()),
                             &self.root_env_dir,
-                            self.db_sync_level,
+                            self.db_sync_strategy,
                         )?;
 
                         let r = f(&space);
@@ -148,6 +167,27 @@ impl Spaces {
     /// Get the dht database (this will create the space if it doesn't already exist).
     pub fn dht_env(&self, dna_hash: &DnaHash) -> ConductorResult<DbWrite<DbKindDht>> {
         self.get_or_create_space_ref(dna_hash, |space| space.dht_env.clone())
+    }
+
+    /// Get the peer database (this will create the space if it doesn't already exist).
+    pub fn p2p_env(&self, dna_hash: &DnaHash) -> ConductorResult<DbWrite<DbKindP2pAgentStore>> {
+        self.get_or_create_space_ref(dna_hash, |space| space.p2p_env.clone())
+    }
+
+    /// Get the peer database (this will create the space if it doesn't already exist).
+    pub fn p2p_metrics_env(
+        &self,
+        dna_hash: &DnaHash,
+    ) -> ConductorResult<DbWrite<DbKindP2pMetrics>> {
+        self.get_or_create_space_ref(dna_hash, |space| space.p2p_metrics_env.clone())
+    }
+
+    /// Get the batch sender (this will create the space if it doesn't already exist).
+    pub fn p2p_batch_sender(
+        &self,
+        dna_hash: &DnaHash,
+    ) -> ConductorResult<tokio::sync::mpsc::Sender<P2pBatch>> {
+        self.get_or_create_space_ref(dna_hash, |space| space.p2p_batch_sender.clone())
     }
 
     #[instrument(skip(self))]
@@ -375,6 +415,8 @@ impl Space {
         root_env_dir: &EnvironmentRootPath,
         db_sync_strategy: DbSyncStrategy,
     ) -> ConductorResult<Self> {
+        use holochain_p2p::DnaHashExt;
+        let space = dna_hash.to_kitsune();
         let cache = DbWrite::open_with_sync_level(
             root_env_dir.as_ref(),
             DbKindCache(dna_hash.clone()),
@@ -396,6 +438,27 @@ impl Space {
                 DbSyncStrategy::Resilient => DbSyncLevel::Normal,
             },
         )?;
+        let p2p_env = DbWrite::open_with_sync_level(
+            root_env_dir.as_ref(),
+            DbKindP2pAgentStore(space.clone()),
+            match db_sync_strategy {
+                DbSyncStrategy::Fast => DbSyncLevel::Off,
+                DbSyncStrategy::Resilient => DbSyncLevel::Normal,
+            },
+        )?;
+        let p2p_metrics_env = DbWrite::open_with_sync_level(
+            root_env_dir.as_ref(),
+            DbKindP2pMetrics(space),
+            match db_sync_strategy {
+                DbSyncStrategy::Fast => DbSyncLevel::Off,
+                DbSyncStrategy::Resilient => DbSyncLevel::Normal,
+            },
+        )?;
+
+        let (tx, rx) = tokio::sync::mpsc::channel(100);
+        tokio::spawn(p2p_agent_store::p2p_put_all_batch(p2p_env.clone(), rx));
+        let p2p_batch_sender = tx;
+
         let countersigning_workspace = CountersigningWorkspace::new();
         let incoming_op_hashes = IncomingOpHashes::default();
         let incoming_ops_batch = IncomingOpsBatch::default();
@@ -404,6 +467,9 @@ impl Space {
             cache,
             authored_env,
             dht_env,
+            p2p_env,
+            p2p_metrics_env,
+            p2p_batch_sender,
             countersigning_workspace,
             incoming_op_hashes,
             incoming_ops_batch,

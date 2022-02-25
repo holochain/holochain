@@ -1540,13 +1540,7 @@ mod builder {
 
             // Create handle
             let handle: ConductorHandle = Arc::new(ConductorHandleImpl {
-                root_env_dir: config.environment_path.clone(),
                 conductor,
-                db_sync_strategy: config.db_sync_strategy,
-
-                p2p_env: Arc::new(parking_lot::Mutex::new(HashMap::new())),
-                p2p_batch_senders: Arc::new(parking_lot::Mutex::new(HashMap::new())),
-                p2p_metrics_env: Arc::new(parking_lot::Mutex::new(HashMap::new())),
 
                 #[cfg(any(test, feature = "test_utils"))]
                 dev_settings: parking_lot::RwLock::new(DevSettings::default()),
@@ -1690,12 +1684,8 @@ mod builder {
 
             // Create handle
             let handle: ConductorHandle = Arc::new(ConductorHandleImpl {
-                root_env_dir: self.config.environment_path.clone(),
                 conductor,
-                p2p_env: envs.p2p(),
-                p2p_batch_senders: Arc::new(parking_lot::Mutex::new(HashMap::new())),
-                p2p_metrics_env: envs.p2p_metrics(),
-                db_sync_strategy: self.config.db_sync_strategy,
+
                 #[cfg(any(test, feature = "test_utils"))]
                 dev_settings: parking_lot::RwLock::new(DevSettings::default()),
             });

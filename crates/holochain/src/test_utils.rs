@@ -37,8 +37,6 @@ use holochain_state::source_chain;
 use holochain_state::test_utils::fresh_reader_test;
 use holochain_state::test_utils::TestEnvs;
 use holochain_types::prelude::*;
-
-use holochain_p2p::DnaHashExt;
 use holochain_wasm_test_utils::TestWasm;
 use kitsune_p2p::KitsuneP2pConfig;
 use rusqlite::named_params;
@@ -660,7 +658,7 @@ async fn display_integration<Db: ReadAccess<DbKindDht>>(env: &Db) -> usize {
 /// Helper for displaying agent infos stored on a conductor
 pub async fn display_agent_infos(conductor: &ConductorHandle) {
     for cell_id in conductor.list_cell_ids(Some(CellStatus::Joined)) {
-        let space = cell_id.dna_hash().to_kitsune();
+        let space = cell_id.dna_hash();
         let env = conductor.get_p2p_env(space);
         let info = p2p_agent_store::dump_state(env.into(), Some(cell_id))
             .await

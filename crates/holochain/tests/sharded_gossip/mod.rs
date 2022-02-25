@@ -172,7 +172,7 @@ async fn mock_network_sharded_gossip() {
             AddressedHolochainP2pMockMsg, HolochainP2pMockChannel, HolochainP2pMockMsg,
         },
     };
-    use holochain_p2p::{dht_arc::DhtLocation, AgentPubKeyExt, DnaHashExt};
+    use holochain_p2p::{dht_arc::DhtLocation, AgentPubKeyExt};
     use holochain_sqlite::db::AsP2pStateTxExt;
     use kitsune_p2p::TransportConfig;
     use kitsune_p2p_types::tx2::tx2_adapter::AdapterFactory;
@@ -570,7 +570,7 @@ async fn mock_network_sharded_gossip() {
         .unwrap();
 
     let (alice,) = apps.into_tuple();
-    let alice_p2p_env = conductor.get_p2p_env(alice.cell_id().dna_hash().to_kitsune());
+    let alice_p2p_env = conductor.get_p2p_env(alice.cell_id().dna_hash());
     let alice_kit = alice.agent_pubkey().to_kitsune();
 
     // Spawn a task to update alice's agent info.
@@ -687,7 +687,7 @@ async fn mock_network_sharding() {
         AddressedHolochainP2pMockMsg, HolochainP2pMockChannel, HolochainP2pMockMsg,
     };
     use holochain_p2p::mock_network::{GossipProtocol, MockScenario};
-    use holochain_p2p::{AgentPubKeyExt, DnaHashExt};
+    use holochain_p2p::AgentPubKeyExt;
     use holochain_state::prelude::*;
     use holochain_types::dht_op::WireOps;
     use holochain_types::element::WireElementOps;
@@ -1056,7 +1056,7 @@ async fn mock_network_sharding() {
         .unwrap();
 
     let (alice,) = apps.into_tuple();
-    let alice_p2p_env = conductor.get_p2p_env(alice.cell_id().dna_hash().to_kitsune());
+    let alice_p2p_env = conductor.get_p2p_env(alice.cell_id().dna_hash());
     let alice_kit = alice.agent_pubkey().to_kitsune();
 
     // Spawn a task to update alice's agent info.

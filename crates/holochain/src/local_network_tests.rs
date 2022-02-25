@@ -15,7 +15,6 @@ use hdk::prelude::CellId;
 use holo_hash::AgentPubKey;
 use holo_hash::HeaderHash;
 use holochain_keystore::AgentPubKeyExt;
-use holochain_p2p::DnaHashExt;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::prelude::TestEnvs;
 use holochain_types::prelude::*;
@@ -273,7 +272,7 @@ async fn conductors_gossip_inner(
 
     let mut envs = Vec::with_capacity(handles.len() + second_handles.len());
     for h in handles.iter().chain(second_handles.iter()) {
-        let space = h.cell_id.dna_hash().to_kitsune();
+        let space = h.cell_id.dna_hash();
         envs.push(h.get_p2p_env(space));
     }
 
@@ -305,7 +304,7 @@ async fn conductors_gossip_inner(
 
     let mut envs = Vec::with_capacity(third_handles.len() + second_handles.len());
     for h in third_handles.iter().chain(second_handles.iter()) {
-        let space = h.cell_id.dna_hash().to_kitsune();
+        let space = h.cell_id.dna_hash();
         envs.push(h.get_p2p_env(space));
     }
 

@@ -10,7 +10,7 @@ use futures::stream::StreamExt;
 use holo_hash::{DhtOpHash, DnaHash};
 use holochain_p2p::{
     dht_arc::{DhtArc, DhtLocation},
-    AgentPubKeyExt, DhtOpHashExt, DnaHashExt,
+    AgentPubKeyExt, DhtOpHashExt,
 };
 use holochain_sqlite::{
     db::{AsP2pStateTxExt, DbKindAuthored, DbKindDht, DbKindP2pAgentStore},
@@ -46,8 +46,7 @@ pub async fn local_machine_session(conductors: &[ConductorHandle], timeout: Dura
                 .entry(cell_id.dna_hash().clone())
                 .or_insert_with(|| vec![None; conductors.len()]);
             if space[i].is_none() {
-                let p2p_env: DbRead<DbKindP2pAgentStore> =
-                    c.get_p2p_env(cell_id.dna_hash().to_kitsune()).into();
+                let p2p_env: DbRead<DbKindP2pAgentStore> = c.get_p2p_env(cell_id.dna_hash()).into();
                 space[i] = Some((p2p_env, Vec::new()));
             }
             space[i].as_mut().unwrap().1.push((
@@ -115,8 +114,7 @@ pub async fn local_machine_session_with_hashes(
                 continue;
             }
             if conductors[i].is_none() {
-                let p2p_env: DbRead<DbKindP2pAgentStore> =
-                    c.get_p2p_env(cell_id.dna_hash().to_kitsune()).into();
+                let p2p_env: DbRead<DbKindP2pAgentStore> = c.get_p2p_env(cell_id.dna_hash()).into();
                 conductors[i] = Some((p2p_env, Vec::new()));
             }
             conductors[i].as_mut().unwrap().1.push((
