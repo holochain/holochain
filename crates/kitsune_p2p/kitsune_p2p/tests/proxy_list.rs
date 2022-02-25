@@ -5,6 +5,7 @@ use kitsune_p2p_proxy::tx2::*;
 use kitsune_p2p_proxy::*;
 use kitsune_p2p_transport_quic::tx2::*;
 use kitsune_p2p_types::config::*;
+use kitsune_p2p_types::tls::*;
 use kitsune_p2p_types::tx2::tx2_pool_promote::*;
 
 #[tokio::test(flavor = "multi_thread")]
