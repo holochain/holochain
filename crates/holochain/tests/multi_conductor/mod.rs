@@ -109,6 +109,20 @@ async fn multi_conductor() -> anyhow::Result<()> {
     let metrics = conductors[1].dump_network_metrics(None).await?;
     println!("@!@! - metrics: {}", metrics);
 
+    // See if we can read some of the keyfiles
+    for c in conductors.iter() {
+        for entry in std::fs::read_dir(c.envs().path()).unwrap() {
+            let path = entry.unwrap().path();
+            if path.to_string_lossy().ends_with(".keylog") {
+                println!(
+                    "--{}--:\n{}",
+                    path.to_string_lossy(),
+                    String::from_utf8_lossy(&std::fs::read(&path).unwrap())
+                );
+            }
+        }
+    }
+
     Ok(())
 }
 
