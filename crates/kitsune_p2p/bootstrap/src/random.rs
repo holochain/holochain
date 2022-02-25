@@ -55,7 +55,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_random() {
-        let store = Store::new();
+        let store = Store::new(vec![]);
         let filter = super::random(store.clone());
         let space: Arc<KitsuneSpace> = Arc::new(fixt!(KitsuneSpace));
         let mut peers = Vec::new();
