@@ -22,7 +22,7 @@ use holochain_p2p::actor::HolochainP2pRefToDna;
 use holochain_p2p::dht_arc::DhtArc;
 use holochain_p2p::dht_arc::PeerViewBeta;
 use holochain_p2p::event::HolochainP2pEvent;
-use holochain_p2p::spawn_holochain_p2p;
+use holochain_p2p::spawn_test_holochain_p2p;
 use holochain_p2p::HolochainP2pDna;
 use holochain_p2p::HolochainP2pRef;
 use holochain_p2p::HolochainP2pSender;
@@ -202,7 +202,7 @@ where
     tuning.tx2_implicit_timeout_ms = 500;
     config.tuning_params = std::sync::Arc::new(tuning);
 
-    let (network, mut recv) = spawn_holochain_p2p(
+    let (network, mut recv) = spawn_test_holochain_p2p(
         config,
         holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_types::tls::TlsConfig::new_ephemeral(
         )

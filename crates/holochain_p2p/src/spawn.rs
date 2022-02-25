@@ -5,10 +5,22 @@ mod actor;
 use actor::*;
 
 /// Spawn a new HolochainP2p actor.  Conductor will call this on initialization.
-pub async fn spawn_holochain_p2p(
+pub async fn spawn_test_holochain_p2p(
     config: kitsune_p2p::KitsuneP2pConfig,
     tls_config: kitsune_p2p::dependencies::kitsune_p2p_types::tls::TlsConfig,
     // host: kitsune_p2p::HostApi,
+) -> HolochainP2pResult<(
+    ghost_actor::GhostSender<HolochainP2p>,
+    HolochainP2pEventReceiver,
+)> {
+    spawn_holochain_p2p(config, tls_config, kitsune_p2p::HostStub::new()).await
+}
+
+/// Spawn a new HolochainP2p actor.  Conductor will call this on initialization.
+pub async fn spawn_holochain_p2p(
+    config: kitsune_p2p::KitsuneP2pConfig,
+    tls_config: kitsune_p2p::dependencies::kitsune_p2p_types::tls::TlsConfig,
+    host: kitsune_p2p::HostApi,
 ) -> HolochainP2pResult<(
     ghost_actor::GhostSender<HolochainP2p>,
     HolochainP2pEventReceiver,
@@ -23,14 +35,7 @@ pub async fn spawn_holochain_p2p(
 
     tokio::task::spawn(
         builder.spawn(
-            HolochainP2pActor::new(
-                config,
-                tls_config,
-                channel_factory,
-                evt_send,
-                kitsune_p2p::HostStub::new(),
-            )
-            .await?,
+            HolochainP2pActor::new(config, tls_config, channel_factory, evt_send, host).await?,
         ),
     );
 
