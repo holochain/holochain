@@ -265,7 +265,7 @@ pub(crate) async fn countersigning_success(
             }
             let op = DhtOp::RegisterAgentActivity(signature, header);
             let basis = op.dht_basis();
-            let ops = vec![(DhtOpHash::with_data_sync(&op), op)];
+            let ops = vec![op];
             if let Err(e) = network.publish(false, false, basis, ops, None).await {
                 tracing::error!(
                     "Failed to publish to other countersigners agent authorities because of: {:?}",
@@ -290,7 +290,7 @@ pub async fn countersigning_publish(
     op: DhtOp,
 ) -> Result<(), ZomeCallResponse> {
     let basis = op.dht_basis();
-    let ops = vec![(DhtOpHash::with_data_sync(&op), op)];
+    let ops = vec![op];
     if let Err(e) = network.publish(false, true, basis, ops, None).await {
         tracing::error!(
             "Failed to publish to entry authorities for countersigning session because of: {:?}",
