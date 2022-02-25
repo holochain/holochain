@@ -160,8 +160,9 @@ pub mod tests {
             type: quic
             bind_to: kitsune-quic://0.0.0.0:0
           proxy_config:
-            type: local_proxy_server
-            proxy_accept_config: reject_all
+            type: remote_proxy_client_from_bootstrap
+            bootstrap_url: https://bootstrap.holo.host
+            fallback_proxy_url: ~
       tuning_params:
         gossip_loop_iteration_delay_ms: 42
         default_rpc_single_timeout_ms: 42
@@ -185,8 +186,9 @@ pub mod tests {
                 override_host: None,
                 override_port: None,
             }),
-            proxy_config: ProxyConfig::LocalProxyServer {
-                proxy_accept_config: Some(ProxyAcceptConfig::RejectAll),
+            proxy_config: ProxyConfig::RemoteProxyClientFromBootstrap {
+                bootstrap_url: url2::url2!("https://bootstrap.holo.host"),
+                fallback_proxy_url: None,
             },
         });
         let mut tuning_params =

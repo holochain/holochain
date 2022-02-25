@@ -46,23 +46,41 @@ impl Default for ProxyRemoteType {
 
 impl ProxyRemoteType {
     /// Get the appropriate proxy_url (or None) given the config
-    pub async fn get_proxy_url(&self) -> Option<TxUrl> {
+    pub async fn get_proxy_url(
+        &self,
+        proxy_from_bootstrap_cb: ProxyFromBootstrapCb,
+    ) -> Option<TxUrl> {
         match self {
             ProxyRemoteType::NoProxy => None,
             ProxyRemoteType::Specific(proxy_url) => Some(proxy_url.clone()),
             ProxyRemoteType::Bootstrap {
-                fallback_proxy_url, ..
+                bootstrap_url,
+                fallback_proxy_url,
             } => {
-                // TODO lookup bootstrap proxy_list here
-                fallback_proxy_url.clone()
+                match tokio::time::timeout(
+                    std::time::Duration::from_secs(10),
+                    proxy_from_bootstrap_cb(bootstrap_url.clone()),
+                )
+                .await
+                {
+                    Ok(Some(proxy)) => Some(proxy),
+                    _ => fallback_proxy_url.clone(),
+                }
             }
         }
     }
 }
 
+/// Callback function signature for fetching dynamic proxy from bootstrap
+pub type ProxyFromBootstrapCb =
+    Arc<dyn Fn(TxUrl) -> BoxFuture<'static, Option<TxUrl>> + 'static + Send + Sync>;
+
+fn stub_proxy_from_bootstrap_cb(_: TxUrl) -> BoxFuture<'static, Option<TxUrl>> {
+    Box::pin(async move { None })
+}
+
 /// Configuration for tx2 proxy wrapper
 #[non_exhaustive]
-#[derive(Default)]
 pub struct ProxyConfig {
     /// Tuning Params
     /// Default: None = default.
@@ -79,20 +97,47 @@ pub struct ProxyConfig {
     /// and we will modify our local_addr() function to make that
     /// endpoint our external address.
     pub client_of_remote_proxy: ProxyRemoteType,
+
+    /// Logic for dynamically fetching a proxy url from the bootstrap service
+    pub proxy_from_bootstrap_cb: ProxyFromBootstrapCb,
+}
+
+impl Default for ProxyConfig {
+    fn default() -> Self {
+        ProxyConfig {
+            tuning_params: None,
+            allow_proxy_fwd: false,
+            client_of_remote_proxy: ProxyRemoteType::default(),
+            proxy_from_bootstrap_cb: Arc::new(stub_proxy_from_bootstrap_cb),
+        }
+    }
 }
 
 impl ProxyConfig {
     /// into inner contents with default application
-    pub fn split(self) -> KitsuneResult<(KitsuneP2pTuningParams, bool, ProxyRemoteType)> {
+    pub fn split(
+        self,
+    ) -> KitsuneResult<(
+        KitsuneP2pTuningParams,
+        bool,
+        ProxyRemoteType,
+        ProxyFromBootstrapCb,
+    )> {
         let ProxyConfig {
             tuning_params,
             allow_proxy_fwd,
             client_of_remote_proxy,
+            proxy_from_bootstrap_cb,
         } = self;
 
         let tuning_params = tuning_params.unwrap_or_default();
 
-        Ok((tuning_params, allow_proxy_fwd, client_of_remote_proxy))
+        Ok((
+            tuning_params,
+            allow_proxy_fwd,
+            client_of_remote_proxy,
+            proxy_from_bootstrap_cb,
+        ))
     }
 }
 
@@ -812,6 +857,7 @@ impl ProxyEp {
         tuning_params: KitsuneP2pTuningParams,
         allow_proxy_fwd: bool,
         client_of_remote_proxy: ProxyRemoteType,
+        proxy_from_bootstrap_cb: ProxyFromBootstrapCb,
     ) -> KitsuneResult<Ep> {
         // this isn't something that needs to be configurable,
         // because it's entirely dependent on the code written here
@@ -846,6 +892,23 @@ impl ProxyEp {
         l_hnd.capture_logic(logic).await?;
 
         {
+            // try to get our proxy addy inline, but fail silently
+            if let Some(proxy_url) = client_of_remote_proxy
+                .get_proxy_url(proxy_from_bootstrap_cb.clone())
+                .await
+            {
+                let _ = cur_proxy_url.share_mut(|r, _| {
+                    *r = Some(ProxyUrl::from(proxy_url.as_str()));
+                    Ok(())
+                });
+                let timeout = tuning_params.implicit_timeout();
+                let hnd = hnd.clone();
+                tokio::task::spawn(async move {
+                    let _ = hnd.get_connection(proxy_url, timeout).await;
+                });
+            }
+
+            // set up the logic loop that keeps us connected to a proxy
             let hnd = hnd.clone();
             l_hnd
                 .capture_logic(async move {
@@ -854,7 +917,10 @@ impl ProxyEp {
                             break;
                         }
 
-                        if let Some(proxy_url) = client_of_remote_proxy.get_proxy_url().await {
+                        if let Some(proxy_url) = client_of_remote_proxy
+                            .get_proxy_url(proxy_from_bootstrap_cb.clone())
+                            .await
+                        {
                             let _ = cur_proxy_url.share_mut(|r, _| {
                                 *r = Some(ProxyUrl::from(proxy_url.as_str()));
                                 Ok(())
@@ -895,16 +961,19 @@ struct ProxyEpFactory {
     tuning_params: KitsuneP2pTuningParams,
     allow_proxy_fwd: bool,
     client_of_remote_proxy: ProxyRemoteType,
+    proxy_from_bootstrap_cb: ProxyFromBootstrapCb,
     sub_fact: EpFactory,
 }
 
 impl ProxyEpFactory {
     pub fn new(sub_fact: EpFactory, config: ProxyConfig) -> KitsuneResult<EpFactory> {
-        let (tuning_params, allow_proxy_fwd, client_of_remote_proxy) = config.split()?;
+        let (tuning_params, allow_proxy_fwd, client_of_remote_proxy, proxy_from_bootstrap_cb) =
+            config.split()?;
         let fact: EpFactory = Arc::new(ProxyEpFactory {
             tuning_params,
             allow_proxy_fwd,
             client_of_remote_proxy,
+            proxy_from_bootstrap_cb,
             sub_fact,
         });
         Ok(fact)
@@ -921,6 +990,7 @@ impl AsEpFactory for ProxyEpFactory {
         let fut = self.sub_fact.bind(bind_spec, timeout);
         let allow_proxy_fwd = self.allow_proxy_fwd;
         let client_of_remote_proxy = self.client_of_remote_proxy.clone();
+        let proxy_from_bootstrap_cb = self.proxy_from_bootstrap_cb.clone();
         async move {
             let sub_ep = fut.await?;
             ProxyEp::new(
@@ -928,6 +998,7 @@ impl AsEpFactory for ProxyEpFactory {
                 tuning_params,
                 allow_proxy_fwd,
                 client_of_remote_proxy,
+                proxy_from_bootstrap_cb,
             )
             .await
         }

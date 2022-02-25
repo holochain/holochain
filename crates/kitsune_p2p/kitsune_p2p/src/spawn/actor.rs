@@ -76,7 +76,6 @@ ghost_actor::ghost_chan! {
 }
 
 pub(crate) struct KitsuneP2pActor {
-    this_addr: url2::Url2,
     channel_factory: ghost_actor::actor_builder::GhostActorChannelFactory<Self>,
     internal_sender: ghost_actor::GhostSender<Internal>,
     evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
@@ -161,6 +160,26 @@ impl KitsuneP2pActor {
                         bootstrap_url,
                         fallback_proxy_url,
                     };
+                    conf.proxy_from_bootstrap_cb = Arc::new(|bootstrap_url| {
+                        Box::pin(async move {
+                            match bootstrap::proxy_list(bootstrap_url.into()).await {
+                                Ok(mut proxy_list) => {
+                                    if proxy_list.is_empty() {
+                                        return None;
+                                    }
+                                    use rand::Rng;
+                                    Some(
+                                        proxy_list
+                                            .remove(
+                                                rand::thread_rng().gen_range(0, proxy_list.len()),
+                                            )
+                                            .into(),
+                                    )
+                                }
+                                _ => None,
+                            }
+                        })
+                    });
                 }
             }
             let f = tx2_proxy(f, conf)?;
@@ -197,10 +216,6 @@ impl KitsuneP2pActor {
 
         // capture endpoint handle
         let ep_hnd = ep.handle().clone();
-
-        let this_addr = ep_hnd.local_addr().map_err(KitsuneP2pError::other)?;
-
-        tracing::info!("this_addr: {}", this_addr);
 
         let i_s = internal_sender.clone();
         tokio::task::spawn({
@@ -431,7 +446,6 @@ impl KitsuneP2pActor {
         ));
 
         Ok(Self {
-            this_addr: this_addr.into(),
             channel_factory,
             internal_sender,
             evt_sender,
@@ -685,8 +699,8 @@ impl ghost_actor::GhostHandler<KitsuneP2p> for KitsuneP2pActor {}
 
 impl KitsuneP2pHandler for KitsuneP2pActor {
     fn handle_list_transport_bindings(&mut self) -> KitsuneP2pHandlerResult<Vec<url2::Url2>> {
-        let this_addr = vec![self.this_addr.clone()];
-        Ok(async move { Ok(this_addr) }.boxed().into())
+        let this_addr = self.ep_hnd.local_addr();
+        Ok(async move { Ok(vec![this_addr?.into()]) }.boxed().into())
     }
 
     fn handle_join(
@@ -696,7 +710,6 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
     ) -> KitsuneP2pHandlerResult<()> {
         let internal_sender = self.internal_sender.clone();
         let space2 = space.clone();
-        let this_addr = self.this_addr.clone();
         let ep_hnd = self.ep_hnd.clone();
         let config = Arc::clone(&self.config);
         let bandwidth_throttles = self.bandwidth_throttles.clone();
@@ -706,7 +719,6 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
             Entry::Vacant(entry) => entry.insert(AsyncLazy::new(async move {
                 let (send, send_inner, evt_recv) = spawn_space(
                     space2,
-                    this_addr,
                     ep_hnd,
                     config,
                     bandwidth_throttles,
