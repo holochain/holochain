@@ -841,11 +841,11 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     }
 
     fn keystore(&self) -> &MetaLairClient {
-        &self.conductor.keystore()
+        self.conductor.keystore()
     }
 
     fn holochain_p2p(&self) -> &holochain_p2p::HolochainP2pRef {
-        &self.conductor.holochain_p2p()
+        self.conductor.holochain_p2p()
     }
 
     async fn create_clone_cell(
@@ -1161,7 +1161,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             .get_or_create_authored_env(cell_id.dna_hash())?;
         let dht_env = self.conductor.get_or_create_dht_env(cell_id.dna_hash())?;
         let dna_hash = cell_id.dna_hash();
-        let p2p_env = self.conductor.spaces.p2p_env(&dna_hash)?;
+        let p2p_env = self.conductor.spaces.p2p_env(dna_hash)?;
 
         let peer_dump = p2p_agent_store::dump_state(p2p_env.into(), Some(cell_id.clone())).await?;
         let source_chain_dump =
