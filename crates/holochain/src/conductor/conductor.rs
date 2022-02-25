@@ -65,7 +65,6 @@ use holochain_keystore::lair_keystore::spawn_new_lair_keystore;
 use holochain_keystore::test_keystore::spawn_legacy_test_keystore;
 use holochain_keystore::test_keystore::spawn_test_keystore;
 use holochain_keystore::MetaLairClient;
-use holochain_sqlite::conn::DbSyncStrategy;
 use holochain_sqlite::prelude::*;
 use holochain_sqlite::sql::sql_cell::state_dump;
 use holochain_state::mutations;
@@ -170,14 +169,8 @@ where
     /// Access to private keys for signing and encryption.
     keystore: MetaLairClient,
 
-    /// The root environment directory where all environments are created
-    root_env_dir: EnvironmentRootPath,
-
     /// Handle to the network actor.
     holochain_p2p: holochain_p2p::HolochainP2pRef,
-
-    /// The map of running queue consumer workflows.
-    queue_consumer_map: QueueConsumerMap,
 
     post_commit: tokio::sync::mpsc::Sender<PostCommitArgs>,
 }
@@ -466,7 +459,7 @@ where
     }
 
     pub(super) fn get_queue_consumer_workflows(&self) -> QueueConsumerMap {
-        self.queue_consumer_map.clone()
+        self.spaces.queue_consumer_map.clone()
     }
 
     /// Start all app interfaces currently in state.
@@ -883,7 +876,7 @@ where
 
     /// Get the root environment directory.
     pub fn root_env_dir(&self) -> &EnvironmentRootPath {
-        &self.root_env_dir
+        &self.spaces.root_env_dir
     }
 
     /// Get the keystore.
@@ -1280,20 +1273,14 @@ where
         wasm_env: DbWrite<DbKindWasm>,
         dna_store: DS,
         keystore: MetaLairClient,
-        root_env_dir: EnvironmentRootPath,
         holochain_p2p: holochain_p2p::HolochainP2pRef,
-        db_sync_level: DbSyncStrategy,
+        spaces: Spaces,
         post_commit: tokio::sync::mpsc::Sender<PostCommitArgs>,
     ) -> ConductorResult<Self> {
-        let queue_consumer_map = QueueConsumerMap::new();
         Ok(Self {
             conductor_env,
             wasm_env,
-            spaces: Spaces::new(
-                root_env_dir.clone(),
-                db_sync_level,
-                queue_consumer_map.clone(),
-            ),
+            spaces,
             cells: RwShare::new(HashMap::new()),
             shutting_down: Arc::new(AtomicBool::new(false)),
             app_interfaces: RwShare::new(HashMap::new()),
@@ -1301,9 +1288,7 @@ where
             admin_websocket_ports: RwShare::new(Vec::new()),
             dna_store: RwShare::new(dna_store),
             keystore,
-            root_env_dir,
             holochain_p2p,
-            queue_consumer_map,
             post_commit,
         })
     }
@@ -1517,6 +1502,7 @@ mod builder {
                     cert_priv_key,
                     cert_digest,
                 };
+            let spaces = Spaces::new(env_path, config.db_sync_strategy);
             let (holochain_p2p, p2p_evt) =
                 holochain_p2p::spawn_holochain_p2p(network_config, tls_config).await?;
 
@@ -1528,9 +1514,8 @@ mod builder {
                 wasm_environment,
                 dna_store,
                 keystore,
-                env_path,
                 holochain_p2p,
-                config.db_sync_strategy,
+                spaces,
                 post_commit_sender,
             )
             .await?;
@@ -1668,14 +1653,18 @@ mod builder {
             let (post_commit_sender, post_commit_receiver) =
                 tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
 
+            let spaces = Spaces::new(
+                self.config.environment_path.clone(),
+                self.config.db_sync_strategy,
+            );
+
             let conductor = Conductor::new(
                 envs.conductor(),
                 envs.wasm(),
                 self.dna_store,
                 keystore,
-                self.config.environment_path.clone(),
                 holochain_p2p,
-                self.config.db_sync_strategy,
+                spaces,
                 post_commit_sender,
             )
             .await?;

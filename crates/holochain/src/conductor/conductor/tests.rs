@@ -33,14 +33,14 @@ async fn can_update_state() {
     let holochain_p2p = holochain_p2p::stub_network().await;
     let (post_commit_sender, _post_commit_receiver) =
         tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
+    let spaces = Spaces::new(envs.path().to_path_buf().into(), Default::default());
     let conductor = Conductor::new(
         envs.conductor(),
         envs.wasm(),
         dna_store,
         keystore,
-        envs.path().to_path_buf().into(),
         holochain_p2p,
-        DbSyncStrategy::default(),
+        spaces,
         post_commit_sender,
     )
     .await
@@ -82,14 +82,15 @@ async fn can_add_clone_cell_to_app() {
     let dna_store = RealDnaStore::new();
     let (post_commit_sender, _post_commit_receiver) =
         tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
+    let spaces = Spaces::new(envs.path().to_path_buf().into(), Default::default());
+
     let conductor = Conductor::new(
         envs.conductor(),
         envs.wasm(),
         dna_store,
         keystore,
-        envs.path().to_path_buf().into(),
         holochain_p2p,
-        DbSyncStrategy::default(),
+        spaces,
         post_commit_sender,
     )
     .await
@@ -152,19 +153,19 @@ async fn can_add_clone_cell_to_app() {
 /// same InstalledAppId
 #[tokio::test(flavor = "multi_thread")]
 async fn app_ids_are_unique() {
-    let environments = test_environments();
+    let envs = test_environments();
     let dna_store = MockDnaStore::new();
     let holochain_p2p = holochain_p2p::stub_network().await;
     let (post_commit_sender, _post_commit_receiver) =
         tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
+    let spaces = Spaces::new(envs.path().to_path_buf().into(), Default::default());
     let conductor = Conductor::new(
-        environments.conductor(),
-        environments.wasm(),
+        envs.conductor(),
+        envs.wasm(),
         dna_store,
-        environments.keystore().clone(),
-        environments.path().to_path_buf().into(),
+        envs.keystore().clone(),
         holochain_p2p,
-        DbSyncStrategy::default(),
+        spaces,
         post_commit_sender,
     )
     .await

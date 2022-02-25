@@ -42,10 +42,10 @@ use std::convert::TryInto;
 /// installed on this conductor.
 pub struct Spaces {
     map: RwShare<HashMap<DnaHash, Space>>,
-    root_env_dir: Arc<EnvironmentRootPath>,
+    pub(crate) root_env_dir: Arc<EnvironmentRootPath>,
     pub(crate) db_sync_strategy: DbSyncStrategy,
     /// The map of running queue consumer workflows.
-    queue_consumer_map: QueueConsumerMap,
+    pub(crate) queue_consumer_map: QueueConsumerMap,
 }
 
 #[derive(Clone)]
@@ -102,16 +102,12 @@ pub struct TestSpace {
 
 impl Spaces {
     /// Create a new empty set of [`DnaHash`] spaces.
-    pub fn new(
-        root_env_dir: EnvironmentRootPath,
-        db_sync_strategy: DbSyncStrategy,
-        queue_consumer_map: QueueConsumerMap,
-    ) -> Self {
+    pub fn new(root_env_dir: EnvironmentRootPath, db_sync_strategy: DbSyncStrategy) -> Self {
         Spaces {
             map: RwShare::new(HashMap::new()),
             root_env_dir: Arc::new(root_env_dir),
             db_sync_strategy,
-            queue_consumer_map,
+            queue_consumer_map: QueueConsumerMap::new(),
         }
     }
 
@@ -497,11 +493,7 @@ impl TestSpaces {
             .prefix("holochain-test-environments")
             .tempdir()
             .unwrap();
-        let spaces = Spaces::new(
-            temp_dir.path().to_path_buf().into(),
-            Default::default(),
-            queue_consumer_map.clone(),
-        );
+        let spaces = Spaces::new(temp_dir.path().to_path_buf().into(), Default::default());
         spaces.map.share_mut(|map| {
             map.extend(
                 test_spaces
