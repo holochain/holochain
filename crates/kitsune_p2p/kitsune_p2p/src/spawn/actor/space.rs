@@ -1096,7 +1096,7 @@ impl Space {
         {
             let space = space.clone();
             let metrics = metrics.clone();
-            let evt_sender = evt_sender.clone();
+            let host = host.clone();
             tokio::task::spawn(async move {
                 loop {
                     tokio::time::sleep(std::time::Duration::from_millis(
@@ -1106,12 +1106,7 @@ impl Space {
 
                     let records = metrics.read().dump_historical();
 
-                    let _ = evt_sender
-                        .k_gen_req(KGenReq::RecordMetrics {
-                            space: space.clone(),
-                            records,
-                        })
-                        .await;
+                    let _ = host.record_metrics(space.clone(), records).await;
                 }
             });
         }
@@ -1120,6 +1115,7 @@ impl Space {
             space.clone(),
             config.tuning_params.clone(),
             evt_sender.clone(),
+            host.clone(),
             metrics.clone(),
         );
 

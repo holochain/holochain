@@ -38,10 +38,6 @@ impl ghost_actor::GhostControlHandler for SwitchboardEventHandler {}
 
 #[allow(warnings)]
 impl KitsuneP2pEventHandler for SwitchboardEventHandler {
-    fn handle_k_gen_req(&mut self, _: KGenReq) -> KitsuneP2pEventHandlerResult<KGenRes> {
-        Err("unimplemented".into())
-    }
-
     fn handle_put_agent_info_signed(
         &mut self,
         PutAgentInfoSignedEvt { space, peer_data }: PutAgentInfoSignedEvt,

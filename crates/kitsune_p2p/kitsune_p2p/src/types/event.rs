@@ -210,37 +210,6 @@ pub struct MetricRecord {
     pub data: serde_json::Value,
 }
 
-/// Generic Kitsune Request of the implementor
-/// This enum may be easier to add variants to for future updates,
-/// rather than adding a full new top-level event message type.
-pub enum KGenReq {
-    /// Extrapolated Peer Coverage
-    PeerExtrapCov {
-        /// The space to extrapolate coverage
-        space: Arc<super::KitsuneSpace>,
-
-        /// Storage arcs of joined agents
-        dht_arc_set: DhtArcSet,
-    },
-
-    /// Record a set of metric records
-    RecordMetrics {
-        /// The space to associate the records with
-        space: Arc<super::KitsuneSpace>,
-
-        /// The records to record
-        records: Vec<MetricRecord>,
-    },
-}
-
-/// Generic Kitsune Respons from the imlementor
-pub enum KGenRes {
-    /// Extrapolated Peer Coverage
-    PeerExtrapCov(Vec<f64>),
-    /// Record a set of metric records
-    RecordMetrics(()),
-}
-
 type KSpace = Arc<super::KitsuneSpace>;
 type KAgent = Arc<super::KitsuneAgent>;
 type KOpHash = Arc<super::KitsuneOpHash>;
@@ -251,8 +220,6 @@ ghost_actor::ghost_chan! {
     /// The KitsuneP2pEvent stream allows handling events generated from the
     /// KitsuneP2p actor.
     pub chan KitsuneP2pEvent<super::KitsuneP2pError> {
-        /// Generic Kitsune Request of the implementor
-        fn k_gen_req(arg: KGenReq) -> KGenRes;
 
         /// We need to store signed agent info.
         fn put_agent_info_signed(input: PutAgentInfoSignedEvt) -> ();

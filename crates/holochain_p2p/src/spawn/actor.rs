@@ -41,20 +41,6 @@ macro_rules! timing_trace {
 struct WrapEvtSender(futures::channel::mpsc::Sender<HolochainP2pEvent>);
 
 impl WrapEvtSender {
-    pub fn k_gen_req(
-        &self,
-        arg: KGenReq,
-    ) -> impl Future<Output = HolochainP2pResult<KGenRes>> + 'static + Send {
-        let dna_hash = match &arg {
-            KGenReq::PeerExtrapCov { space, .. } => DnaHash::from_kitsune(space),
-            KGenReq::RecordMetrics { space, .. } => DnaHash::from_kitsune(space),
-        };
-        timing_trace!(
-            { self.0.k_gen_req(dna_hash, arg) },
-            "(hp2p:handle) k_gen_req",
-        )
-    }
-
     pub fn put_agent_info_signed(
         &self,
         dna_hash: DnaHash,
@@ -574,16 +560,6 @@ impl HolochainP2pActor {
 impl ghost_actor::GhostHandler<kitsune_p2p::event::KitsuneP2pEvent> for HolochainP2pActor {}
 
 impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
-    fn handle_k_gen_req(
-        &mut self,
-        arg: KGenReq,
-    ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<KGenRes> {
-        let evt_sender = self.evt_sender.clone();
-        Ok(async move { Ok(evt_sender.k_gen_req(arg).await?) }
-            .boxed()
-            .into())
-    }
-
     /// We need to store signed agent info.
     #[tracing::instrument(skip(self), level = "trace")]
     fn handle_put_agent_info_signed(

@@ -156,6 +156,7 @@ impl MetricExchangeSync {
         space: Arc<KitsuneSpace>,
         tuning_params: KitsuneP2pTuningParams,
         evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
+        host: HostApi,
         metrics: MetricsSync,
     ) -> Self {
         let out = Self(Arc::new(parking_lot::RwLock::new(MetricExchange::spawn(
@@ -174,11 +175,8 @@ impl MetricExchangeSync {
 
                     if last_extrap_cov.should_trigger() {
                         let arc_set = mx.read().arc_set.clone();
-                        if let Ok(KGenRes::PeerExtrapCov(res)) = evt_sender
-                            .k_gen_req(KGenReq::PeerExtrapCov {
-                                space: space.clone(),
-                                dht_arc_set: arc_set,
-                            })
+                        if let Ok(res) = host
+                            .peer_extrapolated_coverage(space.clone(), arc_set)
                             .await
                         {
                             // MAYBE: ignore outliers?

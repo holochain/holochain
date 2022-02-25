@@ -620,9 +620,6 @@ async fn handle_events(
         tuning_params.concurrent_limit_per_thread,
         move |evt| async move {
             match evt {
-                event::KitsuneP2pEvent::KGenReq { respond, .. } => {
-                    respond.r(Err("unimplemented".into()))
-                }
                 event::KitsuneP2pEvent::PutAgentInfoSigned { respond, input, .. } => {
                     respond.r(Ok(handle_put_agent_info_signed(kdirect.clone(), input)
                         .map_err(KitsuneP2pError::other)

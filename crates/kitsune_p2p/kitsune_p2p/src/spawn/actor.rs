@@ -617,10 +617,6 @@ impl InternalHandler for KitsuneP2pActor {
 impl ghost_actor::GhostHandler<KitsuneP2pEvent> for KitsuneP2pActor {}
 
 impl KitsuneP2pEventHandler for KitsuneP2pActor {
-    fn handle_k_gen_req(&mut self, arg: KGenReq) -> KitsuneP2pEventHandlerResult<KGenRes> {
-        Ok(self.evt_sender.k_gen_req(arg))
-    }
-
     fn handle_put_agent_info_signed(
         &mut self,
         input: crate::event::PutAgentInfoSignedEvt,
@@ -917,10 +913,6 @@ mockall::mock! {
     pub KitsuneP2pEventHandler {}
 
     impl KitsuneP2pEventHandler for KitsuneP2pEventHandler {
-        fn handle_k_gen_req(
-            &mut self,
-            arg: KGenReq,
-        ) -> KitsuneP2pEventHandlerResult<KGenRes>;
 
         fn handle_put_agent_info_signed(
             &mut self,
