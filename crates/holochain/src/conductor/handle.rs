@@ -468,8 +468,6 @@ impl DevSettings {
 #[derive(From)]
 pub struct ConductorHandleImpl<DS: DnaStore + 'static> {
     pub(super) conductor: Conductor<DS>,
-    pub(super) keystore: MetaLairClient,
-    pub(super) holochain_p2p: holochain_p2p::HolochainP2pRef,
 
     /// The root environment directory where all environments are created
     pub(super) root_env_dir: EnvironmentRootPath,
@@ -861,11 +859,11 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     }
 
     fn keystore(&self) -> &MetaLairClient {
-        &self.keystore
+        &self.conductor.keystore()
     }
 
     fn holochain_p2p(&self) -> &holochain_p2p::HolochainP2pRef {
-        &self.holochain_p2p
+        &self.conductor.holochain_p2p()
     }
 
     async fn create_clone_cell(
@@ -1207,7 +1205,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
 
     async fn dump_network_metrics(&self, dna_hash: Option<DnaHash>) -> ConductorApiResult<String> {
         use holochain_p2p::HolochainP2pSender;
-        self.holochain_p2p
+        self.holochain_p2p()
             .dump_network_metrics(dna_hash)
             .await
             .map_err(super::api::error::ConductorApiError::other)
@@ -1300,7 +1298,10 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             .ok()
             .map(|c| (c.0, c.1));
 
-        let network = self.holochain_p2p.to_dna(cell_id.dna_hash().clone());
+        let network = self
+            .conductor
+            .holochain_p2p()
+            .to_dna(cell_id.dna_hash().clone());
 
         // Validate the elements.
         if validate {
@@ -1316,7 +1317,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                 space.authored_env.clone(),
                 space.dht_env.clone(),
                 space.cache.clone(),
-                self.keystore.clone(),
+                self.conductor.keystore().clone(),
                 cell_id.agent_pubkey().clone(),
                 Arc::new(ribosome.dna_def().as_content().clone()),
             )

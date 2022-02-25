@@ -891,6 +891,11 @@ where
         &self.keystore
     }
 
+    /// Get a reference to the conductor's HolochainP2p.
+    pub fn holochain_p2p(&self) -> &holochain_p2p::HolochainP2pRef {
+        &self.holochain_p2p
+    }
+
     /// Remove cells from the cell map in the Conductor
     pub(super) async fn remove_cells(&self, cell_ids: Vec<CellId>) {
         let to_cleanup: Vec<_> = self.cells.share_mut(|cells| {
@@ -1533,16 +1538,10 @@ mod builder {
             #[cfg(any(test, feature = "test_utils"))]
             let conductor = Self::update_fake_state(state, conductor).await?;
 
-            // Get data before handle
-            let keystore = conductor.keystore.clone();
-            let holochain_p2p = conductor.holochain_p2p.clone();
-
             // Create handle
             let handle: ConductorHandle = Arc::new(ConductorHandleImpl {
                 root_env_dir: config.environment_path.clone(),
                 conductor,
-                keystore,
-                holochain_p2p,
                 db_sync_strategy: config.db_sync_strategy,
 
                 p2p_env: Arc::new(parking_lot::Mutex::new(HashMap::new())),
@@ -1689,16 +1688,10 @@ mod builder {
 
             let conductor = Self::update_fake_state(self.state, conductor).await?;
 
-            // Get data before handle
-            let keystore = conductor.keystore.clone();
-            let holochain_p2p = conductor.holochain_p2p.clone();
-
             // Create handle
             let handle: ConductorHandle = Arc::new(ConductorHandleImpl {
                 root_env_dir: self.config.environment_path.clone(),
                 conductor,
-                keystore,
-                holochain_p2p,
                 p2p_env: envs.p2p(),
                 p2p_batch_senders: Arc::new(parking_lot::Mutex::new(HashMap::new())),
                 p2p_metrics_env: envs.p2p_metrics(),
