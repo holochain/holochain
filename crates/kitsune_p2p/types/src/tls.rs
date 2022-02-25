@@ -1,5 +1,6 @@
 //! TLS utils for kitsune
 
+use crate::tx2::tx2_utils::Share;
 use crate::config::*;
 use crate::*;
 use lair_keystore_api_0_0::actor::*;
@@ -64,6 +65,9 @@ pub fn gen_tls_configs(
         .with_single_cert(vec![cert.clone()], cert_priv_key.clone())
         .map_err(KitsuneError::other)?;
 
+    if let Ok(key_log) = create_tuning_param_keylog(&tuning_params, "_quic_server") {
+        tls_server_config.key_log = key_log;
+    }
     tls_server_config.ticketer = rustls::Ticketer::new().map_err(KitsuneError::other)?;
     tls_server_config.session_storage = rustls::server::ServerSessionMemoryCache::new(
         tuning_params.tls_in_mem_session_storage as usize,
@@ -81,6 +85,9 @@ pub fn gen_tls_configs(
         .with_single_cert(vec![cert], cert_priv_key)
         .map_err(KitsuneError::other)?;
 
+    if let Ok(key_log) = create_tuning_param_keylog(&tuning_params, "_quic_client") {
+        tls_client_config.key_log = key_log;
+    }
     tls_client_config.session_storage = rustls::client::ClientSessionMemoryCache::new(
         tuning_params.tls_in_mem_session_storage as usize,
     );
@@ -112,5 +119,52 @@ impl rustls::client::ServerCertVerifier for TlsServerVerifier {
         // TODO - check acceptable cert digest
 
         Ok(rustls::client::ServerCertVerified::assertion())
+    }
+}
+
+fn create_tuning_param_keylog(
+    tuning_params: &KitsuneP2pTuningParams,
+    kind: &'static str,
+) -> KitsuneResult<Arc<dyn rustls::KeyLog>> {
+    let prefix = tuning_params.get_keylog_path_prefix()
+        .ok_or_else(|| KitsuneError::other("no keylog"))?;
+    let path = format!("{}{}.keylog", prefix, kind);
+    let file = std::fs::OpenOptions::new()
+        .append(true)
+        .create(true)
+        .open(path)
+        .map_err(KitsuneError::other)?;
+    let file = std::io::BufWriter::new(file);
+    let log = TuningParamKeyLog {
+        f: Share::new(file),
+    };
+    Ok(Arc::new(log))
+}
+
+struct TuningParamKeyLog<W: 'static + std::io::Write + Send + Sync> {
+    f: Share<std::io::BufWriter<W>>,
+}
+
+impl<W: 'static + std::io::Write + Send + Sync> TuningParamKeyLog<W> {
+    fn try_log(&self, label: &str, client_random: &[u8], secret: &[u8]) -> KitsuneResult<()> {
+        self.f.share_mut(|f, _| {
+            use std::io::Write;
+            write!(f, "{} ", label).map_err(KitsuneError::other)?;
+            for b in client_random.iter() {
+                write!(f, "{:02x}", b).map_err(KitsuneError::other)?;
+            }
+            write!(f, " ").map_err(KitsuneError::other)?;
+            for b in secret.iter() {
+                write!(f, "{:02x}", b).map_err(KitsuneError::other)?;
+            }
+            writeln!(f).map_err(KitsuneError::other)?;
+            f.flush().map_err(KitsuneError::other)
+        })
+    }
+}
+
+impl<W: 'static + std::io::Write + Send + Sync> rustls::KeyLog for TuningParamKeyLog<W> {
+    fn log(&self, label: &str, client_random: &[u8], secret: &[u8]) {
+        let _ = self.try_log(label, client_random, secret);
     }
 }
