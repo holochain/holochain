@@ -1,6 +1,6 @@
 [package]
 name = "holochain_sqlite"
-version = "0.0.28-dev.0"
+version = "0.0.28"
 description = "Abstractions for persistence of Holochain state via SQLite"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -21,12 +21,12 @@ derive_more = "0.99.3"
 either = "1.5.0"
 fallible-iterator = "0.2.0"
 failure = "0.1.6"
-fixt = { version = "0.0.9-dev.0", path = "../fixt" }
+fixt = { version = "0.0.9", path = "../fixt" }
 futures = "0.3.1"
-holo_hash = { path = "../holo_hash", features = ["rusqlite"], version = "0.0.21-dev.0"}
+holo_hash = { path = "../holo_hash", features = ["rusqlite"], version = "0.0.21"}
 holochain_serialized_bytes = "=0.0.51"
-holochain_zome_types = { version = "0.0.26-dev.0", path = "../holochain_zome_types" }
-kitsune_p2p = { version = "0.0.25-dev.0", path = "../kitsune_p2p/kitsune_p2p" }
+holochain_zome_types = { version = "0.0.26", path = "../holochain_zome_types" }
+kitsune_p2p = { version = "0.0.25", path = "../kitsune_p2p/kitsune_p2p" }
 lazy_static = "1.4.0"
 once_cell = "1.4.1"
 must_future = "0.1.1"
@@ -47,7 +47,7 @@ shrinkwraprs = "0.3.0"
 tempfile = "3.3"
 thiserror = "1.0.22"
 tokio = { version = "1.11", features = [ "macros", "rt-multi-thread", "io-util", "sync" ] }
-holochain_util = { version = "0.0.8-dev.0", path = "../holochain_util" }
+holochain_util = { version = "0.0.8", path = "../holochain_util" }
 tracing = "0.1.18"
 tracing-futures = "0.2"
 
