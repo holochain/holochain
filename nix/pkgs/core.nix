@@ -57,7 +57,7 @@ rec {
     cargo test ''${CARGO_TEST_ARGS:-} --lib --manifest-path=crates/test_utils/wasm/wasm_workspace/Cargo.toml --all-features -- --nocapture
   '';
 
-  hcReleaseAutomationTest = writeShellScriptBin "hc-release-automation-test" ''
+  hcReleaseAutomationTest = writeShellScriptBin "hc-test-release-automation" ''
     set -euxo pipefail
     export RUST_BACKTRACE=1
 
@@ -93,15 +93,16 @@ rec {
             --disallowed-version-reqs=">=0.1" \
             --allowed-matched-blockers=UnreleasableViaChangelogFrontmatter \
             --match-filter="^(holochain|holochain_cli|kitsune_p2p_proxy)$" \
-            --additional-manifests=''${TEST_WORKSPACE}/crates/release-automation/Cargo.toml \
             --steps=CreateReleaseBranch,BumpReleaseVersions
       '';
     in
-    writeShellScriptBin "hc-release-automation-test-repo" ''
+    writeShellScriptBin "hc-test-release-automation-repo" ''
       set -euxo pipefail
 
       export TEST_WORKSPACE=$(mktemp -d)
-      trap "rm -rf ''${TEST_WORKSPACE:?}" EXIT
+      if [[ "''${KEEP_TEST_WORKSPACE}" != "true" ]]; then
+        trap "rm -rf ''${TEST_WORKSPACE:?}" EXIT
+      fi
 
       # check the state of the repository
       (
@@ -143,7 +144,7 @@ rec {
     hc-test
   '';
 
-  hcReleaseTest = writeShellScriptBin "hc-release-test" ''
+  hcReleaseTest = writeShellScriptBin "hc-test-release" ''
     set -euxo pipefail
     export RUST_BACKTRACE=1
 
@@ -151,8 +152,8 @@ rec {
     export NUM_JOBS=8
     export CARGO_BUILD_JOBS=8
 
-    ${hcReleaseAutomationTest}/bin/hc-release-automation-test
-    ${hcReleaseAutomationTestRepo}/bin/hc-release-automation-test-repo
+    ${hcReleaseAutomationTest}/bin/hc-test-release-automation
+    ${hcReleaseAutomationTestRepo}/bin/hc-test-release-automation-repo
   '';
 
   hcSpeedTest = writeShellScriptBin "hc-speed-test" ''
