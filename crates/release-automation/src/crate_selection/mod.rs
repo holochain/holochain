@@ -1084,23 +1084,31 @@ impl<'a> ReleaseWorkspace<'a> {
     ) -> Fallible<()>
     where
         T: Iterator<Item = &'a str>,
+        T: Clone,
     {
         for args in [
             vec![
-                vec!["fetch", "--verbose"],
+                vec!["fetch", "--verbose", "--manifest-path", "Cargo.toml"],
                 [
                     vec!["update", "--workspace", "--offline", "--verbose"],
                     if dry_run { vec!["--dry-run"] } else { vec![] },
                 ]
                 .concat(),
             ],
-            if dry_run {
-                vec![]
-            } else {
-                additional_manifests
-                    .map(|mp| vec!["generate-lockfile", "--offline", "--manifest-path", mp])
-                    .collect::<Vec<_>>()
-            },
+            additional_manifests
+                .clone()
+                .map(|mp| {
+                    vec![
+                        vec!["fetch", "--verbose", "--manifest-path", mp],
+                        if dry_run {
+                            vec![]
+                        } else {
+                            vec!["generate-lockfile", "--offline", "--manifest-path", mp]
+                        },
+                    ]
+                })
+                .collect::<Vec<Vec<_>>>()
+                .concat(),
         ]
         .concat()
         {
