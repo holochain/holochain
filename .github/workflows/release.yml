@@ -207,7 +207,7 @@ jobs:
 
           cp -v $HOME/work/holochain/holochain/.git/config .git/config
 
-          git fetch --all --prune --prune-tags --force
+          git fetch --all --tags --prune --prune-tags --force
           git checkout --force -B ${HOLOCHAIN_SOURCE_BRANCH} remotes/origin/${HOLOCHAIN_SOURCE_BRANCH}
 
           # .gitignore might've changed
@@ -237,6 +237,7 @@ jobs:
           cd "${HOLOCHAIN_REPO}"
 
           nix-shell --argstr flavor release --pure --run '
+            set -e
             cargo sweep -s
 
             release-automation \
@@ -702,17 +703,17 @@ jobs:
           cd "${HOLOCHAIN_REPO}"
 
           gh pr create \
-            --title "Merge ${RELEASE_BRANCH} back into develop" \
+            --title "Merge ${RELEASE_BRANCH} back into ${HOLOCHAIN_SOURCE_BRANCH}" \
             --label release \
-            --base develop --head "${RELEASE_BRANCH}" \
-            --reviewer "holochain/core-dev" \
+            --base ${HOLOCHAIN_SOURCE_BRANCH} --head "${RELEASE_BRANCH}" \
             --body 'Please double-check the consistency of the CHANGELOG.md files' 2>&1 | tee gh-pr-create.log
+            # --reviewer "holochain/core-dev" \
 
           pull_request_number="$(tail -n1 gh-pr-create.log | grep -oE '[0-9]+$')"
           echo "::set-output name=pull-request-number::${pull_request_number}"
 
       - name: Enable Pull Request Automerge
-        if: ${{ needs.vars.outputs.dry_run == 'false' }}
+        # if: ${{ needs.vars.outputs.dry_run == 'false' }}
         uses: peter-evans/enable-pull-request-automerge@v1
         with:
           token: ${{ secrets.HRA_GITHUB_TOKEN}}
