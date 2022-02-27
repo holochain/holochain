@@ -53,28 +53,28 @@ jobs:
               name: Install Nix
               no_output_timeout: 30m
               command: |
-                # fix for "too many open files" that breaks tokio
-                ulimit -n 10240
-                # workaround a bug in the Nix installer
-                echo " #" >> /Users/distiller/.bash_profile
-                # catalina nixos install
-                sh <(curl -L https://releases.nixos.org/nix/nix-2.3.8/install) --darwin-use-unencrypted-nix-store-volume
+                 # fix for "too many open files" that breaks tokio
+                 ulimit -n 10240
+                 # workaround a bug in the Nix installer
+                 echo " #" >> /Users/distiller/.bash_profile
+                 # catalina nixos install
+                 sh <(curl -L https://releases.nixos.org/nix/nix-2.3.8/install) --darwin-use-unencrypted-nix-store-volume
          - run:
               name: Set up Nix cache
               command: |
-                $(nix-build . --fallback --no-link -A pkgs.ci.ciSetupNixConf)/bin/hc-ci-setup-nix-conf.sh
+                 $(nix-build . --fallback --no-link -A pkgs.ci.ciSetupNixConf)/bin/hc-ci-setup-nix-conf.sh
          - run:
               name: PR release tests
               no_output_timeout: 30m
               command: |
-                ./scripts/ci_merge-release-test.sh
+                 ./scripts/ci_merge-release-test.sh
 
    hc-static-checks:
       docker:
          - image: holochain/holochain:circle.build.develop
            auth:
-            username: $DOCKER_USER
-            password: $DOCKER_PASS
+              username: $DOCKER_USER
+              password: $DOCKER_PASS
       resource_class: xlarge
       environment:
          CACHIX_NAME: holochain-ci
