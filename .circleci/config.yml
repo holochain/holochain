@@ -35,7 +35,7 @@ jobs:
          - run:
               name: PR release tests
               no_output_timeout: 30m
-              command: ./scripts/ci_merge-release-test.sh
+              command: nix-shell --fallback --pure --argstr flavor "coreDev" --run hc-test-release-automation
    merge-release-test-mac:
       macos:
          xcode: "13.2.1"
@@ -66,8 +66,7 @@ jobs:
          - run:
               name: PR release tests
               no_output_timeout: 30m
-              command: |
-                 ./scripts/ci_merge-release-test.sh
+              command: nix-shell --fallback --pure --argstr flavor "coreDev" --run hc-test-release-automation
 
    hc-static-checks:
       docker:
