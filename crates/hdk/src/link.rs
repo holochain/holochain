@@ -55,15 +55,17 @@ use crate::prelude::*;
 /// If you have the hash of the identity entry you can get all the links, if you have the entry or
 /// header hash for any of the creates or updates you can lookup the identity entry hash out of the
 /// body of the create/update entry.
-pub fn create_link<T: Into<LinkTag>>(
+pub fn create_link<TY: Into<LinkType>, T: Into<LinkTag>>(
     base_address: EntryHash,
     target_address: EntryHash,
+    link_type: TY,
     tag: T,
 ) -> ExternResult<HeaderHash> {
     HDK.with(|h| {
         h.borrow().create_link(CreateLinkInput::new(
             base_address,
             target_address,
+            link_type.into(),
             tag.into(),
             ChainTopOrdering::default(),
         ))

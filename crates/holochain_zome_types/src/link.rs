@@ -3,6 +3,38 @@ use crate::ChainTopOrdering;
 use holo_hash::HeaderHash;
 use holochain_serialized_bytes::prelude::*;
 
+#[derive(
+    Debug,
+    Copy,
+    Clone,
+    Hash,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    serde::Serialize,
+    serde::Deserialize,
+    SerializedBytes,
+)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+pub struct LinkType(u8);
+
+impl LinkType {
+    pub fn new(u: u8) -> Self {
+        Self(u)
+    }
+
+    pub fn into_inner(self) -> u8 {
+        self.0
+    }
+}
+
+impl From<u8> for LinkType {
+    fn from(u: u8) -> Self {
+        Self(u)
+    }
+}
+
 /// Opaque tag for the link applied at the app layer, used to differentiate
 /// between different semantics and validation rules for different links
 #[derive(
@@ -80,6 +112,7 @@ pub struct Link {
 pub struct CreateLinkInput {
     pub base_address: holo_hash::EntryHash,
     pub target_address: holo_hash::EntryHash,
+    pub link_type: LinkType,
     pub tag: LinkTag,
     pub chain_top_ordering: ChainTopOrdering,
 }
@@ -88,12 +121,14 @@ impl CreateLinkInput {
     pub fn new(
         base_address: holo_hash::EntryHash,
         target_address: holo_hash::EntryHash,
+        link_type: LinkType,
         tag: LinkTag,
         chain_top_ordering: ChainTopOrdering,
     ) -> Self {
         Self {
             base_address,
             target_address,
+            link_type,
             tag,
             chain_top_ordering,
         }
