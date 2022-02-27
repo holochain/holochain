@@ -197,6 +197,14 @@ jobs:
          - build-docker:
               box: circle.build
 
+  all-jobs-succeed:
+    docker:
+      - image: bash
+    steps:
+      - run:
+          name: echo
+          command: echo
+
 workflows:
    version: 2.1
    tests:
@@ -208,6 +216,12 @@ workflows:
          - slow-test
          - wasm-test
          # - merge-test-mac
+         - all-jobs-succeed:
+              requires:
+                 - standard-test
+                 - hc-static-checks
+                 - slow-test
+                 - wasm-test
 
    docker-builds:
       triggers:
