@@ -13,7 +13,7 @@ use crate::core::ribosome::InvocationAuth;
 use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCallHostAccess;
 use crate::core::ribosome::ZomeCallInvocation;
-use hdk::prelude::EntryError;
+use hdk::prelude::*;
 use holo_hash::AgentPubKey;
 use holo_hash::AnyDhtHash;
 use holo_hash::EntryHash;
@@ -22,12 +22,10 @@ use holochain_keystore::MetaLairClient;
 use holochain_p2p::actor::GetLinksOptions;
 use holochain_p2p::actor::HolochainP2pRefToDna;
 use holochain_p2p::HolochainP2pDna;
-use holochain_serialized_bytes::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_types::prelude::*;
 use holochain_zome_types::AgentActivity;
 use std::sync::Arc;
-use tracing::*;
 use unwrap_to::unwrap_to;
 
 // Commit entry types //
@@ -269,7 +267,13 @@ impl HostFnCaller {
         link_tag: LinkTag,
     ) -> HeaderHash {
         let (ribosome, call_context, workspace_lock) = self.unpack().await;
-        let input = CreateLinkInput::new(base, target, link_tag, ChainTopOrdering::default());
+        let input = CreateLinkInput::new(
+            base,
+            target,
+            HdkLinkType::Default.into(),
+            link_tag,
+            ChainTopOrdering::default(),
+        );
         let output = { host_fn::create_link::create_link(ribosome, call_context, input).unwrap() };
 
         // Write

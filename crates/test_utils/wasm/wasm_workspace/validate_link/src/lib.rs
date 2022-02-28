@@ -52,6 +52,7 @@ fn add_valid_link_inner() -> ExternResult<HeaderHash> {
     create_link(
         always_linkable_entry_hash.clone(),
         always_linkable_entry_hash,
+        HdkLinkType::Default,
         (),
     )
 }
@@ -74,7 +75,7 @@ fn add_invalid_link_inner() -> ExternResult<HeaderHash> {
     create_entry(&MaybeLinkable::AlwaysLinkable)?;
     create_entry(&MaybeLinkable::NeverLinkable)?;
 
-    create_link(never_linkable_entry_hash, always_linkable_entry_hash, ())
+    create_link(never_linkable_entry_hash, always_linkable_entry_hash, HdkLinkType::Default, ())
 }
 
 #[hdk_extern]

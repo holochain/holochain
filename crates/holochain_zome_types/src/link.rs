@@ -17,7 +17,7 @@ use holochain_serialized_bytes::prelude::*;
     SerializedBytes,
 )]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-pub struct LinkType(u8);
+pub struct LinkType(pub u8);
 
 impl LinkType {
     pub fn new(u: u8) -> Self {
