@@ -16,6 +16,9 @@ async fn main() {
     config.periodic_agent_hook_interval_ms = Some(1000);
     config.periodic_agent_hook = Box::new(|input| {
         async move {
+            // The line below was added when migrating to rust edition 2021, per
+            // https://doc.rust-lang.org/edition-guide/rust-2021/disjoint-capture-in-closures.html#migration
+            let _ = &input;
             let AgentHookInput {
                 root,
                 app_entry_hash,

@@ -1,6 +1,8 @@
 use crate::header::ZomeId;
 use crate::zome::ZomeName;
+use crate::AppEntryType;
 use crate::CapGrant;
+use crate::EntryDefId;
 use crate::EntryDefs;
 use crate::FunctionName;
 use crate::Timestamp;
@@ -37,6 +39,15 @@ impl ZomeInfo {
             entry_defs,
             extern_fns,
         }
+    }
+
+    /// Check if an [`AppEntryType`] matches the [`EntryDefId`] provided for this zome.
+    pub fn matches_entry_def_id(&self, entry_type: &AppEntryType, id: EntryDefId) -> bool {
+        self.entry_defs
+            .0
+            .get(entry_type.id.index())
+            .map_or(false, |stored_id| stored_id.id == id)
+            && self.id == entry_type.zome_id
     }
 }
 

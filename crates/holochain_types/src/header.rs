@@ -12,6 +12,7 @@ use crate::prelude::*;
 use conversions::WrongHeaderError;
 use derive_more::From;
 use holo_hash::EntryHash;
+use holochain_zome_types::op::EntryCreationHeader;
 use holochain_zome_types::prelude::*;
 
 #[cfg(feature = "contrafact")]
@@ -125,6 +126,14 @@ impl NewEntryHeader {
         }
     }
 
+    /// Get the entry type on this header
+    pub fn entry_type(&self) -> &EntryType {
+        match self {
+            NewEntryHeader::Create(Create { entry_type, .. })
+            | NewEntryHeader::Update(Update { entry_type, .. }) => entry_type,
+        }
+    }
+
     /// Get the visibility of this header
     pub fn visibility(&self) -> &EntryVisibility {
         match self {
@@ -147,6 +156,15 @@ impl From<NewEntryHeader> for Header {
         match h {
             NewEntryHeader::Create(h) => Header::Create(h),
             NewEntryHeader::Update(h) => Header::Update(h),
+        }
+    }
+}
+
+impl From<NewEntryHeader> for EntryCreationHeader {
+    fn from(header: NewEntryHeader) -> Self {
+        match header {
+            NewEntryHeader::Create(create) => EntryCreationHeader::Create(create),
+            NewEntryHeader::Update(update) => EntryCreationHeader::Update(update),
         }
     }
 }

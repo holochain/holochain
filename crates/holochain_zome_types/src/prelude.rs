@@ -22,6 +22,7 @@ pub use crate::judged::*;
 pub use crate::link::*;
 pub use crate::metadata::*;
 pub use crate::migrate_agent::*;
+pub use crate::op::*;
 #[cfg(feature = "properties")]
 pub use crate::properties::*;
 pub use crate::query::ChainQueryFilter as QueryFilter;
@@ -33,7 +34,6 @@ pub use crate::signature::*;
 pub use crate::timestamp::*;
 pub use crate::trace::*;
 pub use crate::validate::*;
-pub use crate::validate_link::*;
 pub use crate::warrant::*;
 pub use crate::x_salsa20_poly1305::data::*;
 pub use crate::x_salsa20_poly1305::encrypted_data::*;

@@ -137,7 +137,7 @@ pub(crate) fn cmd(args: &crate::cli::Args, cmd_args: &CrateArgs) -> CommandResul
         ),
 
         CrateCommands::Check(subcmd_args) => {
-            ws.cargo_check(subcmd_args.offline)?;
+            ws.cargo_check(subcmd_args.offline, std::iter::empty::<&str>())?;
 
             Ok(())
         }
@@ -186,7 +186,7 @@ pub(crate) fn apply_dev_versions<'a>(
         if !dry_run {
             // this checks consistency and also updates the Cargo.lock file(s)
             if !no_verify {
-                ws.cargo_check(false)?;
+                ws.cargo_check(false, std::iter::empty::<&str>())?;
             }
 
             if commit {
@@ -348,7 +348,7 @@ pub(crate) fn fixup_releases<'a>(
         if !dry_run {
             // this checks consistency and also updates the Cargo.lock file(s)
             if !no_verify {
-                ws.cargo_check(false)?;
+                ws.cargo_check(false, std::iter::empty::<&str>())?;
             };
 
             if commit {

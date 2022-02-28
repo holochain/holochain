@@ -176,6 +176,7 @@ async fn test_pause_resume() {
 }
 
 #[tokio::test]
+#[ignore = "flaky due to dependence on timing"]
 async fn test_concurrency() {
     // - Trigger overrides already waiting listen.
     let (tx, mut rx) =
