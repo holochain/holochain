@@ -378,7 +378,7 @@ async fn call_workflow<'env>(env: DbWrite<DbKindDht>) {
     let (qt, _rx) = TriggerSender::new();
     let test_network = test_network(None, None).await;
     let holochain_p2p_cell = test_network.dna_network();
-    integrate_dht_ops_workflow(env.clone(), &env.clone().into(), qt, holochain_p2p_cell)
+    integrate_dht_ops_workflow(env.clone(), qt, holochain_p2p_cell)
         .await
         .unwrap();
 }

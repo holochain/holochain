@@ -113,7 +113,7 @@ impl HarnessAgentControlHandler for AgentHarness {
         &mut self,
         data: String,
     ) -> HarnessAgentControlHandlerResult<Arc<KitsuneOpHash>> {
-        let op_hash: Arc<KitsuneOpHash> = TestVal::test_val();
+        let op_hash: Arc<KitsuneOpHash> = hash_op_data(data.as_bytes());
         self.gossip_store.insert(op_hash.clone(), data);
         Ok(async move { Ok(op_hash) }.boxed().into())
     }
@@ -253,10 +253,12 @@ impl KitsuneP2pEventHandler for AgentHarness {
     fn handle_gossip(
         &mut self,
         _space: Arc<super::KitsuneSpace>,
-        ops: Vec<(Arc<super::KitsuneOpHash>, Vec<u8>)>,
+        ops: Vec<KOp>,
     ) -> KitsuneP2pEventHandlerResult<()> {
-        for (op_hash, op_data) in ops {
-            let op_data = String::from_utf8_lossy(&op_data).to_string();
+        for op_data in ops {
+            // TODO: check that we're handling string data uniformly in both directions
+            let op_data = String::from_utf8_lossy(&op_data.0).to_string();
+            let op_hash = hash_op_data(op_data.as_bytes());
             self.harness_chan.publish(HarnessEventType::Gossip {
                 op_hash: (&op_hash).into(),
                 op_data: op_data.clone(),
@@ -284,11 +286,12 @@ impl KitsuneP2pEventHandler for AgentHarness {
     fn handle_fetch_op_data(
         &mut self,
         input: FetchOpDataEvt,
-    ) -> KitsuneP2pEventHandlerResult<Vec<(Arc<super::KitsuneOpHash>, Vec<u8>)>> {
+    ) -> KitsuneP2pEventHandlerResult<Vec<(Arc<super::KitsuneOpHash>, KOp)>> {
         let mut out = Vec::new();
         for hash in input.op_hashes {
             if let Some(op) = self.gossip_store.get(&hash) {
-                out.push((hash.clone(), op.clone().into_bytes()));
+                let data = KitsuneOpData::new(op.clone().into_bytes());
+                out.push((hash.clone(), data));
             }
         }
         Ok(async move { Ok(out) }.boxed().into())

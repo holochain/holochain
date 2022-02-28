@@ -851,7 +851,7 @@ fn build_ops_from_headers(
         // &HeaderHash, &Header, EntryHash are needed to produce the ops.
         let entry_hash = shh.header().entry_hash().cloned();
         let item = (shh.as_hash(), shh.header(), entry_hash);
-        let ops_inner = produce_op_lights_from_iter(vec![item].into_iter(), 1)?;
+        let ops_inner = produce_op_lights_from_iter(vec![item].into_iter())?;
 
         // Break apart the SignedHeaderHashed.
         let (header, sig) = shh.into_header_and_signature();

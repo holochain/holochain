@@ -37,7 +37,7 @@ pub enum WireMessage {
         request_validation_receipt: bool,
         countersigning_session: bool,
         dht_hash: holo_hash::AnyDhtHash,
-        ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
+        ops: Vec<holochain_types::dht_op::DhtOp>,
     },
     ValidationReceipt {
         #[serde(with = "serde_bytes")]
@@ -98,7 +98,7 @@ impl WireMessage {
         request_validation_receipt: bool,
         countersigning_session: bool,
         dht_hash: holo_hash::AnyDhtHash,
-        ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
+        ops: Vec<holochain_types::dht_op::DhtOp>,
     ) -> WireMessage {
         Self::Publish {
             request_validation_receipt,

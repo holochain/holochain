@@ -49,7 +49,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_put() {
-        let store = Store::new();
+        let store = Store::new(vec![]);
         let filter = put(store.clone());
 
         let info = AgentInfoSigned::sign(
