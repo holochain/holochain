@@ -180,7 +180,7 @@ mod tests {
 
     use crate::HolochainP2pSender;
     use holochain_zome_types::ValidationStatus;
-    use kitsune_p2p::dependencies::kitsune_p2p_proxy::TlsConfig;
+    use kitsune_p2p::dependencies::kitsune_p2p_types::tls::TlsConfig;
     use kitsune_p2p::KitsuneP2pConfig;
 
     macro_rules! newhash {
