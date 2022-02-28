@@ -159,23 +159,23 @@ async fn app_validation_workflow_inner(
                         Outcome::Accepted => {
                             total += 1;
                             if let Dependency::Null = dependency {
-                                put_integrated(txn, op_hash, ValidationStatus::Valid)?;
+                                put_integrated(txn, &op_hash, ValidationStatus::Valid)?;
                             } else {
-                                put_integration_limbo(txn, op_hash, ValidationStatus::Valid)?;
+                                put_integration_limbo(txn, &op_hash, ValidationStatus::Valid)?;
                             }
                         }
                         Outcome::AwaitingDeps(deps) => {
                             awaiting += 1;
                             let status = ValidationLimboStatus::AwaitingAppDeps(deps);
-                            put_validation_limbo(txn, op_hash, status)?;
+                            put_validation_limbo(txn, &op_hash, status)?;
                         }
                         Outcome::Rejected(_) => {
                             rejected += 1;
                             tracing::warn!("Received invalid op! Warrants aren't implemented yet, so we can't do anything about this right now, but be warned that somebody on the network has maliciously hacked their node.\nOp: {:?}", op_light);
                             if let Dependency::Null = dependency {
-                                put_integrated(txn, op_hash, ValidationStatus::Rejected)?;
+                                put_integrated(txn, &op_hash, ValidationStatus::Rejected)?;
                             } else {
-                                put_integration_limbo(txn, op_hash, ValidationStatus::Rejected)?;
+                                put_integration_limbo(txn, &op_hash, ValidationStatus::Rejected)?;
                             }
                         }
                     }
@@ -550,7 +550,7 @@ impl AppValidationWorkspace {
 
 pub fn put_validation_limbo(
     txn: &mut Transaction<'_>,
-    hash: DhtOpHash,
+    hash: &DhtOpHash,
     status: ValidationLimboStatus,
 ) -> WorkflowResult<()> {
     set_validation_stage(txn, hash, status)?;
@@ -559,23 +559,23 @@ pub fn put_validation_limbo(
 
 pub fn put_integration_limbo(
     txn: &mut Transaction<'_>,
-    hash: DhtOpHash,
+    hash: &DhtOpHash,
     status: ValidationStatus,
 ) -> WorkflowResult<()> {
-    set_validation_status(txn, hash.clone(), status)?;
+    set_validation_status(txn, hash, status)?;
     set_validation_stage(txn, hash, ValidationLimboStatus::AwaitingIntegration)?;
     Ok(())
 }
 
 pub fn put_integrated(
     txn: &mut Transaction<'_>,
-    hash: DhtOpHash,
+    hash: &DhtOpHash,
     status: ValidationStatus,
 ) -> WorkflowResult<()> {
-    set_validation_status(txn, hash.clone(), status)?;
+    set_validation_status(txn, hash, status)?;
     // This set the validation stage to pending which is correct when
     // it's integrated.
-    set_validation_stage(txn, hash.clone(), ValidationLimboStatus::Pending)?;
+    set_validation_stage(txn, hash, ValidationLimboStatus::Pending)?;
     set_when_integrated(txn, hash, Timestamp::now())?;
     Ok(())
 }

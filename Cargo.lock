@@ -2197,6 +2197,7 @@ name = "holochain_state"
 version = "0.0.27"
 dependencies = [
  "anyhow",
+ "arbitrary",
  "async-recursion",
  "base64",
  "byteorder",

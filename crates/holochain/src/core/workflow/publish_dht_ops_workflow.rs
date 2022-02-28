@@ -62,7 +62,7 @@ pub async fn publish_dht_ops_workflow(
     let continue_publish = env
         .async_commit(move |writer| {
             for hash in success {
-                mutations::set_last_publish_time(writer, hash, now)?;
+                mutations::set_last_publish_time(writer, &hash, now)?;
             }
             WorkflowResult::Ok(publish_query::num_still_needing_publish(writer)? > 0)
         })
@@ -159,7 +159,7 @@ mod tests {
                     let op = DhtOp::RegisterAddLink(sig.clone(), link_add.clone());
                     // Get the hash from the op
                     let op_hashed = DhtOpHashed::from_content_sync(op.clone());
-                    mutations::insert_op(txn, op_hashed)?;
+                    mutations::insert_op(txn, &op_hashed)?;
                 }
                 StateMutationResult::Ok(())
             })

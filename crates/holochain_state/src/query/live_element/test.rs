@@ -28,7 +28,7 @@ async fn can_handle_update_in_scratch() {
     );
 
     // - Create an entry on main db.
-    insert_valid_integrated_op(&mut txn, td.update_store_element_op.clone()).unwrap();
+    insert_valid_integrated_op(&mut txn, &td.update_store_element_op).unwrap();
     let r = query
         .run(Txn::from(&txn))
         .unwrap()
