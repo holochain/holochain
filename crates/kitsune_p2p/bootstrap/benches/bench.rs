@@ -32,7 +32,7 @@ fn bootstrap(bench: &mut Criterion) {
 
     let mut url = url2!("http://127.0.0.1:0");
     let (driver, addr) = runtime.block_on(async {
-        kitsune_p2p_bootstrap::run(([127, 0, 0, 1], 0))
+        kitsune_p2p_bootstrap::run(([127, 0, 0, 1], 0), vec![])
             .await
             .unwrap()
     });

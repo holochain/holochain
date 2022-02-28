@@ -5,8 +5,6 @@ use super::*;
 pub(super) enum Outcome {
     /// Moves to app validation
     Accepted,
-    /// Moves straight to integration
-    SkipAppValidation,
     /// Stays in limbo because another DhtOp
     /// dependency needs to be validated first
     AwaitingOpDep(AnyDhtHash),

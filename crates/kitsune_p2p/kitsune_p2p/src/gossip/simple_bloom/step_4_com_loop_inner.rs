@@ -170,9 +170,9 @@ pub(crate) async fn step_4_com_loop_inner_incoming(
                 let mut to_send_ops = Vec::new();
                 let mut to_send_peer_data = Vec::new();
                 for chunk in &chunks {
-                    match &**chunk {
-                        MetaOpData::Op(key, data) => {
-                            to_send_ops.push((key.clone(), data.clone()));
+                    match chunk {
+                        MetaOpData::Op(_, data) => {
+                            to_send_ops.push(data.clone());
                         }
                         MetaOpData::Agent(agent_info_signed) => {
                             // TODO - we actually only need to do this
@@ -349,7 +349,7 @@ fn pick_url_for_cert(inner: &Share<SimpleBloomModInner>, cert: &Tx2Cert) -> Kits
         let mut most_recent = 0;
         let mut out_url = None;
         for data in i.local_data_map.values() {
-            if let MetaOpData::Agent(agent_info_signed) = &**data {
+            if let MetaOpData::Agent(agent_info_signed) = data {
                 if let Some(url) = agent_info_signed.url_list.get(0) {
                     if let Ok(purl) = kitsune_p2p_proxy::ProxyUrl::from_full(url.as_str()) {
                         if &Tx2Cert::from(purl.digest()) != cert {
@@ -383,8 +383,8 @@ fn pick_url_for_cert(inner: &Share<SimpleBloomModInner>, cert: &Tx2Cert) -> Kits
 
 async fn data_map_get(
     bloom: &SimpleBloomMod,
-    key: &Arc<MetaOpKey>,
-) -> KitsuneResult<Option<Arc<MetaOpData>>> {
+    key: &MetaOpKey,
+) -> KitsuneResult<Option<MetaOpData>> {
     use crate::event::*;
 
     // first, see if we already have the data
@@ -402,7 +402,7 @@ async fn data_map_get(
         return Ok(maybe_data);
     }
 
-    let op_key = match &**key {
+    let op_key = match key {
         MetaOpKey::Op(key) => key.clone(),
         // we should already have all this data...
         MetaOpKey::Agent(_, _) => unreachable!(),
@@ -426,8 +426,8 @@ async fn data_map_get(
     }
 
     let (fetched_key, data) = op.remove(0);
-    let data = Arc::new(MetaOpData::Op(fetched_key.clone(), data));
-    let fetched_key = Arc::new(MetaOpKey::Op(fetched_key));
+    let data = MetaOpData::Op(fetched_key.clone(), data);
+    let fetched_key = MetaOpKey::Op(fetched_key);
     assert_eq!(key, &fetched_key);
 
     // store it before returning it

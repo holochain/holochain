@@ -1,3 +1,4 @@
+use crate::types::actor::KitsuneP2pResult;
 use crate::types::agent_store::AgentInfoSigned;
 use kitsune_p2p_types::bootstrap::RandomQuery;
 use once_cell::sync::Lazy;
@@ -24,6 +25,8 @@ const OP_PUT: &str = "put";
 const OP_NOW: &str = "now";
 /// The header op to tell the service to return a random set of agents in a specific space.
 const OP_RANDOM: &str = "random";
+/// The header op to fetch the proxy_list from the bootstrap service
+const OP_PROXY_LIST: &str = "proxy_list";
 
 /// Standard interface to the remote bootstrap service.
 ///
@@ -159,6 +162,19 @@ pub async fn random(
         .map(|bytes| kitsune_p2p_types::codec::rmp_decode(&mut AsRef::<[u8]>::as_ref(&bytes)))
         .collect();
     Ok(ret?)
+}
+
+/// `do_api` wrapper around the `proxy_list` op.
+///
+/// Fetches the list of proxy servers currently stored in the bootstrap service.
+#[allow(dead_code)]
+pub async fn proxy_list(url: Url2) -> KitsuneP2pResult<Vec<Url2>> {
+    Ok(do_api::<_, Vec<String>>(Some(url), OP_PROXY_LIST, ())
+        .await?
+        .unwrap_or_else(Vec::new)
+        .into_iter()
+        .map(Url2::parse)
+        .collect())
 }
 
 #[cfg(test)]

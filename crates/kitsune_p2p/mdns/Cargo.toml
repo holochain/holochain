@@ -8,7 +8,7 @@ documentation = "https://docs.rs/kitsune_p2p_mdns"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 keywords = [ "holochain", "holo", "p2p", "mdns", "networking" ]
 categories = [ "network-programming" ]
-edition = "2018"
+edition = "2021"
 
 [[example]]
 name = "broadcast"

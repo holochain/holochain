@@ -3,7 +3,29 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
-- Init functions can now make zome calls. [#1186](https://github.com/holochain/holochain/pull/1186)
+- Proxy server chosen from bootstrap server proxy_list [1242](https://github.com/holochain/holochain/pull/1242)
+
+```yaml
+network:
+  transport_pool:
+    - type: proxy
+      proxy_config:
+        type: remote_proxy_client_from_bootstrap
+        bootstrap_url: https://bootstrap.holo.host
+        fallback_proxy_url: ~
+```
+
+## 0.0.127
+
+- **BREAKING CHANGE** App validation callbacks are now run per `Op`. There is now only a single validation callback `fn validate(op: Op) -> ExternResult<ValidateCallbackResult>` that is called for each `Op`. See the documentation for `Op` for more details on what data is passed to the callback. There are example use cases in `crates/test_utils/wasm/wasm_workspace/`. For example in the `validate` test wasm. To update an existing app, you to this version all `validate_*` callbacks including `validate_create_link` must be changed to the new `validate(..)` callback. [\#1212](https://github.com/holochain/holochain/pull/1212).
+
+- `RegisterAgentActivity` ops are now validated by app validation.
+
+- Init functions can now make zome calls. [\#1186](https://github.com/holochain/holochain/pull/1186)
+
+- Adds header hashing to `hash` host fn [1227](https://github.com/holochain/holochain/pull/1227)
+
+- Adds blake2b hashing to `hash` host fn [1228](https://github.com/holochain/holochain/pull/1228)
 
 ## 0.0.126
 
