@@ -1,3 +1,4 @@
+//! A sync RwLock that uses closures to avoid deadlocks.
 use std::sync::Arc;
 
 /// A clonable thread safe read write lock designed to make it hard to create dead locks
@@ -7,6 +8,15 @@ pub struct RwShare<T>(Arc<parking_lot::RwLock<T>>);
 impl<T> Clone for RwShare<T> {
     fn clone(&self) -> Self {
         Self(self.0.clone())
+    }
+}
+
+impl<T> Default for RwShare<T>
+where
+    T: Default,
+{
+    fn default() -> Self {
+        Self(Default::default())
     }
 }
 

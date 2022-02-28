@@ -36,6 +36,7 @@ mr_bundle = { path = "../mr_bundle", features = ["packing"], version = "0.0.7"}
 must_future = "0.1.1"
 nanoid = "0.3"
 observability = "0.1.3"
+parking_lot = "0.10"
 rand = "0.7"
 regex = "1.4"
 rusqlite = { version = "0.26" }
