@@ -584,11 +584,8 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         trace!(dispatch_event = ?event);
         match event {
             holochain_p2p::event::HolochainP2pEvent::KGenReq { arg, respond, .. } => match arg {
-                KGenReq::PeerExtrapCov {
-                    space: _,
-                    dht_arc_set,
-                } => {
-                    let env = { self.p2p_env(&dna_hash) };
+                KGenReq::PeerExtrapCov { space, dht_arc_set } => {
+                    let env = { self.p2p_env(&DnaHash::from_kitsune(&space)) };
                     respond.respond(Ok(async move {
                         use holochain_sqlite::db::AsP2pAgentStoreConExt;
                         let permit = env.conn_permit().await;
@@ -605,8 +602,8 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                     .boxed()
                     .into()));
                 }
-                KGenReq::RecordMetrics { space: _, records } => {
-                    let env = { self.p2p_metrics_env(&dna_hash) };
+                KGenReq::RecordMetrics { space, records } => {
+                    let env = { self.p2p_metrics_env(&DnaHash::from_kitsune(&space)) };
                     respond.respond(Ok(async move {
                         use holochain_sqlite::db::AsP2pMetricStoreConExt;
                         let permit = env.conn_permit().await;
