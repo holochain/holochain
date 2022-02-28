@@ -157,12 +157,25 @@ fn limbo_is_empty(txn: &Transaction) -> bool {
 }
 
 fn show_limbo(txn: &Transaction) -> Vec<DhtOpLight> {
-    txn.prepare("SELECT blob FROM DhtOp WHERE when_integrated IS NULL")
-        .unwrap()
-        .query_and_then([], |row| from_blob(row.get("blob")?))
-        .unwrap()
-        .collect::<StateQueryResult<Vec<DhtOpLight>>>()
-        .unwrap()
+    txn.prepare(
+        "
+        SELECT DhtOp.type, Header.hash, Header.blob
+        FROM DhtOp 
+        JOIN Header ON DhtOp.header_hash = Header.hash
+        WHERE
+        when_integrated IS NULL
+    ",
+    )
+    .unwrap()
+    .query_and_then([], |row| {
+        let op_type: DhtOpType = row.get("type")?;
+        let hash: HeaderHash = row.get("hash")?;
+        let header: SignedHeader = from_blob(row.get("blob")?)?;
+        Ok(DhtOpLight::from_type(op_type, hash, &header.0)?)
+    })
+    .unwrap()
+    .collect::<StateQueryResult<Vec<DhtOpLight>>>()
+    .unwrap()
 }
 
 fn num_valid(txn: &Transaction) -> usize {

@@ -193,7 +193,6 @@ pub fn insert_op_lite(
         "basis_hash": basis,
         "header_hash": header_hash,
         "require_receipt": 0,
-        "blob": to_blob(op_lite)?,
         "op_order": order,
     })?;
     Ok(())
