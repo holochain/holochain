@@ -48,6 +48,7 @@ contrafact = { version = "0.1.0-dev.1", optional = true }
 
 [dev-dependencies]
 anyhow = "1.0.26"
+arbitrary = "1.0"
 fixt = { version = "0.0.8", path = "../fixt" }
 hdk = { version = "0.0.123", path = "../hdk" }
 holochain_wasm_test_utils = { path = "../test_utils/wasm", version = "0.0.27"}

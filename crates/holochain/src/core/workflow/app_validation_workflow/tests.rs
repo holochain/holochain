@@ -25,7 +25,7 @@ use std::time::Duration;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn app_validation_workflow_test() {
-    observability::test_run_open().ok();
+    observability::test_run().ok();
 
     let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![
         TestWasm::Validate,

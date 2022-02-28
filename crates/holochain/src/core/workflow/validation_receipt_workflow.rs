@@ -129,7 +129,7 @@ pub async fn validation_receipt_workflow(
         // Attempted to send the receipt so we now mark
         // it to not send in the future.
         vault
-            .async_commit(|txn| set_require_receipt(txn, op_hash, false))
+            .async_commit(move |txn| set_require_receipt(txn, &op_hash, false))
             .await?;
     }
 

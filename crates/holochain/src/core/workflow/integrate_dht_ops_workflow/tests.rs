@@ -345,23 +345,22 @@ impl Db {
                         Db::Integrated(op) => {
                             let op = DhtOpHashed::from_content_sync(op.clone());
                             let hash = op.as_hash().clone();
-                            mutations::insert_op(txn, op).unwrap();
-                            mutations::set_when_integrated(txn, hash.clone(), Timestamp::now())
-                                .unwrap();
-                            mutations::set_validation_status(txn, hash, ValidationStatus::Valid)
+                            mutations::insert_op(txn, &op).unwrap();
+                            mutations::set_when_integrated(txn, &hash, Timestamp::now()).unwrap();
+                            mutations::set_validation_status(txn, &hash, ValidationStatus::Valid)
                                 .unwrap();
                         }
                         Db::IntQueue(op) => {
                             let op = DhtOpHashed::from_content_sync(op.clone());
                             let hash = op.as_hash().clone();
-                            mutations::insert_op(txn, op).unwrap();
+                            mutations::insert_op(txn, &op).unwrap();
                             mutations::set_validation_stage(
                                 txn,
-                                hash.clone(),
+                                &hash,
                                 ValidationLimboStatus::AwaitingIntegration,
                             )
                             .unwrap();
-                            mutations::set_validation_status(txn, hash, ValidationStatus::Valid)
+                            mutations::set_validation_status(txn, &hash, ValidationStatus::Valid)
                                 .unwrap();
                         }
                         _ => {

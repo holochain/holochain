@@ -84,7 +84,7 @@ fn create_corrupt_db<Kind: DbKindT>(kind: Kind, u: &mut arbitrary::Unstructured)
     let mut txn = conn
         .transaction_with_behavior(holochain_sqlite::rusqlite::TransactionBehavior::Exclusive)
         .unwrap();
-    mutations_helpers::insert_valid_integrated_op(&mut txn, op).unwrap();
+    mutations_helpers::insert_valid_integrated_op(&mut txn, &op).unwrap();
     txn.commit().unwrap();
     conn.close().unwrap();
     corrupt_db(path.as_ref());
