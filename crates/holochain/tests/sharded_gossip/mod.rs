@@ -273,7 +273,7 @@ async fn mock_network_sharded_gossip() {
                                 let arc = data.agent_to_arc[&agent];
                                 if ops
                                     .into_iter()
-                                    .any(|(_, op)| !arc.contains(op.dht_basis().get_loc()))
+                                    .any(|op| !arc.contains(op.dht_basis().get_loc()))
                                 {
                                     bad_publish.take().unwrap().send(()).unwrap();
                                 }
@@ -444,15 +444,9 @@ async fn mock_network_sharded_gossip() {
 
                                         let missing_ops: Vec<_> = missing_hashes
                                             .into_iter()
-                                            .map(|h| {
-                                                (
-                                                    h.clone(),
-                                                    data.ops[&data.op_kit_to_hash[h]].clone(),
-                                                )
-                                            })
-                                            .map(|(hash, op)| {
-                                                (
-                                                    hash,
+                                            .map(|h| data.ops[&data.op_kit_to_hash[h]].clone())
+                                            .map(|op| {
+                                                kitsune_p2p::KitsuneOpData::new(
                                                     holochain_p2p::WireDhtOpData {
                                                         op_data: op.into_content(),
                                                     }
@@ -970,15 +964,9 @@ async fn mock_network_sharding() {
 
                                         let missing_ops: Vec<_> = missing_hashes
                                             .into_iter()
-                                            .map(|h| {
-                                                (
-                                                    h.clone(),
-                                                    data.ops[&data.op_kit_to_hash[h]].clone(),
-                                                )
-                                            })
-                                            .map(|(hash, op)| {
-                                                (
-                                                    hash,
+                                            .map(|h| data.ops[&data.op_kit_to_hash[h]].clone())
+                                            .map(|op| {
+                                                kitsune_p2p::KitsuneOpData::new(
                                                     holochain_p2p::WireDhtOpData {
                                                         op_data: op.into_content(),
                                                     }
@@ -1129,7 +1117,7 @@ async fn mock_network_sharding() {
 #[cfg(feature = "test_utils")]
 async fn run_bootstrap(peer_data: impl Iterator<Item = AgentInfoSigned>) -> Url2 {
     let mut url = url2::url2!("http://127.0.0.1:0");
-    let (driver, addr) = kitsune_p2p_bootstrap::run(([127, 0, 0, 1], 0))
+    let (driver, addr) = kitsune_p2p_bootstrap::run(([127, 0, 0, 1], 0), vec![])
         .await
         .unwrap();
     tokio::spawn(driver);

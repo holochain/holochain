@@ -55,6 +55,16 @@ pub async fn spawn_handler<H: KitsuneP2pEventHandler + ghost_actor::GhostControl
     (tx, tokio::task::spawn(driver))
 }
 
+pub fn hash_op_data(data: &[u8]) -> Arc<KitsuneOpHash> {
+    Arc::new(KitsuneOpHash::new(
+        blake2b_simd::Params::new()
+            .hash_length(32)
+            .hash(data)
+            .as_bytes()
+            .to_vec(),
+    ))
+}
+
 mod switchboard;
 pub use switchboard::*;
 

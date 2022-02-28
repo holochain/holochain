@@ -185,6 +185,9 @@ impl InnerListen {
 impl ghost_actor::GhostControlHandler for InnerListen {
     fn handle_ghost_actor_shutdown(mut self) -> MustBoxFuture<'static, ()> {
         async move {
+            // The line below was added when migrating to rust edition 2021, per
+            // https://doc.rust-lang.org/edition-guide/rust-2021/disjoint-capture-in-closures.html#migration
+            let _ = &self;
             let _ = self.sub_sender.ghost_actor_shutdown().await;
             self.evt_send.close_channel();
             tracing::warn!("proxy listener actor SHUTDOWN");

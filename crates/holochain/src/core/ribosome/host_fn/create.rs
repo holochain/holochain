@@ -157,6 +157,7 @@ pub fn extract_entry_def(
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
     use super::create;
+    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use crate::fixt::*;
     use crate::sweettest::*;
     use ::fixt::prelude::*;
@@ -168,7 +169,6 @@ pub mod wasm_test {
     use holochain_wasm_test_utils::TestWasm;
     use observability;
     use std::sync::Arc;
-    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
 
     #[tokio::test(flavor = "multi_thread")]
     /// we can get an entry hash out of the fn directly
@@ -190,6 +190,9 @@ pub mod wasm_test {
 
         // the chain head should be the committed entry header
         let chain_head = tokio_helper::block_forever_on(async move {
+            // The line below was added when migrating to rust edition 2021, per
+            // https://doc.rust-lang.org/edition-guide/rust-2021/disjoint-capture-in-closures.html#migration
+            let _ = &host_access_2;
             SourceChainResult::Ok(
                 host_access_2
                     .workspace
@@ -209,9 +212,7 @@ pub mod wasm_test {
     async fn ribosome_create_entry_test() {
         observability::test_run().ok();
         let RibosomeTestFixture {
-            conductor,
-            alice,
-            ..
+            conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::Create).await;
 
         // get the result of a commit entry

@@ -90,6 +90,7 @@ mod tests {
     use super::*;
 
     #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "flaky due to dependence on sensitive timing"]
     async fn test_reverse_semaphore() {
         let rs = ReverseSemaphore::new();
 

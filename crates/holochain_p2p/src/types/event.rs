@@ -148,7 +148,7 @@ ghost_actor::ghost_chan! {
             dna_hash: DnaHash,
             request_validation_receipt: bool,
             countersigning_session: bool,
-            ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
+            ops: Vec<holochain_types::dht_op::DhtOp>,
         ) -> ();
 
         /// A remote node is requesting a validation package.

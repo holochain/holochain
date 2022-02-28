@@ -17,6 +17,8 @@ pub enum AppValidationError {
     #[error("Dna is missing {0:?}. Cannot validate without dna.")]
     DnaMissing(DnaHash),
     #[error(transparent)]
+    DhtOpError(#[from] DhtOpError),
+    #[error(transparent)]
     EntryDefStoreError(#[from] EntryDefStoreError),
     #[error(transparent)]
     HolochainP2pError(#[from] HolochainP2pError),
@@ -46,3 +48,4 @@ from_sub_error!(AppValidationError, RibosomeError);
 from_sub_error!(AppValidationError, CascadeError);
 from_sub_error!(AppValidationError, EntryDefStoreError);
 from_sub_error!(AppValidationError, SourceChainError);
+from_sub_error!(AppValidationError, DhtOpError);

@@ -28,7 +28,10 @@ async fn gen_node(maybe_proxy: Option<ProxyUrl>) -> Tx2EpHnd<Wire> {
     let f = tx2_pool_promote(f, Default::default());
     let mut conf = ProxyConfig::default();
     conf.allow_proxy_fwd = true;
-    conf.client_of_remote_proxy = maybe_proxy;
+    conf.client_of_remote_proxy = match maybe_proxy {
+        None => ProxyRemoteType::NoProxy,
+        Some(proxy_url) => ProxyRemoteType::Specific(proxy_url.as_str().into()),
+    };
     let f = tx2_proxy(f, conf).unwrap();
     let f = tx2_api::<Wire>(f, Default::default());
 

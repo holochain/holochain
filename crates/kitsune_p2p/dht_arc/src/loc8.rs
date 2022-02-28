@@ -34,6 +34,12 @@ impl From<i32> for Loc8 {
     }
 }
 
+impl From<i8> for Loc8 {
+    fn from(i: i8) -> Self {
+        (i as i32).into()
+    }
+}
+
 impl PartialEq for Loc8 {
     fn eq(&self, other: &Self) -> bool {
         self.val == other.val

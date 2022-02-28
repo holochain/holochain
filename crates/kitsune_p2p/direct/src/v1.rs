@@ -5,6 +5,7 @@ use crate::*;
 use futures::future::{BoxFuture, FutureExt};
 use futures::stream::StreamExt;
 use ghost_actor::GhostControlSender;
+use kitsune_p2p::test_util::hash_op_data;
 //use ghost_actor::dependencies::tracing;
 use crate::types::direct::*;
 use kitsune_p2p::actor::{BroadcastTo, KitsuneP2pSender};
@@ -44,7 +45,7 @@ pub type CloseCb = Box<dyn FnOnce(u32, &str) -> BoxFuture<'static, ()> + 'static
 pub async fn new_quick_bootstrap_v1(
     _tuning_params: KitsuneP2pTuningParams,
 ) -> KdResult<(TxUrl, KitsuneDirectDriver, CloseCb)> {
-    let (driver, addr) = kitsune_p2p_bootstrap::run(([0, 0, 0, 0], 0))
+    let (driver, addr) = kitsune_p2p_bootstrap::run(([0, 0, 0, 0], 0), vec![])
         .await
         .map_err(KdError::other)?;
 
@@ -824,11 +825,7 @@ async fn handle_call(
     Ok(b"success".to_vec())
 }
 
-async fn handle_gossip(
-    kdirect: Arc<Kd1>,
-    space: Arc<KitsuneSpace>,
-    ops: Vec<(Arc<KitsuneOpHash>, Vec<u8>)>,
-) -> KdResult<()> {
+async fn handle_gossip(kdirect: Arc<Kd1>, space: Arc<KitsuneSpace>, ops: Vec<KOp>) -> KdResult<()> {
     let root = KdHash::from_kitsune_space(&space);
     let agent_info_list = kdirect
         .persist
@@ -837,8 +834,9 @@ async fn handle_gossip(
         .map_err(KdError::other)?;
     for info in agent_info_list {
         let to_agent = info.agent();
-        for (op_hash, op_data) in ops.clone() {
-            let entry = KdEntrySigned::from_wire(op_data.into_boxed_slice())
+        for op_data in ops.clone() {
+            let op_hash = hash_op_data(&op_data.0);
+            let entry = KdEntrySigned::from_wire(op_data.0.clone().into_boxed_slice())
                 .await
                 .map_err(KdError::other)?;
             let op_hash = KdHash::from_kitsune_op_hash(&op_hash);
@@ -906,7 +904,7 @@ async fn handle_query_op_hashes(
 async fn handle_fetch_op_data(
     kdirect: Arc<Kd1>,
     input: FetchOpDataEvt,
-) -> KdResult<Vec<(Arc<KitsuneOpHash>, Vec<u8>)>> {
+) -> KdResult<Vec<(Arc<KitsuneOpHash>, KOp)>> {
     let FetchOpDataEvt {
         space, op_hashes, ..
     } = input;
@@ -929,7 +927,10 @@ async fn handle_fetch_op_data(
                 .get_entry(root.clone(), agent.clone(), hash)
                 .await
             {
-                out.push((op_hash.clone(), entry.as_wire_data_ref().to_vec()));
+                out.push((
+                    op_hash.clone(),
+                    KitsuneOpData::new(entry.as_wire_data_ref().to_vec()),
+                ));
             }
         }
     }

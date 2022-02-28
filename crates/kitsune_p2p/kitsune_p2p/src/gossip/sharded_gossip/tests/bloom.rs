@@ -253,7 +253,7 @@ fn get_time_bounds(
         .map(|i| (window.start + step * i as u32).unwrap())
         .collect::<Vec<_>>();
 
-    let mut iter = times[elements].into_iter();
+    let mut iter = times[elements].iter();
     let start = iter.next().unwrap();
     let mut end = *iter.last().unwrap_or(start);
     end = (end + Duration::from_micros(1)).unwrap();

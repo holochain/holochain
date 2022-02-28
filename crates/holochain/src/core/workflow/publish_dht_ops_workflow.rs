@@ -45,7 +45,7 @@ pub async fn publish_dht_ops_workflow(
     tracing::info!("sending to {} basis locations", to_publish.len());
     let mut success = Vec::new();
     for (basis, ops) in to_publish {
-        let hashes: Vec<_> = ops.iter().map(|(h, _)| h.clone()).collect();
+        let (hashes, ops): (Vec<_>, Vec<_>) = ops.into_iter().unzip();
         if let Err(e) = network.publish(true, false, basis, ops, None).await {
             // If we get a routing error it means the space hasn't started yet and we should try publishing again.
             if let holochain_p2p::HolochainP2pError::RoutingDnaError(_) = e {
@@ -549,7 +549,8 @@ mod tests {
                                     tracing::debug!(?ops);
 
                                     // Check the ops are correct
-                                    for (op_hash, op) in ops {
+                                    for op in ops {
+                                        let op_hash = DhtOpHash::with_data_sync(&op);
                                         match expected.get(&op_hash) {
                                             Some((expected_op, count)) => {
                                                 assert_eq!(&op, expected_op);
