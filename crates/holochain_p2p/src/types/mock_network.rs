@@ -118,6 +118,15 @@ pub enum HolochainP2pMockMsg {
     },
     /// MetricExchange
     MetricExchange(kitsune_p2p::wire::MetricExchange),
+    /// Agent info publish.
+    PublishedAgentInfo {
+        /// The agent this message is addressed to.
+        to_agent: AgentPubKey,
+        /// The dna space this message is for.
+        dna: DnaHash,
+        /// The agent info that is published.
+        info: AgentInfoSigned,
+    },
     /// Aan error has occurred.
     Failure(String),
 }
@@ -411,6 +420,21 @@ impl HolochainP2pMockMsg {
             }
             HolochainP2pMockMsg::MetricExchange(msg) => kwire::Wire::MetricExchange(msg),
             HolochainP2pMockMsg::Failure(reason) => kwire::Wire::Failure(kwire::Failure { reason }),
+            HolochainP2pMockMsg::PublishedAgentInfo {
+                to_agent,
+                dna,
+                info,
+            } => {
+                let space = dna.to_kitsune();
+                let to_agent = to_agent.to_kitsune();
+                let data = info.encode().unwrap().to_vec().into();
+                kwire::Wire::Broadcast(kwire::Broadcast {
+                    space,
+                    to_agent,
+                    data,
+                    destination: BroadcastTo::PublishAgentInfo,
+                })
+            }
         }
     }
 
@@ -430,18 +454,32 @@ impl HolochainP2pMockMsg {
                 to_agent,
                 data,
                 space,
+                destination,
                 ..
             })
             | kwire::Wire::DelegateBroadcast(kwire::DelegateBroadcast {
                 to_agent,
                 data,
                 space,
+                destination,
                 ..
             }) => {
                 let to_agent = holo_hash::AgentPubKey::from_kitsune(&to_agent);
                 let dna = holo_hash::DnaHash::from_kitsune(&space);
-                let msg = crate::wire::WireMessage::decode(data.as_ref()).unwrap();
-                HolochainP2pMockMsg::Wire { to_agent, msg, dna }
+                match destination {
+                    BroadcastTo::Notify => {
+                        let msg = crate::wire::WireMessage::decode(data.as_ref()).unwrap();
+                        HolochainP2pMockMsg::Wire { to_agent, msg, dna }
+                    }
+                    BroadcastTo::PublishAgentInfo => {
+                        let info = AgentInfoSigned::decode(&data[..]).unwrap();
+                        HolochainP2pMockMsg::PublishedAgentInfo {
+                            to_agent,
+                            dna,
+                            info,
+                        }
+                    }
+                }
             }
             kwire::Wire::Gossip(kwire::Gossip {
                 data,

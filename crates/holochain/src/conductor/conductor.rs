@@ -73,6 +73,7 @@ use holochain_state::prelude::from_blob;
 use holochain_state::prelude::StateMutationResult;
 use holochain_state::prelude::StateQueryResult;
 use holochain_types::prelude::*;
+pub use holochain_types::share;
 use rusqlite::{OptionalExtension, Transaction};
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::AtomicBool;
@@ -82,8 +83,6 @@ use tracing::*;
 
 #[cfg(feature = "test_utils")]
 use super::handle::MockConductorHandleT;
-
-mod share;
 
 /// The status of an installed Cell, which captures different phases of its lifecycle
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -958,7 +957,7 @@ where
                 }
 
                 for (key, entry_def) in zome_defs.clone() {
-                    holochain_state::entry_def::put(txn, key, entry_def)?;
+                    holochain_state::entry_def::put(txn, key, &entry_def)?;
                 }
 
                 if !holochain_state::dna_def::contains(txn, dna.dna_hash())? {
@@ -1507,7 +1506,7 @@ mod builder {
             let (cert_digest, cert, cert_priv_key) =
                 keystore.get_or_create_first_tls_cert().await?;
             let tls_config =
-                holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_proxy::TlsConfig {
+                holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_types::tls::TlsConfig {
                     cert,
                     cert_priv_key,
                     cert_digest,
@@ -1669,7 +1668,7 @@ mod builder {
             self.config.environment_path = envs.path().to_path_buf().into();
 
             let (holochain_p2p, p2p_evt) =
-                holochain_p2p::spawn_holochain_p2p(self.config.network.clone().unwrap_or_default(), holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_proxy::TlsConfig::new_ephemeral().await.unwrap())
+                holochain_p2p::spawn_holochain_p2p(self.config.network.clone().unwrap_or_default(), holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_types::tls::TlsConfig::new_ephemeral().await.unwrap())
                     .await?;
 
             let (post_commit_sender, post_commit_receiver) =

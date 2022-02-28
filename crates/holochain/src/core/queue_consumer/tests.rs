@@ -231,7 +231,7 @@ async fn publish_loop() {
     env.conn()
         .unwrap()
         .with_commit_test(|txn| {
-            mutations::insert_op(txn, op).unwrap();
+            mutations::insert_op(txn, &op).unwrap();
         })
         .unwrap();
     let mut dna_network = MockHolochainP2pDnaT::new();
@@ -303,7 +303,7 @@ async fn publish_loop() {
     env.conn()
         .unwrap()
         .with_commit_test(|txn| {
-            mutations::set_last_publish_time(txn, op_hash.clone(), five_mins_ago).unwrap();
+            mutations::set_last_publish_time(txn, &op_hash, five_mins_ago).unwrap();
         })
         .unwrap();
 
@@ -359,7 +359,7 @@ async fn publish_loop() {
     env.conn()
         .unwrap()
         .with_commit_test(|txn| {
-            mutations::set_last_publish_time(txn, op_hash.clone(), five_mins_ago).unwrap();
+            mutations::set_last_publish_time(txn, &op_hash, five_mins_ago).unwrap();
             mutations::set_receipts_complete(txn, &op_hash, false).unwrap();
         })
         .unwrap();
