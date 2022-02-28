@@ -2,7 +2,7 @@
 name = "holochain_util"
 version = "0.0.7"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
-edition = "2018"
+edition = "2021"
 description = "This crate is a collection of various utility functions that are used in the other crates in the holochain repository."
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"

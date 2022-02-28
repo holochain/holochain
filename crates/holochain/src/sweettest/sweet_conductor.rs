@@ -402,6 +402,9 @@ impl SweetConductor {
             futures::stream::iter(iter)
                 .then(|f| f)
                 .for_each(|(env, mut triggers)| async move {
+                    // The line below was added when migrating to rust edition 2021, per
+                    // https://doc.rust-lang.org/edition-guide/rust-2021/disjoint-capture-in-closures.html#migration
+                    let _ = &triggers;
                     crate::test_utils::force_publish_dht_ops(&env, &mut triggers.publish_dht_ops)
                         .await
                         .unwrap();

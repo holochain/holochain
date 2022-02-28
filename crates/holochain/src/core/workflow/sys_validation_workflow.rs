@@ -187,14 +187,6 @@ async fn sys_validation_workflow_inner(
                                 ValidationLimboStatus::SysValidated,
                             )?;
                         }
-                        Outcome::SkipAppValidation => {
-                            total += 1;
-                            if let Dependency::Null = dependency {
-                                put_integrated(txn, &op_hash, ValidationStatus::Valid)?;
-                            } else {
-                                put_integration_limbo(txn, &op_hash, ValidationStatus::Valid)?;
-                            }
-                        }
                         Outcome::AwaitingOpDep(missing_dep) => {
                             awaiting += 1;
                             // TODO: Try and get this dependency to add to limbo
@@ -285,12 +277,7 @@ async fn validate_op(
     )
     .await
     {
-        Ok(_) => match op {
-            // TODO: Check strict mode where store element
-            // is also run through app validation
-            DhtOp::RegisterAgentActivity(_, _) => Ok(Outcome::SkipAppValidation),
-            _ => Ok(Outcome::Accepted),
-        },
+        Ok(_) => Ok(Outcome::Accepted),
         // Handle the errors that result in pending or awaiting deps
         Err(SysValidationError::ValidationOutcome(e)) => {
             info!(

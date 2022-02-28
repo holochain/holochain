@@ -42,15 +42,16 @@ pub(crate) fn set_version<'a>(
     }
 
     let dependants = crt
-        .dependants_in_workspace_filtered(|dep| {
-            dep.version_req() != &cargo::util::OptVersionReq::from(VersionReq::STAR)
+        .dependants_in_workspace_filtered(|(_, deps)| {
+            deps.iter()
+                .any(|dep| dep.version_req() != &cargo::util::OptVersionReq::from(VersionReq::STAR))
         })?
         .to_owned();
 
     for dependant in dependants.iter() {
         let target_manifest = dependant.manifest_path();
 
-        debug!(
+        trace!(
             "[{}] updating dependency version from dependant {} to version {} in manifest {:?}",
             crt.name(),
             dependant.name(),

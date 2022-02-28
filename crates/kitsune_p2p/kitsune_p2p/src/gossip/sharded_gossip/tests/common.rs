@@ -1,3 +1,4 @@
+use crate::test_util::hash_op_data;
 pub use crate::test_util::spawn_handler;
 
 use super::*;
@@ -19,36 +20,37 @@ async fn standard_responses(
     evt_handler
         .expect_handle_get_agent_info_signed()
         .returning({
-            let infos = infos.clone();
             move |input| {
-                let infos = infos.clone();
                 let agent = infos
-                    .iter()
+                    .clone()
+                    .into_iter()
                     .find(|a| a.agent == input.agent)
-                    .unwrap()
-                    .clone();
+                    .unwrap();
                 Ok(async move { Ok(Some(agent)) }.boxed().into())
             }
         });
 
     if with_data {
-        evt_handler.expect_handle_query_op_hashes().returning(|_| {
-            Ok(async {
-                Ok(Some((
-                    vec![Arc::new(KitsuneOpHash(vec![0; 36]))],
-                    full_time_window_inclusive(),
-                )))
-            }
-            .boxed()
-            .into())
-        });
-        evt_handler.expect_handle_fetch_op_data().returning(|_| {
-            Ok(
-                async { Ok(vec![(Arc::new(KitsuneOpHash(vec![0; 36])), vec![0])]) }
-                    .boxed()
-                    .into(),
-            )
-        });
+        let fake_data = KitsuneOpData::new(vec![0]);
+        let fake_hash = hash_op_data(&fake_data.0);
+        let fake_hash_2 = fake_hash.clone();
+        evt_handler
+            .expect_handle_query_op_hashes()
+            .returning(move |_| {
+                let hash = fake_hash_2.clone();
+                Ok(
+                    async move { Ok(Some((vec![hash], full_time_window_inclusive()))) }
+                        .boxed()
+                        .into(),
+                )
+            });
+        evt_handler
+            .expect_handle_fetch_op_data()
+            .returning(move |_| {
+                let hash = fake_hash.clone();
+                let data = fake_data.clone();
+                Ok(async move { Ok(vec![(hash, data)]) }.boxed().into())
+            });
     } else {
         evt_handler
             .expect_handle_query_op_hashes()

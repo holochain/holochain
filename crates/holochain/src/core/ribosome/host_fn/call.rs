@@ -17,6 +17,9 @@ pub fn call(
     let results: Vec<Result<ZomeCallResponse, WasmError>> =
         tokio_helper::block_forever_on(async move {
             join_all(inputs.into_iter().map(|input| async {
+                // The line below was added when migrating to rust edition 2021, per
+                // https://doc.rust-lang.org/edition-guide/rust-2021/disjoint-capture-in-closures.html#migration
+                let _ = &input;
                 let Call {
                     target,
                     zome_name,
