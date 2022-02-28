@@ -68,6 +68,9 @@ fn consistency(bench: &mut Criterion) {
         });
     });
     runtime.block_on(async move {
+        // The line below was added when migrating to rust edition 2021, per
+        // https://doc.rust-lang.org/edition-guide/rust-2021/disjoint-capture-in-closures.html#migration
+        let _ = &others;
         consumer.conductor.shutdown_and_wait().await;
         drop(consumer);
         for c in others.conductors {
@@ -170,7 +173,6 @@ async fn setup() -> (Producer, Consumer, Others) {
         let mut tuning =
             kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
         tuning.gossip_strategy = "sharded-gossip".to_string();
-        // tuning.gossip_strategy = "simple-bloom".to_string();
 
         let mut network = KitsuneP2pConfig::default();
         network.transport_pool = vec![kitsune_p2p::TransportConfig::Quic {

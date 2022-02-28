@@ -2,7 +2,7 @@
 name = "test_wasm_migrate_agent_fail"
 version = "0.0.1"
 authors = [ "thedavidmeister", "thedavidmeister@gmail.com" ]
-edition = "2018"
+edition = "2021"
 
 [lib]
 name = "test_wasm_migrate_agent_fail"
