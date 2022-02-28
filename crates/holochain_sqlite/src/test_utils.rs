@@ -25,8 +25,12 @@ fn test_db<Kind: DbKindT + Send + Sync + 'static>(kind: Kind) -> TestDb<Kind> {
         .tempdir()
         .unwrap();
     TestDb {
-        db: DbWrite::new(tmpdir.path(), kind, crate::conn::DbSyncLevel::default())
-            .expect("Couldn't create test database"),
+        db: DbWrite::new(
+            Some(tmpdir.path()),
+            kind,
+            crate::conn::DbSyncLevel::default(),
+        )
+        .expect("Couldn't create test database"),
         tmpdir,
     }
 }
@@ -80,18 +84,22 @@ pub struct TestDbs {
 impl TestDbs {
     /// Create all three non-cell environments at once
     pub fn new(tempdir: TempDir) -> Self {
-        let conductor =
-            DbWrite::new(tempdir.path(), DbKindConductor, DbSyncLevel::default()).unwrap();
-        let wasm = DbWrite::new(tempdir.path(), DbKindWasm, DbSyncLevel::default()).unwrap();
+        let conductor = DbWrite::new(
+            Some(tempdir.path()),
+            DbKindConductor,
+            DbSyncLevel::default(),
+        )
+        .unwrap();
+        let wasm = DbWrite::new(Some(tempdir.path()), DbKindWasm, DbSyncLevel::default()).unwrap();
         let space = Arc::new(kitsune_p2p::KitsuneSpace(vec![0; 36]));
         let p2p_agent_store = DbWrite::new(
-            tempdir.path(),
+            Some(tempdir.path()),
             DbKindP2pAgentStore(space.clone()),
             DbSyncLevel::default(),
         )
         .unwrap();
         let p2p_metrics = DbWrite::new(
-            tempdir.path(),
+            Some(tempdir.path()),
             DbKindP2pMetrics(space),
             DbSyncLevel::default(),
         )

@@ -254,7 +254,7 @@ fn cache_data(in_memory: bool, data: &MockNetworkData, is_cached: bool) -> Conne
     )
     .unwrap();
     for op in data.ops.values().cloned() {
-        holochain_state::test_utils::mutations_helpers::insert_valid_integrated_op(&mut txn, op)
+        holochain_state::test_utils::mutations_helpers::insert_valid_integrated_op(&mut txn, &op)
             .unwrap();
     }
     for (author, ops) in &data.authored {

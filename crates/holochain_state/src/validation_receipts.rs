@@ -187,7 +187,7 @@ mod tests {
         let test_op_hash = op.as_hash().clone();
         env.conn()
             .unwrap()
-            .with_commit_sync(|txn| mutations::insert_op(txn, op))
+            .with_commit_sync(|txn| mutations::insert_op(txn, &op))
             .unwrap();
 
         let vr1 = fake_vr(&test_op_hash, &keystore).await;

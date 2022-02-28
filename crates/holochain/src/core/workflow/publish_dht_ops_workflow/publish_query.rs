@@ -221,8 +221,8 @@ mod tests {
             .unwrap()
             .with_commit_sync(|txn| {
                 let hash = state.as_hash().clone();
-                insert_op(txn, state.clone()).unwrap();
-                set_last_publish_time(txn, hash.clone(), last_publish).unwrap();
+                insert_op(txn, &state).unwrap();
+                set_last_publish_time(txn, &hash, last_publish).unwrap();
                 set_receipts_complete(txn, &hash, facts.has_required_receipts).unwrap();
                 DatabaseResult::Ok(())
             })

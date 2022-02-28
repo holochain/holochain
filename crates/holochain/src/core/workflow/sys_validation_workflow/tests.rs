@@ -82,14 +82,6 @@ async fn run_test(
             .unwrap();
         !not_empty
     };
-    let show_limbo = |txn: &Transaction| {
-        txn.prepare("SELECT blob FROM DhtOp WHERE when_integrated IS NULL")
-            .unwrap()
-            .query_and_then([], |row| from_blob(row.get("blob")?))
-            .unwrap()
-            .collect::<StateQueryResult<Vec<DhtOpLight>>>()
-            .unwrap()
-    };
 
     // holochain_state::prelude::dump_tmp(&alice_dht_env);
     // Validation should be empty
@@ -353,3 +345,25 @@ async fn dodgy_bob(bob_cell_id: &CellId, handle: &ConductorHandle, dna_file: &Dn
 // 2. The Create link is integrated and valid.
 // ## Expected
 // The Delete header should be invalid for all authorities.
+
+fn show_limbo(txn: &Transaction) -> Vec<DhtOpLight> {
+    txn.prepare(
+        "
+        SELECT DhtOp.type, Header.hash, Header.blob
+        FROM DhtOp 
+        JOIN Header ON DhtOp.header_hash = Header.hash
+        WHERE
+        when_integrated IS NULL
+    ",
+    )
+    .unwrap()
+    .query_and_then([], |row| {
+        let op_type: DhtOpType = row.get("type")?;
+        let hash: HeaderHash = row.get("hash")?;
+        let header: SignedHeader = from_blob(row.get("blob")?)?;
+        Ok(DhtOpLight::from_type(op_type, hash, &header.0)?)
+    })
+    .unwrap()
+    .collect::<StateQueryResult<Vec<DhtOpLight>>>()
+    .unwrap()
+}

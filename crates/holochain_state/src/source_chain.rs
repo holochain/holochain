@@ -22,7 +22,6 @@ use holochain_types::dht_op::UniqueForm;
 use holochain_types::element::SignedHeaderHashedExt;
 use holochain_types::env::DbRead;
 use holochain_types::env::DbWrite;
-use holochain_zome_types::entry::EntryHashed;
 use holochain_zome_types::header;
 use holochain_zome_types::query::ChainQueryFilterRange;
 use holochain_zome_types::CapAccess;
@@ -296,13 +295,13 @@ impl SourceChain {
                 }
 
                 for entry in entries {
-                    insert_entry(txn, entry)?;
+                    insert_entry(txn, entry.as_hash(), entry.as_content())?;
                 }
                 for shh in zomed_headers.iter().map(|(_zome, shh)| shh) {
-                    insert_header(txn, shh.clone())?;
+                    insert_header(txn, shh)?;
                 }
-                for (op, op_hash, op_order, timestamp, _) in ops {
-                    insert_op_lite_into_authored(txn, op, op_hash.clone(), op_order, timestamp)?;
+                for (op, op_hash, op_order, timestamp, _) in &ops {
+                    insert_op_lite_into_authored(txn, op, op_hash, op_order, timestamp)?;
                     // If this is a countersigning session we want to withhold
                     // publishing the ops until the session is successful.
                     if is_countersigning_session {
@@ -1007,11 +1006,11 @@ pub fn put_raw(
         signature,
     );
     if let Some(entry) = entry {
-        insert_entry(txn, EntryHashed::from_content_sync(entry))?;
+        insert_entry(txn, &EntryHash::with_data_sync(&entry), &entry)?;
     }
-    insert_header(txn, shh)?;
+    insert_header(txn, &shh)?;
     for (op, (op_hash, op_order, timestamp)) in ops.into_iter().zip(hashes) {
-        insert_op_lite(txn, op, op_hash.clone(), op_order, timestamp)?;
+        insert_op_lite(txn, &op, &op_hash, &op_order, &timestamp)?;
     }
     Ok(ops_to_integrate)
 }
@@ -1092,7 +1091,10 @@ async fn _put_db<H: HeaderInner, B: HeaderBuilder<H>>(
         if new_head != prev_header {
             let entries = match (entry, header.header().entry_hash()) {
                 (Some(e), Some(entry_hash)) => {
-                    vec![EntryHashed::with_pre_hashed(e, entry_hash.clone())]
+                    vec![holochain_types::EntryHashed::with_pre_hashed(
+                        e,
+                        entry_hash.clone(),
+                    )]
                 }
                 _ => vec![],
             };
