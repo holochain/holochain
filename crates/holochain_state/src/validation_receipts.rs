@@ -72,10 +72,9 @@ impl ValidationReceipt {
             })
             .collect::<Vec<_>>();
         let stream = futures::stream::iter(futures);
-        let signatures = try_stream_of_results(stream).await?;
-        if signatures.is_empty() {
-            return Ok(None);
-        }
+        let signatures = try_stream_of_results(stream)
+            .await?
+            .expect("Signatures cannot be empty because the validators vec is not empty");
         Ok(Some(SignedValidationReceipt {
             receipt: self,
             validators_signatures: signatures,
