@@ -192,20 +192,6 @@ pub mod tuning_params_struct {
         /// by the `SSLKEYLOGFILE` environment variable, or do nothing if
         /// it is not set, or is not writable.
         danger_tls_keylog: String = "no_keylog".to_string(),
-        /*
-        /// log tls secret keys so external debugging tools
-        /// can decrypt communications.
-        /// We can't use the standard SSLKEYLOGFILE env variable
-        /// since a single kitsune instance represents multiple tls sessions.
-        /// If this tuning param starts with "path_prefix:",
-        /// the remainder of the param will be used as a path prefix
-        /// for multiple keylog files, e.g. "path_prefix:/my/path/keylog"
-        /// might result in the following files:
-        /// - "/my/path/keylog_quic_server.keylog"
-        /// - "/my/path/keylog_quic_client.keylog"
-        /// [Default: "no_keylog"]
-        danger_tls_keylog_path_prefix: String = "no_keylog".to_string(),
-        */
     }
 
     impl KitsuneP2pTuningParams {
@@ -220,18 +206,6 @@ pub mod tuning_params_struct {
         pub fn use_env_tls_keylog(&self) -> bool {
             self.danger_tls_keylog == "env_keylog"
         }
-        /*
-        /// If a keylog path prefix was specified, retrieve it
-        pub fn get_keylog_path_prefix(&self) -> Option<String> {
-            const PATH_PREFIX: &[u8] = b"path_prefix:";
-            let bytes = self.danger_tls_keylog_path_prefix.as_bytes();
-            if bytes.len() >= PATH_PREFIX.len() && &bytes[..PATH_PREFIX.len()] == PATH_PREFIX {
-                Some(String::from_utf8_lossy(&bytes[PATH_PREFIX.len()..]).to_string())
-            } else {
-                None
-            }
-        }
-        */
     }
 }
 
