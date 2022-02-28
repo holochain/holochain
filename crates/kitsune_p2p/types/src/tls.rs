@@ -1,9 +1,9 @@
 //! TLS utils for kitsune
 
-use crate::tx2::tx2_utils::Share;
 use crate::config::*;
 use crate::*;
 use lair_keystore_api_0_0::actor::*;
+use once_cell::sync::Lazy;
 
 /// Tls Configuration.
 #[derive(Clone)]
@@ -41,6 +41,12 @@ static CIPHER_SUITES: &[rustls::SupportedCipherSuite] = &[
     rustls::cipher_suite::TLS13_AES_256_GCM_SHA384,
 ];
 
+/// Single shared keylog file all sessions can report to
+static KEY_LOG: Lazy<Arc<dyn rustls::KeyLog>> = Lazy::new(|| {
+    println!("ONTHEUNOE {:?}", std::env::var("SSLKEYLOGFILE"));
+    Arc::new(rustls::KeyLogFile::new())
+});
+
 /// Helper to generate rustls configs given a TlsConfig reference.
 #[allow(dead_code)]
 pub fn gen_tls_configs(
@@ -65,8 +71,8 @@ pub fn gen_tls_configs(
         .with_single_cert(vec![cert.clone()], cert_priv_key.clone())
         .map_err(KitsuneError::other)?;
 
-    if let Ok(key_log) = create_tuning_param_keylog(&tuning_params, "_quic_server") {
-        tls_server_config.key_log = key_log;
+    if tuning_params.use_env_tls_keylog() {
+        tls_server_config.key_log = KEY_LOG.clone();
     }
     tls_server_config.ticketer = rustls::Ticketer::new().map_err(KitsuneError::other)?;
     tls_server_config.session_storage = rustls::server::ServerSessionMemoryCache::new(
@@ -85,8 +91,8 @@ pub fn gen_tls_configs(
         .with_single_cert(vec![cert], cert_priv_key)
         .map_err(KitsuneError::other)?;
 
-    if let Ok(key_log) = create_tuning_param_keylog(&tuning_params, "_quic_client") {
-        tls_client_config.key_log = key_log;
+    if tuning_params.use_env_tls_keylog() {
+        tls_client_config.key_log = KEY_LOG.clone();
     }
     tls_client_config.session_storage = rustls::client::ClientSessionMemoryCache::new(
         tuning_params.tls_in_mem_session_storage as usize,
@@ -122,6 +128,7 @@ impl rustls::client::ServerCertVerifier for TlsServerVerifier {
     }
 }
 
+/*
 fn create_tuning_param_keylog(
     tuning_params: &KitsuneP2pTuningParams,
     kind: &'static str,
@@ -168,3 +175,4 @@ impl<W: 'static + std::io::Write + Send + Sync> rustls::KeyLog for TuningParamKe
         let _ = self.try_log(label, client_random, secret);
     }
 }
+*/

@@ -36,7 +36,12 @@ pub struct SweetConductor {
 
 /// Standard config for SweetConductors
 pub fn standard_config() -> ConductorConfig {
+    let mut tuning_params = kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
+    // note, even with this tuning param, the `SSLKEYLOGFILE` env var
+    // still must be set in order to enable session keylogging
+    tuning_params.danger_tls_keylog = "env_keylog".to_string();
     let mut network = KitsuneP2pConfig::default();
+    network.tuning_params = Arc::new(tuning_params);
     network.transport_pool = vec![kitsune_p2p::TransportConfig::Quic {
         bind_to: None,
         override_host: None,
@@ -81,16 +86,8 @@ impl SweetConductor {
     }
 
     /// Create a SweetConductor with a new set of TestEnvs from the given config
-    pub async fn from_config(mut config: ConductorConfig) -> SweetConductor {
+    pub async fn from_config(config: ConductorConfig) -> SweetConductor {
         let envs = test_environments();
-        // we can't set keylog in `standard_config` since we don't know
-        // the env directory yet... so, gotta do it here
-        if let Some(network) = &mut config.network {
-            let mut tp = (*network.tuning_params).clone();
-            tp.danger_tls_keylog_path_prefix =
-                format!("path_prefix:{}/keylog", envs.path().to_string_lossy());
-            network.tuning_params = Arc::new(tp);
-        }
         let handle = Self::handle_from_existing(&envs, &config, &[]).await;
         Self::new(handle, envs, config).await
     }

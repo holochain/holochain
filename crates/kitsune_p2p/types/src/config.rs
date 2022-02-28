@@ -184,6 +184,15 @@ pub mod tuning_params_struct {
         /// [Default: 200 ms]
         tx2_initial_connect_retry_delay_ms: usize = 200,
 
+        /// if you would like to be able to use an external tool
+        /// to debug the QUIC messages sent and received by kitsune
+        /// you'll need the decryption keys.
+        /// The default of `"no_keylog"` is secure and will not write any keys
+        /// Setting this to `"env_keylog"` will write to a keylog specified
+        /// by the `SSLKEYLOGFILE` environment variable, or do nothing if
+        /// it is not set, or is not writable.
+        danger_tls_keylog: String = "no_keylog".to_string(),
+        /*
         /// log tls secret keys so external debugging tools
         /// can decrypt communications.
         /// We can't use the standard SSLKEYLOGFILE env variable
@@ -196,6 +205,7 @@ pub mod tuning_params_struct {
         /// - "/my/path/keylog_quic_client.keylog"
         /// [Default: "no_keylog"]
         danger_tls_keylog_path_prefix: String = "no_keylog".to_string(),
+        */
     }
 
     impl KitsuneP2pTuningParams {
@@ -205,6 +215,12 @@ pub mod tuning_params_struct {
             crate::KitsuneTimeout::from_millis(self.tx2_implicit_timeout_ms as u64)
         }
 
+        /// returns true if we should initialize a tls keylog
+        /// based on the `SSLKEYLOGFILE` environment variable
+        pub fn use_env_tls_keylog(&self) -> bool {
+            self.danger_tls_keylog == "env_keylog"
+        }
+        /*
         /// If a keylog path prefix was specified, retrieve it
         pub fn get_keylog_path_prefix(&self) -> Option<String> {
             const PATH_PREFIX: &[u8] = b"path_prefix:";
@@ -215,6 +231,7 @@ pub mod tuning_params_struct {
                 None
             }
         }
+        */
     }
 }
 
