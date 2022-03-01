@@ -408,7 +408,11 @@ async fn validate_op_outer(
     let ribosome = RealRibosome::new(dna_file);
     match validate_op(op, host_fn_workspace, network, &ribosome).await {
         Ok(Outcome::AwaitingDeps(hashes)) => {
-            let unfetched_hashes: Vec<AnyDhtHash> = hashes.iter().filter(|&hash| !fetched_deps.contains(hash)).cloned().collect();
+            let unfetched_hashes: Vec<AnyDhtHash> = hashes
+                .iter()
+                .filter(|&hash| !fetched_deps.contains(hash))
+                .cloned()
+                .collect();
             if unfetched_hashes.is_empty() {
                 let in_flight = unfetched_hashes.iter().map(|hash| async move {
                     let cascade_workspace = workspace.validation_workspace().await?;
