@@ -103,7 +103,7 @@ impl SweetConductor {
     ) -> SweetConductor {
         let envs = test_environments();
         let config = builder.config.clone();
-        let handle = builder.test(&envs, &[]).await.unwrap();
+        let handle = builder.test(envs.path(), &[]).await.unwrap();
         Self::new(handle, envs, config).await
     }
 

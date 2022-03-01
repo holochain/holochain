@@ -322,7 +322,7 @@ pub async fn setup_app_inner(
             network,
             ..Default::default()
         })
-        .test(&envs, &[])
+        .test(envs.path(), &[])
         .await
         .unwrap();
 

@@ -321,8 +321,8 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
     /// Create a unique db in a temp dir with no static management of the
     /// connection pool, useful for testing.
     #[cfg(any(test, feature = "test_utils"))]
-    pub fn test(tmpdir: &tempfile::TempDir, kind: Kind) -> DatabaseResult<Self> {
-        Self::new(Some(tmpdir.path()), kind, DbSyncLevel::default())
+    pub fn test(path: &Path, kind: Kind) -> DatabaseResult<Self> {
+        Self::new(Some(path), kind, DbSyncLevel::default())
     }
 
     #[cfg(any(test, feature = "test_utils"))]

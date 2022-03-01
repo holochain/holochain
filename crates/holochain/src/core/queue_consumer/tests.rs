@@ -221,7 +221,7 @@ async fn publish_loop() {
         .prefix("holochain-test-environments")
         .tempdir()
         .unwrap();
-    let env = DbWrite::test(&tmpdir, kind).expect("Couldn't create test database");
+    let env = DbWrite::test(tmpdir.path(), kind).expect("Couldn't create test database");
     let header = Header::arbitrary(&mut u).unwrap();
     let author = header.author().clone();
     let signature = Signature::arbitrary(&mut u).unwrap();

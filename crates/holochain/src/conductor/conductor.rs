@@ -1638,12 +1638,11 @@ mod builder {
         #[cfg(any(test, feature = "test_utils"))]
         pub async fn test(
             mut self,
-            envs: &TestEnvs,
+            env_path: &std::path::Path,
             extra_dnas: &[DnaFile],
         ) -> ConductorResult<ConductorHandle> {
-            let keystore = envs.keystore().clone();
-
-            self.config.environment_path = envs.path().to_path_buf().into();
+            let keystore = test_keystore();
+            self.config.environment_path = env_path.to_path_buf().into();
 
             let (holochain_p2p, p2p_evt) =
                 holochain_p2p::spawn_holochain_p2p(self.config.network.clone().unwrap_or_default(), holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_types::tls::TlsConfig::new_ephemeral().await.unwrap())
@@ -1658,8 +1657,13 @@ mod builder {
             );
 
             let conductor = Conductor::new(
-                envs.conductor(),
-                envs.wasm(),
+                DbWrite::test(
+                    &self.config.environment_path.as_ref().as_path(),
+                    DbKindConductor,
+                )
+                .unwrap(),
+                DbWrite::test(&self.config.environment_path.as_ref().as_path(), DbKindWasm)
+                    .unwrap(),
                 self.dna_store,
                 keystore,
                 holochain_p2p,
@@ -1681,6 +1685,8 @@ mod builder {
             // Install extra DNAs, in particular:
             // the ones with InlineZomes will not be registered in the Wasm DB
             // and cannot be automatically loaded on conductor restart.
+
+            use std::path::Path;
             for dna_file in extra_dnas {
                 handle
                     .register_dna(dna_file.clone())
