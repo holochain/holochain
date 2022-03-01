@@ -10,7 +10,7 @@ use hdk::prelude::*;
 use holo_hash::DnaHash;
 use holochain_conductor_api::{AdminInterfaceConfig, InterfaceDriver};
 use holochain_keystore::MetaLairClient;
-use holochain_state::{prelude::test_env_dir, test_utils::test_environments};
+use holochain_state::prelude::test_env_dir;
 use holochain_types::prelude::*;
 use holochain_websocket::*;
 use kitsune_p2p::KitsuneP2pConfig;
@@ -83,7 +83,7 @@ impl SweetConductor {
         // some other better integration between the two.
         let spaces = Spaces::new(env_dir.path().to_path_buf().into(), Default::default());
 
-        let keystore = test_keystore();
+        let keystore = handle.keystore().clone();
 
         Self {
             handle: Some(SweetConductorHandle(handle)),
@@ -99,7 +99,7 @@ impl SweetConductor {
     /// Create a SweetConductor with a new set of TestEnvs from the given config
     pub async fn from_config(config: ConductorConfig) -> SweetConductor {
         let dir = test_env_dir();
-        let handle = Self::handle_from_existing(&dir.path(), test_keystore(), &config, &[]).await;
+        let handle = Self::handle_from_existing(dir.path(), test_keystore(), &config, &[]).await;
         Self::new(handle, dir, config).await
     }
 
@@ -107,7 +107,7 @@ impl SweetConductor {
     pub async fn from_builder<DS: DnaStore + 'static>(
         builder: ConductorBuilder<DS>,
     ) -> SweetConductor {
-        let envs = test_environments();
+        let envs = test_env_dir();
         let config = builder.config.clone();
         let handle = builder.test(envs.path(), &[]).await.unwrap();
         Self::new(handle, envs, config).await

@@ -547,7 +547,7 @@ mod test {
     #[tokio::test(flavor = "multi_thread")]
     async fn install_list_dna_app() {
         observability::test_run().ok();
-        let envs = test_environments();
+        let envs = test_env_dir();
         let handle = Conductor::builder().test(envs.path(), &[]).await.unwrap();
         let shutdown = handle.take_shutdown_handle().unwrap();
         let admin_api = RealAdminInterfaceApi::new(handle.clone());

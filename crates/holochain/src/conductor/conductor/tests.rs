@@ -27,7 +27,7 @@ use matches::assert_matches;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn can_update_state() {
-    let envs = test_environments();
+    let envs = test_env_dir();
     let dna_store = MockDnaStore::new();
     let keystore = test_keystore();
     let holochain_p2p = holochain_p2p::stub_network().await;
@@ -71,7 +71,7 @@ async fn can_update_state() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn can_add_clone_cell_to_app() {
-    let envs = test_environments();
+    let envs = test_env_dir();
     let keystore = test_keystore();
     let holochain_p2p = holochain_p2p::stub_network().await;
 
@@ -153,7 +153,7 @@ async fn can_add_clone_cell_to_app() {
 /// same InstalledAppId
 #[tokio::test(flavor = "multi_thread")]
 async fn app_ids_are_unique() {
-    let envs = test_environments();
+    let envs = test_env_dir();
     let dna_store = MockDnaStore::new();
     let holochain_p2p = holochain_p2p::stub_network().await;
     let (post_commit_sender, _post_commit_receiver) =
@@ -217,7 +217,7 @@ async fn app_role_ids_are_unique() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn can_set_fake_state() {
-    let envs = test_environments();
+    let envs = test_env_dir();
     let state = ConductorState::default();
     let conductor = ConductorBuilder::new()
         .fake_state(state.clone())

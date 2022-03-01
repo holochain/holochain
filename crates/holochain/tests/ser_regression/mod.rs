@@ -11,7 +11,7 @@ use holochain::conductor::api::ZomeCall;
 use holochain::conductor::ConductorBuilder;
 use holochain::conductor::ConductorHandle;
 
-use holochain_state::prelude::test_environments;
+use holochain_state::prelude::test_env_dir;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 pub use holochain_zome_types::capability::CapSecret;
@@ -172,7 +172,7 @@ pub async fn setup_app(
     cell_data: Vec<(InstalledCell, Option<SerializedBytes>)>,
     dna_store: MockDnaStore,
 ) -> (TempDir, RealAppInterfaceApi, ConductorHandle) {
-    let envs = test_environments();
+    let envs = test_env_dir();
     let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
         .test(envs.path(), &[])
         .await

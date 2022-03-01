@@ -234,7 +234,7 @@ pub mod test_utils {
         cell_data: Vec<(InstalledCell, Option<SerializedBytes>)>,
         dna_store: MockDnaStore,
     ) -> (Arc<TempDir>, RealAppInterfaceApi, ConductorHandle) {
-        let envs = test_environments();
+        let envs = test_env_dir();
 
         let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
             .test(envs.path(), &[])
@@ -290,7 +290,7 @@ pub mod test {
     use holochain_p2p::{AgentPubKeyExt, DnaHashExt};
     use holochain_serialized_bytes::prelude::*;
     use holochain_sqlite::prelude::*;
-    use holochain_state::prelude::test_environments;
+    use holochain_state::prelude::test_env_dir;
     use holochain_types::prelude::*;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_dna_hash;
@@ -319,7 +319,7 @@ pub mod test {
     }
 
     async fn setup_admin() -> (Arc<TempDir>, ConductorHandle) {
-        let envs = test_environments();
+        let envs = test_env_dir();
         let conductor_handle = Conductor::builder().test(envs.path(), &[]).await.unwrap();
         (Arc::new(envs), conductor_handle)
     }
@@ -328,7 +328,7 @@ pub mod test {
         cell_ids_with_proofs: Vec<(CellId, Option<SerializedBytes>)>,
         dna_store: MockDnaStore,
     ) -> (Arc<TempDir>, ConductorHandle) {
-        let envs = test_environments();
+        let envs = test_env_dir();
         let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
             .test(envs.path(), &[])
             .await
@@ -680,7 +680,7 @@ pub mod test {
     #[tokio::test(flavor = "multi_thread")]
     async fn add_agent_info_via_admin() {
         observability::test_run().ok();
-        let test_envs = test_environments();
+        let test_envs = test_env_dir();
         let agents = vec![fake_agent_pubkey_1(), fake_agent_pubkey_2()];
         let dnas = vec![
             make_dna("1", vec![TestWasm::Anchor]).await,

@@ -15,7 +15,7 @@ use holochain_keystore::MetaLairClient;
 use holochain_p2p::actor::HolochainP2pRefToDna;
 use holochain_p2p::HolochainP2pDna;
 use holochain_serialized_bytes::SerializedBytes;
-use holochain_state::prelude::test_environments;
+use holochain_state::prelude::test_env_dir;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 use kitsune_p2p::KitsuneP2pConfig;
@@ -185,7 +185,7 @@ impl ConductorTestData {
         }
 
         let (this, _) = Self::new(
-            test_environments(),
+            test_env_dir(),
             vec![dna_file],
             agents,
             network.unwrap_or_default(),

@@ -1656,12 +1656,11 @@ mod builder {
 
             let conductor = Conductor::new(
                 DbWrite::test(
-                    &self.config.environment_path.as_ref().as_path(),
+                    self.config.environment_path.as_ref().as_path(),
                     DbKindConductor,
                 )
                 .unwrap(),
-                DbWrite::test(&self.config.environment_path.as_ref().as_path(), DbKindWasm)
-                    .unwrap(),
+                DbWrite::test(self.config.environment_path.as_ref().as_path(), DbKindWasm).unwrap(),
                 self.dna_store,
                 keystore,
                 holochain_p2p,
