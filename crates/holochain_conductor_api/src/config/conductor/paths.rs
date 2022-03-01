@@ -5,6 +5,7 @@ use derive_more::Display;
 use derive_more::From;
 use derive_more::FromStr;
 use derive_more::Into;
+use std::path::Path;
 use std::path::PathBuf;
 
 const QUALIFIER: &str = "org";
@@ -32,6 +33,12 @@ pub struct EnvironmentRootPath(PathBuf);
 impl Default for EnvironmentRootPath {
     fn default() -> Self {
         Self(data_root().join(PathBuf::from(DATABASES_DIRECTORY)))
+    }
+}
+
+impl<'a> From<&'a Path> for EnvironmentRootPath {
+    fn from(p: &'a Path) -> Self {
+        p.to_owned().into()
     }
 }
 

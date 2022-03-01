@@ -10,11 +10,13 @@ use hdk::prelude::*;
 use holo_hash::DnaHash;
 use holochain_conductor_api::{AdminInterfaceConfig, InterfaceDriver};
 use holochain_keystore::MetaLairClient;
-use holochain_state::test_utils::{test_environments, TestEnvs};
+use holochain_state::{prelude::test_env_dir, test_utils::test_environments};
 use holochain_types::prelude::*;
 use holochain_websocket::*;
 use kitsune_p2p::KitsuneP2pConfig;
+use std::path::Path;
 use std::sync::Arc;
+use tempfile::TempDir;
 
 /// A stream of signals.
 pub type SignalStream = Box<dyn tokio_stream::Stream<Item = Signal> + Send + Sync + Unpin>;
@@ -28,8 +30,9 @@ pub type SignalStream = Box<dyn tokio_stream::Stream<Item = Signal> + Send + Syn
 #[derive(derive_more::From)]
 pub struct SweetConductor {
     handle: Option<SweetConductorHandle>,
-    envs: TestEnvs,
-    spaces: Spaces,
+    env_dir: TempDir,
+    keystore: MetaLairClient,
+    pub(crate) spaces: Spaces,
     config: ConductorConfig,
     dnas: Vec<DnaFile>,
     signal_stream: Option<SignalStream>,
@@ -60,7 +63,7 @@ impl SweetConductor {
     /// "sweet-interface" so that signals may be emitted
     pub async fn new(
         handle: ConductorHandle,
-        envs: TestEnvs,
+        env_dir: TempDir,
         config: ConductorConfig,
     ) -> SweetConductor {
         // Automatically add a test app interface
@@ -78,11 +81,14 @@ impl SweetConductor {
         // to actually access those databases.
         // As a TODO, we can remove the need for TestEnvs in sweettest or have
         // some other better integration between the two.
-        let spaces = Spaces::new(envs.path().to_path_buf().into(), Default::default());
+        let spaces = Spaces::new(env_dir.path().to_path_buf().into(), Default::default());
+
+        let keystore = test_keystore();
 
         Self {
             handle: Some(SweetConductorHandle(handle)),
-            envs,
+            env_dir,
+            keystore,
             spaces,
             config,
             dnas: Vec::new(),
@@ -92,9 +98,9 @@ impl SweetConductor {
 
     /// Create a SweetConductor with a new set of TestEnvs from the given config
     pub async fn from_config(config: ConductorConfig) -> SweetConductor {
-        let envs = test_environments();
-        let handle = Self::handle_from_existing(&envs, &config, &[]).await;
-        Self::new(handle, envs, config).await
+        let dir = test_env_dir();
+        let handle = Self::handle_from_existing(&dir.path(), test_keystore(), &config, &[]).await;
+        Self::new(handle, dir, config).await
     }
 
     /// Create a SweetConductor from a partially-configured ConductorBuilder
@@ -109,12 +115,14 @@ impl SweetConductor {
 
     /// Create a handle from an existing environment and config
     pub async fn handle_from_existing(
-        envs: &TestEnvs,
+        envs: &Path,
+        keystore: MetaLairClient,
         config: &ConductorConfig,
         extra_dnas: &[DnaFile],
     ) -> ConductorHandle {
         Conductor::builder()
             .config(config.clone())
+            .with_keystore(keystore)
             .test(envs, extra_dnas)
             .await
             .unwrap()
@@ -126,13 +134,13 @@ impl SweetConductor {
     }
 
     /// Access the TestEnvs for this conductor
-    pub fn envs(&self) -> &TestEnvs {
-        &self.envs
+    pub fn envs(&self) -> &Path {
+        &self.env_dir.path()
     }
 
     /// Access the MetaLairClient for this conductor
     pub fn keystore(&self) -> MetaLairClient {
-        self.envs.keystore().clone()
+        self.keystore.clone()
     }
 
     /// Convenience function that uses the internal handle to enable an app
@@ -217,22 +225,10 @@ impl SweetConductor {
         agent: AgentPubKey,
         dna_hashes: impl Iterator<Item = DnaHash>,
     ) -> ConductorApiResult<SweetApp> {
-        use holochain_p2p::DnaHashExt;
         let mut sweet_cells = Vec::new();
         for dna_hash in dna_hashes {
             // Initialize per-space databases
-            // XXX: this is a bit of a hack, force-initializing both sets of
-            // mutexes, because we are using both TestEnvs and Spaces when we
-            // could be using one or the other.
-            let space = self.spaces.get_or_create_space(&dna_hash)?;
-            self.envs
-                .p2p()
-                .lock()
-                .insert(dna_hash.clone().into_kitsune(), space.p2p_env.clone());
-            self.envs.p2p_metrics().lock().insert(
-                dna_hash.clone().into_kitsune(),
-                space.p2p_metrics_env.clone(),
-            );
+            let _space = self.spaces.get_or_create_space(&dna_hash)?;
 
             // Create the SweetCell
             let cell_authored_env = self.handle().0.get_authored_env(&dna_hash)?;
@@ -384,7 +380,13 @@ impl SweetConductor {
     pub async fn startup(&mut self) {
         if self.handle.is_none() {
             self.handle = Some(SweetConductorHandle(
-                Self::handle_from_existing(&self.envs, &self.config, self.dnas.as_slice()).await,
+                Self::handle_from_existing(
+                    self.env_dir.path(),
+                    self.keystore.clone(),
+                    &self.config,
+                    self.dnas.as_slice(),
+                )
+                .await,
             ));
         } else {
             panic!("Attempted to start conductor which was already started");

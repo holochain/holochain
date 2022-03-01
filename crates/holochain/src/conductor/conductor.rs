@@ -1371,8 +1371,6 @@ mod builder {
     use crate::conductor::dna_store::RealDnaStore;
     use crate::conductor::handle::DevSettings;
     use crate::conductor::ConductorHandle;
-    #[cfg(any(test, feature = "test_utils"))]
-    use holochain_state::test_utils::TestEnvs;
 
     /// A configurable Builder for Conductor and sometimes ConductorHandle
     #[derive(Default)]
@@ -1641,7 +1639,7 @@ mod builder {
             env_path: &std::path::Path,
             extra_dnas: &[DnaFile],
         ) -> ConductorResult<ConductorHandle> {
-            let keystore = test_keystore();
+            let keystore = self.keystore.unwrap_or_else(test_keystore);
             self.config.environment_path = env_path.to_path_buf().into();
 
             let (holochain_p2p, p2p_evt) =
@@ -1686,7 +1684,6 @@ mod builder {
             // the ones with InlineZomes will not be registered in the Wasm DB
             // and cannot be automatically loaded on conductor restart.
 
-            use std::path::Path;
             for dna_file in extra_dnas {
                 handle
                     .register_dna(dna_file.clone())

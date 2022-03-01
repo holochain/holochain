@@ -107,14 +107,24 @@ pub fn test_envs_with_keystore(keystore: MetaLairClient) -> TestEnvs {
 }
 
 /// Create a fresh set of test environments with a new TempDir
-pub fn test_environments() -> TestEnvs {
-    let tempdir = tempfile::Builder::new()
+pub fn test_env_dir() -> TempDir {
+    tempfile::Builder::new()
         .prefix("holochain-test-environments")
         .suffix(&nanoid::nanoid!())
         .tempdir()
-        .unwrap();
-    TestEnvs::new(tempdir)
+        .unwrap()
 }
+
+/// Create a fresh set of test environments with a new TempDir
+pub fn test_environments() -> TempDir {
+    test_env_dir()
+}
+
+// /// Create a fresh set of test environments with a new TempDir
+// pub fn test_environments() -> TestEnvs {
+//     let tempdir = test_env_dir();
+//     TestEnvs::new(tempdir)
+// }
 
 /// Create a fresh set of test environments with a new TempDir in a given directory.
 pub fn test_environments_in(path: impl AsRef<Path>) -> TestEnvs {

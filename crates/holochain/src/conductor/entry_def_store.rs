@@ -126,7 +126,7 @@ mod tests {
 
         // all the stuff needed to have a WasmBuf
         let envs = test_environments();
-        let handle = Conductor::builder().test(&envs, &[]).await.unwrap();
+        let handle = Conductor::builder().test(envs.path(), &[]).await.unwrap();
 
         let dna = fake_dna_zomes(
             "",
@@ -172,7 +172,7 @@ mod tests {
         std::mem::drop(handle);
 
         // Restart conductor and check defs are still here
-        let handle = Conductor::builder().test(&envs.into(), &[]).await.unwrap();
+        let handle = Conductor::builder().test(envs.path(), &[]).await.unwrap();
 
         assert_eq!(handle.get_entry_def(&post_def_key), Some(post_def));
         assert_eq!(

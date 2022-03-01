@@ -237,7 +237,7 @@ pub mod test_utils {
         let envs = test_environments();
 
         let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
-            .test(&envs, &[])
+            .test(envs.path(), &[])
             .await
             .unwrap();
 
@@ -264,7 +264,7 @@ pub mod test_utils {
         let handle = conductor_handle.clone();
 
         (
-            Arc::new(envs.into_tempdir()),
+            Arc::new(envs),
             RealAppInterfaceApi::new(conductor_handle),
             handle,
         )
@@ -320,8 +320,8 @@ pub mod test {
 
     async fn setup_admin() -> (Arc<TempDir>, ConductorHandle) {
         let envs = test_environments();
-        let conductor_handle = Conductor::builder().test(&envs, &[]).await.unwrap();
-        (Arc::new(envs.into_tempdir()), conductor_handle)
+        let conductor_handle = Conductor::builder().test(envs.path(), &[]).await.unwrap();
+        (Arc::new(envs), conductor_handle)
     }
 
     async fn setup_admin_fake_cells(
@@ -330,7 +330,7 @@ pub mod test {
     ) -> (Arc<TempDir>, ConductorHandle) {
         let envs = test_environments();
         let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
-            .test(&envs, &[])
+            .test(envs.path(), &[])
             .await
             .unwrap();
 
@@ -345,7 +345,7 @@ pub mod test {
             .await
             .unwrap();
 
-        (Arc::new(envs.into_tempdir()), conductor_handle)
+        (Arc::new(envs), conductor_handle)
     }
 
     async fn activate(conductor_handle: ConductorHandle) -> ConductorHandle {
@@ -681,7 +681,6 @@ pub mod test {
     async fn add_agent_info_via_admin() {
         observability::test_run().ok();
         let test_envs = test_environments();
-        let p2p = test_envs.p2p();
         let agents = vec![fake_agent_pubkey_1(), fake_agent_pubkey_2()];
         let dnas = vec![
             make_dna("1", vec![TestWasm::Anchor]).await,
@@ -692,6 +691,7 @@ pub mod test {
                 .await
                 .0;
         let handle = conductor_test.handle();
+        let spaces = handle.get_spaces();
         let dnas = dnas
             .into_iter()
             .map(|d| d.dna_hash().clone())
@@ -701,7 +701,7 @@ pub mod test {
         crate::assert_eq_retry_10s!(
             {
                 let mut count = 0;
-                for env in p2p.lock().values() {
+                for env in spaces.get_from_spaces(|s| s.p2p_env.clone()) {
                     let mut conn = env.conn().unwrap();
                     let txn = conn.transaction().unwrap();
                     count += txn.p2p_list_agents().unwrap().len();

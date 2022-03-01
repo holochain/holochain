@@ -50,6 +50,7 @@ use super::p2p_agent_store::get_agent_info_signed;
 use super::p2p_agent_store::inject_agent_infos;
 use super::p2p_agent_store::list_all_agent_info;
 use super::p2p_agent_store::list_all_agent_info_signed_near_basis;
+use super::space::Spaces;
 use super::Cell;
 use super::CellError;
 use super::Conductor;
@@ -355,6 +356,10 @@ pub trait ConductorHandleT: Send + Sync {
     /// Retrieve the database for networking. FOR TESTING ONLY.
     #[cfg(any(test, feature = "test_utils"))]
     fn get_p2p_env(&self, space: &DnaHash) -> DbWrite<DbKindP2pAgentStore>;
+
+    /// Retrieve the database for networking. FOR TESTING ONLY.
+    #[cfg(any(test, feature = "test_utils"))]
+    fn get_spaces(&self) -> Spaces;
 
     /// Retrieve Senders for triggering workflows. FOR TESTING ONLY.
     #[cfg(any(test, feature = "test_utils"))]
@@ -1427,6 +1432,11 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     #[cfg(any(test, feature = "test_utils"))]
     fn get_p2p_env(&self, space: &DnaHash) -> DbWrite<DbKindP2pAgentStore> {
         self.p2p_env(space)
+    }
+
+    #[cfg(any(test, feature = "test_utils"))]
+    fn get_spaces(&self) -> Spaces {
+        self.conductor.spaces.clone()
     }
 
     #[cfg(any(test, feature = "test_utils"))]
