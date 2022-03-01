@@ -140,7 +140,7 @@ impl DhtDbQueryCache {
                                     )?
                                     .collect::<rusqlite::Result<Vec<_>>>()?;
                                 let state = ActivityState {
-                                    awaiting_deps: awaiting_deps,
+                                    awaiting_deps,
                                     ..Default::default()
                                 };
                                 any_ready_activity.insert(author, state);
@@ -423,6 +423,8 @@ fn update_ready_to_integrate(prev_state: &mut ActivityState, new_ready: Option<u
                 if x.checked_add(1)
                     .map_or(false, |x_prime| x_prime == new_ready)
                 {
+                    let check_awaiting_deps =
+                        |x_prime_prime| awaiting_deps.first().map(|first| x_prime_prime == *first);
                     // (Ready(x), Out(x''..=y), x') -> Ready(y)
                     // (Ready(x), Out(x''..=y, z..), x') -> (Ready(y), Out(z..))
                     //
@@ -430,9 +432,7 @@ fn update_ready_to_integrate(prev_state: &mut ActivityState, new_ready: Option<u
                     // first sequence in awaiting_deps then we make the end of the sequence
                     // the new read_to_integrate.
                     if x.checked_add(2)
-                        .and_then(|x_prime_prime| {
-                            awaiting_deps.first().map(|first| x_prime_prime == *first)
-                        })
+                        .and_then(check_awaiting_deps)
                         .unwrap_or(false)
                     {
                         if let Some(y) = find_consecutive(awaiting_deps) {
