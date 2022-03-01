@@ -36,7 +36,9 @@ pub(crate) async fn spawn_test_agent(
 > {
     let (p2p, evt) = spawn_kitsune_p2p(
         config,
-        kitsune_p2p_proxy::TlsConfig::new_ephemeral().await.unwrap(),
+        kitsune_p2p_types::tls::TlsConfig::new_ephemeral()
+            .await
+            .unwrap(),
     )
     .await?;
 
