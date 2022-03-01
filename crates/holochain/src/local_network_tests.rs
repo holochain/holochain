@@ -31,7 +31,7 @@ use tracing::debug_span;
 #[test_case(4)]
 #[tokio::test(flavor = "multi_thread")]
 async fn conductors_call_remote(num_conductors: usize) {
-    observability::test_run().ok();
+    // observability::test_run().ok();
     let (dna, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create])
         .await
         .unwrap();

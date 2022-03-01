@@ -4,7 +4,7 @@
 use super::{SweetAgents, SweetApp, SweetAppBatch, SweetCell, SweetConductorHandle};
 use crate::conductor::{
     api::error::ConductorApiResult, config::ConductorConfig, error::ConductorResult,
-    handle::ConductorHandle, CellError, Conductor, ConductorBuilder,
+    handle::ConductorHandle, space::Spaces, CellError, Conductor, ConductorBuilder,
 };
 use hdk::prelude::*;
 use holo_hash::DnaHash;
@@ -29,6 +29,7 @@ pub type SignalStream = Box<dyn tokio_stream::Stream<Item = Signal> + Send + Syn
 pub struct SweetConductor {
     handle: Option<SweetConductorHandle>,
     envs: TestEnvs,
+    spaces: Spaces,
     config: ConductorConfig,
     dnas: Vec<DnaFile>,
     signal_stream: Option<SignalStream>,
@@ -71,9 +72,18 @@ impl SweetConductor {
         // Get a stream of all signals since conductor startup
         let signal_stream = handle.signal_broadcaster().await.subscribe_merged();
 
+        // XXX: this is a bit wonky.
+        // We create a Spaces instance here purely because it's easier to initialize
+        // the per-space databases this way. However, we actually use the TestEnvs
+        // to actually access those databases.
+        // As a TODO, we can remove the need for TestEnvs in sweettest or have
+        // some other better integration between the two.
+        let spaces = Spaces::new(envs.path().to_path_buf().into(), Default::default());
+
         Self {
             handle: Some(SweetConductorHandle(handle)),
             envs,
+            spaces,
             config,
             dnas: Vec::new(),
             signal_stream: Some(Box::new(signal_stream)),
@@ -207,8 +217,24 @@ impl SweetConductor {
         agent: AgentPubKey,
         dna_hashes: impl Iterator<Item = DnaHash>,
     ) -> ConductorApiResult<SweetApp> {
+        use holochain_p2p::DnaHashExt;
         let mut sweet_cells = Vec::new();
         for dna_hash in dna_hashes {
+            // Initialize per-space databases
+            // XXX: this is a bit of a hack, force-initializing both sets of
+            // mutexes, because we are using both TestEnvs and Spaces when we
+            // could be using one or the other.
+            let space = self.spaces.get_or_create_space(&dna_hash)?;
+            self.envs
+                .p2p()
+                .lock()
+                .insert(dna_hash.clone().into_kitsune(), space.p2p_env.clone());
+            self.envs.p2p_metrics().lock().insert(
+                dna_hash.clone().into_kitsune(),
+                space.p2p_metrics_env.clone(),
+            );
+
+            // Create the SweetCell
             let cell_authored_env = self.handle().0.get_authored_env(&dna_hash)?;
             let cell_dht_env = self.handle().0.get_dht_env(&dna_hash)?;
             let cell_id = CellId::new(dna_hash, agent.clone());
