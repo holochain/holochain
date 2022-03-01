@@ -135,7 +135,7 @@ impl SweetConductor {
 
     /// Access the TestEnvs for this conductor
     pub fn envs(&self) -> &Path {
-        &self.env_dir.path()
+        self.env_dir.path()
     }
 
     /// Access the MetaLairClient for this conductor
