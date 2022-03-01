@@ -75,6 +75,24 @@ impl Default for GetOptions {
     }
 }
 
+impl GetOptions {
+    /// Using defaults is dangerous in a must_get as it can undermine determinism.
+    /// We want refactors to explicitly consider this.
+    pub fn must_get_options() -> Self {
+        Self {
+            remote_agent_count: None,
+            timeout_ms: None,
+            as_race: true,
+            race_timeout_ms: None,
+            // Never redirect as the returned value must always match the hash.
+            follow_redirects: false,
+            all_live_headers_with_metadata: false,
+            // Redundant with retrieve_entry internals.
+            request_type: GetRequest::Pending,
+        }
+    }
+}
+
 impl From<holochain_zome_types::entry::GetOptions> for GetOptions {
     fn from(_: holochain_zome_types::entry::GetOptions) -> Self {
         Self::default()

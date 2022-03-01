@@ -22,12 +22,14 @@ pub fn must_get_header<'a>(
             ..
         } => {
             let header_hash = input.into_inner();
-            let network = call_context.host_context.network().clone();
 
             // timeouts must be handled by the network
             tokio_helper::block_forever_on(async move {
                 let workspace = call_context.host_context.workspace();
-                let mut cascade = Cascade::from_workspace_network(&workspace, network);
+                let mut cascade = match call_context.host_context {
+                    HostContext::Validate(_) => Cascade::from_workspace(workspace.stores(), None),
+                    _ => Cascade::from_workspace_network(&workspace, call_context.host_context.network().clone()),
+                };
                 match cascade
                     .retrieve_header(
                         header_hash.clone(),

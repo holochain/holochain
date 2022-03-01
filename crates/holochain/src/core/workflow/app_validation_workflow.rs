@@ -19,6 +19,7 @@ pub use error::*;
 use holo_hash::DhtOpHash;
 use holochain_cascade::Cascade;
 use holochain_keystore::MetaLairClient;
+use holochain_p2p::actor::GetOptions as NetworkGetOptions;
 use holochain_p2p::HolochainP2pDna;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
@@ -28,6 +29,7 @@ use holochain_types::prelude::*;
 use holochain_zome_types::op::EntryCreationHeader;
 use holochain_zome_types::op::Op;
 use rusqlite::Transaction;
+use std::collections::HashSet;
 use tracing::*;
 pub use types::Outcome;
 
@@ -94,8 +96,15 @@ async fn app_validation_workflow_inner(
                 let mut cascade = workspace.full_cascade(network.clone());
                 let r = match dhtop_to_op(op, &mut cascade).await {
                     Ok(op) => {
-                        validate_op_outer(dna_hash, &op, &conductor_handle, &(*workspace), &network)
-                            .await
+                        validate_op_outer(
+                            dna_hash,
+                            &op,
+                            &conductor_handle,
+                            &(*workspace),
+                            &network,
+                            &mut HashSet::default(),
+                        )
+                        .await
                     }
                     Err(e) => Err(e),
                 };
@@ -378,15 +387,17 @@ async fn dhtop_to_op(op: DhtOp, cascade: &mut Cascade) -> AppValidationOutcome<O
     Ok(op)
 }
 
+#[async_recursion::async_recursion]
 async fn validate_op_outer(
     dna_hash: Arc<DnaHash>,
     op: &Op,
     conductor_handle: &ConductorHandle,
     workspace: &AppValidationWorkspace,
     network: &HolochainP2pDna,
+    fetched_deps: &mut HashSet<AnyDhtHash>,
 ) -> AppValidationOutcome<Outcome> {
     // Get the workspace for the validation calls
-    let workspace = workspace.validation_workspace().await?;
+    let host_fn_workspace = workspace.validation_workspace().await?;
 
     // Get the dna file
     let dna_file = conductor_handle
@@ -395,7 +406,42 @@ async fn validate_op_outer(
 
     // Create the ribosome
     let ribosome = RealRibosome::new(dna_file);
-    validate_op(op, workspace, network, &ribosome).await
+    match validate_op(op, host_fn_workspace, network, &ribosome).await {
+        Ok(Outcome::AwaitingDeps(hashes)) => {
+            let unfetched_hashes: Vec<AnyDhtHash> = hashes.iter().filter(|&hash| !fetched_deps.contains(hash)).cloned().collect();
+            if unfetched_hashes.is_empty() {
+                let in_flight = unfetched_hashes.iter().map(|hash| async move {
+                    let cascade_workspace = workspace.validation_workspace().await?;
+                    let mut cascade =
+                        Cascade::from_workspace_network(&cascade_workspace, network.clone());
+                    cascade
+                        .fetch_element(hash.clone(), NetworkGetOptions::must_get_options())
+                        .await?;
+                    Ok(())
+                });
+                let results: AppValidationResult<Vec<()>> = futures::future::join_all(in_flight)
+                    .await
+                    .into_iter()
+                    .collect();
+                results?;
+                for hash in unfetched_hashes {
+                    fetched_deps.insert(hash);
+                }
+                validate_op_outer(
+                    dna_hash,
+                    op,
+                    conductor_handle,
+                    workspace,
+                    network,
+                    fetched_deps,
+                )
+                .await
+            } else {
+                Ok(Outcome::AwaitingDeps(hashes))
+            }
+        }
+        outcome => outcome,
+    }
 }
 
 pub async fn validate_op(

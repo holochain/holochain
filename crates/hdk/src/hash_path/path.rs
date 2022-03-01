@@ -295,14 +295,12 @@ impl Path {
                     parent.path_entry_hash()?,
                     self.path_entry_hash()?,
                     HdkLinkType::Path,
-                    LinkTag::new(
-                        match self.leaf() {
-                            None => <Vec<u8>>::with_capacity(0),
-                            Some(component) => {
-                                UnsafeBytes::from(SerializedBytes::try_from(component)?).into()
-                            }
+                    LinkTag::new(match self.leaf() {
+                        None => <Vec<u8>>::with_capacity(0),
+                        Some(component) => {
+                            UnsafeBytes::from(SerializedBytes::try_from(component)?).into()
                         }
-                    ),
+                    }),
                 )?;
             }
         }
@@ -323,10 +321,7 @@ impl Path {
     /// Only returns links between paths, not to other entries that might have their own links.
     pub fn children(&self) -> ExternResult<Vec<holochain_zome_types::link::Link>> {
         Self::ensure(self)?;
-        let mut unwrapped = get_links(
-            self.path_entry_hash()?,
-            None,
-        )?;
+        let mut unwrapped = get_links(self.path_entry_hash()?, None)?;
         // Only need one of each hash to build the tree.
         unwrapped.sort_unstable_by(|a, b| a.tag.cmp(&b.tag));
         unwrapped.dedup_by(|a, b| a.tag.eq(&b.tag));

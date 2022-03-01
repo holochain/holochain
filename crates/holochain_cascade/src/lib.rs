@@ -261,7 +261,7 @@ where
     }
 
     #[instrument(skip(self, options))]
-    async fn fetch_element(
+    pub async fn fetch_element(
         &mut self,
         hash: AnyDhtHash,
         options: NetworkGetOptions,
