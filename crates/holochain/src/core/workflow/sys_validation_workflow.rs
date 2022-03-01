@@ -109,15 +109,6 @@ async fn sys_validation_workflow_inner(
 
                 let dependency = get_dependency(op_type, &header);
 
-                // If this is agent activity, track it for the cache.
-                let activity = matches!(op_type, DhtOpType::RegisterAgentActivity).then(|| {
-                    (
-                        header.author().clone(),
-                        header.header_seq(),
-                        matches!(dependency, Dependency::Null),
-                    )
-                });
-
                 let r = validate_op(
                     &op,
                     &(*workspace),
@@ -126,7 +117,7 @@ async fn sys_validation_workflow_inner(
                     Some(incoming_dht_ops_sender),
                 )
                 .await;
-                r.map(|o| (op_hash, o, dependency, activity))
+                r.map(|o| (op_hash, o, dependency))
             }
         }
     });
@@ -163,21 +154,15 @@ async fn sys_validation_workflow_inner(
     while let Some(chunk) = iter.next().await {
         let num_ops: usize = chunk.iter().map(|c| c.len()).sum();
         tracing::debug!("Committing {} ops", num_ops);
-        let (t, a, m, r, activity) = space
+        let (t, a, m, r) = space
             .dht_env
             .async_commit(move |txn| {
                 let mut total = 0;
                 let mut awaiting = 0;
                 let mut missing = 0;
                 let mut rejected = 0;
-                let mut agent_activity = Vec::new();
                 for outcome in chunk.into_iter().flatten() {
-                    let (op_hash, outcome, dependency, activity) = outcome?;
-                    // Collect all agent activity.
-                    if let Some(activity) = activity {
-                        agent_activity.push(activity);
-                    }
-
+                    let (op_hash, outcome, dependency) = outcome?;
                     match outcome {
                         Outcome::Accepted => {
                             total += 1;
@@ -216,27 +201,10 @@ async fn sys_validation_workflow_inner(
                         }
                     }
                 }
-                WorkflowResult::Ok((total, awaiting, missing, rejected, agent_activity))
+                WorkflowResult::Ok((total, awaiting, missing, rejected))
             })
             .await?;
 
-        // Once the database transaction is committed, add agent activity to the cache
-        // that is ready for integration.
-        for (author, seq, has_no_dependency) in activity {
-            // Any activity with no dependency is integrated in this workflow.
-            // TODO: This will no longer be true when [#1212](https://github.com/holochain/holochain/pull/1212) lands.
-            if has_no_dependency {
-                space
-                    .dht_query_cache
-                    .set_activity_to_integrated(&author, seq)
-                    .await?;
-            } else {
-                space
-                    .dht_query_cache
-                    .set_activity_ready_to_integrate(&author, seq)
-                    .await?;
-            }
-        }
         total += t;
         if let (Some(start), Some(round_time)) = (start, &mut round_time) {
             let round_el = round_time.elapsed();

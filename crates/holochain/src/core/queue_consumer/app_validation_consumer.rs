@@ -5,11 +5,19 @@ use crate::conductor::manager::ManagedTaskResult;
 use crate::core::workflow::app_validation_workflow::app_validation_workflow;
 use crate::core::workflow::app_validation_workflow::AppValidationWorkspace;
 use holochain_p2p::*;
+use holochain_types::db_cache::DhtDbQueryCache;
 use tokio::task::JoinHandle;
 use tracing::*;
 
 /// Spawn the QueueConsumer for AppValidation workflow
-#[instrument(skip(workspace, conductor_handle, stop, trigger_integration, network))]
+#[instrument(skip(
+    workspace,
+    conductor_handle,
+    stop,
+    trigger_integration,
+    network,
+    dht_query_cache
+))]
 pub fn spawn_app_validation_consumer(
     dna_hash: Arc<DnaHash>,
     workspace: AppValidationWorkspace,
@@ -17,6 +25,7 @@ pub fn spawn_app_validation_consumer(
     mut stop: sync::broadcast::Receiver<()>,
     trigger_integration: TriggerSender,
     network: HolochainP2pDna,
+    dht_query_cache: DhtDbQueryCache,
 ) -> (TriggerSender, JoinHandle<ManagedTaskResult>) {
     let (tx, mut rx) = TriggerSender::new();
     let trigger_self = tx.clone();
@@ -38,6 +47,7 @@ pub fn spawn_app_validation_consumer(
                 trigger_integration.clone(),
                 conductor_handle.clone(),
                 network.clone(),
+                dht_query_cache.clone(),
             )
             .await;
             match result {

@@ -179,6 +179,7 @@ pub async fn spawn_queue_consumer_tasks(
             stop.subscribe(),
             tx_integration.clone(),
             network.clone(),
+            dht_query_cache.clone(),
         )
     });
     if let Some(handle) = handle {
