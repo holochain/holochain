@@ -36,7 +36,8 @@ pub struct SweetConductor {
 
 /// Standard config for SweetConductors
 pub fn standard_config() -> ConductorConfig {
-    let mut tuning_params = kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
+    let mut tuning_params =
+        kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
     // note, even with this tuning param, the `SSLKEYLOGFILE` env var
     // still must be set in order to enable session keylogging
     tuning_params.danger_tls_keylog = "env_keylog".to_string();

@@ -42,10 +42,7 @@ static CIPHER_SUITES: &[rustls::SupportedCipherSuite] = &[
 ];
 
 /// Single shared keylog file all sessions can report to
-static KEY_LOG: Lazy<Arc<dyn rustls::KeyLog>> = Lazy::new(|| {
-    println!("ONTHEUNOE {:?}", std::env::var("SSLKEYLOGFILE"));
-    Arc::new(rustls::KeyLogFile::new())
-});
+static KEY_LOG: Lazy<Arc<dyn rustls::KeyLog>> = Lazy::new(|| Arc::new(rustls::KeyLogFile::new()));
 
 /// Helper to generate rustls configs given a TlsConfig reference.
 #[allow(dead_code)]
