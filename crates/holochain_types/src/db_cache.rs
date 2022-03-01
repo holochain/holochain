@@ -39,7 +39,8 @@ pub struct ActivityState {
     /// Any activity that is ready to be integrated but is waiting
     /// for one or more upstream chain items to be marked ready before it can
     /// be integrated.
-    pub out_of_order: Vec<u32>,
+    /// This is an ordered sparse set.
+    pub awaiting_deps: Vec<u32>,
 }
 
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
@@ -127,9 +128,9 @@ impl DhtDbQueryCache {
                             )?;
 
                             // For each agent with activity that is ready to be integrated gather all
-                            // the chain items and add them to the `out_of_order` list.
+                            // the chain items and add them to the `awaiting_deps` list.
                             for author in all_activity_agents {
-                                let out_of_order = stmt
+                                let awaiting_deps = stmt
                                     .query_map(
                                         named_params! {
                                             ":register_activity": DhtOpType::RegisterAgentActivity,
@@ -139,7 +140,7 @@ impl DhtDbQueryCache {
                                     )?
                                     .collect::<rusqlite::Result<Vec<_>>>()?;
                                 let state = ActivityState {
-                                    out_of_order,
+                                    awaiting_deps: awaiting_deps,
                                     ..Default::default()
                                 };
                                 any_ready_activity.insert(author, state);
@@ -156,7 +157,7 @@ impl DhtDbQueryCache {
                     }
 
                     // Now for each agent we update their activity so that any chain items
-                    // that are ready to integrate are moved out of the `out_of_order` list.
+                    // that are ready to integrate are moved out of the `awaiting_deps` list.
                     for state in all_activity.values_mut() {
                         update_ready_to_integrate(state, None);
                     }
@@ -177,7 +178,7 @@ impl DhtDbQueryCache {
             activity
                 .iter()
                 .filter_map(|(agent, ActivityState { bounds, .. })| {
-                    // If there is anything ready to integrated then it will  be the end of the range.
+                    // If there is anything ready to integrated then it will be the end of the range.
                     let ready_to_integrate = bounds.ready_to_integrate?;
 
                     // The start of the range will be one more then the last integrated item or
@@ -342,7 +343,7 @@ fn update_activity(
         Some(prev_bounds) => update_activity_inner(prev_bounds, new_bounds),
         None => {
             // If the new bounds have `ready_to_integrate` and do not equal zero
-            // then they are out of order.
+            // then they are awaiting dependencies.
             if new_bounds.ready_to_integrate.map_or(false, |i| i != 0) {
                 activity.insert(
                     Arc::new(agent.clone()),
@@ -351,7 +352,7 @@ fn update_activity(
                             integrated: new_bounds.integrated,
                             ..Default::default()
                         },
-                        out_of_order: new_bounds.ready_to_integrate.into_iter().collect(),
+                        awaiting_deps: new_bounds.ready_to_integrate.into_iter().collect(),
                     },
                 );
             } else {
@@ -379,131 +380,165 @@ fn update_activity_inner(prev_state: &mut ActivityState, new_bounds: &ActivityBo
 /// This function is a bit complex but is heavily tested and maintains the
 /// chain activity can only be set to ready if it makes sense to.
 fn update_ready_to_integrate(prev_state: &mut ActivityState, new_ready: Option<u32>) {
+    // There is a new chain item that is ready for integration.
     if let Some(new_ready) = new_ready {
         match prev_state {
+            // Nothing is integrated or currently ready to integrate but there could
+            // be other chain items that are awaiting dependencies.
             ActivityState {
                 bounds:
                     ActivityBounds {
                         integrated: None,
                         ready_to_integrate: ready @ None,
                     },
-                out_of_order,
+                awaiting_deps,
             } => {
                 // (0) -> Ready(0)
+                //
+                // If we have no state and new_ready is zero
+                // then the new ready_to_integrate is set to zero.
                 if new_ready == 0 {
                     *ready = Some(new_ready);
                 // (x) -> Out(x) where x > 0
+                //
+                // If new_ready is not zero then it is added to awaiting_deps.
                 } else {
-                    out_of_order.push(new_ready);
-                    out_of_order.sort_unstable();
+                    awaiting_deps.push(new_ready);
+                    awaiting_deps.sort_unstable();
                 }
             }
-            // (Ready(x), a) -> (Ready(x), Out(y) where a != x')
-            // (Ready(x), Out(y..), a) -> (Ready(x), Out(y, a)) where a != x'
+            // There is existing chain items that are ready to integrate.
             ActivityState {
                 bounds:
                     ActivityBounds {
                         integrated: _,
                         ready_to_integrate: Some(x),
                     },
-                out_of_order,
+                awaiting_deps,
             } => {
                 // (Ready(x), x') -> Ready(x')
+                //
+                // If ready_to_integrate + 1 == new_ready then we know this
+                // new ready is consecutive from the previous ready_to_integrate.
                 if x.checked_add(1)
                     .map_or(false, |x_prime| x_prime == new_ready)
                 {
-                    // (Ready(x), Out(x''..y), x') -> Ready(y)
-                    // (Ready(x), Out(x''..y, z..), x') -> (Ready(y), Out(z..))
+                    // (Ready(x), Out(x''..=y), x') -> Ready(y)
+                    // (Ready(x), Out(x''..=y, z..), x') -> (Ready(y), Out(z..))
+                    //
+                    // If new_ready fills the gap between ready_to_integrate and the
+                    // first sequence in awaiting_deps then we make the end of the sequence
+                    // the new read_to_integrate.
                     if x.checked_add(2)
                         .and_then(|x_prime_prime| {
-                            out_of_order.first().map(|first| x_prime_prime == *first)
+                            awaiting_deps.first().map(|first| x_prime_prime == *first)
                         })
                         .unwrap_or(false)
                     {
-                        if let Some(y) = find_consecutive(out_of_order) {
+                        if let Some(y) = find_consecutive(awaiting_deps) {
                             *x = y;
                         }
                     } else {
                         *x = new_ready;
                     }
                 } else {
-                    out_of_order.push(new_ready);
-                    out_of_order.sort_unstable();
+                    // The new ready chain item is not consecutive from the current
+                    // ready so we add it to awaiting_deps.
+                    awaiting_deps.push(new_ready);
+                    awaiting_deps.sort_unstable();
                 }
             }
+            // There is an existing chain item that is integrated but
+            // no currently ready to integrate.
             ActivityState {
                 bounds:
                     ActivityBounds {
                         integrated: Some(x),
                         ready_to_integrate: ready @ None,
                     },
-                out_of_order,
+                awaiting_deps,
             } => {
                 // (Integrated(x), x') -> (Integrated(x), Ready(x'))
+                //
+                // If the new ready is consecutive from the integrated then we
+                // can set the new ready_to_integrate to the new ready.
                 if x.checked_add(1)
                     .map_or(false, |x_prime| x_prime == new_ready)
                 {
                     *ready = Some(new_ready);
                 // (Integrated(x), a) -> (Integrated(x), Out(y)) where a != 'x
+                //
+                // The new ready is not consecutive from the integrated so we add
+                // it to awaiting_deps.
                 } else {
-                    out_of_order.push(new_ready);
-                    out_of_order.sort_unstable();
+                    awaiting_deps.push(new_ready);
+                    awaiting_deps.sort_unstable();
                 }
             }
         }
     }
-    // (Ready(x), Out(x'..y)) -> (Ready(y))
-    // (Ready(x), Out(x'..y, z..)) -> (Ready(y), Out(z..))
+    // Now we have updated the ready_to_integrate and awaiting_deps if
+    // there was a new_ready we can check if there is now a new consecutive
+    // sequence.
     match prev_state {
+        // Check if there is a consecutive sequence from ready_to_integrate to awaiting_deps.
         ActivityState {
             bounds:
                 ActivityBounds {
                     ready_to_integrate: Some(x),
                     ..
                 },
-            out_of_order,
+            awaiting_deps,
         } => {
             if x.checked_add(1)
-                .and_then(|x_prime| out_of_order.first().map(|first| x_prime == *first))
+                .and_then(|x_prime| awaiting_deps.first().map(|first| x_prime == *first))
                 .unwrap_or(false)
             {
-                if let Some(y) = find_consecutive(out_of_order) {
+                if let Some(y) = find_consecutive(awaiting_deps) {
                     *x = y;
                 }
             }
         }
+        // If there is no ready_to_integrate then
+        // check if there is a consecutive sequence from integrated to awaiting_deps.
         ActivityState {
             bounds:
                 ActivityBounds {
                     integrated: Some(x),
                     ready_to_integrate: ready @ None,
                 },
-            out_of_order,
+            awaiting_deps,
         } => {
             if x.checked_add(1)
-                .and_then(|x_prime| out_of_order.first().map(|first| x_prime == *first))
+                .and_then(|x_prime| awaiting_deps.first().map(|first| x_prime == *first))
                 .unwrap_or(false)
             {
-                if let Some(y) = find_consecutive(out_of_order) {
+                if let Some(y) = find_consecutive(awaiting_deps) {
                     *ready = Some(y);
                 }
             }
         }
+        // Check if there is a zero in the awaiting deps.
+        // This should not happen but is here for robustness.
         ActivityState {
             bounds:
                 ActivityBounds {
                     integrated: None,
                     ready_to_integrate: ready @ None,
                 },
-            out_of_order,
+            awaiting_deps,
         } => {
-            if out_of_order.first().map_or(false, |first| *first == 0) {
-                if let Some(y) = find_consecutive(out_of_order) {
+            if awaiting_deps.first().map_or(false, |first| *first == 0) {
+                if let Some(y) = find_consecutive(awaiting_deps) {
                     *ready = Some(y);
                 }
             }
         }
     }
+
+    // Now the ready_to_integrate and awaiting_deps are updated if
+    // the integrated is the same as the read_to_integrate then that
+    // chain item was integrated so there is no longer a ready_to_integrate.
     if prev_state
         .bounds
         .integrated
@@ -516,13 +551,16 @@ fn update_ready_to_integrate(prev_state: &mut ActivityState, new_ready: Option<u
 
 // Out(x..y) -> (y)
 // Out(x..y, z..)) -> (Out(z..), y)
-fn find_consecutive(out_of_order: &mut Vec<u32>) -> Option<u32> {
-    if out_of_order.len() == 1 {
-        out_of_order.pop()
+//
+// Take the awaiting dependencies and if there's a sequence from the start
+// then remove it and return the end of the sequence.
+fn find_consecutive(awaiting_deps: &mut Vec<u32>) -> Option<u32> {
+    if awaiting_deps.len() == 1 {
+        awaiting_deps.pop()
     } else {
-        let last_consecutive_pos = out_of_order
+        let last_consecutive_pos = awaiting_deps
             .iter()
-            .zip(out_of_order.iter().skip(1))
+            .zip(awaiting_deps.iter().skip(1))
             .position(|(n, delta)| {
                 n.checked_add(1)
                     .map(|n_prime| n_prime != *delta)
@@ -530,15 +568,15 @@ fn find_consecutive(out_of_order: &mut Vec<u32>) -> Option<u32> {
             });
         match last_consecutive_pos {
             Some(pos) => {
-                let r = out_of_order.get(pos).copied();
+                let r = awaiting_deps.get(pos).copied();
                 // Drop the consecutive seqs.
-                drop(out_of_order.drain(..=pos));
-                out_of_order.shrink_to_fit();
+                drop(awaiting_deps.drain(..=pos));
+                awaiting_deps.shrink_to_fit();
                 r
             }
             None => {
-                let r = out_of_order.pop();
-                out_of_order.clear();
+                let r = awaiting_deps.pop();
+                awaiting_deps.clear();
                 r
             }
         }
@@ -558,8 +596,8 @@ impl ActivityState {
         self.bounds.ready_to_integrate = Some(i);
         self
     }
-    fn out(mut self, i: Vec<u32>) -> Self {
-        self.out_of_order = i;
+    fn awaiting(mut self, i: Vec<u32>) -> Self {
+        self.awaiting_deps = i;
         self
     }
 }

@@ -354,3 +354,24 @@ async fn cache_set_all_integrated() {
         assert_eq!(*range, seq_range);
     }
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn check_none_integrated_with_awaiting_deps() {
+    let mut u = Unstructured::new(&NOISE);
+    let author = Arc::new(AgentPubKey::arbitrary(&mut u).unwrap());
+    let db = test_in_mem_db(DbKindDht(Arc::new(DnaHash::from_raw_32(vec![0; 32]))));
+    let cache = DhtDbQueryCache::new(db.clone().into());
+    cache
+        .set_activity_ready_to_integrate(author.as_ref(), 3)
+        .await
+        .unwrap();
+    check_state(&cache, |activity| {
+        let b = activity.get(author.as_ref()).unwrap();
+        assert_eq!(b.integrated, None);
+        assert_eq!(b.ready_to_integrate, None);
+        assert_eq!(b.awaiting_deps, vec![3]);
+    })
+    .await;
+    let to_integrate = cache.get_activity_to_integrate().await.unwrap();
+    assert!(to_integrate.is_empty());
+}

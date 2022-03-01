@@ -112,7 +112,12 @@ fn can_accept_ready_in_random_order() {
             }
             [x] if *x > 0 => {
                 assert_eq!(
-                    activity.get(&author).unwrap().out_of_order.first().unwrap(),
+                    activity
+                        .get(&author)
+                        .unwrap()
+                        .awaiting_deps
+                        .first()
+                        .unwrap(),
                     x
                 );
             }
@@ -123,7 +128,7 @@ fn can_accept_ready_in_random_order() {
                         current_top
                     );
                 } else {
-                    assert_eq!(activity.get(&author).unwrap().out_of_order, spent);
+                    assert_eq!(activity.get(&author).unwrap().awaiting_deps, spent);
                 }
             }
         }
@@ -134,21 +139,23 @@ type AS = ActivityState;
 
 #[test_case(AS::new(), None => AS::new())]
 #[test_case(AS::new(), Some(0) => AS::new().ready(0))]
-#[test_case(AS::new(), Some(1) => AS::new().out(vec![1]))]
+#[test_case(AS::new(), Some(1) => AS::new().awaiting(vec![1]))]
 #[test_case(AS::new().ready(0), Some(1) => AS::new().ready(1))]
-#[test_case(AS::new().ready(0), Some(2) => AS::new().ready(0).out(vec![2]))]
-#[test_case(AS::new().ready(0).out(vec![2]), Some(1) => AS::new().ready(2))]
-#[test_case(AS::new().ready(0).out(vec![2, 3, 4]), Some(1) => AS::new().ready(4))]
-#[test_case(AS::new().ready(0).out(vec![3, 4, 5]), Some(1) => AS::new().ready(1).out(vec![3, 4, 5]))]
-#[test_case(AS::new().ready(0).out(vec![3, 4, 5]), Some(2) => AS::new().ready(0).out(vec![2, 3, 4, 5]))]
+#[test_case(AS::new().ready(0), Some(2) => AS::new().ready(0).awaiting(vec![2]))]
+#[test_case(AS::new().ready(0).awaiting(vec![2]), Some(1) => AS::new().ready(2))]
+#[test_case(AS::new().ready(0).awaiting(vec![2, 3, 4]), Some(1) => AS::new().ready(4))]
+#[test_case(AS::new().ready(0).awaiting(vec![3, 4, 5]), Some(1) => AS::new().ready(1).awaiting(vec![3, 4, 5]))]
+#[test_case(AS::new().ready(0).awaiting(vec![3, 4, 5]), Some(2) => AS::new().ready(0).awaiting(vec![2, 3, 4, 5]))]
 #[test_case(AS::new().integrated(0), Some(1) => AS::new().integrated(0).ready(1))]
-#[test_case(AS::new().integrated(0), Some(2) => AS::new().integrated(0).out(vec![2]))]
-#[test_case(AS::new().integrated(0).out(vec![2]), Some(1) => AS::new().integrated(0).ready(2))]
-#[test_case(AS::new().integrated(0).out(vec![2, 3, 4]), Some(1) => AS::new().integrated(0).ready(4))]
-#[test_case(AS::new().integrated(0).out(vec![3, 4, 5]), Some(1) => AS::new().integrated(0).ready(1).out(vec![3, 4, 5]))]
-#[test_case(AS::new().integrated(0).out(vec![3, 4, 5]), Some(2) => AS::new().integrated(0).out(vec![2, 3, 4, 5]))]
-#[test_case(AS::new().out(vec![0]), None => AS::new().ready(0))]
+#[test_case(AS::new().integrated(0), Some(2) => AS::new().integrated(0).awaiting(vec![2]))]
+#[test_case(AS::new().integrated(0).awaiting(vec![2]), Some(1) => AS::new().integrated(0).ready(2))]
+#[test_case(AS::new().integrated(0).awaiting(vec![2, 3, 4]), Some(1) => AS::new().integrated(0).ready(4))]
+#[test_case(AS::new().integrated(0).awaiting(vec![3, 4, 5]), Some(1) => AS::new().integrated(0).ready(1).awaiting(vec![3, 4, 5]))]
+#[test_case(AS::new().integrated(0).awaiting(vec![3, 4, 5]), Some(2) => AS::new().integrated(0).awaiting(vec![2, 3, 4, 5]))]
+#[test_case(AS::new().awaiting(vec![0]), None => AS::new().ready(0))]
 #[test_case(AS::new().integrated(0).ready(0), None => AS::new().integrated(0))]
+#[test_case(AS::new().integrated(1).awaiting(vec![3, 4, 5]), Some(2) => AS::new().integrated(1).ready(5))]
+#[test_case(AS::new().integrated(1).awaiting(vec![3, 4, 5, 9, 11]), Some(2) => AS::new().integrated(1).ready(5).awaiting(vec![9, 11]))]
 fn update_ready_to_integrate_test(
     mut state: ActivityState,
     new_ready: Option<u32>,
@@ -164,7 +171,8 @@ fn update_ready_to_integrate_test(
 #[test_case(vec![0, 1, 3] => (Some(1), vec![3]))]
 #[test_case(vec![0, 1, 3, 4] => (Some(1), vec![3, 4]))]
 #[test_case(vec![0, 3, 4] => (Some(0), vec![3, 4]))]
-fn find_consecutive_test(mut out_of_order: Vec<u32>) -> (Option<u32>, Vec<u32>) {
-    let r = find_consecutive(&mut out_of_order);
-    (r, out_of_order)
+#[test_case(vec![1, 3, 4] => (Some(1), vec![3, 4]))]
+fn find_consecutive_test(mut awaiting_deps: Vec<u32>) -> (Option<u32>, Vec<u32>) {
+    let r = find_consecutive(&mut awaiting_deps);
+    (r, awaiting_deps)
 }
