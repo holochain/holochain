@@ -1,3 +1,5 @@
+use kitsune_p2p_types::combinators::second;
+
 use super::*;
 
 #[derive(Clone)]
@@ -117,6 +119,9 @@ impl ShardedGossipLocal {
                 })
                 .await
                 .map_err(KitsuneError::other)?
+                .into_iter()
+                .map(second)
+                .collect()
         };
 
         let got_len = missing_ops.len();
@@ -161,10 +166,7 @@ impl ShardedGossipLocal {
     }
 
     /// Incoming ops that were missing from this nodes bloom filter.
-    pub(super) async fn incoming_missing_ops(
-        &self,
-        ops: Vec<(Arc<KitsuneOpHash>, Vec<u8>)>,
-    ) -> KitsuneResult<()> {
+    pub(super) async fn incoming_missing_ops(&self, ops: Vec<KOp>) -> KitsuneResult<()> {
         // Put the ops in the agents that contain the ops within their arcs.
         store::put_ops(&self.evt_sender, &self.space, ops).await?;
 
@@ -173,11 +175,7 @@ impl ShardedGossipLocal {
 }
 
 /// Separate gossip into chunks to keep messages under the max size.
-fn into_chunks(
-    gossip: &mut Vec<ShardedGossipWire>,
-    ops: Vec<(Arc<KitsuneOpHash>, Vec<u8>)>,
-    complete: u8,
-) {
+fn into_chunks(gossip: &mut Vec<ShardedGossipWire>, ops: Vec<KOp>, complete: u8) {
     let mut chunk = Vec::with_capacity(ops.len());
     let mut size = 0;
 
@@ -192,7 +190,7 @@ fn into_chunks(
 
     for op in ops {
         // Bytes for this op.
-        let bytes = op.0.len() + op.1.len();
+        let bytes = op.size();
 
         // Check if this op will fit without going over the max.
         if size + bytes <= MAX_SEND_BUF_BYTES {

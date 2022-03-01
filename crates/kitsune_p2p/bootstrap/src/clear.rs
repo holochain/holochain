@@ -28,7 +28,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_clear() {
-        let store = Store::new();
+        let store = Store::new(vec![]);
 
         let filter = super::clear(store.clone());
         let space: Arc<KitsuneSpace> = Arc::new(fixt!(KitsuneSpace));

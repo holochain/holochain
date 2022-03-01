@@ -25,28 +25,6 @@ pub enum ValidationStatus {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
-pub struct ValidateData {
-    pub element: Element,
-    pub validation_package: Option<ValidationPackage>,
-}
-
-impl ValidateData {
-    pub fn new(element: Element, validation_package: Option<ValidationPackage>) -> Self {
-        Self {
-            element,
-            validation_package,
-        }
-    }
-
-    pub fn new_element_only(element: Element) -> Self {
-        Self {
-            element,
-            validation_package: None,
-        }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
 pub enum ValidateCallbackResult {
     Valid,
     Invalid(String),

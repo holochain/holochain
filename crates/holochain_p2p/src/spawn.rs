@@ -7,7 +7,7 @@ use actor::*;
 /// Spawn a new HolochainP2p actor.  Conductor will call this on initialization.
 pub async fn spawn_holochain_p2p(
     config: kitsune_p2p::KitsuneP2pConfig,
-    tls_config: kitsune_p2p::dependencies::kitsune_p2p_proxy::TlsConfig,
+    tls_config: kitsune_p2p::dependencies::kitsune_p2p_types::tls::TlsConfig,
 ) -> HolochainP2pResult<(
     ghost_actor::GhostSender<HolochainP2p>,
     HolochainP2pEventReceiver,

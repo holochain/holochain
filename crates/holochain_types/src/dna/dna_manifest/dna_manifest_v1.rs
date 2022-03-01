@@ -39,7 +39,7 @@ pub struct DnaManifestV1 {
 
 fn default_origin_time() -> HumanTimestamp {
     // Jan 1, 2022, 12:00:00 AM UTC
-    Timestamp::from_micros(1640995200000000).into()
+    Timestamp::HOLOCHAIN_EPOCH.into()
 }
 
 /// Manifest for an individual Zome

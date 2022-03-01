@@ -32,7 +32,7 @@ impl ShardedGossipLocal {
         for info in agents_within_arc {
             let signed_at_ms = info.signed_at_ms;
             // The key is the agent hash + the signed at.
-            let key = Arc::new(MetaOpKey::Agent(info.0.agent.clone(), signed_at_ms));
+            let key = MetaOpKey::Agent(info.0.agent.clone(), signed_at_ms);
             bloom.set(&key);
         }
         Ok(Some(bloom))
@@ -113,7 +113,7 @@ impl ShardedGossipLocal {
 
                             while iter.peek().is_some() {
                                 for hash in iter.by_ref().take(100) {
-                                    bloom.set(&Arc::new(MetaOpKey::Op(hash)));
+                                    bloom.set(&MetaOpKey::Op(hash));
                                 }
                                 // Yield to the conductor every 100 hashes. Because tasks have
                                 // polling budgets this gives the runtime a chance to schedule other
@@ -199,7 +199,7 @@ impl ShardedGossipLocal {
 
                         while iter.peek().is_some() {
                             for hash in iter.by_ref().take(100) {
-                                if !remote_bloom.check(&Arc::new(MetaOpKey::Op(hash.clone()))) {
+                                if !remote_bloom.check(&MetaOpKey::Op(hash.clone())) {
                                     missing_hashes.push(hash);
                                 }
                             }

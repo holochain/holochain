@@ -65,15 +65,6 @@ pub fn must_get_entry<'a>(
                                 ))?,
                             )?),
                         )),
-                        HostContext::ValidateCreateLink(_) => {
-                            RuntimeError::raise(Box::new(WasmError::HostShortCircuit(
-                                holochain_serialized_bytes::encode(&ExternIO::encode(
-                                    ValidateLinkCallbackResult::UnresolvedDependencies(vec![
-                                        entry_hash.into(),
-                                    ]),
-                                )?)?,
-                            )))
-                        }
                         HostContext::Validate(_) => {
                             RuntimeError::raise(Box::new(WasmError::HostShortCircuit(
                                 holochain_serialized_bytes::encode(&ExternIO::encode(
@@ -109,13 +100,12 @@ pub fn must_get_entry<'a>(
 
 #[cfg(test)]
 pub mod test {
-    use hdk::prelude::*;
-    use holochain_wasm_test_utils::TestWasm;
-    // use std::sync::Arc;
     use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use crate::test_entry_impl;
+    use hdk::prelude::*;
     use holochain_state::prelude::*;
     use holochain_types::prelude::*;
+    use holochain_wasm_test_utils::TestWasm;
     use unwrap_to::unwrap_to;
 
     /// Mimics inside the must_get wasm.

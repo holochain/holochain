@@ -20,6 +20,7 @@ use holochain_state::prelude::*;
 use holochain_types::test_utils::fake_cell_id;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::WebsocketSender;
+use holochain_zome_types::op::Op;
 use kitsune_p2p_types::dependencies::lair_keystore_api_0_0::LairError;
 use maplit::hashset;
 use matches::assert_matches;
@@ -223,97 +224,6 @@ async fn can_set_fake_state() {
         .await
         .unwrap();
     assert_eq!(state, conductor.get_state_from_handle().await.unwrap());
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn proxy_tls_with_test_keystore() {
-    observability::test_run().ok();
-
-    let keystore1 = spawn_test_keystore().await.unwrap();
-    let keystore2 = spawn_test_keystore().await.unwrap();
-
-    if let Err(e) = proxy_tls_inner(keystore1.clone(), keystore2.clone()).await {
-        panic!("{:#?}", e);
-    }
-
-    let _ = keystore1.shutdown().await;
-    let _ = keystore2.shutdown().await;
-}
-
-async fn proxy_tls_inner(
-    keystore1: MetaLairClient,
-    keystore2: MetaLairClient,
-) -> anyhow::Result<()> {
-    use ghost_actor::GhostControlSender;
-    use kitsune_p2p::dependencies::*;
-    use kitsune_p2p_proxy::*;
-    use kitsune_p2p_types::transport::*;
-
-    let (cert_digest, cert, cert_priv_key) = keystore1.get_or_create_first_tls_cert().await?;
-
-    let tls_config1 = TlsConfig {
-        cert,
-        cert_priv_key,
-        cert_digest,
-    };
-
-    let (cert_digest, cert, cert_priv_key) = keystore2.get_or_create_first_tls_cert().await?;
-
-    let tls_config2 = TlsConfig {
-        cert,
-        cert_priv_key,
-        cert_digest,
-    };
-
-    let proxy_config =
-        ProxyConfig::local_proxy_server(tls_config1, AcceptProxyCallback::reject_all());
-    let (bind, evt) = kitsune_p2p_types::transport_mem::spawn_bind_transport_mem().await?;
-    let (bind1, mut evt1) = spawn_kitsune_proxy_listener(
-        proxy_config,
-        kitsune_p2p::dependencies::kitsune_p2p_types::config::KitsuneP2pTuningParams::default(),
-        bind,
-        evt,
-    )
-    .await?;
-    tokio::task::spawn(async move {
-        while let Some(evt) = evt1.next().await {
-            match evt {
-                TransportEvent::IncomingChannel(_, mut write, read) => {
-                    println!("YOOTH");
-                    let data = read.read_to_end().await;
-                    let data = String::from_utf8_lossy(&data);
-                    let data = format!("echo: {}", data);
-                    write.write_and_close(data.into_bytes()).await?;
-                }
-            }
-        }
-        TransportResult::Ok(())
-    });
-    let url1 = bind1.bound_url().await?;
-    println!("{:?}", url1);
-
-    let proxy_config =
-        ProxyConfig::local_proxy_server(tls_config2, AcceptProxyCallback::reject_all());
-    let (bind, evt) = kitsune_p2p_types::transport_mem::spawn_bind_transport_mem().await?;
-    let (bind2, _evt2) = spawn_kitsune_proxy_listener(
-        proxy_config,
-        kitsune_p2p::dependencies::kitsune_p2p_types::config::KitsuneP2pTuningParams::default(),
-        bind,
-        evt,
-    )
-    .await?;
-    println!("{:?}", bind2.bound_url().await?);
-
-    let (_url, mut write, read) = bind2.create_channel(url1).await?;
-    write.write_and_close(b"test".to_vec()).await?;
-    let data = read.read_to_end().await;
-    let data = String::from_utf8_lossy(&data);
-    assert_eq!("echo: test", data);
-
-    let _ = bind1.ghost_actor_shutdown_immediate().await;
-    let _ = bind2.ghost_actor_shutdown_immediate().await;
-
-    Ok(())
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -715,10 +625,13 @@ async fn test_bad_entry_validation_after_genesis_returns_zome_call_error() {
     observability::test_run().ok();
     let unit_entry_def = EntryDef::default_with_id("unit");
     let bad_zome = InlineZome::new_unique(vec![unit_entry_def.clone()])
-        .callback("validate_create_entry", |_api, _data: ValidateData| {
-            Ok(ValidateResult::Invalid(
-                "intentional invalid result for testing".into(),
-            ))
+        .callback("validate", |_api, op: Op| match op {
+            Op::StoreEntry { header, .. } if header.hashed.content.app_entry_type().is_some() => {
+                Ok(ValidateResult::Invalid(
+                    "intentional invalid result for testing".into(),
+                ))
+            }
+            _ => Ok(ValidateResult::Valid),
         })
         .callback("create", move |api, ()| {
             let entry_def_id: EntryDefId = unit_entry_def.id.clone();
@@ -760,7 +673,7 @@ async fn test_bad_entry_validation_after_genesis_returns_zome_call_error() {
 //   Otherwise, we have to devise a way to discover whether a panic happened
 //   during genesis or not.
 // NOTE: we need a test with a failure during a validation callback that happens
-//       *inline*. It's not enough to have a failing validate_create_entry for
+//       *inline*. It's not enough to have a failing validate for
 //       instance, because that failure will be returned by the zome call.
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "need to figure out how to write this test, i.e. to make genesis panic"]
@@ -770,10 +683,17 @@ async fn test_apps_disable_on_panic_after_genesis() {
     let bad_zome = InlineZome::new_unique(vec![unit_entry_def.clone()])
         // We need a different validation callback that doesn't happen inline
         // so we can cause failure in it. But it must also be after genesis.
-        .callback("validate_create_entry", |_api, _data: ValidateData| {
-            // Trigger a deserialization error
-            let _: Entry = SerializedBytes::try_from(())?.try_into()?;
-            Ok(ValidateResult::Valid)
+        .callback("validate", |_api, op: Op| {
+            match op {
+                Op::StoreEntry { header, .. }
+                    if header.hashed.content.app_entry_type().is_some() =>
+                {
+                    // Trigger a deserialization error
+                    let _: Entry = SerializedBytes::try_from(())?.try_into()?;
+                    Ok(ValidateResult::Valid)
+                }
+                _ => Ok(ValidateResult::Valid),
+            }
         })
         .callback("create", move |api, ()| {
             let entry_def_id: EntryDefId = unit_entry_def.id.clone();

@@ -24,6 +24,10 @@ pub enum HoloHashError {
     /// checksum validation failed
     #[error("Holo Hash checksum validation failed")]
     BadChecksum,
+
+    /// this hash size is too large for blake2b
+    #[error("Bad Blake2B hash size.")]
+    BadHashSize,
 }
 
 /// HoloHash Result type

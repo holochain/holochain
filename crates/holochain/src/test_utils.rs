@@ -205,9 +205,10 @@ where
 
     let (network, mut recv) = spawn_holochain_p2p(
         config,
-        holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_proxy::TlsConfig::new_ephemeral()
-            .await
-            .unwrap(),
+        holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_types::tls::TlsConfig::new_ephemeral(
+        )
+        .await
+        .unwrap(),
     )
     .await
     .unwrap();
@@ -500,8 +501,8 @@ fn get_published_ops<Db: ReadAccess<DbKindAuthored>>(
             |row| {
                 let op_type: DhtOpType = row.get("type")?;
                 let hash: HeaderHash = row.get("hash")?;
-                let header: Header = from_blob(row.get("blob")?)?;
-                Ok(DhtOpLight::from_type(op_type, hash, &header)?)
+                let header: SignedHeader = from_blob(row.get("blob")?)?;
+                Ok(DhtOpLight::from_type(op_type, hash, &header.0)?)
             },
         )
         .unwrap()

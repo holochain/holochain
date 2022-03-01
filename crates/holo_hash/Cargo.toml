@@ -1,10 +1,10 @@
 [package]
 name = "holo_hash"
-version = "0.0.19"
+version = "0.0.20"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 keywords = [ "holochain", "holo", "hash", "blake", "blake2b" ]
 categories = [ "cryptography" ]
-edition = "2018"
+edition = "2021"
 description = "hashing helpers supporting dht sharding"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"

@@ -74,13 +74,8 @@ fn expected_invalid_entry(
     let sql = format!(
         "
         {}
-        (
-            (type = :store_entry AND header_hash = :invalid_header_hash 
-                AND basis_hash = :invalid_entry_hash AND validation_status = :rejected)
-            OR
-            (type = :store_element AND header_hash = :invalid_header_hash 
-                AND validation_status = :rejected)
-        )
+        type = :store_entry AND header_hash = :invalid_header_hash 
+            AND basis_hash = :invalid_entry_hash AND validation_status = :rejected
     ",
         SELECT
     );
@@ -92,13 +87,12 @@ fn expected_invalid_entry(
                 ":invalid_header_hash": invalid_header_hash,
                 ":invalid_entry_hash": invalid_entry_hash,
                 ":store_entry": DhtOpType::StoreEntry,
-                ":store_element": DhtOpType::StoreElement,
                 ":rejected": ValidationStatus::Rejected,
             },
             |row| row.get(0),
         )
         .unwrap();
-    count == 2
+    count == 1
 }
 
 // Now we expect an invalid link
@@ -106,13 +100,8 @@ fn expected_invalid_link(txn: &Transaction, invalid_link_hash: &HeaderHash) -> b
     let sql = format!(
         "
         {}
-        (
-            (type = :create_link AND header_hash = :invalid_link_hash 
-                AND validation_status = :rejected)
-            OR
-            (type = :store_element AND header_hash = :invalid_link_hash 
-                AND validation_status = :rejected)
-        )
+        type = :create_link AND header_hash = :invalid_link_hash 
+            AND validation_status = :rejected
     ",
         SELECT
     );
@@ -123,13 +112,12 @@ fn expected_invalid_link(txn: &Transaction, invalid_link_hash: &HeaderHash) -> b
             named_params! {
                 ":invalid_link_hash": invalid_link_hash,
                 ":create_link": DhtOpType::RegisterAddLink,
-                ":store_element": DhtOpType::StoreElement,
                 ":rejected": ValidationStatus::Rejected,
             },
             |row| row.get(0),
         )
         .unwrap();
-    count == 2
+    count == 1
 }
 
 // Now we're trying to remove an invalid link
@@ -137,13 +125,8 @@ fn expected_invalid_remove_link(txn: &Transaction, invalid_remove_hash: &HeaderH
     let sql = format!(
         "
         {}
-        (
-            (type = :delete_link AND header_hash = :invalid_remove_hash 
-                AND validation_status = :rejected)
-            OR
-            (type = :store_element AND header_hash = :invalid_remove_hash 
-                AND validation_status = :rejected)
-        )
+        (type = :delete_link AND header_hash = :invalid_remove_hash 
+            AND validation_status = :rejected)
     ",
         SELECT
     );
@@ -154,13 +137,12 @@ fn expected_invalid_remove_link(txn: &Transaction, invalid_remove_hash: &HeaderH
             named_params! {
                 ":invalid_remove_hash": invalid_remove_hash,
                 ":delete_link": DhtOpType::RegisterRemoveLink,
-                ":store_element": DhtOpType::StoreElement,
                 ":rejected": ValidationStatus::Rejected,
             },
             |row| row.get(0),
         )
         .unwrap();
-    count == 2
+    count == 1
 }
 
 fn limbo_is_empty(txn: &Transaction) -> bool {
@@ -175,12 +157,25 @@ fn limbo_is_empty(txn: &Transaction) -> bool {
 }
 
 fn show_limbo(txn: &Transaction) -> Vec<DhtOpLight> {
-    txn.prepare("SELECT blob FROM DhtOp WHERE when_integrated IS NULL")
-        .unwrap()
-        .query_and_then([], |row| from_blob(row.get("blob")?))
-        .unwrap()
-        .collect::<StateQueryResult<Vec<DhtOpLight>>>()
-        .unwrap()
+    txn.prepare(
+        "
+        SELECT DhtOp.type, Header.hash, Header.blob
+        FROM DhtOp 
+        JOIN Header ON DhtOp.header_hash = Header.hash
+        WHERE
+        when_integrated IS NULL
+    ",
+    )
+    .unwrap()
+    .query_and_then([], |row| {
+        let op_type: DhtOpType = row.get("type")?;
+        let hash: HeaderHash = row.get("hash")?;
+        let header: SignedHeader = from_blob(row.get("blob")?)?;
+        Ok(DhtOpLight::from_type(op_type, hash, &header.0)?)
+    })
+    .unwrap()
+    .collect::<StateQueryResult<Vec<DhtOpLight>>>()
+    .unwrap()
 }
 
 fn num_valid(txn: &Transaction) -> usize {
@@ -236,8 +231,7 @@ async fn run_test(
 
     // Integration should have 3 ops in it
     // StoreEntry should be invalid.
-    // RegisterAgentActivity doesn't run app validation
-    // So they will be valid.
+    // RegisterAgentActivity will be valid.
     let expected_count = 3 + expected_count;
     let alice_env = conductors[0]
         .get_dht_env(&alice_cell_id.dna_hash())
@@ -254,7 +248,8 @@ async fn run_test(
             &invalid_header_hash,
             &invalid_entry_hash
         ));
-        assert_eq!(num_valid(&txn), expected_count - 2);
+        // Expect having one invalid op for the store entry.
+        assert_eq!(num_valid(&txn), expected_count - 1);
     });
 
     let invocation =
@@ -278,7 +273,8 @@ async fn run_test(
             &invalid_header_hash,
             &invalid_entry_hash
         ));
-        assert_eq!(num_valid(&txn), expected_count - 2);
+        // Expect having one invalid op for the store entry.
+        assert_eq!(num_valid(&txn), expected_count - 1);
     });
 
     let invocation =
@@ -307,7 +303,8 @@ async fn run_test(
             &invalid_entry_hash
         ));
         assert!(expected_invalid_link(&txn, &invalid_link_hash));
-        assert_eq!(num_valid(&txn), expected_count - 4);
+        // Expect having two invalid ops for the two store entries.
+        assert_eq!(num_valid(&txn), expected_count - 2);
     });
 
     let invocation = new_invocation(
@@ -337,7 +334,8 @@ async fn run_test(
             &invalid_entry_hash
         ));
         assert!(expected_invalid_link(&txn, &invalid_link_hash));
-        assert_eq!(num_valid(&txn), expected_count - 4);
+        // Expect having two invalid ops for the two store entries.
+        assert_eq!(num_valid(&txn), expected_count - 2);
     });
 
     let invocation = new_invocation(
@@ -372,8 +370,8 @@ async fn run_test(
         ));
         assert!(expected_invalid_link(&txn, &invalid_link_hash));
         assert!(expected_invalid_remove_link(&txn, &invalid_remove_hash));
-        // 6 invalid ops above plus 2 extra invalid ops that `remove_invalid_link` commits.
-        assert_eq!(num_valid(&txn), expected_count - (6 + 2));
+        // 3 invalid ops above plus 1 extra invalid ops that `remove_invalid_link` commits.
+        assert_eq!(num_valid(&txn), expected_count - (3 + 1));
     });
     expected_count
 }
@@ -417,7 +415,8 @@ async fn run_test_entry_def_id(
             &invalid_header_hash,
             &invalid_entry_hash
         ));
-        assert_eq!(num_valid(&txn), expected_count - 10);
+        // Expect having two invalid ops for the two store entries plus the 3 from the previous test.
+        assert_eq!(num_valid(&txn), expected_count - 5);
     });
 }
 

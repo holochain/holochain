@@ -318,7 +318,7 @@ async fn check_app_entry_type_test() {
             name: "app_entry_type_test".to_string(),
             uid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
             properties: SerializedBytes::try_from(()).unwrap(),
-            origin_time: Timestamp::now(),
+            origin_time: Timestamp::HOLOCHAIN_EPOCH,
             zomes: vec![TestWasm::EntryDefs.into()].into(),
         },
         vec![TestWasm::EntryDefs.into()],

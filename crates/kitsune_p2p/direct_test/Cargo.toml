@@ -8,12 +8,12 @@ documentation = "https://docs.rs/kitsune_p2p_direct_test"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 keywords = [ "holochain", "holo", "p2p", "dht", "networking" ]
 categories = [ "network-programming" ]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 kitsune_p2p_direct = { version = "0.0.1", path = "../direct" }
-kitsune_p2p_transport_quic = { version = "0.0.17", path = "../transport_quic" }
-kitsune_p2p_proxy = { version = "0.0.17", path = "../proxy" }
+kitsune_p2p_transport_quic = { version = "0.0.18", path = "../transport_quic" }
+kitsune_p2p_proxy = { version = "0.0.18", path = "../proxy" }
 rand = "0.8.4"
 structopt = "0.3.21"
 tokio = { version = "1.11", features = ["full"] }

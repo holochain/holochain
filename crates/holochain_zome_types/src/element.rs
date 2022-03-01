@@ -324,6 +324,23 @@ impl SignedHeaderHashed {
     pub fn header(&self) -> &Header {
         &self.hashed.content
     }
+
+    /// Create a new SignedHeaderHashed from a type that implements into `Header` and
+    /// has the same hash bytes.
+    /// The caller must make sure the hash does not change.
+    pub fn raw_from_same_hash<T>(other: SignedHashed<T>) -> Self
+    where
+        T: Into<Header>,
+        T: HashableContent<HashType = holo_hash::hash_type::Header>,
+    {
+        let SignedHashed {
+            hashed: HoloHashed { content, hash },
+            signature,
+        } = other;
+        let header = content.into();
+        let hashed = HeaderHashed::with_pre_hashed(header, hash);
+        Self { hashed, signature }
+    }
 }
 
 impl<T> From<SignedHashed<T>> for HoloHashed<T>
