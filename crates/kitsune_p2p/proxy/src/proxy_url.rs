@@ -30,10 +30,10 @@ pub struct ProxyUrl {
 
 impl ProxyUrl {
     /// Create a new proxy url from a full url str.
-    pub fn from_full(full: &str) -> TransportResult<Self> {
+    pub fn from_full(full: &str) -> KitsuneResult<Self> {
         macro_rules! err {
             ($h:literal) => {
-                TransportError::from(format!(
+                KitsuneError::from(format!(
                     "Invalid Proxy Url({}): {}: at: {}:{}",
                     $h,
                     full,
@@ -93,14 +93,14 @@ impl ProxyUrl {
     }
 
     /// Create a new proxy url from a base + tls cert digest.
-    pub fn new(base: &str, cert_digest: CertDigest) -> TransportResult<Self> {
-        let base = url2::try_url2!("{}", base).map_err(TransportError::other)?;
+    pub fn new(base: &str, cert_digest: CertDigest) -> KitsuneResult<Self> {
+        let base = url2::try_url2!("{}", base).map_err(KitsuneError::other)?;
         let tls = base64::encode_config(&cert_digest[..], base64::URL_SAFE_NO_PAD);
         let mut full = url2::url2!("kitsune-proxy://{}", tls);
         {
             let mut path = full
                 .path_segments_mut()
-                .map_err(|_| TransportError::from(""))?;
+                .map_err(|_| KitsuneError::from(""))?;
             path.push(base.scheme());
             if let Some(h) = base.host_str() {
                 path.push("h");

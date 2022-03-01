@@ -69,24 +69,20 @@ fn insert_locally_validated_op(txn: &mut Transaction, op: DhtOpHashed) -> StateM
     if is_private_store_entry(op.as_content()) {
         return Ok(());
     }
-    let hash = op.as_hash().clone();
     let op = filter_private_entry(op)?;
+    let hash = op.as_hash();
 
     let dependency = get_dependency(op.get_type(), &op.header());
 
     // Insert the op.
-    insert_op(txn, op)?;
+    insert_op(txn, &op)?;
     // Set the status to valid because we authored it.
-    set_validation_status(
-        txn,
-        hash.clone(),
-        holochain_zome_types::ValidationStatus::Valid,
-    )?;
+    set_validation_status(txn, hash, holochain_zome_types::ValidationStatus::Valid)?;
     // Set the stage to awaiting integration.
     if let Dependency::Null = dependency {
         // This set the validation stage to pending which is correct when
         // it's integrated.
-        set_validation_stage(txn, hash.clone(), ValidationLimboStatus::Pending)?;
+        set_validation_stage(txn, hash, ValidationLimboStatus::Pending)?;
         set_when_integrated(txn, hash, holochain_zome_types::Timestamp::now())?;
     } else {
         set_validation_stage(txn, hash, ValidationLimboStatus::AwaitingIntegration)?;

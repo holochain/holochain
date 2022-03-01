@@ -91,6 +91,11 @@ fn test_env<Kind: DbKindT>(kind: Kind) -> TestEnv<Kind> {
     }
 }
 
+/// Create a [`DbWrite`] of [`DbKindT`] in memory.
+pub fn test_in_mem_db<Kind: DbKindT>(kind: Kind) -> DbWrite<Kind> {
+    DbWrite::test_in_mem(kind).expect("Couldn't create test database")
+}
+
 /// Create a fresh set of test environments with a new TempDir and custom MetaLairClient
 pub fn test_envs_with_keystore(keystore: MetaLairClient) -> TestEnvs {
     let tempdir = tempfile::Builder::new()
@@ -107,6 +112,16 @@ pub fn test_environments() -> TestEnvs {
         .prefix("holochain-test-environments")
         .suffix(&nanoid::nanoid!())
         .tempdir()
+        .unwrap();
+    TestEnvs::new(tempdir)
+}
+
+/// Create a fresh set of test environments with a new TempDir in a given directory.
+pub fn test_environments_in(path: impl AsRef<Path>) -> TestEnvs {
+    let tempdir = tempfile::Builder::new()
+        .prefix("holochain-test-environments")
+        .suffix(&nanoid::nanoid!())
+        .tempdir_in(path)
         .unwrap();
     TestEnvs::new(tempdir)
 }
