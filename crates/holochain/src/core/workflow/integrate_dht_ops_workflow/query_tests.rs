@@ -152,6 +152,12 @@ fn create_and_insert_op(
     )
     .then(|| Entry::App(fixt!(AppEntryBytes)));
 
+    let seq_not_zero = |seq: &mut u32| {
+        if *seq == 0 {
+            *seq = 1
+        }
+    };
+
     let mut header: Header = match op {
         DhtOpType::RegisterAgentActivity
         | DhtOpType::StoreElement
@@ -159,6 +165,7 @@ fn create_and_insert_op(
         | DhtOpType::RegisterUpdatedContent
         | DhtOpType::RegisterUpdatedElement => {
             let mut update = fixt!(Update);
+            seq_not_zero(&mut update.header_seq);
             if facts.last_header {
                 update.original_header_address = data.last_header.clone();
             }
@@ -170,6 +177,7 @@ fn create_and_insert_op(
         }
         DhtOpType::RegisterDeletedBy | DhtOpType::RegisterDeletedEntryHeader => {
             let mut delete = fixt!(Delete);
+            seq_not_zero(&mut delete.header_seq);
             if facts.last_header {
                 delete.deletes_address = data.last_header.clone();
             }
@@ -177,6 +185,7 @@ fn create_and_insert_op(
         }
         DhtOpType::RegisterAddLink => {
             let mut create_link = fixt!(CreateLink);
+            seq_not_zero(&mut create_link.header_seq);
             if facts.last_entry {
                 create_link.base_address = data.last_entry.clone();
             }
@@ -185,6 +194,7 @@ fn create_and_insert_op(
         }
         DhtOpType::RegisterRemoveLink => {
             let mut delete_link = fixt!(DeleteLink);
+            seq_not_zero(&mut delete_link.header_seq);
             if facts.last_link {
                 delete_link.link_add_address = data.last_link.clone();
             }
