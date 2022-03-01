@@ -27,7 +27,10 @@ pub fn must_get_valid_element<'a>(
                 let workspace = call_context.host_context.workspace();
                 let mut cascade = match call_context.host_context {
                     HostContext::Validate(_) => Cascade::from_workspace(workspace.stores(), None),
-                    _ => Cascade::from_workspace_network(&workspace, call_context.host_context.network().clone()),
+                    _ => Cascade::from_workspace_network(
+                        &workspace,
+                        call_context.host_context.network().clone(),
+                    ),
                 };
                 match cascade
                     .get_header_details(header_hash.clone(), GetOptions::content())

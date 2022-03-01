@@ -26,13 +26,13 @@ pub fn must_get_entry<'a>(
                 let workspace = call_context.host_context.workspace();
                 let mut cascade = match call_context.host_context {
                     HostContext::Validate(_) => Cascade::from_workspace(workspace.stores(), None),
-                    _ => Cascade::from_workspace_network(&workspace, call_context.host_context.network().clone()),
+                    _ => Cascade::from_workspace_network(
+                        &workspace,
+                        call_context.host_context.network().clone(),
+                    ),
                 };
                 match cascade
-                    .retrieve_entry(
-                        entry_hash.clone(),
-                        NetworkGetOptions::must_get_options(),
-                    )
+                    .retrieve_entry(entry_hash.clone(), NetworkGetOptions::must_get_options())
                     .await
                     .map_err(|cascade_error| WasmError::Host(cascade_error.to_string()))?
                 {

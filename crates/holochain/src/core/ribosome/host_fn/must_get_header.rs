@@ -28,26 +28,13 @@ pub fn must_get_header<'a>(
                 let workspace = call_context.host_context.workspace();
                 let mut cascade = match call_context.host_context {
                     HostContext::Validate(_) => Cascade::from_workspace(workspace.stores(), None),
-                    _ => Cascade::from_workspace_network(&workspace, call_context.host_context.network().clone()),
+                    _ => Cascade::from_workspace_network(
+                        &workspace,
+                        call_context.host_context.network().clone(),
+                    ),
                 };
                 match cascade
-                    .retrieve_header(
-                        header_hash.clone(),
-                        // Set every GetOptions manually here.
-                        // Using defaults is dangerous in a must_get as it can undermine determinism.
-                        // We want refactors to explicitly consider this.
-                        NetworkGetOptions {
-                            remote_agent_count: None,
-                            timeout_ms: None,
-                            as_race: true,
-                            race_timeout_ms: None,
-                            // Never redirect as the returned entry must always match the hash.
-                            follow_redirects: false,
-                            all_live_headers_with_metadata: false,
-                            // Redundant with retrieve_entry internals.
-                            request_type: GetRequest::Pending,
-                        },
-                    )
+                    .retrieve_header(header_hash.clone(), NetworkGetOptions::must_get_options())
                     .await
                     .map_err(|cascade_error| WasmError::Host(cascade_error.to_string()))?
                 {
