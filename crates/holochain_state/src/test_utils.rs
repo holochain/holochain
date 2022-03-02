@@ -96,7 +96,6 @@ pub fn test_in_mem_db<Kind: DbKindT>(kind: Kind) -> DbWrite<Kind> {
     DbWrite::test_in_mem(kind).expect("Couldn't create test database")
 }
 
-
 /// Create a fresh set of test environments with a new TempDir
 pub fn test_env_dir() -> TempDir {
     tempfile::Builder::new()

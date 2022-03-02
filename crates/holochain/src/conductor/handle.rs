@@ -5,11 +5,11 @@
 //!
 //! ```rust, no_run
 //! async fn async_main () {
-//! use holochain_state::test_utils::test_environments;
+//! use holochain_state::test_utils::test_env_dir;
 //! use holochain::conductor::{Conductor, ConductorBuilder, ConductorHandle};
-//! let envs = test_environments();
+//! let env_dir = test_env_dir();
 //! let handle: ConductorHandle = ConductorBuilder::new()
-//!    .test(&envs, &[])
+//!    .test(env_dir.path(), &[])
 //!    .await
 //!    .unwrap();
 //!
