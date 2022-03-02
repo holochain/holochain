@@ -53,6 +53,12 @@ pub fn ok_fut<E1, R: Send + 'static>(result: R) -> Result<MustBoxFuture<'static,
     Ok(async move { result }.boxed().into())
 }
 
+/// Helper function for the common case of returning this boxed future type.
+pub fn box_fut<'a, R: Send + 'a>(result: R) -> MustBoxFuture<'a, R> {
+    use futures::FutureExt;
+    async move { result }.boxed().into()
+}
+
 use ::ghost_actor::dependencies::tracing;
 use ghost_actor::dependencies::must_future::MustBoxFuture;
 
