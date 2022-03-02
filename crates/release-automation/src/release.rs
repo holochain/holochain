@@ -30,6 +30,7 @@ use std::{
 use structopt::StructOpt;
 
 use crate::changelog::{Changelog, WorkspaceCrateReleaseHeading};
+use crate::crate_::ensure_crate_io_owners;
 use crate::crate_::increment_patch;
 use crate::crate_selection::Crate;
 pub(crate) use crate_selection::{ReleaseWorkspace, SelectionCriteria};
@@ -105,9 +106,16 @@ pub(crate) fn cmd(args: &crate::cli::Args, cmd_args: &crate::cli::ReleaseArgs) -
                 warn!("{:?} not implemeted", step)
             }
             ReleaseSteps::PublishToCratesIo => publish_to_crates_io(&ws, cmd_args)?,
-            ReleaseSteps::AddOwnersToCratesIo => {
-                add_owners_to_crates_io(&ws, cmd_args, latest_release_crates(&ws)?)?
-            }
+            ReleaseSteps::AddOwnersToCratesIo => ensure_crate_io_owners(
+                &ws,
+                cmd_args.dry_run,
+                &latest_release_crates(&ws)?,
+                // TODO: make this configurable?
+                crate_::MINIMUM_CRATE_OWNERS
+                    .split(",")
+                    .collect::<Vec<_>>()
+                    .as_slice(),
+            )?,
 
             // ReleaseSteps::CreateCrateTags => create_crate_tags(&ws, cmd_args)?,
             ReleaseSteps::PushReleaseTag => {
@@ -404,76 +412,6 @@ fn publish_to_crates_io<'a>(
         &Default::default(),
         &cmd_args.cargo_target_dir,
     )?;
-
-    Ok(())
-}
-
-fn add_owners_to_crates_io<'a>(
-    _ws: &'a ReleaseWorkspace<'a>,
-    cmd_args: &'a ReleaseArgs,
-    crates: Vec<&Crate>,
-) -> Fallible<()> {
-    // TODO(backlog): make this configurable
-    static DEFAULT_CRATE_OWNERS: &[&str] = &["github:holochain:core-dev", "zippy"];
-
-    let desired_owners = DEFAULT_CRATE_OWNERS
-        .iter()
-        .map(|s| s.to_string())
-        .collect::<HashSet<_>>();
-
-    for crt in crates {
-        if crates_index_helper::is_version_published(crt, false)? {
-            let mut cmd = std::process::Command::new("cargo");
-            cmd.args(&["owner", "--list", &crt.name()]);
-
-            debug!("[{}] running command: {:?}", crt.name(), cmd);
-            let output = cmd.output().context("process exitted unsuccessfully")?;
-            if !output.status.success() {
-                warn!(
-                    "[{}] failed list owners: {}",
-                    crt.name(),
-                    String::from_utf8_lossy(&output.stderr)
-                );
-
-                continue;
-            }
-
-            let current_owners = output
-                .stdout
-                .lines()
-                .map(|line| {
-                    line.words_with_breaks()
-                        .take_while(|item| *item != " ")
-                        .collect::<String>()
-                })
-                .collect::<HashSet<_>>();
-            let diff = desired_owners.difference(&current_owners);
-            info!(
-                "[{}] current owners {:?}, missing owners: {:?}",
-                crt.name(),
-                current_owners,
-                diff
-            );
-
-            for owner in diff {
-                let mut cmd = std::process::Command::new("cargo");
-                cmd.args(&["owner", "--add", owner, &crt.name()]);
-
-                debug!("[{}] running command: {:?}", crt.name(), cmd);
-                if !cmd_args.dry_run {
-                    let output = cmd.output().context("process exitted unsuccessfully")?;
-                    if !output.status.success() {
-                        warn!(
-                            "[{}] failed to add owner '{}': {}",
-                            crt.name(),
-                            owner,
-                            String::from_utf8_lossy(&output.stderr)
-                        );
-                    }
-                }
-            }
-        }
-    }
 
     Ok(())
 }
