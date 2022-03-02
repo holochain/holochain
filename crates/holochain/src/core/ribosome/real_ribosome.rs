@@ -90,7 +90,7 @@ pub struct RealRibosome {
 
 struct HostFnBuilder {
     store: Store,
-    env: Env,
+    db: Env,
     ribosome_arc: Arc<RealRibosome>,
     // context_arc: Arc<CallContext>,
     context_key: u64,
@@ -116,8 +116,8 @@ impl HostFnBuilder {
             Function::new_with_env(
                 &self.store,
                 Self::SIGNATURE,
-                self.env.clone(),
-                move |env: &Env, args: &[Value]| -> Result<Vec<Value>, RuntimeError> {
+                self.db.clone(),
+                move |db: &Env, args: &[Value]| -> Result<Vec<Value>, RuntimeError> {
                     let guest_ptr: GuestPtr = match args[0] {
                         Value::I32(i) => i
                             .try_into()
@@ -146,7 +146,7 @@ impl HostFnBuilder {
                             })
                             .clone()
                     };
-                    let result = match env.consume_bytes_from_guest(guest_ptr, len) {
+                    let result = match db.consume_bytes_from_guest(guest_ptr, len) {
                         Ok(input) => {
                             match host_function(
                                 Arc::clone(&ribosome_arc),
@@ -160,7 +160,7 @@ impl HostFnBuilder {
                         }
                         Err(wasm_error) => Err::<_, WasmError>(wasm_error),
                     };
-                    env.set_data(result)
+                    db.set_data(result)
                         .map_err(|e| RuntimeError::new(e.to_string()))?;
                     Ok(vec![])
                 },
@@ -343,7 +343,7 @@ impl RealRibosome {
     }
 
     fn imports(&self, context_key: u64, store: &Store) -> ImportObject {
-        let env = Env::default();
+        let db = Env::default();
         let mut imports = imports! {};
         let mut ns = Exports::new();
 
@@ -355,14 +355,14 @@ impl RealRibosome {
             "__import_data",
             Function::new_native_with_env(
                 store,
-                env.clone(),
+                db.clone(),
                 holochain_wasmer_host::import::__import_data,
             ),
         );
 
         let host_fn_builder = HostFnBuilder {
             store: store.clone(),
-            env,
+            db,
             ribosome_arc,
             context_key,
         };
@@ -429,7 +429,7 @@ impl RealRibosome {
             .with_host_function(&mut ns, "__delete", delete)
             .with_host_function(&mut ns, "__schedule", schedule);
 
-        imports.register("env", ns);
+        imports.register("db", ns);
 
         imports
     }

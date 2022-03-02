@@ -65,7 +65,7 @@ async fn check_valid_if_dna_test() {
     let tmp_dht = test_dht_db();
     let tmp_cache = test_cache_db();
     let keystore = test_keystore();
-    let env = tmp.to_db();
+    let db = tmp.to_db();
     // Test data
     let _activity_return = vec![fixt!(HeaderHash)];
 
@@ -76,7 +76,7 @@ async fn check_valid_if_dna_test() {
     let header = fixt!(CreateLink);
     let cache: DhtDbQueryCache = tmp_dht.to_db().into();
     let mut workspace = SysValidationWorkspace::new(
-        env.clone().into(),
+        db.clone().into(),
         tmp_dht.to_db().into(),
         cache.clone(),
         tmp_cache.to_db(),
@@ -106,7 +106,7 @@ async fn check_valid_if_dna_test() {
     );
     workspace.dna_def = dna_def_original;
 
-    fake_genesis(env.clone().into(), tmp_dht.to_db(), keystore)
+    fake_genesis(db.clone().into(), tmp_dht.to_db(), keystore)
         .await
         .unwrap();
     tmp_dht

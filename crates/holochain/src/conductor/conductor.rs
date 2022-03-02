@@ -807,10 +807,10 @@ where
         impl IntoIterator<Item = (DnaHash, DnaFile)>,
         impl IntoIterator<Item = (EntryDefBufferKey, EntryDef)>,
     )> {
-        let env = &self.spaces.wasm_db;
+        let db = &self.spaces.wasm_db;
 
         // Load out all dna defs
-        let (wasm_tasks, defs) = env
+        let (wasm_tasks, defs) = db
             .async_reader(move |txn| {
                 // Get all the dna defs.
                 let dna_defs: Vec<_> = holochain_state::dna_def::get_all(&txn)?
@@ -926,7 +926,7 @@ where
         &self,
         dna: DnaFile,
     ) -> ConductorResult<Vec<(EntryDefBufferKey, EntryDef)>> {
-        let env = self.spaces.wasm_db.clone();
+        let db = self.spaces.wasm_db.clone();
 
         let zome_defs = get_entry_defs(dna.clone())?;
 
@@ -939,7 +939,7 @@ where
         )
         .await;
 
-        env.async_commit({
+        db.async_commit({
             let zome_defs = zome_defs.clone();
             move |txn| {
                 for dna_wasm in wasms {

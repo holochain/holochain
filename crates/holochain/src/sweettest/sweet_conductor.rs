@@ -423,17 +423,17 @@ impl SweetConductor {
         if let Some(handle) = self.handle.as_ref() {
             let iter = handle.list_cell_ids(None).into_iter().map(|id| async {
                 let id = id;
-                let env = self.get_authored_db(id.dna_hash()).unwrap();
+                let db = self.get_authored_db(id.dna_hash()).unwrap();
                 let trigger = self.get_cell_triggers(&id).unwrap();
-                (env, trigger)
+                (db, trigger)
             });
             futures::stream::iter(iter)
                 .then(|f| f)
-                .for_each(|(env, mut triggers)| async move {
+                .for_each(|(db, mut triggers)| async move {
                     // The line below was added when migrating to rust edition 2021, per
                     // https://doc.rust-lang.org/edition-guide/rust-2021/disjoint-capture-in-closures.html#migration
                     let _ = &triggers;
-                    crate::test_utils::force_publish_dht_ops(&env, &mut triggers.publish_dht_ops)
+                    crate::test_utils::force_publish_dht_ops(&db, &mut triggers.publish_dht_ops)
                         .await
                         .unwrap();
                 })

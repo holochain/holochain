@@ -24,7 +24,7 @@ async fn test_cell_handle_publish() {
     let agent = cell_id.agent_pubkey().clone();
 
     let spaces = TestSpaces::new([dna.clone()]);
-    let env = spaces.test_spaces[&dna].space.authored_db.clone();
+    let db = spaces.test_spaces[&dna].space.authored_db.clone();
     let dht_db = spaces.test_spaces[&dna].space.dht_db.clone();
 
     let test_network = test_network(Some(dna.clone()), Some(agent.clone())).await;
@@ -51,7 +51,7 @@ async fn test_cell_handle_publish() {
     super::Cell::genesis(
         cell_id.clone(),
         mock_handle.clone(),
-        env.clone(),
+        db.clone(),
         dht_db.clone(),
         mock_ribosome,
         None,

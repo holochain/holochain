@@ -7,8 +7,8 @@ use holochain_sqlite::db::DbKindAuthored;
 use holochain_sqlite::db::DbKindCache;
 use holochain_sqlite::db::DbKindDht;
 use holochain_sqlite::db::ReadAccess;
-use holochain_types::env::DbRead;
-use holochain_types::env::DbWrite;
+use holochain_types::db::DbRead;
+use holochain_types::db::DbWrite;
 use holochain_zome_types::DnaDef;
 use holochain_zome_types::SignedHeaderHashed;
 

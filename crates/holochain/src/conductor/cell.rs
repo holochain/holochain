@@ -542,10 +542,10 @@ impl Cell {
         &self,
         header_hash: HeaderHash,
     ) -> CellResult<ValidationPackageResponse> {
-        let env: DbRead<DbKindDht> = self.dht_db().clone().into();
+        let db: DbRead<DbKindDht> = self.dht_db().clone().into();
 
         // Get the header
-        let mut cascade = Cascade::empty().with_dht(env.clone());
+        let mut cascade = Cascade::empty().with_dht(db.clone());
         let header = match cascade
             .retrieve_header(header_hash, Default::default())
             .await?
@@ -571,7 +571,7 @@ impl Cell {
         } else {
             validation_package::get_as_authority(
                 header,
-                env,
+                db,
                 &ribosome.dna_file,
                 self.conductor_handle.as_ref(),
             )
@@ -613,8 +613,8 @@ impl Cell {
         hash: EntryHash,
         options: holochain_p2p::event::GetOptions,
     ) -> CellResult<WireEntryOps> {
-        let env = self.space.dht_db.clone();
-        authority::handle_get_entry(env.into(), hash, options)
+        let db = self.space.dht_db.clone();
+        authority::handle_get_entry(db.into(), hash, options)
             .await
             .map_err(Into::into)
     }
@@ -625,8 +625,8 @@ impl Cell {
         hash: HeaderHash,
         options: holochain_p2p::event::GetOptions,
     ) -> CellResult<WireElementOps> {
-        let env = self.space.dht_db.clone();
-        authority::handle_get_element(env.into(), hash, options)
+        let db = self.space.dht_db.clone();
+        authority::handle_get_element(db.into(), hash, options)
             .await
             .map_err(Into::into)
     }
@@ -652,8 +652,8 @@ impl Cell {
         options: holochain_p2p::event::GetLinksOptions,
     ) -> CellResult<WireLinkOps> {
         debug!(id = ?self.id());
-        let env = self.space.dht_db.clone();
-        authority::handle_get_links(env.into(), link_key, options)
+        let db = self.space.dht_db.clone();
+        authority::handle_get_links(db.into(), link_key, options)
             .await
             .map_err(Into::into)
     }
@@ -665,8 +665,8 @@ impl Cell {
         query: ChainQueryFilter,
         options: holochain_p2p::event::GetActivityOptions,
     ) -> CellResult<AgentActivityResponse<HeaderHash>> {
-        let env = self.space.dht_db.clone();
-        authority::handle_get_agent_activity(env.into(), agent, query, options)
+        let db = self.space.dht_db.clone();
+        authority::handle_get_agent_activity(db.into(), agent, query, options)
             .await
             .map_err(Into::into)
     }

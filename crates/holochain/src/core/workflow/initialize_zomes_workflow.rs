@@ -166,11 +166,11 @@ pub mod tests {
         let test_cache = test_cache_db();
         let test_dht = test_dht_db();
         let keystore = test_keystore();
-        let env = test_db.to_db();
+        let db = test_db.to_db();
         let author = fake_agent_pubkey_1();
 
         // Genesis
-        fake_genesis(env.clone(), test_dht.to_db(), keystore.clone())
+        fake_genesis(db.clone(), test_dht.to_db(), keystore.clone())
             .await
             .unwrap();
 
@@ -178,7 +178,7 @@ pub mod tests {
         let dna_def_hashed = DnaDefHashed::from_content_sync(dna_def.clone());
 
         let workspace = SourceChainWorkspace::new(
-            env.clone(),
+            db.clone(),
             test_dht.to_db(),
             test_cache.to_db(),
             keystore,

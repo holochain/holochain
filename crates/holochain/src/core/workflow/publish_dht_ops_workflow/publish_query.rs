@@ -8,7 +8,7 @@ use holochain_state::query::prelude::*;
 use holochain_types::dht_op::DhtOp;
 use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::dht_op::DhtOpType;
-use holochain_types::env::DbRead;
+use holochain_types::db::DbRead;
 use holochain_zome_types::Entry;
 use holochain_zome_types::EntryVisibility;
 use holochain_zome_types::SignedHeader;
@@ -25,7 +25,7 @@ use super::MIN_PUBLISH_INTERVAL;
 /// - Only get ops that have less then the RECEIPT_BUNDLE_SIZE
 pub async fn get_ops_to_publish(
     agent: AgentPubKey,
-    env: &DbRead<DbKindAuthored>,
+    db: &DbRead<DbKindAuthored>,
 ) -> WorkflowResult<Vec<DhtOpHashed>> {
     let recency_threshold = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -34,7 +34,7 @@ pub async fn get_ops_to_publish(
         .map(|t| t.as_secs())
         .unwrap_or(0);
 
-    let results = env
+    let results = db
         .async_reader(move |txn| {
             let mut stmt = txn.prepare(
                 "
@@ -157,16 +157,16 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn publish_query() {
         observability::test_run().ok();
-        let env = test_authored_db();
-        let expected = test_data(&env.to_db().into());
-        let r = get_ops_to_publish(expected.agent.clone(), &env.to_db().into())
+        let db = test_authored_db();
+        let expected = test_data(&db.to_db().into());
+        let r = get_ops_to_publish(expected.agent.clone(), &db.to_db().into())
             .await
             .unwrap();
         assert_eq!(r, expected.results);
     }
 
     fn create_and_insert_op(
-        env: &DbWrite<DbKindAuthored>,
+        db: &DbWrite<DbKindAuthored>,
         facts: Facts,
         consistent_data: &Consistent,
     ) -> DhtOpHashed {
@@ -217,7 +217,7 @@ mod tests {
             ))
         };
 
-        env.conn()
+        db.conn()
             .unwrap()
             .with_commit_sync(|txn| {
                 let hash = state.as_hash().clone();
@@ -230,7 +230,7 @@ mod tests {
         state
     }
 
-    fn test_data(env: &DbWrite<DbKindAuthored>) -> Expected {
+    fn test_data(db: &DbWrite<DbKindAuthored>) -> Expected {
         let mut results = Vec::new();
         let cd = Consistent {
             this_agent: fixt!(AgentPubKey),
@@ -248,7 +248,7 @@ mod tests {
             is_this_agent: true,
             store_entry: true,
         };
-        let op = create_and_insert_op(env, facts, &cd);
+        let op = create_and_insert_op(db, facts, &cd);
         results.push(op);
 
         // All facts are the same unless stated:
@@ -258,29 +258,29 @@ mod tests {
         let mut f = facts;
         f.private = true;
         f.store_entry = false;
-        let op = create_and_insert_op(env, f, &cd);
+        let op = create_and_insert_op(db, f, &cd);
         results.push(op);
 
         // We **don't** expect any of these in the results:
         // - Private: true.
         let mut f = facts;
         f.private = true;
-        create_and_insert_op(env, f, &cd);
+        create_and_insert_op(db, f, &cd);
 
         // - WithinMinPeriod: true.
         let mut f = facts;
         f.within_min_period = true;
-        create_and_insert_op(env, f, &cd);
+        create_and_insert_op(db, f, &cd);
 
         // - HasRequireReceipts: true.
         let mut f = facts;
         f.has_required_receipts = true;
-        create_and_insert_op(env, f, &cd);
+        create_and_insert_op(db, f, &cd);
 
         // - IsThisAgent: false.
         let mut f = facts;
         f.is_this_agent = false;
-        create_and_insert_op(env, f, &cd);
+        create_and_insert_op(db, f, &cd);
 
         Expected {
             agent: cd.this_agent.clone(),

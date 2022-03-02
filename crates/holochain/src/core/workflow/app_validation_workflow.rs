@@ -84,8 +84,8 @@ async fn app_validation_workflow_inner(
     network: &HolochainP2pDna,
     dht_query_cache: DhtDbQueryCache,
 ) -> WorkflowResult<WorkComplete> {
-    let env = workspace.dht_db.clone().into();
-    let sorted_ops = validation_query::get_ops_to_app_validate(&env).await?;
+    let db = workspace.dht_db.clone().into();
+    let sorted_ops = validation_query::get_ops_to_app_validate(&db).await?;
     let start_len = sorted_ops.len();
     tracing::debug!("validating {} ops", start_len);
     let start = (start_len >= NUM_CONCURRENT_OPS).then(std::time::Instant::now);

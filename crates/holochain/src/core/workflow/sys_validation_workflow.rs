@@ -83,8 +83,8 @@ async fn sys_validation_workflow_inner(
     conductor_handle: ConductorHandle,
     sys_validation_trigger: TriggerSender,
 ) -> WorkflowResult<WorkComplete> {
-    let env = workspace.dht_db.clone();
-    let sorted_ops = validation_query::get_ops_to_sys_validate(&env).await?;
+    let db = workspace.dht_db.clone();
+    let sorted_ops = validation_query::get_ops_to_sys_validate(&db).await?;
     let start_len = sorted_ops.len();
     tracing::debug!("Validating {} ops", start_len);
     let start = (start_len >= NUM_CONCURRENT_OPS).then(std::time::Instant::now);

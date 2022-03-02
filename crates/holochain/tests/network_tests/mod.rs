@@ -59,7 +59,7 @@ async fn get_updates_cache() {
     observability::test_run().ok();
     // Database setup
     let test_db = test_cell_db();
-    let env = test_db.env();
+    let db = test_db.db();
 
     let (element_fixt_store, _) = generate_fixt_store().await;
     let expected = element_fixt_store
@@ -69,7 +69,7 @@ async fn get_updates_cache() {
         .unwrap();
 
     // Create the cascade
-    let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
+    let mut workspace = CallZomeWorkspace::new(db.clone().into()).unwrap();
     let (network, shutdown) = run_fixt_network(element_fixt_store, BTreeMap::new()).await;
 
     {
@@ -103,7 +103,7 @@ async fn get_meta_updates_meta_cache() {
     observability::test_run().ok();
     // Database setup
     let test_db = test_cell_db();
-    let env = test_db.env();
+    let db = test_db.db();
 
     // Setup other metadata store with fixtures attached
     // to known entry hash
@@ -115,7 +115,7 @@ async fn get_meta_updates_meta_cache() {
         .unwrap();
 
     // Create the cascade
-    let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
+    let mut workspace = CallZomeWorkspace::new(db.clone().into()).unwrap();
     let (network, shutdown) = run_fixt_network(BTreeMap::new(), meta_fixt_store).await;
 
     let returned = {
@@ -139,7 +139,7 @@ async fn get_meta_updates_meta_cache() {
     assert_eq!(returned.headers.len(), 1);
     assert_eq!(returned.headers.into_iter().next().unwrap(), expected.1);
     let result = {
-        let mut g = env.conn();
+        let mut g = db.conn();
 let mut reader = g.reader().unwrap();
 
         // Check the cache has been updated
@@ -573,8 +573,8 @@ async fn fake_authority(hash: AnyDhtHash, call_data: &HostFnCaller) {
         .await
         .unwrap();
 
-    let mut element_vault = ElementBuf::vault(call_data.env.clone().into(), false).unwrap();
-    let mut meta_vault = MetadataBuf::vault(call_data.env.clone().into()).unwrap();
+    let mut element_vault = ElementBuf::vault(call_data.db.clone().into(), false).unwrap();
+    let mut meta_vault = MetadataBuf::vault(call_data.db.clone().into()).unwrap();
 
     // Write to the meta vault to fake being an authority
     let (shh, e) = element.clone().into_inner();
@@ -586,7 +586,7 @@ async fn fake_authority(hash: AnyDhtHash, call_data: &HostFnCaller) {
         .unwrap();
 
     call_data
-        .env
+        .db
         .conn()
         .unwrap()
         .with_commit(|writer| {

@@ -20,8 +20,8 @@ use holochain_types::dht_op::DhtOpLight;
 use holochain_types::dht_op::OpOrder;
 use holochain_types::dht_op::UniqueForm;
 use holochain_types::element::SignedHeaderHashedExt;
-use holochain_types::env::DbRead;
-use holochain_types::env::DbWrite;
+use holochain_types::db::DbRead;
+use holochain_types::db::DbWrite;
 use holochain_zome_types::header;
 use holochain_zome_types::query::ChainQueryFilterRange;
 use holochain_zome_types::CapAccess;
@@ -1062,7 +1062,7 @@ pub fn current_countersigning_session(
 
 #[cfg(test)]
 async fn _put_db<H: HeaderInner, B: HeaderBuilder<H>>(
-    vault: holochain_types::env::DbWrite<DbKindAuthored>,
+    vault: holochain_types::db::DbWrite<DbKindAuthored>,
     keystore: &MetaLairClient,
     author: Arc<AgentPubKey>,
     header_builder: B,
@@ -1209,7 +1209,7 @@ pub mod tests {
         let test_db = test_authored_db();
         let dht_db = test_dht_db();
         let keystore = test_keystore();
-        let env = test_db.to_db();
+        let db = test_db.to_db();
         let alice = fixt!(AgentPubKey, Predictable, 0);
         let zome = fixt!(Zome);
 
@@ -1217,7 +1217,7 @@ pub mod tests {
         mock.expect_authority_for_hash().returning(|_| Ok(false));
 
         source_chain::genesis(
-            env.clone(),
+            db.clone(),
             dht_db.to_db(),
             keystore.clone(),
             fake_dna_hash(1),
@@ -1227,21 +1227,21 @@ pub mod tests {
         .await
         .unwrap();
         let chain_1 = SourceChain::new(
-            env.clone().into(),
+            db.clone().into(),
             dht_db.to_db(),
             keystore.clone(),
             alice.clone(),
         )
         .await?;
         let chain_2 = SourceChain::new(
-            env.clone().into(),
+            db.clone().into(),
             dht_db.to_db(),
             keystore.clone(),
             alice.clone(),
         )
         .await?;
         let chain_3 = SourceChain::new(
-            env.clone().into(),
+            db.clone().into(),
             dht_db.to_db(),
             keystore.clone(),
             alice.clone(),
@@ -1279,7 +1279,7 @@ pub mod tests {
         let author = Arc::new(alice);
         chain_1.flush(&mock).await?;
         let author_1 = Arc::clone(&author);
-        let (_, seq, _) = env
+        let (_, seq, _) = db
             .async_commit(move |txn: &mut Transaction| chain_head_db(&txn, author_1))
             .await?;
         assert_eq!(seq, 3);
@@ -1289,14 +1289,14 @@ pub mod tests {
             Err(SourceChainError::HeadMoved(_, _, _, _))
         ));
         let author_2 = Arc::clone(&author);
-        let (_, seq, _) = env
+        let (_, seq, _) = db
             .async_commit(move |txn: &mut Transaction| chain_head_db(&txn, author_2))
             .await?;
         assert_eq!(seq, 3);
 
         chain_3.flush(&mock).await?;
         let author_3 = Arc::clone(&author);
-        let (_, seq, _) = env
+        let (_, seq, _) = db
             .async_commit(move |txn: &mut Transaction| chain_head_db(&txn, author_3))
             .await?;
         assert_eq!(seq, 4);
@@ -1308,14 +1308,14 @@ pub mod tests {
         let test_db = test_authored_db();
         let dht_db = test_dht_db();
         let keystore = test_keystore();
-        let env = test_db.to_db();
+        let db = test_db.to_db();
         let alice = fixt!(AgentPubKey, Predictable, 0);
 
         let mut mock = MockHolochainP2pDnaT::new();
         mock.expect_authority_for_hash().returning(|_| Ok(false));
 
         source_chain::genesis(
-            env.clone(),
+            db.clone(),
             dht_db.to_db(),
             keystore.clone(),
             fake_dna_hash(1),
@@ -1326,21 +1326,21 @@ pub mod tests {
         .unwrap();
 
         let chain_1 = SourceChain::new(
-            env.clone().into(),
+            db.clone().into(),
             dht_db.to_db(),
             keystore.clone(),
             alice.clone(),
         )
         .await?;
         let chain_2 = SourceChain::new(
-            env.clone().into(),
+            db.clone().into(),
             dht_db.to_db(),
             keystore.clone(),
             alice.clone(),
         )
         .await?;
         let chain_3 = SourceChain::new(
-            env.clone().into(),
+            db.clone().into(),
             dht_db.to_db(),
             keystore.clone(),
             alice.clone(),
@@ -1402,7 +1402,7 @@ pub mod tests {
         let author = Arc::new(alice);
         chain_1.flush(&mock).await?;
         let author_1 = Arc::clone(&author);
-        let (_, seq, _) = env
+        let (_, seq, _) = db
             .async_commit(move |txn: &mut Transaction| chain_head_db(&txn, author_1))
             .await?;
         assert_eq!(seq, 3);
@@ -1414,7 +1414,7 @@ pub mod tests {
 
         chain_3.flush(&mock).await?;
         let author_2 = Arc::clone(&author);
-        let (h2, seq, _) = env
+        let (h2, seq, _) = db
             .async_commit(move |txn: &mut Transaction| chain_head_db(&txn, author_2.clone()))
             .await?;
 
@@ -1422,7 +1422,7 @@ pub mod tests {
         assert_ne!(h2, old_h2);
         assert_eq!(seq, 4);
 
-        fresh_reader_test!(env, |txn| {
+        fresh_reader_test!(db, |txn| {
             // get the full element
             let store = Txn::from(&txn);
             let h1_element_entry_fetched = store
@@ -1449,7 +1449,7 @@ pub mod tests {
         let test_db = test_authored_db();
         let dht_db = test_dht_db();
         let keystore = test_keystore();
-        let env = test_db.to_db();
+        let db = test_db.to_db();
         let secret = Some(CapSecretFixturator::new(Unpredictable).next().unwrap());
         let access = CapAccess::from(secret.unwrap());
         let mut mock = MockHolochainP2pDnaT::new();
@@ -1466,7 +1466,7 @@ pub mod tests {
         let alice = agents.next().unwrap();
         let bob = agents.next().unwrap();
         source_chain::genesis(
-            env.clone(),
+            db.clone(),
             dht_db.to_db(),
             keystore.clone(),
             fake_dna_hash(1),
@@ -1478,7 +1478,7 @@ pub mod tests {
 
         {
             let chain =
-                SourceChain::new(env.clone(), dht_db.to_db(), keystore.clone(), alice.clone())
+                SourceChain::new(db.clone(), dht_db.to_db(), keystore.clone(), alice.clone())
                     .await?;
             assert_eq!(
                 chain
@@ -1498,7 +1498,7 @@ pub mod tests {
 
         let (original_header_address, original_entry_address) = {
             let chain = SourceChain::new(
-                env.clone().into(),
+                db.clone().into(),
                 dht_db.to_db(),
                 keystore.clone(),
                 alice.clone(),
@@ -1526,7 +1526,7 @@ pub mod tests {
 
         {
             let chain =
-                SourceChain::new(env.clone(), dht_db.to_db(), keystore.clone(), alice.clone())
+                SourceChain::new(db.clone(), dht_db.to_db(), keystore.clone(), alice.clone())
                     .await?;
             // alice should find her own authorship with higher priority than the committed grant
             // even if she passes in the secret
@@ -1556,7 +1556,7 @@ pub mod tests {
 
         let (updated_header_hash, updated_entry_hash) = {
             let chain = SourceChain::new(
-                env.clone().into(),
+                db.clone().into(),
                 dht_db.to_db(),
                 keystore.clone(),
                 alice.clone(),
@@ -1586,7 +1586,7 @@ pub mod tests {
 
         {
             let chain =
-                SourceChain::new(env.clone(), dht_db.to_db(), keystore.clone(), alice.clone())
+                SourceChain::new(db.clone(), dht_db.to_db(), keystore.clone(), alice.clone())
                     .await?;
             // alice should find her own authorship with higher priority than the committed grant
             // even if she passes in the secret
@@ -1620,7 +1620,7 @@ pub mod tests {
 
         {
             let chain = SourceChain::new(
-                env.clone().into(),
+                db.clone().into(),
                 dht_db.to_db(),
                 keystore.clone(),
                 alice.clone(),
@@ -1644,7 +1644,7 @@ pub mod tests {
 
         {
             let chain =
-                SourceChain::new(env.clone(), dht_db.to_db(), keystore.clone(), alice.clone())
+                SourceChain::new(db.clone(), dht_db.to_db(), keystore.clone(), alice.clone())
                     .await?;
             // alice should find her own authorship
             assert_eq!(
@@ -1682,13 +1682,13 @@ pub mod tests {
     // #[tokio::test(flavor = "multi_thread")]
     // async fn test_get_cap_claim() -> SourceChainResult<()> {
     //     let test_db = test_cell_db();
-    //     let env = test_db.env();
-    //     let env = env.conn().unwrap().await;
+    //     let db = test_db.db();
+    //     let db = db.conn().unwrap().await;
     //     let secret = CapSecretFixturator::new(Unpredictable).next().unwrap();
     //     let agent_pubkey = fake_agent_pubkey_1().into();
     //     let claim = CapClaim::new("tag".into(), agent_pubkey, secret.clone());
     //     {
-    //         let mut store = SourceChainBuf::new(env.clone().into(), &env).await?;
+    //         let mut store = SourceChainBuf::new(db.clone().into(), &db).await?;
     //         store
     //             .genesis(fake_dna_hash(1), fake_agent_pubkey_1(), None)
     //             .await?;
@@ -1696,7 +1696,7 @@ pub mod tests {
     //     }
     //
     //     {
-    //         let mut chain = SourceChain::new(env.clone().into(), &env).await?;
+    //         let mut chain = SourceChain::new(db.clone().into(), &db).await?;
     //         chain.put_cap_claim(claim.clone()).await?;
     //
     // // ideally the following would work, but it won't because currently
@@ -1712,7 +1712,7 @@ pub mod tests {
     //     }
     //
     //     {
-    //         let chain = SourceChain::new(env.clone().into(), &env).await?;
+    //         let chain = SourceChain::new(db.clone().into(), &db).await?;
     //         assert_eq!(
     //             chain.get_persisted_cap_claim_by_secret(&secret).await?,
     //             Some(claim)

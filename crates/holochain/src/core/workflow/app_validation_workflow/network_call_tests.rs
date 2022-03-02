@@ -47,9 +47,9 @@ async fn get_validation_package_test() {
 
     // Helper to get header hashed
     let get_header = {
-        let env = alice_call_data.env.clone();
+        let db = alice_call_data.db.clone();
         move |header_hash| {
-            let alice_authored = ElementBuf::authored(env.clone().into(), false).unwrap();
+            let alice_authored = ElementBuf::authored(db.clone().into(), false).unwrap();
             alice_authored
                 .get_header(header_hash)
                 .unwrap()
@@ -62,7 +62,7 @@ async fn get_validation_package_test() {
     let header_hash = commit_some_data("create_entry", &alice_call_data, &handle).await;
 
     // Expecting every header from the latest to the beginning
-    let alice_source_chain = SourceChain::public_only(alice_call_data.env.clone().into()).unwrap();
+    let alice_source_chain = SourceChain::public_only(alice_call_data.db.clone().into()).unwrap();
     let alice_authored = alice_source_chain.elements();
     let expected_package = alice_source_chain
         .iter_back()
@@ -109,7 +109,7 @@ async fn get_validation_package_test() {
     assert_eq!(validation_package, expected_package.0);
 
     // Get the package for the private entry, this is still full chain
-    let alice_source_chain = SourceChain::public_only(alice_call_data.env.clone().into()).unwrap();
+    let alice_source_chain = SourceChain::public_only(alice_call_data.db.clone().into()).unwrap();
     let alice_authored = alice_source_chain.elements();
     let expected_package = alice_source_chain
         .iter_back()
@@ -153,7 +153,7 @@ async fn get_validation_package_test() {
         .clone();
 
     // Expecting all the elements that match this entry type from the latest to the start
-    let alice_source_chain = SourceChain::public_only(alice_call_data.env.clone().into()).unwrap();
+    let alice_source_chain = SourceChain::public_only(alice_call_data.db.clone().into()).unwrap();
     let alice_authored = alice_source_chain.elements();
     let expected_package = alice_source_chain
         .iter_back()
@@ -201,7 +201,7 @@ async fn get_agent_activity_test() {
     let alice_call_data = conductor_test.alice_call_data_mut();
     let alice_cell_id = &alice_call_data.cell_id;
     let alice_agent_id = alice_cell_id.agent_pubkey();
-    let alice_db = alice_call_data.env.clone();
+    let alice_db = alice_call_data.db.clone();
 
     // Helper for getting expected data
     let get_expected_full = || {
@@ -281,7 +281,7 @@ async fn get_agent_activity_test() {
     let mut expected_count = NUM_COMMITS * 3 + 9 + 2;
 
     wait_for_integration(
-        &alice_call_data.env,
+        &alice_call_data.db,
         expected_count,
         NUM_ATTEMPTS,
         DELAY_PER_ATTEMPT.clone(),
@@ -324,8 +324,8 @@ async fn get_agent_activity_test() {
     let expected_activity = get_expected();
     assert_eq!(agent_activity, expected_activity);
 
-    let mut element_cache = ElementBuf::cache(alice_call_data.env.clone().into()).unwrap();
-    let mut meta_cache = MetadataBuf::cache(alice_call_data.env.clone().into()).unwrap();
+    let mut element_cache = ElementBuf::cache(alice_call_data.db.clone().into()).unwrap();
+    let mut meta_cache = MetadataBuf::cache(alice_call_data.db.clone().into()).unwrap();
     let cache_data = DbPairMut::new(&mut element_cache, &mut meta_cache);
     let mut cascade = Cascade::empty()
         .with_cache(cache_data)
@@ -365,7 +365,7 @@ async fn get_agent_activity_test() {
         .expect("Failed to get any activity from alice");
     let agent_activity = unwrap_to::unwrap_to!(r.valid_activity => ChainItems::Full).clone();
 
-    let alice_source_chain = SourceChain::public_only(alice_call_data.env.clone().into()).unwrap();
+    let alice_source_chain = SourceChain::public_only(alice_call_data.db.clone().into()).unwrap();
     let expected_activity: Vec<_> =
         unwrap_to::unwrap_to!(get_expected_full().valid_activity => ChainItems::Full)
             .into_iter()
@@ -383,7 +383,7 @@ async fn get_agent_activity_test() {
 
     expected_count += NUM_COMMITS * 2;
     wait_for_integration(
-        &alice_call_data.env,
+        &alice_call_data.db,
         expected_count,
         NUM_ATTEMPTS,
         DELAY_PER_ATTEMPT.clone(),
@@ -414,7 +414,7 @@ async fn get_agent_activity_test() {
     let header_hash = commit_some_data("create_msg", &alice_call_data, &handle).await;
 
     // Get the entry type
-    let alice_source_chain = SourceChain::public_only(alice_call_data.env.clone().into()).unwrap();
+    let alice_source_chain = SourceChain::public_only(alice_call_data.db.clone().into()).unwrap();
     let entry_type = alice_source_chain
         .get_element(&header_hash)
         .unwrap()
@@ -429,7 +429,7 @@ async fn get_agent_activity_test() {
     alice_call_data.triggers.produce_dht_ops.trigger();
     expected_count += NUM_COMMITS * 3;
     wait_for_integration(
-        &alice_call_data.env,
+        &alice_call_data.db,
         expected_count,
         NUM_ATTEMPTS,
         DELAY_PER_ATTEMPT.clone(),
@@ -523,14 +523,14 @@ async fn get_custom_package_test() {
 
     // Wait for bob to integrate and then check they have the package cached
     wait_for_integration(
-        &bob_call_data.env,
+        &bob_call_data.db,
         expected_count,
         NUM_ATTEMPTS,
         DELAY_PER_ATTEMPT.clone(),
     )
     .await;
 
-    let alice_source_chain = SourceChain::public_only(alice_call_data.env.clone().into()).unwrap();
+    let alice_source_chain = SourceChain::public_only(alice_call_data.db.clone().into()).unwrap();
     let shh = alice_source_chain
         .iter_back()
         .find(|shh| {
@@ -550,11 +550,11 @@ async fn get_custom_package_test() {
         .unwrap();
 
     {
-        let env: DbRead = bob_call_data.env.clone().into();
-        let element_integrated = ElementBuf::vault(env.clone(), false).unwrap();
-        let meta_integrated = MetadataBuf::vault(env.clone()).unwrap();
-        let mut element_cache = ElementBuf::cache(env.clone()).unwrap();
-        let mut meta_cache = MetadataBuf::cache(env.clone()).unwrap();
+        let db: DbRead = bob_call_data.db.clone().into();
+        let element_integrated = ElementBuf::vault(db.clone(), false).unwrap();
+        let meta_integrated = MetadataBuf::vault(db.clone()).unwrap();
+        let mut element_cache = ElementBuf::cache(db.clone()).unwrap();
+        let mut meta_cache = MetadataBuf::cache(db.clone()).unwrap();
         let cascade = Cascade::empty()
             .with_cache(DbPairMut::new(&mut element_cache, &mut meta_cache))
             .with_integrated(DbPair::new(&element_integrated, &meta_integrated));
@@ -578,7 +578,7 @@ async fn get_agent_activity_host_fn_test() {
     let alice_call_data = conductor_test.alice_call_data();
     let alice_cell_id = &alice_call_data.cell_id;
     let alice_agent_id = alice_cell_id.agent_pubkey();
-    let alice_db = alice_call_data.env.clone();
+    let alice_db = alice_call_data.db.clone();
 
     // Helper for getting expected data
     let get_expected = || {
@@ -616,7 +616,7 @@ async fn get_agent_activity_host_fn_test() {
     let expected_count = NUM_COMMITS * 3 + 9;
 
     wait_for_integration(
-        &alice_call_data.env,
+        &alice_call_data.db,
         expected_count,
         NUM_ATTEMPTS,
         DELAY_PER_ATTEMPT.clone(),
@@ -679,8 +679,8 @@ async fn check_cascade(
     header_hashed: &HeaderHashed,
     call_data: &CellHostFnCaller,
 ) -> Option<ValidationPackage> {
-    let mut element_cache = ElementBuf::cache(call_data.env.clone().into()).unwrap();
-    let mut meta_cache = MetadataBuf::cache(call_data.env.clone().into()).unwrap();
+    let mut element_cache = ElementBuf::cache(call_data.db.clone().into()).unwrap();
+    let mut meta_cache = MetadataBuf::cache(call_data.db.clone().into()).unwrap();
     let cache_data = DbPairMut::new(&mut element_cache, &mut meta_cache);
     let mut cascade = Cascade::empty()
         .with_cache(cache_data)

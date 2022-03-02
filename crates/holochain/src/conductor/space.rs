@@ -220,7 +220,7 @@ impl Spaces {
         let end = window.end;
         let max_ops: u32 = max_ops.try_into().unwrap_or(u32::MAX);
 
-        let env = self.dht_db(dna_hash)?;
+        let db = self.dht_db(dna_hash)?;
         let include_limbo = include_limbo
             .then(|| "\n")
             .unwrap_or("AND DhtOp.when_integrated IS NOT NULL\n");
@@ -262,7 +262,7 @@ impl Spaces {
                 holochain_sqlite::sql::sql_cell::FETCH_OP_HASHES_P2,
             )
         };
-        let results = env
+        let results = db
             .async_reader(move |txn| {
                 let hashes = txn
                     .prepare_cached(&sql)?
@@ -307,8 +307,8 @@ impl Spaces {
     ) -> ConductorResult<Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>> {
         const OPS_IN_MEMORY_BOUND_BYTES: usize = 3_000_000; // 3MB
                                                             // FIXME: Test this query.
-        let env = self.dht_db(dna_hash)?;
-        let results = env
+        let db = self.dht_db(dna_hash)?;
+        let results = db
             .async_reader(move |txn| {
                 let mut out = Vec::with_capacity(op_hashes.len());
                 let mut total_bytes = 0;

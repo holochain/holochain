@@ -62,7 +62,7 @@ mod tests {
         observability::test_run().ok();
 
         // all the stuff needed to have a WasmBuf
-        let env = crate::test_utils::test_wasm_db();
+        let db = crate::test_utils::test_wasm_db();
 
         // a wasm
         let wasm =
@@ -70,10 +70,10 @@ mod tests {
                 .await;
 
         // Put wasm
-        env.conn()?
+        db.conn()?
             .with_commit_sync(|txn| put(txn, wasm.clone()))
             .unwrap();
-        fresh_reader_test!(env, |txn| {
+        fresh_reader_test!(db, |txn| {
             assert!(contains(&txn, &wasm.as_hash()).unwrap());
             // a wasm from the WasmBuf
             let ret = get(&txn, &wasm.as_hash()).unwrap().unwrap();

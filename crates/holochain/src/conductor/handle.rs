@@ -590,12 +590,12 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         match event {
             holochain_p2p::event::HolochainP2pEvent::KGenReq { arg, respond, .. } => match arg {
                 KGenReq::PeerExtrapCov { space, dht_arc_set } => {
-                    let env = { self.p2p_agents_db(&DnaHash::from_kitsune(&space)) };
+                    let db = { self.p2p_agents_db(&DnaHash::from_kitsune(&space)) };
                     respond.respond(Ok(async move {
                         use holochain_sqlite::db::AsP2pAgentStoreConExt;
-                        let permit = env.conn_permit().await;
+                        let permit = db.conn_permit().await;
                         let res = tokio::task::spawn_blocking(move || {
-                            let mut conn = env.from_permit(permit)?;
+                            let mut conn = db.from_permit(permit)?;
                             conn.p2p_extrapolated_coverage(dht_arc_set)
                         })
                         .await;
@@ -608,12 +608,12 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                     .into()));
                 }
                 KGenReq::RecordMetrics { space, records } => {
-                    let env = { self.p2p_metrics_db(&DnaHash::from_kitsune(&space)) };
+                    let db = { self.p2p_metrics_db(&DnaHash::from_kitsune(&space)) };
                     respond.respond(Ok(async move {
                         use holochain_sqlite::db::AsP2pMetricStoreConExt;
-                        let permit = env.conn_permit().await;
+                        let permit = db.conn_permit().await;
                         let res = tokio::task::spawn_blocking(move || {
-                            let mut conn = env.from_permit(permit)?;
+                            let mut conn = db.from_permit(permit)?;
                             conn.p2p_log_metrics(records)
                         })
                         .await;
@@ -649,8 +649,8 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                 respond,
                 ..
             } => {
-                let env = { self.p2p_agents_db(&dna_hash) };
-                let res = get_agent_info_signed(env.into(), kitsune_space, kitsune_agent)
+                let db = { self.p2p_agents_db(&dna_hash) };
+                let res = get_agent_info_signed(db.into(), kitsune_space, kitsune_agent)
                     .await
                     .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
@@ -661,8 +661,8 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                 respond,
                 ..
             } => {
-                let env = { self.p2p_agents_db(&dna_hash) };
-                let res = list_all_agent_info(env.into(), kitsune_space)
+                let db = { self.p2p_agents_db(&dna_hash) };
+                let res = list_all_agent_info(db.into(), kitsune_space)
                     .await
                     .map(|infos| match agents {
                         Some(agents) => infos
@@ -682,10 +682,10 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                 ..
             } => {
                 use holochain_sqlite::db::AsP2pAgentStoreConExt;
-                let env = { self.p2p_agents_db(&dna_hash) };
-                let permit = env.conn_permit().await;
+                let db = { self.p2p_agents_db(&dna_hash) };
+                let permit = db.conn_permit().await;
                 let res = tokio::task::spawn_blocking(move || {
-                    let mut conn = env.from_permit(permit)?;
+                    let mut conn = db.from_permit(permit)?;
                     conn.p2p_gossip_query_agents(since_ms, until_ms, (*arc_set).clone())
                 })
                 .await;
@@ -701,9 +701,9 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                 respond,
                 ..
             } => {
-                let env = { self.p2p_agents_db(&dna_hash) };
+                let db = { self.p2p_agents_db(&dna_hash) };
                 let res = list_all_agent_info_signed_near_basis(
-                    env.into(),
+                    db.into(),
                     kitsune_space,
                     basis_loc,
                     limit,
@@ -718,8 +718,8 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                 respond,
                 ..
             } => {
-                let env = { self.p2p_agents_db(&dna_hash) };
-                let res = query_peer_density(env.into(), kitsune_space, dht_arc)
+                let db = { self.p2p_agents_db(&dna_hash) };
+                let res = query_peer_density(db.into(), kitsune_space, dht_arc)
                     .await
                     .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
@@ -1212,8 +1212,8 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                 .push(agent_info_signed);
         }
         for (space, agent_infos) in space_map {
-            let env = self.p2p_agents_db(&DnaHash::from_kitsune(&space));
-            inject_agent_infos(env, agent_infos.iter()).await?;
+            let db = self.p2p_agents_db(&DnaHash::from_kitsune(&space));
+            inject_agent_infos(db, agent_infos.iter()).await?;
         }
         Ok(())
     }
@@ -1225,8 +1225,8 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         match cell_id {
             Some(c) => {
                 let (d, a) = c.into_dna_and_agent();
-                let env = self.p2p_agents_db(&d);
-                Ok(get_single_agent_info(env.into(), d, a)
+                let db = self.p2p_agents_db(&d);
+                Ok(get_single_agent_info(db.into(), d, a)
                     .await?
                     .map(|a| vec![a])
                     .unwrap_or_default())
@@ -1238,8 +1238,8 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                     .conductor
                     .spaces
                     .get_from_spaces(|s| s.p2p_agents_db.clone());
-                for env in envs {
-                    out.append(&mut all_agent_infos(env.into()).await?);
+                for db in envs {
+                    out.append(&mut all_agent_infos(db.into()).await?);
                 }
                 Ok(out)
             }
