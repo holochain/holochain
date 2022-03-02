@@ -304,14 +304,14 @@ pub async fn dump_state(
 mod tests {
     use super::*;
     use ::fixt::prelude::*;
-    use holochain_state::test_utils::test_p2p_agent_store_db;
+    use holochain_state::test_utils::test_p2p_agents_db;
     use kitsune_p2p::fixt::AgentInfoSignedFixturator;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_store_agent_info_signed() {
         observability::test_run().ok();
 
-        let test_db = test_p2p_agent_store_db();
+        let test_db = test_p2p_agents_db();
         let db = test_db.to_db();
 
         let agent_info_signed = fixt!(AgentInfoSigned, Predictable);
@@ -330,7 +330,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn add_agent_info_to_db() {
         observability::test_run().ok();
-        let t_db = test_p2p_agent_store_db();
+        let t_db = test_p2p_agents_db();
         let db = t_db.to_db();
 
         // - Check no data in the store to start

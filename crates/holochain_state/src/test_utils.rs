@@ -70,7 +70,7 @@ pub fn test_wasm_db() -> TestDb<DbKindWasm> {
 }
 
 /// Create a [TestEnv] of [DbKindP2pAgentStore], backed by a temp directory.
-pub fn test_p2p_agent_store_db() -> TestDb<DbKindP2pAgents> {
+pub fn test_p2p_agents_db() -> TestDb<DbKindP2pAgents> {
     test_db(DbKindP2pAgents(Arc::new(KitsuneSpace(vec![0; 36]))))
 }
 
