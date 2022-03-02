@@ -2,7 +2,7 @@ use super::SweetZome;
 use hdk::prelude::*;
 use holo_hash::DnaHash;
 use holochain_sqlite::db::{DbKindAuthored, DbKindDht};
-use holochain_types::env::DbWrite;
+use holochain_types::db::DbWrite;
 /// A reference to a Cell created by a SweetConductor installation function.
 /// It has very concise methods for calling a zome on this cell
 #[derive(Clone, derive_more::Constructor)]

@@ -12,7 +12,7 @@ use holochain_state::prelude::{
     current_countersigning_session, SourceChainResult, StateMutationResult, Store,
 };
 use holochain_types::signal::{Signal, SystemSignal};
-use holochain_types::{dht_op::DhtOp, env::DbWrite};
+use holochain_types::{db::DbWrite, dht_op::DhtOp};
 use holochain_zome_types::Timestamp;
 use holochain_zome_types::{Entry, SignedHeader, ZomeCallResponse};
 use kitsune_p2p_types::tx2::tx2_utils::Share;

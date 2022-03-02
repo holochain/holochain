@@ -210,7 +210,7 @@ fn cache_data(in_memory: bool, data: &MockNetworkData, is_cached: bool) -> Conne
     let mut conn = if in_memory {
         Connection::open_in_memory().unwrap()
     } else {
-        let p = std::db::temp_dir().join("mock_test_data");
+        let p = std::env::temp_dir().join("mock_test_data");
         std::fs::create_dir(&p).ok();
         let p = p.join("mock_test_data.sqlite3");
         Connection::open(p).unwrap()
@@ -277,7 +277,7 @@ fn cache_data(in_memory: bool, data: &MockNetworkData, is_cached: bool) -> Conne
 }
 
 fn get_cached() -> Option<GeneratedData> {
-    let p = std::db::temp_dir()
+    let p = std::env::temp_dir()
         .join("mock_test_data")
         .join("mock_test_data.sqlite3");
     p.exists().then(|| ()).and_then(|_| {

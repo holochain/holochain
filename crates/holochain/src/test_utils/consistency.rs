@@ -17,7 +17,7 @@ use holochain_sqlite::{
     prelude::DatabaseResult,
 };
 use holochain_state::prelude::StateQueryResult;
-use holochain_types::{dht_op::DhtOpType, env::DbRead};
+use holochain_types::{db::DbRead, dht_op::DhtOpType};
 use kitsune_p2p::{KitsuneAgent, KitsuneOpHash};
 use kitsune_p2p_types::consistency::*;
 use rusqlite::named_params;
@@ -38,7 +38,7 @@ const CONCURRENCY: usize = 100;
 /// A helper for checking consistency of all published ops for all cells in all conductors
 /// has reached consistency in a sharded context.
 pub async fn local_machine_session(conductors: &[ConductorHandle], timeout: Duration) {
-    // For each space get all the cells, their env and the p2p envs.
+    // For each space get all the cells, their db and the p2p envs.
     let mut spaces = HashMap::new();
     for (i, c) in conductors.iter().enumerate() {
         for cell_id in c.list_cell_ids(None) {
@@ -441,7 +441,7 @@ fn generate_session<'iter>(
             agent_dht_map
                 .get(&agent)
                 .cloned()
-                .map(|env| (agent, expected_session, env))
+                .map(|db| (agent, expected_session, db))
         })
 }
 
@@ -672,9 +672,9 @@ async fn gather_published_data(
 
 /// Request the published hashes for the given agent.
 async fn request_published_ops(
-    env: &DbRead<DbKindAuthored>,
+    db: &DbRead<DbKindAuthored>,
 ) -> StateQueryResult<Vec<(DhtLocation, KitsuneOpHash)>> {
-    Ok(env
+    Ok(db
         .async_reader(|txn| {
             // Collect all ops except StoreEntry's that are private.
             let r = txn
@@ -708,9 +708,9 @@ async fn request_published_ops(
 
 /// Request the storage arc for the given agent.
 async fn request_arc(
-    env: &DbRead<DbKindP2pAgents>,
+    db: &DbRead<DbKindP2pAgents>,
     agent: KitsuneAgent,
 ) -> StateQueryResult<Option<DhtArc>> {
-    env.async_reader(move |txn| Ok(txn.p2p_get_agent(&agent)?.map(|info| info.storage_arc)))
+    db.async_reader(move |txn| Ok(txn.p2p_get_agent(&agent)?.map(|info| info.storage_arc)))
         .await
 }
