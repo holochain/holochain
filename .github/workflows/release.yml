@@ -33,7 +33,7 @@ on:
       holonix_source_branch:
         description: "source branch for the release"
         required: false
-        default: "develop"
+        default: "main"
         type: string
       dry_run:
         description: "prevent tag creation and pushing to main and develop branches"
@@ -154,9 +154,9 @@ jobs:
             restoresCargoCache: true
             savesCargoCache: true
             ignoreErrorOnNonUbuntu: true
-            timeout_minutes: 6
+            timeout_minutes: 8
             max_attempts:
-              ubuntu-latest: 12
+              ubuntu-latest: 15
               macos-latest: 1
             run: |
               env \
