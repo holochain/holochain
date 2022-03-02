@@ -137,12 +137,6 @@ where
     /// The collection of cells associated with this Conductor
     cells: RwShare<HashMap<CellId, CellItem<CA>>>,
 
-    /// The database for persisting state related to this Conductor
-    conductor_env: DbWrite<DbKindConductor>,
-
-    /// A database for storing wasm
-    wasm_env: DbWrite<DbKindWasm>,
-
     /// The map of dna hash spaces.
     pub(super) spaces: Spaces,
 
@@ -813,7 +807,7 @@ where
         impl IntoIterator<Item = (DnaHash, DnaFile)>,
         impl IntoIterator<Item = (EntryDefBufferKey, EntryDef)>,
     )> {
-        let env = &self.wasm_env;
+        let env = &self.spaces.wasm_env;
 
         // Load out all dna defs
         let (wasm_tasks, defs) = env
@@ -932,7 +926,7 @@ where
         &self,
         dna: DnaFile,
     ) -> ConductorResult<Vec<(EntryDefBufferKey, EntryDef)>> {
-        let env = self.wasm_env.clone();
+        let env = self.spaces.wasm_env.clone();
 
         let zome_defs = get_entry_defs(dna.clone())?;
 
@@ -1268,8 +1262,6 @@ where
 {
     #[allow(clippy::too_many_arguments)]
     async fn new(
-        conductor_env: DbWrite<DbKindConductor>,
-        wasm_env: DbWrite<DbKindWasm>,
         dna_store: DS,
         keystore: MetaLairClient,
         holochain_p2p: holochain_p2p::HolochainP2pRef,
@@ -1277,8 +1269,6 @@ where
         post_commit: tokio::sync::mpsc::Sender<PostCommitArgs>,
     ) -> ConductorResult<Self> {
         Ok(Self {
-            conductor_env,
-            wasm_env,
             spaces,
             cells: RwShare::new(HashMap::new()),
             shutting_down: Arc::new(AtomicBool::new(false)),
@@ -1293,7 +1283,8 @@ where
     }
 
     pub(super) async fn get_state(&self) -> ConductorResult<ConductorState> {
-        self.conductor_env
+        self.spaces
+            .conductor_env
             .async_reader(|txn| {
                 let state = txn
                     .query_row("SELECT blob FROM ConductorState WHERE id = 1", [], |row| {
@@ -1328,6 +1319,7 @@ where
     {
         self.check_running()?;
         let output = self
+            .spaces
             .conductor_env
             .async_commit(move |txn| {
                 let state = txn
@@ -1476,13 +1468,6 @@ mod builder {
 
             let env_path = self.config.environment_path.clone();
 
-            let environment = DbWrite::open(env_path.as_ref(), DbKindConductor)?;
-
-            let wasm_environment = DbWrite::open(env_path.as_ref(), DbKindWasm)?;
-
-            #[cfg(any(test, feature = "test_utils"))]
-            let state = self.state;
-
             let Self {
                 dna_store, config, ..
             } = self;
@@ -1499,7 +1484,8 @@ mod builder {
                     cert_priv_key,
                     cert_digest,
                 };
-            let spaces = Spaces::new(env_path, config.db_sync_strategy);
+
+            let spaces = Spaces::new(env_path, config.db_sync_strategy)?;
             let (holochain_p2p, p2p_evt) =
                 holochain_p2p::spawn_holochain_p2p(network_config, tls_config).await?;
 
@@ -1507,8 +1493,6 @@ mod builder {
                 tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
 
             let conductor = Conductor::new(
-                environment,
-                wasm_environment,
                 dna_store,
                 keystore,
                 holochain_p2p,
@@ -1518,7 +1502,7 @@ mod builder {
             .await?;
 
             #[cfg(any(test, feature = "test_utils"))]
-            let conductor = Self::update_fake_state(state, conductor).await?;
+            let conductor = Self::update_fake_state(self.state, conductor).await?;
 
             // Create handle
             let handle: ConductorHandle = Arc::new(ConductorHandleImpl {
@@ -1652,15 +1636,9 @@ mod builder {
             let spaces = Spaces::new(
                 self.config.environment_path.clone(),
                 self.config.db_sync_strategy,
-            );
+            )?;
 
             let conductor = Conductor::new(
-                DbWrite::test(
-                    self.config.environment_path.as_ref().as_path(),
-                    DbKindConductor,
-                )
-                .unwrap(),
-                DbWrite::test(self.config.environment_path.as_ref().as_path(), DbKindWasm).unwrap(),
                 self.dna_store,
                 keystore,
                 holochain_p2p,

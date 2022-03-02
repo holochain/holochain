@@ -33,10 +33,8 @@ async fn can_update_state() {
     let holochain_p2p = holochain_p2p::stub_network().await;
     let (post_commit_sender, _post_commit_receiver) =
         tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
-    let spaces = Spaces::new(envs.path().to_path_buf().into(), Default::default());
+    let spaces = Spaces::new(envs.path().to_path_buf().into(), Default::default()).unwrap();
     let conductor = Conductor::new(
-        DbWrite::test(envs.path(), DbKindConductor).unwrap(),
-        DbWrite::test(envs.path(), DbKindWasm).unwrap(),
         dna_store,
         keystore,
         holochain_p2p,
@@ -82,11 +80,9 @@ async fn can_add_clone_cell_to_app() {
     let dna_store = RealDnaStore::new();
     let (post_commit_sender, _post_commit_receiver) =
         tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
-    let spaces = Spaces::new(envs.path().to_path_buf().into(), Default::default());
+    let spaces = Spaces::new(envs.path().to_path_buf().into(), Default::default()).unwrap();
 
     let conductor = Conductor::new(
-        DbWrite::open(envs.path(), DbKindConductor).unwrap(),
-        DbWrite::open(envs.path(), DbKindWasm).unwrap(),
         dna_store,
         keystore,
         holochain_p2p,
@@ -158,10 +154,8 @@ async fn app_ids_are_unique() {
     let holochain_p2p = holochain_p2p::stub_network().await;
     let (post_commit_sender, _post_commit_receiver) =
         tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
-    let spaces = Spaces::new(envs.path().to_path_buf().into(), Default::default());
+    let spaces = Spaces::new(envs.path().to_path_buf().into(), Default::default()).unwrap();
     let conductor = Conductor::new(
-        DbWrite::test(envs.path(), DbKindConductor).unwrap(),
-        DbWrite::test(envs.path(), DbKindWasm).unwrap(),
         dna_store,
         test_keystore(),
         holochain_p2p,

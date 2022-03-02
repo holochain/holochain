@@ -81,7 +81,7 @@ impl SweetConductor {
         // to actually access those databases.
         // As a TODO, we can remove the need for TestEnvs in sweettest or have
         // some other better integration between the two.
-        let spaces = Spaces::new(env_dir.path().to_path_buf().into(), Default::default());
+        let spaces = Spaces::new(env_dir.path().to_path_buf().into(), Default::default()).unwrap();
 
         let keystore = handle.keystore().clone();
 
