@@ -35,16 +35,16 @@ pub struct HostStub;
 impl KitsuneHost for HostStub {
     fn peer_extrapolated_coverage(
         &self,
-        space: Arc<crate::KitsuneSpace>,
-        dht_arc_set: DhtArcSet,
+        _space: Arc<crate::KitsuneSpace>,
+        _dht_arc_set: DhtArcSet,
     ) -> KitsuneHostResult<Vec<f64>> {
         todo!()
     }
 
     fn record_metrics(
         &self,
-        space: Arc<crate::KitsuneSpace>,
-        records: Vec<MetricRecord>,
+        _space: Arc<crate::KitsuneSpace>,
+        _records: Vec<MetricRecord>,
     ) -> KitsuneHostResult<()> {
         todo!()
     }

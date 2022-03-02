@@ -40,7 +40,7 @@ pub(crate) async fn spawn_test_agent(
         kitsune_p2p_types::tls::TlsConfig::new_ephemeral()
             .await
             .unwrap(),
-            host,
+        host,
     )
     .await?;
 

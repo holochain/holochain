@@ -146,6 +146,7 @@ impl Stats {
 
 impl ShardedGossip {
     /// Constructor
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         tuning_params: KitsuneP2pTuningParams,
         space: Arc<KitsuneSpace>,
@@ -163,7 +164,7 @@ impl ShardedGossip {
                 tuning_params,
                 space,
                 evt_sender,
-                host,
+                _host: host,
                 inner: Share::new(ShardedGossipLocalState::new(metrics)),
                 gossip_type,
                 closing: AtomicBool::new(false),
@@ -344,7 +345,7 @@ pub struct ShardedGossipLocal {
     tuning_params: KitsuneP2pTuningParams,
     space: Arc<KitsuneSpace>,
     evt_sender: EventSender,
-    host: HostApi,
+    _host: HostApi,
     inner: Share<ShardedGossipLocalState>,
     closing: AtomicBool,
 }

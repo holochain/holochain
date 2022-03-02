@@ -155,7 +155,6 @@ impl MetricExchangeSync {
     pub fn spawn(
         space: Arc<KitsuneSpace>,
         tuning_params: KitsuneP2pTuningParams,
-        evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
         host: HostApi,
         metrics: MetricsSync,
     ) -> Self {

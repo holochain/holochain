@@ -1114,7 +1114,6 @@ impl Space {
         let metric_exchange = MetricExchangeSync::spawn(
             space.clone(),
             config.tuning_params.clone(),
-            evt_sender.clone(),
             host.clone(),
             metrics.clone(),
         );
