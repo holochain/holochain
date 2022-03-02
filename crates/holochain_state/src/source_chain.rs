@@ -65,7 +65,7 @@ mod error;
 pub struct SourceChain<AuthorDb = DbWrite<DbKindAuthored>, DhtDb = DbWrite<DbKindDht>> {
     scratch: SyncScratch,
     vault: AuthorDb,
-    dht_env: DhtDb,
+    dht_db: DhtDb,
     keystore: MetaLairClient,
     author: Arc<AgentPubKey>,
     persisted_seq: u32,
@@ -329,7 +329,7 @@ impl SourceChain {
                     // the rebase.
                     let child_chain = Self::new(
                         self.vault.clone(),
-                        self.dht_env.clone(),
+                        self.dht_db.clone(),
                         keystore.clone(),
                         (*self.author).clone(),
                     )
@@ -361,7 +361,7 @@ impl SourceChain {
                 }
             }
             Ok(zomed_headers) => {
-                authored_ops_to_dht_db(network, ops_to_integrate, &self.vault, &self.dht_env)
+                authored_ops_to_dht_db(network, ops_to_integrate, &self.vault, &self.dht_db)
                     .await?;
                 SourceChainResult::Ok(zomed_headers)
             }
@@ -377,7 +377,7 @@ where
 {
     pub async fn new(
         vault: AuthorDb,
-        dht_env: DhtDb,
+        dht_db: DhtDb,
         keystore: MetaLairClient,
         author: AgentPubKey,
     ) -> SourceChainResult<Self> {
@@ -392,7 +392,7 @@ where
         Ok(Self {
             scratch,
             vault,
-            dht_env,
+            dht_db,
             keystore,
             author,
             persisted_seq,
@@ -408,7 +408,7 @@ where
     /// really needs to be constructed before genesis runs.
     pub async fn raw_empty(
         vault: AuthorDb,
-        dht_env: DhtDb,
+        dht_db: DhtDb,
         keystore: MetaLairClient,
         author: AgentPubKey,
     ) -> SourceChainResult<Self> {
@@ -430,7 +430,7 @@ where
         Ok(Self {
             scratch,
             vault,
-            dht_env,
+            dht_db,
             keystore,
             author,
             persisted_seq,
@@ -906,7 +906,7 @@ async fn rebase_headers_on(
 
 pub async fn genesis(
     authored: DbWrite<DbKindAuthored>,
-    dht_env: DbWrite<DbKindDht>,
+    dht_db: DbWrite<DbKindDht>,
     keystore: MetaLairClient,
     dna_hash: DnaHash,
     agent_pubkey: AgentPubKey,
@@ -976,7 +976,7 @@ pub async fn genesis(
             SourceChainResult::Ok(ops_to_integrate)
         })
         .await?;
-    authored_ops_to_dht_db_without_check(ops_to_integrate, &authored, &dht_env).await?;
+    authored_ops_to_dht_db_without_check(ops_to_integrate, &authored, &dht_db).await?;
     Ok(())
 }
 
@@ -1180,7 +1180,7 @@ impl From<SourceChain> for SourceChainRead {
     fn from(chain: SourceChain) -> Self {
         SourceChainRead {
             vault: chain.vault.into(),
-            dht_env: chain.dht_env.into(),
+            dht_db: chain.dht_db.into(),
             scratch: chain.scratch,
             keystore: chain.keystore,
             author: chain.author,
@@ -1206,10 +1206,10 @@ pub mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_relaxed_ordering() -> SourceChainResult<()> {
-        let test_env = test_authored_env();
-        let dht_env = test_dht_env();
+        let test_db = test_authored_db();
+        let dht_db = test_dht_db();
         let keystore = test_keystore();
-        let env = test_env.env();
+        let env = test_db.to_db();
         let alice = fixt!(AgentPubKey, Predictable, 0);
         let zome = fixt!(Zome);
 
@@ -1218,7 +1218,7 @@ pub mod tests {
 
         source_chain::genesis(
             env.clone(),
-            dht_env.env(),
+            dht_db.to_db(),
             keystore.clone(),
             fake_dna_hash(1),
             alice.clone(),
@@ -1228,21 +1228,21 @@ pub mod tests {
         .unwrap();
         let chain_1 = SourceChain::new(
             env.clone().into(),
-            dht_env.env(),
+            dht_db.to_db(),
             keystore.clone(),
             alice.clone(),
         )
         .await?;
         let chain_2 = SourceChain::new(
             env.clone().into(),
-            dht_env.env(),
+            dht_db.to_db(),
             keystore.clone(),
             alice.clone(),
         )
         .await?;
         let chain_3 = SourceChain::new(
             env.clone().into(),
-            dht_env.env(),
+            dht_db.to_db(),
             keystore.clone(),
             alice.clone(),
         )
@@ -1305,10 +1305,10 @@ pub mod tests {
     }
     #[tokio::test(flavor = "multi_thread")]
     async fn test_relaxed_ordering_with_entry() -> SourceChainResult<()> {
-        let test_env = test_authored_env();
-        let dht_env = test_dht_env();
+        let test_db = test_authored_db();
+        let dht_db = test_dht_db();
         let keystore = test_keystore();
-        let env = test_env.env();
+        let env = test_db.to_db();
         let alice = fixt!(AgentPubKey, Predictable, 0);
 
         let mut mock = MockHolochainP2pDnaT::new();
@@ -1316,7 +1316,7 @@ pub mod tests {
 
         source_chain::genesis(
             env.clone(),
-            dht_env.env(),
+            dht_db.to_db(),
             keystore.clone(),
             fake_dna_hash(1),
             alice.clone(),
@@ -1327,21 +1327,21 @@ pub mod tests {
 
         let chain_1 = SourceChain::new(
             env.clone().into(),
-            dht_env.env(),
+            dht_db.to_db(),
             keystore.clone(),
             alice.clone(),
         )
         .await?;
         let chain_2 = SourceChain::new(
             env.clone().into(),
-            dht_env.env(),
+            dht_db.to_db(),
             keystore.clone(),
             alice.clone(),
         )
         .await?;
         let chain_3 = SourceChain::new(
             env.clone().into(),
-            dht_env.env(),
+            dht_db.to_db(),
             keystore.clone(),
             alice.clone(),
         )
@@ -1446,10 +1446,10 @@ pub mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_get_cap_grant() -> SourceChainResult<()> {
-        let test_env = test_authored_env();
-        let dht_env = test_dht_env();
+        let test_db = test_authored_db();
+        let dht_db = test_dht_db();
         let keystore = test_keystore();
-        let env = test_env.env();
+        let env = test_db.to_db();
         let secret = Some(CapSecretFixturator::new(Unpredictable).next().unwrap());
         let access = CapAccess::from(secret.unwrap());
         let mut mock = MockHolochainP2pDnaT::new();
@@ -1467,7 +1467,7 @@ pub mod tests {
         let bob = agents.next().unwrap();
         source_chain::genesis(
             env.clone(),
-            dht_env.env(),
+            dht_db.to_db(),
             keystore.clone(),
             fake_dna_hash(1),
             alice.clone(),
@@ -1478,7 +1478,7 @@ pub mod tests {
 
         {
             let chain =
-                SourceChain::new(env.clone(), dht_env.env(), keystore.clone(), alice.clone())
+                SourceChain::new(env.clone(), dht_db.to_db(), keystore.clone(), alice.clone())
                     .await?;
             assert_eq!(
                 chain
@@ -1499,7 +1499,7 @@ pub mod tests {
         let (original_header_address, original_entry_address) = {
             let chain = SourceChain::new(
                 env.clone().into(),
-                dht_env.env(),
+                dht_db.to_db(),
                 keystore.clone(),
                 alice.clone(),
             )
@@ -1526,7 +1526,7 @@ pub mod tests {
 
         {
             let chain =
-                SourceChain::new(env.clone(), dht_env.env(), keystore.clone(), alice.clone())
+                SourceChain::new(env.clone(), dht_db.to_db(), keystore.clone(), alice.clone())
                     .await?;
             // alice should find her own authorship with higher priority than the committed grant
             // even if she passes in the secret
@@ -1557,7 +1557,7 @@ pub mod tests {
         let (updated_header_hash, updated_entry_hash) = {
             let chain = SourceChain::new(
                 env.clone().into(),
-                dht_env.env(),
+                dht_db.to_db(),
                 keystore.clone(),
                 alice.clone(),
             )
@@ -1586,7 +1586,7 @@ pub mod tests {
 
         {
             let chain =
-                SourceChain::new(env.clone(), dht_env.env(), keystore.clone(), alice.clone())
+                SourceChain::new(env.clone(), dht_db.to_db(), keystore.clone(), alice.clone())
                     .await?;
             // alice should find her own authorship with higher priority than the committed grant
             // even if she passes in the secret
@@ -1621,7 +1621,7 @@ pub mod tests {
         {
             let chain = SourceChain::new(
                 env.clone().into(),
-                dht_env.env(),
+                dht_db.to_db(),
                 keystore.clone(),
                 alice.clone(),
             )
@@ -1644,7 +1644,7 @@ pub mod tests {
 
         {
             let chain =
-                SourceChain::new(env.clone(), dht_env.env(), keystore.clone(), alice.clone())
+                SourceChain::new(env.clone(), dht_db.to_db(), keystore.clone(), alice.clone())
                     .await?;
             // alice should find her own authorship
             assert_eq!(
@@ -1681,8 +1681,8 @@ pub mod tests {
     // @todo bring all this back when we want to administer cap claims better
     // #[tokio::test(flavor = "multi_thread")]
     // async fn test_get_cap_claim() -> SourceChainResult<()> {
-    //     let test_env = test_cell_env();
-    //     let env = test_env.env();
+    //     let test_db = test_cell_db();
+    //     let env = test_db.env();
     //     let env = env.conn().unwrap().await;
     //     let secret = CapSecretFixturator::new(Unpredictable).next().unwrap();
     //     let agent_pubkey = fake_agent_pubkey_1().into();
@@ -1724,10 +1724,10 @@ pub mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn source_chain_buffer_iter_back() -> SourceChainResult<()> {
         observability::test_run().ok();
-        let test_env = test_authored_env();
-        let dht_env = test_dht_env();
+        let test_db = test_authored_db();
+        let dht_db = test_dht_db();
         let keystore = test_keystore();
-        let vault = test_env.env();
+        let vault = test_db.to_db();
         let mut mock = MockHolochainP2pDnaT::new();
         mock.expect_authority_for_hash().returning(|_| Ok(false));
 
@@ -1742,7 +1742,7 @@ pub mod tests {
         });
         genesis(
             vault.clone().into(),
-            dht_env.env(),
+            dht_db.to_db(),
             keystore.clone(),
             fixt!(DnaHash),
             (*author).clone(),
@@ -1753,7 +1753,7 @@ pub mod tests {
 
         let source_chain = SourceChain::new(
             vault.clone().into(),
-            dht_env.env(),
+            dht_db.to_db(),
             keystore.clone(),
             (*author).clone(),
         )
@@ -1803,7 +1803,7 @@ pub mod tests {
         // check that you can iterate on the chain
         let source_chain = SourceChain::new(
             vault.clone(),
-            dht_env.env(),
+            dht_db.to_db(),
             keystore.clone(),
             (*author).clone(),
         )
@@ -1819,14 +1819,14 @@ pub mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn source_chain_buffer_dump_entries_json() -> SourceChainResult<()> {
-        let test_env = test_authored_env();
-        let dht_env = test_dht_env();
+        let test_db = test_authored_db();
+        let dht_db = test_dht_db();
         let keystore = test_keystore();
-        let vault = test_env.env();
+        let vault = test_db.to_db();
         let author = keystore.new_sign_keypair_random().await.unwrap();
         genesis(
             vault.clone().into(),
-            dht_env.env(),
+            dht_db.to_db(),
             keystore.clone(),
             fixt!(DnaHash),
             author.clone(),

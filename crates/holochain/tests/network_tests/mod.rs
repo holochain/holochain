@@ -58,8 +58,8 @@ use holochain::test_utils::host_fn_caller::*;
 async fn get_updates_cache() {
     observability::test_run().ok();
     // Database setup
-    let test_env = test_cell_env();
-    let env = test_env.env();
+    let test_db = test_cell_db();
+    let env = test_db.env();
 
     let (element_fixt_store, _) = generate_fixt_store().await;
     let expected = element_fixt_store
@@ -102,8 +102,8 @@ async fn get_updates_cache() {
 async fn get_meta_updates_meta_cache() {
     observability::test_run().ok();
     // Database setup
-    let test_env = test_cell_env();
-    let env = test_env.env();
+    let test_db = test_cell_db();
+    let env = test_db.env();
 
     // Setup other metadata store with fixtures attached
     // to known entry hash

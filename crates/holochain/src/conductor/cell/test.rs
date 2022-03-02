@@ -24,8 +24,8 @@ async fn test_cell_handle_publish() {
     let agent = cell_id.agent_pubkey().clone();
 
     let spaces = TestSpaces::new([dna.clone()]);
-    let env = spaces.test_spaces[&dna].space.authored_env.clone();
-    let dht_env = spaces.test_spaces[&dna].space.dht_env.clone();
+    let env = spaces.test_spaces[&dna].space.authored_db.clone();
+    let dht_db = spaces.test_spaces[&dna].space.dht_db.clone();
 
     let test_network = test_network(Some(dna.clone()), Some(agent.clone())).await;
     let holochain_p2p_cell = test_network.dna_network();
@@ -52,7 +52,7 @@ async fn test_cell_handle_publish() {
         cell_id.clone(),
         mock_handle.clone(),
         env.clone(),
-        dht_env.clone(),
+        dht_db.clone(),
         mock_ribosome,
         None,
     )
@@ -89,7 +89,7 @@ async fn test_cell_handle_publish() {
         .await
         .unwrap();
 
-    op_exists(&dht_env, op_hash).await.unwrap();
+    op_exists(&dht_db, op_hash).await.unwrap();
 
     stop_tx.send(()).unwrap();
     shutdown.await.unwrap().unwrap();

@@ -551,8 +551,8 @@ fn register_delete_link_missing_base(a: TestData) -> (Vec<Db>, Vec<Db>, &'static
 #[tokio::test(flavor = "multi_thread")]
 async fn test_ops_state() {
     observability::test_run().ok();
-    let test_env = test_dht_env();
-    let env = test_env.env();
+    let test_db = test_dht_db();
+    let env = test_db.to_db();
 
     let tests = [
         register_agent_activity,

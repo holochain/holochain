@@ -8,9 +8,9 @@ use error::SysValidationError;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::prelude::fresh_reader_test;
-use holochain_state::prelude::test_authored_env;
-use holochain_state::prelude::test_cache_env;
-use holochain_state::prelude::test_dht_env;
+use holochain_state::prelude::test_authored_db;
+use holochain_state::prelude::test_cache_db;
+use holochain_state::prelude::test_dht_db;
 use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::Header;
@@ -61,11 +61,11 @@ async fn check_previous_header() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn check_valid_if_dna_test() {
-    let tmp = test_authored_env();
-    let tmp_dht = test_dht_env();
-    let tmp_cache = test_cache_env();
+    let tmp = test_authored_db();
+    let tmp_dht = test_dht_db();
+    let tmp_cache = test_cache_db();
     let keystore = test_keystore();
-    let env = tmp.env();
+    let env = tmp.to_db();
     // Test data
     let _activity_return = vec![fixt!(HeaderHash)];
 
@@ -74,12 +74,12 @@ async fn check_valid_if_dna_test() {
 
     // Empty store not dna
     let header = fixt!(CreateLink);
-    let cache: DhtDbQueryCache = tmp_dht.env().into();
+    let cache: DhtDbQueryCache = tmp_dht.to_db().into();
     let mut workspace = SysValidationWorkspace::new(
         env.clone().into(),
-        tmp_dht.env().into(),
+        tmp_dht.to_db().into(),
         cache.clone(),
-        tmp_cache.env(),
+        tmp_cache.to_db(),
         Arc::new(dna_def.clone()),
     );
 
@@ -106,11 +106,11 @@ async fn check_valid_if_dna_test() {
     );
     workspace.dna_def = dna_def_original;
 
-    fake_genesis(env.clone().into(), tmp_dht.env(), keystore)
+    fake_genesis(env.clone().into(), tmp_dht.to_db(), keystore)
         .await
         .unwrap();
     tmp_dht
-        .env()
+        .to_db()
         .conn()
         .unwrap()
         .execute("UPDATE DhtOp SET when_integrated = 0", [])
@@ -420,7 +420,7 @@ async fn incoming_ops_filters_private_entry() {
     let dna = fixt!(DnaHash);
     let spaces = TestSpaces::new([dna.clone()]);
     let space = Arc::new(spaces.test_spaces[&dna].space.clone());
-    let vault = space.dht_env.clone();
+    let vault = space.dht_db.clone();
     let keystore = test_keystore();
     let (tx, _rx) = TriggerSender::new();
 

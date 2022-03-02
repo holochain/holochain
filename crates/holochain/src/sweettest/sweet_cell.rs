@@ -8,8 +8,8 @@ use holochain_types::env::DbWrite;
 #[derive(Clone, derive_more::Constructor)]
 pub struct SweetCell {
     pub(super) cell_id: CellId,
-    pub(super) cell_authored_env: DbWrite<DbKindAuthored>,
-    pub(super) cell_dht_env: DbWrite<DbKindDht>,
+    pub(super) cell_authored_db: DbWrite<DbKindAuthored>,
+    pub(super) cell_dht_db: DbWrite<DbKindDht>,
 }
 
 impl SweetCell {
@@ -19,13 +19,13 @@ impl SweetCell {
     }
 
     /// Get the authored environment for this cell
-    pub fn authored_env(&self) -> &DbWrite<DbKindAuthored> {
-        &self.cell_authored_env
+    pub fn authored_db(&self) -> &DbWrite<DbKindAuthored> {
+        &self.cell_authored_db
     }
 
     /// Get the dht environment for this cell
-    pub fn dht_env(&self) -> &DbWrite<DbKindDht> {
-        &self.cell_dht_env
+    pub fn dht_db(&self) -> &DbWrite<DbKindDht> {
+        &self.cell_dht_db
     }
 
     /// Accessor for AgentPubKey

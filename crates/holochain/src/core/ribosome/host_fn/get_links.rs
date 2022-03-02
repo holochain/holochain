@@ -237,7 +237,7 @@ pub mod slow_tests {
         // Plus one length path for the commit existing.
         expected_count += WaitOps::ENTRY + WaitOps::LINK;
 
-        wait_for_integration_1m(&alice_host_fn_caller.dht_env, expected_count).await;
+        wait_for_integration_1m(&alice_host_fn_caller.dht_db, expected_count).await;
 
         let links: Vec<hdk::prelude::Link> = conductor.call(&alice, "get_long_path", ()).await;
         assert_eq!(links.len(), 1);

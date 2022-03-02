@@ -201,11 +201,11 @@ async fn get_agent_activity_test() {
     let alice_call_data = conductor_test.alice_call_data_mut();
     let alice_cell_id = &alice_call_data.cell_id;
     let alice_agent_id = alice_cell_id.agent_pubkey();
-    let alice_env = alice_call_data.env.clone();
+    let alice_db = alice_call_data.env.clone();
 
     // Helper for getting expected data
     let get_expected_full = || {
-        let alice_source_chain = SourceChain::public_only(alice_env.clone().into()).unwrap();
+        let alice_source_chain = SourceChain::public_only(alice_db.clone().into()).unwrap();
         let valid_activity = alice_source_chain
             .iter_back()
             .collect::<Vec<_>>()
@@ -578,11 +578,11 @@ async fn get_agent_activity_host_fn_test() {
     let alice_call_data = conductor_test.alice_call_data();
     let alice_cell_id = &alice_call_data.cell_id;
     let alice_agent_id = alice_cell_id.agent_pubkey();
-    let alice_env = alice_call_data.env.clone();
+    let alice_db = alice_call_data.env.clone();
 
     // Helper for getting expected data
     let get_expected = || {
-        let alice_source_chain = SourceChain::public_only(alice_env.clone().into()).unwrap();
+        let alice_source_chain = SourceChain::public_only(alice_db.clone().into()).unwrap();
         let valid_activity = alice_source_chain
             .iter_back()
             .collect::<Vec<_>>()

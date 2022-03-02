@@ -24,7 +24,7 @@ pub mod error;
 /// go to the database.
 pub struct DhtDbQueryCache {
     /// The database this is caching queries for.
-    dht_env: DbRead<DbKindDht>,
+    dht_db: DbRead<DbKindDht>,
     /// The cache of agent activity queries.
     activity: Arc<tokio::sync::OnceCell<ActivityCache>>,
 }
@@ -70,9 +70,9 @@ impl DhtDbQueryCache {
 
 impl DhtDbQueryCache {
     /// Create a new cache for dht database queries.
-    pub fn new(dht_env: DbRead<DbKindDht>) -> Self {
+    pub fn new(dht_db: DbRead<DbKindDht>) -> Self {
         Self {
-            dht_env,
+            dht_db,
             activity: Default::default(),
         }
     }
@@ -81,7 +81,7 @@ impl DhtDbQueryCache {
     async fn get_or_try_init(&self) -> DatabaseResult<&ActivityCache> {
         self.activity
             .get_or_try_init(|| {
-                let env = self.dht_env.clone();
+                let env = self.dht_db.clone();
                 async move {
                     let (activity_integrated, mut all_activity) = env
                         .async_reader(|txn| {

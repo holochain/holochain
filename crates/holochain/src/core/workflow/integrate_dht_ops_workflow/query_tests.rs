@@ -104,15 +104,20 @@ impl Scenario {
 #[tokio::test(flavor = "multi_thread")]
 async fn integrate_query() {
     observability::test_run().ok();
-    let env = test_dht_env();
-    let expected = test_data(&env.env().into());
+    let env = test_dht_db();
+    let expected = test_data(&env.to_db().into());
     let (qt, _rx) = TriggerSender::new();
     // dump_tmp(&env.env());
     let test_network = test_network(None, None).await;
     let holochain_p2p_cell = test_network.dna_network();
-    integrate_dht_ops_workflow(env.env().into(), &env.env().into(), qt, holochain_p2p_cell)
-        .await
-        .unwrap();
+    integrate_dht_ops_workflow(
+        env.to_db().into(),
+        &env.to_db().into(),
+        qt,
+        holochain_p2p_cell,
+    )
+    .await
+    .unwrap();
     let hashes = env
         .conn()
         .unwrap()

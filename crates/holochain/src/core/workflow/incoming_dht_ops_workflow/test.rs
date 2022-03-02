@@ -8,7 +8,7 @@ use holochain_keystore::AgentPubKeyExt;
 async fn incoming_ops_to_limbo() {
     observability::test_run().unwrap();
     let space = TestSpace::new(fixt!(DnaHash));
-    let env = space.space.dht_env.clone();
+    let env = space.space.dht_db.clone();
     let keystore = holochain_state::test_utils::test_keystore();
 
     let author = fake_agent_pubkey_1();

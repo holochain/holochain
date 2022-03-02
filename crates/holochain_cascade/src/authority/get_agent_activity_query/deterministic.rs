@@ -137,8 +137,8 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn agent_activity_query() {
         observability::test_run().ok();
-        let test_env = test_dht_env();
-        let env = test_env.env();
+        let test_db = test_dht_db();
+        let env = test_db.to_db();
         let entry_type_1 = fixt!(EntryType);
         let agents = [fixt!(AgentPubKey), fixt!(AgentPubKey), fixt!(AgentPubKey)];
         let mut chains = vec![];

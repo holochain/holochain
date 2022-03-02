@@ -109,7 +109,7 @@ impl SweetConductorBatch {
     pub async fn exchange_peer_info(&self) {
         let mut all = Vec::new();
         for c in self.0.iter() {
-            for env in c.spaces.get_from_spaces(|s| s.p2p_env.clone()) {
+            for env in c.spaces.get_from_spaces(|s| s.p2p_agents_db.clone()) {
                 all.push(env.clone());
             }
         }

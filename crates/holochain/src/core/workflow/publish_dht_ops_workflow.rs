@@ -250,8 +250,8 @@ mod tests {
             observability::test_run().ok();
 
             // Create test env
-            let test_env = test_authored_env();
-            let env = test_env.env();
+            let test_db = test_authored_db();
+            let env = test_db.to_db();
 
             // Setup
             let (_network, dna_network, author, recv_task, rx_complete) =
@@ -304,8 +304,8 @@ mod tests {
             observability::test_run().ok();
 
             // Create test env
-            let test_env = test_authored_env();
-            let env = test_env.env();
+            let test_db = test_authored_db();
+            let env = test_db.to_db();
 
             // Setup
             let (_network, dna_network, author, _, _) =
@@ -356,10 +356,10 @@ mod tests {
                 observability::test_run().ok();
 
                 // Create test env
-                let test_env = test_authored_env();
+                let test_db = test_authored_db();
                 let keystore = holochain_state::test_utils::test_keystore();
-                let dht_env = test_dht_env();
-                let env = test_env.env();
+                let dht_db = test_dht_db();
+                let env = test_db.to_db();
                 let zome = fixt!(Zome);
 
                 let dna = fixt!(DnaHash);
@@ -392,7 +392,7 @@ mod tests {
                 let eu_entry_type = entry_type_fixt.next().unwrap();
 
                 // Genesis and produce ops to clear these from the chains
-                fake_genesis(env.clone(), dht_env.env(), keystore.clone())
+                fake_genesis(env.clone(), dht_db.to_db(), keystore.clone())
                     .await
                     .unwrap();
                 env.conn()
@@ -404,7 +404,7 @@ mod tests {
                 // Put data in elements
                 let source_chain = SourceChain::new(
                     env.clone().into(),
-                    dht_env.env(),
+                    dht_db.to_db(),
                     keystore.clone(),
                     author.clone(),
                 )

@@ -29,12 +29,12 @@ async fn get_ops_to_validate(
     system: bool,
 ) -> WorkflowResult<Vec<DhtOpHashed>> {
     let mut sql = "
-        SELECT 
+        SELECT
         Header.blob as header_blob,
         Entry.blob as entry_blob,
         DhtOp.type as dht_type,
         DhtOp.hash as dht_hash
-        FROM DhtOp 
+        FROM DhtOp
         JOIN
         Header ON DhtOp.header_hash = Header.hash
         LEFT JOIN
@@ -72,7 +72,7 @@ async fn get_ops_to_validate(
     // Once we impl abandoned this won't happen anyway.
     sql.push_str(
         "
-        ORDER BY 
+        ORDER BY
         DhtOp.num_validation_attempts ASC,
         DhtOp.op_order ASC
         LIMIT 10000
@@ -135,9 +135,11 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn sys_validation_query() {
         observability::test_run().ok();
-        let env = test_dht_env();
-        let expected = test_data(&env.env().into());
-        let r = get_ops_to_validate(&env.env().into(), true).await.unwrap();
+        let env = test_dht_db();
+        let expected = test_data(&env.to_db().into());
+        let r = get_ops_to_validate(&env.to_db().into(), true)
+            .await
+            .unwrap();
         let mut r_sorted = r.clone();
         // Sorted by OpOrder
         r_sorted.sort_by_key(|d| {
@@ -224,8 +226,8 @@ mod tests {
         observability::test_run().ok();
         let mut u = Unstructured::new(&NOISE);
 
-        let env = test_dht_env();
-        let env = env.env();
+        let env = test_dht_db();
+        let env = env.to_db();
         let op = DhtOpHashed::from_content_sync(DhtOp::RegisterAgentActivity(
             Signature::arbitrary(&mut u).unwrap(),
             Header::arbitrary(&mut u).unwrap(),

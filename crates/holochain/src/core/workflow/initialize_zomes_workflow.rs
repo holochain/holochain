@@ -139,9 +139,9 @@ pub mod tests {
     use ::fixt::prelude::*;
     use fixt::Unpredictable;
     use holochain_p2p::HolochainP2pDnaFixturator;
-    use holochain_state::prelude::test_authored_env;
-    use holochain_state::prelude::test_cache_env;
-    use holochain_state::prelude::test_dht_env;
+    use holochain_state::prelude::test_authored_db;
+    use holochain_state::prelude::test_cache_db;
+    use holochain_state::prelude::test_dht_db;
     use holochain_state::prelude::SourceChain;
     use holochain_types::prelude::DnaDefHashed;
     use holochain_wasm_test_utils::TestWasm;
@@ -151,8 +151,8 @@ pub mod tests {
 
     async fn get_chain(cell: &SweetCell, keystore: MetaLairClient) -> SourceChain {
         SourceChain::new(
-            cell.authored_env().clone(),
-            cell.dht_env().clone(),
+            cell.authored_db().clone(),
+            cell.dht_db().clone(),
             keystore,
             cell.agent_pubkey().clone(),
         )
@@ -162,15 +162,15 @@ pub mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn adds_init_marker() {
-        let test_env = test_authored_env();
-        let test_cache = test_cache_env();
-        let test_dht = test_dht_env();
+        let test_db = test_authored_db();
+        let test_cache = test_cache_db();
+        let test_dht = test_dht_db();
         let keystore = test_keystore();
-        let env = test_env.env();
+        let env = test_db.to_db();
         let author = fake_agent_pubkey_1();
 
         // Genesis
-        fake_genesis(env.clone(), test_dht.env(), keystore.clone())
+        fake_genesis(env.clone(), test_dht.to_db(), keystore.clone())
             .await
             .unwrap();
 
@@ -179,8 +179,8 @@ pub mod tests {
 
         let workspace = SourceChainWorkspace::new(
             env.clone(),
-            test_dht.env(),
-            test_cache.env(),
+            test_dht.to_db(),
+            test_cache.to_db(),
             keystore,
             author.clone(),
             Arc::new(dna_def),

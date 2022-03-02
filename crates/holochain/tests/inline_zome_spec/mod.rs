@@ -118,7 +118,7 @@ async fn inline_zome_2_agents_1_dna() -> anyhow::Result<()> {
 
     // Wait long enough for Bob to receive gossip
     wait_for_integration_1m(
-        bobbo.dht_env(),
+        bobbo.dht_db(),
         WaitOps::start() + WaitOps::cold_start() + WaitOps::ENTRY,
     )
     .await;
@@ -179,7 +179,7 @@ async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
     assert_ne!(hash_foo, hash_bar);
 
     // Wait long enough for others to receive gossip
-    for env in [bobbo_foo.dht_env(), carol_bar.dht_env()].iter() {
+    for env in [bobbo_foo.dht_db(), carol_bar.dht_db()].iter() {
         wait_for_integration_1m(
             *env,
             WaitOps::start() * 1 + WaitOps::cold_start() * 2 + WaitOps::ENTRY * 1,
@@ -282,7 +282,7 @@ async fn get_deleted() -> anyhow::Result<()> {
         .await;
     let mut expected_count = WaitOps::start() + WaitOps::ENTRY;
 
-    wait_for_integration_1m(alice.dht_env(), expected_count).await;
+    wait_for_integration_1m(alice.dht_db(), expected_count).await;
 
     let elements: Vec<Option<Element>> = conductor
         .call(&alice.zome("zome1"), "read", hash.clone())
@@ -305,7 +305,7 @@ async fn get_deleted() -> anyhow::Result<()> {
         .await;
 
     expected_count += WaitOps::DELETE;
-    wait_for_integration_1m(alice.dht_env(), expected_count).await;
+    wait_for_integration_1m(alice.dht_db(), expected_count).await;
 
     let elements: Vec<Option<Element>> = conductor
         .call(&alice.zome("zome1"), "read_entry", entry_hash)
@@ -497,8 +497,8 @@ async fn insert_source_chain() {
     };
 
     // Get the source chain.
-    let chain = get_chain(alice.authored_env().clone());
-    let original_elements: Vec<_> = fresh_reader_test(alice.authored_env().clone(), |txn| {
+    let chain = get_chain(alice.authored_db().clone());
+    let original_elements: Vec<_> = fresh_reader_test(alice.authored_db().clone(), |txn| {
         let txn: Txn = (&txn).into();
         chain
             .iter()
@@ -552,7 +552,7 @@ async fn insert_source_chain() {
         .await
         .expect("Should pass with valid agent");
 
-    let chain = get_chain(alice.authored_env().clone());
+    let chain = get_chain(alice.authored_db().clone());
     // Chain should be 5 long.
     assert_eq!(chain.len(), 5);
     // Last header should be the one we just inserted.
@@ -577,7 +577,7 @@ async fn insert_source_chain() {
     // Validation is off so forking is possible.
     assert!(result.is_ok());
 
-    let chain = get_chain(alice.authored_env().clone());
+    let chain = get_chain(alice.authored_db().clone());
     // Chain should be 6 long.
     assert_eq!(chain.len(), 6);
     // The new header will be in the chain
@@ -598,7 +598,7 @@ async fn insert_source_chain() {
     // Note this cell is now in an invalid state.
     assert!(result.is_ok());
 
-    let chain = get_chain(alice.authored_env().clone());
+    let chain = get_chain(alice.authored_db().clone());
     // Chain should be 1 long.
     assert_eq!(chain.len(), 1);
     // The new header will be in the chain
@@ -616,7 +616,7 @@ async fn insert_source_chain() {
         .await;
 
     assert!(result.is_ok());
-    let chain = get_chain(alice.authored_env().clone());
+    let chain = get_chain(alice.authored_db().clone());
     // Chain should be 4 long.
     assert_eq!(chain.len(), 4);
     // Last seq should be 3.
@@ -678,7 +678,7 @@ async fn insert_source_chain() {
         .await
         .unwrap();
     let (alice_backup,) = apps.into_tuple();
-    let chain = get_chain(alice_backup.authored_env().clone());
+    let chain = get_chain(alice_backup.authored_db().clone());
     // Chain should be 4 long.
     assert_eq!(chain.len(), 4);
     // Last seq should be 3.

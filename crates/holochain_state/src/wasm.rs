@@ -62,7 +62,7 @@ mod tests {
         observability::test_run().ok();
 
         // all the stuff needed to have a WasmBuf
-        let env = crate::test_utils::test_wasm_env();
+        let env = crate::test_utils::test_wasm_db();
 
         // a wasm
         let wasm =

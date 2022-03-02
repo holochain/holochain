@@ -14,7 +14,7 @@ mod keystore_config;
 pub mod paths;
 //mod logger_config;
 //mod signal_config;
-pub use paths::EnvironmentRootPath;
+pub use paths::DatabaseRootPath;
 
 pub use super::*;
 pub use dpki_config::DpkiConfig;
@@ -30,7 +30,7 @@ use std::path::Path;
 pub struct ConductorConfig {
     /// The path to the database for this conductor.
     /// If omitted, chooses a default path.
-    pub environment_path: EnvironmentRootPath,
+    pub environment_path: DatabaseRootPath,
 
     /// Define how Holochain conductor will connect to a keystore.
     #[serde(default)]

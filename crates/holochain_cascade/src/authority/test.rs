@@ -4,7 +4,7 @@ use crate::test_utils::*;
 use ghost_actor::dependencies::observability;
 use holochain_p2p::actor;
 use holochain_p2p::event::GetRequest;
-use holochain_state::prelude::test_dht_env;
+use holochain_state::prelude::test_dht_db;
 use holochain_types::activity::ChainItems;
 
 fn options() -> holochain_p2p::event::GetOptions {
@@ -18,14 +18,14 @@ fn options() -> holochain_p2p::event::GetOptions {
 #[tokio::test(flavor = "multi_thread")]
 async fn get_entry() {
     observability::test_run().ok();
-    let env = test_dht_env();
+    let env = test_dht_db();
 
     let td = EntryTestData::create();
 
-    fill_db(&env.env(), td.store_entry_op.clone());
+    fill_db(&env.to_db(), td.store_entry_op.clone());
     let options = options();
 
-    let result = handle_get_entry(env.env().into(), td.hash.clone(), options.clone())
+    let result = handle_get_entry(env.to_db().into(), td.hash.clone(), options.clone())
         .await
         .unwrap();
     let expected = WireEntryOps {
@@ -36,9 +36,9 @@ async fn get_entry() {
     };
     assert_eq!(result, expected);
 
-    fill_db(&env.env(), td.delete_entry_header_op.clone());
+    fill_db(&env.to_db(), td.delete_entry_header_op.clone());
 
-    let result = handle_get_entry(env.env().into(), td.hash.clone(), options.clone())
+    let result = handle_get_entry(env.to_db().into(), td.hash.clone(), options.clone())
         .await
         .unwrap();
     let expected = WireEntryOps {
@@ -49,9 +49,9 @@ async fn get_entry() {
     };
     assert_eq!(result, expected);
 
-    fill_db(&env.env(), td.update_content_op.clone());
+    fill_db(&env.to_db(), td.update_content_op.clone());
 
-    let result = handle_get_entry(env.env().into(), td.hash.clone(), options.clone())
+    let result = handle_get_entry(env.to_db().into(), td.hash.clone(), options.clone())
         .await
         .unwrap();
     let expected = WireEntryOps {
@@ -66,15 +66,15 @@ async fn get_entry() {
 #[tokio::test(flavor = "multi_thread")]
 async fn get_element() {
     observability::test_run().ok();
-    let env = test_dht_env();
+    let env = test_dht_db();
 
     let td = ElementTestData::create();
 
-    fill_db(&env.env(), td.store_element_op.clone());
+    fill_db(&env.to_db(), td.store_element_op.clone());
 
     let options = options();
 
-    let result = handle_get_element(env.env().into(), td.create_hash.clone(), options.clone())
+    let result = handle_get_element(env.to_db().into(), td.create_hash.clone(), options.clone())
         .await
         .unwrap();
     let expected = WireElementOps {
@@ -85,9 +85,9 @@ async fn get_element() {
     };
     assert_eq!(result, expected);
 
-    fill_db(&env.env(), td.deleted_by_op.clone());
+    fill_db(&env.to_db(), td.deleted_by_op.clone());
 
-    let result = handle_get_element(env.env().into(), td.create_hash.clone(), options.clone())
+    let result = handle_get_element(env.to_db().into(), td.create_hash.clone(), options.clone())
         .await
         .unwrap();
     let expected = WireElementOps {
@@ -98,9 +98,9 @@ async fn get_element() {
     };
     assert_eq!(result, expected);
 
-    fill_db(&env.env(), td.update_element_op.clone());
+    fill_db(&env.to_db(), td.update_element_op.clone());
 
-    let result = handle_get_element(env.env().into(), td.create_hash.clone(), options.clone())
+    let result = handle_get_element(env.to_db().into(), td.create_hash.clone(), options.clone())
         .await
         .unwrap();
     let expected = WireElementOps {
@@ -111,10 +111,10 @@ async fn get_element() {
     };
     assert_eq!(result, expected);
 
-    fill_db(&env.env(), td.any_store_element_op.clone());
+    fill_db(&env.to_db(), td.any_store_element_op.clone());
 
     let result = handle_get_element(
-        env.env().into(),
+        env.to_db().into(),
         td.any_header_hash.clone(),
         options.clone(),
     )
@@ -132,16 +132,16 @@ async fn get_element() {
 #[tokio::test(flavor = "multi_thread")]
 async fn retrieve_element() {
     observability::test_run().ok();
-    let env = test_dht_env();
+    let env = test_dht_db();
 
     let td = ElementTestData::create();
 
-    fill_db_pending(&env.env(), td.store_element_op.clone());
+    fill_db_pending(&env.to_db(), td.store_element_op.clone());
 
     let mut options = options();
     options.request_type = GetRequest::Pending;
 
-    let result = handle_get_element(env.env().into(), td.create_hash.clone(), options.clone())
+    let result = handle_get_element(env.to_db().into(), td.create_hash.clone(), options.clone())
         .await
         .unwrap();
     let expected = WireElementOps {
@@ -156,15 +156,15 @@ async fn retrieve_element() {
 #[tokio::test(flavor = "multi_thread")]
 async fn get_links() {
     observability::test_run().ok();
-    let env = test_dht_env();
+    let env = test_dht_db();
 
     let td = EntryTestData::create();
 
-    fill_db(&env.env(), td.store_entry_op.clone());
-    fill_db(&env.env(), td.create_link_op.clone());
+    fill_db(&env.to_db(), td.store_entry_op.clone());
+    fill_db(&env.to_db(), td.create_link_op.clone());
     let options = actor::GetLinksOptions::default();
 
-    let result = handle_get_links(env.env().into(), td.link_key.clone(), (&options).into())
+    let result = handle_get_links(env.to_db().into(), td.link_key.clone(), (&options).into())
         .await
         .unwrap();
     let expected = WireLinkOps {
@@ -173,11 +173,15 @@ async fn get_links() {
     };
     assert_eq!(result, expected);
 
-    fill_db(&env.env(), td.delete_link_op.clone());
+    fill_db(&env.to_db(), td.delete_link_op.clone());
 
-    let result = handle_get_links(env.env().into(), td.link_key_tag.clone(), (&options).into())
-        .await
-        .unwrap();
+    let result = handle_get_links(
+        env.to_db().into(),
+        td.link_key_tag.clone(),
+        (&options).into(),
+    )
+    .await
+    .unwrap();
     let expected = WireLinkOps {
         creates: vec![td.wire_create_link_base.clone()],
         deletes: vec![td.wire_delete_link.clone()],
@@ -188,15 +192,15 @@ async fn get_links() {
 #[tokio::test(flavor = "multi_thread")]
 async fn get_agent_activity() {
     observability::test_run().ok();
-    let env = test_dht_env();
+    let env = test_dht_db();
 
     let td = ActivityTestData::valid_chain_scenario();
 
     for hash_op in td.hash_ops.iter().cloned() {
-        fill_db(&env.env(), hash_op);
+        fill_db(&env.to_db(), hash_op);
     }
     for hash_op in td.noise_ops.iter().cloned() {
-        fill_db(&env.env(), hash_op);
+        fill_db(&env.to_db(), hash_op);
     }
 
     let options = actor::GetActivityOptions {
@@ -207,7 +211,7 @@ async fn get_agent_activity() {
     };
 
     let result = handle_get_agent_activity(
-        env.env().into(),
+        env.to_db().into(),
         td.agent.clone(),
         td.query_filter.clone(),
         (&options).into(),
@@ -232,7 +236,7 @@ async fn get_agent_activity() {
         .query_filter
         .sequence_range(ChainQueryFilterRange::HeaderSeqRange(0, 19));
     let result = handle_get_agent_activity(
-        env.env().into(),
+        env.to_db().into(),
         td.agent.clone(),
         filter,
         (&options).into(),

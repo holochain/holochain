@@ -38,7 +38,7 @@ pub async fn get_ops_to_publish(
         .async_reader(move |txn| {
             let mut stmt = txn.prepare(
                 "
-            SELECT 
+            SELECT
             Header.blob as header_blob,
             Entry.blob as entry_blob,
             DhtOp.type as dht_type,
@@ -57,7 +57,7 @@ pub async fn get_ops_to_publish(
             AND
             (DhtOp.last_publish_time IS NULL OR DhtOp.last_publish_time <= :recency_threshold)
             AND
-            DhtOp.receipts_complete IS NULL 
+            DhtOp.receipts_complete IS NULL
             ",
             )?;
             let r = stmt.query_and_then(
@@ -97,13 +97,13 @@ pub async fn get_ops_to_publish(
 pub fn num_still_needing_publish(txn: &Transaction) -> WorkflowResult<usize> {
     let count = txn.query_row(
         "
-        SELECT 
+        SELECT
         COUNT(DhtOp.rowid) as num_ops
         FROM Header
         JOIN
         DhtOp ON DhtOp.header_hash = Header.hash
         WHERE
-        DhtOp.receipts_complete IS NULL 
+        DhtOp.receipts_complete IS NULL
         AND
         (DhtOp.type != :store_entry OR Header.private_entry = 0)
         ",
@@ -126,7 +126,7 @@ mod tests {
     use holochain_state::prelude::insert_op;
     use holochain_state::prelude::set_last_publish_time;
     use holochain_state::prelude::set_receipts_complete;
-    use holochain_state::prelude::test_authored_env;
+    use holochain_state::prelude::test_authored_db;
     use holochain_types::dht_op::DhtOpHashed;
     use holochain_types::header::NewEntryHeader;
     use holochain_zome_types::fixt::*;
@@ -157,9 +157,9 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn publish_query() {
         observability::test_run().ok();
-        let env = test_authored_env();
-        let expected = test_data(&env.env().into());
-        let r = get_ops_to_publish(expected.agent.clone(), &env.env().into())
+        let env = test_authored_db();
+        let expected = test_data(&env.to_db().into());
+        let r = get_ops_to_publish(expected.agent.clone(), &env.to_db().into())
             .await
             .unwrap();
         assert_eq!(r, expected.results);

@@ -299,8 +299,8 @@ impl TestData {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn can_add_and_delete_link() {
-    let test_env = test_dht_env();
-    let arc = test_env.env();
+    let test_db = test_dht_db();
+    let arc = test_db.to_db();
 
     let mut td = fixtures(arc.clone(), 1).into_iter().next().unwrap();
 
@@ -374,8 +374,8 @@ async fn can_add_and_delete_link() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn multiple_links() {
-    let test_env = test_dht_env();
-    let arc = test_env.env();
+    let test_db = test_dht_db();
+    let arc = test_db.to_db();
 
     let mut td = fixtures(arc.clone().into(), 10);
 
@@ -440,8 +440,8 @@ async fn multiple_links() {
 #[tokio::test(flavor = "multi_thread")]
 async fn duplicate_links() {
     observability::test_run().ok();
-    let test_env = test_dht_env();
-    let arc = test_env.env();
+    let test_db = test_dht_db();
+    let arc = test_db.to_db();
 
     let mut td = fixtures(arc.clone(), 10);
     // Add to db then the same to scratch and expect on one result
@@ -502,8 +502,8 @@ async fn duplicate_links() {
 #[tokio::test(flavor = "multi_thread")]
 async fn links_on_same_base() {
     observability::test_run().ok();
-    let test_env = test_dht_env();
-    let arc = test_env.env();
+    let test_db = test_dht_db();
+    let arc = test_db.to_db();
 
     let mut td = fixtures(arc.clone(), 10);
     let base_hash = td[0].base_hash.clone();
@@ -588,8 +588,8 @@ async fn links_on_same_base() {
 #[tokio::test(flavor = "multi_thread")]
 async fn links_on_same_tag() {
     observability::test_run().ok();
-    let test_env = test_dht_env();
-    let arc = test_env.env();
+    let test_db = test_dht_db();
+    let arc = test_db.to_db();
 
     let mut td = fixtures(arc.clone(), 10);
     let base_hash = td[0].base_hash.clone();
