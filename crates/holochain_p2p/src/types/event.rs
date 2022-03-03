@@ -104,14 +104,9 @@ ghost_actor::ghost_chan! {
     /// The HolochainP2pEvent stream allows handling events generated from
     /// the HolochainP2p actor.
     pub chan HolochainP2pEvent<super::HolochainP2pError> {
-        /// Generic Kitsune Request of the implementor
-        fn k_gen_req(dna_hash: DnaHash, arg: KGenReq) -> KGenRes;
 
         /// We need to store signed agent info.
         fn put_agent_info_signed(dna_hash: DnaHash, peer_data: Vec<AgentInfoSigned>) -> ();
-
-        /// We need to get previously stored agent info.
-        fn get_agent_info_signed(dna_hash: DnaHash, to_agent: AgentPubKey, kitsune_space: Arc<kitsune_p2p::KitsuneSpace>, kitsune_agent: Arc<kitsune_p2p::KitsuneAgent>) -> Option<AgentInfoSigned>;
 
         /// We need to get previously stored agent info.
         fn query_agent_info_signed(dna_hash: DnaHash, agents: Option<std::collections::HashSet<Arc<kitsune_p2p::KitsuneAgent>>>, kitsune_space: Arc<kitsune_p2p::KitsuneSpace>) -> Vec<AgentInfoSigned>;
@@ -250,7 +245,6 @@ macro_rules! match_p2p_evt {
             HolochainP2pEvent::GetAgentActivity { $i, .. } => { $($t)* }
             HolochainP2pEvent::ValidationReceiptReceived { $i, .. } => { $($t)* }
             HolochainP2pEvent::SignNetworkData { $i, .. } => { $($t)* }
-            HolochainP2pEvent::GetAgentInfoSigned { $i, .. } => { $($t)* }
             HolochainP2pEvent::CountersigningAuthorityResponse { $i, .. } => { $($t)* }
             $($t2)*
         }
@@ -261,7 +255,6 @@ impl HolochainP2pEvent {
     /// The dna_hash associated with this network p2p event.
     pub fn dna_hash(&self) -> &DnaHash {
         match_p2p_evt!(self => |dna_hash| { dna_hash }, {
-            HolochainP2pEvent::KGenReq { dna_hash, .. } => { dna_hash }
             HolochainP2pEvent::Publish { dna_hash, .. } => { dna_hash }
             HolochainP2pEvent::FetchOpData { dna_hash, .. } => { dna_hash }
             HolochainP2pEvent::QueryOpHashes { dna_hash, .. } => { dna_hash }
@@ -276,7 +269,6 @@ impl HolochainP2pEvent {
     /// The agent_pub_key associated with this network p2p event.
     pub fn target_agents(&self) -> &AgentPubKey {
         match_p2p_evt!(self => |to_agent| { to_agent }, {
-            HolochainP2pEvent::KGenReq { .. } => { unimplemented!("There is no single agent target for KGenReq") }
             HolochainP2pEvent::Publish { .. } => { unimplemented!("There is no single agent target for Publish") }
             HolochainP2pEvent::FetchOpData { .. } => { unimplemented!("There is no single agent target for FetchOpData") }
             HolochainP2pEvent::QueryOpHashes { .. } => { unimplemented!("There is no single agent target for QueryOpHashes") }

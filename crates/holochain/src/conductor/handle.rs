@@ -46,7 +46,6 @@ use super::manager::TaskManagerClient;
 use super::manager::TaskManagerRunHandle;
 use super::p2p_agent_store;
 use super::p2p_agent_store::all_agent_infos;
-use super::p2p_agent_store::get_agent_info_signed;
 use super::p2p_agent_store::inject_agent_infos;
 use super::p2p_agent_store::list_all_agent_info;
 use super::p2p_agent_store::list_all_agent_info_signed_near_basis;
@@ -84,7 +83,6 @@ use holochain_state::prelude::StateMutationResult;
 use holochain_state::source_chain;
 use holochain_types::prelude::*;
 use kitsune_p2p::agent_store::AgentInfoSigned;
-use kitsune_p2p::event::{KGenReq, KGenRes};
 use kitsune_p2p_types::config::JOIN_NETWORK_TIMEOUT;
 use std::collections::HashMap;
 use std::{collections::HashSet, sync::Arc};
@@ -357,6 +355,10 @@ pub trait ConductorHandleT: Send + Sync {
     #[cfg(any(test, feature = "test_utils"))]
     fn get_p2p_env(&self, space: &DnaHash) -> DbWrite<DbKindP2pAgentStore>;
 
+    /// Retrieve the database for metrics. FOR TESTING ONLY.
+    #[cfg(any(test, feature = "test_utils"))]
+    fn get_p2p_metrics_env(&self, space: &DnaHash) -> DbWrite<DbKindP2pMetrics>;
+
     /// Retrieve the database for networking. FOR TESTING ONLY.
     #[cfg(any(test, feature = "test_utils"))]
     fn get_spaces(&self) -> Spaces;
@@ -588,44 +590,6 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         let dna_hash = event.dna_hash().clone();
         trace!(dispatch_event = ?event);
         match event {
-            holochain_p2p::event::HolochainP2pEvent::KGenReq { arg, respond, .. } => match arg {
-                KGenReq::PeerExtrapCov { space, dht_arc_set } => {
-                    let env = { self.p2p_env(&DnaHash::from_kitsune(&space)) };
-                    respond.respond(Ok(async move {
-                        use holochain_sqlite::db::AsP2pAgentStoreConExt;
-                        let permit = env.conn_permit().await;
-                        let res = tokio::task::spawn_blocking(move || {
-                            let mut conn = env.from_permit(permit)?;
-                            conn.p2p_extrapolated_coverage(dht_arc_set)
-                        })
-                        .await;
-                        let res = res
-                            .map_err(holochain_p2p::HolochainP2pError::other)
-                            .and_then(|r| r.map_err(holochain_p2p::HolochainP2pError::other))?;
-                        Ok(KGenRes::PeerExtrapCov(res))
-                    }
-                    .boxed()
-                    .into()));
-                }
-                KGenReq::RecordMetrics { space, records } => {
-                    let env = { self.p2p_metrics_env(&DnaHash::from_kitsune(&space)) };
-                    respond.respond(Ok(async move {
-                        use holochain_sqlite::db::AsP2pMetricStoreConExt;
-                        let permit = env.conn_permit().await;
-                        let res = tokio::task::spawn_blocking(move || {
-                            let mut conn = env.from_permit(permit)?;
-                            conn.p2p_log_metrics(records)
-                        })
-                        .await;
-                        let res = res
-                            .map_err(holochain_p2p::HolochainP2pError::other)
-                            .and_then(|r| r.map_err(holochain_p2p::HolochainP2pError::other))?;
-                        Ok(KGenRes::RecordMetrics(res))
-                    }
-                    .boxed()
-                    .into()));
-                }
-            },
             PutAgentInfoSigned {
                 peer_data, respond, ..
             } => {
@@ -641,18 +605,6 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                     Ok(r) => r.map_err(holochain_p2p::HolochainP2pError::other),
                     Err(e) => Err(holochain_p2p::HolochainP2pError::other(e)),
                 };
-                respond.respond(Ok(async move { res }.boxed().into()));
-            }
-            GetAgentInfoSigned {
-                kitsune_space,
-                kitsune_agent,
-                respond,
-                ..
-            } => {
-                let env = { self.p2p_env(&dna_hash) };
-                let res = get_agent_info_signed(env.into(), kitsune_space, kitsune_agent)
-                    .await
-                    .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
             }
             QueryAgentInfoSigned {
@@ -1432,6 +1384,11 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     #[cfg(any(test, feature = "test_utils"))]
     fn get_p2p_env(&self, space: &DnaHash) -> DbWrite<DbKindP2pAgentStore> {
         self.p2p_env(space)
+    }
+
+    #[cfg(any(test, feature = "test_utils"))]
+    fn get_p2p_metrics_env(&self, space: &DnaHash) -> DbWrite<DbKindP2pMetrics> {
+        self.p2p_metrics_env(space)
     }
 
     #[cfg(any(test, feature = "test_utils"))]

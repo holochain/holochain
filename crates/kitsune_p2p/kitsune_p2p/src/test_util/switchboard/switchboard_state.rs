@@ -4,6 +4,7 @@ use crate::gossip::sharded_gossip::{BandwidthThrottle, GossipType, ShardedGossip
 use crate::test_util::spawn_handler;
 use crate::types::gossip::*;
 use crate::types::wire;
+use crate::HostStub;
 use futures::stream::StreamExt;
 use ghost_actor::dependencies::tracing;
 use ghost_actor::GhostResult;
@@ -120,6 +121,7 @@ impl Switchboard {
         let ep_hnd = ep.handle().clone();
 
         let evt_handler = SwitchboardEventHandler::new(ep_hnd.clone(), self.clone());
+        let host = HostStub::new();
         let (evt_sender, handler_task) = spawn_handler(evt_handler.clone()).await;
 
         let bandwidth = Arc::new(BandwidthThrottle::new(1000.0, 1000.0));
@@ -129,6 +131,7 @@ impl Switchboard {
             space.clone(),
             ep_hnd.clone(),
             evt_sender,
+            host,
             self.gossip_type,
             bandwidth,
             Default::default(),
