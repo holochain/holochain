@@ -445,10 +445,13 @@ jobs:
       - name: Push the main branch
         if: ${{ needs.vars.outputs.dry_run == 'false' }}
         run: |
+          set -x
           source ${HOLOCHAIN_RELEASE_SH}
           cd "${HOLOCHAIN_REPO}"
 
           git status
+
+          git push origin main
 
           git push origin main --tags
 
