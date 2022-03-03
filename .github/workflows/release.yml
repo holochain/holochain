@@ -154,19 +154,17 @@ jobs:
             restoresCargoCache: true
             savesCargoCache: true
             ignoreErrorOnNonUbuntu: true
-            timeout_minutes: 8
+            timeout_minutes: 30
             max_attempts:
-              ubuntu-latest: 24
+              ubuntu-latest: 10
               macos-latest: 1
             run: |
-              # RUST_TEST_THREADS=1 \
-              env \
-                nix-shell \
-                --keep NUM_JOBS \
-                --keep CARGO_BUILD_JOBS \
-                --keep CARGO_TEST_ARGS \
-                --keep RUST_TEST_THREADS \
-                --fallback --pure --argstr flavor "coreDev" --run hc-test-slow
+              nix-shell \
+              --keep NUM_JOBS \
+              --keep CARGO_BUILD_JOBS \
+              --keep CARGO_TEST_ARGS \
+              --keep RUST_TEST_THREADS \
+              --fallback --pure --argstr flavor "coreDev" --run hc-test-slow
 
           - name: cargo-test-static
             restoresCargoCache: true
