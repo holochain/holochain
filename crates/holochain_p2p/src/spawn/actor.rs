@@ -52,22 +52,6 @@ impl WrapEvtSender {
         )
     }
 
-    fn get_agent_info_signed(
-        &self,
-        dna_hash: DnaHash,
-        to_agent: AgentPubKey,
-        kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
-        kitsune_agent: Arc<kitsune_p2p::KitsuneAgent>,
-    ) -> impl Future<Output = HolochainP2pResult<Option<AgentInfoSigned>>> + 'static + Send {
-        timing_trace!(
-            {
-                self.0
-                    .get_agent_info_signed(dna_hash, to_agent, kitsune_space, kitsune_agent)
-            },
-            "(hp2p:handle) get_agent_info_signed",
-        )
-    }
-
     fn query_gossip_agents(
         &self,
         dna_hash: DnaHash,

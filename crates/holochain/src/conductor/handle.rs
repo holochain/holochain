@@ -46,7 +46,6 @@ use super::manager::TaskManagerClient;
 use super::manager::TaskManagerRunHandle;
 use super::p2p_agent_store;
 use super::p2p_agent_store::all_agent_infos;
-use super::p2p_agent_store::get_agent_info_signed;
 use super::p2p_agent_store::inject_agent_infos;
 use super::p2p_agent_store::list_all_agent_info;
 use super::p2p_agent_store::list_all_agent_info_signed_near_basis;
@@ -606,18 +605,6 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                     Ok(r) => r.map_err(holochain_p2p::HolochainP2pError::other),
                     Err(e) => Err(holochain_p2p::HolochainP2pError::other(e)),
                 };
-                respond.respond(Ok(async move { res }.boxed().into()));
-            }
-            GetAgentInfoSigned {
-                kitsune_space,
-                kitsune_agent,
-                respond,
-                ..
-            } => {
-                let env = { self.p2p_env(&dna_hash) };
-                let res = get_agent_info_signed(env.into(), kitsune_space, kitsune_agent)
-                    .await
-                    .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
             }
             QueryAgentInfoSigned {

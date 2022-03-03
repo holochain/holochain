@@ -346,7 +346,6 @@ impl Cell {
         use holochain_p2p::event::HolochainP2pEvent::*;
         match evt {
             PutAgentInfoSigned { .. }
-            | GetAgentInfoSigned { .. }
             | QueryAgentInfoSigned { .. }
             | QueryGossipAgents { .. }
             | QueryOpHashes { .. }

@@ -109,9 +109,6 @@ ghost_actor::ghost_chan! {
         fn put_agent_info_signed(dna_hash: DnaHash, peer_data: Vec<AgentInfoSigned>) -> ();
 
         /// We need to get previously stored agent info.
-        fn get_agent_info_signed(dna_hash: DnaHash, to_agent: AgentPubKey, kitsune_space: Arc<kitsune_p2p::KitsuneSpace>, kitsune_agent: Arc<kitsune_p2p::KitsuneAgent>) -> Option<AgentInfoSigned>;
-
-        /// We need to get previously stored agent info.
         fn query_agent_info_signed(dna_hash: DnaHash, agents: Option<std::collections::HashSet<Arc<kitsune_p2p::KitsuneAgent>>>, kitsune_space: Arc<kitsune_p2p::KitsuneSpace>) -> Vec<AgentInfoSigned>;
 
         /// We need to get agents that fit into an arc set for gossip.
@@ -248,7 +245,6 @@ macro_rules! match_p2p_evt {
             HolochainP2pEvent::GetAgentActivity { $i, .. } => { $($t)* }
             HolochainP2pEvent::ValidationReceiptReceived { $i, .. } => { $($t)* }
             HolochainP2pEvent::SignNetworkData { $i, .. } => { $($t)* }
-            HolochainP2pEvent::GetAgentInfoSigned { $i, .. } => { $($t)* }
             HolochainP2pEvent::CountersigningAuthorityResponse { $i, .. } => { $($t)* }
             $($t2)*
         }
