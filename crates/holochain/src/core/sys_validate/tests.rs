@@ -13,6 +13,7 @@ use holochain_state::prelude::fresh_reader_test;
 use holochain_state::prelude::test_authored_env;
 use holochain_state::prelude::test_cache_env;
 use holochain_state::prelude::test_dht_env;
+use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::Header;
 use matches::assert_matches;
@@ -75,9 +76,11 @@ async fn check_valid_if_dna_test() {
 
     // Empty store not dna
     let header = fixt!(CreateLink);
+    let cache: DhtDbQueryCache = tmp_dht.env().into();
     let mut workspace = SysValidationWorkspace::new(
         env.clone().into(),
         tmp_dht.env().into(),
+        cache.clone(),
         tmp_cache.env(),
         Arc::new(dna_def.clone()),
     );
@@ -116,6 +119,11 @@ async fn check_valid_if_dna_test() {
         .unwrap();
 
     header.author = fake_agent_pubkey_1();
+
+    cache
+        .set_all_activity_to_integrated(vec![(Arc::new(header.author.clone()), 0..=2)])
+        .await
+        .unwrap();
 
     assert_matches!(
         check_valid_if_dna(&header.clone().into(), &workspace).await,

@@ -28,6 +28,7 @@ pub mod error;
 pub mod handle;
 pub mod interactive;
 pub mod interface;
+pub mod kitsune_host_impl;
 pub mod manager;
 pub mod p2p_agent_store;
 pub mod paths;

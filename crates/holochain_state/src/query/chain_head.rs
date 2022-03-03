@@ -143,13 +143,13 @@ mod tests {
             let hash = shh.header_address();
             let op = DhtOpLight::StoreElement(hash.clone(), None, hash.clone().into());
             let op_order = OpOrder::new(op.get_type(), shh.header().timestamp());
-            insert_header(&mut txn, shh.clone()).unwrap();
+            insert_header(&mut txn, shh).unwrap();
             insert_op_lite(
                 &mut txn,
-                op,
-                fixt!(DhtOpHash),
-                op_order,
-                shh.header().timestamp(),
+                &op,
+                &fixt!(DhtOpHash),
+                &op_order,
+                &shh.header().timestamp(),
             )
             .unwrap();
         }

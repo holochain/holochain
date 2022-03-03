@@ -19,16 +19,16 @@ use holochain_p2p::{
 };
 use holochain_sqlite::{
     conn::{DbSyncLevel, DbSyncStrategy},
-    db::{DbKindAuthored, DbKindCache, DbKindDht, DbWrite},
-    prelude::{DatabaseError, DatabaseResult},
+    db::{
+        DbKindAuthored, DbKindCache, DbKindConductor, DbKindDht, DbKindP2pAgentStore,
+        DbKindP2pMetrics, DbKindWasm, DbWrite, ReadAccess,
+    },
+    prelude::DatabaseResult,
 };
-use holochain_state::{
-    prelude::{from_blob, StateQueryResult},
-    query::{map_sql_dht_op_common, StateQueryError},
-};
+use holochain_state::prelude::{from_blob, StateQueryResult};
 use holochain_types::{
+    db_cache::DhtDbQueryCache,
     dht_op::{DhtOp, DhtOpType},
-    prelude::{DnaError, DnaStore},
 };
 use holochain_zome_types::{Entry, EntryVisibility, SignedHeader, Timestamp};
 use kitsune_p2p::event::{TimeWindow, TimeWindowInclusive};
@@ -48,6 +48,7 @@ use crate::core::{
 use super::{
     conductor::RwShare,
     error::{ConductorError, ConductorResult},
+    p2p_agent_store::{self, P2pBatch},
 };
 use std::convert::TryInto;
 
@@ -57,11 +58,14 @@ use std::convert::TryInto;
 /// installed on this conductor.
 pub struct Spaces<DS: DnaStore> {
     map: RwShare<HashMap<DnaHash, Space>>,
-    root_env_dir: Arc<EnvironmentRootPath>,
-    db_sync_level: DbSyncStrategy,
+    // TODO: why is the dna store here again?
     dna_store: RwShare<DS>,
+    pub(crate) root_env_dir: Arc<EnvironmentRootPath>,
+    pub(crate) db_sync_strategy: DbSyncStrategy,
     /// The map of running queue consumer workflows.
-    queue_consumer_map: QueueConsumerMap,
+    pub(crate) queue_consumer_map: QueueConsumerMap,
+    pub(crate) conductor_env: DbWrite<DbKindConductor>,
+    pub(crate) wasm_env: DbWrite<DbKindWasm>,
 }
 
 #[derive(Clone)]
@@ -84,6 +88,18 @@ pub struct Space {
     /// The dht databases. These are shared across cells.
     /// There is one per unique Dna.
     pub dht_env: DbWrite<DbKindDht>,
+
+    /// The database for storing AgentInfoSigned
+    pub p2p_env: DbWrite<DbKindP2pAgentStore>,
+
+    /// The database for storing p2p MetricDatum(s)
+    pub p2p_metrics_env: DbWrite<DbKindP2pMetrics>,
+
+    /// The batch sender for writes to the p2p database.
+    pub p2p_batch_sender: tokio::sync::mpsc::Sender<P2pBatch>,
+
+    /// A cache for slow database queries.
+    pub dht_query_cache: DhtDbQueryCache,
 
     /// Countersigning workspace that is shared across this cell.
     pub countersigning_workspace: CountersigningWorkspace,
@@ -114,17 +130,32 @@ impl<DS: DnaStore> Spaces<DS> {
     /// Create a new empty set of [`DnaHash`] spaces.
     pub fn new(
         root_env_dir: EnvironmentRootPath,
-        db_sync_level: DbSyncStrategy,
         dna_store: RwShare<DS>,
-        queue_consumer_map: QueueConsumerMap,
-    ) -> Self {
-        Spaces {
+        db_sync_strategy: DbSyncStrategy,
+    ) -> ConductorResult<Self> {
+        let db_sync_level = match db_sync_strategy {
+            DbSyncStrategy::Fast => DbSyncLevel::Off,
+            DbSyncStrategy::Resilient => DbSyncLevel::Normal,
+        };
+        let conductor_env =
+            DbWrite::open_with_sync_level(root_env_dir.as_ref(), DbKindConductor, db_sync_level)?;
+        let wasm_env =
+            DbWrite::open_with_sync_level(root_env_dir.as_ref(), DbKindWasm, db_sync_level)?;
+        Ok(Spaces {
             map: RwShare::new(HashMap::new()),
-            root_env_dir: Arc::new(root_env_dir),
-            db_sync_level,
             dna_store,
-            queue_consumer_map,
-        }
+            root_env_dir: Arc::new(root_env_dir),
+            db_sync_strategy,
+            queue_consumer_map: QueueConsumerMap::new(),
+            conductor_env,
+            wasm_env,
+        })
+    }
+
+    /// Get something from every space
+    pub fn get_from_spaces<R, F: Fn(&Space) -> R>(&self, f: F) -> Vec<R> {
+        self.map
+            .share_ref(|spaces| spaces.values().map(f).collect())
     }
 
     /// Get the space if it exists or create it if it doesn't.
@@ -132,14 +163,11 @@ impl<DS: DnaStore> Spaces<DS> {
         self.get_or_create_space_ref(dna_hash, Space::clone)
     }
 
-    fn get_or_create_space_ref<F, R>(&self, dna_hash: &DnaHash, mut f: F) -> ConductorResult<R>
+    fn get_or_create_space_ref<F, R>(&self, dna_hash: &DnaHash, f: F) -> ConductorResult<R>
     where
-        F: FnMut(&Space) -> R,
+        F: Fn(&Space) -> R,
     {
-        match self
-            .map
-            .share_ref(|spaces| spaces.get(dna_hash).map(&mut f))
-        {
+        match self.map.share_ref(|spaces| spaces.get(dna_hash).map(&f)) {
             Some(r) => Ok(r),
             None => self
                 .map
@@ -154,7 +182,7 @@ impl<DS: DnaStore> Spaces<DS> {
                         let space = Space::new(
                             Arc::new(dna_hash.clone()),
                             &self.root_env_dir,
-                            self.db_sync_level,
+                            self.db_sync_strategy,
                             topology,
                         )?;
 
@@ -179,6 +207,27 @@ impl<DS: DnaStore> Spaces<DS> {
     /// Get the dht database (this will create the space if it doesn't already exist).
     pub fn dht_env(&self, dna_hash: &DnaHash) -> ConductorResult<DbWrite<DbKindDht>> {
         self.get_or_create_space_ref(dna_hash, |space| space.dht_env.clone())
+    }
+
+    /// Get the peer database (this will create the space if it doesn't already exist).
+    pub fn p2p_env(&self, dna_hash: &DnaHash) -> ConductorResult<DbWrite<DbKindP2pAgentStore>> {
+        self.get_or_create_space_ref(dna_hash, |space| space.p2p_env.clone())
+    }
+
+    /// Get the peer database (this will create the space if it doesn't already exist).
+    pub fn p2p_metrics_env(
+        &self,
+        dna_hash: &DnaHash,
+    ) -> ConductorResult<DbWrite<DbKindP2pMetrics>> {
+        self.get_or_create_space_ref(dna_hash, |space| space.p2p_metrics_env.clone())
+    }
+
+    /// Get the batch sender (this will create the space if it doesn't already exist).
+    pub fn p2p_batch_sender(
+        &self,
+        dna_hash: &DnaHash,
+    ) -> ConductorResult<tokio::sync::mpsc::Sender<P2pBatch>> {
+        self.get_or_create_space_ref(dna_hash, |space| space.p2p_batch_sender.clone())
     }
 
     #[instrument(skip(self))]
@@ -539,13 +588,16 @@ impl Space {
         db_sync_strategy: DbSyncStrategy,
         topology: Topology,
     ) -> ConductorResult<Self> {
+        use holochain_p2p::DnaHashExt;
+        let space = dna_hash.to_kitsune();
+        let db_sync_level = match db_sync_strategy {
+            DbSyncStrategy::Fast => DbSyncLevel::Off,
+            DbSyncStrategy::Resilient => DbSyncLevel::Normal,
+        };
         let cache = DbWrite::open_with_sync_level(
             root_env_dir.as_ref(),
             DbKindCache(dna_hash.clone()),
-            match db_sync_strategy {
-                DbSyncStrategy::Fast => DbSyncLevel::Off,
-                DbSyncStrategy::Resilient => DbSyncLevel::Normal,
-            },
+            db_sync_level,
         )?;
         let authored_env = DbWrite::open_with_sync_level(
             root_env_dir.as_ref(),
@@ -555,22 +607,39 @@ impl Space {
         let dht_env = DbWrite::open_with_sync_level(
             root_env_dir.as_ref(),
             DbKindDht(dna_hash.clone()),
-            match db_sync_strategy {
-                DbSyncStrategy::Fast => DbSyncLevel::Off,
-                DbSyncStrategy::Resilient => DbSyncLevel::Normal,
-            },
+            db_sync_level,
         )?;
+        let p2p_env = DbWrite::open_with_sync_level(
+            root_env_dir.as_ref(),
+            DbKindP2pAgentStore(space.clone()),
+            db_sync_level,
+        )?;
+        let p2p_metrics_env = DbWrite::open_with_sync_level(
+            root_env_dir.as_ref(),
+            DbKindP2pMetrics(space),
+            db_sync_level,
+        )?;
+
+        let (tx, rx) = tokio::sync::mpsc::channel(100);
+        tokio::spawn(p2p_agent_store::p2p_put_all_batch(p2p_env.clone(), rx));
+        let p2p_batch_sender = tx;
+
         let countersigning_workspace = CountersigningWorkspace::new();
         let incoming_op_hashes = IncomingOpHashes::default();
         let incoming_ops_batch = IncomingOpsBatch::default();
+        let dht_query_cache = DhtDbQueryCache::new(dht_env.clone().into());
         let r = Self {
             dna_hash,
             cache,
             authored_env,
             dht_env,
+            p2p_env,
+            p2p_metrics_env,
+            p2p_batch_sender,
             countersigning_workspace,
             incoming_op_hashes,
             incoming_ops_batch,
+            dht_query_cache,
             topology,
         };
         Ok(r)
@@ -601,8 +670,8 @@ impl<DS: DnaStore> TestSpaces<DS> {
             temp_dir.path().to_path_buf().into(),
             Default::default(),
             dna_store,
-            queue_consumer_map.clone(),
-        );
+        )
+        .unwrap();
         spaces.map.share_mut(|map| {
             map.extend(
                 test_spaces

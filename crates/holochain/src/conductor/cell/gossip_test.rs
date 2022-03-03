@@ -118,14 +118,15 @@ async fn agent_info_test() {
     let p2p_envs: Vec<_> = conductors
         .iter()
         .filter_map(|c| {
-            let lock = c.envs().p2p();
-            let env = lock.lock().values().cloned().next();
-            env
+            c.spaces
+                .get_from_spaces(|s| s.p2p_env.clone())
+                .first()
+                .cloned()
         })
         .collect();
 
     consistency_10s(&[&cell_1, &cell_2]).await;
-    for p2p_env in &p2p_envs {
+    for p2p_env in p2p_envs {
         let len = fresh_reader_test(p2p_env.clone(), |txn| txn.p2p_list_agents().unwrap().len());
         assert_eq!(len, 2);
     }

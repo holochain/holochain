@@ -164,7 +164,7 @@ async fn mock_network_sharded_gossip() {
             AddressedHolochainP2pMockMsg, HolochainP2pMockChannel, HolochainP2pMockMsg,
         },
     };
-    use holochain_p2p::{dht_arc::DhtLocation, AgentPubKeyExt, DnaHashExt};
+    use holochain_p2p::{dht_arc::DhtLocation, AgentPubKeyExt};
     use holochain_sqlite::db::AsP2pStateTxExt;
     use kitsune_p2p::TransportConfig;
     use kitsune_p2p_types::tx2::tx2_adapter::AdapterFactory;
@@ -532,6 +532,7 @@ async fn mock_network_sharded_gossip() {
                         }
                     }
                     HolochainP2pMockMsg::Failure(reason) => panic!("Failure: {}", reason),
+                    HolochainP2pMockMsg::PublishedAgentInfo { .. } => todo!(),
                 }
             }
         }
@@ -573,7 +574,7 @@ async fn mock_network_sharded_gossip() {
         .unwrap();
 
     let (alice,) = apps.into_tuple();
-    let alice_p2p_env = conductor.get_p2p_env(alice.cell_id().dna_hash().to_kitsune());
+    let alice_p2p_env = conductor.get_p2p_env(alice.cell_id().dna_hash());
     let alice_kit = alice.agent_pubkey().to_kitsune();
 
     // Spawn a task to update alice's agent info.
@@ -691,7 +692,7 @@ async fn mock_network_sharding() {
         AddressedHolochainP2pMockMsg, HolochainP2pMockChannel, HolochainP2pMockMsg,
     };
     use holochain_p2p::mock_network::{GossipProtocol, MockScenario};
-    use holochain_p2p::{AgentPubKeyExt, DnaHashExt};
+    use holochain_p2p::AgentPubKeyExt;
     use holochain_state::prelude::*;
     use holochain_types::dht_op::WireOps;
     use holochain_types::element::WireElementOps;
@@ -1033,6 +1034,8 @@ async fn mock_network_sharding() {
                         }
                     }
                     HolochainP2pMockMsg::Failure(reason) => panic!("Failure: {}", reason),
+                    HolochainP2pMockMsg::MetricExchange(_) => (),
+                    HolochainP2pMockMsg::PublishedAgentInfo { .. } => todo!(),
                 }
             }
         }
@@ -1071,7 +1074,7 @@ async fn mock_network_sharding() {
         .unwrap();
 
     let (alice,) = apps.into_tuple();
-    let alice_p2p_env = conductor.get_p2p_env(alice.cell_id().dna_hash().to_kitsune());
+    let alice_p2p_env = conductor.get_p2p_env(alice.cell_id().dna_hash());
     let alice_kit = alice.agent_pubkey().to_kitsune();
 
     // Spawn a task to update alice's agent info.
@@ -1131,7 +1134,7 @@ async fn mock_network_sharding() {
 #[cfg(feature = "TO-BE-REMOVED")]
 async fn run_bootstrap(peer_data: impl Iterator<Item = AgentInfoSigned>) -> Url2 {
     let mut url = url2::url2!("http://127.0.0.1:0");
-    let (driver, addr) = kitsune_p2p_bootstrap::run(([127, 0, 0, 1], 0))
+    let (driver, addr) = kitsune_p2p_bootstrap::run(([127, 0, 0, 1], 0), vec![])
         .await
         .unwrap();
     tokio::spawn(driver);

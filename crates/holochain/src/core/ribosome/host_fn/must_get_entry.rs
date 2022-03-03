@@ -164,17 +164,9 @@ pub mod test {
             .conn()
             .unwrap()
             .with_commit_sync(|txn| {
-                set_validation_status(
-                    txn,
-                    element_state.as_hash().clone(),
-                    ValidationStatus::Rejected,
-                )
-                .unwrap();
-                set_validation_status(
-                    txn,
-                    entry_state.as_hash().clone(),
-                    ValidationStatus::Rejected,
-                )
+                set_validation_status(txn, element_state.as_hash(), ValidationStatus::Rejected)
+                    .unwrap();
+                set_validation_status(txn, entry_state.as_hash(), ValidationStatus::Rejected)
             })
             .unwrap();
 

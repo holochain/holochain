@@ -868,8 +868,8 @@ pub fn row_blob_to_header(
 }
 
 /// Serialize a value to be stored in a database as a BLOB type
-pub fn to_blob<T: Serialize + std::fmt::Debug>(t: T) -> StateQueryResult<Vec<u8>> {
-    Ok(holochain_serialized_bytes::encode(&t)?)
+pub fn to_blob<T: Serialize + std::fmt::Debug>(t: &T) -> StateQueryResult<Vec<u8>> {
+    Ok(holochain_serialized_bytes::encode(t)?)
 }
 
 /// Deserialize a BLOB from a database into a value

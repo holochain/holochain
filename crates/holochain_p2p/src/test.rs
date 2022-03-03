@@ -180,7 +180,7 @@ mod tests {
 
     use crate::HolochainP2pSender;
     use holochain_zome_types::ValidationStatus;
-    use kitsune_p2p::dependencies::kitsune_p2p_proxy::TlsConfig;
+    use kitsune_p2p::dependencies::kitsune_p2p_types::tls::TlsConfig;
     use kitsune_p2p::KitsuneP2pConfig;
 
     macro_rules! newhash {
@@ -211,6 +211,7 @@ mod tests {
         let (p2p, mut evt) = spawn_holochain_p2p(
             KitsuneP2pConfig::default(),
             TlsConfig::new_ephemeral().await.unwrap(),
+            kitsune_p2p::HostStub::new(),
         )
         .await
         .unwrap();
@@ -278,6 +279,7 @@ mod tests {
         let (p2p, mut evt): (HolochainP2pRef, _) = spawn_holochain_p2p(
             KitsuneP2pConfig::default(),
             TlsConfig::new_ephemeral().await.unwrap(),
+            kitsune_p2p::HostStub::new(),
         )
         .await
         .unwrap();
@@ -333,6 +335,7 @@ mod tests {
         let (p2p, mut evt) = spawn_holochain_p2p(
             KitsuneP2pConfig::default(),
             TlsConfig::new_ephemeral().await.unwrap(),
+            kitsune_p2p::HostStub::new(),
         )
         .await
         .unwrap();
@@ -408,7 +411,9 @@ mod tests {
         params.default_rpc_multi_remote_request_grace_ms = 100;
         let mut config = KitsuneP2pConfig::default();
         config.tuning_params = Arc::new(params);
-        let (p2p, mut evt) = spawn_holochain_p2p(config, cert).await.unwrap();
+        let (p2p, mut evt) = spawn_holochain_p2p(config, cert, kitsune_p2p::HostStub::new())
+            .await
+            .unwrap();
 
         let test_1 = WireOps::Element(WireElementOps {
             header: Some(Judged::valid(SignedHeader(fixt!(Header), fixt!(Signature)))),
@@ -506,9 +511,13 @@ mod tests {
         let mut config = KitsuneP2pConfig::default();
         config.tuning_params = Arc::new(params);
 
-        let (p2p, mut evt) = spawn_holochain_p2p(config, TlsConfig::new_ephemeral().await.unwrap())
-            .await
-            .unwrap();
+        let (p2p, mut evt) = spawn_holochain_p2p(
+            config,
+            TlsConfig::new_ephemeral().await.unwrap(),
+            kitsune_p2p::HostStub::new(),
+        )
+        .await
+        .unwrap();
 
         let test_1 = WireLinkOps {
             creates: vec![WireCreateLink::condense(

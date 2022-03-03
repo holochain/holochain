@@ -15,6 +15,7 @@ impl ShardedGossipLocal {
     pub fn test(
         gossip_type: GossipType,
         evt_sender: EventSender,
+        host: HostApi,
         inner: ShardedGossipLocalState,
     ) -> Self {
         // TODO: randomize space
@@ -24,6 +25,7 @@ impl ShardedGossipLocal {
             tuning_params: Default::default(),
             space,
             evt_sender,
+            host_api: host,
             inner: Share::new(inner),
             closing: std::sync::atomic::AtomicBool::new(false),
         }

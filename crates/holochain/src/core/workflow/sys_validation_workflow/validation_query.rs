@@ -161,16 +161,16 @@ mod tests {
             .unwrap()
             .with_commit_sync(|txn| {
                 let hash = state.as_hash().clone();
-                insert_op(txn, state.clone()).unwrap();
+                insert_op(txn, &state).unwrap();
                 if facts.has_validation_status {
-                    set_validation_status(txn, hash.clone(), ValidationStatus::Valid).unwrap();
+                    set_validation_status(txn, &hash, ValidationStatus::Valid).unwrap();
                 }
                 if facts.pending {
                     // No need to do anything because status and stage are null already.
                 } else if facts.awaiting_sys_deps {
                     set_validation_stage(
                         txn,
-                        hash,
+                        &hash,
                         ValidationLimboStatus::AwaitingSysDeps(fixt!(AnyDhtHash)),
                     )
                     .unwrap();
@@ -231,8 +231,8 @@ mod tests {
             Header::arbitrary(&mut u).unwrap(),
         ));
 
-        env.async_commit(|txn| {
-            insert_op(txn, op)?;
+        env.async_commit(move |txn| {
+            insert_op(txn, &op)?;
             StateMutationResult::Ok(())
         })
         .await

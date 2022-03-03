@@ -11,6 +11,7 @@ use chrono::Utc;
 use cli::ReleaseArgs;
 use comrak::{format_commonmark, parse_document, Arena, ComrakOptions};
 use enumflags2::{bitflags, BitFlags};
+use linked_hash_set::LinkedHashSet;
 use log::{debug, error, info, trace, warn};
 use once_cell::sync::OnceCell;
 use std::convert::TryInto;
@@ -29,6 +30,7 @@ use std::{
 use structopt::StructOpt;
 
 use crate::changelog::{Changelog, WorkspaceCrateReleaseHeading};
+use crate::crate_::ensure_crate_io_owners;
 use crate::crate_::increment_patch;
 use crate::crate_selection::Crate;
 pub(crate) use crate_selection::{ReleaseWorkspace, SelectionCriteria};
@@ -104,9 +106,16 @@ pub(crate) fn cmd(args: &crate::cli::Args, cmd_args: &crate::cli::ReleaseArgs) -
                 warn!("{:?} not implemeted", step)
             }
             ReleaseSteps::PublishToCratesIo => publish_to_crates_io(&ws, cmd_args)?,
-            ReleaseSteps::AddOwnersToCratesIo => {
-                add_owners_to_crates_io(&ws, cmd_args, latest_release_crates(&ws)?)?
-            }
+            ReleaseSteps::AddOwnersToCratesIo => ensure_crate_io_owners(
+                &ws,
+                cmd_args.dry_run,
+                &latest_release_crates(&ws)?,
+                // TODO: make this configurable?
+                crate_::MINIMUM_CRATE_OWNERS
+                    .split(",")
+                    .collect::<Vec<_>>()
+                    .as_slice(),
+            )?,
 
             // ReleaseSteps::CreateCrateTags => create_crate_tags(&ws, cmd_args)?,
             ReleaseSteps::PushReleaseTag => {
@@ -310,6 +319,12 @@ fn bump_release_versions<'a>(
         cmd_args.additional_manifests.iter().map(|mp| mp.as_str()),
     )?;
 
+    ws.cargo_check(
+        true,
+        cmd_args.additional_manifests.iter().map(|mp| mp.as_str()),
+    )
+    .context("cargo check failed")?;
+
     if !cmd_args.no_verify && !cmd_args.no_verify_post {
         info!("running consistency checks after changing the versions...");
         publish_paths_to_crates_io(
@@ -320,8 +335,6 @@ fn bump_release_versions<'a>(
             &cmd_args.cargo_target_dir,
         )
         .context("cargo publish dry-run failed")?;
-
-        ws.cargo_check(true).context("cargo check failed")?;
     }
 
     // ## for the workspace release:
@@ -399,76 +412,6 @@ fn publish_to_crates_io<'a>(
         &Default::default(),
         &cmd_args.cargo_target_dir,
     )?;
-
-    Ok(())
-}
-
-fn add_owners_to_crates_io<'a>(
-    _ws: &'a ReleaseWorkspace<'a>,
-    cmd_args: &'a ReleaseArgs,
-    crates: Vec<&Crate>,
-) -> Fallible<()> {
-    // TODO(backlog): make this configurable
-    static DEFAULT_CRATE_OWNERS: &[&str] = &["github:holochain:core-dev", "zippy"];
-
-    let desired_owners = DEFAULT_CRATE_OWNERS
-        .iter()
-        .map(|s| s.to_string())
-        .collect::<HashSet<_>>();
-
-    for crt in crates {
-        if crates_index_helper::is_version_published(crt, false)? {
-            let mut cmd = std::process::Command::new("cargo");
-            cmd.args(&["owner", "--list", &crt.name()]);
-
-            debug!("[{}] running command: {:?}", crt.name(), cmd);
-            let output = cmd.output().context("process exitted unsuccessfully")?;
-            if !output.status.success() {
-                warn!(
-                    "[{}] failed list owners: {}",
-                    crt.name(),
-                    String::from_utf8_lossy(&output.stderr)
-                );
-
-                continue;
-            }
-
-            let current_owners = output
-                .stdout
-                .lines()
-                .map(|line| {
-                    line.words_with_breaks()
-                        .take_while(|item| *item != " ")
-                        .collect::<String>()
-                })
-                .collect::<HashSet<_>>();
-            let diff = desired_owners.difference(&current_owners);
-            info!(
-                "[{}] current owners {:?}, missing owners: {:?}",
-                crt.name(),
-                current_owners,
-                diff
-            );
-
-            for owner in diff {
-                let mut cmd = std::process::Command::new("cargo");
-                cmd.args(&["owner", "--add", owner, &crt.name()]);
-
-                debug!("[{}] running command: {:?}", crt.name(), cmd);
-                if !cmd_args.dry_run {
-                    let output = cmd.output().context("process exitted unsuccessfully")?;
-                    if !output.status.success() {
-                        warn!(
-                            "[{}] failed to add owner '{}': {}",
-                            crt.name(),
-                            owner,
-                            String::from_utf8_lossy(&output.stderr)
-                        );
-                    }
-                }
-            }
-        }
-    }
 
     Ok(())
 }
@@ -780,7 +723,7 @@ fn publish_paths_to_crates_io(
     static USER_AGENT: &str = "Holochain_Core_Dev_Team (devcore@holochain.org)";
     static CRATES_IO_CLIENT: OnceCell<crates_io_api::AsyncClient> = OnceCell::new();
 
-    let crate_names: HashSet<String> = crates.iter().map(|crt| crt.name()).collect();
+    let crate_names: LinkedHashSet<String> = crates.iter().map(|crt| crt.name()).collect();
 
     debug!("attempting to publish {:?}", crate_names);
 
@@ -814,6 +757,8 @@ fn publish_paths_to_crates_io(
                 Ok(())
             }
         };
+
+    let mut published_dry_run = LinkedHashSet::new();
 
     while let Some(crt) = queue.pop_front() {
         if !crt.state().changed() && crates_index_helper::is_version_published(crt, false)? {
@@ -908,7 +853,7 @@ fn publish_paths_to_crates_io(
                 PublishError::PackageNotFound { dependency, .. }
                 | PublishError::PackageVersionNotFound { dependency, .. } => {
                     !dry_run
-                        || !(crate_names.contains(dependency)
+                        || !(published_dry_run.contains(dependency)
                             || allowed_missing_dependencies.contains(dependency))
                 }
                 PublishError::AlreadyUploaded { version, .. } => {
@@ -925,10 +870,12 @@ fn publish_paths_to_crates_io(
             } {
                 errors.push(error);
             } else {
+                published_dry_run.insert(crt.name());
                 tolerated_cntr += 1;
-                trace!("tolerating error: '{:#?}'", &error);
+                debug!("tolerating error: '{:#?}'", &error);
             }
         } else if dry_run {
+            published_dry_run.insert(crt.name());
             publish_cntr += 1;
         } else {
             // wait until the published version is live

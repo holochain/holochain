@@ -83,7 +83,6 @@ async fn test_rpc_multi_logic_mocked() {
     tokio::time::pause();
 
     let space = Arc::new(KitsuneSpace(vec![0; 36]));
-    let this_addr = url2::url2!("fake://");
 
     // build our "SpaceInternal" sender
     let mut m = MockSpaceInternalHandler::new();
@@ -106,9 +105,9 @@ async fn test_rpc_multi_logic_mocked() {
         }
         ok_fut(Ok(out))
     });
-    m.expect_handle_k_gen_req()
-        .returning(move |_| ok_fut(Ok(KGenRes::RecordMetrics(()))));
+
     let evt_sender = build_event_handler(m).await;
+    let host_api = HostStub::new();
 
     let config = Arc::new(KitsuneP2pConfig::default());
 
@@ -235,16 +234,16 @@ async fn test_rpc_multi_logic_mocked() {
     let metric_exchange = MetricExchangeSync::spawn(
         space.clone(),
         config.tuning_params.clone(),
-        evt_sender.clone(),
+        host_api.clone(),
         metrics.clone(),
     );
 
     // build up the ro_inner that discover calls expect
     let ro_inner = Arc::new(SpaceReadOnlyInner {
         space: space.clone(),
-        this_addr,
         i_s,
         evt_sender,
+        host_api,
         ep_hnd,
         parallel_notify_permit: Arc::new(tokio::sync::Semaphore::new(
             config.tuning_params.concurrent_limit_per_thread,

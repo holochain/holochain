@@ -30,19 +30,18 @@ use holochain_serialized_bytes::SerializedBytes;
 use holochain_serialized_bytes::SerializedBytesError;
 use holochain_sqlite::prelude::DatabaseResult;
 use holochain_state::prelude::from_blob;
-use holochain_state::prelude::test_environments;
+use holochain_state::prelude::test_env_dir;
 use holochain_state::prelude::SourceChainResult;
 use holochain_state::prelude::StateQueryResult;
 use holochain_state::source_chain;
 use holochain_state::test_utils::fresh_reader_test;
-use holochain_state::test_utils::TestEnvs;
 use holochain_types::prelude::*;
-
-use holochain_p2p::DnaHashExt;
 use holochain_wasm_test_utils::TestWasm;
 use kitsune_p2p::KitsuneP2pConfig;
 use rusqlite::named_params;
+use std::path::Path;
 use std::time::Duration;
+use tempfile::TempDir;
 use tokio::sync::mpsc;
 
 pub use itertools;
@@ -205,9 +204,11 @@ where
 
     let (network, mut recv) = spawn_holochain_p2p(
         config,
-        holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_proxy::TlsConfig::new_ephemeral()
-            .await
-            .unwrap(),
+        holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_types::tls::TlsConfig::new_ephemeral(
+        )
+        .await
+        .unwrap(),
+        kitsune_p2p::HostStub::new(),
     )
     .await
     .unwrap();
@@ -289,8 +290,10 @@ pub type InstalledCellsWithProofs = Vec<(InstalledCell, Option<SerializedBytes>)
 pub async fn setup_app(
     apps_data: Vec<(&str, InstalledCellsWithProofs)>,
     dnas: Vec<DnaFile>,
-) -> (TestEnvs, RealAppInterfaceApi, ConductorHandle) {
-    setup_app_inner(test_environments(), apps_data, dnas, None).await
+) -> (TempDir, RealAppInterfaceApi, ConductorHandle) {
+    let dir = test_env_dir();
+    let (iface, handle) = setup_app_inner(dir.path(), apps_data, dnas, None).await;
+    (dir, iface, handle)
 }
 
 /// Setup an app with a custom network config for testing
@@ -299,17 +302,19 @@ pub async fn setup_app_with_network(
     apps_data: Vec<(&str, InstalledCellsWithProofs)>,
     dnas: Vec<DnaFile>,
     network: KitsuneP2pConfig,
-) -> (TestEnvs, RealAppInterfaceApi, ConductorHandle) {
-    setup_app_inner(test_environments(), apps_data, dnas, Some(network)).await
+) -> (TempDir, RealAppInterfaceApi, ConductorHandle) {
+    let dir = test_env_dir();
+    let (iface, handle) = setup_app_inner(dir.path(), apps_data, dnas, Some(network)).await;
+    (dir, iface, handle)
 }
 
 /// Setup an app with full configurability
 pub async fn setup_app_inner(
-    envs: TestEnvs,
+    envs: &Path,
     apps_data: Vec<(&str, InstalledCellsWithProofs)>,
     dnas: Vec<DnaFile>,
     network: Option<KitsuneP2pConfig>,
-) -> (TestEnvs, RealAppInterfaceApi, ConductorHandle) {
+) -> (RealAppInterfaceApi, ConductorHandle) {
     let conductor_handle = ConductorBuilder::new()
         .config(ConductorConfig {
             admin_interfaces: Some(vec![AdminInterfaceConfig {
@@ -318,7 +323,7 @@ pub async fn setup_app_inner(
             network,
             ..Default::default()
         })
-        .test(&envs, &[])
+        .test(envs, &[])
         .await
         .unwrap();
 
@@ -328,7 +333,7 @@ pub async fn setup_app_inner(
 
     let handle = conductor_handle.clone();
 
-    (envs, RealAppInterfaceApi::new(conductor_handle), handle)
+    (RealAppInterfaceApi::new(conductor_handle), handle)
 }
 
 /// If HC_WASM_CACHE_PATH is set warm the cache
@@ -477,7 +482,7 @@ fn get_published_ops<Db: ReadAccess<DbKindAuthored>>(
         txn.prepare(
             "
             SELECT
-            DhtOp.blob
+            DhtOp.type, Header.hash, Header.blob
             FROM DhtOp
             JOIN
             Header ON DhtOp.header_hash = Header.hash
@@ -492,7 +497,12 @@ fn get_published_ops<Db: ReadAccess<DbKindAuthored>>(
                 ":store_entry": DhtOpType::StoreEntry,
                 ":author": author,
             },
-            |row| from_blob(row.get("blob")?),
+            |row| {
+                let op_type: DhtOpType = row.get("type")?;
+                let hash: HeaderHash = row.get("hash")?;
+                let header: SignedHeader = from_blob(row.get("blob")?)?;
+                Ok(DhtOpLight::from_type(op_type, hash, &header.0)?)
+            },
         )
         .unwrap()
         .collect::<StateQueryResult<_>>()
@@ -655,7 +665,7 @@ async fn display_integration<Db: ReadAccess<DbKindDht>>(env: &Db) -> usize {
 /// Helper for displaying agent infos stored on a conductor
 pub async fn display_agent_infos(conductor: &ConductorHandle) {
     for cell_id in conductor.list_cell_ids(Some(CellStatus::Joined)) {
-        let space = cell_id.dna_hash().to_kitsune();
+        let space = cell_id.dna_hash();
         let env = conductor.get_p2p_env(space);
         let info = p2p_agent_store::dump_state(env.into(), Some(cell_id))
             .await

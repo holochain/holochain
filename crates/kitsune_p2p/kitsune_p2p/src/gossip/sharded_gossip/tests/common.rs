@@ -1,34 +1,46 @@
-use crate::test_util::hash_op_data;
 pub use crate::test_util::spawn_handler;
+use crate::HostStub;
+use crate::{test_util::hash_op_data, KitsuneHostPanicky};
 
 use super::*;
+
+pub struct StandardResponsesHostApi {
+    infos: Vec<AgentInfoSigned>,
+}
+
+impl KitsuneHostPanicky for StandardResponsesHostApi {
+    const NAME: &'static str = "StandardResponsesHostApi";
+
+    fn get_agent_info_signed(
+        &self,
+        input: GetAgentInfoSignedEvt,
+    ) -> crate::KitsuneHostResult<Option<crate::types::agent_store::AgentInfoSigned>> {
+        let agent = self
+            .infos
+            .clone()
+            .into_iter()
+            .find(|a| a.agent == input.agent)
+            .unwrap();
+        box_fut(Ok(Some(agent)))
+    }
+}
 
 // TODO: integrate with `HandlerBuilder`
 async fn standard_responses(
     agents: Vec<(Arc<KitsuneAgent>, AgentInfoSigned)>,
     with_data: bool,
-) -> MockKitsuneP2pEventHandler {
+) -> (MockKitsuneP2pEventHandler, HostApi) {
     let mut evt_handler = MockKitsuneP2pEventHandler::new();
     let infos = agents.iter().map(|(_, i)| i.clone()).collect::<Vec<_>>();
+    let host = StandardResponsesHostApi {
+        infos: infos.clone(),
+    };
     evt_handler.expect_handle_query_agents().returning({
-        let infos = infos.clone();
         move |_| {
             let infos = infos.clone();
             Ok(async move { Ok(infos.clone()) }.boxed().into())
         }
     });
-    evt_handler
-        .expect_handle_get_agent_info_signed()
-        .returning({
-            move |input| {
-                let agent = infos
-                    .clone()
-                    .into_iter()
-                    .find(|a| a.agent == input.agent)
-                    .unwrap();
-                Ok(async move { Ok(Some(agent)) }.boxed().into())
-            }
-        });
 
     if with_data {
         let fake_data = KitsuneOpData::new(vec![0]);
@@ -62,13 +74,8 @@ async fn standard_responses(
     evt_handler
         .expect_handle_gossip()
         .returning(|_, _| Ok(async { Ok(()) }.boxed().into()));
-    evt_handler.expect_handle_k_gen_req().returning(|r| {
-        ok_fut(Ok(match r {
-            KGenReq::QueryRegionSet { .. } => KGenRes::QueryRegionSet(RegionSetXtcs::empty()),
-            _ => unreachable!("other KGenReqs not handled"),
-        }))
-    });
-    evt_handler
+
+    (evt_handler, Arc::new(host))
 }
 
 pub async fn setup_player(
@@ -76,9 +83,9 @@ pub async fn setup_player(
     agents: Vec<(Arc<KitsuneAgent>, AgentInfoSigned)>,
     with_data: bool,
 ) -> ShardedGossipLocal {
-    let evt_handler = standard_responses(agents, with_data).await;
+    let (evt_handler, host_api) = standard_responses(agents, with_data).await;
     let (evt_sender, _) = spawn_handler(evt_handler).await;
-    ShardedGossipLocal::test(GossipType::Historical, evt_sender, state)
+    ShardedGossipLocal::test(GossipType::Historical, evt_sender, host_api, state)
 }
 
 pub async fn setup_standard_player(
@@ -92,9 +99,9 @@ pub async fn setup_empty_player(
     state: ShardedGossipLocalState,
     agents: Vec<(Arc<KitsuneAgent>, AgentInfoSigned)>,
 ) -> ShardedGossipLocal {
-    let evt_handler = standard_responses(agents, false).await;
+    let (evt_handler, host_api) = standard_responses(agents, false).await;
     let (evt_sender, _) = spawn_handler(evt_handler).await;
-    ShardedGossipLocal::test(GossipType::Historical, evt_sender, state)
+    ShardedGossipLocal::test(GossipType::Historical, evt_sender, host_api, state)
 }
 
 pub async fn agents_with_infos(num_agents: usize) -> Vec<(Arc<KitsuneAgent>, AgentInfoSigned)> {

@@ -221,7 +221,7 @@ async fn publish_loop() {
         .prefix("holochain-test-environments")
         .tempdir()
         .unwrap();
-    let env = DbWrite::test(&tmpdir, kind).expect("Couldn't create test database");
+    let env = DbWrite::test(tmpdir.path(), kind).expect("Couldn't create test database");
     let header = Header::arbitrary(&mut u).unwrap();
     let author = header.author().clone();
     let signature = Signature::arbitrary(&mut u).unwrap();
@@ -231,7 +231,7 @@ async fn publish_loop() {
     env.conn()
         .unwrap()
         .with_commit_test(|txn| {
-            mutations::insert_op(txn, op).unwrap();
+            mutations::insert_op(txn, &op).unwrap();
         })
         .unwrap();
     let mut dna_network = MockHolochainP2pDnaT::new();
@@ -303,7 +303,7 @@ async fn publish_loop() {
     env.conn()
         .unwrap()
         .with_commit_test(|txn| {
-            mutations::set_last_publish_time(txn, op_hash.clone(), five_mins_ago).unwrap();
+            mutations::set_last_publish_time(txn, &op_hash, five_mins_ago).unwrap();
         })
         .unwrap();
 
@@ -359,7 +359,7 @@ async fn publish_loop() {
     env.conn()
         .unwrap()
         .with_commit_test(|txn| {
-            mutations::set_last_publish_time(txn, op_hash.clone(), five_mins_ago).unwrap();
+            mutations::set_last_publish_time(txn, &op_hash, five_mins_ago).unwrap();
             mutations::set_receipts_complete(txn, &op_hash, false).unwrap();
         })
         .unwrap();

@@ -65,7 +65,6 @@ use holochain_keystore::lair_keystore::spawn_new_lair_keystore;
 use holochain_keystore::test_keystore::spawn_legacy_test_keystore;
 use holochain_keystore::test_keystore::spawn_test_keystore;
 use holochain_keystore::MetaLairClient;
-use holochain_sqlite::conn::DbSyncStrategy;
 use holochain_sqlite::prelude::*;
 use holochain_sqlite::sql::sql_cell::state_dump;
 use holochain_state::mutations;
@@ -73,6 +72,7 @@ use holochain_state::prelude::from_blob;
 use holochain_state::prelude::StateMutationResult;
 use holochain_state::prelude::StateQueryResult;
 use holochain_types::prelude::*;
+pub use holochain_types::share;
 use rusqlite::{OptionalExtension, Transaction};
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::AtomicBool;
@@ -82,8 +82,6 @@ use tracing::*;
 
 #[cfg(feature = "test_utils")]
 use super::handle::MockConductorHandleT;
-
-mod share;
 
 /// The status of an installed Cell, which captures different phases of its lifecycle
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -139,12 +137,6 @@ where
     /// The collection of cells associated with this Conductor
     cells: RwShare<HashMap<CellId, CellItem<CA>>>,
 
-    /// The database for persisting state related to this Conductor
-    conductor_env: DbWrite<DbKindConductor>,
-
-    /// A database for storing wasm
-    wasm_env: DbWrite<DbKindWasm>,
-
     /// The map of dna hash spaces.
     pub(super) spaces: Spaces<DS>,
 
@@ -170,14 +162,8 @@ where
     /// Access to private keys for signing and encryption.
     keystore: MetaLairClient,
 
-    /// The root environment directory where all environments are created
-    root_env_dir: EnvironmentRootPath,
-
     /// Handle to the network actor.
     holochain_p2p: holochain_p2p::HolochainP2pRef,
-
-    /// The map of running queue consumer workflows.
-    queue_consumer_map: QueueConsumerMap,
 
     post_commit: tokio::sync::mpsc::Sender<PostCommitArgs>,
 }
@@ -466,7 +452,7 @@ where
     }
 
     pub(super) fn get_queue_consumer_workflows(&self) -> QueueConsumerMap {
-        self.queue_consumer_map.clone()
+        self.spaces.queue_consumer_map.clone()
     }
 
     /// Start all app interfaces currently in state.
@@ -821,7 +807,7 @@ where
         impl IntoIterator<Item = (DnaHash, DnaFile)>,
         impl IntoIterator<Item = (EntryDefBufferKey, EntryDef)>,
     )> {
-        let env = &self.wasm_env;
+        let env = &self.spaces.wasm_env;
 
         // Load out all dna defs
         let (wasm_tasks, defs) = env
@@ -883,12 +869,17 @@ where
 
     /// Get the root environment directory.
     pub fn root_env_dir(&self) -> &EnvironmentRootPath {
-        &self.root_env_dir
+        &self.spaces.root_env_dir
     }
 
     /// Get the keystore.
     pub fn keystore(&self) -> &MetaLairClient {
         &self.keystore
+    }
+
+    /// Get a reference to the conductor's HolochainP2p.
+    pub fn holochain_p2p(&self) -> &holochain_p2p::HolochainP2pRef {
+        &self.holochain_p2p
     }
 
     /// Remove cells from the cell map in the Conductor
@@ -935,7 +926,7 @@ where
         &self,
         dna: DnaFile,
     ) -> ConductorResult<Vec<(EntryDefBufferKey, EntryDef)>> {
-        let env = self.wasm_env.clone();
+        let env = self.spaces.wasm_env.clone();
 
         let zome_defs = get_entry_defs(dna.clone())?;
 
@@ -958,7 +949,7 @@ where
                 }
 
                 for (key, entry_def) in zome_defs.clone() {
-                    holochain_state::entry_def::put(txn, key, entry_def)?;
+                    holochain_state::entry_def::put(txn, key, &entry_def)?;
                 }
 
                 if !holochain_state::dna_def::contains(txn, dna.dna_hash())? {
@@ -1271,26 +1262,14 @@ where
 {
     #[allow(clippy::too_many_arguments)]
     async fn new(
-        conductor_env: DbWrite<DbKindConductor>,
-        wasm_env: DbWrite<DbKindWasm>,
         dna_store: DS,
         keystore: MetaLairClient,
-        root_env_dir: EnvironmentRootPath,
         holochain_p2p: holochain_p2p::HolochainP2pRef,
-        db_sync_level: DbSyncStrategy,
+        spaces: Spaces,
         post_commit: tokio::sync::mpsc::Sender<PostCommitArgs>,
     ) -> ConductorResult<Self> {
-        let queue_consumer_map = QueueConsumerMap::new();
-        let dna_store = RwShare::new(dna_store);
         Ok(Self {
-            conductor_env,
-            wasm_env,
-            spaces: Spaces::new(
-                root_env_dir.clone(),
-                db_sync_level,
-                dna_store.clone(),
-                queue_consumer_map.clone(),
-            ),
+            spaces,
             cells: RwShare::new(HashMap::new()),
             shutting_down: Arc::new(AtomicBool::new(false)),
             app_interfaces: RwShare::new(HashMap::new()),
@@ -1298,15 +1277,14 @@ where
             admin_websocket_ports: RwShare::new(Vec::new()),
             dna_store,
             keystore,
-            root_env_dir,
             holochain_p2p,
-            queue_consumer_map,
             post_commit,
         })
     }
 
     pub(super) async fn get_state(&self) -> ConductorResult<ConductorState> {
-        self.conductor_env
+        self.spaces
+            .conductor_env
             .async_reader(|txn| {
                 let state = txn
                     .query_row("SELECT blob FROM ConductorState WHERE id = 1", [], |row| {
@@ -1341,6 +1319,7 @@ where
     {
         self.check_running()?;
         let output = self
+            .spaces
             .conductor_env
             .async_commit(move |txn| {
                 let state = txn
@@ -1383,9 +1362,8 @@ mod builder {
     use super::*;
     use crate::conductor::dna_store::RealDnaStore;
     use crate::conductor::handle::DevSettings;
+    use crate::conductor::kitsune_host_impl::KitsuneHostImpl;
     use crate::conductor::ConductorHandle;
-    #[cfg(any(test, feature = "test_utils"))]
-    use holochain_state::test_utils::TestEnvs;
 
     /// A configurable Builder for Conductor and sometimes ConductorHandle
     #[derive(Default)]
@@ -1491,13 +1469,6 @@ mod builder {
 
             let env_path = self.config.environment_path.clone();
 
-            let environment = DbWrite::open(env_path.as_ref(), DbKindConductor)?;
-
-            let wasm_environment = DbWrite::open(env_path.as_ref(), DbKindWasm)?;
-
-            #[cfg(any(test, feature = "test_utils"))]
-            let state = self.state;
-
             let Self {
                 dna_store, config, ..
             } = self;
@@ -1509,47 +1480,36 @@ mod builder {
             let (cert_digest, cert, cert_priv_key) =
                 keystore.get_or_create_first_tls_cert().await?;
             let tls_config =
-                holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_proxy::TlsConfig {
+                holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_types::tls::TlsConfig {
                     cert,
                     cert_priv_key,
                     cert_digest,
                 };
+
+            let spaces = Spaces::new(env_path, config.db_sync_strategy)?;
+            let host = KitsuneHostImpl::new(spaces.clone());
+
             let (holochain_p2p, p2p_evt) =
-                holochain_p2p::spawn_holochain_p2p(network_config, tls_config).await?;
+                holochain_p2p::spawn_holochain_p2p(network_config, tls_config, host).await?;
 
             let (post_commit_sender, post_commit_receiver) =
                 tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
 
             let conductor = Conductor::new(
-                environment,
-                wasm_environment,
                 dna_store,
                 keystore,
-                env_path,
                 holochain_p2p,
-                config.db_sync_strategy,
+                spaces,
                 post_commit_sender,
             )
             .await?;
 
             #[cfg(any(test, feature = "test_utils"))]
-            let conductor = Self::update_fake_state(state, conductor).await?;
-
-            // Get data before handle
-            let keystore = conductor.keystore.clone();
-            let holochain_p2p = conductor.holochain_p2p.clone();
+            let conductor = Self::update_fake_state(self.state, conductor).await?;
 
             // Create handle
             let handle: ConductorHandle = Arc::new(ConductorHandleImpl {
-                root_env_dir: config.environment_path.clone(),
                 conductor,
-                keystore,
-                holochain_p2p,
-                db_sync_strategy: config.db_sync_strategy,
-
-                p2p_env: Arc::new(parking_lot::Mutex::new(HashMap::new())),
-                p2p_batch_senders: Arc::new(parking_lot::Mutex::new(HashMap::new())),
-                p2p_metrics_env: Arc::new(parking_lot::Mutex::new(HashMap::new())),
 
                 #[cfg(any(test, feature = "test_utils"))]
                 dev_settings: parking_lot::RwLock::new(DevSettings::default()),
@@ -1663,48 +1623,40 @@ mod builder {
         #[cfg(any(test, feature = "test_utils"))]
         pub async fn test(
             mut self,
-            envs: &TestEnvs,
+            env_path: &std::path::Path,
             extra_dnas: &[DnaFile],
         ) -> ConductorResult<ConductorHandle> {
-            let keystore = envs.keystore().clone();
+            let keystore = self.keystore.unwrap_or_else(test_keystore);
+            self.config.environment_path = env_path.to_path_buf().into();
 
-            self.config.environment_path = envs.path().to_path_buf().into();
+            let spaces = Spaces::new(
+                self.config.environment_path.clone(),
+                self.config.db_sync_strategy,
+            )?;
+            let host = KitsuneHostImpl::new(spaces.clone());
 
             let (holochain_p2p, p2p_evt) =
-                holochain_p2p::spawn_holochain_p2p(self.config.network.clone().unwrap_or_default(), holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_proxy::TlsConfig::new_ephemeral().await.unwrap())
+                holochain_p2p::spawn_holochain_p2p(self.config.network.clone().unwrap_or_default(), holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_types::tls::TlsConfig::new_ephemeral().await.unwrap(), host)
                     .await?;
 
             let (post_commit_sender, post_commit_receiver) =
                 tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
 
             let conductor = Conductor::new(
-                envs.conductor(),
-                envs.wasm(),
                 self.dna_store,
                 keystore,
-                self.config.environment_path.clone(),
                 holochain_p2p,
-                self.config.db_sync_strategy,
+                spaces,
                 post_commit_sender,
             )
             .await?;
 
             let conductor = Self::update_fake_state(self.state, conductor).await?;
 
-            // Get data before handle
-            let keystore = conductor.keystore.clone();
-            let holochain_p2p = conductor.holochain_p2p.clone();
-
             // Create handle
             let handle: ConductorHandle = Arc::new(ConductorHandleImpl {
-                root_env_dir: self.config.environment_path.clone(),
                 conductor,
-                keystore,
-                holochain_p2p,
-                p2p_env: envs.p2p(),
-                p2p_batch_senders: Arc::new(parking_lot::Mutex::new(HashMap::new())),
-                p2p_metrics_env: envs.p2p_metrics(),
-                db_sync_strategy: self.config.db_sync_strategy,
+
                 #[cfg(any(test, feature = "test_utils"))]
                 dev_settings: parking_lot::RwLock::new(DevSettings::default()),
             });
@@ -1712,6 +1664,7 @@ mod builder {
             // Install extra DNAs, in particular:
             // the ones with InlineZomes will not be registered in the Wasm DB
             // and cannot be automatically loaded on conductor restart.
+
             for dna_file in extra_dnas {
                 handle
                     .register_dna(dna_file.clone())

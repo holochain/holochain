@@ -26,7 +26,7 @@ async fn corrupt_cache_creates_new_db() {
     let testdir = create_corrupt_db(kind.clone(), &mut u);
 
     // - Try to open it.
-    let env = DbWrite::test(&testdir, kind).unwrap();
+    let env = DbWrite::test(testdir.path(), kind).unwrap();
 
     // - It opens successfully but the data is wiped.
     let n: usize = fresh_reader_test(env, |txn| {
@@ -47,7 +47,7 @@ async fn corrupt_source_chain_panics() {
     let testdir = create_corrupt_db(kind.clone(), &mut u);
 
     // - Try to open it.
-    let result = DbWrite::test(&testdir, kind);
+    let result = DbWrite::test(testdir.path(), kind);
 
     // - It cannot open.
     assert!(result.is_err());
@@ -84,7 +84,7 @@ fn create_corrupt_db<Kind: DbKindT>(kind: Kind, u: &mut arbitrary::Unstructured)
     let mut txn = conn
         .transaction_with_behavior(holochain_sqlite::rusqlite::TransactionBehavior::Exclusive)
         .unwrap();
-    mutations_helpers::insert_valid_integrated_op(&mut txn, op).unwrap();
+    mutations_helpers::insert_valid_integrated_op(&mut txn, &op).unwrap();
     txn.commit().unwrap();
     conn.close().unwrap();
     corrupt_db(path.as_ref());
