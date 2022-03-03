@@ -38,9 +38,7 @@ impl KitsuneHost for KitsuneHostImpl {
                 conn.p2p_extrapolated_coverage(dht_arc_set)
             })
             .await;
-            let res = res
-                .map_err(holochain_p2p::HolochainP2pError::other)
-                .and_then(|r| r.map_err(holochain_p2p::HolochainP2pError::other))?;
+            let res = res.map_err(Box::new)?.map_err(Box::new)?;
             Ok(res)
         }
         .boxed()
@@ -63,9 +61,7 @@ impl KitsuneHost for KitsuneHostImpl {
                 conn.p2p_log_metrics(records)
             })
             .await;
-            let res = res
-                .map_err(holochain_p2p::HolochainP2pError::other)
-                .and_then(|r| r.map_err(holochain_p2p::HolochainP2pError::other))?;
+            let res = res.map_err(Box::new)?.map_err(Box::new)?;
             Ok(res)
         }
         .boxed()

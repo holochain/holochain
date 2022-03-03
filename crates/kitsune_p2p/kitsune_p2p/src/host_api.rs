@@ -7,7 +7,7 @@ use crate::event::MetricRecord;
 
 /// A boxed future result with dynamic error type
 pub type KitsuneHostResult<'a, T> =
-    MustBoxFuture<'a, Result<T, Box<dyn 'a + Send + std::error::Error>>>;
+    MustBoxFuture<'a, Result<T, Box<dyn 'a + Send + Sync + std::error::Error>>>;
 
 /// The interface to be implemented by the host, which handles various requests
 /// for data
