@@ -445,7 +445,7 @@ jobs:
       - name: Push the main branch
         if: ${{ needs.vars.outputs.dry_run == 'false' }}
         run: |
-          set -x
+          set -e
           source ${HOLOCHAIN_RELEASE_SH}
           cd "${HOLOCHAIN_REPO}"
 
