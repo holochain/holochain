@@ -1,6 +1,7 @@
 pub use crate::test_util::spawn_handler;
 use crate::HostStub;
 use crate::{test_util::hash_op_data, KitsuneHostPanicky};
+use kitsune_p2p_types::box_fut;
 
 use super::*;
 
