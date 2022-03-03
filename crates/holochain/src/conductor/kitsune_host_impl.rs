@@ -4,24 +4,25 @@ use std::sync::Arc;
 
 use futures::FutureExt;
 use holo_hash::DnaHash;
-use holochain_p2p::DnaHashExt;
+use holochain_p2p::{dht::quantum::Topology, DnaHashExt};
 use kitsune_p2p::{
     agent_store::AgentInfoSigned, event::GetAgentInfoSignedEvt, KitsuneHost, KitsuneHostResult,
 };
 
 use super::space::Spaces;
-use holochain_types::env::PermittedConn;
+use holochain_types::{env::PermittedConn, prelude::DnaStore, share::RwShare};
 
 /// Implementation of the Kitsune Host API.
 /// Lets Kitsune make requests of Holochain
 pub struct KitsuneHostImpl {
     spaces: Spaces,
+    dna_store: RwShare<DnaStore>,
 }
 
 impl KitsuneHostImpl {
     /// Constructor
-    pub fn new(spaces: Spaces) -> Arc<Self> {
-        Arc::new(Self { spaces })
+    pub fn new(spaces: Spaces, dna_store: RwShare<DnaStore>) -> Arc<Self> {
+        Arc::new(Self { spaces, dna_store })
     }
 }
 
@@ -84,8 +85,22 @@ impl KitsuneHost for KitsuneHostImpl {
     fn query_region_set(
         &self,
         space: &kitsune_p2p::KitsuneSpace,
-        dht_arc_set: &holochain_p2p::dht_arc::DhtArcSet,
+        dht_arc_set: Arc<holochain_p2p::dht_arc::DhtArcSet>,
     ) -> KitsuneHostResult<holochain_p2p::dht::region::RegionSetXtcs> {
-        todo!()
+        let dna_hash = DnaHash::from_kitsune(&Arc::new(space.clone()));
+        async move {
+            Ok(self
+                .spaces
+                .handle_fetch_op_regions(dna_hash, dht_arc_set)
+                .await?)
+        }
+        .boxed()
+        .into()
+    }
+
+    fn get_topology(&self, space: Arc<kitsune_p2p::KitsuneSpace>) -> Option<Topology> {
+        let dna_hash = DnaHash::from_kitsune(&Arc::new(space.clone()));
+        let dna_def = self.dna_store.get_dna_def(&dna_hash)?;
+        Some(Topology::standard(dna_def.origin_time))
     }
 }

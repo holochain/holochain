@@ -70,8 +70,15 @@ impl KitsuneHost for SwitchboardEventHandler {
     fn query_region_set(
         &self,
         _space: &KitsuneSpace,
-        _dht_arc_set: &dht_arc::DhtArcSet,
+        _dht_arc_set: Arc<dht_arc::DhtArcSet>,
     ) -> crate::KitsuneHostResult<dht::region::RegionSetXtcs> {
+        todo!()
+    }
+
+    fn get_topology(
+        &self,
+        _space: Arc<KitsuneSpace>,
+    ) -> crate::KitsuneHostResult<Option<dht::quantum::Topology>> {
         todo!()
     }
 }

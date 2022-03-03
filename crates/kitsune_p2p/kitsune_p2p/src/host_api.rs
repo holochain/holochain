@@ -1,7 +1,11 @@
 use must_future::MustBoxFuture;
 use std::sync::Arc;
 
-use kitsune_p2p_types::{bin_types::KitsuneSpace, dht::region::RegionSetXtcs, dht_arc::DhtArcSet};
+use kitsune_p2p_types::{
+    bin_types::KitsuneSpace,
+    dht::{quantum::Topology, region::RegionSetXtcs},
+    dht_arc::DhtArcSet,
+};
 
 use crate::event::{GetAgentInfoSignedEvt, MetricRecord};
 
@@ -29,7 +33,7 @@ pub trait KitsuneHost {
     fn query_region_set(
         &self,
         space: &KitsuneSpace,
-        dht_arc_set: &DhtArcSet,
+        dht_arc_set: Arc<DhtArcSet>,
     ) -> KitsuneHostResult<RegionSetXtcs>;
 
     /// Record a set of metric records
@@ -38,6 +42,9 @@ pub trait KitsuneHost {
         space: Arc<KitsuneSpace>,
         records: Vec<MetricRecord>,
     ) -> KitsuneHostResult<()>;
+
+    /// Get the quantum Topology associated with this Space
+    fn get_topology(&self, space: Arc<KitsuneSpace>) -> KitsuneHostResult<Option<Topology>>;
 }
 
 /// Trait object for the host interface

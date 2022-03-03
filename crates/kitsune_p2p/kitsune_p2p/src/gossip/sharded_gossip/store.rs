@@ -263,7 +263,7 @@ pub(super) fn hash_chunks_query(
 pub(super) async fn region_set_query<'a>(
     host_api: HostApi,
     space: &'a KitsuneSpace,
-    common_arc_set: &'a DhtArcSet,
+    common_arc_set: Arc<DhtArcSet>,
 ) -> KitsuneResult<RegionSetXtcs> {
     host_api
         .query_region_set(space, common_arc_set)

@@ -197,7 +197,7 @@ impl ShardedGossipLocal {
 
         let region_set = if let GossipType::Historical = self.gossip_type {
             let region_set =
-                store::region_set_query(self.host_api.clone(), &self.space, &common_arc_set)
+                store::region_set_query(self.host_api.clone(), &self.space, common_arc_set.clone())
                     .await?;
             gossip.push(ShardedGossipWire::op_regions(region_set.clone()));
             Some(region_set)

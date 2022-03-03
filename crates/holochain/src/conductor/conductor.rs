@@ -1262,7 +1262,7 @@ where
 {
     #[allow(clippy::too_many_arguments)]
     async fn new(
-        dna_store: DS,
+        dna_store: RwShare<DS>,
         keystore: MetaLairClient,
         holochain_p2p: holochain_p2p::HolochainP2pRef,
         spaces: Spaces,
@@ -1275,7 +1275,7 @@ where
             app_interfaces: RwShare::new(HashMap::new()),
             task_manager: RwShare::new(None),
             admin_websocket_ports: RwShare::new(Vec::new()),
-            dna_store: RwShare::new(dna_store),
+            dna_store,
             keystore,
             holochain_p2p,
             post_commit,
@@ -1473,6 +1473,8 @@ mod builder {
                 dna_store, config, ..
             } = self;
 
+            let dna_store = RwShare::new(dna_store);
+
             let network_config = match &config.network {
                 None => holochain_p2p::kitsune_p2p::KitsuneP2pConfig::default(),
                 Some(config) => config.clone(),
@@ -1487,7 +1489,7 @@ mod builder {
                 };
 
             let spaces = Spaces::new(env_path, config.db_sync_strategy)?;
-            let host = KitsuneHostImpl::new(spaces.clone());
+            let host = KitsuneHostImpl::new(spaces.clone(), dna_store.clone());
 
             let (holochain_p2p, p2p_evt) =
                 holochain_p2p::spawn_holochain_p2p(network_config, tls_config, host).await?;
@@ -1633,7 +1635,8 @@ mod builder {
                 self.config.environment_path.clone(),
                 self.config.db_sync_strategy,
             )?;
-            let host = KitsuneHostImpl::new(spaces.clone());
+            let dna_store = RwShare::new(self.dna_store);
+            let host = KitsuneHostImpl::new(spaces.clone(), dna_store.clone());
 
             let (holochain_p2p, p2p_evt) =
                 holochain_p2p::spawn_holochain_p2p(self.config.network.clone().unwrap_or_default(), holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_types::tls::TlsConfig::new_ephemeral().await.unwrap(), host)
@@ -1643,7 +1646,7 @@ mod builder {
                 tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
 
             let conductor = Conductor::new(
-                self.dna_store,
+                dna_store,
                 keystore,
                 holochain_p2p,
                 spaces,
