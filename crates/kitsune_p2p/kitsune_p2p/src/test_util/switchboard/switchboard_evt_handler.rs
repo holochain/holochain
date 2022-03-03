@@ -4,8 +4,8 @@
 
 use std::sync::Arc;
 
-use crate::event::*;
 use crate::types::event::{KitsuneP2pEvent, KitsuneP2pEventHandler, KitsuneP2pEventHandlerResult};
+use crate::{event::*, KitsuneHost};
 use kitsune_p2p_types::bin_types::*;
 use kitsune_p2p_types::*;
 
@@ -35,6 +35,38 @@ impl SwitchboardEventHandler {
 
 impl ghost_actor::GhostHandler<KitsuneP2pEvent> for SwitchboardEventHandler {}
 impl ghost_actor::GhostControlHandler for SwitchboardEventHandler {}
+
+impl KitsuneHost for SwitchboardEventHandler {
+    fn get_agent_info_signed(
+        &self,
+        GetAgentInfoSignedEvt { agent, space: _ }: GetAgentInfoSignedEvt,
+    ) -> crate::KitsuneHostResult<Option<crate::types::agent_store::AgentInfoSigned>> {
+        box_fut(Ok(self.sb.share(|state| {
+            let node = state.nodes.get_mut(&self.node).unwrap();
+            let loc = agent.get_loc().as_loc8();
+            node.local_agents
+                .get(&loc)
+                .map(|e| e.info.to_owned())
+                .or_else(|| node.remote_agents.get(&loc).cloned())
+        })))
+    }
+
+    fn peer_extrapolated_coverage(
+        &self,
+        _space: Arc<KitsuneSpace>,
+        _dht_arc_set: dht_arc::DhtArcSet,
+    ) -> crate::KitsuneHostResult<Vec<f64>> {
+        unimplemented!()
+    }
+
+    fn record_metrics(
+        &self,
+        _space: Arc<KitsuneSpace>,
+        _records: Vec<MetricRecord>,
+    ) -> crate::KitsuneHostResult<()> {
+        box_fut(Ok(()))
+    }
+}
 
 #[allow(warnings)]
 impl KitsuneP2pEventHandler for SwitchboardEventHandler {

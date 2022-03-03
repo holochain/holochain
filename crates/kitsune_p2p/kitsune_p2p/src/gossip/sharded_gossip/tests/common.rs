@@ -34,7 +34,6 @@ async fn standard_responses(
         infos: infos.clone(),
     };
     evt_handler.expect_handle_query_agents().returning({
-        let infos = infos.clone();
         move |_| {
             let infos = infos.clone();
             Ok(async move { Ok(infos.clone()) }.boxed().into())
