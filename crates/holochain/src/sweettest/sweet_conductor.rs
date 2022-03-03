@@ -104,9 +104,7 @@ impl SweetConductor {
     }
 
     /// Create a SweetConductor from a partially-configured ConductorBuilder
-    pub async fn from_builder<DS: DnaStore + 'static>(
-        builder: ConductorBuilder<DS>,
-    ) -> SweetConductor {
+    pub async fn from_builder(builder: ConductorBuilder) -> SweetConductor {
         let db_dir = test_db_dir();
         let config = builder.config.clone();
         let handle = builder.test(db_dir.path(), &[]).await.unwrap();

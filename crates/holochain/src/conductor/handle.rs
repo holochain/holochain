@@ -468,8 +468,8 @@ impl DevSettings {
 /// this could be swapped out with, e.g. a channel Sender/Receiver pair
 /// using an actor model.
 #[derive(From)]
-pub struct ConductorHandleImpl<DS: DnaStore + 'static> {
-    pub(super) conductor: Conductor<DS>,
+pub struct ConductorHandleImpl {
+    pub(super) conductor: Conductor,
 
     // This is only available in tests currently, but could be extended to
     // normal usage.
@@ -479,7 +479,7 @@ pub struct ConductorHandleImpl<DS: DnaStore + 'static> {
 }
 
 #[async_trait::async_trait]
-impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
+impl ConductorHandleT for ConductorHandleImpl {
     /// Check that shutdown has not been called
     fn check_running(&self) -> ConductorResult<()> {
         self.conductor.check_running()
@@ -1490,7 +1490,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     }
 }
 
-impl<DS: DnaStore + 'static> ConductorHandleImpl<DS> {
+impl ConductorHandleImpl {
     fn cell_by_id(&self, cell_id: &CellId) -> ConductorApiResult<Arc<Cell>> {
         Ok(self.conductor.cell_by_id(cell_id)?)
     }

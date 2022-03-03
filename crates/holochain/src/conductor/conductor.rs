@@ -14,7 +14,7 @@ pub use self::share::RwShare;
 use super::api::RealAppInterfaceApi;
 use super::config::AdminInterfaceConfig;
 use super::config::InterfaceDriver;
-use super::dna_store::RealDnaStore;
+use super::dna_store::DnaStore;
 use super::entry_def_store::get_entry_defs;
 use super::error::ConductorError;
 use super::handle::ConductorHandleImpl;
@@ -129,9 +129,8 @@ pub(crate) type StopReceiver = tokio::sync::broadcast::Receiver<()>;
 
 /// A Conductor is a group of [Cell]s
 #[derive(Clone)]
-pub struct Conductor<DS = RealDnaStore, CA = CellConductorApi>
+pub struct Conductor<CA = CellConductorApi>
 where
-    DS: DnaStore,
     CA: CellConductorApiT,
 {
     /// The collection of cells associated with this Conductor
@@ -157,7 +156,7 @@ where
     pub(super) task_manager: RwShare<Option<TaskManagerClient>>,
 
     /// Placeholder for what will be the real DNA/Wasm cache
-    dna_store: RwShare<DS>,
+    dna_store: RwShare<DnaStore>,
 
     /// Access to private keys for signing and encryption.
     keystore: MetaLairClient,
@@ -178,10 +177,7 @@ impl Conductor {
 //-----------------------------------------------------------------------------
 // Public methods
 //-----------------------------------------------------------------------------
-impl<DS> Conductor<DS>
-where
-    DS: DnaStore + 'static,
-{
+impl Conductor {
     /// Returns a port which is guaranteed to have a websocket listener with an Admin interface
     /// on it. Useful for specifying port 0 and letting the OS choose a free port.
     pub fn get_arbitrary_admin_websocket_port(&self) -> Option<u16> {
@@ -192,10 +188,7 @@ where
 //-----------------------------------------------------------------------------
 /// Methods used by the [ConductorHandle]
 //-----------------------------------------------------------------------------
-impl<DS> Conductor<DS>
-where
-    DS: DnaStore + 'static,
-{
+impl Conductor {
     pub(super) fn cell_by_id(&self, cell_id: &CellId) -> ConductorResult<Arc<Cell>> {
         let cell = self
             .cells
@@ -254,7 +247,7 @@ where
         }
     }
 
-    pub(super) fn dna_store(&self) -> &RwShare<DS> {
+    pub(super) fn dna_store(&self) -> &RwShare<DnaStore> {
         &self.dna_store
     }
 
@@ -293,10 +286,7 @@ where
         &self,
         configs: Vec<AdminInterfaceConfig>,
         handle: ConductorHandle,
-    ) -> ConductorResult<()>
-    where
-        DS: DnaStore + 'static,
-    {
+    ) -> ConductorResult<()> {
         let admin_api = RealAdminInterfaceApi::new(handle);
         let stop_tx = self.task_manager.share_ref(|tm| {
             tm.as_ref()
@@ -1087,8 +1077,8 @@ where
 /// If genesis fails for any cell, this entire function fails, and all other
 /// partial or complete successes are rolled back.
 /// Note this function takes read locks so should not be called from within a read lock.
-pub(super) async fn genesis_cells<DS: DnaStore + 'static>(
-    conductor: &Conductor<DS>,
+pub(super) async fn genesis_cells(
+    conductor: &Conductor,
     cell_ids_with_proofs: Vec<(CellId, Option<MembraneProof>)>,
     conductor_handle: ConductorHandle,
 ) -> ConductorResult<()> {
@@ -1256,13 +1246,10 @@ fn query_dht_ops_from_statement(
 // Private methods
 //-----------------------------------------------------------------------------
 
-impl<DS> Conductor<DS>
-where
-    DS: DnaStore + 'static,
-{
+impl Conductor {
     #[allow(clippy::too_many_arguments)]
     async fn new(
-        dna_store: DS,
+        dna_store: RwShare<DnaStore>,
         keystore: MetaLairClient,
         holochain_p2p: holochain_p2p::HolochainP2pRef,
         spaces: Spaces,
@@ -1275,7 +1262,7 @@ where
             app_interfaces: RwShare::new(HashMap::new()),
             task_manager: RwShare::new(None),
             admin_websocket_ports: RwShare::new(Vec::new()),
-            dna_store: RwShare::new(dna_store),
+            dna_store,
             keystore,
             holochain_p2p,
             post_commit,
@@ -1360,17 +1347,17 @@ where
 
 mod builder {
     use super::*;
-    use crate::conductor::dna_store::RealDnaStore;
+    use crate::conductor::dna_store::DnaStore;
     use crate::conductor::handle::DevSettings;
     use crate::conductor::ConductorHandle;
 
     /// A configurable Builder for Conductor and sometimes ConductorHandle
     #[derive(Default)]
-    pub struct ConductorBuilder<DS = RealDnaStore> {
+    pub struct ConductorBuilder {
         /// The configuration
         pub config: ConductorConfig,
         /// The DnaStore (mockable)
-        pub dna_store: DS,
+        pub dna_store: DnaStore,
         /// For new lair, passphrase is required
         pub passphrase: Option<sodoken::BufRead>,
         /// Optional keystore override
@@ -1390,20 +1377,7 @@ mod builder {
         }
     }
 
-    impl ConductorBuilder<MockDnaStore> {
-        /// ConductorBuilder using mocked DnaStore, for testing
-        pub fn with_mock_dna_store(dna_store: MockDnaStore) -> ConductorBuilder<MockDnaStore> {
-            Self {
-                dna_store,
-                ..Default::default()
-            }
-        }
-    }
-
-    impl<DS> ConductorBuilder<DS>
-    where
-        DS: DnaStore + 'static,
-    {
+    impl ConductorBuilder {
         /// Set the ConductorConfig used to build this Conductor
         pub fn config(mut self, config: ConductorConfig) -> Self {
             self.config = config;
@@ -1471,6 +1445,8 @@ mod builder {
             let Self {
                 dna_store, config, ..
             } = self;
+
+            let dna_store = RwShare::new(dna_store);
 
             let network_config = match &config.network {
                 None => holochain_p2p::kitsune_p2p::KitsuneP2pConfig::default(),
@@ -1608,8 +1584,8 @@ mod builder {
         #[cfg(any(test, feature = "test_utils"))]
         async fn update_fake_state(
             state: Option<ConductorState>,
-            conductor: Conductor<DS>,
-        ) -> ConductorResult<Conductor<DS>> {
+            conductor: Conductor,
+        ) -> ConductorResult<Conductor> {
             if let Some(state) = state {
                 conductor.update_state(move |_| Ok(state)).await?;
             }
@@ -1639,7 +1615,7 @@ mod builder {
             )?;
 
             let conductor = Conductor::new(
-                self.dna_store,
+                RwShare::new(self.dna_store),
                 keystore,
                 holochain_p2p,
                 spaces,

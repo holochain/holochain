@@ -232,11 +232,10 @@ pub mod test_utils {
     /// One of various ways to setup an app, used somewhere...
     pub async fn setup_app(
         cell_data: Vec<(InstalledCell, Option<SerializedBytes>)>,
-        dna_store: MockDnaStore,
     ) -> (Arc<TempDir>, RealAppInterfaceApi, ConductorHandle) {
         let db_dir = test_db_dir();
 
-        let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
+        let conductor_handle = ConductorBuilder::new()
             .test(db_dir.path(), &[])
             .await
             .unwrap();
@@ -326,10 +325,9 @@ pub mod test {
 
     async fn setup_admin_fake_cells(
         cell_ids_with_proofs: Vec<(CellId, Option<SerializedBytes>)>,
-        dna_store: MockDnaStore,
     ) -> (Arc<TempDir>, ConductorHandle) {
         let db_dir = test_db_dir();
-        let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
+        let conductor_handle = ConductorBuilder::new()
             .test(db_dir.path(), &[])
             .await
             .unwrap();
@@ -432,9 +430,7 @@ pub mod test {
         let cell_id = CellId::from((dna_hash.clone(), fake_agent_pubkey_1()));
         let installed_cell = InstalledCell::new(cell_id.clone(), "handle".into());
 
-        let dna_store = MockDnaStore::single_dna(dna, 1, 1);
-
-        let (_tmpdir, app_api, handle) = setup_app(vec![(installed_cell, None)], dna_store).await;
+        let (_tmpdir, app_api, handle) = setup_app(vec![(installed_cell, None)]).await;
         let mut request: ZomeCall =
             crate::fixt::ZomeCallInvocationFixturator::new(crate::fixt::NamedInvocation(
                 cell_id.clone(),
@@ -484,24 +480,8 @@ pub mod test {
             .cloned()
             .map(|hash| (CellId::from((hash, agent_key.clone())), None))
             .collect::<Vec<_>>();
-        let mut dna_store = MockDnaStore::new();
-        let dna_map_clone = dna_map.clone();
-        dna_store
-            .expect_get_dna_file()
-            .returning(move |hash| dna_map_clone.get(&hash).cloned());
-        dna_store
-            .expect_get_dna_def()
-            .returning(move |hash| dna_map.get(&hash).map(|d| d.dna_def()).cloned());
-        dna_store
-            .expect_add_dnas::<Vec<_>>()
-            .times(1)
-            .return_const(());
-        dna_store
-            .expect_add_entry_defs::<Vec<_>>()
-            .times(1)
-            .return_const(());
-        let (_tmpdir, conductor_handle) =
-            setup_admin_fake_cells(cell_ids_with_proofs, dna_store).await;
+
+        let (_tmpdir, conductor_handle) = setup_admin_fake_cells(cell_ids_with_proofs).await;
         let shutdown = conductor_handle.take_shutdown_handle().unwrap();
         let app_id = "test app".to_string();
 
@@ -631,10 +611,8 @@ pub mod test {
         );
         let cell_id = CellId::from((dna.dna_hash().clone(), fake_agent_pubkey_1()));
 
-        let dna_store = MockDnaStore::single_dna(dna, 1, 1);
-
         let (_tmpdir, conductor_handle) =
-            setup_admin_fake_cells(vec![(cell_id.clone(), None)], dna_store).await;
+            setup_admin_fake_cells(vec![(cell_id.clone(), None)]).await;
         let conductor_handle = activate(conductor_handle).await;
         let shutdown = conductor_handle.take_shutdown_handle().unwrap();
         // Allow agents time to join

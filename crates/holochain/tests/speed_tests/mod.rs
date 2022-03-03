@@ -170,13 +170,10 @@ async fn speed_test(n: Option<usize>) -> TempDir {
     // START CONDUCTOR
     // ///////////////
 
-    let mut dna_store = MockDnaStore::single_dna(dna_file, 2, 2);
-    dna_store.expect_get_entry_def().return_const(None);
-
-    let (test_db, _app_api, handle) = setup_app(
-        vec![(alice_installed_cell, None), (bob_installed_cell, None)],
-        dna_store,
-    )
+    let (test_db, _app_api, handle) = setup_app(vec![
+        (alice_installed_cell, None),
+        (bob_installed_cell, None),
+    ])
     .await;
 
     // Setup websocket handle and app interface
@@ -297,11 +294,10 @@ async fn speed_test(n: Option<usize>) -> TempDir {
 
 pub async fn setup_app(
     cell_data: Vec<(InstalledCell, Option<SerializedBytes>)>,
-    dna_store: MockDnaStore,
 ) -> (TempDir, RealAppInterfaceApi, ConductorHandle) {
     let db_dir = test_db_dir();
 
-    let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
+    let conductor_handle = ConductorBuilder::new()
         .config(ConductorConfig {
             admin_interfaces: Some(vec![AdminInterfaceConfig {
                 driver: InterfaceDriver::Websocket { port: 0 },

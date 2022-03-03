@@ -92,13 +92,10 @@ async fn ser_regression_test() {
     // START CONDUCTOR
     // ///////////////
 
-    let mut dna_store = MockDnaStore::single_dna(dna_file, 2, 2);
-    dna_store.expect_get_entry_def().return_const(None);
-
-    let (_tmpdir, app_api, handle) = setup_app(
-        vec![(alice_installed_cell, None), (bob_installed_cell, None)],
-        dna_store,
-    )
+    let (_tmpdir, app_api, handle) = setup_app(vec![
+        (alice_installed_cell, None),
+        (bob_installed_cell, None),
+    ])
     .await;
 
     // /////////////
@@ -170,10 +167,9 @@ async fn ser_regression_test() {
 
 pub async fn setup_app(
     cell_data: Vec<(InstalledCell, Option<SerializedBytes>)>,
-    dna_store: MockDnaStore,
 ) -> (TempDir, RealAppInterfaceApi, ConductorHandle) {
     let db_dir = test_db_dir();
-    let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
+    let conductor_handle = ConductorBuilder::new()
         .test(db_dir.path(), &[])
         .await
         .unwrap();
