@@ -626,12 +626,6 @@ async fn handle_events(
                         .boxed()
                         .into()));
                 }
-                event::KitsuneP2pEvent::GetAgentInfoSigned { respond, input, .. } => {
-                    respond.r(Ok(handle_get_agent_info_signed(kdirect.clone(), input)
-                        .map_err(KitsuneP2pError::other)
-                        .boxed()
-                        .into()));
-                }
                 event::KitsuneP2pEvent::QueryAgents { respond, input, .. } => {
                     respond.r(Ok(handle_query_agents(kdirect.clone(), input)
                         .map_err(KitsuneP2pError::other)
@@ -736,21 +730,6 @@ async fn handle_put_agent_info_signed(
     }
 
     Ok(())
-}
-
-async fn handle_get_agent_info_signed(
-    kdirect: Arc<Kd1>,
-    input: GetAgentInfoSignedEvt,
-) -> KdResult<Option<AgentInfoSigned>> {
-    let GetAgentInfoSignedEvt { space, agent } = input;
-
-    let root = KdHash::from_kitsune_space(&space);
-    let agent = KdHash::from_kitsune_agent(&agent);
-
-    Ok(match kdirect.persist.get_agent_info(root, agent).await {
-        Ok(i) => Some(i.to_kitsune()),
-        Err(_) => None,
-    })
 }
 
 async fn handle_query_agents(

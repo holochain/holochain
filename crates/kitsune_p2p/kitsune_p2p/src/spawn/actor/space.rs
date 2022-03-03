@@ -1055,6 +1055,7 @@ pub(crate) struct SpaceReadOnlyInner {
     #[allow(dead_code)]
     pub(crate) i_s: ghost_actor::GhostSender<SpaceInternal>,
     pub(crate) evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
+    pub(crate) host_api: HostApi,
     pub(crate) ep_hnd: Tx2EpHnd<wire::Wire>,
     #[allow(dead_code)]
     pub(crate) config: Arc<KitsuneP2pConfig>,
@@ -1070,6 +1071,7 @@ pub(crate) struct Space {
     pub(crate) space: Arc<KitsuneSpace>,
     pub(crate) i_s: ghost_actor::GhostSender<SpaceInternal>,
     pub(crate) evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
+    pub(crate) _host_api: HostApi,
     pub(crate) local_joined_agents: HashSet<Arc<KitsuneAgent>>,
     pub(crate) agent_arcs: HashMap<Arc<KitsuneAgent>, DhtArc>,
     pub(crate) config: Arc<KitsuneP2pConfig>,
@@ -1085,7 +1087,7 @@ impl Space {
         space: Arc<KitsuneSpace>,
         i_s: ghost_actor::GhostSender<SpaceInternal>,
         evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
-        host: HostApi,
+        host_api: HostApi,
         ep_hnd: Tx2EpHnd<wire::Wire>,
         config: Arc<KitsuneP2pConfig>,
         bandwidth_throttles: BandwidthThrottles,
@@ -1096,7 +1098,7 @@ impl Space {
         {
             let space = space.clone();
             let metrics = metrics.clone();
-            let host = host.clone();
+            let host = host_api.clone();
             tokio::task::spawn(async move {
                 loop {
                     tokio::time::sleep(std::time::Duration::from_millis(
@@ -1114,7 +1116,7 @@ impl Space {
         let metric_exchange = MetricExchangeSync::spawn(
             space.clone(),
             config.tuning_params.clone(),
-            host.clone(),
+            host_api.clone(),
             metrics.clone(),
         );
 
@@ -1148,7 +1150,7 @@ impl Space {
                         space.clone(),
                         ep_hnd.clone(),
                         evt_sender.clone(),
-                        host.clone(),
+                        host_api.clone(),
                         metrics.clone(),
                     ),
                 )
@@ -1237,6 +1239,7 @@ impl Space {
             space: space.clone(),
             i_s: i_s.clone(),
             evt_sender: evt_sender.clone(),
+            host_api: host_api.clone(),
             ep_hnd,
             config: config.clone(),
             parallel_notify_permit,
@@ -1249,6 +1252,7 @@ impl Space {
             space,
             i_s,
             evt_sender,
+            _host_api: host_api,
             local_joined_agents: HashSet::new(),
             agent_arcs: HashMap::new(),
             config,

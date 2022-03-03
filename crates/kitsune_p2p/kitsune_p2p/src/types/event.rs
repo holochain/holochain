@@ -225,9 +225,6 @@ ghost_actor::ghost_chan! {
         fn put_agent_info_signed(input: PutAgentInfoSignedEvt) -> ();
 
         /// We need to get previously stored agent info.
-        fn get_agent_info_signed(input: GetAgentInfoSignedEvt) -> Option<crate::types::agent_store::AgentInfoSigned>;
-
-        /// We need to get previously stored agent info.
         fn query_agents(input: QueryAgentsEvt) -> Vec<crate::types::agent_store::AgentInfoSigned>;
 
         /// Query the peer density of a space for a given [`DhtArc`].

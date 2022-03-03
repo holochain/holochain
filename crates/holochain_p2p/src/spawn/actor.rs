@@ -576,25 +576,6 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
         )
     }
 
-    /// We need to get previously stored agent info.
-    #[tracing::instrument(skip(self), level = "trace")]
-    fn handle_get_agent_info_signed(
-        &mut self,
-        input: kitsune_p2p::event::GetAgentInfoSignedEvt,
-    ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<Option<AgentInfoSigned>> {
-        let kitsune_p2p::event::GetAgentInfoSignedEvt { space, agent } = input;
-        let h_space = DnaHash::from_kitsune(&space);
-        let h_agent = AgentPubKey::from_kitsune(&agent);
-        let evt_sender = self.evt_sender.clone();
-        Ok(async move {
-            Ok(evt_sender
-                .get_agent_info_signed(h_space, h_agent, space, agent)
-                .await?)
-        }
-        .boxed()
-        .into())
-    }
-
     /// We need to get previously stored agent info. A single kitusne agent query
     /// can take one of three Holochain agent query paths. We do "duck typing"
     /// on the query object to determine which query path to take. The reason for

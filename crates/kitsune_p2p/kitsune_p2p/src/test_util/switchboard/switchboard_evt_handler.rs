@@ -57,20 +57,6 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
         ok_fut(Ok(()))
     }
 
-    fn handle_get_agent_info_signed(
-        &mut self,
-        GetAgentInfoSignedEvt { space, agent }: GetAgentInfoSignedEvt,
-    ) -> KitsuneP2pEventHandlerResult<Option<crate::types::agent_store::AgentInfoSigned>> {
-        ok_fut(Ok(self.sb.share(|state| {
-            let node = state.nodes.get_mut(&self.node).unwrap();
-            let loc = agent.get_loc().as_loc8();
-            node.local_agents
-                .get(&loc)
-                .map(|e| e.info.to_owned())
-                .or_else(|| node.remote_agents.get(&loc).cloned())
-        })))
-    }
-
     fn handle_query_agents(
         &mut self,
         QueryAgentsEvt {

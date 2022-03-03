@@ -222,10 +222,12 @@ impl KitsuneP2pActor {
         let i_s = internal_sender.clone();
         tokio::task::spawn({
             let evt_sender = evt_sender.clone();
+            let host = host.clone();
             let tuning_params = config.tuning_params.clone();
             async move {
                 ep.for_each_concurrent(tuning_params.concurrent_limit_per_thread, move |event| {
                     let evt_sender = evt_sender.clone();
+                    let host = host.clone();
                     let tuning_params = tuning_params.clone();
                     let i_s = i_s.clone();
                     async move {
@@ -283,7 +285,7 @@ impl KitsuneP2pActor {
                                         resp!(respond, resp);
                                     }
                                     wire::Wire::PeerGet(wire::PeerGet { space, agent }) => {
-                                        if let Ok(Some(agent_info_signed)) = evt_sender
+                                        if let Ok(Some(agent_info_signed)) = host
                                             .get_agent_info_signed(GetAgentInfoSignedEvt {
                                                 space,
                                                 agent,
@@ -624,13 +626,6 @@ impl KitsuneP2pEventHandler for KitsuneP2pActor {
         Ok(self.evt_sender.put_agent_info_signed(input))
     }
 
-    fn handle_get_agent_info_signed(
-        &mut self,
-        input: crate::event::GetAgentInfoSignedEvt,
-    ) -> KitsuneP2pEventHandlerResult<Option<crate::types::agent_store::AgentInfoSigned>> {
-        Ok(self.evt_sender.get_agent_info_signed(input))
-    }
-
     fn handle_query_agents(
         &mut self,
         input: crate::event::QueryAgentsEvt,
@@ -918,11 +913,6 @@ mockall::mock! {
             &mut self,
             input: crate::event::PutAgentInfoSignedEvt,
         ) -> KitsuneP2pEventHandlerResult<()>;
-
-        fn handle_get_agent_info_signed(
-            &mut self,
-            input: crate::event::GetAgentInfoSignedEvt,
-        ) -> KitsuneP2pEventHandlerResult<Option<crate::types::agent_store::AgentInfoSigned>>;
 
         fn handle_query_agents(
             &mut self,
