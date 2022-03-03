@@ -154,9 +154,9 @@ jobs:
             restoresCargoCache: true
             savesCargoCache: true
             ignoreErrorOnNonUbuntu: true
-            timeout_minutes: 10
+            timeout_minutes: 8
             max_attempts:
-              ubuntu-latest: 12
+              ubuntu-latest: 24
               macos-latest: 1
             run: |
               # RUST_TEST_THREADS=1 \
