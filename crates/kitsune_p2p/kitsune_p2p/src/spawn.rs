@@ -1,5 +1,6 @@
 use crate::actor::*;
 use crate::event::*;
+use crate::HostApi;
 
 mod actor;
 use actor::*;
@@ -11,6 +12,7 @@ pub use actor::MockKitsuneP2pEventHandler;
 pub async fn spawn_kitsune_p2p(
     config: crate::KitsuneP2pConfig,
     tls_config: kitsune_p2p_types::tls::TlsConfig,
+    host: HostApi,
 ) -> KitsuneP2pResult<(
     ghost_actor::GhostSender<KitsuneP2p>,
     KitsuneP2pEventReceiver,
@@ -32,6 +34,7 @@ pub async fn spawn_kitsune_p2p(
                 channel_factory,
                 internal_sender,
                 evt_send,
+                host,
             )
             .await?,
         ),

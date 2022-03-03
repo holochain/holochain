@@ -30,17 +30,18 @@ use holochain_serialized_bytes::SerializedBytes;
 use holochain_serialized_bytes::SerializedBytesError;
 use holochain_sqlite::prelude::DatabaseResult;
 use holochain_state::prelude::from_blob;
-use holochain_state::prelude::test_environments;
+use holochain_state::prelude::test_env_dir;
 use holochain_state::prelude::SourceChainResult;
 use holochain_state::prelude::StateQueryResult;
 use holochain_state::source_chain;
 use holochain_state::test_utils::fresh_reader_test;
-use holochain_state::test_utils::TestEnvs;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 use kitsune_p2p::KitsuneP2pConfig;
 use rusqlite::named_params;
+use std::path::Path;
 use std::time::Duration;
+use tempfile::TempDir;
 use tokio::sync::mpsc;
 
 pub use itertools;
@@ -207,6 +208,7 @@ where
         )
         .await
         .unwrap(),
+        kitsune_p2p::HostStub::new(),
     )
     .await
     .unwrap();
@@ -293,8 +295,10 @@ pub type InstalledCellsWithProofs = Vec<(InstalledCell, Option<SerializedBytes>)
 pub async fn setup_app(
     apps_data: Vec<(&str, InstalledCellsWithProofs)>,
     dnas: Vec<DnaFile>,
-) -> (TestEnvs, RealAppInterfaceApi, ConductorHandle) {
-    setup_app_inner(test_environments(), apps_data, dnas, None).await
+) -> (TempDir, RealAppInterfaceApi, ConductorHandle) {
+    let dir = test_env_dir();
+    let (iface, handle) = setup_app_inner(dir.path(), apps_data, dnas, None).await;
+    (dir, iface, handle)
 }
 
 /// Setup an app with a custom network config for testing
@@ -303,17 +307,19 @@ pub async fn setup_app_with_network(
     apps_data: Vec<(&str, InstalledCellsWithProofs)>,
     dnas: Vec<DnaFile>,
     network: KitsuneP2pConfig,
-) -> (TestEnvs, RealAppInterfaceApi, ConductorHandle) {
-    setup_app_inner(test_environments(), apps_data, dnas, Some(network)).await
+) -> (TempDir, RealAppInterfaceApi, ConductorHandle) {
+    let dir = test_env_dir();
+    let (iface, handle) = setup_app_inner(dir.path(), apps_data, dnas, Some(network)).await;
+    (dir, iface, handle)
 }
 
 /// Setup an app with full configurability
 pub async fn setup_app_inner(
-    envs: TestEnvs,
+    envs: &Path,
     apps_data: Vec<(&str, InstalledCellsWithProofs)>,
     dnas: Vec<DnaFile>,
     network: Option<KitsuneP2pConfig>,
-) -> (TestEnvs, RealAppInterfaceApi, ConductorHandle) {
+) -> (RealAppInterfaceApi, ConductorHandle) {
     let conductor_handle = ConductorBuilder::new()
         .config(ConductorConfig {
             admin_interfaces: Some(vec![AdminInterfaceConfig {
@@ -322,7 +328,7 @@ pub async fn setup_app_inner(
             network,
             ..Default::default()
         })
-        .test(&envs, &[])
+        .test(envs, &[])
         .await
         .unwrap();
 
@@ -332,7 +338,7 @@ pub async fn setup_app_inner(
 
     let handle = conductor_handle.clone();
 
-    (envs, RealAppInterfaceApi::new(conductor_handle), handle)
+    (RealAppInterfaceApi::new(conductor_handle), handle)
 }
 
 /// If HC_WASM_CACHE_PATH is set warm the cache

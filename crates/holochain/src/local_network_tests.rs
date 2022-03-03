@@ -16,13 +16,13 @@ use holo_hash::AgentPubKey;
 use holo_hash::HeaderHash;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_serialized_bytes::SerializedBytes;
-use holochain_state::prelude::TestEnvs;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::ZomeCallResponse;
 use kitsune_p2p::KitsuneP2pConfig;
 use matches::assert_matches;
 use shrinkwraprs::Shrinkwrap;
+use tempfile::TempDir;
 use test_case::test_case;
 use tokio_helper;
 use tracing::debug_span;
@@ -423,7 +423,7 @@ struct TestHandle {
     #[shrinkwrap(main_field)]
     handle: ConductorHandle,
     cell_id: CellId,
-    _envs: Arc<TestEnvs>,
+    _envs: Arc<TempDir>,
 }
 
 impl TestHandle {

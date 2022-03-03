@@ -86,7 +86,7 @@ fn test_env<Kind: DbKindT>(kind: Kind) -> TestEnv<Kind> {
         .tempdir()
         .unwrap();
     TestEnv {
-        env: DbWrite::test(&tmpdir, kind).expect("Couldn't create test database"),
+        env: DbWrite::test(tmpdir.path(), kind).expect("Couldn't create test database"),
         tmpdir,
     }
 }
@@ -96,24 +96,13 @@ pub fn test_in_mem_db<Kind: DbKindT>(kind: Kind) -> DbWrite<Kind> {
     DbWrite::test_in_mem(kind).expect("Couldn't create test database")
 }
 
-/// Create a fresh set of test environments with a new TempDir and custom MetaLairClient
-pub fn test_envs_with_keystore(keystore: MetaLairClient) -> TestEnvs {
-    let tempdir = tempfile::Builder::new()
-        .prefix("holochain-test-environments")
-        .suffix(&nanoid::nanoid!())
-        .tempdir()
-        .unwrap();
-    TestEnvs::with_keystore(tempdir, keystore)
-}
-
 /// Create a fresh set of test environments with a new TempDir
-pub fn test_environments() -> TestEnvs {
-    let tempdir = tempfile::Builder::new()
+pub fn test_env_dir() -> TempDir {
+    tempfile::Builder::new()
         .prefix("holochain-test-environments")
         .suffix(&nanoid::nanoid!())
         .tempdir()
-        .unwrap();
-    TestEnvs::new(tempdir)
+        .unwrap()
 }
 
 /// Create a fresh set of test environments with a new TempDir in a given directory.
@@ -241,8 +230,8 @@ pub struct TestEnvs {
 impl TestEnvs {
     /// Create all three non-cell environments at once with a custom keystore
     pub fn with_keystore(tempdir: TempDir, keystore: MetaLairClient) -> Self {
-        let conductor = DbWrite::test(&tempdir, DbKindConductor).unwrap();
-        let wasm = DbWrite::test(&tempdir, DbKindWasm).unwrap();
+        let conductor = DbWrite::test(tempdir.path(), DbKindConductor).unwrap();
+        let wasm = DbWrite::test(tempdir.path(), DbKindWasm).unwrap();
         let p2p = Arc::new(parking_lot::Mutex::new(HashMap::new()));
         let p2p_metrics = Arc::new(parking_lot::Mutex::new(HashMap::new()));
         Self {

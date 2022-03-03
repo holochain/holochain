@@ -15,13 +15,14 @@ use holochain_keystore::MetaLairClient;
 use holochain_p2p::actor::HolochainP2pRefToDna;
 use holochain_p2p::HolochainP2pDna;
 use holochain_serialized_bytes::SerializedBytes;
-use holochain_state::{prelude::test_environments, test_utils::TestEnvs};
+use holochain_state::prelude::test_env_dir;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 use kitsune_p2p::KitsuneP2pConfig;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::convert::TryFrom;
+use tempfile::TempDir;
 
 /// A "factory" for HostFnCaller, which will produce them when given a ZomeName
 pub struct CellHostFnCaller {
@@ -85,14 +86,14 @@ impl CellHostFnCaller {
 /// Everything you need to run a test that uses the conductor
 // TODO: rewrite as sweettests if possible
 pub struct ConductorTestData {
-    _envs: TestEnvs,
+    _envs: TempDir,
     handle: ConductorHandle,
     cell_apis: BTreeMap<CellId, CellHostFnCaller>,
 }
 
 impl ConductorTestData {
     pub async fn new(
-        envs: TestEnvs,
+        envs: TempDir,
         dna_files: Vec<DnaFile>,
         agents: Vec<AgentPubKey>,
         network_config: KitsuneP2pConfig,
@@ -114,8 +115,8 @@ impl ConductorTestData {
             cell_id_by_dna_file.push((dna_file, cell_ids));
         }
 
-        let (_envs, _app_api, handle) = setup_app_inner(
-            envs,
+        let (_app_api, handle) = setup_app_inner(
+            envs.path(),
             vec![("test_app", cells)],
             dna_files.clone(),
             Some(network_config),
@@ -134,7 +135,7 @@ impl ConductorTestData {
         }
 
         let this = Self {
-            _envs,
+            _envs: envs,
             // app_api,
             handle,
             cell_apis,
@@ -184,7 +185,7 @@ impl ConductorTestData {
         }
 
         let (this, _) = Self::new(
-            test_environments(),
+            test_env_dir(),
             vec![dna_file],
             agents,
             network.unwrap_or_default(),

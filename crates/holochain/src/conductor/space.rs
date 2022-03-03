@@ -10,8 +10,8 @@ use holochain_p2p::dht_arc::{ArcInterval, DhtArcSet};
 use holochain_sqlite::{
     conn::{DbSyncLevel, DbSyncStrategy},
     db::{
-        DbKindAuthored, DbKindCache, DbKindDht, DbKindP2pAgentStore, DbKindP2pMetrics, DbWrite,
-        ReadAccess,
+        DbKindAuthored, DbKindCache, DbKindConductor, DbKindDht, DbKindP2pAgentStore,
+        DbKindP2pMetrics, DbKindWasm, DbWrite, ReadAccess,
     },
     prelude::DatabaseResult,
 };
@@ -52,6 +52,8 @@ pub struct Spaces {
     pub(crate) db_sync_strategy: DbSyncStrategy,
     /// The map of running queue consumer workflows.
     pub(crate) queue_consumer_map: QueueConsumerMap,
+    pub(crate) conductor_env: DbWrite<DbKindConductor>,
+    pub(crate) wasm_env: DbWrite<DbKindWasm>,
 }
 
 #[derive(Clone)]
@@ -111,13 +113,26 @@ pub struct TestSpace {
 
 impl Spaces {
     /// Create a new empty set of [`DnaHash`] spaces.
-    pub fn new(root_env_dir: EnvironmentRootPath, db_sync_strategy: DbSyncStrategy) -> Self {
-        Spaces {
+    pub fn new(
+        root_env_dir: EnvironmentRootPath,
+        db_sync_strategy: DbSyncStrategy,
+    ) -> ConductorResult<Self> {
+        let db_sync_level = match db_sync_strategy {
+            DbSyncStrategy::Fast => DbSyncLevel::Off,
+            DbSyncStrategy::Resilient => DbSyncLevel::Normal,
+        };
+        let conductor_env =
+            DbWrite::open_with_sync_level(root_env_dir.as_ref(), DbKindConductor, db_sync_level)?;
+        let wasm_env =
+            DbWrite::open_with_sync_level(root_env_dir.as_ref(), DbKindWasm, db_sync_level)?;
+        Ok(Spaces {
             map: RwShare::new(HashMap::new()),
             root_env_dir: Arc::new(root_env_dir),
             db_sync_strategy,
             queue_consumer_map: QueueConsumerMap::new(),
-        }
+            conductor_env,
+            wasm_env,
+        })
     }
 
     /// Get something from every space
@@ -419,13 +434,14 @@ impl Space {
     ) -> ConductorResult<Self> {
         use holochain_p2p::DnaHashExt;
         let space = dna_hash.to_kitsune();
+        let db_sync_level = match db_sync_strategy {
+            DbSyncStrategy::Fast => DbSyncLevel::Off,
+            DbSyncStrategy::Resilient => DbSyncLevel::Normal,
+        };
         let cache = DbWrite::open_with_sync_level(
             root_env_dir.as_ref(),
             DbKindCache(dna_hash.clone()),
-            match db_sync_strategy {
-                DbSyncStrategy::Fast => DbSyncLevel::Off,
-                DbSyncStrategy::Resilient => DbSyncLevel::Normal,
-            },
+            db_sync_level,
         )?;
         let authored_env = DbWrite::open_with_sync_level(
             root_env_dir.as_ref(),
@@ -435,26 +451,17 @@ impl Space {
         let dht_env = DbWrite::open_with_sync_level(
             root_env_dir.as_ref(),
             DbKindDht(dna_hash.clone()),
-            match db_sync_strategy {
-                DbSyncStrategy::Fast => DbSyncLevel::Off,
-                DbSyncStrategy::Resilient => DbSyncLevel::Normal,
-            },
+            db_sync_level,
         )?;
         let p2p_env = DbWrite::open_with_sync_level(
             root_env_dir.as_ref(),
             DbKindP2pAgentStore(space.clone()),
-            match db_sync_strategy {
-                DbSyncStrategy::Fast => DbSyncLevel::Off,
-                DbSyncStrategy::Resilient => DbSyncLevel::Normal,
-            },
+            db_sync_level,
         )?;
         let p2p_metrics_env = DbWrite::open_with_sync_level(
             root_env_dir.as_ref(),
             DbKindP2pMetrics(space),
-            match db_sync_strategy {
-                DbSyncStrategy::Fast => DbSyncLevel::Off,
-                DbSyncStrategy::Resilient => DbSyncLevel::Normal,
-            },
+            db_sync_level,
         )?;
 
         let (tx, rx) = tokio::sync::mpsc::channel(100);
@@ -501,7 +508,7 @@ impl TestSpaces {
             .prefix("holochain-test-environments")
             .tempdir()
             .unwrap();
-        let spaces = Spaces::new(temp_dir.path().to_path_buf().into(), Default::default());
+        let spaces = Spaces::new(temp_dir.path().to_path_buf().into(), Default::default()).unwrap();
         spaces.map.share_mut(|map| {
             map.extend(
                 test_spaces
