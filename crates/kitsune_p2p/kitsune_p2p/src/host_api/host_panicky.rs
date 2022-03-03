@@ -4,12 +4,18 @@ use super::*;
 /// Allows only specifying the methods you care about, and letting all the rest
 /// panic if called
 pub trait KitsuneHostPanicky: KitsuneHost {
+    /// Name to be printed out on unimplemented panic
+    const NAME: &'static str;
+
     /// We need to get previously stored agent info.
     fn get_agent_info_signed(
         &self,
         _input: GetAgentInfoSignedEvt,
     ) -> KitsuneHostResult<Option<crate::types::agent_store::AgentInfoSigned>> {
-        unimplemented!("default panic for unimplemented KitsuneHost test behavior")
+        unimplemented!(
+            "default panic for unimplemented KitsuneHost test behavior: {}",
+            Self::NAME
+        )
     }
 
     /// Extrapolated Peer Coverage
@@ -18,7 +24,10 @@ pub trait KitsuneHostPanicky: KitsuneHost {
         _space: Arc<KitsuneSpace>,
         _dht_arc_set: DhtArcSet,
     ) -> KitsuneHostResult<Vec<f64>> {
-        unimplemented!("default panic for unimplemented KitsuneHost test behavior")
+        unimplemented!(
+            "default panic for unimplemented KitsuneHost test behavior: {}",
+            Self::NAME
+        )
     }
 
     /// Record a set of metric records
@@ -27,7 +36,10 @@ pub trait KitsuneHostPanicky: KitsuneHost {
         _space: Arc<KitsuneSpace>,
         _records: Vec<MetricRecord>,
     ) -> KitsuneHostResult<()> {
-        unimplemented!("default panic for unimplemented KitsuneHost test behavior")
+        unimplemented!(
+            "default panic for unimplemented KitsuneHost test behavior: {}",
+            Self::NAME
+        )
     }
 }
 

@@ -9,6 +9,8 @@ pub struct StandardResponsesHostApi {
 }
 
 impl KitsuneHostPanicky for StandardResponsesHostApi {
+    const NAME: &'static str = "StandardResponsesHostApi";
+
     fn get_agent_info_signed(
         &self,
         input: GetAgentInfoSignedEvt,
