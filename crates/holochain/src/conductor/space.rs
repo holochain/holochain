@@ -10,7 +10,7 @@ use holochain_p2p::{
     dht::{
         arq::{power_and_count_from_length, ArqBoundsSet},
         hash::RegionHash,
-        quantum::{TelescopingTimes, TimeQuantum, Topology},
+        quantum::{TelescopingTimes, TimeQuantum},
         region::{RegionBounds, RegionCoordSetXtcs, RegionData, RegionSetXtcs},
         ArqBounds, ArqStrat,
     },
@@ -23,14 +23,17 @@ use holochain_sqlite::{
         DbKindAuthored, DbKindCache, DbKindConductor, DbKindDht, DbKindP2pAgentStore,
         DbKindP2pMetrics, DbKindWasm, DbWrite, ReadAccess,
     },
-    prelude::DatabaseResult,
+    prelude::{DatabaseError, DatabaseResult},
 };
-use holochain_state::prelude::{from_blob, StateQueryResult};
+use holochain_state::{
+    prelude::{from_blob, StateQueryResult},
+    query::{map_sql_dht_op_common, StateQueryError},
+};
 use holochain_types::{
     db_cache::DhtDbQueryCache,
     dht_op::{DhtOp, DhtOpType},
 };
-use holochain_zome_types::{Entry, EntryVisibility, SignedHeader, Timestamp};
+use holochain_zome_types::{DnaDefHashed, Entry, EntryVisibility, SignedHeader, Timestamp};
 use kitsune_p2p::event::{TimeWindow, TimeWindowInclusive};
 use rusqlite::named_params;
 use tracing::instrument;
@@ -56,10 +59,8 @@ use std::convert::TryInto;
 /// This is the set of all current
 /// [`DnaHash`] spaces for all cells
 /// installed on this conductor.
-pub struct Spaces<DS: DnaStore> {
+pub struct Spaces {
     map: RwShare<HashMap<DnaHash, Space>>,
-    // TODO: why is the dna store here again?
-    dna_store: RwShare<DS>,
     pub(crate) root_env_dir: Arc<EnvironmentRootPath>,
     pub(crate) db_sync_strategy: DbSyncStrategy,
     /// The map of running queue consumer workflows.
@@ -109,14 +110,11 @@ pub struct Space {
 
     /// Incoming ops batch for this space.
     pub incoming_ops_batch: IncomingOpsBatch,
-
-    /// The topology of this Space(time), determines quantization parameters.
-    pub topology: Topology,
 }
 
 #[cfg(test)]
-pub struct TestSpaces<DS: DnaStore> {
-    pub spaces: Spaces<DS>,
+pub struct TestSpaces {
+    pub spaces: Spaces,
     pub test_spaces: HashMap<DnaHash, TestSpace>,
     pub queue_consumer_map: QueueConsumerMap,
 }
@@ -126,11 +124,10 @@ pub struct TestSpace {
     _temp_dir: tempfile::TempDir,
 }
 
-impl<DS: DnaStore> Spaces<DS> {
+impl Spaces {
     /// Create a new empty set of [`DnaHash`] spaces.
     pub fn new(
         root_env_dir: EnvironmentRootPath,
-        dna_store: RwShare<DS>,
         db_sync_strategy: DbSyncStrategy,
     ) -> ConductorResult<Self> {
         let db_sync_level = match db_sync_strategy {
@@ -143,7 +140,6 @@ impl<DS: DnaStore> Spaces<DS> {
             DbWrite::open_with_sync_level(root_env_dir.as_ref(), DbKindWasm, db_sync_level)?;
         Ok(Spaces {
             map: RwShare::new(HashMap::new()),
-            dna_store,
             root_env_dir: Arc::new(root_env_dir),
             db_sync_strategy,
             queue_consumer_map: QueueConsumerMap::new(),
@@ -174,16 +170,10 @@ impl<DS: DnaStore> Spaces<DS> {
                 .share_mut(|spaces| match spaces.entry(dna_hash.clone()) {
                     std::collections::hash_map::Entry::Occupied(entry) => Ok(f(entry.get())),
                     std::collections::hash_map::Entry::Vacant(entry) => {
-                        let dna_def = self.dna_store.share_ref(|s| {
-                            s.get_dna_def(dna_hash)
-                                .ok_or_else(|| DnaError::DnaMissing(dna_hash.clone()))
-                        })?;
-                        let topology = Topology::standard(dna_def.origin_time.into());
                         let space = Space::new(
                             Arc::new(dna_hash.clone()),
                             &self.root_env_dir,
                             self.db_sync_strategy,
-                            topology,
                         )?;
 
                         let r = f(&space);
@@ -327,15 +317,14 @@ impl<DS: DnaStore> Spaces<DS> {
     /// The network module needs info about various groupings ("regions") of ops
     pub async fn handle_fetch_op_regions(
         &self,
-        dna_hash: &DnaHash,
+        dna_def: &DnaDefHashed,
         // author: AgentPubKey,
         dht_arc_set: DhtArcSet,
     ) -> ConductorResult<RegionSetXtcs> {
+        use holo_hash::HasHash;
+        let dna_hash = dna_def.as_hash();
         let sql = holochain_sqlite::sql::sql_cell::FETCH_OP_REGION;
-        let topology = self
-            .map
-            .share_ref(|m| Some(m.get(dna_hash)?.topology.clone()))
-            .ok_or_else(|| ConductorError::other("Space missing".to_string()))?;
+        let topology = dna_def.topology();
         let max_chunks = ArqStrat::default().max_chunks();
         let arq_set = ArqBoundsSet::new(
             dht_arc_set
@@ -586,7 +575,6 @@ impl Space {
         dna_hash: Arc<DnaHash>,
         root_env_dir: &EnvironmentRootPath,
         db_sync_strategy: DbSyncStrategy,
-        topology: Topology,
     ) -> ConductorResult<Self> {
         use holochain_p2p::DnaHashExt;
         let space = dna_hash.to_kitsune();
@@ -640,22 +628,20 @@ impl Space {
             incoming_op_hashes,
             incoming_ops_batch,
             dht_query_cache,
-            topology,
         };
         Ok(r)
     }
 }
 
 #[cfg(test)]
-impl<DS: DnaStore> TestSpaces<DS> {
-    pub fn new(dna_hashes: impl IntoIterator<Item = DnaHash>, dna_store: RwShare<DS>) -> Self {
+impl TestSpaces {
+    pub fn new(dna_hashes: impl IntoIterator<Item = DnaHash>) -> Self {
         let queue_consumer_map = QueueConsumerMap::new();
-        Self::with_queue_consumer(dna_hashes, dna_store, queue_consumer_map)
+        Self::with_queue_consumer(dna_hashes, queue_consumer_map)
     }
 
     pub fn with_queue_consumer(
         dna_hashes: impl IntoIterator<Item = DnaHash>,
-        dna_store: RwShare<DS>,
         queue_consumer_map: QueueConsumerMap,
     ) -> Self {
         let mut test_spaces: HashMap<DnaHash, _> = HashMap::new();
@@ -666,12 +652,7 @@ impl<DS: DnaStore> TestSpaces<DS> {
             .prefix("holochain-test-environments")
             .tempdir()
             .unwrap();
-        let spaces = Spaces::new(
-            temp_dir.path().to_path_buf().into(),
-            Default::default(),
-            dna_store,
-        )
-        .unwrap();
+        let spaces = Spaces::new(temp_dir.path().to_path_buf().into(), Default::default()).unwrap();
         spaces.map.share_mut(|map| {
             map.extend(
                 test_spaces
@@ -700,7 +681,6 @@ impl TestSpace {
                 Arc::new(dna_hash),
                 &temp_dir.path().to_path_buf().into(),
                 Default::default(),
-                Topology::standard(Timestamp::now()),
             )
             .unwrap(),
             _temp_dir: temp_dir,

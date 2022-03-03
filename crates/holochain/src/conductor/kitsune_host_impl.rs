@@ -80,4 +80,12 @@ impl KitsuneHost for KitsuneHostImpl {
         .boxed()
         .into()
     }
+
+    fn query_region_set(
+        &self,
+        space: &kitsune_p2p::KitsuneSpace,
+        dht_arc_set: &holochain_p2p::dht_arc::DhtArcSet,
+    ) -> KitsuneHostResult<holochain_p2p::dht::region::RegionSetXtcs> {
+        todo!()
+    }
 }

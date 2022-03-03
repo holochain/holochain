@@ -2438,6 +2438,7 @@ dependencies = [
  "holo_hash",
  "holochain_serialized_bytes",
  "holochain_wasmer_common",
+ "kitsune_p2p_dht",
  "kitsune_p2p_timestamp",
  "matches",
  "nanoid 0.3.0",

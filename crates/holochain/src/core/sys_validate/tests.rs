@@ -422,7 +422,7 @@ async fn incoming_ops_filters_private_entry() {
     let dna = fixt!(DnaFile);
     let dna_hash = dna.dna_hash().clone();
     let ds = MockDnaStore::single_dna(dna, 0, 0);
-    let spaces = TestSpaces::new([dna_hash.clone()], RwShare::new(ds));
+    let spaces = TestSpaces::new([dna_hash.clone()]);
     let space = Arc::new(spaces.test_spaces[&dna_hash].space.clone());
     let vault = space.dht_env.clone();
     let keystore = test_keystore();

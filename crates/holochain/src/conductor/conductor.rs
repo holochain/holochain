@@ -138,7 +138,7 @@ where
     cells: RwShare<HashMap<CellId, CellItem<CA>>>,
 
     /// The map of dna hash spaces.
-    pub(super) spaces: Spaces<DS>,
+    pub(super) spaces: Spaces,
 
     /// Set to true when `conductor.shutdown()` has been called, so that other
     /// tasks can check on the shutdown status
@@ -1275,7 +1275,7 @@ where
             app_interfaces: RwShare::new(HashMap::new()),
             task_manager: RwShare::new(None),
             admin_websocket_ports: RwShare::new(Vec::new()),
-            dna_store,
+            dna_store: RwShare::new(dna_store),
             keystore,
             holochain_p2p,
             post_commit,

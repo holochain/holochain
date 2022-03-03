@@ -99,6 +99,11 @@ impl DnaDef {
         clone.uid = uid;
         clone
     }
+
+    /// Get the topology to use for kitsune gossip
+    pub fn topology(&self) -> kitsune_p2p_dht::quantum::Topology {
+        kitsune_p2p_dht::quantum::Topology::standard(self.origin_time)
+    }
 }
 
 /// Get a random UID
