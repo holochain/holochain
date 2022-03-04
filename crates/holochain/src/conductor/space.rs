@@ -136,7 +136,7 @@ impl Spaces {
     }
 
     /// Get something from every space
-    pub fn get_from_spaces<R, F: Fn(&Space) -> R>(&self, f: F) -> Vec<R> {
+    pub fn get_from_spaces<R, F: FnMut(&Space) -> R>(&self, f: F) -> Vec<R> {
         self.map
             .share_ref(|spaces| spaces.values().map(f).collect())
     }
@@ -148,7 +148,7 @@ impl Spaces {
 
     fn get_or_create_space_ref<F, R>(&self, dna_hash: &DnaHash, f: F) -> ConductorResult<R>
     where
-        F: Fn(&Space) -> R,
+        F: FnMut(&Space) -> R,
     {
         match self.map.share_ref(|spaces| spaces.get(dna_hash).map(&f)) {
             Some(r) => Ok(r),
