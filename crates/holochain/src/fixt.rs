@@ -234,16 +234,16 @@ fixturator!(
 fixturator!(
     HostFnWorkspace;
     curve Empty {
-        let authored_env = holochain_state::test_utils::test_authored_env_with_id(get_fixt_index!() as u8);
-        let dht_env = holochain_state::test_utils::test_dht_env_with_id(get_fixt_index!() as u8);
-        let cache = holochain_state::test_utils::test_cache_env();
+        let authored_db = holochain_state::test_utils::test_authored_db_with_id(get_fixt_index!() as u8);
+        let dht_db = holochain_state::test_utils::test_dht_db_with_id(get_fixt_index!() as u8);
+        let cache = holochain_state::test_utils::test_cache_db();
         let keystore = holochain_state::test_utils::test_keystore();
         tokio_helper::block_forever_on(async {
-            fake_genesis(authored_env.env(), dht_env.env(), keystore.clone()).await.unwrap();
+            fake_genesis(authored_db.to_db(), dht_db.to_db(), keystore.clone()).await.unwrap();
             HostFnWorkspace::new(
-                authored_env.env(),
-                dht_env.env(),
-                cache.env(),
+                authored_db.to_db(),
+                dht_db.to_db(),
+                cache.to_db(),
                 keystore,
                 Some(fixt!(AgentPubKey, Predictable, get_fixt_index!())),
                 Arc::new(fixt!(DnaDef))
@@ -251,16 +251,16 @@ fixturator!(
         })
     };
     curve Unpredictable {
-        let authored_env = holochain_state::test_utils::test_authored_env_with_id(get_fixt_index!() as u8);
-        let dht_env = holochain_state::test_utils::test_dht_env_with_id(get_fixt_index!() as u8);
-        let cache = holochain_state::test_utils::test_cache_env();
+        let authored_db = holochain_state::test_utils::test_authored_db_with_id(get_fixt_index!() as u8);
+        let dht_db = holochain_state::test_utils::test_dht_db_with_id(get_fixt_index!() as u8);
+        let cache = holochain_state::test_utils::test_cache_db();
         let keystore = holochain_state::test_utils::test_keystore();
         tokio_helper::block_forever_on(async {
-            fake_genesis(authored_env.env(), dht_env.env(), keystore.clone()).await.unwrap();
+            fake_genesis(authored_db.to_db(), dht_db.to_db(), keystore.clone()).await.unwrap();
             HostFnWorkspace::new(
-                authored_env.env(),
-                dht_env.env(),
-                cache.env(),
+                authored_db.to_db(),
+                dht_db.to_db(),
+                cache.to_db(),
                 keystore,
                 Some(fixt!(AgentPubKey, Predictable, get_fixt_index!())),
                 Arc::new(fixt!(DnaDef))
@@ -268,17 +268,17 @@ fixturator!(
         })
     };
     curve Predictable {
-        let authored_env = holochain_state::test_utils::test_authored_env_with_id(get_fixt_index!() as u8);
-        let dht_env = holochain_state::test_utils::test_dht_env_with_id(get_fixt_index!() as u8);
-        let cache = holochain_state::test_utils::test_cache_env_with_id(get_fixt_index!() as u8);
+        let authored_db = holochain_state::test_utils::test_authored_db_with_id(get_fixt_index!() as u8);
+        let dht_db = holochain_state::test_utils::test_dht_db_with_id(get_fixt_index!() as u8);
+        let cache = holochain_state::test_utils::test_cache_db_with_id(get_fixt_index!() as u8);
         let agent = fixt!(AgentPubKey, Predictable, get_fixt_index!());
         let keystore = holochain_state::test_utils::test_keystore();
         tokio_helper::block_forever_on(async {
-            crate::test_utils::fake_genesis_for_agent(authored_env.env(), dht_env.env(), agent.clone(), keystore.clone()).await.unwrap();
+            crate::test_utils::fake_genesis_for_agent(authored_db.to_db(), dht_db.to_db(), agent.clone(), keystore.clone()).await.unwrap();
             HostFnWorkspace::new(
-                authored_env.env(),
-                dht_env.env(),
-                cache.env(),
+                authored_db.to_db(),
+                dht_db.to_db(),
+                cache.to_db(),
                 keystore,
                 Some(agent),
                 Arc::new(fixt!(DnaDef))
@@ -290,16 +290,16 @@ fixturator!(
 fixturator!(
     HostFnWorkspaceRead;
     curve Empty {
-        let authored_env = holochain_state::test_utils::test_authored_env_with_id(get_fixt_index!() as u8);
-        let dht_env = holochain_state::test_utils::test_dht_env_with_id(get_fixt_index!() as u8);
-        let cache = holochain_state::test_utils::test_cache_env();
+        let authored_db = holochain_state::test_utils::test_authored_db_with_id(get_fixt_index!() as u8);
+        let dht_db = holochain_state::test_utils::test_dht_db_with_id(get_fixt_index!() as u8);
+        let cache = holochain_state::test_utils::test_cache_db();
         let keystore = holochain_state::test_utils::test_keystore();
         tokio_helper::block_forever_on(async {
-            fake_genesis(authored_env.env(), dht_env.env(), keystore.clone()).await.unwrap();
+            fake_genesis(authored_db.to_db(), dht_db.to_db(), keystore.clone()).await.unwrap();
             HostFnWorkspaceRead::new(
-                authored_env.env().into(),
-                dht_env.env().into(),
-                cache.env(),
+                authored_db.to_db().into(),
+                dht_db.to_db().into(),
+                cache.to_db(),
                 keystore,
                 Some(fixt!(AgentPubKey, Predictable, get_fixt_index!())),
                 Arc::new(fixt!(DnaDef))
@@ -307,16 +307,16 @@ fixturator!(
         })
     };
     curve Unpredictable {
-        let authored_env = holochain_state::test_utils::test_authored_env_with_id(get_fixt_index!() as u8);
-        let dht_env = holochain_state::test_utils::test_dht_env_with_id(get_fixt_index!() as u8);
-        let cache = holochain_state::test_utils::test_cache_env();
+        let authored_db = holochain_state::test_utils::test_authored_db_with_id(get_fixt_index!() as u8);
+        let dht_db = holochain_state::test_utils::test_dht_db_with_id(get_fixt_index!() as u8);
+        let cache = holochain_state::test_utils::test_cache_db();
         let keystore = holochain_state::test_utils::test_keystore();
         tokio_helper::block_forever_on(async {
-            fake_genesis(authored_env.env(), dht_env.env(), keystore.clone()).await.unwrap();
+            fake_genesis(authored_db.to_db(), dht_db.to_db(), keystore.clone()).await.unwrap();
             HostFnWorkspaceRead::new(
-                authored_env.env().into(),
-                dht_env.env().into(),
-                cache.env(),
+                authored_db.to_db().into(),
+                dht_db.to_db().into(),
+                cache.to_db(),
                 keystore,
                 Some(fixt!(AgentPubKey, Predictable, get_fixt_index!())),
                 Arc::new(fixt!(DnaDef))
@@ -324,17 +324,17 @@ fixturator!(
         })
     };
     curve Predictable {
-        let authored_env = holochain_state::test_utils::test_authored_env_with_id(get_fixt_index!() as u8);
-        let dht_env = holochain_state::test_utils::test_dht_env_with_id(get_fixt_index!() as u8);
-        let cache = holochain_state::test_utils::test_cache_env_with_id(get_fixt_index!() as u8);
+        let authored_db = holochain_state::test_utils::test_authored_db_with_id(get_fixt_index!() as u8);
+        let dht_db = holochain_state::test_utils::test_dht_db_with_id(get_fixt_index!() as u8);
+        let cache = holochain_state::test_utils::test_cache_db_with_id(get_fixt_index!() as u8);
         let agent = fixt!(AgentPubKey, Predictable, get_fixt_index!());
         let keystore = holochain_state::test_utils::test_keystore();
         tokio_helper::block_forever_on(async {
-            crate::test_utils::fake_genesis_for_agent(authored_env.env(), dht_env.env(), agent.clone(), keystore.clone()).await.unwrap();
+            crate::test_utils::fake_genesis_for_agent(authored_db.to_db(), dht_db.to_db(), agent.clone(), keystore.clone()).await.unwrap();
             HostFnWorkspaceRead::new(
-                authored_env.env().into(),
-                dht_env.env().into(),
-                cache.env(),
+                authored_db.to_db().into(),
+                dht_db.to_db().into(),
+                cache.to_db(),
                 keystore,
                 Some(agent),
                 Arc::new(fixt!(DnaDef))

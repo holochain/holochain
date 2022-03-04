@@ -10,7 +10,7 @@ use hdk::prelude::*;
 use holo_hash::DnaHash;
 use holochain_conductor_api::{AdminInterfaceConfig, InterfaceDriver};
 use holochain_keystore::MetaLairClient;
-use holochain_state::prelude::test_env_dir;
+use holochain_state::prelude::test_db_dir;
 use holochain_types::prelude::*;
 use holochain_websocket::*;
 use kitsune_p2p::KitsuneP2pConfig;
@@ -30,7 +30,7 @@ pub type SignalStream = Box<dyn tokio_stream::Stream<Item = Signal> + Send + Syn
 #[derive(derive_more::From)]
 pub struct SweetConductor {
     handle: Option<SweetConductorHandle>,
-    env_dir: TempDir,
+    db_dir: TempDir,
     keystore: MetaLairClient,
     pub(crate) spaces: Spaces,
     config: ConductorConfig,
@@ -87,7 +87,7 @@ impl SweetConductor {
 
         Self {
             handle: Some(SweetConductorHandle(handle)),
-            env_dir,
+            db_dir: env_dir,
             keystore,
             spaces,
             config,
@@ -98,7 +98,7 @@ impl SweetConductor {
 
     /// Create a SweetConductor with a new set of TestEnvs from the given config
     pub async fn from_config(config: ConductorConfig) -> SweetConductor {
-        let dir = test_env_dir();
+        let dir = test_db_dir();
         let handle = Self::handle_from_existing(dir.path(), test_keystore(), &config, &[]).await;
         Self::new(handle, dir, config).await
     }
@@ -107,15 +107,15 @@ impl SweetConductor {
     pub async fn from_builder<DS: DnaStore + 'static>(
         builder: ConductorBuilder<DS>,
     ) -> SweetConductor {
-        let envs = test_env_dir();
+        let db_dir = test_db_dir();
         let config = builder.config.clone();
-        let handle = builder.test(envs.path(), &[]).await.unwrap();
-        Self::new(handle, envs, config).await
+        let handle = builder.test(db_dir.path(), &[]).await.unwrap();
+        Self::new(handle, db_dir, config).await
     }
 
     /// Create a handle from an existing environment and config
     pub async fn handle_from_existing(
-        envs: &Path,
+        db_dir: &Path,
         keystore: MetaLairClient,
         config: &ConductorConfig,
         extra_dnas: &[DnaFile],
@@ -123,7 +123,7 @@ impl SweetConductor {
         Conductor::builder()
             .config(config.clone())
             .with_keystore(keystore)
-            .test(envs, extra_dnas)
+            .test(db_dir, extra_dnas)
             .await
             .unwrap()
     }
@@ -133,9 +133,9 @@ impl SweetConductor {
         Self::from_config(standard_config()).await
     }
 
-    /// Access the TestEnvs for this conductor
-    pub fn envs(&self) -> &Path {
-        self.env_dir.path()
+    /// Access the database path for this conductor
+    pub fn db_path(&self) -> &Path {
+        self.db_dir.path()
     }
 
     /// Access the MetaLairClient for this conductor
@@ -231,13 +231,13 @@ impl SweetConductor {
             let _space = self.spaces.get_or_create_space(&dna_hash)?;
 
             // Create the SweetCell
-            let cell_authored_env = self.handle().0.get_authored_env(&dna_hash)?;
-            let cell_dht_env = self.handle().0.get_dht_env(&dna_hash)?;
+            let cell_authored_db = self.handle().0.get_authored_db(&dna_hash)?;
+            let cell_dht_db = self.handle().0.get_dht_db(&dna_hash)?;
             let cell_id = CellId::new(dna_hash, agent.clone());
             let cell = SweetCell {
                 cell_id,
-                cell_authored_env,
-                cell_dht_env,
+                cell_authored_db,
+                cell_dht_db,
             };
             sweet_cells.push(cell);
         }
@@ -381,7 +381,7 @@ impl SweetConductor {
         if self.handle.is_none() {
             self.handle = Some(SweetConductorHandle(
                 Self::handle_from_existing(
-                    self.env_dir.path(),
+                    self.db_dir.path(),
                     self.keystore.clone(),
                     &self.config,
                     self.dnas.as_slice(),
@@ -423,17 +423,17 @@ impl SweetConductor {
         if let Some(handle) = self.handle.as_ref() {
             let iter = handle.list_cell_ids(None).into_iter().map(|id| async {
                 let id = id;
-                let env = self.get_authored_env(id.dna_hash()).unwrap();
+                let db = self.get_authored_db(id.dna_hash()).unwrap();
                 let trigger = self.get_cell_triggers(&id).unwrap();
-                (env, trigger)
+                (db, trigger)
             });
             futures::stream::iter(iter)
                 .then(|f| f)
-                .for_each(|(env, mut triggers)| async move {
+                .for_each(|(db, mut triggers)| async move {
                     // The line below was added when migrating to rust edition 2021, per
                     // https://doc.rust-lang.org/edition-guide/rust-2021/disjoint-capture-in-closures.html#migration
                     let _ = &triggers;
-                    crate::test_utils::force_publish_dht_ops(&env, &mut triggers.publish_dht_ops)
+                    crate::test_utils::force_publish_dht_ops(&db, &mut triggers.publish_dht_ops)
                         .await
                         .unwrap();
                 })

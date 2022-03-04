@@ -83,8 +83,8 @@ async fn sys_validation_workflow_inner(
     conductor_handle: ConductorHandle,
     sys_validation_trigger: TriggerSender,
 ) -> WorkflowResult<WorkComplete> {
-    let env = workspace.dht_env.clone();
-    let sorted_ops = validation_query::get_ops_to_sys_validate(&env).await?;
+    let db = workspace.dht_db.clone();
+    let sorted_ops = validation_query::get_ops_to_sys_validate(&db).await?;
     let start_len = sorted_ops.len();
     tracing::debug!("Validating {} ops", start_len);
     let start = (start_len >= NUM_CONCURRENT_OPS).then(std::time::Instant::now);
@@ -155,7 +155,7 @@ async fn sys_validation_workflow_inner(
         let num_ops: usize = chunk.iter().map(|c| c.len()).sum();
         tracing::debug!("Committing {} ops", num_ops);
         let (t, a, m, r) = space
-            .dht_env
+            .dht_db
             .async_commit(move |txn| {
                 let mut total = 0;
                 let mut awaiting = 0;
@@ -790,8 +790,8 @@ fn update_check(entry_update: &Update, original_header: &Header) -> SysValidatio
 
 pub struct SysValidationWorkspace {
     scratch: Option<SyncScratch>,
-    authored_env: DbRead<DbKindAuthored>,
-    dht_env: DbRead<DbKindDht>,
+    authored_db: DbRead<DbKindAuthored>,
+    dht_db: DbRead<DbKindDht>,
     dht_query_cache: Option<DhtDbQueryCache>,
     cache: DbWrite<DbKindCache>,
     pub(crate) dna_def: Arc<DnaDef>,
@@ -799,15 +799,15 @@ pub struct SysValidationWorkspace {
 
 impl SysValidationWorkspace {
     pub fn new(
-        authored_env: DbRead<DbKindAuthored>,
-        dht_env: DbRead<DbKindDht>,
+        authored_db: DbRead<DbKindAuthored>,
+        dht_db: DbRead<DbKindDht>,
         dht_query_cache: DhtDbQueryCache,
         cache: DbWrite<DbKindCache>,
         dna_def: Arc<DnaDef>,
     ) -> Self {
         Self {
-            authored_env,
-            dht_env,
+            authored_db,
+            dht_db,
             dht_query_cache: Some(dht_query_cache),
             cache,
             dna_def,
@@ -826,7 +826,7 @@ impl SysValidationWorkspace {
         // we need to check the author db.
         let author = author.clone();
         let chain_not_empty = self
-            .authored_env
+            .authored_db
             .async_reader(move |txn| {
                 let mut stmt = txn.prepare(
                     "
@@ -867,7 +867,7 @@ impl SysValidationWorkspace {
         let seq = header.header_seq();
         let hash = HeaderHash::with_data_sync(header);
         let header_seq_is_not_empty = self
-            .dht_env
+            .dht_db
             .async_reader({
                 let hash = hash.clone();
                 move |txn| {
@@ -910,10 +910,10 @@ impl SysValidationWorkspace {
     }
     /// Create a cascade with local data only
     pub fn local_cascade(&self) -> Cascade {
-        let cascade = Cascade::empty().with_dht(self.dht_env.clone());
+        let cascade = Cascade::empty().with_dht(self.dht_db.clone());
         match &self.scratch {
             Some(scratch) => cascade
-                .with_authored(self.authored_env.clone())
+                .with_authored(self.authored_db.clone())
                 .with_scratch(scratch.clone()),
             None => cascade,
         }
@@ -923,18 +923,18 @@ impl SysValidationWorkspace {
         network: Network,
     ) -> Cascade<Network> {
         let cascade = Cascade::empty()
-            .with_dht(self.dht_env.clone())
+            .with_dht(self.dht_db.clone())
             .with_network(network, self.cache.clone());
         match &self.scratch {
             Some(scratch) => cascade
-                .with_authored(self.authored_env.clone())
+                .with_authored(self.authored_db.clone())
                 .with_scratch(scratch.clone()),
             None => cascade,
         }
     }
 
     fn dna_hash(&self) -> &DnaHash {
-        self.dht_env.kind().dna_hash()
+        self.dht_db.kind().dna_hash()
     }
 
     /// Get a reference to the sys validation workspace's dna def.
@@ -985,8 +985,8 @@ impl From<&HostFnWorkspace> for SysValidationWorkspace {
         } = h.stores();
         Self {
             scratch,
-            authored_env: authored,
-            dht_env: dht,
+            authored_db: authored,
+            dht_db: dht,
             dht_query_cache: None,
             cache,
             dna_def: h.dna_def(),

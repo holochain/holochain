@@ -29,14 +29,14 @@ const CONFIG_FILENAME: &str = "conductor-config.yml";
     serde::Deserialize,
 )]
 #[display(fmt = "{}", "_0.display()")]
-pub struct EnvironmentRootPath(PathBuf);
-impl Default for EnvironmentRootPath {
+pub struct DatabaseRootPath(PathBuf);
+impl Default for DatabaseRootPath {
     fn default() -> Self {
         Self(data_root().join(PathBuf::from(DATABASES_DIRECTORY)))
     }
 }
 
-impl<'a> From<&'a Path> for EnvironmentRootPath {
+impl<'a> From<&'a Path> for DatabaseRootPath {
     fn from(p: &'a Path) -> Self {
         p.to_owned().into()
     }

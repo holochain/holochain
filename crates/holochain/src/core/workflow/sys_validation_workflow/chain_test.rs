@@ -30,7 +30,7 @@ async fn sys_validation_agent_activity_test() {
         .await;
 
     let changed = cell_1
-        .dht_env()
+        .dht_db()
         .async_commit(|txn| {
             DatabaseResult::Ok(txn.execute(
                 "UPDATE Header SET seq = 4 WHERE hash = ? OR hash = ?",

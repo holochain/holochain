@@ -234,10 +234,10 @@ pub mod test_utils {
         cell_data: Vec<(InstalledCell, Option<SerializedBytes>)>,
         dna_store: MockDnaStore,
     ) -> (Arc<TempDir>, RealAppInterfaceApi, ConductorHandle) {
-        let envs = test_env_dir();
+        let db_dir = test_db_dir();
 
         let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
-            .test(envs.path(), &[])
+            .test(db_dir.path(), &[])
             .await
             .unwrap();
 
@@ -264,7 +264,7 @@ pub mod test_utils {
         let handle = conductor_handle.clone();
 
         (
-            Arc::new(envs),
+            Arc::new(db_dir),
             RealAppInterfaceApi::new(conductor_handle),
             handle,
         )
@@ -290,7 +290,7 @@ pub mod test {
     use holochain_p2p::{AgentPubKeyExt, DnaHashExt};
     use holochain_serialized_bytes::prelude::*;
     use holochain_sqlite::prelude::*;
-    use holochain_state::prelude::test_env_dir;
+    use holochain_state::prelude::test_db_dir;
     use holochain_types::prelude::*;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_dna_hash;
@@ -319,18 +319,18 @@ pub mod test {
     }
 
     async fn setup_admin() -> (Arc<TempDir>, ConductorHandle) {
-        let envs = test_env_dir();
-        let conductor_handle = Conductor::builder().test(envs.path(), &[]).await.unwrap();
-        (Arc::new(envs), conductor_handle)
+        let db_dir = test_db_dir();
+        let conductor_handle = Conductor::builder().test(db_dir.path(), &[]).await.unwrap();
+        (Arc::new(db_dir), conductor_handle)
     }
 
     async fn setup_admin_fake_cells(
         cell_ids_with_proofs: Vec<(CellId, Option<SerializedBytes>)>,
         dna_store: MockDnaStore,
     ) -> (Arc<TempDir>, ConductorHandle) {
-        let envs = test_env_dir();
+        let db_dir = test_db_dir();
         let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
-            .test(envs.path(), &[])
+            .test(db_dir.path(), &[])
             .await
             .unwrap();
 
@@ -345,7 +345,7 @@ pub mod test {
             .await
             .unwrap();
 
-        (Arc::new(envs), conductor_handle)
+        (Arc::new(db_dir), conductor_handle)
     }
 
     async fn activate(conductor_handle: ConductorHandle) -> ConductorHandle {
@@ -680,16 +680,20 @@ pub mod test {
     #[tokio::test(flavor = "multi_thread")]
     async fn add_agent_info_via_admin() {
         observability::test_run().ok();
-        let test_envs = test_env_dir();
+        let test_db_dir = test_db_dir();
         let agents = vec![fake_agent_pubkey_1(), fake_agent_pubkey_2()];
         let dnas = vec![
             make_dna("1", vec![TestWasm::Anchor]).await,
             make_dna("2", vec![TestWasm::Anchor]).await,
         ];
-        let mut conductor_test =
-            ConductorTestData::new(test_envs, dnas.clone(), agents.clone(), Default::default())
-                .await
-                .0;
+        let mut conductor_test = ConductorTestData::new(
+            test_db_dir,
+            dnas.clone(),
+            agents.clone(),
+            Default::default(),
+        )
+        .await
+        .0;
         let handle = conductor_test.handle();
         let spaces = handle.get_spaces();
         let dnas = dnas
@@ -701,7 +705,7 @@ pub mod test {
         crate::assert_eq_retry_10s!(
             {
                 let mut count = 0;
-                for env in spaces.get_from_spaces(|s| s.p2p_env.clone()) {
+                for env in spaces.get_from_spaces(|s| s.p2p_agents_db.clone()) {
                     let mut conn = env.conn().unwrap();
                     let txn = conn.transaction().unwrap();
                     count += txn.p2p_list_agents().unwrap().len();

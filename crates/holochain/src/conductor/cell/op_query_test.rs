@@ -3,7 +3,7 @@ use chrono::Utc;
 use fixt::prelude::*;
 use holochain_sqlite::db::WriteManager;
 use holochain_state::mutations;
-use holochain_state::prelude::test_cell_env;
+use holochain_state::prelude::test_cell_db;
 use holochain_types::dht_op::DhtOpLight;
 use holochain_zome_types::fixt::*;
 use holochain_zome_types::Timestamp;
@@ -11,8 +11,8 @@ use holochain_zome_types::ValidationStatus;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_dht_op_query() {
-    let test_env = test_cell_env();
-    let env = test_env.env();
+    let test_db = test_cell_db();
+    let db = test_db.db();
 
     // Create some integration values
     let mut expected = Vec::new();
@@ -36,7 +36,7 @@ async fn test_dht_op_query() {
     {
         let mut dht_hash = DhtOpHashFixturator::new(Predictable);
         for (validation_status, op, when_integrated) in values {
-            env.conn()
+            db.conn()
                 .unwrap()
                 .with_commit(|txn| mutations::insert_op())
                 .unwrap();
@@ -50,9 +50,9 @@ async fn test_dht_op_query() {
 
     // Check queries
 
-    let mut conn = env.conn().unwrap();
+    let mut conn = db.conn().unwrap();
     conn.with_reader_test(|mut reader| {
-        let buf = IntegratedDhtOpsBuf::new(env.clone().into()).unwrap();
+        let buf = IntegratedDhtOpsBuf::new(db.clone().into()).unwrap();
         // No filter
         let mut r = buf
             .query(&mut reader, None, None, None)
