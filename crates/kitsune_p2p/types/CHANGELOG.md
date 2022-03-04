@@ -4,6 +4,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.0.19
+
 ## 0.0.18
 
 - Sharded DHT arcs is on by default. This means that once the network reaches a certain size, it will split into multiple shards.
