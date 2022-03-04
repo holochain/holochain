@@ -31,6 +31,7 @@ use structopt::StructOpt;
 use crate::changelog::{Changelog, WorkspaceCrateReleaseHeading};
 use crate::crate_::ensure_crate_io_owners;
 use crate::crate_::increment_patch;
+use crate::crate_selection::ensure_release_order_consistency;
 use crate::crate_selection::Crate;
 pub(crate) use crate_selection::{ReleaseWorkspace, SelectionCriteria};
 
@@ -221,7 +222,7 @@ fn bump_release_versions<'a>(
     // run the checks to ensure the repo is in a consistent state to begin with
     if !cmd_args.no_verify && !cmd_args.no_verify_pre {
         info!("running consistency checks before changing the versions...");
-        publish_paths_to_crates_io(
+        do_publish_to_crates_io(
             &selection,
             true,
             true,
@@ -320,7 +321,7 @@ fn bump_release_versions<'a>(
 
     if !cmd_args.no_verify && !cmd_args.no_verify_post {
         info!("running consistency checks after changing the versions...");
-        publish_paths_to_crates_io(
+        do_publish_to_crates_io(
             &selection,
             true,
             true,
@@ -392,13 +393,13 @@ fn bump_release_versions<'a>(
     Ok(())
 }
 
-fn publish_to_crates_io<'a>(
+pub(crate) fn publish_to_crates_io<'a>(
     ws: &'a ReleaseWorkspace<'a>,
     cmd_args: &'a ReleaseArgs,
 ) -> Fallible<()> {
     let crates = latest_release_crates(ws)?;
 
-    publish_paths_to_crates_io(
+    do_publish_to_crates_io(
         &crates,
         cmd_args.dry_run,
         false,
@@ -698,7 +699,7 @@ pub(crate) mod crates_index_helper {
     }
 }
 
-/// Try to publish the given manifests to crates.io.
+/// Try to publish the given crates to crates.io.
 ///
 /// If dry-run is given, the following error conditoins are tolerated:
 /// - a dependency is not found but is part of the release
@@ -706,8 +707,8 @@ pub(crate) mod crates_index_helper {
 ///
 /// For this to work properly all changed crates need to have their dev versions applied.
 /// If they don't, `cargo publish` will prefer a published crates to the local ones.
-fn publish_paths_to_crates_io(
-    crates: &[&Crate],
+pub(crate) fn do_publish_to_crates_io<'a>(
+    crates: &[&'a Crate<'a>],
     dry_run: bool,
     allow_dirty: bool,
     allowed_missing_dependencies: &HashSet<String>,
@@ -715,6 +716,8 @@ fn publish_paths_to_crates_io(
 ) -> Fallible<()> {
     static USER_AGENT: &str = "Holochain_Core_Dev_Team (devcore@holochain.org)";
     static CRATES_IO_CLIENT: OnceCell<crates_io_api::AsyncClient> = OnceCell::new();
+
+    ensure_release_order_consistency(&crates)?;
 
     let crate_names: HashSet<String> = crates.iter().map(|crt| crt.name()).collect();
 
@@ -751,7 +754,12 @@ fn publish_paths_to_crates_io(
             }
         };
 
-    let mut published_dry_run = linked_hash_set::LinkedHashSet::new();
+    let mut published_or_tolerated = linked_hash_set::LinkedHashSet::new();
+
+    let mut publish_cntr_inc = |name: &str| {
+        info!("successfully published {}", name);
+        publish_cntr += 1;
+    };
 
     while let Some(crt) = queue.pop_front() {
         if !crt.state().changed() && crates_index_helper::is_version_published(crt, false)? {
@@ -845,9 +853,10 @@ fn publish_paths_to_crates_io(
                 PublishError::Other(..) => true,
                 PublishError::PackageNotFound { dependency, .. }
                 | PublishError::PackageVersionNotFound { dependency, .. } => {
-                    !dry_run
-                        || !(published_dry_run.contains(dependency)
-                            || allowed_missing_dependencies.contains(dependency))
+                    !((dry_run
+                        && crate_names.contains(dependency)
+                        && published_or_tolerated.contains(dependency))
+                        || allowed_missing_dependencies.contains(dependency))
                 }
                 PublishError::AlreadyUploaded { version, .. } => {
                     crt.version().to_string() != *version
@@ -861,14 +870,17 @@ fn publish_paths_to_crates_io(
                 }
                 PublishError::CheckFailure { .. } => true,
             } {
+                error!("{}", error);
                 errors.push(error);
             } else {
                 tolerated_cntr += 1;
-                trace!("tolerating error: '{:#?}'", &error);
+                debug!("tolerating error: '{:#?}'", &error);
+
+                published_or_tolerated.insert(crt.name());
             }
         } else if dry_run {
-            published_dry_run.insert(crt.name());
-            publish_cntr += 1;
+            publish_cntr_inc(&crt.name_version());
+            published_or_tolerated.insert(crt.name());
         } else {
             // wait until the published version is live
 
@@ -904,7 +916,8 @@ fn publish_paths_to_crates_io(
                 return do_return(errors, check_cntr, publish_cntr, skip_cntr, tolerated_cntr);
             }
 
-            publish_cntr += 1;
+            publish_cntr_inc(&crt.name_version());
+            published_or_tolerated.insert(crt.name());
         }
     }
 

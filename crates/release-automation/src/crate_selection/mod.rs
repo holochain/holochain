@@ -36,6 +36,8 @@ fn releaseworkspace_path_only_fmt(
     write!(f, "{:?}", &ws.root_path)
 }
 
+type DependenciesT = LinkedHashMap<String, Vec<cargo::core::Dependency>>;
+
 #[derive(custom_debug::Debug)]
 pub(crate) struct Crate<'a> {
     package: CargoPackage,
@@ -43,7 +45,7 @@ pub(crate) struct Crate<'a> {
     #[debug(with = "releaseworkspace_path_only_fmt")]
     workspace: &'a ReleaseWorkspace<'a>,
     #[debug(skip)]
-    dependencies_in_workspace: OnceCell<LinkedHashSet<cargo::core::Dependency>>,
+    dependencies_in_workspace: OnceCell<DependenciesT>,
     #[debug(skip)]
     dependants_in_workspace: OnceCell<Vec<&'a Crate<'a>>>,
 }
@@ -112,12 +114,10 @@ impl<'a> Crate<'a> {
     }
 
     /// Returns the crates in the same workspace that this crate depends on.
-    pub(crate) fn dependencies_in_workspace(
-        &'a self,
-    ) -> Fallible<&'a LinkedHashSet<cargo::core::Dependency>> {
+    pub(crate) fn dependencies_in_workspace(&'a self) -> Fallible<&'a DependenciesT> {
         self.dependencies_in_workspace.get_or_try_init(|| {
             // LinkedHashSet automatically deduplicates while maintaining the insertion order.
-            let mut dependencies = LinkedHashSet::new();
+            let mut dependencies = LinkedHashMap::new();
             let ws_members: std::collections::HashMap<_, _> = self
                 .workspace
                 .members_unsorted()?
@@ -131,40 +131,45 @@ impl<'a> Crate<'a> {
             let mut seen = HashSet::new();
 
             while let Some(package) = queue.pop() {
-                seen.insert(package.name());
                 for dep in package.dependencies() {
-                    if dep.source_id().is_path() {
-                        let dep_name = dep.package_name().to_string();
+                    let dep_name = dep.package_name().to_string();
 
-                        // todo(backlog): enable the optional dependency if a feature requested it
+                    // todo: write a test-case for this
+                    if dep.is_optional() && self.workspace.criteria.exclude_optional_deps {
+                        trace!(
+                            "[{}] excluding optional dependency '{}'",
+                            package.name(),
+                            dep_name,
+                        );
 
-                        // todo: write a test-case for this
-                        if dep.is_optional() && self.workspace.criteria.exclude_optional_deps {
-                            trace!(
-                                "[{}] excluding optional dependency '{}'",
-                                package.name(),
-                                dep_name,
-                            );
+                        continue;
+                    }
 
-                            continue;
-                        }
+                    // only consider workspace members
+                    if let Some(dep_package) = ws_members.get(&dep.package_name().to_string()) {
+                        // only consider non-star version requirements
+                        if dep.specified_req() && dep.version_req().to_string() != "*" {
+                            // don't add this package to its own dependencies
+                            if dep_package.name() != package.name() {
+                                dependencies
+                                    .entry(dep_name.clone())
+                                    .or_insert_with(|| vec![])
+                                    .push(dep.to_owned());
 
-                        // todo(backlog): could the path of this dependency possibly be outside of the workspace?
-                        dependencies.insert(dep.to_owned());
-
-                        if let Some(dep_package) = ws_members.get(&dep.package_name().to_string()) {
-                            if dep_package.name() == self.package.name() {
+                                if !seen.contains(&dep_name) {
+                                    queue.push(dep_package);
+                                }
+                            } else {
                                 warn!(
                                     "encountered dependency cycle: {:?} <-> {:?}",
                                     self.name(),
                                     package.name()
                                 );
-                            } else if !seen.contains(&dep_package.name()) {
-                                queue.push(dep_package);
                             }
                         }
                     }
                 }
+                seen.insert(package.name().to_string());
             }
             Ok(dependencies)
         })
@@ -184,7 +189,7 @@ impl<'a> Crate<'a> {
         filter_fn: F,
     ) -> Fallible<&'a Vec<&'a Crate<'a>>>
     where
-        F: Fn(&&Dependency) -> bool,
+        F: Fn(&(&String, &Vec<Dependency>)) -> bool,
         F: Copy,
     {
         self.dependants_in_workspace.get_or_try_init(|| {
@@ -195,8 +200,8 @@ impl<'a> Crate<'a> {
                         .dependencies_in_workspace()?
                         .iter()
                         .filter(filter_fn)
-                        .map(|dep| dep.package_name().to_string())
-                        .collect::<HashSet<_>>()
+                        .map(|(dep_name, _)| dep_name)
+                        .collect::<LinkedHashSet<_>>()
                         .contains(&self.name())
                     {
                         acc.insert(member.name(), *member);
@@ -727,14 +732,16 @@ impl<'a> ReleaseWorkspace<'a> {
                         && get_state!(member.name()).changed()
                         && !get_state!(member.name()).blocked()
                     {
-                        for dep in member.dependencies_in_workspace()? {
-                            insert_state!(
-                                match dep.kind() {
-                                    CargoDepKind::Development => CrateStateFlags::IsWorkspaceDevDependency,
-                                    _ => CrateStateFlags::IsWorkspaceDependency,
-                                },
-                                dep.package_name().to_string()
-                            );
+                        for (_, deps) in member.dependencies_in_workspace()? {
+                            for dep in deps {
+                                insert_state!(
+                                    match dep.kind() {
+                                        CargoDepKind::Development => CrateStateFlags::IsWorkspaceDevDependency,
+                                        _ => CrateStateFlags::IsWorkspaceDependency,
+                                    },
+                                    dep.package_name().to_string()
+                                );
+                            }
                         }
 
                         for dep in member.package().dependencies() {
@@ -812,7 +819,7 @@ impl<'a> ReleaseWorkspace<'a> {
                 release
             })
             .cloned()
-            .collect();
+            .collect::<Vec<_>>();
 
         Ok(release_selection)
     }
@@ -833,16 +840,26 @@ impl<'a> ReleaseWorkspace<'a> {
     /// Members are sorted according to their dependency tree from most independent to most dependent.
     pub(crate) fn members(&'a self) -> Fallible<&'a Vec<&'a Crate<'a>>> {
         self.members_sorted.get_or_try_init(|| -> Fallible<_> {
-            let mut members = self.members_unsorted()?.iter().collect::<Vec<_>>();
+            let mut members = self
+                .members_unsorted()?
+                .iter()
+                .enumerate()
+                .collect::<Vec<_>>();
 
-            let dependencies = self.members_unsorted()?.iter().try_fold(
-                HashMap::<String, HashSet<String>>::new(),
+            let workspace_dependencies = self.members_unsorted()?.iter().try_fold(
+                LinkedHashMap::<String, LinkedHashSet<String>>::new(),
                 |mut acc, elem| -> Fallible<_> {
                     acc.insert(
-                        elem.package.name().to_string(),
+                        elem.name(),
                         elem.dependencies_in_workspace()?
-                            .iter()
-                            .map(|dep| dep.package_name().to_string())
+                            .into_iter()
+                            .filter_map(|(dep_name, deps)| {
+                                deps.into_iter()
+                                    .find(|dep| {
+                                        dep.specified_req() && dep.version_req().to_string() != "*"
+                                    })
+                                    .map(|_| dep_name.clone())
+                            })
                             .collect(),
                     );
 
@@ -851,16 +868,17 @@ impl<'a> ReleaseWorkspace<'a> {
             )?;
 
             // ensure members are ordered respecting their dependency tree
-            members.sort_by(move |a, b| {
+            members.sort_unstable_by(move |(a_i, a), (b_i, b)| {
                 use std::cmp::Ordering::{Equal, Greater, Less};
 
-                let a_deps = dependencies
+                let a_deps = workspace_dependencies
                     .get(&a.name())
                     .unwrap_or_else(|| panic!("dependencies for {} not found", a.name()));
-                let b_deps = dependencies
+                let b_deps = workspace_dependencies
                     .get(&b.name())
                     .unwrap_or_else(|| panic!("dependencies for {} not found", b.name()));
 
+                // understand whether one is a direct dependency of the other
                 let comparison = (a_deps.contains(&b.name()), b_deps.contains(&a.name()));
                 let result = match comparison {
                     (true, true) => {
@@ -868,7 +886,7 @@ impl<'a> ReleaseWorkspace<'a> {
                     }
                     (true, false) => Greater,
                     (false, true) => Less,
-                    (false, false) => Equal,
+                    (false, false) => a_i.cmp(b_i),
                 };
 
                 trace!(
@@ -883,7 +901,7 @@ impl<'a> ReleaseWorkspace<'a> {
                 result
             });
 
-            Ok(members)
+            Ok(members.into_iter().map(|(_, member)| member).collect())
         })
     }
 
@@ -1148,6 +1166,43 @@ pub(crate) fn git_lookup_tag(git_repo: &git2::Repository, tag_name: &str) -> Opt
     trace!("looking up tag '{}' -> {:?}", tag_name, tag);
 
     tag
+}
+
+// we shouldn't need this check but so far the failing case hasn't been reproduced in a test.
+pub(crate) fn ensure_release_order_consistency<'a>(
+    crates: &[&'a Crate<'a>],
+) -> Fallible<LinkedHashSet<String>> {
+    crates
+        .iter()
+        .try_fold(LinkedHashSet::new(), |mut acc, cur| {
+            let wrong_order_deps = cur
+                .dependencies_in_workspace()?
+                .iter()
+                .filter_map(|(dep_package_name, _)| {
+                    if crates
+                        .iter()
+                        .any(|selected| &selected.name() == dep_package_name)
+                        && !acc.contains(dep_package_name)
+                    {
+                        Some(dep_package_name.to_string())
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<_>>();
+
+            if !wrong_order_deps.is_empty() {
+                bail!(
+                    "{} depends on crates that are ordered after it: {:#?}. this is a bug.",
+                    cur.name(),
+                    wrong_order_deps
+                );
+            }
+
+            acc.insert(cur.name());
+
+            Ok(acc)
+        })
 }
 
 #[cfg(test)]

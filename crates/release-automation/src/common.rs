@@ -42,8 +42,9 @@ pub(crate) fn set_version<'a>(
     }
 
     let dependants = crt
-        .dependants_in_workspace_filtered(|dep| {
-            dep.version_req() != &cargo::util::OptVersionReq::from(VersionReq::STAR)
+        .dependants_in_workspace_filtered(|(_dep_name, deps)| {
+            deps.iter()
+                .any(|dep| dep.version_req() != &cargo::util::OptVersionReq::from(VersionReq::STAR))
         })?
         .to_owned();
 
