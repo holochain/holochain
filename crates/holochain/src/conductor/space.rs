@@ -148,7 +148,7 @@ impl Spaces {
 
     fn get_or_create_space_ref<F, R>(&self, dna_hash: &DnaHash, f: F) -> ConductorResult<R>
     where
-        F: FnMut(&Space) -> R,
+        F: Fn(&Space) -> R,
     {
         match self.map.share_ref(|spaces| spaces.get(dna_hash).map(&f)) {
             Some(r) => Ok(r),
