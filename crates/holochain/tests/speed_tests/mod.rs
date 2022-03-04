@@ -17,24 +17,20 @@
 
 #![allow(deprecated)]
 
+use std::sync::Arc;
+
 use ::fixt::prelude::*;
 use hdk::prelude::*;
 use holochain::conductor::api::AdminRequest;
 use holochain::conductor::api::AdminResponse;
 use holochain::conductor::api::AppRequest;
 use holochain::conductor::api::AppResponse;
-use holochain::conductor::api::RealAppInterfaceApi;
 use holochain::conductor::api::ZomeCall;
-use holochain::conductor::config::AdminInterfaceConfig;
-use holochain::conductor::config::ConductorConfig;
-use holochain::conductor::config::InterfaceDriver;
-use holochain::conductor::ConductorBuilder;
-use holochain::conductor::ConductorHandle;
+use holochain::test_utils::setup_app;
 use tempfile::TempDir;
 
 use super::test_utils::*;
 use holochain::sweettest::*;
-use holochain_state::prelude::test_db_dir;
 use holochain_test_wasm_common::AnchorInput;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
@@ -118,7 +114,7 @@ fn speed_test_all(n: usize) {
 }
 
 #[instrument]
-async fn speed_test(n: Option<usize>) -> TempDir {
+async fn speed_test(n: Option<usize>) -> Arc<TempDir> {
     let num = n.unwrap_or(DEFAULT_NUM);
 
     // ////////////
@@ -170,10 +166,10 @@ async fn speed_test(n: Option<usize>) -> TempDir {
     // START CONDUCTOR
     // ///////////////
 
-    let (test_db, _app_api, handle) = setup_app(vec![
-        (alice_installed_cell, None),
-        (bob_installed_cell, None),
-    ])
+    let (test_db, _app_api, handle) = setup_app(
+        vec![dna_file],
+        vec![(alice_installed_cell, None), (bob_installed_cell, None)],
+    )
     .await;
 
     // Setup websocket handle and app interface
@@ -290,45 +286,4 @@ async fn speed_test(n: Option<usize>) -> TempDir {
     handle.shutdown();
     shutdown.await.unwrap().unwrap();
     test_db
-}
-
-pub async fn setup_app(
-    cell_data: Vec<(InstalledCell, Option<SerializedBytes>)>,
-) -> (TempDir, RealAppInterfaceApi, ConductorHandle) {
-    let db_dir = test_db_dir();
-
-    let conductor_handle = ConductorBuilder::new()
-        .config(ConductorConfig {
-            admin_interfaces: Some(vec![AdminInterfaceConfig {
-                driver: InterfaceDriver::Websocket { port: 0 },
-            }]),
-            ..Default::default()
-        })
-        .test(db_dir.path(), &[])
-        .await
-        .unwrap();
-
-    conductor_handle
-        .clone()
-        .install_app("test app".to_string(), cell_data)
-        .await
-        .unwrap();
-
-    conductor_handle
-        .clone()
-        .enable_app("test app".to_string())
-        .await
-        .unwrap();
-
-    let errors = conductor_handle
-        .clone()
-        .reconcile_cell_status_with_app_status()
-        .await
-        .unwrap();
-
-    assert!(errors.is_empty());
-
-    let handle = conductor_handle.clone();
-
-    (db_dir, RealAppInterfaceApi::new(conductor_handle), handle)
 }

@@ -6,17 +6,11 @@ use hdk::prelude::*;
 use holochain::conductor::api::AppInterfaceApi;
 use holochain::conductor::api::AppRequest;
 use holochain::conductor::api::AppResponse;
-use holochain::conductor::api::RealAppInterfaceApi;
 use holochain::conductor::api::ZomeCall;
-use holochain::conductor::ConductorBuilder;
-use holochain::conductor::ConductorHandle;
-
-use holochain_state::prelude::test_db_dir;
+use holochain::test_utils::setup_app;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 pub use holochain_zome_types::capability::CapSecret;
-use observability;
-use tempfile::TempDir;
 
 #[derive(Serialize, Deserialize, SerializedBytes, Debug)]
 struct CreateMessageInput {
@@ -92,10 +86,10 @@ async fn ser_regression_test() {
     // START CONDUCTOR
     // ///////////////
 
-    let (_tmpdir, app_api, handle) = setup_app(vec![
-        (alice_installed_cell, None),
-        (bob_installed_cell, None),
-    ])
+    let (_tmpdir, app_api, handle) = setup_app(
+        vec![dna_file],
+        vec![(alice_installed_cell, None), (bob_installed_cell, None)],
+    )
     .await;
 
     // /////////////
@@ -163,38 +157,4 @@ async fn ser_regression_test() {
     let shutdown = handle.take_shutdown_handle().unwrap();
     handle.shutdown();
     shutdown.await.unwrap().unwrap();
-}
-
-pub async fn setup_app(
-    cell_data: Vec<(InstalledCell, Option<SerializedBytes>)>,
-) -> (TempDir, RealAppInterfaceApi, ConductorHandle) {
-    let db_dir = test_db_dir();
-    let conductor_handle = ConductorBuilder::new()
-        .test(db_dir.path(), &[])
-        .await
-        .unwrap();
-
-    conductor_handle
-        .clone()
-        .install_app("test app".to_string(), cell_data)
-        .await
-        .unwrap();
-
-    conductor_handle
-        .clone()
-        .enable_app("test app".to_string())
-        .await
-        .unwrap();
-
-    let errors = conductor_handle
-        .clone()
-        .reconcile_cell_status_with_app_status()
-        .await
-        .unwrap();
-
-    assert!(errors.is_empty());
-
-    let handle = conductor_handle.clone();
-
-    (db_dir, RealAppInterfaceApi::new(conductor_handle), handle)
 }

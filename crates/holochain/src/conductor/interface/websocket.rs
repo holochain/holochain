@@ -219,65 +219,10 @@ where
 
 /// Test items needed by other crates
 #[cfg(any(test, feature = "test_utils"))]
-pub mod test_utils {
-    use crate::conductor::api::RealAppInterfaceApi;
-    use crate::conductor::conductor::ConductorBuilder;
-    use crate::conductor::ConductorHandle;
-    use holochain_serialized_bytes::prelude::*;
-    use holochain_state::prelude::*;
-    use holochain_types::prelude::*;
-    use std::sync::Arc;
-    use tempfile::TempDir;
-
-    /// One of various ways to setup an app, used somewhere...
-    pub async fn setup_app(
-        dnas: Vec<DnaFile>,
-        cell_data: Vec<(InstalledCell, Option<SerializedBytes>)>,
-    ) -> (Arc<TempDir>, RealAppInterfaceApi, ConductorHandle) {
-        let db_dir = test_db_dir();
-
-        let conductor_handle = ConductorBuilder::new()
-            .test(db_dir.path(), &[])
-            .await
-            .unwrap();
-
-        for dna in dnas {
-            conductor_handle.register_dna(dna).await.unwrap();
-        }
-
-        conductor_handle
-            .clone()
-            .install_app("test app".to_string(), cell_data)
-            .await
-            .unwrap();
-
-        conductor_handle
-            .clone()
-            .enable_app("test app".to_string())
-            .await
-            .unwrap();
-
-        let errors = conductor_handle
-            .clone()
-            .reconcile_cell_status_with_app_status()
-            .await
-            .unwrap();
-
-        assert!(errors.is_empty());
-
-        let handle = conductor_handle.clone();
-
-        (
-            Arc::new(db_dir),
-            RealAppInterfaceApi::new(conductor_handle),
-            handle,
-        )
-    }
-}
+pub use crate::test_utils::setup_app;
 
 #[cfg(test)]
 pub mod test {
-    use super::test_utils::setup_app;
     use super::*;
     use crate::conductor::api::error::ExternalApiWireError;
     use crate::conductor::api::AdminRequest;

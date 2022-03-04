@@ -40,6 +40,7 @@ use holochain_wasm_test_utils::TestWasm;
 use kitsune_p2p::KitsuneP2pConfig;
 use rusqlite::named_params;
 use std::path::Path;
+use std::sync::Arc;
 use std::time::Duration;
 use tempfile::TempDir;
 use tokio::sync::mpsc;
@@ -290,9 +291,54 @@ pub async fn install_app(
 /// Payload for installing cells
 pub type InstalledCellsWithProofs = Vec<(InstalledCell, Option<SerializedBytes>)>;
 
+/// One of various ways to setup an app, used somewhere...
+pub async fn setup_app(
+    dnas: Vec<DnaFile>,
+    cell_data: Vec<(InstalledCell, Option<SerializedBytes>)>,
+) -> (Arc<TempDir>, RealAppInterfaceApi, ConductorHandle) {
+    let db_dir = test_db_dir();
+
+    let conductor_handle = ConductorBuilder::new()
+        .test(db_dir.path(), &[])
+        .await
+        .unwrap();
+
+    for dna in dnas {
+        conductor_handle.register_dna(dna).await.unwrap();
+    }
+
+    conductor_handle
+        .clone()
+        .install_app("test app".to_string(), cell_data)
+        .await
+        .unwrap();
+
+    conductor_handle
+        .clone()
+        .enable_app("test app".to_string())
+        .await
+        .unwrap();
+
+    let errors = conductor_handle
+        .clone()
+        .reconcile_cell_status_with_app_status()
+        .await
+        .unwrap();
+
+    assert!(errors.is_empty());
+
+    let handle = conductor_handle.clone();
+
+    (
+        Arc::new(db_dir),
+        RealAppInterfaceApi::new(conductor_handle),
+        handle,
+    )
+}
+
 /// Setup an app for testing
 /// apps_data is a vec of app nicknames with vecs of their cell data
-pub async fn setup_app(
+pub async fn setup_app_with_names(
     apps_data: Vec<(&str, InstalledCellsWithProofs)>,
     dnas: Vec<DnaFile>,
 ) -> (TempDir, RealAppInterfaceApi, ConductorHandle) {
