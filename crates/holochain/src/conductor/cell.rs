@@ -129,7 +129,7 @@ impl Cell {
         // check if genesis has been run
         let has_genesis = {
             // check if genesis ran.
-            GenesisWorkspace::new(space.authored_env.clone(), space.dht_env.clone())?
+            GenesisWorkspace::new(space.authored_db.clone(), space.dht_db.clone())?
                 .has_genesis(id.agent_pubkey().clone())
                 .await?
         };
@@ -168,8 +168,8 @@ impl Cell {
     pub async fn genesis<Ribosome>(
         id: CellId,
         conductor_handle: ConductorHandle,
-        authored_env: DbWrite<DbKindAuthored>,
-        dht_env: DbWrite<DbKindDht>,
+        authored_db: DbWrite<DbKindAuthored>,
+        dht_db: DbWrite<DbKindDht>,
         ribosome: Ribosome,
         membrane_proof: Option<SerializedBytes>,
     ) -> CellResult<()>
@@ -184,7 +184,7 @@ impl Cell {
         let conductor_api = CellConductorApi::new(conductor_handle.clone(), id.clone());
 
         // run genesis
-        let workspace = GenesisWorkspace::new(authored_env, dht_env)
+        let workspace = GenesisWorkspace::new(authored_db, dht_db)
             .map_err(ConductorApiError::from)
             .map_err(Box::new)?;
 
@@ -237,7 +237,7 @@ impl Cell {
         let author = self.id.agent_pubkey().clone();
         Ok(self
             .space
-            .authored_env
+            .authored_db
             .async_commit(move |txn: &mut Transaction| {
                 delete_all_ephemeral_scheduled_fns(txn, &author)
             })
@@ -249,7 +249,7 @@ impl Cell {
         let author = self.id.agent_pubkey().clone();
         let lives = self
             .space
-            .authored_env
+            .authored_db
             .async_commit(move |txn: &mut Transaction| {
                 // Rescheduling should not fail as the data in the database
                 // should be valid schedules only.
@@ -298,7 +298,7 @@ impl Cell {
                 // We don't do anything with errors in here.
                 let _ = self
                     .space
-                    .authored_env
+                    .authored_db
                     .async_commit(move |txn: &mut Transaction| {
                         for ((scheduled_fn, _), result) in lives.iter().zip(results.iter()) {
                             match result {
@@ -521,8 +521,8 @@ impl Cell {
         signed_headers: Vec<SignedHeader>,
     ) -> CellResult<()> {
         Ok(countersigning_success(
-            self.space.authored_env.clone(),
-            self.space.dht_env.clone(),
+            self.space.authored_db.clone(),
+            self.space.dht_db.clone(),
             &self.holochain_p2p_cell,
             self.id.agent_pubkey().clone(),
             signed_headers,
@@ -540,10 +540,10 @@ impl Cell {
         &self,
         header_hash: HeaderHash,
     ) -> CellResult<ValidationPackageResponse> {
-        let env: DbRead<DbKindDht> = self.dht_env().clone().into();
+        let db: DbRead<DbKindDht> = self.dht_db().clone().into();
 
         // Get the header
-        let mut cascade = Cascade::empty().with_dht(env.clone());
+        let mut cascade = Cascade::empty().with_dht(db.clone());
         let header = match cascade
             .retrieve_header(header_hash, Default::default())
             .await?
@@ -558,9 +558,9 @@ impl Cell {
         if header.author() == self.id.agent_pubkey() {
             validation_package::get_as_author(
                 header,
-                self.space.authored_env.clone().into(),
-                self.dht_env().clone().into(),
-                self.space.cache.clone(),
+                self.space.authored_db.clone().into(),
+                self.dht_db().clone().into(),
+                self.space.cache_db.clone(),
                 &ribosome,
                 &(*self.conductor_handle),
                 &self.holochain_p2p_cell,
@@ -569,7 +569,7 @@ impl Cell {
         } else {
             validation_package::get_as_authority(
                 header,
-                env,
+                db,
                 &ribosome.dna_file,
                 self.conductor_handle.as_ref(),
             )
@@ -611,8 +611,8 @@ impl Cell {
         hash: EntryHash,
         options: holochain_p2p::event::GetOptions,
     ) -> CellResult<WireEntryOps> {
-        let env = self.space.dht_env.clone();
-        authority::handle_get_entry(env.into(), hash, options)
+        let db = self.space.dht_db.clone();
+        authority::handle_get_entry(db.into(), hash, options)
             .await
             .map_err(Into::into)
     }
@@ -623,8 +623,8 @@ impl Cell {
         hash: HeaderHash,
         options: holochain_p2p::event::GetOptions,
     ) -> CellResult<WireElementOps> {
-        let env = self.space.dht_env.clone();
-        authority::handle_get_element(env.into(), hash, options)
+        let db = self.space.dht_db.clone();
+        authority::handle_get_element(db.into(), hash, options)
             .await
             .map_err(Into::into)
     }
@@ -650,8 +650,8 @@ impl Cell {
         options: holochain_p2p::event::GetLinksOptions,
     ) -> CellResult<WireLinkOps> {
         debug!(id = ?self.id());
-        let env = self.space.dht_env.clone();
-        authority::handle_get_links(env.into(), link_key, options)
+        let db = self.space.dht_db.clone();
+        authority::handle_get_links(db.into(), link_key, options)
             .await
             .map_err(Into::into)
     }
@@ -663,8 +663,8 @@ impl Cell {
         query: ChainQueryFilter,
         options: holochain_p2p::event::GetActivityOptions,
     ) -> CellResult<AgentActivityResponse<HeaderHash>> {
-        let env = self.space.dht_env.clone();
-        authority::handle_get_agent_activity(env.into(), agent, query, options)
+        let db = self.space.dht_db.clone();
+        authority::handle_get_agent_activity(db.into(), agent, query, options)
             .await
             .map_err(Into::into)
     }
@@ -679,7 +679,7 @@ impl Cell {
         let hash = receipt.receipt.dht_op_hash.clone();
         let header: Option<SignedHeader> = self
             .space
-            .authored_env
+            .authored_db
             .async_reader(move |txn| {
                 let h: Option<Vec<u8>> = txn
                     .query_row(
@@ -724,7 +724,7 @@ impl Cell {
         );
 
         self.space
-            .dht_env
+            .dht_db
             .async_commit(move |txn| {
                 // Get the current count for this dhtop.
                 let receipt_count: usize = txn.query_row(
@@ -811,8 +811,8 @@ impl Cell {
             Some(l) => l,
             None => {
                 SourceChainWorkspace::new(
-                    self.authored_env().clone(),
-                    self.dht_env().clone(),
+                    self.authored_db().clone(),
+                    self.dht_db().clone(),
                     self.cache().clone(),
                     keystore.clone(),
                     self.id.agent_pubkey().clone(),
@@ -867,8 +867,8 @@ impl Cell {
 
         // Create the workspace
         let workspace = SourceChainWorkspace::init_as_root(
-            self.authored_env().clone(),
-            self.dht_env().clone(),
+            self.authored_db().clone(),
+            self.dht_db().clone(),
             self.cache().clone(),
             keystore.clone(),
             id.agent_pubkey().clone(),
@@ -935,17 +935,17 @@ impl Cell {
     }
 
     /// Accessor for the authored database backing this Cell
-    pub(crate) fn authored_env(&self) -> &DbWrite<DbKindAuthored> {
-        &self.space.authored_env
+    pub(crate) fn authored_db(&self) -> &DbWrite<DbKindAuthored> {
+        &self.space.authored_db
     }
 
     /// Accessor for the authored database backing this Cell
-    pub(crate) fn dht_env(&self) -> &DbWrite<DbKindDht> {
-        &self.space.dht_env
+    pub(crate) fn dht_db(&self) -> &DbWrite<DbKindDht> {
+        &self.space.dht_db
     }
 
     pub(crate) fn cache(&self) -> &DbWrite<DbKindCache> {
-        &self.space.cache
+        &self.space.cache_db
     }
 
     #[cfg(any(test, feature = "test_utils"))]

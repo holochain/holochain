@@ -20,14 +20,13 @@ async fn test_cell_handle_publish() {
 
     let agent_key = keystore.new_sign_keypair_random().await.unwrap();
     let dna_file = fixt!(DnaFile);
-    let _ds = MockDnaStore::single_dna(dna_file.clone(), 0, 0);
     let cell_id = CellId::new(dna_file.dna_hash().clone(), agent_key);
     let dna = cell_id.dna_hash().clone();
     let agent = cell_id.agent_pubkey().clone();
 
     let spaces = TestSpaces::new([dna.clone()]);
-    let env = spaces.test_spaces[&dna].space.authored_env.clone();
-    let dht_env = spaces.test_spaces[&dna].space.dht_env.clone();
+    let db = spaces.test_spaces[&dna].space.authored_db.clone();
+    let dht_db = spaces.test_spaces[&dna].space.dht_db.clone();
 
     let test_network = test_network(Some(dna.clone()), Some(agent.clone())).await;
     let holochain_p2p_cell = test_network.dna_network();
@@ -53,8 +52,8 @@ async fn test_cell_handle_publish() {
     super::Cell::genesis(
         cell_id.clone(),
         mock_handle.clone(),
-        env.clone(),
-        dht_env.clone(),
+        db.clone(),
+        dht_db.clone(),
         mock_ribosome,
         None,
     )
@@ -91,7 +90,7 @@ async fn test_cell_handle_publish() {
         .await
         .unwrap();
 
-    op_exists(&dht_env, op_hash).await.unwrap();
+    op_exists(&dht_db, op_hash).await.unwrap();
 
     stop_tx.send(()).unwrap();
     shutdown.await.unwrap().unwrap();

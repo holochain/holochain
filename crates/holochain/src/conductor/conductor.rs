@@ -14,7 +14,7 @@ pub use self::share::RwShare;
 use super::api::RealAppInterfaceApi;
 use super::config::AdminInterfaceConfig;
 use super::config::InterfaceDriver;
-use super::dna_store::RealDnaStore;
+use super::dna_store::DnaStore;
 use super::entry_def_store::get_entry_defs;
 use super::error::ConductorError;
 use super::handle::ConductorHandleImpl;
@@ -28,7 +28,7 @@ use super::manager::keep_alive_task;
 use super::manager::ManagedTaskAdd;
 use super::manager::ManagedTaskHandle;
 use super::manager::TaskManagerRunHandle;
-use super::paths::EnvironmentRootPath;
+use super::paths::DatabaseRootPath;
 use super::space::Space;
 use super::space::Spaces;
 use super::state::AppInterfaceId;
@@ -129,9 +129,8 @@ pub(crate) type StopReceiver = tokio::sync::broadcast::Receiver<()>;
 
 /// A Conductor is a group of [Cell]s
 #[derive(Clone)]
-pub struct Conductor<DS = RealDnaStore, CA = CellConductorApi>
+pub struct Conductor<CA = CellConductorApi>
 where
-    DS: DnaStore,
     CA: CellConductorApiT,
 {
     /// The collection of cells associated with this Conductor
@@ -157,7 +156,7 @@ where
     pub(super) task_manager: RwShare<Option<TaskManagerClient>>,
 
     /// Placeholder for what will be the real DNA/Wasm cache
-    dna_store: RwShare<DS>,
+    dna_store: RwShare<DnaStore>,
 
     /// Access to private keys for signing and encryption.
     keystore: MetaLairClient,
@@ -178,10 +177,7 @@ impl Conductor {
 //-----------------------------------------------------------------------------
 // Public methods
 //-----------------------------------------------------------------------------
-impl<DS> Conductor<DS>
-where
-    DS: DnaStore + 'static,
-{
+impl Conductor {
     /// Returns a port which is guaranteed to have a websocket listener with an Admin interface
     /// on it. Useful for specifying port 0 and letting the OS choose a free port.
     pub fn get_arbitrary_admin_websocket_port(&self) -> Option<u16> {
@@ -192,10 +188,7 @@ where
 //-----------------------------------------------------------------------------
 /// Methods used by the [ConductorHandle]
 //-----------------------------------------------------------------------------
-impl<DS> Conductor<DS>
-where
-    DS: DnaStore + 'static,
-{
+impl Conductor {
     pub(super) fn cell_by_id(&self, cell_id: &CellId) -> ConductorResult<Arc<Cell>> {
         let cell = self
             .cells
@@ -254,7 +247,7 @@ where
         }
     }
 
-    pub(super) fn dna_store(&self) -> &RwShare<DS> {
+    pub(super) fn dna_store(&self) -> &RwShare<DnaStore> {
         &self.dna_store
     }
 
@@ -293,10 +286,7 @@ where
         &self,
         configs: Vec<AdminInterfaceConfig>,
         handle: ConductorHandle,
-    ) -> ConductorResult<()>
-    where
-        DS: DnaStore + 'static,
-    {
+    ) -> ConductorResult<()> {
         let admin_api = RealAdminInterfaceApi::new(handle);
         let stop_tx = self.task_manager.share_ref(|tm| {
             tm.as_ref()
@@ -492,18 +482,18 @@ where
         self.spaces.get_or_create_space(dna_hash)
     }
 
-    pub(super) fn get_or_create_authored_env(
+    pub(super) fn get_or_create_authored_db(
         &self,
         dna_hash: &DnaHash,
     ) -> ConductorResult<DbWrite<DbKindAuthored>> {
-        self.spaces.authored_env(dna_hash)
+        self.spaces.authored_db(dna_hash)
     }
 
-    pub(super) fn get_or_create_dht_env(
+    pub(super) fn get_or_create_dht_db(
         &self,
         dna_hash: &DnaHash,
     ) -> ConductorResult<DbWrite<DbKindDht>> {
-        self.spaces.dht_env(dna_hash)
+        self.spaces.dht_db(dna_hash)
     }
 
     /// Adjust app statuses (via state transitions) to match the current
@@ -807,10 +797,10 @@ where
         impl IntoIterator<Item = (DnaHash, DnaFile)>,
         impl IntoIterator<Item = (EntryDefBufferKey, EntryDef)>,
     )> {
-        let env = &self.spaces.wasm_env;
+        let db = &self.spaces.wasm_db;
 
         // Load out all dna defs
-        let (wasm_tasks, defs) = env
+        let (wasm_tasks, defs) = db
             .async_reader(move |txn| {
                 // Get all the dna defs.
                 let dna_defs: Vec<_> = holochain_state::dna_def::get_all(&txn)?
@@ -868,8 +858,8 @@ where
     }
 
     /// Get the root environment directory.
-    pub fn root_env_dir(&self) -> &EnvironmentRootPath {
-        &self.spaces.root_env_dir
+    pub fn root_db_dir(&self) -> &DatabaseRootPath {
+        &self.spaces.db_dir
     }
 
     /// Get the keystore.
@@ -926,7 +916,7 @@ where
         &self,
         dna: DnaFile,
     ) -> ConductorResult<Vec<(EntryDefBufferKey, EntryDef)>> {
-        let env = self.spaces.wasm_env.clone();
+        let db = self.spaces.wasm_db.clone();
 
         let zome_defs = get_entry_defs(dna.clone())?;
 
@@ -939,7 +929,7 @@ where
         )
         .await;
 
-        env.async_commit({
+        db.async_commit({
             let zome_defs = zome_defs.clone();
             move |txn| {
                 for dna_wasm in wasms {
@@ -1087,21 +1077,21 @@ where
 /// If genesis fails for any cell, this entire function fails, and all other
 /// partial or complete successes are rolled back.
 /// Note this function takes read locks so should not be called from within a read lock.
-pub(super) async fn genesis_cells<DS: DnaStore + 'static>(
-    conductor: &Conductor<DS>,
+pub(super) async fn genesis_cells(
+    conductor: &Conductor,
     cell_ids_with_proofs: Vec<(CellId, Option<MembraneProof>)>,
     conductor_handle: ConductorHandle,
 ) -> ConductorResult<()> {
     let cells_tasks = cell_ids_with_proofs.into_iter().map(|(cell_id, proof)| {
-        let authored_env = conductor
-            .get_or_create_authored_env(cell_id.dna_hash())
+        let authored_db = conductor
+            .get_or_create_authored_db(cell_id.dna_hash())
             .map_err(|e| CellError::FailedToCreateAuthoredDb(e.into()));
-        let dht_env = conductor
-            .get_or_create_dht_env(cell_id.dna_hash())
+        let dht_db = conductor
+            .get_or_create_dht_db(cell_id.dna_hash())
             .map_err(|e| CellError::FailedToCreateDhtDb(e.into()));
         async {
-            let authored_env = authored_env?;
-            let dht_env = dht_env?;
+            let authored_db = authored_db?;
+            let dht_db = dht_db?;
             let conductor_handle = conductor_handle.clone();
             let cell_id_inner = cell_id.clone();
             let ribosome = conductor_handle
@@ -1111,8 +1101,8 @@ pub(super) async fn genesis_cells<DS: DnaStore + 'static>(
                 Cell::genesis(
                     cell_id_inner,
                     conductor_handle,
-                    authored_env,
-                    dht_env,
+                    authored_db,
+                    dht_db,
                     ribosome,
                     proof,
                 )
@@ -1256,13 +1246,10 @@ fn query_dht_ops_from_statement(
 // Private methods
 //-----------------------------------------------------------------------------
 
-impl<DS> Conductor<DS>
-where
-    DS: DnaStore + 'static,
-{
+impl Conductor {
     #[allow(clippy::too_many_arguments)]
     async fn new(
-        dna_store: RwShare<DS>,
+        dna_store: RwShare<DnaStore>,
         keystore: MetaLairClient,
         holochain_p2p: holochain_p2p::HolochainP2pRef,
         spaces: Spaces,
@@ -1284,7 +1271,7 @@ where
 
     pub(super) async fn get_state(&self) -> ConductorResult<ConductorState> {
         self.spaces
-            .conductor_env
+            .conductor_db
             .async_reader(|txn| {
                 let state = txn
                     .query_row("SELECT blob FROM ConductorState WHERE id = 1", [], |row| {
@@ -1320,7 +1307,7 @@ where
         self.check_running()?;
         let output = self
             .spaces
-            .conductor_env
+            .conductor_db
             .async_commit(move |txn| {
                 let state = txn
                     .query_row("SELECT blob FROM ConductorState WHERE id = 1", [], |row| {
@@ -1360,18 +1347,18 @@ where
 
 mod builder {
     use super::*;
-    use crate::conductor::dna_store::RealDnaStore;
+    use crate::conductor::dna_store::DnaStore;
     use crate::conductor::handle::DevSettings;
     use crate::conductor::kitsune_host_impl::KitsuneHostImpl;
     use crate::conductor::ConductorHandle;
 
     /// A configurable Builder for Conductor and sometimes ConductorHandle
     #[derive(Default)]
-    pub struct ConductorBuilder<DS = RealDnaStore> {
+    pub struct ConductorBuilder {
         /// The configuration
         pub config: ConductorConfig,
         /// The DnaStore (mockable)
-        pub dna_store: DS,
+        pub dna_store: DnaStore,
         /// For new lair, passphrase is required
         pub passphrase: Option<sodoken::BufRead>,
         /// Optional keystore override
@@ -1391,20 +1378,7 @@ mod builder {
         }
     }
 
-    impl ConductorBuilder<MockDnaStore> {
-        /// ConductorBuilder using mocked DnaStore, for testing
-        pub fn with_mock_dna_store(dna_store: MockDnaStore) -> ConductorBuilder<MockDnaStore> {
-            Self {
-                dna_store,
-                ..Default::default()
-            }
-        }
-    }
-
-    impl<DS> ConductorBuilder<DS>
-    where
-        DS: DnaStore + 'static,
-    {
+    impl ConductorBuilder {
         /// Set the ConductorConfig used to build this Conductor
         pub fn config(mut self, config: ConductorConfig) -> Self {
             self.config = config;
@@ -1613,8 +1587,8 @@ mod builder {
         #[cfg(any(test, feature = "test_utils"))]
         async fn update_fake_state(
             state: Option<ConductorState>,
-            conductor: Conductor<DS>,
-        ) -> ConductorResult<Conductor<DS>> {
+            conductor: Conductor,
+        ) -> ConductorResult<Conductor> {
             if let Some(state) = state {
                 conductor.update_state(move |_| Ok(state)).await?;
             }
