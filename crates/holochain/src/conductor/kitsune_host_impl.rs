@@ -1,16 +1,17 @@
 //! Implementation of the Kitsune Host API
 
+mod query_region_set;
+
 use std::sync::Arc;
 
+use super::{dna_store::DnaStore, space::Spaces};
 use futures::FutureExt;
 use holo_hash::DnaHash;
 use holochain_p2p::{dht::quantum::Topology, DnaHashExt};
+use holochain_types::{db::PermittedConn, prelude::DnaError, share::RwShare};
 use kitsune_p2p::{
     agent_store::AgentInfoSigned, event::GetAgentInfoSignedEvt, KitsuneHost, KitsuneHostResult,
 };
-
-use super::space::Spaces;
-use holochain_types::{db::PermittedConn, prelude::DnaStore, share::RwShare};
 
 /// Implementation of the Kitsune Host API.
 /// Lets Kitsune make requests of Holochain
@@ -82,23 +83,27 @@ impl KitsuneHost for KitsuneHostImpl {
 
     fn query_region_set(
         &self,
-        space: &kitsune_p2p::KitsuneSpace,
+        space: Arc<kitsune_p2p::KitsuneSpace>,
         dht_arc_set: Arc<holochain_p2p::dht_arc::DhtArcSet>,
     ) -> KitsuneHostResult<holochain_p2p::dht::region::RegionSetXtcs> {
-        let dna_hash = DnaHash::from_kitsune(&Arc::new(space.clone()));
+        let dna_hash = DnaHash::from_kitsune(&space);
         async move {
-            Ok(self
-                .spaces
-                .handle_fetch_op_regions(dna_hash, dht_arc_set)
-                .await?)
+            let topology = self.get_topology(space.clone()).await?;
+            let db = self.spaces.authored_db(&dna_hash)?;
+            Ok(query_region_set::query_region_set(db, topology, dht_arc_set).await?)
         }
         .boxed()
         .into()
     }
 
-    fn get_topology(&self, space: Arc<kitsune_p2p::KitsuneSpace>) -> Option<Topology> {
-        let dna_hash = DnaHash::from_kitsune(&Arc::new(space.clone()));
-        let dna_def = self.dna_store.get_dna_def(&dna_hash)?;
-        Some(Topology::standard(dna_def.origin_time))
+    fn get_topology(&self, space: Arc<kitsune_p2p::KitsuneSpace>) -> KitsuneHostResult<Topology> {
+        let dna_hash = DnaHash::from_kitsune(&space);
+        let dna_def = self
+            .dna_store
+            .share_mut(|ds| ds.get_dna_def(&dna_hash))
+            .ok_or_else(|| DnaError::DnaMissing(dna_hash));
+        async move { Ok(Topology::standard(dna_def?.origin_time)) }
+            .boxed()
+            .into()
     }
 }

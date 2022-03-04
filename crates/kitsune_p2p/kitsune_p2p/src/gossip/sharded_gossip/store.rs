@@ -260,9 +260,9 @@ pub(super) fn hash_chunks_query(
     Box::pin(f)
 }
 
-pub(super) async fn region_set_query<'a>(
+pub(super) async fn query_region_set<'a>(
     host_api: HostApi,
-    space: &'a KitsuneSpace,
+    space: Arc<KitsuneSpace>,
     common_arc_set: Arc<DhtArcSet>,
 ) -> KitsuneResult<RegionSetXtcs> {
     host_api

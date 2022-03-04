@@ -44,7 +44,7 @@ pub trait KitsuneHostPanicky: KitsuneHost {
 
     fn query_region_set(
         &self,
-        _space: &KitsuneSpace,
+        _space: Arc<KitsuneSpace>,
         _dht_arc_set: Arc<DhtArcSet>,
     ) -> KitsuneHostResult<RegionSetXtcs> {
         unimplemented!(
@@ -53,7 +53,7 @@ pub trait KitsuneHostPanicky: KitsuneHost {
         )
     }
 
-    fn get_topology(&self, space: Arc<KitsuneSpace>) -> KitsuneHostResult<Option<Topology>> {
+    fn get_topology(&self, _space: Arc<KitsuneSpace>) -> KitsuneHostResult<Topology> {
         unimplemented!(
             "default panic for unimplemented KitsuneHost test behavior: {}",
             Self::NAME
@@ -87,13 +87,13 @@ impl<T: KitsuneHostPanicky> KitsuneHost for T {
 
     fn query_region_set(
         &self,
-        space: &KitsuneSpace,
+        space: Arc<KitsuneSpace>,
         dht_arc_set: Arc<DhtArcSet>,
     ) -> KitsuneHostResult<RegionSetXtcs> {
         KitsuneHostPanicky::query_region_set(self, space, dht_arc_set)
     }
 
-    fn get_topology(&self, space: Arc<KitsuneSpace>) -> KitsuneHostResult<Option<Topology>> {
+    fn get_topology(&self, space: Arc<KitsuneSpace>) -> KitsuneHostResult<Topology> {
         KitsuneHostPanicky::get_topology(self, space)
     }
 }

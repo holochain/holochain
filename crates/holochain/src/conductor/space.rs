@@ -50,7 +50,7 @@ use crate::core::{
 
 use super::{
     conductor::RwShare,
-    error::{ConductorError, ConductorResult},
+    error::ConductorResult,
     p2p_agent_store::{self, P2pBatch},
 };
 use std::convert::TryInto;

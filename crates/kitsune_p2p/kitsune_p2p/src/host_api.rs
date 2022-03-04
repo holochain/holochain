@@ -32,7 +32,7 @@ pub trait KitsuneHost: 'static + Send + Sync {
     /// Query aggregate dht op data to form an XTCS set of region data
     fn query_region_set(
         &self,
-        space: &KitsuneSpace,
+        space: Arc<KitsuneSpace>,
         dht_arc_set: Arc<DhtArcSet>,
     ) -> KitsuneHostResult<RegionSetXtcs>;
 
@@ -44,7 +44,7 @@ pub trait KitsuneHost: 'static + Send + Sync {
     ) -> KitsuneHostResult<()>;
 
     /// Get the quantum Topology associated with this Space
-    fn get_topology(&self, space: Arc<KitsuneSpace>) -> KitsuneHostResult<Option<Topology>>;
+    fn get_topology(&self, space: Arc<KitsuneSpace>) -> KitsuneHostResult<Topology>;
 }
 
 /// Trait object for the host interface
