@@ -17,23 +17,20 @@
 
 #![allow(deprecated)]
 
+use std::sync::Arc;
+
 use ::fixt::prelude::*;
 use hdk::prelude::*;
 use holochain::conductor::api::AdminRequest;
 use holochain::conductor::api::AdminResponse;
 use holochain::conductor::api::AppRequest;
 use holochain::conductor::api::AppResponse;
-use holochain::conductor::api::RealAppInterfaceApi;
 use holochain::conductor::api::ZomeCall;
-use holochain::conductor::config::AdminInterfaceConfig;
-use holochain::conductor::config::ConductorConfig;
-use holochain::conductor::config::InterfaceDriver;
-use holochain::conductor::ConductorBuilder;
-use holochain::conductor::ConductorHandle;
+use holochain::test_utils::setup_app;
+use tempfile::TempDir;
 
 use super::test_utils::*;
 use holochain::sweettest::*;
-use holochain_state::{prelude::test_environments, test_utils::TestEnvs};
 use holochain_test_wasm_common::AnchorInput;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
@@ -97,7 +94,7 @@ async fn speed_test_normal() {
 async fn speed_test_persisted() {
     observability::test_run().unwrap();
     let envs = speed_test(None).await;
-    let path = envs.into_tempdir().into_path();
+    let path = envs.path();
     println!("Run the following to see info about the test that just ran,");
     println!("with the correct cell env dir appended to the path:");
     println!();
@@ -117,7 +114,7 @@ fn speed_test_all(n: usize) {
 }
 
 #[instrument]
-async fn speed_test(n: Option<usize>) -> TestEnvs {
+async fn speed_test(n: Option<usize>) -> Arc<TempDir> {
     let num = n.unwrap_or(DEFAULT_NUM);
 
     // ////////////
@@ -169,12 +166,9 @@ async fn speed_test(n: Option<usize>) -> TestEnvs {
     // START CONDUCTOR
     // ///////////////
 
-    let mut dna_store = MockDnaStore::single_dna(dna_file, 2, 2);
-    dna_store.expect_get_entry_def().return_const(None);
-
-    let (test_env, _app_api, handle) = setup_app(
+    let (test_db, _app_api, handle) = setup_app(
+        vec![dna_file],
         vec![(alice_installed_cell, None), (bob_installed_cell, None)],
-        dna_store,
     )
     .await;
 
@@ -291,47 +285,5 @@ async fn speed_test(n: Option<usize>) -> TestEnvs {
     let shutdown = handle.take_shutdown_handle().unwrap();
     handle.shutdown();
     shutdown.await.unwrap().unwrap();
-    test_env
-}
-
-pub async fn setup_app(
-    cell_data: Vec<(InstalledCell, Option<SerializedBytes>)>,
-    dna_store: MockDnaStore,
-) -> (TestEnvs, RealAppInterfaceApi, ConductorHandle) {
-    let envs = test_environments();
-
-    let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
-        .config(ConductorConfig {
-            admin_interfaces: Some(vec![AdminInterfaceConfig {
-                driver: InterfaceDriver::Websocket { port: 0 },
-            }]),
-            ..Default::default()
-        })
-        .test(&envs, &[])
-        .await
-        .unwrap();
-
-    conductor_handle
-        .clone()
-        .install_app("test app".to_string(), cell_data)
-        .await
-        .unwrap();
-
-    conductor_handle
-        .clone()
-        .enable_app("test app".to_string())
-        .await
-        .unwrap();
-
-    let errors = conductor_handle
-        .clone()
-        .reconcile_cell_status_with_app_status()
-        .await
-        .unwrap();
-
-    assert!(errors.is_empty());
-
-    let handle = conductor_handle.clone();
-
-    (envs, RealAppInterfaceApi::new(conductor_handle), handle)
+    test_db
 }

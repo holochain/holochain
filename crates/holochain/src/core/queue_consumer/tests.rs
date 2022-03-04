@@ -221,14 +221,14 @@ async fn publish_loop() {
         .prefix("holochain-test-environments")
         .tempdir()
         .unwrap();
-    let env = DbWrite::test(&tmpdir, kind).expect("Couldn't create test database");
+    let db = DbWrite::test(tmpdir.path(), kind).expect("Couldn't create test database");
     let header = Header::arbitrary(&mut u).unwrap();
     let author = header.author().clone();
     let signature = Signature::arbitrary(&mut u).unwrap();
     let op = DhtOp::RegisterAgentActivity(signature, header);
     let op = DhtOpHashed::from_content_sync(op);
     let op_hash = op.to_hash();
-    env.conn()
+    db.conn()
         .unwrap()
         .with_commit_test(|txn| {
             mutations::insert_op(txn, &op).unwrap();
@@ -253,7 +253,7 @@ async fn publish_loop() {
         timer.elapsed() >= Duration::from_secs(60) && timer.elapsed() < Duration::from_secs(61)
     );
 
-    publish_dht_ops_workflow(env.clone(), &dna_network, &ts, author.clone())
+    publish_dht_ops_workflow(db.clone(), &dna_network, &ts, author.clone())
         .await
         .unwrap();
 
@@ -267,7 +267,7 @@ async fn publish_loop() {
         timer.elapsed() >= Duration::from_secs(60 * 2)
             && timer.elapsed() < Duration::from_secs(60 * 2 + 1)
     );
-    publish_dht_ops_workflow(env.clone(), &dna_network, &ts, author.clone())
+    publish_dht_ops_workflow(db.clone(), &dna_network, &ts, author.clone())
         .await
         .unwrap();
 
@@ -283,7 +283,7 @@ async fn publish_loop() {
     let timer = tokio::time::Instant::now();
     trigger_recv.listen().await.unwrap();
     assert!(timer.elapsed() < Duration::from_secs(1));
-    publish_dht_ops_workflow(env.clone(), &dna_network, &ts, author.clone())
+    publish_dht_ops_workflow(db.clone(), &dna_network, &ts, author.clone())
         .await
         .unwrap();
 
@@ -300,7 +300,7 @@ async fn publish_loop() {
         .and_then(|epoch| epoch.checked_sub(MIN_PUBLISH_INTERVAL))
         .unwrap();
 
-    env.conn()
+    db.conn()
         .unwrap()
         .with_commit_test(|txn| {
             mutations::set_last_publish_time(txn, &op_hash, five_mins_ago).unwrap();
@@ -314,7 +314,7 @@ async fn publish_loop() {
         timer.elapsed() >= Duration::from_secs(60) && timer.elapsed() < Duration::from_secs(61)
     );
 
-    publish_dht_ops_workflow(env.clone(), &dna_network, &ts, author.clone())
+    publish_dht_ops_workflow(db.clone(), &dna_network, &ts, author.clone())
         .await
         .unwrap();
 
@@ -322,7 +322,7 @@ async fn publish_loop() {
     op_published.recv().await.unwrap();
 
     // - Set receipts complete.
-    env.conn()
+    db.conn()
         .unwrap()
         .with_commit_test(|txn| {
             mutations::set_receipts_complete(txn, &op_hash, true).unwrap();
@@ -336,7 +336,7 @@ async fn publish_loop() {
         timer.elapsed() >= Duration::from_secs(60 * 2)
             && timer.elapsed() < Duration::from_secs(60 * 2 + 1)
     );
-    publish_dht_ops_workflow(env.clone(), &dna_network, &ts, author.clone())
+    publish_dht_ops_workflow(db.clone(), &dna_network, &ts, author.clone())
         .await
         .unwrap();
 
@@ -356,7 +356,7 @@ async fn publish_loop() {
 
     // - Set the ops last publish time to five mins ago.
     // - Set receipts not complete.
-    env.conn()
+    db.conn()
         .unwrap()
         .with_commit_test(|txn| {
             mutations::set_last_publish_time(txn, &op_hash, five_mins_ago).unwrap();
@@ -369,7 +369,7 @@ async fn publish_loop() {
     let timer = tokio::time::Instant::now();
     trigger_recv.listen().await.unwrap();
     assert!(timer.elapsed() < Duration::from_secs(1));
-    publish_dht_ops_workflow(env.clone(), &dna_network, &ts, author.clone())
+    publish_dht_ops_workflow(db.clone(), &dna_network, &ts, author.clone())
         .await
         .unwrap();
 
@@ -383,7 +383,7 @@ async fn publish_loop() {
         timer.elapsed() >= Duration::from_secs(60) && timer.elapsed() < Duration::from_secs(61)
     );
 
-    publish_dht_ops_workflow(env.clone(), &dna_network, &ts, author.clone())
+    publish_dht_ops_workflow(db.clone(), &dna_network, &ts, author.clone())
         .await
         .unwrap();
     // - The op is not published because of the time interval.

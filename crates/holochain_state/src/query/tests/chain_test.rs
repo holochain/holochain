@@ -1,4 +1,4 @@
-use crate::test_utils::{test_cell_env, TestEnv};
+use crate::test_utils::{test_cell_db, TestEnv};
 use ::fixt::prelude::*;
 use fallible_iterator::FallibleIterator;
 use holo_hash::AgentPubKey;
@@ -10,14 +10,14 @@ use ChainStatus::*;
 
 fn setup() -> (TestEnv, MetadataBuf, Create, Create, AgentPubKey) {
     observability::test_run().ok();
-    let test_env = test_cell_env();
-    let meta_buf = MetadataBuf::vault(test_env.env().into()).unwrap();
+    let test_db = test_cell_db();
+    let meta_buf = MetadataBuf::vault(test_db.env().into()).unwrap();
     let agent_pubkey = fake_agent_pubkey_1();
     let mut h1 = fixt!(Create);
     let mut h2 = fixt!(Create);
     h1.author = agent_pubkey.clone();
     h2.author = agent_pubkey.clone();
-    (test_env, meta_buf, h1, h2, agent_pubkey)
+    (test_db, meta_buf, h1, h2, agent_pubkey)
 }
 
 /// TEST: The following chain status transitions have the proper precedence

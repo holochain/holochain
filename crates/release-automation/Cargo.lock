@@ -1276,7 +1276,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_util"
-version = "0.0.7"
+version = "0.0.8"
 dependencies = [
  "cfg-if 0.1.10",
  "derive_more",

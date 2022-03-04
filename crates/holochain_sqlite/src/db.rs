@@ -321,8 +321,8 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
     /// Create a unique db in a temp dir with no static management of the
     /// connection pool, useful for testing.
     #[cfg(any(test, feature = "test_utils"))]
-    pub fn test(tmpdir: &tempfile::TempDir, kind: Kind) -> DatabaseResult<Self> {
-        Self::new(Some(tmpdir.path()), kind, DbSyncLevel::default())
+    pub fn test(path: &Path, kind: Kind) -> DatabaseResult<Self> {
+        Self::new(Some(path), kind, DbSyncLevel::default())
     }
 
     #[cfg(any(test, feature = "test_utils"))]
@@ -451,7 +451,7 @@ pub struct DbKindWasm;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
 /// State of the p2p network (one per space).
-pub struct DbKindP2pAgentStore(pub Arc<KitsuneSpace>);
+pub struct DbKindP2pAgents(pub Arc<KitsuneSpace>);
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
 /// Metrics for peers on p2p network (one per space).
@@ -562,7 +562,7 @@ impl DbKindT for DbKindWasm {
     }
 }
 
-impl DbKindT for DbKindP2pAgentStore {
+impl DbKindT for DbKindP2pAgents {
     fn kind(&self) -> DbKind {
         DbKind::P2pAgentStore(self.0.clone())
     }

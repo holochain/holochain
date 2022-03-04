@@ -1,7 +1,7 @@
 #![deny(missing_docs)]
 //! This module is used to configure the conductor
 
-use holochain_types::env::DbSyncStrategy;
+use holochain_types::db::DbSyncStrategy;
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use serde::Serialize;
@@ -14,7 +14,7 @@ mod keystore_config;
 pub mod paths;
 //mod logger_config;
 //mod signal_config;
-pub use paths::EnvironmentRootPath;
+pub use paths::DatabaseRootPath;
 
 pub use super::*;
 pub use dpki_config::DpkiConfig;
@@ -30,7 +30,7 @@ use std::path::Path;
 pub struct ConductorConfig {
     /// The path to the database for this conductor.
     /// If omitted, chooses a default path.
-    pub environment_path: EnvironmentRootPath,
+    pub environment_path: DatabaseRootPath,
 
     /// Define how Holochain conductor will connect to a keystore.
     #[serde(default)]
@@ -51,7 +51,7 @@ pub struct ConductorConfig {
     /// See [sqlite documentation](https://www.sqlite.org/pragma.html#pragma_synchronous)
     /// for information about database sync levels.
     /// See [`DbSyncStrategy`] for details.
-    /// This is best left at it's default value unless you know what you
+    /// This is best left at its default value unless you know what you
     /// are doing.
     pub db_sync_strategy: DbSyncStrategy,
     //

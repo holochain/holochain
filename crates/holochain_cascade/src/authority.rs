@@ -23,14 +23,14 @@ pub(crate) mod get_element_query;
 pub(crate) mod get_entry_ops_query;
 pub(crate) mod get_links_ops_query;
 
-#[instrument(skip(state_env))]
+#[instrument(skip(db))]
 pub async fn handle_get_entry(
-    state_env: DbRead<DbKindDht>,
+    db: DbRead<DbKindDht>,
     hash: EntryHash,
     _options: holochain_p2p::event::GetOptions,
 ) -> CascadeResult<WireEntryOps> {
     let query = GetEntryOpsQuery::new(hash);
-    let results = state_env
+    let results = db
         .async_reader(move |txn| query.run(Txn::from(&txn)))
         .await?;
     Ok(results)

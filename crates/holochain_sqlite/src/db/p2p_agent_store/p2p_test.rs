@@ -33,7 +33,7 @@ fn rand_signed_at_ms() -> u64 {
 }
 
 async fn rand_insert(
-    db: &DbWrite<DbKindP2pAgentStore>,
+    db: &DbWrite<DbKindP2pAgents>,
     space: &Arc<KitsuneSpace>,
     agent: &Arc<KitsuneAgent>,
     long: bool,
@@ -80,7 +80,7 @@ async fn test_p2p_agent_store_extrapolated_coverage() {
 
     let space = rand_space();
 
-    let db = DbWrite::test(&tmp_dir, DbKindP2pAgentStore(space.clone())).unwrap();
+    let db = DbWrite::test(tmp_dir.path(), DbKindP2pAgents(space.clone())).unwrap();
 
     let mut example_agent = rand_agent();
 
@@ -121,7 +121,7 @@ async fn test_p2p_agent_store_gossip_query_sanity() {
 
     let space = rand_space();
 
-    let db = DbWrite::test(&tmp_dir, DbKindP2pAgentStore(space.clone())).unwrap();
+    let db = DbWrite::test(tmp_dir.path(), DbKindP2pAgents(space.clone())).unwrap();
 
     let mut example_agent = rand_agent();
 

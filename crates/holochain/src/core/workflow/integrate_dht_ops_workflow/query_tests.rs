@@ -104,16 +104,21 @@ impl Scenario {
 #[tokio::test(flavor = "multi_thread")]
 async fn integrate_query() {
     observability::test_run().ok();
-    let env = test_dht_env();
-    let expected = test_data(&env.env().into());
+    let db = test_dht_db();
+    let expected = test_data(&db.to_db().into());
     let (qt, _rx) = TriggerSender::new();
-    // dump_tmp(&env.env());
+    // dump_tmp(&db.db());
     let test_network = test_network(None, None).await;
     let holochain_p2p_cell = test_network.dna_network();
-    integrate_dht_ops_workflow(env.env().into(), &env.env().into(), qt, holochain_p2p_cell)
-        .await
-        .unwrap();
-    let hashes = env
+    integrate_dht_ops_workflow(
+        db.to_db().into(),
+        &db.to_db().into(),
+        qt,
+        holochain_p2p_cell,
+    )
+    .await
+    .unwrap();
+    let hashes = db
         .conn()
         .unwrap()
         .with_reader_test(|txn| {
@@ -138,7 +143,7 @@ async fn integrate_query() {
 }
 
 fn create_and_insert_op(
-    env: &DbRead<DbKindDht>,
+    db: &DbRead<DbKindDht>,
     scenario: Scenario,
     data: &mut SharedData,
 ) -> DhtOpHashed {
@@ -215,7 +220,7 @@ fn create_and_insert_op(
         DhtOp::from_type(op, SignedHeader(header.clone(), fixt!(Signature)), entry).unwrap(),
     );
 
-    env.conn()
+    db.conn()
         .unwrap()
         .with_commit_sync(|txn| {
             let hash = state.as_hash().clone();
@@ -234,7 +239,7 @@ fn create_and_insert_op(
     state
 }
 
-fn test_data(env: &DbRead<DbKindDht>) -> Expected {
+fn test_data(db: &DbRead<DbKindDht>) -> Expected {
     let mut hashes = HashSet::new();
     let mut ops = HashMap::new();
 
@@ -257,13 +262,13 @@ fn test_data(env: &DbRead<DbKindDht>) -> Expected {
     ];
     for op_type in ops_with_deps {
         let scenario = Scenario::without_dep(op_type);
-        let op = create_and_insert_op(env, scenario, &mut data);
+        let op = create_and_insert_op(db, scenario, &mut data);
         ops.insert(op.as_hash().clone(), op);
         let scenarios = Scenario::with_dep(op_type);
-        let op = create_and_insert_op(env, scenarios[0], &mut data);
+        let op = create_and_insert_op(db, scenarios[0], &mut data);
         hashes.insert(op.as_hash().clone());
         ops.insert(op.as_hash().clone(), op);
-        let op = create_and_insert_op(env, scenarios[1], &mut data);
+        let op = create_and_insert_op(db, scenarios[1], &mut data);
         hashes.insert(op.as_hash().clone());
         ops.insert(op.as_hash().clone(), op);
     }

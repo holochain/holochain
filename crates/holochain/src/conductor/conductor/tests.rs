@@ -16,7 +16,7 @@ use holochain_conductor_api::InstalledAppInfoStatus;
 use holochain_conductor_api::{AdminRequest, AdminResponse, AppRequest, AppResponse, ZomeCall};
 use holochain_keystore::crude_mock_keystore::spawn_crude_mock_keystore;
 use holochain_keystore::crude_mock_keystore::spawn_real_or_mock_keystore;
-use holochain_state::prelude::*;
+use holochain_state::prelude::{test_keystore, *};
 use holochain_types::test_utils::fake_cell_id;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::WebsocketSender;
@@ -27,20 +27,18 @@ use matches::assert_matches;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn can_update_state() {
-    let envs = test_environments();
-    let dna_store = MockDnaStore::new();
-    let keystore = envs.keystore().clone();
+    let db_dir = test_db_dir();
+    let dna_store = DnaStore::new();
+    let keystore = test_keystore();
     let holochain_p2p = holochain_p2p::stub_network().await;
     let (post_commit_sender, _post_commit_receiver) =
         tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
+    let spaces = Spaces::new(db_dir.path().to_path_buf().into(), Default::default()).unwrap();
     let conductor = Conductor::new(
-        envs.conductor(),
-        envs.wasm(),
         dna_store,
         keystore,
-        envs.path().to_path_buf().into(),
         holochain_p2p,
-        DbSyncStrategy::default(),
+        spaces,
         post_commit_sender,
     )
     .await
@@ -71,25 +69,24 @@ async fn can_update_state() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn can_add_clone_cell_to_app() {
-    let envs = test_environments();
-    let keystore = envs.keystore().clone();
+    let db_dir = test_db_dir();
+    let keystore = test_keystore();
     let holochain_p2p = holochain_p2p::stub_network().await;
 
     let agent = fixt!(AgentPubKey);
     let dna = fake_valid_dna_file("");
     let cell_id = CellId::new(dna.dna_hash().to_owned(), agent.clone());
 
-    let dna_store = RealDnaStore::new();
+    let dna_store = DnaStore::new();
     let (post_commit_sender, _post_commit_receiver) =
         tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
+    let spaces = Spaces::new(db_dir.path().to_path_buf().into(), Default::default()).unwrap();
+
     let conductor = Conductor::new(
-        envs.conductor(),
-        envs.wasm(),
         dna_store,
         keystore,
-        envs.path().to_path_buf().into(),
         holochain_p2p,
-        DbSyncStrategy::default(),
+        spaces,
         post_commit_sender,
     )
     .await
@@ -152,19 +149,17 @@ async fn can_add_clone_cell_to_app() {
 /// same InstalledAppId
 #[tokio::test(flavor = "multi_thread")]
 async fn app_ids_are_unique() {
-    let environments = test_environments();
-    let dna_store = MockDnaStore::new();
+    let db_dir = test_db_dir();
+    let dna_store = DnaStore::new();
     let holochain_p2p = holochain_p2p::stub_network().await;
     let (post_commit_sender, _post_commit_receiver) =
         tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
+    let spaces = Spaces::new(db_dir.path().to_path_buf().into(), Default::default()).unwrap();
     let conductor = Conductor::new(
-        environments.conductor(),
-        environments.wasm(),
         dna_store,
-        environments.keystore().clone(),
-        environments.path().to_path_buf().into(),
+        test_keystore(),
         holochain_p2p,
-        DbSyncStrategy::default(),
+        spaces,
         post_commit_sender,
     )
     .await
@@ -216,11 +211,11 @@ async fn app_role_ids_are_unique() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn can_set_fake_state() {
-    let envs = test_environments();
+    let db_dir = test_db_dir();
     let state = ConductorState::default();
     let conductor = ConductorBuilder::new()
         .fake_state(state.clone())
-        .test(&envs, &[])
+        .test(db_dir.path(), &[])
         .await
         .unwrap();
     assert_eq!(state, conductor.get_state_from_handle().await.unwrap());
@@ -376,11 +371,11 @@ async fn test_signing_error_during_genesis() {
         .await
         .unwrap();
 
-    let envs = test_envs_with_keystore(bad_keystore);
+    let db_dir = test_db_dir();
     let config = ConductorConfig::default();
     let mut conductor = SweetConductor::new(
-        SweetConductor::handle_from_existing(&envs, &config, &[]).await,
-        envs,
+        SweetConductor::handle_from_existing(db_dir.path(), bad_keystore, &config, &[]).await,
+        db_dir,
         config,
     )
     .await;
@@ -441,11 +436,11 @@ async fn test_signing_error_during_genesis_doesnt_bork_interfaces() {
         .await
         .unwrap();
 
-    let envs = test_envs_with_keystore(keystore.clone());
+    let db_dir = test_db_dir();
     let config = standard_config();
     let mut conductor = SweetConductor::new(
-        SweetConductor::handle_from_existing(&envs, &config, &[]).await,
-        envs,
+        SweetConductor::handle_from_existing(db_dir.path(), keystore.clone(), &config, &[]).await,
+        db_dir,
         config,
     )
     .await;
