@@ -35,7 +35,7 @@ pub(crate) fn search_and_discover_peer_connect(
 
             // see if we already know how to reach the tgt agent
             if let Ok(Some(agent_info_signed)) = inner
-                .evt_sender
+                .host_api
                 .get_agent_info_signed(GetAgentInfoSignedEvt {
                     space: inner.space.clone(),
                     agent: to_agent.clone(),

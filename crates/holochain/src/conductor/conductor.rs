@@ -1362,6 +1362,7 @@ mod builder {
     use super::*;
     use crate::conductor::dna_store::RealDnaStore;
     use crate::conductor::handle::DevSettings;
+    use crate::conductor::kitsune_host_impl::KitsuneHostImpl;
     use crate::conductor::ConductorHandle;
 
     /// A configurable Builder for Conductor and sometimes ConductorHandle
@@ -1486,8 +1487,10 @@ mod builder {
                 };
 
             let spaces = Spaces::new(env_path, config.db_sync_strategy)?;
+            let host = KitsuneHostImpl::new(spaces.clone());
+
             let (holochain_p2p, p2p_evt) =
-                holochain_p2p::spawn_holochain_p2p(network_config, tls_config).await?;
+                holochain_p2p::spawn_holochain_p2p(network_config, tls_config, host).await?;
 
             let (post_commit_sender, post_commit_receiver) =
                 tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
@@ -1626,17 +1629,18 @@ mod builder {
             let keystore = self.keystore.unwrap_or_else(test_keystore);
             self.config.environment_path = env_path.to_path_buf().into();
 
-            let (holochain_p2p, p2p_evt) =
-                holochain_p2p::spawn_holochain_p2p(self.config.network.clone().unwrap_or_default(), holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_types::tls::TlsConfig::new_ephemeral().await.unwrap())
-                    .await?;
-
-            let (post_commit_sender, post_commit_receiver) =
-                tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
-
             let spaces = Spaces::new(
                 self.config.environment_path.clone(),
                 self.config.db_sync_strategy,
             )?;
+            let host = KitsuneHostImpl::new(spaces.clone());
+
+            let (holochain_p2p, p2p_evt) =
+                holochain_p2p::spawn_holochain_p2p(self.config.network.clone().unwrap_or_default(), holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_types::tls::TlsConfig::new_ephemeral().await.unwrap(), host)
+                    .await?;
+
+            let (post_commit_sender, post_commit_receiver) =
+                tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
 
             let conductor = Conductor::new(
                 self.dna_store,
