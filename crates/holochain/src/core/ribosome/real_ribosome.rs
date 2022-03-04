@@ -429,7 +429,7 @@ impl RealRibosome {
             .with_host_function(&mut ns, "__delete", delete)
             .with_host_function(&mut ns, "__schedule", schedule);
 
-        imports.register("db", ns);
+        imports.register("env", ns);
 
         imports
     }
