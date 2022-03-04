@@ -231,6 +231,7 @@ pub mod test_utils {
 
     /// One of various ways to setup an app, used somewhere...
     pub async fn setup_app(
+        dnas: Vec<DnaFile>,
         cell_data: Vec<(InstalledCell, Option<SerializedBytes>)>,
     ) -> (Arc<TempDir>, RealAppInterfaceApi, ConductorHandle) {
         let db_dir = test_db_dir();
@@ -239,6 +240,10 @@ pub mod test_utils {
             .test(db_dir.path(), &[])
             .await
             .unwrap();
+
+        for dna in dnas {
+            conductor_handle.register_dna(dna).await.unwrap();
+        }
 
         conductor_handle
             .clone()
@@ -324,6 +329,7 @@ pub mod test {
     }
 
     async fn setup_admin_fake_cells(
+        dnas: Vec<DnaFile>,
         cell_ids_with_proofs: Vec<(CellId, Option<SerializedBytes>)>,
     ) -> (Arc<TempDir>, ConductorHandle) {
         let db_dir = test_db_dir();
@@ -331,6 +337,10 @@ pub mod test {
             .test(db_dir.path(), &[])
             .await
             .unwrap();
+
+        for dna in dnas {
+            conductor_handle.register_dna(dna).await.unwrap();
+        }
 
         let cell_data = cell_ids_with_proofs
             .into_iter()
@@ -430,7 +440,7 @@ pub mod test {
         let cell_id = CellId::from((dna_hash.clone(), fake_agent_pubkey_1()));
         let installed_cell = InstalledCell::new(cell_id.clone(), "handle".into());
 
-        let (_tmpdir, app_api, handle) = setup_app(vec![(installed_cell, None)]).await;
+        let (_tmpdir, app_api, handle) = setup_app(vec![dna], vec![(installed_cell, None)]).await;
         let mut request: ZomeCall =
             crate::fixt::ZomeCallInvocationFixturator::new(crate::fixt::NamedInvocation(
                 cell_id.clone(),
@@ -481,7 +491,7 @@ pub mod test {
             .map(|hash| (CellId::from((hash, agent_key.clone())), None))
             .collect::<Vec<_>>();
 
-        let (_tmpdir, conductor_handle) = setup_admin_fake_cells(cell_ids_with_proofs).await;
+        let (_tmpdir, conductor_handle) = setup_admin_fake_cells(dnas, cell_ids_with_proofs).await;
         let shutdown = conductor_handle.take_shutdown_handle().unwrap();
         let app_id = "test app".to_string();
 
@@ -612,7 +622,7 @@ pub mod test {
         let cell_id = CellId::from((dna.dna_hash().clone(), fake_agent_pubkey_1()));
 
         let (_tmpdir, conductor_handle) =
-            setup_admin_fake_cells(vec![(cell_id.clone(), None)]).await;
+            setup_admin_fake_cells(vec![dna], vec![(cell_id.clone(), None)]).await;
         let conductor_handle = activate(conductor_handle).await;
         let shutdown = conductor_handle.take_shutdown_handle().unwrap();
         // Allow agents time to join
