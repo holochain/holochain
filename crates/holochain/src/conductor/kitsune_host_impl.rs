@@ -10,7 +10,7 @@ use kitsune_p2p::{
 };
 
 use super::space::Spaces;
-use holochain_types::env::PermittedConn;
+use holochain_types::db::PermittedConn;
 
 /// Implementation of the Kitsune Host API.
 /// Lets Kitsune make requests of Holochain
@@ -32,11 +32,11 @@ impl KitsuneHost for KitsuneHostImpl {
         dht_arc_set: holochain_p2p::dht_arc::DhtArcSet,
     ) -> KitsuneHostResult<Vec<f64>> {
         async move {
-            let env = self.spaces.p2p_env(&DnaHash::from_kitsune(&space))?;
+            let db = self.spaces.p2p_agents_db(&DnaHash::from_kitsune(&space))?;
             use holochain_sqlite::db::AsP2pAgentStoreConExt;
-            let permit = env.conn_permit().await;
+            let permit = db.conn_permit().await;
             let task = tokio::task::spawn_blocking(move || {
-                let mut conn = env.from_permit(permit)?;
+                let mut conn = db.from_permit(permit)?;
                 conn.p2p_extrapolated_coverage(dht_arc_set)
             })
             .await;
@@ -52,13 +52,11 @@ impl KitsuneHost for KitsuneHostImpl {
         records: Vec<kitsune_p2p::event::MetricRecord>,
     ) -> KitsuneHostResult<()> {
         async move {
-            let env = self
-                .spaces
-                .p2p_metrics_env(&DnaHash::from_kitsune(&space))?;
+            let db = self.spaces.p2p_metrics_db(&DnaHash::from_kitsune(&space))?;
             use holochain_sqlite::db::AsP2pMetricStoreConExt;
-            let permit = env.conn_permit().await;
+            let permit = db.conn_permit().await;
             let task = tokio::task::spawn_blocking(move || {
-                let mut conn = env.from_permit(permit)?;
+                let mut conn = db.from_permit(permit)?;
                 conn.p2p_log_metrics(records)
             })
             .await;
@@ -73,9 +71,9 @@ impl KitsuneHost for KitsuneHostImpl {
         GetAgentInfoSignedEvt { space, agent }: GetAgentInfoSignedEvt,
     ) -> KitsuneHostResult<Option<AgentInfoSigned>> {
         let dna_hash = DnaHash::from_kitsune(&space);
-        let env = self.spaces.p2p_env(&dna_hash);
+        let db = self.spaces.p2p_agents_db(&dna_hash);
         async move {
-            Ok(super::p2p_agent_store::get_agent_info_signed(env?.into(), space, agent).await?)
+            Ok(super::p2p_agent_store::get_agent_info_signed(db?.into(), space, agent).await?)
         }
         .boxed()
         .into()

@@ -93,7 +93,7 @@ impl AsP2pAgentStoreConExt for crate::db::PConnGuard {
 
 /// Put an AgentInfoSigned record into the p2p_store
 pub async fn p2p_put(
-    db: &DbWrite<DbKindP2pAgentStore>,
+    db: &DbWrite<DbKindP2pAgents>,
     signed: &AgentInfoSigned,
 ) -> DatabaseResult<()> {
     let record = P2pRecord::from_signed(signed)?;
@@ -102,7 +102,7 @@ pub async fn p2p_put(
 
 /// Put an iterator of AgentInfoSigned records into the p2p_store
 pub async fn p2p_put_all(
-    db: &DbWrite<DbKindP2pAgentStore>,
+    db: &DbWrite<DbKindP2pAgents>,
     signed: impl Iterator<Item = &AgentInfoSigned>,
 ) -> DatabaseResult<()> {
     let mut records = Vec::new();
@@ -146,7 +146,7 @@ fn tx_p2p_put(txn: &mut Transaction, record: P2pRecord) -> DatabaseResult<()> {
 }
 
 /// Prune all expired AgentInfoSigned records from the p2p_store
-pub async fn p2p_prune(db: &DbWrite<DbKindP2pAgentStore>) -> DatabaseResult<()> {
+pub async fn p2p_prune(db: &DbWrite<DbKindP2pAgents>) -> DatabaseResult<()> {
     db.async_commit(move |txn| {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::SystemTime::UNIX_EPOCH)

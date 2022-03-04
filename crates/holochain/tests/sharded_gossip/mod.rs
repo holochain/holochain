@@ -571,7 +571,7 @@ async fn mock_network_sharded_gossip() {
         .unwrap();
 
     let (alice,) = apps.into_tuple();
-    let alice_p2p_env = conductor.get_p2p_env(alice.cell_id().dna_hash());
+    let alice_p2p_agents_db = conductor.get_p2p_db(alice.cell_id().dna_hash());
     let alice_kit = alice.agent_pubkey().to_kitsune();
 
     // Spawn a task to update alice's agent info.
@@ -580,7 +580,7 @@ async fn mock_network_sharded_gossip() {
         async move {
             loop {
                 {
-                    let mut conn = alice_p2p_env.conn().unwrap();
+                    let mut conn = alice_p2p_agents_db.conn().unwrap();
                     let txn = conn.transaction().unwrap();
                     let info = txn.p2p_get_agent(&alice_kit).unwrap();
                     {
@@ -1058,7 +1058,7 @@ async fn mock_network_sharding() {
         .unwrap();
 
     let (alice,) = apps.into_tuple();
-    let alice_p2p_env = conductor.get_p2p_env(alice.cell_id().dna_hash());
+    let alice_p2p_agents_db = conductor.get_p2p_db(alice.cell_id().dna_hash());
     let alice_kit = alice.agent_pubkey().to_kitsune();
 
     // Spawn a task to update alice's agent info.
@@ -1066,7 +1066,7 @@ async fn mock_network_sharding() {
         let alice_info = alice_info.clone();
         async move {
             loop {
-                fresh_reader_test(alice_p2p_env.clone(), |txn| {
+                fresh_reader_test(alice_p2p_agents_db.clone(), |txn| {
                     let info = txn.p2p_get_agent(&alice_kit).unwrap();
                     {
                         if let Some(info) = &info {

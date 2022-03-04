@@ -28,7 +28,7 @@ use super::manager::keep_alive_task;
 use super::manager::ManagedTaskAdd;
 use super::manager::ManagedTaskHandle;
 use super::manager::TaskManagerRunHandle;
-use super::paths::EnvironmentRootPath;
+use super::paths::DatabaseRootPath;
 use super::space::Space;
 use super::space::Spaces;
 use super::state::AppInterfaceId;
@@ -492,18 +492,18 @@ where
         self.spaces.get_or_create_space(dna_hash)
     }
 
-    pub(super) fn get_or_create_authored_env(
+    pub(super) fn get_or_create_authored_db(
         &self,
         dna_hash: &DnaHash,
     ) -> ConductorResult<DbWrite<DbKindAuthored>> {
-        self.spaces.authored_env(dna_hash)
+        self.spaces.authored_db(dna_hash)
     }
 
-    pub(super) fn get_or_create_dht_env(
+    pub(super) fn get_or_create_dht_db(
         &self,
         dna_hash: &DnaHash,
     ) -> ConductorResult<DbWrite<DbKindDht>> {
-        self.spaces.dht_env(dna_hash)
+        self.spaces.dht_db(dna_hash)
     }
 
     /// Adjust app statuses (via state transitions) to match the current
@@ -807,10 +807,10 @@ where
         impl IntoIterator<Item = (DnaHash, DnaFile)>,
         impl IntoIterator<Item = (EntryDefBufferKey, EntryDef)>,
     )> {
-        let env = &self.spaces.wasm_env;
+        let db = &self.spaces.wasm_db;
 
         // Load out all dna defs
-        let (wasm_tasks, defs) = env
+        let (wasm_tasks, defs) = db
             .async_reader(move |txn| {
                 // Get all the dna defs.
                 let dna_defs: Vec<_> = holochain_state::dna_def::get_all(&txn)?
@@ -868,8 +868,8 @@ where
     }
 
     /// Get the root environment directory.
-    pub fn root_env_dir(&self) -> &EnvironmentRootPath {
-        &self.spaces.root_env_dir
+    pub fn root_db_dir(&self) -> &DatabaseRootPath {
+        &self.spaces.db_dir
     }
 
     /// Get the keystore.
@@ -926,7 +926,7 @@ where
         &self,
         dna: DnaFile,
     ) -> ConductorResult<Vec<(EntryDefBufferKey, EntryDef)>> {
-        let env = self.spaces.wasm_env.clone();
+        let db = self.spaces.wasm_db.clone();
 
         let zome_defs = get_entry_defs(dna.clone())?;
 
@@ -939,7 +939,7 @@ where
         )
         .await;
 
-        env.async_commit({
+        db.async_commit({
             let zome_defs = zome_defs.clone();
             move |txn| {
                 for dna_wasm in wasms {
@@ -1093,15 +1093,15 @@ pub(super) async fn genesis_cells<DS: DnaStore + 'static>(
     conductor_handle: ConductorHandle,
 ) -> ConductorResult<()> {
     let cells_tasks = cell_ids_with_proofs.into_iter().map(|(cell_id, proof)| {
-        let authored_env = conductor
-            .get_or_create_authored_env(cell_id.dna_hash())
+        let authored_db = conductor
+            .get_or_create_authored_db(cell_id.dna_hash())
             .map_err(|e| CellError::FailedToCreateAuthoredDb(e.into()));
-        let dht_env = conductor
-            .get_or_create_dht_env(cell_id.dna_hash())
+        let dht_db = conductor
+            .get_or_create_dht_db(cell_id.dna_hash())
             .map_err(|e| CellError::FailedToCreateDhtDb(e.into()));
         async {
-            let authored_env = authored_env?;
-            let dht_env = dht_env?;
+            let authored_db = authored_db?;
+            let dht_db = dht_db?;
             let conductor_handle = conductor_handle.clone();
             let cell_id_inner = cell_id.clone();
             let ribosome = conductor_handle
@@ -1111,8 +1111,8 @@ pub(super) async fn genesis_cells<DS: DnaStore + 'static>(
                 Cell::genesis(
                     cell_id_inner,
                     conductor_handle,
-                    authored_env,
-                    dht_env,
+                    authored_db,
+                    dht_db,
                     ribosome,
                     proof,
                 )
@@ -1284,7 +1284,7 @@ where
 
     pub(super) async fn get_state(&self) -> ConductorResult<ConductorState> {
         self.spaces
-            .conductor_env
+            .conductor_db
             .async_reader(|txn| {
                 let state = txn
                     .query_row("SELECT blob FROM ConductorState WHERE id = 1", [], |row| {
@@ -1320,7 +1320,7 @@ where
         self.check_running()?;
         let output = self
             .spaces
-            .conductor_env
+            .conductor_db
             .async_commit(move |txn| {
                 let state = txn
                     .query_row("SELECT blob FROM ConductorState WHERE id = 1", [], |row| {

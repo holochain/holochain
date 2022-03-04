@@ -125,14 +125,14 @@ where
     pub fn with_network<N: HolochainP2pDnaT + Clone>(
         self,
         network: N,
-        cache_env: DbWrite<DbKindCache>,
+        cache_db: DbWrite<DbKindCache>,
     ) -> Cascade<N> {
         Cascade {
             authored: self.authored,
             dht: self.dht,
             scratch: self.scratch,
             private_data: self.private_data,
-            cache: Some(cache_env),
+            cache: Some(cache_db),
             network: Some(network),
         }
     }

@@ -27,13 +27,13 @@ use matches::assert_matches;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn can_update_state() {
-    let envs = test_env_dir();
+    let db_dir = test_db_dir();
     let dna_store = MockDnaStore::new();
     let keystore = test_keystore();
     let holochain_p2p = holochain_p2p::stub_network().await;
     let (post_commit_sender, _post_commit_receiver) =
         tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
-    let spaces = Spaces::new(envs.path().to_path_buf().into(), Default::default()).unwrap();
+    let spaces = Spaces::new(db_dir.path().to_path_buf().into(), Default::default()).unwrap();
     let conductor = Conductor::new(
         dna_store,
         keystore,
@@ -69,7 +69,7 @@ async fn can_update_state() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn can_add_clone_cell_to_app() {
-    let envs = test_env_dir();
+    let db_dir = test_db_dir();
     let keystore = test_keystore();
     let holochain_p2p = holochain_p2p::stub_network().await;
 
@@ -80,7 +80,7 @@ async fn can_add_clone_cell_to_app() {
     let dna_store = RealDnaStore::new();
     let (post_commit_sender, _post_commit_receiver) =
         tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
-    let spaces = Spaces::new(envs.path().to_path_buf().into(), Default::default()).unwrap();
+    let spaces = Spaces::new(db_dir.path().to_path_buf().into(), Default::default()).unwrap();
 
     let conductor = Conductor::new(
         dna_store,
@@ -149,12 +149,12 @@ async fn can_add_clone_cell_to_app() {
 /// same InstalledAppId
 #[tokio::test(flavor = "multi_thread")]
 async fn app_ids_are_unique() {
-    let envs = test_env_dir();
+    let db_dir = test_db_dir();
     let dna_store = MockDnaStore::new();
     let holochain_p2p = holochain_p2p::stub_network().await;
     let (post_commit_sender, _post_commit_receiver) =
         tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
-    let spaces = Spaces::new(envs.path().to_path_buf().into(), Default::default()).unwrap();
+    let spaces = Spaces::new(db_dir.path().to_path_buf().into(), Default::default()).unwrap();
     let conductor = Conductor::new(
         dna_store,
         test_keystore(),
@@ -211,11 +211,11 @@ async fn app_role_ids_are_unique() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn can_set_fake_state() {
-    let envs = test_env_dir();
+    let db_dir = test_db_dir();
     let state = ConductorState::default();
     let conductor = ConductorBuilder::new()
         .fake_state(state.clone())
-        .test(envs.path(), &[])
+        .test(db_dir.path(), &[])
         .await
         .unwrap();
     assert_eq!(state, conductor.get_state_from_handle().await.unwrap());
@@ -371,11 +371,11 @@ async fn test_signing_error_during_genesis() {
         .await
         .unwrap();
 
-    let envs = test_env_dir();
+    let db_dir = test_db_dir();
     let config = ConductorConfig::default();
     let mut conductor = SweetConductor::new(
-        SweetConductor::handle_from_existing(envs.path(), bad_keystore, &config, &[]).await,
-        envs,
+        SweetConductor::handle_from_existing(db_dir.path(), bad_keystore, &config, &[]).await,
+        db_dir,
         config,
     )
     .await;
@@ -436,11 +436,11 @@ async fn test_signing_error_during_genesis_doesnt_bork_interfaces() {
         .await
         .unwrap();
 
-    let envs = test_env_dir();
+    let db_dir = test_db_dir();
     let config = standard_config();
     let mut conductor = SweetConductor::new(
-        SweetConductor::handle_from_existing(envs.path(), keystore.clone(), &config, &[]).await,
-        envs,
+        SweetConductor::handle_from_existing(db_dir.path(), keystore.clone(), &config, &[]).await,
+        db_dir,
         config,
     )
     .await;

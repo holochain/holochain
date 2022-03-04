@@ -132,9 +132,9 @@ pub mod test {
             .commit_entry(entry.clone(), ENTRY_DEF_ID)
             .await;
 
-        let dht_env = conductor
+        let dht_db = conductor
             .inner_handle()
-            .get_dht_env(alice.cell_id().dna_hash())
+            .get_dht_db(alice.cell_id().dna_hash())
             .unwrap();
 
         // When we first get the element it will return because we haven't yet
@@ -160,7 +160,7 @@ pub mod test {
             header.clone(),
             maybe_entry_box,
         ));
-        dht_env
+        dht_db
             .conn()
             .unwrap()
             .with_commit_sync(|txn| {

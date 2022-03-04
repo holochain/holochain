@@ -273,7 +273,7 @@ async fn conductors_gossip_inner(
     let mut envs = Vec::with_capacity(handles.len() + second_handles.len());
     for h in handles.iter().chain(second_handles.iter()) {
         let space = h.cell_id.dna_hash();
-        envs.push(h.get_p2p_env(space));
+        envs.push(h.get_p2p_db(space));
     }
 
     if share_peers {
@@ -305,7 +305,7 @@ async fn conductors_gossip_inner(
     let mut envs = Vec::with_capacity(third_handles.len() + second_handles.len());
     for h in third_handles.iter().chain(second_handles.iter()) {
         let space = h.cell_id.dna_hash();
-        envs.push(h.get_p2p_env(space));
+        envs.push(h.get_p2p_db(space));
     }
 
     if share_peers {
@@ -376,13 +376,13 @@ async fn check_gossip(
 
     let mut others = Vec::with_capacity(all_handles.len());
     for other in all_handles {
-        let other = other.get_dht_env(other.cell_id.dna_hash()).unwrap().into();
+        let other = other.get_dht_db(other.cell_id.dna_hash()).unwrap().into();
         others.push(other);
     }
     let others_ref = others.iter().collect::<Vec<_>>();
 
     wait_for_integration_with_others(
-        &handle.get_dht_env(handle.cell_id.dna_hash()).unwrap(),
+        &handle.get_dht_db(handle.cell_id.dna_hash()).unwrap(),
         &others_ref,
         expected_count,
         NUM_ATTEMPTS,
@@ -406,7 +406,7 @@ async fn check_gossip(
 }
 
 #[tracing::instrument(skip(envs))]
-async fn check_peers(envs: Vec<DbWrite<DbKindP2pAgentStore>>) {
+async fn check_peers(envs: Vec<DbWrite<DbKindP2pAgents>>) {
     for (i, a) in envs.iter().enumerate() {
         let peers = all_agent_infos(a.clone().into()).await.unwrap();
         let num_peers = peers.len();
@@ -423,7 +423,7 @@ struct TestHandle {
     #[shrinkwrap(main_field)]
     handle: ConductorHandle,
     cell_id: CellId,
-    _envs: Arc<TempDir>,
+    _db_dir: Arc<TempDir>,
 }
 
 impl TestHandle {
@@ -462,7 +462,7 @@ async fn setup(
     let mut handles = Vec::with_capacity(num_conductors);
     for _ in 0..num_conductors {
         let dnas = vec![dna_file.clone()];
-        let (_envs, _, handle) =
+        let (_db_dir, _, handle) =
             setup_app_with_network(vec![], vec![], network.clone().unwrap_or_default()).await;
 
         let agent_key = AgentPubKey::new_random(handle.keystore()).await.unwrap();
@@ -470,7 +470,7 @@ async fn setup(
         let app = InstalledCell::new(cell_id.clone(), "cell_handle".into());
         install_app("test_app", vec![(app, None)], dnas.clone(), handle.clone()).await;
         handles.push(TestHandle {
-            _envs: Arc::new(_envs),
+            _db_dir: Arc::new(_db_dir),
             cell_id,
             handle,
         });

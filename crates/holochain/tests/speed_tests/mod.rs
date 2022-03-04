@@ -34,7 +34,7 @@ use tempfile::TempDir;
 
 use super::test_utils::*;
 use holochain::sweettest::*;
-use holochain_state::prelude::test_env_dir;
+use holochain_state::prelude::test_db_dir;
 use holochain_test_wasm_common::AnchorInput;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
@@ -173,7 +173,7 @@ async fn speed_test(n: Option<usize>) -> TempDir {
     let mut dna_store = MockDnaStore::single_dna(dna_file, 2, 2);
     dna_store.expect_get_entry_def().return_const(None);
 
-    let (test_env, _app_api, handle) = setup_app(
+    let (test_db, _app_api, handle) = setup_app(
         vec![(alice_installed_cell, None), (bob_installed_cell, None)],
         dna_store,
     )
@@ -292,14 +292,14 @@ async fn speed_test(n: Option<usize>) -> TempDir {
     let shutdown = handle.take_shutdown_handle().unwrap();
     handle.shutdown();
     shutdown.await.unwrap().unwrap();
-    test_env
+    test_db
 }
 
 pub async fn setup_app(
     cell_data: Vec<(InstalledCell, Option<SerializedBytes>)>,
     dna_store: MockDnaStore,
 ) -> (TempDir, RealAppInterfaceApi, ConductorHandle) {
-    let envs = test_env_dir();
+    let db_dir = test_db_dir();
 
     let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
         .config(ConductorConfig {
@@ -308,7 +308,7 @@ pub async fn setup_app(
             }]),
             ..Default::default()
         })
-        .test(envs.path(), &[])
+        .test(db_dir.path(), &[])
         .await
         .unwrap();
 
@@ -334,5 +334,5 @@ pub async fn setup_app(
 
     let handle = conductor_handle.clone();
 
-    (envs, RealAppInterfaceApi::new(conductor_handle), handle)
+    (db_dir, RealAppInterfaceApi::new(conductor_handle), handle)
 }

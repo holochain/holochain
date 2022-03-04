@@ -24,8 +24,6 @@ pub mod dht_op;
 pub mod dna;
 pub mod element;
 pub mod entry;
-#[allow(missing_docs)]
-pub mod env;
 pub mod fixt;
 pub mod header;
 pub mod link;
