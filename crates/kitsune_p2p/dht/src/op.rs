@@ -54,7 +54,7 @@ impl Ord for OpData {
     }
 }
 
-pub trait OpRegion<D>: PartialOrd + Ord {
+pub trait OpRegion<D>: PartialOrd + Ord + Send + Sync {
     fn loc(&self) -> Loc;
     fn timestamp(&self) -> Timestamp;
     fn region_data(&self) -> D;

@@ -1,9 +1,11 @@
+use must_future::MustBoxFuture;
+
 use crate::{
     agent::AgentInfo,
     arq::{ascii::add_location_ascii, *},
     hash::{fake_hash, AgentKey},
-    host::{AccessOpStore, AccessPeerStore},
     op::Op,
+    persistence::{AccessOpStore, AccessPeerStore},
     quantum::{GossipParams, TelescopingTimes, TimeQuantum, Topology},
     region::*,
 };
@@ -72,6 +74,13 @@ impl AccessOpStore for TestNode {
 
     fn query_region(&self, region: &RegionBounds) -> RegionData {
         self.store.query_region(region)
+    }
+
+    fn fetch_region_set(
+        &self,
+        coords: RegionCoordSetXtcs,
+    ) -> MustBoxFuture<Result<RegionSetXtcs, ()>> {
+        self.store.fetch_region_set(coords)
     }
 
     fn integrate_ops<Ops: Clone + Iterator<Item = Op>>(&mut self, ops: Ops) {

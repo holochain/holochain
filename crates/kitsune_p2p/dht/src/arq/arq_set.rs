@@ -1,8 +1,8 @@
 use kitsune_p2p_dht_arc::DhtArcSet;
 
-use crate::arq::ArqBounds;
+use crate::{arq::ArqBounds, ArqStrat};
 
-use super::{Arq, ArqBounded};
+use super::{power_and_count_from_length, Arq, ArqBounded};
 
 pub type ArqSet = ArqSetImpl<Arq>;
 pub type ArqBoundsSet = ArqSetImpl<ArqBounds>;
@@ -108,6 +108,23 @@ impl<A: ArqBounded> ArqSetImpl<A> {
         for (i, arq) in self.arqs().into_iter().enumerate() {
             println!("|{}| {}:\t{}", arq.to_ascii(len), i, arq.count());
         }
+    }
+}
+
+impl ArqBoundsSet {
+    pub fn from_dht_arc_set(strat: &ArqStrat, dht_arc_set: &DhtArcSet) -> Self {
+        let max_chunks = strat.max_chunks();
+        Self::new(
+            dht_arc_set
+                .intervals()
+                .into_iter()
+                .map(|i| {
+                    let len = i.length();
+                    let (pow, _) = power_and_count_from_length(len, max_chunks);
+                    ArqBounds::from_interval_rounded(pow, i)
+                })
+                .collect(),
+        )
     }
 }
 

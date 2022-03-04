@@ -7,6 +7,8 @@
 
 use std::sync::Arc;
 
+use must_future::MustBoxFuture;
+
 use crate::{
     agent::AgentInfo,
     arq::ArqBoundsSet,
@@ -18,7 +20,9 @@ use crate::{
 };
 
 /// TODO: make async
-pub trait AccessOpStore<D: TreeDataConstraints = RegionData, O: OpRegion<D> = OpData> {
+pub trait AccessOpStore<D: TreeDataConstraints = RegionData, O: OpRegion<D> = OpData>:
+    Send
+{
     fn query_op_data(&self, region: &RegionBounds) -> Vec<Arc<O>>;
     fn query_ops_by_coords(&self, region: &RegionCoords) -> Vec<Arc<O>> {
         self.query_op_data(&region.to_bounds(self.topo()))
@@ -29,6 +33,11 @@ pub trait AccessOpStore<D: TreeDataConstraints = RegionData, O: OpRegion<D> = Op
     fn query_region_coords(&self, region: &RegionCoords) -> D {
         self.query_region(&region.to_bounds(self.topo()))
     }
+
+    fn fetch_region_set(
+        &self,
+        coords: RegionCoordSetXtcs,
+    ) -> MustBoxFuture<Result<RegionSetXtcs<D>, ()>>;
 
     fn integrate_ops<Ops: Clone + Iterator<Item = Arc<O>>>(&mut self, ops: Ops);
 

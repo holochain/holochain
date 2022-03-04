@@ -2,8 +2,8 @@
 
 use kitsune_p2p_dht::{
     arq::*,
-    host::*,
     op::*,
+    persistence::*,
     quantum::*,
     region::*,
     test_utils::{

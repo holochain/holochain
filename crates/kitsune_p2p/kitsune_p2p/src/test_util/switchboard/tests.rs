@@ -1,5 +1,7 @@
 use kitsune_p2p_timestamp::Timestamp;
-use kitsune_p2p_types::{config::KitsuneP2pTuningParams, dht_arc::loc8::Loc8};
+use kitsune_p2p_types::{
+    config::KitsuneP2pTuningParams, dht::quantum::Topology, dht_arc::loc8::Loc8,
+};
 use rand::Rng;
 
 use crate::{
@@ -12,7 +14,8 @@ use pretty_assertions::assert_eq;
 #[tokio::test(flavor = "multi_thread")]
 async fn fullsync_3way_recent() {
     // observability::test_run().ok();
-    let sb = Switchboard::new(GossipType::Recent);
+    let topo = Topology::standard_epoch();
+    let sb = Switchboard::new(topo, GossipType::Recent);
 
     let [n1, n2, n3] = sb.add_nodes(tuning_params()).await;
 
@@ -58,7 +61,8 @@ async fn fullsync_3way_recent() {
 #[tokio::test(flavor = "multi_thread")]
 async fn sharded_3way_recent() {
     observability::test_run().ok();
-    let sb = Switchboard::new(GossipType::Recent);
+    let topo = Topology::standard_epoch();
+    let sb = Switchboard::new(topo, GossipType::Recent);
 
     let [n1, n2, n3] = sb.add_nodes(tuning_params()).await;
 
@@ -103,7 +107,8 @@ async fn sharded_3way_recent() {
 #[tokio::test(flavor = "multi_thread")]
 async fn transitive_peer_gossip() {
     observability::test_run().ok();
-    let sb = Switchboard::new(GossipType::Recent);
+    let topo = Topology::standard_epoch();
+    let sb = Switchboard::new(topo, GossipType::Recent);
 
     let [n1, n2, n3, n4] = sb.add_nodes(tuning_params()).await;
 
@@ -171,7 +176,8 @@ async fn transitive_peer_gossip() {
 async fn sharded_4way_recent() {
     observability::test_run().ok();
 
-    let sb = Switchboard::new(GossipType::Recent);
+    let topo = Topology::standard_epoch();
+    let sb = Switchboard::new(topo, GossipType::Recent);
 
     let [n1, n2, n3, n4] = sb.add_nodes(tuning_params()).await;
 
@@ -239,8 +245,9 @@ async fn sharded_4way_recent() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn sharded_4way_historical() {
-    // observability::test_run().ok();
-    let sb = Switchboard::new(GossipType::Historical);
+    observability::test_run().ok();
+    let topo = Topology::standard(Timestamp::ZERO);
+    let sb = Switchboard::new(topo, GossipType::Historical);
 
     let [n1, n2, n3, n4] = sb.add_nodes(tuning_params()).await;
 

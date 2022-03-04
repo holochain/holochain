@@ -4,7 +4,6 @@ use crate::gossip::sharded_gossip::{BandwidthThrottle, GossipType, ShardedGossip
 use crate::test_util::spawn_handler;
 use crate::types::gossip::*;
 use crate::types::wire;
-use crate::HostStub;
 use futures::stream::StreamExt;
 use ghost_actor::dependencies::tracing;
 use ghost_actor::GhostResult;
@@ -15,6 +14,8 @@ use kitsune_p2p_types::agent_info::agent_info_helper::{AgentInfoEncode, AgentMet
 use kitsune_p2p_types::agent_info::{AgentInfoInner, AgentInfoSigned};
 use kitsune_p2p_types::bin_types::*;
 use kitsune_p2p_types::config::KitsuneP2pTuningParams;
+use kitsune_p2p_types::dht::quantum::Topology;
+use kitsune_p2p_types::dht::ArqStrat;
 use kitsune_p2p_types::dht_arc::loc8::Loc8;
 use kitsune_p2p_types::dht_arc::{ArcInterval, DhtArc, DhtLocation};
 use kitsune_p2p_types::metrics::metric_task;
@@ -45,7 +46,7 @@ static ZERO_SPACE: once_cell::sync::Lazy<Arc<KitsuneSpace>> =
 /// represents the shared state across all nodes in a space.
 ///
 /// This is essentially an Arc<Clone<SwitchboardState>>, which is passed to
-/// SwitchboardEventHandler and is alsoaccessible to your test, so that you can
+/// SwitchboardEventHandler and is also accessible to your test, so that you can
 /// manually modify state while gossip is modifying the same state.
 ///
 /// When calling `add_node(s)`, a new gossip module is created, a task is
@@ -54,6 +55,8 @@ static ZERO_SPACE: once_cell::sync::Lazy<Arc<KitsuneSpace>> =
 /// in the process.
 #[derive(Clone)]
 pub struct Switchboard {
+    pub(super) strat: ArqStrat,
+    pub(super) topology: Topology,
     inner: Share<SwitchboardState>,
     gossip_type: GossipType,
 }
@@ -66,8 +69,10 @@ impl Switchboard {
     //   both gossip loops to share the same state.
     //   Or, this could be modified to take a list of GossipTypes, so that
     //   multiple loops will be created internally.
-    pub fn new(gossip_type: GossipType) -> Self {
+    pub fn new(topology: Topology, gossip_type: GossipType) -> Self {
         Self {
+            strat: ArqStrat::default(),
+            topology,
             inner: Share::new(SwitchboardState::default()),
             gossip_type,
         }
@@ -121,7 +126,7 @@ impl Switchboard {
         let ep_hnd = ep.handle().clone();
 
         let evt_handler = SwitchboardEventHandler::new(ep_hnd.clone(), self.clone());
-        let host = HostStub::new();
+        let host_api = Arc::new(evt_handler.clone());
         let (evt_sender, handler_task) = spawn_handler(evt_handler.clone()).await;
 
         let bandwidth = Arc::new(BandwidthThrottle::new(1000.0, 1000.0));
@@ -131,7 +136,7 @@ impl Switchboard {
             space.clone(),
             ep_hnd.clone(),
             evt_sender,
-            host,
+            host_api,
             self.gossip_type,
             bandwidth,
             Default::default(),

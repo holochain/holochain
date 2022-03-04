@@ -10,6 +10,8 @@ pub trait TreeDataConstraints:
     + AddAssign
     + Sub<Output = Self>
     + Copy
+    + Send
+    + Sync
     + std::fmt::Debug
     + serde::Serialize
     + serde::de::DeserializeOwned
@@ -21,6 +23,8 @@ impl<T> TreeDataConstraints for T where
         + AddAssign
         + Sub<Output = T>
         + Copy
+        + Send
+        + Sync
         + std::fmt::Debug
         + serde::Serialize
         + serde::de::DeserializeOwned

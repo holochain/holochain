@@ -3,8 +3,8 @@ use once_cell::sync::OnceCell;
 use crate::{
     arq::*,
     error::{GossipError, GossipResult},
-    host::AccessOpStore,
     op::OpRegion,
+    persistence::AccessOpStore,
     quantum::*,
     tree::TreeDataConstraints,
 };
@@ -41,6 +41,18 @@ impl RegionCoordSetXtcs {
                     .map(move |(it, t)| ((ix as u32, it as u32), RegionCoords::new(x, t)))
             })
         })
+    }
+
+    pub fn into_region_set<D, E, F>(self, mut f: F) -> Result<RegionSetXtcs<D>, E>
+    where
+        D: TreeDataConstraints,
+        F: FnMut(((u32, u32), RegionCoords)) -> Result<D, E>,
+    {
+        let data = self
+            .region_coords_nested()
+            .map(move |column| column.map(&mut f).collect::<Result<Vec<D>, E>>())
+            .collect::<Result<Vec<Vec<D>>, E>>()?;
+        Ok(RegionSetXtcs::from_data(self, data))
     }
 
     pub fn empty() -> Self {

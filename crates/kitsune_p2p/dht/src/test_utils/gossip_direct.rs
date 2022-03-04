@@ -1,6 +1,6 @@
 use crate::{
     error::{GossipError, GossipResult},
-    host::HostAccess,
+    persistence::HostAccess,
     quantum::{Quantum, TimeQuantum},
 };
 

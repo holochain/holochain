@@ -13,6 +13,7 @@ use governor::state::{InMemoryState, NotKeyed};
 use governor::RateLimiter;
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::codec::Codec;
+use kitsune_p2p_types::combinators::second;
 use kitsune_p2p_types::config::*;
 use kitsune_p2p_types::dht::region::RegionSetXtcs;
 use kitsune_p2p_types::dht_arc::{ArcInterval, DhtArcSet};
@@ -728,18 +729,31 @@ impl ShardedGossipLocal {
                 if let Some(state) = self.get_state(&cert)? {
                     if let Some(sent) = state.region_set_sent {
                         let regions = sent.diff(region_set).map_err(KitsuneError::other)?;
-                        let topo = todo!("get topology");
+                        let topo = self
+                            .host_api
+                            .get_topology(self.space.clone())
+                            .await
+                            .map_err(KitsuneError::other)?;
                         let bounds: Vec<_> = regions
                             .into_iter()
                             .map(|r| r.coords.to_bounds(&topo))
                             .collect();
                         // TODO: make region set diffing more robust to different times / arc power levels.
 
-                        self.evt_sender.fetch_op_data(FetchOpDataEvt {
-                            space: self.space.clone(),
-                            query: FetchOpDataEvtQuery::Regions(bounds),
-                        });
-                        vec![todo!()]
+                        let ops = self
+                            .evt_sender
+                            .fetch_op_data(FetchOpDataEvt {
+                                space: self.space.clone(),
+                                query: FetchOpDataEvtQuery::Regions(bounds),
+                            })
+                            .await
+                            .map_err(KitsuneError::other)?
+                            .into_iter()
+                            .map(second)
+                            .collect();
+
+                        // FIXME: batching
+                        vec![ShardedGossipWire::missing_ops(ops, 2)]
                     } else {
                         tracing::error!(
                             "We received OpRegions gossip without sending any ourselves"

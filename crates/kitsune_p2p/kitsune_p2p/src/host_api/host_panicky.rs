@@ -4,7 +4,8 @@ use super::*;
 
 /// A supertrait of KitsuneHost convenient for defining test handlers.
 /// Allows only specifying the methods you care about, and letting all the rest
-/// panic if called
+/// panic if called.
+/// This trait's methods should match exactly with KitsuneHost.
 #[allow(missing_docs)]
 pub trait KitsuneHostPanicky: KitsuneHost {
     /// Name to be printed out on unimplemented panic

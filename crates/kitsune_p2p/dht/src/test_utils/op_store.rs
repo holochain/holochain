@@ -1,12 +1,12 @@
-use std::{collections::BTreeSet, ops::Bound, sync::Arc};
-
 use crate::{
-    host::AccessOpStore,
     op::{OpData, OpRegion},
+    persistence::AccessOpStore,
     quantum::{GossipParams, Topology},
     region::{RegionBounds, RegionData},
     tree::{Tree, TreeDataConstraints},
 };
+use futures::future::FutureExt;
+use std::{collections::BTreeSet, ops::Bound, sync::Arc};
 
 #[derive(Clone)]
 pub struct OpStore<D: TreeDataConstraints = RegionData, O: OpRegion<D> = OpData> {
@@ -40,6 +40,15 @@ impl<D: TreeDataConstraints, O: OpRegion<D>> AccessOpStore<D, O> for OpStore<D, 
 
     fn query_region(&self, region: &RegionBounds) -> D {
         self.tree.lookup(region)
+    }
+
+    fn fetch_region_set(
+        &self,
+        coords: crate::prelude::RegionCoordSetXtcs,
+    ) -> must_future::MustBoxFuture<Result<crate::prelude::RegionSetXtcs<D>, ()>> {
+        async move { coords.into_region_set(|(_, coords)| Ok(self.query_region_coords(&coords))) }
+            .boxed()
+            .into()
     }
 
     fn integrate_ops<Ops: Clone + Iterator<Item = Arc<O>>>(&mut self, ops: Ops) {

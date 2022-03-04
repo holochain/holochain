@@ -6,7 +6,15 @@ use std::sync::Arc;
 
 use crate::types::event::{KitsuneP2pEvent, KitsuneP2pEventHandler, KitsuneP2pEventHandlerResult};
 use crate::{event::*, KitsuneHost};
+use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::bin_types::*;
+use kitsune_p2p_types::combinators::second;
+use kitsune_p2p_types::dht::hash::RegionHash;
+use kitsune_p2p_types::dht::prelude::{
+    array_xor, ArqBoundsSet, RegionBounds, RegionCoordSetXtcs, RegionData,
+};
+use kitsune_p2p_types::dht::quantum::{TelescopingTimes, TimeQuantum};
+use kitsune_p2p_types::dht_arc::{ArcInterval, DhtLocation};
 use kitsune_p2p_types::*;
 
 use super::switchboard_state::{NodeEp, NodeOpEntry, OpEntry, Switchboard};
@@ -70,16 +78,49 @@ impl KitsuneHost for SwitchboardEventHandler {
     fn query_region_set(
         &self,
         _space: Arc<KitsuneSpace>,
-        _dht_arc_set: Arc<dht_arc::DhtArcSet>,
+        dht_arc_set: Arc<dht_arc::DhtArcSet>,
     ) -> crate::KitsuneHostResult<dht::region::RegionSetXtcs> {
-        todo!()
+        let arq_set = ArqBoundsSet::from_dht_arc_set(&self.sb.strat, &dht_arc_set);
+        // TODO: This should be behind the current moment by however much Recent gossip covers.
+        let current = Timestamp::now();
+        let times = TelescopingTimes::new(TimeQuantum::from_timestamp(&self.sb.topology, current));
+        let coord_set = RegionCoordSetXtcs::new(times, arq_set);
+        let r = coord_set.into_region_set(|(_, coords)| {
+            let RegionBounds {
+                x: (x0, x1),
+                t: (t0, t1),
+            } = coords.to_bounds(&self.sb.topology);
+            let ops: Vec<_> = self.sb.share(|sb| {
+                sb.ops
+                    .iter()
+                    .filter(move |(loc, op)| {
+                        let loc = DhtLocation::from(**loc);
+                        let arc = ArcInterval::new(x0, x1);
+                        arc.contains(&loc) && t0 <= op.timestamp && op.timestamp < t1
+                    })
+                    .map(second)
+                    .cloned()
+                    .collect()
+            });
+            let hash = ops.iter().fold([0; 32], |mut h, o| {
+                array_xor(&mut h, o.hash.get_bytes().try_into().unwrap());
+                h
+            });
+
+            Ok(RegionData {
+                hash: RegionHash::from(hash),
+                count: ops.len() as u32,
+                size: ops.len() as u32,
+            })
+        });
+        box_fut(r)
     }
 
     fn get_topology(
         &self,
         _space: Arc<KitsuneSpace>,
     ) -> crate::KitsuneHostResult<dht::quantum::Topology> {
-        todo!()
+        box_fut(Ok(self.sb.topology.clone()))
     }
 }
 
@@ -247,7 +288,15 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
                     (e.hash.to_owned(), KitsuneOpData::new(vec![loc.as_u8()]))
                 })
                 .collect(),
-            FetchOpDataEvtQuery::Regions(coords) => todo!("implement"),
+            FetchOpDataEvtQuery::Regions(bounds) => bounds
+                .into_iter()
+                .flat_map(|b| {
+                    sb.ops.iter().filter_map(move |(loc, o)| {
+                        b.contains(&DhtLocation::from(*loc), &o.timestamp)
+                            .then(|| (o.hash.clone(), KitsuneOpData::new(vec![loc.as_u8()])))
+                    })
+                })
+                .collect(),
         })))
     }
 

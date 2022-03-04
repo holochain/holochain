@@ -36,6 +36,10 @@ impl RegionBounds {
         Self { x, t }
     }
 
+    pub fn contains(&self, x: &Loc, t: &Timestamp) -> bool {
+        self.arc_interval().contains(x) && self.time_range().contains(t)
+    }
+
     pub fn arc_interval(&self) -> ArcInterval {
         ArcInterval::new(self.x.0, self.x.1)
     }

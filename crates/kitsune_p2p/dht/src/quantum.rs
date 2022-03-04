@@ -293,6 +293,10 @@ impl Topology {
         }
     }
 
+    pub fn standard_epoch() -> Self {
+        Self::standard(Timestamp::HOLOCHAIN_EPOCH)
+    }
+
     pub fn space_coord(&self, x: Loc) -> SpaceQuantum {
         (x.as_u32() / self.space.quantum).into()
     }

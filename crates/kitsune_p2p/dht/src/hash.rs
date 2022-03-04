@@ -28,6 +28,7 @@ pub struct AgentKey(pub Hash32);
     derive_more::Constructor,
     derive_more::Deref,
     derive_more::DerefMut,
+    derive_more::From,
     serde::Serialize,
     serde::Deserialize,
 )]
