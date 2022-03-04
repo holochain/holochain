@@ -208,6 +208,7 @@ where
         )
         .await
         .unwrap(),
+        kitsune_p2p::HostStub::new(),
     )
     .await
     .unwrap();

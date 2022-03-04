@@ -81,7 +81,7 @@ pub fn test_p2p_metrics_db() -> TestDb<DbKindP2pMetrics> {
 
 fn test_db<Kind: DbKindT>(kind: Kind) -> TestDb<Kind> {
     let tmpdir = tempfile::Builder::new()
-        .prefix("holochain-test-environments")
+        .prefix("holochain-test-environments-")
         .suffix(&nanoid::nanoid!())
         .tempdir()
         .unwrap();
