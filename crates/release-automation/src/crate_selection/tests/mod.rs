@@ -124,25 +124,25 @@ fn members_dependencies() {
                 crt.dependencies_in_workspace()
                     .unwrap()
                     .into_iter()
-                    .map(|(name, _)| name)
+                    .map(|dep| dep.package_name().to_string())
                     .collect(),
             )
         })
         .collect::<LinkedHashSet<_>>();
 
     let expected_result = [
-        ("crate_b".to_string(), vec![]),
-        ("crate_c".to_string(), vec!["crate_b".to_string()]),
         (
             "crate_a".to_string(),
-            vec!["crate_b".to_string(), "crate_c".to_string()],
+            vec!["crate_c".to_string(), "crate_b".to_string()],
         ),
+        ("crate_b".to_string(), vec![]),
+        ("crate_c".to_string(), vec!["crate_b".to_string()]),
         (
             "crate_d".to_string(),
             vec![
                 "crate_a".to_string(),
-                "crate_b".to_string(),
                 "crate_c".to_string(),
+                "crate_b".to_string(),
             ],
         ),
     ]
@@ -150,7 +150,7 @@ fn members_dependencies() {
     .cloned()
     .collect::<LinkedHashSet<_>>();
 
-    pretty_assertions::assert_eq!(expected_result, result, "left is expected");
+    assert_eq!(expected_result, result);
 }
 
 #[test]
@@ -222,7 +222,7 @@ use CrateStateFlags::ChangedSincePreviousRelease;
 use CrateStateFlags::DisallowedVersionReqViolated;
 use CrateStateFlags::EnforcedVersionReqViolated;
 use CrateStateFlags::IsWorkspaceDependency;
-use CrateStateFlags::IsWorkspaceVersionedDevDependency;
+use CrateStateFlags::IsWorkspaceDevDependency;
 use CrateStateFlags::Matched;
 use CrateStateFlags::MissingChangelog;
 use CrateStateFlags::MissingReadme;
@@ -265,7 +265,7 @@ fn crate_state_block_consistency() {
 #[test]
 fn crate_state_allowed_dev_dependency_blockers() {
     let flags: BitFlags<CrateStateFlags> = (&[
-        IsWorkspaceVersionedDevDependency,
+        IsWorkspaceDevDependency,
         UnreleasableViaChangelogFrontmatter,
         MissingChangelog,
         EnforcedVersionReqViolated,
