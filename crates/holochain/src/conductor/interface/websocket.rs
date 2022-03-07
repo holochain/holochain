@@ -219,61 +219,10 @@ where
 
 /// Test items needed by other crates
 #[cfg(any(test, feature = "test_utils"))]
-pub mod test_utils {
-    use crate::conductor::api::RealAppInterfaceApi;
-    use crate::conductor::conductor::ConductorBuilder;
-    use crate::conductor::ConductorHandle;
-    use holochain_serialized_bytes::prelude::*;
-    use holochain_state::prelude::*;
-    use holochain_types::prelude::*;
-    use std::sync::Arc;
-    use tempfile::TempDir;
-
-    /// One of various ways to setup an app, used somewhere...
-    pub async fn setup_app(
-        cell_data: Vec<(InstalledCell, Option<SerializedBytes>)>,
-        dna_store: MockDnaStore,
-    ) -> (Arc<TempDir>, RealAppInterfaceApi, ConductorHandle) {
-        let envs = test_environments();
-
-        let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
-            .test(&envs, &[])
-            .await
-            .unwrap();
-
-        conductor_handle
-            .clone()
-            .install_app("test app".to_string(), cell_data)
-            .await
-            .unwrap();
-
-        conductor_handle
-            .clone()
-            .enable_app("test app".to_string())
-            .await
-            .unwrap();
-
-        let errors = conductor_handle
-            .clone()
-            .reconcile_cell_status_with_app_status()
-            .await
-            .unwrap();
-
-        assert!(errors.is_empty());
-
-        let handle = conductor_handle.clone();
-
-        (
-            Arc::new(envs.into_tempdir()),
-            RealAppInterfaceApi::new(conductor_handle),
-            handle,
-        )
-    }
-}
+pub use crate::test_utils::setup_app;
 
 #[cfg(test)]
 pub mod test {
-    use super::test_utils::setup_app;
     use super::*;
     use crate::conductor::api::error::ExternalApiWireError;
     use crate::conductor::api::AdminRequest;
@@ -290,7 +239,7 @@ pub mod test {
     use holochain_p2p::{AgentPubKeyExt, DnaHashExt};
     use holochain_serialized_bytes::prelude::*;
     use holochain_sqlite::prelude::*;
-    use holochain_state::prelude::test_environments;
+    use holochain_state::prelude::test_db_dir;
     use holochain_types::prelude::*;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_dna_hash;
@@ -319,20 +268,24 @@ pub mod test {
     }
 
     async fn setup_admin() -> (Arc<TempDir>, ConductorHandle) {
-        let envs = test_environments();
-        let conductor_handle = Conductor::builder().test(&envs, &[]).await.unwrap();
-        (Arc::new(envs.into_tempdir()), conductor_handle)
+        let db_dir = test_db_dir();
+        let conductor_handle = Conductor::builder().test(db_dir.path(), &[]).await.unwrap();
+        (Arc::new(db_dir), conductor_handle)
     }
 
     async fn setup_admin_fake_cells(
+        dnas: Vec<DnaFile>,
         cell_ids_with_proofs: Vec<(CellId, Option<SerializedBytes>)>,
-        dna_store: MockDnaStore,
     ) -> (Arc<TempDir>, ConductorHandle) {
-        let envs = test_environments();
-        let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
-            .test(&envs, &[])
+        let db_dir = test_db_dir();
+        let conductor_handle = ConductorBuilder::new()
+            .test(db_dir.path(), &[])
             .await
             .unwrap();
+
+        for dna in dnas {
+            conductor_handle.register_dna(dna).await.unwrap();
+        }
 
         let cell_data = cell_ids_with_proofs
             .into_iter()
@@ -345,7 +298,7 @@ pub mod test {
             .await
             .unwrap();
 
-        (Arc::new(envs.into_tempdir()), conductor_handle)
+        (Arc::new(db_dir), conductor_handle)
     }
 
     async fn activate(conductor_handle: ConductorHandle) -> ConductorHandle {
@@ -432,9 +385,7 @@ pub mod test {
         let cell_id = CellId::from((dna_hash.clone(), fake_agent_pubkey_1()));
         let installed_cell = InstalledCell::new(cell_id.clone(), "handle".into());
 
-        let dna_store = MockDnaStore::single_dna(dna, 1, 1);
-
-        let (_tmpdir, app_api, handle) = setup_app(vec![(installed_cell, None)], dna_store).await;
+        let (_tmpdir, app_api, handle) = setup_app(vec![dna], vec![(installed_cell, None)]).await;
         let mut request: ZomeCall =
             crate::fixt::ZomeCallInvocationFixturator::new(crate::fixt::NamedInvocation(
                 cell_id.clone(),
@@ -484,24 +435,8 @@ pub mod test {
             .cloned()
             .map(|hash| (CellId::from((hash, agent_key.clone())), None))
             .collect::<Vec<_>>();
-        let mut dna_store = MockDnaStore::new();
-        let dna_map_clone = dna_map.clone();
-        dna_store
-            .expect_get_dna_file()
-            .returning(move |hash| dna_map_clone.get(&hash).cloned());
-        dna_store
-            .expect_get_dna_def()
-            .returning(move |hash| dna_map.get(&hash).map(|d| d.dna_def()).cloned());
-        dna_store
-            .expect_add_dnas::<Vec<_>>()
-            .times(1)
-            .return_const(());
-        dna_store
-            .expect_add_entry_defs::<Vec<_>>()
-            .times(1)
-            .return_const(());
-        let (_tmpdir, conductor_handle) =
-            setup_admin_fake_cells(cell_ids_with_proofs, dna_store).await;
+
+        let (_tmpdir, conductor_handle) = setup_admin_fake_cells(dnas, cell_ids_with_proofs).await;
         let shutdown = conductor_handle.take_shutdown_handle().unwrap();
         let app_id = "test app".to_string();
 
@@ -631,10 +566,8 @@ pub mod test {
         );
         let cell_id = CellId::from((dna.dna_hash().clone(), fake_agent_pubkey_1()));
 
-        let dna_store = MockDnaStore::single_dna(dna, 1, 1);
-
         let (_tmpdir, conductor_handle) =
-            setup_admin_fake_cells(vec![(cell_id.clone(), None)], dna_store).await;
+            setup_admin_fake_cells(vec![dna], vec![(cell_id.clone(), None)]).await;
         let conductor_handle = activate(conductor_handle).await;
         let shutdown = conductor_handle.take_shutdown_handle().unwrap();
         // Allow agents time to join
@@ -680,18 +613,22 @@ pub mod test {
     #[tokio::test(flavor = "multi_thread")]
     async fn add_agent_info_via_admin() {
         observability::test_run().ok();
-        let test_envs = test_environments();
-        let p2p = test_envs.p2p();
+        let test_db_dir = test_db_dir();
         let agents = vec![fake_agent_pubkey_1(), fake_agent_pubkey_2()];
         let dnas = vec![
             make_dna("1", vec![TestWasm::Anchor]).await,
             make_dna("2", vec![TestWasm::Anchor]).await,
         ];
-        let mut conductor_test =
-            ConductorTestData::new(test_envs, dnas.clone(), agents.clone(), Default::default())
-                .await
-                .0;
+        let mut conductor_test = ConductorTestData::new(
+            test_db_dir,
+            dnas.clone(),
+            agents.clone(),
+            Default::default(),
+        )
+        .await
+        .0;
         let handle = conductor_test.handle();
+        let spaces = handle.get_spaces();
         let dnas = dnas
             .into_iter()
             .map(|d| d.dna_hash().clone())
@@ -701,7 +638,7 @@ pub mod test {
         crate::assert_eq_retry_10s!(
             {
                 let mut count = 0;
-                for env in p2p.lock().values() {
+                for env in spaces.get_from_spaces(|s| s.p2p_agents_db.clone()) {
                     let mut conn = env.conn().unwrap();
                     let txn = conn.transaction().unwrap();
                     count += txn.p2p_list_agents().unwrap().len();

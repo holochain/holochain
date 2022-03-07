@@ -12,7 +12,7 @@ use holochain_state::prelude::{
     current_countersigning_session, SourceChainResult, StateMutationResult, Store,
 };
 use holochain_types::signal::{Signal, SystemSignal};
-use holochain_types::{dht_op::DhtOp, env::DbWrite};
+use holochain_types::{db::DbWrite, dht_op::DhtOp};
 use holochain_zome_types::Timestamp;
 use holochain_zome_types::{Entry, SignedHeader, ZomeCallResponse};
 use kitsune_p2p_types::tx2::tx2_utils::Share;
@@ -136,8 +136,8 @@ pub(crate) async fn countersigning_workflow(
 
 /// An incoming countersigning session success.
 pub(crate) async fn countersigning_success(
-    authored_env: DbWrite<DbKindAuthored>,
-    dht_env: DbWrite<DbKindDht>,
+    authored_db: DbWrite<DbKindAuthored>,
+    dht_db: DbWrite<DbKindDht>,
     network: &HolochainP2pDna,
     author: AgentPubKey,
     signed_headers: Vec<SignedHeader>,
@@ -197,7 +197,7 @@ pub(crate) async fn countersigning_success(
         }
     };
     let this_cell_headers_op_basis_hashes: Vec<(DhtOpHash, AnyDhtHash)> =
-        authored_env.async_reader(reader_closure).await?;
+        authored_db.async_reader(reader_closure).await?;
 
     // If there is no active session then we can short circuit.
     if this_cell_headers_op_basis_hashes.is_empty() {
@@ -217,7 +217,7 @@ pub(crate) async fn countersigning_success(
         .map(|SignedHeader(h, _)| HeaderHash::with_data_sync(h))
         .collect();
 
-    let result = authored_env
+    let result = authored_db
         .async_commit({
             let author = author.clone();
             let entry_hash = entry_hash.clone();
@@ -253,8 +253,8 @@ pub(crate) async fn countersigning_success(
         authored_ops_to_dht_db(
             network,
             this_cell_headers_op_basis_hashes,
-            &(authored_env.into()),
-            &dht_env,
+            &(authored_db.into()),
+            &dht_db,
         )
         .await?;
         integration_trigger.trigger();

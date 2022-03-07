@@ -2,7 +2,7 @@ use crate::conductor::handle::DevSettingsDelta;
 use crate::sweettest::*;
 use crate::test_utils::conductor_setup::ConductorTestData;
 use crate::test_utils::consistency_10s;
-use crate::test_utils::consistency_envs;
+use crate::test_utils::consistency_dbs;
 use crate::test_utils::inline_zomes::simple_create_read_zome;
 use crate::test_utils::new_zome_call;
 use hdk::prelude::*;
@@ -48,19 +48,19 @@ async fn gossip_test() {
     const NUM_ATTEMPTS: usize = 200;
     const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_millis(100);
 
-    let all_cell_envs = vec![
+    let all_cell_dbs = vec![
         (
             bob_call_data.cell_id.agent_pubkey(),
-            &bob_call_data.authored_env,
-            &bob_call_data.dht_env,
+            &bob_call_data.authored_db,
+            &bob_call_data.dht_db,
         ),
         (
             conductor_test.alice_call_data().cell_id.agent_pubkey(),
-            &conductor_test.alice_call_data().authored_env,
-            &conductor_test.alice_call_data().dht_env,
+            &conductor_test.alice_call_data().authored_db,
+            &conductor_test.alice_call_data().dht_db,
         ),
     ];
-    consistency_envs(&all_cell_envs, NUM_ATTEMPTS, DELAY_PER_ATTEMPT).await;
+    consistency_dbs(&all_cell_dbs, NUM_ATTEMPTS, DELAY_PER_ATTEMPT).await;
 
     // Bob list anchors
     let invocation = new_zome_call(
@@ -115,18 +115,21 @@ async fn agent_info_test() {
     let ((cell_1,), (cell_2,)) = apps.into_tuples();
     conductors.exchange_peer_info().await;
 
-    let p2p_envs: Vec<_> = conductors
+    let p2p_agents_dbs: Vec<_> = conductors
         .iter()
         .filter_map(|c| {
-            let lock = c.envs().p2p();
-            let env = lock.lock().values().cloned().next();
-            env
+            c.spaces
+                .get_from_spaces(|s| s.p2p_agents_db.clone())
+                .first()
+                .cloned()
         })
         .collect();
 
     consistency_10s(&[&cell_1, &cell_2]).await;
-    for p2p_env in &p2p_envs {
-        let len = fresh_reader_test(p2p_env.clone(), |txn| txn.p2p_list_agents().unwrap().len());
+    for p2p_agents_db in p2p_agents_dbs {
+        let len = fresh_reader_test(p2p_agents_db.clone(), |txn| {
+            txn.p2p_list_agents().unwrap().len()
+        });
         assert_eq!(len, 2);
     }
 }

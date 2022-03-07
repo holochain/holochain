@@ -4,8 +4,9 @@ pub(crate) mod workspace_mocker;
 use std::path::Path;
 
 use chrono::TimeZone;
+use linked_hash_set::LinkedHashSet;
 
-use crate::release::ReleaseSteps;
+use crate::release::{ReleaseSteps, ReleaseWorkspace};
 
 #[test]
 fn release_steps_are_ordered() {

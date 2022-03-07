@@ -179,8 +179,8 @@ mod tests {
     async fn test_validation_receipts_db_populate_and_list() -> StateMutationResult<()> {
         observability::test_run().ok();
 
-        let test_env = crate::test_utils::test_authored_env();
-        let env = test_env.env();
+        let test_db = crate::test_utils::test_authored_db();
+        let env = test_db.to_db();
         let keystore = crate::test_utils::test_keystore();
 
         let op = DhtOpHashed::from_content_sync(DhtOp::RegisterAgentActivity(

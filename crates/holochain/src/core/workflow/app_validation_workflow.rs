@@ -84,8 +84,8 @@ async fn app_validation_workflow_inner(
     network: &HolochainP2pDna,
     dht_query_cache: DhtDbQueryCache,
 ) -> WorkflowResult<WorkComplete> {
-    let env = workspace.dht_env.clone().into();
-    let sorted_ops = validation_query::get_ops_to_app_validate(&env).await?;
+    let db = workspace.dht_db.clone().into();
+    let sorted_ops = validation_query::get_ops_to_app_validate(&db).await?;
     let start_len = sorted_ops.len();
     tracing::debug!("validating {} ops", start_len);
     let start = (start_len >= NUM_CONCURRENT_OPS).then(std::time::Instant::now);
@@ -165,7 +165,7 @@ async fn app_validation_workflow_inner(
             chunk.iter().map(|c| c.len()).sum::<usize>()
         );
         let (t, a, r, activity) = workspace
-            .dht_env
+            .dht_db
             .async_commit(move |txn| {
                 let mut total = 0;
                 let mut awaiting = 0;
@@ -552,8 +552,8 @@ fn run_validation_callback_inner(
 }
 
 pub struct AppValidationWorkspace {
-    authored_env: DbRead<DbKindAuthored>,
-    dht_env: DbWrite<DbKindDht>,
+    authored_db: DbRead<DbKindAuthored>,
+    dht_db: DbWrite<DbKindDht>,
     cache: DbWrite<DbKindCache>,
     keystore: MetaLairClient,
     dna_def: Arc<DnaDef>,
@@ -561,15 +561,15 @@ pub struct AppValidationWorkspace {
 
 impl AppValidationWorkspace {
     pub fn new(
-        authored_env: DbRead<DbKindAuthored>,
-        dht_env: DbWrite<DbKindDht>,
+        authored_db: DbRead<DbKindAuthored>,
+        dht_db: DbWrite<DbKindDht>,
         cache: DbWrite<DbKindCache>,
         keystore: MetaLairClient,
         dna_def: Arc<DnaDef>,
     ) -> Self {
         Self {
-            authored_env,
-            dht_env,
+            authored_db,
+            dht_db,
             cache,
             keystore,
             dna_def,
@@ -578,8 +578,8 @@ impl AppValidationWorkspace {
 
     pub async fn validation_workspace(&self) -> AppValidationResult<HostFnWorkspaceRead> {
         Ok(HostFnWorkspace::new(
-            self.authored_env.clone(),
-            self.dht_env.clone().into(),
+            self.authored_db.clone(),
+            self.dht_db.clone().into(),
             self.cache.clone(),
             self.keystore.clone(),
             None,
@@ -593,8 +593,8 @@ impl AppValidationWorkspace {
         network: Network,
     ) -> Cascade<Network> {
         Cascade::empty()
-            .with_authored(self.authored_env.clone())
-            .with_dht(self.dht_env.clone().into())
+            .with_authored(self.authored_db.clone())
+            .with_dht(self.dht_db.clone().into())
             .with_network(network, self.cache.clone())
     }
 }

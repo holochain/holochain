@@ -89,7 +89,7 @@ async fn multi_conductor() -> anyhow::Result<()> {
 
     // Wait long enough for Bob to receive gossip
     wait_for_integration_1m(
-        bobbo.dht_env(),
+        bobbo.dht_db(),
         WaitOps::start() * 1 + WaitOps::cold_start() * 2 + WaitOps::ENTRY * 1,
     )
     .await;
@@ -277,10 +277,10 @@ async fn private_entries_dont_leak() {
     )
     .await;
 
-    check_for_private_entries(alice.dht_env().clone());
-    check_for_private_entries(conductors[0].get_cache_env(alice.cell_id()).unwrap());
-    check_for_private_entries(bobbo.dht_env().clone());
-    check_for_private_entries(conductors[1].get_cache_env(bobbo.cell_id()).unwrap());
+    check_for_private_entries(alice.dht_db().clone());
+    check_for_private_entries(conductors[0].get_cache_db(alice.cell_id()).unwrap());
+    check_for_private_entries(bobbo.dht_db().clone());
+    check_for_private_entries(conductors[1].get_cache_db(bobbo.cell_id()).unwrap());
 }
 
 fn check_for_private_entries<Kind: DbKindT>(env: DbWrite<Kind>) {

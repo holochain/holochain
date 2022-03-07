@@ -127,7 +127,7 @@ pub async fn incoming_dht_ops_workflow(
     let Space {
         incoming_op_hashes,
         incoming_ops_batch,
-        dht_env,
+        dht_db,
         ..
     } = space;
     let mut filter_ops = Vec::new();
@@ -152,7 +152,7 @@ pub async fn incoming_dht_ops_workflow(
     }
 
     if !request_validation_receipt {
-        ops = filter_existing_ops(dht_env, ops).await?;
+        ops = filter_existing_ops(dht_db, ops).await?;
     }
 
     for (hash, op) in ops {
@@ -177,12 +177,12 @@ pub async fn incoming_dht_ops_workflow(
     if maybe_batch.is_some() {
         // there was no already running batch task, so spawn one:
         tokio::task::spawn({
-            let dht_env = dht_env.clone();
+            let dht_db = dht_db.clone();
             async move {
                 while let Some(entries) = maybe_batch {
                     let senders = Arc::new(parking_lot::Mutex::new(Vec::new()));
                     let senders2 = senders.clone();
-                    if let Err(err) = dht_env
+                    if let Err(err) = dht_db
                         .async_commit(move |txn| {
                             for entry in entries {
                                 let InOpBatchEntry {
