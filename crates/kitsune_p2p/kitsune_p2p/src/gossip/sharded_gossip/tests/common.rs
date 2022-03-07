@@ -1,17 +1,20 @@
 pub use crate::test_util::spawn_handler;
-use crate::HostStub;
 use crate::{test_util::hash_op_data, KitsuneHostPanicky};
+use crate::{HostStub, KitsuneHost};
 use kitsune_p2p_types::box_fut;
+use kitsune_p2p_types::dht::prelude::{ArqBoundsSet, RegionCoordSetXtcs, RegionData};
+use kitsune_p2p_types::dht::quantum::{TelescopingTimes, Topology};
+use kitsune_p2p_types::dht::{ArqStrat, PeerStrat};
 
 use super::*;
 
 pub struct StandardResponsesHostApi {
     infos: Vec<AgentInfoSigned>,
+    topology: Topology,
+    with_data: bool,
 }
 
-impl KitsuneHostPanicky for StandardResponsesHostApi {
-    const NAME: &'static str = "StandardResponsesHostApi";
-
+impl KitsuneHost for StandardResponsesHostApi {
     fn get_agent_info_signed(
         &self,
         input: GetAgentInfoSignedEvt,
@@ -24,6 +27,51 @@ impl KitsuneHostPanicky for StandardResponsesHostApi {
             .unwrap();
         box_fut(Ok(Some(agent)))
     }
+
+    fn peer_extrapolated_coverage(
+        &self,
+        space: Arc<KitsuneSpace>,
+        dht_arc_set: DhtArcSet,
+    ) -> crate::KitsuneHostResult<Vec<f64>> {
+        todo!()
+    }
+
+    fn query_region_set(
+        &self,
+        _space: Arc<KitsuneSpace>,
+        dht_arc_set: Arc<DhtArcSet>,
+    ) -> crate::KitsuneHostResult<RegionSetXtcs> {
+        let arqs = ArqBoundsSet::from_dht_arc_set(&ArqStrat::default(), &dht_arc_set);
+        let coords = RegionCoordSetXtcs::new(TelescopingTimes::new(0.into()), arqs);
+        let chunks = coords.region_coords_nested().count();
+        let region_set = if self.with_data {
+            // XXX: this is very fake, and also wrong
+            let data = RegionData {
+                hash: [0; 32].into(),
+                size: 1,
+                count: 1,
+            };
+            RegionSetXtcs::from_data(coords, vec![vec![data]; chunks])
+        } else {
+            RegionSetXtcs::from_data(coords, vec![])
+        };
+        box_fut(Ok(region_set))
+    }
+
+    fn record_metrics(
+        &self,
+        _space: Arc<KitsuneSpace>,
+        _records: Vec<MetricRecord>,
+    ) -> crate::KitsuneHostResult<()> {
+        box_fut(Ok(()))
+    }
+
+    fn get_topology(
+        &self,
+        _space: Arc<KitsuneSpace>,
+    ) -> crate::KitsuneHostResult<dht::quantum::Topology> {
+        box_fut(Ok(self.topology.clone()))
+    }
 }
 
 // TODO: integrate with `HandlerBuilder`
@@ -33,8 +81,10 @@ async fn standard_responses(
 ) -> (MockKitsuneP2pEventHandler, HostApi) {
     let mut evt_handler = MockKitsuneP2pEventHandler::new();
     let infos = agents.iter().map(|(_, i)| i.clone()).collect::<Vec<_>>();
-    let host = StandardResponsesHostApi {
+    let host_api = StandardResponsesHostApi {
         infos: infos.clone(),
+        topology: Topology::standard_epoch(),
+        with_data,
     };
     evt_handler.expect_handle_query_agents().returning({
         move |_| {
@@ -76,7 +126,7 @@ async fn standard_responses(
         .expect_handle_gossip()
         .returning(|_, _| Ok(async { Ok(()) }.boxed().into()));
 
-    (evt_handler, Arc::new(host))
+    (evt_handler, Arc::new(host_api))
 }
 
 pub async fn setup_player(

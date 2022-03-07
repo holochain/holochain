@@ -23,6 +23,26 @@ ghost_actor::ghost_chan! {
     }
 }
 
+pub struct HarnessHost;
+
+impl HarnessHost {
+    pub fn new() -> Arc<Self> {
+        Arc::new(Self)
+    }
+}
+
+impl KitsuneHostPanicky for HarnessHost {
+    const NAME: &'static str = "HarnessHost";
+
+    fn peer_extrapolated_coverage(
+        &self,
+        _space: Arc<KitsuneSpace>,
+        _dht_arc_set: DhtArcSet,
+    ) -> KitsuneHostResult<Vec<f64>> {
+        box_fut(Ok(vec![]))
+    }
+}
+
 pub(crate) async fn spawn_test_agent(
     harness_chan: HarnessEventChannel,
     config: KitsuneP2pConfig,
@@ -35,7 +55,7 @@ pub(crate) async fn spawn_test_agent(
     KitsuneP2pError,
 > {
     let topology = Topology::standard_epoch();
-    let host = HostStub::new();
+    let host = HarnessHost::new();
     let (p2p, evt) = spawn_kitsune_p2p(
         config,
         kitsune_p2p_types::tls::TlsConfig::new_ephemeral()
@@ -63,6 +83,7 @@ pub(crate) async fn spawn_test_agent(
 }
 
 use kitsune_p2p_timestamp::Timestamp;
+use kitsune_p2p_types::box_fut;
 use kitsune_p2p_types::dependencies::lair_keystore_api_0_0;
 use kitsune_p2p_types::dht::quantum::Topology;
 use kitsune_p2p_types::dht::PeerStrat;

@@ -20,10 +20,6 @@ pub enum PeerView {
 }
 
 impl PeerView {
-    pub fn topo(&self) -> &Topology {
-        todo!()
-    }
-
     /// Given the current view of a peer and the peer's current coverage,
     /// this returns the next step to take in reaching the ideal coverage.
     pub fn update_arc(&self, dht_arc: &mut DhtArc) -> bool {
@@ -33,7 +29,7 @@ impl PeerView {
             Self::Quantized(v) => {
                 let mut arq = Arq::from_dht_arc(&v.strat, dht_arc);
                 let updated = v.update_arq(&mut arq);
-                *dht_arc = arq.to_dht_arc(self.topo());
+                *dht_arc = arq.to_dht_arc(&v.topo);
                 updated
             }
         }
