@@ -97,7 +97,7 @@ pub(crate) struct CrateCheckArgs {
 }
 
 pub(crate) const MINIMUM_CRATE_OWNERS: &str =
-    "github:holochain:core-dev,holochain-release-automation,holochain-release-automation2,zippy,steveej";
+    "github:holochain:core-dev,holochain-release-automation,holochain-release-automation2,zippy,steveeJ";
 
 #[derive(Debug, StructOpt)]
 pub(crate) struct EnsureCrateOwnersArgs {
