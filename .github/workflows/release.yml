@@ -536,7 +536,14 @@ jobs:
           ## limits ssh access and adds the ssh public keys of the listed GitHub users
           limit-access-to-users: steveeJ,jost-s,freesig,neonphog,thedavidmeister,maackle
 
+  github-actions-ci-jobs-succeed:
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: "ubuntu-latest"
+    needs: [vars, prepare]
+    steps: [{ name: "ci-jobs-succeed", run: ":" }]
+
   all-jobs-succeed:
+    if: ${{ github.event_name != 'pull_request' }}
     runs-on: "ubuntu-latest"
     needs: [vars, prepare, test, finalize]
     steps: [{ name: "all-jobs-succeed", run: ":" }]
