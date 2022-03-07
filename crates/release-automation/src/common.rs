@@ -88,7 +88,11 @@ fn set_dependency_version(manifest_path: &Path, name: &str, version: &str) -> Fa
                     .expect("manifest is already verified")
                     .contains_key(name)
             {
-                manifest[key][name]["version"] = toml_edit::value(version);
+                let existing_version = manifest[key][name]["version"].as_str().unwrap_or("*");
+
+                if *key == "dependencies" || !existing_version.contains("*") {
+                    manifest[key][name]["version"] = toml_edit::value(version);
+                }
             }
         }
 
