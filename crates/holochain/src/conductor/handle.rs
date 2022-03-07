@@ -670,8 +670,12 @@ impl ConductorHandleT for ConductorHandleImpl {
                 respond,
                 ..
             } => {
+                let topo = self
+                    .get_dna_def(&dna_hash)
+                    .ok_or_else(|| DnaError::DnaMissing(dna_hash.clone()))?
+                    .topology();
                 let db = { self.p2p_agents_db(&dna_hash) };
-                let res = query_peer_density(db.into(), kitsune_space, dht_arc)
+                let res = query_peer_density(db.into(), topo, kitsune_space, dht_arc)
                     .await
                     .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));

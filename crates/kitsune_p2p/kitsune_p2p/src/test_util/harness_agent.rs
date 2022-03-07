@@ -34,6 +34,7 @@ pub(crate) async fn spawn_test_agent(
     ),
     KitsuneP2pError,
 > {
+    let topology = Topology::standard_epoch();
     let host = HostStub::new();
     let (p2p, evt) = spawn_kitsune_p2p(
         config,
@@ -54,7 +55,7 @@ pub(crate) async fn spawn_test_agent(
         .create_channel::<HarnessAgentControl>()
         .await?;
 
-    let harness = AgentHarness::new(harness_chan).await?;
+    let harness = AgentHarness::new(harness_chan, topology).await?;
     let agent = harness.agent.clone();
     tokio::task::spawn(builder.spawn(harness));
 
@@ -63,6 +64,7 @@ pub(crate) async fn spawn_test_agent(
 
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::dependencies::lair_keystore_api_0_0;
+use kitsune_p2p_types::dht::quantum::Topology;
 use kitsune_p2p_types::dht::PeerStrat;
 use kitsune_p2p_types::dht_arc::DhtArcSet;
 use lair_keystore_api_0_0::entry::EntrySignEd25519;
@@ -74,10 +76,14 @@ struct AgentHarness {
     harness_chan: HarnessEventChannel,
     agent_store: HashMap<Arc<KitsuneAgent>, Arc<AgentInfoSigned>>,
     gossip_store: HashMap<Arc<KitsuneOpHash>, String>,
+    topology: Topology,
 }
 
 impl AgentHarness {
-    pub async fn new(harness_chan: HarnessEventChannel) -> Result<Self, KitsuneP2pError> {
+    pub async fn new(
+        harness_chan: HarnessEventChannel,
+        topology: Topology,
+    ) -> Result<Self, KitsuneP2pError> {
         let EntrySignEd25519 { priv_key, pub_key } = sign_ed25519_keypair_new_from_entropy()
             .await
             .map_err(KitsuneP2pError::other)?;
@@ -89,6 +95,7 @@ impl AgentHarness {
             harness_chan,
             agent_store: HashMap::new(),
             gossip_store: HashMap::new(),
+            topology,
         })
     }
 }
@@ -205,7 +212,7 @@ impl KitsuneP2pEventHandler for AgentHarness {
             .collect();
 
         // contains is already checked in the iterator
-        let view = strat.view_unchecked(dht_arc, arcs.as_slice());
+        let view = strat.view_unchecked(self.topology.clone(), dht_arc, arcs.as_slice());
 
         Ok(async move { Ok(view) }.boxed().into())
     }

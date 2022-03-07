@@ -55,12 +55,18 @@ impl DhtLocation {
     }
 }
 
+impl From<u32> for DhtLocation {
+    fn from(x: u32) -> Self {
+        DhtLocation::new(x)
+    }
+}
+
 // This From impl exists to make it easier to construct DhtLocations near the
 // maximum value in tests
 #[cfg(any(test, feature = "test_utils"))]
 impl From<i32> for DhtLocation {
-    fn from(i: i32) -> Self {
-        (i as u32).into()
+    fn from(x: i32) -> Self {
+        DhtLocation::new(x as u32)
     }
 }
 
@@ -139,7 +145,7 @@ impl DhtArc {
         let do_hold_something = self.half_length != 0;
         let only_hold_self = self.half_length == 1 && self.center_loc == other_location;
         // Add one to convert to "array length" from math distance
-        let dist_as_array_len = shortest_arc_distance(self.center_loc, other_location.0) + 1;
+        let dist_as_array_len = shortest_arc_distance(self.center_loc, other_location) + 1;
         // Check for any other dist and the special case of the maximum array len
         let within_range = self.half_length > 1 && dist_as_array_len <= self.half_length;
         // Have to hold something and hold ourself or something within range
@@ -172,19 +178,19 @@ impl DhtArc {
         } else if self.half_length >= MAX_HALF_LENGTH - 1 {
             ArcRange {
                 start: Bound::Included(
-                    (self.center_loc.0 - DhtLocation::from(MAX_HALF_LENGTH - 1).0).0,
+                    (self.center_loc.0 - DhtLocation::new(MAX_HALF_LENGTH - 1).0).0,
                 ),
                 end: Bound::Included(
-                    (self.center_loc.0 + DhtLocation::from(MAX_HALF_LENGTH).0 - Wrapping(2)).0,
+                    (self.center_loc.0 + DhtLocation::new(MAX_HALF_LENGTH).0 - Wrapping(2)).0,
                 ),
             }
         } else {
             ArcRange {
                 start: Bound::Included(
-                    (self.center_loc.0 - DhtLocation::from(self.half_length - 1).0).0,
+                    (self.center_loc.0 - DhtLocation::new(self.half_length - 1).0).0,
                 ),
                 end: Bound::Included(
-                    (self.center_loc.0 + DhtLocation::from(self.half_length).0 - Wrapping(1)).0,
+                    (self.center_loc.0 + DhtLocation::new(self.half_length).0 - Wrapping(1)).0,
                 ),
             }
         }
@@ -232,12 +238,6 @@ impl DhtArc {
     /// Is this DhtArc empty?
     pub fn is_empty(&self) -> bool {
         self.half_length == 0
-    }
-}
-
-impl From<u32> for DhtLocation {
-    fn from(a: u32) -> Self {
-        Self(Wrapping(a))
     }
 }
 

@@ -1,6 +1,6 @@
 use kitsune_p2p_dht_arc::ArcInterval;
 
-use crate::Loc;
+use crate::{quantum::Topology, Loc};
 
 use super::{Arq, ArqBounded, ArqBounds};
 
@@ -21,8 +21,8 @@ pub(crate) fn loc_downscale(len: usize, d: Loc) -> usize {
 }
 
 impl Arq {
-    pub fn to_ascii(&self, len: usize) -> String {
-        let mut s = self.to_bounds().to_ascii(len);
+    pub fn to_ascii(&self, topo: &Topology, len: usize) -> String {
+        let mut s = self.to_bounds().to_ascii(topo, len);
         if !self.is_empty() {
             let center = loc_downscale(len, self.center);
             s.replace_range(center..center + 1, "@");
@@ -52,7 +52,7 @@ pub fn add_location_ascii(mut s: String, locs: Vec<Loc>) -> String {
 impl ArqBounds {
     /// Handy ascii representation of an arc, especially useful when
     /// looking at several arcs at once to get a sense of their overlap
-    pub fn to_ascii(&self, len: usize) -> String {
+    pub fn to_ascii(&self, topo: &Topology, len: usize) -> String {
         let empty = || " ".repeat(len);
         let full = || "-".repeat(len);
 
@@ -73,7 +73,7 @@ impl ArqBounds {
             }
         };
 
-        match self.to_interval() {
+        match self.to_interval(topo) {
             ArcInterval::Full => full(),
             ArcInterval::Empty => empty(),
             ArcInterval::Bounded(lo0, hi0) => {

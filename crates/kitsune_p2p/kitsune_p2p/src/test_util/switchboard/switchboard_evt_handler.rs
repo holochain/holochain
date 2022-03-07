@@ -86,10 +86,13 @@ impl KitsuneHost for SwitchboardEventHandler {
         let times = TelescopingTimes::new(TimeQuantum::from_timestamp(&self.sb.topology, current));
         let coord_set = RegionCoordSetXtcs::new(times, arq_set);
         let r = coord_set.into_region_set(|(_, coords)| {
+            dbg!(&coords);
+            let bounds = coords.to_bounds(&self.sb.topology);
+            dbg!(&bounds);
             let RegionBounds {
                 x: (x0, x1),
                 t: (t0, t1),
-            } = coords.to_bounds(&self.sb.topology);
+            } = bounds;
             let ops: Vec<_> = self.sb.share(|sb| {
                 sb.ops
                     .iter()
@@ -291,9 +294,11 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
             FetchOpDataEvtQuery::Regions(bounds) => bounds
                 .into_iter()
                 .flat_map(|b| {
+                    dbg!(&b);
                     sb.ops.iter().filter_map(move |(loc, o)| {
-                        b.contains(&DhtLocation::from(*loc), &o.timestamp)
-                            .then(|| (o.hash.clone(), KitsuneOpData::new(vec![loc.as_u8()])))
+                        let contains = b.contains(&DhtLocation::from(*loc), &o.timestamp);
+                        dbg!((&loc, &o.timestamp, contains));
+                        contains.then(|| (o.hash.clone(), KitsuneOpData::new(vec![loc.as_u8()])))
                     })
                 })
                 .collect(),

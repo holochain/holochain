@@ -63,7 +63,7 @@ fn gossip_scenario_full_sync() {
 
     let max_time = TimeQuantum::from(525600 / 12).to_timestamp_bounds(&topo).0; // 1 year
 
-    let arqs = generate_ideal_coverage(&mut rng, &strat, None, n as u32, 0.0);
+    let arqs = generate_ideal_coverage(&topo, &mut rng, &strat, None, n as u32, 0.0);
     let mut nodes: Vec<_> = arqs
         .iter()
         .map(|a| TestNode::new(topo.clone(), gopa, *a))
@@ -97,7 +97,7 @@ fn gossip_scenario_full_sync() {
             .enumerate()
             .map(|(i, n)| {
                 let ops = n.query_op_data(&full_region);
-                println!("{}", n.ascii_arq_and_ops(i, 64));
+                println!("{}", n.ascii_arq_and_ops(&topo, i, 64));
                 ops.len()
             })
             .collect::<Vec<_>>(),
@@ -120,7 +120,7 @@ fn gossip_scenario_full_sync() {
     }
 
     for (i, n) in nodes.iter().enumerate() {
-        println!("{}", n.ascii_arq_and_ops(i, 64));
+        println!("{}", n.ascii_arq_and_ops(&topo, i, 64));
     }
 
     assert_eq!(nodes[0].query_op_data(&full_region).len(), num_ops);

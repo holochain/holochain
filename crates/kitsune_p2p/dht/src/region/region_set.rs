@@ -238,15 +238,19 @@ mod tests {
     use super::*;
 
     /// Only works for arqs that don't span `u32::MAX / 2`
-    fn op_grid(arq: &ArqBounds, trange: impl Iterator<Item = i64> + Clone) -> Vec<Op> {
-        let (left, right) = (arq.left(), arq.right());
+    fn op_grid(
+        topo: &Topology,
+        arq: &ArqBounds,
+        trange: impl Iterator<Item = i64> + Clone,
+    ) -> Vec<Op> {
+        let (left, right) = (arq.left(topo), arq.right(topo));
         let mid = u32::MAX / 2;
         assert!(
             !(left < mid && right > mid),
             "This hacky logic does not work for arqs which span `u32::MAX / 2`"
         );
-        let xstep = (arq.length() / arq.count() as u64) as usize;
-        (left as i32..arq.right() as i32 + 1)
+        let xstep = (arq.length(topo) / arq.count() as u64) as usize;
+        (left as i32..arq.right(topo) as i32 + 1)
             .step_by(xstep)
             .flat_map(|x| {
                 trange.clone().map(move |t| {
@@ -261,18 +265,19 @@ mod tests {
 
     #[test]
     fn test_regions() {
-        let pow = 8;
-        let arq = Arq::new(0.into(), pow, 4).to_bounds();
-        assert_eq!(arq.left() as i32, 0);
-        assert_eq!(arq.right(), 1023 as u32);
-
         let topo = Topology::identity(Timestamp::from_micros(1000));
+        let pow = 8;
+        let arq = Arq::new(0u32.into(), pow, 4).to_bounds();
+        assert_eq!(arq.left(&topo) as i32, 0);
+        assert_eq!(arq.right(&topo), 1023 as u32);
+
         let mut store = OpStore::new(topo.clone(), GossipParams::zero());
 
         // Create a nx by nt grid of ops and integrate into the store
         let nx = 8;
         let nt = 10;
         let ops = op_grid(
+            &topo,
             &Arq::new(0.into(), pow, 8).to_bounds(),
             (1000..11000 as i64).step_by(1000),
         );
@@ -293,10 +298,10 @@ mod tests {
 
     #[test]
     fn test_rectify() {
-        let arq = Arq::new(0.into(), 8, 4).to_bounds();
         let topo = Topology::identity_zero();
+        let arq = Arq::new(0u32.into(), 8, 4).to_bounds();
         let mut store = OpStore::new(topo.clone(), GossipParams::zero());
-        store.integrate_ops(op_grid(&arq, 10..20).into_iter());
+        store.integrate_ops(op_grid(&topo, &arq, 10..20).into_iter());
 
         let tt_a = TelescopingTimes::new(TimeQuantum::from(20));
         let tt_b = TelescopingTimes::new(TimeQuantum::from(30));
@@ -333,11 +338,11 @@ mod tests {
         let topo = Topology::identity_zero();
 
         let mut store1 = OpStore::new(topo.clone(), GossipParams::zero());
-        store1.integrate_ops(op_grid(&arq, 10..20).into_iter());
+        store1.integrate_ops(op_grid(&topo, &arq, 10..20).into_iter());
 
         let extra_ops = [
-            OpData::fake(Loc::from(-300i32 as u32), Timestamp::from_micros(18), 4),
-            OpData::fake(Loc::from(12), Timestamp::from_micros(12), 4),
+            OpData::fake(Loc::from(-300i32), Timestamp::from_micros(18), 4),
+            OpData::fake(Loc::from(12u32), Timestamp::from_micros(12), 4),
         ];
         let mut store2 = store1.clone();
         store2.integrate_ops(extra_ops.clone().into_iter());

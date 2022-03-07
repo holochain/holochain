@@ -2,6 +2,7 @@
 #![cfg(feature = "testing")]
 
 use kitsune_p2p_dht::arq::*;
+use kitsune_p2p_dht::quantum::Topology;
 use kitsune_p2p_dht::test_utils::min_redundancy::calc_min_redundancy;
 use rand::prelude::StdRng;
 use rand::thread_rng;
@@ -102,6 +103,7 @@ where
 /// dynamic_peer_indices: Indices of peers who should be updated. If None, all peers will be updated.
 /// detail: Level of output detail. More is more verbose. detail: u8,
 pub fn run_one_epoch(
+    topo: &Topology,
     strat: &ArqStrat,
     mut peers: Peers,
     dynamic_peer_indices: Option<&HashSet<usize>>,
@@ -120,7 +122,7 @@ pub fn run_one_epoch(
     let mut delta_max = -full_len();
 
     // TODO: update the continuous test framework to only use one view per epoch
-    let mut view = PeerViewQ::new(strat.clone(), peers.clone());
+    let mut view = PeerViewQ::new(topo.clone(), strat.clone(), peers.clone());
 
     if detail {
         println!(
@@ -138,12 +140,12 @@ pub fn run_one_epoch(
             }
         }
         let mut arq = peers.get_mut(i).unwrap();
-        let before = arq.length() as f64;
+        let before = arq.length(topo) as f64;
         let before_pow = arq.power();
 
         let stats = view.update_arq_with_stats(&mut arq);
 
-        let after = arq.length() as f64;
+        let after = arq.length(topo) as f64;
         let delta = after - before;
 
         if detail {
@@ -180,7 +182,7 @@ pub fn run_one_epoch(
                 .unwrap_or("??".magenta());
             println!(
                 "|{}| #{:<3} {:>3} {:>3} {:>3} {} {} {: >3} {}",
-                arq.to_interval().to_ascii(64),
+                arq.to_interval(topo).to_ascii(64),
                 i,
                 arq.count(),
                 arq.power(),
@@ -220,7 +222,7 @@ pub fn run_one_epoch(
     }
 
     let tot = peers.len() as f64;
-    let min_redundancy = calc_min_redundancy(peers.clone());
+    let min_redundancy = calc_min_redundancy(topo, peers.clone());
     let stats = EpochStats {
         net_delta_avg: delta_net / tot / full_len(),
         gross_delta_avg: delta_gross / tot / full_len(),

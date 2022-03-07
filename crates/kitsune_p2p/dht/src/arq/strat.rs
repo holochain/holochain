@@ -1,5 +1,7 @@
 use kitsune_p2p_dht_arc::{DhtArc, PeerStratAlpha, PeerStratBeta};
 
+use crate::quantum::Topology;
+
 use super::{Arq, PeerView, PeerViewQ};
 
 /// A Strategy for generating PeerViews.
@@ -18,11 +20,12 @@ impl Default for PeerStrat {
 }
 
 impl PeerStrat {
-    pub fn view(&self, arc: DhtArc, peers: &[DhtArc]) -> PeerView {
+    pub fn view(&self, topo: Topology, arc: DhtArc, peers: &[DhtArc]) -> PeerView {
         match self {
             Self::Alpha(s) => s.view(arc, peers).into(),
             Self::Beta(s) => s.view(arc, peers).into(),
             Self::Quantized(s) => PeerViewQ::new(
+                topo,
                 s.clone(),
                 peers.iter().map(|p| Arq::from_dht_arc(s, p)).collect(),
             )
@@ -30,11 +33,12 @@ impl PeerStrat {
         }
     }
 
-    pub fn view_unchecked(&self, arc: DhtArc, peers: &[DhtArc]) -> PeerView {
+    pub fn view_unchecked(&self, topo: Topology, arc: DhtArc, peers: &[DhtArc]) -> PeerView {
         match self {
             Self::Alpha(s) => s.view_unchecked(arc, peers).into(),
             Self::Beta(s) => s.view_unchecked(arc, peers).into(),
             Self::Quantized(s) => PeerViewQ::new(
+                topo,
                 s.clone(),
                 peers.iter().map(|p| Arq::from_dht_arc(s, p)).collect(),
             )

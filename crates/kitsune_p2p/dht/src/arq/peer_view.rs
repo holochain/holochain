@@ -1,6 +1,8 @@
 use kitsune_p2p_dht_arc::{ArcInterval, DhtArc, PeerViewAlpha, PeerViewBeta};
 use num_traits::Zero;
 
+use crate::quantum::Topology;
+
 use super::{is_full, Arq, ArqBounded, ArqBounds, ArqStrat};
 
 /// A "view" of the peers in a neighborhood. The view consists of a few
@@ -18,6 +20,10 @@ pub enum PeerView {
 }
 
 impl PeerView {
+    pub fn topo(&self) -> &Topology {
+        todo!()
+    }
+
     /// Given the current view of a peer and the peer's current coverage,
     /// this returns the next step to take in reaching the ideal coverage.
     pub fn update_arc(&self, dht_arc: &mut DhtArc) -> bool {
@@ -27,7 +33,7 @@ impl PeerView {
             Self::Quantized(v) => {
                 let mut arq = Arq::from_dht_arc(&v.strat, dht_arc);
                 let updated = v.update_arq(&mut arq);
-                *dht_arc = arq.to_dht_arc();
+                *dht_arc = arq.to_dht_arc(self.topo());
                 updated
             }
         }
@@ -37,6 +43,9 @@ impl PeerView {
 pub struct PeerViewQ {
     /// The strategy which generated this view
     strat: ArqStrat,
+
+    /// The topology of the network space
+    topo: Topology,
 
     /// The peers in this view (TODO: replace with calculated values)
     peers: Vec<Arq>,
@@ -49,9 +58,10 @@ pub struct PeerViewQ {
 }
 
 impl PeerViewQ {
-    pub fn new(strat: ArqStrat, peers: Vec<Arq>) -> Self {
+    pub fn new(topo: Topology, strat: ArqStrat, peers: Vec<Arq>) -> Self {
         Self {
             strat,
+            topo,
             peers,
             #[cfg(feature = "testing")]
             skip_index: None,
@@ -63,7 +73,7 @@ impl PeerViewQ {
     ///       So, it's more useful for testing. Probably want to tease out some
     ///       concept of a test DHT from this.
     pub fn actual_coverage(&self) -> f64 {
-        actual_coverage(self.peers.iter())
+        actual_coverage(&self.topo, self.peers.iter())
     }
 
     /// Extrapolate the coverage of the entire network from our local view.
@@ -78,7 +88,7 @@ impl PeerViewQ {
     /// TODO: this probably will be rewritten when PeerView is rewritten to
     /// have the filter baked in.
     pub fn extrapolated_coverage_and_filtered_count(&self, filter: &ArqBounds) -> (f64, usize) {
-        let filter = filter.to_interval();
+        let filter = filter.to_interval(&self.topo);
         if filter == ArcInterval::Empty {
             // More accurately this would be 0, but it's handy to not have
             // divide-by-zero crashes
@@ -98,14 +108,17 @@ impl PeerViewQ {
         // different in the future.
         let (sum, count) = self
             .filtered_arqs(filter)
-            .fold(initial, |(sum, count), arq| (sum + arq.length(), count + 1));
+            .fold(initial, |(sum, count), arq| {
+                (sum + arq.length(&self.topo), count + 1)
+            });
         let cov = sum as f64 / filter_len as f64;
         (cov, count)
     }
 
     /// Compute the total coverage observed within the filter interval.
     pub fn raw_coverage(&self, filter: &ArqBounds) -> f64 {
-        self.extrapolated_coverage(filter) * filter.to_interval().length() as f64 / 2f64.powf(32.0)
+        self.extrapolated_coverage(filter) * filter.to_interval(&self.topo).length() as f64
+            / 2f64.powf(32.0)
     }
 
     pub fn update_arq(&self, arq: &mut Arq) -> bool {
@@ -326,7 +339,7 @@ impl PeerViewQ {
     pub fn power_stats(&self, filter: &Arq) -> PowerStats {
         use statrs::statistics::*;
         let mut powers: Vec<_> = self
-            .filtered_arqs(filter.to_interval())
+            .filtered_arqs(filter.to_interval(&self.topo))
             .filter(|a| a.count > 0)
             .map(|a| a.power as f64)
             .collect();
@@ -363,12 +376,12 @@ pub struct UpdateArqStats {
 
 /// The actual coverage provided by these peers. Assumes that this is the
 /// entire view of the DHT, all peers are accounted for here.
-pub fn actual_coverage<'a, A: 'a, P: Iterator<Item = &'a A>>(peers: P) -> f64
+pub fn actual_coverage<'a, A: 'a, P: Iterator<Item = &'a A>>(topo: &Topology, peers: P) -> f64
 where
     ArqBounds: From<&'a A>,
 {
     peers
-        .map(|a| ArqBounds::from(a).length() as f64 / 2f64.powf(32.0))
+        .map(|a| ArqBounds::from(a).length(topo) as f64 / 2f64.powf(32.0))
         .sum()
 }
 
@@ -384,6 +397,7 @@ mod tests {
     use kitsune_p2p_dht_arc::ArcInterval;
 
     use crate::arq::{pow2, print_arqs};
+    use crate::quantum::Topology;
     use crate::Loc;
 
     use super::*;
@@ -398,6 +412,7 @@ mod tests {
 
     #[test]
     fn test_filtered_arqs() {
+        let topo = Topology::identity_zero();
         let pow = 25;
         let s = pow2(pow);
         let a = make_arq(pow, 0, 0x20);
@@ -407,11 +422,11 @@ mod tests {
         assert_eq!(b.center, Loc::from(s * 0x10 + s / 2));
         assert_eq!(c.center, Loc::from(s * 0x20 + s / 2));
         let arqs = vec![a, b, c];
-        print_arqs(&arqs, 64);
-        let view = PeerViewQ::new(Default::default(), arqs);
+        print_arqs(&topo, &arqs, 64);
+        let view = PeerViewQ::new(topo.clone(), Default::default(), arqs);
 
         let get = |b: Arq| {
-            view.filtered_arqs(b.to_interval())
+            view.filtered_arqs(b.to_interval(&topo))
                 .cloned()
                 .collect::<Vec<_>>()
         };
@@ -423,13 +438,14 @@ mod tests {
 
     #[test]
     fn test_coverage() {
+        let topo = Topology::identity_zero();
         let pow = 24;
         let arqs: Vec<_> = (0..0x100)
             .step_by(0x10)
             .map(|x| make_arq(pow, x, x + 0x20))
             .collect();
-        print_arqs(&arqs, 64);
-        let view = PeerViewQ::new(Default::default(), arqs);
+        print_arqs(&topo, &arqs, 64);
+        let view = PeerViewQ::new(topo, Default::default(), arqs);
         assert_eq!(
             view.extrapolated_coverage_and_filtered_count(&make_arq(pow, 0, 0x10).to_bounds()),
             (2.0, 1)

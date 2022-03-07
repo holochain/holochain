@@ -24,7 +24,7 @@ pub fn gossip_direct<Peer: HostAccess>(
     if left.topo() != right.topo() {
         return Err(GossipError::TopologyMismatch);
     }
-    let _topo = left.topo();
+    let topo = left.topo();
 
     let common_arqs = {
         // ROUND I: Initial handshake, exchange ArqSets and as-at timestamps
@@ -49,7 +49,7 @@ pub fn gossip_direct<Peer: HostAccess>(
         {
             return Err(GossipError::ArqPowerDiffTooLarge);
         }
-        al.intersection(&ar)
+        al.intersection(&topo, &ar)
     };
 
     {

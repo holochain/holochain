@@ -51,12 +51,12 @@ impl TestNode {
         RegionSetXtcs::from_data(coords, data).into()
     }
 
-    pub fn ascii_arq_and_ops(&self, i: usize, len: usize) -> String {
+    pub fn ascii_arq_and_ops(&self, topo: &Topology, i: usize, len: usize) -> String {
         let arq = self.arq();
         format!(
             "|{}| {}: {}/{} @ {}",
             add_location_ascii(
-                arq.to_ascii(len),
+                arq.to_ascii(topo, len),
                 self.store.ops.iter().map(|o| o.loc).collect()
             ),
             i,

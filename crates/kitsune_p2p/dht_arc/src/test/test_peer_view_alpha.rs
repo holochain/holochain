@@ -12,8 +12,8 @@ fn test_arc_dist() {
     // start at 5 go all the way around the arc anti-clockwise until
     // you reach 5. You will have traveled 5 less then the entire arc plus one
     // for the reserved zero value
-    assert_eq!(shortest_arc_distance(10, 5), 5);
-    assert_eq!(shortest_arc_distance(5, 10), 5);
+    assert_eq!(shortest_arc_distance(10u32, 5), 5);
+    assert_eq!(shortest_arc_distance(5u32, 10), 5);
     assert_eq!(
         shortest_arc_distance(Wrapping(u32::MAX) + Wrapping(5), u32::MAX),
         5
@@ -27,46 +27,46 @@ fn test_arc_dist() {
 
 #[test]
 fn test_dht_arc() {
-    assert!(!DhtArc::new(0, 0).contains(0));
+    assert!(!DhtArc::new(0u32, 0).contains(0));
 
-    assert!(DhtArc::new(0, 1).contains(0));
+    assert!(DhtArc::new(0u32, 1).contains(0));
 
-    assert!(!DhtArc::new(0, 1).contains(1));
+    assert!(!DhtArc::new(0u32, 1).contains(1));
     assert!(!DhtArc::new(1, 0).contains(0));
     assert!(!DhtArc::new(1, 0).contains(1));
 
     assert!(DhtArc::new(1, 1).contains(1));
-    assert!(DhtArc::new(0, 2).contains(0));
-    assert!(DhtArc::new(0, 2).contains(1));
-    assert!(DhtArc::new(0, 2).contains(u32::MAX));
+    assert!(DhtArc::new(0u32, 2).contains(0));
+    assert!(DhtArc::new(0u32, 2).contains(1));
+    assert!(DhtArc::new(0u32, 2).contains(u32::MAX));
 
-    assert!(!DhtArc::new(0, 2).contains(2));
-    assert!(!DhtArc::new(0, 2).contains(3));
-    assert!(!DhtArc::new(0, 2).contains(u32::MAX - 1));
-    assert!(!DhtArc::new(0, 2).contains(u32::MAX - 2));
+    assert!(!DhtArc::new(0u32, 2).contains(2));
+    assert!(!DhtArc::new(0u32, 2).contains(3));
+    assert!(!DhtArc::new(0u32, 2).contains(u32::MAX - 1));
+    assert!(!DhtArc::new(0u32, 2).contains(u32::MAX - 2));
 
-    assert!(DhtArc::new(0, 3).contains(2));
-    assert!(DhtArc::new(0, 3).contains(u32::MAX - 1));
+    assert!(DhtArc::new(0u32, 3).contains(2));
+    assert!(DhtArc::new(0u32, 3).contains(u32::MAX - 1));
 
-    assert!(DhtArc::new(0, MAX_HALF_LENGTH).contains(u32::MAX / 2));
-    assert!(DhtArc::new(0, MAX_HALF_LENGTH).contains(u32::MAX));
-    assert!(DhtArc::new(0, MAX_HALF_LENGTH).contains(0));
-    assert!(DhtArc::new(0, MAX_HALF_LENGTH).contains(MAX_HALF_LENGTH));
+    assert!(DhtArc::new(0u32, MAX_HALF_LENGTH).contains(u32::MAX / 2));
+    assert!(DhtArc::new(0u32, MAX_HALF_LENGTH).contains(u32::MAX));
+    assert!(DhtArc::new(0u32, MAX_HALF_LENGTH).contains(0));
+    assert!(DhtArc::new(0u32, MAX_HALF_LENGTH).contains(MAX_HALF_LENGTH));
 }
 
 #[test]
 fn test_arc_interval_conversion() {
     assert_eq!(
-        DhtArc::new(0, MAX_HALF_LENGTH).interval(),
+        DhtArc::new(0u32, MAX_HALF_LENGTH).interval(),
         ArcInterval::Full,
     );
-    assert_eq!(DhtArc::new(0, u32::MAX).interval(), ArcInterval::Full,);
+    assert_eq!(DhtArc::new(0u32, u32::MAX).interval(), ArcInterval::Full,);
     assert_eq!(
-        DhtArc::new(0, u32::MAX / 3).interval(),
+        DhtArc::new(0u32, u32::MAX / 3).interval(),
         ArcInterval::new(u32::MAX - u32::MAX / 3 + 2, u32::MAX / 3 - 1),
     );
     assert_eq!(
-        DhtArc::new(0, u32::MAX / 4).interval(),
+        DhtArc::new(0u32, u32::MAX / 4).interval(),
         ArcInterval::new(u32::MAX - u32::MAX / 4 + 2, u32::MAX / 4 - 1),
     );
     assert_eq!(DhtArc::new(1000, 5).interval(), ArcInterval::new(996, 1004),);
@@ -108,8 +108,8 @@ fn test_arc_start_end() {
         assert!(DhtArc::new(mid, hl + 1).contains(opp));
     };
 
-    assert!(DhtArc::new(0, 0).range().is_empty());
-    assert_eq!(DhtArc::new(0, 1).range().into_inc(), 0..=0);
+    assert!(DhtArc::new(0u32, 0).range().is_empty());
+    assert_eq!(DhtArc::new(0u32, 1).range().into_inc(), 0..=0);
     assert_eq!(DhtArc::new(1, 2).range().into_inc(), 0..=2);
     assert_eq!(
         DhtArc::new(quarter, quarter + 1).range().into_inc(),
@@ -144,7 +144,7 @@ fn test_arc_start_end() {
     check_bounds(half, MAX_HALF_LENGTH - 2, 2, u32::MAX - 1);
 
     assert_eq!(
-        DhtArc::new(0, 2).range(),
+        DhtArc::new(0u32, 2).range(),
         ArcRange {
             start: Included(u32::MAX),
             end: Included(1)
@@ -162,7 +162,7 @@ fn test_arc_start_end() {
     check_bounds(u32::MAX, 2, u32::MAX - 1, 0);
 
     assert_eq!(
-        DhtArc::new(0, MAX_HALF_LENGTH).range(),
+        DhtArc::new(0u32, MAX_HALF_LENGTH).range(),
         ArcRange {
             start: Included(half),
             end: Included(half - 1)
@@ -171,7 +171,7 @@ fn test_arc_start_end() {
     check_bounds_full(0, MAX_HALF_LENGTH, half, half - 1);
 
     assert_eq!(
-        DhtArc::new(0, MAX_HALF_LENGTH - 1).range(),
+        DhtArc::new(0u32, MAX_HALF_LENGTH - 1).range(),
         ArcRange {
             start: Included(half),
             end: Included(half - 1)
@@ -208,27 +208,30 @@ fn test_arc_len() {
         U32_LEN - 3
     );
 
-    assert_eq!(DhtArc::new(0, MAX_HALF_LENGTH).range().len(), U32_LEN);
-
-    assert_eq!(DhtArc::new(0, MAX_HALF_LENGTH - 1).range().len(), U32_LEN);
+    assert_eq!(DhtArc::new(0u32, MAX_HALF_LENGTH).range().len(), U32_LEN);
 
     assert_eq!(
-        DhtArc::new(0, MAX_HALF_LENGTH - 2).range().len(),
+        DhtArc::new(0u32, MAX_HALF_LENGTH - 1).range().len(),
+        U32_LEN
+    );
+
+    assert_eq!(
+        DhtArc::new(0u32, MAX_HALF_LENGTH - 2).range().len(),
         U32_LEN - 3
     );
 
     assert_eq!(
-        DhtArc::new(0, MAX_HALF_LENGTH - 3).range().len(),
+        DhtArc::new(0u32, MAX_HALF_LENGTH - 3).range().len(),
         U32_LEN - 5
     );
 
-    assert_eq!(DhtArc::new(0, 0).range().len(), 0);
+    assert_eq!(DhtArc::new(0u32, 0).range().len(), 0);
 
-    assert_eq!(DhtArc::new(0, 1).range().len(), 1);
+    assert_eq!(DhtArc::new(0u32, 1).range().len(), 1);
 
-    assert_eq!(DhtArc::new(0, 2).range().len(), 3);
+    assert_eq!(DhtArc::new(0u32, 2).range().len(), 3);
 
-    assert_eq!(DhtArc::new(0, 3).range().len(), 5);
+    assert_eq!(DhtArc::new(0u32, 3).range().len(), 5);
 }
 
 #[test]
@@ -236,7 +239,7 @@ fn test_arc_len() {
 fn test_peer_density() {
     let strat = PeerStratAlpha::default();
     let arc = |c, n, h| {
-        let mut arc = DhtArc::new(0, h);
+        let mut arc = DhtArc::new(0u32, h);
         PeerViewAlpha::new(Default::default(), arc, c, n).update_arc(&mut arc);
         (arc.coverage() * 10000.0).round() / 10000.0
     };
@@ -255,14 +258,14 @@ fn test_peer_density() {
     assert_eq!(arc(1.0, DEFAULT_MIN_PEERS, MAX_HALF_LENGTH), 1.0);
 
     // - Start with half coverage and minimum density
-    let mut arc = DhtArc::new(0, MAX_HALF_LENGTH / 2);
+    let mut arc = DhtArc::new(0u32, MAX_HALF_LENGTH / 2);
     let peers = even_dist_peers(DEFAULT_MIN_PEERS, &[MAX_HALF_LENGTH]);
     converge(&mut arc, &peers);
     // - Converge to full coverage
     assert_eq!(arc.coverage(), 1.0);
 
     // - Start with full coverage and over density
-    let mut arc = DhtArc::new(0, MAX_HALF_LENGTH);
+    let mut arc = DhtArc::new(0u32, MAX_HALF_LENGTH);
     let peers = even_dist_peers(DEFAULT_MIN_PEERS * 2, &[MAX_HALF_LENGTH]);
     converge(&mut arc, &peers);
     // - Converge to half coverage
@@ -286,20 +289,20 @@ fn test_peer_density() {
 #[test]
 fn test_check_for_gaps() {
     // Gaps
-    assert!(check_for_gaps(vec![DhtArc::new(0, 1)]));
-    assert!(check_for_gaps(vec![DhtArc::new(0, 0)]));
-    assert!(check_for_gaps(vec![DhtArc::new(0, MAX_HALF_LENGTH - 2)]));
+    assert!(check_for_gaps(vec![DhtArc::new(0u32, 1)]));
+    assert!(check_for_gaps(vec![DhtArc::new(0u32, 0)]));
+    assert!(check_for_gaps(vec![DhtArc::new(0u32, MAX_HALF_LENGTH - 2)]));
     assert!(check_for_gaps(vec![
-        DhtArc::new(0, MAX_HALF_LENGTH / 2),
-        DhtArc::new(0, MAX_HALF_LENGTH / 2)
+        DhtArc::new(0u32, MAX_HALF_LENGTH / 2),
+        DhtArc::new(0u32, MAX_HALF_LENGTH / 2)
     ]));
     assert!(check_for_gaps(vec![
-        DhtArc::new(0, MAX_HALF_LENGTH / 3 + 1),
+        DhtArc::new(0u32, MAX_HALF_LENGTH / 3 + 1),
         DhtArc::new(MAX_HALF_LENGTH / 3, MAX_HALF_LENGTH / 3 + 1),
         DhtArc::new((MAX_HALF_LENGTH / 3) * 2 + 100, MAX_HALF_LENGTH / 3 + 1)
     ]));
     assert!(check_for_gaps(vec![
-        DhtArc::new(0, MAX_HALF_LENGTH / 3 + 1),
+        DhtArc::new(0u32, MAX_HALF_LENGTH / 3 + 1),
         DhtArc::new(MAX_HALF_LENGTH / 3 - 1, MAX_HALF_LENGTH / 3 + 1),
         DhtArc::new(
             MAX_HALF_LENGTH + (MAX_HALF_LENGTH / 3),
@@ -308,13 +311,13 @@ fn test_check_for_gaps() {
     ]));
 
     // No Gaps
-    assert!(!check_for_gaps(vec![DhtArc::new(0, MAX_HALF_LENGTH)]));
+    assert!(!check_for_gaps(vec![DhtArc::new(0u32, MAX_HALF_LENGTH)]));
     assert!(!check_for_gaps(vec![
-        DhtArc::new(0, MAX_HALF_LENGTH / 2 + 1),
+        DhtArc::new(0u32, MAX_HALF_LENGTH / 2 + 1),
         DhtArc::new(MAX_HALF_LENGTH, MAX_HALF_LENGTH / 2 + 1)
     ]));
     assert!(!check_for_gaps(vec![
-        DhtArc::new(0, MAX_HALF_LENGTH / 3 + 1),
+        DhtArc::new(0u32, MAX_HALF_LENGTH / 3 + 1),
         DhtArc::new(MAX_HALF_LENGTH / 3 - 1, MAX_HALF_LENGTH / 3 + 1),
         DhtArc::new(
             MAX_HALF_LENGTH + (MAX_HALF_LENGTH / 8) - 100,
@@ -326,22 +329,22 @@ fn test_check_for_gaps() {
 #[test]
 fn test_check_redundancy() {
     // Gaps
-    assert_eq!(check_redundancy(vec![DhtArc::new(0, 1)]), 0);
-    assert_eq!(check_redundancy(vec![DhtArc::new(0, 0)]), 0);
+    assert_eq!(check_redundancy(vec![DhtArc::new(0u32, 1)]), 0);
+    assert_eq!(check_redundancy(vec![DhtArc::new(0u32, 0)]), 0);
     assert_eq!(
-        check_redundancy(vec![DhtArc::new(0, MAX_HALF_LENGTH - 2)]),
+        check_redundancy(vec![DhtArc::new(0u32, MAX_HALF_LENGTH - 2)]),
         0
     );
     assert_eq!(
         check_redundancy(vec![
-            DhtArc::new(0, MAX_HALF_LENGTH / 2),
-            DhtArc::new(0, MAX_HALF_LENGTH / 2)
+            DhtArc::new(0u32, MAX_HALF_LENGTH / 2),
+            DhtArc::new(0u32, MAX_HALF_LENGTH / 2)
         ]),
         0
     );
     assert_eq!(
         check_redundancy(vec![
-            DhtArc::new(0, MAX_HALF_LENGTH / 3 + 1),
+            DhtArc::new(0u32, MAX_HALF_LENGTH / 3 + 1),
             DhtArc::new(MAX_HALF_LENGTH / 3, MAX_HALF_LENGTH / 3 + 1),
             DhtArc::new((MAX_HALF_LENGTH / 3) * 2 + 100, MAX_HALF_LENGTH / 3 + 1)
         ]),
@@ -349,7 +352,7 @@ fn test_check_redundancy() {
     );
     assert_eq!(
         check_redundancy(vec![
-            DhtArc::new(0, MAX_HALF_LENGTH / 3 + 1),
+            DhtArc::new(0u32, MAX_HALF_LENGTH / 3 + 1),
             DhtArc::new(MAX_HALF_LENGTH / 3 - 1, MAX_HALF_LENGTH / 3 + 1),
             DhtArc::new(
                 MAX_HALF_LENGTH + (MAX_HALF_LENGTH / 3),
@@ -360,25 +363,28 @@ fn test_check_redundancy() {
     );
 
     // No Gaps
-    assert_eq!(check_redundancy(vec![DhtArc::new(0, MAX_HALF_LENGTH)]), 1);
     assert_eq!(
-        check_redundancy(vec![DhtArc::new(0, MAX_HALF_LENGTH); 3]),
+        check_redundancy(vec![DhtArc::new(0u32, MAX_HALF_LENGTH)]),
+        1
+    );
+    assert_eq!(
+        check_redundancy(vec![DhtArc::new(0u32, MAX_HALF_LENGTH); 3]),
         3
     );
     assert_eq!(
-        check_redundancy(vec![DhtArc::new(0, MAX_HALF_LENGTH - 1)]),
+        check_redundancy(vec![DhtArc::new(0u32, MAX_HALF_LENGTH - 1)]),
         1
     );
     assert_eq!(
         check_redundancy(vec![
-            DhtArc::new(0, MAX_HALF_LENGTH / 2 + 1),
+            DhtArc::new(0u32, MAX_HALF_LENGTH / 2 + 1),
             DhtArc::new(MAX_HALF_LENGTH, MAX_HALF_LENGTH / 2 + 1)
         ]),
         1
     );
     assert_eq!(
         check_redundancy(vec![
-            DhtArc::new(0, MAX_HALF_LENGTH / 3 + 1),
+            DhtArc::new(0u32, MAX_HALF_LENGTH / 3 + 1),
             DhtArc::new(MAX_HALF_LENGTH / 3 - 1, MAX_HALF_LENGTH / 3 + 1),
             DhtArc::new(
                 MAX_HALF_LENGTH + (MAX_HALF_LENGTH / 8) - 100,

@@ -1,6 +1,6 @@
 use std::num::Wrapping;
 
-use crate::arq::*;
+use crate::{arq::*, quantum::Topology};
 
 /// Margin of error for floating point comparisons
 const ERROR_MARGIN: f64 = 0.0000000001;
@@ -8,7 +8,7 @@ const ERROR_MARGIN: f64 = 0.0000000001;
 /// Check a set of peers the actual redundancy across all peers.
 /// This can tell if there is bad distribution.
 /// Note this function is only used for verification in tests at this time.
-pub fn calc_min_redundancy(peers: Vec<Arq>) -> u32 {
+pub fn calc_min_redundancy(topo: &Topology, peers: Vec<Arq>) -> u32 {
     use std::collections::HashSet;
     #[derive(Clone, Copy, Debug)]
     enum Side {
@@ -21,8 +21,8 @@ pub fn calc_min_redundancy(peers: Vec<Arq>) -> u32 {
         side: Side,
         pos: u32,
     }
-    let left = |arc: &Arq| arc.to_bounds().left();
-    let right = |arc: &Arq| arc.to_bounds().right();
+    let left = |arc: &Arq| arc.to_bounds().left(topo);
+    let right = |arc: &Arq| arc.to_bounds().right(topo);
 
     // Turn each arc into a side with a unique id that is
     // shared by both sides.
@@ -49,7 +49,7 @@ pub fn calc_min_redundancy(peers: Vec<Arq>) -> u32 {
     let peers: Vec<_> = peers
         .into_iter()
         .filter(|a| {
-            if (a.length_ratio() - 1.0).abs() < ERROR_MARGIN {
+            if (a.length_ratio(topo) - 1.0).abs() < ERROR_MARGIN {
                 full_r += 1;
                 false
             } else {

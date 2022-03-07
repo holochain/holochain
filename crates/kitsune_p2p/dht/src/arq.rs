@@ -25,12 +25,12 @@ pub fn pow2f(p: u8) -> f64 {
 }
 
 pub trait ArqBounded: Sized + serde::Serialize + serde::de::DeserializeOwned {
-    fn to_interval(&self) -> ArcInterval;
+    fn to_interval(&self, topo: &Topology) -> ArcInterval;
 
-    fn length(&self) -> u64;
+    fn length(&self, topo: &Topology) -> u64;
 
-    fn length_ratio(&self) -> f64 {
-        self.length() as f64 / 2f64.powf(32.0)
+    fn length_ratio(&self, topo: &Topology) -> f64 {
+        self.length(topo) as f64 / 2f64.powf(32.0)
     }
 
     /// Get a reference to the arq's power.
@@ -54,8 +54,8 @@ pub trait ArqBounded: Sized + serde::Serialize + serde::de::DeserializeOwned {
 
     fn to_bounds(&self) -> ArqBounds;
 
-    fn to_ascii(&self, len: usize) -> String {
-        self.to_bounds().to_ascii(len)
+    fn to_ascii(&self, topo: &Topology, len: usize) -> String {
+        self.to_bounds().to_ascii(topo, len)
     }
 }
 
@@ -173,8 +173,8 @@ impl Arq {
         &mut self.count
     }
 
-    pub fn to_dht_arc(&self) -> DhtArc {
-        let len = self.length();
+    pub fn to_dht_arc(&self, topo: &Topology) -> DhtArc {
+        let len = self.length(topo);
         let hl = ((len + 1) / 2) as u32;
         DhtArc::new(self.center, hl)
     }
@@ -218,12 +218,12 @@ impl ArqBounded for Arq {
         }
     }
 
-    fn to_interval(&self) -> ArcInterval {
-        self.to_bounds().to_interval()
+    fn to_interval(&self, topo: &Topology) -> ArcInterval {
+        self.to_bounds().to_interval(topo)
     }
 
-    fn length(&self) -> u64 {
-        self.to_interval().length()
+    fn length(&self, topo: &Topology) -> u64 {
+        self.to_interval(topo).length()
     }
 
     fn power(&self) -> u8 {
@@ -255,18 +255,18 @@ impl ArqBounded for ArqBounds {
         *self
     }
 
-    fn to_interval(&self) -> ArcInterval {
+    fn to_interval(&self, topo: &Topology) -> ArcInterval {
         if is_full(self.power, self.count) {
             ArcInterval::Full
         } else if let Some((a, b)) = self.boundary_chunks() {
-            ArcInterval::new(a.left(), b.right())
+            ArcInterval::new(a.left(topo), b.right(topo))
         } else {
             ArcInterval::Empty
         }
     }
 
-    fn length(&self) -> u64 {
-        self.to_interval().length()
+    fn length(&self, topo: &Topology) -> u64 {
+        self.to_interval(topo).length()
     }
 
     fn power(&self) -> u8 {
@@ -386,16 +386,16 @@ impl ArqBounds {
     }
 
     // TODO: test
-    pub fn left(&self) -> u32 {
-        self.offset.exp_wrapping(self.power)
+    pub fn left(&self, topo: &Topology) -> u32 {
+        self.offset.exp_wrapping(topo, self.power)
     }
 
     // TODO: test
     // XXX: doesn't really apply for an empty ArqBounds!
-    pub fn right(&self) -> u32 {
+    pub fn right(&self, topo: &Topology) -> u32 {
         self.offset
             .wrapping_add(self.count)
-            .exp_wrapping(self.power)
+            .exp_wrapping(topo, self.power)
             .wrapping_sub(1)
     }
 
@@ -525,10 +525,11 @@ mod tests {
 
     #[test]
     fn test_full_intervals() {
-        let full1 = Arq::new_full(0.into(), 29);
+        let topo = Topology::identity_zero();
+        let full1 = Arq::new_full(0u32.into(), 29);
         let full2 = Arq::new_full(2u32.pow(31).into(), 25);
-        assert_eq!(full1.to_interval(), ArcInterval::Full);
-        assert_eq!(full2.to_interval(), ArcInterval::Full);
+        assert_eq!(full1.to_interval(&topo), ArcInterval::Full);
+        assert_eq!(full2.to_interval(&topo), ArcInterval::Full);
     }
 
     #[test]
@@ -599,6 +600,8 @@ mod tests {
     proptest::proptest! {
         #[test]
         fn test_preserve_ordering_for_bounds(mut centers: Vec<u32>, count in 0u32..8, power in 10u8..20) {
+            let topo = Topology::identity_zero();
+
             // given a list of sorted centerpoints
             centers.sort();
 
@@ -609,7 +612,7 @@ mod tests {
             // Ensure the list of ArqBounds also grows monotonically.
             // However, there may be one point at which monotonicity is broken,
             // corresponding to the left edge wrapping around.
-            bounds.sort_by_key(|(_, b)| b.left());
+            bounds.sort_by_key(|(_, b)| b.left(&topo));
 
             let mut prev = 0;
             let mut split = None;
@@ -636,10 +639,11 @@ mod tests {
 
         #[test]
         fn dht_arc_roundtrip(center: u32, pow in 3..29u8, count in 0..8u32) {
+            let topo = Topology::identity_zero();
             let length = (count as u64 * 2u64.pow(pow as u32) / 2 * 2).saturating_sub(1);
             let strat = ArqStrat::default();
             let arq = approximate_arq(&strat, center.into(), length);
-            let dht_arc = arq.to_dht_arc();
+            let dht_arc = arq.to_dht_arc(&topo);
             let arq2 = Arq::from_dht_arc(&strat, &dht_arc);
             assert_eq!(arq, arq2);
         }

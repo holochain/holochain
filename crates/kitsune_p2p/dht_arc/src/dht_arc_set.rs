@@ -337,7 +337,7 @@ impl ArcInterval<DhtLocation> {
             let gap = if lo > hi {
                 lo - hi
             } else {
-                DhtLocation::from(u32::MAX) - hi + lo
+                DhtLocation::MAX - hi + lo
             };
             if gap <= 2.into() {
                 // Because a halflen must be even, a small gap leads to full coverage
@@ -357,7 +357,7 @@ impl ArcInterval<DhtLocation> {
     pub fn to_bounds_grouped(&self) -> Option<(DhtLocation, DhtLocation)> {
         match self {
             Self::Empty => None,
-            Self::Full => Some((u32::MIN.into(), u32::MAX.into())),
+            Self::Full => Some((DhtLocation::MIN, DhtLocation::MAX)),
             &Self::Bounded(lo, hi) => Some((lo, hi)),
         }
     }

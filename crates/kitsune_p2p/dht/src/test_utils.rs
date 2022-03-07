@@ -4,6 +4,7 @@ pub mod op_store;
 pub mod test_node;
 
 use crate::arq::*;
+use crate::quantum::Topology;
 
 use kitsune_p2p_dht_arc::DhtLocation as Loc;
 use rand::prelude::StdRng;
@@ -57,6 +58,7 @@ pub fn unit_arq(strat: &ArqStrat, unit_center: f64, unit_len: f64) -> Arq {
 /// Each agent is perfectly evenly spaced around the DHT (+/- some jitter),
 /// with stable arc lengths that are sized to meet the minimum coverage target
 pub fn generate_ideal_coverage(
+    topo: &Topology,
     rng: &mut StdRng,
     strat: &ArqStrat,
     cov: Option<f64>,
@@ -80,7 +82,7 @@ pub fn generate_ideal_coverage(
         })
         .collect();
 
-    let cov = actual_coverage(peers.iter());
+    let cov = actual_coverage(topo, peers.iter());
     let min = (target / (strat.buffer / 2.0 + 1.0)).floor();
     let max = (min * (strat.buffer + 1.0)).ceil();
     assert!(
@@ -177,6 +179,8 @@ mod tests {
 
     #[test]
     fn test_ideal_coverage_case() {
+        let topo = Topology::identity_zero();
+
         let strat = ArqStrat {
             // min_coverage: 44.93690369578987,
             // buffer: 0.1749926,
@@ -186,9 +190,9 @@ mod tests {
         };
 
         let mut rng = seeded_rng(None);
-        let peers = generate_ideal_coverage(&mut rng, &strat, None, 100, 0.0);
+        let peers = generate_ideal_coverage(&topo, &mut rng, &strat, None, 100, 0.0);
 
-        let view = PeerViewQ::new(strat.clone(), peers);
+        let view = PeerViewQ::new(topo, strat.clone(), peers);
         let cov = view.actual_coverage();
 
         let min = strat.min_coverage;
@@ -205,14 +209,15 @@ mod tests {
         /// range.
         #[test]
         fn test_ideal_coverage(min_coverage in 40f64..100.0, buffer in 0.1f64..0.5, num_peers in 100u32..200) {
+            let topo = Topology::identity_zero();
             let strat = ArqStrat {
                 min_coverage,
                 buffer,
                 ..Default::default()
             };
             let mut rng = seeded_rng(None);
-            let peers = generate_ideal_coverage(&mut rng, &strat, None, num_peers, 0.0);
-            let view = PeerViewQ::new(strat.clone(), peers);
+            let peers = generate_ideal_coverage(&topo, &mut rng, &strat, None, num_peers, 0.0);
+            let view = PeerViewQ::new(topo, strat.clone(), peers);
             let cov = view.actual_coverage();
 
             let min = strat.min_coverage;
@@ -248,6 +253,7 @@ mod tests {
 
         #[test]
         fn length_is_always_close(center in 0.0f64..0.999, len in 0.001f64..1.0) {
+            let topo = Topology::identity_zero();
             let strat = ArqStrat {
                 min_coverage: 10.0,
                 buffer: 0.144,
@@ -255,7 +261,7 @@ mod tests {
             };
             let a = unit_arq(&strat, center, len);
             let target_len = (len * 2f64.powf(32.0)) as i64;
-            let true_len = a.to_interval().length() as i64;
+            let true_len = a.to_interval(&topo).length() as i64;
             assert!((true_len - target_len).abs() < a.spacing() as i64);
         }
     }

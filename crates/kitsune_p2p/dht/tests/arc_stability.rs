@@ -2,6 +2,7 @@ mod common;
 
 use common::quantized::*;
 use kitsune_p2p_dht::{
+    quantum::Topology,
     test_utils::{generate_ideal_coverage, generate_messy_coverage, seeded_rng},
     *,
 };
@@ -43,8 +44,8 @@ fn stability_test_case_near_ideal() {
     std::env::set_var("RUST_LOG", "debug");
     observability::test_run().ok();
 
+    let topo = Topology::identity_zero();
     let detail = false;
-
     let mut rng = seeded_rng(None);
     let n = 150;
     let j = 0.1;
@@ -56,8 +57,8 @@ fn stability_test_case_near_ideal() {
     };
     println!("{}", strat.summary());
 
-    let peers = generate_ideal_coverage(&mut rng, &strat, Some(cov * 2.0), n, j);
-    parameterized_stability_test(&strat, peers, detail);
+    let peers = generate_ideal_coverage(&topo, &mut rng, &strat, Some(cov * 2.0), n, j);
+    parameterized_stability_test(&topo, &strat, peers, detail);
 }
 
 #[test]
@@ -65,6 +66,7 @@ fn stability_test_case_messy() {
     std::env::set_var("RUST_LOG", "debug");
     observability::test_run().ok();
 
+    let topo = Topology::identity_zero();
     let detail = true;
 
     let mut rng = seeded_rng(None);
@@ -78,7 +80,7 @@ fn stability_test_case_messy() {
         ..Default::default()
     };
     let peers = generate_messy_coverage(&mut rng, &strat, len_mean, len_std, n, j);
-    parameterized_stability_test(&strat, peers, detail);
+    parameterized_stability_test(&topo, &strat, peers, detail);
 }
 
 proptest::proptest! {
@@ -89,6 +91,7 @@ proptest::proptest! {
         std::env::set_var("RUST_LOG", "debug");
         observability::test_run().ok();
 
+        let topo = Topology::identity_zero();
         let detail = false;
 
         let mut rng = seeded_rng(None);
@@ -102,11 +105,11 @@ proptest::proptest! {
         };
 
         let peers = generate_messy_coverage(&mut rng, &strat, len_mean, len_std, num_peers, j);
-        parameterized_stability_test(&strat, peers, detail);
+        parameterized_stability_test(&topo, &strat, peers, detail);
     }
 }
 
-fn parameterized_stability_test(strat: &ArqStrat, peers: Vec<Arq>, detail: bool) {
+fn parameterized_stability_test(topo: &Topology, strat: &ArqStrat, peers: Vec<Arq>, detail: bool) {
     println!("{}", strat.summary());
 
     if detail {
@@ -114,7 +117,7 @@ fn parameterized_stability_test(strat: &ArqStrat, peers: Vec<Arq>, detail: bool)
         for (i, arq) in peers.iter().enumerate() {
             println!(
                 "|{}| #{:<3} {:>3} {:>3}",
-                arq.to_interval().to_ascii(64),
+                arq.to_interval(topo).to_ascii(64),
                 i,
                 arq.count(),
                 arq.power()
@@ -124,7 +127,7 @@ fn parameterized_stability_test(strat: &ArqStrat, peers: Vec<Arq>, detail: bool)
 
     tracing::debug!("{}", EpochStats::oneline_header());
     let eq = determine_equilibrium(1, peers.clone(), |peers| {
-        let (peers, stats) = run_one_epoch(strat, peers, None, detail);
+        let (peers, stats) = run_one_epoch(topo, strat, peers, None, detail);
         tracing::debug!("{}", stats.oneline());
         (peers, stats)
     });
@@ -132,7 +135,7 @@ fn parameterized_stability_test(strat: &ArqStrat, peers: Vec<Arq>, detail: bool)
     report.log();
     pass_report(&report, strat.min_coverage);
 
-    let actual_cov = actual_coverage(eq.runs()[0].peers.iter());
+    let actual_cov = actual_coverage(topo, eq.runs()[0].peers.iter());
     assert!(actual_cov >= strat.min_coverage);
     assert!(actual_cov <= strat.max_coverage() + 1.0);
 }
