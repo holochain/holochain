@@ -196,7 +196,7 @@ jobs:
          - build-docker:
               box: circle.build
 
-   all-jobs-succeed:
+   ci-jobs-succeed:
       docker:
          - image: bash
       steps:
@@ -215,7 +215,7 @@ workflows:
          - slow-test
          - wasm-test
          # - merge-test-mac
-         - all-jobs-succeed:
+         - ci-jobs-succeed:
               requires:
                  - standard-test
                  - hc-static-checks
