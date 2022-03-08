@@ -32,7 +32,7 @@ pub type ZomeCallResult = RibosomeResult<ZomeCallResponse>;
 
 pub struct CallZomeWorkflowArgs<Ribosome>
 where
-    Ribosome: RibosomeT + Send,
+    Ribosome: RibosomeT + Send + Sync,
 {
     pub ribosome: Ribosome,
     pub invocation: ZomeCallInvocation,
@@ -59,7 +59,7 @@ pub async fn call_zome_workflow<Ribosome>(
     trigger_integrate_dht_ops: TriggerSender,
 ) -> WorkflowResult<ZomeCallResult>
 where
-    Ribosome: RibosomeT + Send + 'static,
+    Ribosome: RibosomeT + Send + Sync + 'static,
 {
     let should_write = args.is_root_zome_call;
     let conductor_handle = args.conductor_handle.clone();
@@ -113,7 +113,7 @@ async fn call_zome_workflow_inner<Ribosome>(
     args: CallZomeWorkflowArgs<Ribosome>,
 ) -> WorkflowResult<ZomeCallResult>
 where
-    Ribosome: RibosomeT + Send + 'static,
+    Ribosome: RibosomeT + Send + Sync + 'static,
 {
     let CallZomeWorkflowArgs {
         ribosome,
@@ -207,7 +207,7 @@ pub async fn inline_validation<Ribosome>(
     ribosome: Ribosome,
 ) -> WorkflowResult<()>
 where
-    Ribosome: RibosomeT + Send + 'static,
+    Ribosome: RibosomeT + Send + Sync + 'static,
 {
     let to_app_validate = {
         // collect all the elements we need to validate in wasm

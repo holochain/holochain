@@ -96,15 +96,8 @@ async fn app_validation_workflow_inner(
                 let mut cascade = workspace.full_cascade(network.clone());
                 let r = match dhtop_to_op(op, &mut cascade).await {
                     Ok(op) => {
-                        validate_op_outer(
-                            dna_hash,
-                            &op,
-                            &conductor_handle,
-                            &(*workspace),
-                            &network,
-                            &mut HashSet::default(),
-                        )
-                        .await
+                        validate_op_outer(dna_hash, &op, &conductor_handle, &(*workspace), &network)
+                            .await
                     }
                     Err(e) => Err(e),
                 };
@@ -387,14 +380,12 @@ async fn dhtop_to_op(op: DhtOp, cascade: &mut Cascade) -> AppValidationOutcome<O
     Ok(op)
 }
 
-#[async_recursion::async_recursion]
 async fn validate_op_outer(
     dna_hash: Arc<DnaHash>,
     op: &Op,
     conductor_handle: &ConductorHandle,
     workspace: &AppValidationWorkspace,
     network: &HolochainP2pDna,
-    fetched_deps: &mut HashSet<AnyDhtHash>,
 ) -> AppValidationOutcome<Outcome> {
     // Get the workspace for the validation calls
     let host_fn_workspace = workspace.validation_workspace().await?;
@@ -406,54 +397,18 @@ async fn validate_op_outer(
 
     // Create the ribosome
     let ribosome = RealRibosome::new(dna_file);
-    match validate_op(op, host_fn_workspace, network, &ribosome).await {
-        Ok(Outcome::AwaitingDeps(hashes)) => {
-            let unfetched_hashes: Vec<AnyDhtHash> = hashes
-                .iter()
-                .filter(|&hash| !fetched_deps.contains(hash))
-                .cloned()
-                .collect();
-            if unfetched_hashes.is_empty() {
-                let in_flight = unfetched_hashes.iter().map(|hash| async move {
-                    let cascade_workspace = workspace.validation_workspace().await?;
-                    let mut cascade =
-                        Cascade::from_workspace_network(&cascade_workspace, network.clone());
-                    cascade
-                        .fetch_element(hash.clone(), NetworkGetOptions::must_get_options())
-                        .await?;
-                    Ok(())
-                });
-                let results: AppValidationResult<Vec<()>> = futures::future::join_all(in_flight)
-                    .await
-                    .into_iter()
-                    .collect();
-                results?;
-                for hash in unfetched_hashes {
-                    fetched_deps.insert(hash);
-                }
-                validate_op_outer(
-                    dna_hash,
-                    op,
-                    conductor_handle,
-                    workspace,
-                    network,
-                    fetched_deps,
-                )
-                .await
-            } else {
-                Ok(Outcome::AwaitingDeps(hashes))
-            }
-        }
-        outcome => outcome,
-    }
+    validate_op(op, host_fn_workspace, network, &ribosome).await
 }
 
-pub async fn validate_op(
+pub async fn validate_op<R>(
     op: &Op,
     workspace: HostFnWorkspaceRead,
     network: &HolochainP2pDna,
-    ribosome: &impl RibosomeT,
-) -> AppValidationOutcome<Outcome> {
+    ribosome: &R,
+) -> AppValidationOutcome<Outcome>
+where
+    R: RibosomeT + Sync,
+{
     let zomes_to_invoke = match op {
         Op::RegisterAgentActivity { .. } | Op::StoreElement { .. } => ZomesToInvoke::All,
         Op::StoreEntry {
@@ -492,7 +447,14 @@ pub async fn validate_op(
 
     let invocation = ValidateInvocation::new(zomes_to_invoke, op)
         .map_err(|e| AppValidationError::RibosomeError(e.into()))?;
-    let outcome = run_validation_callback_inner(invocation, ribosome, workspace, network.clone())?;
+    let outcome = run_validation_callback_inner(
+        invocation,
+        ribosome,
+        workspace,
+        network.clone(),
+        &mut HashSet::default(),
+    )
+    .await?;
 
     Ok(outcome)
 }
@@ -535,18 +497,62 @@ fn zome_id_to_zome(zome_id: ZomeId, dna_def: &DnaDef) -> AppValidationResult<Zom
         .into())
 }
 
-fn run_validation_callback_inner(
+#[async_recursion::async_recursion]
+async fn run_validation_callback_inner<R>(
     invocation: ValidateInvocation,
-    ribosome: &impl RibosomeT,
-    workspace_lock: HostFnWorkspaceRead,
+    ribosome: &R,
+    workspace_read: HostFnWorkspaceRead,
     network: HolochainP2pDna,
-) -> AppValidationResult<Outcome> {
-    let validate: ValidateResult =
-        ribosome.run_validate(ValidateHostAccess::new(workspace_lock, network), invocation)?;
-    match validate {
+    fetched_deps: &mut HashSet<AnyDhtHash>,
+) -> AppValidationResult<Outcome>
+where
+    R: RibosomeT + Sync,
+{
+    let validate_result = ribosome.run_validate(
+        ValidateHostAccess::new(workspace_read.clone(), network.clone()),
+        invocation.clone(),
+    )?;
+    match validate_result {
         ValidateResult::Valid => Ok(Outcome::Accepted),
         ValidateResult::Invalid(reason) => Ok(Outcome::Rejected(reason)),
-        ValidateResult::UnresolvedDependencies(hashes) => Ok(Outcome::AwaitingDeps(hashes)),
+        ValidateResult::UnresolvedDependencies(hashes) => {
+            let unfetched_hashes: Vec<AnyDhtHash> = hashes
+                .iter()
+                .filter(|&hash| !fetched_deps.contains(hash))
+                .cloned()
+                .collect();
+
+            if unfetched_hashes.is_empty() {
+                Ok(Outcome::AwaitingDeps(hashes))
+            } else {
+                let in_flight = hashes.into_iter().map(|hash| async {
+                    let cascade_workspace = workspace_read.clone();
+                    // let cascade_workspace = workspace.validation_workspace().await?;
+                    let mut cascade =
+                        Cascade::from_workspace_network(&cascade_workspace, network.clone());
+                    cascade
+                        .fetch_element(hash.clone(), NetworkGetOptions::must_get_options())
+                        .await?;
+                    Ok(hash)
+                });
+                let results: AppValidationResult<Vec<AnyDhtHash>> =
+                    futures::future::join_all(in_flight)
+                        .await
+                        .into_iter()
+                        .collect();
+                for hash in results? {
+                    fetched_deps.insert(hash);
+                }
+                run_validation_callback_inner(
+                    invocation,
+                    ribosome,
+                    workspace_read,
+                    network,
+                    fetched_deps,
+                )
+                .await
+            }
+        }
     }
 }
 

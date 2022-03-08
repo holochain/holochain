@@ -4,7 +4,6 @@ use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
 use holochain_cascade::Cascade;
 use holochain_p2p::actor::GetOptions as NetworkGetOptions;
-use holochain_p2p::event::GetRequest;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
 use holochain_wasmer_host::prelude::*;

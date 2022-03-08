@@ -45,7 +45,7 @@ pub async fn initialize_zomes_workflow<Ribosome>(
     args: InitializeZomesWorkflowArgs<Ribosome>,
 ) -> WorkflowResult<InitResult>
 where
-    Ribosome: RibosomeT + Send + 'static,
+    Ribosome: RibosomeT + Clone + Send + Sync + 'static,
 {
     let conductor_handle = args.conductor_handle.clone();
     let result =
@@ -78,7 +78,7 @@ async fn initialize_zomes_workflow_inner<Ribosome>(
     args: InitializeZomesWorkflowArgs<Ribosome>,
 ) -> WorkflowResult<InitResult>
 where
-    Ribosome: RibosomeT + Send + 'static,
+    Ribosome: RibosomeT + Send + Sync + 'static,
 {
     let dna_def = args.dna_def().clone();
     let InitializeZomesWorkflowArgs {
