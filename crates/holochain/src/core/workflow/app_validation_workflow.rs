@@ -516,18 +516,11 @@ where
         ValidateResult::Valid => Ok(Outcome::Accepted),
         ValidateResult::Invalid(reason) => Ok(Outcome::Rejected(reason)),
         ValidateResult::UnresolvedDependencies(hashes) => {
-            let unfetched_hashes: Vec<AnyDhtHash> = hashes
-                .iter()
-                .filter(|&hash| !fetched_deps.contains(hash))
-                .cloned()
-                .collect();
-
-            if unfetched_hashes.is_empty() {
+            if !hashes.iter().any(|hash| !fetched_deps.contains(hash)) {
                 Ok(Outcome::AwaitingDeps(hashes))
             } else {
                 let in_flight = hashes.into_iter().map(|hash| async {
                     let cascade_workspace = workspace_read.clone();
-                    // let cascade_workspace = workspace.validation_workspace().await?;
                     let mut cascade =
                         Cascade::from_workspace_network(&cascade_workspace, network.clone());
                     cascade
