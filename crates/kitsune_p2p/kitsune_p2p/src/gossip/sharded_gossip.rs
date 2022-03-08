@@ -726,8 +726,8 @@ impl ShardedGossipLocal {
                 None => Vec::with_capacity(0),
             },
             ShardedGossipWire::OpRegions(OpRegions { region_set }) => {
-                if let Some(state) = self.get_state(&cert)? {
-                    if let Some(sent) = state.region_set_sent {
+                if let Some(state) = self.incoming_ops_finished(&cert)? {
+                    if let Some(sent) = state.region_set_sent.clone() {
                         let regions = sent.diff(region_set).map_err(KitsuneError::other)?;
                         let topo = self
                             .host_api

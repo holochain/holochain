@@ -4,6 +4,7 @@ use crate::NOISE;
 use arbitrary::Arbitrary;
 
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "needs rewrite with new OpRegions logic"]
 /// Runs through a happy path gossip round between two agents.
 async fn sharded_sanity_test() {
     // - Setup players and data.
@@ -33,7 +34,7 @@ async fn sharded_sanity_test() {
     )
     .await;
 
-    // - Bob try's to initiate.
+    // - Bob tries to initiate.
     let (_, _, bob_outgoing) = bob.try_initiate().await.unwrap().unwrap();
     let alices_cert = bob
         .inner
@@ -62,7 +63,7 @@ async fn sharded_sanity_test() {
     // - Send the above to bob.
     for incoming in alice_outgoing {
         let outgoing = bob
-            .process_incoming(alices_cert.clone(), incoming)
+            .process_incoming(alices_cert.clone(), dbg!(incoming))
             .await
             .unwrap();
         bob_outgoing.extend(outgoing);

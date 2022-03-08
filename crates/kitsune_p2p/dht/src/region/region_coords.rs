@@ -48,3 +48,38 @@ impl RegionBounds {
         self.t.0..=self.t.1
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // proptest::proptest! {
+    //     #[test]
+    //     fn region_bounds() {
+    //         let topo = Topology::standard_epoch();
+    //         let b1 = RegionCoords::new(SpaceSegment::new(27, 38), TimeSegment::new(4, 7412352))
+    //             .to_bounds(&topo);
+    //             dbg!(b1);
+    //         assert!(b1.x.0 != b1.x.1);
+    //         assert!(b1.t.0 != b1.t.1);
+    //     }
+
+    // }
+
+    #[test]
+    fn region_bounds_regressions() {
+        use std::str::FromStr;
+        let topo = Topology::standard_epoch();
+        let b =
+            RegionCoords::new(SpaceSegment::new(12, 100), TimeSegment::new(4, 12)).to_bounds(&topo);
+
+        dbg!(&b);
+        assert_eq!(b.x.0, 409600.into());
+        assert_eq!(b.x.1, 17186815.into());
+        assert_eq!(b.t.0, Timestamp::from_str("2022-01-01T16:00:00Z").unwrap());
+        assert_eq!(
+            b.t.1,
+            Timestamp::from_str("2022-01-01T01:08:25.032703Z").unwrap()
+        );
+    }
+}

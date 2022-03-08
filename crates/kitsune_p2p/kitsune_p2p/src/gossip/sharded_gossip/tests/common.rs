@@ -42,10 +42,12 @@ impl KitsuneHost for StandardResponsesHostApi {
         dht_arc_set: Arc<DhtArcSet>,
     ) -> crate::KitsuneHostResult<RegionSetXtcs> {
         let arqs = ArqBoundsSet::from_dht_arc_set(&ArqStrat::default(), &dht_arc_set);
-        let coords = RegionCoordSetXtcs::new(TelescopingTimes::new(0.into()), arqs);
+        let coords = RegionCoordSetXtcs::new(TelescopingTimes::new(1.into()), arqs);
         let chunks = coords.region_coords_nested().count();
         let region_set = if self.with_data {
-            // XXX: this is very fake, and also wrong
+            // XXX: this is very fake, and completely wrong!
+            //      in order to properly match the fake data returned in other methods,
+            //      there should really only be one nonzero region.
             let data = RegionData {
                 hash: [0; 32].into(),
                 size: 1,
