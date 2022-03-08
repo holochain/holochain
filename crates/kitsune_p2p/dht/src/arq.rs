@@ -179,8 +179,9 @@ impl Arq {
         DhtArc::new(self.center, hl)
     }
 
-    pub fn from_dht_arc(strat: &ArqStrat, dht_arc: &DhtArc) -> Self {
+    pub fn from_dht_arc(topo: &Topology, strat: &ArqStrat, dht_arc: &DhtArc) -> Self {
         approximate_arq(
+            topo,
             strat,
             dht_arc.center_loc(),
             (dht_arc.half_length() as u64 * 2).saturating_sub(1),
@@ -462,9 +463,9 @@ pub fn power_upshift(power: u8, count: u32) -> Option<(u8, u32)> {
     }
 }
 
-pub fn power_and_count_from_length(len: u64, max_chunks: u32) -> (u8, u32) {
+pub fn power_and_count_from_length(dim: &Dimension, len: u64, max_chunks: u32) -> (u8, u32) {
     let mut power = 0;
-    let mut count = len as f64;
+    let mut count = (len / dim.quantum as u64) as f64;
     let max = max_chunks as f64;
 
     while count.round() > max {
@@ -476,13 +477,13 @@ pub fn power_and_count_from_length(len: u64, max_chunks: u32) -> (u8, u32) {
 }
 
 /// Given a center and a length, give Arq which matches most closely given the provided strategy
-pub fn approximate_arq(strat: &ArqStrat, center: Loc, len: u64) -> Arq {
+pub fn approximate_arq(topo: &Topology, strat: &ArqStrat, center: Loc, len: u64) -> Arq {
     if len == 2u64.pow(32) {
         Arq::new_full(center, strat.max_power)
     } else if len == 0 {
         Arq::new(center, strat.min_power, 0)
     } else {
-        let (power, count) = power_and_count_from_length(len, strat.max_chunks());
+        let (power, count) = power_and_count_from_length(&topo.space, len, strat.max_chunks());
 
         let min = strat.min_chunks() as f64;
         let max = strat.max_chunks() as f64;
@@ -499,6 +500,7 @@ pub fn approximate_arq(strat: &ArqStrat, center: Loc, len: u64) -> Arq {
             count,
             max
         );
+        debug_assert!(count - 1 <= u32::MAX / topo.space.quantum);
         Arq::new(center, power as u8, count)
     }
 }
@@ -642,9 +644,9 @@ mod tests {
             let topo = Topology::identity_zero();
             let length = (count as u64 * 2u64.pow(pow as u32) / 2 * 2).saturating_sub(1);
             let strat = ArqStrat::default();
-            let arq = approximate_arq(&strat, center.into(), length);
+            let arq = approximate_arq(&topo, &strat, center.into(), length);
             let dht_arc = arq.to_dht_arc(&topo);
-            let arq2 = Arq::from_dht_arc(&strat, &dht_arc);
+            let arq2 = Arq::from_dht_arc(&topo, &strat, &dht_arc);
             assert_eq!(arq, arq2);
         }
     }

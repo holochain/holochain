@@ -121,6 +121,7 @@ impl SpacetimeCoords {
 }
 
 fn bounds<Q: Quantum, N: From<u32>>(dim: &Dimension, power: u8, offset: Q, count: u32) -> (N, N) {
+    dbg!(&dim, power, &offset, count);
     let q = dim.quantum * 2u32.pow(power.into());
     let start = offset.inner().wrapping_mul(q);
     let len = count.wrapping_mul(q);
@@ -228,7 +229,7 @@ pub type TimeSegment = Segment<TimeQuantum>;
 pub struct Dimension {
     /// The smallest possible length in this dimension.
     /// Determines the interval represented by the leaf of a tree.
-    quantum: u32,
+    pub(crate) quantum: u32,
     /// The size of this dimension, meaning the number of possible values
     /// that can be represented.
     ///
@@ -310,6 +311,10 @@ impl Topology {
         Self::standard(Timestamp::HOLOCHAIN_EPOCH)
     }
 
+    pub fn standard_zero() -> Self {
+        Self::standard(Timestamp::ZERO)
+    }
+
     pub fn space_coord(&self, x: Loc) -> SpaceQuantum {
         (x.as_u32() / self.space.quantum).into()
     }
@@ -381,7 +386,6 @@ impl TelescopingTimes {
 
             times.push(seg);
             seg.offset += 1;
-            dbg!(&max);
             max -= 1;
             if max == 0 {
                 break;

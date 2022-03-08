@@ -27,7 +27,7 @@ impl PeerView {
             Self::Alpha(v) => v.update_arc(dht_arc),
             Self::Beta(v) => v.update_arc(dht_arc),
             Self::Quantized(v) => {
-                let mut arq = Arq::from_dht_arc(&v.strat, dht_arc);
+                let mut arq = Arq::from_dht_arc(&v.topo, &v.strat, dht_arc);
                 let updated = v.update_arq(&mut arq);
                 *dht_arc = arq.to_dht_arc(&v.topo);
                 updated

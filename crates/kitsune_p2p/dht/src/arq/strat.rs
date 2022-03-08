@@ -24,12 +24,13 @@ impl PeerStrat {
         match self {
             Self::Alpha(s) => s.view(arc, peers).into(),
             Self::Beta(s) => s.view(arc, peers).into(),
-            Self::Quantized(s) => PeerViewQ::new(
-                topo,
-                s.clone(),
-                peers.iter().map(|p| Arq::from_dht_arc(s, p)).collect(),
-            )
-            .into(),
+            Self::Quantized(s) => {
+                let peers = peers
+                    .iter()
+                    .map(|p| Arq::from_dht_arc(&topo, s, p))
+                    .collect();
+                PeerViewQ::new(topo, s.clone(), peers).into()
+            }
         }
     }
 
@@ -37,12 +38,14 @@ impl PeerStrat {
         match self {
             Self::Alpha(s) => s.view_unchecked(arc, peers).into(),
             Self::Beta(s) => s.view_unchecked(arc, peers).into(),
-            Self::Quantized(s) => PeerViewQ::new(
-                topo,
-                s.clone(),
-                peers.iter().map(|p| Arq::from_dht_arc(s, p)).collect(),
-            )
-            .into(),
+            Self::Quantized(s) => {
+                // TODO: differentiate checked vs unchecked
+                let peers = peers
+                    .iter()
+                    .map(|p| Arq::from_dht_arc(&topo, s, p))
+                    .collect();
+                PeerViewQ::new(topo, s.clone(), peers).into()
+            }
         }
     }
 }

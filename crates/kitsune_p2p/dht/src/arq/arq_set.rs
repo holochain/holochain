@@ -112,7 +112,7 @@ impl<A: ArqBounded> ArqSetImpl<A> {
 }
 
 impl ArqBoundsSet {
-    pub fn from_dht_arc_set(strat: &ArqStrat, dht_arc_set: &DhtArcSet) -> Self {
+    pub fn from_dht_arc_set(topo: &Topology, strat: &ArqStrat, dht_arc_set: &DhtArcSet) -> Self {
         let max_chunks = strat.max_chunks();
         Self::new(
             dht_arc_set
@@ -120,7 +120,7 @@ impl ArqBoundsSet {
                 .into_iter()
                 .map(|i| {
                     let len = i.length();
-                    let (pow, _) = power_and_count_from_length(len, max_chunks);
+                    let (pow, _) = power_and_count_from_length(&topo.space, len, max_chunks);
                     ArqBounds::from_interval_rounded(pow, i)
                 })
                 .collect(),

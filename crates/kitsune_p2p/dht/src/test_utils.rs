@@ -36,7 +36,7 @@ type DataVec = statrs::statistics::Data<Vec<f64>>;
 
 pub type Peers = Vec<Arq>;
 
-pub fn unit_arq(strat: &ArqStrat, unit_center: f64, unit_len: f64) -> Arq {
+pub fn unit_arq(topo: &Topology, strat: &ArqStrat, unit_center: f64, unit_len: f64) -> Arq {
     assert!(
         0.0 <= unit_center && unit_center < 1.0,
         "center out of bounds {}",
@@ -49,6 +49,7 @@ pub fn unit_arq(strat: &ArqStrat, unit_center: f64, unit_len: f64) -> Arq {
     );
 
     approximate_arq(
+        topo,
         strat,
         Loc::from((unit_center * full_len()) as u32),
         (unit_len * full_len()) as u64,
@@ -78,7 +79,7 @@ pub fn generate_ideal_coverage(
             let center =
                 ((i as f64 / nf) + (2.0 * jitter * rng.gen::<f64>()) - jitter).rem_euclid(1.0);
 
-            unit_arq(strat, center, len)
+            unit_arq(topo, strat, center, len)
         })
         .collect();
 
@@ -108,6 +109,7 @@ pub fn generate_messy_coverage(
     tracing::info!("N = {}, J = {}", n, jitter);
     tracing::info!("ArqStrat: = {:#?}", strat);
 
+    let topo = Topology::identity_zero();
     let len_dist = statrs::distribution::Normal::new(len_mean, len_std).unwrap();
 
     let nf = n as f64;
@@ -117,7 +119,7 @@ pub fn generate_messy_coverage(
             let center =
                 ((i as f64 / nf) + (2.0 * jitter * rng.gen::<f64>()) - jitter).rem_euclid(1.0);
             let len = len_dist.sample(rng).clamp(0.0, 1.0);
-            unit_arq(strat, center, len)
+            unit_arq(&topo, strat, center, len)
         })
         .collect();
 
@@ -126,6 +128,7 @@ pub fn generate_messy_coverage(
 
 #[test]
 fn test_unit_arc() {
+    let topo = Topology::identity_zero();
     let strat = ArqStrat {
         min_coverage: 10.0,
         buffer: 0.2,
@@ -134,37 +137,37 @@ fn test_unit_arc() {
     let expected_chunks = 8;
 
     {
-        let a = unit_arq(&strat, 0.0, 0.0);
+        let a = unit_arq(&topo, &strat, 0.0, 0.0);
         assert_eq!(a.power(), strat.min_power);
         assert_eq!(a.count(), 0);
     }
     {
-        let a = unit_arq(&strat, 0.0, 1.0);
+        let a = unit_arq(&topo, &strat, 0.0, 1.0);
         assert_eq!(a.power(), 29);
         assert_eq!(a.count(), 8);
     }
     {
-        let a = unit_arq(&strat, 0.0, 1.0 / 2.0);
+        let a = unit_arq(&topo, &strat, 0.0, 1.0 / 2.0);
         assert_eq!(a.power(), 28);
         assert_eq!(a.count(), expected_chunks);
     }
     {
-        let a = unit_arq(&strat, 0.0, 1.0 / 4.0);
+        let a = unit_arq(&topo, &strat, 0.0, 1.0 / 4.0);
         assert_eq!(a.power(), 27);
         assert_eq!(a.count(), expected_chunks);
     }
     {
-        let a = unit_arq(&strat, 0.0, 1.0 / 8.0);
+        let a = unit_arq(&topo, &strat, 0.0, 1.0 / 8.0);
         assert_eq!(a.power(), 26);
         assert_eq!(a.count(), expected_chunks);
     }
     {
-        let a = unit_arq(&strat, 0.0, 1.0 / 16.0);
+        let a = unit_arq(&topo, &strat, 0.0, 1.0 / 16.0);
         assert_eq!(a.power(), 25);
         assert_eq!(a.count(), expected_chunks);
     }
     {
-        let a = unit_arq(&strat, 0.0, 1.0 / 32.0);
+        let a = unit_arq(&topo, &strat, 0.0, 1.0 / 32.0);
         assert_eq!(a.power(), 24);
         assert_eq!(a.count(), expected_chunks);
     }
@@ -228,12 +231,13 @@ mod tests {
 
         #[test]
         fn chunk_count_is_always_within_bounds(center in 0.0f64..0.999, len in 0.001f64..1.0) {
+            let topo = Topology::identity_zero();
             let strat = ArqStrat {
                 min_coverage: 10.0,
                 buffer: 0.144,
                 ..Default::default()
             };
-            let a = unit_arq(&strat, center, len);
+            let a = unit_arq(&topo, &strat, center, len);
 
             assert!(a.count() >= strat.min_chunks());
             assert!(a.count() <= strat.max_chunks());
@@ -241,12 +245,13 @@ mod tests {
 
         #[test]
         fn power_is_always_within_bounds(center in 0.0f64..0.999, len in 0.001f64..1.0) {
+            let topo = Topology::identity_zero();
             let strat = ArqStrat {
                 min_coverage: 10.0,
                 buffer: 0.144,
                 ..Default::default()
             };
-            let a = unit_arq(&strat, center, len);
+            let a = unit_arq(&topo, &strat, center, len);
             assert!(a.power() >= strat.min_power);
             assert!(a.power() <= strat.max_power);
         }
@@ -259,7 +264,7 @@ mod tests {
                 buffer: 0.144,
                 ..Default::default()
             };
-            let a = unit_arq(&strat, center, len);
+            let a = unit_arq(&topo, &strat, center, len);
             let target_len = (len * 2f64.powf(32.0)) as i64;
             let true_len = a.to_interval(&topo).length() as i64;
             assert!((true_len - target_len).abs() < a.spacing() as i64);

@@ -136,6 +136,16 @@ fn parameterized_stability_test(topo: &Topology, strat: &ArqStrat, peers: Vec<Ar
     pass_report(&report, strat.min_coverage);
 
     let actual_cov = actual_coverage(topo, eq.runs()[0].peers.iter());
-    assert!(actual_cov >= strat.min_coverage);
-    assert!(actual_cov <= strat.max_coverage() + 1.0);
+    assert!(
+        actual_cov >= strat.min_coverage,
+        "{} < {}",
+        actual_cov,
+        strat.min_coverage
+    );
+    assert!(
+        actual_cov <= strat.max_coverage() + 1.0,
+        "{} > {}",
+        actual_cov,
+        strat.max_coverage() + 1.0
+    );
 }
