@@ -20,6 +20,7 @@ use holochain_state::host_fn_workspace::HostFnStores;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::prelude::*;
 use holochain_state::scratch::SyncScratch;
+use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::prelude::*;
 use holochain_zome_types::Entry;
 use holochain_zome_types::ValidationStatus;
@@ -82,8 +83,8 @@ async fn sys_validation_workflow_inner(
     conductor_handle: ConductorHandle,
     sys_validation_trigger: TriggerSender,
 ) -> WorkflowResult<WorkComplete> {
-    let env = workspace.dht_env.clone();
-    let sorted_ops = validation_query::get_ops_to_sys_validate(&env).await?;
+    let db = workspace.dht_db.clone();
+    let sorted_ops = validation_query::get_ops_to_sys_validate(&db).await?;
     let start_len = sorted_ops.len();
     tracing::debug!("Validating {} ops", start_len);
     let start = (start_len >= NUM_CONCURRENT_OPS).then(std::time::Instant::now);
@@ -104,7 +105,10 @@ async fn sys_validation_workflow_inner(
             async move {
                 let (op, op_hash) = so.into_inner();
                 let op_type = op.get_type();
-                let dependency = get_dependency(op_type, &op.header());
+                let header = op.header();
+
+                let dependency = get_dependency(op_type, &header);
+
                 let r = validate_op(
                     &op,
                     &(*workspace),
@@ -151,7 +155,7 @@ async fn sys_validation_workflow_inner(
         let num_ops: usize = chunk.iter().map(|c| c.len()).sum();
         tracing::debug!("Committing {} ops", num_ops);
         let (t, a, m, r) = space
-            .dht_env
+            .dht_db
             .async_commit(move |txn| {
                 let mut total = 0;
                 let mut awaiting = 0;
@@ -164,7 +168,7 @@ async fn sys_validation_workflow_inner(
                             total += 1;
                             put_validation_limbo(
                                 txn,
-                                op_hash,
+                                &op_hash,
                                 ValidationLimboStatus::SysValidated,
                             )?;
                         }
@@ -180,19 +184,19 @@ async fn sys_validation_workflow_inner(
                             // we were meant to get a StoreElement or StoreEntry or
                             // RegisterAgentActivity or RegisterAddLink.
                             let status = ValidationLimboStatus::AwaitingSysDeps(missing_dep);
-                            put_validation_limbo(txn, op_hash, status)?;
+                            put_validation_limbo(txn, &op_hash, status)?;
                         }
                         Outcome::MissingDhtDep => {
                             missing += 1;
                             // TODO: Not sure what missing dht dep is. Check if we need this.
-                            put_validation_limbo(txn, op_hash, ValidationLimboStatus::Pending)?;
+                            put_validation_limbo(txn, &op_hash, ValidationLimboStatus::Pending)?;
                         }
                         Outcome::Rejected => {
                             rejected += 1;
                             if let Dependency::Null = dependency {
-                                put_integrated(txn, op_hash, ValidationStatus::Rejected)?;
+                                put_integrated(txn, &op_hash, ValidationStatus::Rejected)?;
                             } else {
-                                put_integration_limbo(txn, op_hash, ValidationStatus::Rejected)?;
+                                put_integration_limbo(txn, &op_hash, ValidationStatus::Rejected)?;
                             }
                         }
                     }
@@ -200,6 +204,7 @@ async fn sys_validation_workflow_inner(
                 WorkflowResult::Ok((total, awaiting, missing, rejected))
             })
             .await?;
+
         total += t;
         if let (Some(start), Some(round_time)) = (start, &mut round_time) {
             let round_el = round_time.elapsed();
@@ -785,31 +790,43 @@ fn update_check(entry_update: &Update, original_header: &Header) -> SysValidatio
 
 pub struct SysValidationWorkspace {
     scratch: Option<SyncScratch>,
-    authored_env: DbRead<DbKindAuthored>,
-    dht_env: DbRead<DbKindDht>,
+    authored_db: DbRead<DbKindAuthored>,
+    dht_db: DbRead<DbKindDht>,
+    dht_query_cache: Option<DhtDbQueryCache>,
     cache: DbWrite<DbKindCache>,
     pub(crate) dna_def: Arc<DnaDef>,
 }
 
 impl SysValidationWorkspace {
     pub fn new(
-        authored_env: DbRead<DbKindAuthored>,
-        dht_env: DbRead<DbKindDht>,
+        authored_db: DbRead<DbKindAuthored>,
+        dht_db: DbRead<DbKindDht>,
+        dht_query_cache: DhtDbQueryCache,
         cache: DbWrite<DbKindCache>,
         dna_def: Arc<DnaDef>,
     ) -> Self {
         Self {
-            authored_env,
-            dht_env,
+            authored_db,
+            dht_db,
+            dht_query_cache: Some(dht_query_cache),
             cache,
             dna_def,
             scratch: None,
         }
     }
 
-    pub async fn is_chain_empty(&self, author: AgentPubKey) -> SourceChainResult<bool> {
+    pub async fn is_chain_empty(&self, author: &AgentPubKey) -> SourceChainResult<bool> {
+        // If we have a query cache then this is an authority node and
+        // we can quickly check if the chain is empty from the cache.
+        if let Some(c) = &self.dht_query_cache {
+            return Ok(c.is_chain_empty(author).await?);
+        }
+
+        // Otherwise we need to check this is an author node and
+        // we need to check the author db.
+        let author = author.clone();
         let chain_not_empty = self
-            .dht_env
+            .authored_db
             .async_reader(move |txn| {
                 let mut stmt = txn.prepare(
                     "
@@ -850,7 +867,7 @@ impl SysValidationWorkspace {
         let seq = header.header_seq();
         let hash = HeaderHash::with_data_sync(header);
         let header_seq_is_not_empty = self
-            .dht_env
+            .dht_db
             .async_reader({
                 let hash = hash.clone();
                 move |txn| {
@@ -893,10 +910,10 @@ impl SysValidationWorkspace {
     }
     /// Create a cascade with local data only
     pub fn local_cascade(&self) -> Cascade {
-        let cascade = Cascade::empty().with_dht(self.dht_env.clone());
+        let cascade = Cascade::empty().with_dht(self.dht_db.clone());
         match &self.scratch {
             Some(scratch) => cascade
-                .with_authored(self.authored_env.clone())
+                .with_authored(self.authored_db.clone())
                 .with_scratch(scratch.clone()),
             None => cascade,
         }
@@ -906,18 +923,18 @@ impl SysValidationWorkspace {
         network: Network,
     ) -> Cascade<Network> {
         let cascade = Cascade::empty()
-            .with_dht(self.dht_env.clone())
+            .with_dht(self.dht_db.clone())
             .with_network(network, self.cache.clone());
         match &self.scratch {
             Some(scratch) => cascade
-                .with_authored(self.authored_env.clone())
+                .with_authored(self.authored_db.clone())
                 .with_scratch(scratch.clone()),
             None => cascade,
         }
     }
 
     fn dna_hash(&self) -> &DnaHash {
-        self.dht_env.kind().dna_hash()
+        self.dht_db.kind().dna_hash()
     }
 
     /// Get a reference to the sys validation workspace's dna def.
@@ -928,7 +945,7 @@ impl SysValidationWorkspace {
 
 fn put_validation_limbo(
     txn: &mut Transaction<'_>,
-    hash: DhtOpHash,
+    hash: &DhtOpHash,
     status: ValidationLimboStatus,
 ) -> WorkflowResult<()> {
     set_validation_stage(txn, hash, status)?;
@@ -937,23 +954,23 @@ fn put_validation_limbo(
 
 fn put_integration_limbo(
     txn: &mut Transaction<'_>,
-    hash: DhtOpHash,
+    hash: &DhtOpHash,
     status: ValidationStatus,
 ) -> WorkflowResult<()> {
-    set_validation_status(txn, hash.clone(), status)?;
+    set_validation_status(txn, hash, status)?;
     set_validation_stage(txn, hash, ValidationLimboStatus::AwaitingIntegration)?;
     Ok(())
 }
 
 pub fn put_integrated(
     txn: &mut Transaction<'_>,
-    hash: DhtOpHash,
+    hash: &DhtOpHash,
     status: ValidationStatus,
 ) -> WorkflowResult<()> {
-    set_validation_status(txn, hash.clone(), status)?;
+    set_validation_status(txn, hash, status)?;
     // This set the validation stage to pending which is correct when
     // it's integrated.
-    set_validation_stage(txn, hash.clone(), ValidationLimboStatus::Pending)?;
+    set_validation_stage(txn, hash, ValidationLimboStatus::Pending)?;
     set_when_integrated(txn, hash, Timestamp::now())?;
     Ok(())
 }
@@ -968,8 +985,9 @@ impl From<&HostFnWorkspace> for SysValidationWorkspace {
         } = h.stores();
         Self {
             scratch,
-            authored_env: authored,
-            dht_env: dht,
+            authored_db: authored,
+            dht_db: dht,
+            dht_query_cache: None,
             cache,
             dna_def: h.dna_def(),
         }

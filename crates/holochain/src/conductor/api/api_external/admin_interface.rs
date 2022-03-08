@@ -415,8 +415,8 @@ mod test {
     #[tokio::test(flavor = "multi_thread")]
     async fn register_list_dna_app() -> Result<()> {
         observability::test_run().ok();
-        let envs = test_environments();
-        let handle = Conductor::builder().test(&envs.into(), &[]).await?;
+        let env_dir = test_db_dir();
+        let handle = Conductor::builder().test(env_dir.path(), &[]).await?;
         let shutdown = handle.take_shutdown_handle().unwrap();
         let admin_api = RealAdminInterfaceApi::new(handle.clone());
         let uid = Uuid::new_v4();
@@ -547,8 +547,8 @@ mod test {
     #[tokio::test(flavor = "multi_thread")]
     async fn install_list_dna_app() {
         observability::test_run().ok();
-        let envs = test_environments();
-        let handle = Conductor::builder().test(&envs.into(), &[]).await.unwrap();
+        let db_dir = test_db_dir();
+        let handle = Conductor::builder().test(db_dir.path(), &[]).await.unwrap();
         let shutdown = handle.take_shutdown_handle().unwrap();
         let admin_api = RealAdminInterfaceApi::new(handle.clone());
         let uid = Uuid::new_v4();

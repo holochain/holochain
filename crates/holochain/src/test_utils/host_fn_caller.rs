@@ -82,8 +82,8 @@ pub enum MaybeLinkable {
 /// can be called from Rust instead of Wasm
 #[derive(Clone)]
 pub struct HostFnCaller {
-    pub authored_env: DbWrite<DbKindAuthored>,
-    pub dht_env: DbWrite<DbKindDht>,
+    pub authored_db: DbWrite<DbKindAuthored>,
+    pub dht_db: DbWrite<DbKindDht>,
     pub cache: DbWrite<DbKindCache>,
     pub ribosome: RealRibosome,
     pub zome_path: ZomePath,
@@ -111,9 +111,9 @@ impl HostFnCaller {
         dna_file: &DnaFile,
         zome_index: usize,
     ) -> HostFnCaller {
-        let authored_env = handle.get_authored_env(cell_id.dna_hash()).unwrap();
-        let dht_env = handle.get_dht_env(cell_id.dna_hash()).unwrap();
-        let cache = handle.get_cache_env(cell_id).unwrap();
+        let authored_db = handle.get_authored_db(cell_id.dna_hash()).unwrap();
+        let dht_db = handle.get_dht_db(cell_id.dna_hash()).unwrap();
+        let cache = handle.get_cache_db(cell_id).unwrap();
         let keystore = handle.keystore().clone();
         let network = handle.holochain_p2p().to_dna(cell_id.dna_hash().clone());
 
@@ -127,8 +127,8 @@ impl HostFnCaller {
         let call_zome_handle =
             CellConductorApi::new(handle.clone(), cell_id.clone()).into_call_zome_handle();
         HostFnCaller {
-            authored_env,
-            dht_env,
+            authored_db,
+            dht_db,
             cache,
             ribosome,
             zome_path,
@@ -139,18 +139,18 @@ impl HostFnCaller {
         }
     }
 
-    pub fn authored_env(&self) -> DbWrite<DbKindAuthored> {
-        self.authored_env.clone()
+    pub fn authored_db(&self) -> DbWrite<DbKindAuthored> {
+        self.authored_db.clone()
     }
 
-    pub fn dht_env(&self) -> DbWrite<DbKindDht> {
-        self.dht_env.clone()
+    pub fn dht_db(&self) -> DbWrite<DbKindDht> {
+        self.dht_db.clone()
     }
 
     pub async fn unpack(&self) -> (Arc<RealRibosome>, Arc<CallContext>, HostFnWorkspace) {
         let HostFnCaller {
-            authored_env,
-            dht_env,
+            authored_db,
+            dht_db,
             cache,
             network,
             keystore,
@@ -163,8 +163,8 @@ impl HostFnCaller {
         let (cell_id, zome_name) = zome_path.into();
 
         let workspace_lock = HostFnWorkspace::new(
-            authored_env,
-            dht_env,
+            authored_db,
+            dht_db,
             cache,
             keystore.clone(),
             Some(cell_id.agent_pubkey().clone()),

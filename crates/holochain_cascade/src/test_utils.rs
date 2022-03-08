@@ -24,11 +24,11 @@ use holochain_state::mutations::set_when_integrated;
 use holochain_state::prelude::Query;
 use holochain_state::prelude::Txn;
 use holochain_types::activity::AgentActivityResponse;
+use holochain_types::db::DbRead;
+use holochain_types::db::DbWrite;
 use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::dht_op::WireOps;
 use holochain_types::element::WireElementOps;
-use holochain_types::env::DbRead;
-use holochain_types::env::DbWrite;
 use holochain_types::link::WireLinkKey;
 use holochain_types::link::WireLinkOps;
 use holochain_types::metadata::MetadataSet;
@@ -246,9 +246,9 @@ pub fn fill_db<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: DhtOpHashed) {
     env.conn()
         .unwrap()
         .with_commit_sync(|txn| {
-            let hash = op.as_hash().clone();
-            insert_op(txn, op).unwrap();
-            set_validation_status(txn, hash.clone(), ValidationStatus::Valid).unwrap();
+            let hash = op.as_hash();
+            insert_op(txn, &op).unwrap();
+            set_validation_status(txn, hash, ValidationStatus::Valid).unwrap();
             set_when_integrated(txn, hash, Timestamp::now()).unwrap();
             DatabaseResult::Ok(())
         })
@@ -259,9 +259,9 @@ pub fn fill_db_rejected<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: DhtOpHash
     env.conn()
         .unwrap()
         .with_commit_sync(|txn| {
-            let hash = op.as_hash().clone();
-            insert_op(txn, op).unwrap();
-            set_validation_status(txn, hash.clone(), ValidationStatus::Rejected).unwrap();
+            let hash = op.as_hash();
+            insert_op(txn, &op).unwrap();
+            set_validation_status(txn, hash, ValidationStatus::Rejected).unwrap();
             set_when_integrated(txn, hash, Timestamp::now()).unwrap();
             DatabaseResult::Ok(())
         })
@@ -272,8 +272,8 @@ pub fn fill_db_pending<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: DhtOpHashe
     env.conn()
         .unwrap()
         .with_commit_sync(|txn| {
-            let hash = op.as_hash().clone();
-            insert_op(txn, op).unwrap();
+            let hash = op.as_hash();
+            insert_op(txn, &op).unwrap();
             set_validation_status(txn, hash, ValidationStatus::Valid).unwrap();
             DatabaseResult::Ok(())
         })
@@ -284,7 +284,7 @@ pub fn fill_db_as_author(env: &DbWrite<DbKindAuthored>, op: DhtOpHashed) {
     env.conn()
         .unwrap()
         .with_commit_sync(|txn| {
-            insert_op(txn, op).unwrap();
+            insert_op(txn, &op).unwrap();
             DatabaseResult::Ok(())
         })
         .unwrap();

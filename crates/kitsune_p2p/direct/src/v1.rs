@@ -153,7 +153,9 @@ pub fn new_kitsune_direct_v1(
 
         let tls = persist.singleton_tls_config().await?;
 
-        let (p2p, evt) = spawn_kitsune_p2p(sub_config, tls)
+        let host = HostStub::new();
+
+        let (p2p, evt) = spawn_kitsune_p2p(sub_config, tls, host)
             .await
             .map_err(KdError::other)?;
 
@@ -618,17 +620,8 @@ async fn handle_events(
         tuning_params.concurrent_limit_per_thread,
         move |evt| async move {
             match evt {
-                event::KitsuneP2pEvent::KGenReq { respond, .. } => {
-                    respond.r(Err("unimplemented".into()))
-                }
                 event::KitsuneP2pEvent::PutAgentInfoSigned { respond, input, .. } => {
                     respond.r(Ok(handle_put_agent_info_signed(kdirect.clone(), input)
-                        .map_err(KitsuneP2pError::other)
-                        .boxed()
-                        .into()));
-                }
-                event::KitsuneP2pEvent::GetAgentInfoSigned { respond, input, .. } => {
-                    respond.r(Ok(handle_get_agent_info_signed(kdirect.clone(), input)
                         .map_err(KitsuneP2pError::other)
                         .boxed()
                         .into()));
@@ -737,21 +730,6 @@ async fn handle_put_agent_info_signed(
     }
 
     Ok(())
-}
-
-async fn handle_get_agent_info_signed(
-    kdirect: Arc<Kd1>,
-    input: GetAgentInfoSignedEvt,
-) -> KdResult<Option<AgentInfoSigned>> {
-    let GetAgentInfoSignedEvt { space, agent } = input;
-
-    let root = KdHash::from_kitsune_space(&space);
-    let agent = KdHash::from_kitsune_agent(&agent);
-
-    Ok(match kdirect.persist.get_agent_info(root, agent).await {
-        Ok(i) => Some(i.to_kitsune()),
-        Err(_) => None,
-    })
 }
 
 async fn handle_query_agents(

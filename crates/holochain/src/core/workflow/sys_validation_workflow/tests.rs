@@ -63,9 +63,9 @@ async fn run_test(
     // Init is not run because we aren't calling the zome.
     let expected_count = 9 + 14;
 
-    let alice_dht_env = conductors[0].get_dht_env(alice_cell_id.dna_hash()).unwrap();
+    let alice_dht_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
     wait_for_integration(
-        &alice_dht_env,
+        &alice_dht_db,
         expected_count,
         num_attempts,
         delay_per_attempt.clone(),
@@ -82,23 +82,15 @@ async fn run_test(
             .unwrap();
         !not_empty
     };
-    let show_limbo = |txn: &Transaction| {
-        txn.prepare("SELECT blob FROM DhtOp WHERE when_integrated IS NULL")
-            .unwrap()
-            .query_and_then([], |row| from_blob(row.get("blob")?))
-            .unwrap()
-            .collect::<StateQueryResult<Vec<DhtOpLight>>>()
-            .unwrap()
-    };
 
-    // holochain_state::prelude::dump_tmp(&alice_dht_env);
+    // holochain_state::prelude::dump_tmp(&alice_dht_db);
     // Validation should be empty
-    fresh_reader_test(alice_dht_env, |txn| {
+    fresh_reader_test(alice_dht_db, |txn| {
         let limbo = show_limbo(&txn);
         assert!(limbo_is_empty(&txn), "{:?}", limbo);
 
         let num_valid_ops: usize = txn
-                .query_row("SELECT COUNT(hash) FROM DhtOP WHERE when_integrated IS NOT NULL AND validation_status = :status", 
+                .query_row("SELECT COUNT(hash) FROM DhtOP WHERE when_integrated IS NOT NULL AND validation_status = :status",
                 named_params!{
                     ":status": ValidationStatus::Valid,
                 },
@@ -113,9 +105,9 @@ async fn run_test(
     // Integration should have 13 ops in it
     let expected_count = 14 + expected_count;
 
-    let alice_env = conductors[0].get_dht_env(alice_cell_id.dna_hash()).unwrap();
+    let alice_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
     wait_for_integration(
-        &alice_env,
+        &alice_db,
         expected_count,
         num_attempts,
         delay_per_attempt.clone(),
@@ -127,10 +119,10 @@ async fn run_test(
         let valid_ops: usize = txn
                 .query_row(
                     "
-                    SELECT COUNT(hash) FROM DhtOP 
-                    WHERE 
-                    when_integrated IS NOT NULL 
-                    AND 
+                    SELECT COUNT(hash) FROM DhtOP
+                    WHERE
+                    when_integrated IS NOT NULL
+                    AND
                     (validation_status = :valid
                         OR (validation_status = :rejected
                             AND (
@@ -146,7 +138,7 @@ async fn run_test(
                             )
                         )
                     )
-                    ", 
+                    ",
                 named_params!{
                     ":valid": ValidationStatus::Valid,
                     ":rejected": ValidationStatus::Rejected,
@@ -164,7 +156,7 @@ async fn run_test(
         valid_ops
     };
 
-    fresh_reader_test(alice_env, |txn| {
+    fresh_reader_test(alice_db, |txn| {
         // Validation should be empty
         let limbo = show_limbo(&txn);
         assert!(limbo_is_empty(&txn), "{:?}", limbo);
@@ -178,9 +170,9 @@ async fn run_test(
     // Integration should have new 5 ops in it
     let expected_count = 5 + expected_count;
 
-    let alice_env = conductors[0].get_dht_env(alice_cell_id.dna_hash()).unwrap();
+    let alice_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
     wait_for_integration(
-        &alice_env,
+        &alice_db,
         expected_count,
         num_attempts,
         delay_per_attempt.clone(),
@@ -188,19 +180,19 @@ async fn run_test(
     .await;
 
     // Validation should still contain bobs link pending because the target was missing
-    // holochain_state::prelude::dump_tmp(&alice_env);
-    fresh_reader_test(alice_env.clone(), |txn| {
+    // holochain_state::prelude::dump_tmp(&alice_db);
+    fresh_reader_test(alice_db.clone(), |txn| {
         let valid_ops = num_valid_ops(&txn);
         assert_eq!(valid_ops, expected_count);
     });
     crate::assert_eq_retry_1m!(
         {
-            fresh_reader_test(alice_env.clone(), |txn| {
+            fresh_reader_test(alice_db.clone(), |txn| {
                 let num_limbo_ops: usize = txn
                     .query_row(
                         "
-                        SELECT COUNT(hash) FROM DhtOP 
-                        WHERE 
+                        SELECT COUNT(hash) FROM DhtOP
+                        WHERE
                         when_integrated IS NULL
                         AND (validation_stage IS NULL OR validation_stage = 2)
                         ",
@@ -353,3 +345,25 @@ async fn dodgy_bob(bob_cell_id: &CellId, handle: &ConductorHandle, dna_file: &Dn
 // 2. The Create link is integrated and valid.
 // ## Expected
 // The Delete header should be invalid for all authorities.
+
+fn show_limbo(txn: &Transaction) -> Vec<DhtOpLight> {
+    txn.prepare(
+        "
+        SELECT DhtOp.type, Header.hash, Header.blob
+        FROM DhtOp
+        JOIN Header ON DhtOp.header_hash = Header.hash
+        WHERE
+        when_integrated IS NULL
+    ",
+    )
+    .unwrap()
+    .query_and_then([], |row| {
+        let op_type: DhtOpType = row.get("type")?;
+        let hash: HeaderHash = row.get("hash")?;
+        let header: SignedHeader = from_blob(row.get("blob")?)?;
+        Ok(DhtOpLight::from_type(op_type, hash, &header.0)?)
+    })
+    .unwrap()
+    .collect::<StateQueryResult<Vec<DhtOpLight>>>()
+    .unwrap()
+}

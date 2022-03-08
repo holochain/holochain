@@ -80,6 +80,7 @@ pub(crate) struct KitsuneP2pActor {
     internal_sender: ghost_actor::GhostSender<Internal>,
     evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
     ep_hnd: Tx2EpHnd<wire::Wire>,
+    host: HostApi,
     #[allow(clippy::type_complexity)]
     spaces: HashMap<
         Arc<KitsuneSpace>,
@@ -96,10 +97,11 @@ pub(crate) struct KitsuneP2pActor {
 impl KitsuneP2pActor {
     pub async fn new(
         config: KitsuneP2pConfig,
-        tls_config: kitsune_p2p_proxy::TlsConfig,
+        tls_config: kitsune_p2p_types::tls::TlsConfig,
         channel_factory: ghost_actor::actor_builder::GhostActorChannelFactory<Self>,
         internal_sender: ghost_actor::GhostSender<Internal>,
         evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
+        host: HostApi,
     ) -> KitsuneP2pResult<Self> {
         crate::types::metrics::init();
 
@@ -220,10 +222,12 @@ impl KitsuneP2pActor {
         let i_s = internal_sender.clone();
         tokio::task::spawn({
             let evt_sender = evt_sender.clone();
+            let host = host.clone();
             let tuning_params = config.tuning_params.clone();
             async move {
                 ep.for_each_concurrent(tuning_params.concurrent_limit_per_thread, move |event| {
                     let evt_sender = evt_sender.clone();
+                    let host = host.clone();
                     let tuning_params = tuning_params.clone();
                     let i_s = i_s.clone();
                     async move {
@@ -281,7 +285,7 @@ impl KitsuneP2pActor {
                                         resp!(respond, resp);
                                     }
                                     wire::Wire::PeerGet(wire::PeerGet { space, agent }) => {
-                                        if let Ok(Some(agent_info_signed)) = evt_sender
+                                        if let Ok(Some(agent_info_signed)) = host
                                             .get_agent_info_signed(GetAgentInfoSignedEvt {
                                                 space,
                                                 agent,
@@ -450,6 +454,7 @@ impl KitsuneP2pActor {
             internal_sender,
             evt_sender,
             ep_hnd,
+            host,
             spaces: HashMap::new(),
             config: Arc::new(config),
             bandwidth_throttles,
@@ -614,22 +619,11 @@ impl InternalHandler for KitsuneP2pActor {
 impl ghost_actor::GhostHandler<KitsuneP2pEvent> for KitsuneP2pActor {}
 
 impl KitsuneP2pEventHandler for KitsuneP2pActor {
-    fn handle_k_gen_req(&mut self, arg: KGenReq) -> KitsuneP2pEventHandlerResult<KGenRes> {
-        Ok(self.evt_sender.k_gen_req(arg))
-    }
-
     fn handle_put_agent_info_signed(
         &mut self,
         input: crate::event::PutAgentInfoSignedEvt,
     ) -> KitsuneP2pEventHandlerResult<()> {
         Ok(self.evt_sender.put_agent_info_signed(input))
-    }
-
-    fn handle_get_agent_info_signed(
-        &mut self,
-        input: crate::event::GetAgentInfoSignedEvt,
-    ) -> KitsuneP2pEventHandlerResult<Option<crate::types::agent_store::AgentInfoSigned>> {
-        Ok(self.evt_sender.get_agent_info_signed(input))
     }
 
     fn handle_query_agents(
@@ -711,6 +705,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         let internal_sender = self.internal_sender.clone();
         let space2 = space.clone();
         let ep_hnd = self.ep_hnd.clone();
+        let host = self.host.clone();
         let config = Arc::clone(&self.config);
         let bandwidth_throttles = self.bandwidth_throttles.clone();
         let parallel_notify_permit = self.parallel_notify_permit.clone();
@@ -720,6 +715,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
                 let (send, send_inner, evt_recv) = spawn_space(
                     space2,
                     ep_hnd,
+                    host,
                     config,
                     bandwidth_throttles,
                     parallel_notify_permit,
@@ -912,20 +908,11 @@ mockall::mock! {
     pub KitsuneP2pEventHandler {}
 
     impl KitsuneP2pEventHandler for KitsuneP2pEventHandler {
-        fn handle_k_gen_req(
-            &mut self,
-            arg: KGenReq,
-        ) -> KitsuneP2pEventHandlerResult<KGenRes>;
 
         fn handle_put_agent_info_signed(
             &mut self,
             input: crate::event::PutAgentInfoSignedEvt,
         ) -> KitsuneP2pEventHandlerResult<()>;
-
-        fn handle_get_agent_info_signed(
-            &mut self,
-            input: crate::event::GetAgentInfoSignedEvt,
-        ) -> KitsuneP2pEventHandlerResult<Option<crate::types::agent_store::AgentInfoSigned>>;
 
         fn handle_query_agents(
             &mut self,

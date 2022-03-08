@@ -45,7 +45,7 @@ async fn authored_test() {
     triggers.publish_dht_ops.trigger();
 
     // Alice commits the entry
-    fresh_reader_test(alice_call_data.authored_env.clone(), |txn| {
+    fresh_reader_test(alice_call_data.authored_db.clone(), |txn| {
         let basis: AnyDhtHash = entry_hash.clone().into();
         let has_authored_entry: bool = txn
             .query_row(
@@ -67,14 +67,14 @@ async fn authored_test() {
     let expected_count = 3 + 14;
 
     wait_for_integration(
-        &bob_call_data.dht_env,
+        &bob_call_data.dht_db,
         expected_count,
         num_attempts,
         delay_per_attempt.clone(),
     )
     .await;
 
-    fresh_reader_test(bob_call_data.authored_env.clone(), |txn| {
+    fresh_reader_test(bob_call_data.authored_db.clone(), |txn| {
         let basis: AnyDhtHash = entry_hash.clone().into();
         let has_authored_entry: bool = txn
             .query_row(
@@ -90,7 +90,7 @@ async fn authored_test() {
         // Bob Should not have the entry in their authored table
         assert!(!has_authored_entry);
     });
-    fresh_reader_test(bob_call_data.dht_env.clone(), |txn| {
+    fresh_reader_test(bob_call_data.dht_db.clone(), |txn| {
         let basis: AnyDhtHash = entry_hash.clone().into();
         let has_integrated_entry: bool = txn
             .query_row(
@@ -114,7 +114,7 @@ async fn authored_test() {
     let triggers = handle.get_cell_triggers(&bob_call_data.cell_id).unwrap();
     triggers.publish_dht_ops.trigger();
 
-    fresh_reader_test(bob_call_data.authored_env.clone(), |txn| {
+    fresh_reader_test(bob_call_data.authored_db.clone(), |txn| {
         let basis: AnyDhtHash = entry_hash.clone().into();
         let has_authored_entry: bool = txn
             .query_row(

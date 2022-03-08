@@ -16,11 +16,11 @@ pub fn capability_grants(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
+    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use ::fixt::prelude::*;
     use hdk::prelude::*;
     use holochain_types::fixt::CapSecretFixturator;
     use holochain_wasm_test_utils::TestWasm;
-    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
 
     use matches::assert_matches;
 
@@ -28,9 +28,7 @@ pub mod wasm_test {
     async fn ribosome_capability_secret_test() {
         observability::test_run().ok();
         let RibosomeTestFixture {
-            conductor,
-            alice,
-            ..
+            conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::Capability).await;
 
         let _: CapSecret = conductor.call(&alice, "cap_secret", ()).await;
@@ -40,25 +38,27 @@ pub mod wasm_test {
     async fn ribosome_transferable_cap_grant() {
         observability::test_run().ok();
         let RibosomeTestFixture {
-            conductor,
-            alice,
-            ..
+            conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::Capability).await;
 
         let secret: CapSecret = conductor.call(&alice, "cap_secret", ()).await;
-        let header: HeaderHash = conductor.call(&alice, "transferable_cap_grant", secret).await;
+        let header: HeaderHash = conductor
+            .call(&alice, "transferable_cap_grant", secret)
+            .await;
         let maybe_element: Option<Element> = conductor.call(&alice, "get_entry", header).await;
-        let entry_secret: CapSecret = maybe_element.and_then(|element| {
-            let cap_grant_entry = element.entry().to_grant_option().unwrap();
-            match cap_grant_entry.access {
-                CapAccess::Transferable { secret, .. } => Some(secret),
-                _ => None,
-            }
-        }).unwrap();
+        let entry_secret: CapSecret = maybe_element
+            .and_then(|element| {
+                let cap_grant_entry = element.entry().to_grant_option().unwrap();
+                match cap_grant_entry.access {
+                    CapAccess::Transferable { secret, .. } => Some(secret),
+                    _ => None,
+                }
+            })
+            .unwrap();
         assert_eq!(entry_secret, secret);
     }
 
-    // MAYBE: [ B-03669 ] can move this to an integration test (may need to switch to using a RealDnaStore)
+    // MAYBE: [ B-03669 ] can move this to an integration test (may need to switch to using a DnaStore)
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_authorized_call() -> anyhow::Result<()> {
         observability::test_run().ok();

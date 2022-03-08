@@ -1,65 +1,4 @@
 //! # Dht Operational Transforms
-//! These are the operational transformations that can be applied to Holochain data.
-//! Every [`Header`] produces a set of operations.
-//! These operations are each sent to an authority for validation.
-//!
-//! ## Producing Operations
-//! The following is a list of the operations that can be produced by each [`Header`]:
-//! - Every [`Header`] produces a [`Op::RegisterAgentActivity`] and a [`Op::StoreElement`].
-//! - [`Header::Create`] also produces a [`Op::StoreEntry`].
-//! - [`Header::Update`] also produces a [`Op::StoreEntry`] and a [`Op::RegisterUpdate`].
-//! - [`Header::Delete`] also produces a [`Op::RegisterDelete`].
-//! - [`Header::CreateLink`] also produces a [`Op::RegisterCreateLink`].
-//! - [`Header::DeleteLink`] also produces a [`Op::RegisterDeleteLink`].
-//!
-//! ## Authorities
-//! There are three types of authorities in Holochain:
-//!
-//! #### The Header Authority
-//! This set of authorities receives the [`Op::StoreElement`].
-//! This is where you can implement your own logic for checking
-//! that it is valid to store any of the [`Header`] variants
-//! according to your own applications rules.
-//!
-//! #### The Entry Authority
-//! This set of authorities receives the [`Op::StoreEntry`].
-//! This is where you can implement your own logic for checking
-//! that it is valid to store an [`Entry`].
-//! You can think of this as the "Create" from the CRUD acronym.
-//!
-//! ##### Metadata
-//! The entry authority is also responsible for storing the metadata for each entry.
-//! They receive the [`Op::RegisterUpdate`] and [`Op::RegisterDelete`].
-//! This is where you can implement your own logic for checking that it is valid to
-//! update or delete any of the [`Entry`] types defined in your application.
-//! You can think of this as the "Update" and "Delete" from the CRUD acronym.
-//!
-//! They receive the [`Op::RegisterCreateLink`] and [`Op::RegisterDeleteLink`].
-//! This is where you can implement your own logic for checking that it is valid to
-//! place a link on a base [`Entry`].
-//!
-//! #### The Chain Authority
-//! This set of authorities receives the [`Op::RegisterAgentActivity`].
-//! This is where you can implement your own logic for checking that it is valid to
-//! add a new [`Header`] to an agent source chain.
-//! You are not validating the individual element but the entire agents source chain.
-//!
-//! ##### Author
-//! When authoring a new [`Header`] to your source chain, the
-//! validation will be run from the perspective of every authority.
-//!
-//! ##### A note on metadata for the Header authority.
-//! Technically speaking the Header authority also receives and validates the
-//! [`Op::RegisterUpdate`] and [`Op::RegisterDelete`] but they run the same callback
-//! as the Entry authority because it would be inconsistent to have two separate
-//! validation outcomes for these ops.
-//!
-//! ## Running Validation
-//! When the `fn validate(op: Op) -> ExternResult<ValidateCallbackResult>` is called
-//! it will be passed the operation variant for the authority that is
-//! actually running the validation.
-//!
-//! For example the entry authority will be passed the [`Op::StoreEntry`] operation.
 
 use crate::{
     AppEntryType, Create, CreateLink, Delete, DeleteLink, Element, Entry, EntryType, Header,
@@ -71,6 +10,68 @@ use kitsune_p2p_timestamp::Timestamp;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
 #[cfg_attr(feature = "test_utils", derive(arbitrary::Arbitrary))]
+/// # Dht Operational Transforms
+/// These are the operational transformations that can be applied to Holochain data.
+/// Every [`Header`] produces a set of operations.
+/// These operations are each sent to an authority for validation.
+///
+/// ## Producing Operations
+/// The following is a list of the operations that can be produced by each [`Header`]:
+/// - Every [`Header`] produces a [`Op::RegisterAgentActivity`] and a [`Op::StoreElement`].
+/// - [`Header::Create`] also produces a [`Op::StoreEntry`].
+/// - [`Header::Update`] also produces a [`Op::StoreEntry`] and a [`Op::RegisterUpdate`].
+/// - [`Header::Delete`] also produces a [`Op::RegisterDelete`].
+/// - [`Header::CreateLink`] also produces a [`Op::RegisterCreateLink`].
+/// - [`Header::DeleteLink`] also produces a [`Op::RegisterDeleteLink`].
+///
+/// ## Authorities
+/// There are three types of authorities in Holochain:
+///
+/// #### The Header Authority
+/// This set of authorities receives the [`Op::StoreElement`].
+/// This is where you can implement your own logic for checking
+/// that it is valid to store any of the [`Header`] variants
+/// according to your own applications rules.
+///
+/// #### The Entry Authority
+/// This set of authorities receives the [`Op::StoreEntry`].
+/// This is where you can implement your own logic for checking
+/// that it is valid to store an [`Entry`].
+/// You can think of this as the "Create" from the CRUD acronym.
+///
+/// ##### Metadata
+/// The entry authority is also responsible for storing the metadata for each entry.
+/// They receive the [`Op::RegisterUpdate`] and [`Op::RegisterDelete`].
+/// This is where you can implement your own logic for checking that it is valid to
+/// update or delete any of the [`Entry`] types defined in your application.
+/// You can think of this as the "Update" and "Delete" from the CRUD acronym.
+///
+/// They receive the [`Op::RegisterCreateLink`] and [`Op::RegisterDeleteLink`].
+/// This is where you can implement your own logic for checking that it is valid to
+/// place a link on a base [`Entry`].
+///
+/// #### The Chain Authority
+/// This set of authorities receives the [`Op::RegisterAgentActivity`].
+/// This is where you can implement your own logic for checking that it is valid to
+/// add a new [`Header`] to an agent source chain.
+/// You are not validating the individual element but the entire agents source chain.
+///
+/// ##### Author
+/// When authoring a new [`Header`] to your source chain, the
+/// validation will be run from the perspective of every authority.
+///
+/// ##### A note on metadata for the Header authority.
+/// Technically speaking the Header authority also receives and validates the
+/// [`Op::RegisterUpdate`] and [`Op::RegisterDelete`] but they run the same callback
+/// as the Entry authority because it would be inconsistent to have two separate
+/// validation outcomes for these ops.
+///
+/// ## Running Validation
+/// When the `fn validate(op: Op) -> ExternResult<ValidateCallbackResult>` is called
+/// it will be passed the operation variant for the authority that is
+/// actually running the validation.
+///
+/// For example the entry authority will be passed the [`Op::StoreEntry`] operation.
 /// The operational transforms that can are applied to Holochain data.
 /// Operations beginning with `Store` are concerned with creating and
 /// storing data.

@@ -4,6 +4,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+- Allow TLS session keylogging via tuning param `danger_tls_keylog` = `env_keylog`, and environment variable `SSLKEYLOGFILE` (See kitsune_p2p crate api documentation). [#1261](https://github.com/holochain/holochain/pull/1261)
+
+## 0.0.25
+
 - BREAKING: Gossip messages no longer contain the hash of the ops being gossiped. This is a breaking protocol change.
 - Removed the unmaintained "simple-bloom" gossip module in favor of "sharded-gossip"
 

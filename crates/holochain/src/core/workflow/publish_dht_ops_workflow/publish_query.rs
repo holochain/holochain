@@ -5,10 +5,10 @@ use holo_hash::AgentPubKey;
 use holo_hash::DhtOpHash;
 use holochain_sqlite::db::DbKindAuthored;
 use holochain_state::query::prelude::*;
+use holochain_types::db::DbRead;
 use holochain_types::dht_op::DhtOp;
 use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::dht_op::DhtOpType;
-use holochain_types::env::DbRead;
 use holochain_zome_types::Entry;
 use holochain_zome_types::EntryVisibility;
 use holochain_zome_types::SignedHeader;
@@ -25,7 +25,7 @@ use super::MIN_PUBLISH_INTERVAL;
 /// - Only get ops that have less then the RECEIPT_BUNDLE_SIZE
 pub async fn get_ops_to_publish(
     agent: AgentPubKey,
-    env: &DbRead<DbKindAuthored>,
+    db: &DbRead<DbKindAuthored>,
 ) -> WorkflowResult<Vec<DhtOpHashed>> {
     let recency_threshold = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -34,11 +34,11 @@ pub async fn get_ops_to_publish(
         .map(|t| t.as_secs())
         .unwrap_or(0);
 
-    let results = env
+    let results = db
         .async_reader(move |txn| {
             let mut stmt = txn.prepare(
                 "
-            SELECT 
+            SELECT
             Header.blob as header_blob,
             Entry.blob as entry_blob,
             DhtOp.type as dht_type,
@@ -57,7 +57,7 @@ pub async fn get_ops_to_publish(
             AND
             (DhtOp.last_publish_time IS NULL OR DhtOp.last_publish_time <= :recency_threshold)
             AND
-            DhtOp.receipts_complete IS NULL 
+            DhtOp.receipts_complete IS NULL
             ",
             )?;
             let r = stmt.query_and_then(
@@ -97,13 +97,13 @@ pub async fn get_ops_to_publish(
 pub fn num_still_needing_publish(txn: &Transaction) -> WorkflowResult<usize> {
     let count = txn.query_row(
         "
-        SELECT 
+        SELECT
         COUNT(DhtOp.rowid) as num_ops
         FROM Header
         JOIN
         DhtOp ON DhtOp.header_hash = Header.hash
         WHERE
-        DhtOp.receipts_complete IS NULL 
+        DhtOp.receipts_complete IS NULL
         AND
         (DhtOp.type != :store_entry OR Header.private_entry = 0)
         ",
@@ -126,7 +126,7 @@ mod tests {
     use holochain_state::prelude::insert_op;
     use holochain_state::prelude::set_last_publish_time;
     use holochain_state::prelude::set_receipts_complete;
-    use holochain_state::prelude::test_authored_env;
+    use holochain_state::prelude::test_authored_db;
     use holochain_types::dht_op::DhtOpHashed;
     use holochain_types::header::NewEntryHeader;
     use holochain_zome_types::fixt::*;
@@ -157,16 +157,16 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn publish_query() {
         observability::test_run().ok();
-        let env = test_authored_env();
-        let expected = test_data(&env.env().into());
-        let r = get_ops_to_publish(expected.agent.clone(), &env.env().into())
+        let db = test_authored_db();
+        let expected = test_data(&db.to_db().into());
+        let r = get_ops_to_publish(expected.agent.clone(), &db.to_db().into())
             .await
             .unwrap();
         assert_eq!(r, expected.results);
     }
 
     fn create_and_insert_op(
-        env: &DbWrite<DbKindAuthored>,
+        db: &DbWrite<DbKindAuthored>,
         facts: Facts,
         consistent_data: &Consistent,
     ) -> DhtOpHashed {
@@ -217,12 +217,12 @@ mod tests {
             ))
         };
 
-        env.conn()
+        db.conn()
             .unwrap()
             .with_commit_sync(|txn| {
                 let hash = state.as_hash().clone();
-                insert_op(txn, state.clone()).unwrap();
-                set_last_publish_time(txn, hash.clone(), last_publish).unwrap();
+                insert_op(txn, &state).unwrap();
+                set_last_publish_time(txn, &hash, last_publish).unwrap();
                 set_receipts_complete(txn, &hash, facts.has_required_receipts).unwrap();
                 DatabaseResult::Ok(())
             })
@@ -230,7 +230,7 @@ mod tests {
         state
     }
 
-    fn test_data(env: &DbWrite<DbKindAuthored>) -> Expected {
+    fn test_data(db: &DbWrite<DbKindAuthored>) -> Expected {
         let mut results = Vec::new();
         let cd = Consistent {
             this_agent: fixt!(AgentPubKey),
@@ -248,7 +248,7 @@ mod tests {
             is_this_agent: true,
             store_entry: true,
         };
-        let op = create_and_insert_op(env, facts, &cd);
+        let op = create_and_insert_op(db, facts, &cd);
         results.push(op);
 
         // All facts are the same unless stated:
@@ -258,29 +258,29 @@ mod tests {
         let mut f = facts;
         f.private = true;
         f.store_entry = false;
-        let op = create_and_insert_op(env, f, &cd);
+        let op = create_and_insert_op(db, f, &cd);
         results.push(op);
 
         // We **don't** expect any of these in the results:
         // - Private: true.
         let mut f = facts;
         f.private = true;
-        create_and_insert_op(env, f, &cd);
+        create_and_insert_op(db, f, &cd);
 
         // - WithinMinPeriod: true.
         let mut f = facts;
         f.within_min_period = true;
-        create_and_insert_op(env, f, &cd);
+        create_and_insert_op(db, f, &cd);
 
         // - HasRequireReceipts: true.
         let mut f = facts;
         f.has_required_receipts = true;
-        create_and_insert_op(env, f, &cd);
+        create_and_insert_op(db, f, &cd);
 
         // - IsThisAgent: false.
         let mut f = facts;
         f.is_this_agent = false;
-        create_and_insert_op(env, f, &cd);
+        create_and_insert_op(db, f, &cd);
 
         Expected {
             agent: cd.this_agent.clone(),

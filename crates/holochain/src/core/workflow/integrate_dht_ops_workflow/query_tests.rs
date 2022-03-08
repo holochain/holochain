@@ -104,16 +104,21 @@ impl Scenario {
 #[tokio::test(flavor = "multi_thread")]
 async fn integrate_query() {
     observability::test_run().ok();
-    let env = test_dht_env();
-    let expected = test_data(&env.env().into());
+    let db = test_dht_db();
+    let expected = test_data(&db.to_db().into());
     let (qt, _rx) = TriggerSender::new();
-    // dump_tmp(&env.env());
+    // dump_tmp(&db.db());
     let test_network = test_network(None, None).await;
     let holochain_p2p_cell = test_network.dna_network();
-    integrate_dht_ops_workflow(env.env().into(), qt, holochain_p2p_cell)
-        .await
-        .unwrap();
-    let hashes = env
+    integrate_dht_ops_workflow(
+        db.to_db().into(),
+        &db.to_db().into(),
+        qt,
+        holochain_p2p_cell,
+    )
+    .await
+    .unwrap();
+    let hashes = db
         .conn()
         .unwrap()
         .with_reader_test(|txn| {
@@ -138,7 +143,7 @@ async fn integrate_query() {
 }
 
 fn create_and_insert_op(
-    env: &DbRead<DbKindDht>,
+    db: &DbRead<DbKindDht>,
     scenario: Scenario,
     data: &mut SharedData,
 ) -> DhtOpHashed {
@@ -152,6 +157,12 @@ fn create_and_insert_op(
     )
     .then(|| Entry::App(fixt!(AppEntryBytes)));
 
+    let seq_not_zero = |seq: &mut u32| {
+        if *seq == 0 {
+            *seq = 1
+        }
+    };
+
     let mut header: Header = match op {
         DhtOpType::RegisterAgentActivity
         | DhtOpType::StoreElement
@@ -159,6 +170,7 @@ fn create_and_insert_op(
         | DhtOpType::RegisterUpdatedContent
         | DhtOpType::RegisterUpdatedElement => {
             let mut update = fixt!(Update);
+            seq_not_zero(&mut update.header_seq);
             if facts.last_header {
                 update.original_header_address = data.last_header.clone();
             }
@@ -170,6 +182,7 @@ fn create_and_insert_op(
         }
         DhtOpType::RegisterDeletedBy | DhtOpType::RegisterDeletedEntryHeader => {
             let mut delete = fixt!(Delete);
+            seq_not_zero(&mut delete.header_seq);
             if facts.last_header {
                 delete.deletes_address = data.last_header.clone();
             }
@@ -177,6 +190,7 @@ fn create_and_insert_op(
         }
         DhtOpType::RegisterAddLink => {
             let mut create_link = fixt!(CreateLink);
+            seq_not_zero(&mut create_link.header_seq);
             if facts.last_entry {
                 create_link.base_address = data.last_entry.clone();
             }
@@ -185,6 +199,7 @@ fn create_and_insert_op(
         }
         DhtOpType::RegisterRemoveLink => {
             let mut delete_link = fixt!(DeleteLink);
+            seq_not_zero(&mut delete_link.header_seq);
             if facts.last_link {
                 delete_link.link_add_address = data.last_link.clone();
             }
@@ -205,23 +220,18 @@ fn create_and_insert_op(
         DhtOp::from_type(op, SignedHeader(header.clone(), fixt!(Signature)), entry).unwrap(),
     );
 
-    env.conn()
+    db.conn()
         .unwrap()
         .with_commit_sync(|txn| {
             let hash = state.as_hash().clone();
-            insert_op(txn, state.clone()).unwrap();
-            set_validation_status(txn, hash.clone(), ValidationStatus::Valid).unwrap();
+            insert_op(txn, &state).unwrap();
+            set_validation_status(txn, &hash, ValidationStatus::Valid).unwrap();
             if facts.integrated {
-                set_when_integrated(txn, hash.clone(), holochain_zome_types::Timestamp::now())
-                    .unwrap();
+                set_when_integrated(txn, &hash, holochain_zome_types::Timestamp::now()).unwrap();
             }
             if facts.awaiting_integration {
-                set_validation_stage(
-                    txn,
-                    hash.clone(),
-                    ValidationLimboStatus::AwaitingIntegration,
-                )
-                .unwrap();
+                set_validation_stage(txn, &hash, ValidationLimboStatus::AwaitingIntegration)
+                    .unwrap();
             }
             DatabaseResult::Ok(())
         })
@@ -229,7 +239,7 @@ fn create_and_insert_op(
     state
 }
 
-fn test_data(env: &DbRead<DbKindDht>) -> Expected {
+fn test_data(db: &DbRead<DbKindDht>) -> Expected {
     let mut hashes = HashSet::new();
     let mut ops = HashMap::new();
 
@@ -252,13 +262,13 @@ fn test_data(env: &DbRead<DbKindDht>) -> Expected {
     ];
     for op_type in ops_with_deps {
         let scenario = Scenario::without_dep(op_type);
-        let op = create_and_insert_op(env, scenario, &mut data);
+        let op = create_and_insert_op(db, scenario, &mut data);
         ops.insert(op.as_hash().clone(), op);
         let scenarios = Scenario::with_dep(op_type);
-        let op = create_and_insert_op(env, scenarios[0], &mut data);
+        let op = create_and_insert_op(db, scenarios[0], &mut data);
         hashes.insert(op.as_hash().clone());
         ops.insert(op.as_hash().clone(), op);
-        let op = create_and_insert_op(env, scenarios[1], &mut data);
+        let op = create_and_insert_op(db, scenarios[1], &mut data);
         hashes.insert(op.as_hash().clone());
         ops.insert(op.as_hash().clone(), op);
     }

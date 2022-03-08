@@ -105,9 +105,9 @@ async fn test_rpc_multi_logic_mocked() {
         }
         ok_fut(Ok(out))
     });
-    m.expect_handle_k_gen_req()
-        .returning(move |_| ok_fut(Ok(KGenRes::RecordMetrics(()))));
+
     let evt_sender = build_event_handler(m).await;
+    let host_api = HostStub::new();
 
     let config = Arc::new(KitsuneP2pConfig::default());
 
@@ -234,7 +234,7 @@ async fn test_rpc_multi_logic_mocked() {
     let metric_exchange = MetricExchangeSync::spawn(
         space.clone(),
         config.tuning_params.clone(),
-        evt_sender.clone(),
+        host_api.clone(),
         metrics.clone(),
     );
 
@@ -243,6 +243,7 @@ async fn test_rpc_multi_logic_mocked() {
         space: space.clone(),
         i_s,
         evt_sender,
+        host_api,
         ep_hnd,
         parallel_notify_permit: Arc::new(tokio::sync::Semaphore::new(
             config.tuning_params.concurrent_limit_per_thread,

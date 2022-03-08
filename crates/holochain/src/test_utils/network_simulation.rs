@@ -254,7 +254,7 @@ fn cache_data(in_memory: bool, data: &MockNetworkData, is_cached: bool) -> Conne
     )
     .unwrap();
     for op in data.ops.values().cloned() {
-        holochain_state::test_utils::mutations_helpers::insert_valid_integrated_op(&mut txn, op)
+        holochain_state::test_utils::mutations_helpers::insert_valid_integrated_op(&mut txn, &op)
             .unwrap();
     }
     for (author, ops) in &data.authored {
@@ -400,8 +400,8 @@ async fn create_test_data(
     let mut ops = HashMap::new();
     for (i, cell) in cells.iter().enumerate() {
         eprintln!("Extracting data {}", i);
-        let env = cell.authored_env().clone();
-        let data = fresh_reader_test(env, |mut txn| {
+        let db = cell.authored_db().clone();
+        let data = fresh_reader_test(db, |mut txn| {
             get_authored_ops(&mut txn, cell.agent_pubkey())
         });
         let hashes = data.keys().cloned().collect::<Vec<_>>();
