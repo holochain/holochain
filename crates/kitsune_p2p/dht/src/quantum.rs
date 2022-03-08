@@ -121,7 +121,6 @@ impl SpacetimeCoords {
 }
 
 fn bounds<Q: Quantum, N: From<u32>>(dim: &Dimension, power: u8, offset: Q, count: u32) -> (N, N) {
-    dbg!(&dim, power, &offset, count);
     let q = dim.quantum * 2u32.pow(power.into());
     let start = offset.inner().wrapping_mul(q);
     let len = count.wrapping_mul(q);
@@ -156,7 +155,7 @@ impl<Q: Quantum> Segment<Q> {
         }
     }
 
-    pub fn quantized_length(&self) -> u64 {
+    pub fn num_quanta(&self) -> u64 {
         // If power is 32, this overflows a u32
         2u64.pow(self.power.into())
     }
@@ -164,16 +163,16 @@ impl<Q: Quantum> Segment<Q> {
     pub fn absolute_length(&self, topo: &Topology) -> u64 {
         let q = Q::dimension(topo).quantum as u64;
         // If power is 32, this overflows a u32
-        2u64.pow(self.power.into()) * q
+        self.num_quanta() * q
     }
 
     /// Get the quanta which bound this segment
     pub fn quantum_bounds(&self) -> (Q, Q) {
-        let len = self.quantized_length();
-        let a = (len * u64::from(self.offset)) as u32;
+        let n = self.num_quanta();
+        let a = (n * u64::from(self.offset)) as u32;
         (
             Q::from(a),
-            Q::from(a.wrapping_add(len as u32).wrapping_sub(1)),
+            Q::from(a.wrapping_add(n as u32).wrapping_sub(1)),
         )
     }
 
@@ -229,7 +228,7 @@ pub type TimeSegment = Segment<TimeQuantum>;
 pub struct Dimension {
     /// The smallest possible length in this dimension.
     /// Determines the interval represented by the leaf of a tree.
-    pub(crate) quantum: u32,
+    pub quantum: u32,
     /// The size of this dimension, meaning the number of possible values
     /// that can be represented.
     ///
@@ -418,16 +417,8 @@ impl TelescopingTimes {
         let (left, right) = if a.0.time > b.0.time { (b, a) } else { (a, b) };
         let (lt, ld) = left;
         let (rt, rd) = right;
-        let mut lt: Vec<_> = lt
-            .segments()
-            .iter()
-            .map(TimeSegment::quantized_length)
-            .collect();
-        let rt: Vec<_> = rt
-            .segments()
-            .iter()
-            .map(TimeSegment::quantized_length)
-            .collect();
+        let mut lt: Vec<_> = lt.segments().iter().map(TimeSegment::num_quanta).collect();
+        let rt: Vec<_> = rt.segments().iter().map(TimeSegment::num_quanta).collect();
         assert_eq!(lt.len(), ld.len());
         assert_eq!(rt.len(), rd.len());
         let mut i = 0;
@@ -487,14 +478,14 @@ mod tests {
     #[test]
     fn segment_length() {
         let s = TimeSegment::new(31, 0);
-        assert_eq!(s.quantized_length(), 2u64.pow(31));
+        assert_eq!(s.num_quanta(), 2u64.pow(31));
     }
 
     fn lengths(t: TimeQuantum) -> Vec<u32> {
         TelescopingTimes::new(t)
             .segments()
             .into_iter()
-            .map(|i| i.quantized_length() as u32)
+            .map(|i| i.num_quanta() as u32)
             .collect()
     }
 
@@ -570,7 +561,7 @@ mod tests {
             let ts = TelescopingTimes::new(now.into()).segments();
             let total = ts.iter().fold(0u64, |len, t| {
                 assert_eq!(t.quantum_bounds().0.inner(), len as u32, "t = {:?}, len = {}", t, len);
-                len + t.quantized_length()
+                len + t.num_quanta()
             });
             assert_eq!(total, now as u64);
         }

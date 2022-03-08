@@ -30,34 +30,42 @@ impl KitsuneHost for StandardResponsesHostApi {
 
     fn peer_extrapolated_coverage(
         &self,
-        space: Arc<KitsuneSpace>,
-        dht_arc_set: DhtArcSet,
+        _space: Arc<KitsuneSpace>,
+        _dht_arc_set: DhtArcSet,
     ) -> crate::KitsuneHostResult<Vec<f64>> {
         todo!()
     }
 
     fn query_region_set(
         &self,
-        _space: Arc<KitsuneSpace>,
+        space: Arc<KitsuneSpace>,
         dht_arc_set: Arc<DhtArcSet>,
     ) -> crate::KitsuneHostResult<RegionSetXtcs> {
-        let arqs = ArqBoundsSet::from_dht_arc_set(&ArqStrat::default(), &dht_arc_set);
-        let coords = RegionCoordSetXtcs::new(TelescopingTimes::new(1.into()), arqs);
-        let chunks = coords.region_coords_nested().count();
-        let region_set = if self.with_data {
-            // XXX: this is very fake, and completely wrong!
-            //      in order to properly match the fake data returned in other methods,
-            //      there should really only be one nonzero region.
-            let data = RegionData {
-                hash: [0; 32].into(),
-                size: 1,
-                count: 1,
+        async move {
+            let arqs = ArqBoundsSet::from_dht_arc_set(
+                &self.get_topology(space).await?,
+                &ArqStrat::default(),
+                &dht_arc_set,
+            );
+            let coords = RegionCoordSetXtcs::new(TelescopingTimes::new(1.into()), arqs);
+            let chunks = coords.region_coords_nested().count();
+            let region_set = if self.with_data {
+                // XXX: this is very fake, and completely wrong!
+                //      in order to properly match the fake data returned in other methods,
+                //      there should really only be one nonzero region.
+                let data = RegionData {
+                    hash: [0; 32].into(),
+                    size: 1,
+                    count: 1,
+                };
+                RegionSetXtcs::from_data(coords, vec![vec![data]; chunks])
+            } else {
+                RegionSetXtcs::from_data(coords, vec![])
             };
-            RegionSetXtcs::from_data(coords, vec![vec![data]; chunks])
-        } else {
-            RegionSetXtcs::from_data(coords, vec![])
-        };
-        box_fut(Ok(region_set))
+            Ok(region_set)
+        }
+        .boxed()
+        .into()
     }
 
     fn record_metrics(

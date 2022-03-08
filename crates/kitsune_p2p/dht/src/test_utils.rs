@@ -97,6 +97,7 @@ pub fn generate_ideal_coverage(
 }
 
 pub fn generate_messy_coverage(
+    topo: &Topology,
     rng: &mut StdRng,
     strat: &ArqStrat,
     len_mean: f64,
@@ -109,7 +110,6 @@ pub fn generate_messy_coverage(
     tracing::info!("N = {}, J = {}", n, jitter);
     tracing::info!("ArqStrat: = {:#?}", strat);
 
-    let topo = Topology::identity_zero();
     let len_dist = statrs::distribution::Normal::new(len_mean, len_std).unwrap();
 
     let nf = n as f64;
@@ -119,7 +119,7 @@ pub fn generate_messy_coverage(
             let center =
                 ((i as f64 / nf) + (2.0 * jitter * rng.gen::<f64>()) - jitter).rem_euclid(1.0);
             let len = len_dist.sample(rng).clamp(0.0, 1.0);
-            unit_arq(&topo, strat, center, len)
+            unit_arq(topo, strat, center, len)
         })
         .collect();
 

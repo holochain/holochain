@@ -44,7 +44,7 @@ fn stability_test_case_near_ideal() {
     std::env::set_var("RUST_LOG", "debug");
     observability::test_run().ok();
 
-    let topo = Topology::identity_zero();
+    let topo = Topology::standard_zero();
     let detail = false;
     let mut rng = seeded_rng(None);
     let n = 150;
@@ -66,7 +66,7 @@ fn stability_test_case_messy() {
     std::env::set_var("RUST_LOG", "debug");
     observability::test_run().ok();
 
-    let topo = Topology::identity_zero();
+    let topo = Topology::standard_zero();
     let detail = true;
 
     let mut rng = seeded_rng(None);
@@ -79,7 +79,7 @@ fn stability_test_case_messy() {
         min_coverage: cov,
         ..Default::default()
     };
-    let peers = generate_messy_coverage(&mut rng, &strat, len_mean, len_std, n, j);
+    let peers = generate_messy_coverage(&topo, &mut rng, &strat, len_mean, len_std, n, j);
     parameterized_stability_test(&topo, &strat, peers, detail);
 }
 
@@ -104,7 +104,7 @@ proptest::proptest! {
             ..Default::default()
         };
 
-        let peers = generate_messy_coverage(&mut rng, &strat, len_mean, len_std, num_peers, j);
+        let peers = generate_messy_coverage(&topo, &mut rng, &strat, len_mean, len_std, num_peers, j);
         parameterized_stability_test(&topo, &strat, peers, detail);
     }
 }

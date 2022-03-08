@@ -140,13 +140,13 @@ pub fn run_one_epoch(
             }
         }
         let mut arq = peers.get_mut(i).unwrap();
-        let before = arq.length(topo) as f64;
+        let before = arq.absolute_length(topo) as f64;
         let before_pow = arq.power();
 
         let stats = view.update_arq_with_stats(&mut arq);
 
-        let after = arq.length(topo) as f64;
-        let delta = after - before;
+        let after = arq.absolute_length(topo) as f64;
+        let delta = (after - before) / topo.space.quantum as f64;
 
         if detail {
             let d = delta as i64 / 2i64.pow(before_pow as u32);

@@ -6,6 +6,7 @@ use std::sync::Arc;
 
 use crate::types::event::{KitsuneP2pEvent, KitsuneP2pEventHandler, KitsuneP2pEventHandlerResult};
 use crate::{event::*, KitsuneHost};
+use futures::FutureExt;
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::bin_types::*;
 use kitsune_p2p_types::combinators::second;
@@ -77,46 +78,50 @@ impl KitsuneHost for SwitchboardEventHandler {
 
     fn query_region_set(
         &self,
-        _space: Arc<KitsuneSpace>,
+        space: Arc<KitsuneSpace>,
         dht_arc_set: Arc<dht_arc::DhtArcSet>,
     ) -> crate::KitsuneHostResult<dht::region::RegionSetXtcs> {
-        let arq_set = ArqBoundsSet::from_dht_arc_set(&self.sb.strat, &dht_arc_set);
-        // TODO: This should be behind the current moment by however much Recent gossip covers.
-        let current = Timestamp::now();
-        let times = TelescopingTimes::new(TimeQuantum::from_timestamp(&self.sb.topology, current));
-        let coord_set = RegionCoordSetXtcs::new(times, arq_set);
-        let r = coord_set.into_region_set(|(_, coords)| {
-            dbg!(&coords);
-            let bounds = coords.to_bounds(&self.sb.topology);
-            dbg!(&bounds);
-            let RegionBounds {
-                x: (x0, x1),
-                t: (t0, t1),
-            } = bounds;
-            let ops: Vec<_> = self.sb.share(|sb| {
-                sb.ops
-                    .iter()
-                    .filter(move |(loc, op)| {
-                        let loc = DhtLocation::from(**loc);
-                        let arc = ArcInterval::new(x0, x1);
-                        arc.contains(&loc) && t0 <= op.timestamp && op.timestamp < t1
-                    })
-                    .map(second)
-                    .cloned()
-                    .collect()
-            });
-            let hash = ops.iter().fold([0; 32], |mut h, o| {
-                array_xor(&mut h, o.hash.get_bytes().try_into().unwrap());
-                h
-            });
+        async move {
+            let topo = self.get_topology(space).await?;
+            let arq_set = ArqBoundsSet::from_dht_arc_set(&topo, &self.sb.strat, &dht_arc_set);
+            // TODO: This should be behind the current moment by however much Recent gossip covers.
+            let current = Timestamp::now();
+            let times =
+                TelescopingTimes::new(TimeQuantum::from_timestamp(&self.sb.topology, current));
+            let coord_set = RegionCoordSetXtcs::new(times, arq_set);
+            coord_set.into_region_set(|(_, coords)| {
+                let bounds = coords.to_bounds(&self.sb.topology);
+                dbg!(&bounds);
+                let RegionBounds {
+                    x: (x0, x1),
+                    t: (t0, t1),
+                } = bounds;
+                let ops: Vec<_> = self.sb.share(|sb| {
+                    sb.ops
+                        .iter()
+                        .filter(move |(loc, op)| {
+                            let loc = DhtLocation::from(**loc);
+                            let arc = ArcInterval::new(x0, x1);
+                            arc.contains(&loc) && t0 <= op.timestamp && op.timestamp < t1
+                        })
+                        .map(second)
+                        .cloned()
+                        .collect()
+                });
+                let hash = ops.iter().fold([0; 32], |mut h, o| {
+                    array_xor(&mut h, o.hash.get_bytes().try_into().unwrap());
+                    h
+                });
 
-            Ok(RegionData {
-                hash: RegionHash::from(hash),
-                count: ops.len() as u32,
-                size: ops.len() as u32,
+                Ok(RegionData {
+                    hash: RegionHash::from(hash),
+                    count: ops.len() as u32,
+                    size: ops.len() as u32,
+                })
             })
-        });
-        box_fut(r)
+        }
+        .boxed()
+        .into()
     }
 
     fn get_topology(

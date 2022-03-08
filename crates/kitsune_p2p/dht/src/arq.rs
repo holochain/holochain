@@ -27,10 +27,10 @@ pub fn pow2f(p: u8) -> f64 {
 pub trait ArqBounded: Sized + serde::Serialize + serde::de::DeserializeOwned {
     fn to_interval(&self, topo: &Topology) -> ArcInterval;
 
-    fn length(&self, topo: &Topology) -> u64;
+    fn absolute_length(&self, topo: &Topology) -> u64;
 
     fn length_ratio(&self, topo: &Topology) -> f64 {
-        self.length(topo) as f64 / 2f64.powf(32.0)
+        self.absolute_length(topo) as f64 / 2f64.powf(32.0)
     }
 
     /// Get a reference to the arq's power.
@@ -174,7 +174,7 @@ impl Arq {
     }
 
     pub fn to_dht_arc(&self, topo: &Topology) -> DhtArc {
-        let len = self.length(topo);
+        let len = self.absolute_length(topo);
         let hl = ((len + 1) / 2) as u32;
         DhtArc::new(self.center, hl)
     }
@@ -223,7 +223,7 @@ impl ArqBounded for Arq {
         self.to_bounds().to_interval(topo)
     }
 
-    fn length(&self, topo: &Topology) -> u64 {
+    fn absolute_length(&self, topo: &Topology) -> u64 {
         self.to_interval(topo).length()
     }
 
@@ -266,7 +266,7 @@ impl ArqBounded for ArqBounds {
         }
     }
 
-    fn length(&self, topo: &Topology) -> u64 {
+    fn absolute_length(&self, topo: &Topology) -> u64 {
         self.to_interval(topo).length()
     }
 

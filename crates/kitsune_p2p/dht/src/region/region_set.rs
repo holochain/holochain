@@ -249,7 +249,7 @@ mod tests {
             !(left < mid && right > mid),
             "This hacky logic does not work for arqs which span `u32::MAX / 2`"
         );
-        let xstep = (arq.length(topo) / arq.count() as u64) as usize;
+        let xstep = (arq.absolute_length(topo) / arq.count() as u64) as usize;
         (left as i32..arq.right(topo) as i32 + 1)
             .step_by(xstep)
             .flat_map(|x| {

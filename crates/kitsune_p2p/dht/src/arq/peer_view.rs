@@ -105,7 +105,7 @@ impl PeerViewQ {
         let (sum, count) = self
             .filtered_arqs(filter)
             .fold(initial, |(sum, count), arq| {
-                (sum + arq.length(&self.topo), count + 1)
+                (sum + arq.absolute_length(&self.topo), count + 1)
             });
         let cov = sum as f64 / filter_len as f64;
         (cov, count)
@@ -377,7 +377,7 @@ where
     ArqBounds: From<&'a A>,
 {
     peers
-        .map(|a| ArqBounds::from(a).length(topo) as f64 / 2f64.powf(32.0))
+        .map(|a| ArqBounds::from(a).absolute_length(topo) as f64 / 2f64.powf(32.0))
         .sum()
 }
 
