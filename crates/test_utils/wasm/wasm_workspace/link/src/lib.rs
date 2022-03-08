@@ -18,12 +18,12 @@ fn target() -> ExternResult<EntryHash> {
 
 #[hdk_extern]
 fn create_link(_: ()) -> ExternResult<HeaderHash> {
-    hdk::prelude::create_link(base()?, target()?, HdkLinkType::Default, ())
+    hdk::prelude::create_link(base()?, target()?, HdkLinkType::Any, ())
 }
 
 #[hdk_extern]
 fn create_back_link(_: ()) -> ExternResult<HeaderHash> {
-    hdk::prelude::create_link(target()?, base()?, HdkLinkType::Default, ())
+    hdk::prelude::create_link(target()?, base()?, HdkLinkType::Any, ())
 }
 
 #[hdk_extern]
@@ -91,7 +91,7 @@ fn commit_existing_path(_: ()) -> ExternResult<()> {
         hdk::prelude::create_link(
             parent.path_entry_hash()?,
             path.path_entry_hash()?,
-            HdkLinkType::Default,
+            HdkLinkType::Any,
             LinkTag::new(
                 match path.leaf() {
                     None => <Vec<u8>>::new(),

@@ -294,7 +294,7 @@ impl Path {
                 create_link(
                     parent.path_entry_hash()?,
                     self.path_entry_hash()?,
-                    HdkLinkType::Path,
+                    HdkLinkType::Paths,
                     LinkTag::new(
                         match self.leaf() {
                             None => <Vec<u8>>::with_capacity(0),

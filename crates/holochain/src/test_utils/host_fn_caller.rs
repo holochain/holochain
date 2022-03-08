@@ -270,7 +270,7 @@ impl HostFnCaller {
         let input = CreateLinkInput::new(
             base,
             target,
-            HdkLinkType::Default.into(),
+            HdkLinkType::Any.into(),
             link_tag,
             ChainTopOrdering::default(),
         );
