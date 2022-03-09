@@ -6,6 +6,46 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20220309.134939
+
+## [holochain-0.0.129](crates/holochain/CHANGELOG.md#0.0.129)
+
+## [holochain\_cascade-0.0.29](crates/holochain_cascade/CHANGELOG.md#0.0.29)
+
+## [holochain\_cli-0.0.30](crates/holochain_cli/CHANGELOG.md#0.0.30)
+
+## [holochain\_cli\_sandbox-0.0.26](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.26)
+
+## [holochain\_websocket-0.0.29](crates/holochain_websocket/CHANGELOG.md#0.0.29)
+
+## [holochain\_conductor\_api-0.0.29](crates/holochain_conductor_api/CHANGELOG.md#0.0.29)
+
+## [holochain\_state-0.0.29](crates/holochain_state/CHANGELOG.md#0.0.29)
+
+## [holochain\_wasm\_test\_utils-0.0.29](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.29)
+
+## [holochain\_p2p-0.0.29](crates/holochain_p2p/CHANGELOG.md#0.0.29)
+
+## [kitsune\_p2p\_bootstrap-0.0.5](crates/kitsune_p2p_bootstrap/CHANGELOG.md#0.0.5)
+
+## [holochain\_cli\_bundle-0.0.25](crates/holochain_cli_bundle/CHANGELOG.md#0.0.25)
+
+## [holochain\_types-0.0.29](crates/holochain_types/CHANGELOG.md#0.0.29)
+
+## [holochain\_keystore-0.0.29](crates/holochain_keystore/CHANGELOG.md#0.0.29)
+
+## [holochain\_sqlite-0.0.29](crates/holochain_sqlite/CHANGELOG.md#0.0.29)
+
+## [kitsune\_p2p-0.0.26](crates/kitsune_p2p/CHANGELOG.md#0.0.26)
+
+- Allow TLS session keylogging via tuning param `danger_tls_keylog` = `env_keylog`, and environment variable `SSLKEYLOGFILE` (See kitsune\_p2p crate api documentation). [\#1261](https://github.com/holochain/holochain/pull/1261)
+
+## [kitsune\_p2p\_proxy-0.0.20](crates/kitsune_p2p_proxy/CHANGELOG.md#0.0.20)
+
+## [kitsune\_p2p\_transport\_quic-0.0.20](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.0.20)
+
+## [kitsune\_p2p\_types-0.0.20](crates/kitsune_p2p_types/CHANGELOG.md#0.0.20)
+
 # 20220303.215755
 
 ## [holochain-0.0.128](crates/holochain/CHANGELOG.md#0.0.128)
