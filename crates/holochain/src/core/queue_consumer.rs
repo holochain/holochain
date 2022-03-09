@@ -749,6 +749,14 @@ async fn next_job_or_exit(
 }
 
 /// Does nothing.
+/// Does extra nothing and logs about it if the error shouldn't bail the
+/// workflow.
 fn handle_workflow_error(err: WorkflowError) -> ManagedTaskResult {
-    Err(Box::new(ConductorError::from(err)).into())
+    if err.workflow_should_bail() {
+        Err(Box::new(ConductorError::from(err)).into())
+    }
+    else {
+        tracing::error!(?err);
+        Ok(())
+    }
 }
