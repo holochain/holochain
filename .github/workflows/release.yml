@@ -41,7 +41,7 @@ on:
         default: "true"
         type: string
       debug:
-        description: "stop for debugging after preparing hte release"
+        description: "start an ssh session via upterm on failure"
         required: false
         default: "true"
         type: string
