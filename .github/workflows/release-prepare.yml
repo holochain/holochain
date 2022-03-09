@@ -38,6 +38,11 @@ on:
       CACHIX_AUTH_TOKEN:
         required: true
 
+    outputs:
+      releasable_crates:
+        description: "whether there are any releaseable crates"
+        value: ${{ jobs.prepare.outputs.releasable_crates }}
+
 jobs:
   prepare:
     env:
@@ -50,6 +55,7 @@ jobs:
       version: ${{ steps.write-env-and-tag.outputs.version }}
       version_compat: ${{ steps.write-env-and-tag.outputs.version_compat }}
       release_branch: ${{ steps.write-env-and-tag.outputs.release_branch }}
+      releasable_crates: ${{ steps.bump-versions.outputs.releasable_crates }}
 
     steps:
       # - name: Maximize build space
@@ -161,8 +167,9 @@ jobs:
           fi
 
       - name: Bump the crate versions for the release
+        id: bump-versions
         run: |
-          set -e
+          set -ex
           source "${HOLOCHAIN_RELEASE_SH}"
           cd "${HOLOCHAIN_REPO}"
 
@@ -193,6 +200,12 @@ jobs:
 
             cargo sweep -f
             '
+
+          if ! git diff --exit-code --quiet ${HOLOCHAIN_SOURCE_BRANCH:?}; then
+            echo "::set-output name=releasable_crates::true"
+          else
+            echo "::set-output name=releasable_crates::false"
+          fi
 
       - name: Append to the environment file and set outputs
         id: write-env-and-tag
