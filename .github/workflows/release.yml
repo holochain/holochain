@@ -372,7 +372,7 @@ jobs:
             cd "${HOLOCHAIN_REPO}"
 
             ${{ matrix.testCommand.run }}
-        continue-on-error: ${{ matrix.platform != 'ubuntu-latest' && matrix.testCommand.ignoreErrorOnNonUbuntu != 'true' }}
+        continue-on-error: ${{ matrix.platform != 'ubuntu-latest' && matrix.testCommand.ignoreErrorOnNonUbuntu == true }}
 
       - name: Garbage-collect cache
         if: ${{ always() && matrix.testCommand.savesCargoCache == true }}
