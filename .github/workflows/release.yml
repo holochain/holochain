@@ -2,7 +2,7 @@ name: release holochain
 
 on:
   schedule:
-    - cron: "40 13 * * 3" # at 1 AM on wednesday
+    - cron: "0 1 * * 3" # at 1 AM on wednesday
   workflow_dispatch:
     inputs:
       # holochain_url:
@@ -513,7 +513,7 @@ jobs:
       - name: Create a pull-request towards the develop branch
         id: cpr
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN }}
         run: |
           set -euE -o pipefail
 
@@ -534,7 +534,7 @@ jobs:
         if: ${{ needs.vars.outputs.dry_run == 'false' }}
         uses: peter-evans/enable-pull-request-automerge@v1
         with:
-          token: ${{ secrets.HRA_GITHUB_TOKEN}}
+          token: ${{ secrets.GITHUB_TOKEN}}
           pull-request-number: ${{ steps.cpr.outputs.pull-request-number }}
           merge-method: squash
       - name: Auto approve Pull Request
@@ -549,6 +549,7 @@ jobs:
         if: ${{ failure() || needs.vars.outputs.debug == 'true' }}
         env:
           GITHUB_ACTION_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_HRA_ACTION_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN }}
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         with:
           ## limits ssh access and adds the ssh public key for the user which triggered the workflow
