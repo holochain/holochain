@@ -91,7 +91,6 @@ impl KitsuneHost for SwitchboardEventHandler {
             let coord_set = RegionCoordSetXtcs::new(times, arq_set);
             coord_set.into_region_set(|(_, coords)| {
                 let bounds = coords.to_bounds(&self.sb.topology);
-                dbg!(&bounds);
                 let RegionBounds {
                     x: (x0, x1),
                     t: (t0, t1),

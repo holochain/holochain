@@ -152,7 +152,12 @@ impl Quantum for SpaceQuantum {
     }
 
     fn normalized(self, topo: &Topology) -> Self {
-        Self(self.0 % 2u32.pow(Self::dimension(topo).bit_depth as u32))
+        let depth = Self::dimension(topo).bit_depth as u32;
+        if depth >= 32 {
+            self
+        } else {
+            Self(self.0 % 2u32.pow(depth))
+        }
     }
 }
 
@@ -244,6 +249,7 @@ impl<Q: Quantum> Segment<Q> {
 
     pub fn contains(&self, topo: &Topology, coord: Q) -> bool {
         let (lo, hi) = self.quantum_bounds(topo);
+        let coord = coord.normalized(&topo);
         if lo <= hi {
             lo <= coord && coord <= hi
         } else {
@@ -604,11 +610,18 @@ mod tests {
     #[test]
     fn test_contains_normalized() {
         let topo = Topology::standard_epoch();
-        let s = TimeSegment::new(31, 0);
-        assert_eq!(s.quantum_bounds(&topo), (0.into(), (u32::MAX / 2).into()));
-        assert!(s.contains(&topo, 0.into()));
-        assert!(!s.contains(&topo, (u32::MAX / 2 + 2).into()));
-        todo!("write actual test, all of the above is copy-pasted")
+        let m = 2u32.pow(topo.space.bit_depth as u32);
+        let s = SpaceSegment::new(2, m + 5);
+        let bounds = s.quantum_bounds(&topo);
+        // The quantum bounds are normalized (wrapped)
+        assert_eq!(bounds, SpaceSegment::new(2, 5).quantum_bounds(&topo));
+        assert_eq!(bounds, (20.into(), 23.into()));
+
+        assert!(s.contains(&topo, 20.into()));
+        assert!(s.contains(&topo, 23.into()));
+        assert!(s.contains(&topo, (m * 2 + 20).into()));
+        assert!(s.contains(&topo, (m * 3 + 23).into()));
+        assert!(!s.contains(&topo, (m * 4 + 24).into()));
     }
 
     #[test]
