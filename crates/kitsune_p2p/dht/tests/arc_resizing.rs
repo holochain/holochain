@@ -162,7 +162,7 @@ fn test_degenerate_asymmetrical_coverage() {
     let topo = Topology::unit_zero();
     let other = ArqBounds::from_interval(&topo, 4, ArcInterval::new(0x0u32, 0x80))
         .unwrap()
-        .to_arq();
+        .to_arq(&topo);
     let others = vec![other; 10];
     // aim for coverage between 5 and 6.
     let strat = ArqStrat {

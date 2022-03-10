@@ -322,9 +322,9 @@ impl ArqBounds {
         }
     }
 
-    pub fn to_arq(&self) -> Arq {
+    pub fn to_arq(&self, topo: &Topology) -> Arq {
         Arq {
-            left_edge: self.pseudocenter(),
+            left_edge: self.pseudocenter(topo),
             power: self.power,
             count: self.count,
         }
@@ -429,9 +429,14 @@ impl ArqBounds {
     /// Return a plausible place for the centerpoint of the Arq.
     /// Obviously these pseudo-centerpoints are not evenly distributed, so
     /// be careful where you use them.
-    pub fn pseudocenter(&self) -> Loc {
+    pub fn pseudocenter(&self, topo: &Topology) -> Loc {
         let s = self.spacing();
-        let center = (s * self.offset.inner()).wrapping_add(s / 2);
+        let center = self
+            .offset
+            .inner()
+            .wrapping_mul(s)
+            .wrapping_mul(topo.space.quantum)
+            .wrapping_add(s / 2);
         Loc::from(center as u32)
     }
 

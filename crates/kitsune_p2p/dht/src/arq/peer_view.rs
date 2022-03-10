@@ -402,7 +402,7 @@ mod tests {
             pow,
             ArcInterval::new(pow2(pow) * lo, (pow2(pow) as u64 * hi as u64) as u32),
         )
-        .to_arq()
+        .to_arq(topo)
     }
 
     #[test]
