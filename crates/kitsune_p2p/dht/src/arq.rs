@@ -83,19 +83,19 @@ pub struct Arq {
 // impl Eq for Arq {}
 
 impl Arq {
-    pub fn new(center: Loc, power: u8, count: u32) -> Self {
+    pub fn new(left_edge: Loc, power: u8, count: u32) -> Self {
         Self {
-            left_edge: center,
+            left_edge,
             power,
             count,
         }
     }
 
-    pub fn new_full(center: Loc, power: u8) -> Self {
+    pub fn new_full(left_edge: Loc, power: u8) -> Self {
         let count = 2u32.pow(32 - power as u32);
         assert!(is_full(power, count));
         Self {
-            left_edge: center,
+            left_edge,
             power,
             count,
         }
@@ -153,8 +153,8 @@ impl Arq {
     fn chunk_at(&self, sequence: u32) -> SpaceSegment {
         let s = self.spacing();
         // the offset of the central chunk
-        let center = self.left_edge.as_u32() / s;
-        let offset = center.wrapping_add(sequence);
+        let left_edge = self.left_edge.as_u32() / s;
+        let offset = left_edge.wrapping_add(sequence);
         SpaceSegment::new(self.power.into(), offset)
     }
 
@@ -173,8 +173,8 @@ impl Arq {
         }
     }
 
-    /// Get a reference to the arq's center.
-    pub fn center(&self) -> Loc {
+    /// Get a reference to the arq's left edge in absolute coordinates.
+    pub fn left_edge(&self) -> Loc {
         self.left_edge
     }
 
@@ -516,11 +516,11 @@ pub fn power_and_count_from_length(dim: &Dimension, len: u64, max_chunks: u32) -
 }
 
 /// Given a center and a length, give Arq which matches most closely given the provided strategy
-pub fn approximate_arq(topo: &Topology, strat: &ArqStrat, center: Loc, len: u64) -> Arq {
+pub fn approximate_arq(topo: &Topology, strat: &ArqStrat, left_edge: Loc, len: u64) -> Arq {
     if len == 2u64.pow(32) {
-        Arq::new_full(center, strat.max_power)
+        Arq::new_full(left_edge, strat.max_power)
     } else if len == 0 {
-        Arq::new(center, strat.min_power, 0)
+        Arq::new(left_edge, strat.min_power, 0)
     } else {
         let (power, count) = power_and_count_from_length(&topo.space, len, strat.max_chunks());
 
@@ -540,7 +540,7 @@ pub fn approximate_arq(topo: &Topology, strat: &ArqStrat, center: Loc, len: u64)
             max
         );
         debug_assert!(count == 0 || count - 1 <= u32::MAX / topo.space.quantum);
-        Arq::new(center, power as u8, count)
+        Arq::new(left_edge, power as u8, count)
     }
 }
 

@@ -387,7 +387,10 @@ mod tests {
     #[test]
     fn test_diff_standard_topo() {
         let topo = Topology::standard_zero();
-        let arq = Arq::new(Loc::from(-32i32 as u32), 4, 4).to_bounds(&topo);
+        let pow: u8 = 4;
+        // This arq goes from -2^17 to 2^17, with a chunk size of 2^16
+        let left_edge = Loc::from(-(2i32.pow(pow as u32 + 12 + 1)));
+        let arq = Arq::new(left_edge, pow, 4).to_bounds(&topo);
         dbg!(&arq, arq.to_interval(&topo));
 
         let mut store1 = OpStore::new(topo.clone(), GossipParams::zero());
@@ -395,16 +398,14 @@ mod tests {
 
         let extra_ops = [
             OpData::fake(
-                dbg!(SpaceQuantum::max_value(&topo) - SpaceQuantum::from(300))
-                    .to_loc_bounds(&topo)
-                    .0,
+                left_edge,
                 TimeQuantum::from(18).to_timestamp_bounds(&topo).0,
-                4,
+                13,
             ),
             OpData::fake(
-                SpaceQuantum::from(12u32).to_loc_bounds(&topo).0,
+                Loc::from(11111),
                 TimeQuantum::from(12).to_timestamp_bounds(&topo).0,
-                4,
+                11,
             ),
         ];
         // Store 2 has everything store 1 has, plus 2 extra ops
@@ -429,7 +430,7 @@ mod tests {
         assert_eq!(diff.len(), 2);
 
         assert!(diff[0].coords.contains(&extra_ops[0].coords(&topo)));
-        assert!(diff[1].coords.contains(&extra_ops[1].coords(&topo)));
+        assert!(diff[1].coords.contains(&dbg!(extra_ops[1].coords(&topo))));
 
         // Adding the region data from each extra op to the region data of the
         // diff which was missing those ops should be the same as the query

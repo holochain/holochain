@@ -62,7 +62,7 @@ impl TestNode {
             i,
             arq.power(),
             arq.count(),
-            arq.center()
+            arq.left_edge()
         )
     }
 }

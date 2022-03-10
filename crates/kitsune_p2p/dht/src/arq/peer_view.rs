@@ -319,7 +319,7 @@ impl PeerViewQ {
         }
 
         if is_full(arq.power(), arq.count()) {
-            *arq = Arq::new_full(arq.center(), arq.power());
+            *arq = Arq::new_full(arq.left_edge(), arq.power());
         }
 
         // check if anything changed

@@ -162,6 +162,7 @@ impl Quantum for TimeQuantum {
     }
 }
 
+#[derive(Debug)]
 pub struct SpacetimeCoords {
     pub space: SpaceQuantum,
     pub time: TimeQuantum,
@@ -231,7 +232,7 @@ impl<Q: Quantum> Segment<Q> {
     }
 
     pub fn contains(&self, coord: Q) -> bool {
-        let (lo, hi) = self.quantum_bounds();
+        let (lo, hi) = dbg!(self.quantum_bounds());
         if lo <= hi {
             lo <= coord && coord <= hi
         } else {
