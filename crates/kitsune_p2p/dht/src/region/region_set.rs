@@ -367,8 +367,8 @@ mod tests {
         dbg!(&diff, &extra_ops);
         assert_eq!(diff.len(), 2);
 
-        assert!(diff[0].coords.contains(&extra_ops[0].coords(&topo)));
-        assert!(diff[1].coords.contains(&extra_ops[1].coords(&topo)));
+        assert!(diff[0].coords.contains(&topo, &extra_ops[0].coords(&topo)));
+        assert!(diff[1].coords.contains(&topo, &extra_ops[1].coords(&topo)));
 
         // Adding the region data from each extra op to the region data of the
         // diff which was missing those ops should be the same as the query
@@ -403,7 +403,7 @@ mod tests {
                 13,
             ),
             OpData::fake(
-                Loc::from(11111),
+                Loc::from(11111u32),
                 TimeQuantum::from(12).to_timestamp_bounds(&topo).0,
                 11,
             ),
@@ -429,8 +429,10 @@ mod tests {
         dbg!(&diff, &extra_ops);
         assert_eq!(diff.len(), 2);
 
-        assert!(diff[0].coords.contains(&extra_ops[0].coords(&topo)));
-        assert!(diff[1].coords.contains(&dbg!(extra_ops[1].coords(&topo))));
+        assert!(diff[0].coords.contains(&topo, &extra_ops[0].coords(&topo)));
+        assert!(diff[1]
+            .coords
+            .contains(&topo, &extra_ops[1].coords(&topo)));
 
         // Adding the region data from each extra op to the region data of the
         // diff which was missing those ops should be the same as the query

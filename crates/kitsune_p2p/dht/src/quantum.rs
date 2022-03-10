@@ -120,6 +120,8 @@ pub trait Quantum: From<u32> + PartialEq + Eq + PartialOrd + Ord + std::fmt::Deb
 
     fn dimension(topo: &Topology) -> &Dimension;
 
+    fn normalized(self, topo: &Topology) -> Self;
+
     fn max_value(topo: &Topology) -> Self {
         Self::from((2u64.pow(Self::dimension(topo).bit_depth as u32) - 1) as u32)
     }
@@ -148,6 +150,10 @@ impl Quantum for SpaceQuantum {
     fn dimension(topo: &Topology) -> &Dimension {
         &topo.space
     }
+
+    fn normalized(self, topo: &Topology) -> Self {
+        Self(self.0 % 2u32.pow(Self::dimension(topo).bit_depth as u32))
+    }
 }
 
 impl Quantum for TimeQuantum {
@@ -159,6 +165,11 @@ impl Quantum for TimeQuantum {
 
     fn dimension(topo: &Topology) -> &Dimension {
         &topo.time
+    }
+
+    // Time coordinates do not wrap, so normalization is an identity
+    fn normalized(self, _topo: &Topology) -> Self {
+        self
     }
 }
 
@@ -222,17 +233,17 @@ impl<Q: Quantum> Segment<Q> {
     }
 
     /// Get the quanta which bound this segment
-    pub fn quantum_bounds(&self) -> (Q, Q) {
+    pub fn quantum_bounds(&self, topo: &Topology) -> (Q, Q) {
         let n = self.num_quanta();
         let a = (n * u64::from(self.offset)) as u32;
         (
-            Q::from(a),
-            Q::from(a.wrapping_add(n as u32).wrapping_sub(1)),
+            Q::from(a).normalized(&topo),
+            Q::from(a.wrapping_add(n as u32).wrapping_sub(1)).normalized(&topo),
         )
     }
 
-    pub fn contains(&self, coord: Q) -> bool {
-        let (lo, hi) = dbg!(self.quantum_bounds());
+    pub fn contains(&self, topo: &Topology, coord: Q) -> bool {
+        let (lo, hi) = self.quantum_bounds(topo);
         if lo <= hi {
             lo <= coord && coord <= hi
         } else {
@@ -583,10 +594,21 @@ mod tests {
 
     #[test]
     fn test_contains() {
+        let topo = Topology::unit_zero();
         let s = TimeSegment::new(31, 0);
-        assert_eq!(s.quantum_bounds(), (0.into(), (u32::MAX / 2).into()));
-        assert!(s.contains(0.into()));
-        assert!(!s.contains((u32::MAX / 2 + 2).into()));
+        assert_eq!(s.quantum_bounds(&topo), (0.into(), (u32::MAX / 2).into()));
+        assert!(s.contains(&topo, 0.into()));
+        assert!(!s.contains(&topo, (u32::MAX / 2 + 2).into()));
+    }
+
+    #[test]
+    fn test_contains_normalized() {
+        let topo = Topology::standard_epoch();
+        let s = TimeSegment::new(31, 0);
+        assert_eq!(s.quantum_bounds(&topo), (0.into(), (u32::MAX / 2).into()));
+        assert!(s.contains(&topo, 0.into()));
+        assert!(!s.contains(&topo, (u32::MAX / 2 + 2).into()));
+        todo!("write actual test, all of the above is copy-pasted")
     }
 
     #[test]
@@ -672,9 +694,10 @@ mod tests {
     proptest::proptest! {
         #[test]
         fn telescoping_times_cover_total_time_span(now in 0u32..u32::MAX) {
+            let topo = Topology::unit_zero();
             let ts = TelescopingTimes::new(now.into()).segments();
             let total = ts.iter().fold(0u64, |len, t| {
-                assert_eq!(t.quantum_bounds().0.inner(), len as u32, "t = {:?}, len = {}", t, len);
+                assert_eq!(t.quantum_bounds(&topo).0.inner(), len as u32, "t = {:?}, len = {}", t, len);
                 len + t.num_quanta()
             });
             assert_eq!(total, now as u64);

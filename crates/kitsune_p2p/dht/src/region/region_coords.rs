@@ -20,8 +20,8 @@ impl RegionCoords {
         }
     }
 
-    pub fn contains(&self, coords: &SpacetimeCoords) -> bool {
-        self.space.contains(coords.space) && self.time.contains(coords.time)
+    pub fn contains(&self, topo: &Topology, coords: &SpacetimeCoords) -> bool {
+        self.space.contains(&topo, coords.space) && self.time.contains(&topo, coords.time)
     }
 }
 
