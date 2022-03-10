@@ -22,9 +22,9 @@ pub(crate) fn loc_downscale(len: usize, d: Loc) -> usize {
 
 impl Arq {
     pub fn to_ascii(&self, topo: &Topology, len: usize) -> String {
-        let mut s = self.to_bounds().to_ascii(topo, len);
+        let mut s = self.to_bounds(&topo).to_ascii(topo, len);
         if !self.is_empty() {
-            let center = loc_downscale(len, self.center);
+            let center = loc_downscale(len, self.left_edge);
             s.replace_range(center..center + 1, "@");
         }
         s

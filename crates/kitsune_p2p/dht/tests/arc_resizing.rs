@@ -170,7 +170,7 @@ fn test_degenerate_asymmetrical_coverage() {
         buffer: 0.1,
         ..Default::default()
     };
-    let view = PeerViewQ::new(topo, strat, others);
+    let view = PeerViewQ::new(topo.clone(), strat, others);
 
     let arq = Arq::new(
         Loc::new(0),
@@ -178,7 +178,7 @@ fn test_degenerate_asymmetrical_coverage() {
         0x10,
     );
 
-    let extrapolated = view.extrapolated_coverage(&arq.to_bounds());
+    let extrapolated = view.extrapolated_coverage(&arq.to_bounds(&topo));
     assert_eq!(extrapolated, 5.0);
     let old = arq.clone();
     let mut new = arq.clone();
@@ -209,7 +209,7 @@ fn test_scenario() {
         // create 10 peers, all with full arcs, fully covering the DHT
         let peers: Vec<_> = generate_ideal_coverage(&topo, &mut rng, &strat, None, 10, jitter);
         let view = PeerViewQ::new(topo.clone(), strat.clone(), peers);
-        let extrapolated = view.extrapolated_coverage(&arq.to_bounds());
+        let extrapolated = view.extrapolated_coverage(&arq.to_bounds(&topo));
         assert_eq!(extrapolated, 10.0);
 
         // expect that the arq remains full under these conditions
@@ -229,7 +229,7 @@ fn test_scenario() {
             assert_eq!(peer_power, 26);
 
             let view = PeerViewQ::new(topo.clone(), strat.clone(), peers.clone());
-            let extrapolated = view.extrapolated_coverage(&arq.to_bounds());
+            let extrapolated = view.extrapolated_coverage(&arq.to_bounds(&topo));
             assert!(extrapolated > strat.max_coverage());
             // assert!(strat.min_coverage <= extrapolated && extrapolated <= strat.max_coverage());
 

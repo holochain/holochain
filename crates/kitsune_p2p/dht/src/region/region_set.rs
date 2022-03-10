@@ -270,7 +270,7 @@ mod tests {
     fn test_regions() {
         let topo = Topology::unit(Timestamp::from_micros(1000));
         let pow = 8;
-        let arq = Arq::new(0u32.into(), pow, 4).to_bounds();
+        let arq = Arq::new(0u32.into(), pow, 4).to_bounds(&topo);
         assert_eq!(arq.left(&topo) as i32, 0);
         assert_eq!(arq.right(&topo), 1023 as u32);
 
@@ -281,7 +281,7 @@ mod tests {
         let nt = 10;
         let ops = op_grid(
             &topo,
-            &Arq::new(0.into(), pow, 8).to_bounds(),
+            &Arq::new(0.into(), pow, 8).to_bounds(&topo),
             (1000..11000 as i64).step_by(1000),
         );
         assert_eq!(ops.len(), nx * nt);
@@ -302,7 +302,7 @@ mod tests {
     #[test]
     fn test_rectify() {
         let topo = Topology::unit_zero();
-        let arq = Arq::new(0u32.into(), 8, 4).to_bounds();
+        let arq = Arq::new(0u32.into(), 8, 4).to_bounds(&topo);
         let mut store = OpStore::new(topo.clone(), GossipParams::zero());
         store.integrate_ops(op_grid(&topo, &arq, 10..20).into_iter());
 
@@ -337,7 +337,7 @@ mod tests {
     #[test]
     fn test_diff() {
         let topo = Topology::unit_zero();
-        let arq = Arq::new(Loc::from(-512i32 as u32), 8, 4).to_bounds();
+        let arq = Arq::new(Loc::from(-512i32 as u32), 8, 4).to_bounds(&topo);
         dbg!(&arq, arq.to_interval(&topo));
 
         let mut store1 = OpStore::new(topo.clone(), GossipParams::zero());
@@ -387,7 +387,7 @@ mod tests {
     #[test]
     fn test_diff_standard_topo() {
         let topo = Topology::standard_zero();
-        let arq = Arq::new(Loc::from(-32i32 as u32), 4, 4).to_bounds();
+        let arq = Arq::new(Loc::from(-32i32 as u32), 4, 4).to_bounds(&topo);
         dbg!(&arq, arq.to_interval(&topo));
 
         let mut store1 = OpStore::new(topo.clone(), GossipParams::zero());

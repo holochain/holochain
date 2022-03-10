@@ -146,7 +146,7 @@ pub fn print_arqs<'a, A: ArqBounded>(topo: &Topology, arqs: &'a [A], len: usize)
             "|{}| {}:\t{} +{} *2^{}",
             arq.to_ascii(topo, len),
             i,
-            arq.to_bounds().offset(),
+            arq.to_bounds(&topo).offset(),
             arq.count(),
             arq.power()
         );
@@ -164,7 +164,7 @@ mod tests {
         let topo = Topology::unit_zero();
         let a = Arq::new(536870912u32.into(), 27, 11);
         let b = Arq::new(805306368u32.into(), 27, 11);
-        dbg!(a.to_bounds().offset());
+        dbg!(a.to_bounds(&topo).offset());
 
         let a = ArqSet::single(a);
         let b = ArqSet::single(b);

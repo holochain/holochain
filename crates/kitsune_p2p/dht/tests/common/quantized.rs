@@ -163,7 +163,7 @@ pub fn run_one_epoch(
                 delta_str
             };
 
-            let cov = view.extrapolated_coverage(&arq.to_bounds());
+            let cov = view.extrapolated_coverage(&arq.to_bounds(&topo));
             let slack_factor = view.slack_factor(cov, stats.num_peers);
 
             let slack_str = if slack_factor == 1.0 {

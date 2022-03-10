@@ -34,7 +34,7 @@ impl TestNode {
 
     /// The ArqBounds to use when gossiping
     pub fn arq_bounds(&self) -> ArqBounds {
-        self.agent_info.arq.to_bounds()
+        self.agent_info.arq.to_bounds(self.topo())
     }
 
     /// Get the RegionSet for this node, suitable for gossiping

@@ -52,17 +52,17 @@ pub trait ArqBounded: Sized + serde::Serialize + serde::de::DeserializeOwned {
         self.count() == 0
     }
 
-    fn to_bounds(&self) -> ArqBounds;
+    fn to_bounds(&self, topo: &Topology) -> ArqBounds;
 
     fn to_ascii(&self, topo: &Topology, len: usize) -> String {
-        self.to_bounds().to_ascii(topo, len)
+        self.to_bounds(topo).to_ascii(topo, len)
     }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Arq {
     /// Location around which this coverage is centered
-    center: Loc,
+    left_edge: Loc,
     /// The level of quantization. Total ArqBounds length is `2^power * count`.
     /// The power must be between 0 and 31, inclusive.
     power: u8,
@@ -85,7 +85,7 @@ pub struct Arq {
 impl Arq {
     pub fn new(center: Loc, power: u8, count: u32) -> Self {
         Self {
-            center,
+            left_edge: center,
             power,
             count,
         }
@@ -95,7 +95,7 @@ impl Arq {
         let count = 2u32.pow(32 - power as u32);
         assert!(is_full(power, count));
         Self {
-            center,
+            left_edge: center,
             power,
             count,
         }
@@ -110,7 +110,7 @@ impl Arq {
     /// Otherwise, return None.
     pub fn requantize(&self, power: u8) -> Option<Self> {
         requantize(self.power, self.count, power).map(|(power, count)| Self {
-            center: self.center,
+            left_edge: self.left_edge,
             power,
             count,
         })
@@ -153,7 +153,7 @@ impl Arq {
     fn chunk_at(&self, sequence: u32) -> SpaceSegment {
         let s = self.spacing();
         // the offset of the central chunk
-        let center = self.center.as_u32() / s;
+        let center = self.left_edge.as_u32() / s;
         let offset = center.wrapping_add(sequence);
         SpaceSegment::new(self.power.into(), offset)
     }
@@ -175,7 +175,7 @@ impl Arq {
 
     /// Get a reference to the arq's center.
     pub fn center(&self) -> Loc {
-        self.center
+        self.left_edge
     }
 
     /// Get a mutable reference to the arq's count.
@@ -186,7 +186,7 @@ impl Arq {
     pub fn to_dht_arc(&self, topo: &Topology) -> DhtArc {
         let len = self.absolute_length(topo);
         let hl = ((len + 1) / 2) as u32;
-        DhtArc::new(self.center, hl)
+        DhtArc::new(self.left_edge, hl)
     }
 
     pub fn from_dht_arc(topo: &Topology, strat: &ArqStrat, dht_arc: &DhtArc) -> Self {
@@ -199,18 +199,6 @@ impl Arq {
     }
 }
 
-impl From<Arq> for ArqBounds {
-    fn from(a: Arq) -> Self {
-        a.to_bounds()
-    }
-}
-
-impl From<&Arq> for ArqBounds {
-    fn from(a: &Arq) -> Self {
-        a.to_bounds()
-    }
-}
-
 impl From<&ArqBounds> for ArqBounds {
     fn from(a: &ArqBounds) -> Self {
         *a
@@ -218,19 +206,19 @@ impl From<&ArqBounds> for ArqBounds {
 }
 
 impl ArqBounded for Arq {
-    fn to_bounds(&self) -> ArqBounds {
+    fn to_bounds(&self, topo: &Topology) -> ArqBounds {
         let s = self.spacing();
-        let c = self.center.as_u32();
-        let center_offset = c / s;
+        let c = self.left_edge.as_u32();
+        let offset = c / s / topo.space.quantum;
         ArqBounds {
-            offset: center_offset.into(),
+            offset: offset.into(),
             power: self.power,
             count: self.count,
         }
     }
 
     fn to_interval(&self, topo: &Topology) -> ArcInterval {
-        self.to_bounds().to_interval(topo)
+        self.to_bounds(topo).to_interval(topo)
     }
 
     fn absolute_length(&self, topo: &Topology) -> u64 {
@@ -247,7 +235,7 @@ impl ArqBounded for Arq {
 
     fn requantize(&self, power: u8) -> Option<Self> {
         requantize(self.power, self.count, power).map(|(power, count)| Self {
-            center: self.center,
+            left_edge: self.left_edge,
             power,
             count,
         })
@@ -274,7 +262,7 @@ pub struct ArqBounds {
 // impl Eq for ArqBounds {}
 
 impl ArqBounded for ArqBounds {
-    fn to_bounds(&self) -> ArqBounds {
+    fn to_bounds(&self, _topo: &Topology) -> ArqBounds {
         *self
     }
 
@@ -336,7 +324,7 @@ impl ArqBounds {
 
     pub fn to_arq(&self) -> Arq {
         Arq {
-            center: self.pseudocenter(),
+            left_edge: self.pseudocenter(),
             power: self.power,
             count: self.count,
         }
@@ -575,7 +563,7 @@ mod tests {
     #[test]
     fn test_chunk_at() {
         let c = Arq {
-            center: Loc::from(256),
+            left_edge: Loc::from(256),
             power: 4,
             count: 10,
         };
@@ -589,7 +577,7 @@ mod tests {
     #[test]
     fn arq_requantize() {
         let c = Arq {
-            center: Loc::from(42),
+            left_edge: Loc::from(42),
             power: 20,
             count: 10,
         };
@@ -605,7 +593,7 @@ mod tests {
         assert_eq!(rq(&c, 24).map(|c| c.count), None);
 
         let c = Arq {
-            center: Loc::from(42),
+            left_edge: Loc::from(42),
             power: 20,
             count: 256,
         };
@@ -617,16 +605,17 @@ mod tests {
 
     #[test]
     fn to_bounds() {
+        let topo = Topology::unit_zero();
         let pow: u8 = 4;
         {
             let a = Arq::new((2u32.pow(pow.into()) - 1).into(), pow, 16);
-            let b = a.to_bounds();
+            let b = a.to_bounds(&topo);
             assert_eq!(b.offset(), SpaceQuantum::from(0));
             assert_eq!(b.count(), 16);
         }
         {
             let a = Arq::new(4.into(), pow, 18);
-            let b = a.to_bounds();
+            let b = a.to_bounds(&topo);
             assert_eq!(b.count(), 18);
         }
     }
@@ -648,7 +637,7 @@ mod tests {
 
             // build identical arqs at each centerpoint and convert them to ArqBounds
             let arqs: Vec<_> = centers.into_iter().map(|c| Arq::new(c.into(), power, count)).collect();
-            let mut bounds: Vec<_> = arqs.into_iter().map(|a| a.to_bounds()).enumerate().collect();
+            let mut bounds: Vec<_> = arqs.into_iter().map(|a| a.to_bounds(&topo)).enumerate().collect();
 
             // Ensure the list of ArqBounds also grows monotonically.
             // However, there may be one point at which monotonicity is broken,
@@ -705,7 +694,7 @@ mod tests {
             let topo = Topology::standard_epoch();
             let length = count as u64 * 2u64.pow(pow as u32) / 2 * 2;
             let strat = ArqStrat::default();
-            let arq = approximate_arq(&topo, &strat, center.into(), length).to_bounds();
+            let arq = approximate_arq(&topo, &strat, center.into(), length).to_bounds(&topo);
             let interval = arq.to_interval(&topo);
             let arq2 = ArqBounds::from_interval(&topo, arq.power(), interval.clone()).unwrap();
             assert!(ArqBounds::equivalent(&topo, &arq, &arq2));

@@ -214,7 +214,8 @@ impl PeerViewQ {
     /// More detail on these assumptions here:
     /// https://hackmd.io/@hololtd/r1IAIbr5Y/https%3A%2F%2Fhackmd.io%2FK_fkBj6XQO2rCUZRRL9n2g
     pub fn update_arq_with_stats(&self, arq: &mut Arq) -> UpdateArqStats {
-        let (cov, num_peers) = self.extrapolated_coverage_and_filtered_count(&arq.to_bounds());
+        let (cov, num_peers) =
+            self.extrapolated_coverage_and_filtered_count(&arq.to_bounds(&self.topo));
 
         let old_count = arq.count();
         let old_power = arq.power();
@@ -245,7 +246,7 @@ impl PeerViewQ {
             // don't update. This happens when we shrink too much and
             // lose sight of peers.
             let (new_cov, new_num_peers) =
-                self.extrapolated_coverage_and_filtered_count(&tentative.to_bounds());
+                self.extrapolated_coverage_and_filtered_count(&tentative.to_bounds(&self.topo));
             if new_count < old_count
                 && (new_cov < self.strat.min_coverage
                     || (!self.is_slacking(cov, num_peers)
@@ -358,7 +359,7 @@ impl PeerViewQ {
             .filter(|(i, _)| self.skip_index.as_ref() != Some(i))
             .map(|(_, arq)| arq);
 
-        it.filter(move |arq| filter.contains(arq.center))
+        it.filter(move |arq| filter.contains(arq.left_edge))
     }
 }
 
@@ -372,12 +373,9 @@ pub struct UpdateArqStats {
 
 /// The actual coverage provided by these peers. Assumes that this is the
 /// entire view of the DHT, all peers are accounted for here.
-pub fn actual_coverage<'a, A: 'a, P: Iterator<Item = &'a A>>(topo: &Topology, peers: P) -> f64
-where
-    ArqBounds: From<&'a A>,
-{
+pub fn actual_coverage<'a, P: Iterator<Item = &'a Arq>>(topo: &Topology, peers: P) -> f64 {
     peers
-        .map(|a| ArqBounds::from(a).absolute_length(topo) as f64 / 2f64.powf(32.0))
+        .map(|a| a.absolute_length(topo) as f64 / 2f64.powf(32.0))
         .sum()
 }
 
@@ -415,9 +413,9 @@ mod tests {
         let a = make_arq(&topo, pow, 0, 0x20);
         let b = make_arq(&topo, pow, 0x10, 0x30);
         let c = make_arq(&topo, pow, 0x20, 0x40);
-        assert_eq!(a.center, Loc::from(s * 0x0 + s / 2));
-        assert_eq!(b.center, Loc::from(s * 0x10 + s / 2));
-        assert_eq!(c.center, Loc::from(s * 0x20 + s / 2));
+        assert_eq!(a.left_edge, Loc::from(s * 0x0 + s / 2));
+        assert_eq!(b.left_edge, Loc::from(s * 0x10 + s / 2));
+        assert_eq!(c.left_edge, Loc::from(s * 0x20 + s / 2));
         let arqs = vec![a, b, c];
         print_arqs(&topo, &arqs, 64);
         let view = PeerViewQ::new(topo.clone(), Default::default(), arqs);
@@ -445,19 +443,19 @@ mod tests {
         let view = PeerViewQ::new(topo.clone(), Default::default(), arqs);
         assert_eq!(
             view.extrapolated_coverage_and_filtered_count(
-                &make_arq(&topo, pow, 0, 0x10).to_bounds()
+                &make_arq(&topo, pow, 0, 0x10).to_bounds(&topo)
             ),
             (2.0, 1)
         );
         assert_eq!(
             view.extrapolated_coverage_and_filtered_count(
-                &make_arq(&topo, pow, 0, 0x20).to_bounds()
+                &make_arq(&topo, pow, 0, 0x20).to_bounds(&topo)
             ),
             (2.0, 2)
         );
         assert_eq!(
             view.extrapolated_coverage_and_filtered_count(
-                &make_arq(&topo, pow, 0, 0x40).to_bounds()
+                &make_arq(&topo, pow, 0, 0x40).to_bounds(&topo)
             ),
             (2.0, 4)
         );
@@ -466,7 +464,7 @@ mod tests {
         // this will probably change
         assert_eq!(
             view.extrapolated_coverage_and_filtered_count(
-                &make_arq(&topo, pow, 0x10, 0x20).to_bounds()
+                &make_arq(&topo, pow, 0x10, 0x20).to_bounds(&topo)
             ),
             (2.0, 1)
         );

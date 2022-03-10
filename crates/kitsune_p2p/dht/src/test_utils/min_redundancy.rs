@@ -21,8 +21,8 @@ pub fn calc_min_redundancy(topo: &Topology, peers: Vec<Arq>) -> u32 {
         side: Side,
         pos: u32,
     }
-    let left = |arc: &Arq| arc.to_bounds().left(topo);
-    let right = |arc: &Arq| arc.to_bounds().right(topo);
+    let left = |arc: &Arq| arc.to_bounds(&topo).left(topo);
+    let right = |arc: &Arq| arc.to_bounds(&topo).right(topo);
 
     // Turn each arc into a side with a unique id that is
     // shared by both sides.
