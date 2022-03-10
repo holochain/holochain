@@ -128,7 +128,7 @@ pub fn generate_messy_coverage(
 
 #[test]
 fn test_unit_arc() {
-    let topo = Topology::identity_zero();
+    let topo = Topology::unit_zero();
     let strat = ArqStrat {
         min_coverage: 10.0,
         buffer: 0.2,
@@ -182,7 +182,7 @@ mod tests {
 
     #[test]
     fn test_ideal_coverage_case() {
-        let topo = Topology::identity_zero();
+        let topo = Topology::unit_zero();
 
         let strat = ArqStrat {
             // min_coverage: 44.93690369578987,
@@ -212,7 +212,7 @@ mod tests {
         /// range.
         #[test]
         fn test_ideal_coverage(min_coverage in 40f64..100.0, buffer in 0.1f64..0.5, num_peers in 100u32..200) {
-            let topo = Topology::identity_zero();
+            let topo = Topology::unit_zero();
             let strat = ArqStrat {
                 min_coverage,
                 buffer,
@@ -231,7 +231,7 @@ mod tests {
 
         #[test]
         fn chunk_count_is_always_within_bounds(center in 0.0f64..0.999, len in 0.001f64..1.0) {
-            let topo = Topology::identity_zero();
+            let topo = Topology::unit_zero();
             let strat = ArqStrat {
                 min_coverage: 10.0,
                 buffer: 0.144,
@@ -245,7 +245,7 @@ mod tests {
 
         #[test]
         fn power_is_always_within_bounds(center in 0.0f64..0.999, len in 0.001f64..1.0) {
-            let topo = Topology::identity_zero();
+            let topo = Topology::unit_zero();
             let strat = ArqStrat {
                 min_coverage: 10.0,
                 buffer: 0.144,
@@ -258,7 +258,7 @@ mod tests {
 
         #[test]
         fn length_is_always_close(center in 0.0f64..0.999, len in 0.001f64..1.0) {
-            let topo = Topology::identity_zero();
+            let topo = Topology::unit_zero();
             let strat = ArqStrat {
                 min_coverage: 10.0,
                 buffer: 0.144,

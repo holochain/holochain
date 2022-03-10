@@ -94,11 +94,11 @@ impl<D: TreeDataConstraints> RegionSet<D> {
         }
     }
 
-    pub fn query(&self, bounds: &RegionBounds) -> ! {
+    pub fn query(&self, _bounds: &RegionBounds) -> ! {
         unimplemented!("only implement after trying naive database-only approach")
     }
 
-    pub fn update(&self, c: SpacetimeCoords, d: D) -> ! {
+    pub fn update(&self, _c: SpacetimeCoords, _d: D) -> ! {
         unimplemented!("only implement after trying naive database-only approach")
     }
 
@@ -237,6 +237,10 @@ mod tests {
 
     use super::*;
 
+    /// Create a uniform grid of ops:
+    /// - one gridline per arq segment
+    /// - one gridline per time specified in the iterator
+    ///
     /// Only works for arqs that don't span `u32::MAX / 2`
     fn op_grid(
         topo: &Topology,
@@ -254,10 +258,9 @@ mod tests {
             .step_by(xstep)
             .flat_map(|x| {
                 trange.clone().map(move |t| {
-                    // 16 x 100 total ops.
-                    // x interval: [-1024, -1024)
-                    // t interval: [1000, 11000)
-                    OpData::fake(Loc::from(x as u32), Timestamp::from_micros(t), 10)
+                    let x = SpaceQuantum::from(x as u32).to_loc_bounds(topo).0;
+                    let t = TimeQuantum::from(t as u32).to_timestamp_bounds(topo).0;
+                    OpData::fake(x, t, 10)
                 })
             })
             .collect()
@@ -265,7 +268,7 @@ mod tests {
 
     #[test]
     fn test_regions() {
-        let topo = Topology::identity(Timestamp::from_micros(1000));
+        let topo = Topology::unit(Timestamp::from_micros(1000));
         let pow = 8;
         let arq = Arq::new(0u32.into(), pow, 4).to_bounds();
         assert_eq!(arq.left(&topo) as i32, 0);
@@ -298,7 +301,7 @@ mod tests {
 
     #[test]
     fn test_rectify() {
-        let topo = Topology::identity_zero();
+        let topo = Topology::unit_zero();
         let arq = Arq::new(0u32.into(), 8, 4).to_bounds();
         let mut store = OpStore::new(topo.clone(), GossipParams::zero());
         store.integrate_ops(op_grid(&topo, &arq, 10..20).into_iter());
@@ -333,9 +336,9 @@ mod tests {
 
     #[test]
     fn test_diff() {
-        let arq = Arq::new(Loc::from(-(2i32.pow(8) * 2) as u32), 8, 4).to_bounds();
-        dbg!(&arq);
-        let topo = Topology::identity_zero();
+        let topo = Topology::unit_zero();
+        let arq = Arq::new(Loc::from(-512i32 as u32), 8, 4).to_bounds();
+        dbg!(&arq, arq.to_interval(&topo));
 
         let mut store1 = OpStore::new(topo.clone(), GossipParams::zero());
         store1.integrate_ops(op_grid(&topo, &arq, 10..20).into_iter());
@@ -361,6 +364,68 @@ mod tests {
         assert_ne!(rset_a.data, rset_b.data);
 
         let diff = rset_a.clone().diff(rset_b.clone()).unwrap();
+        dbg!(&diff, &extra_ops);
+        assert_eq!(diff.len(), 2);
+
+        assert!(diff[0].coords.contains(&extra_ops[0].coords(&topo)));
+        assert!(diff[1].coords.contains(&extra_ops[1].coords(&topo)));
+
+        // Adding the region data from each extra op to the region data of the
+        // diff which was missing those ops should be the same as the query
+        // of the store which contains the extra ops over the same region
+        // TODO: proptest this
+        assert_eq!(
+            diff[0].data + extra_ops[0].region_data(),
+            store2.query_region_coords(&diff[0].coords)
+        );
+        assert_eq!(
+            diff[1].data + extra_ops[1].region_data(),
+            store2.query_region_coords(&diff[1].coords)
+        );
+    }
+
+    #[test]
+    fn test_diff_standard_topo() {
+        let topo = Topology::standard_zero();
+        let arq = Arq::new(Loc::from(-32i32 as u32), 4, 4).to_bounds();
+        dbg!(&arq, arq.to_interval(&topo));
+
+        let mut store1 = OpStore::new(topo.clone(), GossipParams::zero());
+        store1.integrate_ops(op_grid(&topo, &arq, 10..20).into_iter());
+
+        let extra_ops = [
+            OpData::fake(
+                dbg!(SpaceQuantum::max_value(&topo) - SpaceQuantum::from(300))
+                    .to_loc_bounds(&topo)
+                    .0,
+                TimeQuantum::from(18).to_timestamp_bounds(&topo).0,
+                4,
+            ),
+            OpData::fake(
+                SpaceQuantum::from(12u32).to_loc_bounds(&topo).0,
+                TimeQuantum::from(12).to_timestamp_bounds(&topo).0,
+                4,
+            ),
+        ];
+        // Store 2 has everything store 1 has, plus 2 extra ops
+        let mut store2 = store1.clone();
+        store2.integrate_ops(extra_ops.clone().into_iter());
+
+        let coords_a = RegionCoordSetXtcs::new(
+            TelescopingTimes::new(TimeQuantum::from(20)),
+            ArqBoundsSet::single(arq.clone()),
+        );
+        let coords_b = RegionCoordSetXtcs::new(
+            TelescopingTimes::new(TimeQuantum::from(21)),
+            ArqBoundsSet::single(arq.clone()),
+        );
+
+        let rset_a = RegionSetXtcs::from_store(&store1, coords_a);
+        let rset_b = RegionSetXtcs::from_store(&store2, coords_b);
+        assert_ne!(rset_a.data, rset_b.data);
+
+        let diff = rset_a.clone().diff(rset_b.clone()).unwrap();
+        dbg!(&diff, &extra_ops);
         assert_eq!(diff.len(), 2);
 
         assert!(diff[0].coords.contains(&extra_ops[0].coords(&topo)));

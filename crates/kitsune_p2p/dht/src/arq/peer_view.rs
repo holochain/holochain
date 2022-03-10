@@ -398,8 +398,9 @@ mod tests {
 
     use super::*;
 
-    fn make_arq(pow: u8, lo: u32, hi: u32) -> Arq {
+    fn make_arq(topo: &Topology, pow: u8, lo: u32, hi: u32) -> Arq {
         ArqBounds::from_interval_rounded(
+            topo,
             pow,
             ArcInterval::new(pow2(pow) * lo, (pow2(pow) as u64 * hi as u64) as u32),
         )
@@ -408,12 +409,12 @@ mod tests {
 
     #[test]
     fn test_filtered_arqs() {
-        let topo = Topology::identity_zero();
+        let topo = Topology::unit_zero();
         let pow = 25;
         let s = pow2(pow);
-        let a = make_arq(pow, 0, 0x20);
-        let b = make_arq(pow, 0x10, 0x30);
-        let c = make_arq(pow, 0x20, 0x40);
+        let a = make_arq(&topo, pow, 0, 0x20);
+        let b = make_arq(&topo, pow, 0x10, 0x30);
+        let c = make_arq(&topo, pow, 0x20, 0x40);
         assert_eq!(a.center, Loc::from(s * 0x0 + s / 2));
         assert_eq!(b.center, Loc::from(s * 0x10 + s / 2));
         assert_eq!(c.center, Loc::from(s * 0x20 + s / 2));
@@ -426,39 +427,47 @@ mod tests {
                 .cloned()
                 .collect::<Vec<_>>()
         };
-        assert_eq!(get(make_arq(pow, 0, 0x10)), vec![a]);
-        assert_eq!(get(make_arq(pow, 0, 0x20)), vec![a, b]);
-        assert_eq!(get(make_arq(pow, 0, 0x40)), vec![a, b, c]);
-        assert_eq!(get(make_arq(pow, 0x10, 0x20)), vec![b]);
+        assert_eq!(get(make_arq(&topo, pow, 0, 0x10)), vec![a]);
+        assert_eq!(get(make_arq(&topo, pow, 0, 0x20)), vec![a, b]);
+        assert_eq!(get(make_arq(&topo, pow, 0, 0x40)), vec![a, b, c]);
+        assert_eq!(get(make_arq(&topo, pow, 0x10, 0x20)), vec![b]);
     }
 
     #[test]
     fn test_coverage() {
-        let topo = Topology::identity_zero();
+        let topo = Topology::unit_zero();
         let pow = 24;
         let arqs: Vec<_> = (0..0x100)
             .step_by(0x10)
-            .map(|x| make_arq(pow, x, x + 0x20))
+            .map(|x| make_arq(&topo, pow, x, x + 0x20))
             .collect();
         print_arqs(&topo, &arqs, 64);
-        let view = PeerViewQ::new(topo, Default::default(), arqs);
+        let view = PeerViewQ::new(topo.clone(), Default::default(), arqs);
         assert_eq!(
-            view.extrapolated_coverage_and_filtered_count(&make_arq(pow, 0, 0x10).to_bounds()),
+            view.extrapolated_coverage_and_filtered_count(
+                &make_arq(&topo, pow, 0, 0x10).to_bounds()
+            ),
             (2.0, 1)
         );
         assert_eq!(
-            view.extrapolated_coverage_and_filtered_count(&make_arq(pow, 0, 0x20).to_bounds()),
+            view.extrapolated_coverage_and_filtered_count(
+                &make_arq(&topo, pow, 0, 0x20).to_bounds()
+            ),
             (2.0, 2)
         );
         assert_eq!(
-            view.extrapolated_coverage_and_filtered_count(&make_arq(pow, 0, 0x40).to_bounds()),
+            view.extrapolated_coverage_and_filtered_count(
+                &make_arq(&topo, pow, 0, 0x40).to_bounds()
+            ),
             (2.0, 4)
         );
 
         // TODO: when changing PeerView logic to bake in the filter,
         // this will probably change
         assert_eq!(
-            view.extrapolated_coverage_and_filtered_count(&make_arq(pow, 0x10, 0x20).to_bounds()),
+            view.extrapolated_coverage_and_filtered_count(
+                &make_arq(&topo, pow, 0x10, 0x20).to_bounds()
+            ),
             (2.0, 1)
         );
     }

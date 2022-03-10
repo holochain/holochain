@@ -72,6 +72,16 @@ pub struct Arq {
     count: u32,
 }
 
+// impl PartialEq for Arq {
+//     fn eq(&self, other: &Self) -> bool {
+//         let sl = self.spacing();
+//         let sr = other.spacing();
+//         self.count.wrapping_mul(sl) == other.count.wrapping_mul(sr) && self.center == other.center
+//     }
+// }
+
+// impl Eq for Arq {}
+
 impl Arq {
     pub fn new(center: Loc, power: u8, count: u32) -> Self {
         Self {
@@ -184,7 +194,7 @@ impl Arq {
             topo,
             strat,
             dht_arc.center_loc(),
-            (dht_arc.half_length() as u64 * 2).saturating_sub(1),
+            dht_arc.half_length() as u64 * 2,
         )
     }
 }
@@ -251,6 +261,18 @@ pub struct ArqBounds {
     count: u32,
 }
 
+// impl PartialEq for ArqBounds {
+//     fn eq(&self, other: &Self) -> bool {
+//         let sl = self.spacing();
+//         let sr = other.spacing();
+//         self.count == 0 && other.count == 0
+//             || (self.count.wrapping_mul(sl) == other.count.wrapping_mul(sr)
+//                 && self.offset.inner().wrapping_mul(sl) == other.offset.inner().wrapping_mul(sr))
+//     }
+// }
+
+// impl Eq for ArqBounds {}
+
 impl ArqBounded for ArqBounds {
     fn to_bounds(&self) -> ArqBounds {
         *self
@@ -288,12 +310,20 @@ impl ArqBounded for ArqBounds {
 }
 
 impl ArqBounds {
-    pub fn from_interval_rounded(power: u8, interval: ArcInterval) -> Self {
-        Self::from_interval_inner(power, interval, true).unwrap()
+    pub fn equivalent(topo: &Topology, a: &Self, b: &Self) -> bool {
+        let qa = a.spacing() * topo.space.quantum;
+        let qb = b.spacing() * topo.space.quantum;
+        a.count == 0 && b.count == 0
+            || (a.offset.inner().wrapping_mul(qa) == b.offset.inner().wrapping_mul(qb)
+                && a.count.wrapping_mul(qa) == b.count.wrapping_mul(qb))
     }
 
-    pub fn from_interval(power: u8, interval: ArcInterval) -> Option<Self> {
-        Self::from_interval_inner(power, interval, false)
+    pub fn from_interval_rounded(topo: &Topology, power: u8, interval: ArcInterval) -> Self {
+        Self::from_interval_inner(&topo.space, power, interval, true).unwrap()
+    }
+
+    pub fn from_interval(topo: &Topology, power: u8, interval: ArcInterval) -> Option<Self> {
+        Self::from_interval_inner(&topo.space, power, interval, false)
     }
 
     pub fn from_parts(power: u8, offset: SpaceQuantum, count: u32) -> Self {
@@ -313,27 +343,35 @@ impl ArqBounds {
     }
 
     pub fn empty(power: u8) -> Self {
-        Self::from_interval(power, ArcInterval::Empty).unwrap()
+        Self::from_interval(&Topology::unit_zero(), power, ArcInterval::Empty).unwrap()
     }
 
-    fn from_interval_inner(power: u8, interval: ArcInterval, rounded: bool) -> Option<Self> {
-        assert!(power > 0);
-        let full_count = 2u32.pow(32 - power as u32);
+    fn from_interval_inner(
+        dim: &Dimension,
+        power: u8,
+        interval: ArcInterval,
+        rounded: bool,
+    ) -> Option<Self> {
         match interval {
             ArcInterval::Empty => Some(Self {
                 offset: 0.into(),
                 power,
                 count: 0,
             }),
-            ArcInterval::Full => Some(Self {
-                offset: 0.into(),
-                power,
-                count: full_count,
-            }),
+            ArcInterval::Full => {
+                assert!(power > 0);
+                let full_count = 2u32.pow(32 - power as u32);
+                Some(Self {
+                    offset: 0.into(),
+                    power,
+                    count: full_count,
+                })
+            }
             ArcInterval::Bounded(lo, hi) => {
                 let lo = lo.as_u32();
                 let hi = hi.as_u32();
-                let s = 2u32.pow(power as u32);
+                let q = dim.quantum;
+                let s = 2u32.pow(power as u32) * q;
                 let offset = lo / s;
                 let len = if lo <= hi {
                     hi - lo + 1
@@ -343,7 +381,7 @@ impl ArqBounds {
                 let count = len / s;
                 // TODO: this is kinda wrong. The right bound of the interval
                 // should be 1 less, but we'll accept if it bleeds over by 1 too.
-                if rounded || lo == offset * s && (dbg!(len % s) <= 1) {
+                if rounded || lo == offset * s && (len % s <= 1) {
                     Some(Self {
                         offset: offset.into(),
                         power,
@@ -500,7 +538,7 @@ pub fn approximate_arq(topo: &Topology, strat: &ArqStrat, center: Loc, len: u64)
             count,
             max
         );
-        debug_assert!(count - 1 <= u32::MAX / topo.space.quantum);
+        debug_assert!(count == 0 || count - 1 <= u32::MAX / topo.space.quantum);
         Arq::new(center, power as u8, count)
     }
 }
@@ -527,7 +565,7 @@ mod tests {
 
     #[test]
     fn test_full_intervals() {
-        let topo = Topology::identity_zero();
+        let topo = Topology::unit_zero();
         let full1 = Arq::new_full(0u32.into(), 29);
         let full2 = Arq::new_full(2u32.pow(31).into(), 25);
         assert_eq!(full1.to_interval(&topo), ArcInterval::Full);
@@ -595,14 +633,15 @@ mod tests {
 
     #[test]
     fn from_interval_regression() {
+        let topo = Topology::unit_zero();
         let i = ArcInterval::Bounded(4294967040u32.into(), 511.into());
-        assert!(ArqBounds::from_interval(8, i).is_some());
+        assert!(ArqBounds::from_interval(&topo, 8, i).is_some());
     }
 
     proptest::proptest! {
         #[test]
         fn test_preserve_ordering_for_bounds(mut centers: Vec<u32>, count in 0u32..8, power in 10u8..20) {
-            let topo = Topology::identity_zero();
+            let topo = Topology::standard_epoch();
 
             // given a list of sorted centerpoints
             centers.sort();
@@ -640,14 +679,36 @@ mod tests {
         }
 
         #[test]
-        fn dht_arc_roundtrip(center: u32, pow in 3..29u8, count in 0..8u32) {
-            let topo = Topology::identity_zero();
-            let length = (count as u64 * 2u64.pow(pow as u32) / 2 * 2).saturating_sub(1);
+        fn dht_arc_roundtrip_unit_topo(center: u32, pow in 3..29u8, count in 0..8u32) {
+            let topo = Topology::unit_zero();
+            let length = count as u64 * 2u64.pow(pow as u32) / 2 * 2;
             let strat = ArqStrat::default();
             let arq = approximate_arq(&topo, &strat, center.into(), length);
             let dht_arc = arq.to_dht_arc(&topo);
             let arq2 = Arq::from_dht_arc(&topo, &strat, &dht_arc);
             assert_eq!(arq, arq2);
+        }
+
+        #[test]
+        fn dht_arc_roundtrip_standard_topo(center: u32, pow in 3..29u8, count in 0..8u32) {
+            let topo = Topology::standard_epoch();
+            let length = count as u64 * 2u64.pow(pow as u32) / 2 * 2;
+            let strat = ArqStrat::default();
+            let arq = approximate_arq(&topo, &strat, center.into(), length);
+            let dht_arc = arq.to_dht_arc(&topo);
+            let arq2 = Arq::from_dht_arc(&topo, &strat, &dht_arc);
+            assert_eq!(arq, arq2);
+        }
+
+        #[test]
+        fn arc_interval_roundtrip(center: u32, pow in 3..19u8, count in 0..8u32) {
+            let topo = Topology::standard_epoch();
+            let length = count as u64 * 2u64.pow(pow as u32) / 2 * 2;
+            let strat = ArqStrat::default();
+            let arq = approximate_arq(&topo, &strat, center.into(), length).to_bounds();
+            let interval = arq.to_interval(&topo);
+            let arq2 = ArqBounds::from_interval(&topo, arq.power(), interval.clone()).unwrap();
+            assert!(ArqBounds::equivalent(&topo, &arq, &arq2));
         }
     }
 }

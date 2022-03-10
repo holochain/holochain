@@ -13,3 +13,4 @@ cc 4ff091d2c68ae13cbb50704d7e1b7ce09d5dd8eb0a18a9e330060ead9922908e # shrinks to
 cc 2114cf98e01fc238006b6570d03c3cd3929d5883606c763dc4b149aad6a0b75a # shrinks to center = 0, pow = 3, count = 1
 cc 90bdeafe40d63355ed1b0f165443968553acc1a3bdc2090eae8b4cae7035cd8d # shrinks to center = 0, pow = 4, count = 1
 cc 66cdbfa73902d7a834f8548740171d678f3f190c1da2eabaa445adc55783b61f # shrinks to center = 0, pow = 3, count = 3
+cc 7576fd018881c41bb07d294439b3b806f29bfa1544c00952e79a22e859d41462 # shrinks to center = 0, pow = 11, count = 3

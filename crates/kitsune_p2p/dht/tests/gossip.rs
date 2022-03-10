@@ -18,7 +18,7 @@ use rand::Rng;
 
 #[test]
 fn test_basic() {
-    let topo = Topology::identity_zero();
+    let topo = Topology::unit_zero();
     let gopa = GossipParams::new(1.into(), 0);
     let ts = |t: u32| TimeQuantum::from(t).to_timestamp_bounds(&topo).0;
 

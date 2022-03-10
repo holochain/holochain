@@ -96,7 +96,9 @@ impl<A: ArqBounded> ArqSetImpl<A> {
             arqs: DhtArcSet::intersection(&a1, &a2)
                 .intervals()
                 .into_iter()
-                .map(|interval| ArqBounds::from_interval(power, interval).expect("cannot fail"))
+                .map(|interval| {
+                    ArqBounds::from_interval(topo, power, interval).expect("cannot fail")
+                })
                 .collect(),
             power,
         }
@@ -121,7 +123,7 @@ impl ArqBoundsSet {
                 .map(|i| {
                     let len = i.length();
                     let (pow, _) = power_and_count_from_length(&topo.space, len, max_chunks);
-                    ArqBounds::from_interval_rounded(pow, i)
+                    ArqBounds::from_interval_rounded(topo, pow, i)
                 })
                 .collect(),
         )
@@ -159,7 +161,7 @@ mod tests {
     #[test]
     fn intersect_arqs() {
         observability::test_run().ok();
-        let topo = Topology::identity_zero();
+        let topo = Topology::unit_zero();
         let a = Arq::new(536870912u32.into(), 27, 11);
         let b = Arq::new(805306368u32.into(), 27, 11);
         dbg!(a.to_bounds().offset());

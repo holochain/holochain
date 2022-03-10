@@ -1,3 +1,50 @@
+//! Data types representing the various ways space and time can be quantized.
+//!
+//! Kitsune thinks of space-time coordinates on three different levels:
+//!
+//! ### Absolute coordinates
+//!
+//! At the absolute level, space coordinates are represented by `u32` (via `DhtLocation`),
+//! and time coordinates by `i64` (via `Timestamp`). The timestamp and DHT location
+//! of each op is measured in absolute coordinates, as well as the DHT locations of
+//! agents
+//!
+//! ### Quantized coordinates
+//!
+//! Some data types represent quantized space/time. The `Topology` for a network
+//! determines the quantum size for both the time and space dimensions, meaning
+//! that any absolute coordinate will always be a multiple of this quantum size.
+//! Hence, quantized coordinates are expressed in terms of multiples of the
+//! quantum size.
+//!
+//! `SpaceQuantum` and `TimeQuantum` express quantized coordinates. They refer
+//! to a specific quantum-sized portion of space/time.
+//!
+//! Note that any transformation between Absolute and Quantized coordinates
+//! requires the information contained in the `Topology` of the network.
+//!
+//! ### Segment coordinates (or, Exponential coordinates)
+//!
+//! The spacetime we are interested in has dimensions that are not only quantized,
+//! but are also hierarchically organized into non-overlapping segments.
+//! When expressing segments of space larger than a single quantum, we only ever talk about
+//! groupings of 2, 4, 8, 16, etc. quanta at a time, and these groupings are
+//! always aligned so that no two segments of a given size ever overlap. Moreover,
+//! any two segments of different sizes either overlap completely (one is a strict
+//! superset of the other), or they don't overlap at all (they are disjoint sets).
+//!
+//! Segment coordinates are expressed in terms of:
+//! - a *power* (exponent of 2) which determines the length of the segment *expressed as a Quantized coordinate*
+//! - an *offset*, which is a multiple of the length of this segment to determine
+//!   the "left" edge's distance from the origin *as a Quantized coordinate*
+//!
+//! You must still convert from these Quantized coordinates to get to the actual
+//! Absolute coordinates.
+//!
+//! The pairing of any `SpaceSegment` with any `TimeSegment` forms a `Region`,
+//! a bounded rectangle of spacetime.
+//!
+
 use std::{marker::PhantomData, ops::AddAssign};
 
 use crate::op::{Loc, Timestamp};
@@ -16,6 +63,7 @@ use derivative::Derivative;
     Ord,
     Hash,
     derive_more::Add,
+    derive_more::Sub,
     derive_more::Display,
     derive_more::From,
     serde::Serialize,
@@ -25,7 +73,7 @@ pub struct SpaceQuantum(u32);
 
 impl SpaceQuantum {
     pub fn to_loc_bounds(&self, topo: &Topology) -> (Loc, Loc) {
-        let (a, b): (u32, u32) = bounds(&topo.space, 1, *self, 1);
+        let (a, b): (u32, u32) = bounds(&topo.space, 0, *self, 1);
         (Loc::from(a), Loc::from(b))
     }
 }
@@ -43,6 +91,7 @@ impl SpaceQuantum {
     Ord,
     Hash,
     derive_more::Add,
+    derive_more::Sub,
     derive_more::Display,
     derive_more::From,
     serde::Serialize,
@@ -56,7 +105,7 @@ impl TimeQuantum {
     }
 
     pub fn to_timestamp_bounds(&self, topo: &Topology) -> (Timestamp, Timestamp) {
-        let (a, b): (i64, i64) = bounds(&topo.time, 1, *self, 1);
+        let (a, b): (i64, i64) = bounds64(&topo.time, 0, *self, 1);
         (
             Timestamp::from_micros(a + topo.time_origin.as_micros()),
             Timestamp::from_micros(b + topo.time_origin.as_micros()),
@@ -65,13 +114,17 @@ impl TimeQuantum {
 }
 
 pub trait Quantum: From<u32> + PartialEq + Eq + PartialOrd + Ord + std::fmt::Debug {
-    const MAX: u32 = u32::MAX;
     type Target;
 
     fn inner(&self) -> u32;
 
     fn dimension(topo: &Topology) -> &Dimension;
 
+    fn max_value(topo: &Topology) -> Self {
+        Self::from((2u64.pow(Self::dimension(topo).bit_depth as u32) - 1) as u32)
+    }
+
+    /// Convert to the absolute u32 coordinate space, wrapping if needed
     fn exp_wrapping(&self, topo: &Topology, pow: u8) -> u32 {
         (self.inner() as u64 * Self::dimension(topo).quantum as u64 * 2u64.pow(pow as u32)) as u32
     }
@@ -140,8 +193,9 @@ fn bounds64<Q: Quantum, N: From<i64>>(dim: &Dimension, power: u8, offset: Q, cou
 /// is at (offset * length).
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Segment<Q: Quantum> {
-    // TODO: make `u8`?
+    /// The exponent, where length = 2^power
     pub power: u8,
+    /// The offset from the origin, measured in number of lengths
     pub offset: u32,
     phantom: PhantomData<Q>,
 }
@@ -237,7 +291,7 @@ pub struct Dimension {
 }
 
 impl Dimension {
-    pub fn identity() -> Self {
+    pub fn unit() -> Self {
         Dimension {
             quantum: 1,
             bit_depth: 32,
@@ -247,10 +301,12 @@ impl Dimension {
     pub const fn standard_space() -> Self {
         let quantum_power = 12;
         Dimension {
-            // if a network has 1 million peers, the average spacing between them is ~4,300
-            // so at a target coverage of 100, each arc will be ~430,000 in length
-            // which divided by 16 is ~2700, which is about 2^15.
-            // So, we'll go down to 2^12.
+            // if a network has 1 million peers,
+            // the average spacing between them is ~4,300
+            // so at a target coverage of 100,
+            // each arc will be ~430,000 in length
+            // which divided by 16 (max chunks) is ~2700, which is about 2^15.
+            // So, we'll go down to 2^12 just to be extra safe.
             // This means we only need 20 bits to represent any location.
             quantum: 2u32.pow(quantum_power),
             bit_depth: 20,
@@ -259,7 +315,8 @@ impl Dimension {
 
     pub const fn standard_time() -> Self {
         Dimension {
-            // 5 minutes, in microseconds
+            // 5 minutes in microseconds = 1mil * 60 * 5 = 300,000,000
+            // log2 of this is 28.16, FYI
             quantum: 1_000_000 * 60 * 5,
 
             // 12 quanta = 1 hour.
@@ -282,18 +339,18 @@ pub struct Topology {
 }
 
 impl Topology {
-    pub fn identity(time_origin: Timestamp) -> Self {
+    pub fn unit(time_origin: Timestamp) -> Self {
         Self {
-            space: Dimension::identity(),
-            time: Dimension::identity(),
+            space: Dimension::unit(),
+            time: Dimension::unit(),
             time_origin,
         }
     }
 
-    pub fn identity_zero() -> Self {
+    pub fn unit_zero() -> Self {
         Self {
-            space: Dimension::identity(),
-            time: Dimension::identity(),
+            space: Dimension::unit(),
+            time: Dimension::unit(),
             time_origin: Timestamp::from_micros(0),
         }
     }
@@ -466,6 +523,62 @@ impl GossipParams {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn to_bounds_unit_topo() {
+        let topo = Topology::unit_zero();
+
+        assert_eq!(
+            SpaceQuantum::from(12).to_loc_bounds(&topo),
+            (12.into(), 12.into())
+        );
+        assert_eq!(
+            SpaceQuantum::max_value(&topo).to_loc_bounds(&topo),
+            (u32::MAX.into(), u32::MAX.into())
+        );
+
+        assert_eq!(
+            TimeQuantum::from(12).to_timestamp_bounds(&topo),
+            (Timestamp::from_micros(12), Timestamp::from_micros(12))
+        );
+
+        assert_eq!(
+            TimeQuantum::max_value(&topo).to_timestamp_bounds(&topo),
+            (
+                Timestamp::from_micros(u32::MAX as i64),
+                Timestamp::from_micros(u32::MAX as i64),
+            )
+        );
+    }
+
+    #[test]
+    fn to_bounds_standard_topo() {
+        let origin = Timestamp::ZERO;
+        let topo = Topology::standard(origin.clone());
+        let epoch = origin.as_micros();
+        let xq = topo.space.quantum;
+        let tq = topo.time.quantum as i64;
+
+        assert_eq!(
+            SpaceQuantum::from(12).to_loc_bounds(&topo),
+            ((12 * xq).into(), (13 * xq - 1).into())
+        );
+        assert_eq!(
+            SpaceQuantum::max_value(&topo).to_loc_bounds(&topo),
+            ((u32::MAX - xq + 1).into(), u32::MAX.into())
+        );
+
+        assert_eq!(
+            TimeQuantum::from(12).to_timestamp_bounds(&topo),
+            (
+                Timestamp::from_micros(epoch + 12 * tq),
+                Timestamp::from_micros(epoch + 13 * tq - 1)
+            )
+        );
+
+        // just ensure this doesn't panic
+        let _ = TimeQuantum::max_value(&topo).to_timestamp_bounds(&topo);
+    }
 
     #[test]
     fn test_contains() {

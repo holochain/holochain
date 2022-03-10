@@ -1,25 +1,28 @@
 use crate::{
     op::{OpData, OpRegion},
     persistence::AccessOpStore,
+    prelude::{RegionSet, RegionSetXtcs},
     quantum::{GossipParams, Topology},
     region::{RegionBounds, RegionData},
-    tree::{Tree, TreeDataConstraints},
+    tree::TreeDataConstraints,
 };
 use futures::future::FutureExt;
 use std::{collections::BTreeSet, ops::Bound, sync::Arc};
 
 #[derive(Clone)]
 pub struct OpStore<D: TreeDataConstraints = RegionData, O: OpRegion<D> = OpData> {
+    pub(crate) topo: Topology,
     pub(crate) ops: BTreeSet<Arc<O>>,
-    pub(crate) tree: Tree<D>,
+    pub(crate) _region_set: RegionSet<D>,
     pub(crate) gossip_params: GossipParams,
 }
 
 impl<D: TreeDataConstraints, O: OpRegion<D>> OpStore<D, O> {
     pub fn new(topo: Topology, gossip_params: GossipParams) -> Self {
         Self {
+            topo,
             ops: Default::default(),
-            tree: Tree::new(topo, todo!()),
+            _region_set: RegionSetXtcs::empty().into(),
             gossip_params,
         }
     }
@@ -39,7 +42,10 @@ impl<D: TreeDataConstraints, O: OpRegion<D>> AccessOpStore<D, O> for OpStore<D, 
     }
 
     fn query_region(&self, region: &RegionBounds) -> D {
-        self.tree.lookup(region)
+        self.query_op_data(region)
+            .into_iter()
+            .map(|o| o.region_data())
+            .fold(D::zero(), |d, o| d + o)
     }
 
     fn fetch_region_set(
@@ -52,14 +58,14 @@ impl<D: TreeDataConstraints, O: OpRegion<D>> AccessOpStore<D, O> for OpStore<D, 
     }
 
     fn integrate_ops<Ops: Clone + Iterator<Item = Arc<O>>>(&mut self, ops: Ops) {
-        for op in ops.clone() {
-            self.tree.add(op.region_tuple(self.tree.topo()));
-        }
+        // for op in ops.clone() {
+        //     self.region_set.add(op.region_tuple(self.region_set.topo()));
+        // }
         self.ops.extend(ops);
     }
 
     fn topo(&self) -> &Topology {
-        self.tree.topo()
+        &self.topo
     }
 
     fn gossip_params(&self) -> GossipParams {

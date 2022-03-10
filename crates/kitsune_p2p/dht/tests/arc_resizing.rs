@@ -21,7 +21,7 @@ fn resize_to_equilibrium(view: &PeerViewQ, arq: &mut Arq) {
 /// when shrinking towards empty, let the arq be resized as small as possible
 /// before losing peers.
 fn test_shrink_towards_empty() {
-    let topo = Topology::identity_zero();
+    let topo = Topology::unit_zero();
     let mut rng = seeded_rng(None);
 
     // aim for coverage between 10 and 12
@@ -55,7 +55,7 @@ fn test_shrink_towards_empty() {
 /// when growing to full, let the arq be resized as large as it can be under
 /// the constraints of the ArqStrat.
 fn test_grow_towards_full() {
-    let topo = Topology::identity_zero();
+    let topo = Topology::unit_zero();
     let mut rng = seeded_rng(None);
 
     // aim for coverage between 10 and 12, with no limit on power diff
@@ -92,7 +92,7 @@ fn test_grow_towards_full() {
 /// when growing to full, let the arq be resized to full when the max_power_diff
 /// is not a constraint
 fn test_grow_to_full() {
-    let topo = Topology::identity_zero();
+    let topo = Topology::unit_zero();
     let mut rng = seeded_rng(None);
 
     // aim for coverage between 10 and 12, with no limit on power diff
@@ -129,7 +129,7 @@ fn test_grow_to_full() {
 /// If the current coverage is far from the target, growing can occur in
 /// multiple chunks
 fn test_grow_by_multiple_chunks() {
-    let topo = Topology::identity_zero();
+    let topo = Topology::unit_zero();
     let mut rng = seeded_rng(None);
 
     // aim for coverage between 10 and 12
@@ -159,8 +159,8 @@ fn test_grow_by_multiple_chunks() {
 /// (not a very good test, probably)
 fn test_degenerate_asymmetrical_coverage() {
     observability::test_run().ok();
-    let topo = Topology::identity_zero();
-    let other = ArqBounds::from_interval(4, ArcInterval::new(0x0u32, 0x80))
+    let topo = Topology::unit_zero();
+    let other = ArqBounds::from_interval(&topo, 4, ArcInterval::new(0x0u32, 0x80))
         .unwrap()
         .to_arq();
     let others = vec![other; 10];
@@ -192,7 +192,7 @@ fn test_degenerate_asymmetrical_coverage() {
 /// it should work.
 fn test_scenario() {
     let mut rng = seeded_rng(None);
-    let topo = Topology::identity_zero();
+    let topo = Topology::unit_zero();
 
     // aim for coverage between 10 and 12.
     let strat = ArqStrat {

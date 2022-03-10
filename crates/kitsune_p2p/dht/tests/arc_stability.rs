@@ -91,7 +91,7 @@ proptest::proptest! {
         std::env::set_var("RUST_LOG", "debug");
         observability::test_run().ok();
 
-        let topo = Topology::identity_zero();
+        let topo = Topology::unit_zero();
         let detail = false;
 
         let mut rng = seeded_rng(None);
