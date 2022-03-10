@@ -197,6 +197,13 @@ impl Arq {
             dht_arc.half_length() as u64 * 2,
         )
     }
+
+    /// The two arqs represent the same interval despite having potentially different terms
+    pub fn equivalent(topo: &Topology, a: &Self, b: &Self) -> bool {
+        let qa = a.spacing() * topo.space.quantum;
+        let qb = b.spacing() * topo.space.quantum;
+        a.left_edge == b.left_edge && (a.count.wrapping_mul(qa) == b.count.wrapping_mul(qb))
+    }
 }
 
 impl From<&ArqBounds> for ArqBounds {
@@ -298,6 +305,7 @@ impl ArqBounded for ArqBounds {
 }
 
 impl ArqBounds {
+    /// The two arqs represent the same interval despite having potentially different terms
     pub fn equivalent(topo: &Topology, a: &Self, b: &Self) -> bool {
         let qa = a.spacing() * topo.space.quantum;
         let qb = b.spacing() * topo.space.quantum;
@@ -691,7 +699,7 @@ mod tests {
             let arq = approximate_arq(&topo, &strat, center.into(), length);
             let dht_arc = arq.to_dht_arc(&topo);
             let arq2 = Arq::from_dht_arc(&topo, &strat, &dht_arc);
-            assert_eq!(arq, arq2);
+            assert!(Arq::equivalent(&topo, &arq, &arq2));
         }
 
         #[test]
