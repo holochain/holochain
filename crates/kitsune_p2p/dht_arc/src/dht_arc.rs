@@ -1,185 +1,9 @@
 //! A type for indicating ranges on the dht arc
 
-use derive_more::From;
-use derive_more::Into;
-use num_traits::AsPrimitive;
-use std::num::Wrapping;
 use std::ops::Bound;
 use std::ops::RangeBounds;
 
 use crate::*;
-
-/// Type for representing a location that can wrap around
-/// a u32 dht arc
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    serde::Serialize,
-    serde::Deserialize,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Hash,
-    From,
-    Into,
-    derive_more::AsRef,
-    derive_more::Deref,
-    derive_more::Display,
-)]
-pub struct DhtLocation(pub Wrapping<u32>);
-
-impl DhtLocation {
-    pub fn new(loc: u32) -> Self {
-        Self(Wrapping(loc))
-    }
-
-    pub fn as_u32(&self) -> u32 {
-        self.0 .0
-    }
-
-    pub fn as_i64(&self) -> i64 {
-        self.0 .0 as i64
-    }
-
-    #[cfg(any(test, feature = "test_utils"))]
-    pub fn as_i32(&self) -> i32 {
-        self.0 .0 as i32
-    }
-}
-
-// This From impl exists to make it easier to construct DhtLocations near the
-// maximum value in tests
-#[cfg(any(test, feature = "test_utils"))]
-impl From<i32> for DhtLocation {
-    fn from(i: i32) -> Self {
-        (i as u32).into()
-    }
-}
-
-#[cfg(feature = "sqlite")]
-impl rusqlite::ToSql for DhtLocation {
-    fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput> {
-        Ok(rusqlite::types::ToSqlOutput::Owned(self.0 .0.into()))
-    }
-}
-
-/// The maximum you can hold either side of the hash location
-/// is half the circle.
-/// This is half of the furthest index you can hold
-/// 1 is added for rounding
-/// 1 more is added to represent the middle point of an odd length array
-pub const MAX_HALF_LENGTH: u32 = (u32::MAX / 2) + 1 + 1;
-
-/// Maximum number of values that a u32 can represent.
-pub(crate) const U32_LEN: u64 = u32::MAX as u64 + 1;
-
-impl From<u32> for DhtLocation {
-    fn from(a: u32) -> Self {
-        Self(Wrapping(a))
-    }
-}
-
-impl AsPrimitive<u32> for DhtLocation {
-    fn as_(self) -> u32 {
-        self.as_u32()
-    }
-}
-
-impl num_traits::Num for DhtLocation {
-    type FromStrRadixErr = <u32 as num_traits::Num>::FromStrRadixErr;
-
-    fn from_str_radix(str: &str, radix: u32) -> Result<Self, Self::FromStrRadixErr> {
-        u32::from_str_radix(str, radix).map(Self::new)
-    }
-}
-
-impl std::ops::Add for DhtLocation {
-    type Output = Self;
-
-    fn add(self, rhs: Self) -> Self::Output {
-        Self(self.0 + rhs.0)
-    }
-}
-
-impl std::ops::Sub for DhtLocation {
-    type Output = Self;
-
-    fn sub(self, rhs: Self) -> Self::Output {
-        Self(self.0 - rhs.0)
-    }
-}
-
-impl std::ops::Mul for DhtLocation {
-    type Output = Self;
-
-    fn mul(self, rhs: Self) -> Self::Output {
-        Self(self.0 * rhs.0)
-    }
-}
-
-impl std::ops::Div for DhtLocation {
-    type Output = Self;
-
-    fn div(self, rhs: Self) -> Self::Output {
-        Self(self.0 / rhs.0)
-    }
-}
-
-impl std::ops::Rem for DhtLocation {
-    type Output = Self;
-
-    fn rem(self, rhs: Self) -> Self::Output {
-        Self(self.0 % rhs.0)
-    }
-}
-
-impl num_traits::Zero for DhtLocation {
-    fn zero() -> Self {
-        Self::new(0)
-    }
-
-    fn is_zero(&self) -> bool {
-        self.0 .0 == 0
-    }
-}
-
-impl num_traits::One for DhtLocation {
-    fn one() -> Self {
-        Self::new(1)
-    }
-}
-
-impl interval::ops::Width for DhtLocation {
-    type Output = u32;
-
-    fn max_value() -> Self {
-        u32::max_value().into()
-    }
-
-    fn min_value() -> Self {
-        u32::min_value().into()
-    }
-
-    fn width(lower: &Self, upper: &Self) -> Self::Output {
-        u32::width(&lower.0 .0, &upper.0 .0)
-    }
-}
-
-impl From<DhtLocation> for u32 {
-    fn from(l: DhtLocation) -> Self {
-        (l.0).0
-    }
-}
-
-/// Finds the distance from `b` to `a` in a circular space
-pub(crate) fn wrapped_distance<A: Into<DhtLocation>, B: Into<DhtLocation>>(a: A, b: B) -> u32 {
-    // Turn into wrapped u32s
-    let a = a.into().0;
-    let b = b.into().0;
-    (b - a).0
-}
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 /// This represents the range of values covered by an arc
@@ -240,34 +64,347 @@ impl RangeBounds<u32> for ArcRange {
     }
 }
 
-/// Scale a number in a smaller space (specified by `len`) up into the `u32` space.
-/// The number to scale can be negative, which is wrapped to a positive value via modulo
-#[cfg(any(test, feature = "test_utils"))]
-pub(crate) fn loc_upscale(len: usize, v: i32) -> u32 {
-    let max = 2f64.powi(32);
-    let lenf = len as f64;
-    let vf = v as f64;
-    (max / lenf * vf) as i64 as u32
+/// An alternate implementation of `ArcRange`
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub enum ArcInterval<T = DhtLocation> {
+    Empty(T),
+    Full(T),
+    Bounded(T, T),
 }
 
-/// Scale a u32 DhtLocation down into a smaller space (specified by `len`)
-#[cfg(any(test, feature = "test_utils"))]
-pub(crate) fn loc_downscale(len: usize, d: DhtLocation) -> usize {
-    let max = 2f64.powi(32);
-    let lenf = len as f64;
-    ((lenf / max * (d.as_u32() as f64)) as usize) % len
+impl<T: PartialOrd + num_traits::Num> ArcInterval<T> {
+    pub fn contains<B: std::borrow::Borrow<T>>(&self, t: B) -> bool {
+        match self {
+            Self::Empty(_) => false,
+            Self::Full(_) => true,
+            Self::Bounded(lo, hi) => {
+                let t = t.borrow();
+                if lo <= hi {
+                    lo <= t && t <= hi
+                } else {
+                    lo <= t || t <= hi
+                }
+            }
+        }
+    }
 }
 
-#[test]
-fn test_loc_upscale() {
-    let m = 2f64.powi(32);
-    assert_eq!(loc_upscale(8, 0), DhtLocation::from(0).as_u32());
-    assert_eq!(
-        loc_upscale(8, 1),
-        DhtLocation::from((m / 8.0) as u32).as_u32()
-    );
-    assert_eq!(
-        loc_upscale(3, 1),
-        DhtLocation::from((m / 3.0) as u32).as_u32()
-    );
+impl<T> ArcInterval<T> {
+    pub fn map<U, F: Fn(T) -> U>(self, f: F) -> ArcInterval<U> {
+        match self {
+            Self::Empty(s) => ArcInterval::Empty(f(s)),
+            Self::Full(s) => ArcInterval::Full(f(s)),
+            Self::Bounded(lo, hi) => ArcInterval::Bounded(f(lo), f(hi)),
+        }
+    }
+
+    #[deprecated = "left over from refactor"]
+    pub fn interval(self) -> Self {
+        self
+    }
+}
+
+impl<T: num_traits::AsPrimitive<u32>> ArcInterval<T> {
+    pub fn from_bounds(start: T, end: T) -> ArcInterval<DhtLocation> {
+        let start = start.as_();
+        let end = end.as_();
+        if is_full(start, end) {
+            ArcInterval::Full(start.into())
+        } else {
+            ArcInterval::Bounded(DhtLocation::new(start), DhtLocation::new(end))
+        }
+    }
+
+    pub fn from_start_and_len(start: T, len: u64) -> ArcInterval<DhtLocation> {
+        let start = start.as_();
+        if len == 0 {
+            ArcInterval::Empty(start.into())
+        } else {
+            let end = start.wrapping_add((len - 1) as u32);
+            ArcInterval::from_bounds(start, end)
+        }
+    }
+
+    /// Convenience for our legacy code which defined arcs in terms of half-lengths
+    /// rather than full lengths
+    pub fn from_start_and_halflen(start: T, halflen: u32) -> ArcInterval<DhtLocation> {
+        Self::from_start_and_len(start, (halflen as u64) * 2 - 1)
+    }
+
+    pub fn new_generic(start: T, end: T) -> Self {
+        if is_full(start.as_(), end.as_()) {
+            Self::Full(start)
+        } else {
+            Self::Bounded(start, end)
+        }
+    }
+}
+
+impl ArcInterval<u32> {
+    pub fn canonical(self) -> ArcInterval {
+        match self {
+            ArcInterval::Empty(s) => ArcInterval::Empty(DhtLocation::new(s)),
+            ArcInterval::Full(s) => ArcInterval::Full(DhtLocation::new(s)),
+            ArcInterval::Bounded(lo, hi) => {
+                ArcInterval::from_bounds(DhtLocation::new(lo), DhtLocation::new(hi))
+            }
+        }
+    }
+}
+
+impl ArcInterval<DhtLocation> {
+    /// Constructor
+    pub fn new_empty(s: DhtLocation) -> Self {
+        Self::Empty(s)
+    }
+
+    /// Represent an arc as an optional range of inclusive endpoints.
+    /// If none, the arc length is 0
+    pub fn to_bounds_grouped(&self) -> Option<(DhtLocation, DhtLocation)> {
+        match self {
+            Self::Empty(_) => None,
+            Self::Full(s) => Some((*s, s.as_u32().wrapping_sub(1).into())),
+            &Self::Bounded(lo, hi) => Some((lo, hi)),
+        }
+    }
+
+    /// Same as to_bounds_grouped, but with the return type "inside-out"
+    pub fn to_primitive_bounds_detached(&self) -> (Option<u32>, Option<u32>) {
+        self.to_bounds_grouped()
+            .map(|(a, b)| (Some(a.as_u32()), Some(b.as_u32())))
+            .unwrap_or_default()
+    }
+
+    /// Check if this arc is empty.
+    pub fn is_empty(&self) -> bool {
+        matches!(self, Self::Empty(_))
+    }
+
+    /// Check if arcs overlap
+    pub fn overlaps(&self, other: &Self) -> bool {
+        let a = DhtArcSet::from(self);
+        let b = DhtArcSet::from(other);
+        a.overlap(&b)
+    }
+
+    /// Amount of intersection between two arcs
+    pub fn overlap_coverage(&self, other: &Self) -> f64 {
+        let a = DhtArcSet::from(self);
+        let b = DhtArcSet::from(other);
+        let c = a.intersection(&b);
+        c.size() as f64 / a.size() as f64
+    }
+
+    pub fn start_loc(&self) -> DhtLocation {
+        match self {
+            ArcInterval::Empty(s) => *s,
+            ArcInterval::Full(s) => *s,
+            ArcInterval::Bounded(s, _) => *s,
+        }
+    }
+
+    /// Get the range of the arc
+    pub fn range(&self) -> ArcRange {
+        match self {
+            ArcInterval::Empty(s) => ArcRange {
+                start: Bound::Excluded(s.as_u32()),
+                end: Bound::Excluded(s.as_u32()),
+            },
+            ArcInterval::Full(s) => ArcRange {
+                start: Bound::Included(s.as_u32()),
+                end: Bound::Included(s.as_u32().wrapping_sub(1)),
+            },
+            ArcInterval::Bounded(lo, hi) => ArcRange {
+                start: Bound::Included(lo.as_u32()),
+                end: Bound::Included(hi.as_u32()),
+            },
+        }
+    }
+
+    /// The percentage of the full circle that is covered
+    /// by this arc.
+    pub fn coverage(&self) -> f64 {
+        self.length() as f64 / 2f64.powf(32.0)
+    }
+
+    pub fn length(&self) -> u64 {
+        match self {
+            ArcInterval::Empty(_) => 0,
+            ArcInterval::Full(_) => 2u64.pow(32),
+            ArcInterval::Bounded(lo, hi) => hi.as_u32().wrapping_sub(lo.as_u32()).into(),
+        }
+    }
+
+    // #[deprecated = "leftover from refactor"]
+    pub fn half_length(&self) -> u32 {
+        (self.length() / 2) as u32 + 1
+    }
+
+    /// Update the half length based on a PeerView reading.
+    /// This will converge on a new target instead of jumping directly
+    /// to the new target and is designed to be called at a given rate
+    /// with more recent peer views.
+    pub fn update_length<V: Into<PeerView>>(&mut self, view: V) {
+        let new_length = (U32_LEN as f64 * view.into().next_coverage(self.coverage())) as u64;
+        *self = Self::from_start_and_len(self.start_loc(), new_length)
+    }
+
+    #[cfg(any(test, feature = "test_utils"))]
+    /// Handy ascii representation of an arc, especially useful when
+    /// looking at several arcs at once to get a sense of their overlap
+    pub fn to_ascii(&self, len: usize) -> String {
+        let empty = || " ".repeat(len);
+        let full = || "-".repeat(len);
+
+        // If lo and hi are less than one bucket's width apart when scaled down,
+        // decide whether to interpret this as empty or full
+        let decide = |lo: &DhtLocation, hi: &DhtLocation| {
+            let mid = loc_upscale(len, (len / 2) as i32);
+            if lo < hi {
+                if hi.as_u32() - lo.as_u32() < mid {
+                    empty()
+                } else {
+                    full()
+                }
+            } else if lo.as_u32() - hi.as_u32() < mid {
+                full()
+            } else {
+                empty()
+            }
+        };
+
+        match self {
+            Self::Full(_) => full(),
+            Self::Empty(_) => empty(),
+            Self::Bounded(lo0, hi0) => {
+                let lo = loc_downscale(len, *lo0);
+                let hi = loc_downscale(len, *hi0);
+                let mut s = if lo0 <= hi0 {
+                    if lo >= hi {
+                        vec![decide(lo0, hi0)]
+                    } else {
+                        vec![
+                            " ".repeat(lo),
+                            "-".repeat(hi - lo + 1),
+                            " ".repeat((len - hi).saturating_sub(1)),
+                        ]
+                    }
+                } else if lo <= hi {
+                    vec![decide(lo0, hi0)]
+                } else {
+                    vec![
+                        "-".repeat(hi + 1),
+                        " ".repeat((lo - hi).saturating_sub(1)),
+                        "-".repeat(len - lo),
+                    ]
+                }
+                .join("");
+                let start = loc_downscale(len, self.start_loc());
+                s.replace_range(start..start + 1, "@");
+                s
+            }
+        }
+    }
+
+    #[cfg(any(test, feature = "test_utils"))]
+    /// Ascii representation of an arc, with a histogram of op locations superimposed.
+    /// Each character of the string, if an op falls in that "bucket", will be represented
+    /// by a hexadecimal digit representing the number of ops in that bucket,
+    /// with a max of 0xF (15)
+    pub fn to_ascii_with_ops<L: Into<crate::loc8::Loc8>, I: IntoIterator<Item = L>>(
+        &self,
+        len: usize,
+        ops: I,
+    ) -> String {
+        use crate::loc8::Loc8;
+
+        let mut buf = vec![0; len];
+        let mut s = self.to_ascii(len);
+        for o in ops {
+            let o: Loc8 = o.into();
+            let o: DhtLocation = o.into();
+            let loc = loc_downscale(len, o);
+            buf[loc] += 1;
+        }
+        for (i, v) in buf.into_iter().enumerate() {
+            if v > 0 {
+                // add hex representation of number of ops in this bucket
+                let c = format!("{:x}", v.min(0xf));
+                s.replace_range(i..i + 1, &c);
+            }
+        }
+        s
+    }
+
+    pub fn canonical(self) -> ArcInterval {
+        self
+    }
+}
+
+/// Check whether a bounded interval is equivalent to the Full interval
+pub fn is_full(start: u32, end: u32) -> bool {
+    (start == super::dht_arc_set::MIN && end >= super::dht_arc_set::MAX)
+        || end == start.wrapping_sub(1)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn arc_contains() {
+        let convergent = ArcInterval::Bounded(10, 20);
+        let divergent = ArcInterval::Bounded(20, 10);
+
+        assert!(!convergent.contains(0));
+        assert!(!convergent.contains(5));
+        assert!(convergent.contains(10));
+        assert!(convergent.contains(15));
+        assert!(convergent.contains(20));
+        assert!(!convergent.contains(25));
+        assert!(!convergent.contains(u32::MAX));
+
+        assert!(divergent.contains(0));
+        assert!(divergent.contains(5));
+        assert!(divergent.contains(10));
+        assert!(!divergent.contains(15));
+        assert!(divergent.contains(20));
+        assert!(divergent.contains(25));
+        assert!(divergent.contains(u32::MAX));
+    }
+
+    #[test]
+    fn test_ascii() {
+        let cent = u32::MAX / 100 + 1;
+        assert_eq!(
+            ArcInterval::from_bounds(cent * 30, cent * 60).to_ascii(10),
+            "   -@--   ".to_string()
+        );
+        assert_eq!(
+            ArcInterval::from_bounds(cent * 33, cent * 63).to_ascii(10),
+            "   -@--   ".to_string()
+        );
+        assert_eq!(
+            ArcInterval::from_bounds(cent * 29, cent * 59).to_ascii(10),
+            "  --@-    ".to_string()
+        );
+
+        assert_eq!(
+            ArcInterval::from_bounds(cent * 60, cent * 30).to_ascii(10),
+            "----  ---@".to_string()
+        );
+        assert_eq!(
+            ArcInterval::from_bounds(cent * 63, cent * 33).to_ascii(10),
+            "----  ---@".to_string()
+        );
+        assert_eq!(
+            ArcInterval::from_bounds(cent * 59, cent * 29).to_ascii(10),
+            "---  ----@".to_string()
+        );
+
+        assert_eq!(
+            ArcInterval::from_bounds(cent * 99, cent * 0).to_ascii(10),
+            "-        @".to_string()
+        );
+    }
 }

@@ -13,6 +13,9 @@ pub use dht_arc_redundancy::*;
 mod dht_arc_set;
 pub use dht_arc_set::*;
 
+mod dht_location;
+pub use dht_location::*;
+
 mod peer_view;
 pub use peer_view::*;
 
