@@ -18,7 +18,7 @@ impl DhtArcBucket {
     pub fn new<I: IntoIterator<Item = DhtArc>>(filter: DhtArc, arcs: I) -> Self {
         let arcs = arcs
             .into_iter()
-            .filter(|a| filter.contains(a.center_loc))
+            .filter(|a| filter.contains(a.start_loc))
             .collect();
         Self { filter, arcs }
     }

@@ -413,7 +413,7 @@ pub use paste;
 /// Agent activity for any other agent on the network can be fetched.
 /// The agent activity is _only the headers_ of the remote agent's source chain.
 /// Agent activity allows efficient building of the history of an agent.
-/// Agent activity is retrieved from a dedicated neighbourhood centered around the agent.
+/// Agent activity is retrieved from a dedicated neighbourhood near the agent.
 /// The agent's neighbourhood also maintains a passive security net that guards against attempted chain forks and/or rollbacks.
 /// The same query DSL for local chain queries is used to filter remote agent activity headers.
 pub mod chain;

@@ -837,7 +837,7 @@ async fn mock_network_sharding() {
                                     if arc.contains(basis_loc) {
                                         0
                                     } else {
-                                        (arc.center_loc().as_u32() as i64 - basis_loc_i).abs()
+                                        (arc.start_loc().as_u32() as i64 - basis_loc_i).abs()
                                     },
                                     a,
                                 )

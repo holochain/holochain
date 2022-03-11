@@ -30,7 +30,7 @@ impl PeerStratAlpha {
     pub fn view(&self, arc: DhtArc, peers: &[DhtArc]) -> PeerViewAlpha {
         let peers: Vec<DhtArc> = peers
             .iter()
-            .filter(|a| arc.contains(a.center_loc))
+            .filter(|a| arc.contains(a.start_loc))
             .copied()
             .collect();
         Self::view_unchecked(self, arc, peers.as_slice())

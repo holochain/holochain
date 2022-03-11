@@ -80,24 +80,24 @@ pub(crate) const U32_LEN: u64 = u32::MAX as u64 + 1;
 
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
 /// Represents how much of a dht arc is held
-/// center_loc is where the hash is.
-/// The center_loc is the center of the arc
-/// The half length is the length of items held
-/// from the center in both directions
+/// start_loc is where the hash is.
+/// The start_loc is the left edge of the arc.
+/// The length is how far the arc extends to the right.
+/// The half-length is half the length.
 /// half_length 0 means nothing is held
-/// half_length 1 means just the center_loc is held
-/// half_length n where n > 1 will hold those positions out
-/// half_length u32::MAX / 2 + 1 covers all positions
-/// on either side of center_loc.
-/// Imagine an bidirectional array:
+/// half_length 1 means just the start_loc is held
+/// half_length n where n > 1 will hold those locations out to 2n - 1
+/// half_length u32::MAX / 2 + 1 covers all locations in the DHT.
+///
+/// Imagine an array:
 /// ```text
-/// [4][3][2][1][0][1][2][3][4]
-// half length of 3 will give you
-///       [2][1][0][1][2]
+///     [0][1][2][3][4][5][6][7]
+/// a half length of 3 will give you
+///     [0][1][2][3][4]
 /// ```
 pub struct DhtArc {
-    /// The center location of this dht arc
-    pub(crate) center_loc: DhtLocation,
+    /// The start location of this dht arc
+    pub(crate) start_loc: DhtLocation,
 
     /// The "half-length" of this dht arc
     pub(crate) half_length: u32,
@@ -105,29 +105,29 @@ pub struct DhtArc {
 
 impl DhtArc {
     /// Create an Arc from a hash location plus a length on either side
-    /// half length is (0..(u32::Max / 2 + 1))
-    pub fn new<I: Into<DhtLocation>>(center_loc: I, half_length: u32) -> Self {
+    /// half length is (0..(u32::MAX / 2 + 1))
+    pub fn new<I: Into<DhtLocation>>(start_loc: I, half_length: u32) -> Self {
         let half_length = std::cmp::min(half_length, MAX_HALF_LENGTH);
         Self {
-            center_loc: center_loc.into(),
+            start_loc: start_loc.into(),
             half_length,
         }
     }
 
-    /// Create a full arc from a center location
-    pub fn full<I: Into<DhtLocation>>(center_loc: I) -> Self {
-        Self::new(center_loc, MAX_HALF_LENGTH)
+    /// Create a full arc from a start location
+    pub fn full<I: Into<DhtLocation>>(start_loc: I) -> Self {
+        Self::new(start_loc, MAX_HALF_LENGTH)
     }
 
-    /// Create an empty arc from a center location
-    pub fn empty<I: Into<DhtLocation>>(center_loc: I) -> Self {
-        Self::new(center_loc, 0)
+    /// Create an empty arc from a start location
+    pub fn empty<I: Into<DhtLocation>>(start_loc: I) -> Self {
+        Self::new(start_loc, 0)
     }
 
     /// Create an arc with a coverage.
-    pub fn with_coverage<I: Into<DhtLocation>>(center_loc: I, coverage: f64) -> Self {
+    pub fn with_coverage<I: Into<DhtLocation>>(start_loc: I, coverage: f64) -> Self {
         let coverage = coverage.clamp(0.0, 1.0);
-        Self::new(center_loc, (MAX_HALF_LENGTH as f64 * coverage) as u32)
+        Self::new(start_loc, (MAX_HALF_LENGTH as f64 * coverage) as u32)
     }
 
     /// Update the half length based on a PeerView reading.
@@ -143,9 +143,9 @@ impl DhtArc {
     pub fn contains<I: Into<DhtLocation>>(&self, other_location: I) -> bool {
         let other_location = other_location.into();
         let do_hold_something = self.half_length != 0;
-        let only_hold_self = self.half_length == 1 && self.center_loc == other_location;
+        let only_hold_self = self.half_length == 1 && self.start_loc == other_location;
         // Add one to convert to "array length" from math distance
-        let dist_as_array_len = shortest_arc_distance(self.center_loc, other_location.0) + 1;
+        let dist_as_array_len = wrapped_distance(self.start_loc, other_location.0) + 1;
         // Check for any other dist and the special case of the maximum array len
         let within_range = self.half_length > 1 && dist_as_array_len <= self.half_length;
         // Have to hold something and hold ourself or something within range
@@ -165,33 +165,29 @@ impl DhtArc {
     pub fn range(&self) -> ArcRange {
         if self.half_length == 0 {
             ArcRange {
-                start: Bound::Excluded(self.center_loc.into()),
-                end: Bound::Excluded(self.center_loc.into()),
+                start: Bound::Excluded(self.start_loc.into()),
+                end: Bound::Excluded(self.start_loc.into()),
             }
         } else if self.half_length == 1 {
             ArcRange {
-                start: Bound::Included(self.center_loc.into()),
-                end: Bound::Included(self.center_loc.into()),
+                start: Bound::Included(self.start_loc.into()),
+                end: Bound::Included(self.start_loc.into()),
             }
         // In order to make sure the arc covers the full range we need some overlap at the
         // end to account for division rounding.
         } else if self.half_length >= MAX_HALF_LENGTH - 1 {
             ArcRange {
-                start: Bound::Included(
-                    (self.center_loc.0 - DhtLocation::from(MAX_HALF_LENGTH - 1).0).0,
-                ),
+                start: Bound::Included((self.start_loc.0).0),
                 end: Bound::Included(
-                    (self.center_loc.0 + DhtLocation::from(MAX_HALF_LENGTH).0 - Wrapping(2)).0,
+                    (self.start_loc.0 + Wrapping(2) * DhtLocation::from(MAX_HALF_LENGTH).0
+                        - Wrapping(1))
+                    .0,
                 ),
             }
         } else {
             ArcRange {
-                start: Bound::Included(
-                    (self.center_loc.0 - DhtLocation::from(self.half_length - 1).0).0,
-                ),
-                end: Bound::Included(
-                    (self.center_loc.0 + DhtLocation::from(self.half_length).0 - Wrapping(1)).0,
-                ),
+                start: Bound::Included((self.start_loc.0).0),
+                end: Bound::Included((self.start_loc.0 + DhtLocation::from(self.half_length).0).0),
             }
         }
     }
@@ -230,9 +226,9 @@ impl DhtArc {
         &mut self.half_length
     }
 
-    /// Get the center location of this arc.
-    pub fn center_loc(&self) -> DhtLocation {
-        self.center_loc
+    /// Get the start location of this arc.
+    pub fn start_loc(&self) -> DhtLocation {
+        self.start_loc
     }
 
     /// Is this DhtArc empty?
@@ -339,12 +335,12 @@ impl From<DhtLocation> for u32 {
     }
 }
 
-/// Finds the shortest distance between two points on a circle
-pub(crate) fn shortest_arc_distance<A: Into<DhtLocation>, B: Into<DhtLocation>>(a: A, b: B) -> u32 {
+/// Finds the distance from `b` to `a` in a circular space
+pub(crate) fn wrapped_distance<A: Into<DhtLocation>, B: Into<DhtLocation>>(a: A, b: B) -> u32 {
     // Turn into wrapped u32s
     let a = a.into().0;
     let b = b.into().0;
-    std::cmp::min(a - b, b - a).0
+    (b - a).0
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -433,9 +429,9 @@ impl DhtArc {
         let lenf = len as f64;
         let len = len as isize;
         let half_cov = (self.coverage() * lenf / 2.0) as isize;
-        let center = self.center_loc.0 .0 as f64 / U32_LEN as f64;
-        let center = (center * lenf) as isize;
-        for mut i in (center - half_cov)..(center + half_cov) {
+        let start = (self.start_loc.0).0 as f64 / U32_LEN as f64;
+        let start = (start * lenf) as isize;
+        for mut i in start..(start + 2 * half_cov) {
             if i >= len {
                 i -= len;
             }
@@ -444,7 +440,7 @@ impl DhtArc {
             }
             out[i as usize] = "-";
         }
-        out[center as usize] = "@";
+        out[start as usize] = "@";
         let out: String = out.iter().map(|a| a.chars()).flatten().collect();
         out
     }
@@ -458,12 +454,10 @@ impl DhtArc {
                 let end = end.as_u32();
                 if start <= end {
                     let half_length = ((end as f64 - start as f64 + 2f64) / 2f64).round() as u32;
-                    let center = ((start as f64 + end as f64) / 2f64).round() as u32;
-                    Self::new(center, half_length)
+                    Self::new(start, half_length)
                 } else {
                     let half_length = MAX_HALF_LENGTH - ((start - end) / 2);
-                    let center = Wrapping(start) + Wrapping(half_length) - Wrapping(1);
-                    Self::new(center.0, half_length)
+                    Self::new(start, half_length)
                 }
             }
         }
@@ -500,46 +494,6 @@ fn test_loc_upscale() {
         loc_upscale(3, 1),
         DhtLocation::from((m / 3.0) as u32).as_u32()
     );
-}
-
-#[test]
-/// Test the center_loc calculation for a variety of ArcIntervals
-fn arc_interval_center_loc() {
-    use pretty_assertions::assert_eq;
-
-    let intervals = vec![
-        // singleton
-        (ArcInterval::<i32>::new(0, 0), 0),
-        (ArcInterval::<i32>::new(2, 2), 2),
-        (ArcInterval::<i32>::new(3, 3), 3),
-        // non-wrapping
-        (ArcInterval::<i32>::new(2, 4), 3),
-        (ArcInterval::<i32>::new(2, 5), 4),
-        (ArcInterval::<i32>::new(2, 6), 4),
-        (ArcInterval::<i32>::new(0, 8), 4),
-        (ArcInterval::<i32>::new(1, 8), 5),
-        (ArcInterval::<i32>::new(2, 8), 5),
-        (ArcInterval::<i32>::new(3, 5), 4),
-        (ArcInterval::<i32>::new(3, 6), 5),
-        (ArcInterval::<i32>::new(3, 7), 5),
-        // wrapping
-        (ArcInterval::<i32>::new(-3, 3), 0),
-        (ArcInterval::<i32>::new(-4, 3), 0),
-        (ArcInterval::<i32>::new(-4, 4), 0),
-        (ArcInterval::<i32>::new(-5, 4), 0),
-        (ArcInterval::<i32>::new(-4, 2), -1i32),
-        (ArcInterval::<i32>::new(-5, 2), -1i32),
-        (ArcInterval::<i32>::new(-5, 3), -1i32),
-    ];
-    let expected: Vec<_> = intervals
-        .iter()
-        .map(|(_, c)| DhtLocation::from(*c))
-        .collect();
-    let actual: Vec<_> = intervals
-        .into_iter()
-        .map(|(i, _)| i.canonical().center_loc())
-        .collect();
-    assert_eq!(expected, actual);
 }
 
 #[test]
@@ -586,18 +540,18 @@ fn interval_dht_arc_roundtrip() {
         .map(|i| DhtArc::from_interval(i.to_owned()).interval())
         .collect();
 
-    // Show that roundtrips don't alter the centerpoints at all
-    let original_centers: Vec<_> = intervals.iter().map(|i| i.center_loc()).collect();
-    let quantized_centers: Vec<_> = quantized.iter().map(|i| i.center_loc()).collect();
-    let roundtrip_centers: Vec<_> = roundtrips.iter().map(|i| i.center_loc()).collect();
-    let dht_arc_centers: Vec<_> = quantized
+    // Show that roundtrips don't alter the starting points at all
+    let original_starts: Vec<_> = intervals.iter().map(|i| i.start_loc()).collect();
+    let quantized_starts: Vec<_> = quantized.iter().map(|i| i.start_loc()).collect();
+    let roundtrip_starts: Vec<_> = roundtrips.iter().map(|i| i.start_loc()).collect();
+    let dht_arc_starts: Vec<_> = quantized
         .iter()
-        .map(|i| DhtArc::from_interval(i.clone()).center_loc())
+        .map(|i| DhtArc::from_interval(i.clone()).start_loc())
         .collect();
     assert_eq!(quantized, roundtrips);
-    assert_eq!(original_centers, quantized_centers);
-    assert_eq!(original_centers, roundtrip_centers);
-    assert_eq!(original_centers, dht_arc_centers);
+    assert_eq!(original_starts, quantized_starts);
+    assert_eq!(original_starts, roundtrip_starts);
+    assert_eq!(original_starts, dht_arc_starts);
 }
 
 #[test]

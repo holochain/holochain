@@ -295,7 +295,7 @@ impl SwitchboardState {
                     "",
                     agent_loc8,
                     ascii,
-                    interval.center_loc().as_loc8(),
+                    interval.start_loc().as_loc8(),
                     interval.map(|b| DhtLocation::as_loc8(&b)),
                     width = width
                 );
@@ -546,7 +546,7 @@ impl SwitchboardAgent {
         let lo: Loc8 = lo.into();
         let hi: Loc8 = hi.into();
         let initial_arc = ArcInterval::Bounded(lo, hi);
-        let loc8 = initial_arc.clone().canonical().center_loc().as_loc8();
+        let loc8 = initial_arc.clone().canonical().start_loc().as_loc8();
 
         Self {
             loc: loc8,
@@ -556,13 +556,13 @@ impl SwitchboardAgent {
 
     /// Construct an agent from arc bounds.
     /// The agent's location is taken as the midpoint of the arc.
-    pub fn from_center_and_half_len<L: Into<Loc8>>(center: L, half_len: u8) -> Self {
-        let center: Loc8 = center.into();
+    pub fn from_start_and_half_len<L: Into<Loc8>>(start: L, half_len: u8) -> Self {
+        let start: Loc8 = start.into();
         let half_len = Loc8::upscale(half_len as i32);
-        let initial_arc = DhtArc::new(center, half_len).interval().as_loc8();
+        let initial_arc = DhtArc::new(start, half_len).interval().as_loc8();
 
         Self {
-            loc: center,
+            loc: start,
             initial_arc,
         }
     }

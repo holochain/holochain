@@ -107,10 +107,10 @@ async fn transitive_peer_gossip() {
 
     let [n1, n2, n3, n4] = sb.add_nodes(tuning_params()).await;
 
-    let a1 = SwitchboardAgent::from_center_and_half_len(0, 68);
-    let a2 = SwitchboardAgent::from_center_and_half_len(64, 68);
-    let a3 = SwitchboardAgent::from_center_and_half_len(128, 68);
-    let a4 = SwitchboardAgent::from_center_and_half_len(192, 68);
+    let a1 = SwitchboardAgent::from_start_and_half_len(0, 68);
+    let a2 = SwitchboardAgent::from_start_and_half_len(64, 68);
+    let a3 = SwitchboardAgent::from_start_and_half_len(128, 68);
+    let a4 = SwitchboardAgent::from_start_and_half_len(192, 68);
 
     sb.share(|sb| {
         sb.add_local_agent(&n1, &a1);
@@ -175,10 +175,10 @@ async fn sharded_4way_recent() {
 
     let [n1, n2, n3, n4] = sb.add_nodes(tuning_params()).await;
 
-    let a1 = SwitchboardAgent::from_center_and_half_len(0, 68);
-    let a2 = SwitchboardAgent::from_center_and_half_len(64, 68);
-    let a3 = SwitchboardAgent::from_center_and_half_len(128, 68);
-    let a4 = SwitchboardAgent::from_center_and_half_len(192, 68);
+    let a1 = SwitchboardAgent::from_start_and_half_len(0, 68);
+    let a2 = SwitchboardAgent::from_start_and_half_len(64, 68);
+    let a3 = SwitchboardAgent::from_start_and_half_len(128, 68);
+    let a4 = SwitchboardAgent::from_start_and_half_len(192, 68);
 
     let ops: Vec<_> = (0..256).step_by(8).map(|u| Loc8::from(u)).collect();
 
@@ -244,10 +244,10 @@ async fn sharded_4way_historical() {
 
     let [n1, n2, n3, n4] = sb.add_nodes(tuning_params()).await;
 
-    let a1 = SwitchboardAgent::from_center_and_half_len(0, 68);
-    let a2 = SwitchboardAgent::from_center_and_half_len(64, 68);
-    let a3 = SwitchboardAgent::from_center_and_half_len(128, 68);
-    let a4 = SwitchboardAgent::from_center_and_half_len(192, 68);
+    let a1 = SwitchboardAgent::from_start_and_half_len(0, 68);
+    let a2 = SwitchboardAgent::from_start_and_half_len(64, 68);
+    let a3 = SwitchboardAgent::from_start_and_half_len(128, 68);
+    let a4 = SwitchboardAgent::from_start_and_half_len(192, 68);
 
     let now = Timestamp::now().as_micros();
     let ops_only: Vec<_> = (0..256).step_by(8).map(|u| Loc8::from(u)).collect();

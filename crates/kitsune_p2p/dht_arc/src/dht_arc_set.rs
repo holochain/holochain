@@ -371,8 +371,8 @@ impl ArcInterval<DhtLocation> {
         c.size() as f64 / a.size() as f64
     }
 
-    pub fn center_loc(&self) -> DhtLocation {
-        DhtArc::from_interval(self.clone()).center_loc()
+    pub fn start_loc(&self) -> DhtLocation {
+        DhtArc::from_interval(self.clone()).start_loc()
     }
 
     #[cfg(any(test, feature = "test_utils"))]
@@ -427,8 +427,8 @@ impl ArcInterval<DhtLocation> {
                     ]
                 }
                 .join("");
-                let center = loc_downscale(len, self.center_loc());
-                s.replace_range(center..center + 1, "@");
+                let start = loc_downscale(len, self.start_loc());
+                s.replace_range(start..start + 1, "@");
                 s
             }
         }

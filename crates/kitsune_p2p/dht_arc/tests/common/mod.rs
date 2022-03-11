@@ -174,11 +174,11 @@ pub fn simple_parameterized_generator(
     generate_evenly_spaced_with_half_lens_and_jitter(rng, j, halflens)
 }
 
-/// Define arcs by centerpoint and halflen in the unit interval [0.0, 1.0]
+/// Define arcs by start location and halflen in the unit interval [0.0, 1.0]
 pub fn unit_arcs<H: Iterator<Item = (f64, f64)>>(arcs: H) -> Peers {
     let fc = full_len();
     let fh = MAX_HALF_LENGTH as f64;
-    arcs.map(|(c, h)| DhtArc::new((c * fc).min(u32::MAX as f64) as u32, (h * fh) as u32))
+    arcs.map(|(s, h)| DhtArc::new((s * fc).min(u32::MAX as f64) as u32, (h * fh) as u32))
         .collect()
 }
 

@@ -12,17 +12,14 @@ fn test_arc_dist() {
     // start at 5 go all the way around the arc anti-clockwise until
     // you reach 5. You will have traveled 5 less then the entire arc plus one
     // for the reserved zero value
-    assert_eq!(shortest_arc_distance(10, 5), 5);
-    assert_eq!(shortest_arc_distance(5, 10), 5);
+    assert_eq!(wrapped_distance(10, 5), 5);
+    assert_eq!(wrapped_distance(5, 10), 5);
     assert_eq!(
-        shortest_arc_distance(Wrapping(u32::MAX) + Wrapping(5), u32::MAX),
+        wrapped_distance(Wrapping(u32::MAX) + Wrapping(5), u32::MAX),
         5
     );
-    assert_eq!(shortest_arc_distance(0, u32::MAX), 1);
-    assert_eq!(
-        shortest_arc_distance(0, MAX_HALF_LENGTH),
-        MAX_HALF_LENGTH - 2
-    );
+    assert_eq!(wrapped_distance(0, u32::MAX), 1);
+    assert_eq!(wrapped_distance(0, MAX_HALF_LENGTH), MAX_HALF_LENGTH - 2);
 }
 
 #[test]
