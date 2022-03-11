@@ -441,7 +441,7 @@ impl DhtArc {
             out[i as usize] = "-";
         }
         out[start as usize] = "@";
-        let out: String = out.iter().map(|a| a.chars()).flatten().collect();
+        let out: String = out.iter().flat_map(|a| a.chars()).collect();
         out
     }
 
