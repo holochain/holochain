@@ -61,12 +61,7 @@ impl PeerStratBeta {
     /// Imagine the case where you join a large network with a full arc, you might have a
     /// good sample size close to your location long before you sync all the networks peer
     /// information.
-    fn check_focused_view(
-        &self,
-        arc: DhtArc,
-        peers: &[DhtArc],
-        focus_size: usize,
-    ) -> Option<f64> {
+    fn check_focused_view(&self, arc: DhtArc, peers: &[DhtArc], focus_size: usize) -> Option<f64> {
         // Focus size cannot be zero.
         if focus_size == 0 {
             return None;
@@ -88,7 +83,7 @@ impl PeerStratBeta {
 
                 // Create the focused view's arc using the
                 // furthest peer as the half length.
-                let focused_arc = DhtArc::from_start_and_halflen(
+                let focused_arc = DhtArc::from_start_and_half_len(
                     arc.start_loc(),
                     wrapped_distance(
                         arc.start_loc(),
@@ -151,12 +146,7 @@ impl PeerViewBeta {
     /// - The filter used to create the bucket.
     /// - Average coverage of all peers in the bucket.
     /// - Count of peers in the bucket.
-    pub fn new(
-        strat: PeerStratBeta,
-        filter: DhtArc,
-        total_coverage: f64,
-        count: usize,
-    ) -> Self {
+    pub fn new(strat: PeerStratBeta, filter: DhtArc, total_coverage: f64, count: usize) -> Self {
         Self {
             strat,
             filter,

@@ -175,7 +175,7 @@ pub fn unit_arcs<H: Iterator<Item = (f64, f64)>>(arcs: H) -> Peers {
     let fc = full_len();
     let fh = MAX_HALF_LENGTH as f64;
     arcs.map(|(s, h)| {
-        DhtArc::from_start_and_halflen((s * fc).min(u32::MAX as f64) as u32, (h * fh) as u32)
+        DhtArc::from_start_and_half_len((s * fc).min(u32::MAX as f64) as u32, (h * fh) as u32)
     })
     .collect()
 }

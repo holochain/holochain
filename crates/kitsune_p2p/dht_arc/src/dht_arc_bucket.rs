@@ -31,6 +31,7 @@ impl DhtArcBucket {
         }
     }
 
+    #[cfg(any(test, feature = "test_utils"))]
     pub fn to_ascii(&self, len: usize) -> String {
         let mut buf = "".to_string();
         for a in &self.arcs {

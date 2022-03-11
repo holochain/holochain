@@ -165,7 +165,7 @@ impl<'de> serde::Deserialize<'de> for AgentInfoSigned {
 
         let start_loc = agent.get_loc();
         let storage_arc =
-            DhtArc::from_start_and_halflen(start_loc, meta.dht_storage_arc_half_length);
+            DhtArc::from_start_and_half_len(start_loc, meta.dht_storage_arc_half_length);
 
         let AgentInfoEncode {
             space,
@@ -231,10 +231,7 @@ impl AgentInfoSigned {
         let inner = AgentInfoInner {
             space,
             agent,
-            storage_arc: DhtArc::from_start_and_halflen(
-                start_loc,
-                dht_storage_arc_half_length,
-            ),
+            storage_arc: DhtArc::from_start_and_half_len(start_loc, dht_storage_arc_half_length),
             url_list,
             signed_at_ms,
             expires_at_ms,
