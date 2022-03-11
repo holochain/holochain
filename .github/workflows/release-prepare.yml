@@ -1,9 +1,6 @@
 on:
   workflow_call:
     inputs:
-      holochain_source_branch:
-        type: string
-        required: true
       dry_run:
         type: string
         required: true
@@ -11,6 +8,21 @@ on:
         type: string
         required: true
 
+      HOLOCHAIN_SOURCE_BRANCH:
+        type: string
+        required: true
+      HOLOCHAIN_URL:
+        type: string
+        required: false
+        default: "https://github.com/holochain/holochain"
+      HOLOCHAIN_NIXPKGS_URL:
+        type: string
+        required: false
+        default: "https://github.com/holochain/holochain-nixkpgs.git"
+      HOLONIX_URL:
+        type: string
+        required: false
+        default: "https://github.com/holochain/holonix.git"
       HOLOCHAIN_REPO:
         type: string
         required: true
@@ -97,9 +109,9 @@ jobs:
 
       - name: Prepare the environment file
         env:
-          HOLOCHAIN_SOURCE_BRANCH: ${{ inputs.holochain_source_branch }}
-          HOLOCHAIN_URL: "https://github.com/holochain/holochain"
-          HOLOCHAIN_NIXPKGS_URL: "https://github.com/holochain/holochain-nixkpgs.git"
+          HOLOCHAIN_SOURCE_BRANCH: ${{ inputs.HOLOCHAIN_SOURCE_BRANCH }}
+          HOLOCHAIN_URL: ${{ inputs.HOLOCHAIN_URL }}
+          HOLOCHAIN_NIXPKGS_URL: ${{ inputs.HOLOCHAIN_NIXPKGS_URL }}
           HOLONIX_URL: "https://github.com/holochain/holonix.git"
         run: |
           cat <<EOF > "${HOLOCHAIN_RELEASE_SH}"
