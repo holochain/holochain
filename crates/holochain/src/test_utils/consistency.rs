@@ -9,7 +9,7 @@ use std::{
 use futures::stream::StreamExt;
 use holo_hash::{DhtOpHash, DnaHash};
 use holochain_p2p::{
-    dht_arc::{DhtArc, DhtLocation},
+    dht_arc::{ArcInterval, DhtLocation},
     AgentPubKeyExt, DhtOpHashExt,
 };
 use holochain_sqlite::{
@@ -351,7 +351,7 @@ async fn gather_conductor_data(
     p2p_agents_db: DbRead<DbKindP2pAgents>,
     agents: Vec<(DbRead<DbKindAuthored>, DbRead<DbKindDht>, Arc<KitsuneAgent>)>,
 ) -> (
-    Vec<(Arc<KitsuneAgent>, DhtArc)>,
+    Vec<(Arc<KitsuneAgent>, ArcInterval)>,
     Vec<(DhtLocation, KitsuneOpHash)>,
 ) {
     // Create the stores iterator with the environments to search.
@@ -386,7 +386,7 @@ async fn gather_conductor_data(
 async fn expect_all(
     tx: tokio::sync::mpsc::Sender<SessionMessage>,
     timeout: Duration,
-    all_agents: Vec<(Arc<KitsuneAgent>, DhtArc)>,
+    all_agents: Vec<(Arc<KitsuneAgent>, ArcInterval)>,
     all_hashes: Vec<(DhtLocation, KitsuneOpHash)>,
     agent_dht_map: HashMap<Arc<KitsuneAgent>, DbRead<DbKindDht>>,
     agent_p2p_map: HashMap<Arc<KitsuneAgent>, DbRead<DbKindP2pAgents>>,
@@ -398,7 +398,7 @@ async fn expect_all(
 /// Generate the consistency sessions for each agent along with their environments.
 /// This is where we check which agents should be holding which hashes and agents.
 fn generate_session<'iter>(
-    all_agents: &'iter Vec<(Arc<KitsuneAgent>, DhtArc)>,
+    all_agents: &'iter Vec<(Arc<KitsuneAgent>, ArcInterval)>,
     all_hashes: &'iter Vec<(DhtLocation, KitsuneOpHash)>,
     timeout: Duration,
     agent_dht_map: HashMap<Arc<KitsuneAgent>, DbRead<DbKindDht>>,
@@ -710,7 +710,7 @@ async fn request_published_ops(
 async fn request_arc(
     db: &DbRead<DbKindP2pAgents>,
     agent: KitsuneAgent,
-) -> StateQueryResult<Option<DhtArc>> {
+) -> StateQueryResult<Option<ArcInterval>> {
     db.async_reader(move |txn| Ok(txn.p2p_get_agent(&agent)?.map(|info| info.storage_arc)))
         .await
 }

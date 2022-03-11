@@ -29,16 +29,16 @@ impl Default for PeerStratBeta {
 }
 
 impl PeerStratBeta {
-    pub fn view(&self, arc: DhtArc, peers: &[DhtArc]) -> PeerViewBeta {
-        let peers: Vec<DhtArc> = peers
+    pub fn view(&self, arc: ArcInterval, peers: &[ArcInterval]) -> PeerViewBeta {
+        let peers: Vec<ArcInterval> = peers
             .iter()
-            .filter(|a| arc.contains(a.start_loc))
+            .filter(|a| arc.contains(a.start_loc()))
             .copied()
             .collect();
         Self::view_unchecked(self, arc, peers.as_slice())
     }
 
-    pub fn view_unchecked(&self, arc: DhtArc, peers: &[DhtArc]) -> PeerViewBeta {
+    pub fn view_unchecked(&self, arc: ArcInterval, peers: &[ArcInterval]) -> PeerViewBeta {
         let total_coverage = total_coverage(peers);
         let count = peers.len();
         let mut full_view = PeerViewBeta::new(*self, arc, total_coverage, count);
@@ -61,7 +61,12 @@ impl PeerStratBeta {
     /// Imagine the case where you join a large network with a full arc, you might have a
     /// good sample size close to your location long before you sync all the networks peer
     /// information.
-    fn check_focused_view(&self, arc: DhtArc, peers: &[DhtArc], focus_size: usize) -> Option<f64> {
+    fn check_focused_view(
+        &self,
+        arc: ArcInterval,
+        peers: &[ArcInterval],
+        focus_size: usize,
+    ) -> Option<f64> {
         // Focus size cannot be zero.
         if focus_size == 0 {
             return None;
@@ -73,7 +78,7 @@ impl PeerStratBeta {
                 // Sort the peers by distance to this view's start location.
                 let mut closest_peers = peers.to_vec();
                 closest_peers
-                    .sort_unstable_by_key(|a| wrapped_distance(arc.start_loc, a.start_loc));
+                    .sort_unstable_by_key(|a| wrapped_distance(arc.start_loc(), a.start_loc()));
 
                 // Take a focused sample of the min_sample_size.
                 let closest_peers = closest_peers
@@ -83,15 +88,16 @@ impl PeerStratBeta {
 
                 // Create the focused view's arc using the
                 // furthest peer as the half length.
-                let focused_arc = DhtArc::new(
-                    arc.start_loc,
+                let focused_arc = ArcInterval::from_start_and_halflen(
+                    arc.start_loc(),
                     wrapped_distance(
-                        arc.start_loc,
+                        arc.start_loc(),
                         closest_peers
                             .last()
                             .expect("Can't be empty if we have twice the focus size")
-                            .start_loc,
-                    ),
+                            .start_loc(),
+                    )
+                    .into(),
                 );
 
                 // Disable focusing to prevent recursion.
@@ -130,7 +136,7 @@ pub struct PeerViewBeta {
     /// The strategy params that generated this view.
     pub strat: PeerStratBeta,
     /// The arc that filtered the bucket that generated this view.
-    filter: DhtArc,
+    filter: ArcInterval,
     /// The number of peers in the bucket.
     pub count: usize,
     /// An optional more focused view's target
@@ -145,7 +151,12 @@ impl PeerViewBeta {
     /// - The filter used to create the bucket.
     /// - Average coverage of all peers in the bucket.
     /// - Count of peers in the bucket.
-    pub fn new(strat: PeerStratBeta, filter: DhtArc, total_coverage: f64, count: usize) -> Self {
+    pub fn new(
+        strat: PeerStratBeta,
+        filter: ArcInterval,
+        total_coverage: f64,
+        count: usize,
+    ) -> Self {
         Self {
             strat,
             filter,
@@ -287,6 +298,6 @@ impl PeerViewBeta {
 }
 
 /// Total coverage of all peers.
-fn total_coverage(peers: &[DhtArc]) -> f64 {
+fn total_coverage(peers: &[ArcInterval]) -> f64 {
     peers.iter().map(|a| a.coverage()).sum::<f64>()
 }

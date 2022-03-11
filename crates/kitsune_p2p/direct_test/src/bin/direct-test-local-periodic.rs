@@ -69,7 +69,7 @@ async fn main() {
                         test.root.clone(),
                         agent.clone(),
                         full_time_window(),
-                        ArcInterval::Full.into(),
+                        ArcInterval::Full(0.into()).into(),
                     )
                     .await
                     .unwrap()

@@ -5,19 +5,19 @@ use holochain_p2p::dht_arc::PeerStratAlpha;
 use holochain_p2p::dht_arc::DEFAULT_MIN_PEERS;
 use holochain_p2p::dht_arc::DEFAULT_MIN_REDUNDANCY;
 use holochain_p2p::dht_arc::MAX_HALF_LENGTH;
-use kitsune_p2p::dht_arc::DhtArc;
+use kitsune_p2p::dht_arc::ArcInterval;
 use kitsune_p2p::*;
 use kitsune_p2p_types::dht_arc::check_redundancy;
 use kitsune_p2p_types::dht_arc::gaps::check_for_gaps;
 
-async fn get_peers(num: usize, half_lens: &[u32], keystore: MetaLairClient) -> Vec<DhtArc> {
+async fn get_peers(num: usize, half_lens: &[u32], keystore: MetaLairClient) -> Vec<ArcInterval> {
     let mut half_lens = half_lens.iter().cycle();
     let mut out = Vec::with_capacity(num);
 
     let agents = SweetAgents::get(keystore, num).await;
     for agent in agents {
         let agent = holochain_p2p::agent_holo_to_kit(agent);
-        let arc = DhtArc::new(agent.get_loc(), *half_lens.next().unwrap());
+        let arc = ArcInterval::new(agent.get_loc(), *half_lens.next().unwrap());
         out.push(arc);
     }
     out
@@ -32,7 +32,7 @@ async fn get_peers(num: usize, half_lens: &[u32], keystore: MetaLairClient) -> V
 async fn test_arc_redundancy() {
     let conductor = SweetConductor::from_config(Default::default()).await;
     let keystore = conductor.keystore();
-    fn converge(peers: &mut Vec<DhtArc>) {
+    fn converge(peers: &mut Vec<ArcInterval>) {
         let mut mature = false;
         for _ in 0..40 {
             for i in 0..peers.len() {
@@ -80,7 +80,7 @@ async fn test_arc_redundancy() {
 async fn test_arc_redundancy_all() {
     let conductor = SweetConductor::from_config(Default::default()).await;
     let keystore = conductor.keystore();
-    let converge = |peers: &mut Vec<DhtArc>| {
+    let converge = |peers: &mut Vec<ArcInterval>| {
         let mut mature = false;
         for _ in 0..40 {
             for i in 0..peers.len() {
@@ -147,7 +147,7 @@ async fn test_join_leave() {
     let num_peers = DEFAULT_MIN_PEERS;
 
     let coverages = vec![MAX_HALF_LENGTH];
-    let converge = |peers: &mut Vec<DhtArc>| {
+    let converge = |peers: &mut Vec<ArcInterval>| {
         for i in 0..peers.len() {
             let p = peers.clone();
             let arc = peers.get_mut(i).unwrap();

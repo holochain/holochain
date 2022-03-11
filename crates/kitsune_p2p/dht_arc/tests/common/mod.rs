@@ -19,11 +19,7 @@ pub const DETAIL: u8 = 1;
 
 type DataVec = statrs::statistics::Data<Vec<f64>>;
 
-pub type Peers = Vec<DhtArc>;
-
-fn max_halflen() -> f64 {
-    MAX_HALF_LENGTH as f64
-}
+pub type Peers = Vec<ArcInterval>;
 
 fn full_len() -> f64 {
     2f64.powi(32)
@@ -107,8 +103,8 @@ pub fn run_one_epoch(
 ) -> (Peers, EpochStats) {
     let mut net = 0.0;
     let mut gross = 0.0;
-    let mut delta_min = max_halflen();
-    let mut delta_max = -max_halflen();
+    let mut delta_min = full_len();
+    let mut delta_max = -full_len();
     let mut index_min = peers.len();
     let mut index_max = peers.len();
     for i in 0..peers.len() {
@@ -120,9 +116,9 @@ pub fn run_one_epoch(
         let p = peers.clone();
         let arc = peers.get_mut(i).unwrap();
         let view = strat.view(*arc, p.as_slice());
-        let before = arc.half_length() as f64;
+        let before = arc.length() as f64;
         arc.update_length(view);
-        let after = arc.half_length() as f64;
+        let after = arc.length() as f64;
         let delta = after - before;
         // dbg!(&before, &after, &delta);
         net += delta;
@@ -149,11 +145,11 @@ pub fn run_one_epoch(
     let tot = peers.len() as f64;
     let min_redundancy = check_redundancy(peers.clone());
     let stats = EpochStats {
-        net_delta_avg: net / tot / max_halflen(),
-        gross_delta_avg: gross / tot / max_halflen(),
+        net_delta_avg: net / tot / full_len(),
+        gross_delta_avg: gross / tot / full_len(),
         min_redundancy: min_redundancy,
-        delta_min: delta_min / max_halflen(),
-        delta_max: delta_max / max_halflen(),
+        delta_min: delta_min / full_len(),
+        delta_max: delta_max / full_len(),
     };
     (peers, stats)
 }
@@ -178,8 +174,10 @@ pub fn simple_parameterized_generator(
 pub fn unit_arcs<H: Iterator<Item = (f64, f64)>>(arcs: H) -> Peers {
     let fc = full_len();
     let fh = MAX_HALF_LENGTH as f64;
-    arcs.map(|(s, h)| DhtArc::new((s * fc).min(u32::MAX as f64) as u32, (h * fh) as u32))
-        .collect()
+    arcs.map(|(s, h)| {
+        ArcInterval::from_start_and_halflen((s * fc).min(u32::MAX as f64) as u32, (h * fh) as u32)
+    })
+    .collect()
 }
 
 /// Each agent is perfect evenly spaced around the DHT,

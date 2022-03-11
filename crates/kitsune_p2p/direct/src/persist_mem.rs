@@ -4,6 +4,7 @@ use crate::types::persist::*;
 use crate::*;
 use futures::future::{BoxFuture, FutureExt};
 use kitsune_p2p::dht_arc::DhtArcSet;
+use kitsune_p2p::dht_arc::DhtLocation;
 use kitsune_p2p::dht_arc::PeerStratBeta;
 use kitsune_p2p::event::TimeWindow;
 use kitsune_p2p_types::tls::*;
@@ -370,7 +371,7 @@ impl AsKdPersist for PersistMem {
             let mut with_dist = store
                 .get_all()?
                 .into_iter()
-                .map(|info| (info.basis_distance_to_storage(basis_loc), info))
+                .map(|info| (info.basis_distance_to_storage(basis_loc.into()), info))
                 .collect::<Vec<_>>();
             with_dist.sort_by(|a, b| a.0.cmp(&b.0));
             Ok(with_dist
@@ -385,7 +386,7 @@ impl AsKdPersist for PersistMem {
     fn query_peer_density(
         &self,
         root: KdHash,
-        dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
+        dht_arc: kitsune_p2p_types::dht_arc::ArcInterval,
     ) -> BoxFuture<'static, KdResult<kitsune_p2p_types::dht_arc::PeerViewBeta>> {
         let store = self.0.share_mut(move |i, _| match i.agent_info.get(&root) {
             Some(store) => Ok(store.clone()),
@@ -400,7 +401,7 @@ impl AsKdPersist for PersistMem {
                 .get_all()?
                 .into_iter()
                 .filter_map(|v| {
-                    if dht_arc.contains(v.agent().as_loc()) {
+                    if dht_arc.contains(DhtLocation::from(v.agent().as_loc())) {
                         Some(*v.storage_arc())
                     } else {
                         None

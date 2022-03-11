@@ -189,7 +189,7 @@ impl KitsuneP2pEventHandler for AgentHarness {
     fn handle_query_peer_density(
         &mut self,
         _space: Arc<KitsuneSpace>,
-        dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
+        dht_arc: kitsune_p2p_types::dht_arc::ArcInterval,
     ) -> KitsuneP2pEventHandlerResult<kitsune_p2p_types::dht_arc::PeerViewBeta> {
         let strat = PeerStratBeta::default();
         let arcs: Vec<_> = self

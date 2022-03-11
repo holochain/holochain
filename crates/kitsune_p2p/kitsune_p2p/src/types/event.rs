@@ -227,8 +227,8 @@ ghost_actor::ghost_chan! {
         /// We need to get previously stored agent info.
         fn query_agents(input: QueryAgentsEvt) -> Vec<crate::types::agent_store::AgentInfoSigned>;
 
-        /// Query the peer density of a space for a given [`DhtArc`].
-        fn query_peer_density(space: KSpace, dht_arc: kitsune_p2p_types::dht_arc::DhtArc) -> kitsune_p2p_types::dht_arc::PeerViewBeta;
+        /// Query the peer density of a space for a given [`ArcInterval`].
+        fn query_peer_density(space: KSpace, dht_arc: kitsune_p2p_types::dht_arc::ArcInterval) -> kitsune_p2p_types::dht_arc::PeerViewBeta;
 
         /// We are receiving a request from a remote node.
         fn call(space: KSpace, to_agent: KAgent, payload: Payload) -> Vec<u8>;

@@ -48,11 +48,11 @@ pub trait AsKdPersist: 'static + Send + Sync {
         limit: u32,
     ) -> BoxFuture<'static, KdResult<Vec<KdAgentInfo>>>;
 
-    /// Query the peer density of a space for a given [`DhtArc`].
+    /// Query the peer density of a space for a given [`ArcInterval`].
     fn query_peer_density(
         &self,
         root: KdHash,
-        dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
+        dht_arc: kitsune_p2p_types::dht_arc::ArcInterval,
     ) -> BoxFuture<'static, KdResult<kitsune_p2p_types::dht_arc::PeerViewBeta>>;
 
     /// Store entry
@@ -171,11 +171,11 @@ impl KdPersist {
         AsKdPersist::query_agent_info_near_basis(&*self.0, root, basis_loc, limit)
     }
 
-    /// Query the peer density of a space for a given [`DhtArc`].
+    /// Query the peer density of a space for a given [`ArcInterval`].
     pub fn query_peer_density(
         &self,
         root: KdHash,
-        dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
+        dht_arc: kitsune_p2p_types::dht_arc::ArcInterval,
     ) -> impl Future<Output = KdResult<kitsune_p2p_types::dht_arc::PeerViewBeta>> + 'static + Send
     {
         AsKdPersist::query_peer_density(&*self.0, root, dht_arc)

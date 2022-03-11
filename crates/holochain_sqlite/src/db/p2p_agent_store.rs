@@ -226,7 +226,7 @@ impl AsP2pStateTxExt for Transaction<'_> {
             },
         )? {
             let info = r?;
-            let interval = info.storage_arc.interval();
+            let interval = info.storage_arc.clone();
             if arcset.overlap(&interval.into()) {
                 out.push(info);
             }
@@ -267,7 +267,7 @@ impl AsP2pStateTxExt for Transaction<'_> {
 
         for interval in dht_arc_set.intervals() {
             match interval {
-                ArcInterval::Full => {
+                ArcInterval::Full(_) => {
                     out.push(stmt.query_row(
                         named_params! {
                             ":now": now,
@@ -339,7 +339,7 @@ impl P2pRecord {
 
         let is_active = !signed.url_list.is_empty();
 
-        let (storage_start_loc, storage_end_loc) = arc.primitive_range_detached();
+        let (storage_start_loc, storage_end_loc) = arc.to_primitive_bounds_detached();
 
         Ok(Self {
             agent,

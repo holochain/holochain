@@ -747,7 +747,7 @@ async fn handle_query_agents(
 async fn handle_query_peer_density(
     kdirect: Arc<Kd1>,
     space: Arc<KitsuneSpace>,
-    dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
+    dht_arc: kitsune_p2p_types::dht_arc::ArcInterval,
 ) -> KdResult<kitsune_p2p_types::dht_arc::PeerViewBeta> {
     let root = KdHash::from_kitsune_space(&space);
     let density = kdirect.persist.query_peer_density(root, dht_arc).await?;

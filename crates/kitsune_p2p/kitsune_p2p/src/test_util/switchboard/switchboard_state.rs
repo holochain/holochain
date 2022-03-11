@@ -16,7 +16,7 @@ use kitsune_p2p_types::agent_info::{AgentInfoInner, AgentInfoSigned};
 use kitsune_p2p_types::bin_types::*;
 use kitsune_p2p_types::config::KitsuneP2pTuningParams;
 use kitsune_p2p_types::dht_arc::loc8::Loc8;
-use kitsune_p2p_types::dht_arc::{ArcInterval, DhtArc, DhtLocation};
+use kitsune_p2p_types::dht_arc::{ArcInterval, DhtLocation};
 use kitsune_p2p_types::metrics::metric_task;
 use kitsune_p2p_types::tx2::tx2_api::*;
 use kitsune_p2p_types::tx2::tx2_pool_promote::*;
@@ -276,9 +276,9 @@ impl SwitchboardState {
             let node_id = ep.uniq();
             let ascii = if with_ops {
                 let ops = node.ops.keys().copied();
-                ArcInterval::Empty.to_ascii_with_ops(width, ops)
+                ArcInterval::Empty(DhtLocation::from(0)).to_ascii_with_ops(width, ops)
             } else {
-                ArcInterval::Empty.to_ascii(width)
+                ArcInterval::Empty(DhtLocation::from(0)).to_ascii(width)
             };
             println!(
                 "{:>4} {:>+5} ({:^width$})",
@@ -288,7 +288,7 @@ impl SwitchboardState {
                 width = width
             );
             for (agent_loc8, agent) in node.local_agents.iter() {
-                let interval = agent.info.storage_arc.interval();
+                let interval = &agent.info.storage_arc;
                 let ascii = interval.to_ascii(width);
                 println!(
                     "{:>4} {:>+5} |{:^width$}| {:>+4} {:?}",
@@ -533,10 +533,10 @@ pub struct SwitchboardAgent {
 
 impl SwitchboardAgent {
     /// Construct an agent with a full arc at the specified location.
-    pub fn full<L: Into<Loc8>>(loc: L) -> Self {
+    pub fn full<L: Copy + Into<Loc8>>(loc: L) -> Self {
         Self {
             loc: loc.into(),
-            initial_arc: ArcInterval::Full,
+            initial_arc: ArcInterval::Full(loc.into()),
         }
     }
 
@@ -558,8 +558,9 @@ impl SwitchboardAgent {
     /// The agent's location is taken as the midpoint of the arc.
     pub fn from_start_and_half_len<L: Into<Loc8>>(start: L, half_len: u8) -> Self {
         let start: Loc8 = start.into();
-        let half_len = Loc8::upscale(half_len as i32);
-        let initial_arc = DhtArc::new(start, half_len).interval().as_loc8();
+        let len = half_len * 2 - 1;
+        let end = Loc8::from((start.as_u8() + len - 1) as i8);
+        let initial_arc = ArcInterval::Bounded(start, end);
 
         Self {
             loc: start,
@@ -704,7 +705,7 @@ fn fake_agent_info(
     let state = AgentInfoInner {
         space,
         agent,
-        storage_arc: DhtArc::from_interval(interval),
+        storage_arc: interval,
         url_list,
         signed_at_ms: 0,
         expires_at_ms: u64::MAX,

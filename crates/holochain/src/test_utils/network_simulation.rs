@@ -9,7 +9,7 @@ use ::fixt::prelude::*;
 use hdk::prelude::*;
 use holo_hash::{DhtOpHash, DnaHash};
 use holochain_conductor_api::conductor::ConductorConfig;
-use holochain_p2p::dht_arc::{ArcInterval, DhtArc, DhtLocation};
+use holochain_p2p::dht_arc::{ArcInterval, ArcInterval, DhtLocation};
 use holochain_p2p::{AgentPubKeyExt, DhtOpHashExt, DnaHashExt};
 use holochain_sqlite::db::{p2p_put_single, AsP2pStateTxExt};
 use holochain_state::prelude::from_blob;
@@ -41,7 +41,7 @@ pub struct MockNetworkData {
     /// KitsuneAgent -> AgentPubKey
     pub agent_kit_to_hash: HashMap<Arc<KitsuneAgent>, Arc<AgentPubKey>>,
     /// Agent storage arcs.
-    pub agent_to_arc: HashMap<Arc<AgentPubKey>, DhtArc>,
+    pub agent_to_arc: HashMap<Arc<AgentPubKey>, ArcInterval>,
     /// Agents peer info.
     pub agent_to_info: HashMap<Arc<AgentPubKey>, AgentInfoSigned>,
     /// Hashes ordered by their basis location.

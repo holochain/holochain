@@ -1,42 +1,42 @@
 use crate::*;
 
 /// When sampling a section of the arc we can
-/// collect all the other peer [`DhtArc`]s into a
+/// collect all the other peer [`ArcInterval`]s into a
 /// DhtBucket.
 /// All the peer arcs arc contained within the buckets filter arc.
 /// The filter is this peer's "view" into their section of the dht arc.
 /// This type is mainly used for Display purposes.
 pub struct DhtArcBucket {
     /// The arc used to filter this bucket.
-    filter: DhtArc,
+    filter: ArcInterval,
     /// The arcs in this bucket.
-    arcs: Vec<DhtArc>,
+    arcs: Vec<ArcInterval>,
 }
 
 impl DhtArcBucket {
     /// Select only the arcs that fit into the bucket.
-    pub fn new<I: IntoIterator<Item = DhtArc>>(filter: DhtArc, arcs: I) -> Self {
+    pub fn new<I: IntoIterator<Item = ArcInterval>>(filter: ArcInterval, arcs: I) -> Self {
         let arcs = arcs
             .into_iter()
-            .filter(|a| filter.contains(a.start_loc))
+            .filter(|a| filter.contains(a.start_loc()))
             .collect();
         Self { filter, arcs }
     }
 
     /// Same as new but doesn't check if arcs fit into the bucket.
-    pub fn new_unchecked(bucket: DhtArc, arcs: Vec<DhtArc>) -> Self {
+    pub fn new_unchecked(bucket: ArcInterval, arcs: Vec<ArcInterval>) -> Self {
         Self {
             filter: bucket,
             arcs,
         }
     }
-}
 
-impl std::fmt::Display for DhtArcBucket {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    pub fn to_ascii(&self, len: usize) -> String {
+        let mut buf = "".to_string();
         for a in &self.arcs {
-            writeln!(f, "{}", a)?;
+            buf += &a.to_ascii(len);
         }
-        writeln!(f, "{} <- Bucket arc", self.filter)
+        buf += &format!("{} <- Bucket arc", self.filter.to_ascii(len));
+        buf
     }
 }

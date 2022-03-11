@@ -140,8 +140,8 @@ impl DhtLocation {
 impl ArcInterval {
     pub fn as_loc8(&self) -> ArcInterval<Loc8> {
         match self {
-            Self::Empty => ArcInterval::Empty,
-            Self::Full => ArcInterval::Full,
+            Self::Empty(s) => ArcInterval::Empty(s.as_loc8()),
+            Self::Full(s) => ArcInterval::Full(s.as_loc8()),
             Self::Bounded(lo, hi) => ArcInterval::Bounded(lo.as_loc8(), hi.as_loc8()),
         }
     }
@@ -153,9 +153,9 @@ where
 {
     pub fn canonical(self) -> ArcInterval {
         match self {
-            ArcInterval::Empty => ArcInterval::Empty,
-            ArcInterval::Full => ArcInterval::Full,
-            ArcInterval::Bounded(lo, hi) => ArcInterval::new(
+            ArcInterval::Empty(s) => ArcInterval::Empty(DhtLocation::from(Loc8::from(s))),
+            ArcInterval::Full(s) => ArcInterval::Full(DhtLocation::from(Loc8::from(s))),
+            ArcInterval::Bounded(lo, hi) => ArcInterval::from_bounds(
                 DhtLocation::from(Loc8::from(lo)),
                 DhtLocation::from(Loc8::from(hi)),
             ),

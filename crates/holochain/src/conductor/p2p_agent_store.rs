@@ -4,7 +4,7 @@ use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
 use holochain_conductor_api::AgentInfoDump;
 use holochain_conductor_api::P2pAgentsDump;
-use holochain_p2p::dht_arc::DhtArc;
+use holochain_p2p::dht_arc::ArcInterval;
 use holochain_p2p::dht_arc::PeerStratBeta;
 use holochain_p2p::dht_arc::PeerViewBeta;
 use holochain_p2p::kitsune_p2p::agent_store::AgentInfoSigned;
@@ -191,11 +191,11 @@ pub async fn list_all_agent_info_signed_near_basis(
 }
 
 /// Get the peer density an agent is currently seeing within
-/// a given [`DhtArc`]
+/// a given [`ArcInterval`]
 pub async fn query_peer_density(
     env: DbRead<DbKindP2pAgents>,
     kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
-    dht_arc: DhtArc,
+    dht_arc: ArcInterval,
 ) -> ConductorResult<PeerViewBeta> {
     let now = now();
     let arcs = run_query(env, move |mut conn| Ok(conn.p2p_list_agents()?)).await?;

@@ -13,7 +13,7 @@
 use std::time::Duration;
 
 use crate::bin_types::*;
-use dht_arc::{DhtArc, DhtLocation};
+use dht_arc::{ArcInterval, DhtLocation};
 
 use super::*;
 
@@ -22,7 +22,7 @@ pub struct PublishedData {
     /// The agent that published the data.
     pub agent: Arc<KitsuneAgent>,
     /// The storage arc of the agent.
-    pub storage_arc: DhtArc,
+    pub storage_arc: ArcInterval,
     /// The op hashes published by the agent.
     pub published_hashes: Vec<(DhtLocation, KitsuneOpHash)>,
 }

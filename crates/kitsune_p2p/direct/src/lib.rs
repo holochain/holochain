@@ -47,7 +47,7 @@ pub mod prelude {
     pub use crate::types::persist::KdPersist;
     pub use crate::types::srv::{HttpRespondCb, HttpResponse, KdSrv, KdSrvEvt, KdSrvEvtStream};
     pub use crate::v1::*;
-    pub use kitsune_p2p::dht_arc::DhtArc;
+    pub use kitsune_p2p::dht_arc::ArcInterval;
     pub use kitsune_p2p_direct_api::{KdApi, KdError, KdResult};
 }
 
