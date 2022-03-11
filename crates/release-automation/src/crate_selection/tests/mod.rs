@@ -124,31 +124,31 @@ fn members_dependencies() {
                 crt.dependencies_in_workspace()
                     .unwrap()
                     .into_iter()
-                    .map(|(name, _)| name)
-                    .collect(),
+                    .map(|(dep_name, _)| dep_name.clone())
+                    .collect::<HashSet<_>>(),
             )
         })
-        .collect::<LinkedHashSet<_>>();
+        .collect::<Vec<_>>();
 
     let expected_result = [
         ("crate_b".to_string(), vec![]),
         ("crate_c".to_string(), vec!["crate_b".to_string()]),
         (
             "crate_a".to_string(),
-            vec!["crate_b".to_string(), "crate_c".to_string()],
+            vec!["crate_c".to_string(), "crate_b".to_string()],
         ),
         (
             "crate_d".to_string(),
             vec![
                 "crate_a".to_string(),
-                "crate_b".to_string(),
                 "crate_c".to_string(),
+                "crate_b".to_string(),
             ],
         ),
     ]
-    .iter()
-    .cloned()
-    .collect::<LinkedHashSet<_>>();
+    .into_iter()
+    .map(|(name, deps)| (name, deps.into_iter().collect::<HashSet<_>>()))
+    .collect::<Vec<_>>();
 
     pretty_assertions::assert_eq!(expected_result, result, "left is expected");
 }
@@ -193,12 +193,10 @@ fn members_sorted_ws2() {
     let workspace_mocker = example_workspace_2().unwrap();
     let workspace = ReleaseWorkspace::try_new(workspace_mocker.root()).unwrap();
 
-    let result = workspace
-        .members()
-        .unwrap()
-        .iter()
-        .map(|crt| crt.name())
-        .collect::<Vec<_>>();
+    let crates = workspace.members().unwrap();
+    ensure_release_order_consistency(crates).unwrap();
+
+    let result = crates.iter().map(|crt| crt.name()).collect::<Vec<_>>();
 
     let expected_result = ["crate_b", "crate_c", "crate_a", "crate_d"]
         .iter()
@@ -222,7 +220,7 @@ use CrateStateFlags::ChangedSincePreviousRelease;
 use CrateStateFlags::DisallowedVersionReqViolated;
 use CrateStateFlags::EnforcedVersionReqViolated;
 use CrateStateFlags::IsWorkspaceDependency;
-use CrateStateFlags::IsWorkspaceVersionedDevDependency;
+use CrateStateFlags::IsWorkspaceDevDependency;
 use CrateStateFlags::Matched;
 use CrateStateFlags::MissingChangelog;
 use CrateStateFlags::MissingReadme;
@@ -265,7 +263,7 @@ fn crate_state_block_consistency() {
 #[test]
 fn crate_state_allowed_dev_dependency_blockers() {
     let flags: BitFlags<CrateStateFlags> = (&[
-        IsWorkspaceVersionedDevDependency,
+        IsWorkspaceDevDependency,
         UnreleasableViaChangelogFrontmatter,
         MissingChangelog,
         EnforcedVersionReqViolated,

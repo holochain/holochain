@@ -99,6 +99,9 @@ pub(crate) mod cli {
 
         #[structopt(long, default_value = "warn")]
         pub(crate) log_level: log::Level,
+
+        #[structopt(long, default_value = "release_automation=info")]
+        pub(crate) log_filters: String,
     }
 
     #[derive(Debug, StructOpt)]
@@ -322,6 +325,7 @@ fn main() -> CommandResult {
     env_logger::builder()
         .filter_level(args.log_level.to_level_filter())
         .filter(Some("cargo::core::workspace"), log::LevelFilter::Error)
+        .parse_filters(&args.log_filters)
         .format_timestamp(None)
         .init();
 
