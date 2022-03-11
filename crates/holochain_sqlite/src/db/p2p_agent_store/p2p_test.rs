@@ -155,21 +155,13 @@ async fn test_p2p_agent_store_gossip_query_sanity() {
 
     // check that gossip query over full range returns 20 results
     let all = con
-        .p2p_gossip_query_agents(
-            u64::MIN,
-            u64::MAX,
-            DhtArc::from_bounds(0, u32::MAX).into(),
-        )
+        .p2p_gossip_query_agents(u64::MIN, u64::MAX, DhtArc::from_bounds(0, u32::MAX).into())
         .unwrap();
     assert_eq!(all.len(), num_nonzero);
 
     // check that gossip query over zero time returns zero results
     let all = con
-        .p2p_gossip_query_agents(
-            u64::MIN,
-            u64::MIN,
-            DhtArc::from_bounds(0, u32::MAX).into(),
-        )
+        .p2p_gossip_query_agents(u64::MIN, u64::MIN, DhtArc::from_bounds(0, u32::MAX).into())
         .unwrap();
     assert_eq!(all.len(), 0);
 

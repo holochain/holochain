@@ -127,8 +127,7 @@ impl ShardedGossipLocal {
         // Get the local intervals.
         let local_agent_arcs =
             store::local_agent_arcs(&self.evt_sender, &self.space, &local_agents).await?;
-        let local_arcs: Vec<DhtArc> =
-            local_agent_arcs.into_iter().map(|(_, arc)| arc).collect();
+        let local_arcs: Vec<DhtArc> = local_agent_arcs.into_iter().map(|(_, arc)| arc).collect();
 
         let agent_list = self
             .evt_sender
