@@ -91,8 +91,7 @@ impl PeerStratBeta {
                             .last()
                             .expect("Can't be empty if we have twice the focus size")
                             .start_loc(),
-                    )
-                    .into(),
+                    ),
                 );
 
                 // Disable focusing to prevent recursion.

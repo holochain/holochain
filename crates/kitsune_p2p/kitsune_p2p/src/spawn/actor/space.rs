@@ -305,8 +305,8 @@ impl SpaceInternalHandler for Space {
         let mut local_agent_info_events = Vec::new();
         match destination {
             BroadcastTo::Notify => {
-                for agent in self.local_joined_agents.iter().cloned() {
-                    if let Some(arc) = self.agent_arcs.get(&agent) {
+                for agent in self.local_joined_agents.iter() {
+                    if let Some(arc) = self.agent_arcs.get(agent) {
                         if arc.contains(basis.get_loc()) {
                             let fut = self.evt_sender.notify(
                                 space.clone(),
@@ -770,8 +770,8 @@ impl KitsuneP2pHandler for Space {
         let mut local_agent_info_events = Vec::new();
         match destination {
             BroadcastTo::Notify => {
-                for agent in self.local_joined_agents.iter().cloned() {
-                    if let Some(arc) = self.agent_arcs.get(&agent) {
+                for agent in self.local_joined_agents.iter() {
+                    if let Some(arc) = self.agent_arcs.get(agent) {
                         if arc.contains(basis.get_loc()) {
                             let fut = self.evt_sender.notify(
                                 space.clone(),

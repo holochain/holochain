@@ -546,7 +546,7 @@ impl SwitchboardAgent {
         let lo: Loc8 = lo.into();
         let hi: Loc8 = hi.into();
         let initial_arc = DhtArc::Bounded(lo, hi);
-        let loc8 = initial_arc.clone().canonical().start_loc().as_loc8();
+        let loc8 = initial_arc.canonical().start_loc().as_loc8();
 
         Self {
             loc: loc8,

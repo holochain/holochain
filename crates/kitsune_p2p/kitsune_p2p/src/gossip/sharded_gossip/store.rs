@@ -51,7 +51,7 @@ pub(super) async fn local_agent_arcs(
     Ok(query_agent_info(evt_sender, space, local_agents)
         .await?
         .into_iter()
-        .map(|info| (info.agent.clone(), info.storage_arc.clone()))
+        .map(|info| (info.agent.clone(), info.storage_arc))
         .collect::<Vec<_>>())
 }
 
