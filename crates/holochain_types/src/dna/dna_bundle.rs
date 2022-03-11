@@ -142,7 +142,7 @@ impl DnaBundle {
 
                     let properties: SerializedBytes = properties
                         .as_ref()
-                        .or(manifest.properties.as_ref())
+                        .or_else(|| manifest.properties.as_ref())
                         .map(SerializedBytes::try_from)
                         .unwrap_or_else(|| SerializedBytes::try_from(()))?;
                     let uid = uid.or_else(|| manifest.uid.clone()).unwrap_or_default();
