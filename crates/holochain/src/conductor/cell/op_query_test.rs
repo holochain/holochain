@@ -104,7 +104,7 @@ async fn test_dht_op_query() {
                 &mut reader,
                 Some(ages_ago.into()),
                 Some(future.into()),
-                Some(ArcInterval::new(same_basis.get_loc(), 1)),
+                Some(DhtArc::new(same_basis.get_loc(), 1)),
             )
             .unwrap()
             .map(|(_, v)| Ok(v))
@@ -120,7 +120,7 @@ async fn test_dht_op_query() {
                 &mut reader,
                 None,
                 None,
-                Some(ArcInterval::new(same_basis.get_loc(), 1)),
+                Some(DhtArc::new(same_basis.get_loc(), 1)),
             )
             .unwrap()
             .map(|(_, v)| Ok(v))

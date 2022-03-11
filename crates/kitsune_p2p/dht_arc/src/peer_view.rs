@@ -3,7 +3,7 @@ mod peer_view_beta;
 pub use peer_view_alpha::*;
 pub use peer_view_beta::*;
 
-use crate::ArcInterval;
+use crate::DhtArc;
 
 pub mod gaps;
 
@@ -22,14 +22,14 @@ impl Default for PeerStrat {
 }
 
 impl PeerStrat {
-    pub fn view(&self, arc: ArcInterval, peers: &[ArcInterval]) -> PeerView {
+    pub fn view(&self, arc: DhtArc, peers: &[DhtArc]) -> PeerView {
         match self {
             Self::Alpha(s) => s.view(arc, peers).into(),
             Self::Beta(s) => s.view(arc, peers).into(),
         }
     }
 
-    pub fn view_unchecked(&self, arc: ArcInterval, peers: &[ArcInterval]) -> PeerView {
+    pub fn view_unchecked(&self, arc: DhtArc, peers: &[DhtArc]) -> PeerView {
         match self {
             Self::Alpha(s) => s.view_unchecked(arc, peers).into(),
             Self::Beta(s) => s.view_unchecked(arc, peers).into(),

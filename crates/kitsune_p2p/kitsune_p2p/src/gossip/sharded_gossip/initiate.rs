@@ -78,7 +78,7 @@ impl ShardedGossipLocal {
     pub(super) async fn incoming_initiate(
         &self,
         peer_cert: Tx2Cert,
-        remote_arc_set: Vec<ArcInterval>,
+        remote_arc_set: Vec<DhtArc>,
         remote_id: u32,
         remote_agent_list: Vec<AgentInfoSigned>,
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
@@ -127,7 +127,7 @@ impl ShardedGossipLocal {
         // Get the local intervals.
         let local_agent_arcs =
             store::local_agent_arcs(&self.evt_sender, &self.space, &local_agents).await?;
-        let local_arcs: Vec<ArcInterval> =
+        let local_arcs: Vec<DhtArc> =
             local_agent_arcs.into_iter().map(|(_, arc)| arc).collect();
 
         let agent_list = self
@@ -186,8 +186,8 @@ impl ShardedGossipLocal {
     pub(super) async fn generate_blooms(
         &self,
         remote_agent_list: Vec<AgentInfoSigned>,
-        local_arcs: Vec<ArcInterval>,
-        remote_arc_set: Vec<ArcInterval>,
+        local_arcs: Vec<DhtArc>,
+        remote_arc_set: Vec<DhtArc>,
         gossip: &mut Vec<ShardedGossipWire>,
     ) -> KitsuneResult<RoundState> {
         // Create the common arc set from the remote and local arcs.

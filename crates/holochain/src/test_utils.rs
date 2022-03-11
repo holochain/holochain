@@ -19,7 +19,7 @@ use holochain_conductor_api::IntegrationStateDump;
 use holochain_conductor_api::IntegrationStateDumps;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::actor::HolochainP2pRefToDna;
-use holochain_p2p::dht_arc::ArcInterval;
+use holochain_p2p::dht_arc::DhtArc;
 use holochain_p2p::dht_arc::PeerViewBeta;
 use holochain_p2p::event::HolochainP2pEvent;
 use holochain_p2p::spawn_holochain_p2p;
@@ -238,7 +238,7 @@ where
                     respond.r(Ok(async move {
                         Ok(PeerViewBeta::new(
                             Default::default(),
-                            ArcInterval::full(0),
+                            DhtArc::full(0),
                             1.0,
                             1,
                         ))

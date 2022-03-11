@@ -19,7 +19,7 @@ pub const DETAIL: u8 = 1;
 
 type DataVec = statrs::statistics::Data<Vec<f64>>;
 
-pub type Peers = Vec<ArcInterval>;
+pub type Peers = Vec<DhtArc>;
 
 fn full_len() -> f64 {
     2f64.powi(32)
@@ -175,7 +175,7 @@ pub fn unit_arcs<H: Iterator<Item = (f64, f64)>>(arcs: H) -> Peers {
     let fc = full_len();
     let fh = MAX_HALF_LENGTH as f64;
     arcs.map(|(s, h)| {
-        ArcInterval::from_start_and_halflen((s * fc).min(u32::MAX as f64) as u32, (h * fh) as u32)
+        DhtArc::from_start_and_halflen((s * fc).min(u32::MAX as f64) as u32, (h * fh) as u32)
     })
     .collect()
 }

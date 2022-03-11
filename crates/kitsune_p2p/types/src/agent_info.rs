@@ -1,7 +1,7 @@
 //! Data structures to be stored in the agent/peer database.
 
 use crate::bin_types::*;
-use crate::dht_arc::ArcInterval;
+use crate::dht_arc::DhtArc;
 use crate::tx2::tx2_utils::TxUrl;
 use crate::*;
 use agent_info_helper::*;
@@ -10,7 +10,7 @@ use agent_info_helper::*;
 pub type UrlList = Vec<TxUrl>;
 
 /// An agent paired with its storage arc in interval form
-pub type AgentArc = (Arc<KitsuneAgent>, ArcInterval);
+pub type AgentArc = (Arc<KitsuneAgent>, DhtArc);
 
 /// agent_info helper types
 pub mod agent_info_helper {
@@ -65,7 +65,7 @@ pub struct AgentInfoInner {
     pub agent: Arc<KitsuneAgent>,
 
     /// The storage arc currently being published by this agent.
-    pub storage_arc: ArcInterval,
+    pub storage_arc: DhtArc,
 
     /// List of urls the agent can be reached at, in the agent's own preference order.
     pub url_list: UrlList,
@@ -165,7 +165,7 @@ impl<'de> serde::Deserialize<'de> for AgentInfoSigned {
 
         let start_loc = agent.get_loc();
         let storage_arc =
-            ArcInterval::from_start_and_halflen(start_loc, meta.dht_storage_arc_half_length);
+            DhtArc::from_start_and_halflen(start_loc, meta.dht_storage_arc_half_length);
 
         let AgentInfoEncode {
             space,
@@ -231,7 +231,7 @@ impl AgentInfoSigned {
         let inner = AgentInfoInner {
             space,
             agent,
-            storage_arc: ArcInterval::from_start_and_halflen(
+            storage_arc: DhtArc::from_start_and_halflen(
                 start_loc,
                 dht_storage_arc_half_length,
             ),

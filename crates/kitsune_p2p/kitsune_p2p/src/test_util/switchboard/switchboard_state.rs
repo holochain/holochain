@@ -16,7 +16,7 @@ use kitsune_p2p_types::agent_info::{AgentInfoInner, AgentInfoSigned};
 use kitsune_p2p_types::bin_types::*;
 use kitsune_p2p_types::config::KitsuneP2pTuningParams;
 use kitsune_p2p_types::dht_arc::loc8::Loc8;
-use kitsune_p2p_types::dht_arc::{ArcInterval, DhtLocation};
+use kitsune_p2p_types::dht_arc::{DhtArc, DhtLocation};
 use kitsune_p2p_types::metrics::metric_task;
 use kitsune_p2p_types::tx2::tx2_api::*;
 use kitsune_p2p_types::tx2::tx2_pool_promote::*;
@@ -276,9 +276,9 @@ impl SwitchboardState {
             let node_id = ep.uniq();
             let ascii = if with_ops {
                 let ops = node.ops.keys().copied();
-                ArcInterval::Empty(DhtLocation::from(0)).to_ascii_with_ops(width, ops)
+                DhtArc::Empty(DhtLocation::from(0)).to_ascii_with_ops(width, ops)
             } else {
-                ArcInterval::Empty(DhtLocation::from(0)).to_ascii(width)
+                DhtArc::Empty(DhtLocation::from(0)).to_ascii(width)
             };
             println!(
                 "{:>4} {:>+5} ({:^width$})",
@@ -522,13 +522,13 @@ impl SwitchboardState {
 /// The reason for this type is to reduce the redundancy
 /// of needing to specify both the agent's location and the
 /// storage arc. It is most convenient to specify arcs in terms
-/// of ArcInterval, but we use the agent's Loc8 location as their
+/// of DhtArc, but we use the agent's Loc8 location as their
 /// unique identifier. This allows specification of agents in
 /// terms of arcs.
 #[derive(Clone, derive_more::AsRef)]
 pub struct SwitchboardAgent {
     pub(super) loc: Loc8,
-    initial_arc: ArcInterval<Loc8>,
+    initial_arc: DhtArc<Loc8>,
 }
 
 impl SwitchboardAgent {
@@ -536,7 +536,7 @@ impl SwitchboardAgent {
     pub fn full<L: Copy + Into<Loc8>>(loc: L) -> Self {
         Self {
             loc: loc.into(),
-            initial_arc: ArcInterval::Full(loc.into()),
+            initial_arc: DhtArc::Full(loc.into()),
         }
     }
 
@@ -545,7 +545,7 @@ impl SwitchboardAgent {
     pub fn from_bounds<L: Into<Loc8>>(lo: L, hi: L) -> Self {
         let lo: Loc8 = lo.into();
         let hi: Loc8 = hi.into();
-        let initial_arc = ArcInterval::Bounded(lo, hi);
+        let initial_arc = DhtArc::Bounded(lo, hi);
         let loc8 = initial_arc.clone().canonical().start_loc().as_loc8();
 
         Self {
@@ -560,7 +560,7 @@ impl SwitchboardAgent {
         let start: Loc8 = start.into();
         let len = half_len * 2 - 1;
         let end = Loc8::from((start.as_u8() + len - 1) as i8);
-        let initial_arc = ArcInterval::Bounded(start, end);
+        let initial_arc = DhtArc::Bounded(start, end);
 
         Self {
             loc: start,
@@ -680,7 +680,7 @@ fn fake_agent_info(
     space: KSpace,
     node: &NodeEp,
     agent: KAgent,
-    interval: ArcInterval,
+    interval: DhtArc,
 ) -> AgentInfoSigned {
     use crate::fixt::*;
     let url_list = vec![node.local_addr().unwrap()];

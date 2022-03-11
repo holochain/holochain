@@ -9,7 +9,7 @@ use ::fixt::prelude::*;
 use hdk::prelude::*;
 use holo_hash::{DhtOpHash, DnaHash};
 use holochain_conductor_api::conductor::ConductorConfig;
-use holochain_p2p::dht_arc::{ArcInterval, ArcInterval, DhtLocation};
+use holochain_p2p::dht_arc::{DhtArc, DhtArc, DhtLocation};
 use holochain_p2p::{AgentPubKeyExt, DhtOpHashExt, DnaHashExt};
 use holochain_sqlite::db::{p2p_put_single, AsP2pStateTxExt};
 use holochain_state::prelude::from_blob;
@@ -41,7 +41,7 @@ pub struct MockNetworkData {
     /// KitsuneAgent -> AgentPubKey
     pub agent_kit_to_hash: HashMap<Arc<KitsuneAgent>, Arc<AgentPubKey>>,
     /// Agent storage arcs.
-    pub agent_to_arc: HashMap<Arc<AgentPubKey>, ArcInterval>,
+    pub agent_to_arc: HashMap<Arc<AgentPubKey>, DhtArc>,
     /// Agents peer info.
     pub agent_to_info: HashMap<Arc<AgentPubKey>, AgentInfoSigned>,
     /// Hashes ordered by their basis location.
@@ -141,9 +141,9 @@ impl MockNetworkData {
     pub fn hashes_authority_for(&self, agent: &AgentPubKey) -> Vec<Arc<DhtOpHash>> {
         let arc = self.agent_to_arc[agent].interval();
         match arc {
-            ArcInterval::Empty => Vec::with_capacity(0),
-            ArcInterval::Full => self.ops_by_loc.values().flatten().cloned().collect(),
-            ArcInterval::Bounded(start, end) => {
+            DhtArc::Empty => Vec::with_capacity(0),
+            DhtArc::Full => self.ops_by_loc.values().flatten().cloned().collect(),
+            DhtArc::Bounded(start, end) => {
                 if start <= end {
                     self.ops_by_loc
                         .range(start..=end)
@@ -323,7 +323,7 @@ async fn create_test_data(
     let num_storage_buckets = (1.0 / coverage).round() as u32;
     let bucket_size = u32::MAX / num_storage_buckets;
     let buckets = (0..num_storage_buckets)
-        .map(|i| ArcInterval::new(i * bucket_size, i * bucket_size + bucket_size))
+        .map(|i| DhtArc::new(i * bucket_size, i * bucket_size + bucket_size))
         .collect::<Vec<_>>();
     let mut bucket_counts = vec![0; buckets.len()];
     let mut entries = Vec::with_capacity(buckets.len() * approx_num_ops_held);

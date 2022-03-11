@@ -6,8 +6,8 @@ use std::ops::{Bound, RangeBounds};
 
 /// Check a set of peers for a gap in coverage.
 /// Note this function is only used for verification in tests at this time.
-pub fn check_for_gaps(peers: Vec<ArcInterval>) -> bool {
-    let left = |arc: &ArcInterval| match arc.range().start_bound() {
+pub fn check_for_gaps(peers: Vec<DhtArc>) -> bool {
+    let left = |arc: &DhtArc| match arc.range().start_bound() {
         Bound::Included(arm) => *arm,
         _ => unreachable!(),
     };

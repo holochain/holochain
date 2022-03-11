@@ -27,8 +27,8 @@ impl Default for PeerStratAlpha {
 }
 
 impl PeerStratAlpha {
-    pub fn view(&self, arc: ArcInterval, peers: &[ArcInterval]) -> PeerViewAlpha {
-        let peers: Vec<ArcInterval> = peers
+    pub fn view(&self, arc: DhtArc, peers: &[DhtArc]) -> PeerViewAlpha {
+        let peers: Vec<DhtArc> = peers
             .iter()
             .filter(|a| arc.contains(a.start_loc()))
             .copied()
@@ -36,7 +36,7 @@ impl PeerStratAlpha {
         Self::view_unchecked(self, arc, peers.as_slice())
     }
 
-    pub fn view_unchecked(&self, arc: ArcInterval, peers: &[ArcInterval]) -> PeerViewAlpha {
+    pub fn view_unchecked(&self, arc: DhtArc, peers: &[DhtArc]) -> PeerViewAlpha {
         let (total, count) = peers.iter().fold((0u64, 0usize), |(total, count), arc| {
             (total + arc.length(), count + 1)
         });
@@ -55,7 +55,7 @@ pub struct PeerViewAlpha {
     /// The strategy params that generated this view.
     strat: PeerStratAlpha,
     /// The arc that filtered the bucket that generated this view.
-    filter: ArcInterval,
+    filter: DhtArc,
     /// The average coverage of peers in the bucket.
     average_coverage: f64,
     /// The number of peers in the bucket.
@@ -67,12 +67,7 @@ impl PeerViewAlpha {
     /// - The filter used to create the bucket.
     /// - Average coverage of all peers in the bucket.
     /// - Count of peers in the bucket.
-    pub fn new(
-        strat: PeerStratAlpha,
-        filter: ArcInterval,
-        average_coverage: f64,
-        count: usize,
-    ) -> Self {
+    pub fn new(strat: PeerStratAlpha, filter: DhtArc, average_coverage: f64, count: usize) -> Self {
         Self {
             strat,
             filter,

@@ -5,7 +5,7 @@ use ghost_actor::dependencies::tracing;
 use kitsune_p2p_mdns::*;
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use kitsune_p2p_types::codec::{rmp_decode, rmp_encode};
-use kitsune_p2p_types::dht_arc::{ArcInterval, DhtArcSet};
+use kitsune_p2p_types::dht_arc::{DhtArc, DhtArcSet};
 use kitsune_p2p_types::tx2::tx2_utils::TxUrl;
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::AtomicBool;
@@ -46,7 +46,7 @@ ghost_actor::ghost_chan! {
         fn is_agent_local(agent: KAgent) -> bool;
 
         /// Update the arc of a local agent.
-        fn update_agent_arc(agent: KAgent, arc: ArcInterval) -> ();
+        fn update_agent_arc(agent: KAgent, arc: DhtArc) -> ();
 
         /// Incoming Delegate Broadcast
         /// We are being requested to delegate a broadcast to our neighborhood
@@ -282,7 +282,7 @@ impl SpaceInternalHandler for Space {
     fn handle_update_agent_arc(
         &mut self,
         agent: Arc<KitsuneAgent>,
-        arc: ArcInterval,
+        arc: DhtArc,
     ) -> SpaceInternalHandlerResult<()> {
         self.agent_arcs.insert(agent, arc);
         self.update_metric_exchange_arcset();
@@ -446,7 +446,7 @@ struct UpdateAgentInfoInput<'borrow> {
     expires_after: u64,
     space: Arc<KitsuneSpace>,
     agent: Arc<KitsuneAgent>,
-    arc: ArcInterval,
+    arc: DhtArc,
     urls: &'borrow Vec<TxUrl>,
     evt_sender: &'borrow futures::channel::mpsc::Sender<KitsuneP2pEvent>,
     internal_sender: &'borrow ghost_actor::GhostSender<SpaceInternal>,
@@ -460,7 +460,7 @@ struct UpdateAgentInfoInput<'borrow> {
 async fn update_arc_length(
     evt_sender: &futures::channel::mpsc::Sender<KitsuneP2pEvent>,
     space: Arc<KitsuneSpace>,
-    arc: &mut ArcInterval,
+    arc: &mut DhtArc,
 ) -> KitsuneP2pResult<()> {
     let density = evt_sender.query_peer_density(space.clone(), *arc).await?;
     arc.update_length(density);
@@ -1073,7 +1073,7 @@ pub(crate) struct Space {
     pub(crate) evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
     pub(crate) _host_api: HostApi,
     pub(crate) local_joined_agents: HashSet<Arc<KitsuneAgent>>,
-    pub(crate) agent_arcs: HashMap<Arc<KitsuneAgent>, ArcInterval>,
+    pub(crate) agent_arcs: HashMap<Arc<KitsuneAgent>, DhtArc>,
     pub(crate) config: Arc<KitsuneP2pConfig>,
     mdns_handles: HashMap<Vec<u8>, Arc<AtomicBool>>,
     mdns_listened_spaces: HashSet<String>,
@@ -1336,7 +1336,7 @@ impl Space {
     }
 
     /// Get the existing agent storage arc or create a new one.
-    fn get_agent_arc(&self, agent: &Arc<KitsuneAgent>) -> ArcInterval {
+    fn get_agent_arc(&self, agent: &Arc<KitsuneAgent>) -> DhtArc {
         if self
             .config
             .tuning_params
@@ -1347,9 +1347,9 @@ impl Space {
                 Some(arc) => arc,
                 None => {
                     if self.agent_arcs.is_empty() {
-                        ArcInterval::Full(agent.get_loc())
+                        DhtArc::Full(agent.get_loc())
                     } else {
-                        ArcInterval::Empty(agent.get_loc())
+                        DhtArc::Empty(agent.get_loc())
                     }
                 }
             }
@@ -1359,7 +1359,7 @@ impl Space {
             self.agent_arcs
                 .get(agent)
                 .cloned()
-                .unwrap_or_else(|| ArcInterval::Full(agent.get_loc()))
+                .unwrap_or_else(|| DhtArc::Full(agent.get_loc()))
         }
     }
 }

@@ -29,8 +29,8 @@ impl Default for PeerStratBeta {
 }
 
 impl PeerStratBeta {
-    pub fn view(&self, arc: ArcInterval, peers: &[ArcInterval]) -> PeerViewBeta {
-        let peers: Vec<ArcInterval> = peers
+    pub fn view(&self, arc: DhtArc, peers: &[DhtArc]) -> PeerViewBeta {
+        let peers: Vec<DhtArc> = peers
             .iter()
             .filter(|a| arc.contains(a.start_loc()))
             .copied()
@@ -38,7 +38,7 @@ impl PeerStratBeta {
         Self::view_unchecked(self, arc, peers.as_slice())
     }
 
-    pub fn view_unchecked(&self, arc: ArcInterval, peers: &[ArcInterval]) -> PeerViewBeta {
+    pub fn view_unchecked(&self, arc: DhtArc, peers: &[DhtArc]) -> PeerViewBeta {
         let total_coverage = total_coverage(peers);
         let count = peers.len();
         let mut full_view = PeerViewBeta::new(*self, arc, total_coverage, count);
@@ -63,8 +63,8 @@ impl PeerStratBeta {
     /// information.
     fn check_focused_view(
         &self,
-        arc: ArcInterval,
-        peers: &[ArcInterval],
+        arc: DhtArc,
+        peers: &[DhtArc],
         focus_size: usize,
     ) -> Option<f64> {
         // Focus size cannot be zero.
@@ -88,7 +88,7 @@ impl PeerStratBeta {
 
                 // Create the focused view's arc using the
                 // furthest peer as the half length.
-                let focused_arc = ArcInterval::from_start_and_halflen(
+                let focused_arc = DhtArc::from_start_and_halflen(
                     arc.start_loc(),
                     wrapped_distance(
                         arc.start_loc(),
@@ -136,7 +136,7 @@ pub struct PeerViewBeta {
     /// The strategy params that generated this view.
     pub strat: PeerStratBeta,
     /// The arc that filtered the bucket that generated this view.
-    filter: ArcInterval,
+    filter: DhtArc,
     /// The number of peers in the bucket.
     pub count: usize,
     /// An optional more focused view's target
@@ -153,7 +153,7 @@ impl PeerViewBeta {
     /// - Count of peers in the bucket.
     pub fn new(
         strat: PeerStratBeta,
-        filter: ArcInterval,
+        filter: DhtArc,
         total_coverage: f64,
         count: usize,
     ) -> Self {
@@ -298,6 +298,6 @@ impl PeerViewBeta {
 }
 
 /// Total coverage of all peers.
-fn total_coverage(peers: &[ArcInterval]) -> f64 {
+fn total_coverage(peers: &[DhtArc]) -> f64 {
     peers.iter().map(|a| a.coverage()).sum::<f64>()
 }

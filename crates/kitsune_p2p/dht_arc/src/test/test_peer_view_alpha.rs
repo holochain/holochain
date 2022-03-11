@@ -25,50 +25,50 @@ fn test_arc_dist() {
 #[test]
 fn test_check_for_gaps() {
     // Gaps
-    assert!(check_for_gaps(vec![ArcInterval::from_start_and_halflen(
+    assert!(check_for_gaps(vec![DhtArc::from_start_and_halflen(
         0, 1
     )]));
-    assert!(check_for_gaps(vec![ArcInterval::from_start_and_halflen(
+    assert!(check_for_gaps(vec![DhtArc::from_start_and_halflen(
         0, 0
     )]));
-    assert!(check_for_gaps(vec![ArcInterval::from_start_and_halflen(
+    assert!(check_for_gaps(vec![DhtArc::from_start_and_halflen(
         0,
         MAX_HALF_LENGTH - 2
     )]));
     assert!(check_for_gaps(vec![
-        ArcInterval::from_start_and_halflen(0u32, MAX_HALF_LENGTH / 2),
-        ArcInterval::from_start_and_halflen(0u32, MAX_HALF_LENGTH / 2)
+        DhtArc::from_start_and_halflen(0u32, MAX_HALF_LENGTH / 2),
+        DhtArc::from_start_and_halflen(0u32, MAX_HALF_LENGTH / 2)
     ]));
     assert!(check_for_gaps(vec![
-        ArcInterval::from_start_and_halflen(0u32, MAX_HALF_LENGTH / 3 + 1),
-        ArcInterval::from_start_and_halflen(MAX_HALF_LENGTH / 3, MAX_HALF_LENGTH / 3 + 1),
-        ArcInterval::from_start_and_halflen(
+        DhtArc::from_start_and_halflen(0u32, MAX_HALF_LENGTH / 3 + 1),
+        DhtArc::from_start_and_halflen(MAX_HALF_LENGTH / 3, MAX_HALF_LENGTH / 3 + 1),
+        DhtArc::from_start_and_halflen(
             (MAX_HALF_LENGTH / 3) * 2 + 100,
             MAX_HALF_LENGTH / 3 + 1
         )
     ]));
     assert!(check_for_gaps(vec![
-        ArcInterval::from_start_and_halflen(0u32, MAX_HALF_LENGTH / 3 + 1),
-        ArcInterval::from_start_and_halflen(MAX_HALF_LENGTH / 3 - 1, MAX_HALF_LENGTH / 3 + 1),
-        ArcInterval::from_start_and_halflen(
+        DhtArc::from_start_and_halflen(0u32, MAX_HALF_LENGTH / 3 + 1),
+        DhtArc::from_start_and_halflen(MAX_HALF_LENGTH / 3 - 1, MAX_HALF_LENGTH / 3 + 1),
+        DhtArc::from_start_and_halflen(
             MAX_HALF_LENGTH + (MAX_HALF_LENGTH / 3),
             MAX_HALF_LENGTH / 2 + MAX_HALF_LENGTH / 8,
         ),
     ]));
 
     // No Gaps
-    assert!(!check_for_gaps(vec![ArcInterval::from_start_and_halflen(
+    assert!(!check_for_gaps(vec![DhtArc::from_start_and_halflen(
         0,
         MAX_HALF_LENGTH
     )]));
     assert!(!check_for_gaps(vec![
-        ArcInterval::from_start_and_halflen(0u32, MAX_HALF_LENGTH / 2 + 1),
-        ArcInterval::from_start_and_halflen(MAX_HALF_LENGTH, MAX_HALF_LENGTH / 2 + 1)
+        DhtArc::from_start_and_halflen(0u32, MAX_HALF_LENGTH / 2 + 1),
+        DhtArc::from_start_and_halflen(MAX_HALF_LENGTH, MAX_HALF_LENGTH / 2 + 1)
     ]));
     assert!(!check_for_gaps(vec![
-        ArcInterval::from_start_and_halflen(0u32, MAX_HALF_LENGTH / 3 + 1),
-        ArcInterval::from_start_and_halflen(MAX_HALF_LENGTH / 3 - 1, MAX_HALF_LENGTH / 3 + 1),
-        ArcInterval::from_start_and_halflen(
+        DhtArc::from_start_and_halflen(0u32, MAX_HALF_LENGTH / 3 + 1),
+        DhtArc::from_start_and_halflen(MAX_HALF_LENGTH / 3 - 1, MAX_HALF_LENGTH / 3 + 1),
+        DhtArc::from_start_and_halflen(
             MAX_HALF_LENGTH + (MAX_HALF_LENGTH / 8) - 100,
             MAX_HALF_LENGTH / 2 + MAX_HALF_LENGTH / 8,
         )
@@ -79,15 +79,15 @@ fn test_check_for_gaps() {
 fn test_check_redundancy() {
     // Gaps
     assert_eq!(
-        check_redundancy(vec![ArcInterval::from_start_and_halflen(0u32, 1)]),
+        check_redundancy(vec![DhtArc::from_start_and_halflen(0u32, 1)]),
         0
     );
     assert_eq!(
-        check_redundancy(vec![ArcInterval::from_start_and_halflen(0u32, 0)]),
+        check_redundancy(vec![DhtArc::from_start_and_halflen(0u32, 0)]),
         0
     );
     assert_eq!(
-        check_redundancy(vec![ArcInterval::from_start_and_halflen(
+        check_redundancy(vec![DhtArc::from_start_and_halflen(
             0u32,
             MAX_HALF_LENGTH - 2
         )]),
@@ -95,16 +95,16 @@ fn test_check_redundancy() {
     );
     assert_eq!(
         check_redundancy(vec![
-            ArcInterval::from_start_and_halflen(0u32, MAX_HALF_LENGTH / 2),
-            ArcInterval::from_start_and_halflen(0u32, MAX_HALF_LENGTH / 2)
+            DhtArc::from_start_and_halflen(0u32, MAX_HALF_LENGTH / 2),
+            DhtArc::from_start_and_halflen(0u32, MAX_HALF_LENGTH / 2)
         ]),
         0
     );
     assert_eq!(
         check_redundancy(vec![
-            ArcInterval::from_start_and_halflen(0u32, MAX_HALF_LENGTH / 3 + 1),
-            ArcInterval::from_start_and_halflen(MAX_HALF_LENGTH / 3, MAX_HALF_LENGTH / 3 + 1),
-            ArcInterval::from_start_and_halflen(
+            DhtArc::from_start_and_halflen(0u32, MAX_HALF_LENGTH / 3 + 1),
+            DhtArc::from_start_and_halflen(MAX_HALF_LENGTH / 3, MAX_HALF_LENGTH / 3 + 1),
+            DhtArc::from_start_and_halflen(
                 (MAX_HALF_LENGTH / 3) * 2 + 100,
                 MAX_HALF_LENGTH / 3 + 1
             )
@@ -113,9 +113,9 @@ fn test_check_redundancy() {
     );
     assert_eq!(
         check_redundancy(vec![
-            ArcInterval::from_start_and_halflen(0u32, MAX_HALF_LENGTH / 3 + 1),
-            ArcInterval::from_start_and_halflen(MAX_HALF_LENGTH / 3 - 1, MAX_HALF_LENGTH / 3 + 1),
-            ArcInterval::from_start_and_halflen(
+            DhtArc::from_start_and_halflen(0u32, MAX_HALF_LENGTH / 3 + 1),
+            DhtArc::from_start_and_halflen(MAX_HALF_LENGTH / 3 - 1, MAX_HALF_LENGTH / 3 + 1),
+            DhtArc::from_start_and_halflen(
                 MAX_HALF_LENGTH + (MAX_HALF_LENGTH / 3),
                 MAX_HALF_LENGTH / 2 + MAX_HALF_LENGTH / 8,
             ),
@@ -125,7 +125,7 @@ fn test_check_redundancy() {
 
     // No Gaps
     assert_eq!(
-        check_redundancy(vec![ArcInterval::from_start_and_halflen(
+        check_redundancy(vec![DhtArc::from_start_and_halflen(
             0u32,
             MAX_HALF_LENGTH
         )]),
@@ -133,7 +133,7 @@ fn test_check_redundancy() {
     );
     assert_eq!(
         check_redundancy(vec![
-            ArcInterval::from_start_and_halflen(
+            DhtArc::from_start_and_halflen(
                 0u32,
                 MAX_HALF_LENGTH
             );
@@ -142,7 +142,7 @@ fn test_check_redundancy() {
         3
     );
     assert_eq!(
-        check_redundancy(vec![ArcInterval::from_start_and_halflen(
+        check_redundancy(vec![DhtArc::from_start_and_halflen(
             0u32,
             MAX_HALF_LENGTH - 1
         )]),
@@ -150,16 +150,16 @@ fn test_check_redundancy() {
     );
     assert_eq!(
         check_redundancy(vec![
-            ArcInterval::from_start_and_halflen(0u32, MAX_HALF_LENGTH / 2 + 1),
-            ArcInterval::from_start_and_halflen(MAX_HALF_LENGTH, MAX_HALF_LENGTH / 2 + 1)
+            DhtArc::from_start_and_halflen(0u32, MAX_HALF_LENGTH / 2 + 1),
+            DhtArc::from_start_and_halflen(MAX_HALF_LENGTH, MAX_HALF_LENGTH / 2 + 1)
         ]),
         1
     );
     assert_eq!(
         check_redundancy(vec![
-            ArcInterval::from_start_and_halflen(0u32, MAX_HALF_LENGTH / 3 + 1),
-            ArcInterval::from_start_and_halflen(MAX_HALF_LENGTH / 3 - 1, MAX_HALF_LENGTH / 3 + 1),
-            ArcInterval::from_start_and_halflen(
+            DhtArc::from_start_and_halflen(0u32, MAX_HALF_LENGTH / 3 + 1),
+            DhtArc::from_start_and_halflen(MAX_HALF_LENGTH / 3 - 1, MAX_HALF_LENGTH / 3 + 1),
+            DhtArc::from_start_and_halflen(
                 MAX_HALF_LENGTH + (MAX_HALF_LENGTH / 8) - 100,
                 MAX_HALF_LENGTH / 2 + MAX_HALF_LENGTH / 8,
             )
@@ -169,7 +169,7 @@ fn test_check_redundancy() {
     let arm = Wrapping(MAX_HALF_LENGTH / 3);
     let mut peers = Vec::new();
     for i in 0..12 {
-        peers.push(ArcInterval::from_start_and_halflen(
+        peers.push(DhtArc::from_start_and_halflen(
             (arm * Wrapping(i)).0,
             arm.0 + 10,
         ));
@@ -180,7 +180,7 @@ fn test_check_redundancy() {
 #[test]
 #[ignore = "too brittle"]
 fn test_peer_gaps() {
-    let converge = |peers: &mut Vec<ArcInterval>| {
+    let converge = |peers: &mut Vec<DhtArc>| {
         let strat: PeerStrat = PeerStratAlpha {
             check_gaps: true,
             ..Default::default()
@@ -215,14 +215,14 @@ fn test_peer_gaps() {
     }
 }
 
-pub(crate) fn even_dist_peers(num: usize, half_lens: &[u32]) -> Vec<ArcInterval> {
+pub(crate) fn even_dist_peers(num: usize, half_lens: &[u32]) -> Vec<DhtArc> {
     let mut hl = half_lens.iter();
     let iter = std::iter::repeat_with(|| hl.next().unwrap_or(&half_lens[0]));
     (0..num)
         .zip(iter)
         .map(|(i, half_len)| {
             let dist = i as f64 / num as f64 * u32::MAX as f64;
-            ArcInterval::from_start_and_halflen(dist as u32, *half_len)
+            DhtArc::from_start_and_halflen(dist as u32, *half_len)
         })
         .collect()
 }

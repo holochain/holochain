@@ -7,7 +7,7 @@ use std::{
 /// Check a set of peers the actual redundancy across all peers.
 /// This can tell if there is bad distribution.
 /// Note this function is only used for verification in tests at this time.
-pub fn check_redundancy(peers: Vec<ArcInterval>) -> u32 {
+pub fn check_redundancy(peers: Vec<DhtArc>) -> u32 {
     use std::collections::HashSet;
     #[derive(Clone, Copy, Debug)]
     enum Side {
@@ -20,11 +20,11 @@ pub fn check_redundancy(peers: Vec<ArcInterval>) -> u32 {
         side: Side,
         pos: u32,
     }
-    let left = |arc: &ArcInterval| match arc.range().start_bound() {
+    let left = |arc: &DhtArc| match arc.range().start_bound() {
         Bound::Included(arm) => *arm,
         _ => unreachable!(),
     };
-    let right = |arc: &ArcInterval| match arc.range().end_bound() {
+    let right = |arc: &DhtArc| match arc.range().end_bound() {
         Bound::Included(arm) => *arm,
         _ => unreachable!(),
     };
@@ -32,7 +32,7 @@ pub fn check_redundancy(peers: Vec<ArcInterval>) -> u32 {
     // Turn each arc into a side with a unique id that is
     // shared by both sides.
     let mut id = 0;
-    let mut sides = |arc: &ArcInterval| {
+    let mut sides = |arc: &DhtArc| {
         let i = id;
         let l = Arm {
             id: i,

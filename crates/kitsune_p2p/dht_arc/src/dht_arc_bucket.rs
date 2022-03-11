@@ -1,21 +1,21 @@
 use crate::*;
 
 /// When sampling a section of the arc we can
-/// collect all the other peer [`ArcInterval`]s into a
+/// collect all the other peer [`DhtArc`]s into a
 /// DhtBucket.
 /// All the peer arcs arc contained within the buckets filter arc.
 /// The filter is this peer's "view" into their section of the dht arc.
 /// This type is mainly used for Display purposes.
 pub struct DhtArcBucket {
     /// The arc used to filter this bucket.
-    filter: ArcInterval,
+    filter: DhtArc,
     /// The arcs in this bucket.
-    arcs: Vec<ArcInterval>,
+    arcs: Vec<DhtArc>,
 }
 
 impl DhtArcBucket {
     /// Select only the arcs that fit into the bucket.
-    pub fn new<I: IntoIterator<Item = ArcInterval>>(filter: ArcInterval, arcs: I) -> Self {
+    pub fn new<I: IntoIterator<Item = DhtArc>>(filter: DhtArc, arcs: I) -> Self {
         let arcs = arcs
             .into_iter()
             .filter(|a| filter.contains(a.start_loc()))
@@ -24,7 +24,7 @@ impl DhtArcBucket {
     }
 
     /// Same as new but doesn't check if arcs fit into the bucket.
-    pub fn new_unchecked(bucket: ArcInterval, arcs: Vec<ArcInterval>) -> Self {
+    pub fn new_unchecked(bucket: DhtArc, arcs: Vec<DhtArc>) -> Self {
         Self {
             filter: bucket,
             arcs,

@@ -60,19 +60,19 @@ impl RangeBounds<u32> for ArcRange {
         u32: PartialOrd<U>,
         U: ?Sized + PartialOrd<u32>,
     {
-        unimplemented!("Contains doesn't make sense for this type of range due to redundant holding near the bounds. Use ArcInterval::contains")
+        unimplemented!("Contains doesn't make sense for this type of range due to redundant holding near the bounds. Use DhtArc::contains")
     }
 }
 
 /// An alternate implementation of `ArcRange`
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-pub enum ArcInterval<T = DhtLocation> {
+pub enum DhtArc<T = DhtLocation> {
     Empty(T),
     Full(T),
     Bounded(T, T),
 }
 
-impl<T: PartialOrd + num_traits::Num> ArcInterval<T> {
+impl<T: PartialOrd + num_traits::Num> DhtArc<T> {
     pub fn contains<B: std::borrow::Borrow<T>>(&self, t: B) -> bool {
         match self {
             Self::Empty(_) => false,
@@ -89,12 +89,12 @@ impl<T: PartialOrd + num_traits::Num> ArcInterval<T> {
     }
 }
 
-impl<T> ArcInterval<T> {
-    pub fn map<U, F: Fn(T) -> U>(self, f: F) -> ArcInterval<U> {
+impl<T> DhtArc<T> {
+    pub fn map<U, F: Fn(T) -> U>(self, f: F) -> DhtArc<U> {
         match self {
-            Self::Empty(s) => ArcInterval::Empty(f(s)),
-            Self::Full(s) => ArcInterval::Full(f(s)),
-            Self::Bounded(lo, hi) => ArcInterval::Bounded(f(lo), f(hi)),
+            Self::Empty(s) => DhtArc::Empty(f(s)),
+            Self::Full(s) => DhtArc::Full(f(s)),
+            Self::Bounded(lo, hi) => DhtArc::Bounded(f(lo), f(hi)),
         }
     }
 
@@ -104,30 +104,30 @@ impl<T> ArcInterval<T> {
     }
 }
 
-impl<T: num_traits::AsPrimitive<u32>> ArcInterval<T> {
-    pub fn from_bounds(start: T, end: T) -> ArcInterval<DhtLocation> {
+impl<T: num_traits::AsPrimitive<u32>> DhtArc<T> {
+    pub fn from_bounds(start: T, end: T) -> DhtArc<DhtLocation> {
         let start = start.as_();
         let end = end.as_();
         if is_full(start, end) {
-            ArcInterval::Full(start.into())
+            DhtArc::Full(start.into())
         } else {
-            ArcInterval::Bounded(DhtLocation::new(start), DhtLocation::new(end))
+            DhtArc::Bounded(DhtLocation::new(start), DhtLocation::new(end))
         }
     }
 
-    pub fn from_start_and_len(start: T, len: u64) -> ArcInterval<DhtLocation> {
+    pub fn from_start_and_len(start: T, len: u64) -> DhtArc<DhtLocation> {
         let start = start.as_();
         if len == 0 {
-            ArcInterval::Empty(start.into())
+            DhtArc::Empty(start.into())
         } else {
             let end = start.wrapping_add((len - 1) as u32);
-            ArcInterval::from_bounds(start, end)
+            DhtArc::from_bounds(start, end)
         }
     }
 
     /// Convenience for our legacy code which defined arcs in terms of half-lengths
     /// rather than full lengths
-    pub fn from_start_and_halflen(start: T, halflen: u32) -> ArcInterval<DhtLocation> {
+    pub fn from_start_and_halflen(start: T, halflen: u32) -> DhtArc<DhtLocation> {
         Self::from_start_and_len(start, (halflen as u64) * 2 - 1)
     }
 
@@ -140,19 +140,19 @@ impl<T: num_traits::AsPrimitive<u32>> ArcInterval<T> {
     }
 }
 
-impl ArcInterval<u32> {
-    pub fn canonical(self) -> ArcInterval {
+impl DhtArc<u32> {
+    pub fn canonical(self) -> DhtArc {
         match self {
-            ArcInterval::Empty(s) => ArcInterval::Empty(DhtLocation::new(s)),
-            ArcInterval::Full(s) => ArcInterval::Full(DhtLocation::new(s)),
-            ArcInterval::Bounded(lo, hi) => {
-                ArcInterval::from_bounds(DhtLocation::new(lo), DhtLocation::new(hi))
+            DhtArc::Empty(s) => DhtArc::Empty(DhtLocation::new(s)),
+            DhtArc::Full(s) => DhtArc::Full(DhtLocation::new(s)),
+            DhtArc::Bounded(lo, hi) => {
+                DhtArc::from_bounds(DhtLocation::new(lo), DhtLocation::new(hi))
             }
         }
     }
 }
 
-impl ArcInterval<DhtLocation> {
+impl DhtArc<DhtLocation> {
     /// Constructor
     pub fn new_empty(s: DhtLocation) -> Self {
         Self::Empty(s)
@@ -197,24 +197,24 @@ impl ArcInterval<DhtLocation> {
 
     pub fn start_loc(&self) -> DhtLocation {
         match self {
-            ArcInterval::Empty(s) => *s,
-            ArcInterval::Full(s) => *s,
-            ArcInterval::Bounded(s, _) => *s,
+            DhtArc::Empty(s) => *s,
+            DhtArc::Full(s) => *s,
+            DhtArc::Bounded(s, _) => *s,
         }
     }
 
     /// Get the range of the arc
     pub fn range(&self) -> ArcRange {
         match self {
-            ArcInterval::Empty(s) => ArcRange {
+            DhtArc::Empty(s) => ArcRange {
                 start: Bound::Excluded(s.as_u32()),
                 end: Bound::Excluded(s.as_u32()),
             },
-            ArcInterval::Full(s) => ArcRange {
+            DhtArc::Full(s) => ArcRange {
                 start: Bound::Included(s.as_u32()),
                 end: Bound::Included(s.as_u32().wrapping_sub(1)),
             },
-            ArcInterval::Bounded(lo, hi) => ArcRange {
+            DhtArc::Bounded(lo, hi) => ArcRange {
                 start: Bound::Included(lo.as_u32()),
                 end: Bound::Included(hi.as_u32()),
             },
@@ -229,9 +229,9 @@ impl ArcInterval<DhtLocation> {
 
     pub fn length(&self) -> u64 {
         match self {
-            ArcInterval::Empty(_) => 0,
-            ArcInterval::Full(_) => 2u64.pow(32),
-            ArcInterval::Bounded(lo, hi) => hi.as_u32().wrapping_sub(lo.as_u32()).into(),
+            DhtArc::Empty(_) => 0,
+            DhtArc::Full(_) => 2u64.pow(32),
+            DhtArc::Bounded(lo, hi) => hi.as_u32().wrapping_sub(lo.as_u32()).into(),
         }
     }
 
@@ -336,7 +336,7 @@ impl ArcInterval<DhtLocation> {
         s
     }
 
-    pub fn canonical(self) -> ArcInterval {
+    pub fn canonical(self) -> DhtArc {
         self
     }
 }
@@ -353,8 +353,8 @@ mod tests {
 
     #[test]
     fn arc_contains() {
-        let convergent = ArcInterval::Bounded(10, 20);
-        let divergent = ArcInterval::Bounded(20, 10);
+        let convergent = DhtArc::Bounded(10, 20);
+        let divergent = DhtArc::Bounded(20, 10);
 
         assert!(!convergent.contains(0));
         assert!(!convergent.contains(5));
@@ -377,33 +377,33 @@ mod tests {
     fn test_ascii() {
         let cent = u32::MAX / 100 + 1;
         assert_eq!(
-            ArcInterval::from_bounds(cent * 30, cent * 60).to_ascii(10),
+            DhtArc::from_bounds(cent * 30, cent * 60).to_ascii(10),
             "   -@--   ".to_string()
         );
         assert_eq!(
-            ArcInterval::from_bounds(cent * 33, cent * 63).to_ascii(10),
+            DhtArc::from_bounds(cent * 33, cent * 63).to_ascii(10),
             "   -@--   ".to_string()
         );
         assert_eq!(
-            ArcInterval::from_bounds(cent * 29, cent * 59).to_ascii(10),
+            DhtArc::from_bounds(cent * 29, cent * 59).to_ascii(10),
             "  --@-    ".to_string()
         );
 
         assert_eq!(
-            ArcInterval::from_bounds(cent * 60, cent * 30).to_ascii(10),
+            DhtArc::from_bounds(cent * 60, cent * 30).to_ascii(10),
             "----  ---@".to_string()
         );
         assert_eq!(
-            ArcInterval::from_bounds(cent * 63, cent * 33).to_ascii(10),
+            DhtArc::from_bounds(cent * 63, cent * 33).to_ascii(10),
             "----  ---@".to_string()
         );
         assert_eq!(
-            ArcInterval::from_bounds(cent * 59, cent * 29).to_ascii(10),
+            DhtArc::from_bounds(cent * 59, cent * 29).to_ascii(10),
             "---  ----@".to_string()
         );
 
         assert_eq!(
-            ArcInterval::from_bounds(cent * 99, cent * 0).to_ascii(10),
+            DhtArc::from_bounds(cent * 99, cent * 0).to_ascii(10),
             "-        @".to_string()
         );
     }

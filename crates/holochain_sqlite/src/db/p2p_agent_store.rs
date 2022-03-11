@@ -3,7 +3,7 @@
 use crate::prelude::*;
 use crate::sql::*;
 use kitsune_p2p::agent_store::AgentInfoSigned;
-use kitsune_p2p::dht_arc::{ArcInterval, DhtArcSet};
+use kitsune_p2p::dht_arc::{DhtArc, DhtArcSet};
 use kitsune_p2p::KitsuneAgent;
 use rusqlite::*;
 use std::sync::Arc;
@@ -267,7 +267,7 @@ impl AsP2pStateTxExt for Transaction<'_> {
 
         for interval in dht_arc_set.intervals() {
             match interval {
-                ArcInterval::Full(_) => {
+                DhtArc::Full(_) => {
                     out.push(stmt.query_row(
                         named_params! {
                             ":now": now,
@@ -277,7 +277,7 @@ impl AsP2pStateTxExt for Transaction<'_> {
                         |r| r.get(0),
                     )?);
                 }
-                ArcInterval::Bounded(start, end) => {
+                DhtArc::Bounded(start, end) => {
                     out.push(stmt.query_row(
                         named_params! {
                             ":now": now,
