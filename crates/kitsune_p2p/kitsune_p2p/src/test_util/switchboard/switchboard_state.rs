@@ -559,7 +559,7 @@ impl SwitchboardAgent {
     pub fn from_start_and_half_len<L: Into<Loc8>>(start: L, half_len: u8) -> Self {
         let start: Loc8 = start.into();
         let len = half_len * 2 - 1;
-        let end = Loc8::from((start.as_u8() + len - 1) as i8);
+        let end = Loc8::from((start.as_u8().wrapping_add(len).wrapping_sub(1)) as i8);
         let initial_arc = DhtArc::Bounded(start, end);
 
         Self {

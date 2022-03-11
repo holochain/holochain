@@ -128,7 +128,7 @@ impl<T: num_traits::AsPrimitive<u32>> DhtArc<T> {
     /// Convenience for our legacy code which defined arcs in terms of half-lengths
     /// rather than full lengths
     pub fn from_start_and_half_len(start: T, halflen: u32) -> DhtArc<DhtLocation> {
-        Self::from_start_and_len(start, (halflen as u64) * 2 - 1)
+        Self::from_start_and_len(start, (halflen as u64 * 2).wrapping_sub(1))
     }
 
     pub fn new_generic(start: T, end: T) -> Self {
