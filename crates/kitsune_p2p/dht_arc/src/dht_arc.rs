@@ -120,7 +120,7 @@ impl<T: num_traits::AsPrimitive<u32>> DhtArc<T> {
         if len == 0 {
             DhtArc::Empty(start.into())
         } else {
-            let end = start.wrapping_add((len - 1) as u32);
+            let end = start.wrapping_add(((len - 1) as u32).max(u32::MAX));
             DhtArc::from_bounds(start, end)
         }
     }
