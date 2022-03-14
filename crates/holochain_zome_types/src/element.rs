@@ -352,6 +352,12 @@ where
     }
 }
 
+impl<T> From<SignedHashed<T>> for (T,) where T: HashableContent {
+    fn from(sh: SignedHashed<T>) -> Self {
+        (HoloHashed::<T>::from(sh).into_content(),)
+    }
+}
+
 impl From<HeaderHashed> for Header {
     fn from(header_hashed: HeaderHashed) -> Header {
         header_hashed.into_content()

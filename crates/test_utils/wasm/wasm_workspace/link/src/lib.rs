@@ -20,6 +20,10 @@ fn target() -> ExternResult<EntryHash> {
     path("b")
 }
 
+fn targetless() -> ExternResult<EntryHash> {
+    Ok(EntryHash::from_raw_32([2_u8; 32].to_vec()))
+}
+
 #[hdk_extern]
 fn create_link(_: ()) -> ExternResult<HeaderHash> {
     hdk::prelude::create_link(base()?, target()?, HdkLinkType::Any, ())
@@ -27,7 +31,7 @@ fn create_link(_: ()) -> ExternResult<HeaderHash> {
 
 #[hdk_extern]
 fn create_baseless_link(_: ()) -> ExternResult<HeaderHash> {
-    hdk::prelude::create_link(baseless()?, target()?, HdkLinkType::Any, ())
+    hdk::prelude::create_link(baseless()?, targetless()?, HdkLinkType::Any, ())
 }
 
 #[hdk_extern]
