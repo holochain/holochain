@@ -12,6 +12,10 @@ fn base() -> ExternResult<EntryHash> {
     path("a")
 }
 
+fn baseless() -> ExternResult<EntryHash> {
+    Ok(EntryHash::from_raw_32([1_u8; 32].to_vec()))
+}
+
 fn target() -> ExternResult<EntryHash> {
     path("b")
 }
@@ -19,6 +23,11 @@ fn target() -> ExternResult<EntryHash> {
 #[hdk_extern]
 fn create_link(_: ()) -> ExternResult<HeaderHash> {
     hdk::prelude::create_link(base()?, target()?, HdkLinkType::Any, ())
+}
+
+#[hdk_extern]
+fn create_baseless_link(_: ()) -> ExternResult<HeaderHash> {
+    hdk::prelude::create_link(baseless()?, target()?, HdkLinkType::Any, ())
 }
 
 #[hdk_extern]
@@ -34,6 +43,11 @@ fn delete_link(input: HeaderHash) -> ExternResult<HeaderHash> {
 #[hdk_extern]
 fn get_links(_: ()) -> ExternResult<Vec<Link>> {
     hdk::prelude::get_links(base()?, None)
+}
+
+#[hdk_extern]
+fn get_baseless_links(_: ()) -> ExternResult<Vec<Link>> {
+    hdk::prelude::get_links(baseless()?, None)
 }
 
 #[hdk_extern]
