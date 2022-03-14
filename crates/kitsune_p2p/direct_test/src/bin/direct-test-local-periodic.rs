@@ -1,7 +1,7 @@
 #![allow(clippy::field_reassign_with_default)]
 use futures::future::FutureExt;
 use kitsune_p2p_direct::dependencies::kitsune_p2p::event::full_time_window;
-use kitsune_p2p_direct::dependencies::kitsune_p2p_types::dht_arc::ArcInterval;
+use kitsune_p2p_direct::dependencies::kitsune_p2p_types::dht_arc::DhtArc;
 use kitsune_p2p_direct::dependencies::*;
 use kitsune_p2p_direct::prelude::*;
 use kitsune_p2p_direct_test::direct_test_local_periodic::*;
@@ -69,7 +69,7 @@ async fn main() {
                         test.root.clone(),
                         agent.clone(),
                         full_time_window(),
-                        ArcInterval::Full.into(),
+                        DhtArc::Full(0.into()).into(),
                     )
                     .await
                     .unwrap()

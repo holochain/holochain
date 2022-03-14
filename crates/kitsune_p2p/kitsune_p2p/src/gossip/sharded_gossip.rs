@@ -16,7 +16,7 @@ use kitsune_p2p_types::codec::Codec;
 use kitsune_p2p_types::combinators::second;
 use kitsune_p2p_types::config::*;
 use kitsune_p2p_types::dht::region::RegionSetXtcs;
-use kitsune_p2p_types::dht_arc::{ArcInterval, DhtArcSet};
+use kitsune_p2p_types::dht_arc::{DhtArc, DhtArcSet};
 use kitsune_p2p_types::metrics::*;
 use kitsune_p2p_types::tx2::tx2_api::*;
 use kitsune_p2p_types::tx2::tx2_utils::*;
@@ -955,7 +955,7 @@ kitsune_p2p_types::write_codec_enum! {
         Initiate(0x10) {
             /// The list of arc intervals (equivalent to a [`DhtArcSet`])
             /// for all local agents
-            intervals.0: Vec<ArcInterval>,
+            intervals.0: Vec<DhtArc>,
             /// A random number to resolve concurrent initiates.
             id.1: u32,
             /// List of active local agents represented by this node.
@@ -966,7 +966,7 @@ kitsune_p2p_types::write_codec_enum! {
         Accept(0x20) {
             /// The list of arc intervals (equivalent to a [`DhtArcSet`])
             /// for all local agents
-            intervals.0: Vec<ArcInterval>,
+            intervals.0: Vec<DhtArc>,
             /// List of active local agents represented by this node.
             agent_list.1: Vec<AgentInfoSigned>,
         },

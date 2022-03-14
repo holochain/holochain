@@ -142,7 +142,7 @@ async fn partial_missing_doesnt_finish() {
             round_map: maplit::hashmap! {
                 cert.clone() => RoundState {
                     remote_agent_list: vec![],
-                    common_arc_set: Arc::new(ArcInterval::Full.into()),
+                    common_arc_set: Arc::new(DhtArcSet::Full),
                     num_sent_ops_blooms: 1,
                     received_all_incoming_ops_blooms: true,
                     last_touch: Instant::now(),
@@ -191,7 +191,7 @@ async fn missing_ops_finishes() {
             round_map: maplit::hashmap! {
                 cert.clone() => RoundState {
                     remote_agent_list: vec![],
-                    common_arc_set: Arc::new(ArcInterval::Full.into()),
+                    common_arc_set: Arc::new(DhtArcSet::Full),
                     num_sent_ops_blooms: 1,
                     received_all_incoming_ops_blooms: true,
                     last_touch: Instant::now(),
@@ -241,7 +241,7 @@ async fn missing_ops_doesnt_finish_awaiting_bloom_responses() {
             round_map: maplit::hashmap! {
                 cert.clone() => RoundState {
                     remote_agent_list: vec![],
-                    common_arc_set: Arc::new(ArcInterval::Full.into()),
+                    common_arc_set: Arc::new(DhtArcSet::Full),
                     num_sent_ops_blooms: 1,
                     received_all_incoming_ops_blooms: false,
                     last_touch: Instant::now(),
@@ -291,7 +291,7 @@ async fn bloom_response_finishes() {
             round_map: maplit::hashmap! {
                 cert.clone() => RoundState {
                     remote_agent_list: vec![],
-                    common_arc_set: Arc::new(ArcInterval::Full.into()),
+                    common_arc_set: Arc::new(DhtArcSet::Full),
                     num_sent_ops_blooms: 0,
                     received_all_incoming_ops_blooms: false,
                     last_touch: Instant::now(),
@@ -341,7 +341,7 @@ async fn bloom_response_doesnt_finish_outstanding_incoming() {
             round_map: maplit::hashmap! {
                 cert.clone() => RoundState {
                     remote_agent_list: vec![],
-                    common_arc_set: Arc::new(ArcInterval::Full.into()),
+                    common_arc_set: Arc::new(DhtArcSet::Full),
                     num_sent_ops_blooms: 1,
                     received_all_incoming_ops_blooms: false,
                     last_touch: Instant::now(),
@@ -394,7 +394,7 @@ async fn no_data_still_finishes() {
             round_map: maplit::hashmap! {
                 bob_cert.clone() => RoundState {
                     remote_agent_list: vec![],
-                    common_arc_set: Arc::new(ArcInterval::Full.into()),
+                    common_arc_set: Arc::new(DhtArcSet::Full),
                     num_sent_ops_blooms: 0,
                     received_all_incoming_ops_blooms: false,
                     last_touch: Instant::now(),
@@ -418,7 +418,7 @@ async fn no_data_still_finishes() {
             round_map: maplit::hashmap! {
                 alice_cert.clone() => RoundState {
                     remote_agent_list: vec![],
-                    common_arc_set: Arc::new(ArcInterval::Full.into()),
+                    common_arc_set: Arc::new(DhtArcSet::Full),
                     num_sent_ops_blooms: 1,
                     received_all_incoming_ops_blooms: true,
                     last_touch: Instant::now(),

@@ -7,7 +7,7 @@ mod common;
 use kitsune_p2p_dht::arq::print_arq;
 use kitsune_p2p_dht::quantum::Topology;
 use kitsune_p2p_dht::*;
-use kitsune_p2p_dht_arc::ArcInterval;
+use kitsune_p2p_dht_arc::DhtArc;
 
 use kitsune_p2p_dht::test_utils::generate_ideal_coverage;
 use kitsune_p2p_dht::test_utils::seeded_rng;
@@ -160,7 +160,7 @@ fn test_grow_by_multiple_chunks() {
 fn test_degenerate_asymmetrical_coverage() {
     observability::test_run().ok();
     let topo = Topology::unit_zero();
-    let other = ArqBounds::from_interval(&topo, 4, ArcInterval::new(0x0u32, 0x80))
+    let other = ArqBounds::from_interval(&topo, 4, DhtArc::from_bounds(0x0u32, 0x80))
         .unwrap()
         .to_arq(&topo);
     let others = vec![other; 10];

@@ -305,8 +305,8 @@ impl SpaceInternalHandler for Space {
         let mut local_agent_info_events = Vec::new();
         match destination {
             BroadcastTo::Notify => {
-                for agent in self.local_joined_agents.iter().cloned() {
-                    if let Some(arc) = self.agent_arcs.get(&agent) {
+                for agent in self.local_joined_agents.iter() {
+                    if let Some(arc) = self.agent_arcs.get(agent) {
                         if arc.contains(basis.get_loc()) {
                             let fut = self.evt_sender.notify(
                                 space.clone(),
@@ -770,8 +770,8 @@ impl KitsuneP2pHandler for Space {
         let mut local_agent_info_events = Vec::new();
         match destination {
             BroadcastTo::Notify => {
-                for agent in self.local_joined_agents.iter().cloned() {
-                    if let Some(arc) = self.agent_arcs.get(&agent) {
+                for agent in self.local_joined_agents.iter() {
+                    if let Some(arc) = self.agent_arcs.get(agent) {
                         if arc.contains(basis.get_loc()) {
                             let fut = self.evt_sender.notify(
                                 space.clone(),
@@ -1266,7 +1266,7 @@ impl Space {
         let arc_set = self
             .agent_arcs
             .iter()
-            .map(|(_, a)| DhtArcSet::from_interval(a.interval()))
+            .map(|(_, a)| DhtArcSet::from_interval(a))
             .fold(DhtArcSet::new_empty(), |a, i| a.union(&i));
         self.ro_inner.metric_exchange.write().update_arcset(arc_set);
     }
@@ -1347,9 +1347,9 @@ impl Space {
                 Some(arc) => arc,
                 None => {
                     if self.agent_arcs.is_empty() {
-                        DhtArc::full(agent.get_loc())
+                        DhtArc::Full(agent.get_loc())
                     } else {
-                        DhtArc::empty(agent.get_loc())
+                        DhtArc::Empty(agent.get_loc())
                     }
                 }
             }
@@ -1359,7 +1359,7 @@ impl Space {
             self.agent_arcs
                 .get(agent)
                 .cloned()
-                .unwrap_or_else(|| DhtArc::full(agent.get_loc()))
+                .unwrap_or_else(|| DhtArc::Full(agent.get_loc()))
         }
     }
 }

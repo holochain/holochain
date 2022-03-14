@@ -1,5 +1,5 @@
 use crate::Loc;
-use kitsune_p2p_dht_arc::ArcInterval;
+use kitsune_p2p_dht_arc::DhtArc;
 use kitsune_p2p_timestamp::Timestamp;
 
 use crate::quantum::{SpaceSegment, SpacetimeCoords, TimeSegment, Topology};
@@ -40,8 +40,8 @@ impl RegionBounds {
         self.arc_interval().contains(x) && self.time_range().contains(t)
     }
 
-    pub fn arc_interval(&self) -> ArcInterval {
-        ArcInterval::new(self.x.0, self.x.1)
+    pub fn arc_interval(&self) -> DhtArc {
+        DhtArc::from_bounds(self.x.0, self.x.1)
     }
 
     pub fn time_range(&self) -> std::ops::RangeInclusive<Timestamp> {

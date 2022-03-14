@@ -7,7 +7,7 @@ use crate::*;
 fn test_peer_coverage() {
     let strat = PeerStratBeta::default();
     let arc = |c, n, h| {
-        let mut arc = DhtArc::new(0, h);
+        let mut arc = DhtArc::from_start_and_half_len(0u32, h);
         PeerViewBeta::new(Default::default(), arc, c, n).update_arc(&mut arc);
         (arc.coverage() * 10000.0).round() / 10000.0
     };
@@ -31,14 +31,14 @@ fn test_peer_coverage() {
     );
 
     // - Start with half coverage and minimum density
-    let mut arc = DhtArc::new(0, MAX_HALF_LENGTH / 2);
+    let mut arc = DhtArc::from_start_and_half_len(0u32, MAX_HALF_LENGTH / 2);
     let peers = even_dist_peers(DEFAULT_MIN_PEERS, &[MAX_HALF_LENGTH]);
     converge(&mut arc, &peers);
     // - Converge to full coverage
     assert_eq!(arc.coverage(), 1.0);
 
     // - Start with full coverage and over density
-    let mut arc = DhtArc::new(0, MAX_HALF_LENGTH);
+    let mut arc = DhtArc::from_start_and_half_len(0u32, MAX_HALF_LENGTH);
     let peers = even_dist_peers(DEFAULT_MIN_PEERS * 4, &[MAX_HALF_LENGTH]);
     converge(&mut arc, &peers);
     // - Converge to half coverage
@@ -49,28 +49,28 @@ fn test_peer_coverage() {
     );
 
     // - Start with full coverage and low density
-    let mut arc = DhtArc::new(u32::MAX / 2, MAX_HALF_LENGTH);
+    let mut arc = DhtArc::from_start_and_half_len(u32::MAX / 2, MAX_HALF_LENGTH);
     let peers = even_dist_peers(DEFAULT_MIN_PEERS * 2, &[20]);
     converge(&mut arc, &peers);
     // - Converge to a full coverage
     assert_eq!((arc.coverage() * 100.0).round() / 100.0, 1.0);
 
     //- Start with no coverage and under density
-    let mut arc = DhtArc::new(u32::MAX / 2, 0);
+    let mut arc = DhtArc::from_start_and_half_len(u32::MAX / 2, 0);
     let peers = even_dist_peers(DEFAULT_MIN_PEERS * 8, &[MAX_HALF_LENGTH / 10]);
     converge(&mut arc, &peers);
     // - Converge to a full coverage
     assert_eq!((arc.coverage() * 100.0).round() / 100.0, 1.0);
 
     // - Start with no coverage and full network.
-    let mut arc = DhtArc::new(u32::MAX / 2, 0);
+    let mut arc = DhtArc::from_start_and_half_len(u32::MAX / 2, 0);
     let peers = even_dist_peers(1000, &[(MAX_HALF_LENGTH as f64 * 0.1) as u32]);
     converge(&mut arc, &peers);
     // - Converge to a full coverage
     assert_between(arc.coverage(), 0.0, 0.1 + DEFAULT_COVERAGE_BUFFER);
 
     // - Start with no coverage and an almost full network.
-    let mut arc = DhtArc::new(u32::MAX / 2, 0);
+    let mut arc = DhtArc::from_start_and_half_len(u32::MAX / 2, 0);
     let peers = even_dist_peers(999, &[(MAX_HALF_LENGTH as f64 * 0.1) as u32]);
     converge(&mut arc, &peers);
     // - Converge to a full coverage

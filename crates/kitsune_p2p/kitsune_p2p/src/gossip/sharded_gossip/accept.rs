@@ -7,7 +7,7 @@ impl ShardedGossipLocal {
     pub(super) async fn incoming_accept(
         &self,
         peer_cert: Tx2Cert,
-        remote_arc_set: Vec<ArcInterval>,
+        remote_arc_set: Vec<DhtArc>,
         remote_agent_list: Vec<AgentInfoSigned>,
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
         let (local_agents, when_initiated, accept_is_from_target) =

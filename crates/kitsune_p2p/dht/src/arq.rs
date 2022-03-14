@@ -12,7 +12,7 @@ pub use arq_set::*;
 pub use peer_view::*;
 pub use strat::*;
 
-use kitsune_p2p_dht_arc::{ArcInterval, DhtArc};
+use kitsune_p2p_dht_arc::DhtArc;
 
 use crate::{op::Loc, quantum::*};
 
@@ -25,7 +25,7 @@ pub fn pow2f(p: u8) -> f64 {
 }
 
 pub trait ArqBounded: Sized + serde::Serialize + serde::de::DeserializeOwned {
-    fn to_interval(&self, topo: &Topology) -> ArcInterval;
+    fn to_interval(&self, topo: &Topology) -> DhtArc;
 
     fn absolute_length(&self, topo: &Topology) -> u64;
 
@@ -186,14 +186,14 @@ impl Arq {
     pub fn to_dht_arc(&self, topo: &Topology) -> DhtArc {
         let len = self.absolute_length(topo);
         let hl = ((len + 1) / 2) as u32;
-        DhtArc::new(self.left_edge, hl)
+        DhtArc::from_start_and_half_len(self.left_edge, hl)
     }
 
     pub fn from_dht_arc(topo: &Topology, strat: &ArqStrat, dht_arc: &DhtArc) -> Self {
         approximate_arq(
             topo,
             strat,
-            dht_arc.center_loc(),
+            dht_arc.start_loc(),
             dht_arc.half_length() as u64 * 2,
         )
     }
@@ -224,7 +224,7 @@ impl ArqBounded for Arq {
         }
     }
 
-    fn to_interval(&self, topo: &Topology) -> ArcInterval {
+    fn to_interval(&self, topo: &Topology) -> DhtArc {
         self.to_bounds(topo).to_interval(topo)
     }
 
@@ -273,13 +273,13 @@ impl ArqBounded for ArqBounds {
         *self
     }
 
-    fn to_interval(&self, topo: &Topology) -> ArcInterval {
+    fn to_interval(&self, topo: &Topology) -> DhtArc {
         if is_full(self.power, self.count) {
-            ArcInterval::Full
+            DhtArc::Full(todo!())
         } else if let Some((a, b)) = self.boundary_chunks() {
-            ArcInterval::new(a.left(topo), b.right(topo))
+            DhtArc::from_bounds(a.left(topo), b.right(topo))
         } else {
-            ArcInterval::Empty
+            DhtArc::Empty(todo!())
         }
     }
 
@@ -314,11 +314,11 @@ impl ArqBounds {
                 && a.count.wrapping_mul(qa) == b.count.wrapping_mul(qb))
     }
 
-    pub fn from_interval_rounded(topo: &Topology, power: u8, interval: ArcInterval) -> Self {
+    pub fn from_interval_rounded(topo: &Topology, power: u8, interval: DhtArc) -> Self {
         Self::from_interval_inner(&topo.space, power, interval, true).unwrap()
     }
 
-    pub fn from_interval(topo: &Topology, power: u8, interval: ArcInterval) -> Option<Self> {
+    pub fn from_interval(topo: &Topology, power: u8, interval: DhtArc) -> Option<Self> {
         Self::from_interval_inner(&topo.space, power, interval, false)
     }
 
@@ -339,22 +339,22 @@ impl ArqBounds {
     }
 
     pub fn empty(power: u8) -> Self {
-        Self::from_interval(&Topology::unit_zero(), power, ArcInterval::Empty).unwrap()
+        Self::from_interval(&Topology::unit_zero(), power, DhtArc::Empty(todo!())).unwrap()
     }
 
     fn from_interval_inner(
         dim: &Dimension,
         power: u8,
-        interval: ArcInterval,
+        interval: DhtArc,
         rounded: bool,
     ) -> Option<Self> {
         match interval {
-            ArcInterval::Empty => Some(Self {
+            DhtArc::Empty(_) => Some(Self {
                 offset: 0.into(),
                 power,
                 count: 0,
             }),
-            ArcInterval::Full => {
+            DhtArc::Full(_) => {
                 assert!(power > 0);
                 let full_count = 2u32.pow(32 - power as u32);
                 Some(Self {
@@ -363,7 +363,7 @@ impl ArqBounds {
                     count: full_count,
                 })
             }
-            ArcInterval::Bounded(lo, hi) => {
+            DhtArc::Bounded(lo, hi) => {
                 let lo = lo.as_u32();
                 let hi = hi.as_u32();
                 let q = dim.quantum;
@@ -569,8 +569,8 @@ mod tests {
         let topo = Topology::unit_zero();
         let full1 = Arq::new_full(0u32.into(), 29);
         let full2 = Arq::new_full(2u32.pow(31).into(), 25);
-        assert_eq!(full1.to_interval(&topo), ArcInterval::Full);
-        assert_eq!(full2.to_interval(&topo), ArcInterval::Full);
+        assert!(matches!(full1.to_interval(&topo), DhtArc::Full(_)));
+        assert!(matches!(full2.to_interval(&topo), DhtArc::Full(_)));
     }
 
     #[test]
@@ -636,7 +636,7 @@ mod tests {
     #[test]
     fn from_interval_regression() {
         let topo = Topology::unit_zero();
-        let i = ArcInterval::Bounded(4294967040u32.into(), 511.into());
+        let i = DhtArc::Bounded(4294967040u32.into(), 511.into());
         assert!(ArqBounds::from_interval(&topo, 8, i).is_some());
     }
 

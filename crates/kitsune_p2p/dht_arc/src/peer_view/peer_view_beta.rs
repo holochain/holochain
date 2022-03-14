@@ -32,7 +32,7 @@ impl PeerStratBeta {
     pub fn view(&self, arc: DhtArc, peers: &[DhtArc]) -> PeerViewBeta {
         let peers: Vec<DhtArc> = peers
             .iter()
-            .filter(|a| arc.contains(a.center_loc))
+            .filter(|a| arc.contains(a.start_loc()))
             .copied()
             .collect();
         Self::view_unchecked(self, arc, peers.as_slice())
@@ -54,12 +54,12 @@ impl PeerStratBeta {
     /// portion of the network then we might need to.
     ///
     /// The idea here is that you may already have enough peer information to make a
-    /// better extrapolation of the full network in a area more focused around your center
+    /// better extrapolation of the full network in a area more focused around your location
     /// point. In this case it is not worth waiting for all the peer information to
     /// sync for the larger view as that might take a long time.
     ///
     /// Imagine the case where you join a large network with a full arc, you might have a
-    /// good sample size close to your center long before you sync all the networks peer
+    /// good sample size close to your location long before you sync all the networks peer
     /// information.
     fn check_focused_view(&self, arc: DhtArc, peers: &[DhtArc], focus_size: usize) -> Option<f64> {
         // Focus size cannot be zero.
@@ -70,10 +70,10 @@ impl PeerStratBeta {
         // size then check a more focused view.
         (self.focus_nearby && peers.len() >= focus_size as usize * 2)
             .then(|| {
-                // Sort the peers by distance to this views center location.
+                // Sort the peers by distance to this view's start location.
                 let mut closest_peers = peers.to_vec();
                 closest_peers
-                    .sort_unstable_by_key(|a| shortest_arc_distance(arc.center_loc, a.center_loc));
+                    .sort_unstable_by_key(|a| wrapped_distance(arc.start_loc(), a.start_loc()));
 
                 // Take a focused sample of the min_sample_size.
                 let closest_peers = closest_peers
@@ -83,14 +83,14 @@ impl PeerStratBeta {
 
                 // Create the focused view's arc using the
                 // furthest peer as the half length.
-                let focused_arc = DhtArc::new(
-                    arc.center_loc,
-                    shortest_arc_distance(
-                        arc.center_loc,
+                let focused_arc = DhtArc::from_start_and_half_len(
+                    arc.start_loc(),
+                    wrapped_distance(
+                        arc.start_loc(),
                         closest_peers
                             .last()
                             .expect("Can't be empty if we have twice the focus size")
-                            .center_loc,
+                            .start_loc(),
                     ),
                 );
 
@@ -239,7 +239,7 @@ impl PeerViewBeta {
         } else {
             current + (delta * self.strat.delta_scale)
         };
-        *dht_arc.half_length_mut() = (MAX_HALF_LENGTH as f64 * new_coverage) as u32;
+        dht_arc.update_length((U32_LEN as f64 * new_coverage) as u64);
         true
     }
 

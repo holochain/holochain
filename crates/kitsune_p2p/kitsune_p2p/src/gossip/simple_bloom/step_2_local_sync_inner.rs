@@ -48,7 +48,7 @@ impl Inner {
             if let Ok(Some((ops, _))) = evt_sender
                 .query_op_hashes(QueryOpHashesEvt {
                     space: space.clone(),
-                    arc_set: ArcInterval::Full.into(),
+                    arc_set: DhtArc::Full.into(),
                     window: full_time_window(),
                     max_ops: usize::MAX,
                     include_limbo: false,

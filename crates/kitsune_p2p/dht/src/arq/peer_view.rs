@@ -1,4 +1,4 @@
-use kitsune_p2p_dht_arc::{ArcInterval, DhtArc, PeerViewAlpha, PeerViewBeta};
+use kitsune_p2p_dht_arc::{DhtArc, PeerViewAlpha, PeerViewBeta};
 use num_traits::Zero;
 
 use crate::quantum::Topology;
@@ -85,7 +85,7 @@ impl PeerViewQ {
     /// have the filter baked in.
     pub fn extrapolated_coverage_and_filtered_count(&self, filter: &ArqBounds) -> (f64, usize) {
         let filter = filter.to_interval(&self.topo);
-        if filter == ArcInterval::Empty {
+        if let DhtArc::Empty(_) = filter {
             // More accurately this would be 0, but it's handy to not have
             // divide-by-zero crashes
             return (1.0, 1);
@@ -350,7 +350,7 @@ impl PeerViewQ {
         PowerStats { median, std_dev }
     }
 
-    fn filtered_arqs<'a>(&'a self, filter: ArcInterval) -> impl Iterator<Item = &'a Arq> {
+    fn filtered_arqs<'a>(&'a self, filter: DhtArc) -> impl Iterator<Item = &'a Arq> {
         let it = self.peers.iter();
 
         #[cfg(feature = "testing")]
@@ -388,7 +388,7 @@ pub struct PowerStats {
 #[cfg(test)]
 mod tests {
 
-    use kitsune_p2p_dht_arc::ArcInterval;
+    use kitsune_p2p_dht_arc::DhtArc;
 
     use crate::arq::{pow2, print_arqs};
     use crate::quantum::Topology;
@@ -400,7 +400,7 @@ mod tests {
         ArqBounds::from_interval_rounded(
             topo,
             pow,
-            ArcInterval::new(pow2(pow) * lo, (pow2(pow) as u64 * hi as u64) as u32),
+            DhtArc::from_bounds(pow2(pow) * lo, (pow2(pow) as u64 * hi as u64) as u32),
         )
         .to_arq(topo)
     }

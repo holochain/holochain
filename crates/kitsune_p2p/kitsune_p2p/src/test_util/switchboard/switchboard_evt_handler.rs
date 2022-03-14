@@ -15,7 +15,7 @@ use kitsune_p2p_types::dht::prelude::{
     array_xor, ArqBoundsSet, RegionBounds, RegionCoordSetXtcs, RegionData,
 };
 use kitsune_p2p_types::dht::quantum::{TelescopingTimes, TimeQuantum};
-use kitsune_p2p_types::dht_arc::{ArcInterval, DhtLocation};
+use kitsune_p2p_types::dht_arc::{DhtArc, DhtLocation};
 use kitsune_p2p_types::*;
 
 use super::switchboard_state::{NodeEp, NodeOpEntry, OpEntry, Switchboard};
@@ -100,7 +100,7 @@ impl KitsuneHost for SwitchboardEventHandler {
                         .iter()
                         .filter(move |(loc, op)| {
                             let loc = DhtLocation::from(**loc);
-                            let arc = ArcInterval::new(x0, x1);
+                            let arc = DhtArc::from_bounds(x0, x1);
                             arc.contains(&loc) && t0 <= op.timestamp && op.timestamp < t1
                         })
                         .map(second)

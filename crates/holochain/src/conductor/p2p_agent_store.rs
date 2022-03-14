@@ -124,22 +124,15 @@ pub async fn get_single_agent_info(
 #[cfg(any(test, feature = "test_utils"))]
 pub async fn exchange_peer_info(envs: Vec<DbWrite<DbKindP2pAgents>>) {
     for (i, a) in envs.iter().enumerate() {
+        let infos_a = all_agent_infos(a.clone().into()).await.unwrap();
         for (j, b) in envs.iter().enumerate() {
             if i == j {
                 continue;
             }
-            inject_agent_infos(
-                a.clone(),
-                all_agent_infos(b.clone().into()).await.unwrap().iter(),
-            )
-            .await
-            .unwrap();
-            inject_agent_infos(
-                b.clone(),
-                all_agent_infos(a.clone().into()).await.unwrap().iter(),
-            )
-            .await
-            .unwrap();
+            let infos_b = all_agent_infos(b.clone().into()).await.unwrap();
+
+            inject_agent_infos(a.clone(), infos_b.iter()).await.unwrap();
+            inject_agent_infos(b.clone(), infos_a.iter()).await.unwrap();
         }
     }
 }

@@ -14,7 +14,7 @@ use holochain_p2p::{
         region::{RegionBounds, RegionCoordSetXtcs, RegionData, RegionSetXtcs},
         ArqBounds, ArqStrat,
     },
-    dht_arc::{ArcInterval, DhtArcSet},
+    dht_arc::{DhtArc, DhtArcSet},
     event::FetchOpDataQuery,
 };
 use holochain_sqlite::{
@@ -239,7 +239,7 @@ impl Spaces {
             .unwrap_or("AND DhtOp.when_integrated IS NOT NULL\n");
 
         let intervals = dht_arc_set.intervals();
-        let sql = if let Some(ArcInterval::Full) = intervals.first() {
+        let sql = if let Some(DhtArc::Full(_)) = intervals.first() {
             format!(
                 "{}{}{}",
                 holochain_sqlite::sql::sql_cell::FETCH_OP_HASHES_P1,
@@ -249,9 +249,9 @@ impl Spaces {
         } else {
             let sql_ranges = intervals
                 .into_iter()
-                .filter(|i| matches!(i, &ArcInterval::Bounded(_, _)))
+                .filter(|i| matches!(i, &DhtArc::Bounded(_, _)))
                 .map(|interval| match interval {
-                    ArcInterval::Bounded(start_loc, end_loc) => {
+                    DhtArc::Bounded(start_loc, end_loc) => {
                         if start_loc <= end_loc {
                             format!(
                                 "AND storage_center_loc >= {} AND storage_center_loc <= {}",
@@ -329,8 +329,8 @@ impl Spaces {
                 .into_iter()
                 .map(|i| {
                     let len = i.length();
-                    let (pow, _) = power_and_count_from_length(len, max_chunks);
-                    ArqBounds::from_interval_rounded(pow, i)
+                    let (pow, _) = power_and_count_from_length(&topology.space, len, max_chunks);
+                    ArqBounds::from_interval_rounded(&topology, pow, i)
                 })
                 .collect(),
         );

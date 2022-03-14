@@ -14,7 +14,7 @@ use kitsune_p2p_types::dht::region::RegionSetXtcs;
 use kitsune_p2p_types::{
     agent_info::AgentInfoSigned,
     bin_types::{KOp, KitsuneAgent, KitsuneOpHash, KitsuneSpace},
-    dht_arc::{ArcInterval, DhtArcSet},
+    dht_arc::{DhtArc, DhtArcSet},
     KitsuneError, KitsuneResult,
 };
 
@@ -49,11 +49,11 @@ pub(super) async fn local_agent_arcs(
     evt_sender: &EventSender,
     space: &Arc<KitsuneSpace>,
     local_agents: &HashSet<Arc<KitsuneAgent>>,
-) -> KitsuneResult<Vec<(Arc<KitsuneAgent>, ArcInterval)>> {
+) -> KitsuneResult<Vec<(Arc<KitsuneAgent>, DhtArc)>> {
     Ok(query_agent_info(evt_sender, space, local_agents)
         .await?
         .into_iter()
-        .map(|info| (info.agent.clone(), info.storage_arc.interval()))
+        .map(|info| (info.agent.clone(), info.storage_arc))
         .collect::<Vec<_>>())
 }
 
@@ -62,7 +62,7 @@ pub(super) async fn local_arcs(
     evt_sender: &EventSender,
     space: &Arc<KitsuneSpace>,
     local_agents: &HashSet<Arc<KitsuneAgent>>,
-) -> KitsuneResult<Vec<ArcInterval>> {
+) -> KitsuneResult<Vec<DhtArc>> {
     Ok(local_agent_arcs(evt_sender, space, local_agents)
         .await?
         .into_iter()
@@ -92,7 +92,7 @@ pub(super) async fn agents_within_arcset(
     evt_sender: &EventSender,
     space: &Arc<KitsuneSpace>,
     arc_set: Arc<DhtArcSet>,
-) -> KitsuneResult<Vec<(Arc<KitsuneAgent>, ArcInterval)>> {
+) -> KitsuneResult<Vec<(Arc<KitsuneAgent>, DhtArc)>> {
     Ok(evt_sender
         .query_agents(QueryAgentsEvt::new(space.clone()).by_arc_set(arc_set))
         .await
