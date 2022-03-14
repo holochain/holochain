@@ -50,22 +50,18 @@ fn test_check_for_gaps() {
     ]));
 
     // No Gaps
-    assert!(!check_for_gaps(vec![dbg!(DhtArc::from_start_and_half_len(
+    assert!(!check_for_gaps(vec![DhtArc::from_start_and_half_len(
         0,
         MAX_HALF_LENGTH
-    ))]));
+    )]));
     assert!(!check_for_gaps(vec![
         DhtArc::from_start_and_half_len(0u32, MAX_HALF_LENGTH / 2 + 1),
         DhtArc::from_start_and_half_len(MAX_HALF_LENGTH, MAX_HALF_LENGTH / 2 + 1)
     ]));
-    assert!(!check_for_gaps(vec![
-        dbg!(DhtArc::from_start_and_half_len(0u32, MAX_HALF_LENGTH / 3 + 1)),
-        dbg!(DhtArc::from_start_and_half_len(MAX_HALF_LENGTH / 3 - 1, MAX_HALF_LENGTH / 3 + 1)),
-        dbg!(DhtArc::from_start_and_half_len(
-            MAX_HALF_LENGTH + (MAX_HALF_LENGTH / 8) - 100,
-            MAX_HALF_LENGTH / 2 + MAX_HALF_LENGTH / 8,
-        ))
-    ]));
+    let one = DhtArc::from_start_and_half_len(0u32, MAX_HALF_LENGTH / 3 + 1);
+    let two = DhtArc::from_start_and_half_len(MAX_HALF_LENGTH / 3 - 1, MAX_HALF_LENGTH / 3 + 1);
+    let three = DhtArc::from_start_and_half_len(MAX_HALF_LENGTH - 100, MAX_HALF_LENGTH / 2 + 100);
+    assert!(!check_for_gaps(vec![one, two, three]));
 }
 
 #[test]
@@ -142,17 +138,12 @@ fn test_check_redundancy() {
         ]),
         1
     );
-    assert_eq!(
-        check_redundancy(vec![
-            DhtArc::from_start_and_half_len(0u32, MAX_HALF_LENGTH / 3 + 1),
-            DhtArc::from_start_and_half_len(MAX_HALF_LENGTH / 3 - 1, MAX_HALF_LENGTH / 3 + 1),
-            DhtArc::from_start_and_half_len(
-                MAX_HALF_LENGTH + (MAX_HALF_LENGTH / 8) - 100,
-                MAX_HALF_LENGTH / 2 + MAX_HALF_LENGTH / 8,
-            )
-        ]),
-        1
-    );
+
+    let one = DhtArc::from_start_and_half_len(0u32, MAX_HALF_LENGTH / 3 + 1);
+    let two = DhtArc::from_start_and_half_len(MAX_HALF_LENGTH / 3 - 1, MAX_HALF_LENGTH / 3 + 1);
+    let three = DhtArc::from_start_and_half_len(MAX_HALF_LENGTH - 100, MAX_HALF_LENGTH / 2 + 100);
+    assert_eq!(check_redundancy(vec![one, two, three]), 1);
+
     let arm = Wrapping(MAX_HALF_LENGTH / 3);
     let mut peers = Vec::new();
     for i in 0..12 {

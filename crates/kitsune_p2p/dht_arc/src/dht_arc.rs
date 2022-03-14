@@ -231,7 +231,9 @@ impl DhtArc<DhtLocation> {
         match self {
             DhtArc::Empty(_) => 0,
             DhtArc::Full(_) => 2u64.pow(32),
-            DhtArc::Bounded(lo, hi) => hi.as_u32().wrapping_sub(lo.as_u32()).into(),
+            DhtArc::Bounded(lo, hi) => (hi.as_u32().wrapping_sub(lo.as_u32()) as u64)
+                .wrapping_add(1)
+                .into(),
         }
     }
 
@@ -360,7 +362,7 @@ pub fn half_to_full_len(half_len: u32) -> u64 {
         0
     } else if half_len == MAX_HALF_LENGTH {
         U32_LEN
-    }else {
+    } else {
         (half_len as u64 * 2).wrapping_sub(1)
     }
 }
@@ -389,6 +391,16 @@ mod tests {
         assert!(divergent.contains(20));
         assert!(divergent.contains(25));
         assert!(divergent.contains(u32::MAX));
+    }
+
+    #[test]
+    fn test_length() {
+        let full = 2u64.pow(32);
+        assert_eq!(DhtArc::Empty(0.into()).length(), 0);
+        assert_eq!(DhtArc::from_bounds(0, 0).length(), 1);
+        assert_eq!(DhtArc::from_bounds(0, 1).length(), 2);
+        assert_eq!(DhtArc::from_bounds(1, 0).length(), full);
+        assert_eq!(DhtArc::from_bounds(2, 0).length(), full - 1);
     }
 
     #[test]
