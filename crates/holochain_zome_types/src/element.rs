@@ -352,7 +352,10 @@ where
     }
 }
 
-impl<T> From<SignedHashed<T>> for (T,) where T: HashableContent {
+impl<T> From<SignedHashed<T>> for (T,)
+where
+    T: HashableContent,
+{
     fn from(sh: SignedHashed<T>) -> Self {
         (HoloHashed::<T>::from(sh).into_content(),)
     }

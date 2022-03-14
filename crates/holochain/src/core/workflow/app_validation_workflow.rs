@@ -393,11 +393,9 @@ async fn dhtop_to_op(op: DhtOp, cascade: &mut Cascade) -> AppValidationOutcome<O
                 original_entry,
             }
         }
-        DhtOp::RegisterAddLink(signature, create_link) => {
-            Op::RegisterCreateLink {
-                create_link: SignedHashed::new(create_link, signature),
-            }
-        }
+        DhtOp::RegisterAddLink(signature, create_link) => Op::RegisterCreateLink {
+            create_link: SignedHashed::new(create_link, signature),
+        },
         DhtOp::RegisterRemoveLink(signature, delete_link) => {
             let create_link = cascade
                 .retrieve_header(delete_link.link_add_address.clone(), Default::default())
