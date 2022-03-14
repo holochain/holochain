@@ -120,15 +120,15 @@ impl<T: num_traits::AsPrimitive<u32>> DhtArc<T> {
         if len == 0 {
             DhtArc::Empty(start.into())
         } else {
-            let end = start.wrapping_add(((len - 1) as u32).max(u32::MAX));
+            let end = start.wrapping_add(((len - 1) as u32).min(u32::MAX));
             DhtArc::from_bounds(start, end)
         }
     }
 
     /// Convenience for our legacy code which defined arcs in terms of half-lengths
     /// rather than full lengths
-    pub fn from_start_and_half_len(start: T, halflen: u32) -> DhtArc<DhtLocation> {
-        Self::from_start_and_len(start, (halflen as u64 * 2).wrapping_sub(1))
+    pub fn from_start_and_half_len(start: T, half_len: u32) -> DhtArc<DhtLocation> {
+        Self::from_start_and_len(start, half_to_full_len(half_len))
     }
 
     pub fn new_generic(start: T, end: T) -> Self {
@@ -237,7 +237,7 @@ impl DhtArc<DhtLocation> {
 
     // #[deprecated = "leftover from refactor"]
     pub fn half_length(&self) -> u32 {
-        (self.length() / 2) as u32 + 1
+        full_to_half_len(self.length())
     }
 
     /// Update the half length based on a PeerView reading.
@@ -347,6 +347,24 @@ pub fn is_full(start: u32, end: u32) -> bool {
         || end == start.wrapping_sub(1)
 }
 
+pub fn full_to_half_len(full_len: u64) -> u32 {
+    if full_len == 0 {
+        0
+    } else {
+        ((full_len / 2) as u32).wrapping_add(1).min(MAX_HALF_LENGTH)
+    }
+}
+
+pub fn half_to_full_len(half_len: u32) -> u64 {
+    if half_len == 0 {
+        0
+    } else if half_len == MAX_HALF_LENGTH {
+        U32_LEN
+    }else {
+        (half_len as u64 * 2).wrapping_sub(1)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -378,28 +396,28 @@ mod tests {
         let cent = u32::MAX / 100 + 1;
         assert_eq!(
             DhtArc::from_bounds(cent * 30, cent * 60).to_ascii(10),
-            "   -@--   ".to_string()
+            "   @---   ".to_string()
         );
         assert_eq!(
             DhtArc::from_bounds(cent * 33, cent * 63).to_ascii(10),
-            "   -@--   ".to_string()
+            "   @---   ".to_string()
         );
         assert_eq!(
             DhtArc::from_bounds(cent * 29, cent * 59).to_ascii(10),
-            "  --@-    ".to_string()
+            "  @---    ".to_string()
         );
 
         assert_eq!(
             DhtArc::from_bounds(cent * 60, cent * 30).to_ascii(10),
-            "----  ---@".to_string()
+            "----  @---".to_string()
         );
         assert_eq!(
             DhtArc::from_bounds(cent * 63, cent * 33).to_ascii(10),
-            "----  ---@".to_string()
+            "----  @---".to_string()
         );
         assert_eq!(
             DhtArc::from_bounds(cent * 59, cent * 29).to_ascii(10),
-            "---  ----@".to_string()
+            "---  @----".to_string()
         );
 
         assert_eq!(

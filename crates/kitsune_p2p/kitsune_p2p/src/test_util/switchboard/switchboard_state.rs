@@ -558,9 +558,13 @@ impl SwitchboardAgent {
     /// The agent's location is taken as the midpoint of the arc.
     pub fn from_start_and_half_len<L: Into<Loc8>>(start: L, half_len: u8) -> Self {
         let start: Loc8 = start.into();
-        let len = half_len * 2 - 1;
-        let end = Loc8::from((start.as_u8().wrapping_add(len).wrapping_sub(1)) as i8);
-        let initial_arc = DhtArc::Bounded(start, end);
+        let initial_arc = if half_len == 0 {
+            DhtArc::Empty(start)
+        } else {
+            let len = half_len * 2 - 1;
+            let end = Loc8::from((start.as_u8().wrapping_add(len).wrapping_sub(1)) as i8);
+            DhtArc::Bounded(start, end)
+        };
 
         Self {
             loc: start,

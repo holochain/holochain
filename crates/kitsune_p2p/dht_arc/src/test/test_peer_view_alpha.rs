@@ -12,14 +12,14 @@ fn test_arc_dist() {
     // start at 5 go all the way around the arc anti-clockwise until
     // you reach 5. You will have traveled 5 less then the entire arc plus one
     // for the reserved zero value
-    assert_eq!(wrapped_distance(10, 5), 5);
+    assert_eq!(wrapped_distance(10, 5), u32::MAX - 4);
     assert_eq!(wrapped_distance(5, 10), 5);
     assert_eq!(
-        wrapped_distance(Wrapping(u32::MAX) + Wrapping(5), u32::MAX),
+        wrapped_distance(u32::MAX, Wrapping(u32::MAX) + Wrapping(5)),
         5
     );
-    assert_eq!(wrapped_distance(0, u32::MAX), 1);
-    assert_eq!(wrapped_distance(0, MAX_HALF_LENGTH), MAX_HALF_LENGTH - 2);
+    assert_eq!(wrapped_distance(u32::MAX, 0), 1);
+    assert_eq!(wrapped_distance(0, MAX_HALF_LENGTH), MAX_HALF_LENGTH);
 }
 
 #[test]
@@ -50,21 +50,21 @@ fn test_check_for_gaps() {
     ]));
 
     // No Gaps
-    assert!(!check_for_gaps(vec![DhtArc::from_start_and_half_len(
+    assert!(!check_for_gaps(vec![dbg!(DhtArc::from_start_and_half_len(
         0,
         MAX_HALF_LENGTH
-    )]));
+    ))]));
     assert!(!check_for_gaps(vec![
         DhtArc::from_start_and_half_len(0u32, MAX_HALF_LENGTH / 2 + 1),
         DhtArc::from_start_and_half_len(MAX_HALF_LENGTH, MAX_HALF_LENGTH / 2 + 1)
     ]));
     assert!(!check_for_gaps(vec![
-        DhtArc::from_start_and_half_len(0u32, MAX_HALF_LENGTH / 3 + 1),
-        DhtArc::from_start_and_half_len(MAX_HALF_LENGTH / 3 - 1, MAX_HALF_LENGTH / 3 + 1),
-        DhtArc::from_start_and_half_len(
+        dbg!(DhtArc::from_start_and_half_len(0u32, MAX_HALF_LENGTH / 3 + 1)),
+        dbg!(DhtArc::from_start_and_half_len(MAX_HALF_LENGTH / 3 - 1, MAX_HALF_LENGTH / 3 + 1)),
+        dbg!(DhtArc::from_start_and_half_len(
             MAX_HALF_LENGTH + (MAX_HALF_LENGTH / 8) - 100,
             MAX_HALF_LENGTH / 2 + MAX_HALF_LENGTH / 8,
-        )
+        ))
     ]));
 }
 
