@@ -195,7 +195,7 @@ pub mod slow_tests {
         let _: HeaderHash = conductor.call(&alice, "create_baseless_link", ()).await;
         let links: Vec<Link> = conductor.call(&alice, "get_baseless_links", ()).await;
 
-        dbg(&links);
+        dbg!(&links);
     }
 
     #[tokio::test(flavor = "multi_thread")]
