@@ -231,9 +231,9 @@ impl DhtArc<DhtLocation> {
         match self {
             DhtArc::Empty(_) => 0,
             DhtArc::Full(_) => 2u64.pow(32),
-            DhtArc::Bounded(lo, hi) => (hi.as_u32().wrapping_sub(lo.as_u32()) as u64)
-                .wrapping_add(1)
-                .into(),
+            DhtArc::Bounded(lo, hi) => {
+                (hi.as_u32().wrapping_sub(lo.as_u32()) as u64).wrapping_add(1)
+            }
         }
     }
 
