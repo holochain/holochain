@@ -116,10 +116,10 @@ impl WorkflowError {
     /// True if a workflow encountering this error should bail, else it should
     /// continue executing/looping.
     pub fn workflow_should_bail(&self) -> bool {
-        match self {
-            Self::GenesisFailure(_) => true,
-            _ => false,
-        }
+        // Currently GenesisFailure is the only thing we abort the app for but
+        // in the future this could be expanded to a more sophisticated match
+        // statement covering more fatal issues.
+        matches!(self, Self::GenesisFailure(_))
     }
 }
 
