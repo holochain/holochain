@@ -46,12 +46,7 @@ pub fn get_dependency(op_type: DhtOpType, header: &Header) -> Dependency {
             Header::Delete(delete) => Dependency::Header(delete.deletes_address.clone()),
             _ => Dependency::Null,
         },
-        DhtOpType::RegisterAddLink => match header {
-            Header::CreateLink(create_link) => {
-                Dependency::Entry(create_link.base_address.clone().into())
-            }
-            _ => Dependency::Null,
-        },
+        DhtOpType::RegisterAddLink => Dependency::Null,
         DhtOpType::RegisterRemoveLink => match header {
             Header::DeleteLink(delete_link) => {
                 Dependency::Header(delete_link.link_add_address.clone())

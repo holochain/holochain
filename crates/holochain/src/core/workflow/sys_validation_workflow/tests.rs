@@ -1,3 +1,4 @@
+use crate::holochain_wasmer_host::prelude::WasmError;
 use crate::sweettest::SweetConductorBatch;
 use crate::sweettest::SweetDnaFile;
 use crate::test_utils::host_fn_caller::*;
@@ -102,7 +103,7 @@ async fn run_test(
     let (bad_update_header, bad_update_entry_hash, link_add_hash) =
         bob_makes_a_large_link(&bob_cell_id, &conductors[1].handle(), &dna_file).await;
 
-    // Integration should have 13 ops in it
+    // Integration should have 14 ops in it + the running tally
     let expected_count = 14 + expected_count;
 
     let alice_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
@@ -179,8 +180,8 @@ async fn run_test(
     )
     .await;
 
-    // Validation should still contain bobs link pending because the target was missing
-    // holochain_state::prelude::dump_tmp(&alice_db);
+    // Validation should still contain bobs link delete because it points at
+    // garbage hashes as a dependency.
     fresh_reader_test(alice_db.clone(), |txn| {
         let valid_ops = num_valid_ops(&txn);
         assert_eq!(valid_ops, expected_count);
@@ -194,7 +195,7 @@ async fn run_test(
                         SELECT COUNT(hash) FROM DhtOP
                         WHERE
                         when_integrated IS NULL
-                        AND (validation_stage IS NULL OR validation_stage = 2)
+                        AND (validation_stage IS NULL OR validation_stage = 0)
                         ",
                         [],
                         |row| row.get(0),
@@ -301,28 +302,44 @@ async fn bob_makes_a_large_link(
 }
 
 async fn dodgy_bob(bob_cell_id: &CellId, handle: &ConductorHandle, dna_file: &DnaFile) {
-    let base = Post("Bob is the best and I'll link to proof so you can check".into());
-    let target = Post("Dodgy proof Bob is the best".into());
-    let base_entry_hash = Entry::try_from(base.clone()).unwrap().to_hash();
-    let target_entry_hash = Entry::try_from(target.clone()).unwrap().to_hash();
-    let link_tag = fixt!(LinkTag);
+    let legit_entry = Post("Bob is the best and I'll link to proof so you can check".into());
     let call_data = HostFnCaller::create(bob_cell_id, handle, dna_file).await;
 
     // 11
     call_data
-        .commit_entry(base.clone().try_into().unwrap(), POST_ID)
+        .commit_entry(legit_entry.clone().try_into().unwrap(), POST_ID)
         .await;
 
-    // Whoops forgot to commit that proof
+    // Delete a link that doesn't exist buy pushing garbage addresses straight
+    // on to the source chain and flush the workspace.
+    let (_ribosome, call_context, workspace_lock) = call_data.unpack().await;
+    // garbage addresses.
+    let base_address = EntryHash::from_raw_32([1_u8; 32].to_vec());
+    let link_add_address = HeaderHash::from_raw_32([2_u8; 32].to_vec());
 
-    // Link the entries
-    call_data
-        .create_link(
-            base_entry_hash.clone(),
-            target_entry_hash.clone(),
-            link_tag.clone(),
+    let source_chain = call_context
+        .host_context
+        .workspace_write()
+        .source_chain()
+        .as_ref()
+        .expect("Must have source chain if write_workspace access is given");
+    let zome = call_context.zome.clone();
+
+    let header_builder = builder::DeleteLink {
+        link_add_address,
+        base_address,
+    };
+    let _header_hash = source_chain
+        .put(
+            Some(zome),
+            header_builder,
+            None,
+            ChainTopOrdering::default(),
         )
-        .await;
+        .await
+        .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))
+        .unwrap();
+    workspace_lock.flush(&call_data.network).await.unwrap();
 
     // Produce and publish these commits
     let triggers = handle.get_cell_triggers(&bob_cell_id).unwrap();

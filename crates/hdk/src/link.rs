@@ -1,5 +1,17 @@
 use crate::prelude::*;
 
+#[repr(u8)]
+pub enum HdkLinkType {
+    Paths = u8::MAX - 1,
+    Any = u8::MAX,
+}
+
+impl From<HdkLinkType> for LinkType {
+    fn from(hdk_link_type: HdkLinkType) -> Self {
+        Self(hdk_link_type as u8)
+    }
+}
+
 /// Create a link from a base entry to a target entry, with an optional tag.
 ///
 /// Links represent the general idea of relationships between entries.
@@ -55,15 +67,17 @@ use crate::prelude::*;
 /// If you have the hash of the identity entry you can get all the links, if you have the entry or
 /// header hash for any of the creates or updates you can lookup the identity entry hash out of the
 /// body of the create/update entry.
-pub fn create_link<T: Into<LinkTag>>(
+pub fn create_link<TY: Into<LinkType>, T: Into<LinkTag>>(
     base_address: EntryHash,
     target_address: EntryHash,
+    link_type: TY,
     tag: T,
 ) -> ExternResult<HeaderHash> {
     HDK.with(|h| {
         h.borrow().create_link(CreateLinkInput::new(
             base_address,
             target_address,
+            link_type.into(),
             tag.into(),
             ChainTopOrdering::default(),
         ))

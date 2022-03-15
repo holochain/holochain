@@ -1,5 +1,6 @@
 use crate::entry_def::EntryVisibility;
 use crate::link::LinkTag;
+use crate::link::LinkType;
 use crate::timestamp::Timestamp;
 pub use builder::HeaderBuilder;
 pub use builder::HeaderBuilderCommon;
@@ -486,6 +487,7 @@ pub struct CreateLink {
     pub base_address: EntryHash,
     pub target_address: EntryHash,
     pub zome_id: ZomeId,
+    pub link_type: LinkType,
     pub tag: LinkTag,
 }
 
