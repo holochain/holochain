@@ -5,6 +5,9 @@ use std::ops::RangeBounds;
 
 use crate::*;
 
+pub const FULL_LEN: u64 = 2u64.pow(32);
+pub const FULL_LEN_F: f64 = FULL_LEN as f64;
+
 #[derive(Debug, Clone, Eq, PartialEq)]
 /// This represents the range of values covered by an arc
 pub struct ArcRange {
