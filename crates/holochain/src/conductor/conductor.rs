@@ -1269,7 +1269,6 @@ impl Conductor {
         })
     }
 
-    #[allow(dead_code)]
     pub(crate) async fn prune_p2p_agents_db(&self) -> ConductorResult<()> {
         use holochain_p2p::AgentPubKeyExt;
 
