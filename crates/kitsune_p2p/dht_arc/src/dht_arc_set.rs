@@ -395,13 +395,13 @@ impl DhtArc<DhtLocation> {
     /// The percentage of the full circle that is covered
     /// by this arc.
     pub fn coverage(&self) -> f64 {
-        self.length() as f64 / 2f64.powf(32.0)
+        self.length() as f64 / FULL_LEN_F
     }
 
     pub fn length(&self) -> u64 {
         match self {
             DhtArc::Empty(_) => 0,
-            DhtArc::Full(_) => 2u64.pow(32),
+            DhtArc::Full(_) => FULL_LEN,
             DhtArc::Bounded(lo, hi) => {
                 (hi.as_u32().wrapping_sub(lo.as_u32()) as u64).wrapping_add(1)
             }
@@ -566,7 +566,7 @@ mod tests {
 
     #[test]
     fn test_length() {
-        let full = 2u64.pow(32);
+        let full = FULL_LEN;
         assert_eq!(DhtArc::Empty(0.into()).length(), 0);
         assert_eq!(DhtArc::from_bounds(0, 0).length(), 1);
         assert_eq!(DhtArc::from_bounds(0, 1).length(), 2);

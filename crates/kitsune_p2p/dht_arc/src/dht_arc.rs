@@ -8,6 +8,9 @@ use derive_more::Into;
 use num_traits::AsPrimitive;
 use std::num::Wrapping;
 
+pub const FULL_LEN: u64 = 2u64.pow(32);
+pub const FULL_LEN_F: f64 = FULL_LEN as f64;
+
 /// Type for representing a location that can wrap around
 /// a u32 dht arc
 #[derive(
@@ -184,7 +187,7 @@ pub(crate) fn wrapped_distance<A: Into<DhtLocation>, B: Into<DhtLocation>>(a: A,
 /// The number to scale can be negative, which is wrapped to a positive value via modulo
 #[cfg(any(test, feature = "test_utils"))]
 pub(crate) fn loc_upscale(len: usize, v: i32) -> u32 {
-    let max = 2f64.powi(32);
+    let max = FULL_LEN_F;
     let lenf = len as f64;
     let vf = v as f64;
     (max / lenf * vf) as i64 as u32
@@ -193,14 +196,14 @@ pub(crate) fn loc_upscale(len: usize, v: i32) -> u32 {
 /// Scale a u32 DhtLocation down into a smaller space (specified by `len`)
 #[cfg(any(test, feature = "test_utils"))]
 pub(crate) fn loc_downscale(len: usize, d: DhtLocation) -> usize {
-    let max = 2f64.powi(32);
+    let max = FULL_LEN_F;
     let lenf = len as f64;
     ((lenf / max * (d.as_u32() as f64)) as usize) % len
 }
 
 #[test]
 fn test_loc_upscale() {
-    let m = 2f64.powi(32);
+    let m = FULL_LEN_F;
     assert_eq!(loc_upscale(8, 0), DhtLocation::from(0).as_u32());
     assert_eq!(
         loc_upscale(8, 1),
