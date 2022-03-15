@@ -142,10 +142,6 @@ pub enum Op {
     RegisterCreateLink {
         /// The signed and hashed [`Header::CreateLink`] that registers the link.
         create_link: SignedHashed<CreateLink>,
-        /// The base [`Entry`] that is being linked from.
-        base: Entry,
-        /// The target [`Entry`] that is being linked to.
-        target: Entry,
     },
     /// Deletes a link between two [`Entry`]s.
     /// This is the act of creating a [`Header::DeleteLink`] and

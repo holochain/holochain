@@ -13,9 +13,9 @@ entry_defs![MaybeLinkable::entry_def()];
 pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op {
         // This is a pretty pointless example as everything is valid.
-        Op::RegisterCreateLink { base, target, .. } => {
-            let base: MaybeLinkable = base.try_into()?;
-            let target: MaybeLinkable = target.try_into()?;
+        Op::RegisterCreateLink { create_link } => {
+            let base: MaybeLinkable = must_get_entry(<(CreateLink,)>::from(create_link.clone()).0.base_address)?.try_into()?;
+            let target: MaybeLinkable = must_get_entry(<(CreateLink,)>::from(create_link).0.target_address)?.try_into()?;
             Ok(match base {
                 MaybeLinkable::AlwaysLinkable => match target {
                     MaybeLinkable::AlwaysLinkable => ValidateCallbackResult::Valid,
@@ -52,6 +52,7 @@ fn add_valid_link_inner() -> ExternResult<HeaderHash> {
     create_link(
         always_linkable_entry_hash.clone(),
         always_linkable_entry_hash,
+        HdkLinkType::Any,
         (),
     )
 }
@@ -74,7 +75,7 @@ fn add_invalid_link_inner() -> ExternResult<HeaderHash> {
     create_entry(&MaybeLinkable::AlwaysLinkable)?;
     create_entry(&MaybeLinkable::NeverLinkable)?;
 
-    create_link(never_linkable_entry_hash, always_linkable_entry_hash, ())
+    create_link(never_linkable_entry_hash, always_linkable_entry_hash, HdkLinkType::Any, ())
 }
 
 #[hdk_extern]

@@ -28,22 +28,22 @@ on:
       holochain-nixpkgs_source_branch:
         description: "source branch for the release"
         required: false
-        default: "develop"
+        default: ""
         type: string
       holonix_source_branch:
         description: "source branch for the release"
         required: false
-        default: "main"
+        default: ""
         type: string
       dry_run:
         description: "prevent tag creation and pushing to main and develop branches"
         required: false
-        default: ""
+        default: "true"
         type: string
       debug:
-        description: "stop for debugging after preparing hte release"
+        description: "start an ssh session via upterm on failure"
         required: false
-        default: ""
+        default: "true"
         type: string
 
   pull_request: {}
@@ -63,6 +63,8 @@ jobs:
       # holochain_url: ${{ steps.eval.outputs.holochain_url }}
       # holochain_nixpkgs_url: ${{ steps.eval.outputs.holochain_nixpkgs_url }}
       # holonix_url: ${{ steps.eval.outputs.holonix_url }}
+      holochain_nixpkgs_source_branch: ${{ steps.eval.outputs.holochain_nixpkgs_source_branch }}
+      holonix_source_branch: ${{ steps.eval.outputs.holonix_source_branch }}
       holochain_source_branch: ${{ steps.eval.outputs.holochain_source_branch }}
       dry_run: ${{ steps.eval.outputs.dry_run }}
       debug: ${{ steps.eval.outputs.debug }}
@@ -73,6 +75,8 @@ jobs:
           # input_holochain_url: ${{ github.event.inputs.holochain_url }}
           # input_holochain_nixpkgs_url: ${{ github.event.inputs.holochain_nixpkgs_url }}
           # input_holonix_url: ${{ github.event.inputs.holonix_url }}
+          input_holochain_nixpkgs_source_branch: ${{ github.event.inputs.holochain-nixpkgs_source_branch }}
+          input_holonix_source_branch: ${{ github.event.inputs.holonix_source_branch }}
           input_holochain_source_branch: ${{ github.event.inputs.holochain_source_branch }}
           input_dry_run: ${{ github.event.inputs.dry_run}}
           input_debug: ${{ github.event.inputs.debug }}
@@ -91,14 +95,30 @@ jobs:
             echo "::set-output name=holochain_source_branch::${GITHUB_HEAD_REF:-${GITHUB_REF_NAME}}"
           fi
 
+          if [[ ${input_holochain_nixpkgs_source_branch} != "" ]]; then
+            echo "::set-output name=holochain_nixpkgs_source_branch::${input_holochain_nixpkgs_source_branch}"
+          else
+            echo "::set-output name=holochain_nixpkgs_source_branch::develop"
+          fi
+
+          if [[ ${input_holonix_source_branch} != "" ]]; then
+            echo "::set-output name=holonix_source_branch::${input_holonix_source_branch}"
+          else
+            echo "::set-output name=holonix_source_branch::main"
+          fi
+
           if [[ ${input_dry_run} != "" ]]; then
             echo "::set-output name=dry_run::${input_dry_run}"
+          elif [[ "${{ github.event_name }}" == "schedule" ]]; then
+            echo "::set-output name=dry_run::false"
           else
             echo "::set-output name=dry_run::true"
           fi
 
           if [[ ${input_debug} != "" ]]; then
             echo "::set-output name=debug::${input_debug}"
+          elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "::set-output name=debug::false"
           else
             echo "::set-output name=debug::true"
           fi
@@ -110,9 +130,9 @@ jobs:
     needs: [vars]
     uses: ./.github/workflows/release-prepare.yml
     with:
-      holochain_source_branch: ${{ needs.vars.outputs.holochain_source_branch }}
       dry_run: ${{ needs.vars.outputs.dry_run }}
       debug: ${{ needs.vars.outputs.debug }}
+      HOLOCHAIN_SOURCE_BRANCH: ${{ needs.vars.outputs.holochain_source_branch }}
       HOLOCHAIN_REPO: ${{ needs.vars.outputs.HOLOCHAIN_REPO }}
       HOLOCHAIN_RELEASE_SH: ${{ needs.vars.outputs.HOLOCHAIN_RELEASE_SH }}
       CACHIX_REV: ${{ needs.vars.outputs.CACHIX_REV }}
@@ -205,6 +225,8 @@ jobs:
               ubuntu-latest: 1
               macos-latest: 1
             run: |
+              set -x
+
               # remove everything that wouldn't be on github either
               git clean -fdx
 
@@ -215,6 +237,12 @@ jobs:
               cd "${HOLOCHAIN_NIXPKGS_REPO}"
 
               git checkout -b "${RELEASE_BRANCH}"
+
+              if grep --quiet ${VERSION_COMPAT} packages/holochain/versions/update_config.toml; then
+                export VERSION_COMPAT="${VERSION_COMPAT}-ci"
+                export TAG="${TAG}-ci"
+                git -C "${HOLOCHAIN_REPO}" tag "${TAG}"
+              fi
 
               cat <<EOF >> packages/holochain/versions/update_config.toml
 
@@ -341,8 +369,8 @@ jobs:
         env:
           # NUM_JOBS: ""
           # CARGO_BUILD_JOBS: ""
-          HOLOCHAIN_NIXPKGS_SOURCE_BRANCH: ${{ github.event.inputs.holochain-nixpkgs_source_branch }}
-          HOLONIX_SOURCE_BRANCH: ${{ github.event.inputs.holonix_source_branch }}
+          HOLOCHAIN_NIXPKGS_SOURCE_BRANCH: ${{ needs.vars.outputs.holochain_nixpkgs_source_branch }}
+          HOLONIX_SOURCE_BRANCH: ${{ needs.vars.outputs.holonix_source_branch }}
         with:
           timeout_minutes: ${{ matrix.testCommand.timeout_minutes }}
           max_attempts: ${{ matrix.testCommand.max_attempts[matrix.platform] }}
@@ -352,7 +380,7 @@ jobs:
             cd "${HOLOCHAIN_REPO}"
 
             ${{ matrix.testCommand.run }}
-        continue-on-error: ${{ matrix.platform != 'ubuntu-latest' && matrix.testCommand.ignoreErrorOnNonUbuntu != 'true' }}
+        continue-on-error: ${{ matrix.platform != 'ubuntu-latest' && matrix.testCommand.ignoreErrorOnNonUbuntu == true }}
 
       - name: Garbage-collect cache
         if: ${{ always() && matrix.testCommand.savesCargoCache == true }}
@@ -386,7 +414,7 @@ jobs:
           limit-access-to-users: steveeJ,jost-s,freesig,neonphog,thedavidmeister,maackle
 
   finalize:
-    if: ${{ github.event_name != 'pull_request' }}
+    if: ${{ github.event_name != 'pull_request' && needs.prepare.outputs.releasable_crates == 'true' }}
     needs: [vars, prepare, test]
     env:
       HOLOCHAIN_REPO: ${{ needs.vars.outputs.HOLOCHAIN_REPO }}
@@ -493,7 +521,7 @@ jobs:
       - name: Create a pull-request towards the develop branch
         id: cpr
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN }}
         run: |
           set -euE -o pipefail
 
@@ -514,7 +542,7 @@ jobs:
         if: ${{ needs.vars.outputs.dry_run == 'false' }}
         uses: peter-evans/enable-pull-request-automerge@v1
         with:
-          token: ${{ secrets.HRA_GITHUB_TOKEN}}
+          token: ${{ secrets.GITHUB_TOKEN}}
           pull-request-number: ${{ steps.cpr.outputs.pull-request-number }}
           merge-method: squash
       - name: Auto approve Pull Request
@@ -529,6 +557,7 @@ jobs:
         if: ${{ failure() || needs.vars.outputs.debug == 'true' }}
         env:
           GITHUB_ACTION_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_HRA_ACTION_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN }}
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         with:
           ## limits ssh access and adds the ssh public key for the user which triggered the workflow
