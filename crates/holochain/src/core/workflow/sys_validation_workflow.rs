@@ -730,30 +730,10 @@ async fn register_deleted_entry_header(
 
 async fn register_add_link(
     link_add: &CreateLink,
-    workspace: &SysValidationWorkspace,
-    network: HolochainP2pDna,
-    incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
+    _workspace: &SysValidationWorkspace,
+    _network: HolochainP2pDna,
+    _incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
 ) -> SysValidationResult<()> {
-    // Get data ready to validate
-    let base_entry_address = &link_add.base_address;
-    let target_entry_address = &link_add.target_address;
-
-    // Checks
-    check_and_hold_any_store_entry(
-        base_entry_address,
-        workspace,
-        network.clone(),
-        incoming_dht_ops_sender,
-        |_| Ok(()),
-    )
-    .await?;
-
-    let mut cascade = workspace.full_cascade(network);
-    cascade
-        .retrieve_entry(target_entry_address.clone(), Default::default())
-        .await?
-        .ok_or_else(|| ValidationOutcome::DepMissingFromDht(target_entry_address.clone().into()))?;
-
     check_tag_size(&link_add.tag)?;
     Ok(())
 }

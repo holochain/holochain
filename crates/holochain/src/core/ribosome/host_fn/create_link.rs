@@ -21,6 +21,7 @@ pub fn create_link<'a>(
             let CreateLinkInput {
                 base_address,
                 target_address,
+                link_type,
                 tag,
                 chain_top_ordering,
             } = input;
@@ -32,7 +33,7 @@ pub fn create_link<'a>(
 
             // Construct the link add
             let header_builder =
-                builder::CreateLink::new(base_address, target_address, zome_id, tag);
+                builder::CreateLink::new(base_address, target_address, zome_id, link_type, tag);
 
             let header_hash = tokio_helper::block_forever_on(tokio::task::spawn(async move {
                 // push the header into the source chain

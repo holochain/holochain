@@ -85,6 +85,7 @@ pub struct WireCreateLink {
     pub prev_header: HeaderHash,
 
     pub target_address: EntryHash,
+    pub link_type: LinkType,
     pub tag: Option<LinkTag>,
     pub signature: Signature,
     pub validation_status: ValidationStatus,
@@ -117,6 +118,7 @@ impl WireCreateLink {
             header_seq: h.header_seq,
             prev_header: h.prev_header,
             target_address: h.target_address,
+            link_type: h.link_type,
             tag: if tag { Some(h.tag) } else { None },
             signature,
             validation_status,
@@ -152,6 +154,7 @@ impl WireCreateLink {
             base_address: key.base.clone(),
             target_address: self.target_address,
             zome_id: key.zome_id,
+            link_type: self.link_type,
             tag,
         });
         let signature = self.signature;
