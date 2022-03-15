@@ -207,10 +207,11 @@ fn bounds64<N: From<i64>>(dim: &Dimension, power: u8, offset: Offset, count: u32
 }
 
 /// An Offset represents the position of the left edge of some Segment.
-/// The absolute coordinate of the offset is determined by the "power" of its
+/// The absolute DhtLocation of the offset is determined by the "power" of its
 /// context, and topology of the space, by:
 ///
-///     x = 2^pow * topology.space.quantum
+///     dht location = 2^pow * topology.space.quantum
+///
 #[derive(
     Copy,
     Clone,
