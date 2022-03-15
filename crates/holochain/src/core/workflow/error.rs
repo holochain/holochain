@@ -117,7 +117,7 @@ impl WorkflowError {
     /// continue executing/looping.
     pub fn workflow_should_bail(&self) -> bool {
         match self {
-            GenesisFailure(_) => true,
+            Self::GenesisFailure(_) => true,
             _ => false,
         }
     }
