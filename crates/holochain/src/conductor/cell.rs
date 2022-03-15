@@ -934,6 +934,11 @@ impl Cell {
         }
     }
 
+    /// Accessor for the p2p_agents_db backing this Cell
+    pub(crate) fn p2p_agents_db(&self) -> &DbWrite<DbKindP2pAgents> {
+        &self.space.p2p_agents_db
+    }
+
     /// Accessor for the authored database backing this Cell
     pub(crate) fn authored_db(&self) -> &DbWrite<DbKindAuthored> {
         &self.space.authored_db

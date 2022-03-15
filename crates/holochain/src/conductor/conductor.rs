@@ -1269,6 +1269,29 @@ impl Conductor {
         })
     }
 
+    #[allow(dead_code)]
+    pub(crate) async fn prune_p2p_agents_db(&self) -> ConductorResult<()> {
+        use holochain_p2p::AgentPubKeyExt;
+
+        let mut space_to_agents = HashMap::new();
+
+        for cell in self.cells.share_ref(|c| {
+            <Result<_, one_err::OneErr>>::Ok(c.keys().cloned().collect::<Vec<_>>())
+        })? {
+            space_to_agents
+                .entry(cell.dna_hash().clone())
+                .or_insert_with(Vec::new)
+                .push(cell.agent_pubkey().to_kitsune());
+        }
+
+        for (space, agents) in space_to_agents {
+            let db = self.spaces.p2p_agents_db(&space)?;
+            p2p_prune(&db, agents).await?;
+        }
+
+        Ok(())
+    }
+
     pub(super) async fn get_state(&self) -> ConductorResult<ConductorState> {
         self.spaces
             .conductor_db
@@ -1480,6 +1503,8 @@ mod builder {
             )
             .await?;
 
+            let shutting_down = conductor.shutting_down.clone();
+
             #[cfg(any(test, feature = "test_utils"))]
             let conductor = Self::update_fake_state(self.state, conductor).await?;
 
@@ -1490,6 +1515,18 @@ mod builder {
                 #[cfg(any(test, feature = "test_utils"))]
                 dev_settings: parking_lot::RwLock::new(DevSettings::default()),
             });
+
+            {
+                let handle = handle.clone();
+                tokio::task::spawn(async move {
+                    while !shutting_down.load(std::sync::atomic::Ordering::Relaxed) {
+                        tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+                        if let Err(e) = handle.prune_p2p_agents_db().await {
+                            tracing::error!("failed to prune p2p_agents_db: {:?}", e);
+                        }
+                    }
+                });
+            }
 
             Self::finish(handle, config, p2p_evt, post_commit_receiver).await
         }

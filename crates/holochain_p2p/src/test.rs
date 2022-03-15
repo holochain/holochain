@@ -17,6 +17,7 @@ impl HolochainP2pHandler for StubNetwork {
         &mut self,
         dna_hash: DnaHash,
         agent_pub_key: AgentPubKey,
+        initial_arc: Option<crate::dht_arc::DhtArc>,
     ) -> HolochainP2pHandlerResult<()> {
         Err("stub".into())
     }
