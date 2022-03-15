@@ -2,15 +2,14 @@
 //! A Conductor is a dynamically changing group of [Cell]s.
 //!
 //! A Conductor can be managed:
-//! - externally, via a [AppInterfaceApi]
-//! - from within a [Cell], via [CellConductorApi]
+//! - externally, via an [`AppInterfaceApi`](super::api::AppInterfaceApi)
+//! - from within a [`Cell`](super::Cell), via [`CellConductorApi`](super::api::CellConductorApi)
 //!
 //! In normal use cases, a single Holochain user runs a single Conductor in a single process.
 //! However, there's no reason we can't have multiple Conductors in a single process, simulating multiple
 //! users in a testing environment.
 
 pub use self::share::RwShare;
-
 use super::api::RealAppInterfaceApi;
 use super::config::AdminInterfaceConfig;
 use super::config::InterfaceDriver;
