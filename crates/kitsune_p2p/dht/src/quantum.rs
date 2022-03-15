@@ -73,7 +73,7 @@ pub struct SpaceQuantum(u32);
 
 impl SpaceQuantum {
     pub fn to_loc_bounds(&self, topo: &Topology) -> (Loc, Loc) {
-        let (a, b): (u32, u32) = bounds(&topo.space, 0, *self, 1);
+        let (a, b): (u32, u32) = bounds(&topo.space, 0, self.0.into(), 1);
         (Loc::from(a), Loc::from(b))
     }
 }
@@ -105,7 +105,7 @@ impl TimeQuantum {
     }
 
     pub fn to_timestamp_bounds(&self, topo: &Topology) -> (Timestamp, Timestamp) {
-        let (a, b): (i64, i64) = bounds64(&topo.time, 0, *self, 1);
+        let (a, b): (i64, i64) = bounds64(&topo.time, 0, self.0.into(), 1);
         (
             Timestamp::from_micros(a + topo.time_origin.as_micros()),
             Timestamp::from_micros(b + topo.time_origin.as_micros()),
@@ -120,6 +120,8 @@ pub trait Quantum: From<u32> + PartialEq + Eq + PartialOrd + Ord + std::fmt::Deb
 
     fn dimension(topo: &Topology) -> &Dimension;
 
+    /// If this coord is beyond the max value for its dimension, wrap it around
+    /// the max value
     fn normalized(self, topo: &Topology) -> Self;
 
     fn max_value(topo: &Topology) -> Self {
@@ -152,7 +154,7 @@ impl Quantum for SpaceQuantum {
     }
 
     fn normalized(self, topo: &Topology) -> Self {
-        let depth = Self::dimension(topo).bit_depth as u32;
+        let depth = topo.space.bit_depth as u32;
         if depth >= 32 {
             self
         } else {
@@ -190,19 +192,41 @@ impl SpacetimeCoords {
     }
 }
 
-fn bounds<Q: Quantum, N: From<u32>>(dim: &Dimension, power: u8, offset: Q, count: u32) -> (N, N) {
+fn bounds<N: From<u32>>(dim: &Dimension, power: u8, offset: Offset, count: u32) -> (N, N) {
     let q = dim.quantum * 2u32.pow(power.into());
-    let start = offset.inner().wrapping_mul(q);
+    let start = offset.wrapping_mul(q);
     let len = count.wrapping_mul(q);
     (start.into(), start.wrapping_add(len).wrapping_sub(1).into())
 }
 
-fn bounds64<Q: Quantum, N: From<i64>>(dim: &Dimension, power: u8, offset: Q, count: u32) -> (N, N) {
+fn bounds64<N: From<i64>>(dim: &Dimension, power: u8, offset: Offset, count: u32) -> (N, N) {
     let q = dim.quantum as i64 * 2i64.pow(power.into());
-    let start = (offset.inner() as i64).wrapping_mul(q);
+    let start = (*offset as i64).wrapping_mul(q);
     let len = (count as i64).wrapping_mul(q);
     (start.into(), start.wrapping_add(len).wrapping_sub(1).into())
 }
+
+/// An Offset represents the position of the left edge of some Segment.
+/// The absolute coordinate of the offset is determined by the "power" of its
+/// context, and topology of the space, by:
+///
+///     x = 2^pow * topology.space.quantum
+#[derive(
+    Copy,
+    Clone,
+    Debug,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    derive_more::Add,
+    derive_more::Sub,
+    derive_more::Deref,
+    derive_more::DerefMut,
+    derive_more::From,
+)]
+pub struct Offset(u32);
 
 /// Any interval in space or time is represented by a node in a tree, so our
 /// way of describing intervals uses tree coordinates as well:
@@ -213,7 +237,7 @@ pub struct Segment<Q: Quantum> {
     /// The exponent, where length = 2^power
     pub power: u8,
     /// The offset from the origin, measured in number of lengths
-    pub offset: u32,
+    pub offset: Offset,
     phantom: PhantomData<Q>,
 }
 
@@ -221,7 +245,7 @@ impl<Q: Quantum> Segment<Q> {
     pub fn new(power: u8, offset: u32) -> Self {
         Self {
             power,
-            offset,
+            offset: Offset::from(offset),
             phantom: PhantomData,
         }
     }
@@ -240,7 +264,7 @@ impl<Q: Quantum> Segment<Q> {
     /// Get the quanta which bound this segment
     pub fn quantum_bounds(&self, topo: &Topology) -> (Q, Q) {
         let n = self.num_quanta();
-        let a = (n * u64::from(self.offset)) as u32;
+        let a = (n * u64::from(*self.offset)) as u32;
         (
             Q::from(a).normalized(&topo),
             Q::from(a.wrapping_add(n as u32).wrapping_sub(1)).normalized(&topo),
@@ -266,8 +290,8 @@ impl<Q: Quantum> Segment<Q> {
         } else {
             let power = self.power - 1;
             Some((
-                Segment::new(power, self.offset * 2),
-                Segment::new(power, self.offset * 2 + 1),
+                Segment::new(power, *self.offset * 2),
+                Segment::new(power, *self.offset * 2 + 1),
             ))
         }
     }
@@ -278,16 +302,14 @@ fn test_quantum_bounds() {}
 
 impl SpaceSegment {
     pub fn loc_bounds(&self, topo: &Topology) -> (Loc, Loc) {
-        let (a, b): (u32, u32) =
-            bounds(&topo.space, self.power, SpaceQuantum::from(self.offset), 1);
+        let (a, b): (u32, u32) = bounds(&topo.space, self.power, self.offset, 1);
         (Loc::from(a), Loc::from(b))
     }
 }
 
 impl TimeSegment {
     pub fn timestamp_bounds(&self, topo: &Topology) -> (Timestamp, Timestamp) {
-        let (a, b): (i64, i64) =
-            bounds64(&topo.time, self.power, TimeQuantum::from(self.offset), 1);
+        let (a, b): (i64, i64) = bounds64(&topo.time, self.power, self.offset, 1);
         let o = topo.time_origin.as_micros();
         (Timestamp::from_micros(a + o), Timestamp::from_micros(b + o))
     }
@@ -452,14 +474,14 @@ impl TelescopingTimes {
         let mask = 1u32.rotate_right(1); // 0b100000...
         for _ in 0..iters {
             seg.power -= 1;
-            seg.offset *= 2;
+            *seg.offset *= 2;
 
             // remove the leading zero and shift left
             now &= !mask;
             now <<= 1;
 
             times.push(seg);
-            seg.offset += 1;
+            *seg.offset += 1;
             max -= 1;
             if max == 0 {
                 break;
@@ -467,7 +489,7 @@ impl TelescopingTimes {
             if now & mask > 0 {
                 // if the MSB is 1, duplicate the segment
                 times.push(seg);
-                seg.offset += 1;
+                *seg.offset += 1;
                 max -= 1;
                 if max == 0 {
                     break;

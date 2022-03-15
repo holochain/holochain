@@ -581,10 +581,10 @@ mod tests {
             count: 10,
         };
 
-        assert_eq!(c.chunk_at(0).offset, 16);
-        assert_eq!(c.chunk_at(1).offset, 17);
-        assert_eq!(c.chunk_at(2).offset, 18);
-        assert_eq!(c.chunk_at(3).offset, 19);
+        assert_eq!(*c.chunk_at(0).offset, 16);
+        assert_eq!(*c.chunk_at(1).offset, 17);
+        assert_eq!(*c.chunk_at(2).offset, 18);
+        assert_eq!(*c.chunk_at(3).offset, 19);
     }
 
     #[test]
