@@ -17,9 +17,8 @@ use holochain_types::prelude::*;
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::mpsc::OwnedPermit;
 use tracing::*;
-
-/// The concrete implementation of [CellConductorApiT], which is used to give
-/// Cells an API for calling back to their [Conductor].
+/// The concrete implementation of [`CellConductorApiT`], which is used to give
+/// Cells an API for calling back to their [`Conductor`](crate::conductor::Conductor).
 #[derive(Clone)]
 pub struct CellConductorApi {
     conductor_handle: ConductorHandle,
