@@ -63,7 +63,7 @@ mod tests {
             let info = AgentInfoSigned::sign(
                 space.clone(),
                 Arc::new(fixt!(KitsuneAgent, Unpredictable)),
-                u32::MAX / 4,
+                u32::MAX as u64 / 4,
                 vec!["fake:".into()],
                 0,
                 std::time::UNIX_EPOCH.elapsed().unwrap().as_millis() as u64 + 60_000_000,

@@ -432,7 +432,7 @@ async fn reset_peer_data(peers: Vec<AgentInfoSigned>, dna_hash: &DnaHash) -> Vec
         let info = AgentInfoSigned::sign(
             space_hash.clone(),
             peer.agent.clone(),
-            ((u32::MAX / 2) as f64 * coverage) as u32,
+            (u32::MAX as f64 * coverage) as u64,
             vec![url2::url2!(
                 "kitsune-proxy://CIW6PxKxs{}MSmB7kLD8xyyj4mqcw/kitsune-quic/h/localhost/p/5778/-",
                 rand_string

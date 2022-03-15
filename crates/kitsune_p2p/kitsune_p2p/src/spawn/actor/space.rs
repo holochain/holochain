@@ -501,7 +501,7 @@ async fn update_single_agent_info(
     let agent_info_signed = AgentInfoSigned::sign(
         space.clone(),
         agent.clone(),
-        arc.half_length(),
+        arc.length(),
         urls.clone(),
         signed_at_ms,
         expires_at_ms,

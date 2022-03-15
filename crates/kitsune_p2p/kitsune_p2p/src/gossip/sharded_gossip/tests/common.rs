@@ -123,7 +123,7 @@ pub async fn agent_info(agent: Arc<KitsuneAgent>) -> AgentInfoSigned {
     AgentInfoSigned::sign(
         Arc::new(fixt!(KitsuneSpace)),
         agent,
-        u32::MAX / 2,
+        u32::MAX as u64 / 2,
         vec![url2::url2!(
             "kitsune-proxy://CIW6PxKxs{}cKwUpaMSmB7kLD8xyyj4mqcw/kitsune-quic/h/localhost/p/5778/-",
             rand_string

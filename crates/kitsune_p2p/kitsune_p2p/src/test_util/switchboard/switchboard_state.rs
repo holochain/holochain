@@ -689,7 +689,7 @@ fn fake_agent_info(
     use crate::fixt::*;
     let url_list = vec![node.local_addr().unwrap()];
     let meta_info = AgentMetaInfoEncode {
-        dht_storage_arc_half_length: 0,
+        dht_storage_arc_full_length: 0,
     };
     let mut buf = Vec::new();
     kitsune_p2p_types::codec::rmp_encode(&mut buf, meta_info).unwrap();

@@ -73,7 +73,7 @@ fixturator!(
             AgentInfoSigned::sign(
                 Arc::new(fixt!(KitsuneSpace, Empty)),
                 Arc::new(fixt!(KitsuneAgent, Empty)),
-                u32::MAX / 4,
+                u32::MAX as u64 / 4,
                 fixt!(UrlList, Empty),
                 0,
                 0,
@@ -88,7 +88,7 @@ fixturator!(
             AgentInfoSigned::sign(
                 Arc::new(fixt!(KitsuneSpace, Unpredictable)),
                 Arc::new(fixt!(KitsuneAgent, Unpredictable)),
-                u32::MAX / 4,
+                u32::MAX as u64 / 4,
                 fixt!(UrlList, Empty),
                 0,
                 0,
@@ -103,7 +103,7 @@ fixturator!(
             AgentInfoSigned::sign(
                 Arc::new(fixt!(KitsuneSpace, Predictable)),
                 Arc::new(fixt!(KitsuneAgent, Predictable)),
-                u32::MAX / 4,
+                u32::MAX as u64 / 4,
                 fixt!(UrlList, Empty),
                 0,
                 0,

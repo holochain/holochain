@@ -211,7 +211,7 @@ mod tests {
         let agent_info_signed = AgentInfoSigned::sign(
             Arc::new(space),
             Arc::new(agent),
-            u32::MAX,
+            u32::MAX as u64,
             urls,
             signed_at_ms,
             expires_at_ms,
@@ -303,7 +303,7 @@ mod tests {
             let agent_info_signed = AgentInfoSigned::sign(
                 Arc::new(space.clone()),
                 Arc::new(kitsune_agent.clone()),
-                u32::MAX,
+                u32::MAX as u64,
                 fixt!(UrlList),
                 signed_at_ms,
                 expires_at_ms,

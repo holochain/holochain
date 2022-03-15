@@ -19,7 +19,7 @@ pub mod agent_info_helper {
     #[allow(missing_docs)]
     #[derive(Debug, serde::Serialize, serde::Deserialize)]
     pub struct AgentMetaInfoEncode {
-        pub dht_storage_arc_half_length: u32,
+        pub dht_storage_arc_full_length: u64,
     }
 
     #[allow(missing_docs)]
@@ -164,8 +164,7 @@ impl<'de> serde::Deserialize<'de> for AgentInfoSigned {
         }
 
         let start_loc = agent.get_loc();
-        let storage_arc =
-            DhtArc::from_start_and_half_len(start_loc, meta.dht_storage_arc_half_length);
+        let storage_arc = DhtArc::from_start_and_len(start_loc, meta.dht_storage_arc_full_length);
 
         let AgentInfoEncode {
             space,
@@ -196,7 +195,7 @@ impl AgentInfoSigned {
     pub async fn sign<'a, R, F>(
         space: Arc<KitsuneSpace>,
         agent: Arc<KitsuneAgent>,
-        dht_storage_arc_half_length: u32,
+        dht_storage_arc_full_length: u64,
         url_list: UrlList,
         signed_at_ms: u64,
         expires_at_ms: u64,
@@ -207,7 +206,7 @@ impl AgentInfoSigned {
         F: FnOnce(&[u8]) -> R,
     {
         let meta = AgentMetaInfoEncode {
-            dht_storage_arc_half_length,
+            dht_storage_arc_full_length,
         };
         let mut buf = Vec::new();
         crate::codec::rmp_encode(&mut buf, meta).map_err(KitsuneError::other)?;
@@ -231,7 +230,7 @@ impl AgentInfoSigned {
         let inner = AgentInfoInner {
             space,
             agent,
-            storage_arc: DhtArc::from_start_and_half_len(start_loc, dht_storage_arc_half_length),
+            storage_arc: DhtArc::from_start_and_len(start_loc, dht_storage_arc_full_length),
             url_list,
             signed_at_ms,
             expires_at_ms,

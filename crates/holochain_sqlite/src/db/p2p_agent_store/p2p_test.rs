@@ -48,17 +48,17 @@ async fn rand_insert(
         signed_at_ms + rng.gen_range(100, 200)
     };
 
-    let half_len = match rng.gen_range(0_u8, 9_u8) {
+    let len = match rng.gen_range(0_u8, 9_u8) {
         0 => 0,
         1 => u32::MAX,
         2 => rng.gen_range(0, u32::MAX / 2),
         _ => rng.gen_range(0, u32::MAX / 1000),
-    };
+    } as u64;
 
     let signed = AgentInfoSigned::sign(
         space.clone(),
         agent.clone(),
-        half_len,
+        len,
         vec!["fake:".into()],
         signed_at_ms,
         expires_at_ms,
@@ -177,7 +177,7 @@ async fn test_p2p_agent_store_gossip_query_sanity() {
         .p2p_gossip_query_agents(
             u64::MIN,
             u64::MAX,
-            DhtArc::from_bounds(0, u32::MAX / 4).into(),
+            DhtArc::from_bounds(0, u32::MAX as u64 / 4).into(),
         )
         .unwrap();
     // NOTE - not sure this is right with <= num_nonzero... but it breaks

@@ -14,7 +14,7 @@ fn make_agent(c: u8) -> AgentInfoSigned {
     futures::executor::block_on(AgentInfoSigned::sign(
         space,
         agent,
-        u32::MAX,
+        u32::MAX as u64,
         vec![format!("fake://{}", c).into()],
         42,
         69,
