@@ -112,6 +112,15 @@ impl WorkflowError {
     pub fn other(e: impl Into<Box<dyn std::error::Error + Send + Sync>>) -> Self {
         Self::Other(e.into())
     }
+
+    /// True if a workflow encountering this error should bail, else it should
+    /// continue executing/looping.
+    pub fn workflow_should_bail(&self) -> bool {
+        // Currently GenesisFailure is the only thing we abort the app for but
+        // in the future this could be expanded to a more sophisticated match
+        // statement covering more fatal issues.
+        matches!(self, Self::GenesisFailure(_))
+    }
 }
 
 impl From<one_err::OneErr> for WorkflowError {
