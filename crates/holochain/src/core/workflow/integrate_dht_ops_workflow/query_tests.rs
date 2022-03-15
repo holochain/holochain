@@ -69,14 +69,6 @@ impl Scenario {
                 op.facts.last_header = true;
                 [dep, op]
             }
-            DhtOpType::RegisterAddLink => {
-                let mut dep = Self::without_dep(DhtOpType::StoreEntry);
-                let mut op = Self::without_dep(op_type);
-                dep.facts.integrated = true;
-                dep.facts.awaiting_integration = false;
-                op.facts.last_entry = true;
-                [dep, op]
-            }
             DhtOpType::RegisterRemoveLink => {
                 let mut dep = Self::without_dep(DhtOpType::RegisterAddLink);
                 let mut op = Self::without_dep(op_type);
@@ -253,7 +245,6 @@ fn test_data(db: &DbRead<DbKindDht>) -> Expected {
     };
     let ops_with_deps = [
         DhtOpType::RegisterAgentActivity,
-        DhtOpType::RegisterAddLink,
         DhtOpType::RegisterRemoveLink,
         DhtOpType::RegisterUpdatedContent,
         DhtOpType::RegisterUpdatedElement,
