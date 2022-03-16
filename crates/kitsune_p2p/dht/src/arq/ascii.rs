@@ -24,7 +24,7 @@ impl Arq {
     pub fn to_ascii(&self, topo: &Topology, len: usize) -> String {
         let mut s = self.to_bounds(&topo).to_ascii(topo, len);
         if !self.is_empty() {
-            let center = loc_downscale(len, self.left_edge);
+            let center = loc_downscale(len, self.start_loc());
             s.replace_range(center..center + 1, "@");
         }
         s

@@ -263,10 +263,10 @@ pub struct Segment<Q: Quantum> {
 }
 
 impl<Q: Quantum> Segment<Q> {
-    pub fn new(power: u8, offset: u32) -> Self {
+    pub fn new(power: u8, offset: Offset) -> Self {
         Self {
             power,
-            offset: Offset::from(offset),
+            offset,
             phantom: PhantomData,
         }
     }

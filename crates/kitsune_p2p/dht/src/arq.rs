@@ -72,7 +72,7 @@ impl<S: ArqStart> Arq<S> {
     /// The absolute length of each segment
     #[inline]
     pub fn absolute_interval(&self, topo: &Topology) -> u32 {
-        self.quantum_interval * topo.space.quantum
+        self.quantum_interval() * topo.space.quantum
     }
 
     fn absolute_length(&self, topo: &Topology) -> u64 {
@@ -80,17 +80,17 @@ impl<S: ArqStart> Arq<S> {
     }
 
     fn to_interval(&self, topo: &Topology) -> DhtArcRange {
-        if is_full(self.power, self.count) {
+        if is_full(topo, self.power, *self.count) {
             DhtArcRange::Full
-        } else if self.count == 0 {
+        } else if *self.count == 0 {
             DhtArcRange::Empty
         } else {
-            let (a, b) = self.to_edge_locations(topo);
+            let (a, b) = self.to_edge_locs(topo);
             DhtArcRange::from_bounds(a, b)
         }
     }
 
-    fn to_edge_locations(&self, topo: &Topology) -> (Loc, Loc) {
+    fn to_edge_locs(&self, topo: &Topology) -> (Loc, Loc) {
         let left = self.start.to_loc(topo, self.power);
         let len = self.count.to_loc(topo, self.power);
         (left, left + len)
@@ -112,10 +112,10 @@ impl<S: ArqStart> Arq<S> {
     /// only requantize if there is no information loss due to rounding.
     /// Otherwise, return None.
     pub fn requantize(&self, power: u8) -> Option<Self> {
-        requantize(self.power, self.count, power).map(|(power, count)| Self {
+        requantize(self.power, *self.count, power).map(|(power, count)| Self {
             start: self.start,
             power,
-            count,
+            count: count.into(),
         })
     }
 
@@ -181,7 +181,7 @@ impl Arq<Loc> {
     }
 
     /// Get a reference to the arq's left edge in absolute coordinates.
-    pub fn left_edge(&self) -> Loc {
+    pub fn start_loc(&self) -> Loc {
         self.start
     }
 
@@ -192,7 +192,7 @@ impl Arq<Loc> {
 
     pub fn to_dht_arc(&self, topo: &Topology) -> DhtArc {
         let len = self.absolute_length(topo);
-        DhtArc::from_start_and_len(self.left_edge, len)
+        DhtArc::from_start_and_len(self.start, len)
     }
 
     pub fn from_dht_arc(topo: &Topology, strat: &ArqStrat, dht_arc: &DhtArc) -> Self {
@@ -308,30 +308,16 @@ impl ArqBounds {
     }
 
     pub fn segments(&self) -> impl Iterator<Item = SpaceSegment> + '_ {
-        (0..self.count)
-            .map(|c| SpaceSegment::new(self.power.into(), c.wrapping_add(self.start.inner())))
+        (0..*self.count)
+            .map(|c| SpaceSegment::new(self.power.into(), c.wrapping_add(*self.start).into()))
     }
 
     pub fn chunk_width(&self) -> u64 {
         2u64.pow(self.power as u32)
     }
 
-    /// Return a plausible place for the centerpoint of the Arq.
-    /// Obviously these pseudo-centerpoints are not evenly distributed, so
-    /// be careful where you use them.
-    pub fn pseudocenter(&self, topo: &Topology) -> Loc {
-        let s = self.spacing();
-        let center = self
-            .start
-            .inner()
-            .wrapping_mul(s)
-            .wrapping_mul(topo.space.quantum)
-            .wrapping_add(s / 2);
-        Loc::from(center as u32)
-    }
-
     /// Get a reference to the arq bounds's offset.
-    pub fn offset(&self) -> SpaceQuantum {
+    pub fn offset(&self) -> Offset {
         self.start
     }
 }
@@ -364,7 +350,7 @@ pub fn requantize(old_power: u8, old_count: u32, new_power: u8) -> Option<(u8, u
     }
 }
 
-pub fn power_and_count_from_length(dim: &Dimension, len: u64, max_chunks: u32) -> (u8, Offset) {
+pub fn power_and_count_from_length(dim: &Dimension, len: u64, max_chunks: u32) -> (u8, u32) {
     let mut power = 0;
     let mut count = (len / dim.quantum as u64) as f64;
     let max = max_chunks as f64;
@@ -374,13 +360,13 @@ pub fn power_and_count_from_length(dim: &Dimension, len: u64, max_chunks: u32) -
         count /= 2.0;
     }
     let count = count.round() as u32;
-    (power, count.into())
+    (power, count)
 }
 
 /// Given a center and a length, give Arq which matches most closely given the provided strategy
 pub fn approximate_arq(topo: &Topology, strat: &ArqStrat, start: Loc, len: u64) -> Arq {
     if len == 2u64.pow(32) {
-        Arq::new_full(start, strat.max_power)
+        Arq::new_full(topo, start, strat.max_power)
     } else if len == 0 {
         Arq::new(start, strat.min_power, 0)
     } else {
@@ -437,53 +423,39 @@ mod tests {
     #[test]
     fn test_full_intervals() {
         let topo = Topology::unit_zero();
-        let full1 = Arq::new_full(0u32.into(), 29);
-        let full2 = Arq::new_full(2u32.pow(31).into(), 25);
+        let full1 = Arq::new_full(&topo, 0u32.into(), 29);
+        let full2 = Arq::new_full(&topo, 2u32.pow(31).into(), 25);
         assert!(matches!(full1.to_interval(&topo), DhtArcRange::Full));
         assert!(matches!(full2.to_interval(&topo), DhtArcRange::Full));
     }
 
     #[test]
-    fn test_chunk_at() {
-        let c = Arq {
-            start: Loc::from(256),
-            power: 4,
-            count: 10,
-        };
-
-        assert_eq!(*c.chunk_at(0).offset, 16);
-        assert_eq!(*c.chunk_at(1).offset, 17);
-        assert_eq!(*c.chunk_at(2).offset, 18);
-        assert_eq!(*c.chunk_at(3).offset, 19);
-    }
-
-    #[test]
     fn arq_requantize() {
         let c = Arq {
-            start: Loc::from(42),
+            start: Loc::from(42u32),
             power: 20,
             count: 10,
         };
 
         let rq = |c: &Arq, p| (*c).requantize(p);
 
-        assert_eq!(rq(&c, 18).map(|c| c.count), Some(40));
-        assert_eq!(rq(&c, 19).map(|c| c.count), Some(20));
-        assert_eq!(rq(&c, 20).map(|c| c.count), Some(10));
-        assert_eq!(rq(&c, 21).map(|c| c.count), Some(5));
-        assert_eq!(rq(&c, 22).map(|c| c.count), None);
-        assert_eq!(rq(&c, 23).map(|c| c.count), None);
-        assert_eq!(rq(&c, 24).map(|c| c.count), None);
+        assert_eq!(rq(&c, 18).map(|c| *c.count), Some(40));
+        assert_eq!(rq(&c, 19).map(|c| *c.count), Some(20));
+        assert_eq!(rq(&c, 20).map(|c| *c.count), Some(10));
+        assert_eq!(rq(&c, 21).map(|c| *c.count), Some(5));
+        assert_eq!(rq(&c, 22).map(|c| *c.count), None);
+        assert_eq!(rq(&c, 23).map(|c| *c.count), None);
+        assert_eq!(rq(&c, 24).map(|c| *c.count), None);
 
         let c = Arq {
-            start: Loc::from(42),
+            start: Loc::from(42u32),
             power: 20,
             count: 256,
         };
 
-        assert_eq!(rq(&c, 12).map(|c| c.count), Some(256 * 256));
-        assert_eq!(rq(&c, 28).map(|c| c.count), Some(1));
-        assert_eq!(rq(&c, 29).map(|c| c.count), None);
+        assert_eq!(rq(&c, 12).map(|c| *c.count), Some(256 * 256));
+        assert_eq!(rq(&c, 28).map(|c| *c.count), Some(1));
+        assert_eq!(rq(&c, 29).map(|c| *c.count), None);
     }
 
     #[test]
@@ -493,11 +465,11 @@ mod tests {
         {
             let a = Arq::new((2u32.pow(pow.into()) - 1).into(), pow, 16);
             let b = a.to_bounds(&topo);
-            assert_eq!(b.offset(), SpaceQuantum::from(0));
+            assert_eq!(b.offset(), Offset(0));
             assert_eq!(b.count(), 16);
         }
         {
-            let a = Arq::new(4.into(), pow, 18);
+            let a = Arq::new(4u32.into(), pow, 18);
             let b = a.to_bounds(&topo);
             assert_eq!(b.count(), 18);
         }

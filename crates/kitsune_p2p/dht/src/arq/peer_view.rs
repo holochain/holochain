@@ -1,7 +1,7 @@
 use kitsune_p2p_dht_arc::{DhtArc, PeerViewAlpha, PeerViewBeta};
 use num_traits::Zero;
 
-use crate::quantum::Topology;
+use crate::quantum::{Offset, Topology};
 
 use super::{is_full, Arq, ArqBounded, ArqStrat};
 
@@ -238,7 +238,7 @@ impl PeerViewQ {
 
         if new_count != old_count {
             let mut tentative = arq.clone();
-            tentative.count = new_count;
+            tentative.count = Offset(new_count);
 
             // If shrinking caused us to go below the target coverage,
             // or to start "slacking" (not seeing enough peers), then
@@ -261,7 +261,7 @@ impl PeerViewQ {
         }
 
         // Commit the change to the count
-        arq.count = new_count;
+        arq.count = Offset(new_count);
 
         let power_above_min = |pow| {
             // not already at the minimum
@@ -272,13 +272,13 @@ impl PeerViewQ {
 
         loop {
             // check for power downshift opportunity
-            if arq.count < self.strat.min_chunks() {
+            if *arq.count < self.strat.min_chunks() {
                 if power_above_min(arq.power) {
                     *arq = arq.downshift();
                 } else {
                     // If we could not downshift due to other constraints, then we cannot
                     // shrink any smaller than the min_chunks.
-                    arq.count = self.strat.min_chunks();
+                    arq.count = Offset(self.strat.min_chunks());
                 }
             } else {
                 break;
@@ -294,7 +294,7 @@ impl PeerViewQ {
 
         loop {
             // check for power upshift opportunity
-            if arq.count > self.strat.max_chunks() {
+            if *arq.count > self.strat.max_chunks() {
                 if power_below_max(arq.power) {
                     // Attempt to requantize to the next higher power.
                     // If we only grew by one chunk, into an odd count, then don't
@@ -310,15 +310,15 @@ impl PeerViewQ {
                 } else {
                     // If we could not upshift due to other constraints, then we cannot
                     // grow any larger than the max_chunks.
-                    arq.count = self.strat.max_chunks();
+                    arq.count = Offset(self.strat.max_chunks());
                 }
             } else {
                 break;
             }
         }
 
-        if is_full(arq.power(), arq.count()) {
-            *arq = Arq::new_full(arq.left_edge(), arq.power());
+        if is_full(topo, arq.power(), arq.count()) {
+            *arq = Arq::new_full(topo, arq.start_loc(), arq.power());
         }
 
         // check if anything changed
@@ -399,7 +399,10 @@ mod tests {
         let a = ArqBounds::from_interval_rounded(
             topo,
             pow,
-            DhtArcRange::from_bounds(pow2(pow) * lo, ((pow2(pow) as u64 * hi as u64) as u32).wrapping_sub(1)),
+            DhtArcRange::from_bounds(
+                pow2(pow) * lo,
+                ((pow2(pow) as u64 * hi as u64) as u32).wrapping_sub(1),
+            ),
         );
         a.to_arq(topo)
     }
