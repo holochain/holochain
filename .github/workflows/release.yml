@@ -117,6 +117,8 @@ jobs:
 
           if [[ ${input_debug} != "" ]]; then
             echo "::set-output name=debug::${input_debug}"
+          elif [[ "${{ github.event_name }}" == "schedule" ]]; then
+            echo "::set-output name=debug::false"
           elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
             echo "::set-output name=debug::false"
           else
