@@ -99,7 +99,7 @@ impl MockNetworkData {
             .collect();
         let agent_to_arc = agent_to_info
             .iter()
-            .map(|(k, v)| (k.clone(), v.storage_arc.into()))
+            .map(|(k, v)| (k.clone(), v.storage_arc))
             .collect();
         Self {
             authored,
