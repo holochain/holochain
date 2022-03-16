@@ -13,7 +13,7 @@ use derivative::Derivative;
 use super::{Region, RegionBounds, RegionCoords, RegionData};
 
 #[derive(Debug, PartialEq, Eq, derive_more::Constructor, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "testing", derive(Clone))]
+#[cfg_attr(feature = "test_utils", derive(Clone))]
 pub struct RegionCoordSetXtcs {
     times: TelescopingTimes,
     arq_set: ArqBoundsSet,
@@ -68,7 +68,7 @@ impl RegionCoordSetXtcs {
 /// but this is an enum to make room for a more generic representation, e.g.
 /// a simple Vec<Region>, if we want a more intricate algorithm later.
 #[derive(Debug, derive_more::From)]
-#[cfg_attr(feature = "testing", derive(Clone))]
+#[cfg_attr(feature = "test_utils", derive(Clone))]
 pub enum RegionSet<T: TreeDataConstraints = RegionData> {
     /// eXponential Time, Constant Space.
     Xtcs(RegionSetXtcs<T>),
@@ -123,7 +123,7 @@ impl<D: TreeDataConstraints> RegionSet<D> {
 /// correspond to the generated coordinates.
 #[derive(Debug, serde::Serialize, serde::Deserialize, Derivative)]
 #[derivative(PartialEq, Eq)]
-#[cfg_attr(feature = "testing", derive(Clone))]
+#[cfg_attr(feature = "test_utils", derive(Clone))]
 pub struct RegionSetXtcs<D: TreeDataConstraints = RegionData> {
     /// The generator for the coordinates
     pub(crate) coords: RegionCoordSetXtcs,
@@ -224,7 +224,7 @@ impl<D: TreeDataConstraints> RegionSetXtcs<D> {
 }
 
 #[cfg(test)]
-#[cfg(feature = "testing")]
+#[cfg(feature = "test_utils")]
 mod tests {
 
     use kitsune_p2p_timestamp::Timestamp;
@@ -242,19 +242,21 @@ mod tests {
     /// - one gridline per time specified in the iterator
     ///
     /// Only works for arqs that don't span `u32::MAX / 2`
-    fn op_grid(
+    fn op_grid<S: ArqStart>(
         topo: &Topology,
-        arq: &ArqBounds,
+        arq: &Arq<S>,
         trange: impl Iterator<Item = i64> + Clone,
     ) -> Vec<Op> {
-        let (left, right) = (arq.left(topo), arq.right(topo));
+        let (left, right) = arq.to_edge_locs(topo);
+        let left = left.as_u32();
+        let right = right.as_u32();
         let mid = u32::MAX / 2;
         assert!(
             !(left < mid && right > mid),
             "This hacky logic does not work for arqs which span `u32::MAX / 2`"
         );
         let xstep = (arq.absolute_length(topo) / arq.count() as u64) as usize;
-        (left as i32..arq.right(topo) as i32 + 1)
+        (left as i32..=right as i32)
             .step_by(xstep)
             .flat_map(|x| {
                 trange.clone().map(move |t| {
@@ -270,9 +272,11 @@ mod tests {
     fn test_regions() {
         let topo = Topology::unit(Timestamp::from_micros(1000));
         let pow = 8;
-        let arq = Arq::new(0u32.into(), pow, 4).to_bounds(&topo);
-        assert_eq!(arq.left(&topo) as i32, 0);
-        assert_eq!(arq.right(&topo), 1023 as u32);
+        let arq = Arq::new(0u32.into(), pow, 4);
+        assert_eq!(
+            arq.to_edge_locs(&topo),
+            (Loc::from(0u32), Loc::from(1023u32))
+        );
 
         let mut store = OpStore::new(topo.clone(), GossipParams::zero());
 
@@ -281,7 +285,7 @@ mod tests {
         let nt = 10;
         let ops = op_grid(
             &topo,
-            &Arq::new(0u32.into(), pow, 8).to_bounds(&topo),
+            &Arq::new(0u32.into(), pow, 8),
             (1000..11000 as i64).step_by(1000),
         );
         assert_eq!(ops.len(), nx * nt);
@@ -291,7 +295,7 @@ mod tests {
         // The total count should be half of what's in the op store,
         // since the arq covers exactly half of the ops
         let times = TelescopingTimes::new(TimeQuantum::from(11000));
-        let coords = RegionCoordSetXtcs::new(times, ArqBoundsSet::single(arq));
+        let coords = RegionCoordSetXtcs::new(times, ArqBoundsSet::single(arq.to_bounds(&topo)));
         let rset = RegionSetXtcs::from_store(&store, coords);
         assert_eq!(
             rset.data.concat().iter().map(|r| r.count).sum::<u32>() as usize,

@@ -1,5 +1,5 @@
 #![allow(dead_code)]
-#![cfg(feature = "testing")]
+#![cfg(feature = "test_utils")]
 
 use kitsune_p2p_dht::arq::PeerStrat;
 use kitsune_p2p_dht::quantum::Topology;

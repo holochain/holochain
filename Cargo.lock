@@ -2802,6 +2802,7 @@ dependencies = [
  "futures",
  "gcollections",
  "intervallum",
+ "kitsune_p2p_dht",
  "kitsune_p2p_dht_arc",
  "kitsune_p2p_timestamp",
  "maplit",

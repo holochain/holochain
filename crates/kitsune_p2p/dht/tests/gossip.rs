@@ -1,4 +1,4 @@
-#![cfg(feature = "testing")]
+#![cfg(feature = "test_utils")]
 
 use kitsune_p2p_dht::{
     arq::*,
@@ -46,7 +46,7 @@ fn test_basic() {
 #[test]
 fn gossip_scenario_full_sync() {
     observability::test_run().ok();
-    let topo = Topology::standard(Timestamp::from_micros(0));
+    let topo = Topology::standard_zero();
     let gopa = GossipParams::new(1.into(), 0);
 
     let mut rng = seeded_rng(None);

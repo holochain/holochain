@@ -3,7 +3,7 @@ use num_traits::Zero;
 
 use crate::quantum::{Offset, Topology};
 
-use super::{is_full, Arq, ArqBounded, ArqStrat};
+use super::{is_full, Arq, ArqStrat};
 
 /// A "view" of the peers in a neighborhood. The view consists of a few
 /// observations about the distribution of peers within a particular arc, used
@@ -46,7 +46,7 @@ pub struct PeerViewQ {
     /// The peers in this view (TODO: replace with calculated values)
     peers: Vec<Arq>,
 
-    #[cfg(feature = "testing")]
+    #[cfg(feature = "test_utils")]
     /// Omit the arq at this index from all peer considerations.
     /// Useful for tests which update all arqs, without needing to
     /// construct a new PeerView for each arq needing to be updated
@@ -59,7 +59,7 @@ impl PeerViewQ {
             strat,
             topo,
             peers,
-            #[cfg(feature = "testing")]
+            #[cfg(feature = "test_utils")]
             skip_index: None,
         }
     }
@@ -90,7 +90,7 @@ impl PeerViewQ {
             // divide-by-zero crashes
             return (1.0, 1);
         }
-        let filter_len = dbg!(filter.length());
+        let filter_len = filter.length();
 
         let initial = (0, 0);
 
@@ -265,7 +265,7 @@ impl PeerViewQ {
 
         let power_above_min = |pow| {
             // not already at the minimum
-            pow > self.strat.min_power
+            pow > topo.min_space_power()
              // don't power down if power is already too low
              && (median_power as i8 - pow as i8) < self.strat.max_power_diff as i8
         };
@@ -287,7 +287,7 @@ impl PeerViewQ {
 
         let power_below_max = |pow| {
             // not already at the maximum
-            pow < self.strat.max_power
+            pow < topo.max_space_power(&self.strat)
             // don't power up if power is already too high
             && (pow as i8 - median_power as i8) < self.strat.max_power_diff as i8
         };
@@ -336,7 +336,7 @@ impl PeerViewQ {
         use statrs::statistics::*;
         let mut powers: Vec<_> = self
             .filtered_arqs(filter.to_dht_arc(topo))
-            .filter(|a| a.count > 0)
+            .filter(|a| *a.count > 0)
             .map(|a| a.power as f64)
             .collect();
         powers.push(filter.power() as f64);
@@ -352,13 +352,13 @@ impl PeerViewQ {
     fn filtered_arqs<'a>(&'a self, filter: DhtArc) -> impl Iterator<Item = &'a Arq> {
         let it = self.peers.iter();
 
-        #[cfg(feature = "testing")]
+        #[cfg(feature = "test_utils")]
         let it = it
             .enumerate()
             .filter(|(i, _)| self.skip_index.as_ref() != Some(i))
             .map(|(_, arq)| arq);
 
-        it.filter(move |arq| filter.contains(arq.left_edge))
+        it.filter(move |arq| filter.contains(&arq.start_loc()))
     }
 }
 
@@ -387,11 +387,13 @@ pub struct PowerStats {
 #[cfg(test)]
 mod tests {
 
+    use std::convert::identity;
+
     use kitsune_p2p_dht_arc::DhtArcRange;
 
     use crate::arq::{pow2, print_arqs};
     use crate::quantum::Topology;
-    use crate::{ArqBounds, Loc};
+    use crate::ArqBounds;
 
     use super::*;
 
@@ -404,14 +406,13 @@ mod tests {
                 ((pow2(pow) as u64 * hi as u64) as u32).wrapping_sub(1),
             ),
         );
-        a.to_arq(topo)
+        a.to_arq(topo, identity)
     }
 
     #[test]
     fn test_filtered_arqs() {
         let topo = Topology::unit_zero();
         let pow = 25;
-        let s = pow2(pow);
         let a = make_arq(&topo, pow, 0, 0x20);
         let b = make_arq(&topo, pow, 0x10, 0x30);
         let c = make_arq(&topo, pow, 0x20, 0x40);

@@ -10,7 +10,7 @@ pub mod tree;
 
 pub use arq::{actual_coverage, Arq, ArqBounds, ArqStrat, PeerStrat, PeerView, PeerViewQ};
 
-#[cfg(feature = "testing")]
+#[cfg(feature = "test_utils")]
 pub mod test_utils;
 
 pub use kitsune_p2p_dht_arc::DhtLocation as Loc;

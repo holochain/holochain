@@ -63,18 +63,6 @@ pub struct ArqStrat {
     /// a min coverage of 50 with a buffer of 0.2 implies a max coverage of 60.
     pub buffer: f64,
 
-    /// There is a point below which we never want to lower the power.
-    /// The algorithm will crash if this is 0, but in reality we want this to be
-    /// substantially higher.
-    ///
-    /// Our "quantum chunk size" is 2^(min_power).
-    pub min_power: u8,
-
-    /// There is a point above which we never want to raise the power.
-    /// This is because we want even a full arq to contain a certain number of
-    /// chunks.
-    pub max_power: u8,
-
     /// If the difference between the arq's power and the median power of all
     /// peer arqs (including this one) is greater than this diff,
     /// then don't requantize:
@@ -124,11 +112,6 @@ impl Default for ArqStrat {
             min_coverage: 50.0,
             // this buffer implies min-max chunk count of 8-16
             buffer: 0.143,
-            min_power: 1,
-            // the max power should be set so that a full arq is representable,
-            // i.e. the number of chunks needed at max power is within the valid
-            // range of chunk count
-            max_power: 32 - 3,
             power_std_dev_threshold: 1.0,
             max_power_diff: 2,
             slacker_ratio: 0.75,
@@ -170,6 +153,10 @@ impl ArqStrat {
         let max_chunks = self.min_chunks() * 2 - 1;
         assert!(max_chunks % 2 == 1);
         max_chunks
+    }
+
+    pub fn max_chunks_log2(&self) -> u8 {
+        (self.max_chunks() as f64).log2().floor() as u8
     }
 
     /// The chunk count which gives us the quantization resolution appropriate

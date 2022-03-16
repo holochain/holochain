@@ -4,7 +4,7 @@ mod arq_set;
 mod peer_view;
 mod strat;
 
-#[cfg(feature = "testing")]
+#[cfg(feature = "test_utils")]
 pub mod ascii;
 
 pub use arq_set::*;
@@ -16,13 +16,16 @@ use kitsune_p2p_dht_arc::{DhtArc, DhtArcRange};
 
 use crate::{op::Loc, quantum::*};
 
-pub fn pow2(p: u8) -> u32 {
+pub const fn pow2(p: u8) -> u32 {
     2u32.pow(p as u32)
 }
 
 pub fn pow2f(p: u8) -> f64 {
     2f64.powf(p as f64)
 }
+
+/// Maximum number of values that a u32 can represent.
+pub(crate) const U32_LEN: u64 = u32::MAX as u64 + 1;
 
 /// Represents the start point or "left edge" of an Arq.
 ///
@@ -31,19 +34,27 @@ pub fn pow2f(p: u8) -> f64 {
 ///    to an Agent's location, and which can be requantized, resized, etc.
 /// 2. An Arq which has no absolute location defined, and which simply represents
 ///    a (quantized) range.
-pub trait ArqStart: Sized {
+pub trait ArqStart: Sized + Copy + std::fmt::Debug {
     fn to_loc(&self, topo: &Topology, power: u8) -> Loc;
+    fn to_offset(&self, topo: &Topology, power: u8) -> Offset;
 }
 
 impl ArqStart for Loc {
     fn to_loc(&self, _topo: &Topology, _power: u8) -> Loc {
         *self
     }
+
+    fn to_offset(&self, topo: &Topology, power: u8) -> Offset {
+        Offset::from_loc_rounded(*self, topo, power)
+    }
 }
 
 impl ArqStart for Offset {
     fn to_loc(&self, topo: &Topology, power: u8) -> Loc {
         self.to_loc(topo, power)
+    }
+    fn to_offset(&self, _topo: &Topology, _power: u8) -> Offset {
+        *self
     }
 }
 
@@ -72,14 +83,28 @@ impl<S: ArqStart> Arq<S> {
     /// The absolute length of each segment
     #[inline]
     pub fn absolute_interval(&self, topo: &Topology) -> u32 {
-        self.quantum_interval() * topo.space.quantum
+        let len = self
+            .quantum_interval()
+            .saturating_mul(topo.space.quantum)
+            .min(u32::MAX / 2);
+        // this really shouldn't ever be larger than MAX / 8
+        // debug_assert!(len < u32::MAX / 4);
+        len
     }
 
-    fn absolute_length(&self, topo: &Topology) -> u64 {
-        self.to_interval(topo).length()
+    /// The absolute length of the entire arq.
+    pub fn absolute_length(&self, topo: &Topology) -> u64 {
+        let len = (self.absolute_interval(topo) as u64 * (*self.count as u64)).min(U32_LEN);
+        debug_assert_eq!(
+            len,
+            self.to_interval(topo).length(),
+            "lengths don't match {:?}",
+            self
+        );
+        len
     }
 
-    fn to_interval(&self, topo: &Topology) -> DhtArcRange {
+    pub fn to_interval(&self, topo: &Topology) -> DhtArcRange {
         if is_full(topo, self.power, *self.count) {
             DhtArcRange::Full
         } else if *self.count == 0 {
@@ -90,21 +115,23 @@ impl<S: ArqStart> Arq<S> {
         }
     }
 
-    fn to_edge_locs(&self, topo: &Topology) -> (Loc, Loc) {
-        let left = self.start.to_loc(topo, self.power);
-        let len = self.count.to_loc(topo, self.power);
-        (left, left + len)
+    pub fn to_edge_locs(&self, topo: &Topology) -> (Loc, Loc) {
+        let start = self.start.to_offset(topo, self.power);
+        let left = start.to_loc(topo, self.power);
+        let right = (start + self.count).to_loc(topo, self.power) - Loc::from(1);
+        (left, right)
     }
 
-    fn power(&self) -> u8 {
+    pub fn power(&self) -> u8 {
         self.power
     }
 
-    fn count(&self) -> u32 {
+    pub fn count(&self) -> u32 {
         self.count.into()
     }
 
-    fn length_ratio(&self, topo: &Topology) -> f64 {
+    /// What portion of the whole circle does this arq cover?
+    pub fn coverage(&self, topo: &Topology) -> f64 {
         self.absolute_length(topo) as f64 / 2f64.powf(32.0)
     }
 
@@ -119,17 +146,21 @@ impl<S: ArqStart> Arq<S> {
         })
     }
 
-    fn is_full(&self, topo: &Topology) -> bool {
+    pub fn is_full(&self, topo: &Topology) -> bool {
         is_full(topo, self.power(), self.count())
     }
 
-    fn is_empty(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         self.count() == 0
     }
 
-    // fn to_ascii(&self, topo: &Topology, len: usize) -> String {
-    //     self.to_bounds(topo).to_ascii(topo, len)
-    // }
+    pub fn from_parts(power: u8, start: S, count: Offset) -> Self {
+        Self {
+            power,
+            start,
+            count,
+        }
+    }
 }
 
 impl Arq<Loc> {
@@ -142,7 +173,7 @@ impl Arq<Loc> {
     }
 
     pub fn new_full(topo: &Topology, start: Loc, power: u8) -> Self {
-        let count = 2u32.pow(32 - power as u32 - topo.space_power as u32);
+        let count = pow2(32u8.saturating_sub(power + topo.space_power));
         assert!(is_full(topo, power, count));
         Self {
             start,
@@ -165,14 +196,14 @@ impl Arq<Loc> {
         } else {
             self.count
         };
-        (count % 2 == 0).then(|| Self {
+        (*count % 2 == 0).then(|| Self {
             start: self.start,
             power: self.power + 1,
             count: count / 2,
         })
     }
 
-    fn to_bounds(&self, topo: &Topology) -> ArqBounds {
+    pub fn to_bounds(&self, topo: &Topology) -> ArqBounds {
         ArqBounds {
             start: Offset::from(self.start.as_u32() / self.absolute_interval(topo)),
             power: self.power,
@@ -196,12 +227,7 @@ impl Arq<Loc> {
     }
 
     pub fn from_dht_arc(topo: &Topology, strat: &ArqStrat, dht_arc: &DhtArc) -> Self {
-        approximate_arq(
-            topo,
-            strat,
-            dht_arc.start_loc(),
-            dht_arc.half_length() as u64 * 2,
-        )
+        approximate_arq(topo, strat, dht_arc.start_loc(), dht_arc.length())
     }
 
     /// The two arqs represent the same interval despite having potentially different terms
@@ -236,18 +262,10 @@ impl ArqBounds {
         Self::from_interval_inner(&topo.space, power, interval, false)
     }
 
-    pub fn from_parts(power: u8, start: Offset, count: Offset) -> Self {
-        Self {
-            power,
-            start,
-            count,
-        }
-    }
-
     #[cfg(any(test, feature = "test_utils"))]
-    pub fn to_arq(&self, topo: &Topology) -> Arq {
+    pub fn to_arq<F: FnOnce(Loc) -> Loc>(&self, topo: &Topology, f: F) -> Arq {
         Arq {
-            start: todo!(),
+            start: f(self.start.to_loc(topo, self.power)),
             power: self.power,
             count: self.count,
         }
@@ -308,8 +326,7 @@ impl ArqBounds {
     }
 
     pub fn segments(&self) -> impl Iterator<Item = SpaceSegment> + '_ {
-        (0..*self.count)
-            .map(|c| SpaceSegment::new(self.power.into(), c.wrapping_add(*self.start).into()))
+        (0..*self.count).map(|c| SpaceSegment::new(self.power.into(), c.wrapping_add(*self.start)))
     }
 
     pub fn chunk_width(&self) -> u64 {
@@ -323,15 +340,22 @@ impl ArqBounds {
 }
 
 /// Calculate whether a given combination of power and count corresponds to
-/// full DHT coverage
-pub fn is_full(topo: &Topology, mut power: u8, count: u32) -> bool {
-    power -= topo.space_power;
-    if power >= 32 {
-        true
-    } else if power == 0 {
+/// full DHT coverage.
+///
+/// e.g. if the space quantum is 2^12, and the power is 14,
+/// then the max power is (32 - 12) = 24. Any power 24 or greater implies fullness,
+/// since even a count of 1 would be greater than 2^32.
+/// Any power lower than 24 will result in full coverage with
+/// count >= 2^(32 - 12 - 14) = 2^6 = 64, since it would take 64 chunks of
+/// size 2^(12 + 14) to cover the full space.
+pub fn is_full(topo: &Topology, power: u8, count: u32) -> bool {
+    let max = 32u8.saturating_sub(topo.space_power);
+    if power == 0 {
         false
+    } else if power >= 32 {
+        true
     } else {
-        count >= 2u32.pow(32 - power as u32)
+        count >= pow2(max.saturating_sub(power))
     }
 }
 
@@ -366,9 +390,9 @@ pub fn power_and_count_from_length(dim: &Dimension, len: u64, max_chunks: u32) -
 /// Given a center and a length, give Arq which matches most closely given the provided strategy
 pub fn approximate_arq(topo: &Topology, strat: &ArqStrat, start: Loc, len: u64) -> Arq {
     if len == 2u64.pow(32) {
-        Arq::new_full(topo, start, strat.max_power)
+        Arq::new_full(topo, start, topo.max_space_power(strat))
     } else if len == 0 {
-        Arq::new(start, strat.min_power, 0)
+        Arq::new(start, topo.min_space_power(), 0)
     } else {
         let (power, count) = power_and_count_from_length(&topo.space, len, strat.max_chunks());
 
@@ -417,6 +441,11 @@ mod tests {
             let topo = Topology::standard_epoch();
             assert!(!is_full(&topo, 31 - 12, 1));
             assert!(is_full(&topo, 31 - 12, 2));
+
+            // power too high, doesn't panic
+            assert!(is_full(&topo, 31, 2));
+            // power too low, doesn't panic
+            assert!(!is_full(&topo, 1, 2));
         }
     }
 
@@ -434,7 +463,7 @@ mod tests {
         let c = Arq {
             start: Loc::from(42u32),
             power: 20,
-            count: 10,
+            count: Offset(10),
         };
 
         let rq = |c: &Arq, p| (*c).requantize(p);
@@ -450,7 +479,7 @@ mod tests {
         let c = Arq {
             start: Loc::from(42u32),
             power: 20,
-            count: 256,
+            count: Offset(256),
         };
 
         assert_eq!(rq(&c, 12).map(|c| *c.count), Some(256 * 256));
@@ -459,7 +488,7 @@ mod tests {
     }
 
     #[test]
-    fn to_bounds() {
+    fn test_to_bounds() {
         let topo = Topology::unit_zero();
         let pow: u8 = 4;
         {
@@ -483,8 +512,24 @@ mod tests {
     }
 
     proptest::proptest! {
+
         #[test]
-        fn test_preserve_ordering_for_bounds(mut centers: Vec<u32>, count in 0u32..8, power in 10u8..20) {
+        fn test_to_edge_locs(power in 0u8..16, count in 8u32..16, loc: u32) {
+            // We use powers from 0 to 16 because with standard space topology,
+            // the quantum size is 2^12, and the max count is 16 which is 2^4,
+            // so any power greater than 16 could result in an overflow.
+            let topo = Topology::standard_epoch();
+            let a = Arq::from_parts(power, Loc::from(loc), Offset(count));
+            let (left, right) = a.to_edge_locs(&topo);
+            let p = pow2(power);
+            assert_eq!(left.as_u32() % p, 0);
+            assert_eq!(right.as_u32().wrapping_add(1) % p, 0);
+
+            assert_eq!(a.absolute_length(&topo), (right - left).as_u32() as u64 + 1);
+        }
+
+        #[test]
+        fn test_preserve_ordering_for_bounds(mut centers: Vec<u32>, count in 0u32..8, power in 0u8..16) {
             let topo = Topology::standard_epoch();
 
             // given a list of sorted centerpoints
@@ -497,7 +542,7 @@ mod tests {
             // Ensure the list of ArqBounds also grows monotonically.
             // However, there may be one point at which monotonicity is broken,
             // corresponding to the left edge wrapping around.
-            bounds.sort_by_key(|(_, b)| b.left(&topo));
+            bounds.sort_by_key(|(_, b)| b.to_edge_locs(&topo).0);
 
             let mut prev = 0;
             let mut split = None;
@@ -523,29 +568,31 @@ mod tests {
         }
 
         #[test]
-        fn dht_arc_roundtrip_unit_topo(center: u32, pow in 3..29u8, count in 0..8u32) {
+        fn dht_arc_roundtrip_unit_topo(center: u32, pow in 4..29u8, count in 0..8u32) {
             let topo = Topology::unit_zero();
             let length = count as u64 * 2u64.pow(pow as u32) / 2 * 2;
             let strat = ArqStrat::default();
             let arq = approximate_arq(&topo, &strat, center.into(), length);
             let dht_arc = arq.to_dht_arc(&topo);
+            assert_eq!(arq.absolute_length(&topo), dht_arc.length());
             let arq2 = Arq::from_dht_arc(&topo, &strat, &dht_arc);
             assert_eq!(arq, arq2);
         }
 
         #[test]
-        fn dht_arc_roundtrip_standard_topo(center: u32, pow in 3..29u8, count in 0..8u32) {
+        fn dht_arc_roundtrip_standard_topo(center: u32, pow in 0..16u8, count in 0..8u32) {
             let topo = Topology::standard_epoch();
             let length = count as u64 * 2u64.pow(pow as u32) / 2 * 2;
             let strat = ArqStrat::default();
             let arq = approximate_arq(&topo, &strat, center.into(), length);
             let dht_arc = arq.to_dht_arc(&topo);
+            assert_eq!(arq.absolute_length(&topo), dht_arc.length());
             let arq2 = Arq::from_dht_arc(&topo, &strat, &dht_arc);
-            assert!(Arq::equivalent(&topo, &arq, &arq2));
+            assert!(Arq::<Loc>::equivalent(&topo, &arq, &arq2));
         }
 
         #[test]
-        fn arc_interval_roundtrip(center: u32, pow in 3..19u8, count in 0..8u32) {
+        fn arc_interval_roundtrip(center: u32, pow in 0..16u8, count in 0..8u32) {
             let topo = Topology::standard_epoch();
             let length = count as u64 * 2u64.pow(pow as u32) / 2 * 2;
             let strat = ArqStrat::default();

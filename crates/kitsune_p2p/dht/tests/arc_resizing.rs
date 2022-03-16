@@ -1,6 +1,6 @@
 //! Tests of arq resizing behavior.
 
-#![cfg(feature = "testing")]
+#![cfg(feature = "test_utils")]
 
 mod common;
 
@@ -36,10 +36,10 @@ fn test_shrink_towards_empty() {
     // generate peers with a bit too much coverage (14 > 12)
     let peers: Vec<_> = generate_ideal_coverage(&topo, &mut rng, &strat, Some(14.5), 100, jitter);
     let peer_power = peers.iter().map(|p| p.power()).min().unwrap();
-    let view = PeerViewQ::new(topo, strat.clone(), peers);
+    let view = PeerViewQ::new(topo.clone(), strat.clone(), peers);
 
     // start with a full arq at max power
-    let mut arq = Arq::new_full(0u32.into(), strat.max_power);
+    let mut arq = Arq::new_full(&topo, 0u32.into(), topo.max_space_power(&strat));
     resize_to_equilibrium(&view, &mut arq);
     // test that the arc gets reduced in power to match those of its peers
     assert!(
@@ -117,9 +117,9 @@ fn test_grow_to_full() {
         print_arq(&topo, &arq, 64);
     }
     // ensure that the arq grows to full size
-    assert_eq!(arq.power(), strat.max_power);
+    assert_eq!(arq.power(), topo.max_space_power(&strat));
     assert_eq!(arq.count(), 8);
-    assert!(arq::is_full(arq.power(), arq.count()));
+    assert!(arq::is_full(&topo, arq.power(), arq.count()));
 }
 
 #[test]
@@ -162,7 +162,7 @@ fn test_degenerate_asymmetrical_coverage() {
     let topo = Topology::unit_zero();
     let other = ArqBounds::from_interval(&topo, 4, DhtArcRange::from_bounds(0x0u32, 0x80))
         .unwrap()
-        .to_arq(&topo);
+        .to_arq(&topo, |l| l);
     let others = vec![other; 10];
     // aim for coverage between 5 and 6.
     let strat = ArqStrat {
@@ -205,7 +205,7 @@ fn test_scenario() {
 
     {
         // start with a full arq
-        let mut arq = Arq::new_full(Loc::new(0x0), strat.max_power);
+        let mut arq = Arq::new_full(&topo, Loc::new(0x0), topo.max_space_power(&strat));
         // create 10 peers, all with full arcs, fully covering the DHT
         let peers: Vec<_> = generate_ideal_coverage(&topo, &mut rng, &strat, None, 10, jitter);
         let view = PeerViewQ::new(topo.clone(), strat.clone(), peers);
@@ -219,7 +219,7 @@ fn test_scenario() {
 
     {
         // start with a full arq again
-        let mut arq = Arq::new_full(Loc::new(0x0), strat.max_power);
+        let mut arq = Arq::new_full(&topo, Loc::new(0x0), topo.max_space_power(&strat));
         // create 100 peers, with arcs at about 10%,
         // covering a bit more than they need to
         let peers = generate_ideal_coverage(&topo, &mut rng, &strat, Some(13.0), 100, jitter);

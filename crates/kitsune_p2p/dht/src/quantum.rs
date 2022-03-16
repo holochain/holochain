@@ -50,6 +50,7 @@ use std::{marker::PhantomData, ops::AddAssign};
 use crate::{
     op::{Loc, Timestamp},
     prelude::pow2,
+    ArqStrat,
 };
 use derivative::Derivative;
 
@@ -157,11 +158,11 @@ impl Quantum for SpaceQuantum {
     }
 
     fn normalized(self, topo: &Topology) -> Self {
-        let depth = topo.space.bit_depth as u32;
+        let depth = topo.space.bit_depth;
         if depth >= 32 {
             self
         } else {
-            Self(self.0 % 2u32.pow(depth))
+            Self(self.0 % pow2(depth))
         }
     }
 }
@@ -196,7 +197,7 @@ impl SpacetimeCoords {
 }
 
 fn bounds<N: From<u32>>(dim: &Dimension, power: u8, offset: Offset, count: u32) -> (N, N) {
-    let q = dim.quantum * 2u32.pow(power.into());
+    let q = dim.quantum * pow2(power);
     let start = offset.wrapping_mul(q);
     let len = count.wrapping_mul(q);
     (start.into(), start.wrapping_add(len).wrapping_sub(1).into())
@@ -247,6 +248,11 @@ impl Offset {
     pub fn to_quantum(&self, power: u8) -> SpaceQuantum {
         self.wrapping_mul(pow2(power)).into()
     }
+
+    /// Get the nearest rounded-down Offset for this Loc
+    pub fn from_loc_rounded(loc: Loc, topo: &Topology, power: u8) -> Offset {
+        (loc.as_u32() / topo.space.quantum / pow2(power)).into()
+    }
 }
 
 /// Any interval in space or time is represented by a node in a tree, so our
@@ -263,10 +269,10 @@ pub struct Segment<Q: Quantum> {
 }
 
 impl<Q: Quantum> Segment<Q> {
-    pub fn new(power: u8, offset: Offset) -> Self {
+    pub fn new<O: Into<Offset>>(power: u8, offset: O) -> Self {
         Self {
             power,
-            offset,
+            offset: offset.into(),
             phantom: PhantomData,
         }
     }
@@ -311,8 +317,8 @@ impl<Q: Quantum> Segment<Q> {
         } else {
             let power = self.power - 1;
             Some((
-                Segment::new(power, *self.offset * 2),
-                Segment::new(power, *self.offset * 2 + 1),
+                Segment::new(power, Offset(*self.offset * 2)),
+                Segment::new(power, Offset(*self.offset * 2 + 1)),
             ))
         }
     }
@@ -367,7 +373,7 @@ impl Dimension {
             // which divided by 16 (max chunks) is ~2700, which is about 2^15.
             // So, we'll go down to 2^12 just to be extra safe.
             // This means we only need 20 bits to represent any location.
-            quantum: 2u32.pow(quantum_power),
+            quantum: pow2(quantum_power),
             bit_depth: 20,
         }
     }
@@ -444,6 +450,19 @@ impl Topology {
     pub fn time_coord(&self, t: Timestamp) -> TimeQuantum {
         let t = (t.as_micros() - self.time_origin.as_micros()).max(0);
         ((t / self.time.quantum as i64) as u32).into()
+    }
+
+    /// The minimum power to use in "exponentional coordinates".
+    pub fn min_space_power(&self) -> u8 {
+        // if space quantum power is 0, then min has to be at least 1.
+        // otherwise, it can be 0
+        1u8.saturating_sub(self.space_power)
+    }
+
+    /// The maximum power to use in "exponentional coordinates".
+    /// This is 16 for standard space topology.
+    pub fn max_space_power(&self, strat: &ArqStrat) -> u8 {
+        32 - self.space_power - strat.max_chunks_log2()
     }
 }
 
@@ -658,7 +677,7 @@ mod tests {
     #[test]
     fn test_contains_normalized() {
         let topo = Topology::standard_epoch();
-        let m = 2u32.pow(topo.space.bit_depth as u32);
+        let m = pow2(topo.space.bit_depth);
         let s = SpaceSegment::new(2, m + 5);
         let bounds = s.quantum_bounds(&topo);
         // The quantum bounds are normalized (wrapped)

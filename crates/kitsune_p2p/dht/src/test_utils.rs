@@ -138,12 +138,12 @@ fn test_unit_arc() {
 
     {
         let a = unit_arq(&topo, &strat, 0.0, 0.0);
-        assert_eq!(a.power(), strat.min_power);
+        assert_eq!(a.power(), topo.min_space_power());
         assert_eq!(a.count(), 0);
     }
     {
         let a = unit_arq(&topo, &strat, 0.0, 1.0);
-        assert_eq!(a.power(), 29);
+        assert_eq!(a.power(), topo.max_space_power(&strat));
         assert_eq!(a.count(), 8);
     }
     {
@@ -252,8 +252,8 @@ mod tests {
                 ..Default::default()
             };
             let a = unit_arq(&topo, &strat, center, len);
-            assert!(a.power() >= strat.min_power);
-            assert!(a.power() <= strat.max_power);
+            assert!(a.power() >= topo.min_space_power());
+            assert!(a.power() <= topo.max_space_power(&strat));
         }
 
         #[test]
@@ -267,7 +267,7 @@ mod tests {
             let a = unit_arq(&topo, &strat, center, len);
             let target_len = (len * 2f64.powf(32.0)) as i64;
             let true_len = a.to_interval(&topo).length() as i64;
-            assert!((true_len - target_len).abs() < a.spacing() as i64);
+            assert!((true_len - target_len).abs() < a.absolute_interval(&topo) as i64);
         }
     }
 }

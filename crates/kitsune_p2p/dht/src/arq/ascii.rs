@@ -2,7 +2,7 @@ use kitsune_p2p_dht_arc::DhtArcRange;
 
 use crate::{quantum::Topology, Loc};
 
-use super::{Arq, ArqBounds};
+use super::{Arq, ArqStart};
 
 /// Scale a number in a smaller space (specified by `len`) up into the `u32` space.
 /// The number to scale can be negative, which is wrapped to a positive value via modulo
@@ -18,17 +18,6 @@ pub(crate) fn loc_downscale(len: usize, d: Loc) -> usize {
     let max = 2f64.powi(32);
     let lenf = len as f64;
     ((lenf / max * (d.as_u32() as f64)) as usize) % len
-}
-
-impl Arq {
-    pub fn to_ascii(&self, topo: &Topology, len: usize) -> String {
-        let mut s = self.to_bounds(&topo).to_ascii(topo, len);
-        if !self.is_empty() {
-            let center = loc_downscale(len, self.start_loc());
-            s.replace_range(center..center + 1, "@");
-        }
-        s
-    }
 }
 
 pub fn add_location_ascii(mut s: String, locs: Vec<Loc>) -> String {
@@ -49,7 +38,7 @@ pub fn add_location_ascii(mut s: String, locs: Vec<Loc>) -> String {
     s
 }
 
-impl ArqBounds {
+impl<S: ArqStart> Arq<S> {
     /// Handy ascii representation of an arc, especially useful when
     /// looking at several arcs at once to get a sense of their overlap
     pub fn to_ascii(&self, topo: &Topology, len: usize) -> String {

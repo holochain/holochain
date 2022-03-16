@@ -150,7 +150,7 @@ pub fn print_arqs<'a, S: ArqStart>(topo: &Topology, arqs: &'a [Arq<S>], len: usi
             "|{}| {}:\t{} +{} *2^{}",
             arq.to_ascii(topo, len),
             i,
-            arq.to_bounds(&topo).offset(),
+            *arq.start.to_offset(topo, arq.power()),
             arq.count(),
             arq.power()
         );
@@ -184,17 +184,17 @@ mod tests {
             ArqBounds {
                 start: 0.into(),
                 power: 10,
-                count: 10,
+                count: Offset(10),
             },
             ArqBounds {
                 start: 0.into(),
                 power: 8,
-                count: 40,
+                count: Offset(40),
             },
             ArqBounds {
                 start: 0.into(),
                 power: 12,
-                count: 3,
+                count: Offset(3),
             },
         ]);
 
@@ -204,17 +204,17 @@ mod tests {
                 ArqBounds {
                     start: 0.into(),
                     power: 8,
-                    count: (4 * 10)
+                    count: Offset(4 * 10)
                 },
                 ArqBounds {
                     start: 0.into(),
                     power: 8,
-                    count: 40
+                    count: Offset(40)
                 },
                 ArqBounds {
                     start: 0.into(),
                     power: 8,
-                    count: (3 * 16)
+                    count: Offset(3 * 16)
                 },
             ]
         );
