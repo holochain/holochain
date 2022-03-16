@@ -546,7 +546,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN}}
           pull-request-number: ${{ steps.cpr.outputs.pull-request-number }}
-          merge-method: squash
+          merge-method: merge
       - name: Auto approve Pull Request
         if: ${{ needs.vars.outputs.dry_run == 'false' }}
         uses: juliangruber/approve-pull-request-action@v1
