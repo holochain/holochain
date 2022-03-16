@@ -1,7 +1,7 @@
 //! bunch of nodes gossip consistency test
 
 use kitsune_p2p_direct::dependencies::kitsune_p2p::event::full_time_window;
-use kitsune_p2p_direct::dependencies::kitsune_p2p_types::dht_arc::DhtArc;
+use kitsune_p2p_direct::dependencies::kitsune_p2p_types::dht_arc::DhtArcRange;
 use kitsune_p2p_direct::dependencies::kitsune_p2p_types::dht_arc::DhtArcSet;
 use kitsune_p2p_direct::dependencies::*;
 use kitsune_p2p_direct::prelude::*;
@@ -509,7 +509,7 @@ impl Test {
                         self.root.clone(),
                         agent.clone(),
                         full_time_window(),
-                        DhtArcSet::from(DhtArc::Full(0.into())),
+                        DhtArcSet::from(DhtArcRange::Full(0.into())),
                     )
                     .await
                     .unwrap()
@@ -533,7 +533,7 @@ impl Test {
                         self.root.clone(),
                         agent.clone(),
                         full_time_window(),
-                        DhtArcSet::from(DhtArc::Full(0.into())),
+                        DhtArcSet::from(DhtArcRange::Full(0.into())),
                     )
                     .await
                     .unwrap()

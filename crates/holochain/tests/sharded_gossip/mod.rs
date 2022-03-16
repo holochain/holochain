@@ -344,7 +344,7 @@ async fn mock_network_sharded_gossip() {
                                             let a = alice.storage_arc;
                                             let b = interval.clone();
                                             debug!("{}\n{}", a.to_ascii(10), b.to_ascii(10));
-                                            let a: DhtArcSet = a.into();
+                                            let a: DhtArcSet = a.inner().into();
                                             let b: DhtArcSet = b.into();
                                             if !a.overlap(&b) {
                                                 num_missed_gossips += 1;

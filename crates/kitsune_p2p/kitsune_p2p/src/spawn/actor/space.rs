@@ -5,7 +5,7 @@ use ghost_actor::dependencies::tracing;
 use kitsune_p2p_mdns::*;
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use kitsune_p2p_types::codec::{rmp_decode, rmp_encode};
-use kitsune_p2p_types::dht_arc::{DhtArc, DhtArcSet};
+use kitsune_p2p_types::dht_arc::{DhtArc, DhtArcRange, DhtArcSet};
 use kitsune_p2p_types::tx2::tx2_utils::TxUrl;
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::AtomicBool;
@@ -1266,7 +1266,7 @@ impl Space {
         let arc_set = self
             .agent_arcs
             .iter()
-            .map(|(_, a)| DhtArcSet::from_interval(a))
+            .map(|(_, a)| DhtArcSet::from_interval(DhtArcRange::from(a)))
             .fold(DhtArcSet::new_empty(), |a, i| a.union(&i));
         self.ro_inner.metric_exchange.write().update_arcset(arc_set);
     }
@@ -1347,9 +1347,9 @@ impl Space {
                 Some(arc) => arc,
                 None => {
                     if self.agent_arcs.is_empty() {
-                        DhtArc::Full(agent.get_loc())
+                        DhtArc::full(agent.get_loc())
                     } else {
-                        DhtArc::Empty(agent.get_loc())
+                        DhtArc::empty(agent.get_loc())
                     }
                 }
             }
@@ -1359,7 +1359,7 @@ impl Space {
             self.agent_arcs
                 .get(agent)
                 .cloned()
-                .unwrap_or_else(|| DhtArc::Full(agent.get_loc()))
+                .unwrap_or_else(|| DhtArc::full(agent.get_loc()))
         }
     }
 }
