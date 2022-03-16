@@ -502,33 +502,33 @@ mod tests {
     fn test_ascii() {
         let cent = u32::MAX / 100 + 1;
         assert_eq!(
-            DhtArcRange::from_bounds(cent * 30, cent * 60).to_ascii(10),
+            DhtArc::from_bounds(cent * 30, cent * 60).to_ascii(10),
             "   @---   ".to_string()
         );
         assert_eq!(
-            DhtArcRange::from_bounds(cent * 33, cent * 63).to_ascii(10),
+            DhtArc::from_bounds(cent * 33, cent * 63).to_ascii(10),
             "   @---   ".to_string()
         );
         assert_eq!(
-            DhtArcRange::from_bounds(cent * 29, cent * 59).to_ascii(10),
+            DhtArc::from_bounds(cent * 29, cent * 59).to_ascii(10),
             "  @---    ".to_string()
         );
 
         assert_eq!(
-            DhtArcRange::from_bounds(cent * 60, cent * 30).to_ascii(10),
+            DhtArc::from_bounds(cent * 60, cent * 30).to_ascii(10),
             "----  @---".to_string()
         );
         assert_eq!(
-            DhtArcRange::from_bounds(cent * 63, cent * 33).to_ascii(10),
+            DhtArc::from_bounds(cent * 63, cent * 33).to_ascii(10),
             "----  @---".to_string()
         );
         assert_eq!(
-            DhtArcRange::from_bounds(cent * 59, cent * 29).to_ascii(10),
+            DhtArc::from_bounds(cent * 59, cent * 29).to_ascii(10),
             "---  @----".to_string()
         );
 
         assert_eq!(
-            DhtArcRange::from_bounds(cent * 99, cent * 0).to_ascii(10),
+            DhtArc::from_bounds(cent * 99, cent * 0).to_ascii(10),
             "-        @".to_string()
         );
     }

@@ -1,4 +1,4 @@
-use crate::{loc_upscale, DhtArcRange};
+use crate::{loc_upscale, DhtArc};
 
 use pretty_assertions::assert_eq;
 
@@ -48,7 +48,7 @@ fn test_cases_raw<'a>(len: usize, cases: impl IntoIterator<Item = (u32, u32, &'a
     let actual: Vec<_> = cases
         .into_iter()
         .map(|(lo, hi, _)| {
-            let ascii = DhtArcRange::from_bounds(lo, hi).to_ascii(len);
+            let ascii = DhtArc::from_bounds(lo, hi).to_ascii(len);
             let bounds = fmt_bounds(lo, hi);
             assert_eq!(ascii.len(), len, "Wrong length for case {}", bounds);
             (bounds, ascii)
@@ -71,7 +71,7 @@ fn test_cases_scaled<'a>(len: usize, cases: impl IntoIterator<Item = (i32, i32, 
         .into_iter()
         .map(|(lo, hi, _)| {
             let ascii =
-                DhtArcRange::from_bounds(loc_upscale(len, lo), loc_upscale(len, hi)).to_ascii(len);
+                DhtArc::from_bounds(loc_upscale(len, lo), loc_upscale(len, hi)).to_ascii(len);
             let bounds = fmt_bounds(lo, hi);
             assert_eq!(ascii.len(), len, "Wrong length for case {}", bounds);
             (bounds, ascii)
