@@ -52,6 +52,7 @@ pub fn gossip_direct<Peer: HostAccess>(
         al.intersection(&topo, &ar)
     };
 
+
     {
         // ROUND II: Send Agents (not shown)
     }
@@ -86,12 +87,12 @@ pub fn gossip_direct<Peer: HostAccess>(
         // - "send" missing ops
         for op in ops_right {
             stats.ops_rcvd += 1;
-            stats.op_data_rcvd += op.size;
+            stats.op_data_rcvd += op.size as u64;
             left.integrate_op(op);
         }
         for op in ops_left {
             stats.ops_sent += 1;
-            stats.op_data_sent += op.size;
+            stats.op_data_sent += op.size as u64;
             right.integrate_op(op);
         }
     }
@@ -104,16 +105,16 @@ pub struct TestNodeGossipRoundStats {
     pub regions_rcvd: u32,
     pub ops_sent: u32,
     pub ops_rcvd: u32,
-    pub op_data_sent: u32,
-    pub op_data_rcvd: u32,
+    pub op_data_sent: u64,
+    pub op_data_rcvd: u64,
 }
 
 impl TestNodeGossipRoundStats {
-    pub fn total_sent(&self) -> u32 {
-        self.regions_sent + self.op_data_sent
+    pub fn total_sent(&self) -> u64 {
+        self.regions_sent as u64 + self.op_data_sent
     }
 
-    pub fn total_rcvd(&self) -> u32 {
-        self.regions_rcvd + self.op_data_rcvd
+    pub fn total_rcvd(&self) -> u64 {
+        self.regions_rcvd as u64 + self.op_data_rcvd
     }
 }

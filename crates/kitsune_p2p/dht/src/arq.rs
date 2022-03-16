@@ -16,11 +16,13 @@ use kitsune_p2p_dht_arc::{DhtArc, DhtArcRange};
 
 use crate::{op::Loc, quantum::*};
 
-pub const fn pow2(p: u8) -> u32 {
-    2u32.pow(p as u32)
+pub fn pow2(p: u8) -> u32 {
+    debug_assert!(p < 32);
+    2u32.pow((p as u32).min(31))
 }
 
 pub fn pow2f(p: u8) -> f64 {
+    debug_assert!(p < 32);
     2f64.powf(p as f64)
 }
 
@@ -61,14 +63,14 @@ impl ArqStart for Offset {
 #[derive(Debug, Copy, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Arq<S: ArqStart = Loc> {
     /// Location around which this coverage is centered
-    start: S,
+    pub start: S,
     /// The level of quantization. Total ArqBounds length is `2^power * count`.
     /// The power must be between 0 and 31, inclusive.
-    power: u8,
+    pub power: u8,
     /// The number of unit lengths.
     /// We never expect the count to be less than 4 or so, and not much larger
     /// than 32.
-    count: Offset,
+    pub count: Offset,
 }
 
 pub type ArqBounds = Arq<Offset>;
@@ -173,7 +175,7 @@ impl Arq<Loc> {
     }
 
     pub fn new_full(topo: &Topology, start: Loc, power: u8) -> Self {
-        let count = pow2(32u8.saturating_sub(power + topo.space_power));
+        let count = pow2(32u8.saturating_sub(power + topo.space.quantum_power));
         assert!(is_full(topo, power, count));
         Self {
             start,
@@ -289,7 +291,7 @@ impl ArqBounds {
             }),
             DhtArcRange::Full => {
                 assert!(power > 0);
-                let full_count = 2u32.pow(32 - power as u32);
+                let full_count = 2u32.pow(32 - power as u32 - dim.quantum_power as u32);
                 Some(Self {
                     start: 0.into(),
                     power,
@@ -349,7 +351,7 @@ impl ArqBounds {
 /// count >= 2^(32 - 12 - 14) = 2^6 = 64, since it would take 64 chunks of
 /// size 2^(12 + 14) to cover the full space.
 pub fn is_full(topo: &Topology, power: u8, count: u32) -> bool {
-    let max = 32u8.saturating_sub(topo.space_power);
+    let max = 32u8.saturating_sub(topo.space.quantum_power);
     if power == 0 {
         false
     } else if power >= 32 {
@@ -375,6 +377,7 @@ pub fn requantize(old_power: u8, old_count: u32, new_power: u8) -> Option<(u8, u
 }
 
 pub fn power_and_count_from_length(dim: &Dimension, len: u64, max_chunks: u32) -> (u8, u32) {
+    assert!(len <= U32_LEN);
     let mut power = 0;
     let mut count = (len / dim.quantum as u64) as f64;
     let max = max_chunks as f64;
@@ -389,9 +392,7 @@ pub fn power_and_count_from_length(dim: &Dimension, len: u64, max_chunks: u32) -
 
 /// Given a center and a length, give Arq which matches most closely given the provided strategy
 pub fn approximate_arq(topo: &Topology, strat: &ArqStrat, start: Loc, len: u64) -> Arq {
-    if len == 2u64.pow(32) {
-        Arq::new_full(topo, start, topo.max_space_power(strat))
-    } else if len == 0 {
+    if len == 0 {
         Arq::new(start, topo.min_space_power(), 0)
     } else {
         let (power, count) = power_and_count_from_length(&topo.space, len, strat.max_chunks());
@@ -412,6 +413,11 @@ pub fn approximate_arq(topo: &Topology, strat: &ArqStrat, start: Loc, len: u64) 
             max
         );
         debug_assert!(count == 0 || count - 1 <= u32::MAX / topo.space.quantum);
+        debug_assert!(
+            power <= topo.max_space_power(strat),
+            "power too large: {}",
+            power
+        );
         Arq::new(start, power as u8, count)
     }
 }

@@ -197,7 +197,7 @@ impl SpacetimeCoords {
 }
 
 fn bounds<N: From<u32>>(dim: &Dimension, power: u8, offset: Offset, count: u32) -> (N, N) {
-    let q = dim.quantum * pow2(power);
+    let q = dim.quantum.wrapping_mul(pow2(power));
     let start = offset.wrapping_mul(q);
     let len = count.wrapping_mul(q);
     (start.into(), start.wrapping_add(len).wrapping_sub(1).into())
@@ -350,6 +350,11 @@ pub struct Dimension {
     /// The smallest possible length in this dimension.
     /// Determines the interval represented by the leaf of a tree.
     pub quantum: u32,
+
+    /// The smallest power of 2 which is larger than the quantum.
+    /// Needed for various calculations.
+    pub quantum_power: u8,
+
     /// The log2 size of this dimension, so that 2^bit_depth is the number of
     /// possible values that can be represented.
     bit_depth: u8,
@@ -359,6 +364,7 @@ impl Dimension {
     pub fn unit() -> Self {
         Dimension {
             quantum: 1,
+            quantum_power: 0,
             bit_depth: 32,
         }
     }
@@ -373,8 +379,9 @@ impl Dimension {
             // which divided by 16 (max chunks) is ~2700, which is about 2^15.
             // So, we'll go down to 2^12 just to be extra safe.
             // This means we only need 20 bits to represent any location.
-            quantum: pow2(quantum_power),
-            bit_depth: 20,
+            quantum: 2u32.pow(quantum_power as u32),
+            quantum_power,
+            bit_depth: 32 - quantum_power,
         }
     }
 
@@ -383,12 +390,15 @@ impl Dimension {
             // 5 minutes in microseconds = 1mil * 60 * 5 = 300,000,000
             // log2 of this is 28.16, FYI
             quantum: 1_000_000 * 60 * 5,
+            quantum_power: 29,
 
             // 12 quanta = 1 hour.
             // If we set the max lifetime for a network to ~100 years, which
             // is 12 * 24 * 365 * 1000 = 105,120,000 time quanta,
             // the log2 of which is 26.64,
             // then we can store any time coordinate in that range using 27 bits.
+            //
+            // BTW, the log2 of 100 years in microseconds is 54.81
             bit_depth: 27,
         }
     }
@@ -399,10 +409,6 @@ impl Dimension {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Topology {
     pub space: Dimension,
-    // HACK: we need the log2 representation of the space quantum in a few places,
-    // so we store it here. This MUST match up with space.quantum, i.e.:
-    // 2^space_power == space.quantum
-    pub space_power: u8,
     pub time: Dimension,
     pub time_origin: Timestamp,
 }
@@ -411,7 +417,6 @@ impl Topology {
     pub fn unit(time_origin: Timestamp) -> Self {
         Self {
             space: Dimension::unit(),
-            space_power: 0,
             time: Dimension::unit(),
             time_origin,
         }
@@ -420,7 +425,6 @@ impl Topology {
     pub fn unit_zero() -> Self {
         Self {
             space: Dimension::unit(),
-            space_power: 0,
             time: Dimension::unit(),
             time_origin: Timestamp::from_micros(0),
         }
@@ -429,7 +433,6 @@ impl Topology {
     pub fn standard(time_origin: Timestamp) -> Self {
         Self {
             space: Dimension::standard_space(),
-            space_power: 12,
             time: Dimension::standard_time(),
             time_origin,
         }
@@ -456,13 +459,13 @@ impl Topology {
     pub fn min_space_power(&self) -> u8 {
         // if space quantum power is 0, then min has to be at least 1.
         // otherwise, it can be 0
-        1u8.saturating_sub(self.space_power)
+        1u8.saturating_sub(self.space.quantum_power)
     }
 
     /// The maximum power to use in "exponentional coordinates".
-    /// This is 16 for standard space topology.
+    /// This is 17 for standard space topology. (32 - 12 - 3)
     pub fn max_space_power(&self, strat: &ArqStrat) -> u8 {
-        32 - self.space_power - strat.max_chunks_log2()
+        32 - self.space.quantum_power - strat.max_chunks_log2()
     }
 }
 

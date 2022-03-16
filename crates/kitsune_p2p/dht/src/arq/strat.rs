@@ -155,6 +155,8 @@ impl ArqStrat {
         max_chunks
     }
 
+    /// The floor of the log2 of the max_chunks.
+    /// For the default of 15, floor(log2(15)) = 3
     pub fn max_chunks_log2(&self) -> u8 {
         (self.max_chunks() as f64).log2().floor() as u8
     }
