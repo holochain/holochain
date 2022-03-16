@@ -1,6 +1,6 @@
 [package]
 name = "holochain_zome_types"
-version = "0.0.27-dev.0"
+version = "0.0.27"
 description = "Holochain zome types"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
