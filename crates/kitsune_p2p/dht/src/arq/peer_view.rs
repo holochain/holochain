@@ -90,7 +90,7 @@ impl PeerViewQ {
             // divide-by-zero crashes
             return (1.0, 1);
         }
-        let filter_len = filter.length();
+        let filter_len = dbg!(filter.length());
 
         let initial = (0, 0);
 
@@ -396,12 +396,12 @@ mod tests {
     use super::*;
 
     fn make_arq(topo: &Topology, pow: u8, lo: u32, hi: u32) -> Arq {
-        ArqBounds::from_interval_rounded(
+        let a = ArqBounds::from_interval_rounded(
             topo,
             pow,
-            DhtArcRange::from_bounds(pow2(pow) * lo, (pow2(pow) as u64 * hi as u64) as u32),
-        )
-        .to_arq(topo)
+            DhtArcRange::from_bounds(pow2(pow) * lo, ((pow2(pow) as u64 * hi as u64) as u32).wrapping_sub(1)),
+        );
+        a.to_arq(topo)
     }
 
     #[test]
@@ -412,9 +412,7 @@ mod tests {
         let a = make_arq(&topo, pow, 0, 0x20);
         let b = make_arq(&topo, pow, 0x10, 0x30);
         let c = make_arq(&topo, pow, 0x20, 0x40);
-        assert_eq!(a.left_edge, Loc::from(s * 0x0 + s / 2));
-        assert_eq!(b.left_edge, Loc::from(s * 0x10 + s / 2));
-        assert_eq!(c.left_edge, Loc::from(s * 0x20 + s / 2));
+
         let arqs = vec![a, b, c];
         print_arqs(&topo, &arqs, 64);
         let view = PeerViewQ::new(topo.clone(), Default::default(), arqs);

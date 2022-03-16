@@ -450,7 +450,7 @@ pub fn full_to_half_len(full_len: u64) -> u32 {
 pub fn half_to_full_len(half_len: u32) -> u64 {
     if half_len == 0 {
         0
-    } else if half_len == MAX_HALF_LENGTH {
+    } else if half_len >= MAX_HALF_LENGTH {
         U32_LEN
     } else {
         (half_len as u64 * 2).wrapping_sub(1)

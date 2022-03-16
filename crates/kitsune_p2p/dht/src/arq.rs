@@ -185,8 +185,7 @@ impl Arq {
 
     pub fn to_dht_arc(&self, topo: &Topology) -> DhtArc {
         let len = self.absolute_length(topo);
-        let hl = ((len + 1) / 2) as u32;
-        DhtArc::from_start_and_half_len(self.left_edge, hl)
+        DhtArc::from_start_and_len(self.left_edge, len)
     }
 
     pub fn from_dht_arc(topo: &Topology, strat: &ArqStrat, dht_arc: &DhtArc) -> Self {
@@ -251,6 +250,7 @@ impl ArqBounded for Arq {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ArqBounds {
+    // TODO: must be Offset type!
     offset: SpaceQuantum,
     power: u8,
     count: u32,
@@ -332,7 +332,7 @@ impl ArqBounds {
 
     pub fn to_arq(&self, topo: &Topology) -> Arq {
         Arq {
-            left_edge: self.pseudocenter(topo),
+            left_edge: (self.offset.inner() * topo.space.quantum * pow2(self.power)).into(),
             power: self.power,
             count: self.count,
         }
