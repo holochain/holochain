@@ -214,7 +214,7 @@ fn bounds64<N: From<i64>>(dim: &Dimension, power: u8, offset: Offset, count: u32
 /// The absolute DhtLocation of the offset is determined by the "power" of its
 /// context, and topology of the space, by:
 ///
-///     dht location = offset * 2^pow * topology.space.quantum
+///   dht location = offset * 2^pow * topology.space.quantum
 #[derive(
     Copy,
     Clone,
