@@ -226,7 +226,7 @@ impl Spaces {
             .unwrap_or("AND DhtOp.when_integrated IS NOT NULL\n");
 
         let intervals = dht_arc_set.intervals();
-        let sql = if let Some(DhtArcRange::Full(_)) = intervals.first() {
+        let sql = if let Some(DhtArcRange::Full) = intervals.first() {
             format!(
                 "{}{}{}",
                 holochain_sqlite::sql::sql_cell::FETCH_OP_HASHES_P1,

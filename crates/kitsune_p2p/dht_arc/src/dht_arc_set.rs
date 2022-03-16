@@ -74,17 +74,15 @@ impl DhtArcSet {
 
     pub fn from_interval<A: Borrow<DhtArcRange>>(arc: A) -> Self {
         match arc.borrow() {
-            DhtArcRange::Full(_) => Self::new_full(),
-            DhtArcRange::Empty(_) => Self::new_empty(),
+            DhtArcRange::Full => Self::new_full(),
+            DhtArcRange::Empty => Self::new_empty(),
             DhtArcRange::Bounded(start, end) => Self::from_bounds(*start, *end),
         }
     }
 
     pub fn intervals(&self) -> Vec<DhtArcRange> {
         match self {
-            // XXX: loss of information here, this DhtArcRange
-            //      does not actually know about its true start
-            Self::Full => vec![DhtArcRange::Full(0u32.into())],
+            Self::Full => vec![DhtArcRange::Full],
             Self::Partial(intervals) => {
                 let mut intervals: VecDeque<(DhtLocation, DhtLocation)> =
                     intervals.iter().map(|i| (i.lower(), i.upper())).collect();

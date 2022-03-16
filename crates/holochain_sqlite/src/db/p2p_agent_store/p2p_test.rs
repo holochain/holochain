@@ -175,7 +175,7 @@ async fn test_p2p_agent_store_gossip_query_sanity() {
 
     // check that gossip query over zero arc returns zero results
     let all = con
-        .p2p_gossip_query_agents(u64::MIN, u64::MAX, DhtArcRange::Empty(0.into()).into())
+        .p2p_gossip_query_agents(u64::MIN, u64::MAX, DhtArcRange::Empty.into())
         .unwrap();
     assert_eq!(all.len(), 0);
 

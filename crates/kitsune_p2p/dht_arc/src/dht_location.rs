@@ -25,6 +25,9 @@ use std::num::Wrapping;
 pub struct DhtLocation(pub Wrapping<u32>);
 
 impl DhtLocation {
+    pub const MIN: Self = Self(Wrapping(u32::MIN));
+    pub const MAX: Self = Self(Wrapping(u32::MAX));
+
     pub fn new(loc: u32) -> Self {
         Self(Wrapping(loc))
     }

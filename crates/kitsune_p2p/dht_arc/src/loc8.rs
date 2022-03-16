@@ -140,8 +140,8 @@ impl DhtLocation {
 impl DhtArcRange {
     pub fn as_loc8(&self) -> DhtArcRange<Loc8> {
         match self {
-            Self::Empty(s) => DhtArcRange::Empty(s.as_loc8()),
-            Self::Full(s) => DhtArcRange::Full(s.as_loc8()),
+            Self::Empty => DhtArcRange::Empty,
+            Self::Full => DhtArcRange::Full,
             Self::Bounded(lo, hi) => DhtArcRange::Bounded(lo.as_loc8(), hi.as_loc8()),
         }
     }
@@ -153,8 +153,8 @@ where
 {
     pub fn canonical(self) -> DhtArcRange {
         match self {
-            DhtArcRange::Empty(s) => DhtArcRange::Empty(DhtLocation::from(Loc8::from(s))),
-            DhtArcRange::Full(s) => DhtArcRange::Full(DhtLocation::from(Loc8::from(s))),
+            DhtArcRange::Empty => DhtArcRange::Empty,
+            DhtArcRange::Full => DhtArcRange::Full,
             DhtArcRange::Bounded(lo, hi) => DhtArcRange::from_bounds(
                 DhtLocation::from(Loc8::from(lo)),
                 DhtLocation::from(Loc8::from(hi)),

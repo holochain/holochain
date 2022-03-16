@@ -509,7 +509,7 @@ impl Test {
                         self.root.clone(),
                         agent.clone(),
                         full_time_window(),
-                        DhtArcSet::from(DhtArcRange::Full(0.into())),
+                        DhtArcSet::from(DhtArcRange::Full),
                     )
                     .await
                     .unwrap()
@@ -533,7 +533,7 @@ impl Test {
                         self.root.clone(),
                         agent.clone(),
                         full_time_window(),
-                        DhtArcSet::from(DhtArcRange::Full(0.into())),
+                        DhtArcSet::from(DhtArcRange::Full),
                     )
                     .await
                     .unwrap()

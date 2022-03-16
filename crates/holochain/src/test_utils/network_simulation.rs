@@ -9,7 +9,7 @@ use ::fixt::prelude::*;
 use hdk::prelude::*;
 use holo_hash::{DhtOpHash, DnaHash};
 use holochain_conductor_api::conductor::ConductorConfig;
-use holochain_p2p::dht_arc::{DhtArcRange, DhtLocation};
+use holochain_p2p::dht_arc::{DhtArc, DhtArcRange, DhtLocation};
 use holochain_p2p::{AgentPubKeyExt, DhtOpHashExt, DnaHashExt};
 use holochain_sqlite::db::{p2p_put_single, AsP2pStateTxExt};
 use holochain_state::prelude::from_blob;
@@ -41,7 +41,7 @@ pub struct MockNetworkData {
     /// KitsuneAgent -> AgentPubKey
     pub agent_kit_to_hash: HashMap<Arc<KitsuneAgent>, Arc<AgentPubKey>>,
     /// Agent storage arcs.
-    pub agent_to_arc: HashMap<Arc<AgentPubKey>, DhtArcRange>,
+    pub agent_to_arc: HashMap<Arc<AgentPubKey>, DhtArc>,
     /// Agents peer info.
     pub agent_to_info: HashMap<Arc<AgentPubKey>, AgentInfoSigned>,
     /// Hashes ordered by their basis location.
@@ -141,8 +141,8 @@ impl MockNetworkData {
     pub fn hashes_authority_for(&self, agent: &AgentPubKey) -> Vec<Arc<DhtOpHash>> {
         let arc = self.agent_to_arc[agent].interval();
         match arc {
-            DhtArcRange::Empty(_) => Vec::with_capacity(0),
-            DhtArcRange::Full(_) => self.ops_by_loc.values().flatten().cloned().collect(),
+            DhtArcRange::Empty => Vec::with_capacity(0),
+            DhtArcRange::Full => self.ops_by_loc.values().flatten().cloned().collect(),
             DhtArcRange::Bounded(start, end) => {
                 if start <= end {
                     self.ops_by_loc

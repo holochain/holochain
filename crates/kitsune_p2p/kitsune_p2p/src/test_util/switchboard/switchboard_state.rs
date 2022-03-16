@@ -276,9 +276,9 @@ impl SwitchboardState {
             let node_id = ep.uniq();
             let ascii = if with_ops {
                 let ops = node.ops.keys().copied();
-                DhtArcRange::Empty(DhtLocation::from(0)).to_ascii_with_ops(width, ops)
+                DhtArcRange::Empty.to_ascii_with_ops(width, ops)
             } else {
-                DhtArcRange::Empty(DhtLocation::from(0)).to_ascii(width)
+                DhtArcRange::Empty.to_ascii(width)
             };
             println!(
                 "{:>4} {:>+5} ({:^width$})",
@@ -536,7 +536,7 @@ impl SwitchboardAgent {
     pub fn full<L: Copy + Into<Loc8>>(loc: L) -> Self {
         Self {
             loc: loc.into(),
-            initial_arc: DhtArcRange::Full(loc.into()),
+            initial_arc: DhtArcRange::Full,
         }
     }
 
@@ -559,7 +559,7 @@ impl SwitchboardAgent {
     pub fn from_start_and_half_len<L: Into<Loc8>>(start: L, half_len: u8) -> Self {
         let start: Loc8 = start.into();
         let initial_arc = if half_len == 0 {
-            DhtArcRange::Empty(start)
+            DhtArcRange::Empty
         } else {
             let len = half_len * 2 - 1;
             let end = Loc8::from((start.as_u8().wrapping_add(len).wrapping_sub(1)) as i8);

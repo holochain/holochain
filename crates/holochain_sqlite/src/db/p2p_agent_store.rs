@@ -268,7 +268,7 @@ impl AsP2pStateTxExt for Transaction<'_> {
 
         for interval in dht_arc_set.intervals() {
             match interval {
-                DhtArcRange::Full(_) => {
+                DhtArcRange::Full => {
                     out.push(stmt.query_row(
                         named_params! {
                             ":now": now,

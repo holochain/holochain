@@ -69,7 +69,7 @@ async fn main() {
                         test.root.clone(),
                         agent.clone(),
                         full_time_window(),
-                        DhtArcRange::Full(0.into()).into(),
+                        DhtArcRange::Full.into(),
                     )
                     .await
                     .unwrap()

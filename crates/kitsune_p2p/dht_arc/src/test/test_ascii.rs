@@ -1,4 +1,4 @@
-use crate::{loc_upscale, DhtArc, DhtArcRange};
+use crate::{loc_upscale, DhtArcRange};
 
 use pretty_assertions::assert_eq;
 
