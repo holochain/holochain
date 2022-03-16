@@ -281,7 +281,7 @@ mod tests {
         let nt = 10;
         let ops = op_grid(
             &topo,
-            &Arq::new(0.into(), pow, 8).to_bounds(&topo),
+            &Arq::new(0u32.into(), pow, 8).to_bounds(&topo),
             (1000..11000 as i64).step_by(1000),
         );
         assert_eq!(ops.len(), nx * nt);
@@ -430,9 +430,7 @@ mod tests {
         assert_eq!(diff.len(), 2);
 
         assert!(diff[0].coords.contains(&topo, &extra_ops[0].coords(&topo)));
-        assert!(diff[1]
-            .coords
-            .contains(&topo, &extra_ops[1].coords(&topo)));
+        assert!(diff[1].coords.contains(&topo, &extra_ops[1].coords(&topo)));
 
         // Adding the region data from each extra op to the region data of the
         // diff which was missing those ops should be the same as the query

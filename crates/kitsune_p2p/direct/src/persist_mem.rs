@@ -405,8 +405,9 @@ impl AsKdPersist for PersistMem {
                 .get_all()?
                 .into_iter()
                 .filter_map(|v| {
-                    if dht_arc.contains(DhtLocation::from(v.agent().as_loc())) {
-                        Some(*v.storage_arc())
+                    let loc = DhtLocation::from(v.agent().as_loc());
+                    if dht_arc.contains(loc) {
+                        Some(DhtArc::from_parts(*v.storage_arc(), loc))
                     } else {
                         None
                     }

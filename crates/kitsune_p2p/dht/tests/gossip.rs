@@ -23,7 +23,7 @@ fn test_basic() {
     let ts = |t: u32| TimeQuantum::from(t).to_timestamp_bounds(&topo).0;
 
     let alice_arq = Arq::new((-128i32 as u32).into(), 8, 4);
-    let bobbo_arq = Arq::new(0.into(), 8, 4);
+    let bobbo_arq = Arq::new(0u32.into(), 8, 4);
     let mut alice = TestNode::new(topo.clone(), gopa, alice_arq);
     let mut bobbo = TestNode::new(topo.clone(), gopa, bobbo_arq);
 

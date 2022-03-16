@@ -143,7 +143,7 @@ pub fn run_one_epoch(
         let before = arq.absolute_length(topo) as f64;
         let before_pow = arq.power();
 
-        let stats = view.update_arq_with_stats(&mut arq);
+        let stats = view.update_arq_with_stats(topo, &mut arq);
 
         let after = arq.absolute_length(topo) as f64;
         let delta = (after - before) / topo.space.quantum as f64;
@@ -163,7 +163,7 @@ pub fn run_one_epoch(
                 delta_str
             };
 
-            let cov = view.extrapolated_coverage(&arq.to_bounds(&topo));
+            let cov = view.extrapolated_coverage(&arq);
             let slack_factor = view.slack_factor(cov, stats.num_peers);
 
             let slack_str = if slack_factor == 1.0 {

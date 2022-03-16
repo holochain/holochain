@@ -1,4 +1,4 @@
-use kitsune_p2p_dht_arc::DhtArc;
+use kitsune_p2p_dht_arc::DhtArcRange;
 
 use crate::{quantum::Topology, Loc};
 
@@ -74,9 +74,9 @@ impl ArqBounds {
         };
 
         match self.to_interval(topo) {
-            DhtArc::Full(_) => full(),
-            DhtArc::Empty(_) => empty(),
-            DhtArc::Bounded(lo0, hi0) => {
+            DhtArcRange::Full => full(),
+            DhtArcRange::Empty => empty(),
+            DhtArcRange::Bounded(lo0, hi0) => {
                 let lo = loc_downscale(len, lo0);
                 let hi = loc_downscale(len, hi0);
 

@@ -118,7 +118,7 @@ mod tests {
     fn integrate_and_query_ops() {
         let topo = Topology::unit_zero();
         let gopa = GossipParams::zero();
-        let arq = Arq::new(0.into(), 8, 4);
+        let arq = Arq::new(0u32.into(), 8, 4);
         let mut node = TestNode::new(topo, gopa, arq);
 
         node.integrate_ops(
@@ -160,7 +160,7 @@ mod tests {
     fn gossip_regression() {
         let topo = Topology::unit_zero();
         let gopa = GossipParams::zero();
-        let alice_arq = Arq::new(0.into(), 8, 4);
+        let alice_arq = Arq::new(0u32.into(), 8, 4);
         let bobbo_arq = Arq::new(128.into(), 8, 4);
         let mut alice = TestNode::new(topo.clone(), gopa, alice_arq);
         let mut bobbo = TestNode::new(topo.clone(), gopa, bobbo_arq);

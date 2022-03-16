@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use crate::{loc_downscale, loc_upscale, DhtArc, DhtLocation};
+use crate::{loc_downscale, loc_upscale, DhtArcRange, DhtLocation};
 
 /// A representation of DhtLocation in the u8 space. Useful for writing tests
 /// that test the full range of possible locations while still working with small numbers.
@@ -137,25 +137,25 @@ impl DhtLocation {
     }
 }
 
-impl DhtArc {
-    pub fn as_loc8(&self) -> DhtArc<Loc8> {
+impl DhtArcRange {
+    pub fn as_loc8(&self) -> DhtArcRange<Loc8> {
         match self {
-            Self::Empty(s) => DhtArc::Empty(s.as_loc8()),
-            Self::Full(s) => DhtArc::Full(s.as_loc8()),
-            Self::Bounded(lo, hi) => DhtArc::Bounded(lo.as_loc8(), hi.as_loc8()),
+            Self::Empty => DhtArcRange::Empty,
+            Self::Full => DhtArcRange::Full,
+            Self::Bounded(lo, hi) => DhtArcRange::Bounded(lo.as_loc8(), hi.as_loc8()),
         }
     }
 }
 
-impl<L> DhtArc<L>
+impl<L> DhtArcRange<L>
 where
     Loc8: From<L>,
 {
-    pub fn canonical(self) -> DhtArc {
+    pub fn canonical(self) -> DhtArcRange {
         match self {
-            DhtArc::Empty(s) => DhtArc::Empty(DhtLocation::from(Loc8::from(s))),
-            DhtArc::Full(s) => DhtArc::Full(DhtLocation::from(Loc8::from(s))),
-            DhtArc::Bounded(lo, hi) => DhtArc::from_bounds(
+            DhtArcRange::Empty => DhtArcRange::Empty,
+            DhtArcRange::Full => DhtArcRange::Full,
+            DhtArcRange::Bounded(lo, hi) => DhtArcRange::from_bounds(
                 DhtLocation::from(Loc8::from(lo)),
                 DhtLocation::from(Loc8::from(hi)),
             ),

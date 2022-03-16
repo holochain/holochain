@@ -1,3 +1,4 @@
+use kitsune_p2p_types::dht_arc::DhtArcRange;
 use rand::Rng;
 
 use super::*;
@@ -26,7 +27,11 @@ impl ShardedGossipLocal {
         }
 
         // Get the local agents intervals.
-        let intervals = store::local_arcs(&self.evt_sender, &self.space, &local_agents).await?;
+        let intervals: Vec<_> = store::local_arcs(&self.evt_sender, &self.space, &local_agents)
+            .await?
+            .into_iter()
+            .map(DhtArcRange::from)
+            .collect();
 
         // Choose a remote agent to gossip with.
         let remote_agent = self
@@ -78,7 +83,7 @@ impl ShardedGossipLocal {
     pub(super) async fn incoming_initiate(
         &self,
         peer_cert: Tx2Cert,
-        remote_arc_set: Vec<DhtArc>,
+        remote_arc_set: Vec<DhtArcRange>,
         remote_id: u32,
         remote_agent_list: Vec<AgentInfoSigned>,
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
@@ -127,7 +132,10 @@ impl ShardedGossipLocal {
         // Get the local intervals.
         let local_agent_arcs =
             store::local_agent_arcs(&self.evt_sender, &self.space, &local_agents).await?;
-        let local_arcs: Vec<DhtArc> = local_agent_arcs.into_iter().map(|(_, arc)| arc).collect();
+        let local_arcs: Vec<DhtArcRange> = local_agent_arcs
+            .into_iter()
+            .map(|(_, arc)| arc.into())
+            .collect();
 
         let agent_list = self
             .evt_sender
@@ -185,8 +193,8 @@ impl ShardedGossipLocal {
     pub(super) async fn generate_blooms_or_regions(
         &self,
         remote_agent_list: Vec<AgentInfoSigned>,
-        local_arcs: Vec<DhtArc>,
-        remote_arc_set: Vec<DhtArc>,
+        local_arcs: Vec<DhtArcRange>,
+        remote_arc_set: Vec<DhtArcRange>,
         gossip: &mut Vec<ShardedGossipWire>,
     ) -> KitsuneResult<RoundState> {
         // Create the common arc set from the remote and local arcs.

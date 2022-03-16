@@ -336,8 +336,8 @@ async fn mock_network_sharded_gossip() {
                                             let a = alice.storage_arc;
                                             let b = interval.clone();
                                             debug!("{}\n{}", a.to_ascii(10), b.to_ascii(10));
-                                            let a: DhtArcSet = a.into();
-                                            let b: DhtArcSet = b.into();
+                                            let a: DhtArcSet = a.inner().into();
+                                            let b: DhtArcSet = b.inner().into();
                                             if !a.overlap(&b) {
                                                 num_missed_gossips += 1;
                                             }
@@ -355,7 +355,7 @@ async fn mock_network_sharded_gossip() {
                                             module: module.clone(),
                                             gossip: GossipProtocol::Sharded(
                                                 ShardedGossipWire::accept(
-                                                    vec![interval],
+                                                    vec![interval.into()],
                                                     vec![agent_info],
                                                 ),
                                             ),
@@ -886,7 +886,7 @@ async fn mock_network_sharding() {
                                             module: module.clone(),
                                             gossip: GossipProtocol::Sharded(
                                                 ShardedGossipWire::accept(
-                                                    vec![interval],
+                                                    vec![interval.into()],
                                                     vec![agent_info],
                                                 ),
                                             ),
