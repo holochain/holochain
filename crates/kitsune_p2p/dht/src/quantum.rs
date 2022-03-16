@@ -47,7 +47,10 @@
 
 use std::{marker::PhantomData, ops::AddAssign};
 
-use crate::op::{Loc, Timestamp};
+use crate::{
+    op::{Loc, Timestamp},
+    prelude::pow2,
+};
 use derivative::Derivative;
 
 /// Represents some number of space quanta. The actual DhtLocation that this
@@ -207,10 +210,10 @@ fn bounds64<N: From<i64>>(dim: &Dimension, power: u8, offset: Offset, count: u32
 }
 
 /// An Offset represents the position of the left edge of some Segment.
-/// The absolute coordinate of the offset is determined by the "power" of its
+/// The absolute DhtLocation of the offset is determined by the "power" of its
 /// context, and topology of the space, by:
 ///
-///     x = 2^pow * topology.space.quantum
+///     dht location = offset * 2^pow * topology.space.quantum
 #[derive(
     Copy,
     Clone,
@@ -222,11 +225,29 @@ fn bounds64<N: From<i64>>(dim: &Dimension, power: u8, offset: Offset, count: u32
     Hash,
     derive_more::Add,
     derive_more::Sub,
+    derive_more::Mul,
+    derive_more::Div,
     derive_more::Deref,
     derive_more::DerefMut,
     derive_more::From,
+    derive_more::Into,
+    serde::Serialize,
+    serde::Deserialize,
 )]
-pub struct Offset(u32);
+#[serde(transparent)]
+pub struct Offset(pub u32);
+
+impl Offset {
+    pub fn to_loc(&self, topo: &Topology, power: u8) -> Loc {
+        self.wrapping_mul(topo.space.quantum)
+            .wrapping_mul(pow2(power))
+            .into()
+    }
+
+    pub fn to_quantum(&self, power: u8) -> SpaceQuantum {
+        self.wrapping_mul(pow2(power)).into()
+    }
+}
 
 /// Any interval in space or time is represented by a node in a tree, so our
 /// way of describing intervals uses tree coordinates as well:
@@ -323,10 +344,8 @@ pub struct Dimension {
     /// The smallest possible length in this dimension.
     /// Determines the interval represented by the leaf of a tree.
     pub quantum: u32,
-    /// The size of this dimension, meaning the number of possible values
-    /// that can be represented.
-    ///
-    /// Unused, but could be used for a more compact wire data type.
+    /// The log2 size of this dimension, so that 2^bit_depth is the number of
+    /// possible values that can be represented.
     bit_depth: u8,
 }
 
@@ -374,6 +393,10 @@ impl Dimension {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Topology {
     pub space: Dimension,
+    // HACK: we need the log2 representation of the space quantum in a few places,
+    // so we store it here. This MUST match up with space.quantum, i.e.:
+    // 2^space_power == space.quantum
+    pub space_power: u8,
     pub time: Dimension,
     pub time_origin: Timestamp,
 }
@@ -382,6 +405,7 @@ impl Topology {
     pub fn unit(time_origin: Timestamp) -> Self {
         Self {
             space: Dimension::unit(),
+            space_power: 0,
             time: Dimension::unit(),
             time_origin,
         }
@@ -390,6 +414,7 @@ impl Topology {
     pub fn unit_zero() -> Self {
         Self {
             space: Dimension::unit(),
+            space_power: 0,
             time: Dimension::unit(),
             time_origin: Timestamp::from_micros(0),
         }
@@ -398,6 +423,7 @@ impl Topology {
     pub fn standard(time_origin: Timestamp) -> Self {
         Self {
             space: Dimension::standard_space(),
+            space_power: 12,
             time: Dimension::standard_time(),
             time_origin,
         }

@@ -8,9 +8,7 @@ pub mod quantum;
 pub mod region;
 pub mod tree;
 
-pub use arq::{
-    actual_coverage, Arq, ArqBounded, ArqBounds, ArqStrat, PeerStrat, PeerView, PeerViewQ,
-};
+pub use arq::{actual_coverage, Arq, ArqBounds, ArqStrat, PeerStrat, PeerView, PeerViewQ};
 
 #[cfg(feature = "testing")]
 pub mod test_utils;

@@ -1,11 +1,15 @@
 use kitsune_p2p_dht_arc::DhtArcSet;
 
-use crate::{arq::ArqBounds, quantum::Topology, ArqStrat};
+use crate::{
+    arq::ArqBounds,
+    quantum::{Offset, Topology},
+    ArqStrat, Loc,
+};
 
-use super::{power_and_count_from_length, Arq, ArqBounded};
+use super::{power_and_count_from_length, Arq, ArqStart};
 
-pub type ArqSet = ArqSetImpl<Arq>;
-pub type ArqBoundsSet = ArqSetImpl<ArqBounds>;
+pub type ArqSet = ArqSetImpl<Loc>;
+pub type ArqBoundsSet = ArqSetImpl<Offset>;
 
 /// A collection of ArqBounds.
 /// All bounds are guaranteed to be quantized to the same power
@@ -23,20 +27,20 @@ pub type ArqBoundsSet = ArqSetImpl<ArqBounds>;
     serde::Serialize,
     serde::Deserialize,
 )]
-pub struct ArqSetImpl<A: ArqBounded> {
+pub struct ArqSetImpl<S: ArqStart> {
     #[into_iterator]
     #[deref]
     #[deref_mut]
     #[index]
     #[index_mut]
-    #[serde(bound(deserialize = "A: serde::de::DeserializeOwned"))]
-    pub(crate) arqs: Vec<A>,
+    #[serde(bound(deserialize = "S: serde::de::DeserializeOwned"))]
+    pub(crate) arqs: Vec<Arq<S>>,
     power: u8,
 }
 
-impl<A: ArqBounded> ArqSetImpl<A> {
+impl<S: ArqStart> ArqSetImpl<S> {
     /// Normalize all arqs to be of the same power (use the minimum power)
-    pub fn new(arqs: Vec<A>) -> Self {
+    pub fn new(arqs: Vec<Arq<S>>) -> Self {
         if let Some(pow) = arqs.iter().map(|a| a.power()).min() {
             Self {
                 arqs: arqs
@@ -57,7 +61,7 @@ impl<A: ArqBounded> ArqSetImpl<A> {
         Self::new(vec![])
     }
 
-    pub fn single(arq: A) -> Self {
+    pub fn single(arq: Arq<S>) -> Self {
         Self::new(vec![arq])
     }
 
@@ -67,7 +71,7 @@ impl<A: ArqBounded> ArqSetImpl<A> {
     }
 
     /// Get a reference to the arq set's arqs.
-    pub fn arqs(&self) -> &[A] {
+    pub fn arqs(&self) -> &[Arq<S>] {
         self.arqs.as_ref()
     }
 
@@ -88,7 +92,7 @@ impl<A: ArqBounded> ArqSetImpl<A> {
             .map(|arqs| Self { arqs, power })
     }
 
-    pub fn intersection(&self, topo: &Topology, other: &Self) -> ArqSetImpl<ArqBounds> {
+    pub fn intersection(&self, topo: &Topology, other: &Self) -> ArqSetImpl<Offset> {
         let power = self.power.min(other.power());
         let a1 = self.requantize(power).unwrap().to_dht_arc_set(topo);
         let a2 = other.requantize(power).unwrap().to_dht_arc_set(topo);
@@ -131,7 +135,7 @@ impl ArqBoundsSet {
 }
 
 /// View ascii for arq bounds
-pub fn print_arq<'a, A: ArqBounded>(topo: &Topology, arq: &'a A, len: usize) {
+pub fn print_arq<'a, S: ArqStart>(topo: &Topology, arq: &'a Arq<S>, len: usize) {
     println!(
         "|{}| {} *2^{}",
         arq.to_ascii(topo, len),
@@ -140,7 +144,7 @@ pub fn print_arq<'a, A: ArqBounded>(topo: &Topology, arq: &'a A, len: usize) {
     );
 }
 
-pub fn print_arqs<'a, A: ArqBounded>(topo: &Topology, arqs: &'a [A], len: usize) {
+pub fn print_arqs<'a, S: ArqStart>(topo: &Topology, arqs: &'a [Arq<S>], len: usize) {
     for (i, arq) in arqs.iter().enumerate() {
         println!(
             "|{}| {}:\t{} +{} *2^{}",
@@ -178,17 +182,17 @@ mod tests {
     fn normalize_arqs() {
         let s = ArqSetImpl::new(vec![
             ArqBounds {
-                offset: 0.into(),
+                start: 0.into(),
                 power: 10,
                 count: 10,
             },
             ArqBounds {
-                offset: 0.into(),
+                start: 0.into(),
                 power: 8,
                 count: 40,
             },
             ArqBounds {
-                offset: 0.into(),
+                start: 0.into(),
                 power: 12,
                 count: 3,
             },
@@ -198,17 +202,17 @@ mod tests {
             s.arqs,
             vec![
                 ArqBounds {
-                    offset: 0.into(),
+                    start: 0.into(),
                     power: 8,
                     count: (4 * 10)
                 },
                 ArqBounds {
-                    offset: 0.into(),
+                    start: 0.into(),
                     power: 8,
                     count: 40
                 },
                 ArqBounds {
-                    offset: 0.into(),
+                    start: 0.into(),
                     power: 8,
                     count: (3 * 16)
                 },
