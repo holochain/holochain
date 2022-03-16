@@ -14,7 +14,7 @@ use holochain_p2p::{
         region::{RegionBounds, RegionCoordSetXtcs, RegionData, RegionSetXtcs},
         ArqBounds, ArqStrat,
     },
-    dht_arc::{DhtArc, DhtArcSet},
+    dht_arc::{DhtArcRange, DhtArcSet},
     event::FetchOpDataQuery,
 };
 use holochain_sqlite::{
@@ -239,7 +239,7 @@ impl Spaces {
             .unwrap_or("AND DhtOp.when_integrated IS NOT NULL\n");
 
         let intervals = dht_arc_set.intervals();
-        let sql = if let Some(DhtArc::Full(_)) = intervals.first() {
+        let sql = if let Some(DhtArcRange::Full) = intervals.first() {
             format!(
                 "{}{}{}",
                 holochain_sqlite::sql::sql_cell::FETCH_OP_HASHES_P1,
@@ -249,9 +249,9 @@ impl Spaces {
         } else {
             let sql_ranges = intervals
                 .into_iter()
-                .filter(|i| matches!(i, &DhtArc::Bounded(_, _)))
+                .filter(|i| matches!(i, &DhtArcRange::Bounded(_, _)))
                 .map(|interval| match interval {
-                    DhtArc::Bounded(start_loc, end_loc) => {
+                    DhtArcRange::Bounded(start_loc, end_loc) => {
                         if start_loc <= end_loc {
                             format!(
                                 "AND storage_center_loc >= {} AND storage_center_loc <= {}",

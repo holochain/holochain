@@ -27,10 +27,6 @@ type DataVec = statrs::statistics::Data<Vec<f64>>;
 
 pub type Peers = Vec<DhtArc>;
 
-fn full_len() -> f64 {
-    2f64.powi(32)
-}
-
 pub fn seeded_rng(seed: Option<u64>) -> StdRng {
     let seed = seed.unwrap_or_else(|| thread_rng().gen());
     tracing::info!("RNG seed: {}", seed);
@@ -110,8 +106,8 @@ pub fn run_one_epoch(
 ) -> (Peers, EpochStats) {
     let mut net = 0.0;
     let mut gross = 0.0;
-    let mut delta_min = full_len();
-    let mut delta_max = -full_len();
+    let mut delta_min = FULL_LEN_F;
+    let mut delta_max = -FULL_LEN_F;
     let mut index_min = peers.len();
     let mut index_max = peers.len();
     for i in 0..peers.len() {
@@ -152,11 +148,11 @@ pub fn run_one_epoch(
     let tot = peers.len() as f64;
     let min_redundancy = check_redundancy(peers.clone());
     let stats = EpochStats {
-        net_delta_avg: net / tot / full_len(),
-        gross_delta_avg: gross / tot / full_len(),
+        net_delta_avg: net / tot / FULL_LEN_F,
+        gross_delta_avg: gross / tot / FULL_LEN_F,
         min_redundancy: min_redundancy,
-        delta_min: delta_min / full_len(),
-        delta_max: delta_max / full_len(),
+        delta_min: delta_min / FULL_LEN_F,
+        delta_max: delta_max / FULL_LEN_F,
     };
     (peers, stats)
 }
@@ -179,7 +175,7 @@ pub fn simple_parameterized_generator(
 
 /// Define arcs by start location and halflen in the unit interval [0.0, 1.0]
 pub fn unit_arcs<H: Iterator<Item = (f64, f64)>>(arcs: H) -> Peers {
-    let fc = full_len();
+    let fc = FULL_LEN_F;
     let fh = MAX_HALF_LENGTH as f64;
     arcs.map(|(s, h)| {
         DhtArc::from_start_and_half_len((s * fc).min(u32::MAX as f64) as u32, (h * fh) as u32)

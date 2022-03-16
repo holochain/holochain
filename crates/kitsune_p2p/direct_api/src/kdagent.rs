@@ -1,10 +1,11 @@
 //! kdirect kdagent type
 
 use crate::*;
-use kitsune_p2p_dht_arc::{DhtArc, DhtLocation};
+use kitsune_p2p_dht_arc::{DhtArcRange, DhtLocation};
 
 /// Additional types associated with the KdAgentInfo struct
 pub mod kd_agent_info {
+
     use super::*;
 
     /// the inner kd agent type
@@ -19,7 +20,7 @@ pub mod kd_agent_info {
         pub agent: KdHash,
 
         /// The storage arc currently being published by this agent.
-        pub storage_arc: DhtArc,
+        pub storage_arc: DhtArcRange,
 
         /// transport addressses this agent is reachable at
         #[serde(rename = "urlList")]
@@ -102,7 +103,7 @@ impl KdAgentInfo {
     }
 
     /// get the storage arc
-    pub fn storage_arc(&self) -> &DhtArc {
+    pub fn storage_arc(&self) -> &DhtArcRange {
         &self.0.storage_arc
     }
 
