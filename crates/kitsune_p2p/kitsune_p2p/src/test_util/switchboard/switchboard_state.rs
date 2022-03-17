@@ -140,12 +140,11 @@ impl Switchboard {
             self.gossip_type,
             bandwidth,
             Default::default(),
+            true,
         );
-        let gossip = GossipModule(gossip);
-        let gossip2 = gossip.clone();
+        let gossip_module = GossipModule(gossip.clone());
 
         let ep_task = metric_task(async move {
-            dbg!("begin metric task");
             while let Some(evt) = ep.next().await {
                 match evt {
                     // what other messages do i need to handle?
@@ -159,7 +158,7 @@ impl Switchboard {
                                 let data: Vec<u8> = data.into();
                                 let data: Box<[u8]> = data.into_boxed_slice();
 
-                                gossip2.incoming_gossip(con, url, data)?
+                                gossip_module.incoming_gossip(con, url, data)?
                             }
                             _ => unimplemented!(),
                         }
@@ -589,14 +588,13 @@ pub struct SpaceEntry {
 }
 
 /// The value of the SwitchboardSpace::nodes hashmap
-#[derive(Debug)]
 pub struct NodeEntry {
     pub(super) local_agents: HashMap<Loc8, AgentEntry>,
     pub(super) remote_agents: HashMap<Loc8, AgentInfoSigned>,
     /// The ops held by this node.
     /// Other data for this op can be found in SwitchboardSpace::ops
     pub(super) ops: HashMap<Loc8, NodeOpEntry>,
-    pub(super) gossip: GossipModule,
+    pub(super) gossip: Arc<ShardedGossip>,
 }
 
 impl NodeEntry {

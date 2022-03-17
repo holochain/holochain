@@ -246,7 +246,11 @@ async fn sharded_4way_recent() {
 #[tokio::test(flavor = "multi_thread")]
 async fn sharded_4way_historical() {
     observability::test_run().ok();
-    let topo = Topology::standard(Timestamp::ZERO);
+
+    let now = Timestamp::now().as_micros();
+    // 1 year ago
+    let then = now - 1_000_000 * 60 * 60 * 24 * 365;
+    let topo = Topology::standard(Timestamp::from_micros(then));
     let sb = Switchboard::new(topo, GossipType::Historical);
 
     let [n1, n2, n3, n4] = sb.add_nodes(tuning_params()).await;
@@ -255,8 +259,6 @@ async fn sharded_4way_historical() {
     let a2 = SwitchboardAgent::from_start_and_half_len(64, 68);
     let a3 = SwitchboardAgent::from_start_and_half_len(128, 68);
     let a4 = SwitchboardAgent::from_start_and_half_len(192, 68);
-
-    let now = Timestamp::now().as_micros();
     let ops_only: Vec<_> = (0..256).step_by(8).map(|u| Loc8::from(u)).collect();
     let ops_timed: Vec<_> = ops_only
         .clone()
@@ -264,7 +266,7 @@ async fn sharded_4way_historical() {
         .map(|o| {
             (
                 o,
-                Timestamp::from_micros(rand::thread_rng().gen_range(0, now)),
+                Timestamp::from_micros(rand::thread_rng().gen_range(then, now)),
             )
         })
         .collect();
@@ -303,6 +305,16 @@ async fn sharded_4way_historical() {
             ),
             (&agent_locs, &agent_locs, &agent_locs, &agent_locs)
         );
+
+        let history = sb
+            .nodes
+            .get(&n1)
+            .unwrap()
+            .gossip
+            .state
+            .share_ref(|s| Ok(s.get_history()))
+            .unwrap();
+        dbg!(history);
 
         assert_eq!(
             (

@@ -110,7 +110,7 @@ pub struct ShardedGossip {
     // The endpoint to use for all outgoing comms
     ep_hnd: Tx2EpHnd<wire::Wire>,
     /// The internal mutable state
-    inner: Share<ShardedGossipState>,
+    pub(crate) state: Share<ShardedGossipState>,
     /// Bandwidth for incoming and outgoing gossip.
     bandwidth: Arc<BandwidthThrottle>,
 }
@@ -158,10 +158,16 @@ impl ShardedGossip {
         gossip_type: GossipType,
         bandwidth: Arc<BandwidthThrottle>,
         metrics: MetricsSync,
+        enable_history: bool,
     ) -> Arc<Self> {
+        let state = if enable_history {
+            ShardedGossipState::with_history()
+        } else {
+            Default::default()
+        };
         let this = Arc::new(Self {
             ep_hnd,
-            inner: Share::new(Default::default()),
+            state: Share::new(state),
             gossip: ShardedGossipLocal {
                 tuning_params,
                 space,
@@ -252,8 +258,8 @@ impl ShardedGossip {
                     vec![ShardedGossipWire::error(e.to_string())]
                 }
             };
-            self.inner.share_mut(|i, _| {
-                i.outgoing.extend(outgoing.into_iter().map(|msg| {
+            self.state.share_mut(|i, _| {
+                i.push_outgoing(outgoing.into_iter().map(|msg| {
                     (
                         con.peer_cert(),
                         HowToConnect::Con(con.clone(), remote_url.clone()),
@@ -280,8 +286,8 @@ impl ShardedGossip {
     async fn run_one_iteration(&self) {
         match self.gossip.try_initiate().await {
             Ok(Some(outgoing)) => {
-                if let Err(err) = self.inner.share_mut(|i, _| {
-                    i.outgoing.push_back(outgoing);
+                if let Err(err) = self.state.share_mut(|i, _| {
+                    i.push_outgoing([outgoing]);
                     Ok(())
                 }) {
                     tracing::error!(
@@ -300,11 +306,7 @@ impl ShardedGossip {
     }
 
     fn pop_queues(&self) -> KitsuneResult<(Option<Incoming>, Option<Outgoing>)> {
-        self.inner.share_mut(move |inner, _| {
-            let incoming = inner.incoming.pop_front();
-            let outgoing = inner.outgoing.pop_front();
-            Ok((incoming, outgoing))
-        })
+        self.state.share_mut(move |inner, _| Ok(inner.pop()))
     }
 
     /// Log the statistics for the gossip loop.
@@ -323,7 +325,7 @@ impl ShardedGossip {
                 .checked_div(stats.count)
                 .unwrap_or_default();
             let lens = self
-                .inner
+                .state
                 .share_mut(|i, _| Ok((i.incoming.len(), i.outgoing.len())))
                 .map(|(i, o)| format!("Queues: Incoming: {}, Outgoing {}", i, o))
                 .unwrap_or_else(|_| "Queues empty".to_string());
@@ -460,11 +462,59 @@ impl ShardedGossipLocalState {
     }
 }
 
-/// The internal mutable state for [`ShardedGossip`]
-#[derive(Default)]
-pub struct ShardedGossipState {
+/// The incoming and outgoing queues for [`ShardedGossip`]
+#[derive(Default, Clone, Debug)]
+pub struct ShardedGossipQueues {
     incoming: VecDeque<Incoming>,
     outgoing: VecDeque<Outgoing>,
+}
+
+/// The internal mutable state for [`ShardedGossip`]
+#[derive(Default, derive_more::Deref)]
+pub(crate) struct ShardedGossipState {
+    /// The incoming and outgoing queues
+    #[deref]
+    queues: ShardedGossipQueues,
+    /// If Some, these queues are never cleared, and contain every message
+    /// ever sent and received, for diagnostics and debugging.
+    history: Option<ShardedGossipQueues>,
+}
+
+impl ShardedGossipState {
+    /// Construct state with history queues
+    pub fn with_history() -> Self {
+        Self {
+            queues: Default::default(),
+            history: Some(Default::default()),
+        }
+    }
+
+    #[cfg(feature = "test_utils")]
+    #[allow(dead_code)]
+    pub fn get_history(&self) -> Option<ShardedGossipQueues> {
+        self.history.clone()
+    }
+
+    pub fn push_incoming<I: Clone + IntoIterator<Item = Incoming>>(&mut self, incoming: I) {
+        if let Some(history) = &mut self.history {
+            history.incoming.extend(incoming.clone().into_iter());
+        }
+        self.queues.incoming.extend(incoming.into_iter());
+    }
+
+    pub fn push_outgoing<I: Clone + IntoIterator<Item = Outgoing>>(&mut self, outgoing: I) {
+        if let Some(history) = &mut self.history {
+            history.outgoing.extend(outgoing.clone().into_iter());
+        }
+        self.queues.outgoing.extend(outgoing.into_iter());
+    }
+
+    pub fn pop(&mut self) -> (Option<Incoming>, Option<Outgoing>) {
+        (
+            self.queues.incoming.pop_front(),
+            self.queues.outgoing.pop_front(),
+        )
+    }
 }
 
 /// The state representing a single active ongoing "round" of gossip with a
@@ -1063,7 +1113,7 @@ impl AsGossipModule for ShardedGossip {
         let (bytes, gossip) =
             ShardedGossipWire::decode_ref(&gossip_data).map_err(KitsuneError::other)?;
         let new_initiate = matches!(gossip, ShardedGossipWire::Initiate(_));
-        self.inner.share_mut(move |i, _| {
+        self.state.share_mut(move |i, _| {
             let overloaded = i.incoming.len() > 20;
             if overloaded {
                 tracing::warn!(
@@ -1073,14 +1123,13 @@ impl AsGossipModule for ShardedGossip {
             }
             // If we are overloaded then return busy to any new initiates.
             if overloaded && new_initiate {
-                i.outgoing.push_back((
+                i.push_outgoing([(
                     con.peer_cert(),
                     HowToConnect::Con(con, remote_url),
                     ShardedGossipWire::busy(),
-                ));
+                )]);
             } else {
-                i.incoming
-                    .push_back((con, remote_url, gossip, bytes as usize));
+                i.push_incoming([(con, remote_url, gossip, bytes as usize)]);
             }
             Ok(())
         })
@@ -1148,6 +1197,7 @@ impl AsGossipModuleFactory for ShardedRecentGossipFactory {
             GossipType::Recent,
             self.bandwidth.clone(),
             metrics,
+            false,
         ))
     }
 }
@@ -1181,6 +1231,7 @@ impl AsGossipModuleFactory for ShardedHistoricalGossipFactory {
             GossipType::Historical,
             self.bandwidth.clone(),
             metrics,
+            false,
         ))
     }
 }

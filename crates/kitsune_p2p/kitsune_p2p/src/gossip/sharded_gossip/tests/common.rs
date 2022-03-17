@@ -54,7 +54,7 @@ impl KitsuneHost for StandardResponsesHostApi {
                 //      in order to properly match the fake data returned in other methods,
                 //      there should really only be one nonzero region.
                 let data = RegionData {
-                    hash: [0; 32].into(),
+                    hash: [1; 32].into(),
                     size: 1,
                     count: 1,
                 };

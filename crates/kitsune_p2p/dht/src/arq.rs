@@ -90,7 +90,7 @@ impl<S: ArqStart> Arq<S> {
             .saturating_mul(topo.space.quantum)
             .min(u32::MAX / 2);
         // this really shouldn't ever be larger than MAX / 8
-        // debug_assert!(len < u32::MAX / 4);
+        debug_assert!(len < u32::MAX / 4);
         len
     }
 

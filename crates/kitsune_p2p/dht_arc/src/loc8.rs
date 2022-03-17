@@ -127,13 +127,17 @@ impl DhtLocation {
     /// suitable for use as a hash type.
     #[cfg(feature = "test_utils")]
     pub fn to_representative_test_bytes_36(&self) -> Vec<u8> {
-        self.as_u32()
+        let mut bytes: Vec<u8> = self
+            .as_u32()
             .to_le_bytes()
             .iter()
             .cycle()
             .take(36)
             .copied()
-            .collect()
+            .collect();
+        // to distinguish the 0 location from an empty hash
+        bytes[0] = 255;
+        bytes
     }
 }
 
