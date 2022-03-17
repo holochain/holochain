@@ -1,7 +1,7 @@
-//! Defines [ConductorHandle], a lightweight cloneable reference to a Conductor
+//! Defines [`ConductorHandle`], a lightweight cloneable reference to a Conductor
 //! with a limited public interface.
 //!
-//! A ConductorHandle can be produced via [Conductor::into_handle]
+//! A ConductorHandle can be produced via [`ConductorBuilder`](crate::conductor::ConductorBuilder)
 //!
 //! ```rust, no_run
 //! async fn async_main () {
@@ -26,7 +26,7 @@
 //!
 //! First, it specifies how to synchronize
 //! read/write access to a single Conductor across multiple references. The various
-//! Conductor APIs - [CellConductorApi], [AdminInterfaceApi], and [AppInterfaceApi],
+//! Conductor APIs - [CellConductorApi](super::api::CellConductorApi), [AdminInterfaceApi](super::api::AdminInterfaceApi), and [AppInterfaceApi](super::api::AppInterfaceApi),
 //! use a ConductorHandle as their sole method of interaction with a Conductor.
 //!
 //! Secondly, it hides the concrete type of the Conductor behind a dyn Trait.
@@ -133,25 +133,25 @@ pub trait ConductorHandleT: Send + Sync {
     /// List the app interfaces currently install.
     async fn list_app_interfaces(&self) -> ConductorResult<Vec<u16>>;
 
-    /// Install a [DnaFile] in this Conductor
+    /// Install a [`DnaFile`](holochain_types::dna::DnaFile) in this Conductor
     async fn register_dna(&self, dna: DnaFile) -> ConductorResult<()>;
 
     /// Get the list of hashes of installed Dnas in this Conductor
     fn list_dnas(&self) -> Vec<DnaHash>;
 
-    /// Get a [DnaDef] from the [DnaStore]
+    /// Get a [`DnaDef`](holochain_types::prelude::DnaDef) from the [`DnaStore`](crate::conductor::dna_store::DnaStore)
     fn get_dna_def(&self, hash: &DnaHash) -> Option<DnaDef>;
 
-    /// Get a [DnaFile] from the [DnaStore]
+    /// Get a [`DnaFile`](holochain_types::dna::DnaFile) from the [`DnaStore`](crate::conductor::dna_store::DnaStore)
     fn get_dna_file(&self, hash: &DnaHash) -> Option<DnaFile>;
 
-    /// Get an instance of a [RealRibosome] for the DnaHash
+    /// Get an instance of a [`RealRibosome`](crate::core::ribosome::real_ribosome::RealRibosome) for the DnaHash
     fn get_ribosome(&self, dna_hash: &DnaHash) -> ConductorResult<RealRibosome>;
 
-    /// Get a [EntryDef] from the [EntryDefBuffer]
+    /// Get an [`EntryDef`](holochain_zome_types::EntryDef) from the [`EntryDefBufferKey`](holochain_types::dna::EntryDefBufferKey)
     fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef>;
 
-    /// Add the [DnaFile]s from the wasm and dna_def databases into memory
+    /// Add the [`DnaFile`](holochain_types::dna::DnaFile)s from the wasm and dna_def databases into memory
     async fn load_dnas(&self) -> ConductorResult<()>;
 
     /// Dispatch a network event to the correct cell.

@@ -9,6 +9,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - Workflow errors generally now log rather than abort the current app [1279](https://github.com/holochain/holochain/pull/1279/files)
 
+- Fixed broken links in Rust docs [#1284](https://github.com/holochain/holochain/pull/1284)
+
 ## 0.0.129
 
 ## 0.0.128
