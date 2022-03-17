@@ -346,6 +346,7 @@ impl Outer {
                     let con_hnd =
                         match discover::peer_connect(ro_inner.clone(), &info, max_timeout).await {
                             PeerDiscoverResult::OkShortcut => {
+                                tracing::trace!("remote peer is local");
                                 permit.close();
                                 return;
                             }
@@ -445,52 +446,7 @@ impl Outer {
                 let first_discover_permit = grace_permit();
                 drop(startup_permit);
 
-                tracing::trace!("(rpc_multi_logic) remote get cached start");
-
-                // first try remotes we already know about
-                if let Ok(infos) = discover::get_cached_remotes_near_basis(
-                    ro_inner.clone(),
-                    basis.get_loc(),
-                    max_timeout,
-                )
-                .await
-                {
-                    let cached_remote_count = infos.len();
-                    tracing::trace!(
-                        %cached_remote_count,
-                        "(rpc_multi_logic) remote get cached",
-                    );
-
-                    for info in infos {
-                        if check_remote_agent(&inner, &info.agent) {
-                            continue;
-                        }
-
-                        let permit = grace_permit();
-                        remote_call(info, permit);
-                    }
-                }
-
-                // if we sent our request count already, we can return
-                let already_done = inner
-                    .share_mut(|i, _| {
-                        if i.remain_remote_count == 0 {
-                            Ok(true)
-                        } else {
-                            Ok(false)
-                        }
-                    })
-                    .expect("we never close this share");
-                if already_done {
-                    tracing::trace!("(rpc_multi_logic) remote get done after cached");
-                    first_discover_permit.close();
-                    return;
-                }
-
                 tracing::trace!("(rpc_multi_logic) remote get searched start");
-
-                let second_discover_permit = grace_permit();
-                first_discover_permit.close();
 
                 // if we still have requests to send, let's discover new nodes
                 if let Ok(infos) = discover::search_remotes_covering_basis(
@@ -516,7 +472,7 @@ impl Outer {
                     }
                 }
 
-                second_discover_permit.close();
+                first_discover_permit.close();
 
                 tracing::trace!("(rpc_multi_logic) remote get done");
             }
