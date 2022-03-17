@@ -24,7 +24,6 @@ struct TestData {
     entry_update_entry: Update,
     original_header_hash: HeaderHash,
     original_entry_hash: EntryHash,
-    new_entry_hash: EntryHash,
     original_header: NewEntryHeader,
     entry_delete: Delete,
     link_add: CreateLink,
@@ -123,7 +122,6 @@ impl TestData {
             entry_delete,
             link_add,
             link_remove,
-            new_entry_hash,
         }
     }
 }
@@ -138,7 +136,6 @@ enum Db {
     MetaActivity(Header),
     MetaUpdate(AnyDhtHash, Header),
     MetaDelete(HeaderHash, Header),
-    MetaLink(CreateLink, EntryHash),
     MetaLinkEmpty(CreateLink),
 }
 
@@ -305,20 +302,6 @@ impl Db {
                             )
                             .unwrap();
                         assert!(!not_empty, "{}", here);
-                    }
-                    Db::MetaLink(link_add, target_hash) => {
-                        let link_add_hash =
-                            HeaderHash::with_data_sync(&Header::from(link_add.clone()));
-                        let query = GetLinksQuery::new(
-                            link_add.base_address.clone(),
-                            link_add.zome_id,
-                            Some(link_add.tag.clone()),
-                        );
-                        let res = query.run(Txn::from(&txn)).unwrap();
-                        assert_eq!(res.len(), 1, "{}", here);
-                        assert_eq!(res[0].create_link_hash, link_add_hash, "{}", here);
-                        assert_eq!(res[0].target, target_hash, "{}", here);
-                        assert_eq!(res[0].tag, link_add.tag, "{}", here);
                     }
                     Db::MetaLinkEmpty(link_add) => {
                         let query = GetLinksQuery::new(
@@ -500,21 +483,6 @@ fn register_deleted_header_by(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     (pre_state, expect, "register deleted header by")
 }
 
-fn register_add_link(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
-    let original_op = DhtOp::StoreEntry(
-        a.signature.clone(),
-        a.original_header.clone(),
-        a.original_entry.clone().into(),
-    );
-    let op = DhtOp::RegisterAddLink(a.signature.clone(), a.link_add.clone());
-    let pre_state = vec![Db::Integrated(original_op), Db::IntQueue(op.clone())];
-    let expect = vec![
-        Db::Integrated(op.clone()),
-        Db::MetaLink(a.link_add.clone(), a.new_entry_hash.clone().into()),
-    ];
-    (pre_state, expect, "register link add")
-}
-
 fn register_delete_link(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     let original_op = DhtOp::StoreEntry(
         a.signature.clone(),
@@ -560,7 +528,6 @@ async fn test_ops_state() {
         register_updated_element,
         register_deleted_by,
         register_deleted_header_by,
-        register_add_link,
         register_delete_link,
         register_delete_link_missing_base,
     ];

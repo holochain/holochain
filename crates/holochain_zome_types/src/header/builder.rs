@@ -4,6 +4,7 @@ use crate::header;
 use crate::header::HeaderInner;
 use crate::header::ZomeId;
 use crate::link::LinkTag;
+use crate::link::LinkType;
 use header::Dna;
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
@@ -119,6 +120,7 @@ builder_variant!(CreateLink {
     base_address: EntryHash,
     target_address: EntryHash,
     zome_id: ZomeId,
+    link_type: LinkType,
     tag: LinkTag,
 });
 
