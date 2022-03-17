@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use holo_hash::EntryHash;
+use holo_hash::ExternalHash;
 use holo_hash::HeaderHash;
 
 pub struct Hash256Bits([u8; 32]);
@@ -14,6 +15,8 @@ pub enum HashInput {
     Entry(Entry),
     /// Hash a Header.
     Header(Header),
+    /// Hash arbitrary bytes to an ExternalHash.
+    External(#[serde(with = "serde_bytes")] Vec<u8>),
     /// Blake2b is the native Holochain hashing algorithm and compatible with
     /// e.g. Polkadot and Zcash.
     /// Second value is the output length of the hash in bytes.
@@ -35,6 +38,7 @@ pub enum HashInput {
 pub enum HashOutput {
     Entry(EntryHash),
     Header(HeaderHash),
+    External(ExternalHash),
     Blake2B(#[serde(with = "serde_bytes")] Vec<u8>),
     Sha256(Hash256Bits),
     Sha512(Hash512Bits),
