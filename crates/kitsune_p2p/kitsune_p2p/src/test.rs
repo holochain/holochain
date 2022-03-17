@@ -107,7 +107,7 @@ mod tests {
         // TODO when networking works, just add_*_agent again...
         // but for now, we need the two agents to be on the same node:
         let a2: Arc<KitsuneAgent> = TestVal::test_val();
-        p2p.join(space.clone(), a2.clone()).await?;
+        p2p.join(space.clone(), a2.clone(), None).await?;
 
         let res = p2p.rpc_single(space, a1, b"hello".to_vec(), None).await?;
         assert_eq!(b"echo: hello".to_vec(), res);
@@ -127,9 +127,9 @@ mod tests {
         // TODO when networking works, just add_*_agent again...
         // but for now, we need the two agents to be on the same node:
         let a2: Arc<KitsuneAgent> = TestVal::test_val();
-        p2p.join(space.clone(), a2.clone()).await?;
+        p2p.join(space.clone(), a2.clone(), None).await?;
         let a3: Arc<KitsuneAgent> = TestVal::test_val();
-        p2p.join(space.clone(), a3.clone()).await?;
+        p2p.join(space.clone(), a3.clone(), None).await?;
 
         let mut input = actor::RpcMulti::new(
             &Default::default(),
@@ -194,7 +194,7 @@ mod tests {
         // TODO when networking works, just add_*_agent again...
         // but for now, we need the two agents to be on the same node:
         let a2: Arc<KitsuneAgent> = TestVal::test_val();
-        p2p.join(space.clone(), a2.clone()).await?;
+        p2p.join(space.clone(), a2.clone(), None).await?;
 
         let op1 = harness
             .inject_gossip_data(a1.clone(), "agent-1-data".to_string())
@@ -238,7 +238,7 @@ mod tests {
         assert_eq!(num_agent_info, 1);
 
         let a2: Arc<KitsuneAgent> = TestVal::test_val();
-        p2p.join(space.clone(), a2.clone()).await?;
+        p2p.join(space.clone(), a2.clone(), None).await?;
 
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;
 

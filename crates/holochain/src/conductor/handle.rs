@@ -193,6 +193,9 @@ pub trait ConductorHandleT: Send + Sync {
     /// Request access to this conductor's networking handle
     fn holochain_p2p(&self) -> &holochain_p2p::HolochainP2pRef;
 
+    /// Prune expired agent_infos from the p2p agents database
+    async fn prune_p2p_agents_db(&self) -> ConductorResult<()>;
+
     /// Create a new Cell in an existing App based on an existing DNA
     async fn create_clone_cell(
         self: Arc<Self>,
@@ -800,6 +803,10 @@ impl ConductorHandleT for ConductorHandleImpl {
 
     fn holochain_p2p(&self) -> &holochain_p2p::HolochainP2pRef {
         self.conductor.holochain_p2p()
+    }
+
+    async fn prune_p2p_agents_db(&self) -> ConductorResult<()> {
+        self.conductor.prune_p2p_agents_db().await
     }
 
     async fn create_clone_cell(
@@ -1552,13 +1559,24 @@ impl ConductorHandleImpl {
         // Join the network but ignore errors because the
         // space retries joining all cells every 5 minutes.
 
+        use holochain_p2p::AgentPubKeyExt;
+
         let tasks = self
             .conductor
             .mark_pending_cells_as_joining()
             .into_iter()
-            .map(|(id, cell)| (id, cell.holochain_p2p_dna().clone()))
-            .map(|(cell_id, network)| async move {
-                match tokio::time::timeout(JOIN_NETWORK_TIMEOUT, network.join(cell_id.agent_pubkey().clone())).await {
+            .map(|(cell_id, cell)| async move {
+                let p2p_agents_db = cell.p2p_agents_db().clone();
+                let kagent = cell_id.agent_pubkey().to_kitsune();
+                let agent_info = match p2p_agents_db.async_reader(move |tx| {
+                    tx.p2p_get_agent(&kagent)
+                }).await {
+                    Ok(maybe_info) => maybe_info,
+                    _ => None,
+                };
+                let maybe_initial_arc = agent_info.map(|i| i.storage_arc);
+                let network = cell.holochain_p2p_dna().clone();
+                match tokio::time::timeout(JOIN_NETWORK_TIMEOUT, network.join(cell_id.agent_pubkey().clone(), maybe_initial_arc)).await {
                     Ok(Err(e)) => {
                         tracing::info!(error = ?e, cell_id = ?cell_id, "Error while trying to join the network");
                         Err(cell_id)
