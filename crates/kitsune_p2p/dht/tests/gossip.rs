@@ -61,14 +61,26 @@ fn gossip_scenario_full_sync() {
         ..Default::default()
     };
 
+    let expected_num_space_chunks: u32 = 8;
+    let expected_num_time_chunks: u32 = 22;
+
     let max_time = TimeQuantum::from(525600 / 12).to_timestamp_bounds(&topo).0; // 1 year
+    assert_eq!(
+        TelescopingTimes::new(topo.time_coord(max_time))
+            .segments()
+            .len() as u32,
+        expected_num_time_chunks
+    );
 
     // these arqs will all be Full coverage
     let arqs = generate_ideal_coverage(&topo, &mut rng, &strat, None, n as u32, 0.0);
 
     let mut nodes: Vec<_> = arqs
         .iter()
-        .map(|a| TestNode::new(topo.clone(), gopa, *a))
+        .map(|a| {
+            assert_eq!(a.count(), expected_num_space_chunks);
+            TestNode::new(topo.clone(), gopa, *a)
+        })
         .collect();
 
     let num_ops = ops_per_node * n;
@@ -116,8 +128,14 @@ fn gossip_scenario_full_sync() {
             let stats = gossip_direct_at(n1, n2, topo.time_coord(max_time)).unwrap();
 
             // Something is wrong if we're sending tons of regions
-            assert!(stats.regions_sent < 700);
-            assert!(stats.regions_rcvd < 700);
+            assert_eq!(
+                stats.regions_sent,
+                expected_num_space_chunks * expected_num_time_chunks
+            );
+            assert_eq!(
+                stats.regions_rcvd,
+                expected_num_space_chunks * expected_num_time_chunks
+            );
             println!(
                 "{:>2} <-> {:<2}  regions sent/rcvd: {}/{}, ops sent/rcvd: {:3}/{:3}, bytes sent/rcvd: {}/{}",
                 a, b, stats.regions_sent, stats.regions_rcvd, stats.ops_sent, stats.ops_rcvd, stats.op_data_sent, stats.op_data_rcvd
