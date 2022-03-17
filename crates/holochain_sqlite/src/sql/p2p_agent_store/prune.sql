@@ -1,5 +1,5 @@
 -- it's hard to construct queries with input arrays
--- we're taking the strategy here of concatonating a bunch of
+-- we're taking the strategy here of concatenating a bunch of
 -- local agent ids together, and extracting them here
 WITH RECURSIVE split(src, cur_idx, slice) AS (
   -- we have to manually configure the first seed row
