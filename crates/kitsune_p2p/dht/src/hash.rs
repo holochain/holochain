@@ -38,6 +38,10 @@ impl RegionHash {
     pub fn from_vec(v: Vec<u8>) -> Option<Self> {
         v.try_into().map(|a| Self(a)).ok()
     }
+
+    pub fn loc(&self) -> u32 {
+        u32::from_be_bytes(self.0[28..32].try_into().unwrap())
+    }
 }
 
 impl std::fmt::Debug for OpHash {

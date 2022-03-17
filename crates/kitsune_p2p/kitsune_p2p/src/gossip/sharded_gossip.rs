@@ -778,13 +778,16 @@ impl ShardedGossipLocal {
             ShardedGossipWire::OpRegions(OpRegions { region_set }) => {
                 if let Some(state) = self.incoming_ops_finished(&cert)? {
                     if let Some(sent) = state.region_set_sent.clone() {
-                        let regions = sent.diff(region_set).map_err(KitsuneError::other)?;
+                        dbg!(sent.report_nonzero_regions());
+                        dbg!(region_set.report_nonzero_regions());
+                        let diff_regions = sent.diff(region_set).map_err(KitsuneError::other)?;
+                        dbg!(diff_regions.iter().filter(|r| r.data.count > 0).count());
                         let topo = self
                             .host_api
                             .get_topology(self.space.clone())
                             .await
                             .map_err(KitsuneError::other)?;
-                        let bounds: Vec<_> = regions
+                        let bounds: Vec<_> = diff_regions
                             .into_iter()
                             .map(|r| r.coords.to_bounds(&topo))
                             .collect();
@@ -817,6 +820,13 @@ impl ShardedGossipLocal {
             ShardedGossipWire::MissingOps(MissingOps { ops, finished }) => {
                 let mut gossip = Vec::with_capacity(0);
                 let finished = MissingOpsStatus::try_from(finished)?;
+
+                // doesn't work as epxected:
+                // let doing_historic_region_gossip = self
+                //     .get_state(&cert)?
+                //     .map(|s| s.region_set_sent.is_some())
+                //     .unwrap_or_default();
+
                 let state = match finished {
                     // This is a single chunk of ops. No need to reply.
                     MissingOpsStatus::ChunkComplete => self.get_state(&cert)?,
@@ -849,9 +859,15 @@ impl ShardedGossipLocal {
                         state
                     }
                 };
-                if state.is_some() && !ops.is_empty() {
-                    self.incoming_missing_ops(ops).await?;
-                }
+
+                // dbg!(&doing_historic_region_gossip, &state.is_some(), ops.len());
+
+                // XXX: TODO: come back to this later after implementing batching for
+                //      region gossip, for now I just don't care about the state,
+                //      and just want to handle the incoming ops.
+                // if (doing_historic_region_gossip || state.is_some()) && !ops.is_empty() {
+                self.incoming_missing_ops(ops).await?;
+                // }
                 gossip
             }
             ShardedGossipWire::NoAgents(_) => {

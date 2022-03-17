@@ -34,11 +34,11 @@ impl From<i32> for Loc8 {
     }
 }
 
-impl From<i8> for Loc8 {
-    fn from(i: i8) -> Self {
-        (i as i32).into()
-    }
-}
+// impl From<i8> for Loc8 {
+//     fn from(i: i8) -> Self {
+//         (i as i32).into()
+//     }
+// }
 
 impl PartialEq for Loc8 {
     fn eq(&self, other: &Self) -> bool {
@@ -93,6 +93,11 @@ impl Loc8 {
         } else {
             self.as_u8() as u32 as i32
         }
+    }
+
+    pub fn to_unsigned(mut self) -> Self {
+        self.sign = false;
+        self
     }
 
     pub fn set<L: Into<Loc8>, I: IntoIterator<Item = L>>(it: I) -> BTreeSet<Self> {

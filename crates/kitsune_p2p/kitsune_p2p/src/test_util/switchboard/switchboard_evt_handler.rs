@@ -96,12 +96,32 @@ impl KitsuneHost for SwitchboardEventHandler {
                     t: (t0, t1),
                 } = bounds;
                 let ops: Vec<_> = self.sb.share(|sb| {
-                    sb.ops
+                    let all_ops = &sb.ops;
+                    let node_ops = &sb.nodes;
+
+                    // let held: Vec<Loc8> = sb
+                    // .nodes
+                    // .get(&self.node)
+                    // .unwrap()
+                    // .ops
+                    // .iter()
+                    // .filter(|(_, o)| o.is_integrated)
+                    // .map(|(loc8, _)| loc8)
+                    // .collect();
+
+                    all_ops
                         .iter()
-                        .filter(move |(loc, op)| {
-                            let loc = DhtLocation::from(**loc);
+                        .filter(move |(loc8, op)| {
+                            let loc = DhtLocation::from(**loc8);
                             let arc = DhtArc::from_bounds(x0, x1);
-                            arc.contains(&loc) && t0 <= op.timestamp && op.timestamp < t1
+                            let owned = node_ops
+                                .get(&self.node)
+                                .unwrap()
+                                .ops
+                                .get(loc8)
+                                .map(|o| o.is_integrated)
+                                .unwrap_or_default();
+                            owned && arc.contains(&loc) && t0 <= op.timestamp && op.timestamp < t1
                         })
                         .map(second)
                         .cloned()
@@ -220,7 +240,8 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
                 // NB: this may be problematic on the receiving end because we
                 // actually care whether this Loc8 is interpreted as u8 or i8,
                 // and we lose that information here.
-                let loc = (op.0[0] as u8 as i8).into();
+                let loc = (op.0[0] as u8 as i32).into();
+                dbg!((&self.node, loc));
 
                 // TODO: allow setting integration status
                 node.ops.insert(
@@ -298,10 +319,10 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
             FetchOpDataEvtQuery::Regions(bounds) => bounds
                 .into_iter()
                 .flat_map(|b| {
-                    dbg!(&b);
+                    // dbg!(&b);
                     sb.ops.iter().filter_map(move |(loc, o)| {
                         let contains = b.contains(&DhtLocation::from(*loc), &o.timestamp);
-                        dbg!((&loc, &o.timestamp, contains));
+                        // dbg!((&loc, &o.timestamp, contains));
                         contains.then(|| (o.hash.clone(), KitsuneOpData::new(vec![loc.as_u8()])))
                     })
                 })

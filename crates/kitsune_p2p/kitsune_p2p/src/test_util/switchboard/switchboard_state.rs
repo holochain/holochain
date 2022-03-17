@@ -457,6 +457,7 @@ impl SwitchboardState {
             .ops
             .keys()
             .copied()
+            .map(Loc8::to_unsigned)
             .collect()
     }
 
@@ -566,7 +567,7 @@ impl SwitchboardAgent {
             DhtArcRange::Empty
         } else {
             let len = half_len * 2 - 1;
-            let end = Loc8::from((start.as_u8().wrapping_add(len).wrapping_sub(1)) as i8);
+            let end = Loc8::from((start.as_u8().wrapping_add(len).wrapping_sub(1)) as i32);
             DhtArcRange::Bounded(start, end)
         };
 

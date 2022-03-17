@@ -126,7 +126,7 @@ impl<D: TreeDataConstraints> RegionSet<D> {
 #[cfg_attr(feature = "test_utils", derive(Clone))]
 pub struct RegionSetXtcs<D: TreeDataConstraints = RegionData> {
     /// The generator for the coordinates
-    pub(crate) coords: RegionCoordSetXtcs,
+    pub coords: RegionCoordSetXtcs,
 
     /// the actual coordinates as generated
     #[derivative(PartialEq = "ignore")]
@@ -136,7 +136,7 @@ pub struct RegionSetXtcs<D: TreeDataConstraints = RegionData> {
     /// The outer vec corresponds to the spatial segments;
     /// the inner vecs are the time segments.
     #[serde(bound(deserialize = "D: serde::de::DeserializeOwned"))]
-    pub(crate) data: Vec<Vec<D>>,
+    pub data: Vec<Vec<D>>,
 }
 
 impl<D: TreeDataConstraints> RegionSetXtcs<D> {
@@ -220,6 +220,24 @@ impl<D: TreeDataConstraints> RegionSetXtcs<D> {
             .collect();
 
         Ok(regions)
+    }
+}
+
+#[cfg(feature = "test_utils")]
+impl RegionSetXtcs {
+    pub fn nonzero_regions(
+        &self,
+    ) -> impl '_ + Iterator<Item = ((u32, u32), RegionCoords, RegionData)> {
+        self.coords.region_coords_flat().filter_map(|((i, j), c)| {
+            let d = &self.data[i as usize][j as usize];
+            (d.count > 0).then(|| ((i, j), c, d.clone()))
+        })
+    }
+
+    pub fn report_nonzero_regions(&self) -> Vec<String> {
+        self.nonzero_regions()
+            .map(|((i, j), _, d)| format!("({},{}): {}", i, j, d.hash.loc()))
+            .collect()
     }
 }
 

@@ -78,3 +78,5 @@ mock_network = [
   "kitsune_p2p_types/test_utils",
   "mockall",
 ]
+
+[workspace]
