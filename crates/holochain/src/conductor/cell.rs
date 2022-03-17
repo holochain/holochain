@@ -90,9 +90,9 @@ impl PartialEq for Cell {
 /// A Cell is guaranteed to contain a Source Chain which has undergone
 /// Genesis.
 ///
-/// The [Conductor] manages a collection of Cells, and will call functions
+/// The [`Conductor`](super::Conductor) manages a collection of Cells, and will call functions
 /// on the Cell when a Conductor API method is called (either a
-/// [CellConductorApi] or an [AppInterfaceApi])
+/// [`CellConductorApi`](super::api::CellConductorApi) or an [`AppInterfaceApi`](super::api::AppInterfaceApi))
 pub struct Cell<Api = CellConductorApi, P2pCell = holochain_p2p::HolochainP2pDna>
 where
     Api: CellConductorApiT,
@@ -932,6 +932,11 @@ impl Cell {
             Some(dna) => Ok(RealRibosome::new(dna)),
             None => Err(DnaError::DnaMissing(self.dna_hash().to_owned()).into()),
         }
+    }
+
+    /// Accessor for the p2p_agents_db backing this Cell
+    pub(crate) fn p2p_agents_db(&self) -> &DbWrite<DbKindP2pAgents> {
+        &self.space.p2p_agents_db
     }
 
     /// Accessor for the authored database backing this Cell

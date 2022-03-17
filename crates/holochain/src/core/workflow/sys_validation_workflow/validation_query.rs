@@ -12,14 +12,14 @@ use crate::core::workflow::error::WorkflowResult;
 
 /// Get all ops that need to sys or app validated in order.
 /// - Sys validated or awaiting app dependencies.
-/// - Ordered by type then timestamp (See [`DhtOpOrder`])
+/// - Ordered by type then timestamp (See [`DhtOpOrder`](crate::core::validation::DhtOpOrder))
 pub async fn get_ops_to_app_validate(db: &DbRead<DbKindDht>) -> WorkflowResult<Vec<DhtOpHashed>> {
     get_ops_to_validate(db, false).await
 }
 
 /// Get all ops that need to sys or app validated in order.
 /// - Pending or awaiting sys dependencies.
-/// - Ordered by type then timestamp (See [`DhtOpOrder`])
+/// - Ordered by type then timestamp (See [`DhtOpOrder`](crate::core::validation::DhtOpOrder))
 pub async fn get_ops_to_sys_validate(db: &DbRead<DbKindDht>) -> WorkflowResult<Vec<DhtOpHashed>> {
     get_ops_to_validate(db, true).await
 }

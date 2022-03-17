@@ -1,7 +1,6 @@
 //! This module contains data and functions for running operations
 //! at the level of a [`DnaHash`] space.
-//! Multiple [`Cell`]'s could share the same space.
-
+//! Multiple [`Cell`](crate::conductor::Cell)'s could share the same space.
 use std::{collections::HashMap, sync::Arc};
 
 use holo_hash::{DhtOpHash, DnaHash};
