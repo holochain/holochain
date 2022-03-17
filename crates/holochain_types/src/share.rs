@@ -93,4 +93,11 @@ impl<T> RwShare<T> {
             .expect("Failed to take a write lock for over 5 minutes this must be a deadlock");
         f(&mut t)
     }
+
+    /// Try to unwrap the inner type if there are no outstanding references.
+    pub fn try_unwrap(self) -> Result<T, Self> {
+        Arc::try_unwrap(self.0)
+            .map(|lock| lock.into_inner())
+            .map_err(|t| Self(t))
+    }
 }

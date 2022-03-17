@@ -87,6 +87,12 @@ impl DhtArc {
         Self(DhtArcRange::Full, Some(loc))
     }
 
+    /// Create a arc range from a start location with a percentage of
+    /// the total coverage.
+    pub fn with_coverage(start: DhtLocation, coverage: f64) -> Self {
+        Self::from_parts(DhtArcRange::with_coverage(start, coverage), start)
+    }
+
     pub fn start_loc(&self) -> DhtLocation {
         match (self.0, self.1) {
             (DhtArcRange::Empty, Some(loc)) => loc,
@@ -277,6 +283,18 @@ impl DhtArcRange<DhtLocation> {
     /// Constructor
     pub fn new_empty() -> Self {
         Self::Empty
+    }
+
+    /// Create a arc range from a start location with a percentage of
+    /// the total coverage.
+    pub fn with_coverage(start: DhtLocation, coverage: f64) -> Self {
+        let coverage = coverage.clamp(0.0, 1.0);
+        if coverage == 0.0 {
+            Self::Empty
+        } else {
+            let len = (u32::MAX as f64 * coverage) as u64;
+            Self::from_start_and_len(start, len)
+        }
     }
 
     /// Represent an arc as an optional range of inclusive endpoints.

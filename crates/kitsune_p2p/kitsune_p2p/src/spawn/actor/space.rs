@@ -463,7 +463,10 @@ async fn update_arc_length(
     arc: &mut DhtArc,
 ) -> KitsuneP2pResult<()> {
     let density = evt_sender.query_peer_density(space.clone(), *arc).await?;
+    dbg!(&density);
+    dbg!(arc.coverage());
     arc.update_length(density);
+    dbg!(arc.coverage());
     Ok(())
 }
 
@@ -597,6 +600,7 @@ impl KitsuneP2pHandler for Space {
         initial_arc: Option<DhtArc>,
     ) -> KitsuneP2pHandlerResult<()> {
         if let Some(initial_arc) = initial_arc {
+            dbg!(initial_arc.coverage());
             self.agent_arcs.insert(agent.clone(), initial_arc);
         }
         self.local_joined_agents.insert(agent.clone());
@@ -1351,7 +1355,8 @@ impl Space {
                 Some(arc) => arc,
                 None => {
                     if self.agent_arcs.is_empty() {
-                        DhtArc::full(agent.get_loc())
+                        // DhtArc::full(agent.get_loc())
+                        DhtArc::with_coverage(agent.get_loc(), 0.2)
                     } else {
                         DhtArc::empty(agent.get_loc())
                     }

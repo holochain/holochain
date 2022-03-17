@@ -328,6 +328,8 @@ impl ShardedGossip {
             let _ = self.gossip.inner.share_mut(|i, _| {
                     let s = tracing::trace_span!("gossip_metrics", gossip_type = %self.gossip.gossip_type);
                     s.in_scope(|| tracing::trace!("{}\nStats over last 5s:\n\tAverage processing time {:?}\n\tIteration count: {}\n\tMax gossip processing time: {:?}\n\t{}", i.metrics, stats.avg_processing_time, stats.count, stats.max_processing_time, lens));
+                    s.in_scope(|| tracing::trace!(rounds = ?i.round_map));
+                    s.in_scope(|| tracing::trace!(initiate = ?i.initiate_tgt.as_ref().and_then(|s| s.when_initiated.as_ref().map(|s|s.elapsed()))));
                     Ok(())
                 });
             *stats = Stats::reset();
@@ -350,6 +352,22 @@ pub struct ShardedGossipLocal {
     closing: AtomicBool,
 }
 
+impl std::fmt::Debug for ShardedGossipLocal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut s = f.debug_struct("ShardedGossipLocal");
+        s.field("gossip_type", &self.gossip_type)
+            .field("tuning_params", &self.tuning_params)
+            .field("space", &self.space);
+        self.inner
+            .share_ref(|i| {
+                s.field("inner", &i);
+                Ok(())
+            })
+            .unwrap();
+        s.field("closing", &self.closing).finish()
+    }
+}
+
 /// Incoming gossip.
 type Incoming = (Tx2ConHnd<wire::Wire>, TxUrl, ShardedGossipWire, usize);
 /// Outgoing gossip.
@@ -369,7 +387,7 @@ pub(crate) struct ShardedGossipTarget {
 }
 
 /// The internal mutable state for [`ShardedGossipLocal`]
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct ShardedGossipLocalState {
     /// The list of agents on this node
     local_agents: HashSet<Arc<KitsuneAgent>>,
@@ -385,6 +403,15 @@ impl ShardedGossipLocalState {
     fn new(metrics: MetricsSync) -> Self {
         Self {
             metrics,
+            ..Default::default()
+        }
+    }
+
+    #[cfg(feature = "test_utils")]
+    /// Builds gossip with local agents
+    pub fn with_local_agents(local_agents: HashSet<Arc<KitsuneAgent>>) -> Self {
+        Self {
+            local_agents,
             ..Default::default()
         }
     }
@@ -621,7 +648,8 @@ impl ShardedGossipLocal {
         })
     }
 
-    async fn process_incoming(
+    /// Process incoming gossip
+    pub async fn process_incoming(
         &self,
         cert: Tx2Cert,
         msg: ShardedGossipWire,

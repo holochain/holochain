@@ -166,7 +166,10 @@ pub fn check_prev_header(header: &Header) -> SysValidationResult<()> {
                     .map_err(ValidationOutcome::from)?;
                 Ok(())
             } else {
-                Err(PrevHeaderError::InvalidRoot).map_err(|e| ValidationOutcome::from(e).into())
+                Err(PrevHeaderError::InvalidRoot(
+                    "Not DNA but has header seq of 0".to_string(),
+                ))
+                .map_err(|e| ValidationOutcome::from(e).into())
             }
         }
     }
@@ -180,7 +183,10 @@ pub async fn check_valid_if_dna(
     match header {
         Header::Dna(_) => {
             if !workspace.is_chain_empty(header.author()).await? {
-                Err(PrevHeaderError::InvalidRoot).map_err(|e| ValidationOutcome::from(e).into())
+                Err(PrevHeaderError::InvalidRoot(
+                    "Got dna but chain is not empty".to_string(),
+                ))
+                .map_err(|e| ValidationOutcome::from(e).into())
             } else if header.timestamp() < workspace.dna_def().origin_time {
                 // If the Dna timestamp is ahead of the origin time, every other header
                 // will be inductively so also due to the prev_header check
@@ -383,7 +389,10 @@ pub fn validate_chain<'iter>(
                     // If there's no persisted chain head, then the first header
                     // must be a DNA.
                     if !matches!(header, Header::Dna(_)) {
-                        return Err(ValidationOutcome::from(PrevHeaderError::InvalidRoot).into());
+                        return Err(ValidationOutcome::from(PrevHeaderError::InvalidRoot(
+                            "There was no chain head but the header was not a DNA".to_string(),
+                        ))
+                        .into());
                     }
                 }
             }
@@ -414,7 +423,9 @@ fn check_prev_header_chain(
 ) -> Result<(), PrevHeaderError> {
     // DNA cannot appear later in the chain.
     if matches!(header, Header::Dna(_)) {
-        Err(PrevHeaderError::InvalidRoot)
+        Err(PrevHeaderError::InvalidRoot(
+            "Got a DNA later in the source chain".to_string(),
+        ))
     } else if header.prev_header().map_or(true, |p| p != prev_header_hash) {
         // Check the prev hash matches.
         Err(PrevHeaderError::HashMismatch)

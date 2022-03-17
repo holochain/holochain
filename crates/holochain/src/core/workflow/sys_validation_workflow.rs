@@ -138,7 +138,7 @@ async fn sys_validation_workflow_inner(
         // Send the result to task that will commit to the database.
         while let Some(op) = iter.next().await {
             if tx.send(op).await.is_err() {
-                tracing::warn!("app validation task has failed to send ops. This is not a problem if the conductor is shutting down");
+                tracing::warn!("sys validation task has failed to send ops. This is not a problem if the conductor is shutting down");
                 break;
             }
         }
@@ -196,6 +196,7 @@ async fn sys_validation_workflow_inner(
                             if let Dependency::Null = dependency {
                                 put_integrated(txn, &op_hash, ValidationStatus::Rejected)?;
                             } else {
+                                // FIXME: This needs to go into the db cache if it's agent activity.
                                 put_integration_limbo(txn, &op_hash, ValidationStatus::Rejected)?;
                             }
                         }
@@ -255,11 +256,13 @@ async fn validate_op(
                 error = ?e,
                 error_msg = %e
             );
+            let error = format!("{}: {:?}", e, e);
             let outcome = handle_failed(e);
             if let Outcome::Rejected = outcome {
                 warn!(
                     dna = %workspace.dna_hash(),
                     msg = "DhtOp was rejected during system validation.",
+                    %error,
                     ?op,
                 )
             }

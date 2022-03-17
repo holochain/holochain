@@ -20,9 +20,11 @@ impl Default for PeerStratBeta {
             min_sample_size: DEFAULT_REDUNDANCY_TARGET as u16,
             coverage_buffer: DEFAULT_COVERAGE_BUFFER,
             total_coverage_buffer: DEFAULT_TOTAL_COVERAGE_BUFFER,
-            default_uptime: DEFAULT_UPTIME,
+            // default_uptime: DEFAULT_UPTIME,
+            default_uptime: 1.0,
             noise_threshold: DEFAULT_NOISE_THRESHOLD,
-            delta_scale: DEFAULT_DELTA_SCALE,
+            // delta_scale: DEFAULT_DELTA_SCALE,
+            delta_scale: 0.01,
             delta_threshold: DEFAULT_DELTA_THRESHOLD,
         }
     }

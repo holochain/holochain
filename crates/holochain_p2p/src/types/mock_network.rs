@@ -4,6 +4,7 @@
 use fixt::prelude::Distribution;
 use futures::stream::Stream;
 use kitsune_p2p::actor::BroadcastTo;
+use kitsune_p2p::test_util::mock_network::KitsuneMockAddr;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::ops::Range;
@@ -16,7 +17,6 @@ use crate::types::DnaHashExt;
 use futures::StreamExt;
 use holo_hash::{AgentPubKey, DnaHash};
 use kitsune_p2p::agent_store::AgentInfoSigned;
-use kitsune_p2p::dependencies::kitsune_p2p_proxy::ProxyUrl;
 use kitsune_p2p::test_util::mock_network::to_kitsune_channel;
 use kitsune_p2p::test_util::mock_network::KitsuneMock;
 use kitsune_p2p::test_util::mock_network::ToKitsuneMockChannelRx;
@@ -24,20 +24,48 @@ use kitsune_p2p::test_util::mock_network::ToKitsuneMockChannelTx;
 use kitsune_p2p::test_util::mock_network::{FromKitsuneMockChannelTx, KitsuneMockRespond};
 use kitsune_p2p::wire as kwire;
 use kitsune_p2p::GossipModuleType;
-use kitsune_p2p_types::tx2::tx2_utils::TxUrl;
 use kitsune_p2p_types::tx2::MsgId;
 use kitsune_p2p_types::Tx2Cert;
 
 static MSG_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+static UNKNOWN_AGENT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
 
-fn next_msg_id() -> MsgId {
-    MsgId::new(MSG_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed))
+/// Generate a unique message id.
+pub fn next_msg_id() -> MsgId {
+    MsgId::new(MSG_ID.fetch_add(1, std::sync::atomic::Ordering::SeqCst))
+}
+
+fn next_unknown_agent() -> Agent {
+    Agent::Unknown(UNKNOWN_AGENT.fetch_add(1, std::sync::atomic::Ordering::SeqCst))
+}
+
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+/// An agent that we might know the key for
+/// or is unknown because it has come from a new connection.
+pub enum Agent {
+    /// A known agents key.
+    Key(Arc<AgentPubKey>),
+    /// An unknown unique agent.
+    Unknown(u64),
+}
+
+impl Agent {
+    /// If there is a key get it.
+    pub fn as_key(&self) -> Option<&Arc<AgentPubKey>> {
+        match self {
+            Agent::Key(k) => Some(k),
+            Agent::Unknown(_) => None,
+        }
+    }
 }
 
 /// A channel between the simulated network and the set of real
 /// holochain nodes.
 pub struct HolochainP2pMockChannel {
-    address_map: HashMap<AgentPubKey, (Tx2Cert, TxUrl)>,
+    address_map: HashMap<Arc<AgentPubKey>, Arc<KitsuneMockAddr>>,
+    rev_address_map: HashMap<Arc<KitsuneMockAddr>, Arc<AgentPubKey>>,
+    real_nodes: HashMap<Agent, Arc<KitsuneMockAddr>>,
+    rev_real_nodes: HashMap<Arc<KitsuneMockAddr>, Agent>,
     from_kitsune: Pin<Box<dyn Stream<Item = KitsuneMock> + Send + Sync + 'static>>,
     to_kitsune: ToKitsuneMockChannelTx,
 }
@@ -75,7 +103,9 @@ pub struct AddressedHolochainP2pMockMsg {
     /// The network message.
     pub msg: HolochainP2pMockMsg,
     /// The simulated agent associated with this connection.
-    pub agent: AgentPubKey,
+    pub from_agent: Agent,
+    /// The simulated agent associated with this connection.
+    pub to_agent: Agent,
 }
 
 #[derive(Debug)]
@@ -160,7 +190,7 @@ impl HolochainP2pMockChannel {
     /// The buffer is the amount of messages that can be buffered.
     /// The scenario sets up the why this simulated network will behave.
     pub fn channel(
-        peer_data: Vec<AgentInfoSigned>,
+        peer_data: Vec<(AgentInfoSigned, Tx2Cert)>,
         buffer: usize,
         scenario: MockScenario,
     ) -> (
@@ -170,11 +200,10 @@ impl HolochainP2pMockChannel {
     ) {
         let address_map: HashMap<_, _> = peer_data
             .into_iter()
-            .map(|info| {
+            .map(|(info, cert)| {
                 let agent = holo_hash::AgentPubKey::from_kitsune(&info.agent);
                 let url = info.url_list.get(0).cloned().unwrap();
-                let cert = Tx2Cert::from(ProxyUrl::from_full(url.as_str()).unwrap().digest());
-                (agent, (cert, url))
+                (Arc::new(agent), Arc::new(KitsuneMockAddr { cert, url }))
             })
             .collect();
         let offline_nodes: HashSet<_> = {
@@ -185,9 +214,13 @@ impl HolochainP2pMockChannel {
                     let offline = rand::distributions::Uniform::from(0.0..1.0);
                     offline.sample(&mut rng) <= scenario.percent_offline
                 })
-                .map(|(cert, _)| cert.clone())
+                .map(|addr| addr.cert.clone())
                 .collect()
         };
+        let rev_address_map = address_map
+            .iter()
+            .map(|(k, v)| (v.clone(), k.clone()))
+            .collect();
         let offline_nodes = Arc::new(offline_nodes);
         let (from_kitsune_tx, from_kitsune_rx) = tokio::sync::mpsc::channel(buffer);
         let (to_kitsune_tx, to_kitsune_rx) = to_kitsune_channel(buffer);
@@ -216,14 +249,14 @@ impl HolochainP2pMockChannel {
                         };
                         tokio::time::sleep(delay).await;
                         keep.then(|| t)
-                            .filter(|m| !offline_nodes.contains(m.cert()))
+                            .filter(|m| !offline_nodes.contains(m.to_cert()))
                     }
                 }
             })
-            .buffer_unordered(10)
+            .buffer_unordered(100)
             .filter_map(|t| async move { t });
         let from_kitsune = Box::pin(stream);
-        let stream = tokio_stream::wrappers::ReceiverStream::new(rx).for_each_concurrent(10, {
+        let stream = tokio_stream::wrappers::ReceiverStream::new(rx).for_each_concurrent(100, {
             move |msg| {
                 let scenario = scenario.clone();
                 let to_kitsune_tx = to_kitsune_tx.clone();
@@ -258,6 +291,9 @@ impl HolochainP2pMockChannel {
             to_kitsune_rx,
             Self {
                 address_map,
+                rev_address_map,
+                real_nodes: Default::default(),
+                rev_real_nodes: Default::default(),
                 from_kitsune,
                 to_kitsune: tx,
             },
@@ -277,23 +313,27 @@ impl HolochainP2pMockChannel {
         match self.from_kitsune.next().await {
             Some(msg) => {
                 let to_agent = self
-                    .address_map
-                    .iter()
-                    .find_map(|(agent, (cert, _))| {
-                        if cert == msg.cert() {
-                            Some(agent.clone())
-                        } else {
-                            None
-                        }
-                    })
+                    .rev_address_map
+                    .get(msg.to())
+                    .map(|a| (**a).clone())
                     .unwrap();
+                let from_agent = match self.rev_real_nodes.get(msg.from()) {
+                    Some(agent) => agent.clone(),
+                    None => {
+                        let addr = Arc::new(msg.from().clone());
+                        let agent = next_unknown_agent();
+                        self.rev_real_nodes.insert(addr.clone(), agent.clone());
+                        self.real_nodes.insert(agent.clone(), addr);
+                        agent
+                    }
+                };
 
                 let (msg, respond) = msg.into_msg_respond();
 
                 let msg = HolochainP2pMockMsg::from_wire_msg(msg);
 
                 let respond = respond.map(|respond| HolochainP2pMockRespond { respond });
-                Some((msg.addressed(to_agent), respond))
+                Some((msg.addressed(from_agent, to_agent), respond))
             }
             None => None,
         }
@@ -302,19 +342,33 @@ impl HolochainP2pMockChannel {
     /// Send a notify or request from an addressed simulated agent.
     /// If this is a request you will get back the response.
     pub async fn send(&self, msg: AddressedHolochainP2pMockMsg) -> Option<HolochainP2pMockMsg> {
-        let AddressedHolochainP2pMockMsg { msg, agent: from } = msg;
-        let (cert, url) = self.address_map.get(&from).cloned().unwrap();
+        let AddressedHolochainP2pMockMsg {
+            msg,
+            from_agent,
+            to_agent,
+        } = msg;
+        let from = self
+            .address_map
+            .get(
+                from_agent
+                    .as_key()
+                    .expect("Cannot send from an unknown agent"),
+            )
+            .map(|a| (**a).clone())
+            .unwrap();
+        let to = self
+            .real_nodes
+            .get(&to_agent)
+            .map(|a| (**a).clone())
+            .unwrap();
         let id = msg.to_id();
         let (msg, rx) = if id.is_notify() {
-            (
-                KitsuneMock::notify(id, cert, url, msg.into_wire_msg()),
-                None,
-            )
+            (KitsuneMock::notify(id, to, from, msg.into_wire_msg()), None)
         } else {
             let (respond, rx) = tokio::sync::oneshot::channel();
 
             (
-                KitsuneMock::request(id, cert, url, msg.into_wire_msg(), respond),
+                KitsuneMock::request(id, to, from, msg.into_wire_msg(), respond),
                 Some(rx),
             )
         };
@@ -327,14 +381,39 @@ impl HolochainP2pMockChannel {
             None => None,
         }
     }
+
+    /// Add real nodes to the network.
+    pub fn add_real_agents(
+        &mut self,
+        peer_data: impl IntoIterator<Item = (Arc<AgentPubKey>, Arc<KitsuneMockAddr>)>,
+    ) {
+        for (agent, addr) in peer_data {
+            self.real_nodes
+                .insert(Agent::Key(agent.clone()), addr.clone());
+            self.rev_real_nodes.insert(addr, Agent::Key(agent));
+        }
+    }
+
+    /// Get a real nodes address.
+    pub fn real_node_address(&self, agent: &Agent) -> Arc<KitsuneMockAddr> {
+        self.real_nodes[agent].clone()
+    }
 }
 
 impl HolochainP2pMockMsg {
     /// Associate a message with the simulated agent that is sending or receiving
     /// this message. From holochain's point of view this is the remote node that
     /// the message is being sent to or received from.
-    pub fn addressed(self, agent: AgentPubKey) -> AddressedHolochainP2pMockMsg {
-        AddressedHolochainP2pMockMsg { msg: self, agent }
+    pub fn addressed(
+        self,
+        from_agent: impl Into<Agent>,
+        to_agent: impl Into<Agent>,
+    ) -> AddressedHolochainP2pMockMsg {
+        AddressedHolochainP2pMockMsg {
+            msg: self,
+            from_agent: from_agent.into(),
+            to_agent: to_agent.into(),
+        }
     }
 
     /// Generate the correct message id associated with this message.
@@ -510,6 +589,27 @@ impl HolochainP2pMockMsg {
             kwire::Wire::PeerQueryResp(msg) => HolochainP2pMockMsg::PeerQueryResp(msg),
             kwire::Wire::CallResp(msg) => HolochainP2pMockMsg::CallResp(msg.data),
             kwire::Wire::Failure(msg) => HolochainP2pMockMsg::Failure(msg.reason),
+        }
+    }
+}
+
+impl From<Arc<AgentPubKey>> for Agent {
+    fn from(k: Arc<AgentPubKey>) -> Self {
+        Agent::Key(k)
+    }
+}
+
+impl From<AgentPubKey> for Agent {
+    fn from(k: AgentPubKey) -> Self {
+        Agent::Key(Arc::new(k))
+    }
+}
+
+impl std::fmt::Display for Agent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Agent::Key(k) => write!(f, "{}", k),
+            Agent::Unknown(u) => write!(f, "Unknown({})", u),
         }
     }
 }

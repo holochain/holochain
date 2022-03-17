@@ -51,7 +51,7 @@ async fn check_previous_header() {
     assert_matches!(
         check_prev_header(&header.clone().into()),
         Err(SysValidationError::ValidationOutcome(
-            ValidationOutcome::PrevHeaderError(PrevHeaderError::InvalidRoot)
+            ValidationOutcome::PrevHeaderError(PrevHeaderError::InvalidRoot(_))
         ))
     );
     // Dna is always ok because of the type system
@@ -126,7 +126,7 @@ async fn check_valid_if_dna_test() {
     assert_matches!(
         check_valid_if_dna(&header.clone().into(), &workspace).await,
         Err(SysValidationError::ValidationOutcome(
-            ValidationOutcome::PrevHeaderError(PrevHeaderError::InvalidRoot)
+            ValidationOutcome::PrevHeaderError(PrevHeaderError::InvalidRoot(_))
         ))
     );
 }
@@ -533,7 +533,7 @@ fn valid_chain_test() {
     assert!(matches!(
         err,
         SysValidationError::ValidationOutcome(ValidationOutcome::PrevHeaderError(
-            PrevHeaderError::InvalidRoot
+            PrevHeaderError::InvalidRoot(_)
         ))
     ));
 
@@ -544,7 +544,7 @@ fn valid_chain_test() {
     assert!(matches!(
         err,
         SysValidationError::ValidationOutcome(ValidationOutcome::PrevHeaderError(
-            PrevHeaderError::InvalidRoot
+            PrevHeaderError::InvalidRoot(_)
         ))
     ));
 
@@ -554,7 +554,7 @@ fn valid_chain_test() {
     assert!(matches!(
         err,
         SysValidationError::ValidationOutcome(ValidationOutcome::PrevHeaderError(
-            PrevHeaderError::InvalidRoot
+            PrevHeaderError::InvalidRoot(_)
         ))
     ));
 

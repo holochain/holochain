@@ -16,6 +16,12 @@ impl SweetConductorHandle {
         std::sync::Arc::clone(&self.0)
     }
 
+    /// Create a new handle. You probably don't want to
+    /// use this unless you know what you are doing.
+    pub fn from_handle(handle: ConductorHandle) -> Self {
+        Self(handle)
+    }
+
     /// Make a zome call to a Cell, as if that Cell were the caller. Most common case.
     /// No capability is necessary, since the authorship capability is automatically granted.
     pub async fn call<I, O, F>(&self, zome: &SweetZome, fn_name: F, payload: I) -> O

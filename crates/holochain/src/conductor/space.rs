@@ -240,12 +240,12 @@ impl Spaces {
                     DhtArcRange::Bounded(start_loc, end_loc) => {
                         if start_loc <= end_loc {
                             format!(
-                                "AND storage_center_loc >= {} AND storage_center_loc <= {}",
+                                "AND storage_center_loc >= {} AND storage_center_loc <= {} ",
                                 start_loc, end_loc
                             )
                         } else {
                             format!(
-                                "AND (storage_center_loc < {} OR storage_center_loc > {})",
+                                "AND (storage_center_loc < {} OR storage_center_loc > {}) ",
                                 end_loc, start_loc
                             )
                         }

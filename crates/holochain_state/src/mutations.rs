@@ -172,7 +172,7 @@ pub fn insert_op_lite_into_authored(
 
 /// Insert a [`DhtOpLight`] into the database.
 pub fn insert_op_lite(
-    txn: &mut Transaction,
+    txn: &Transaction,
     op_lite: &DhtOpLight,
     hash: &DhtOpHash,
     order: &OpOrder,
@@ -395,7 +395,7 @@ pub fn set_receipts_complete(
 
 /// Insert a [`Header`] into the database.
 pub fn insert_header(
-    txn: &mut Transaction,
+    txn: &Transaction,
     header: &SignedHeaderHashed,
 ) -> StateMutationResult<()> {
     #[derive(Serialize, Debug)]
@@ -498,7 +498,7 @@ pub fn insert_header(
 
 /// Insert an [`Entry`] into the database.
 pub fn insert_entry(
-    txn: &mut Transaction,
+    txn: &Transaction,
     hash: &EntryHash,
     entry: &Entry,
 ) -> StateMutationResult<()> {

@@ -8,7 +8,7 @@ use kitsune_p2p_types::{
 
 use crate::gossip::{decode_bloom_filter, encode_bloom_filter, MetaOpKey};
 
-use super::EncodedTimedBloomFilter;
+use super::*;
 
 /// Create an agent bloom for testing.
 pub fn create_agent_bloom<'a>(
@@ -87,4 +87,25 @@ pub fn check_agent_boom<'a>(
         })
         .map(|(a, _)| a)
         .collect()
+}
+
+impl ShardedGossipLocal {
+    pub fn new_test(
+        gossip_type: GossipType,
+        tuning_params: KitsuneP2pTuningParams,
+        space: Arc<KitsuneSpace>,
+        evt_sender: EventSender,
+        host: HostApi,
+        inner: ShardedGossipLocalState,
+    ) -> Self {
+        Self {
+            gossip_type,
+            tuning_params,
+            space,
+            evt_sender,
+            _host: host,
+            inner: Share::new(inner),
+            closing: std::sync::atomic::AtomicBool::new(false),
+        }
+    }
 }
