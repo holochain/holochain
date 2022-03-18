@@ -227,7 +227,7 @@ impl Spaces {
         let intervals = dht_arc_set.intervals();
         let sql = if let Some(ArcInterval::Full) = intervals.first() {
             format!(
-                "{}{}{}",
+                "{} {} {}",
                 holochain_sqlite::sql::sql_cell::FETCH_OP_HASHES_P1,
                 include_limbo,
                 holochain_sqlite::sql::sql_cell::FETCH_OP_HASHES_P2,
@@ -254,7 +254,7 @@ impl Spaces {
                 })
                 .collect::<String>();
             format!(
-                "{}{}{}{}",
+                "{} {} {} {}",
                 holochain_sqlite::sql::sql_cell::FETCH_OP_HASHES_P1,
                 include_limbo,
                 sql_ranges,
