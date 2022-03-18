@@ -2,13 +2,21 @@
 //! arbitrary bytes.
 //!
 //! Holochain makes extensive use of hashes to address any content. It utilizes
-//! [Blake2b](https://www.blake2.net/) as hashing algorithm. Hashes in 
-//! Holochain have a length of 39 bytes, made up of 3 bytes for identifying the
-//! hash and 36 bytes of digest. The complete scheme is:
+//! [Blake2b](https://www.blake2.net/) as hashing algorithm. Holochain hashes
+//! have a length of 39 bytes, made up of 3 bytes for identifying the hash, 32
+//! bytes of digest and 4 location bytes. The complete scheme of a hash in byte
+//! format is:
 //! 
+//! ```text
+//! <hash type code as varint><hash size in bytes><hash<location>>
 //! ```
-//! <encoding scheme><hash type code as varint><hash size in bytes><hash>
+//! 
+//! The complete scheme of encoded hashes is:
+//! 
+//! ```text
+//! <encoding scheme><hash type code as varint><hash size in bytes><hash<location>>
 //! ```
+//! 
 //!
 //! ## Example
 //! This is an example of a public agent key hash, displayed as a byte array in
@@ -63,16 +71,14 @@
 //! hash and its length in Base64 encoded strings. Resulting hashes have the
 //! following format:
 //!
-//! ```
+//! ```text
 //! <hash type code as varint><hash size in bytes><hash>
 //! ```
 //!
-//! Hashes in Holochain are 39 bytes long, including the hash type code and the
-//! hash size in bytes. The actual digest of the hashed content, i. e. the
-//! result of the Blake2b algorithm, is 36 bytes long. Therefore the first 3
-//! bytes are reserved for hash type code and hash size. Coming back to the
-//! byte array representation of the example agent pub key, the first 3 bytes
-//! are `132 32 36`. In hexadecimal notation, it's written `0x84 0x20 0x24`.
+//! Hashes in Holochain are 39 bytes long and comprise the hash type code, the
+//! hash size in bytes and the hash. Coming back to the byte array
+//! representation of the example agent pub key, the first 3 bytes are
+//! `132 32 36`. In hexadecimal notation, it is written as `0x84 0x20 0x24`.
 //!
 //! Byte 1 and 2 are taken up by the hash type code as an
 //! [unsigned varint](https://github.com/multiformats/unsigned-varint). Varint
@@ -89,7 +95,20 @@
 //!   was chosen in accordance with `holoChain`.
 //!
 //! Byte 3, which is `0x24` in hexadecimal and `36` in decimal notation,
-//! reflects the hash size in bytes, meaning the **digests are 36 bytes long**.
+//! reflects the hash size in bytes, meaning the **hashes are 36 bytes long**.
+//! 
+//! ### Digest and DHT location
+//! 
+//! The 36 bytes long hash consists of the actual digest of the hashed content
+//! and the computed location of the hash within the distributed hash table
+//! (DHT). The Blake2b algorithm used by Holochain produces hashes of 32 bytes
+//! length.
+//! 
+//! The final 4 bytes are the DHT location bytes. They are interpreted to
+//! identify the context of the hash. For example, the location of an agent pub
+//! key hash refers to the agent's surrounding nodes, whereas the location of
+//! an entry or header reveals who is responsible for the value. Location bytes
+//! also serve as an integrity check of the hash itself.
 //!
 //!
 //! ## Valid Holochain hash types
