@@ -147,10 +147,10 @@
 //!
 //! Breakdown of the example agent pub key encoded as Base64:
 //!
-//! | Multibase encoding   | type + length                       | hash                                                    |
+//! | Multibase encoding   | type + length                       | hash + dht location                                     |
 //! | -------------------- | ----------------------------------- | ------------------------------------------------------- |
 //! | u                    | hCAk                                | J9p-IlfMpeP_HeygQt2jqHDXu4-YRAQezq3L0m9nz3wCa0Mh        |
-//! | base64url no padding | public agent key of 36 bytes length | Base64 encoding of Blake2b hash                         |
+//! | base64url no padding | public agent key of 36 bytes length | Base64 encoding of Blake2b hash + location              |
 
 use crate::prelude::*;
 
