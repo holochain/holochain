@@ -36,4 +36,5 @@ holochain_util = { version = "0.0.8", path = "../holochain_util" }
 [features]
 mock_network = [
   "kitsune_p2p/mock_network",
+  "kitsune_p2p/test_utils",
 ]

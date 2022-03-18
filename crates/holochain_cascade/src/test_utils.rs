@@ -8,6 +8,7 @@ use holo_hash::EntryHash;
 use holo_hash::HasHash;
 use holo_hash::HeaderHash;
 use holochain_p2p::actor;
+use holochain_p2p::dht_arc::DhtArc;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_p2p::HolochainP2pError;
 use holochain_p2p::MockHolochainP2pDnaT;
@@ -221,7 +222,11 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         todo!()
     }
 
-    async fn join(&self, _agent: AgentPubKey) -> actor::HolochainP2pResult<()> {
+    async fn join(
+        &self,
+        _agent: AgentPubKey,
+        _initial_arc: Option<DhtArc>,
+    ) -> actor::HolochainP2pResult<()> {
         todo!()
     }
 
@@ -395,7 +400,11 @@ impl HolochainP2pDnaT for MockNetwork {
         todo!()
     }
 
-    async fn join(&self, _agent: AgentPubKey) -> actor::HolochainP2pResult<()> {
+    async fn join(
+        &self,
+        _agent: AgentPubKey,
+        _initial_arc: Option<DhtArc>,
+    ) -> actor::HolochainP2pResult<()> {
         todo!()
     }
 

@@ -701,6 +701,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         &mut self,
         space: Arc<KitsuneSpace>,
         agent: Arc<KitsuneAgent>,
+        initial_arc: Option<crate::dht_arc::DhtArc>,
     ) -> KitsuneP2pHandlerResult<()> {
         let internal_sender = self.internal_sender.clone();
         let space2 = space.clone();
@@ -732,7 +733,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         let space_sender = space_sender.get();
         Ok(async move {
             let (space_sender, _) = space_sender.await;
-            space_sender.join(space, agent).await
+            space_sender.join(space, agent, initial_arc).await
         }
         .boxed()
         .into())

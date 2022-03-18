@@ -146,14 +146,32 @@ fn tx_p2p_put(txn: &mut Transaction, record: P2pRecord) -> DatabaseResult<()> {
 }
 
 /// Prune all expired AgentInfoSigned records from the p2p_store
-pub async fn p2p_prune(db: &DbWrite<DbKindP2pAgents>) -> DatabaseResult<()> {
+pub async fn p2p_prune(
+    db: &DbWrite<DbKindP2pAgents>,
+    local_agents: Vec<Arc<KitsuneAgent>>,
+) -> DatabaseResult<()> {
+    let mut agent_list = Vec::with_capacity(local_agents.len() * 36);
+    for agent in local_agents.iter() {
+        agent_list.extend_from_slice(agent.as_ref());
+    }
+    if agent_list.is_empty() {
+        // this is a hack around an apparent bug in sqlite
+        // where the delete doesn't run if the subquery returns no rows
+        agent_list.extend_from_slice(&[0; 36]);
+    }
     db.async_commit(move |txn| {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::SystemTime::UNIX_EPOCH)
             .unwrap()
             .as_millis() as u64;
 
-        txn.execute(sql_p2p_agent_store::PRUNE, named_params! { ":now": now })?;
+        txn.execute(
+            sql_p2p_agent_store::PRUNE,
+            named_params! {
+                ":now": now,
+                ":agent_list": agent_list,
+            },
+        )?;
         DatabaseResult::Ok(())
     })
     .await?;
