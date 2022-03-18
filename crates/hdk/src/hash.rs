@@ -104,11 +104,10 @@
 //! (DHT). The Blake2b algorithm used by Holochain produces hashes of 32 bytes
 //! length.
 //!
-//! The final 4 bytes are the DHT location bytes. They are interpreted to
-//! identify the context of the hash. For example, the location of an agent pub
-//! key hash refers to the agent's surrounding nodes, whereas the location of
-//! an entry or header reveals who is responsible for the value. Location bytes
-//! also serve as an integrity check of the hash itself.
+//! The final 4 bytes are location bytes. They are interpreted to identify
+//! the position of an agent's arc, meaning the portion of the DHT that the
+//! agent holds. Location bytes further serve as an integrity check of the hash
+//! itself.
 //!
 //!
 //! ## Valid Holochain hash types
