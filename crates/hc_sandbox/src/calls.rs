@@ -76,7 +76,7 @@ pub enum AdminRequestCli {
     DisableApp(DisableApp),
     DumpState(DumpState),
     /// Calls AdminRequest::AddAgentInfo.
-    /// [Unimplemented].
+    /// _Unimplemented_.
     AddAgents,
     ListAgents(ListAgents),
 }
