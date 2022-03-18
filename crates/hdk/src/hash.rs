@@ -6,17 +6,17 @@
 //! have a length of 39 bytes, made up of 3 bytes for identifying the hash, 32
 //! bytes of digest and 4 location bytes. The complete scheme of a hash in byte
 //! format is:
-//! 
+//!
 //! ```text
 //! <hash type code as varint><hash size in bytes><hash<location>>
 //! ```
-//! 
+//!
 //! The complete scheme of encoded hashes is:
-//! 
+//!
 //! ```text
 //! <encoding scheme><hash type code as varint><hash size in bytes><hash<location>>
 //! ```
-//! 
+//!
 //!
 //! ## Example
 //! This is an example of a public agent key hash, displayed as a byte array in
@@ -96,14 +96,14 @@
 //!
 //! Byte 3, which is `0x24` in hexadecimal and `36` in decimal notation,
 //! reflects the hash size in bytes, meaning the **hashes are 36 bytes long**.
-//! 
+//!
 //! ### Digest and DHT location
-//! 
+//!
 //! The 36 bytes long hash consists of the actual digest of the hashed content
 //! and the computed location of the hash within the distributed hash table
 //! (DHT). The Blake2b algorithm used by Holochain produces hashes of 32 bytes
 //! length.
-//! 
+//!
 //! The final 4 bytes are the DHT location bytes. They are interpreted to
 //! identify the context of the hash. For example, the location of an agent pub
 //! key hash refers to the agent's surrounding nodes, whereas the location of
