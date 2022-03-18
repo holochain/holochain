@@ -568,13 +568,21 @@ jobs:
           limit-access-to-users: steveeJ,jost-s,freesig,neonphog,thedavidmeister,maackle
 
   github-actions-ci-jobs-succeed:
-    if: ${{ github.event_name == 'pull_request' }}
+    if: ${{ always() && github.event_name == 'pull_request' }}
     runs-on: "ubuntu-latest"
     needs: [vars, prepare]
-    steps: [{ name: "ci-jobs-succeed", run: ":" }]
+    steps:
+      - name: Check status
+        env:
+          RESULTS: "${{ toJSON(needs.*.result) }}"
+        run: "[[ $(jq -n 'env.RESULTS | fromjson | unique == [\"success\"]') == \"true\" ]]\n"
 
   all-jobs-succeed:
-    if: ${{ github.event_name != 'pull_request' }}
+    if: ${{ always() && github.event_name != 'pull_request' }}
     runs-on: "ubuntu-latest"
     needs: [vars, prepare, test, finalize]
-    steps: [{ name: "all-jobs-succeed", run: ":" }]
+    steps:
+      - name: Check status
+        env:
+          RESULTS: "${{ toJSON(needs.*.result) }}"
+        run: "[[ $(jq -n 'env.RESULTS | fromjson | unique == [\"success\"]') == \"true\" ]]\n"
