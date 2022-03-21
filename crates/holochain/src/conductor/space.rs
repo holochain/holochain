@@ -1,7 +1,6 @@
 //! This module contains data and functions for running operations
 //! at the level of a [`DnaHash`] space.
-//! Multiple [`Cell`]'s could share the same space.
-
+//! Multiple [`Cell`](crate::conductor::Cell)'s could share the same space.
 use std::{collections::HashMap, sync::Arc};
 
 use holo_hash::{DhtOpHash, DnaHash};
@@ -228,7 +227,7 @@ impl Spaces {
         let intervals = dht_arc_set.intervals();
         let sql = if let Some(ArcInterval::Full) = intervals.first() {
             format!(
-                "{}{}{}",
+                "{} {} {}",
                 holochain_sqlite::sql::sql_cell::FETCH_OP_HASHES_P1,
                 include_limbo,
                 holochain_sqlite::sql::sql_cell::FETCH_OP_HASHES_P2,
@@ -255,7 +254,7 @@ impl Spaces {
                 })
                 .collect::<String>();
             format!(
-                "{}{}{}{}",
+                "{} {} {} {}",
                 holochain_sqlite::sql::sql_cell::FETCH_OP_HASHES_P1,
                 include_limbo,
                 sql_ranges,

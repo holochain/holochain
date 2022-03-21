@@ -210,7 +210,7 @@ async fn in_chan_recv_logic(
         }
     }
 
-    tracing::warn!(?local_cert, ?peer_cert, "channel logic end");
+    tracing::info!(?local_cert, ?peer_cert, "channel logic end");
 
     Ok(())
 }
