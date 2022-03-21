@@ -52,7 +52,6 @@ pub fn gossip_direct<Peer: HostAccess>(
         al.intersection(&topo, &ar)
     };
 
-
     {
         // ROUND II: Send Agents (not shown)
     }

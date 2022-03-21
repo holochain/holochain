@@ -112,10 +112,10 @@ async fn transitive_peer_gossip() {
 
     let [n1, n2, n3, n4] = sb.add_nodes(tuning_params()).await;
 
-    let a1 = SwitchboardAgent::from_start_and_len(&topo, 0, 128 );
-    let a2 = SwitchboardAgent::from_start_and_len(&topo, 64, 128 );
-    let a3 = SwitchboardAgent::from_start_and_len(&topo, 128, 128 );
-    let a4 = SwitchboardAgent::from_start_and_len(&topo, 192, 128 );
+    let a1 = SwitchboardAgent::from_start_and_len(&topo, 0, 128);
+    let a2 = SwitchboardAgent::from_start_and_len(&topo, 64, 128);
+    let a3 = SwitchboardAgent::from_start_and_len(&topo, 128, 128);
+    let a4 = SwitchboardAgent::from_start_and_len(&topo, 192, 128);
 
     sb.share(|sb| {
         sb.add_local_agent(&n1, &a1);
@@ -270,10 +270,10 @@ async fn sharded_4way_historical() {
 
     let [n1, n2, n3, n4] = sb.add_nodes(tuning_params()).await;
 
-    let a1 = SwitchboardAgent::from_start_and_len(&topo, 0, 128 );
-    let a2 = SwitchboardAgent::from_start_and_len(&topo, 64, 128 );
-    let a3 = SwitchboardAgent::from_start_and_len(&topo, 128, 128 );
-    let a4 = SwitchboardAgent::from_start_and_len(&topo, 192, 128 );
+    let a1 = SwitchboardAgent::from_start_and_len(&topo, 0, 128);
+    let a2 = SwitchboardAgent::from_start_and_len(&topo, 64, 128);
+    let a3 = SwitchboardAgent::from_start_and_len(&topo, 128, 128);
+    let a4 = SwitchboardAgent::from_start_and_len(&topo, 192, 128);
     let ops_only: Vec<_> = (0..256).step_by(8).map(|u| Loc8::from(u)).collect();
     let ops_timed: Vec<_> = ops_only
         .clone()
