@@ -15,7 +15,7 @@ use pretty_assertions::assert_eq;
 async fn fullsync_3way_recent() {
     // observability::test_run().ok();
     let topo = Topology::standard_epoch();
-    let sb = Switchboard::new(topo, GossipType::Recent);
+    let sb = Switchboard::new(topo.clone(), GossipType::Recent);
 
     let [n1, n2, n3] = sb.add_nodes(tuning_params()).await;
 
@@ -62,7 +62,7 @@ async fn fullsync_3way_recent() {
 async fn sharded_3way_recent() {
     observability::test_run().ok();
     let topo = Topology::standard_epoch();
-    let sb = Switchboard::new(topo, GossipType::Recent);
+    let sb = Switchboard::new(topo.clone(), GossipType::Recent);
 
     let [n1, n2, n3] = sb.add_nodes(tuning_params()).await;
 
@@ -108,14 +108,14 @@ async fn sharded_3way_recent() {
 async fn transitive_peer_gossip() {
     observability::test_run().ok();
     let topo = Topology::standard_epoch();
-    let sb = Switchboard::new(topo, GossipType::Recent);
+    let sb = Switchboard::new(topo.clone(), GossipType::Recent);
 
     let [n1, n2, n3, n4] = sb.add_nodes(tuning_params()).await;
 
-    let a1 = SwitchboardAgent::from_start_and_half_len(0, 68);
-    let a2 = SwitchboardAgent::from_start_and_half_len(64, 68);
-    let a3 = SwitchboardAgent::from_start_and_half_len(128, 68);
-    let a4 = SwitchboardAgent::from_start_and_half_len(192, 68);
+    let a1 = SwitchboardAgent::from_start_and_len(&topo, 0, 128 );
+    let a2 = SwitchboardAgent::from_start_and_len(&topo, 64, 128 );
+    let a3 = SwitchboardAgent::from_start_and_len(&topo, 128, 128 );
+    let a4 = SwitchboardAgent::from_start_and_len(&topo, 192, 128 );
 
     sb.share(|sb| {
         sb.add_local_agent(&n1, &a1);
@@ -177,14 +177,14 @@ async fn sharded_4way_recent() {
     observability::test_run().ok();
 
     let topo = Topology::standard_epoch();
-    let sb = Switchboard::new(topo, GossipType::Recent);
+    let sb = Switchboard::new(topo.clone(), GossipType::Recent);
 
     let [n1, n2, n3, n4] = sb.add_nodes(tuning_params()).await;
 
-    let a1 = SwitchboardAgent::from_start_and_half_len(0, 68);
-    let a2 = SwitchboardAgent::from_start_and_half_len(64, 68);
-    let a3 = SwitchboardAgent::from_start_and_half_len(128, 68);
-    let a4 = SwitchboardAgent::from_start_and_half_len(192, 68);
+    let a1 = SwitchboardAgent::from_start_and_len(&topo, 0, 128);
+    let a2 = SwitchboardAgent::from_start_and_len(&topo, 64, 128);
+    let a3 = SwitchboardAgent::from_start_and_len(&topo, 128, 128);
+    let a4 = SwitchboardAgent::from_start_and_len(&topo, 192, 128);
 
     let ops: Vec<_> = (0..256).step_by(8).map(|u| Loc8::from(u)).collect();
 
@@ -266,14 +266,14 @@ async fn sharded_4way_historical() {
     // 1 year ago
     let then = now - 1_000_000 * 60 * 60 * 24 * 365;
     let topo = Topology::standard(Timestamp::from_micros(then));
-    let sb = Switchboard::new(topo, GossipType::Historical);
+    let sb = Switchboard::new(topo.clone(), GossipType::Historical);
 
     let [n1, n2, n3, n4] = sb.add_nodes(tuning_params()).await;
 
-    let a1 = SwitchboardAgent::from_start_and_half_len(0, 68);
-    let a2 = SwitchboardAgent::from_start_and_half_len(64, 68);
-    let a3 = SwitchboardAgent::from_start_and_half_len(128, 68);
-    let a4 = SwitchboardAgent::from_start_and_half_len(192, 68);
+    let a1 = SwitchboardAgent::from_start_and_len(&topo, 0, 128 );
+    let a2 = SwitchboardAgent::from_start_and_len(&topo, 64, 128 );
+    let a3 = SwitchboardAgent::from_start_and_len(&topo, 128, 128 );
+    let a4 = SwitchboardAgent::from_start_and_len(&topo, 192, 128 );
     let ops_only: Vec<_> = (0..256).step_by(8).map(|u| Loc8::from(u)).collect();
     let ops_timed: Vec<_> = ops_only
         .clone()
@@ -320,7 +320,7 @@ async fn sharded_4way_historical() {
     });
 
     // let gossip do its thing
-    tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+    tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
 
     sb.share(|sb| {
         sb.print_ascii_arcs(64, true);
@@ -333,7 +333,7 @@ async fn sharded_4way_historical() {
                 &sb.all_peers(&n1),
                 &sb.all_peers(&n2),
                 &sb.all_peers(&n3),
-                &sb.all_peers(&n4)
+                &sb.all_peers(&n4),
             ),
             (&agent_locs, &agent_locs, &agent_locs, &agent_locs)
         );
@@ -347,6 +347,8 @@ async fn sharded_4way_historical() {
         //     .share_ref(|s| Ok(s.get_history()))
         //     .unwrap();
         // dbg!(history);
+
+        // dbg!(&sb.nodes, &sb.ops);
 
         assert_eq!(
             (

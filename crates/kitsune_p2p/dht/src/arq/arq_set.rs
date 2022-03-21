@@ -112,25 +112,29 @@ impl<S: ArqStart> ArqSetImpl<S> {
     pub fn print_arqs(&self, topo: &Topology, len: usize) {
         println!("{} arqs, power: {}", self.arqs().len(), self.power());
         for (i, arq) in self.arqs().into_iter().enumerate() {
-            println!("|{}| {}:\t{}", arq.to_ascii(topo, len), i, arq.count());
+            println!("|{}| {:>3}:\t{:3}", arq.to_ascii(topo, len), i, arq.count(),);
         }
     }
 }
 
 impl ArqBoundsSet {
-    pub fn from_dht_arc_set(topo: &Topology, strat: &ArqStrat, dht_arc_set: &DhtArcSet) -> Self {
+    pub fn from_dht_arc_set(
+        topo: &Topology,
+        strat: &ArqStrat,
+        dht_arc_set: &DhtArcSet,
+    ) -> Option<Self> {
         let max_chunks = strat.max_chunks();
-        Self::new(
+        Some(Self::new(
             dht_arc_set
                 .intervals()
                 .into_iter()
                 .map(|i| {
                     let len = i.length();
                     let (pow, _) = power_and_count_from_length(&topo.space, len, max_chunks);
-                    ArqBounds::from_interval_rounded(topo, pow, i)
+                    ArqBounds::from_interval(topo, pow, i)
                 })
-                .collect(),
-        )
+                .collect::<Option<Vec<_>>>()?,
+        ))
     }
 }
 

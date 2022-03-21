@@ -15,6 +15,7 @@ use kitsune_p2p_types::dht::prelude::{
     array_xor, ArqBoundsSet, RegionBounds, RegionCoordSetXtcs, RegionData,
 };
 use kitsune_p2p_types::dht::quantum::{TelescopingTimes, TimeQuantum};
+use kitsune_p2p_types::dht_arc::loc8::Loc8;
 use kitsune_p2p_types::dht_arc::{DhtArc, DhtLocation};
 use kitsune_p2p_types::*;
 
@@ -83,7 +84,18 @@ impl KitsuneHost for SwitchboardEventHandler {
     ) -> crate::KitsuneHostResult<dht::region::RegionSetXtcs> {
         async move {
             let topo = self.get_topology(space).await?;
-            let arq_set = ArqBoundsSet::from_dht_arc_set(&topo, &self.sb.strat, &dht_arc_set);
+            dbg!(&dht_arc_set);
+            let arq_set = ArqBoundsSet::from_dht_arc_set(&topo, &self.sb.strat, &dht_arc_set)
+                .expect("an arq could not be quantized");
+            dbg!(&self.node, &arq_set);
+            let arcs = arq_set
+                .to_dht_arc_set(&topo)
+                .intervals()
+                .into_iter()
+                .map(|i| i.map(|loc| loc.as_loc8()))
+                .collect::<Vec<_>>();
+            dbg!(arcs);
+            arq_set.print_arqs(&topo, 64);
             // TODO: This should be behind the current moment by however much Recent gossip covers.
             let current = Timestamp::now();
             let times =
@@ -240,12 +252,14 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
                 // NB: this may be problematic on the receiving end because we
                 // actually care whether this Loc8 is interpreted as u8 or i8,
                 // and we lose that information here.
-                let loc = (op.0[0] as u8 as i32).into();
-                dbg!((&self.node, loc));
+                let loc = op.0[0] as u8 as i32;
+                if loc == 192 {
+                    dbg!((&self.node, loc));
+                }
 
                 // TODO: allow setting integration status
                 node.ops.insert(
-                    loc,
+                    loc.into(),
                     NodeOpEntry {
                         is_integrated: true,
                     },

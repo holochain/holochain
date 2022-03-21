@@ -46,7 +46,8 @@ impl KitsuneHost for StandardResponsesHostApi {
                 &self.get_topology(space).await?,
                 &ArqStrat::default(),
                 &dht_arc_set,
-            );
+            )
+            .expect("an arc in the set could not be quantized");
             let coords = RegionCoordSetXtcs::new(TelescopingTimes::new(1.into()), arqs);
             let chunks = coords.region_coords_nested().count();
             let region_set = if self.with_data {

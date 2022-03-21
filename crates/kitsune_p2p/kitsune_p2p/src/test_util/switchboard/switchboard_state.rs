@@ -14,8 +14,9 @@ use kitsune_p2p_types::agent_info::agent_info_helper::{AgentInfoEncode, AgentMet
 use kitsune_p2p_types::agent_info::{AgentInfoInner, AgentInfoSigned};
 use kitsune_p2p_types::bin_types::*;
 use kitsune_p2p_types::config::KitsuneP2pTuningParams;
+use kitsune_p2p_types::dht::prelude::power_and_count_from_length;
 use kitsune_p2p_types::dht::quantum::Topology;
-use kitsune_p2p_types::dht::ArqStrat;
+use kitsune_p2p_types::dht::{ArqBounds, ArqStrat};
 use kitsune_p2p_types::dht_arc::loc8::Loc8;
 use kitsune_p2p_types::dht_arc::{DhtArc, DhtArcRange, DhtLocation};
 use kitsune_p2p_types::metrics::metric_task;
@@ -530,7 +531,7 @@ impl SwitchboardState {
 /// of DhtArcRange, but we use the agent's Loc8 location as their
 /// unique identifier. This allows specification of agents in
 /// terms of arcs.
-#[derive(Clone, derive_more::AsRef)]
+#[derive(Debug, Clone, derive_more::AsRef)]
 pub struct SwitchboardAgent {
     pub(super) loc: Loc8,
     initial_arc: DhtArcRange<Loc8>,
@@ -561,15 +562,22 @@ impl SwitchboardAgent {
 
     /// Construct an agent from arc bounds.
     /// The agent's location is taken as the midpoint of the arc.
-    pub fn from_start_and_half_len<L: Into<Loc8>>(start: L, half_len: u8) -> Self {
+    pub fn from_start_and_len<L: Into<Loc8>>(topo: &Topology, start: L, len: u8) -> Self {
         let start: Loc8 = start.into();
-        let initial_arc = if half_len == 0 {
+        let initial_arc = if len == 0 {
             DhtArcRange::Empty
         } else {
-            let len = half_len * 2 - 1;
-            let end = Loc8::from((start.as_u8().wrapping_add(len).wrapping_sub(1)) as i32);
+            let end = Loc8::from((start.as_u8().wrapping_add(len)) as i32);
             DhtArcRange::Bounded(start, end)
         };
+
+        {
+            let canonical = initial_arc.canonical();
+            let (power, _count) = power_and_count_from_length(&topo.space, canonical.length(), 16);
+            dbg!(canonical.length(), power, _count);
+            ArqBounds::from_interval(topo, power, canonical)
+                .expect(&format!("Arc is not quantizable. Power is {}", power));
+        }
 
         Self {
             loc: start,
@@ -589,6 +597,7 @@ pub struct SpaceEntry {
 }
 
 /// The value of the SwitchboardSpace::nodes hashmap
+#[derive(Debug)]
 pub struct NodeEntry {
     pub(super) local_agents: HashMap<Loc8, AgentEntry>,
     pub(super) remote_agents: HashMap<Loc8, AgentInfoSigned>,

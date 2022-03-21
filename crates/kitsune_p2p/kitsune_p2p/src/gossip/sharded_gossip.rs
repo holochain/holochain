@@ -115,6 +115,12 @@ pub struct ShardedGossip {
     bandwidth: Arc<BandwidthThrottle>,
 }
 
+impl std::fmt::Debug for ShardedGossip {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ShardedGossip{...}").finish()
+    }
+}
+
 /// Basic statistic for gossip loop processing performance.
 struct Stats {
     start: Instant,
@@ -778,10 +784,10 @@ impl ShardedGossipLocal {
             ShardedGossipWire::OpRegions(OpRegions { region_set }) => {
                 if let Some(state) = self.incoming_ops_finished(&cert)? {
                     if let Some(sent) = state.region_set_sent.clone() {
-                        dbg!(sent.report_nonzero_regions());
-                        dbg!(region_set.report_nonzero_regions());
+                        // dbg!(sent.report_nonzero_regions());
+                        //                         dbg!(region_set.report_nonzero_regions());
                         let diff_regions = sent.diff(region_set).map_err(KitsuneError::other)?;
-                        dbg!(diff_regions.iter().filter(|r| r.data.count > 0).count());
+                        // dbg!(diff_regions.iter().filter(|r| r.data.count > 0).count());
                         let topo = self
                             .host_api
                             .get_topology(self.space.clone())

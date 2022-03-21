@@ -426,6 +426,8 @@ pub fn approximate_arq(topo: &Topology, strat: &ArqStrat, start: Loc, len: u64) 
 mod tests {
     use super::*;
 
+    use test_case::test_case;
+
     #[test]
     fn test_is_full() {
         {
@@ -515,6 +517,21 @@ mod tests {
         let topo = Topology::unit_zero();
         let i = DhtArcRange::Bounded(4294967040u32.into(), 511.into());
         assert!(ArqBounds::from_interval(&topo, 8, i).is_some());
+    }
+
+    #[test_case(2u64.pow(30), (14, 16))]
+    #[test_case(2u64.pow(31), (15, 16))]
+    #[test_case(2u64.pow(32), (16, 16))]
+    #[test_case(128 * 2u64.pow(24), (15, 16))]
+    #[test_case((128 + 16) * 2u64.pow(24), (16, 9))]
+    fn test_power_and_count_from_length(len: u64, expected: (u8, u32)) {
+        let topo = Topology::standard_epoch();
+        let (p, c) = power_and_count_from_length(&topo.space, len, 16);
+        assert_eq!((p, c), expected);
+        assert_eq!(
+            2u64.pow(p as u32 + topo.space.quantum_power as u32) * c as u64,
+            len
+        );
     }
 
     proptest::proptest! {

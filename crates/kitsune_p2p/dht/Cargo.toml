@@ -32,9 +32,10 @@ observability = "0.1"
 pretty_assertions = "0.7.2"
 proptest = "1"
 rand = "0.8"
+test-case = "1.2"
 
 # TODO: remove when integrating
-# [workspace]
+[workspace]
 
 [features]
 test_utils = [

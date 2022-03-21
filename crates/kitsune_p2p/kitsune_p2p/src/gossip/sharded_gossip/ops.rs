@@ -168,7 +168,7 @@ impl ShardedGossipLocal {
     /// Incoming ops that were missing from this nodes bloom filter.
     pub(super) async fn incoming_missing_ops(&self, ops: Vec<KOp>) -> KitsuneResult<()> {
         // Put the ops in the agents that contain the ops within their arcs.
-        dbg!("incoming_missing_ops", ops.len());
+        // dbg!(&ops);
         store::put_ops(&self.evt_sender, &self.space, ops).await?;
 
         Ok(())
