@@ -574,7 +574,7 @@ impl SwitchboardAgent {
         {
             let canonical = initial_arc.canonical();
             let (power, _count) = power_and_count_from_length(&topo.space, canonical.length(), 16);
-            dbg!(canonical.length(), power, _count);
+            // dbg!(canonical.length(), power, _count);
             ArqBounds::from_interval(topo, power, canonical)
                 .expect(&format!("Arc is not quantizable. Power is {}", power));
         }

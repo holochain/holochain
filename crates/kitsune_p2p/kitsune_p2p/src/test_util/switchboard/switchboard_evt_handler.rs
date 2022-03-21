@@ -84,17 +84,14 @@ impl KitsuneHost for SwitchboardEventHandler {
     ) -> crate::KitsuneHostResult<dht::region::RegionSetXtcs> {
         async move {
             let topo = self.get_topology(space).await?;
-            dbg!(&dht_arc_set);
             let arq_set = ArqBoundsSet::from_dht_arc_set(&topo, &self.sb.strat, &dht_arc_set)
                 .expect("an arq could not be quantized");
-            dbg!(&self.node, &arq_set);
             let arcs = arq_set
                 .to_dht_arc_set(&topo)
                 .intervals()
                 .into_iter()
                 .map(|i| i.map(|loc| loc.as_loc8()))
                 .collect::<Vec<_>>();
-            dbg!(arcs);
             arq_set.print_arqs(&topo, 64);
             // TODO: This should be behind the current moment by however much Recent gossip covers.
             let current = Timestamp::now();

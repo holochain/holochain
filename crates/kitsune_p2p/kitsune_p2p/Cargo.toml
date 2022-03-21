@@ -79,4 +79,4 @@ mock_network = [
   "mockall",
 ]
 
-[workspace]
+# [workspace]
