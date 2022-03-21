@@ -66,7 +66,7 @@
 //!  hc r -n 5 ./elemental-chat.dna gen -a "my-app" network quic
 //! ```
 //! #### Call
-//! Allows calling the [`AdminRequest`] api.
+//! Allows calling the [`AdminRequest`](https://docs.rs/holochain_conductor_api/latest/holochain_conductor_api/enum.AdminRequest.html) api.
 //! If the conductors are not already running they
 //! will be run to make the call.
 //!
