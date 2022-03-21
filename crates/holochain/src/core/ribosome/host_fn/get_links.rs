@@ -2,7 +2,7 @@ use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
-use futures::future::join_all;
+use futures::StreamExt;
 use holochain_cascade::Cascade;
 use holochain_p2p::actor::GetLinksOptions;
 use holochain_types::prelude::*;
@@ -10,18 +10,21 @@ use holochain_wasmer_host::prelude::WasmError;
 use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]
+#[tracing::instrument(skip(ribosome, call_context), fields(?call_context.zome, function = ?call_context.function_name))]
 pub fn get_links<'a>(
     ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     inputs: Vec<GetLinksInput>,
 ) -> Result<Vec<Vec<Link>>, WasmError> {
+    let num_requests = inputs.len();
+    tracing::debug!("Starting with {} requests.", num_requests);
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess {
             read_workspace: Permission::Allow,
             ..
         } => {
             let results: Vec<Result<Vec<Link>, _>> = tokio_helper::block_forever_on(async move {
-                join_all(inputs.into_iter().map(|input| async {
+                futures::stream::iter(inputs.into_iter().map(|input| async {
                     let GetLinksInput {
                         base_address,
                         tag_prefix,
@@ -41,6 +44,10 @@ pub fn get_links<'a>(
                     .dht_get_links(key, GetLinksOptions::default())
                     .await
                 }))
+                // Limit concurrent calls to 10 as each call
+                // can spawn multiple connections.
+                .buffered(10)
+                .collect()
                 .await
             });
             let results: Result<Vec<_>, _> = results
@@ -50,7 +57,15 @@ pub fn get_links<'a>(
                     Err(cascade_error) => Err(WasmError::Host(cascade_error.to_string())),
                 })
                 .collect();
-            Ok(results?)
+            let results = results?;
+            tracing::debug!(
+                "Ending with {} out of {} results, {} total links and {} total responses.",
+                results.iter().filter(|r| !r.is_empty()).count(),
+                num_requests,
+                results.iter().map(|r| r.len()).sum::<usize>(),
+                results.len(),
+            );
+            Ok(results)
         }
         _ => Err(WasmError::Host(
             RibosomeError::HostFnPermissions(
@@ -66,12 +81,12 @@ pub fn get_links<'a>(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod slow_tests {
+    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use crate::test_utils::wait_for_integration_1m;
     use crate::test_utils::WaitOps;
     use hdk::prelude::*;
     use holochain_test_wasm_common::*;
     use holochain_wasm_test_utils::TestWasm;
-    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_entry_hash_path_children() {
@@ -130,7 +145,10 @@ pub mod slow_tests {
 
         assert_eq!(
             anchor_address_one.get_raw_32().to_vec(),
-            vec![174, 222, 191, 173, 245, 226, 135, 240, 9, 44, 238, 112, 158, 41, 73, 28, 175, 94, 206, 82, 82, 109, 9, 156, 73, 22, 188, 213, 148, 21, 234, 45],
+            vec![
+                174, 222, 191, 173, 245, 226, 135, 240, 9, 44, 238, 112, 158, 41, 73, 28, 175, 94,
+                206, 82, 82, 109, 9, 156, 73, 22, 188, 213, 148, 21, 234, 45
+            ],
         );
 
         // anchor foo baz
@@ -144,7 +162,10 @@ pub mod slow_tests {
 
         assert_eq!(
             anchor_address_two.get_raw_32().to_vec(),
-            vec![21, 114, 154, 43, 189, 82, 166, 104, 159, 55, 86, 94, 68, 245, 79, 49, 187, 175, 236, 67, 38, 216, 232, 239, 18, 83, 98, 200, 136, 198, 232, 117],
+            vec![
+                21, 114, 154, 43, 189, 82, 166, 104, 159, 55, 86, 94, 68, 245, 79, 49, 187, 175,
+                236, 67, 38, 216, 232, 239, 18, 83, 98, 200, 136, 198, 232, 117
+            ],
         );
 
         let list_anchor_type_addresses_output: EntryHashes = conductor
@@ -157,7 +178,10 @@ pub mod slow_tests {
             (list_anchor_type_addresses_output.0)[0]
                 .get_raw_32()
                 .to_vec(),
-            vec![5, 114, 66, 208, 85, 124, 76, 245, 245, 255, 31, 76, 173, 73, 168, 139, 56, 20, 93, 162, 167, 43, 203, 164, 172, 158, 29, 43, 74, 254, 81, 241],
+            vec![
+                5, 114, 66, 208, 85, 124, 76, 245, 245, 255, 31, 76, 173, 73, 168, 139, 56, 20, 93,
+                162, 167, 43, 203, 164, 172, 158, 29, 43, 74, 254, 81, 241
+            ],
         );
 
         let list_anchor_addresses_output: EntryHashes = conductor
@@ -195,14 +219,8 @@ pub mod slow_tests {
         let header_hash: HeaderHash = conductor.call(&alice, "create_baseless_link", ()).await;
         let links: Vec<Link> = conductor.call(&alice, "get_baseless_links", ()).await;
 
-        assert_eq!(
-            links[0].create_link_hash,
-            header_hash
-        );
-        assert_eq!(
-            links[0].target,
-            EntryHash::from_raw_32([2_u8; 32].to_vec()),
-        );
+        assert_eq!(links[0].create_link_hash, header_hash);
+        assert_eq!(links[0].target, EntryHash::from_raw_32([2_u8; 32].to_vec()),);
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -237,7 +255,10 @@ pub mod slow_tests {
     async fn dup_path_test() {
         observability::test_run().ok();
         let RibosomeTestFixture {
-            conductor, alice, alice_host_fn_caller, ..
+            conductor,
+            alice,
+            alice_host_fn_caller,
+            ..
         } = RibosomeTestFixture::new(TestWasm::Link).await;
 
         for _ in 0..2 {
