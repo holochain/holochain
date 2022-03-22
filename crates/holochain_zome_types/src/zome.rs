@@ -6,6 +6,8 @@
 //! using Rust closures, and is useful for quickly defining zomes on-the-fly
 //! for tests.
 
+pub use holochain_integrity_types::zome::*;
+
 use holochain_serialized_bytes::prelude::*;
 
 pub mod error;
@@ -173,81 +175,5 @@ impl ZomeDef {
     /// create a Zome from a holo_hash WasmHash instead of a holo_hash one
     pub fn from_hash(wasm_hash: holo_hash::WasmHash) -> Self {
         Self::Wasm(WasmZome { wasm_hash })
-    }
-}
-
-/// ZomeName as a String.
-#[derive(Clone, Debug, Serialize, Hash, Deserialize, Ord, Eq, PartialEq, PartialOrd)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[repr(transparent)]
-pub struct ZomeName(pub String);
-
-impl ZomeName {
-    pub fn unknown() -> Self {
-        "UnknownZomeName".into()
-    }
-
-    pub fn new<S: ToString>(s: S) -> Self {
-        ZomeName(s.to_string())
-    }
-}
-
-impl std::fmt::Display for ZomeName {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-impl From<&str> for ZomeName {
-    fn from(s: &str) -> Self {
-        Self::from(s.to_string())
-    }
-}
-
-impl From<String> for ZomeName {
-    fn from(s: String) -> Self {
-        Self(s)
-    }
-}
-
-/// A single function name.
-#[repr(transparent)]
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, PartialOrd, Ord, Eq, Hash)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-pub struct FunctionName(pub String);
-
-impl FunctionName {
-    pub fn new<S: ToString>(s: S) -> Self {
-        FunctionName(s.to_string())
-    }
-}
-
-impl std::fmt::Display for FunctionName {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-impl From<FunctionName> for String {
-    fn from(function_name: FunctionName) -> Self {
-        function_name.0
-    }
-}
-
-impl From<String> for FunctionName {
-    fn from(s: String) -> Self {
-        Self(s)
-    }
-}
-
-impl From<&str> for FunctionName {
-    fn from(s: &str) -> Self {
-        Self::from(s.to_string())
-    }
-}
-
-impl AsRef<str> for FunctionName {
-    fn as_ref(&self) -> &str {
-        self.0.as_ref()
     }
 }
