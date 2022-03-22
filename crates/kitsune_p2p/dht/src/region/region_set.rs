@@ -23,15 +23,13 @@ impl RegionCoordSetXtcs {
     /// Generate the XTCS region coords given the generating parameters.
     /// Each RegionCoords is paired with the relative spacetime coords, which
     /// can be used to pair the generated coords with stored data.
-    pub fn region_coords_flat<'a>(
-        &'a self,
-    ) -> impl Iterator<Item = ((u32, u32), RegionCoords)> + 'a {
+    pub fn region_coords_flat(&self) -> impl Iterator<Item = ((u32, u32), RegionCoords)> + '_ {
         self.region_coords_nested().flatten()
     }
 
-    pub fn region_coords_nested<'a>(
-        &'a self,
-    ) -> impl Iterator<Item = impl Iterator<Item = ((u32, u32), RegionCoords)>> + 'a {
+    pub fn region_coords_nested(
+        &self,
+    ) -> impl Iterator<Item = impl Iterator<Item = ((u32, u32), RegionCoords)>> + '_ {
         self.arq_set.arqs().iter().flat_map(move |arq| {
             arq.segments().enumerate().map(move |(ix, x)| {
                 self.times
@@ -82,13 +80,13 @@ impl<D: TreeDataConstraints> RegionSet<D> {
     }
 
     /// can be used to pair the generated coords with stored data.
-    pub fn region_coords<'a>(&'a self) -> impl Iterator<Item = RegionCoords> + 'a {
+    pub fn region_coords(&self) -> impl Iterator<Item = RegionCoords> + '_ {
         match self {
             Self::Xtcs(set) => set.coords.region_coords_flat().map(|(_, coords)| coords),
         }
     }
 
-    pub fn regions<'a>(&'a self) -> impl Iterator<Item = Region<D>> + 'a {
+    pub fn regions(&self) -> impl Iterator<Item = Region<D>> + '_ {
         match self {
             Self::Xtcs(set) => set.regions(),
         }
@@ -183,7 +181,7 @@ impl<D: TreeDataConstraints> RegionSetXtcs<D> {
         }
     }
 
-    pub fn regions<'a>(&'a self) -> impl Iterator<Item = Region<D>> + 'a {
+    pub fn regions(&self) -> impl Iterator<Item = Region<D>> + '_ {
         self.coords
             .region_coords_flat()
             .map(|((ix, it), coords)| Region::new(coords, self.data[ix as usize][it as usize]))
@@ -230,7 +228,7 @@ impl RegionSetXtcs {
     ) -> impl '_ + Iterator<Item = ((u32, u32), RegionCoords, RegionData)> {
         self.coords.region_coords_flat().filter_map(|((i, j), c)| {
             let d = &self.data[i as usize][j as usize];
-            (d.count > 0).then(|| ((i, j), c, d.clone()))
+            (d.count > 0).then(|| ((i, j), c, *d))
         })
     }
 

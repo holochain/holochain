@@ -830,7 +830,7 @@ impl ShardedGossipLocal {
                 //     .map(|s| s.region_set_sent.is_some())
                 //     .unwrap_or_default();
 
-                let state = match finished {
+                let _state = match finished {
                     // This is a single chunk of ops. No need to reply.
                     MissingOpsStatus::ChunkComplete => self.get_state(&cert)?,
                     // This is the last chunk in the batch. Reply with [`OpBloomsBatchReceived`]

@@ -328,7 +328,7 @@ impl ArqBounds {
     }
 
     pub fn segments(&self) -> impl Iterator<Item = SpaceSegment> + '_ {
-        (0..*self.count).map(|c| SpaceSegment::new(self.power.into(), c.wrapping_add(*self.start)))
+        (0..*self.count).map(|c| SpaceSegment::new(self.power, c.wrapping_add(*self.start)))
     }
 
     pub fn chunk_width(&self) -> u64 {

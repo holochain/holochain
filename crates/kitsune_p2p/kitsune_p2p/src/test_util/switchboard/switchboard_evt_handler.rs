@@ -15,7 +15,6 @@ use kitsune_p2p_types::dht::prelude::{
     array_xor, ArqBoundsSet, RegionBounds, RegionCoordSetXtcs, RegionData,
 };
 use kitsune_p2p_types::dht::quantum::{TelescopingTimes, TimeQuantum};
-use kitsune_p2p_types::dht_arc::loc8::Loc8;
 use kitsune_p2p_types::dht_arc::{DhtArc, DhtLocation};
 use kitsune_p2p_types::*;
 
@@ -86,12 +85,7 @@ impl KitsuneHost for SwitchboardEventHandler {
             let topo = self.get_topology(space).await?;
             let arq_set = ArqBoundsSet::from_dht_arc_set(&topo, &self.sb.strat, &dht_arc_set)
                 .expect("an arq could not be quantized");
-            let arcs = arq_set
-                .to_dht_arc_set(&topo)
-                .intervals()
-                .into_iter()
-                .map(|i| i.map(|loc| loc.as_loc8()))
-                .collect::<Vec<_>>();
+
             // TODO: This should be behind the current moment by however much Recent gossip covers.
             let current = Timestamp::now();
             let times =

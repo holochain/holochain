@@ -293,14 +293,14 @@ impl<Q: Quantum> Segment<Q> {
         let n = self.num_quanta();
         let a = (n * u64::from(*self.offset)) as u32;
         (
-            Q::from(a).normalized(&topo),
-            Q::from(a.wrapping_add(n as u32).wrapping_sub(1)).normalized(&topo),
+            Q::from(a).normalized(topo),
+            Q::from(a.wrapping_add(n as u32).wrapping_sub(1)).normalized(topo),
         )
     }
 
     pub fn contains(&self, topo: &Topology, coord: Q) -> bool {
         let (lo, hi) = self.quantum_bounds(topo);
-        let coord = coord.normalized(&topo);
+        let coord = coord.normalized(topo);
         if lo <= hi {
             lo <= coord && coord <= hi
         } else {

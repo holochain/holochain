@@ -69,7 +69,7 @@ impl<D: TreeDataConstraints, O: OpRegion<D>> AccessOpStore<D, O> for OpStore<D, 
     }
 
     fn gossip_params(&self) -> GossipParams {
-        self.gossip_params.clone()
+        self.gossip_params
     }
 }
 

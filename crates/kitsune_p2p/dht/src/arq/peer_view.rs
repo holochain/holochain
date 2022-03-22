@@ -214,12 +214,12 @@ impl PeerViewQ {
     /// More detail on these assumptions here:
     /// https://hackmd.io/@hololtd/r1IAIbr5Y/https%3A%2F%2Fhackmd.io%2FK_fkBj6XQO2rCUZRRL9n2g
     pub fn update_arq_with_stats(&self, topo: &Topology, arq: &mut Arq) -> UpdateArqStats {
-        let (cov, num_peers) = self.extrapolated_coverage_and_filtered_count(&arq);
+        let (cov, num_peers) = self.extrapolated_coverage_and_filtered_count(arq);
 
         let old_count = arq.count();
         let old_power = arq.power();
 
-        let power_stats = self.power_stats(topo, &arq);
+        let power_stats = self.power_stats(topo, arq);
         let PowerStats {
             median: median_power,
             ..
@@ -237,7 +237,7 @@ impl PeerViewQ {
         };
 
         if new_count != old_count {
-            let mut tentative = arq.clone();
+            let mut tentative = *arq;
             tentative.count = Offset(new_count);
 
             // If shrinking caused us to go below the target coverage,
@@ -349,7 +349,7 @@ impl PeerViewQ {
         PowerStats { median, std_dev }
     }
 
-    fn filtered_arqs<'a>(&'a self, filter: DhtArc) -> impl Iterator<Item = &'a Arq> {
+    fn filtered_arqs(&self, filter: DhtArc) -> impl Iterator<Item = &Arq> {
         let it = self.peers.iter();
 
         #[cfg(feature = "test_utils")]

@@ -49,7 +49,7 @@ pub fn gossip_direct<Peer: HostAccess>(
         {
             return Err(GossipError::ArqPowerDiffTooLarge);
         }
-        al.intersection(&topo, &ar)
+        al.intersection(topo, &ar)
     };
 
     {
@@ -61,7 +61,7 @@ pub fn gossip_direct<Peer: HostAccess>(
 
         // - calculate regions
         let regions_left = left.region_set(common_arqs.clone(), time_left);
-        let regions_right = right.region_set(common_arqs.clone(), time_right);
+        let regions_right = right.region_set(common_arqs, time_right);
         stats.regions_sent += regions_left.count() as u32;
         stats.regions_rcvd += regions_right.count() as u32;
         (regions_left, regions_right)

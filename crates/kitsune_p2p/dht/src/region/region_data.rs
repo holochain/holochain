@@ -9,7 +9,7 @@ pub fn array_xor<const N: usize>(a: &mut [u8; N], b: &[u8; N]) {
 impl RegionHash {
     /// Any null node hashes just get ignored.
     pub fn xor(&mut self, other: &Self) {
-        array_xor(&mut *self, &other);
+        array_xor(&mut *self, other);
     }
 }
 

@@ -36,7 +36,7 @@ pub struct RegionHash(pub Hash32);
 
 impl RegionHash {
     pub fn from_vec(v: Vec<u8>) -> Option<Self> {
-        v.try_into().map(|a| Self(a)).ok()
+        v.try_into().map(Self).ok()
     }
 
     pub fn loc(&self) -> u32 {

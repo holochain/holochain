@@ -17,7 +17,6 @@ pub fn get_input() {
     let mut input_string = String::new();
     std::io::stdin()
         .read_line(&mut input_string)
-        .ok()
         .expect("Failed to read line");
 }
 
@@ -38,12 +37,12 @@ pub type Peers = Vec<Arq>;
 
 pub fn unit_arq(topo: &Topology, strat: &ArqStrat, unit_center: f64, unit_len: f64) -> Arq {
     assert!(
-        0.0 <= unit_center && unit_center < 1.0,
+        (0.0..1.0).contains(&unit_center),
         "center out of bounds {}",
         unit_center
     );
     assert!(
-        0.0 <= unit_len && unit_len <= 1.0,
+        (0.0..=1.0).contains(&unit_len),
         "len out of bounds {}",
         unit_len
     );
