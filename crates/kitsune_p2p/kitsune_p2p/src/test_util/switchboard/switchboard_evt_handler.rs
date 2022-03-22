@@ -92,7 +92,6 @@ impl KitsuneHost for SwitchboardEventHandler {
                 .into_iter()
                 .map(|i| i.map(|loc| loc.as_loc8()))
                 .collect::<Vec<_>>();
-            arq_set.print_arqs(&topo, 64);
             // TODO: This should be behind the current moment by however much Recent gossip covers.
             let current = Timestamp::now();
             let times =

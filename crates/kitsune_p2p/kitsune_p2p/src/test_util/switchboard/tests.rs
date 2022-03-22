@@ -358,14 +358,18 @@ async fn sharded_4way_historical() {
                 sb.get_ops_loc8(&n4),
             ),
             (
-                Loc8::set(ops_only[0..=16].to_vec()),
-                Loc8::set(ops_only[8..=24].to_vec()),
-                Loc8::set(ops_only[16..32].to_vec().into_iter().chain([ops_only[0]])),
+                // NB: in the similar test for recent gossip above, these ranges are
+                //     inclusive, but here they are end-exclusive. This is due to
+                //     the behavior of arc quantization, where only entire large
+                //     segments can be covered, which in this case excludes the endpoint.
+                Loc8::set(ops_only[0..16].to_vec()),
+                Loc8::set(ops_only[8..24].to_vec()),
+                Loc8::set(ops_only[16..32].to_vec()),
                 Loc8::set(
                     ops_only[24..32]
                         .to_vec()
                         .into_iter()
-                        .chain(ops_only[0..=8].to_vec())
+                        .chain(ops_only[0..8].to_vec())
                 ),
             )
         );
