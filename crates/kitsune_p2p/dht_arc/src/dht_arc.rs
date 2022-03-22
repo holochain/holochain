@@ -67,19 +67,8 @@ impl RangeBounds<u32> for ArcRange {
     }
 }
 
-#[derive(
-    Copy,
-    Clone,
-    Debug,
-    derive_more::Deref,
-    serde::Serialize,
-    serde::Deserialize,
-)]
-pub struct DhtArc(
-    #[deref]
-    DhtArcRange,
-    Option<DhtLocation>,
-);
+#[derive(Copy, Clone, Debug, derive_more::Deref, serde::Serialize, serde::Deserialize)]
+pub struct DhtArc(#[deref] DhtArcRange, Option<DhtLocation>);
 
 impl DhtArc {
     pub fn bounded(a: DhtArcRange) -> Self {
