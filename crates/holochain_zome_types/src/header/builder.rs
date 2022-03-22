@@ -9,6 +9,7 @@ use header::Dna;
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
 use holo_hash::EntryHash;
+use holo_hash::AnyLinkableHash;
 use holo_hash::HeaderHash;
 use holochain_serialized_bytes::SerializedBytes;
 
@@ -117,8 +118,8 @@ macro_rules! builder_variant {
 builder_variant!(InitZomesComplete {});
 
 builder_variant!(CreateLink {
-    base_address: EntryHash,
-    target_address: EntryHash,
+    base_address: AnyLinkableHash,
+    target_address: AnyLinkableHash,
     zome_id: ZomeId,
     link_type: LinkType,
     tag: LinkTag,
@@ -126,7 +127,7 @@ builder_variant!(CreateLink {
 
 builder_variant!(DeleteLink {
     link_add_address: HeaderHash,
-    base_address: EntryHash,
+    base_address: AnyLinkableHash,
 });
 
 builder_variant!(OpenChain {

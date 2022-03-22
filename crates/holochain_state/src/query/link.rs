@@ -110,7 +110,7 @@ impl LinksQuery {
             Header.create_link_hash IN ({})
             AND
             DhtOp.validation_status = :status
-            AND 
+            AND
             DhtOp.when_integrated IS NOT NULL
             ",
             sub_create_query
@@ -234,7 +234,7 @@ fn link_from_header(header: Header) -> StateQueryResult<Link> {
     let hash = HeaderHash::with_data_sync(&header);
     match header {
         Header::CreateLink(header) => Ok(Link {
-            target: header.target_address,
+            target: header.target_address.into(),
             timestamp: header.timestamp,
             tag: header.tag,
             create_link_hash: hash,

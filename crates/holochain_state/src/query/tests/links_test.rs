@@ -49,7 +49,7 @@ fn fixtures(env: DbWrite<DbKindDht>, n: usize) -> Vec<TestData> {
 
         let expected_link = Link {
             create_link_hash: link_add_hash.clone(),
-            target: target_address.clone(),
+            target: target_address.clone().into(),
             timestamp: link_add.timestamp.clone().into(),
             tag: tag.clone(),
         };

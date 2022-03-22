@@ -110,14 +110,14 @@ impl LinkTestData {
         );
 
         let link = Link {
-            target: target_hash.clone(),
+            target: target_hash.clone().into(),
             timestamp: create_link.timestamp,
             tag: create_link.tag.clone(),
             create_link_hash: create_link_hash.clone(),
         };
 
         let later_link = Link {
-            target: target_hash.clone(),
+            target: target_hash.clone().into(),
             timestamp: later_create_link.timestamp,
             tag: later_create_link.tag.clone(),
             create_link_hash: later_create_link_hash.clone(),

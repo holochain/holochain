@@ -5,7 +5,9 @@ use crate::hash_type;
 use crate::AgentPubKey;
 use crate::AgentPubKeyB64;
 use crate::AnyDhtHash;
+use crate::AnyLinkableHash;
 use crate::AnyDhtHashB64;
+use crate::AnyLinkableHashB64;
 use crate::DhtOpHash;
 use crate::DhtOpHashB64;
 use crate::DnaHash;
@@ -23,6 +25,7 @@ use std::convert::TryFrom;
 
 pub type HashTypeEntry = hash_type::Entry;
 pub type HashTypeAnyDht = hash_type::AnyDht;
+pub type HashTypeAnyLinkable = hash_type::AnyLinkable;
 
 // TODO: use strum to do this:
 //
@@ -36,6 +39,13 @@ fixturator!(
     curve Empty HashTypeAnyDht::Header;
     curve Unpredictable HashTypeAnyDht::Header;
     curve Predictable HashTypeAnyDht::Header;
+);
+
+fixturator!(
+    HashTypeAnyLinkable;
+    curve Empty HashTypeAnyLinkable::External;
+    curve Unpredictable HashTypeAnyLinkable::Header;
+    curve Predictable HashTypeAnyLinkable::Entry;
 );
 
 /// A type alias for a Vec<u8> whose fixturator is expected to only return
@@ -158,4 +168,13 @@ fixturator!(
 fixturator!(
     AnyDhtHashB64;
     constructor fn new(AnyDhtHash);
+);
+
+fixturator!(
+    AnyLinkableHash;
+    constructor fn from_raw_36_and_type(ThirtySixHashBytes, HashTypeAnyLinkable);
+);
+fixturator!(
+    AnyLinkableHashB64;
+    constructor fn new(AnyLinkableHash);
 );

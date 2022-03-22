@@ -2,26 +2,26 @@ use hdk::prelude::*;
 
 entry_defs![Path::entry_def(), PathEntry::entry_def()];
 
-fn path(s: &str) -> ExternResult<EntryHash> {
+fn path(s: &str) -> ExternResult<AnyLinkableHash> {
     let path = Path::from(s);
     path.ensure()?;
-    path.path_entry_hash()
+    Ok(path.path_entry_hash()?.into())
 }
 
-fn base() -> ExternResult<EntryHash> {
+fn base() -> ExternResult<AnyLinkableHash> {
     path("a")
 }
 
-fn baseless() -> ExternResult<EntryHash> {
-    Ok(EntryHash::from_raw_32([1_u8; 32].to_vec()))
+fn baseless() -> ExternResult<AnyLinkableHash> {
+    Ok(EntryHash::from_raw_32([1_u8; 32].to_vec()).into())
 }
 
-fn target() -> ExternResult<EntryHash> {
+fn target() -> ExternResult<AnyLinkableHash> {
     path("b")
 }
 
-fn targetless() -> ExternResult<EntryHash> {
-    Ok(EntryHash::from_raw_32([2_u8; 32].to_vec()))
+fn targetless() -> ExternResult<AnyLinkableHash> {
+    Ok(EntryHash::from_raw_32([2_u8; 32].to_vec()).into())
 }
 
 #[hdk_extern]
@@ -107,8 +107,8 @@ fn commit_existing_path(_: ()) -> ExternResult<()> {
     if let Some(parent) = path.parent() {
         parent.ensure()?;
         hdk::prelude::create_link(
-            parent.path_entry_hash()?,
-            path.path_entry_hash()?,
+            parent.path_entry_hash()?.into(),
+            path.path_entry_hash()?.into(),
             HdkLinkType::Any,
             LinkTag::new(
                 match path.leaf() {

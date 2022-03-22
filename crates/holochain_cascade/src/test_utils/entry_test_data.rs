@@ -174,7 +174,7 @@ impl EntryTestData {
         };
 
         let link = Link {
-            target: create_link.target_address.clone(),
+            target: create_link.target_address.clone().into(),
             timestamp: create_link.timestamp,
             tag: create_link.tag,
             create_link_hash,

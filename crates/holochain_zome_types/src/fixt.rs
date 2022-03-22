@@ -88,12 +88,12 @@ fixturator!(
 
 fixturator!(
     DeleteLink;
-    constructor fn from_builder(HeaderBuilderCommon, HeaderHash, EntryHash);
+    constructor fn from_builder(HeaderBuilderCommon, HeaderHash, AnyLinkableHash);
 );
 
 fixturator!(
     CreateLink;
-    constructor fn from_builder(HeaderBuilderCommon, EntryHash, EntryHash, u8, LinkType, LinkTag);
+    constructor fn from_builder(HeaderBuilderCommon, AnyLinkableHash, AnyLinkableHash, u8, LinkType, LinkTag);
 );
 
 fixturator!(
@@ -105,15 +105,15 @@ fixturator!(
 );
 
 pub struct KnownCreateLink {
-    pub base_address: EntryHash,
-    pub target_address: EntryHash,
+    pub base_address: AnyLinkableHash,
+    pub target_address: AnyLinkableHash,
     pub tag: LinkTag,
     pub zome_id: ZomeId,
 }
 
 pub struct KnownDeleteLink {
     pub link_add_address: holo_hash::HeaderHash,
-    pub base_address: holo_hash::EntryHash,
+    pub base_address: AnyLinkableHash,
 }
 
 impl Iterator for CreateLinkFixturator<KnownCreateLink> {

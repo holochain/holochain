@@ -78,6 +78,7 @@ pub use holo_hash::HasHash;
 pub use holo_hash::HeaderHash;
 pub use holo_hash::HoloHash;
 pub use holo_hash::HoloHashed;
+pub use holo_hash::AnyLinkableHash;
 pub use holochain_wasmer_guest::*;
 pub use holochain_zome_types;
 pub use holochain_zome_types::prelude::*;

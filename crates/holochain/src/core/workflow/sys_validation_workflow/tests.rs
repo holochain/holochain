@@ -233,8 +233,8 @@ async fn bob_links_in_a_legit_way(
     // Link the entries
     let link_add_address = call_data
         .create_link(
-            base_entry_hash.clone(),
-            target_entry_hash.clone(),
+            base_entry_hash.clone().into(),
+            target_entry_hash.clone().into(),
             link_tag.clone(),
         )
         .await;
@@ -279,8 +279,8 @@ async fn bob_makes_a_large_link(
     // Commit a large header
     let link_add_address = call_data
         .create_link(
-            base_entry_hash.clone(),
-            target_entry_hash.clone(),
+            base_entry_hash.clone().into(),
+            target_entry_hash.clone().into(),
             link_tag.clone(),
         )
         .await;

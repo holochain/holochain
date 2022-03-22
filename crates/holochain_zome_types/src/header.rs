@@ -9,6 +9,7 @@ use holo_hash::impl_hashable_content;
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
 use holo_hash::EntryHash;
+use holo_hash::AnyLinkableHash;
 use holo_hash::HashableContent;
 use holo_hash::HeaderHash;
 use holo_hash::HoloHashed;
@@ -484,8 +485,8 @@ pub struct CreateLink {
     pub header_seq: u32,
     pub prev_header: HeaderHash,
 
-    pub base_address: EntryHash,
-    pub target_address: EntryHash,
+    pub base_address: AnyLinkableHash,
+    pub target_address: AnyLinkableHash,
     pub zome_id: ZomeId,
     pub link_type: LinkType,
     pub tag: LinkTag,
@@ -503,7 +504,7 @@ pub struct DeleteLink {
     /// this is redundant with the `CreateLink` header but needs to be included to facilitate DHT ops
     /// this is NOT exposed to wasm developers and is validated by the subconscious to ensure that
     /// it always matches the `base_address` of the `CreateLink`
-    pub base_address: EntryHash,
+    pub base_address: AnyLinkableHash,
     /// The address of the `CreateLink` being reversed
     pub link_add_address: HeaderHash,
 }

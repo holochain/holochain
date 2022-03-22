@@ -92,7 +92,7 @@ impl AsRef<Vec<u8>> for LinkTag {
 )]
 pub struct Link {
     /// The [Entry] being linked to
-    pub target: holo_hash::EntryHash,
+    pub target: holo_hash::AnyLinkableHash,
     /// When the link was added
     pub timestamp: crate::Timestamp,
     /// A tag used to find this link
@@ -104,8 +104,8 @@ pub struct Link {
 /// Zome IO inner type for link creation.
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub struct CreateLinkInput {
-    pub base_address: holo_hash::EntryHash,
-    pub target_address: holo_hash::EntryHash,
+    pub base_address: holo_hash::AnyLinkableHash,
+    pub target_address: holo_hash::AnyLinkableHash,
     pub link_type: LinkType,
     pub tag: LinkTag,
     pub chain_top_ordering: ChainTopOrdering,
@@ -113,8 +113,8 @@ pub struct CreateLinkInput {
 
 impl CreateLinkInput {
     pub fn new(
-        base_address: holo_hash::EntryHash,
-        target_address: holo_hash::EntryHash,
+        base_address: holo_hash::AnyLinkableHash,
+        target_address: holo_hash::AnyLinkableHash,
         link_type: LinkType,
         tag: LinkTag,
         chain_top_ordering: ChainTopOrdering,
@@ -148,13 +148,13 @@ impl DeleteLinkInput {
 
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub struct GetLinksInput {
-    pub base_address: holo_hash::EntryHash,
+    pub base_address: holo_hash::AnyLinkableHash,
     pub tag_prefix: Option<crate::link::LinkTag>,
 }
 
 impl GetLinksInput {
     pub fn new(
-        base_address: holo_hash::EntryHash,
+        base_address: holo_hash::AnyLinkableHash,
         tag_prefix: Option<crate::link::LinkTag>,
     ) -> Self {
         Self {
