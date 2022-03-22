@@ -72,13 +72,11 @@ impl RangeBounds<u32> for ArcRange {
     Clone,
     Debug,
     derive_more::Deref,
-    derive_more::DerefMut,
     serde::Serialize,
     serde::Deserialize,
 )]
 pub struct DhtArc(
     #[deref]
-    #[deref_mut]
     DhtArcRange,
     Option<DhtLocation>,
 );
