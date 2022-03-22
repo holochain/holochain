@@ -46,6 +46,7 @@ pub trait AccessOpStore<D: TreeDataConstraints = RegionData, O: OpRegion<D> = Op
     }
 
     fn gossip_params(&self) -> GossipParams;
+
     fn topo(&self) -> &Topology;
 
     /// Get the RegionSet for this node, suitable for gossiping

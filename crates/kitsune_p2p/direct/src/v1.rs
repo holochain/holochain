@@ -913,7 +913,7 @@ async fn handle_fetch_op_data(
                 }
             }
         }
-        FetchOpDataEvtQuery::Regions(_coords) => todo!("implement"),
+        FetchOpDataEvtQuery::Regions(_coords) => unimplemented!(),
     }
 
     Ok(out)

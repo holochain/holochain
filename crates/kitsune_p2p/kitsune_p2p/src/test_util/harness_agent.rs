@@ -317,7 +317,7 @@ impl KitsuneP2pEventHandler for AgentHarness {
                     }
                 }
             }
-            FetchOpDataEvtQuery::Regions(_coords) => todo!("implement"),
+            FetchOpDataEvtQuery::Regions(_coords) => unimplemented!(),
         }
         Ok(async move { Ok(out) }.boxed().into())
     }

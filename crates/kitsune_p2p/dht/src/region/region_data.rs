@@ -55,7 +55,13 @@ impl num_traits::Zero for RegionData {
     }
 
     fn is_zero(&self) -> bool {
-        todo!()
+        if self.count == 0 {
+            debug_assert_eq!(self.size, 0);
+            debug_assert_eq!(self.hash, RegionHash::zero());
+            true
+        } else {
+            false
+        }
     }
 }
 
