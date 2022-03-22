@@ -11,18 +11,23 @@ categories = [ "cryptography" ]
 edition = "2021"
 
 [lib]
-crate-type = [ "cdylib", "rlib" ]
+crate-type = ["cdylib", "rlib"]
 path = "src/lib.rs"
 
 [features]
 default = []
 mock = ["hdk_derive/mock", "mockall"]
 encoding = ["holo_hash/encoding"]
-fixturators = [ "holochain_zome_types/fixturators", "holo_hash/fixturators" ]
-test_utils = [ "fixturators", "holochain_zome_types/test_utils", "holo_hash/test_utils" ]
-properties = [ "holochain_zome_types/properties" ]
+fixturators = ["holochain_zome_types/fixturators", "holo_hash/fixturators"]
+test_utils = [
+    "fixturators",
+    "holochain_zome_types/test_utils",
+    "holo_hash/test_utils",
+]
+properties = ["holochain_zome_types/properties"]
 
 [dependencies]
+idk = { version = "0.0.1", path = "../idk" }
 hdk_derive = { version = "0.0.27", path = "../hdk_derive" }
 holo_hash = { version = "0.0.21", path = "../holo_hash" }
 holochain_wasmer_guest = "=0.0.77"
@@ -35,7 +40,7 @@ serde_bytes = "0.11"
 thiserror = "1.0.22"
 tracing = "0.1"
 tracing-core = "0.1"
-mockall = { version = "0.10.2", optional = true }
+mockall = { version = "0.11.0", optional = true }
 
 
 [dev-dependencies]

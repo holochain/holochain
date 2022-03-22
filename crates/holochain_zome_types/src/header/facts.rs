@@ -137,10 +137,17 @@ mod tests {
     }
 }
 
+pub trait HeaderRefMut {
+    fn author_mut(&mut self) -> &mut AgentPubKey;
+    fn header_seq_mut(&mut self) -> Option<&mut u32>;
+    fn prev_header_mut(&mut self) -> Option<&mut HeaderHash>;
+    fn entry_data_mut(&mut self) -> Option<(&mut EntryHash, &mut EntryType)>;
+}
+
 /// Some necessary extra mutators for lenses/prisms over Headers
-impl Header {
+impl HeaderRefMut for Header {
     /// returns a mutable reference to the author
-    pub fn author_mut(&mut self) -> &mut AgentPubKey {
+    fn author_mut(&mut self) -> &mut AgentPubKey {
         match *self {
             Self::Dna(Dna { ref mut author, .. })
             | Self::AgentValidationPkg(AgentValidationPkg { ref mut author, .. })
@@ -155,7 +162,7 @@ impl Header {
         }
     }
     /// returns a mutable reference to the sequence ordinal of this header
-    pub fn header_seq_mut(&mut self) -> Option<&mut u32> {
+    fn header_seq_mut(&mut self) -> Option<&mut u32> {
         match *self {
             // Dna is always 0
             Self::Dna(Dna { .. }) => None,
@@ -190,7 +197,7 @@ impl Header {
     }
 
     /// returns the previous header except for the DNA header which doesn't have a previous
-    pub fn prev_header_mut(&mut self) -> Option<&mut HeaderHash> {
+    fn prev_header_mut(&mut self) -> Option<&mut HeaderHash> {
         match self {
             Self::Dna(Dna { .. }) => None,
             Self::AgentValidationPkg(AgentValidationPkg {
@@ -232,7 +239,7 @@ impl Header {
         }
     }
 
-    pub fn entry_data_mut(&mut self) -> Option<(&mut EntryHash, &mut EntryType)> {
+    fn entry_data_mut(&mut self) -> Option<(&mut EntryHash, &mut EntryType)> {
         match self {
             Self::Create(Create {
                 ref mut entry_hash,

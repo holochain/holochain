@@ -95,7 +95,15 @@ impl Query for DeterministicGetAgentActivityQuery {
 
     fn fold(&self, mut state: Self::State, item: Self::Item) -> StateQueryResult<Self::State> {
         let (shh, status) = item.into();
-        let (header, hash) = shh.into_inner();
+        let SignedHeaderHashed {
+            hashed:
+                HeaderHashed {
+                    content: header,
+                    hash,
+                },
+            signature,
+        } = shh;
+        let sh = SignedHeader(header, signature);
         // By tracking the prev_header of the last header we added to the chain,
         // we can filter out branches. If we performed branch detection in this
         // query, it would not be deterministic.
@@ -106,8 +114,8 @@ impl Query for DeterministicGetAgentActivityQuery {
         // discontinuous, and we will have to collect into a sorted list before
         // doing this fold.
         if Some(hash) == state.prev_header {
-            state.prev_header = header.header().prev_header().cloned();
-            state.chain.push((header, status).into());
+            state.prev_header = sh.header().prev_header().cloned();
+            state.chain.push((sh, status).into());
         }
         Ok(state)
     }

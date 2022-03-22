@@ -1,0 +1,18 @@
+[package]
+name = "test_wasm_integrity_zome"
+version = "0.0.1"
+authors = ["thedavidmeister", "thedavidmeister@gmail.com"]
+edition = "2018"
+
+[lib]
+name = "test_wasm_create_entry"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+serde = "1.0"
+idk = { path = "../../../../idk" }
+holochain_mock_idk = { path = "../../../mock_idk", optional = true }
+
+[features]
+default = []
+mock = ["holochain_mock_idk"]

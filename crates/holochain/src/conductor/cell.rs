@@ -548,7 +548,7 @@ impl Cell {
             .retrieve_header(header_hash, Default::default())
             .await?
         {
-            Some(shh) => shh.into_header_and_signature().0,
+            Some(shh) => shh.hashed,
             None => return Ok(None.into()),
         };
 
