@@ -102,7 +102,10 @@ pub struct Arq<S: ArqStart = Loc> {
     pub count: Offset,
 }
 
-/// Alias for Arq
+/// Alias for Arq with an Loc start
+pub type ArqLocated = Arq<Loc>;
+
+/// Alias for Arq with an Offset start
 pub type ArqBounds = Arq<Offset>;
 
 impl<S: ArqStart> Arq<S> {

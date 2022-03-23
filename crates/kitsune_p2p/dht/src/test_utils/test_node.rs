@@ -121,7 +121,7 @@ mod tests {
     fn integrate_and_query_ops() {
         let topo = Topology::unit_zero();
         let gopa = GossipParams::zero();
-        let arq = Arq::new(0u32.into(), 8, 4);
+        let arq = Arq::new(8, 0u32.into(), 4.into());
         let mut node = TestNode::new(topo, gopa, arq);
 
         node.integrate_ops(
