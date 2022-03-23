@@ -23,16 +23,9 @@ use crate::{
 pub trait AccessOpStore<D: TreeDataConstraints = RegionData, O: OpRegion<D> = OpData>:
     Send
 {
-    fn query_op_data(&self, region: &RegionBounds) -> Vec<Arc<O>>;
-    fn query_ops_by_coords(&self, region: &RegionCoords) -> Vec<Arc<O>> {
-        self.query_op_data(&region.to_bounds(self.topo()))
-    }
+    fn query_op_data(&self, region: &RegionCoords) -> Vec<Arc<O>>;
 
-    fn query_region(&self, region: &RegionBounds) -> D;
-
-    fn query_region_coords(&self, region: &RegionCoords) -> D {
-        self.query_region(&region.to_bounds(self.topo()))
-    }
+    fn query_region_data(&self, region: &RegionCoords) -> D;
 
     fn fetch_region_set(
         &self,
@@ -56,7 +49,7 @@ pub trait AccessOpStore<D: TreeDataConstraints = RegionData, O: OpRegion<D> = Op
             .region_coords_nested()
             .map(|columns| {
                 columns
-                    .map(|(_, coords)| self.query_region_coords(&coords))
+                    .map(|(_, coords)| self.query_region_data(&coords))
                     .collect::<Vec<_>>()
             })
             .collect::<Vec<_>>();

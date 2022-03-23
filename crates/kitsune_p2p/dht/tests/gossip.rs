@@ -100,8 +100,7 @@ fn gossip_scenario_full_sync() {
     let full_region = RegionCoords {
         space: SpaceSegment::new(31, 0),
         time: TimeSegment::new(31, 0),
-    }
-    .to_bounds(&topo);
+    };
 
     // Assert that each node has the expected number of ops to start with,
     // and print each arq at the same time.

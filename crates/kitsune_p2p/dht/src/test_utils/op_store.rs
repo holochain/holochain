@@ -1,9 +1,9 @@
 use crate::{
     op::{OpData, OpRegion},
     persistence::AccessOpStore,
-    prelude::{RegionSet, RegionSetXtcs},
+    prelude::{RegionCoords, RegionSet, RegionSetXtcs},
     quantum::{GossipParams, Topology},
-    region::{RegionBounds, RegionData},
+    region::RegionData,
     tree::TreeDataConstraints,
 };
 use futures::future::FutureExt;
@@ -29,7 +29,8 @@ impl<D: TreeDataConstraints, O: OpRegion<D>> OpStore<D, O> {
 }
 
 impl<D: TreeDataConstraints, O: OpRegion<D>> AccessOpStore<D, O> for OpStore<D, O> {
-    fn query_op_data(&self, region: &RegionBounds) -> Vec<Arc<O>> {
+    fn query_op_data(&self, region: &RegionCoords) -> Vec<Arc<O>> {
+        let region = region.to_bounds(self.topo());
         let (x0, x1) = region.x;
         let (t0, t1) = region.t;
         let op0 = O::bound(t0, x0);
@@ -41,7 +42,7 @@ impl<D: TreeDataConstraints, O: OpRegion<D>> AccessOpStore<D, O> for OpStore<D, 
             .collect()
     }
 
-    fn query_region(&self, region: &RegionBounds) -> D {
+    fn query_region_data(&self, region: &RegionCoords) -> D {
         self.query_op_data(region)
             .into_iter()
             .map(|o| o.region_data())
@@ -52,7 +53,7 @@ impl<D: TreeDataConstraints, O: OpRegion<D>> AccessOpStore<D, O> for OpStore<D, 
         &self,
         coords: crate::prelude::RegionCoordSetXtcs,
     ) -> must_future::MustBoxFuture<Result<crate::prelude::RegionSetXtcs<D>, ()>> {
-        async move { coords.into_region_set(|(_, coords)| Ok(self.query_region_coords(&coords))) }
+        async move { coords.into_region_set(|(_, coords)| Ok(self.query_region_data(&coords))) }
             .boxed()
             .into()
     }

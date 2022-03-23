@@ -44,7 +44,7 @@ impl TestNode {
             .region_coords_nested()
             .map(|columns| {
                 columns
-                    .map(|(_, coords)| self.query_region_coords(&coords))
+                    .map(|(_, coords)| self.query_region_data(&coords))
                     .collect::<Vec<_>>()
             })
             .collect::<Vec<_>>();
@@ -68,12 +68,12 @@ impl TestNode {
 }
 
 impl AccessOpStore for TestNode {
-    fn query_op_data(&self, region: &RegionBounds) -> Vec<Op> {
+    fn query_op_data(&self, region: &RegionCoords) -> Vec<Op> {
         self.store.query_op_data(region)
     }
 
-    fn query_region(&self, region: &RegionBounds) -> RegionData {
-        self.store.query_region(region)
+    fn query_region_data(&self, region: &RegionCoords) -> RegionData {
+        self.store.query_region_data(region)
     }
 
     fn fetch_region_set(
@@ -110,7 +110,7 @@ impl AccessPeerStore for TestNode {
 mod tests {
     use kitsune_p2p_timestamp::Timestamp;
 
-    use crate::op::OpData;
+    use crate::{op::OpData, quantum::*};
 
     use super::*;
 
@@ -123,33 +123,33 @@ mod tests {
 
         node.integrate_ops(
             [
-                OpData::fake(0.into(), Timestamp::from_micros(10), 1234),
-                OpData::fake(1000.into(), Timestamp::from_micros(20), 2345),
-                OpData::fake(2000.into(), Timestamp::from_micros(15), 3456),
+                OpData::fake(0u32.into(), Timestamp::from_micros(10), 1234),
+                OpData::fake(1000u32.into(), Timestamp::from_micros(20), 2345),
+                OpData::fake(2000u32.into(), Timestamp::from_micros(15), 3456),
             ]
             .into_iter(),
         );
         {
-            let data = node.query_region(&RegionBounds::new(
-                (0.into(), 100.into()),
-                (Timestamp::from_micros(0), Timestamp::from_micros(20)),
-            ));
+            let data = node.query_region_data(&RegionCoords {
+                space: SpaceSegment::new(7, 0),
+                time: TimeSegment::new(5, 0),
+            });
             assert_eq!(data.count, 1);
             assert_eq!(data.size, 1234);
         }
         {
-            let data = node.query_region(&RegionBounds::new(
-                (0.into(), 1001.into()),
-                (Timestamp::from_micros(0), Timestamp::from_micros(21)),
-            ));
+            let data = node.query_region_data(&RegionCoords {
+                space: SpaceSegment::new(10, 0),
+                time: TimeSegment::new(5, 0),
+            });
             assert_eq!(data.count, 2);
             assert_eq!(data.size, 1234 + 2345);
         }
         {
-            let data = node.query_region(&RegionBounds::new(
-                (1000.into(), 1001.into()),
-                (Timestamp::from_micros(0), Timestamp::from_micros(20)),
-            ));
+            let data = node.query_region_data(&RegionCoords {
+                space: SpaceSegment::new(7, 1),
+                time: TimeSegment::new(5, 0),
+            });
             assert_eq!(data.count, 1);
             assert_eq!(data.size, 2345);
         }

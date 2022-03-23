@@ -162,7 +162,7 @@ impl<D: TreeDataConstraints> RegionSetXtcs<D> {
             .region_coords_nested()
             .map(|columns| {
                 columns
-                    .map(|(_, coords)| store.query_region_coords(&coords))
+                    .map(|(_, coords)| store.query_region_data(&coords))
                     .collect()
             })
             .collect();
@@ -396,11 +396,11 @@ mod tests {
         // TODO: proptest this
         assert_eq!(
             diff[0].data + extra_ops[0].region_data(),
-            store2.query_region_coords(&diff[0].coords)
+            store2.query_region_data(&diff[0].coords)
         );
         assert_eq!(
             diff[1].data + extra_ops[1].region_data(),
-            store2.query_region_coords(&diff[1].coords)
+            store2.query_region_data(&diff[1].coords)
         );
     }
 
@@ -458,11 +458,11 @@ mod tests {
         // TODO: proptest this
         assert_eq!(
             diff[0].data + extra_ops[0].region_data(),
-            store2.query_region_coords(&diff[0].coords)
+            store2.query_region_data(&diff[0].coords)
         );
         assert_eq!(
             diff[1].data + extra_ops[1].region_data(),
-            store2.query_region_coords(&diff[1].coords)
+            store2.query_region_data(&diff[1].coords)
         );
     }
 }

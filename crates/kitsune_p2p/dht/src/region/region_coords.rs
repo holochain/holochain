@@ -32,8 +32,11 @@ pub struct RegionBounds {
 }
 
 impl RegionBounds {
-    pub fn new(x: (Loc, Loc), t: (Timestamp, Timestamp)) -> Self {
-        Self { x, t }
+    pub fn new<L: Into<Loc>>((a, b): (L, L), t: (Timestamp, Timestamp)) -> Self {
+        Self {
+            x: (a.into(), b.into()),
+            t,
+        }
     }
 
     pub fn contains(&self, x: &Loc, t: &Timestamp) -> bool {
