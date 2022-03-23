@@ -7,7 +7,7 @@ impl ShardedGossipLocal {
     pub(super) async fn incoming_accept(
         &self,
         peer_cert: Tx2Cert,
-        remote_arc_set: Vec<DhtArc>,
+        remote_arc_set: Vec<DhtArcRange>,
         remote_agent_list: Vec<AgentInfoSigned>,
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
         let (local_agents, when_initiated, accept_is_from_target) =
@@ -51,7 +51,7 @@ impl ShardedGossipLocal {
             store::local_agent_arcs(&self.evt_sender, &self.space, &local_agents)
                 .await?
                 .into_iter()
-                .map(|(_, a)| a)
+                .map(|(_, a)| a.into())
                 .collect();
 
         let mut gossip = Vec::new();

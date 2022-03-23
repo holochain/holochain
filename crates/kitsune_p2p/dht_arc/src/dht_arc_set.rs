@@ -2,7 +2,7 @@ use gcollections::ops::*;
 use interval::{interval_set::*, IntervalSet};
 use std::{borrow::Borrow, collections::VecDeque};
 
-use crate::{is_full, DhtArc, DhtLocation};
+use crate::{is_full, DhtArcRange, DhtLocation};
 
 // For u32, IntervalSet excludes MAX from its set of valid values due to its
 // need to be able to express the width of an interval using a u32.
@@ -72,19 +72,17 @@ impl DhtArcSet {
         }
     }
 
-    pub fn from_interval<A: Borrow<DhtArc>>(arc: A) -> Self {
+    pub fn from_interval<A: Borrow<DhtArcRange>>(arc: A) -> Self {
         match arc.borrow() {
-            DhtArc::Full(_) => Self::new_full(),
-            DhtArc::Empty(_) => Self::new_empty(),
-            DhtArc::Bounded(start, end) => Self::from_bounds(*start, *end),
+            DhtArcRange::Full => Self::new_full(),
+            DhtArcRange::Empty => Self::new_empty(),
+            DhtArcRange::Bounded(start, end) => Self::from_bounds(*start, *end),
         }
     }
 
-    pub fn intervals(&self) -> Vec<DhtArc> {
+    pub fn intervals(&self) -> Vec<DhtArcRange> {
         match self {
-            // XXX: loss of information here, this DhtArc
-            //      does not actually know about its true start
-            Self::Full => vec![DhtArc::Full(0u32.into())],
+            Self::Full => vec![DhtArcRange::Full],
             Self::Partial(intervals) => {
                 let mut intervals: VecDeque<(DhtLocation, DhtLocation)> =
                     intervals.iter().map(|i| (i.lower(), i.upper())).collect();
@@ -113,7 +111,7 @@ impl DhtArcSet {
                 }
                 intervals
                     .into_iter()
-                    .map(|(lo, hi)| DhtArc::from_bounds(lo, hi))
+                    .map(|(lo, hi)| DhtArcRange::from_bounds(lo, hi))
                     .collect()
             }
         }
@@ -167,28 +165,28 @@ impl DhtArcSet {
     }
 }
 
-impl From<&DhtArc> for DhtArcSet {
-    fn from(arc: &DhtArc) -> Self {
+impl From<&DhtArcRange> for DhtArcSet {
+    fn from(arc: &DhtArcRange) -> Self {
         Self::from_interval(arc)
     }
 }
 
-impl From<DhtArc> for DhtArcSet {
-    fn from(arc: DhtArc) -> Self {
+impl From<DhtArcRange> for DhtArcSet {
+    fn from(arc: DhtArcRange) -> Self {
         Self::from_interval(arc)
     }
 }
 
-impl From<&[DhtArc]> for DhtArcSet {
-    fn from(arcs: &[DhtArc]) -> Self {
+impl From<&[DhtArcRange]> for DhtArcSet {
+    fn from(arcs: &[DhtArcRange]) -> Self {
         arcs.iter()
             .map(Self::from)
             .fold(Self::new_empty(), |a, b| a.union(&b))
     }
 }
 
-impl From<Vec<DhtArc>> for DhtArcSet {
-    fn from(arcs: Vec<DhtArc>) -> Self {
+impl From<Vec<DhtArcRange>> for DhtArcSet {
+    fn from(arcs: Vec<DhtArcRange>) -> Self {
         arcs.iter()
             .map(Self::from)
             .fold(Self::new_empty(), |a, b| a.union(&b))
@@ -199,7 +197,7 @@ impl From<Vec<(DhtLocation, DhtLocation)>> for DhtArcSet {
     fn from(pairs: Vec<(DhtLocation, DhtLocation)>) -> Self {
         pairs
             .into_iter()
-            .map(|(a, b)| Self::from(&DhtArc::from_bounds(a, b)))
+            .map(|(a, b)| Self::from(&DhtArcRange::from_bounds(a, b)))
             .fold(Self::new_empty(), |a, b| a.union(&b))
     }
 }

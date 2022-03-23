@@ -16,7 +16,7 @@ use kitsune_p2p_types::agent_info::{AgentInfoInner, AgentInfoSigned};
 use kitsune_p2p_types::bin_types::*;
 use kitsune_p2p_types::config::KitsuneP2pTuningParams;
 use kitsune_p2p_types::dht_arc::loc8::Loc8;
-use kitsune_p2p_types::dht_arc::{DhtArc, DhtLocation};
+use kitsune_p2p_types::dht_arc::{DhtArc, DhtArcRange, DhtLocation};
 use kitsune_p2p_types::metrics::metric_task;
 use kitsune_p2p_types::tx2::tx2_api::*;
 use kitsune_p2p_types::tx2::tx2_pool_promote::*;
@@ -225,7 +225,7 @@ impl SwitchboardState {
             self.space.clone(),
             node_ep,
             agent.clone(),
-            initial_arc.canonical(),
+            DhtArc::from_parts(initial_arc.canonical(), loc8.into()),
         );
         if let Some(existing) = self.local_agent_by_loc8(loc8) {
             panic!(
@@ -276,9 +276,9 @@ impl SwitchboardState {
             let node_id = ep.uniq();
             let ascii = if with_ops {
                 let ops = node.ops.keys().copied();
-                DhtArc::Empty(DhtLocation::from(0)).to_ascii_with_ops(width, ops)
+                DhtArcRange::Empty.to_ascii_with_ops(width, ops)
             } else {
-                DhtArc::Empty(DhtLocation::from(0)).to_ascii(width)
+                DhtArcRange::Empty.to_ascii(width)
             };
             println!(
                 "{:>4} {:>+5} ({:^width$})",
@@ -522,13 +522,13 @@ impl SwitchboardState {
 /// The reason for this type is to reduce the redundancy
 /// of needing to specify both the agent's location and the
 /// storage arc. It is most convenient to specify arcs in terms
-/// of DhtArc, but we use the agent's Loc8 location as their
+/// of DhtArcRange, but we use the agent's Loc8 location as their
 /// unique identifier. This allows specification of agents in
 /// terms of arcs.
 #[derive(Clone, derive_more::AsRef)]
 pub struct SwitchboardAgent {
     pub(super) loc: Loc8,
-    initial_arc: DhtArc<Loc8>,
+    initial_arc: DhtArcRange<Loc8>,
 }
 
 impl SwitchboardAgent {
@@ -536,7 +536,7 @@ impl SwitchboardAgent {
     pub fn full<L: Copy + Into<Loc8>>(loc: L) -> Self {
         Self {
             loc: loc.into(),
-            initial_arc: DhtArc::Full(loc.into()),
+            initial_arc: DhtArcRange::Full,
         }
     }
 
@@ -545,8 +545,8 @@ impl SwitchboardAgent {
     pub fn from_bounds<L: Into<Loc8>>(lo: L, hi: L) -> Self {
         let lo: Loc8 = lo.into();
         let hi: Loc8 = hi.into();
-        let initial_arc = DhtArc::Bounded(lo, hi);
-        let loc8 = initial_arc.canonical().start_loc().as_loc8();
+        let initial_arc = DhtArcRange::Bounded(lo, hi);
+        let loc8 = lo;
 
         Self {
             loc: loc8,
@@ -559,11 +559,11 @@ impl SwitchboardAgent {
     pub fn from_start_and_half_len<L: Into<Loc8>>(start: L, half_len: u8) -> Self {
         let start: Loc8 = start.into();
         let initial_arc = if half_len == 0 {
-            DhtArc::Empty(start)
+            DhtArcRange::Empty
         } else {
             let len = half_len * 2 - 1;
             let end = Loc8::from((start.as_u8().wrapping_add(len).wrapping_sub(1)) as i8);
-            DhtArc::Bounded(start, end)
+            DhtArcRange::Bounded(start, end)
         };
 
         Self {

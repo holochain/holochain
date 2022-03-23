@@ -9,7 +9,7 @@ use ::fixt::prelude::*;
 use hdk::prelude::*;
 use holo_hash::{DhtOpHash, DnaHash};
 use holochain_conductor_api::conductor::ConductorConfig;
-use holochain_p2p::dht_arc::{DhtArc, DhtLocation};
+use holochain_p2p::dht_arc::{DhtArc, DhtArcRange, DhtLocation};
 use holochain_p2p::{AgentPubKeyExt, DhtOpHashExt, DnaHashExt};
 use holochain_sqlite::db::{p2p_put_single, AsP2pStateTxExt};
 use holochain_state::prelude::from_blob;
@@ -141,9 +141,9 @@ impl MockNetworkData {
     pub fn hashes_authority_for(&self, agent: &AgentPubKey) -> Vec<Arc<DhtOpHash>> {
         let arc = self.agent_to_arc[agent].interval();
         match arc {
-            DhtArc::Empty(_) => Vec::with_capacity(0),
-            DhtArc::Full(_) => self.ops_by_loc.values().flatten().cloned().collect(),
-            DhtArc::Bounded(start, end) => {
+            DhtArcRange::Empty => Vec::with_capacity(0),
+            DhtArcRange::Full => self.ops_by_loc.values().flatten().cloned().collect(),
+            DhtArcRange::Bounded(start, end) => {
                 if start <= end {
                     self.ops_by_loc
                         .range(start..=end)
@@ -323,7 +323,7 @@ async fn create_test_data(
     let num_storage_buckets = (1.0 / coverage).round() as u32;
     let bucket_size = u32::MAX / num_storage_buckets;
     let buckets = (0..num_storage_buckets)
-        .map(|i| DhtArc::from_bounds(i * bucket_size, i * bucket_size + bucket_size))
+        .map(|i| DhtArcRange::from_bounds(i * bucket_size, i * bucket_size + bucket_size))
         .collect::<Vec<_>>();
     let mut bucket_counts = vec![0; buckets.len()];
     let mut entries = Vec::with_capacity(buckets.len() * approx_num_ops_held);
