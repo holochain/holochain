@@ -10,7 +10,7 @@ use holo_hash::AgentPubKey;
 use holochain_serialized_bytes::prelude::*;
 
 /// App-specific payload for proving membership in the membrane of the app
-pub type MembraneProof = SerializedBytes;
+pub type MembraneProof = std::sync::Arc<SerializedBytes>;
 
 /// Data passed into the genesis_self_check callback for verifying the initial
 /// chain entries

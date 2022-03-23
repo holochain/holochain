@@ -4,6 +4,8 @@
 //! - AgentId
 //!
 
+use std::sync::Arc;
+
 use super::error::WorkflowError;
 use super::error::WorkflowResult;
 use crate::core::ribosome::guest_callback::genesis_self_check::{
@@ -26,7 +28,7 @@ where
 {
     dna_file: DnaFile,
     agent_pubkey: AgentPubKey,
-    membrane_proof: Option<SerializedBytes>,
+    membrane_proof: Option<MembraneProof>,
     ribosome: Ribosome,
 }
 
