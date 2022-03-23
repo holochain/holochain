@@ -6,6 +6,52 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20220323.023956
+
+## [holochain-0.0.131](crates/holochain/CHANGELOG.md#0.0.131)
+
+- When joining the network set arc size to previous value if available instead of full to avoid network load [1287](https://github.com/holochain/holochain/pull/1287)
+
+## [holochain\_test\_wasm\_common-0.0.26](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.26)
+
+## [holochain\_cascade-0.0.31](crates/holochain_cascade/CHANGELOG.md#0.0.31)
+
+## [holochain\_websocket-0.0.31](crates/holochain_websocket/CHANGELOG.md#0.0.31)
+
+## [holochain\_conductor\_api-0.0.31](crates/holochain_conductor_api/CHANGELOG.md#0.0.31)
+
+## [holochain\_state-0.0.31](crates/holochain_state/CHANGELOG.md#0.0.31)
+
+## [holochain\_wasm\_test\_utils-0.0.31](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.31)
+
+## [holochain\_p2p-0.0.31](crates/holochain_p2p/CHANGELOG.md#0.0.31)
+
+## [kitsune\_p2p\_bootstrap-0.0.6](crates/kitsune_p2p_bootstrap/CHANGELOG.md#0.0.6)
+
+## [holochain\_cli\_bundle-0.0.27](crates/holochain_cli_bundle/CHANGELOG.md#0.0.27)
+
+## [holochain\_types-0.0.31](crates/holochain_types/CHANGELOG.md#0.0.31)
+
+## [holochain\_keystore-0.0.31](crates/holochain_keystore/CHANGELOG.md#0.0.31)
+
+## [holochain\_sqlite-0.0.31](crates/holochain_sqlite/CHANGELOG.md#0.0.31)
+
+## [kitsune\_p2p-0.0.27](crates/kitsune_p2p/CHANGELOG.md#0.0.27)
+
+## [kitsune\_p2p\_proxy-0.0.21](crates/kitsune_p2p_proxy/CHANGELOG.md#0.0.21)
+
+## [kitsune\_p2p\_transport\_quic-0.0.21](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.0.21)
+
+## [kitsune\_p2p\_types-0.0.21](crates/kitsune_p2p_types/CHANGELOG.md#0.0.21)
+
+## [mr\_bundle-0.0.9](crates/mr_bundle/CHANGELOG.md#0.0.9)
+
+## [holochain\_util-0.0.9](crates/holochain_util/CHANGELOG.md#0.0.9)
+
+## [hdk-0.0.126](crates/hdk/CHANGELOG.md#0.0.126)
+
+- Docs: Explain how hashes in Holochain are composed and its components on the module page for `hdk::hash` [\#1299](https://github.com/holochain/holochain/pull/1299).
+
 # 20220316.022611
 
 ## [holochain-0.0.130](crates/holochain/CHANGELOG.md#0.0.130)
