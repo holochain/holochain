@@ -1,3 +1,5 @@
+//! Methods to help with ascii representations of Arqs
+
 use kitsune_p2p_dht_arc::DhtArcRange;
 
 use crate::{quantum::Topology, Loc};
@@ -20,6 +22,8 @@ pub(crate) fn loc_downscale(len: usize, d: Loc) -> usize {
     ((lenf / max * (d.as_u32() as f64)) as usize) % len
 }
 
+/// Add a hex character [0-f] to represent the number of ops at each position
+/// in the ascii representation fo the arc
 pub fn add_location_ascii(mut s: String, locs: Vec<Loc>) -> String {
     let len = s.len();
 
@@ -62,7 +66,7 @@ impl<S: ArqStart> Arq<S> {
             }
         };
 
-        match self.to_interval(topo) {
+        match self.to_dht_arc_range(topo) {
             DhtArcRange::Full => full(),
             DhtArcRange::Empty => empty(),
             DhtArcRange::Bounded(lo0, hi0) => {

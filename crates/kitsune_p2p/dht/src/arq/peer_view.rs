@@ -14,8 +14,11 @@ use super::{is_full, Arq, ArqStrat};
 /// target arc length) over time.
 #[derive(derive_more::From)]
 pub enum PeerView {
+    /// The "alpha" PeerView
     Alpha(PeerViewAlpha),
+    /// The "beta" PeerView
     Beta(PeerViewBeta),
+    /// The quantized PeerView
     Quantized(PeerViewQ),
 }
 
@@ -27,7 +30,7 @@ impl PeerView {
             Self::Alpha(v) => v.update_arc(dht_arc),
             Self::Beta(v) => v.update_arc(dht_arc),
             Self::Quantized(v) => {
-                let mut arq = Arq::from_dht_arc(&v.topo, &v.strat, dht_arc);
+                let mut arq = Arq::from_dht_arc_approximate(&v.topo, &v.strat, dht_arc);
                 let updated = v.update_arq(&v.topo, &mut arq);
                 *dht_arc = arq.to_dht_arc(&v.topo);
                 updated
@@ -36,6 +39,7 @@ impl PeerView {
     }
 }
 
+/// The Quantized PeerView
 pub struct PeerViewQ {
     /// The strategy which generated this view
     strat: ArqStrat,
@@ -113,7 +117,7 @@ impl PeerViewQ {
 
     /// Compute the total coverage observed within the filter interval.
     pub fn raw_coverage(&self, filter: &Arq) -> f64 {
-        self.extrapolated_coverage(filter) * filter.to_interval(&self.topo).length() as f64
+        self.extrapolated_coverage(filter) * filter.to_dht_arc_range(&self.topo).length() as f64
             / 2f64.powf(32.0)
     }
 

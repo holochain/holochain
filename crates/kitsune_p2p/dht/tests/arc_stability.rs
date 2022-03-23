@@ -117,7 +117,7 @@ fn parameterized_stability_test(topo: &Topology, strat: &ArqStrat, peers: Vec<Ar
         for (i, arq) in peers.iter().enumerate() {
             println!(
                 "|{}| #{:<3} {:>3} {:>3}",
-                arq.to_interval(topo).to_ascii(64),
+                arq.to_dht_arc_range(topo).to_ascii(64),
                 i,
                 arq.count(),
                 arq.power()

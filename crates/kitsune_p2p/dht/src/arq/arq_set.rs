@@ -79,7 +79,7 @@ impl<S: ArqStart> ArqSetImpl<S> {
         DhtArcSet::from(
             self.arqs
                 .iter()
-                .map(|a| a.to_interval(topo))
+                .map(|a| a.to_dht_arc_range(topo))
                 .collect::<Vec<_>>(),
         )
     }
@@ -170,8 +170,8 @@ mod tests {
     fn intersect_arqs() {
         observability::test_run().ok();
         let topo = Topology::unit_zero();
-        let a = Arq::new(536870912u32.into(), 27, 11);
-        let b = Arq::new(805306368u32.into(), 27, 11);
+        let a = Arq::new(27, 536870912u32.into(), 11.into());
+        let b = Arq::new(27, 805306368u32.into(), 11.into());
         dbg!(a.to_bounds(&topo).offset());
 
         let a = ArqSet::single(a);

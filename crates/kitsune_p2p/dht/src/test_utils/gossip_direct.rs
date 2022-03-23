@@ -1,10 +1,10 @@
 use crate::{
     error::{GossipError, GossipResult},
-    persistence::HostAccess,
+    persistence::HostAccessTest,
     quantum::{Quantum, TimeQuantum},
 };
 
-pub fn gossip_direct_at<Peer: HostAccess>(
+pub fn gossip_direct_at<Peer: HostAccessTest>(
     left: &mut Peer,
     right: &mut Peer,
     now: TimeQuantum,
@@ -14,7 +14,7 @@ pub fn gossip_direct_at<Peer: HostAccess>(
 
 /// Quick 'n dirty simulation of a gossip round. Mutates both nodes as if
 /// they were exchanging gossip messages, without the rigmarole of a real protocol
-pub fn gossip_direct<Peer: HostAccess>(
+pub fn gossip_direct<Peer: HostAccessTest>(
     (left, time_left): (&mut Peer, TimeQuantum),
     (right, time_right): (&mut Peer, TimeQuantum),
 ) -> GossipResult<TestNodeGossipRoundStats> {

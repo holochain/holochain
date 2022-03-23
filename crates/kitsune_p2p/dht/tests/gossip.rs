@@ -9,6 +9,7 @@ use kitsune_p2p_dht::{
     test_utils::{
         generate_ideal_coverage,
         gossip_direct::{gossip_direct, gossip_direct_at},
+        op_data::OpData,
         seeded_rng,
         test_node::TestNode,
     },
@@ -22,8 +23,8 @@ fn test_basic() {
     let gopa = GossipParams::new(1.into(), 0);
     let ts = |t: u32| TimeQuantum::from(t).to_timestamp_bounds(&topo).0;
 
-    let alice_arq = Arq::new((-128i32 as u32).into(), 8, 4);
-    let bobbo_arq = Arq::new(0u32.into(), 8, 4);
+    let alice_arq = Arq::new(8, (-128i32 as u32).into(), 4.into());
+    let bobbo_arq = Arq::new(8, 0u32.into(), 4.into());
     let mut alice = TestNode::new(topo.clone(), gopa, alice_arq);
     let mut bobbo = TestNode::new(topo.clone(), gopa, bobbo_arq);
 

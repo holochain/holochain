@@ -10,93 +10,27 @@ pub use kitsune_p2p_dht_arc::DhtLocation as Loc;
 
 pub use kitsune_p2p_timestamp::Timestamp;
 
-/// TODO: mark this as for testing only. /// This is indeed the type that Holochain provides.
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub struct OpData {
-    pub loc: Loc,
-    pub hash: OpHash,
-    pub size: u32,
-    pub timestamp: Timestamp,
-}
-
-impl OpData {
-    pub fn loc(&self) -> Loc {
-        self.loc
-    }
-
-    /// Obviously only for testing
-    pub fn fake(loc: Loc, timestamp: Timestamp, size: u32) -> Op {
-        use crate::hash::fake_hash;
-        Op::new(Self {
-            loc,
-            timestamp,
-            size,
-            hash: fake_hash().into(),
-        })
-    }
-}
-
-impl Borrow<Timestamp> for OpData {
-    fn borrow(&self) -> &Timestamp {
-        &self.timestamp
-    }
-}
-
-impl PartialOrd for OpData {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for OpData {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        (&self.timestamp, &self.loc).cmp(&(&other.timestamp, &other.loc))
-    }
-}
-
+/// Everything that Kitsune needs to know about an Op.
+/// Intended to be implemented by the host.
 pub trait OpRegion<D>: PartialOrd + Ord + Send + Sync {
+    /// The op's Location
     fn loc(&self) -> Loc;
+    /// The op's Timestamp
     fn timestamp(&self) -> Timestamp;
+    /// The RegionData that would be produced if this op were the only op
+    /// in the region. The sum of these produces the RegionData for the whole
+    /// region.
     fn region_data(&self) -> D;
 
+    /// The quantized space and time coordinates, based on the location and timestamp.
     fn coords(&self, topo: &Topology) -> SpacetimeCoords {
         SpacetimeCoords {
             space: topo.space_coord(self.loc()),
             time: topo.time_coord(self.timestamp()),
         }
     }
-    fn region_tuple(&self, topo: &Topology) -> (SpacetimeCoords, D) {
-        (self.coords(topo), self.region_data())
-    }
 
+    /// Create an Op with arbitrary data but that has the given timestamp and location.
+    /// Used for bounded range queries based on the PartialOrd impl of the op.
     fn bound(timestamp: Timestamp, loc: Loc) -> Self;
 }
-
-impl OpRegion<RegionData> for OpData {
-    fn loc(&self) -> Loc {
-        self.loc
-    }
-
-    fn timestamp(&self) -> Timestamp {
-        self.timestamp
-    }
-
-    fn region_data(&self) -> RegionData {
-        RegionData {
-            hash: self.hash.into(),
-            size: self.size,
-            count: 1,
-        }
-    }
-
-    fn bound(timestamp: Timestamp, loc: Loc) -> Self {
-        Self {
-            loc,
-            timestamp,
-            size: 0,
-            hash: [0; 32].into(),
-        }
-    }
-}
-
-pub type Op = Arc<OpData>;

@@ -182,7 +182,7 @@ pub fn run_one_epoch(
                 .unwrap_or("??".magenta());
             println!(
                 "|{}| #{:<3} {:>3} {:>3} {:>3} {} {} {: >3} {}",
-                arq.to_interval(topo).to_ascii(64),
+                arq.to_dht_arc_range(topo).to_ascii(64),
                 i,
                 arq.count(),
                 arq.power(),

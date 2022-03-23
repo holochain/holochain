@@ -154,7 +154,7 @@ impl<D: TreeDataConstraints> RegionSetXtcs<D> {
         }
     }
 
-    pub fn from_store<O: OpRegion<D>, S: AccessOpStore<D, O>>(
+    pub fn from_store<O: OpRegion<D>, S: AccessOpStore<O, D>>(
         store: &S,
         coords: RegionCoordSetXtcs,
     ) -> Self {
@@ -246,8 +246,10 @@ mod tests {
     use kitsune_p2p_timestamp::Timestamp;
 
     use crate::{
-        op::{Op, OpData},
-        test_utils::op_store::OpStore,
+        test_utils::{
+            op_data::{Op, OpData},
+            op_store::OpStore,
+        },
         Loc,
     };
 
@@ -358,7 +360,7 @@ mod tests {
     fn test_diff() {
         let topo = Topology::unit_zero();
         let arq = Arq::new(Loc::from(-512i32 as u32), 8, 4).to_bounds(&topo);
-        dbg!(&arq, arq.to_interval(&topo));
+        dbg!(&arq, arq.to_dht_arc_range(&topo));
 
         let mut store1 = OpStore::new(topo.clone(), GossipParams::zero());
         store1.integrate_ops(op_grid(&topo, &arq, 10..20).into_iter());
@@ -411,7 +413,7 @@ mod tests {
         // This arq goes from -2^17 to 2^17, with a chunk size of 2^16
         let left_edge = Loc::from(-(2i32.pow(pow as u32 + 12 + 1)));
         let arq = Arq::new(left_edge, pow, 4).to_bounds(&topo);
-        dbg!(&arq, arq.to_interval(&topo));
+        dbg!(&arq, arq.to_dht_arc_range(&topo));
 
         let mut store1 = OpStore::new(topo.clone(), GossipParams::zero());
         store1.integrate_ops(op_grid(&topo, &arq, 10..20).into_iter());

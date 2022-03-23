@@ -1,40 +1,43 @@
 use must_future::MustBoxFuture;
 
 use crate::{
-    agent::AgentInfo,
     arq::{ascii::add_location_ascii, *},
     hash::{fake_hash, AgentKey},
-    op::Op,
     persistence::{AccessOpStore, AccessPeerStore},
     quantum::{GossipParams, TelescopingTimes, TimeQuantum, Topology},
     region::*,
 };
 
-use super::op_store::OpStore;
+use super::{
+    op_data::{Op, OpData},
+    op_store::OpStore,
+};
 
+/// A "node", with test-worthy implementation of the host interface
 pub struct TestNode {
     _agent: AgentKey,
-    agent_info: AgentInfo,
+    agent_arq: Arq,
     store: OpStore,
 }
 
 impl TestNode {
+    /// Constructor
     pub fn new(topo: Topology, gopa: GossipParams, arq: Arq) -> Self {
         Self {
             _agent: AgentKey(fake_hash()),
-            agent_info: AgentInfo { arq },
+            agent_arq: arq,
             store: OpStore::new(topo, gopa),
         }
     }
 
     /// The Arq to use when gossiping
     pub fn arq(&self) -> Arq {
-        self.agent_info.arq
+        self.agent_arq
     }
 
     /// The ArqBounds to use when gossiping
     pub fn arq_bounds(&self) -> ArqBounds {
-        self.agent_info.arq.to_bounds(self.topo())
+        self.agent_arq.to_bounds(self.topo())
     }
 
     /// Get the RegionSet for this node, suitable for gossiping
@@ -67,7 +70,7 @@ impl TestNode {
     }
 }
 
-impl AccessOpStore for TestNode {
+impl AccessOpStore<OpData> for TestNode {
     fn query_op_data(&self, region: &RegionCoords) -> Vec<Op> {
         self.store.query_op_data(region)
     }
@@ -97,8 +100,8 @@ impl AccessOpStore for TestNode {
 }
 
 impl AccessPeerStore for TestNode {
-    fn get_agent_info(&self, _agent: AgentKey) -> crate::agent::AgentInfo {
-        self.agent_info.clone()
+    fn get_agent_arq(&self, _agent: AgentKey) -> crate::arq::Arq {
+        self.agent_arq.clone()
     }
 
     fn get_arq_set(&self) -> ArqBoundsSet {
@@ -110,7 +113,7 @@ impl AccessPeerStore for TestNode {
 mod tests {
     use kitsune_p2p_timestamp::Timestamp;
 
-    use crate::{op::OpData, quantum::*};
+    use crate::quantum::*;
 
     use super::*;
 

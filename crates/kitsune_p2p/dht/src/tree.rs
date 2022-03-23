@@ -2,7 +2,7 @@ use std::ops::{AddAssign, Sub};
 
 use num_traits::Zero;
 
-use crate::{op::*, quantum::*, region::*};
+use crate::{op::*, quantum::*, region::*, test_utils::op_data::Op};
 
 pub trait TreeDataConstraints:
     Eq
@@ -63,6 +63,6 @@ impl<D: TreeDataConstraints> Tree<D> {
 
 impl Tree<RegionData> {
     pub fn add_op(&mut self, op: Op) {
-        self.add(op.region_tuple(&self.topo));
+        self.add((op.coords(self.topo()), op.region_data()));
     }
 }

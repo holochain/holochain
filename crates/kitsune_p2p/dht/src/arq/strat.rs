@@ -27,7 +27,7 @@ impl PeerStrat {
             Self::Quantized(s) => {
                 let peers = peers
                     .iter()
-                    .map(|p| Arq::from_dht_arc(&topo, s, p))
+                    .map(|p| Arq::from_dht_arc_approximate(&topo, s, p))
                     .collect();
                 PeerViewQ::new(topo, s.clone(), peers).into()
             }
@@ -42,7 +42,7 @@ impl PeerStrat {
                 // TODO: differentiate checked vs unchecked
                 let peers = peers
                     .iter()
-                    .map(|p| Arq::from_dht_arc(&topo, s, p))
+                    .map(|p| Arq::from_dht_arc_approximate(&topo, s, p))
                     .collect();
                 PeerViewQ::new(topo, s.clone(), peers).into()
             }

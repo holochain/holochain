@@ -75,7 +75,7 @@ fn test_grow_towards_full() {
     let view = PeerViewQ::new(topo.clone(), strat.clone(), peers);
 
     // start with an arq comparable to one's peers
-    let mut arq = Arq::new(0u32.into(), peer_power, 12);
+    let mut arq = Arq::new(peer_power, 0u32.into(), 12.into());
     loop {
         let stats = view.update_arq_with_stats(&topo, &mut arq);
         if !stats.changed {
@@ -111,7 +111,7 @@ fn test_grow_to_full() {
     let view = PeerViewQ::new(topo.clone(), strat.clone(), peers);
 
     // start with an arq comparable to one's peers
-    let mut arq = Arq::new(0u32.into(), peer_power, 12);
+    let mut arq = Arq::new(peer_power, 0u32.into(), 12.into());
     print_arq(&topo, &arq, 64);
     while view.update_arq(&topo, &mut arq) {
         print_arq(&topo, &arq, 64);
@@ -145,7 +145,7 @@ fn test_grow_by_multiple_chunks() {
     let peer_power = peers.iter().map(|p| p.power()).min().unwrap();
     let view = PeerViewQ::new(topo.clone(), strat.clone(), peers);
 
-    let arq = Arq::new(0u32.into(), peer_power - 1, 6);
+    let arq = Arq::new(peer_power - 1, 0u32.into(), 6.into());
     let mut resized = arq.clone();
     view.update_arq(&topo, &mut resized);
     assert!(resized.power() > arq.power() || resized.count() > arq.count() + 1);
@@ -173,9 +173,9 @@ fn test_degenerate_asymmetrical_coverage() {
     let view = PeerViewQ::new(topo.clone(), strat, others);
 
     let arq = Arq::new(
-        Loc::new(0),
         4, // log2 of 0x10
-        0x10,
+        Loc::new(0),
+        0x10.into(),
     );
 
     let extrapolated = view.extrapolated_coverage(&arq);

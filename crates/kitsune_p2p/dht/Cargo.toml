@@ -35,7 +35,7 @@ rand = "0.8"
 test-case = "1.2"
 
 # TODO: remove when integrating
-# [workspace]
+[workspace]
 
 [features]
 test_utils = [

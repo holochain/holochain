@@ -1,4 +1,5 @@
-pub mod agent;
+#![warn(missing_docs)]
+
 pub mod arq;
 pub mod error;
 pub mod hash;
@@ -16,7 +17,6 @@ pub mod test_utils;
 pub use kitsune_p2p_dht_arc::DhtLocation as Loc;
 
 pub mod prelude {
-    pub use super::agent::*;
     pub use super::arq::*;
     pub use super::error::*;
     pub use super::hash::*;

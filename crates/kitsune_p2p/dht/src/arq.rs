@@ -1,4 +1,10 @@
-//! "Quantized DHT Arc"
+//! The Quantized DHT Arc type
+//!
+//! Arq coordinates are expressed in terms of powers-of-two, representing
+//! the "chunk" or "segment" size to work with. The actual extent of the Arq
+//! is expressed as a `start` and an `offset`, in terms of the chunk size.
+//! So, Arq boundaries can only ever fall on a quantized grid which is determined
+//! by the `power` setting.
 
 mod arq_set;
 mod peer_view;
@@ -16,11 +22,13 @@ use kitsune_p2p_dht_arc::{DhtArc, DhtArcRange};
 
 use crate::{op::Loc, quantum::*};
 
+/// Convenience method for taking the power of 2 in u32
 pub fn pow2(p: u8) -> u32 {
     debug_assert!(p < 32);
     2u32.pow((p as u32).min(31))
 }
 
+/// Convenience method for taking the power of 2 in f64
 pub fn pow2f(p: u8) -> f64 {
     debug_assert!(p < 32);
     2f64.powf(p as f64)
@@ -37,7 +45,9 @@ pub(crate) const U32_LEN: u64 = u32::MAX as u64 + 1;
 /// 2. An Arq which has no absolute location defined, and which simply represents
 ///    a (quantized) range.
 pub trait ArqStart: Sized + Copy + std::fmt::Debug {
+    /// Get the DhtLocation representation
     fn to_loc(&self, topo: &Topology, power: u8) -> Loc;
+    /// Get the exponential Offset representation
     fn to_offset(&self, topo: &Topology, power: u8) -> Offset;
 }
 
@@ -60,6 +70,25 @@ impl ArqStart for Offset {
     }
 }
 
+/// A quantized DHT arc.
+///
+/// ## Coordinates
+///
+/// Arq coordinates are expressed in terms of powers-of-two, representing
+/// the "chunk" or "segment" size to work with.
+/// The chunk size is determined by the [`Topology`] of the space it is in,
+/// as well as the `power` of the Arq. The actual chunk size is given by:
+///
+/// `chunk size = topology.space.quantum * 2^power`
+///
+/// So, the `power` represents the amount of quantization *on top* of the quantum
+/// size set by the Topology, not the total quantization level.
+///
+/// The `start` is generic, because there are actually two flavors of Arq:
+/// - one which has a definite starting DhtLocation associated with it,
+/// - and one which does not.
+///
+/// The first flavor is significant
 #[derive(Debug, Copy, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Arq<S: ArqStart = Loc> {
     /// Location around which this coverage is centered
@@ -73,20 +102,30 @@ pub struct Arq<S: ArqStart = Loc> {
     pub count: Offset,
 }
 
+/// Alias for Arq
 pub type ArqBounds = Arq<Offset>;
 
 impl<S: ArqStart> Arq<S> {
+    /// Constructor from individual parts
+    pub fn new(power: u8, start: S, count: Offset) -> Self {
+        Self {
+            power,
+            start,
+            count,
+        }
+    }
+
     /// The number of quanta to use for each segment
     #[inline]
-    pub fn quantum_interval(&self) -> u32 {
+    fn quantum_chunk_width(&self) -> u32 {
         pow2(self.power)
     }
 
-    /// The absolute length of each segment
+    /// The absolute length of each segment, the "chunk size"
     #[inline]
-    pub fn absolute_interval(&self, topo: &Topology) -> u32 {
+    pub(crate) fn absolute_chunk_width(&self, topo: &Topology) -> u32 {
         let len = self
-            .quantum_interval()
+            .quantum_chunk_width()
             .saturating_mul(topo.space.quantum)
             .min(u32::MAX / 2);
         // this really shouldn't ever be larger than MAX / 8
@@ -96,17 +135,18 @@ impl<S: ArqStart> Arq<S> {
 
     /// The absolute length of the entire arq.
     pub fn absolute_length(&self, topo: &Topology) -> u64 {
-        let len = (self.absolute_interval(topo) as u64 * (*self.count as u64)).min(U32_LEN);
+        let len = (self.absolute_chunk_width(topo) as u64 * (*self.count as u64)).min(U32_LEN);
         debug_assert_eq!(
             len,
-            self.to_interval(topo).length(),
+            self.to_dht_arc_range(topo).length(),
             "lengths don't match {:?}",
             self
         );
         len
     }
 
-    pub fn to_interval(&self, topo: &Topology) -> DhtArcRange {
+    /// Convert to [`DhtArcRange`]
+    pub fn to_dht_arc_range(&self, topo: &Topology) -> DhtArcRange {
         if is_full(topo, self.power, *self.count) {
             DhtArcRange::Full
         } else if *self.count == 0 {
@@ -117,6 +157,7 @@ impl<S: ArqStart> Arq<S> {
         }
     }
 
+    /// Determine the edges of this Arq in absolute coordinates ([`Loc`])
     pub fn to_edge_locs(&self, topo: &Topology) -> (Loc, Loc) {
         let start = self.start.to_offset(topo, self.power);
         let left = start.to_loc(topo, self.power);
@@ -124,10 +165,12 @@ impl<S: ArqStart> Arq<S> {
         (left, right)
     }
 
+    /// Accessor
     pub fn power(&self) -> u8 {
         self.power
     }
 
+    /// Accessor
     pub fn count(&self) -> u32 {
         self.count.into()
     }
@@ -148,32 +191,20 @@ impl<S: ArqStart> Arq<S> {
         })
     }
 
+    /// This arq has full coverage
     pub fn is_full(&self, topo: &Topology) -> bool {
         is_full(topo, self.power(), self.count())
     }
 
+    /// This arq has zero coverage
     pub fn is_empty(&self) -> bool {
         self.count() == 0
-    }
-
-    pub fn from_parts(power: u8, start: S, count: Offset) -> Self {
-        Self {
-            power,
-            start,
-            count,
-        }
     }
 }
 
 impl Arq<Loc> {
-    pub fn new(start: Loc, power: u8, count: u32) -> Self {
-        Self {
-            start,
-            power,
-            count: count.into(),
-        }
-    }
-
+    /// Construct a full arq at the given power.
+    /// The `count` is calculated accordingly.
     pub fn new_full(topo: &Topology, start: Loc, power: u8) -> Self {
         let count = pow2(32u8.saturating_sub(power + topo.space.quantum_power));
         assert!(is_full(topo, power, count));
@@ -184,6 +215,7 @@ impl Arq<Loc> {
         }
     }
 
+    /// Reduce the power by 1
     pub fn downshift(&self) -> Self {
         Self {
             start: self.start,
@@ -192,6 +224,8 @@ impl Arq<Loc> {
         }
     }
 
+    /// Increase the power by 1. If this results in rounding, return None,
+    /// unless `force` is true, in which case always return Some.
     pub fn upshift(&self, force: bool) -> Option<Self> {
         let count = if force && *self.count % 2 == 1 {
             self.count + Offset(1)
@@ -205,9 +239,11 @@ impl Arq<Loc> {
         })
     }
 
+    /// Convert to the [`ArqBounds`] representation, which forgets about the
+    /// [`Loc`] associate with this arq.
     pub fn to_bounds(&self, topo: &Topology) -> ArqBounds {
         ArqBounds {
-            start: Offset::from(self.start.as_u32() / self.absolute_interval(topo)),
+            start: Offset::from(self.start.as_u32() / self.absolute_chunk_width(topo)),
             power: self.power,
             count: self.count,
         }
@@ -223,19 +259,21 @@ impl Arq<Loc> {
         &mut self.count
     }
 
+    /// Convert to [`DhtArc`]
     pub fn to_dht_arc(&self, topo: &Topology) -> DhtArc {
         let len = self.absolute_length(topo);
         DhtArc::from_start_and_len(self.start, len)
     }
 
-    pub fn from_dht_arc(topo: &Topology, strat: &ArqStrat, dht_arc: &DhtArc) -> Self {
+    /// Computes the Arq which most closely matches the given [`DhtArc`]
+    pub fn from_dht_arc_approximate(topo: &Topology, strat: &ArqStrat, dht_arc: &DhtArc) -> Self {
         approximate_arq(topo, strat, dht_arc.start_loc(), dht_arc.length())
     }
 
     /// The two arqs represent the same interval despite having potentially different terms
     pub fn equivalent(topo: &Topology, a: &Self, b: &Self) -> bool {
-        let qa = a.absolute_interval(topo);
-        let qb = b.absolute_interval(topo);
+        let qa = a.absolute_chunk_width(topo);
+        let qb = b.absolute_chunk_width(topo);
         a.start == b.start && (a.count.wrapping_mul(qa) == b.count.wrapping_mul(qb))
     }
 }
@@ -249,21 +287,24 @@ impl From<&ArqBounds> for ArqBounds {
 impl ArqBounds {
     /// The two arqs represent the same interval despite having potentially different terms
     pub fn equivalent(topo: &Topology, a: &Self, b: &Self) -> bool {
-        let qa = a.absolute_interval(topo);
-        let qb = b.absolute_interval(topo);
+        let qa = a.absolute_chunk_width(topo);
+        let qb = b.absolute_chunk_width(topo);
         *a.count == 0 && *b.count == 0
             || (a.start.wrapping_mul(qa) == b.start.wrapping_mul(qb)
                 && a.count.wrapping_mul(qa) == b.count.wrapping_mul(qb))
     }
 
+    /// Return the ArqBounds which most closely matches the given [`DhtArcRange`]
     pub fn from_interval_rounded(topo: &Topology, power: u8, interval: DhtArcRange) -> Self {
         Self::from_interval_inner(&topo.space, power, interval, true).unwrap()
     }
 
+    /// Return the ArqBounds which is equivalent to the given [`DhtArcRange`] if it exists.
     pub fn from_interval(topo: &Topology, power: u8, interval: DhtArcRange) -> Option<Self> {
         Self::from_interval_inner(&topo.space, power, interval, false)
     }
 
+    /// Upcast this ArqBounds to an Arq that has knowledge of its [`Loc`]
     #[cfg(any(test, feature = "test_utils"))]
     pub fn to_arq<F: FnOnce(Loc) -> Loc>(&self, topo: &Topology, f: F) -> Arq {
         Arq {
@@ -273,8 +314,9 @@ impl ArqBounds {
         }
     }
 
-    pub fn empty(power: u8) -> Self {
-        Self::from_interval(&Topology::unit_zero(), power, DhtArcRange::Empty).unwrap()
+    /// An arbitrary zero-coverage arq.
+    pub fn empty(topo: &Topology, power: u8) -> Self {
+        Self::from_interval(topo, power, DhtArcRange::Empty).unwrap()
     }
 
     fn from_interval_inner(
@@ -327,12 +369,9 @@ impl ArqBounds {
         }
     }
 
+    /// Iterate over each segment (chunk) in the Arq
     pub fn segments(&self) -> impl Iterator<Item = SpaceSegment> + '_ {
         (0..*self.count).map(|c| SpaceSegment::new(self.power, c.wrapping_add(*self.start)))
-    }
-
-    pub fn chunk_width(&self) -> u64 {
-        2u64.pow(self.power as u32)
     }
 
     /// Get a reference to the arq bounds's offset.
@@ -361,6 +400,7 @@ pub fn is_full(topo: &Topology, power: u8, count: u32) -> bool {
     }
 }
 
+/// Helper for requantizing arq data
 pub fn requantize(old_power: u8, old_count: u32, new_power: u8) -> Option<(u8, u32)> {
     if old_power < new_power {
         let factor = 2u32.pow((new_power - old_power) as u32);
@@ -376,6 +416,8 @@ pub fn requantize(old_power: u8, old_count: u32, new_power: u8) -> Option<(u8, u
     }
 }
 
+/// Calculate the unique pairing of power and count implied by a given length
+/// and max number of chunks
 pub fn power_and_count_from_length(dim: &Dimension, len: u64, max_chunks: u32) -> (u8, u32) {
     assert!(len <= U32_LEN);
     let mut power = 0;
@@ -393,7 +435,7 @@ pub fn power_and_count_from_length(dim: &Dimension, len: u64, max_chunks: u32) -
 /// Given a center and a length, give Arq which matches most closely given the provided strategy
 pub fn approximate_arq(topo: &Topology, strat: &ArqStrat, start: Loc, len: u64) -> Arq {
     if len == 0 {
-        Arq::new(start, topo.min_space_power(), 0)
+        Arq::new(topo.min_space_power(), start, 0.into())
     } else {
         let (power, count) = power_and_count_from_length(&topo.space, len, strat.max_chunks());
 
@@ -418,7 +460,7 @@ pub fn approximate_arq(topo: &Topology, strat: &ArqStrat, start: Loc, len: u64) 
             "power too large: {}",
             power
         );
-        Arq::new(start, power as u8, count)
+        Arq::new(power as u8, start, count.into())
     }
 }
 
@@ -462,8 +504,8 @@ mod tests {
         let topo = Topology::unit_zero();
         let full1 = Arq::new_full(&topo, 0u32.into(), 29);
         let full2 = Arq::new_full(&topo, 2u32.pow(31).into(), 25);
-        assert!(matches!(full1.to_interval(&topo), DhtArcRange::Full));
-        assert!(matches!(full2.to_interval(&topo), DhtArcRange::Full));
+        assert!(matches!(full1.to_dht_arc_range(&topo), DhtArcRange::Full));
+        assert!(matches!(full2.to_dht_arc_range(&topo), DhtArcRange::Full));
     }
 
     #[test]
@@ -500,13 +542,13 @@ mod tests {
         let topo = Topology::unit_zero();
         let pow: u8 = 4;
         {
-            let a = Arq::new((2u32.pow(pow.into()) - 1).into(), pow, 16);
+            let a = Arq::new(pow, (2u32.pow(pow.into()) - 1).into(), 16.into());
             let b = a.to_bounds(&topo);
             assert_eq!(b.offset(), Offset(0));
             assert_eq!(b.count(), 16);
         }
         {
-            let a = Arq::new(4u32.into(), pow, 18);
+            let a = Arq::new(pow, 4u32.into(), 18.into());
             let b = a.to_bounds(&topo);
             assert_eq!(b.count(), 18);
         }
@@ -542,7 +584,7 @@ mod tests {
             // the quantum size is 2^12, and the max count is 16 which is 2^4,
             // so any power greater than 16 could result in an overflow.
             let topo = Topology::standard_epoch();
-            let a = Arq::from_parts(power, Loc::from(loc), Offset(count));
+            let a = Arq::new(power, Loc::from(loc), Offset(count));
             let (left, right) = a.to_edge_locs(&topo);
             let p = pow2(power);
             assert_eq!(left.as_u32() % p, 0);
@@ -559,7 +601,7 @@ mod tests {
             centers.sort();
 
             // build identical arqs at each centerpoint and convert them to ArqBounds
-            let arqs: Vec<_> = centers.into_iter().map(|c| Arq::new(c.into(), power, count)).collect();
+            let arqs: Vec<_> = centers.into_iter().map(|c| Arq::new(power, c.into(), count.into())).collect();
             let mut bounds: Vec<_> = arqs.into_iter().map(|a| a.to_bounds(&topo)).enumerate().collect();
 
             // Ensure the list of ArqBounds also grows monotonically.
@@ -598,7 +640,7 @@ mod tests {
             let arq = approximate_arq(&topo, &strat, center.into(), length);
             let dht_arc = arq.to_dht_arc(&topo);
             assert_eq!(arq.absolute_length(&topo), dht_arc.length());
-            let arq2 = Arq::from_dht_arc(&topo, &strat, &dht_arc);
+            let arq2 = Arq::from_dht_arc_approximate(&topo, &strat, &dht_arc);
             assert_eq!(arq, arq2);
         }
 
@@ -610,7 +652,7 @@ mod tests {
             let arq = approximate_arq(&topo, &strat, center.into(), length);
             let dht_arc = arq.to_dht_arc(&topo);
             assert_eq!(arq.absolute_length(&topo), dht_arc.length());
-            let arq2 = Arq::from_dht_arc(&topo, &strat, &dht_arc);
+            let arq2 = Arq::from_dht_arc_approximate(&topo, &strat, &dht_arc);
             assert!(Arq::<Loc>::equivalent(&topo, &arq, &arq2));
         }
 
@@ -620,7 +662,7 @@ mod tests {
             let length = count as u64 * 2u64.pow(pow as u32) / 2 * 2;
             let strat = ArqStrat::default();
             let arq = approximate_arq(&topo, &strat, center.into(), length).to_bounds(&topo);
-            let interval = arq.to_interval(&topo);
+            let interval = arq.to_dht_arc_range(&topo);
             let arq2 = ArqBounds::from_interval(&topo, arq.power(), interval.clone()).unwrap();
             assert!(ArqBounds::equivalent(&topo, &arq, &arq2));
         }

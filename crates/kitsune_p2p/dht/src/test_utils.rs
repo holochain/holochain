@@ -1,5 +1,6 @@
 pub mod gossip_direct;
 pub mod min_redundancy;
+pub mod op_data;
 pub mod op_store;
 pub mod test_node;
 
@@ -265,8 +266,8 @@ mod tests {
             };
             let a = unit_arq(&topo, &strat, center, len);
             let target_len = (len * 2f64.powf(32.0)) as i64;
-            let true_len = a.to_interval(&topo).length() as i64;
-            assert!((true_len - target_len).abs() < a.absolute_interval(&topo) as i64);
+            let true_len = a.to_dht_arc_range(&topo).length() as i64;
+            assert!((true_len - target_len).abs() < a.absolute_chunk_width(&topo) as i64);
         }
     }
 }
