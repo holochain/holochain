@@ -58,6 +58,7 @@ pub struct PeerViewQ {
 }
 
 impl PeerViewQ {
+    /// Constructor
     pub fn new(topo: Topology, strat: ArqStrat, peers: Vec<Arq>) -> Self {
         Self {
             strat,
@@ -121,6 +122,7 @@ impl PeerViewQ {
             / 2f64.powf(32.0)
     }
 
+    /// Mutate the arq to its ideal target
     pub fn update_arq(&self, topo: &Topology, arq: &mut Arq) -> bool {
         self.update_arq_with_stats(topo, arq).changed
     }
@@ -129,6 +131,13 @@ impl PeerViewQ {
         num_peers as f64 <= cov * self.strat.slacker_ratio
     }
 
+    /// The "slacker" factor. If our observed coverage is significantly
+    /// greater than the number of peers we see, it's an indication
+    /// that we may need to pick up more slack.
+    ///
+    /// This check helps balance out stable but unequitable situations where
+    /// all peers have a similar estimated coverage, but some peers are
+    /// holding much more than others.
     pub fn slack_factor(&self, cov: f64, num_peers: usize) -> f64 {
         if self.is_slacking(cov, num_peers) {
             if num_peers.is_zero() {
@@ -336,6 +345,8 @@ impl PeerViewQ {
         }
     }
 
+    /// Gather statistics about the power levels of all arqs in this view.
+    /// Used to make inferences about what your neighbors are up to.
     pub fn power_stats(&self, topo: &Topology, filter: &Arq) -> PowerStats {
         use statrs::statistics::*;
         let mut powers: Vec<_> = self
@@ -366,11 +377,16 @@ impl PeerViewQ {
     }
 }
 
+/// A summary of what happened while updating an Arq
 #[derive(Debug, Clone)]
 pub struct UpdateArqStats {
+    /// Did the arq change?
     pub changed: bool,
+    /// How much did the arq "want" to change?
     pub desired_delta: i32,
+    /// PowerStats, if calculated.
     pub power: Option<PowerStats>,
+    /// Number of peers initially visible from this arq.
     pub num_peers: usize,
 }
 
@@ -382,9 +398,13 @@ pub fn actual_coverage<'a, P: Iterator<Item = &'a Arq>>(topo: &Topology, peers: 
         .sum()
 }
 
+/// Statistics about the power levels of all arqs in a view.
+/// Used to make inferences about what your neighbors are up to.
 #[derive(Debug, Clone)]
 pub struct PowerStats {
+    /// The median power level
     pub median: u8,
+    /// The standard deviation of power levels
     pub std_dev: f64,
 }
 

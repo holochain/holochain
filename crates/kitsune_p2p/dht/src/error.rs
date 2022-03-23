@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 #[derive(Debug, thiserror::Error)]
 pub enum GossipError {
     #[error("The fundamental parameters of Op region spacetime are mismatched between nodes.")]

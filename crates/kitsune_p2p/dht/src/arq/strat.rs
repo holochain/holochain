@@ -8,8 +8,11 @@ use super::{Arq, PeerView, PeerViewQ};
 /// The enum allows us to add new strategies over time.
 #[derive(Debug, Clone, derive_more::From)]
 pub enum PeerStrat {
+    /// The "alpha" peer strat
     Alpha(PeerStratAlpha),
+    /// The "beta" peer strat
     Beta(PeerStratBeta),
+    /// The quantized peer strat
     Quantized(ArqStrat),
 }
 
@@ -20,6 +23,8 @@ impl Default for PeerStrat {
 }
 
 impl PeerStrat {
+    /// Generate a view using this strategy.
+    /// Ensures that only peers which are visible from `arc` are included.
     pub fn view(&self, topo: Topology, arc: DhtArc, peers: &[DhtArc]) -> PeerView {
         match self {
             Self::Alpha(s) => s.view(arc, peers).into(),
@@ -34,6 +39,8 @@ impl PeerStrat {
         }
     }
 
+    /// Generate a view using this strategy.
+    /// Assumes that out-of-sight peers have already been filtered out.
     pub fn view_unchecked(&self, topo: Topology, arc: DhtArc, peers: &[DhtArc]) -> PeerView {
         match self {
             Self::Alpha(s) => s.view_unchecked(arc, peers).into(),
@@ -50,6 +57,8 @@ impl PeerStrat {
     }
 }
 
+/// "Arq Resizing Strategy". Defines all parameters necessary to run the arq
+/// resizing algorithm.
 #[derive(Debug, Clone)]
 pub struct ArqStrat {
     /// The minimum coverage the DHT seeks to maintain.
@@ -171,6 +180,7 @@ impl ArqStrat {
         (self.buffer + 1.0) / self.buffer
     }
 
+    /// Get a summary report of this strat in string format
     pub fn summary(&self) -> String {
         format!(
             "

@@ -1,3 +1,5 @@
+//! Types representing a set of Arqs all of the same "power".
+
 use kitsune_p2p_dht_arc::DhtArcSet;
 
 use crate::{
@@ -8,7 +10,9 @@ use crate::{
 
 use super::{power_and_count_from_length, Arq, ArqStart};
 
+/// Alias for a set of [`Arq`]
 pub type ArqSet = ArqSetImpl<Loc>;
+/// Alias for a set of [`ArqBounds`]
 pub type ArqBoundsSet = ArqSetImpl<Offset>;
 
 /// A collection of ArqBounds.
@@ -57,10 +61,12 @@ impl<S: ArqStart> ArqSetImpl<S> {
         }
     }
 
+    /// Empty set
     pub fn empty() -> Self {
         Self::new(vec![])
     }
 
+    /// Singleton set
     pub fn single(arq: Arq<S>) -> Self {
         Self::new(vec![arq])
     }
@@ -75,6 +81,7 @@ impl<S: ArqStart> ArqSetImpl<S> {
         self.arqs.as_ref()
     }
 
+    /// Convert to a set of "continuous" arcs
     pub fn to_dht_arc_set(&self, topo: &Topology) -> DhtArcSet {
         DhtArcSet::from(
             self.arqs
@@ -84,6 +91,7 @@ impl<S: ArqStart> ArqSetImpl<S> {
         )
     }
 
+    /// Requantize each arq in the set.
     pub fn requantize(&self, power: u8) -> Option<Self> {
         self.arqs
             .iter()
@@ -92,6 +100,7 @@ impl<S: ArqStart> ArqSetImpl<S> {
             .map(|arqs| Self { arqs, power })
     }
 
+    /// Intersection of all arqs contained within
     pub fn intersection(&self, topo: &Topology, other: &Self) -> ArqSetImpl<Offset> {
         let power = self.power.min(other.power());
         let a1 = self.requantize(power).unwrap().to_dht_arc_set(topo);
@@ -118,6 +127,8 @@ impl<S: ArqStart> ArqSetImpl<S> {
 }
 
 impl ArqBoundsSet {
+    /// Convert back from a continuous arc set to a quantized one.
+    /// If any information is lost, return None.
     pub fn from_dht_arc_set(
         topo: &Topology,
         strat: &ArqStrat,
@@ -138,7 +149,7 @@ impl ArqBoundsSet {
     }
 }
 
-/// View ascii for arq bounds
+/// Print ascii for arq bounds
 pub fn print_arq<S: ArqStart>(topo: &Topology, arq: &Arq<S>, len: usize) {
     println!(
         "|{}| {} *2^{}",
@@ -148,6 +159,7 @@ pub fn print_arq<S: ArqStart>(topo: &Topology, arq: &Arq<S>, len: usize) {
     );
 }
 
+/// Print a collection of arqs
 pub fn print_arqs<S: ArqStart>(topo: &Topology, arqs: &[Arq<S>], len: usize) {
     for (i, arq) in arqs.iter().enumerate() {
         println!(
