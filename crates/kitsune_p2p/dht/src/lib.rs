@@ -10,7 +10,6 @@ pub mod op;
 pub mod persistence;
 pub mod quantum;
 pub mod region;
-pub mod tree;
 
 pub use arq::{actual_coverage, Arq, ArqBounds, ArqStrat, PeerStrat, PeerView, PeerViewQ};
 
@@ -27,5 +26,4 @@ pub mod prelude {
     pub use super::persistence::*;
     pub use super::quantum::*;
     pub use super::region::*;
-    pub use super::tree::*;
 }
