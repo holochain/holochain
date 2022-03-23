@@ -67,6 +67,10 @@ impl RangeBounds<u32> for ArcRange {
     }
 }
 
+/// The main DHT arc type. Represents an Agent's storage Arc on the DHT,
+/// preserving the agent's DhtLocation even in the case of a Full or Empty arc.
+/// Contrast to [`DhtArcRange`], which is used for cases where the arc is not
+/// associated with any particular Agent, and so the agent's Location cannot be known.
 #[derive(Copy, Clone, Debug, derive_more::Deref, serde::Serialize, serde::Deserialize)]
 pub struct DhtArc(#[deref] DhtArcRange, Option<DhtLocation>);
 
@@ -174,7 +178,14 @@ impl From<&DhtArc> for DhtArcRange {
     }
 }
 
-/// An alternate implementation of `ArcRange`
+/// A variant of DHT arc which is intentionally forgetful of the Agent's location.
+/// This type is used in places where set logic (union and intersection)
+/// is performed on arcs, which splits and joins arcs in such a way that it
+/// doesn't make sense to claim that the arc belongs to any particular agent or
+/// location.
+///
+/// This type exists to make sure we don't accidentally intepret the starting
+/// point of such a "derived" arc as a legitimate agent location.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum DhtArcRange<T = DhtLocation> {
     Empty,
