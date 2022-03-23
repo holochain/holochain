@@ -143,8 +143,9 @@ impl GenesisWorkspace {
 pub mod tests {
     use super::*;
 
-    use crate::conductor::api::MockCellConductorApi;
+    use crate::conductor::api::MockCellConductorApiT;
     use crate::core::ribosome::MockRibosomeT;
+    use futures::FutureExt;
     use holochain_state::prelude::test_dht_db;
     use holochain_state::{prelude::test_authored_db, source_chain::SourceChain};
     use holochain_types::test_utils::fake_agent_pubkey_1;
@@ -165,10 +166,11 @@ pub mod tests {
 
         {
             let workspace = GenesisWorkspace::new(vault.clone().into(), dht_db.to_db()).unwrap();
-            let mut api = MockCellConductorApi::new();
-            api.expect_sync_dpki_request()
-                .returning(|_, _| Ok("mocked dpki request response".to_string()));
-            api.expect_mock_keystore().return_const(keystore.clone());
+            let mut api = MockCellConductorApiT::new();
+            api.expect_dpki_request().returning(|_, _| {
+                async move { Ok("mocked dpki request response".to_string()) }.boxed()
+            });
+            api.expect_keystore().return_const(keystore.clone());
             let mut ribosome = MockRibosomeT::new();
             ribosome
                 .expect_run_genesis_self_check()
