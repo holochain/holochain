@@ -84,7 +84,7 @@ impl CellHostFnCaller {
 }
 
 /// Everything you need to run a test that uses the conductor
-// TODO: rewrite as sweettests if possible
+// MAYBE: rewrite as sweettests if possible
 pub struct ConductorTestData {
     _db_dir: TempDir,
     handle: ConductorHandle,

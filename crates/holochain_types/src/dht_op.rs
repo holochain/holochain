@@ -526,7 +526,6 @@ impl DhtOpLight {
     }
 }
 
-// FIXME: need to use this in HashableContent
 #[allow(missing_docs)]
 #[derive(Serialize, Debug)]
 pub enum UniqueForm<'a> {
