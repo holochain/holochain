@@ -238,7 +238,7 @@ async fn test_p2p_agent_store_gossip_query_sanity() {
     }
 
     // prune everything by expires time
-    p2p_prune(&db).await.unwrap();
+    p2p_prune(&db, vec![]).await.unwrap();
 
     // after prune, make sure all are pruned
     let all = con.p2p_list_agents().unwrap();

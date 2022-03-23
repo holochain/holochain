@@ -1,6 +1,6 @@
 //! A Ribosome is a structure which knows how to execute hApp code.
 //!
-//! We have only one instance of this: [RealRibosome]. The abstract trait exists
+//! We have only one instance of this: [crate::core::ribosome::real_ribosome::RealRibosome]. The abstract trait exists
 //! so that we can write mocks against the `RibosomeT` interface, as well as
 //! opening the possiblity that we might support applications written in other
 //! languages and environments.
@@ -441,7 +441,7 @@ impl From<&ZomeCallHostAccess> for HostFnAccess {
 }
 
 /// Interface for a Ribosome. Currently used only for mocking, as our only
-/// real concrete type is [RealRibosome]
+/// real concrete type is [`RealRibosome`](crate::core::ribosome::real_ribosome::RealRibosome)
 #[automock]
 pub trait RibosomeT: Sized + std::fmt::Debug {
     fn dna_def(&self) -> &DnaDefHashed;
@@ -538,9 +538,8 @@ pub trait RibosomeT: Sized + std::fmt::Debug {
         invocation: PostCommitInvocation,
     ) -> RibosomeResult<()>;
 
-    /// Helper function for running a validation callback. Just calls
-    /// [`run_callback`][] under the hood.
-    /// [`run_callback`]: #method.run_callback
+    /// Helper function for running a validation callback. Calls
+    /// [`do_callback!`] under the hood.
     fn run_validate(
         &self,
         access: ValidateHostAccess,

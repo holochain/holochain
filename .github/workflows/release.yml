@@ -2,7 +2,7 @@ name: release holochain
 
 on:
   schedule:
-    - cron: "0 1 * * 3" # at 1 AM on wednesday
+    - cron: "0 0 * * 3" # at 0 AM on wednesday
   workflow_dispatch:
     inputs:
       # holochain_url:
@@ -117,6 +117,8 @@ jobs:
 
           if [[ ${input_debug} != "" ]]; then
             echo "::set-output name=debug::${input_debug}"
+          elif [[ "${{ github.event_name }}" == "schedule" ]]; then
+            echo "::set-output name=debug::false"
           elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
             echo "::set-output name=debug::false"
           else
@@ -225,6 +227,8 @@ jobs:
               ubuntu-latest: 1
               macos-latest: 1
             run: |
+              set -x
+
               # remove everything that wouldn't be on github either
               git clean -fdx
 
@@ -235,6 +239,12 @@ jobs:
               cd "${HOLOCHAIN_NIXPKGS_REPO}"
 
               git checkout -b "${RELEASE_BRANCH}"
+
+              if grep --quiet ${VERSION_COMPAT} packages/holochain/versions/update_config.toml; then
+                export VERSION_COMPAT="${VERSION_COMPAT}-ci"
+                export TAG="${TAG}-ci"
+                git -C "${HOLOCHAIN_REPO}" tag "${TAG}"
+              fi
 
               cat <<EOF >> packages/holochain/versions/update_config.toml
 
@@ -372,7 +382,7 @@ jobs:
             cd "${HOLOCHAIN_REPO}"
 
             ${{ matrix.testCommand.run }}
-        continue-on-error: ${{ matrix.platform != 'ubuntu-latest' && matrix.testCommand.ignoreErrorOnNonUbuntu != 'true' }}
+        continue-on-error: ${{ matrix.platform != 'ubuntu-latest' && matrix.testCommand.ignoreErrorOnNonUbuntu == true }}
 
       - name: Garbage-collect cache
         if: ${{ always() && matrix.testCommand.savesCargoCache == true }}
@@ -406,7 +416,7 @@ jobs:
           limit-access-to-users: steveeJ,jost-s,freesig,neonphog,thedavidmeister,maackle
 
   finalize:
-    if: ${{ github.event_name != 'pull_request' }}
+    if: ${{ github.event_name != 'pull_request' && needs.prepare.outputs.releasable_crates == 'true' }}
     needs: [vars, prepare, test]
     env:
       HOLOCHAIN_REPO: ${{ needs.vars.outputs.HOLOCHAIN_REPO }}
@@ -536,7 +546,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN}}
           pull-request-number: ${{ steps.cpr.outputs.pull-request-number }}
-          merge-method: squash
+          merge-method: merge
       - name: Auto approve Pull Request
         if: ${{ needs.vars.outputs.dry_run == 'false' }}
         uses: juliangruber/approve-pull-request-action@v1
@@ -558,13 +568,21 @@ jobs:
           limit-access-to-users: steveeJ,jost-s,freesig,neonphog,thedavidmeister,maackle
 
   github-actions-ci-jobs-succeed:
-    if: ${{ github.event_name == 'pull_request' }}
+    if: ${{ always() && github.event_name == 'pull_request' }}
     runs-on: "ubuntu-latest"
     needs: [vars, prepare]
-    steps: [{ name: "ci-jobs-succeed", run: ":" }]
+    steps:
+      - name: Check status
+        env:
+          RESULTS: "${{ toJSON(needs.*.result) }}"
+        run: "[[ $(jq -n 'env.RESULTS | fromjson | unique == [\"success\"]') == \"true\" ]]\n"
 
   all-jobs-succeed:
-    if: ${{ github.event_name != 'pull_request' }}
+    if: ${{ always() && github.event_name != 'pull_request' }}
     runs-on: "ubuntu-latest"
     needs: [vars, prepare, test, finalize]
-    steps: [{ name: "all-jobs-succeed", run: ":" }]
+    steps:
+      - name: Check status
+        env:
+          RESULTS: "${{ toJSON(needs.*.result) }}"
+        run: "[[ $(jq -n 'env.RESULTS | fromjson | unique == [\"success\"]') == \"true\" ]]\n"
