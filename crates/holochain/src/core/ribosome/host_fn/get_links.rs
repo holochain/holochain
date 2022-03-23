@@ -96,11 +96,11 @@ pub mod slow_tests {
 
         assert!(exists_output);
 
-        let foo_bar: holo_hash::EntryHash = conductor
+        let foo_bar: holo_hash::AnyLinkableHash = conductor
             .call(&alice, "path_entry_hash", "foo.bar".to_string())
             .await;
 
-        let foo_baz: holo_hash::EntryHash = conductor
+        let foo_baz: holo_hash::AnyLinkableHash = conductor
             .call(&alice, "path_entry_hash", "foo.baz".to_string())
             .await;
 
@@ -201,7 +201,7 @@ pub mod slow_tests {
         );
         assert_eq!(
             links[0].target,
-            EntryHash::from_raw_32([2_u8; 32].to_vec()),
+            EntryHash::from_raw_32([2_u8; 32].to_vec()).into(),
         );
     }
 

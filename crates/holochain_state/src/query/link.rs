@@ -13,14 +13,14 @@ pub struct GetLinksQuery {
 
 #[derive(Debug, Clone)]
 pub struct LinksQuery {
-    pub base: Arc<EntryHash>,
+    pub base: Arc<AnyLinkableHash>,
     pub zome_id: ZomeId,
     pub tag: Option<String>,
     query: String,
 }
 
 impl LinksQuery {
-    pub fn new(base: EntryHash, zome_id: ZomeId, tag: Option<LinkTag>) -> Self {
+    pub fn new(base: AnyLinkableHash, zome_id: ZomeId, tag: Option<LinkTag>) -> Self {
         let tag = tag.map(|tag| Self::tag_to_hex(&tag));
         let create_string = Self::create_query_string(tag.clone());
         let delete_string = Self::delete_query_string(tag.clone());
@@ -41,11 +41,11 @@ impl LinksQuery {
         s
     }
 
-    pub fn base(base: EntryHash, zome_id: ZomeId) -> Self {
+    pub fn base(base: AnyLinkableHash, zome_id: ZomeId) -> Self {
         Self::new(base, zome_id, None)
     }
 
-    pub fn tag(base: EntryHash, zome_id: ZomeId, tag: LinkTag) -> Self {
+    pub fn tag(base: AnyLinkableHash, zome_id: ZomeId, tag: LinkTag) -> Self {
         Self::new(base, zome_id, Some(tag))
     }
 
@@ -133,19 +133,19 @@ impl LinksQuery {
 }
 
 impl GetLinksQuery {
-    pub fn new(base: EntryHash, zome_id: ZomeId, tag: Option<LinkTag>) -> Self {
+    pub fn new(base: AnyLinkableHash, zome_id: ZomeId, tag: Option<LinkTag>) -> Self {
         Self {
             query: LinksQuery::new(base, zome_id, tag),
         }
     }
 
-    pub fn base(base: EntryHash, zome_id: ZomeId) -> Self {
+    pub fn base(base: AnyLinkableHash, zome_id: ZomeId) -> Self {
         Self {
             query: LinksQuery::base(base, zome_id),
         }
     }
 
-    pub fn tag(base: EntryHash, zome_id: ZomeId, tag: LinkTag) -> Self {
+    pub fn tag(base: AnyLinkableHash, zome_id: ZomeId, tag: LinkTag) -> Self {
         Self {
             query: LinksQuery::tag(base, zome_id, tag),
         }
@@ -234,7 +234,7 @@ fn link_from_header(header: Header) -> StateQueryResult<Link> {
     let hash = HeaderHash::with_data_sync(&header);
     match header {
         Header::CreateLink(header) => Ok(Link {
-            target: header.target_address.into(),
+            target: header.target_address,
             timestamp: header.timestamp,
             tag: header.tag,
             create_link_hash: hash,

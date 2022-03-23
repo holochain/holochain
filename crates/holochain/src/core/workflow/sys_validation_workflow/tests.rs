@@ -314,7 +314,7 @@ async fn dodgy_bob(bob_cell_id: &CellId, handle: &ConductorHandle, dna_file: &Dn
     // on to the source chain and flush the workspace.
     let (_ribosome, call_context, workspace_lock) = call_data.unpack().await;
     // garbage addresses.
-    let base_address = EntryHash::from_raw_32([1_u8; 32].to_vec());
+    let base_address: AnyLinkableHash = EntryHash::from_raw_32([1_u8; 32].to_vec()).into();
     let link_add_address = HeaderHash::from_raw_32([2_u8; 32].to_vec());
 
     let source_chain = call_context

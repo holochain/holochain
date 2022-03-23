@@ -37,6 +37,12 @@ pub type AnyDhtHash = HoloHash<hash_type::AnyDht>;
 /// The hash of anything linkable.
 pub type AnyLinkableHash = HoloHash<hash_type::AnyLinkable>;
 
+impl From<AnyLinkableHash> for AnyDhtHash {
+    fn from(hash: AnyLinkableHash) -> Self {
+        hash.retype(hash_type::AnyDht::Entry)
+    }
+}
+
 impl From<HeaderHash> for AnyDhtHash {
     fn from(hash: HeaderHash) -> Self {
         hash.retype(hash_type::AnyDht::Header)

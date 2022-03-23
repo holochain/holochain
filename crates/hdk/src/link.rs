@@ -163,7 +163,10 @@ pub fn get_links(base: AnyLinkableHash, link_tag: Option<LinkTag>) -> ExternResu
 /// c.f. get_links that returns only the creates that have not been deleted.
 ///
 /// See [ `get_links` ].
-pub fn get_link_details(base: AnyLinkableHash, link_tag: Option<LinkTag>) -> ExternResult<LinkDetails> {
+pub fn get_link_details(
+    base: AnyLinkableHash,
+    link_tag: Option<LinkTag>,
+) -> ExternResult<LinkDetails> {
     Ok(HDK
         .with(|h| {
             h.borrow()

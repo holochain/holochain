@@ -7,9 +7,9 @@ use crate::link::LinkTag;
 use crate::link::LinkType;
 use header::Dna;
 use holo_hash::AgentPubKey;
+use holo_hash::AnyLinkableHash;
 use holo_hash::DnaHash;
 use holo_hash::EntryHash;
-use holo_hash::AnyLinkableHash;
 use holo_hash::HeaderHash;
 use holochain_serialized_bytes::SerializedBytes;
 

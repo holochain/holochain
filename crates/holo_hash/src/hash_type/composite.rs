@@ -1,6 +1,5 @@
 use super::*;
 use crate::error::HoloHashError;
-use crate::HoloHash;
 use std::convert::TryInto;
 
 #[cfg(feature = "serialization")]
@@ -93,10 +92,10 @@ pub enum AnyLinkable {
 }
 
 #[cfg(feature = "arbitrary")]
-impl<'a> arbitrary::Arbitrary<'a> for HoloHash<AnyLinkable> {
+impl<'a> arbitrary::Arbitrary<'a> for crate::HoloHash<AnyLinkable> {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         let any_linkable = AnyLinkable::arbitrary(u)?;
-        let some_hash = HoloHash::<Entry>::arbitrary(u)?;
+        let some_hash = crate::HoloHash::<Entry>::arbitrary(u)?;
         Ok(some_hash.retype(any_linkable))
     }
 }
