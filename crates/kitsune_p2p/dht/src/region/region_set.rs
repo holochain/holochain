@@ -6,11 +6,10 @@ use crate::{
     op::OpRegion,
     persistence::AccessOpStore,
     quantum::*,
-    tree::TreeDataConstraints,
 };
 use derivative::Derivative;
 
-use super::{Region, RegionBounds, RegionCoords, RegionData};
+use super::{Region, RegionBounds, RegionCoords, RegionData, RegionDataConstraints};
 
 #[derive(Debug, PartialEq, Eq, derive_more::Constructor, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "test_utils", derive(Clone))]
@@ -43,7 +42,7 @@ impl RegionCoordSetXtcs {
 
     pub fn into_region_set<D, E, F>(self, mut f: F) -> Result<RegionSetXtcs<D>, E>
     where
-        D: TreeDataConstraints,
+        D: RegionDataConstraints,
         F: FnMut(((u32, u32), RegionCoords)) -> Result<D, E>,
     {
         let data = self
@@ -67,12 +66,12 @@ impl RegionCoordSetXtcs {
 /// a simple Vec<Region>, if we want a more intricate algorithm later.
 #[derive(Debug, derive_more::From)]
 #[cfg_attr(feature = "test_utils", derive(Clone))]
-pub enum RegionSet<T: TreeDataConstraints = RegionData> {
+pub enum RegionSet<T: RegionDataConstraints = RegionData> {
     /// eXponential Time, Constant Space.
     Xtcs(RegionSetXtcs<T>),
 }
 
-impl<D: TreeDataConstraints> RegionSet<D> {
+impl<D: RegionDataConstraints> RegionSet<D> {
     pub fn count(&self) -> usize {
         match self {
             Self::Xtcs(set) => set.count(),
@@ -122,7 +121,7 @@ impl<D: TreeDataConstraints> RegionSet<D> {
 #[derive(Debug, serde::Serialize, serde::Deserialize, Derivative)]
 #[derivative(PartialEq, Eq)]
 #[cfg_attr(feature = "test_utils", derive(Clone))]
-pub struct RegionSetXtcs<D: TreeDataConstraints = RegionData> {
+pub struct RegionSetXtcs<D: RegionDataConstraints = RegionData> {
     /// The generator for the coordinates
     pub coords: RegionCoordSetXtcs,
 
@@ -137,7 +136,7 @@ pub struct RegionSetXtcs<D: TreeDataConstraints = RegionData> {
     pub data: Vec<Vec<D>>,
 }
 
-impl<D: TreeDataConstraints> RegionSetXtcs<D> {
+impl<D: RegionDataConstraints> RegionSetXtcs<D> {
     pub fn empty() -> Self {
         Self {
             coords: RegionCoordSetXtcs::empty(),
@@ -230,12 +229,6 @@ impl RegionSetXtcs {
             let d = &self.data[i as usize][j as usize];
             (d.count > 0).then(|| ((i, j), c, *d))
         })
-    }
-
-    pub fn report_nonzero_regions(&self) -> Vec<String> {
-        self.nonzero_regions()
-            .map(|((i, j), _, d)| format!("({},{}): {}", i, j, d.hash.loc()))
-            .collect()
     }
 }
 

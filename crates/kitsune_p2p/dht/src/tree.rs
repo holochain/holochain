@@ -4,40 +4,13 @@ use num_traits::Zero;
 
 use crate::{op::*, quantum::*, region::*, test_utils::op_data::Op};
 
-pub trait TreeDataConstraints:
-    Eq
-    + Zero
-    + AddAssign
-    + Sub<Output = Self>
-    + Copy
-    + Send
-    + Sync
-    + std::fmt::Debug
-    + serde::Serialize
-    + serde::de::DeserializeOwned
-{
-}
-impl<T> TreeDataConstraints for T where
-    T: Eq
-        + Zero
-        + AddAssign
-        + Sub<Output = T>
-        + Copy
-        + Send
-        + Sync
-        + std::fmt::Debug
-        + serde::Serialize
-        + serde::de::DeserializeOwned
-{
-}
-
 #[derive(Clone)]
-pub struct Tree<D: TreeDataConstraints = RegionData> {
+pub struct Tree<D: RegionDataConstraints = RegionData> {
     pub(crate) tree: RegionSet<D>,
     topo: Topology,
 }
 
-impl<D: TreeDataConstraints> Tree<D> {
+impl<D: RegionDataConstraints> Tree<D> {
     pub fn new(topo: Topology, region_set: RegionSet<D>) -> Self {
         Self {
             // TODO: take topology into account to reduce max size

@@ -1,10 +1,6 @@
-use std::{borrow::Borrow, sync::Arc};
+//! Defines the trait which represents everything Kitsune needs to know about Ops
 
-use crate::{
-    hash::OpHash,
-    quantum::{SpacetimeCoords, Topology},
-    region::RegionData,
-};
+use crate::quantum::{SpacetimeCoords, Topology};
 
 pub use kitsune_p2p_dht_arc::DhtLocation as Loc;
 

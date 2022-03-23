@@ -1,3 +1,6 @@
+//! Defines the structure of the DHT and the operations which can be performed
+//! in and on it.
+
 #![warn(missing_docs)]
 
 pub mod arq;

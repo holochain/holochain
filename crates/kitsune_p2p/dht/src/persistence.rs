@@ -20,13 +20,12 @@ use crate::{
     quantum::{GossipParams, TelescopingTimes, TimeQuantum, Topology},
     region::*,
     test_utils::op_data::OpData,
-    tree::TreeDataConstraints,
     Arq,
 };
 
 /// All methods involved in accessing the op store, to be implemented by the host.
 // TODO: make async
-pub trait AccessOpStore<O: OpRegion<D>, D: TreeDataConstraints = RegionData>: Send {
+pub trait AccessOpStore<O: OpRegion<D>, D: RegionDataConstraints = RegionData>: Send {
     /// Query the actual ops inside a region
     fn query_op_data(&self, region: &RegionCoords) -> Vec<Arc<O>>;
 
@@ -79,11 +78,11 @@ pub trait AccessPeerStore {
 }
 
 /// Represents all methods implemented by the host.
-pub trait HostAccess<O: OpRegion<D>, D: TreeDataConstraints = RegionData>:
+pub trait HostAccess<O: OpRegion<D>, D: RegionDataConstraints = RegionData>:
     AccessOpStore<O, D> + AccessPeerStore
 {
 }
-impl<T, O: OpRegion<D>, D: TreeDataConstraints> HostAccess<O, D> for T where
+impl<T, O: OpRegion<D>, D: RegionDataConstraints> HostAccess<O, D> for T where
     T: AccessOpStore<O, D> + AccessPeerStore
 {
 }

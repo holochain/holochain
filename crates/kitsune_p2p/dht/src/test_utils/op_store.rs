@@ -3,8 +3,7 @@ use crate::{
     persistence::AccessOpStore,
     prelude::{RegionCoords, RegionSet, RegionSetXtcs},
     quantum::{GossipParams, Topology},
-    region::RegionData,
-    tree::TreeDataConstraints,
+    region::{RegionData, RegionDataConstraints},
 };
 use futures::future::FutureExt;
 use std::{collections::BTreeSet, ops::Bound, sync::Arc};
@@ -12,14 +11,14 @@ use std::{collections::BTreeSet, ops::Bound, sync::Arc};
 use super::op_data::OpData;
 
 #[derive(Clone)]
-pub struct OpStore<O: OpRegion<D> = OpData, D: TreeDataConstraints = RegionData> {
+pub struct OpStore<O: OpRegion<D> = OpData, D: RegionDataConstraints = RegionData> {
     pub(crate) topo: Topology,
     pub(crate) ops: BTreeSet<Arc<O>>,
     pub(crate) _region_set: RegionSet<D>,
     pub(crate) gossip_params: GossipParams,
 }
 
-impl<D: TreeDataConstraints, O: OpRegion<D>> OpStore<O, D> {
+impl<D: RegionDataConstraints, O: OpRegion<D>> OpStore<O, D> {
     pub fn new(topo: Topology, gossip_params: GossipParams) -> Self {
         Self {
             topo,
@@ -30,7 +29,7 @@ impl<D: TreeDataConstraints, O: OpRegion<D>> OpStore<O, D> {
     }
 }
 
-impl<D: TreeDataConstraints, O: OpRegion<D>> AccessOpStore<O, D> for OpStore<O, D> {
+impl<D: RegionDataConstraints, O: OpRegion<D>> AccessOpStore<O, D> for OpStore<O, D> {
     fn query_op_data(&self, region: &RegionCoords) -> Vec<Arc<O>> {
         let region = region.to_bounds(self.topo());
         let (x0, x1) = region.x;

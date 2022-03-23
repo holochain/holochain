@@ -1,5 +1,12 @@
+//! Simple hash types.
+//!
+//! TODO: unify with hashes from `kitsune_p2p_types::bin_types`
+
+/// 32 bytes
 pub type Hash32 = [u8; 32];
 
+/// Get a fake hash, for testing only.
+#[cfg(feature = "test_utils")]
 pub fn fake_hash() -> Hash32 {
     use rand::distributions::*;
 
@@ -10,16 +17,19 @@ pub fn fake_hash() -> Hash32 {
     bytes
 }
 
+/// The hash of an Op
 #[derive(
     Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, derive_more::Constructor, derive_more::From,
 )]
 pub struct OpHash(pub Hash32);
 
+/// The hash of an Agent
 #[derive(
     Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, derive_more::Constructor, derive_more::From,
 )]
 pub struct AgentKey(pub Hash32);
 
+/// The hash of a Region, which is the XOR of all OpHashes contained in this region.
 #[derive(
     Copy,
     Clone,
@@ -35,12 +45,9 @@ pub struct AgentKey(pub Hash32);
 pub struct RegionHash(pub Hash32);
 
 impl RegionHash {
+    /// If the Vec is 32 long, construct a RegionHash from it
     pub fn from_vec(v: Vec<u8>) -> Option<Self> {
         v.try_into().map(Self).ok()
-    }
-
-    pub fn loc(&self) -> u32 {
-        u32::from_be_bytes(self.0[28..32].try_into().unwrap())
     }
 }
 
