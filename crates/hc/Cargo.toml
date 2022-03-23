@@ -21,7 +21,7 @@ path = "src/lib.rs"
 [dependencies]
 anyhow = "1.0"
 futures = "0.3"
-holochain_cli_bundle = { path = "../hc_bundle", version = "0.0.27-dev.0"}
+holochain_cli_bundle = { path = "../hc_bundle", version = "0.0.27"}
 holochain_cli_sandbox = { path = "../hc_sandbox", version = "0.0.28-dev.0"}
 observability = "0.1.3"
 structopt = "0.3"
