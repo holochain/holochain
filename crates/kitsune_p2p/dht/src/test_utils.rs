@@ -1,3 +1,5 @@
+//! Utils for testing
+
 pub mod gossip_direct;
 pub mod min_redundancy;
 pub mod op_data;
@@ -21,6 +23,7 @@ pub fn get_input() {
         .expect("Failed to read line");
 }
 
+/// A RNG suitable for testing, if no seed is passed, uses standard random seed.
 pub fn seeded_rng(seed: Option<u64>) -> StdRng {
     let seed = seed.unwrap_or_else(|| thread_rng().gen());
     tracing::info!("RNG seed: {}", seed);
@@ -34,13 +37,15 @@ fn full_len() -> f64 {
 #[allow(dead_code)]
 type DataVec = statrs::statistics::Data<Vec<f64>>;
 
+/// Your peers just look like a bunch of Arqs
 pub type Peers = Vec<Arq>;
 
-pub fn unit_arq(topo: &Topology, strat: &ArqStrat, unit_center: f64, unit_len: f64) -> Arq {
+/// Construct an arq from start and length specified in the interval [0, 1]
+pub fn unit_arq(topo: &Topology, strat: &ArqStrat, unit_start: f64, unit_len: f64) -> Arq {
     assert!(
-        (0.0..1.0).contains(&unit_center),
+        (0.0..1.0).contains(&unit_start),
         "center out of bounds {}",
-        unit_center
+        unit_start
     );
     assert!(
         (0.0..=1.0).contains(&unit_len),
@@ -51,7 +56,7 @@ pub fn unit_arq(topo: &Topology, strat: &ArqStrat, unit_center: f64, unit_len: f
     approximate_arq(
         topo,
         strat,
-        Loc::from((unit_center * full_len()) as u32),
+        Loc::from((unit_start * full_len()) as u32),
         (unit_len * full_len()) as u64,
     )
 }
@@ -96,6 +101,8 @@ pub fn generate_ideal_coverage(
     peers
 }
 
+/// Generates arqs with lengths according to a standard distribution, to test
+/// wildly unbalanced initial conditions
 pub fn generate_messy_coverage(
     topo: &Topology,
     rng: &mut StdRng,

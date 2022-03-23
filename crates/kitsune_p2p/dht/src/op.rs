@@ -1,6 +1,6 @@
 //! Defines the trait which represents everything Kitsune needs to know about Ops
 
-use crate::quantum::{SpacetimeCoords, Topology};
+use crate::quantum::{SpacetimeQuantumCoords, Topology};
 
 pub use kitsune_p2p_dht_arc::DhtLocation as Loc;
 
@@ -19,8 +19,8 @@ pub trait OpRegion<D>: PartialOrd + Ord + Send + Sync {
     fn region_data(&self) -> D;
 
     /// The quantized space and time coordinates, based on the location and timestamp.
-    fn coords(&self, topo: &Topology) -> SpacetimeCoords {
-        SpacetimeCoords {
+    fn coords(&self, topo: &Topology) -> SpacetimeQuantumCoords {
+        SpacetimeQuantumCoords {
             space: topo.space_coord(self.loc()),
             time: topo.time_coord(self.timestamp()),
         }

@@ -18,6 +18,7 @@ pub mod test_utils;
 
 pub use kitsune_p2p_dht_arc::DhtLocation as Loc;
 
+/// Common exports
 pub mod prelude {
     pub use super::arq::*;
     pub use super::error::*;

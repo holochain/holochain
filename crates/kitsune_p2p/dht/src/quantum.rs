@@ -54,7 +54,7 @@ use crate::{
 };
 use derivative::Derivative;
 
-/// Represents some number of space quanta. The actual DhtLocation that this
+/// Represents some particular quantum area of space. The actual DhtLocation that this
 /// coordinate corresponds to depends upon the space quantum size specified
 /// in the Topology
 #[derive(
@@ -76,13 +76,14 @@ use derivative::Derivative;
 pub struct SpaceQuantum(u32);
 
 impl SpaceQuantum {
+    /// The locations at either end of this quantum
     pub fn to_loc_bounds(&self, topo: &Topology) -> (Loc, Loc) {
         let (a, b): (u32, u32) = bounds(&topo.space, 0, self.0.into(), 1);
         (Loc::from(a), Loc::from(b))
     }
 }
 
-/// Represents some number of time quanta. The actual Timestamp that this
+/// Represents some particular quantum area of time . The actual Timestamp that this
 /// coordinate corresponds to depends upon the time quantum size specified
 /// in the Topology
 #[derive(
@@ -104,10 +105,12 @@ impl SpaceQuantum {
 pub struct TimeQuantum(u32);
 
 impl TimeQuantum {
+    /// The quantum which contains this timestamp
     pub fn from_timestamp(topo: &Topology, timestamp: Timestamp) -> Self {
         topo.time_coord(timestamp)
     }
 
+    /// The timestamps at either end of this quantum
     pub fn to_timestamp_bounds(&self, topo: &Topology) -> (Timestamp, Timestamp) {
         let (a, b): (i64, i64) = bounds64(&topo.time, 0, self.0.into(), 1);
         (
@@ -117,17 +120,23 @@ impl TimeQuantum {
     }
 }
 
+/// A quantum in the physical sense: the smallest possible amount of something.
+/// Here, we are talking about Time and Space quanta.
 pub trait Quantum: From<u32> + PartialEq + Eq + PartialOrd + Ord + std::fmt::Debug {
-    type Target;
+    /// The absolute coordinate which this quantum corresponds to (time or space)
+    type Absolute;
 
+    /// The u32 representation
     fn inner(&self) -> u32;
 
+    /// Return the proper dimension (time or space) from the topology
     fn dimension(topo: &Topology) -> &Dimension;
 
     /// If this coord is beyond the max value for its dimension, wrap it around
     /// the max value
     fn normalized(self, topo: &Topology) -> Self;
 
+    /// The maximum quantum for this dimension
     fn max_value(topo: &Topology) -> Self {
         Self::from((2u64.pow(Self::dimension(topo).bit_depth as u32) - 1) as u32)
     }
@@ -137,17 +146,19 @@ pub trait Quantum: From<u32> + PartialEq + Eq + PartialOrd + Ord + std::fmt::Deb
         (self.inner() as u64 * Self::dimension(topo).quantum as u64 * 2u64.pow(pow as u32)) as u32
     }
 
+    /// Exposes wrapping addition for the u32
     fn wrapping_add(self, other: u32) -> Self {
         Self::from((self.inner()).wrapping_add(other))
     }
 
+    /// Exposes wrapping subtraction for the u32
     fn wrapping_sub(self, other: u32) -> Self {
         Self::from((self.inner()).wrapping_sub(other))
     }
 }
 
 impl Quantum for SpaceQuantum {
-    type Target = Loc;
+    type Absolute = Loc;
 
     fn inner(&self) -> u32 {
         self.0
@@ -168,7 +179,7 @@ impl Quantum for SpaceQuantum {
 }
 
 impl Quantum for TimeQuantum {
-    type Target = Timestamp;
+    type Absolute = Timestamp;
 
     fn inner(&self) -> u32 {
         self.0
@@ -184,13 +195,17 @@ impl Quantum for TimeQuantum {
     }
 }
 
+/// A SpaceQuantum and a TimeQuantum form a quantum of spacetime
 #[derive(Debug)]
-pub struct SpacetimeCoords {
+pub struct SpacetimeQuantumCoords {
+    /// The space quantum coordinate
     pub space: SpaceQuantum,
+    /// The time quantum coordinate
     pub time: TimeQuantum,
 }
 
-impl SpacetimeCoords {
+impl SpacetimeQuantumCoords {
+    /// Unpack the space and time coordinates
     pub fn to_tuple(&self) -> (u32, u32) {
         (self.space.0, self.time.0)
     }
@@ -215,6 +230,9 @@ fn bounds64<N: From<i64>>(dim: &Dimension, power: u8, offset: Offset, count: u32
 /// context, and topology of the space, by:
 ///
 ///   dht location = offset * 2^pow * topology.space.quantum
+///
+/// Currently we only discuss offsets in Space. TODO: do we need to talk about
+/// Time Offsets as well?
 #[derive(
     Copy,
     Clone,
@@ -239,17 +257,19 @@ fn bounds64<N: From<i64>>(dim: &Dimension, power: u8, offset: Offset, count: u32
 pub struct Offset(pub u32);
 
 impl Offset {
+    /// Get the absolute coordinate for this Offset
     pub fn to_loc(&self, topo: &Topology, power: u8) -> Loc {
         self.wrapping_mul(topo.space.quantum)
             .wrapping_mul(pow2(power))
             .into()
     }
 
+    /// Get the quantum coordinate for this Offset
     pub fn to_quantum(&self, power: u8) -> SpaceQuantum {
         self.wrapping_mul(pow2(power)).into()
     }
 
-    /// Get the nearest rounded-down Offset for this Loc
+    /// Get the nearest rounded-down Offset for the given Loc
     pub fn from_loc_rounded(loc: Loc, topo: &Topology, power: u8) -> Offset {
         (loc.as_u32() / topo.space.quantum / pow2(power)).into()
     }
@@ -269,6 +289,7 @@ pub struct Segment<Q: Quantum> {
 }
 
 impl<Q: Quantum> Segment<Q> {
+    /// Constructor
     pub fn new<O: Into<Offset>>(power: u8, offset: O) -> Self {
         Self {
             power,
@@ -277,11 +298,13 @@ impl<Q: Quantum> Segment<Q> {
         }
     }
 
+    /// How many quanta does this segment cover?
     pub fn num_quanta(&self) -> u64 {
         // If power is 32, this overflows a u32
         2u64.pow(self.power.into())
     }
 
+    /// The length, in absolute terms (Location or microseconds of time)
     pub fn absolute_length(&self, topo: &Topology) -> u64 {
         let q = Q::dimension(topo).quantum as u64;
         // If power is 32, this overflows a u32
@@ -298,7 +321,8 @@ impl<Q: Quantum> Segment<Q> {
         )
     }
 
-    pub fn contains(&self, topo: &Topology, coord: Q) -> bool {
+    /// The segment contains the given quantum coord
+    pub fn contains_quantum(&self, topo: &Topology, coord: Q) -> bool {
         let (lo, hi) = self.quantum_bounds(topo);
         let coord = coord.normalized(topo);
         if lo <= hi {
@@ -673,8 +697,8 @@ mod tests {
         let topo = Topology::unit_zero();
         let s = TimeSegment::new(31, 0);
         assert_eq!(s.quantum_bounds(&topo), (0.into(), (u32::MAX / 2).into()));
-        assert!(s.contains(&topo, 0.into()));
-        assert!(!s.contains(&topo, (u32::MAX / 2 + 2).into()));
+        assert!(s.contains_quantum(&topo, 0.into()));
+        assert!(!s.contains_quantum(&topo, (u32::MAX / 2 + 2).into()));
     }
 
     #[test]
@@ -687,11 +711,11 @@ mod tests {
         assert_eq!(bounds, SpaceSegment::new(2, 5).quantum_bounds(&topo));
         assert_eq!(bounds, (20.into(), 23.into()));
 
-        assert!(s.contains(&topo, 20.into()));
-        assert!(s.contains(&topo, 23.into()));
-        assert!(s.contains(&topo, (m * 2 + 20).into()));
-        assert!(s.contains(&topo, (m * 3 + 23).into()));
-        assert!(!s.contains(&topo, (m * 4 + 24).into()));
+        assert!(s.contains_quantum(&topo, 20.into()));
+        assert!(s.contains_quantum(&topo, 23.into()));
+        assert!(s.contains_quantum(&topo, (m * 2 + 20).into()));
+        assert!(s.contains_quantum(&topo, (m * 3 + 23).into()));
+        assert!(!s.contains_quantum(&topo, (m * 4 + 24).into()));
     }
 
     #[test]

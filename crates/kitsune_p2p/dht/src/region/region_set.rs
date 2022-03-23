@@ -95,7 +95,7 @@ impl<D: RegionDataConstraints> RegionSet<D> {
         unimplemented!("only implement after trying naive database-only approach")
     }
 
-    pub fn update(&self, _c: SpacetimeCoords, _d: D) -> ! {
+    pub fn update(&self, _c: SpacetimeQuantumCoords, _d: D) -> ! {
         unimplemented!("only implement after trying naive database-only approach")
     }
 

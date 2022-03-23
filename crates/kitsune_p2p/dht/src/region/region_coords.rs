@@ -2,7 +2,7 @@ use crate::Loc;
 use kitsune_p2p_dht_arc::DhtArc;
 use kitsune_p2p_timestamp::Timestamp;
 
-use crate::quantum::{SpaceSegment, SpacetimeCoords, TimeSegment, Topology};
+use crate::quantum::{SpaceSegment, SpacetimeQuantumCoords, TimeSegment, Topology};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, derive_more::Constructor)]
 pub struct RegionCoords {
@@ -20,8 +20,9 @@ impl RegionCoords {
         }
     }
 
-    pub fn contains(&self, topo: &Topology, coords: &SpacetimeCoords) -> bool {
-        self.space.contains(topo, coords.space) && self.time.contains(topo, coords.time)
+    pub fn contains(&self, topo: &Topology, coords: &SpacetimeQuantumCoords) -> bool {
+        self.space.contains_quantum(topo, coords.space)
+            && self.time.contains_quantum(topo, coords.time)
     }
 }
 
