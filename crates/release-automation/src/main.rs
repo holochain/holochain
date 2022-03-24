@@ -283,6 +283,14 @@ pub(crate) mod cli {
         /// Paths to manifest that will also be considered when updating the Cargo.lock files
         #[structopt(long)]
         pub(crate) additional_manifests: Vec<String>,
+
+        #[structopt(
+            long,
+            default_value = crate_::MINIMUM_CRATE_OWNERS,
+            use_delimiter = true,
+            multiple = false,
+        )]
+        pub(crate) minimum_crate_owners: Vec<String>,
     }
 
     /// Parses a commad separated input string to a set of strings.

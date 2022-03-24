@@ -96,6 +96,7 @@ pub(crate) struct CrateCheckArgs {
     offline: bool,
 }
 
+/// These crate.io handles are used as the default minimum crate owners for all published crates.
 pub(crate) const MINIMUM_CRATE_OWNERS: &str =
     "github:holochain:core-dev,holochain-release-automation,holochain-release-automation2,zippy,steveeJ";
 
@@ -170,12 +171,7 @@ pub(crate) fn cmd(args: &crate::cli::Args, cmd_args: &CrateArgs) -> CommandResul
                 &ws,
                 subcmd_args.dry_run,
                 ws.members()?,
-                subcmd_args
-                    .minimum_crate_owners
-                    .iter()
-                    .map(|s| s.as_str())
-                    .collect::<Vec<_>>()
-                    .as_slice(),
+                subcmd_args.minimum_crate_owners.as_slice(),
             )?;
 
             Ok(())
@@ -404,12 +400,12 @@ pub(crate) fn ensure_crate_io_owners<'a>(
     _ws: &'a ReleaseWorkspace<'a>,
     dry_run: bool,
     crates: &[&Crate],
-    minimum_crate_owners: &[&str],
+    minimum_crate_owners: &[String],
 ) -> Fallible<()> {
     let desired_owners = minimum_crate_owners
-        .iter()
-        .map(|s| s.to_string())
-        .collect::<HashSet<_>>();
+        .into_iter()
+        .cloned()
+        .collect::<HashSet<String>>();
 
     for crt in crates {
         if !crates_index_helper::is_version_published(crt, false)? {

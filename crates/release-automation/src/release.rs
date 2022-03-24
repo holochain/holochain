@@ -88,11 +88,7 @@ pub(crate) fn cmd(args: &crate::cli::Args, cmd_args: &crate::cli::ReleaseArgs) -
                 &ws,
                 cmd_args.dry_run,
                 &latest_release_crates(&ws)?,
-                // TODO: make this configurable?
-                crate_::MINIMUM_CRATE_OWNERS
-                    .split(",")
-                    .collect::<Vec<_>>()
-                    .as_slice(),
+                &cmd_args.minimum_crate_owners,
             )?,
         }
     }

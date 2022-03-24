@@ -309,7 +309,7 @@ Automated steps still require running the tool manually ;-).
 
         If this succeeds, repeat the command without the `--dry-run` to perform the changes.
 
-    0. Ensure the *(FIXME: hardcoded)* set of owners are invited to all crates.
+    0. Ensure the default set of owners are invited to all crates.
 
         ```sh
         nix-shell --pure --run '
