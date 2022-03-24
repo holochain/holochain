@@ -222,6 +222,7 @@ pub enum KitsuneErrorKind {
 
 impl PartialEq for KitsuneErrorKind {
     fn eq(&self, oth: &Self) -> bool {
+        #[allow(clippy::match_like_matches_macro)]
         match (self, oth) {
             (Self::TimedOut, Self::TimedOut) => true,
             (Self::Closed, Self::Closed) => true,

@@ -41,6 +41,14 @@ impl KitsuneHostPanicky for HarnessHost {
     ) -> KitsuneHostResult<Vec<f64>> {
         box_fut(Ok(vec![]))
     }
+
+    fn query_region_set(
+        &self,
+        _space: Arc<KitsuneSpace>,
+        _dht_arc_set: Arc<DhtArcSet>,
+    ) -> KitsuneHostResult<RegionSetLtcs> {
+        box_fut(Ok(RegionSetLtcs::empty()))
+    }
 }
 
 pub(crate) async fn spawn_test_agent(
@@ -85,6 +93,7 @@ pub(crate) async fn spawn_test_agent(
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::box_fut;
 use kitsune_p2p_types::dependencies::lair_keystore_api_0_0;
+use kitsune_p2p_types::dht::prelude::RegionSetLtcs;
 use kitsune_p2p_types::dht::quantum::Topology;
 use kitsune_p2p_types::dht::PeerStrat;
 use kitsune_p2p_types::dht_arc::DhtArcSet;

@@ -537,6 +537,9 @@ pub struct RoundState {
     /// We've received the last op bloom filter from our partner
     /// (the one with `finished` == true)
     received_all_incoming_ops_blooms: bool,
+    /// Received all responses to OpRegions, which is the batched set of Op data
+    /// in the diff of regions
+    has_pending_historical_op_data: bool,
     /// There are still op blooms to send because the previous
     /// batch was too big to send in a single gossip iteration.
     bloom_batch_cursor: Option<Timestamp>,
@@ -594,6 +597,7 @@ impl ShardedGossipLocal {
             common_arc_set,
             num_sent_ops_blooms: 0,
             received_all_incoming_ops_blooms: false,
+            has_pending_historical_op_data: false,
             bloom_batch_cursor: None,
             ops_batch_queue: OpsBatchQueue::new(),
             last_touch: Instant::now(),
@@ -670,6 +674,8 @@ impl ShardedGossipLocal {
             let update_state = |state: &mut RoundState| {
                 let num_ops_blooms = state.num_sent_ops_blooms.saturating_sub(1);
                 state.num_sent_ops_blooms = num_ops_blooms;
+                // NOTE: there is only ever one "batch" of OpRegions
+                state.has_pending_historical_op_data = false;
                 state.is_finished()
             };
             if i.round_map
@@ -953,6 +959,7 @@ impl RoundState {
     /// - This node has no queued missing ops to send to the remote node.
     fn is_finished(&self) -> bool {
         self.num_sent_ops_blooms == 0
+            && !self.has_pending_historical_op_data
             && self.received_all_incoming_ops_blooms
             && self.bloom_batch_cursor.is_none()
             && self.ops_batch_queue.is_empty()

@@ -216,7 +216,7 @@ impl ShardedGossipLocal {
         };
 
         // Generate the new state.
-        let state = self.new_state(remote_agent_list, common_arc_set, region_set)?;
+        let mut state = self.new_state(remote_agent_list, common_arc_set, region_set)?;
 
         // Generate the agent bloom.
         if let GossipType::Recent = self.gossip_type {
@@ -228,7 +228,9 @@ impl ShardedGossipLocal {
             self.next_bloom_batch(state, gossip).await
         } else {
             // Everything has already been taken care of for Historical
-            // gossip already
+            // gossip already. Just mark this true so that the state will not
+            // be considered "finished" until all op data is received.
+            state.has_pending_historical_op_data = true;
             Ok(state)
         }
     }
