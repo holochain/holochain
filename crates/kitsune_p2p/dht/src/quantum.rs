@@ -107,7 +107,7 @@ pub struct TimeQuantum(u32);
 impl TimeQuantum {
     /// The quantum which contains this timestamp
     pub fn from_timestamp(topo: &Topology, timestamp: Timestamp) -> Self {
-        topo.time_coord(timestamp)
+        topo.time_quantum(timestamp)
     }
 
     /// The timestamps at either end of this quantum
@@ -348,10 +348,8 @@ impl<Q: Quantum> Segment<Q> {
     }
 }
 
-#[test]
-fn test_quantum_bounds() {}
-
 impl SpaceSegment {
+    /// Get the start and end bounds, in absolute Loc coordinates, for this segment
     pub fn loc_bounds(&self, topo: &Topology) -> (Loc, Loc) {
         let (a, b): (u32, u32) = bounds(&topo.space, self.power, self.offset, 1);
         (Loc::from(a), Loc::from(b))
@@ -359,6 +357,7 @@ impl SpaceSegment {
 }
 
 impl TimeSegment {
+    /// Get the start and end bounds, in absolute Timestamp coordinates, for this segment
     pub fn timestamp_bounds(&self, topo: &Topology) -> (Timestamp, Timestamp) {
         let (a, b): (i64, i64) = bounds64(&topo.time, self.power, self.offset, 1);
         let o = topo.time_origin.as_micros();
@@ -366,9 +365,12 @@ impl TimeSegment {
     }
 }
 
+/// Alias
 pub type SpaceSegment = Segment<SpaceQuantum>;
+/// Alias
 pub type TimeSegment = Segment<TimeQuantum>;
 
+/// Defines the quantization of a dimension of spacetime.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Dimension {
     /// The smallest possible length in this dimension.
@@ -385,6 +387,10 @@ pub struct Dimension {
 }
 
 impl Dimension {
+    /// No quantization.
+    /// Used for testing, making it easier to construct values without thinking
+    /// of unit conversions.
+    #[cfg(feature = "test_utils")]
     pub fn unit() -> Self {
         Dimension {
             quantum: 1,
@@ -393,6 +399,7 @@ impl Dimension {
         }
     }
 
+    /// The standard space quantum size is 2^12
     pub const fn standard_space() -> Self {
         let quantum_power = 12;
         Dimension {
@@ -409,6 +416,7 @@ impl Dimension {
         }
     }
 
+    /// The standard time quantum size is 5 minutes (300 million microseconds)
     pub const fn standard_time() -> Self {
         Dimension {
             // 5 minutes in microseconds = 1mil * 60 * 5 = 300,000,000
@@ -428,16 +436,33 @@ impl Dimension {
     }
 }
 
-/// Parameters which are constant for all time trees in a given network.
-/// They determine the relationship between tree structure and absolute time.
+/// Topology defines the structure of spacetime, in particular how space and
+/// time are quantized.
+///
+/// Any calculation which requires converting from absolute coordinates to
+/// quantized coordinates must refer to the topology. Therefore, this type is
+/// ubiquitous! More functions than not take it as a parameter. This may seem
+/// cumbersome, but there are a few reasons why this is helpful:
+/// - We currently use a "standard" quantization for all networks, but we may
+///   find it beneficial in the future to let each network specify its own
+///   quantization levels, based on its own traffic and longevity needs.
+/// - It is confusing to be working with three different coordinate systems in
+///   this codebase, and the presence of a `&topo` param in a function is a
+///   helpful reminder to be extra mindful about the unit conversions that are
+///   happening
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Topology {
+    /// The quantization of space
     pub space: Dimension,
+    /// The quantization of time
     pub time: Dimension,
+    /// The origin of time, meaning the 0th quantum contains this Timestamp.
     pub time_origin: Timestamp,
 }
 
 impl Topology {
+    /// Unit dimensions with the given time origin
+    #[cfg(feature = "test_utils")]
     pub fn unit(time_origin: Timestamp) -> Self {
         Self {
             space: Dimension::unit(),
@@ -446,6 +471,8 @@ impl Topology {
         }
     }
 
+    /// Unit dimensions with a zero time origin
+    #[cfg(feature = "test_utils")]
     pub fn unit_zero() -> Self {
         Self {
             space: Dimension::unit(),
@@ -454,6 +481,7 @@ impl Topology {
         }
     }
 
+    /// Standard dimensions with the given time origin
     pub fn standard(time_origin: Timestamp) -> Self {
         Self {
             space: Dimension::standard_space(),
@@ -462,19 +490,24 @@ impl Topology {
         }
     }
 
+    /// Standard dimensions with the [`HOLOCHAIN_EPOCH`] as the time origin
     pub fn standard_epoch() -> Self {
         Self::standard(Timestamp::HOLOCHAIN_EPOCH)
     }
 
+    /// Standard dimensions with a zero time origin
+    #[cfg(feature = "test_utils")]
     pub fn standard_zero() -> Self {
         Self::standard(Timestamp::ZERO)
     }
 
-    pub fn space_coord(&self, x: Loc) -> SpaceQuantum {
+    /// Returns the space quantum which contains this location
+    pub fn space_quantum(&self, x: Loc) -> SpaceQuantum {
         (x.as_u32() / self.space.quantum).into()
     }
 
-    pub fn time_coord(&self, t: Timestamp) -> TimeQuantum {
+    /// Returns the time quantum which contains this timestamp
+    pub fn time_quantum(&self, t: Timestamp) -> TimeQuantum {
         let t = (t.as_micros() - self.time_origin.as_micros()).max(0);
         ((t / self.time.quantum as i64) as u32).into()
     }
@@ -493,8 +526,11 @@ impl Topology {
     }
 }
 
-/// A type which generates a list of exponentially expanding time windows, as per
-/// this document: https://hackmd.io/@hololtd/r1IAIbr5Y
+/// A type which generates a list of exponentially expanding time windows
+/// which fit into a tree structure. See [this document](https://hackmd.io/@hololtd/r1IAIbr5Y)
+/// for the full understanding.
+///
+/// TODO: add this documentation to the codebase
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Derivative, serde::Serialize, serde::Deserialize)]
 #[derivative(PartialOrd, Ord)]
 pub struct TelescopingTimes {
@@ -506,6 +542,7 @@ pub struct TelescopingTimes {
 }
 
 impl TelescopingTimes {
+    /// An empty set of times
     pub fn empty() -> Self {
         Self {
             time: 0.into(),
@@ -513,6 +550,7 @@ impl TelescopingTimes {
         }
     }
 
+    /// Constructor,
     pub fn new(time: TimeQuantum) -> Self {
         Self { time, limit: None }
     }
@@ -575,6 +613,7 @@ impl TelescopingTimes {
         times
     }
 
+    /// Set a limit
     pub fn limit(&self, limit: u32) -> Self {
         Self {
             time: self.time,
@@ -582,6 +621,17 @@ impl TelescopingTimes {
         }
     }
 
+    /// Modify the region data associated with two different TelescopingTimes
+    /// of different lengths, so that both data vectors are referring to
+    /// the same regions.
+    ///
+    /// In general, when one TelescopingTimes sequence is longer than another,
+    /// the longer sequence will have larger TimeSegments than the shorter one.
+    /// To rectify them, the shorter sequence needs to merge some of its earlier
+    /// data until it has a segment large enough to match the larger segment
+    /// of the other sequence. This continues until all segments of the smaller
+    /// sequence are exhausted. Then, the longer sequence is truncated to match
+    /// the shorter one.
     pub fn rectify<T: AddAssign>(a: (&Self, &mut Vec<T>), b: (&Self, &mut Vec<T>)) {
         let (left, right) = if a.0.time > b.0.time { (b, a) } else { (a, b) };
         let (lt, ld) = left;
@@ -603,6 +653,18 @@ impl TelescopingTimes {
     }
 }
 
+/// Node-specific parameters for gossip.
+/// While the [`Topology`] must be the same for every node in a network, each
+/// node is free to choose its own GossipParams.
+///
+/// Choosing smaller values for these offsets can lead to less resource usage,
+/// at the expense of reducing opportunities to gossip with other nodes.
+/// This is also largely dependent on the characteristcs of the network,
+/// since if almost all nodes are operating with the same current timestamp
+/// and Arq power level, there will be very little need for reconciliation.
+///
+/// In networks where nodes are offline for long periods of time, or latency
+/// is very high (sneakernet), it could be helpful to increase these values.
 #[derive(Copy, Clone, Debug, derive_more::Constructor)]
 pub struct GossipParams {
     /// What +/- coordinate offset will you accept for timestamps?
@@ -624,6 +686,7 @@ pub struct GossipParams {
 }
 
 impl GossipParams {
+    /// Zero-tolerance gossip params
     pub fn zero() -> Self {
         Self {
             max_time_offset: 0.into(),

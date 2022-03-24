@@ -1,5 +1,6 @@
 use crate::hash::{OpHash, RegionHash};
 
+/// Take bitwise XOR of each element of both arrays
 pub fn array_xor<const N: usize>(a: &mut [u8; N], b: &[u8; N]) {
     for i in 0..N {
         a[i] ^= b[i];
@@ -38,10 +39,20 @@ impl From<OpHash> for RegionHash {
     }
 }
 
+/// The pertinent data that we care about for each Region. This is what gets
+/// sent over gossip so that nodes can discover which Regions are different
+/// between them.
+///
+/// The size and count data can also act as heuristics to help us fine-tune the
+/// gossip algorithm, although currently they are unused (except for the purpose
+/// of disambiguation in the rare case of an XOR hash collision).
 #[derive(Copy, Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct RegionData {
+    /// The XOR of hashes of all Ops in this Region
     pub hash: RegionHash,
+    /// The total size of Op data contains in this Region
     pub size: u32,
+    /// The number of Ops in this Region.
     pub count: u32,
 }
 

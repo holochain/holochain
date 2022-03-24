@@ -21,8 +21,8 @@ pub trait OpRegion<D>: PartialOrd + Ord + Send + Sync {
     /// The quantized space and time coordinates, based on the location and timestamp.
     fn coords(&self, topo: &Topology) -> SpacetimeQuantumCoords {
         SpacetimeQuantumCoords {
-            space: topo.space_coord(self.loc()),
-            time: topo.time_coord(self.timestamp()),
+            space: topo.space_quantum(self.loc()),
+            time: topo.time_quantum(self.timestamp()),
         }
     }
 

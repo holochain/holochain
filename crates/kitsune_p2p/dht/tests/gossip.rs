@@ -67,7 +67,7 @@ fn gossip_scenario_full_sync() {
 
     let max_time = TimeQuantum::from(525600 / 12).to_timestamp_bounds(&topo).0; // 1 year
     assert_eq!(
-        TelescopingTimes::new(topo.time_coord(max_time))
+        TelescopingTimes::new(topo.time_quantum(max_time))
             .segments()
             .len() as u32,
         expected_num_time_chunks
@@ -125,7 +125,7 @@ fn gossip_scenario_full_sync() {
             let a = i;
             let b = i + x / 2;
             let (n1, n2) = get_two_mut(nodes.as_mut_slice(), a, b);
-            let stats = gossip_direct_at(n1, n2, topo.time_coord(max_time)).unwrap();
+            let stats = gossip_direct_at(n1, n2, topo.time_quantum(max_time)).unwrap();
 
             // Something is wrong if we're sending tons of regions
             assert_eq!(

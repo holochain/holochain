@@ -15,15 +15,11 @@
 //! Regions represents the union of those two Regions. The sum of hashes is defined
 //! as the XOR of hashes, which allows this compatibility.
 
-mod error;
 mod region_coords;
 mod region_data;
-mod region_set;
 
-pub use error::*;
 pub use region_coords::*;
 pub use region_data::*;
-pub use region_set::*;
 
 use num_traits::Zero;
 use std::ops::{AddAssign, Sub};

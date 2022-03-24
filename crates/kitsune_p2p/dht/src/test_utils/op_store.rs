@@ -1,7 +1,7 @@
 use crate::{
     op::OpRegion,
     persistence::AccessOpStore,
-    prelude::{RegionCoords, RegionSet, RegionSetXtcs},
+    prelude::{RegionCoords, RegionSet, RegionSetLtcs},
     quantum::{GossipParams, Topology},
     region::{RegionData, RegionDataConstraints},
 };
@@ -23,7 +23,7 @@ impl<D: RegionDataConstraints, O: OpRegion<D>> OpStore<O, D> {
         Self {
             topo,
             ops: Default::default(),
-            _region_set: RegionSetXtcs::empty().into(),
+            _region_set: RegionSetLtcs::empty().into(),
             gossip_params,
         }
     }
@@ -52,8 +52,8 @@ impl<D: RegionDataConstraints, O: OpRegion<D>> AccessOpStore<O, D> for OpStore<O
 
     fn fetch_region_set(
         &self,
-        coords: crate::prelude::RegionCoordSetXtcs,
-    ) -> must_future::MustBoxFuture<Result<crate::prelude::RegionSetXtcs<D>, ()>> {
+        coords: crate::prelude::RegionCoordSetLtcs,
+    ) -> must_future::MustBoxFuture<Result<crate::prelude::RegionSetLtcs<D>, ()>> {
         async move { coords.into_region_set(|(_, coords)| Ok(self.query_region_data(&coords))) }
             .boxed()
             .into()

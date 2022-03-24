@@ -1,64 +1,20 @@
-use once_cell::sync::OnceCell;
+//! A RegionSet is a compact representation of a set of Regions -- the [`RegionCoords`]
+//! defining the regions, and their associated [`RegionData`].
+//!
+//! Currently we have only one scheme for specifying RegionSets, called "LTCS".
+//! "LTCS" is an acronym standing for "Logarithmic Time, Constant Space",
+//! and it refers to our current scheme of partitioning spacetime during gossip, which
+//! is to use a constant number of SpaceSegments (8..16) and a logarithmically
+//! growing number of TimeSegments, with larger segments to cover older times.
+//! In the future we may have other schemes.
 
-use crate::{
-    arq::*,
-    error::{GossipError, GossipResult},
-    op::OpRegion,
-    persistence::AccessOpStore,
-    quantum::*,
-};
-use derivative::Derivative;
+mod ltcs;
 
-use super::{Region, RegionBounds, RegionCoords, RegionData, RegionDataConstraints};
+pub use ltcs::*;
 
-#[derive(Debug, PartialEq, Eq, derive_more::Constructor, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "test_utils", derive(Clone))]
-pub struct RegionCoordSetXtcs {
-    times: TelescopingTimes,
-    arq_set: ArqBoundsSet,
-}
+use crate::{error::GossipResult, quantum::*};
 
-impl RegionCoordSetXtcs {
-    /// Generate the XTCS region coords given the generating parameters.
-    /// Each RegionCoords is paired with the relative spacetime coords, which
-    /// can be used to pair the generated coords with stored data.
-    pub fn region_coords_flat(&self) -> impl Iterator<Item = ((u32, u32), RegionCoords)> + '_ {
-        self.region_coords_nested().flatten()
-    }
-
-    pub fn region_coords_nested(
-        &self,
-    ) -> impl Iterator<Item = impl Iterator<Item = ((u32, u32), RegionCoords)>> + '_ {
-        self.arq_set.arqs().iter().flat_map(move |arq| {
-            arq.segments().enumerate().map(move |(ix, x)| {
-                self.times
-                    .segments()
-                    .into_iter()
-                    .enumerate()
-                    .map(move |(it, t)| ((ix as u32, it as u32), RegionCoords::new(x, t)))
-            })
-        })
-    }
-
-    pub fn into_region_set<D, E, F>(self, mut f: F) -> Result<RegionSetXtcs<D>, E>
-    where
-        D: RegionDataConstraints,
-        F: FnMut(((u32, u32), RegionCoords)) -> Result<D, E>,
-    {
-        let data = self
-            .region_coords_nested()
-            .map(move |column| column.map(&mut f).collect::<Result<Vec<D>, E>>())
-            .collect::<Result<Vec<Vec<D>>, E>>()?;
-        Ok(RegionSetXtcs::from_data(self, data))
-    }
-
-    pub fn empty() -> Self {
-        Self {
-            times: TelescopingTimes::empty(),
-            arq_set: ArqBoundsSet::empty(),
-        }
-    }
-}
+use crate::region::{Region, RegionBounds, RegionCoords, RegionData, RegionDataConstraints};
 
 /// The generic definition of a set of Regions.
 /// The current representation is very specific to our current algorithm,
@@ -67,34 +23,46 @@ impl RegionCoordSetXtcs {
 #[derive(Debug, derive_more::From)]
 #[cfg_attr(feature = "test_utils", derive(Clone))]
 pub enum RegionSet<T: RegionDataConstraints = RegionData> {
-    /// eXponential Time, Constant Space.
-    Xtcs(RegionSetXtcs<T>),
+    /// Logarithmic Time, Constant Space.
+    Ltcs(RegionSetLtcs<T>),
 }
 
 impl<D: RegionDataConstraints> RegionSet<D> {
+    /// The number of regions specified
     pub fn count(&self) -> usize {
         match self {
-            Self::Xtcs(set) => set.count(),
+            Self::Ltcs(set) => set.count(),
         }
     }
 
     /// can be used to pair the generated coords with stored data.
     pub fn region_coords(&self) -> impl Iterator<Item = RegionCoords> + '_ {
         match self {
-            Self::Xtcs(set) => set.coords.region_coords_flat().map(|(_, coords)| coords),
+            Self::Ltcs(set) => set.coords.region_coords_flat().map(|(_, coords)| coords),
         }
     }
 
+    /// Iterator over all Regions
     pub fn regions(&self) -> impl Iterator<Item = Region<D>> + '_ {
         match self {
-            Self::Xtcs(set) => set.regions(),
+            Self::Ltcs(set) => set.regions(),
         }
     }
 
+    /// The RegionSet can be used to answer questions about more regions than
+    /// just the ones specified: If a larger region is queried, and this set contains
+    /// a set of regions which over that larger region, then the larger region
+    /// can be dynamically constructed.
+    ///
+    /// This allows agents with differently computed RegionSets to still engage
+    /// in gossip without needing to recompute regions.
     pub fn query(&self, _bounds: &RegionBounds) -> ! {
         unimplemented!("only implement after trying naive database-only approach")
     }
 
+    /// In order for this RegionSet to be queryable, new data needs to be
+    /// integrated into it to avoid needing to recompute it from the database
+    /// on each query.
     pub fn update(&self, _c: SpacetimeQuantumCoords, _d: D) -> ! {
         unimplemented!("only implement after trying naive database-only approach")
     }
@@ -103,7 +71,7 @@ impl<D: RegionDataConstraints> RegionSet<D> {
     /// input RegionSets.
     pub fn diff(self, other: Self) -> GossipResult<Vec<Region<D>>> {
         match (self, other) {
-            (Self::Xtcs(left), Self::Xtcs(right)) => left.diff(right),
+            (Self::Ltcs(left), Self::Ltcs(right)) => left.diff(right),
         }
         // Notes on a generic algorithm for the diff of generic regions:
         // can we use a Fenwick tree to look up regions?
@@ -114,124 +82,6 @@ impl<D: RegionDataConstraints> RegionSet<D> {
     }
 }
 
-/// Implementation for the compact XTCS region set format which gets sent over the wire.
-/// The coordinates for the regions are specified by a few values.
-/// The data to match the coordinates are specified in a 2D vector which must
-/// correspond to the generated coordinates.
-#[derive(Debug, serde::Serialize, serde::Deserialize, Derivative)]
-#[derivative(PartialEq, Eq)]
-#[cfg_attr(feature = "test_utils", derive(Clone))]
-pub struct RegionSetXtcs<D: RegionDataConstraints = RegionData> {
-    /// The generator for the coordinates
-    pub coords: RegionCoordSetXtcs,
-
-    /// the actual coordinates as generated
-    #[derivative(PartialEq = "ignore")]
-    #[serde(skip)]
-    pub(crate) _region_coords: OnceCell<Vec<RegionCoords>>,
-
-    /// The outer vec corresponds to the spatial segments;
-    /// the inner vecs are the time segments.
-    #[serde(bound(deserialize = "D: serde::de::DeserializeOwned"))]
-    pub data: Vec<Vec<D>>,
-}
-
-impl<D: RegionDataConstraints> RegionSetXtcs<D> {
-    pub fn empty() -> Self {
-        Self {
-            coords: RegionCoordSetXtcs::empty(),
-            data: vec![],
-            _region_coords: OnceCell::new(),
-        }
-    }
-
-    pub fn from_data(coords: RegionCoordSetXtcs, data: Vec<Vec<D>>) -> Self {
-        Self {
-            coords,
-            data,
-            _region_coords: OnceCell::new(),
-        }
-    }
-
-    pub fn from_store<O: OpRegion<D>, S: AccessOpStore<O, D>>(
-        store: &S,
-        coords: RegionCoordSetXtcs,
-    ) -> Self {
-        let data = coords
-            .region_coords_nested()
-            .map(|columns| {
-                columns
-                    .map(|(_, coords)| store.query_region_data(&coords))
-                    .collect()
-            })
-            .collect();
-        Self {
-            coords,
-            data,
-            _region_coords: OnceCell::new(),
-        }
-    }
-
-    pub fn count(&self) -> usize {
-        if self.data.is_empty() {
-            0
-        } else {
-            self.data.len() * self.data[0].len()
-        }
-    }
-
-    pub fn regions(&self) -> impl Iterator<Item = Region<D>> + '_ {
-        self.coords
-            .region_coords_flat()
-            .map(|((ix, it), coords)| Region::new(coords, self.data[ix as usize][it as usize]))
-    }
-
-    /// Reshape the two region sets so that both match, omitting or merging
-    /// regions as needed
-    pub fn rectify(&mut self, other: &mut Self) -> GossipResult<()> {
-        if self.coords.arq_set != other.coords.arq_set {
-            return Err(GossipError::ArqSetMismatchForDiff);
-        }
-        if self.coords.times > other.coords.times {
-            std::mem::swap(self, other);
-        }
-        let mut len = 0;
-        for (da, db) in self.data.iter_mut().zip(other.data.iter_mut()) {
-            TelescopingTimes::rectify((&self.coords.times, da), (&other.coords.times, db));
-            len = da.len();
-        }
-        let times = other.coords.times.limit(len as u32);
-        self.coords.times = times;
-        other.coords.times = times;
-        Ok(())
-    }
-
-    pub fn diff(mut self, mut other: Self) -> GossipResult<Vec<Region<D>>> {
-        self.rectify(&mut other)?;
-
-        let regions = self
-            .regions()
-            .into_iter()
-            .zip(other.regions().into_iter())
-            .filter_map(|(a, b)| (a.data != b.data).then(|| a))
-            .collect();
-
-        Ok(regions)
-    }
-}
-
-#[cfg(feature = "test_utils")]
-impl RegionSetXtcs {
-    pub fn nonzero_regions(
-        &self,
-    ) -> impl '_ + Iterator<Item = ((u32, u32), RegionCoords, RegionData)> {
-        self.coords.region_coords_flat().filter_map(|((i, j), c)| {
-            let d = &self.data[i as usize][j as usize];
-            (d.count > 0).then(|| ((i, j), c, *d))
-        })
-    }
-}
-
 #[cfg(test)]
 #[cfg(feature = "test_utils")]
 mod tests {
@@ -239,11 +89,14 @@ mod tests {
     use kitsune_p2p_timestamp::Timestamp;
 
     use crate::{
+        op::*,
+        persistence::*,
+        prelude::{ArqBoundsSet, ArqLocated, ArqStart},
         test_utils::{
             op_data::{Op, OpData},
             op_store::OpStore,
         },
-        Loc,
+        Arq, Loc,
     };
 
     use super::*;
@@ -306,8 +159,8 @@ mod tests {
         // The total count should be half of what's in the op store,
         // since the arq covers exactly half of the ops
         let times = TelescopingTimes::new(TimeQuantum::from(11000));
-        let coords = RegionCoordSetXtcs::new(times, ArqBoundsSet::single(arq.to_bounds(&topo)));
-        let rset = RegionSetXtcs::from_store(&store, coords);
+        let coords = RegionCoordSetLtcs::new(times, ArqBoundsSet::single(arq.to_bounds(&topo)));
+        let rset = RegionSetLtcs::from_store(&store, coords);
         assert_eq!(
             rset.data.concat().iter().map(|r| r.count).sum::<u32>() as usize,
             nx * nt / 2
@@ -317,17 +170,17 @@ mod tests {
     #[test]
     fn test_rectify() {
         let topo = Topology::unit_zero();
-        let arq = Arq::new(8, 0u32.into(), 4.into()).to_bounds(&topo.into());
+        let arq = Arq::new(8, 0u32.into(), 4.into()).to_bounds(&topo);
         let mut store = OpStore::new(topo.clone(), GossipParams::zero());
         store.integrate_ops(op_grid(&topo, &arq, 10..20).into_iter());
 
         let tt_a = TelescopingTimes::new(TimeQuantum::from(20));
         let tt_b = TelescopingTimes::new(TimeQuantum::from(30));
-        let coords_a = RegionCoordSetXtcs::new(tt_a, ArqBoundsSet::single(arq.clone()));
-        let coords_b = RegionCoordSetXtcs::new(tt_b, ArqBoundsSet::single(arq.clone()));
+        let coords_a = RegionCoordSetLtcs::new(tt_a, ArqBoundsSet::single(arq.clone()));
+        let coords_b = RegionCoordSetLtcs::new(tt_b, ArqBoundsSet::single(arq.clone()));
 
-        let mut rset_a = RegionSetXtcs::from_store(&store, coords_a);
-        let mut rset_b = RegionSetXtcs::from_store(&store, coords_b);
+        let mut rset_a = RegionSetLtcs::from_store(&store, coords_a);
+        let mut rset_b = RegionSetLtcs::from_store(&store, coords_b);
         assert_ne!(rset_a.data, rset_b.data);
 
         rset_a.rectify(&mut rset_b).unwrap();
@@ -352,7 +205,7 @@ mod tests {
     #[test]
     fn test_diff() {
         let topo = Topology::unit_zero();
-        let arq = Arq::new(8, Loc::from(-512i32 as u32), 4.into()).to_bounds(&topo.into());
+        let arq = Arq::new(8, Loc::from(-512i32 as u32), 4.into()).to_bounds(&topo);
         dbg!(&arq, arq.to_dht_arc_range(&topo));
 
         let mut store1 = OpStore::new(topo.clone(), GossipParams::zero());
@@ -365,17 +218,17 @@ mod tests {
         let mut store2 = store1.clone();
         store2.integrate_ops(extra_ops.clone().into_iter());
 
-        let coords_a = RegionCoordSetXtcs::new(
+        let coords_a = RegionCoordSetLtcs::new(
             TelescopingTimes::new(TimeQuantum::from(20)),
             ArqBoundsSet::single(arq.clone()),
         );
-        let coords_b = RegionCoordSetXtcs::new(
+        let coords_b = RegionCoordSetLtcs::new(
             TelescopingTimes::new(TimeQuantum::from(21)),
             ArqBoundsSet::single(arq.clone()),
         );
 
-        let rset_a = RegionSetXtcs::from_store(&store1, coords_a);
-        let rset_b = RegionSetXtcs::from_store(&store2, coords_b);
+        let rset_a = RegionSetLtcs::from_store(&store1, coords_a);
+        let rset_b = RegionSetLtcs::from_store(&store2, coords_b);
         assert_ne!(rset_a.data, rset_b.data);
 
         let diff = rset_a.clone().diff(rset_b.clone()).unwrap();
@@ -405,7 +258,7 @@ mod tests {
         let pow: u8 = 4;
         // This arq goes from -2^17 to 2^17, with a chunk size of 2^16
         let left_edge = Loc::from(-(2i32.pow(pow as u32 + 12 + 1)));
-        let arq = Arq::new(pow, left_edge, 4.into()).to_bounds(&topo.into());
+        let arq = Arq::new(pow, left_edge, 4.into()).to_bounds(&topo);
         dbg!(&arq, arq.to_dht_arc_range(&topo));
 
         let mut store1 = OpStore::new(topo.clone(), GossipParams::zero());
@@ -427,17 +280,17 @@ mod tests {
         let mut store2 = store1.clone();
         store2.integrate_ops(extra_ops.clone().into_iter());
 
-        let coords_a = RegionCoordSetXtcs::new(
+        let coords_a = RegionCoordSetLtcs::new(
             TelescopingTimes::new(TimeQuantum::from(20)),
             ArqBoundsSet::single(arq.clone()),
         );
-        let coords_b = RegionCoordSetXtcs::new(
+        let coords_b = RegionCoordSetLtcs::new(
             TelescopingTimes::new(TimeQuantum::from(21)),
             ArqBoundsSet::single(arq.clone()),
         );
 
-        let rset_a = RegionSetXtcs::from_store(&store1, coords_a);
-        let rset_b = RegionSetXtcs::from_store(&store2, coords_b);
+        let rset_a = RegionSetLtcs::from_store(&store1, coords_a);
+        let rset_b = RegionSetLtcs::from_store(&store2, coords_b);
         assert_ne!(rset_a.data, rset_b.data);
 
         let diff = rset_a.clone().diff(rset_b.clone()).unwrap();

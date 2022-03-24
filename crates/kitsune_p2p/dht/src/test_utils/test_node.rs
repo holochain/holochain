@@ -4,8 +4,10 @@ use crate::{
     arq::{ascii::add_location_ascii, *},
     hash::{fake_hash, AgentKey},
     persistence::{AccessOpStore, AccessPeerStore},
+    prelude::RegionCoordSetLtcs,
     quantum::{GossipParams, TelescopingTimes, TimeQuantum, Topology},
     region::*,
+    region_set::*,
 };
 
 use super::{
@@ -42,7 +44,7 @@ impl TestNode {
 
     /// Get the RegionSet for this node, suitable for gossiping
     pub fn region_set(&self, arq_set: ArqBoundsSet, now: TimeQuantum) -> RegionSet {
-        let coords = RegionCoordSetXtcs::new(TelescopingTimes::new(now), arq_set);
+        let coords = RegionCoordSetLtcs::new(TelescopingTimes::new(now), arq_set);
         let data = coords
             .region_coords_nested()
             .map(|columns| {
@@ -51,7 +53,7 @@ impl TestNode {
                     .collect::<Vec<_>>()
             })
             .collect::<Vec<_>>();
-        RegionSetXtcs::from_data(coords, data).into()
+        RegionSetLtcs::from_data(coords, data).into()
     }
 
     pub fn ascii_arq_and_ops(&self, topo: &Topology, i: usize, len: usize) -> String {
@@ -81,8 +83,8 @@ impl AccessOpStore<OpData> for TestNode {
 
     fn fetch_region_set(
         &self,
-        coords: RegionCoordSetXtcs,
-    ) -> MustBoxFuture<Result<RegionSetXtcs, ()>> {
+        coords: RegionCoordSetLtcs,
+    ) -> MustBoxFuture<Result<RegionSetLtcs, ()>> {
         self.store.fetch_region_set(coords)
     }
 

@@ -19,6 +19,7 @@ use crate::{
     op::*,
     quantum::{GossipParams, TelescopingTimes, TimeQuantum, Topology},
     region::*,
+    region_set::*,
     test_utils::op_data::OpData,
     Arq,
 };
@@ -35,8 +36,8 @@ pub trait AccessOpStore<O: OpRegion<D>, D: RegionDataConstraints = RegionData>: 
     /// Fetch a set of Regions (the coords and the data) given the set of coords
     fn fetch_region_set(
         &self,
-        coords: RegionCoordSetXtcs,
-    ) -> MustBoxFuture<Result<RegionSetXtcs<D>, ()>>;
+        coords: RegionCoordSetLtcs,
+    ) -> MustBoxFuture<Result<RegionSetLtcs<D>, ()>>;
 
     /// Integrate incoming ops, updating the necessary stores
     fn integrate_ops<Ops: Clone + Iterator<Item = Arc<O>>>(&mut self, ops: Ops);
@@ -54,7 +55,7 @@ pub trait AccessOpStore<O: OpRegion<D>, D: RegionDataConstraints = RegionData>: 
 
     /// Get the RegionSet for this node, suitable for gossiping
     fn region_set(&self, arq_set: ArqBoundsSet, now: TimeQuantum) -> RegionSet<D> {
-        let coords = RegionCoordSetXtcs::new(TelescopingTimes::new(now), arq_set);
+        let coords = RegionCoordSetLtcs::new(TelescopingTimes::new(now), arq_set);
         let data = coords
             .region_coords_nested()
             .map(|columns| {
@@ -63,7 +64,7 @@ pub trait AccessOpStore<O: OpRegion<D>, D: RegionDataConstraints = RegionData>: 
                     .collect::<Vec<_>>()
             })
             .collect::<Vec<_>>();
-        RegionSetXtcs::from_data(coords, data).into()
+        RegionSetLtcs::from_data(coords, data).into()
     }
 }
 
