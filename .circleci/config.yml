@@ -36,37 +36,6 @@ jobs:
               name: PR release tests
               no_output_timeout: 30m
               command: nix-shell --fallback --pure --argstr flavor "coreDev" --run hc-test-release-automation
-   merge-release-test-mac:
-      macos:
-         xcode: "13.2.1"
-      # todo: use "large" which is currently blocked on our plan
-      resource_class: medium
-      environment:
-         CACHIX_NAME: holochain-ci
-         NIXPKGS_ALLOW_UNFREE: 1
-      steps:
-         - checkout
-         - run:
-              name: Unset CircleCI's forced conversion of HTTPS->SSH
-              command: git config --global --unset "url.ssh://git@github.com.insteadof"
-         - run:
-              name: Install Nix
-              no_output_timeout: 30m
-              command: |
-                 # fix for "too many open files" that breaks tokio
-                 ulimit -n 10240
-                 # workaround a bug in the Nix installer
-                 echo " #" >> /Users/distiller/.bash_profile
-                 # catalina nixos install
-                 sh <(curl -L https://releases.nixos.org/nix/nix-2.3.8/install) --darwin-use-unencrypted-nix-store-volume
-         - run:
-              name: Set up Nix cache
-              command: |
-                 $(nix-build . --fallback --no-link -A pkgs.ci.ciSetupNixConf)/bin/hc-ci-setup-nix-conf.sh
-         - run:
-              name: PR release tests
-              no_output_timeout: 30m
-              command: nix-shell --fallback --pure --argstr flavor "coreDev" --run hc-test-release-automation
 
    hc-static-checks:
       docker:
