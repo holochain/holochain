@@ -4,7 +4,6 @@ use crate::{
     arq::*,
     error::{GossipError, GossipResult},
     op::OpRegion,
-    persistence::AccessOpStore,
     quantum::*,
 };
 use derivative::Derivative;
@@ -112,28 +111,6 @@ impl<D: RegionDataConstraints> RegionSetLtcs<D> {
         }
     }
 
-    /// Query the specified OpStore for each coord in the set, constructing
-    /// the full RegionSet.
-    /// TODO: can probably implement in terms of RegionCoords::into_region_set()
-    pub fn from_store<O: OpRegion<D>, S: AccessOpStore<O, D>>(
-        store: &S,
-        coords: RegionCoordSetLtcs,
-    ) -> Self {
-        let data = coords
-            .region_coords_nested()
-            .map(|columns| {
-                columns
-                    .map(|(_, coords)| store.query_region_data(&coords))
-                    .collect()
-            })
-            .collect();
-        Self {
-            coords,
-            data,
-            _region_coords: OnceCell::new(),
-        }
-    }
-
     /// The total number of regions represented in this region set
     pub fn count(&self) -> usize {
         if self.data.is_empty() {
@@ -183,6 +160,22 @@ impl<D: RegionDataConstraints> RegionSetLtcs<D> {
             .collect();
 
         Ok(regions)
+    }
+}
+
+#[cfg(feature = "test_utils")]
+impl<D: RegionDataConstraints> RegionSetLtcs<D> {
+    /// Query the specified OpStore for each coord in the set, constructing
+    /// the full RegionSet. Purely for convenience.
+    pub fn from_store<O: OpRegion<D>, S: crate::persistence::AccessOpStore<O, D>>(
+        store: &S,
+        coords: RegionCoordSetLtcs,
+    ) -> Self {
+        coords
+            .into_region_set(|(_, coords)| {
+                Result::<_, std::convert::Infallible>::Ok(store.query_region_data(&coords))
+            })
+            .unwrap()
     }
 }
 

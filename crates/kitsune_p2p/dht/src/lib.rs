@@ -7,12 +7,17 @@ pub mod arq;
 pub mod error;
 pub mod hash;
 pub mod op;
-pub mod persistence;
 pub mod quantum;
 pub mod region;
 pub mod region_set;
 
 pub use arq::{actual_coverage, Arq, ArqBounds, ArqStrat, PeerStrat, PeerView, PeerViewQ};
+
+// The persistence traits are currently unused except for test implementations of
+// a kitsune host. If we ever use them in actual host implementations, we can
+// take the feature flag off.
+#[cfg(feature = "test_utils")]
+pub mod persistence;
 
 #[cfg(feature = "test_utils")]
 pub mod test_utils;
