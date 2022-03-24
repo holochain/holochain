@@ -304,10 +304,12 @@ pub(crate) mod cli {
 
         input
             .split(',')
+            .map(str::trim)
             .filter(|s| !s.is_empty())
             .map(|csf| {
-                ReleaseSteps::from_str(csf)
-                    .map_err(|_| anyhow::anyhow!("could not parse '{}' as ReleaseSteps", input))
+                ReleaseSteps::from_str(csf).map_err(|_| {
+                    anyhow::anyhow!("could not parse '{}' in '{}' as ReleaseSteps:", csf, input)
+                })
             })
             .try_fold(
                 Default::default(),

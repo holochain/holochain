@@ -47,17 +47,10 @@ pub(crate) enum ReleaseSteps {
     /// substeps: get crate selection, bump cargo toml versions, rotate
     /// changelog, commit changes
     BumpReleaseVersions,
-    PushForPrToMain,
-    CreatePrToMain,
     /// verify that the release tag exists on the main branch and is the
     /// second commit on it, directly after the merge commit
-    VerifyMainBranch,
     PublishToCratesIo,
     AddOwnersToCratesIo,
-    // CreateCrateTags,
-    PushReleaseTag,
-    PushForDevelopPr,
-    CreatePrToDevelop,
 }
 
 // todo(backlog): what if at any point during the release process we have to merge a hotfix to main?
@@ -90,21 +83,6 @@ pub(crate) fn cmd(args: &crate::cli::Args, cmd_args: &crate::cli::ReleaseArgs) -
         match step {
             ReleaseSteps::CreateReleaseBranch => create_release_branch(&ws, cmd_args)?,
             ReleaseSteps::BumpReleaseVersions => bump_release_versions(&ws, cmd_args)?,
-            ReleaseSteps::PushForPrToMain => {
-                // todo(backlog): push the release branch
-                // todo(backlog): create a PR against the main branch
-                warn!("{:?} not implemeted", step)
-            }
-            ReleaseSteps::CreatePrToMain => {
-                // todo: create a pull request from the release branch to the main branch
-                // todo: notify someone to review the PR
-                warn!("{:?} not implemeted", step)
-            }
-            ReleaseSteps::VerifyMainBranch => {
-                // todo: verify we're on the main branch
-                // todo: verify the Pr has been merged
-                warn!("{:?} not implemeted", step)
-            }
             ReleaseSteps::PublishToCratesIo => publish_to_crates_io(&ws, cmd_args)?,
             ReleaseSteps::AddOwnersToCratesIo => ensure_crate_io_owners(
                 &ws,
@@ -116,22 +94,6 @@ pub(crate) fn cmd(args: &crate::cli::Args, cmd_args: &crate::cli::ReleaseArgs) -
                     .collect::<Vec<_>>()
                     .as_slice(),
             )?,
-
-            // ReleaseSteps::CreateCrateTags => create_crate_tags(&ws, cmd_args)?,
-            ReleaseSteps::PushReleaseTag => {
-                // todo: push all the tags that originated in this workspace release to the upstream:
-                // - every crate release tag
-                warn!("{:?} not implemeted", step)
-            }
-            ReleaseSteps::PushForDevelopPr => {
-                // todo(backlog): push the release branch
-                warn!("{:?} not implemeted", step)
-            }
-            ReleaseSteps::CreatePrToDevelop => {
-                // todo(backlog): create a PR against the develop branch
-                // todo: verify the Pr has been merged
-                warn!("{:?} not implemeted", step)
-            }
         }
     }
 
