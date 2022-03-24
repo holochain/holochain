@@ -129,10 +129,10 @@ jobs:
               no_output_timeout: 30m
               command: nix-shell --fallback --pure --argstr flavor "coreDev" --run hc-test-wasm
 
+   # todo: split this up like the other tests and activate it
    merge-test-mac:
       macos:
          xcode: "12.0.0"
-      # todo: use "large" which is currently blocked on our plan
       resource_class: medium
       environment:
          CACHIX_NAME: holochain-ci
