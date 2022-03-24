@@ -337,15 +337,15 @@ async fn mock_network_sharded_gossip() {
                                         last_intervals = Some(intervals);
                                         let arc = data.agent_to_arc[&agent];
                                         let agent_info = data.agent_to_info[&agent].clone();
-                                        let interval = arc.interval();
+                                        let interval = arc;
 
                                         // If we have info for alice check the overlap.
                                         if let Some(alice) = &alice {
-                                            let a = alice.storage_arc.interval();
+                                            let a = alice.storage_arc;
                                             let b = interval.clone();
                                             debug!("{}\n{}", a.to_ascii(10), b.to_ascii(10));
-                                            let a: DhtArcSet = a.into();
-                                            let b: DhtArcSet = b.into();
+                                            let a: DhtArcSet = a.inner().into();
+                                            let b: DhtArcSet = b.inner().into();
                                             if !a.overlap(&b) {
                                                 num_missed_gossips += 1;
                                             }
@@ -363,7 +363,7 @@ async fn mock_network_sharded_gossip() {
                                             module: module.clone(),
                                             gossip: GossipProtocol::Sharded(
                                                 ShardedGossipWire::accept(
-                                                    vec![interval],
+                                                    vec![interval.into()],
                                                     vec![agent_info],
                                                 ),
                                             ),
@@ -475,8 +475,8 @@ async fn mock_network_sharded_gossip() {
                                             .as_ref()
                                             .map(|alice| {
                                                 let arc = data.agent_to_arc[&agent];
-                                                let a = alice.storage_arc.interval();
-                                                let b = arc.interval();
+                                                let a = alice.storage_arc;
+                                                let b = arc;
                                                 let num_should_hold = this_agent_hashes
                                                     .iter()
                                                     .filter(|hash| {
@@ -837,7 +837,7 @@ async fn mock_network_sharding() {
                                     if arc.contains(basis_loc) {
                                         0
                                     } else {
-                                        (arc.center_loc().as_u32() as i64 - basis_loc_i).abs()
+                                        (arc.start_loc().as_u32() as i64 - basis_loc_i).abs()
                                     },
                                     a,
                                 )
@@ -873,7 +873,7 @@ async fn mock_network_sharding() {
                                         last_intervals = Some(intervals);
                                         let arc = data.agent_to_arc[&agent];
                                         let agent_info = data.agent_to_info[&agent].clone();
-                                        let interval = arc.interval();
+                                        let interval = arc;
 
                                         // Accept the initiate.
                                         let msg = HolochainP2pMockMsg::Gossip {
@@ -881,7 +881,7 @@ async fn mock_network_sharding() {
                                             module: module.clone(),
                                             gossip: GossipProtocol::Sharded(
                                                 ShardedGossipWire::accept(
-                                                    vec![interval],
+                                                    vec![interval.into()],
                                                     vec![agent_info],
                                                 ),
                                             ),

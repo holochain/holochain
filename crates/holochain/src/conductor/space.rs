@@ -5,7 +5,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use holo_hash::{DhtOpHash, DnaHash};
 use holochain_conductor_api::conductor::DatabaseRootPath;
-use holochain_p2p::dht_arc::{ArcInterval, DhtArcSet};
+use holochain_p2p::dht_arc::{DhtArcRange, DhtArcSet};
 use holochain_sqlite::{
     conn::{DbSyncLevel, DbSyncStrategy},
     db::{
@@ -225,7 +225,7 @@ impl Spaces {
             .unwrap_or("AND DhtOp.when_integrated IS NOT NULL\n");
 
         let intervals = dht_arc_set.intervals();
-        let sql = if let Some(ArcInterval::Full) = intervals.first() {
+        let sql = if let Some(DhtArcRange::Full) = intervals.first() {
             format!(
                 "{} {} {}",
                 holochain_sqlite::sql::sql_cell::FETCH_OP_HASHES_P1,
@@ -235,9 +235,9 @@ impl Spaces {
         } else {
             let sql_ranges = intervals
                 .into_iter()
-                .filter(|i| matches!(i, &ArcInterval::Bounded(_, _)))
+                .filter(|i| matches!(i, &DhtArcRange::Bounded(_, _)))
                 .map(|interval| match interval {
-                    ArcInterval::Bounded(start_loc, end_loc) => {
+                    DhtArcRange::Bounded(start_loc, end_loc) => {
                         if start_loc <= end_loc {
                             format!(
                                 "AND storage_center_loc >= {} AND storage_center_loc <= {}",
