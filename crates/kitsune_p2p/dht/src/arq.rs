@@ -132,7 +132,11 @@ impl<S: ArqStart> Arq<S> {
             .saturating_mul(topo.space.quantum)
             .min(u32::MAX / 2);
         // this really shouldn't ever be larger than MAX / 8
-        debug_assert!(len < u32::MAX / 4);
+        debug_assert!(
+            len < u32::MAX / 4,
+            "chunk width is much larger than expected: {}",
+            len
+        );
         len
     }
 
@@ -355,7 +359,7 @@ impl ArqBounds {
                     (2u64.pow(32) - (lo as u64) + (hi as u64) + 1) as u32
                 };
                 let count = len / s;
-                // TODO: this is kinda wrong. The right bound of the interval
+                // XXX: this is kinda wrong. The right bound of the interval
                 // should be 1 less, but we'll accept if it bleeds over by 1 too.
                 if rounded || lo == offset * s && (len % s <= 1) {
                     Some(Self {

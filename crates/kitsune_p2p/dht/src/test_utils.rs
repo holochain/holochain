@@ -192,21 +192,21 @@ mod tests {
 
     use super::*;
     use proptest::proptest;
+    use test_case::test_case;
 
-    #[test]
-    fn test_ideal_coverage_case() {
+    #[test_case(21.62, 0.1, 100)]
+    #[test_case(89.6, 0.25, 100)]
+    fn test_ideal_coverage_cases(min_coverage: f64, buffer: f64, num_peers: u32) {
         let topo = Topology::unit_zero();
 
         let strat = ArqStrat {
-            // min_coverage: 44.93690369578987,
-            // buffer: 0.1749926,
-            min_coverage: 21.620980,
-            buffer: 0.1,
+            min_coverage,
+            buffer,
             ..Default::default()
         };
 
         let mut rng = seeded_rng(None);
-        let peers = generate_ideal_coverage(&topo, &mut rng, &strat, None, 100, 0.0);
+        let peers = generate_ideal_coverage(&topo, &mut rng, &strat, None, num_peers, 0.0);
 
         let view = PeerViewQ::new(topo, strat.clone(), peers);
         let cov = view.actual_coverage();
@@ -224,7 +224,7 @@ mod tests {
         /// so this test asserts that the extrapolated coverage falls within the
         /// range.
         #[test]
-        fn test_ideal_coverage(min_coverage in 40f64..100.0, buffer in 0.1f64..0.5, num_peers in 100u32..200) {
+        fn test_ideal_coverage(min_coverage in 40f64..100.0, buffer in 0.1f64..0.25, num_peers in 100u32..200) {
             let topo = Topology::unit_zero();
             let strat = ArqStrat {
                 min_coverage,
