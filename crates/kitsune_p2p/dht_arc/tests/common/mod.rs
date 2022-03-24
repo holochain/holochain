@@ -111,9 +111,9 @@ pub fn run_one_epoch(
         }
         let p = peers.clone();
         let arc = peers.get_mut(i).unwrap();
-        let view = strat.view(*arc, p.as_slice());
+        let view = strat.view(*arc, p.as_slice()).into();
         let before = arc.length() as f64;
-        arc.update_length(view);
+        arc.update_length(&view);
         let after = arc.length() as f64;
         let delta = after - before;
         // dbg!(&before, &after, &delta);

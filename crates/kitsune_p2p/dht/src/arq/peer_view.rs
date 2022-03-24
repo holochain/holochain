@@ -1,4 +1,4 @@
-use kitsune_p2p_dht_arc::{DhtArc, PeerViewAlpha, PeerViewBeta};
+use kitsune_p2p_dht_arc::{DhtArc, PeerView as LegacyPeerView, PeerViewAlpha, PeerViewBeta};
 use num_traits::Zero;
 
 use crate::quantum::{Offset, Topology};
@@ -27,14 +27,26 @@ impl PeerView {
     /// this returns the next step to take in reaching the ideal coverage.
     pub fn update_arc(&self, dht_arc: &mut DhtArc) -> bool {
         match self {
-            Self::Alpha(v) => v.update_arc(dht_arc),
-            Self::Beta(v) => v.update_arc(dht_arc),
+            Self::Alpha(_) | Self::Beta(_) => {
+                let view = self.to_legacy_peer_view().unwrap();
+                dht_arc.update_length(&view);
+                true
+            }
             Self::Quantized(v) => {
                 let mut arq = Arq::from_dht_arc_approximate(&v.topo, &v.strat, dht_arc);
                 let updated = v.update_arq(&v.topo, &mut arq);
                 *dht_arc = arq.to_dht_arc(&v.topo);
                 updated
             }
+        }
+    }
+
+    /// Convert to the corresponding PeerView enum used in the `kitsune_p2p_dht_arc` crate
+    pub fn to_legacy_peer_view(&self) -> Option<LegacyPeerView> {
+        match self {
+            Self::Alpha(v) => Some(LegacyPeerView::Alpha(v.clone())),
+            Self::Beta(v) => Some(LegacyPeerView::Beta(v.clone())),
+            Self::Quantized(_) => None,
         }
     }
 }
