@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use kitsune_p2p_types::{
     bin_types::KitsuneSpace,
-    dht::{quantum::Topology, region::RegionSetXtcs},
+    dht::{quantum::Topology, region_set::RegionSetLtcs},
     dht_arc::DhtArcSet,
 };
 
@@ -29,12 +29,12 @@ pub trait KitsuneHost: 'static + Send + Sync {
         dht_arc_set: DhtArcSet,
     ) -> KitsuneHostResult<Vec<f64>>;
 
-    /// Query aggregate dht op data to form an XTCS set of region data
+    /// Query aggregate dht op data to form an LTCS set of region data
     fn query_region_set(
         &self,
         space: Arc<KitsuneSpace>,
         dht_arc_set: Arc<DhtArcSet>,
-    ) -> KitsuneHostResult<RegionSetXtcs>;
+    ) -> KitsuneHostResult<RegionSetLtcs>;
 
     /// Record a set of metric records
     fn record_metrics(

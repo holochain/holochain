@@ -47,6 +47,7 @@ pub use crate::link::create_link;
 pub use crate::link::delete_link;
 pub use crate::link::get_link_details;
 pub use crate::link::get_links;
+pub use crate::link::HdkLinkType;
 pub use crate::map_extern;
 pub use crate::map_extern::ExternResult;
 pub use crate::map_extern_infallible;

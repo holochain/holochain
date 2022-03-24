@@ -12,7 +12,7 @@ use kitsune_p2p_types::bin_types::*;
 use kitsune_p2p_types::combinators::second;
 use kitsune_p2p_types::dht::hash::RegionHash;
 use kitsune_p2p_types::dht::prelude::{
-    array_xor, ArqBoundsSet, RegionBounds, RegionCoordSetXtcs, RegionData,
+    array_xor, ArqBoundsSet, RegionBounds, RegionCoordSetLtcs, RegionData,
 };
 use kitsune_p2p_types::dht::quantum::{TelescopingTimes, TimeQuantum};
 use kitsune_p2p_types::dht_arc::{DhtArc, DhtLocation};
@@ -80,7 +80,7 @@ impl KitsuneHost for SwitchboardEventHandler {
         &self,
         space: Arc<KitsuneSpace>,
         dht_arc_set: Arc<dht_arc::DhtArcSet>,
-    ) -> crate::KitsuneHostResult<dht::region::RegionSetXtcs> {
+    ) -> crate::KitsuneHostResult<dht::region_set::RegionSetLtcs> {
         async move {
             let topo = self.get_topology(space).await?;
             let arq_set = ArqBoundsSet::from_dht_arc_set(&topo, &self.sb.strat, &dht_arc_set)
@@ -90,7 +90,7 @@ impl KitsuneHost for SwitchboardEventHandler {
             let current = Timestamp::now();
             let times =
                 TelescopingTimes::new(TimeQuantum::from_timestamp(&self.sb.topology, current));
-            let coord_set = RegionCoordSetXtcs::new(times, arq_set);
+            let coord_set = RegionCoordSetLtcs::new(times, arq_set);
             coord_set.into_region_set(|(_, coords)| {
                 let bounds = coords.to_bounds(&self.sb.topology);
                 let RegionBounds {

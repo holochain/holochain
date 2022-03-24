@@ -15,7 +15,7 @@ use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::codec::Codec;
 use kitsune_p2p_types::combinators::second;
 use kitsune_p2p_types::config::*;
-use kitsune_p2p_types::dht::region::RegionSetXtcs;
+use kitsune_p2p_types::dht::region_set::RegionSetLtcs;
 use kitsune_p2p_types::dht_arc::{DhtArcRange, DhtArcSet};
 use kitsune_p2p_types::metrics::*;
 use kitsune_p2p_types::tx2::tx2_api::*;
@@ -549,7 +549,7 @@ pub struct RoundState {
     round_timeout: std::time::Duration,
     /// The RegionSet we will send to our gossip partner during Historical
     /// gossip (will be None for Recent).
-    region_set_sent: Option<RegionSetXtcs>,
+    region_set_sent: Option<RegionSetLtcs>,
 }
 
 impl ShardedGossipLocal {
@@ -587,7 +587,7 @@ impl ShardedGossipLocal {
         &self,
         remote_agent_list: Vec<AgentInfoSigned>,
         common_arc_set: Arc<DhtArcSet>,
-        region_set_sent: Option<RegionSetXtcs>,
+        region_set_sent: Option<RegionSetLtcs>,
     ) -> KitsuneResult<RoundState> {
         Ok(RoundState {
             remote_agent_list,
@@ -1063,7 +1063,7 @@ kitsune_p2p_types::write_codec_enum! {
         /// Send Op region hashes
         OpRegions(0x51) {
             /// The region hashes for all common ops
-            region_set.0: RegionSetXtcs,
+            region_set.0: RegionSetLtcs,
         },
 
         /// Any ops that were missing from the remote bloom.

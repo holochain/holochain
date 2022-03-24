@@ -11,14 +11,14 @@ pub async fn query_region_set(
     db: DbWrite<DbKindAuthored>,
     topology: Topology,
     dht_arc_set: Arc<DhtArcSet>,
-) -> ConductorResult<RegionSetXtcs> {
+) -> ConductorResult<RegionSetLtcs> {
     let strat = ArqStrat::default();
     let arq_set = ArqBoundsSet::from_dht_arc_set(&topology, &strat, &dht_arc_set)
         .expect("arc is not quantizable (FIXME: only use quantized arcs)");
     // TODO: This should be behind the current moment by however much Recent gossip covers.
     let current = Timestamp::now();
     let times = TelescopingTimes::new(TimeQuantum::from_timestamp(&topology, current));
-    let coords = RegionCoordSetXtcs::new(times, arq_set);
+    let coords = RegionCoordSetLtcs::new(times, arq_set);
 
     let region_set = db
         .async_reader(move |txn| {

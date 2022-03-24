@@ -2,7 +2,7 @@ pub use crate::test_util::spawn_handler;
 use crate::{test_util::hash_op_data, KitsuneHostPanicky};
 use crate::{HostStub, KitsuneHost};
 use kitsune_p2p_types::box_fut;
-use kitsune_p2p_types::dht::prelude::{ArqBoundsSet, RegionCoordSetXtcs, RegionData};
+use kitsune_p2p_types::dht::prelude::{ArqBoundsSet, RegionCoordSetLtcs, RegionData};
 use kitsune_p2p_types::dht::quantum::{TelescopingTimes, Topology};
 use kitsune_p2p_types::dht::{ArqStrat, PeerStrat};
 
@@ -40,7 +40,7 @@ impl KitsuneHost for StandardResponsesHostApi {
         &self,
         space: Arc<KitsuneSpace>,
         dht_arc_set: Arc<DhtArcSet>,
-    ) -> crate::KitsuneHostResult<RegionSetXtcs> {
+    ) -> crate::KitsuneHostResult<RegionSetLtcs> {
         async move {
             let arqs = ArqBoundsSet::from_dht_arc_set(
                 &self.get_topology(space).await?,
@@ -48,7 +48,7 @@ impl KitsuneHost for StandardResponsesHostApi {
                 &dht_arc_set,
             )
             .expect("an arc in the set could not be quantized");
-            let coords = RegionCoordSetXtcs::new(TelescopingTimes::new(1.into()), arqs);
+            let coords = RegionCoordSetLtcs::new(TelescopingTimes::new(1.into()), arqs);
             let chunks = coords.region_coords_nested().count();
             let region_set = if self.with_data {
                 // XXX: this is very fake, and completely wrong!
@@ -59,9 +59,9 @@ impl KitsuneHost for StandardResponsesHostApi {
                     size: 1,
                     count: 1,
                 };
-                RegionSetXtcs::from_data(coords, vec![vec![data]; chunks])
+                RegionSetLtcs::from_data(coords, vec![vec![data]; chunks])
             } else {
-                RegionSetXtcs::from_data(coords, vec![])
+                RegionSetLtcs::from_data(coords, vec![])
             };
             Ok(region_set)
         }

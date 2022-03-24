@@ -861,14 +861,17 @@ impl HolochainP2pHandler for HolochainP2pActor {
         &mut self,
         dna_hash: DnaHash,
         agent_pub_key: AgentPubKey,
+        initial_arc: Option<crate::dht_arc::DhtArc>,
     ) -> HolochainP2pHandlerResult<()> {
         let space = dna_hash.into_kitsune();
         let agent = agent_pub_key.into_kitsune();
 
         let kitsune_p2p = self.kitsune_p2p.clone();
-        Ok(async move { Ok(kitsune_p2p.join(space, agent).await?) }
-            .boxed()
-            .into())
+        Ok(
+            async move { Ok(kitsune_p2p.join(space, agent, initial_arc).await?) }
+                .boxed()
+                .into(),
+        )
     }
 
     #[tracing::instrument(skip(self), level = "trace")]

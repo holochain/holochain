@@ -594,7 +594,11 @@ impl KitsuneP2pHandler for Space {
         &mut self,
         space: Arc<KitsuneSpace>,
         agent: Arc<KitsuneAgent>,
+        initial_arc: Option<DhtArc>,
     ) -> KitsuneP2pHandlerResult<()> {
+        if let Some(initial_arc) = initial_arc {
+            self.agent_arcs.insert(agent.clone(), initial_arc);
+        }
         self.local_joined_agents.insert(agent.clone());
         for module in self.gossip_mod.values() {
             module.local_agent_join(agent.clone());
@@ -1356,6 +1360,9 @@ impl Space {
         } else {
             // TODO: We are simply setting the initial arc to full.
             // In the future we may want to do something more intelligent.
+            //
+            // In the case an initial_arc is passend into the join request,
+            // handle_join will initialize this agent_arcs map to that value.
             self.agent_arcs
                 .get(agent)
                 .cloned()

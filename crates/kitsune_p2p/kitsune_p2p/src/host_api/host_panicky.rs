@@ -1,4 +1,4 @@
-use kitsune_p2p_types::dht::region::RegionSetXtcs;
+use kitsune_p2p_types::dht::region_set::RegionSetLtcs;
 
 use super::*;
 
@@ -47,7 +47,7 @@ pub trait KitsuneHostPanicky: KitsuneHost {
         &self,
         _space: Arc<KitsuneSpace>,
         _dht_arc_set: Arc<DhtArcSet>,
-    ) -> KitsuneHostResult<RegionSetXtcs> {
+    ) -> KitsuneHostResult<RegionSetLtcs> {
         unimplemented!(
             "default panic for unimplemented KitsuneHost test behavior: {}",
             Self::NAME
@@ -90,7 +90,7 @@ impl<T: KitsuneHostPanicky> KitsuneHost for T {
         &self,
         space: Arc<KitsuneSpace>,
         dht_arc_set: Arc<DhtArcSet>,
-    ) -> KitsuneHostResult<RegionSetXtcs> {
+    ) -> KitsuneHostResult<RegionSetLtcs> {
         KitsuneHostPanicky::query_region_set(self, space, dht_arc_set)
     }
 

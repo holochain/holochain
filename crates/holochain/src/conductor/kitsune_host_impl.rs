@@ -85,7 +85,7 @@ impl KitsuneHost for KitsuneHostImpl {
         &self,
         space: Arc<kitsune_p2p::KitsuneSpace>,
         dht_arc_set: Arc<holochain_p2p::dht_arc::DhtArcSet>,
-    ) -> KitsuneHostResult<holochain_p2p::dht::region::RegionSetXtcs> {
+    ) -> KitsuneHostResult<holochain_p2p::dht::region_set::RegionSetLtcs> {
         let dna_hash = DnaHash::from_kitsune(&space);
         async move {
             let topology = self.get_topology(space.clone()).await?;

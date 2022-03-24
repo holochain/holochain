@@ -1,7 +1,6 @@
 //! This module contains data and functions for running operations
 //! at the level of a [`DnaHash`] space.
-//! Multiple [`Cell`]'s could share the same space.
-
+//! Multiple [`Cell`](crate::conductor::Cell)'s could share the same space.
 use std::{collections::HashMap, sync::Arc};
 
 use holo_hash::{DhtOpHash, DnaHash};
@@ -11,7 +10,8 @@ use holochain_p2p::{
         arq::{power_and_count_from_length, ArqBoundsSet},
         hash::RegionHash,
         quantum::{TelescopingTimes, TimeQuantum},
-        region::{RegionBounds, RegionCoordSetXtcs, RegionData, RegionSetXtcs},
+        region::{RegionBounds, RegionData},
+        region_set::{RegionCoordSetLtcs, RegionSetLtcs},
         ArqBounds, ArqStrat,
     },
     dht_arc::{DhtArcRange, DhtArcSet},
@@ -241,7 +241,7 @@ impl Spaces {
         let intervals = dht_arc_set.intervals();
         let sql = if let Some(DhtArcRange::Full) = intervals.first() {
             format!(
-                "{}{}{}",
+                "{} {} {}",
                 holochain_sqlite::sql::sql_cell::FETCH_OP_HASHES_P1,
                 include_limbo,
                 holochain_sqlite::sql::sql_cell::FETCH_OP_HASHES_P2,
@@ -268,7 +268,7 @@ impl Spaces {
                 })
                 .collect::<String>();
             format!(
-                "{}{}{}{}",
+                "{} {} {} {}",
                 holochain_sqlite::sql::sql_cell::FETCH_OP_HASHES_P1,
                 include_limbo,
                 sql_ranges,
@@ -317,7 +317,7 @@ impl Spaces {
         dna_def: &DnaDefHashed,
         // author: AgentPubKey,
         dht_arc_set: DhtArcSet,
-    ) -> ConductorResult<RegionSetXtcs> {
+    ) -> ConductorResult<RegionSetLtcs> {
         use holo_hash::HasHash;
         let dna_hash = dna_def.as_hash();
         let sql = holochain_sqlite::sql::sql_cell::FETCH_OP_REGION;
@@ -337,7 +337,7 @@ impl Spaces {
         // TODO: This should be behind the current moment by however much Recent gossip covers.
         let current = Timestamp::now();
         let times = TelescopingTimes::new(TimeQuantum::from_timestamp(&topology, current));
-        let coords = RegionCoordSetXtcs::new(times, arq_set);
+        let coords = RegionCoordSetLtcs::new(times, arq_set);
         let coords_clone = coords.clone();
         let data = self
             .authored_db(dna_hash)?
@@ -375,7 +375,7 @@ impl Spaces {
                     .collect::<Result<Vec<Vec<RegionData>>, DatabaseError>>()
             })
             .await?;
-        Ok(RegionSetXtcs::from_data(coords, data))
+        Ok(RegionSetLtcs::from_data(coords, data))
     }
 
     #[instrument(skip(self, query))]

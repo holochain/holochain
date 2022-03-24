@@ -1,10 +1,6 @@
 use hdk::prelude::*;
-use hdk::hash_path::path::DHT_PREFIX;
 
-entry_defs![
-    Path::entry_def(),
-    PathEntry::entry_def()
-];
+entry_defs![Path::entry_def(), PathEntry::entry_def()];
 
 fn path(s: &str) -> ExternResult<EntryHash> {
     let path = Path::from(s);
@@ -16,18 +12,31 @@ fn base() -> ExternResult<EntryHash> {
     path("a")
 }
 
+fn baseless() -> ExternResult<EntryHash> {
+    Ok(EntryHash::from_raw_32([1_u8; 32].to_vec()))
+}
+
 fn target() -> ExternResult<EntryHash> {
     path("b")
 }
 
+fn targetless() -> ExternResult<EntryHash> {
+    Ok(EntryHash::from_raw_32([2_u8; 32].to_vec()))
+}
+
 #[hdk_extern]
 fn create_link(_: ()) -> ExternResult<HeaderHash> {
-    hdk::prelude::create_link(base()?, target()?, ())
+    hdk::prelude::create_link(base()?, target()?, HdkLinkType::Any, ())
+}
+
+#[hdk_extern]
+fn create_baseless_link(_: ()) -> ExternResult<HeaderHash> {
+    hdk::prelude::create_link(baseless()?, targetless()?, HdkLinkType::Any, ())
 }
 
 #[hdk_extern]
 fn create_back_link(_: ()) -> ExternResult<HeaderHash> {
-    hdk::prelude::create_link(target()?, base()?, ())
+    hdk::prelude::create_link(target()?, base()?, HdkLinkType::Any, ())
 }
 
 #[hdk_extern]
@@ -38,6 +47,11 @@ fn delete_link(input: HeaderHash) -> ExternResult<HeaderHash> {
 #[hdk_extern]
 fn get_links(_: ()) -> ExternResult<Vec<Link>> {
     hdk::prelude::get_links(base()?, None)
+}
+
+#[hdk_extern]
+fn get_baseless_links(_: ()) -> ExternResult<Vec<Link>> {
+    hdk::prelude::get_links(baseless()?, None)
 }
 
 #[hdk_extern]
@@ -57,18 +71,22 @@ fn get_back_link_details(_: ()) -> ExternResult<LinkDetails> {
 
 #[hdk_extern]
 fn get_links_bidi(_: ()) -> ExternResult<Vec<Vec<Link>>> {
-    HDK.with(|h| h.borrow().get_links(vec![
-        GetLinksInput::new(base()?, None),
-        GetLinksInput::new(target()?, None),
-    ]))
+    HDK.with(|h| {
+        h.borrow().get_links(vec![
+            GetLinksInput::new(base()?, None),
+            GetLinksInput::new(target()?, None),
+        ])
+    })
 }
 
 #[hdk_extern]
 fn get_link_details_bidi(_: ()) -> ExternResult<Vec<LinkDetails>> {
-    HDK.with(|h| h.borrow().get_link_details(vec![
-        GetLinksInput::new(base()?, None),
-        GetLinksInput::new(target()?, None),
-    ]))
+    HDK.with(|h| {
+        h.borrow().get_link_details(vec![
+            GetLinksInput::new(base()?, None),
+            GetLinksInput::new(target()?, None),
+        ])
+    })
 }
 
 #[hdk_extern]
@@ -88,15 +106,20 @@ fn commit_existing_path(_: ()) -> ExternResult<()> {
     create_entry(&path.path_entry()?)?;
     if let Some(parent) = path.parent() {
         parent.ensure()?;
-        hdk::prelude::create_link(parent.path_entry_hash()?, path.path_entry_hash()?, LinkTag::new(
-            [DHT_PREFIX].iter()
-                .chain(match path.leaf() {
+        hdk::prelude::create_link(
+            parent.path_entry_hash()?,
+            path.path_entry_hash()?,
+            HdkLinkType::Any,
+            LinkTag::new(
+                match path.leaf() {
                     None => <Vec<u8>>::new(),
-                    Some(component) => UnsafeBytes::from(SerializedBytes::try_from(component)?).into(),
-                }.iter())
-                .cloned()
-                .collect::<Vec<u8>>(),
-        ))?;
+                    Some(component) => {
+                        UnsafeBytes::from(SerializedBytes::try_from(component)?).into()
+                    }
+                }
+                .to_vec(),
+            ),
+        )?;
     }
     Ok(())
 }

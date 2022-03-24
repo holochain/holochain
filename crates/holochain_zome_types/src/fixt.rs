@@ -93,7 +93,11 @@ fixturator!(
 
 fixturator!(
     CreateLink;
-    constructor fn from_builder(HeaderBuilderCommon, EntryHash, EntryHash, u8, LinkTag);
+    constructor fn from_builder(HeaderBuilderCommon, EntryHash, EntryHash, u8, LinkType, LinkTag);
+);
+
+fixturator!(
+    LinkType; constructor fn new(u8);
 );
 
 fixturator!(
