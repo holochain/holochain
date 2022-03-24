@@ -56,6 +56,7 @@ impl TestNode {
         RegionSetLtcs::from_data(coords, data).into()
     }
 
+    /// Print an ascii representation of the node's arq and all ops held
     pub fn ascii_arq_and_ops(&self, topo: &Topology, i: usize, len: usize) -> String {
         let arq = self.arq();
         format!(

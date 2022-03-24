@@ -3,7 +3,7 @@
 
 use kitsune_p2p_dht::arq::*;
 use kitsune_p2p_dht::quantum::Topology;
-use kitsune_p2p_dht::test_utils::min_redundancy::calc_min_redundancy;
+use kitsune_p2p_dht::test_utils::calc_min_redundancy;
 use rand::prelude::StdRng;
 use rand::thread_rng;
 use rand::Rng;

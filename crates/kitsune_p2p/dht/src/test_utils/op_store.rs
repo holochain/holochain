@@ -10,6 +10,7 @@ use std::{collections::BTreeSet, ops::Bound, sync::Arc};
 
 use super::op_data::OpData;
 
+/// An in-memory implementation of a node's op store
 #[derive(Clone)]
 pub struct OpStore<O: OpRegion<D> = OpData, D: RegionDataConstraints = RegionData> {
     pub(crate) topo: Topology,
@@ -19,6 +20,7 @@ pub struct OpStore<O: OpRegion<D> = OpData, D: RegionDataConstraints = RegionDat
 }
 
 impl<D: RegionDataConstraints, O: OpRegion<D>> OpStore<O, D> {
+    /// Construct an empty store
     pub fn new(topo: Topology, gossip_params: GossipParams) -> Self {
         Self {
             topo,

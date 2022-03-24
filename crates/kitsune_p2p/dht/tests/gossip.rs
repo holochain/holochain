@@ -7,11 +7,7 @@ use kitsune_p2p_dht::{
     quantum::*,
     region::*,
     test_utils::{
-        generate_ideal_coverage,
-        gossip_direct::{gossip_direct, gossip_direct_at},
-        op_data::OpData,
-        seeded_rng,
-        test_node::TestNode,
+        generate_ideal_coverage, gossip_direct, gossip_direct_at, seeded_rng, OpData, TestNode,
     },
 };
 use kitsune_p2p_timestamp::Timestamp;

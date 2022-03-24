@@ -92,10 +92,7 @@ mod tests {
         op::*,
         persistence::*,
         prelude::{ArqBoundsSet, ArqLocated, ArqStart},
-        test_utils::{
-            op_data::{Op, OpData},
-            op_store::OpStore,
-        },
+        test_utils::{Op, OpData, OpStore},
         Arq, Loc,
     };
 

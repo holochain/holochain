@@ -2,8 +2,10 @@ use crate::{
     error::{GossipError, GossipResult},
     persistence::HostAccessTest,
     quantum::{Quantum, TimeQuantum},
+    region::REGION_MASS,
 };
 
+/// Do [`gossip_direct`], with both nodes at the same current time
 pub fn gossip_direct_at<Peer: HostAccessTest>(
     left: &mut Peer,
     right: &mut Peer,
@@ -98,7 +100,9 @@ pub fn gossip_direct<Peer: HostAccessTest>(
     Ok(stats)
 }
 
+/// Stats about what was sent and received during the gossip round
 #[derive(Clone, Debug, Default, derive_more::Add)]
+#[allow(missing_docs)]
 pub struct TestNodeGossipRoundStats {
     pub regions_sent: u32,
     pub regions_rcvd: u32,
@@ -109,11 +113,13 @@ pub struct TestNodeGossipRoundStats {
 }
 
 impl TestNodeGossipRoundStats {
+    /// The total bytes sent
     pub fn total_sent(&self) -> u64 {
-        self.regions_sent as u64 + self.op_data_sent
+        (self.regions_sent * REGION_MASS) as u64 + self.op_data_sent
     }
 
+    /// The total bytes received
     pub fn total_rcvd(&self) -> u64 {
-        self.regions_rcvd as u64 + self.op_data_rcvd
+        (self.regions_rcvd * REGION_MASS) as u64 + self.op_data_rcvd
     }
 }

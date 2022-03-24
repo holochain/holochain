@@ -20,7 +20,7 @@ use crate::{
     quantum::{GossipParams, TelescopingTimes, TimeQuantum, Topology},
     region::*,
     region_set::*,
-    test_utils::op_data::OpData,
+    test_utils::OpData,
     Arq,
 };
 

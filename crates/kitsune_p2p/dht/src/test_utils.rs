@@ -1,10 +1,16 @@
 //! Utils for testing
 
-pub mod gossip_direct;
-pub mod min_redundancy;
-pub mod op_data;
-pub mod op_store;
-pub mod test_node;
+mod gossip_direct;
+mod min_redundancy;
+mod op_data;
+mod op_store;
+mod test_node;
+
+pub use gossip_direct::*;
+pub use min_redundancy::*;
+pub use op_data::*;
+pub use op_store::*;
+pub use test_node::*;
 
 use crate::arq::*;
 use crate::quantum::Topology;
