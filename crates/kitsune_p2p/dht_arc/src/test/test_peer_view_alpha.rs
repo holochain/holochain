@@ -170,7 +170,7 @@ fn test_peer_gaps() {
                 let p = peers.clone();
                 let arc = peers.get_mut(i).unwrap();
                 let view = strat.view(*arc, p.as_slice());
-                arc.update_length(view);
+                arc.update_length(&view);
             }
             if gaps {
                 gaps = check_for_gaps(peers.clone());

@@ -100,8 +100,8 @@ impl DhtArc {
     /// This will converge on a new target instead of jumping directly
     /// to the new target and is designed to be called at a given rate
     /// with more recent peer views.
-    pub fn update_length<V: Into<PeerView>>(&mut self, view: V) {
-        let new_length = (U32_LEN as f64 * view.into().next_coverage(self.coverage())) as u64;
+    pub fn update_length(&mut self, view: &PeerView) {
+        let new_length = (U32_LEN as f64 * view.next_coverage(self.coverage())) as u64;
         *self = Self::from_start_and_len(self.start_loc(), new_length)
     }
 
