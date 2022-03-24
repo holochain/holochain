@@ -21,14 +21,6 @@ type DataVec = statrs::statistics::Data<Vec<f64>>;
 
 pub type Peers = Vec<DhtArc>;
 
-fn max_halflen() -> f64 {
-    MAX_HALF_LENGTH as f64
-}
-
-fn full_len() -> f64 {
-    2f64.powi(32)
-}
-
 pub fn seeded_rng(seed: Option<u64>) -> StdRng {
     let seed = seed.unwrap_or_else(|| thread_rng().gen());
     tracing::info!("RNG seed: {}", seed);
@@ -107,8 +99,8 @@ pub fn run_one_epoch(
 ) -> (Peers, EpochStats) {
     let mut net = 0.0;
     let mut gross = 0.0;
-    let mut delta_min = max_halflen();
-    let mut delta_max = -max_halflen();
+    let mut delta_min = FULL_LEN_F;
+    let mut delta_max = -FULL_LEN_F;
     let mut index_min = peers.len();
     let mut index_max = peers.len();
     for i in 0..peers.len() {
@@ -120,9 +112,9 @@ pub fn run_one_epoch(
         let p = peers.clone();
         let arc = peers.get_mut(i).unwrap();
         let view = strat.view(*arc, p.as_slice());
-        let before = arc.half_length() as f64;
+        let before = arc.length() as f64;
         arc.update_length(view);
-        let after = arc.half_length() as f64;
+        let after = arc.length() as f64;
         let delta = after - before;
         // dbg!(&before, &after, &delta);
         net += delta;
@@ -149,11 +141,11 @@ pub fn run_one_epoch(
     let tot = peers.len() as f64;
     let min_redundancy = check_redundancy(peers.clone());
     let stats = EpochStats {
-        net_delta_avg: net / tot / max_halflen(),
-        gross_delta_avg: gross / tot / max_halflen(),
+        net_delta_avg: net / tot / FULL_LEN_F,
+        gross_delta_avg: gross / tot / FULL_LEN_F,
         min_redundancy: min_redundancy,
-        delta_min: delta_min / max_halflen(),
-        delta_max: delta_max / max_halflen(),
+        delta_min: delta_min / FULL_LEN_F,
+        delta_max: delta_max / FULL_LEN_F,
     };
     (peers, stats)
 }
@@ -174,12 +166,14 @@ pub fn simple_parameterized_generator(
     generate_evenly_spaced_with_half_lens_and_jitter(rng, j, halflens)
 }
 
-/// Define arcs by centerpoint and halflen in the unit interval [0.0, 1.0]
+/// Define arcs by start location and halflen in the unit interval [0.0, 1.0]
 pub fn unit_arcs<H: Iterator<Item = (f64, f64)>>(arcs: H) -> Peers {
-    let fc = full_len();
+    let fc = FULL_LEN_F;
     let fh = MAX_HALF_LENGTH as f64;
-    arcs.map(|(c, h)| DhtArc::new((c * fc).min(u32::MAX as f64) as u32, (h * fh) as u32))
-        .collect()
+    arcs.map(|(s, h)| {
+        DhtArc::from_start_and_half_len((s * fc).min(u32::MAX as f64) as u32, (h * fh) as u32)
+    })
+    .collect()
 }
 
 /// Each agent is perfect evenly spaced around the DHT,

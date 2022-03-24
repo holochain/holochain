@@ -1,6 +1,6 @@
 SELECT
   SUM(
-    -- first, sum up the 0.0 - 1.0 coverage of everyone centered in our arc
+    -- first, sum up the 0.0 - 1.0 coverage of everyone contained in our arc
     CASE
       -- if start is before end
       WHEN (storage_start_loc <= storage_end_loc) THEN IFNULL(

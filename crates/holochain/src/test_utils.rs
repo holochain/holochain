@@ -238,7 +238,7 @@ where
                     respond.r(Ok(async move {
                         Ok(PeerViewBeta::new(
                             Default::default(),
-                            DhtArc::full(0),
+                            DhtArc::full(0.into()),
                             1.0,
                             1,
                         ))
