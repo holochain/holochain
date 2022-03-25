@@ -114,6 +114,8 @@ impl AccessPeerStore for TestNode {
 
 #[cfg(test)]
 mod tests {
+    use std::str::FromStr;
+
     use kitsune_p2p_timestamp::Timestamp;
 
     use crate::spacetime::*;
@@ -159,6 +161,72 @@ mod tests {
             let coords = RegionCoords {
                 space: SpaceSegment::new(10, 1),
                 time: TimeSegment::new(5, 0),
+            };
+            dbg!(coords.to_bounds(&topo));
+            let data = node.query_region_data(&coords);
+            assert_eq!(data.count, 1);
+            assert_eq!(data.size, 3456);
+        }
+    }
+
+    #[test]
+    fn integrate_and_query_ops_standard_topo() {
+        let topo = Topology::standard_epoch();
+        let gopa = GossipParams::zero();
+        let arq = Arq::new(8, 0u32.into(), 4.into());
+        let mut node = TestNode::new(topo.clone(), gopa, arq);
+
+        let p = pow2(12);
+
+        node.integrate_ops(
+            [
+                OpData::fake(
+                    // origin
+                    1.into(),
+                    // origin
+                    Timestamp::from_str("2022-01-01T00:02:00Z").unwrap(),
+                    1234,
+                ),
+                OpData::fake(
+                    // 10 quanta from origin
+                    (p * 10).into(),
+                    // 1 quantum from origin
+                    Timestamp::from_str("2022-01-01T00:05:00Z").unwrap(),
+                    2345,
+                ),
+                OpData::fake(
+                    (p * 100).into(),
+                    // 12 * 24 quanta from origin
+                    Timestamp::from_str("2022-01-02T00:00:00Z").unwrap(),
+                    3456,
+                ),
+            ]
+            .into_iter(),
+        );
+        {
+            let coords = RegionCoords {
+                space: SpaceSegment::new(0, 0),
+                time: TimeSegment::new(0, 0),
+            };
+            dbg!(coords.to_bounds(&topo));
+            let data = node.query_region_data(&coords);
+            assert_eq!(data.count, 1);
+            assert_eq!(data.size, 1234);
+        }
+        {
+            let coords = RegionCoords {
+                space: SpaceSegment::new(4, 0),
+                time: TimeSegment::new(1, 0),
+            };
+            dbg!(coords.to_bounds(&topo));
+            let data = node.query_region_data(&coords);
+            assert_eq!(data.count, 2);
+            assert_eq!(data.size, 1234 + 2345);
+        }
+        {
+            let coords = RegionCoords {
+                space: SpaceSegment::new(2, 25),
+                time: TimeSegment::new(0, 12 * 24),
             };
             dbg!(coords.to_bounds(&topo));
             let data = node.query_region_data(&coords);
