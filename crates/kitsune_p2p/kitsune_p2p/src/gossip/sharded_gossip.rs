@@ -66,7 +66,7 @@ pub(crate) mod tests;
 /// with the constant in PoolBuf which cannot be set at runtime)
 /// ^^ obviously we're no longer following the above advice..
 ///    in the case of the pool buf management, any gossips larger than
-///    16000 will now be shrunk resulting in additional memory thrashing
+///    16,000,000 will now be shrunk resulting in additional memory thrashing
 const MAX_SEND_BUF_BYTES: usize = 16_000_000;
 
 /// The timeout for a gossip round if there is no contact. One minute.

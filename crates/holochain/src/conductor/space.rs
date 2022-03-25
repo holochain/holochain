@@ -457,6 +457,7 @@ impl Spaces {
                 let mut out = Vec::with_capacity(op_hashes.len());
                 let mut total_bytes = 0;
                 for hash in op_hashes {
+                    // FIXME: cache this query (make prepared statement)
                     let r = txn.query_row_and_then(
                         "
                             SELECT DhtOp.hash, DhtOp.type AS dht_type,
@@ -500,6 +501,7 @@ impl Spaces {
                         Ok((r, bytes)) => {
                             out.push(r);
                             total_bytes += bytes;
+                            // pair(maackle, freesig): be sure to add this limit in the region fetch case too
                             if total_bytes > OPS_IN_MEMORY_BOUND_BYTES {
                                 break;
                             }
