@@ -5,9 +5,9 @@ use crate::{
     hash::{fake_hash, AgentKey},
     persistence::{AccessOpStore, AccessPeerStore},
     prelude::RegionCoordSetLtcs,
-    spacetime::{GossipParams, TelescopingTimes, TimeQuantum, Topology},
     region::*,
     region_set::*,
+    spacetime::{GossipParams, TelescopingTimes, TimeQuantum, Topology},
 };
 
 use super::{
@@ -125,7 +125,7 @@ mod tests {
         let topo = Topology::unit_zero();
         let gopa = GossipParams::zero();
         let arq = Arq::new(8, 0u32.into(), 4.into());
-        let mut node = TestNode::new(topo, gopa, arq);
+        let mut node = TestNode::new(topo.clone(), gopa, arq);
 
         node.integrate_ops(
             [
@@ -136,28 +136,34 @@ mod tests {
             .into_iter(),
         );
         {
-            let data = node.query_region_data(&RegionCoords {
+            let coords = RegionCoords {
                 space: SpaceSegment::new(7, 0),
                 time: TimeSegment::new(5, 0),
-            });
+            };
+            dbg!(coords.to_bounds(&topo));
+            let data = node.query_region_data(&coords);
             assert_eq!(data.count, 1);
             assert_eq!(data.size, 1234);
         }
         {
-            let data = node.query_region_data(&RegionCoords {
+            let coords = RegionCoords {
                 space: SpaceSegment::new(10, 0),
                 time: TimeSegment::new(5, 0),
-            });
+            };
+            dbg!(coords.to_bounds(&topo));
+            let data = node.query_region_data(&coords);
             assert_eq!(data.count, 2);
             assert_eq!(data.size, 1234 + 2345);
         }
         {
-            let data = node.query_region_data(&RegionCoords {
-                space: SpaceSegment::new(7, 1),
+            let coords = RegionCoords {
+                space: SpaceSegment::new(10, 1),
                 time: TimeSegment::new(5, 0),
-            });
+            };
+            dbg!(coords.to_bounds(&topo));
+            let data = node.query_region_data(&coords);
             assert_eq!(data.count, 1);
-            assert_eq!(data.size, 2345);
+            assert_eq!(data.size, 3456);
         }
     }
 
