@@ -114,9 +114,8 @@ impl AccessPeerStore for TestNode {
 
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr;
-
     use kitsune_p2p_timestamp::Timestamp;
+    use std::str::FromStr;
 
     use crate::spacetime::*;
 
