@@ -47,8 +47,8 @@ pub(crate) const U32_LEN: u64 = u32::MAX as u64 + 1;
 pub trait ArqStart: Sized + Copy + std::fmt::Debug {
     /// Get the DhtLocation representation
     fn to_loc(&self, topo: &Topology, power: u8) -> Loc;
-    /// Get the exponential Offset representation
-    fn to_offset(&self, topo: &Topology, power: u8) -> Offset;
+    /// Get the exponential SpaceOffset representation
+    fn to_offset(&self, topo: &Topology, power: u8) -> SpaceOffset;
 }
 
 impl ArqStart for Loc {
@@ -56,16 +56,17 @@ impl ArqStart for Loc {
         *self
     }
 
-    fn to_offset(&self, topo: &Topology, power: u8) -> Offset {
-        Offset::from_loc_rounded(*self, topo, power)
+    fn to_offset(&self, topo: &Topology, power: u8) -> SpaceOffset {
+        SpaceOffset::from_absolute_rounded(*self, topo, power)
     }
 }
 
-impl ArqStart for Offset {
+impl ArqStart for SpaceOffset {
     fn to_loc(&self, topo: &Topology, power: u8) -> Loc {
-        self.to_loc(topo, power)
+        self.to_absolute(topo, power)
     }
-    fn to_offset(&self, _topo: &Topology, _power: u8) -> Offset {
+
+    fn to_offset(&self, _topo: &Topology, _power: u8) -> SpaceOffset {
         *self
     }
 }
@@ -99,18 +100,18 @@ pub struct Arq<S: ArqStart = Loc> {
     /// The number of unit lengths.
     /// We never expect the count to be less than 4 or so, and not much larger
     /// than 32.
-    pub count: Offset,
+    pub count: SpaceOffset,
 }
 
 /// Alias for Arq with an Loc start
 pub type ArqLocated = Arq<Loc>;
 
-/// Alias for Arq with an Offset start
-pub type ArqBounds = Arq<Offset>;
+/// Alias for Arq with an SpaceOffset start
+pub type ArqBounds = Arq<SpaceOffset>;
 
 impl<S: ArqStart> Arq<S> {
     /// Constructor from individual parts
-    pub fn new(power: u8, start: S, count: Offset) -> Self {
+    pub fn new(power: u8, start: S, count: SpaceOffset) -> Self {
         Self {
             power,
             start,
@@ -235,7 +236,7 @@ impl Arq<Loc> {
     /// unless `force` is true, in which case always return Some.
     pub fn upshift(&self, force: bool) -> Option<Self> {
         let count = if force && *self.count % 2 == 1 {
-            self.count + Offset(1)
+            self.count + SpaceOffset(1)
         } else {
             self.count
         };
@@ -250,7 +251,7 @@ impl Arq<Loc> {
     /// [`Loc`] associate with this arq.
     pub fn to_bounds(&self, topo: &Topology) -> ArqBounds {
         ArqBounds {
-            start: Offset::from(self.start.as_u32() / self.absolute_chunk_width(topo)),
+            start: SpaceOffset::from(self.start.as_u32() / self.absolute_chunk_width(topo)),
             power: self.power,
             count: self.count,
         }
@@ -382,7 +383,7 @@ impl ArqBounds {
     }
 
     /// Get a reference to the arq bounds's offset.
-    pub fn offset(&self) -> Offset {
+    pub fn offset(&self) -> SpaceOffset {
         self.start
     }
 }
@@ -520,7 +521,7 @@ mod tests {
         let c = Arq {
             start: Loc::from(42u32),
             power: 20,
-            count: Offset(10),
+            count: SpaceOffset(10),
         };
 
         let rq = |c: &Arq, p| (*c).requantize(p);
@@ -536,7 +537,7 @@ mod tests {
         let c = Arq {
             start: Loc::from(42u32),
             power: 20,
-            count: Offset(256),
+            count: SpaceOffset(256),
         };
 
         assert_eq!(rq(&c, 12).map(|c| *c.count), Some(256 * 256));
@@ -551,7 +552,7 @@ mod tests {
         {
             let a = Arq::new(pow, (2u32.pow(pow.into()) - 1).into(), 16.into());
             let b = a.to_bounds(&topo);
-            assert_eq!(b.offset(), Offset(0));
+            assert_eq!(b.offset(), SpaceOffset(0));
             assert_eq!(b.count(), 16);
         }
         {
@@ -591,7 +592,7 @@ mod tests {
             // the quantum size is 2^12, and the max count is 16 which is 2^4,
             // so any power greater than 16 could result in an overflow.
             let topo = Topology::standard_epoch();
-            let a = Arq::new(power, Loc::from(loc), Offset(count));
+            let a = Arq::new(power, Loc::from(loc), SpaceOffset(count));
             let (left, right) = a.to_edge_locs(&topo);
             let p = pow2(power);
             assert_eq!(left.as_u32() % p, 0);

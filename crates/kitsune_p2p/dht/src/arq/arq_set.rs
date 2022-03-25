@@ -4,7 +4,7 @@ use kitsune_p2p_dht_arc::DhtArcSet;
 
 use crate::{
     arq::ArqBounds,
-    quantum::{Offset, Topology},
+    quantum::{SpaceOffset, Topology},
     ArqStrat, Loc,
 };
 
@@ -13,7 +13,7 @@ use super::{power_and_count_from_length, Arq, ArqStart};
 /// Alias for a set of [`Arq`]
 pub type ArqSet = ArqSetImpl<Loc>;
 /// Alias for a set of [`ArqBounds`]
-pub type ArqBoundsSet = ArqSetImpl<Offset>;
+pub type ArqBoundsSet = ArqSetImpl<SpaceOffset>;
 
 /// A collection of ArqBounds.
 /// All bounds are guaranteed to be quantized to the same power
@@ -101,7 +101,7 @@ impl<S: ArqStart> ArqSetImpl<S> {
     }
 
     /// Intersection of all arqs contained within
-    pub fn intersection(&self, topo: &Topology, other: &Self) -> ArqSetImpl<Offset> {
+    pub fn intersection(&self, topo: &Topology, other: &Self) -> ArqSetImpl<SpaceOffset> {
         let power = self.power.min(other.power());
         let a1 = self.requantize(power).unwrap().to_dht_arc_set(topo);
         let a2 = other.requantize(power).unwrap().to_dht_arc_set(topo);
@@ -200,17 +200,17 @@ mod tests {
             ArqBounds {
                 start: 0.into(),
                 power: 10,
-                count: Offset(10),
+                count: SpaceOffset(10),
             },
             ArqBounds {
                 start: 0.into(),
                 power: 8,
-                count: Offset(40),
+                count: SpaceOffset(40),
             },
             ArqBounds {
                 start: 0.into(),
                 power: 12,
-                count: Offset(3),
+                count: SpaceOffset(3),
             },
         ]);
 
@@ -220,17 +220,17 @@ mod tests {
                 ArqBounds {
                     start: 0.into(),
                     power: 8,
-                    count: Offset(4 * 10)
+                    count: SpaceOffset(4 * 10)
                 },
                 ArqBounds {
                     start: 0.into(),
                     power: 8,
-                    count: Offset(40)
+                    count: SpaceOffset(40)
                 },
                 ArqBounds {
                     start: 0.into(),
                     power: 8,
-                    count: Offset(3 * 16)
+                    count: SpaceOffset(3 * 16)
                 },
             ]
         );

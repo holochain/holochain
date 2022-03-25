@@ -1,7 +1,7 @@
 use kitsune_p2p_dht_arc::{DhtArc, PeerViewAlpha, PeerViewBeta};
 use num_traits::Zero;
 
-use crate::quantum::{Offset, Topology};
+use crate::quantum::{SpaceOffset, Topology};
 
 use super::{is_full, Arq, ArqStrat};
 
@@ -251,7 +251,7 @@ impl PeerViewQ {
 
         if new_count != old_count {
             let mut tentative = *arq;
-            tentative.count = Offset(new_count);
+            tentative.count = SpaceOffset(new_count);
 
             // If shrinking caused us to go below the target coverage,
             // or to start "slacking" (not seeing enough peers), then
@@ -274,7 +274,7 @@ impl PeerViewQ {
         }
 
         // Commit the change to the count
-        arq.count = Offset(new_count);
+        arq.count = SpaceOffset(new_count);
 
         let power_above_min = |pow| {
             // not already at the minimum
@@ -291,7 +291,7 @@ impl PeerViewQ {
                 } else {
                     // If we could not downshift due to other constraints, then we cannot
                     // shrink any smaller than the min_chunks.
-                    arq.count = Offset(self.strat.min_chunks());
+                    arq.count = SpaceOffset(self.strat.min_chunks());
                 }
             } else {
                 break;
@@ -323,7 +323,7 @@ impl PeerViewQ {
                 } else {
                     // If we could not upshift due to other constraints, then we cannot
                     // grow any larger than the max_chunks.
-                    arq.count = Offset(self.strat.max_chunks());
+                    arq.count = SpaceOffset(self.strat.max_chunks());
                 }
             } else {
                 break;

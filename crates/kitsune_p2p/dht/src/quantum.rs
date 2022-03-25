@@ -45,7 +45,7 @@
 //! a bounded rectangle of spacetime.
 //!
 
-use std::{marker::PhantomData, ops::AddAssign};
+use std::ops::{AddAssign, Deref};
 
 use crate::{
     op::{Loc, Timestamp},
@@ -122,7 +122,9 @@ impl TimeQuantum {
 
 /// A quantum in the physical sense: the smallest possible amount of something.
 /// Here, we are talking about Time and Space quanta.
-pub trait Quantum: From<u32> + PartialEq + Eq + PartialOrd + Ord + std::fmt::Debug {
+pub trait Quantum:
+    Copy + Clone + From<u32> + PartialEq + Eq + PartialOrd + Ord + std::fmt::Debug
+{
     /// The absolute coordinate which this quantum corresponds to (time or space)
     type Absolute;
 
@@ -211,14 +213,14 @@ impl SpacetimeQuantumCoords {
     }
 }
 
-fn bounds<N: From<u32>>(dim: &Dimension, power: u8, offset: Offset, count: u32) -> (N, N) {
+fn bounds<N: From<u32>>(dim: &Dimension, power: u8, offset: SpaceOffset, count: u32) -> (N, N) {
     let q = dim.quantum.wrapping_mul(pow2(power));
     let start = offset.wrapping_mul(q);
     let len = count.wrapping_mul(q);
     (start.into(), start.wrapping_add(len).wrapping_sub(1).into())
 }
 
-fn bounds64<N: From<i64>>(dim: &Dimension, power: u8, offset: Offset, count: u32) -> (N, N) {
+fn bounds64<N: From<i64>>(dim: &Dimension, power: u8, offset: TimeOffset, count: u32) -> (N, N) {
     let q = dim.quantum as i64 * 2i64.pow(power.into());
     let start = (*offset as i64).wrapping_mul(q);
     let len = (count as i64).wrapping_mul(q);
@@ -226,13 +228,30 @@ fn bounds64<N: From<i64>>(dim: &Dimension, power: u8, offset: Offset, count: u32
 }
 
 /// An Offset represents the position of the left edge of some Segment.
+/// Offsets must be paired with a *power* to map to quantum coordinates.
 /// The absolute DhtLocation of the offset is determined by the "power" of its
 /// context, and topology of the space, by:
 ///
-///   dht location = offset * 2^pow * topology.space.quantum
-///
-/// Currently we only discuss offsets in Space. TODO: do we need to talk about
-/// Time Offsets as well?
+///   dht_location = offset * 2^pow * quantum_size
+pub trait Offset: Sized + Copy + Clone + Deref<Target = u32> + From<u32> {
+    /// The type of quantum to map to, which also implies the absolute coordinates
+    type Quantum: Quantum;
+
+    /// Get the absolute coordinate for this Offset
+    fn to_absolute(
+        &self,
+        topo: &Topology,
+        power: u8,
+    ) -> <<Self as Offset>::Quantum as Quantum>::Absolute;
+
+    /// Get the quantum coordinate for this Offset
+    fn to_quantum(&self, power: u8) -> Self::Quantum;
+
+    /// Get the nearest rounded-down Offset for the given Loc
+    fn from_absolute_rounded(loc: Loc, topo: &Topology, power: u8) -> Self;
+}
+
+/// An Offset in space.
 #[derive(
     Copy,
     Clone,
@@ -254,24 +273,72 @@ fn bounds64<N: From<i64>>(dim: &Dimension, power: u8, offset: Offset, count: u32
     serde::Deserialize,
 )]
 #[serde(transparent)]
-pub struct Offset(pub u32);
+pub struct SpaceOffset(pub u32);
 
-impl Offset {
+/// An Offset in time.
+#[derive(
+    Copy,
+    Clone,
+    Debug,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    derive_more::Add,
+    derive_more::Sub,
+    derive_more::Mul,
+    derive_more::Div,
+    derive_more::Deref,
+    derive_more::DerefMut,
+    derive_more::From,
+    derive_more::Into,
+    serde::Serialize,
+    serde::Deserialize,
+)]
+#[serde(transparent)]
+pub struct TimeOffset(pub u32);
+
+impl Offset for SpaceOffset {
+    type Quantum = SpaceQuantum;
+
     /// Get the absolute coordinate for this Offset
-    pub fn to_loc(&self, topo: &Topology, power: u8) -> Loc {
+    fn to_absolute(&self, topo: &Topology, power: u8) -> Loc {
         self.wrapping_mul(topo.space.quantum)
             .wrapping_mul(pow2(power))
             .into()
     }
 
     /// Get the quantum coordinate for this Offset
-    pub fn to_quantum(&self, power: u8) -> SpaceQuantum {
+    fn to_quantum(&self, power: u8) -> Self::Quantum {
         self.wrapping_mul(pow2(power)).into()
     }
 
     /// Get the nearest rounded-down Offset for the given Loc
-    pub fn from_loc_rounded(loc: Loc, topo: &Topology, power: u8) -> Offset {
+    fn from_absolute_rounded(loc: Loc, topo: &Topology, power: u8) -> Self {
         (loc.as_u32() / topo.space.quantum / pow2(power)).into()
+    }
+}
+
+impl Offset for TimeOffset {
+    type Quantum = TimeQuantum;
+
+    /// Get the absolute coordinate for this Offset
+    fn to_absolute(&self, topo: &Topology, power: u8) -> Timestamp {
+        Timestamp::from_micros(
+            self.wrapping_mul(topo.time.quantum)
+                .wrapping_mul(pow2(power)) as i64,
+        )
+    }
+
+    /// Get the quantum coordinate for this Offset
+    fn to_quantum(&self, power: u8) -> Self::Quantum {
+        self.wrapping_mul(pow2(power)).into()
+    }
+
+    /// Get the nearest rounded-down Offset for the given Loc
+    fn from_absolute_rounded(loc: Loc, topo: &Topology, power: u8) -> Self {
+        (loc.as_u32() / topo.time.quantum / pow2(power)).into()
     }
 }
 
@@ -280,21 +347,19 @@ impl Offset {
 /// The length of an interval is 2^(power), and the position of its left edge
 /// is at (offset * length).
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub struct Segment<Q: Quantum> {
+pub struct Segment<O: Offset> {
     /// The exponent, where length = 2^power
     pub power: u8,
     /// The offset from the origin, measured in number of lengths
-    pub offset: Offset,
-    phantom: PhantomData<Q>,
+    pub offset: O,
 }
 
-impl<Q: Quantum> Segment<Q> {
+impl<O: Offset> Segment<O> {
     /// Constructor
-    pub fn new<O: Into<Offset>>(power: u8, offset: O) -> Self {
+    pub fn new<OO: Into<O>>(power: u8, offset: OO) -> Self {
         Self {
             power,
             offset: offset.into(),
-            phantom: PhantomData,
         }
     }
 
@@ -306,23 +371,23 @@ impl<Q: Quantum> Segment<Q> {
 
     /// The length, in absolute terms (Location or microseconds of time)
     pub fn absolute_length(&self, topo: &Topology) -> u64 {
-        let q = Q::dimension(topo).quantum as u64;
+        let q = O::Quantum::dimension(topo).quantum as u64;
         // If power is 32, this overflows a u32
         self.num_quanta() * q
     }
 
     /// Get the quanta which bound this segment
-    pub fn quantum_bounds(&self, topo: &Topology) -> (Q, Q) {
+    pub fn quantum_bounds(&self, topo: &Topology) -> (O::Quantum, O::Quantum) {
         let n = self.num_quanta();
         let a = (n * u64::from(*self.offset)) as u32;
         (
-            Q::from(a).normalized(topo),
-            Q::from(a.wrapping_add(n as u32).wrapping_sub(1)).normalized(topo),
+            O::Quantum::from(a).normalized(topo),
+            O::Quantum::from(a.wrapping_add(n as u32).wrapping_sub(1)).normalized(topo),
         )
     }
 
     /// The segment contains the given quantum coord
-    pub fn contains_quantum(&self, topo: &Topology, coord: Q) -> bool {
+    pub fn contains_quantum(&self, topo: &Topology, coord: O::Quantum) -> bool {
         let (lo, hi) = self.quantum_bounds(topo);
         let coord = coord.normalized(topo);
         if lo <= hi {
@@ -332,8 +397,7 @@ impl<Q: Quantum> Segment<Q> {
         }
     }
 
-    /// Halving an interval is equivalent to taking the child nodes of the node
-    /// which represents this interval
+    /// Split a segment in half
     pub fn halve(self) -> Option<(Self, Self)> {
         if self.power == 0 {
             // Can't split a quantum value (a leaf has no children)
@@ -341,8 +405,8 @@ impl<Q: Quantum> Segment<Q> {
         } else {
             let power = self.power - 1;
             Some((
-                Segment::new(power, Offset(*self.offset * 2)),
-                Segment::new(power, Offset(*self.offset * 2 + 1)),
+                Segment::new(power, O::from(*self.offset * 2)),
+                Segment::new(power, O::from(*self.offset * 2 + 1)),
             ))
         }
     }
@@ -366,9 +430,9 @@ impl TimeSegment {
 }
 
 /// Alias
-pub type SpaceSegment = Segment<SpaceQuantum>;
+pub type SpaceSegment = Segment<SpaceOffset>;
 /// Alias
-pub type TimeSegment = Segment<TimeQuantum>;
+pub type TimeSegment = Segment<TimeOffset>;
 
 /// Defines the quantization of a dimension of spacetime.
 #[derive(Clone, Debug, PartialEq, Eq)]
