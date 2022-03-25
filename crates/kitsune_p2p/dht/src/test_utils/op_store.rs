@@ -2,7 +2,7 @@ use crate::{
     op::OpRegion,
     persistence::AccessOpStore,
     prelude::{RegionCoords, RegionSet, RegionSetLtcs},
-    quantum::{GossipParams, Topology},
+    spacetime::{GossipParams, Topology},
     region::{RegionData, RegionDataConstraints},
 };
 use futures::future::FutureExt;

@@ -1,7 +1,7 @@
 use kitsune_p2p_dht_arc::{DhtArc, PeerViewAlpha, PeerViewBeta};
 use num_traits::Zero;
 
-use crate::quantum::{SpaceOffset, Topology};
+use crate::spacetime::{SpaceOffset, Topology};
 
 use super::{is_full, Arq, ArqStrat};
 
@@ -416,7 +416,7 @@ mod tests {
     use kitsune_p2p_dht_arc::DhtArcRange;
 
     use crate::arq::{pow2, print_arqs};
-    use crate::quantum::Topology;
+    use crate::spacetime::Topology;
     use crate::ArqBounds;
 
     use super::*;

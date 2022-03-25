@@ -5,7 +5,7 @@
 mod common;
 
 use kitsune_p2p_dht::arq::print_arq;
-use kitsune_p2p_dht::quantum::Topology;
+use kitsune_p2p_dht::spacetime::Topology;
 use kitsune_p2p_dht::*;
 
 use kitsune_p2p_dht::test_utils::generate_ideal_coverage;

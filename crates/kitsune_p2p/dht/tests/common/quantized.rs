@@ -2,7 +2,7 @@
 #![cfg(feature = "test_utils")]
 
 use kitsune_p2p_dht::arq::*;
-use kitsune_p2p_dht::quantum::Topology;
+use kitsune_p2p_dht::spacetime::Topology;
 use kitsune_p2p_dht::test_utils::calc_min_redundancy;
 use rand::prelude::StdRng;
 use rand::thread_rng;

@@ -7,7 +7,7 @@ use std::sync::Arc;
 use super::{dna_store::DnaStore, space::Spaces};
 use futures::FutureExt;
 use holo_hash::DnaHash;
-use holochain_p2p::{dht::quantum::Topology, DnaHashExt};
+use holochain_p2p::{dht::spacetime::Topology, DnaHashExt};
 use holochain_types::{db::PermittedConn, prelude::DnaError, share::RwShare};
 use kitsune_p2p::{
     agent_store::AgentInfoSigned, event::GetAgentInfoSignedEvt, KitsuneHost, KitsuneHostResult,

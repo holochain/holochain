@@ -1,6 +1,6 @@
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::{
-    config::KitsuneP2pTuningParams, dht::quantum::Topology, dht_arc::loc8::Loc8,
+    config::KitsuneP2pTuningParams, dht::spacetime::Topology, dht_arc::loc8::Loc8,
 };
 use rand::Rng;
 

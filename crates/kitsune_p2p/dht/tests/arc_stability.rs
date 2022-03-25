@@ -2,7 +2,7 @@ mod common;
 
 use common::quantized::*;
 use kitsune_p2p_dht::{
-    quantum::Topology,
+    spacetime::Topology,
     test_utils::{generate_ideal_coverage, generate_messy_coverage, seeded_rng},
     *,
 };

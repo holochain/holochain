@@ -5,7 +5,7 @@ use crate::{
     hash::{fake_hash, AgentKey},
     persistence::{AccessOpStore, AccessPeerStore},
     prelude::RegionCoordSetLtcs,
-    quantum::{GossipParams, TelescopingTimes, TimeQuantum, Topology},
+    spacetime::{GossipParams, TelescopingTimes, TimeQuantum, Topology},
     region::*,
     region_set::*,
 };
@@ -116,7 +116,7 @@ impl AccessPeerStore for TestNode {
 mod tests {
     use kitsune_p2p_timestamp::Timestamp;
 
-    use crate::quantum::*;
+    use crate::spacetime::*;
 
     use super::*;
 

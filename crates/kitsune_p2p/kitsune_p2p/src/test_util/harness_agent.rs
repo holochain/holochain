@@ -94,7 +94,7 @@ use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::box_fut;
 use kitsune_p2p_types::dependencies::lair_keystore_api_0_0;
 use kitsune_p2p_types::dht::prelude::RegionSetLtcs;
-use kitsune_p2p_types::dht::quantum::Topology;
+use kitsune_p2p_types::dht::spacetime::Topology;
 use kitsune_p2p_types::dht::PeerStrat;
 use kitsune_p2p_types::dht_arc::DhtArcSet;
 use lair_keystore_api_0_0::entry::EntrySignEd25519;

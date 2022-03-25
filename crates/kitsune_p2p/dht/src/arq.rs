@@ -20,7 +20,7 @@ pub use strat::*;
 
 use kitsune_p2p_dht_arc::{DhtArc, DhtArcRange};
 
-use crate::{op::Loc, quantum::*};
+use crate::{op::Loc, spacetime::*};
 
 /// Convenience method for taking the power of 2 in u32
 pub fn pow2(p: u8) -> u32 {

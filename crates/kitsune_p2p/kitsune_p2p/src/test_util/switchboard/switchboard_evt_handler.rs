@@ -14,7 +14,7 @@ use kitsune_p2p_types::dht::hash::RegionHash;
 use kitsune_p2p_types::dht::prelude::{
     array_xor, ArqBoundsSet, RegionBounds, RegionCoordSetLtcs, RegionData,
 };
-use kitsune_p2p_types::dht::quantum::{TelescopingTimes, TimeQuantum};
+use kitsune_p2p_types::dht::spacetime::{TelescopingTimes, TimeQuantum};
 use kitsune_p2p_types::dht_arc::{DhtArc, DhtLocation};
 use kitsune_p2p_types::*;
 
@@ -148,7 +148,7 @@ impl KitsuneHost for SwitchboardEventHandler {
     fn get_topology(
         &self,
         _space: Arc<KitsuneSpace>,
-    ) -> crate::KitsuneHostResult<dht::quantum::Topology> {
+    ) -> crate::KitsuneHostResult<dht::spacetime::Topology> {
         box_fut(Ok(self.sb.topology.clone()))
     }
 }

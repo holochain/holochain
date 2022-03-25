@@ -4,7 +4,7 @@ use crate::{
     arq::*,
     error::{GossipError, GossipResult},
     op::OpRegion,
-    quantum::*,
+    spacetime::*,
 };
 use derivative::Derivative;
 

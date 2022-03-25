@@ -4,7 +4,7 @@ use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
 use holochain_conductor_api::AgentInfoDump;
 use holochain_conductor_api::P2pAgentsDump;
-use holochain_p2p::dht::quantum::Topology;
+use holochain_p2p::dht::spacetime::Topology;
 use holochain_p2p::dht::PeerStrat;
 use holochain_p2p::dht::PeerView;
 use holochain_p2p::dht_arc::DhtArc;

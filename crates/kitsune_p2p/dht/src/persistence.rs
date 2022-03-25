@@ -17,9 +17,9 @@ use crate::{
     arq::ArqBoundsSet,
     hash::AgentKey,
     op::*,
-    quantum::{GossipParams, TelescopingTimes, TimeQuantum, Topology},
     region::*,
     region_set::*,
+    spacetime::{GossipParams, TelescopingTimes, TimeQuantum, Topology},
     test_utils::OpData,
     Arq,
 };

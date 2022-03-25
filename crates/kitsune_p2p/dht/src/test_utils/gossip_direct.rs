@@ -1,7 +1,7 @@
 use crate::{
     error::{GossipError, GossipResult},
     persistence::HostAccessTest,
-    quantum::{Quantum, TimeQuantum},
+    spacetime::{Quantum, TimeQuantum},
     region::REGION_MASS,
 };
 

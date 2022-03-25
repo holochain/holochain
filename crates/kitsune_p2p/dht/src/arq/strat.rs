@@ -1,6 +1,6 @@
 use kitsune_p2p_dht_arc::{DhtArc, PeerStratAlpha, PeerStratBeta};
 
-use crate::quantum::Topology;
+use crate::spacetime::Topology;
 
 use super::{Arq, PeerView, PeerViewQ};
 

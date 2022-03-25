@@ -15,7 +15,7 @@ use kitsune_p2p_types::agent_info::{AgentInfoInner, AgentInfoSigned};
 use kitsune_p2p_types::bin_types::*;
 use kitsune_p2p_types::config::KitsuneP2pTuningParams;
 use kitsune_p2p_types::dht::prelude::power_and_count_from_length;
-use kitsune_p2p_types::dht::quantum::Topology;
+use kitsune_p2p_types::dht::spacetime::Topology;
 use kitsune_p2p_types::dht::{ArqBounds, ArqStrat};
 use kitsune_p2p_types::dht_arc::loc8::Loc8;
 use kitsune_p2p_types::dht_arc::{DhtArc, DhtArcRange, DhtLocation};

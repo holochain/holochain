@@ -2,7 +2,7 @@
 
 use kitsune_p2p_dht_arc::DhtArcRange;
 
-use crate::{quantum::Topology, Loc};
+use crate::{spacetime::Topology, Loc};
 
 use super::{Arq, ArqStart};
 

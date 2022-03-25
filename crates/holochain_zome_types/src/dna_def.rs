@@ -101,8 +101,8 @@ impl DnaDef {
     }
 
     /// Get the topology to use for kitsune gossip
-    pub fn topology(&self) -> kitsune_p2p_dht::quantum::Topology {
-        kitsune_p2p_dht::quantum::Topology::standard(self.origin_time)
+    pub fn topology(&self) -> kitsune_p2p_dht::spacetime::Topology {
+        kitsune_p2p_dht::spacetime::Topology::standard(self.origin_time)
     }
 }
 

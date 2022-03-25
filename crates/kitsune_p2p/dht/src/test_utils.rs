@@ -13,7 +13,7 @@ pub use op_store::*;
 pub use test_node::*;
 
 use crate::arq::*;
-use crate::quantum::Topology;
+use crate::spacetime::Topology;
 
 use kitsune_p2p_dht_arc::DhtLocation as Loc;
 use rand::prelude::StdRng;

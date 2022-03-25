@@ -3,7 +3,7 @@
 use crate::types::persist::*;
 use crate::*;
 use futures::future::{BoxFuture, FutureExt};
-use kitsune_p2p::dht::quantum::Topology;
+use kitsune_p2p::dht::spacetime::Topology;
 use kitsune_p2p::dht_arc::DhtArcSet;
 use kitsune_p2p::dht_arc::DhtLocation;
 use kitsune_p2p::event::TimeWindow;

@@ -1,6 +1,6 @@
 //! Defines the trait which represents everything Kitsune needs to know about Ops
 
-use crate::quantum::{SpacetimeQuantumCoords, Topology};
+use crate::spacetime::{SpacetimeQuantumCoords, Topology};
 
 pub use kitsune_p2p_dht_arc::DhtLocation as Loc;
 

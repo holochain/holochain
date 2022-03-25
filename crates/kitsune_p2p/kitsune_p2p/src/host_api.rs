@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use kitsune_p2p_types::{
     bin_types::KitsuneSpace,
-    dht::{quantum::Topology, region_set::RegionSetLtcs},
+    dht::{region_set::RegionSetLtcs, spacetime::Topology},
     dht_arc::DhtArcSet,
 };
 

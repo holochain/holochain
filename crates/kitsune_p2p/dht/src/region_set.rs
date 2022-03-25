@@ -12,7 +12,7 @@ mod ltcs;
 
 pub use ltcs::*;
 
-use crate::{error::GossipResult, quantum::*};
+use crate::{error::GossipResult, spacetime::*};
 
 use crate::region::{Region, RegionBounds, RegionCoords, RegionData, RegionDataConstraints};
 

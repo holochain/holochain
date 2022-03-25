@@ -2,7 +2,7 @@ use crate::Loc;
 use kitsune_p2p_dht_arc::DhtArc;
 use kitsune_p2p_timestamp::Timestamp;
 
-use crate::quantum::{SpaceSegment, SpacetimeQuantumCoords, TimeSegment, Topology};
+use crate::spacetime::{SpaceSegment, SpacetimeQuantumCoords, TimeSegment, Topology};
 
 /// The cross product of a space segment and at time segment forms a Region.
 /// Hence, these two segments are the coordinates which define a Region of spacetime.

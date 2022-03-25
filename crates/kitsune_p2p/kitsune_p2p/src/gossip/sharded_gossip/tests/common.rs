@@ -3,7 +3,7 @@ use crate::{test_util::hash_op_data, KitsuneHostPanicky};
 use crate::{HostStub, KitsuneHost};
 use kitsune_p2p_types::box_fut;
 use kitsune_p2p_types::dht::prelude::{ArqBoundsSet, RegionCoordSetLtcs, RegionData};
-use kitsune_p2p_types::dht::quantum::{TelescopingTimes, Topology};
+use kitsune_p2p_types::dht::spacetime::{TelescopingTimes, Topology};
 use kitsune_p2p_types::dht::{ArqStrat, PeerStrat};
 
 use super::*;
@@ -80,7 +80,7 @@ impl KitsuneHost for StandardResponsesHostApi {
     fn get_topology(
         &self,
         _space: Arc<KitsuneSpace>,
-    ) -> crate::KitsuneHostResult<dht::quantum::Topology> {
+    ) -> crate::KitsuneHostResult<dht::spacetime::Topology> {
         box_fut(Ok(self.topology.clone()))
     }
 }
