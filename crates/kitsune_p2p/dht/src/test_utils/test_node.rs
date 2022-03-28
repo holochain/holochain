@@ -104,7 +104,7 @@ impl AccessOpStore<OpData> for TestNode {
 
 impl AccessPeerStore for TestNode {
     fn get_agent_arq(&self, _agent: AgentKey) -> crate::arq::Arq {
-        self.agent_arq.clone()
+        self.agent_arq
     }
 
     fn get_arq_set(&self) -> ArqBoundsSet {
@@ -114,8 +114,9 @@ impl AccessPeerStore for TestNode {
 
 #[cfg(test)]
 mod tests {
-    use kitsune_p2p_timestamp::Timestamp;
     use std::str::FromStr;
+
+    use kitsune_p2p_timestamp::Timestamp;
 
     use crate::spacetime::*;
 
@@ -181,7 +182,7 @@ mod tests {
             [
                 OpData::fake(
                     // origin
-                    1.into(),
+                    1u32.into(),
                     // origin
                     Timestamp::from_str("2022-01-01T00:02:00Z").unwrap(),
                     1234,

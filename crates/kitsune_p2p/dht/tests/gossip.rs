@@ -4,8 +4,8 @@ use kitsune_p2p_dht::{
     arq::*,
     op::*,
     persistence::*,
-    spacetime::*,
     region::*,
+    spacetime::*,
     test_utils::{
         generate_ideal_coverage, gossip_direct, gossip_direct_at, seeded_rng, OpData, TestNode,
     },

@@ -1,8 +1,8 @@
 use crate::{
     error::{GossipError, GossipResult},
     persistence::HostAccessTest,
-    spacetime::{Quantum, TimeQuantum},
     region::REGION_MASS,
+    spacetime::{Quantum, TimeQuantum},
 };
 
 /// Do [`gossip_direct`], with both nodes at the same current time
