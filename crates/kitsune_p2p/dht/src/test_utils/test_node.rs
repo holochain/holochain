@@ -114,6 +114,8 @@ impl AccessPeerStore for TestNode {
 
 #[cfg(test)]
 mod tests {
+    use std::str::FromStr;
+
     use kitsune_p2p_timestamp::Timestamp;
 
     use crate::spacetime::*;
@@ -180,7 +182,7 @@ mod tests {
             [
                 OpData::fake(
                     // origin
-                    1.into(),
+                    1u32.into(),
                     // origin
                     Timestamp::from_str("2022-01-01T00:02:00Z").unwrap(),
                     1234,
