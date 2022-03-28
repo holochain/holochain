@@ -4,8 +4,6 @@
 //! - AgentId
 //!
 
-use std::sync::Arc;
-
 use super::error::WorkflowError;
 use super::error::WorkflowResult;
 use crate::core::ribosome::guest_callback::genesis_self_check::{
