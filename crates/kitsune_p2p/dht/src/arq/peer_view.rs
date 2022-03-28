@@ -44,8 +44,8 @@ impl PeerView {
     /// Convert to the corresponding PeerView enum used in the `kitsune_p2p_dht_arc` crate
     pub fn to_legacy_peer_view(&self) -> Option<LegacyPeerView> {
         match self {
-            Self::Alpha(v) => Some(LegacyPeerView::Alpha(v)),
-            Self::Beta(v) => Some(LegacyPeerView::Beta(v)),
+            Self::Alpha(v) => Some(LegacyPeerView::Alpha(*v)),
+            Self::Beta(v) => Some(LegacyPeerView::Beta(*v)),
             Self::Quantized(_) => None,
         }
     }
