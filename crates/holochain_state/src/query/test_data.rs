@@ -68,10 +68,10 @@ impl LinkTestData {
         let target_hash = EntryHash::with_data_sync(&target);
         create_target.entry_hash = target_hash.clone();
 
-        create_link.base_address = base_hash.clone();
-        later_create_link.base_address = base_hash.clone();
-        create_link.target_address = target_hash.clone();
-        later_create_link.target_address = target_hash.clone();
+        create_link.base_address = base_hash.clone().into();
+        later_create_link.base_address = base_hash.clone().into();
+        create_link.target_address = target_hash.clone().into();
+        later_create_link.target_address = target_hash.clone().into();
 
         let create_link_sig = fixt!(Signature);
         let create_link_op = DhtOp::RegisterAddLink(create_link_sig.clone(), create_link.clone());
@@ -93,7 +93,7 @@ impl LinkTestData {
             HeaderHash::with_data_sync(&Header::CreateLink(later_create_link.clone()));
 
         delete_link.link_add_address = create_link_hash.clone();
-        delete_link.base_address = base_hash.clone();
+        delete_link.base_address = base_hash.clone().into();
 
         let delete_link_op = DhtOp::RegisterRemoveLink(fixt!(Signature), delete_link.clone());
 
@@ -123,14 +123,14 @@ impl LinkTestData {
             create_link_hash: later_create_link_hash.clone(),
         };
 
-        let base_query = GetLinksQuery::base(base_hash.clone(), create_link.zome_id);
+        let base_query = GetLinksQuery::base(base_hash.clone().into(), create_link.zome_id);
         let tag_query = GetLinksQuery::tag(
-            base_hash.clone(),
+            base_hash.clone().into(),
             create_link.zome_id,
             create_link.tag.clone(),
         );
         let details_tag_query = GetLinkDetailsQuery::tag(
-            base_hash.clone(),
+            base_hash.clone().into(),
             create_link.zome_id,
             create_link.tag.clone(),
         );
