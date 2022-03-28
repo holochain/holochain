@@ -104,7 +104,7 @@ impl AccessOpStore<OpData> for TestNode {
 
 impl AccessPeerStore for TestNode {
     fn get_agent_arq(&self, _agent: AgentKey) -> crate::arq::Arq {
-        self.agent_arq.clone()
+        self.agent_arq
     }
 
     fn get_arq_set(&self) -> ArqBoundsSet {
