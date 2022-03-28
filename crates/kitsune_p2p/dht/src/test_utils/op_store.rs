@@ -2,8 +2,8 @@ use crate::{
     op::OpRegion,
     persistence::AccessOpStore,
     prelude::{RegionCoords, RegionSet, RegionSetLtcs},
-    spacetime::{GossipParams, Topology},
     region::{RegionData, RegionDataConstraints},
+    spacetime::{GossipParams, Topology},
 };
 use futures::future::FutureExt;
 use std::{collections::BTreeSet, ops::Bound, sync::Arc};
