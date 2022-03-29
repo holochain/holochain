@@ -206,6 +206,22 @@ pub mod slow_tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    async fn external_get_links() {
+        observability::test_run().ok();
+        let RibosomeTestFixture {
+            conductor, alice, ..
+        } = RibosomeTestFixture::new(TestWasm::Link).await;
+
+        let header_hash: HeaderHash = conductor.call(&alice, "create_external_base_link", ()).await;
+        let links: Vec<Link> = conductor.call(&alice, "get_external_links", ()).await;
+
+        assert_eq!(
+            links[0].create_link_hash,
+            header_hash
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
     async fn multi_get_links() {
         observability::test_run().ok();
         let RibosomeTestFixture {
