@@ -107,10 +107,10 @@ async fn transitive_peer_gossip() {
 
     let [n1, n2, n3, n4] = sb.add_nodes(tuning_params()).await;
 
-    let a1 = SwitchboardAgent::from_center_and_half_len(0, 68);
-    let a2 = SwitchboardAgent::from_center_and_half_len(64, 68);
-    let a3 = SwitchboardAgent::from_center_and_half_len(128, 68);
-    let a4 = SwitchboardAgent::from_center_and_half_len(192, 68);
+    let a1 = SwitchboardAgent::from_start_and_half_len(0, 68);
+    let a2 = SwitchboardAgent::from_start_and_half_len(64, 68);
+    let a3 = SwitchboardAgent::from_start_and_half_len(128, 68);
+    let a4 = SwitchboardAgent::from_start_and_half_len(192, 68);
 
     sb.share(|sb| {
         sb.add_local_agent(&n1, &a1);
@@ -175,10 +175,10 @@ async fn sharded_4way_recent() {
 
     let [n1, n2, n3, n4] = sb.add_nodes(tuning_params()).await;
 
-    let a1 = SwitchboardAgent::from_center_and_half_len(0, 68);
-    let a2 = SwitchboardAgent::from_center_and_half_len(64, 68);
-    let a3 = SwitchboardAgent::from_center_and_half_len(128, 68);
-    let a4 = SwitchboardAgent::from_center_and_half_len(192, 68);
+    let a1 = SwitchboardAgent::from_start_and_half_len(0, 68);
+    let a2 = SwitchboardAgent::from_start_and_half_len(64, 68);
+    let a3 = SwitchboardAgent::from_start_and_half_len(128, 68);
+    let a4 = SwitchboardAgent::from_start_and_half_len(192, 68);
 
     let ops: Vec<_> = (0..256).step_by(8).map(|u| Loc8::from(u)).collect();
 
@@ -228,10 +228,10 @@ async fn sharded_4way_recent() {
                 sb.get_ops_loc8(&n4),
             ),
             (
-                Loc8::set(ops[24..32].to_vec().into_iter().chain(ops[0..=8].to_vec())),
                 Loc8::set(ops[0..=16].to_vec()),
                 Loc8::set(ops[8..=24].to_vec()),
                 Loc8::set(ops[16..32].to_vec().into_iter().chain([ops[0]])),
+                Loc8::set(ops[24..32].to_vec().into_iter().chain(ops[0..=8].to_vec())),
             )
         );
     });
@@ -244,10 +244,10 @@ async fn sharded_4way_historical() {
 
     let [n1, n2, n3, n4] = sb.add_nodes(tuning_params()).await;
 
-    let a1 = SwitchboardAgent::from_center_and_half_len(0, 68);
-    let a2 = SwitchboardAgent::from_center_and_half_len(64, 68);
-    let a3 = SwitchboardAgent::from_center_and_half_len(128, 68);
-    let a4 = SwitchboardAgent::from_center_and_half_len(192, 68);
+    let a1 = SwitchboardAgent::from_start_and_half_len(0, 68);
+    let a2 = SwitchboardAgent::from_start_and_half_len(64, 68);
+    let a3 = SwitchboardAgent::from_start_and_half_len(128, 68);
+    let a4 = SwitchboardAgent::from_start_and_half_len(192, 68);
 
     let now = Timestamp::now().as_micros();
     let ops_only: Vec<_> = (0..256).step_by(8).map(|u| Loc8::from(u)).collect();
@@ -305,15 +305,15 @@ async fn sharded_4way_historical() {
                 sb.get_ops_loc8(&n4),
             ),
             (
+                Loc8::set(ops_only[0..=16].to_vec()),
+                Loc8::set(ops_only[8..=24].to_vec()),
+                Loc8::set(ops_only[16..32].to_vec().into_iter().chain([ops_only[0]])),
                 Loc8::set(
                     ops_only[24..32]
                         .to_vec()
                         .into_iter()
                         .chain(ops_only[0..=8].to_vec())
                 ),
-                Loc8::set(ops_only[0..=16].to_vec()),
-                Loc8::set(ops_only[8..=24].to_vec()),
-                Loc8::set(ops_only[16..32].to_vec().into_iter().chain([ops_only[0]])),
             )
         );
     });
