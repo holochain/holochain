@@ -179,9 +179,17 @@ impl HashTypeSync for Entry {}
 impl HashTypeSync for Header {}
 // A DnaHash is a hash of the DnaDef, which excludes the wasm bytecode
 impl HashTypeSync for Dna {}
+
 // We don't know what external data might be getting hashed but typically it
 // would be small, like a reference to something in an external system such as
 // a hash in a different DHT, an IPFS hash or a UUID, etc.
+/// External hashes have a DHT location and hash prefix like all other native
+/// holochain hashes but are NOT found/fetchable on the DHT.
+/// External hashing makes no assumptions about the data that was digested to
+/// create the hash so arbitrary bytes can be passed in.
+/// It is valid to EITHER use an existing 32 byte hash/data as literal bytes
+/// for an external hash (literal+prefix, no data loss) OR digest arbitrary
+/// data into an external hash (support all data, opaque result).
 impl HashTypeSync for External {}
 
 impl HashTypeAsync for NetId {}
