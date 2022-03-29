@@ -76,6 +76,11 @@ impl Topology {
         ((t / self.time.quantum as i64) as u32).into()
     }
 
+    /// Returns the time quantum which contains this timestamp
+    pub fn time_quantum_duration(&self, d: std::time::Duration) -> TimeQuantum {
+        ((d.as_micros() as i64 / self.time.quantum as i64) as u32).into()
+    }
+
     /// The minimum power to use in "exponentional coordinates".
     pub fn min_space_power(&self) -> u8 {
         // if space quantum power is 0, then min has to be at least 1.

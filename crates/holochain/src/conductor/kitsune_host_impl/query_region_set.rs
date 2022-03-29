@@ -15,9 +15,8 @@ pub async fn query_region_set(
     let strat = ArqStrat::default();
     let arq_set = ArqBoundsSet::from_dht_arc_set(&topology, &strat, &dht_arc_set)
         .expect("arc is not quantizable (FIXME: only use quantized arcs)");
-    // TODO: This should be behind the current moment by however much Recent gossip covers.
-    let current = Timestamp::now();
-    let times = TelescopingTimes::new(TimeQuantum::from_timestamp(&topology, current));
+
+    let times = TelescopingTimes::historical(&topology);
     let coords = RegionCoordSetLtcs::new(times, arq_set);
 
     let region_set = db

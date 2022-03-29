@@ -46,7 +46,10 @@
 //! a bounded rectangle of spacetime.
 //!
 
-use std::ops::{AddAssign, Deref};
+use std::{
+    ops::{AddAssign, Deref},
+    time::Duration,
+};
 
 use crate::{
     op::{Loc, Timestamp},
@@ -64,3 +67,7 @@ pub use quantum::*;
 pub use segment::*;
 pub use telescoping_times::*;
 pub use topology::*;
+
+/// How far back from the current moment do we consider data to still be "recent"
+/// vs "historical"? This const gives the answer.
+pub const RECENT_THRESHOLD: Duration = Duration::from_secs(60 * 60);

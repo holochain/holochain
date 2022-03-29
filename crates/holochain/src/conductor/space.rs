@@ -11,7 +11,7 @@ use holochain_p2p::{
         hash::RegionHash,
         region::{RegionBounds, RegionData},
         region_set::{RegionCoordSetLtcs, RegionSetLtcs},
-        spacetime::{TelescopingTimes, TimeQuantum},
+        spacetime::TelescopingTimes,
         ArqBounds, ArqStrat,
     },
     dht_arc::{DhtArcRange, DhtArcSet},
@@ -334,9 +334,7 @@ impl Spaces {
                 })
                 .collect(),
         );
-        // TODO: This should be behind the current moment by however much Recent gossip covers.
-        let current = Timestamp::now();
-        let times = TelescopingTimes::new(TimeQuantum::from_timestamp(&topology, current));
+        let times = TelescopingTimes::historical(&topology);
         let coords = RegionCoordSetLtcs::new(times, arq_set);
         let coords_clone = coords.clone();
         let data = self
