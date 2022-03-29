@@ -250,6 +250,10 @@ impl OpsBatchQueueInner {
             self.next_id += 1;
             id
         });
+
+        // the id must always be one that we've generated before
+        debug_assert!(id < self.next_id);
+
         {
             let queue = self.queues.entry(id).or_insert_with(VecDeque::new);
             queue.push_back(queued);
