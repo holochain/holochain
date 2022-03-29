@@ -424,8 +424,7 @@ impl InstalledAppCommon {
     pub fn cloned_cells(&self) -> impl Iterator<Item = &CellId> {
         self.role_assignments
             .iter()
-            .map(|(_, role)| &role.clones)
-            .flatten()
+            .flat_map(|(_, role)| &role.clones)
     }
 
     /// Iterator of all cells, both provisioned and cloned

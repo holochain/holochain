@@ -238,7 +238,7 @@ where
                     respond.r(Ok(async move {
                         Ok(PeerViewBeta::new(
                             Default::default(),
-                            DhtArc::full(0),
+                            DhtArc::full(0.into()),
                             1.0,
                             1,
                         ))
@@ -254,7 +254,7 @@ where
     let mut key_fixt = AgentPubKeyFixturator::new(Predictable);
     let agent_key = agent_key.unwrap_or_else(|| key_fixt.next().unwrap());
     let dna_network = network.to_dna(dna.clone());
-    network.join(dna.clone(), agent_key).await.unwrap();
+    network.join(dna.clone(), agent_key, None).await.unwrap();
     TestNetwork::new(network, respond_task, dna_network)
 }
 

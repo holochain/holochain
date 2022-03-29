@@ -1,3 +1,157 @@
+//! Functions to generate standardized hashes of Holochain elements and
+//! arbitrary bytes.
+//!
+//! Holochain makes extensive use of hashes to address any content. It utilizes
+//! [Blake2b](https://www.blake2.net/) as hashing algorithm. Holochain hashes
+//! have a length of 39 bytes, made up of 3 bytes for identifying the hash, 32
+//! bytes of digest and 4 location bytes. The complete scheme of a hash in byte
+//! format is:
+//!
+//! ```text
+//! <hash type code as varint><hash size in bytes><hash<location>>
+//! ```
+//!
+//! The complete scheme of encoded hashes is:
+//!
+//! ```text
+//! <encoding scheme><hash type code as varint><hash size in bytes><hash<location>>
+//! ```
+//!
+//!
+//! ## Example
+//! This is an example of a public agent key hash, displayed as a byte array in
+//! decimal notation:
+//!
+//! ```
+//! 132  32  36  39 218 126  34  87
+//! 204 165 227 255  29 236 160  66
+//! 221 163 168 112 215 187 143 152
+//!  68   4  30 206 173 203 210 111
+//! 103 207 124   2 107  67  33
+//! ```
+//!
+//! ### Base64 encoding
+//!
+//! Since hashes have to be exchanged over the network, their bytes are encoded
+//! before sending and decoded after reception, to avoid data corruption during
+//! transport. To convert the hashes from a byte format to a transferrable
+//! string, Holochain encodes them with the
+//! [Base64 scheme](https://developer.mozilla.org/en-US/docs/Glossary/Base64).
+//! Encoding the example public agent key in Base64 results in:
+//!
+//! ```
+//! hCAkJ9p+IlfMpeP/HeygQt2jqHDXu4+YRAQezq3L0m9nz3wCa0Mh
+//! ```
+//!
+//! ### Self-identifying hash encoding
+//!
+//! Following the
+//! [Multibase protocol](https://github.com/multiformats/multibase), hashes in
+//! Holochain self-identify its encoding in Base64. All hashes in text format
+//! are prefixed with a `u`, to identify them as
+//! [`base64url`](https://github.com/multiformats/multibase/blob/master/multibase.csv#L23).
+//! This encoding guarantees URL and filename safe Base64 strings through
+//! replacing potentially unsafe characters like `+` and `/` by `-` and `_`
+//! (see [RFC4648](https://datatracker.ietf.org/doc/html/rfc4648#section-5)).
+//! The example public agent key becomes:
+//!
+//! ```
+//! uhCAkJ9p-IlfMpeP_HeygQt2jqHDXu4-YRAQezq3L0m9nz3wCa0Mh
+//! ```
+//!
+//! > This only applies to Base64 encoded strings. Hashes in binary format
+//! > **must not** be prefixed with `u`.
+//!
+//!
+//! ### Self-identifying hash type and size
+//!
+//! Further self-identification of Holochain hashes is achieved by adhering to
+//! the [Multihash protocol](https://github.com/multiformats/multihash). The
+//! scheme it defines allows for including information on the semantic type of
+//! hash and its length in Base64 encoded strings. Resulting hashes have the
+//! following format:
+//!
+//! ```text
+//! <hash type code as varint><hash size in bytes><hash>
+//! ```
+//!
+//! Hashes in Holochain are 39 bytes long and comprise the hash type code, the
+//! hash size in bytes and the hash. Coming back to the byte array
+//! representation of the example agent pub key, the first 3 bytes are
+//! `132 32 36`. In hexadecimal notation, it is written as `0x84 0x20 0x24`.
+//!
+//! Byte 1 and 2 are taken up by the hash type code as an
+//! [unsigned varint](https://github.com/multiformats/unsigned-varint). Varint
+//! is a serial encoding of an integer as a byte array of variable length.
+//! When decoded to a regular integer, varint `132 32` equates to `4100`. This
+//! and the other Multihash values employed for Holochain hashes meet several
+//! criteria:
+//!
+//! * It encodes as more than one byte, as one byte entries are reserved in
+//!   Multihash.
+//! * An encoding consisting of two bytes plus the length byte makes three
+//!   bytes, which always translates to 4 characters in Base64 encoding.
+//! * The resulting Base64 encoding is supposed to be human-recognizable. `hC`
+//!   was chosen in accordance with `holoChain`.
+//!
+//! Byte 3, which is `0x24` in hexadecimal and `36` in decimal notation,
+//! reflects the hash size in bytes, meaning the **hashes are 36 bytes long**.
+//!
+//! ### Digest and DHT location
+//!
+//! The 36 bytes long hash consists of the actual digest of the hashed content
+//! and the computed location of the hash within the distributed hash table
+//! (DHT). The Blake2b algorithm used by Holochain produces hashes of 32 bytes
+//! length.
+//!
+//! The final 4 bytes are location bytes. They are interpreted to identify
+//! the position of an agent's arc, meaning the portion of the DHT that the
+//! agent holds. Location bytes further serve as an integrity check of the hash
+//! itself.
+//!
+//!
+//! ## Valid Holochain hash types
+//!
+//! Here is a list of all valid hash types in Holochain, in hexadecimal,
+//! decimal and Base64 notation and what they are used for:
+//!
+//! | hex      | decimal   | base64 | integer |  usage  |
+//! | -------- | --------- | ------ | ------- | ------- |
+//! | 84 20 24 | 132 32 36 | hCAk   | 4100    | Agent   |
+//! | 84 21 24 | 132 33 36 | hCEk   | 4228    | Entry   |
+//! | 84 22 24 | 132 34 36 | hCIk   | 4356    | Net ID  |
+//! | 84 23 24 | 132 35 36 | hCMk   | 4484    |         |
+//! | 84 24 24 | 132 36 36 | hCQk   | 4612    | DHT Op  |
+//! | 84 25 24 | 132 37 36 | hCUk   | 4740    |         |
+//! | 84 26 24 | 132 38 36 | hCYk   | 4868    |         |
+//! | 84 27 24 | 132 39 36 | hCck   | 4996    |         |
+//! | 84 28 24 | 132 40 36 | hCgk   | 5124    |         |
+//! | 84 29 24 | 132 41 36 | hCkk   | 5252    | Header  |
+//! | 84 2a 24 | 132 42 36 | hCok   | 5380    | WASM    |
+//! | 84 2b 24 | 132 43 36 | hCsk   | 5508    |         |
+//! | 84 2c 24 | 132 44 36 | hCwk   | 5636    |         |
+//! | 84 2d 24 | 132 45 36 | hC0k   | 5764    | DNA     |
+//! | 84 2e 24 | 132 46 36 | hC4k   | 5892    |         |
+//! | 84 2f 24 | 132 47 36 | hC8k   | 6020    |         |
+//!
+//!
+//! ### Breakdowns of example
+//!
+//! Breakdown of the example agent pub key as byte array in decimal notation:
+//!
+//! | type                   | length        | hash                                                                                                                   | dht location   |
+//! | ---------------------- | ------------- | ---------------------------------------------------------------------------------------------------------------------- | -------------- |
+//! | 132 32                 | 36            | 39 218 126 34 87 204 165 227 255 29 236 160 66 221 163 168 112 215 187 143 152 68 4 30 206 173 203 210 111 103 207 124 | 2 107 67 33    |
+//! | public agent key       | 36 bytes long | Blake2b hash, 32 bytes long                                                                                            | u32: 558066434 |
+//!
+//!
+//! Breakdown of the example agent pub key encoded as Base64:
+//!
+//! | Multibase encoding   | type + length                       | hash + dht location                                     |
+//! | -------------------- | ----------------------------------- | ------------------------------------------------------- |
+//! | u                    | hCAk                                | J9p-IlfMpeP_HeygQt2jqHDXu4-YRAQezq3L0m9nz3wCa0Mh        |
+//! | base64url no padding | public agent key of 36 bytes length | Base64 encoding of Blake2b hash + location              |
+
 use crate::prelude::*;
 
 /// Hash anything that implements [`TryInto<Entry>`].

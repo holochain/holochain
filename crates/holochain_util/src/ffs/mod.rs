@@ -38,7 +38,7 @@ macro_rules! impl_ffs {
         )*
 
         /// Wrap dunce::canonicalize, since std::fs::canonicalize has problems for Windows
-        /// (see https://docs.rs/dunce/1.0.1/dunce/index.html)
+        /// (see <https://docs.rs/dunce/1.0.1/dunce/index.html>)
         pub async fn canonicalize<P: Clone + AsRef<std::path::Path>>(path: P) -> IoResult<PathBuf> {
             dunce::canonicalize(path.clone()).map_err(mapper(path))
         }

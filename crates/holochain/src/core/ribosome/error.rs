@@ -1,5 +1,5 @@
 #![deny(missing_docs)]
-//! Errors occurring during a [Ribosome] call
+//! Errors occurring during a [`RealRibosome`](crate::core::ribosome::real_ribosome::RealRibosome) call
 
 use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::interface::error::InterfaceError;
@@ -13,7 +13,7 @@ use holochain_zome_types::inline_zome::error::InlineZomeError;
 use thiserror::Error;
 use tokio::task::JoinError;
 
-/// Errors occurring during a [Ribosome] call
+/// Errors occurring during a [`RealRibosome`](crate::core::ribosome::real_ribosome::RealRibosome) call
 #[derive(Error, Debug)]
 pub enum RibosomeError {
     /// Dna error while working with Ribosome.

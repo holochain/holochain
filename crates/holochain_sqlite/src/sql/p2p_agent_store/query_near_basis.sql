@@ -36,7 +36,7 @@ FROM
             :basis <= storage_end_loc
             OR :basis >= storage_start_loc
           ) THEN 0
-          /* if it is in the center, uncovered area */
+          /* if it is in the middle, uncovered area */
           ELSE min(
             :basis - storage_end_loc,
             storage_start_loc - :basis

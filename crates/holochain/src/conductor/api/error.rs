@@ -1,5 +1,4 @@
-//! Errors occurring during a [CellConductorApi] or [InterfaceApi] call
-
+//! Errors occurring during a [`CellConductorApi`](super::CellConductorApi) or [`InterfaceApi`](super::InterfaceApi) call
 use crate::conductor::error::ConductorError;
 use crate::conductor::interface::error::InterfaceError;
 use crate::conductor::CellError;
@@ -14,7 +13,7 @@ use holochain_zome_types::cell::CellId;
 use mr_bundle::error::MrBundleError;
 use thiserror::Error;
 
-/// Errors occurring during a [CellConductorApi] or [InterfaceApi] call
+/// Errors occurring during a [`CellConductorApi`](super::CellConductorApi) or [`InterfaceApi`](super::InterfaceApi) call
 #[derive(Error, Debug)]
 pub enum ConductorApiError {
     /// The Dna for this Cell is not installed in the conductor.

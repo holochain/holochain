@@ -41,7 +41,7 @@ impl ShardedGossipLocal {
                         .expect("Your system clock is set before UNIX epoch")
             })
             .filter(|a| remote_agents_within_arc_set.contains(&a.agent))
-            .filter(|a| !a.storage_arc.interval().is_empty())
+            .filter(|a| !a.storage_arc.is_empty())
         {
             // Get an address if there is one.
             let info = info

@@ -1,9 +1,9 @@
 //! Allows easy construction of small ranges via ASCII art, useful for testing
 
-use crate::{ArcInterval, DhtArcSet};
+use crate::{DhtArcRange, DhtArcSet};
 
 pub fn ascii(s: &str) -> DhtArcSet {
-    let mut arcs = Vec::<ArcInterval>::new();
+    let mut arcs = Vec::<DhtArcRange>::new();
     let mut i: usize = 0;
 
     loop {
@@ -21,7 +21,7 @@ pub fn ascii(s: &str) -> DhtArcSet {
             i += 1
         }
         let end = i - 1;
-        arcs.push(ArcInterval::new(start as u32, end as u32));
+        arcs.push(DhtArcRange::from_bounds(start as u32, end as u32));
     }
 
     arcs.as_slice().into()
@@ -41,27 +41,27 @@ mod tests {
         assert_eq!(
             DhtArcSet::from(
                 vec![
-                    ArcInterval::new(0, 2).canonical(),
-                    ArcInterval::new(u32::MAX - 2, u32::MAX).canonical()
+                    DhtArcRange::from_bounds(0, 2).canonical(),
+                    DhtArcRange::from_bounds(u32::MAX - 2, u32::MAX).canonical()
                 ]
                 .as_slice()
             )
             .intervals(),
-            vec![ArcInterval::new(u32::MAX - 2, 2).canonical()]
+            vec![DhtArcRange::from_bounds(u32::MAX - 2, 2).canonical()]
         );
         assert_eq!(
             ascii("ooo    oo ").intervals(),
             vec![
-                ArcInterval::new(0, 2).canonical(),
-                ArcInterval::new(7, 8).canonical()
+                DhtArcRange::from_bounds(0, 2).canonical(),
+                DhtArcRange::from_bounds(7, 8).canonical()
             ]
         );
         assert_eq!(
             ascii("oo oo o   ").intervals(),
             vec![
-                ArcInterval::new(0, 1).canonical(),
-                ArcInterval::new(3, 4).canonical(),
-                ArcInterval::new(6, 6).canonical(),
+                DhtArcRange::from_bounds(0, 1).canonical(),
+                DhtArcRange::from_bounds(3, 4).canonical(),
+                DhtArcRange::from_bounds(6, 6).canonical(),
             ]
         );
     }
