@@ -9,9 +9,9 @@ use holochain_p2p::{
     dht::{
         arq::{power_and_count_from_length, ArqBoundsSet},
         hash::RegionHash,
-        spacetime::{TelescopingTimes, TimeQuantum},
         region::{RegionBounds, RegionData},
         region_set::{RegionCoordSetLtcs, RegionSetLtcs},
+        spacetime::{TelescopingTimes, TimeQuantum},
         ArqBounds, ArqStrat,
     },
     dht_arc::{DhtArcRange, DhtArcSet},
