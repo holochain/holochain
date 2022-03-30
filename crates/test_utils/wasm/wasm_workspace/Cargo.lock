@@ -295,7 +295,7 @@ checksum = "ab5ef0d4909ef3724cc8cce6ccc8572c5c817592e9285f5464f8e86f8bd3726e"
 
 [[package]]
 name = "hdk"
-version = "0.0.125"
+version = "0.0.126"
 dependencies = [
  "hdk_derive",
  "holo_hash",
@@ -375,7 +375,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_test_wasm_common"
-version = "0.0.25"
+version = "0.0.26"
 dependencies = [
  "hdk",
  "serde",

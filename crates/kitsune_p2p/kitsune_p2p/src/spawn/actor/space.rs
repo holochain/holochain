@@ -5,7 +5,7 @@ use ghost_actor::dependencies::tracing;
 use kitsune_p2p_mdns::*;
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use kitsune_p2p_types::codec::{rmp_decode, rmp_encode};
-use kitsune_p2p_types::dht_arc::{DhtArc, DhtArcSet};
+use kitsune_p2p_types::dht_arc::{DhtArc, DhtArcRange, DhtArcSet};
 use kitsune_p2p_types::tx2::tx2_utils::TxUrl;
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::AtomicBool;
@@ -305,8 +305,8 @@ impl SpaceInternalHandler for Space {
         let mut local_agent_info_events = Vec::new();
         match destination {
             BroadcastTo::Notify => {
-                for agent in self.local_joined_agents.iter().cloned() {
-                    if let Some(arc) = self.agent_arcs.get(&agent) {
+                for agent in self.local_joined_agents.iter() {
+                    if let Some(arc) = self.agent_arcs.get(agent) {
                         if arc.contains(basis.get_loc()) {
                             let fut = self.evt_sender.notify(
                                 space.clone(),
@@ -774,8 +774,8 @@ impl KitsuneP2pHandler for Space {
         let mut local_agent_info_events = Vec::new();
         match destination {
             BroadcastTo::Notify => {
-                for agent in self.local_joined_agents.iter().cloned() {
-                    if let Some(arc) = self.agent_arcs.get(&agent) {
+                for agent in self.local_joined_agents.iter() {
+                    if let Some(arc) = self.agent_arcs.get(agent) {
                         if arc.contains(basis.get_loc()) {
                             let fut = self.evt_sender.notify(
                                 space.clone(),
@@ -1270,7 +1270,7 @@ impl Space {
         let arc_set = self
             .agent_arcs
             .iter()
-            .map(|(_, a)| DhtArcSet::from_interval(a.interval()))
+            .map(|(_, a)| DhtArcSet::from_interval(DhtArcRange::from(a)))
             .fold(DhtArcSet::new_empty(), |a, i| a.union(&i));
         self.ro_inner.metric_exchange.write().update_arcset(arc_set);
     }

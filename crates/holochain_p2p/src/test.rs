@@ -238,7 +238,7 @@ mod tests {
                     QueryPeerDensity { respond, .. } => {
                         let view = kitsune_p2p_types::dht_arc::PeerViewBeta::new(
                             PeerStratBeta::default(),
-                            dht_arc::DhtArc::full(0),
+                            dht_arc::DhtArc::full(0.into()),
                             1.0,
                             2,
                         );
@@ -305,7 +305,7 @@ mod tests {
                     QueryPeerDensity { respond, .. } => {
                         let view = kitsune_p2p_types::dht_arc::PeerViewBeta::new(
                             PeerStratBeta::default(),
-                            dht_arc::DhtArc::full(0),
+                            dht_arc::DhtArc::full(0.into()),
                             1.0,
                             2,
                         );
@@ -363,7 +363,7 @@ mod tests {
                     QueryPeerDensity { respond, .. } => {
                         let view = kitsune_p2p_types::dht_arc::PeerViewBeta::new(
                             PeerStratBeta::default(),
-                            dht_arc::DhtArc::full(0),
+                            dht_arc::DhtArc::full(0.into()),
                             1.0,
                             2,
                         );
@@ -456,7 +456,7 @@ mod tests {
                     QueryPeerDensity { respond, .. } => {
                         let view = kitsune_p2p_types::dht_arc::PeerViewBeta::new(
                             PeerStratBeta::default(),
-                            dht_arc::DhtArc::full(0),
+                            dht_arc::DhtArc::full(0.into()),
                             1.0,
                             2,
                         );
@@ -548,7 +548,7 @@ mod tests {
                     QueryPeerDensity { respond, .. } => {
                         let view = kitsune_p2p_types::dht_arc::PeerViewBeta::new(
                             PeerStratBeta::default(),
-                            dht_arc::DhtArc::full(0),
+                            dht_arc::DhtArc::full(0.into()),
                             1.0,
                             2,
                         );
