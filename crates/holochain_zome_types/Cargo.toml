@@ -1,6 +1,6 @@
 [package]
 name = "holochain_zome_types"
-version = "0.0.27"
+version = "0.0.28-dev.0"
 description = "Holochain zome types"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -14,7 +14,7 @@ edition = "2021"
 [dependencies]
 chrono = "0.4.6"
 kitsune_p2p_timestamp = { version = "0.0.7", path = "../kitsune_p2p/timestamp" }
-holo_hash = { version = "0.0.21", path = "../holo_hash" }
+holo_hash = { version = "0.0.22-dev.0", path = "../holo_hash" }
 holochain_serialized_bytes = "=0.0.51"
 paste = "=1.0.5"
 serde = { version = "1.0", features = [ "derive" ] }
@@ -26,7 +26,7 @@ tracing = "0.1"
 holochain_wasmer_common = "=0.0.77"
 
 # fixturator dependencies
-fixt = { version = "0.0.9", path = "../fixt", optional = true }
+fixt = { version = "0.0.10-dev.0", path = "../fixt", optional = true }
 strum = { version = "0.18.0", optional = true }
 rand = {version = "0.7", optional = true}
 
