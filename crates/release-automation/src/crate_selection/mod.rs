@@ -230,6 +230,8 @@ type MemberStates = LinkedHashMap<String, CrateState>;
 pub(crate) struct ReleaseWorkspace<'a> {
     root_path: PathBuf,
     criteria: SelectionCriteria,
+    git_config_name: String,
+    git_config_email: String,
 
     changelog: Option<ChangelogT<'a, WorkspaceChangelog>>,
 
@@ -522,6 +524,10 @@ impl CrateState {
 }
 
 impl<'a> ReleaseWorkspace<'a> {
+    const README_FILENAME: &'a str = "README.md";
+    const GIT_CONFIG_NAME: &'a str = "Holochain Core Dev Team";
+    const GIT_CONFIG_EMAIL: &'a str = "devcore@holochain.org";
+
     pub fn try_new_with_criteria(
         root_path: PathBuf,
         criteria: SelectionCriteria,
@@ -554,6 +560,9 @@ impl<'a> ReleaseWorkspace<'a> {
         let new = Self {
             // initialised: false,
             git_repo: git2::Repository::open(&root_path)?,
+
+            git_config_name: Self::GIT_CONFIG_NAME.to_string(),
+            git_config_email: Self::GIT_CONFIG_EMAIL.to_string(),
 
             root_path,
             criteria: Default::default(),
@@ -652,8 +661,7 @@ impl<'a> ReleaseWorkspace<'a> {
                             insert_state!(CrateStateFlags::DisallowedVersionReqViolated);
                         });
 
-                    // todo: define a const or variable for the joined path
-                    if !std::path::Path::new(&member.root().join("README.md")).exists() {
+                    if !std::path::Path::new(&member.root().join(Self::README_FILENAME)).exists() {
                         insert_state!(CrateStateFlags::MissingReadme);
                     }
 
@@ -965,8 +973,8 @@ impl<'a> ReleaseWorkspace<'a> {
     // todo: make this configurable?
     fn git_signature(&self) -> Fallible<git2::Signature> {
         Ok(git2::Signature::now(
-            "Holochain Core Dev Team",
-            "devcore@holochain.org",
+            &self.git_config_name,
+            &self.git_config_email,
         )?)
     }
 

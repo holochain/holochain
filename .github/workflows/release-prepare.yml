@@ -42,6 +42,12 @@ on:
       releasable_crates:
         description: "whether there are any releaseable crates"
         value: ${{ jobs.prepare.outputs.releasable_crates }}
+      version:
+        description: "which holochain version, if one, will be released"
+        value: ${{ jobs.prepare.outputs.version }}
+      tag:
+        description: "which holochain tag, if one, will be released"
+        value: ${{ jobs.prepare.outputs.tag }}
 
 jobs:
   prepare:

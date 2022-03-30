@@ -30,7 +30,7 @@ impl PeerStratAlpha {
     pub fn view(&self, arc: DhtArc, peers: &[DhtArc]) -> PeerViewAlpha {
         let peers: Vec<DhtArc> = peers
             .iter()
-            .filter(|a| arc.contains(a.center_loc))
+            .filter(|a| arc.contains(a.start_loc()))
             .copied()
             .collect();
         Self::view_unchecked(self, arc, peers.as_slice())
@@ -38,10 +38,10 @@ impl PeerStratAlpha {
 
     pub fn view_unchecked(&self, arc: DhtArc, peers: &[DhtArc]) -> PeerViewAlpha {
         let (total, count) = peers.iter().fold((0u64, 0usize), |(total, count), arc| {
-            (total + arc.half_length as u64, count + 1)
+            (total + arc.length(), count + 1)
         });
         let average = if count > 0 {
-            (total as f64 / count as f64) / MAX_HALF_LENGTH as f64
+            (total as f64 / count as f64) / U32_LEN as f64
         } else {
             0.0
         };

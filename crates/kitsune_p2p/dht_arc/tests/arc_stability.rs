@@ -55,7 +55,7 @@ fn single_agent_convergence_debug() {
     let s = ArcLenStrategy::Constant(redundancy as f64 / n as f64);
 
     let mut peers = simple_parameterized_generator(&mut rng, n, j, s);
-    *peers[0].half_length_mut() = MAX_HALF_LENGTH;
+    peers[0] = DhtArc::full(peers[0].start_loc());
     tracing::debug!("{}", EpochStats::oneline_header());
     let runs = determine_equilibrium(1, peers, |peers| {
         let dynamic = Some(maplit::hashset![0]);
@@ -87,7 +87,7 @@ pub fn run_report(
     let mut rng = seeded_rng(seed);
 
     let mut peers = simple_parameterized_generator(&mut rng, n, j, s);
-    *peers[0].half_length_mut() = MAX_HALF_LENGTH;
+    peers[0] = DhtArc::full(peers[0].start_loc());
     let runs = determine_equilibrium(iters, peers, |peers| {
         let (peers, stats) = run_one_epoch(strat, peers, indices.as_ref(), DETAIL);
         tracing::debug!("{}", peers[0].coverage());
