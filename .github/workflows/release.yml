@@ -573,9 +573,47 @@ jobs:
     needs: [vars, prepare]
     steps:
       - name: Check status
+        id: check-status
         env:
           RESULTS: "${{ toJSON(needs.*.result) }}"
         run: "[[ $(jq -n 'env.RESULTS | fromjson | unique == [\"success\"]') == \"true\" ]]\n"
+
+      - name: Post mattermost message
+        if: always()
+        shell: bash
+        continue-on-error: true
+        env:
+          STATUS: ${{ steps.check-status.outcome }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+          WORKFLOW_RUN_URL: "https://github.com/holochain/holochain/actions/runs/${{ github.run_id }}"
+          HRA_MATTERMOST_TOKEN: ${{ secrets.HRA_MATTERMOST_TOKEN }}
+
+          # dev/holochain-rsm/CI
+          MM_CHANNEL_ID: "uzjosy5d3fdcxe35oyw9naihfw"
+        run: |
+          set -xeEu
+
+          if [[ "${STATUS}" == "success" ]]; then
+            holochain_status=":white_check_mark:"
+          else
+            holochain_status=":x:"
+          fi
+
+          holochain_status="${holochain_status} [log](${WORKFLOW_RUN_URL})"
+
+          message=$(cat <<-EOF
+          #### Holochain release run (ci-only mode)
+
+          Version | ${VERSION}
+          --- | ---
+          holochain | ${holochain_status}
+          EOF
+          )
+          export message
+
+          data=$(jq -n --compact-output '{"channel_id":env.MM_CHANNEL_ID, "message":env.message, "props":{"version":env.VERSION}}')
+          curl -X POST -H "Authorization: Bearer ${HRA_MATTERMOST_TOKEN}" -d "$data" https://chat.holochain.org/api/v4/posts
 
   all-jobs-succeed:
     if: ${{ always() && github.event_name != 'pull_request' }}
@@ -597,6 +635,10 @@ jobs:
           TAG: ${{ needs.prepare.outputs.tag }}
           WORKFLOW_RUN_URL: "https://github.com/holochain/holochain/actions/runs/${{ github.run_id }}"
           HRA_MATTERMOST_TOKEN: ${{ secrets.HRA_MATTERMOST_TOKEN }}
+          DRY_RUN: "${{ needs.vars.outputs.dry_run }}"
+
+          # dev/HC-releases
+          MM_CHANNEL_ID: "cdxeytdc97ff3e1jbdzgyfcduo"
         run: |
           if [[ "${STATUS}" == "success" ]]; then
             holochain_status=":white_check_mark: [log](${WORKFLOW_RUN_URL}), [tag](https://github.com/holochain/holochain/releases/tag/${TAG})"
@@ -604,9 +646,13 @@ jobs:
             holochain_status=":x: [log](${WORKFLOW_RUN_URL})"
           fi
 
-          # post to the dev/HC-releases channel
-          read -r -d '' message <<-EOF
-          #### Holochain release attempt
+          mode="release-mode"
+          if [[ "${DRY_RUN}" == "true" ]]; then
+            mode="${mode}, dry-run"
+          fi
+
+          message=$(cat <<-EOF
+          #### Holochain release run (${mode})
 
           Version | ${VERSION}
           --- | ---
@@ -614,7 +660,8 @@ jobs:
           holochain-nixpkgs | _undetermined_
           holonix | _undetermined_
           EOF
+          )
           export message
 
-          data=$(jq -n --compact-output '{"channel_id":"cdxeytdc97ff3e1jbdzgyfcduo", "message":env.message, "props":{"version":env.VERSION}}')
+          data=$(jq -n --compact-output '{"channel_id":env.MM_CHANNEL_ID, "message":env.message, "props":{"version":env.VERSION}}')
           curl -X POST -H "Authorization: Bearer ${HRA_MATTERMOST_TOKEN}" -d "$data" https://chat.holochain.org/api/v4/posts
