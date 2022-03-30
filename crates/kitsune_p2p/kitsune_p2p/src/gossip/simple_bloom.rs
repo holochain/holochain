@@ -418,7 +418,7 @@ impl SimpleBloomMod {
     }
 
     async fn step_2_local_sync(&self) -> KitsuneResult<bool> {
-        let local_agents = self.inner.share_mut(|i, _| Ok(i.local_agents.clone()))?;
+        let local_agents = self.inner.share_mut(|i, _| Ok(i.local_agents().clone()))?;
 
         let (data_map, key_set, bloom) = match self.step_2_local_sync_inner(local_agents).await {
             Err(e) => {
@@ -486,14 +486,14 @@ impl AsGossipModule for SimpleBloomMod {
 
     fn local_agent_join(&self, a: Arc<KitsuneAgent>) {
         let _ = self.inner.share_mut(move |i, _| {
-            i.local_agents.insert(a);
+            i.local_agents().insert(a);
             Ok(())
         });
     }
 
     fn local_agent_leave(&self, a: Arc<KitsuneAgent>) {
         let _ = self.inner.share_mut(move |i, _| {
-            i.local_agents.remove(&a);
+            i.local_agents().remove(&a);
             Ok(())
         });
     }

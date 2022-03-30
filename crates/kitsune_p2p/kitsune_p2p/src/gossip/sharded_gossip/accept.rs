@@ -13,13 +13,13 @@ impl ShardedGossipLocal {
         let (local_agents, when_initiated, accept_is_from_target) =
             self.inner.share_mut(|i, _| {
                 let accept_is_from_target = i
-                    .initiate_tgt
+                    .initiate_tgt()
                     .as_ref()
                     .map(|tgt| tgt.cert == peer_cert)
                     .unwrap_or(false);
-                let when_initiated = i.initiate_tgt.as_ref().and_then(|i| i.when_initiated);
+                let when_initiated = i.initiate_tgt().as_ref().and_then(|i| i.when_initiated);
                 Ok((
-                    i.local_agents.clone(),
+                    i.local_agents().clone(),
                     when_initiated,
                     accept_is_from_target,
                 ))
@@ -70,7 +70,7 @@ impl ShardedGossipLocal {
             // TODO: What happen if we are in the middle of a new outgoing and
             // a stale accept comes in for the same peer cert?
             // Maybe we need to check timestamps on messages or have unique round ids?
-            inner.round_map.insert(peer_cert.clone(), state);
+            inner.round_map().insert(peer_cert.clone(), state);
             inner.metrics.write().record_initiate(&remote_agent_list);
             Ok(())
         })?;

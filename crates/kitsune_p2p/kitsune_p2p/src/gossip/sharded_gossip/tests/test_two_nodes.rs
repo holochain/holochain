@@ -37,7 +37,7 @@ async fn sharded_sanity_test() {
     let (_, _, bob_outgoing) = bob.try_initiate().await.unwrap().unwrap();
     let alices_cert = bob
         .inner
-        .share_ref(|i| Ok(i.initiate_tgt.as_ref().unwrap().cert.clone()))
+        .share_ref(|i| Ok(i.initiate_tgt().as_ref().unwrap().cert.clone()))
         .unwrap();
 
     // - Send initiate to alice.
@@ -52,7 +52,7 @@ async fn sharded_sanity_test() {
         .inner
         .share_mut(|i, _| {
             // - Check alice has one current round.
-            assert_eq!(i.round_map.current_rounds().len(), 1);
+            assert_eq!(i.round_map().current_rounds().len(), 1);
             Ok(())
         })
         .unwrap();
@@ -73,7 +73,7 @@ async fn sharded_sanity_test() {
     bob.inner
         .share_mut(|i, _| {
             // - Check bob has one current round.
-            assert_eq!(i.round_map.current_rounds().len(), 1);
+            assert_eq!(i.round_map().current_rounds().len(), 1);
             Ok(())
         })
         .unwrap();
@@ -95,10 +95,10 @@ async fn sharded_sanity_test() {
         .inner
         .share_mut(|i, _| {
             // Assert alice has no initiate target.
-            assert!(i.initiate_tgt.is_none());
+            assert!(i.initiate_tgt().is_none());
             // Assert alice has no current rounds as alice
             // has now finished this round of gossip.
-            assert_eq!(i.round_map.current_rounds().len(), 0);
+            assert_eq!(i.round_map().current_rounds().len(), 0);
             Ok(())
         })
         .unwrap();
@@ -118,10 +118,10 @@ async fn sharded_sanity_test() {
     bob.inner
         .share_mut(|i, _| {
             // Assert bob has no initiate target.
-            assert!(i.initiate_tgt.is_none());
+            assert!(i.initiate_tgt().is_none());
             // Assert bob has no current rounds as alice
             // has now finished this round of gossip.
-            assert_eq!(i.round_map.current_rounds().len(), 0);
+            assert_eq!(i.round_map().current_rounds().len(), 0);
             Ok(())
         })
         .unwrap();
@@ -168,9 +168,9 @@ async fn partial_missing_doesnt_finish() {
 
     bob.inner
         .share_mut(|i, _| {
-            assert!(i.initiate_tgt.is_none());
+            assert!(i.initiate_tgt().is_none());
             // - Check bob still has a current round.
-            assert_eq!(i.round_map.current_rounds().len(), 1);
+            assert_eq!(i.round_map().current_rounds().len(), 1);
             Ok(())
         })
         .unwrap();
@@ -216,9 +216,9 @@ async fn missing_ops_finishes() {
 
     bob.inner
         .share_mut(|i, _| {
-            assert!(i.initiate_tgt.is_none());
+            assert!(i.initiate_tgt().is_none());
             // - Bob now has no current rounds.
-            assert_eq!(i.round_map.current_rounds().len(), 0);
+            assert_eq!(i.round_map().current_rounds().len(), 0);
             Ok(())
         })
         .unwrap();
@@ -265,9 +265,9 @@ async fn missing_ops_doesnt_finish_awaiting_bloom_responses() {
 
     bob.inner
         .share_mut(|i, _| {
-            assert!(i.initiate_tgt.is_none());
+            assert!(i.initiate_tgt().is_none());
             // - Bob still has a current round.
-            assert_eq!(i.round_map.current_rounds().len(), 1);
+            assert_eq!(i.round_map().current_rounds().len(), 1);
             Ok(())
         })
         .unwrap();
@@ -314,9 +314,9 @@ async fn bloom_response_finishes() {
 
     bob.inner
         .share_mut(|i, _| {
-            assert!(i.initiate_tgt.is_none());
+            assert!(i.initiate_tgt().is_none());
             // - Bob now has no current rounds.
-            assert_eq!(i.round_map.current_rounds().len(), 0);
+            assert_eq!(i.round_map().current_rounds().len(), 0);
             Ok(())
         })
         .unwrap();
@@ -363,9 +363,9 @@ async fn bloom_response_doesnt_finish_outstanding_incoming() {
 
     bob.inner
         .share_mut(|i, _| {
-            assert!(i.initiate_tgt.is_none());
+            assert!(i.initiate_tgt().is_none());
             // - Bob still has a current round.
-            assert_eq!(i.round_map.current_rounds().len(), 1);
+            assert_eq!(i.round_map().current_rounds().len(), 1);
             Ok(())
         })
         .unwrap();
@@ -454,15 +454,15 @@ async fn no_data_still_finishes() {
     alice
         .inner
         .share_mut(|i, _| {
-            assert!(i.initiate_tgt.is_none());
-            assert_eq!(i.round_map.current_rounds().len(), 0);
+            assert!(i.initiate_tgt().is_none());
+            assert_eq!(i.round_map().current_rounds().len(), 0);
             Ok(())
         })
         .unwrap();
     bob.inner
         .share_mut(|i, _| {
-            assert!(i.initiate_tgt.is_none());
-            assert_eq!(i.round_map.current_rounds().len(), 0);
+            assert!(i.initiate_tgt().is_none());
+            assert_eq!(i.round_map().current_rounds().len(), 0);
             Ok(())
         })
         .unwrap();
@@ -546,8 +546,8 @@ async fn initiate_after_target_is_set() {
 
     bob.inner
         .share_mut(|i, _| {
-            dbg!(&i.initiate_tgt);
-            dbg!(i.round_map.current_rounds().len());
+            dbg!(&i.initiate_tgt());
+            dbg!(i.round_map().current_rounds().len());
             Ok(())
         })
         .unwrap();
@@ -555,8 +555,8 @@ async fn initiate_after_target_is_set() {
     let bob_initiate = bob.try_initiate().await.unwrap();
     bob.inner
         .share_mut(|i, _| {
-            dbg!(&i.initiate_tgt);
-            dbg!(i.round_map.current_rounds().len());
+            dbg!(&i.initiate_tgt());
+            dbg!(i.round_map().current_rounds().len());
             Ok(())
         })
         .unwrap();
@@ -596,7 +596,7 @@ async fn initiate_times_out() {
     alice
         .inner
         .share_mut(|i, _| {
-            assert!(i.initiate_tgt.is_some());
+            assert!(i.initiate_tgt().is_some());
             Ok(())
         })
         .unwrap();
@@ -607,7 +607,7 @@ async fn initiate_times_out() {
     alice
         .inner
         .share_mut(|i, _| {
-            assert!(i.initiate_tgt.is_some());
+            assert!(i.initiate_tgt().is_some());
             Ok(())
         })
         .unwrap();
@@ -626,7 +626,7 @@ async fn initiate_times_out() {
     alice
         .inner
         .share_mut(|i, _| {
-            assert!(i.initiate_tgt.is_some());
+            assert!(i.initiate_tgt().is_some());
             Ok(())
         })
         .unwrap();
@@ -646,8 +646,8 @@ async fn initiate_times_out() {
     alice
         .inner
         .share_mut(|i, _| {
-            assert!(i.initiate_tgt.is_some());
-            assert_eq!(i.round_map.current_rounds().len(), 1);
+            assert!(i.initiate_tgt().is_some());
+            assert_eq!(i.round_map().current_rounds().len(), 1);
             Ok(())
         })
         .unwrap();
@@ -659,7 +659,7 @@ async fn initiate_times_out() {
     alice
         .inner
         .share_mut(|i, _| {
-            i.round_map.get(&tgt2_cert);
+            i.round_map().get(&tgt2_cert);
             Ok(())
         })
         .unwrap();
@@ -674,7 +674,7 @@ async fn initiate_times_out() {
     alice
         .inner
         .share_mut(|i, _| {
-            assert!(i.initiate_tgt.is_some());
+            assert!(i.initiate_tgt().is_some());
             Ok(())
         })
         .unwrap();

@@ -324,7 +324,7 @@ async fn periodic_agent_hook_task(
         tokio::time::sleep(std::time::Duration::from_millis(interval_ms)).await;
 
         for node in nodes.iter() {
-            for agent in node.local_agents.iter() {
+            for agent in node.local_agents().iter() {
                 let input = AgentHookInput {
                     root: root.clone(),
                     app_entry_hash: app_entry_hash.clone(),

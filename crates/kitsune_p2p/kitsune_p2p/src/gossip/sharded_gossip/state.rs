@@ -10,7 +10,7 @@ pub struct ShardedGossipLocalState {
     round_map: RoundStateMap,
     /// Metrics that track remote node states and help guide
     /// the next node to gossip with.
-    metrics: MetricsSync,
+    pub metrics: MetricsSync,
 }
 
 impl ShardedGossipLocalState {
@@ -24,17 +24,17 @@ impl ShardedGossipLocalState {
     pub(super) fn remove_state(&mut self, state_key: &StateKey, error: bool) -> Option<RoundState> {
         // Check if the round to be removed matches the current initiate_tgt
         let init_tgt = self
-            .initiate_tgt
+            .initiate_tgt()
             .as_ref()
             .map(|tgt| &tgt.cert == state_key)
             .unwrap_or(false);
         let remote_agent_list = if init_tgt {
-            let initiate_tgt = self.initiate_tgt.take().unwrap();
+            let initiate_tgt = self.initiate_tgt().take().unwrap();
             initiate_tgt.remote_agent_list
         } else {
             vec![]
         };
-        let r = self.round_map.remove(state_key);
+        let r = self.round_map().remove(state_key);
         if let Some(r) = &r {
             if error {
                 self.metrics.write().record_error(&r.remote_agent_list);
@@ -49,12 +49,12 @@ impl ShardedGossipLocalState {
 
     pub(super) fn check_tgt_expired(&mut self) {
         if let Some((remote_agent_list, cert, when_initiated)) = self
-            .initiate_tgt
+            .initiate_tgt()
             .as_ref()
             .map(|tgt| (&tgt.remote_agent_list, tgt.cert.clone(), tgt.when_initiated))
         {
             // Check if no current round exists and we've timed out the initiate.
-            let no_current_round_exist = !self.round_map.round_exists(&cert);
+            let no_current_round_exist = !self.round_map().round_exists(&cert);
             match when_initiated {
                 Some(when_initiated)
                     if no_current_round_exist && when_initiated.elapsed() > ROUND_TIMEOUT =>
@@ -79,7 +79,7 @@ impl ShardedGossipLocalState {
     }
 
     pub(super) fn show_local_agents(&self) -> &HashSet<Arc<KitsuneAgent>> {
-        &self.local_agents
+        &self.local_agents()
     }
 
     pub(super) fn log_state(&self) {
@@ -87,6 +87,24 @@ impl ShardedGossipLocalState {
             ?self.round_map,
             ?self.initiate_tgt,
         )
+    }
+
+    /// Get a reference to the sharded gossip local state's round map.
+    #[must_use]
+    pub fn round_map(&self) -> &RoundStateMap {
+        &self.round_map
+    }
+
+    /// Get a reference to the sharded gossip local state's initiate tgt.
+    #[must_use]
+    pub fn initiate_tgt(&self) -> Option<&ShardedGossipTarget> {
+        self.initiate_tgt.as_ref()
+    }
+
+    /// Get a reference to the sharded gossip local state's local agents.
+    #[must_use]
+    pub fn local_agents(&self) -> &HashSet<Arc<KitsuneAgent>> {
+        &self.local_agents
     }
 }
 

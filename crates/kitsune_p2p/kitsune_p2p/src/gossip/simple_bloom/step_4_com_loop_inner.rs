@@ -158,7 +158,7 @@ pub(crate) async fn step_4_com_loop_inner_incoming(
 
             // parse/integrate the chunks
             let futs = bloom.inner.share_mut(move |i, _| {
-                if let Some(endpoint) = i.initiate_tgt.clone() {
+                if let Some(endpoint) = i.initiate_tgt().clone() {
                     if finished && con.peer_cert() == *endpoint.cert() {
                         i.initiate_tgt = None;
                     }
@@ -222,7 +222,7 @@ pub(crate) async fn step_4_com_loop_inner_incoming(
         // for now, just always accept gossip initiates
         if send_accept {
             let local_filter = encode_bloom_filter(&i.local_bloom);
-            let gossip = GossipWire::accept(i.local_agents.clone(), local_filter);
+            let gossip = GossipWire::accept(i.local_agents().clone(), local_filter);
             let peer_cert = con_clone.peer_cert();
             let endpoint = GossipTgt::new(remote_agents_clone, peer_cert);
             i.outgoing.push((
@@ -254,14 +254,14 @@ pub(crate) async fn step_4_com_loop_inner_incoming(
         let remote_agents_clone = remote_agents.clone();
         let remote_url_clone = remote_url.clone();
         bloom.inner.share_mut(move |i, _| {
-            if let Some(tgt) = i.initiate_tgt.clone() {
+            if let Some(tgt) = i.initiate_tgt().clone() {
                 if con.peer_cert() == *tgt.cert() {
                     i.initiate_tgt = None;
                 }
             }
 
             // publish an empty chunk in case it was the remote who initiated
-            let gossip = GossipWire::chunk(i.local_agents.clone(), true, Vec::new());
+            let gossip = GossipWire::chunk(i.local_agents().clone(), true, Vec::new());
             let peer_cert = con.peer_cert();
             let endpoint = GossipTgt::new(remote_agents_clone, peer_cert);
             i.outgoing
@@ -319,7 +319,7 @@ pub(crate) async fn step_4_com_loop_inner_incoming(
 
     bloom.inner.share_mut(move |i, _| {
         for (finished, chunks) in gossip {
-            let gossip = GossipWire::chunk(i.local_agents.clone(), finished, chunks);
+            let gossip = GossipWire::chunk(i.local_agents().clone(), finished, chunks);
             let peer_cert = con.peer_cert();
             let endpoint = GossipTgt::new(remote_agents.clone(), peer_cert);
             i.outgoing.push((
@@ -392,7 +392,7 @@ async fn data_map_get(
         // erm, just using a random agent??
         Ok((
             bloom.space.clone(),
-            i.local_agents.iter().next().unwrap().clone(),
+            i.local_agents().iter().next().unwrap().clone(),
             i.local_data_map.get(key).cloned(),
         ))
     })?;

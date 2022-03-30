@@ -16,7 +16,7 @@ impl SimpleBloomMod {
                 .filter_map(|v| {
                     if let MetaOpData::Agent(agent_info_signed) = v {
                         // this is for remote gossip, we've already sync local agents
-                        if inner.local_agents.contains(&agent_info_signed.agent) {
+                        if inner.local_agents().contains(&agent_info_signed.agent) {
                             return None;
                         }
 
@@ -94,7 +94,7 @@ impl SimpleBloomMod {
                 let gossip = encode_bloom_filter(&inner.local_bloom);
                 let bloom_byte_count = gossip.len();
                 tracing::info!(%url, ?endpoint, %bloom_byte_count, "initiating gossip");
-                let gossip = GossipWire::initiate(inner.local_agents.clone(), gossip);
+                let gossip = GossipWire::initiate(inner.local_agents().clone(), gossip);
                 inner
                     .outgoing
                     .push((endpoint, HowToConnect::Url(url), gossip));

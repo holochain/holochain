@@ -44,7 +44,7 @@ impl KitsuneHost for SwitchboardEventHandler {
         box_fut(Ok(self.sb.share(|state| {
             let node = state.nodes.get_mut(&self.node).unwrap();
             let loc = agent.get_loc().as_loc8();
-            node.local_agents
+            node.local_agents()
                 .get(&loc)
                 .map(|e| e.info.to_owned())
                 .or_else(|| node.remote_agents.get(&loc).cloned())

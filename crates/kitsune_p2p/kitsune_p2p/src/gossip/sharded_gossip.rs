@@ -421,7 +421,7 @@ impl ShardedGossipLocal {
 
     fn get_state(&self, id: &StateKey) -> KitsuneResult<Option<RoundState>> {
         self.inner
-            .share_mut(|i, _| Ok(i.round_map.get(id).cloned()))
+            .share_mut(|i, _| Ok(i.round_map().get(id).cloned()))
     }
 
     fn remove_state(&self, id: &StateKey, error: bool) -> KitsuneResult<Option<RoundState>> {
@@ -430,12 +430,12 @@ impl ShardedGossipLocal {
 
     fn remove_target(&self, id: &StateKey, error: bool) -> KitsuneResult<()> {
         self.inner.share_mut(|i, _| {
-            if i.initiate_tgt
+            if i.initiate_tgt()
                 .as_ref()
                 .map(|tgt| &tgt.cert == id)
                 .unwrap_or(false)
             {
-                let initiate_tgt = i.initiate_tgt.take().unwrap();
+                let initiate_tgt = i.initiate_tgt().take().unwrap();
                 if error {
                     i.metrics
                         .write()
@@ -453,11 +453,11 @@ impl ShardedGossipLocal {
     /// If the round is still active then update the state.
     fn update_state_if_active(&self, key: StateKey, state: RoundState) -> KitsuneResult<()> {
         self.inner.share_mut(|i, _| {
-            if i.round_map.round_exists(&key) {
+            if i.round_map().round_exists(&key) {
                 if state.is_finished() {
                     i.remove_state(&key, false);
                 } else {
-                    i.round_map.insert(key, state);
+                    i.round_map().insert(key, state);
                 }
             }
             Ok(())
@@ -467,7 +467,7 @@ impl ShardedGossipLocal {
     fn incoming_ops_finished(&self, state_id: &StateKey) -> KitsuneResult<Option<RoundState>> {
         self.inner.share_mut(|i, _| {
             let finished = i
-                .round_map
+                .round_map()
                 .get_mut(state_id)
                 .map(|state| {
                     state.received_all_incoming_ops_blooms = true;
@@ -477,7 +477,7 @@ impl ShardedGossipLocal {
             if finished {
                 Ok(i.remove_state(state_id, false))
             } else {
-                Ok(i.round_map.get(state_id).cloned())
+                Ok(i.round_map().get(state_id).cloned())
             }
         })
     }
@@ -489,14 +489,14 @@ impl ShardedGossipLocal {
                 state.num_sent_ops_blooms = num_ops_blooms;
                 state.is_finished()
             };
-            if i.round_map
+            if i.round_map()
                 .get_mut(state_id)
                 .map(update_state)
                 .unwrap_or(true)
             {
                 Ok(i.remove_state(state_id, false))
             } else {
-                Ok(i.round_map.get(state_id).cloned())
+                Ok(i.round_map().get(state_id).cloned())
             }
         })
     }
@@ -680,7 +680,7 @@ impl ShardedGossipLocal {
     fn record_timeouts(&self) {
         self.inner
             .share_mut(|i, _| {
-                for (cert, r) in i.round_map.take_timed_out_rounds() {
+                for (cert, r) in i.round_map().take_timed_out_rounds() {
                     tracing::warn!("The node {:?} has timed out their gossip round", cert);
                     i.metrics.write().record_error(&r.remote_agent_list);
                 }
@@ -691,7 +691,7 @@ impl ShardedGossipLocal {
 
     fn show_local_agents(&self) -> HashSet<Arc<KitsuneAgent>> {
         self.inner
-            .share_mut(|i, _| Ok(i.local_agents.clone()))
+            .share_mut(|i, _| Ok(i.local_agents().clone()))
             .unwrap_or_default()
     }
 
@@ -898,7 +898,7 @@ impl AsGossipModule for ShardedGossip {
     fn local_agent_join(&self, a: Arc<KitsuneAgent>) {
         let _ = self.gossip.inner.share_mut(move |i, _| {
             i.new_integrated_data()?;
-            i.local_agents.insert(a);
+            i.local_agents().insert(a);
             let s = tracing::trace_span!("gossip_trigger", agents = ?i.show_local_agents(), msg = "New agent joining");
             s.in_scope(|| i.log_state());
             Ok(())
@@ -907,7 +907,7 @@ impl AsGossipModule for ShardedGossip {
 
     fn local_agent_leave(&self, a: Arc<KitsuneAgent>) {
         let _ = self.gossip.inner.share_mut(move |i, _| {
-            i.local_agents.remove(&a);
+            i.local_agents().remove(&a);
             Ok(())
         });
     }
