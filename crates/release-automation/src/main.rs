@@ -283,6 +283,14 @@ pub(crate) mod cli {
         /// Paths to manifest that will also be considered when updating the Cargo.lock files
         #[structopt(long)]
         pub(crate) additional_manifests: Vec<String>,
+
+        #[structopt(
+            long,
+            default_value = crate_::MINIMUM_CRATE_OWNERS,
+            use_delimiter = true,
+            multiple = false,
+        )]
+        pub(crate) minimum_crate_owners: Vec<String>,
     }
 
     /// Parses a commad separated input string to a set of strings.
@@ -304,10 +312,12 @@ pub(crate) mod cli {
 
         input
             .split(',')
+            .map(str::trim)
             .filter(|s| !s.is_empty())
             .map(|csf| {
-                ReleaseSteps::from_str(csf)
-                    .map_err(|_| anyhow::anyhow!("could not parse '{}' as ReleaseSteps", input))
+                ReleaseSteps::from_str(csf).map_err(|_| {
+                    anyhow::anyhow!("could not parse '{}' in '{}' as ReleaseSteps:", csf, input)
+                })
             })
             .try_fold(
                 Default::default(),
