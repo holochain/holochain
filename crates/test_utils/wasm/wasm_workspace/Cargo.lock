@@ -481,9 +481,7 @@ name = "kitsune_p2p_timestamp"
 version = "0.0.7"
 dependencies = [
  "chrono",
- "derive_more",
  "serde",
- "thiserror",
 ]
 
 [[package]]
