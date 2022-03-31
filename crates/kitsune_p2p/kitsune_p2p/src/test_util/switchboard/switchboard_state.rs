@@ -237,7 +237,7 @@ impl SwitchboardState {
             .nodes
             .get_mut(node_ep)
             .expect("Node must be added first");
-        if let Some(existing) = node.local_agents().insert(loc8, AgentEntry::new(info)) {
+        if let Some(existing) = node.local_agents.insert(loc8, AgentEntry::new(info)) {
             panic!(
                 "Attempted to insert two agents at the same Loc8. Existing agent info: {:?}",
                 existing.info
@@ -287,7 +287,7 @@ impl SwitchboardState {
                 ascii,
                 width = width
             );
-            for (agent_loc8, agent) in node.local_agents().iter() {
+            for (agent_loc8, agent) in node.local_agents.iter() {
                 let interval = &agent.info.storage_arc;
                 let ascii = interval.to_ascii(width);
                 println!(
@@ -346,7 +346,7 @@ impl SwitchboardState {
                     loc8,
                     self.node_for_local_agent_loc8(loc8)
                         .unwrap()
-                        .local_agents()
+                        .local_agents
                         .get(&loc8)
                         .unwrap()
                         .info
@@ -369,13 +369,13 @@ impl SwitchboardState {
         let all_agent_locs: Vec<_> = self
             .nodes
             .values()
-            .flat_map(|n| n.local_agents().keys())
+            .flat_map(|n| n.local_agents.keys())
             .collect();
         let info: Vec<(_, Vec<_>)> = self
             .nodes
             .iter()
             .map(|(ep, n)| {
-                let local: HashSet<_> = n.local_agents().keys().collect();
+                let local: HashSet<_> = n.local_agents.keys().collect();
                 (
                     ep.clone(),
                     all_agent_locs
@@ -459,13 +459,13 @@ impl SwitchboardState {
     pub(super) fn node_for_local_agent_loc8(&self, loc8: Loc8) -> Option<&NodeEntry> {
         self.nodes
             .values()
-            .find(|n| n.local_agents().keys().contains(&loc8))
+            .find(|n| n.local_agents.keys().contains(&loc8))
     }
 
     pub(super) fn node_for_local_agent_loc8_mut(&mut self, loc8: Loc8) -> Option<&mut NodeEntry> {
         self.nodes
             .values_mut()
-            .find(|n| n.local_agents().keys().contains(&loc8))
+            .find(|n| n.local_agents.keys().contains(&loc8))
     }
 
     pub(super) fn node_for_local_agent_hash_mut(
@@ -501,7 +501,7 @@ impl SwitchboardState {
             .nodes
             .get_mut(node)
             .expect("Node not added")
-            .local_agents()
+            .local_agents
     }
 
     /// Get the remote agent map for a node. Just for minor boilerplate reduction.
@@ -596,11 +596,11 @@ pub struct NodeEntry {
 
 impl NodeEntry {
     pub(super) fn local_agent_by_loc8(&self, loc8: Loc8) -> Option<&AgentEntry> {
-        self.local_agents().get(&loc8)
+        self.local_agents.get(&loc8)
     }
 
     pub(super) fn local_agent_by_loc8_mut(&mut self, loc8: Loc8) -> Option<&mut AgentEntry> {
-        self.local_agents().get_mut(&loc8)
+        self.local_agents.get_mut(&loc8)
     }
 
     pub(super) fn local_agent_by_hash(&self, hash: &KitsuneAgent) -> Option<&AgentEntry> {
@@ -615,7 +615,7 @@ impl NodeEntry {
     }
 
     pub(super) fn all_agent_infos(&self) -> HashSet<AgentInfoSigned> {
-        self.local_agents()
+        self.local_agents
             .values()
             .map(|a| a.info.clone())
             .chain(self.remote_agents.values().cloned())

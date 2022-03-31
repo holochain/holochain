@@ -470,7 +470,7 @@ impl ShardedGossipLocal {
                 .round_map()
                 .get_mut(state_id)
                 .map(|state| {
-                    state.received_all_incoming_ops_blooms = true;
+                    state.set_received_all_incoming_ops_blooms();
                     state.is_finished()
                 })
                 .unwrap_or(true);
@@ -485,8 +485,7 @@ impl ShardedGossipLocal {
     fn decrement_ops_blooms(&self, state_id: &StateKey) -> KitsuneResult<Option<RoundState>> {
         self.inner.share_mut(|i, _| {
             let update_state = |state: &mut RoundState| {
-                let num_ops_blooms = state.num_sent_ops_blooms.saturating_sub(1);
-                state.num_sent_ops_blooms = num_ops_blooms;
+                state.decrement_sent_ops_blooms();
                 state.is_finished()
             };
             if i.round_map()
@@ -620,9 +619,9 @@ impl ShardedGossipLocal {
                         // If there are more blooms to send because this node had to batch the blooms
                         // and all the outstanding blooms have been received then this node will send
                         // the next batch of ops blooms starting from the saved cursor.
-                        if let Some(state) = state.as_mut().filter(|s| {
-                            s.bloom_batch_cursor.is_some() && s.num_sent_ops_blooms == 0
-                        }) {
+                        if let Some(state) =
+                            state.as_mut().filter(|s| s.ready_for_next_bloom_batch())
+                        {
                             // We will be producing some gossip so we need to allocate.
                             gossip = Vec::new();
                             // Generate the next ops blooms batch.
@@ -682,7 +681,7 @@ impl ShardedGossipLocal {
             .share_mut(|i, _| {
                 for (cert, r) in i.round_map().take_timed_out_rounds() {
                     tracing::warn!("The node {:?} has timed out their gossip round", cert);
-                    i.metrics.write().record_error(&r.remote_agent_list);
+                    i.metrics.write().record_error(r.remote_agent_list());
                 }
                 Ok(())
             })
@@ -898,7 +897,7 @@ impl AsGossipModule for ShardedGossip {
     fn local_agent_join(&self, a: Arc<KitsuneAgent>) {
         let _ = self.gossip.inner.share_mut(move |i, _| {
             i.new_integrated_data()?;
-            i.local_agents().insert(a);
+            i.add_local_agent(a);
             let s = tracing::trace_span!("gossip_trigger", agents = ?i.show_local_agents(), msg = "New agent joining");
             s.in_scope(|| i.log_state());
             Ok(())
@@ -907,7 +906,7 @@ impl AsGossipModule for ShardedGossip {
 
     fn local_agent_leave(&self, a: Arc<KitsuneAgent>) {
         let _ = self.gossip.inner.share_mut(move |i, _| {
-            i.local_agents().remove(&a);
+            i.remove_local_agent(&a);
             Ok(())
         });
     }

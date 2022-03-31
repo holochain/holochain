@@ -41,7 +41,7 @@ impl ShardedGossipLocal {
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
         // Check which ops are missing.
         let missing_hashes = self
-            .check_ops_bloom((*state.common_arc_set).clone(), &remote_bloom)
+            .check_ops_bloom((*state.common_arc_set()).clone(), &remote_bloom)
             .await?;
 
         let missing_hashes = match missing_hashes {

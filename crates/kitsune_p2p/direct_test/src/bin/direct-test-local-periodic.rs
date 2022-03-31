@@ -61,7 +61,7 @@ async fn main() {
 
         let mut entry_counts = Vec::new();
         for node in test.nodes.iter() {
-            for agent in node.local_agents().iter() {
+            for agent in node.local_agents.iter() {
                 let entry_count = node
                     .kdirect
                     .get_persist()

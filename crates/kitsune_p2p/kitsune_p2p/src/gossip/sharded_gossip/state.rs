@@ -6,7 +6,7 @@ pub struct ShardedGossipLocalState {
     /// The list of agents on this node
     local_agents: HashSet<Arc<KitsuneAgent>>,
     /// If Some, we are in the process of trying to initiate gossip with this target.
-    initiate_tgt: Option<ShardedGossipTarget>,
+    pub initiate_tgt: Option<ShardedGossipTarget>,
     round_map: RoundStateMap,
     /// Metrics that track remote node states and help guide
     /// the next node to gossip with.
@@ -21,6 +21,10 @@ impl ShardedGossipLocalState {
         }
     }
 
+    pub(super) fn add_round(&mut self, key: StateKey, state: RoundState) {
+        self.round_map.insert(key, state);
+    }
+
     pub(super) fn remove_state(&mut self, state_key: &StateKey, error: bool) -> Option<RoundState> {
         // Check if the round to be removed matches the current initiate_tgt
         let init_tgt = self
@@ -29,7 +33,7 @@ impl ShardedGossipLocalState {
             .map(|tgt| &tgt.cert == state_key)
             .unwrap_or(false);
         let remote_agent_list = if init_tgt {
-            let initiate_tgt = self.initiate_tgt().take().unwrap();
+            let initiate_tgt = self.initiate_tgt.take().unwrap();
             initiate_tgt.remote_agent_list
         } else {
             vec![]
@@ -48,22 +52,23 @@ impl ShardedGossipLocalState {
     }
 
     pub(super) fn check_tgt_expired(&mut self) {
-        if let Some((remote_agent_list, cert, when_initiated)) = self
-            .initiate_tgt()
-            .as_ref()
-            .map(|tgt| (&tgt.remote_agent_list, tgt.cert.clone(), tgt.when_initiated))
-        {
-            // Check if no current round exists and we've timed out the initiate.
-            let no_current_round_exist = !self.round_map().round_exists(&cert);
-            match when_initiated {
+        // Check if no current round exists and we've timed out the initiate.
+        let round_exists = self
+            .initiate_tgt
+            .as_mut()
+            .map(|tgt| tgt.cert.clone())
+            .map(|cert| self.round_exists(&cert))
+            .unwrap_or_default();
+        if let Some(tgt) = self.initiate_tgt.as_ref() {
+            match tgt.when_initiated {
                 Some(when_initiated)
-                    if no_current_round_exist && when_initiated.elapsed() > ROUND_TIMEOUT =>
+                    if !round_exists && when_initiated.elapsed() > ROUND_TIMEOUT =>
                 {
-                    tracing::error!("Tgt expired {:?}", cert);
-                    self.metrics.write().record_error(remote_agent_list);
+                    tracing::error!("Tgt expired {:?}", tgt.cert);
+                    self.metrics.write().record_error(&tgt.remote_agent_list);
                     self.initiate_tgt = None;
                 }
-                None if no_current_round_exist => {
+                None if !round_exists => {
                     self.initiate_tgt = None;
                 }
                 _ => (),
@@ -91,8 +96,8 @@ impl ShardedGossipLocalState {
 
     /// Get a reference to the sharded gossip local state's round map.
     #[must_use]
-    pub fn round_map(&self) -> &RoundStateMap {
-        &self.round_map
+    pub fn round_map(&mut self) -> &mut RoundStateMap {
+        &mut self.round_map
     }
 
     /// Get a reference to the sharded gossip local state's initiate tgt.
@@ -105,6 +110,35 @@ impl ShardedGossipLocalState {
     #[must_use]
     pub fn local_agents(&self) -> &HashSet<Arc<KitsuneAgent>> {
         &self.local_agents
+    }
+
+    pub fn add_local_agent(&mut self, a: Arc<KitsuneAgent>) {
+        // TODO: QG, update RegionSet
+        self.local_agents.insert(a);
+    }
+
+    pub fn remove_local_agent(&mut self, a: &Arc<KitsuneAgent>) {
+        // TODO: QG, update RegionSet
+        self.local_agents.remove(a);
+    }
+
+    /// Set the sharded gossip local state's initiate tgt.
+    pub fn set_initiate_tgt(&mut self, initiate_tgt: ShardedGossipTarget) {
+        self.initiate_tgt = Some(initiate_tgt);
+    }
+
+    /// Set the sharded gossip local state's initiate tgt.
+    pub fn clear_initiate_tgt(&mut self) {
+        self.initiate_tgt = None;
+    }
+
+    /// Get the set of current rounds and remove any expired rounds.
+    pub fn current_rounds(&mut self) -> HashSet<Tx2Cert> {
+        self.round_map.current_rounds()
+    }
+
+    pub fn round_exists(&mut self, key: &StateKey) -> bool {
+        self.round_map.round_exists(key)
     }
 }
 
@@ -131,12 +165,12 @@ pub struct RoundState {
     received_all_incoming_ops_blooms: bool,
     /// There are still op blooms to send because the previous
     /// batch was too big to send in a single gossip iteration.
-    bloom_batch_cursor: Option<Timestamp>,
+    pub bloom_batch_cursor: Option<Timestamp>,
     /// Missing op hashes that have been batched for
     /// future processing.
-    ops_batch_queue: OpsBatchQueue,
+    pub ops_batch_queue: OpsBatchQueue,
     /// Last moment we had any contact for this round.
-    last_touch: Instant,
+    pub(super) last_touch: Instant,
     /// Amount of time before a round is considered expired.
     round_timeout: std::time::Duration,
 }
@@ -145,6 +179,10 @@ impl RoundState {
     pub fn increment_sent_ops_blooms(&mut self) -> u8 {
         self.num_sent_ops_blooms += 1;
         self.num_sent_ops_blooms
+    }
+
+    pub fn decrement_sent_ops_blooms(&mut self) {
+        self.num_sent_ops_blooms = self.num_sent_ops_blooms.saturating_sub(1);
     }
 
     /// A round is finished if:
@@ -157,5 +195,38 @@ impl RoundState {
             && self.received_all_incoming_ops_blooms
             && self.bloom_batch_cursor.is_none()
             && self.ops_batch_queue.is_empty()
+    }
+
+    /// There is still a cursor, and all pending ops are fully sent
+    pub fn ready_for_next_bloom_batch(&self) -> bool {
+        self.bloom_batch_cursor.is_some() && self.num_sent_ops_blooms == 0
+    }
+
+    pub fn set_received_all_incoming_ops_blooms(&mut self) {
+        self.received_all_incoming_ops_blooms = true;
+    }
+
+    /// Get a reference to the round state's remote agent list.
+    #[must_use]
+    pub fn remote_agent_list(&self) -> &[AgentInfoSigned] {
+        self.remote_agent_list.as_ref()
+    }
+
+    /// Get the round state's last touch.
+    #[must_use]
+    pub fn last_touch(&self) -> Instant {
+        self.last_touch
+    }
+
+    /// Get the round state's round timeout.
+    #[must_use]
+    pub fn round_timeout(&self) -> Duration {
+        self.round_timeout
+    }
+
+    /// Get a reference to the round state's common arc set.
+    #[must_use]
+    pub fn common_arc_set(&self) -> Arc<DhtArcSet> {
+        self.common_arc_set.clone()
     }
 }
