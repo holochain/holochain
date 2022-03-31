@@ -26,7 +26,6 @@ use holochain_p2p::spawn_holochain_p2p;
 use holochain_p2p::HolochainP2pDna;
 use holochain_p2p::HolochainP2pRef;
 use holochain_p2p::HolochainP2pSender;
-use holochain_serialized_bytes::SerializedBytes;
 use holochain_serialized_bytes::SerializedBytesError;
 use holochain_sqlite::prelude::DatabaseResult;
 use holochain_state::prelude::from_blob;
@@ -261,7 +260,7 @@ where
 /// Do what's necessary to install an app
 pub async fn install_app(
     name: &str,
-    cell_data: Vec<(InstalledCell, Option<SerializedBytes>)>,
+    cell_data: Vec<(InstalledCell, Option<MembraneProof>)>,
     dnas: Vec<DnaFile>,
     conductor_handle: ConductorHandle,
 ) {
@@ -289,12 +288,12 @@ pub async fn install_app(
 }
 
 /// Payload for installing cells
-pub type InstalledCellsWithProofs = Vec<(InstalledCell, Option<SerializedBytes>)>;
+pub type InstalledCellsWithProofs = Vec<(InstalledCell, Option<MembraneProof>)>;
 
 /// One of various ways to setup an app, used somewhere...
 pub async fn setup_app(
     dnas: Vec<DnaFile>,
-    cell_data: Vec<(InstalledCell, Option<SerializedBytes>)>,
+    cell_data: Vec<(InstalledCell, Option<MembraneProof>)>,
 ) -> (Arc<TempDir>, RealAppInterfaceApi, ConductorHandle) {
     let db_dir = test_db_dir();
 

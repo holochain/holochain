@@ -5,12 +5,12 @@ use crate::header::HeaderInner;
 use crate::header::ZomeId;
 use crate::link::LinkTag;
 use crate::link::LinkType;
+use crate::MembraneProof;
 use header::Dna;
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
 use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
-use holochain_serialized_bytes::SerializedBytes;
 
 #[derive(Clone, Debug)]
 pub struct HeaderBuilderCommon {
@@ -156,7 +156,7 @@ builder_variant!(Delete {
 });
 
 builder_variant!(AgentValidationPkg {
-    membrane_proof: Option<SerializedBytes>,
+    membrane_proof: Option<MembraneProof>,
 });
 
 impl Dna {

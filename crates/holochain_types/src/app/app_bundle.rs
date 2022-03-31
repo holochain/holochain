@@ -231,7 +231,6 @@ impl AppRoleResolution {
 
     /// Return the IDs of new cells to be created as part of the resolution.
     /// Does not return existing cells to be reused.
-    // TODO: remove clone of MembraneProof
     pub fn cells_to_create(&self) -> Vec<(CellId, Option<MembraneProof>)> {
         self.dnas_to_register
             .iter()
