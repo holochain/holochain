@@ -8,12 +8,9 @@ impl ShardedGossipLocal {
         state: RoundState,
         remote_bloom: BloomFilter,
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
-        // Unpack this rounds state.
-        let RoundState { common_arc_set, .. } = state;
-
         // Get all agents within common arc and filter out
         // the ones in the remote bloom.
-        let missing: Vec<_> = get_agent_info(&self.evt_sender, &self.space, common_arc_set)
+        let missing: Vec<_> = get_agent_info(&self.evt_sender, &self.space, state.common_arc_set())
             .await?
             .filter(|info| {
                 // Check them against the bloom

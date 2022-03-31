@@ -79,7 +79,7 @@ async fn standard_responses(
     (evt_handler, Arc::new(host))
 }
 
-pub async fn setup_player(
+pub(super) async fn setup_player(
     state: ShardedGossipLocalState,
     agents: Vec<(Arc<KitsuneAgent>, AgentInfoSigned)>,
     with_data: bool,
@@ -89,14 +89,14 @@ pub async fn setup_player(
     ShardedGossipLocal::test(GossipType::Historical, evt_sender, host_api, state)
 }
 
-pub async fn setup_standard_player(
+pub(super) async fn setup_standard_player(
     state: ShardedGossipLocalState,
     agents: Vec<(Arc<KitsuneAgent>, AgentInfoSigned)>,
 ) -> ShardedGossipLocal {
     setup_player(state, agents, true).await
 }
 
-pub async fn setup_empty_player(
+pub(super) async fn setup_empty_player(
     state: ShardedGossipLocalState,
     agents: Vec<(Arc<KitsuneAgent>, AgentInfoSigned)>,
 ) -> ShardedGossipLocal {

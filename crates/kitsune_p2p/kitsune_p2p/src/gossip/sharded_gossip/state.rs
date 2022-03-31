@@ -2,15 +2,16 @@ use super::*;
 
 /// The internal mutable state for [`ShardedGossipLocal`]
 #[derive(Default)]
-pub struct ShardedGossipLocalState {
+#[cfg_attr(feature = "test_utils", derive(Clone, derive_builder::Builder))]
+pub(super) struct ShardedGossipLocalState {
     /// The list of agents on this node
     local_agents: HashSet<Arc<KitsuneAgent>>,
     /// If Some, we are in the process of trying to initiate gossip with this target.
-    pub initiate_tgt: Option<ShardedGossipTarget>,
+    pub(super) initiate_tgt: Option<ShardedGossipTarget>,
     round_map: RoundStateMap,
     /// Metrics that track remote node states and help guide
     /// the next node to gossip with.
-    pub metrics: MetricsSync,
+    pub(super) metrics: MetricsSync,
 }
 
 impl ShardedGossipLocalState {
@@ -96,48 +97,48 @@ impl ShardedGossipLocalState {
 
     /// Get a reference to the sharded gossip local state's round map.
     #[must_use]
-    pub fn round_map(&mut self) -> &mut RoundStateMap {
+    pub(super) fn round_map(&mut self) -> &mut RoundStateMap {
         &mut self.round_map
     }
 
     /// Get a reference to the sharded gossip local state's initiate tgt.
     #[must_use]
-    pub fn initiate_tgt(&self) -> Option<&ShardedGossipTarget> {
+    pub(super) fn initiate_tgt(&self) -> Option<&ShardedGossipTarget> {
         self.initiate_tgt.as_ref()
     }
 
     /// Get a reference to the sharded gossip local state's local agents.
     #[must_use]
-    pub fn local_agents(&self) -> &HashSet<Arc<KitsuneAgent>> {
+    pub(super) fn local_agents(&self) -> &HashSet<Arc<KitsuneAgent>> {
         &self.local_agents
     }
 
-    pub fn add_local_agent(&mut self, a: Arc<KitsuneAgent>) {
+    pub(super) fn add_local_agent(&mut self, a: Arc<KitsuneAgent>) {
         // TODO: QG, update RegionSet
         self.local_agents.insert(a);
     }
 
-    pub fn remove_local_agent(&mut self, a: &Arc<KitsuneAgent>) {
+    pub(super) fn remove_local_agent(&mut self, a: &Arc<KitsuneAgent>) {
         // TODO: QG, update RegionSet
         self.local_agents.remove(a);
     }
 
     /// Set the sharded gossip local state's initiate tgt.
-    pub fn set_initiate_tgt(&mut self, initiate_tgt: ShardedGossipTarget) {
+    pub(super) fn set_initiate_tgt(&mut self, initiate_tgt: ShardedGossipTarget) {
         self.initiate_tgt = Some(initiate_tgt);
     }
 
     /// Set the sharded gossip local state's initiate tgt.
-    pub fn clear_initiate_tgt(&mut self) {
+    pub(super) fn clear_initiate_tgt(&mut self) {
         self.initiate_tgt = None;
     }
 
     /// Get the set of current rounds and remove any expired rounds.
-    pub fn current_rounds(&mut self) -> HashSet<Tx2Cert> {
+    pub(super) fn current_rounds(&mut self) -> HashSet<Tx2Cert> {
         self.round_map.current_rounds()
     }
 
-    pub fn round_exists(&mut self, key: &StateKey) -> bool {
+    pub(super) fn round_exists(&mut self, key: &StateKey) -> bool {
         self.round_map.round_exists(key)
     }
 }
@@ -145,13 +146,14 @@ impl ShardedGossipLocalState {
 /// The internal mutable state for [`ShardedGossip`]
 #[derive(Default)]
 pub struct ShardedGossipState {
-    pub incoming: VecDeque<Incoming>,
-    pub outgoing: VecDeque<Outgoing>,
+    pub(crate) incoming: VecDeque<Incoming>,
+    pub(crate) outgoing: VecDeque<Outgoing>,
 }
 
 /// The state representing a single active ongoing "round" of gossip with a
 /// remote node
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "test_utils", derive(derive_builder::Builder))]
 pub struct RoundState {
     /// The remote agents hosted by the remote node, used for metrics tracking
     remote_agent_list: Vec<AgentInfoSigned>,
@@ -176,11 +178,13 @@ pub struct RoundState {
 }
 
 impl RoundState {
+    /// Record that an op bloom is sent and receipt is pending
     pub fn increment_sent_ops_blooms(&mut self) -> u8 {
         self.num_sent_ops_blooms += 1;
         self.num_sent_ops_blooms
     }
 
+    /// Mark a sent op bloom as being received
     pub fn decrement_sent_ops_blooms(&mut self) {
         self.num_sent_ops_blooms = self.num_sent_ops_blooms.saturating_sub(1);
     }
@@ -202,6 +206,7 @@ impl RoundState {
         self.bloom_batch_cursor.is_some() && self.num_sent_ops_blooms == 0
     }
 
+    /// Set the `received_all_incoming_ops_blooms` flag to `true`
     pub fn set_received_all_incoming_ops_blooms(&mut self) {
         self.received_all_incoming_ops_blooms = true;
     }

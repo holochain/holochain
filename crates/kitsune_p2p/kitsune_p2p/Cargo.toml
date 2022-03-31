@@ -45,10 +45,12 @@ fixt = { path = "../../fixt", version = "0.0.10"}
 arbitrary = { version = "1.0", features = ["derive"] }
 
 blake2b_simd = { version = "0.5.10", optional = true }
+derive_builder = { version = "0.9", optional = true }
 maplit = { version = "1", optional = true }
 mockall = { version = "0.10.2", optional = true }
 
 [dev-dependencies]
+kitsune_p2p = {path = ".", features = ["test_utils"]}
 kitsune_p2p_bootstrap = { path = "../bootstrap" }
 contrafact = { version = "0.1.0-dev.1" }
 kitsune_p2p_timestamp = { version = "0.0.7", path = "../timestamp", features = ["now", "arbitrary"] }
@@ -67,6 +69,7 @@ test_utils = [
   "tokio/test-util",
   "ghost_actor/test_utils",
   "kitsune_p2p_types/test_utils",
+  "derive_builder",
   "maplit",
   "mockall",
   "kitsune_p2p_timestamp/arbitrary",

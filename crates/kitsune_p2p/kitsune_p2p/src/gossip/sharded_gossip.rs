@@ -362,6 +362,7 @@ type StateKey = Tx2Cert;
 
 /// Info associated with an outgoing gossip target
 #[derive(Debug)]
+#[cfg_attr(feature = "test_utils", derive(Clone))]
 pub(crate) struct ShardedGossipTarget {
     pub(crate) remote_agent_list: Vec<AgentInfoSigned>,
     pub(crate) cert: Tx2Cert,
@@ -407,16 +408,22 @@ impl ShardedGossipLocal {
         remote_agent_list: Vec<AgentInfoSigned>,
         common_arc_set: Arc<DhtArcSet>,
     ) -> KitsuneResult<RoundState> {
-        Ok(RoundState {
-            remote_agent_list,
-            common_arc_set,
-            num_sent_ops_blooms: 0,
-            received_all_incoming_ops_blooms: false,
-            bloom_batch_cursor: None,
-            ops_batch_queue: OpsBatchQueue::new(),
-            last_touch: Instant::now(),
-            round_timeout: ROUND_TIMEOUT,
-        })
+        Ok(RoundStateBuilder::default()
+            .remote_agent_list(remote_agent_list)
+            .common_arc_set(common_arc_set)
+            .round_timeout(ROUND_TIMEOUT)
+            .last_touch(Instant::now())
+            .build()?)
+        // Ok(RoundState {
+        //     remote_agent_list,
+        //     common_arc_set,
+        //     num_sent_ops_blooms: 0,
+        //     received_all_incoming_ops_blooms: false,
+        //     bloom_batch_cursor: None,
+        //     ops_batch_queue: OpsBatchQueue::new(),
+        //     last_touch: Instant::now(),
+        //     round_timeout: ROUND_TIMEOUT,
+        // })
     }
 
     fn get_state(&self, id: &StateKey) -> KitsuneResult<Option<RoundState>> {

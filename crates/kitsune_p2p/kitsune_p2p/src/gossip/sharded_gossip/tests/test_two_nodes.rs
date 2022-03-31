@@ -16,19 +16,19 @@ async fn sharded_sanity_test() {
     let bob_agent = iter.next().unwrap().0;
 
     let alice = setup_standard_player(
-        ShardedGossipLocalState {
-            local_agents: maplit::hashset! { alice_agent.clone() },
-            ..Default::default()
-        },
+        ShardedGossipLocalStateBuilder::default()
+            .local_agents(maplit::hashset! { alice_agent.clone() })
+            .build()
+            .unwrap(),
         agents.clone(),
     )
     .await;
 
     let bob = setup_standard_player(
-        ShardedGossipLocalState {
-            local_agents: maplit::hashset! { bob_agent.clone() },
-            ..Default::default()
-        },
+        ShardedGossipLocalStateBuilder::default()
+            .local_agents(maplit::hashset! { bob_agent.clone() })
+            .build()
+            .unwrap(),
         agents.clone(),
     )
     .await;
@@ -137,22 +137,24 @@ async fn partial_missing_doesnt_finish() {
     // - Set bob up with a current round that expects one
     // response to a sent bloom.
     let bob = setup_standard_player(
-        ShardedGossipLocalState {
-            round_map: maplit::hashmap! {
-                cert.clone() => RoundState {
-                    remote_agent_list: vec![],
-                    common_arc_set: Arc::new(DhtArcSet::Full),
-                    num_sent_ops_blooms: 1,
-                    received_all_incoming_ops_blooms: true,
-                    last_touch: Instant::now(),
-                    round_timeout: std::time::Duration::MAX,
-                    bloom_batch_cursor: None,
-                    ops_batch_queue: OpsBatchQueue::new(),
+        ShardedGossipLocalStateBuilder::default()
+            .round_map(
+                maplit::hashmap! {
+                    cert.clone() => RoundStateBuilder::default()
+                        .remote_agent_list(vec![])
+                        .common_arc_set(Arc::new(DhtArcSet::Full))
+                        .num_sent_ops_blooms(1)
+                        .received_all_incoming_ops_blooms(true)
+                        .last_touch(Instant::now())
+                        .round_timeout(std::time::Duration::MAX)
+                        .bloom_batch_cursor(None)
+                        .ops_batch_queue(OpsBatchQueue::new()).build().unwrap()
+
                 }
-            }
-            .into(),
-            ..Default::default()
-        },
+                .into(),
+            )
+            .build()
+            .unwrap(),
         vec![],
     )
     .await;
@@ -185,22 +187,24 @@ async fn missing_ops_finishes() {
 
     // - Set bob up the same as the test above.
     let bob = setup_standard_player(
-        ShardedGossipLocalState {
-            round_map: maplit::hashmap! {
-                cert.clone() => RoundState {
-                    remote_agent_list: vec![],
-                    common_arc_set: Arc::new(DhtArcSet::Full),
-                    num_sent_ops_blooms: 1,
-                    received_all_incoming_ops_blooms: true,
-                    last_touch: Instant::now(),
-                    round_timeout: std::time::Duration::MAX,
-                    bloom_batch_cursor: None,
-                    ops_batch_queue: OpsBatchQueue::new(),
+        ShardedGossipLocalStateBuilder::default()
+            .round_map(
+                maplit::hashmap! {
+                    cert.clone() => RoundStateBuilder::default()
+                        .remote_agent_list(vec![])
+                        .common_arc_set(Arc::new(DhtArcSet::Full))
+                        .num_sent_ops_blooms(1)
+                        .received_all_incoming_ops_blooms(true)
+                        .last_touch(Instant::now())
+                        .round_timeout(std::time::Duration::MAX)
+                        .bloom_batch_cursor(None)
+                        .ops_batch_queue(OpsBatchQueue::new()).build().unwrap()
+
                 }
-            }
-            .into(),
-            ..Default::default()
-        },
+                .into(),
+            )
+            .build()
+            .unwrap(),
         vec![],
     )
     .await;
@@ -234,22 +238,24 @@ async fn missing_ops_doesnt_finish_awaiting_bloom_responses() {
 
     // - Set bob up awaiting incoming blooms and one response.
     let bob = setup_standard_player(
-        ShardedGossipLocalState {
-            round_map: maplit::hashmap! {
-                cert.clone() => RoundState {
-                    remote_agent_list: vec![],
-                    common_arc_set: Arc::new(DhtArcSet::Full),
-                    num_sent_ops_blooms: 1,
-                    received_all_incoming_ops_blooms: false,
-                    last_touch: Instant::now(),
-                    round_timeout: std::time::Duration::MAX,
-                    bloom_batch_cursor: None,
-                    ops_batch_queue: OpsBatchQueue::new(),
+        ShardedGossipLocalStateBuilder::default()
+            .round_map(
+                maplit::hashmap! {
+                    cert.clone() => RoundStateBuilder::default()
+                        .remote_agent_list(vec![])
+                        .common_arc_set(Arc::new(DhtArcSet::Full))
+                        .num_sent_ops_blooms(1)
+                        .received_all_incoming_ops_blooms(false)
+                        .last_touch(Instant::now())
+                        .round_timeout(std::time::Duration::MAX)
+                        .bloom_batch_cursor(None)
+                        .ops_batch_queue(OpsBatchQueue::new()).build().unwrap()
+
                 }
-            }
-            .into(),
-            ..Default::default()
-        },
+                .into(),
+            )
+            .build()
+            .unwrap(),
         vec![],
     )
     .await;
@@ -283,22 +289,24 @@ async fn bloom_response_finishes() {
     // - Set bob up with a current round that expects no responses
     // and has not received all blooms.
     let bob = setup_standard_player(
-        ShardedGossipLocalState {
-            round_map: maplit::hashmap! {
-                cert.clone() => RoundState {
-                    remote_agent_list: vec![],
-                    common_arc_set: Arc::new(DhtArcSet::Full),
-                    num_sent_ops_blooms: 0,
-                    received_all_incoming_ops_blooms: false,
-                    last_touch: Instant::now(),
-                    round_timeout: std::time::Duration::MAX,
-                    bloom_batch_cursor: None,
-                    ops_batch_queue: OpsBatchQueue::new(),
+        ShardedGossipLocalStateBuilder::default()
+            .round_map(
+                maplit::hashmap! {
+                    cert.clone() => RoundStateBuilder::default()
+                        .remote_agent_list(vec![])
+                        .common_arc_set(Arc::new(DhtArcSet::Full))
+                        .num_sent_ops_blooms(0)
+                        .received_all_incoming_ops_blooms(false)
+                        .last_touch(Instant::now())
+                        .round_timeout(std::time::Duration::MAX)
+                        .bloom_batch_cursor(None)
+                        .ops_batch_queue(OpsBatchQueue::new()).build().unwrap()
+
                 }
-            }
-            .into(),
-            ..Default::default()
-        },
+                .into(),
+            )
+            .build()
+            .unwrap(),
         vec![],
     )
     .await;
@@ -332,22 +340,24 @@ async fn bloom_response_doesnt_finish_outstanding_incoming() {
     // - Set bob up with a current round that expects one response
     // and has not received all blooms.
     let bob = setup_standard_player(
-        ShardedGossipLocalState {
-            round_map: maplit::hashmap! {
-                cert.clone() => RoundState {
-                    remote_agent_list: vec![],
-                    common_arc_set: Arc::new(DhtArcSet::Full),
-                    num_sent_ops_blooms: 1,
-                    received_all_incoming_ops_blooms: false,
-                    last_touch: Instant::now(),
-                    round_timeout: std::time::Duration::MAX,
-                    bloom_batch_cursor: None,
-                    ops_batch_queue: OpsBatchQueue::new(),
+        ShardedGossipLocalStateBuilder::default()
+            .round_map(
+                maplit::hashmap! {
+                    cert.clone() => RoundStateBuilder::default()
+                        .remote_agent_list(vec![])
+                        .common_arc_set(Arc::new(DhtArcSet::Full))
+                        .num_sent_ops_blooms(1)
+                        .received_all_incoming_ops_blooms(false)
+                        .last_touch(Instant::now())
+                        .round_timeout(std::time::Duration::MAX)
+                        .bloom_batch_cursor(None)
+                        .ops_batch_queue(OpsBatchQueue::new()).build().unwrap()
+
                 }
-            }
-            .into(),
-            ..Default::default()
-        },
+                .into(),
+            )
+            .build()
+            .unwrap(),
         vec![],
     )
     .await;
@@ -383,46 +393,50 @@ async fn no_data_still_finishes() {
     let agents = agents_with_infos(2).await;
     // - Alice is expecting no responses and is expecting blooms.
     let alice = setup_empty_player(
-        ShardedGossipLocalState {
-            local_agents: maplit::hashset!(agents[0].0.clone()),
-            round_map: maplit::hashmap! {
-                bob_cert.clone() => RoundState {
-                    remote_agent_list: vec![],
-                    common_arc_set: Arc::new(DhtArcSet::Full),
-                    num_sent_ops_blooms: 0,
-                    received_all_incoming_ops_blooms: false,
-                    last_touch: Instant::now(),
-                    round_timeout: std::time::Duration::MAX,
-                    bloom_batch_cursor: None,
-                    ops_batch_queue: OpsBatchQueue::new(),
+        ShardedGossipLocalStateBuilder::default()
+            .local_agents(maplit::hashset!(agents[0].0.clone()))
+            .round_map(
+                maplit::hashmap! {
+                    bob_cert.clone() => RoundStateBuilder::default()
+                        .remote_agent_list(vec![])
+                        .common_arc_set(Arc::new(DhtArcSet::Full))
+                        .num_sent_ops_blooms(0)
+                        .received_all_incoming_ops_blooms(false)
+                        .last_touch(Instant::now())
+                        .round_timeout(std::time::Duration::MAX)
+                        .bloom_batch_cursor(None)
+                        .ops_batch_queue(OpsBatchQueue::new()).build().unwrap()
+
                 }
-            }
-            .into(),
-            ..Default::default()
-        },
+                .into(),
+            )
+            .build()
+            .unwrap(),
         agents.clone(),
     )
     .await;
 
     // - Bob is expecting one responses and is expecting no blooms.
     let bob = setup_empty_player(
-        ShardedGossipLocalState {
-            local_agents: maplit::hashset!(agents[1].0.clone()),
-            round_map: maplit::hashmap! {
-                alice_cert.clone() => RoundState {
-                    remote_agent_list: vec![],
-                    common_arc_set: Arc::new(DhtArcSet::Full),
-                    num_sent_ops_blooms: 1,
-                    received_all_incoming_ops_blooms: true,
-                    last_touch: Instant::now(),
-                    round_timeout: std::time::Duration::MAX,
-                    bloom_batch_cursor: None,
-                    ops_batch_queue: OpsBatchQueue::new(),
+        ShardedGossipLocalStateBuilder::default()
+            .local_agents(maplit::hashset!(agents[1].0.clone()))
+            .round_map(
+                maplit::hashmap! {
+                    alice_cert.clone() => RoundStateBuilder::default()
+                        .remote_agent_list(vec![])
+                        .common_arc_set(Arc::new(DhtArcSet::Full))
+                        .num_sent_ops_blooms(1)
+                        .received_all_incoming_ops_blooms(true)
+                        .last_touch(Instant::now())
+                        .round_timeout(std::time::Duration::MAX)
+                        .bloom_batch_cursor(None)
+                        .ops_batch_queue(OpsBatchQueue::new()).build().unwrap()
+
                 }
-            }
-            .into(),
-            ..Default::default()
-        },
+                .into(),
+            )
+            .build()
+            .unwrap(),
         agents.clone(),
     )
     .await;
@@ -475,19 +489,19 @@ async fn double_initiate_is_handled() {
     let agents = agents_with_infos(2).await;
     // - Set up two players with themselves as local agents.
     let alice = setup_empty_player(
-        ShardedGossipLocalState {
-            local_agents: maplit::hashset!(agents[0].0.clone()),
-            ..Default::default()
-        },
+        ShardedGossipLocalStateBuilder::default()
+            .local_agents(maplit::hashset!(agents[0].0.clone()))
+            .build()
+            .unwrap(),
         agents.clone(),
     )
     .await;
 
     let bob = setup_empty_player(
-        ShardedGossipLocalState {
-            local_agents: maplit::hashset!(agents[1].0.clone()),
-            ..Default::default()
-        },
+        ShardedGossipLocalStateBuilder::default()
+            .local_agents(maplit::hashset!(agents[1].0.clone()))
+            .build()
+            .unwrap(),
         agents.clone(),
     )
     .await;
@@ -516,19 +530,19 @@ async fn double_initiate_is_handled() {
 async fn initiate_after_target_is_set() {
     let agents = agents_with_infos(2).await;
     let alice = setup_empty_player(
-        ShardedGossipLocalState {
-            local_agents: maplit::hashset!(agents[0].0.clone()),
-            ..Default::default()
-        },
+        ShardedGossipLocalStateBuilder::default()
+            .local_agents(maplit::hashset!(agents[0].0.clone()))
+            .build()
+            .unwrap(),
         agents.clone(),
     )
     .await;
 
     let bob = setup_empty_player(
-        ShardedGossipLocalState {
-            local_agents: maplit::hashset!(agents[1].0.clone()),
-            ..Default::default()
-        },
+        ShardedGossipLocalStateBuilder::default()
+            .local_agents(maplit::hashset!(agents[1].0.clone()))
+            .build()
+            .unwrap(),
         agents.clone(),
     )
     .await;
@@ -571,18 +585,18 @@ async fn initiate_times_out() {
     let agents = agents_with_infos(3).await;
     let alice_cert = cert_from_info(agents[0].1.clone());
     let alice = setup_empty_player(
-        ShardedGossipLocalState {
-            local_agents: maplit::hashset!(agents[0].0.clone()),
-            ..Default::default()
-        },
+        ShardedGossipLocalStateBuilder::default()
+            .local_agents(maplit::hashset!(agents[0].0.clone()))
+            .build()
+            .unwrap(),
         agents.clone(),
     )
     .await;
     let bob = setup_empty_player(
-        ShardedGossipLocalState {
-            local_agents: maplit::hashset!(agents[1].0.clone()),
-            ..Default::default()
-        },
+        ShardedGossipLocalStateBuilder::default()
+            .local_agents(maplit::hashset!(agents[1].0.clone()))
+            .build()
+            .unwrap(),
         agents.clone(),
     )
     .await;

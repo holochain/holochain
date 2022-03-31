@@ -2,6 +2,7 @@ use super::*;
 
 /// Map of gossip round state that checks for timed out rounds on gets.
 #[derive(Default, Debug)]
+#[cfg_attr(feature = "test_utils", derive(Clone))]
 pub(super) struct RoundStateMap {
     map: HashMap<StateKey, RoundState>,
     timed_out: Vec<(StateKey, RoundState)>,

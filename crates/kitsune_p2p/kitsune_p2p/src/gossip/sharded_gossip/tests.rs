@@ -13,7 +13,7 @@ mod test_two_nodes;
 
 impl ShardedGossipLocal {
     /// Create an instance suitable for testing
-    pub fn test(
+    pub(super) fn test(
         gossip_type: GossipType,
         evt_sender: EventSender,
         host: HostApi,
