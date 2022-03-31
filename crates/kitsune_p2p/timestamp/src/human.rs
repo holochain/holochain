@@ -8,7 +8,9 @@ use std::convert::TryFrom;
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum HumanTimestamp {
+    /// A microsecond resolution [`Timestamp`].
     Micros(Timestamp),
+    /// A RFC3339 [`DateTime`].
     RFC3339(DateTime),
 }
 
