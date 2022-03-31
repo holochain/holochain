@@ -16,7 +16,7 @@
 //! The Location dimension is circular, and the Time dimension is linear.
 //!
 //! Each Agent has an Arc which marks out a portion of the circle of Locations.
-//! Arcs have a fixed starting point, and extends "clockwise" by some length which
+//! Arcs have a fixed starting point, and extend "clockwise" by some length which
 //! is chosen by Kitsune and changes over time. Every Agent is responsible for
 //! holding a copy of any Ops whose location overlaps their Arc. As we will see
 //! later, Arcs are *quantized*.
@@ -37,10 +37,10 @@
 //! the network, and a constantly increasing height as time marches forward.
 //!
 //! So:
-//! - An Op can be thought of a point somewhere on the surface of this cylinder,
+//! - An Op can be thought of as a point somewhere on the surface of this cylinder,
 //! - An Agent can be thought of as a line perpendicular to the base, extending
 //!   across the entire length of the cylinder.
-//! - An Arcs can be thought of as a rectangular "stripe" made by sweeping the
+//! - An Arc can be thought of as a rectangular "stripe" made by sweeping the
 //!   Agent line across the distance specified by the length of the Arc.
 //! - A *Region* is an arbitrary rectangular area of spacetime.
 //!
@@ -96,7 +96,7 @@
 //! efficiently determine which Ops they already have in common, and which they need to send
 //! to each other.
 //!
-//! This as accomplished by agents exchanging information about the Regions of spacetime that they
+//! This is accomplished by agents exchanging information about the Regions of spacetime that they
 //! hold in common. This needs to be done with a minimum of coordination, which is why we use a
 //! uniform quantization of spacetime -- if there are only so many ways to split up spacetime into
 //! Regions, there is a greater chance that agents will have information on the exact same regions.
