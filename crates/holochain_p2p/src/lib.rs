@@ -30,7 +30,11 @@ pub trait HolochainP2pDnaT {
     fn dna_hash(&self) -> DnaHash;
 
     /// The p2p module must be informed at runtime which dna/agent pairs it should be tracking.
-    async fn join(&self, agent: AgentPubKey) -> actor::HolochainP2pResult<()>;
+    async fn join(
+        &self,
+        agent: AgentPubKey,
+        initial_arc: Option<crate::dht_arc::DhtArc>,
+    ) -> actor::HolochainP2pResult<()>;
 
     /// If a cell is disabled, we'll need to \"leave\" the network module as well.
     async fn leave(&self, agent: AgentPubKey) -> actor::HolochainP2pResult<()>;
@@ -148,8 +152,14 @@ impl HolochainP2pDnaT for HolochainP2pDna {
     }
 
     /// The p2p module must be informed at runtime which dna/agent pairs it should be tracking.
-    async fn join(&self, agent: AgentPubKey) -> actor::HolochainP2pResult<()> {
-        self.sender.join((*self.dna_hash).clone(), agent).await
+    async fn join(
+        &self,
+        agent: AgentPubKey,
+        initial_arc: Option<crate::dht_arc::DhtArc>,
+    ) -> actor::HolochainP2pResult<()> {
+        self.sender
+            .join((*self.dna_hash).clone(), agent, initial_arc)
+            .await
     }
 
     /// If a cell is disabled, we'll need to \"leave\" the network module as well.

@@ -208,7 +208,7 @@ ghost_actor::ghost_chan! {
     /// actor instance.
     pub chan HolochainP2p<HolochainP2pError> {
         /// The p2p module must be informed at runtime which dna/agent pairs it should be tracking.
-        fn join(dna_hash: DnaHash, agent_pub_key: AgentPubKey) -> ();
+        fn join(dna_hash: DnaHash, agent_pub_key: AgentPubKey, initial_arc: Option<crate::dht_arc::DhtArc>) -> ();
 
         /// If a cell is disabled, we'll need to \"leave\" the network module as well.
         fn leave(dna_hash: DnaHash, agent_pub_key: AgentPubKey) -> ();

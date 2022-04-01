@@ -4,6 +4,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.0.28
+
+## 0.0.27
+
+## 0.0.26
+
+## 0.0.25
+
+## 0.0.24
+
 ## 0.0.23
 
 - The DNA manifest now requires an `origin_time` Timestamp field, which will be used in the forthcoming gossip optimization.

@@ -5,6 +5,7 @@ use kitsune_p2p_proxy::tx2::*;
 use kitsune_p2p_proxy::*;
 use kitsune_p2p_transport_quic::tx2::*;
 use kitsune_p2p_types::config::*;
+use kitsune_p2p_types::tls::*;
 use kitsune_p2p_types::tx2::tx2_pool_promote::*;
 
 #[tokio::test(flavor = "multi_thread")]
@@ -69,7 +70,9 @@ async fn test_integrated_proxy_list() {
         },
     }];
 
-    let (actor, mut evt) = spawn_kitsune_p2p(kconf, k_tls).await.unwrap();
+    let (actor, mut evt) = spawn_kitsune_p2p(kconf, k_tls, HostStub::new())
+        .await
+        .unwrap();
 
     tokio::task::spawn(async move {
         while let Some(e) = evt.next().await {

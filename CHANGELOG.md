@@ -6,6 +6,261 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20220330.010719
+
+## [holochain-0.0.132](crates/holochain/CHANGELOG.md#0.0.132)
+
+## [holochain\_test\_wasm\_common-0.0.27](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.27)
+
+## [holochain\_cascade-0.0.32](crates/holochain_cascade/CHANGELOG.md#0.0.32)
+
+## [holochain\_websocket-0.0.32](crates/holochain_websocket/CHANGELOG.md#0.0.32)
+
+## [holochain\_conductor\_api-0.0.32](crates/holochain_conductor_api/CHANGELOG.md#0.0.32)
+
+## [holochain\_state-0.0.32](crates/holochain_state/CHANGELOG.md#0.0.32)
+
+## [holochain\_wasm\_test\_utils-0.0.32](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.32)
+
+## [holochain\_p2p-0.0.32](crates/holochain_p2p/CHANGELOG.md#0.0.32)
+
+## [kitsune\_p2p\_bootstrap-0.0.7](crates/kitsune_p2p_bootstrap/CHANGELOG.md#0.0.7)
+
+## [holochain\_cli\_bundle-0.0.28](crates/holochain_cli_bundle/CHANGELOG.md#0.0.28)
+
+## [holochain\_types-0.0.32](crates/holochain_types/CHANGELOG.md#0.0.32)
+
+## [holochain\_keystore-0.0.32](crates/holochain_keystore/CHANGELOG.md#0.0.32)
+
+## [holochain\_sqlite-0.0.32](crates/holochain_sqlite/CHANGELOG.md#0.0.32)
+
+## [kitsune\_p2p-0.0.28](crates/kitsune_p2p/CHANGELOG.md#0.0.28)
+
+## [kitsune\_p2p\_proxy-0.0.22](crates/kitsune_p2p_proxy/CHANGELOG.md#0.0.22)
+
+## [kitsune\_p2p\_transport\_quic-0.0.22](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.0.22)
+
+## [kitsune\_p2p\_types-0.0.22](crates/kitsune_p2p_types/CHANGELOG.md#0.0.22)
+
+## [hdk-0.0.127](crates/hdk/CHANGELOG.md#0.0.127)
+
+## [hdk\_derive-0.0.28](crates/hdk_derive/CHANGELOG.md#0.0.28)
+
+## [holochain\_zome\_types-0.0.28](crates/holochain_zome_types/CHANGELOG.md#0.0.28)
+
+## [holo\_hash-0.0.22](crates/holo_hash/CHANGELOG.md#0.0.22)
+
+## [kitsune\_p2p\_dht\_arc-0.0.11](crates/kitsune_p2p_dht_arc/CHANGELOG.md#0.0.11)
+
+- **BREAKING** Arcs are now “unidirectional”, meaning rather than the agent location defining the centerpoint of the storage arc, the agent location defines the left edge of the arc.
+
+This is a huge change, particularly to gossip behavior. With bidirectional arcs, when peers have roughly equivalently sized arcs, half of the peers who have overlapping arcs will not see each other or gossip with each other because their centerpoints are not contained within each others’ arcs. With unidirectional arcs, this problem is removed at the expense of making peer discovery asymmmetrical, which we have found to have no adverse effects.
+
+## [fixt-0.0.10](crates/fixt/CHANGELOG.md#0.0.10)
+
+# 20220323.023956
+
+## [holochain-0.0.131](crates/holochain/CHANGELOG.md#0.0.131)
+
+- When joining the network set arc size to previous value if available instead of full to avoid network load [1287](https://github.com/holochain/holochain/pull/1287)
+
+## [holochain\_test\_wasm\_common-0.0.26](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.26)
+
+## [holochain\_cascade-0.0.31](crates/holochain_cascade/CHANGELOG.md#0.0.31)
+
+## [holochain\_websocket-0.0.31](crates/holochain_websocket/CHANGELOG.md#0.0.31)
+
+## [holochain\_conductor\_api-0.0.31](crates/holochain_conductor_api/CHANGELOG.md#0.0.31)
+
+## [holochain\_state-0.0.31](crates/holochain_state/CHANGELOG.md#0.0.31)
+
+## [holochain\_wasm\_test\_utils-0.0.31](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.31)
+
+## [holochain\_p2p-0.0.31](crates/holochain_p2p/CHANGELOG.md#0.0.31)
+
+## [kitsune\_p2p\_bootstrap-0.0.6](crates/kitsune_p2p_bootstrap/CHANGELOG.md#0.0.6)
+
+## [holochain\_cli\_bundle-0.0.27](crates/holochain_cli_bundle/CHANGELOG.md#0.0.27)
+
+## [holochain\_types-0.0.31](crates/holochain_types/CHANGELOG.md#0.0.31)
+
+## [holochain\_keystore-0.0.31](crates/holochain_keystore/CHANGELOG.md#0.0.31)
+
+## [holochain\_sqlite-0.0.31](crates/holochain_sqlite/CHANGELOG.md#0.0.31)
+
+## [kitsune\_p2p-0.0.27](crates/kitsune_p2p/CHANGELOG.md#0.0.27)
+
+## [kitsune\_p2p\_proxy-0.0.21](crates/kitsune_p2p_proxy/CHANGELOG.md#0.0.21)
+
+## [kitsune\_p2p\_transport\_quic-0.0.21](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.0.21)
+
+## [kitsune\_p2p\_types-0.0.21](crates/kitsune_p2p_types/CHANGELOG.md#0.0.21)
+
+## [mr\_bundle-0.0.9](crates/mr_bundle/CHANGELOG.md#0.0.9)
+
+## [holochain\_util-0.0.9](crates/holochain_util/CHANGELOG.md#0.0.9)
+
+## [hdk-0.0.126](crates/hdk/CHANGELOG.md#0.0.126)
+
+- Docs: Explain how hashes in Holochain are composed and its components on the module page for `hdk::hash` [\#1299](https://github.com/holochain/holochain/pull/1299).
+
+# 20220316.022611
+
+## [holochain-0.0.130](crates/holochain/CHANGELOG.md#0.0.130)
+
+- Workflow errors generally now log rather than abort the current app [1279](https://github.com/holochain/holochain/pull/1279/files)
+
+## [holochain\_test\_wasm\_common-0.0.25](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.25)
+
+## [holochain\_cascade-0.0.30](crates/holochain_cascade/CHANGELOG.md#0.0.30)
+
+## [holochain\_cli-0.0.31](crates/holochain_cli/CHANGELOG.md#0.0.31)
+
+## [holochain\_cli\_sandbox-0.0.27](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.27)
+
+## [holochain\_websocket-0.0.30](crates/holochain_websocket/CHANGELOG.md#0.0.30)
+
+## [holochain\_conductor\_api-0.0.30](crates/holochain_conductor_api/CHANGELOG.md#0.0.30)
+
+## [holochain\_state-0.0.30](crates/holochain_state/CHANGELOG.md#0.0.30)
+
+## [holochain\_wasm\_test\_utils-0.0.30](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.30)
+
+## [holochain\_p2p-0.0.30](crates/holochain_p2p/CHANGELOG.md#0.0.30)
+
+## [holochain\_cli\_bundle-0.0.26](crates/holochain_cli_bundle/CHANGELOG.md#0.0.26)
+
+## [holochain\_types-0.0.30](crates/holochain_types/CHANGELOG.md#0.0.30)
+
+## [holochain\_keystore-0.0.30](crates/holochain_keystore/CHANGELOG.md#0.0.30)
+
+## [holochain\_sqlite-0.0.30](crates/holochain_sqlite/CHANGELOG.md#0.0.30)
+
+## [hdk-0.0.125](crates/hdk/CHANGELOG.md#0.0.125)
+
+- hdk: link base and target are no longer required to exist on the current DHT and aren’t made available via. validation ops (use must\_get\_entry instead) [\#1266](https://github.com/holochain/holochain/pull/1266)
+
+## [hdk\_derive-0.0.27](crates/hdk_derive/CHANGELOG.md#0.0.27)
+
+## [holochain\_zome\_types-0.0.27](crates/holochain_zome_types/CHANGELOG.md#0.0.27)
+
+# 20220309.134939
+
+## [holochain-0.0.129](crates/holochain/CHANGELOG.md#0.0.129)
+
+## [holochain\_cascade-0.0.29](crates/holochain_cascade/CHANGELOG.md#0.0.29)
+
+## [holochain\_cli-0.0.30](crates/holochain_cli/CHANGELOG.md#0.0.30)
+
+## [holochain\_cli\_sandbox-0.0.26](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.26)
+
+## [holochain\_websocket-0.0.29](crates/holochain_websocket/CHANGELOG.md#0.0.29)
+
+## [holochain\_conductor\_api-0.0.29](crates/holochain_conductor_api/CHANGELOG.md#0.0.29)
+
+## [holochain\_state-0.0.29](crates/holochain_state/CHANGELOG.md#0.0.29)
+
+## [holochain\_wasm\_test\_utils-0.0.29](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.29)
+
+## [holochain\_p2p-0.0.29](crates/holochain_p2p/CHANGELOG.md#0.0.29)
+
+## [kitsune\_p2p\_bootstrap-0.0.5](crates/kitsune_p2p_bootstrap/CHANGELOG.md#0.0.5)
+
+## [holochain\_cli\_bundle-0.0.25](crates/holochain_cli_bundle/CHANGELOG.md#0.0.25)
+
+## [holochain\_types-0.0.29](crates/holochain_types/CHANGELOG.md#0.0.29)
+
+## [holochain\_keystore-0.0.29](crates/holochain_keystore/CHANGELOG.md#0.0.29)
+
+## [holochain\_sqlite-0.0.29](crates/holochain_sqlite/CHANGELOG.md#0.0.29)
+
+## [kitsune\_p2p-0.0.26](crates/kitsune_p2p/CHANGELOG.md#0.0.26)
+
+- Allow TLS session keylogging via tuning param `danger_tls_keylog` = `env_keylog`, and environment variable `SSLKEYLOGFILE` (See kitsune\_p2p crate api documentation). [\#1261](https://github.com/holochain/holochain/pull/1261)
+
+## [kitsune\_p2p\_proxy-0.0.20](crates/kitsune_p2p_proxy/CHANGELOG.md#0.0.20)
+
+## [kitsune\_p2p\_transport\_quic-0.0.20](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.0.20)
+
+## [kitsune\_p2p\_types-0.0.20](crates/kitsune_p2p_types/CHANGELOG.md#0.0.20)
+
+# 20220303.215755
+
+## [holochain-0.0.128](crates/holochain/CHANGELOG.md#0.0.128)
+
+- Proxy server chosen from bootstrap server proxy\_list [1242](https://github.com/holochain/holochain/pull/1242)
+
+<!-- end list -->
+
+``` yaml
+network:
+  transport_pool:
+    - type: proxy
+      proxy_config:
+        type: remote_proxy_client_from_bootstrap
+        bootstrap_url: https://bootstrap.holo.host
+        fallback_proxy_url: ~
+```
+
+## [holochain\_test\_wasm\_common-0.0.24](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.24)
+
+## [holochain\_cascade-0.0.28](crates/holochain_cascade/CHANGELOG.md#0.0.28)
+
+## [holochain\_cli\_sandbox-0.0.25](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.25)
+
+## [holochain\_websocket-0.0.28](crates/holochain_websocket/CHANGELOG.md#0.0.28)
+
+## [holochain\_conductor\_api-0.0.28](crates/holochain_conductor_api/CHANGELOG.md#0.0.28)
+
+## [holochain\_state-0.0.28](crates/holochain_state/CHANGELOG.md#0.0.28)
+
+## [holochain\_wasm\_test\_utils-0.0.28](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.28)
+
+## [holochain\_p2p-0.0.28](crates/holochain_p2p/CHANGELOG.md#0.0.28)
+
+## [kitsune\_p2p\_bootstrap-0.0.4](crates/kitsune_p2p_bootstrap/CHANGELOG.md#0.0.4)
+
+## [holochain\_cli-0.0.29](crates/holochain_cli/CHANGELOG.md#0.0.29)
+
+## [holochain\_cli\_bundle-0.0.24](crates/holochain_cli_bundle/CHANGELOG.md#0.0.24)
+
+## [holochain\_types-0.0.28](crates/holochain_types/CHANGELOG.md#0.0.28)
+
+## [holochain\_keystore-0.0.28](crates/holochain_keystore/CHANGELOG.md#0.0.28)
+
+## [holochain\_sqlite-0.0.28](crates/holochain_sqlite/CHANGELOG.md#0.0.28)
+
+## [kitsune\_p2p-0.0.25](crates/kitsune_p2p/CHANGELOG.md#0.0.25)
+
+- BREAKING: Gossip messages no longer contain the hash of the ops being gossiped. This is a breaking protocol change.
+- Removed the unmaintained “simple-bloom” gossip module in favor of “sharded-gossip”
+
+## [kitsune\_p2p\_proxy-0.0.19](crates/kitsune_p2p_proxy/CHANGELOG.md#0.0.19)
+
+## [kitsune\_p2p\_transport\_quic-0.0.19](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.0.19)
+
+## [kitsune\_p2p\_types-0.0.19](crates/kitsune_p2p_types/CHANGELOG.md#0.0.19)
+
+## [kitsune\_p2p\_mdns-0.0.3](crates/kitsune_p2p_mdns/CHANGELOG.md#0.0.3)
+
+## [mr\_bundle-0.0.8](crates/mr_bundle/CHANGELOG.md#0.0.8)
+
+## [holochain\_util-0.0.8](crates/holochain_util/CHANGELOG.md#0.0.8)
+
+## [hdk-0.0.124](crates/hdk/CHANGELOG.md#0.0.124)
+
+## [hdk\_derive-0.0.26](crates/hdk_derive/CHANGELOG.md#0.0.26)
+
+## [holochain\_zome\_types-0.0.26](crates/holochain_zome_types/CHANGELOG.md#0.0.26)
+
+## [kitsune\_p2p\_timestamp-0.0.7](crates/kitsune_p2p_timestamp/CHANGELOG.md#0.0.7)
+
+## [holo\_hash-0.0.21](crates/holo_hash/CHANGELOG.md#0.0.21)
+
+## [kitsune\_p2p\_dht\_arc-0.0.10](crates/kitsune_p2p_dht_arc/CHANGELOG.md#0.0.10)
+
+## [fixt-0.0.9](crates/fixt/CHANGELOG.md#0.0.9)
+
 # 20220223.090000
 
 ## [holochain-0.0.127](crates/holochain/CHANGELOG.md#0.0.127)

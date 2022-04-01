@@ -17,9 +17,8 @@ use holochain_types::prelude::*;
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::mpsc::OwnedPermit;
 use tracing::*;
-
-/// The concrete implementation of [CellConductorApiT], which is used to give
-/// Cells an API for calling back to their [Conductor].
+/// The concrete implementation of [`CellConductorApiT`], which is used to give
+/// Cells an API for calling back to their [`Conductor`](crate::conductor::Conductor).
 #[derive(Clone)]
 pub struct CellConductorApi {
     conductor_handle: ConductorHandle,
@@ -111,7 +110,8 @@ impl CellConductorApiT for CellConductorApi {
 
 /// The "internal" Conductor API interface, for a Cell to talk to its calling Conductor.
 #[async_trait]
-pub trait CellConductorApiT: Clone + Send + Sync + Sized {
+#[mockall::automock]
+pub trait CellConductorApiT: Send + Sync + Sized {
     /// Get this cell id
     fn cell_id(&self) -> &CellId;
 
@@ -134,16 +134,16 @@ pub trait CellConductorApiT: Clone + Send + Sync + Sized {
     /// attached app interface
     async fn signal_broadcaster(&self) -> SignalBroadcaster;
 
-    /// Get a [Dna] from the [DnaStore]
+    /// Get a [`Dna`](holochain_types::prelude::Dna) from the [`DnaStore`](crate::conductor::dna_store::DnaStore)
     fn get_dna(&self, dna_hash: &DnaHash) -> Option<DnaFile>;
 
-    /// Get the [Dna] of this cell from the [DnaStore]
+    /// Get the [`Dna`](holochain_types::prelude::Dna) of this cell from the [`DnaStore`](crate::conductor::dna_store::DnaStore)
     fn get_this_dna(&self) -> ConductorApiResult<DnaFile>;
 
-    /// Get a [Zome] from this cell's Dna
+    /// Get a [`Zome`](holochain_types::prelude::Zome) from this cell's Dna
     fn get_zome(&self, dna_hash: &DnaHash, zome_name: &ZomeName) -> ConductorApiResult<Zome>;
 
-    /// Get a [EntryDef] from the [EntryDefBuf]
+    /// Get a [`EntryDef`](holochain_zome_types::EntryDef) from the [`EntryDefBufferKey`](holochain_types::dna::EntryDefBufferKey)
     fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef>;
 
     /// Turn this into a call zome handle

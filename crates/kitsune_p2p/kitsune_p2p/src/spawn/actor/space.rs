@@ -5,7 +5,7 @@ use ghost_actor::dependencies::tracing;
 use kitsune_p2p_mdns::*;
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use kitsune_p2p_types::codec::{rmp_decode, rmp_encode};
-use kitsune_p2p_types::dht_arc::{DhtArc, DhtArcSet};
+use kitsune_p2p_types::dht_arc::{DhtArc, DhtArcRange, DhtArcSet};
 use kitsune_p2p_types::tx2::tx2_utils::TxUrl;
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::AtomicBool;
@@ -80,6 +80,7 @@ ghost_actor::ghost_chan! {
 pub(crate) async fn spawn_space(
     space: Arc<KitsuneSpace>,
     ep_hnd: Tx2EpHnd<wire::Wire>,
+    host: HostApi,
     config: Arc<KitsuneP2pConfig>,
     bandwidth_throttles: BandwidthThrottles,
     parallel_notify_permit: Arc<tokio::sync::Semaphore>,
@@ -106,6 +107,7 @@ pub(crate) async fn spawn_space(
         space,
         i_s.clone(),
         evt_send,
+        host,
         ep_hnd,
         config,
         bandwidth_throttles,
@@ -303,8 +305,8 @@ impl SpaceInternalHandler for Space {
         let mut local_agent_info_events = Vec::new();
         match destination {
             BroadcastTo::Notify => {
-                for agent in self.local_joined_agents.iter().cloned() {
-                    if let Some(arc) = self.agent_arcs.get(&agent) {
+                for agent in self.local_joined_agents.iter() {
+                    if let Some(arc) = self.agent_arcs.get(agent) {
                         if arc.contains(basis.get_loc()) {
                             let fut = self.evt_sender.notify(
                                 space.clone(),
@@ -592,7 +594,11 @@ impl KitsuneP2pHandler for Space {
         &mut self,
         space: Arc<KitsuneSpace>,
         agent: Arc<KitsuneAgent>,
+        initial_arc: Option<DhtArc>,
     ) -> KitsuneP2pHandlerResult<()> {
+        if let Some(initial_arc) = initial_arc {
+            self.agent_arcs.insert(agent.clone(), initial_arc);
+        }
         self.local_joined_agents.insert(agent.clone());
         for module in self.gossip_mod.values() {
             module.local_agent_join(agent.clone());
@@ -768,8 +774,8 @@ impl KitsuneP2pHandler for Space {
         let mut local_agent_info_events = Vec::new();
         match destination {
             BroadcastTo::Notify => {
-                for agent in self.local_joined_agents.iter().cloned() {
-                    if let Some(arc) = self.agent_arcs.get(&agent) {
+                for agent in self.local_joined_agents.iter() {
+                    if let Some(arc) = self.agent_arcs.get(agent) {
                         if arc.contains(basis.get_loc()) {
                             let fut = self.evt_sender.notify(
                                 space.clone(),
@@ -1053,6 +1059,7 @@ pub(crate) struct SpaceReadOnlyInner {
     #[allow(dead_code)]
     pub(crate) i_s: ghost_actor::GhostSender<SpaceInternal>,
     pub(crate) evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
+    pub(crate) host_api: HostApi,
     pub(crate) ep_hnd: Tx2EpHnd<wire::Wire>,
     #[allow(dead_code)]
     pub(crate) config: Arc<KitsuneP2pConfig>,
@@ -1068,6 +1075,7 @@ pub(crate) struct Space {
     pub(crate) space: Arc<KitsuneSpace>,
     pub(crate) i_s: ghost_actor::GhostSender<SpaceInternal>,
     pub(crate) evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
+    pub(crate) _host_api: HostApi,
     pub(crate) local_joined_agents: HashSet<Arc<KitsuneAgent>>,
     pub(crate) agent_arcs: HashMap<Arc<KitsuneAgent>, DhtArc>,
     pub(crate) config: Arc<KitsuneP2pConfig>,
@@ -1083,6 +1091,7 @@ impl Space {
         space: Arc<KitsuneSpace>,
         i_s: ghost_actor::GhostSender<SpaceInternal>,
         evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
+        host_api: HostApi,
         ep_hnd: Tx2EpHnd<wire::Wire>,
         config: Arc<KitsuneP2pConfig>,
         bandwidth_throttles: BandwidthThrottles,
@@ -1093,7 +1102,7 @@ impl Space {
         {
             let space = space.clone();
             let metrics = metrics.clone();
-            let evt_sender = evt_sender.clone();
+            let host = host_api.clone();
             tokio::task::spawn(async move {
                 loop {
                     tokio::time::sleep(std::time::Duration::from_millis(
@@ -1103,12 +1112,7 @@ impl Space {
 
                     let records = metrics.read().dump_historical();
 
-                    let _ = evt_sender
-                        .k_gen_req(KGenReq::RecordMetrics {
-                            space: space.clone(),
-                            records,
-                        })
-                        .await;
+                    let _ = host.record_metrics(space.clone(), records).await;
                 }
             });
         }
@@ -1116,7 +1120,7 @@ impl Space {
         let metric_exchange = MetricExchangeSync::spawn(
             space.clone(),
             config.tuning_params.clone(),
-            evt_sender.clone(),
+            host_api.clone(),
             metrics.clone(),
         );
 
@@ -1150,6 +1154,7 @@ impl Space {
                         space.clone(),
                         ep_hnd.clone(),
                         evt_sender.clone(),
+                        host_api.clone(),
                         metrics.clone(),
                     ),
                 )
@@ -1238,6 +1243,7 @@ impl Space {
             space: space.clone(),
             i_s: i_s.clone(),
             evt_sender: evt_sender.clone(),
+            host_api: host_api.clone(),
             ep_hnd,
             config: config.clone(),
             parallel_notify_permit,
@@ -1250,6 +1256,7 @@ impl Space {
             space,
             i_s,
             evt_sender,
+            _host_api: host_api,
             local_joined_agents: HashSet::new(),
             agent_arcs: HashMap::new(),
             config,
@@ -1263,7 +1270,7 @@ impl Space {
         let arc_set = self
             .agent_arcs
             .iter()
-            .map(|(_, a)| DhtArcSet::from_interval(a.interval()))
+            .map(|(_, a)| DhtArcSet::from_interval(DhtArcRange::from(a)))
             .fold(DhtArcSet::new_empty(), |a, i| a.union(&i));
         self.ro_inner.metric_exchange.write().update_arcset(arc_set);
     }
@@ -1353,6 +1360,9 @@ impl Space {
         } else {
             // TODO: We are simply setting the initial arc to full.
             // In the future we may want to do something more intelligent.
+            //
+            // In the case an initial_arc is passend into the join request,
+            // handle_join will initialize this agent_arcs map to that value.
             self.agent_arcs
                 .get(agent)
                 .cloned()

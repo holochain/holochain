@@ -125,14 +125,14 @@ where
     pub fn with_network<N: HolochainP2pDnaT + Clone>(
         self,
         network: N,
-        cache_env: DbWrite<DbKindCache>,
+        cache_db: DbWrite<DbKindCache>,
     ) -> Cascade<N> {
         Cascade {
             authored: self.authored,
             dht: self.dht,
             scratch: self.scratch,
             private_data: self.private_data,
-            cache: Some(cache_env),
+            cache: Some(cache_db),
             network: Some(network),
         }
     }
@@ -197,7 +197,7 @@ impl<Network> Cascade<Network>
 where
     Network: HolochainP2pDnaT + Clone + 'static + Send,
 {
-    fn insert_rendered_op(txn: &mut Transaction, op: RenderedOp) -> CascadeResult<()> {
+    fn insert_rendered_op(txn: &mut Transaction, op: &RenderedOp) -> CascadeResult<()> {
         let RenderedOp {
             op_light,
             op_hash,
@@ -207,9 +207,9 @@ where
         let op_order = OpOrder::new(op_light.get_type(), header.header().timestamp());
         let timestamp = header.header().timestamp();
         insert_header(txn, header)?;
-        insert_op_lite(txn, op_light, op_hash.clone(), op_order, timestamp)?;
+        insert_op_lite(txn, op_light, op_hash, &op_order, &timestamp)?;
         if let Some(status) = validation_status {
-            set_validation_status(txn, op_hash.clone(), status)?;
+            set_validation_status(txn, op_hash, *status)?;
         }
         // We set the integrated to for the cache so it can match the
         // same query as the vault. This can also be used for garbage collection.
@@ -217,10 +217,10 @@ where
         Ok(())
     }
 
-    fn insert_rendered_ops(txn: &mut Transaction, ops: RenderedOps) -> CascadeResult<()> {
+    fn insert_rendered_ops(txn: &mut Transaction, ops: &RenderedOps) -> CascadeResult<()> {
         let RenderedOps { ops, entry } = ops;
         if let Some(entry) = entry {
-            insert_entry(txn, entry)?;
+            insert_entry(txn, entry.as_hash(), entry.as_content())?;
         }
         for op in ops {
             Self::insert_rendered_op(txn, op)?;
@@ -234,7 +234,7 @@ where
             .async_commit(|txn| {
                 for response in responses {
                     let ops = response.render()?;
-                    Self::insert_rendered_ops(txn, ops)?;
+                    Self::insert_rendered_ops(txn, &ops)?;
                 }
                 CascadeResult::Ok(())
             })
@@ -252,7 +252,7 @@ where
             .async_commit(move |txn| {
                 for response in responses {
                     let ops = response.render(&key)?;
-                    Self::insert_rendered_ops(txn, ops)?;
+                    Self::insert_rendered_ops(txn, &ops)?;
                 }
                 CascadeResult::Ok(())
             })

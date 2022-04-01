@@ -13,7 +13,6 @@ pub mod wasm;
 pub use dna_bundle::*;
 pub use dna_file::*;
 pub use dna_manifest::*;
-pub use dna_store::MockDnaStore;
 pub use dna_store::*;
 pub use error::DnaError;
 pub use holo_hash::*;

@@ -6,7 +6,7 @@ use crate::agent_store::AgentInfoSigned;
 use crate::gossip::{decode_bloom_filter, encode_bloom_filter};
 use crate::types::event::*;
 use crate::types::gossip::*;
-use crate::types::*;
+use crate::{types::*, HostApi};
 use ghost_actor::dependencies::tracing;
 use governor::clock::DefaultClock;
 use governor::state::{InMemoryState, NotKeyed};
@@ -14,7 +14,7 @@ use governor::RateLimiter;
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::codec::Codec;
 use kitsune_p2p_types::config::*;
-use kitsune_p2p_types::dht_arc::{ArcInterval, DhtArcSet};
+use kitsune_p2p_types::dht_arc::{DhtArcRange, DhtArcSet};
 use kitsune_p2p_types::metrics::*;
 use kitsune_p2p_types::tx2::tx2_api::*;
 use kitsune_p2p_types::tx2::tx2_utils::*;
@@ -146,11 +146,13 @@ impl Stats {
 
 impl ShardedGossip {
     /// Constructor
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         tuning_params: KitsuneP2pTuningParams,
         space: Arc<KitsuneSpace>,
         ep_hnd: Tx2EpHnd<wire::Wire>,
         evt_sender: EventSender,
+        host: HostApi,
         gossip_type: GossipType,
         bandwidth: Arc<BandwidthThrottle>,
         metrics: MetricsSync,
@@ -162,6 +164,7 @@ impl ShardedGossip {
                 tuning_params,
                 space,
                 evt_sender,
+                _host: host,
                 inner: Share::new(ShardedGossipLocalState::new(metrics)),
                 gossip_type,
                 closing: AtomicBool::new(false),
@@ -342,6 +345,7 @@ pub struct ShardedGossipLocal {
     tuning_params: KitsuneP2pTuningParams,
     space: Arc<KitsuneSpace>,
     evt_sender: EventSender,
+    _host: HostApi,
     inner: Share<ShardedGossipLocalState>,
     closing: AtomicBool,
 }
@@ -905,7 +909,7 @@ kitsune_p2p_types::write_codec_enum! {
         Initiate(0x10) {
             /// The list of arc intervals (equivalent to a [`DhtArcSet`])
             /// for all local agents
-            intervals.0: Vec<ArcInterval>,
+            intervals.0: Vec<DhtArcRange>,
             /// A random number to resolve concurrent initiates.
             id.1: u32,
             /// List of active local agents represented by this node.
@@ -916,7 +920,7 @@ kitsune_p2p_types::write_codec_enum! {
         Accept(0x20) {
             /// The list of arc intervals (equivalent to a [`DhtArcSet`])
             /// for all local agents
-            intervals.0: Vec<ArcInterval>,
+            intervals.0: Vec<DhtArcRange>,
             /// List of active local agents represented by this node.
             agent_list.1: Vec<AgentInfoSigned>,
         },
@@ -1080,6 +1084,7 @@ impl AsGossipModuleFactory for ShardedRecentGossipFactory {
         space: Arc<KitsuneSpace>,
         ep_hnd: Tx2EpHnd<wire::Wire>,
         evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
+        host: HostApi,
         metrics: MetricsSync,
     ) -> GossipModule {
         GossipModule(ShardedGossip::new(
@@ -1087,6 +1092,7 @@ impl AsGossipModuleFactory for ShardedRecentGossipFactory {
             space,
             ep_hnd,
             evt_sender,
+            host,
             GossipType::Recent,
             self.bandwidth.clone(),
             metrics,
@@ -1111,6 +1117,7 @@ impl AsGossipModuleFactory for ShardedHistoricalGossipFactory {
         space: Arc<KitsuneSpace>,
         ep_hnd: Tx2EpHnd<wire::Wire>,
         evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
+        host: HostApi,
         metrics: MetricsSync,
     ) -> GossipModule {
         GossipModule(ShardedGossip::new(
@@ -1118,6 +1125,7 @@ impl AsGossipModuleFactory for ShardedHistoricalGossipFactory {
             space,
             ep_hnd,
             evt_sender,
+            host,
             GossipType::Historical,
             self.bandwidth.clone(),
             metrics,

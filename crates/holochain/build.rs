@@ -71,9 +71,10 @@ mod version_info {
         use std::str::FromStr;
         use toml::Value;
 
-        let manifest_path = std::path::PathBuf::from_str(env!("CARGO_MANIFEST_DIR"))
-            .unwrap()
-            .join("Cargo.toml");
+        let manifest_path =
+            std::path::PathBuf::from_str(option_env!("CARGO_MANIFEST_DIR").unwrap_or("."))
+                .unwrap()
+                .join("Cargo.toml");
         let manifest = std::fs::read_to_string(&manifest_path)
             .unwrap_or_else(|e| panic!("reading {:?}: {}", &manifest_path, e));
 

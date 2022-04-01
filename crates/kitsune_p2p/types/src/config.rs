@@ -183,6 +183,15 @@ pub mod tuning_params_struct {
         /// multiplied by 2x on every loop)
         /// [Default: 200 ms]
         tx2_initial_connect_retry_delay_ms: usize = 200,
+
+        /// if you would like to be able to use an external tool
+        /// to debug the QUIC messages sent and received by kitsune
+        /// you'll need the decryption keys.
+        /// The default of `"no_keylog"` is secure and will not write any keys
+        /// Setting this to `"env_keylog"` will write to a keylog specified
+        /// by the `SSLKEYLOGFILE` environment variable, or do nothing if
+        /// it is not set, or is not writable.
+        danger_tls_keylog: String = "no_keylog".to_string(),
     }
 
     impl KitsuneP2pTuningParams {
@@ -190,6 +199,12 @@ pub mod tuning_params_struct {
         /// based on the tuning parameter tx2_implicit_timeout_ms
         pub fn implicit_timeout(&self) -> crate::KitsuneTimeout {
             crate::KitsuneTimeout::from_millis(self.tx2_implicit_timeout_ms as u64)
+        }
+
+        /// returns true if we should initialize a tls keylog
+        /// based on the `SSLKEYLOGFILE` environment variable
+        pub fn use_env_tls_keylog(&self) -> bool {
+            self.danger_tls_keylog == "env_keylog"
         }
     }
 }

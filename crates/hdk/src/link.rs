@@ -2,8 +2,8 @@ use crate::prelude::*;
 
 #[repr(u8)]
 pub enum HdkLinkType {
-    Path = u8::MAX - 1,
-    Default = u8::MAX,
+    Paths = u8::MAX - 1,
+    Any = u8::MAX,
 }
 
 impl From<HdkLinkType> for LinkType {

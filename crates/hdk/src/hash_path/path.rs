@@ -294,7 +294,7 @@ impl Path {
                 create_link(
                     parent.path_entry_hash()?,
                     self.path_entry_hash()?,
-                    HdkLinkType::Path,
+                    HdkLinkType::Paths,
                     LinkTag::new(match self.leaf() {
                         None => <Vec<u8>>::with_capacity(0),
                         Some(component) => {
@@ -340,7 +340,7 @@ impl Path {
         let components: ExternResult<Vec<Option<Component>>> = children
             .into_iter()
             .map(|link| {
-                let component_bytes = &link.tag.0[1..];
+                let component_bytes = &link.tag.0[..];
                 if component_bytes.is_empty() {
                     Ok(None)
                 } else {

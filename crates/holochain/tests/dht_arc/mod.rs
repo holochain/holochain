@@ -17,7 +17,7 @@ async fn get_peers(num: usize, half_lens: &[u32], keystore: MetaLairClient) -> V
     let agents = SweetAgents::get(keystore, num).await;
     for agent in agents {
         let agent = holochain_p2p::agent_holo_to_kit(agent);
-        let arc = DhtArc::new(agent.get_loc(), *half_lens.next().unwrap());
+        let arc = DhtArc::from_start_and_half_len(agent.get_loc(), *half_lens.next().unwrap());
         out.push(arc);
     }
     out

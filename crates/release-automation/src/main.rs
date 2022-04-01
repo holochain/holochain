@@ -99,6 +99,9 @@ pub(crate) mod cli {
 
         #[structopt(long, default_value = "warn")]
         pub(crate) log_level: log::Level,
+
+        #[structopt(long, default_value = "release_automation=info")]
+        pub(crate) log_filters: String,
     }
 
     #[derive(Debug, StructOpt)]
@@ -280,6 +283,14 @@ pub(crate) mod cli {
         /// Paths to manifest that will also be considered when updating the Cargo.lock files
         #[structopt(long)]
         pub(crate) additional_manifests: Vec<String>,
+
+        #[structopt(
+            long,
+            default_value = crate_::MINIMUM_CRATE_OWNERS,
+            use_delimiter = true,
+            multiple = false,
+        )]
+        pub(crate) minimum_crate_owners: Vec<String>,
     }
 
     /// Parses a commad separated input string to a set of strings.
@@ -301,10 +312,12 @@ pub(crate) mod cli {
 
         input
             .split(',')
+            .map(str::trim)
             .filter(|s| !s.is_empty())
             .map(|csf| {
-                ReleaseSteps::from_str(csf)
-                    .map_err(|_| anyhow::anyhow!("could not parse '{}' as ReleaseSteps", input))
+                ReleaseSteps::from_str(csf).map_err(|_| {
+                    anyhow::anyhow!("could not parse '{}' in '{}' as ReleaseSteps:", csf, input)
+                })
             })
             .try_fold(
                 Default::default(),
@@ -322,6 +335,7 @@ fn main() -> CommandResult {
     env_logger::builder()
         .filter_level(args.log_level.to_level_filter())
         .filter(Some("cargo::core::workspace"), log::LevelFilter::Error)
+        .parse_filters(&args.log_filters)
         .format_timestamp(None)
         .init();
 

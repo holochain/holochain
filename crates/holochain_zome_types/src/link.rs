@@ -29,12 +29,6 @@ impl LinkType {
     }
 }
 
-impl From<u8> for LinkType {
-    fn from(u: u8) -> Self {
-        Self(u)
-    }
-}
-
 /// Opaque tag for the link applied at the app layer, used to differentiate
 /// between different semantics and validation rules for different links
 #[derive(

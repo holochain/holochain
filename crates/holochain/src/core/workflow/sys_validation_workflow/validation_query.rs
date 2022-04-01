@@ -1,10 +1,10 @@
 use holo_hash::DhtOpHash;
 use holochain_sqlite::db::DbKindDht;
 use holochain_state::query::prelude::*;
+use holochain_types::db::DbRead;
 use holochain_types::dht_op::DhtOp;
 use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::dht_op::DhtOpType;
-use holochain_types::env::DbRead;
 use holochain_zome_types::Entry;
 use holochain_zome_types::SignedHeader;
 
@@ -12,29 +12,29 @@ use crate::core::workflow::error::WorkflowResult;
 
 /// Get all ops that need to sys or app validated in order.
 /// - Sys validated or awaiting app dependencies.
-/// - Ordered by type then timestamp (See [`DhtOpOrder`])
-pub async fn get_ops_to_app_validate(env: &DbRead<DbKindDht>) -> WorkflowResult<Vec<DhtOpHashed>> {
-    get_ops_to_validate(env, false).await
+/// - Ordered by type then timestamp (See [`DhtOpOrder`](crate::core::validation::DhtOpOrder))
+pub async fn get_ops_to_app_validate(db: &DbRead<DbKindDht>) -> WorkflowResult<Vec<DhtOpHashed>> {
+    get_ops_to_validate(db, false).await
 }
 
 /// Get all ops that need to sys or app validated in order.
 /// - Pending or awaiting sys dependencies.
-/// - Ordered by type then timestamp (See [`DhtOpOrder`])
-pub async fn get_ops_to_sys_validate(env: &DbRead<DbKindDht>) -> WorkflowResult<Vec<DhtOpHashed>> {
-    get_ops_to_validate(env, true).await
+/// - Ordered by type then timestamp (See [`DhtOpOrder`](crate::core::validation::DhtOpOrder))
+pub async fn get_ops_to_sys_validate(db: &DbRead<DbKindDht>) -> WorkflowResult<Vec<DhtOpHashed>> {
+    get_ops_to_validate(db, true).await
 }
 
 async fn get_ops_to_validate(
-    env: &DbRead<DbKindDht>,
+    db: &DbRead<DbKindDht>,
     system: bool,
 ) -> WorkflowResult<Vec<DhtOpHashed>> {
     let mut sql = "
-        SELECT 
+        SELECT
         Header.blob as header_blob,
         Entry.blob as entry_blob,
         DhtOp.type as dht_type,
         DhtOp.hash as dht_hash
-        FROM DhtOp 
+        FROM DhtOp
         JOIN
         Header ON DhtOp.header_hash = Header.hash
         LEFT JOIN
@@ -72,13 +72,13 @@ async fn get_ops_to_validate(
     // Once we impl abandoned this won't happen anyway.
     sql.push_str(
         "
-        ORDER BY 
+        ORDER BY
         DhtOp.num_validation_attempts ASC,
         DhtOp.op_order ASC
         LIMIT 10000
         ",
     );
-    env.async_reader(move |txn| {
+    db.async_reader(move |txn| {
         let mut stmt = txn.prepare(&sql)?;
         let r = stmt.query_and_then([], |row| {
             let header = from_blob::<SignedHeader>(row.get("header_blob")?)?;
@@ -135,9 +135,9 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn sys_validation_query() {
         observability::test_run().ok();
-        let env = test_dht_env();
-        let expected = test_data(&env.env().into());
-        let r = get_ops_to_validate(&env.env().into(), true).await.unwrap();
+        let db = test_dht_db();
+        let expected = test_data(&db.to_db().into());
+        let r = get_ops_to_validate(&db.to_db().into(), true).await.unwrap();
         let mut r_sorted = r.clone();
         // Sorted by OpOrder
         r_sorted.sort_by_key(|d| {
@@ -151,26 +151,26 @@ mod tests {
         }
     }
 
-    fn create_and_insert_op(env: &DbWrite<DbKindDht>, facts: Facts) -> DhtOpHashed {
+    fn create_and_insert_op(db: &DbWrite<DbKindDht>, facts: Facts) -> DhtOpHashed {
         let state = DhtOpHashed::from_content_sync(DhtOp::RegisterAgentActivity(
             fixt!(Signature),
             fixt!(Header),
         ));
 
-        env.conn()
+        db.conn()
             .unwrap()
             .with_commit_sync(|txn| {
                 let hash = state.as_hash().clone();
-                insert_op(txn, state.clone()).unwrap();
+                insert_op(txn, &state).unwrap();
                 if facts.has_validation_status {
-                    set_validation_status(txn, hash.clone(), ValidationStatus::Valid).unwrap();
+                    set_validation_status(txn, &hash, ValidationStatus::Valid).unwrap();
                 }
                 if facts.pending {
                     // No need to do anything because status and stage are null already.
                 } else if facts.awaiting_sys_deps {
                     set_validation_stage(
                         txn,
-                        hash,
+                        &hash,
                         ValidationLimboStatus::AwaitingSysDeps(fixt!(AnyDhtHash)),
                     )
                     .unwrap();
@@ -182,7 +182,7 @@ mod tests {
         state
     }
 
-    fn test_data(env: &DbWrite<DbKindDht>) -> Expected {
+    fn test_data(db: &DbWrite<DbKindDht>) -> Expected {
         let mut results = Vec::new();
         // We **do** expect any of these in the results:
         let facts = Facts {
@@ -191,7 +191,7 @@ mod tests {
             has_validation_status: false,
         };
         for _ in 0..20 {
-            let op = create_and_insert_op(env, facts);
+            let op = create_and_insert_op(db, facts);
             results.push(op);
         }
 
@@ -201,7 +201,7 @@ mod tests {
             has_validation_status: false,
         };
         for _ in 0..20 {
-            let op = create_and_insert_op(env, facts);
+            let op = create_and_insert_op(db, facts);
             results.push(op);
         }
 
@@ -212,7 +212,7 @@ mod tests {
             has_validation_status: true,
         };
         for _ in 0..20 {
-            create_and_insert_op(env, facts);
+            create_and_insert_op(db, facts);
         }
 
         Expected { results }
@@ -224,21 +224,21 @@ mod tests {
         observability::test_run().ok();
         let mut u = Unstructured::new(&NOISE);
 
-        let env = test_dht_env();
-        let env = env.env();
+        let db = test_dht_db();
+        let db = db.to_db();
         let op = DhtOpHashed::from_content_sync(DhtOp::RegisterAgentActivity(
             Signature::arbitrary(&mut u).unwrap(),
             Header::arbitrary(&mut u).unwrap(),
         ));
 
-        env.async_commit(|txn| {
-            insert_op(txn, op)?;
+        db.async_commit(move |txn| {
+            insert_op(txn, &op)?;
             StateMutationResult::Ok(())
         })
         .await
         .unwrap();
 
-        let read: DbRead<_> = env.clone().into();
+        let read: DbRead<_> = db.clone().into();
         let mut read_ops = std::collections::HashSet::new();
         let hashes: Vec<_> = get_ops_to_app_validate(&read)
             .await

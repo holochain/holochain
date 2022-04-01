@@ -1,15 +1,15 @@
-//! Defines [ConductorHandle], a lightweight cloneable reference to a Conductor
+//! Defines [`ConductorHandle`], a lightweight cloneable reference to a Conductor
 //! with a limited public interface.
 //!
-//! A ConductorHandle can be produced via [Conductor::into_handle]
+//! A ConductorHandle can be produced via [`ConductorBuilder`](crate::conductor::ConductorBuilder)
 //!
 //! ```rust, no_run
 //! async fn async_main () {
-//! use holochain_state::test_utils::test_environments;
+//! use holochain_state::test_utils::test_db_dir;
 //! use holochain::conductor::{Conductor, ConductorBuilder, ConductorHandle};
-//! let envs = test_environments();
+//! let env_dir = test_db_dir();
 //! let handle: ConductorHandle = ConductorBuilder::new()
-//!    .test(&envs, &[])
+//!    .test(env_dir.path(), &[])
 //!    .await
 //!    .unwrap();
 //!
@@ -26,7 +26,7 @@
 //!
 //! First, it specifies how to synchronize
 //! read/write access to a single Conductor across multiple references. The various
-//! Conductor APIs - [CellConductorApi], [AdminInterfaceApi], and [AppInterfaceApi],
+//! Conductor APIs - [CellConductorApi](super::api::CellConductorApi), [AdminInterfaceApi](super::api::AdminInterfaceApi), and [AppInterfaceApi](super::api::AppInterfaceApi),
 //! use a ConductorHandle as their sole method of interaction with a Conductor.
 //!
 //! Secondly, it hides the concrete type of the Conductor behind a dyn Trait.
@@ -46,10 +46,10 @@ use super::manager::TaskManagerClient;
 use super::manager::TaskManagerRunHandle;
 use super::p2p_agent_store;
 use super::p2p_agent_store::all_agent_infos;
-use super::p2p_agent_store::get_agent_info_signed;
 use super::p2p_agent_store::inject_agent_infos;
 use super::p2p_agent_store::list_all_agent_info;
 use super::p2p_agent_store::list_all_agent_info_signed_near_basis;
+use super::space::Spaces;
 use super::Cell;
 use super::CellError;
 use super::Conductor;
@@ -65,7 +65,6 @@ use crate::core::workflow::ZomeCallResult;
 use derive_more::From;
 use futures::future::FutureExt;
 use futures::StreamExt;
-use holochain_conductor_api::conductor::EnvironmentRootPath;
 use holochain_conductor_api::AppStatusFilter;
 use holochain_conductor_api::FullStateDump;
 use holochain_conductor_api::InstalledAppInfo;
@@ -76,7 +75,6 @@ use holochain_p2p::event::HolochainP2pEvent;
 use holochain_p2p::event::HolochainP2pEvent::*;
 use holochain_p2p::DnaHashExt;
 use holochain_p2p::HolochainP2pDnaT;
-use holochain_sqlite::conn::DbSyncStrategy;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_state::prelude::SourceChainError;
 use holochain_state::prelude::SourceChainResult;
@@ -85,8 +83,6 @@ use holochain_state::prelude::StateMutationResult;
 use holochain_state::source_chain;
 use holochain_types::prelude::*;
 use kitsune_p2p::agent_store::AgentInfoSigned;
-use kitsune_p2p::event::{KGenReq, KGenRes};
-use kitsune_p2p::KitsuneSpace;
 use kitsune_p2p_types::config::JOIN_NETWORK_TIMEOUT;
 use std::collections::HashMap;
 use std::{collections::HashSet, sync::Arc};
@@ -137,25 +133,25 @@ pub trait ConductorHandleT: Send + Sync {
     /// List the app interfaces currently install.
     async fn list_app_interfaces(&self) -> ConductorResult<Vec<u16>>;
 
-    /// Install a [DnaFile] in this Conductor
+    /// Install a [`DnaFile`](holochain_types::dna::DnaFile) in this Conductor
     async fn register_dna(&self, dna: DnaFile) -> ConductorResult<()>;
 
     /// Get the list of hashes of installed Dnas in this Conductor
     fn list_dnas(&self) -> Vec<DnaHash>;
 
-    /// Get a [DnaDef] from the [DnaStore]
+    /// Get a [`DnaDef`](holochain_types::prelude::DnaDef) from the [`DnaStore`](crate::conductor::dna_store::DnaStore)
     fn get_dna_def(&self, hash: &DnaHash) -> Option<DnaDef>;
 
-    /// Get a [DnaFile] from the [DnaStore]
+    /// Get a [`DnaFile`](holochain_types::dna::DnaFile) from the [`DnaStore`](crate::conductor::dna_store::DnaStore)
     fn get_dna_file(&self, hash: &DnaHash) -> Option<DnaFile>;
 
-    /// Get an instance of a [RealRibosome] for the DnaHash
+    /// Get an instance of a [`RealRibosome`](crate::core::ribosome::real_ribosome::RealRibosome) for the DnaHash
     fn get_ribosome(&self, dna_hash: &DnaHash) -> ConductorResult<RealRibosome>;
 
-    /// Get a [EntryDef] from the [EntryDefBuffer]
+    /// Get an [`EntryDef`](holochain_zome_types::EntryDef) from the [`EntryDefBufferKey`](holochain_types::dna::EntryDefBufferKey)
     fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef>;
 
-    /// Add the [DnaFile]s from the wasm and dna_def databases into memory
+    /// Add the [`DnaFile`](holochain_types::dna::DnaFile)s from the wasm and dna_def databases into memory
     async fn load_dnas(&self) -> ConductorResult<()>;
 
     /// Dispatch a network event to the correct cell.
@@ -196,6 +192,9 @@ pub trait ConductorHandleT: Send + Sync {
 
     /// Request access to this conductor's networking handle
     fn holochain_p2p(&self) -> &holochain_p2p::HolochainP2pRef;
+
+    /// Prune expired agent_infos from the p2p agents database
+    async fn prune_p2p_agents_db(&self) -> ConductorResult<()>;
 
     /// Create a new Cell in an existing App based on an existing DNA
     async fn create_clone_cell(
@@ -345,19 +344,27 @@ pub trait ConductorHandleT: Send + Sync {
 
     /// Retrieve the authored environment for this dna. FOR TESTING ONLY.
     #[cfg(any(test, feature = "test_utils"))]
-    fn get_authored_env(&self, cell_id: &DnaHash) -> ConductorApiResult<DbWrite<DbKindAuthored>>;
+    fn get_authored_db(&self, cell_id: &DnaHash) -> ConductorApiResult<DbWrite<DbKindAuthored>>;
 
     /// Retrieve the dht environment for this dna. FOR TESTING ONLY.
     #[cfg(any(test, feature = "test_utils"))]
-    fn get_dht_env(&self, cell_id: &DnaHash) -> ConductorApiResult<DbWrite<DbKindDht>>;
+    fn get_dht_db(&self, cell_id: &DnaHash) -> ConductorApiResult<DbWrite<DbKindDht>>;
 
     /// Retrieve the database for this cell. FOR TESTING ONLY.
     #[cfg(any(test, feature = "test_utils"))]
-    fn get_cache_env(&self, cell_id: &CellId) -> ConductorApiResult<DbWrite<DbKindCache>>;
+    fn get_cache_db(&self, cell_id: &CellId) -> ConductorApiResult<DbWrite<DbKindCache>>;
 
     /// Retrieve the database for networking. FOR TESTING ONLY.
     #[cfg(any(test, feature = "test_utils"))]
-    fn get_p2p_env(&self, space: Arc<KitsuneSpace>) -> DbWrite<DbKindP2pAgentStore>;
+    fn get_p2p_db(&self, space: &DnaHash) -> DbWrite<DbKindP2pAgents>;
+
+    /// Retrieve the database for metrics. FOR TESTING ONLY.
+    #[cfg(any(test, feature = "test_utils"))]
+    fn get_p2p_metrics_db(&self, space: &DnaHash) -> DbWrite<DbKindP2pMetrics>;
+
+    /// Retrieve the database for networking. FOR TESTING ONLY.
+    #[cfg(any(test, feature = "test_utils"))]
+    fn get_spaces(&self) -> Spaces;
 
     /// Retrieve Senders for triggering workflows. FOR TESTING ONLY.
     #[cfg(any(test, feature = "test_utils"))]
@@ -466,28 +473,8 @@ impl DevSettings {
 /// this could be swapped out with, e.g. a channel Sender/Receiver pair
 /// using an actor model.
 #[derive(From)]
-pub struct ConductorHandleImpl<DS: DnaStore + 'static> {
-    pub(super) conductor: Conductor<DS>,
-    pub(super) keystore: MetaLairClient,
-    pub(super) holochain_p2p: holochain_p2p::HolochainP2pRef,
-
-    /// The root environment directory where all environments are created
-    pub(super) root_env_dir: EnvironmentRootPath,
-
-    /// The database for storing AgentInfoSigned
-    pub(super) p2p_env:
-        Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, DbWrite<DbKindP2pAgentStore>>>>,
-
-    /// The database for storing p2p MetricDatum(s)
-    pub(super) p2p_metrics_env:
-        Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, DbWrite<DbKindP2pMetrics>>>>,
-
-    /// Database sync level
-    pub(super) db_sync_strategy: DbSyncStrategy,
-
-    /// The batch sender for writes to the p2p database.
-    pub(super) p2p_batch_senders:
-        Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, tokio::sync::mpsc::Sender<P2pBatch>>>>,
+pub struct ConductorHandleImpl {
+    pub(super) conductor: Conductor,
 
     // This is only available in tests currently, but could be extended to
     // normal usage.
@@ -497,7 +484,7 @@ pub struct ConductorHandleImpl<DS: DnaStore + 'static> {
 }
 
 #[async_trait::async_trait]
-impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
+impl ConductorHandleT for ConductorHandleImpl {
     /// Check that shutdown has not been called
     fn check_running(&self) -> ConductorResult<()> {
         self.conductor.check_running()
@@ -603,51 +590,13 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         &self,
         event: holochain_p2p::event::HolochainP2pEvent,
     ) -> ConductorApiResult<()> {
-        let space = event.dna_hash().to_kitsune();
+        let dna_hash = event.dna_hash().clone();
         trace!(dispatch_event = ?event);
         match event {
-            holochain_p2p::event::HolochainP2pEvent::KGenReq { arg, respond, .. } => match arg {
-                KGenReq::PeerExtrapCov { space, dht_arc_set } => {
-                    let env = { self.p2p_env(space) };
-                    respond.respond(Ok(async move {
-                        use holochain_sqlite::db::AsP2pAgentStoreConExt;
-                        let permit = env.conn_permit().await;
-                        let res = tokio::task::spawn_blocking(move || {
-                            let mut conn = env.from_permit(permit)?;
-                            conn.p2p_extrapolated_coverage(dht_arc_set)
-                        })
-                        .await;
-                        let res = res
-                            .map_err(holochain_p2p::HolochainP2pError::other)
-                            .and_then(|r| r.map_err(holochain_p2p::HolochainP2pError::other))?;
-                        Ok(KGenRes::PeerExtrapCov(res))
-                    }
-                    .boxed()
-                    .into()));
-                }
-                KGenReq::RecordMetrics { space, records } => {
-                    let env = { self.p2p_metrics_env(space) };
-                    respond.respond(Ok(async move {
-                        use holochain_sqlite::db::AsP2pMetricStoreConExt;
-                        let permit = env.conn_permit().await;
-                        let res = tokio::task::spawn_blocking(move || {
-                            let mut conn = env.from_permit(permit)?;
-                            conn.p2p_log_metrics(records)
-                        })
-                        .await;
-                        let res = res
-                            .map_err(holochain_p2p::HolochainP2pError::other)
-                            .and_then(|r| r.map_err(holochain_p2p::HolochainP2pError::other))?;
-                        Ok(KGenRes::RecordMetrics(res))
-                    }
-                    .boxed()
-                    .into()));
-                }
-            },
             PutAgentInfoSigned {
                 peer_data, respond, ..
             } => {
-                let sender = self.p2p_batch_sender(space);
+                let sender = self.p2p_batch_sender(&dna_hash);
                 let (result_sender, response) = tokio::sync::oneshot::channel();
                 let _ = sender
                     .send(P2pBatch {
@@ -661,26 +610,14 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                 };
                 respond.respond(Ok(async move { res }.boxed().into()));
             }
-            GetAgentInfoSigned {
-                kitsune_space,
-                kitsune_agent,
-                respond,
-                ..
-            } => {
-                let env = { self.p2p_env(space) };
-                let res = get_agent_info_signed(env.into(), kitsune_space, kitsune_agent)
-                    .await
-                    .map_err(holochain_p2p::HolochainP2pError::other);
-                respond.respond(Ok(async move { res }.boxed().into()));
-            }
             QueryAgentInfoSigned {
                 kitsune_space,
                 agents,
                 respond,
                 ..
             } => {
-                let env = { self.p2p_env(space) };
-                let res = list_all_agent_info(env.into(), kitsune_space)
+                let db = { self.p2p_agents_db(&dna_hash) };
+                let res = list_all_agent_info(db.into(), kitsune_space)
                     .await
                     .map(|infos| match agents {
                         Some(agents) => infos
@@ -700,10 +637,10 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                 ..
             } => {
                 use holochain_sqlite::db::AsP2pAgentStoreConExt;
-                let env = { self.p2p_env(space) };
-                let permit = env.conn_permit().await;
+                let db = { self.p2p_agents_db(&dna_hash) };
+                let permit = db.conn_permit().await;
                 let res = tokio::task::spawn_blocking(move || {
-                    let mut conn = env.from_permit(permit)?;
+                    let mut conn = db.from_permit(permit)?;
                     conn.p2p_gossip_query_agents(since_ms, until_ms, (*arc_set).clone())
                 })
                 .await;
@@ -719,9 +656,9 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                 respond,
                 ..
             } => {
-                let env = { self.p2p_env(space) };
+                let db = { self.p2p_agents_db(&dna_hash) };
                 let res = list_all_agent_info_signed_near_basis(
-                    env.into(),
+                    db.into(),
                     kitsune_space,
                     basis_loc,
                     limit,
@@ -736,8 +673,8 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                 respond,
                 ..
             } => {
-                let env = { self.p2p_env(space) };
-                let res = query_peer_density(env.into(), kitsune_space, dht_arc)
+                let db = { self.p2p_agents_db(&dna_hash) };
+                let res = query_peer_density(db.into(), kitsune_space, dht_arc)
                     .await
                     .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
@@ -861,11 +798,15 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     }
 
     fn keystore(&self) -> &MetaLairClient {
-        &self.keystore
+        self.conductor.keystore()
     }
 
     fn holochain_p2p(&self) -> &holochain_p2p::HolochainP2pRef {
-        &self.holochain_p2p
+        self.conductor.holochain_p2p()
+    }
+
+    async fn prune_p2p_agents_db(&self) -> ConductorResult<()> {
+        self.conductor.prune_p2p_agents_db().await
     }
 
     async fn create_clone_cell(
@@ -1150,25 +1091,21 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
 
     async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String> {
         let cell = self.conductor.cell_by_id(cell_id)?;
-        let authored_env = cell.authored_env();
-        let dht_env = cell.dht_env();
-        let space = cell_id.dna_hash().to_kitsune();
-        let p2p_env = self
-            .p2p_env
-            .lock()
-            .get(&space)
-            .cloned()
-            .expect("invalid cell space");
+        let authored_db = cell.authored_db();
+        let dht_db = cell.dht_db();
+        let space = cell_id.dna_hash();
+        let p2p_agents_db = self.p2p_agents_db(space);
 
-        let peer_dump = p2p_agent_store::dump_state(p2p_env.into(), Some(cell_id.clone())).await?;
+        let peer_dump =
+            p2p_agent_store::dump_state(p2p_agents_db.into(), Some(cell_id.clone())).await?;
         let source_chain_dump =
-            source_chain::dump_state(authored_env.clone().into(), cell_id.agent_pubkey().clone())
+            source_chain::dump_state(authored_db.clone().into(), cell_id.agent_pubkey().clone())
                 .await?;
 
         let out = JsonDump {
             peer_dump,
             source_chain_dump,
-            integration_dump: integration_dump(&dht_env.clone().into()).await?,
+            integration_dump: integration_dump(&dht_db.clone().into()).await?,
         };
         // Add summary
         let summary = out.to_string();
@@ -1181,33 +1118,29 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         cell_id: &CellId,
         dht_ops_cursor: Option<u64>,
     ) -> ConductorApiResult<FullStateDump> {
-        let authored_env = self
+        let authored_db = self
             .conductor
-            .get_or_create_authored_env(cell_id.dna_hash())?;
-        let dht_env = self.conductor.get_or_create_dht_env(cell_id.dna_hash())?;
-        let space = cell_id.dna_hash().to_kitsune();
-        let p2p_env = self
-            .p2p_env
-            .lock()
-            .get(&space)
-            .cloned()
-            .expect("invalid cell space");
+            .get_or_create_authored_db(cell_id.dna_hash())?;
+        let dht_db = self.conductor.get_or_create_dht_db(cell_id.dna_hash())?;
+        let dna_hash = cell_id.dna_hash();
+        let p2p_agents_db = self.conductor.spaces.p2p_agents_db(dna_hash)?;
 
-        let peer_dump = p2p_agent_store::dump_state(p2p_env.into(), Some(cell_id.clone())).await?;
+        let peer_dump =
+            p2p_agent_store::dump_state(p2p_agents_db.into(), Some(cell_id.clone())).await?;
         let source_chain_dump =
-            source_chain::dump_state(authored_env.into(), cell_id.agent_pubkey().clone()).await?;
+            source_chain::dump_state(authored_db.into(), cell_id.agent_pubkey().clone()).await?;
 
         let out = FullStateDump {
             peer_dump,
             source_chain_dump,
-            integration_dump: full_integration_dump(&dht_env, dht_ops_cursor).await?,
+            integration_dump: full_integration_dump(&dht_db, dht_ops_cursor).await?,
         };
         Ok(out)
     }
 
     async fn dump_network_metrics(&self, dna_hash: Option<DnaHash>) -> ConductorApiResult<String> {
         use holochain_p2p::HolochainP2pSender;
-        self.holochain_p2p
+        self.holochain_p2p()
             .dump_network_metrics(dna_hash)
             .await
             .map_err(super::api::error::ConductorApiError::other)
@@ -1238,8 +1171,8 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                 .push(agent_info_signed);
         }
         for (space, agent_infos) in space_map {
-            let env = self.p2p_env(space);
-            inject_agent_infos(env, agent_infos.iter()).await?;
+            let db = self.p2p_agents_db(&DnaHash::from_kitsune(&space));
+            inject_agent_infos(db, agent_infos.iter()).await?;
         }
         Ok(())
     }
@@ -1251,9 +1184,8 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         match cell_id {
             Some(c) => {
                 let (d, a) = c.into_dna_and_agent();
-                let space = d.to_kitsune();
-                let env = self.p2p_env(space);
-                Ok(get_single_agent_info(env.into(), d, a)
+                let db = self.p2p_agents_db(&d);
+                Ok(get_single_agent_info(db.into(), d, a)
                     .await?
                     .map(|a| vec![a])
                     .unwrap_or_default())
@@ -1261,9 +1193,12 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             None => {
                 let mut out = Vec::new();
                 // collecting so the mutex lock can close
-                let envs = self.p2p_env.lock().values().cloned().collect::<Vec<_>>();
-                for env in envs {
-                    out.append(&mut all_agent_infos(env.into()).await?);
+                let envs = self
+                    .conductor
+                    .spaces
+                    .get_from_spaces(|s| s.p2p_agents_db.clone());
+                for db in envs {
+                    out.append(&mut all_agent_infos(db.into()).await?);
                 }
                 Ok(out)
             }
@@ -1291,7 +1226,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
 
         // Get the chain head if there is one.
         let persisted_chain_head = space
-            .authored_env
+            .authored_db
             .async_reader({
                 let author = Arc::new(cell_id.agent_pubkey().clone());
                 move |txn| holochain_state::prelude::chain_head_db(&txn, author)
@@ -1300,7 +1235,10 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             .ok()
             .map(|c| (c.0, c.1));
 
-        let network = self.holochain_p2p.to_dna(cell_id.dna_hash().clone());
+        let network = self
+            .conductor
+            .holochain_p2p()
+            .to_dna(cell_id.dna_hash().clone());
 
         // Validate the elements.
         if validate {
@@ -1313,10 +1251,10 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             // Create a raw source chain to validate against because
             // genesis may not have been run yet.
             let workspace = SourceChainWorkspace::raw_empty(
-                space.authored_env.clone(),
-                space.dht_env.clone(),
-                space.cache.clone(),
-                self.keystore.clone(),
+                space.authored_db.clone(),
+                space.dht_db.clone(),
+                space.cache_db.clone(),
+                self.conductor.keystore().clone(),
                 cell_id.agent_pubkey().clone(),
                 Arc::new(ribosome.dna_def().as_content().clone()),
             )
@@ -1355,8 +1293,8 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             .await
             .map_err(Box::new)?;
         }
-        let authored_env = space.authored_env;
-        let dht_env = space.dht_env;
+        let authored_db = space.authored_db;
+        let dht_db = space.dht_db;
 
         // Produce the op lights for each element.
         let data = elements
@@ -1373,7 +1311,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             .collect::<StateMutationResult<Vec<_>>>()?;
 
         // Commit the elements to the source chain.
-        let ops_to_integrate = authored_env
+        let ops_to_integrate = authored_db
             .async_commit({
                 let cell_id = cell_id.clone();
                 move |txn| {
@@ -1431,8 +1369,8 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             holochain_state::integrate::authored_ops_to_dht_db(
                 &network,
                 ops_to_integrate,
-                &authored_env,
-                &dht_env,
+                &authored_db,
+                &dht_db,
             )
             .await?;
         }
@@ -1440,24 +1378,34 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     }
 
     #[cfg(any(test, feature = "test_utils"))]
-    fn get_authored_env(&self, dna_hash: &DnaHash) -> ConductorApiResult<DbWrite<DbKindAuthored>> {
-        Ok(self.conductor.get_or_create_authored_env(dna_hash)?)
+    fn get_authored_db(&self, dna_hash: &DnaHash) -> ConductorApiResult<DbWrite<DbKindAuthored>> {
+        Ok(self.conductor.get_or_create_authored_db(dna_hash)?)
     }
 
     #[cfg(any(test, feature = "test_utils"))]
-    fn get_dht_env(&self, dna_hash: &DnaHash) -> ConductorApiResult<DbWrite<DbKindDht>> {
-        Ok(self.conductor.get_or_create_dht_env(dna_hash)?)
+    fn get_dht_db(&self, dna_hash: &DnaHash) -> ConductorApiResult<DbWrite<DbKindDht>> {
+        Ok(self.conductor.get_or_create_dht_db(dna_hash)?)
     }
 
     #[cfg(any(test, feature = "test_utils"))]
-    fn get_cache_env(&self, cell_id: &CellId) -> ConductorApiResult<DbWrite<DbKindCache>> {
+    fn get_cache_db(&self, cell_id: &CellId) -> ConductorApiResult<DbWrite<DbKindCache>> {
         let cell = self.cell_by_id(cell_id)?;
         Ok(cell.cache().clone())
     }
 
     #[cfg(any(test, feature = "test_utils"))]
-    fn get_p2p_env(&self, space: Arc<KitsuneSpace>) -> DbWrite<DbKindP2pAgentStore> {
-        self.p2p_env(space)
+    fn get_p2p_db(&self, space: &DnaHash) -> DbWrite<DbKindP2pAgents> {
+        self.p2p_agents_db(space)
+    }
+
+    #[cfg(any(test, feature = "test_utils"))]
+    fn get_p2p_metrics_db(&self, space: &DnaHash) -> DbWrite<DbKindP2pMetrics> {
+        self.p2p_metrics_db(space)
+    }
+
+    #[cfg(any(test, feature = "test_utils"))]
+    fn get_spaces(&self) -> Spaces {
+        self.conductor.spaces.clone()
     }
 
     #[cfg(any(test, feature = "test_utils"))]
@@ -1506,7 +1454,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     }
 }
 
-impl<DS: DnaStore + 'static> ConductorHandleImpl<DS> {
+impl ConductorHandleImpl {
     fn cell_by_id(&self, cell_id: &CellId) -> ConductorApiResult<Arc<Cell>> {
         Ok(self.conductor.cell_by_id(cell_id)?)
     }
@@ -1611,13 +1559,24 @@ impl<DS: DnaStore + 'static> ConductorHandleImpl<DS> {
         // Join the network but ignore errors because the
         // space retries joining all cells every 5 minutes.
 
+        use holochain_p2p::AgentPubKeyExt;
+
         let tasks = self
             .conductor
             .mark_pending_cells_as_joining()
             .into_iter()
-            .map(|(id, cell)| (id, cell.holochain_p2p_dna().clone()))
-            .map(|(cell_id, network)| async move {
-                match tokio::time::timeout(JOIN_NETWORK_TIMEOUT, network.join(cell_id.agent_pubkey().clone())).await {
+            .map(|(cell_id, cell)| async move {
+                let p2p_agents_db = cell.p2p_agents_db().clone();
+                let kagent = cell_id.agent_pubkey().to_kitsune();
+                let agent_info = match p2p_agents_db.async_reader(move |tx| {
+                    tx.p2p_get_agent(&kagent)
+                }).await {
+                    Ok(maybe_info) => maybe_info,
+                    _ => None,
+                };
+                let maybe_initial_arc = agent_info.map(|i| i.storage_arc);
+                let network = cell.holochain_p2p_dna().clone();
+                match tokio::time::timeout(JOIN_NETWORK_TIMEOUT, network.join(cell_id.agent_pubkey().clone(), maybe_initial_arc)).await {
                     Ok(Err(e)) => {
                         tracing::info!(error = ?e, cell_id = ?cell_id, "Error while trying to join the network");
                         Err(cell_id)
@@ -1653,59 +1612,24 @@ impl<DS: DnaStore + 'static> ConductorHandleImpl<DS> {
         cell_ids
     }
 
-    pub(super) fn p2p_env(&self, space: Arc<KitsuneSpace>) -> DbWrite<DbKindP2pAgentStore> {
-        let mut p2p_env = self.p2p_env.lock();
-        let db_sync_strategy = self.db_sync_strategy;
-        p2p_env
-            .entry(space.clone())
-            .or_insert_with(move || {
-                let root_env_dir = self.root_env_dir.as_ref();
-                DbWrite::open_with_sync_level(
-                    root_env_dir,
-                    DbKindP2pAgentStore(space),
-                    match db_sync_strategy {
-                        DbSyncStrategy::Fast => DbSyncLevel::Off,
-                        DbSyncStrategy::Resilient => DbSyncLevel::Normal,
-                    },
-                )
-                .expect("failed to open p2p_agent_store database")
-            })
-            .clone()
+    pub(super) fn p2p_agents_db(&self, hash: &DnaHash) -> DbWrite<DbKindP2pAgents> {
+        self.conductor
+            .spaces
+            .p2p_agents_db(hash)
+            .expect("failed to open p2p_agent_store database")
     }
 
-    pub(super) fn p2p_batch_sender(
-        &self,
-        space: Arc<KitsuneSpace>,
-    ) -> tokio::sync::mpsc::Sender<P2pBatch> {
-        let mut p2p_env = self.p2p_batch_senders.lock();
-        p2p_env
-            .entry(space.clone())
-            .or_insert_with(|| {
-                let (tx, rx) = tokio::sync::mpsc::channel(100);
-                let env = { self.p2p_env(space) };
-                tokio::spawn(p2p_agent_store::p2p_put_all_batch(env, rx));
-                tx
-            })
-            .clone()
+    pub(super) fn p2p_batch_sender(&self, hash: &DnaHash) -> tokio::sync::mpsc::Sender<P2pBatch> {
+        self.conductor
+            .spaces
+            .p2p_batch_sender(hash)
+            .expect("failed to get p2p_batch_sender")
     }
 
-    pub(super) fn p2p_metrics_env(&self, space: Arc<KitsuneSpace>) -> DbWrite<DbKindP2pMetrics> {
-        let mut p2p_metrics_env = self.p2p_metrics_env.lock();
-        let db_sync_strategy = self.db_sync_strategy;
-        p2p_metrics_env
-            .entry(space.clone())
-            .or_insert_with(move || {
-                let root_env_dir = self.root_env_dir.as_ref();
-                DbWrite::open_with_sync_level(
-                    root_env_dir,
-                    DbKindP2pMetrics(space),
-                    match db_sync_strategy {
-                        DbSyncStrategy::Fast => DbSyncLevel::Off,
-                        DbSyncStrategy::Resilient => DbSyncLevel::Normal,
-                    },
-                )
-                .expect("failed to open p2p_metrics database")
-            })
-            .clone()
+    pub(super) fn p2p_metrics_db(&self, hash: &DnaHash) -> DbWrite<DbKindP2pMetrics> {
+        self.conductor
+            .spaces
+            .p2p_metrics_db(hash)
+            .expect("failed to open p2p_metrics_store database")
     }
 }

@@ -1,6 +1,6 @@
 [package]
 name = "kitsune_p2p_timestamp"
-version = "0.0.6"
+version = "0.0.7"
 description = "Microsecond-precision timestamp datatype for kitsune_p2p"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -13,26 +13,23 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+serde = { version = "1.0", features = ["derive"] }
 
-chrono = { version = "0.4.6", features = ["serde"] }
-derive_more = "0.99"
-serde = { version = "1.0", features = [ "derive" ] }
-thiserror = "1"
+# Dependencies not needed for integrity.
+chrono = { version = "0.4.6", features = ["serde"], optional = true }
 
-# arbitrary
-arbitrary = { version = "1.0", features = ["derive"], optional = true }
-
-# rusqlite
+# Dependencies only needed for full.
 rusqlite = { version = "0.26", optional = true }
+
+# Dependencies only needed for testing by downstream crates.
+arbitrary = { version = "1.0", features = ["derive"], optional = true }
 
 [dev-dependencies]
 holochain_serialized_bytes = "=0.0.51"
 serde_yaml = "0.8"
 
 [features]
-now = []
+default = ["chrono"]
+now = ["chrono"]
 
-full = [
-  "now",
-  "rusqlite",
-]
+full = ["now", "rusqlite"]

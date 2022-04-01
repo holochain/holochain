@@ -26,10 +26,10 @@ fn delete_via_input(delete_input: DeleteInput) -> ExternResult<HeaderHash> {
     delete_entry(delete_input)
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "mock"))]
 pub mod test {
-    use hdk::prelude::*;
     use ::fixt::prelude::*;
+    use hdk::prelude::*;
 
     #[test]
     fn create_smoke() {
@@ -39,9 +39,11 @@ pub mod test {
         let closure_header_hash = header_hash.clone();
         mock_hdk
             .expect_create()
-            .with(hdk::prelude::mockall::predicate::eq(
-                CreateInput::try_from(&super::Thing).unwrap(),
-            ))
+            .with(hdk::prelude::mockall::predicate::eq(CreateInput {
+                entry_def_id: super::Thing::entry_def_id(),
+                entry: super::Thing.try_into().unwrap(),
+                chain_top_ordering: Default::default(),
+            }))
             .times(1)
             .return_once(move |_| Ok(closure_header_hash));
 

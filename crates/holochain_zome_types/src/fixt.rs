@@ -23,6 +23,7 @@ use holo_hash::*;
 use holochain_serialized_bytes::prelude::SerializedBytes;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
+use std::sync::Arc;
 
 pub use holo_hash::fixt::*;
 
@@ -79,7 +80,7 @@ impl Iterator for AppEntryTypeFixturator<EntryVisibility> {
 }
 
 /// Alias
-pub type MaybeSerializedBytes = Option<SerializedBytes>;
+pub type MaybeMembraneProof = Option<Arc<SerializedBytes>>;
 
 fixturator!(
     HeaderBuilderCommon;
@@ -93,7 +94,11 @@ fixturator!(
 
 fixturator!(
     CreateLink;
-    constructor fn from_builder(HeaderBuilderCommon, EntryHash, EntryHash, u8, u8, LinkTag);
+    constructor fn from_builder(HeaderBuilderCommon, EntryHash, EntryHash, u8, LinkType, LinkTag);
+);
+
+fixturator!(
+    LinkType; constructor fn new(u8);
 );
 
 fixturator!(
@@ -501,16 +506,16 @@ fixturator!(
 );
 
 fixturator! {
-    MaybeSerializedBytes;
+    MaybeMembraneProof;
     enum [ Some None ];
-    curve Empty MaybeSerializedBytes::None;
-    curve Unpredictable match MaybeSerializedBytesVariant::random() {
-        MaybeSerializedBytesVariant::None => MaybeSerializedBytes::None,
-        MaybeSerializedBytesVariant::Some => MaybeSerializedBytes::Some(fixt!(SerializedBytes)),
+    curve Empty MaybeMembraneProof::None;
+    curve Unpredictable match MaybeMembraneProofVariant::random() {
+        MaybeMembraneProofVariant::None => MaybeMembraneProof::None,
+        MaybeMembraneProofVariant::Some => MaybeMembraneProof::Some(Arc::new(fixt!(SerializedBytes))),
     };
-    curve Predictable match MaybeSerializedBytesVariant::nth(get_fixt_index!()) {
-        MaybeSerializedBytesVariant::None => MaybeSerializedBytes::None,
-        MaybeSerializedBytesVariant::Some => MaybeSerializedBytes::Some(SerializedBytesFixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap()),
+    curve Predictable match MaybeMembraneProofVariant::nth(get_fixt_index!()) {
+        MaybeMembraneProofVariant::None => MaybeMembraneProof::None,
+        MaybeMembraneProofVariant::Some => MaybeMembraneProof::Some(Arc::new(SerializedBytesFixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap())),
     };
 }
 
@@ -538,7 +543,7 @@ fixturator! {
 
 fixturator!(
     AgentValidationPkg;
-    constructor fn from_builder(HeaderBuilderCommon, MaybeSerializedBytes);
+    constructor fn from_builder(HeaderBuilderCommon, MaybeMembraneProof);
 );
 
 fixturator!(
