@@ -171,7 +171,7 @@ impl Cell {
         authored_db: DbWrite<DbKindAuthored>,
         dht_db: DbWrite<DbKindDht>,
         ribosome: Ribosome,
-        membrane_proof: Option<SerializedBytes>,
+        membrane_proof: Option<MembraneProof>,
     ) -> CellResult<()>
     where
         Ribosome: RibosomeT + Send + 'static,

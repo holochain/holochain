@@ -85,6 +85,8 @@ impl From<Vec<ValidateCallbackResult>> for GenesisSelfCheckResult {
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
+    use std::sync::Arc;
+
     use super::GenesisSelfCheckInvocation;
     use crate::core::ribosome::{
         guest_callback::genesis_self_check::{GenesisSelfCheckHostAccess, GenesisSelfCheckResult},
@@ -101,7 +103,7 @@ mod slow_tests {
         GenesisSelfCheckInvocation {
             payload: GenesisSelfCheckData {
                 dna_def: fixt!(DnaDef),
-                membrane_proof: Some(().try_into().unwrap()),
+                membrane_proof: Some(Arc::new(().try_into().unwrap())),
                 agent_key: fixt!(AgentPubKey),
             },
         }
