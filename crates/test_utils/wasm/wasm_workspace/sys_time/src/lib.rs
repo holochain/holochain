@@ -5,7 +5,7 @@ fn sys_time(_: ()) -> ExternResult<Timestamp> {
     hdk::prelude::sys_time()
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "mock"))]
 pub mod test {
     use hdk::prelude::*;
 
