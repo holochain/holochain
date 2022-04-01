@@ -162,10 +162,14 @@ pub mod slow_tests {
 
         assert_eq!(
             anchor_address_two.get_raw_32().to_vec(),
-            vec![]
+            vec![
+                21, 114, 154, 43, 189, 82, 166, 104, 159, 55, 86, 94, 68, 245, 79, 49, 187, 175,
+                236, 67, 38, 216, 232, 239, 18, 83, 98, 200, 136, 198, 232, 117
+            ],
         );
 
         let list_anchor_type_addresses_output: EntryHashes = conductor
+            .call(&alice, "list_anchor_type_addresses", ())
             .await;
 
         // should be 1 anchor type, "foo"
