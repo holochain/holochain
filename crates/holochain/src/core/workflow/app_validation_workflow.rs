@@ -16,6 +16,7 @@ use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomesToInvoke;
 use error::AppValidationResult;
 pub use error::*;
+use futures::stream::StreamExt;
 use holo_hash::DhtOpHash;
 use holochain_cascade::Cascade;
 use holochain_keystore::MetaLairClient;
@@ -109,7 +110,6 @@ async fn app_validation_workflow_inner(
     // Create a stream of concurrent validation futures.
     // This will run NUM_CONCURRENT_OPS validation futures concurrently and
     // return up to NUM_CONCURRENT_OPS * 100 results.
-    use futures::stream::StreamExt;
     let mut iter = futures::stream::iter(iter)
         .buffer_unordered(NUM_CONCURRENT_OPS)
         .ready_chunks(NUM_CONCURRENT_OPS * 100);
@@ -516,7 +516,12 @@ where
         ValidateResult::Valid => Ok(Outcome::Accepted),
         ValidateResult::Invalid(reason) => Ok(Outcome::Rejected(reason)),
         ValidateResult::UnresolvedDependencies(hashes) => {
-            if !hashes.iter().any(|hash| !fetched_deps.contains(hash)) {
+            // This is the base case where we've been recursing and start seeing
+            // all the same hashes unresolved that we already tried to fetch.
+            // At this point we should just give up on the inline recursing and
+            // let some future background task attempt to fetch these hashes
+            // again. Hopefully by then the hashes are fetchable.
+            if hashes.iter().all(|hash| fetched_deps.contains(hash)) {
                 Ok(Outcome::AwaitingDeps(hashes))
             } else {
                 let in_flight = hashes.into_iter().map(|hash| async {
@@ -528,11 +533,12 @@ where
                         .await?;
                     Ok(hash)
                 });
-                let results: AppValidationResult<Vec<AnyDhtHash>> =
-                    futures::future::join_all(in_flight)
-                        .await
-                        .into_iter()
-                        .collect();
+                let results: Vec<_> = futures::stream::iter(in_flight)
+                    .buffered(10)
+                    .collect()
+                    .await;
+                dbg!(&results);
+                let results: AppValidationResult<Vec<_>> = results.into_iter().collect();
                 for hash in results? {
                     fetched_deps.insert(hash);
                 }
