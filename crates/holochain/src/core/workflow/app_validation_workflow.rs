@@ -488,7 +488,7 @@ where
         ribosome,
         workspace,
         network.clone(),
-        &mut HashSet::default(),
+        (HashSet::<AnyDhtHash>::new(), 0),
     )
     .await?;
 
@@ -539,7 +539,7 @@ async fn run_validation_callback_inner<R>(
     ribosome: &R,
     workspace_read: HostFnWorkspaceRead,
     network: HolochainP2pDna,
-    fetched_deps: &mut HashSet<AnyDhtHash>,
+    (mut fetched_deps, recursion_depth): (HashSet<AnyDhtHash>, usize),
 ) -> AppValidationResult<Outcome>
 where
     R: RibosomeT + Sync,
@@ -557,7 +557,8 @@ where
             // At this point we should just give up on the inline recursing and
             // let some future background task attempt to fetch these hashes
             // again. Hopefully by then the hashes are fetchable.
-            if hashes.iter().all(|hash| fetched_deps.contains(hash)) {
+            // 20 is a completely arbitrary max recursion depth.
+            if recursion_depth < 20 || hashes.iter().all(|hash| fetched_deps.contains(hash)) {
                 Ok(Outcome::AwaitingDeps(hashes))
             } else {
                 let in_flight = hashes.into_iter().map(|hash| async {
@@ -570,10 +571,10 @@ where
                     Ok(hash)
                 });
                 let results: Vec<_> = futures::stream::iter(in_flight)
+                    // 10 is completely arbitrary.
                     .buffered(10)
                     .collect()
                     .await;
-                dbg!(&results);
                 let results: AppValidationResult<Vec<_>> = results.into_iter().collect();
                 for hash in results? {
                     fetched_deps.insert(hash);
@@ -583,7 +584,7 @@ where
                     ribosome,
                     workspace_read,
                     network,
-                    fetched_deps,
+                    (fetched_deps, recursion_depth + 1),
                 )
                 .await
             }
