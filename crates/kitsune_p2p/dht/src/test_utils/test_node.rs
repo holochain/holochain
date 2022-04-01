@@ -1,8 +1,10 @@
+use std::collections::HashMap;
+
 use must_future::MustBoxFuture;
 
 use crate::{
     arq::{ascii::add_location_ascii, *},
-    hash::{fake_hash, AgentKey},
+    hash::AgentKey,
     persistence::{AccessOpStore, AccessPeerStore},
     prelude::RegionCoordSetLtcs,
     region::*,
@@ -17,29 +19,23 @@ use super::{
 
 /// A "node", with test-worthy implementation of the host interface
 pub struct TestNode {
-    _agent: AgentKey,
-    agent_arq: Arq,
+    arqs: HashMap<AgentKey, Arq>,
     store: OpStore,
 }
 
 impl TestNode {
     /// Constructor
-    pub fn new(topo: Topology, gopa: GossipParams, arq: Arq) -> Self {
+    pub fn new(topo: Topology, gopa: GossipParams, arqs: HashMap<AgentKey, Arq>) -> Self {
         Self {
-            _agent: AgentKey(fake_hash()),
-            agent_arq: arq,
+            arqs,
             store: OpStore::new(topo, gopa),
         }
     }
-
-    /// The Arq to use when gossiping
-    pub fn arq(&self) -> Arq {
-        self.agent_arq
-    }
-
-    /// The ArqBounds to use when gossiping
-    pub fn arq_bounds(&self) -> ArqBounds {
-        self.agent_arq.to_bounds(self.topo())
+    /// Constructor
+    pub fn new_single(topo: Topology, gopa: GossipParams, arq: Arq) -> (Self, AgentKey) {
+        let agent_key = AgentKey::fake();
+        let node = Self::new(topo, gopa, [(agent_key.clone(), arq)].into_iter().collect());
+        (node, agent_key)
     }
 
     /// Get the RegionSet for this node, suitable for gossiping
@@ -57,19 +53,24 @@ impl TestNode {
     }
 
     /// Print an ascii representation of the node's arq and all ops held
-    pub fn ascii_arq_and_ops(&self, topo: &Topology, i: usize, len: usize) -> String {
-        let arq = self.arq();
-        format!(
-            "|{}| {}: {}/{} @ {}",
-            add_location_ascii(
-                arq.to_ascii(topo, len),
-                self.store.ops.iter().map(|o| o.loc).collect()
-            ),
-            i,
-            arq.power(),
-            arq.count(),
-            arq.start_loc()
-        )
+    pub fn ascii_arqs_and_ops(&self, topo: &Topology, i: usize, len: usize) -> String {
+        self.arqs
+            .iter()
+            .map(|(agent, arq)| {
+                format!(
+                    "{:?}: |{}| {}: {}/{} @ {}\n",
+                    agent,
+                    add_location_ascii(
+                        arq.to_ascii(topo, len),
+                        self.store.ops.iter().map(|o| o.loc).collect()
+                    ),
+                    i,
+                    arq.power(),
+                    arq.count(),
+                    arq.start_loc()
+                )
+            })
+            .collect()
     }
 }
 
@@ -103,12 +104,17 @@ impl AccessOpStore<OpData> for TestNode {
 }
 
 impl AccessPeerStore for TestNode {
-    fn get_agent_arq(&self, _agent: AgentKey) -> crate::arq::Arq {
-        self.agent_arq
+    fn get_agent_arq(&self, agent: &AgentKey) -> crate::arq::Arq {
+        *self.arqs.get(agent).unwrap()
     }
 
     fn get_arq_set(&self) -> ArqBoundsSet {
-        ArqBoundsSet::single(self.arq_bounds())
+        ArqBoundsSet::new(
+            self.arqs
+                .iter()
+                .map(|(_, arq)| arq.to_bounds(&self.store.topo))
+                .collect(),
+        )
     }
 }
 
@@ -127,7 +133,7 @@ mod tests {
         let topo = Topology::unit_zero();
         let gopa = GossipParams::zero();
         let arq = Arq::new(8, 0u32.into(), 4.into());
-        let mut node = TestNode::new(topo.clone(), gopa, arq);
+        let (mut node, _) = TestNode::new_single(topo.clone(), gopa, arq);
 
         node.integrate_ops(
             [
@@ -174,7 +180,7 @@ mod tests {
         let topo = Topology::standard_epoch();
         let gopa = GossipParams::zero();
         let arq = Arq::new(8, 0u32.into(), 4.into());
-        let mut node = TestNode::new(topo.clone(), gopa, arq);
+        let (mut node, _) = TestNode::new_single(topo.clone(), gopa, arq);
 
         let p = pow2(12);
 
@@ -233,30 +239,5 @@ mod tests {
             assert_eq!(data.count, 1);
             assert_eq!(data.size, 3456);
         }
-    }
-
-    #[test]
-    #[cfg(obsolete)]
-    fn gossip_regression() {
-        let topo = Topology::unit_zero();
-        let gopa = GossipParams::zero();
-        let alice_arq = Arq::new(0u32.into(), 8, 4);
-        let bobbo_arq = Arq::new(128.into(), 8, 4);
-        let mut alice = TestNode::new(topo.clone(), gopa, alice_arq);
-        let mut bobbo = TestNode::new(topo.clone(), gopa, bobbo_arq);
-
-        alice.integrate_ops([OpData::fake(0.into(), Timestamp::from_micros(10), 4321)].into_iter());
-        bobbo.integrate_ops(
-            [OpData::fake(128.into(), Timestamp::from_micros(20), 1234)].into_iter(),
-        );
-
-        // dbg!(&alice.tree.tree);
-        let b = (4294967295, 71);
-        let a = (4294967040, 64);
-
-        let ne = alice.store.tree.tree.prefix_sum(b);
-        let sw = alice.store.tree.tree.prefix_sum(a);
-        assert_eq!(ne, sw);
-        // alice.tree.tree.query((4294967040, 64), (4294967295, 71));
     }
 }

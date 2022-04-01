@@ -23,11 +23,25 @@ pub fn fake_hash() -> Hash32 {
 )]
 pub struct OpHash(pub Hash32);
 
+impl OpHash {
+    /// Random fake hash for testing
+    pub fn fake() -> Self {
+        Self(fake_hash())
+    }
+}
+
 /// The hash of an Agent
 #[derive(
     Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, derive_more::Constructor, derive_more::From,
 )]
 pub struct AgentKey(pub Hash32);
+
+impl AgentKey {
+    /// Random fake hash for testing
+    pub fn fake() -> Self {
+        Self(fake_hash())
+    }
+}
 
 /// The hash of a Region, which is the XOR of all OpHashes contained in this region.
 #[derive(

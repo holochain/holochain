@@ -72,7 +72,7 @@ pub trait AccessOpStore<O: OpRegion<D>, D: RegionDataConstraints = RegionData>: 
 // TODO: make async
 pub trait AccessPeerStore {
     /// Get the arq for an agent
-    fn get_agent_arq(&self, agent: AgentKey) -> Arq;
+    fn get_agent_arq(&self, agent: &AgentKey) -> Arq;
 
     /// Get the set of all arqs for this node
     fn get_arq_set(&self) -> ArqBoundsSet;

@@ -1,7 +1,10 @@
 #![cfg(feature = "test_utils")]
 
+use std::collections::HashMap;
+
 use kitsune_p2p_dht::{
     arq::*,
+    hash::AgentKey,
     op::*,
     persistence::*,
     region::*,
@@ -11,6 +14,7 @@ use kitsune_p2p_dht::{
     },
 };
 use kitsune_p2p_timestamp::Timestamp;
+use maplit::hashmap;
 use rand::Rng;
 
 #[test]
@@ -21,8 +25,8 @@ fn test_basic() {
 
     let alice_arq = Arq::new(8, (-128i32 as u32).into(), 4.into());
     let bobbo_arq = Arq::new(8, 0u32.into(), 4.into());
-    let mut alice = TestNode::new(topo.clone(), gopa, alice_arq);
-    let mut bobbo = TestNode::new(topo.clone(), gopa, bobbo_arq);
+    let (mut alice, _) = TestNode::new_single(topo.clone(), gopa, alice_arq);
+    let (mut bobbo, _) = TestNode::new_single(topo.clone(), gopa, bobbo_arq);
 
     alice.integrate_op(OpData::fake(0.into(), ts(10), 4321));
     bobbo.integrate_op(OpData::fake(128.into(), ts(20), 1234));
@@ -38,6 +42,11 @@ fn test_basic() {
     assert_eq!(stats.regions_rcvd, 3 * ntb);
     assert_eq!(stats.op_data_sent, 4321);
     assert_eq!(stats.op_data_rcvd, 1234);
+}
+
+#[test]
+fn test_multi() {
+    todo!("tests of multiple arcs per node, with different powers.")
 }
 
 #[test]
@@ -76,7 +85,7 @@ fn gossip_scenario_full_sync() {
         .iter()
         .map(|a| {
             assert_eq!(a.count(), expected_num_space_chunks);
-            TestNode::new(topo.clone(), gopa, *a)
+            TestNode::new_single(topo.clone(), gopa, *a).0
         })
         .collect();
 
@@ -107,7 +116,7 @@ fn gossip_scenario_full_sync() {
             .enumerate()
             .map(|(i, n)| {
                 let ops = n.query_op_data(&full_region);
-                println!("{}", n.ascii_arq_and_ops(&topo, i, 64));
+                println!("{}", n.ascii_arqs_and_ops(&topo, i, 64));
                 ops.len()
             })
             .collect::<Vec<_>>(),
@@ -140,7 +149,7 @@ fn gossip_scenario_full_sync() {
     }
 
     for (i, n) in nodes.iter().enumerate() {
-        println!("{}", n.ascii_arq_and_ops(&topo, i, 64));
+        println!("{}", n.ascii_arqs_and_ops(&topo, i, 64));
     }
 
     assert_eq!(nodes[0].query_op_data(&full_region).len(), num_ops);
