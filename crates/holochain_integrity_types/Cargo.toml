@@ -10,7 +10,7 @@ authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2021"
 
 [dependencies]
-holo_hash = { version = "0.0.21", path = "../holo_hash" }
+holo_hash = { version = "0.0.22", path = "../holo_hash" }
 holochain_serialized_bytes = "=0.0.51"
 serde = { version = "1.0", features = ["derive"] }
 serde_bytes = "0.11"
