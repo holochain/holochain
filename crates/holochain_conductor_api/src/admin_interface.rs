@@ -231,7 +231,7 @@ pub enum AdminRequest {
         port: Option<u16>,
     },
 
-    /// List all the app interfaces currently attached with [`AttachAppInterface`].
+    /// List all the app interfaces currently attached with [`AdminRequest::AttachAppInterface`].
     ListAppInterfaces,
 
     /// Dump the state of the `Cell` specified by argument `cell_id`,
