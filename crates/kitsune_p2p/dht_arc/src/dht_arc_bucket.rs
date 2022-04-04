@@ -18,7 +18,7 @@ impl DhtArcBucket {
     pub fn new<I: IntoIterator<Item = DhtArc>>(filter: DhtArc, arcs: I) -> Self {
         let arcs = arcs
             .into_iter()
-            .filter(|a| filter.contains(a.center_loc))
+            .filter(|a| filter.contains(a.start_loc()))
             .collect();
         Self { filter, arcs }
     }
@@ -30,13 +30,13 @@ impl DhtArcBucket {
             arcs,
         }
     }
-}
 
-impl std::fmt::Display for DhtArcBucket {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    pub fn to_ascii(&self, len: usize) -> String {
+        let mut buf = "".to_string();
         for a in &self.arcs {
-            writeln!(f, "{}", a)?;
+            buf += &a.to_ascii(len);
         }
-        writeln!(f, "{} <- Bucket arc", self.filter)
+        buf += &format!("{} <- Bucket arc", self.filter.to_ascii(len));
+        buf
     }
 }

@@ -3,7 +3,8 @@
 use crate::prelude::*;
 use crate::sql::*;
 use kitsune_p2p::agent_store::AgentInfoSigned;
-use kitsune_p2p::dht_arc::{ArcInterval, DhtArcSet};
+use kitsune_p2p::dht_arc::DhtArcRange;
+use kitsune_p2p::dht_arc::DhtArcSet;
 use kitsune_p2p::KitsuneAgent;
 use rusqlite::*;
 use std::sync::Arc;
@@ -244,7 +245,7 @@ impl AsP2pStateTxExt for Transaction<'_> {
             },
         )? {
             let info = r?;
-            let interval = info.storage_arc.interval();
+            let interval = DhtArcRange::from(info.storage_arc);
             if arcset.overlap(&interval.into()) {
                 out.push(info);
             }
@@ -285,7 +286,7 @@ impl AsP2pStateTxExt for Transaction<'_> {
 
         for interval in dht_arc_set.intervals() {
             match interval {
-                ArcInterval::Full => {
+                DhtArcRange::Full => {
                     out.push(stmt.query_row(
                         named_params! {
                             ":now": now,
@@ -295,7 +296,7 @@ impl AsP2pStateTxExt for Transaction<'_> {
                         |r| r.get(0),
                     )?);
                 }
-                ArcInterval::Bounded(start, end) => {
+                DhtArcRange::Bounded(start, end) => {
                     out.push(stmt.query_row(
                         named_params! {
                             ":now": now,
@@ -353,11 +354,11 @@ impl P2pRecord {
         let expires_at_ms = signed.expires_at_ms;
         let arc = signed.storage_arc;
 
-        let storage_center_loc = arc.center_loc().into();
+        let storage_center_loc = arc.start_loc().into();
 
         let is_active = !signed.url_list.is_empty();
 
-        let (storage_start_loc, storage_end_loc) = arc.primitive_range_detached();
+        let (storage_start_loc, storage_end_loc) = arc.to_primitive_bounds_detached();
 
         Ok(Self {
             agent,

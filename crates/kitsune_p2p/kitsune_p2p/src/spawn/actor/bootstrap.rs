@@ -171,7 +171,7 @@ pub async fn random(
 pub async fn proxy_list(url: Url2) -> KitsuneP2pResult<Vec<Url2>> {
     Ok(do_api::<_, Vec<String>>(Some(url), OP_PROXY_LIST, ())
         .await?
-        .unwrap_or_else(Vec::new)
+        .unwrap_or_default()
         .into_iter()
         .map(Url2::parse)
         .collect())

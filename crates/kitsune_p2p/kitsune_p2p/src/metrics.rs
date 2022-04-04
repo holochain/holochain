@@ -378,8 +378,7 @@ impl Metrics {
         remote_agent_list
             .into_iter()
             .filter_map(|agent_info| self.map.get(agent_info.into().agent()))
-            .map(|info| info.complete_rounds.back())
-            .flatten()
+            .filter_map(|info| info.complete_rounds.back())
             .min()
     }
 
@@ -402,6 +401,7 @@ impl Metrics {
         T: Into<AgentLike<'a>>,
         I: IntoIterator<Item = T>,
     {
+        #[allow(clippy::map_flatten)]
         remote_agent_list
             .into_iter()
             .filter_map(|agent_info| self.map.get(agent_info.into().agent()))

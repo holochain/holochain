@@ -3,13 +3,18 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+
+## 0.0.132
+
+## 0.0.131
+
 - When joining the network set arc size to previous value if available instead of full to avoid network load [1287](https://github.com/holochain/holochain/pull/1287)
 
 ## 0.0.130
 
 - Workflow errors generally now log rather than abort the current app [1279](https://github.com/holochain/holochain/pull/1279/files)
 
-- Fixed broken links in Rust docs [#1284](https://github.com/holochain/holochain/pull/1284)
+- Fixed broken links in Rust docs [\#1284](https://github.com/holochain/holochain/pull/1284)
 
 ## 0.0.129
 

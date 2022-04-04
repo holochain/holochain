@@ -5,7 +5,9 @@ use crate::*;
 use futures::future::{BoxFuture, FutureExt};
 use futures::stream::StreamExt;
 use ghost_actor::GhostControlSender;
+use kitsune_p2p::dht_arc::DhtArcSet;
 use kitsune_p2p::test_util::hash_op_data;
+use kitsune_p2p_types::box_fut;
 //use ghost_actor::dependencies::tracing;
 use crate::types::direct::*;
 use kitsune_p2p::actor::{BroadcastTo, KitsuneP2pSender};
@@ -153,17 +155,18 @@ pub fn new_kitsune_direct_v1(
 
         let tls = persist.singleton_tls_config().await?;
 
-        let host = HostStub::new();
-
-        let (p2p, evt) = spawn_kitsune_p2p(sub_config, tls, host)
-            .await
-            .map_err(KdError::other)?;
+        let (_, evt, (kdirect, srv, srv_evt)) = spawn_kitsune_p2p_with_fn(sub_config, tls, |p2p| {
+            async move {
+                let (srv, srv_evt) = new_srv(Default::default(), ui_port).await.unwrap();
+                let kdirect = Kd1::new(srv.clone(), persist, p2p);
+                ((kdirect.clone(), srv, srv_evt), kdirect as HostApi)
+            }
+            .boxed()
+        })
+        .await
+        .map_err(KdError::other)?;
 
         let mut logic_chan = <LogicChan<()>>::new(tuning_params.concurrent_limit_per_thread);
-
-        let (srv, srv_evt) = new_srv(Default::default(), ui_port).await?;
-        let kdirect = Kd1::new(srv.clone(), persist, p2p);
-
         let cc = logic_chan.handle().clone();
 
         cc.capture_logic(handle_events(tuning_params.clone(), kdirect.clone(), evt))
@@ -277,6 +280,44 @@ impl AsKitsuneDirect for Kd1 {
                 .map_err(KdError::other)
         }
         .boxed()
+    }
+}
+
+impl KitsuneHost for Kd1 {
+    fn get_agent_info_signed(
+        &self,
+        input: GetAgentInfoSignedEvt,
+    ) -> KitsuneHostResult<Option<AgentInfoSigned>> {
+        let GetAgentInfoSignedEvt { space, agent } = input;
+
+        let root = KdHash::from_kitsune_space(&space);
+        let agent = KdHash::from_kitsune_agent(&agent);
+
+        async move {
+            Ok(match self.persist.get_agent_info(root, agent).await {
+                Ok(i) => Some(i.to_kitsune()),
+                Err(_) => None,
+            })
+        }
+        .boxed()
+        .into()
+    }
+
+    /// Extrapolated Peer Coverage
+    fn peer_extrapolated_coverage(
+        &self,
+        _space: Arc<KitsuneSpace>,
+        _dht_arc_set: DhtArcSet,
+    ) -> KitsuneHostResult<Vec<f64>> {
+        box_fut(Err("Kd1 just returns errors for some methods".into()))
+    }
+
+    fn record_metrics(
+        &self,
+        _space: Arc<KitsuneSpace>,
+        _records: Vec<MetricRecord>,
+    ) -> KitsuneHostResult<()> {
+        box_fut(Err("Kd1 just returns errors for some methods".into()))
     }
 }
 
