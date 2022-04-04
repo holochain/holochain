@@ -8,11 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased](https://github.com/holochain/holochain/compare/hdk-v0.0.100...HEAD)
 
-<<<<<<< HEAD
 - hdk: Adds external hash type for data that has a DHT location but does not exist on the DHT [#1298](https://github.com/holochain/holochain/pull/1298)
-=======
-## 0.0.127
->>>>>>> e7c7c0ce8f390009f56c42ef5fdd84047aec2985
 
 ## 0.0.126
 
