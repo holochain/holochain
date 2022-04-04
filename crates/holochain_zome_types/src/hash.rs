@@ -15,8 +15,6 @@ pub enum HashInput {
     Entry(Entry),
     /// Hash a Header.
     Header(Header),
-    /// Hash arbitrary bytes to an ExternalHash.
-    External(#[serde(with = "serde_bytes")] Vec<u8>),
     /// Blake2b is the native Holochain hashing algorithm and compatible with
     /// e.g. Polkadot and Zcash.
     /// Second value is the output length of the hash in bytes.

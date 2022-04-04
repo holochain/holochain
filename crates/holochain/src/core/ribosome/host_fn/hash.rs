@@ -1,7 +1,6 @@
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holo_hash::encode::blake2b_n;
-use holo_hash::ExternalHash;
 use holo_hash::HasHash;
 use holochain_wasmer_host::prelude::WasmError;
 use holochain_zome_types::prelude::*;
@@ -20,9 +19,6 @@ pub fn hash(
         HashInput::Header(header) => HashOutput::Header(
             holochain_zome_types::header::HeaderHashed::from_content_sync(header).into_hash(),
         ),
-        HashInput::External(bytes) => HashOutput::External({
-            ExternalHash::from_raw_32(holo_hash::encode::blake2b_256(&bytes))
-        }),
         HashInput::Blake2B(data, output_len) => HashOutput::Blake2B(
             blake2b_n(&data, output_len as usize).map_err(|e| WasmError::Host(e.to_string()))?,
         ),

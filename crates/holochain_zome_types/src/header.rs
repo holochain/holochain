@@ -2,6 +2,7 @@ use crate::entry_def::EntryVisibility;
 use crate::link::LinkTag;
 use crate::link::LinkType;
 use crate::timestamp::Timestamp;
+use crate::MembraneProof;
 pub use builder::HeaderBuilder;
 pub use builder::HeaderBuilderCommon;
 use conversions::WrongHeaderError;
@@ -462,7 +463,7 @@ pub struct AgentValidationPkg {
     pub header_seq: u32,
     pub prev_header: HeaderHash,
 
-    pub membrane_proof: Option<SerializedBytes>,
+    pub membrane_proof: Option<MembraneProof>,
 }
 
 /// A header which declares that all zome init functions have successfully

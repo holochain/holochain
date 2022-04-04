@@ -222,33 +222,6 @@ pub fn hash_header(input: Header) -> ExternResult<HeaderHash> {
     }
 }
 
-/// Hash arbitrary bytes into an `ExternalHash`.
-///
-/// External hashes have a DHT location and hash prefix like all other native
-/// holochain hashes but are NOT found/fetchable on the DHT.
-///
-/// External hashing makes no assumptions about the data that was digested to
-/// create the hash so arbitrary bytes can be passed in. Note however that the
-/// hashing is synchronous (like everything in wasm) so avoid very large data
-/// inputs.
-///
-/// It is valid to EITHER use an existing 32 byte hash/data as literal bytes
-/// for an external hash (literal+prefix, no data loss) OR digest arbitrary
-/// data into an external hash (support all data, opaque result).
-///
-/// This function facilitates the latter, if you have compatible 32 byte data
-/// consider whether `ExternalHash::from_raw_32` might better serve your use
-/// case, or retyping a native holochain hash in place:
-/// `entry_hash.retype(hash_type::External)`
-/// The benefit of NOT using `hash_external` is that if the hash exists in some
-/// external location such as an entry in some other DHT, it can be referenced.
-pub fn hash_external(input: Vec<u8>) -> ExternResult<ExternalHash> {
-    match HDK.with(|h| h.borrow().hash(HashInput::External(input)))? {
-        HashOutput::External(external_hash) => Ok(external_hash),
-        _ => unreachable!(),
-    }
-}
-
 /// Hash arbitrary bytes using BLAKE2b.
 /// This is the same algorithm used by holochain for typed hashes.
 /// Notably the output hash length is configurable.
