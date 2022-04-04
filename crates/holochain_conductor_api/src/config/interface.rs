@@ -15,8 +15,8 @@ pub struct AdminInterfaceConfig {
 /// Configuration for interfaces, specifying the means by which an interface
 /// should be opened.
 ///
-/// NB: This struct is used in both [ConductorConfig] and [ConductorState], so
-/// any change to the serialization strategy is a **breaking change**.
+/// NB: This struct is used in both [`ConductorConfig`](crate::conductor::ConductorConfig)
+/// and `ConductorState`, so any change to the serialization strategy is a **breaking change**.
 #[derive(Clone, Deserialize, Serialize, Debug, PartialEq)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum InterfaceDriver {
