@@ -11,6 +11,7 @@ members = [
   "crates/hc_bundle",
   "crates/hc_sandbox",
 
+  "crates/holochain_integrity_types",
   "crates/holochain",
   "crates/holochain_cascade",
   "crates/holochain_conductor_api",
@@ -23,7 +24,6 @@ members = [
   "crates/holochain_websocket",
   "crates/holochain_util",
   "crates/holochain_zome_types",
-  "crates/holochain_integrity_types",
 
   "crates/kitsune_p2p/dht_arc",
   "crates/kitsune_p2p/bootstrap",
