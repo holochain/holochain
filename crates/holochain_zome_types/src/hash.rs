@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use holo_hash::EntryHash;
+use holo_hash::ExternalHash;
 use holo_hash::HeaderHash;
 
 pub struct Hash256Bits([u8; 32]);
@@ -35,6 +36,7 @@ pub enum HashInput {
 pub enum HashOutput {
     Entry(EntryHash),
     Header(HeaderHash),
+    External(ExternalHash),
     Blake2B(#[serde(with = "serde_bytes")] Vec<u8>),
     Sha256(Hash256Bits),
     Sha512(Hash512Bits),

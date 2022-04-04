@@ -248,6 +248,10 @@ pub fn hash_sha512(input: Vec<u8>) -> ExternResult<Vec<u8>> {
     }
 }
 
+/// Hash arbitrary bytes using keccak256.
+/// This is the same algorithm used by ethereum and other EVM compatible blockchains.
+/// It is essentially the same as sha3 256 but with a minor difference in configuration
+/// that is enough to generate different hash outputs.
 pub fn hash_keccak256(input: Vec<u8>) -> ExternResult<Vec<u8>> {
     match HDK.with(|h| h.borrow().hash(HashInput::Keccak256(input)))? {
         HashOutput::Keccak256(hash) => Ok(hash.as_ref().to_vec()),
@@ -255,6 +259,8 @@ pub fn hash_keccak256(input: Vec<u8>) -> ExternResult<Vec<u8>> {
     }
 }
 
+/// Hash arbitrary bytes using SHA3 256.
+/// This is the official NIST standard for 256 bit SHA3 hashes.
 pub fn hash_sha3(input: Vec<u8>) -> ExternResult<Vec<u8>> {
     match HDK.with(|h| h.borrow().hash(HashInput::Sha3256(input)))? {
         HashOutput::Sha3256(hash) => Ok(hash.as_ref().to_vec()),
