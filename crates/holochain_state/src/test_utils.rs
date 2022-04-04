@@ -69,7 +69,7 @@ pub fn test_wasm_db() -> TestDb<DbKindWasm> {
     test_db(DbKindWasm)
 }
 
-/// Create a [`TestDb`] of [DbKindP2pAgentStore], backed by a temp directory.
+/// Create a [`TestDb`] of [`DbKindP2pAgents`], backed by a temp directory.
 pub fn test_p2p_agents_db() -> TestDb<DbKindP2pAgents> {
     test_db(DbKindP2pAgents(Arc::new(KitsuneSpace(vec![0; 36]))))
 }
