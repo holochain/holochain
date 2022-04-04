@@ -40,6 +40,7 @@ use holochain_zome_types::HeaderBuilder;
 use holochain_zome_types::HeaderBuilderCommon;
 use holochain_zome_types::HeaderHashed;
 use holochain_zome_types::HeaderInner;
+use holochain_zome_types::MembraneProof;
 use holochain_zome_types::PreflightRequest;
 use holochain_zome_types::QueryFilter;
 use holochain_zome_types::Signature;
@@ -910,7 +911,7 @@ pub async fn genesis(
     keystore: MetaLairClient,
     dna_hash: DnaHash,
     agent_pubkey: AgentPubKey,
-    membrane_proof: Option<SerializedBytes>,
+    membrane_proof: Option<MembraneProof>,
 ) -> SourceChainResult<()> {
     let dna_header = Header::Dna(header::Dna {
         author: agent_pubkey.clone(),

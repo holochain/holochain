@@ -92,7 +92,7 @@ fn verify_signature(
     Ok(())
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "mock"))]
 pub mod tests {
     use hdk::prelude::*;
     use ::fixt::prelude::{fixt, Predictable};

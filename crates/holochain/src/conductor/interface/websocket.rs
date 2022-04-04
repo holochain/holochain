@@ -275,7 +275,7 @@ pub mod test {
 
     async fn setup_admin_fake_cells(
         dnas: Vec<DnaFile>,
-        cell_ids_with_proofs: Vec<(CellId, Option<SerializedBytes>)>,
+        cell_ids_with_proofs: Vec<(CellId, Option<MembraneProof>)>,
     ) -> (Arc<TempDir>, ConductorHandle) {
         let db_dir = test_db_dir();
         let conductor_handle = ConductorBuilder::new()

@@ -190,7 +190,7 @@ impl HashTypeSync for Dna {}
 /// It is valid to EITHER use an existing 32 byte hash/data as literal bytes
 /// for an external hash (literal+prefix, no data loss) OR digest arbitrary
 /// data into an external hash (support all data, opaque result).
-impl HashTypeSync for External {}
+impl HashTypeAsync for External {}
 
 impl HashTypeAsync for NetId {}
 impl HashTypeAsync for Wasm {}
