@@ -82,6 +82,19 @@ impl<D: RegionDataConstraints> RegionSet<D> {
     }
 }
 
+#[cfg(feature = "test_utils")]
+impl RegionSet {
+    /// Return only the regions which have ops in them. Useful for testing
+    /// sparse scenarios.
+    pub fn nonzero_regions(
+        &self,
+    ) -> impl '_ + Iterator<Item = ((u32, u32), RegionCoords, RegionData)> {
+        match self {
+            Self::Ltcs(set) => set.nonzero_regions(),
+        }
+    }
+}
+
 #[cfg(test)]
 #[cfg(feature = "test_utils")]
 mod tests {

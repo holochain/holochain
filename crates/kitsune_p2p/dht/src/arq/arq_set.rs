@@ -121,7 +121,14 @@ impl<S: ArqStart> ArqSetImpl<S> {
     pub fn print_arqs(&self, topo: &Topology, len: usize) {
         println!("{} arqs, power: {}", self.arqs().len(), self.power());
         for (i, arq) in self.arqs().iter().enumerate() {
-            println!("|{}| {:>3}:\t{:3}", arq.to_ascii(topo, len), i, arq.count(),);
+            println!(
+                "{:>3}: |{}| {}/{} @ {:?}",
+                i,
+                arq.to_ascii(topo, len),
+                arq.power(),
+                arq.count(),
+                arq.start
+            );
         }
     }
 }
@@ -176,6 +183,8 @@ pub fn print_arqs<S: ArqStart>(topo: &Topology, arqs: &[Arq<S>], len: usize) {
 #[cfg(test)]
 mod tests {
 
+    use crate::prelude::pow2;
+
     use super::*;
 
     #[test]
@@ -192,6 +201,42 @@ mod tests {
         print_arqs(&topo, &a, 64);
         print_arqs(&topo, &b, 64);
         print_arqs(&topo, &c, 64);
+    }
+
+    #[test]
+    fn intersect_arqs_multi() {
+        observability::test_run().ok();
+        let topo = Topology::unit_zero();
+
+        let pow = 26;
+        let sa1 = (u32::MAX - 4 * pow2(pow) + 1).into();
+        let sa2 = (13 * pow2(pow - 1)).into();
+        let sb1 = 0u32.into();
+        let sb2 = (20 * pow2(pow - 1)).into();
+
+        let a = ArqSet::new(vec![
+            Arq::new(pow, sa1, 8.into()),
+            Arq::new(pow - 1, sa2, 8.into()),
+        ]);
+        let b = ArqSet::new(vec![
+            Arq::new(pow, sb1, 8.into()),
+            Arq::new(pow - 1, sb2, 8.into()),
+        ]);
+
+        let c = a.intersection(&topo, &b);
+        print_arqs(&topo, &a, 64);
+        println!("");
+        print_arqs(&topo, &b, 64);
+        println!("");
+        // the last arq of c doesn't show up in the ascii representation, but
+        // it is there.
+        print_arqs(&topo, &c, 64);
+
+        let arqs = c.arqs();
+        assert_eq!(arqs.len(), 3);
+        assert_eq!(arqs[0].start, 0.into());
+        assert_eq!(arqs[1].start, 13.into());
+        assert_eq!(arqs[2].start, 20.into());
     }
 
     #[test]

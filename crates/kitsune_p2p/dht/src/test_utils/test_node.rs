@@ -53,18 +53,18 @@ impl TestNode {
     }
 
     /// Print an ascii representation of the node's arq and all ops held
-    pub fn ascii_arqs_and_ops(&self, topo: &Topology, i: usize, len: usize) -> String {
+    pub fn ascii_arqs_and_ops(&self, topo: &Topology, len: usize) -> String {
         self.arqs
             .iter()
-            .map(|(agent, arq)| {
+            .enumerate()
+            .map(|(i, (_, arq))| {
                 format!(
-                    "{:?}: |{}| {}: {}/{} @ {}\n",
-                    agent,
+                    "{:>3}: |{}| {}/{} @ {}\n",
+                    i,
                     add_location_ascii(
                         arq.to_ascii(topo, len),
                         self.store.ops.iter().map(|o| o.loc).collect()
                     ),
-                    i,
                     arq.power(),
                     arq.count(),
                     arq.start_loc()
