@@ -586,7 +586,7 @@ impl ExternalApiWireError {
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes, Clone)]
-/// Filter for [`ListApps`].
+/// Filter for [`AdminRequest::ListApps`].
 pub enum AppStatusFilter {
     Enabled,
     Disabled,
