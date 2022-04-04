@@ -215,7 +215,7 @@ pub enum AdminRequest {
 
     /// Open up a new websocket interface at the networking port
     /// (optionally) specified by argument `port` (or using any free port if argument `port` is `None`)
-    /// over which you can then use the [`AppRequest`] API.
+    /// over which you can then use the [`AppRequest`](super::AppRequest) API.
     /// Any active `App` will be callable via this interface.
     /// The successful [`AdminResponse::AppInterfaceAttached`] message will contain
     /// the port chosen by the conductor if `None` was passed.
@@ -267,7 +267,7 @@ pub enum AdminRequest {
     DumpFullState {
         /// The `CellId` for which to dump state
         cell_id: Box<CellId>,
-        /// The last seen DhtOp RowId, returned in [`FullIntegrationDump`]
+        /// The last seen DhtOp RowId, returned in [`AdminRequest::DumpFullState`]
         /// Only DhtOps with RowId greater than the cursor will be returned
         dht_ops_cursor: Option<u64>,
     },
