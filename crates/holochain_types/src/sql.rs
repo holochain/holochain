@@ -52,4 +52,3 @@ impl<'a> From<&'a LinkTag> for SqlOutput<'a> {
         SqlOutput(ToSqlOutput::Borrowed((&d.0[..]).into()))
     }
 }
-

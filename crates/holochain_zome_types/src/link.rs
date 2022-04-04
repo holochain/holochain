@@ -114,4 +114,3 @@ impl LinkDetails {
         self.into()
     }
 }
-
