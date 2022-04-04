@@ -7,10 +7,6 @@ members = [
   "crates/holo_hash",
   "crates/mr_bundle",
 
-  "crates/hc",
-  "crates/hc_bundle",
-  "crates/hc_sandbox",
-
   "crates/holochain_integrity_types",
   "crates/holochain",
   "crates/holochain_cascade",
@@ -24,6 +20,10 @@ members = [
   "crates/holochain_websocket",
   "crates/holochain_util",
   "crates/holochain_zome_types",
+
+  "crates/hc",
+  "crates/hc_bundle",
+  "crates/hc_sandbox",
 
   "crates/kitsune_p2p/dht_arc",
   "crates/kitsune_p2p/bootstrap",
