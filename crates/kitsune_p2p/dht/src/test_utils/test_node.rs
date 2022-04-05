@@ -42,7 +42,7 @@ impl TestNode {
     pub fn region_set(&self, arq_set: ArqBoundsSet, now: TimeQuantum) -> RegionSet {
         let coords = RegionCoordSetLtcs::new(TelescopingTimes::new(now), arq_set);
         coords
-            .into_region_set_infallible(|(_, coords)| Ok(self.query_region_data(&coords)))
+            .into_region_set_infallible(|(_, coords)| self.query_region_data(&coords))
             .into()
     }
 

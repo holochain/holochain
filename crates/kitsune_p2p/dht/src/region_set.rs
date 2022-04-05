@@ -81,7 +81,7 @@ impl RegionSet {
     /// sparse scenarios.
     pub fn nonzero_regions(
         &self,
-    ) -> impl '_ + Iterator<Item = ((u32, u32), RegionCoords, RegionData)> {
+    ) -> impl '_ + Iterator<Item = ((usize, usize, usize), RegionCoords, RegionData)> {
         match self {
             Self::Ltcs(set) => set.nonzero_regions(),
         }
@@ -97,9 +97,9 @@ mod tests {
     use crate::{
         op::*,
         persistence::*,
-        prelude::{ArqBoundsSet, ArqLocated, ArqStart},
+        prelude::{ArqBoundsSet, ArqLocated, ArqSet, ArqStart},
         test_utils::{Op, OpData, OpStore},
-        Arq, Loc,
+        Arq, ArqBounds, Loc,
     };
 
     use super::*;
@@ -136,6 +136,23 @@ mod tests {
     }
 
     #[test]
+    fn test_count() {
+        use num_traits::Zero;
+        let arqs = ArqBoundsSet::new(vec![
+            ArqBounds::new(12, 11.into(), 8.into()),
+            ArqBounds::new(12, 11.into(), 7.into()),
+            ArqBounds::new(12, 11.into(), 5.into()),
+        ]);
+        let tt = TelescopingTimes::new(TimeQuantum::from(11));
+        let nt = tt.segments().len();
+        let expected = (8 + 7 + 5) * nt;
+        let coords = RegionCoordSetLtcs::new(tt, arqs);
+        assert_eq!(coords.count(), expected);
+        let regions = coords.into_region_set_infallible(|_| RegionData::zero());
+        assert_eq!(regions.count(), expected);
+    }
+
+    #[test]
     fn test_regions() {
         let topo = Topology::unit(Timestamp::from_micros(1000));
         let pow = 8;
@@ -165,7 +182,12 @@ mod tests {
         let coords = RegionCoordSetLtcs::new(times, ArqBoundsSet::single(arq.to_bounds(&topo)));
         let rset = RegionSetLtcs::from_store(&store, coords);
         assert_eq!(
-            rset.data.concat().iter().map(|r| r.count).sum::<u32>() as usize,
+            rset.data
+                .concat()
+                .concat()
+                .iter()
+                .map(|r| r.count)
+                .sum::<u32>() as usize,
             nx * nt / 2
         );
     }

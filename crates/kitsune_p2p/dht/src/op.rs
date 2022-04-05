@@ -8,7 +8,7 @@ pub use kitsune_p2p_timestamp::Timestamp;
 
 /// Everything that Kitsune needs to know about an Op.
 /// Intended to be implemented by the host.
-pub trait OpRegion<D>: PartialOrd + Ord + Send + Sync {
+pub trait OpRegion<D>: PartialOrd + Ord + Send + Sync + std::fmt::Debug {
     /// The op's Location
     fn loc(&self) -> Loc;
     /// The op's Timestamp

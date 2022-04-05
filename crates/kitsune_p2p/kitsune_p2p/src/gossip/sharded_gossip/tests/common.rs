@@ -49,7 +49,6 @@ impl KitsuneHost for StandardResponsesHostApi {
             )
             .expect("an arc in the set could not be quantized");
             let coords = RegionCoordSetLtcs::new(TelescopingTimes::new(1.into()), arqs);
-            let chunks = coords.num_space_chunks();
             let region_set = if self.with_data {
                 // XXX: this is very fake, and completely wrong!
                 //      in order to properly match the fake data returned in other methods,
@@ -59,7 +58,7 @@ impl KitsuneHost for StandardResponsesHostApi {
                     size: 1,
                     count: 1,
                 };
-                RegionSetLtcs::from_data(coords, vec![vec![data]; chunks])
+                coords.into_region_set_infallible(|_| data.clone())
             } else {
                 RegionSetLtcs::from_data(coords, vec![])
             };

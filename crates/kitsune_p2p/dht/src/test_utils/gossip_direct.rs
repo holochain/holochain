@@ -67,8 +67,6 @@ pub fn gossip_direct<Peer: HostAccessTest>(
         // - calculate regions
         let regions_left = left.region_set(common_arqs.clone(), time_left);
         let regions_right = right.region_set(common_arqs.clone(), time_right);
-        dbg!(regions_left.nonzero_regions().collect::<Vec<_>>());
-        dbg!(regions_right.nonzero_regions().collect::<Vec<_>>());
         stats.regions_sent += regions_left.count() as u32;
         stats.regions_rcvd += regions_right.count() as u32;
         (regions_left, regions_right)

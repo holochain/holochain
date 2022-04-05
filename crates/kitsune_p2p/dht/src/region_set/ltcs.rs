@@ -29,24 +29,28 @@ impl RegionCoordSetLtcs {
     #[cfg_attr(not(feature = "test_utils"), deprecated = "use into_region_set")]
     pub(crate) fn region_coords_flat(
         &self,
-    ) -> impl Iterator<Item = ((u32, u32), RegionCoords)> + '_ {
-        self.region_coords_nested().flatten()
+    ) -> impl Iterator<Item = ((usize, usize, usize), RegionCoords)> + '_ {
+        self.region_coords_nested().flatten().flatten()
     }
 
     /// Iterate over the coords in the same structure in which they are stored:
-    /// An outer Vec corresponding to space segments,
+    /// An outermost Vec corresponding to the arqs,
+    /// An middle Vec corresponding to space segments,
     /// and inner Vecs corresponding to time segments.
     #[cfg_attr(not(feature = "test_utils"), deprecated = "use into_region_set")]
     pub(crate) fn region_coords_nested(
         &self,
-    ) -> impl Iterator<Item = impl Iterator<Item = ((u32, u32), RegionCoords)>> + '_ {
-        self.arq_set.arqs().iter().flat_map(move |arq| {
+    ) -> impl Iterator<
+        Item = impl Iterator<Item = impl Iterator<Item = ((usize, usize, usize), RegionCoords)>> + '_,
+    > + '_ {
+        let arqs = self.arq_set.arqs();
+        arqs.iter().enumerate().map(move |(ia, arq)| {
             arq.segments().enumerate().map(move |(ix, x)| {
                 self.times
                     .segments()
                     .into_iter()
                     .enumerate()
-                    .map(move |(it, t)| ((ix as u32, it as u32), RegionCoords::new(x, t)))
+                    .map(move |(it, t)| ((ia, ix, it), RegionCoords::new(x, t)))
             })
         })
     }
@@ -55,22 +59,27 @@ impl RegionCoordSetLtcs {
     pub fn into_region_set<D, F, E>(self, mut f: F) -> Result<RegionSetLtcs<D>, E>
     where
         D: RegionDataConstraints,
-        F: FnMut(((u32, u32), RegionCoords)) -> Result<D, E>,
+        F: FnMut(((usize, usize, usize), RegionCoords)) -> Result<D, E>,
     {
         let data = self
             .region_coords_nested()
-            .map(move |column| column.map(&mut f).collect::<Result<Vec<D>, E>>())
-            .collect::<Result<Vec<Vec<D>>, E>>()?;
+            .map(|arqdata| {
+                arqdata
+                    .map(|column| column.map(&mut f).collect::<Result<Vec<D>, E>>())
+                    .collect::<Result<Vec<Vec<D>>, E>>()
+            })
+            .collect::<Result<Vec<Vec<Vec<D>>>, E>>()?;
         Ok(RegionSetLtcs::from_data(self, data))
     }
 
     /// Generate data for each coord in the set, creating the corresponding [`RegionSetLtcs`].
-    pub fn into_region_set_infallible<D, F>(self, f: F) -> RegionSetLtcs<D>
+    pub fn into_region_set_infallible<D, F>(self, mut f: F) -> RegionSetLtcs<D>
     where
         D: RegionDataConstraints,
-        F: FnMut(((u32, u32), RegionCoords)) -> Result<D, std::convert::Infallible>,
+        F: FnMut(((usize, usize, usize), RegionCoords)) -> D,
     {
-        self.into_region_set(f).unwrap()
+        self.into_region_set(|c| Result::<D, std::convert::Infallible>::Ok(f(c)))
+            .unwrap()
     }
 
     /// An empty set of coords
@@ -84,6 +93,12 @@ impl RegionCoordSetLtcs {
     /// Return the number of chunks in the arq set
     pub fn num_space_chunks(&self) -> usize {
         self.arq_set.arqs().len()
+    }
+
+    /// The total number of coords represented here.
+    pub fn count(&self) -> usize {
+        let nt = self.times.segments().len();
+        self.arq_set.arqs().iter().map(|a| a.count()).sum::<u32>() as usize * nt
     }
 }
 
@@ -106,7 +121,7 @@ pub struct RegionSetLtcs<D: RegionDataConstraints = RegionData> {
     /// The outer vec corresponds to the spatial segments;
     /// the inner vecs are the time segments.
     #[serde(bound(deserialize = "D: serde::de::DeserializeOwned"))]
-    pub data: Vec<Vec<D>>,
+    pub data: Vec<Vec<Vec<D>>>,
 }
 
 impl<D: RegionDataConstraints> RegionSetLtcs<D> {
@@ -121,7 +136,7 @@ impl<D: RegionDataConstraints> RegionSetLtcs<D> {
 
     /// Construct the region set from existing data.
     /// The data must match the coords!
-    pub fn from_data(coords: RegionCoordSetLtcs, data: Vec<Vec<D>>) -> Self {
+    pub fn from_data(coords: RegionCoordSetLtcs, data: Vec<Vec<Vec<D>>>) -> Self {
         Self {
             coords,
             data,
@@ -131,18 +146,27 @@ impl<D: RegionDataConstraints> RegionSetLtcs<D> {
 
     /// The total number of regions represented in this region set
     pub fn count(&self) -> usize {
-        if self.data.is_empty() {
-            0
-        } else {
-            self.data.len() * self.data[0].len()
-        }
+        self.data
+            .iter()
+            .map(|d| {
+                if d.is_empty() {
+                    0
+                } else {
+                    // All inner lengths must be equal
+                    debug_assert!(d.iter().all(|i| i.len() == d[0].len()));
+                    d.len() * d[0].len()
+                }
+            })
+            .sum()
     }
 
     /// Iterate over each region in the set
     pub fn regions(&self) -> impl Iterator<Item = Region<D>> + '_ {
         self.coords
             .region_coords_flat()
-            .map(|((ix, it), coords)| Region::new(coords, self.data[ix as usize][it as usize]))
+            .map(|((ia, ix, it), coords)| {
+                Region::new(coords, self.data[ia][ix as usize][it as usize])
+            })
     }
 
     /// Reshape the two region sets so that both match, omitting or merging
@@ -156,8 +180,10 @@ impl<D: RegionDataConstraints> RegionSetLtcs<D> {
         }
         let mut len = 0;
         for (da, db) in self.data.iter_mut().zip(other.data.iter_mut()) {
-            TelescopingTimes::rectify((&self.coords.times, da), (&other.coords.times, db));
-            len = da.len();
+            for (dda, ddb) in da.iter_mut().zip(db.iter_mut()) {
+                TelescopingTimes::rectify((&self.coords.times, dda), (&other.coords.times, ddb));
+                len = dda.len();
+            }
         }
         let times = other.coords.times.limit(len as u32);
         self.coords.times = times;
@@ -189,7 +215,7 @@ impl<D: RegionDataConstraints> RegionSetLtcs<D> {
         store: &S,
         coords: RegionCoordSetLtcs,
     ) -> Self {
-        coords.into_region_set_infallible(|(_, coords)| Ok(store.query_region_data(&coords)))
+        coords.into_region_set_infallible(|(_, coords)| store.query_region_data(&coords))
     }
 }
 
@@ -199,10 +225,12 @@ impl RegionSetLtcs {
     /// sparse scenarios.
     pub fn nonzero_regions(
         &self,
-    ) -> impl '_ + Iterator<Item = ((u32, u32), RegionCoords, RegionData)> {
-        self.coords.region_coords_flat().filter_map(|((i, j), c)| {
-            let d = &self.data[i as usize][j as usize];
-            (d.count > 0).then(|| ((i, j), c, *d))
-        })
+    ) -> impl '_ + Iterator<Item = ((usize, usize, usize), RegionCoords, RegionData)> {
+        self.coords
+            .region_coords_flat()
+            .filter_map(|((a, x, y), c)| {
+                let d = &self.data[a][x][y];
+                (d.count > 0).then(|| ((a, x, y), c, *d))
+            })
     }
 }

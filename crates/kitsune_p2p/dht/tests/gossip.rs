@@ -71,10 +71,8 @@ fn test_multi() {
 
     alice.integrate_op(OpData::fake(sb1, ts(10), 123));
     bobbo.integrate_op(OpData::fake(sa2, ts(11), 234));
-    // Timestamp matters: seems the hour-back thing is happening here?
-    todo!("find out why this works when setting time quantum to < 20");
     alice.integrate_op(OpData::fake(sb2, ts(25), 345));
-    bobbo.integrate_op(OpData::fake(sb1 + (pow2(pow) * 2).into(), ts(15), 456));
+    bobbo.integrate_op(OpData::fake(sb1 + (pow2(pow) * 2).into(), ts(29), 456));
 
     println!("{}", alice.ascii_arqs_and_ops(&topo, 64));
     println!("{}", bobbo.ascii_arqs_and_ops(&topo, 64));
