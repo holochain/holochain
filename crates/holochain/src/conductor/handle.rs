@@ -136,6 +136,14 @@ pub trait ConductorHandleT: Send + Sync {
     /// Install a [`DnaFile`](holochain_types::dna::DnaFile) in this Conductor
     async fn register_dna(&self, dna: DnaFile) -> ConductorResult<()>;
 
+    /// Hot swap coordinator zomes on an existing dna.
+    async fn hot_swap_coordinators(
+        &self,
+        hash: &DnaHash,
+        coordinator_zomes: Zomes,
+        wasms: Vec<wasm::DnaWasm>,
+    ) -> ConductorResult<()>;
+
     /// Get the list of hashes of installed Dnas in this Conductor
     fn list_dnas(&self) -> Vec<DnaHash>;
 
@@ -547,6 +555,40 @@ impl ConductorHandleT for ConductorHandleImpl {
     async fn register_dna(&self, dna: DnaFile) -> ConductorResult<()> {
         self.register_genotype(dna.clone()).await?;
         self.conductor.register_phenotype(dna);
+        Ok(())
+    }
+
+    async fn hot_swap_coordinators(
+        &self,
+        hash: &DnaHash,
+        coordinator_zomes: Zomes,
+        wasms: Vec<wasm::DnaWasm>,
+    ) -> ConductorResult<()> {
+        // Note this isn't really concurrent safe. It would be a race condition to hotswap the
+        // same dna concurrently.
+        let mut dna_file =
+            self.conductor
+                .dna_store()
+                .share_ref(|d| match d.get_dna_file(hash) {
+                    Some(dna) => Ok(dna),
+                    None => Err(DnaError::DnaMissing(hash.to_owned())),
+                })?;
+        let _old_wasms = dna_file
+            .hot_swap_coordinators(coordinator_zomes.clone(), wasms.clone())
+            .await?;
+
+        // Add new wasm code to db.
+        self.conductor
+            .put_wasm_code(dna_file.clone(), wasms.into_iter(), Vec::with_capacity(0))
+            .await?;
+
+        // Update DnaStore.
+        self.conductor
+            .dna_store()
+            .share_mut(|d| d.add_dna(dna_file));
+
+        // TODO: Remove old wasm code? (Maybe this needs to be done on restart as it could be in use).
+
         Ok(())
     }
 

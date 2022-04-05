@@ -2,9 +2,9 @@ use super::create::extract_entry_def;
 use super::delete::get_original_address;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
+use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
 use holochain_wasmer_host::prelude::WasmError;
-use crate::core::ribosome::RibosomeError;
 
 use holochain_types::prelude::*;
 use std::sync::Arc;
@@ -29,7 +29,15 @@ pub fn update<'a>(
                 entry_def_id,
                 entry,
                 chain_top_ordering,
+                zome_name,
             } = create_input;
+            let zome = match &zome_name {
+                Some(zome_name) => ribosome
+                    .dna_def()
+                    .get_integrity_zome(&zome_name)
+                    .map_err(|zome_error| WasmError::Host(zome_error.to_string()))?,
+                None => call_context.zome.clone(),
+            };
 
             // Countersigned entries have different header handling.
             match entry {
@@ -40,7 +48,7 @@ pub fn update<'a>(
                         .source_chain()
                         .as_ref()
                         .expect("Must have source chain if write_workspace access is given")
-                        .put_countersigned(Some(call_context.zome.clone()), entry, chain_top_ordering)
+                        .put_countersigned(Some(zome.clone()), entry, chain_top_ordering)
                         .await
                         .map_err(|source_chain_error| {
                             WasmError::Host(source_chain_error.to_string())
@@ -52,11 +60,9 @@ pub fn update<'a>(
 
                     // extract the zome position
                     let header_zome_id =
-                        ribosome
-                            .zome_to_id(&call_context.zome)
-                            .map_err(|source_chain_error| {
-                                WasmError::Host(source_chain_error.to_string())
-                            })?;
+                        ribosome.zome_to_id(&zome).map_err(|source_chain_error| {
+                            WasmError::Host(source_chain_error.to_string())
+                        })?;
 
                     // extract the entry defs for a zome
                     let entry_type = match entry_def_id {
@@ -64,6 +70,7 @@ pub fn update<'a>(
                             let (header_entry_def_id, entry_visibility) = extract_entry_def(
                                 ribosome,
                                 call_context.clone(),
+                                zome.clone(),
                                 entry_def_id.into(),
                             )?;
                             let app_entry_type = AppEntryType::new(
@@ -90,7 +97,6 @@ pub fn update<'a>(
                         entry_hash,
                     };
                     let workspace = call_context.host_context.workspace_write();
-                    let zome = call_context.zome.clone();
 
                     // return the hash of the updated entry
                     // note that validation is handled by the workflow
@@ -113,11 +119,14 @@ pub fn update<'a>(
                 }
             }
         }
-        _ => Err(WasmError::Host(RibosomeError::HostFnPermissions(
-            call_context.zome.zome_name().clone(),
-            call_context.function_name().clone(),
-            "update".into()
-        ).to_string()))
+        _ => Err(WasmError::Host(
+            RibosomeError::HostFnPermissions(
+                call_context.zome.zome_name().clone(),
+                call_context.function_name().clone(),
+                "update".into(),
+            )
+            .to_string(),
+        )),
     }
 }
 

@@ -242,7 +242,11 @@ impl FnComponents {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(test, derive(arbitrary::Arbitrary))]
 pub enum ZomesToInvoke {
+    /// All the integrity zomes.
+    AllIntegrity,
+    /// All integrity and coordinator zomes.
     All,
+    /// A single zome.
     One(Zome),
 }
 
@@ -450,10 +454,16 @@ pub trait RibosomeT: Sized + std::fmt::Debug {
 
     fn zomes_to_invoke(&self, zomes_to_invoke: ZomesToInvoke) -> Vec<Zome> {
         match zomes_to_invoke {
+            ZomesToInvoke::AllIntegrity => self
+                .dna_def()
+                .integrity_zomes
+                .iter()
+                .cloned()
+                .map(Into::into)
+                .collect(),
             ZomesToInvoke::All => self
                 .dna_def()
-                .zomes
-                .iter()
+                .all_zomes()
                 .cloned()
                 .map(Into::into)
                 .collect(),
@@ -465,8 +475,7 @@ pub trait RibosomeT: Sized + std::fmt::Debug {
         let zome_name = zome.zome_name();
         match self
             .dna_def()
-            .zomes
-            .iter()
+            .all_zomes()
             .position(|(name, _)| name == zome_name)
         {
             Some(index) => Ok(holochain_zome_types::header::ZomeId::from(index as u8)),

@@ -31,7 +31,7 @@ impl From<&GenesisSelfCheckHostAccess> for HostFnAccess {
 
 impl Invocation for GenesisSelfCheckInvocation {
     fn zomes(&self) -> ZomesToInvoke {
-        ZomesToInvoke::All
+        ZomesToInvoke::AllIntegrity
     }
     fn fn_components(&self) -> FnComponents {
         vec!["genesis_self_check".into()].into()

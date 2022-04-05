@@ -1,11 +1,12 @@
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashMap},
     path::{Path, PathBuf},
 };
 
 use crate::prelude::*;
+use futures::StreamExt;
 use holo_hash::*;
-use mr_bundle::Location;
+use mr_bundle::{Location, ResourceBytes};
 
 /// A bundle of Wasm zomes, respresented as a file.
 #[derive(
@@ -37,8 +38,8 @@ impl DnaBundle {
         uid: Option<Uid>,
         properties: Option<YamlProperties>,
     ) -> DnaResult<(DnaFile, DnaHash)> {
-        let (zomes, wasms) = self.inner_maps().await?;
-        let (dna_def, original_hash) = self.to_dna_def(zomes, uid, properties)?;
+        let ([integrity, coordinator], wasms) = self.inner_maps().await?;
+        let (dna_def, original_hash) = self.to_dna_def(integrity, coordinator, uid, properties)?;
 
         Ok((DnaFile::from_parts(dna_def, wasms), original_hash))
     }
@@ -58,55 +59,31 @@ impl DnaBundle {
             .map_err(Into::into)
     }
 
-    async fn inner_maps(&self) -> DnaResult<(Zomes, WasmMap)> {
+    async fn inner_maps(&self) -> DnaResult<([Zomes; 2], WasmMap)> {
         let mut resources = self.resolve_all_cloned().await?;
-        let intermediate: Vec<_> = match self.manifest() {
-            DnaManifest::V1(manifest) => manifest
-                .zomes
-                .iter()
-                .map(|z| {
-                    let bytes = resources
-                        .remove(&z.location)
-                        .expect("resource referenced in manifest must exist");
-                    (
-                        z.name.clone(),
-                        z.hash.clone().map(WasmHash::from),
-                        DnaWasm::from(bytes),
-                    )
-                })
-                .collect(),
+        let data = match self.manifest() {
+            DnaManifest::V1(manifest) => {
+                let integrity =
+                    hash_bytes(manifest.zomes.integrity.iter().cloned(), &mut resources).await?;
+                let coordinator =
+                    hash_bytes(manifest.zomes.coordinator.iter().cloned(), &mut resources).await?;
+                [integrity, coordinator]
+            }
         };
 
-        let data = futures::future::join_all(intermediate.into_iter().map(
-            |(zome_name, expected_hash, wasm)| async {
-                let hash = wasm.to_hash().await;
-                if let Some(expected) = expected_hash {
-                    if hash != expected {
-                        return Err(DnaError::WasmHashMismatch(expected, hash));
-                    }
-                }
-                DnaResult::Ok((zome_name, hash, wasm))
-            },
-        ))
-        .await
-        .into_iter()
-        .collect::<Result<Vec<_>, _>>()?;
+        let mut zomes = [Zomes::default(), Zomes::default()];
+        let mut code = BTreeMap::new();
 
-        let zomes: Zomes = data
-            .iter()
-            .map(|(zome_name, hash, _)| {
+        for (data, out) in data.into_iter().zip(zomes.iter_mut()) {
+            out.extend(data.iter().map(|(zome_name, hash, _)| {
                 (
                     zome_name.clone(),
                     ZomeDef::Wasm(WasmZome::new(hash.clone())),
                 )
-            })
-            .collect();
+            }));
+            code.extend(data.into_iter().map(|(_, hash, wasm)| (hash, wasm)));
+        }
 
-        let code: BTreeMap<_, _> = data
-            .into_iter()
-            .map(|(_, hash, wasm)| (hash, wasm))
-            .into_iter()
-            .collect();
         let wasms = WasmMap::from(code);
 
         Ok((zomes, wasms))
@@ -115,7 +92,8 @@ impl DnaBundle {
     /// Convert to a DnaDef
     pub fn to_dna_def(
         &self,
-        zomes: Zomes,
+        integrity_zomes: Zomes,
+        coordinator_zomes: Zomes,
         uid: Option<Uid>,
         properties: Option<YamlProperties>,
     ) -> DnaResult<(DnaDefHashed, DnaHash)> {
@@ -128,7 +106,8 @@ impl DnaBundle {
                         manifest.properties.clone().unwrap_or_default(),
                     )?,
                     origin_time: manifest.origin_time.into(),
-                    zomes,
+                    integrity_zomes,
+                    coordinator_zomes,
                 };
 
                 if uid.is_none() && properties.is_none() {
@@ -169,8 +148,8 @@ impl DnaBundle {
 
     #[cfg(feature = "test_utils")]
     fn manifest_from_dna_def(dna_def: DnaDef) -> DnaResult<DnaManifest> {
-        let zomes = dna_def
-            .zomes
+        let integrity = dna_def
+            .integrity_zomes
             .into_iter()
             .filter_map(|(name, zome)| {
                 match zome {
@@ -188,6 +167,29 @@ impl DnaBundle {
                 })
             })
             .collect();
+        let coordinator = dna_def
+            .coordinator_zomes
+            .into_iter()
+            .filter_map(|(name, zome)| {
+                match zome {
+                    ZomeDef::Wasm(wz) => Some(wz.wasm_hash),
+                    ZomeDef::Inline(_) => None,
+                }
+                .map(|hash| {
+                    let hash = WasmHashB64::from(hash);
+                    let filename = format!("{}", hash);
+                    ZomeManifest {
+                        name,
+                        hash: Some(hash),
+                        location: Location::Bundled(PathBuf::from(filename)),
+                    }
+                })
+            })
+            .collect();
+        let zomes = AllZomes {
+            integrity,
+            coordinator,
+        };
         Ok(DnaManifestCurrent {
             name: dna_def.name,
             uid: Some(dna_def.uid),
@@ -204,6 +206,34 @@ impl DnaBundle {
     }
 }
 
+async fn hash_bytes(
+    zomes: impl Iterator<Item = ZomeManifest>,
+    resources: &mut HashMap<Location, ResourceBytes>,
+) -> DnaResult<Vec<(ZomeName, WasmHash, DnaWasm)>> {
+    let iter = zomes.map(|z| {
+        let bytes = resources
+            .remove(&z.location)
+            .expect("resource referenced in manifest must exist");
+        let zome_name = z.name;
+        let expected_hash = z.hash.map(WasmHash::from);
+        let wasm = DnaWasm::from(bytes);
+        async move {
+            let hash = wasm.to_hash().await;
+            if let Some(expected) = expected_hash {
+                if hash != expected {
+                    return Err(DnaError::WasmHashMismatch(expected, hash));
+                }
+            }
+            DnaResult::Ok((zome_name, hash, wasm))
+        }
+    });
+    futures::stream::iter(iter)
+        .buffered(10)
+        .collect::<Vec<_>>()
+        .await
+        .into_iter()
+        .collect()
+}
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
@@ -223,19 +253,22 @@ mod tests {
             uid: Some("original uid".to_string()),
             properties: Some(serde_yaml::Value::Null.into()),
             origin_time: Timestamp::HOLOCHAIN_EPOCH.into(),
-            zomes: vec![
-                ZomeManifest {
-                    name: "zome1".into(),
-                    hash: None,
-                    location: mr_bundle::Location::Bundled(path1.clone()),
-                },
-                ZomeManifest {
-                    name: "zome2".into(),
-                    // Intentional wrong hash
-                    hash: Some(hash1.clone().into()),
-                    location: mr_bundle::Location::Bundled(path2.clone()),
-                },
-            ],
+            zomes: AllZomes {
+                integrity: vec![
+                    ZomeManifest {
+                        name: "zome1".into(),
+                        hash: None,
+                        location: mr_bundle::Location::Bundled(path1.clone()),
+                    },
+                    ZomeManifest {
+                        name: "zome2".into(),
+                        // Intentional wrong hash
+                        hash: Some(hash1.clone().into()),
+                        location: mr_bundle::Location::Bundled(path2.clone()),
+                    },
+                ],
+                coordinator: vec![],
+            },
         };
         let resources = vec![(path1, wasm1), (path2, wasm2)];
 
@@ -251,13 +284,13 @@ mod tests {
         );
 
         // - Correct the hash and try again
-        manifest.zomes[1].hash = Some(hash2.into());
+        manifest.zomes.integrity[1].hash = Some(hash2.into());
         let bundle: DnaBundle =
             mr_bundle::Bundle::new_unchecked(manifest.clone().into(), resources.clone())
                 .unwrap()
                 .into();
         let dna_file: DnaFile = bundle.into_dna_file(None, None).await.unwrap().0;
-        assert_eq!(dna_file.dna_def().zomes.len(), 2);
+        assert_eq!(dna_file.dna_def().integrity_zomes.len(), 2);
         assert_eq!(dna_file.code().len(), 2);
 
         // - Check that properties and UUID can be overridden

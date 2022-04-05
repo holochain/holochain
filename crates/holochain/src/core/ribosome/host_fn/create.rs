@@ -23,6 +23,13 @@ pub fn create<'a>(
         } => {
             let entry = AsRef::<Entry>::as_ref(&input);
             let chain_top_ordering = *input.chain_top_ordering();
+            let zome = match &input.zome_name {
+                Some(zome_name) => ribosome
+                    .dna_def()
+                    .get_integrity_zome(&zome_name)
+                    .map_err(|zome_error| WasmError::Host(zome_error.to_string()))?,
+                None => call_context.zome.clone(),
+            };
 
             // Countersigned entries have different header handling.
             match entry {
@@ -34,7 +41,7 @@ pub fn create<'a>(
                         .as_ref()
                         .expect("Must have source chain if write_workspace access is given")
                         .put_countersigned(
-                            Some(call_context.zome.clone()),
+                            Some(zome.clone()),
                             input.into_entry(),
                             chain_top_ordering,
                         )
@@ -49,7 +56,7 @@ pub fn create<'a>(
 
                     // extract the zome position
                     let header_zome_id = ribosome
-                        .zome_to_id(&call_context.zome)
+                        .zome_to_id(&zome)
                         .expect("Failed to get ID for current zome");
 
                     // extract the entry defs for a zome
@@ -58,6 +65,7 @@ pub fn create<'a>(
                             let (header_entry_def_id, entry_visibility) = extract_entry_def(
                                 ribosome,
                                 call_context.clone(),
+                                zome.clone(),
                                 entry_def_id.to_owned().into(),
                             )?;
                             let app_entry_type = AppEntryType::new(
@@ -90,7 +98,7 @@ pub fn create<'a>(
                             .as_ref()
                             .expect("Must have source chain if write_workspace access is given")
                             .put(
-                                Some(call_context.zome.clone()),
+                                Some(zome.clone()),
                                 header_builder,
                                 Some(input.into_entry()),
                                 chain_top_ordering,
@@ -117,6 +125,7 @@ pub fn create<'a>(
 pub fn extract_entry_def(
     ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
+    zome: Zome,
     entry_def_id: EntryDefId,
 ) -> Result<(holochain_zome_types::header::EntryDefIndex, EntryVisibility), WasmError> {
     let app_entry_type = match ribosome
@@ -125,7 +134,7 @@ pub fn extract_entry_def(
     {
         // the ribosome returned some defs
         EntryDefsResult::Defs(defs) => {
-            let maybe_entry_defs = defs.get(call_context.zome.zome_name());
+            let maybe_entry_defs = defs.get(zome.zome_name());
             match maybe_entry_defs {
                 // convert the entry def id string into a numeric position in the defs
                 Some(entry_defs) => {
@@ -145,7 +154,7 @@ pub fn extract_entry_def(
         Some(app_entry_type) => Ok(app_entry_type),
         None => Err(WasmError::Host(
             RibosomeError::EntryDefs(
-                call_context.zome.zome_name().clone(),
+                zome.zome_name().clone(),
                 format!("entry def not found for {:?}", entry_def_id),
             )
             .to_string(),

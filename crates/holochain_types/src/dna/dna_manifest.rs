@@ -2,6 +2,9 @@ use crate::prelude::*;
 use std::path::PathBuf;
 mod dna_manifest_v1;
 
+#[cfg(test)]
+mod test;
+
 /// Re-export the current version. When creating a new version, just re-export
 /// the new version, and update the code accordingly.
 pub use dna_manifest_v1::{
@@ -41,7 +44,7 @@ impl DnaManifest {
         uid: Option<String>,
         properties: Option<YamlProperties>,
         origin_time: HumanTimestamp,
-        zomes: Vec<ZomeManifest>,
+        zomes: AllZomes,
     ) -> Self {
         DnaManifestCurrent::new(name, uid, properties, origin_time, zomes).into()
     }

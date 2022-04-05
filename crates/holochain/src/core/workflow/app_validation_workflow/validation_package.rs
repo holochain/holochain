@@ -64,7 +64,7 @@ pub fn get_as_author_custom(
 
     let zome = match ribosome
         .dna_def()
-        .zomes
+        .integrity_zomes
         .get(app_entry_type.zome_id().index())
     {
         Some(zome_tuple) => zome_tuple.clone().into(),

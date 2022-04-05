@@ -706,7 +706,11 @@ impl Cell {
             Some(EntryType::App(entry_type)) => {
                 let zome_index = u8::from(entry_type.zome_id()) as usize;
                 let dna_file = self.conductor_api.get_this_dna().map_err(Box::new)?;
-                let zome = dna_file.dna().zomes.get(zome_index).map(|(_, z)| z.clone());
+                let zome = dna_file
+                    .dna()
+                    .integrity_zomes
+                    .get(zome_index)
+                    .map(|(_, z)| z.clone());
                 match zome {
                     Some(zome) => self
                         .conductor_api

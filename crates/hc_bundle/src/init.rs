@@ -2,8 +2,8 @@ use std::io::Write;
 use std::{io, path::PathBuf};
 
 use holochain_types::prelude::{
-    AppBundle, AppManifest, AppManifestCurrentBuilder, AppRoleManifest, DnaBundle, DnaManifest,
-    Timestamp,
+    AllZomes, AppBundle, AppManifest, AppManifestCurrentBuilder, AppRoleManifest, DnaBundle,
+    DnaManifest, Timestamp,
 };
 use holochain_types::web_app::{WebAppBundle, WebAppManifest};
 
@@ -46,7 +46,8 @@ fn prompt_dna_init(root_dir: PathBuf) -> anyhow::Result<DnaBundle> {
         "uid:",
         "00000000-0000-0000-0000-000000000000",
     )?);
-    let manifest = DnaManifest::current(name, uid, None, Timestamp::now().into(), vec![]);
+    let manifest =
+        DnaManifest::current(name, uid, None, Timestamp::now().into(), AllZomes::empty());
     Ok(DnaBundle::new(manifest, vec![], root_dir)?)
 }
 

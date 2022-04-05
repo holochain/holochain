@@ -47,7 +47,19 @@ pub struct DnaDef {
     pub origin_time: Timestamp,
 
     /// A vector of zomes associated with your DNA.
-    pub zomes: Zomes,
+    pub integrity_zomes: Zomes,
+
+    /// A vector of zomes that do not affect
+    /// the [`DnaHash`].
+    pub coordinator_zomes: Zomes,
+}
+
+#[derive(Serialize, Debug, PartialEq, Eq)]
+struct DnaDefHash<'a> {
+    name: &'a String,
+    uid: &'a String,
+    properties: &'a SerializedBytes,
+    integrity_zomes: &'a Zomes,
 }
 
 #[cfg(feature = "test_utils")]
@@ -56,19 +68,37 @@ impl DnaDef {
     pub fn unique_from_zomes(zomes: Vec<Zome>) -> DnaDef {
         let zomes = zomes.into_iter().map(|z| z.into_inner()).collect();
         DnaDefBuilder::default()
-            .zomes(zomes)
+            .integrity_zomes(zomes)
             .random_uid()
             .build()
             .unwrap()
     }
 }
 
+impl DnaDef {
+    /// Get all zomes including the integrity and coordinator zomes.
+    pub fn all_zomes(&self) -> impl Iterator<Item = &(ZomeName, zome::ZomeDef)> {
+        self.integrity_zomes
+            .iter()
+            .chain(self.coordinator_zomes.iter())
+    }
+}
+
 #[cfg(feature = "full-dna-def")]
 impl DnaDef {
+    /// Find an integrity zome from a [`ZomeName`].
+    pub fn get_integrity_zome(&self, zome_name: &ZomeName) -> Result<zome::Zome, ZomeError> {
+        self.integrity_zomes
+            .iter()
+            .find(|(name, _)| name == zome_name)
+            .cloned()
+            .map(|(name, def)| Zome::new(name, def))
+            .ok_or_else(|| ZomeError::ZomeNotFound(format!("Zome '{}' not found", &zome_name,)))
+    }
+
     /// Return a Zome
     pub fn get_zome(&self, zome_name: &ZomeName) -> Result<zome::Zome, ZomeError> {
-        self.zomes
-            .iter()
+        self.all_zomes()
             .find(|(name, _)| name == zome_name)
             .cloned()
             .map(|(name, def)| Zome::new(name, def))
@@ -77,8 +107,7 @@ impl DnaDef {
 
     /// Return a Zome, error if not a WasmZome
     pub fn get_wasm_zome(&self, zome_name: &ZomeName) -> Result<&zome::WasmZome, ZomeError> {
-        self.zomes
-            .iter()
+        self.all_zomes()
             .find(|(name, _)| name == zome_name)
             .map(|(_, def)| def)
             .ok_or_else(|| ZomeError::ZomeNotFound(format!("Zome '{}' not found", &zome_name,)))
@@ -121,4 +150,26 @@ impl DnaDefBuilder {
 pub type DnaDefHashed = HoloHashed<DnaDef>;
 
 #[cfg(feature = "full-dna-def")]
-impl_hashable_content!(DnaDef, Dna);
+impl HashableContent for DnaDef {
+    type HashType = holo_hash::hash_type::Dna;
+
+    fn hash_type(&self) -> Self::HashType {
+        holo_hash::hash_type::Dna::new()
+    }
+
+    fn hashable_content(&self) -> HashableContentBytes {
+        let hash = DnaDefHash {
+            name: &self.name,
+            uid: &self.uid,
+            properties: &self.properties,
+            integrity_zomes: &self.integrity_zomes,
+        };
+        HashableContentBytes::Content(
+            holochain_serialized_bytes::UnsafeBytes::from(
+                holochain_serialized_bytes::encode(&hash)
+                    .expect("Could not serialize HashableContent"),
+            )
+            .into(),
+        )
+    }
+}

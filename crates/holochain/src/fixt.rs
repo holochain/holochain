@@ -147,7 +147,7 @@ fixturator!(
             ));
         }
         let mut dna_def = DnaDefFixturator::new(Unpredictable).next().unwrap();
-        dna_def.zomes = zomes;
+        dna_def.integrity_zomes = zomes;
         let dna = dna_def.into_hashed();
         DnaFile::from_parts(dna, WasmMapFixturator::new(Unpredictable).next().unwrap())
     };
@@ -170,7 +170,7 @@ fixturator!(
         let mut dna_def = DnaDefFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap();
-        dna_def.zomes = zomes;
+        dna_def.integrity_zomes = zomes;
         let dna = dna_def.into_hashed();
         DnaFile::from_parts(
             dna,

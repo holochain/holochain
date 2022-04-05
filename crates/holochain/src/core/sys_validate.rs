@@ -273,7 +273,7 @@ pub async fn check_app_entry_type(
     // Check if the zome is found
     let zome = dna_file
         .dna()
-        .zomes
+        .integrity_zomes
         .get(zome_index)
         .ok_or_else(|| ValidationOutcome::ZomeId(entry_type.clone()))?
         .clone()

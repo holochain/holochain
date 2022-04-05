@@ -82,6 +82,27 @@ impl DnaFile {
         })
     }
 
+    /// Host swap coordinator zomes for this dna.
+    pub async fn hot_swap_coordinators(
+        &mut self,
+        coordinator_zomes: Zomes,
+        wasms: Vec<wasm::DnaWasm>,
+    ) -> Result<Vec<WasmHash>, DnaError> {
+        let old_zomes =
+            std::mem::replace(&mut self.dna.content.coordinator_zomes, coordinator_zomes);
+        let mut old_wasm_hashes = Vec::with_capacity(old_zomes.len());
+        for (name, def) in &old_zomes {
+            let wasm_hash = def.wasm_hash(name)?;
+            self.code.0.remove(&wasm_hash);
+            old_wasm_hashes.push(wasm_hash);
+        }
+        for wasm in wasms {
+            let wasm_hash = holo_hash::WasmHash::with_data(&wasm).await;
+            self.code.0.insert(wasm_hash, wasm);
+        }
+        Ok(old_wasm_hashes)
+    }
+
     /// Construct a DnaFile from its constituent parts
     #[cfg(feature = "fixturators")]
     pub fn from_parts(dna: DnaDefHashed, code: WasmMap) -> Self {

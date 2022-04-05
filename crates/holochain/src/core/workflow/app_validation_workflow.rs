@@ -433,7 +433,7 @@ pub async fn validate_op(
     ribosome: &impl RibosomeT,
 ) -> AppValidationOutcome<Outcome> {
     let zomes_to_invoke = match op {
-        Op::RegisterAgentActivity { .. } | Op::StoreElement { .. } => ZomesToInvoke::All,
+        Op::RegisterAgentActivity { .. } | Op::StoreElement { .. } => ZomesToInvoke::AllIntegrity,
         Op::StoreEntry {
             header:
                 SignedHashed {
@@ -491,7 +491,7 @@ pub fn entry_creation_zomes_to_invoke(
             let zome = zome_id_to_zome(aet.zome_id(), dna_def)?;
             Ok(ZomesToInvoke::One(zome))
         }
-        _ => Ok(ZomesToInvoke::All),
+        _ => Ok(ZomesToInvoke::AllIntegrity),
     }
 }
 
@@ -506,7 +506,7 @@ fn create_link_zomes_to_invoke(
 fn zome_id_to_zome(zome_id: ZomeId, dna_def: &DnaDef) -> AppValidationResult<Zome> {
     let zome_index = u8::from(zome_id) as usize;
     Ok(dna_def
-        .zomes
+        .integrity_zomes
         .get(zome_index)
         .ok_or(AppValidationError::ZomeId(zome_id))?
         .clone()

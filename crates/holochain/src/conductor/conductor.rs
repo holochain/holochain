@@ -420,8 +420,7 @@ impl Conductor {
     ) -> ConductorResult<Vec<(EntryDefBufferKey, EntryDef)>> {
         let is_full_wasm_dna = dna
             .dna_def()
-            .zomes
-            .iter()
+            .all_zomes()
             .all(|(_, zome_def)| matches!(zome_def, ZomeDef::Wasm(_)));
 
         // Only install wasm if the DNA is composed purely of WasmZomes (no InlineZomes)
@@ -811,8 +810,7 @@ impl Conductor {
                     .iter()
                     .flat_map(|dna_def| {
                         dna_def
-                            .zomes
-                            .iter()
+                            .all_zomes()
                             .map(|(zome_name, zome)| Ok(zome.wasm_hash(zome_name)?))
                     })
                     .collect::<ConductorResult<HashSet<_>>>()?;
@@ -827,26 +825,26 @@ impl Conductor {
                             .map(|wasm| (wasm_hash, wasm))
                     })
                     .collect::<ConductorResult<HashMap<_, _>>>()?;
-                let wasm_tasks =
-                    holochain_state::dna_def::get_all(&txn)?
-                        .into_iter()
-                        .map(|dna_def| {
-                            // Load all wasms for each dna_def from the wasm db into memory
-                            let wasms = dna_def.zomes.clone().into_iter().filter_map(
-                                |(zome_name, zome)| {
-                                    let wasm_hash = zome.wasm_hash(&zome_name).ok()?;
-                                    // Note this is a cheap arc clone.
-                                    wasms.get(&wasm_hash).cloned()
-                                },
-                            );
-                            let wasms = wasms.collect::<Vec<_>>();
-                            async move {
-                                let dna_file = DnaFile::new(dna_def.into_content(), wasms).await?;
-                                ConductorResult::Ok((dna_file.dna_hash().clone(), dna_file))
-                            }
-                        })
-                        // This needs to happen due to the environment not being Send
-                        .collect::<Vec<_>>();
+                let wasm_tasks = holochain_state::dna_def::get_all(&txn)?
+                    .into_iter()
+                    .map(|dna_def| {
+                        // Load all wasms for each dna_def from the wasm db into memory
+                        let wasms = dna_def
+                            .all_zomes()
+                            .cloned()
+                            .filter_map(|(zome_name, zome)| {
+                                let wasm_hash = zome.wasm_hash(&zome_name).ok()?;
+                                // Note this is a cheap arc clone.
+                                wasms.get(&wasm_hash).cloned()
+                            });
+                        let wasms = wasms.collect::<Vec<_>>();
+                        async move {
+                            let dna_file = DnaFile::new(dna_def.into_content(), wasms).await?;
+                            ConductorResult::Ok((dna_file.dna_hash().clone(), dna_file))
+                        }
+                    })
+                    // This needs to happen due to the environment not being Send
+                    .collect::<Vec<_>>();
                 let defs = holochain_state::entry_def::get_all(&txn)?;
                 ConductorResult::Ok((wasm_tasks, defs))
             })
@@ -915,39 +913,44 @@ impl Conductor {
         &self,
         dna: DnaFile,
     ) -> ConductorResult<Vec<(EntryDefBufferKey, EntryDef)>> {
-        let db = self.spaces.wasm_db.clone();
-
         let zome_defs = get_entry_defs(dna.clone())?;
+        let code = dna.code().clone().into_iter().map(|(_, c)| c);
+        self.put_wasm_code(dna, code, zome_defs).await
+    }
 
+    pub(super) async fn put_wasm_code(
+        &self,
+        dna: DnaFile,
+        code: impl Iterator<Item = wasm::DnaWasm>,
+        zome_defs: Vec<(EntryDefBufferKey, EntryDef)>,
+    ) -> ConductorResult<Vec<(EntryDefBufferKey, EntryDef)>> {
         // TODO: PERF: This loop might be slow
-        let wasms = futures::future::join_all(
-            dna.code()
-                .clone()
-                .into_iter()
-                .map(|(_, dna_wasm)| DnaWasmHashed::from_content(dna_wasm)),
-        )
-        .await;
+        let wasms =
+            futures::future::join_all(code.map(|dna_wasm| DnaWasmHashed::from_content(dna_wasm)))
+                .await;
 
-        db.async_commit({
-            let zome_defs = zome_defs.clone();
-            move |txn| {
-                for dna_wasm in wasms {
-                    if !holochain_state::wasm::contains(txn, dna_wasm.as_hash())? {
-                        holochain_state::wasm::put(txn, dna_wasm)?;
+        self.spaces
+            .wasm_db
+            .async_commit({
+                let zome_defs = zome_defs.clone();
+                move |txn| {
+                    for dna_wasm in wasms {
+                        if !holochain_state::wasm::contains(txn, dna_wasm.as_hash())? {
+                            holochain_state::wasm::put(txn, dna_wasm)?;
+                        }
                     }
-                }
 
-                for (key, entry_def) in zome_defs.clone() {
-                    holochain_state::entry_def::put(txn, key, &entry_def)?;
-                }
+                    for (key, entry_def) in zome_defs.clone() {
+                        holochain_state::entry_def::put(txn, key, &entry_def)?;
+                    }
 
-                if !holochain_state::dna_def::contains(txn, dna.dna_hash())? {
-                    holochain_state::dna_def::put(txn, dna.dna_def().clone())?;
+                    if !holochain_state::dna_def::contains(txn, dna.dna_hash())? {
+                        holochain_state::dna_def::put(txn, dna.dna_def().clone())?;
+                    }
+                    StateMutationResult::Ok(())
                 }
-                StateMutationResult::Ok(())
-            }
-        })
-        .await?;
+            })
+            .await?;
 
         Ok(zome_defs)
     }

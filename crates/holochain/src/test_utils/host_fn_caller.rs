@@ -119,7 +119,13 @@ impl HostFnCaller {
 
         let zome_path = (
             cell_id.clone(),
-            dna_file.dna().zomes.get(zome_index).unwrap().0.clone(),
+            dna_file
+                .dna()
+                .integrity_zomes
+                .get(zome_index)
+                .unwrap()
+                .0
+                .clone(),
         )
             .into();
         let ribosome = RealRibosome::new(dna_file.clone());

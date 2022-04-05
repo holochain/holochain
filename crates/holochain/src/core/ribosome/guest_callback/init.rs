@@ -47,7 +47,7 @@ impl From<&InitHostAccess> for HostFnAccess {
 
 impl Invocation for InitInvocation {
     fn zomes(&self) -> ZomesToInvoke {
-        ZomesToInvoke::All
+        ZomesToInvoke::AllIntegrity
     }
     fn fn_components(&self) -> FnComponents {
         vec!["init".into()].into()
@@ -190,7 +190,7 @@ mod test {
         let init_invocation = InitInvocationFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();
-        assert_eq!(ZomesToInvoke::All, init_invocation.zomes(),);
+        assert_eq!(ZomesToInvoke::AllIntegrity, init_invocation.zomes(),);
     }
 
     #[test]

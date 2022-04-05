@@ -6,6 +6,7 @@
 //! entry_types, and special entries, like deletion_entry and cap_entry.
 
 use crate::header::ChainTopOrdering;
+use holochain_integrity_types::ZomeName;
 use holochain_serialized_bytes::prelude::*;
 
 mod app_entry_bytes;
@@ -75,6 +76,8 @@ pub enum GetStrategy {
 /// Zome input to create an entry.
 #[derive(PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct CreateInput {
+    /// The name of the zome where this entry will be created.
+    pub zome_name: Option<ZomeName>,
     /// EntryDefId for the created entry.
     pub entry_def_id: crate::entry_def::EntryDefId,
     /// Entry body.
@@ -91,6 +94,7 @@ impl CreateInput {
         chain_top_ordering: ChainTopOrdering,
     ) -> Self {
         Self {
+            zome_name: None,
             entry_def_id,
             entry,
             chain_top_ordering,

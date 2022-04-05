@@ -41,7 +41,7 @@ impl From<&EntryDefsHostAccess> for HostFnAccess {
 
 impl Invocation for EntryDefsInvocation {
     fn zomes(&self) -> ZomesToInvoke {
-        ZomesToInvoke::All
+        ZomesToInvoke::AllIntegrity
     }
     fn fn_components(&self) -> FnComponents {
         vec!["entry_defs".into()].into()
@@ -148,7 +148,7 @@ mod test {
         let entry_defs_invocation = EntryDefsInvocationFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();
-        assert_eq!(ZomesToInvoke::All, entry_defs_invocation.zomes(),);
+        assert_eq!(ZomesToInvoke::AllIntegrity, entry_defs_invocation.zomes(),);
     }
 
     #[tokio::test(flavor = "multi_thread")]

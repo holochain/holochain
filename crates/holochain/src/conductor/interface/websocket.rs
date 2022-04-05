@@ -600,7 +600,8 @@ pub mod test {
                 uid: uid.to_string(),
                 properties: SerializedBytes::try_from(()).unwrap(),
                 origin_time: Timestamp::HOLOCHAIN_EPOCH,
-                zomes: zomes.clone().into_iter().map(Into::into).collect(),
+                integrity_zomes: zomes.clone().into_iter().map(Into::into).collect(),
+                coordinator_zomes: Default::default(),
             },
             zomes.into_iter().map(Into::into),
         )

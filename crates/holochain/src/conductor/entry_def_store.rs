@@ -48,7 +48,7 @@ pub(crate) async fn get_entry_def_from_ids(
     dna_def: &DnaDefHashed,
     conductor_handle: &dyn ConductorHandleT,
 ) -> EntryDefStoreResult<Option<EntryDef>> {
-    match dna_def.zomes.get(zome_id.index()) {
+    match dna_def.integrity_zomes.get(zome_id.index()) {
         Some((_, zome)) => {
             get_entry_def(entry_def_index, zome.clone(), dna_def, conductor_handle).await
         }
@@ -66,7 +66,7 @@ pub(crate) fn get_entry_defs(
     // Get the zomes hashes
     let zomes = dna
         .dna()
-        .zomes
+        .integrity_zomes
         .iter()
         .cloned()
         .map(|(zome_name, zome)| (zome_name, zome))
