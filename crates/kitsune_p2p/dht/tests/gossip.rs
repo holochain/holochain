@@ -99,6 +99,54 @@ fn test_multi() {
 }
 
 #[test]
+fn test_mismatched_powers() {
+    let topo = Topology::unit_zero();
+    let gopa = GossipParams::new(1.into(), 0);
+    let ts = |t: u32| TimeQuantum::from(t).to_timestamp_bounds(&topo).0;
+    let pow = 26;
+
+    let sa = (u32::MAX - 4 * pow2(pow) + 1).into();
+    let sb = 0u32.into();
+
+    let alice_arqs = hashmap! {
+        AgentKey::fake() => Arq::new(pow, sa, 8.into()),
+    };
+    let bobbo_arqs = hashmap! {
+        AgentKey::fake() => Arq::new(pow - 1, sb, 8.into()),
+    };
+    let mut alice = TestNode::new(topo.clone(), gopa, alice_arqs);
+    let mut bobbo = TestNode::new(topo.clone(), gopa, bobbo_arqs);
+
+    alice.integrate_op(OpData::fake(sb, ts(10), 123));
+    bobbo.integrate_op(OpData::fake(sb + (pow2(pow) * 2).into(), ts(11), 234));
+
+    println!("{}", alice.ascii_arqs_and_ops(&topo, 64));
+    println!("{}", bobbo.ascii_arqs_and_ops(&topo, 64));
+
+    let tq = TimeQuantum::from(30);
+    let nt = TelescopingTimes::new(tq).segments().len() as u32;
+    assert_eq!(nt, 8);
+
+    let info = gossip_direct_at(&mut alice, &mut bobbo, tq).unwrap();
+
+    let common = info.common_arqs;
+    common.print_arqs(&topo, 64);
+    assert_eq!(common.arqs().len(), 3);
+
+    // There are 3 arqs in the common set, and they have 8, 3, and 1 segments
+    // respectively. Therefore, the total number of segments is 12, and the total
+    // number of regions sent is 12 * the number of time segments.
+    let num_regions = (8 + 3 + 1) * nt;
+    dbg!(&info.stats);
+    assert_eq!(info.stats.regions_sent, num_regions);
+    assert_eq!(info.stats.regions_rcvd, num_regions);
+    assert_eq!(info.stats.ops_sent, 2);
+    assert_eq!(info.stats.ops_rcvd, 2);
+    assert_eq!(info.stats.op_data_sent, 123 + 345);
+    assert_eq!(info.stats.op_data_rcvd, 234 + 456);
+}
+
+#[test]
 fn gossip_scenario_full_sync() {
     observability::test_run().ok();
     let topo = Topology::standard_zero();
