@@ -618,7 +618,12 @@ impl<'a> UniqueForm<'a> {
 pub fn produce_ops_from_element(element: &Element) -> DhtOpResult<Vec<DhtOp>> {
     let op_lights = produce_op_lights_from_elements(vec![element])?;
     let (shh, maybe_entry) = element.clone().into_inner();
-    let (header, signature): (Header, Signature) = shh.into_inner().0.into();
+    let SignedHeaderHashed {
+        hashed: HeaderHashed {
+            content: header, ..
+        },
+        signature,
+    } = shh;
 
     let mut ops = Vec::with_capacity(op_lights.len());
 

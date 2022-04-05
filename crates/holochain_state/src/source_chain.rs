@@ -22,6 +22,7 @@ use holochain_types::dht_op::DhtOpLight;
 use holochain_types::dht_op::OpOrder;
 use holochain_types::dht_op::UniqueForm;
 use holochain_types::element::SignedHeaderHashedExt;
+use holochain_types::sql::AsSql;
 use holochain_zome_types::header;
 use holochain_zome_types::query::ChainQueryFilterRange;
 use holochain_zome_types::CapAccess;
@@ -38,6 +39,7 @@ use holochain_zome_types::GrantedFunction;
 use holochain_zome_types::Header;
 use holochain_zome_types::HeaderBuilder;
 use holochain_zome_types::HeaderBuilderCommon;
+use holochain_zome_types::HeaderExt;
 use holochain_zome_types::HeaderHashed;
 use holochain_zome_types::HeaderInner;
 use holochain_zome_types::MembraneProof;
@@ -720,8 +722,8 @@ where
                         .query_and_then(
                         named_params! {
                                 ":author": author.as_ref(),
-                                ":entry_type": query.entry_type,
-                                ":header_type": query.header_type,
+                                ":entry_type": query.entry_type.as_sql(),
+                                ":header_type": query.header_type.as_sql(),
                                 ":range_start": match query.sequence_range {
                                     ChainQueryFilterRange::HeaderSeqRange(start, _) => Some(start),
                                     _ => None,
@@ -855,7 +857,7 @@ fn build_ops_from_headers(
         let ops_inner = produce_op_lights_from_iter(vec![item].into_iter())?;
 
         // Break apart the SignedHeaderHashed.
-        let (header, sig) = shh.into_header_and_signature();
+        let (header, sig) = shh.into_inner();
         let (header, hash) = header.into_inner();
 
         // We need to take the header by value and put it back each loop.
@@ -987,7 +989,7 @@ pub fn put_raw(
     ops: Vec<DhtOpLight>,
     entry: Option<Entry>,
 ) -> StateMutationResult<Vec<DhtOpHash>> {
-    let (header, signature) = shh.into_header_and_signature();
+    let (header, signature) = shh.into_inner();
     let (header, hash) = header.into_inner();
     let mut header = Some(header);
     let mut hashes = Vec::with_capacity(ops.len());
@@ -1087,7 +1089,7 @@ async fn _put_db<H: HeaderInner, B: HeaderBuilder<H>>(
     let (header, entry) = element.into_inner();
     let entry = entry.into_option();
     let hash = header.as_hash().clone();
-    vault.conn()?.with_commit_sync(|txn| {
+    vault.conn()?.with_commit_sync(|txn: &mut Transaction| {
         let (new_head, new_seq, new_timestamp) = chain_head_db(txn, author.clone())?;
         if new_head != prev_header {
             let entries = match (entry, header.header().entry_hash()) {

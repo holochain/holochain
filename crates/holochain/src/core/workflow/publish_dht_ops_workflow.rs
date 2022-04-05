@@ -462,8 +462,7 @@ mod tests {
                 let expected = {
                     let mut map = HashMap::new();
                     // Op is expected to not contain the Entry even though the above contains the entry
-                    let (entry_create_header, sig) =
-                        entry_create_header.into_header_and_signature();
+                    let (entry_create_header, sig) = entry_create_header.into_inner();
                     let expected_op = DhtOp::RegisterAgentActivity(
                         sig.clone(),
                         entry_create_header.clone().into_content(),
@@ -485,8 +484,7 @@ mod tests {
 
                     // Create RegisterUpdatedContent
                     // Op is expected to not contain the Entry
-                    let (entry_update_header, sig) =
-                        entry_update_header.into_header_and_signature();
+                    let (entry_update_header, sig) = entry_update_header.into_inner();
                     let entry_update_header: Update =
                         entry_update_header.into_content().try_into().unwrap();
                     let expected_op =

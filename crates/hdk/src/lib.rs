@@ -291,6 +291,10 @@ pub mod countersigning;
 /// For example, an agent could choose to 'block' another agent and ignore all their updates.
 pub mod entry;
 
+pub use idk::entry_def_index;
+pub use idk::entry_defs;
+pub use idk::entry_type;
+
 pub mod hash;
 
 /// Distributed Hash Tables (DHTs) are fundamentally all key/value stores (content addressable).

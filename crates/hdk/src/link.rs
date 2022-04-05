@@ -1,16 +1,6 @@
 use crate::prelude::*;
 
-#[repr(u8)]
-pub enum HdkLinkType {
-    Paths = u8::MAX - 1,
-    Any = u8::MAX,
-}
-
-impl From<HdkLinkType> for LinkType {
-    fn from(hdk_link_type: HdkLinkType) -> Self {
-        Self(hdk_link_type as u8)
-    }
-}
+pub use idk::link::*;
 
 /// Create a link from a base entry to a target entry, with an optional tag.
 ///
