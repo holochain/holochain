@@ -35,13 +35,6 @@ impl<D: RegionDataConstraints> RegionSet<D> {
         }
     }
 
-    /// can be used to pair the generated coords with stored data.
-    pub fn region_coords(&self) -> impl Iterator<Item = RegionCoords> + '_ {
-        match self {
-            Self::Ltcs(set) => set.coords.region_coords_flat().map(|(_, coords)| coords),
-        }
-    }
-
     /// Iterator over all Regions
     pub fn regions(&self) -> impl Iterator<Item = Region<D>> + '_ {
         match self {

@@ -56,15 +56,9 @@ pub trait AccessOpStore<O: OpRegion<D>, D: RegionDataConstraints = RegionData>: 
     /// Get the RegionSet for this node, suitable for gossiping
     fn region_set(&self, arq_set: ArqBoundsSet, now: TimeQuantum) -> RegionSet<D> {
         let coords = RegionCoordSetLtcs::new(TelescopingTimes::new(now), arq_set);
-        let data = coords
-            .region_coords_nested()
-            .map(|columns| {
-                columns
-                    .map(|(_, coords)| self.query_region_data(&coords))
-                    .collect::<Vec<_>>()
-            })
-            .collect::<Vec<_>>();
-        RegionSetLtcs::from_data(coords, data).into()
+        coords
+            .into_region_set_infallible(|(_, coords)| Ok(self.query_region_data(&coords)))
+            .into()
     }
 }
 

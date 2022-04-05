@@ -49,7 +49,7 @@ impl KitsuneHost for StandardResponsesHostApi {
             )
             .expect("an arc in the set could not be quantized");
             let coords = RegionCoordSetLtcs::new(TelescopingTimes::new(1.into()), arqs);
-            let chunks = coords.region_coords_nested().count();
+            let chunks = coords.num_space_chunks();
             let region_set = if self.with_data {
                 // XXX: this is very fake, and completely wrong!
                 //      in order to properly match the fake data returned in other methods,

@@ -26,14 +26,18 @@ impl RegionCoordSetLtcs {
     /// Generate the LTCS region coords given the generating parameters.
     /// Each RegionCoords is paired with the relative spacetime coords, which
     /// can be used to pair the generated coords with stored data.
-    pub fn region_coords_flat(&self) -> impl Iterator<Item = ((u32, u32), RegionCoords)> + '_ {
+    #[cfg_attr(not(feature = "test_utils"), deprecated = "use into_region_set")]
+    pub(crate) fn region_coords_flat(
+        &self,
+    ) -> impl Iterator<Item = ((u32, u32), RegionCoords)> + '_ {
         self.region_coords_nested().flatten()
     }
 
     /// Iterate over the coords in the same structure in which they are stored:
     /// An outer Vec corresponding to space segments,
     /// and inner Vecs corresponding to time segments.
-    pub fn region_coords_nested(
+    #[cfg_attr(not(feature = "test_utils"), deprecated = "use into_region_set")]
+    pub(crate) fn region_coords_nested(
         &self,
     ) -> impl Iterator<Item = impl Iterator<Item = ((u32, u32), RegionCoords)>> + '_ {
         self.arq_set.arqs().iter().flat_map(move |arq| {
@@ -48,7 +52,7 @@ impl RegionCoordSetLtcs {
     }
 
     /// Generate data for each coord in the set, creating the corresponding [`RegionSetLtcs`].
-    pub fn into_region_set<D, E, F>(self, mut f: F) -> Result<RegionSetLtcs<D>, E>
+    pub fn into_region_set<D, F, E>(self, mut f: F) -> Result<RegionSetLtcs<D>, E>
     where
         D: RegionDataConstraints,
         F: FnMut(((u32, u32), RegionCoords)) -> Result<D, E>,
@@ -60,12 +64,26 @@ impl RegionCoordSetLtcs {
         Ok(RegionSetLtcs::from_data(self, data))
     }
 
+    /// Generate data for each coord in the set, creating the corresponding [`RegionSetLtcs`].
+    pub fn into_region_set_infallible<D, F>(self, f: F) -> RegionSetLtcs<D>
+    where
+        D: RegionDataConstraints,
+        F: FnMut(((u32, u32), RegionCoords)) -> Result<D, std::convert::Infallible>,
+    {
+        self.into_region_set(f).unwrap()
+    }
+
     /// An empty set of coords
     pub fn empty() -> Self {
         Self {
             times: TelescopingTimes::empty(),
             arq_set: ArqBoundsSet::empty(),
         }
+    }
+
+    /// Return the number of chunks in the arq set
+    pub fn num_space_chunks(&self) -> usize {
+        self.arq_set.arqs().len()
     }
 }
 
@@ -171,11 +189,7 @@ impl<D: RegionDataConstraints> RegionSetLtcs<D> {
         store: &S,
         coords: RegionCoordSetLtcs,
     ) -> Self {
-        coords
-            .into_region_set(|(_, coords)| {
-                Result::<_, std::convert::Infallible>::Ok(store.query_region_data(&coords))
-            })
-            .unwrap()
+        coords.into_region_set_infallible(|(_, coords)| Ok(store.query_region_data(&coords)))
     }
 }
 

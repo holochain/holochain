@@ -337,43 +337,33 @@ impl Spaces {
         let times = TelescopingTimes::historical(&topology);
         let coords = RegionCoordSetLtcs::new(times, arq_set);
         let coords_clone = coords.clone();
-        let data = self
-            .authored_db(dna_hash)?
+        self.authored_db(dna_hash)?
             .async_reader(move |txn| {
                 let mut stmt = txn.prepare_cached(sql).map_err(DatabaseError::from)?;
-                coords_clone
-                    .region_coords_nested()
-                    .map(|column| {
-                        column
-                            .map(|(_, coords)| {
-                                let bounds = coords.to_bounds(&topology);
-                                let (x0, x1) = bounds.x;
-                                let (t0, t1) = bounds.t;
-                                stmt.query_row(
-                                    named_params! {
-                                        ":storage_start_loc": x0,
-                                        ":storage_end_loc": x1,
-                                        ":timestamp_min": t0,
-                                        ":timestamp_max": t1,
-                                        // ":author": &author, // TODO: unneeded for authored table?
-                                    },
-                                    |row| {
-                                        Ok(RegionData {
-                                            hash: RegionHash::from_vec(row.get("hash")?)
-                                                .expect("region hash must be 32 bytes"),
-                                            size: row.get("size")?,
-                                            count: row.get("count")?,
-                                        })
-                                    },
-                                )
+                Ok(coords_clone.into_region_set(|(_, coords)| {
+                    let bounds = coords.to_bounds(&topology);
+                    let (x0, x1) = bounds.x;
+                    let (t0, t1) = bounds.t;
+                    stmt.query_row(
+                        named_params! {
+                            ":storage_start_loc": x0,
+                            ":storage_end_loc": x1,
+                            ":timestamp_min": t0,
+                            ":timestamp_max": t1,
+                            // ":author": &author, // TODO: unneeded for authored table?
+                        },
+                        |row| {
+                            Ok(RegionData {
+                                hash: RegionHash::from_vec(row.get("hash")?)
+                                    .expect("region hash must be 32 bytes"),
+                                size: row.get("size")?,
+                                count: row.get("count")?,
                             })
-                            .collect::<Result<Vec<RegionData>, rusqlite::Error>>()
-                            .map_err(DatabaseError::from)
-                    })
-                    .collect::<Result<Vec<Vec<RegionData>>, DatabaseError>>()
+                        },
+                    )
+                })?)
             })
-            .await?;
-        Ok(RegionSetLtcs::from_data(coords, data))
+            .await
     }
 
     #[instrument(skip(self, query))]
