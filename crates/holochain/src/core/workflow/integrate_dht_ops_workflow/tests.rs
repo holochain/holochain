@@ -86,8 +86,8 @@ impl TestData {
 
         // Link add
         let mut link_add = fixt!(CreateLink);
-        link_add.base_address = original_entry_hash.clone();
-        link_add.target_address = new_entry_hash.clone();
+        link_add.base_address = original_entry_hash.clone().into();
+        link_add.target_address = new_entry_hash.clone().into();
         link_add.zome_id = fixt!(ZomeId);
         link_add.tag = fixt!(LinkTag);
 
@@ -95,7 +95,7 @@ impl TestData {
 
         // Link remove
         let mut link_remove = fixt!(DeleteLink);
-        link_remove.base_address = original_entry_hash.clone();
+        link_remove.base_address = original_entry_hash.clone().into();
         link_remove.link_add_address = link_add_hash.clone();
 
         // Any Header

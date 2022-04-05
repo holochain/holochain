@@ -184,7 +184,7 @@ fn create_and_insert_op(
             let mut create_link = fixt!(CreateLink);
             seq_not_zero(&mut create_link.header_seq);
             if facts.last_entry {
-                create_link.base_address = data.last_entry.clone();
+                create_link.base_address = data.last_entry.clone().into();
             }
             data.last_link = HeaderHash::with_data_sync(&Header::CreateLink(create_link.clone()));
             create_link.into()

@@ -115,24 +115,24 @@
 //! Here is a list of all valid hash types in Holochain, in hexadecimal,
 //! decimal and Base64 notation and what they are used for:
 //!
-//! | hex      | decimal   | base64 | integer |  usage  |
-//! | -------- | --------- | ------ | ------- | ------- |
-//! | 84 20 24 | 132 32 36 | hCAk   | 4100    | Agent   |
-//! | 84 21 24 | 132 33 36 | hCEk   | 4228    | Entry   |
-//! | 84 22 24 | 132 34 36 | hCIk   | 4356    | Net ID  |
-//! | 84 23 24 | 132 35 36 | hCMk   | 4484    |         |
-//! | 84 24 24 | 132 36 36 | hCQk   | 4612    | DHT Op  |
-//! | 84 25 24 | 132 37 36 | hCUk   | 4740    |         |
-//! | 84 26 24 | 132 38 36 | hCYk   | 4868    |         |
-//! | 84 27 24 | 132 39 36 | hCck   | 4996    |         |
-//! | 84 28 24 | 132 40 36 | hCgk   | 5124    |         |
-//! | 84 29 24 | 132 41 36 | hCkk   | 5252    | Header  |
-//! | 84 2a 24 | 132 42 36 | hCok   | 5380    | WASM    |
-//! | 84 2b 24 | 132 43 36 | hCsk   | 5508    |         |
-//! | 84 2c 24 | 132 44 36 | hCwk   | 5636    |         |
-//! | 84 2d 24 | 132 45 36 | hC0k   | 5764    | DNA     |
-//! | 84 2e 24 | 132 46 36 | hC4k   | 5892    |         |
-//! | 84 2f 24 | 132 47 36 | hC8k   | 6020    |         |
+//! | hex      | decimal   | base64 | integer |  usage   |
+//! | -------- | --------- | ------ | ------- | -------- |
+//! | 84 20 24 | 132 32 36 | hCAk   | 4100    | Agent    |
+//! | 84 21 24 | 132 33 36 | hCEk   | 4228    | Entry    |
+//! | 84 22 24 | 132 34 36 | hCIk   | 4356    | Net ID   |
+//! | 84 23 24 | 132 35 36 | hCMk   | 4484    |          |
+//! | 84 24 24 | 132 36 36 | hCQk   | 4612    | DHT Op   |
+//! | 84 25 24 | 132 37 36 | hCUk   | 4740    |          |
+//! | 84 26 24 | 132 38 36 | hCYk   | 4868    |          |
+//! | 84 27 24 | 132 39 36 | hCck   | 4996    |          |
+//! | 84 28 24 | 132 40 36 | hCgk   | 5124    |          |
+//! | 84 29 24 | 132 41 36 | hCkk   | 5252    | Header   |
+//! | 84 2a 24 | 132 42 36 | hCok   | 5380    | WASM     |
+//! | 84 2b 24 | 132 43 36 | hCsk   | 5508    |          |
+//! | 84 2c 24 | 132 44 36 | hCwk   | 5636    |          |
+//! | 84 2d 24 | 132 45 36 | hC0k   | 5764    | DNA      |
+//! | 84 2e 24 | 132 46 36 | hC4k   | 5892    |          |
+//! | 84 2f 24 | 132 47 36 | hC8k   | 6020    | External |
 //!
 //!
 //! ### Breakdowns of example
@@ -248,6 +248,10 @@ pub fn hash_sha512(input: Vec<u8>) -> ExternResult<Vec<u8>> {
     }
 }
 
+/// Hash arbitrary bytes using keccak256.
+/// This is the same algorithm used by ethereum and other EVM compatible blockchains.
+/// It is essentially the same as sha3 256 but with a minor difference in configuration
+/// that is enough to generate different hash outputs.
 pub fn hash_keccak256(input: Vec<u8>) -> ExternResult<Vec<u8>> {
     match HDK.with(|h| h.borrow().hash(HashInput::Keccak256(input)))? {
         HashOutput::Keccak256(hash) => Ok(hash.as_ref().to_vec()),
@@ -255,6 +259,8 @@ pub fn hash_keccak256(input: Vec<u8>) -> ExternResult<Vec<u8>> {
     }
 }
 
+/// Hash arbitrary bytes using SHA3 256.
+/// This is the official NIST standard for 256 bit SHA3 hashes.
 pub fn hash_sha3(input: Vec<u8>) -> ExternResult<Vec<u8>> {
     match HDK.with(|h| h.borrow().hash(HashInput::Sha3256(input)))? {
         HashOutput::Sha3256(hash) => Ok(hash.as_ref().to_vec()),
