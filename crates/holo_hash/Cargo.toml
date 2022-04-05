@@ -50,3 +50,8 @@ hashing = ["futures", "must_future", "blake2b_simd", "serialization"]
 serialization = ["holochain_serialized_bytes", "serde", "serde_bytes"]
 encoding = ["base64", "blake2b_simd", "derive_more"]
 test_utils = ["fixturators"]
+
+[package.metadata.docs.rs]
+
+# Features to pass to Cargo (default: [])
+features = ["full"]
