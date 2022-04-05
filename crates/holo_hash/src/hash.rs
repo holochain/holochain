@@ -30,9 +30,6 @@ use crate::has_hash::HasHash;
 use crate::HashType;
 use crate::PrimitiveHashType;
 
-#[cfg(feature = "hashing")]
-use crate::encode;
-
 /// Length of the prefix bytes (3)
 pub const HOLO_HASH_PREFIX_LEN: usize = 3;
 
@@ -169,7 +166,7 @@ impl<T: HashType> HoloHash<T> {
     /// the location bytes will used as provided, not computed.
     pub fn from_raw_32_and_type(mut hash: Vec<u8>, hash_type: T) -> Self {
         if hash.len() == HOLO_HASH_CORE_LEN {
-            hash.append(&mut encode::holo_dht_location_bytes(&hash));
+            hash.append(&mut crate::hash_ext::holo_dht_location_bytes(&hash));
         }
 
         assert_length!(HOLO_HASH_UNTYPED_LEN, &hash);
@@ -254,18 +251,18 @@ fn bytes_to_loc(bytes: &[u8]) -> u32 {
 mod tests {
     use crate::*;
 
-    #[cfg(not(feature = "encoding"))]
-    fn assert_type<T: HashType>(t: &str, h: HoloHash<T>) {
-        assert_eq!(3_688_618_971, h.get_loc());
-        assert_eq!(
-            "[219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219]",
-            format!("{:?}", h.get_raw_32()),
-        );
-    }
-
     #[test]
     #[cfg(not(feature = "encoding"))]
     fn test_enum_types() {
+        fn assert_type<T: HashType>(t: &str, h: HoloHash<T>) {
+            assert_eq!(3_688_618_971, h.get_loc().as_u32());
+            assert_eq!(
+                "[219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219]",
+                format!("{:?}", h.get_raw_32()),
+            );
+            assert_eq!(t, h.hash_type().hash_name())
+        }
+
         assert_type(
             "DnaHash",
             DnaHash::from_raw_36(vec![0xdb; HOLO_HASH_UNTYPED_LEN]),

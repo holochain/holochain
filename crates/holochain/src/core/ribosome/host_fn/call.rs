@@ -280,4 +280,23 @@ pub mod wasm_test {
         assert_eq!(agent_info.agent_initial_pubkey, bob_pubkey);
         assert_eq!(agent_info.agent_latest_pubkey, bob_pubkey);
     }
+    #[tokio::test(flavor = "multi_thread")]
+    /// holo hash with invalid checksum is retected
+    ///
+    /// this test is useful because checksum validation in holo_hash is optional
+    /// and we might forget to enable it in the host.
+    async fn holo_hash_invalid_checksum() {
+        observability::test_run().ok();
+        let RibosomeTestFixture {
+            conductor,
+            alice,
+            bob_pubkey,
+            ..
+        } = RibosomeTestFixture::new(TestWasm::WhoAmI).await;
+        let mut invalid_pubkey = bob_pubkey.get_raw_39().to_vec();
+        *invalid_pubkey.last_mut().unwrap() ^= 1; // Flip a bit in the checksum
+        let result: Result<AgentInfo, _> = conductor.call_fallible(&alice, "whoarethey", invalid_pubkey).await;
+        // FIXME: Fails because DNA is programmed to panic on error
+        assert_eq!(format!("{:?}", result.unwrap_err()), format!("{:?}", holo_hash::error::HoloHashError::BadChecksum));
+    }
 }

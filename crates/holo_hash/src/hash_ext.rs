@@ -1,5 +1,5 @@
 use crate::assert_length;
-use crate::encode;
+use crate::error::HoloHashError;
 use crate::hash_type;
 use crate::HashType;
 use crate::HashableContent;
@@ -90,7 +90,7 @@ fn hash_from_content<T: HashType, C: HashableContent<HashType = T>>(content: &C)
     match content.hashable_content() {
         HashableContentBytes::Content(sb) => {
             let bytes: Vec<u8> = holochain_serialized_bytes::UnsafeBytes::from(sb).into();
-            let hash = encode::blake2b_256(&bytes);
+            let hash = blake2b_256(&bytes);
             assert_length!(HOLO_HASH_CORE_LEN, &hash);
             HoloHash::<T>::from_raw_32_and_type(hash, content.hash_type())
         }
@@ -152,4 +152,45 @@ where
             .boxed()
             .into()
     }
+}
+
+/// internal compute the holo dht location u32
+pub fn holo_dht_location_bytes(data: &[u8]) -> Vec<u8> {
+    // Assert the data size is relatively small so we are
+    // comfortable executing this synchronously / blocking tokio thread.
+    assert_eq!(32, data.len(), "only 32 byte hashes supported");
+
+    let hash = blake2b_128(data);
+    let mut out = vec![hash[0], hash[1], hash[2], hash[3]];
+    for i in (4..16).step_by(4) {
+        out[0] ^= hash[i];
+        out[1] ^= hash[i + 1];
+        out[2] ^= hash[i + 2];
+        out[3] ^= hash[i + 3];
+    }
+    out
+}
+
+/// Arbitrary (within limits) output length blake2b
+pub fn blake2b_n(data: &[u8], length: usize) -> Result<Vec<u8>, HoloHashError> {
+    // blake2b_simd does an assert on the hash length and we allow happ devs
+    // to set this so we have to put a result guarding against the bounds.
+    if length < 1 || blake2b_simd::OUTBYTES < length {
+        return Err(HoloHashError::BadHashSize);
+    }
+    Ok(blake2b_simd::Params::new()
+        .hash_length(length)
+        .hash(data)
+        .as_bytes()
+        .to_vec())
+}
+
+/// internal compute a 32 byte blake2b hash
+pub fn blake2b_256(data: &[u8]) -> Vec<u8> {
+    blake2b_n(data, 32).unwrap()
+}
+
+/// internal compute a 16 byte blake2b hash
+pub fn blake2b_128(data: &[u8]) -> Vec<u8> {
+    blake2b_n(data, 16).unwrap()
 }
