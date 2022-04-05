@@ -90,8 +90,8 @@ impl EntryTestData {
         update.original_entry_address = entry_hash.clone();
         update.original_header_address = create_hash.clone();
 
-        create_link.base_address = entry_hash.clone();
-        delete_link.base_address = entry_hash.clone();
+        create_link.base_address = entry_hash.clone().into();
+        delete_link.base_address = entry_hash.clone().into();
         let create_link_header = Header::CreateLink(create_link.clone());
         let delete_header = Header::Delete(delete.clone());
         let update_header = Header::Update(update.clone());

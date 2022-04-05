@@ -16,6 +16,7 @@ use holochain_types::dht_op::{DhtOpHashed, DhtOpType};
 use holochain_types::prelude::DhtOpError;
 use holochain_types::prelude::DnaDefHashed;
 use holochain_types::prelude::DnaWasmHashed;
+use holochain_types::sql::AsSql;
 use holochain_zome_types::entry::EntryHashed;
 use holochain_zome_types::*;
 use std::str::FromStr;
@@ -424,7 +425,7 @@ pub fn insert_header(
                 "prev_hash": prev_hash,
                 "base_hash": create_link.base_address,
                 "zome_id": create_link.zome_id.index() as u32,
-                "tag": create_link.tag,
+                "tag": create_link.tag.as_sql(),
                 "blob": to_blob(&signed_header)?,
             })?;
         }

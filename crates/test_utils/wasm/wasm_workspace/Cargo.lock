@@ -349,6 +349,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "holochain_integrity_types"
+version = "0.0.1"
+dependencies = [
+ "holo_hash",
+ "holochain_serialized_bytes",
+ "kitsune_p2p_timestamp",
+ "serde",
+ "serde_bytes",
+ "subtle",
+ "tracing",
+]
+
+[[package]]
 name = "holochain_serialized_bytes"
 version = "0.0.51"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -410,9 +423,9 @@ dependencies = [
 name = "holochain_zome_types"
 version = "0.0.28"
 dependencies = [
- "chrono",
  "fixt",
  "holo_hash",
+ "holochain_integrity_types",
  "holochain_serialized_bytes",
  "holochain_wasmer_common",
  "kitsune_p2p_timestamp",

@@ -2070,6 +2070,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "holochain_integrity_types"
+version = "0.0.1"
+dependencies = [
+ "arbitrary",
+ "holo_hash",
+ "holochain_serialized_bytes",
+ "kitsune_p2p_timestamp",
+ "serde",
+ "serde_bytes",
+ "subtle",
+ "tracing",
+]
+
+[[package]]
 name = "holochain_keystore"
 version = "0.0.32"
 dependencies = [
@@ -2407,11 +2421,11 @@ name = "holochain_zome_types"
 version = "0.0.28"
 dependencies = [
  "arbitrary",
- "chrono",
  "contrafact",
  "derive_builder",
  "fixt",
  "holo_hash",
+ "holochain_integrity_types",
  "holochain_serialized_bytes",
  "holochain_wasmer_common",
  "kitsune_p2p_timestamp",

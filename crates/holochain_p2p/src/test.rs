@@ -567,7 +567,7 @@ mod tests {
             holo_hash::hash_type::Entry,
         );
         let link_key = WireLinkKey {
-            base: hash,
+            base: hash.into(),
             zome_id: 0.into(),
             tag: None,
         };
