@@ -443,7 +443,7 @@ pub async fn validate_op<R>(
     ribosome: &R,
 ) -> AppValidationOutcome<Outcome>
 where
-    R: RibosomeT + Sync,
+    R: RibosomeT,
 {
     let zomes_to_invoke = match op {
         Op::RegisterAgentActivity { .. } | Op::StoreElement { .. } => ZomesToInvoke::All,
@@ -542,7 +542,7 @@ async fn run_validation_callback_inner<R>(
     (mut fetched_deps, recursion_depth): (HashSet<AnyDhtHash>, usize),
 ) -> AppValidationResult<Outcome>
 where
-    R: RibosomeT + Sync,
+    R: RibosomeT,
 {
     let validate_result = ribosome.run_validate(
         ValidateHostAccess::new(workspace_read.clone(), network.clone()),
