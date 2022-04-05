@@ -1,7 +1,5 @@
 #![cfg(feature = "test_utils")]
 
-use std::collections::HashMap;
-
 use kitsune_p2p_dht::{
     arq::*,
     hash::AgentKey,
@@ -164,8 +162,7 @@ fn gossip_scenario_full_sync() {
     assert_eq!(
         nodes
             .iter()
-            .enumerate()
-            .map(|(i, n)| {
+            .map(|n| {
                 let ops = n.query_op_data(&full_region);
                 println!("{}", n.ascii_arqs_and_ops(&topo, 64));
                 ops.len()
@@ -201,7 +198,7 @@ fn gossip_scenario_full_sync() {
         }
     }
 
-    for (i, n) in nodes.iter().enumerate() {
+    for n in nodes.iter() {
         println!("{}", n.ascii_arqs_and_ops(&topo, 64));
     }
 

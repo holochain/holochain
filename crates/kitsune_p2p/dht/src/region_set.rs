@@ -97,7 +97,7 @@ mod tests {
     use crate::{
         op::*,
         persistence::*,
-        prelude::{ArqBoundsSet, ArqLocated, ArqSet, ArqStart},
+        prelude::{ArqBoundsSet, ArqLocated, ArqStart},
         test_utils::{Op, OpData, OpStore},
         Arq, ArqBounds, Loc,
     };
