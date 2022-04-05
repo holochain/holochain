@@ -174,7 +174,7 @@ impl Cell {
         membrane_proof: Option<MembraneProof>,
     ) -> CellResult<()>
     where
-        Ribosome: RibosomeT + Send + 'static,
+        Ribosome: RibosomeT + 'static,
     {
         // get the dna
         let dna_file = conductor_handle

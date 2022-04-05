@@ -1871,6 +1871,7 @@ dependencies = [
  "anyhow",
  "arbitrary",
  "assert_cmd",
+ "async-recursion",
  "async-trait",
  "base64",
  "byteorder",

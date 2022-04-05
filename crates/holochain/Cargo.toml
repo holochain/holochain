@@ -75,6 +75,7 @@ uuid = { version = "0.7", features = [ "serde", "v4" ] }
 xsalsa20poly1305 = "0.6.0"
 holochain_wasm_test_utils = { version = "0.0.32", path = "../test_utils/wasm" }
 tiny-keccak = { version = "2.0.2", features = ["keccak", "sha3"] }
+async-recursion = "0.3"
 
 # Dependencies for test_utils: keep in sync with below
 hdk = { version = "0.0.127", path = "../hdk", optional = true }

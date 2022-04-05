@@ -16,9 +16,11 @@ use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomesToInvoke;
 use error::AppValidationResult;
 pub use error::*;
+use futures::stream::StreamExt;
 use holo_hash::DhtOpHash;
 use holochain_cascade::Cascade;
 use holochain_keystore::MetaLairClient;
+use holochain_p2p::actor::GetOptions as NetworkGetOptions;
 use holochain_p2p::HolochainP2pDna;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
@@ -29,6 +31,7 @@ use holochain_types::prelude::*;
 use holochain_zome_types::op::EntryCreationHeader;
 use holochain_zome_types::op::Op;
 use rusqlite::Transaction;
+use std::collections::HashSet;
 use tracing::*;
 pub use types::Outcome;
 
@@ -133,7 +136,6 @@ async fn app_validation_workflow_inner(
     // Create a stream of concurrent validation futures.
     // This will run NUM_CONCURRENT_OPS validation futures concurrently and
     // return up to NUM_CONCURRENT_OPS * 100 results.
-    use futures::stream::StreamExt;
     let mut iter = futures::stream::iter(iter)
         .buffer_unordered(NUM_CONCURRENT_OPS)
         .ready_chunks(NUM_CONCURRENT_OPS * 100);
@@ -422,7 +424,7 @@ async fn validate_op_outer(
     network: &HolochainP2pDna,
 ) -> AppValidationOutcome<Outcome> {
     // Get the workspace for the validation calls
-    let workspace = workspace.validation_workspace().await?;
+    let host_fn_workspace = workspace.validation_workspace().await?;
 
     // Get the dna file
     let dna_file = conductor_handle
@@ -431,15 +433,18 @@ async fn validate_op_outer(
 
     // Create the ribosome
     let ribosome = RealRibosome::new(dna_file);
-    validate_op(op, workspace, network, &ribosome).await
+    validate_op(op, host_fn_workspace, network, &ribosome).await
 }
 
-pub async fn validate_op(
+pub async fn validate_op<R>(
     op: &Op,
     workspace: HostFnWorkspaceRead,
     network: &HolochainP2pDna,
-    ribosome: &impl RibosomeT,
-) -> AppValidationOutcome<Outcome> {
+    ribosome: &R,
+) -> AppValidationOutcome<Outcome>
+where
+    R: RibosomeT,
+{
     let zomes_to_invoke = match op {
         Op::RegisterAgentActivity { .. } | Op::StoreElement { .. } => ZomesToInvoke::All,
         Op::StoreEntry {
@@ -478,7 +483,14 @@ pub async fn validate_op(
 
     let invocation = ValidateInvocation::new(zomes_to_invoke, op)
         .map_err(|e| AppValidationError::RibosomeError(e.into()))?;
-    let outcome = run_validation_callback_inner(invocation, ribosome, workspace, network.clone())?;
+    let outcome = run_validation_callback_inner(
+        invocation,
+        ribosome,
+        workspace,
+        network.clone(),
+        (HashSet::<AnyDhtHash>::new(), 0),
+    )
+    .await?;
 
     Ok(outcome)
 }
@@ -521,18 +533,62 @@ fn zome_id_to_zome(zome_id: ZomeId, dna_def: &DnaDef) -> AppValidationResult<Zom
         .into())
 }
 
-fn run_validation_callback_inner(
+#[async_recursion::async_recursion]
+async fn run_validation_callback_inner<R>(
     invocation: ValidateInvocation,
-    ribosome: &impl RibosomeT,
-    workspace_lock: HostFnWorkspaceRead,
+    ribosome: &R,
+    workspace_read: HostFnWorkspaceRead,
     network: HolochainP2pDna,
-) -> AppValidationResult<Outcome> {
-    let validate: ValidateResult =
-        ribosome.run_validate(ValidateHostAccess::new(workspace_lock, network), invocation)?;
-    match validate {
+    (mut fetched_deps, recursion_depth): (HashSet<AnyDhtHash>, usize),
+) -> AppValidationResult<Outcome>
+where
+    R: RibosomeT,
+{
+    let validate_result = ribosome.run_validate(
+        ValidateHostAccess::new(workspace_read.clone(), network.clone()),
+        invocation.clone(),
+    )?;
+    match validate_result {
         ValidateResult::Valid => Ok(Outcome::Accepted),
         ValidateResult::Invalid(reason) => Ok(Outcome::Rejected(reason)),
-        ValidateResult::UnresolvedDependencies(hashes) => Ok(Outcome::AwaitingDeps(hashes)),
+        ValidateResult::UnresolvedDependencies(hashes) => {
+            // This is the base case where we've been recursing and start seeing
+            // all the same hashes unresolved that we already tried to fetch.
+            // At this point we should just give up on the inline recursing and
+            // let some future background task attempt to fetch these hashes
+            // again. Hopefully by then the hashes are fetchable.
+            // 20 is a completely arbitrary max recursion depth.
+            if recursion_depth < 20 || hashes.iter().all(|hash| fetched_deps.contains(hash)) {
+                Ok(Outcome::AwaitingDeps(hashes))
+            } else {
+                let in_flight = hashes.into_iter().map(|hash| async {
+                    let cascade_workspace = workspace_read.clone();
+                    let mut cascade =
+                        Cascade::from_workspace_network(&cascade_workspace, network.clone());
+                    cascade
+                        .fetch_element(hash.clone(), NetworkGetOptions::must_get_options())
+                        .await?;
+                    Ok(hash)
+                });
+                let results: Vec<_> = futures::stream::iter(in_flight)
+                    // 10 is completely arbitrary.
+                    .buffered(10)
+                    .collect()
+                    .await;
+                let results: AppValidationResult<Vec<_>> = results.into_iter().collect();
+                for hash in results? {
+                    fetched_deps.insert(hash);
+                }
+                run_validation_callback_inner(
+                    invocation,
+                    ribosome,
+                    workspace_read,
+                    network,
+                    (fetched_deps, recursion_depth + 1),
+                )
+                .await
+            }
+        }
     }
 }
 
