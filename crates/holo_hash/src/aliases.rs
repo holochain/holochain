@@ -27,6 +27,9 @@ pub type NetIdHash = HoloHash<hash_type::NetId>;
 /// The hash of some wasm bytecode
 pub type WasmHash = HoloHash<hash_type::Wasm>;
 
+/// The hash of some external data that can't or doesn't exist on the DHT.
+pub type ExternalHash = HoloHash<hash_type::External>;
+
 /// The hash of anything referrable in the DHT.
 /// This is a composite of either an EntryHash or a HeaderHash
 pub type AnyDhtHash = HoloHash<hash_type::AnyDht>;
