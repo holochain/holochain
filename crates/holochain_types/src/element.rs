@@ -301,7 +301,7 @@ impl RawGetEntryResponse {
         let entry = entry
             .into_option()
             .expect("Get entry responses cannot be created without entries");
-        let (header, signature) = shh.into_header_and_signature();
+        let (header, signature) = shh.into_inner();
         let (new_entry_header, entry_type) = match header.into_content() {
             Header::Create(ec) => {
                 let et = ec.entry_type.clone();
@@ -427,7 +427,7 @@ impl WireElement {
         let ElementStatus { element, status } = e;
         let (signed_header, maybe_entry) = element.into_inner();
         Self {
-            signed_header: signed_header.into_inner().0,
+            signed_header: signed_header.into(),
             // TODO: consider refactoring WireElement to use ElementEntry
             // instead of Option<Entry>
             maybe_entry: maybe_entry.into_option(),
@@ -461,11 +461,21 @@ mod tests {
         let header = HeaderFixturator::new(Unpredictable).next().unwrap();
         let signed_header = SignedHeader(header, signature);
         let hashed: HoloHashed<SignedHeader> = HoloHashed::from_content_sync(signed_header);
-        let shh: SignedHeaderHashed = hashed.clone().into();
+        let HoloHashed {
+            content: SignedHeader(header, signature),
+            hash,
+        } = hashed.clone();
+        let shh = SignedHeaderHashed {
+            hashed: HeaderHashed::with_pre_hashed(header, hash),
+            signature,
+        };
 
         assert_eq!(shh.header_address(), hashed.as_hash());
 
-        let round: HoloHashed<SignedHeader> = shh.into();
+        let round = HoloHashed {
+            content: SignedHeader(shh.header().clone(), shh.signature().clone()),
+            hash: shh.header_address().clone(),
+        };
 
         assert_eq!(hashed, round);
     }

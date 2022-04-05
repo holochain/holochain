@@ -8,7 +8,7 @@ use kitsune_p2p_types::{
 
 use crate::gossip::{decode_bloom_filter, encode_bloom_filter, MetaOpKey};
 
-use super::EncodedTimedBloomFilter;
+use super::*;
 
 /// Create an agent bloom for testing.
 pub fn create_agent_bloom<'a>(

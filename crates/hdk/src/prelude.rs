@@ -1,4 +1,3 @@
-pub use crate::app_entry;
 pub use crate::capability::create_cap_claim;
 pub use crate::capability::create_cap_grant;
 pub use crate::capability::delete_cap_grant;
@@ -50,13 +49,11 @@ pub use crate::link::get_links;
 pub use crate::link::HdkLinkType;
 pub use crate::map_extern;
 pub use crate::map_extern::ExternResult;
-pub use crate::map_extern_infallible;
 pub use crate::p2p::call;
 pub use crate::p2p::call_remote;
 pub use crate::p2p::emit_signal;
 pub use crate::p2p::remote_signal;
 pub use crate::random::*;
-pub use crate::register_entry;
 pub use crate::time::schedule;
 pub use crate::time::sleep;
 pub use crate::time::sys_time;
@@ -81,6 +78,10 @@ pub use holo_hash::HoloHashed;
 pub use holochain_wasmer_guest::*;
 pub use holochain_zome_types;
 pub use holochain_zome_types::prelude::*;
+pub use idk;
+pub use idk::map_extern_infallible;
+pub use idk::prelude::app_entry;
+pub use idk::prelude::register_entry;
 pub use std::collections::BTreeSet;
 pub use std::collections::HashSet;
 pub use std::convert::TryFrom;
@@ -89,6 +90,9 @@ pub use tracing::{debug, error, info, instrument, trace, warn};
 
 #[cfg(feature = "mock")]
 pub use mockall;
+
+#[cfg(feature = "mock")]
+pub use crate::hdk::MockHdkT;
 
 // This needs to be called at least once _somewhere_ and is idempotent.
 #[macro_export]

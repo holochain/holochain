@@ -111,7 +111,7 @@ impl Query for GetLinksOpsQuery {
                 ":create": DhtOpType::RegisterAddLink,
                 ":delete": DhtOpType::RegisterRemoveLink,
                 ":base_hash": self.base,
-                ":zome_id": self.zome_id,
+                ":zome_id": *self.zome_id,
             }
         }
         .to_vec()
