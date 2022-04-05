@@ -30,8 +30,7 @@ mod validation_test;
 /// Placeholder for the return value of a zome invocation
 pub type ZomeCallResult = RibosomeResult<ZomeCallResponse>;
 
-pub struct CallZomeWorkflowArgs<RibosomeT>
-{
+pub struct CallZomeWorkflowArgs<RibosomeT> {
     pub ribosome: RibosomeT,
     pub invocation: ZomeCallInvocation,
     pub signal_tx: SignalBroadcaster,
