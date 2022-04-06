@@ -1,7 +1,9 @@
 use anyhow::{bail, Context};
 use bstr::ByteSlice;
 use cargo::util::VersionExt;
-use log::{debug, info, warn};
+use linked_hash_map::LinkedHashMap;
+use linked_hash_set::LinkedHashSet;
+use log::{debug, info, trace, warn};
 use semver::Version;
 use std::collections::{HashMap, HashSet};
 use structopt::StructOpt;
@@ -91,6 +93,9 @@ pub(crate) struct CrateFixupUnpublishedReleases {
 }
 
 #[derive(Debug, StructOpt)]
+pub(crate) struct CrateDetectMissingReleaseheadings {}
+
+#[derive(Debug, StructOpt)]
 pub(crate) struct CrateCheckArgs {
     #[structopt(long)]
     offline: bool,
@@ -123,6 +128,9 @@ pub(crate) enum CrateCommands {
 
     /// check the latest (or given) release for crates that aren't published, remove their tags, and bump their version.
     FixupUnpublishedReleases(CrateFixupUnpublishedReleases),
+
+    /// verify that all published crates have a heading in their changelog
+    DetectMissingReleaseheadings(CrateDetectMissingReleaseheadings),
 
     Check(CrateCheckArgs),
     EnsureCrateOwners(EnsureCrateOwnersArgs),
@@ -176,7 +184,139 @@ pub(crate) fn cmd(args: &crate::cli::Args, cmd_args: &CrateArgs) -> CommandResul
 
             Ok(())
         }
+        CrateCommands::DetectMissingReleaseheadings(subcmd_args) => {
+            cmd_detect_missing_releaseheadings(&ws, subcmd_args)
+        }
     }
+}
+
+fn cmd_detect_missing_releaseheadings<'a>(
+    ws: &'a ReleaseWorkspace<'a>,
+    _subcmd_args: &CrateDetectMissingReleaseheadings,
+) -> Fallible<()> {
+    let missing_headings = detect_missing_releaseheadings(ws)?;
+
+    if !missing_headings.is_empty() {
+        bail!("missing crate release headings: {:#?}", missing_headings);
+    }
+
+    Ok(())
+}
+
+/// if there are any crate release headings present in the workspace changelog but missing from the crate changelogs an error is returned.
+///
+/// uses the workspace changelog as a source of truth for existing crate releases.
+/// this reasonable because the workspace changelog it's only changed on releases it's not prone to manual mistakes.
+pub(crate) fn detect_missing_releaseheadings<'a>(
+    ws: &'a ReleaseWorkspace<'a>,
+) -> Fallible<LinkedHashMap<String, LinkedHashSet<String>>> {
+    use itertools::Itertools;
+
+    let crate_headings_toplevel = {
+        let cl = ws
+            .changelog()
+            // .map(|cl| cl.topmost_release())
+            .ok_or_else(|| {
+                anyhow::anyhow!("no changelog found in workspace at '{:?}'", ws.root())
+            })?;
+
+        cl.changes()?
+            .iter()
+            .map(|change| match change {
+                crate::changelog::ChangeT::Release(rc) => match rc {
+                    crate::changelog::ReleaseChange::WorkspaceReleaseChange(_title, releases) => {
+                        Ok(releases.clone())
+                    }
+                    unexpected => bail!("expected a WorkspaceReleaseChange here: {:?}", unexpected),
+                },
+                _ => Ok(vec![]),
+            })
+            // TODO: what happens with errors here?
+            .flatten_ok()
+            .collect::<Fallible<Vec<_>>>()?
+    };
+
+    let crate_headings_toplevel_by_crate = crate_headings_toplevel.into_iter().try_fold(
+        LinkedHashMap::<String, LinkedHashSet<String>>::new(),
+        |mut acc, cur| -> Fallible<_> {
+            // TODO: use crate names to detect the split instead of the delimiter
+            let (crt, version) = cur.split_once('-').ok_or(anyhow::anyhow!(
+                "could not split '{}' by
+                '-'",
+                cur
+            ))?;
+
+            acc.entry(crt.to_string())
+                .or_insert_with(|| Default::default())
+                .insert(version.to_string());
+
+            Ok(acc)
+        },
+    )?;
+
+    trace!(
+        "toplevel crate headings: {:#?}",
+        crate_headings_toplevel_by_crate
+    );
+
+    let crate_headings_cratedirs = ws.members()?.into_iter().try_fold(
+        LinkedHashMap::<String, LinkedHashSet<String>>::new(),
+        |mut acc, crt| -> Fallible<_> {
+            let name = crt.name();
+
+            let crt_released_versions = if let Some(cl) = crt.changelog() {
+                cl.changes()?
+                    .iter()
+                    .map(|change| match change {
+                        crate::changelog::ChangeT::Release(rc) => match rc {
+                            crate::changelog::ReleaseChange::CrateReleaseChange(version) => {
+                                Ok(Some(version.clone()))
+                            }
+                            unexpected => {
+                                bail!("expected a CrateReleaseChange here: {:?}", unexpected)
+                            }
+                        },
+                        _ => Ok(None),
+                    })
+                    // TODO: what happens with errors here?
+                    .flatten_ok()
+                    .collect::<Fallible<Vec<_>>>()?
+            } else {
+                // don't change the result if the crate has no changelog
+                return Ok(acc);
+            };
+
+            acc.entry(name)
+                .or_insert_with(|| Default::default())
+                .extend(crt_released_versions);
+
+            Ok(acc)
+        },
+    )?;
+
+    let missing_headings: LinkedHashMap<String, LinkedHashSet<String>> =
+        crate_headings_toplevel_by_crate
+            .iter()
+            .filter_map(|(crt, headings)| {
+                // only consider crates that still exist as they could have been deleted entirely at some point
+                if let Some(headings_crate) = crate_headings_cratedirs.get(crt) {
+                    let diff = headings
+                        .difference(headings_crate)
+                        .cloned()
+                        .collect::<LinkedHashSet<_>>();
+
+                    if !diff.is_empty() {
+                        Some((crt.to_owned(), diff))
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+    Ok(missing_headings)
 }
 
 /// Scans the workspace for crates that have changed since their previous release and bumps their version to a dev version.
