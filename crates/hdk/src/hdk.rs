@@ -6,12 +6,13 @@ pub const HDK_NOT_REGISTERED: &str = "HDK not registered";
 /// This is a cell so it can be set many times.
 /// Every test needs its own mock so each test needs to set it.
 use core::cell::RefCell;
+use std::rc::Rc;
 
 #[cfg(any(feature = "mock", not(target_arch = "wasm32")))]
-thread_local!(pub static HDK: RefCell<Box<dyn HdkT>> = RefCell::new(Box::new(ErrHdk)));
+thread_local!(pub static HDK: RefCell<Rc<dyn HdkT>> = RefCell::new(Rc::new(ErrHdk)));
 
 #[cfg(all(not(feature = "mock"), target_arch = "wasm32"))]
-thread_local!(pub static HDK: RefCell<Box<dyn HdkT>> = RefCell::new(Box::new(HostHdk)));
+thread_local!(pub static HDK: RefCell<Rc<dyn HdkT>> = RefCell::new(Rc::new(HostHdk)));
 
 /// When mocking is enabled the mockall crate automatically builds a MockHdkT for us.
 /// ```ignore
@@ -510,7 +511,12 @@ pub fn set_hdk<H: 'static>(hdk: H)
 where
     H: HdkT,
 {
+    let hdk = Rc::new(hdk);
+    let hdk2 = hdk.clone();
     HDK.with(|h| {
-        *h.borrow_mut() = Box::new(hdk);
+        *h.borrow_mut() = hdk2;
+    });
+    idk::idk::IDK.with(|h| {
+        *h.borrow_mut() = hdk;
     });
 }

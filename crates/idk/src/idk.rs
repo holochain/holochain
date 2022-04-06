@@ -5,12 +5,13 @@ pub const IDK_NOT_REGISTERED: &str = "IDK not registered";
 /// This is a cell so it can be set many times.
 /// Every test needs its own mock so each test needs to set it.
 use core::cell::RefCell;
+use std::rc::Rc;
 
 #[cfg(any(feature = "mock", not(target_arch = "wasm32")))]
-thread_local!(pub static IDK: RefCell<Box<dyn IdkT>> = RefCell::new(Box::new(ErrIdk)));
+thread_local!(pub static IDK: RefCell<Rc<dyn IdkT>> = RefCell::new(Rc::new(ErrIdk)));
 
 #[cfg(all(not(feature = "mock"), target_arch = "wasm32"))]
-thread_local!(pub static IDK: RefCell<Box<dyn IdkT>> = RefCell::new(Box::new(HostIdk)));
+thread_local!(pub static IDK: RefCell<Rc<dyn IdkT>> = RefCell::new(Rc::new(HostIdk)));
 
 /// When mocking is enabled the mockall crate automatically builds a MockIdkT for us.
 /// ```ignore
@@ -176,9 +177,9 @@ impl IdkT for HostIdk {
 /// At any time the global IDK can be set to a different idk.
 /// Generally this is only useful during rust unit testing.
 /// When executing wasm without the `mock` feature, the host will be assumed.
-pub fn set_idk<H: 'static>(idk: H) -> Box<dyn IdkT>
+pub fn set_idk<H: 'static>(idk: H) -> Rc<dyn IdkT>
 where
     H: IdkT,
 {
-    IDK.with(|h| std::mem::replace(&mut *h.borrow_mut(), Box::new(idk)))
+    IDK.with(|h| std::mem::replace(&mut *h.borrow_mut(), Rc::new(idk)))
 }

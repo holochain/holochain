@@ -736,3 +736,51 @@ fixturator!(
             .unwrap(),
     };
 );
+
+fixturator!(
+    DnaInfo;
+    curve Empty DnaInfo {
+        name: StringFixturator::new_indexed(Empty, get_fixt_index!())
+            .next()
+            .unwrap(),
+        hash: DnaHashFixturator::new_indexed(Empty, get_fixt_index!())
+            .next()
+            .unwrap(),
+        properties: SerializedBytesFixturator::new_indexed(Empty, get_fixt_index!())
+            .next()
+            .unwrap(),
+        zome_names: vec![ZomeNameFixturator::new_indexed(Empty, get_fixt_index!())
+            .next()
+            .unwrap()],
+    };
+
+    curve Unpredictable DnaInfo {
+        name: StringFixturator::new_indexed(Unpredictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+        hash: DnaHashFixturator::new_indexed(Unpredictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+        properties: SerializedBytesFixturator::new_indexed(Unpredictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+        zome_names: vec![ZomeNameFixturator::new_indexed(Unpredictable, get_fixt_index!())
+            .next()
+            .unwrap()],
+    };
+
+    curve Predictable DnaInfo {
+        name: StringFixturator::new_indexed(Predictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+        hash: DnaHashFixturator::new_indexed(Predictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+        properties: SerializedBytesFixturator::new_indexed(Predictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+        zome_names: vec![ZomeNameFixturator::new_indexed(Predictable, get_fixt_index!())
+            .next()
+            .unwrap()],
+    };
+);

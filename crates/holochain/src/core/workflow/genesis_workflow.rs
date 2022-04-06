@@ -4,6 +4,8 @@
 //! - AgentId
 //!
 
+use std::sync::Arc;
+
 use super::error::WorkflowError;
 use super::error::WorkflowResult;
 use crate::core::ribosome::guest_callback::genesis_self_check::{
@@ -65,14 +67,27 @@ where
         return Ok(());
     }
 
+    let dna_hash = ribosome.dna_def().to_hash();
+    let DnaDef {
+        name,
+        properties,
+        zomes,
+        ..
+    } = &ribosome.dna_def().content;
+    let dna_info = DnaInfo {
+        zome_names: zomes.iter().map(|(n, _)| n.clone()).collect(),
+        name: name.clone(),
+        hash: dna_hash,
+        properties: properties.clone(),
+    };
     let result = ribosome.run_genesis_self_check(
         GenesisSelfCheckHostAccess,
         GenesisSelfCheckInvocation {
-            payload: GenesisSelfCheckData {
-                dna_def: dna_file.dna_def().clone(),
+            payload: Arc::new(GenesisSelfCheckData {
+                dna_info,
                 membrane_proof: membrane_proof.clone(),
                 agent_key: agent_pubkey.clone(),
-            },
+            }),
         },
     )?;
 
