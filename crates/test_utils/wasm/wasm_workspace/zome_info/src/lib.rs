@@ -42,10 +42,10 @@ fn remote_call_info(agent: AgentPubKey) -> ExternResult<CallInfo> {
         None,
         &(),
     )? {
-        ZomeCallResponse::Ok(extern_io) => Ok(extern_io.decode()?),
+        ZomeCallResponse::Ok(extern_io) => Ok(extern_io.decode().map_err(|e| wasm_error!(e.into()))?),
         not_ok => {
             tracing::warn!(?not_ok);
-            Err(WasmError::Guest(format!("{:?}", not_ok)))
+            Err(wasm_error!(WasmErrorInner::Guest(format!("{:?}", not_ok))))
         },
     }
 }
@@ -59,10 +59,10 @@ fn remote_remote_call_info(agent: AgentPubKey) -> ExternResult<CallInfo> {
         None,
         agent_info()?.agent_initial_pubkey,
     )? {
-        ZomeCallResponse::Ok(extern_io) => Ok(extern_io.decode()?),
+        ZomeCallResponse::Ok(extern_io) => Ok(extern_io.decode().map_err(|e| wasm_error!(e.into()))?),
         not_ok => {
             tracing::warn!(?not_ok);
-            Err(WasmError::Guest(format!("{:?}", not_ok)))
+            Err(wasm_error!(WasmErrorInner::Guest(format!("{:?}", not_ok))))
         },
     }
 }

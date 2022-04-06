@@ -96,8 +96,8 @@ pub fn get_anchor(anchor_address: EntryHash) -> ExternResult<Option<Anchor>> {
     Ok(
         match crate::prelude::get(anchor_address, GetOptions::content())?.and_then(|el| el.into()) {
             Some(Entry::App(eb)) => {
-                let path = Path::try_from(SerializedBytes::from(eb))?;
-                Some(Anchor::try_from(&path)?)
+                let path = Path::try_from(SerializedBytes::from(eb)).map_err(|e| wasm_error!(e.into()))?;
+                Some(Anchor::try_from(&path).map_err(|e| wasm_error!(e.into()))?)
             }
             _ => None,
         },
@@ -160,7 +160,7 @@ pub fn list_anchor_tags(anchor_type: String) -> ExternResult<Vec<String>> {
             Err(e) => Err(e),
         })
         .collect();
-    let mut anchor_tags = hopefully_anchor_tags?;
+    let mut anchor_tags = hopefully_anchor_tags.map_err(|e| wasm_error!(e.into()))?;
     anchor_tags.sort();
     anchor_tags.dedup();
     Ok(anchor_tags)

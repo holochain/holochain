@@ -84,7 +84,7 @@ fn commit_existing_path(_: ()) -> ExternResult<()> {
     create_entry(&path)?;
     if let Some(parent) = path.parent() {
         parent.ensure()?;
-        hdk::prelude::create_link(parent.hash()?, path.hash()?, LinkTag::try_from(&path)?)?;
+        hdk::prelude::create_link(parent.hash()?, path.hash()?, LinkTag::try_from(&path).map_err(|e| wasm_error!(e.into()))?)?;
     }
     Ok(())
 }

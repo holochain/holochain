@@ -30,7 +30,7 @@ where
                 zome_name,
                 fn_name,
                 cap_secret,
-                ExternIO::encode(payload)?,
+                ExternIO::encode(payload).map_err(|e| wasm_error!(e.into()))?,
                 provenance,
             )])
         })?
@@ -79,7 +79,7 @@ where
                 zome,
                 fn_name,
                 cap_secret,
-                ExternIO::encode(payload)?,
+                ExternIO::encode(payload).map_err(|e| wasm_error!(e.into()))?,
             )])
         })?
         .into_iter()
@@ -102,7 +102,7 @@ where
 {
     HDK.with(|h| {
         h.borrow()
-            .emit_signal(AppSignal::new(ExternIO::encode(input)?))
+            .emit_signal(AppSignal::new(ExternIO::encode(input).map_err(|e| wasm_error!(e.into()))?))
     })
 }
 
@@ -139,7 +139,7 @@ where
 {
     HDK.with(|h| {
         h.borrow().remote_signal(RemoteSignal {
-            signal: ExternIO::encode(input)?,
+            signal: ExternIO::encode(input).map_err(|e| wasm_error!(e.into()))?,
             agents,
         })
     })

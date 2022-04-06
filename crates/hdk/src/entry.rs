@@ -415,15 +415,15 @@ macro_rules! app_entry {
                 match entry {
                     $crate::prelude::Entry::App(eb) => Ok(Self::try_from(
                         $crate::prelude::SerializedBytes::from(eb.to_owned()),
-                    )?),
+                    ).map_err(|e| wasm_error!(e.into()))?),
                     $crate::prelude::Entry::CounterSign(_, eb) => Ok(Self::try_from(
                         $crate::prelude::SerializedBytes::from(eb.to_owned()),
-                    )?),
-                    _ => Err($crate::prelude::SerializedBytesError::Deserialize(format!(
+                    ).map_err(|e| wasm_error!(e.into()))?),
+                    _ => Err(wasm_error!($crate::prelude::SerializedBytesError::Deserialize(format!(
                         "{:?} is not an Entry::App or Entry::CounterSign so has no serialized bytes",
                         entry
                     ))
-                    .into()),
+                    .into())),
                 }
             }
         }
@@ -447,7 +447,10 @@ macro_rules! app_entry {
             fn try_from(element: &$crate::prelude::Element) -> Result<Self, Self::Error> {
                 Ok(match element.entry() {
                     ElementEntry::Present(entry) => Self::try_from(entry)?,
-                    _ => return Err(Self::Error::Guest(format!("Tried to deserialize an element, expecting it to contain entry data, but there was none. Element HeaderHash: {}", element.header_hashed().as_hash()))),
+                    _ => return Err(
+                        wasm_error!(
+                        $crate::prelude::WasmErrorInner::Guest(format!("Tried to deserialize an element, expecting it to contain entry data, but there was none. Element HeaderHash: {}", element.header_hashed().as_hash())))
+                    ),
                 })
             }
         }
@@ -462,12 +465,12 @@ macro_rules! app_entry {
         impl TryFrom<&$t> for $crate::prelude::AppEntryBytes {
             type Error = $crate::prelude::WasmError;
             fn try_from(t: &$t) -> Result<Self, Self::Error> {
-                AppEntryBytes::try_from(SerializedBytes::try_from(t)?).map_err(|entry_error| match entry_error {
+                AppEntryBytes::try_from(SerializedBytes::try_from(t).map_err(|e| wasm_error!(e.into()))?).map_err(|entry_error| match entry_error {
                     EntryError::SerializedBytes(serialized_bytes_error) => {
-                        WasmError::Serialize(serialized_bytes_error)
+                        wasm_error!(WasmErrorInner::Serialize(serialized_bytes_error))
                     }
                     EntryError::EntryTooLarge(_) => {
-                        WasmError::Guest(entry_error.to_string())
+                        wasm_error!(WasmErrorInner::Guest(entry_error.to_string()))
                     }
                 })
             }
@@ -740,9 +743,9 @@ macro_rules! entry_def_index {
                             "Failed to lookup index for entry def id."
                         );
                         Err::<$crate::prelude::EntryDefIndex, $crate::prelude::WasmError>(
-                            $crate::prelude::WasmError::Guest(
+                            $crate::prelude::wasm_error!($crate::prelude::WasmErrorInner::Guest(
                                 "Failed to lookup index for entry def id.".into(),
-                            ),
+                            )),
                         )
                     }
                 }

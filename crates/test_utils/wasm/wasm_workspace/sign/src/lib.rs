@@ -17,8 +17,8 @@ fn sign_ephemeral(_: ()) -> ExternResult<Vec<EphemeralSignatures>> {
         // Need to use raw if the types are different.
         hdk::prelude::sign_ephemeral_raw(
             vec![
-                holochain_serialized_bytes::encode(&One([1, 2]))?,
-                holochain_serialized_bytes::encode(&Two([2, 3]))?,
+                holochain_serialized_bytes::encode(&One([1, 2])).map_err(|e| wasm_error!(e.into()))?,
+                holochain_serialized_bytes::encode(&Two([2, 3])).map_err(|e| wasm_error!(e.into()))?,
             ]
         )?
     ])
