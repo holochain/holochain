@@ -7,6 +7,7 @@ use crate::core::workflow::app_validation_workflow::validation_package::get_as_a
 use crate::core::workflow::app_validation_workflow::validation_package::get_as_author_sub_chain;
 use holochain_cascade::Cascade;
 use holochain_p2p::HolochainP2pDna;
+use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::dna::DnaFile;
 use holochain_zome_types::HeaderHashed;
 
@@ -14,15 +15,18 @@ use holochain_zome_types::HeaderHashed;
     header_hashed,
     authored_db,
     dht_db,
+    dht_db_cache,
     cache,
     ribosome,
     conductor_handle,
     network
 ))]
+#[allow(clippy::too_many_arguments)]
 pub(super) async fn get_as_author(
     header_hashed: HeaderHashed,
     authored_db: DbRead<DbKindAuthored>,
     dht_db: DbRead<DbKindDht>,
+    dht_db_cache: DhtDbQueryCache,
     cache: DbWrite<DbKindCache>,
     ribosome: &impl RibosomeT,
     conductor_handle: &dyn ConductorHandleT,
@@ -36,6 +40,7 @@ pub(super) async fn get_as_author(
     let mut source_chain = SourceChainRead::new(
         authored_db.clone(),
         dht_db.clone(),
+        dht_db_cache.clone(),
         conductor_handle.keystore().clone(),
         header.author().clone(),
     )
@@ -90,6 +95,7 @@ pub(super) async fn get_as_author(
             let workspace_lock = HostFnWorkspace::new(
                 authored_db.clone(),
                 dht_db,
+                dht_db_cache,
                 cache,
                 conductor_handle.keystore().clone(),
                 Some(header.author().clone()),

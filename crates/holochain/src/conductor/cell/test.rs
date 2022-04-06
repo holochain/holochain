@@ -26,6 +26,7 @@ async fn test_cell_handle_publish() {
     let spaces = TestSpaces::new([dna.clone()]);
     let db = spaces.test_spaces[&dna].space.authored_db.clone();
     let dht_db = spaces.test_spaces[&dna].space.dht_db.clone();
+    let dht_db_cache = spaces.test_spaces[&dna].space.dht_query_cache.clone();
 
     let test_network = test_network(Some(dna.clone()), Some(agent.clone())).await;
     let holochain_p2p_cell = test_network.dna_network();
@@ -53,6 +54,7 @@ async fn test_cell_handle_publish() {
         mock_handle.clone(),
         db.clone(),
         dht_db.clone(),
+        dht_db_cache.clone(),
         mock_ribosome,
         None,
     )

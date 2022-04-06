@@ -171,6 +171,7 @@ pub async fn spawn_queue_consumer_tasks(
             AppValidationWorkspace::new(
                 authored_db.clone().into(),
                 dht_db.clone(),
+                space.dht_query_cache.clone(),
                 cache.clone(),
                 keystore.clone(),
                 Arc::new(dna_def),

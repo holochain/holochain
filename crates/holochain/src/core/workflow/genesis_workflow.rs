@@ -14,12 +14,13 @@ use derive_more::Constructor;
 use holochain_sqlite::prelude::*;
 use holochain_state::source_chain;
 use holochain_state::workspace::WorkspaceResult;
+use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::prelude::*;
 use rusqlite::named_params;
 use tracing::*;
 
 /// The struct which implements the genesis Workflow
-#[derive(Constructor, Debug)]
+#[derive(Constructor)]
 pub struct GenesisWorkflowArgs<Ribosome>
 where
     Ribosome: RibosomeT + 'static,
@@ -28,9 +29,10 @@ where
     agent_pubkey: AgentPubKey,
     membrane_proof: Option<MembraneProof>,
     ribosome: Ribosome,
+    dht_db_cache: DhtDbQueryCache,
 }
 
-#[instrument(skip(workspace, api))]
+#[instrument(skip(workspace, api, args))]
 pub async fn genesis_workflow<'env, Api: CellConductorApiT, Ribosome>(
     mut workspace: GenesisWorkspace,
     api: Api,
@@ -56,6 +58,7 @@ where
         agent_pubkey,
         membrane_proof,
         ribosome,
+        dht_db_cache,
     } = args;
 
     if workspace.has_genesis(agent_pubkey.clone()).await? {
@@ -91,6 +94,7 @@ where
     source_chain::genesis(
         workspace.vault.clone(),
         workspace.dht_db.clone(),
+        &dht_db_cache,
         api.keystore().clone(),
         dna_file.dna_hash().clone(),
         agent_pubkey,
@@ -159,6 +163,7 @@ pub mod tests {
         observability::test_run().unwrap();
         let test_db = test_authored_db();
         let dht_db = test_dht_db();
+        let dht_db_cache = DhtDbQueryCache::new(dht_db.to_db().into());
         let keystore = test_keystore();
         let vault = test_db.to_db();
         let dna = fake_dna_file("a");
@@ -180,15 +185,21 @@ pub mod tests {
                 agent_pubkey: author.clone(),
                 membrane_proof: None,
                 ribosome,
+                dht_db_cache: dht_db_cache.clone(),
             };
             let _: () = genesis_workflow(workspace, api, args).await.unwrap();
         }
 
         {
-            let source_chain =
-                SourceChain::new(vault.clone(), dht_db.to_db(), keystore, author.clone())
-                    .await
-                    .unwrap();
+            let source_chain = SourceChain::new(
+                vault.clone(),
+                dht_db.to_db(),
+                dht_db_cache,
+                keystore,
+                author.clone(),
+            )
+            .await
+            .unwrap();
             let headers = source_chain
                 .query(Default::default())
                 .await
