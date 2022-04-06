@@ -445,7 +445,7 @@ pub struct Update {
 /// Declare that a previously published Header should be nullified and
 /// considered deleted.
 ///
-/// Via the associated [DhtOp], this also has an effect on Entries: namely,
+/// Via the associated [`crate::Op`], this also has an effect on Entries: namely,
 /// that a previously published Entry will become inaccessible if all of its
 /// Headers are marked deleted.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]

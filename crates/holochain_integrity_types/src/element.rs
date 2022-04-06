@@ -40,7 +40,7 @@ pub enum ElementEntry {
     NotApplicable,
     /// The Header has an entry but was stored without it.
     /// This can happen when you receive gossip of just a header
-    /// when the header type is a [NewEntryHeader]
+    /// when the header type is a [`crate::EntryCreationHeader`]
     NotStored,
 }
 

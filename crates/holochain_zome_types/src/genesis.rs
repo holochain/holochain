@@ -5,4 +5,10 @@
 //! joining to ensure that they can catch any problems they can before being
 //! subject to the scrutiny of their peers and facing possible rejection.
 
+//! For more details see [`holochain_integrity_types::genesis`].
+
+#[doc(no_inline)]
+pub use holochain_integrity_types::genesis;
+
+#[doc(inline)]
 pub use holochain_integrity_types::genesis::*;

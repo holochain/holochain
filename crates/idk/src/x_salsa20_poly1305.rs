@@ -29,7 +29,7 @@ pub fn x_salsa20_poly1305_decrypt(
 /// This means that if any decrypted data is returned by this function it was created by _either_
 /// keypair and has not been tampered with.
 ///
-/// See https://www.imperialviolet.org/2015/05/16/aeads.html
+/// See <https://www.imperialviolet.org/2015/05/16/aeads.html>
 pub fn x_25519_x_salsa20_poly1305_decrypt(
     recipient: X25519PubKey,
     sender: X25519PubKey,

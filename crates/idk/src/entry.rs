@@ -342,13 +342,13 @@ macro_rules! register_entry {
 /// On the other hand, EntryDef::from(Foo::new()) works better when e.g. using create_entry() as
 /// an instance of Foo already exists and we need the entry def id back for creates and updates.
 ///
-/// If you don't want to use the macro you can simply implement similar fns youself.
+/// If you don't want to use the macro you can simply implement similar fns yourself.
 ///
 /// This is not a trait at the moment, it could be in the future but for now these functions and
 /// impls are just a loose set of conventions.
 ///
 /// It's actually entirely possible to interact with core directly without any of these.
-/// e.g. [`create_entry`] is just building a tuple of [`EntryDefId`] and [`Entry::App`] under the hood.
+/// e.g. committing is just building a tuple of [`EntryDefId`] and [`Entry::App`] under the hood.
 ///
 /// This requires that TryFrom and TryInto [`derive@SerializedBytes`] is implemented for the entry type,
 /// which implies that [`serde::Serialize`] and [`serde::Deserialize`] is also implemented.

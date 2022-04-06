@@ -36,7 +36,7 @@
 //! The code is not strictly organised this way but you'll get a feel for it as you write your own hApps.
 //!
 //! Roughly speaking, 80% of your apps can be production ready using just 20% of the IDK features and code.
-//! These are the 'high level' functions such as [ `crate::entry::create_entry` ] and macros like [ `#[hdk_extern]` ].
+//! These are the 'high level' functions such as [`must_get_entry`](crate::entry::must_get_entry)  and macros like [`hdk_extern`](hdk_derive::hdk_extern).
 //! Every Holochain function is available with a typed and documented wrapper and there is a set of macros for exposing functions and defining entries.
 //!
 //! The 20% of the time that you need to go deeper there is another layer followng its own 80/20 rule.
@@ -226,7 +226,7 @@
 //! The __guest must handle this error__ and either return it back to the host which _then_ rolls back writes (see above) or implement some kind of graceful failure or retry logic.
 //!
 //! The `Result` from the host in the case of host calls indicates whether the execution _completed_ successfully and is _in addition to_ other Result-like enums.
-//! For example, a remote call can be `Ok` from the host's perspective but contain an [ `crate::prelude::ZomeCallResponse::Unauthorized` ] "failure" enum variant from the remote agent, both need to be handled in context.
+//! For example, a remote call can be `Ok` from the host's perspective but contain an Unauthorized "failure" enum variant from the remote agent, both need to be handled in context.
 
 /// Working with app and system entries.
 ///
@@ -256,7 +256,7 @@ pub mod hash;
 /// Maps a Rust function to an extern that WASM can expose to the Holochain host.
 ///
 /// Annotate any compatible function with `#[hdk_extern]` to expose it to Holochain as a WASM extern.
-/// The [ `map_extern!` ] macro is used internally by the `#[hdk_extern]` attribute.
+/// The [`map_extern!`] macro is used internally by the `#[hdk_extern]` attribute.
 ///
 /// Compatible functions:
 ///
