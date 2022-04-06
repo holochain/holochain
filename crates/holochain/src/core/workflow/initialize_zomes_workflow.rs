@@ -20,7 +20,7 @@ use tracing::*;
 #[derive(Constructor)]
 pub struct InitializeZomesWorkflowArgs<Ribosome>
 where
-    Ribosome: RibosomeT + Send + 'static,
+    Ribosome: RibosomeT + 'static,
 {
     pub ribosome: Ribosome,
     pub conductor_handle: ConductorHandle,
@@ -30,7 +30,7 @@ where
 
 impl<Ribosome> InitializeZomesWorkflowArgs<Ribosome>
 where
-    Ribosome: RibosomeT + Send + 'static,
+    Ribosome: RibosomeT + 'static,
 {
     pub fn dna_def(&self) -> &DnaDef {
         self.ribosome.dna_def().as_content()
@@ -45,7 +45,7 @@ pub async fn initialize_zomes_workflow<Ribosome>(
     args: InitializeZomesWorkflowArgs<Ribosome>,
 ) -> WorkflowResult<InitResult>
 where
-    Ribosome: RibosomeT + Send + 'static,
+    Ribosome: RibosomeT + Clone + 'static,
 {
     let conductor_handle = args.conductor_handle.clone();
     let result =
@@ -78,7 +78,7 @@ async fn initialize_zomes_workflow_inner<Ribosome>(
     args: InitializeZomesWorkflowArgs<Ribosome>,
 ) -> WorkflowResult<InitResult>
 where
-    Ribosome: RibosomeT + Send + 'static,
+    Ribosome: RibosomeT + 'static,
 {
     let dna_def = args.dna_def().clone();
     let InitializeZomesWorkflowArgs {

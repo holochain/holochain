@@ -286,6 +286,10 @@ mod tests {
             "DhtOpHash",
             DhtOpHash::from_raw_36(vec![0xdb; HOLO_HASH_UNTYPED_LEN]),
         );
+        assert_type!(
+            "ExternalHash",
+            ExternalHash::from_raw_36(vec![0xdb; HOLO_HASH_UNTYPED_LEN]),
+        );
     }
 
     #[test]

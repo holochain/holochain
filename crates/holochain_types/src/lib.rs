@@ -32,6 +32,8 @@ pub mod metadata;
 pub mod prelude;
 pub mod share;
 pub mod signal;
+#[warn(missing_docs)]
+pub mod sql;
 pub mod validate;
 pub mod web_app;
 
