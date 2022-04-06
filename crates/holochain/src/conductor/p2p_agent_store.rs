@@ -197,6 +197,8 @@ pub async fn query_peer_density(
     let arcs: Vec<_> = arcs
         .into_iter()
         .filter_map(|v| {
+            // note: this is what makes PeerView "checked"
+            // TODO: remove this once removing view_unchecked
             if dht_arc.contains(v.agent.get_loc()) {
                 if v.space == kitsune_space && !is_expired(now, &v) {
                     Some(v.storage_arc)
