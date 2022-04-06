@@ -23,6 +23,7 @@ use holochain_p2p::actor::GetLinksOptions;
 use holochain_p2p::actor::HolochainP2pRefToDna;
 use holochain_p2p::HolochainP2pDna;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
+use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::prelude::*;
 use holochain_zome_types::AgentActivity;
 use std::sync::Arc;
@@ -84,6 +85,7 @@ pub enum MaybeLinkable {
 pub struct HostFnCaller {
     pub authored_db: DbWrite<DbKindAuthored>,
     pub dht_db: DbWrite<DbKindDht>,
+    pub dht_db_cache: DhtDbQueryCache,
     pub cache: DbWrite<DbKindCache>,
     pub ribosome: RealRibosome,
     pub zome_path: ZomePath,
@@ -113,6 +115,7 @@ impl HostFnCaller {
     ) -> HostFnCaller {
         let authored_db = handle.get_authored_db(cell_id.dna_hash()).unwrap();
         let dht_db = handle.get_dht_db(cell_id.dna_hash()).unwrap();
+        let dht_db_cache = handle.get_dht_db_cache(cell_id.dna_hash()).unwrap();
         let cache = handle.get_cache_db(cell_id).unwrap();
         let keystore = handle.keystore().clone();
         let network = handle.holochain_p2p().to_dna(cell_id.dna_hash().clone());
@@ -129,6 +132,7 @@ impl HostFnCaller {
         HostFnCaller {
             authored_db,
             dht_db,
+            dht_db_cache,
             cache,
             ribosome,
             zome_path,
@@ -158,6 +162,7 @@ impl HostFnCaller {
             signal_tx,
             zome_path,
             call_zome_handle,
+            dht_db_cache,
         } = self.clone();
 
         let (cell_id, zome_name) = zome_path.into();
@@ -165,6 +170,7 @@ impl HostFnCaller {
         let workspace_lock = HostFnWorkspace::new(
             authored_db,
             dht_db,
+            dht_db_cache,
             cache,
             keystore.clone(),
             Some(cell_id.agent_pubkey().clone()),

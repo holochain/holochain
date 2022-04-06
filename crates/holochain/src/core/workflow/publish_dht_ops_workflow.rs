@@ -115,6 +115,7 @@ mod tests {
     use holochain_p2p::actor::HolochainP2pSender;
     use holochain_p2p::HolochainP2pDna;
     use holochain_p2p::HolochainP2pRef;
+    use holochain_types::db_cache::DhtDbQueryCache;
     use observability;
     use rusqlite::Transaction;
     use std::collections::HashMap;
@@ -405,6 +406,7 @@ mod tests {
                 let source_chain = SourceChain::new(
                     db.clone().into(),
                     dht_db.to_db(),
+                    DhtDbQueryCache::new(dht_db.clone().into()),
                     keystore.clone(),
                     author.clone(),
                 )

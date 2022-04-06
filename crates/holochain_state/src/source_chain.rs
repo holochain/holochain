@@ -15,6 +15,7 @@ use holochain_p2p::HolochainP2pDnaT;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_types::db::DbRead;
 use holochain_types::db::DbWrite;
+use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::dht_op::produce_op_lights_from_elements;
 use holochain_types::dht_op::produce_op_lights_from_iter;
 use holochain_types::dht_op::DhtOp;
@@ -69,6 +70,7 @@ pub struct SourceChain<AuthorDb = DbWrite<DbKindAuthored>, DhtDb = DbWrite<DbKin
     scratch: SyncScratch,
     vault: AuthorDb,
     dht_db: DhtDb,
+    dht_db_cache: DhtDbQueryCache,
     keystore: MetaLairClient,
     author: Arc<AgentPubKey>,
     persisted_seq: u32,
@@ -333,6 +335,7 @@ impl SourceChain {
                     let child_chain = Self::new(
                         self.vault.clone(),
                         self.dht_db.clone(),
+                        self.dht_db_cache.clone(),
                         keystore.clone(),
                         (*self.author).clone(),
                     )
@@ -364,8 +367,14 @@ impl SourceChain {
                 }
             }
             Ok(zomed_headers) => {
-                authored_ops_to_dht_db(network, ops_to_integrate, &self.vault, &self.dht_db)
-                    .await?;
+                authored_ops_to_dht_db(
+                    network,
+                    ops_to_integrate,
+                    &self.vault,
+                    &self.dht_db,
+                    &self.dht_db_cache,
+                )
+                .await?;
                 SourceChainResult::Ok(zomed_headers)
             }
             result => result,
@@ -381,6 +390,7 @@ where
     pub async fn new(
         vault: AuthorDb,
         dht_db: DhtDb,
+        dht_db_cache: DhtDbQueryCache,
         keystore: MetaLairClient,
         author: AgentPubKey,
     ) -> SourceChainResult<Self> {
@@ -396,6 +406,7 @@ where
             scratch,
             vault,
             dht_db,
+            dht_db_cache,
             keystore,
             author,
             persisted_seq,
@@ -412,6 +423,7 @@ where
     pub async fn raw_empty(
         vault: AuthorDb,
         dht_db: DhtDb,
+        dht_db_cache: DhtDbQueryCache,
         keystore: MetaLairClient,
         author: AgentPubKey,
     ) -> SourceChainResult<Self> {
@@ -434,6 +446,7 @@ where
             scratch,
             vault,
             dht_db,
+            dht_db_cache,
             keystore,
             author,
             persisted_seq,
@@ -910,6 +923,7 @@ async fn rebase_headers_on(
 pub async fn genesis(
     authored: DbWrite<DbKindAuthored>,
     dht_db: DbWrite<DbKindDht>,
+    dht_db_cache: &DhtDbQueryCache,
     keystore: MetaLairClient,
     dna_hash: DnaHash,
     agent_pubkey: AgentPubKey,
@@ -979,7 +993,8 @@ pub async fn genesis(
             SourceChainResult::Ok(ops_to_integrate)
         })
         .await?;
-    authored_ops_to_dht_db_without_check(ops_to_integrate, &authored, &dht_db).await?;
+    authored_ops_to_dht_db_without_check(ops_to_integrate, &authored, &dht_db, dht_db_cache)
+        .await?;
     Ok(())
 }
 
@@ -1184,6 +1199,7 @@ impl From<SourceChain> for SourceChainRead {
         SourceChainRead {
             vault: chain.vault.into(),
             dht_db: chain.dht_db.into(),
+            dht_db_cache: chain.dht_db_cache,
             scratch: chain.scratch,
             keystore: chain.keystore,
             author: chain.author,
@@ -1218,10 +1234,12 @@ pub mod tests {
 
         let mut mock = MockHolochainP2pDnaT::new();
         mock.expect_authority_for_hash().returning(|_| Ok(false));
+        let dht_db_cache = DhtDbQueryCache::new(dht_db.to_db().into());
 
         source_chain::genesis(
             db.clone(),
             dht_db.to_db(),
+            &dht_db_cache,
             keystore.clone(),
             fake_dna_hash(1),
             alice.clone(),
@@ -1232,6 +1250,7 @@ pub mod tests {
         let chain_1 = SourceChain::new(
             db.clone().into(),
             dht_db.to_db(),
+            dht_db_cache.clone(),
             keystore.clone(),
             alice.clone(),
         )
@@ -1239,6 +1258,7 @@ pub mod tests {
         let chain_2 = SourceChain::new(
             db.clone().into(),
             dht_db.to_db(),
+            dht_db_cache.clone(),
             keystore.clone(),
             alice.clone(),
         )
@@ -1246,6 +1266,7 @@ pub mod tests {
         let chain_3 = SourceChain::new(
             db.clone().into(),
             dht_db.to_db(),
+            dht_db_cache.clone(),
             keystore.clone(),
             alice.clone(),
         )
@@ -1316,10 +1337,12 @@ pub mod tests {
 
         let mut mock = MockHolochainP2pDnaT::new();
         mock.expect_authority_for_hash().returning(|_| Ok(false));
+        let dht_db_cache = DhtDbQueryCache::new(dht_db.to_db().into());
 
         source_chain::genesis(
             db.clone(),
             dht_db.to_db(),
+            &dht_db_cache,
             keystore.clone(),
             fake_dna_hash(1),
             alice.clone(),
@@ -1331,6 +1354,7 @@ pub mod tests {
         let chain_1 = SourceChain::new(
             db.clone().into(),
             dht_db.to_db(),
+            dht_db_cache.clone(),
             keystore.clone(),
             alice.clone(),
         )
@@ -1338,6 +1362,7 @@ pub mod tests {
         let chain_2 = SourceChain::new(
             db.clone().into(),
             dht_db.to_db(),
+            dht_db_cache.clone(),
             keystore.clone(),
             alice.clone(),
         )
@@ -1345,6 +1370,7 @@ pub mod tests {
         let chain_3 = SourceChain::new(
             db.clone().into(),
             dht_db.to_db(),
+            dht_db_cache.clone(),
             keystore.clone(),
             alice.clone(),
         )
@@ -1451,6 +1477,7 @@ pub mod tests {
     async fn test_get_cap_grant() -> SourceChainResult<()> {
         let test_db = test_authored_db();
         let dht_db = test_dht_db();
+        let dht_db_cache = DhtDbQueryCache::new(dht_db.to_db().into());
         let keystore = test_keystore();
         let db = test_db.to_db();
         let secret = Some(CapSecretFixturator::new(Unpredictable).next().unwrap());
@@ -1471,6 +1498,7 @@ pub mod tests {
         source_chain::genesis(
             db.clone(),
             dht_db.to_db(),
+            &dht_db_cache,
             keystore.clone(),
             fake_dna_hash(1),
             alice.clone(),
@@ -1480,9 +1508,14 @@ pub mod tests {
         .unwrap();
 
         {
-            let chain =
-                SourceChain::new(db.clone(), dht_db.to_db(), keystore.clone(), alice.clone())
-                    .await?;
+            let chain = SourceChain::new(
+                db.clone(),
+                dht_db.to_db(),
+                dht_db_cache.clone(),
+                keystore.clone(),
+                alice.clone(),
+            )
+            .await?;
             assert_eq!(
                 chain
                     .valid_cap_grant(function.clone(), alice.clone(), secret.clone())
@@ -1503,6 +1536,7 @@ pub mod tests {
             let chain = SourceChain::new(
                 db.clone().into(),
                 dht_db.to_db(),
+                dht_db_cache.clone(),
                 keystore.clone(),
                 alice.clone(),
             )
@@ -1528,9 +1562,14 @@ pub mod tests {
         };
 
         {
-            let chain =
-                SourceChain::new(db.clone(), dht_db.to_db(), keystore.clone(), alice.clone())
-                    .await?;
+            let chain = SourceChain::new(
+                db.clone(),
+                dht_db.to_db(),
+                dht_db_cache.clone(),
+                keystore.clone(),
+                alice.clone(),
+            )
+            .await?;
             // alice should find her own authorship with higher priority than the committed grant
             // even if she passes in the secret
             assert_eq!(
@@ -1561,6 +1600,7 @@ pub mod tests {
             let chain = SourceChain::new(
                 db.clone().into(),
                 dht_db.to_db(),
+                dht_db_cache.clone(),
                 keystore.clone(),
                 alice.clone(),
             )
@@ -1588,9 +1628,14 @@ pub mod tests {
         };
 
         {
-            let chain =
-                SourceChain::new(db.clone(), dht_db.to_db(), keystore.clone(), alice.clone())
-                    .await?;
+            let chain = SourceChain::new(
+                db.clone(),
+                dht_db.to_db(),
+                dht_db_cache.clone(),
+                keystore.clone(),
+                alice.clone(),
+            )
+            .await?;
             // alice should find her own authorship with higher priority than the committed grant
             // even if she passes in the secret
             assert_eq!(
@@ -1625,6 +1670,7 @@ pub mod tests {
             let chain = SourceChain::new(
                 db.clone().into(),
                 dht_db.to_db(),
+                dht_db_cache.clone(),
                 keystore.clone(),
                 alice.clone(),
             )
@@ -1646,9 +1692,14 @@ pub mod tests {
         }
 
         {
-            let chain =
-                SourceChain::new(db.clone(), dht_db.to_db(), keystore.clone(), alice.clone())
-                    .await?;
+            let chain = SourceChain::new(
+                db.clone(),
+                dht_db.to_db(),
+                dht_db_cache.clone(),
+                keystore.clone(),
+                alice.clone(),
+            )
+            .await?;
             // alice should find her own authorship
             assert_eq!(
                 chain
@@ -1729,6 +1780,7 @@ pub mod tests {
         observability::test_run().ok();
         let test_db = test_authored_db();
         let dht_db = test_dht_db();
+        let dht_db_cache = DhtDbQueryCache::new(dht_db.to_db().into());
         let keystore = test_keystore();
         let vault = test_db.to_db();
         let mut mock = MockHolochainP2pDnaT::new();
@@ -1746,6 +1798,7 @@ pub mod tests {
         genesis(
             vault.clone().into(),
             dht_db.to_db(),
+            &dht_db_cache,
             keystore.clone(),
             fixt!(DnaHash),
             (*author).clone(),
@@ -1757,6 +1810,7 @@ pub mod tests {
         let source_chain = SourceChain::new(
             vault.clone().into(),
             dht_db.to_db(),
+            dht_db_cache.clone(),
             keystore.clone(),
             (*author).clone(),
         )
@@ -1807,6 +1861,7 @@ pub mod tests {
         let source_chain = SourceChain::new(
             vault.clone(),
             dht_db.to_db(),
+            dht_db_cache.clone(),
             keystore.clone(),
             (*author).clone(),
         )
@@ -1824,12 +1879,14 @@ pub mod tests {
     async fn source_chain_buffer_dump_entries_json() -> SourceChainResult<()> {
         let test_db = test_authored_db();
         let dht_db = test_dht_db();
+        let dht_db_cache = DhtDbQueryCache::new(dht_db.to_db().into());
         let keystore = test_keystore();
         let vault = test_db.to_db();
         let author = keystore.new_sign_keypair_random().await.unwrap();
         genesis(
             vault.clone().into(),
             dht_db.to_db(),
+            &dht_db_cache,
             keystore.clone(),
             fixt!(DnaHash),
             author.clone(),

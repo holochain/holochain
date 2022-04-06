@@ -531,6 +531,7 @@ fn run_validation_callback_inner(
 pub struct AppValidationWorkspace {
     authored_db: DbRead<DbKindAuthored>,
     dht_db: DbWrite<DbKindDht>,
+    dht_db_cache: DhtDbQueryCache,
     cache: DbWrite<DbKindCache>,
     keystore: MetaLairClient,
     dna_def: Arc<DnaDef>,
@@ -540,6 +541,7 @@ impl AppValidationWorkspace {
     pub fn new(
         authored_db: DbRead<DbKindAuthored>,
         dht_db: DbWrite<DbKindDht>,
+        dht_db_cache: DhtDbQueryCache,
         cache: DbWrite<DbKindCache>,
         keystore: MetaLairClient,
         dna_def: Arc<DnaDef>,
@@ -547,6 +549,7 @@ impl AppValidationWorkspace {
         Self {
             authored_db,
             dht_db,
+            dht_db_cache,
             cache,
             keystore,
             dna_def,
@@ -557,6 +560,7 @@ impl AppValidationWorkspace {
         Ok(HostFnWorkspace::new(
             self.authored_db.clone(),
             self.dht_db.clone().into(),
+            self.dht_db_cache.clone(),
             self.cache.clone(),
             self.keystore.clone(),
             None,

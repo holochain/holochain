@@ -143,6 +143,7 @@ pub mod tests {
     use holochain_state::prelude::test_cache_db;
     use holochain_state::prelude::test_dht_db;
     use holochain_state::prelude::SourceChain;
+    use holochain_types::db_cache::DhtDbQueryCache;
     use holochain_types::prelude::DnaDefHashed;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::fake_agent_pubkey_1;
@@ -153,6 +154,7 @@ pub mod tests {
         SourceChain::new(
             cell.authored_db().clone(),
             cell.dht_db().clone(),
+            DhtDbQueryCache::new(cell.dht_db().clone().into()),
             keystore,
             cell.agent_pubkey().clone(),
         )
@@ -180,6 +182,7 @@ pub mod tests {
         let workspace = SourceChainWorkspace::new(
             db.clone(),
             test_dht.to_db(),
+            DhtDbQueryCache::new(test_dht.to_db().into()),
             test_cache.to_db(),
             keystore,
             author.clone(),

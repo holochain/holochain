@@ -9,6 +9,7 @@ use holochain_sqlite::db::DbKindDht;
 use holochain_sqlite::db::ReadAccess;
 use holochain_types::db::DbRead;
 use holochain_types::db::DbWrite;
+use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_zome_types::DnaDef;
 use holochain_zome_types::SignedHeaderHashed;
 
@@ -72,13 +73,20 @@ impl SourceChainWorkspace {
     pub async fn new(
         authored: DbWrite<DbKindAuthored>,
         dht: DbWrite<DbKindDht>,
+        dht_db_cache: DhtDbQueryCache,
         cache: DbWrite<DbKindCache>,
         keystore: MetaLairClient,
         author: AgentPubKey,
         dna_def: Arc<DnaDef>,
     ) -> SourceChainResult<Self> {
-        let source_chain =
-            SourceChain::new(authored.clone(), dht.clone(), keystore, author).await?;
+        let source_chain = SourceChain::new(
+            authored.clone(),
+            dht.clone(),
+            dht_db_cache.clone(),
+            keystore,
+            author,
+        )
+        .await?;
         Self::new_inner(authored, dht, cache, source_chain, dna_def, false).await
     }
 
@@ -86,13 +94,20 @@ impl SourceChainWorkspace {
     pub async fn init_as_root(
         authored: DbWrite<DbKindAuthored>,
         dht: DbWrite<DbKindDht>,
+        dht_db_cache: DhtDbQueryCache,
         cache: DbWrite<DbKindCache>,
         keystore: MetaLairClient,
         author: AgentPubKey,
         dna_def: Arc<DnaDef>,
     ) -> SourceChainResult<Self> {
-        let source_chain =
-            SourceChain::new(authored.clone(), dht.clone(), keystore, author).await?;
+        let source_chain = SourceChain::new(
+            authored.clone(),
+            dht.clone(),
+            dht_db_cache.clone(),
+            keystore,
+            author,
+        )
+        .await?;
         Self::new_inner(authored, dht, cache, source_chain, dna_def, true).await
     }
 
@@ -103,13 +118,20 @@ impl SourceChainWorkspace {
     pub async fn raw_empty(
         authored: DbWrite<DbKindAuthored>,
         dht: DbWrite<DbKindDht>,
+        dht_db_cache: DhtDbQueryCache,
         cache: DbWrite<DbKindCache>,
         keystore: MetaLairClient,
         author: AgentPubKey,
         dna_def: Arc<DnaDef>,
     ) -> SourceChainResult<Self> {
-        let source_chain =
-            SourceChain::raw_empty(authored.clone(), dht.clone(), keystore, author).await?;
+        let source_chain = SourceChain::raw_empty(
+            authored.clone(),
+            dht.clone(),
+            dht_db_cache.clone(),
+            keystore,
+            author,
+        )
+        .await?;
         Self::new_inner(authored, dht, cache, source_chain, dna_def, false).await
     }
 
@@ -149,15 +171,23 @@ where
     pub async fn new(
         authored: SourceChainDb,
         dht: SourceChainDht,
+        dht_db_cache: DhtDbQueryCache,
         cache: DbWrite<DbKindCache>,
         keystore: MetaLairClient,
         author: Option<AgentPubKey>,
         dna_def: Arc<DnaDef>,
     ) -> SourceChainResult<Self> {
         let source_chain = match author {
-            Some(author) => {
-                Some(SourceChain::new(authored.clone(), dht.clone(), keystore, author).await?)
-            }
+            Some(author) => Some(
+                SourceChain::new(
+                    authored.clone(),
+                    dht.clone(),
+                    dht_db_cache.clone(),
+                    keystore,
+                    author,
+                )
+                .await?,
+            ),
             None => None,
         };
         Ok(Self {
