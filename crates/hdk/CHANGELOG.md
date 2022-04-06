@@ -12,6 +12,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - hdk: Adds compound hash type for linkable hashes [#1308](https://github.com/holochain/holochain/pull/1308)
 - hdk: Missing dependencies are fetched async for validation [#1268](https://github.com/holochain/holochain/pull/1268)
 
+## 0.0.127
+
 ## 0.0.126
 
 - Docs: Explain how hashes in Holochain are composed and its components on the module page for `hdk::hash` [\#1299](https://github.com/holochain/holochain/pull/1299).
