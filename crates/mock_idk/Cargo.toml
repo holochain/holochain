@@ -8,5 +8,5 @@ license = "Apache-2.0"
 documentation = "https://docs.rs/holochain_mock_idk"
 
 [dependencies]
-idk = { path = "../../idk" }
+idk = { path = "../idk" }
 mockall = { version = "0.11.0" }
