@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20220406.151853
+
+## [holochain-0.0.134](crates/holochain/CHANGELOG.md#0.0.134)
+
+## [holochain\_conductor\_api-0.0.34](crates/holochain_conductor_api/CHANGELOG.md#0.0.34)
+
+## [holochain\_state-0.0.34](crates/holochain_state/CHANGELOG.md#0.0.34)
+
+## [hdk-0.0.128](crates/hdk/CHANGELOG.md#0.0.128)
+
+- hdk: Adds compound hash type for linkable hashes [\#1308](https://github.com/holochain/holochain/pull/1308)
+- hdk: Missing dependencies are fetched async for validation [\#1268](https://github.com/holochain/holochain/pull/1268)
+
 # 20220406.010602
 
 ## [holochain\_cli\_bundle-0.0.29](crates/holochain_cli_bundle/CHANGELOG.md#0.0.29)

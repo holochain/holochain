@@ -1766,7 +1766,7 @@ dependencies = [
 
 [[package]]
 name = "hdk"
-version = "0.0.128-dev.0"
+version = "0.0.128"
 dependencies = [
  "fixt",
  "hdk_derive",
@@ -1866,7 +1866,7 @@ dependencies = [
 
 [[package]]
 name = "holochain"
-version = "0.0.133"
+version = "0.0.134"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -2048,7 +2048,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_conductor_api"
-version = "0.0.33"
+version = "0.0.34"
 dependencies = [
  "derive_more",
  "directories 2.0.2",
@@ -2209,7 +2209,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_state"
-version = "0.0.33"
+version = "0.0.34"
 dependencies = [
  "anyhow",
  "arbitrary",

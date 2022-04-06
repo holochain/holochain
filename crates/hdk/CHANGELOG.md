@@ -8,12 +8,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased](https://github.com/holochain/holochain/compare/hdk-v0.0.100...HEAD)
 
-- hdk: Adds compound hash type for linkable hashes [#1308](https://github.com/holochain/holochain/pull/1308)
-- hdk: Missing dependencies are fetched async for validation [#1268](https://github.com/holochain/holochain/pull/1268)
+## 0.0.128
+
+- hdk: Adds compound hash type for linkable hashes [\#1308](https://github.com/holochain/holochain/pull/1308)
+- hdk: Missing dependencies are fetched async for validation [\#1268](https://github.com/holochain/holochain/pull/1268)
 
 ## 0.0.127
 
-- hdk: Adds external hash type for data that has a DHT location but does not exist on the DHT [#1298](https://github.com/holochain/holochain/pull/1298)
+- hdk: Adds external hash type for data that has a DHT location but does not exist on the DHT [\#1298](https://github.com/holochain/holochain/pull/1298)
 
 ## 0.0.126
 
@@ -101,14 +103,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - hdk: Now supports deserializing countersigned entries in app entry `try_from`
 
 - hdk: implements multi-call for:
-
+  
   - `remote_call`
   - `call`
   - `get`
   - `get_details`
   - `get_links`
   - `get_link_details`
-
+  
   We strictly only needed `remote_call` for countersigning, but feedback from the community was that having to sequentially loop over these common HDK functions is a pain point, so we enabled all of them to be async over a vector of inputs.
 
 ## 0.0.102
