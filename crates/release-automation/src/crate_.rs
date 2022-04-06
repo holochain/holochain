@@ -73,7 +73,7 @@ pub(crate) fn parse_fixup_releases(input: &str) -> Fallible<FixupReleases> {
 }
 
 #[derive(Debug, StructOpt)]
-pub(crate) struct CrateFixupReleases {
+pub(crate) struct CrateFixupUnpublishedReleases {
     #[structopt(long, default_value = DEFAULT_DEV_SUFFIX)]
     pub(crate) dev_suffix: String,
 
@@ -122,7 +122,7 @@ pub(crate) enum CrateCommands {
     ApplyDevVersions(CrateApplyDevVersionsArgs),
 
     /// check the latest (or given) release for crates that aren't published, remove their tags, and bump their version.
-    FixupReleases(CrateFixupReleases),
+    FixupUnpublishedReleases(CrateFixupUnpublishedReleases),
 
     Check(CrateCheckArgs),
     EnsureCrateOwners(EnsureCrateOwnersArgs),
@@ -152,7 +152,7 @@ pub(crate) fn cmd(args: &crate::cli::Args, cmd_args: &CrateArgs) -> CommandResul
             subcmd_args.no_verify,
         ),
 
-        CrateCommands::FixupReleases(subcmd_args) => fixup_releases(
+        CrateCommands::FixupUnpublishedReleases(subcmd_args) => fixup_unpublished_releases(
             &ws,
             &subcmd_args.dev_suffix,
             &subcmd_args.fixup_releases,
@@ -292,7 +292,7 @@ pub(crate) fn increment_patch(v: &mut semver::Version) {
     v.build = semver::BuildMetadata::EMPTY;
 }
 
-pub(crate) fn fixup_releases<'a>(
+pub(crate) fn fixup_unpublished_releases<'a>(
     ws: &'a ReleaseWorkspace<'a>,
     dev_suffix: &str,
     fixup: &FixupReleases,
