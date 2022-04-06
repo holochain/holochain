@@ -1,6 +1,6 @@
 [package]
 name = "kitsune_p2p_timestamp"
-version = "0.0.8-dev.0"
+version = "0.0.8"
 description = "Microsecond-precision timestamp datatype for kitsune_p2p"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
