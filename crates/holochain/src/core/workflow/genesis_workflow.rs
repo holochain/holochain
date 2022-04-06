@@ -195,6 +195,8 @@ pub mod tests {
             ribosome
                 .expect_run_genesis_self_check()
                 .returning(|_, _| Ok(GenesisSelfCheckResult::Valid));
+            let dna_def = DnaDefHashed::from_content_sync(dna.dna_def().clone());
+            ribosome.expect_dna_def().return_const(dna_def);
             let args = GenesisWorkflowArgs {
                 dna_file: dna.clone(),
                 agent_pubkey: author.clone(),
