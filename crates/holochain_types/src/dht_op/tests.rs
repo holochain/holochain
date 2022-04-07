@@ -333,7 +333,7 @@ fn from_type_op() {
         for op in ops {
             check_identity(
                 op,
-                element.signed_header().clone().into_inner().0,
+                SignedHeader::from(element.signed_header().clone()),
                 element.entry().clone().into_option(),
             );
         }

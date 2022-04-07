@@ -12,7 +12,7 @@ edition = "2021"
 [dependencies]
 holo_hash = { version = "0.0.23", path = "../holo_hash" }
 holochain_serialized_bytes = "=0.0.51"
-serde = { version = "1.0", features = ["derive"] }
+serde = { version = "1.0", features = ["derive", "rc"] }
 serde_bytes = "0.11"
 
 # Just the bare minimum timestamp with no extra features.

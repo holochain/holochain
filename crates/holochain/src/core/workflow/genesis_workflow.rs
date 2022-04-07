@@ -4,6 +4,8 @@
 //! - AgentId
 //!
 
+use std::sync::Arc;
+
 use super::error::WorkflowError;
 use super::error::WorkflowResult;
 use crate::core::ribosome::guest_callback::genesis_self_check::{
@@ -14,12 +16,13 @@ use derive_more::Constructor;
 use holochain_sqlite::prelude::*;
 use holochain_state::source_chain;
 use holochain_state::workspace::WorkspaceResult;
+use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::prelude::*;
 use rusqlite::named_params;
 use tracing::*;
 
 /// The struct which implements the genesis Workflow
-#[derive(Constructor, Debug)]
+#[derive(Constructor)]
 pub struct GenesisWorkflowArgs<Ribosome>
 where
     Ribosome: RibosomeT + 'static,
@@ -28,9 +31,10 @@ where
     agent_pubkey: AgentPubKey,
     membrane_proof: Option<MembraneProof>,
     ribosome: Ribosome,
+    dht_db_cache: DhtDbQueryCache,
 }
 
-#[instrument(skip(workspace, api))]
+#[instrument(skip(workspace, api, args))]
 pub async fn genesis_workflow<'env, Api: CellConductorApiT, Ribosome>(
     mut workspace: GenesisWorkspace,
     api: Api,
@@ -56,20 +60,34 @@ where
         agent_pubkey,
         membrane_proof,
         ribosome,
+        dht_db_cache,
     } = args;
 
     if workspace.has_genesis(agent_pubkey.clone()).await? {
         return Ok(());
     }
 
+    let dna_hash = ribosome.dna_def().to_hash();
+    let DnaDef {
+        name,
+        properties,
+        zomes,
+        ..
+    } = &ribosome.dna_def().content;
+    let dna_info = DnaInfo {
+        zome_names: zomes.iter().map(|(n, _)| n.clone()).collect(),
+        name: name.clone(),
+        hash: dna_hash,
+        properties: properties.clone(),
+    };
     let result = ribosome.run_genesis_self_check(
         GenesisSelfCheckHostAccess,
         GenesisSelfCheckInvocation {
-            payload: GenesisSelfCheckData {
-                dna_def: dna_file.dna_def().clone(),
+            payload: Arc::new(GenesisSelfCheckData {
+                dna_info,
                 membrane_proof: membrane_proof.clone(),
                 agent_key: agent_pubkey.clone(),
-            },
+            }),
         },
     )?;
 
@@ -91,6 +109,7 @@ where
     source_chain::genesis(
         workspace.vault.clone(),
         workspace.dht_db.clone(),
+        &dht_db_cache,
         api.keystore().clone(),
         dna_file.dna_hash().clone(),
         agent_pubkey,
@@ -159,6 +178,7 @@ pub mod tests {
         observability::test_run().unwrap();
         let test_db = test_authored_db();
         let dht_db = test_dht_db();
+        let dht_db_cache = DhtDbQueryCache::new(dht_db.to_db().into());
         let keystore = test_keystore();
         let vault = test_db.to_db();
         let dna = fake_dna_file("a");
@@ -175,20 +195,28 @@ pub mod tests {
             ribosome
                 .expect_run_genesis_self_check()
                 .returning(|_, _| Ok(GenesisSelfCheckResult::Valid));
+            let dna_def = DnaDefHashed::from_content_sync(dna.dna_def().clone());
+            ribosome.expect_dna_def().return_const(dna_def);
             let args = GenesisWorkflowArgs {
                 dna_file: dna.clone(),
                 agent_pubkey: author.clone(),
                 membrane_proof: None,
                 ribosome,
+                dht_db_cache: dht_db_cache.clone(),
             };
             let _: () = genesis_workflow(workspace, api, args).await.unwrap();
         }
 
         {
-            let source_chain =
-                SourceChain::new(vault.clone(), dht_db.to_db(), keystore, author.clone())
-                    .await
-                    .unwrap();
+            let source_chain = SourceChain::new(
+                vault.clone(),
+                dht_db.to_db(),
+                dht_db_cache,
+                keystore,
+                author.clone(),
+            )
+            .await
+            .unwrap();
             let headers = source_chain
                 .query(Default::default())
                 .await

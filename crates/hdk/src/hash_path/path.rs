@@ -149,7 +149,6 @@ pub struct Path(Vec<Component>);
 
 entry_def!(Path EntryDef {
     id: "hdk.path".into(),
-    crdt_type: CrdtType,
     required_validations: RequiredValidations::default(),
     visibility: EntryVisibility::Public,
     required_validation_type: RequiredValidationType::default(),
@@ -181,7 +180,6 @@ impl PathEntry {
 
 entry_def!(PathEntry EntryDef {
     id: "hdk.path_entry".into(),
-    crdt_type: CrdtType,
     required_validations: RequiredValidations::default(),
     visibility: EntryVisibility::Public,
     required_validation_type: RequiredValidationType::default(),
