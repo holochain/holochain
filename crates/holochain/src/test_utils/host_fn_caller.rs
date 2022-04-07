@@ -16,7 +16,6 @@ use crate::core::ribosome::ZomeCallInvocation;
 use hdk::prelude::*;
 use holo_hash::AgentPubKey;
 use holo_hash::AnyDhtHash;
-use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::actor::GetLinksOptions;
@@ -268,8 +267,8 @@ impl HostFnCaller {
 
     pub async fn create_link<'env>(
         &self,
-        base: EntryHash,
-        target: EntryHash,
+        base: AnyLinkableHash,
+        target: AnyLinkableHash,
         link_tag: LinkTag,
     ) -> HeaderHash {
         let (ribosome, call_context, workspace_lock) = self.unpack().await;
@@ -307,7 +306,7 @@ impl HostFnCaller {
 
     pub async fn get_links<'env>(
         &self,
-        base: EntryHash,
+        base: AnyLinkableHash,
         link_tag: Option<LinkTag>,
         _options: GetLinksOptions,
     ) -> Vec<Link> {
@@ -329,7 +328,7 @@ impl HostFnCaller {
 
     pub async fn get_link_details<'env>(
         &self,
-        base: EntryHash,
+        base: AnyLinkableHash,
         tag: LinkTag,
         _options: GetLinksOptions,
     ) -> Vec<(SignedHeaderHashed, Vec<SignedHeaderHashed>)> {

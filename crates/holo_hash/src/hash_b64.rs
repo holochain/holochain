@@ -81,3 +81,6 @@ pub type ExternalHashB64 = HoloHashB64<hash_type::External>;
 
 /// Base64-ready version of AnyDhtHash
 pub type AnyDhtHashB64 = HoloHashB64<hash_type::AnyDht>;
+
+/// Base64-ready version of AnyLinkableHash
+pub type AnyLinkableHashB64 = HoloHashB64<hash_type::AnyLinkable>;

@@ -25,7 +25,7 @@ use tracing::*;
 #[derive(Constructor)]
 pub struct GenesisWorkflowArgs<Ribosome>
 where
-    Ribosome: RibosomeT + Send + 'static,
+    Ribosome: RibosomeT + 'static,
 {
     dna_file: DnaFile,
     agent_pubkey: AgentPubKey,
@@ -41,7 +41,7 @@ pub async fn genesis_workflow<'env, Api: CellConductorApiT, Ribosome>(
     args: GenesisWorkflowArgs<Ribosome>,
 ) -> WorkflowResult<()>
 where
-    Ribosome: RibosomeT + Send + 'static,
+    Ribosome: RibosomeT + 'static,
 {
     genesis_workflow_inner(&mut workspace, args, api).await?;
     Ok(())
@@ -53,7 +53,7 @@ async fn genesis_workflow_inner<Api: CellConductorApiT, Ribosome>(
     api: Api,
 ) -> WorkflowResult<()>
 where
-    Ribosome: RibosomeT + Send + 'static,
+    Ribosome: RibosomeT + 'static,
 {
     let GenesisWorkflowArgs {
         dna_file,
