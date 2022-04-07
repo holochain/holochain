@@ -2,7 +2,7 @@ use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]
@@ -34,7 +34,7 @@ pub fn agent_info<'a>(
                     .as_ref()
                     .expect("Must have source chain if agent_info access is given")
                     .chain_head()
-                    .map_err(|e| WasmError::Host(e.to_string()))?,
+                    .map_err(|e| wasm_error!(WasmErrorInner::Host(e.to_string())))?,
             })
         }
         _ => unreachable!(),

@@ -2,7 +2,7 @@ use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 
 use holochain_types::prelude::*;
 use std::sync::Arc;
@@ -46,8 +46,8 @@ pub fn create_link<'a>(
                     .await?;
                 Ok::<HeaderHash, RibosomeError>(header_hash)
             }))
-            .map_err(|join_error| WasmError::Host(join_error.to_string()))?
-            .map_err(|ribosome_error| WasmError::Host(ribosome_error.to_string()))?;
+            .map_err(|join_error| wasm_error!(WasmErrorInner::Host(join_error.to_string())))?
+            .map_err(|ribosome_error| wasm_error!(WasmErrorInner::Host(ribosome_error.to_string())))?;
 
             // return the hash of the committed link
             // note that validation is handled by the workflow

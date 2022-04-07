@@ -1,7 +1,7 @@
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::{WasmError, WasmErrorInner, wasm_error};
 use ring::rand::SecureRandom;
 use std::sync::Arc;
 use crate::core::ribosome::HostFnAccess;
@@ -18,7 +18,7 @@ pub fn random_bytes(
             let mut bytes = vec![0; input as _];
             system_random
                 .fill(&mut bytes)
-                .map_err(|ring_unspecified_error| WasmError::Host(ring_unspecified_error.to_string()))?;
+                .map_err(|ring_unspecified_error| wasm_error!(WasmErrorInner::Host(ring_unspecified_error.to_string())))?;
 
             Ok(Bytes::from(bytes))
         },

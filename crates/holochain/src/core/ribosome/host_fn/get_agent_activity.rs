@@ -3,7 +3,7 @@ use crate::core::ribosome::RibosomeT;
 use holochain_cascade::Cascade;
 use holochain_p2p::actor::GetActivityOptions;
 use holochain_types::prelude::*;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 use crate::core::ribosome::HostFnAccess;
 
@@ -42,7 +42,7 @@ pub fn get_agent_activity(
         let activity = cascade
             .get_agent_activity(agent_pubkey, chain_query_filter, options)
             .await
-            .map_err(|cascade_error| WasmError::Host(cascade_error.to_string()))?;
+            .map_err(|cascade_error| wasm_error!(WasmErrorInner::Host(cascade_error.to_string())))?;
 
                 Ok(activity.into())
             })

@@ -124,19 +124,23 @@ impl HostFnBuilder {
                 self.env.clone(),
                 move |env: &Env, args: &[Value]| -> Result<Vec<Value>, RuntimeError> {
                     let guest_ptr: GuestPtr = match args[0] {
-                        Value::I32(i) => i
-                            .try_into()
-                            .map_err(|_| RuntimeError::new(WasmError::PointerMap))?,
+                        Value::I32(i) => i.try_into().map_err(|_| {
+                            RuntimeError::new(wasm_error!(WasmErrorInner::PointerMap))
+                        })?,
                         _ => {
-                            return Err::<_, RuntimeError>(RuntimeError::new(WasmError::PointerMap))
+                            return Err::<_, RuntimeError>(RuntimeError::new(wasm_error!(
+                                WasmErrorInner::PointerMap
+                            )))
                         }
                     };
                     let len: Len = match args[1] {
-                        Value::I32(i) => i
-                            .try_into()
-                            .map_err(|_| RuntimeError::new(WasmError::PointerMap))?,
+                        Value::I32(i) => i.try_into().map_err(|_| {
+                            RuntimeError::new(wasm_error!(WasmErrorInner::PointerMap))
+                        })?,
                         _ => {
-                            return Err::<_, RuntimeError>(RuntimeError::new(WasmError::PointerMap))
+                            return Err::<_, RuntimeError>(RuntimeError::new(wasm_error!(
+                                WasmErrorInner::PointerMap
+                            )))
                         }
                     };
                     let context_arc = {
@@ -283,7 +287,8 @@ impl RealRibosome {
             let module = self.module(&zome_name)?;
             let imports: ImportObject = Self::imports(self, context_key, module.store());
             let instance = Arc::new(Mutex::new(
-                Instance::new(&module, &imports).map_err(|e| WasmError::Compile(e.to_string()))?,
+                Instance::new(&module, &imports)
+                    .map_err(|e| wasm_error!(WasmErrorInner::Compile(e.to_string())))?,
             ));
             RibosomeResult::Ok(instance)
         };
@@ -487,12 +492,11 @@ impl RibosomeT for RealRibosome {
             entry_defs: {
                 match self
                     .run_entry_defs(EntryDefsHostAccess, EntryDefsInvocation)
-                    .map_err(|e| WasmError::Host(e.to_string()))?
+                    .map_err(|e| wasm_error!(WasmErrorInner::Host(e.to_string())))?
                 {
                     EntryDefsResult::Err(zome, error_string) => {
-                        return Err(RibosomeError::WasmError(WasmError::Host(format!(
-                            "{}: {}",
-                            zome, error_string
+                        return Err(RibosomeError::WasmError(wasm_error!(WasmErrorInner::Host(
+                            format!("{}: {}", zome, error_string)
                         ))))
                     }
                     EntryDefsResult::Defs(defs) => match defs.get(zome.zome_name()) {

@@ -1,9 +1,9 @@
 use crate::core::ribosome::CallContext;
+use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
-use crate::core::ribosome::HostFnAccess;
 
 pub fn x_25519_x_salsa20_poly1305_decrypt(
     _ribosome: Arc<impl RibosomeT>,
@@ -11,7 +11,10 @@ pub fn x_25519_x_salsa20_poly1305_decrypt(
     input: X25519XSalsa20Poly1305Decrypt,
 ) -> Result<Option<XSalsa20Poly1305Data>, WasmError> {
     match HostFnAccess::from(&call_context.host_context()) {
-        HostFnAccess{ keystore_deterministic: Permission::Allow, .. } => {
+        HostFnAccess {
+            keystore_deterministic: Permission::Allow,
+            ..
+        } => {
             tokio_helper::block_forever_on(async move {
                 // zome_types too restrictive,
                 // causing us to have to clone everything because there's
@@ -35,8 +38,8 @@ pub fn x_25519_x_salsa20_poly1305_decrypt(
                 // why is this an Option #&*(*#@&*&????????
                 holochain_keystore::LairResult::Ok(Some(res.to_vec().into()))
             })
-            .map_err(|keystore_error| WasmError::Host(keystore_error.to_string()))
-        },
+            .map_err(|keystore_error| wasm_error!(WasmErrorInner::Host(keystore_error.to_string())))
+        }
         _ => unreachable!(),
     }
 }

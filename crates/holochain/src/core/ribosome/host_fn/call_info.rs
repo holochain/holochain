@@ -2,7 +2,7 @@ use crate::core::ribosome::CallContext;
 use crate::core::ribosome::InvocationAuth;
 use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 use holochain_zome_types::info::CallInfo;
 use std::sync::Arc;
 
@@ -36,7 +36,7 @@ pub fn call_info(
                                 check_function,
                                 check_agent,
                                 cap_secret,
-                            ).await.map_err(|e| WasmError::Host(e.to_string()))?
+                            ).await.map_err(|e| wasm_error!(WasmErrorInner::Host(e.to_string())))?
                             // This is really a problem.
                             // It means that the host function calling into `call_info`
                             // is using a cap secret that never had authorization to call in the first place.

@@ -3,7 +3,7 @@ use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_cascade::error::CascadeError;
 use holochain_cascade::Cascade;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 
 use crate::core::ribosome::HostFnAccess;
 use holo_hash::EntryHash;
@@ -46,7 +46,7 @@ pub fn delete<'a>(
                     .put(Some(call_context.zome.clone()), header_builder, None, chain_top_ordering)
                     .await
                     .map_err(|source_chain_error| {
-                        WasmError::Host(source_chain_error.to_string())
+                        wasm_error!(WasmErrorInner::Host(source_chain_error.to_string()))
                     })?;
                 Ok(header_hash)
             })
@@ -92,7 +92,7 @@ pub(crate) fn get_original_address<'a>(
             None => Err(RibosomeError::ElementDeps(address.into())),
         }
     })
-    .map_err(|ribosome_error| WasmError::Host(ribosome_error.to_string()))
+    .map_err(|ribosome_error| wasm_error!(WasmErrorInner::Host(ribosome_error.to_string())))
 }
 
 #[cfg(test)]

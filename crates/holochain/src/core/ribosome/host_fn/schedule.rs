@@ -1,7 +1,7 @@
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 
 pub fn schedule(
@@ -27,7 +27,7 @@ pub fn schedule(
                         input.into(),
                     ));
                 })
-                .map_err(|e| WasmError::Host(e.to_string()))?;
+                .map_err(|e| wasm_error!(WasmErrorInner::Host(e.to_string())))?;
             Ok(())
         }
         _ => unreachable!(),

@@ -4,7 +4,7 @@ use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeT;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 
 use holochain_types::prelude::*;
 use std::sync::Arc;
@@ -33,10 +33,14 @@ pub fn create<'a>(
                         .source_chain()
                         .as_ref()
                         .expect("Must have source chain if write_workspace access is given")
-                        .put_countersigned(Some(call_context.zome.clone()), input.into_entry(), chain_top_ordering)
+                        .put_countersigned(
+                            Some(call_context.zome.clone()),
+                            input.into_entry(),
+                            chain_top_ordering,
+                        )
                         .await
                         .map_err(|source_chain_error| {
-                            WasmError::Host(source_chain_error.to_string())
+                            wasm_error!(WasmErrorInner::Host(source_chain_error.to_string()))
                         })
                 }),
                 _ => {
@@ -85,10 +89,15 @@ pub fn create<'a>(
                             .source_chain()
                             .as_ref()
                             .expect("Must have source chain if write_workspace access is given")
-                            .put(Some(call_context.zome.clone()), header_builder, Some(input.into_entry()), chain_top_ordering)
+                            .put(
+                                Some(call_context.zome.clone()),
+                                header_builder,
+                                Some(input.into_entry()),
+                                chain_top_ordering,
+                            )
                             .await
                             .map_err(|source_chain_error| {
-                                WasmError::Host(source_chain_error.to_string())
+                                wasm_error!(WasmErrorInner::Host(source_chain_error.to_string()))
                             })
                     })
                 }
@@ -105,7 +114,7 @@ pub fn extract_entry_def(
 ) -> Result<(holochain_zome_types::header::EntryDefIndex, EntryVisibility), WasmError> {
     let app_entry_type = match ribosome
         .run_entry_defs((&call_context.host_context).into(), EntryDefsInvocation)
-        .map_err(|ribosome_error| WasmError::Host(ribosome_error.to_string()))?
+        .map_err(|ribosome_error| wasm_error!(WasmErrorInner::Host(ribosome_error.to_string())))?
     {
         // the ribosome returned some defs
         EntryDefsResult::Defs(defs) => {
@@ -127,13 +136,13 @@ pub fn extract_entry_def(
     };
     match app_entry_type {
         Some(app_entry_type) => Ok(app_entry_type),
-        None => Err(WasmError::Host(
+        None => Err(wasm_error!(WasmErrorInner::Host(
             RibosomeError::EntryDefs(
                 call_context.zome.zome_name().clone(),
                 format!("entry def not found for {:?}", entry_def_id),
             )
             .to_string(),
-        )),
+        ))),
     }
 }
 

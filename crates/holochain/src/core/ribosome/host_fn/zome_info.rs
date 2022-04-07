@@ -1,7 +1,7 @@
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::error::RibosomeError;
@@ -15,7 +15,7 @@ pub fn zome_info(
         HostFnAccess{ bindings_deterministic: Permission::Allow, .. } => {
             ribosome.zome_info(call_context.zome.clone()).map_err(|e| match e {
                 RibosomeError::WasmError(wasm_error) => wasm_error,
-                other_error => WasmError::Host(other_error.to_string()),
+                other_error => wasm_error!(WasmErrorInner::Host(other_error.to_string())),
             })
         },
         _ => unreachable!(),

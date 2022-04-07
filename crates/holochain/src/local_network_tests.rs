@@ -12,7 +12,7 @@ use crate::test_utils::new_zome_call;
 use crate::test_utils::setup_app_with_network;
 use crate::test_utils::wait_for_integration_with_others;
 use hdk::prelude::CellId;
-use hdk::prelude::WasmError;
+use hdk::prelude::*;
 use holo_hash::AgentPubKey;
 use holo_hash::HeaderHash;
 use holochain_keystore::AgentPubKeyExt;
@@ -59,7 +59,7 @@ fn conductors_call_remote(num_conductors: usize) {
         for (_, _, result) in results {
             match result {
                 Some(r) => match r {
-                    Err(RibosomeError::WasmError(WasmError::Guest(e))) => {
+                    Err(RibosomeError::WasmError(WasmError { error: WasmErrorInner::Guest(e), .. })) => {
                         assert_eq!(e, TIMEOUT_ERROR)
                     }
                     _ => panic!("Unexpected result: {:?}", r),

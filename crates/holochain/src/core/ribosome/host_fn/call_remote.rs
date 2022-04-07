@@ -4,7 +4,7 @@ use crate::core::ribosome::RibosomeT;
 use futures::future::join_all;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_types::prelude::*;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 
 pub fn call_remote(
@@ -50,7 +50,7 @@ pub fn call_remote(
                 })
                 .collect();
 
-            Ok(results?)
+            Ok(results.map_err(|e| wasm_error!(e.into()))?)
         }
         _ => unreachable!(),
     }

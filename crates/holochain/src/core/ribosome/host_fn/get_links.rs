@@ -1,12 +1,12 @@
 use crate::core::ribosome::CallContext;
+use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeT;
+use futures::future::join_all;
 use holochain_cascade::Cascade;
 use holochain_p2p::actor::GetLinksOptions;
 use holochain_types::prelude::*;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
-use crate::core::ribosome::HostFnAccess;
-use futures::future::join_all;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn get_links<'a>(
@@ -15,38 +15,44 @@ pub fn get_links<'a>(
     inputs: Vec<GetLinksInput>,
 ) -> Result<Vec<Vec<Link>>, WasmError> {
     match HostFnAccess::from(&call_context.host_context()) {
-        HostFnAccess{ read_workspace: Permission::Allow, .. } => {
+        HostFnAccess {
+            read_workspace: Permission::Allow,
+            ..
+        } => {
             let results: Vec<Result<Vec<Link>, _>> = tokio_helper::block_forever_on(async move {
-                join_all(inputs.into_iter().map(|input| {
-                    async {
-                        let GetLinksInput {
-                            base_address,
-                            tag_prefix,
-                        } = input;
-                        let zome_id = ribosome
-                            .zome_to_id(&call_context.zome)
-                            .expect("Failed to get ID for current zome.");
-                        let key = WireLinkKey {
-                            base: base_address,
-                            zome_id,
-                            tag: tag_prefix,
-                        };
-                        Cascade::from_workspace_network(
-                            &call_context.host_context.workspace(),
-                            call_context.host_context.network().to_owned(),
-                        ).dht_get_links(key, GetLinksOptions::default()).await
-                    }
-                }
-                )).await
+                join_all(inputs.into_iter().map(|input| async {
+                    let GetLinksInput {
+                        base_address,
+                        tag_prefix,
+                    } = input;
+                    let zome_id = ribosome
+                        .zome_to_id(&call_context.zome)
+                        .expect("Failed to get ID for current zome.");
+                    let key = WireLinkKey {
+                        base: base_address,
+                        zome_id,
+                        tag: tag_prefix,
+                    };
+                    Cascade::from_workspace_network(
+                        &call_context.host_context.workspace(),
+                        call_context.host_context.network().to_owned(),
+                    )
+                    .dht_get_links(key, GetLinksOptions::default())
+                    .await
+                }))
+                .await
             });
-            let results: Result<Vec<_>, _> = results.into_iter().map(|result|
-                match result {
+            let results: Result<Vec<_>, _> = results
+                .into_iter()
+                .map(|result| match result {
                     Ok(links_vec) => Ok(links_vec),
-                    Err(cascade_error) => Err(WasmError::Host(cascade_error.to_string())),
-                }
-            ).collect();
+                    Err(cascade_error) => {
+                        Err(wasm_error!(WasmErrorInner::Host(cascade_error.to_string())))
+                    }
+                })
+                .collect();
             Ok(results?)
-        },
+        }
         _ => unreachable!(),
     }
 }
@@ -76,13 +82,15 @@ pub mod slow_tests {
             TestWasm::HashPath,
             "ensure",
             "foo.bar".to_string()
-        ).unwrap();
+        )
+        .unwrap();
         let _: () = crate::call_test_ribosome!(
             host_access,
             TestWasm::HashPath,
             "ensure",
             "foo.bar".to_string()
-        ).unwrap();
+        )
+        .unwrap();
 
         // ensure foo.baz
         let _: () = crate::call_test_ribosome!(
@@ -90,14 +98,16 @@ pub mod slow_tests {
             TestWasm::HashPath,
             "ensure",
             "foo.baz".to_string()
-        ).unwrap();
+        )
+        .unwrap();
 
         let exists_output: bool = crate::call_test_ribosome!(
             host_access,
             TestWasm::HashPath,
             "exists",
             "foo".to_string()
-        ).unwrap();
+        )
+        .unwrap();
 
         assert_eq!(true, exists_output,);
 
@@ -106,21 +116,24 @@ pub mod slow_tests {
             TestWasm::HashPath,
             "hash",
             "foo.bar".to_string()
-        ).unwrap();
+        )
+        .unwrap();
 
         let foo_baz: holo_hash::EntryHash = crate::call_test_ribosome!(
             host_access,
             TestWasm::HashPath,
             "hash",
             "foo.baz".to_string()
-        ).unwrap();
+        )
+        .unwrap();
 
         let links: Vec<holochain_zome_types::link::Link> = crate::call_test_ribosome!(
             host_access,
             TestWasm::HashPath,
             "children",
             "foo".to_string()
-        ).unwrap();
+        )
+        .unwrap();
 
         assert_eq!(2, links.len());
         assert_eq!(links[0].target, foo_bar,);
@@ -137,7 +150,8 @@ pub mod slow_tests {
             TestWasm::Anchor,
             "anchor",
             AnchorInput("foo".to_string(), "bar".to_string())
-        ).unwrap();
+        )
+        .unwrap();
 
         assert_eq!(
             anchor_address_one.get_raw_32().to_vec(),
@@ -153,7 +167,8 @@ pub mod slow_tests {
             TestWasm::Anchor,
             "anchor",
             AnchorInput("foo".to_string(), "baz".to_string())
-        ).unwrap();
+        )
+        .unwrap();
 
         assert_eq!(
             anchor_address_two.get_raw_32().to_vec(),
@@ -168,7 +183,8 @@ pub mod slow_tests {
             TestWasm::Anchor,
             "get_anchor",
             anchor_address_one
-        ).unwrap();
+        )
+        .unwrap();
 
         assert_eq!(
             Some(Anchor {
@@ -183,7 +199,8 @@ pub mod slow_tests {
             TestWasm::Anchor,
             "list_anchor_type_addresses",
             ()
-        ).unwrap();
+        )
+        .unwrap();
 
         // should be 1 anchor type, "foo"
         assert_eq!(list_anchor_type_addresses_output.0.len(), 1,);
@@ -203,7 +220,8 @@ pub mod slow_tests {
                 TestWasm::Anchor,
                 "list_anchor_addresses",
                 "foo".to_string()
-            ).unwrap()
+            )
+            .unwrap()
         };
 
         // should be 2 anchors under "foo" sorted by hash
@@ -222,7 +240,8 @@ pub mod slow_tests {
             TestWasm::Anchor,
             "list_anchor_tags",
             "foo".to_string()
-        ).unwrap();
+        )
+        .unwrap();
 
         assert_eq!(
             vec!["bar".to_string(), "baz".to_string()],
@@ -234,62 +253,31 @@ pub mod slow_tests {
     async fn multi_get_links() {
         observability::test_run().ok();
         let host_access = fixt!(ZomeCallHostAccess, Predictable);
-        let _: HeaderHash = crate::call_test_ribosome!(
-            host_access,
-            TestWasm::Link,
-            "create_link",
-            ()
-        ).unwrap();
-        let _: HeaderHash = crate::call_test_ribosome!(
-            host_access,
-            TestWasm::Link,
-            "create_back_link",
-            ()
-        ).unwrap();
-        let forward_links: Vec<Link> = crate::call_test_ribosome!(
-            host_access,
-            TestWasm::Link,
-            "get_links",
-            ()
-        ).unwrap();
-        let back_links: Vec<Link> = crate::call_test_ribosome!(
-            host_access,
-            TestWasm::Link,
-            "get_back_links",
-            ()
-        ).unwrap();
-        let links_bidi: Vec<Vec<Link>> = crate::call_test_ribosome!(
-            host_access,
-            TestWasm::Link,
-            "get_links_bidi",
-            ()
-        ).unwrap();
+        let _: HeaderHash =
+            crate::call_test_ribosome!(host_access, TestWasm::Link, "create_link", ()).unwrap();
+        let _: HeaderHash =
+            crate::call_test_ribosome!(host_access, TestWasm::Link, "create_back_link", ())
+                .unwrap();
+        let forward_links: Vec<Link> =
+            crate::call_test_ribosome!(host_access, TestWasm::Link, "get_links", ()).unwrap();
+        let back_links: Vec<Link> =
+            crate::call_test_ribosome!(host_access, TestWasm::Link, "get_back_links", ()).unwrap();
+        let links_bidi: Vec<Vec<Link>> =
+            crate::call_test_ribosome!(host_access, TestWasm::Link, "get_links_bidi", ()).unwrap();
 
-        assert_eq!(
-            links_bidi,
-            vec![forward_links, back_links],
-        );
+        assert_eq!(links_bidi, vec![forward_links, back_links],);
 
-        let forward_link_details: LinkDetails = crate::call_test_ribosome!(
-            host_access,
-            TestWasm::Link,
-            "get_link_details",
-            ()
-        ).unwrap();
+        let forward_link_details: LinkDetails =
+            crate::call_test_ribosome!(host_access, TestWasm::Link, "get_link_details", ())
+                .unwrap();
 
-        let back_link_details: LinkDetails = crate::call_test_ribosome!(
-            host_access,
-            TestWasm::Link,
-            "get_back_link_details",
-            ()
-        ).unwrap();
+        let back_link_details: LinkDetails =
+            crate::call_test_ribosome!(host_access, TestWasm::Link, "get_back_link_details", ())
+                .unwrap();
 
-        let link_details_bidi: Vec<LinkDetails> = crate::call_test_ribosome!(
-            host_access,
-            TestWasm::Link,
-            "get_link_details_bidi",
-            ()
-        ).unwrap();
+        let link_details_bidi: Vec<LinkDetails> =
+            crate::call_test_ribosome!(host_access, TestWasm::Link, "get_link_details_bidi", ())
+                .unwrap();
         assert_eq!(
             link_details_bidi,
             vec![forward_link_details, back_link_details],

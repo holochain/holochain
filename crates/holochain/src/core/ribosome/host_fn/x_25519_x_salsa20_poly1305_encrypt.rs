@@ -1,7 +1,7 @@
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 use crate::core::ribosome::HostFnAccess;
 
@@ -33,7 +33,7 @@ pub fn x_25519_x_salsa20_poly1305_encrypt(
                     cipher.to_vec(),
                 ))
             })
-            .map_err(|keystore_error| WasmError::Host(keystore_error.to_string()))
+            .map_err(|keystore_error| wasm_error!(WasmErrorInner::Host(keystore_error.to_string())))
         },
         _ => unreachable!(),
     }

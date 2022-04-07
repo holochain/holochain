@@ -3,7 +3,7 @@ use super::delete::get_original_address;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeT;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 
 use holochain_types::prelude::*;
 use std::sync::Arc;
@@ -42,7 +42,7 @@ pub fn update<'a>(
                         .put_countersigned(Some(call_context.zome.clone()), entry, chain_top_ordering)
                         .await
                         .map_err(|source_chain_error| {
-                            WasmError::Host(source_chain_error.to_string())
+                            wasm_error!(WasmErrorInner::Host(source_chain_error.to_string()))
                         })
                 }),
                 _ => {
@@ -54,7 +54,7 @@ pub fn update<'a>(
                         ribosome
                             .zome_to_id(&call_context.zome)
                             .map_err(|source_chain_error| {
-                                WasmError::Host(source_chain_error.to_string())
+                                wasm_error!(WasmErrorInner::Host(source_chain_error.to_string()))
                             })?;
 
                     // extract the entry defs for a zome
@@ -105,7 +105,7 @@ pub fn update<'a>(
                             .put(Some(zome), header_builder, Some(entry), chain_top_ordering)
                             .await
                             .map_err(|source_chain_error| {
-                                WasmError::Host(source_chain_error.to_string())
+                                wasm_error!(WasmErrorInner::Host(source_chain_error.to_string()))
                             })?;
                         Ok(header_hash)
                     })

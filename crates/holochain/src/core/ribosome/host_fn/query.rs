@@ -2,7 +2,7 @@ use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 
 pub fn query(
@@ -23,7 +23,7 @@ pub fn query(
                 .expect("Must have source chain to query the source chain")
                 .query(input)
                 .await
-                .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?;
+                .map_err(|source_chain_error| wasm_error!(WasmErrorInner::Host(source_chain_error.to_string())))?;
             Ok(elements)
         }),
         _ => unreachable!(),

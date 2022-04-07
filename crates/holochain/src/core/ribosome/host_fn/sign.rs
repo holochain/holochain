@@ -1,7 +1,7 @@
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 use crate::core::ribosome::HostFnAccess;
 
@@ -14,7 +14,7 @@ pub fn sign(
         HostFnAccess { keystore: Permission::Allow, .. } => tokio_helper::block_forever_on(async move {
             call_context.host_context.keystore().sign(input.key, input.data.into_vec().into()).await
         })
-        .map_err(|keystore_error| WasmError::Host(keystore_error.to_string())),
+        .map_err(|keystore_error| wasm_error!(WasmErrorInner::Host(keystore_error.to_string()))),
         _ => unreachable!(),
     }
 }

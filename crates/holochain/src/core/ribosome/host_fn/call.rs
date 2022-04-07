@@ -4,7 +4,7 @@ use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCall;
 use futures::future::join_all;
 use holochain_types::prelude::*;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 
 pub fn call(
@@ -64,11 +64,11 @@ pub fn call(
                 .map(|result| match result {
                     Ok(v) => match v {
                         Ok(v) => Ok(v),
-                        Err(ribosome_error) => Err(WasmError::Host(ribosome_error.to_string())),
+                        Err(ribosome_error) => Err(wasm_error!(WasmErrorInner::Host(ribosome_error.to_string()))),
                     },
-                    Err(conductor_api_error) => {
-                        Err(WasmError::Host(conductor_api_error.to_string()))
-                    }
+                    Err(conductor_api_error) => Err(wasm_error!(WasmErrorInner::Host(
+                        conductor_api_error.to_string()
+                    ))),
                 })
                 .collect();
             Ok(results?)
@@ -144,14 +144,8 @@ pub mod wasm_test {
         match output {
             ZomeCallResponse::Ok(guest_output) => {
                 let agent_info: AgentInfo = guest_output.decode().unwrap();
-                assert_eq!(
-                    &agent_info.agent_initial_pubkey,
-                    bob_agent_id
-                );
-                assert_eq!(
-                    &agent_info.agent_latest_pubkey,
-                    bob_agent_id
-                );
+                assert_eq!(&agent_info.agent_initial_pubkey, bob_agent_id);
+                assert_eq!(&agent_info.agent_latest_pubkey, bob_agent_id);
             }
             _ => unreachable!(),
         }
