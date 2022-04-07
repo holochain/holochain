@@ -124,7 +124,7 @@ impl LinksQuery {
                 ":create": DhtOpType::RegisterAddLink,
                 ":delete": DhtOpType::RegisterRemoveLink,
                 ":base_hash": self.base,
-                ":zome_id": self.zome_id,
+                ":zome_id": *self.zome_id,
                 ":status": ValidationStatus::Valid,
             }
         }
@@ -201,7 +201,7 @@ impl Query for GetLinksQuery {
 
     fn fold(&self, mut state: Self::State, data: Self::Item) -> StateQueryResult<Self::State> {
         let shh = data.data;
-        let (header, _) = shh.into_header_and_signature();
+        let (header, _) = shh.into_inner();
         let (header, hash) = header.into_inner();
         match header {
             Header::CreateLink(create_link) => {

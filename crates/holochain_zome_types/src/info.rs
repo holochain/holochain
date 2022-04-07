@@ -1,55 +1,11 @@
-use crate::header::ZomeId;
-use crate::zome::ZomeName;
-use crate::AppEntryType;
 use crate::CapGrant;
-use crate::EntryDefId;
-use crate::EntryDefs;
 use crate::FunctionName;
 use crate::Timestamp;
 use holo_hash::AgentPubKey;
-use holo_hash::DnaHash;
 use holo_hash::HeaderHash;
 use holochain_serialized_bytes::prelude::*;
 
-/// The properties of the current dna/zome being called.
-#[allow(missing_docs)]
-#[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, PartialEq)]
-pub struct ZomeInfo {
-    pub name: ZomeName,
-    /// The position of this zome in the `dna.json`
-    pub id: ZomeId,
-    pub properties: SerializedBytes,
-    pub entry_defs: EntryDefs,
-    // @todo make this include function signatures when they exist.
-    pub extern_fns: Vec<FunctionName>,
-}
-
-impl ZomeInfo {
-    pub fn new(
-        name: ZomeName,
-        id: ZomeId,
-        properties: SerializedBytes,
-        entry_defs: EntryDefs,
-        extern_fns: Vec<FunctionName>,
-    ) -> Self {
-        Self {
-            name,
-            id,
-            properties,
-            entry_defs,
-            extern_fns,
-        }
-    }
-
-    /// Check if an [`AppEntryType`] matches the [`EntryDefId`] provided for this zome.
-    pub fn matches_entry_def_id(&self, entry_type: &AppEntryType, id: EntryDefId) -> bool {
-        self.entry_defs
-            .0
-            .get(entry_type.id.index())
-            .map_or(false, |stored_id| stored_id.id == id)
-            && self.id == entry_type.zome_id
-    }
-}
+pub use holochain_integrity_types::info::*;
 
 /// The struct containing all information about the executing agent's identity.
 #[allow(missing_docs)]
@@ -81,15 +37,6 @@ impl AgentInfo {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AppInfo;
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct DnaInfo {
-    pub name: String,
-    pub hash: DnaHash,
-    pub properties: SerializedBytes,
-    // In ZomeId order as to match corresponding `ZomeInfo` for each.
-    pub zome_names: Vec<ZomeName>,
-}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CallInfo {

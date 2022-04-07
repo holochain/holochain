@@ -48,6 +48,8 @@ async fn test_cell_handle_publish() {
     mock_ribosome
         .expect_run_genesis_self_check()
         .returning(|_, _| Ok(GenesisSelfCheckResult::Valid));
+    let dna_def = DnaDefHashed::from_content_sync(dna_file.dna_def().clone());
+    mock_ribosome.expect_dna_def().return_const(dna_def);
 
     super::Cell::genesis(
         cell_id.clone(),

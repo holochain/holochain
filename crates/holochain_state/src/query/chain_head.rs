@@ -75,7 +75,7 @@ impl Query for ChainHeadQuery {
         Ok(state.map(|sh| {
             let seq = sh.header().header_seq();
             let timestamp = sh.header().timestamp();
-            let hash = sh.into_inner().1;
+            let hash = sh.hashed.hash;
             (hash, seq, timestamp)
         }))
     }

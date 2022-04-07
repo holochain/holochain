@@ -198,8 +198,6 @@ fn hash_path_anchor_path() {
 fn hash_path_anchor_entry_def() {
     assert_eq!(PathEntry::entry_def_id(), Anchor::entry_def_id(),);
 
-    assert_eq!(PathEntry::crdt_type(), Anchor::crdt_type(),);
-
     assert_eq!(
         PathEntry::required_validations(),
         Anchor::required_validations(),

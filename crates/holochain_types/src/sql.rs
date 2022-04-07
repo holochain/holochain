@@ -47,8 +47,30 @@ where
     }
 }
 
+fn via_display(data: &impl std::fmt::Display) -> SqlOutput {
+    SqlOutput(ToSqlOutput::Owned(data.to_string().into()))
+}
+
+impl<'a> From<&'a HeaderType> for SqlOutput<'a> {
+    fn from(d: &'a HeaderType) -> Self {
+        via_display(d)
+    }
+}
+
+impl<'a> From<&'a EntryType> for SqlOutput<'a> {
+    fn from(d: &'a EntryType) -> Self {
+        via_display(d)
+    }
+}
+
 impl<'a> From<&'a LinkTag> for SqlOutput<'a> {
     fn from(d: &'a LinkTag) -> Self {
         SqlOutput(ToSqlOutput::Borrowed((&d.0[..]).into()))
+    }
+}
+
+impl<'a, 'b> From<&'b ZomeId> for SqlOutput<'a> {
+    fn from(d: &'b ZomeId) -> Self {
+        Self(d.0.into())
     }
 }
