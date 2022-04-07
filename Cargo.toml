@@ -5,8 +5,8 @@ members = [
   "crates/hdk",
   "crates/hdk_derive",
   "crates/holo_hash",
-  "crates/idk",
-  "crates/mock_idk",
+  "crates/holochain_deterministic_integrity",
+  "crates/mock_hdi",
   "crates/mr_bundle",
 
   "crates/holochain_integrity_types",

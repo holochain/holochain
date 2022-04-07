@@ -291,9 +291,9 @@ pub mod countersigning;
 /// For example, an agent could choose to 'block' another agent and ignore all their updates.
 pub mod entry;
 
-pub use idk::entry_def_index;
-pub use idk::entry_defs;
-pub use idk::entry_type;
+pub use holochain_deterministic_integrity::entry_def_index;
+pub use holochain_deterministic_integrity::entry_defs;
+pub use holochain_deterministic_integrity::entry_type;
 
 pub mod hash;
 

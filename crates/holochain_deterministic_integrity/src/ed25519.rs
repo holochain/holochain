@@ -14,7 +14,7 @@ where
     S: Into<Signature>,
     D: serde::Serialize + std::fmt::Debug,
 {
-    IDK.with(|h| {
+    HDI.with(|h| {
         h.borrow()
             .verify_signature(VerifySignature::new(key.into(), signature.into(), data)?)
     })
@@ -32,7 +32,7 @@ where
     K: Into<AgentPubKey>,
     S: Into<Signature>,
 {
-    IDK.with(|h| {
+    HDI.with(|h| {
         h.borrow()
             .verify_signature(VerifySignature::new_raw(key.into(), signature.into(), data))
     })

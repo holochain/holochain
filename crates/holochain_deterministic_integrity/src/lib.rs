@@ -36,7 +36,7 @@ pub mod hash;
 /// - Accept `serde::Serialize + std::fmt::Debug` input
 /// - Return `Result<O, WasmError>` (`ExternResult`) output where `O: serde::Serialize + std::fmt::Debug`
 ///
-/// This module only defines macros so check the IDK crate root to see more documentation.
+/// This module only defines macros so check the HDI crate root to see more documentation.
 ///
 /// A _new_ extern function is created with the same name as the function with the `#[hdk_extern]` attribute.
 /// The new extern is placed in a child module of the current scope.
@@ -46,7 +46,7 @@ pub mod hash;
 ///
 /// - Extern syntax for Rust
 /// - Receiving the serialized bytes from the host at a memory pointer specified by the guest
-/// - Setting the IDK WASM tracing subscriber as the global default
+/// - Setting the HDI WASM tracing subscriber as the global default
 /// - Deserializing the input from the host
 /// - Calling the function annotated with `#[hdk_extern]`
 /// - Serializing the result
@@ -108,7 +108,7 @@ pub mod ed25519;
 pub mod info;
 
 #[cfg(feature = "trace")]
-/// Integrates IDK with the Rust tracing crate.
+/// Integrates HDI with the Rust tracing crate.
 ///
 /// The functions and structs in this module do _not_ need to be used directly.
 /// The `#[hdk_extern]` attribute on functions exposed externally all set the `WasmSubscriber` as the global default.
@@ -119,10 +119,10 @@ pub mod trace;
 
 /// The interface between the host and guest is implemented as an `HdkT` trait.
 ///
-/// The `set_hdk` function globally sets a `RefCell` to track the current IDK implementation.
-/// When the `mock` feature is set then this will default to an IDK that always errors, else a WASM host is assumed to exist.
+/// The `set_hdk` function globally sets a `RefCell` to track the current HDI implementation.
+/// When the `mock` feature is set then this will default to an HDI that always errors, else a WASM host is assumed to exist.
 /// The `mockall` crate (in prelude with `mock` feature) can be used to generate compatible mocks for unit testing.
 /// See mocking examples in the test WASMs crate, such as `agent_info`.
-pub mod idk;
+pub mod hdi;
 
 pub mod link;

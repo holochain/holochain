@@ -1,6 +1,6 @@
 use crate::prelude::*;
 
-pub use idk::link::*;
+pub use holochain_deterministic_integrity::link::*;
 
 /// Create a link from a base entry to a target entry, with an optional tag.
 ///

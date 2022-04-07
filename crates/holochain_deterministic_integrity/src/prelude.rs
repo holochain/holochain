@@ -10,7 +10,7 @@ pub use crate::entry_def_index;
 pub use crate::entry_defs;
 pub use crate::entry_type;
 pub use crate::hash::*;
-pub use crate::idk::*;
+pub use crate::hdi::*;
 pub use crate::info::dna_info;
 pub use crate::info::zome_info;
 pub use crate::link::HdkLinkType;

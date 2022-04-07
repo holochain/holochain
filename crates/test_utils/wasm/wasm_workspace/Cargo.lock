@@ -305,9 +305,9 @@ version = "0.0.128-dev.0"
 dependencies = [
  "hdk_derive",
  "holo_hash",
+ "holochain_deterministic_integrity",
  "holochain_wasmer_guest",
  "holochain_zome_types",
- "idk",
  "mockall",
  "paste",
  "serde",
@@ -356,6 +356,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "holochain_deterministic_integrity"
+version = "0.0.1"
+dependencies = [
+ "hdk_derive",
+ "holo_hash",
+ "holochain_integrity_types",
+ "holochain_wasmer_guest",
+ "paste",
+ "serde",
+ "serde_bytes",
+]
+
+[[package]]
 name = "holochain_integrity_types"
 version = "0.0.1"
 dependencies = [
@@ -369,10 +382,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "holochain_mock_idk"
+name = "holochain_mock_hdi"
 version = "0.0.1"
 dependencies = [
- "idk",
+ "holochain_deterministic_integrity",
  "mockall",
 ]
 
@@ -453,19 +466,6 @@ dependencies = [
  "subtle",
  "thiserror",
  "tracing",
-]
-
-[[package]]
-name = "idk"
-version = "0.0.1"
-dependencies = [
- "hdk_derive",
- "holo_hash",
- "holochain_integrity_types",
- "holochain_wasmer_guest",
- "paste",
- "serde",
- "serde_bytes",
 ]
 
 [[package]]
@@ -1187,8 +1187,8 @@ dependencies = [
 name = "test_wasm_integrity_zome"
 version = "0.0.1"
 dependencies = [
- "holochain_mock_idk",
- "idk",
+ "holochain_deterministic_integrity",
+ "holochain_mock_hdi",
  "serde",
 ]
 

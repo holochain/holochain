@@ -24,7 +24,7 @@ use crate::prelude::*;
 /// - Callbacks will return early with `UnresolvedDependencies`
 /// - Zome calls will receive a `WasmError` from the host
 pub fn must_get_entry(entry_hash: EntryHash) -> ExternResult<EntryHashed> {
-    IDK.with(|h| {
+    HDI.with(|h| {
         h.borrow()
             .must_get_entry(MustGetEntryInput::new(entry_hash))
     })
@@ -51,7 +51,7 @@ pub fn must_get_entry(entry_hash: EntryHash) -> ExternResult<EntryHashed> {
 /// - Callbacks will return early with `UnresolvedDependencies`
 /// - Zome calls will receive a `WasmError` from the host
 pub fn must_get_header(header_hash: HeaderHash) -> ExternResult<SignedHeaderHashed> {
-    IDK.with(|h| {
+    HDI.with(|h| {
         h.borrow()
             .must_get_header(MustGetHeaderInput::new(header_hash))
     })
@@ -97,7 +97,7 @@ pub fn must_get_header(header_hash: HeaderHash) -> ExternResult<SignedHeaderHash
 /// - Callbacks will return early with `UnresolvedDependencies`
 /// - Zome calls will receive a `WasmError` from the host
 pub fn must_get_valid_element(header_hash: HeaderHash) -> ExternResult<Element> {
-    IDK.with(|h| {
+    HDI.with(|h| {
         h.borrow()
             .must_get_valid_element(MustGetValidElementInput::new(header_hash))
     })
@@ -411,7 +411,7 @@ macro_rules! entry_defs {
 /// The host actually has no idea how to do this mapping, it is provided by the wasm!
 ///
 /// Therefore this is a macro that calls the [`entry_defs!`] callback as defined within a zome directly from the zome.
-/// It is a macro so that we can call a function with a known name `crate::entry_defs` from the IDK before the function is defined.
+/// It is a macro so that we can call a function with a known name `crate::entry_defs` from the HDI before the function is defined.
 ///
 /// Obviously this assumes and requires that a compliant [`entry_defs!`] callback _is_ defined at the root of the crate.
 #[macro_export]

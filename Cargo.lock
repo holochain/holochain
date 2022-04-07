@@ -1787,9 +1787,9 @@ dependencies = [
  "fixt",
  "hdk_derive",
  "holo_hash",
+ "holochain_deterministic_integrity",
  "holochain_wasmer_guest",
  "holochain_zome_types",
- "idk",
  "mockall 0.11.0",
  "paste",
  "serde",
@@ -2088,6 +2088,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "holochain_deterministic_integrity"
+version = "0.0.1"
+dependencies = [
+ "fixt",
+ "hdk_derive",
+ "holo_hash",
+ "holochain_integrity_types",
+ "holochain_wasmer_guest",
+ "mockall 0.10.2",
+ "paste",
+ "serde",
+ "serde_bytes",
+ "tracing",
+ "tracing-core",
+]
+
+[[package]]
 name = "holochain_integrity_types"
 version = "0.0.1"
 dependencies = [
@@ -2124,10 +2141,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "holochain_mock_idk"
+name = "holochain_mock_hdi"
 version = "0.0.1"
 dependencies = [
- "idk",
+ "holochain_deterministic_integrity",
  "mockall 0.11.0",
 ]
 
@@ -2575,23 +2592,6 @@ name = "ident_case"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b9e0384b61958566e926dc50660321d12159025e767c18e043daf26b70104c39"
-
-[[package]]
-name = "idk"
-version = "0.0.1"
-dependencies = [
- "fixt",
- "hdk_derive",
- "holo_hash",
- "holochain_integrity_types",
- "holochain_wasmer_guest",
- "mockall 0.10.2",
- "paste",
- "serde",
- "serde_bytes",
- "tracing",
- "tracing-core",
-]
 
 [[package]]
 name = "idna"

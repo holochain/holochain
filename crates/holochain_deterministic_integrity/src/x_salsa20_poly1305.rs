@@ -14,7 +14,7 @@ pub fn x_salsa20_poly1305_decrypt(
     key_ref: XSalsa20Poly1305KeyRef,
     encrypted_data: XSalsa20Poly1305EncryptedData,
 ) -> ExternResult<Option<XSalsa20Poly1305Data>> {
-    IDK.with(|h| {
+    HDI.with(|h| {
         h.borrow()
             .x_salsa20_poly1305_decrypt(XSalsa20Poly1305Decrypt::new(key_ref, encrypted_data))
     })
@@ -35,7 +35,7 @@ pub fn x_25519_x_salsa20_poly1305_decrypt(
     sender: X25519PubKey,
     encrypted_data: XSalsa20Poly1305EncryptedData,
 ) -> ExternResult<Option<XSalsa20Poly1305Data>> {
-    IDK.with(|h| {
+    HDI.with(|h| {
         h.borrow()
             .x_25519_x_salsa20_poly1305_decrypt(X25519XSalsa20Poly1305Decrypt::new(
                 recipient,

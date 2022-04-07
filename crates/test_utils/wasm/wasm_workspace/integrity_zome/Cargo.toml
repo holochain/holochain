@@ -10,9 +10,9 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 serde = "1.0"
-idk = { path = "../../../../idk" }
-holochain_mock_idk = { path = "../../../../mock_idk", optional = true }
+holochain_deterministic_integrity = { path = "../../../../holochain_deterministic_integrity" }
+holochain_mock_hdi = { path = "../../../../mock_hdi", optional = true }
 
 [features]
 default = []
-mock = ["holochain_mock_idk"]
+mock = ["holochain_mock_hdi"]

@@ -199,7 +199,7 @@ where
     Entry: TryFrom<I, Error = E>,
     WasmError: From<E>,
 {
-    match IDK.with(|h| h.borrow().hash(HashInput::Entry(Entry::try_from(input)?)))? {
+    match HDI.with(|h| h.borrow().hash(HashInput::Entry(Entry::try_from(input)?)))? {
         HashOutput::Entry(entry_hash) => Ok(entry_hash),
         _ => unreachable!(),
     }
@@ -208,15 +208,15 @@ where
 /// Hash a `Header` into a `HeaderHash`.
 ///
 /// [`hash_entry`] has more of a discussion around different hash types and how
-/// they are used within the IDK.
+/// they are used within the HDI.
 ///
 /// It is strongly recommended to use [`hash_header`] to calculate the hash rather than hand rolling an in-wasm solution.
 /// Any inconsistencies in serialization or hash handling will result in dangling references to things due to a "corrupt" hash.
 ///
-/// Note that usually relevant IDK functions return a [`HeaderHashed`] or [`SignedHeaderHashed`] which already has associated methods to access the `HeaderHash` of the inner `Header`.
+/// Note that usually relevant HDI functions return a [`HeaderHashed`] or [`SignedHeaderHashed`] which already has associated methods to access the `HeaderHash` of the inner `Header`.
 /// In normal usage it is unlikely to be required to separately hash a [`Header`] like this.
 pub fn hash_header(input: Header) -> ExternResult<HeaderHash> {
-    match IDK.with(|h| h.borrow().hash(HashInput::Header(input)))? {
+    match HDI.with(|h| h.borrow().hash(HashInput::Header(input)))? {
         HashOutput::Header(header_hash) => Ok(header_hash),
         _ => unreachable!(),
     }
@@ -226,7 +226,7 @@ pub fn hash_header(input: Header) -> ExternResult<HeaderHash> {
 /// This is the same algorithm used by holochain for typed hashes.
 /// Notably the output hash length is configurable.
 pub fn hash_blake2b(input: Vec<u8>, output_len: u8) -> ExternResult<Vec<u8>> {
-    match IDK.with(|h| h.borrow().hash(HashInput::Blake2B(input, output_len)))? {
+    match HDI.with(|h| h.borrow().hash(HashInput::Blake2B(input, output_len)))? {
         HashOutput::Blake2B(vec) => Ok(vec),
         _ => unreachable!(),
     }
@@ -234,7 +234,7 @@ pub fn hash_blake2b(input: Vec<u8>, output_len: u8) -> ExternResult<Vec<u8>> {
 
 /// @todo - not implemented on the host
 pub fn hash_sha256(input: Vec<u8>) -> ExternResult<Vec<u8>> {
-    match IDK.with(|h| h.borrow().hash(HashInput::Sha256(input)))? {
+    match HDI.with(|h| h.borrow().hash(HashInput::Sha256(input)))? {
         HashOutput::Sha256(hash) => Ok(hash.as_ref().to_vec()),
         _ => unreachable!(),
     }
@@ -242,7 +242,7 @@ pub fn hash_sha256(input: Vec<u8>) -> ExternResult<Vec<u8>> {
 
 /// @todo - not implemented on the host
 pub fn hash_sha512(input: Vec<u8>) -> ExternResult<Vec<u8>> {
-    match IDK.with(|h| h.borrow().hash(HashInput::Sha512(input)))? {
+    match HDI.with(|h| h.borrow().hash(HashInput::Sha512(input)))? {
         HashOutput::Sha512(hash) => Ok(hash.as_ref().to_vec()),
         _ => unreachable!(),
     }
@@ -253,7 +253,7 @@ pub fn hash_sha512(input: Vec<u8>) -> ExternResult<Vec<u8>> {
 /// It is essentially the same as sha3 256 but with a minor difference in configuration
 /// that is enough to generate different hash outputs.
 pub fn hash_keccak256(input: Vec<u8>) -> ExternResult<Vec<u8>> {
-    match IDK.with(|h| h.borrow().hash(HashInput::Keccak256(input)))? {
+    match HDI.with(|h| h.borrow().hash(HashInput::Keccak256(input)))? {
         HashOutput::Keccak256(hash) => Ok(hash.as_ref().to_vec()),
         _ => unreachable!(),
     }
@@ -262,7 +262,7 @@ pub fn hash_keccak256(input: Vec<u8>) -> ExternResult<Vec<u8>> {
 /// Hash arbitrary bytes using SHA3 256.
 /// This is the official NIST standard for 256 bit SHA3 hashes.
 pub fn hash_sha3(input: Vec<u8>) -> ExternResult<Vec<u8>> {
-    match IDK.with(|h| h.borrow().hash(HashInput::Sha3256(input)))? {
+    match HDI.with(|h| h.borrow().hash(HashInput::Sha3256(input)))? {
         HashOutput::Sha3256(hash) => Ok(hash.as_ref().to_vec()),
         _ => unreachable!(),
     }

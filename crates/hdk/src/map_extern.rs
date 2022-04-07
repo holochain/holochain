@@ -1,4 +1,4 @@
-pub use idk::map_extern::*;
+pub use holochain_deterministic_integrity::map_extern::*;
 
 /// Hides away the gross bit where we hook up integer pointers to length-prefixed guest memory
 /// to serialization and deserialization, and returning things to the host, and memory allocation
@@ -24,13 +24,15 @@ pub use idk::map_extern::*;
 #[macro_export]
 macro_rules! map_extern {
     ( $name:tt, $f:ident, $input:ty, $output:ty ) => {
-        $crate::prelude::idk::map_extern!($name, $f, $input, $output);
+        $crate::prelude::holochain_deterministic_integrity::map_extern!($name, $f, $input, $output);
     };
 }
 
 #[macro_export]
 macro_rules! map_extern_infallible {
     ( $name:tt, $f:ident, $input:ty, $output:ty ) => {
-        $crate::prelude::idk::map_extern_infallible!($name, $f, $input, $output);
+        $crate::prelude::holochain_deterministic_integrity::map_extern_infallible!(
+            $name, $f, $input, $output
+        );
     };
 }
