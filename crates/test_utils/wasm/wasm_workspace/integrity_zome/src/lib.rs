@@ -203,7 +203,7 @@ pub mod test {
             }
         });
 
-        set_holochain_deterministic_integrity(mock_hdi);
+        set_hdi(mock_hdi);
 
         call_verify_signature(VerifySignature {
             key: empty_agent_key.clone(),

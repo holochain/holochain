@@ -21,7 +21,7 @@ mock_hdi.expect_hash().once().returning({
 });
 
 // Set the HDI to use the mock.
-set_holochain_deterministic_integrity(mock_hdi);
+set_hdi(mock_hdi);
 
 // Create an input type.
 let hash_input = HashInput::Entry(Entry::Agent(empty_agent_key.clone()));
