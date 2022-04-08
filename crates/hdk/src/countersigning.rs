@@ -31,6 +31,9 @@ pub fn accept_countersigning_preflight_request(
 pub fn session_times_from_millis(ms: u64) -> ExternResult<CounterSigningSessionTimes> {
     let start = sys_time()?;
     let end = start + core::time::Duration::from_millis(ms);
-    CounterSigningSessionTimes::try_new(start, end.map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?)
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))
+    CounterSigningSessionTimes::try_new(
+        start,
+        end.map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?,
+    )
+    .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))
 }

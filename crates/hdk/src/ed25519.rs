@@ -8,7 +8,10 @@ where
     K: Into<AgentPubKey>,
     D: serde::Serialize + std::fmt::Debug,
 {
-    HDK.with(|h| h.borrow().sign(Sign::new(key.into(), data).map_err(|e| wasm_error!(e.into()))?))
+    HDK.with(|h| {
+        h.borrow()
+            .sign(Sign::new(key.into(), data).map_err(|e| wasm_error!(e.into()))?)
+    })
 }
 
 /// Sign some data using the private key for the passed public key.
@@ -31,7 +34,10 @@ pub fn sign_ephemeral<D>(datas: Vec<D>) -> ExternResult<EphemeralSignatures>
 where
     D: serde::Serialize + std::fmt::Debug,
 {
-    HDK.with(|h| h.borrow().sign_ephemeral(SignEphemeral::new(datas).map_err(|e| wasm_error!(e.into()))?))
+    HDK.with(|h| {
+        h.borrow()
+            .sign_ephemeral(SignEphemeral::new(datas).map_err(|e| wasm_error!(e.into()))?)
+    })
 }
 
 /// Sign N data using an ephemeral private key.
@@ -60,8 +66,10 @@ where
     D: serde::Serialize + std::fmt::Debug,
 {
     HDK.with(|h| {
-        h.borrow()
-            .verify_signature(VerifySignature::new(key.into(), signature.into(), data).map_err(|e| wasm_error!(e.into()))?)
+        h.borrow().verify_signature(
+            VerifySignature::new(key.into(), signature.into(), data)
+                .map_err(|e| wasm_error!(e.into()))?,
+        )
     })
 }
 

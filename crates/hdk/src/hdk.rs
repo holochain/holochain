@@ -107,7 +107,9 @@ pub struct ErrHdk;
 
 impl ErrHdk {
     fn err<T>() -> ExternResult<T> {
-        Err(wasm_error!(WasmErrorInner::Guest(HDK_NOT_REGISTERED.to_string())))
+        Err(wasm_error!(WasmErrorInner::Guest(
+            HDK_NOT_REGISTERED.to_string()
+        )))
     }
 }
 

@@ -101,8 +101,9 @@ where
     I: serde::Serialize + std::fmt::Debug,
 {
     HDK.with(|h| {
-        h.borrow()
-            .emit_signal(AppSignal::new(ExternIO::encode(input).map_err(|e| wasm_error!(e.into()))?))
+        h.borrow().emit_signal(AppSignal::new(
+            ExternIO::encode(input).map_err(|e| wasm_error!(e.into()))?,
+        ))
     })
 }
 

@@ -59,7 +59,10 @@ fn conductors_call_remote(num_conductors: usize) {
         for (_, _, result) in results {
             match result {
                 Some(r) => match r {
-                    Err(RibosomeError::WasmError(WasmError { error: WasmErrorInner::Guest(e), .. })) => {
+                    Err(RibosomeError::WasmError(WasmError {
+                        error: WasmErrorInner::Guest(e),
+                        ..
+                    })) => {
                         assert_eq!(e, TIMEOUT_ERROR)
                     }
                     _ => panic!("Unexpected result: {:?}", r),

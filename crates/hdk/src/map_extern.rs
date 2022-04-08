@@ -28,7 +28,9 @@ macro_rules! map_extern_preamble {
 pub fn encode_to_guestptrlen<T: std::fmt::Debug + Serialize>(v: T) -> GuestPtrLen {
     match ExternIO::encode(v) {
         Ok(v) => return_ptr::<ExternIO>(v),
-        Err(serialized_bytes_error) => return_err_ptr(wasm_error!(WasmErrorInner::Serialize(serialized_bytes_error))),
+        Err(serialized_bytes_error) => return_err_ptr(wasm_error!(WasmErrorInner::Serialize(
+            serialized_bytes_error
+        ))),
     }
 }
 

@@ -61,7 +61,9 @@ impl CallbackResult for ValidateCallbackResult {
     }
     fn try_from_wasm_error(wasm_error: WasmError) -> Result<Self, WasmError> {
         match wasm_error.error {
-            WasmErrorInner::Guest(_) | WasmErrorInner::Serialize(_) | WasmErrorInner::Deserialize(_) => {
+            WasmErrorInner::Guest(_)
+            | WasmErrorInner::Serialize(_)
+            | WasmErrorInner::Deserialize(_) => {
                 Ok(ValidateCallbackResult::Invalid(wasm_error.to_string()))
             }
             WasmErrorInner::Host(_)
@@ -106,9 +108,11 @@ impl CallbackResult for ValidationPackageCallbackResult {
     }
     fn try_from_wasm_error(wasm_error: WasmError) -> Result<Self, WasmError> {
         match wasm_error.error {
-            WasmErrorInner::Guest(_) | WasmErrorInner::Serialize(_) | WasmErrorInner::Deserialize(_) => Ok(
-                ValidationPackageCallbackResult::Fail(wasm_error.to_string()),
-            ),
+            WasmErrorInner::Guest(_)
+            | WasmErrorInner::Serialize(_)
+            | WasmErrorInner::Deserialize(_) => Ok(ValidationPackageCallbackResult::Fail(
+                wasm_error.to_string(),
+            )),
             WasmErrorInner::Host(_)
             | WasmErrorInner::HostShortCircuit(_)
             | WasmErrorInner::GuestResultHandling(_)

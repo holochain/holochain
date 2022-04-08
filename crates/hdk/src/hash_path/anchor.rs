@@ -96,7 +96,8 @@ pub fn get_anchor(anchor_address: EntryHash) -> ExternResult<Option<Anchor>> {
     Ok(
         match crate::prelude::get(anchor_address, GetOptions::content())?.and_then(|el| el.into()) {
             Some(Entry::App(eb)) => {
-                let path = Path::try_from(SerializedBytes::from(eb)).map_err(|e| wasm_error!(e.into()))?;
+                let path =
+                    Path::try_from(SerializedBytes::from(eb)).map_err(|e| wasm_error!(e.into()))?;
                 Some(Anchor::try_from(&path).map_err(|e| wasm_error!(e.into()))?)
             }
             _ => None,

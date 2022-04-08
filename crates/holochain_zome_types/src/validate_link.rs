@@ -31,7 +31,9 @@ impl CallbackResult for ValidateLinkCallbackResult {
     }
     fn try_from_wasm_error(wasm_error: WasmError) -> Result<Self, WasmError> {
         match wasm_error.error {
-            WasmErrorInner::Guest(_) | WasmErrorInner::Serialize(_) | WasmErrorInner::Deserialize(_) => {
+            WasmErrorInner::Guest(_)
+            | WasmErrorInner::Serialize(_)
+            | WasmErrorInner::Deserialize(_) => {
                 Ok(ValidateLinkCallbackResult::Invalid(wasm_error.to_string()))
             }
             WasmErrorInner::Host(_)
