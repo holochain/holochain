@@ -1,6 +1,7 @@
 use crate::element::SignedHeaderHashed;
 use crate::ChainTopOrdering;
 use holo_hash::HeaderHash;
+use holochain_integrity_types::ZomeName;
 use holochain_serialized_bytes::prelude::*;
 
 pub use holochain_integrity_types::link::*;
@@ -36,6 +37,7 @@ pub struct CreateLinkInput {
     pub link_type: LinkType,
     pub tag: LinkTag,
     pub chain_top_ordering: ChainTopOrdering,
+    pub zome_name: Option<ZomeName>,
 }
 
 impl CreateLinkInput {
@@ -52,6 +54,7 @@ impl CreateLinkInput {
             link_type,
             tag,
             chain_top_ordering,
+            zome_name: None,
         }
     }
 }

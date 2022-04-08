@@ -24,11 +24,29 @@ pub fn create_link<'a>(
                 link_type,
                 tag,
                 chain_top_ordering,
+                zome_name,
             } = input;
+
+            let zome = match zome_name {
+                Some(zome_name) => ribosome
+                    .dna_def()
+                    .get_integrity_zome(&zome_name)
+                    .map_err(|zome_error| WasmError::Host(zome_error.to_string()))?,
+                None => ribosome
+                    .dna_def()
+                    .is_integrity_zome(call_context.zome.zome_name())
+                    .then(|| call_context.zome.clone())
+                    .ok_or_else(|| {
+                        WasmError::Host(format!(
+                            "Tried to commit link to zome {} that is not an integrity zome",
+                            call_context.zome.zome_name().clone()
+                        ))
+                    })?,
+            };
 
             // extract the zome position
             let zome_id = ribosome
-                .zome_to_id(&call_context.zome)
+                .zome_to_id(&zome)
                 .expect("Failed to get ID for current zome");
 
             // Construct the link add
@@ -43,7 +61,7 @@ pub fn create_link<'a>(
                     .source_chain()
                     .as_ref()
                     .expect("Must have source chain if write_workspace access is given")
-                    .put(Some(call_context.zome.clone()), header_builder, None, chain_top_ordering)
+                    .put(Some(zome), header_builder, None, chain_top_ordering)
                     .await?;
                 Ok::<HeaderHash, RibosomeError>(header_hash)
             }))
@@ -56,11 +74,14 @@ pub fn create_link<'a>(
             // being atomic
             Ok(header_hash)
         }
-        _ => Err(WasmError::Host(RibosomeError::HostFnPermissions(
-            call_context.zome.zome_name().clone(),
-            call_context.function_name().clone(),
-            "create_link".into()
-        ).to_string()))
+        _ => Err(WasmError::Host(
+            RibosomeError::HostFnPermissions(
+                call_context.zome.zome_name().clone(),
+                call_context.function_name().clone(),
+                "create_link".into(),
+            )
+            .to_string(),
+        )),
     }
 }
 

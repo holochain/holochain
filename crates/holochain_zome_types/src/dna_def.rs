@@ -96,6 +96,13 @@ impl DnaDef {
             .ok_or_else(|| ZomeError::ZomeNotFound(format!("Zome '{}' not found", &zome_name,)))
     }
 
+    /// Check if a zome is an integrity zome.
+    pub fn is_integrity_zome(&self, zome_name: &ZomeName) -> bool {
+        self.integrity_zomes
+            .iter()
+            .any(|(name, _)| name == zome_name)
+    }
+
     /// Return a Zome
     pub fn get_zome(&self, zome_name: &ZomeName) -> Result<zome::Zome, ZomeError> {
         self.all_zomes()

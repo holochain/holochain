@@ -31,12 +31,21 @@ pub fn update<'a>(
                 chain_top_ordering,
                 zome_name,
             } = create_input;
-            let zome = match &zome_name {
+            let zome = match zome_name {
                 Some(zome_name) => ribosome
                     .dna_def()
-                    .get_integrity_zome(zome_name)
+                    .get_integrity_zome(&zome_name)
                     .map_err(|zome_error| WasmError::Host(zome_error.to_string()))?,
-                None => call_context.zome.clone(),
+                None => ribosome
+                    .dna_def()
+                    .is_integrity_zome(call_context.zome.zome_name())
+                    .then(|| call_context.zome.clone())
+                    .ok_or_else(|| {
+                        WasmError::Host(format!(
+                            "Tried to commit to zome {} that is not an integrity zome",
+                            call_context.zome.zome_name().clone()
+                        ))
+                    })?,
             };
 
             // Countersigned entries have different header handling.
