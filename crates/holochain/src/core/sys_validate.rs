@@ -686,7 +686,7 @@ async fn check_and_hold<I: Into<AnyDhtHash> + Clone>(
 fn make_store_element(element: Element) -> Option<(DhtOpHash, DhtOp)> {
     // Extract the data
     let (shh, element_entry) = element.privatized().into_inner();
-    let (header, signature) = shh.into_header_and_signature();
+    let (header, signature) = shh.into_inner();
     let header = header.into_content();
 
     // Check the entry
@@ -708,7 +708,7 @@ fn make_store_element(element: Element) -> Option<(DhtOpHash, DhtOp)> {
 fn make_store_entry(element: Element) -> Option<(DhtOpHash, DhtOp)> {
     // Extract the data
     let (shh, element_entry) = element.into_inner();
-    let (header, signature) = shh.into_header_and_signature();
+    let (header, signature) = shh.into_inner();
 
     // Check the entry and exit early if it's not there
     let entry_box = element_entry.into_option()?.into();
@@ -730,7 +730,7 @@ fn make_store_entry(element: Element) -> Option<(DhtOpHash, DhtOp)> {
 fn make_register_add_link(element: Element) -> Option<(DhtOpHash, DhtOp)> {
     // Extract the data
     let (shh, _) = element.into_inner();
-    let (header, signature) = shh.into_header_and_signature();
+    let (header, signature) = shh.into_inner();
 
     // If the header is the wrong type exit early
     let header = header.into_content().try_into().ok()?;
@@ -750,7 +750,7 @@ fn make_register_add_link(element: Element) -> Option<(DhtOpHash, DhtOp)> {
 fn make_register_agent_activity(element: Element) -> Option<(DhtOpHash, DhtOp)> {
     // Extract the data
     let (shh, _) = element.into_inner();
-    let (header, signature) = shh.into_header_and_signature();
+    let (header, signature) = shh.into_inner();
 
     // If the header is the wrong type exit early
     let header = header.into_content();

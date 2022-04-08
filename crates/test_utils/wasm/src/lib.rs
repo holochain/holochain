@@ -9,6 +9,8 @@ pub enum TestWasm {
     Anchor,
     Bench,
     Capability,
+    CoordinatorZome,
+    CoordinatorZomeUpdate,
     CounterSigning,
     Create,
     Crd,
@@ -24,6 +26,7 @@ pub enum TestWasm {
     HdkExtern,
     InitFail,
     InitPass,
+    IntegrityZome,
     Link,
     MigrateAgentFail,
     MigrateAgentPass,
@@ -98,6 +101,9 @@ impl From<TestWasm> for ZomeName {
             TestWasm::ValidationPackageSuccess => "validation_package_success",
             TestWasm::WhoAmI => "whoami",
             TestWasm::ZomeInfo => "zome_info",
+            TestWasm::CoordinatorZome => "coordinator_zome",
+            TestWasm::CoordinatorZomeUpdate => "coordinator_zome_update",
+            TestWasm::IntegrityZome => "integrity_zome",
         })
     }
 }
@@ -212,6 +218,15 @@ impl From<TestWasm> for DnaWasm {
             TestWasm::WhoAmI => get_code("wasm32-unknown-unknown/release/test_wasm_whoami.wasm"),
             TestWasm::ZomeInfo => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_zome_info.wasm")
+            }
+            TestWasm::CoordinatorZome => {
+                get_code("wasm32-unknown-unknown/release/test_wasm_coordinator_zome.wasm")
+            }
+            TestWasm::CoordinatorZomeUpdate => {
+                get_code("wasm32-unknown-unknown/release/test_wasm_coordinator_zome_update.wasm")
+            }
+            TestWasm::IntegrityZome => {
+                get_code("wasm32-unknown-unknown/release/test_wasm_integrity_zome.wasm")
             }
         })
     }

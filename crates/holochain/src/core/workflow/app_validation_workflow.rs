@@ -266,13 +266,6 @@ async fn app_validation_workflow_inner(
     })
 }
 
-pub fn to_single_zome(zomes_to_invoke: ZomesToInvoke) -> AppValidationResult<Zome> {
-    match zomes_to_invoke {
-        ZomesToInvoke::All => Err(AppValidationError::LinkMultipleZomes),
-        ZomesToInvoke::One(z) => Ok(z),
-    }
-}
-
 pub async fn element_to_op(
     element: Element,
     op_type: DhtOpType,
@@ -282,7 +275,7 @@ pub async fn element_to_op(
     let mut activity_entry = None;
     let (shh, entry) = element.into_inner();
     let mut entry = entry.into_option();
-    let (header, _) = shh.into_inner();
+    let header = shh.into();
     // Register agent activity doesn't store the entry so we need to
     // save it so we can reconstruct the element later.
     if matches!(op_type, RegisterAgentActivity) {
@@ -361,9 +354,10 @@ async fn dhtop_to_op(op: DhtOp, cascade: &mut Cascade) -> AppValidationOutcome<O
             let original_header = cascade
                 .retrieve_header(update.original_header_address.clone(), Default::default())
                 .await?
-                .and_then(|e| {
-                    let sh = e.into_inner().0;
-                    NewEntryHeader::try_from(sh.0).ok().map(|h| h.into())
+                .and_then(|sh| {
+                    NewEntryHeader::try_from(sh.hashed.content)
+                        .ok()
+                        .map(|h| h.into())
                 })
                 .ok_or_else(|| Outcome::awaiting(&update.original_header_address))?;
             Op::RegisterUpdate {
@@ -384,9 +378,10 @@ async fn dhtop_to_op(op: DhtOp, cascade: &mut Cascade) -> AppValidationOutcome<O
             let original_header = cascade
                 .retrieve_header(delete.deletes_address.clone(), Default::default())
                 .await?
-                .and_then(|e| {
-                    let sh = e.into_inner().0;
-                    NewEntryHeader::try_from(sh.0).ok().map(|h| h.into())
+                .and_then(|sh| {
+                    NewEntryHeader::try_from(sh.hashed.content)
+                        .ok()
+                        .map(|h| h.into())
                 })
                 .ok_or_else(|| Outcome::awaiting(&delete.deletes_address))?;
             Op::RegisterDelete {
@@ -402,10 +397,7 @@ async fn dhtop_to_op(op: DhtOp, cascade: &mut Cascade) -> AppValidationOutcome<O
             let create_link = cascade
                 .retrieve_header(delete_link.link_add_address.clone(), Default::default())
                 .await?
-                .and_then(|e| {
-                    let sh = e.into_inner().0;
-                    CreateLink::try_from(sh.0).ok()
-                })
+                .and_then(|sh| CreateLink::try_from(sh.hashed.content).ok())
                 .ok_or_else(|| Outcome::awaiting(&delete_link.link_add_address))?;
             Op::RegisterDeleteLink {
                 delete_link: SignedHashed::new(delete_link, signature),
@@ -595,6 +587,7 @@ where
 pub struct AppValidationWorkspace {
     authored_db: DbRead<DbKindAuthored>,
     dht_db: DbWrite<DbKindDht>,
+    dht_db_cache: DhtDbQueryCache,
     cache: DbWrite<DbKindCache>,
     keystore: MetaLairClient,
     dna_def: Arc<DnaDef>,
@@ -604,6 +597,7 @@ impl AppValidationWorkspace {
     pub fn new(
         authored_db: DbRead<DbKindAuthored>,
         dht_db: DbWrite<DbKindDht>,
+        dht_db_cache: DhtDbQueryCache,
         cache: DbWrite<DbKindCache>,
         keystore: MetaLairClient,
         dna_def: Arc<DnaDef>,
@@ -611,6 +605,7 @@ impl AppValidationWorkspace {
         Self {
             authored_db,
             dht_db,
+            dht_db_cache,
             cache,
             keystore,
             dna_def,
@@ -621,6 +616,7 @@ impl AppValidationWorkspace {
         Ok(HostFnWorkspace::new(
             self.authored_db.clone(),
             self.dht_db.clone().into(),
+            self.dht_db_cache.clone(),
             self.cache.clone(),
             self.keystore.clone(),
             None,

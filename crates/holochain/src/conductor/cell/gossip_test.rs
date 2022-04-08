@@ -2,84 +2,50 @@ use crate::conductor::handle::DevSettingsDelta;
 use crate::sweettest::*;
 use crate::test_utils::conductor_setup::ConductorTestData;
 use crate::test_utils::consistency_10s;
-use crate::test_utils::consistency_dbs;
 use crate::test_utils::inline_zomes::simple_create_read_zome;
-use crate::test_utils::new_zome_call;
 use hdk::prelude::*;
 use holochain_sqlite::prelude::*;
+use holochain_state::prelude::dump_tmp;
 use holochain_state::prelude::fresh_reader_test;
 use holochain_test_wasm_common::AnchorInput;
 use holochain_wasm_test_utils::TestWasm;
 use kitsune_p2p::KitsuneP2pConfig;
-use matches::assert_matches;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn gossip_test() {
     observability::test_run().ok();
-    const NUM: usize = 1;
-    let zomes = vec![TestWasm::Anchor];
-    let mut conductor_test = ConductorTestData::two_agents(zomes, false).await;
-    let handle = conductor_test.handle();
-    let alice_call_data = &conductor_test.alice_call_data();
-    let alice_cell_id = &alice_call_data.cell_id;
+    let mut conductors = SweetConductorBatch::from_standard_config(2).await;
 
-    // ALICE adding anchors
-
-    let anchor_invocation = |anchor: &str, cell_id, i: usize| {
-        let anchor = AnchorInput(anchor.into(), i.to_string());
-        new_zome_call(cell_id, "anchor", anchor, TestWasm::Anchor)
-    };
-
-    for i in 0..NUM {
-        let invocation = anchor_invocation("alice", alice_cell_id, i).unwrap();
-        let response = handle.call_zome(invocation).await.unwrap().unwrap();
-        assert_matches!(response, ZomeCallResponse::Ok(_));
+    for c in conductors.iter() {
+        c.update_dev_settings(DevSettingsDelta {
+            publish: Some(false),
+            ..Default::default()
+        });
     }
+    let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Anchor])
+        .await
+        .unwrap();
 
-    // Give publish time to finish
-    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+    let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
+    let ((cell_1,), (cell_2,)) = apps.into_tuples();
+    conductors.exchange_peer_info().await;
 
-    // Bring Bob online
-    conductor_test.bring_bob_online().await;
-    let bob_call_data = conductor_test.bob_call_data().unwrap();
-    let bob_cell_id = &bob_call_data.cell_id;
+    let anchor = AnchorInput("alice".to_string(), "0".to_string());
+    let _: EntryHash = conductors[0]
+        .call(&cell_1.zome(TestWasm::Anchor), "anchor", anchor)
+        .await;
 
-    // Give gossip some time to finish
-    const NUM_ATTEMPTS: usize = 200;
-    const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_millis(100);
+    consistency_10s(&[&cell_1, &cell_2]).await;
+    dump_tmp(cell_1.dht_db());
 
-    let all_cell_dbs = vec![
-        (
-            bob_call_data.cell_id.agent_pubkey(),
-            &bob_call_data.authored_db,
-            &bob_call_data.dht_db,
-        ),
-        (
-            conductor_test.alice_call_data().cell_id.agent_pubkey(),
-            &conductor_test.alice_call_data().authored_db,
-            &conductor_test.alice_call_data().dht_db,
-        ),
-    ];
-    consistency_dbs(&all_cell_dbs, NUM_ATTEMPTS, DELAY_PER_ATTEMPT).await;
-
-    // Bob list anchors
-    let invocation = new_zome_call(
-        bob_cell_id,
-        "list_anchor_addresses",
-        "alice".to_string(),
-        TestWasm::Anchor,
-    )
-    .unwrap();
-    let response = handle.call_zome(invocation).await.unwrap().unwrap();
-    match response {
-        ZomeCallResponse::Ok(r) => {
-            let hashes: EntryHashes = r.decode().unwrap();
-            assert_eq!(hashes.0.len(), NUM);
-        }
-        _ => unreachable!(),
-    }
-
-    conductor_test.shutdown_conductor().await;
+    let hashes: EntryHashes = conductors[1]
+        .call(
+            &cell_2.zome(TestWasm::Anchor),
+            "list_anchor_addresses",
+            "alice",
+        )
+        .await;
+    assert_eq!(hashes.0.len(), 1);
 }
 
 #[tokio::test(flavor = "multi_thread")]
