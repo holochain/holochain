@@ -384,7 +384,7 @@ pub mod test {
 
         assert_eq!(
             garbage_entry_validate_result.unwrap(),
-            ValidateResult::Invalid("Serialize(Deserialize(\"invalid type: boolean `false`, expected a HoloHash of primitive hash_type\"))".into())
+            ValidateResult::Invalid("WasmError { file: \"must_get/src/lib.rs\", line: 8, error: Serialize(Deserialize(\"invalid type: boolean `false`, expected a HoloHash of primitive hash_type\")) }".into())
         );
     }
 }
