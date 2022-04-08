@@ -730,7 +730,8 @@ pub mod test {
 
     #[test]
     pub fn test_check_countersigning_preflight_request_agents_dupes() {
-        let mut u = arbitrary::Unstructured::new(&[0; 1000]);
+        let data: Vec<_> = (0u8..255).cycle().take(1000).collect();
+        let mut u = arbitrary::Unstructured::new(&data);
         let mut preflight_request = PreflightRequest::arbitrary(&mut u).unwrap();
 
         let alice = AgentPubKey::arbitrary(&mut u).unwrap();

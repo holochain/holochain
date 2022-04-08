@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostContext;
 use crate::core::ribosome::Invocation;
@@ -9,7 +11,7 @@ use holochain_types::prelude::*;
 
 #[derive(Clone)]
 pub struct GenesisSelfCheckInvocation {
-    pub payload: GenesisSelfCheckData,
+    pub payload: Arc<GenesisSelfCheckData>,
 }
 
 #[derive(Clone, Constructor)]
@@ -41,12 +43,6 @@ impl Invocation for GenesisSelfCheckInvocation {
     }
     fn auth(&self) -> InvocationAuth {
         InvocationAuth::LocalCallback
-    }
-}
-
-impl From<GenesisSelfCheckInvocation> for GenesisSelfCheckData {
-    fn from(i: GenesisSelfCheckInvocation) -> Self {
-        i.payload
     }
 }
 
@@ -88,12 +84,17 @@ mod slow_tests {
     use std::sync::Arc;
 
     use super::GenesisSelfCheckInvocation;
-    use crate::core::ribosome::{
-        guest_callback::genesis_self_check::{GenesisSelfCheckHostAccess, GenesisSelfCheckResult},
-        RibosomeT,
-    };
     use crate::fixt::curve::Zomes;
     use crate::fixt::*;
+    use crate::{
+        core::ribosome::{
+            guest_callback::genesis_self_check::{
+                GenesisSelfCheckHostAccess, GenesisSelfCheckResult,
+            },
+            RibosomeT,
+        },
+        sweettest::*,
+    };
     use ::fixt::prelude::*;
     use holo_hash::fixt::AgentPubKeyFixturator;
     use holochain_types::prelude::*;
@@ -101,11 +102,11 @@ mod slow_tests {
 
     fn invocation_fixture() -> GenesisSelfCheckInvocation {
         GenesisSelfCheckInvocation {
-            payload: GenesisSelfCheckData {
-                dna_def: fixt!(DnaDef),
+            payload: Arc::new(GenesisSelfCheckData {
+                dna_info: fixt!(DnaInfo),
                 membrane_proof: Some(Arc::new(().try_into().unwrap())),
                 agent_key: fixt!(AgentPubKey),
-            },
+            }),
         }
     }
 
@@ -150,5 +151,24 @@ mod slow_tests {
             result,
             GenesisSelfCheckResult::Invalid("esoteric edge case".into()),
         );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_integrity_zome_can_run_self_check() {
+        let mut conductor = SweetConductor::from_config(Default::default()).await;
+        let (dna, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::IntegrityZome])
+            .await
+            .unwrap();
+
+        let app = conductor.setup_app("app", &[dna]).await.unwrap();
+        let cells = app.into_cells();
+
+        let _: EntryHashed = conductor
+            .call(
+                &cells[0].zome(TestWasm::IntegrityZome),
+                "call_must_get_entry",
+                EntryHash::from(cells[0].cell_id().agent_pubkey().clone()),
+            )
+            .await;
     }
 }

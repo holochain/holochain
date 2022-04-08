@@ -1,25 +1,25 @@
 use crate::prelude::*;
 
-pub const IDK_NOT_REGISTERED: &str = "IDK not registered";
+pub const HDI_NOT_REGISTERED: &str = "HDI not registered";
 
 /// This is a cell so it can be set many times.
 /// Every test needs its own mock so each test needs to set it.
 use core::cell::RefCell;
+use std::rc::Rc;
 
 #[cfg(any(feature = "mock", not(target_arch = "wasm32")))]
-thread_local!(pub static IDK: RefCell<Box<dyn IdkT>> = RefCell::new(Box::new(ErrIdk)));
+thread_local!(pub static HDI: RefCell<Rc<dyn HdiT>> = RefCell::new(Rc::new(ErrHdi)));
 
 #[cfg(all(not(feature = "mock"), target_arch = "wasm32"))]
-thread_local!(pub static IDK: RefCell<Box<dyn IdkT>> = RefCell::new(Box::new(HostIdk)));
+thread_local!(pub static HDI: RefCell<Rc<dyn HdiT>> = RefCell::new(Rc::new(HostHdi)));
 
-/// When mocking is enabled the mockall crate automatically builds a MockIdkT for us.
+/// When mocking is enabled the mockall crate automatically builds a MockHdiT for us.
 /// ```ignore
-/// let mut mock = MockIdkT::new();
-/// mock_idk.expect_foo().times(1).etc().etc();
-/// set_idk(mock_idk);
+/// let mut mock_hdi = MockHdiT::new();
+/// mock_hdi.expect_foo().times(1).etc().etc();
+/// set_hdi(mock_hdi);
 /// ```
-// #[cfg_attr(feature = "mock", automock)]
-pub trait IdkT: Send + Sync {
+pub trait HdiT: Send + Sync {
     // Ed25519
     fn verify_signature(&self, verify_signature: VerifySignature) -> ExternResult<bool>;
     fn hash(&self, hash_input: HashInput) -> ExternResult<HashOutput>;
@@ -49,18 +49,18 @@ pub trait IdkT: Send + Sync {
     ) -> ExternResult<Option<XSalsa20Poly1305Data>>;
 }
 
-/// Used as a placeholder before any other Idk is registered.
+/// Used as a placeholder before any other Hdi is registered.
 /// Generally only useful for testing but technically can be set any time.
-pub struct ErrIdk;
+pub struct ErrHdi;
 
-impl ErrIdk {
+impl ErrHdi {
     fn err<T>() -> ExternResult<T> {
-        Err(WasmError::Guest(IDK_NOT_REGISTERED.to_string()))
+        Err(WasmError::Guest(HDI_NOT_REGISTERED.to_string()))
     }
 }
 
-/// Every call is an error for the ErrIdk.
-impl IdkT for ErrIdk {
+/// Every call is an error for the ErrHdi.
+impl HdiT for ErrHdi {
     fn verify_signature(&self, _: VerifySignature) -> ExternResult<bool> {
         Self::err()
     }
@@ -101,21 +101,21 @@ impl IdkT for ErrIdk {
     }
 }
 
-/// The IDK implemented as externs provided by the host.
-pub struct HostIdk;
+/// The HDI implemented as externs provided by the host.
+pub struct HostHdi;
 
-impl HostIdk {
+impl HostHdi {
     pub const fn new() -> Self {
         Self {}
     }
 }
 
-/// The real idk implements `host_call` for every idk function.
+/// The real holochain_deterministic_integrity implements `host_call` for every holochain_deterministic_integrity function.
 /// This is deferring to the standard `holochain_wasmer_guest` crate functionality.
 /// Every function works exactly the same way with the same basic signatures and patterns.
-/// Elsewhere in the idk are more high level wrappers around this basic trait.
+/// Elsewhere in the holochain_deterministic_integrity are more high level wrappers around this basic trait.
 #[cfg(all(not(feature = "mock"), target_arch = "wasm32"))]
-impl IdkT for HostIdk {
+impl HdiT for HostHdi {
     fn verify_signature(&self, verify_signature: VerifySignature) -> ExternResult<bool> {
         host_call::<VerifySignature, bool>(__verify_signature, verify_signature)
     }
@@ -173,12 +173,12 @@ impl IdkT for HostIdk {
     }
 }
 
-/// At any time the global IDK can be set to a different idk.
+/// At any time the global HDI can be set to a different HDI.
 /// Generally this is only useful during rust unit testing.
 /// When executing wasm without the `mock` feature, the host will be assumed.
-pub fn set_idk<H: 'static>(idk: H) -> Box<dyn IdkT>
+pub fn set_hdi<H: 'static>(hdi: H) -> Rc<dyn HdiT>
 where
-    H: IdkT,
+    H: HdiT,
 {
-    IDK.with(|h| std::mem::replace(&mut *h.borrow_mut(), Box::new(idk)))
+    HDI.with(|h| std::mem::replace(&mut *h.borrow_mut(), Rc::new(hdi)))
 }

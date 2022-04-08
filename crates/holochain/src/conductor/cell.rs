@@ -41,6 +41,7 @@ use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_state::prelude::*;
 use holochain_state::schedule::live_scheduled_fns;
+use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::prelude::*;
 use rusqlite::OptionalExtension;
 use rusqlite::Transaction;
@@ -170,11 +171,12 @@ impl Cell {
         conductor_handle: ConductorHandle,
         authored_db: DbWrite<DbKindAuthored>,
         dht_db: DbWrite<DbKindDht>,
+        dht_db_cache: DhtDbQueryCache,
         ribosome: Ribosome,
         membrane_proof: Option<MembraneProof>,
     ) -> CellResult<()>
     where
-        Ribosome: RibosomeT + Send + 'static,
+        Ribosome: RibosomeT + 'static,
     {
         // get the dna
         let dna_file = conductor_handle
@@ -193,6 +195,7 @@ impl Cell {
             id.agent_pubkey().clone(),
             membrane_proof,
             ribosome,
+            dht_db_cache,
         );
 
         genesis_workflow(workspace, conductor_api, args)
@@ -521,8 +524,7 @@ impl Cell {
         signed_headers: Vec<SignedHeader>,
     ) -> CellResult<()> {
         Ok(countersigning_success(
-            self.space.authored_db.clone(),
-            self.space.dht_db.clone(),
+            self.space.clone(),
             &self.holochain_p2p_cell,
             self.id.agent_pubkey().clone(),
             signed_headers,
@@ -560,6 +562,7 @@ impl Cell {
                 header,
                 self.space.authored_db.clone().into(),
                 self.dht_db().clone().into(),
+                self.space.dht_query_cache.clone(),
                 self.space.cache_db.clone(),
                 &ribosome,
                 &(*self.conductor_handle),
@@ -817,6 +820,7 @@ impl Cell {
                 SourceChainWorkspace::new(
                     self.authored_db().clone(),
                     self.dht_db().clone(),
+                    self.space.dht_query_cache.clone(),
                     self.cache().clone(),
                     keystore.clone(),
                     self.id.agent_pubkey().clone(),
@@ -873,6 +877,7 @@ impl Cell {
         let workspace = SourceChainWorkspace::init_as_root(
             self.authored_db().clone(),
             self.dht_db().clone(),
+            self.space.dht_query_cache.clone(),
             self.cache().clone(),
             keystore.clone(),
             id.agent_pubkey().clone(),

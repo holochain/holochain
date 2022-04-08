@@ -34,7 +34,7 @@ pub fn update<'a>(
             let zome = match &zome_name {
                 Some(zome_name) => ribosome
                     .dna_def()
-                    .get_integrity_zome(&zome_name)
+                    .get_integrity_zome(zome_name)
                     .map_err(|zome_error| WasmError::Host(zome_error.to_string()))?,
                 None => call_context.zome.clone(),
             };

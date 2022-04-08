@@ -358,6 +358,13 @@ pub trait ConductorHandleT: Send + Sync {
     #[cfg(any(test, feature = "test_utils"))]
     fn get_dht_db(&self, cell_id: &DnaHash) -> ConductorApiResult<DbWrite<DbKindDht>>;
 
+    /// Retrieve the dht environment for this dna. FOR TESTING ONLY.
+    #[cfg(any(test, feature = "test_utils"))]
+    fn get_dht_db_cache(
+        &self,
+        cell_id: &DnaHash,
+    ) -> ConductorApiResult<holochain_types::db_cache::DhtDbQueryCache>;
+
     /// Retrieve the database for this cell. FOR TESTING ONLY.
     #[cfg(any(test, feature = "test_utils"))]
     fn get_cache_db(&self, cell_id: &CellId) -> ConductorApiResult<DbWrite<DbKindCache>>;
@@ -1295,6 +1302,7 @@ impl ConductorHandleT for ConductorHandleImpl {
             let workspace = SourceChainWorkspace::raw_empty(
                 space.authored_db.clone(),
                 space.dht_db.clone(),
+                space.dht_query_cache.clone(),
                 space.cache_db.clone(),
                 self.conductor.keystore().clone(),
                 cell_id.agent_pubkey().clone(),
@@ -1413,6 +1421,7 @@ impl ConductorHandleT for ConductorHandleImpl {
                 ops_to_integrate,
                 &authored_db,
                 &dht_db,
+                &space.dht_query_cache,
             )
             .await?;
         }
@@ -1427,6 +1436,16 @@ impl ConductorHandleT for ConductorHandleImpl {
     #[cfg(any(test, feature = "test_utils"))]
     fn get_dht_db(&self, dna_hash: &DnaHash) -> ConductorApiResult<DbWrite<DbKindDht>> {
         Ok(self.conductor.get_or_create_dht_db(dna_hash)?)
+    }
+    #[cfg(any(test, feature = "test_utils"))]
+    fn get_dht_db_cache(
+        &self,
+        dna_hash: &DnaHash,
+    ) -> ConductorApiResult<holochain_types::db_cache::DhtDbQueryCache> {
+        Ok(self
+            .conductor
+            .get_or_create_space(dna_hash)?
+            .dht_query_cache)
     }
 
     #[cfg(any(test, feature = "test_utils"))]

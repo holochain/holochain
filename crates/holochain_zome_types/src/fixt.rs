@@ -89,12 +89,12 @@ fixturator!(
 
 fixturator!(
     DeleteLink;
-    constructor fn from_builder(HeaderBuilderCommon, HeaderHash, EntryHash);
+    constructor fn from_builder(HeaderBuilderCommon, HeaderHash, AnyLinkableHash);
 );
 
 fixturator!(
     CreateLink;
-    constructor fn from_builder(HeaderBuilderCommon, EntryHash, EntryHash, u8, LinkType, LinkTag);
+    constructor fn from_builder(HeaderBuilderCommon, AnyLinkableHash, AnyLinkableHash, u8, LinkType, LinkTag);
 );
 
 fixturator!(
@@ -106,15 +106,15 @@ fixturator!(
 );
 
 pub struct KnownCreateLink {
-    pub base_address: EntryHash,
-    pub target_address: EntryHash,
+    pub base_address: AnyLinkableHash,
+    pub target_address: AnyLinkableHash,
     pub tag: LinkTag,
     pub zome_id: ZomeId,
 }
 
 pub struct KnownDeleteLink {
     pub link_add_address: holo_hash::HeaderHash,
-    pub base_address: holo_hash::EntryHash,
+    pub base_address: AnyLinkableHash,
 }
 
 impl Iterator for CreateLinkFixturator<KnownCreateLink> {
@@ -743,5 +743,53 @@ fixturator!(
         coordinator_zomes: ZomesFixturator::new_indexed(Empty, get_fixt_index!())
             .next()
             .unwrap(),
+    };
+);
+
+fixturator!(
+    DnaInfo;
+    curve Empty DnaInfo {
+        name: StringFixturator::new_indexed(Empty, get_fixt_index!())
+            .next()
+            .unwrap(),
+        hash: DnaHashFixturator::new_indexed(Empty, get_fixt_index!())
+            .next()
+            .unwrap(),
+        properties: SerializedBytesFixturator::new_indexed(Empty, get_fixt_index!())
+            .next()
+            .unwrap(),
+        zome_names: vec![ZomeNameFixturator::new_indexed(Empty, get_fixt_index!())
+            .next()
+            .unwrap()],
+    };
+
+    curve Unpredictable DnaInfo {
+        name: StringFixturator::new_indexed(Unpredictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+        hash: DnaHashFixturator::new_indexed(Unpredictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+        properties: SerializedBytesFixturator::new_indexed(Unpredictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+        zome_names: vec![ZomeNameFixturator::new_indexed(Unpredictable, get_fixt_index!())
+            .next()
+            .unwrap()],
+    };
+
+    curve Predictable DnaInfo {
+        name: StringFixturator::new_indexed(Predictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+        hash: DnaHashFixturator::new_indexed(Predictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+        properties: SerializedBytesFixturator::new_indexed(Predictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+        zome_names: vec![ZomeNameFixturator::new_indexed(Predictable, get_fixt_index!())
+            .next()
+            .unwrap()],
     };
 );

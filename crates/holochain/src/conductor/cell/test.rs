@@ -26,6 +26,7 @@ async fn test_cell_handle_publish() {
     let spaces = TestSpaces::new([dna.clone()]);
     let db = spaces.test_spaces[&dna].space.authored_db.clone();
     let dht_db = spaces.test_spaces[&dna].space.dht_db.clone();
+    let dht_db_cache = spaces.test_spaces[&dna].space.dht_query_cache.clone();
 
     let test_network = test_network(Some(dna.clone()), Some(agent.clone())).await;
     let holochain_p2p_cell = test_network.dna_network();
@@ -47,12 +48,15 @@ async fn test_cell_handle_publish() {
     mock_ribosome
         .expect_run_genesis_self_check()
         .returning(|_, _| Ok(GenesisSelfCheckResult::Valid));
+    let dna_def = DnaDefHashed::from_content_sync(dna_file.dna_def().clone());
+    mock_ribosome.expect_dna_def().return_const(dna_def);
 
     super::Cell::genesis(
         cell_id.clone(),
         mock_handle.clone(),
         db.clone(),
         dht_db.clone(),
+        dht_db_cache.clone(),
         mock_ribosome,
         None,
     )

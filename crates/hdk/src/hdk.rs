@@ -1,17 +1,18 @@
 use crate::prelude::*;
-use idk::idk::IdkT;
+use holochain_deterministic_integrity::hdi::HdiT;
 
 pub const HDK_NOT_REGISTERED: &str = "HDK not registered";
 
 /// This is a cell so it can be set many times.
 /// Every test needs its own mock so each test needs to set it.
 use core::cell::RefCell;
+use std::rc::Rc;
 
 #[cfg(any(feature = "mock", not(target_arch = "wasm32")))]
-thread_local!(pub static HDK: RefCell<Box<dyn HdkT>> = RefCell::new(Box::new(ErrHdk)));
+thread_local!(pub static HDK: RefCell<Rc<dyn HdkT>> = RefCell::new(Rc::new(ErrHdk)));
 
 #[cfg(all(not(feature = "mock"), target_arch = "wasm32"))]
-thread_local!(pub static HDK: RefCell<Box<dyn HdkT>> = RefCell::new(Box::new(HostHdk)));
+thread_local!(pub static HDK: RefCell<Rc<dyn HdkT>> = RefCell::new(Rc::new(HostHdk)));
 
 /// When mocking is enabled the mockall crate automatically builds a MockHdkT for us.
 /// ```ignore
@@ -19,7 +20,7 @@ thread_local!(pub static HDK: RefCell<Box<dyn HdkT>> = RefCell::new(Box::new(Hos
 /// mock_hdk.expect_foo().times(1).etc().etc();
 /// set_hdk(mock_hdk);
 /// ```
-pub trait HdkT: IdkT {
+pub trait HdkT: HdiT {
     // Chain
     fn get_agent_activity(
         &self,
@@ -136,7 +137,7 @@ mockall::mock! {
 
     }
 
-    impl IdkT for HdkT {
+    impl HdiT for HdkT {
         fn verify_signature(&self, verify_signature: VerifySignature) -> ExternResult<bool>;
         fn hash(&self, hash_input: HashInput) -> ExternResult<HashOutput>;
         fn must_get_entry(&self, must_get_entry_input: MustGetEntryInput) -> ExternResult<EntryHashed>;
@@ -178,7 +179,7 @@ impl ErrHdk {
 }
 
 /// Every call is an error for the ErrHdk.
-impl IdkT for ErrHdk {
+impl HdiT for ErrHdk {
     fn verify_signature(&self, _verify_signature: VerifySignature) -> ExternResult<bool> {
         Self::err()
     }
@@ -341,48 +342,48 @@ impl HdkT for ErrHdk {
 pub struct HostHdk;
 
 #[cfg(all(not(feature = "mock"), target_arch = "wasm32"))]
-use idk::idk::HostIdk;
+use holochain_deterministic_integrity::hdi::HostHdi;
 
 #[cfg(all(not(feature = "mock"), target_arch = "wasm32"))]
-impl IdkT for HostHdk {
+impl HdiT for HostHdk {
     fn verify_signature(&self, verify_signature: VerifySignature) -> ExternResult<bool> {
-        HostIdk::new().verify_signature(verify_signature)
+        HostHdi::new().verify_signature(verify_signature)
     }
     fn hash(&self, hash_input: HashInput) -> ExternResult<HashOutput> {
-        HostIdk::new().hash(hash_input)
+        HostHdi::new().hash(hash_input)
     }
     fn must_get_entry(&self, must_get_entry_input: MustGetEntryInput) -> ExternResult<EntryHashed> {
-        HostIdk::new().must_get_entry(must_get_entry_input)
+        HostHdi::new().must_get_entry(must_get_entry_input)
     }
     fn must_get_header(
         &self,
         must_get_header_input: MustGetHeaderInput,
     ) -> ExternResult<SignedHeaderHashed> {
-        HostIdk::new().must_get_header(must_get_header_input)
+        HostHdi::new().must_get_header(must_get_header_input)
     }
     fn must_get_valid_element(
         &self,
         must_get_valid_element_input: MustGetValidElementInput,
     ) -> ExternResult<Element> {
-        HostIdk::new().must_get_valid_element(must_get_valid_element_input)
+        HostHdi::new().must_get_valid_element(must_get_valid_element_input)
     }
     fn dna_info(&self, _: ()) -> ExternResult<DnaInfo> {
-        HostIdk::new().dna_info(())
+        HostHdi::new().dna_info(())
     }
     fn zome_info(&self, _: ()) -> ExternResult<ZomeInfo> {
-        HostIdk::new().zome_info(())
+        HostHdi::new().zome_info(())
     }
     fn x_salsa20_poly1305_decrypt(
         &self,
         x_salsa20_poly1305_decrypt: XSalsa20Poly1305Decrypt,
     ) -> ExternResult<Option<XSalsa20Poly1305Data>> {
-        HostIdk::new().x_salsa20_poly1305_decrypt(x_salsa20_poly1305_decrypt)
+        HostHdi::new().x_salsa20_poly1305_decrypt(x_salsa20_poly1305_decrypt)
     }
     fn x_25519_x_salsa20_poly1305_decrypt(
         &self,
         x_25519_x_salsa20_poly1305_decrypt: X25519XSalsa20Poly1305Decrypt,
     ) -> ExternResult<Option<XSalsa20Poly1305Data>> {
-        HostIdk::new().x_25519_x_salsa20_poly1305_decrypt(x_25519_x_salsa20_poly1305_decrypt)
+        HostHdi::new().x_25519_x_salsa20_poly1305_decrypt(x_25519_x_salsa20_poly1305_decrypt)
     }
 }
 
@@ -510,7 +511,12 @@ pub fn set_hdk<H: 'static>(hdk: H)
 where
     H: HdkT,
 {
+    let hdk = Rc::new(hdk);
+    let hdk2 = hdk.clone();
     HDK.with(|h| {
-        *h.borrow_mut() = Box::new(hdk);
+        *h.borrow_mut() = hdk2;
+    });
+    holochain_deterministic_integrity::hdi::HDI.with(|h| {
+        *h.borrow_mut() = hdk;
     });
 }

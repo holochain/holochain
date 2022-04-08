@@ -5,7 +5,8 @@ members = [
   "crates/hdk",
   "crates/hdk_derive",
   "crates/holo_hash",
-  "crates/idk",
+  "crates/holochain_deterministic_integrity",
+  "crates/mock_hdi",
   "crates/mr_bundle",
 
   "crates/holochain_integrity_types",
@@ -38,7 +39,6 @@ members = [
   "crates/kitsune_p2p/transport_quic",
   "crates/kitsune_p2p/types",
 
-  "crates/test_utils/mock_idk",
   "crates/test_utils/wasm",
   "crates/test_utils/wasm_common",
 ]

@@ -1,5 +1,5 @@
 use crate::prelude::*;
-pub use idk::x_salsa20_poly1305::*;
+pub use holochain_deterministic_integrity::x_salsa20_poly1305::*;
 
 /// Generate a new x25519 keypair in lair from entropy.
 /// Only the pubkey is returned from lair because the secret key never leaves lair.

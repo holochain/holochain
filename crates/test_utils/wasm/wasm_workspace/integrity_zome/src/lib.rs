@@ -1,4 +1,4 @@
-use idk::prelude::*;
+use holochain_deterministic_integrity::prelude::*;
 
 #[hdk_entry(
     id = "post",
@@ -23,6 +23,16 @@ pub struct Msg(pub String);
 pub struct PrivMsg(pub String);
 
 entry_defs![Post::entry_def(), Msg::entry_def(), PrivMsg::entry_def()];
+
+#[hdk_extern]
+fn genesis_self_check(data: GenesisSelfCheckData) -> ExternResult<ValidateCallbackResult> {
+    let GenesisSelfCheckData {
+        dna_info: _,
+        membrane_proof: _,
+        agent_key: _,
+    } = data;
+    Ok(ValidateCallbackResult::Valid)
+}
 
 #[hdk_extern]
 fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
@@ -55,27 +65,27 @@ fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
 
 #[hdk_extern]
 fn call_verify_signature(verify_signature: VerifySignature) -> ExternResult<bool> {
-    IDK.with(|i| i.borrow().verify_signature(verify_signature))
+    HDI.with(|i| i.borrow().verify_signature(verify_signature))
 }
 #[hdk_extern]
 fn call_hash(hash_input: HashInput) -> ExternResult<HashOutput> {
-    IDK.with(|i| i.borrow().hash(hash_input))
+    HDI.with(|i| i.borrow().hash(hash_input))
 }
 #[hdk_extern]
 fn call_must_get_entry(must_get_entry_input: MustGetEntryInput) -> ExternResult<EntryHashed> {
-    IDK.with(|i| i.borrow().must_get_entry(must_get_entry_input))
+    HDI.with(|i| i.borrow().must_get_entry(must_get_entry_input))
 }
 #[hdk_extern]
 fn call_must_get_header(
     must_get_header_input: MustGetHeaderInput,
 ) -> ExternResult<SignedHeaderHashed> {
-    IDK.with(|i| i.borrow().must_get_header(must_get_header_input))
+    HDI.with(|i| i.borrow().must_get_header(must_get_header_input))
 }
 #[hdk_extern]
 fn call_must_get_valid_element(
     must_get_valid_element_input: MustGetValidElementInput,
 ) -> ExternResult<Element> {
-    IDK.with(|i| {
+    HDI.with(|i| {
         i.borrow()
             .must_get_valid_element(must_get_valid_element_input)
     })
@@ -83,24 +93,24 @@ fn call_must_get_valid_element(
 // Info
 #[hdk_extern]
 fn call_dna_info(dna_info_input: ()) -> ExternResult<DnaInfo> {
-    IDK.with(|i| i.borrow().dna_info(dna_info_input))
+    HDI.with(|i| i.borrow().dna_info(dna_info_input))
 }
 #[hdk_extern]
 fn call_zome_info(zome_info_input: ()) -> ExternResult<ZomeInfo> {
-    IDK.with(|i| i.borrow().zome_info(zome_info_input))
+    HDI.with(|i| i.borrow().zome_info(zome_info_input))
 }
 // Trace
 #[cfg(feature = "trace")]
 #[hdk_extern]
 fn call_trace(trace_msg: TraceMsg) -> ExternResult<()> {
-    IDK.with(|i| i.borrow().trace(trace_msg))
+    HDI.with(|i| i.borrow().trace(trace_msg))
 }
 // XSalsa20Poly1305
 #[hdk_extern]
 fn call_x_salsa20_poly1305_decrypt(
     x_salsa20_poly1305_decrypt: XSalsa20Poly1305Decrypt,
 ) -> ExternResult<Option<XSalsa20Poly1305Data>> {
-    IDK.with(|i| {
+    HDI.with(|i| {
         i.borrow()
             .x_salsa20_poly1305_decrypt(x_salsa20_poly1305_decrypt)
     })
@@ -109,7 +119,7 @@ fn call_x_salsa20_poly1305_decrypt(
 fn call_x_25519_x_salsa20_poly1305_decrypt(
     x_25519_x_salsa20_poly1305_decrypt: X25519XSalsa20Poly1305Decrypt,
 ) -> ExternResult<Option<XSalsa20Poly1305Data>> {
-    IDK.with(|i| {
+    HDI.with(|i| {
         i.borrow()
             .x_25519_x_salsa20_poly1305_decrypt(x_25519_x_salsa20_poly1305_decrypt)
     })
@@ -117,27 +127,27 @@ fn call_x_25519_x_salsa20_poly1305_decrypt(
 
 #[cfg(all(test, feature = "mock"))]
 pub mod test {
-    use idk::prelude::holo_hash::DnaHash;
+    use holochain_deterministic_integrity::prelude::holo_hash::DnaHash;
 
     use super::*;
     #[test]
-    fn test_all_idk() {
-        let mut mock_idk = holochain_mock_idk::MockIdkT::new();
+    fn test_all_holochain_deterministic_integrity() {
+        let mut mock_hdi = holochain_mock_hdi::MockHdiT::new();
         let empty_agent_key = AgentPubKey::from_raw_36(vec![0u8; 36]);
         let empty_header_hash = HeaderHash::from_raw_36(vec![0u8; 36]);
         let empty_dna_hash = DnaHash::from_raw_36(vec![0u8; 36]);
 
-        mock_idk
+        mock_hdi
             .expect_verify_signature()
             .once()
             .returning(|_| Ok(true));
 
-        mock_idk.expect_hash().once().returning({
+        mock_hdi.expect_hash().once().returning({
             let empty_agent_key = empty_agent_key.clone();
             move |_| Ok(HashOutput::Entry(empty_agent_key.clone().into()))
         });
 
-        mock_idk.expect_must_get_entry().once().returning({
+        mock_hdi.expect_must_get_entry().once().returning({
             let empty_agent_key = empty_agent_key.clone();
             move |_| {
                 Ok(EntryHashed::with_pre_hashed(
@@ -159,17 +169,17 @@ pub mod test {
             Signature([0u8; 64]),
         );
 
-        mock_idk.expect_must_get_header().once().returning({
+        mock_hdi.expect_must_get_header().once().returning({
             let dna = dna.clone();
             move |_| Ok(dna.clone())
         });
 
-        mock_idk.expect_must_get_valid_element().once().returning({
+        mock_hdi.expect_must_get_valid_element().once().returning({
             let dna = dna.clone();
             move |_| Ok(Element::new(dna.clone(), None))
         });
 
-        mock_idk.expect_dna_info().once().returning({
+        mock_hdi.expect_dna_info().once().returning({
             let empty_dna_hash = empty_dna_hash.clone();
             move |_| {
                 Ok(DnaInfo {
@@ -181,7 +191,7 @@ pub mod test {
             }
         });
 
-        mock_idk.expect_zome_info().once().returning({
+        mock_hdi.expect_zome_info().once().returning({
             move |_| {
                 Ok(ZomeInfo {
                     name: "".to_string().into(),
@@ -193,7 +203,7 @@ pub mod test {
             }
         });
 
-        set_idk(mock_idk);
+        set_hdi(mock_hdi);
 
         call_verify_signature(VerifySignature {
             key: empty_agent_key.clone(),

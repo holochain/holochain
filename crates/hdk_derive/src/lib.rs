@@ -99,7 +99,7 @@ impl quote::ToTokens for EntryDefId {
         match &self.0 {
             holochain_integrity_types::entry_def::EntryDefId::App(s) => {
                 tokens.append_all(quote::quote! {
-                    idk::prelude::EntryDefId::App(String::from(#s))
+                    holochain_deterministic_integrity::prelude::EntryDefId::App(String::from(#s))
                 });
             }
             _ => unreachable!(),
@@ -111,7 +111,7 @@ impl quote::ToTokens for RequiredValidations {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let u = <u8>::from(self.0);
         tokens.append_all(quote::quote! {
-            idk::prelude::RequiredValidations::from(#u)
+            holochain_deterministic_integrity::prelude::RequiredValidations::from(#u)
         });
     }
 }
@@ -126,7 +126,7 @@ impl quote::ToTokens for EntryVisibility {
             proc_macro2::Span::call_site(),
         );
         tokens.append_all(quote::quote! {
-            idk::prelude::EntryVisibility::#variant
+            holochain_deterministic_integrity::prelude::EntryVisibility::#variant
         });
     }
 }
@@ -143,7 +143,7 @@ impl quote::ToTokens for RequiredValidationType {
             proc_macro2::Span::call_site(),
         );
         tokens.append_all(quote::quote! {
-            idk::prelude::RequiredValidationType::#variant
+            holochain_deterministic_integrity::prelude::RequiredValidationType::#variant
         });
     }
 }
@@ -156,7 +156,7 @@ impl quote::ToTokens for EntryDef {
         let required_validation_type = RequiredValidationType(self.0.required_validation_type);
 
         tokens.append_all(quote::quote! {
-            idk::prelude::EntryDef {
+            holochain_deterministic_integrity::prelude::EntryDef {
                 id: #id,
                 visibility: #visibility,
                 required_validations: #required_validations,
@@ -178,9 +178,9 @@ pub fn hdk_entry(attrs: TokenStream, code: TokenStream) -> TokenStream {
     let entry_def = syn::parse_macro_input!(attrs as EntryDef);
 
     (quote::quote! {
-        #[derive(serde::Serialize, serde::Deserialize, idk::prelude::SerializedBytes, std::fmt::Debug)]
+        #[derive(serde::Serialize, serde::Deserialize, holochain_deterministic_integrity::prelude::SerializedBytes, std::fmt::Debug)]
         #item
-        idk::prelude::entry_def!(#struct_ident #entry_def);
+        holochain_deterministic_integrity::prelude::entry_def!(#struct_ident #entry_def);
     })
     .into()
 }

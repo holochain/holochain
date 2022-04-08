@@ -34,6 +34,7 @@ use holochain_state::prelude::SourceChainResult;
 use holochain_state::prelude::StateQueryResult;
 use holochain_state::source_chain;
 use holochain_state::test_utils::fresh_reader_test;
+use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 use kitsune_p2p::KitsuneP2pConfig;
@@ -788,7 +789,16 @@ pub async fn fake_genesis_for_agent(
     let dna = fake_dna_file("cool dna");
     let dna_hash = dna.dna_hash().clone();
 
-    source_chain::genesis(vault, dht_db, keystore, dna_hash, agent, None).await
+    source_chain::genesis(
+        vault,
+        dht_db.clone(),
+        &DhtDbQueryCache::new(dht_db.clone().into()),
+        keystore,
+        dna_hash,
+        agent,
+        None,
+    )
+    .await
 }
 
 /// Force all dht ops without enough validation receipts to be published.

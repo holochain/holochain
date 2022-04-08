@@ -24,7 +24,7 @@ use crate::prelude::*;
 /// - Callbacks will return early with `UnresolvedDependencies`
 /// - Zome calls will receive a `WasmError` from the host
 pub fn must_get_entry(entry_hash: EntryHash) -> ExternResult<EntryHashed> {
-    IDK.with(|h| {
+    HDI.with(|h| {
         h.borrow()
             .must_get_entry(MustGetEntryInput::new(entry_hash))
     })
@@ -51,7 +51,7 @@ pub fn must_get_entry(entry_hash: EntryHash) -> ExternResult<EntryHashed> {
 /// - Callbacks will return early with `UnresolvedDependencies`
 /// - Zome calls will receive a `WasmError` from the host
 pub fn must_get_header(header_hash: HeaderHash) -> ExternResult<SignedHeaderHashed> {
-    IDK.with(|h| {
+    HDI.with(|h| {
         h.borrow()
             .must_get_header(MustGetHeaderInput::new(header_hash))
     })
@@ -97,7 +97,7 @@ pub fn must_get_header(header_hash: HeaderHash) -> ExternResult<SignedHeaderHash
 /// - Callbacks will return early with `UnresolvedDependencies`
 /// - Zome calls will receive a `WasmError` from the host
 pub fn must_get_valid_element(header_hash: HeaderHash) -> ExternResult<Element> {
-    IDK.with(|h| {
+    HDI.with(|h| {
         h.borrow()
             .must_get_valid_element(MustGetValidElementInput::new(header_hash))
     })
@@ -342,13 +342,13 @@ macro_rules! register_entry {
 /// On the other hand, EntryDef::from(Foo::new()) works better when e.g. using create_entry() as
 /// an instance of Foo already exists and we need the entry def id back for creates and updates.
 ///
-/// If you don't want to use the macro you can simply implement similar fns youself.
+/// If you don't want to use the macro you can simply implement similar fns yourself.
 ///
 /// This is not a trait at the moment, it could be in the future but for now these functions and
 /// impls are just a loose set of conventions.
 ///
 /// It's actually entirely possible to interact with core directly without any of these.
-/// e.g. [`create_entry`] is just building a tuple of [`EntryDefId`] and [`Entry::App`] under the hood.
+/// e.g. committing is just building a tuple of [`EntryDefId`] and [`Entry::App`] under the hood.
 ///
 /// This requires that TryFrom and TryInto [`derive@SerializedBytes`] is implemented for the entry type,
 /// which implies that [`serde::Serialize`] and [`serde::Deserialize`] is also implemented.
@@ -411,7 +411,7 @@ macro_rules! entry_defs {
 /// The host actually has no idea how to do this mapping, it is provided by the wasm!
 ///
 /// Therefore this is a macro that calls the [`entry_defs!`] callback as defined within a zome directly from the zome.
-/// It is a macro so that we can call a function with a known name `crate::entry_defs` from the IDK before the function is defined.
+/// It is a macro so that we can call a function with a known name `crate::entry_defs` from the HDI before the function is defined.
 ///
 /// Obviously this assumes and requires that a compliant [`entry_defs!`] callback _is_ defined at the root of the crate.
 #[macro_export]
