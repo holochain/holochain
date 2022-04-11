@@ -101,7 +101,7 @@ fn test_multi() {
 #[test]
 fn test_mismatched_powers() {
     let topo = Topology::unit_zero();
-    let gopa = GossipParams::new(1.into(), 0);
+    let gopa = GossipParams::new(1.into(), 1);
     let ts = |t: u32| TimeQuantum::from(t).to_timestamp_bounds(&topo).0;
     let pow = 26;
 
@@ -131,19 +131,19 @@ fn test_mismatched_powers() {
 
     let common = info.common_arqs;
     common.print_arqs(&topo, 64);
-    assert_eq!(common.arqs().len(), 3);
+    assert_eq!(common.arqs().len(), 1);
 
     // There are 3 arqs in the common set, and they have 8, 3, and 1 segments
     // respectively. Therefore, the total number of segments is 12, and the total
     // number of regions sent is 12 * the number of time segments.
-    let num_regions = (8 + 3 + 1) * nt;
+    let num_regions = 8 * nt;
     dbg!(&info.stats);
     assert_eq!(info.stats.regions_sent, num_regions);
     assert_eq!(info.stats.regions_rcvd, num_regions);
-    assert_eq!(info.stats.ops_sent, 2);
-    assert_eq!(info.stats.ops_rcvd, 2);
-    assert_eq!(info.stats.op_data_sent, 123 + 345);
-    assert_eq!(info.stats.op_data_rcvd, 234 + 456);
+    assert_eq!(info.stats.ops_sent, 1);
+    assert_eq!(info.stats.ops_rcvd, 1);
+    assert_eq!(info.stats.op_data_sent, 123);
+    assert_eq!(info.stats.op_data_rcvd, 234);
 }
 
 #[test]
