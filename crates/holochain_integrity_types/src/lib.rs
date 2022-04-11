@@ -36,7 +36,6 @@ pub mod zome;
 #[allow(missing_docs)]
 pub mod zome_io;
 
-#[cfg(feature = "tracing")]
 pub mod trace;
 
 pub use entry::Entry;

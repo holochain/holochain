@@ -153,7 +153,6 @@ mockall::mock! {
         fn dna_info(&self, dna_info_input: ()) -> ExternResult<DnaInfo>;
         fn zome_info(&self, zome_info_input: ()) -> ExternResult<ZomeInfo>;
         // Trace
-        #[cfg(feature = "trace")]
         fn trace(&self, trace_msg: TraceMsg) -> ExternResult<()>;
         // XSalsa20Poly1305
         fn x_salsa20_poly1305_decrypt(
@@ -214,6 +213,10 @@ impl HdiT for ErrHdk {
     }
 
     fn zome_info(&self, _zome_info_input: ()) -> ExternResult<ZomeInfo> {
+        Self::err()
+    }
+
+    fn trace(&self, _: TraceMsg) -> ExternResult<()> {
         Self::err()
     }
 
@@ -372,6 +375,9 @@ impl HdiT for HostHdk {
     }
     fn zome_info(&self, _: ()) -> ExternResult<ZomeInfo> {
         HostHdi::new().zome_info(())
+    }
+    fn trace(&self, m: TraceMsg) -> ExternResult<()> {
+        HostHdi::new().trace(m)
     }
     fn x_salsa20_poly1305_decrypt(
         &self,
