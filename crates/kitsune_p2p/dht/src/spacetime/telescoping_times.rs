@@ -30,10 +30,10 @@ impl TelescopingTimes {
     }
 
     /// Get TelescopingTimes from the origin time up until times less than
-    /// [`RECENT_THRESHOLD`] ago, to be handled by historical gossip.
+    /// `recent_threshold` ago, to be handled by historical gossip.
     /// (Recent gossip will handle everything after the threshold.)
-    pub fn historical(topo: &Topology) -> Self {
-        let threshold = (Timestamp::now() - RECENT_THRESHOLD)
+    pub fn historical(topo: &Topology, recent_threshold: Duration) -> Self {
+        let threshold = (Timestamp::now() - recent_threshold)
             .expect("The system time is set to something unreasonable");
         let time_quantum = TimeQuantum::from_timestamp(topo, threshold);
         Self::new(time_quantum)

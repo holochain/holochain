@@ -1,10 +1,10 @@
 //! This module contains data and functions for running operations
 //! at the level of a [`DnaHash`] space.
 //! Multiple [`Cell`](crate::conductor::Cell)'s could share the same space.
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use holo_hash::{DhtOpHash, DnaHash};
-use holochain_conductor_api::conductor::DatabaseRootPath;
+use holochain_conductor_api::conductor::{ConductorConfig, DatabaseRootPath};
 use holochain_p2p::{
     dht::{
         arq::{power_and_count_from_length, ArqBoundsSet},
@@ -34,7 +34,10 @@ use holochain_types::{
     dht_op::{DhtOp, DhtOpType},
 };
 use holochain_zome_types::{DnaDefHashed, Entry, EntryVisibility, SignedHeader, Timestamp};
-use kitsune_p2p::event::{TimeWindow, TimeWindowInclusive};
+use kitsune_p2p::{
+    event::{TimeWindow, TimeWindowInclusive},
+    KitsuneP2pConfig,
+};
 use rusqlite::named_params;
 use tracing::instrument;
 
@@ -67,6 +70,7 @@ pub struct Spaces {
     pub(crate) queue_consumer_map: QueueConsumerMap,
     pub(crate) conductor_db: DbWrite<DbKindConductor>,
     pub(crate) wasm_db: DbWrite<DbKindWasm>,
+    network_config: KitsuneP2pConfig,
 }
 
 #[derive(Clone)]
@@ -126,10 +130,9 @@ pub struct TestSpace {
 
 impl Spaces {
     /// Create a new empty set of [`DnaHash`] spaces.
-    pub fn new(
-        root_db_dir: DatabaseRootPath,
-        db_sync_strategy: DbSyncStrategy,
-    ) -> ConductorResult<Self> {
+    pub fn new(config: &ConductorConfig) -> ConductorResult<Self> {
+        let root_db_dir = config.environment_path.clone();
+        let db_sync_strategy = config.db_sync_strategy.clone();
         let db_sync_level = match db_sync_strategy {
             DbSyncStrategy::Fast => DbSyncLevel::Off,
             DbSyncStrategy::Resilient => DbSyncLevel::Normal,
@@ -145,6 +148,7 @@ impl Spaces {
             queue_consumer_map: QueueConsumerMap::new(),
             conductor_db,
             wasm_db,
+            network_config: config.network.clone().unwrap_or_default(),
         })
     }
 
@@ -334,7 +338,7 @@ impl Spaces {
                 })
                 .collect(),
         );
-        let times = TelescopingTimes::historical(&topology);
+        let times = TelescopingTimes::historical(&topology, self.recent_threshold());
         let coords = RegionCoordSetLtcs::new(times, arq_set);
         let coords_clone = coords.clone();
         self.authored_db(dna_hash)?
@@ -555,6 +559,15 @@ impl Spaces {
         }
         Ok(())
     }
+
+    /// Get the recent_threshold based on the kitsune network config
+    pub fn recent_threshold(&self) -> Duration {
+        Duration::from_secs(
+            self.network_config
+                .tuning_params
+                .danger_gossip_recent_threshold_secs,
+        )
+    }
 }
 
 impl Space {
@@ -642,7 +655,11 @@ impl TestSpaces {
             .prefix("holochain-test-environments")
             .tempdir()
             .unwrap();
-        let spaces = Spaces::new(temp_dir.path().to_path_buf().into(), Default::default()).unwrap();
+        let spaces = Spaces::new(&ConductorConfig {
+            environment_path: temp_dir.path().to_path_buf().into(),
+            ..Default::default()
+        })
+        .unwrap();
         spaces.map.share_mut(|map| {
             map.extend(
                 test_spaces

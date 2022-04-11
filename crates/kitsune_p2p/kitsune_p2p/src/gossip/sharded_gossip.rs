@@ -15,7 +15,6 @@ use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::codec::Codec;
 use kitsune_p2p_types::combinators::second;
 use kitsune_p2p_types::config::*;
-use kitsune_p2p_types::dht::prelude::RECENT_THRESHOLD;
 use kitsune_p2p_types::dht::region_set::RegionSetLtcs;
 use kitsune_p2p_types::dht_arc::{DhtArcRange, DhtArcSet};
 use kitsune_p2p_types::metrics::*;
@@ -568,13 +567,14 @@ impl ShardedGossipLocal {
     /// Calculate the time range for a gossip round.
     fn calculate_time_range(&self) -> TimeWindow {
         const NOW: Duration = Duration::from_secs(0);
+        let threshold = Duration::from_secs(self.tuning_params.danger_gossip_recent_threshold_secs);
         match self.gossip_type {
-            GossipType::Recent => time_range(RECENT_THRESHOLD, NOW),
+            GossipType::Recent => time_range(threshold, NOW),
             GossipType::Historical => {
                 let one_hour_ago = std::time::UNIX_EPOCH
                     .elapsed()
                     .expect("Your clock is set before unix epoch")
-                    - RECENT_THRESHOLD;
+                    - threshold;
                 Timestamp::from_micros(0)
                     ..Timestamp::from_micros(
                         one_hour_ago

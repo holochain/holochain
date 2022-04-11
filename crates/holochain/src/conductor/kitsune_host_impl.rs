@@ -12,18 +12,28 @@ use holochain_types::{db::PermittedConn, prelude::DnaError, share::RwShare};
 use kitsune_p2p::{
     agent_store::AgentInfoSigned, event::GetAgentInfoSignedEvt, KitsuneHost, KitsuneHostResult,
 };
+use kitsune_p2p_types::config::KitsuneP2pTuningParams;
 
 /// Implementation of the Kitsune Host API.
 /// Lets Kitsune make requests of Holochain
 pub struct KitsuneHostImpl {
     spaces: Spaces,
     dna_store: RwShare<DnaStore>,
+    tuning_params: KitsuneP2pTuningParams,
 }
 
 impl KitsuneHostImpl {
     /// Constructor
-    pub fn new(spaces: Spaces, dna_store: RwShare<DnaStore>) -> Arc<Self> {
-        Arc::new(Self { spaces, dna_store })
+    pub fn new(
+        spaces: Spaces,
+        dna_store: RwShare<DnaStore>,
+        tuning_params: KitsuneP2pTuningParams,
+    ) -> Arc<Self> {
+        Arc::new(Self {
+            spaces,
+            dna_store,
+            tuning_params,
+        })
     }
 }
 
@@ -90,7 +100,10 @@ impl KitsuneHost for KitsuneHostImpl {
         async move {
             let topology = self.get_topology(space.clone()).await?;
             let db = self.spaces.authored_db(&dna_hash)?;
-            Ok(query_region_set::query_region_set(db, topology, dht_arc_set).await?)
+            Ok(
+                query_region_set::query_region_set(db, topology, dht_arc_set, &self.tuning_params)
+                    .await?,
+            )
         }
         .boxed()
         .into()

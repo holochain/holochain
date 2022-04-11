@@ -1462,18 +1462,13 @@ mod builder {
                 }
             };
 
-            let env_path = self.config.environment_path.clone();
-
             let Self {
                 dna_store, config, ..
             } = self;
 
             let dna_store = RwShare::new(dna_store);
 
-            let network_config = match &config.network {
-                None => holochain_p2p::kitsune_p2p::KitsuneP2pConfig::default(),
-                Some(config) => config.clone(),
-            };
+            let network_config = config.network.clone().unwrap_or_default();
             let (cert_digest, cert, cert_priv_key) =
                 keystore.get_or_create_first_tls_cert().await?;
             let tls_config =
@@ -1483,8 +1478,12 @@ mod builder {
                     cert_digest,
                 };
 
-            let spaces = Spaces::new(env_path, config.db_sync_strategy)?;
-            let host = KitsuneHostImpl::new(spaces.clone(), dna_store.clone());
+            let spaces = Spaces::new(&config)?;
+            let host = KitsuneHostImpl::new(
+                spaces.clone(),
+                dna_store.clone(),
+                network_config.tuning_params.clone(),
+            );
 
             let (holochain_p2p, p2p_evt) =
                 holochain_p2p::spawn_holochain_p2p(network_config, tls_config, host).await?;
@@ -1640,15 +1639,16 @@ mod builder {
             let keystore = self.keystore.unwrap_or_else(test_keystore);
             self.config.environment_path = env_path.to_path_buf().into();
 
-            let spaces = Spaces::new(
-                self.config.environment_path.clone(),
-                self.config.db_sync_strategy,
-            )?;
+            let spaces = Spaces::new(&self.config)?;
+
+            let network_config = self.config.network.clone().unwrap_or_default();
+            let tuning_params = network_config.tuning_params.clone();
+
             let dna_store = RwShare::new(self.dna_store);
-            let host = KitsuneHostImpl::new(spaces.clone(), dna_store.clone());
+            let host = KitsuneHostImpl::new(spaces.clone(), dna_store.clone(), tuning_params);
 
             let (holochain_p2p, p2p_evt) =
-                holochain_p2p::spawn_holochain_p2p(self.config.network.clone().unwrap_or_default(), holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_types::tls::TlsConfig::new_ephemeral().await.unwrap(), host)
+                holochain_p2p::spawn_holochain_p2p(network_config, holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_types::tls::TlsConfig::new_ephemeral().await.unwrap(), host)
                     .await?;
 
             let (post_commit_sender, post_commit_receiver) =

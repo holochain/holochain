@@ -14,7 +14,6 @@ use holochain_sqlite::prelude::*;
 use holochain_state::prelude::StateMutationResult;
 use holochain_state::prelude::StateQueryResult;
 use holochain_zome_types::CellId;
-use kitsune_p2p::KitsuneBinType;
 use std::sync::Arc;
 use thiserror::Error;
 
