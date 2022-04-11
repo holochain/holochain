@@ -91,12 +91,12 @@ impl From<&str> for HolochainP2pError {
     }
 }
 
-/// Turn an [AgentKey] into a [KitsuneAgent]
+/// Turn an [`AgentKey`](holo_hash::AgentPubKey) into a [`KitsuneAgent`](kitsune_p2p::KitsuneAgent)
 pub fn agent_holo_to_kit(a: holo_hash::AgentPubKey) -> kitsune_p2p::KitsuneAgent {
     a.into_kitsune_raw()
 }
 
-/// Turn a [DnaHash] into a [KitsuneSpace]
+/// Turn a [`DnaHash`](holo_hash::DnaHash) into a [`KitsuneSpace`](kitsune_p2p::KitsuneSpace)
 pub fn space_holo_to_kit(d: holo_hash::DnaHash) -> kitsune_p2p::KitsuneSpace {
     d.into_kitsune_raw()
 }
