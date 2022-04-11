@@ -407,6 +407,7 @@ pub fn insert_header(
     let header = header.header();
     let signed_header = SignedHeaderRef(header, signature);
     let header_type = header.header_type();
+    let header_type = header_type.as_sql();
     let header_seq = header.header_seq();
     let author = header.author().clone();
     let prev_hash = header.prev_header().cloned();
@@ -419,7 +420,7 @@ pub fn insert_header(
         Header::CreateLink(create_link) => {
             sql_insert!(txn, Header, {
                 "hash": hash,
-                "type": header_type ,
+                "type": header_type,
                 "seq": header_seq,
                 "author": author,
                 "prev_hash": prev_hash,
@@ -432,7 +433,7 @@ pub fn insert_header(
         Header::DeleteLink(delete_link) => {
             sql_insert!(txn, Header, {
                 "hash": hash,
-                "type": header_type ,
+                "type": header_type,
                 "seq": header_seq,
                 "author": author,
                 "prev_hash": prev_hash,
@@ -443,12 +444,12 @@ pub fn insert_header(
         Header::Create(create) => {
             sql_insert!(txn, Header, {
                 "hash": hash,
-                "type": header_type ,
+                "type": header_type,
                 "seq": header_seq,
                 "author": author,
                 "prev_hash": prev_hash,
                 "entry_hash": create.entry_hash,
-                "entry_type": create.entry_type,
+                "entry_type": create.entry_type.as_sql(),
                 "private_entry": private,
                 "blob": to_blob(&signed_header)?,
             })?;
@@ -456,7 +457,7 @@ pub fn insert_header(
         Header::Delete(delete) => {
             sql_insert!(txn, Header, {
                 "hash": hash,
-                "type": header_type ,
+                "type": header_type,
                 "seq": header_seq,
                 "author": author,
                 "prev_hash": prev_hash,
@@ -468,12 +469,12 @@ pub fn insert_header(
         Header::Update(update) => {
             sql_insert!(txn, Header, {
                 "hash": hash,
-                "type": header_type ,
+                "type": header_type,
                 "seq": header_seq,
                 "author": author,
                 "prev_hash": prev_hash,
                 "entry_hash": update.entry_hash,
-                "entry_type": update.entry_type,
+                "entry_type": update.entry_type.as_sql(),
                 "original_entry_hash": update.original_entry_address,
                 "original_header_hash": update.original_header_address,
                 "private_entry": private,
@@ -487,7 +488,7 @@ pub fn insert_header(
         | Header::CloseChain(_) => {
             sql_insert!(txn, Header, {
                 "hash": hash,
-                "type": header_type ,
+                "type": header_type,
                 "seq": header_seq,
                 "author": author,
                 "prev_hash": prev_hash,

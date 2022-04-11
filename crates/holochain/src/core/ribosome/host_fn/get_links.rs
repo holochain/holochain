@@ -82,8 +82,6 @@ pub fn get_links<'a>(
 #[cfg(feature = "slow_tests")]
 pub mod slow_tests {
     use crate::core::ribosome::wasm_test::RibosomeTestFixture;
-    use crate::test_utils::wait_for_integration_1m;
-    use crate::test_utils::WaitOps;
     use hdk::prelude::*;
     use holochain_test_wasm_common::*;
     use holochain_wasm_test_utils::TestWasm;
@@ -277,21 +275,12 @@ pub mod slow_tests {
     async fn dup_path_test() {
         observability::test_run().ok();
         let RibosomeTestFixture {
-            conductor,
-            alice,
-            alice_host_fn_caller,
-            ..
+            conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::Link).await;
 
         for _ in 0..2 {
             let _result: () = conductor.call(&alice, "commit_existing_path", ()).await;
         }
-
-        let mut expected_count = WaitOps::start() + WaitOps::path(1);
-        // Plus one length path for the commit existing.
-        expected_count += WaitOps::ENTRY + WaitOps::LINK;
-
-        wait_for_integration_1m(&alice_host_fn_caller.dht_db, expected_count).await;
 
         let links: Vec<hdk::prelude::Link> = conductor.call(&alice, "get_long_path", ()).await;
         assert_eq!(links.len(), 1);

@@ -52,14 +52,12 @@ pub mod test {
                 EntryDef {
                     id: "post".into(),
                     visibility: Default::default(),
-                    crdt_type: Default::default(),
                     required_validations: Default::default(),
                     required_validation_type: Default::default(),
                 },
                 EntryDef {
                     id: "comment".into(),
                     visibility: EntryVisibility::Private,
-                    crdt_type: Default::default(),
                     required_validations: Default::default(),
                     required_validation_type: Default::default(),
                 }

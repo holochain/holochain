@@ -443,7 +443,7 @@ impl From<&ZomeCallHostAccess> for HostFnAccess {
 /// Interface for a Ribosome. Currently used only for mocking, as our only
 /// real concrete type is [`RealRibosome`](crate::core::ribosome::real_ribosome::RealRibosome)
 #[automock]
-pub trait RibosomeT: Sized + std::fmt::Debug {
+pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
     fn dna_def(&self) -> &DnaDefHashed;
 
     fn zome_info(&self, zome: Zome) -> RibosomeResult<ZomeInfo>;

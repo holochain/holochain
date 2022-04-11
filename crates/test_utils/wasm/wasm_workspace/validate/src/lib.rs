@@ -39,7 +39,6 @@ impl From<&ThisWasmEntry> for EntryDef {
     fn from(entry: &ThisWasmEntry) -> Self {
         Self {
             id: entry.into(),
-            crdt_type: entry.into(),
             required_validations: entry.into(),
             visibility: entry.into(),
             required_validation_type: Default::default(),
@@ -139,7 +138,7 @@ fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
 }
 
 fn _commit_validate(to_commit: ThisWasmEntry) -> ExternResult<HeaderHash> {
-    create_entry(&to_commit)
+    create((&to_commit).try_into()?)
 }
 
 #[hdk_extern]
