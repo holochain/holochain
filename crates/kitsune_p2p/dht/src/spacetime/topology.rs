@@ -178,18 +178,12 @@ pub struct GossipParams {
     /// What +/- coordinate offset will you accept for timestamps?
     /// e.g. if the time quantum is 5 min,
     /// a time buffer of 2 will allow +/- 10 min.
-    ///
-    /// This, along with `max_space_power_offset`, determines what range of
-    /// region resolution gets stored in the 2D Fenwick tree
     pub max_time_offset: TimeQuantum,
 
     /// What difference in power will you accept for other agents' Arqs?
-    /// e.g. if the power I use in my arq is 22, and this offset is 2,
+    /// e.g. if the power I use in my arq is 16, and this offset is 2,
     /// I won't talk to anyone whose arq is expressed with a power lower
-    /// than 20 or greater than 24
-    ///
-    /// This, along with `max_time_offset`, determines what range of
-    /// region resolution gets stored in the 2D Fenwick tree
+    /// than 14 or greater than 18.
     pub max_space_power_offset: u8,
 }
 

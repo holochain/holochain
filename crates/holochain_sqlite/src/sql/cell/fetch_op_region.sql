@@ -1,7 +1,7 @@
 SELECT
   COUNT() AS count,
   SUM(LENGTH(Header.blob) + LENGTH(Entry.blob)) AS blobsize,
-  REDUCE_XOR(hash) AS xor_hash,
+  REDUCE_XOR(hash) AS xor_hash
 FROM
   DhtOp
   JOIN Header ON DhtOp.header_hash = Header.hash
