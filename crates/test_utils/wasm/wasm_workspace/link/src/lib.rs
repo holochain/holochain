@@ -55,40 +55,40 @@ fn delete_link(input: HeaderHash) -> ExternResult<HeaderHash> {
 
 #[hdk_extern]
 fn get_links(_: ()) -> ExternResult<Vec<Link>> {
-    hdk::prelude::get_links(base()?, None)
+    hdk::prelude::get_links(base()?, None, None)
 }
 
 #[hdk_extern]
 fn get_baseless_links(_: ()) -> ExternResult<Vec<Link>> {
-    hdk::prelude::get_links(baseless()?, None)
+    hdk::prelude::get_links(baseless()?, None, None)
 }
 
 #[hdk_extern]
 fn get_external_links(_: ()) -> ExternResult<Vec<Link>> {
-    hdk::prelude::get_links(external()?, None)
+    hdk::prelude::get_links(external()?, None, None)
 }
 
 #[hdk_extern]
 fn get_link_details(_: ()) -> ExternResult<LinkDetails> {
-    hdk::prelude::get_link_details(base()?, None)
+    hdk::prelude::get_link_details(base()?, None, None)
 }
 
 #[hdk_extern]
 fn get_back_links(_: ()) -> ExternResult<Vec<Link>> {
-    hdk::prelude::get_links(target()?, None)
+    hdk::prelude::get_links(target()?, None, None)
 }
 
 #[hdk_extern]
 fn get_back_link_details(_: ()) -> ExternResult<LinkDetails> {
-    hdk::prelude::get_link_details(target()?, None)
+    hdk::prelude::get_link_details(target()?, None, None)
 }
 
 #[hdk_extern]
 fn get_links_bidi(_: ()) -> ExternResult<Vec<Vec<Link>>> {
     HDK.with(|h| {
         h.borrow().get_links(vec![
-            GetLinksInput::new(base()?, None),
-            GetLinksInput::new(target()?, None),
+            GetLinksInput::new(base()?, None, None),
+            GetLinksInput::new(target()?, None, None),
         ])
     })
 }
@@ -97,15 +97,15 @@ fn get_links_bidi(_: ()) -> ExternResult<Vec<Vec<Link>>> {
 fn get_link_details_bidi(_: ()) -> ExternResult<Vec<LinkDetails>> {
     HDK.with(|h| {
         h.borrow().get_link_details(vec![
-            GetLinksInput::new(base()?, None),
-            GetLinksInput::new(target()?, None),
+            GetLinksInput::new(base()?, None, None),
+            GetLinksInput::new(target()?, None, None),
         ])
     })
 }
 
 #[hdk_extern]
 fn delete_all_links(_: ()) -> ExternResult<()> {
-    for link in hdk::prelude::get_links(base()?, None)? {
+    for link in hdk::prelude::get_links(base()?, None, None)? {
         hdk::prelude::delete_link(link.create_link_hash)?;
     }
     Ok(())

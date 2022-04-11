@@ -21,25 +21,28 @@ pub fn get_link_details<'a>(
             ..
         } => {
             let results: Vec<Result<Vec<_>, _>> = tokio_helper::block_forever_on(async move {
-                join_all(inputs.into_iter().map(|input| async {
+                join_all(inputs.into_iter().map(|input| {
                     let GetLinksInput {
                         base_address,
+                        link_type,
                         tag_prefix,
                     } = input;
                     let zome_id = ribosome
                         .zome_to_id(&call_context.zome)
                         .expect("Failed to get ID for current zome.");
+                    let workspace = call_context.host_context.workspace();
+                    let network = call_context.host_context.network().to_owned();
                     let key = WireLinkKey {
                         base: base_address,
                         zome_id,
+                        link_type,
                         tag: tag_prefix,
                     };
-                    Cascade::from_workspace_network(
-                        &call_context.host_context.workspace(),
-                        call_context.host_context.network().to_owned(),
-                    )
-                    .get_link_details(key, GetLinksOptions::default())
-                    .await
+                    async move {
+                        Cascade::from_workspace_network(&workspace, network)
+                            .get_link_details(key, GetLinksOptions::default())
+                            .await
+                    }
                 }))
                 .await
             });
@@ -66,10 +69,10 @@ pub fn get_link_details<'a>(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod slow_tests {
+    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::element::SignedHeaderHashed;
     use holochain_zome_types::Header;
-    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_entry_hash_path_children_details() {
@@ -113,8 +116,9 @@ pub mod slow_tests {
 
         let to_remove_hash = to_remove.as_hash().clone();
 
-        let _remove_hash: holo_hash::HeaderHash =
-            conductor.call(&alice, "delete_link", to_remove_hash.clone()).await;
+        let _remove_hash: holo_hash::HeaderHash = conductor
+            .call(&alice, "delete_link", to_remove_hash.clone())
+            .await;
 
         let children_details_output_2: holochain_zome_types::link::LinkDetails = conductor
             .call(&alice, "children_details", "foo".to_string())

@@ -569,6 +569,7 @@ mod tests {
         let link_key = WireLinkKey {
             base: hash.into(),
             zome_id: 0.into(),
+            link_type: None,
             tag: None,
         };
 

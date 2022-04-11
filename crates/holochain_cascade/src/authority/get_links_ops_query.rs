@@ -13,6 +13,7 @@ use holochain_zome_types::HasValidationStatus;
 use holochain_zome_types::Header;
 use holochain_zome_types::Judged;
 use holochain_zome_types::LinkTag;
+use holochain_zome_types::LinkType;
 use holochain_zome_types::SignedHeader;
 use holochain_zome_types::ZomeId;
 
@@ -22,6 +23,7 @@ use super::WireLinkKey;
 pub struct GetLinksOpsQuery {
     base: Arc<AnyLinkableHash>,
     zome_id: ZomeId,
+    link_type: Option<Arc<LinkType>>,
     tag: Option<Arc<LinkTag>>,
 }
 
@@ -30,6 +32,7 @@ impl GetLinksOpsQuery {
         Self {
             base: Arc::new(key.base),
             zome_id: key.zome_id,
+            link_type: key.link_type.map(Arc::new),
             tag: key.tag.map(Arc::new),
         }
     }
@@ -62,7 +65,7 @@ impl Query for GetLinksOpsQuery {
         let sub_create = "
             SELECT Header.hash FROM DhtOp
         ";
-        let common = "
+        let mut common_query: String = "
             JOIN Header On DhtOp.header_hash = Header.hash
             WHERE DhtOp.type = :create
             AND
@@ -71,21 +74,26 @@ impl Query for GetLinksOpsQuery {
             Header.zome_id = :zome_id
             AND
             DhtOp.when_integrated IS NOT NULL
-        ";
-        let common_query = match &self.tag {
-            Some(tag) => {
-                let tag = Self::tag_to_hex(tag.as_ref());
-                format!(
-                    "
-                    {}
-                    AND
-                    HEX(Header.tag) LIKE '{}%'
-                ",
-                    common, tag
-                )
-            }
-            None => common.into(),
-        };
+        "
+        .to_string();
+        if let Some(tag) = &self.tag {
+            common_query.push_str(&format!(
+                "
+            AND
+            HEX(Header.tag) LIKE '{}%'
+            ",
+                Self::tag_to_hex(tag.as_ref())
+            ));
+        }
+        if let Some(link_type) = &self.link_type {
+            common_query.push_str(&format!(
+                "
+            AND
+            Header.link_type = {}
+            ",
+                link_type.into_inner()
+            ));
+        }
         let create_query = format!("{}{}", create, common_query);
         let sub_create_query = format!("{}{}", sub_create, common_query);
         let delete_query = format!(

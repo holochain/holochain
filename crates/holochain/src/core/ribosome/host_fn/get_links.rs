@@ -24,9 +24,10 @@ pub fn get_links<'a>(
             ..
         } => {
             let results: Vec<Result<Vec<Link>, _>> = tokio_helper::block_forever_on(async move {
-                futures::stream::iter(inputs.into_iter().map(|input| async {
+                futures::stream::iter(inputs.into_iter().map(|input| {
                     let GetLinksInput {
                         base_address,
+                        link_type,
                         tag_prefix,
                     } = input;
                     let zome_id = ribosome
@@ -35,14 +36,16 @@ pub fn get_links<'a>(
                     let key = WireLinkKey {
                         base: base_address,
                         zome_id,
+                        link_type,
                         tag: tag_prefix,
                     };
-                    Cascade::from_workspace_network(
-                        &call_context.host_context.workspace(),
-                        call_context.host_context.network().to_owned(),
-                    )
-                    .dht_get_links(key, GetLinksOptions::default())
-                    .await
+                    let workspace = call_context.host_context.workspace();
+                    let network = call_context.host_context.network().clone();
+                    async move {
+                        Cascade::from_workspace_network(&workspace, network)
+                            .dht_get_links(key, GetLinksOptions::default())
+                            .await
+                    }
                 }))
                 // Limit concurrent calls to 10 as each call
                 // can spawn multiple connections.
@@ -217,10 +220,7 @@ pub mod slow_tests {
         let header_hash: HeaderHash = conductor.call(&alice, "create_baseless_link", ()).await;
         let links: Vec<Link> = conductor.call(&alice, "get_baseless_links", ()).await;
 
-        assert_eq!(
-            links[0].create_link_hash,
-            header_hash
-        );
+        assert_eq!(links[0].create_link_hash, header_hash);
         assert_eq!(
             links[0].target,
             EntryHash::from_raw_32([2_u8; 32].to_vec()).into(),
@@ -234,13 +234,12 @@ pub mod slow_tests {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::Link).await;
 
-        let header_hash: HeaderHash = conductor.call(&alice, "create_external_base_link", ()).await;
+        let header_hash: HeaderHash = conductor
+            .call(&alice, "create_external_base_link", ())
+            .await;
         let links: Vec<Link> = conductor.call(&alice, "get_external_links", ()).await;
 
-        assert_eq!(
-            links[0].create_link_hash,
-            header_hash
-        );
+        assert_eq!(links[0].create_link_hash, header_hash);
     }
 
     #[tokio::test(flavor = "multi_thread")]

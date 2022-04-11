@@ -307,11 +307,12 @@ impl HostFnCaller {
     pub async fn get_links<'env>(
         &self,
         base: AnyLinkableHash,
+        link_type: Option<LinkType>,
         link_tag: Option<LinkTag>,
         _options: GetLinksOptions,
     ) -> Vec<Link> {
         let (ribosome, call_context, workspace_lock) = self.unpack().await;
-        let input = GetLinksInput::new(base, link_tag);
+        let input = GetLinksInput::new(base, link_type, link_tag);
         let output = {
             host_fn::get_links::get_links(ribosome, call_context, vec![input])
                 .unwrap()
@@ -329,11 +330,12 @@ impl HostFnCaller {
     pub async fn get_link_details<'env>(
         &self,
         base: AnyLinkableHash,
-        tag: LinkTag,
+        link_type: Option<LinkType>,
+        tag: Option<LinkTag>,
         _options: GetLinksOptions,
     ) -> Vec<(SignedHeaderHashed, Vec<SignedHeaderHashed>)> {
         let (ribosome, call_context, workspace_lock) = self.unpack().await;
-        let input = GetLinksInput::new(base, Some(tag));
+        let input = GetLinksInput::new(base, link_type, tag);
         let output = {
             host_fn::get_link_details::get_link_details(ribosome, call_context, vec![input])
                 .unwrap()

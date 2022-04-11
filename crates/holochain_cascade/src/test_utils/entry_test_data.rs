@@ -165,11 +165,13 @@ impl EntryTestData {
         let link_key = WireLinkKey {
             base: create_link.base_address.clone(),
             zome_id: create_link.zome_id,
+            link_type: None,
             tag: None,
         };
         let link_key_tag = WireLinkKey {
             base: create_link.base_address.clone(),
             zome_id: create_link.zome_id,
+            link_type: None,
             tag: Some(create_link.tag.clone()),
         };
 

@@ -106,6 +106,8 @@ pub fn delete_link(address: HeaderHash) -> ExternResult<HeaderHash> {
 
 /// Returns all links that reference a base entry hash, optionally filtered by tag.
 ///
+/// Type filtering is according to the byte id for the link type.
+///
 /// Tag filtering is a simple bytes prefix.
 ///
 /// e.g. if you had these links:
@@ -123,11 +125,15 @@ pub fn delete_link(address: HeaderHash) -> ExternResult<HeaderHash> {
 /// deleted c.f. get_link_details that returns all the creates and all the deletes together.
 ///
 /// See [ `get_link_details` ].
-pub fn get_links(base: AnyLinkableHash, link_tag: Option<LinkTag>) -> ExternResult<Vec<Link>> {
+pub fn get_links(
+    base: AnyLinkableHash,
+    link_type: Option<LinkType>,
+    link_tag: Option<LinkTag>,
+) -> ExternResult<Vec<Link>> {
     Ok(HDK
         .with(|h| {
             h.borrow()
-                .get_links(vec![GetLinksInput::new(base, link_tag)])
+                .get_links(vec![GetLinksInput::new(base, link_type, link_tag)])
         })?
         .into_iter()
         .next()
@@ -155,12 +161,13 @@ pub fn get_links(base: AnyLinkableHash, link_tag: Option<LinkTag>) -> ExternResu
 /// See [ `get_links` ].
 pub fn get_link_details(
     base: AnyLinkableHash,
+    link_type: Option<LinkType>,
     link_tag: Option<LinkTag>,
 ) -> ExternResult<LinkDetails> {
     Ok(HDK
         .with(|h| {
             h.borrow()
-                .get_link_details(vec![GetLinksInput::new(base, link_tag)])
+                .get_link_details(vec![GetLinksInput::new(base, link_type, link_tag)])
         })?
         .into_iter()
         .next()

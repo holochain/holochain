@@ -25,6 +25,12 @@ impl LinkType {
     }
 }
 
+impl AsRef<u8> for LinkType {
+    fn as_ref(&self) -> &u8 {
+        &self.0
+    }
+}
+
 /// Opaque tag for the link applied at the app layer, used to differentiate
 /// between different semantics and validation rules for different links
 #[derive(
