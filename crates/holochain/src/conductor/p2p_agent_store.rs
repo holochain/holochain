@@ -197,14 +197,8 @@ pub async fn query_peer_density(
     let arcs: Vec<_> = arcs
         .into_iter()
         .filter_map(|v| {
-            // note: this is what makes PeerView "checked"
-            // TODO: remove this once removing view_unchecked
-            if dht_arc.contains(v.agent.get_loc()) {
-                if v.space == kitsune_space && !is_expired(now, &v) {
-                    Some(v.storage_arc)
-                } else {
-                    None
-                }
+            if v.space == kitsune_space && !is_expired(now, &v) {
+                Some(v.storage_arc)
             } else {
                 None
             }
@@ -212,7 +206,7 @@ pub async fn query_peer_density(
         .collect();
 
     // contains is already checked in the iterator
-    Ok(PeerStrat::default().view_unchecked(topology, dht_arc, arcs.as_slice()))
+    Ok(PeerStrat::default().view(topology, dht_arc, arcs.as_slice()))
 }
 
 /// Put single agent info into store

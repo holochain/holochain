@@ -229,20 +229,10 @@ impl KitsuneP2pEventHandler for AgentHarness {
         dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
     ) -> KitsuneP2pEventHandlerResult<kitsune_p2p_types::dht::PeerView> {
         let strat = PeerStrat::default();
-        let arcs: Vec<_> = self
-            .agent_store
-            .values()
-            .filter_map(|v| {
-                if dht_arc.contains(v.agent.get_loc()) {
-                    Some(v.storage_arc)
-                } else {
-                    None
-                }
-            })
-            .collect();
+        let arcs: Vec<_> = self.agent_store.values().map(|v| v.storage_arc).collect();
 
         // contains is already checked in the iterator
-        let view = strat.view_unchecked(self.topology.clone(), dht_arc, arcs.as_slice());
+        let view = strat.view(self.topology.clone(), dht_arc, arcs.as_slice());
 
         Ok(async move { Ok(view) }.boxed().into())
     }

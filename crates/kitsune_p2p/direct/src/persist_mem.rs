@@ -4,8 +4,7 @@ use crate::types::persist::*;
 use crate::*;
 use futures::future::{BoxFuture, FutureExt};
 use kitsune_p2p::dht::spacetime::Topology;
-use kitsune_p2p::dht_arc::DhtArcSet;
-use kitsune_p2p::dht_arc::DhtLocation;
+use kitsune_p2p::dht_arc::{DhtArcSet, DhtLocation};
 use kitsune_p2p::event::TimeWindow;
 use kitsune_p2p_types::dht::PeerStrat;
 use kitsune_p2p_types::tls::*;
@@ -396,26 +395,20 @@ impl AsKdPersist for PersistMem {
         });
         async move {
             let store = match store {
-                Err(_) => {
-                    return Ok(PeerStrat::default().view_unchecked(topo.clone(), dht_arc, &[]))
-                }
+                Err(_) => return Ok(PeerStrat::default().view(topo.clone(), dht_arc, &[])),
                 Ok(store) => store,
             };
             let arcs: Vec<_> = store
                 .get_all()?
                 .into_iter()
-                .filter_map(|v| {
+                .map(|v| {
                     let loc = DhtLocation::from(v.agent().as_loc());
-                    if dht_arc.contains(loc) {
-                        Some(DhtArc::from_parts(*v.storage_arc(), loc))
-                    } else {
-                        None
-                    }
+                    DhtArc::from_parts(*v.storage_arc(), loc)
                 })
                 .collect();
 
             // contains is already checked in the iterator
-            Ok(PeerStrat::default().view_unchecked(topo, dht_arc, arcs.as_slice()))
+            Ok(PeerStrat::default().view(topo, dht_arc, arcs.as_slice()))
         }
         .boxed()
     }

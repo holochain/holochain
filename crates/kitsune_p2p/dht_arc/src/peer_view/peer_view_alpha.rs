@@ -33,10 +33,6 @@ impl PeerStratAlpha {
             .filter(|a| arc.contains(a.start_loc()))
             .copied()
             .collect();
-        Self::view_unchecked(self, arc, peers.as_slice())
-    }
-
-    pub fn view_unchecked(&self, arc: DhtArc, peers: &[DhtArc]) -> PeerViewAlpha {
         let (total, count) = peers.iter().fold((0u64, 0usize), |(total, count), arc| {
             (total + arc.length(), count + 1)
         });

@@ -38,23 +38,6 @@ impl PeerStrat {
             }
         }
     }
-
-    /// Generate a view using this strategy.
-    /// Assumes that out-of-sight peers have already been filtered out.
-    pub fn view_unchecked(&self, topo: Topology, arc: DhtArc, peers: &[DhtArc]) -> PeerView {
-        match self {
-            Self::Alpha(s) => s.view_unchecked(arc, peers).into(),
-            Self::Beta(s) => s.view_unchecked(arc, peers).into(),
-            Self::Quantized(s) => {
-                // TODO: differentiate checked vs unchecked
-                let peers = peers
-                    .iter()
-                    .map(|p| Arq::from_dht_arc_approximate(&topo, s, p))
-                    .collect();
-                PeerViewQ::new(topo, s.clone(), peers).into()
-            }
-        }
-    }
 }
 
 /// "Arq Resizing Strategy". Defines all parameters necessary to run the arq
