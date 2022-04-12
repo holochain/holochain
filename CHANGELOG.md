@@ -1932,8 +1932,6 @@ This will include the hdk-0.0.100 release.
 
 # 20210226.155101
 
-## Global
-
 This release was initiated for publishing the HDK at version *0.0.100-alpha.1*. We are in the process of redefining the release process around this repository so rough edges are still expected at this point.
 
 ### Added
