@@ -153,7 +153,7 @@ impl HdiT for HostHdi {
             host_call::<TraceMsg, ()>(__trace, trace_msg)
         } else {
             Err(WasmError::Guest(
-                "The tracing feature is off (It is off by default)",
+                "The tracing feature is off (It is off by default)".to_string(),
             ))
         }
     }
