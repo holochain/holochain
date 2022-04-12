@@ -119,7 +119,7 @@ impl FetchOpDataQuery {
                     .map(|h| DhtOpHash::from_kitsune(&h))
                     .collect::<Vec<_>>(),
             ),
-            FetchOpDataEvtQuery::Regions(_coords) => todo!("implement"),
+            FetchOpDataEvtQuery::Regions(coords) => Self::Regions(coords),
         }
     }
 }

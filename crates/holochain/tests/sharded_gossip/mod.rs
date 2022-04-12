@@ -124,7 +124,7 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
         .handle_fetch_op_regions(dna_file.dna(), holochain_p2p::dht_arc::DhtArcSet::Full)
         .await
         .unwrap();
-    dbg!(regions);
+    dbg!(regions.nonzero_regions().collect::<Vec<_>>());
 
     let ops = conductors[0]
         .get_spaces()

@@ -58,6 +58,9 @@ use super::{
 };
 use std::convert::TryInto;
 
+#[cfg(test)]
+mod tests;
+
 #[derive(Clone)]
 /// This is the set of all current
 /// [`DnaHash`] spaces for all cells
