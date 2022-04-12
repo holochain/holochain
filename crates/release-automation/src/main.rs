@@ -100,7 +100,7 @@ pub(crate) mod cli {
         #[structopt(long, default_value = "warn")]
         pub(crate) log_level: log::Level,
 
-        #[structopt(long, default_value = "release_automation=info")]
+        #[structopt(long, default_value = "")]
         pub(crate) log_filters: String,
     }
 
