@@ -1,6 +1,6 @@
 [package]
 name = "holochain_integrity_types"
-version = "0.0.1"
+version = "0.0.2-dev.0"
 description = "Holochain integrity types"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
