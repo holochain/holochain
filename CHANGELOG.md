@@ -6,6 +6,59 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20220412.180516
+
+## [holochain\_cli-0.0.32](crates/holochain_cli/CHANGELOG.md#0.0.32)
+
+- Fixed broken links in Rust docs [\#1284](https://github.com/holochain/holochain/pull/1284)
+
+## [holochain\_cli\_sandbox-0.0.28](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.28)
+
+- `hc sandbox` command for installing happs was limited to 16mb websocket message limit and would error if given a large happ bundle. now it won’t.  [\#1322](https://github.com/holochain/holochain/pull/1322)
+- Fixed broken links in Rust docs [\#1284](https://github.com/holochain/holochain/pull/1284)
+
+## [holochain\_cli\_bundle-0.0.30](crates/holochain_cli_bundle/CHANGELOG.md#0.0.30)
+
+## [holochain-0.0.134](crates/holochain/CHANGELOG.md#0.0.134)
+
+## [holochain\_websocket-0.0.34](crates/holochain_websocket/CHANGELOG.md#0.0.34)
+
+## [holochain\_test\_wasm\_common-0.0.29](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.29)
+
+## [holochain\_conductor\_api-0.0.34](crates/holochain_conductor_api/CHANGELOG.md#0.0.34)
+
+## [holochain\_cascade-0.0.34](crates/holochain_cascade/CHANGELOG.md#0.0.34)
+
+## [holochain\_state-0.0.34](crates/holochain_state/CHANGELOG.md#0.0.34)
+
+## [holochain\_wasm\_test\_utils-0.0.34](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.34)
+
+## [holochain\_p2p-0.0.34](crates/holochain_p2p/CHANGELOG.md#0.0.34)
+
+## [kitsune\_p2p\_bootstrap-0.0.9](crates/kitsune_p2p_bootstrap/CHANGELOG.md#0.0.9)
+
+## [holochain\_types-0.0.34](crates/holochain_types/CHANGELOG.md#0.0.34)
+
+## [holochain\_keystore-0.0.34](crates/holochain_keystore/CHANGELOG.md#0.0.34)
+
+## [holochain\_sqlite-0.0.34](crates/holochain_sqlite/CHANGELOG.md#0.0.34)
+
+## [kitsune\_p2p-0.0.30](crates/kitsune_p2p/CHANGELOG.md#0.0.30)
+
+## [hdk-0.0.128](crates/hdk/CHANGELOG.md#0.0.128)
+
+- hdk: Adds external hash type for data that has a DHT location but does not exist on the DHT [\#1298](https://github.com/holochain/holochain/pull/1298)
+- hdk: Adds compound hash type for linkable hashes [\#1308](https://github.com/holochain/holochain/pull/1308)
+- hdk: Missing dependencies are fetched async for validation [\#1268](https://github.com/holochain/holochain/pull/1268)
+
+## [holochain\_zome\_types-0.0.30](crates/holochain_zome_types/CHANGELOG.md#0.0.30)
+
+## [holochain\_deterministic\_integrity-0.0.1](crates/holochain_deterministic_integrity/CHANGELOG.md#0.0.1)
+
+## [hdk\_derive-0.0.30](crates/hdk_derive/CHANGELOG.md#0.0.30)
+
+## [holochain\_integrity\_types-0.0.2](crates/holochain_integrity_types/CHANGELOG.md#0.0.2)
+
 # 20220406.010602
 
 ## [holochain\_cli\_bundle-0.0.29](crates/holochain_cli_bundle/CHANGELOG.md#0.0.29)
