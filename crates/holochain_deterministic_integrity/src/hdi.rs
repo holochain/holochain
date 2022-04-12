@@ -152,7 +152,9 @@ impl HdiT for HostHdi {
         if cfg!(feature = "trace") {
             host_call::<TraceMsg, ()>(__trace, trace_msg)
         } else {
-            Ok(())
+            Err(WasmError::Guest(
+                "The tracing feature is off (It is off by default)",
+            ))
         }
     }
     fn x_salsa20_poly1305_decrypt(

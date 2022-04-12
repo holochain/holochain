@@ -65,10 +65,9 @@ impl tracing_core::Subscriber for WasmSubscriber {
 
         // The event is pushed to the host to be picked up by the subscriber on that side.
         // The visitor is dropped.
-        HDK.with(|h| {
-            crate::hdk::HdkT::trace(
-                h.borrow().as_ref(),
-                TraceMsg {
+        holochain_deterministic_integrity::hdi::HDI.with(|h| {
+            h.borrow()
+                .trace(TraceMsg {
                     level: event.metadata().level().into(),
                     msg: format!(
                         "{}:{}:{} {}{}",
@@ -78,9 +77,8 @@ impl tracing_core::Subscriber for WasmSubscriber {
                         visitor.fields,
                         visitor.message
                     ),
-                },
-            )
-            .ok()
+                })
+                .ok()
         });
     }
     fn enter(&self, _span: &tracing::Id) {
