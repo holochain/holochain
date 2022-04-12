@@ -4,17 +4,21 @@ use hdk::prelude::*;
 use holochain::conductor::config::ConductorConfig;
 use holochain::sweettest::{SweetConductorBatch, SweetDnaFile};
 use holochain::test_utils::consistency_10s;
+use holochain_p2p::dht_arc::DhtLocation;
 use kitsune_p2p::KitsuneP2pConfig;
+use kitsune_p2p_types::config::RECENT_THRESHOLD_DEFAULT;
 
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
 #[serde(transparent)]
 #[repr(transparent)]
 struct AppString(String);
 
-fn make_config() -> ConductorConfig {
+fn make_config(recent_threshold: Option<u64>) -> ConductorConfig {
     let mut tuning =
         kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
     tuning.gossip_strategy = "sharded-gossip".to_string();
+    tuning.danger_gossip_recent_threshold_secs =
+        recent_threshold.unwrap_or(RECENT_THRESHOLD_DEFAULT.as_secs());
 
     let mut network = KitsuneP2pConfig::default();
     network.transport_pool = vec![kitsune_p2p::TransportConfig::Quic {
@@ -38,7 +42,7 @@ async fn fullsync_sharded_gossip() -> anyhow::Result<()> {
     let _g = observability::test_run().ok();
     const NUM_CONDUCTORS: usize = 2;
 
-    let mut conductors = SweetConductorBatch::from_config(NUM_CONDUCTORS, make_config()).await;
+    let mut conductors = SweetConductorBatch::from_config(NUM_CONDUCTORS, make_config(None)).await;
     for c in conductors.iter() {
         c.update_dev_settings(DevSettingsDelta {
             publish: Some(false),
@@ -88,7 +92,8 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
     let _g = observability::test_run().ok();
     const NUM_CONDUCTORS: usize = 3;
 
-    let mut conductors = SweetConductorBatch::from_config(NUM_CONDUCTORS, make_config()).await;
+    let mut conductors =
+        SweetConductorBatch::from_config(NUM_CONDUCTORS, make_config(Some(0))).await;
     for c in conductors.iter() {
         c.update_dev_settings(DevSettingsDelta {
             publish: Some(false),
@@ -100,7 +105,10 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
         .await
         .unwrap();
 
-    let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
+    let apps = conductors
+        .setup_app("app", &[dna_file.clone()])
+        .await
+        .unwrap();
     conductors.exchange_peer_info().await;
 
     let ((alice,), (bobbo,), _) = apps.into_tuples();
@@ -110,6 +118,26 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
         .call(&alice.zome("zome1"), "create_batch", 100)
         .await;
     let all_cells = vec![&alice, &bobbo];
+
+    let regions = conductors[0]
+        .get_spaces()
+        .handle_fetch_op_regions(dna_file.dna(), holochain_p2p::dht_arc::DhtArcSet::Full)
+        .await
+        .unwrap();
+    dbg!(regions);
+
+    let ops = conductors[0]
+        .get_spaces()
+        .handle_fetch_op_data_by_regions(
+            dna_file.dna_hash(),
+            vec![holochain_p2p::dht::region::RegionBounds::new(
+                (DhtLocation::MIN, DhtLocation::MAX),
+                (Timestamp::MIN, Timestamp::MAX),
+            )],
+        )
+        .await
+        .unwrap();
+    dbg!(ops);
 
     // Wait long enough for Bob to receive gossip
     consistency_10s(&all_cells).await;
@@ -142,7 +170,7 @@ async fn fullsync_sharded_local_gossip() -> anyhow::Result<()> {
 
     let _g = observability::test_run().ok();
 
-    let mut conductor = SweetConductor::from_config(make_config()).await;
+    let mut conductor = SweetConductor::from_config(make_config(None)).await;
     conductor.update_dev_settings(DevSettingsDelta {
         publish: Some(false),
         ..Default::default()

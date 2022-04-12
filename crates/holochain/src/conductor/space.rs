@@ -319,7 +319,6 @@ impl Spaces {
     pub async fn handle_fetch_op_regions(
         &self,
         dna_def: &DnaDefHashed,
-        // author: AgentPubKey,
         dht_arc_set: DhtArcSet,
     ) -> ConductorResult<RegionSetLtcs> {
         use holo_hash::HasHash;
@@ -341,33 +340,33 @@ impl Spaces {
         let times = TelescopingTimes::historical(&topology, self.recent_threshold());
         let coords = RegionCoordSetLtcs::new(times, arq_set);
         let coords_clone = coords.clone();
-        self.authored_db(dna_hash)?
-            .async_reader(move |txn| {
-                let mut stmt = txn.prepare_cached(sql).map_err(DatabaseError::from)?;
-                Ok(coords_clone.into_region_set(|(_, coords)| {
-                    let bounds = coords.to_bounds(&topology);
-                    let (x0, x1) = bounds.x;
-                    let (t0, t1) = bounds.t;
-                    stmt.query_row(
-                        named_params! {
-                            ":storage_start_loc": x0,
-                            ":storage_end_loc": x1,
-                            ":timestamp_min": t0,
-                            ":timestamp_max": t1,
-                            // ":author": &author, // TODO: unneeded for authored table?
-                        },
-                        |row| {
-                            Ok(RegionData {
-                                hash: RegionHash::from_vec(row.get("hash")?)
-                                    .expect("region hash must be 32 bytes"),
-                                size: row.get("size")?,
-                                count: row.get("count")?,
-                            })
-                        },
-                    )
-                })?)
-            })
-            .await
+        let db = self.dht_db(dna_hash)?;
+        db.async_reader(move |txn| {
+            let mut stmt = txn.prepare_cached(sql).map_err(DatabaseError::from)?;
+            Ok(coords_clone.into_region_set(|(_, coords)| {
+                let bounds = coords.to_bounds(&topology);
+                let (x0, x1) = bounds.x;
+                let (t0, t1) = bounds.t;
+                stmt.query_row(
+                    named_params! {
+                        ":storage_start_loc": x0,
+                        ":storage_end_loc": x1,
+                        ":timestamp_min": t0,
+                        ":timestamp_max": t1,
+                    },
+                    |row| {
+                        let size: f64 = row.get("total_size")?;
+                        Ok(RegionData {
+                            hash: RegionHash::from_vec(row.get("xor_hash")?)
+                                .expect("region hash must be 32 bytes"),
+                            size: size.max(u32::MAX as f64) as u32,
+                            count: row.get("count")?,
+                        })
+                    },
+                )
+            })?)
+        })
+        .await
     }
 
     #[instrument(skip(self, query))]
@@ -398,7 +397,7 @@ impl Spaces {
     ) -> ConductorResult<Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>> {
         let sql = holochain_sqlite::sql::sql_cell::FETCH_OPS_BY_REGION;
         Ok(self
-            .authored_db(dna_hash)?
+            .dht_db(dna_hash)?
             .async_reader(move |txn| {
                 let mut stmt = txn.prepare_cached(sql).map_err(StateQueryError::from)?;
                 StateQueryResult::Ok(

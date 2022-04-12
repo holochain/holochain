@@ -53,9 +53,11 @@ fn query_region_coords(
             ":timestamp_max": t1,
         },
         |row| {
+            let size: f64 = row.get("total_size")?;
             Ok(RegionData {
-                hash: RegionHash::from_vec(row.get("hash")?).expect("region hash must be 32 bytes"),
-                size: row.get("size")?,
+                hash: RegionHash::from_vec(row.get("xor_hash")?)
+                    .expect("region hash must be 32 bytes"),
+                size: size.max(u32::MAX as f64) as u32,
                 count: row.get("count")?,
             })
         },

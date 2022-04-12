@@ -3,6 +3,9 @@
 /// How long kitsune should wait before timing out when joining the network.
 pub const JOIN_NETWORK_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(20);
 
+/// One hour
+pub const RECENT_THRESHOLD_DEFAULT: std::time::Duration = std::time::Duration::from_secs(60 * 60);
+
 /// Wrapper for the actual KitsuneP2pTuningParams struct
 /// so the widely used type def can be an Arc<>
 pub mod tuning_params_struct {
@@ -197,8 +200,8 @@ pub mod tuning_params_struct {
         /// to historical gossip. This is dangerous, because gossip may not be
         /// possible with nodes using a different setting for this threshold.
         /// Do not change this except in testing environments.
-        /// [Default: 1 hours]
-        danger_gossip_recent_threshold_secs: u64 = 60 * 60,
+        /// [Default: 1 hour]
+        danger_gossip_recent_threshold_secs: u64 = super::RECENT_THRESHOLD_DEFAULT.as_secs(),
     }
 
     impl KitsuneP2pTuningParams {
