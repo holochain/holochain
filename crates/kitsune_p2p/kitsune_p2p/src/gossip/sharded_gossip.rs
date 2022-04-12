@@ -1133,12 +1133,12 @@ impl AsGossipModuleFactory for ShardedHistoricalGossipFactory {
     }
 }
 
-/// Create a recent [`GossipModuleFactory`]
+/// Create a recent [`GossipModuleFactory`](gossip::GossipModuleFactory)
 pub fn recent_factory(bandwidth: Arc<BandwidthThrottle>) -> GossipModuleFactory {
     GossipModuleFactory(Arc::new(ShardedRecentGossipFactory::new(bandwidth)))
 }
 
-/// Create a [`GossipModuleFactory`]
+/// Create a [`GossipModuleFactory`](gossip::GossipModuleFactory)
 pub fn historical_factory(bandwidth: Arc<BandwidthThrottle>) -> GossipModuleFactory {
     GossipModuleFactory(Arc::new(ShardedHistoricalGossipFactory::new(bandwidth)))
 }
