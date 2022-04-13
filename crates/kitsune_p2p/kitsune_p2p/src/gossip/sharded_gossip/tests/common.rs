@@ -1,6 +1,6 @@
 pub use crate::test_util::spawn_handler;
 use crate::HostStub;
-use crate::{test_util::hash_op_data, KitsuneHostPanicky};
+use crate::{test_util::hash_op_data, KitsuneHostDefaultError};
 use kitsune_p2p_types::box_fut;
 
 use super::*;
@@ -9,7 +9,7 @@ pub struct StandardResponsesHostApi {
     infos: Vec<AgentInfoSigned>,
 }
 
-impl KitsuneHostPanicky for StandardResponsesHostApi {
+impl KitsuneHostDefaultError for StandardResponsesHostApi {
     const NAME: &'static str = "StandardResponsesHostApi";
 
     fn get_agent_info_signed(
