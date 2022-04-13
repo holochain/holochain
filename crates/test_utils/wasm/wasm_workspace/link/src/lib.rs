@@ -148,7 +148,7 @@ fn commit_existing_path(_: ()) -> ExternResult<()> {
         hdk::prelude::create_link(
             parent.path_entry_hash()?.into(),
             path.path_entry_hash()?.into(),
-            HdkLinkType::Any,
+            HdkLinkType::Paths,
             LinkTag::new(
                 match path.leaf() {
                     None => <Vec<u8>>::new(),
