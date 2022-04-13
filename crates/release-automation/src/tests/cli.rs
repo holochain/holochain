@@ -757,6 +757,11 @@ fn release_dry_run_fails_on_unallowed_conditions() {
             "#,
             },
         );
+
+        workspace
+            .update_lockfile(false, std::iter::empty())
+            .unwrap();
+
         workspace.git_add_all_and_commit("msg", None).unwrap();
 
         let mut cmd = assert_cmd::Command::cargo_bin("release-automation").unwrap();

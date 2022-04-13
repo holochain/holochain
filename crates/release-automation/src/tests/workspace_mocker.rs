@@ -667,7 +667,9 @@ pub(crate) fn example_workspace_4<'a>() -> Fallible<WorkspaceMocker> {
             name: "wildcard_dependency".to_string(),
             version: "0.0.1".to_string(),
             dependencies: vec![],
-            dev_dependencies: vec![r#"criterion = '*'"#.to_string()],
+            dev_dependencies: vec![
+                r#"wildcard_dependency = {path = ".", version = '*'}"#.to_string()
+            ],
             excluded: false,
             ty: workspace_mocker::MockProjectType::Bin,
             changelog: Some(indoc::formatdoc!(
