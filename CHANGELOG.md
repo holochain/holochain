@@ -6,6 +6,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20220413.201525
+
+## [holochain\_cli-0.0.33](crates/holochain_cli/CHANGELOG.md#0.0.33)
+
+## [holochain\_cli\_sandbox-0.0.29](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.29)
+
+## [holochain-0.0.135](crates/holochain/CHANGELOG.md#0.0.135)
+
+## [holochain\_test\_wasm\_common-0.0.30](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.30)
+
+## [holochain\_conductor\_api-0.0.35](crates/holochain_conductor_api/CHANGELOG.md#0.0.35)
+
+## [holochain\_cascade-0.0.35](crates/holochain_cascade/CHANGELOG.md#0.0.35)
+
+## [holochain\_state-0.0.35](crates/holochain_state/CHANGELOG.md#0.0.35)
+
+## [hdk-0.0.129](crates/hdk/CHANGELOG.md#0.0.129)
+
+## [holochain\_deterministic\_integrity-0.0.2](crates/holochain_deterministic_integrity/CHANGELOG.md#0.0.2)
+
 # 20220413.011152
 
 ## [holochain\_cli-0.0.32](crates/holochain_cli/CHANGELOG.md#0.0.32)
