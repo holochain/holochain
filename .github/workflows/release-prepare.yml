@@ -172,6 +172,21 @@ jobs:
             git branch -D ${obsolete_branches}
           fi
 
+      - name: Detect missing release headings
+        run: |
+          set -ex
+          source "${HOLOCHAIN_RELEASE_SH}"
+          cd "${HOLOCHAIN_REPO}"
+
+          nix-shell --argstr flavor release --pure --run '
+            set -e
+
+            release-automation \
+              --workspace-path=$PWD \
+              --log-level=debug \
+              crate detect-missing-releaseheadings
+            '
+
       - name: Bump the crate versions for the release
         id: bump-versions
         run: |
