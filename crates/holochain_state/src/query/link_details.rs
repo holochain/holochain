@@ -11,9 +11,14 @@ pub struct GetLinkDetailsQuery {
 }
 
 impl GetLinkDetailsQuery {
-    pub fn new(base: AnyLinkableHash, zome_id: ZomeId, tag: Option<LinkTag>) -> Self {
+    pub fn new(
+        base: AnyLinkableHash,
+        zome_id: ZomeId,
+        link_type: Option<LinkType>,
+        tag: Option<LinkTag>,
+    ) -> Self {
         Self {
-            query: LinksQuery::new(base, zome_id, tag),
+            query: LinksQuery::new(base, zome_id, link_type, tag),
         }
     }
 

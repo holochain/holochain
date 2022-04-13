@@ -307,6 +307,7 @@ impl Db {
                         let query = GetLinksQuery::new(
                             link_add.base_address.clone(),
                             link_add.zome_id,
+                            Some(link_add.link_type.clone()),
                             Some(link_add.tag.clone()),
                         );
                         let res = query.run(Txn::from(&txn)).unwrap();

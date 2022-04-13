@@ -57,6 +57,7 @@ impl Query for GetLinksOpsQuery {
     type Output = Self::State;
 
     fn query(&self) -> String {
+        dbg!("query");
         let create = "
             SELECT Header.blob AS header_blob, DhtOp.type AS dht_type,
             DhtOp.validation_status AS status
@@ -86,6 +87,7 @@ impl Query for GetLinksOpsQuery {
             ));
         }
         if let Some(link_type) = &self.link_type {
+            dbg!(&link_type);
             common_query.push_str(&format!(
                 "
             AND

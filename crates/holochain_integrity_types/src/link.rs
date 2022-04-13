@@ -10,7 +10,7 @@ use holochain_serialized_bytes::prelude::*;
     Ord,
     serde::Serialize,
     serde::Deserialize,
-    SerializedBytes,
+    // SerializedBytes,
 )]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct LinkType(pub u8);
@@ -22,6 +22,15 @@ impl LinkType {
 
     pub fn into_inner(self) -> u8 {
         self.0
+    }
+}
+
+impl<T> From<T> for LinkType
+where
+    T: Into<u8>,
+{
+    fn from(u: T) -> Self {
+        LinkType(u.into())
     }
 }
 

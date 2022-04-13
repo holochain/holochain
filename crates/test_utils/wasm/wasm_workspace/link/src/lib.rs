@@ -1,5 +1,15 @@
 use hdk::prelude::*;
 
+enum LinkTypes {
+    Foo,
+}
+
+impl From<LinkTypes> for u8 {
+    fn from(link_types: LinkTypes) -> Self {
+        link_types as u8
+    }
+}
+
 entry_defs![Path::entry_def(), PathEntry::entry_def()];
 
 fn path(s: &str) -> ExternResult<AnyLinkableHash> {
@@ -34,6 +44,11 @@ fn create_link(_: ()) -> ExternResult<HeaderHash> {
 }
 
 #[hdk_extern]
+fn create_typed_link(_: ()) -> ExternResult<HeaderHash> {
+    hdk::prelude::create_link(base()?, targetless()?, LinkTypes::Foo as u8, ())
+}
+
+#[hdk_extern]
 fn create_baseless_link(_: ()) -> ExternResult<HeaderHash> {
     hdk::prelude::create_link(baseless()?, targetless()?, HdkLinkType::Any, ())
 }
@@ -59,6 +74,11 @@ fn get_links(_: ()) -> ExternResult<Vec<Link>> {
 }
 
 #[hdk_extern]
+fn get_typed_links(_: ()) -> ExternResult<Vec<Link>> {
+    hdk::prelude::get_links(base()?, Some(LinkTypes::Foo.into()), None)
+}
+
+#[hdk_extern]
 fn get_baseless_links(_: ()) -> ExternResult<Vec<Link>> {
     hdk::prelude::get_links(baseless()?, None, None)
 }
@@ -71,6 +91,11 @@ fn get_external_links(_: ()) -> ExternResult<Vec<Link>> {
 #[hdk_extern]
 fn get_link_details(_: ()) -> ExternResult<LinkDetails> {
     hdk::prelude::get_link_details(base()?, None, None)
+}
+
+#[hdk_extern]
+fn get_typed_link_details(_: ()) -> ExternResult<LinkDetails> {
+    hdk::prelude::get_link_details(base()?, Some(LinkTypes::Foo.into()), None)
 }
 
 #[hdk_extern]

@@ -719,7 +719,7 @@ where
         if !authority {
             self.fetch_links(key.clone(), options).await?;
         }
-        let query = GetLinksQuery::new(key.base, key.zome_id, key.tag);
+        let query = GetLinksQuery::new(key.base, key.zome_id, key.link_type, key.tag);
         let results = self.cascading(query).await?;
         Ok(results)
     }
@@ -736,7 +736,7 @@ where
         if !authority {
             self.fetch_links(key.clone(), options).await?;
         }
-        let query = GetLinkDetailsQuery::new(key.base, key.zome_id, key.tag);
+        let query = GetLinkDetailsQuery::new(key.base, key.zome_id, key.link_type, key.tag);
         let results = self.cascading(query).await?;
         Ok(results)
     }

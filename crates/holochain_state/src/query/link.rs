@@ -15,18 +15,25 @@ pub struct GetLinksQuery {
 pub struct LinksQuery {
     pub base: Arc<AnyLinkableHash>,
     pub zome_id: ZomeId,
+    pub link_type: Option<LinkType>,
     pub tag: Option<String>,
     query: String,
 }
 
 impl LinksQuery {
-    pub fn new(base: AnyLinkableHash, zome_id: ZomeId, tag: Option<LinkTag>) -> Self {
+    pub fn new(
+        base: AnyLinkableHash,
+        zome_id: ZomeId,
+        link_type: Option<LinkType>,
+        tag: Option<LinkTag>,
+    ) -> Self {
         let tag = tag.map(|tag| Self::tag_to_hex(&tag));
-        let create_string = Self::create_query_string(tag.clone());
-        let delete_string = Self::delete_query_string(tag.clone());
+        let create_string = Self::create_query_string(link_type, tag.clone());
+        let delete_string = Self::delete_query_string(link_type, tag.clone());
         Self {
             base: Arc::new(base),
             zome_id,
+            link_type,
             tag,
             query: Self::create_query(create_string, delete_string),
         }
@@ -42,11 +49,11 @@ impl LinksQuery {
     }
 
     pub fn base(base: AnyLinkableHash, zome_id: ZomeId) -> Self {
-        Self::new(base, zome_id, None)
+        Self::new(base, zome_id, None, None)
     }
 
     pub fn tag(base: AnyLinkableHash, zome_id: ZomeId, tag: LinkTag) -> Self {
-        Self::new(base, zome_id, Some(tag))
+        Self::new(base, zome_id, None, Some(tag))
     }
 
     fn create_query(create: String, delete: String) -> String {
@@ -70,7 +77,7 @@ impl LinksQuery {
             AND DhtOp.when_integrated IS NOT NULL
         "
     }
-    fn create_query_string(tag: Option<String>) -> String {
+    fn create_query_string(link_type: Option<LinkType>, tag: Option<String>) -> String {
         let s = format!(
             "
             SELECT Header.blob AS header_blob FROM DhtOp
@@ -78,7 +85,21 @@ impl LinksQuery {
             ",
             Self::common_query_string()
         );
-        Self::add_tag(s, tag)
+        Self::add_link_type(Self::add_tag(s, tag), link_type)
+    }
+    fn add_link_type(q: String, maybe_link_type: Option<LinkType>) -> String {
+        if let Some(link_type) = maybe_link_type {
+            format!(
+                "{}
+                AND
+                Header.link_type = {}
+                ",
+                q,
+                link_type.into_inner()
+            )
+        } else {
+            q
+        }
     }
     fn add_tag(q: String, tag: Option<String>) -> String {
         if let Some(tag) = tag {
@@ -92,7 +113,7 @@ impl LinksQuery {
             q
         }
     }
-    fn delete_query_string(tag: Option<String>) -> String {
+    fn delete_query_string(link_type: Option<LinkType>, tag: Option<String>) -> String {
         let sub_create_query = format!(
             "
             SELECT Header.hash FROM DhtOp
@@ -100,7 +121,7 @@ impl LinksQuery {
             ",
             Self::common_query_string()
         );
-        let sub_create_query = Self::add_tag(sub_create_query, tag);
+        let sub_create_query = Self::add_link_type(Self::add_tag(sub_create_query, tag), link_type);
         let delete_query = format!(
             "
             SELECT Header.blob AS header_blob FROM DhtOp
@@ -133,9 +154,14 @@ impl LinksQuery {
 }
 
 impl GetLinksQuery {
-    pub fn new(base: AnyLinkableHash, zome_id: ZomeId, tag: Option<LinkTag>) -> Self {
+    pub fn new(
+        base: AnyLinkableHash,
+        zome_id: ZomeId,
+        link_type: Option<LinkType>,
+        tag: Option<LinkTag>,
+    ) -> Self {
         Self {
-            query: LinksQuery::new(base, zome_id, tag),
+            query: LinksQuery::new(base, zome_id, link_type, tag),
         }
     }
 

@@ -117,3 +117,9 @@ impl LinkDetails {
         self.into()
     }
 }
+
+impl AsRef<CreateLinkWithDeleteLinks> for LinkDetails {
+    fn as_ref(&self) -> &CreateLinkWithDeleteLinks {
+        &self.0
+    }
+}

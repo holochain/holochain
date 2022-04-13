@@ -211,6 +211,43 @@ pub mod slow_tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    async fn typed_get_links() {
+        observability::test_run().ok();
+        let RibosomeTestFixture {
+            conductor, alice, ..
+        } = RibosomeTestFixture::new(TestWasm::Link).await;
+
+        let _header_hash_untyped: HeaderHash = conductor.call(&alice, "create_link", ()).await;
+        let _header_hash_typed: HeaderHash = conductor.call(&alice, "create_typed_link", ()).await;
+
+        let mut links: Vec<Link> = conductor.call(&alice, "get_links", ()).await;
+        let link_details: LinkDetails = conductor.call(&alice, "get_link_details", ()).await;
+        let typed_links: Vec<Link> = conductor.call(&alice, "get_typed_links", ()).await;
+        let typed_link_details: LinkDetails =
+            conductor.call(&alice, "get_typed_link_details", ()).await;
+
+        links.sort_by(|a, b| a.target.partial_cmp(&b.target).unwrap());
+
+        assert!(links.len() == 2);
+        assert!(link_details.as_ref().len() == 2);
+        assert!(typed_links.len() == 1);
+        assert!(typed_link_details.as_ref().len() == 1);
+
+        // After sorting the first link is the typed one.
+        assert_eq!(links[0], typed_links[0]);
+        assert_eq!(
+            links[0].target,
+            if let Header::CreateLink(create_link) =
+                &typed_link_details.into_inner()[0].0.hashed.content
+            {
+                create_link.target_address.clone()
+            } else {
+                unreachable!();
+            }
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
     async fn baseless_get_links() {
         observability::test_run().ok();
         let RibosomeTestFixture {
