@@ -10,7 +10,7 @@ use holochain_state::prelude::test_dht_db;
 use holochain_state::scratch::Scratch;
 use holochain_types::link::WireLinkOps;
 use holochain_zome_types::ChainTopOrdering;
-use holochain_zome_types::ZomeFixturator;
+use holochain_zome_types::CoordinatorZomeFixturator;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn links_not_authority() {
@@ -116,7 +116,7 @@ async fn links_authoring() {
     // Environments
     let cache = test_cache_db();
     let mut scratch = Scratch::new();
-    let zome = fixt!(Zome);
+    let zome = fixt!(CoordinatorZome);
 
     // Data
     let td = EntryTestData::create();

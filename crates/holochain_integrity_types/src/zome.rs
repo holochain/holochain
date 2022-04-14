@@ -6,13 +6,27 @@
 //! using Rust closures, and is useful for quickly defining zomes on-the-fly
 //! for tests.
 
+use std::borrow::Cow;
+
 use holochain_serialized_bytes::prelude::*;
 
 /// ZomeName as a String.
 #[derive(Clone, Debug, Serialize, Hash, Deserialize, Ord, Eq, PartialEq, PartialOrd)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[repr(transparent)]
-pub struct ZomeName(pub String);
+pub struct ZomeName(pub Cow<'static, str>);
+
+#[cfg(feature = "arbitrary")]
+impl<'a> arbitrary::Arbitrary<'a> for ZomeName {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        Ok(Self(String::arbitrary(u)?.into()))
+    }
+}
+
+/// A trait for converting a value to a [`ZomeName`].
+pub trait ToZomeName {
+    /// Converts the value to a [`ZomeName`].
+    fn zome_name(&self) -> ZomeName;
+}
 
 impl ZomeName {
     /// Create an unknown zome name.
@@ -22,7 +36,7 @@ impl ZomeName {
 
     /// Create a zome name from a string.
     pub fn new<S: ToString>(s: S) -> Self {
-        ZomeName(s.to_string())
+        ZomeName(s.to_string().into())
     }
 }
 
@@ -34,13 +48,13 @@ impl std::fmt::Display for ZomeName {
 
 impl From<&str> for ZomeName {
     fn from(s: &str) -> Self {
-        Self::from(s.to_string())
+        Self(s.to_string().into())
     }
 }
 
 impl From<String> for ZomeName {
     fn from(s: String) -> Self {
-        Self(s)
+        Self(s.into())
     }
 }
 

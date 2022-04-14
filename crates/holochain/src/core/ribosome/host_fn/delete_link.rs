@@ -82,7 +82,7 @@ pub fn delete_link<'a>(
                     base_address,
                 };
                 let header_hash = source_chain
-                    .put(Some(zome), header_builder, None, chain_top_ordering)
+                    .put(None, header_builder, None, chain_top_ordering)
                     .await
                     .map_err(|source_chain_error| {
                         WasmError::Host(source_chain_error.to_string())

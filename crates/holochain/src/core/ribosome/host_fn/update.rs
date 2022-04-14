@@ -1,5 +1,5 @@
 use super::create::extract_entry_def;
-use super::delete::get_original_address;
+use super::delete::get_original_entry_data;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
@@ -23,29 +23,26 @@ pub fn update<'a>(
             // destructure the args out into an app type def id and entry
             let UpdateInput {
                 original_header_address,
-                create_input,
-            } = input;
-            let CreateInput {
                 entry_def_id,
                 entry,
                 chain_top_ordering,
-                zome_name,
-            } = create_input;
-            let zome = match zome_name {
-                Some(zome_name) => ribosome
+            } = input;
+
+            let (original_entry_address, entry_type) =
+                get_original_entry_data(call_context.clone(), original_header_address.clone())?;
+
+            let zome = match entry_type {
+                EntryType::App(AppEntryType { zome_id, .. }) => {
+                    let zome = ribosome
                     .dna_def()
-                    .get_integrity_zome(&zome_name)
-                    .map_err(|zome_error| WasmError::Host(zome_error.to_string()))?,
-                None => ribosome
-                    .dna_def()
-                    .is_integrity_zome(call_context.zome.zome_name())
-                    .then(|| call_context.zome.clone())
-                    .ok_or_else(|| {
-                        WasmError::Host(format!(
-                            "Tried to commit to zome {} that is not an integrity zome",
-                            call_context.zome.zome_name().clone()
-                        ))
-                    })?,
+                    .integrity_zomes
+                    .get(zome_id.index())
+                    .cloned()
+                    .map(Zome::from)
+                    .ok_or_else(|| WasmError::Host(format!("Tried to delete an entry from ZomeId {} which is not an integrity zome", zome_id)))?;
+                    Some(zome)
+                }
+                _ => None,
             };
 
             // Countersigned entries have different header handling.
@@ -57,7 +54,7 @@ pub fn update<'a>(
                         .source_chain()
                         .as_ref()
                         .expect("Must have source chain if write_workspace access is given")
-                        .put_countersigned(Some(zome.clone()), entry, chain_top_ordering)
+                        .put_countersigned(None, entry, chain_top_ordering)
                         .await
                         .map_err(|source_chain_error| {
                             WasmError::Host(source_chain_error.to_string())
@@ -67,15 +64,17 @@ pub fn update<'a>(
                     // build the entry hash
                     let entry_hash = EntryHash::with_data_sync(&entry);
 
-                    // extract the zome position
-                    let header_zome_id =
-                        ribosome.zome_to_id(&zome).map_err(|source_chain_error| {
-                            WasmError::Host(source_chain_error.to_string())
-                        })?;
-
                     // extract the entry defs for a zome
                     let entry_type = match entry_def_id {
                         EntryDefId::App(entry_def_id) => {
+                            let zome = zome
+                                .as_ref()
+                                .expect("Zome can never be none for a EntryDefLocation::App");
+                            // extract the zome position
+                            let header_zome_id =
+                                ribosome.zome_name_to_id(zome.zome_name()).map_err(|source_chain_error| {
+                                    WasmError::Host(source_chain_error.to_string())
+                                })?;
                             let (header_entry_def_id, entry_visibility) = extract_entry_def(
                                 ribosome,
                                 call_context.clone(),
@@ -92,11 +91,6 @@ pub fn update<'a>(
                         EntryDefId::CapGrant => EntryType::CapGrant,
                         EntryDefId::CapClaim => EntryType::CapClaim,
                     };
-
-                    let original_entry_address = get_original_address(
-                        call_context.clone(),
-                        original_header_address.clone(),
-                    )?;
 
                     // build a header for the entry being updated
                     let header_builder = builder::Update {
@@ -118,7 +112,7 @@ pub fn update<'a>(
                             .expect("Must have source chain if write_workspace access is given");
                         // push the header and the entry into the source chain
                         let header_hash = source_chain
-                            .put(Some(zome), header_builder, Some(entry), chain_top_ordering)
+                            .put(None, header_builder, Some(entry), chain_top_ordering)
                             .await
                             .map_err(|source_chain_error| {
                                 WasmError::Host(source_chain_error.to_string())

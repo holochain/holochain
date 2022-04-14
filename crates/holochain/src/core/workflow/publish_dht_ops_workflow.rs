@@ -361,7 +361,7 @@ mod tests {
                 let keystore = holochain_state::test_utils::test_keystore();
                 let dht_db = test_dht_db();
                 let db = test_db.to_db();
-                let zome = fixt!(Zome);
+                let zome = fixt!(CoordinatorZome);
 
                 let dna = fixt!(DnaHash);
                 let filter_events = |evt: &_| match evt {

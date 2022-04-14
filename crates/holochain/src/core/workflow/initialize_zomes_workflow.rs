@@ -290,7 +290,7 @@ pub mod tests {
     async fn commit_during_init_one_zome_unimplemented_one_fails() {
         let zome_fail = InlineZome::new_unique(vec![]).callback("init", |api, _: ()| {
             api.create(CreateInput::new(
-                EntryDefId::CapGrant,
+                EntryDefLocation::CapGrant,
                 Entry::CapGrant(CapGrantEntry {
                     tag: "".into(),
                     access: ().into(),

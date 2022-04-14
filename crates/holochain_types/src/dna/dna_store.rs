@@ -6,14 +6,14 @@ use crate::prelude::*;
 )]
 pub struct EntryDefBufferKey {
     /// The zome to which this entry def belongs
-    pub zome: ZomeDef,
+    pub zome: IntegrityZomeDef,
     /// The index, for ordering
     pub entry_def_position: EntryDefIndex,
 }
 
 impl EntryDefBufferKey {
     /// Create a new key
-    pub fn new(zome: ZomeDef, entry_def_position: EntryDefIndex) -> Self {
+    pub fn new(zome: IntegrityZomeDef, entry_def_position: EntryDefIndex) -> Self {
         Self {
             zome,
             entry_def_position,

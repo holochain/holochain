@@ -4,7 +4,6 @@ pub use crate::ed25519::verify_signature_raw;
 pub use crate::entry::must_get_entry;
 pub use crate::entry::must_get_header;
 pub use crate::entry::must_get_valid_element;
-pub use crate::entry::EntryDefRegistration;
 pub use crate::entry_def;
 pub use crate::entry_def_index;
 pub use crate::entry_defs;

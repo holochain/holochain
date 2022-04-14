@@ -85,7 +85,7 @@ impl DnaFile {
     /// Host swap coordinator zomes for this dna.
     pub async fn hot_swap_coordinators(
         &mut self,
-        coordinator_zomes: Zomes,
+        coordinator_zomes: CoordinatorZomes,
         wasms: Vec<wasm::DnaWasm>,
     ) -> Result<Vec<WasmHash>, DnaError> {
         let old_zomes =

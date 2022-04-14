@@ -26,8 +26,8 @@ pub fn create(create_input: CreateInput) -> ExternResult<HeaderHash> {
 ///
 /// Usually you don't need to use this function directly; it is the most general way to update an
 /// entry and standardizes the internals of higher level update functions.
-pub fn update(hash: HeaderHash, create_input: CreateInput) -> ExternResult<HeaderHash> {
-    HDK.with(|h| h.borrow().update(UpdateInput::new(hash, create_input)))
+pub fn update(input: UpdateInput) -> ExternResult<HeaderHash> {
+    HDK.with(|h| h.borrow().update(input))
 }
 
 /// General function that can delete any entry type.
@@ -68,11 +68,17 @@ where
 /// See [`get`] and [`get_details`] for more information on CRUD.
 pub fn create_entry<I, E>(input: I) -> ExternResult<HeaderHash>
 where
-    I: EntryDefRegistration,
+    I: ToAppEntryDefName,
+    I: ToZomeName,
     Entry: TryFrom<I, Error = E>,
     WasmError: From<E>,
 {
-    create(try_into_create_input(input)?)
+    let create_input = CreateInput::new(
+        EntryDefLocation::app(input.zome_name(), input.entry_def_name()),
+        input.try_into()?,
+        ChainTopOrdering::default(),
+    );
+    create(create_input)
 }
 
 /// Delete an app entry. Also see [`delete`].
@@ -135,7 +141,8 @@ where
     Entry: TryFrom<I, Error = E>,
     WasmError: From<E>,
 {
-    update(hash, try_into_create_input(input)?)
+    todo!()
+    // update(hash, try_into_create_input(input)?)
 }
 
 /// Gets an element for a given entry or header hash.
@@ -299,20 +306,4 @@ macro_rules! entry_def {
         $crate::prelude::holochain_deterministic_integrity::app_entry!($t);
         $crate::prelude::holochain_deterministic_integrity::register_entry!($t $def);
     };
-}
-
-/// Helper to convert a type to [`CreateInput`].
-/// This is needed because [`TryInto`] / [`TryFrom`] cannot be
-/// impl on a generic type.
-fn try_into_create_input<T, E>(t: T) -> Result<CreateInput, WasmError>
-where
-    T: EntryDefRegistration,
-    Entry: TryFrom<T, Error = E>,
-    WasmError: From<E>,
-{
-    Ok(CreateInput::new(
-        T::entry_def_id(),
-        t.try_into()?,
-        ChainTopOrdering::default(),
-    ))
 }

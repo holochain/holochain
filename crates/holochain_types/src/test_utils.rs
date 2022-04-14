@@ -47,7 +47,7 @@ pub fn fake_dna_zomes_named(uid: &str, name: &str, zomes: Vec<(ZomeName, DnaWasm
             let wasm = crate::dna::wasm::DnaWasmHashed::from_content(wasm).await;
             let (wasm, wasm_hash) = wasm.into_inner();
             dna.integrity_zomes
-                .push((zome_name, ZomeDef::Wasm(WasmZome { wasm_hash })));
+                .push((zome_name, ZomeDef::Wasm(WasmZome { wasm_hash }).into()));
             wasm_code.push(wasm);
         }
         DnaFile::new(dna, wasm_code).await

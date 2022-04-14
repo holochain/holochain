@@ -34,7 +34,7 @@ use holochain_zome_types::ScheduledFn;
 /// Cascade.
 #[derive(Debug, Clone, Default)]
 pub struct Scratch {
-    zomed_headers: Vec<(Option<Zome>, SignedHeaderHashed)>,
+    zomed_headers: Vec<(Option<CoordinatorZome>, SignedHeaderHashed)>,
     entries: HashMap<EntryHash, Arc<Entry>>,
     chain_top_ordering: ChainTopOrdering,
     scheduled_fns: Vec<ScheduledFn>,
@@ -77,7 +77,7 @@ impl Scratch {
 
     pub fn add_header(
         &mut self,
-        zome: Option<Zome>,
+        zome: Option<CoordinatorZome>,
         item: SignedHeaderHashed,
         chain_top_ordering: ChainTopOrdering,
     ) {
@@ -198,7 +198,7 @@ impl Scratch {
     /// Drain out all the headers.
     pub fn drain_zomed_headers(
         &mut self,
-    ) -> impl Iterator<Item = (Option<Zome>, SignedHeaderHashed)> + '_ {
+    ) -> impl Iterator<Item = (Option<CoordinatorZome>, SignedHeaderHashed)> + '_ {
         self.chain_head = None;
         self.zomed_headers.drain(..)
     }

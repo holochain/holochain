@@ -10,7 +10,6 @@ pub use crate::crdt::*;
 pub use crate::dna_def::*;
 pub use crate::element::*;
 pub use crate::entry::*;
-pub use crate::entry::*;
 pub use crate::entry_def::*;
 pub use crate::genesis::*;
 pub use crate::hash::*;

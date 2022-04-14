@@ -27,6 +27,7 @@ pub mod entry;
 pub mod fixt;
 pub mod header;
 pub mod link;
+pub mod inline_zome;
 mod macros;
 pub mod metadata;
 pub mod prelude;

@@ -8,13 +8,25 @@ use self::error::InlineZomeResult;
 use crate::prelude::*;
 use serde::de::DeserializeOwned;
 use std::collections::HashMap;
+use std::marker::PhantomData;
+use std::sync::Arc;
 
 pub mod error;
 
 pub type BoxApi = Box<dyn HostFnApiT>;
 
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct IntegrityZomeMarker;
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct CoordinatorZomeMarker;
+
+pub type InlineIntegrityZome = InlineZome<IntegrityZomeMarker>;
+pub type InlineCoordinatorZome = InlineZome<CoordinatorZomeMarker>;
+
 /// An InlineZome, which consists
-pub struct InlineZome {
+pub struct InlineZome<T> {
+    /// Inline zome type marker.
+    _t: PhantomData<T>,
     /// Since closures cannot be serialized, we include a UID which
     /// is the only part of an InlineZome that gets serialized.
     /// This uuid becomes part of the determination of the DnaHash
@@ -30,20 +42,14 @@ pub struct InlineZome {
     pub(super) callbacks: HashMap<FunctionName, InlineZomeFn>,
 }
 
-impl InlineZome {
-    /// Create a new zome with the given UID
-    pub fn new<S: Into<String>>(uuid: S, entry_defs: Vec<EntryDef>) -> Self {
-        let entry_defs_callback =
-            move |_, _: ()| Ok(EntryDefsCallbackResult::Defs(entry_defs.clone().into()));
+impl<T> InlineZome<T> {
+    /// Inner constructor.
+    fn new_inner<S: Into<String>>(uuid: S) -> Self {
         Self {
+            _t: PhantomData,
             uuid: uuid.into(),
             callbacks: HashMap::new(),
         }
-        .callback("entry_defs", Box::new(entry_defs_callback))
-    }
-    /// Create a new zome with a unique random UID
-    pub fn new_unique(entry_defs: Vec<EntryDef>) -> Self {
-        Self::new(nanoid::nanoid!(), entry_defs)
     }
 
     pub fn callbacks(&self) -> Vec<FunctionName> {
@@ -89,39 +95,128 @@ impl InlineZome {
     }
 }
 
+impl InlineIntegrityZome {
+    /// Create a new integrity zome with the given UID
+    pub fn new<S: Into<String>>(uuid: S, entry_defs: Vec<EntryDef>) -> Self {
+        let entry_defs_callback =
+            move |_, _: ()| Ok(EntryDefsCallbackResult::Defs(entry_defs.clone().into()));
+        Self::new_inner(uuid).callback("entry_defs", Box::new(entry_defs_callback))
+    }
+    /// Create a new integrity zome with a unique random UID
+    pub fn new_unique(entry_defs: Vec<EntryDef>) -> Self {
+        Self::new(nanoid::nanoid!(), entry_defs)
+    }
+}
+
+impl InlineCoordinatorZome {
+    /// Create a new coordinator zome with the given UID
+    pub fn new<S: Into<String>>(uuid: S) -> Self {
+        Self::new_inner(uuid)
+    }
+    /// Create a new coordinator zome with a unique random UID
+    pub fn new_unique() -> Self {
+        Self::new(nanoid::nanoid!())
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct DynInlineZome(pub Arc<dyn InlineZomeT + Send + Sync>);
+
+pub trait InlineZomeT: std::fmt::Debug {
+    /// Get the callbacks for this [`InlineZome`].
+    fn callbacks(&self) -> Vec<FunctionName>;
+
+    /// Make a call to an inline zome callback.
+    /// If the callback doesn't exist, return None.
+    fn maybe_call(
+        &self,
+        api: BoxApi,
+        name: &FunctionName,
+        input: ExternIO,
+    ) -> InlineZomeResult<Option<ExternIO>>;
+
+    /// Accessor
+    fn uuid(&self) -> String;
+}
+
 /// An inline zome function takes a Host API and an input, and produces an output.
 pub type InlineZomeFn =
     Box<dyn Fn(BoxApi, ExternIO) -> InlineZomeResult<ExternIO> + 'static + Send + Sync>;
 
-impl std::fmt::Debug for InlineZome {
+impl<T: std::fmt::Debug> InlineZomeT for InlineZome<T> {
+    fn callbacks(&self) -> Vec<FunctionName> {
+        self.callbacks()
+    }
+
+    fn maybe_call(
+        &self,
+        api: BoxApi,
+        name: &FunctionName,
+        input: ExternIO,
+    ) -> InlineZomeResult<Option<ExternIO>> {
+        self.maybe_call(api, name, input)
+    }
+
+    fn uuid(&self) -> String {
+        self.uuid()
+    }
+}
+
+impl<T: std::fmt::Debug> std::fmt::Debug for InlineZome<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_fmt(format_args!("<InlineZome {}>", self.uuid))
     }
 }
 
-impl PartialEq for InlineZome {
-    fn eq(&self, other: &InlineZome) -> bool {
+impl<T: PartialEq> PartialEq for InlineZome<T> {
+    fn eq(&self, other: &InlineZome<T>) -> bool {
         self.uuid == other.uuid
     }
 }
 
-impl PartialOrd for InlineZome {
-    fn partial_cmp(&self, other: &InlineZome) -> Option<std::cmp::Ordering> {
+impl PartialEq for DynInlineZome {
+    fn eq(&self, other: &DynInlineZome) -> bool {
+        self.0.uuid() == other.0.uuid()
+    }
+}
+
+impl<T: PartialOrd> PartialOrd for InlineZome<T> {
+    fn partial_cmp(&self, other: &InlineZome<T>) -> Option<std::cmp::Ordering> {
         Some(self.uuid.cmp(&other.uuid))
     }
 }
 
-impl Eq for InlineZome {}
+impl PartialOrd for DynInlineZome {
+    fn partial_cmp(&self, other: &DynInlineZome) -> Option<std::cmp::Ordering> {
+        Some(self.0.uuid().cmp(&other.0.uuid()))
+    }
+}
 
-impl Ord for InlineZome {
-    fn cmp(&self, other: &InlineZome) -> std::cmp::Ordering {
+impl<T: Eq> Eq for InlineZome<T> {}
+
+impl Eq for DynInlineZome {}
+
+impl<T: Ord> Ord for InlineZome<T> {
+    fn cmp(&self, other: &InlineZome<T>) -> std::cmp::Ordering {
         self.uuid.cmp(&other.uuid)
     }
 }
 
-impl std::hash::Hash for InlineZome {
+impl Ord for DynInlineZome {
+    fn cmp(&self, other: &DynInlineZome) -> std::cmp::Ordering {
+        self.0.uuid().cmp(&other.0.uuid())
+    }
+}
+
+impl<T: std::hash::Hash> std::hash::Hash for InlineZome<T> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.uuid.hash(state);
+    }
+}
+
+impl std::hash::Hash for DynInlineZome {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.uuid().hash(state);
     }
 }
 
@@ -134,7 +229,7 @@ mod tests {
     #[test]
     #[allow(unused_variables, unreachable_code)]
     fn can_create_inline_dna() {
-        let zome = InlineZome::new("", vec![]).callback("zome_fn_1", |api, a: ()| {
+        let zome = InlineIntegrityZome::new("", vec![]).callback("zome_fn_1", |api, a: ()| {
             let hash: AnyDhtHash = todo!();
             Ok(api
                 .get(vec![GetInput::new(hash, GetOptions::default())])

@@ -31,6 +31,7 @@ use holochain_zome_types::CapGrant;
 use holochain_zome_types::CapSecret;
 use holochain_zome_types::CellId;
 use holochain_zome_types::ChainTopOrdering;
+use holochain_zome_types::CoordinatorZome;
 use holochain_zome_types::CounterSigningAgentState;
 use holochain_zome_types::CounterSigningSessionData;
 use holochain_zome_types::Element;
@@ -50,7 +51,6 @@ use holochain_zome_types::Signature;
 use holochain_zome_types::SignedHeader;
 use holochain_zome_types::SignedHeaderHashed;
 use holochain_zome_types::Timestamp;
-use holochain_zome_types::Zome;
 
 use crate::chain_lock::is_chain_locked;
 use crate::chain_lock::is_lock_expired;
@@ -149,7 +149,7 @@ impl SourceChain {
 
     pub async fn put_with_header(
         &self,
-        zome: Option<Zome>,
+        zome: Option<CoordinatorZome>,
         header: Header,
         maybe_entry: Option<Entry>,
         chain_top_ordering: ChainTopOrdering,
@@ -165,7 +165,7 @@ impl SourceChain {
 
     pub async fn put_countersigned(
         &self,
-        zome: Option<Zome>,
+        zome: Option<CoordinatorZome>,
         entry: Entry,
         chain_top_ordering: ChainTopOrdering,
     ) -> SourceChainResult<HeaderHash> {
@@ -186,7 +186,8 @@ impl SourceChain {
 
     pub async fn put<H: HeaderInner, B: HeaderBuilder<H>>(
         &self,
-        zome: Option<Zome>,
+        // This sets which zome is called for post commit.
+        zome: Option<CoordinatorZome>,
         header_builder: B,
         maybe_entry: Option<Entry>,
         chain_top_ordering: ChainTopOrdering,
@@ -224,7 +225,7 @@ impl SourceChain {
     pub async fn flush(
         &self,
         network: &(dyn HolochainP2pDnaT + Send + Sync),
-    ) -> SourceChainResult<Vec<(Option<Zome>, SignedHeaderHashed)>> {
+    ) -> SourceChainResult<Vec<(Option<CoordinatorZome>, SignedHeaderHashed)>> {
         // Nothing to write
         if self.scratch.apply(|s| s.is_empty())? {
             return Ok(Vec::new());
@@ -852,9 +853,9 @@ pub fn lock_for_entry(entry: Option<&Entry>) -> SourceChainResult<Vec<u8>> {
 
 #[allow(clippy::complexity)]
 fn build_ops_from_headers(
-    zomed_headers: Vec<(Option<Zome>, SignedHeaderHashed)>,
+    zomed_headers: Vec<(Option<CoordinatorZome>, SignedHeaderHashed)>,
 ) -> SourceChainResult<(
-    Vec<(Option<Zome>, SignedHeaderHashed)>,
+    Vec<(Option<CoordinatorZome>, SignedHeaderHashed)>,
     Vec<(DhtOpLight, DhtOpHash, OpOrder, Timestamp, Dependency)>,
 )> {
     // Headers end up back in here.
@@ -901,11 +902,11 @@ fn build_ops_from_headers(
 
 async fn rebase_headers_on(
     keystore: &MetaLairClient,
-    mut zomed_headers: Vec<(Option<Zome>, SignedHeaderHashed)>,
+    mut zomed_headers: Vec<(Option<CoordinatorZome>, SignedHeaderHashed)>,
     mut rebase_header: HeaderHash,
     mut rebase_seq: u32,
     mut rebase_timestamp: Timestamp,
-) -> Result<Vec<(Option<Zome>, SignedHeaderHashed)>, ScratchError> {
+) -> Result<Vec<(Option<CoordinatorZome>, SignedHeaderHashed)>, ScratchError> {
     zomed_headers.sort_by_key(|(_zome, shh)| shh.header().header_seq());
     for (_zome, shh) in zomed_headers.iter_mut() {
         let mut header = shh.header().clone();
@@ -1230,7 +1231,7 @@ pub mod tests {
         let keystore = test_keystore();
         let db = test_db.to_db();
         let alice = fixt!(AgentPubKey, Predictable, 0);
-        let zome = fixt!(Zome);
+        let zome = fixt!(CoordinatorZome);
 
         let mut mock = MockHolochainP2pDnaT::new();
         mock.expect_authority_for_hash().returning(|_| Ok(false));
@@ -1483,7 +1484,7 @@ pub mod tests {
         let secret = Some(CapSecretFixturator::new(Unpredictable).next().unwrap());
         let access = CapAccess::from(secret.unwrap());
         let mut mock = MockHolochainP2pDnaT::new();
-        let zome = fixt!(Zome);
+        let zome = fixt!(CoordinatorZome);
         mock.expect_authority_for_hash().returning(|_| Ok(false));
 
         // @todo curry
@@ -1787,7 +1788,7 @@ pub mod tests {
         mock.expect_authority_for_hash().returning(|_| Ok(false));
 
         let author = Arc::new(keystore.new_sign_keypair_random().await.unwrap());
-        let zome = fixt!(Zome);
+        let zome = fixt!(CoordinatorZome);
 
         fresh_reader_test!(vault, |txn| {
             assert_matches!(

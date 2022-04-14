@@ -474,7 +474,7 @@ impl RibosomeT for RealRibosome {
         Ok(ZomeInfo {
             name: zome.zome_name().clone(),
             id: self
-                .zome_to_id(&zome)
+                .zome_name_to_id(zome.zome_name())
                 .expect("Failed to get ID for current zome"),
             properties: SerializedBytes::default(),
             entry_defs: {
@@ -508,7 +508,7 @@ impl RibosomeT for RealRibosome {
                         extern_fns.sort();
                         extern_fns
                     }
-                    ZomeDef::Inline(zome) => zome.callbacks(),
+                    ZomeDef::Inline(zome) => zome.0.callbacks(),
                 }
             },
         })
@@ -562,7 +562,7 @@ impl RibosomeT for RealRibosome {
             ZomeDef::Inline(zome) => {
                 let input = invocation.clone().host_input()?;
                 let api = HostFnApi::new(Arc::new(self.clone()), Arc::new(call_context));
-                let result = zome.maybe_call(Box::new(api), to_call, input)?;
+                let result = zome.0.maybe_call(Box::new(api), to_call, input)?;
                 Ok(result)
             }
         }
@@ -682,7 +682,7 @@ pub mod wasm_test {
     async fn ribosome_extern_test() {
         observability::test_run().ok();
 
-        let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::HdkExtern])
+        let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::HdkExtern])
             .await
             .unwrap();
         let alice_pubkey = fixt!(AgentPubKey, Predictable, 0);

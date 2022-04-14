@@ -30,7 +30,7 @@ pub fn get_links<'a>(
                         tag_prefix,
                     } = input;
                     let zome_id = ribosome
-                        .zome_to_id(&call_context.zome)
+                        .zome_name_to_id(todo!())
                         .expect("Failed to get ID for current zome.");
                     let key = WireLinkKey {
                         base: base_address,

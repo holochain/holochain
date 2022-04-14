@@ -91,7 +91,7 @@ macro_rules! dht_op_update {
 /// Insert a [`DhtOp`] into the [`Scratch`].
 pub fn insert_op_scratch(
     scratch: &mut Scratch,
-    zome: Option<Zome>,
+    zome: Option<CoordinatorZome>,
     op: DhtOpHashed,
     chain_top_ordering: ChainTopOrdering,
 ) -> StateMutationResult<()> {
@@ -117,7 +117,7 @@ pub fn insert_op_scratch(
 
 pub fn insert_element_scratch(
     scratch: &mut Scratch,
-    zome: Option<Zome>,
+    zome: Option<CoordinatorZome>,
     element: Element,
     chain_top_ordering: ChainTopOrdering,
 ) {
@@ -628,7 +628,7 @@ pub fn reschedule_expired(
             },
             |row| {
                 Ok((
-                    ZomeName(row.get(0)?),
+                    ZomeName(row.get::<_, String>(0)?.into()),
                     FunctionName(row.get(1)?),
                     row.get(2)?,
                 ))

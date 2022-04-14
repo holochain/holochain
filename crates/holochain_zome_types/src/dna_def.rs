@@ -9,7 +9,10 @@ use crate::zome::error::ZomeError;
 use holo_hash::*;
 
 /// Zomes need to be an ordered map from ZomeName to a Zome
-pub type Zomes = Vec<(ZomeName, zome::ZomeDef)>;
+pub type IntegrityZomes = Vec<(ZomeName, zome::IntegrityZomeDef)>;
+
+/// Zomes need to be an ordered map from ZomeName to a Zome
+pub type CoordinatorZomes = Vec<(ZomeName, zome::CoordinatorZomeDef)>;
 
 /// Placeholder for a real UID type
 pub type Uid = String;
@@ -47,11 +50,11 @@ pub struct DnaDef {
     pub origin_time: Timestamp,
 
     /// A vector of zomes associated with your DNA.
-    pub integrity_zomes: Zomes,
+    pub integrity_zomes: IntegrityZomes,
 
     /// A vector of zomes that do not affect
     /// the [`DnaHash`].
-    pub coordinator_zomes: Zomes,
+    pub coordinator_zomes: CoordinatorZomes,
 }
 
 #[derive(Serialize, Debug, PartialEq, Eq)]
@@ -59,16 +62,21 @@ struct DnaDefHash<'a> {
     name: &'a String,
     uid: &'a String,
     properties: &'a SerializedBytes,
-    integrity_zomes: &'a Zomes,
+    integrity_zomes: &'a IntegrityZomes,
 }
 
 #[cfg(feature = "test_utils")]
 impl DnaDef {
     /// Create a DnaDef with a random UID, useful for testing
-    pub fn unique_from_zomes(zomes: Vec<Zome>) -> DnaDef {
-        let zomes = zomes.into_iter().map(|z| z.into_inner()).collect();
+    pub fn unique_from_zomes(
+        integrity: Vec<IntegrityZome>,
+        coordinator: Vec<CoordinatorZome>,
+    ) -> DnaDef {
+        let integrity = integrity.into_iter().map(|z| z.into_inner()).collect();
+        let coordinator = coordinator.into_iter().map(|z| z.into_inner()).collect();
         DnaDefBuilder::default()
-            .integrity_zomes(zomes)
+            .integrity_zomes(integrity)
+            .coordinator_zomes(coordinator)
             .random_uid()
             .build()
             .unwrap()
@@ -77,22 +85,30 @@ impl DnaDef {
 
 impl DnaDef {
     /// Get all zomes including the integrity and coordinator zomes.
-    pub fn all_zomes(&self) -> impl Iterator<Item = &(ZomeName, zome::ZomeDef)> {
+    pub fn all_zomes(&self) -> impl Iterator<Item = (&ZomeName, &zome::ZomeDef)> {
         self.integrity_zomes
             .iter()
-            .chain(self.coordinator_zomes.iter())
+            .map(|(n, def)| (n, def.as_any_zome_def()))
+            .chain(
+                self.coordinator_zomes
+                    .iter()
+                    .map(|(n, def)| (n, def.as_any_zome_def())),
+            )
     }
 }
 
 #[cfg(feature = "full-dna-def")]
 impl DnaDef {
     /// Find an integrity zome from a [`ZomeName`].
-    pub fn get_integrity_zome(&self, zome_name: &ZomeName) -> Result<zome::Zome, ZomeError> {
+    pub fn get_integrity_zome(
+        &self,
+        zome_name: &ZomeName,
+    ) -> Result<zome::IntegrityZome, ZomeError> {
         self.integrity_zomes
             .iter()
             .find(|(name, _)| name == zome_name)
             .cloned()
-            .map(|(name, def)| Zome::new(name, def))
+            .map(|(name, def)| IntegrityZome::new(name, def))
             .ok_or_else(|| ZomeError::ZomeNotFound(format!("Zome '{}' not found", &zome_name,)))
     }
 
@@ -104,18 +120,22 @@ impl DnaDef {
     }
 
     /// Return a Zome
-    pub fn get_zome(&self, zome_name: &ZomeName) -> Result<zome::Zome, ZomeError> {
-        self.all_zomes()
+    pub fn get_coordinator_zome(
+        &self,
+        zome_name: &ZomeName,
+    ) -> Result<zome::CoordinatorZome, ZomeError> {
+        self.coordinator_zomes
+            .iter()
             .find(|(name, _)| name == zome_name)
             .cloned()
-            .map(|(name, def)| Zome::new(name, def))
+            .map(|(name, def)| CoordinatorZome::new(name, def))
             .ok_or_else(|| ZomeError::ZomeNotFound(format!("Zome '{}' not found", &zome_name,)))
     }
 
     /// Return a Zome, error if not a WasmZome
     pub fn get_wasm_zome(&self, zome_name: &ZomeName) -> Result<&zome::WasmZome, ZomeError> {
         self.all_zomes()
-            .find(|(name, _)| name == zome_name)
+            .find(|(name, _)| *name == zome_name)
             .map(|(_, def)| def)
             .ok_or_else(|| ZomeError::ZomeNotFound(format!("Zome '{}' not found", &zome_name,)))
             .and_then(|def| {

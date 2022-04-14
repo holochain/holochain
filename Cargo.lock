@@ -1803,6 +1803,8 @@ dependencies = [
 name = "hdk_derive"
 version = "0.0.29"
 dependencies = [
+ "darling 0.13.4",
+ "heck 0.4.0",
  "holochain_integrity_types",
  "paste",
  "proc-macro2",

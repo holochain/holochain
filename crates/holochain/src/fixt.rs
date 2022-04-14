@@ -138,7 +138,7 @@ fixturator!(
         // align the wasm hashes across the file and def
         let mut zome_name_fixturator = ZomeNameFixturator::new(Unpredictable);
         let wasms = WasmMapFixturator::new(Unpredictable).next().unwrap();
-        let mut zomes: Zomes = Vec::new();
+        let mut zomes: IntegrityZomes = Vec::new();
         for (hash, _) in wasms {
             zomes.push((
                 zome_name_fixturator.next().unwrap(),
@@ -159,7 +159,7 @@ fixturator!(
         let wasms = WasmMapFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap();
-        let mut zomes: Zomes = Vec::new();
+        let mut zomes: IntegrityZomes = Vec::new();
         for (hash, _) in wasms {
             zomes.push((
                 zome_name_fixturator.next().unwrap(),
@@ -397,7 +397,7 @@ fixturator!(
 
 fixturator!(
     PostCommitInvocation;
-    constructor fn new(Zome, SignedHeaderHashedVec);
+    constructor fn new(IntegrityZome, SignedHeaderHashedVec);
 );
 
 fixturator!(
@@ -407,7 +407,7 @@ fixturator!(
 
 fixturator!(
     ZomesToInvoke;
-    constructor fn one(Zome);
+    constructor fn one(CoordinatorZome);
 );
 
 fixturator!(
@@ -417,7 +417,7 @@ fixturator!(
 
 fixturator!(
     ValidationPackageInvocation;
-    constructor fn new(Zome, AppEntryType);
+    constructor fn new(IntegrityZome, AppEntryType);
 );
 
 fixturator!(
@@ -445,14 +445,14 @@ fixturator!(
 
 fixturator!(
     CallContext;
-    constructor fn new(Zome, FunctionName, HostContext, InvocationAuth);
+    constructor fn new(CoordinatorZome, FunctionName, HostContext, InvocationAuth);
 );
 
 fixturator!(
     ZomeCallInvocation;
     curve Empty ZomeCallInvocation {
         cell_id: CellIdFixturator::new(Empty).next().unwrap(),
-        zome: ZomeFixturator::new(Empty).next().unwrap(),
+        zome: CoordinatorZomeFixturator::new(Empty).next().unwrap(),
         cap_secret: Some(CapSecretFixturator::new(Empty).next().unwrap()),
         fn_name: FunctionNameFixturator::new(Empty).next().unwrap(),
         payload: ExternIoFixturator::new(Empty).next().unwrap(),
@@ -460,7 +460,7 @@ fixturator!(
     };
     curve Unpredictable ZomeCallInvocation {
         cell_id: CellIdFixturator::new(Unpredictable).next().unwrap(),
-        zome: ZomeFixturator::new(Unpredictable).next().unwrap(),
+        zome: CoordinatorZomeFixturator::new(Unpredictable).next().unwrap(),
         cap_secret: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
         fn_name: FunctionNameFixturator::new(Unpredictable).next().unwrap(),
         payload: ExternIoFixturator::new(Unpredictable).next().unwrap(),
@@ -470,7 +470,7 @@ fixturator!(
         cell_id: CellIdFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap(),
-        zome: ZomeFixturator::new_indexed(Predictable, get_fixt_index!())
+        zome: CoordinatorZomeFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap(),
         cap_secret: Some(CapSecretFixturator::new_indexed(Predictable, get_fixt_index!())

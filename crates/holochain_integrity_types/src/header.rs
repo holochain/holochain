@@ -171,6 +171,23 @@ impl Header {
         }
     }
 
+    /// Pull out the entry data by move.
+    pub fn into_entry_data(self) -> Option<(EntryHash, EntryType)> {
+        match self {
+            Self::Create(Create {
+                entry_hash,
+                entry_type,
+                ..
+            }) => Some((entry_hash, entry_type)),
+            Self::Update(Update {
+                entry_hash,
+                entry_type,
+                ..
+            }) => Some((entry_hash, entry_type)),
+            _ => None,
+        }
+    }
+
     pub fn entry_hash(&self) -> Option<&EntryHash> {
         self.entry_data().map(|d| d.0)
     }

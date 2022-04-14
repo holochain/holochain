@@ -185,7 +185,7 @@ impl TestData {
             fixt!(Signature),
         ));
         self.scratch
-            .add_header(Some(fixt!(Zome)), header, ChainTopOrdering::default());
+            .add_header(Some(fixt!(CoordinatorZome)), header, ChainTopOrdering::default());
     }
     fn delete_link(&self) {
         let op = DhtOpHashed::from_content_sync(DhtOp::RegisterRemoveLink(
@@ -204,7 +204,7 @@ impl TestData {
             fixt!(Signature),
         ));
         self.scratch
-            .add_header(Some(fixt!(Zome)), header, ChainTopOrdering::default());
+            .add_header(Some(fixt!(CoordinatorZome)), header, ChainTopOrdering::default());
     }
     fn clear_scratch(&mut self) {
         self.scratch.drain_zomed_headers().for_each(|_| ());

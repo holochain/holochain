@@ -61,15 +61,15 @@ mod tests {
     use std::sync::atomic::Ordering;
 
     use super::*;
-    use crate::sweettest::SweetDnaFile;
-    use crate::sweettest::{SweetAgents, SweetConductorBatch};
+    use crate::sweettest::*;
     use futures::future;
     use hdk::prelude::*;
+    use holochain_types::inline_zome::InlineZomeSet;
 
-    fn zome(agents: Vec<AgentPubKey>, num_signals: Arc<AtomicUsize>) -> InlineZome {
+    fn zome(agents: Vec<AgentPubKey>, num_signals: Arc<AtomicUsize>) -> InlineZomeSet {
         let entry_def = EntryDef::default_with_id("entrydef");
 
-        InlineZome::new_unique(vec![entry_def.clone()])
+        SweetEasyInline::new(vec![entry_def.clone()])
             .callback("signal_others", move |api, ()| {
                 let signal = ExternIO::encode("Hey").unwrap();
                 let signal = RemoteSignal {
@@ -95,14 +95,14 @@ mod tests {
                     functions,
                 };
                 api.create(CreateInput::new(
-                    EntryDefId::CapGrant,
+                    EntryDefLocation::CapGrant,
                     Entry::CapGrant(cap_grant_entry),
                     ChainTopOrdering::default(),
                 ))
                 .unwrap();
 
                 Ok(InitCallbackResult::Pass)
-            })
+            }).into()
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -118,12 +118,10 @@ mod tests {
         let agents =
             future::join_all(conductors.iter().map(|c| SweetAgents::one(c.keystore()))).await;
 
-        let (dna_file, _) = SweetDnaFile::unique_from_inline_zome(
-            "zome1",
-            zome(agents.clone(), num_signals.clone()),
-        )
-        .await
-        .unwrap();
+        let (dna_file, _, _) =
+            SweetDnaFile::unique_from_inline_zomes(zome(agents.clone(), num_signals.clone()))
+                .await
+                .unwrap();
 
         let apps = conductors
             .setup_app_for_zipped_agents("app", &agents, &[dna_file.clone().into()])
@@ -141,7 +139,11 @@ mod tests {
         let signals = signals.into_iter().flatten().collect::<Vec<_>>();
 
         let _: () = conductors[0]
-            .call(&cells[0].zome("zome1"), "signal_others", ())
+            .call(
+                &cells[0].zome(SweetEasyInline::COORDINATOR),
+                "signal_others",
+                (),
+            )
             .await;
 
         crate::assert_eq_retry_10s!(num_signals.load(Ordering::SeqCst), NUM_CONDUCTORS);

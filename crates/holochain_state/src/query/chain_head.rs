@@ -101,7 +101,7 @@ mod tests {
         observability::test_run().ok();
         let mut conn = Connection::open_in_memory().unwrap();
         SCHEMA_CELL.initialize(&mut conn, None).unwrap();
-        let zome = fixt!(Zome);
+        let zome = fixt!(CoordinatorZome);
 
         let mut txn = conn
             .transaction_with_behavior(TransactionBehavior::Exclusive)

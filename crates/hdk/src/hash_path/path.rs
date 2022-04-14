@@ -3,7 +3,6 @@ use crate::hash_path::shard::SHARDEND;
 use crate::prelude::*;
 use holochain_wasmer_guest::*;
 use holochain_zome_types::link::LinkTag;
-use holochain_zome_types::validate::RequiredValidationType;
 use std::str::FromStr;
 
 /// Allows for "foo.bar.baz" to automatically move to/from ["foo", "bar", "baz"] components.
@@ -286,7 +285,7 @@ impl Path {
     /// Recursively touch this and every parent that doesn't exist yet.
     pub fn ensure(&self) -> ExternResult<()> {
         if !self.exists()? {
-            create_entry(self.path_entry()?)?;
+            // create_entry(self.path_entry()?)?;
             if let Some(parent) = self.parent() {
                 parent.ensure()?;
                 create_link(

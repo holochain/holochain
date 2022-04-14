@@ -38,7 +38,7 @@ impl DnaBundle {
         uid: Option<Uid>,
         properties: Option<YamlProperties>,
     ) -> DnaResult<(DnaFile, DnaHash)> {
-        let ([integrity, coordinator], wasms) = self.inner_maps().await?;
+        let (integrity, coordinator, wasms) = self.inner_maps().await?;
         let (dna_def, original_hash) = self.to_dna_def(integrity, coordinator, uid, properties)?;
 
         Ok((DnaFile::from_parts(dna_def, wasms), original_hash))
@@ -59,7 +59,7 @@ impl DnaBundle {
             .map_err(Into::into)
     }
 
-    async fn inner_maps(&self) -> DnaResult<([Zomes; 2], WasmMap)> {
+    async fn inner_maps(&self) -> DnaResult<(IntegrityZomes, CoordinatorZomes, WasmMap)> {
         let mut resources = self.resolve_all_cloned().await?;
         let data = match self.manifest() {
             DnaManifest::V1(manifest) => {
@@ -71,29 +71,40 @@ impl DnaBundle {
             }
         };
 
-        let mut zomes = [Zomes::default(), Zomes::default()];
-        let mut code = BTreeMap::new();
-
-        for (data, out) in data.into_iter().zip(zomes.iter_mut()) {
-            out.extend(data.iter().map(|(zome_name, hash, _)| {
+        let integrity_zomes = data[0]
+            .iter()
+            .map(|(zome_name, hash, _)| {
                 (
                     zome_name.clone(),
-                    ZomeDef::Wasm(WasmZome::new(hash.clone())),
+                    ZomeDef::Wasm(WasmZome::new(hash.clone())).into(),
                 )
-            }));
-            code.extend(data.into_iter().map(|(_, hash, wasm)| (hash, wasm)));
-        }
+            })
+            .collect();
+        let coordinator_zomes = data[1]
+            .iter()
+            .map(|(zome_name, hash, _)| {
+                (
+                    zome_name.clone(),
+                    ZomeDef::Wasm(WasmZome::new(hash.clone())).into(),
+                )
+            })
+            .collect();
+        let code: BTreeMap<_, _> = data
+            .into_iter()
+            .flatten()
+            .map(|(_, hash, wasm)| (hash, wasm))
+            .collect();
 
         let wasms = WasmMap::from(code);
 
-        Ok((zomes, wasms))
+        Ok((integrity_zomes, coordinator_zomes, wasms))
     }
 
     /// Convert to a DnaDef
     pub fn to_dna_def(
         &self,
-        integrity_zomes: Zomes,
-        coordinator_zomes: Zomes,
+        integrity_zomes: IntegrityZomes,
+        coordinator_zomes: CoordinatorZomes,
         uid: Option<Uid>,
         properties: Option<YamlProperties>,
     ) -> DnaResult<(DnaDefHashed, DnaHash)> {
@@ -153,11 +164,7 @@ impl DnaBundle {
             .integrity_zomes
             .into_iter()
             .filter_map(|(name, zome)| {
-                match zome {
-                    ZomeDef::Wasm(wz) => Some(wz.wasm_hash),
-                    ZomeDef::Inline(_) => None,
-                }
-                .map(|hash| {
+                zome.wasm_hash(&name).ok().map(|hash| {
                     let hash = WasmHashB64::from(hash);
                     let filename = format!("{}", hash);
                     ZomeManifest {
@@ -172,11 +179,7 @@ impl DnaBundle {
             .coordinator_zomes
             .into_iter()
             .filter_map(|(name, zome)| {
-                match zome {
-                    ZomeDef::Wasm(wz) => Some(wz.wasm_hash),
-                    ZomeDef::Inline(_) => None,
-                }
-                .map(|hash| {
+                zome.wasm_hash(&name).ok().map(|hash| {
                     let hash = WasmHashB64::from(hash);
                     let filename = format!("{}", hash);
                     ZomeManifest {

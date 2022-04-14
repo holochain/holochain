@@ -200,7 +200,7 @@ mod slow_tests {
         let mut post_commit_invocation = PostCommitInvocationFixturator::new(::fixt::Empty)
             .next()
             .unwrap();
-        post_commit_invocation.zome = TestWasm::Foo.into();
+        post_commit_invocation.zome = CoordinatorZome::from(TestWasm::Foo).erase_type();
 
         let result = ribosome
             .run_post_commit(host_access, post_commit_invocation)
@@ -219,7 +219,7 @@ mod slow_tests {
         let mut post_commit_invocation = PostCommitInvocationFixturator::new(::fixt::Empty)
             .next()
             .unwrap();
-        post_commit_invocation.zome = TestWasm::PostCommitSuccess.into();
+        post_commit_invocation.zome = CoordinatorZome::from(TestWasm::PostCommitSuccess).erase_type();
 
         let result = ribosome
             .run_post_commit(host_access, post_commit_invocation)

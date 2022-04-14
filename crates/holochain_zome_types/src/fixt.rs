@@ -669,20 +669,53 @@ fixturator!(
 );
 
 fixturator!(
-    Zomes;
+    IntegrityZome;
+    constructor fn new(ZomeName, IntegrityZomeDef);
+);
+
+fixturator!(
+    IntegrityZomes;
     curve Empty Vec::new();
     curve Unpredictable {
         // @todo implement unpredictable zomes
-        ZomesFixturator::new(Empty).next().unwrap()
+        IntegrityZomesFixturator::new(Empty).next().unwrap()
     };
     curve Predictable {
         // @todo implement predictable zomes
-        ZomesFixturator::new(Empty).next().unwrap()
+        IntegrityZomesFixturator::new(Empty).next().unwrap()
+    };
+);
+
+fixturator!(
+    CoordinatorZome;
+    constructor fn new(ZomeName, CoordinatorZomeDef);
+);
+
+fixturator!(
+    CoordinatorZomes;
+    curve Empty Vec::new();
+    curve Unpredictable {
+        // @todo implement unpredictable zomes
+        CoordinatorZomesFixturator::new(Empty).next().unwrap()
+    };
+    curve Predictable {
+        // @todo implement predictable zomes
+        CoordinatorZomesFixturator::new(Empty).next().unwrap()
     };
 );
 
 fixturator!(
     ZomeDef;
+    constructor fn from_hash(WasmHash);
+);
+
+fixturator!(
+    IntegrityZomeDef;
+    constructor fn from_hash(WasmHash);
+);
+
+fixturator!(
+    CoordinatorZomeDef;
     constructor fn from_hash(WasmHash);
 );
 
@@ -699,10 +732,10 @@ fixturator!(
             .next()
             .unwrap(),
         origin_time: Timestamp::HOLOCHAIN_EPOCH,
-        integrity_zomes: ZomesFixturator::new_indexed(Empty, get_fixt_index!())
+        integrity_zomes: IntegrityZomesFixturator::new_indexed(Empty, get_fixt_index!())
             .next()
             .unwrap(),
-        coordinator_zomes: ZomesFixturator::new_indexed(Empty, get_fixt_index!())
+        coordinator_zomes: CoordinatorZomesFixturator::new_indexed(Empty, get_fixt_index!())
             .next()
             .unwrap(),
     };
@@ -718,10 +751,10 @@ fixturator!(
             .next()
             .unwrap(),
         origin_time: Timestamp::HOLOCHAIN_EPOCH,
-        integrity_zomes: ZomesFixturator::new_indexed(Unpredictable, get_fixt_index!())
+        integrity_zomes: IntegrityZomesFixturator::new_indexed(Unpredictable, get_fixt_index!())
             .next()
             .unwrap(),
-        coordinator_zomes: ZomesFixturator::new_indexed(Empty, get_fixt_index!())
+        coordinator_zomes: CoordinatorZomesFixturator::new_indexed(Empty, get_fixt_index!())
             .next()
             .unwrap(),
     };
@@ -737,10 +770,10 @@ fixturator!(
             .next()
             .unwrap(),
         origin_time: Timestamp::HOLOCHAIN_EPOCH,
-        integrity_zomes: ZomesFixturator::new_indexed(Predictable, get_fixt_index!())
+        integrity_zomes: IntegrityZomesFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap(),
-        coordinator_zomes: ZomesFixturator::new_indexed(Empty, get_fixt_index!())
+        coordinator_zomes: CoordinatorZomesFixturator::new_indexed(Empty, get_fixt_index!())
             .next()
             .unwrap(),
     };

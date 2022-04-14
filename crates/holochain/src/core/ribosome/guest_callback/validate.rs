@@ -239,7 +239,8 @@ mod slow_tests {
         let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
             .next()
             .unwrap();
-        validate_invocation.zomes_to_invoke = ZomesToInvoke::One(TestWasm::Foo.into());
+        validate_invocation.zomes_to_invoke =
+            ZomesToInvoke::One(IntegrityZome::from(TestWasm::Foo).erase_type());
 
         let result = ribosome
             .run_validate(fixt!(ValidateHostAccess), validate_invocation)
@@ -254,7 +255,8 @@ mod slow_tests {
         let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateValid]))
             .next()
             .unwrap();
-        validate_invocation.zomes_to_invoke = ZomesToInvoke::One(TestWasm::ValidateValid.into());
+        validate_invocation.zomes_to_invoke =
+            ZomesToInvoke::One(IntegrityZome::from(TestWasm::ValidateValid).erase_type());
 
         let result = ribosome
             .run_validate(fixt!(ValidateHostAccess), validate_invocation)
@@ -286,7 +288,8 @@ mod slow_tests {
             ),
         };
 
-        let zomes_to_invoke = ZomesToInvoke::One(TestWasm::ValidateInvalid.into());
+        let zomes_to_invoke =
+            ZomesToInvoke::One(IntegrityZome::from(TestWasm::ValidateValid).erase_type());
         let validate_invocation = ValidateInvocation::new(zomes_to_invoke, &op).unwrap();
 
         let result = ribosome

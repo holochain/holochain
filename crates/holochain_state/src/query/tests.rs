@@ -33,7 +33,7 @@ async fn get_links() {
     observability::test_run().ok();
     let mut scratch = Scratch::new();
     let mut conn = Connection::open_in_memory().unwrap();
-    let zome = fixt!(Zome);
+    let zome = fixt!(CoordinatorZome);
     SCHEMA_CELL.initialize(&mut conn, None).unwrap();
 
     let mut cache = Connection::open_in_memory().unwrap();
@@ -118,7 +118,7 @@ async fn get_entry() {
     observability::test_run().ok();
     let mut scratch = Scratch::new();
     let mut conn = Connection::open_in_memory().unwrap();
-    let zome = fixt!(Zome);
+    let zome = fixt!(CoordinatorZome);
     SCHEMA_CELL.initialize(&mut conn, None).unwrap();
 
     let mut cache = Connection::open_in_memory().unwrap();

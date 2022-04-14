@@ -32,21 +32,12 @@ pub fn create_link<'a>(
                     .dna_def()
                     .get_integrity_zome(&zome_name)
                     .map_err(|zome_error| WasmError::Host(zome_error.to_string()))?,
-                None => ribosome
-                    .dna_def()
-                    .is_integrity_zome(call_context.zome.zome_name())
-                    .then(|| call_context.zome.clone())
-                    .ok_or_else(|| {
-                        WasmError::Host(format!(
-                            "Tried to commit link to zome {} that is not an integrity zome",
-                            call_context.zome.zome_name().clone()
-                        ))
-                    })?,
+                None => todo!(),
             };
 
             // extract the zome position
             let zome_id = ribosome
-                .zome_to_id(&zome)
+                .zome_name_to_id(zome.zome_name())
                 .expect("Failed to get ID for current zome");
 
             // Construct the link add
@@ -61,7 +52,7 @@ pub fn create_link<'a>(
                     .source_chain()
                     .as_ref()
                     .expect("Must have source chain if write_workspace access is given")
-                    .put(Some(zome), header_builder, None, chain_top_ordering)
+                    .put(None, header_builder, None, chain_top_ordering)
                     .await?;
                 Ok::<HeaderHash, RibosomeError>(header_hash)
             }))

@@ -53,7 +53,6 @@ pub mod test {
         let (dna_file, _, _) = SweetDnaFile::from_test_wasms(
             random_uid(),
             vec![TestWasm::ZomeInfo],
-            vec![],
             properties,
         )
         .await

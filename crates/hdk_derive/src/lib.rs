@@ -7,6 +7,14 @@ use syn::parse::ParseStream;
 use syn::parse::Result;
 use syn::punctuated::Punctuated;
 
+mod entry_def_registration;
+mod entry_defs_conversions;
+mod entry_defs_full;
+mod entry_defs_name_registration;
+mod to_app_entry_def_name;
+mod to_zome_name;
+mod util;
+
 struct EntryDef(holochain_integrity_types::entry_def::EntryDef);
 struct EntryDefId(holochain_integrity_types::entry_def::EntryDefId);
 struct EntryVisibility(holochain_integrity_types::entry_def::EntryVisibility);
@@ -15,7 +23,8 @@ struct RequiredValidationType(holochain_integrity_types::validate::RequiredValid
 
 impl Parse for EntryDef {
     fn parse(input: ParseStream) -> Result<Self> {
-        let mut id = holochain_integrity_types::entry_def::EntryDefId::App(String::default());
+        let mut id =
+            holochain_integrity_types::entry_def::EntryDefId::App(String::default().into());
         let mut required_validations =
             holochain_integrity_types::entry_def::RequiredValidations::default();
         let mut visibility = holochain_integrity_types::entry_def::EntryVisibility::default();
@@ -29,7 +38,7 @@ impl Parse for EntryDef {
                     "id" => match var.lit {
                         syn::Lit::Str(s) => {
                             id = holochain_integrity_types::entry_def::EntryDefId::App(
-                                s.value().to_string(),
+                                s.value().to_string().into(),
                             )
                         }
                         _ => unreachable!(),
@@ -98,8 +107,9 @@ impl quote::ToTokens for EntryDefId {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         match &self.0 {
             holochain_integrity_types::entry_def::EntryDefId::App(s) => {
+                let string: String = s.0.to_string();
                 tokens.append_all(quote::quote! {
-                    holochain_deterministic_integrity::prelude::EntryDefId::App(String::from(#s))
+                    holochain_deterministic_integrity::prelude::EntryDefId::App(#string.into())
                 });
             }
             _ => unreachable!(),
@@ -219,4 +229,34 @@ pub fn hdk_extern(attrs: TokenStream, item: TokenStream) -> TokenStream {
         })
         .into()
     }
+}
+
+#[proc_macro_derive(ToZomeName, attributes(zome_name))]
+pub fn derive_to_zome_name(input: TokenStream) -> TokenStream {
+    to_zome_name::derive(input)
+}
+
+#[proc_macro_derive(ToAppEntryDefName, attributes(entry_def_name))]
+pub fn derive_to_app_entry_def_name(input: TokenStream) -> TokenStream {
+    to_app_entry_def_name::derive(input)
+}
+
+#[proc_macro_derive(EntryDefRegistration, attributes(entry_def))]
+pub fn derive_entry_def_registration(input: TokenStream) -> TokenStream {
+    entry_def_registration::derive(input)
+}
+
+#[proc_macro_attribute]
+pub fn entry_defs_full(attrs: TokenStream, code: TokenStream) -> TokenStream {
+    entry_defs_full::build(attrs, code)
+}
+
+#[proc_macro_attribute]
+pub fn entry_defs_name_registration(attrs: TokenStream, code: TokenStream) -> TokenStream {
+    entry_defs_name_registration::build(attrs, code)
+}
+
+#[proc_macro_attribute]
+pub fn entry_defs_conversions(attrs: TokenStream, code: TokenStream) -> TokenStream {
+    entry_defs_conversions::build(attrs, code)
 }

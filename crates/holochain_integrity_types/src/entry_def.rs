@@ -1,20 +1,45 @@
+use std::borrow::Cow;
+
 use crate::validate::RequiredValidationType;
 use crate::EntryDefIndex;
 use holochain_serialized_bytes::prelude::*;
 
 const DEFAULT_REQUIRED_VALIDATIONS: u8 = 5;
 
-#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub enum EntryDefId {
-    App(String),
+    App(AppEntryDefName),
     CapClaim,
     CapGrant,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
+pub struct AppEntryDefName(pub Cow<'static, str>);
+
+/// A trait for converting a value to a [`AppEntryDefName`].
+pub trait ToAppEntryDefName {
+    /// Converts the value to a [`AppEntryDefName`] without consuming it.
+    fn entry_def_name(&self) -> AppEntryDefName;
+}
+
+/// Trait for binding static [`EntryDef`] property access for a type.
+/// See [`register_entry`]
+pub trait EntryDefRegistration {
+    const ENTRY_DEFS: &'static [AppEntryDef];
+}
+
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub struct RequiredValidations(pub u8);
 
-#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub struct EntryDef {
     /// Zome-unique identifier for this entry type
     pub id: EntryDefId,
@@ -26,10 +51,34 @@ pub struct EntryDef {
     pub required_validation_type: RequiredValidationType,
 }
 
+#[derive(
+    Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
+pub struct AppEntryDef {
+    /// Zome-unique identifier for this entry type
+    pub name: AppEntryDefName,
+    /// Public or Private
+    pub visibility: EntryVisibility,
+    /// how many validations to receive before considered "network saturated" (MAX value of 50?)
+    pub required_validations: RequiredValidations,
+}
+
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct EntryDefs(pub Vec<EntryDef>);
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Copy, Hash)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    SerializedBytes,
+)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum EntryVisibility {
     Public,
@@ -39,6 +88,15 @@ pub enum EntryVisibility {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
 pub enum EntryDefsCallbackResult {
     Defs(EntryDefs),
+}
+
+impl AppEntryDefName {
+    pub fn new(s: impl Into<Cow<'static, str>>) -> Self {
+        Self(s.into())
+    }
+    pub const fn from_str(s: &'static str) -> Self {
+        Self(Cow::Borrowed(s))
+    }
 }
 
 impl Default for EntryVisibility {
@@ -136,12 +194,30 @@ impl From<Vec<EntryDef>> for EntryDefsCallbackResult {
 
 impl From<String> for EntryDefId {
     fn from(s: String) -> Self {
-        Self::App(s)
+        Self::App(s.into())
     }
 }
 
 impl From<&str> for EntryDefId {
     fn from(s: &str) -> Self {
-        Self::App(s.to_string())
+        Self::App(s.to_string().into())
+    }
+}
+
+impl From<&'static str> for AppEntryDefName {
+    fn from(s: &'static str) -> Self {
+        Self(Cow::Borrowed(s))
+    }
+}
+
+impl From<String> for AppEntryDefName {
+    fn from(s: String) -> Self {
+        Self(Cow::Owned(s))
+    }
+}
+
+impl From<AppEntryDefName> for EntryDefId {
+    fn from(name: AppEntryDefName) -> Self {
+        EntryDefId::App(name)
     }
 }

@@ -12,7 +12,7 @@ async fn entry_scratch_same_as_sql() {
     observability::test_run().ok();
     let mut scratch = Scratch::new();
     let mut conn = Connection::open_in_memory().unwrap();
-    let zome = fixt!(Zome);
+    let zome = fixt!(CoordinatorZome);
     SCHEMA_CELL.initialize(&mut conn, None).unwrap();
 
     let mut txn = conn
@@ -48,7 +48,7 @@ async fn element_scratch_same_as_sql() {
     observability::test_run().ok();
     let mut scratch = Scratch::new();
     let mut conn = Connection::open_in_memory().unwrap();
-    let zome = fixt!(Zome);
+    let zome = fixt!(CoordinatorZome);
     SCHEMA_CELL.initialize(&mut conn, None).unwrap();
 
     let mut txn = conn

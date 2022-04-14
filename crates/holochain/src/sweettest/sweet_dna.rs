@@ -1,4 +1,6 @@
+use holochain_types::inline_zome::InlineZomeSet;
 use holochain_types::prelude::*;
+use holochain_wasm_test_utils::TestWasmPair;
 use std::path::Path;
 
 /// Helpful constructors for DnaFiles used in tests
@@ -34,31 +36,13 @@ impl SweetDnaFile {
     }
 
     /// Create a DnaFile from a collection of Zomes
-    pub async fn from_integrity_only(
-        uid: String,
-        integrity_zomes: Vec<(ZomeName, ZomeDef)>,
-        wasms: Vec<wasm::DnaWasm>,
-        properties: SerializedBytes,
-    ) -> DnaResult<(DnaFile, Vec<Zome>)> {
-        let (dna, zomes, _) = Self::from_zomes(
-            uid,
-            integrity_zomes,
-            Vec::with_capacity(0),
-            wasms,
-            properties,
-        )
-        .await?;
-        Ok((dna, zomes))
-    }
-
-    /// Create a DnaFile from a collection of Zomes
     pub async fn from_zomes(
         uid: String,
-        integrity_zomes: Vec<(ZomeName, ZomeDef)>,
-        coordinator_zomes: Vec<(ZomeName, ZomeDef)>,
+        integrity_zomes: IntegrityZomes,
+        coordinator_zomes: CoordinatorZomes,
         wasms: Vec<wasm::DnaWasm>,
         properties: SerializedBytes,
-    ) -> DnaResult<(DnaFile, Vec<Zome>, Vec<Zome>)> {
+    ) -> DnaResult<(DnaFile, Vec<IntegrityZome>, Vec<CoordinatorZome>)> {
         let dna_def = DnaDefBuilder::default()
             .uid(uid)
             .integrity_zomes(integrity_zomes.clone())
@@ -69,13 +53,13 @@ impl SweetDnaFile {
             .unwrap();
 
         let dna_file = DnaFile::new(dna_def, wasms).await?;
-        let integrity_zomes: Vec<Zome> = integrity_zomes
+        let integrity_zomes = integrity_zomes
             .into_iter()
-            .map(|(n, z)| Zome::new(n, z))
+            .map(|(n, z)| IntegrityZome::new(n, z))
             .collect();
-        let coordinator_zomes: Vec<Zome> = coordinator_zomes
+        let coordinator_zomes = coordinator_zomes
             .into_iter()
-            .map(|(n, z)| Zome::new(n, z))
+            .map(|(n, z)| CoordinatorZome::new(n, z))
             .collect();
         Ok((dna_file, integrity_zomes, coordinator_zomes))
     }
@@ -83,86 +67,90 @@ impl SweetDnaFile {
     /// Create a DnaFile from a collection of Zomes,
     /// with a random UID
     pub async fn unique_from_zomes(
-        zomes: Vec<(ZomeName, ZomeDef)>,
+        integrity_zomes: IntegrityZomes,
+        coordinator_zomes: CoordinatorZomes,
         wasms: Vec<wasm::DnaWasm>,
-    ) -> DnaResult<(DnaFile, Vec<Zome>)> {
-        Self::from_integrity_only(random_uid(), zomes, wasms, SerializedBytes::default()).await
-    }
-
-    /// Create a DnaFile from a collection of TestWasm
-    pub async fn from_test_wasms<W>(
-        uid: String,
-        integrity_wasms: Vec<W>,
-        coordinator_wasms: Vec<W>,
-        properties: SerializedBytes,
-    ) -> DnaResult<(DnaFile, Vec<Zome>, Vec<Zome>)>
-    where
-        W: Into<(ZomeName, ZomeDef)> + Into<wasm::DnaWasm> + Clone,
-    {
-        let integrity_zomes = integrity_wasms
-            .clone()
-            .into_iter()
-            .map(Into::into)
-            .collect();
-        let coordinator_zomes = coordinator_wasms
-            .clone()
-            .into_iter()
-            .map(Into::into)
-            .collect();
-        let wasms = integrity_wasms
-            .into_iter()
-            .chain(coordinator_wasms.into_iter())
-            .map(Into::into)
-            .collect();
-        Self::from_zomes(uid, integrity_zomes, coordinator_zomes, wasms, properties).await
-    }
-
-    /// Create a DnaFile from a collection of TestWasm
-    /// with a random UID
-    pub async fn unique_from_test_wasms<W>(test_wasms: Vec<W>) -> DnaResult<(DnaFile, Vec<Zome>)>
-    where
-        W: Into<(ZomeName, ZomeDef)> + Into<wasm::DnaWasm> + Clone,
-    {
-        let (dna, zomes, _) = Self::from_test_wasms(
+    ) -> DnaResult<(DnaFile, Vec<IntegrityZome>, Vec<CoordinatorZome>)> {
+        Self::from_zomes(
             random_uid(),
-            test_wasms,
-            Vec::with_capacity(0),
-            SerializedBytes::default(),
-        )
-        .await?;
-        Ok((dna, zomes))
-    }
-
-    /// Create a DnaFile from a collection of TestWasm
-    /// with a random UID
-    pub async fn unique_coordinator_from_test_wasms<W>(
-        integrity_wasms: Vec<W>,
-        coordinator_wasms: Vec<W>,
-    ) -> DnaResult<(DnaFile, Vec<Zome>, Vec<Zome>)>
-    where
-        W: Into<(ZomeName, ZomeDef)> + Into<wasm::DnaWasm> + Clone,
-    {
-        Self::from_test_wasms(
-            random_uid(),
-            integrity_wasms,
-            coordinator_wasms,
+            integrity_zomes,
+            coordinator_zomes,
+            wasms,
             SerializedBytes::default(),
         )
         .await
     }
 
+    /// Create a DnaFile from a collection of TestWasm
+    pub async fn from_test_wasms<W>(
+        uid: String,
+        wasms: Vec<W>,
+        properties: SerializedBytes,
+    ) -> DnaResult<(DnaFile, Vec<IntegrityZome>, Vec<CoordinatorZome>)>
+    where
+        W: Into<TestWasmPair<IntegrityZome, CoordinatorZome>>
+            + Into<TestWasmPair<wasm::DnaWasm>>
+            + Clone,
+    {
+        let (integrity_zomes, coordinator_zomes) = wasms
+            .clone()
+            .into_iter()
+            .map(|w| {
+                let TestWasmPair::<IntegrityZome, CoordinatorZome> {
+                    integrity,
+                    coordinator,
+                } = w.into();
+                (integrity.into_inner(), coordinator.into_inner())
+            })
+            .unzip();
+
+        let wasms = wasms
+            .into_iter()
+            .flat_map(|w| {
+                let TestWasmPair::<DnaWasm> {
+                    integrity,
+                    coordinator,
+                } = w.into();
+                [integrity, coordinator]
+            })
+            .collect();
+
+        Self::from_zomes(uid, integrity_zomes, coordinator_zomes, wasms, properties).await
+    }
+
+    /// Create a DnaFile from a collection of TestWasm
+    /// with a random UID
+    pub async fn unique_from_test_wasms<W>(
+        test_wasms: Vec<W>,
+    ) -> DnaResult<(DnaFile, Vec<IntegrityZome>, Vec<CoordinatorZome>)>
+    where
+        W: Into<TestWasmPair<IntegrityZome, CoordinatorZome>>
+            + Into<TestWasmPair<wasm::DnaWasm>>
+            + Clone,
+    {
+        let (dna, integrity_zomes, coordinator_zomes) =
+            Self::from_test_wasms(random_uid(), test_wasms, SerializedBytes::default()).await?;
+        Ok((dna, integrity_zomes, coordinator_zomes))
+    }
+
     /// Create a DnaFile from a collection of InlineZomes (no Wasm)
     pub async fn from_inline_zomes(
         uid: String,
-        zomes: Vec<(&str, InlineZome)>,
-    ) -> DnaResult<(DnaFile, Vec<Zome>)> {
-        Self::from_integrity_only(
+        zomes: InlineZomeSet,
+    ) -> DnaResult<(DnaFile, Vec<IntegrityZome>, Vec<CoordinatorZome>)> {
+        Self::from_zomes(
             uid,
             zomes
+                .integrity_zomes
                 .into_iter()
                 .map(|(n, z)| (n.into(), z.into()))
                 .collect(),
-            Vec::new(),
+            zomes
+                .coordinator_zomes
+                .into_iter()
+                .map(|(n, z)| (n.into(), z.into()))
+                .collect(),
+            Vec::with_capacity(0),
             SerializedBytes::default(),
         )
         .await
@@ -171,28 +159,9 @@ impl SweetDnaFile {
     /// Create a DnaFile from a collection of InlineZomes (no Wasm),
     /// with a random UID
     pub async fn unique_from_inline_zomes(
-        zomes: Vec<(&str, InlineZome)>,
-    ) -> DnaResult<(DnaFile, Vec<Zome>)> {
+        zomes: InlineZomeSet,
+    ) -> DnaResult<(DnaFile, Vec<IntegrityZome>, Vec<CoordinatorZome>)> {
         Self::from_inline_zomes(random_uid(), zomes).await
-    }
-
-    /// Create a DnaFile from a single InlineZome (no Wasm)
-    pub async fn from_inline_zome(
-        uid: String,
-        zome_name: &str,
-        zome: InlineZome,
-    ) -> DnaResult<(DnaFile, Zome)> {
-        let (dna_file, mut zomes) = Self::from_inline_zomes(uid, vec![(zome_name, zome)]).await?;
-        Ok((dna_file, zomes.pop().unwrap()))
-    }
-
-    /// Create a DnaFile from a single InlineZome (no Wasm)
-    /// with a random UID
-    pub async fn unique_from_inline_zome(
-        zome_name: &str,
-        zome: InlineZome,
-    ) -> DnaResult<(DnaFile, Zome)> {
-        Self::from_inline_zome(random_uid(), zome_name, zome).await
     }
 }
 
@@ -202,7 +171,10 @@ pub struct SweetDnaDef;
 impl SweetDnaDef {
     /// Create a DnaDef with a random UID, useful for testing
     // TODO: move fully into sweettest when possible
-    pub fn unique_from_zomes(zomes: Vec<Zome>) -> DnaDef {
-        DnaDef::unique_from_zomes(zomes)
+    pub fn unique_from_zomes(
+        integrity_zomes: Vec<IntegrityZome>,
+        coordinator_zomes: Vec<CoordinatorZome>,
+    ) -> DnaDef {
+        DnaDef::unique_from_zomes(integrity_zomes, coordinator_zomes)
     }
 }

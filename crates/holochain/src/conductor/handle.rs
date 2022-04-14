@@ -140,7 +140,7 @@ pub trait ConductorHandleT: Send + Sync {
     async fn hot_swap_coordinators(
         &self,
         hash: &DnaHash,
-        coordinator_zomes: Zomes,
+        coordinator_zomes: CoordinatorZomes,
         wasms: Vec<wasm::DnaWasm>,
     ) -> ConductorResult<()>;
 
@@ -568,7 +568,7 @@ impl ConductorHandleT for ConductorHandleImpl {
     async fn hot_swap_coordinators(
         &self,
         hash: &DnaHash,
-        coordinator_zomes: Zomes,
+        coordinator_zomes: CoordinatorZomes,
         wasms: Vec<wasm::DnaWasm>,
     ) -> ConductorResult<()> {
         // Note this isn't really concurrent safe. It would be a race condition to hotswap the

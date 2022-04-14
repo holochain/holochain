@@ -4,6 +4,16 @@ use integrity_zome::Post;
 use integrity_zome::PrivMsg;
 use test_wasm_integrity_zome as integrity_zome;
 
+enum IntegrityZomeTypes{
+    Msg(Msg),
+    Post(Post),
+    PrivMsg(PrivMsg),
+}
+
+enum EntryZomes {
+    IntegrityZome(IntegrityZomeTypes)
+}
+
 fn post() -> Post {
     Post("foo".into())
 }
@@ -16,23 +26,24 @@ fn priv_msg() -> PrivMsg {
     PrivMsg("Don't tell anyone".into())
 }
 
-#[hdk_extern]
-fn create_entry(_: ()) -> ExternResult<HeaderHash> {
-    let post = post();
-    let mut input = CreateInput::new(
-        (&post).into(),
-        post.try_into().unwrap(),
-        // This is used to test many conductors thrashing creates between
-        // each other so we want to avoid retries that make the test take
-        // a long time.
-        ChainTopOrdering::Relaxed,
-    );
-    input.zome_name = Some("integrity_zome".into());
-    HDK.with(|h| h.borrow().create(input))
-}
+// #[hdk_extern]
+// fn create_entry(_: ()) -> ExternResult<HeaderHash> {
+//     let post = post();
+//     let mut input = CreateInput::new(
+//         (&post).into(),
+//         post.try_into().unwrap(),
+//         // This is used to test many conductors thrashing creates between
+//         // each other so we want to avoid retries that make the test take
+//         // a long time.
+//         ChainTopOrdering::Relaxed,
+//     );
+//     input.zome_name = Some("integrity_zome".into());
+//     HDK.with(|h| h.borrow().create(input))
+// }
 
 #[hdk_extern]
 fn create_post(post: crate::Post) -> ExternResult<HeaderHash> {
+    let post = EntryZomes::IntegrityZome(IntegrityZomeTypes::Post(post));
     hdk::prelude::create_entry(&post)
 }
 

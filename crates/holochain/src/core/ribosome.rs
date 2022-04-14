@@ -458,21 +458,18 @@ pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
                 .dna_def()
                 .integrity_zomes
                 .iter()
-                .cloned()
-                .map(Into::into)
+                .map(|(n, d)| (n.clone(), d.clone().erase_type()).into())
                 .collect(),
             ZomesToInvoke::All => self
                 .dna_def()
                 .all_zomes()
-                .cloned()
-                .map(Into::into)
+                .map(|(n, d)| (n.clone(), d.clone()).into())
                 .collect(),
             ZomesToInvoke::One(zome) => vec![zome],
         }
     }
 
-    fn zome_to_id(&self, zome: &Zome) -> RibosomeResult<ZomeId> {
-        let zome_name = zome.zome_name();
+    fn zome_name_to_id(&self, zome_name: &ZomeName) -> RibosomeResult<ZomeId> {
         match self
             .dna_def()
             .all_zomes()
@@ -602,7 +599,7 @@ pub mod wasm_test {
 
     impl RibosomeTestFixture {
         pub async fn new(test_wasm: TestWasm) -> Self {
-            let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![test_wasm])
+            let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![test_wasm])
                 .await
                 .unwrap();
 

@@ -17,7 +17,7 @@ use holochain_zome_types::EntryDetails;
 use holochain_zome_types::EntryDhtStatus;
 use holochain_zome_types::GetOptions;
 use holochain_zome_types::ValidationStatus;
-use holochain_zome_types::ZomeFixturator;
+use holochain_zome_types::CoordinatorZomeFixturator;
 
 async fn assert_can_get<N: HolochainP2pDnaT + Clone + Send + 'static>(
     td_entry: &EntryTestData,
@@ -258,7 +258,7 @@ async fn entry_authoring() {
     // Environments
     let cache = test_cache_db();
     let mut scratch = Scratch::new();
-    let zome = fixt!(Zome);
+    let zome = fixt!(CoordinatorZome);
 
     // Data
     let td_entry = EntryTestData::create();
@@ -355,7 +355,7 @@ async fn content_authoring() {
     // Environments
     let cache = test_cache_db();
     let mut scratch = Scratch::new();
-    let zome = fixt!(Zome);
+    let zome = fixt!(CoordinatorZome);
 
     // Data
     let td_entry = EntryTestData::create();

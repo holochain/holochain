@@ -193,20 +193,11 @@ fn hash_path_anchor_path() {
     }
 }
 
-#[cfg(test)]
-#[test]
-fn hash_path_anchor_entry_def() {
-    assert_eq!(PathEntry::entry_def_id(), Anchor::entry_def_id(),);
-
-    assert_eq!(
-        PathEntry::required_validations(),
-        Anchor::required_validations(),
-    );
-
-    assert_eq!(PathEntry::entry_visibility(), Anchor::entry_visibility(),);
-
-    assert_eq!(PathEntry::entry_def(), Anchor::entry_def(),);
-}
+// #[cfg(test)]
+// #[test]
+// fn hash_path_anchor_entry_def() {
+//     assert_eq!(PathEntry::ENTRY_DEFS, Anchor::ENTRY_DEFS,);
+// }
 
 #[cfg(test)]
 #[test]

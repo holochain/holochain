@@ -21,7 +21,7 @@ pub mod error;
 /// or fallback to running the zome
 pub(crate) async fn get_entry_def(
     entry_def_index: EntryDefIndex,
-    zome: ZomeDef,
+    zome: IntegrityZomeDef,
     dna_def: &DnaDefHashed,
     conductor_handle: &dyn ConductorHandleT,
 ) -> EntryDefStoreResult<Option<EntryDef>> {
