@@ -8,8 +8,8 @@ use holochain_types::dht_op::DhtOpType;
 use holochain_zome_types::Entry;
 use holochain_zome_types::SignedHeader;
 
-use crate::core::workflow::error::WorkflowResult;
 pub use crate::core::validation::DhtOpOrder;
+use crate::core::workflow::error::WorkflowResult;
 
 /// Get all ops that need to sys or app validated in order.
 /// - Sys validated or awaiting app dependencies.
