@@ -1,6 +1,6 @@
 [package]
 name = "holochain_state"
-version = "0.0.34"
+version = "0.0.35"
 description = "TODO minimize deps"
 license-file = "LICENSE_CAL-1.0"
 homepage = "https://github.com/holochain/holochain"
@@ -50,7 +50,7 @@ contrafact = { version = "0.1.0-dev.1", optional = true }
 anyhow = "1.0.26"
 arbitrary = "1.0"
 fixt = { version = "0.0.10", path = "../fixt" }
-hdk = { version = "0.0.128", path = "../hdk" }
+hdk = { version = "0.0.129", path = "../hdk" }
 holochain_wasm_test_utils = { path = "../test_utils/wasm", version = "0.0.34"}
 matches = "0.1.8"
 observability = "0.1.3"
