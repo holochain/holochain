@@ -176,9 +176,9 @@ jobs:
             restoresCargoCache: true
             savesCargoCache: true
             ignoreErrorOnNonUbuntu: true
-            timeout_minutes: 30
+            timeout_minutes: 60
             max_attempts:
-              ubuntu-latest: 10
+              ubuntu-latest: 5
               macos-latest: 1
             run: |
               nix-shell \
