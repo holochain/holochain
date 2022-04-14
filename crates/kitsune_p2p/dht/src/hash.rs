@@ -59,9 +59,15 @@ impl AgentKey {
 pub struct RegionHash(pub Hash32);
 
 impl RegionHash {
-    /// If the Vec is 32 long, construct a RegionHash from it
+    /// If the Vec is 32/36/39 long, construct a RegionHash from it
     pub fn from_vec(v: Vec<u8>) -> Option<Self> {
-        v.try_into().map(Self).ok()
+        if v.len() == 39 {
+            v[4..36].try_into().map(Self).ok()
+        } else if v.len() == 36 {
+            v[4..36].try_into().map(Self).ok()
+        } else {
+            v[..].try_into().map(Self).ok()
+        }
     }
 }
 

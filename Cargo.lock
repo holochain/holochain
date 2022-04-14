@@ -1898,6 +1898,7 @@ dependencies = [
  "byteorder",
  "cfg-if 0.1.10",
  "chrono",
+ "contrafact",
  "criterion",
  "derive_more",
  "directories 2.0.2",

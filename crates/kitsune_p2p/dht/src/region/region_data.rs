@@ -1,3 +1,5 @@
+use num_traits::Zero;
+
 use crate::hash::{OpHash, RegionHash};
 
 /// Take bitwise XOR of each element of both arrays
@@ -30,6 +32,12 @@ impl num_traits::Zero for RegionHash {
 
     fn is_zero(&self) -> bool {
         *self == Self::zero()
+    }
+}
+
+impl std::iter::Sum for RegionHash {
+    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
+        iter.reduce(|a, b| a + b).unwrap_or_else(RegionHash::zero)
     }
 }
 
@@ -91,6 +99,12 @@ impl std::ops::Add for RegionData {
     fn add(mut self, other: Self) -> Self::Output {
         self += other;
         self
+    }
+}
+
+impl std::iter::Sum for RegionData {
+    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
+        iter.reduce(|a, b| a + b).unwrap_or_else(RegionData::zero)
     }
 }
 

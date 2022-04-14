@@ -154,6 +154,43 @@ impl Header {
             | Self::Update(Update { ref mut author, .. }) => author,
         }
     }
+
+    /// returns a mutable reference to the timestamp
+    pub fn timestamp_mut(&mut self) -> &mut Timestamp {
+        match *self {
+            Self::Dna(Dna {
+                ref mut timestamp, ..
+            })
+            | Self::AgentValidationPkg(AgentValidationPkg {
+                ref mut timestamp, ..
+            })
+            | Self::InitZomesComplete(InitZomesComplete {
+                ref mut timestamp, ..
+            })
+            | Self::CreateLink(CreateLink {
+                ref mut timestamp, ..
+            })
+            | Self::DeleteLink(DeleteLink {
+                ref mut timestamp, ..
+            })
+            | Self::Delete(Delete {
+                ref mut timestamp, ..
+            })
+            | Self::CloseChain(CloseChain {
+                ref mut timestamp, ..
+            })
+            | Self::OpenChain(OpenChain {
+                ref mut timestamp, ..
+            })
+            | Self::Create(Create {
+                ref mut timestamp, ..
+            })
+            | Self::Update(Update {
+                ref mut timestamp, ..
+            }) => timestamp,
+        }
+    }
+
     /// returns a mutable reference to the sequence ordinal of this header
     pub fn header_seq_mut(&mut self) -> Option<&mut u32> {
         match *self {

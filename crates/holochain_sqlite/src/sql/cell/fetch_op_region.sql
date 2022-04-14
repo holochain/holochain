@@ -1,6 +1,6 @@
 SELECT
   COUNT() AS count,
-  TOTAL(LENGTH(Header.blob) + LENGTH(Entry.blob)) AS total_size,
+  TOTAL(LENGTH(Header.blob)) + TOTAL(LENGTH(Entry.blob)) AS total_size,
   REDUCE_XOR(DhtOp.hash) AS xor_hash
 FROM
   DhtOp
