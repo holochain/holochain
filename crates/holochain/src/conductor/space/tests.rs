@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::time::Duration;
 
 use arbitrary::*;
@@ -34,6 +35,8 @@ async fn test_region_queries() {
     let agent = keystore.new_sign_keypair_random().await.unwrap();
     let mut dna_def = DnaDef::arbitrary(&mut u).unwrap();
     let two_hrs_ago = (Timestamp::now() - Duration::from_secs(60 * 60 * 2)).unwrap();
+
+    // - The origin time is two hours ago
     dna_def.origin_time = two_hrs_ago.clone();
     let dna_def = DnaDefHashed::from_content_sync(dna_def);
     let db = spaces.dht_db(dna_def.as_hash()).unwrap();
@@ -52,8 +55,8 @@ async fn test_region_queries() {
         fill_db(&db, op.clone());
         ops.push(op.clone());
 
-        // also construct an op which is ahead of the historical time window,
-        // to ensure that these ops don't get returned in region queries
+        // also construct ops which are in the recent time window,
+        // to test that these ops don't get returned in region queries
         *op2.timestamp_mut() = (two_hrs_ago
             + Duration::from_secs(rand::thread_rng().gen_range(60 * 60, 2 * 60 * 60)))
         .unwrap();
@@ -67,7 +70,7 @@ async fn test_region_queries() {
         .unwrap();
     let region_sum: RegionData = regions.regions().map(|r| r.data).sum();
     let hash_sum = ops
-        .into_iter()
+        .iter()
         .map(|op| RegionHash::from_vec(op.as_hash().get_raw_39().to_vec()).unwrap())
         .sum();
     assert_eq!(region_sum.count as usize, NUM_OPS);
@@ -75,5 +78,22 @@ async fn test_region_queries() {
 
     dbg!(regions.nonzero_regions().collect::<Vec<_>>());
 
-    todo!("now make sure we can fetch all ops by using these regions");
+    let fetched_ops: BTreeSet<DhtOp> = spaces
+        .handle_fetch_op_data_by_regions(
+            dna_def.as_hash(),
+            regions
+                .regions()
+                .map(|r| r.coords.to_bounds(&dna_def.topology()))
+                .collect(),
+        )
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|(_, op)| op)
+        .collect();
+
+    let inserted_ops: BTreeSet<DhtOp> = ops.into_iter().map(|op| op.into_content()).collect();
+
+    assert_eq!(fetched_ops.len(), NUM_OPS);
+    assert_eq!(inserted_ops, fetched_ops);
 }

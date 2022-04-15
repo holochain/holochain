@@ -8,6 +8,7 @@ impl NewEntryHeader {
         }
     }
 
+
     pub fn timestamp_mut(&mut self) -> &mut Timestamp {
         match self {
             Self::Create(Create {

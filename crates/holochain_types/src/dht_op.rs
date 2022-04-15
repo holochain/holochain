@@ -403,6 +403,22 @@ impl DhtOp {
         };
         Ok(r)
     }
+
+    fn to_order(&self) -> OpOrder {
+        OpOrder::new(self.get_type(), self.timestamp())
+    }
+}
+
+impl PartialOrd for DhtOp {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for DhtOp {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.to_order().cmp(&other.to_order())
+    }
 }
 
 impl DhtOpLight {

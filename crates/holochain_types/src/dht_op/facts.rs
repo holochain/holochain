@@ -109,6 +109,21 @@ impl DhtOp {
         }
     }
 
+    /// Access to the Timestamp
+    pub fn timestamp(&self) -> Timestamp {
+        match self {
+            DhtOp::StoreElement(_, h, _) => h.timestamp(),
+            DhtOp::StoreEntry(_, h, _) => h.timestamp(),
+            DhtOp::RegisterAgentActivity(_, h) => h.timestamp(),
+            DhtOp::RegisterUpdatedContent(_, h, _) => h.timestamp,
+            DhtOp::RegisterUpdatedElement(_, h, _) => h.timestamp,
+            DhtOp::RegisterDeletedBy(_, h) => h.timestamp,
+            DhtOp::RegisterDeletedEntryHeader(_, h) => h.timestamp,
+            DhtOp::RegisterAddLink(_, h) => h.timestamp,
+            DhtOp::RegisterRemoveLink(_, h) => h.timestamp,
+        }
+    }
+
     /// Mutable access to the Timestamp
     pub fn timestamp_mut(&mut self) -> &mut Timestamp {
         match self {

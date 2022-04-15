@@ -143,10 +143,10 @@ impl NewEntryHeader {
     }
 
     /// Get the timestamp of this header
-    pub fn timestamp(&self) -> &holochain_zome_types::timestamp::Timestamp {
+    pub fn timestamp(&self) -> holochain_zome_types::timestamp::Timestamp {
         match self {
             NewEntryHeader::Create(Create { timestamp, .. })
-            | NewEntryHeader::Update(Update { timestamp, .. }) => timestamp,
+            | NewEntryHeader::Update(Update { timestamp, .. }) => *timestamp,
         }
     }
 }
