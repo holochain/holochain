@@ -1,5 +1,5 @@
 SELECT
-  COUNT() AS count,
+  COUNT(DhtOp.hash) AS count,
   TOTAL(LENGTH(Header.blob)) + TOTAL(LENGTH(Entry.blob)) AS total_size,
   REDUCE_XOR(DhtOp.hash) AS xor_hash
 FROM
@@ -27,5 +27,5 @@ WHERE
   ) -- op timestamp is within temporal bounds
   AND (
     authored_timestamp >= :timestamp_min
-    AND authored_timestamp < :timestamp_max
+    AND authored_timestamp <= :timestamp_max
   )

@@ -415,7 +415,6 @@ impl Spaces {
                                     ":storage_end_loc": x1,
                                     ":timestamp_min": t0,
                                     ":timestamp_max": t1,
-                                    // ":author": &author, // TODO: unneeded for authored table?
                                 },
                                 |row| {
                                     let hash: DhtOpHash =

@@ -28,5 +28,5 @@ WHERE
   ) -- op timestamp is within temporal bounds
   AND (
     authored_timestamp >= :timestamp_min
-    AND authored_timestamp < :timestamp_max
+    AND authored_timestamp <= :timestamp_max
   )

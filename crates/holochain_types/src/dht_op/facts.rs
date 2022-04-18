@@ -11,11 +11,22 @@ use holochain_keystore::MetaLairClient;
 /// - If the header does not reference an Entry, the entry will be None
 pub fn valid_dht_op<'a>(keystore: MetaLairClient, author: AgentPubKey) -> Facts<'static, DhtOp> {
     facts![
-        brute("Header type matches Entry existence", |op: &DhtOp| {
-            let has_header = op.header().entry_data().is_some();
-            let has_entry = op.entry().is_some();
-            has_header == has_entry
-        }),
+        brute(
+            "Header type matches Entry existence, and is public if exists",
+            |op: &DhtOp| {
+                let header = op.header();
+                let h = header.entry_data();
+                let e = op.entry();
+                match (h, e) {
+                    (Some((_entry_hash, entry_type)), Some(_e)) => {
+                        // Ensure that entries are public
+                        entry_type.visibility().is_public()
+                    }
+                    (None, None) => true,
+                    _ => false,
+                }
+            }
+        ),
         mapped(
             "If there is entry data, the header must point to it",
             |op: &DhtOp| {

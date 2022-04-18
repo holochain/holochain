@@ -57,6 +57,14 @@ impl RegionBounds {
         self.arc_interval().contains(x) && self.time_range().contains(t)
     }
 
+    /// Just the primitive underlying numbers. For diagnostics.
+    pub fn to_primitive(&self) -> ((u32, u32), (i64, i64)) {
+        (
+            (self.x.0.as_u32(), self.x.1.as_u32()),
+            (self.t.0.as_micros(), self.t.1.as_micros()),
+        )
+    }
+
     fn arc_interval(&self) -> DhtArc {
         DhtArc::from_bounds(self.x.0, self.x.1)
     }

@@ -2296,6 +2296,7 @@ dependencies = [
  "holochain_util",
  "holochain_zome_types",
  "itertools 0.10.3",
+ "kitsune_p2p_dht",
  "lazy_static",
  "maplit",
  "matches",
