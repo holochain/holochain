@@ -149,7 +149,6 @@ pub struct Path(Vec<Component>);
 
 entry_def!(Path EntryDef {
     id: "hdk.path".into(),
-    crdt_type: CrdtType,
     required_validations: RequiredValidations::default(),
     visibility: EntryVisibility::Public,
     required_validation_type: RequiredValidationType::default(),
@@ -181,7 +180,6 @@ impl PathEntry {
 
 entry_def!(PathEntry EntryDef {
     id: "hdk.path_entry".into(),
-    crdt_type: CrdtType,
     required_validations: RequiredValidations::default(),
     visibility: EntryVisibility::Public,
     required_validation_type: RequiredValidationType::default(),
@@ -292,8 +290,8 @@ impl Path {
             if let Some(parent) = self.parent() {
                 parent.ensure()?;
                 create_link(
-                    parent.path_entry_hash()?,
-                    self.path_entry_hash()?,
+                    parent.path_entry_hash()?.into(),
+                    self.path_entry_hash()?.into(),
                     HdkLinkType::Paths,
                     LinkTag::new(match self.leaf() {
                         None => <Vec<u8>>::with_capacity(0),
@@ -321,7 +319,7 @@ impl Path {
     /// Only returns links between paths, not to other entries that might have their own links.
     pub fn children(&self) -> ExternResult<Vec<holochain_zome_types::link::Link>> {
         Self::ensure(self)?;
-        let mut unwrapped = get_links(self.path_entry_hash()?, None)?;
+        let mut unwrapped = get_links(self.path_entry_hash()?.into(), None)?;
         // Only need one of each hash to build the tree.
         unwrapped.sort_unstable_by(|a, b| a.tag.cmp(&b.tag));
         unwrapped.dedup_by(|a, b| a.tag.eq(&b.tag));
@@ -367,7 +365,7 @@ impl Path {
     pub fn children_details(&self) -> ExternResult<holochain_zome_types::link::LinkDetails> {
         Self::ensure(self)?;
         get_link_details(
-            self.path_entry_hash()?,
+            self.path_entry_hash()?.into(),
             Some(holochain_zome_types::link::LinkTag::new([])),
         )
     }

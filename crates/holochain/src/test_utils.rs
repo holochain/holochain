@@ -26,7 +26,6 @@ use holochain_p2p::spawn_holochain_p2p;
 use holochain_p2p::HolochainP2pDna;
 use holochain_p2p::HolochainP2pRef;
 use holochain_p2p::HolochainP2pSender;
-use holochain_serialized_bytes::SerializedBytes;
 use holochain_serialized_bytes::SerializedBytesError;
 use holochain_sqlite::prelude::DatabaseResult;
 use holochain_state::prelude::from_blob;
@@ -35,6 +34,7 @@ use holochain_state::prelude::SourceChainResult;
 use holochain_state::prelude::StateQueryResult;
 use holochain_state::source_chain;
 use holochain_state::test_utils::fresh_reader_test;
+use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 use kitsune_p2p::KitsuneP2pConfig;
@@ -263,7 +263,7 @@ where
 /// Do what's necessary to install an app
 pub async fn install_app(
     name: &str,
-    cell_data: Vec<(InstalledCell, Option<SerializedBytes>)>,
+    cell_data: Vec<(InstalledCell, Option<MembraneProof>)>,
     dnas: Vec<DnaFile>,
     conductor_handle: ConductorHandle,
 ) {
@@ -291,12 +291,12 @@ pub async fn install_app(
 }
 
 /// Payload for installing cells
-pub type InstalledCellsWithProofs = Vec<(InstalledCell, Option<SerializedBytes>)>;
+pub type InstalledCellsWithProofs = Vec<(InstalledCell, Option<MembraneProof>)>;
 
 /// One of various ways to setup an app, used somewhere...
 pub async fn setup_app(
     dnas: Vec<DnaFile>,
-    cell_data: Vec<(InstalledCell, Option<SerializedBytes>)>,
+    cell_data: Vec<(InstalledCell, Option<MembraneProof>)>,
 ) -> (Arc<TempDir>, RealAppInterfaceApi, ConductorHandle) {
     let db_dir = test_db_dir();
 
@@ -791,7 +791,16 @@ pub async fn fake_genesis_for_agent(
     let dna = fake_dna_file("cool dna");
     let dna_hash = dna.dna_hash().clone();
 
-    source_chain::genesis(vault, dht_db, keystore, dna_hash, agent, None).await
+    source_chain::genesis(
+        vault,
+        dht_db.clone(),
+        &DhtDbQueryCache::new(dht_db.clone().into()),
+        keystore,
+        dna_hash,
+        agent,
+        None,
+    )
+    .await
 }
 
 /// Force all dht ops without enough validation receipts to be published.

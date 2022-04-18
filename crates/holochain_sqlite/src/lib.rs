@@ -4,19 +4,16 @@
 //!
 //! See [this hackmd](https://holo.hackmd.io/@holochain/SkuVLpqEL) for a diagram explaining the relationships between these building blocks and the higher abstractions
 
-// pub mod buffer;
 pub mod conn;
 pub mod db;
 pub mod error;
 pub mod exports;
 pub mod fatal;
 pub mod functions;
-// pub mod key;
 pub mod prelude;
 pub mod schema;
 pub mod sql;
 pub mod swansong;
-// pub mod transaction;
 
 mod table;
 

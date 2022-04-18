@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use holo_hash::EntryHash;
+use holo_hash::AnyLinkableHash;
 use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::Row;
 use holochain_state::query::prelude::*;
@@ -20,7 +20,7 @@ use super::WireLinkKey;
 
 #[derive(Debug, Clone)]
 pub struct GetLinksOpsQuery {
-    base: Arc<EntryHash>,
+    base: Arc<AnyLinkableHash>,
     zome_id: ZomeId,
     tag: Option<Arc<LinkTag>>,
 }
@@ -111,7 +111,7 @@ impl Query for GetLinksOpsQuery {
                 ":create": DhtOpType::RegisterAddLink,
                 ":delete": DhtOpType::RegisterRemoveLink,
                 ":base_hash": self.base,
-                ":zome_id": self.zome_id,
+                ":zome_id": *self.zome_id,
             }
         }
         .to_vec()

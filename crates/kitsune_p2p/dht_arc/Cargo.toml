@@ -1,6 +1,6 @@
 [package]
 name = "kitsune_p2p_dht_arc"
-version = "0.0.10"
+version = "0.0.11"
 description = "Kitsune P2p Dht Arc Utils"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"

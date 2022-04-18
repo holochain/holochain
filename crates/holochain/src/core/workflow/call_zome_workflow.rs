@@ -30,11 +30,8 @@ mod validation_test;
 /// Placeholder for the return value of a zome invocation
 pub type ZomeCallResult = RibosomeResult<ZomeCallResponse>;
 
-pub struct CallZomeWorkflowArgs<Ribosome>
-where
-    Ribosome: RibosomeT + Send,
-{
-    pub ribosome: Ribosome,
+pub struct CallZomeWorkflowArgs<RibosomeT> {
+    pub ribosome: RibosomeT,
     pub invocation: ZomeCallInvocation,
     pub signal_tx: SignalBroadcaster,
     pub conductor_handle: ConductorHandle,
@@ -59,7 +56,7 @@ pub async fn call_zome_workflow<Ribosome>(
     trigger_integrate_dht_ops: TriggerSender,
 ) -> WorkflowResult<ZomeCallResult>
 where
-    Ribosome: RibosomeT + Send + 'static,
+    Ribosome: RibosomeT + 'static,
 {
     let should_write = args.is_root_zome_call;
     let conductor_handle = args.conductor_handle.clone();
@@ -113,7 +110,7 @@ async fn call_zome_workflow_inner<Ribosome>(
     args: CallZomeWorkflowArgs<Ribosome>,
 ) -> WorkflowResult<ZomeCallResult>
 where
-    Ribosome: RibosomeT + Send + 'static,
+    Ribosome: RibosomeT + 'static,
 {
     let CallZomeWorkflowArgs {
         ribosome,
@@ -179,7 +176,7 @@ pub async fn call_zome_function_authorized<R>(
     invocation: ZomeCallInvocation,
 ) -> WorkflowResult<(R, RibosomeResult<ZomeCallResponse>)>
 where
-    R: RibosomeT + Send + 'static,
+    R: RibosomeT + 'static,
 {
     if invocation.is_authorized(&host_access).await? {
         tokio::task::spawn_blocking(|| {
@@ -207,7 +204,7 @@ pub async fn inline_validation<Ribosome>(
     ribosome: Ribosome,
 ) -> WorkflowResult<()>
 where
-    Ribosome: RibosomeT + Send + 'static,
+    Ribosome: RibosomeT + 'static,
 {
     let to_app_validate = {
         // collect all the elements we need to validate in wasm

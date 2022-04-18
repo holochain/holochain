@@ -18,12 +18,12 @@ fn anchor_many(inputs: ManyAnchorInput) -> ExternResult<Vec<EntryHash>> {
 }
 
 #[hdk_extern]
-fn list_anchor_type_addresses(_: ()) -> ExternResult<Vec<EntryHash>> {
+fn list_anchor_type_addresses(_: ()) -> ExternResult<Vec<AnyLinkableHash>> {
     hdk::prelude::list_anchor_type_addresses()
 }
 
 #[hdk_extern]
-fn list_anchor_addresses(anchor_type: String) -> ExternResult<Vec<EntryHash>> {
+fn list_anchor_addresses(anchor_type: String) -> ExternResult<Vec<AnyLinkableHash>> {
     hdk::prelude::list_anchor_addresses(
         anchor_type,
     )

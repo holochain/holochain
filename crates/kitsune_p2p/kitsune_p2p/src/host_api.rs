@@ -57,6 +57,6 @@ mod host_stub;
 pub use host_stub::*;
 
 #[cfg(any(test, feature = "test_utils"))]
-mod host_panicky;
+mod host_default_error;
 #[cfg(any(test, feature = "test_utils"))]
-pub use host_panicky::*;
+pub use host_default_error::*;

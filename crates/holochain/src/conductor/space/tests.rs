@@ -6,7 +6,6 @@ use holo_hash::HasHash;
 use holochain_cascade::test_utils::fill_db;
 use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_p2p::dht::hash::RegionHash;
-use holochain_p2p::dht::prelude::OpRegion;
 use holochain_p2p::dht::region::RegionData;
 use holochain_p2p::dht_arc::DhtArcSet;
 use holochain_types::dht_op::facts::valid_dht_op;

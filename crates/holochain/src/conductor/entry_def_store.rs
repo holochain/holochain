@@ -137,14 +137,12 @@ mod tests {
         let post_def = EntryDef {
             id: "post".into(),
             visibility: EntryVisibility::Public,
-            crdt_type: CrdtType,
             required_validations: 5.into(),
             required_validation_type: Default::default(),
         };
         let comment_def = EntryDef {
             id: "comment".into(),
             visibility: EntryVisibility::Private,
-            crdt_type: CrdtType,
             required_validations: 5.into(),
             required_validation_type: Default::default(),
         };

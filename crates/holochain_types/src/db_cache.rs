@@ -313,7 +313,7 @@ fn prev_is_empty_new_is_zero(
 }
 
 /// If there's already activity marked integrated
-/// then only + 1 sequence number can be integrated.
+/// then only the same or + 1 sequence number can be integrated.
 fn integrated_is_consecutive(
     prev_bounds: Option<&ActivityBounds>,
     new_bounds: &ActivityBounds,
@@ -322,7 +322,7 @@ fn integrated_is_consecutive(
         .and_then(|p| p.integrated)
         .zip(new_bounds.integrated)
         .map_or(true, |(p, n)| {
-            p.checked_add(1).map(|p1| n == p1).unwrap_or(false)
+            (p == n) || p.checked_add(1).map(|p1| n == p1).unwrap_or(false)
         })
 }
 

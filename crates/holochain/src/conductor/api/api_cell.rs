@@ -110,7 +110,8 @@ impl CellConductorApiT for CellConductorApi {
 
 /// The "internal" Conductor API interface, for a Cell to talk to its calling Conductor.
 #[async_trait]
-pub trait CellConductorApiT: Clone + Send + Sync + Sized {
+#[mockall::automock]
+pub trait CellConductorApiT: Send + Sync + Sized {
     /// Get this cell id
     fn cell_id(&self) -> &CellId;
 

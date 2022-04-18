@@ -57,6 +57,11 @@ fn create_post(post: crate::Post) -> ExternResult<HeaderHash> {
 }
 
 #[hdk_extern]
+fn delete_post(post_hash: HeaderHash) -> ExternResult<HeaderHash> {
+    hdk::prelude::delete_entry(post_hash)
+}
+
+#[hdk_extern]
 fn get_entry(_: ()) -> ExternResult<Option<Element>> {
     get(hash_entry(&post())?, GetOptions::content())
 }

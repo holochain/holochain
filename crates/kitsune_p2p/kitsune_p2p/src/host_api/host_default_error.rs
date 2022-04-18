@@ -1,24 +1,26 @@
+use kitsune_p2p_types::box_fut;
 use kitsune_p2p_types::dht::region_set::RegionSetLtcs;
 
 use super::*;
 
 /// A supertrait of KitsuneHost convenient for defining test handlers.
 /// Allows only specifying the methods you care about, and letting all the rest
-/// panic if called.
-/// This trait's methods should match exactly with KitsuneHost.
+/// throw errors if called
 #[allow(missing_docs)]
-pub trait KitsuneHostPanicky: KitsuneHost {
-    /// Name to be printed out on unimplemented panic
+pub trait KitsuneHostDefaultError: KitsuneHost {
+    /// Name to be printed out on unimplemented error
     const NAME: &'static str;
 
     fn get_agent_info_signed(
         &self,
         _input: GetAgentInfoSignedEvt,
     ) -> KitsuneHostResult<Option<crate::types::agent_store::AgentInfoSigned>> {
-        unimplemented!(
-            "default panic for unimplemented KitsuneHost test behavior: {}",
+        box_fut(Err(format!(
+            "error for unimplemented KitsuneHost test behavior: method {} of {}",
+            "get_agent_info_signed",
             Self::NAME
         )
+        .into()))
     }
 
     fn peer_extrapolated_coverage(
@@ -26,10 +28,12 @@ pub trait KitsuneHostPanicky: KitsuneHost {
         _space: Arc<KitsuneSpace>,
         _dht_arc_set: DhtArcSet,
     ) -> KitsuneHostResult<Vec<f64>> {
-        unimplemented!(
-            "default panic for unimplemented KitsuneHost test behavior: {}",
+        box_fut(Err(format!(
+            "error for unimplemented KitsuneHost test behavior: method {} of {}",
+            "peer_extrapolated_coverage",
             Self::NAME
         )
+        .into()))
     }
 
     fn record_metrics(
@@ -37,10 +41,12 @@ pub trait KitsuneHostPanicky: KitsuneHost {
         _space: Arc<KitsuneSpace>,
         _records: Vec<MetricRecord>,
     ) -> KitsuneHostResult<()> {
-        unimplemented!(
-            "default panic for unimplemented KitsuneHost test behavior: {}",
+        box_fut(Err(format!(
+            "error for unimplemented KitsuneHost test behavior: method {} of {}",
+            "record_metrics",
             Self::NAME
         )
+        .into()))
     }
 
     fn query_region_set(
@@ -48,26 +54,30 @@ pub trait KitsuneHostPanicky: KitsuneHost {
         _space: Arc<KitsuneSpace>,
         _dht_arc_set: Arc<DhtArcSet>,
     ) -> KitsuneHostResult<RegionSetLtcs> {
-        unimplemented!(
-            "default panic for unimplemented KitsuneHost test behavior: {}",
+        box_fut(Err(format!(
+            "error for unimplemented KitsuneHost test behavior: method {} of {}",
+            "query_region_set",
             Self::NAME
         )
+        .into()))
     }
 
     fn get_topology(&self, _space: Arc<KitsuneSpace>) -> KitsuneHostResult<Topology> {
-        unimplemented!(
-            "default panic for unimplemented KitsuneHost test behavior: {}",
+        box_fut(Err(format!(
+            "error for unimplemented KitsuneHost test behavior: method {} of {}",
+            "get_topology",
             Self::NAME
         )
+        .into()))
     }
 }
 
-impl<T: KitsuneHostPanicky> KitsuneHost for T {
+impl<T: KitsuneHostDefaultError> KitsuneHost for T {
     fn get_agent_info_signed(
         &self,
         input: GetAgentInfoSignedEvt,
     ) -> KitsuneHostResult<Option<crate::types::agent_store::AgentInfoSigned>> {
-        KitsuneHostPanicky::get_agent_info_signed(self, input)
+        KitsuneHostDefaultError::get_agent_info_signed(self, input)
     }
 
     fn peer_extrapolated_coverage(
@@ -75,7 +85,7 @@ impl<T: KitsuneHostPanicky> KitsuneHost for T {
         space: Arc<KitsuneSpace>,
         dht_arc_set: DhtArcSet,
     ) -> KitsuneHostResult<Vec<f64>> {
-        KitsuneHostPanicky::peer_extrapolated_coverage(self, space, dht_arc_set)
+        KitsuneHostDefaultError::peer_extrapolated_coverage(self, space, dht_arc_set)
     }
 
     fn record_metrics(
@@ -83,7 +93,7 @@ impl<T: KitsuneHostPanicky> KitsuneHost for T {
         space: Arc<KitsuneSpace>,
         records: Vec<MetricRecord>,
     ) -> KitsuneHostResult<()> {
-        KitsuneHostPanicky::record_metrics(self, space, records)
+        KitsuneHostDefaultError::record_metrics(self, space, records)
     }
 
     fn query_region_set(
@@ -91,10 +101,10 @@ impl<T: KitsuneHostPanicky> KitsuneHost for T {
         space: Arc<KitsuneSpace>,
         dht_arc_set: Arc<DhtArcSet>,
     ) -> KitsuneHostResult<RegionSetLtcs> {
-        KitsuneHostPanicky::query_region_set(self, space, dht_arc_set)
+        KitsuneHostDefaultError::query_region_set(self, space, dht_arc_set)
     }
 
     fn get_topology(&self, space: Arc<KitsuneSpace>) -> KitsuneHostResult<Topology> {
-        KitsuneHostPanicky::get_topology(self, space)
+        KitsuneHostDefaultError::get_topology(self, space)
     }
 }

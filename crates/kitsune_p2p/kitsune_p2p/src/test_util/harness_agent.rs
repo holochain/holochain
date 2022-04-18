@@ -31,7 +31,7 @@ impl HarnessHost {
     }
 }
 
-impl KitsuneHostPanicky for HarnessHost {
+impl KitsuneHostDefaultError for HarnessHost {
     const NAME: &'static str = "HarnessHost";
 
     fn peer_extrapolated_coverage(
