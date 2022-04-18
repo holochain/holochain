@@ -24,6 +24,8 @@ statrs = "0.15"
 thiserror = "1.0"
 tracing = "0.1.29"
 
+arbitrary = { version = "1.0", features = ["derive"], optional = true}
+
 [dev-dependencies]
 kitsune_p2p_dht = { path = ".", features = ["test_utils"]}
 kitsune_p2p_dht_arc = { path = "../dht_arc", features = ["test_utils"]}

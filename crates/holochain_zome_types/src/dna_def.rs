@@ -7,6 +7,7 @@ use crate::prelude::*;
 use crate::zome::error::ZomeError;
 #[cfg(feature = "full-dna-def")]
 use holo_hash::*;
+use kitsune_p2p_dht::prelude::Topology;
 
 /// Zomes need to be an ordered map from ZomeName to a Zome
 pub type Zomes = Vec<(ZomeName, zome::ZomeDef)>;
@@ -44,8 +45,11 @@ pub struct DnaDef {
     /// The time used to denote the origin of the network, used to calculate
     /// time windows during gossip.
     /// All Header timestamps must come after this time.
-    #[cfg_attr(feature = "full-dna-def", builder(default = "Timestamp::now()"))]
-    pub origin_time: Timestamp,
+    #[cfg_attr(
+        feature = "full-dna-def",
+        builder(default = "Topology::standard(Timestamp::now())")
+    )]
+    pub topology: Topology,
 
     /// A vector of zomes associated with your DNA.
     pub zomes: Zomes,
@@ -102,8 +106,8 @@ impl DnaDef {
     }
 
     /// Get the topology to use for kitsune gossip
-    pub fn topology(&self) -> kitsune_p2p_dht::spacetime::Topology {
-        kitsune_p2p_dht::spacetime::Topology::standard(self.origin_time)
+    pub fn topology(&self) -> &kitsune_p2p_dht::spacetime::Topology {
+        &self.topology
     }
 }
 

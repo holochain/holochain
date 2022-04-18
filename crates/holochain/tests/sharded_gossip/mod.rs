@@ -17,6 +17,7 @@ fn make_config(recent_threshold: Option<u64>) -> ConductorConfig {
     let mut tuning =
         kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
     tuning.gossip_strategy = "sharded-gossip".to_string();
+    tuning.gossip_peer_on_success_next_gossip_delay_ms = 500;
     tuning.danger_gossip_recent_threshold_secs =
         recent_threshold.unwrap_or(RECENT_THRESHOLD_DEFAULT.as_secs());
 
@@ -101,9 +102,20 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
         });
     }
 
-    let (dna_file, _) = SweetDnaFile::unique_from_inline_zome("zome1", batch_create_zome())
+    let (mut dna_file, _) = SweetDnaFile::unique_from_inline_zome("zome1", batch_create_zome())
         .await
         .unwrap();
+
+    let dna_file = {
+        let mut dna = dna_file.dna.into_content();
+        dna.topology = Topology {
+            space: Dimension::standard_space(),
+            time: Dimension::time_quantum_one_second(),
+            time_origin: Timestamp::now(),
+        };
+        dna_file.dna = DnaDefHashed::from_content_sync(dna);
+        dna_file
+    };
 
     let apps = conductors
         .setup_app("app", &[dna_file.clone()])
@@ -115,7 +127,7 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
 
     // Call the "create" zome fn on Alice's app
     let hashes: Vec<HeaderHash> = conductors[0]
-        .call(&alice.zome("zome1"), "create_batch", 100)
+        .call(&alice.zome("zome1"), "create_batch", 5)
         .await;
     let all_cells = vec![&alice, &bobbo];
 
@@ -126,7 +138,7 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
         .unwrap();
     dbg!(regions.nonzero_regions().collect::<Vec<_>>());
 
-    let ops = conductors[0]
+    let alice_ops: BTreeSet<_> = conductors[0]
         .get_spaces()
         .handle_fetch_op_data_by_regions(
             dna_file.dna_hash(),
@@ -136,11 +148,32 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
             )],
         )
         .await
-        .unwrap();
-    dbg!(ops);
+        .unwrap()
+        .into_iter()
+        .map(kitsune_p2p_types::combinators::first)
+        .collect();
 
     // Wait long enough for Bob to receive gossip
     consistency_10s(&all_cells).await;
+
+    let bobbo_ops: BTreeSet<_> = conductors[1]
+        .get_spaces()
+        .handle_fetch_op_data_by_regions(
+            dna_file.dna_hash(),
+            vec![holochain_p2p::dht::region::RegionBounds::new(
+                (DhtLocation::MIN, DhtLocation::MAX),
+                (Timestamp::MIN, Timestamp::MAX),
+            )],
+        )
+        .await
+        .unwrap()
+        .into_iter()
+        .map(kitsune_p2p_types::combinators::first)
+        .collect();
+
+    dbg!(&alice_ops, &bobbo_ops);
+    assert_eq!(alice_ops, bobbo_ops);
+
     // let p2p = conductors[0].envs().p2p().lock().values().next().cloned().unwrap();
     // holochain_state::prelude::dump_tmp(&p2p);
     // holochain_state::prelude::dump_tmp(&alice.env());
@@ -152,10 +185,10 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
 
     // Assert that the Element bobbo sees matches what alice committed
     assert_eq!(element.header().author(), alice.agent_pubkey());
-    assert_eq!(
+    assert!(matches!(
         *element.entry(),
-        ElementEntry::Present(Entry::app(().try_into().unwrap()).unwrap())
-    );
+        ElementEntry::Present(Entry::App(_))
+    ));
 
     Ok(())
 }

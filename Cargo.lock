@@ -2855,6 +2855,7 @@ dependencies = [
 name = "kitsune_p2p_dht"
 version = "0.0.1"
 dependencies = [
+ "arbitrary",
  "colored",
  "derivative",
  "derive_more",

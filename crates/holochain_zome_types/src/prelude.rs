@@ -46,6 +46,9 @@ pub use crate::zome_io::ExternIO;
 pub use crate::zome_io::*;
 pub use crate::*;
 
+#[cfg(feature = "full")]
+pub use kitsune_p2p_dht::prelude::*;
+
 #[cfg(feature = "full-dna-def")]
 pub use crate::zome::inline_zome::error::*;
 #[cfg(feature = "full-dna-def")]

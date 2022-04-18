@@ -14,7 +14,8 @@ use super::*;
 ///   this codebase, and the presence of a `&topo` param in a function is a
 ///   helpful reminder to be extra mindful about the unit conversions that are
 ///   happening
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct Topology {
     /// The quantization of space
     pub space: Dimension,
@@ -96,7 +97,8 @@ impl Topology {
 }
 
 /// Defines the quantization of a dimension of spacetime.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct Dimension {
     /// The smallest possible length in this dimension.
     /// Determines the interval represented by the leaf of a tree.
@@ -156,6 +158,18 @@ impl Dimension {
             // then we can store any time coordinate in that range using 27 bits.
             //
             // BTW, the log2 of 100 years in microseconds is 54.81
+            bit_depth: 27,
+        }
+    }
+
+    /// The standard time quantum size is 5 minutes (300 million microseconds)
+    #[cfg(feature = "test_utils")]
+    pub const fn time_quantum_one_second() -> Self {
+        Dimension {
+            // 1 second in microseconds = 1mil
+            // log2 of this is 19.93, FYI
+            quantum: 1_000_000,
+            quantum_power: 20,
             bit_depth: 27,
         }
     }

@@ -20,7 +20,7 @@ async fn direct_validation_test() {
             name: "direct_validation_test".to_string(),
             uid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
             properties: SerializedBytes::try_from(()).unwrap(),
-            origin_time: Timestamp::HOLOCHAIN_EPOCH,
+            topology: Topology::standard_epoch(),
             zomes: vec![TestWasm::Update.into()].into(),
         },
         vec![TestWasm::Update.into()],

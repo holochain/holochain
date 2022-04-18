@@ -181,7 +181,7 @@ pub async fn check_valid_if_dna(
         Header::Dna(_) => {
             if !workspace.is_chain_empty(header.author()).await? {
                 Err(PrevHeaderError::InvalidRoot).map_err(|e| ValidationOutcome::from(e).into())
-            } else if header.timestamp() < workspace.dna_def().origin_time {
+            } else if header.timestamp() < workspace.dna_def().topology.time_origin {
                 // If the Dna timestamp is ahead of the origin time, every other header
                 // will be inductively so also due to the prev_header check
                 Err(PrevHeaderError::InvalidRootOriginTime)

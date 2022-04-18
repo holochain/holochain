@@ -43,7 +43,7 @@ async fn test_region_queries() {
 
     // - The origin time is two hours ago
     let mut dna_def = DnaDef::arbitrary(&mut u).unwrap();
-    dna_def.origin_time = two_hrs_ago.clone();
+    dna_def.topology = Topology::standard(two_hrs_ago.clone());
 
     // Builds an arbitrary valid op at the given timestamp
     let mut arbitrary_valid_op = |timestamp: Timestamp| -> DhtOp {

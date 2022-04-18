@@ -61,7 +61,14 @@ default = ["full-dna-def", "fixturators", "test_utils", "subtle-encoding"]
 # but used in Holochain
 full-dna-def = ["derive_builder", "kitsune_p2p_dht", "nanoid", "shrinkwraprs"]
 
-full = ["default", "rusqlite", "num_enum", "kitsune_p2p_timestamp/full", "properties"]
+full = [
+  "default",
+  "num_enum",
+  "properties",
+  "rusqlite",
+  "kitsune_p2p_timestamp/full",
+  "kitsune_p2p_dht/arbitrary",
+]
 
 fixturators = ["fixt", "rand", "strum", "holo_hash/fixturators", ]
 

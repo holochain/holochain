@@ -451,7 +451,7 @@ async fn setup(
             name: "conductor_test".to_string(),
             uid,
             properties: SerializedBytes::try_from(()).unwrap(),
-            origin_time: Timestamp::HOLOCHAIN_EPOCH,
+            topology: Topology::standard_epoch(),
             zomes: zomes.clone().into_iter().map(Into::into).collect(),
         },
         zomes.into_iter().map(Into::into),

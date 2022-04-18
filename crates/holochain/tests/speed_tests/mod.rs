@@ -126,7 +126,7 @@ async fn speed_test(n: Option<usize>) -> Arc<TempDir> {
             name: "need_for_speed_test".to_string(),
             uid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
             properties: SerializedBytes::try_from(()).unwrap(),
-            origin_time: Timestamp::HOLOCHAIN_EPOCH,
+            topology: Topology::standard_epoch(),
             zomes: vec![TestWasm::Anchor.into()].into(),
         },
         vec![TestWasm::Anchor.into()],
