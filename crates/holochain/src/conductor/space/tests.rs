@@ -7,7 +7,7 @@ use holochain_cascade::test_utils::fill_db;
 use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_p2p::dht::hash::RegionHash;
 use holochain_p2p::dht::prelude::OpRegion;
-use holochain_p2p::dht::region::{Region, RegionBounds, RegionData};
+use holochain_p2p::dht::region::RegionData;
 use holochain_p2p::dht_arc::DhtArcSet;
 use holochain_types::dht_op::facts::valid_dht_op;
 use holochain_types::dht_op::{DhtOp, DhtOpHashed};
@@ -98,45 +98,6 @@ async fn test_region_queries() {
         .sum();
     assert_eq!(region_sum.count as usize, NUM_OPS);
     assert_eq!(region_sum.hash, hash_sum);
-
-    //
-    let ops_filtered: Vec<(Region, RegionBounds, Vec<_>)> = region_set
-        .regions()
-        .map(|r| {
-            let oo = ops
-                .iter()
-                .filter(|o| {
-                    let c = o.coords(&topo);
-                    r.coords.contains(&topo, &c)
-                })
-                .map(|o| {
-                    (
-                        o.as_hash().clone(),
-                        o.get_type(),
-                        (o.loc(), o.timestamp()),
-                        o.coords(&topo),
-                    )
-                })
-                .collect();
-            let bounds = r.coords.to_bounds(&topo);
-            (r, bounds, oo)
-        })
-        .collect();
-
-    // dbg!(ops_filtered);
-
-    // fetch ops one region at a time and see if they match the region data
-    for (i, region) in region_set.regions().enumerate() {
-        let bounds = region.coords.to_bounds(&topo);
-        // dbg!(bounds.to_primitive());
-        let data = spaces
-            .handle_fetch_op_data_by_regions(dna_def.as_hash(), vec![bounds])
-            .await
-            .unwrap();
-        // dbg!(&ops_filtered[i]);
-        // dbg!(&data.iter().map(first_ref).collect::<Vec<_>>());
-        assert_eq!(data.len(), region.data.count as usize)
-    }
 
     let mut fetched_ops: Vec<_> = spaces
         .handle_fetch_op_data_by_regions(
