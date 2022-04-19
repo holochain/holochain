@@ -80,7 +80,7 @@ jobs:
             command: $(nix-build . --fallback --no-link -A pkgs.ci.ciSetupNixConf)/bin/hc-ci-setup-nix-conf.sh
       - run:
          name: Build docs with rustdoc
-         command: nix-shell --pure -p cargo --run cargo doc
+         command: nix-shell --pure -p cargo --run "cargo doc"
 
    standard-test:
       docker:
