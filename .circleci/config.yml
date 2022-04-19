@@ -60,6 +60,22 @@ jobs:
               no_output_timeout: 30m
               command: nix-shell --fallback --pure --argstr flavor "coreDev" --run hc-static-checks
 
+   rustdoc-build-test:
+      docker:
+         - image: holochain/holochain:circle.build.develop
+           auth:
+              username: $DOCKER_USER
+              password: $DOCKER_PASS
+      resource_class: xlarge
+      environment:
+         CACHIX_NAME: holochain-ci
+         NIXPKGS_ALLOW_UNFREE: 1
+      steps:
+      - checkout
+      - run:
+            name: Build docs with rustdoc
+            command: cargo docs
+
    standard-test:
       docker:
          - image: holochain/holochain:circle.build.develop
@@ -176,20 +192,21 @@ jobs:
 workflows:
    tests:
       jobs:
-         - merge-release-test
+         # - merge-release-test
          # - merge-release-test-mac
-         - standard-test
-         - hc-static-checks
-         - slow-test
-         - wasm-test
+         # - standard-test
+         - rustdoc-build-test
+         # - hc-static-checks
+         # - slow-test
+         # - wasm-test
          # - merge-test-mac
-         - ci-jobs-succeed:
-              requires:
-                 - standard-test
-                 - hc-static-checks
-                 - slow-test
-                 - wasm-test
-                 - merge-release-test
+         # - ci-jobs-succeed:
+         #      requires:
+               #   - standard-test
+               #   - hc-static-checks
+               #   - slow-test
+               #   - wasm-test
+               #   - merge-release-test
 
    docker-builds:
       triggers:
