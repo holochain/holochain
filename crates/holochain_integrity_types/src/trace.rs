@@ -19,6 +19,7 @@ pub enum Level {
     TRACE,
 }
 
+#[cfg(feature = "tracing")]
 impl From<&tracing::Level> for Level {
     fn from(level: &tracing::Level) -> Self {
         match *level {

@@ -62,8 +62,6 @@ pub trait HdkT: HdiT {
     fn sys_time(&self, sys_time_input: ()) -> ExternResult<Timestamp>;
     fn schedule(&self, scheduled_fn: String) -> ExternResult<()>;
     fn sleep(&self, wake_after: std::time::Duration) -> ExternResult<()>;
-    // Trace
-    fn trace(&self, trace_msg: TraceMsg) -> ExternResult<()>;
     // XSalsa20Poly1305
     fn create_x25519_keypair(&self, create_x25519_keypair_input: ()) -> ExternResult<X25519PubKey>;
     fn x_salsa20_poly1305_encrypt(
@@ -122,8 +120,6 @@ mockall::mock! {
         fn sys_time(&self, sys_time_input: ()) -> ExternResult<Timestamp>;
         fn schedule(&self, scheduled_fn: String) -> ExternResult<()>;
         fn sleep(&self, wake_after: std::time::Duration) -> ExternResult<()>;
-        // Trace
-        fn trace(&self, trace_msg: TraceMsg) -> ExternResult<()>;
         // XSalsa20Poly1305
         fn create_x25519_keypair(&self, create_x25519_keypair_input: ()) -> ExternResult<X25519PubKey>;
         fn x_salsa20_poly1305_encrypt(
@@ -153,7 +149,6 @@ mockall::mock! {
         fn dna_info(&self, dna_info_input: ()) -> ExternResult<DnaInfo>;
         fn zome_info(&self, zome_info_input: ()) -> ExternResult<ZomeInfo>;
         // Trace
-        #[cfg(feature = "trace")]
         fn trace(&self, trace_msg: TraceMsg) -> ExternResult<()>;
         // XSalsa20Poly1305
         fn x_salsa20_poly1305_decrypt(
@@ -214,6 +209,10 @@ impl HdiT for ErrHdk {
     }
 
     fn zome_info(&self, _zome_info_input: ()) -> ExternResult<ZomeInfo> {
+        Self::err()
+    }
+
+    fn trace(&self, _: TraceMsg) -> ExternResult<()> {
         Self::err()
     }
 
@@ -311,10 +310,6 @@ impl HdkT for ErrHdk {
     fn sleep(&self, _: std::time::Duration) -> ExternResult<()> {
         Self::err()
     }
-    // Trace
-    fn trace(&self, _: TraceMsg) -> ExternResult<()> {
-        Self::err()
-    }
     // XSalsa20Poly1305
     fn create_x25519_keypair(
         &self,
@@ -372,6 +367,9 @@ impl HdiT for HostHdk {
     }
     fn zome_info(&self, _: ()) -> ExternResult<ZomeInfo> {
         HostHdi::new().zome_info(())
+    }
+    fn trace(&self, m: TraceMsg) -> ExternResult<()> {
+        HostHdi::new().trace(m)
     }
     fn x_salsa20_poly1305_decrypt(
         &self,
@@ -477,9 +475,6 @@ impl HdkT for HostHdk {
     }
     fn sleep(&self, wake_after: std::time::Duration) -> ExternResult<()> {
         host_call::<std::time::Duration, ()>(__sleep, wake_after)
-    }
-    fn trace(&self, trace_msg: TraceMsg) -> ExternResult<()> {
-        host_call::<TraceMsg, ()>(__trace, trace_msg)
     }
     fn create_x25519_keypair(&self, _: ()) -> ExternResult<X25519PubKey> {
         host_call::<(), X25519PubKey>(__create_x25519_keypair, ())

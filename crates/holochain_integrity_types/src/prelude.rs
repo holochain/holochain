@@ -14,7 +14,6 @@ pub use crate::link::*;
 pub use crate::op::*;
 pub use crate::signature::*;
 pub use crate::timestamp::*;
-#[cfg(feature = "tracing")]
 pub use crate::trace::*;
 pub use crate::validate::*;
 pub use crate::x_salsa20_poly1305::data::*;
