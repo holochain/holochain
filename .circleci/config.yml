@@ -174,7 +174,6 @@ jobs:
               command: echo
 
 workflows:
-   version: 2.1
    tests:
       jobs:
          - merge-release-test
