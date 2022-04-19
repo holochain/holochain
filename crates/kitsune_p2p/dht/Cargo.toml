@@ -34,9 +34,6 @@ proptest = "1"
 rand = "0.8"
 test-case = "1.2"
 
-# TODO: remove when integrating
-# [workspace]
-
 [features]
 test_utils = [
   "colored"
