@@ -22,7 +22,7 @@ use super::*;
 pub struct SpaceQuantum(u32);
 
 impl SpaceQuantum {
-    /// The locations at either end of this quantum
+    /// The inclusive locations at either end of this quantum
     pub fn to_loc_bounds(&self, topo: &Topology) -> (Loc, Loc) {
         let (a, b): (u32, u32) = bounds(&topo.space, 0, self.0.into(), 1);
         (Loc::from(a), Loc::from(b))
@@ -56,7 +56,7 @@ impl TimeQuantum {
         topo.time_quantum(timestamp)
     }
 
-    /// The timestamps at either end of this quantum
+    /// The inclusive timestamps at either end of this quantum
     pub fn to_timestamp_bounds(&self, topo: &Topology) -> (Timestamp, Timestamp) {
         let (a, b): (i64, i64) = bounds64(&topo.time, 0, self.0.into(), 1);
         (

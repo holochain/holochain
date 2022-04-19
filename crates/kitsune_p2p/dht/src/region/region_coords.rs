@@ -37,9 +37,9 @@ impl RegionCoords {
 /// alignment.
 #[derive(Debug)]
 pub struct RegionBounds {
-    /// The min and max locations
+    /// The inclusive min and max locations
     pub x: (Loc, Loc),
-    /// The min and max timestamps
+    /// The inclusive min and max timestamps
     pub t: (Timestamp, Timestamp),
 }
 
