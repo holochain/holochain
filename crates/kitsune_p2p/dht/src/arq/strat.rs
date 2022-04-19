@@ -62,9 +62,9 @@ pub struct ArqStrat {
     ///
     /// This parameter determines how likely it is for there to be a difference in
     /// chunk sizes between two agents' arqs. It establishes the tradeoff between
-    /// the size of payloads that must be sent and the extra depth of Fenwick
-    /// tree data that must be stored (to accomodate agents whose power is
-    /// lower than ours).
+    /// the size of payloads that must be sent and the extra coordination or
+    /// computation that must be performed to accomodate agents whose power is
+    /// lower than ours.
     ///
     /// This parameter is also what allows an arq to shrink to zero in a
     /// reasonable number of steps. Without this limit on power diff, we would

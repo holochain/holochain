@@ -83,8 +83,12 @@ impl Topology {
 
     /// The minimum power to use in "exponentional coordinates".
     pub fn min_space_power(&self) -> u8 {
-        // if space quantum power is 0, then min has to be at least 1.
-        // otherwise, it can be 0
+        // If space.quantum_power is 0, then min has to be at least 1, because
+        // in that case we can talk about 2^32 quanta at power 0, which would
+        // overflow a `u32`.
+        //
+        // If space.quantum_power is greater than 0 (the standard is 12), then
+        // the min power can be 0.
         1u8.saturating_sub(self.space.quantum_power)
     }
 
@@ -172,18 +176,18 @@ impl Dimension {
 /// and Arq power level, there will be very little need for reconciliation.
 ///
 /// In networks where nodes are offline for long periods of time, or latency
-/// is very high (sneakernet), it could be helpful to increase these values.
+/// is very high (e.g. sneakernet), it could be helpful to increase these values.
 #[derive(Copy, Clone, Debug, derive_more::Constructor)]
 pub struct GossipParams {
     /// What +/- coordinate offset will you accept for timestamps?
     /// e.g. if the time quantum is 5 min,
-    /// a time buffer of 2 will allow +/- 10 min.
+    /// a time buffer of 2 will allow +/- 10 min discrepancies with gossip partners.
     pub max_time_offset: TimeQuantum,
 
     /// What difference in power will you accept for other agents' Arqs?
-    /// e.g. if the power I use in my arq is 16, and this offset is 2,
+    /// e.g. if the power I use in my arq is 14, and this offset is 2,
     /// I won't talk to anyone whose arq is expressed with a power lower
-    /// than 14 or greater than 18.
+    /// than 12 or greater than 16
     pub max_space_power_offset: u8,
 }
 

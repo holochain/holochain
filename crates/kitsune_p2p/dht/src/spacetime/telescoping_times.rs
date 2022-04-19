@@ -1,10 +1,14 @@
 use super::*;
 
-/// A type which generates a list of exponentially expanding time windows
-/// which fit into a tree structure. See [this document](https://hackmd.io/@hololtd/r1IAIbr5Y)
-/// for the full understanding.
+/// A type which generates a sequence of exponentially expanding TimeSegments,
+/// with the smallest possible segment covering the most recent time, and larger
+/// segments as we go further back in time.
 ///
-/// TODO: add this documentation to the codebase
+/// The segments completely cover the set of time quanta from 0 to the
+/// specified `time` parameter. The segments never overlap.
+///
+/// The set of segments grows logarithmically with the number of time quanta
+/// to be covered.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Derivative, serde::Serialize, serde::Deserialize)]
 #[derivative(PartialOrd, Ord)]
 pub struct TelescopingTimes {
