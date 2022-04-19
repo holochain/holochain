@@ -111,39 +111,41 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
         .unwrap();
     conductors.exchange_peer_info().await;
 
-    let ((alice,), (bobbo,), _) = apps.into_tuples();
+    let ((alice,), (bobbo,), (carol,)) = apps.into_tuples();
 
     // Call the "create" zome fn on Alice's app
     let hashes: Vec<HeaderHash> = conductors[0]
         .call(&alice.zome("zome1"), "create_batch", 100)
         .await;
-    let all_cells = vec![&alice, &bobbo];
-
-    let regions = conductors[0]
-        .get_spaces()
-        .handle_fetch_op_regions(dna_file.dna(), holochain_p2p::dht_arc::DhtArcSet::Full)
-        .await
-        .unwrap();
-    dbg!(regions.nonzero_regions().collect::<Vec<_>>());
-
-    let ops = conductors[0]
-        .get_spaces()
-        .handle_fetch_op_data_by_regions(
-            dna_file.dna_hash(),
-            vec![holochain_p2p::dht::region::RegionBounds::new(
-                (DhtLocation::MIN, DhtLocation::MAX),
-                (Timestamp::MIN, Timestamp::MAX),
-            )],
-        )
-        .await
-        .unwrap();
-    dbg!(ops);
+    let all_cells = vec![&alice, &bobbo, &carol];
 
     // Wait long enough for Bob to receive gossip
     consistency_10s(&all_cells).await;
-    // let p2p = conductors[0].envs().p2p().lock().values().next().cloned().unwrap();
-    // holochain_state::prelude::dump_tmp(&p2p);
-    // holochain_state::prelude::dump_tmp(&alice.env());
+
+    let mut all_op_hashes = vec![];
+
+    for i in [0, 1, 2] {
+        let mut hashes: Vec<_> = conductors[i]
+            .get_spaces()
+            .handle_fetch_op_data_by_regions(
+                dna_file.dna_hash(),
+                vec![holochain_p2p::dht::region::RegionBounds::new(
+                    (DhtLocation::MIN, DhtLocation::MAX),
+                    (Timestamp::MIN, Timestamp::MAX),
+                )],
+            )
+            .await
+            .unwrap()
+            .into_iter()
+            .map(holochain_types::prelude::first)
+            .collect();
+        hashes.sort();
+        all_op_hashes.push(hashes);
+    }
+
+    assert_eq!(all_op_hashes[0], all_op_hashes[1]);
+    assert_eq!(all_op_hashes[1], all_op_hashes[2]);
+
     // Verify that bobbo can run "read" on his cell and get alice's Header
     let element: Option<Element> = conductors[1]
         .call(&bobbo.zome("zome1"), "read", hashes[0].clone())
@@ -152,10 +154,10 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
 
     // Assert that the Element bobbo sees matches what alice committed
     assert_eq!(element.header().author(), alice.agent_pubkey());
-    assert_eq!(
+    assert!(matches!(
         *element.entry(),
-        ElementEntry::Present(Entry::app(().try_into().unwrap()).unwrap())
-    );
+        ElementEntry::Present(Entry::App(_))
+    ));
 
     Ok(())
 }
