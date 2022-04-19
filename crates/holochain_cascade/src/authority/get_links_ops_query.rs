@@ -13,6 +13,7 @@ use holochain_zome_types::HasValidationStatus;
 use holochain_zome_types::Header;
 use holochain_zome_types::Judged;
 use holochain_zome_types::LinkTag;
+use holochain_zome_types::LinkTypeQuery;
 use holochain_zome_types::SignedHeader;
 use holochain_zome_types::ZomeId;
 
@@ -21,7 +22,7 @@ use super::WireLinkKey;
 #[derive(Debug, Clone)]
 pub struct GetLinksOpsQuery {
     base: Arc<AnyLinkableHash>,
-    zome_id: ZomeId,
+    type_query: Option<LinkTypeQuery<ZomeId>>,
     tag: Option<Arc<LinkTag>>,
 }
 
@@ -29,7 +30,7 @@ impl GetLinksOpsQuery {
     pub fn new(key: WireLinkKey) -> Self {
         Self {
             base: Arc::new(key.base),
-            zome_id: key.zome_id,
+            type_query: key.type_query,
             tag: key.tag.map(Arc::new),
         }
     }
@@ -62,30 +63,47 @@ impl Query for GetLinksOpsQuery {
         let sub_create = "
             SELECT Header.hash FROM DhtOp
         ";
-        let common = "
+        let mut common_query = "
             JOIN Header On DhtOp.header_hash = Header.hash
             WHERE DhtOp.type = :create
             AND
             Header.base_hash = :base_hash
             AND
-            Header.zome_id = :zome_id
-            AND
             DhtOp.when_integrated IS NOT NULL
-        ";
-        let common_query = match &self.tag {
-            Some(tag) => {
-                let tag = Self::tag_to_hex(tag.as_ref());
-                format!(
-                    "
+        "
+        .to_string();
+
+        if let Some(tag) = &self.tag {
+            let tag = Self::tag_to_hex(tag.as_ref());
+            common_query = format!(
+                "
                     {}
                     AND
                     HEX(Header.tag) LIKE '{}%'
                 ",
-                    common, tag
-                )
+                common_query, tag
+            );
+        }
+        if let Some(link_type) = &self.type_query {
+            common_query = format!(
+                "
+                {}
+                AND
+                Header.zome_id = :zome_id
+                ",
+                common_query
+            );
+            if let LinkTypeQuery::SingleType(_, _) = link_type {
+                common_query = format!(
+                    "
+                {}
+                AND
+                Header.link_type = :link_type
+                ",
+                    common_query
+                );
             }
-            None => common.into(),
-        };
+        }
         let create_query = format!("{}{}", create, common_query);
         let sub_create_query = format!("{}{}", sub_create, common_query);
         let delete_query = format!(
@@ -106,15 +124,35 @@ impl Query for GetLinksOpsQuery {
     }
 
     fn params(&self) -> Vec<Params> {
-        {
-            named_params! {
-                ":create": DhtOpType::RegisterAddLink,
-                ":delete": DhtOpType::RegisterRemoveLink,
-                ":base_hash": self.base,
-                ":zome_id": *self.zome_id,
+        match &self.type_query {
+            Some(LinkTypeQuery::AllTypes(zome_id)) => {
+                named_params! {
+                    ":create": DhtOpType::RegisterAddLink,
+                    ":delete": DhtOpType::RegisterRemoveLink,
+                    ":base_hash": self.base,
+                    ":zome_id": **zome_id,
+                }
             }
+            .to_vec(),
+            Some(LinkTypeQuery::SingleType(zome_id, link_type)) => {
+                named_params! {
+                    ":create": DhtOpType::RegisterAddLink,
+                    ":delete": DhtOpType::RegisterRemoveLink,
+                    ":base_hash": self.base,
+                    ":zome_id": **zome_id,
+                    ":link_type": **link_type,
+                }
+            }
+            .to_vec(),
+            None => {
+                named_params! {
+                    ":create": DhtOpType::RegisterAddLink,
+                    ":delete": DhtOpType::RegisterRemoveLink,
+                    ":base_hash": self.base,
+                }
+            }
+            .to_vec(),
         }
-        .to_vec()
     }
 
     fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Item>> {

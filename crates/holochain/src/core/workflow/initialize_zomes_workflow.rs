@@ -228,7 +228,7 @@ pub mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn commit_during_init() {
         // SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create, TestWasm::InitFail])
-        let (dna, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create])
+        let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create])
             .await
             .unwrap();
         let mut conductor = SweetConductor::from_standard_config().await;
@@ -261,7 +261,7 @@ pub mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn commit_during_init_one_zome_passes_one_fails() {
-        let (dna, _) =
+        let (dna, _, _) =
             SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create, TestWasm::InitFail])
                 .await
                 .unwrap();
@@ -288,7 +288,7 @@ pub mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn commit_during_init_one_zome_unimplemented_one_fails() {
-        let zome_fail = InlineZome::new_unique(vec![]).callback("init", |api, _: ()| {
+        let zome_fail = SweetEasyInline::new(vec![]).callback("init", |api, _: ()| {
             api.create(CreateInput::new(
                 EntryDefLocation::CapGrant,
                 Entry::CapGrant(CapGrantEntry {
@@ -300,20 +300,16 @@ pub mod tests {
             ))?;
             Ok(InitCallbackResult::Fail("reason".into()))
         });
-        let zome_no_init = crate::conductor::conductor::tests::simple_create_entry_zome();
+        let zomes =
+            crate::conductor::conductor::tests::simple_create_entry_zome().merge(zome_fail.0);
 
-        let (dna, _) = SweetDnaFile::unique_from_inline_zomes(vec![
-            ("no-init", zome_no_init),
-            ("fail", zome_fail),
-        ])
-        .await
-        .unwrap();
+        let (dna, _, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await.unwrap();
 
         let mut conductor = SweetConductor::from_standard_config().await;
         let keystore = conductor.keystore();
         let app = conductor.setup_app("app", &[dna]).await.unwrap();
         let (cell,) = app.into_tuple();
-        let zome = cell.zome("no-init");
+        let zome = cell.zome("create_entry");
 
         assert_eq!(get_chain(&cell, keystore.clone()).await.len().unwrap(), 3);
 

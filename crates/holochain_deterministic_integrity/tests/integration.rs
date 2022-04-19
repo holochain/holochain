@@ -60,6 +60,11 @@ pub enum EntryTypes4 {
     Post(Post),
 }
 
+pub enum LinkTypes {
+    MsgLink,
+    PostLink,
+}
+
 #[test]
 fn can_get_entry_def_name() {
     assert_eq!(

@@ -27,7 +27,9 @@ impl SweetZome {
 pub struct SweetEasyInline(pub InlineZomeSet);
 
 impl SweetEasyInline {
+    /// Zome name for the integrity zome.
     pub const INTEGRITY: &'static str = "integrity";
+    /// Zome name for the coordinator zome.
     pub const COORDINATOR: &'static str = "coordinator";
 
     /// Create a single integrity zome with the [`ZomeName`] "integrity"

@@ -23,33 +23,47 @@ pub fn get_links<'a>(
             read_workspace: Permission::Allow,
             ..
         } => {
-            let results: Vec<Result<Vec<Link>, _>> = tokio_helper::block_forever_on(async move {
-                futures::stream::iter(inputs.into_iter().map(|input| async {
-                    let GetLinksInput {
-                        base_address,
-                        tag_prefix,
-                    } = input;
-                    let zome_id = ribosome
-                        .zome_name_to_id(todo!())
-                        .expect("Failed to get ID for current zome.");
-                    let key = WireLinkKey {
-                        base: base_address,
-                        zome_id,
-                        tag: tag_prefix,
-                    };
-                    Cascade::from_workspace_network(
-                        &call_context.host_context.workspace(),
-                        call_context.host_context.network().to_owned(),
-                    )
-                    .dht_get_links(key, GetLinksOptions::default())
+            let results: Vec<Result<Vec<Link>, RibosomeError>> =
+                tokio_helper::block_forever_on(async move {
+                    futures::stream::iter(inputs.into_iter().map(|input| async {
+                        let GetLinksInput {
+                            base_address,
+                            type_location,
+                            tag_prefix,
+                        } = input;
+
+                        let location = type_location.map_or(Ok(None), |location| {
+                            let (zome_name, link_type) = match location {
+                                LinkTypeQuery::AllTypes(zome_name) => (zome_name, None),
+                                LinkTypeQuery::SingleType(zome_name, link_type) => {
+                                    (zome_name, Some(link_type))
+                                }
+                            };
+                            ribosome.zome_name_to_id(&zome_name).map(|zome_id| {
+                                Some(match link_type {
+                                    Some(lt) => LinkTypeQuery::SingleType(zome_id, lt),
+                                    None => LinkTypeQuery::AllTypes(zome_id),
+                                })
+                            })
+                        })?;
+                        let key = WireLinkKey {
+                            base: base_address,
+                            type_query: location,
+                            tag: tag_prefix,
+                        };
+                        Ok(Cascade::from_workspace_network(
+                            &call_context.host_context.workspace(),
+                            call_context.host_context.network().to_owned(),
+                        )
+                        .dht_get_links(key, GetLinksOptions::default())
+                        .await?)
+                    }))
+                    // Limit concurrent calls to 10 as each call
+                    // can spawn multiple connections.
+                    .buffered(10)
+                    .collect()
                     .await
-                }))
-                // Limit concurrent calls to 10 as each call
-                // can spawn multiple connections.
-                .buffered(10)
-                .collect()
-                .await
-            });
+                });
             let results: Result<Vec<_>, _> = results
                 .into_iter()
                 .map(|result| match result {
@@ -217,10 +231,7 @@ pub mod slow_tests {
         let header_hash: HeaderHash = conductor.call(&alice, "create_baseless_link", ()).await;
         let links: Vec<Link> = conductor.call(&alice, "get_baseless_links", ()).await;
 
-        assert_eq!(
-            links[0].create_link_hash,
-            header_hash
-        );
+        assert_eq!(links[0].create_link_hash, header_hash);
         assert_eq!(
             links[0].target,
             EntryHash::from_raw_32([2_u8; 32].to_vec()).into(),
@@ -234,13 +245,12 @@ pub mod slow_tests {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::Link).await;
 
-        let header_hash: HeaderHash = conductor.call(&alice, "create_external_base_link", ()).await;
+        let header_hash: HeaderHash = conductor
+            .call(&alice, "create_external_base_link", ())
+            .await;
         let links: Vec<Link> = conductor.call(&alice, "get_external_links", ()).await;
 
-        assert_eq!(
-            links[0].create_link_hash,
-            header_hash
-        );
+        assert_eq!(links[0].create_link_hash, header_hash);
     }
 
     #[tokio::test(flavor = "multi_thread")]

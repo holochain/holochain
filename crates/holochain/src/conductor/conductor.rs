@@ -829,14 +829,11 @@ impl Conductor {
                     .into_iter()
                     .map(|dna_def| {
                         // Load all wasms for each dna_def from the wasm db into memory
-                        let wasms = dna_def
-                            .all_zomes()
-                            .cloned()
-                            .filter_map(|(zome_name, zome)| {
-                                let wasm_hash = zome.wasm_hash(&zome_name).ok()?;
-                                // Note this is a cheap arc clone.
-                                wasms.get(&wasm_hash).cloned()
-                            });
+                        let wasms = dna_def.all_zomes().filter_map(|(zome_name, zome)| {
+                            let wasm_hash = zome.wasm_hash(zome_name).ok()?;
+                            // Note this is a cheap arc clone.
+                            wasms.get(&wasm_hash).cloned()
+                        });
                         let wasms = wasms.collect::<Vec<_>>();
                         async move {
                             let dna_file = DnaFile::new(dna_def.into_content(), wasms).await?;

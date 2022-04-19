@@ -151,11 +151,11 @@ mod tests {
             .into_hash();
 
         let post_def_key = EntryDefBufferKey {
-            zome: ZomeDef::from_hash(dna_wasm.clone()),
+            zome: IntegrityZomeDef::from_hash(dna_wasm.clone()),
             entry_def_position: 0.into(),
         };
         let comment_def_key = EntryDefBufferKey {
-            zome: ZomeDef::from_hash(dna_wasm),
+            zome: IntegrityZomeDef::from_hash(dna_wasm),
             entry_def_position: 1.into(),
         };
 

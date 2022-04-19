@@ -204,7 +204,7 @@ impl HostFnCaller {
 }
 
 impl HostFnCaller {
-    pub async fn commit_entry<E: Into<entry_def::EntryDefId>>(
+    pub async fn commit_entry<E: Into<EntryDefLocation>>(
         &self,
         entry: Entry,
         entry_def_id: E,
@@ -240,13 +240,16 @@ impl HostFnCaller {
         &self,
         entry: Entry,
         entry_def_id: E,
-        original_header_hash: HeaderHash,
+        original_header_address: HeaderHash,
     ) -> HeaderHash {
         let (ribosome, call_context, workspace_lock) = self.unpack().await;
-        let input = UpdateInput::new(
-            original_header_hash,
-            CreateInput::new(entry_def_id.into(), entry, ChainTopOrdering::default()),
-        );
+        let input = UpdateInput {
+            original_header_address,
+            entry_def_id: entry_def_id.into(),
+            entry,
+            chain_top_ordering: Default::default(),
+        };
+
         let output = { host_fn::update::update(ribosome, call_context, input).unwrap() };
 
         // Write
@@ -275,13 +278,14 @@ impl HostFnCaller {
         &self,
         base: AnyLinkableHash,
         target: AnyLinkableHash,
+        zome_name: impl Into<ZomeName>,
         link_tag: LinkTag,
     ) -> HeaderHash {
         let (ribosome, call_context, workspace_lock) = self.unpack().await;
         let input = CreateLinkInput::new(
             base,
             target,
-            HdkLinkType::Any.into(),
+            LinkTypeLocation::new(zome_name, HdkLinkType::Any),
             link_tag,
             ChainTopOrdering::default(),
         );
@@ -313,11 +317,12 @@ impl HostFnCaller {
     pub async fn get_links<'env>(
         &self,
         base: AnyLinkableHash,
+        type_query: Option<LinkTypeQuery>,
         link_tag: Option<LinkTag>,
         _options: GetLinksOptions,
     ) -> Vec<Link> {
         let (ribosome, call_context, workspace_lock) = self.unpack().await;
-        let input = GetLinksInput::new(base, link_tag);
+        let input = GetLinksInput::new(base, type_query, link_tag);
         let output = {
             host_fn::get_links::get_links(ribosome, call_context, vec![input])
                 .unwrap()
@@ -335,11 +340,12 @@ impl HostFnCaller {
     pub async fn get_link_details<'env>(
         &self,
         base: AnyLinkableHash,
+        type_query: Option<LinkTypeQuery>,
         tag: LinkTag,
         _options: GetLinksOptions,
     ) -> Vec<(SignedHeaderHashed, Vec<SignedHeaderHashed>)> {
         let (ribosome, call_context, workspace_lock) = self.unpack().await;
-        let input = GetLinksInput::new(base, Some(tag));
+        let input = GetLinksInput::new(base, type_query, Some(tag));
         let output = {
             host_fn::get_link_details::get_link_details(ribosome, call_context, vec![input])
                 .unwrap()

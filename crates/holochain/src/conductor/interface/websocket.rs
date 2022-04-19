@@ -246,6 +246,7 @@ pub mod test {
     use holochain_types::test_utils::fake_dna_zomes;
     use holochain_types::{app::InstallAppDnaPayload, prelude::InstallAppPayload};
     use holochain_wasm_test_utils::TestWasm;
+    use holochain_wasm_test_utils::TestZomes;
     use holochain_websocket::Respond;
     use holochain_zome_types::cell::CellId;
     use holochain_zome_types::test_utils::fake_agent_pubkey_2;
@@ -421,7 +422,7 @@ pub mod test {
         let mut dnas = Vec::new();
         for _i in 0..2 as u32 {
             let zomes = vec![TestWasm::Foo.into()];
-            let def = DnaDef::unique_from_zomes(zomes.clone());
+            let def = DnaDef::unique_from_zomes(zomes.clone(), Vec::new());
             dnas.push(DnaFile::new(def, vec![TestWasm::Foo.into()]).await.unwrap());
         }
         let dna_map = dnas
@@ -600,8 +601,18 @@ pub mod test {
                 uid: uid.to_string(),
                 properties: SerializedBytes::try_from(()).unwrap(),
                 origin_time: Timestamp::HOLOCHAIN_EPOCH,
-                integrity_zomes: zomes.clone().into_iter().map(Into::into).collect(),
-                coordinator_zomes: Default::default(),
+                integrity_zomes: zomes
+                    .clone()
+                    .into_iter()
+                    .map(TestZomes::from)
+                    .map(|z| z.integrity.into_inner())
+                    .collect(),
+                coordinator_zomes: zomes
+                    .clone()
+                    .into_iter()
+                    .map(TestZomes::from)
+                    .map(|z| z.coordinator.into_inner())
+                    .collect(),
             },
             zomes.into_iter().map(Into::into),
         )

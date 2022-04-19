@@ -64,7 +64,7 @@ impl InlineZomeSet {
             [(coordinator_zome_name, coordinator_uuid.into())],
         )
     }
-    
+
     /// A helper function to create a unique single integrity and coordinator zome.
     pub fn new_unique_single(
         integrity_zome_name: &'static str,
@@ -104,6 +104,39 @@ impl InlineZomeSet {
             integrity_zomes,
             coordinator_zomes,
         }
+    }
+
+    /// Merge two inline zome sets together.
+    ///
+    /// # Panics
+    ///
+    /// Panics if zome names collide across sets.
+    pub fn merge(mut self, other: Self) -> Self {
+        for (k, v) in other.integrity_zomes {
+            if self.integrity_zomes.insert(k, v).is_some() {
+                panic!("InlineZomeSet contains duplicate key {} on merge.", k);
+            }
+        }
+        for (k, v) in other.coordinator_zomes {
+            if self.coordinator_zomes.insert(k, v).is_some() {
+                panic!("InlineZomeSet contains duplicate key {} on merge.", k);
+            }
+        }
+        self
+    }
+
+    /// Get the inner zomes
+    pub fn into_zomes(self) -> (Vec<IntegrityZome>, Vec<CoordinatorZome>) {
+        (
+            self.integrity_zomes
+                .into_iter()
+                .map(|(n, z)| IntegrityZome::new((*n).into(), z.into()))
+                .collect(),
+            self.coordinator_zomes
+                .into_iter()
+                .map(|(n, z)| CoordinatorZome::new((*n).into(), z.into()))
+                .collect(),
+        )
     }
 }
 

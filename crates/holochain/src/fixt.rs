@@ -72,7 +72,7 @@ impl Iterator for RealRibosomeFixturator<curve::Zomes> {
         // warm the module cache for each wasm in the ribosome
         for zome in self.0.curve.0.clone() {
             let mut call_context = CallContextFixturator::new(Empty).next().unwrap();
-            call_context.zome = zome.into();
+            call_context.zome = CoordinatorZome::from(zome).erase_type();
             ribosome.module(call_context.zome.zome_name()).unwrap();
         }
 
@@ -142,9 +142,9 @@ fixturator!(
         for (hash, _) in wasms {
             zomes.push((
                 zome_name_fixturator.next().unwrap(),
-                ZomeDef::Wasm(WasmZome {
-                    wasm_hash: hash.to_owned(),
-                }),
+                IntegrityZomeDef::from_hash(
+                    hash.to_owned()
+                ),
             ));
         }
         let mut dna_def = DnaDefFixturator::new(Unpredictable).next().unwrap();
@@ -163,9 +163,9 @@ fixturator!(
         for (hash, _) in wasms {
             zomes.push((
                 zome_name_fixturator.next().unwrap(),
-                ZomeDef::Wasm(WasmZome {
-                    wasm_hash: hash.to_owned(),
-                }),
+                IntegrityZomeDef::from_hash(
+                    hash.to_owned()
+                ),
             ));
         }
         let mut dna_def = DnaDefFixturator::new_indexed(Predictable, get_fixt_index!())
@@ -397,7 +397,7 @@ fixturator!(
 
 fixturator!(
     PostCommitInvocation;
-    constructor fn new(IntegrityZome, SignedHeaderHashedVec);
+    constructor fn new(CoordinatorZome, SignedHeaderHashedVec);
 );
 
 fixturator!(
@@ -407,7 +407,7 @@ fixturator!(
 
 fixturator!(
     ZomesToInvoke;
-    constructor fn one(CoordinatorZome);
+    constructor fn one(Zome);
 );
 
 fixturator!(
@@ -445,14 +445,14 @@ fixturator!(
 
 fixturator!(
     CallContext;
-    constructor fn new(CoordinatorZome, FunctionName, HostContext, InvocationAuth);
+    constructor fn new(Zome, FunctionName, HostContext, InvocationAuth);
 );
 
 fixturator!(
     ZomeCallInvocation;
     curve Empty ZomeCallInvocation {
         cell_id: CellIdFixturator::new(Empty).next().unwrap(),
-        zome: CoordinatorZomeFixturator::new(Empty).next().unwrap(),
+        zome: ZomeFixturator::new(Empty).next().unwrap(),
         cap_secret: Some(CapSecretFixturator::new(Empty).next().unwrap()),
         fn_name: FunctionNameFixturator::new(Empty).next().unwrap(),
         payload: ExternIoFixturator::new(Empty).next().unwrap(),
@@ -460,7 +460,7 @@ fixturator!(
     };
     curve Unpredictable ZomeCallInvocation {
         cell_id: CellIdFixturator::new(Unpredictable).next().unwrap(),
-        zome: CoordinatorZomeFixturator::new(Unpredictable).next().unwrap(),
+        zome: ZomeFixturator::new(Unpredictable).next().unwrap(),
         cap_secret: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
         fn_name: FunctionNameFixturator::new(Unpredictable).next().unwrap(),
         payload: ExternIoFixturator::new(Unpredictable).next().unwrap(),
@@ -470,7 +470,7 @@ fixturator!(
         cell_id: CellIdFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap(),
-        zome: CoordinatorZomeFixturator::new_indexed(Predictable, get_fixt_index!())
+        zome: ZomeFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap(),
         cap_secret: Some(CapSecretFixturator::new_indexed(Predictable, get_fixt_index!())
@@ -499,7 +499,7 @@ impl Iterator for ZomeCallInvocationFixturator<NamedInvocation> {
             .next()
             .unwrap();
         ret.cell_id = self.0.curve.0.clone();
-        ret.zome = self.0.curve.1.into();
+        ret.zome = CoordinatorZome::from(self.0.curve.1).erase_type();
         ret.fn_name = self.0.curve.2.clone().into();
         ret.payload = self.0.curve.3.clone();
 

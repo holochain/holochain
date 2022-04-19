@@ -117,7 +117,10 @@ pub mod test {
 
         let entry = Entry::try_from(Something(vec![1, 2, 3])).unwrap();
         let header_hash = alice_host_fn_caller
-            .commit_entry(entry.clone(), ENTRY_DEF_ID)
+            .commit_entry(
+                entry.clone(),
+                (TestWasm::MustGet.integrity_zome_name(), ENTRY_DEF_ID),
+            )
             .await;
 
         let dht_db = conductor

@@ -26,7 +26,6 @@ pub fn create<'a>(
                 entry,
                 chain_top_ordering,
             } = input;
-            let chain_top_ordering = *input.chain_top_ordering();
 
             let zome = match &entry_location {
                 EntryDefLocation::App(location) => Some(
@@ -47,7 +46,7 @@ pub fn create<'a>(
                         .source_chain()
                         .as_ref()
                         .expect("Must have source chain if write_workspace access is given")
-                        .put_countersigned(None, input.into_entry(), chain_top_ordering)
+                        .put_countersigned(None, entry, chain_top_ordering)
                         .await
                         .map_err(|source_chain_error| {
                             WasmError::Host(source_chain_error.to_string())
@@ -55,7 +54,7 @@ pub fn create<'a>(
                 }),
                 _ => {
                     // build the entry hash
-                    let entry_hash = EntryHash::with_data_sync(AsRef::<Entry>::as_ref(&input));
+                    let entry_hash = EntryHash::with_data_sync(&entry);
 
                     // extract the entry defs for a zome
                     let entry_type = match entry_location {
@@ -105,12 +104,7 @@ pub fn create<'a>(
                             .source_chain()
                             .as_ref()
                             .expect("Must have source chain if write_workspace access is given")
-                            .put(
-                                None,
-                                header_builder,
-                                Some(input.into_entry()),
-                                chain_top_ordering,
-                            )
+                            .put(None, header_builder, Some(entry), chain_top_ordering)
                             .await
                             .map_err(|source_chain_error| {
                                 WasmError::Host(source_chain_error.to_string())

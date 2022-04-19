@@ -123,16 +123,16 @@ impl LinkTestData {
             create_link_hash: later_create_link_hash.clone(),
         };
 
-        let base_query = GetLinksQuery::base(base_hash.clone().into(), create_link.zome_id);
-        let tag_query = GetLinksQuery::tag(
+        let base_query = GetLinksQuery::base(base_hash.clone().into());
+        let tag_query = GetLinksQuery::new(
             base_hash.clone().into(),
-            create_link.zome_id,
-            create_link.tag.clone(),
+            Some(LinkTypeQuery::AllTypes(create_link.zome_id)),
+            Some(create_link.tag.clone()),
         );
-        let details_tag_query = GetLinkDetailsQuery::tag(
+        let details_tag_query = GetLinkDetailsQuery::new(
             base_hash.clone().into(),
-            create_link.zome_id,
-            create_link.tag.clone(),
+            Some(LinkTypeQuery::AllTypes(create_link.zome_id)),
+            Some(create_link.tag.clone()),
         );
 
         Self {

@@ -71,6 +71,31 @@ pub struct TestWasmPair<I, C = I> {
     pub coordinator: C,
 }
 
+pub type TestZomes = TestWasmPair<IntegrityZome, CoordinatorZome>;
+
+impl TestWasm {
+    /// Get the [`ZomeName`] for the integrity zome.
+    pub fn integrity_zome_name(self) -> ZomeName {
+        TestWasmPair::<ZomeName>::from(self).integrity
+    }
+    /// Get the [`ZomeName`] for the coordinator zome.
+    pub fn coordinator_zome_name(self) -> ZomeName {
+        TestWasmPair::<ZomeName>::from(self).coordinator
+    }
+    /// Get the [`Zome`] for the integrity zome.
+    pub fn integrity_zome(self) -> Zome {
+        TestWasmPair::<IntegrityZome, CoordinatorZome>::from(self)
+            .integrity
+            .erase_type()
+    }
+    /// Get the [`Zome`] for the coordinator zome.
+    pub fn coordinator_zome(self) -> Zome {
+        TestWasmPair::<IntegrityZome, CoordinatorZome>::from(self)
+            .coordinator
+            .erase_type()
+    }
+}
+
 impl From<TestIntegrityWasm> for ZomeName {
     fn from(test_wasm: TestIntegrityWasm) -> ZomeName {
         ZomeName::from(match test_wasm {
@@ -235,6 +260,18 @@ impl From<TestWasm> for PathBuf {
 
 impl From<TestWasm> for DnaWasm {
     fn from(t: TestWasm) -> Self {
+        DnaWasm::from(get_code(PathBuf::from(t)))
+    }
+}
+
+impl From<TestIntegrityWasm> for DnaWasm {
+    fn from(t: TestIntegrityWasm) -> Self {
+        DnaWasm::from(get_code(PathBuf::from(t)))
+    }
+}
+
+impl From<TestCoordinatorWasm> for DnaWasm {
+    fn from(t: TestCoordinatorWasm) -> Self {
         DnaWasm::from(get_code(PathBuf::from(t)))
     }
 }

@@ -568,7 +568,7 @@ mod tests {
         );
         let link_key = WireLinkKey {
             base: hash.into(),
-            zome_id: 0.into(),
+            type_query: Some(LinkTypeQuery::AllTypes(0.into())),
             tag: None,
         };
 

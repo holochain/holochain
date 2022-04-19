@@ -22,7 +22,7 @@ pub struct Msg(pub String);
 )]
 pub struct PrivMsg(pub String);
 
-entry_defs![Post::entry_def(), Msg::entry_def(), PrivMsg::entry_def()];
+// entry_defs![Post::entry_def(), Msg::entry_def(), PrivMsg::entry_def()];
 
 #[hdk_extern]
 fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
@@ -38,17 +38,17 @@ fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
         entry,
     } = op
     {
-        if header
-            .app_entry_type()
-            .filter(|app_entry_type| {
-                this_zome.matches_entry_def_id(app_entry_type, Post::entry_def_id())
-            })
-            .map_or(Ok(false), |_| {
-                Post::try_from(entry).map(|post| &post.0 == "Banana")
-            })?
-        {
-            return Ok(ValidateCallbackResult::Invalid("No Bananas!".to_string()));
-        }
+        // if header
+        //     .app_entry_type()
+        //     .filter(|app_entry_type| {
+        //         this_zome.matches_entry_def_id(app_entry_type, Post::entry_def_id())
+        //     })
+        //     .map_or(Ok(false), |_| {
+        //         Post::try_from(entry).map(|post| &post.0 == "Banana")
+        //     })?
+        // {
+        //     return Ok(ValidateCallbackResult::Invalid("No Bananas!".to_string()));
+        // }
     }
     Ok(ValidateCallbackResult::Valid)
 }

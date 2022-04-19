@@ -12,7 +12,7 @@ use holochain_state::prelude::test_authored_db;
 use holochain_state::prelude::test_cache_db;
 use holochain_state::prelude::test_dht_db;
 use holochain_types::db_cache::DhtDbQueryCache;
-use holochain_wasm_test_utils::TestWasm;
+use holochain_wasm_test_utils::*;
 use holochain_zome_types::Header;
 use matches::assert_matches;
 use observability;
@@ -326,7 +326,7 @@ async fn check_app_entry_type_test() {
             uid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
             properties: SerializedBytes::try_from(()).unwrap(),
             origin_time: Timestamp::HOLOCHAIN_EPOCH,
-            integrity_zomes: vec![TestWasm::EntryDefs.into()].into(),
+            integrity_zomes: vec![TestZomes::from(TestWasm::EntryDefs).integrity.into_inner()],
             coordinator_zomes: Default::default(),
         },
         vec![TestWasm::EntryDefs.into()],

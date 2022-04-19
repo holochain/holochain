@@ -85,20 +85,26 @@ impl TryFrom<&Path> for Anchor {
 
 /// Simple string interface to simple string based paths.
 /// a.k.a "the anchor pattern" that predates paths by a few years.
-pub fn anchor(anchor_type: String, anchor_text: String) -> ExternResult<holo_hash::EntryHash> {
+pub fn anchor(
+    zome_name: ZomeName,
+    anchor_type: String,
+    anchor_text: String,
+) -> ExternResult<holo_hash::EntryHash> {
     let path: Path = (&Anchor {
         anchor_type,
         anchor_text: Some(anchor_text),
     })
         .into();
+    let path = path.locate(zome_name);
     path.ensure()?;
     path.path_entry_hash()
 }
 
 /// Returns every entry hash in a vector from the root of an anchor.
 /// Hashes are sorted in the same way that paths sort children.
-pub fn list_anchor_type_addresses() -> ExternResult<Vec<AnyLinkableHash>> {
+pub fn list_anchor_type_addresses(zome_name: ZomeName) -> ExternResult<Vec<AnyLinkableHash>> {
     let links = Path::from(vec![Component::new(ROOT.to_vec())])
+        .locate(zome_name)
         .children()?
         .into_iter()
         .map(|link| link.target)
@@ -109,13 +115,17 @@ pub fn list_anchor_type_addresses() -> ExternResult<Vec<AnyLinkableHash>> {
 /// Returns every entry hash in a vector from the second level of an anchor.
 /// Uses the string argument to build the path from the root.
 /// Hashes are sorted in the same way that paths sort children.
-pub fn list_anchor_addresses(anchor_type: String) -> ExternResult<Vec<AnyLinkableHash>> {
+pub fn list_anchor_addresses(
+    zome_name: ZomeName,
+    anchor_type: String,
+) -> ExternResult<Vec<AnyLinkableHash>> {
     let path: Path = (&Anchor {
         anchor_type,
         anchor_text: None,
     })
         .into();
     let links = path
+        .locate(zome_name)
         .children()?
         .into_iter()
         .map(|link| link.target)
@@ -127,12 +137,13 @@ pub fn list_anchor_addresses(anchor_type: String) -> ExternResult<Vec<AnyLinkabl
 /// tags are a single array of bytes, so to get an external interface that is somewhat backwards
 /// compatible we need to rebuild the anchors from the paths serialized into the links and then
 /// return them.
-pub fn list_anchor_tags(anchor_type: String) -> ExternResult<Vec<String>> {
+pub fn list_anchor_tags(zome_name: ZomeName, anchor_type: String) -> ExternResult<Vec<String>> {
     let path: Path = (&Anchor {
         anchor_type,
         anchor_text: None,
     })
         .into();
+    let path = path.locate(zome_name);
     path.ensure()?;
     let hopefully_anchor_tags: Result<Vec<String>, WasmError> = path
         .children_paths()?

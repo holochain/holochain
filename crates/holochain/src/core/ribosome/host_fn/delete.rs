@@ -13,7 +13,7 @@ use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn delete<'a>(
-    ribosome: Arc<impl RibosomeT>,
+    _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: DeleteInput,
 ) -> Result<HeaderHash, WasmError> {
@@ -26,24 +26,10 @@ pub fn delete<'a>(
                 deletes_header_hash,
                 chain_top_ordering,
             } = input;
-            let (deletes_entry_address, entry_type) =
+            let (deletes_entry_address, _) =
                 get_original_entry_data(call_context.clone(), deletes_header_hash.clone())?;
 
             let host_access = call_context.host_context();
-
-            let zome = match entry_type {
-                EntryType::App(AppEntryType { zome_id, .. }) => {
-                    let zome = ribosome
-                    .dna_def()
-                    .integrity_zomes
-                    .get(zome_id.index())
-                    .cloned()
-                    .map(Zome::from)
-                    .ok_or_else(|| WasmError::Host(format!("Tried to delete an entry from ZomeId {} which is not an integrity zome", zome_id)))?;
-                    Some(zome)
-                }
-                _ => None,
-            };
 
             // handle timeouts at the source chain layer
             tokio_helper::block_forever_on(async move {

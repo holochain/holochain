@@ -19,6 +19,7 @@ use holochain_state::prelude::test_db_dir;
 use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
+use holochain_wasm_test_utils::TestZomes;
 use kitsune_p2p::KitsuneP2pConfig;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
@@ -177,8 +178,18 @@ impl ConductorTestData {
                 uid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
                 properties: SerializedBytes::try_from(()).unwrap(),
                 origin_time: Timestamp::HOLOCHAIN_EPOCH,
-                integrity_zomes: zomes.clone().into_iter().map(Into::into).collect(),
-                coordinator_zomes: Default::default(),
+                integrity_zomes: zomes
+                    .clone()
+                    .into_iter()
+                    .map(TestZomes::from)
+                    .map(|z| z.integrity.into_inner())
+                    .collect(),
+                coordinator_zomes: zomes
+                    .clone()
+                    .into_iter()
+                    .map(TestZomes::from)
+                    .map(|z| z.coordinator.into_inner())
+                    .collect(),
             },
             zomes.into_iter().map(Into::into),
         )

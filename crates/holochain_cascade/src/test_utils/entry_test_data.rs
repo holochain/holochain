@@ -20,6 +20,7 @@ use holochain_zome_types::Header;
 use holochain_zome_types::HeaderHashed;
 use holochain_zome_types::Judged;
 use holochain_zome_types::Link;
+use holochain_zome_types::LinkTypeQuery;
 use holochain_zome_types::SerializedBytes;
 use holochain_zome_types::SignedHeader;
 use holochain_zome_types::SignedHeaderHashed;
@@ -164,12 +165,12 @@ impl EntryTestData {
 
         let link_key = WireLinkKey {
             base: create_link.base_address.clone(),
-            zome_id: create_link.zome_id,
+            type_query: Some(LinkTypeQuery::AllTypes(create_link.zome_id)),
             tag: None,
         };
         let link_key_tag = WireLinkKey {
             base: create_link.base_address.clone(),
-            zome_id: create_link.zome_id,
+            type_query: Some(LinkTypeQuery::AllTypes(create_link.zome_id)),
             tag: Some(create_link.tag.clone()),
         };
 

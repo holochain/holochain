@@ -27,7 +27,7 @@ use std::time::Duration;
 async fn sys_validation_workflow_test() {
     observability::test_run().ok();
 
-    let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create])
+    let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create])
         .await
         .unwrap();
 
@@ -221,12 +221,18 @@ async fn bob_links_in_a_legit_way(
     let call_data = HostFnCaller::create(bob_cell_id, handle, dna_file).await;
     // 3
     call_data
-        .commit_entry(base.clone().try_into().unwrap(), POST_ID)
+        .commit_entry(
+            base.clone().try_into().unwrap(),
+            (TestWasm::Create.integrity_zome_name(), POST_ID),
+        )
         .await;
 
     // 4
     call_data
-        .commit_entry(target.clone().try_into().unwrap(), POST_ID)
+        .commit_entry(
+            target.clone().try_into().unwrap(),
+            (TestWasm::Create.integrity_zome_name(), POST_ID),
+        )
         .await;
 
     // 5
@@ -235,6 +241,7 @@ async fn bob_links_in_a_legit_way(
         .create_link(
             base_entry_hash.clone().into(),
             target_entry_hash.clone().into(),
+            TestWasm::Create.integrity_zome_name(),
             link_tag.clone(),
         )
         .await;
@@ -267,12 +274,18 @@ async fn bob_makes_a_large_link(
 
     // 6
     let original_header_address = call_data
-        .commit_entry(base.clone().try_into().unwrap(), POST_ID)
+        .commit_entry(
+            base.clone().try_into().unwrap(),
+            (TestWasm::Create.integrity_zome_name(), POST_ID),
+        )
         .await;
 
     // 7
     call_data
-        .commit_entry(target.clone().try_into().unwrap(), POST_ID)
+        .commit_entry(
+            target.clone().try_into().unwrap(),
+            (TestWasm::Create.integrity_zome_name(), POST_ID),
+        )
         .await;
 
     // 8
@@ -281,6 +294,7 @@ async fn bob_makes_a_large_link(
         .create_link(
             base_entry_hash.clone().into(),
             target_entry_hash.clone().into(),
+            TestWasm::Create.integrity_zome_name(),
             link_tag.clone(),
         )
         .await;
@@ -307,7 +321,10 @@ async fn dodgy_bob(bob_cell_id: &CellId, handle: &ConductorHandle, dna_file: &Dn
 
     // 11
     call_data
-        .commit_entry(legit_entry.clone().try_into().unwrap(), POST_ID)
+        .commit_entry(
+            legit_entry.clone().try_into().unwrap(),
+            (TestWasm::Create.integrity_zome_name(), POST_ID),
+        )
         .await;
 
     // Delete a link that doesn't exist buy pushing garbage addresses straight
@@ -323,19 +340,13 @@ async fn dodgy_bob(bob_cell_id: &CellId, handle: &ConductorHandle, dna_file: &Dn
         .source_chain()
         .as_ref()
         .expect("Must have source chain if write_workspace access is given");
-    let zome = call_context.zome.clone();
 
     let header_builder = builder::DeleteLink {
         link_add_address,
         base_address,
     };
     let _header_hash = source_chain
-        .put(
-            Some(zome),
-            header_builder,
-            None,
-            ChainTopOrdering::default(),
-        )
+        .put(None, header_builder, None, ChainTopOrdering::default())
         .await
         .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))
         .unwrap();

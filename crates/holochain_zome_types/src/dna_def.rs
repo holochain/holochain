@@ -119,7 +119,7 @@ impl DnaDef {
             .any(|(name, _)| name == zome_name)
     }
 
-    /// Return a Zome
+    /// Find a coordinator zome from a [`ZomeName`].
     pub fn get_coordinator_zome(
         &self,
         zome_name: &ZomeName,
@@ -129,6 +129,23 @@ impl DnaDef {
             .find(|(name, _)| name == zome_name)
             .cloned()
             .map(|(name, def)| CoordinatorZome::new(name, def))
+            .ok_or_else(|| ZomeError::ZomeNotFound(format!("Zome '{}' not found", &zome_name,)))
+    }
+
+    /// Find a any zome from a [`ZomeName`].
+    pub fn get_zome(&self, zome_name: &ZomeName) -> Result<zome::Zome, ZomeError> {
+        self.integrity_zomes
+            .iter()
+            .find(|(name, _)| name == zome_name)
+            .cloned()
+            .map(|(name, def)| Zome::new(name, def.erase_type()))
+            .or_else(|| {
+                self.coordinator_zomes
+                    .iter()
+                    .find(|(name, _)| name == zome_name)
+                    .cloned()
+                    .map(|(name, def)| Zome::new(name, def.erase_type()))
+            })
             .ok_or_else(|| ZomeError::ZomeNotFound(format!("Zome '{}' not found", &zome_name,)))
     }
 

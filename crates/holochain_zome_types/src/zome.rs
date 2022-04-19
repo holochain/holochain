@@ -261,6 +261,20 @@ impl<'a> arbitrary::Arbitrary<'a> for ZomeDef {
     }
 }
 
+#[cfg(feature = "test_utils")]
+impl<'a> arbitrary::Arbitrary<'a> for IntegrityZomeDef {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        Ok(Self(ZomeDef::Wasm(WasmZome::arbitrary(u)?)))
+    }
+}
+
+#[cfg(feature = "test_utils")]
+impl<'a> arbitrary::Arbitrary<'a> for CoordinatorZomeDef {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        Ok(Self(ZomeDef::Wasm(WasmZome::arbitrary(u)?)))
+    }
+}
+
 /// A zome defined by Wasm bytecode
 #[derive(
     Serialize, Deserialize, Hash, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, SerializedBytes,

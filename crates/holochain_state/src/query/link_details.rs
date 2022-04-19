@@ -11,21 +11,13 @@ pub struct GetLinkDetailsQuery {
 }
 
 impl GetLinkDetailsQuery {
-    pub fn new(base: AnyLinkableHash, zome_id: ZomeId, tag: Option<LinkTag>) -> Self {
+    pub fn new(
+        base: AnyLinkableHash,
+        type_query: Option<LinkTypeQuery<ZomeId>>,
+        tag: Option<LinkTag>,
+    ) -> Self {
         Self {
-            query: LinksQuery::new(base, zome_id, tag),
-        }
-    }
-
-    pub fn base(base: AnyLinkableHash, zome_id: ZomeId) -> Self {
-        Self {
-            query: LinksQuery::base(base, zome_id),
-        }
-    }
-
-    pub fn tag(base: AnyLinkableHash, zome_id: ZomeId, tag: LinkTag) -> Self {
-        Self {
-            query: LinksQuery::tag(base, zome_id, tag),
+            query: LinksQuery::new(base, type_query, tag),
         }
     }
 }
@@ -55,21 +47,24 @@ impl Query for GetLinkDetailsQuery {
     fn as_filter(&self) -> Box<dyn Fn(&QueryData<Self>) -> bool> {
         let query = &self.query;
         let base_filter = query.base.clone();
-        let zome_id_filter = query.zome_id;
+        let type_query_filter = query.type_query.clone();
         let tag_filter = query.tag.clone();
         let f = move |header: &QueryData<Self>| match header.header() {
             Header::CreateLink(CreateLink {
                 base_address,
                 zome_id,
                 tag,
+                link_type,
                 ..
             }) => {
                 *base_address == *base_filter
-                    && *zome_id == zome_id_filter
+                    && type_query_filter.as_ref().map_or(true, |z| match z {
+                        LinkTypeQuery::AllTypes(z) => *zome_id == *z,
+                        LinkTypeQuery::SingleType(z, lt) => *zome_id == *z && *link_type == *lt,
+                    })
                     && tag_filter
                         .as_ref()
-                        .map(|t| LinksQuery::tag_to_hex(tag).starts_with(&(**t)))
-                        .unwrap_or(true)
+                        .map_or(true, |t| LinksQuery::tag_to_hex(tag).starts_with(&(**t)))
             }
             Header::DeleteLink(DeleteLink { base_address, .. }) => *base_address == *base_filter,
             _ => false,

@@ -203,15 +203,7 @@ pub mod wasm_test {
         let expected_path =
             hdk::hash_path::path::Path::from(vec![Component::from("foo"), Component::from("bar")]);
 
-        let path_hash = holochain_zome_types::entry::EntryHashed::from_content_sync(
-            Entry::try_from(expected_path).unwrap(),
-        )
-        .into_hash();
-
-        let path_entry_hash = holochain_zome_types::entry::EntryHashed::from_content_sync(
-            Entry::try_from(PathEntry::new(path_hash)).unwrap(),
-        )
-        .into_hash();
+        let path_entry_hash = expected_path.path_entry_hash().unwrap();
 
         assert_eq!(path_entry_hash.into_inner(), output.into_inner(),);
     }

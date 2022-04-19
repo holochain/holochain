@@ -501,7 +501,7 @@ pub fn entry_creation_zomes_to_invoke(
             ..
         }) => {
             let zome = zome_id_to_zome(aet.zome_id(), dna_def)?;
-            Ok(ZomesToInvoke::One(zome))
+            Ok(ZomesToInvoke::One(zome.erase_type()))
         }
         _ => Ok(ZomesToInvoke::AllIntegrity),
     }
@@ -512,10 +512,10 @@ fn create_link_zomes_to_invoke(
     dna_def: &DnaDef,
 ) -> AppValidationOutcome<ZomesToInvoke> {
     let zome = zome_id_to_zome(create_link.zome_id, dna_def)?;
-    Ok(ZomesToInvoke::One(zome))
+    Ok(ZomesToInvoke::One(zome.erase_type()))
 }
 
-fn zome_id_to_zome(zome_id: ZomeId, dna_def: &DnaDef) -> AppValidationResult<Zome> {
+fn zome_id_to_zome(zome_id: ZomeId, dna_def: &DnaDef) -> AppValidationResult<IntegrityZome> {
     let zome_index = u8::from(zome_id) as usize;
     Ok(dna_def
         .integrity_zomes

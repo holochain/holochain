@@ -15,6 +15,7 @@ use holochain_sqlite::db::{p2p_put_single, AsP2pStateTxExt};
 use holochain_state::prelude::from_blob;
 use holochain_state::test_utils::fresh_reader_test;
 use holochain_types::dht_op::{DhtOp, DhtOpHashed, DhtOpType};
+use holochain_types::inline_zome::InlineZomeSet;
 use holochain_types::prelude::DnaFile;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use kitsune_p2p::KitsuneP2pConfig;
@@ -50,12 +51,15 @@ pub struct MockNetworkData {
     pub op_to_loc: HashMap<Arc<DhtOpHash>, DhtLocation>,
     /// The DhtOps
     pub ops: HashMap<Arc<DhtOpHash>, DhtOpHashed>,
-    /// The uuid for the dna.
-    pub uuid: String,
+    /// The uuid for the integrity zome (also for the dna).
+    pub integrity_uuid: String,
+    /// The uuid for the coordinator zome.
+    pub coordinator_uuid: String,
 }
 
 struct GeneratedData {
-    uuid: String,
+    integrity_uuid: String,
+    coordinator_uuid: String,
     peer_data: Vec<AgentInfoSigned>,
     authored: HashMap<Arc<AgentPubKey>, Vec<Arc<DhtOpHash>>>,
     ops: HashMap<Arc<DhtOpHash>, DhtOpHashed>,
@@ -64,7 +68,8 @@ struct GeneratedData {
 impl MockNetworkData {
     fn new(data: GeneratedData) -> Self {
         let GeneratedData {
-            uuid,
+            integrity_uuid,
+            coordinator_uuid,
             peer_data,
             authored,
             ops,
@@ -112,7 +117,8 @@ impl MockNetworkData {
             ops_by_loc,
             op_to_loc,
             ops,
-            uuid,
+            integrity_uuid,
+            coordinator_uuid,
         }
     }
 
@@ -181,24 +187,36 @@ pub async fn generate_test_data(
     let is_cached = cached.is_some();
     let (data, dna_hash) = match cached {
         Some(cached) => {
-            let uuid = cached.uuid.clone();
-            let dna_file = data_zome(uuid).await;
+            let dna_file = data_zome(
+                cached.integrity_uuid.clone(),
+                cached.coordinator_uuid.clone(),
+            )
+            .await;
             let dna_hash = dna_file.dna_hash().clone();
             (cached, dna_hash)
         }
         None => {
-            let uuid = nanoid::nanoid!();
+            let integrity_uuid = nanoid::nanoid!();
+            let coordinator_uuid = nanoid::nanoid!();
 
-            let dna_file = data_zome(uuid.clone()).await;
+            let dna_file = data_zome(integrity_uuid.clone(), coordinator_uuid.clone()).await;
             let dna_hash = dna_file.dna_hash().clone();
-            let data = create_test_data(num_agents, min_num_ops_held, dna_file, uuid).await;
+            let data = create_test_data(
+                num_agents,
+                min_num_ops_held,
+                dna_file,
+                integrity_uuid,
+                coordinator_uuid,
+            )
+            .await;
             (data, dna_hash)
         }
     };
     let generated_data = GeneratedData {
         ops: data.ops,
         peer_data: reset_peer_data(data.peer_data, &dna_hash).await,
-        uuid: data.uuid,
+        integrity_uuid: data.integrity_uuid,
+        coordinator_uuid: data.coordinator_uuid,
         authored: data.authored,
     };
     let data = MockNetworkData::new(generated_data);
@@ -240,7 +258,8 @@ fn cache_data(in_memory: bool, data: &MockNetworkData, is_cached: bool) -> Conne
     txn.execute(
         "
         CREATE TABLE IF NOT EXISTS Uuid(
-            uuid TEXT NOT NULL
+            integrity_uuid TEXT NOT NULL,
+            coordinator_uuid TEXT NOT NULL
         )
         ",
         [],
@@ -248,9 +267,9 @@ fn cache_data(in_memory: bool, data: &MockNetworkData, is_cached: bool) -> Conne
     .unwrap();
     txn.execute(
         "
-        INSERT INTO Uuid (uuid) VALUES(?)
+        INSERT INTO Uuid (integrity_uuid, coordinator_uuid) VALUES(?)
         ",
-        [&data.uuid],
+        [&data.integrity_uuid, &data.coordinator_uuid],
     )
     .unwrap();
     for op in data.ops.values() {
@@ -286,8 +305,13 @@ fn get_cached() -> Option<GeneratedData> {
             .transaction_with_behavior(rusqlite::TransactionBehavior::Exclusive)
             .unwrap();
         // If there's no uuid then there's no data.
-        let uuid = txn
-            .query_row("SELECT uuid FROM Uuid", [], |row| row.get(0))
+        let integrity_uuid = txn
+            .query_row("SELECT integrity_uuid FROM Uuid", [], |row| row.get(0))
+            .optional()
+            .ok()
+            .flatten()?;
+        let coordinator_uuid = txn
+            .query_row("SELECT coordinator_uuid FROM Uuid", [], |row| row.get(0))
             .optional()
             .ok()
             .flatten()?;
@@ -305,7 +329,8 @@ fn get_cached() -> Option<GeneratedData> {
             });
 
         Some(GeneratedData {
-            uuid,
+            integrity_uuid,
+            coordinator_uuid,
             peer_data,
             authored,
             ops,
@@ -317,7 +342,8 @@ async fn create_test_data(
     num_agents: usize,
     approx_num_ops_held: usize,
     dna_file: DnaFile,
-    uuid: String,
+    integrity_uuid: String,
+    coordinator_uuid: String,
 ) -> GeneratedData {
     let coverage = ((50.0 / num_agents as f64) * 2.0).clamp(0.0, 1.0);
     let num_storage_buckets = (1.0 / coverage).round() as u32;
@@ -412,7 +438,8 @@ async fn create_test_data(
     let peer_data = conductor.get_agent_infos(None).await.unwrap();
     dbg!("Done");
     GeneratedData {
-        uuid,
+        integrity_uuid,
+        coordinator_uuid,
         peer_data,
         authored,
         ops,
@@ -514,27 +541,40 @@ fn get_authored_ops(
 /// you must use the data generation zome in the actual simulation
 /// so the Dna element matches.
 /// Hopefully this limitation can be overcome in the future.
-pub async fn data_zome(uuid: String) -> DnaFile {
+pub async fn data_zome(integrity_uuid: String, coordinator_uuid: String) -> DnaFile {
+    let integrity_zome_name = "integrity_zome1";
+    let coordinator_zome_name = "zome1";
     let entry_def = EntryDef::default_with_id("entrydef");
 
-    let zome = InlineZome::new(uuid.clone(), vec![entry_def.clone()])
-        .callback("create_many", move |api, entries: Vec<Entry>| {
+    let zomes = InlineZomeSet::new(
+        [(
+            integrity_zome_name,
+            integrity_uuid.clone(),
+            vec![entry_def.clone()],
+        )],
+        [(coordinator_zome_name, coordinator_uuid)],
+    )
+    .callback(
+        coordinator_zome_name,
+        "create_many",
+        move |api, entries: Vec<Entry>| {
             let entry_def_id: EntryDefId = entry_def.id.clone();
             for entry in entries {
                 api.create(CreateInput::new(
-                    entry_def_id.clone(),
+                    (integrity_zome_name, entry_def_id.clone()).into(),
                     entry,
                     ChainTopOrdering::default(),
                 ))?;
             }
             Ok(())
-        })
-        .callback("read", |api, hash: HeaderHash| {
-            api.get(vec![GetInput::new(hash.into(), GetOptions::default())])
-                .map(|e| e.into_iter().next().unwrap())
-                .map_err(Into::into)
-        });
-    let (dna_file, _) = SweetDnaFile::from_inline_zome(uuid, "zome1", zome)
+        },
+    )
+    .callback(coordinator_zome_name, "read", |api, hash: HeaderHash| {
+        api.get(vec![GetInput::new(hash.into(), GetOptions::default())])
+            .map(|e| e.into_iter().next().unwrap())
+            .map_err(Into::into)
+    });
+    let (dna_file, _, _) = SweetDnaFile::from_inline_zomes(integrity_uuid, zomes)
         .await
         .unwrap();
     dna_file

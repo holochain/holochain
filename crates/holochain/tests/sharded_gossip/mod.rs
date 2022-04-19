@@ -52,7 +52,7 @@ async fn fullsync_sharded_gossip() -> anyhow::Result<()> {
         });
     }
 
-    let (dna_file, _) = SweetDnaFile::unique_from_inline_zome("zome1", simple_create_read_zome())
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_create_read_zome())
         .await
         .unwrap();
 
@@ -114,7 +114,7 @@ async fn fullsync_sharded_local_gossip() -> anyhow::Result<()> {
         ..Default::default()
     });
 
-    let (dna_file, _) = SweetDnaFile::unique_from_inline_zome("zome1", simple_create_read_zome())
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_create_read_zome())
         .await
         .unwrap();
 
@@ -200,7 +200,7 @@ async fn mock_network_sharded_gossip() {
 
     // We have to use the same dna that was used to generate the test data.
     // This is a short coming I hope to overcome in future versions.
-    let dna_file = data_zome(data.uuid.clone()).await;
+    let dna_file = data_zome(data.integrity_uuid.clone(), data.coordinator_uuid.clone()).await;
 
     // We are pretending that all simulated agents have all other agents (except the real agent)
     // for this test.
@@ -719,7 +719,7 @@ async fn mock_network_sharding() {
 
     // We have to use the same dna that was used to generate the test data.
     // This is a short coming I hope to overcome in future versions.
-    let dna_file = data_zome(data.uuid.clone()).await;
+    let dna_file = data_zome(data.integrity_uuid.clone(), data.coordinator_uuid.clone()).await;
 
     // We are pretending that all simulated agents have all other agents (except the real agent)
     // for this test.

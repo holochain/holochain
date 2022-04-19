@@ -20,29 +20,43 @@ pub fn get_link_details<'a>(
             read_workspace: Permission::Allow,
             ..
         } => {
-            let results: Vec<Result<Vec<_>, _>> = tokio_helper::block_forever_on(async move {
-                join_all(inputs.into_iter().map(|input| async {
-                    let GetLinksInput {
-                        base_address,
-                        tag_prefix,
-                    } = input;
-                    let zome_id = ribosome
-                        .zome_name_to_id(todo!())
-                        .expect("Failed to get ID for current zome.");
-                    let key = WireLinkKey {
-                        base: base_address,
-                        zome_id,
-                        tag: tag_prefix,
-                    };
-                    Cascade::from_workspace_network(
-                        &call_context.host_context.workspace(),
-                        call_context.host_context.network().to_owned(),
-                    )
-                    .get_link_details(key, GetLinksOptions::default())
+            let results: Vec<Result<Vec<_>, RibosomeError>> =
+                tokio_helper::block_forever_on(async move {
+                    join_all(inputs.into_iter().map(|input| async {
+                        let GetLinksInput {
+                            base_address,
+                            type_location,
+                            tag_prefix,
+                        } = input;
+
+                        let location = type_location.map_or(Ok(None), |location| {
+                            let (zome_name, link_type) = match location {
+                                LinkTypeQuery::AllTypes(zome_name) => (zome_name, None),
+                                LinkTypeQuery::SingleType(zome_name, link_type) => {
+                                    (zome_name, Some(link_type))
+                                }
+                            };
+                            ribosome.zome_name_to_id(&zome_name).map(|zome_id| {
+                                Some(match link_type {
+                                    Some(lt) => LinkTypeQuery::SingleType(zome_id, lt),
+                                    None => LinkTypeQuery::AllTypes(zome_id),
+                                })
+                            })
+                        })?;
+                        let key = WireLinkKey {
+                            base: base_address,
+                            type_query: location,
+                            tag: tag_prefix,
+                        };
+                        Ok(Cascade::from_workspace_network(
+                            &call_context.host_context.workspace(),
+                            call_context.host_context.network().to_owned(),
+                        )
+                        .get_link_details(key, GetLinksOptions::default())
+                        .await?)
+                    }))
                     .await
-                }))
-                .await
-            });
+                });
             let results: Result<Vec<_>, _> = results
                 .into_iter()
                 .map(|result| match result {
@@ -66,10 +80,10 @@ pub fn get_link_details<'a>(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod slow_tests {
+    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::element::SignedHeaderHashed;
     use holochain_zome_types::Header;
-    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_entry_hash_path_children_details() {
@@ -113,8 +127,9 @@ pub mod slow_tests {
 
         let to_remove_hash = to_remove.as_hash().clone();
 
-        let _remove_hash: holo_hash::HeaderHash =
-            conductor.call(&alice, "delete_link", to_remove_hash.clone()).await;
+        let _remove_hash: holo_hash::HeaderHash = conductor
+            .call(&alice, "delete_link", to_remove_hash.clone())
+            .await;
 
         let children_details_output_2: holochain_zome_types::link::LinkDetails = conductor
             .call(&alice, "children_details", "foo".to_string())

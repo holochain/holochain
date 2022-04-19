@@ -71,7 +71,6 @@ pub fn delete_link<'a>(
                 .source_chain()
                 .as_ref()
                 .expect("Must have source chain if write_workspace access is given");
-            let zome = call_context.zome.clone();
 
             // handle timeouts at the source chain layer
 

@@ -250,3 +250,21 @@ impl From<(String, EntryDefId)> for EntryDefLocation {
         Self::from((ZomeName::from(z), e))
     }
 }
+
+impl From<(ZomeName, &str)> for EntryDefLocation {
+    fn from((zome, e): (ZomeName, &str)) -> Self {
+        Self::App(AppEntryDefLocation {
+            zome,
+            entry: e.to_string().into(),
+        })
+    }
+}
+
+impl From<(ZomeName, String)> for EntryDefLocation {
+    fn from((zome, e): (ZomeName, String)) -> Self {
+        Self::App(AppEntryDefLocation {
+            zome,
+            entry: e.into(),
+        })
+    }
+}

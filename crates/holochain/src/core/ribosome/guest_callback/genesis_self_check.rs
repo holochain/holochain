@@ -98,7 +98,7 @@ mod slow_tests {
     use ::fixt::prelude::*;
     use holo_hash::fixt::AgentPubKeyFixturator;
     use holochain_types::prelude::*;
-    use holochain_wasm_test_utils::TestWasm;
+    use holochain_wasm_test_utils::{TestCoordinatorWasm, TestIntegrityWasm, TestWasm};
 
     fn invocation_fixture() -> GenesisSelfCheckInvocation {
         GenesisSelfCheckInvocation {
@@ -156,16 +156,20 @@ mod slow_tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn test_integrity_zome_can_run_self_check() {
         let mut conductor = SweetConductor::from_config(Default::default()).await;
-        let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::IntegrityZome])
-            .await
-            .unwrap();
+        let (dna, _, _) = SweetDnaFile::unique_from_zomes(
+            vec![TestIntegrityWasm::IntegrityZome],
+            Vec::<TestCoordinatorWasm>::new(),
+            vec![TestIntegrityWasm::IntegrityZome],
+        )
+        .await
+        .unwrap();
 
         let app = conductor.setup_app("app", &[dna]).await.unwrap();
         let cells = app.into_cells();
 
         let _: EntryHashed = conductor
             .call(
-                &cells[0].zome(TestWasm::IntegrityZome),
+                &cells[0].zome(TestIntegrityWasm::IntegrityZome),
                 "call_must_get_entry",
                 EntryHash::from(cells[0].cell_id().agent_pubkey().clone()),
             )

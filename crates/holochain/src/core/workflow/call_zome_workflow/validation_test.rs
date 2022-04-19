@@ -8,6 +8,7 @@ use crate::test_utils::setup_app_with_names;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
+use holochain_wasm_test_utils::TestZomes;
 use holochain_zome_types::cell::CellId;
 use std::convert::TryFrom;
 
@@ -21,8 +22,8 @@ async fn direct_validation_test() {
             uid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
             properties: SerializedBytes::try_from(()).unwrap(),
             origin_time: Timestamp::HOLOCHAIN_EPOCH,
-            integrity_zomes: vec![TestWasm::Update.into()].into(),
-            coordinator_zomes: Default::default(),
+            integrity_zomes: vec![TestZomes::from(TestWasm::Update).integrity.into_inner()],
+            coordinator_zomes: vec![TestZomes::from(TestWasm::Update).coordinator.into_inner()],
         },
         vec![TestWasm::Update.into()],
     )

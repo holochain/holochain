@@ -246,13 +246,23 @@ pub enum ZomesToInvoke {
     AllIntegrity,
     /// All integrity and coordinator zomes.
     All,
-    /// A single zome.
+    /// A single zome of unknown type.
     One(Zome),
+    /// A single integrity zome.
+    OneIntegrity(IntegrityZome),
+    /// A single coordinator zome.
+    OneCoordinator(CoordinatorZome),
 }
 
 impl ZomesToInvoke {
     pub fn one(zome: Zome) -> Self {
         Self::One(zome)
+    }
+    pub fn one_integrity(zome: IntegrityZome) -> Self {
+        Self::OneIntegrity(zome)
+    }
+    pub fn one_coordinator(zome: CoordinatorZome) -> Self {
+        Self::OneCoordinator(zome)
     }
 }
 
@@ -466,6 +476,8 @@ pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
                 .map(|(n, d)| (n.clone(), d.clone()).into())
                 .collect(),
             ZomesToInvoke::One(zome) => vec![zome],
+            ZomesToInvoke::OneIntegrity(zome) => vec![zome.erase_type()],
+            ZomesToInvoke::OneCoordinator(zome) => vec![zome.erase_type()],
         }
     }
 

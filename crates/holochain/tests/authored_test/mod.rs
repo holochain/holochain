@@ -37,7 +37,10 @@ async fn authored_test() {
     // 3
     alice_call_data
         .get_api(TestWasm::Create)
-        .commit_entry(entry.clone().try_into().unwrap(), POST_ID)
+        .commit_entry(
+            entry.clone().try_into().unwrap(),
+            (TestWasm::Create.integrity_zome_name(), POST_ID),
+        )
         .await;
 
     // publish these commits
@@ -107,7 +110,10 @@ async fn authored_test() {
     // Now bob commits the entry
     bob_call_data
         .get_api(TestWasm::Create)
-        .commit_entry(entry.clone().try_into().unwrap(), POST_ID)
+        .commit_entry(
+            entry.clone().try_into().unwrap(),
+            (TestWasm::Create.integrity_zome_name(), POST_ID),
+        )
         .await;
 
     // Produce and publish these commits

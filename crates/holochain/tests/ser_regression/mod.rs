@@ -10,6 +10,7 @@ use holochain::conductor::api::ZomeCall;
 use holochain::test_utils::setup_app;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
+use holochain_wasm_test_utils::TestZomes;
 pub use holochain_zome_types::capability::CapSecret;
 
 #[derive(Serialize, Deserialize, SerializedBytes, Debug)]
@@ -47,8 +48,12 @@ async fn ser_regression_test() {
             uid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
             properties: SerializedBytes::try_from(()).unwrap(),
             origin_time: Timestamp::HOLOCHAIN_EPOCH,
-            integrity_zomes: vec![TestWasm::SerRegression.into()].into(),
-            coordinator_zomes: Default::default(),
+            integrity_zomes: vec![TestZomes::from(TestWasm::SerRegression)
+                .integrity
+                .into_inner()],
+            coordinator_zomes: vec![TestZomes::from(TestWasm::SerRegression)
+                .coordinator
+                .into_inner()],
         },
         vec![TestWasm::SerRegression.into()],
     )

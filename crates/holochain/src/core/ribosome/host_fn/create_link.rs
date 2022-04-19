@@ -21,19 +21,15 @@ pub fn create_link<'a>(
             let CreateLinkInput {
                 base_address,
                 target_address,
-                link_type,
+                type_location,
                 tag,
                 chain_top_ordering,
-                zome_name,
             } = input;
 
-            let zome = match zome_name {
-                Some(zome_name) => ribosome
-                    .dna_def()
-                    .get_integrity_zome(&zome_name)
-                    .map_err(|zome_error| WasmError::Host(zome_error.to_string()))?,
-                None => todo!(),
-            };
+            let zome = ribosome
+                .dna_def()
+                .get_integrity_zome(&type_location.zome)
+                .map_err(|zome_error| WasmError::Host(zome_error.to_string()))?;
 
             // extract the zome position
             let zome_id = ribosome
@@ -41,8 +37,13 @@ pub fn create_link<'a>(
                 .expect("Failed to get ID for current zome");
 
             // Construct the link add
-            let header_builder =
-                builder::CreateLink::new(base_address, target_address, zome_id, link_type, tag);
+            let header_builder = builder::CreateLink::new(
+                base_address,
+                target_address,
+                zome_id,
+                type_location.link,
+                tag,
+            );
 
             let header_hash = tokio_helper::block_forever_on(tokio::task::spawn(async move {
                 // push the header into the source chain

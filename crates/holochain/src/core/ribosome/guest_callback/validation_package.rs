@@ -12,12 +12,12 @@ use holochain_types::prelude::*;
 
 #[derive(Clone)]
 pub struct ValidationPackageInvocation {
-    zome: Zome,
+    zome: IntegrityZome,
     app_entry_type: AppEntryType,
 }
 
 impl ValidationPackageInvocation {
-    pub fn new(zome: Zome, app_entry_type: AppEntryType) -> Self {
+    pub fn new(zome: IntegrityZome, app_entry_type: AppEntryType) -> Self {
         Self {
             zome,
             app_entry_type,
@@ -48,7 +48,7 @@ impl From<&ValidationPackageHostAccess> for HostFnAccess {
 
 impl Invocation for ValidationPackageInvocation {
     fn zomes(&self) -> ZomesToInvoke {
-        ZomesToInvoke::One(self.zome.to_owned())
+        ZomesToInvoke::One(self.zome.to_owned().erase_type())
     }
     fn fn_components(&self) -> FnComponents {
         // @todo zome_id is a u8, is this really an ergonomic way for us to interact with
@@ -204,7 +204,7 @@ mod test {
                 .unwrap();
         let zome = validation_package_invocation.zome.clone();
         assert_eq!(
-            ZomesToInvoke::One(zome),
+            ZomesToInvoke::One(zome.erase_type()),
             validation_package_invocation.zomes(),
         );
     }
@@ -257,6 +257,7 @@ mod slow_tests {
     use hdk::prelude::EntryVisibility;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::validate::ValidationPackage;
+    use holochain_zome_types::IntegrityZome;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_validation_package_unimplemented() {
@@ -270,7 +271,7 @@ mod slow_tests {
             ValidationPackageInvocationFixturator::new(::fixt::Empty)
                 .next()
                 .unwrap();
-        validation_package_invocation.zome = TestWasm::Foo.into();
+        validation_package_invocation.zome = IntegrityZome::from(TestWasm::Foo);
 
         let result = ribosome
             .run_validation_package(host_access, validation_package_invocation)
@@ -290,7 +291,8 @@ mod slow_tests {
             ValidationPackageInvocationFixturator::new(::fixt::Empty)
                 .next()
                 .unwrap();
-        validation_package_invocation.zome = TestWasm::ValidationPackageSuccess.into();
+        validation_package_invocation.zome =
+            IntegrityZome::from(TestWasm::ValidationPackageSuccess);
         validation_package_invocation.app_entry_type =
             AppEntryType::new(3.into(), 0.into(), EntryVisibility::Public);
 
@@ -315,7 +317,7 @@ mod slow_tests {
             ValidationPackageInvocationFixturator::new(::fixt::Empty)
                 .next()
                 .unwrap();
-        validation_package_invocation.zome = TestWasm::ValidationPackageFail.into();
+        validation_package_invocation.zome = IntegrityZome::from(TestWasm::ValidationPackageFail);
 
         let result = ribosome
             .run_validation_package(host_access, validation_package_invocation)

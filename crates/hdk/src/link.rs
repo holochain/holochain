@@ -57,17 +57,23 @@ pub use holochain_deterministic_integrity::link::*;
 /// If you have the hash of the identity entry you can get all the links, if you have the entry or
 /// header hash for any of the creates or updates you can lookup the identity entry hash out of the
 /// body of the create/update entry.
-pub fn create_link<TY: Into<LinkType>, T: Into<LinkTag>>(
+pub fn create_link<TY, T>(
     base_address: AnyLinkableHash,
     target_address: AnyLinkableHash,
-    link_type: TY,
+    link_type_location: TY,
     tag: T,
-) -> ExternResult<HeaderHash> {
+) -> ExternResult<HeaderHash>
+where
+    TY: ToZomeName,
+    TY: Into<LinkType>,
+    T: Into<LinkTag>,
+{
+    let zome_name = link_type_location.zome_name();
     HDK.with(|h| {
         h.borrow().create_link(CreateLinkInput::new(
             base_address,
             target_address,
-            link_type.into(),
+            LinkTypeLocation::new(zome_name, link_type_location),
             tag.into(),
             ChainTopOrdering::default(),
         ))
@@ -123,11 +129,27 @@ pub fn delete_link(address: HeaderHash) -> ExternResult<HeaderHash> {
 /// deleted c.f. get_link_details that returns all the creates and all the deletes together.
 ///
 /// See [ `get_link_details` ].
-pub fn get_links(base: AnyLinkableHash, link_tag: Option<LinkTag>) -> ExternResult<Vec<Link>> {
+pub fn get_links<TY>(
+    base: AnyLinkableHash,
+    type_location: TY,
+    link_tag: Option<LinkTag>,
+) -> ExternResult<Vec<Link>>
+where
+    TY: Into<Option<Box<dyn ToLinkTypeQuery>>>,
+{
     Ok(HDK
         .with(|h| {
-            h.borrow()
-                .get_links(vec![GetLinksInput::new(base, link_tag)])
+            h.borrow().get_links(vec![GetLinksInput::new(
+                base,
+                type_location.into().map(|b| {
+                    let zome_name = b.zome_name();
+                    b.link_type().map_or_else(
+                        || LinkTypeQuery::AllTypes(zome_name.clone()),
+                        |link_type| LinkTypeQuery::SingleType(zome_name.clone(), link_type),
+                    )
+                }),
+                link_tag,
+            )])
         })?
         .into_iter()
         .next()
@@ -153,14 +175,27 @@ pub fn get_links(base: AnyLinkableHash, link_tag: Option<LinkTag>) -> ExternResu
 /// c.f. get_links that returns only the creates that have not been deleted.
 ///
 /// See [ `get_links` ].
-pub fn get_link_details(
+pub fn get_link_details<TY>(
     base: AnyLinkableHash,
+    type_location: TY,
     link_tag: Option<LinkTag>,
-) -> ExternResult<LinkDetails> {
+) -> ExternResult<LinkDetails>
+where
+    TY: Into<Option<Box<dyn ToLinkTypeQuery>>>,
+{
     Ok(HDK
         .with(|h| {
-            h.borrow()
-                .get_link_details(vec![GetLinksInput::new(base, link_tag)])
+            h.borrow().get_link_details(vec![GetLinksInput::new(
+                base,
+                type_location.into().map(|b| {
+                    let zome_name = b.zome_name();
+                    b.link_type().map_or_else(
+                        || LinkTypeQuery::AllTypes(zome_name.clone()),
+                        |link_type| LinkTypeQuery::SingleType(zome_name.clone(), link_type),
+                    )
+                }),
+                link_tag,
+            )])
         })?
         .into_iter()
         .next()

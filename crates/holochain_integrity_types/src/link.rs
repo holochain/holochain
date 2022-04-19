@@ -73,3 +73,11 @@ impl AsRef<Vec<u8>> for LinkTag {
         &self.0
     }
 }
+
+impl std::ops::Deref for LinkType {
+    type Target = u8;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}

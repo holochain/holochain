@@ -11,13 +11,13 @@ use holochain_state::prelude::test_cache_db;
 use holochain_state::prelude::test_dht_db;
 use holochain_state::scratch::Scratch;
 use holochain_zome_types::ChainTopOrdering;
+use holochain_zome_types::CoordinatorZomeFixturator;
 use holochain_zome_types::Details;
 use holochain_zome_types::ElementDetails;
 use holochain_zome_types::EntryDetails;
 use holochain_zome_types::EntryDhtStatus;
 use holochain_zome_types::GetOptions;
 use holochain_zome_types::ValidationStatus;
-use holochain_zome_types::CoordinatorZomeFixturator;
 
 async fn assert_can_get<N: HolochainP2pDnaT + Clone + Send + 'static>(
     td_entry: &EntryTestData,

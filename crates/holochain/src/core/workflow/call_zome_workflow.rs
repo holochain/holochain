@@ -70,7 +70,7 @@ where
     if should_write {
         let is_empty = workspace.source_chain().is_empty()?;
         let countersigning_op = workspace.source_chain().countersigning_op()?;
-        let flushed_headers: Vec<(Option<Zome>, SignedHeaderHashed)> =
+        let flushed_headers: Vec<(Option<CoordinatorZome>, SignedHeaderHashed)> =
             HostFnWorkspace::from(workspace.clone())
                 .flush(&network)
                 .await?;

@@ -4,10 +4,10 @@ use std::{
 };
 
 use holo_hash::{AgentPubKey, HeaderHash};
-use holochain_types::dht_op::DhtOpType;
+use holochain_types::{dht_op::DhtOpType, inline_zome::InlineZomeSet};
 use holochain_zome_types::{
     AppEntryType, BoxApi, ChainTopOrdering, CreateInput, Entry, EntryDef, EntryDefId,
-    EntryDefIndex, Header, HeaderType, InlineZome, Op, TryInto, ZomeId,
+    EntryDefIndex, Header, HeaderType, Op, TryInto, ZomeId,
 };
 
 use crate::{
@@ -170,26 +170,26 @@ async fn app_validation_ops() {
     observability::test_run().ok();
     let entry_def_a = EntryDef::default_with_id("a");
     let entry_def_b = EntryDef::default_with_id("b");
-    let call_back_a = || {
+    let call_back_a = |zome_name: &'static str| {
         let entry_def_a = entry_def_a.clone();
         move |api: BoxApi, ()| {
             let entry_def_id: EntryDefId = entry_def_a.id.clone();
             let entry = Entry::app(().try_into().unwrap()).unwrap();
             let hash = api.create(CreateInput::new(
-                entry_def_id,
+                (zome_name, entry_def_id).into(),
                 entry,
                 ChainTopOrdering::default(),
             ))?;
             Ok(hash)
         }
     };
-    let call_back_b = || {
+    let call_back_b = |zome_name: &'static str| {
         let entry_def_b = entry_def_b.clone();
         move |api: BoxApi, ()| {
             let entry_def_id: EntryDefId = entry_def_b.id.clone();
             let entry = Entry::app(().try_into().unwrap()).unwrap();
             let hash = api.create(CreateInput::new(
-                entry_def_id,
+                (zome_name, entry_def_id).into(),
                 entry,
                 ChainTopOrdering::default(),
             ))?;
@@ -295,57 +295,75 @@ async fn app_validation_ops() {
     let mut conductors = SweetConductorBatch::from_standard_config(2).await;
     let alice = SweetAgents::one(conductors[0].keystore()).await;
     let bob = SweetAgents::one(conductors[1].keystore()).await;
-    let mut zomes = Vec::new();
 
     let mut agents = HashMap::new();
     agents.insert(alice.clone(), ALICE);
     agents.insert(bob.clone(), BOB);
 
-    zomes.push((
-        "zome1",
-        InlineZome::new("a", vec![entry_def_a.clone(), entry_def_b.clone()])
-            .callback("create_a", call_back_a())
-            .callback("create_b", call_back_b())
-            .callback(
-                "validate",
-                validation_callback(ZOME_A_0, agents.clone(), events_tx.clone()),
+    let zomes = InlineZomeSet::new(
+        [
+            (
+                "integrity_zome1",
+                "integrity_a".to_string(),
+                vec![entry_def_a.clone(), entry_def_b.clone()],
             ),
-    ));
-    zomes.push((
-        "zome2",
-        InlineZome::new("b", vec![entry_def_a.clone(), entry_def_b.clone()])
-            .callback("create_a", call_back_a())
-            .callback("create_b", call_back_b())
-            .callback(
-                "validate",
-                validation_callback(ZOME_A_1, agents.clone(), events_tx.clone()),
+            (
+                "integrity_zome2",
+                "integrity_b".to_string(),
+                vec![entry_def_a.clone(), entry_def_b.clone()],
             ),
-    ));
-    let (dna_file_a, _) = SweetDnaFile::from_inline_zomes("".into(), zomes)
+        ],
+        [("zome1", "a".to_string()), ("zome2", "b".to_string())],
+    )
+    .callback("zome1", "create_a", call_back_a("integrity_zome1"))
+    .callback("zome1", "create_b", call_back_b("integrity_zome1"))
+    .callback(
+        "integrity_zome1",
+        "validate",
+        validation_callback(ZOME_A_0, agents.clone(), events_tx.clone()),
+    )
+    .callback("zome2", "create_a", call_back_a("integrity_zome2"))
+    .callback("zome2", "create_b", call_back_b("integrity_zome2"))
+    .callback(
+        "integrity_zome2",
+        "validate",
+        validation_callback(ZOME_A_1, agents.clone(), events_tx.clone()),
+    );
+    let (dna_file_a, _, _) = SweetDnaFile::from_inline_zomes("".into(), zomes)
         .await
         .unwrap();
-    let mut zomes = Vec::new();
-    zomes.push((
-        "zome1",
-        InlineZome::new("a", vec![entry_def_a.clone(), entry_def_b.clone()])
-            .callback("create_a", call_back_a())
-            .callback("create_b", call_back_b())
-            .callback(
-                "validate",
-                validation_callback(ZOME_B_0, agents.clone(), events_tx.clone()),
+
+    let zomes = InlineZomeSet::new(
+        [
+            (
+                "integrity_zome1",
+                "integrity_a".to_string(),
+                vec![entry_def_a.clone(), entry_def_b.clone()],
             ),
-    ));
-    zomes.push((
-        "zome2",
-        InlineZome::new("b", vec![entry_def_a.clone(), entry_def_b.clone()])
-            .callback("create_a", call_back_a())
-            .callback("create_b", call_back_b())
-            .callback(
-                "validate",
-                validation_callback(ZOME_B_1, agents.clone(), events_tx.clone()),
+            (
+                "integrity_zome2",
+                "integrity_b".to_string(),
+                vec![entry_def_a.clone(), entry_def_b.clone()],
             ),
-    ));
-    let (dna_file_b, _) = SweetDnaFile::from_inline_zomes("".into(), zomes)
+        ],
+        [("zome1", "a".to_string()), ("zome2", "b".to_string())],
+    )
+    .callback("zome1", "create_a", call_back_a("integrity_zome1"))
+    .callback("zome1", "create_b", call_back_b("integrity_zome2"))
+    .callback(
+        "integrity_zome1",
+        "validate",
+        validation_callback(ZOME_B_0, agents.clone(), events_tx.clone()),
+    )
+    .callback("zome2", "create_a", call_back_a("integrity_zome2"))
+    .callback("zome2", "create_b", call_back_b("integrity_zome2"))
+    .callback(
+        "integrity_zome2",
+        "validate",
+        validation_callback(ZOME_B_1, agents.clone(), events_tx.clone()),
+    );
+
+    let (dna_file_b, _, _) = SweetDnaFile::from_inline_zomes("".into(), zomes)
         .await
         .unwrap();
     let app = conductors[0]

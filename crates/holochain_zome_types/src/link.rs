@@ -1,6 +1,7 @@
 use crate::element::SignedHeaderHashed;
 use crate::ChainTopOrdering;
 use holo_hash::HeaderHash;
+use holochain_integrity_types::ToZomeName;
 use holochain_integrity_types::ZomeName;
 use holochain_serialized_bytes::prelude::*;
 
@@ -29,32 +30,61 @@ pub struct Link {
     pub create_link_hash: HeaderHash,
 }
 
+#[derive(
+    Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
+/// A full location of where to find an [`LinkType`]
+/// within the dna's zomes.
+///
+/// The [`ZomeName`] must be unique to the [`DnaDef`](crate::prelude::DnaDef).
+/// The [`LinkType`] must be unique to the zome.
+pub struct LinkTypeLocation {
+    /// The name of the integrity zome that defines
+    /// and validates the below type.
+    pub zome: ZomeName,
+    /// The unique u8 for this link type..
+    pub link: LinkType,
+}
+
+pub trait ToLinkTypeQuery: ToZomeName {
+    fn link_type(&self) -> Option<LinkType>;
+}
+
+#[derive(
+    Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
+/// The location of the links being queried.
+pub enum LinkTypeQuery<Z = ZomeName> {
+    /// All link types in this zome.
+    AllTypes(Z),
+    /// Only this link type in this zome.
+    SingleType(Z, LinkType),
+}
+
 /// Zome IO inner type for link creation.
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub struct CreateLinkInput {
     pub base_address: holo_hash::AnyLinkableHash,
     pub target_address: holo_hash::AnyLinkableHash,
-    pub link_type: LinkType,
+    pub type_location: LinkTypeLocation,
     pub tag: LinkTag,
     pub chain_top_ordering: ChainTopOrdering,
-    pub zome_name: Option<ZomeName>,
 }
 
 impl CreateLinkInput {
     pub fn new(
         base_address: holo_hash::AnyLinkableHash,
         target_address: holo_hash::AnyLinkableHash,
-        link_type: LinkType,
+        type_location: LinkTypeLocation,
         tag: LinkTag,
         chain_top_ordering: ChainTopOrdering,
     ) -> Self {
         Self {
             base_address,
             target_address,
-            link_type,
+            type_location,
             tag,
             chain_top_ordering,
-            zome_name: None,
         }
     }
 }
@@ -79,16 +109,19 @@ impl DeleteLinkInput {
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub struct GetLinksInput {
     pub base_address: holo_hash::AnyLinkableHash,
+    pub type_location: Option<LinkTypeQuery>,
     pub tag_prefix: Option<crate::link::LinkTag>,
 }
 
 impl GetLinksInput {
     pub fn new(
         base_address: holo_hash::AnyLinkableHash,
+        type_location: Option<LinkTypeQuery>,
         tag_prefix: Option<crate::link::LinkTag>,
     ) -> Self {
         Self {
             base_address,
+            type_location,
             tag_prefix,
         }
     }
@@ -115,5 +148,43 @@ impl From<LinkDetails> for CreateLinkWithDeleteLinks {
 impl LinkDetails {
     pub fn into_inner(self) -> CreateLinkWithDeleteLinks {
         self.into()
+    }
+}
+
+impl LinkTypeLocation {
+    pub fn new(zome_name: impl Into<ZomeName>, link_type: impl Into<LinkType>) -> Self {
+        Self {
+            zome: zome_name.into(),
+            link: link_type.into(),
+        }
+    }
+}
+
+impl ToZomeName for LinkTypeLocation {
+    fn zome_name(&self) -> ZomeName {
+        self.zome.clone()
+    }
+}
+
+impl From<LinkTypeLocation> for LinkType {
+    fn from(l: LinkTypeLocation) -> Self {
+        l.link
+    }
+}
+
+impl ToLinkTypeQuery for LinkTypeQuery {
+    fn link_type(&self) -> Option<LinkType> {
+        match self {
+            LinkTypeQuery::AllTypes(_) => None,
+            LinkTypeQuery::SingleType(_, lt) => Some(*lt),
+        }
+    }
+}
+
+impl ToZomeName for LinkTypeQuery {
+    fn zome_name(&self) -> ZomeName {
+        match self {
+            LinkTypeQuery::AllTypes(z) | LinkTypeQuery::SingleType(z, _) => z.clone(),
+        }
     }
 }
