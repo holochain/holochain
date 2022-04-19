@@ -153,7 +153,7 @@ impl HdiT for HostHdi {
             host_call::<TraceMsg, ()>(__trace, trace_msg)
         } else {
             Err(WasmError::Guest(
-                "`trace()` can only be used when the "trace" cargo feature is set (it is off by default).".to_string(),
+                "`trace()` can only be used when the \"trace\" cargo feature is set (it is off by default).".to_string(),
             ))
         }
     }
