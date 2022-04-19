@@ -62,7 +62,7 @@ jobs:
 
    rustdoc-build-test:
       docker:
-         - image: holochain/holochain:circle.build.develop
+         - image: nixos/nix:latest
            auth:
               username: $DOCKER_USER
               password: $DOCKER_PASS
@@ -72,12 +72,6 @@ jobs:
          NIXPKGS_ALLOW_UNFREE: 1
       steps:
       - checkout
-      - run:
-            name: Unset CircleCI's forced conversion of HTTPS->SSH
-            command: git config --global --unset "url.ssh://git@github.com.insteadof"
-      - run:
-            name: Set up Nix cache
-            command: $(nix-build . --fallback --no-link -A pkgs.ci.ciSetupNixConf)/bin/hc-ci-setup-nix-conf.sh
       - run:
          name: Build docs with rustdoc
          command: nix-shell --pure -p cargo --run "cargo doc"
