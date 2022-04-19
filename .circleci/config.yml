@@ -73,14 +73,8 @@ jobs:
       steps:
       - checkout
       - run:
-            name: Unset CircleCI's forced conversion of HTTPS->SSH
-            command: git config --global --unset "url.ssh://git@github.com.insteadof"
-      - run:
-            name: Set up Nix cache
-            command: $(nix-build . --fallback --no-link -A pkgs.ci.ciSetupNixConf)/bin/hc-ci-setup-nix-conf.sh
-      - run:
          name: Build docs with rustdoc
-         command: nix-shell --pure --run cargo docs
+         command: nix-shell --pure -p cargo --run cargo docs
 
    standard-test:
       docker:
