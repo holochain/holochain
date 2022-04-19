@@ -54,7 +54,6 @@ use holochain_deterministic_integrity::prelude::*;
         fn dna_info(&self, dna_info_input: ()) -> ExternResult<DnaInfo>;
         fn zome_info(&self, zome_info_input: ()) -> ExternResult<ZomeInfo>;
         // Trace
-        #[cfg(feature = "trace")]
         fn trace(&self, trace_msg: TraceMsg) -> ExternResult<()>;
         // XSalsa20Poly1305
         fn x_salsa20_poly1305_decrypt(
