@@ -47,6 +47,8 @@ impl From<OpHash> for RegionHash {
 /// gossip algorithm, although currently they are unused (except for the purpose
 /// of disambiguation in the rare case of an XOR hash collision).
 #[derive(Copy, Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(from = "RegionDataCompact")]
+#[serde(into = "RegionDataCompact")]
 pub struct RegionData {
     /// The XOR of hashes of all Ops in this Region
     pub hash: RegionHash,
@@ -111,4 +113,35 @@ impl std::ops::Sub for RegionData {
         self -= other;
         self
     }
+}
+
+/// Tuple-based representation of RegionData, used for sending more compact
+/// wire messages
+#[derive(Copy, Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct RegionDataCompact(RegionHash, u32, u32);
+
+impl From<RegionData> for RegionDataCompact {
+    fn from(d: RegionData) -> Self {
+        Self(d.hash, d.size, d.count)
+    }
+}
+
+impl From<RegionDataCompact> for RegionData {
+    fn from(RegionDataCompact(hash, size, count): RegionDataCompact) -> Self {
+        Self { hash, size, count }
+    }
+}
+
+#[test]
+fn region_data_is_compact() {
+    let hash: RegionHash = crate::hash::fake_hash().into();
+    let original = holochain_serialized_bytes::encode(&RegionData {
+        hash: hash.clone(),
+        size: 1111,
+        count: 11,
+    })
+    .unwrap();
+    let compact =
+        holochain_serialized_bytes::encode(&RegionDataCompact(hash.clone(), 1111, 11)).unwrap();
+    assert_eq!(compact.len(), original.len());
 }
