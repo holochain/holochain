@@ -46,7 +46,7 @@ async fn ser_regression_test() {
             name: "ser_regression_test".to_string(),
             uid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
             properties: SerializedBytes::try_from(()).unwrap(),
-            topology: Topology::standard_epoch(),
+            origin_time: Timestamp::HOLOCHAIN_EPOCH,
             zomes: vec![TestWasm::SerRegression.into()].into(),
         },
         vec![TestWasm::SerRegression.into()],

@@ -21,7 +21,6 @@ use ::fixt::rng;
 use holo_hash::EntryHash;
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::SerializedBytes;
-use kitsune_p2p_dht::prelude::Topology;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::sync::Arc;
@@ -699,7 +698,7 @@ fixturator!(
         properties: SerializedBytesFixturator::new_indexed(Empty, get_fixt_index!())
             .next()
             .unwrap(),
-        topology: Topology::standard(Timestamp::HOLOCHAIN_EPOCH),
+        origin_time: Timestamp::HOLOCHAIN_EPOCH,
         zomes: ZomesFixturator::new_indexed(Empty, get_fixt_index!())
             .next()
             .unwrap(),
@@ -715,7 +714,7 @@ fixturator!(
         properties: SerializedBytesFixturator::new_indexed(Unpredictable, get_fixt_index!())
             .next()
             .unwrap(),
-        topology: Topology::standard(Timestamp::HOLOCHAIN_EPOCH),
+        origin_time: Timestamp::HOLOCHAIN_EPOCH,
         zomes: ZomesFixturator::new_indexed(Unpredictable, get_fixt_index!())
             .next()
             .unwrap(),
@@ -731,7 +730,7 @@ fixturator!(
         properties: SerializedBytesFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap(),
-        topology: Topology::standard(Timestamp::HOLOCHAIN_EPOCH),
+        origin_time: Timestamp::HOLOCHAIN_EPOCH,
         zomes: ZomesFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap(),

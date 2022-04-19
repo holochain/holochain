@@ -44,7 +44,7 @@ impl SweetDnaFile {
             .uid(uid)
             .zomes(zomes.clone())
             .properties(properties.clone())
-            .topology(Topology::standard_epoch())
+            .origin_time(Timestamp::HOLOCHAIN_EPOCH)
             .build()
             .unwrap();
 

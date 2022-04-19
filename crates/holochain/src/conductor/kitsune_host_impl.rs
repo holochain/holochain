@@ -115,6 +115,8 @@ impl KitsuneHost for KitsuneHostImpl {
             .dna_store
             .share_mut(|ds| ds.get_dna_def(&dna_hash))
             .ok_or_else(|| DnaError::DnaMissing(dna_hash));
-        async move { Ok(dna_def?.topology) }.boxed().into()
+        async move { Ok(Topology::standard(dna_def?.origin_time)) }
+            .boxed()
+            .into()
     }
 }

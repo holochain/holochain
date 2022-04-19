@@ -127,7 +127,7 @@ impl DnaBundle {
                     properties: SerializedBytes::try_from(
                         manifest.properties.clone().unwrap_or_default(),
                     )?,
-                    topology: Topology::standard(manifest.origin_time.into()),
+                    origin_time: manifest.origin_time.into(),
                     zomes,
                 };
 
@@ -198,7 +198,7 @@ impl DnaBundle {
                     e
                 ))
             })?),
-            origin_time: dna_def.topology.time_origin.into(),
+            origin_time: dna_def.origin_time.into(),
             zomes,
         }
         .into())

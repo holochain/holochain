@@ -49,7 +49,7 @@ impl From<WasmMapSerialized> for WasmMap {
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, SerializedBytes)]
 pub struct DnaFile {
     /// The hashable portion that can be shared with hApp code.
-    pub dna: DnaDefHashed,
+    pub(super) dna: DnaDefHashed,
 
     /// The bytes of the WASM zomes referenced in the Dna portion.
     pub(super) code: WasmMap,
