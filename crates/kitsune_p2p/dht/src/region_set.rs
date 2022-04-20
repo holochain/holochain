@@ -215,6 +215,11 @@ mod tests {
         let coords: Vec<Vec<_>> = rset_a
             .coords
             .region_coords_nested()
+            // The outer layer of iterators corresponds to arqs in the ArqSet.
+            // There is only one arq, so just take the first item.
+            .next()
+            .unwrap()
+            // The other two layers are for space and time segments
             .map(|col| col.collect())
             .collect();
 

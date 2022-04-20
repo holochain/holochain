@@ -60,11 +60,22 @@ async fn test_region_queries() {
     let db = spaces.dht_db(dna_def.as_hash()).unwrap();
     let mut ops = vec![];
 
+    // - Check that we have no ops to begin with
+    let region_set = spaces
+        .handle_fetch_op_regions(&dna_def, DhtArcSet::Full)
+        .await
+        .unwrap();
+    let region_sum: RegionData = region_set.regions().map(|r| r.data).sum();
+    assert_eq!(region_sum.count as usize, 0);
+
+    let min_ms = 1000 * 60;
+    let hour_ms = min_ms * 60;
+
     for _ in 0..NUM_OPS {
         // timestamp is between 1 and 2 hours ago, which is the historical
         // window
         let op = arbitrary_valid_op(
-            (two_hrs_ago + Duration::from_millis(rand::thread_rng().gen_range(0, 1000 * 60 * 60)))
+            (two_hrs_ago + Duration::from_millis(rand::thread_rng().gen_range(0, hour_ms)))
                 .unwrap(),
         );
         let op = DhtOpHashed::from_content_sync(op);
@@ -72,20 +83,21 @@ async fn test_region_queries() {
         ops.push(op.clone());
 
         // also construct ops which are in the recent time window,
-        // to test that these ops don't get returned in region queries
+        // to test that these ops don't get returned in region queries.
+        // There is a 5 min overlap between historical and recent time windows
+        // (1 time quantum) so we make sure to account for that here also.
         let op2 = arbitrary_valid_op(
             (two_hrs_ago
                 + Duration::from_millis(
-                    1000 * 60 * 60 + rand::thread_rng().gen_range(0, 1000 * 60 * 60),
+                    hour_ms + rand::thread_rng().gen_range(5 * min_ms, hour_ms),
                 ))
             .unwrap(),
         );
         let op2 = DhtOpHashed::from_content_sync(op2);
         fill_db(&db, op2);
     }
-    let arcset = DhtArcSet::Full;
     let region_set = spaces
-        .handle_fetch_op_regions(&dna_def, arcset)
+        .handle_fetch_op_regions(&dna_def, DhtArcSet::Full)
         .await
         .unwrap();
 
