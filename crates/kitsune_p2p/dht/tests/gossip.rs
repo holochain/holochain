@@ -15,6 +15,8 @@ use kitsune_p2p_timestamp::Timestamp;
 use maplit::hashmap;
 use rand::Rng;
 
+/// Test that alice and bob can each gossip a single op to each other, using
+/// the PoC gossip_direct implementation
 #[test]
 fn test_basic() {
     let topo = Topology::unit_zero();
@@ -44,6 +46,9 @@ fn test_basic() {
     assert_eq!(stats.op_data_rcvd, 1234);
 }
 
+/// Test that alice and bob can each gossip two ops to each other,
+/// with multiple storage arcs per node with different powers, using
+/// the PoC gossip_direct implementation
 #[test]
 fn test_multi() {
     let topo = Topology::unit_zero();
@@ -98,6 +103,7 @@ fn test_multi() {
     assert_eq!(info.stats.op_data_rcvd, 234 + 456);
 }
 
+/// Test that gossip still works when the two nodes have different arq powers
 #[test]
 fn test_mismatched_powers() {
     let topo = Topology::unit_zero();
@@ -146,6 +152,8 @@ fn test_mismatched_powers() {
     assert_eq!(info.stats.op_data_rcvd, 234);
 }
 
+/// Test that a bunch of ops spread out across 16 nodes can all be gossiped to one
+/// of the nodes after enough gossip rounds
 #[test]
 fn gossip_scenario_full_sync() {
     observability::test_run().ok();

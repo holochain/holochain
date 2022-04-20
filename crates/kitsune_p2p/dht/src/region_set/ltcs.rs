@@ -35,8 +35,8 @@ impl RegionCoordSetLtcs {
 
     /// Iterate over the coords in the same structure in which they are stored:
     /// An outermost Vec corresponding to the arqs,
-    /// An middle Vec corresponding to space segments,
-    /// and inner Vecs corresponding to time segments.
+    /// middle Vecs corresponding to space segments per arq,
+    /// and inner Vecs corresponding to time segments per arq.
     #[cfg_attr(not(feature = "test_utils"), deprecated = "use into_region_set")]
     pub(crate) fn region_coords_nested(
         &self,
@@ -72,7 +72,8 @@ impl RegionCoordSetLtcs {
         Ok(RegionSetLtcs::from_data(self, data))
     }
 
-    /// Generate data for each coord in the set, creating the corresponding [`RegionSetLtcs`].
+    /// Generate data for each coord in the set, creating the corresponding [`RegionSetLtcs`],
+    /// using a mapping function which cannot fail.
     pub fn into_region_set_infallible<D, F>(self, mut f: F) -> RegionSetLtcs<D>
     where
         D: RegionDataConstraints,
@@ -118,8 +119,9 @@ pub struct RegionSetLtcs<D: RegionDataConstraints = RegionData> {
     #[serde(skip)]
     pub(crate) _region_coords: OnceCell<Vec<RegionCoords>>,
 
-    /// The outer vec corresponds to the spatial segments;
-    /// the inner vecs are the time segments.
+    /// The outermost vec corresponds to arqs in the ArqSet;
+    /// The middle vecs correspond to the spatial segments per arq;
+    /// the innermost vecs are the time segments per arq.
     #[serde(bound(deserialize = "D: serde::de::DeserializeOwned"))]
     pub data: Vec<Vec<Vec<D>>>,
 }
@@ -165,7 +167,7 @@ impl<D: RegionDataConstraints> RegionSetLtcs<D> {
         self.coords
             .region_coords_flat()
             .map(|((ia, ix, it), coords)| {
-                Region::new(coords, self.data[ia][ix as usize][it as usize])
+                Region::new(coords, self.data[ia][ix as usize][it as usize].clone())
             })
     }
 
@@ -230,7 +232,7 @@ impl RegionSetLtcs {
             .region_coords_flat()
             .filter_map(|((a, x, y), c)| {
                 let d = &self.data[a][x][y];
-                (d.count > 0).then(|| ((a, x, y), c, *d))
+                (d.count > 0).then(|| ((a, x, y), c, d.clone()))
             })
     }
 }

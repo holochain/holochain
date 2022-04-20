@@ -86,7 +86,8 @@ impl KitsuneHost for SwitchboardEventHandler {
             let arq_set = ArqBoundsSet::from_dht_arc_set(&topo, &self.sb.strat, &dht_arc_set)
                 .expect("an arq could not be quantized");
 
-            // TODO: This should be behind the current moment by however much Recent gossip covers.
+            // NOTE: This should techncially be behind the current moment
+            // by however much Recent gossip covers (1 hour).
             let current = Timestamp::now();
             let times =
                 TelescopingTimes::new(TimeQuantum::from_timestamp(&self.sb.topology, current));

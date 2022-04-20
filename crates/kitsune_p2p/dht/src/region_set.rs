@@ -273,11 +273,11 @@ mod tests {
         // of the store which contains the extra ops over the same region
         // TODO: proptest this
         assert_eq!(
-            diff[0].data + extra_ops[0].region_data(),
+            diff[0].data.clone() + extra_ops[0].region_data(),
             store2.query_region_data(&diff[0].coords)
         );
         assert_eq!(
-            diff[1].data + extra_ops[1].region_data(),
+            diff[1].data.clone() + extra_ops[1].region_data(),
             store2.query_region_data(&diff[1].coords)
         );
     }
@@ -335,11 +335,11 @@ mod tests {
         // of the store which contains the extra ops over the same region
         // TODO: proptest this
         assert_eq!(
-            diff[0].data + extra_ops[0].region_data(),
+            diff[0].data.clone() + extra_ops[0].region_data(),
             store2.query_region_data(&diff[0].coords)
         );
         assert_eq!(
-            diff[1].data + extra_ops[1].region_data(),
+            diff[1].data.clone() + extra_ops[1].region_data(),
             store2.query_region_data(&diff[1].coords)
         );
     }

@@ -87,7 +87,7 @@ impl ArqStart for SpaceOffset {
     }
 
     fn requantize_down(&self, factor: u32) -> Self {
-        Self::from(*self * factor)
+        *self * factor
     }
 }
 

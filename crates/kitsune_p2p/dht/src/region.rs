@@ -45,7 +45,7 @@ pub trait RegionDataConstraints:
     + Zero
     + AddAssign
     + Sub<Output = Self>
-    + Copy
+    + Clone
     + Send
     + Sync
     + std::fmt::Debug
@@ -58,7 +58,7 @@ impl<T> RegionDataConstraints for T where
         + Zero
         + AddAssign
         + Sub<Output = T>
-        + Copy
+        + Clone
         + Send
         + Sync
         + std::fmt::Debug

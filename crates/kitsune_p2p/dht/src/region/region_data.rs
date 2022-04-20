@@ -54,7 +54,7 @@ impl From<OpHash> for RegionHash {
 /// The size and count data can also act as heuristics to help us fine-tune the
 /// gossip algorithm, although currently they are unused (except for the purpose
 /// of disambiguation in the rare case of an XOR hash collision).
-#[derive(Copy, Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(from = "RegionDataCompact")]
 #[serde(into = "RegionDataCompact")]
 pub struct RegionData {
@@ -131,7 +131,7 @@ impl std::ops::Sub for RegionData {
 
 /// Tuple-based representation of RegionData, used for sending more compact
 /// wire messages
-#[derive(Copy, Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct RegionDataCompact(RegionHash, u32, u32);
 
 impl From<RegionData> for RegionDataCompact {

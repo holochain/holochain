@@ -225,9 +225,9 @@ mod tests {
 
         let c = a.intersection(&topo, &b);
         print_arqs(&topo, &a, 64);
-        println!("");
+        println!();
         print_arqs(&topo, &b, 64);
-        println!("");
+        println!();
         // the last arq of c doesn't show up in the ascii representation, but
         // it is there.
         print_arqs(&topo, &c, 64);

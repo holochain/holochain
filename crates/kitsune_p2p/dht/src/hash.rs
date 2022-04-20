@@ -19,7 +19,7 @@ pub fn fake_hash() -> Hash32 {
 
 /// The hash of an Op
 #[derive(
-    Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, derive_more::Constructor, derive_more::From,
+    Clone, Hash, PartialEq, Eq, PartialOrd, Ord, derive_more::Constructor, derive_more::From,
 )]
 pub struct OpHash(pub Hash32);
 
@@ -32,7 +32,7 @@ impl OpHash {
 
 /// The hash of an Agent
 #[derive(
-    Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, derive_more::Constructor, derive_more::From,
+    Clone, Hash, PartialEq, Eq, PartialOrd, Ord, derive_more::Constructor, derive_more::From,
 )]
 pub struct AgentKey(pub Hash32);
 
@@ -45,7 +45,6 @@ impl AgentKey {
 
 /// The hash of a Region, which is the XOR of all OpHashes contained in this region.
 #[derive(
-    Copy,
     Clone,
     PartialEq,
     Eq,
@@ -61,9 +60,7 @@ pub struct RegionHash(pub Hash32);
 impl RegionHash {
     /// If the Vec is 32/36/39 long, construct a RegionHash from it
     pub fn from_vec(v: Vec<u8>) -> Option<Self> {
-        if v.len() == 39 {
-            v[4..36].try_into().map(Self).ok()
-        } else if v.len() == 36 {
+        if v.len() == 36 || v.len() == 39 {
             v[4..36].try_into().map(Self).ok()
         } else {
             v[..].try_into().map(Self).ok()
