@@ -8,24 +8,29 @@ assignees: ''
 ---
 
 **Describe the bug**
-A clear and concise description of what the bug is, how you encountered it, and the text of any error you received.
-
-**Steps to reproduce**
-- Create a minimal reproduction project using the scaffolding tool: `npm init @holochain`
-- Produce the error
-- Upload the project to a repository and link it here
-- Provide steps/commands to reproduce the error
+A clear and concise description of what the bug is, how you encountered it, and
+the text of any error you received.
 
 **Expected behavior**
 A clear and concise description of what you expected to happen.
 
-**Screenshots**
-If applicable, add screenshots to help explain your problem.
-
 **System information:**
  - OS: [e.g. iOS]
  - Browser [e.g. chrome, safari]
- - Holochain and HDK Version (run `hn-introspect` from the nix shell and paste output)
+ - Holochain and HDK Version (run `hn-introspect` as well as `holochain --build-info`
+ from the nix shell and paste output)
+
+**Steps to reproduce**
+For isolating the bug, it is helpful to see a failing test or a repo that
+reproduces the bug in a fresh hApp.
+
+- Write a failing test with Sweettest
+- Write a failing test with Tryorama
+- Create a minimal reproduction project using `hn-init` and add the code that
+produces the bug.
+
+**Screenshots**
+If applicable, add screenshots to help explain your problem.
 
 **Additional context**
 Add any other context about the problem here.
