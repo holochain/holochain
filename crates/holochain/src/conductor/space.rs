@@ -319,6 +319,13 @@ impl Spaces {
     }
 
     /// The network module needs info about various groupings ("regions") of ops
+    ///
+    /// Note that this always includes all ops regardless of integration status.
+    /// This is to avoid the degenerate case of freshly joining a network, and
+    /// having several new peers gossiping with you at once about the same regions.
+    /// If we calculate our region hash only by integrated ops, we will experience
+    /// mismatches for a large number of ops repeatedly until we have integrated
+    /// those ops. Note that when *sending* ops we filter out ops in limbo.
     pub async fn handle_fetch_op_regions(
         &self,
         dna_def: &DnaDefHashed,

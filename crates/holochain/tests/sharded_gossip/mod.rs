@@ -4,7 +4,6 @@ use hdk::prelude::*;
 use holochain::conductor::config::ConductorConfig;
 use holochain::sweettest::{SweetConductorBatch, SweetDnaFile};
 use holochain::test_utils::consistency_10s;
-use holochain_p2p::dht_arc::DhtLocation;
 use kitsune_p2p::KitsuneP2pConfig;
 use kitsune_p2p_types::config::RECENT_THRESHOLD_DEFAULT;
 
@@ -90,7 +89,9 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
     };
 
     let _g = observability::test_run().ok();
+
     const NUM_CONDUCTORS: usize = 3;
+    const NUM_OPS: usize = 100;
 
     let mut conductors =
         SweetConductorBatch::from_config(NUM_CONDUCTORS, make_config(Some(0))).await;
@@ -115,7 +116,7 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
 
     // Call the "create" zome fn on Alice's app
     let hashes: Vec<HeaderHash> = conductors[0]
-        .call(&alice.zome("zome1"), "create_batch", 100)
+        .call(&alice.zome("zome1"), "create_batch", NUM_OPS)
         .await;
     let all_cells = vec![&alice, &bobbo, &carol];
 
@@ -124,26 +125,28 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
 
     let mut all_op_hashes = vec![];
 
-    for i in [0, 1, 2] {
+    for i in 0..NUM_CONDUCTORS {
         let mut hashes: Vec<_> = conductors[i]
             .get_spaces()
-            .handle_fetch_op_data_by_regions(
+            .handle_query_op_hashes(
                 dna_file.dna_hash(),
-                vec![holochain_p2p::dht::region::RegionBounds::new(
-                    (DhtLocation::MIN, DhtLocation::MAX),
-                    (Timestamp::MIN, Timestamp::MAX),
-                )],
+                holochain_p2p::dht_arc::DhtArcSet::Full,
+                kitsune_p2p::event::full_time_window(),
+                100000000,
+                true,
             )
             .await
             .unwrap()
-            .into_iter()
-            .map(holochain_types::prelude::first)
-            .collect();
+            .unwrap()
+            .0;
+
         hashes.sort();
         all_op_hashes.push(hashes);
     }
 
+    assert_eq!(all_op_hashes[0].len(), all_op_hashes[1].len());
     assert_eq!(all_op_hashes[0], all_op_hashes[1]);
+    assert_eq!(all_op_hashes[1].len(), all_op_hashes[2].len());
     assert_eq!(all_op_hashes[1], all_op_hashes[2]);
 
     // Verify that bobbo can run "read" on his cell and get alice's Header

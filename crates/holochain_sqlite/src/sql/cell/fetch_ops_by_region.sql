@@ -29,4 +29,5 @@ WHERE
   AND (
     authored_timestamp >= :timestamp_min
     AND authored_timestamp <= :timestamp_max
-  )
+  ) -- ops are integrated, i.e. not in limbo
+  AND DhtOp.when_integrated IS NOT NULL
