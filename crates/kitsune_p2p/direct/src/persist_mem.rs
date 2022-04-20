@@ -4,6 +4,7 @@ use crate::types::persist::*;
 use crate::*;
 use futures::future::{BoxFuture, FutureExt};
 use kitsune_p2p::dht_arc::DhtArcSet;
+use kitsune_p2p::dht_arc::DhtLocation;
 use kitsune_p2p::dht_arc::PeerStratBeta;
 use kitsune_p2p::event::TimeWindow;
 use kitsune_p2p_types::tls::*;
@@ -370,7 +371,7 @@ impl AsKdPersist for PersistMem {
             let mut with_dist = store
                 .get_all()?
                 .into_iter()
-                .map(|info| (info.basis_distance_to_storage(basis_loc), info))
+                .map(|info| (info.basis_distance_to_storage(basis_loc.into()), info))
                 .collect::<Vec<_>>();
             with_dist.sort_by(|a, b| a.0.cmp(&b.0));
             Ok(with_dist
@@ -393,15 +394,16 @@ impl AsKdPersist for PersistMem {
         });
         async move {
             let store = match store {
-                Err(_) => return Err("root not found".into()),
+                Err(_) => return Ok(PeerStratBeta::default().view_unchecked(dht_arc, &[])),
                 Ok(store) => store,
             };
             let arcs: Vec<_> = store
                 .get_all()?
                 .into_iter()
                 .filter_map(|v| {
-                    if dht_arc.contains(v.agent().as_loc()) {
-                        Some(*v.storage_arc())
+                    let loc = DhtLocation::from(v.agent().as_loc());
+                    if dht_arc.contains(loc) {
+                        Some(DhtArc::from_parts(*v.storage_arc(), loc))
                     } else {
                         None
                     }

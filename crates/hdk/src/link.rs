@@ -1,5 +1,7 @@
 use crate::prelude::*;
 
+pub use holochain_deterministic_integrity::link::*;
+
 /// Create a link from a base entry to a target entry, with an optional tag.
 ///
 /// Links represent the general idea of relationships between entries.
@@ -55,15 +57,17 @@ use crate::prelude::*;
 /// If you have the hash of the identity entry you can get all the links, if you have the entry or
 /// header hash for any of the creates or updates you can lookup the identity entry hash out of the
 /// body of the create/update entry.
-pub fn create_link<T: Into<LinkTag>>(
-    base_address: EntryHash,
-    target_address: EntryHash,
+pub fn create_link<TY: Into<LinkType>, T: Into<LinkTag>>(
+    base_address: AnyLinkableHash,
+    target_address: AnyLinkableHash,
+    link_type: TY,
     tag: T,
 ) -> ExternResult<HeaderHash> {
     HDK.with(|h| {
         h.borrow().create_link(CreateLinkInput::new(
             base_address,
             target_address,
+            link_type.into(),
             tag.into(),
             ChainTopOrdering::default(),
         ))
@@ -119,7 +123,7 @@ pub fn delete_link(address: HeaderHash) -> ExternResult<HeaderHash> {
 /// deleted c.f. get_link_details that returns all the creates and all the deletes together.
 ///
 /// See [ `get_link_details` ].
-pub fn get_links(base: EntryHash, link_tag: Option<LinkTag>) -> ExternResult<Vec<Link>> {
+pub fn get_links(base: AnyLinkableHash, link_tag: Option<LinkTag>) -> ExternResult<Vec<Link>> {
     Ok(HDK
         .with(|h| {
             h.borrow()
@@ -149,7 +153,10 @@ pub fn get_links(base: EntryHash, link_tag: Option<LinkTag>) -> ExternResult<Vec
 /// c.f. get_links that returns only the creates that have not been deleted.
 ///
 /// See [ `get_links` ].
-pub fn get_link_details(base: EntryHash, link_tag: Option<LinkTag>) -> ExternResult<LinkDetails> {
+pub fn get_link_details(
+    base: AnyLinkableHash,
+    link_tag: Option<LinkTag>,
+) -> ExternResult<LinkDetails> {
     Ok(HDK
         .with(|h| {
             h.borrow()

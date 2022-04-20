@@ -6,9 +6,9 @@ use holochain_cascade::Cascade;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_p2p::MockHolochainP2pDnaT;
 use holochain_state::mutations::insert_op_scratch;
-use holochain_state::prelude::test_authored_env;
-use holochain_state::prelude::test_cache_env;
-use holochain_state::prelude::test_dht_env;
+use holochain_state::prelude::test_authored_db;
+use holochain_state::prelude::test_cache_db;
+use holochain_state::prelude::test_dht_db;
 use holochain_state::scratch::Scratch;
 use holochain_zome_types::ChainTopOrdering;
 use holochain_zome_types::Details;
@@ -233,20 +233,20 @@ async fn entry_not_authority_or_authoring() {
     observability::test_run().ok();
 
     // Environments
-    let cache = test_cache_env();
-    let authority = test_dht_env();
+    let cache = test_cache_db();
+    let authority = test_dht_db();
 
     // Data
     let td_entry = EntryTestData::create();
     let td_element = ElementTestData::create();
-    fill_db(&authority.env(), td_entry.store_entry_op.clone());
-    fill_db(&authority.env(), td_element.any_store_element_op.clone());
+    fill_db(&authority.to_db(), td_entry.store_entry_op.clone());
+    fill_db(&authority.to_db(), td_element.any_store_element_op.clone());
 
     // Network
-    let network = PassThroughNetwork::authority_for_nothing(vec![authority.env().clone().into()]);
+    let network = PassThroughNetwork::authority_for_nothing(vec![authority.to_db().clone().into()]);
 
     // Cascade
-    let mut cascade = Cascade::empty().with_network(network, cache.env());
+    let mut cascade = Cascade::empty().with_network(network, cache.to_db());
 
     assert_can_get(&td_entry, &td_element, &mut cascade, GetOptions::latest()).await;
 }
@@ -256,7 +256,7 @@ async fn entry_authoring() {
     observability::test_run().ok();
 
     // Environments
-    let cache = test_cache_env();
+    let cache = test_cache_db();
     let mut scratch = Scratch::new();
     let zome = fixt!(Zome);
 
@@ -287,7 +287,7 @@ async fn entry_authoring() {
     // Cascade
     let mut cascade = Cascade::empty()
         .with_scratch(scratch.into_sync())
-        .with_network(mock, cache.env());
+        .with_network(mock, cache.to_db());
 
     assert_can_get(&td_entry, &td_element, &mut cascade, GetOptions::latest()).await;
 }
@@ -297,14 +297,14 @@ async fn entry_authority() {
     observability::test_run().ok();
 
     // Environments
-    let cache = test_cache_env();
-    let vault = test_authored_env();
+    let cache = test_cache_db();
+    let vault = test_authored_db();
 
     // Data
     let td_entry = EntryTestData::create();
     let td_element = ElementTestData::create();
-    fill_db(&vault.env(), td_entry.store_entry_op.clone());
-    fill_db(&vault.env(), td_element.any_store_element_op.clone());
+    fill_db(&vault.to_db(), td_entry.store_entry_op.clone());
+    fill_db(&vault.to_db(), td_element.any_store_element_op.clone());
 
     // Network
     // - Not expecting any calls to the network.
@@ -314,8 +314,8 @@ async fn entry_authority() {
 
     // Cascade
     let mut cascade = Cascade::empty()
-        .with_authored(vault.env().into())
-        .with_network(mock, cache.env());
+        .with_authored(vault.to_db().into())
+        .with_network(mock, cache.to_db());
 
     assert_can_get(&td_entry, &td_element, &mut cascade, GetOptions::latest()).await;
 }
@@ -325,14 +325,14 @@ async fn content_not_authority_or_authoring() {
     observability::test_run().ok();
 
     // Environments
-    let cache = test_cache_env();
-    let vault = test_authored_env();
+    let cache = test_cache_db();
+    let vault = test_authored_db();
 
     // Data
     let td_entry = EntryTestData::create();
     let td_element = ElementTestData::create();
-    fill_db(&vault.env(), td_entry.store_entry_op.clone());
-    fill_db(&vault.env(), td_element.any_store_element_op.clone());
+    fill_db(&vault.to_db(), td_entry.store_entry_op.clone());
+    fill_db(&vault.to_db(), td_element.any_store_element_op.clone());
 
     // Network
     // - Not expecting any calls to the network.
@@ -342,8 +342,8 @@ async fn content_not_authority_or_authoring() {
 
     // Cascade
     let mut cascade = Cascade::empty()
-        .with_authored(vault.env().into())
-        .with_network(mock, cache.env());
+        .with_authored(vault.to_db().into())
+        .with_network(mock, cache.to_db());
 
     assert_can_get(&td_entry, &td_element, &mut cascade, GetOptions::content()).await;
 }
@@ -353,7 +353,7 @@ async fn content_authoring() {
     observability::test_run().ok();
 
     // Environments
-    let cache = test_cache_env();
+    let cache = test_cache_db();
     let mut scratch = Scratch::new();
     let zome = fixt!(Zome);
 
@@ -384,7 +384,7 @@ async fn content_authoring() {
     // Cascade
     let mut cascade = Cascade::empty()
         .with_scratch(scratch.into_sync())
-        .with_network(mock, cache.env());
+        .with_network(mock, cache.to_db());
 
     assert_can_get(&td_entry, &td_element, &mut cascade, GetOptions::content()).await;
 }
@@ -394,8 +394,8 @@ async fn content_authority() {
     observability::test_run().ok();
 
     // Environments
-    let cache = test_cache_env();
-    let vault = test_authored_env();
+    let cache = test_cache_db();
+    let vault = test_authored_db();
 
     // Data
     let td_entry = EntryTestData::create();
@@ -409,8 +409,8 @@ async fn content_authority() {
 
     // Cascade
     let mut cascade = Cascade::empty()
-        .with_authored(vault.env().into())
-        .with_network(mock, cache.env());
+        .with_authored(vault.to_db().into())
+        .with_network(mock, cache.to_db());
 
     assert_is_none(&td_entry, &td_element, &mut cascade, GetOptions::content()).await;
 }
@@ -420,20 +420,20 @@ async fn rejected_ops() {
     observability::test_run().ok();
 
     // Environments
-    let cache = test_cache_env();
-    let authority = test_dht_env();
+    let cache = test_cache_db();
+    let authority = test_dht_db();
 
     // Data
     let td_entry = EntryTestData::create();
     let td_element = ElementTestData::create();
-    fill_db_rejected(&authority.env(), td_entry.store_entry_op.clone());
-    fill_db_rejected(&authority.env(), td_element.any_store_element_op.clone());
+    fill_db_rejected(&authority.to_db(), td_entry.store_entry_op.clone());
+    fill_db_rejected(&authority.to_db(), td_element.any_store_element_op.clone());
 
     // Network
-    let network = PassThroughNetwork::authority_for_nothing(vec![authority.env().clone().into()]);
+    let network = PassThroughNetwork::authority_for_nothing(vec![authority.to_db().clone().into()]);
 
     // Cascade
-    let mut cascade = Cascade::empty().with_network(network, cache.env());
+    let mut cascade = Cascade::empty().with_network(network, cache.to_db());
     assert_rejected(&td_entry, &td_element, &mut cascade, GetOptions::latest()).await;
 }
 
@@ -442,20 +442,20 @@ async fn check_can_handle_rejected_ops_in_cache() {
     observability::test_run().ok();
 
     // Environments
-    let cache = test_cache_env();
-    let authority = test_dht_env();
+    let cache = test_cache_db();
+    let authority = test_dht_db();
 
     // Data
     let td_entry = EntryTestData::create();
     let td_element = ElementTestData::create();
-    fill_db_rejected(&cache.env(), td_entry.store_entry_op.clone());
-    fill_db_rejected(&cache.env(), td_element.any_store_element_op.clone());
+    fill_db_rejected(&cache.to_db(), td_entry.store_entry_op.clone());
+    fill_db_rejected(&cache.to_db(), td_element.any_store_element_op.clone());
 
     // Network
-    let network = PassThroughNetwork::authority_for_nothing(vec![authority.env().clone().into()]);
+    let network = PassThroughNetwork::authority_for_nothing(vec![authority.to_db().clone().into()]);
 
     // Cascade
-    let mut cascade = Cascade::empty().with_network(network, cache.env());
+    let mut cascade = Cascade::empty().with_network(network, cache.to_db());
     assert_rejected(&td_entry, &td_element, &mut cascade, GetOptions::latest()).await;
 }
 
@@ -486,34 +486,34 @@ async fn test_pending_data_isnt_returned() {
     observability::test_run().ok();
 
     // Environments
-    let cache = test_cache_env();
-    let authority = test_dht_env();
-    let vault = test_authored_env();
+    let cache = test_cache_db();
+    let authority = test_dht_db();
+    let vault = test_authored_db();
 
     // Data
     let td_entry = EntryTestData::create();
     let td_element = ElementTestData::create();
-    fill_db_pending(&authority.env(), td_entry.store_entry_op.clone());
-    fill_db_pending(&authority.env(), td_element.any_store_element_op.clone());
-    fill_db_pending(&vault.env(), td_entry.store_entry_op.clone());
-    fill_db_pending(&vault.env(), td_element.any_store_element_op.clone());
-    fill_db_pending(&cache.env(), td_entry.store_entry_op.clone());
-    fill_db_pending(&cache.env(), td_element.any_store_element_op.clone());
+    fill_db_pending(&authority.to_db(), td_entry.store_entry_op.clone());
+    fill_db_pending(&authority.to_db(), td_element.any_store_element_op.clone());
+    fill_db_pending(&vault.to_db(), td_entry.store_entry_op.clone());
+    fill_db_pending(&vault.to_db(), td_element.any_store_element_op.clone());
+    fill_db_pending(&cache.to_db(), td_entry.store_entry_op.clone());
+    fill_db_pending(&cache.to_db(), td_element.any_store_element_op.clone());
 
     // Network
-    let network = PassThroughNetwork::authority_for_nothing(vec![authority.env().clone().into()]);
+    let network = PassThroughNetwork::authority_for_nothing(vec![authority.to_db().clone().into()]);
 
     // Cascade
-    let mut cascade = Cascade::empty().with_network(network, cache.env());
+    let mut cascade = Cascade::empty().with_network(network, cache.to_db());
 
     assert_is_none(&td_entry, &td_element, &mut cascade, GetOptions::latest()).await;
 
     assert_can_retrieve(&td_entry, &mut cascade, GetOptions::latest()).await;
 
-    let network = PassThroughNetwork::authority_for_all(vec![authority.env().clone().into()]);
+    let network = PassThroughNetwork::authority_for_all(vec![authority.to_db().clone().into()]);
 
     // Cascade
-    let mut cascade = Cascade::empty().with_network(network, cache.env());
+    let mut cascade = Cascade::empty().with_network(network, cache.to_db());
 
     assert_is_none(&td_entry, &td_element, &mut cascade, GetOptions::latest()).await;
 

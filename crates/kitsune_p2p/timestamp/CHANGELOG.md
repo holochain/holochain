@@ -4,6 +4,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.0.8
+
+- **BREAKING**: All chrono logic is behind the `chrono` feature flag which is on by default. If you are using this crate with `no-default-features` you will no longer have access to any chrono related functionality.
+
+## 0.0.7
+
+## 0.0.6
+
 ## 0.0.5
 
 ## 0.0.4

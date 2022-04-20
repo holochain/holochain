@@ -8,9 +8,10 @@ use error::SysValidationError;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::prelude::fresh_reader_test;
-use holochain_state::prelude::test_authored_env;
-use holochain_state::prelude::test_cache_env;
-use holochain_state::prelude::test_dht_env;
+use holochain_state::prelude::test_authored_db;
+use holochain_state::prelude::test_cache_db;
+use holochain_state::prelude::test_dht_db;
+use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::Header;
 use matches::assert_matches;
@@ -60,40 +61,67 @@ async fn check_previous_header() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn check_valid_if_dna_test() {
-    let tmp = test_authored_env();
-    let tmp_dht = test_dht_env();
-    let tmp_cache = test_cache_env();
+    let tmp = test_authored_db();
+    let tmp_dht = test_dht_db();
+    let tmp_cache = test_cache_db();
     let keystore = test_keystore();
-    let env = tmp.env();
+    let db = tmp.to_db();
     // Test data
     let _activity_return = vec![fixt!(HeaderHash)];
 
+    let mut dna_def = fixt!(DnaDef);
+    dna_def.origin_time = Timestamp::MIN;
+
     // Empty store not dna
     let header = fixt!(CreateLink);
-    let workspace =
-        SysValidationWorkspace::new(env.clone().into(), tmp_dht.env().into(), tmp_cache.env());
+    let cache: DhtDbQueryCache = tmp_dht.to_db().into();
+    let mut workspace = SysValidationWorkspace::new(
+        db.clone().into(),
+        tmp_dht.to_db().into(),
+        cache.clone(),
+        tmp_cache.to_db(),
+        Arc::new(dna_def.clone()),
+    );
 
     assert_matches!(
         check_valid_if_dna(&header.clone().into(), &workspace).await,
         Ok(())
     );
     let mut header = fixt!(Dna);
+
     assert_matches!(
         check_valid_if_dna(&header.clone().into(), &workspace).await,
         Ok(())
     );
 
-    fake_genesis(env.clone().into(), tmp_dht.env(), keystore)
+    // - Test that an origin_time in the future leads to invalid Dna header commit
+    let dna_def_original = workspace.dna_def();
+    dna_def.origin_time = Timestamp::MAX;
+    workspace.dna_def = Arc::new(dna_def);
+    assert_matches!(
+        check_valid_if_dna(&header.clone().into(), &workspace).await,
+        Err(SysValidationError::ValidationOutcome(
+            ValidationOutcome::PrevHeaderError(PrevHeaderError::InvalidRootOriginTime)
+        ))
+    );
+    workspace.dna_def = dna_def_original;
+
+    fake_genesis(db.clone().into(), tmp_dht.to_db(), keystore)
         .await
         .unwrap();
     tmp_dht
-        .env()
+        .to_db()
         .conn()
         .unwrap()
         .execute("UPDATE DhtOp SET when_integrated = 0", [])
         .unwrap();
 
     header.author = fake_agent_pubkey_1();
+
+    cache
+        .set_all_activity_to_integrated(vec![(Arc::new(header.author.clone()), 0..=2)])
+        .await
+        .unwrap();
 
     assert_matches!(
         check_valid_if_dna(&header.clone().into(), &workspace).await,
@@ -297,6 +325,7 @@ async fn check_app_entry_type_test() {
             name: "app_entry_type_test".to_string(),
             uid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
             properties: SerializedBytes::try_from(()).unwrap(),
+            origin_time: Timestamp::HOLOCHAIN_EPOCH,
             zomes: vec![TestWasm::EntryDefs.into()].into(),
         },
         vec![TestWasm::EntryDefs.into()],
@@ -311,7 +340,7 @@ async fn check_app_entry_type_test() {
     let mut conductor_handle = MockConductorHandleT::new();
     // # No dna or entry def
     conductor_handle.expect_get_entry_def().return_const(None);
-    conductor_handle.expect_get_dna().return_const(None);
+    conductor_handle.expect_get_dna_file().return_const(None);
 
     // ## Dna is missing
     let aet = AppEntryType::new(0.into(), 0.into(), EntryVisibility::Public);
@@ -325,7 +354,7 @@ async fn check_app_entry_type_test() {
     conductor_handle.checkpoint();
     conductor_handle.expect_get_entry_def().return_const(None);
     conductor_handle
-        .expect_get_dna()
+        .expect_get_dna_file()
         .return_const(Some(dna_file.clone()));
     let aet = AppEntryType::new(0.into(), 1.into(), EntryVisibility::Public);
     assert_matches!(
@@ -391,7 +420,7 @@ async fn incoming_ops_filters_private_entry() {
     let dna = fixt!(DnaHash);
     let spaces = TestSpaces::new([dna.clone()]);
     let space = Arc::new(spaces.test_spaces[&dna].space.clone());
-    let vault = space.dht_env.clone();
+    let vault = space.dht_db.clone();
     let keystore = test_keystore();
     let (tx, _rx) = TriggerSender::new();
 

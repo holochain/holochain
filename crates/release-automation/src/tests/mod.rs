@@ -4,12 +4,18 @@ pub(crate) mod workspace_mocker;
 use std::path::Path;
 
 use chrono::TimeZone;
+use linked_hash_set::LinkedHashSet;
 
-use crate::release::ReleaseSteps;
+use crate::release::{ReleaseSteps, ReleaseWorkspace};
 
 #[test]
 fn release_steps_are_ordered() {
-    let input = "BumpReleaseVersions,VerifyMainBranch,PushForPrToMain,CreatePrToMain,PublishToCratesIo,PushReleaseTag,PushForDevelopPr,CreatePrToDevelop,CreateReleaseBranch";
+    let input = r"
+        CreateReleaseBranch,
+        BumpReleaseVersions,
+        PublishToCratesIo,
+        AddOwnersToCratesIo,
+    ";
 
     let parsed = super::cli::parse_releasesteps(input)
         .unwrap()
@@ -20,7 +26,7 @@ fn release_steps_are_ordered() {
 
     assert_eq!(parsed.get(1), Some(&ReleaseSteps::BumpReleaseVersions));
 
-    assert_eq!(parsed.last(), Some(&ReleaseSteps::CreatePrToDevelop));
+    assert_eq!(parsed.last(), Some(&ReleaseSteps::AddOwnersToCratesIo));
 }
 
 #[test]

@@ -66,7 +66,7 @@
 //!  hc r -n 5 ./elemental-chat.dna gen -a "my-app" network quic
 //! ```
 //! #### Call
-//! Allows calling the [`AdminRequest`] api.
+//! Allows calling the [`AdminRequest`](https://docs.rs/holochain_conductor_api/latest/holochain_conductor_api/enum.AdminRequest.html) api.
 //! If the conductors are not already running they
 //! will be run to make the call.
 //!
@@ -108,7 +108,8 @@
 //! ```
 //! and the examples.
 
-use holochain_cli_bundle as hc_bundle;
+// Useful to have this public when using this as a library.
+pub use holochain_cli_bundle as hc_bundle;
 use holochain_cli_sandbox as hc_sandbox;
 use structopt::StructOpt;
 

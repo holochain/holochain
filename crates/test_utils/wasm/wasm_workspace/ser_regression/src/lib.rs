@@ -40,7 +40,7 @@ fn create_channel(name: String) -> ExternResult<EntryHash> {
     let sb: SerializedBytes = channel_hash.clone().try_into().unwrap();
     create_entry(&channel)?;
     debug!("sb in channel {:?}", sb);
-    create_link(path.path_entry_hash()?, channel_hash.clone(), ())?;
+    create_link(path.path_entry_hash()?.into(), channel_hash.clone().into(), HdkLinkType::Any, ())?;
     Ok(channel_hash)
 }
 
@@ -54,6 +54,6 @@ fn create_message(input: crate::CreateMessageInput) -> ExternResult<EntryHash> {
     let message = ChannelMessage::new(content);
     let message_hash = hash_entry(&message)?;
     create_entry(&message)?;
-    create_link(channel_hash, message_hash.clone(), ())?;
+    create_link(channel_hash.into(), message_hash.clone().into(), HdkLinkType::Any, ())?;
     Ok(message_hash)
 }

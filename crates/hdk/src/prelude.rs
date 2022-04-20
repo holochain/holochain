@@ -1,4 +1,3 @@
-pub use crate::app_entry;
 pub use crate::capability::create_cap_claim;
 pub use crate::capability::create_cap_grant;
 pub use crate::capability::delete_cap_grant;
@@ -20,7 +19,6 @@ pub use crate::entry::delete;
 pub use crate::entry::delete_entry;
 pub use crate::entry::get;
 pub use crate::entry::get_details;
-pub use crate::entry::hash_entry;
 pub use crate::entry::must_get_entry;
 pub use crate::entry::must_get_header;
 pub use crate::entry::must_get_valid_element;
@@ -31,6 +29,7 @@ pub use crate::entry_def;
 pub use crate::entry_def_index;
 pub use crate::entry_defs;
 pub use crate::entry_type;
+pub use crate::hash::*;
 pub use crate::hash_path::anchor::anchor;
 pub use crate::hash_path::anchor::list_anchor_addresses;
 pub use crate::hash_path::anchor::list_anchor_tags;
@@ -47,15 +46,14 @@ pub use crate::link::create_link;
 pub use crate::link::delete_link;
 pub use crate::link::get_link_details;
 pub use crate::link::get_links;
+pub use crate::link::HdkLinkType;
 pub use crate::map_extern;
 pub use crate::map_extern::ExternResult;
-pub use crate::map_extern_infallible;
 pub use crate::p2p::call;
 pub use crate::p2p::call_remote;
 pub use crate::p2p::emit_signal;
 pub use crate::p2p::remote_signal;
 pub use crate::random::*;
-pub use crate::register_entry;
 pub use crate::time::schedule;
 pub use crate::time::sleep;
 pub use crate::time::sys_time;
@@ -70,12 +68,18 @@ pub use hdk_derive::hdk_extern;
 pub use holo_hash;
 pub use holo_hash::AgentPubKey;
 pub use holo_hash::AnyDhtHash;
+pub use holo_hash::AnyLinkableHash;
 pub use holo_hash::EntryHash;
 pub use holo_hash::EntryHashes;
+pub use holo_hash::ExternalHash;
 pub use holo_hash::HasHash;
 pub use holo_hash::HeaderHash;
 pub use holo_hash::HoloHash;
 pub use holo_hash::HoloHashed;
+pub use holochain_deterministic_integrity;
+pub use holochain_deterministic_integrity::map_extern_infallible;
+pub use holochain_deterministic_integrity::prelude::app_entry;
+pub use holochain_deterministic_integrity::prelude::register_entry;
 pub use holochain_wasmer_guest::*;
 pub use holochain_zome_types;
 pub use holochain_zome_types::prelude::*;
@@ -84,10 +88,12 @@ pub use std::collections::HashSet;
 pub use std::convert::TryFrom;
 pub use tracing;
 pub use tracing::{debug, error, info, instrument, trace, warn};
-pub use tracing_subscriber;
 
 #[cfg(feature = "mock")]
 pub use mockall;
+
+#[cfg(feature = "mock")]
+pub use crate::hdk::MockHdkT;
 
 // This needs to be called at least once _somewhere_ and is idempotent.
 #[macro_export]
@@ -95,7 +101,7 @@ macro_rules! holochain_externs {
     () => {
         holochain_wasmer_guest::host_externs!(
             __trace,
-            __hash_entry,
+            __hash,
             __unreachable,
             __verify_signature,
             __sign,

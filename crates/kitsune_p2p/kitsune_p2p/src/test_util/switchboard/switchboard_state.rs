@@ -4,6 +4,7 @@ use crate::gossip::sharded_gossip::{BandwidthThrottle, GossipType, ShardedGossip
 use crate::test_util::spawn_handler;
 use crate::types::gossip::*;
 use crate::types::wire;
+use crate::HostStub;
 use futures::stream::StreamExt;
 use ghost_actor::dependencies::tracing;
 use ghost_actor::GhostResult;
@@ -15,7 +16,7 @@ use kitsune_p2p_types::agent_info::{AgentInfoInner, AgentInfoSigned};
 use kitsune_p2p_types::bin_types::*;
 use kitsune_p2p_types::config::KitsuneP2pTuningParams;
 use kitsune_p2p_types::dht_arc::loc8::Loc8;
-use kitsune_p2p_types::dht_arc::{ArcInterval, DhtArc, DhtLocation};
+use kitsune_p2p_types::dht_arc::{DhtArc, DhtArcRange, DhtLocation};
 use kitsune_p2p_types::metrics::metric_task;
 use kitsune_p2p_types::tx2::tx2_api::*;
 use kitsune_p2p_types::tx2::tx2_pool_promote::*;
@@ -59,7 +60,7 @@ pub struct Switchboard {
 
 impl Switchboard {
     /// Constructor. Only works for one GossipType at a time.
-    // TODO: if it's desirable to test multiple gossip loops running at the
+    // MAYBE: if it's desirable to test multiple gossip loops running at the
     //   same time on the same state, another method could be exposed to take
     //   an already instantiated `Share<SwitchboardState>`, which will cause
     //   both gossip loops to share the same state.
@@ -92,7 +93,6 @@ impl Switchboard {
         &self,
         tuning_params: KitsuneP2pTuningParams,
     ) -> [NodeEp; N] {
-        use std::convert::TryInto;
         let mut nodes = vec![];
         for _ in 0..N {
             nodes.push(self.add_node(tuning_params.clone()).await);
@@ -121,6 +121,7 @@ impl Switchboard {
         let ep_hnd = ep.handle().clone();
 
         let evt_handler = SwitchboardEventHandler::new(ep_hnd.clone(), self.clone());
+        let host = HostStub::new();
         let (evt_sender, handler_task) = spawn_handler(evt_handler.clone()).await;
 
         let bandwidth = Arc::new(BandwidthThrottle::new(1000.0, 1000.0));
@@ -130,6 +131,7 @@ impl Switchboard {
             space.clone(),
             ep_hnd.clone(),
             evt_sender,
+            host,
             self.gossip_type,
             bandwidth,
             Default::default(),
@@ -223,7 +225,7 @@ impl SwitchboardState {
             self.space.clone(),
             node_ep,
             agent.clone(),
-            initial_arc.canonical(),
+            DhtArc::from_parts(initial_arc.canonical(), loc8.into()),
         );
         if let Some(existing) = self.local_agent_by_loc8(loc8) {
             panic!(
@@ -274,9 +276,9 @@ impl SwitchboardState {
             let node_id = ep.uniq();
             let ascii = if with_ops {
                 let ops = node.ops.keys().copied();
-                ArcInterval::Empty.to_ascii_with_ops(width, ops)
+                DhtArcRange::Empty.to_ascii_with_ops(width, ops)
             } else {
-                ArcInterval::Empty.to_ascii(width)
+                DhtArcRange::Empty.to_ascii(width)
             };
             println!(
                 "{:>4} {:>+5} ({:^width$})",
@@ -286,14 +288,14 @@ impl SwitchboardState {
                 width = width
             );
             for (agent_loc8, agent) in node.local_agents.iter() {
-                let interval = agent.info.storage_arc.interval();
+                let interval = &agent.info.storage_arc;
                 let ascii = interval.to_ascii(width);
                 println!(
                     "{:>4} {:>+5} |{:^width$}| {:>+4} {:?}",
                     "",
                     agent_loc8,
                     ascii,
-                    interval.center_loc().as_loc8(),
+                    interval.start_loc().as_loc8(),
                     interval.map(|b| DhtLocation::as_loc8(&b)),
                     width = width
                 );
@@ -417,14 +419,7 @@ impl SwitchboardState {
 
         // Update node-wide op store with data and timestamp
         for (loc8, hash, timestamp) in ops {
-            if let Some(existing) = self.ops.insert(
-                loc8,
-                OpEntry {
-                    hash,
-                    data: vec![],
-                    timestamp,
-                },
-            ) {
+            if let Some(existing) = self.ops.insert(loc8, OpEntry { hash, timestamp }) {
                 tracing::warn!(
                     "inserted same op twice. this could be significant if dealing with custom timestamps. {:?}",
                     existing
@@ -527,21 +522,21 @@ impl SwitchboardState {
 /// The reason for this type is to reduce the redundancy
 /// of needing to specify both the agent's location and the
 /// storage arc. It is most convenient to specify arcs in terms
-/// of ArcInterval, but we use the agent's Loc8 location as their
+/// of DhtArcRange, but we use the agent's Loc8 location as their
 /// unique identifier. This allows specification of agents in
 /// terms of arcs.
 #[derive(Clone, derive_more::AsRef)]
 pub struct SwitchboardAgent {
     pub(super) loc: Loc8,
-    initial_arc: ArcInterval<Loc8>,
+    initial_arc: DhtArcRange<Loc8>,
 }
 
 impl SwitchboardAgent {
     /// Construct an agent with a full arc at the specified location.
-    pub fn full<L: Into<Loc8>>(loc: L) -> Self {
+    pub fn full<L: Copy + Into<Loc8>>(loc: L) -> Self {
         Self {
             loc: loc.into(),
-            initial_arc: ArcInterval::Full,
+            initial_arc: DhtArcRange::Full,
         }
     }
 
@@ -550,9 +545,8 @@ impl SwitchboardAgent {
     pub fn from_bounds<L: Into<Loc8>>(lo: L, hi: L) -> Self {
         let lo: Loc8 = lo.into();
         let hi: Loc8 = hi.into();
-        let initial_arc = ArcInterval::Bounded(lo, hi);
-        dbg!(&lo, &hi, &initial_arc);
-        let loc8 = initial_arc.clone().canonical().center_loc().as_loc8();
+        let initial_arc = DhtArcRange::Bounded(lo, hi);
+        let loc8 = lo;
 
         Self {
             loc: loc8,
@@ -562,13 +556,18 @@ impl SwitchboardAgent {
 
     /// Construct an agent from arc bounds.
     /// The agent's location is taken as the midpoint of the arc.
-    pub fn from_center_and_half_len<L: Into<Loc8>>(center: L, half_len: u8) -> Self {
-        let center: Loc8 = center.into();
-        let half_len = Loc8::upscale(half_len as i32);
-        let initial_arc = DhtArc::new(center, half_len).interval().as_loc8();
+    pub fn from_start_and_half_len<L: Into<Loc8>>(start: L, half_len: u8) -> Self {
+        let start: Loc8 = start.into();
+        let initial_arc = if half_len == 0 {
+            DhtArcRange::Empty
+        } else {
+            let len = half_len * 2 - 1;
+            let end = Loc8::from((start.as_u8().wrapping_add(len).wrapping_sub(1)) as i8);
+            DhtArcRange::Bounded(start, end)
+        };
 
         Self {
-            loc: center,
+            loc: start,
             initial_arc,
         }
     }
@@ -655,13 +654,17 @@ pub struct NodeOpEntry {
 }
 
 /// The value of the SwitchboardSpace::ops hashmap
+///
+/// Note that in a real implementation, the op store would include the actual
+/// op data. Since op data is opaque to kitsune, we don't need to actually store
+/// it for these tests and can just use dummy values. *Actually*, we take
+/// take advantage of that fact by hijacking the op data to include a single
+/// byte which represents the Loc8 location of this op.
 #[derive(Debug, Clone)]
 pub struct OpEntry {
     /// Not strictly necessary as it can be computed from the Loc8 key, but here
-    /// for convenience since there is no one-step way to go from Loc8 -> KitsuneOpHash
+    /// for convenience
     pub hash: KOpHash,
-    /// The opaque data for the op. Probably doesn't matter and can be removed.
-    pub data: Vec<u8>,
     /// The timestamp associated with this op. Same for all agents, intrinsic to the
     /// op itself.
     pub timestamp: Timestamp,
@@ -681,7 +684,7 @@ fn fake_agent_info(
     space: KSpace,
     node: &NodeEp,
     agent: KAgent,
-    interval: ArcInterval,
+    interval: DhtArc,
 ) -> AgentInfoSigned {
     use crate::fixt::*;
     let url_list = vec![node.local_addr().unwrap()];
@@ -706,7 +709,7 @@ fn fake_agent_info(
     let state = AgentInfoInner {
         space,
         agent,
-        storage_arc: DhtArc::from_interval(interval),
+        storage_arc: interval,
         url_list,
         signed_at_ms: 0,
         expires_at_ms: u64::MAX,

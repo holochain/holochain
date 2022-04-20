@@ -23,11 +23,14 @@ fn rand_agent() -> Arc<KitsuneAgent> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_p2p_metric_store_sanity() {
-    let tmp_dir = tempdir::TempDir::new("p2p_agent_store_gossip_query_sanity").unwrap();
+    let tmp_dir = tempfile::Builder::new()
+        .prefix("p2p_agent_store_gossip_query_sanity")
+        .tempdir()
+        .unwrap();
 
     let space = rand_space();
 
-    let db = DbWrite::test(&tmp_dir, DbKindP2pMetrics(space.clone())).unwrap();
+    let db = DbWrite::test(tmp_dir.path(), DbKindP2pMetrics(space.clone())).unwrap();
 
     let permit = db.conn_permit().await;
     let mut con = db.from_permit(permit).unwrap();

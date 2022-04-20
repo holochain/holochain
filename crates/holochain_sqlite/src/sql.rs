@@ -4,8 +4,8 @@ pub mod sql_cell {
         include_str!("sql/cell/update_dep_activity.sql");
     pub const ACTIVITY_INTEGRATED_UPPER_BOUND: &str =
         include_str!("sql/cell/activity_integrated_upper_bound.sql");
-    pub const ACTIVITY_MISSING_DEP_UPPER_BOUND: &str =
-        include_str!("sql/cell/activity_missing_dep_upper_bound.sql");
+    pub const ALL_ACTIVITY_AUTHORS: &str = include_str!("sql/cell/all_activity_authors.sql");
+    pub const ALL_READY_ACTIVITY: &str = include_str!("sql/cell/all_ready_activity.sql");
     pub const UPDATE_INTEGRATE_DEP_STORE_ELEMENT: &str =
         include_str!("sql/cell/update_dep_store_element.sql");
     pub const UPDATE_INTEGRATE_DEP_STORE_ENTRY: &str =

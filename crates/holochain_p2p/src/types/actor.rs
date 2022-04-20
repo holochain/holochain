@@ -75,6 +75,24 @@ impl Default for GetOptions {
     }
 }
 
+impl GetOptions {
+    /// Using defaults is dangerous in a must_get as it can undermine determinism.
+    /// We want refactors to explicitly consider this.
+    pub fn must_get_options() -> Self {
+        Self {
+            remote_agent_count: None,
+            timeout_ms: None,
+            as_race: true,
+            race_timeout_ms: None,
+            // Never redirect as the returned value must always match the hash.
+            follow_redirects: false,
+            all_live_headers_with_metadata: false,
+            // Redundant with retrieve_entry internals.
+            request_type: GetRequest::Pending,
+        }
+    }
+}
+
 impl From<holochain_zome_types::entry::GetOptions> for GetOptions {
     fn from(_: holochain_zome_types::entry::GetOptions) -> Self {
         Self::default()
@@ -190,7 +208,7 @@ ghost_actor::ghost_chan! {
     /// actor instance.
     pub chan HolochainP2p<HolochainP2pError> {
         /// The p2p module must be informed at runtime which dna/agent pairs it should be tracking.
-        fn join(dna_hash: DnaHash, agent_pub_key: AgentPubKey) -> ();
+        fn join(dna_hash: DnaHash, agent_pub_key: AgentPubKey, initial_arc: Option<crate::dht_arc::DhtArc>) -> ();
 
         /// If a cell is disabled, we'll need to \"leave\" the network module as well.
         fn leave(dna_hash: DnaHash, agent_pub_key: AgentPubKey) -> ();
@@ -226,7 +244,7 @@ ghost_actor::ghost_chan! {
             request_validation_receipt: bool,
             countersigning_session: bool,
             dht_hash: holo_hash::AnyDhtHash,
-            ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
+            ops: Vec<holochain_types::dht_op::DhtOp>,
             timeout_ms: Option<u64>,
         ) -> ();
 

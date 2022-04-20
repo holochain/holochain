@@ -5,6 +5,7 @@ use super::*;
 use anyhow::bail;
 use anyhow::Context;
 use bstr::ByteSlice;
+use cargo::util::VersionExt;
 use chrono::TimeZone;
 use chrono::Utc;
 use cli::ReleaseArgs;
@@ -28,6 +29,9 @@ use std::{
 use structopt::StructOpt;
 
 use crate::changelog::{Changelog, WorkspaceCrateReleaseHeading};
+use crate::crate_::ensure_crate_io_owners;
+use crate::crate_::increment_patch;
+use crate::crate_selection::ensure_release_order_consistency;
 use crate::crate_selection::Crate;
 pub(crate) use crate_selection::{ReleaseWorkspace, SelectionCriteria};
 
@@ -43,17 +47,10 @@ pub(crate) enum ReleaseSteps {
     /// substeps: get crate selection, bump cargo toml versions, rotate
     /// changelog, commit changes
     BumpReleaseVersions,
-    PushForPrToMain,
-    CreatePrToMain,
     /// verify that the release tag exists on the main branch and is the
     /// second commit on it, directly after the merge commit
-    VerifyMainBranch,
     PublishToCratesIo,
     AddOwnersToCratesIo,
-    // CreateCrateTags,
-    PushReleaseTag,
-    PushForDevelopPr,
-    CreatePrToDevelop,
 }
 
 // todo(backlog): what if at any point during the release process we have to merge a hotfix to main?
@@ -86,41 +83,13 @@ pub(crate) fn cmd(args: &crate::cli::Args, cmd_args: &crate::cli::ReleaseArgs) -
         match step {
             ReleaseSteps::CreateReleaseBranch => create_release_branch(&ws, cmd_args)?,
             ReleaseSteps::BumpReleaseVersions => bump_release_versions(&ws, cmd_args)?,
-            ReleaseSteps::PushForPrToMain => {
-                // todo(backlog): push the release branch
-                // todo(backlog): create a PR against the main branch
-                warn!("{:?} not implemeted", step)
-            }
-            ReleaseSteps::CreatePrToMain => {
-                // todo: create a pull request from the release branch to the main branch
-                // todo: notify someone to review the PR
-                warn!("{:?} not implemeted", step)
-            }
-            ReleaseSteps::VerifyMainBranch => {
-                // todo: verify we're on the main branch
-                // todo: verify the Pr has been merged
-                warn!("{:?} not implemeted", step)
-            }
             ReleaseSteps::PublishToCratesIo => publish_to_crates_io(&ws, cmd_args)?,
-            ReleaseSteps::AddOwnersToCratesIo => {
-                add_owners_to_crates_io(&ws, cmd_args, latest_release_crates(&ws)?)?
-            }
-
-            // ReleaseSteps::CreateCrateTags => create_crate_tags(&ws, cmd_args)?,
-            ReleaseSteps::PushReleaseTag => {
-                // todo: push all the tags that originated in this workspace release to the upstream:
-                // - every crate release tag
-                warn!("{:?} not implemeted", step)
-            }
-            ReleaseSteps::PushForDevelopPr => {
-                // todo(backlog): push the release branch
-                warn!("{:?} not implemeted", step)
-            }
-            ReleaseSteps::CreatePrToDevelop => {
-                // todo(backlog): create a PR against the develop branch
-                // todo: verify the Pr has been merged
-                warn!("{:?} not implemeted", step)
-            }
+            ReleaseSteps::AddOwnersToCratesIo => ensure_crate_io_owners(
+                &ws,
+                cmd_args.dry_run,
+                &latest_release_crates(&ws)?,
+                &cmd_args.minimum_crate_owners,
+            )?,
         }
     }
 
@@ -209,9 +178,9 @@ fn bump_release_versions<'a>(
     }
 
     // run the checks to ensure the repo is in a consistent state to begin with
-    if !cmd_args.no_verify {
+    if !cmd_args.no_verify && !cmd_args.no_verify_pre {
         info!("running consistency checks before changing the versions...");
-        publish_paths_to_crates_io(
+        do_publish_to_crates_io(
             &selection,
             true,
             true,
@@ -228,7 +197,10 @@ fn bump_release_versions<'a>(
         let maybe_previous_release_version = crt
             .changelog()
             .ok_or_else(|| {
-                anyhow::anyhow!("[{}] cannot determine most recent release: missing changelog")
+                anyhow::anyhow!(
+                    "[{}] cannot determine most recent release: missing changelog",
+                    crt.name()
+                )
             })?
             .topmost_release()?
             .map(|change| semver::Version::parse(change.title()))
@@ -242,7 +214,7 @@ fn bump_release_versions<'a>(
             }
 
             // todo(backlog): support configurable major/minor/patch/rc? version bumps
-            previous_release_version.increment_patch();
+            increment_patch(&mut previous_release_version);
 
             previous_release_version
         } else {
@@ -251,7 +223,7 @@ fn bump_release_versions<'a>(
 
             if new_version.is_prerelease() {
                 // todo(backlog): support configurable major/minor/patch/rc? version bumps
-                new_version.increment_patch();
+                increment_patch(&mut new_version);
             }
 
             new_version
@@ -300,18 +272,21 @@ fn bump_release_versions<'a>(
         }
     }
 
-    ws.update_lockfile(cmd_args.dry_run)?;
+    ws.update_lockfile(
+        cmd_args.dry_run,
+        cmd_args.additional_manifests.iter().map(|mp| mp.as_str()),
+    )?;
 
-    if !cmd_args.no_verify {
+    if !cmd_args.no_verify && !cmd_args.no_verify_post {
         info!("running consistency checks after changing the versions...");
-        publish_paths_to_crates_io(
+        do_publish_to_crates_io(
             &selection,
             true,
             true,
             &cmd_args.allowed_missing_dependencies,
             &cmd_args.cargo_target_dir,
         )
-        .context("consistency checks failed")?;
+        .context("cargo publish dry-run failed")?;
     }
 
     // ## for the workspace release:
@@ -376,89 +351,19 @@ fn bump_release_versions<'a>(
     Ok(())
 }
 
-fn publish_to_crates_io<'a>(
+pub(crate) fn publish_to_crates_io<'a>(
     ws: &'a ReleaseWorkspace<'a>,
     cmd_args: &'a ReleaseArgs,
 ) -> Fallible<()> {
     let crates = latest_release_crates(ws)?;
 
-    publish_paths_to_crates_io(
+    do_publish_to_crates_io(
         &crates,
         cmd_args.dry_run,
         false,
         &Default::default(),
         &cmd_args.cargo_target_dir,
     )?;
-
-    Ok(())
-}
-
-fn add_owners_to_crates_io<'a>(
-    _ws: &'a ReleaseWorkspace<'a>,
-    cmd_args: &'a ReleaseArgs,
-    crates: Vec<&Crate>,
-) -> Fallible<()> {
-    // TODO(backlog): make this configurable
-    static DEFAULT_CRATE_OWNERS: &[&str] = &["github:holochain:core-dev", "zippy"];
-
-    let desired_owners = DEFAULT_CRATE_OWNERS
-        .iter()
-        .map(|s| s.to_string())
-        .collect::<HashSet<_>>();
-
-    for crt in crates {
-        if crates_index_helper::is_version_published(crt, false)? {
-            let mut cmd = std::process::Command::new("cargo");
-            cmd.args(&["owner", "--list", &crt.name()]);
-
-            debug!("[{}] running command: {:?}", crt.name(), cmd);
-            let output = cmd.output().context("process exitted unsuccessfully")?;
-            if !output.status.success() {
-                warn!(
-                    "[{}] failed list owners: {}",
-                    crt.name(),
-                    String::from_utf8_lossy(&output.stderr)
-                );
-
-                continue;
-            }
-
-            let current_owners = output
-                .stdout
-                .lines()
-                .map(|line| {
-                    line.words_with_breaks()
-                        .take_while(|item| *item != " ")
-                        .collect::<String>()
-                })
-                .collect::<HashSet<_>>();
-            let diff = desired_owners.difference(&current_owners);
-            info!(
-                "[{}] current owners {:?}, missing owners: {:?}",
-                crt.name(),
-                current_owners,
-                diff
-            );
-
-            for owner in diff {
-                let mut cmd = std::process::Command::new("cargo");
-                cmd.args(&["owner", "--add", owner, &crt.name()]);
-
-                debug!("[{}] running command: {:?}", crt.name(), cmd);
-                if !cmd_args.dry_run {
-                    let output = cmd.output().context("process exitted unsuccessfully")?;
-                    if !output.status.success() {
-                        warn!(
-                            "[{}] failed to add owner '{}': {}",
-                            crt.name(),
-                            owner,
-                            String::from_utf8_lossy(&output.stderr)
-                        );
-                    }
-                }
-            }
-        }
-    }
 
     Ok(())
 }
@@ -711,29 +616,36 @@ impl PublishError {
 pub(crate) mod crates_index_helper {
     use super::*;
 
-    static CRATES_IO_INDEX: OnceCell<crates_index::Index> = OnceCell::new();
+    static CRATES_IO_INDEX: OnceCell<Mutex<crates_index::Index>> = OnceCell::new();
 
-    pub(crate) fn index(update: bool) -> Fallible<&'static crates_index::Index> {
+    pub(crate) fn index(update: bool) -> Fallible<&'static Mutex<crates_index::Index>> {
         let first_run = CRATES_IO_INDEX.get().is_none();
 
         let crates_io_index = CRATES_IO_INDEX.get_or_try_init(|| -> Fallible<_> {
-            let index = crates_index::Index::new_cargo_default();
+            let mut index = crates_index::Index::new_cargo_default()?;
             trace!("Using crates index at {:?}", index.path());
 
-            index.retrieve_or_update()?;
+            index.update()?;
 
-            Ok(index)
+            Ok(Mutex::new(index))
         })?;
 
         if !first_run && update {
-            crates_io_index.update()?;
+            crates_io_index
+                .lock()
+                .map_err(|e| anyhow::anyhow!("failed to lock the index: {}", e))?
+                .update()?;
         }
 
         Ok(crates_io_index)
     }
 
     pub(crate) fn is_version_published(crt: &Crate, update: bool) -> Fallible<bool> {
-        Ok(index(update)?
+        let index_lock = index(update)?
+            .lock()
+            .map_err(|e| anyhow::anyhow!("failed to lock the index: {}", e))?;
+
+        Ok(index_lock
             .crate_(&crt.name())
             .map(|indexed_crate| -> bool {
                 indexed_crate
@@ -745,7 +657,7 @@ pub(crate) mod crates_index_helper {
     }
 }
 
-/// Try to publish the given manifests to crates.io.
+/// Try to publish the given crates to crates.io.
 ///
 /// If dry-run is given, the following error conditoins are tolerated:
 /// - a dependency is not found but is part of the release
@@ -753,8 +665,8 @@ pub(crate) mod crates_index_helper {
 ///
 /// For this to work properly all changed crates need to have their dev versions applied.
 /// If they don't, `cargo publish` will prefer a published crates to the local ones.
-fn publish_paths_to_crates_io(
-    crates: &[&Crate],
+pub(crate) fn do_publish_to_crates_io<'a>(
+    crates: &[&'a Crate<'a>],
     dry_run: bool,
     allow_dirty: bool,
     allowed_missing_dependencies: &HashSet<String>,
@@ -762,6 +674,8 @@ fn publish_paths_to_crates_io(
 ) -> Fallible<()> {
     static USER_AGENT: &str = "Holochain_Core_Dev_Team (devcore@holochain.org)";
     static CRATES_IO_CLIENT: OnceCell<crates_io_api::AsyncClient> = OnceCell::new();
+
+    ensure_release_order_consistency(&crates)?;
 
     let crate_names: HashSet<String> = crates.iter().map(|crt| crt.name()).collect();
 
@@ -798,6 +712,13 @@ fn publish_paths_to_crates_io(
             }
         };
 
+    let mut published_or_tolerated = linked_hash_set::LinkedHashSet::new();
+
+    let mut publish_cntr_inc = |name: &str| {
+        info!("successfully published {}", name);
+        publish_cntr += 1;
+    };
+
     while let Some(crt) = queue.pop_front() {
         if !crt.state().changed() && crates_index_helper::is_version_published(crt, false)? {
             debug!(
@@ -810,7 +731,7 @@ fn publish_paths_to_crates_io(
         let manifest_path = crt.manifest_path();
         let cargo_target_dir_string = cargo_target_dir
             .as_ref()
-            .map(|target_dir| format!("--target-dir={}", target_dir.to_string_lossy().to_string()));
+            .map(|target_dir| format!("--target-dir={}", target_dir.to_string_lossy()));
 
         let mut cmd = std::process::Command::new("cargo");
         cmd.args(
@@ -819,6 +740,7 @@ fn publish_paths_to_crates_io(
                     "check",
                     "--locked",
                     "--verbose",
+                    "--release",
                     &format!("--manifest-path={}", manifest_path.to_string_lossy()),
                 ],
                 if let Some(target_dir) = cargo_target_dir_string.as_ref() {
@@ -889,9 +811,10 @@ fn publish_paths_to_crates_io(
                 PublishError::Other(..) => true,
                 PublishError::PackageNotFound { dependency, .. }
                 | PublishError::PackageVersionNotFound { dependency, .. } => {
-                    !dry_run
-                        || !(crate_names.contains(dependency)
-                            || allowed_missing_dependencies.contains(dependency))
+                    !((dry_run
+                        && crate_names.contains(dependency)
+                        && published_or_tolerated.contains(dependency))
+                        || allowed_missing_dependencies.contains(dependency))
                 }
                 PublishError::AlreadyUploaded { version, .. } => {
                     crt.version().to_string() != *version
@@ -905,13 +828,17 @@ fn publish_paths_to_crates_io(
                 }
                 PublishError::CheckFailure { .. } => true,
             } {
+                error!("{}", error);
                 errors.push(error);
             } else {
                 tolerated_cntr += 1;
-                trace!("tolerating error: '{:#?}'", &error);
+                debug!("tolerating error: '{:#?}'", &error);
+
+                published_or_tolerated.insert(crt.name());
             }
         } else if dry_run {
-            publish_cntr += 1;
+            publish_cntr_inc(&crt.name_version());
+            published_or_tolerated.insert(crt.name());
         } else {
             // wait until the published version is live
 
@@ -947,7 +874,8 @@ fn publish_paths_to_crates_io(
                 return do_return(errors, check_cntr, publish_cntr, skip_cntr, tolerated_cntr);
             }
 
-            publish_cntr += 1;
+            publish_cntr_inc(&crt.name_version());
+            published_or_tolerated.insert(crt.name());
         }
     }
 

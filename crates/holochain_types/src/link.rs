@@ -2,6 +2,7 @@
 
 use holo_hash::AgentPubKey;
 use holo_hash::AnyDhtHash;
+use holo_hash::AnyLinkableHash;
 use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
 use holochain_serialized_bytes::prelude::*;
@@ -40,7 +41,7 @@ pub enum WireLinkMetaKey {
 /// Link key for sending across the wire for get links requests.
 pub struct WireLinkKey {
     /// Base the links are on.
-    pub base: EntryHash,
+    pub base: AnyLinkableHash,
     /// The zome the links are in.
     pub zome_id: ZomeId,
     /// Optionally specify a tag for more specific queries.
@@ -84,7 +85,8 @@ pub struct WireCreateLink {
     pub header_seq: u32,
     pub prev_header: HeaderHash,
 
-    pub target_address: EntryHash,
+    pub target_address: AnyLinkableHash,
+    pub link_type: LinkType,
     pub tag: Option<LinkTag>,
     pub signature: Signature,
     pub validation_status: ValidationStatus,
@@ -117,6 +119,7 @@ impl WireCreateLink {
             header_seq: h.header_seq,
             prev_header: h.prev_header,
             target_address: h.target_address,
+            link_type: h.link_type,
             tag: if tag { Some(h.tag) } else { None },
             signature,
             validation_status,
@@ -152,6 +155,7 @@ impl WireCreateLink {
             base_address: key.base.clone(),
             target_address: self.target_address,
             zome_id: key.zome_id,
+            link_type: self.link_type,
             tag,
         });
         let signature = self.signature;

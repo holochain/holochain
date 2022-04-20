@@ -1,11 +1,18 @@
-use std::collections::{HashMap, HashSet};
-
-use anyhow::bail;
-use log::{debug, info, warn};
+use anyhow::{bail, Context};
+use bstr::ByteSlice;
+use cargo::util::VersionExt;
+use linked_hash_map::LinkedHashMap;
+use linked_hash_set::LinkedHashSet;
+use log::{debug, info, trace, warn};
 use semver::Version;
+use std::collections::{HashMap, HashSet};
 use structopt::StructOpt;
 
-use crate::{crate_selection::Crate, release::ReleaseWorkspace, CommandResult, Fallible};
+use crate::{
+    crate_selection::Crate,
+    release::{crates_index_helper, ReleaseWorkspace},
+    CommandResult, Fallible,
+};
 
 #[derive(StructOpt, Debug)]
 pub(crate) struct CrateArgs {
@@ -34,6 +41,9 @@ pub(crate) struct CrateApplyDevVersionsArgs {
 
     #[structopt(long)]
     pub(crate) commit: bool,
+
+    #[structopt(long)]
+    pub(crate) no_verify: bool,
 }
 
 #[derive(Debug)]
@@ -65,7 +75,7 @@ pub(crate) fn parse_fixup_releases(input: &str) -> Fallible<FixupReleases> {
 }
 
 #[derive(Debug, StructOpt)]
-pub(crate) struct CrateFixupReleases {
+pub(crate) struct CrateFixupUnpublishedReleases {
     #[structopt(long, default_value = DEFAULT_DEV_SUFFIX)]
     pub(crate) dev_suffix: String,
 
@@ -77,6 +87,38 @@ pub(crate) struct CrateFixupReleases {
 
     #[structopt(long)]
     pub(crate) commit: bool,
+
+    #[structopt(long)]
+    pub(crate) no_verify: bool,
+}
+
+#[derive(Debug, StructOpt)]
+pub(crate) struct CrateDetectMissingReleaseheadings {}
+
+#[derive(Debug, StructOpt)]
+pub(crate) struct CrateCheckArgs {
+    #[structopt(long)]
+    offline: bool,
+}
+
+/// These crate.io handles are used as the default minimum crate owners for all published crates.
+pub(crate) const MINIMUM_CRATE_OWNERS: &str =
+    "github:holochain:core-dev,holochain-release-automation,holochain-release-automation2,zippy,steveeJ";
+
+#[derive(Debug, StructOpt)]
+pub(crate) struct EnsureCrateOwnersArgs {
+    #[structopt(long)]
+    dry_run: bool,
+
+    /// Assumes the default crate owners that are ensured to be set for each crate in the workspace.
+    #[structopt(
+        long,
+        default_value = MINIMUM_CRATE_OWNERS,
+        use_delimiter = true,
+        multiple = false,
+
+    )]
+    minimum_crate_owners: Vec<String>,
 }
 
 #[derive(Debug, StructOpt)]
@@ -85,7 +127,13 @@ pub(crate) enum CrateCommands {
     ApplyDevVersions(CrateApplyDevVersionsArgs),
 
     /// check the latest (or given) release for crates that aren't published, remove their tags, and bump their version.
-    FixupReleases(CrateFixupReleases),
+    FixupUnpublishedReleases(CrateFixupUnpublishedReleases),
+
+    /// verify that all published crates have a heading in their changelog
+    DetectMissingReleaseheadings(CrateDetectMissingReleaseheadings),
+
+    Check(CrateCheckArgs),
+    EnsureCrateOwners(EnsureCrateOwnersArgs),
 }
 
 pub(crate) fn cmd(args: &crate::cli::Args, cmd_args: &CrateArgs) -> CommandResult {
@@ -109,16 +157,166 @@ pub(crate) fn cmd(args: &crate::cli::Args, cmd_args: &CrateArgs) -> CommandResul
             &subcmd_args.dev_suffix,
             subcmd_args.dry_run,
             subcmd_args.commit,
+            subcmd_args.no_verify,
         ),
 
-        CrateCommands::FixupReleases(subcmd_args) => fixup_releases(
+        CrateCommands::FixupUnpublishedReleases(subcmd_args) => fixup_unpublished_releases(
             &ws,
             &subcmd_args.dev_suffix,
             &subcmd_args.fixup_releases,
             subcmd_args.dry_run,
             subcmd_args.commit,
+            subcmd_args.no_verify,
         ),
+
+        CrateCommands::Check(subcmd_args) => {
+            ws.cargo_check(subcmd_args.offline, std::iter::empty::<&str>())?;
+
+            Ok(())
+        }
+        CrateCommands::EnsureCrateOwners(subcmd_args) => {
+            ensure_crate_io_owners(
+                &ws,
+                subcmd_args.dry_run,
+                ws.members()?,
+                subcmd_args.minimum_crate_owners.as_slice(),
+            )?;
+
+            Ok(())
+        }
+        CrateCommands::DetectMissingReleaseheadings(subcmd_args) => {
+            cmd_detect_missing_releaseheadings(&ws, subcmd_args)
+        }
     }
+}
+
+fn cmd_detect_missing_releaseheadings<'a>(
+    ws: &'a ReleaseWorkspace<'a>,
+    _subcmd_args: &CrateDetectMissingReleaseheadings,
+) -> Fallible<()> {
+    let missing_headings = detect_missing_releaseheadings(ws)?;
+
+    if !missing_headings.is_empty() {
+        bail!("missing crate release headings: {:#?}", missing_headings);
+    }
+
+    Ok(())
+}
+
+/// if there are any crate release headings present in the workspace changelog but missing from the crate changelogs an error is returned.
+///
+/// uses the workspace changelog as a source of truth for existing crate releases.
+/// this reasonable because the workspace changelog it's only changed on releases it's not prone to manual mistakes.
+pub(crate) fn detect_missing_releaseheadings<'a>(
+    ws: &'a ReleaseWorkspace<'a>,
+) -> Fallible<LinkedHashMap<String, LinkedHashSet<String>>> {
+    use itertools::Itertools;
+
+    let crate_headings_toplevel = {
+        let cl = ws
+            .changelog()
+            // .map(|cl| cl.topmost_release())
+            .ok_or_else(|| {
+                anyhow::anyhow!("no changelog found in workspace at '{:?}'", ws.root())
+            })?;
+
+        cl.changes()?
+            .iter()
+            .map(|change| match change {
+                crate::changelog::ChangeT::Release(rc) => match rc {
+                    crate::changelog::ReleaseChange::WorkspaceReleaseChange(_title, releases) => {
+                        Ok(releases.clone())
+                    }
+                    unexpected => bail!("expected a WorkspaceReleaseChange here: {:?}", unexpected),
+                },
+                _ => Ok(vec![]),
+            })
+            // TODO: what happens with errors here?
+            .flatten_ok()
+            .collect::<Fallible<Vec<_>>>()?
+    };
+
+    let crate_headings_toplevel_by_crate = crate_headings_toplevel.into_iter().try_fold(
+        LinkedHashMap::<String, LinkedHashSet<String>>::new(),
+        |mut acc, cur| -> Fallible<_> {
+            // TODO: use crate names to detect the split instead of the delimiter
+            let (crt, version) = cur.split_once('-').ok_or(anyhow::anyhow!(
+                "could not split '{}' by
+                '-'",
+                cur
+            ))?;
+
+            acc.entry(crt.to_string())
+                .or_insert_with(|| Default::default())
+                .insert(version.to_string());
+
+            Ok(acc)
+        },
+    )?;
+
+    trace!(
+        "toplevel crate headings: {:#?}",
+        crate_headings_toplevel_by_crate
+    );
+
+    let crate_headings_cratedirs = ws.members()?.into_iter().try_fold(
+        LinkedHashMap::<String, LinkedHashSet<String>>::new(),
+        |mut acc, crt| -> Fallible<_> {
+            let name = crt.name();
+
+            let crt_released_versions = if let Some(cl) = crt.changelog() {
+                cl.changes()?
+                    .iter()
+                    .map(|change| match change {
+                        crate::changelog::ChangeT::Release(rc) => match rc {
+                            crate::changelog::ReleaseChange::CrateReleaseChange(version) => {
+                                Ok(Some(version.clone()))
+                            }
+                            unexpected => {
+                                bail!("expected a CrateReleaseChange here: {:?}", unexpected)
+                            }
+                        },
+                        _ => Ok(None),
+                    })
+                    // TODO: what happens with errors here?
+                    .flatten_ok()
+                    .collect::<Fallible<Vec<_>>>()?
+            } else {
+                // don't change the result if the crate has no changelog
+                return Ok(acc);
+            };
+
+            acc.entry(name)
+                .or_insert_with(|| Default::default())
+                .extend(crt_released_versions);
+
+            Ok(acc)
+        },
+    )?;
+
+    let missing_headings: LinkedHashMap<String, LinkedHashSet<String>> =
+        crate_headings_toplevel_by_crate
+            .iter()
+            .filter_map(|(crt, headings)| {
+                // only consider crates that still exist as they could have been deleted entirely at some point
+                if let Some(headings_crate) = crate_headings_cratedirs.get(crt) {
+                    let diff = headings
+                        .difference(headings_crate)
+                        .cloned()
+                        .collect::<LinkedHashSet<_>>();
+
+                    if !diff.is_empty() {
+                        Some((crt.to_owned(), diff))
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+    Ok(missing_headings)
 }
 
 /// Scans the workspace for crates that have changed since their previous release and bumps their version to a dev version.
@@ -137,6 +335,7 @@ pub(crate) fn apply_dev_versions<'a>(
     dev_suffix: &str,
     dry_run: bool,
     commit: bool,
+    no_verify: bool,
 ) -> Fallible<()> {
     let applicable_crates = ws
         .members()?
@@ -161,7 +360,9 @@ pub(crate) fn apply_dev_versions<'a>(
 
         if !dry_run {
             // this checks consistency and also updates the Cargo.lock file(s)
-            ws.cargo_check(false)?;
+            if !no_verify {
+                ws.cargo_check(false, std::iter::empty::<&str>())?;
+            }
 
             if commit {
                 ws.git_add_all_and_commit(&commit_msg, None)?;
@@ -198,7 +399,7 @@ pub(crate) fn apply_dev_vesrions_to_selection<'a>(
             continue;
         }
 
-        version.increment_patch();
+        increment_patch(&mut version);
         version = semver::Version::parse(&format!("{}-{}", version, dev_suffix))?;
 
         debug!(
@@ -225,12 +426,19 @@ pub(crate) fn apply_dev_vesrions_to_selection<'a>(
     Ok(msg)
 }
 
-pub(crate) fn fixup_releases<'a>(
+pub(crate) fn increment_patch(v: &mut semver::Version) {
+    v.patch += 1;
+    v.pre = semver::Prerelease::EMPTY;
+    v.build = semver::BuildMetadata::EMPTY;
+}
+
+pub(crate) fn fixup_unpublished_releases<'a>(
     ws: &'a ReleaseWorkspace<'a>,
     dev_suffix: &str,
     fixup: &FixupReleases,
     dry_run: bool,
     commit: bool,
+    no_verify: bool,
 ) -> Fallible<()> {
     let mut unpublished_crates: std::collections::BTreeMap<
         String,
@@ -314,10 +522,84 @@ pub(crate) fn fixup_releases<'a>(
 
         if !dry_run {
             // this checks consistency and also updates the Cargo.lock file(s)
-            ws.cargo_check(false)?;
+            if !no_verify {
+                ws.cargo_check(false, std::iter::empty::<&str>())?;
+            };
 
             if commit {
                 ws.git_add_all_and_commit(&commit_msg, None)?;
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// Ensures that the given crates have at least sent an invite to the given crate.io usernames.
+pub(crate) fn ensure_crate_io_owners<'a>(
+    _ws: &'a ReleaseWorkspace<'a>,
+    dry_run: bool,
+    crates: &[&Crate],
+    minimum_crate_owners: &[String],
+) -> Fallible<()> {
+    let desired_owners = minimum_crate_owners
+        .into_iter()
+        .cloned()
+        .collect::<HashSet<String>>();
+
+    for crt in crates {
+        if !crates_index_helper::is_version_published(crt, false)? {
+            warn!("{} is not published, skipping..", crt.name());
+            continue;
+        }
+
+        let mut cmd = std::process::Command::new("cargo");
+        cmd.args(&["owner", "--list", &crt.name()]);
+
+        debug!("[{}] running command: {:?}", crt.name(), cmd);
+        let output = cmd.output().context("process exitted unsuccessfully")?;
+        if !output.status.success() {
+            warn!(
+                "[{}] failed list owners: {}",
+                crt.name(),
+                String::from_utf8_lossy(&output.stderr)
+            );
+
+            continue;
+        }
+
+        let current_owners = output
+            .stdout
+            .lines()
+            .map(|line| {
+                line.words_with_breaks()
+                    .take_while(|item| *item != " ")
+                    .collect::<String>()
+            })
+            .collect::<HashSet<_>>();
+        let diff = desired_owners.difference(&current_owners);
+        info!(
+            "[{}] current owners {:?}, missing owners: {:?}",
+            crt.name(),
+            current_owners,
+            diff
+        );
+
+        for owner in diff {
+            let mut cmd = std::process::Command::new("cargo");
+            cmd.args(&["owner", "--add", owner, &crt.name()]);
+
+            debug!("[{}] running command: {:?}", crt.name(), cmd);
+            if !dry_run {
+                let output = cmd.output().context("process exitted unsuccessfully")?;
+                if !output.status.success() {
+                    warn!(
+                        "[{}] failed to add owner '{}': {}",
+                        crt.name(),
+                        owner,
+                        String::from_utf8_lossy(&output.stderr)
+                    );
+                }
             }
         }
     }

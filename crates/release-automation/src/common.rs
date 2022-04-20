@@ -42,7 +42,10 @@ pub(crate) fn set_version<'a>(
     }
 
     let dependants = crt
-        .dependants_in_workspace_filtered(|dep| dep.version_req() != &VersionReq::any())?
+        .dependants_in_workspace_filtered(|(_dep_name, deps)| {
+            deps.iter()
+                .any(|dep| dep.version_req() != &cargo::util::OptVersionReq::from(VersionReq::STAR))
+        })?
         .to_owned();
 
     for dependant in dependants.iter() {
@@ -85,7 +88,11 @@ fn set_dependency_version(manifest_path: &Path, name: &str, version: &str) -> Fa
                     .expect("manifest is already verified")
                     .contains_key(name)
             {
-                manifest[key][name]["version"] = toml_edit::value(version);
+                let existing_version = manifest[key][name]["version"].as_str().unwrap_or("*");
+
+                if *key == "dependencies" || !existing_version.contains("*") {
+                    manifest[key][name]["version"] = toml_edit::value(version);
+                }
             }
         }
 

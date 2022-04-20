@@ -42,7 +42,7 @@ pub enum DnaSource {
     /// register the dna loaded from a bundle file on disk
     Path(PathBuf),
     /// register the dna as provided in the DnaBundle data structure
-    Bundle(DnaBundle),
+    Bundle(Box<DnaBundle>),
     /// register the dna from an existing registered DNA (assumes properties will be set)
     Hash(DnaHash),
 }
@@ -424,8 +424,7 @@ impl InstalledAppCommon {
     pub fn cloned_cells(&self) -> impl Iterator<Item = &CellId> {
         self.role_assignments
             .iter()
-            .map(|(_, role)| &role.clones)
-            .flatten()
+            .flat_map(|(_, role)| &role.clones)
     }
 
     /// Iterator of all cells, both provisioned and cloned

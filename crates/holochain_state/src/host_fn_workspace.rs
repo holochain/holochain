@@ -7,8 +7,10 @@ use holochain_sqlite::db::DbKindAuthored;
 use holochain_sqlite::db::DbKindCache;
 use holochain_sqlite::db::DbKindDht;
 use holochain_sqlite::db::ReadAccess;
-use holochain_types::env::DbRead;
-use holochain_types::env::DbWrite;
+use holochain_types::db::DbRead;
+use holochain_types::db::DbWrite;
+use holochain_types::db_cache::DhtDbQueryCache;
+use holochain_zome_types::DnaDef;
 use holochain_zome_types::SignedHeaderHashed;
 
 use crate::prelude::SourceChain;
@@ -26,6 +28,12 @@ pub struct HostFnWorkspace<
     authored: DbRead<DbKindAuthored>,
     dht: DbRead<DbKindDht>,
     cache: DbWrite<DbKindCache>,
+    dna_def: Arc<DnaDef>,
+    /// Did the root call that started this call chain
+    /// come from an init callback.
+    /// This is needed so that we don't run init recursively inside
+    /// init calls.
+    init_is_root: bool,
 }
 
 #[derive(Clone, shrinkwraprs::Shrinkwrap)]
@@ -54,19 +62,53 @@ impl HostFnWorkspace {
             None => Ok(Vec::with_capacity(0)),
         }
     }
+
+    /// Get a reference to the host fn workspace's dna def.
+    pub fn dna_def(&self) -> Arc<DnaDef> {
+        self.dna_def.clone()
+    }
 }
 
 impl SourceChainWorkspace {
     pub async fn new(
         authored: DbWrite<DbKindAuthored>,
         dht: DbWrite<DbKindDht>,
+        dht_db_cache: DhtDbQueryCache,
         cache: DbWrite<DbKindCache>,
         keystore: MetaLairClient,
         author: AgentPubKey,
+        dna_def: Arc<DnaDef>,
     ) -> SourceChainResult<Self> {
-        let source_chain =
-            SourceChain::new(authored.clone(), dht.clone(), keystore, author).await?;
-        Self::new_inner(authored, dht, cache, source_chain).await
+        let source_chain = SourceChain::new(
+            authored.clone(),
+            dht.clone(),
+            dht_db_cache.clone(),
+            keystore,
+            author,
+        )
+        .await?;
+        Self::new_inner(authored, dht, cache, source_chain, dna_def, false).await
+    }
+
+    /// Create a source chain workspace where the root caller is the init callback.
+    pub async fn init_as_root(
+        authored: DbWrite<DbKindAuthored>,
+        dht: DbWrite<DbKindDht>,
+        dht_db_cache: DhtDbQueryCache,
+        cache: DbWrite<DbKindCache>,
+        keystore: MetaLairClient,
+        author: AgentPubKey,
+        dna_def: Arc<DnaDef>,
+    ) -> SourceChainResult<Self> {
+        let source_chain = SourceChain::new(
+            authored.clone(),
+            dht.clone(),
+            dht_db_cache.clone(),
+            keystore,
+            author,
+        )
+        .await?;
+        Self::new_inner(authored, dht, cache, source_chain, dna_def, true).await
     }
 
     /// Create a source chain with a blank chain head.
@@ -76,13 +118,21 @@ impl SourceChainWorkspace {
     pub async fn raw_empty(
         authored: DbWrite<DbKindAuthored>,
         dht: DbWrite<DbKindDht>,
+        dht_db_cache: DhtDbQueryCache,
         cache: DbWrite<DbKindCache>,
         keystore: MetaLairClient,
         author: AgentPubKey,
+        dna_def: Arc<DnaDef>,
     ) -> SourceChainResult<Self> {
-        let source_chain =
-            SourceChain::raw_empty(authored.clone(), dht.clone(), keystore, author).await?;
-        Self::new_inner(authored, dht, cache, source_chain).await
+        let source_chain = SourceChain::raw_empty(
+            authored.clone(),
+            dht.clone(),
+            dht_db_cache.clone(),
+            keystore,
+            author,
+        )
+        .await?;
+        Self::new_inner(authored, dht, cache, source_chain, dna_def, false).await
     }
 
     async fn new_inner(
@@ -90,16 +140,26 @@ impl SourceChainWorkspace {
         dht: DbWrite<DbKindDht>,
         cache: DbWrite<DbKindCache>,
         source_chain: SourceChain,
+        dna_def: Arc<DnaDef>,
+        init_is_root: bool,
     ) -> SourceChainResult<Self> {
         Ok(Self {
             inner: HostFnWorkspace {
                 source_chain: Some(source_chain.clone()),
                 authored: authored.into(),
                 dht: dht.into(),
+                dna_def,
                 cache,
+                init_is_root,
             },
             source_chain,
         })
+    }
+
+    /// Did this zome call chain originate from within
+    /// an init callback.
+    pub fn called_from_init(&self) -> bool {
+        self.inner.init_is_root
     }
 }
 
@@ -111,14 +171,23 @@ where
     pub async fn new(
         authored: SourceChainDb,
         dht: SourceChainDht,
+        dht_db_cache: DhtDbQueryCache,
         cache: DbWrite<DbKindCache>,
         keystore: MetaLairClient,
         author: Option<AgentPubKey>,
+        dna_def: Arc<DnaDef>,
     ) -> SourceChainResult<Self> {
         let source_chain = match author {
-            Some(author) => {
-                Some(SourceChain::new(authored.clone(), dht.clone(), keystore, author).await?)
-            }
+            Some(author) => Some(
+                SourceChain::new(
+                    authored.clone(),
+                    dht.clone(),
+                    dht_db_cache.clone(),
+                    keystore,
+                    author,
+                )
+                .await?,
+            ),
             None => None,
         };
         Ok(Self {
@@ -126,6 +195,8 @@ where
             authored: authored.into(),
             dht: dht.into(),
             cache,
+            dna_def,
+            init_is_root: false,
         })
     }
     pub fn source_chain(&self) -> &Option<SourceChain<SourceChainDb, SourceChainDht>> {
@@ -169,6 +240,8 @@ impl From<HostFnWorkspace> for HostFnWorkspaceRead {
             authored: workspace.authored,
             dht: workspace.dht,
             cache: workspace.cache,
+            dna_def: workspace.dna_def,
+            init_is_root: workspace.init_is_root,
         }
     }
 }
@@ -186,6 +259,8 @@ impl From<SourceChainWorkspace> for HostFnWorkspaceRead {
             authored: workspace.inner.authored,
             dht: workspace.inner.dht,
             cache: workspace.inner.cache,
+            dna_def: workspace.inner.dna_def,
+            init_is_root: workspace.inner.init_is_root,
         }
     }
 }

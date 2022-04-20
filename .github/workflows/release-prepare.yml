@@ -1,0 +1,289 @@
+on:
+  workflow_call:
+    inputs:
+      dry_run:
+        type: string
+        required: true
+      debug:
+        type: string
+        required: true
+
+      HOLOCHAIN_SOURCE_BRANCH:
+        type: string
+        required: true
+      HOLOCHAIN_URL:
+        type: string
+        required: false
+        default: "https://github.com/holochain/holochain"
+      HOLOCHAIN_NIXPKGS_URL:
+        type: string
+        required: false
+        default: "https://github.com/holochain/holochain-nixkpgs.git"
+      HOLONIX_URL:
+        type: string
+        required: false
+        default: "https://github.com/holochain/holonix.git"
+      HOLOCHAIN_REPO:
+        type: string
+        required: true
+      HOLOCHAIN_RELEASE_SH:
+        type: string
+        required: true
+      CACHIX_REV:
+        type: string
+        required: true
+    secrets:
+      CACHIX_SIGNING_KEY:
+        required: true
+      CACHIX_AUTH_TOKEN:
+        required: true
+
+    outputs:
+      releasable_crates:
+        description: "whether there are any releaseable crates"
+        value: ${{ jobs.prepare.outputs.releasable_crates }}
+      version:
+        description: "which holochain version, if one, will be released"
+        value: ${{ jobs.prepare.outputs.version }}
+      tag:
+        description: "which holochain tag, if one, will be released"
+        value: ${{ jobs.prepare.outputs.tag }}
+
+jobs:
+  prepare:
+    env:
+      HOLOCHAIN_REPO: ${{ inputs.HOLOCHAIN_REPO }}
+      HOLOCHAIN_RELEASE_SH: ${{ inputs.HOLOCHAIN_RELEASE_SH }}
+      CACHIX_REV: ${{ inputs.CACHIX_REV }}
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.write-env-and-tag.outputs.tag }}
+      version: ${{ steps.write-env-and-tag.outputs.version }}
+      version_compat: ${{ steps.write-env-and-tag.outputs.version_compat }}
+      release_branch: ${{ steps.write-env-and-tag.outputs.release_branch }}
+      releasable_crates: ${{ steps.bump-versions.outputs.releasable_crates }}
+
+    steps:
+      # - name: Maximize build space
+      #   # uses: easimon/maximize-build-space@master
+      #   uses: AdityaGarg8/remove-unwanted-software@v1
+      #   with:
+      #     remove-dotnet: true
+      #     remove-android: true
+      #     remove-haskell: true
+      - name: Checkout repository
+        uses: actions/checkout@v2.4.0
+      - name: Install nix
+        uses: cachix/install-nix-action@v16
+      - name: Setup cachix
+        uses: cachix/cachix-action@v10
+        with:
+          name: holochain-ci
+          signingKey: "${{ secrets.CACHIX_SIGNING_KEY }}"
+          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
+          installCommand: |
+            nix-env -if https://github.com/cachix/cachix/tarball/${CACHIX_REV:?} \
+              --substituters 'https://cache.nixos.org https://cachix.cachix.org' \
+              --trusted-public-keys 'cachix.cachix.org-1:eWNHQldwUO7G2VkjpnjDbWwy4KQ/HNxht7H4SSoMckM= cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY='
+      - name: Set NIX_PATH (FIXME)
+        run: echo NIX_PATH=nixpkgs=$(./scripts/nix_path.sh) >> $GITHUB_ENV
+
+      - name: Restore the holochain release repository
+        uses: steveeJ-forks/actions-cache/restore@main
+        with:
+          path: |
+            /tmp/holochain_release.sh
+            # asterisk is a workaround for https://github.com/actions/cache/issues/494
+            /tmp/holochain_repo/*
+            !/tmp/holochain_repo/.cargo/
+            !/tmp/holochain_repo/target/
+          key: holochain-repo-finalize-release-
+          restore-keys: |
+            holochain-repo-
+          required: false
+
+      - name: Restore holochain cargo related state and build files
+        uses: steveeJ-forks/actions-cache/restore@main
+        id: restore-build-files
+        with:
+          path: |
+            /tmp/holochain_repo/.cargo/bin/
+            /tmp/holochain_repo/.cargo/registry/index/
+            /tmp/holochain_repo/.cargo/registry/cache/
+            /tmp/holochain_repo/.cargo/git/db/
+            /tmp/holochain_repo/target/
+          key: ${{ runner.os }}-prepare-${{ github.run_id }}
+          restore-keys: |
+            ${{ runner.os }}-prepare
+            ${{ runner.os }}-test-release-cargo-test-standard
+            ${{ runner.os }}
+          required: false
+
+      - name: Prepare the environment file
+        env:
+          HOLOCHAIN_SOURCE_BRANCH: ${{ inputs.HOLOCHAIN_SOURCE_BRANCH }}
+          HOLOCHAIN_URL: ${{ inputs.HOLOCHAIN_URL }}
+          HOLOCHAIN_NIXPKGS_URL: ${{ inputs.HOLOCHAIN_NIXPKGS_URL }}
+          HOLONIX_URL: "https://github.com/holochain/holonix.git"
+        run: |
+          cat <<EOF > "${HOLOCHAIN_RELEASE_SH}"
+          PATH="~/.cargo/bin:$PATH"
+
+          export HOLOCHAIN_URL=${HOLOCHAIN_URL:?}
+          export HOLOCHAIN_NIXPKGS_URL=${HOLOCHAIN_NIXPKGS_URL:?}
+          export HOLONIX_URL=${HOLONIX_URL:?}
+
+          export HOLOCHAIN_SOURCE_BRANCH="${HOLOCHAIN_SOURCE_BRANCH:?}"
+
+          export HOLOCHAIN_NIXPKGS_REPO=$(mktemp -d)
+          export HOLONIX_REPO=$(mktemp -d)
+          EOF
+
+          cat ${HOLOCHAIN_RELEASE_SH}
+
+      - name: Prepare the holochain repository
+        run: |
+          set -eE -o pipefail
+          source "${HOLOCHAIN_RELEASE_SH}"
+
+          if [[ ! -d "${HOLOCHAIN_REPO}" ]]; then
+            rm -rf "${HOLOCHAIN_REPO}"
+            mkdir -p "${HOLOCHAIN_REPO}"
+          fi
+
+          cd "${HOLOCHAIN_REPO}"
+
+          if ! git status; then
+            git init
+            git remote add origin "${HOLOCHAIN_URL}"
+          fi
+
+          cp -v $HOME/work/holochain/holochain/.git/config .git/config
+
+          git fetch --all --tags --prune --prune-tags --force
+          git checkout --force -B ${HOLOCHAIN_SOURCE_BRANCH} remotes/origin/${HOLOCHAIN_SOURCE_BRANCH}
+
+          # .gitignore might've changed
+          git reset --hard
+          git clean -fd
+
+          obsolete_branches="$(git branch --list | sed -E 's/^ +//' | (grep -oE '^release-[0-9\.]+' || :))"
+          if [[ -n "${obsolete_branches}" ]]; then
+            git branch -D ${obsolete_branches}
+          fi
+
+      - name: Detect missing release headings
+        run: |
+          set -ex
+          source "${HOLOCHAIN_RELEASE_SH}"
+          cd "${HOLOCHAIN_REPO}"
+
+          nix-shell --argstr flavor release --pure --run '
+            set -e
+
+            release-automation \
+              --workspace-path=$PWD \
+              --log-level=debug \
+              crate detect-missing-releaseheadings
+            '
+
+      - name: Bump the crate versions for the release
+        id: bump-versions
+        run: |
+          set -ex
+          source "${HOLOCHAIN_RELEASE_SH}"
+          cd "${HOLOCHAIN_REPO}"
+
+          nix-shell --argstr flavor release --pure --run '
+            set -e
+            cargo sweep -s
+
+            release-automation \
+              --workspace-path=$PWD \
+              --log-level=debug \
+              release \
+                --force-branch-creation \
+                --steps=CreateReleaseBranch
+
+            release-automation \
+              --workspace-path=$PWD \
+              crate apply-dev-versions --commit --no-verify
+
+            release-automation \
+              --workspace-path=$PWD \
+              --log-level=debug \
+              release \
+                --no-verify-pre \
+                --force-tag-creation \
+                --match-filter="^(holochain|holochain_cli|kitsune_p2p_proxy)$" \
+                --disallowed-version-reqs=">=0.1" \
+                --steps=BumpReleaseVersions
+
+            cargo sweep -f
+            '
+
+          if ! git diff --exit-code --quiet ${HOLOCHAIN_SOURCE_BRANCH:?}; then
+            echo "::set-output name=releasable_crates::true"
+          else
+            echo "::set-output name=releasable_crates::false"
+          fi
+
+      - name: Append to the environment file and set outputs
+        id: write-env-and-tag
+        run: |
+          source "${HOLOCHAIN_RELEASE_SH}"
+          cd "${HOLOCHAIN_REPO}"
+
+          cat <<EOF >> "${HOLOCHAIN_RELEASE_SH}"
+          export TAG=$(git tag --list | grep holochain- | tail -n1)
+          export VERSION=\${TAG/holochain-/}
+          export VERSION_COMPAT="v\${VERSION//./_}"
+          export RELEASE_BRANCH=$(git branch --show-current)
+          EOF
+
+          source "${HOLOCHAIN_RELEASE_SH}"
+
+          echo "::set-output name=tag::${TAG}"
+          echo "::set-output name=version::${VERSION}"
+          echo "::set-output name=version_compat::${VERSION_COMPAT}"
+          echo "::set-output name=release_branch::${RELEASE_BRANCH}"
+
+      - name: Merge release branch to main
+        run: |
+          source "${HOLOCHAIN_RELEASE_SH}"
+          cd "${HOLOCHAIN_REPO}"
+
+          git checkout --force -B main origin/main
+          git merge --ff-only "${RELEASE_BRANCH}"
+
+      - name: Cache the holochain release repository
+        uses: steveeJ-forks/actions-cache/save@main
+        with:
+          path: |
+            /tmp/holochain_release.sh
+            # asterisk is a workaround for https://github.com/actions/cache/issues/494
+            /tmp/holochain_repo/*
+            !/tmp/holochain_repo/.cargo/
+            !/tmp/holochain_repo/target/
+          key: holochain-repo-${{ github.run_id }}-${{ github.run_number }}
+
+      - name: Cache cargo related build files
+        uses: steveeJ-forks/actions-cache/save@main
+        if: success() || ${{ steps.restore-build-files.outputs.cache-hit != 'false' }}
+        with:
+          path: |
+            /tmp/holochain_repo/.cargo/bin/
+            /tmp/holochain_repo/.cargo/registry/index/
+            /tmp/holochain_repo/.cargo/registry/cache/
+            /tmp/holochain_repo/.cargo/git/db/
+            /tmp/holochain_repo/target/
+          key: ${{ runner.os }}-prepare-${{ github.run_id }}-${{ github.run_number }}
+
+      - name: Setup upterm session
+        uses: lhotari/action-upterm@v1
+        if: ${{ failure() && inputs.debug == 'true' }}
+        with:
+          ## limits ssh access and adds the ssh public key for the user which triggered the workflow
+          limit-access-to-actor: true
+          ## limits ssh access and adds the ssh public keys of the listed GitHub users
+          limit-access-to-users: steveeJ,jost-s,freesig,neonphog,thedavidmeister,maackle

@@ -17,6 +17,7 @@ impl HolochainP2pHandler for StubNetwork {
         &mut self,
         dna_hash: DnaHash,
         agent_pub_key: AgentPubKey,
+        initial_arc: Option<crate::dht_arc::DhtArc>,
     ) -> HolochainP2pHandlerResult<()> {
         Err("stub".into())
     }
@@ -57,7 +58,7 @@ impl HolochainP2pHandler for StubNetwork {
         request_validation_receipt: bool,
         countersigning_session: bool,
         dht_hash: holo_hash::AnyDhtHash,
-        ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
+        ops: Vec<holochain_types::dht_op::DhtOp>,
         timeout_ms: Option<u64>,
     ) -> HolochainP2pHandlerResult<()> {
         Err("stub".into())
@@ -176,10 +177,11 @@ mod tests {
     use ::fixt::prelude::*;
     use futures::future::FutureExt;
     use ghost_actor::GhostControlSender;
+    use kitsune_p2p::dht_arc::PeerStratBeta;
 
     use crate::HolochainP2pSender;
     use holochain_zome_types::ValidationStatus;
-    use kitsune_p2p::dependencies::kitsune_p2p_proxy::TlsConfig;
+    use kitsune_p2p::dependencies::kitsune_p2p_types::tls::TlsConfig;
     use kitsune_p2p::KitsuneP2pConfig;
 
     macro_rules! newhash {
@@ -210,6 +212,7 @@ mod tests {
         let (p2p, mut evt) = spawn_holochain_p2p(
             KitsuneP2pConfig::default(),
             TlsConfig::new_ephemeral().await.unwrap(),
+            kitsune_p2p::HostStub::new(),
         )
         .await
         .unwrap();
@@ -232,13 +235,22 @@ mod tests {
                     PutAgentInfoSigned { respond, .. } => {
                         respond.r(Ok(async move { Ok(()) }.boxed().into()));
                     }
+                    QueryPeerDensity { respond, .. } => {
+                        let view = kitsune_p2p_types::dht_arc::PeerViewBeta::new(
+                            PeerStratBeta::default(),
+                            dht_arc::DhtArc::full(0.into()),
+                            1.0,
+                            2,
+                        );
+                        respond.r(Ok(async move { Ok(view) }.boxed().into()));
+                    }
                     _ => {}
                 }
             }
         });
 
-        p2p.join(dna.clone(), a1.clone()).await.unwrap();
-        p2p.join(dna.clone(), a2.clone()).await.unwrap();
+        p2p.join(dna.clone(), a1.clone(), None).await.unwrap();
+        p2p.join(dna.clone(), a2.clone(), None).await.unwrap();
 
         let res = p2p
             .call_remote(
@@ -267,6 +279,7 @@ mod tests {
         let (p2p, mut evt): (HolochainP2pRef, _) = spawn_holochain_p2p(
             KitsuneP2pConfig::default(),
             TlsConfig::new_ephemeral().await.unwrap(),
+            kitsune_p2p::HostStub::new(),
         )
         .await
         .unwrap();
@@ -289,13 +302,22 @@ mod tests {
                     PutAgentInfoSigned { respond, .. } => {
                         respond.r(Ok(async move { Ok(()) }.boxed().into()));
                     }
+                    QueryPeerDensity { respond, .. } => {
+                        let view = kitsune_p2p_types::dht_arc::PeerViewBeta::new(
+                            PeerStratBeta::default(),
+                            dht_arc::DhtArc::full(0.into()),
+                            1.0,
+                            2,
+                        );
+                        respond.r(Ok(async move { Ok(view) }.boxed().into()));
+                    }
                     _ => {}
                 }
             }
         });
 
-        p2p.join(dna.clone(), a1.clone()).await.unwrap();
-        p2p.join(dna.clone(), a2.clone()).await.unwrap();
+        p2p.join(dna.clone(), a1.clone(), None).await.unwrap();
+        p2p.join(dna.clone(), a2.clone(), None).await.unwrap();
 
         p2p.send_validation_receipt(dna, a1, UnsafeBytes::from(b"receipt-test".to_vec()).into())
             .await
@@ -312,6 +334,7 @@ mod tests {
         let (p2p, mut evt) = spawn_holochain_p2p(
             KitsuneP2pConfig::default(),
             TlsConfig::new_ephemeral().await.unwrap(),
+            kitsune_p2p::HostStub::new(),
         )
         .await
         .unwrap();
@@ -337,14 +360,23 @@ mod tests {
                     QueryAgentInfoSigned { respond, .. } => {
                         respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
                     }
+                    QueryPeerDensity { respond, .. } => {
+                        let view = kitsune_p2p_types::dht_arc::PeerViewBeta::new(
+                            PeerStratBeta::default(),
+                            dht_arc::DhtArc::full(0.into()),
+                            1.0,
+                            2,
+                        );
+                        respond.r(Ok(async move { Ok(view) }.boxed().into()));
+                    }
                     _ => {}
                 }
             }
         });
 
-        p2p.join(dna.clone(), a1.clone()).await.unwrap();
-        p2p.join(dna.clone(), a2.clone()).await.unwrap();
-        p2p.join(dna.clone(), a3.clone()).await.unwrap();
+        p2p.join(dna.clone(), a1.clone(), None).await.unwrap();
+        p2p.join(dna.clone(), a2.clone(), None).await.unwrap();
+        p2p.join(dna.clone(), a3.clone(), None).await.unwrap();
 
         let header_hash = holo_hash::AnyDhtHash::from_raw_36_and_type(
             b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_vec(),
@@ -369,12 +401,17 @@ mod tests {
 
         let (dna, a1, a2, _a3) = test_setup();
 
-        let (p2p, mut evt) = spawn_holochain_p2p(
-            KitsuneP2pConfig::default(),
-            TlsConfig::new_ephemeral().await.unwrap(),
-        )
-        .await
-        .unwrap();
+        let cert = TlsConfig::new_ephemeral().await.unwrap();
+
+        let mut params =
+            kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
+        params.default_rpc_multi_remote_agent_count = 1;
+        params.default_rpc_multi_remote_request_grace_ms = 100;
+        let mut config = KitsuneP2pConfig::default();
+        config.tuning_params = Arc::new(params);
+        let (p2p, mut evt) = spawn_holochain_p2p(config, cert, kitsune_p2p::HostStub::new())
+            .await
+            .unwrap();
 
         let test_1 = WireOps::Element(WireElementOps {
             header: Some(Judged::valid(SignedHeader(fixt!(Header), fixt!(Signature)))),
@@ -416,15 +453,24 @@ mod tests {
                     QueryOpHashes { respond, .. } => {
                         respond.r(Ok(async move { Ok(None) }.boxed().into()));
                     }
-                    evt => println!("unhandled: {:?}", evt),
+                    QueryPeerDensity { respond, .. } => {
+                        let view = kitsune_p2p_types::dht_arc::PeerViewBeta::new(
+                            PeerStratBeta::default(),
+                            dht_arc::DhtArc::full(0.into()),
+                            1.0,
+                            2,
+                        );
+                        respond.r(Ok(async move { Ok(view) }.boxed().into()));
+                    }
+                    evt => tracing::trace!("unhandled: {:?}", evt),
                 }
             }
         });
 
         tracing::info!("test - join1");
-        p2p.join(dna.clone(), a1.clone()).await.unwrap();
+        p2p.join(dna.clone(), a1.clone(), None).await.unwrap();
         tracing::info!("test - join2");
-        p2p.join(dna.clone(), a2.clone()).await.unwrap();
+        p2p.join(dna.clone(), a2.clone(), None).await.unwrap();
 
         let hash = holo_hash::AnyDhtHash::from_raw_36_and_type(
             b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_vec(),
@@ -455,9 +501,17 @@ mod tests {
     async fn test_get_links_workflow() {
         let (dna, a1, a2, _) = test_setup();
 
+        let mut params =
+            kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
+        params.default_rpc_multi_remote_agent_count = 1;
+        params.default_rpc_multi_remote_request_grace_ms = 100;
+        let mut config = KitsuneP2pConfig::default();
+        config.tuning_params = Arc::new(params);
+
         let (p2p, mut evt) = spawn_holochain_p2p(
-            KitsuneP2pConfig::default(),
+            config,
             TlsConfig::new_ephemeral().await.unwrap(),
+            kitsune_p2p::HostStub::new(),
         )
         .await
         .unwrap();
@@ -491,20 +545,29 @@ mod tests {
                     PutAgentInfoSigned { respond, .. } => {
                         respond.r(Ok(async move { Ok(()) }.boxed().into()));
                     }
+                    QueryPeerDensity { respond, .. } => {
+                        let view = kitsune_p2p_types::dht_arc::PeerViewBeta::new(
+                            PeerStratBeta::default(),
+                            dht_arc::DhtArc::full(0.into()),
+                            1.0,
+                            2,
+                        );
+                        respond.r(Ok(async move { Ok(view) }.boxed().into()));
+                    }
                     _ => {}
                 }
             }
         });
 
-        p2p.join(dna.clone(), a1.clone()).await.unwrap();
-        p2p.join(dna.clone(), a2.clone()).await.unwrap();
+        p2p.join(dna.clone(), a1.clone(), None).await.unwrap();
+        p2p.join(dna.clone(), a2.clone(), None).await.unwrap();
 
         let hash = holo_hash::EntryHash::from_raw_36_and_type(
             b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_vec(),
             holo_hash::hash_type::Entry,
         );
         let link_key = WireLinkKey {
-            base: hash,
+            base: hash.into(),
             zome_id: 0.into(),
             tag: None,
         };

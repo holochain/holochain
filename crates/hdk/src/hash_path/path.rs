@@ -3,8 +3,8 @@ use crate::hash_path::shard::SHARDEND;
 use crate::prelude::*;
 use holochain_wasmer_guest::*;
 use holochain_zome_types::link::LinkTag;
+use holochain_zome_types::validate::RequiredValidationType;
 use std::str::FromStr;
-use validate::RequiredValidationType;
 
 /// Allows for "foo.bar.baz" to automatically move to/from ["foo", "bar", "baz"] components.
 /// Technically it's moving each string component in as bytes.
@@ -12,14 +12,6 @@ use validate::RequiredValidationType;
 ///
 /// See `impl From<String> for Path` below.
 pub const DELIMITER: &str = ".";
-
-/// All paths use the same link tag and entry def id.
-/// Different pathing schemes/systems/implementations should namespace themselves by their path
-/// components rather than trying to layer different link namespaces over the same path components.
-/// Similarly there is no need to define different entry types for different pathing strategies.
-/// The DHT_PREFIX ends up as both the prefix of the link tags and also in the
-/// `PathEntry` struct itself to mitigate collisions on the DHT.
-pub const DHT_PREFIX: u8 = 0;
 
 /// Each path component is arbitrary bytes to be hashed together in a predictable way when the path
 /// is hashed to create something that can be linked and discovered by all DHT participants.
@@ -157,13 +149,12 @@ pub struct Path(Vec<Component>);
 
 entry_def!(Path EntryDef {
     id: "hdk.path".into(),
-    crdt_type: CrdtType,
     required_validations: RequiredValidations::default(),
     visibility: EntryVisibility::Public,
     required_validation_type: RequiredValidationType::default(),
 });
 
-/// A [ `PathEntry` ] is the hash of a [ `Path` ] and the [ `DHT_PREFIX` ].
+/// A [ `PathEntry` ] is the hash of a [ `Path` ].
 /// This is what is committed and shared on the DHT to build links off as their
 /// base and target. If we committed the `Path` directly then the size of each
 /// node entry content would be the size of all the components of the path.
@@ -183,19 +174,12 @@ pub struct PathEntry(#[serde(with = "serde_bytes")] Vec<u8>);
 
 impl PathEntry {
     pub fn new(entry_hash: EntryHash) -> Self {
-        Self(
-            [DHT_PREFIX]
-                .iter()
-                .chain(entry_hash.get_raw_32())
-                .cloned()
-                .collect(),
-        )
+        Self(entry_hash.get_raw_32().to_vec())
     }
 }
 
 entry_def!(PathEntry EntryDef {
     id: "hdk.path_entry".into(),
-    crdt_type: CrdtType,
     required_validations: RequiredValidations::default(),
     visibility: EntryVisibility::Public,
     required_validation_type: RequiredValidationType::default(),
@@ -306,24 +290,15 @@ impl Path {
             if let Some(parent) = self.parent() {
                 parent.ensure()?;
                 create_link(
-                    parent.path_entry_hash()?,
-                    self.path_entry_hash()?,
-                    LinkTag::new(
-                        [DHT_PREFIX]
-                            .iter()
-                            .chain(
-                                match self.leaf() {
-                                    None => <Vec<u8>>::with_capacity(0),
-                                    Some(component) => {
-                                        UnsafeBytes::from(SerializedBytes::try_from(component)?)
-                                            .into()
-                                    }
-                                }
-                                .iter(),
-                            )
-                            .cloned()
-                            .collect::<Vec<u8>>(),
-                    ),
+                    parent.path_entry_hash()?.into(),
+                    self.path_entry_hash()?.into(),
+                    HdkLinkType::Paths,
+                    LinkTag::new(match self.leaf() {
+                        None => <Vec<u8>>::with_capacity(0),
+                        Some(component) => {
+                            UnsafeBytes::from(SerializedBytes::try_from(component)?).into()
+                        }
+                    }),
                 )?;
             }
         }
@@ -344,10 +319,7 @@ impl Path {
     /// Only returns links between paths, not to other entries that might have their own links.
     pub fn children(&self) -> ExternResult<Vec<holochain_zome_types::link::Link>> {
         Self::ensure(self)?;
-        let mut unwrapped = get_links(
-            self.path_entry_hash()?,
-            Some(holochain_zome_types::link::LinkTag::new([DHT_PREFIX])),
-        )?;
+        let mut unwrapped = get_links(self.path_entry_hash()?.into(), None)?;
         // Only need one of each hash to build the tree.
         unwrapped.sort_unstable_by(|a, b| a.tag.cmp(&b.tag));
         unwrapped.dedup_by(|a, b| a.tag.eq(&b.tag));
@@ -366,7 +338,7 @@ impl Path {
         let components: ExternResult<Vec<Option<Component>>> = children
             .into_iter()
             .map(|link| {
-                let component_bytes = &link.tag.0[1..];
+                let component_bytes = &link.tag.0[..];
                 if component_bytes.is_empty() {
                     Ok(None)
                 } else {
@@ -393,8 +365,8 @@ impl Path {
     pub fn children_details(&self) -> ExternResult<holochain_zome_types::link::LinkDetails> {
         Self::ensure(self)?;
         get_link_details(
-            self.path_entry_hash()?,
-            Some(holochain_zome_types::link::LinkTag::new([DHT_PREFIX])),
+            self.path_entry_hash()?.into(),
+            Some(holochain_zome_types::link::LinkTag::new([])),
         )
     }
 

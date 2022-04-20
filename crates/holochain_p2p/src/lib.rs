@@ -30,7 +30,11 @@ pub trait HolochainP2pDnaT {
     fn dna_hash(&self) -> DnaHash;
 
     /// The p2p module must be informed at runtime which dna/agent pairs it should be tracking.
-    async fn join(&self, agent: AgentPubKey) -> actor::HolochainP2pResult<()>;
+    async fn join(
+        &self,
+        agent: AgentPubKey,
+        initial_arc: Option<crate::dht_arc::DhtArc>,
+    ) -> actor::HolochainP2pResult<()>;
 
     /// If a cell is disabled, we'll need to \"leave\" the network module as well.
     async fn leave(&self, agent: AgentPubKey) -> actor::HolochainP2pResult<()>;
@@ -67,7 +71,7 @@ pub trait HolochainP2pDnaT {
         request_validation_receipt: bool,
         countersigning_session: bool,
         dht_hash: holo_hash::AnyDhtHash,
-        ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
+        ops: Vec<holochain_types::dht_op::DhtOp>,
         timeout_ms: Option<u64>,
     ) -> actor::HolochainP2pResult<()>;
 
@@ -148,8 +152,14 @@ impl HolochainP2pDnaT for HolochainP2pDna {
     }
 
     /// The p2p module must be informed at runtime which dna/agent pairs it should be tracking.
-    async fn join(&self, agent: AgentPubKey) -> actor::HolochainP2pResult<()> {
-        self.sender.join((*self.dna_hash).clone(), agent).await
+    async fn join(
+        &self,
+        agent: AgentPubKey,
+        initial_arc: Option<crate::dht_arc::DhtArc>,
+    ) -> actor::HolochainP2pResult<()> {
+        self.sender
+            .join((*self.dna_hash).clone(), agent, initial_arc)
+            .await
     }
 
     /// If a cell is disabled, we'll need to \"leave\" the network module as well.
@@ -212,7 +222,7 @@ impl HolochainP2pDnaT for HolochainP2pDna {
         request_validation_receipt: bool,
         countersigning_session: bool,
         dht_hash: holo_hash::AnyDhtHash,
-        ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
+        ops: Vec<holochain_types::dht_op::DhtOp>,
         timeout_ms: Option<u64>,
     ) -> actor::HolochainP2pResult<()> {
         self.sender
@@ -242,7 +252,7 @@ impl HolochainP2pDnaT for HolochainP2pDna {
             .await
     }
 
-    /// Get an entry from the DHT.
+    /// Get [`DhtOp::StoreElement`] or [`DhtOp::StoreEntry`] from the DHT.
     async fn get(
         &self,
         dht_hash: holo_hash::AnyDhtHash,

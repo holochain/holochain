@@ -95,7 +95,15 @@ impl Query for DeterministicGetAgentActivityQuery {
 
     fn fold(&self, mut state: Self::State, item: Self::Item) -> StateQueryResult<Self::State> {
         let (shh, status) = item.into();
-        let (header, hash) = shh.into_inner();
+        let SignedHeaderHashed {
+            hashed:
+                HeaderHashed {
+                    content: header,
+                    hash,
+                },
+            signature,
+        } = shh;
+        let sh = SignedHeader(header, signature);
         // By tracking the prev_header of the last header we added to the chain,
         // we can filter out branches. If we performed branch detection in this
         // query, it would not be deterministic.
@@ -106,8 +114,8 @@ impl Query for DeterministicGetAgentActivityQuery {
         // discontinuous, and we will have to collect into a sorted list before
         // doing this fold.
         if Some(hash) == state.prev_header {
-            state.prev_header = header.header().prev_header().cloned();
-            state.chain.push((header, status).into());
+            state.prev_header = sh.header().prev_header().cloned();
+            state.chain.push((sh, status).into());
         }
         Ok(state)
     }
@@ -137,8 +145,8 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn agent_activity_query() {
         observability::test_run().ok();
-        let test_env = test_dht_env();
-        let env = test_env.env();
+        let test_db = test_dht_db();
+        let db = test_db.to_db();
         let entry_type_1 = fixt!(EntryType);
         let agents = [fixt!(AgentPubKey), fixt!(AgentPubKey), fixt!(AgentPubKey)];
         let mut chains = vec![];
@@ -163,7 +171,7 @@ mod tests {
                 chain.push(HeaderHash::with_data_sync(&header));
                 let op = DhtOp::RegisterAgentActivity(fixt!(Signature), header.into());
                 let op = DhtOpHashed::from_content_sync(op);
-                fill_db(&env, op);
+                fill_db(&db, op);
             }
             chains.push(chain);
         }
@@ -184,7 +192,7 @@ mod tests {
         let options = GetActivityOptions::default();
 
         let results_full = crate::authority::handle_get_agent_activity_deterministic(
-            env.clone().into(),
+            db.clone().into(),
             agents[2].clone(),
             filter_full,
             options.clone(),
@@ -193,7 +201,7 @@ mod tests {
         .unwrap();
 
         let results_partial = crate::authority::handle_get_agent_activity_deterministic(
-            env.clone().into(),
+            db.clone().into(),
             agents[2].clone(),
             filter_partial,
             options,

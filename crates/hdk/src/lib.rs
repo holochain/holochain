@@ -3,16 +3,16 @@
 //! Functions of a Holochain application (hApp) can be organized into reusable components. In Holochain terminology these components are called "zomes".
 //! One or multiple zomes are compiled into a WebAssembly (WASM) binary, referred to as a DNA. All of the DNAs of an application are bundled to a hApp.
 //!
-//! hApps can be installed on a device that's running a so-called conductor, Holochain's runtime. Clients can then call each zome's functions via Remote Procedure Calls (RPC).
-//! Holochain employs websocket ports for these RPCs, served by the conductor. Calls are made either from a client on localhost or from other nodes on the network.
-//! The zome function to be executed must be specified in each call. Every zome function in turn defines the response it returns to the client as part of a zome's code.
-//! [More info on Holochain's architecture](https://developer.holochain.org/concepts/2_application_architecture/)
-//!
 //! hApps are required to produce and validate data deterministically, which is stored in a content-addressable manner retrieved by hash value.
 //! Since hApps are run as a binary on the hosting system, they must run in a sandboxed environment to prevent execution of insecure commands.
 //! Instead of writing and maintaining a custom format and specification for these artifacts as well as a runtime environment to execute them,
 //! Holochain makes use of WASM as the format of its applications. WASM binaries meet the aforementioned requirements as per the
 //! [WebAssembly specification](https://webassembly.github.io/spec/core/).
+//!
+//! hApps can be installed on a device that's running a so-called conductor, Holochain's runtime. Clients can then call each zome's functions via Remote Procedure Calls (RPC).
+//! Holochain employs websocket ports for these RPCs, served by the conductor. Calls are made either from a client on localhost or from other nodes on the network.
+//! The zome function to be executed must be specified in each call. Every zome function in turn defines the response it returns to the client as part of a zome's code.
+//! [More info on Holochain's architecture](https://developer.holochain.org/concepts/2_application_architecture/)
 //!
 //! Low-level communication between the conductor and WASM binaries, like typing and serialization of data, is encapsulated by the HDK.
 //! Using the HDK, hApp developers can focus on their application's logic. [Learn more about WASM in Holochain.](https://github.com/holochain/holochain/blob/develop/crates/hdk/ON-WASM.md)
@@ -291,6 +291,12 @@ pub mod countersigning;
 /// For example, an agent could choose to 'block' another agent and ignore all their updates.
 pub mod entry;
 
+pub use holochain_deterministic_integrity::entry_def_index;
+pub use holochain_deterministic_integrity::entry_defs;
+pub use holochain_deterministic_integrity::entry_type;
+
+pub mod hash;
+
 /// Distributed Hash Tables (DHTs) are fundamentally all key/value stores (content addressable).
 ///
 /// This has lots of benefits but can make discoverability difficult.
@@ -411,7 +417,7 @@ pub use paste;
 /// Agent activity for any other agent on the network can be fetched.
 /// The agent activity is _only the headers_ of the remote agent's source chain.
 /// Agent activity allows efficient building of the history of an agent.
-/// Agent activity is retrieved from a dedicated neighbourhood centered around the agent.
+/// Agent activity is retrieved from a dedicated neighbourhood near the agent.
 /// The agent's neighbourhood also maintains a passive security net that guards against attempted chain forks and/or rollbacks.
 /// The same query DSL for local chain queries is used to filter remote agent activity headers.
 pub mod chain;

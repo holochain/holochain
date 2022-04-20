@@ -7,22 +7,26 @@ use crate::core::workflow::app_validation_workflow::validation_package::get_as_a
 use crate::core::workflow::app_validation_workflow::validation_package::get_as_author_sub_chain;
 use holochain_cascade::Cascade;
 use holochain_p2p::HolochainP2pDna;
+use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::dna::DnaFile;
 use holochain_zome_types::HeaderHashed;
 
 #[instrument(skip(
     header_hashed,
-    authored_env,
-    dht_env,
+    authored_db,
+    dht_db,
+    dht_db_cache,
     cache,
     ribosome,
     conductor_handle,
     network
 ))]
+#[allow(clippy::too_many_arguments)]
 pub(super) async fn get_as_author(
     header_hashed: HeaderHashed,
-    authored_env: DbRead<DbKindAuthored>,
-    dht_env: DbRead<DbKindDht>,
+    authored_db: DbRead<DbKindAuthored>,
+    dht_db: DbRead<DbKindDht>,
+    dht_db_cache: DhtDbQueryCache,
     cache: DbWrite<DbKindCache>,
     ribosome: &impl RibosomeT,
     conductor_handle: &dyn ConductorHandleT,
@@ -34,8 +38,9 @@ pub(super) async fn get_as_author(
     // TODO: evaluate if we even need to use a source chain here
     // vs directly querying the database.
     let mut source_chain = SourceChainRead::new(
-        authored_env.clone(),
-        dht_env.clone(),
+        authored_db.clone(),
+        dht_db.clone(),
+        dht_db_cache.clone(),
         conductor_handle.keystore().clone(),
         header.author().clone(),
     )
@@ -81,18 +86,20 @@ pub(super) async fn get_as_author(
             Ok(Some(get_as_author_full(header_seq, &source_chain).await?).into())
         }
         RequiredValidationType::Custom => {
-            let cascade = Cascade::empty().with_authored(authored_env.clone());
+            let cascade = Cascade::empty().with_authored(authored_db.clone());
 
             if let Some(elements) = cascade.get_validation_package_local(header_hashed.as_hash())? {
                 return Ok(Some(ValidationPackage::new(elements)).into());
             }
 
             let workspace_lock = HostFnWorkspace::new(
-                authored_env.clone(),
-                dht_env,
+                authored_db.clone(),
+                dht_db,
+                dht_db_cache,
                 cache,
                 conductor_handle.keystore().clone(),
                 Some(header.author().clone()),
+                Arc::new(ribosome.dna_def().as_content().clone()),
             )
             .await?;
             let result =

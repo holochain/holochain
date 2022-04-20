@@ -11,7 +11,6 @@ use crate::*;
 use futures::future::FutureExt;
 use futures::stream::StreamExt;
 use kitsune_p2p_proxy::tx2::*;
-use kitsune_p2p_proxy::ProxyUrl;
 use kitsune_p2p_transport_quic::tx2::*;
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use kitsune_p2p_types::async_lazy::AsyncLazy;
@@ -77,11 +76,11 @@ ghost_actor::ghost_chan! {
 }
 
 pub(crate) struct KitsuneP2pActor {
-    this_addr: url2::Url2,
     channel_factory: ghost_actor::actor_builder::GhostActorChannelFactory<Self>,
     internal_sender: ghost_actor::GhostSender<Internal>,
     evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
     ep_hnd: Tx2EpHnd<wire::Wire>,
+    host: HostApi,
     #[allow(clippy::type_complexity)]
     spaces: HashMap<
         Arc<KitsuneSpace>,
@@ -98,10 +97,11 @@ pub(crate) struct KitsuneP2pActor {
 impl KitsuneP2pActor {
     pub async fn new(
         config: KitsuneP2pConfig,
-        tls_config: kitsune_p2p_proxy::TlsConfig,
+        tls_config: kitsune_p2p_types::tls::TlsConfig,
         channel_factory: ghost_actor::actor_builder::GhostActorChannelFactory<Self>,
         internal_sender: ghost_actor::GhostSender<Internal>,
         evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
+        host: HostApi,
     ) -> KitsuneP2pResult<Self> {
         crate::types::metrics::init();
 
@@ -149,9 +149,40 @@ impl KitsuneP2pActor {
         let f = if !is_mock {
             let mut conf = kitsune_p2p_proxy::tx2::ProxyConfig::default();
             conf.tuning_params = Some(config.tuning_params.clone());
-            if let Some(use_proxy) = &tx2_conf.use_proxy {
-                let proxy_url = ProxyUrl::from(use_proxy.as_str());
-                conf.client_of_remote_proxy = Some(proxy_url);
+            match tx2_conf.use_proxy {
+                KitsuneP2pTx2ProxyConfig::NoProxy => (),
+                KitsuneP2pTx2ProxyConfig::Specific(proxy_url) => {
+                    conf.client_of_remote_proxy = ProxyRemoteType::Specific(proxy_url);
+                }
+                KitsuneP2pTx2ProxyConfig::Bootstrap {
+                    bootstrap_url,
+                    fallback_proxy_url,
+                } => {
+                    conf.client_of_remote_proxy = ProxyRemoteType::Bootstrap {
+                        bootstrap_url,
+                        fallback_proxy_url,
+                    };
+                    conf.proxy_from_bootstrap_cb = Arc::new(|bootstrap_url| {
+                        Box::pin(async move {
+                            match bootstrap::proxy_list(bootstrap_url.into()).await {
+                                Ok(mut proxy_list) => {
+                                    if proxy_list.is_empty() {
+                                        return None;
+                                    }
+                                    use rand::Rng;
+                                    Some(
+                                        proxy_list
+                                            .remove(
+                                                rand::thread_rng().gen_range(0, proxy_list.len()),
+                                            )
+                                            .into(),
+                                    )
+                                }
+                                _ => None,
+                            }
+                        })
+                    });
+                }
             }
             let f = tx2_proxy(f, conf)?;
             f
@@ -188,17 +219,15 @@ impl KitsuneP2pActor {
         // capture endpoint handle
         let ep_hnd = ep.handle().clone();
 
-        let this_addr = ep_hnd.local_addr().map_err(KitsuneP2pError::other)?;
-
-        tracing::info!("this_addr: {}", this_addr);
-
         let i_s = internal_sender.clone();
         tokio::task::spawn({
             let evt_sender = evt_sender.clone();
+            let host = host.clone();
             let tuning_params = config.tuning_params.clone();
             async move {
                 ep.for_each_concurrent(tuning_params.concurrent_limit_per_thread, move |event| {
                     let evt_sender = evt_sender.clone();
+                    let host = host.clone();
                     let tuning_params = tuning_params.clone();
                     let i_s = i_s.clone();
                     async move {
@@ -256,7 +285,7 @@ impl KitsuneP2pActor {
                                         resp!(respond, resp);
                                     }
                                     wire::Wire::PeerGet(wire::PeerGet { space, agent }) => {
-                                        if let Ok(Some(agent_info_signed)) = evt_sender
+                                        if let Ok(Some(agent_info_signed)) = host
                                             .get_agent_info_signed(GetAgentInfoSignedEvt {
                                                 space,
                                                 agent,
@@ -421,11 +450,11 @@ impl KitsuneP2pActor {
         ));
 
         Ok(Self {
-            this_addr: this_addr.into(),
             channel_factory,
             internal_sender,
             evt_sender,
             ep_hnd,
+            host,
             spaces: HashMap::new(),
             config: Arc::new(config),
             bandwidth_throttles,
@@ -440,6 +469,9 @@ impl ghost_actor::GhostControlHandler for KitsuneP2pActor {
         use futures::sink::SinkExt;
         use ghost_actor::GhostControlSender;
         async move {
+            // The line below was added when migrating to rust edition 2021, per
+            // https://doc.rust-lang.org/edition-guide/rust-2021/disjoint-capture-in-closures.html#migration
+            let _ = &self;
             // this is a curtesy, ok if fails
             let _ = self.evt_sender.close().await;
             self.ep_hnd.close(500, "").await;
@@ -587,22 +619,11 @@ impl InternalHandler for KitsuneP2pActor {
 impl ghost_actor::GhostHandler<KitsuneP2pEvent> for KitsuneP2pActor {}
 
 impl KitsuneP2pEventHandler for KitsuneP2pActor {
-    fn handle_k_gen_req(&mut self, arg: KGenReq) -> KitsuneP2pEventHandlerResult<KGenRes> {
-        Ok(self.evt_sender.k_gen_req(arg))
-    }
-
     fn handle_put_agent_info_signed(
         &mut self,
         input: crate::event::PutAgentInfoSignedEvt,
     ) -> KitsuneP2pEventHandlerResult<()> {
         Ok(self.evt_sender.put_agent_info_signed(input))
-    }
-
-    fn handle_get_agent_info_signed(
-        &mut self,
-        input: crate::event::GetAgentInfoSignedEvt,
-    ) -> KitsuneP2pEventHandlerResult<Option<crate::types::agent_store::AgentInfoSigned>> {
-        Ok(self.evt_sender.get_agent_info_signed(input))
     }
 
     fn handle_query_agents(
@@ -641,7 +662,7 @@ impl KitsuneP2pEventHandler for KitsuneP2pActor {
     fn handle_gossip(
         &mut self,
         space: Arc<KitsuneSpace>,
-        ops: Vec<(Arc<KitsuneOpHash>, Vec<u8>)>,
+        ops: Vec<KOp>,
     ) -> KitsuneP2pEventHandlerResult<()> {
         Ok(self.evt_sender.gossip(space, ops))
     }
@@ -649,7 +670,7 @@ impl KitsuneP2pEventHandler for KitsuneP2pActor {
     fn handle_fetch_op_data(
         &mut self,
         input: FetchOpDataEvt,
-    ) -> KitsuneP2pEventHandlerResult<Vec<(Arc<KitsuneOpHash>, Vec<u8>)>> {
+    ) -> KitsuneP2pEventHandlerResult<Vec<(Arc<KitsuneOpHash>, KOp)>> {
         Ok(self.evt_sender.fetch_op_data(input))
     }
 
@@ -672,19 +693,20 @@ impl ghost_actor::GhostHandler<KitsuneP2p> for KitsuneP2pActor {}
 
 impl KitsuneP2pHandler for KitsuneP2pActor {
     fn handle_list_transport_bindings(&mut self) -> KitsuneP2pHandlerResult<Vec<url2::Url2>> {
-        let this_addr = vec![self.this_addr.clone()];
-        Ok(async move { Ok(this_addr) }.boxed().into())
+        let this_addr = self.ep_hnd.local_addr();
+        Ok(async move { Ok(vec![this_addr?.into()]) }.boxed().into())
     }
 
     fn handle_join(
         &mut self,
         space: Arc<KitsuneSpace>,
         agent: Arc<KitsuneAgent>,
+        initial_arc: Option<crate::dht_arc::DhtArc>,
     ) -> KitsuneP2pHandlerResult<()> {
         let internal_sender = self.internal_sender.clone();
         let space2 = space.clone();
-        let this_addr = self.this_addr.clone();
         let ep_hnd = self.ep_hnd.clone();
+        let host = self.host.clone();
         let config = Arc::clone(&self.config);
         let bandwidth_throttles = self.bandwidth_throttles.clone();
         let parallel_notify_permit = self.parallel_notify_permit.clone();
@@ -693,8 +715,8 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
             Entry::Vacant(entry) => entry.insert(AsyncLazy::new(async move {
                 let (send, send_inner, evt_recv) = spawn_space(
                     space2,
-                    this_addr,
                     ep_hnd,
+                    host,
                     config,
                     bandwidth_throttles,
                     parallel_notify_permit,
@@ -711,7 +733,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         let space_sender = space_sender.get();
         Ok(async move {
             let (space_sender, _) = space_sender.await;
-            space_sender.join(space, agent).await
+            space_sender.join(space, agent, initial_arc).await
         }
         .boxed()
         .into())
@@ -887,20 +909,11 @@ mockall::mock! {
     pub KitsuneP2pEventHandler {}
 
     impl KitsuneP2pEventHandler for KitsuneP2pEventHandler {
-        fn handle_k_gen_req(
-            &mut self,
-            arg: KGenReq,
-        ) -> KitsuneP2pEventHandlerResult<KGenRes>;
 
         fn handle_put_agent_info_signed(
             &mut self,
             input: crate::event::PutAgentInfoSignedEvt,
         ) -> KitsuneP2pEventHandlerResult<()>;
-
-        fn handle_get_agent_info_signed(
-            &mut self,
-            input: crate::event::GetAgentInfoSignedEvt,
-        ) -> KitsuneP2pEventHandlerResult<Option<crate::types::agent_store::AgentInfoSigned>>;
 
         fn handle_query_agents(
             &mut self,
@@ -930,7 +943,7 @@ mockall::mock! {
         fn handle_gossip(
             &mut self,
             space: Arc<KitsuneSpace>,
-            ops: Vec<(Arc<KitsuneOpHash>, Vec<u8>)>,
+            ops: Vec<KOp>,
         ) -> KitsuneP2pEventHandlerResult<()>;
 
         fn handle_query_op_hashes(
@@ -941,7 +954,7 @@ mockall::mock! {
         fn handle_fetch_op_data(
             &mut self,
             input: FetchOpDataEvt,
-        ) -> KitsuneP2pEventHandlerResult<Vec<(Arc<KitsuneOpHash>, Vec<u8>)>> ;
+        ) -> KitsuneP2pEventHandlerResult<Vec<(Arc<KitsuneOpHash>, KOp)>> ;
 
         fn handle_sign_network_data(
             &mut self,

@@ -1,7 +1,6 @@
-#[cfg(test)]
-use contrafact::Fact;
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::{config::KitsuneP2pTuningParams, dht_arc::loc8::Loc8};
+use rand::Rng;
 
 use crate::{
     gossip::sharded_gossip::GossipType, test_util::switchboard::switchboard_state::SwitchboardAgent,
@@ -72,11 +71,11 @@ async fn sharded_3way_recent() {
         sb.add_local_agent(&n2, &a2);
         sb.add_local_agent(&n3, &a3);
 
-        sb.print_ascii_arcs(128, true);
-
         sb.add_ops_now(&n1, true, [10, 20, 30, 40, 50, 60, 70, 80]);
         sb.add_ops_now(&n2, true, [-10, -20, -30, -40, -50, -60, -70, -80]);
         sb.add_ops_now(&n3, true, [90, 120, -120, -90]);
+
+        sb.print_ascii_arcs(64, true);
 
         sb.exchange_all_peer_info();
     });
@@ -85,7 +84,7 @@ async fn sharded_3way_recent() {
     tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
 
     sb.share(|sb| {
-        sb.print_ascii_arcs(128, true);
+        sb.print_ascii_arcs(64, true);
         assert_eq!(
             (
                 sb.get_ops_loc8(&n1),
@@ -108,10 +107,10 @@ async fn transitive_peer_gossip() {
 
     let [n1, n2, n3, n4] = sb.add_nodes(tuning_params()).await;
 
-    let a1 = SwitchboardAgent::from_center_and_half_len(0, 68);
-    let a2 = SwitchboardAgent::from_center_and_half_len(64, 68);
-    let a3 = SwitchboardAgent::from_center_and_half_len(128, 68);
-    let a4 = SwitchboardAgent::from_center_and_half_len(192, 68);
+    let a1 = SwitchboardAgent::from_start_and_half_len(0, 68);
+    let a2 = SwitchboardAgent::from_start_and_half_len(64, 68);
+    let a3 = SwitchboardAgent::from_start_and_half_len(128, 68);
+    let a4 = SwitchboardAgent::from_start_and_half_len(192, 68);
 
     sb.share(|sb| {
         sb.add_local_agent(&n1, &a1);
@@ -176,10 +175,10 @@ async fn sharded_4way_recent() {
 
     let [n1, n2, n3, n4] = sb.add_nodes(tuning_params()).await;
 
-    let a1 = SwitchboardAgent::from_center_and_half_len(0, 68);
-    let a2 = SwitchboardAgent::from_center_and_half_len(64, 68);
-    let a3 = SwitchboardAgent::from_center_and_half_len(128, 68);
-    let a4 = SwitchboardAgent::from_center_and_half_len(192, 68);
+    let a1 = SwitchboardAgent::from_start_and_half_len(0, 68);
+    let a2 = SwitchboardAgent::from_start_and_half_len(64, 68);
+    let a3 = SwitchboardAgent::from_start_and_half_len(128, 68);
+    let a4 = SwitchboardAgent::from_start_and_half_len(192, 68);
 
     let ops: Vec<_> = (0..256).step_by(8).map(|u| Loc8::from(u)).collect();
 
@@ -229,10 +228,10 @@ async fn sharded_4way_recent() {
                 sb.get_ops_loc8(&n4),
             ),
             (
-                Loc8::set(ops[24..32].to_vec().into_iter().chain(ops[0..=8].to_vec())),
                 Loc8::set(ops[0..=16].to_vec()),
                 Loc8::set(ops[8..=24].to_vec()),
                 Loc8::set(ops[16..32].to_vec().into_iter().chain([ops[0]])),
+                Loc8::set(ops[24..32].to_vec().into_iter().chain(ops[0..=8].to_vec())),
             )
         );
     });
@@ -240,18 +239,17 @@ async fn sharded_4way_recent() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn sharded_4way_historical() {
-    observability::test_run().ok();
-    let mut u = arbitrary::Unstructured::new(&crate::NOISE);
-
+    // observability::test_run().ok();
     let sb = Switchboard::new(GossipType::Historical);
 
     let [n1, n2, n3, n4] = sb.add_nodes(tuning_params()).await;
 
-    let a1 = SwitchboardAgent::from_center_and_half_len(0, 68);
-    let a2 = SwitchboardAgent::from_center_and_half_len(64, 68);
-    let a3 = SwitchboardAgent::from_center_and_half_len(128, 68);
-    let a4 = SwitchboardAgent::from_center_and_half_len(192, 68);
+    let a1 = SwitchboardAgent::from_start_and_half_len(0, 68);
+    let a2 = SwitchboardAgent::from_start_and_half_len(64, 68);
+    let a3 = SwitchboardAgent::from_start_and_half_len(128, 68);
+    let a4 = SwitchboardAgent::from_start_and_half_len(192, 68);
 
+    let now = Timestamp::now().as_micros();
     let ops_only: Vec<_> = (0..256).step_by(8).map(|u| Loc8::from(u)).collect();
     let ops_timed: Vec<_> = ops_only
         .clone()
@@ -259,10 +257,7 @@ async fn sharded_4way_historical() {
         .map(|o| {
             (
                 o,
-                contrafact::brute("timestamp is in the past", |t: &Timestamp| {
-                    *t < Timestamp::now()
-                })
-                .build(&mut u),
+                Timestamp::from_micros(rand::thread_rng().gen_range(0, now)),
             )
         })
         .collect();
@@ -310,15 +305,15 @@ async fn sharded_4way_historical() {
                 sb.get_ops_loc8(&n4),
             ),
             (
+                Loc8::set(ops_only[0..=16].to_vec()),
+                Loc8::set(ops_only[8..=24].to_vec()),
+                Loc8::set(ops_only[16..32].to_vec().into_iter().chain([ops_only[0]])),
                 Loc8::set(
                     ops_only[24..32]
                         .to_vec()
                         .into_iter()
                         .chain(ops_only[0..=8].to_vec())
                 ),
-                Loc8::set(ops_only[0..=16].to_vec()),
-                Loc8::set(ops_only[8..=24].to_vec()),
-                Loc8::set(ops_only[16..32].to_vec().into_iter().chain([ops_only[0]])),
             )
         );
     });

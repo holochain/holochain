@@ -75,7 +75,7 @@ impl Query for ChainHeadQuery {
         Ok(state.map(|sh| {
             let seq = sh.header().header_seq();
             let timestamp = sh.header().timestamp();
-            let hash = sh.into_inner().1;
+            let hash = sh.hashed.hash;
             (hash, seq, timestamp)
         }))
     }
@@ -143,13 +143,13 @@ mod tests {
             let hash = shh.header_address();
             let op = DhtOpLight::StoreElement(hash.clone(), None, hash.clone().into());
             let op_order = OpOrder::new(op.get_type(), shh.header().timestamp());
-            insert_header(&mut txn, shh.clone()).unwrap();
+            insert_header(&mut txn, shh).unwrap();
             insert_op_lite(
                 &mut txn,
-                op,
-                fixt!(DhtOpHash),
-                op_order,
-                shh.header().timestamp(),
+                &op,
+                &fixt!(DhtOpHash),
+                &op_order,
+                &shh.header().timestamp(),
             )
             .unwrap();
         }

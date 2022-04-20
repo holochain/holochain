@@ -5,14 +5,13 @@ use holo_hash::{AgentPubKey, DhtOpHash, HeaderHash};
 use holo_hash::{AnyDhtHash, EntryHash};
 use holochain_keystore::AgentPubKeyExt;
 use holochain_p2p::{HolochainP2pDna, HolochainP2pDnaT};
-use holochain_sqlite::db::{DbKindAuthored, DbKindDht};
 use holochain_state::integrate::authored_ops_to_dht_db;
 use holochain_state::mutations;
 use holochain_state::prelude::{
     current_countersigning_session, SourceChainResult, StateMutationResult, Store,
 };
+use holochain_types::dht_op::DhtOp;
 use holochain_types::signal::{Signal, SystemSignal};
-use holochain_types::{dht_op::DhtOp, env::DbWrite};
 use holochain_zome_types::Timestamp;
 use holochain_zome_types::{Entry, SignedHeader, ZomeCallResponse};
 use kitsune_p2p_types::tx2::tx2_utils::Share;
@@ -136,14 +135,16 @@ pub(crate) async fn countersigning_workflow(
 
 /// An incoming countersigning session success.
 pub(crate) async fn countersigning_success(
-    authored_env: DbWrite<DbKindAuthored>,
-    dht_env: DbWrite<DbKindDht>,
+    space: Space,
     network: &HolochainP2pDna,
     author: AgentPubKey,
     signed_headers: Vec<SignedHeader>,
     trigger: QueueTriggers,
     mut signal: SignalBroadcaster,
 ) -> WorkflowResult<()> {
+    let authored_db = space.authored_db;
+    let dht_db = space.dht_db;
+    let dht_db_cache = space.dht_query_cache;
     let QueueTriggers {
         publish_dht_ops: publish_trigger,
         integrate_dht_ops: integration_trigger,
@@ -197,7 +198,7 @@ pub(crate) async fn countersigning_success(
         }
     };
     let this_cell_headers_op_basis_hashes: Vec<(DhtOpHash, AnyDhtHash)> =
-        authored_env.async_reader(reader_closure).await?;
+        authored_db.async_reader(reader_closure).await?;
 
     // If there is no active session then we can short circuit.
     if this_cell_headers_op_basis_hashes.is_empty() {
@@ -217,7 +218,7 @@ pub(crate) async fn countersigning_success(
         .map(|SignedHeader(h, _)| HeaderHash::with_data_sync(h))
         .collect();
 
-    let result = authored_env
+    let result = authored_db
         .async_commit({
             let author = author.clone();
             let entry_hash = entry_hash.clone();
@@ -253,8 +254,9 @@ pub(crate) async fn countersigning_success(
         authored_ops_to_dht_db(
             network,
             this_cell_headers_op_basis_hashes,
-            &(authored_env.into()),
-            &dht_env,
+            &(authored_db.into()),
+            &dht_db,
+            &dht_db_cache,
         )
         .await?;
         integration_trigger.trigger();
@@ -265,7 +267,7 @@ pub(crate) async fn countersigning_success(
             }
             let op = DhtOp::RegisterAgentActivity(signature, header);
             let basis = op.dht_basis();
-            let ops = vec![(DhtOpHash::with_data_sync(&op), op)];
+            let ops = vec![op];
             if let Err(e) = network.publish(false, false, basis, ops, None).await {
                 tracing::error!(
                     "Failed to publish to other countersigners agent authorities because of: {:?}",
@@ -290,7 +292,7 @@ pub async fn countersigning_publish(
     op: DhtOp,
 ) -> Result<(), ZomeCallResponse> {
     let basis = op.dht_basis();
-    let ops = vec![(DhtOpHash::with_data_sync(&op), op)];
+    let ops = vec![op];
     if let Err(e) = network.publish(false, true, basis, ops, None).await {
         tracing::error!(
             "Failed to publish to entry authorities for countersigning session because of: {:?}",

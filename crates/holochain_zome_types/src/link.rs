@@ -3,54 +3,7 @@ use crate::ChainTopOrdering;
 use holo_hash::HeaderHash;
 use holochain_serialized_bytes::prelude::*;
 
-/// Opaque tag for the link applied at the app layer, used to differentiate
-/// between different semantics and validation rules for different links
-#[derive(
-    Debug,
-    PartialOrd,
-    Ord,
-    Clone,
-    Hash,
-    serde::Serialize,
-    serde::Deserialize,
-    PartialEq,
-    Eq,
-    SerializedBytes,
-)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-pub struct LinkTag(#[serde(with = "serde_bytes")] pub Vec<u8>);
-
-impl LinkTag {
-    /// New tag from bytes
-    pub fn new<T>(t: T) -> Self
-    where
-        T: Into<Vec<u8>>,
-    {
-        Self(t.into())
-    }
-
-    pub fn into_inner(self) -> Vec<u8> {
-        self.0
-    }
-}
-
-impl From<Vec<u8>> for LinkTag {
-    fn from(b: Vec<u8>) -> Self {
-        Self(b)
-    }
-}
-
-impl From<()> for LinkTag {
-    fn from(_: ()) -> Self {
-        Self(Vec::new())
-    }
-}
-
-impl AsRef<Vec<u8>> for LinkTag {
-    fn as_ref(&self) -> &Vec<u8> {
-        &self.0
-    }
-}
+pub use holochain_integrity_types::link::*;
 
 #[derive(
     Debug,
@@ -66,7 +19,7 @@ impl AsRef<Vec<u8>> for LinkTag {
 )]
 pub struct Link {
     /// The [Entry] being linked to
-    pub target: holo_hash::EntryHash,
+    pub target: holo_hash::AnyLinkableHash,
     /// When the link was added
     pub timestamp: crate::Timestamp,
     /// A tag used to find this link
@@ -78,22 +31,25 @@ pub struct Link {
 /// Zome IO inner type for link creation.
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub struct CreateLinkInput {
-    pub base_address: holo_hash::EntryHash,
-    pub target_address: holo_hash::EntryHash,
+    pub base_address: holo_hash::AnyLinkableHash,
+    pub target_address: holo_hash::AnyLinkableHash,
+    pub link_type: LinkType,
     pub tag: LinkTag,
     pub chain_top_ordering: ChainTopOrdering,
 }
 
 impl CreateLinkInput {
     pub fn new(
-        base_address: holo_hash::EntryHash,
-        target_address: holo_hash::EntryHash,
+        base_address: holo_hash::AnyLinkableHash,
+        target_address: holo_hash::AnyLinkableHash,
+        link_type: LinkType,
         tag: LinkTag,
         chain_top_ordering: ChainTopOrdering,
     ) -> Self {
         Self {
             base_address,
             target_address,
+            link_type,
             tag,
             chain_top_ordering,
         }
@@ -119,13 +75,13 @@ impl DeleteLinkInput {
 
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub struct GetLinksInput {
-    pub base_address: holo_hash::EntryHash,
+    pub base_address: holo_hash::AnyLinkableHash,
     pub tag_prefix: Option<crate::link::LinkTag>,
 }
 
 impl GetLinksInput {
     pub fn new(
-        base_address: holo_hash::EntryHash,
+        base_address: holo_hash::AnyLinkableHash,
         tag_prefix: Option<crate::link::LinkTag>,
     ) -> Self {
         Self {
@@ -156,12 +112,5 @@ impl From<LinkDetails> for CreateLinkWithDeleteLinks {
 impl LinkDetails {
     pub fn into_inner(self) -> CreateLinkWithDeleteLinks {
         self.into()
-    }
-}
-
-#[cfg(feature = "full")]
-impl rusqlite::ToSql for LinkTag {
-    fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput> {
-        Ok(rusqlite::types::ToSqlOutput::Borrowed((&self.0[..]).into()))
     }
 }

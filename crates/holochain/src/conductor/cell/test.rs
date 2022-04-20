@@ -24,15 +24,19 @@ async fn test_cell_handle_publish() {
     let agent = cell_id.agent_pubkey().clone();
 
     let spaces = TestSpaces::new([dna.clone()]);
-    let env = spaces.test_spaces[&dna].space.authored_env.clone();
-    let dht_env = spaces.test_spaces[&dna].space.dht_env.clone();
+    let db = spaces.test_spaces[&dna].space.authored_db.clone();
+    let dht_db = spaces.test_spaces[&dna].space.dht_db.clone();
+    let dht_db_cache = spaces.test_spaces[&dna].space.dht_query_cache.clone();
 
     let test_network = test_network(Some(dna.clone()), Some(agent.clone())).await;
     let holochain_p2p_cell = test_network.dna_network();
 
     let mut mock_handle = crate::conductor::handle::MockConductorHandleT::new();
     mock_handle
-        .expect_get_dna()
+        .expect_get_dna_def()
+        .return_const(Some(dna_file.dna_def().clone()));
+    mock_handle
+        .expect_get_dna_file()
         .return_const(Some(dna_file.clone()));
     mock_handle
         .expect_get_queue_consumer_workflows()
@@ -44,12 +48,15 @@ async fn test_cell_handle_publish() {
     mock_ribosome
         .expect_run_genesis_self_check()
         .returning(|_, _| Ok(GenesisSelfCheckResult::Valid));
+    let dna_def = DnaDefHashed::from_content_sync(dna_file.dna_def().clone());
+    mock_ribosome.expect_dna_def().return_const(dna_def);
 
     super::Cell::genesis(
         cell_id.clone(),
         mock_handle.clone(),
-        env.clone(),
-        dht_env.clone(),
+        db.clone(),
+        dht_db.clone(),
+        dht_db_cache.clone(),
         mock_ribosome,
         None,
     )
@@ -76,17 +83,17 @@ async fn test_cell_handle_publish() {
         hash: dna.clone(),
     });
     let hh = HeaderHashed::from_content_sync(header.clone());
-    let shh = SignedHeaderHashed::new(&keystore, hh).await.unwrap();
+    let shh = SignedHeaderHashed::sign(&keystore, hh).await.unwrap();
     let op = DhtOp::StoreElement(shh.signature().clone(), header.clone(), None);
     let op_hash = DhtOpHashed::from_content_sync(op.clone()).into_hash();
 
     spaces
         .spaces
-        .handle_publish(&dna, true, false, vec![(op_hash.clone(), op.clone())])
+        .handle_publish(&dna, true, false, vec![op.clone()])
         .await
         .unwrap();
 
-    op_exists(&dht_env, op_hash).await.unwrap();
+    op_exists(&dht_db, op_hash).await.unwrap();
 
     stop_tx.send(()).unwrap();
     shutdown.await.unwrap().unwrap();

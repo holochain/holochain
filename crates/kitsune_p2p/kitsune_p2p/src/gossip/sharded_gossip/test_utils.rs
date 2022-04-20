@@ -6,9 +6,9 @@ use kitsune_p2p_types::{
     tx2::tx2_utils::PoolBuf,
 };
 
-use crate::gossip::simple_bloom::{decode_bloom_filter, encode_bloom_filter, MetaOpKey};
+use crate::gossip::{decode_bloom_filter, encode_bloom_filter, MetaOpKey};
 
-use super::EncodedTimedBloomFilter;
+use super::*;
 
 /// Create an agent bloom for testing.
 pub fn create_agent_bloom<'a>(
@@ -26,7 +26,7 @@ pub fn create_agent_bloom<'a>(
     for info in agents {
         let signed_at_ms = info.signed_at_ms;
         // The key is the agent hash + the signed at.
-        let key = Arc::new(MetaOpKey::Agent(info.0.agent.clone(), signed_at_ms));
+        let key = MetaOpKey::Agent(info.0.agent.clone(), signed_at_ms);
         bloom.set(&key);
     }
     if empty {
@@ -42,7 +42,7 @@ pub fn create_ops_bloom(ops: Vec<Arc<KitsuneOpHash>>) -> PoolBuf {
     let bloom = ops.into_iter().fold(
         bloomfilter::Bloom::new_for_fp_rate(len, 0.01),
         |mut bloom, op| {
-            let key = Arc::new(MetaOpKey::Op(op));
+            let key = MetaOpKey::Op(op);
             bloom.set(&key);
             bloom
         },
@@ -69,7 +69,7 @@ pub fn check_ops_boom<'a>(
             let filter = decode_bloom_filter(&filter);
             ops.filter(|(t, _)| time_window.contains(t))
                 .map(|(_, h)| h)
-                .filter(|op| !filter.check(&Arc::new(MetaOpKey::Op((**op).clone()))))
+                .filter(|op| !filter.check(&MetaOpKey::Op((**op).clone())))
                 .collect()
         }
     }
@@ -83,10 +83,7 @@ pub fn check_agent_boom<'a>(
     let filter = decode_bloom_filter(bloom);
     agents
         .filter(|(agent, info)| {
-            !filter.check(&Arc::new(MetaOpKey::Agent(
-                (*agent).clone(),
-                info.signed_at_ms,
-            )))
+            !filter.check(&MetaOpKey::Agent((*agent).clone(), info.signed_at_ms))
         })
         .map(|(a, _)| a)
         .collect()

@@ -127,6 +127,7 @@ impl DnaBundle {
                     properties: SerializedBytes::try_from(
                         manifest.properties.clone().unwrap_or_default(),
                     )?,
+                    origin_time: manifest.origin_time.into(),
                     zomes,
                 };
 
@@ -139,9 +140,10 @@ impl DnaBundle {
                     // Otherwise, record the original hash first, for version comparisons.
                     let original_hash = DnaHash::with_data_sync(&dna_def);
 
+                    let props = manifest.properties.as_ref();
                     let properties: SerializedBytes = properties
                         .as_ref()
-                        .or_else(|| manifest.properties.as_ref())
+                        .or(props)
                         .map(SerializedBytes::try_from)
                         .unwrap_or_else(|| SerializedBytes::try_from(()))?;
                     let uid = uid.or_else(|| manifest.uid.clone()).unwrap_or_default();
@@ -196,6 +198,7 @@ impl DnaBundle {
                     e
                 ))
             })?),
+            origin_time: dna_def.origin_time.into(),
             zomes,
         }
         .into())
@@ -220,6 +223,7 @@ mod tests {
             name: "name".into(),
             uid: Some("original uid".to_string()),
             properties: Some(serde_yaml::Value::Null.into()),
+            origin_time: Timestamp::HOLOCHAIN_EPOCH.into(),
             zomes: vec![
                 ZomeManifest {
                     name: "zome1".into(),

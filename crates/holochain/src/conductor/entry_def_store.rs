@@ -30,7 +30,7 @@ pub(crate) async fn get_entry_def(
     let entry_def = conductor_handle.get_entry_def(&key);
     let dna_hash = dna_def.as_hash();
     let dna_file = conductor_handle
-        .get_dna(dna_hash)
+        .get_dna_file(dna_hash)
         .ok_or_else(|| EntryDefStoreError::DnaFileMissing(dna_hash.clone()))?;
 
     // If it's not found run the ribosome and get the entry defs
@@ -115,7 +115,7 @@ mod tests {
     use super::EntryDefBufferKey;
     use crate::conductor::Conductor;
     use holo_hash::HasHash;
-    use holochain_state::prelude::test_environments;
+    use holochain_state::prelude::test_db_dir;
     use holochain_types::prelude::*;
     use holochain_types::test_utils::fake_dna_zomes;
     use holochain_wasm_test_utils::TestWasm;
@@ -125,8 +125,8 @@ mod tests {
         observability::test_run().ok();
 
         // all the stuff needed to have a WasmBuf
-        let envs = test_environments();
-        let handle = Conductor::builder().test(&envs, &[]).await.unwrap();
+        let db_dir = test_db_dir();
+        let handle = Conductor::builder().test(db_dir.path(), &[]).await.unwrap();
 
         let dna = fake_dna_zomes(
             "",
@@ -137,14 +137,12 @@ mod tests {
         let post_def = EntryDef {
             id: "post".into(),
             visibility: EntryVisibility::Public,
-            crdt_type: CrdtType,
             required_validations: 5.into(),
             required_validation_type: Default::default(),
         };
         let comment_def = EntryDef {
             id: "comment".into(),
             visibility: EntryVisibility::Private,
-            crdt_type: CrdtType,
             required_validations: 5.into(),
             required_validation_type: Default::default(),
         };
@@ -172,7 +170,7 @@ mod tests {
         std::mem::drop(handle);
 
         // Restart conductor and check defs are still here
-        let handle = Conductor::builder().test(&envs.into(), &[]).await.unwrap();
+        let handle = Conductor::builder().test(db_dir.path(), &[]).await.unwrap();
 
         assert_eq!(handle.get_entry_def(&post_def_key), Some(post_def));
         assert_eq!(

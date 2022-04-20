@@ -8,8 +8,8 @@ documentation = "https://docs.rs/fixt_test"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 keywords = [ "holochain", "holo", "test", "fixture" ]
 categories = [ "fixtures" ]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
-fixt = { path = ".." ,version = "0.0.8"}
+fixt = { path = ".." ,version = "0.0.10"}
 paste = "1.0.5"

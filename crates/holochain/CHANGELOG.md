@@ -4,6 +4,56 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.0.135
+
+## 0.0.134
+
+## 0.0.133
+
+## 0.0.132
+
+## 0.0.131
+
+- When joining the network set arc size to previous value if available instead of full to avoid network load [1287](https://github.com/holochain/holochain/pull/1287)
+
+## 0.0.130
+
+- Workflow errors generally now log rather than abort the current app [1279](https://github.com/holochain/holochain/pull/1279/files)
+
+- Fixed broken links in Rust docs [\#1284](https://github.com/holochain/holochain/pull/1284)
+
+## 0.0.129
+
+## 0.0.128
+
+- Proxy server chosen from bootstrap server proxy\_list [1242](https://github.com/holochain/holochain/pull/1242)
+
+<!-- end list -->
+
+``` yaml
+network:
+  transport_pool:
+    - type: proxy
+      proxy_config:
+        type: remote_proxy_client_from_bootstrap
+        bootstrap_url: https://bootstrap.holo.host
+        fallback_proxy_url: ~
+```
+
+## 0.0.127
+
+- **BREAKING CHANGE** App validation callbacks are now run per `Op`. There is now only a single validation callback `fn validate(op: Op) -> ExternResult<ValidateCallbackResult>` that is called for each `Op`. See the documentation for `Op` for more details on what data is passed to the callback. There are example use cases in `crates/test_utils/wasm/wasm_workspace/`. For example in the `validate` test wasm. To update an existing app, you to this version all `validate_*` callbacks including `validate_create_link` must be changed to the new `validate(..)` callback. [\#1212](https://github.com/holochain/holochain/pull/1212).
+
+- `RegisterAgentActivity` ops are now validated by app validation.
+
+- Init functions can now make zome calls. [\#1186](https://github.com/holochain/holochain/pull/1186)
+
+- Adds header hashing to `hash` host fn [1227](https://github.com/holochain/holochain/pull/1227)
+
+- Adds blake2b hashing to `hash` host fn [1228](https://github.com/holochain/holochain/pull/1228)
+
+## 0.0.126
+
 ## 0.0.125
 
 ## 0.0.124

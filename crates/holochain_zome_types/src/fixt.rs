@@ -23,6 +23,7 @@ use holo_hash::*;
 use holochain_serialized_bytes::prelude::SerializedBytes;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
+use std::sync::Arc;
 
 pub use holo_hash::fixt::*;
 
@@ -79,7 +80,7 @@ impl Iterator for AppEntryTypeFixturator<EntryVisibility> {
 }
 
 /// Alias
-pub type MaybeSerializedBytes = Option<SerializedBytes>;
+pub type MaybeMembraneProof = Option<Arc<SerializedBytes>>;
 
 fixturator!(
     HeaderBuilderCommon;
@@ -88,12 +89,16 @@ fixturator!(
 
 fixturator!(
     DeleteLink;
-    constructor fn from_builder(HeaderBuilderCommon, HeaderHash, EntryHash);
+    constructor fn from_builder(HeaderBuilderCommon, HeaderHash, AnyLinkableHash);
 );
 
 fixturator!(
     CreateLink;
-    constructor fn from_builder(HeaderBuilderCommon, EntryHash, EntryHash, u8, LinkTag);
+    constructor fn from_builder(HeaderBuilderCommon, AnyLinkableHash, AnyLinkableHash, u8, LinkType, LinkTag);
+);
+
+fixturator!(
+    LinkType; constructor fn new(u8);
 );
 
 fixturator!(
@@ -101,15 +106,15 @@ fixturator!(
 );
 
 pub struct KnownCreateLink {
-    pub base_address: EntryHash,
-    pub target_address: EntryHash,
+    pub base_address: AnyLinkableHash,
+    pub target_address: AnyLinkableHash,
     pub tag: LinkTag,
     pub zome_id: ZomeId,
 }
 
 pub struct KnownDeleteLink {
     pub link_add_address: holo_hash::HeaderHash,
-    pub base_address: holo_hash::EntryHash,
+    pub base_address: AnyLinkableHash,
 }
 
 impl Iterator for CreateLinkFixturator<KnownCreateLink> {
@@ -468,7 +473,7 @@ fixturator!(
 
 fixturator!(
     EntryDef;
-    constructor fn new(EntryDefId, EntryVisibility, CrdtType, RequiredValidations, RequiredValidationType);
+    constructor fn new(EntryDefId, EntryVisibility, RequiredValidations, RequiredValidationType);
 );
 
 fixturator!(
@@ -501,16 +506,16 @@ fixturator!(
 );
 
 fixturator! {
-    MaybeSerializedBytes;
+    MaybeMembraneProof;
     enum [ Some None ];
-    curve Empty MaybeSerializedBytes::None;
-    curve Unpredictable match MaybeSerializedBytesVariant::random() {
-        MaybeSerializedBytesVariant::None => MaybeSerializedBytes::None,
-        MaybeSerializedBytesVariant::Some => MaybeSerializedBytes::Some(fixt!(SerializedBytes)),
+    curve Empty MaybeMembraneProof::None;
+    curve Unpredictable match MaybeMembraneProofVariant::random() {
+        MaybeMembraneProofVariant::None => MaybeMembraneProof::None,
+        MaybeMembraneProofVariant::Some => MaybeMembraneProof::Some(Arc::new(fixt!(SerializedBytes))),
     };
-    curve Predictable match MaybeSerializedBytesVariant::nth(get_fixt_index!()) {
-        MaybeSerializedBytesVariant::None => MaybeSerializedBytes::None,
-        MaybeSerializedBytesVariant::Some => MaybeSerializedBytes::Some(SerializedBytesFixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap()),
+    curve Predictable match MaybeMembraneProofVariant::nth(get_fixt_index!()) {
+        MaybeMembraneProofVariant::None => MaybeMembraneProof::None,
+        MaybeMembraneProofVariant::Some => MaybeMembraneProof::Some(Arc::new(SerializedBytesFixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap())),
     };
 }
 
@@ -538,7 +543,7 @@ fixturator! {
 
 fixturator!(
     AgentValidationPkg;
-    constructor fn from_builder(HeaderBuilderCommon, MaybeSerializedBytes);
+    constructor fn from_builder(HeaderBuilderCommon, MaybeMembraneProof);
 );
 
 fixturator!(
@@ -693,6 +698,7 @@ fixturator!(
         properties: SerializedBytesFixturator::new_indexed(Empty, get_fixt_index!())
             .next()
             .unwrap(),
+        origin_time: Timestamp::HOLOCHAIN_EPOCH,
         zomes: ZomesFixturator::new_indexed(Empty, get_fixt_index!())
             .next()
             .unwrap(),
@@ -708,6 +714,7 @@ fixturator!(
         properties: SerializedBytesFixturator::new_indexed(Unpredictable, get_fixt_index!())
             .next()
             .unwrap(),
+        origin_time: Timestamp::HOLOCHAIN_EPOCH,
         zomes: ZomesFixturator::new_indexed(Unpredictable, get_fixt_index!())
             .next()
             .unwrap(),
@@ -723,8 +730,57 @@ fixturator!(
         properties: SerializedBytesFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap(),
+        origin_time: Timestamp::HOLOCHAIN_EPOCH,
         zomes: ZomesFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap(),
+    };
+);
+
+fixturator!(
+    DnaInfo;
+    curve Empty DnaInfo {
+        name: StringFixturator::new_indexed(Empty, get_fixt_index!())
+            .next()
+            .unwrap(),
+        hash: DnaHashFixturator::new_indexed(Empty, get_fixt_index!())
+            .next()
+            .unwrap(),
+        properties: SerializedBytesFixturator::new_indexed(Empty, get_fixt_index!())
+            .next()
+            .unwrap(),
+        zome_names: vec![ZomeNameFixturator::new_indexed(Empty, get_fixt_index!())
+            .next()
+            .unwrap()],
+    };
+
+    curve Unpredictable DnaInfo {
+        name: StringFixturator::new_indexed(Unpredictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+        hash: DnaHashFixturator::new_indexed(Unpredictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+        properties: SerializedBytesFixturator::new_indexed(Unpredictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+        zome_names: vec![ZomeNameFixturator::new_indexed(Unpredictable, get_fixt_index!())
+            .next()
+            .unwrap()],
+    };
+
+    curve Predictable DnaInfo {
+        name: StringFixturator::new_indexed(Predictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+        hash: DnaHashFixturator::new_indexed(Predictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+        properties: SerializedBytesFixturator::new_indexed(Predictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+        zome_names: vec![ZomeNameFixturator::new_indexed(Predictable, get_fixt_index!())
+            .next()
+            .unwrap()],
     };
 );

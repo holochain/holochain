@@ -10,19 +10,36 @@ enum MaybeLinkable {
 entry_defs![MaybeLinkable::entry_def()];
 
 #[hdk_extern]
-fn validate_create_link(
-    validate_create_link_data: ValidateCreateLinkData,
-) -> ExternResult<ValidateLinkCallbackResult> {
-    let base: MaybeLinkable = validate_create_link_data.base.try_into()?;
-    let target: MaybeLinkable = validate_create_link_data.target.try_into()?;
+pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
+    match op {
+        // This is a pretty pointless example as everything is valid.
+        Op::RegisterCreateLink { create_link } => {
+            let base: MaybeLinkable =
+                must_get_entry(create_link.hashed.content.base_address.into())?.try_into()?;
+            let target: MaybeLinkable =
+                must_get_entry(create_link.hashed.content.target_address.into())?.try_into()?;
+            Ok(match base {
+                MaybeLinkable::AlwaysLinkable => match target {
+                    MaybeLinkable::AlwaysLinkable => ValidateCallbackResult::Valid,
+                    _ => ValidateCallbackResult::Invalid("target never validates".to_string()),
+                },
+                _ => ValidateCallbackResult::Invalid("base never validates".to_string()),
+            })
+        }
+        Op::RegisterDeleteLink { create_link, .. } => {
+            let base: MaybeLinkable = must_get_entry(create_link.base_address.into())?.try_into()?;
+            Ok(match base {
+                MaybeLinkable::AlwaysLinkable => ValidateCallbackResult::Valid,
+                _ => ValidateCallbackResult::Invalid("base never validates".to_string()),
+            })
+        }
+        _ => Ok(ValidateCallbackResult::Valid),
+    }
+}
 
-    Ok(match base {
-        MaybeLinkable::AlwaysLinkable => match target {
-            MaybeLinkable::AlwaysLinkable => ValidateLinkCallbackResult::Valid,
-            _ => ValidateLinkCallbackResult::Invalid("target never validates".to_string()),
-        },
-        _ => ValidateLinkCallbackResult::Invalid("base never validates".to_string()),
-    })
+#[hdk_extern]
+fn must_get_valid_element(header_hash: HeaderHash) -> ExternResult<Element> {
+    hdk::prelude::must_get_valid_element(header_hash)
 }
 
 #[hdk_extern]
@@ -35,8 +52,9 @@ fn add_valid_link_inner() -> ExternResult<HeaderHash> {
     create_entry(&MaybeLinkable::AlwaysLinkable)?;
 
     create_link(
-        always_linkable_entry_hash.clone(),
-        always_linkable_entry_hash,
+        always_linkable_entry_hash.clone().into(),
+        always_linkable_entry_hash.into(),
+        HdkLinkType::Any,
         (),
     )
 }
@@ -60,8 +78,9 @@ fn add_invalid_link_inner() -> ExternResult<HeaderHash> {
     create_entry(&MaybeLinkable::NeverLinkable)?;
 
     create_link(
-        never_linkable_entry_hash,
-        always_linkable_entry_hash,
+        never_linkable_entry_hash.into(),
+        always_linkable_entry_hash.into(),
+        HdkLinkType::Any,
         (),
     )
 }
@@ -70,21 +89,4 @@ fn add_invalid_link_inner() -> ExternResult<HeaderHash> {
 fn remove_invalid_link(_: ()) -> ExternResult<HeaderHash> {
     let valid_link = add_invalid_link_inner()?;
     delete_link(valid_link)
-}
-
-#[hdk_extern]
-fn validate(_element: ValidateData) -> ExternResult<ValidateCallbackResult> {
-    Ok(ValidateCallbackResult::Valid)
-}
-
-#[hdk_extern]
-fn validate_delete_link(
-    validate_delete_link: ValidateDeleteLinkData,
-) -> ExternResult<ValidateLinkCallbackResult> {
-    let delete_link = validate_delete_link.delete_link;
-    let base: MaybeLinkable = must_get_entry(delete_link.base_address)?.try_into()?;
-    Ok(match base {
-        MaybeLinkable::AlwaysLinkable => ValidateLinkCallbackResult::Valid,
-        _ => ValidateLinkCallbackResult::Invalid("base never validates".to_string()),
-    })
 }

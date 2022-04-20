@@ -13,14 +13,14 @@ pub struct GetLinksQuery {
 
 #[derive(Debug, Clone)]
 pub struct LinksQuery {
-    pub base: Arc<EntryHash>,
+    pub base: Arc<AnyLinkableHash>,
     pub zome_id: ZomeId,
     pub tag: Option<String>,
     query: String,
 }
 
 impl LinksQuery {
-    pub fn new(base: EntryHash, zome_id: ZomeId, tag: Option<LinkTag>) -> Self {
+    pub fn new(base: AnyLinkableHash, zome_id: ZomeId, tag: Option<LinkTag>) -> Self {
         let tag = tag.map(|tag| Self::tag_to_hex(&tag));
         let create_string = Self::create_query_string(tag.clone());
         let delete_string = Self::delete_query_string(tag.clone());
@@ -41,11 +41,11 @@ impl LinksQuery {
         s
     }
 
-    pub fn base(base: EntryHash, zome_id: ZomeId) -> Self {
+    pub fn base(base: AnyLinkableHash, zome_id: ZomeId) -> Self {
         Self::new(base, zome_id, None)
     }
 
-    pub fn tag(base: EntryHash, zome_id: ZomeId, tag: LinkTag) -> Self {
+    pub fn tag(base: AnyLinkableHash, zome_id: ZomeId, tag: LinkTag) -> Self {
         Self::new(base, zome_id, Some(tag))
     }
 
@@ -110,7 +110,7 @@ impl LinksQuery {
             Header.create_link_hash IN ({})
             AND
             DhtOp.validation_status = :status
-            AND 
+            AND
             DhtOp.when_integrated IS NOT NULL
             ",
             sub_create_query
@@ -124,7 +124,7 @@ impl LinksQuery {
                 ":create": DhtOpType::RegisterAddLink,
                 ":delete": DhtOpType::RegisterRemoveLink,
                 ":base_hash": self.base,
-                ":zome_id": self.zome_id,
+                ":zome_id": *self.zome_id,
                 ":status": ValidationStatus::Valid,
             }
         }
@@ -133,19 +133,19 @@ impl LinksQuery {
 }
 
 impl GetLinksQuery {
-    pub fn new(base: EntryHash, zome_id: ZomeId, tag: Option<LinkTag>) -> Self {
+    pub fn new(base: AnyLinkableHash, zome_id: ZomeId, tag: Option<LinkTag>) -> Self {
         Self {
             query: LinksQuery::new(base, zome_id, tag),
         }
     }
 
-    pub fn base(base: EntryHash, zome_id: ZomeId) -> Self {
+    pub fn base(base: AnyLinkableHash, zome_id: ZomeId) -> Self {
         Self {
             query: LinksQuery::base(base, zome_id),
         }
     }
 
-    pub fn tag(base: EntryHash, zome_id: ZomeId, tag: LinkTag) -> Self {
+    pub fn tag(base: AnyLinkableHash, zome_id: ZomeId, tag: LinkTag) -> Self {
         Self {
             query: LinksQuery::tag(base, zome_id, tag),
         }
@@ -201,7 +201,7 @@ impl Query for GetLinksQuery {
 
     fn fold(&self, mut state: Self::State, data: Self::Item) -> StateQueryResult<Self::State> {
         let shh = data.data;
-        let (header, _) = shh.into_header_and_signature();
+        let (header, _) = shh.into_inner();
         let (header, hash) = header.into_inner();
         match header {
             Header::CreateLink(create_link) => {

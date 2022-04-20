@@ -4,7 +4,7 @@ use crate::conductor::ConductorHandle;
 use crate::core::workflow::error::WorkflowError;
 use crate::core::SourceChainError;
 use crate::test_utils::new_zome_call;
-use crate::test_utils::setup_app;
+use crate::test_utils::setup_app_with_names;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
@@ -20,6 +20,7 @@ async fn direct_validation_test() {
             name: "direct_validation_test".to_string(),
             uid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
             properties: SerializedBytes::try_from(()).unwrap(),
+            origin_time: Timestamp::HOLOCHAIN_EPOCH,
             zomes: vec![TestWasm::Update.into()].into(),
         },
         vec![TestWasm::Update.into()],
@@ -31,7 +32,7 @@ async fn direct_validation_test() {
     let alice_cell_id = CellId::new(dna_file.dna_hash().to_owned(), alice_agent_id.clone());
     let alice_installed_cell = InstalledCell::new(alice_cell_id.clone(), "alice_handle".into());
 
-    let (_tmpdir, _app_api, handle) = setup_app(
+    let (_tmpdir, _app_api, handle) = setup_app_with_names(
         vec![("test_app", vec![(alice_installed_cell, None)])],
         vec![dna_file.clone()],
     )

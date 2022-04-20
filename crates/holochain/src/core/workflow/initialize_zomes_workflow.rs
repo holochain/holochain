@@ -1,4 +1,7 @@
 use super::error::WorkflowResult;
+use crate::conductor::api::CellConductorApi;
+use crate::conductor::api::CellConductorApiT;
+use crate::conductor::interface::SignalBroadcaster;
 use crate::conductor::ConductorHandle;
 use crate::core::ribosome::guest_callback::init::InitHostAccess;
 use crate::core::ribosome::guest_callback::init::InitInvocation;
@@ -17,11 +20,21 @@ use tracing::*;
 #[derive(Constructor)]
 pub struct InitializeZomesWorkflowArgs<Ribosome>
 where
-    Ribosome: RibosomeT + Send + 'static,
+    Ribosome: RibosomeT + 'static,
 {
-    pub dna_def: DnaDef,
     pub ribosome: Ribosome,
     pub conductor_handle: ConductorHandle,
+    pub signal_tx: SignalBroadcaster,
+    pub cell_id: CellId,
+}
+
+impl<Ribosome> InitializeZomesWorkflowArgs<Ribosome>
+where
+    Ribosome: RibosomeT + 'static,
+{
+    pub fn dna_def(&self) -> &DnaDef {
+        self.ribosome.dna_def().as_content()
+    }
 }
 
 #[instrument(skip(network, keystore, workspace, args))]
@@ -32,7 +45,7 @@ pub async fn initialize_zomes_workflow<Ribosome>(
     args: InitializeZomesWorkflowArgs<Ribosome>,
 ) -> WorkflowResult<InitResult>
 where
-    Ribosome: RibosomeT + Send + 'static,
+    Ribosome: RibosomeT + Clone + 'static,
 {
     let conductor_handle = args.conductor_handle.clone();
     let result =
@@ -65,16 +78,26 @@ async fn initialize_zomes_workflow_inner<Ribosome>(
     args: InitializeZomesWorkflowArgs<Ribosome>,
 ) -> WorkflowResult<InitResult>
 where
-    Ribosome: RibosomeT + Send + 'static,
+    Ribosome: RibosomeT + 'static,
 {
+    let dna_def = args.dna_def().clone();
     let InitializeZomesWorkflowArgs {
-        dna_def,
         ribosome,
         conductor_handle,
+        signal_tx,
+        cell_id,
     } = args;
+    let call_zome_handle =
+        CellConductorApi::new(conductor_handle.clone(), cell_id.clone()).into_call_zome_handle();
     // Call the init callback
     let result = {
-        let host_access = InitHostAccess::new(workspace.clone().into(), keystore, network.clone());
+        let host_access = InitHostAccess::new(
+            workspace.clone().into(),
+            keystore,
+            network.clone(),
+            signal_tx,
+            call_zome_handle,
+        );
         let invocation = InitInvocation { dna_def };
         ribosome.run_init(host_access, invocation)?
     };
@@ -96,7 +119,7 @@ where
     .await??;
 
     // TODO: Validate scratch items
-    super::inline_validation(workspace, network, conductor_handle, None, ribosome).await?;
+    super::inline_validation(workspace, network, conductor_handle, ribosome).await?;
 
     Ok(result)
 }
@@ -107,6 +130,7 @@ pub mod tests {
 
     use super::*;
     use crate::conductor::handle::MockConductorHandleT;
+    use crate::core::ribosome::guest_callback::validate::ValidateResult;
     use crate::core::ribosome::MockRibosomeT;
     use crate::fixt::DnaDefFixturator;
     use crate::fixt::MetaLairClientFixturator;
@@ -115,10 +139,11 @@ pub mod tests {
     use ::fixt::prelude::*;
     use fixt::Unpredictable;
     use holochain_p2p::HolochainP2pDnaFixturator;
-    use holochain_state::prelude::test_authored_env;
-    use holochain_state::prelude::test_cache_env;
-    use holochain_state::prelude::test_dht_env;
+    use holochain_state::prelude::test_authored_db;
+    use holochain_state::prelude::test_cache_db;
+    use holochain_state::prelude::test_dht_db;
     use holochain_state::prelude::SourceChain;
+    use holochain_types::db_cache::DhtDbQueryCache;
     use holochain_types::prelude::DnaDefHashed;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::fake_agent_pubkey_1;
@@ -127,8 +152,9 @@ pub mod tests {
 
     async fn get_chain(cell: &SweetCell, keystore: MetaLairClient) -> SourceChain {
         SourceChain::new(
-            cell.authored_env().clone(),
-            cell.dht_env().clone(),
+            cell.authored_db().clone(),
+            cell.dht_db().clone(),
+            DhtDbQueryCache::new(cell.dht_db().clone().into()),
             keystore,
             cell.agent_pubkey().clone(),
         )
@@ -138,41 +164,51 @@ pub mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn adds_init_marker() {
-        let test_env = test_authored_env();
-        let test_cache = test_cache_env();
-        let test_dht = test_dht_env();
+        let test_db = test_authored_db();
+        let test_cache = test_cache_db();
+        let test_dht = test_dht_db();
         let keystore = test_keystore();
-        let env = test_env.env();
+        let db = test_db.to_db();
         let author = fake_agent_pubkey_1();
 
         // Genesis
-        fake_genesis(env.clone(), test_dht.env(), keystore.clone())
+        fake_genesis(db.clone(), test_dht.to_db(), keystore.clone())
             .await
             .unwrap();
 
+        let dna_def = DnaDefFixturator::new(Unpredictable).next().unwrap();
+        let dna_def_hashed = DnaDefHashed::from_content_sync(dna_def.clone());
+
         let workspace = SourceChainWorkspace::new(
-            env.clone(),
-            test_dht.env(),
-            test_cache.env(),
+            db.clone(),
+            test_dht.to_db(),
+            DhtDbQueryCache::new(test_dht.to_db().into()),
+            test_cache.to_db(),
             keystore,
             author.clone(),
+            Arc::new(dna_def),
         )
         .await
         .unwrap();
         let mut ribosome = MockRibosomeT::new();
-        let dna_def = DnaDefFixturator::new(Unpredictable).next().unwrap();
-        let dna_def_hashed = DnaDefHashed::from_content_sync(dna_def.clone());
+
         // Setup the ribosome mock
         ribosome
             .expect_run_init()
             .returning(move |_workspace, _invocation| Ok(InitResult::Pass));
-        ribosome.expect_dna_def().return_const(dna_def_hashed);
+        ribosome
+            .expect_run_validate()
+            .returning(move |_, _| Ok(ValidateResult::Valid));
+        ribosome
+            .expect_dna_def()
+            .return_const(dna_def_hashed.clone());
 
         let conductor_handle = Arc::new(MockConductorHandleT::new());
         let args = InitializeZomesWorkflowArgs {
             ribosome,
-            dna_def,
             conductor_handle,
+            signal_tx: SignalBroadcaster::noop(),
+            cell_id: CellId::new(dna_def_hashed.to_hash(), author.clone()),
         };
         let keystore = fixt!(MetaLairClient);
         let network = fixt!(HolochainP2pDna);

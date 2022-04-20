@@ -82,9 +82,10 @@ pub async fn spawn_queue_consumer_tasks(
     stop: sync::broadcast::Sender<()>,
 ) -> (QueueTriggers, InitialQueueTriggers) {
     let Space {
-        authored_env,
-        dht_env,
-        cache,
+        authored_db,
+        dht_db,
+        cache_db: cache,
+        dht_query_cache,
         ..
     } = space;
 
@@ -95,7 +96,7 @@ pub async fn spawn_queue_consumer_tasks(
     // Publish
     let (tx_publish, handle) = spawn_publish_dht_ops_consumer(
         cell_id.agent_pubkey().clone(),
-        authored_env.clone(),
+        authored_db.clone(),
         conductor_handle.clone(),
         stop.subscribe(),
         Box::new(network.clone()),
@@ -115,7 +116,7 @@ pub async fn spawn_queue_consumer_tasks(
         queue_consumer_map.spawn_once_validation_receipt(dna_hash.clone(), || {
             spawn_validation_receipt_consumer(
                 dna_hash.clone(),
-                dht_env.clone(),
+                dht_db.clone(),
                 conductor_handle.clone(),
                 stop.subscribe(),
                 network.clone(),
@@ -139,8 +140,8 @@ pub async fn spawn_queue_consumer_tasks(
         queue_consumer_map.spawn_once_integration(dna_hash.clone(), || {
             spawn_integrate_dht_ops_consumer(
                 dna_hash.clone(),
-                dht_env.clone(),
-                cell_id.clone(),
+                dht_db.clone(),
+                dht_query_cache.clone(),
                 stop.subscribe(),
                 tx_receipt.clone(),
                 network.clone(),
@@ -158,21 +159,28 @@ pub async fn spawn_queue_consumer_tasks(
             .expect("Failed to manage workflow handle");
     }
 
+    let dna_def = conductor_handle
+        .get_dna_def(&*dna_hash)
+        .expect("Dna must be in store");
+
     // App validation
     // One per space.
     let (tx_app, handle) = queue_consumer_map.spawn_once_app_validation(dna_hash.clone(), || {
         spawn_app_validation_consumer(
             dna_hash.clone(),
             AppValidationWorkspace::new(
-                authored_env.clone().into(),
-                dht_env.clone(),
+                authored_db.clone().into(),
+                dht_db.clone(),
+                space.dht_query_cache.clone(),
                 cache.clone(),
                 keystore.clone(),
+                Arc::new(dna_def),
             ),
             conductor_handle.clone(),
             stop.subscribe(),
             tx_integration.clone(),
             network.clone(),
+            dht_query_cache.clone(),
         )
     });
     if let Some(handle) = handle {
@@ -186,14 +194,20 @@ pub async fn spawn_queue_consumer_tasks(
             .expect("Failed to manage workflow handle");
     }
 
+    let dna_def = conductor_handle
+        .get_dna_def(&*dna_hash)
+        .expect("Dna must be in store");
+
     // Sys validation
     // One per space.
     let (tx_sys, handle) = queue_consumer_map.spawn_once_sys_validation(dna_hash.clone(), || {
         spawn_sys_validation_consumer(
             SysValidationWorkspace::new(
-                authored_env.clone().into(),
-                dht_env.clone().into(),
+                authored_db.clone().into(),
+                dht_db.clone().into(),
+                dht_query_cache.clone(),
                 cache.clone(),
+                Arc::new(dna_def),
             ),
             space.clone(),
             conductor_handle.clone(),
@@ -736,6 +750,13 @@ async fn next_job_or_exit(
 }
 
 /// Does nothing.
+/// Does extra nothing and logs about it if the error shouldn't bail the
+/// workflow.
 fn handle_workflow_error(err: WorkflowError) -> ManagedTaskResult {
-    Err(Box::new(ConductorError::from(err)).into())
+    if err.workflow_should_bail() {
+        Err(Box::new(ConductorError::from(err)).into())
+    } else {
+        tracing::error!(?err);
+        Ok(())
+    }
 }

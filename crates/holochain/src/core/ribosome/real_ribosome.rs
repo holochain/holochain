@@ -22,9 +22,6 @@ use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentResult;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
-use crate::core::ribosome::guest_callback::validate_link::ValidateLinkHostAccess;
-use crate::core::ribosome::guest_callback::validate_link::ValidateLinkInvocation;
-use crate::core::ribosome::guest_callback::validate_link::ValidateLinkResult;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageInvocation;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
 use crate::core::ribosome::guest_callback::CallIterator;
@@ -46,7 +43,7 @@ use crate::core::ribosome::host_fn::get::get;
 use crate::core::ribosome::host_fn::get_details::get_details;
 use crate::core::ribosome::host_fn::get_link_details::get_link_details;
 use crate::core::ribosome::host_fn::get_links::get_links;
-use crate::core::ribosome::host_fn::hash_entry::hash_entry;
+use crate::core::ribosome::host_fn::hash::hash;
 use crate::core::ribosome::host_fn::must_get_entry::must_get_entry;
 use crate::core::ribosome::host_fn::must_get_header::must_get_header;
 use crate::core::ribosome::host_fn::must_get_valid_element::must_get_valid_element;
@@ -93,7 +90,7 @@ pub struct RealRibosome {
 
 struct HostFnBuilder {
     store: Store,
-    env: Env,
+    db: Env,
     ribosome_arc: Arc<RealRibosome>,
     // context_arc: Arc<CallContext>,
     context_key: u64,
@@ -119,8 +116,8 @@ impl HostFnBuilder {
             Function::new_with_env(
                 &self.store,
                 Self::SIGNATURE,
-                self.env.clone(),
-                move |env: &Env, args: &[Value]| -> Result<Vec<Value>, RuntimeError> {
+                self.db.clone(),
+                move |db: &Env, args: &[Value]| -> Result<Vec<Value>, RuntimeError> {
                     let guest_ptr: GuestPtr = match args[0] {
                         Value::I32(i) => i
                             .try_into()
@@ -149,7 +146,7 @@ impl HostFnBuilder {
                             })
                             .clone()
                     };
-                    let result = match env.consume_bytes_from_guest(guest_ptr, len) {
+                    let result = match db.consume_bytes_from_guest(guest_ptr, len) {
                         Ok(input) => {
                             match host_function(
                                 Arc::clone(&ribosome_arc),
@@ -163,7 +160,7 @@ impl HostFnBuilder {
                         }
                         Err(wasm_error) => Err::<_, WasmError>(wasm_error),
                     };
-                    env.set_data(result)
+                    db.set_data(result)
                         .map_err(|e| RuntimeError::new(e.to_string()))?;
                     Ok(vec![])
                 },
@@ -346,7 +343,7 @@ impl RealRibosome {
     }
 
     fn imports(&self, context_key: u64, store: &Store) -> ImportObject {
-        let env = Env::default();
+        let db = Env::default();
         let mut imports = imports! {};
         let mut ns = Exports::new();
 
@@ -358,21 +355,21 @@ impl RealRibosome {
             "__import_data",
             Function::new_native_with_env(
                 store,
-                env.clone(),
+                db.clone(),
                 holochain_wasmer_host::import::__import_data,
             ),
         );
 
         let host_fn_builder = HostFnBuilder {
             store: store.clone(),
-            env,
+            db,
             ribosome_arc,
             context_key,
         };
 
         host_fn_builder
             .with_host_function(&mut ns, "__trace", trace)
-            .with_host_function(&mut ns, "__hash_entry", hash_entry)
+            .with_host_function(&mut ns, "__hash", hash)
             .with_host_function(&mut ns, "__version", version)
             .with_host_function(&mut ns, "__verify_signature", verify_signature)
             .with_host_function(&mut ns, "__sign", sign)
@@ -630,14 +627,6 @@ impl RibosomeT for RealRibosome {
         do_callback!(self, host_access, invocation, ValidateCallbackResult)
     }
 
-    fn run_validate_link<I: Invocation + 'static>(
-        &self,
-        host_access: ValidateLinkHostAccess,
-        invocation: ValidateLinkInvocation<I>,
-    ) -> RibosomeResult<ValidateLinkResult> {
-        do_callback!(self, host_access, invocation, ValidateLinkCallbackResult)
-    }
-
     fn run_init(
         &self,
         host_access: InitHostAccess,
@@ -679,8 +668,6 @@ impl RibosomeT for RealRibosome {
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
-    use crate::conductor::ConductorBuilder;
-    use crate::core::ribosome::MockDnaStore;
     use crate::core::ribosome::ZomeCall;
     use crate::sweettest::SweetConductor;
     use crate::sweettest::SweetDnaFile;
@@ -701,16 +688,7 @@ pub mod wasm_test {
         let alice_pubkey = fixt!(AgentPubKey, Predictable, 0);
         let bob_pubkey = fixt!(AgentPubKey, Predictable, 1);
 
-        let mut dna_store = MockDnaStore::new();
-        dna_store.expect_add_dnas::<Vec<_>>().return_const(());
-        dna_store.expect_add_entry_defs::<Vec<_>>().return_const(());
-        dna_store.expect_add_dna().return_const(());
-        dna_store
-            .expect_get()
-            .return_const(Some(dna_file.clone().into()));
-
-        let mut conductor =
-            SweetConductor::from_builder(ConductorBuilder::with_mock_dna_store(dna_store)).await;
+        let mut conductor = SweetConductor::from_standard_config().await;
 
         let apps = conductor
             .setup_app_for_agents(

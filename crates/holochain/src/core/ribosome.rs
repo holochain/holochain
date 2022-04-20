@@ -1,6 +1,6 @@
 //! A Ribosome is a structure which knows how to execute hApp code.
 //!
-//! We have only one instance of this: [RealRibosome]. The abstract trait exists
+//! We have only one instance of this: [crate::core::ribosome::real_ribosome::RealRibosome]. The abstract trait exists
 //! so that we can write mocks against the `RibosomeT` interface, as well as
 //! opening the possiblity that we might support applications written in other
 //! languages and environments.
@@ -24,9 +24,6 @@ use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentResult;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
-use crate::core::ribosome::guest_callback::validate_link::ValidateLinkHostAccess;
-use crate::core::ribosome::guest_callback::validate_link::ValidateLinkInvocation;
-use crate::core::ribosome::guest_callback::validate_link::ValidateLinkResult;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageInvocation;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
 use crate::core::ribosome::guest_callback::CallIterator;
@@ -103,7 +100,6 @@ pub enum HostContext {
     Init(InitHostAccess),
     MigrateAgent(MigrateAgentHostAccess),
     PostCommit(PostCommitHostAccess), // MAYBE: add emit_signal access here?
-    ValidateCreateLink(ValidateLinkHostAccess),
     Validate(ValidateHostAccess),
     ValidationPackage(ValidationPackageHostAccess),
     ZomeCall(ZomeCallHostAccess),
@@ -115,7 +111,6 @@ impl From<&HostContext> for HostFnAccess {
             HostContext::ZomeCall(access) => access.into(),
             HostContext::GenesisSelfCheck(access) => access.into(),
             HostContext::Validate(access) => access.into(),
-            HostContext::ValidateCreateLink(access) => access.into(),
             HostContext::Init(access) => access.into(),
             HostContext::EntryDefs(access) => access.into(),
             HostContext::MigrateAgent(access) => access.into(),
@@ -134,8 +129,7 @@ impl HostContext {
             | Self::MigrateAgent(MigrateAgentHostAccess { workspace, .. })
             | Self::PostCommit(PostCommitHostAccess { workspace, .. }) => workspace.into(),
             Self::ValidationPackage(ValidationPackageHostAccess { workspace, .. })
-            | Self::Validate(ValidateHostAccess { workspace, .. })
-            | Self::ValidateCreateLink(ValidateLinkHostAccess { workspace, .. }) => workspace,
+            | Self::Validate(ValidateHostAccess { workspace, .. }) => workspace,
             _ => panic!(
                 "Gave access to a host function that uses the workspace without providing a workspace"
             ),
@@ -174,8 +168,7 @@ impl HostContext {
             | Self::Init(InitHostAccess { network, .. })
             | Self::PostCommit(PostCommitHostAccess { network, .. })
             | Self::ValidationPackage(ValidationPackageHostAccess { network, .. })
-            | Self::Validate(ValidateHostAccess { network, .. })
-            | Self::ValidateCreateLink(ValidateLinkHostAccess { network, .. }) => network,
+            | Self::Validate(ValidateHostAccess { network, .. }) => network,
             _ => panic!(
                 "Gave access to a host function that uses the network without providing a network"
             ),
@@ -185,18 +178,12 @@ impl HostContext {
     /// Get the signal broadcaster, panics if none was provided
     pub fn signal_tx(&mut self) -> &mut SignalBroadcaster {
         match self {
-            Self::ZomeCall(ZomeCallHostAccess { signal_tx, .. }) => signal_tx,
+            Self::ZomeCall(ZomeCallHostAccess { signal_tx, .. })
+            | Self::Init(InitHostAccess { signal_tx, .. })
+            => signal_tx,
             _ => panic!(
                 "Gave access to a host function that uses the signal broadcaster without providing one"
             ),
-        }
-    }
-
-    /// Get the associated CellId, panics if not applicable
-    pub fn cell_id(&self) -> &CellId {
-        match self {
-            Self::ZomeCall(ZomeCallHostAccess { cell_id, .. }) => cell_id,
-            _ => panic!("Gave access to a host function that references a CellId"),
         }
     }
 
@@ -205,7 +192,9 @@ impl HostContext {
         match self {
             Self::ZomeCall(ZomeCallHostAccess {
                 call_zome_handle, ..
-            }) => call_zome_handle,
+            })
+            | Self::Init(InitHostAccess { call_zome_handle, .. })
+            => call_zome_handle,
             _ => panic!(
                 "Gave access to a host function that uses the call zome handle without providing a call zome handle"
             ),
@@ -251,6 +240,7 @@ impl FnComponents {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(test, derive(arbitrary::Arbitrary))]
 pub enum ZomesToInvoke {
     All,
     One(Zome),
@@ -436,10 +426,6 @@ pub struct ZomeCallHostAccess {
     pub network: HolochainP2pDna,
     pub signal_tx: SignalBroadcaster,
     pub call_zome_handle: CellConductorReadHandle,
-    // NB: this is kind of an odd place for this, since CellId is not really a special
-    // "resource" to give access to, but rather it's a bit of data that makes sense in
-    // the context of zome calls, but not every CallContext
-    pub cell_id: CellId,
 }
 
 impl From<ZomeCallHostAccess> for HostContext {
@@ -455,9 +441,9 @@ impl From<&ZomeCallHostAccess> for HostFnAccess {
 }
 
 /// Interface for a Ribosome. Currently used only for mocking, as our only
-/// real concrete type is [RealRibosome]
+/// real concrete type is [`RealRibosome`](crate::core::ribosome::real_ribosome::RealRibosome)
 #[automock]
-pub trait RibosomeT: Sized + std::fmt::Debug {
+pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
     fn dna_def(&self) -> &DnaDefHashed;
 
     fn zome_info(&self, zome: Zome) -> RibosomeResult<ZomeInfo>;
@@ -552,20 +538,13 @@ pub trait RibosomeT: Sized + std::fmt::Debug {
         invocation: PostCommitInvocation,
     ) -> RibosomeResult<()>;
 
-    /// Helper function for running a validation callback. Just calls
-    /// [`run_callback`][] under the hood.
-    /// [`run_callback`]: #method.run_callback
+    /// Helper function for running a validation callback. Calls
+    /// [`do_callback!`] under the hood.
     fn run_validate(
         &self,
         access: ValidateHostAccess,
         invocation: ValidateInvocation,
     ) -> RibosomeResult<ValidateResult>;
-
-    fn run_validate_link<I: Invocation + 'static>(
-        &self,
-        access: ValidateLinkHostAccess,
-        invocation: ValidateLinkInvocation<I>,
-    ) -> RibosomeResult<ValidateLinkResult>;
 
     /// Runs the specified zome fn. Returns the cursor used by HDK,
     /// so that it can be passed on to source chain manager for transactional writes
@@ -579,70 +558,19 @@ pub trait RibosomeT: Sized + std::fmt::Debug {
 #[cfg(test)]
 pub mod wasm_test {
     use crate::core::ribosome::FnComponents;
+    use crate::sweettest::SweetAgents;
+    use crate::sweettest::SweetConductor;
+    use crate::sweettest::SweetDnaFile;
+    use crate::sweettest::SweetZome;
+    use crate::test_utils::host_fn_caller::HostFnCaller;
     use core::time::Duration;
+    use holo_hash::AgentPubKey;
+    use holochain_wasm_test_utils::TestWasm;
 
     pub fn now() -> Duration {
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .expect("Time went backwards")
-    }
-
-    /// Directly call a function in a TestWasm
-    #[macro_export]
-    macro_rules! call_test_ribosome {
-        ( $host_access:expr, $test_wasm:expr, $fn_name:literal, $input:expr ) => {{
-            let mut host_access = $host_access.clone();
-            let input = $input.clone();
-            tokio::task::spawn(async move {
-                use holo_hash::*;
-                use $crate::core::ribosome::RibosomeT;
-
-                let ribosome =
-                    $crate::fixt::RealRibosomeFixturator::new($crate::fixt::curve::Zomes(vec![
-                        $test_wasm.into(),
-                    ]))
-                    .next()
-                    .unwrap();
-
-                let cell_id = host_access.cell_id.clone();
-                let author = cell_id.agent_pubkey().clone();
-
-                // Required because otherwise the network will return routing errors
-                let test_network = crate::test_utils::test_network(
-                    Some(ribosome.dna_def().as_hash().clone()),
-                    Some(author),
-                )
-                .await;
-                let dna_network = test_network.dna_network();
-                host_access.network = dna_network;
-
-                let invocation =
-                    $crate::fixt::ZomeCallInvocationFixturator::new($crate::fixt::NamedInvocation(
-                        cell_id,
-                        $test_wasm.into(),
-                        $fn_name.into(),
-                        holochain_zome_types::ExternIO::encode(input).unwrap(),
-                    ))
-                    .next()
-                    .unwrap();
-
-                match ribosome.call_zome_function(host_access, invocation.clone()) {
-                    Ok(crate::core::ribosome::ZomeCallResponse::Ok(guest_output)) => {
-                        Ok(guest_output.decode().unwrap())
-                    }
-                    Ok(crate::core::ribosome::ZomeCallResponse::Unauthorized(_, _, _, _)) => {
-                        unreachable!()
-                    }
-                    Ok(crate::core::ribosome::ZomeCallResponse::NetworkError(_)) => unreachable!(),
-                    Ok(crate::core::ribosome::ZomeCallResponse::CountersigningSession(e)) => {
-                        panic!("Failed a countersigning session {}", e)
-                    }
-                    Err(e) => Err(e),
-                }
-            })
-            .await
-            .unwrap()
-        }};
     }
 
     #[test]
@@ -651,5 +579,58 @@ pub mod wasm_test {
         let expected = vec!["foo_bar_baz", "foo_bar", "foo"];
 
         assert_eq!(fn_components.into_iter().collect::<Vec<String>>(), expected,);
+    }
+
+    pub struct RibosomeTestFixture {
+        pub conductor: SweetConductor,
+        pub alice_pubkey: AgentPubKey,
+        pub bob_pubkey: AgentPubKey,
+        pub alice: SweetZome,
+        pub bob: SweetZome,
+        pub alice_host_fn_caller: HostFnCaller,
+        pub bob_host_fn_caller: HostFnCaller,
+    }
+
+    impl RibosomeTestFixture {
+        pub async fn new(test_wasm: TestWasm) -> Self {
+            let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![test_wasm])
+                .await
+                .unwrap();
+
+            let mut conductor = SweetConductor::from_standard_config().await;
+            let (alice_pubkey, bob_pubkey) = SweetAgents::alice_and_bob();
+
+            let apps = conductor
+                .setup_app_for_agents(
+                    "app-",
+                    &[alice_pubkey.clone(), bob_pubkey.clone()],
+                    &[dna_file.clone().into()],
+                )
+                .await
+                .unwrap();
+
+            let ((alice,), (bob,)) = apps.into_tuples();
+
+            let alice_host_fn_caller =
+                HostFnCaller::create_for_zome(alice.cell_id(), &conductor.handle(), &dna_file, 0)
+                    .await;
+
+            let bob_host_fn_caller =
+                HostFnCaller::create_for_zome(bob.cell_id(), &conductor.handle(), &dna_file, 0)
+                    .await;
+
+            let alice = alice.zome(test_wasm);
+            let bob = bob.zome(test_wasm);
+
+            Self {
+                conductor,
+                alice_pubkey,
+                bob_pubkey,
+                alice,
+                bob,
+                alice_host_fn_caller,
+                bob_host_fn_caller,
+            }
+        }
     }
 }

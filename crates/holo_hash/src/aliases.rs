@@ -27,9 +27,21 @@ pub type NetIdHash = HoloHash<hash_type::NetId>;
 /// The hash of some wasm bytecode
 pub type WasmHash = HoloHash<hash_type::Wasm>;
 
+/// The hash of some external data that can't or doesn't exist on the DHT.
+pub type ExternalHash = HoloHash<hash_type::External>;
+
 /// The hash of anything referrable in the DHT.
 /// This is a composite of either an EntryHash or a HeaderHash
 pub type AnyDhtHash = HoloHash<hash_type::AnyDht>;
+
+/// The hash of anything linkable.
+pub type AnyLinkableHash = HoloHash<hash_type::AnyLinkable>;
+
+impl From<AnyLinkableHash> for AnyDhtHash {
+    fn from(hash: AnyLinkableHash) -> Self {
+        hash.retype(hash_type::AnyDht::Entry)
+    }
+}
 
 impl From<HeaderHash> for AnyDhtHash {
     fn from(hash: HeaderHash) -> Self {
@@ -60,6 +72,48 @@ impl From<AnyDhtHash> for HeaderHash {
 impl From<AnyDhtHash> for EntryHash {
     fn from(hash: AnyDhtHash) -> Self {
         hash.retype(hash_type::Entry)
+    }
+}
+
+impl From<HeaderHash> for AnyLinkableHash {
+    fn from(hash: HeaderHash) -> Self {
+        hash.retype(hash_type::AnyLinkable::Header)
+    }
+}
+
+impl From<EntryHash> for AnyLinkableHash {
+    fn from(hash: EntryHash) -> Self {
+        hash.retype(hash_type::AnyLinkable::Entry)
+    }
+}
+
+impl From<AgentPubKey> for AnyLinkableHash {
+    fn from(hash: AgentPubKey) -> Self {
+        hash.retype(hash_type::AnyLinkable::Entry)
+    }
+}
+
+impl From<ExternalHash> for AnyLinkableHash {
+    fn from(hash: ExternalHash) -> Self {
+        hash.retype(hash_type::AnyLinkable::External)
+    }
+}
+
+impl From<AnyLinkableHash> for HeaderHash {
+    fn from(hash: AnyLinkableHash) -> Self {
+        hash.retype(hash_type::Header)
+    }
+}
+
+impl From<AnyLinkableHash> for EntryHash {
+    fn from(hash: AnyLinkableHash) -> Self {
+        hash.retype(hash_type::Entry)
+    }
+}
+
+impl From<AnyLinkableHash> for ExternalHash {
+    fn from(hash: AnyLinkableHash) -> Self {
+        hash.retype(hash_type::External)
     }
 }
 

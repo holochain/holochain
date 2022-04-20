@@ -15,30 +15,30 @@ use ::fixt::prelude::*;
 use holochain_conductor_api::InstalledAppInfoStatus;
 use holochain_conductor_api::{AdminRequest, AdminResponse, AppRequest, AppResponse, ZomeCall};
 use holochain_keystore::crude_mock_keystore::spawn_crude_mock_keystore;
-use holochain_state::prelude::*;
+use holochain_keystore::crude_mock_keystore::spawn_real_or_mock_keystore;
+use holochain_state::prelude::{test_keystore, *};
 use holochain_types::test_utils::fake_cell_id;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::WebsocketSender;
+use holochain_zome_types::op::Op;
 use kitsune_p2p_types::dependencies::lair_keystore_api_0_0::LairError;
 use maplit::hashset;
 use matches::assert_matches;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn can_update_state() {
-    let envs = test_environments();
-    let dna_store = MockDnaStore::new();
-    let keystore = envs.keystore().clone();
+    let db_dir = test_db_dir();
+    let dna_store = DnaStore::new();
+    let keystore = test_keystore();
     let holochain_p2p = holochain_p2p::stub_network().await;
     let (post_commit_sender, _post_commit_receiver) =
         tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
+    let spaces = Spaces::new(db_dir.path().to_path_buf().into(), Default::default()).unwrap();
     let conductor = Conductor::new(
-        envs.conductor(),
-        envs.wasm(),
         dna_store,
         keystore,
-        envs.path().to_path_buf().into(),
         holochain_p2p,
-        DbSyncStrategy::default(),
+        spaces,
         post_commit_sender,
     )
     .await
@@ -69,25 +69,24 @@ async fn can_update_state() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn can_add_clone_cell_to_app() {
-    let envs = test_environments();
-    let keystore = envs.keystore().clone();
+    let db_dir = test_db_dir();
+    let keystore = test_keystore();
     let holochain_p2p = holochain_p2p::stub_network().await;
 
     let agent = fixt!(AgentPubKey);
     let dna = fake_valid_dna_file("");
     let cell_id = CellId::new(dna.dna_hash().to_owned(), agent.clone());
 
-    let dna_store = RealDnaStore::new();
+    let dna_store = DnaStore::new();
     let (post_commit_sender, _post_commit_receiver) =
         tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
+    let spaces = Spaces::new(db_dir.path().to_path_buf().into(), Default::default()).unwrap();
+
     let conductor = Conductor::new(
-        envs.conductor(),
-        envs.wasm(),
         dna_store,
         keystore,
-        envs.path().to_path_buf().into(),
         holochain_p2p,
-        DbSyncStrategy::default(),
+        spaces,
         post_commit_sender,
     )
     .await
@@ -150,19 +149,17 @@ async fn can_add_clone_cell_to_app() {
 /// same InstalledAppId
 #[tokio::test(flavor = "multi_thread")]
 async fn app_ids_are_unique() {
-    let environments = test_environments();
-    let dna_store = MockDnaStore::new();
+    let db_dir = test_db_dir();
+    let dna_store = DnaStore::new();
     let holochain_p2p = holochain_p2p::stub_network().await;
     let (post_commit_sender, _post_commit_receiver) =
         tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
+    let spaces = Spaces::new(db_dir.path().to_path_buf().into(), Default::default()).unwrap();
     let conductor = Conductor::new(
-        environments.conductor(),
-        environments.wasm(),
         dna_store,
-        environments.keystore().clone(),
-        environments.path().to_path_buf().into(),
+        test_keystore(),
         holochain_p2p,
-        DbSyncStrategy::default(),
+        spaces,
         post_commit_sender,
     )
     .await
@@ -214,105 +211,14 @@ async fn app_role_ids_are_unique() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn can_set_fake_state() {
-    let envs = test_environments();
+    let db_dir = test_db_dir();
     let state = ConductorState::default();
     let conductor = ConductorBuilder::new()
         .fake_state(state.clone())
-        .test(&envs, &[])
+        .test(db_dir.path(), &[])
         .await
         .unwrap();
     assert_eq!(state, conductor.get_state_from_handle().await.unwrap());
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn proxy_tls_with_test_keystore() {
-    observability::test_run().ok();
-
-    let keystore1 = spawn_test_keystore().await.unwrap();
-    let keystore2 = spawn_test_keystore().await.unwrap();
-
-    if let Err(e) = proxy_tls_inner(keystore1.clone(), keystore2.clone()).await {
-        panic!("{:#?}", e);
-    }
-
-    let _ = keystore1.shutdown().await;
-    let _ = keystore2.shutdown().await;
-}
-
-async fn proxy_tls_inner(
-    keystore1: MetaLairClient,
-    keystore2: MetaLairClient,
-) -> anyhow::Result<()> {
-    use ghost_actor::GhostControlSender;
-    use kitsune_p2p::dependencies::*;
-    use kitsune_p2p_proxy::*;
-    use kitsune_p2p_types::transport::*;
-
-    let (cert_digest, cert, cert_priv_key) = keystore1.get_or_create_first_tls_cert().await?;
-
-    let tls_config1 = TlsConfig {
-        cert,
-        cert_priv_key,
-        cert_digest,
-    };
-
-    let (cert_digest, cert, cert_priv_key) = keystore2.get_or_create_first_tls_cert().await?;
-
-    let tls_config2 = TlsConfig {
-        cert,
-        cert_priv_key,
-        cert_digest,
-    };
-
-    let proxy_config =
-        ProxyConfig::local_proxy_server(tls_config1, AcceptProxyCallback::reject_all());
-    let (bind, evt) = kitsune_p2p_types::transport_mem::spawn_bind_transport_mem().await?;
-    let (bind1, mut evt1) = spawn_kitsune_proxy_listener(
-        proxy_config,
-        kitsune_p2p::dependencies::kitsune_p2p_types::config::KitsuneP2pTuningParams::default(),
-        bind,
-        evt,
-    )
-    .await?;
-    tokio::task::spawn(async move {
-        while let Some(evt) = evt1.next().await {
-            match evt {
-                TransportEvent::IncomingChannel(_, mut write, read) => {
-                    println!("YOOTH");
-                    let data = read.read_to_end().await;
-                    let data = String::from_utf8_lossy(&data);
-                    let data = format!("echo: {}", data);
-                    write.write_and_close(data.into_bytes()).await?;
-                }
-            }
-        }
-        TransportResult::Ok(())
-    });
-    let url1 = bind1.bound_url().await?;
-    println!("{:?}", url1);
-
-    let proxy_config =
-        ProxyConfig::local_proxy_server(tls_config2, AcceptProxyCallback::reject_all());
-    let (bind, evt) = kitsune_p2p_types::transport_mem::spawn_bind_transport_mem().await?;
-    let (bind2, _evt2) = spawn_kitsune_proxy_listener(
-        proxy_config,
-        kitsune_p2p::dependencies::kitsune_p2p_types::config::KitsuneP2pTuningParams::default(),
-        bind,
-        evt,
-    )
-    .await?;
-    println!("{:?}", bind2.bound_url().await?);
-
-    let (_url, mut write, read) = bind2.create_channel(url1).await?;
-    write.write_and_close(b"test".to_vec()).await?;
-    let data = read.read_to_end().await;
-    let data = String::from_utf8_lossy(&data);
-    assert_eq!("echo: test", data);
-
-    let _ = bind1.ghost_actor_shutdown_immediate().await;
-    let _ = bind2.ghost_actor_shutdown_immediate().await;
-
-    Ok(())
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -465,11 +371,11 @@ async fn test_signing_error_during_genesis() {
         .await
         .unwrap();
 
-    let envs = test_envs_with_keystore(bad_keystore);
+    let db_dir = test_db_dir();
     let config = ConductorConfig::default();
     let mut conductor = SweetConductor::new(
-        SweetConductor::handle_from_existing(&envs, &config, &[]).await,
-        envs,
+        SweetConductor::handle_from_existing(db_dir.path(), bad_keystore, &config, &[]).await,
+        db_dir,
         config,
     )
     .await;
@@ -524,25 +430,22 @@ async fn make_signing_call(client: &mut WebsocketSender, cell: &SweetCell) -> Ap
 /// not seem to be an issue, therefore I'm not putting the effort into fixing it
 /// right now.
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "we need a better mock keystore in order to implement this test"]
-#[allow(unreachable_code, unused_variables, unused_mut)]
 async fn test_signing_error_during_genesis_doesnt_bork_interfaces() {
     observability::test_run().ok();
-    let good_keystore = spawn_test_keystore().await.unwrap();
-    let bad_keystore = spawn_crude_mock_keystore(|| LairError::other("test error"))
+    let (keystore, keystore_control) = spawn_real_or_mock_keystore(|_| Err("test error".into()))
         .await
         .unwrap();
 
-    let envs = test_envs_with_keystore(good_keystore.clone());
+    let db_dir = test_db_dir();
     let config = standard_config();
     let mut conductor = SweetConductor::new(
-        SweetConductor::handle_from_existing(&envs, &config, &[]).await,
-        envs,
+        SweetConductor::handle_from_existing(db_dir.path(), keystore.clone(), &config, &[]).await,
+        db_dir,
         config,
     )
     .await;
 
-    let (agent1, agent2, agent3) = SweetAgents::three(good_keystore.clone()).await;
+    let (agent1, agent2, agent3) = SweetAgents::three(keystore.clone()).await;
 
     let (dna, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Sign])
         .await
@@ -566,7 +469,7 @@ async fn test_signing_error_during_genesis_doesnt_bork_interfaces() {
     let (mut admin_client, _) = conductor.admin_ws_client().await;
 
     // Now use the bad keystore to cause a signing error on the next zome call
-    todo!("switch keystore to always-erroring mode");
+    keystore_control.use_mock();
 
     let response: AdminResponse = admin_client
         .request(AdminRequest::InstallApp(Box::new(InstallAppPayload {
@@ -587,18 +490,13 @@ async fn test_signing_error_during_genesis_doesnt_bork_interfaces() {
     assert_matches!(response, AppResponse::Error(_));
 
     // Go back to the good keystore, see if we can proceed
-    todo!("switch keystore to always-correct mode");
+    keystore_control.use_real();
 
     let response = make_signing_call(&mut app_client, &cell2).await;
     assert_matches!(response, AppResponse::ZomeCall(_));
 
     let response = make_signing_call(&mut app_client, &cell1).await;
     assert_matches!(response, AppResponse::ZomeCall(_));
-
-    // conductor
-    //     .setup_app_for_agent("app3", agent3, &[dna.clone()])
-    //     .await
-    //     .unwrap();
 }
 
 pub(crate) fn simple_create_entry_zome() -> InlineZome {
@@ -692,36 +590,6 @@ async fn test_reenable_app() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "Causing a tokio thread to panic is problematic.
-This is supposed to emulate a panic in a wasm validation callback, but it's not the same.
-However, when wasm panics, it returns an error anyway, so the other similar test
-which tests for validation errors should be sufficient."]
-async fn test_cells_disable_on_validation_panic() {
-    observability::test_run().ok();
-    let bad_zome =
-        InlineZome::new_unique(Vec::new()).callback("validate", |_api, _data: ValidateData| {
-            panic!("intentional panic during validation");
-            #[allow(unreachable_code)]
-            Ok(ValidateResult::Valid)
-        });
-    let mut conductor = SweetConductor::from_standard_config().await;
-
-    // This may be an error, depending on if validation runs before or after
-    // the app is enabled. Proceed in either case.
-    let _ = common_genesis_test_app(&mut conductor, bad_zome).await;
-
-    // - Ensure that the app was disabled because one Cell panicked during validation
-    //   (while publishing genesis elements)
-    assert_eq_retry_10s!(
-        {
-            let state = conductor.get_state_from_handle().await.unwrap();
-            (state.enabled_apps().count(), state.stopped_apps().count())
-        },
-        (0, 1)
-    );
-}
-
-#[tokio::test(flavor = "multi_thread")]
 async fn test_installation_fails_if_genesis_self_check_is_invalid() {
     observability::test_run().ok();
     let bad_zome = InlineZome::new_unique(Vec::new()).callback(
@@ -752,10 +620,13 @@ async fn test_bad_entry_validation_after_genesis_returns_zome_call_error() {
     observability::test_run().ok();
     let unit_entry_def = EntryDef::default_with_id("unit");
     let bad_zome = InlineZome::new_unique(vec![unit_entry_def.clone()])
-        .callback("validate_create_entry", |_api, _data: ValidateData| {
-            Ok(ValidateResult::Invalid(
-                "intentional invalid result for testing".into(),
-            ))
+        .callback("validate", |_api, op: Op| match op {
+            Op::StoreEntry { header, .. } if header.hashed.content.app_entry_type().is_some() => {
+                Ok(ValidateResult::Invalid(
+                    "intentional invalid result for testing".into(),
+                ))
+            }
+            _ => Ok(ValidateResult::Valid),
         })
         .callback("create", move |api, ()| {
             let entry_def_id: EntryDefId = unit_entry_def.id.clone();
@@ -797,20 +668,27 @@ async fn test_bad_entry_validation_after_genesis_returns_zome_call_error() {
 //   Otherwise, we have to devise a way to discover whether a panic happened
 //   during genesis or not.
 // NOTE: we need a test with a failure during a validation callback that happens
-//       *inline*. It's not enough to have a failing validate_create_entry for
+//       *inline*. It's not enough to have a failing validate for
 //       instance, because that failure will be returned by the zome call.
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "need to figure out how to write this test"]
+#[ignore = "need to figure out how to write this test, i.e. to make genesis panic"]
 async fn test_apps_disable_on_panic_after_genesis() {
     observability::test_run().ok();
     let unit_entry_def = EntryDef::default_with_id("unit");
     let bad_zome = InlineZome::new_unique(vec![unit_entry_def.clone()])
         // We need a different validation callback that doesn't happen inline
         // so we can cause failure in it. But it must also be after genesis.
-        .callback("validate_create_entry", |_api, _data: ValidateData| {
-            // Trigger a deserialization error
-            let _: Entry = SerializedBytes::try_from(())?.try_into()?;
-            Ok(ValidateResult::Valid)
+        .callback("validate", |_api, op: Op| {
+            match op {
+                Op::StoreEntry { header, .. }
+                    if header.hashed.content.app_entry_type().is_some() =>
+                {
+                    // Trigger a deserialization error
+                    let _: Entry = SerializedBytes::try_from(())?.try_into()?;
+                    Ok(ValidateResult::Valid)
+                }
+                _ => Ok(ValidateResult::Valid),
+            }
         })
         .callback("create", move |api, ()| {
             let entry_def_id: EntryDefId = unit_entry_def.id.clone();

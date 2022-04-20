@@ -57,6 +57,11 @@ fn create_post(post: crate::Post) -> ExternResult<HeaderHash> {
 }
 
 #[hdk_extern]
+fn delete_post(post_hash: HeaderHash) -> ExternResult<HeaderHash> {
+    hdk::prelude::delete_entry(post_hash)
+}
+
+#[hdk_extern]
 fn get_entry(_: ()) -> ExternResult<Option<Element>> {
     get(hash_entry(&post())?, GetOptions::content())
 }
@@ -90,17 +95,32 @@ fn create_priv_msg(_: ()) -> ExternResult<HeaderHash> {
 }
 
 #[hdk_extern]
-fn validate_create_entry_post(
-    validation_data: ValidateData,
-) -> ExternResult<ValidateCallbackResult> {
-    let element = validation_data.element;
-    let r = match element.entry().to_app_option::<Post>() {
-        Ok(Some(post)) if &post.0 == "Banana" => {
-            ValidateCallbackResult::Invalid("No Bananas!".to_string())
+fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
+    let this_zome = zome_info()?;
+    if let Op::StoreEntry {
+        header:
+            SignedHashed {
+                hashed: HoloHashed {
+                    content: header, ..
+                },
+                ..
+            },
+        entry,
+    } = op
+    {
+        if header
+            .app_entry_type()
+            .filter(|app_entry_type| {
+                this_zome.matches_entry_def_id(app_entry_type, Post::entry_def_id())
+            })
+            .map_or(Ok(false), |_| {
+                Post::try_from(entry).map(|post| &post.0 == "Banana")
+            })?
+        {
+            return Ok(ValidateCallbackResult::Invalid("No Bananas!".to_string()));
         }
-        _ => ValidateCallbackResult::Valid,
-    };
-    Ok(r)
+    }
+    Ok(ValidateCallbackResult::Valid)
 }
 
 #[hdk_extern]
@@ -178,6 +198,39 @@ fn call_create_entry_remotely(agent: AgentPubKey) -> ExternResult<HeaderHash> {
         }
         // Unbounded recursion.
         ZomeCallResponse::NetworkError(_) => call_create_entry_remotely(agent),
+        ZomeCallResponse::CountersigningSession(e) => Err(WasmError::Guest(format!(
+            "Countersigning session failed: {}",
+            e
+        ))),
+    }
+}
+
+#[hdk_extern]
+fn must_get_valid_element(header_hash: HeaderHash) -> ExternResult<Element> {
+    hdk::prelude::must_get_valid_element(header_hash)
+}
+
+/// Same as above but doesn't recurse on network errors.
+#[hdk_extern]
+fn call_create_entry_remotely_no_rec(agent: AgentPubKey) -> ExternResult<HeaderHash> {
+    let zome_call_response: ZomeCallResponse = call_remote(
+        agent.clone(),
+        "create_entry".to_string().into(),
+        "create_entry".to_string().into(),
+        None,
+        &(),
+    )?;
+
+    match zome_call_response {
+        ZomeCallResponse::Ok(v) => Ok(v.decode()?),
+        ZomeCallResponse::Unauthorized(cell_id, zome_name, function_name, agent_pubkey) => {
+            Err(WasmError::Guest(format!(
+                "Unauthorized: {} {} {} {}",
+                cell_id, zome_name, function_name, agent_pubkey
+            )))
+        }
+        // Unbounded recursion.
+        ZomeCallResponse::NetworkError(e) => Err(WasmError::Guest(format!("Network Error: {}", e))),
         ZomeCallResponse::CountersigningSession(e) => Err(WasmError::Guest(format!(
             "Countersigning session failed: {}",
             e

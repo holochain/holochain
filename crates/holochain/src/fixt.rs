@@ -13,11 +13,6 @@ use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentInvocation
 use crate::core::ribosome::guest_callback::post_commit::PostCommitHostAccess;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateHostAccess;
-use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
-use crate::core::ribosome::guest_callback::validate_link::ValidateCreateLinkInvocation;
-use crate::core::ribosome::guest_callback::validate_link::ValidateDeleteLinkInvocation;
-use crate::core::ribosome::guest_callback::validate_link::ValidateLinkHostAccess;
-use crate::core::ribosome::guest_callback::validate_link::ValidateLinkInvocation;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageHostAccess;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageInvocation;
 use crate::core::ribosome::real_ribosome::RealRibosome;
@@ -37,6 +32,7 @@ use holochain_p2p::HolochainP2pDnaFixturator;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
 use holochain_state::test_utils::test_keystore;
+use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 use rand::seq::IteratorRandom;
@@ -239,34 +235,58 @@ fixturator!(
 fixturator!(
     HostFnWorkspace;
     curve Empty {
-        let authored_env = holochain_state::test_utils::test_authored_env_with_id(get_fixt_index!() as u8);
-        let dht_env = holochain_state::test_utils::test_dht_env_with_id(get_fixt_index!() as u8);
-        let cache = holochain_state::test_utils::test_cache_env();
+        let authored_db = holochain_state::test_utils::test_authored_db_with_id(get_fixt_index!() as u8);
+        let dht_db = holochain_state::test_utils::test_dht_db_with_id(get_fixt_index!() as u8);
+        let cache = holochain_state::test_utils::test_cache_db();
         let keystore = holochain_state::test_utils::test_keystore();
         tokio_helper::block_forever_on(async {
-            fake_genesis(authored_env.env(), dht_env.env(), keystore.clone()).await.unwrap();
-            HostFnWorkspace::new(authored_env.env(), dht_env.env(), cache.env(), keystore, Some(fixt!(AgentPubKey, Predictable, get_fixt_index!()))).await.unwrap()
+            fake_genesis(authored_db.to_db(), dht_db.to_db(), keystore.clone()).await.unwrap();
+            HostFnWorkspace::new(
+                authored_db.to_db(),
+                dht_db.to_db(),
+                DhtDbQueryCache::new(dht_db.to_db().into()),
+                cache.to_db(),
+                keystore,
+                Some(fixt!(AgentPubKey, Predictable, get_fixt_index!())),
+                Arc::new(fixt!(DnaDef))
+            ).await.unwrap()
         })
     };
     curve Unpredictable {
-        let authored_env = holochain_state::test_utils::test_authored_env_with_id(get_fixt_index!() as u8);
-        let dht_env = holochain_state::test_utils::test_dht_env_with_id(get_fixt_index!() as u8);
-        let cache = holochain_state::test_utils::test_cache_env();
+        let authored_db = holochain_state::test_utils::test_authored_db_with_id(get_fixt_index!() as u8);
+        let dht_db = holochain_state::test_utils::test_dht_db_with_id(get_fixt_index!() as u8);
+        let cache = holochain_state::test_utils::test_cache_db();
         let keystore = holochain_state::test_utils::test_keystore();
         tokio_helper::block_forever_on(async {
-            fake_genesis(authored_env.env(), dht_env.env(), keystore.clone()).await.unwrap();
-            HostFnWorkspace::new(authored_env.env(), dht_env.env(), cache.env(), keystore, Some(fixt!(AgentPubKey, Predictable, get_fixt_index!()))).await.unwrap()
+            fake_genesis(authored_db.to_db(), dht_db.to_db(), keystore.clone()).await.unwrap();
+            HostFnWorkspace::new(
+                authored_db.to_db(),
+                dht_db.to_db(),
+                DhtDbQueryCache::new(dht_db.to_db().into()),
+                cache.to_db(),
+                keystore,
+                Some(fixt!(AgentPubKey, Predictable, get_fixt_index!())),
+                Arc::new(fixt!(DnaDef))
+            ).await.unwrap()
         })
     };
     curve Predictable {
-        let authored_env = holochain_state::test_utils::test_authored_env_with_id(get_fixt_index!() as u8);
-        let dht_env = holochain_state::test_utils::test_dht_env_with_id(get_fixt_index!() as u8);
-        let cache = holochain_state::test_utils::test_cache_env_with_id(get_fixt_index!() as u8);
+        let authored_db = holochain_state::test_utils::test_authored_db_with_id(get_fixt_index!() as u8);
+        let dht_db = holochain_state::test_utils::test_dht_db_with_id(get_fixt_index!() as u8);
+        let cache = holochain_state::test_utils::test_cache_db_with_id(get_fixt_index!() as u8);
         let agent = fixt!(AgentPubKey, Predictable, get_fixt_index!());
         let keystore = holochain_state::test_utils::test_keystore();
         tokio_helper::block_forever_on(async {
-            crate::test_utils::fake_genesis_for_agent(authored_env.env(), dht_env.env(), agent.clone(), keystore.clone()).await.unwrap();
-            HostFnWorkspace::new(authored_env.env(), dht_env.env(), cache.env(), keystore, Some(agent)).await.unwrap()
+            crate::test_utils::fake_genesis_for_agent(authored_db.to_db(), dht_db.to_db(), agent.clone(), keystore.clone()).await.unwrap();
+            HostFnWorkspace::new(
+                authored_db.to_db(),
+                dht_db.to_db(),
+                DhtDbQueryCache::new(dht_db.to_db().into()),
+                cache.to_db(),
+                keystore,
+                Some(agent),
+                Arc::new(fixt!(DnaDef))
+            ).await.unwrap()
         })
     };
 );
@@ -274,34 +294,58 @@ fixturator!(
 fixturator!(
     HostFnWorkspaceRead;
     curve Empty {
-        let authored_env = holochain_state::test_utils::test_authored_env_with_id(get_fixt_index!() as u8);
-        let dht_env = holochain_state::test_utils::test_dht_env_with_id(get_fixt_index!() as u8);
-        let cache = holochain_state::test_utils::test_cache_env();
+        let authored_db = holochain_state::test_utils::test_authored_db_with_id(get_fixt_index!() as u8);
+        let dht_db = holochain_state::test_utils::test_dht_db_with_id(get_fixt_index!() as u8);
+        let cache = holochain_state::test_utils::test_cache_db();
         let keystore = holochain_state::test_utils::test_keystore();
         tokio_helper::block_forever_on(async {
-            fake_genesis(authored_env.env(), dht_env.env(), keystore.clone()).await.unwrap();
-            HostFnWorkspaceRead::new(authored_env.env().into(), dht_env.env().into(), cache.env(), keystore, Some(fixt!(AgentPubKey, Predictable, get_fixt_index!()))).await.unwrap()
+            fake_genesis(authored_db.to_db(), dht_db.to_db(), keystore.clone()).await.unwrap();
+            HostFnWorkspaceRead::new(
+                authored_db.to_db().into(),
+                dht_db.to_db().into(),
+                DhtDbQueryCache::new(dht_db.to_db().into()),
+                cache.to_db(),
+                keystore,
+                Some(fixt!(AgentPubKey, Predictable, get_fixt_index!())),
+                Arc::new(fixt!(DnaDef))
+            ).await.unwrap()
         })
     };
     curve Unpredictable {
-        let authored_env = holochain_state::test_utils::test_authored_env_with_id(get_fixt_index!() as u8);
-        let dht_env = holochain_state::test_utils::test_dht_env_with_id(get_fixt_index!() as u8);
-        let cache = holochain_state::test_utils::test_cache_env();
+        let authored_db = holochain_state::test_utils::test_authored_db_with_id(get_fixt_index!() as u8);
+        let dht_db = holochain_state::test_utils::test_dht_db_with_id(get_fixt_index!() as u8);
+        let cache = holochain_state::test_utils::test_cache_db();
         let keystore = holochain_state::test_utils::test_keystore();
         tokio_helper::block_forever_on(async {
-            fake_genesis(authored_env.env(), dht_env.env(), keystore.clone()).await.unwrap();
-            HostFnWorkspaceRead::new(authored_env.env().into(), dht_env.env().into(), cache.env(), keystore, Some(fixt!(AgentPubKey, Predictable, get_fixt_index!()))).await.unwrap()
+            fake_genesis(authored_db.to_db(), dht_db.to_db(), keystore.clone()).await.unwrap();
+            HostFnWorkspaceRead::new(
+                authored_db.to_db().into(),
+                dht_db.to_db().into(),
+                DhtDbQueryCache::new(dht_db.to_db().into()),
+                cache.to_db(),
+                keystore,
+                Some(fixt!(AgentPubKey, Predictable, get_fixt_index!())),
+                Arc::new(fixt!(DnaDef))
+            ).await.unwrap()
         })
     };
     curve Predictable {
-        let authored_env = holochain_state::test_utils::test_authored_env_with_id(get_fixt_index!() as u8);
-        let dht_env = holochain_state::test_utils::test_dht_env_with_id(get_fixt_index!() as u8);
-        let cache = holochain_state::test_utils::test_cache_env_with_id(get_fixt_index!() as u8);
+        let authored_db = holochain_state::test_utils::test_authored_db_with_id(get_fixt_index!() as u8);
+        let dht_db = holochain_state::test_utils::test_dht_db_with_id(get_fixt_index!() as u8);
+        let cache = holochain_state::test_utils::test_cache_db_with_id(get_fixt_index!() as u8);
         let agent = fixt!(AgentPubKey, Predictable, get_fixt_index!());
         let keystore = holochain_state::test_utils::test_keystore();
         tokio_helper::block_forever_on(async {
-            crate::test_utils::fake_genesis_for_agent(authored_env.env(), dht_env.env(), agent.clone(), keystore.clone()).await.unwrap();
-            HostFnWorkspaceRead::new(authored_env.env().into(), dht_env.env().into(), cache.env(), keystore, Some(agent)).await.unwrap()
+            crate::test_utils::fake_genesis_for_agent(authored_db.to_db(), dht_db.to_db(), agent.clone(), keystore.clone()).await.unwrap();
+            HostFnWorkspaceRead::new(
+                authored_db.to_db().into(),
+                dht_db.to_db().into(),
+                DhtDbQueryCache::new(dht_db.to_db().into()),
+                cache.to_db(),
+                keystore,
+                Some(agent),
+                Arc::new(fixt!(DnaDef))
+            ).await.unwrap()
         })
     };
 );
@@ -318,7 +362,7 @@ fixturator!(
 
 fixturator!(
     ZomeCallHostAccess;
-    constructor fn new(HostFnWorkspace, MetaLairClient, HolochainP2pDna, SignalBroadcaster, CellConductorReadHandle, CellId);
+    constructor fn new(HostFnWorkspace, MetaLairClient, HolochainP2pDna, SignalBroadcaster, CellConductorReadHandle);
 );
 
 fixturator!(
@@ -338,7 +382,7 @@ fixturator!(
 
 fixturator!(
     InitHostAccess;
-    constructor fn new(HostFnWorkspace, MetaLairClient, HolochainP2pDna);
+    constructor fn new(HostFnWorkspace, MetaLairClient, HolochainP2pDna, SignalBroadcaster, CellConductorReadHandle);
 );
 
 fixturator!(
@@ -364,61 +408,6 @@ fixturator!(
 fixturator!(
     ZomesToInvoke;
     constructor fn one(Zome);
-);
-
-fn make_validate_invocation(
-    zomes_to_invoke: ZomesToInvoke,
-    element: Element,
-) -> ValidateInvocation {
-    ValidateInvocation {
-        zomes_to_invoke,
-        element: Arc::new(element),
-        validation_package: None,
-        entry_def_id: None,
-    }
-}
-
-fixturator!(
-    ValidateInvocation;
-    vanilla fn make_validate_invocation(ZomesToInvoke, Element);
-);
-
-fixturator!(
-    ValidateCreateLinkInvocation;
-    constructor fn new(Zome, CreateLink, Entry, Entry);
-);
-
-fixturator!(
-    ValidateDeleteLinkInvocation;
-    constructor fn new(Zome, DeleteLink);
-);
-
-/// Macros don't get along with generics.
-type ValidateLinkInvocationCreate = ValidateLinkInvocation<ValidateCreateLinkInvocation>;
-
-fixturator!(
-    ValidateLinkInvocationCreate;
-    constructor fn new(ValidateCreateLinkInvocation);
-    curve Zome {
-        let mut c = ValidateCreateLinkInvocationFixturator::new(Empty)
-            .next()
-            .unwrap();
-        c.zome = get_fixt_curve!();
-        ValidateLinkInvocationCreate::new(c)
-    };
-);
-
-/// Macros don't get along with generics.
-type ValidateLinkInvocationDelete = ValidateLinkInvocation<ValidateDeleteLinkInvocation>;
-
-fixturator!(
-    ValidateLinkInvocationDelete;
-    constructor fn new(ValidateDeleteLinkInvocation);
-);
-
-fixturator!(
-    ValidateLinkHostAccess;
-    constructor fn new(HostFnWorkspace, HolochainP2pDna);
 );
 
 fixturator!(

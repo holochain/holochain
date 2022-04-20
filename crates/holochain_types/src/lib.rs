@@ -19,19 +19,21 @@ pub mod autonomic;
 pub mod chain;
 pub mod combinators;
 pub mod db;
+pub mod db_cache;
 pub mod dht_op;
 pub mod dna;
 pub mod element;
 pub mod entry;
-#[allow(missing_docs)]
-pub mod env;
 pub mod fixt;
 pub mod header;
 pub mod link;
 mod macros;
 pub mod metadata;
 pub mod prelude;
+pub mod share;
 pub mod signal;
+#[warn(missing_docs)]
+pub mod sql;
 pub mod validate;
 pub mod web_app;
 

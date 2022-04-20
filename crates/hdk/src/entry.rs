@@ -1,59 +1,62 @@
 use crate::prelude::*;
 
+pub use holochain_deterministic_integrity::entry::*;
+
 /// General function that can create any entry type.
 ///
-/// This is used under the hood by [ `create_entry` ], [ `create_cap_grant` ] and [ `create_cap_claim` ].
+/// This is used under the hood by [`create_entry`], [`create_cap_grant`] and [`create_cap_claim`].
 ///
-/// The host builds a [ `Create` ] header for the passed entry value and commits a new element to the
+/// The host builds a [`Create`] header for the passed entry value and commits a new element to the
 /// chain.
 ///
 /// Usually you don't need to use this function directly; it is the most general way to create an
-/// entry and standardises the internals of higher level create functions.
+/// entry and standardizes the internals of higher level create functions.
 pub fn create(create_input: CreateInput) -> ExternResult<HeaderHash> {
     HDK.with(|h| h.borrow().create(create_input))
 }
 
-/// Update any entry type.
+/// General function that can update any entry type.
 ///
-/// This is used under the hood by [ `update_entry` ], [ `update_cap_grant` ] and `update_cap_claim`.
+/// This is used under the hood by [`update_entry`], [`update_cap_grant`] and `update_cap_claim`.
+///
 /// @todo implement update_cap_claim
 ///
-/// The host builds an [ `Update` ] header for the passed entry value and commits a new update to the
+/// The host builds an [`Update`] header for the passed entry value and commits a new update to the
 /// chain.
 ///
 /// Usually you don't need to use this function directly; it is the most general way to update an
-/// entry and standardises the internals of higher level create functions.
+/// entry and standardizes the internals of higher level update functions.
 pub fn update(hash: HeaderHash, create_input: CreateInput) -> ExternResult<HeaderHash> {
     HDK.with(|h| h.borrow().update(UpdateInput::new(hash, create_input)))
 }
 
 /// General function that can delete any entry type.
 ///
-/// This is used under the hood by [ `delete_entry` ], [ `delete_cap_grant` ] and `delete_cap_claim`.
+/// This is used under the hood by [`delete_entry`], [`delete_cap_grant`] and `delete_cap_claim`.
+///
 /// @todo implement delete_cap_claim
 ///
-/// The host builds a [ `Delete` ] header for the passed entry and commits a new element to the chain.
+/// The host builds a [`Delete`] header for the passed entry and commits a new element to the chain.
 ///
-/// Usually you don't need to use this function directly; it is the most general way to update an
-/// entry and standardises the internals of higher level create functions.
-pub fn delete(deletes_header_address: HeaderHash) -> ExternResult<HeaderHash> {
-    HDK.with(|h| {
-        h.borrow().delete(DeleteInput::new(
-            deletes_header_address,
-            ChainTopOrdering::default(),
-        ))
-    })
+/// Usually you don't need to use this function directly; it is the most general way to delete an
+/// entry and standardizes the internals of higher level delete functions.
+pub fn delete<I, E>(delete_input: I) -> ExternResult<HeaderHash>
+where
+    DeleteInput: TryFrom<I, Error = E>,
+    WasmError: From<E>,
+{
+    HDK.with(|h| h.borrow().delete(DeleteInput::try_from(delete_input)?))
 }
 
-/// Create an app entry.
+/// Create an app entry. Also see [`create`].
 ///
 /// Apps define app entries by registering entry def ids with the `entry_defs` callback and serialize the
 /// entry content when committing to the source chain.
 ///
-/// This function accepts any input that implements [ `TryInto<CreateInput>` ].
-/// The default impls from the `#[hdk_entry( .. )]` and [ `entry_def!` ] macros include this.
+/// This function accepts any input that implements [`TryInto<CreateInput>`].
+/// The default impls from the `#[hdk_entry( .. )]` and [`entry_def!`] macros include this.
 ///
-/// With generic type handling it may make sense to directly construct [ `CreateInput` ] and [ `create` ].
+/// With generic type handling it may make sense to directly construct [`CreateInput`] and [`create`].
 ///
 /// e.g.
 /// ```ignore
@@ -62,78 +65,47 @@ pub fn delete(deletes_header_address: HeaderHash) -> ExternResult<HeaderHash> {
 /// create_entry(Foo(50))?;
 /// ```
 ///
-/// See [ `get` ] and [ `get_details` ] for more information on CRUD.
+/// See [`get`] and [`get_details`] for more information on CRUD.
 pub fn create_entry<I, E>(input: I) -> ExternResult<HeaderHash>
 where
-    CreateInput: TryFrom<I, Error = E>,
-    WasmError: From<E>,
-{
-    create(CreateInput::try_from(input)?)
-}
-
-/// Alias to delete
-///
-/// Takes the [ `HeaderHash` ] of the element to delete.
-///
-/// ```ignore
-/// delete_entry(entry_hash(foo_entry)?)?;
-/// ```
-pub fn delete_entry(hash: HeaderHash) -> ExternResult<HeaderHash> {
-    delete(hash)
-}
-
-/// Hash anything that that implements [ `TryInto<Entry>` ].
-///
-/// Hashes are typed in holochain, e.g. [ `HeaderHash` ] and [ `EntryHash` ] are different and yield different
-/// bytes for a given value. This ensures correctness and allows type based dispatch in various
-/// areas of the codebase.
-///
-/// Usually you want to hash a value that you want to reference on the DHT with [ `get` ] etc. because
-/// it represents some domain-specific data sourced externally or generated within the wasm.
-/// [ `HeaderHash` ] hashes are _always_ generated by the process of committing something to a local
-/// chain. Every host function that commits an entry returns the new [ `HeaderHash` ]. The [ `HeaderHash` ] can
-/// also be used with [ `get` ] etc. to retreive a _specific_ element from the DHT rather than the
-/// oldest live element.
-/// However there is no way to _generate_ a header hash directly from a header from inside wasm.
-/// [ `Element` ] values (entry+header pairs returned by [ `get` ] etc.) contain prehashed header structs
-/// called [ `HeaderHashed` ], which is composed of a [ `HeaderHash` ] alongside the "raw" [ `Header` ] value. Generally the pre-hashing is
-/// more efficient than hashing headers ad-hoc as hashing always needs to be done at the database
-/// layer, so we want to re-use that as much as possible.
-/// The header hash can be extracted from the Element as `element.header_hashed().as_hash()`.
-/// @todo is there any use-case that can't be satisfied by the `header_hashed` approach?
-///
-/// Anything that is annotated with #[hdk_entry( .. )] or entry_def!( .. ) implements this so is
-/// compatible automatically.
-///
-/// [ `hash_entry` ] is "dumb" in that it doesn't check that the entry is defined, committed, on the DHT or
-/// any other validation, it simply generates the hash for the serialized representation of
-/// something in the same way that the DHT would.
-///
-/// It is strongly recommended that you use the [ `hash_entry` ] function to calculate hashes to avoid
-/// inconsistencies between hashes in the wasm guest and the host.
-/// For example, a lot of the crypto crates in rust compile to wasm so in theory could generate the
-/// hash in the guest, but there is the potential that the serialization logic could be slightly
-/// different, etc.
-///
-/// ```ignore
-/// #[hdk_entry(id="foo")]
-/// struct Foo;
-///
-/// let foo_hash = hash_entry(Foo)?;
-/// ```
-pub fn hash_entry<I, E>(input: I) -> ExternResult<EntryHash>
-where
+    I: EntryDefRegistration,
     Entry: TryFrom<I, Error = E>,
     WasmError: From<E>,
 {
-    HDK.with(|h| h.borrow().hash_entry(Entry::try_from(input)?))
+    create(try_into_create_input(input)?)
 }
 
-/// Thin wrapper around update for app entries.
-/// The hash is the [ `HeaderHash` ] of the deleted element, the input is a [ `TryInto<CreateInput>` ].
+/// Delete an app entry. Also see [`delete`].
+///
+/// This function accepts the [`HeaderHash`] of the element to delete and optionally an argument to
+/// specify the [`ChainTopOrdering`]. Refer to [`DeleteInput`] for details.
+///
+/// ```ignore
+/// #[hdk_entry(id = "foo")]
+/// struct Foo(u32);
+///
+/// let header_hash = create_entry(Foo(50))?;
+/// let delete_entry_header_hash = delete_entry(header_hash.clone())?;
+/// ```
+///
+/// with a specific [`ChainTopOrdering`]:
+/// ```ignore
+/// delete_entry(DeleteInput::new(header_hash.clone(), ChainTopOrdering::Relaxed)?;
+/// ```
+pub fn delete_entry<I, E>(delete_input: I) -> ExternResult<HeaderHash>
+where
+    DeleteInput: TryFrom<I, Error = E>,
+    WasmError: From<E>,
+{
+    delete(delete_input)
+}
+
+/// Update an app entry. Also see [`update`].
+///
+/// The hash is the [`HeaderHash`] of the deleted element, the input is a [`TryInto<CreateInput>`].
 ///
 /// Updates can reference Elements which contain Entry data -- namely, Creates and other Updates -- but
-/// not Deletes or system Elements
+/// not Deletes or system Elements.
 ///
 /// As updates can reference elements on other agent's source chains across unpredictable network
 /// topologies, they are treated as a tree structure.
@@ -154,15 +126,16 @@ where
 /// @todo in the future this will be true because we will have the concept of 'redirects':
 /// Works as an app entry delete+create.
 ///
-/// See [ `create_entry` ]
-/// See [ `update` ]
-/// See [ `delete_entry` ]
+/// See [`create_entry`]
+/// See [`update`]
+/// See [`delete_entry`]
 pub fn update_entry<I, E>(hash: HeaderHash, input: I) -> ExternResult<HeaderHash>
 where
-    CreateInput: TryFrom<I, Error = E>,
+    I: EntryDefRegistration,
+    Entry: TryFrom<I, Error = E>,
     WasmError: From<E>,
 {
-    update(hash, CreateInput::try_from(input)?)
+    update(hash, try_into_create_input(input)?)
 }
 
 /// Gets an element for a given entry or header hash.
@@ -173,15 +146,15 @@ where
 ///
 /// An element is no longer live once it is referenced by a valid delete element.
 /// An update to an element does not change its liveness.
-/// See [ `get_details` ] for more information about how CRUD elements reference each other.
+/// See [`get_details`] for more information about how CRUD elements reference each other.
 ///
-/// Note: [ `get` ] __always triggers and blocks on a network call__.
+/// Note: [`get`] __always triggers and blocks on a network call__.
 ///       @todo implement a 'get optimistic' that returns based on the current opinion of the world
 ///       and performs network calls in the background so they are available 'next time'.
 ///
 /// Note: Deletes are considered in the liveness but Updates are not currently followed
 ///       automatically due to the need for the happ to disambiguate update logic.
-///       @todo implement 'redirect' logic so that updates are followed by [ `get` ].
+///       @todo implement 'redirect' logic so that updates are followed by [`get`].
 ///
 /// Note: Updates typically point to a different entry hash than what they are updating but not
 ///       always, e.g. consider changing `foo` to `bar` back to `foo`. The entry hashes in a crud
@@ -191,7 +164,7 @@ where
 ///
 /// Note: "oldest live" only relates to disambiguating many creates and updates from many authors
 ///       pointing to a single entry, it is not the "current value" of an entry in a CRUD sense.
-///       e.g. If "foo" is created then updated to "bar", a [ `get` ] on the hash of "foo" will return
+///       e.g. If "foo" is created then updated to "bar", a [`get`] on the hash of "foo" will return
 ///            "foo" as part of an element with the "oldest live" header.
 ///            To discover "bar" the agent needs to call `get_details` and decide how it wants to
 ///            collapse many potential creates, updates and deletes down into a single or filtered
@@ -224,112 +197,9 @@ where
         .unwrap())
 }
 
-/// MUST get an EntryHashed at a given EntryHash.
-///
-/// The EntryHashed is NOT guaranteed to be associated with a valid (or even validated) Header/Element.
-/// For example, an invalid Element could be published and `must_get_entry` would return the EntryHashed.
-///
-/// This may be useful during validation callbacks where the validity and relevance of some content can be
-/// asserted by the CURRENT validation callback independent of an Element. This behaviour avoids the potential for
-/// eclipse attacks to lie about the validity of some data and cause problems for a hApp.
-/// If you NEED to know that a dependency is valid in order for the current validation logic
-/// (e.g. inductive validation of a tree) then `must_get_valid_element` is likely what you need.
-///
-/// `must_get_entry` is available in contexts such as validation where both determinism and network access is desirable.
-///
-/// An EntryHashed will NOT be returned if:
-/// - @TODO It is PURGED (community redacted entry)
-/// - @TODO ALL headers pointing to it are WITHDRAWN by the authors
-/// - ALL headers pointing to it are ABANDONED by ALL authorities due to validation failure
-/// - Nobody knows about it on the currently visible network
-///
-/// If an EntryHashed fails to be returned:
-///
-/// - Callbacks will return early with `UnresolvedDependencies`
-/// - Zome calls will receive a `WasmError` from the host
-pub fn must_get_entry(entry_hash: EntryHash) -> ExternResult<EntryHashed> {
-    HDK.with(|h| {
-        h.borrow()
-            .must_get_entry(MustGetEntryInput::new(entry_hash))
-    })
-}
-
-/// MUST get a SignedHeaderHashed at a given HeaderHash.
-///
-/// The SignedHeaderHashed is NOT guaranteed to be a valid (or even validated) Element.
-/// For example, an invalid Header could be published and `must_get_header` would return the `SignedHeaderHashed`.
-///
-/// This may be useful during validation callbacks where the validity depends on a Header existing regardless of its associated Entry.
-/// For example, we may simply need to check that the author is the same for two referenced Headers.
-///
-/// `must_get_header` is available in contexts such as validation where both determinism and network access is desirable.
-///
-/// A `SignedHeaderHashed` will NOT be returned if:
-///
-/// - @TODO The header is WITHDRAWN by the author
-/// - @TODO The header is ABANDONED by ALL authorities
-/// - Nobody knows about it on the currently visible network
-///
-/// If a `SignedHeaderHashed` fails to be returned:
-///
-/// - Callbacks will return early with `UnresolvedDependencies`
-/// - Zome calls will receive a `WasmError` from the host
-pub fn must_get_header(header_hash: HeaderHash) -> ExternResult<SignedHeaderHashed> {
-    HDK.with(|h| {
-        h.borrow()
-            .must_get_header(MustGetHeaderInput::new(header_hash))
-    })
-}
-
-/// MUST get a VALID Element at a given HeaderHash
-///
-/// The Element is guaranteed to be valid.
-/// More accurately the Element is guarantee to be consistently reported as valid by the visible network.
-///
-/// The validity requirement makes this more complex but notably enables inductive validation of arbitrary graph structures.
-/// For example "If this Element is valid, and its parent is valid, up to the root, then the whole tree of Elements is valid".
-///
-/// If at least one authority (1 of N trust) claims the Element is invalid then a conflict resolution/warranting round will be triggered.
-///
-/// In the case of a total eclipse (every visible authority is lying) then we cannot immediately detect an invalid Element.
-/// Unlike `must_get_entry` and `must_get_header` we cannot simply inspect the cryptographic integrity to know this.
-///
-/// In theory we can run validation of the returned Element ourselves, which itself may be based on `must_get_X` calls.
-/// If there is a large nested graph of `must_get_valid_element` calls this could be extremely heavy.
-/// Note though that each "hop" in recursive validation is routed to a completely different set of authorities.
-/// It does not take many hops to reach the point where an attacker needs to eclipse the entire network to lie about Element validity.
-///
-/// @TODO We keep signed receipts from authorities serving up "valid elements".
-/// - If we ever discover an element we were told is valid is invalid we can retroactively look to warrant authorities
-/// - We can async (e.g. in a background task) be recursively validating Element dependencies ourselves, following hops until there is no room for lies
-/// - We can with small probability recursively validate to several hops inline to discourage potential eclipse attacks with a credible immediate threat
-///
-/// If you do not care about validity and simply want a pair of Header+Entry data, then use both `must_get_header` and `must_get_entry` together.
-///
-/// `must_get_valid_element` is available in contexts such as validation where both determinism and network access is desirable.
-///
-/// An `Element` will not be returned if:
-///
-/// - @TODO It is WITHDRAWN by the author
-/// - @TODO The Entry is PURGED by the community
-/// - It is ABANDONED by ALL authorities due to failed validation
-/// - If ANY authority (1 of N trust) OR ourselves (0 of N trust) believes it INVALID
-/// - Nobody knows about it on the visible network
-///
-/// If an `Element` fails to be returned:
-///
-/// - Callbacks will return early with `UnresolvedDependencies`
-/// - Zome calls will receive a `WasmError` from the host
-pub fn must_get_valid_element(header_hash: HeaderHash) -> ExternResult<Element> {
-    HDK.with(|h| {
-        h.borrow()
-            .must_get_valid_element(MustGetValidElementInput::new(header_hash))
-    })
-}
-
-/// Get an element from the hash AND the details for the entry or header hash passed in.
-/// Returns [ `None` ] if the entry/header does not exist.
-/// The details returned are a contextual mix of elements and header hashes, see below.
+/// Get an element and its details for the entry or header hash passed in.
+/// Returns [`None`] if the entry/header does not exist.
+/// The details returned are a contextual mix of elements and header hashes.
 ///
 /// Note: The return details will be inferred by the hash type passed in, be careful to pass in the
 ///       correct hash type for the details you want.
@@ -337,7 +207,7 @@ pub fn must_get_valid_element(header_hash: HeaderHash) -> ExternResult<Element> 
 /// Note: If a header hash is passed in the element returned is the specified element.
 ///       If an entry hash is passed in all the headers (so implicitly all the elements) are
 ///       returned for the entry that matches that hash.
-///       See [ `get` ] for more information about what "oldest live" means.
+///       See [`get`] for more information about what "oldest live" means.
 ///
 /// The details returned include relevant creates, updates and deletes for the hash passed in.
 ///
@@ -350,11 +220,11 @@ pub fn must_get_valid_element(header_hash: HeaderHash) -> ExternResult<Element> 
 /// Full elements are returned for direct references to the passed hash.
 /// Header hashes are returned for references to references to the passed hash.
 ///
-/// [ `Details` ] for a header hash return:
+/// [`Details`] for a header hash return:
 /// - the element for this header hash if it exists
 /// - all update and delete _elements_ that reference that specified header
 ///
-/// [ `Details` ] for an entry hash return:
+/// [`Details`] for an entry hash return:
 /// - all creates, updates and delete _elements_ that reference that entry hash
 /// - all update and delete _elements_ that reference the elements that reference the entry hash
 ///
@@ -367,10 +237,10 @@ pub fn must_get_valid_element(header_hash: HeaderHash) -> ExternResult<Element> 
 ///
 /// Note: There are multiple header types that exist and operate entirely outside of CRUD elements
 ///       so they cannot reference or be referenced by CRUD, so are immutable or have their own
-///       mutation logic (e.g. link create/delete) and will not be included in [ `get_details` ] results
+///       mutation logic (e.g. link create/delete) and will not be included in [`get_details`] results
 ///       e.g. the DNA itself, links, migrations, etc.
-///       However the element will still be returned by [ `get_details` ] if a header hash is passed,
-///       these header-only elements will have [ `None` ] as the entry value.
+///       However the element will still be returned by [`get_details`] if a header hash is passed,
+///       these header-only elements will have [`None`] as the entry value.
 pub fn get_details<H: Into<AnyDhtHash>>(
     hash: H,
     options: GetOptions,
@@ -383,262 +253,6 @@ pub fn get_details<H: Into<AnyDhtHash>>(
         .into_iter()
         .next()
         .unwrap())
-}
-
-/// Trait for binding static [ `EntryDef` ] property access for a type.
-/// See [ `register_entry` ]
-pub trait EntryDefRegistration {
-    fn entry_def() -> crate::prelude::EntryDef;
-
-    fn entry_def_id() -> crate::prelude::EntryDefId;
-
-    fn entry_visibility() -> crate::prelude::EntryVisibility;
-
-    fn crdt_type() -> crate::prelude::CrdtType;
-
-    fn required_validations() -> crate::prelude::RequiredValidations;
-}
-
-/// Implements conversion traits to allow a struct to be handled as an app entry.
-/// If you have some need to implement custom serialization logic or metadata injection
-/// you can do so by implementing these traits manually instead.
-///
-/// This requires that TryFrom and TryInto [ `derive@SerializedBytes` ] is implemented for the entry type,
-/// which implies that [ `serde::Serialize` ] and [ `serde::Deserialize` ] is also implemented.
-/// These can all be derived and there is an attribute macro that both does the default defines.
-#[macro_export]
-macro_rules! app_entry {
-    ( $t:ident ) => {
-        impl TryFrom<&$crate::prelude::Entry> for $t {
-            type Error = $crate::prelude::WasmError;
-            fn try_from(entry: &$crate::prelude::Entry) -> Result<Self, Self::Error> {
-                match entry {
-                    $crate::prelude::Entry::App(eb) => Ok(Self::try_from(
-                        $crate::prelude::SerializedBytes::from(eb.to_owned()),
-                    )?),
-                    $crate::prelude::Entry::CounterSign(_, eb) => Ok(Self::try_from(
-                        $crate::prelude::SerializedBytes::from(eb.to_owned()),
-                    )?),
-                    _ => Err($crate::prelude::SerializedBytesError::Deserialize(format!(
-                        "{:?} is not an Entry::App or Entry::CounterSign so has no serialized bytes",
-                        entry
-                    ))
-                    .into()),
-                }
-            }
-        }
-
-        impl TryFrom<$crate::prelude::Entry> for $t {
-            type Error = $crate::prelude::WasmError;
-            fn try_from(entry: $crate::prelude::Entry) -> Result<Self, Self::Error> {
-                Self::try_from(&entry)
-            }
-        }
-
-        impl TryFrom<$crate::prelude::EntryHashed> for $t {
-            type Error = $crate::prelude::WasmError;
-            fn try_from(entry_hashed: $crate::prelude::EntryHashed) -> Result<Self, Self::Error> {
-                Self::try_from(entry_hashed.as_content())
-            }
-        }
-
-        impl TryFrom<&$crate::prelude::Element> for $t {
-            type Error = $crate::prelude::WasmError;
-            fn try_from(element: &$crate::prelude::Element) -> Result<Self, Self::Error> {
-                Ok(match element.entry() {
-                    ElementEntry::Present(entry) => Self::try_from(entry)?,
-                    _ => return Err(Self::Error::Guest(format!("Tried to deserialize an element, expecting it to contain entry data, but there was none. Element HeaderHash: {}", element.header_hashed().as_hash()))),
-                })
-            }
-        }
-
-        impl TryFrom<$crate::prelude::Element> for $t {
-            type Error = $crate::prelude::WasmError;
-            fn try_from(element: $crate::prelude::Element) -> Result<Self, Self::Error> {
-                (&element).try_into()
-            }
-        }
-
-        impl TryFrom<&$t> for $crate::prelude::AppEntryBytes {
-            type Error = $crate::prelude::WasmError;
-            fn try_from(t: &$t) -> Result<Self, Self::Error> {
-                AppEntryBytes::try_from(SerializedBytes::try_from(t)?).map_err(|entry_error| match entry_error {
-                    EntryError::SerializedBytes(serialized_bytes_error) => {
-                        WasmError::Serialize(serialized_bytes_error)
-                    }
-                    EntryError::EntryTooLarge(_) => {
-                        WasmError::Guest(entry_error.to_string())
-                    }
-                })
-            }
-        }
-
-        impl TryFrom<$t> for $crate::prelude::AppEntryBytes {
-            type Error = $crate::prelude::WasmError;
-            fn try_from(t: $t) -> Result<Self, Self::Error> {
-                Self::try_from(&t)
-            }
-        }
-
-        impl TryFrom<&$t> for $crate::prelude::Entry {
-            type Error = $crate::prelude::WasmError;
-            fn try_from(t: &$t) -> Result<Self, Self::Error> {
-                Ok(Self::App($crate::prelude::AppEntryBytes::try_from(t)?))
-            }
-        }
-
-        impl TryFrom<$t> for $crate::prelude::Entry {
-            type Error = $crate::prelude::WasmError;
-            fn try_from(t: $t) -> Result<Self, Self::Error> {
-                Self::try_from(&t)
-            }
-        }
-    };
-}
-
-/// Implements a whole lot of sane defaults for a struct or enum that should behave as an entry,
-/// *without* implementing the app entry conversion interface.
-///
-/// This allows crates to easily define a struct as an entry separately to binding that struct
-/// as an entry type in a dependent crate.
-///
-/// For most normal applications, you should use the [ `entry_def!` ] macro instead.
-#[macro_export]
-macro_rules! register_entry {
-    ( $t:ident $def:expr ) => {
-        impl $crate::prelude::EntryDefRegistration for $t {
-            fn entry_def() -> $crate::prelude::EntryDef {
-                $def
-            }
-
-            fn entry_def_id() -> $crate::prelude::EntryDefId {
-                Self::entry_def().id
-            }
-
-            fn entry_visibility() -> $crate::prelude::EntryVisibility {
-                Self::entry_def().visibility
-            }
-
-            fn crdt_type() -> $crate::prelude::CrdtType {
-                Self::entry_def().crdt_type
-            }
-
-            fn required_validations() -> $crate::prelude::RequiredValidations {
-                Self::entry_def().required_validations
-            }
-        }
-
-        impl From<$t> for $crate::prelude::EntryDef
-        where
-            $t: $crate::prelude::EntryDefRegistration,
-        {
-            fn from(_: $t) -> Self {
-                $t::entry_def()
-            }
-        }
-
-        impl From<&$t> for $crate::prelude::EntryDef
-        where
-            $t: $crate::prelude::EntryDefRegistration,
-        {
-            fn from(_: &$t) -> Self {
-                $t::entry_def()
-            }
-        }
-
-        impl From<$t> for $crate::prelude::EntryDefId
-        where
-            $t: $crate::prelude::EntryDefRegistration,
-        {
-            fn from(_: $t) -> Self {
-                $t::entry_def_id()
-            }
-        }
-
-        impl From<&$t> for $crate::prelude::EntryDefId
-        where
-            $t: $crate::prelude::EntryDefRegistration,
-        {
-            fn from(_: &$t) -> Self {
-                $t::entry_def_id()
-            }
-        }
-
-        impl TryFrom<&$t> for $crate::prelude::CreateInput
-        where
-            $t: $crate::prelude::EntryDefRegistration,
-        {
-            type Error = $crate::prelude::WasmError;
-            fn try_from(t: &$t) -> Result<Self, Self::Error> {
-                Ok(Self::new(
-                    $t::entry_def_id(),
-                    t.try_into()?,
-                    ChainTopOrdering::default(),
-                ))
-            }
-        }
-
-        impl TryFrom<$t> for $crate::prelude::CreateInput {
-            type Error = $crate::prelude::WasmError;
-            fn try_from(t: $t) -> Result<Self, Self::Error> {
-                (&t).try_into()
-            }
-        }
-
-        impl From<$t> for $crate::prelude::EntryVisibility
-        where
-            $t: $crate::prelude::EntryDefRegistration,
-        {
-            fn from(_: $t) -> Self {
-                $t::entry_visibility()
-            }
-        }
-
-        impl From<&$t> for $crate::prelude::EntryVisibility
-        where
-            $t: $crate::prelude::EntryDefRegistration,
-        {
-            fn from(_: &$t) -> Self {
-                $t::entry_visibility()
-            }
-        }
-
-        impl From<$t> for $crate::prelude::CrdtType
-        where
-            $t: $crate::prelude::EntryDefRegistration,
-        {
-            fn from(_: $t) -> Self {
-                $t::crdt_type()
-            }
-        }
-
-        impl From<&$t> for $crate::prelude::CrdtType
-        where
-            $t: $crate::prelude::EntryDefRegistration,
-        {
-            fn from(_: &$t) -> Self {
-                $t::crdt_type()
-            }
-        }
-
-        impl From<$t> for $crate::prelude::RequiredValidations
-        where
-            $t: $crate::prelude::EntryDefRegistration,
-        {
-            fn from(_: $t) -> Self {
-                $t::required_validations()
-            }
-        }
-
-        impl From<&$t> for $crate::prelude::RequiredValidations
-        where
-            $t: $crate::prelude::EntryDefRegistration,
-        {
-            fn from(_: &$t) -> Self {
-                $t::required_validations()
-            }
-        }
-    };
 }
 
 /// Implements a whole lot of sane defaults for a struct or enum that should behave as an entry.
@@ -657,10 +271,10 @@ macro_rules! register_entry {
 /// impls are just a loose set of conventions.
 ///
 /// It's actually entirely possible to interact with core directly without any of these.
-/// e.g. [ `create_entry` ] is just building a tuple of [ `EntryDefId` ] and [ `Entry::App` ] under the hood.
+/// e.g. [`create_entry`] is just building a tuple of [`EntryDefId`] and [`Entry::App`] under the hood.
 ///
-/// This requires that TryFrom and TryInto [ `derive@SerializedBytes` ] is implemented for the entry type,
-/// which implies that [ `serde::Serialize` ] and [ `serde::Deserialize` ] is also implemented.
+/// This requires that TryFrom and TryInto [`derive@SerializedBytes`] is implemented for the entry type,
+/// which implies that [`serde::Serialize`] and [`serde::Deserialize`] is also implemented.
 /// These can all be derived and there is an attribute macro that both does the default defines.
 ///
 ///  e.g. the following are equivalent
@@ -682,91 +296,23 @@ macro_rules! register_entry {
 #[macro_export]
 macro_rules! entry_def {
     ( $t:ident $def:expr ) => {
-        app_entry!($t);
-        register_entry!($t $def);
+        $crate::prelude::holochain_deterministic_integrity::app_entry!($t);
+        $crate::prelude::holochain_deterministic_integrity::register_entry!($t $def);
     };
 }
 
-/// Shorthand to implement the entry defs callback similar to the vec![ .. ] macro but for entries.
-///
-/// e.g. the following are the same
-///
-/// ```ignore
-/// entry_defs![ Foo::entry_def() ];
-/// ```
-///
-/// ```ignore
-/// #[hdk_extern]
-/// fn entry_defs(_: ()) -> ExternResult<EntryDefsCallbackResult> {
-///   Ok(vec![ Foo::entry_def() ].into())
-/// }
-/// ```
-#[macro_export]
-macro_rules! entry_defs {
-    [ $( $def:expr ),* ] => {
-        #[hdk_extern]
-        pub fn entry_defs(_: ()) -> $crate::prelude::ExternResult<$crate::prelude::EntryDefsCallbackResult> {
-            Ok($crate::prelude::EntryDefsCallbackResult::from(vec![ $( $def ),* ]))
-        }
-    };
-}
-
-/// Attempts to lookup the [ `EntryDefIndex` ] given an [ `EntryDefId` ].
-///
-/// The [ `EntryDefId` ] is a [ `String` ] newtype and the [ `EntryDefIndex` ] is a u8 newtype.
-/// The [ `EntryDefIndex` ] is used to reference the entry type in headers on the DHT and as the index of the type exported to tooling.
-/// The [ `EntryDefId` ] is the 'human friendly' string that the [ `entry_defs!` ] callback maps to the index.
-///
-/// The host actually has no idea how to do this mapping, it is provided by the wasm!
-///
-/// Therefore this is a macro that calls the [ `entry_defs!` ] callback as defined within a zome directly from the zome.
-/// It is a macro so that we can call a function with a known name `crate::entry_defs` from the HDK before the function is defined.
-///
-/// Obviously this assumes and requires that a compliant [ `entry_defs!` ] callback _is_ defined at the root of the crate.
-#[macro_export]
-macro_rules! entry_def_index {
-    ( $t:ty ) => {
-        match $crate::prelude::zome_info() {
-            Ok(ZomeInfo { entry_defs, .. }) => {
-                match entry_defs.entry_def_index_from_id(<$t>::entry_def_id()) {
-                    Some(entry_def_index) => Ok::<
-                        $crate::prelude::EntryDefIndex,
-                        $crate::prelude::WasmError,
-                    >(entry_def_index),
-                    None => {
-                        $crate::prelude::tracing::error!(
-                            entry_def_type = stringify!($t),
-                            ?entry_defs,
-                            "Failed to lookup index for entry def id."
-                        );
-                        Err::<$crate::prelude::EntryDefIndex, $crate::prelude::WasmError>(
-                            $crate::prelude::WasmError::Guest(
-                                "Failed to lookup index for entry def id.".into(),
-                            ),
-                        )
-                    }
-                }
-            }
-            Err(error) => {
-                $crate::prelude::tracing::error!(?error, "Failed to lookup entry defs.");
-                Err::<$crate::prelude::EntryDefIndex, $crate::prelude::WasmError>(error)
-            }
-        }
-    };
-}
-
-#[macro_export]
-macro_rules! entry_type {
-    ( $t:ty ) => {
-        match $crate::prelude::entry_def_index!($t) {
-            Ok(e_id) => match $crate::prelude::zome_info() {
-                Ok(ZomeInfo { id, .. }) => Ok($crate::prelude::EntryType::App(
-                    $crate::prelude::AppEntryType::new(e_id, id, <$t>::entry_visibility()),
-                )),
-                Err(e) => Err(e),
-                _ => unreachable!(),
-            },
-            Err(e) => Err(e),
-        }
-    };
+/// Helper to convert a type to [`CreateInput`].
+/// This is needed because [`TryInto`] / [`TryFrom`] cannot be
+/// impl on a generic type.
+fn try_into_create_input<T, E>(t: T) -> Result<CreateInput, WasmError>
+where
+    T: EntryDefRegistration,
+    Entry: TryFrom<T, Error = E>,
+    WasmError: From<E>,
+{
+    Ok(CreateInput::new(
+        T::entry_def_id(),
+        t.try_into()?,
+        ChainTopOrdering::default(),
+    ))
 }

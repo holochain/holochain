@@ -1,8 +1,8 @@
 [package]
 name = "release-automation"
-version = "0.2.0-alpha.0"
+version = "0.2.0-alpha.1"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
-edition = "2018"
+edition = "2021"
 documentation = "https://docs.rs/release-automation"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -11,13 +11,12 @@ documentation = "https://docs.rs/release-automation"
 comrak = "0.10"
 yaml-rust = "0.4.5"
 structopt = "0.3"
-pulldown-cmark = "0.8"
 bstr = "0.2"
-cargo = "0.53"
+cargo = "0.58"
 once_cell = "1.7"
 anyhow = "1.0"
 # needs to be in sync with what cargo is using
-semver = "0.10"
+semver = "1.0.3"
 serde = "1.0"
 serde_yaml = "0.8"
 educe = "0.4"
@@ -37,8 +36,8 @@ toml_edit = "0.2"
 thiserror = "1"
 regex = "1.5"
 crates_io_api = "0.7"
-holochain_util = { path = "../holochain_util" ,version = "0.0.6"}
-crates-index = "0.16"
+crates-index = "0.18"
+itertools = "0.10"
 
 # used for the example clippy fix-json
 rustfix = "0.6"
@@ -48,6 +47,7 @@ serde_with = "1.9.4"
 [dev-dependencies]
 ctor = "0.1"
 prettydiff = "0.4"
+pretty_assertions = "1.1"
 tempfile = "3"
 cargo-test-support = { git = "https://github.com/rust-lang/cargo", branch = "rust-1.53.0" }
 assert_cmd = "1.0"

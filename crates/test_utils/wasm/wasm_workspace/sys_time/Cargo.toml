@@ -2,15 +2,18 @@
 name = "test_wasm_sys_time"
 version = "0.0.1"
 authors = [ "thedavidmeister", "thedavidmeister@gmail.com" ]
-edition = "2018"
+edition = "2021"
 
 [lib]
 name = "test_wasm_sys_time"
 crate-type = [ "cdylib", "rlib" ]
 
 [dependencies]
-hdk = { path = "../../../../hdk", features = ["fixturators"] }
+hdk = { path = "../../../../hdk" }
 serde = "1.0"
+
+[dev-dependencies]
+hdk = { path = "../../../../hdk", features = ["fixturators"] }
 
 [features]
 default = []

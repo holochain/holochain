@@ -4,6 +4,7 @@ use std::slice::SliceIndex;
 use super::common::*;
 use super::*;
 use crate::gossip::sharded_gossip::bloom::Batch;
+use crate::HostStub;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn bloom_windows() {
@@ -234,10 +235,12 @@ async fn make_node_inner(data: Option<(usize, TimeWindow)>) -> ShardedGossipLoca
             Ok(async move { Ok(data) }.boxed().into())
         });
     let (evt_sender, _) = spawn_handler(evt_handler).await;
+    let host = HostStub::new();
 
     ShardedGossipLocal::test(
         GossipType::Historical,
         evt_sender,
+        host,
         ShardedGossipLocalState::default(),
     )
 }
@@ -253,7 +256,7 @@ fn get_time_bounds(
         .map(|i| (window.start + step * i as u32).unwrap())
         .collect::<Vec<_>>();
 
-    let mut iter = times[elements].into_iter();
+    let mut iter = times[elements].iter();
     let start = iter.next().unwrap();
     let mut end = *iter.last().unwrap_or(start);
     end = (end + Duration::from_micros(1)).unwrap();

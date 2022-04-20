@@ -1,8 +1,9 @@
+use crate as zt;
 use crate::cell::CellId;
-use crate::prelude as zt;
 use crate::zome::FunctionName;
 use crate::zome::ZomeName;
 use holo_hash::AgentPubKey;
+pub use holochain_integrity_types::zome_io::*;
 use holochain_serialized_bytes::prelude::*;
 
 /// All wasm shared I/O types need to share the same basic behaviours to cross the host/guest
@@ -29,51 +30,6 @@ macro_rules! wasm_io_types {
 // - first the sparse callback is triggered with SB input/output
 // - then the guest inflates the expected input or the host the expected output based on the
 //   callback flavour
-
-#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, Eq)]
-#[serde(transparent)]
-#[repr(transparent)]
-pub struct ExternIO(#[serde(with = "serde_bytes")] pub Vec<u8>);
-
-impl ExternIO {
-    pub fn encode<I>(input: I) -> Result<Self, SerializedBytesError>
-    where
-        I: serde::Serialize + std::fmt::Debug,
-    {
-        Ok(Self(holochain_serialized_bytes::encode(&input)?))
-    }
-    pub fn decode<O>(&self) -> Result<O, SerializedBytesError>
-    where
-        O: serde::de::DeserializeOwned + std::fmt::Debug,
-    {
-        holochain_serialized_bytes::decode(&self.0)
-    }
-
-    pub fn into_vec(self) -> Vec<u8> {
-        self.into()
-    }
-    pub fn as_bytes(&self) -> &[u8] {
-        self.as_ref()
-    }
-}
-
-impl AsRef<[u8]> for ExternIO {
-    fn as_ref(&self) -> &[u8] {
-        &self.0
-    }
-}
-
-impl From<Vec<u8>> for ExternIO {
-    fn from(v: Vec<u8>) -> Self {
-        Self(v)
-    }
-}
-
-impl From<ExternIO> for Vec<u8> {
-    fn from(extern_io: ExternIO) -> Self {
-        extern_io.0
-    }
-}
 
 wasm_io_types! {
 
@@ -138,8 +94,8 @@ wasm_io_types! {
     // Attempt to get a live entry from the cascade.
     fn get (Vec<zt::entry::GetInput>) -> Vec<Option<zt::element::Element>>;
 
-    // Hash an entry on the host.
-    fn hash_entry (zt::entry::Entry) -> holo_hash::EntryHash;
+    // Hash data on the host.
+    fn hash (zt::hash::HashInput) -> zt::hash::HashOutput;
 
     // Retreive an element from the DHT or short circuit.
     fn must_get_valid_element (zt::entry::MustGetValidElementInput) -> zt::element::Element;

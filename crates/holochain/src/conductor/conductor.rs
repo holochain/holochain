@@ -2,19 +2,18 @@
 //! A Conductor is a dynamically changing group of [Cell]s.
 //!
 //! A Conductor can be managed:
-//! - externally, via a [AppInterfaceApi]
-//! - from within a [Cell], via [CellConductorApi]
+//! - externally, via an [`AppInterfaceApi`](super::api::AppInterfaceApi)
+//! - from within a [`Cell`](super::Cell), via [`CellConductorApi`](super::api::CellConductorApi)
 //!
 //! In normal use cases, a single Holochain user runs a single Conductor in a single process.
 //! However, there's no reason we can't have multiple Conductors in a single process, simulating multiple
 //! users in a testing environment.
 
 pub use self::share::RwShare;
-
 use super::api::RealAppInterfaceApi;
 use super::config::AdminInterfaceConfig;
 use super::config::InterfaceDriver;
-use super::dna_store::RealDnaStore;
+use super::dna_store::DnaStore;
 use super::entry_def_store::get_entry_defs;
 use super::error::ConductorError;
 use super::handle::ConductorHandleImpl;
@@ -28,7 +27,7 @@ use super::manager::keep_alive_task;
 use super::manager::ManagedTaskAdd;
 use super::manager::ManagedTaskHandle;
 use super::manager::TaskManagerRunHandle;
-use super::paths::EnvironmentRootPath;
+use super::paths::DatabaseRootPath;
 use super::space::Space;
 use super::space::Spaces;
 use super::state::AppInterfaceId;
@@ -65,7 +64,6 @@ use holochain_keystore::lair_keystore::spawn_new_lair_keystore;
 use holochain_keystore::test_keystore::spawn_legacy_test_keystore;
 use holochain_keystore::test_keystore::spawn_test_keystore;
 use holochain_keystore::MetaLairClient;
-use holochain_sqlite::conn::DbSyncStrategy;
 use holochain_sqlite::prelude::*;
 use holochain_sqlite::sql::sql_cell::state_dump;
 use holochain_state::mutations;
@@ -73,6 +71,7 @@ use holochain_state::prelude::from_blob;
 use holochain_state::prelude::StateMutationResult;
 use holochain_state::prelude::StateQueryResult;
 use holochain_types::prelude::*;
+pub use holochain_types::share;
 use rusqlite::{OptionalExtension, Transaction};
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::AtomicBool;
@@ -82,8 +81,6 @@ use tracing::*;
 
 #[cfg(feature = "test_utils")]
 use super::handle::MockConductorHandleT;
-
-mod share;
 
 /// The status of an installed Cell, which captures different phases of its lifecycle
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -131,19 +128,12 @@ pub(crate) type StopReceiver = tokio::sync::broadcast::Receiver<()>;
 
 /// A Conductor is a group of [Cell]s
 #[derive(Clone)]
-pub struct Conductor<DS = RealDnaStore, CA = CellConductorApi>
+pub struct Conductor<CA = CellConductorApi>
 where
-    DS: DnaStore,
     CA: CellConductorApiT,
 {
     /// The collection of cells associated with this Conductor
     cells: RwShare<HashMap<CellId, CellItem<CA>>>,
-
-    /// The database for persisting state related to this Conductor
-    conductor_env: DbWrite<DbKindConductor>,
-
-    /// A database for storing wasm
-    wasm_env: DbWrite<DbKindWasm>,
 
     /// The map of dna hash spaces.
     pub(super) spaces: Spaces,
@@ -165,19 +155,13 @@ where
     pub(super) task_manager: RwShare<Option<TaskManagerClient>>,
 
     /// Placeholder for what will be the real DNA/Wasm cache
-    dna_store: RwShare<DS>,
+    dna_store: RwShare<DnaStore>,
 
     /// Access to private keys for signing and encryption.
     keystore: MetaLairClient,
 
-    /// The root environment directory where all environments are created
-    root_env_dir: EnvironmentRootPath,
-
     /// Handle to the network actor.
     holochain_p2p: holochain_p2p::HolochainP2pRef,
-
-    /// The map of running queue consumer workflows.
-    queue_consumer_map: QueueConsumerMap,
 
     post_commit: tokio::sync::mpsc::Sender<PostCommitArgs>,
 }
@@ -192,10 +176,7 @@ impl Conductor {
 //-----------------------------------------------------------------------------
 // Public methods
 //-----------------------------------------------------------------------------
-impl<DS> Conductor<DS>
-where
-    DS: DnaStore + 'static,
-{
+impl Conductor {
     /// Returns a port which is guaranteed to have a websocket listener with an Admin interface
     /// on it. Useful for specifying port 0 and letting the OS choose a free port.
     pub fn get_arbitrary_admin_websocket_port(&self) -> Option<u16> {
@@ -206,10 +187,7 @@ where
 //-----------------------------------------------------------------------------
 /// Methods used by the [ConductorHandle]
 //-----------------------------------------------------------------------------
-impl<DS> Conductor<DS>
-where
-    DS: DnaStore + 'static,
-{
+impl Conductor {
     pub(super) fn cell_by_id(&self, cell_id: &CellId) -> ConductorResult<Arc<Cell>> {
         let cell = self
             .cells
@@ -268,7 +246,7 @@ where
         }
     }
 
-    pub(super) fn dna_store(&self) -> &RwShare<DS> {
+    pub(super) fn dna_store(&self) -> &RwShare<DnaStore> {
         &self.dna_store
     }
 
@@ -307,10 +285,7 @@ where
         &self,
         configs: Vec<AdminInterfaceConfig>,
         handle: ConductorHandle,
-    ) -> ConductorResult<()>
-    where
-        DS: DnaStore + 'static,
-    {
+    ) -> ConductorResult<()> {
         let admin_api = RealAdminInterfaceApi::new(handle);
         let stop_tx = self.task_manager.share_ref(|tm| {
             tm.as_ref()
@@ -466,7 +441,7 @@ where
     }
 
     pub(super) fn get_queue_consumer_workflows(&self) -> QueueConsumerMap {
-        self.queue_consumer_map.clone()
+        self.spaces.queue_consumer_map.clone()
     }
 
     /// Start all app interfaces currently in state.
@@ -494,10 +469,11 @@ where
 
     /// Instantiate a Ribosome for use with a DNA
     pub(crate) fn get_ribosome(&self, dna_hash: &DnaHash) -> ConductorResult<RealRibosome> {
-        self.dna_store.share_ref(|d| match d.get(dna_hash) {
-            Some(dna) => Ok(RealRibosome::new(dna)),
-            None => Err(DnaError::DnaMissing(dna_hash.to_owned()).into()),
-        })
+        self.dna_store
+            .share_ref(|d| match d.get_dna_file(dna_hash) {
+                Some(dna) => Ok(RealRibosome::new(dna)),
+                None => Err(DnaError::DnaMissing(dna_hash.to_owned()).into()),
+            })
     }
 
     /// Get a dna space or create it if one doesn't exist.
@@ -505,18 +481,18 @@ where
         self.spaces.get_or_create_space(dna_hash)
     }
 
-    pub(super) fn get_or_create_authored_env(
+    pub(super) fn get_or_create_authored_db(
         &self,
         dna_hash: &DnaHash,
     ) -> ConductorResult<DbWrite<DbKindAuthored>> {
-        self.spaces.authored_env(dna_hash)
+        self.spaces.authored_db(dna_hash)
     }
 
-    pub(super) fn get_or_create_dht_env(
+    pub(super) fn get_or_create_dht_db(
         &self,
         dna_hash: &DnaHash,
     ) -> ConductorResult<DbWrite<DbKindDht>> {
-        self.spaces.dht_env(dna_hash)
+        self.spaces.dht_db(dna_hash)
     }
 
     /// Adjust app statuses (via state transitions) to match the current
@@ -793,7 +769,7 @@ where
             })
             .await?;
         let child_dna = dna_store.share_ref(|ds| {
-            ds.get(&parent_dna_hash)
+            ds.get_dna_file(&parent_dna_hash)
                 .ok_or(DnaError::DnaMissing(parent_dna_hash))?
                 .modify_phenotype(random_uid(), properties)
         })?;
@@ -820,10 +796,10 @@ where
         impl IntoIterator<Item = (DnaHash, DnaFile)>,
         impl IntoIterator<Item = (EntryDefBufferKey, EntryDef)>,
     )> {
-        let env = &self.wasm_env;
+        let db = &self.spaces.wasm_db;
 
         // Load out all dna defs
-        let (wasm_tasks, defs) = env
+        let (wasm_tasks, defs) = db
             .async_reader(move |txn| {
                 // Get all the dna defs.
                 let dna_defs: Vec<_> = holochain_state::dna_def::get_all(&txn)?
@@ -881,13 +857,18 @@ where
     }
 
     /// Get the root environment directory.
-    pub fn root_env_dir(&self) -> &EnvironmentRootPath {
-        &self.root_env_dir
+    pub fn root_db_dir(&self) -> &DatabaseRootPath {
+        &self.spaces.db_dir
     }
 
     /// Get the keystore.
     pub fn keystore(&self) -> &MetaLairClient {
         &self.keystore
+    }
+
+    /// Get a reference to the conductor's HolochainP2p.
+    pub fn holochain_p2p(&self) -> &holochain_p2p::HolochainP2pRef {
+        &self.holochain_p2p
     }
 
     /// Remove cells from the cell map in the Conductor
@@ -934,7 +915,7 @@ where
         &self,
         dna: DnaFile,
     ) -> ConductorResult<Vec<(EntryDefBufferKey, EntryDef)>> {
-        let env = self.wasm_env.clone();
+        let db = self.spaces.wasm_db.clone();
 
         let zome_defs = get_entry_defs(dna.clone())?;
 
@@ -947,7 +928,7 @@ where
         )
         .await;
 
-        env.async_commit({
+        db.async_commit({
             let zome_defs = zome_defs.clone();
             move |txn| {
                 for dna_wasm in wasms {
@@ -957,7 +938,7 @@ where
                 }
 
                 for (key, entry_def) in zome_defs.clone() {
-                    holochain_state::entry_def::put(txn, key, entry_def)?;
+                    holochain_state::entry_def::put(txn, key, &entry_def)?;
                 }
 
                 if !holochain_state::dna_def::contains(txn, dna.dna_hash())? {
@@ -1095,21 +1076,20 @@ where
 /// If genesis fails for any cell, this entire function fails, and all other
 /// partial or complete successes are rolled back.
 /// Note this function takes read locks so should not be called from within a read lock.
-pub(super) async fn genesis_cells<DS: DnaStore + 'static>(
-    conductor: &Conductor<DS>,
+pub(super) async fn genesis_cells(
+    conductor: &Conductor,
     cell_ids_with_proofs: Vec<(CellId, Option<MembraneProof>)>,
     conductor_handle: ConductorHandle,
 ) -> ConductorResult<()> {
     let cells_tasks = cell_ids_with_proofs.into_iter().map(|(cell_id, proof)| {
-        let authored_env = conductor
-            .get_or_create_authored_env(cell_id.dna_hash())
-            .map_err(|e| CellError::FailedToCreateAuthoredDb(e.into()));
-        let dht_env = conductor
-            .get_or_create_dht_env(cell_id.dna_hash())
-            .map_err(|e| CellError::FailedToCreateDhtDb(e.into()));
+        let space = conductor
+            .get_or_create_space(cell_id.dna_hash())
+            .map_err(|e| CellError::FailedToCreateDnaSpace(e.into()));
         async {
-            let authored_env = authored_env?;
-            let dht_env = dht_env?;
+            let space = space?;
+            let authored_db = space.authored_db;
+            let dht_db = space.dht_db;
+            let dht_db_cache = space.dht_query_cache;
             let conductor_handle = conductor_handle.clone();
             let cell_id_inner = cell_id.clone();
             let ribosome = conductor_handle
@@ -1119,8 +1099,9 @@ pub(super) async fn genesis_cells<DS: DnaStore + 'static>(
                 Cell::genesis(
                     cell_id_inner,
                     conductor_handle,
-                    authored_env,
-                    dht_env,
+                    authored_db,
+                    dht_db,
+                    dht_db_cache,
                     ribosome,
                     proof,
                 )
@@ -1264,46 +1245,54 @@ fn query_dht_ops_from_statement(
 // Private methods
 //-----------------------------------------------------------------------------
 
-impl<DS> Conductor<DS>
-where
-    DS: DnaStore + 'static,
-{
+impl Conductor {
     #[allow(clippy::too_many_arguments)]
     async fn new(
-        conductor_env: DbWrite<DbKindConductor>,
-        wasm_env: DbWrite<DbKindWasm>,
-        dna_store: DS,
+        dna_store: RwShare<DnaStore>,
         keystore: MetaLairClient,
-        root_env_dir: EnvironmentRootPath,
         holochain_p2p: holochain_p2p::HolochainP2pRef,
-        db_sync_level: DbSyncStrategy,
+        spaces: Spaces,
         post_commit: tokio::sync::mpsc::Sender<PostCommitArgs>,
     ) -> ConductorResult<Self> {
-        let queue_consumer_map = QueueConsumerMap::new();
         Ok(Self {
-            conductor_env,
-            wasm_env,
-            spaces: Spaces::new(
-                root_env_dir.clone(),
-                db_sync_level,
-                queue_consumer_map.clone(),
-            ),
+            spaces,
             cells: RwShare::new(HashMap::new()),
             shutting_down: Arc::new(AtomicBool::new(false)),
             app_interfaces: RwShare::new(HashMap::new()),
             task_manager: RwShare::new(None),
             admin_websocket_ports: RwShare::new(Vec::new()),
-            dna_store: RwShare::new(dna_store),
+            dna_store,
             keystore,
-            root_env_dir,
             holochain_p2p,
-            queue_consumer_map,
             post_commit,
         })
     }
 
+    pub(crate) async fn prune_p2p_agents_db(&self) -> ConductorResult<()> {
+        use holochain_p2p::AgentPubKeyExt;
+
+        let mut space_to_agents = HashMap::new();
+
+        for cell in self.cells.share_ref(|c| {
+            <Result<_, one_err::OneErr>>::Ok(c.keys().cloned().collect::<Vec<_>>())
+        })? {
+            space_to_agents
+                .entry(cell.dna_hash().clone())
+                .or_insert_with(Vec::new)
+                .push(cell.agent_pubkey().to_kitsune());
+        }
+
+        for (space, agents) in space_to_agents {
+            let db = self.spaces.p2p_agents_db(&space)?;
+            p2p_prune(&db, agents).await?;
+        }
+
+        Ok(())
+    }
+
     pub(super) async fn get_state(&self) -> ConductorResult<ConductorState> {
-        self.conductor_env
+        self.spaces
+            .conductor_db
             .async_reader(|txn| {
                 let state = txn
                     .query_row("SELECT blob FROM ConductorState WHERE id = 1", [], |row| {
@@ -1338,7 +1327,8 @@ where
     {
         self.check_running()?;
         let output = self
-            .conductor_env
+            .spaces
+            .conductor_db
             .async_commit(move |txn| {
                 let state = txn
                     .query_row("SELECT blob FROM ConductorState WHERE id = 1", [], |row| {
@@ -1378,19 +1368,18 @@ where
 
 mod builder {
     use super::*;
-    use crate::conductor::dna_store::RealDnaStore;
+    use crate::conductor::dna_store::DnaStore;
     use crate::conductor::handle::DevSettings;
+    use crate::conductor::kitsune_host_impl::KitsuneHostImpl;
     use crate::conductor::ConductorHandle;
-    #[cfg(any(test, feature = "test_utils"))]
-    use holochain_state::test_utils::TestEnvs;
 
     /// A configurable Builder for Conductor and sometimes ConductorHandle
     #[derive(Default)]
-    pub struct ConductorBuilder<DS = RealDnaStore> {
+    pub struct ConductorBuilder {
         /// The configuration
         pub config: ConductorConfig,
         /// The DnaStore (mockable)
-        pub dna_store: DS,
+        pub dna_store: DnaStore,
         /// For new lair, passphrase is required
         pub passphrase: Option<sodoken::BufRead>,
         /// Optional keystore override
@@ -1410,20 +1399,7 @@ mod builder {
         }
     }
 
-    impl ConductorBuilder<MockDnaStore> {
-        /// ConductorBuilder using mocked DnaStore, for testing
-        pub fn with_mock_dna_store(dna_store: MockDnaStore) -> ConductorBuilder<MockDnaStore> {
-            Self {
-                dna_store,
-                ..Default::default()
-            }
-        }
-    }
-
-    impl<DS> ConductorBuilder<DS>
-    where
-        DS: DnaStore + 'static,
-    {
+    impl ConductorBuilder {
         /// Set the ConductorConfig used to build this Conductor
         pub fn config(mut self, config: ConductorConfig) -> Self {
             self.config = config;
@@ -1488,16 +1464,11 @@ mod builder {
 
             let env_path = self.config.environment_path.clone();
 
-            let environment = DbWrite::open(env_path.as_ref(), DbKindConductor)?;
-
-            let wasm_environment = DbWrite::open(env_path.as_ref(), DbKindWasm)?;
-
-            #[cfg(any(test, feature = "test_utils"))]
-            let state = self.state;
-
             let Self {
                 dna_store, config, ..
             } = self;
+
+            let dna_store = RwShare::new(dna_store);
 
             let network_config = match &config.network {
                 None => holochain_p2p::kitsune_p2p::KitsuneP2pConfig::default(),
@@ -1506,51 +1477,54 @@ mod builder {
             let (cert_digest, cert, cert_priv_key) =
                 keystore.get_or_create_first_tls_cert().await?;
             let tls_config =
-                holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_proxy::TlsConfig {
+                holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_types::tls::TlsConfig {
                     cert,
                     cert_priv_key,
                     cert_digest,
                 };
+
+            let spaces = Spaces::new(env_path, config.db_sync_strategy)?;
+            let host = KitsuneHostImpl::new(spaces.clone());
+
             let (holochain_p2p, p2p_evt) =
-                holochain_p2p::spawn_holochain_p2p(network_config, tls_config).await?;
+                holochain_p2p::spawn_holochain_p2p(network_config, tls_config, host).await?;
 
             let (post_commit_sender, post_commit_receiver) =
                 tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
 
             let conductor = Conductor::new(
-                environment,
-                wasm_environment,
                 dna_store,
                 keystore,
-                env_path,
                 holochain_p2p,
-                config.db_sync_strategy,
+                spaces,
                 post_commit_sender,
             )
             .await?;
 
-            #[cfg(any(test, feature = "test_utils"))]
-            let conductor = Self::update_fake_state(state, conductor).await?;
+            let shutting_down = conductor.shutting_down.clone();
 
-            // Get data before handle
-            let keystore = conductor.keystore.clone();
-            let holochain_p2p = conductor.holochain_p2p.clone();
+            #[cfg(any(test, feature = "test_utils"))]
+            let conductor = Self::update_fake_state(self.state, conductor).await?;
 
             // Create handle
             let handle: ConductorHandle = Arc::new(ConductorHandleImpl {
-                root_env_dir: config.environment_path.clone(),
                 conductor,
-                keystore,
-                holochain_p2p,
-                db_sync_strategy: config.db_sync_strategy,
-
-                p2p_env: Arc::new(parking_lot::Mutex::new(HashMap::new())),
-                p2p_batch_senders: Arc::new(parking_lot::Mutex::new(HashMap::new())),
-                p2p_metrics_env: Arc::new(parking_lot::Mutex::new(HashMap::new())),
 
                 #[cfg(any(test, feature = "test_utils"))]
                 dev_settings: parking_lot::RwLock::new(DevSettings::default()),
             });
+
+            {
+                let handle = handle.clone();
+                tokio::task::spawn(async move {
+                    while !shutting_down.load(std::sync::atomic::Ordering::Relaxed) {
+                        tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+                        if let Err(e) = handle.prune_p2p_agents_db().await {
+                            tracing::error!("failed to prune p2p_agents_db: {:?}", e);
+                        }
+                    }
+                });
+            }
 
             Self::finish(handle, config, p2p_evt, post_commit_receiver).await
         }
@@ -1648,8 +1622,8 @@ mod builder {
         #[cfg(any(test, feature = "test_utils"))]
         async fn update_fake_state(
             state: Option<ConductorState>,
-            conductor: Conductor<DS>,
-        ) -> ConductorResult<Conductor<DS>> {
+            conductor: Conductor,
+        ) -> ConductorResult<Conductor> {
             if let Some(state) = state {
                 conductor.update_state(move |_| Ok(state)).await?;
             }
@@ -1660,48 +1634,40 @@ mod builder {
         #[cfg(any(test, feature = "test_utils"))]
         pub async fn test(
             mut self,
-            envs: &TestEnvs,
+            env_path: &std::path::Path,
             extra_dnas: &[DnaFile],
         ) -> ConductorResult<ConductorHandle> {
-            let keystore = envs.keystore().clone();
+            let keystore = self.keystore.unwrap_or_else(test_keystore);
+            self.config.environment_path = env_path.to_path_buf().into();
 
-            self.config.environment_path = envs.path().to_path_buf().into();
+            let spaces = Spaces::new(
+                self.config.environment_path.clone(),
+                self.config.db_sync_strategy,
+            )?;
+            let host = KitsuneHostImpl::new(spaces.clone());
 
             let (holochain_p2p, p2p_evt) =
-                holochain_p2p::spawn_holochain_p2p(self.config.network.clone().unwrap_or_default(), holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_proxy::TlsConfig::new_ephemeral().await.unwrap())
+                holochain_p2p::spawn_holochain_p2p(self.config.network.clone().unwrap_or_default(), holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_types::tls::TlsConfig::new_ephemeral().await.unwrap(), host)
                     .await?;
 
             let (post_commit_sender, post_commit_receiver) =
                 tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
 
             let conductor = Conductor::new(
-                envs.conductor(),
-                envs.wasm(),
-                self.dna_store,
+                RwShare::new(self.dna_store),
                 keystore,
-                self.config.environment_path.clone(),
                 holochain_p2p,
-                self.config.db_sync_strategy,
+                spaces,
                 post_commit_sender,
             )
             .await?;
 
             let conductor = Self::update_fake_state(self.state, conductor).await?;
 
-            // Get data before handle
-            let keystore = conductor.keystore.clone();
-            let holochain_p2p = conductor.holochain_p2p.clone();
-
             // Create handle
             let handle: ConductorHandle = Arc::new(ConductorHandleImpl {
-                root_env_dir: self.config.environment_path.clone(),
                 conductor,
-                keystore,
-                holochain_p2p,
-                p2p_env: envs.p2p(),
-                p2p_batch_senders: Arc::new(parking_lot::Mutex::new(HashMap::new())),
-                p2p_metrics_env: envs.p2p_metrics(),
-                db_sync_strategy: self.config.db_sync_strategy,
+
                 #[cfg(any(test, feature = "test_utils"))]
                 dev_settings: parking_lot::RwLock::new(DevSettings::default()),
             });
@@ -1709,6 +1675,7 @@ mod builder {
             // Install extra DNAs, in particular:
             // the ones with InlineZomes will not be registered in the Wasm DB
             // and cannot be automatically loaded on conductor restart.
+
             for dna_file in extra_dnas {
                 handle
                     .register_dna(dna_file.clone())

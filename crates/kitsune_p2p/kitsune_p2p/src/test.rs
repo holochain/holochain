@@ -41,42 +41,6 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    #[ignore] // david.b disabled while we're full sync, not actually making
-              //         get requests
-    async fn test_transport_multi_coms() -> Result<(), KitsuneP2pError> {
-        observability::test_run().ok();
-        let (harness, _evt) = spawn_test_harness_mem().await?;
-
-        let space = harness.add_space().await?;
-        let (a1, p2p1) = harness.add_direct_agent("one".into()).await?;
-        let (a2, _p2p2) = harness.add_direct_agent("two".into()).await?;
-        let (a3, _p2p3) = harness.add_direct_agent("tre".into()).await?;
-
-        // needed until we have some way of bootstrapping
-        harness.magic_peer_info_exchange().await?;
-
-        let mut input = actor::RpcMulti::new(
-            &Default::default(),
-            space,
-            TestVal::test_val(),
-            b"test-multi-request".to_vec(),
-        );
-        input.max_remote_agent_count = 5;
-        input.max_timeout = kitsune_p2p_types::KitsuneTimeout::from_millis(200);
-        let res = p2p1.rpc_multi(input).await.unwrap();
-
-        assert_eq!(3, res.len());
-        for r in res {
-            let data = String::from_utf8_lossy(&r.response);
-            assert_eq!("echo: test-multi-request", &data);
-            assert!(r.agent == a1 || r.agent == a2 || r.agent == a3);
-        }
-
-        harness.ghost_actor_shutdown().await?;
-        Ok(())
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
     async fn test_peer_info_store() -> Result<(), KitsuneP2pError> {
         observability::test_run().ok();
 
@@ -143,7 +107,7 @@ mod tests {
         // TODO when networking works, just add_*_agent again...
         // but for now, we need the two agents to be on the same node:
         let a2: Arc<KitsuneAgent> = TestVal::test_val();
-        p2p.join(space.clone(), a2.clone()).await?;
+        p2p.join(space.clone(), a2.clone(), None).await?;
 
         let res = p2p.rpc_single(space, a1, b"hello".to_vec(), None).await?;
         assert_eq!(b"echo: hello".to_vec(), res);
@@ -163,9 +127,9 @@ mod tests {
         // TODO when networking works, just add_*_agent again...
         // but for now, we need the two agents to be on the same node:
         let a2: Arc<KitsuneAgent> = TestVal::test_val();
-        p2p.join(space.clone(), a2.clone()).await?;
+        p2p.join(space.clone(), a2.clone(), None).await?;
         let a3: Arc<KitsuneAgent> = TestVal::test_val();
-        p2p.join(space.clone(), a3.clone()).await?;
+        p2p.join(space.clone(), a3.clone(), None).await?;
 
         let mut input = actor::RpcMulti::new(
             &Default::default(),
@@ -230,7 +194,7 @@ mod tests {
         // TODO when networking works, just add_*_agent again...
         // but for now, we need the two agents to be on the same node:
         let a2: Arc<KitsuneAgent> = TestVal::test_val();
-        p2p.join(space.clone(), a2.clone()).await?;
+        p2p.join(space.clone(), a2.clone(), None).await?;
 
         let op1 = harness
             .inject_gossip_data(a1.clone(), "agent-1-data".to_string())
@@ -274,7 +238,7 @@ mod tests {
         assert_eq!(num_agent_info, 1);
 
         let a2: Arc<KitsuneAgent> = TestVal::test_val();
-        p2p.join(space.clone(), a2.clone()).await?;
+        p2p.join(space.clone(), a2.clone(), None).await?;
 
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;
 
@@ -358,6 +322,7 @@ mod tests {
 
     /// Test that we can publish agent info.
     #[tokio::test(flavor = "multi_thread")]
+    // @freesig Can anyone think of a better way to do this?
     #[ignore = "Need a better way then waiting 6 minutes to test this"]
     async fn test_publish_agent_info() {
         observability::test_run().ok();

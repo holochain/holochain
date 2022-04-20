@@ -4,8 +4,8 @@
 
 use std::sync::Arc;
 
-use crate::event::*;
 use crate::types::event::{KitsuneP2pEvent, KitsuneP2pEventHandler, KitsuneP2pEventHandlerResult};
+use crate::{event::*, KitsuneHost};
 use kitsune_p2p_types::bin_types::*;
 use kitsune_p2p_types::*;
 
@@ -36,12 +36,40 @@ impl SwitchboardEventHandler {
 impl ghost_actor::GhostHandler<KitsuneP2pEvent> for SwitchboardEventHandler {}
 impl ghost_actor::GhostControlHandler for SwitchboardEventHandler {}
 
-#[allow(warnings)]
-impl KitsuneP2pEventHandler for SwitchboardEventHandler {
-    fn handle_k_gen_req(&mut self, _: KGenReq) -> KitsuneP2pEventHandlerResult<KGenRes> {
-        Err("unimplemented".into())
+impl KitsuneHost for SwitchboardEventHandler {
+    fn get_agent_info_signed(
+        &self,
+        GetAgentInfoSignedEvt { agent, space: _ }: GetAgentInfoSignedEvt,
+    ) -> crate::KitsuneHostResult<Option<crate::types::agent_store::AgentInfoSigned>> {
+        box_fut(Ok(self.sb.share(|state| {
+            let node = state.nodes.get_mut(&self.node).unwrap();
+            let loc = agent.get_loc().as_loc8();
+            node.local_agents
+                .get(&loc)
+                .map(|e| e.info.to_owned())
+                .or_else(|| node.remote_agents.get(&loc).cloned())
+        })))
     }
 
+    fn peer_extrapolated_coverage(
+        &self,
+        _space: Arc<KitsuneSpace>,
+        _dht_arc_set: dht_arc::DhtArcSet,
+    ) -> crate::KitsuneHostResult<Vec<f64>> {
+        unimplemented!()
+    }
+
+    fn record_metrics(
+        &self,
+        _space: Arc<KitsuneSpace>,
+        _records: Vec<MetricRecord>,
+    ) -> crate::KitsuneHostResult<()> {
+        box_fut(Ok(()))
+    }
+}
+
+#[allow(warnings)]
+impl KitsuneP2pEventHandler for SwitchboardEventHandler {
     fn handle_put_agent_info_signed(
         &mut self,
         PutAgentInfoSignedEvt { space, peer_data }: PutAgentInfoSignedEvt,
@@ -59,20 +87,6 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
                 );
         });
         ok_fut(Ok(()))
-    }
-
-    fn handle_get_agent_info_signed(
-        &mut self,
-        GetAgentInfoSignedEvt { space, agent }: GetAgentInfoSignedEvt,
-    ) -> KitsuneP2pEventHandlerResult<Option<crate::types::agent_store::AgentInfoSigned>> {
-        ok_fut(Ok(self.sb.share(|state| {
-            let node = state.nodes.get_mut(&self.node).unwrap();
-            let loc = agent.get_loc().as_loc8();
-            node.local_agents
-                .get(&loc)
-                .map(|e| e.info.to_owned())
-                .or_else(|| node.remote_agents.get(&loc).cloned())
-        })))
     }
 
     fn handle_query_agents(
@@ -129,15 +143,25 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
     fn handle_gossip(
         &mut self,
         _space: Arc<KitsuneSpace>,
-        ops: Vec<(Arc<KitsuneOpHash>, Vec<u8>)>,
+        ops: Vec<KOp>,
     ) -> KitsuneP2pEventHandlerResult<()> {
         ok_fut(Ok(self.sb.share(|sb| {
             let node = sb.nodes.get_mut(&self.node).unwrap();
-            for (hash, op_data) in ops {
-                let loc8 = hash.get_loc().as_loc8();
+            for op in ops {
+                // As a hack, we just set the first bytes of the op data to the
+                // loc8 location. This mimics the real world usage, where the
+                // location would be able to be extracted from the real op data,
+                // but is just a hack here since we're not even bothering to
+                // deserialize.
+                //
+                // NB: this may be problematic on the receiving end because we
+                // actually care whether this Loc8 is interpreted as u8 or i8,
+                // and we lose that information here.
+                let loc = (op.0[0] as u8 as i8).into();
+
                 // TODO: allow setting integration status
                 node.ops.insert(
-                    loc8,
+                    loc,
                     NodeOpEntry {
                         is_integrated: true,
                     },
@@ -158,16 +182,20 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
     ) -> KitsuneP2pEventHandlerResult<Option<(Vec<Arc<KitsuneOpHash>>, TimeWindowInclusive)>> {
         ok_fut(Ok(self.sb.share(|sb| {
             let (ops, timestamps): (Vec<_>, Vec<_>) = sb
-                .ops
+                .get_ops_loc8(&self.node)
                 .iter()
-                .filter(|(op_loc8, op)| {
-                    // Does the op fall within the time window?
-                    window.contains(&op.timestamp)
-                    // Does the op fall within one of the specified arcsets
-                    // with the correct integration/limbo criteria?
-                        && arc_set.contains((**op_loc8).into())
+                .filter_map(|op_loc8| {
+                    let op = sb.ops.get(op_loc8).unwrap();
+                    (
+                        // Does the op fall within the time window?
+                        window.contains(&op.timestamp)
+                        // Does the op fall within one of the specified arcsets
+                        // with the correct integration/limbo criteria?
+                        && arc_set.contains((*op_loc8).into())
+                    )
+                    .then(|| op)
                 })
-                .map(|(_, op)| (op.hash.clone(), op.timestamp))
+                .map(|op| (op.hash.clone(), op.timestamp))
                 .take(max_ops)
                 .unzip();
 
@@ -194,13 +222,14 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
     fn handle_fetch_op_data(
         &mut self,
         FetchOpDataEvt { space, op_hashes }: FetchOpDataEvt,
-    ) -> KitsuneP2pEventHandlerResult<Vec<(Arc<KitsuneOpHash>, Vec<u8>)>> {
+    ) -> KitsuneP2pEventHandlerResult<Vec<(Arc<KitsuneOpHash>, KOp)>> {
         ok_fut(Ok(self.sb.share(|sb| {
             op_hashes
                 .into_iter()
                 .map(|hash| {
-                    let e: &OpEntry = sb.ops.get(&hash.get_loc().as_loc8()).unwrap();
-                    (e.hash.to_owned(), e.data.to_owned())
+                    let loc = hash.get_loc().as_loc8();
+                    let e: &OpEntry = sb.ops.get(&loc).unwrap();
+                    (e.hash.to_owned(), KitsuneOpData::new(vec![loc.as_u8()]))
                 })
                 .collect()
         })))

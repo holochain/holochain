@@ -8,6 +8,7 @@ use holo_hash::EntryHash;
 use holo_hash::HasHash;
 use holo_hash::HeaderHash;
 use holochain_p2p::actor;
+use holochain_p2p::dht_arc::DhtArc;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_p2p::HolochainP2pError;
 use holochain_p2p::MockHolochainP2pDnaT;
@@ -24,11 +25,11 @@ use holochain_state::mutations::set_when_integrated;
 use holochain_state::prelude::Query;
 use holochain_state::prelude::Txn;
 use holochain_types::activity::AgentActivityResponse;
+use holochain_types::db::DbRead;
+use holochain_types::db::DbWrite;
 use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::dht_op::WireOps;
 use holochain_types::element::WireElementOps;
-use holochain_types::env::DbRead;
-use holochain_types::env::DbWrite;
 use holochain_types::link::WireLinkKey;
 use holochain_types::link::WireLinkOps;
 use holochain_types::metadata::MetadataSet;
@@ -195,7 +196,7 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         _request_validation_receipt: bool,
         _countersigning_session: bool,
         _dht_hash: holo_hash::AnyDhtHash,
-        _ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
+        _ops: Vec<holochain_types::dht_op::DhtOp>,
         _timeout_ms: Option<u64>,
     ) -> actor::HolochainP2pResult<()> {
         todo!()
@@ -221,7 +222,11 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         todo!()
     }
 
-    async fn join(&self, _agent: AgentPubKey) -> actor::HolochainP2pResult<()> {
+    async fn join(
+        &self,
+        _agent: AgentPubKey,
+        _initial_arc: Option<DhtArc>,
+    ) -> actor::HolochainP2pResult<()> {
         todo!()
     }
 
@@ -246,9 +251,9 @@ pub fn fill_db<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: DhtOpHashed) {
     env.conn()
         .unwrap()
         .with_commit_sync(|txn| {
-            let hash = op.as_hash().clone();
-            insert_op(txn, op).unwrap();
-            set_validation_status(txn, hash.clone(), ValidationStatus::Valid).unwrap();
+            let hash = op.as_hash();
+            insert_op(txn, &op).unwrap();
+            set_validation_status(txn, hash, ValidationStatus::Valid).unwrap();
             set_when_integrated(txn, hash, Timestamp::now()).unwrap();
             DatabaseResult::Ok(())
         })
@@ -259,9 +264,9 @@ pub fn fill_db_rejected<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: DhtOpHash
     env.conn()
         .unwrap()
         .with_commit_sync(|txn| {
-            let hash = op.as_hash().clone();
-            insert_op(txn, op).unwrap();
-            set_validation_status(txn, hash.clone(), ValidationStatus::Rejected).unwrap();
+            let hash = op.as_hash();
+            insert_op(txn, &op).unwrap();
+            set_validation_status(txn, hash, ValidationStatus::Rejected).unwrap();
             set_when_integrated(txn, hash, Timestamp::now()).unwrap();
             DatabaseResult::Ok(())
         })
@@ -272,8 +277,8 @@ pub fn fill_db_pending<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: DhtOpHashe
     env.conn()
         .unwrap()
         .with_commit_sync(|txn| {
-            let hash = op.as_hash().clone();
-            insert_op(txn, op).unwrap();
+            let hash = op.as_hash();
+            insert_op(txn, &op).unwrap();
             set_validation_status(txn, hash, ValidationStatus::Valid).unwrap();
             DatabaseResult::Ok(())
         })
@@ -284,7 +289,7 @@ pub fn fill_db_as_author(env: &DbWrite<DbKindAuthored>, op: DhtOpHashed) {
     env.conn()
         .unwrap()
         .with_commit_sync(|txn| {
-            insert_op(txn, op).unwrap();
+            insert_op(txn, &op).unwrap();
             DatabaseResult::Ok(())
         })
         .unwrap();
@@ -369,7 +374,7 @@ impl HolochainP2pDnaT for MockNetwork {
         _request_validation_receipt: bool,
         _countersigning_session: bool,
         _dht_hash: holo_hash::AnyDhtHash,
-        _ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
+        _ops: Vec<holochain_types::dht_op::DhtOp>,
         _timeout_ms: Option<u64>,
     ) -> actor::HolochainP2pResult<()> {
         todo!()
@@ -395,7 +400,11 @@ impl HolochainP2pDnaT for MockNetwork {
         todo!()
     }
 
-    async fn join(&self, _agent: AgentPubKey) -> actor::HolochainP2pResult<()> {
+    async fn join(
+        &self,
+        _agent: AgentPubKey,
+        _initial_arc: Option<DhtArc>,
+    ) -> actor::HolochainP2pResult<()> {
         todo!()
     }
 

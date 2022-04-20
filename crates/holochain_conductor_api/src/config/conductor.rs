@@ -1,7 +1,7 @@
 #![deny(missing_docs)]
 //! This module is used to configure the conductor
 
-use holochain_types::env::DbSyncStrategy;
+use holochain_types::db::DbSyncStrategy;
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use serde::Serialize;
@@ -14,7 +14,7 @@ mod keystore_config;
 pub mod paths;
 //mod logger_config;
 //mod signal_config;
-pub use paths::EnvironmentRootPath;
+pub use paths::DatabaseRootPath;
 
 pub use super::*;
 pub use dpki_config::DpkiConfig;
@@ -30,7 +30,7 @@ use std::path::Path;
 pub struct ConductorConfig {
     /// The path to the database for this conductor.
     /// If omitted, chooses a default path.
-    pub environment_path: EnvironmentRootPath,
+    pub environment_path: DatabaseRootPath,
 
     /// Define how Holochain conductor will connect to a keystore.
     #[serde(default)]
@@ -51,7 +51,7 @@ pub struct ConductorConfig {
     /// See [sqlite documentation](https://www.sqlite.org/pragma.html#pragma_synchronous)
     /// for information about database sync levels.
     /// See [`DbSyncStrategy`] for details.
-    /// This is best left at it's default value unless you know what you
+    /// This is best left at its default value unless you know what you
     /// are doing.
     pub db_sync_strategy: DbSyncStrategy,
     //
@@ -160,8 +160,9 @@ pub mod tests {
             type: quic
             bind_to: kitsune-quic://0.0.0.0:0
           proxy_config:
-            type: local_proxy_server
-            proxy_accept_config: reject_all
+            type: remote_proxy_client_from_bootstrap
+            bootstrap_url: https://bootstrap.holo.host
+            fallback_proxy_url: ~
       tuning_params:
         gossip_loop_iteration_delay_ms: 42
         default_rpc_single_timeout_ms: 42
@@ -185,8 +186,9 @@ pub mod tests {
                 override_host: None,
                 override_port: None,
             }),
-            proxy_config: ProxyConfig::LocalProxyServer {
-                proxy_accept_config: Some(ProxyAcceptConfig::RejectAll),
+            proxy_config: ProxyConfig::RemoteProxyClientFromBootstrap {
+                bootstrap_url: url2::url2!("https://bootstrap.holo.host"),
+                fallback_proxy_url: None,
             },
         });
         let mut tuning_params =

@@ -37,6 +37,7 @@ pub fn fake_dna_zomes_named(uid: &str, name: &str, zomes: Vec<(ZomeName, DnaWasm
             .try_into()
             .unwrap(),
         uid: uid.to_string(),
+        origin_time: Timestamp::HOLOCHAIN_EPOCH,
         zomes: Vec::new(),
     };
     tokio_helper::block_forever_on(async move {
@@ -54,9 +55,12 @@ pub fn fake_dna_zomes_named(uid: &str, name: &str, zomes: Vec<(ZomeName, DnaWasm
 }
 
 /// Save a Dna to a file and return the path and tempdir that contains it
-pub async fn write_fake_dna_file(dna: DnaFile) -> anyhow::Result<(PathBuf, tempdir::TempDir)> {
+pub async fn write_fake_dna_file(dna: DnaFile) -> anyhow::Result<(PathBuf, tempfile::TempDir)> {
     let bundle = DnaBundle::from_dna_file(dna).await?;
-    let tmp_dir = tempdir::TempDir::new("fake_dna")?;
+    let tmp_dir = tempfile::Builder::new()
+        .prefix("fake_dna")
+        .tempdir()
+        .unwrap();
     let mut path: PathBuf = tmp_dir.path().into();
     path.push("test-dna.dna");
     bundle.write_to_file(&path).await?;
@@ -105,7 +109,7 @@ pub async fn fake_unique_element(
     });
 
     Ok((
-        SignedHeaderHashed::new(keystore, header_1.into_hashed()).await?,
+        SignedHeaderHashed::sign(keystore, header_1.into_hashed()).await?,
         entry,
     ))
 }

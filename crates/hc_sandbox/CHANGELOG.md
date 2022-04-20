@@ -4,6 +4,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.0.29
+
+## 0.0.28
+
+- `hc sandbox` command for installing happs was limited to 16mb websocket message limit and would error if given a large happ bundle. now it won’t.  [\#1322](https://github.com/holochain/holochain/pull/1322)
+- Fixed broken links in Rust docs [\#1284](https://github.com/holochain/holochain/pull/1284)
+
+## 0.0.27
+
+## 0.0.26
+
+## 0.0.25
+
+## 0.0.24
+
+## 0.0.23
+
 ## 0.0.22
 
 ## 0.0.21

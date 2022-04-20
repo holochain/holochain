@@ -14,6 +14,7 @@ use enumflags2::{bitflags, BitFlags};
 use linked_hash_map::LinkedHashMap;
 use linked_hash_set::LinkedHashSet;
 use once_cell::unsync::{Lazy, OnceCell};
+use regex::Regex;
 use semver::Version;
 use std::cell::Cell;
 use std::collections::{BTreeSet, HashMap, HashSet};
@@ -36,6 +37,8 @@ fn releaseworkspace_path_only_fmt(
     write!(f, "{:?}", &ws.root_path)
 }
 
+type DependenciesT = LinkedHashMap<String, Vec<cargo::core::Dependency>>;
+
 #[derive(custom_debug::Debug)]
 pub(crate) struct Crate<'a> {
     package: CargoPackage,
@@ -43,7 +46,7 @@ pub(crate) struct Crate<'a> {
     #[debug(with = "releaseworkspace_path_only_fmt")]
     workspace: &'a ReleaseWorkspace<'a>,
     #[debug(skip)]
-    dependencies_in_workspace: OnceCell<LinkedHashSet<cargo::core::Dependency>>,
+    dependencies_in_workspace: OnceCell<DependenciesT>,
     #[debug(skip)]
     dependants_in_workspace: OnceCell<Vec<&'a Crate<'a>>>,
 }
@@ -112,12 +115,10 @@ impl<'a> Crate<'a> {
     }
 
     /// Returns the crates in the same workspace that this crate depends on.
-    pub(crate) fn dependencies_in_workspace(
-        &'a self,
-    ) -> Fallible<&'a LinkedHashSet<cargo::core::Dependency>> {
+    pub(crate) fn dependencies_in_workspace(&'a self) -> Fallible<&'a DependenciesT> {
         self.dependencies_in_workspace.get_or_try_init(|| {
             // LinkedHashSet automatically deduplicates while maintaining the insertion order.
-            let mut dependencies = LinkedHashSet::new();
+            let mut dependencies = LinkedHashMap::new();
             let ws_members: std::collections::HashMap<_, _> = self
                 .workspace
                 .members_unsorted()?
@@ -131,40 +132,45 @@ impl<'a> Crate<'a> {
             let mut seen = HashSet::new();
 
             while let Some(package) = queue.pop() {
-                seen.insert(package.name());
                 for dep in package.dependencies() {
-                    if dep.source_id().is_path() {
-                        let dep_name = dep.package_name().to_string();
+                    let dep_name = dep.package_name().to_string();
 
-                        // todo(backlog): enable the optional dependency if a feature requested it
+                    // todo: write a test-case for this
+                    if dep.is_optional() && self.workspace.criteria.exclude_optional_deps {
+                        trace!(
+                            "[{}] excluding optional dependency '{}'",
+                            package.name(),
+                            dep_name,
+                        );
 
-                        // todo: write a test-case for this
-                        if dep.is_optional() && self.workspace.criteria.exclude_optional_deps {
-                            trace!(
-                                "[{}] excluding optional dependency '{}'",
-                                package.name(),
-                                dep_name,
-                            );
+                        continue;
+                    }
 
-                            continue;
-                        }
+                    // only consider workspace members
+                    if let Some(dep_package) = ws_members.get(&dep.package_name().to_string()) {
+                        // only consider non-star version requirements
+                        if dep.specified_req() && dep.version_req().to_string() != "*" {
+                            // don't add this package to its own dependencies
+                            if dep_package.name() != package.name() {
+                                dependencies
+                                    .entry(dep_name.clone())
+                                    .or_insert_with(|| vec![])
+                                    .push(dep.to_owned());
 
-                        // todo(backlog): could the path of this dependency possibly be outside of the workspace?
-                        dependencies.insert(dep.to_owned());
-
-                        if let Some(dep_package) = ws_members.get(&dep.package_name().to_string()) {
-                            if dep_package.name() == self.package.name() {
+                                if !seen.contains(&dep_name) {
+                                    queue.push(dep_package);
+                                }
+                            } else {
                                 warn!(
                                     "encountered dependency cycle: {:?} <-> {:?}",
                                     self.name(),
                                     package.name()
                                 );
-                            } else if !seen.contains(&dep_package.name()) {
-                                queue.push(dep_package);
                             }
                         }
                     }
                 }
+                seen.insert(package.name().to_string());
             }
             Ok(dependencies)
         })
@@ -184,7 +190,7 @@ impl<'a> Crate<'a> {
         filter_fn: F,
     ) -> Fallible<&'a Vec<&'a Crate<'a>>>
     where
-        F: Fn(&&Dependency) -> bool,
+        F: Fn(&(&String, &Vec<Dependency>)) -> bool,
         F: Copy,
     {
         self.dependants_in_workspace.get_or_try_init(|| {
@@ -195,8 +201,8 @@ impl<'a> Crate<'a> {
                         .dependencies_in_workspace()?
                         .iter()
                         .filter(filter_fn)
-                        .map(|dep| dep.package_name().to_string())
-                        .collect::<HashSet<_>>()
+                        .map(|(dep_name, _)| dep_name)
+                        .collect::<LinkedHashSet<_>>()
                         .contains(&self.name())
                     {
                         acc.insert(member.name(), *member);
@@ -225,6 +231,8 @@ type MemberStates = LinkedHashMap<String, CrateState>;
 pub(crate) struct ReleaseWorkspace<'a> {
     root_path: PathBuf,
     criteria: SelectionCriteria,
+    git_config_name: String,
+    git_config_email: String,
 
     changelog: Option<ChangelogT<'a, WorkspaceChangelog>>,
 
@@ -253,7 +261,7 @@ pub(crate) struct SelectionCriteria {
 
 /// Defines detailed crate's state in terms of the release process.
 #[bitflags]
-#[repr(u16)]
+#[repr(u32)]
 #[derive(enum_utils::FromStr, Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum CrateStateFlags {
     /// matches a package filter
@@ -285,6 +293,10 @@ pub(crate) enum CrateStateFlags {
     MissingLicense,
     /// Has a dependency that contains '*'
     HasWildcardDependency,
+    /// One of the manifest keywords is too long
+    ManifestKeywordExceeds20Chars,
+    ManifestKeywordContainsInvalidChar,
+    ManifestKeywordsMoreThan5,
 }
 
 /// Defines the meta states that can be derived from the more detailed `CrateStateFlags`.
@@ -324,6 +336,9 @@ impl CrateState {
             | MissingDescription
             | MissingLicense
             | HasWildcardDependency
+            | ManifestKeywordExceeds20Chars
+            | ManifestKeywordContainsInvalidChar
+            | ManifestKeywordsMoreThan5
     });
 
     pub(crate) fn new(
@@ -517,6 +532,10 @@ impl CrateState {
 }
 
 impl<'a> ReleaseWorkspace<'a> {
+    const README_FILENAME: &'a str = "README.md";
+    const GIT_CONFIG_NAME: &'a str = "Holochain Core Dev Team";
+    const GIT_CONFIG_EMAIL: &'a str = "devcore@holochain.org";
+
     pub fn try_new_with_criteria(
         root_path: PathBuf,
         criteria: SelectionCriteria,
@@ -550,6 +569,9 @@ impl<'a> ReleaseWorkspace<'a> {
             // initialised: false,
             git_repo: git2::Repository::open(&root_path)?,
 
+            git_config_name: Self::GIT_CONFIG_NAME.to_string(),
+            git_config_email: Self::GIT_CONFIG_EMAIL.to_string(),
+
             root_path,
             criteria: Default::default(),
             changelog,
@@ -579,6 +601,8 @@ impl<'a> ReleaseWorkspace<'a> {
                 ..Default::default()
             };
 
+            let keyword_validation_re = Regex::new("^[a-zA-Z][a-zA-Z_\\-0-9]+$").unwrap();
+
             for member in self.members()? {
 
                 // helper macros to access the desired state
@@ -605,6 +629,18 @@ impl<'a> ReleaseWorkspace<'a> {
 
                     if metadata.description.is_none() {
                         insert_state!(CrateStateFlags::MissingDescription);
+                    }
+
+                    // see https://doc.rust-lang.org/cargo/reference/manifest.html?highlight=keywords#the-keywords-field
+                    // Note: crates.io has a maximum of 5 keywords. Each keyword must be ASCII text, start with a letter, and only contain letters, numbers, _ or -, and have at most 20 characters.
+                    if metadata.keywords.iter().any(|keyword| keyword.len() > 20) {
+                        insert_state!(CrateStateFlags::ManifestKeywordExceeds20Chars);
+                    }
+                    if metadata.keywords.iter().any(|keyword| !keyword_validation_re.is_match(keyword)) {
+                        insert_state!(CrateStateFlags::ManifestKeywordContainsInvalidChar);
+                    }
+                    if metadata.keywords.len() > 5 {
+                        insert_state!(CrateStateFlags::ManifestKeywordsMoreThan5);
                     }
                 }
 
@@ -647,8 +683,7 @@ impl<'a> ReleaseWorkspace<'a> {
                             insert_state!(CrateStateFlags::DisallowedVersionReqViolated);
                         });
 
-                    // todo: define a const or variable for the joined path
-                    if !std::path::Path::new(&member.root().join("README.md")).exists() {
+                    if !std::path::Path::new(&member.root().join(Self::README_FILENAME)).exists() {
                         insert_state!(CrateStateFlags::MissingReadme);
                     }
 
@@ -727,14 +762,16 @@ impl<'a> ReleaseWorkspace<'a> {
                         && get_state!(member.name()).changed()
                         && !get_state!(member.name()).blocked()
                     {
-                        for dep in member.dependencies_in_workspace()? {
-                            insert_state!(
-                                match dep.kind() {
-                                    CargoDepKind::Development => CrateStateFlags::IsWorkspaceDevDependency,
-                                    _ => CrateStateFlags::IsWorkspaceDependency,
-                                },
-                                dep.package_name().to_string()
-                            );
+                        for (_, deps) in member.dependencies_in_workspace()? {
+                            for dep in deps {
+                                insert_state!(
+                                    match dep.kind() {
+                                        CargoDepKind::Development => CrateStateFlags::IsWorkspaceDevDependency,
+                                        _ => CrateStateFlags::IsWorkspaceDependency,
+                                    },
+                                    dep.package_name().to_string()
+                                );
+                            }
                         }
 
                         for dep in member.package().dependencies() {
@@ -812,7 +849,7 @@ impl<'a> ReleaseWorkspace<'a> {
                 release
             })
             .cloned()
-            .collect();
+            .collect::<Vec<_>>();
 
         Ok(release_selection)
     }
@@ -833,16 +870,26 @@ impl<'a> ReleaseWorkspace<'a> {
     /// Members are sorted according to their dependency tree from most independent to most dependent.
     pub(crate) fn members(&'a self) -> Fallible<&'a Vec<&'a Crate<'a>>> {
         self.members_sorted.get_or_try_init(|| -> Fallible<_> {
-            let mut members = self.members_unsorted()?.iter().collect::<Vec<_>>();
+            let mut members = self
+                .members_unsorted()?
+                .iter()
+                .enumerate()
+                .collect::<Vec<_>>();
 
-            let dependencies = self.members_unsorted()?.iter().try_fold(
-                HashMap::<String, HashSet<String>>::new(),
+            let workspace_dependencies = self.members_unsorted()?.iter().try_fold(
+                LinkedHashMap::<String, LinkedHashSet<String>>::new(),
                 |mut acc, elem| -> Fallible<_> {
                     acc.insert(
-                        elem.package.name().to_string(),
+                        elem.name(),
                         elem.dependencies_in_workspace()?
-                            .iter()
-                            .map(|dep| dep.package_name().to_string())
+                            .into_iter()
+                            .filter_map(|(dep_name, deps)| {
+                                deps.into_iter()
+                                    .find(|dep| {
+                                        dep.specified_req() && dep.version_req().to_string() != "*"
+                                    })
+                                    .map(|_| dep_name.clone())
+                            })
                             .collect(),
                     );
 
@@ -851,16 +898,17 @@ impl<'a> ReleaseWorkspace<'a> {
             )?;
 
             // ensure members are ordered respecting their dependency tree
-            members.sort_by(move |a, b| {
+            members.sort_unstable_by(move |(a_i, a), (b_i, b)| {
                 use std::cmp::Ordering::{Equal, Greater, Less};
 
-                let a_deps = dependencies
+                let a_deps = workspace_dependencies
                     .get(&a.name())
                     .unwrap_or_else(|| panic!("dependencies for {} not found", a.name()));
-                let b_deps = dependencies
+                let b_deps = workspace_dependencies
                     .get(&b.name())
                     .unwrap_or_else(|| panic!("dependencies for {} not found", b.name()));
 
+                // understand whether one is a direct dependency of the other
                 let comparison = (a_deps.contains(&b.name()), b_deps.contains(&a.name()));
                 let result = match comparison {
                     (true, true) => {
@@ -868,7 +916,7 @@ impl<'a> ReleaseWorkspace<'a> {
                     }
                     (true, false) => Greater,
                     (false, true) => Less,
-                    (false, false) => Equal,
+                    (false, false) => a_i.cmp(b_i),
                 };
 
                 trace!(
@@ -883,7 +931,7 @@ impl<'a> ReleaseWorkspace<'a> {
                 result
             });
 
-            Ok(members)
+            Ok(members.into_iter().map(|(_, member)| member).collect())
         })
     }
 
@@ -947,8 +995,8 @@ impl<'a> ReleaseWorkspace<'a> {
     // todo: make this configurable?
     fn git_signature(&self) -> Fallible<git2::Signature> {
         Ok(git2::Signature::now(
-            "Holochain Core Dev Team",
-            "devcore@holochain.org",
+            &self.git_config_name,
+            &self.git_config_email,
         )?)
     }
 
@@ -1005,44 +1053,101 @@ impl<'a> ReleaseWorkspace<'a> {
         self.changelog.as_ref()
     }
 
-    pub(crate) fn update_lockfile(&'a self, dry_run: bool) -> Fallible<()> {
-        let mut cmd = std::process::Command::new("cargo");
-        cmd.current_dir(self.root()).args(
-            &[
-                vec!["update", "--workspace", "--offline", "--verbose"],
-                if dry_run { vec!["--dry-run"] } else { vec![] },
-            ]
-            .concat(),
-        );
-        debug!("running command: {:?}", cmd);
+    pub(crate) fn update_lockfile<T>(
+        &'a self,
+        dry_run: bool,
+        additional_manifests: T,
+    ) -> Fallible<()>
+    where
+        T: Iterator<Item = &'a str>,
+        T: Clone,
+    {
+        for args in [
+            vec![
+                vec!["fetch", "--verbose", "--manifest-path", "Cargo.toml"],
+                [
+                    vec!["update", "--workspace", "--offline", "--verbose"],
+                    if dry_run { vec!["--dry-run"] } else { vec![] },
+                ]
+                .concat(),
+            ],
+            additional_manifests
+                .clone()
+                .map(|mp| {
+                    vec![
+                        vec!["fetch", "--verbose", "--manifest-path", mp],
+                        vec![
+                            vec!["update", "--offline", "--verbose", "--manifest-path", mp],
+                            vec![if dry_run { "--dry-run" } else { "" }],
+                        ]
+                        .concat(),
+                    ]
+                })
+                .collect::<Vec<Vec<_>>>()
+                .concat(),
+        ]
+        .concat()
+        {
+            let mut cmd = std::process::Command::new("cargo");
+            cmd.current_dir(self.root()).args(args);
+            debug!("running command: {:?}", cmd);
 
-        if !dry_run {
-            let mut cmd = cmd.spawn()?;
-            let cmd_status = cmd.wait()?;
-            if !cmd_status.success() {
-                bail!("running {:?} failed: \n{:?}", cmd, cmd.stderr);
+            if !dry_run {
+                let mut cmd = cmd.spawn()?;
+                let cmd_status = cmd.wait()?;
+                if !cmd_status.success() {
+                    bail!("running {:?} failed: \n{:?}", cmd, cmd.stderr);
+                }
             }
         }
 
         Ok(())
     }
 
-    pub(crate) fn cargo_check(&'a self, offline: bool) -> Fallible<()> {
-        let mut cmd = std::process::Command::new("cargo")
-            .current_dir(self.root())
-            .args(
-                &[
-                    vec!["check", "--workspace", "--all-targets", "--all-features"],
-                    if offline { vec!["--offline"] } else { vec![] },
-                ]
-                .concat(),
-            )
-            .spawn()?;
+    pub(crate) fn cargo_check<T>(&'a self, offline: bool, additional_manifests: T) -> Fallible<()>
+    where
+        T: Iterator<Item = &'a str>,
+    {
+        for args in [
+            vec![vec![
+                vec![
+                    "check",
+                    "--workspace",
+                    "--all-targets",
+                    "--all-features",
+                    "--release",
+                ],
+                if offline { vec!["--offline"] } else { vec![] },
+            ]
+            .concat()],
+            additional_manifests
+                .map(|mp| -> Vec<&str> {
+                    vec![
+                        vec![
+                            "check",
+                            "--all-targets",
+                            "--all-features",
+                            "--release",
+                            "--manifest-path",
+                            mp,
+                        ],
+                        if offline { vec!["--offline"] } else { vec![] },
+                    ]
+                    .concat()
+                })
+                .collect::<Vec<_>>(),
+        ]
+        .concat()
+        {
+            let mut cmd = std::process::Command::new("cargo");
+            cmd.current_dir(self.root()).args(args);
+            debug!("running command: {:?}", cmd);
 
-        let cmd_status = cmd.wait()?;
-
-        if !cmd_status.success() {
-            bail!("running {:?} failed: \n{:?}", cmd, cmd.stderr);
+            let mut cmd = cmd.spawn()?;
+            let cmd_status = cmd.wait()?;
+            if !cmd_status.success() {
+                bail!("running {:?} failed: \n{:?}", cmd, cmd.stderr);
+            }
         }
 
         Ok(())
@@ -1091,6 +1196,43 @@ pub(crate) fn git_lookup_tag(git_repo: &git2::Repository, tag_name: &str) -> Opt
     trace!("looking up tag '{}' -> {:?}", tag_name, tag);
 
     tag
+}
+
+// we shouldn't need this check but so far the failing case hasn't been reproduced in a test.
+pub(crate) fn ensure_release_order_consistency<'a>(
+    crates: &[&'a Crate<'a>],
+) -> Fallible<LinkedHashSet<String>> {
+    crates
+        .iter()
+        .try_fold(LinkedHashSet::new(), |mut acc, cur| {
+            let wrong_order_deps = cur
+                .dependencies_in_workspace()?
+                .iter()
+                .filter_map(|(dep_package_name, _)| {
+                    if crates
+                        .iter()
+                        .any(|selected| &selected.name() == dep_package_name)
+                        && !acc.contains(dep_package_name)
+                    {
+                        Some(dep_package_name.to_string())
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<_>>();
+
+            if !wrong_order_deps.is_empty() {
+                bail!(
+                    "{} depends on crates that are ordered after it: {:#?}. this is a bug.",
+                    cur.name(),
+                    wrong_order_deps
+                );
+            }
+
+            acc.insert(cur.name());
+
+            Ok(acc)
+        })
 }
 
 #[cfg(test)]

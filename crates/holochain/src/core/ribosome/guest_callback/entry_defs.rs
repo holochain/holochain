@@ -180,12 +180,11 @@ mod test {
 mod slow_tests {
     use crate::core::ribosome::guest_callback::entry_defs::EntryDefsHostAccess;
     use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
+    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use crate::core::ribosome::RibosomeT;
     use crate::fixt::curve::Zomes;
     use crate::fixt::EntryDefsInvocationFixturator;
     use crate::fixt::RealRibosomeFixturator;
-    use crate::fixt::ZomeCallHostAccessFixturator;
-    use ::fixt::prelude::*;
     use holochain_types::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
     pub use holochain_zome_types::entry_def::EntryVisibility;
@@ -208,12 +207,12 @@ mod slow_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_entry_defs_index_lookup() {
-        let host_access = fixt!(ZomeCallHostAccess, Predictable);
-        let output: () =
-            crate::call_test_ribosome!(host_access, TestWasm::EntryDefs, "assert_indexes", ())
-                .unwrap();
+        observability::test_run().ok();
+        let RibosomeTestFixture {
+            conductor, alice, ..
+        } = RibosomeTestFixture::new(TestWasm::EntryDefs).await;
 
-        assert_eq!(&(), &output);
+        let _: () = conductor.call(&alice, "assert_indexes", ()).await;
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -237,14 +236,12 @@ mod slow_tests {
                     EntryDef {
                         id: "post".into(),
                         visibility: EntryVisibility::Public,
-                        crdt_type: CrdtType,
                         required_validations: 5.into(),
                         required_validation_type: Default::default(),
                     },
                     EntryDef {
                         id: "comment".into(),
                         visibility: EntryVisibility::Private,
-                        crdt_type: CrdtType,
                         required_validations: 5.into(),
                         required_validation_type: Default::default(),
                     },

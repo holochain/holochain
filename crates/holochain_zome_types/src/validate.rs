@@ -4,6 +4,8 @@ use holo_hash::AnyDhtHash;
 use holochain_serialized_bytes::prelude::*;
 use holochain_wasmer_common::WasmError;
 
+pub use holochain_integrity_types::validate::*;
+
 /// The validation status for an op or element
 /// much of this happens in the subconscious
 /// an entry missing validation dependencies may cycle through Pending many times before finally
@@ -22,37 +24,6 @@ pub enum ValidationStatus {
     /// the subconscious has decided to never again attempt a conscious validation
     /// commonly due to missing validation dependencies remaining missing for "too long"
     Abandoned = 2,
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
-pub struct ValidateData {
-    pub element: Element,
-    pub validation_package: Option<ValidationPackage>,
-}
-
-impl ValidateData {
-    pub fn new(element: Element, validation_package: Option<ValidationPackage>) -> Self {
-        Self {
-            element,
-            validation_package,
-        }
-    }
-
-    pub fn new_element_only(element: Element) -> Self {
-        Self {
-            element,
-            validation_package: None,
-        }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
-pub enum ValidateCallbackResult {
-    Valid,
-    Invalid(String),
-    /// Subconscious needs to map this to either pending or abandoned based on context that the
-    /// wasm can't possibly have.
-    UnresolvedDependencies(Vec<AnyDhtHash>),
 }
 
 impl CallbackResult for ValidateCallbackResult {
@@ -79,20 +50,6 @@ impl CallbackResult for ValidateCallbackResult {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
 pub struct ValidationPackage(pub Vec<Element>);
 
-/// The level of validation package required by
-/// an entry.
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
-pub enum RequiredValidationType {
-    /// Just the element (default)
-    Element,
-    /// All chain items of the same entry type
-    SubChain,
-    /// The entire chain
-    Full,
-    /// A custom package set by the zome
-    Custom,
-}
-
 #[derive(Clone, PartialEq, Serialize, Deserialize, SerializedBytes, Debug)]
 pub enum ValidationPackageCallbackResult {
     Success(ValidationPackage),
@@ -118,12 +75,6 @@ impl CallbackResult for ValidationPackageCallbackResult {
             | WasmError::ErrorWhileError
             | WasmError::Memory => Err(wasm_error),
         }
-    }
-}
-
-impl Default for RequiredValidationType {
-    fn default() -> Self {
-        Self::Element
     }
 }
 

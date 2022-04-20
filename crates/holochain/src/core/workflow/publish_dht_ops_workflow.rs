@@ -31,21 +31,21 @@ pub const DEFAULT_RECEIPT_BUNDLE_SIZE: u8 = 5;
 /// flooding the network with spurious publishes.
 pub const MIN_PUBLISH_INTERVAL: time::Duration = time::Duration::from_secs(60 * 5);
 
-#[instrument(skip(env, network, trigger_self))]
+#[instrument(skip(db, network, trigger_self))]
 pub async fn publish_dht_ops_workflow(
-    env: DbWrite<DbKindAuthored>,
+    db: DbWrite<DbKindAuthored>,
     network: &(dyn HolochainP2pDnaT + Send + Sync),
     trigger_self: &TriggerSender,
     agent: AgentPubKey,
 ) -> WorkflowResult<WorkComplete> {
     let mut complete = WorkComplete::Complete;
-    let to_publish = publish_dht_ops_workflow_inner(env.clone().into(), agent).await?;
+    let to_publish = publish_dht_ops_workflow_inner(db.clone().into(), agent).await?;
 
     // Commit to the network
     tracing::info!("sending to {} basis locations", to_publish.len());
     let mut success = Vec::new();
     for (basis, ops) in to_publish {
-        let hashes: Vec<_> = ops.iter().map(|(h, _)| h.clone()).collect();
+        let (hashes, ops): (Vec<_>, Vec<_>) = ops.into_iter().unzip();
         if let Err(e) = network.publish(true, false, basis, ops, None).await {
             // If we get a routing error it means the space hasn't started yet and we should try publishing again.
             if let holochain_p2p::HolochainP2pError::RoutingDnaError(_) = e {
@@ -59,10 +59,10 @@ pub async fn publish_dht_ops_workflow(
 
     tracing::info!("sent {} ops", success.len());
     let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?;
-    let continue_publish = env
+    let continue_publish = db
         .async_commit(move |writer| {
             for hash in success {
-                mutations::set_last_publish_time(writer, hash, now)?;
+                mutations::set_last_publish_time(writer, &hash, now)?;
             }
             WorkflowResult::Ok(publish_query::num_still_needing_publish(writer)? > 0)
         })
@@ -83,13 +83,13 @@ pub async fn publish_dht_ops_workflow(
 
 /// Read the authored for ops with receipt count < R
 pub async fn publish_dht_ops_workflow_inner(
-    env: DbRead<DbKindAuthored>,
+    db: DbRead<DbKindAuthored>,
     agent: AgentPubKey,
 ) -> WorkflowResult<HashMap<AnyDhtHash, Vec<(DhtOpHash, DhtOp)>>> {
     // Ops to publish by basis
     let mut to_publish = HashMap::new();
 
-    for op_hashed in publish_query::get_ops_to_publish(agent, &env).await? {
+    for op_hashed in publish_query::get_ops_to_publish(agent, &db).await? {
         let (op, op_hash) = op_hashed.into_inner();
         // For every op publish a request
         // Collect and sort ops by basis
@@ -115,6 +115,7 @@ mod tests {
     use holochain_p2p::actor::HolochainP2pSender;
     use holochain_p2p::HolochainP2pDna;
     use holochain_p2p::HolochainP2pRef;
+    use holochain_types::db_cache::DhtDbQueryCache;
     use observability;
     use rusqlite::Transaction;
     use std::collections::HashMap;
@@ -131,7 +132,7 @@ mod tests {
 
     /// publish ops setup
     async fn setup(
-        env: DbWrite<DbKindAuthored>,
+        db: DbWrite<DbKindAuthored>,
         num_agents: u32,
         num_hash: u32,
         panic_on_publish: bool,
@@ -147,7 +148,7 @@ mod tests {
         let mut link_add_fixt = CreateLinkFixturator::new(Unpredictable);
         let author = fake_agent_pubkey_1();
 
-        env.conn()
+        db.conn()
             .unwrap()
             .with_commit_sync(|txn| {
                 for _ in 0..num_hash {
@@ -159,7 +160,7 @@ mod tests {
                     let op = DhtOp::RegisterAddLink(sig.clone(), link_add.clone());
                     // Get the hash from the op
                     let op_hashed = DhtOpHashed::from_content_sync(op.clone());
-                    mutations::insert_op(txn, op_hashed)?;
+                    mutations::insert_op(txn, &op_hashed)?;
                 }
                 StateMutationResult::Ok(())
             })
@@ -215,7 +216,7 @@ mod tests {
         // Join some agents onto the network
         // Skip the first agent as it has already joined
         for agent in agents.into_iter().skip(1) {
-            HolochainP2pRef::join(&network, dna.clone(), agent)
+            HolochainP2pRef::join(&network, dna.clone(), agent, None)
                 .await
                 .unwrap();
         }
@@ -225,12 +226,12 @@ mod tests {
 
     /// Call the workflow
     async fn call_workflow(
-        env: DbWrite<DbKindAuthored>,
+        db: DbWrite<DbKindAuthored>,
         dna_network: HolochainP2pDna,
         author: AgentPubKey,
     ) {
         let (trigger_sender, _) = TriggerSender::new();
-        publish_dht_ops_workflow(env.clone().into(), &dna_network, &trigger_sender, author)
+        publish_dht_ops_workflow(db.clone().into(), &dna_network, &trigger_sender, author)
             .await
             .unwrap();
     }
@@ -249,15 +250,15 @@ mod tests {
         tokio_helper::block_forever_on(async {
             observability::test_run().ok();
 
-            // Create test env
-            let test_env = test_authored_env();
-            let env = test_env.env();
+            // Create test db
+            let test_db = test_authored_db();
+            let db = test_db.to_db();
 
             // Setup
             let (_network, dna_network, author, recv_task, rx_complete) =
-                setup(env.clone(), num_agents, num_hash, false).await;
+                setup(db.clone(), num_agents, num_hash, false).await;
 
-            call_workflow(env.clone().into(), dna_network, author).await;
+            call_workflow(db.clone().into(), dna_network, author).await;
 
             // Wait for expected # of responses, or timeout
             tokio::select! {
@@ -269,7 +270,7 @@ mod tests {
 
             let check = async move {
                 recv_task.await.unwrap();
-                fresh_reader_test!(env, |txn: Transaction| {
+                fresh_reader_test!(db, |txn: Transaction| {
                     let unpublished_ops: bool = txn
                         .query_row(
                             "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE last_publish_time IS NULL)",
@@ -303,16 +304,16 @@ mod tests {
         tokio_helper::block_forever_on(async {
             observability::test_run().ok();
 
-            // Create test env
-            let test_env = test_authored_env();
-            let env = test_env.env();
+            // Create test db
+            let test_db = test_authored_db();
+            let db = test_db.to_db();
 
             // Setup
-            let (_network, dna_network, author, recv_task, _) =
-                setup(env.clone(), num_agents, num_hash, true).await;
+            let (_network, dna_network, author, _, _) =
+                setup(db.clone(), num_agents, num_hash, true).await;
 
             // Update the authored to have complete receipts
-            env.conn()
+            db.conn()
                 .unwrap()
                 .with_commit_test(|txn| {
                     txn.execute("UPDATE DhtOp SET receipts_complete = 1", [])
@@ -321,18 +322,13 @@ mod tests {
                 .unwrap();
 
             // Call the workflow
-            call_workflow(env.clone().into(), dna_network, author).await;
+            call_workflow(db.clone().into(), dna_network, author).await;
 
             // If we can wait a while without receiving any publish, we have succeeded
             tokio::time::sleep(Duration::from_millis(
                 std::cmp::min(50, std::cmp::max(2000, 10 * num_agents * num_hash)).into(),
             ))
             .await;
-
-            // Shutdown
-            tokio::time::timeout(Duration::from_secs(10), recv_task)
-                .await
-                .ok();
         });
     }
 
@@ -360,11 +356,11 @@ mod tests {
             async {
                 observability::test_run().ok();
 
-                // Create test env
-                let test_env = test_authored_env();
+                // Create test db
+                let test_db = test_authored_db();
                 let keystore = holochain_state::test_utils::test_keystore();
-                let dht_env = test_dht_env();
-                let env = test_env.env();
+                let dht_db = test_dht_db();
+                let db = test_db.to_db();
                 let zome = fixt!(Zome);
 
                 let dna = fixt!(DnaHash);
@@ -397,10 +393,10 @@ mod tests {
                 let eu_entry_type = entry_type_fixt.next().unwrap();
 
                 // Genesis and produce ops to clear these from the chains
-                fake_genesis(env.clone(), dht_env.env(), keystore.clone())
+                fake_genesis(db.clone(), dht_db.to_db(), keystore.clone())
                     .await
                     .unwrap();
-                env.conn()
+                db.conn()
                     .unwrap()
                     .execute("UPDATE DhtOp SET receipts_complete = 1", [])
                     .unwrap();
@@ -408,8 +404,9 @@ mod tests {
 
                 // Put data in elements
                 let source_chain = SourceChain::new(
-                    env.clone().into(),
-                    dht_env.env(),
+                    db.clone().into(),
+                    dht_db.to_db(),
+                    DhtDbQueryCache::new(dht_db.clone().into()),
                     keystore.clone(),
                     author.clone(),
                 )
@@ -446,7 +443,7 @@ mod tests {
                     .unwrap();
 
                 source_chain.flush(&dna_network).await.unwrap();
-                let (entry_create_header, entry_update_header) = env
+                let (entry_create_header, entry_update_header) = db
                     .conn()
                     .unwrap()
                     .with_commit_test(|writer| {
@@ -467,8 +464,7 @@ mod tests {
                 let expected = {
                     let mut map = HashMap::new();
                     // Op is expected to not contain the Entry even though the above contains the entry
-                    let (entry_create_header, sig) =
-                        entry_create_header.into_header_and_signature();
+                    let (entry_create_header, sig) = entry_create_header.into_inner();
                     let expected_op = DhtOp::RegisterAgentActivity(
                         sig.clone(),
                         entry_create_header.clone().into_content(),
@@ -490,8 +486,7 @@ mod tests {
 
                     // Create RegisterUpdatedContent
                     // Op is expected to not contain the Entry
-                    let (entry_update_header, sig) =
-                        entry_update_header.into_header_and_signature();
+                    let (entry_update_header, sig) = entry_update_header.into_inner();
                     let entry_update_header: Update =
                         entry_update_header.into_content().try_into().unwrap();
                     let expected_op =
@@ -544,7 +539,7 @@ mod tests {
                 let mut recv_count: u32 = 0;
 
                 // Receive events and increment count
-                let recv_task = tokio::task::spawn({
+                tokio::task::spawn({
                     async move {
                         let mut tx_complete = Some(tx_complete);
                         while let Some(evt) = recv.recv().await {
@@ -554,7 +549,8 @@ mod tests {
                                     tracing::debug!(?ops);
 
                                     // Check the ops are correct
-                                    for (op_hash, op) in ops {
+                                    for op in ops {
+                                        let op_hash = DhtOpHash::with_data_sync(&op);
                                         match expected.get(&op_hash) {
                                             Some((expected_op, count)) => {
                                                 assert_eq!(&op, expected_op);
@@ -589,13 +585,13 @@ mod tests {
                 {
                     let network = test_network.network();
                     for agent in agents {
-                        HolochainP2pRef::join(&network, dna.clone(), agent)
+                        HolochainP2pRef::join(&network, dna.clone(), agent, None)
                             .await
                             .unwrap()
                     }
                 }
 
-                call_workflow(env.clone().into(), dna_network, author).await;
+                call_workflow(db.clone().into(), dna_network, author).await;
 
                 // Wait for expected # of responses, or timeout
                 tokio::select! {
@@ -622,11 +618,6 @@ mod tests {
                     num_agents * 2,
                     register_agent_activity_count.load(Ordering::SeqCst)
                 );
-
-                // Shutdown
-                tokio::time::timeout(Duration::from_secs(10), recv_task)
-                    .await
-                    .ok();
             }
             .instrument(debug_span!("private_entries")),
         );

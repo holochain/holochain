@@ -2,7 +2,7 @@
 name = "test_wasm_crd"
 version = "0.0.1"
 authors = [ "thedavidmeister", "thedavidmeister@gmail.com" ]
-edition = "2018"
+edition = "2021"
 
 [lib]
 name = "test_wasm_crd"
@@ -11,7 +11,7 @@ crate-type = [ "cdylib", "rlib" ]
 [dependencies]
 serde = "1.0"
 holochain_test_wasm_common = { path = "../../../wasm_common" }
-hdk = { path = "../../../../hdk", features = ["fixturators"] }
+hdk = { path = "../../../../hdk" }
 
 [features]
 default = []
@@ -19,3 +19,4 @@ mock = ["hdk/mock"]
 
 [dev-dependencies]
 fixt = { path = "../../../../fixt" }
+hdk = { path = "../../../../hdk", features = ["fixturators"] }

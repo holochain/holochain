@@ -41,6 +41,7 @@ use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_state::prelude::*;
 use holochain_state::schedule::live_scheduled_fns;
+use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::prelude::*;
 use rusqlite::OptionalExtension;
 use rusqlite::Transaction;
@@ -90,9 +91,9 @@ impl PartialEq for Cell {
 /// A Cell is guaranteed to contain a Source Chain which has undergone
 /// Genesis.
 ///
-/// The [Conductor] manages a collection of Cells, and will call functions
+/// The [`Conductor`](super::Conductor) manages a collection of Cells, and will call functions
 /// on the Cell when a Conductor API method is called (either a
-/// [CellConductorApi] or an [AppInterfaceApi])
+/// [`CellConductorApi`](super::api::CellConductorApi) or an [`AppInterfaceApi`](super::api::AppInterfaceApi))
 pub struct Cell<Api = CellConductorApi, P2pCell = holochain_p2p::HolochainP2pDna>
 where
     Api: CellConductorApiT,
@@ -129,7 +130,7 @@ impl Cell {
         // check if genesis has been run
         let has_genesis = {
             // check if genesis ran.
-            GenesisWorkspace::new(space.authored_env.clone(), space.dht_env.clone())?
+            GenesisWorkspace::new(space.authored_db.clone(), space.dht_db.clone())?
                 .has_genesis(id.agent_pubkey().clone())
                 .await?
         };
@@ -168,23 +169,24 @@ impl Cell {
     pub async fn genesis<Ribosome>(
         id: CellId,
         conductor_handle: ConductorHandle,
-        authored_env: DbWrite<DbKindAuthored>,
-        dht_env: DbWrite<DbKindDht>,
+        authored_db: DbWrite<DbKindAuthored>,
+        dht_db: DbWrite<DbKindDht>,
+        dht_db_cache: DhtDbQueryCache,
         ribosome: Ribosome,
-        membrane_proof: Option<SerializedBytes>,
+        membrane_proof: Option<MembraneProof>,
     ) -> CellResult<()>
     where
-        Ribosome: RibosomeT + Send + 'static,
+        Ribosome: RibosomeT + 'static,
     {
         // get the dna
         let dna_file = conductor_handle
-            .get_dna(id.dna_hash())
+            .get_dna_file(id.dna_hash())
             .ok_or_else(|| DnaError::DnaMissing(id.dna_hash().to_owned()))?;
 
         let conductor_api = CellConductorApi::new(conductor_handle.clone(), id.clone());
 
         // run genesis
-        let workspace = GenesisWorkspace::new(authored_env, dht_env)
+        let workspace = GenesisWorkspace::new(authored_db, dht_db)
             .map_err(ConductorApiError::from)
             .map_err(Box::new)?;
 
@@ -193,6 +195,7 @@ impl Cell {
             id.agent_pubkey().clone(),
             membrane_proof,
             ribosome,
+            dht_db_cache,
         );
 
         genesis_workflow(workspace, conductor_api, args)
@@ -237,7 +240,7 @@ impl Cell {
         let author = self.id.agent_pubkey().clone();
         Ok(self
             .space
-            .authored_env
+            .authored_db
             .async_commit(move |txn: &mut Transaction| {
                 delete_all_ephemeral_scheduled_fns(txn, &author)
             })
@@ -249,7 +252,7 @@ impl Cell {
         let author = self.id.agent_pubkey().clone();
         let lives = self
             .space
-            .authored_env
+            .authored_db
             .async_commit(move |txn: &mut Transaction| {
                 // Rescheduling should not fail as the data in the database
                 // should be valid schedules only.
@@ -298,7 +301,7 @@ impl Cell {
                 // We don't do anything with errors in here.
                 let _ = self
                     .space
-                    .authored_env
+                    .authored_db
                     .async_commit(move |txn: &mut Transaction| {
                         for ((scheduled_fn, _), result) in lives.iter().zip(results.iter()) {
                             match result {
@@ -345,9 +348,7 @@ impl Cell {
     ) -> CellResult<()> {
         use holochain_p2p::event::HolochainP2pEvent::*;
         match evt {
-            KGenReq { .. }
-            | PutAgentInfoSigned { .. }
-            | GetAgentInfoSigned { .. }
+            PutAgentInfoSigned { .. }
             | QueryAgentInfoSigned { .. }
             | QueryGossipAgents { .. }
             | QueryOpHashes { .. }
@@ -523,8 +524,7 @@ impl Cell {
         signed_headers: Vec<SignedHeader>,
     ) -> CellResult<()> {
         Ok(countersigning_success(
-            self.space.authored_env.clone(),
-            self.space.dht_env.clone(),
+            self.space.clone(),
             &self.holochain_p2p_cell,
             self.id.agent_pubkey().clone(),
             signed_headers,
@@ -542,15 +542,15 @@ impl Cell {
         &self,
         header_hash: HeaderHash,
     ) -> CellResult<ValidationPackageResponse> {
-        let env: DbRead<DbKindDht> = self.dht_env().clone().into();
+        let db: DbRead<DbKindDht> = self.dht_db().clone().into();
 
         // Get the header
-        let mut cascade = Cascade::empty().with_dht(env.clone());
+        let mut cascade = Cascade::empty().with_dht(db.clone());
         let header = match cascade
             .retrieve_header(header_hash, Default::default())
             .await?
         {
-            Some(shh) => shh.into_header_and_signature().0,
+            Some(shh) => shh.hashed,
             None => return Ok(None.into()),
         };
 
@@ -560,9 +560,10 @@ impl Cell {
         if header.author() == self.id.agent_pubkey() {
             validation_package::get_as_author(
                 header,
-                self.space.authored_env.clone().into(),
-                self.dht_env().clone().into(),
-                self.space.cache.clone(),
+                self.space.authored_db.clone().into(),
+                self.dht_db().clone().into(),
+                self.space.dht_query_cache.clone(),
+                self.space.cache_db.clone(),
                 &ribosome,
                 &(*self.conductor_handle),
                 &self.holochain_p2p_cell,
@@ -571,7 +572,7 @@ impl Cell {
         } else {
             validation_package::get_as_authority(
                 header,
-                env,
+                db,
                 &ribosome.dna_file,
                 self.conductor_handle.as_ref(),
             )
@@ -613,8 +614,8 @@ impl Cell {
         hash: EntryHash,
         options: holochain_p2p::event::GetOptions,
     ) -> CellResult<WireEntryOps> {
-        let env = self.space.dht_env.clone();
-        authority::handle_get_entry(env.into(), hash, options)
+        let db = self.space.dht_db.clone();
+        authority::handle_get_entry(db.into(), hash, options)
             .await
             .map_err(Into::into)
     }
@@ -625,8 +626,8 @@ impl Cell {
         hash: HeaderHash,
         options: holochain_p2p::event::GetOptions,
     ) -> CellResult<WireElementOps> {
-        let env = self.space.dht_env.clone();
-        authority::handle_get_element(env.into(), hash, options)
+        let db = self.space.dht_db.clone();
+        authority::handle_get_element(db.into(), hash, options)
             .await
             .map_err(Into::into)
     }
@@ -652,8 +653,8 @@ impl Cell {
         options: holochain_p2p::event::GetLinksOptions,
     ) -> CellResult<WireLinkOps> {
         debug!(id = ?self.id());
-        let env = self.space.dht_env.clone();
-        authority::handle_get_links(env.into(), link_key, options)
+        let db = self.space.dht_db.clone();
+        authority::handle_get_links(db.into(), link_key, options)
             .await
             .map_err(Into::into)
     }
@@ -665,8 +666,8 @@ impl Cell {
         query: ChainQueryFilter,
         options: holochain_p2p::event::GetActivityOptions,
     ) -> CellResult<AgentActivityResponse<HeaderHash>> {
-        let env = self.space.dht_env.clone();
-        authority::handle_get_agent_activity(env.into(), agent, query, options)
+        let db = self.space.dht_db.clone();
+        authority::handle_get_agent_activity(db.into(), agent, query, options)
             .await
             .map_err(Into::into)
     }
@@ -681,7 +682,7 @@ impl Cell {
         let hash = receipt.receipt.dht_op_hash.clone();
         let header: Option<SignedHeader> = self
             .space
-            .authored_env
+            .authored_db
             .async_reader(move |txn| {
                 let h: Option<Vec<u8>> = txn
                     .query_row(
@@ -726,7 +727,7 @@ impl Cell {
         );
 
         self.space
-            .dht_env
+            .dht_db
             .async_commit(move |txn| {
                 // Get the current count for this dhtop.
                 let receipt_count: usize = txn.query_row(
@@ -787,10 +788,25 @@ impl Cell {
         call: ZomeCall,
         workspace_lock: Option<SourceChainWorkspace>,
     ) -> CellResult<ZomeCallResult> {
-        // Check if init has run if not run it
-        self.check_or_run_zome_init().await?;
+        // Only check if init has run if this call is not coming from
+        // an already running init call.
+        if workspace_lock
+            .as_ref()
+            .map_or(true, |w| !w.called_from_init())
+        {
+            // Check if init has run if not run it
+            self.check_or_run_zome_init().await?;
+        }
 
         let keystore = self.conductor_api.keystore().clone();
+
+        let conductor_handle = self.conductor_handle.clone();
+        let signal_tx = self.signal_broadcaster().await;
+        let ribosome = self.get_ribosome().await?;
+        let invocation =
+            ZomeCallInvocation::try_from_interface_call(self.conductor_api.clone(), call).await?;
+
+        let dna_def = ribosome.dna_def().as_content().clone();
 
         // If there is no existing zome call then this is the root zome call
         let is_root_zome_call = workspace_lock.is_none();
@@ -798,21 +814,17 @@ impl Cell {
             Some(l) => l,
             None => {
                 SourceChainWorkspace::new(
-                    self.authored_env().clone(),
-                    self.dht_env().clone(),
+                    self.authored_db().clone(),
+                    self.dht_db().clone(),
+                    self.space.dht_query_cache.clone(),
                     self.cache().clone(),
                     keystore.clone(),
                     self.id.agent_pubkey().clone(),
+                    Arc::new(dna_def),
                 )
                 .await?
             }
         };
-
-        let conductor_handle = self.conductor_handle.clone();
-        let signal_tx = self.signal_broadcaster().await;
-        let ribosome = self.get_ribosome().await?;
-        let invocation =
-            ZomeCallInvocation::try_from_interface_call(self.conductor_api.clone(), call).await?;
 
         let args = CallZomeWorkflowArgs {
             cell_id: self.id.clone(),
@@ -849,13 +861,23 @@ impl Cell {
         let keystore = self.conductor_api.keystore().clone();
         let id = self.id.clone();
         let conductor_handle = self.conductor_handle.clone();
+
+        // get the dna
+        let dna_file = conductor_handle
+            .get_dna_file(id.dna_hash())
+            .ok_or_else(|| DnaError::DnaMissing(id.dna_hash().to_owned()))?;
+
+        let dna_def = dna_file.dna_def().clone();
+
         // Create the workspace
-        let workspace = SourceChainWorkspace::new(
-            self.authored_env().clone(),
-            self.dht_env().clone(),
+        let workspace = SourceChainWorkspace::init_as_root(
+            self.authored_db().clone(),
+            self.dht_db().clone(),
+            self.space.dht_query_cache.clone(),
             self.cache().clone(),
             keystore.clone(),
             id.agent_pubkey().clone(),
+            Arc::new(dna_def),
         )
         .await?;
 
@@ -865,20 +887,17 @@ impl Cell {
         }
         trace!("running init");
 
-        // get the dna
-        let dna_file = conductor_handle
-            .get_dna(id.dna_hash())
-            .ok_or_else(|| DnaError::DnaMissing(id.dna_hash().to_owned()))?;
-        let dna_def = dna_file.dna_def().clone();
-
         // Get the ribosome
         let ribosome = RealRibosome::new(dna_file);
 
+        let signal_tx = self.signal_broadcaster().await;
+
         // Run the workflow
         let args = InitializeZomesWorkflowArgs {
-            dna_def,
             ribosome,
             conductor_handle,
+            signal_tx,
+            cell_id: self.id.clone(),
         };
         let init_result =
             initialize_zomes_workflow(workspace, self.holochain_p2p_cell.clone(), keystore, args)
@@ -920,18 +939,23 @@ impl Cell {
         }
     }
 
-    /// Accessor for the authored database backing this Cell
-    pub(crate) fn authored_env(&self) -> &DbWrite<DbKindAuthored> {
-        &self.space.authored_env
+    /// Accessor for the p2p_agents_db backing this Cell
+    pub(crate) fn p2p_agents_db(&self) -> &DbWrite<DbKindP2pAgents> {
+        &self.space.p2p_agents_db
     }
 
     /// Accessor for the authored database backing this Cell
-    pub(crate) fn dht_env(&self) -> &DbWrite<DbKindDht> {
-        &self.space.dht_env
+    pub(crate) fn authored_db(&self) -> &DbWrite<DbKindAuthored> {
+        &self.space.authored_db
+    }
+
+    /// Accessor for the authored database backing this Cell
+    pub(crate) fn dht_db(&self) -> &DbWrite<DbKindDht> {
+        &self.space.dht_db
     }
 
     pub(crate) fn cache(&self) -> &DbWrite<DbKindCache> {
-        &self.space.cache
+        &self.space.cache_db
     }
 
     #[cfg(any(test, feature = "test_utils"))]

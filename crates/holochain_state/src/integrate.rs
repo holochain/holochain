@@ -2,6 +2,7 @@ use holo_hash::{AnyDhtHash, DhtOpHash, HasHash};
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_types::{
+    db_cache::DhtDbQueryCache,
     dht_op::{DhtOp, DhtOpHashed, DhtOpType},
     prelude::DhtOpResult,
 };
@@ -16,8 +17,9 @@ use crate::{prelude::*, query::get_public_op_from_db};
 pub async fn authored_ops_to_dht_db(
     network: &(dyn HolochainP2pDnaT + Send + Sync),
     hashes: Vec<(DhtOpHash, AnyDhtHash)>,
-    authored_env: &DbRead<DbKindAuthored>,
-    dht_env: &DbWrite<DbKindDht>,
+    authored_db: &DbRead<DbKindAuthored>,
+    dht_db: &DbWrite<DbKindDht>,
+    dht_db_cache: &DhtDbQueryCache,
 ) -> StateMutationResult<()> {
     // Check if any agents in this space are an authority for these hashes.
     let mut should_hold_hashes = Vec::new();
@@ -28,19 +30,21 @@ pub async fn authored_ops_to_dht_db(
     }
 
     // Clone the ops into the dht db for the hashes that should be held.
-    authored_ops_to_dht_db_without_check(should_hold_hashes, authored_env, dht_env).await
+    authored_ops_to_dht_db_without_check(should_hold_hashes, authored_db, dht_db, dht_db_cache)
+        .await
 }
 
 /// Insert any authored ops that have been locally validated
 /// into the dht database awaiting integration.
 pub async fn authored_ops_to_dht_db_without_check(
     hashes: Vec<DhtOpHash>,
-    authored_env: &DbRead<DbKindAuthored>,
-    dht_env: &DbWrite<DbKindDht>,
+    authored_db: &DbRead<DbKindAuthored>,
+    dht_db: &DbWrite<DbKindDht>,
+    dht_db_cache: &DhtDbQueryCache,
 ) -> StateMutationResult<()> {
     // Get the ops from the authored database.
     let mut ops = Vec::with_capacity(hashes.len());
-    let ops = authored_env
+    let ops = authored_db
         .async_reader(move |txn| {
             for hash in hashes {
                 // This function filters out any private entries from ops
@@ -52,46 +56,68 @@ pub async fn authored_ops_to_dht_db_without_check(
             StateMutationResult::Ok(ops)
         })
         .await?;
-    dht_env
+    let mut activity = Vec::new();
+    let activity = dht_db
         .async_commit(|txn| {
             for op in ops {
-                insert_locally_validated_op(txn, op)?;
+                if let Some(op) = insert_locally_validated_op(txn, op)? {
+                    activity.push(op);
+                }
             }
-            StateMutationResult::Ok(())
+            StateMutationResult::Ok(activity)
         })
         .await?;
+    for op in activity {
+        let dependency = get_dependency(op.get_type(), &op.header());
+
+        if matches!(dependency, Dependency::Null) {
+            let _ = dht_db_cache
+                .set_activity_to_integrated(op.header().author(), op.header().header_seq())
+                .await;
+        } else {
+            dht_db_cache
+                .set_activity_ready_to_integrate(op.header().author(), op.header().header_seq())
+                .await?;
+        }
+    }
     Ok(())
 }
 
-fn insert_locally_validated_op(txn: &mut Transaction, op: DhtOpHashed) -> StateMutationResult<()> {
+fn insert_locally_validated_op(
+    txn: &mut Transaction,
+    op: DhtOpHashed,
+) -> StateMutationResult<Option<DhtOpHashed>> {
     // These checks are redundant but cheap and future proof this function
     // against anyone using it with private entries.
     if is_private_store_entry(op.as_content()) {
-        return Ok(());
+        return Ok(None);
     }
-    let hash = op.as_hash().clone();
     let op = filter_private_entry(op)?;
+    let hash = op.as_hash();
 
     let dependency = get_dependency(op.get_type(), &op.header());
+    let op_type = op.get_type();
 
     // Insert the op.
-    insert_op(txn, op)?;
+    insert_op(txn, &op)?;
     // Set the status to valid because we authored it.
-    set_validation_status(
-        txn,
-        hash.clone(),
-        holochain_zome_types::ValidationStatus::Valid,
-    )?;
+    set_validation_status(txn, hash, holochain_zome_types::ValidationStatus::Valid)?;
+
+    // If this is a `RegisterAgentActivity` then we need to return it to the dht db cache.
     // Set the stage to awaiting integration.
     if let Dependency::Null = dependency {
         // This set the validation stage to pending which is correct when
         // it's integrated.
-        set_validation_stage(txn, hash.clone(), ValidationLimboStatus::Pending)?;
+        set_validation_stage(txn, hash, ValidationLimboStatus::Pending)?;
         set_when_integrated(txn, hash, holochain_zome_types::Timestamp::now())?;
     } else {
         set_validation_stage(txn, hash, ValidationLimboStatus::AwaitingIntegration)?;
     }
-    Ok(())
+    if matches!(op_type, DhtOpType::RegisterAgentActivity) {
+        Ok(Some(op))
+    } else {
+        Ok(None)
+    }
 }
 
 fn filter_private_entry(op: DhtOpHashed) -> DhtOpResult<DhtOpHashed> {
