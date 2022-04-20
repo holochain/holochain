@@ -4,7 +4,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
-- Fixed broken links in Rust docs [#1284](https://github.com/holochain/holochain/pull/1284)
+## 0.0.33
+
+## 0.0.32
+
+- Fixed broken links in Rust docs [\#1284](https://github.com/holochain/holochain/pull/1284)
+
+## 0.0.31
 
 ## 0.0.30
 

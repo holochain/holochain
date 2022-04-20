@@ -14,6 +14,7 @@ use enumflags2::{bitflags, BitFlags};
 use linked_hash_map::LinkedHashMap;
 use linked_hash_set::LinkedHashSet;
 use once_cell::unsync::{Lazy, OnceCell};
+use regex::Regex;
 use semver::Version;
 use std::cell::Cell;
 use std::collections::{BTreeSet, HashMap, HashSet};
@@ -230,6 +231,8 @@ type MemberStates = LinkedHashMap<String, CrateState>;
 pub(crate) struct ReleaseWorkspace<'a> {
     root_path: PathBuf,
     criteria: SelectionCriteria,
+    git_config_name: String,
+    git_config_email: String,
 
     changelog: Option<ChangelogT<'a, WorkspaceChangelog>>,
 
@@ -258,7 +261,7 @@ pub(crate) struct SelectionCriteria {
 
 /// Defines detailed crate's state in terms of the release process.
 #[bitflags]
-#[repr(u16)]
+#[repr(u32)]
 #[derive(enum_utils::FromStr, Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum CrateStateFlags {
     /// matches a package filter
@@ -290,6 +293,10 @@ pub(crate) enum CrateStateFlags {
     MissingLicense,
     /// Has a dependency that contains '*'
     HasWildcardDependency,
+    /// One of the manifest keywords is too long
+    ManifestKeywordExceeds20Chars,
+    ManifestKeywordContainsInvalidChar,
+    ManifestKeywordsMoreThan5,
 }
 
 /// Defines the meta states that can be derived from the more detailed `CrateStateFlags`.
@@ -329,6 +336,9 @@ impl CrateState {
             | MissingDescription
             | MissingLicense
             | HasWildcardDependency
+            | ManifestKeywordExceeds20Chars
+            | ManifestKeywordContainsInvalidChar
+            | ManifestKeywordsMoreThan5
     });
 
     pub(crate) fn new(
@@ -522,6 +532,10 @@ impl CrateState {
 }
 
 impl<'a> ReleaseWorkspace<'a> {
+    const README_FILENAME: &'a str = "README.md";
+    const GIT_CONFIG_NAME: &'a str = "Holochain Core Dev Team";
+    const GIT_CONFIG_EMAIL: &'a str = "devcore@holochain.org";
+
     pub fn try_new_with_criteria(
         root_path: PathBuf,
         criteria: SelectionCriteria,
@@ -555,6 +569,9 @@ impl<'a> ReleaseWorkspace<'a> {
             // initialised: false,
             git_repo: git2::Repository::open(&root_path)?,
 
+            git_config_name: Self::GIT_CONFIG_NAME.to_string(),
+            git_config_email: Self::GIT_CONFIG_EMAIL.to_string(),
+
             root_path,
             criteria: Default::default(),
             changelog,
@@ -584,6 +601,8 @@ impl<'a> ReleaseWorkspace<'a> {
                 ..Default::default()
             };
 
+            let keyword_validation_re = Regex::new("^[a-zA-Z][a-zA-Z_\\-0-9]+$").unwrap();
+
             for member in self.members()? {
 
                 // helper macros to access the desired state
@@ -610,6 +629,18 @@ impl<'a> ReleaseWorkspace<'a> {
 
                     if metadata.description.is_none() {
                         insert_state!(CrateStateFlags::MissingDescription);
+                    }
+
+                    // see https://doc.rust-lang.org/cargo/reference/manifest.html?highlight=keywords#the-keywords-field
+                    // Note: crates.io has a maximum of 5 keywords. Each keyword must be ASCII text, start with a letter, and only contain letters, numbers, _ or -, and have at most 20 characters.
+                    if metadata.keywords.iter().any(|keyword| keyword.len() > 20) {
+                        insert_state!(CrateStateFlags::ManifestKeywordExceeds20Chars);
+                    }
+                    if metadata.keywords.iter().any(|keyword| !keyword_validation_re.is_match(keyword)) {
+                        insert_state!(CrateStateFlags::ManifestKeywordContainsInvalidChar);
+                    }
+                    if metadata.keywords.len() > 5 {
+                        insert_state!(CrateStateFlags::ManifestKeywordsMoreThan5);
                     }
                 }
 
@@ -652,8 +683,7 @@ impl<'a> ReleaseWorkspace<'a> {
                             insert_state!(CrateStateFlags::DisallowedVersionReqViolated);
                         });
 
-                    // todo: define a const or variable for the joined path
-                    if !std::path::Path::new(&member.root().join("README.md")).exists() {
+                    if !std::path::Path::new(&member.root().join(Self::README_FILENAME)).exists() {
                         insert_state!(CrateStateFlags::MissingReadme);
                     }
 
@@ -965,8 +995,8 @@ impl<'a> ReleaseWorkspace<'a> {
     // todo: make this configurable?
     fn git_signature(&self) -> Fallible<git2::Signature> {
         Ok(git2::Signature::now(
-            "Holochain Core Dev Team",
-            "devcore@holochain.org",
+            &self.git_config_name,
+            &self.git_config_email,
         )?)
     }
 

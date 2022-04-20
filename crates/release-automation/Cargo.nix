@@ -5686,6 +5686,10 @@ rec {
             packageId = "indoc";
           }
           {
+            name = "itertools";
+            packageId = "itertools";
+          }
+          {
             name = "linked-hash-map";
             packageId = "linked-hash-map";
           }

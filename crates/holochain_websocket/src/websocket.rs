@@ -155,7 +155,7 @@ impl Websocket {
         // ---- LISTENER SHUTDOWN ---- //
 
         // Shutdown the receiver stream if the listener is dropped
-        // TODO: Should this shutdown immediately or gracefully. Currently it is immediately.
+        // TODO: Should this shutdown immediately or gracefully? Currently it is immediately.
         let rx_from_websocket = listener_shutdown.wrap(rx_from_websocket_stream);
 
         // Run the to and from external socket tasks.

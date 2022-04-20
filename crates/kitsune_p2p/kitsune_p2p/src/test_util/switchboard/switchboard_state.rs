@@ -60,7 +60,7 @@ pub struct Switchboard {
 
 impl Switchboard {
     /// Constructor. Only works for one GossipType at a time.
-    // TODO: if it's desirable to test multiple gossip loops running at the
+    // MAYBE: if it's desirable to test multiple gossip loops running at the
     //   same time on the same state, another method could be exposed to take
     //   an already instantiated `Share<SwitchboardState>`, which will cause
     //   both gossip loops to share the same state.

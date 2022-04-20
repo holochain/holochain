@@ -140,9 +140,10 @@ impl DnaBundle {
                     // Otherwise, record the original hash first, for version comparisons.
                     let original_hash = DnaHash::with_data_sync(&dna_def);
 
+                    let props = manifest.properties.as_ref();
                     let properties: SerializedBytes = properties
                         .as_ref()
-                        .or_else(|| manifest.properties.as_ref())
+                        .or(props)
                         .map(SerializedBytes::try_from)
                         .unwrap_or_else(|| SerializedBytes::try_from(()))?;
                     let uid = uid.or_else(|| manifest.uid.clone()).unwrap_or_default();

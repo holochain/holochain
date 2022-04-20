@@ -97,7 +97,7 @@ pub fn anchor(anchor_type: String, anchor_text: String) -> ExternResult<holo_has
 
 /// Returns every entry hash in a vector from the root of an anchor.
 /// Hashes are sorted in the same way that paths sort children.
-pub fn list_anchor_type_addresses() -> ExternResult<Vec<EntryHash>> {
+pub fn list_anchor_type_addresses() -> ExternResult<Vec<AnyLinkableHash>> {
     let links = Path::from(vec![Component::new(ROOT.to_vec())])
         .children()?
         .into_iter()
@@ -109,7 +109,7 @@ pub fn list_anchor_type_addresses() -> ExternResult<Vec<EntryHash>> {
 /// Returns every entry hash in a vector from the second level of an anchor.
 /// Uses the string argument to build the path from the root.
 /// Hashes are sorted in the same way that paths sort children.
-pub fn list_anchor_addresses(anchor_type: String) -> ExternResult<Vec<EntryHash>> {
+pub fn list_anchor_addresses(anchor_type: String) -> ExternResult<Vec<AnyLinkableHash>> {
     let path: Path = (&Anchor {
         anchor_type,
         anchor_text: None,
@@ -197,8 +197,6 @@ fn hash_path_anchor_path() {
 #[test]
 fn hash_path_anchor_entry_def() {
     assert_eq!(PathEntry::entry_def_id(), Anchor::entry_def_id(),);
-
-    assert_eq!(PathEntry::crdt_type(), Anchor::crdt_type(),);
 
     assert_eq!(
         PathEntry::required_validations(),

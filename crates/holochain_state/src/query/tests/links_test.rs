@@ -35,8 +35,8 @@ fn fixtures(env: DbWrite<DbKindDht>, n: usize) -> Vec<TestData> {
         let zome_id = zome_id.next().unwrap();
 
         let link_add = KnownCreateLink {
-            base_address: base_address.clone(),
-            target_address: target_address.clone(),
+            base_address: base_address.clone().into(),
+            target_address: target_address.clone().into(),
             zome_id,
             tag: tag.clone(),
         };
@@ -49,7 +49,7 @@ fn fixtures(env: DbWrite<DbKindDht>, n: usize) -> Vec<TestData> {
 
         let expected_link = Link {
             create_link_hash: link_add_hash.clone(),
-            target: target_address.clone(),
+            target: target_address.clone().into(),
             timestamp: link_add.timestamp.clone().into(),
             tag: tag.clone(),
         };
@@ -142,7 +142,7 @@ impl TestData {
         // Make sure there is at least some tag
         let half_tag = if tag_len > 1 { tag_len / 2 } else { tag_len };
         let half_tag = LinkTag::new(&self.tag.0[..half_tag]);
-        let query = GetLinksQuery::tag(self.base_hash.clone(), self.zome_id, half_tag);
+        let query = GetLinksQuery::tag(self.base_hash.clone().into(), self.zome_id, half_tag);
         let val = fresh_reader_test(self.env.clone(), |txn| {
             query.run(DbScratch::new(&[&txn], &self.scratch)).unwrap()
         });
@@ -154,7 +154,7 @@ impl TestData {
         // Make sure there is at least some tag
         let half_tag = if tag_len > 1 { tag_len / 2 } else { tag_len };
         let half_tag = LinkTag::new(&self.tag.0[..half_tag]);
-        let query = GetLinksQuery::tag(self.base_hash.clone(), self.zome_id, half_tag);
+        let query = GetLinksQuery::tag(self.base_hash.clone().into(), self.zome_id, half_tag);
         let val = fresh_reader_test(self.env.clone(), |txn| {
             query
                 .run(DbScratch::new(&[&txn], &self.scratch))
@@ -222,7 +222,7 @@ impl TestData {
             .collect::<Vec<_>>();
         let mut val = Vec::new();
         for d in td {
-            let query = GetLinksQuery::base(base_hash.clone(), d.zome_id);
+            let query = GetLinksQuery::base(base_hash.clone().into(), d.zome_id);
             fresh_reader_test(d.env.clone(), |txn| {
                 val.extend(
                     query
@@ -249,7 +249,7 @@ impl TestData {
             .iter()
             .map(|d| d.expected_link.clone())
             .collect::<Vec<_>>();
-        let query = GetLinksQuery::tag(base_hash, zome_id, tag);
+        let query = GetLinksQuery::tag(base_hash.into(), zome_id, tag);
         let mut val = Vec::new();
         for d in td {
             fresh_reader_test(d.env.clone(), |txn| {
@@ -281,7 +281,7 @@ impl TestData {
             .iter()
             .map(|d| d.expected_link.clone())
             .collect::<Vec<_>>();
-        let query = GetLinksQuery::tag(base_hash, zome_id, half_tag);
+        let query = GetLinksQuery::tag(base_hash.into(), zome_id, half_tag);
         let mut val = Vec::new();
         for d in td {
             fresh_reader_test(d.env.clone(), |txn| {
@@ -510,15 +510,15 @@ async fn links_on_same_base() {
     let base_hash = &base_hash;
     for d in td.iter_mut() {
         d.base_hash = base_hash.clone();
-        d.link_add.base_address = base_hash.clone();
+        d.link_add.base_address = base_hash.clone().into();
         // Create the new hash
         let (_, link_add_hash): (_, HeaderHash) =
             HeaderHashed::from_content_sync(Header::CreateLink(d.link_add.clone())).into();
         d.expected_link.create_link_hash = link_add_hash.clone();
         d.link_remove.link_add_address = link_add_hash;
-        d.link_remove.base_address = base_hash.clone();
-        d.query = GetLinksQuery::tag(base_hash.clone(), d.zome_id, d.tag.clone());
-        d.query_no_tag = GetLinksQuery::base(base_hash.clone(), d.zome_id);
+        d.link_remove.base_address = base_hash.clone().into();
+        d.query = GetLinksQuery::tag(base_hash.clone().into(), d.zome_id, d.tag.clone());
+        d.query_no_tag = GetLinksQuery::base(base_hash.clone().into(), d.zome_id);
     }
     {
         // Add
@@ -600,10 +600,10 @@ async fn links_on_same_tag() {
         d.base_hash = base_hash.clone();
         d.zome_id = zome_id;
         d.tag = tag.clone();
-        d.link_add.base_address = base_hash.clone();
+        d.link_add.base_address = base_hash.clone().into();
         d.link_add.zome_id = zome_id;
         d.link_add.tag = tag.clone();
-        d.link_remove.base_address = base_hash.clone();
+        d.link_remove.base_address = base_hash.clone().into();
 
         // Create the new hash
         let (_, link_add_hash): (_, HeaderHash) =
@@ -612,8 +612,8 @@ async fn links_on_same_tag() {
         d.expected_link.tag = tag.clone();
         d.link_remove.link_add_address = link_add_hash;
 
-        d.query = GetLinksQuery::tag(base_hash.clone(), d.zome_id, tag.clone());
-        d.query_no_tag = GetLinksQuery::base(base_hash.clone(), d.zome_id);
+        d.query = GetLinksQuery::tag(base_hash.clone().into(), d.zome_id, tag.clone());
+        d.query_no_tag = GetLinksQuery::base(base_hash.clone().into(), d.zome_id);
     }
     {
         // Add
