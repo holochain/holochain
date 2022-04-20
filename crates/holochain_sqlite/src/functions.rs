@@ -24,7 +24,8 @@ impl Aggregate<RegionHash, Vec<u8>> for AggregateXor {
         let blob: Vec<u8> = ctx.get(0)?;
         let len = blob.len();
         if let Some(a) = RegionHash::from_vec(blob) {
-            Ok(v.xor(&a))
+            v.xor(&a);
+            Ok(())
         } else {
             Err(Error::UserFunctionError(
                 format!(

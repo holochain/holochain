@@ -7,7 +7,10 @@ use std::sync::Arc;
 use super::{dna_store::DnaStore, space::Spaces};
 use futures::FutureExt;
 use holo_hash::DnaHash;
-use holochain_p2p::{dht::spacetime::Topology, DnaHashExt};
+use holochain_p2p::{
+    dht::{spacetime::Topology, ArqStrat},
+    DnaHashExt,
+};
 use holochain_types::{db::PermittedConn, prelude::DnaError, share::RwShare};
 use kitsune_p2p::{
     agent_store::AgentInfoSigned, event::GetAgentInfoSignedEvt, KitsuneHost, KitsuneHostResult,
@@ -20,6 +23,7 @@ pub struct KitsuneHostImpl {
     spaces: Spaces,
     dna_store: RwShare<DnaStore>,
     tuning_params: KitsuneP2pTuningParams,
+    strat: ArqStrat,
 }
 
 impl KitsuneHostImpl {
@@ -28,11 +32,13 @@ impl KitsuneHostImpl {
         spaces: Spaces,
         dna_store: RwShare<DnaStore>,
         tuning_params: KitsuneP2pTuningParams,
+        strat: ArqStrat,
     ) -> Arc<Self> {
         Arc::new(Self {
             spaces,
             dna_store,
             tuning_params,
+            strat,
         })
     }
 }
@@ -100,10 +106,14 @@ impl KitsuneHost for KitsuneHostImpl {
         async move {
             let topology = self.get_topology(space.clone()).await?;
             let db = self.spaces.authored_db(&dna_hash)?;
-            Ok(
-                query_region_set::query_region_set(db, topology, dht_arc_set, &self.tuning_params)
-                    .await?,
+            Ok(query_region_set::query_region_set(
+                db,
+                topology,
+                &self.strat,
+                dht_arc_set,
+                &self.tuning_params,
             )
+            .await?)
         }
         .boxed()
         .into()

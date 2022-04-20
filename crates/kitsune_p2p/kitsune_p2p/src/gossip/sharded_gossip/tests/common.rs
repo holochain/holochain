@@ -11,6 +11,7 @@ use super::*;
 pub struct StandardResponsesHostApi {
     infos: Vec<AgentInfoSigned>,
     topology: Topology,
+    strat: ArqStrat,
     with_data: bool,
 }
 
@@ -44,7 +45,7 @@ impl KitsuneHost for StandardResponsesHostApi {
         async move {
             let arqs = ArqBoundsSet::from_dht_arc_set(
                 &self.get_topology(space).await?,
-                &ArqStrat::default(),
+                &self.strat,
                 &dht_arc_set,
             )
             .expect("an arc in the set could not be quantized");
@@ -94,6 +95,7 @@ async fn standard_responses(
     let host_api = StandardResponsesHostApi {
         infos: infos.clone(),
         topology: Topology::standard_epoch(),
+        strat: ArqStrat::default(),
         with_data,
     };
     evt_handler.expect_handle_query_agents().returning({

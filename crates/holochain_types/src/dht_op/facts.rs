@@ -9,18 +9,23 @@ use holochain_keystore::MetaLairClient;
 /// - The Signature matches the Header
 /// - If the header references an Entry, the Entry will exist and be of the appropriate hash
 /// - If the header does not reference an Entry, the entry will be None
-pub fn valid_dht_op<'a>(keystore: MetaLairClient, author: AgentPubKey) -> Facts<'static, DhtOp> {
+pub fn valid_dht_op<'a>(
+    keystore: MetaLairClient,
+    author: AgentPubKey,
+    must_be_public: bool,
+) -> Facts<'static, DhtOp> {
     facts![
         brute(
             "Header type matches Entry existence, and is public if exists",
-            |op: &DhtOp| {
+            move |op: &DhtOp| {
                 let header = op.header();
                 let h = header.entry_data();
                 let e = op.entry();
+                dbg!(&h, &e);
                 match (h, e) {
                     (Some((_entry_hash, entry_type)), Some(_e)) => {
                         // Ensure that entries are public
-                        entry_type.visibility().is_public()
+                        !must_be_public || entry_type.visibility().is_public()
                     }
                     (None, None) => true,
                     _ => false,
@@ -94,8 +99,7 @@ mod tests {
         let op2 = DhtOp::StoreElement(se.clone(), he.clone(), None);
         let op3 = DhtOp::StoreElement(sn.clone(), hn.clone(), Some(Box::new(e.clone())));
         let op4 = DhtOp::StoreElement(sn.clone(), hn.clone(), None);
-
-        let fact = valid_dht_op(keystore, agent);
+        let fact = valid_dht_op(keystore, agent, false);
 
         fact.check(&op1).unwrap();
         assert!(fact.check(&op2).is_err());

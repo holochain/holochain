@@ -49,7 +49,7 @@ async fn test_region_queries() {
     let mut arbitrary_valid_op = |timestamp: Timestamp| -> DhtOp {
         let mut op = DhtOp::arbitrary(&mut u).unwrap();
         *op.author_mut() = agent.clone();
-        let mut fact = valid_dht_op(keystore.clone(), agent.clone());
+        let mut fact = valid_dht_op(keystore.clone(), agent.clone(), true);
         fact.satisfy(&mut op, &mut u);
         *op.timestamp_mut() = timestamp;
         op

@@ -1367,6 +1367,8 @@ impl Conductor {
 }
 
 mod builder {
+    use holochain_p2p::dht::ArqStrat;
+
     use super::*;
     use crate::conductor::dna_store::DnaStore;
     use crate::conductor::handle::DevSettings;
@@ -1477,12 +1479,14 @@ mod builder {
                     cert_priv_key,
                     cert_digest,
                 };
+            let strat = ArqStrat::default();
 
             let spaces = Spaces::new(&config)?;
             let host = KitsuneHostImpl::new(
                 spaces.clone(),
                 dna_store.clone(),
                 network_config.tuning_params.clone(),
+                strat,
             );
 
             let (holochain_p2p, p2p_evt) =
@@ -1643,9 +1647,10 @@ mod builder {
 
             let network_config = self.config.network.clone().unwrap_or_default();
             let tuning_params = network_config.tuning_params.clone();
+            let strat = ArqStrat::default();
 
             let dna_store = RwShare::new(self.dna_store);
-            let host = KitsuneHostImpl::new(spaces.clone(), dna_store.clone(), tuning_params);
+            let host = KitsuneHostImpl::new(spaces.clone(), dna_store.clone(), tuning_params, strat);
 
             let (holochain_p2p, p2p_evt) =
                 holochain_p2p::spawn_holochain_p2p(network_config, holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_types::tls::TlsConfig::new_ephemeral().await.unwrap(), host)

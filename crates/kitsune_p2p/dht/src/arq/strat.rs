@@ -112,6 +112,14 @@ impl Default for ArqStrat {
 }
 
 impl ArqStrat {
+    /// Constructor
+    pub fn from_params(min_coverage: f64) -> Self {
+        Self {
+            min_coverage,
+            ..Default::default()
+        }
+    }
+
     /// The midline between min and max coverage
     pub fn midline_coverage(&self) -> f64 {
         (self.min_coverage + self.max_coverage()) / 2.0

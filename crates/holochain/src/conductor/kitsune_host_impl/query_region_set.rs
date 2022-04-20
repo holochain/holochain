@@ -11,10 +11,10 @@ use crate::conductor::error::ConductorResult;
 pub async fn query_region_set(
     db: DbWrite<DbKindAuthored>,
     topology: Topology,
+    strat: &ArqStrat,
     dht_arc_set: Arc<DhtArcSet>,
     tuning_params: &KitsuneP2pTuningParams,
 ) -> ConductorResult<RegionSetLtcs> {
-    let strat = ArqStrat::default();
     let arq_set = ArqBoundsSet::from_dht_arc_set(&topology, &strat, &dht_arc_set)
         .expect("arc is not quantizable (FIXME: only use quantized arcs)");
     let recent_threshold =
