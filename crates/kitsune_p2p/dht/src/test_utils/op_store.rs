@@ -38,8 +38,7 @@ impl<D: RegionDataConstraints, O: OpRegion<D>> AccessOpStore<O, D> for OpStore<O
         let (t0, t1) = region.t;
         let op0 = O::bound(t0, x0);
         let op1 = O::bound(t1, x0);
-        self
-            .ops
+        self.ops
             .range((Bound::Included(op0), Bound::Included(op1)))
             .filter(|o| x0 <= o.loc() && o.loc() <= x1)
             .cloned()

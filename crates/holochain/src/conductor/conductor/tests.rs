@@ -87,7 +87,8 @@ async fn can_add_clone_cell_to_app() {
     let spaces = Spaces::new(&ConductorConfig {
         environment_path: db_dir.path().to_path_buf().into(),
         ..Default::default()
-    }).unwrap();
+    })
+    .unwrap();
 
     let conductor = Conductor::new(
         dna_store,
