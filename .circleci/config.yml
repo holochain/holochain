@@ -70,6 +70,7 @@ jobs:
       environment:
          CACHIX_NAME: holochain-ci
          NIXPKGS_ALLOW_UNFREE: 1
+         RUSTDOCFLAGS: -Dwarnings # let rustdoc fail on warnings
       steps:
          - checkout
          - run:
