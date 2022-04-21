@@ -199,21 +199,22 @@ jobs:
 workflows:
    tests:
       jobs:
-         # - merge-release-test
+         - merge-release-test
          # - merge-release-test-mac
-         # - standard-test
+         - standard-test
          - rustdoc-build-test
-         # - hc-static-checks
-         # - slow-test
-         # - wasm-test
+         - hc-static-checks
+         - slow-test
+         - wasm-test
          # - merge-test-mac
-         # - ci-jobs-succeed:
-         #      requires:
-         #   - standard-test
-         #   - hc-static-checks
-         #   - slow-test
-         #   - wasm-test
-         #   - merge-release-test
+         - ci-jobs-succeed:
+              requires:
+                 - standard-test
+                 - rustdoc-build-test
+                 - hc-static-checks
+                 - slow-test
+                 - wasm-test
+                 - merge-release-test
 
    docker-builds:
       triggers:
