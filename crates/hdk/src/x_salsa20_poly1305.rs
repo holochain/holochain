@@ -37,8 +37,8 @@ pub fn create_x25519_keypair() -> ExternResult<X25519PubKey> {
 /// If you want to encrypt content so that a _specific_ recipient (i.e. public key) can decrypt it
 /// then see the libsodium `box` algorithm or similar.
 ///
-/// See https://doc.libsodium.org/secret-key_cryptography/secretbox
-/// See https://nacl.cr.yp.to/secretbox.html
+/// See <https://doc.libsodium.org/secret-key_cryptography/secretbox>
+/// See <https://nacl.cr.yp.to/secretbox.html>
 pub fn x_salsa20_poly1305_encrypt(
     key_ref: XSalsa20Poly1305KeyRef,
     data: XSalsa20Poly1305Data,
@@ -64,7 +64,7 @@ pub fn x_salsa20_poly1305_encrypt(
 ///    party knows they did not create a certain message so they know it came from the counterpary
 ///    but neither can prove to a third party that any message wasn't forged. Note that if you want
 ///    the opposite it is not enough to simply layer signatures and encryption.
-///    See https://theworld.com/~dtd/sign_encrypt/sign_encrypt7.html
+///    See <https://theworld.com/~dtd/sign_encrypt/sign_encrypt7.html>
 ///  - To encrypt something potentially large for potentially many recipients efficiently it may be
 ///    worth chunking the large data, secret boxing it with a unique key for each chunk, then
 ///    boxing the _keys_ for each recipient alongside the chunks, to avoid encrypting the large
@@ -84,8 +84,8 @@ pub fn x_salsa20_poly1305_encrypt(
 /// If you want to encrypt content so that _any_ recipient with a shared secret can decrypt it
 /// then see the libsodium `secretbox` algorithm or similar.
 ///
-/// See https://doc.libsodium.org/public-key_cryptography/authenticated_encryption
-/// See https://nacl.cr.yp.to/box.html
+/// See <https://doc.libsodium.org/public-key_cryptography/authenticated_encryption>
+/// See <https://nacl.cr.yp.to/box.html>
 pub fn x_25519_x_salsa20_poly1305_encrypt(
     sender: X25519PubKey,
     recipient: X25519PubKey,

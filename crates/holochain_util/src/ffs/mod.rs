@@ -5,12 +5,12 @@
 //! the path used in the function call.
 //!
 //! This helps with "file not found" errors. Without ffs, the error would be:
-//! ```ignore
+//! ```text
 //! Error: No such file or directory (os error 2)
 //! ```
 //!
 //! and with ffs, the error becomes:
-//! ```ignore
+//! ```text
 //! ffs::IoError at path '/foo/bar': No such file or directory (os error 2)
 //! ```
 

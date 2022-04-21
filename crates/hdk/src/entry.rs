@@ -90,7 +90,7 @@ where
 ///
 /// with a specific [`ChainTopOrdering`]:
 /// ```ignore
-/// delete_entry(DeleteInput::new(header_hash.clone(), ChainTopOrdering::Relaxed)?;
+/// delete_entry(DeleteInput::new(header_hash.clone(), ChainTopOrdering::Relaxed))?;
 /// ```
 pub fn delete_entry<I, E>(delete_input: I) -> ExternResult<HeaderHash>
 where

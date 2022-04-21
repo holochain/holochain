@@ -18,7 +18,7 @@ pub enum KeystoreConfig {
     LairServerLegacyDeprecated {
         /// Optional path for keystore directory. If not specified,
         /// will use the default provided by:
-        /// [ConfigBuilder]()https://docs.rs/lair_keystore_api/0.0.1-alpha.4/lair_keystore_api/struct.ConfigBuilder.html)
+        /// [`ConfigBuilder`](https://docs.rs/lair_keystore_api/0.0.1-alpha.4/lair_keystore_api/struct.ConfigBuilder.html)
         #[serde(default)]
         keystore_path: Option<std::path::PathBuf>,
 

@@ -10,7 +10,7 @@ use std::convert::TryFrom;
 pub enum HumanTimestamp {
     /// A microsecond resolution [`Timestamp`].
     Micros(Timestamp),
-    /// A RFC3339 [`DateTime`].
+    /// A RFC3339 [`DateTime`](chrono::DateTime).
     RFC3339(DateTime),
 }
 
