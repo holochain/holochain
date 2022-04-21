@@ -80,9 +80,7 @@ jobs:
               command: $(nix-build . --fallback --no-link -A pkgs.ci.ciSetupNixConf)/bin/hc-ci-setup-nix-conf.sh
          - run:
               name: Build docs with rustdoc
-              command: nix-shell --fallback --pure --argstr flavor "coreDev" --run "cargo doc"
-              environment:
-                 RUSTDOCFLAGS: "-Dwarnings" # let rustdoc fail on warnings
+              command: nix-shell --fallback --pure --argstr flavor "coreDev" --run "export RUSTDOCFLAGS=-Dwarnings cargo doc"
 
    standard-test:
       docker:
