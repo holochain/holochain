@@ -62,7 +62,7 @@ jobs:
 
    rustdoc-build-test:
       docker:
-         - image: nixos/nix:latest
+         - image: holochain/holochain:circle.build.develop
            auth:
               username: $DOCKER_USER
               password: $DOCKER_PASS
