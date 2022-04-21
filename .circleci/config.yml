@@ -82,7 +82,7 @@ jobs:
               name: Build docs with rustdoc
               command: nix-shell --fallback --pure --argstr flavor "coreDev" --run "cargo doc"
               environment:
-                 RUSTDOCFLAGS: -Dwarnings # let rustdoc fail on warnings
+                 RUSTDOCFLAGS: "-Dwarnings" # let rustdoc fail on warnings
 
    standard-test:
       docker:
