@@ -17,7 +17,7 @@ pub(crate) mod check;
 pub(crate) mod common;
 pub(crate) mod crate_;
 pub(crate) mod crate_selection;
-pub(crate) mod release;
+pub mod release;
 
 #[cfg(test)]
 pub(crate) mod tests;
