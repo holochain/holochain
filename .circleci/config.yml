@@ -70,6 +70,7 @@ jobs:
       environment:
          CACHIX_NAME: holochain-ci
          NIXPKGS_ALLOW_UNFREE: 1
+         RUSTDOCFLAGS: -Dwarnings
       steps:
          - checkout
          - run:
@@ -80,7 +81,7 @@ jobs:
               command: $(nix-build . --fallback --no-link -A pkgs.ci.ciSetupNixConf)/bin/hc-ci-setup-nix-conf.sh
          - run:
               name: Build docs with rustdoc
-              command: nix-shell --fallback --pure --argstr flavor "coreDev" --run "export RUSTDOCFLAGS=-Dwarnings cargo doc"
+              command: nix-shell --fallback --pure --keep RUSTDOCFLAGS --argstr flavor "coreDev" --run "echo $RUSTDOCFLAGS"
 
    standard-test:
       docker:
