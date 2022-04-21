@@ -119,6 +119,10 @@ pub mod tuning_params_struct {
         /// be too long. [Default: 1 minutes]
         gossip_local_sync_delay_ms: u32 = 1000 * 60,
 
+        /// The target redundancy is the number of peers we expect to hold any
+        /// given Op.
+        gossip_redundancy_target: f64 = 100.0,
+
         /// Should gossip dynamically resize storage arcs?
         gossip_dynamic_arcs: bool = true,
 

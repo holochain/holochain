@@ -1479,7 +1479,8 @@ mod builder {
                     cert_priv_key,
                     cert_digest,
                 };
-            let strat = ArqStrat::default();
+            let strat =
+                ArqStrat::from_params(network_config.tuning_params.gossip_redundancy_target);
 
             let spaces = Spaces::new(&config)?;
             let host = KitsuneHostImpl::new(
@@ -1647,10 +1648,11 @@ mod builder {
 
             let network_config = self.config.network.clone().unwrap_or_default();
             let tuning_params = network_config.tuning_params.clone();
-            let strat = ArqStrat::default();
+            let strat = ArqStrat::from_params(tuning_params.gossip_redundancy_target);
 
             let dna_store = RwShare::new(self.dna_store);
-            let host = KitsuneHostImpl::new(spaces.clone(), dna_store.clone(), tuning_params, strat);
+            let host =
+                KitsuneHostImpl::new(spaces.clone(), dna_store.clone(), tuning_params, strat);
 
             let (holochain_p2p, p2p_evt) =
                 holochain_p2p::spawn_holochain_p2p(network_config, holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_types::tls::TlsConfig::new_ephemeral().await.unwrap(), host)
