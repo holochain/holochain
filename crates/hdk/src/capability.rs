@@ -9,7 +9,7 @@ use crate::prelude::*;
 /// The grant entry is never sent, only the associated secret.
 /// The claim should be created on the local source chain so that it can be retrieved for later use.
 ///
-/// Grantees of [`CapGranti`] secrets use [`CapClaim`] entries to save the secret.
+/// Grantees of [`CapGrant`] secrets use [`CapClaim`] entries to save the secret.
 ///
 /// The [`CapClaim`] contains the secret, tag and issuing agent.
 /// Only the secret should ever be sent back to the issuing agent, everything else is only for local
