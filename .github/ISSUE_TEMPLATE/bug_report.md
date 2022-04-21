@@ -22,10 +22,11 @@ A clear and concise description of what you expected to happen.
 
 **Steps to reproduce**
 For isolating the bug, it is helpful to see a failing test or a repo that
-reproduces the bug in a fresh hApp.
+reproduces the bug in a fresh hApp. Some suggestions for methods
+of writing a reproduction of a bug:
 
-- Write a failing test with Sweettest
-- Write a failing test with Tryorama
+- Write a failing test with [Sweettest](https://docs.rs/holochain/latest/holochain/sweettest/index.html)
+- Write a failing test with [Tryorama](https://github.com/holochain/tryorama/)
 - Create a minimal reproduction project using `hn-init` and add the code that
 produces the bug.
 
