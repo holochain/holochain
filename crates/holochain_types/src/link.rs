@@ -15,14 +15,6 @@ use crate::dht_op::DhtOpType;
 use crate::dht_op::RenderedOp;
 use crate::dht_op::RenderedOps;
 
-/// Links interrelate entries in a source chain.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash, SerializedBytes)]
-pub struct Link {
-    base: EntryHash,
-    target: EntryHash,
-    tag: LinkTag,
-}
-
 /// Owned link key for sending across networks
 #[deprecated = "This is being replaced by WireLinkKey"]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
@@ -225,32 +217,6 @@ impl WireLinkMetaKey {
         match self {
             Base(b) | BaseZome(b, _) | BaseZomeTag(b, _, _) | Full(b, _, _, _) => b.clone().into(),
         }
-    }
-}
-
-impl Link {
-    /// Construct a new link.
-    pub fn new(base: &EntryHash, target: &EntryHash, tag: &LinkTag) -> Self {
-        Link {
-            base: base.to_owned(),
-            target: target.to_owned(),
-            tag: tag.to_owned(),
-        }
-    }
-
-    /// Get the base address of this link.
-    pub fn base(&self) -> &EntryHash {
-        &self.base
-    }
-
-    /// Get the target address of this link.
-    pub fn target(&self) -> &EntryHash {
-        &self.target
-    }
-
-    /// Get the tag of this link.
-    pub fn tag(&self) -> &LinkTag {
-        &self.tag
     }
 }
 
