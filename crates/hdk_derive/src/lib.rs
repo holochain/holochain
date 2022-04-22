@@ -8,11 +8,17 @@ use syn::parse::Result;
 use syn::punctuated::Punctuated;
 
 mod entry_def_registration;
+mod entry_defs;
 mod entry_defs_conversions;
-mod entry_defs_full;
 mod entry_defs_name_registration;
+mod entry_helper;
+mod entry_zomes;
+mod link_types;
+mod link_zomes;
 mod to_app_entry_def_name;
+mod to_link_type_query;
 mod to_zome_name;
+mod unit_enum;
 mod util;
 
 struct EntryDef(holochain_integrity_types::entry_def::EntryDef);
@@ -236,6 +242,11 @@ pub fn derive_to_zome_name(input: TokenStream) -> TokenStream {
     to_zome_name::derive(input)
 }
 
+#[proc_macro_derive(ToLinkTypeQuery)]
+pub fn derive_to_link_type_query(input: TokenStream) -> TokenStream {
+    to_link_type_query::derive(input)
+}
+
 #[proc_macro_derive(ToAppEntryDefName, attributes(entry_def_name))]
 pub fn derive_to_app_entry_def_name(input: TokenStream) -> TokenStream {
     to_app_entry_def_name::derive(input)
@@ -246,9 +257,19 @@ pub fn derive_entry_def_registration(input: TokenStream) -> TokenStream {
     entry_def_registration::derive(input)
 }
 
+#[proc_macro_derive(UnitEnum)]
+pub fn derive_to_unit_enum(input: TokenStream) -> TokenStream {
+    unit_enum::derive(input)
+}
+
 #[proc_macro_attribute]
-pub fn entry_defs_full(attrs: TokenStream, code: TokenStream) -> TokenStream {
-    entry_defs_full::build(attrs, code)
+pub fn hdk_entry_defs(attrs: TokenStream, code: TokenStream) -> TokenStream {
+    entry_defs::build(attrs, code)
+}
+
+#[proc_macro_attribute]
+pub fn hdk_link_types(attrs: TokenStream, code: TokenStream) -> TokenStream {
+    link_types::build(attrs, code)
 }
 
 #[proc_macro_attribute]
@@ -259,4 +280,19 @@ pub fn entry_defs_name_registration(attrs: TokenStream, code: TokenStream) -> To
 #[proc_macro_attribute]
 pub fn entry_defs_conversions(attrs: TokenStream, code: TokenStream) -> TokenStream {
     entry_defs_conversions::build(attrs, code)
+}
+
+#[proc_macro_attribute]
+pub fn hdk_entry_zomes(attrs: TokenStream, code: TokenStream) -> TokenStream {
+    entry_zomes::build(attrs, code)
+}
+
+#[proc_macro_attribute]
+pub fn hdk_link_zomes(attrs: TokenStream, code: TokenStream) -> TokenStream {
+    link_zomes::build(attrs, code)
+}
+
+#[proc_macro_attribute]
+pub fn hdk_entry_helper(attrs: TokenStream, code: TokenStream) -> TokenStream {
+    entry_helper::build(attrs, code)
 }

@@ -1,37 +1,44 @@
 use crate::integrity::*;
 use hdk::prelude::*;
 
+#[hdk_entry_zomes]
+enum EntryZomes {
+    IntegrityCreateEntry(crate::integrity::EntryTypes),
+}
+
 fn post() -> Post {
     Post("foo".into())
+}
+
+fn new_post() -> EntryZomes {
+    EntryZomes::IntegrityCreateEntry(EntryTypes::Post(Post("foo".into())))
 }
 
 fn msg() -> Msg {
     Msg("hello".into())
 }
 
-fn priv_msg() -> PrivMsg {
-    PrivMsg("Don't tell anyone".into())
+#[hdk_extern]
+fn create_entry(_: ()) -> ExternResult<HeaderHash> {
+    let post = new_post();
+    HDK.with(|h| {
+        h.borrow().create(CreateInput::new(
+            (&post).into(),
+            post.try_into().unwrap(),
+            // This is used to test many conductors thrashing creates between
+            // each other so we want to avoid retries that make the test take
+            // a long time.
+            ChainTopOrdering::Relaxed,
+        ))
+    })
 }
 
-// #[hdk_extern]
-// fn create_entry(_: ()) -> ExternResult<HeaderHash> {
-//     let post = post();
-//     HDK.with(|h| {
-//         h.borrow().create(CreateInput::new(
-//             EntryLocation::app(post.0, "create_entry_integrity"),
-//             post.try_into().unwrap(),
-//             // This is used to test many conductors thrashing creates between
-//             // each other so we want to avoid retries that make the test take
-//             // a long time.
-//             ChainTopOrdering::Relaxed,
-//         ))
-//     })
-// }
-
-// #[hdk_extern]
-// fn create_post(post: Post) -> ExternResult<HeaderHash> {
-//     hdk::prelude::create_entry(&post)
-// }
+#[hdk_extern]
+fn create_post(post: Post) -> ExternResult<HeaderHash> {
+    hdk::prelude::create_entry(&EntryZomes::IntegrityCreateEntry(
+        crate::integrity::EntryTypes::Post(post),
+    ))
+}
 
 #[hdk_extern]
 fn delete_post(post_hash: HeaderHash) -> ExternResult<HeaderHash> {
@@ -61,15 +68,21 @@ fn get_post(hash: HeaderHash) -> ExternResult<Option<Element>> {
     get(hash, GetOptions::content())
 }
 
-// #[hdk_extern]
-// fn create_msg(_: ()) -> ExternResult<HeaderHash> {
-//     hdk::prelude::create_entry(&msg())
-// }
+#[hdk_extern]
+fn create_msg(_: ()) -> ExternResult<HeaderHash> {
+    use EntryTypes::*;
+    use EntryZomes::*;
+    hdk::prelude::create_entry(IntegrityCreateEntry(Msg(msg())))
+}
 
-// #[hdk_extern]
-// fn create_priv_msg(_: ()) -> ExternResult<HeaderHash> {
-//     hdk::prelude::create_entry(&priv_msg())
-// }
+#[hdk_extern]
+fn create_priv_msg(_: ()) -> ExternResult<HeaderHash> {
+    use EntryTypes::*;
+    use EntryZomes::*;
+    hdk::prelude::create_entry(&IntegrityCreateEntry(PrivMsg(crate::integrity::PrivMsg(
+        "Don't tell anyone".into(),
+    ))))
+}
 
 #[hdk_extern]
 fn get_activity(
@@ -93,44 +106,44 @@ fn init(_: ()) -> ExternResult<InitCallbackResult> {
     Ok(InitCallbackResult::Pass)
 }
 
-// /// Create a post entry then
-// /// create another post through a
-// /// call
-// #[hdk_extern]
-// fn call_create_entry(_: ()) -> ExternResult<HeaderHash> {
-//     // Create an entry directly via. the hdk.
-//     hdk::prelude::create_entry(&post())?;
-//     // Create an entry via a `call`.
-//     let zome_call_response: ZomeCallResponse = call(
-//         CallTargetCell::Local,
-//         "create_entry".to_string().into(),
-//         "create_entry".to_string().into(),
-//         None,
-//         &(),
-//     )?;
+/// Create a post entry then
+/// create another post through a
+/// call
+#[hdk_extern]
+fn call_create_entry(_: ()) -> ExternResult<HeaderHash> {
+    // Create an entry directly via. the hdk.
+    hdk::prelude::create_entry(&new_post())?;
+    // Create an entry via a `call`.
+    let zome_call_response: ZomeCallResponse = call(
+        CallTargetCell::Local,
+        zome_info()?.name,
+        "create_entry".to_string().into(),
+        None,
+        &(),
+    )?;
 
-//     match zome_call_response {
-//         ZomeCallResponse::Ok(v) => Ok(v.decode()?),
-//         ZomeCallResponse::Unauthorized(cell_id, zome_name, function_name, agent_pubkey) => {
-//             Err(WasmError::Guest(format!(
-//                 "Unauthorized: {} {} {} {}",
-//                 cell_id, zome_name, function_name, agent_pubkey
-//             )))
-//         }
-//         // Unbounded recursion.
-//         ZomeCallResponse::NetworkError(_) => call_create_entry(()),
-//         ZomeCallResponse::CountersigningSession(e) => Err(WasmError::Guest(format!(
-//             "Countersigning session failed: {}",
-//             e
-//         ))),
-//     }
-// }
+    match zome_call_response {
+        ZomeCallResponse::Ok(v) => Ok(v.decode()?),
+        ZomeCallResponse::Unauthorized(cell_id, zome_name, function_name, agent_pubkey) => {
+            Err(WasmError::Guest(format!(
+                "Unauthorized: {} {} {} {}",
+                cell_id, zome_name, function_name, agent_pubkey
+            )))
+        }
+        // Unbounded recursion.
+        ZomeCallResponse::NetworkError(_) => call_create_entry(()),
+        ZomeCallResponse::CountersigningSession(e) => Err(WasmError::Guest(format!(
+            "Countersigning session failed: {}",
+            e
+        ))),
+    }
+}
 
 #[hdk_extern]
 fn call_create_entry_remotely(agent: AgentPubKey) -> ExternResult<HeaderHash> {
     let zome_call_response: ZomeCallResponse = call_remote(
         agent.clone(),
-        "create_entry".to_string().into(),
+        zome_info()?.name,
         "create_entry".to_string().into(),
         None,
         &(),
@@ -163,7 +176,7 @@ fn must_get_valid_element(header_hash: HeaderHash) -> ExternResult<Element> {
 fn call_create_entry_remotely_no_rec(agent: AgentPubKey) -> ExternResult<HeaderHash> {
     let zome_call_response: ZomeCallResponse = call_remote(
         agent.clone(),
-        "create_entry".to_string().into(),
+        zome_info()?.name,
         "create_entry".to_string().into(),
         None,
         &(),

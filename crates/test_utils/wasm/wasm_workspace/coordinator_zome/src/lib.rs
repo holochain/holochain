@@ -1,50 +1,45 @@
 use hdk::prelude::*;
+use integrity_zome::EntryTypes;
 use integrity_zome::Msg;
 use integrity_zome::Post;
 use integrity_zome::PrivMsg;
 use test_wasm_integrity_zome as integrity_zome;
 
-enum IntegrityZomeTypes{
-    Msg(Msg),
-    Post(Post),
-    PrivMsg(PrivMsg),
-}
-
+#[hdk_entry_zomes]
 enum EntryZomes {
-    IntegrityZome(IntegrityZomeTypes)
+    IntegrityZome(integrity_zome::EntryTypes),
 }
 
 fn post() -> Post {
     Post("foo".into())
 }
 
+fn new_post() -> EntryZomes {
+    EntryZomes::IntegrityZome(EntryTypes::Post(Post("foo".into())))
+}
+
 fn msg() -> Msg {
     Msg("hello".into())
 }
 
-fn priv_msg() -> PrivMsg {
-    PrivMsg("Don't tell anyone".into())
+#[hdk_extern]
+fn create_entry(_: ()) -> ExternResult<HeaderHash> {
+    let post = new_post();
+    HDK.with(|h| {
+        h.borrow().create(CreateInput::new(
+            (&post).into(),
+            post.try_into().unwrap(),
+            // This is used to test many conductors thrashing creates between
+            // each other so we want to avoid retries that make the test take
+            // a long time.
+            ChainTopOrdering::Relaxed,
+        ))
+    })
 }
 
-// #[hdk_extern]
-// fn create_entry(_: ()) -> ExternResult<HeaderHash> {
-//     let post = post();
-//     let mut input = CreateInput::new(
-//         (&post).into(),
-//         post.try_into().unwrap(),
-//         // This is used to test many conductors thrashing creates between
-//         // each other so we want to avoid retries that make the test take
-//         // a long time.
-//         ChainTopOrdering::Relaxed,
-//     );
-//     input.zome_name = Some("integrity_zome".into());
-//     HDK.with(|h| h.borrow().create(input))
-// }
-
 #[hdk_extern]
-fn create_post(post: crate::Post) -> ExternResult<HeaderHash> {
-    let post = EntryZomes::IntegrityZome(IntegrityZomeTypes::Post(post));
-    hdk::prelude::create_entry(&post)
+fn create_post(post: Post) -> ExternResult<HeaderHash> {
+    hdk::prelude::create_entry(&EntryZomes::IntegrityZome(EntryTypes::Post(post)))
 }
 
 #[hdk_extern]
@@ -77,12 +72,14 @@ fn get_post(hash: HeaderHash) -> ExternResult<Option<Element>> {
 
 #[hdk_extern]
 fn create_msg(_: ()) -> ExternResult<HeaderHash> {
-    hdk::prelude::create_entry(&msg())
+    hdk::prelude::create_entry(EntryZomes::IntegrityZome(EntryTypes::Msg(msg())))
 }
 
 #[hdk_extern]
 fn create_priv_msg(_: ()) -> ExternResult<HeaderHash> {
-    hdk::prelude::create_entry(&priv_msg())
+    hdk::prelude::create_entry(&EntryZomes::IntegrityZome(EntryTypes::PrivMsg(PrivMsg(
+        "Don't tell anyone".into(),
+    ))))
 }
 
 #[hdk_extern]
@@ -113,11 +110,11 @@ fn init(_: ()) -> ExternResult<InitCallbackResult> {
 #[hdk_extern]
 fn call_create_entry(_: ()) -> ExternResult<HeaderHash> {
     // Create an entry directly via. the hdk.
-    hdk::prelude::create_entry(&post())?;
+    hdk::prelude::create_entry(&new_post())?;
     // Create an entry via a `call`.
     let zome_call_response: ZomeCallResponse = call(
         CallTargetCell::Local,
-        "create_entry".to_string().into(),
+        zome_info()?.name,
         "create_entry".to_string().into(),
         None,
         &(),
@@ -144,7 +141,7 @@ fn call_create_entry(_: ()) -> ExternResult<HeaderHash> {
 fn call_create_entry_remotely(agent: AgentPubKey) -> ExternResult<HeaderHash> {
     let zome_call_response: ZomeCallResponse = call_remote(
         agent.clone(),
-        "create_entry".to_string().into(),
+        zome_info()?.name,
         "create_entry".to_string().into(),
         None,
         &(),
@@ -177,7 +174,7 @@ fn must_get_valid_element(header_hash: HeaderHash) -> ExternResult<Element> {
 fn call_create_entry_remotely_no_rec(agent: AgentPubKey) -> ExternResult<HeaderHash> {
     let zome_call_response: ZomeCallResponse = call_remote(
         agent.clone(),
-        "create_entry".to_string().into(),
+        zome_info()?.name,
         "create_entry".to_string().into(),
         None,
         &(),

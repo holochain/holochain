@@ -66,7 +66,6 @@ pub fn derive(input: TokenStream) -> TokenStream {
             const ENTRY_DEFS: &'static [AppEntryDef] = &#ident::ENTRY_DEFS;
         }
     };
-    // eprintln!("{}", output);
     output.into()
 }
 

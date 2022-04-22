@@ -11,21 +11,22 @@ use crate::prelude::*;
 /// - fn_name: The name of the function in the zome you are calling.
 /// - cap_secret: The capability secret if required.
 /// - payload: The arguments to the function you are calling.
-pub fn call<I>(
+pub fn call<I, Z>(
     to_cell: CallTargetCell,
-    zome_name: ZomeName,
+    zome_name: Z,
     fn_name: FunctionName,
     cap_secret: Option<CapSecret>,
     payload: I,
 ) -> ExternResult<ZomeCallResponse>
 where
     I: serde::Serialize + std::fmt::Debug,
+    Z: Into<ZomeName>,
 {
     Ok(HDK
         .with(|h| {
             h.borrow().call(vec![Call::new(
                 CallTarget::ConductorCell(to_cell),
-                zome_name,
+                zome_name.into(),
                 fn_name,
                 cap_secret,
                 ExternIO::encode(payload)?,
@@ -59,21 +60,22 @@ where
 /// let foo: Foo = call_remote(bob, "foo_zome", "do_it", secret, serializable_payload)?;
 /// ...
 /// ```
-pub fn call_remote<I>(
+pub fn call_remote<I, Z>(
     agent: AgentPubKey,
-    zome: ZomeName,
+    zome: Z,
     fn_name: FunctionName,
     cap_secret: Option<CapSecret>,
     payload: I,
 ) -> ExternResult<ZomeCallResponse>
 where
     I: serde::Serialize + std::fmt::Debug,
+    Z: Into<ZomeName>,
 {
     Ok(HDK
         .with(|h| {
             h.borrow().call(vec![Call::new(
                 CallTarget::NetworkAgent(agent),
-                zome,
+                zome.into(),
                 fn_name,
                 cap_secret,
                 ExternIO::encode(payload)?,

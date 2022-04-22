@@ -59,8 +59,6 @@ pub enum TestWasm {
     ValidateCreateLinkInvalid,
     ValidateValid,
     ValidateCreateLinkValid,
-    ValidationPackageFail,
-    ValidationPackageSuccess,
     WhoAmI,
     ZomeInfo,
 }
@@ -156,8 +154,6 @@ impl From<TestWasm> for ZomeName {
             TestWasm::ValidateCreateLinkInvalid => "validate_link_add_invalid",
             TestWasm::ValidateValid => "validate_valid",
             TestWasm::ValidateCreateLinkValid => "validate_link_add_valid",
-            TestWasm::ValidationPackageFail => "validation_package_fail",
-            TestWasm::ValidationPackageSuccess => "validation_package_success",
             TestWasm::WhoAmI => "whoami",
             TestWasm::ZomeInfo => "zome_info",
         })
@@ -246,12 +242,6 @@ impl From<TestWasm> for PathBuf {
             TestWasm::ValidateCreateLinkValid => {
                 "wasm32-unknown-unknown/release/test_wasm_validate_link_add_valid.wasm"
             }
-            TestWasm::ValidationPackageFail => {
-                "wasm32-unknown-unknown/release/test_wasm_validation_package_fail.wasm"
-            }
-            TestWasm::ValidationPackageSuccess => {
-                "wasm32-unknown-unknown/release/test_wasm_validation_package_success.wasm"
-            }
             TestWasm::WhoAmI => "wasm32-unknown-unknown/release/test_wasm_whoami.wasm",
             TestWasm::ZomeInfo => "wasm32-unknown-unknown/release/test_wasm_zome_info.wasm",
         })
@@ -261,6 +251,16 @@ impl From<TestWasm> for PathBuf {
 impl From<TestWasm> for DnaWasm {
     fn from(t: TestWasm) -> Self {
         DnaWasm::from(get_code(PathBuf::from(t)))
+    }
+}
+
+impl From<TestWasm> for Vec<DnaWasm> {
+    fn from(t: TestWasm) -> Self {
+        let TestWasmPair {
+            integrity,
+            coordinator,
+        } = TestWasmPair::<DnaWasm>::from(t);
+        vec![integrity, coordinator]
     }
 }
 
@@ -289,7 +289,9 @@ impl From<TestWasm> for TestWasmPair<PathBuf> {
         let mut integrity_file_name = OsString::new();
         integrity_file_name.push("integrity_");
         integrity_file_name.push(coordinator.file_name().expect("Must have file name"));
-        integrity.set_file_name(integrity_file_name);
+        integrity.pop();
+        integrity.push("examples");
+        integrity.push(integrity_file_name);
         TestWasmPair {
             integrity,
             coordinator,

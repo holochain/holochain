@@ -198,3 +198,17 @@ macro_rules! secure_primitive {
         }
     };
 }
+
+/// A utility trait for associating an enum with
+/// data with it's unit equivalent.
+pub trait UnitEnum {
+    /// An enum with the same variants as the implementor
+    /// but without any data.
+    type Unit;
+
+    /// Turn this type into it's unit enum.
+    fn to_unit(&self) -> Self::Unit;
+
+    /// Get the index of this enum variant.
+    fn index(&self) -> usize;
+}

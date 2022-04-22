@@ -100,3 +100,33 @@ impl AsRef<str> for FunctionName {
         self.0.as_ref()
     }
 }
+
+impl ToZomeName for &ZomeName {
+    fn zome_name(&self) -> ZomeName {
+        (*self).clone()
+    }
+}
+
+impl ToZomeName for ZomeName {
+    fn zome_name(&self) -> ZomeName {
+        self.clone()
+    }
+}
+
+impl ToZomeName for &str {
+    fn zome_name(&self) -> ZomeName {
+        ZomeName::new(self)
+    }
+}
+
+impl ToZomeName for &String {
+    fn zome_name(&self) -> ZomeName {
+        ZomeName::new(self)
+    }
+}
+
+impl ToZomeName for String {
+    fn zome_name(&self) -> ZomeName {
+        ZomeName::new(self)
+    }
+}

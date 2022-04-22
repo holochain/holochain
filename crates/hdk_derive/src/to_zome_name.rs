@@ -53,7 +53,24 @@ pub fn derive(input: TokenStream) -> TokenStream {
                 #inner
             }
         }
+
+        impl ToZomeName for &#ident {
+            fn zome_name(&self) -> ZomeName {
+                #inner
+            }
+        }
+
+        impl From<#ident> for ZomeName {
+            fn from(i: #ident) -> Self {
+                i.zome_name()
+            }
+        }
+
+        impl From<&#ident> for ZomeName {
+            fn from(i: &#ident) -> Self {
+                i.zome_name()
+            }
+        }
     };
-    // eprintln!("{}", output);
     output.into()
 }

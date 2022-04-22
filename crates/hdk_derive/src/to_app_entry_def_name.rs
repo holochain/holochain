@@ -54,6 +54,5 @@ pub fn derive(input: TokenStream) -> TokenStream {
             }
         }
     };
-    // eprintln!("{}", output);
     output.into()
 }

@@ -234,8 +234,8 @@ impl From<String> for Path {
 impl Path {
     /// Attach a [`ZomeName`] to this path
     /// so it's location is known for commits.
-    pub fn locate(self, zome_name: ZomeName) -> LocatedPath {
-        LocatedPath(zome_name, self)
+    pub fn locate(self, zome_name: impl Into<ZomeName>) -> LocatedPath {
+        LocatedPath(zome_name.into(), self)
     }
     /// What is the hash for the current [ `Path` ]?
     pub fn path_entry_hash(&self) -> ExternResult<holo_hash::EntryHash> {
@@ -278,7 +278,6 @@ impl LocatedPath {
     pub fn ensure(&self) -> ExternResult<()> {
         if !self.exists()? {
             if let Some(parent) = self.parent() {
-                let parent = parent.locate(self.0.clone());
                 parent.ensure()?;
                 create_link(
                     parent.path_entry_hash()?.into(),
@@ -300,10 +299,10 @@ impl LocatedPath {
     }
 
     /// The parent of the current path is simply the path truncated one level.
-    pub fn parent(&self) -> Option<Path> {
+    pub fn parent(&self) -> Option<Self> {
         if self.1.as_ref().len() > 1 {
             let parent_vec: Vec<Component> = self.1.as_ref()[0..self.1.as_ref().len() - 1].to_vec();
-            Some(parent_vec.into())
+            Some(Path::from(parent_vec).locate(self.0.clone()))
         } else {
             None
         }
@@ -379,6 +378,12 @@ impl std::ops::Deref for LocatedPath {
 
     fn deref(&self) -> &Self::Target {
         &self.1
+    }
+}
+
+impl From<LocatedPath> for Path {
+    fn from(p: LocatedPath) -> Self {
+        p.1
     }
 }
 

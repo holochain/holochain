@@ -1,9 +1,12 @@
 use hdk::prelude::*;
 
-entry_defs![PathEntry::entry_def()];
+#[derive(ToZomeName)]
+enum Zomes {
+    IntegrityQuery,
+}
 
 fn path(s: &str) -> ExternResult<EntryHash> {
-    let path = Path::from(s);
+    let path = Path::from(s).locate(Zomes::IntegrityQuery);
     path.ensure()?;
     path.path_entry_hash()
 }

@@ -423,7 +423,11 @@ pub mod test {
         for _i in 0..2 as u32 {
             let zomes = vec![TestWasm::Foo.into()];
             let def = DnaDef::unique_from_zomes(zomes.clone(), Vec::new());
-            dnas.push(DnaFile::new(def, vec![TestWasm::Foo.into()]).await.unwrap());
+            dnas.push(
+                DnaFile::new(def, Vec::<DnaWasm>::from(TestWasm::Foo))
+                    .await
+                    .unwrap(),
+            );
         }
         let dna_map = dnas
             .iter()
@@ -614,7 +618,7 @@ pub mod test {
                     .map(|z| z.coordinator.into_inner())
                     .collect(),
             },
-            zomes.into_iter().map(Into::into),
+            zomes.into_iter().flat_map(|t| Vec::<DnaWasm>::from(t)),
         )
         .await
         .unwrap()

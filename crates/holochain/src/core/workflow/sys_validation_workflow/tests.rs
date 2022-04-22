@@ -304,7 +304,6 @@ async fn bob_makes_a_large_link(
     let bad_update_header = call_data
         .update_entry(
             bad_update.clone().try_into().unwrap(),
-            MSG_ID,
             original_header_address,
         )
         .await;

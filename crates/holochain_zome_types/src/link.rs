@@ -47,7 +47,7 @@ pub struct LinkTypeLocation {
 }
 
 pub trait ToLinkTypeQuery: ToZomeName {
-    fn link_type(&self) -> Option<LinkType>;
+    fn link_type(&self) -> LinkTypeQuery;
 }
 
 #[derive(
@@ -173,11 +173,8 @@ impl From<LinkTypeLocation> for LinkType {
 }
 
 impl ToLinkTypeQuery for LinkTypeQuery {
-    fn link_type(&self) -> Option<LinkType> {
-        match self {
-            LinkTypeQuery::AllTypes(_) => None,
-            LinkTypeQuery::SingleType(_, lt) => Some(*lt),
-        }
+    fn link_type(&self) -> LinkTypeQuery {
+        self.clone()
     }
 }
 
@@ -186,5 +183,11 @@ impl ToZomeName for LinkTypeQuery {
         match self {
             LinkTypeQuery::AllTypes(z) | LinkTypeQuery::SingleType(z, _) => z.clone(),
         }
+    }
+}
+
+impl From<ZomeName> for LinkTypeQuery {
+    fn from(z: ZomeName) -> Self {
+        LinkTypeQuery::AllTypes(z)
     }
 }

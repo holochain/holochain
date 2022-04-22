@@ -141,13 +141,7 @@ where
         .with(|h| {
             h.borrow().get_links(vec![GetLinksInput::new(
                 base,
-                type_location.into().map(|b| {
-                    let zome_name = b.zome_name();
-                    b.link_type().map_or_else(
-                        || LinkTypeQuery::AllTypes(zome_name.clone()),
-                        |link_type| LinkTypeQuery::SingleType(zome_name.clone(), link_type),
-                    )
-                }),
+                type_location.into().map(|b| b.link_type()),
                 link_tag,
             )])
         })?
@@ -187,13 +181,7 @@ where
         .with(|h| {
             h.borrow().get_link_details(vec![GetLinksInput::new(
                 base,
-                type_location.into().map(|b| {
-                    let zome_name = b.zome_name();
-                    b.link_type().map_or_else(
-                        || LinkTypeQuery::AllTypes(zome_name.clone()),
-                        |link_type| LinkTypeQuery::SingleType(zome_name.clone(), link_type),
-                    )
-                }),
+                type_location.into().map(|b| b.link_type()),
                 link_tag,
             )])
         })?

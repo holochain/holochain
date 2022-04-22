@@ -176,6 +176,8 @@ impl DnaFile {
     /// Fetch the Webassembly byte code for a zome.
     pub fn get_wasm_for_zome(&self, zome_name: &ZomeName) -> Result<&wasm::DnaWasm, DnaError> {
         let wasm_hash = &self.dna.get_wasm_zome(zome_name)?.wasm_hash;
+        dbg!(&wasm_hash);
+        dbg!(&self.code.0);
         self.code.0.get(wasm_hash).ok_or(DnaError::InvalidWasmHash)
     }
 

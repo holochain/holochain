@@ -41,6 +41,18 @@ fn main() {
     let wasm_out = std::env::var_os("HC_TEST_WASM_DIR");
     let cargo_command = std::env::var_os("CARGO");
     let cargo_command = cargo_command.as_deref().unwrap_or_else(|| "cargo".as_ref());
+
+    build_test_wasms(&wasm_out, cargo_command, should_build, false, &wasms_path);
+    build_test_wasms(&wasm_out, cargo_command, should_build, true, &wasms_path);
+}
+
+fn build_test_wasms(
+    wasm_out: &Option<std::ffi::OsString>,
+    cargo_command: &std::ffi::OsStr,
+    should_build: bool,
+    build_integrity_zomes: bool,
+    wasms_path: &str,
+) {
     let mut cmd = std::process::Command::new(cargo_command);
     cmd.env_remove("RUSTFLAGS");
     cmd.env_remove("CARGO_BUILD_RUSTFLAGS");
@@ -60,6 +72,12 @@ fn main() {
         cmd.arg("check")
             .arg("--manifest-path")
             .arg("wasm_workspace/Cargo.toml");
+    }
+    if build_integrity_zomes {
+        cmd.arg("--examples");
+        cmd.arg("--no-default-features");
+        cmd.arg("--features");
+        cmd.arg("integrity");
     }
     match wasm_out {
         Some(wasm_out) => {

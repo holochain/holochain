@@ -1,9 +1,7 @@
+pub use crate::integrity::*;
 use hdk::prelude::*;
 
-#[hdk_entry(id = "countree")]
-/// a tree of counters
-#[derive(Default, Clone, Copy, PartialEq)]
-pub struct CounTree(u32);
+use super::EntryZomes::*;
 
 impl std::ops::Add for CounTree {
     type Output = Self;
@@ -25,7 +23,7 @@ impl CounTree {
     pub fn ensure(countree: CounTree) -> ExternResult<HeaderHash> {
         match get(hash_entry(&countree)?, GetOptions::latest())? {
             Some(element) => Ok(element.header_address().to_owned()),
-            None => create_entry(&countree),
+            None => create_entry(&IntegrityCrud(EntryTypes::Countree(countree))),
         }
     }
 
@@ -33,12 +31,9 @@ impl CounTree {
         HDK.with(|h| {
             h.borrow().get_details(
                 header_hashes
-                .into_iter()
-                .map(|header_hash|
-                    GetInput::new(
-                        header_hash.into(),
-                        GetOptions::latest()
-                    )).collect()
+                    .into_iter()
+                    .map(|header_hash| GetInput::new(header_hash.into(), GetOptions::latest()))
+                    .collect(),
             )
         })
     }
@@ -48,13 +43,10 @@ impl CounTree {
         HDK.with(|h| {
             h.borrow().get_details(
                 entry_hashes
-                .into_iter()
-                .map(|entry_hash|
-                    GetInput::new(
-                        entry_hash.into(),
-                        GetOptions::latest()
-                    )
-                ).collect())
+                    .into_iter()
+                    .map(|entry_hash| GetInput::new(entry_hash.into(), GetOptions::latest()))
+                    .collect(),
+            )
         })
     }
 

@@ -176,8 +176,6 @@ impl GetInput {
 pub struct UpdateInput {
     /// Header of the element being updated.
     pub original_header_address: holo_hash::HeaderHash,
-    /// EntryDefId for the created entry
-    pub entry_def_id: crate::entry_def::EntryDefId,
     /// Entry body.
     pub entry: crate::entry::Entry,
     /// ChainTopBehaviour for the write.

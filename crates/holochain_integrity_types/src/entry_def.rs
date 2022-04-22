@@ -221,3 +221,14 @@ impl From<AppEntryDefName> for EntryDefId {
         EntryDefId::App(name)
     }
 }
+
+impl From<AppEntryDef> for EntryDef {
+    fn from(app: AppEntryDef) -> Self {
+        Self {
+            id: app.name.into(),
+            visibility: app.visibility,
+            required_validations: app.required_validations,
+            required_validation_type: Default::default(),
+        }
+    }
+}

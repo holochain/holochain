@@ -236,16 +236,14 @@ impl HostFnCaller {
         output
     }
 
-    pub async fn update_entry<'env, E: Into<entry_def::EntryDefId>>(
+    pub async fn update_entry(
         &self,
         entry: Entry,
-        entry_def_id: E,
         original_header_address: HeaderHash,
     ) -> HeaderHash {
         let (ribosome, call_context, workspace_lock) = self.unpack().await;
         let input = UpdateInput {
             original_header_address,
-            entry_def_id: entry_def_id.into(),
             entry,
             chain_top_ordering: Default::default(),
         };

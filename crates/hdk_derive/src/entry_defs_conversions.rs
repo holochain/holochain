@@ -24,6 +24,7 @@ pub fn build(_attrs: TokenStream, input: TokenStream) -> TokenStream {
                         syn::Fields::Named(_) => todo!(),
                         syn::Fields::Unit => todo!(),
                         syn::Fields::Unnamed(_) => {
+                            // TODO: Error if fields is longer then one.
                             quote::quote! {#ident::#v_ident (v) => SerializedBytes::try_from(v),}
                         }
                     }
@@ -78,6 +79,5 @@ pub fn build(_attrs: TokenStream, input: TokenStream) -> TokenStream {
         }
 
     };
-    eprintln!("{}", output);
     output.into()
 }

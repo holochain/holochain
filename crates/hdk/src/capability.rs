@@ -192,7 +192,6 @@ pub fn update_cap_grant(
 ) -> ExternResult<HeaderHash> {
     update(UpdateInput {
         original_header_address: old_grant_header_hash,
-        entry_def_id: EntryDefId::CapGrant,
         entry: Entry::CapGrant(new_grant_value),
         chain_top_ordering: ChainTopOrdering::default(),
     })

@@ -137,13 +137,11 @@ where
 /// See [`delete_entry`]
 pub fn update_entry<I, E>(hash: HeaderHash, input: I) -> ExternResult<HeaderHash>
 where
-    I: ToAppEntryDefName,
     Entry: TryFrom<I, Error = E>,
     WasmError: From<E>,
 {
     let input = UpdateInput {
         original_header_address: hash,
-        entry_def_id: input.entry_def_name().into(),
         entry: input.try_into()?,
         chain_top_ordering: ChainTopOrdering::default(),
     };
