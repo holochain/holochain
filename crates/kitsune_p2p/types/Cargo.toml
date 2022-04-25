@@ -11,7 +11,7 @@ categories = [ "network-programming" ]
 edition = "2021"
 
 [dependencies]
-lair_keystore_api_0_0 = { version = "=0.0.9", package = "lair_keystore_api" }
+lair_keystore_api_0_0 = { version = "=0.0.10", package = "lair_keystore_api" }
 lair_keystore_api = "=0.1.1"
 base64 = "0.13"
 derive_more = "0.99.7"
