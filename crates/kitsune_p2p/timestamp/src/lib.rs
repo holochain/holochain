@@ -126,7 +126,7 @@ impl Timestamp {
     }
 
     /// Add unsigned core::time::Duration{ secs: u64, nanos: u32 } to a Timestamp.  See:
-    /// https://doc.rust-lang.org/src/core/time.rs.html#53-56
+    /// <https://doc.rust-lang.org/src/core/time.rs.html#53-56>
     pub fn checked_add(&self, rhs: &core::time::Duration) -> Option<Timestamp> {
         let micros = rhs.as_micros();
         if micros <= i64::MAX as u128 {
