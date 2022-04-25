@@ -7,6 +7,46 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 # \[Unreleased\]
 - Docs: Fix intra-doc links in all crates [#1323](https://github.com/holochain/holochain/pull/1323)
 
+# 20220421.145237
+
+## [holochain\_cli-0.0.34](crates/holochain_cli/CHANGELOG.md#0.0.34)
+
+## [holochain\_cli\_sandbox-0.0.30](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.30)
+
+## [holochain\_cli\_bundle-0.0.31](crates/holochain_cli_bundle/CHANGELOG.md#0.0.31)
+
+## [holochain-0.0.136](crates/holochain/CHANGELOG.md#0.0.136)
+
+## [holochain\_websocket-0.0.35](crates/holochain_websocket/CHANGELOG.md#0.0.35)
+
+## [holochain\_test\_wasm\_common-0.0.31](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.31)
+
+## [holochain\_conductor\_api-0.0.36](crates/holochain_conductor_api/CHANGELOG.md#0.0.36)
+
+## [holochain\_cascade-0.0.36](crates/holochain_cascade/CHANGELOG.md#0.0.36)
+
+## [holochain\_state-0.0.36](crates/holochain_state/CHANGELOG.md#0.0.36)
+
+## [holochain\_wasm\_test\_utils-0.0.35](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.35)
+
+## [holochain\_p2p-0.0.35](crates/holochain_p2p/CHANGELOG.md#0.0.35)
+
+## [holochain\_types-0.0.35](crates/holochain_types/CHANGELOG.md#0.0.35)
+
+## [holochain\_keystore-0.0.35](crates/holochain_keystore/CHANGELOG.md#0.0.35)
+
+## [holochain\_sqlite-0.0.35](crates/holochain_sqlite/CHANGELOG.md#0.0.35)
+
+## [hdk-0.0.130](crates/hdk/CHANGELOG.md#0.0.130)
+
+## [holochain\_zome\_types-0.0.31](crates/holochain_zome_types/CHANGELOG.md#0.0.31)
+
+## [holochain\_deterministic\_integrity-0.0.3](crates/holochain_deterministic_integrity/CHANGELOG.md#0.0.3)
+
+## [hdk\_derive-0.0.31](crates/hdk_derive/CHANGELOG.md#0.0.31)
+
+## [holochain\_integrity\_types-0.0.3](crates/holochain_integrity_types/CHANGELOG.md#0.0.3)
+
 # 20220414.075333
 
 ## [holochain\_cli-0.0.33](crates/holochain_cli/CHANGELOG.md#0.0.33)
