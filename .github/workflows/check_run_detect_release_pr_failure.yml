@@ -7,10 +7,8 @@ on:
   check_suite:
     types: [completed]
 jobs:
-  investigate_check_suite:
+  investigate_always:
     runs-on: ubuntu-latest
-    if: >-
-      (github.event.state == 'error' || github.event.state == 'failure')
     steps:
       - name: Debug
         run: |
