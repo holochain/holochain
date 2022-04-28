@@ -485,34 +485,6 @@ jobs:
 
           git push origin main --tags
 
-      - name: Publish crates
-        if: ${{ needs.vars.outputs.dry_run == 'false' }}
-        env:
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-        run: |
-          source ${HOLOCHAIN_RELEASE_SH}
-          cd "${HOLOCHAIN_REPO}"
-
-          nix-shell --argstr flavor release --keep CARGO_REGISTRY_TOKEN --pure --run '
-            release-automation \
-              --workspace-path=$PWD \
-              --log-level=trace \
-              release \
-                --steps=PublishToCratesIo,AddOwnersToCratesIo
-            '
-
-      - name: Create a github release
-        if: ${{ needs.vars.outputs.dry_run == 'false' }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          source ${HOLOCHAIN_RELEASE_SH}
-          cd "${HOLOCHAIN_REPO}"
-
-          gh release create "${TAG:?}" \
-            --title "holochain ${VERSION:?}" \
-            --notes "***Please read [this release's top-level CHANGELOG](https://github.com/holochain/holochain/blob/main/CHANGELOG.md#$(sed -E 's/(release-|\.)//g' <<<"${RELEASE_BRANCH:?}")) to see the full list of crates that were released together.***"
-
       - name: Push the release branch
         run: |
           source ${HOLOCHAIN_RELEASE_SH}
@@ -553,6 +525,34 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           number: ${{ steps.cpr.outputs.pull-request-number }}
+
+      - name: Publish crates
+        if: ${{ needs.vars.outputs.dry_run == 'false' }}
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: |
+          source ${HOLOCHAIN_RELEASE_SH}
+          cd "${HOLOCHAIN_REPO}"
+
+          nix-shell --argstr flavor release --keep CARGO_REGISTRY_TOKEN --pure --run '
+            release-automation \
+              --workspace-path=$PWD \
+              --log-level=trace \
+              release \
+                --steps=PublishToCratesIo,AddOwnersToCratesIo
+            '
+
+      - name: Create a github release
+        if: ${{ needs.vars.outputs.dry_run == 'false' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          source ${HOLOCHAIN_RELEASE_SH}
+          cd "${HOLOCHAIN_REPO}"
+
+          gh release create "${TAG:?}" \
+            --title "holochain ${VERSION:?}" \
+            --notes "***Please read [this release's top-level CHANGELOG](https://github.com/holochain/holochain/blob/main/CHANGELOG.md#$(sed -E 's/(release-|\.)//g' <<<"${RELEASE_BRANCH:?}")) to see the full list of crates that were released together.***"
 
       - name: Setup upterm session
         uses: lhotari/action-upterm@v1
