@@ -3,6 +3,13 @@ name: detect critical check failures
 on:
   status: {}
 
+  check_suite:
+    types: [completed]
+    steps:
+      - name: Debug
+        run: |
+          jq < ${GITHUB_EVENT_PATH}
+
 jobs:
   investigate_event:
     runs-on: ubuntu-latest
@@ -17,6 +24,11 @@ jobs:
         run: |
           echo "$STATE": "$DESCRIPTION"
           jq < ${GITHUB_EVENT_PATH}
+
+          # ignore this check if the commit is already on develop
+          if [[ "true" == $(jq --raw-output '.branches | map(select(.name  == "develop") | .name) | length != 0' < ${GITHUB_EVENT_PATH}) ]]; then
+            exit 0
+          fi
 
           export pr_base="$(jq --raw-output '.repository.default_branch' < ${GITHUB_EVENT_PATH})"
           export pr_head="$(jq --raw-output '.branches | map(select(.name | startswith("pr_")) | .name) | .[0]' < ${GITHUB_EVENT_PATH})"
