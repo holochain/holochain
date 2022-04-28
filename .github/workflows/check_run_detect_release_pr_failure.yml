@@ -1,0 +1,15 @@
+name: detect critical check failures
+
+on:
+  check_run:
+    types: [completed]
+
+jobs:
+  notify-on-failure:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Debug check
+        shell: bash
+        run: |
+          echo "{{ toJSON(check_run) }}" | jq .
