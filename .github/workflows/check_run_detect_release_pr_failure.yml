@@ -16,7 +16,7 @@ jobs:
           DESCRIPTION: ${{ github.event.description }}
         run: |
           echo $STATE: $DESCRIPTION
-          echo "${{ toJSON(branches) }}" | jq .
+          echo "${{ toJSON(github.event) }}" | jq .
 
           # gh pr list --base develop --head pr_debug_checks --json id,title,labels,url,statusCheckRollup
 
