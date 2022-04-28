@@ -4,7 +4,9 @@ on:
     # Run when pull requests get labeled
     pull_request:
         types: [labeled, opened, ready_for_review, reopened]
-        branches: ["release-**"]
+        branches:
+            - "release-**"
+            - "develop"
 
 jobs:
     auto-rebase:
