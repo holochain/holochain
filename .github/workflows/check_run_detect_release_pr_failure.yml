@@ -20,26 +20,28 @@ jobs:
         run: |
           set -x
 
+          export BRANCH_PREFIX="release-"
+
           echo "$STATE": "$DESCRIPTION"
           jq < ${GITHUB_EVENT_PATH}
 
-          # ignore this check if the commit is already on develop
-          if [[ "true" == $(jq --raw-output '.branches | map(select(.name  == "develop") | .name) | length != 0' < ${GITHUB_EVENT_PATH}) ]]; then
+          # ignore this check if the commit is already on the default base branch
+          export pr_base="$(jq --raw-output '.repository.default_branch' < ${GITHUB_EVENT_PATH})"
+
+          if [[ "true" == $(jq --raw-output '.branches | map(select(.name  == env.pr_base) | .name) | length != 0' < ${GITHUB_EVENT_PATH}) ]]; then
             exit 0
           fi
-
-          export pr_base="$(jq --raw-output '.repository.default_branch' < ${GITHUB_EVENT_PATH})"
 
           # try to find the branch in the 'branches' array.
           # this array is not populated for status updates that came in from release CI runs.
           # this is because the commit is the result of merging the PR with the base branch
-          export pr_head="$(jq --raw-output '.branches | map(select(.name | startswith("release-")) | .name) | .[0]' < ${GITHUB_EVENT_PATH})"
+          export pr_head="$(jq --raw-output '.branches | map(select(.name | startswith(env.BRANCH_PREFIX)) | .name) | .[0]' < ${GITHUB_EVENT_PATH})"
 
           # try to use the most recent parent to identify the branch
           if [[ "${pr_head}" == null ]]; then
             parent_commit=$(jq --raw-output '.commit.parents[-1].sha' < ${GITHUB_EVENT_PATH})
             git fetch --all
-            export pr_head=$(git branch -a --contains ${parent_commit} --format '%(refname:short)' | sed 's/origin\///' | uniq | jq --raw-output --raw-input --slurp 'split("\n") | .[0:-1] | map(select(startswith("release-")))[0]')
+            export pr_head=$(git branch -a --contains ${parent_commit} --format '%(refname:short)' | sed 's/origin\///' | uniq | jq --raw-output --raw-input --slurp 'split("\n") | .[0:-1] | map(select(startswith(env.BRANCH_PREFIX)))[0]')
           fi
 
           if [[ "${pr_head}" == null ]]; then
@@ -54,9 +56,9 @@ jobs:
           # gh pr edit ${pr_number} --add-reviewer "@holochain/core-dev"
 
           cat <<EOF | gh pr comment ${pr_number} --body-file -
-          ${STATUS}: ${target_url}
+          ${STATE}: ${target_url}
 
-          this PR was determined to be part of a release due to its branch prefix 'release-'.
+          this PR was determined to be part of a release due to its branch prefix _${BRANCH_PREFIX}_.
 
           /cc @holochain/core-dev
           EOF
