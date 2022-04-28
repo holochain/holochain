@@ -1,7 +1,8 @@
 name: detect critical check failures
 
 on:
-  status: {}
+  check_run:
+    types: [completed]
 
   check_suite:
     types: [completed]
@@ -9,8 +10,7 @@ jobs:
   investigate_check_suite:
     runs-on: ubuntu-latest
     if: >-
-      (github.event_name == 'check_suite')
-      && (github.event.state == 'error' || github.event.state == 'failure')
+      (github.event.state == 'error' || github.event.state == 'failure')
     steps:
       - name: Debug
         run: |
@@ -19,8 +19,7 @@ jobs:
   investigate_event:
     runs-on: ubuntu-latest
     if: >-
-      (github.event_name == 'status')
-      && (github.event.state == 'error' || github.event.state == 'failure')
+      (github.event.state == 'error' || github.event.state == 'failure')
       && github.event.description != 'Your CircleCI tests were canceled'
     steps:
       - name: Debug
