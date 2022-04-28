@@ -68,7 +68,7 @@ jobs:
           EOF
 
           message=$(cat <<-EOF
-          ### [PR _$(gh pr view ${pr_number} --json title --jq '.title')_ (${pr_number})]($(gh pr view ${pr_number} --json title,url --jq '.title')): check ${STATE}
+          ##### [PR _$(gh pr view ${pr_number} --json title --jq '.title')_ (${pr_number})]($(gh pr view ${pr_number} --json url --jq '.url')): check ${STATE}
 
           ${target_url}
 
