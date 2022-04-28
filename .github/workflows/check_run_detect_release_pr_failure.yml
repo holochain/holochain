@@ -39,7 +39,7 @@ jobs:
           if [[ "${pr_head}" == null ]]; then
             parent_commit=$(jq --raw-output '.commit.parents[-1].sha' < ${GITHUB_EVENT_PATH})
             git fetch --all
-            export pr_head=$(git branch -a --contains ${parent_commit} --format '%(refname:short)' | sed 's/origin\///' | uniq | jq --raw-input --slurp 'split("\n") | .[0:-1] | map(select(startswith("release-")))[0]')
+            export pr_head=$(git branch -a --contains ${parent_commit} --format '%(refname:short)' | sed 's/origin\///' | uniq | jq --raw-output --raw-input --slurp 'split("\n") | .[0:-1] | map(select(startswith("release-")))[0]')
           fi
 
           if [[ "${pr_head}" == null ]]; then
