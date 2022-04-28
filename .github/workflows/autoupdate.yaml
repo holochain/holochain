@@ -16,7 +16,7 @@ jobs:
         steps:
             - uses: docker://chinthakagodawita/autoupdate-action:v1
               env:
-                  github_token: "${{ secrets.HRA_GITHUB_TOKEN }}"
+                  GITHUB_TOKEN: "${{ secrets.HRA_GITHUB_TOKEN }}"
                   PR_FILTER: "labelled"
                   PR_LABELS: "autoupdate:opt-in"
                   MERGE_CONFLICT_ACTION: "fail"
