@@ -29,7 +29,18 @@ jobs:
           fi
 
           export pr_base="$(jq --raw-output '.repository.default_branch' < ${GITHUB_EVENT_PATH})"
+
+          # try to find the branch in the 'branches' array.
+          # this array is not populated for status updates that came in from release CI runs.
+          # this is because the commit is the result of merging the PR with the base branch
           export pr_head="$(jq --raw-output '.branches | map(select(.name | startswith("release-")) | .name) | .[0]' < ${GITHUB_EVENT_PATH})"
+
+          # try to use the most recent parent to identify the branch
+          if [[ "${pr_head}" == null ]]; then
+            parent_commit=$(jq --raw-output '.commit.parents[-1].sha' < json.json)
+            git fetch --all
+            export pr_head=$(git branch -a --contains ${parent_commit} --format '%(refname:short)' | sed 's/origin\///' | uniq | jq --raw-input --slurp 'split("\n") | .[0:-1] | map(select(startswith("release-")))[0]')
+          fi
 
           if [[ "${pr_head}" == null ]]; then
             echo failing commit is not part of a release pr, exiting.
@@ -37,7 +48,6 @@ jobs:
           fi
 
           export target_url="$(jq --raw-output '.target_url' < ${GITHUB_EVENT_PATH})"
-          export pr_id="$(gh pr list --state open --json id --jq '.[0].id' --base develop --head release-improve-resilience)"
           export pr_number="$(gh pr list --state open --json number --jq '.[0].number' --base ${pr_base} --head ${pr_head})"
 
           cat <<EOF | echo gh pr comment ${pr_number} --body-file -
