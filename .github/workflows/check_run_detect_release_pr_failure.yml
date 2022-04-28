@@ -21,6 +21,8 @@ jobs:
         env:
           STATE: ${{ github.event.state }}
           DESCRIPTION: ${{ github.event.description }}
+          # TODO: uncomment once confident in the logic
+          # GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN }}
         run: |
           echo "$STATE": "$DESCRIPTION"
           jq < ${GITHUB_EVENT_PATH}
