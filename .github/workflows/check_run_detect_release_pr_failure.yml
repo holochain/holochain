@@ -54,13 +54,9 @@ jobs:
           # gh pr edit ${pr_number} --add-reviewer "@holochain/core-dev"
 
           cat <<EOF | gh pr comment ${pr_number} --body-file -
-          ${DESCRIPTION}
+          ${STATUS}: ${target_url}
 
-          details: ${target_url}
-
-          ---
-
-          _this PR was determined to be part of a release due to its branch prefix 'release-'.
+          this PR was determined to be part of a release due to its branch prefix 'release-'.
 
           /cc @holochain/core-dev
           EOF
