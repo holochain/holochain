@@ -17,8 +17,12 @@ jobs:
           STATE: ${{ github.event.state }}
           DESCRIPTION: ${{ github.event.description }}
           GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN }}
+
+          # dev/holochain-rsm/CI
+          MM_CHANNEL_ID: "uzjosy5d3fdcxe35oyw9naihfw"
+          HRA_MATTERMOST_TOKEN: ${{ secrets.HRA_MATTERMOST_TOKEN }}
         run: |
-          set -x
+          set -x +e
 
           export BRANCH_PREFIX="release-"
 
@@ -62,3 +66,18 @@ jobs:
 
           /cc @holochain/core-dev
           EOF
+
+          message=$(cat <<-EOF
+          ### [PR _$(gh pr view ${pr_number} --json title --jq '.title')_ (${pr_number})]($(gh pr view ${pr_number} --json title,url --jq '.title')): check ${STATE}
+
+          ${target_url}
+
+          this PR was determined to be part of a release due to its branch prefix _${BRANCH_PREFIX}_.
+
+          /cc @abe
+          EOF)
+          export message
+
+          # send a mattermost message
+          data=$(jq -n --compact-output '{"channel_id":env.MM_CHANNEL_ID, "message":env.message, "props":{"version":env.VERSION}}')
+          curl -X POST -H "Authorization: Bearer ${HRA_MATTERMOST_TOKEN}" -d "$data" https://chat.holochain.org/api/v4/posts
