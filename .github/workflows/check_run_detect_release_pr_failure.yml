@@ -14,9 +14,10 @@ jobs:
         env:
           STATE: ${{ github.event.state }}
           DESCRIPTION: ${{ github.event.description }}
+          EVENT_JSON: ${{ toJSON(github.event) }}
         run: |
-          echo $STATE: $DESCRIPTION
-          echo "${{ toJSON(github.event) }}" | jq .
+          echo "$STATE": "$DESCRIPTION"
+          jq -n 'env.EVENT_JSON'
 
           # gh pr list --base develop --head pr_debug_checks --json id,title,labels,url,statusCheckRollup
 
