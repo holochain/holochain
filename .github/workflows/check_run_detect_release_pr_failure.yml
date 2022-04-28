@@ -7,9 +7,10 @@ on:
     types: [completed]
 jobs:
   investigate_check_suite:
-    if: >-
-      github.event_name == 'check_suite'
     runs-on: ubuntu-latest
+    if: >-
+      (github.event_name == 'check_suite')
+      && (github.event.state == 'error' || github.event.state == 'failure')
     steps:
       - name: Debug
         run: |
