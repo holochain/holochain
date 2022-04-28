@@ -7,6 +7,8 @@ on:
     types: [completed]
 jobs:
   investigate_check_suite:
+    if: >-
+      github.event_name == 'check_suite'
     runs-on: ubuntu-latest
     steps:
       - name: Debug
@@ -16,7 +18,8 @@ jobs:
   investigate_event:
     runs-on: ubuntu-latest
     if: >-
-      (github.event.state == 'error' || github.event.state == 'failure')
+      (github.event_name == 'status')
+      && (github.event.state == 'error' || github.event.state == 'failure')
       && github.event.description != 'Your CircleCI tests were canceled'
     steps:
       - name: Debug
