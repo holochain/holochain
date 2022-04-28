@@ -18,8 +18,8 @@ jobs:
           DESCRIPTION: ${{ github.event.description }}
           GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN }}
 
-          # dev/holochain-rsm/CI
-          MM_CHANNEL_ID: "uzjosy5d3fdcxe35oyw9naihfw"
+          # dev/HC-releases
+          MM_CHANNEL_ID: "cdxeytdc97ff3e1jbdzgyfcduo"
           HRA_MATTERMOST_TOKEN: ${{ secrets.HRA_MATTERMOST_TOKEN }}
         run: |
           set -x +e
@@ -73,8 +73,6 @@ jobs:
           ${target_url}
 
           this PR was determined to be part of a release due to its branch prefix _${BRANCH_PREFIX}_.
-
-          /cc @abe
           EOF)
           export message
 
