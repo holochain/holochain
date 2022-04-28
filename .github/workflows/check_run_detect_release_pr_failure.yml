@@ -68,9 +68,9 @@ jobs:
           EOF
 
           message=$(cat <<-EOF
-          ##### [PR _$(gh pr view ${pr_number} --json title --jq '.title')_ (${pr_number})]($(gh pr view ${pr_number} --json url --jq '.url')): check ${STATE}
+          ##### [PR#${pr_number} _$(gh pr view ${pr_number} --json title --jq '.title')_ ]($(gh pr view ${pr_number} --json url --jq '.url')): check ${STATE}
 
-          ${target_url}
+          [${DESCRIPTION} (click here for details)](${target_url})
 
           this PR was determined to be part of a release due to its branch prefix _${BRANCH_PREFIX}_.
           EOF)
