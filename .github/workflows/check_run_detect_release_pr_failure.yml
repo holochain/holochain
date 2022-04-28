@@ -1,32 +1,22 @@
 name: detect critical check failures
 
 on:
-  check_run:
-    types: [completed]
+  status: {}
 
-  check_suite:
-    types: [completed]
 jobs:
-  investigate_always:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Debug
-        run: |
-          jq < ${GITHUB_EVENT_PATH}
-
   investigate_event:
     runs-on: ubuntu-latest
     if: >-
       (github.event.state == 'error' || github.event.state == 'failure')
       && github.event.description != 'Your CircleCI tests were canceled'
     steps:
-      - name: Debug
-        env:
+      - env:
           STATE: ${{ github.event.state }}
           DESCRIPTION: ${{ github.event.description }}
-          # TODO: uncomment once confident in the logic
-          # GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN }}
         run: |
+          set -x
+
           echo "$STATE": "$DESCRIPTION"
           jq < ${GITHUB_EVENT_PATH}
 
@@ -41,7 +31,7 @@ jobs:
           export pr_id="$(gh pr list --state open --json id --jq '.[0].id' --base develop --head release-improve-resilience)"
           export pr_number="$(gh pr list --state open --json number--jq '.[0].number' --base develop --head release-improve-resilience)"
 
-          cat <<EOF | gh pr comment ${pr_number} --body-file -
+          cat <<EOF | echo gh pr comment ${pr_number} --body-file -
           _this PR was determined to be part of a release due to its branch prefix 'release-'.
           assigning the core-dev team to take a look here._
 
@@ -51,4 +41,4 @@ jobs:
           details: ${target_url}
           EOF
 
-          gh pr edit ${pr_number} --add-assignee "holochain/core-dev"
+          echo gh pr edit ${pr_number} --add-assignee "holochain/core-dev"
