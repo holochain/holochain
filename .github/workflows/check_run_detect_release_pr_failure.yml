@@ -8,8 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     if: >-
       (github.event.state == 'error' || github.event.state == 'failure')
-      &&
-      github.event.description != "Your CircleCI tests were canceled"
+      && github.event.description != 'Your CircleCI tests were canceled'
     steps:
       - name: Debug
         env:
