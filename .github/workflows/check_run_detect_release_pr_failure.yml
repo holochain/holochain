@@ -5,12 +5,14 @@ on:
 
   check_suite:
     types: [completed]
+jobs:
+  investigate_check_suite:
+    runs-on: ubuntu-latest
     steps:
       - name: Debug
         run: |
           jq < ${GITHUB_EVENT_PATH}
 
-jobs:
   investigate_event:
     runs-on: ubuntu-latest
     if: >-
