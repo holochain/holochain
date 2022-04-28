@@ -50,7 +50,8 @@ jobs:
           export target_url="$(jq --raw-output '.target_url' < ${GITHUB_EVENT_PATH})"
           export pr_number="$(gh pr list --state open --json number --jq '.[0].number' --base ${pr_base} --head ${pr_head})"
 
-          gh pr edit ${pr_number} --add-reviewer "@holochain/core-dev"
+          # TODO: uncomment once the token has access to the team
+          # gh pr edit ${pr_number} --add-reviewer "@holochain/core-dev"
 
           cat <<EOF | gh pr comment ${pr_number} --body-file -
           ${DESCRIPTION}
@@ -60,4 +61,6 @@ jobs:
           ---
 
           _this PR was determined to be part of a release due to its branch prefix 'release-'.
+
+          /cc @holochain/core-dev
           EOF
