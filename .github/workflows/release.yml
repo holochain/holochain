@@ -505,6 +505,7 @@ jobs:
           gh pr create \
             --title "Merge ${RELEASE_BRANCH} back into ${HOLOCHAIN_SOURCE_BRANCH}" \
             --label release \
+            --label "autoupdate:opt-in" \
             --base ${HOLOCHAIN_SOURCE_BRANCH} --head "${RELEASE_BRANCH}" \
             --body 'Please double-check the consistency of the CHANGELOG.md files' 2>&1 | tee gh-pr-create.log
             # --reviewer "holochain/core-dev" \
