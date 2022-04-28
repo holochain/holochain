@@ -1,0 +1,30 @@
+name: detect critical check failures
+
+on:
+  status: {}
+
+jobs:
+  investigate_event:
+    runs-on: ubuntu-latest
+    # if: >-
+    #   github.event.state == 'error' ||
+    #   github.event.state == 'failure'
+    steps:
+      - name: Debug
+        env:
+          STATE: ${{ github.event.state }}
+          DESCRIPTION: ${{ github.event.description }}
+        run: |
+          echo $STATE: $DESCRIPTION
+          echo "${{ toJSON(branches) }}" | jq .
+
+          # gh pr list --base develop --head pr_debug_checks --json id,title,labels,url,statusCheckRollup
+
+      - name: Setup upterm session
+        uses: lhotari/action-upterm@v1
+        if: always()
+        with:
+          ## limits ssh access and adds the ssh public key for the user which triggered the workflow
+          limit-access-to-actor: true
+          ## limits ssh access and adds the ssh public keys of the listed GitHub users
+          limit-access-to-users: steveeJ,jost-s,freesig,neonphog,thedavidmeister,maackle
