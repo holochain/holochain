@@ -616,6 +616,28 @@ jobs:
           data=$(jq -n --compact-output '{"channel_id":env.MM_CHANNEL_ID, "message":env.message, "props":{"version":env.VERSION}}')
           curl -X POST -H "Authorization: Bearer ${HRA_MATTERMOST_TOKEN}" -d "$data" https://chat.holochain.org/api/v4/posts
 
+      - name: Trigger status event
+        if: always()
+        shell: bash
+        continue-on-error: true
+        env:
+          STATUS: ${{ steps.check-status.outcome }}
+          WORKFLOW_RUN_URL: "https://github.com/holochain/holochain/actions/runs/${{ github.run_id }}"
+        run: |
+          set -x
+
+          data=$(jq -n --compact-output '{
+            "state":env.STATUS,
+            "target_url":env.WORKFLOW_RUN_URL,
+            "description":"release workflow completed",
+            "context":"github-actions/relelase-holochain"
+          }')
+          curl -L -X POST \
+            -H "Content-Type: application/json" \
+            -H "Authorization: token ${{ secrets.HRA_GITHUB_TOKEN}}" \
+            -d "$data" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/statuses/${{ github.sha }}"
+
   all-jobs-succeed:
     if: ${{ always() && github.event_name != 'pull_request' }}
     runs-on: "ubuntu-latest"
