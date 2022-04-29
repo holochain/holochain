@@ -84,3 +84,27 @@ pub type AnyDhtHashB64 = HoloHashB64<hash_type::AnyDht>;
 
 /// Base64-ready version of AnyLinkableHash
 pub type AnyLinkableHashB64 = HoloHashB64<hash_type::AnyLinkable>;
+
+impl From<EntryHashB64> for AnyLinkableHash {
+    fn from(h: EntryHashB64) -> Self {
+        EntryHash::from(h).into()
+    }
+}
+
+impl From<HeaderHashB64> for AnyLinkableHash {
+    fn from(h: HeaderHashB64) -> Self {
+        HeaderHash::from(h).into()
+    }
+}
+
+impl From<EntryHashB64> for AnyDhtHash {
+    fn from(h: EntryHashB64) -> Self {
+        EntryHash::from(h).into()
+    }
+}
+
+impl From<HeaderHashB64> for AnyDhtHash {
+    fn from(h: HeaderHashB64) -> Self {
+        HeaderHash::from(h).into()
+    }
+}
