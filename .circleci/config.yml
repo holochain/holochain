@@ -194,27 +194,12 @@ jobs:
       steps:
          - run:
               name: echo
-              command: echo
+              command: exit 1
 
 workflows:
    tests:
       jobs:
-         - merge-release-test
-         # - merge-release-test-mac
-         - standard-test
-         - rustdoc-build-test
-         - hc-static-checks
-         - slow-test
-         - wasm-test
-         # - merge-test-mac
-         - ci-jobs-succeed:
-              requires:
-                 - standard-test
-                 - rustdoc-build-test
-                 - hc-static-checks
-                 - slow-test
-                 - wasm-test
-                 - merge-release-test
+         - ci-jobs-succeed
 
    docker-builds:
       triggers:
