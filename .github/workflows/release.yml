@@ -141,6 +141,7 @@ jobs:
     secrets:
       CACHIX_SIGNING_KEY: ${{ secrets.CACHIX_AUTH_TOKEN }}
       CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
+      HRA_GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN}}
 
   test:
     if: ${{ github.event_name != 'pull_request' }}
@@ -167,8 +168,6 @@ jobs:
               macos-latest: 10
             run: |
               nix-shell \
-                --keep NUM_JOBS \
-                --keep CARGO_BUILD_JOBS \
                 --keep CARGO_TEST_ARGS \
                 --fallback --pure --argstr flavor "coreDev" --run hc-test-standard
 
@@ -176,16 +175,13 @@ jobs:
             restoresCargoCache: true
             savesCargoCache: true
             ignoreErrorOnNonUbuntu: true
-            timeout_minutes: 30
+            timeout_minutes: 15
             max_attempts:
-              ubuntu-latest: 30
+              ubuntu-latest: 60
               macos-latest: 1
             run: |
               nix-shell \
-              --keep NUM_JOBS \
-              --keep CARGO_BUILD_JOBS \
               --keep CARGO_TEST_ARGS \
-              --keep RUST_TEST_THREADS \
               --fallback --pure --argstr flavor "coreDev" --run hc-test-slow
 
           - name: cargo-test-static
@@ -198,8 +194,6 @@ jobs:
               macos-latest: 1
             run: |
               nix-shell \
-                --keep NUM_JOBS \
-                --keep CARGO_BUILD_JOBS \
                 --keep CARGO_TEST_ARGS \
                 --fallback --pure --argstr flavor "coreDev" --run hc-static-checks
 
@@ -213,8 +207,6 @@ jobs:
               macos-latest: 1
             run: |
               nix-shell \
-                --keep NUM_JOBS \
-                --keep CARGO_BUILD_JOBS \
                 --keep CARGO_TEST_ARGS \
                 --fallback --pure --argstr flavor "coreDev" --run hc-test-wasm
 
@@ -354,8 +346,6 @@ jobs:
       - name: ${{ matrix.testCommand.name }} (build only)
         if: ${{ matrix.testCommand.restoresCargoCache == true }}
         env:
-          # NUM_JOBS: ""
-          # CARGO_BUILD_JOBS: ""
           CARGO_TEST_ARGS: "--no-run"
         run: |
           set -e
@@ -369,8 +359,6 @@ jobs:
       - name: ${{ matrix.testCommand.name }} (run)
         uses: nick-fields/retry@v2
         env:
-          # NUM_JOBS: ""
-          # CARGO_BUILD_JOBS: ""
           HOLOCHAIN_NIXPKGS_SOURCE_BRANCH: ${{ needs.vars.outputs.holochain_nixpkgs_source_branch }}
           HOLONIX_SOURCE_BRANCH: ${{ needs.vars.outputs.holonix_source_branch }}
         with:
