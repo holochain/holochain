@@ -42,7 +42,15 @@ rec {
 
     # alas, we cannot specify --features in the virtual workspace
     # run the specific slow tests in the holochain crate
-    cargo test ''${CARGO_TEST_ARGS:-} --manifest-path=crates/holochain/Cargo.toml --features slow_tests,test_utils,build_wasms,db-encryption --profile fast-test -- --nocapture
+    for i in $(((RANDOM % NUM_JOBS) + 1)) $NUM_JOBS 1 ; do
+      if env \
+        RUST_TEST_THREADS=$i \
+        cargo test ''${CARGO_TEST_ARGS:-} --manifest-path=crates/holochain/Cargo.toml --features slow_tests,test_utils,build_wasms,db-encryption --profile fast-test -- --nocapture
+      then
+        echo succeeded with RUST_TEST_THREADS=$i
+        exit 0
+      fi
+    done
   '';
 
   hcWasmTests = writeShellScriptBin "hc-test-wasm" ''
