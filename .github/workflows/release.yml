@@ -167,8 +167,6 @@ jobs:
               macos-latest: 10
             run: |
               nix-shell \
-                --keep NUM_JOBS \
-                --keep CARGO_BUILD_JOBS \
                 --keep CARGO_TEST_ARGS \
                 --fallback --pure --argstr flavor "coreDev" --run hc-test-standard
 
@@ -182,10 +180,7 @@ jobs:
               macos-latest: 1
             run: |
               nix-shell \
-              --keep NUM_JOBS \
-              --keep CARGO_BUILD_JOBS \
               --keep CARGO_TEST_ARGS \
-              --keep RUST_TEST_THREADS \
               --fallback --pure --argstr flavor "coreDev" --run hc-test-slow
 
           - name: cargo-test-static
@@ -198,8 +193,6 @@ jobs:
               macos-latest: 1
             run: |
               nix-shell \
-                --keep NUM_JOBS \
-                --keep CARGO_BUILD_JOBS \
                 --keep CARGO_TEST_ARGS \
                 --fallback --pure --argstr flavor "coreDev" --run hc-static-checks
 
@@ -213,8 +206,6 @@ jobs:
               macos-latest: 1
             run: |
               nix-shell \
-                --keep NUM_JOBS \
-                --keep CARGO_BUILD_JOBS \
                 --keep CARGO_TEST_ARGS \
                 --fallback --pure --argstr flavor "coreDev" --run hc-test-wasm
 
@@ -354,8 +345,6 @@ jobs:
       - name: ${{ matrix.testCommand.name }} (build only)
         if: ${{ matrix.testCommand.restoresCargoCache == true }}
         env:
-          # NUM_JOBS: ""
-          # CARGO_BUILD_JOBS: ""
           CARGO_TEST_ARGS: "--no-run"
         run: |
           set -e
@@ -369,8 +358,6 @@ jobs:
       - name: ${{ matrix.testCommand.name }} (run)
         uses: nick-fields/retry@v2
         env:
-          # NUM_JOBS: ""
-          # CARGO_BUILD_JOBS: ""
           HOLOCHAIN_NIXPKGS_SOURCE_BRANCH: ${{ needs.vars.outputs.holochain_nixpkgs_source_branch }}
           HOLONIX_SOURCE_BRANCH: ${{ needs.vars.outputs.holonix_source_branch }}
         with:
