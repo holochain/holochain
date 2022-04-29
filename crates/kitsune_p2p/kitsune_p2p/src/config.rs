@@ -169,8 +169,8 @@ pub enum TransportConfig {
 }
 
 #[derive(Clone)]
-/// A simple wrapper around the [`AdaptorFactory`] to allow implementing
-/// Debug and PartialEq.
+/// A simple wrapper around the [`AdaptorFactory`](tx2::tx2_adapter::AdapterFactory)
+/// to allow implementing Debug and PartialEq.
 pub struct AdapterFactoryMock(pub AdapterFactory);
 
 impl std::fmt::Debug for AdapterFactoryMock {

@@ -178,7 +178,7 @@ jobs:
             ignoreErrorOnNonUbuntu: true
             timeout_minutes: 30
             max_attempts:
-              ubuntu-latest: 10
+              ubuntu-latest: 30
               macos-latest: 1
             run: |
               nix-shell \
@@ -485,6 +485,48 @@ jobs:
 
           git push origin main --tags
 
+      - name: Push the release branch
+        run: |
+          source ${HOLOCHAIN_RELEASE_SH}
+          cd "${HOLOCHAIN_REPO}"
+          git checkout ${RELEASE_BRANCH}
+          git push origin ${RELEASE_BRANCH}
+
+      - name: Create a pull-request towards the develop branch
+        id: cpr
+        env:
+          GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN }}
+        run: |
+          set -euE -o pipefail
+
+          source ${HOLOCHAIN_RELEASE_SH}
+          cd "${HOLOCHAIN_REPO}"
+
+          gh pr create \
+            --title "Merge ${RELEASE_BRANCH} back into ${HOLOCHAIN_SOURCE_BRANCH}" \
+            --label release \
+            --label "autoupdate:opt-in" \
+            --base ${HOLOCHAIN_SOURCE_BRANCH} --head "${RELEASE_BRANCH}" \
+            --body 'Please double-check the consistency of the CHANGELOG.md files' 2>&1 | tee gh-pr-create.log
+            # --reviewer "holochain/core-dev" \
+
+          pull_request_number="$(tail -n1 gh-pr-create.log | grep -oE '[0-9]+$')"
+          echo "::set-output name=pull-request-number::${pull_request_number}"
+
+      - name: Enable Pull Request Automerge
+        if: ${{ needs.vars.outputs.dry_run == 'false' }}
+        uses: peter-evans/enable-pull-request-automerge@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN}}
+          pull-request-number: ${{ steps.cpr.outputs.pull-request-number }}
+          merge-method: merge
+      - name: Auto approve Pull Request
+        if: ${{ needs.vars.outputs.dry_run == 'false' }}
+        uses: juliangruber/approve-pull-request-action@v1
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          number: ${{ steps.cpr.outputs.pull-request-number }}
+
       - name: Publish crates
         if: ${{ needs.vars.outputs.dry_run == 'false' }}
         env:
@@ -512,47 +554,6 @@ jobs:
           gh release create "${TAG:?}" \
             --title "holochain ${VERSION:?}" \
             --notes "***Please read [this release's top-level CHANGELOG](https://github.com/holochain/holochain/blob/main/CHANGELOG.md#$(sed -E 's/(release-|\.)//g' <<<"${RELEASE_BRANCH:?}")) to see the full list of crates that were released together.***"
-
-      - name: Push the release branch
-        run: |
-          source ${HOLOCHAIN_RELEASE_SH}
-          cd "${HOLOCHAIN_REPO}"
-          git checkout ${RELEASE_BRANCH}
-          git push origin ${RELEASE_BRANCH}
-
-      - name: Create a pull-request towards the develop branch
-        id: cpr
-        env:
-          GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN }}
-        run: |
-          set -euE -o pipefail
-
-          source ${HOLOCHAIN_RELEASE_SH}
-          cd "${HOLOCHAIN_REPO}"
-
-          gh pr create \
-            --title "Merge ${RELEASE_BRANCH} back into ${HOLOCHAIN_SOURCE_BRANCH}" \
-            --label release \
-            --base ${HOLOCHAIN_SOURCE_BRANCH} --head "${RELEASE_BRANCH}" \
-            --body 'Please double-check the consistency of the CHANGELOG.md files' 2>&1 | tee gh-pr-create.log
-            # --reviewer "holochain/core-dev" \
-
-          pull_request_number="$(tail -n1 gh-pr-create.log | grep -oE '[0-9]+$')"
-          echo "::set-output name=pull-request-number::${pull_request_number}"
-
-      - name: Enable Pull Request Automerge
-        if: ${{ needs.vars.outputs.dry_run == 'false' }}
-        uses: peter-evans/enable-pull-request-automerge@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN}}
-          pull-request-number: ${{ steps.cpr.outputs.pull-request-number }}
-          merge-method: merge
-      - name: Auto approve Pull Request
-        if: ${{ needs.vars.outputs.dry_run == 'false' }}
-        uses: juliangruber/approve-pull-request-action@v1
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          number: ${{ steps.cpr.outputs.pull-request-number }}
 
       - name: Setup upterm session
         uses: lhotari/action-upterm@v1
@@ -614,6 +615,28 @@ jobs:
 
           data=$(jq -n --compact-output '{"channel_id":env.MM_CHANNEL_ID, "message":env.message, "props":{"version":env.VERSION}}')
           curl -X POST -H "Authorization: Bearer ${HRA_MATTERMOST_TOKEN}" -d "$data" https://chat.holochain.org/api/v4/posts
+
+      - name: Trigger status event
+        if: always()
+        shell: bash
+        continue-on-error: true
+        env:
+          STATUS: ${{ steps.check-status.outcome }}
+          WORKFLOW_RUN_URL: "https://github.com/holochain/holochain/actions/runs/${{ github.run_id }}"
+        run: |
+          set -x
+
+          data=$(jq -n --compact-output '{
+            "state":env.STATUS,
+            "target_url":env.WORKFLOW_RUN_URL,
+            "description":"release workflow completed",
+            "context":"github-actions/relelase-holochain"
+          }')
+          curl -L -X POST \
+            -H "Content-Type: application/json" \
+            -H "Authorization: token ${{ secrets.HRA_GITHUB_TOKEN}}" \
+            -d "$data" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/statuses/${{ github.sha }}"
 
   all-jobs-succeed:
     if: ${{ always() && github.event_name != 'pull_request' }}
