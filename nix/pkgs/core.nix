@@ -45,7 +45,7 @@ rec {
     for i in $(((RANDOM % NUM_JOBS) + 1)) $NUM_JOBS 1 ; do
       if env \
         RUST_TEST_THREADS=$i \
-        cargo test ''${CARGO_TEST_ARGS:-} --manifest-path=crates/holochain/Cargo.toml --features slow_tests,test_utils,build_wasms,db-encryption --profile fast-test -- --nocapture
+        cargo test ''${CARGO_TEST_ARGS:-} -p holochain --features slow_tests,test_utils,build_wasms,db-encryption --profile fast-test -- --nocapture
       then
         echo succeeded with RUST_TEST_THREADS=$i
         exit 0
