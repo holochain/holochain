@@ -7,7 +7,6 @@
   # false = use a local copy of holonix (useful for debugging)
   use-github = true;
 
-  # controls whether holonix' holochain binaries (holochain, hc, etc.) are included in PATH
   includeHolochainBinaries = false;
 
   # configuration for when use-github = false
@@ -20,10 +19,11 @@
      then (import ./nix/sources.nix).holonix
      else local.path;
 
-  importFn = args: import (pathFn {}) ({
-      inherit includeHolochainBinaries;
-    } // args)
-    ;
+  importFn = args: import (pathFn {}) (args // ({
+    include = (args.include or {}) // {
+      holochainBinaries = args.include.holochainBinaries or includeHolochainBinaries;
+    };
+  }));
  };
 
  release = {
