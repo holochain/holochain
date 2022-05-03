@@ -8,6 +8,8 @@
     use-github = true;
 
     includeHolochainBinaries = false;
+    includeScaffolding = false;
+    includeTest = false;
 
     # configuration for when use-github = false
     local = {
@@ -22,6 +24,8 @@
 
     importFn = args: import (pathFn { }) (args // ({
       include = (args.include or { }) // {
+        scaffolding = args.include.scaffolding or includeScaffolding;
+        test = args.include.test or includeTest;
         holochainBinaries = args.include.holochainBinaries or includeHolochainBinaries;
       };
     }));
