@@ -8,8 +8,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
-- Docs: Fix intra-doc links in all crates [#1323](https://github.com/holochain/holochain/pull/1323)
 - hdk: Provide `Into<AnyHashable>` impl for `EntryHash` and `HeaderHash`. This allows `create_link` and `get_links` to be used directly with EntryHash and HeaderHash arguments, rather than needing to construct an AnyHashable explicitly.
+
+## 0.0.131
+
+- Docs: Fix intra-doc links in all crates [\#1323](https://github.com/holochain/holochain/pull/1323)
 
 ## 0.0.130
 
