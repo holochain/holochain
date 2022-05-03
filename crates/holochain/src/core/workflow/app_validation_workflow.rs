@@ -75,7 +75,7 @@ pub async fn app_validation_workflow(
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
     // trigger other workflows
-    trigger_integration.trigger();
+    trigger_integration.trigger("app_validation_workflow");
 
     Ok(complete)
 }

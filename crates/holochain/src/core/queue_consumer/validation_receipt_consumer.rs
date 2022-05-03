@@ -38,7 +38,10 @@ pub fn spawn_validation_receipt_consumer(
             )
             .await
             {
-                Ok(WorkComplete::Incomplete) => trigger_self.trigger(),
+                Ok(WorkComplete::Incomplete) => {
+                    tracing::debug!("Work incomplete, retriggering workflow");
+                    trigger_self.trigger("retrigger")
+                }
                 Err(err) => handle_workflow_error(err)?,
                 _ => (),
             };
