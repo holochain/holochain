@@ -46,7 +46,7 @@ pub fn get<'a>(
                 .into_iter()
                 .map(|result| match result {
                     Ok(v) => Ok(v),
-                    Err(cascade_error) => Err(WasmError::Host(cascade_error.to_string())),
+                    Err(cascade_error) => Err(wasm_error!(WasmErrorInner::Host(cascade_error.to_string()))),
                 })
                 .collect();
             let results = results?;
@@ -58,14 +58,14 @@ pub fn get<'a>(
             );
             Ok(results)
         }
-        _ => Err(WasmError::Host(
+        _ => Err(wasm_error!(WasmErrorInner::Host(
             RibosomeError::HostFnPermissions(
                 call_context.zome.zome_name().clone(),
                 call_context.function_name().clone(),
                 "get".into(),
             )
             .to_string(),
-        )),
+        ))),
     }
 }
 

@@ -47,8 +47,8 @@ pub fn create_link<'a>(
                     .await?;
                 Ok::<HeaderHash, RibosomeError>(header_hash)
             }))
-            .map_err(|join_error| WasmError::Host(join_error.to_string()))?
-            .map_err(|ribosome_error| WasmError::Host(ribosome_error.to_string()))?;
+            .map_err(|join_error| wasm_error!(WasmErrorInner::Host(join_error.to_string())))?
+            .map_err(|ribosome_error| wasm_error!(WasmErrorInner::Host(ribosome_error.to_string())))?;
 
             // return the hash of the committed link
             // note that validation is handled by the workflow
@@ -56,11 +56,11 @@ pub fn create_link<'a>(
             // being atomic
             Ok(header_hash)
         }
-        _ => Err(WasmError::Host(RibosomeError::HostFnPermissions(
+        _ => Err(wasm_error!(WasmErrorInner::Host(RibosomeError::HostFnPermissions(
             call_context.zome.zome_name().clone(),
             call_context.function_name().clone(),
             "create_link".into()
-        ).to_string()))
+        ).to_string())))
     }
 }
 

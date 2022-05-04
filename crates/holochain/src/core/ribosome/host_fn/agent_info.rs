@@ -35,14 +35,14 @@ pub fn agent_info<'a>(
                     .as_ref()
                     .expect("Must have source chain if agent_info access is given")
                     .chain_head()
-                    .map_err(|e| WasmError::Host(e.to_string()))?,
+                    .map_err(|e| wasm_error!(WasmErrorInner::Host(e.to_string())))?,
             })
         }
-        _ => Err(WasmError::Host(RibosomeError::HostFnPermissions(
+        _ => Err(wasm_error!(WasmErrorInner::Host(RibosomeError::HostFnPermissions(
             call_context.zome.zome_name().clone(),
             call_context.function_name().clone(),
             "agent_info".into()
-        ).to_string()))
+        ).to_string())))
     }
 }
 

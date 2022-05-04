@@ -35,7 +35,7 @@ pub fn must_get_valid_element<'a>(
                 match cascade
                     .get_header_details(header_hash.clone(), GetOptions::content())
                     .await
-                    .map_err(|cascade_error| WasmError::Host(cascade_error.to_string()))?
+                    .map_err(|cascade_error| wasm_error!(WasmErrorInner::Host(cascade_error.to_string())))?
                 {
                     Some(ElementDetails {
                         element,
@@ -47,44 +47,44 @@ pub fn must_get_valid_element<'a>(
                         | HostContext::GenesisSelfCheck(_)
                         | HostContext::MigrateAgent(_)
                         | HostContext::PostCommit(_)
-                        | HostContext::ZomeCall(_) => Err(WasmError::Host(format!(
+                        | HostContext::ZomeCall(_) => Err(wasm_error!(WasmErrorInner::Host(format!(
                             "Failed to get Element {}",
                             header_hash
-                        ))),
+                        )))),
                         HostContext::Init(_) => RuntimeError::raise(Box::new(
-                            WasmError::HostShortCircuit(holochain_serialized_bytes::encode(
+                            wasm_error!(WasmErrorInner::HostShortCircuit(holochain_serialized_bytes::encode(
                                 &ExternIO::encode(InitCallbackResult::UnresolvedDependencies(
                                     vec![header_hash.into()],
                                 ))?,
                             )?),
-                        )),
+                        ))),
                         HostContext::Validate(_) => RuntimeError::raise(Box::new(
-                            WasmError::HostShortCircuit(holochain_serialized_bytes::encode(
+                            wasm_error!(WasmErrorInner::HostShortCircuit(holochain_serialized_bytes::encode(
                                 &ExternIO::encode(ValidateCallbackResult::UnresolvedDependencies(
                                     vec![header_hash.into()],
                                 ))?,
                             )?),
-                        )),
+                        ))),
                         HostContext::ValidationPackage(_) => {
-                            RuntimeError::raise(Box::new(WasmError::HostShortCircuit(
+                            RuntimeError::raise(Box::new(wasm_error!(WasmErrorInner::HostShortCircuit(
                                 holochain_serialized_bytes::encode(&ExternIO::encode(
                                     ValidationPackageCallbackResult::UnresolvedDependencies(vec![
                                         header_hash.into(),
                                     ]),
                                 )?)?,
-                            )))
+                            ))))
                         }
                     },
                 }
             })
         }
-        _ => Err(WasmError::Host(
+        _ => Err(wasm_error!(WasmErrorInner::Host(
             RibosomeError::HostFnPermissions(
                 call_context.zome.zome_name().clone(),
                 call_context.function_name().clone(),
                 "must_get_valid_element".into(),
             )
             .to_string(),
-        )),
+        ))),
     }
 }

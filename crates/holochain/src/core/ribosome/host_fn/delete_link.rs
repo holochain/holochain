@@ -43,7 +43,7 @@ pub fn delete_link<'a>(
                             .map(|el| el.into_inner().0),
                     )
                 })
-                .map_err(|cascade_error| WasmError::Host(cascade_error.to_string()))?;
+                .map_err(|cascade_error| wasm_error!(WasmErrorInner::Host(cascade_error.to_string())))?;
 
             let base_address = match maybe_add_link {
                 Some(add_link_signed_header_hash) => {
@@ -63,7 +63,7 @@ pub fn delete_link<'a>(
                 // network connection dropped out)
                 None => Err(RibosomeError::ElementDeps(address.clone().into())),
             }
-            .map_err(|ribosome_error| WasmError::Host(ribosome_error.to_string()))?;
+            .map_err(|ribosome_error| wasm_error!(WasmErrorInner::Host(ribosome_error.to_string())))?;
 
             let source_chain = call_context
                 .host_context
@@ -85,19 +85,19 @@ pub fn delete_link<'a>(
                     .put(Some(zome), header_builder, None, chain_top_ordering)
                     .await
                     .map_err(|source_chain_error| {
-                        WasmError::Host(source_chain_error.to_string())
+                        wasm_error!(WasmErrorInner::Host(source_chain_error.to_string()))
                     })?;
                 Ok(header_hash)
             })
         }
-        _ => Err(WasmError::Host(
+        _ => Err(wasm_error!(WasmErrorInner::Host(
             RibosomeError::HostFnPermissions(
                 call_context.zome.zome_name().clone(),
                 call_context.function_name().clone(),
                 "delete_link".into(),
             )
             .to_string(),
-        )),
+        ))),
     }
 }
 

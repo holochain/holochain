@@ -19,15 +19,15 @@ pub fn random_bytes(
             let mut bytes = vec![0; input as _];
             system_random
                 .fill(&mut bytes)
-                .map_err(|ring_unspecified_error| WasmError::Host(ring_unspecified_error.to_string()))?;
+                .map_err(|ring_unspecified_error| wasm_error!(WasmErrorInner::Host(ring_unspecified_error.to_string())))?;
 
             Ok(Bytes::from(bytes))
         },
-        _ => Err(WasmError::Host(RibosomeError::HostFnPermissions(
+        _ => Err(wasm_error!(WasmErrorInner::Host(RibosomeError::HostFnPermissions(
             call_context.zome.zome_name().clone(),
             call_context.function_name().clone(),
             "random_bytes".into()
-        ).to_string()))
+        ).to_string())))
     }
 }
 

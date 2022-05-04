@@ -128,7 +128,7 @@ fn commit_existing_path(_: ()) -> ExternResult<()> {
                 match path.leaf() {
                     None => <Vec<u8>>::new(),
                     Some(component) => {
-                        UnsafeBytes::from(SerializedBytes::try_from(component)?).into()
+                        UnsafeBytes::from(SerializedBytes::try_from(component).map_err(|e| wasm_error!(e.into()))?).into()
                     }
                 }
                 .to_vec(),

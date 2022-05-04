@@ -54,7 +54,7 @@ pub fn get_links<'a>(
                 .into_iter()
                 .map(|result| match result {
                     Ok(links_vec) => Ok(links_vec),
-                    Err(cascade_error) => Err(WasmError::Host(cascade_error.to_string())),
+                    Err(cascade_error) => Err(wasm_error!(WasmErrorInner::Host(cascade_error.to_string()))),
                 })
                 .collect();
             let results = results?;
@@ -67,14 +67,14 @@ pub fn get_links<'a>(
             );
             Ok(results)
         }
-        _ => Err(WasmError::Host(
+        _ => Err(wasm_error!(WasmErrorInner::Host(
             RibosomeError::HostFnPermissions(
                 call_context.zome.zome_name().clone(),
                 call_context.function_name().clone(),
                 "get_links".into(),
             )
             .to_string(),
-        )),
+        ))),
     }
 }
 

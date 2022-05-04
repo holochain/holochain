@@ -43,16 +43,16 @@ pub fn get_agent_activity(
             let activity = cascade
                 .get_agent_activity(agent_pubkey, chain_query_filter, options)
                 .await
-                .map_err(|cascade_error| WasmError::Host(cascade_error.to_string()))?;
+                .map_err(|cascade_error| wasm_error!(WasmErrorInner::Host(cascade_error.to_string())))?;
 
                     Ok(activity.into())
                 })
         },
-        _ => Err(WasmError::Host(RibosomeError::HostFnPermissions(
+        _ => Err(wasm_error!(WasmErrorInner::Host(RibosomeError::HostFnPermissions(
             call_context.zome.zome_name().clone(),
             call_context.function_name().clone(),
             "get_agent_activity".into()
-        ).to_string()))
+        ).to_string())))
     }
 }
 

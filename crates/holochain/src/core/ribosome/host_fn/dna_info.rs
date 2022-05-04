@@ -28,14 +28,14 @@ pub fn dna_info(
                 .map(|(zome_name, _zome_def)| zome_name.to_owned())
                 .collect(),
         }),
-        _ => Err(WasmError::Host(
+        _ => Err(wasm_error!(WasmErrorInner::Host(
             RibosomeError::HostFnPermissions(
                 call_context.zome.zome_name().clone(),
                 call_context.function_name().clone(),
                 "dna_info".into(),
             )
             .to_string(),
-        )),
+        ))),
     }
 }
 

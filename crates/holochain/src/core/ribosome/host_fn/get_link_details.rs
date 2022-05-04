@@ -47,19 +47,19 @@ pub fn get_link_details<'a>(
                 .into_iter()
                 .map(|result| match result {
                     Ok(v) => Ok(v.into()),
-                    Err(cascade_error) => Err(WasmError::Host(cascade_error.to_string())),
+                    Err(cascade_error) => Err(wasm_error!(WasmErrorInner::Host(cascade_error.to_string()))),
                 })
                 .collect();
             Ok(results?)
         }
-        _ => Err(WasmError::Host(
+        _ => Err(wasm_error!(WasmErrorInner::Host(
             RibosomeError::HostFnPermissions(
                 call_context.zome.zome_name().clone(),
                 call_context.function_name().clone(),
                 "get_link_details".into(),
             )
             .to_string(),
-        )),
+        ))),
     }
 }
 

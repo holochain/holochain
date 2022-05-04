@@ -71,7 +71,7 @@ pub fn call(
                                 {
                                     Ok(serialized_bytes) => {
                                         ZomeCallResponse::try_from(serialized_bytes)
-                                            .map_err(WasmError::from)
+                                            .map_err(|e| wasm_error!(e.into()))
                                     }
                                     Err(e) => Ok(ZomeCallResponse::NetworkError(e.to_string())),
                                 }
@@ -109,24 +109,24 @@ pub fn call(
                                 {
                                     Ok(Ok(zome_call_response)) => Ok(zome_call_response),
                                     Ok(Err(ribosome_error)) => {
-                                        Err(WasmError::Host(ribosome_error.to_string()))
+                                        Err(wasm_error!(WasmErrorInner::Host(ribosome_error.to_string())))
                                     }
                                     Err(conductor_api_error) => {
-                                        Err(WasmError::Host(conductor_api_error.to_string()))
+                                        Err(wasm_error!(WasmErrorInner::Host(conductor_api_error.to_string())))
                                     }
                                 }
                             }
                         };
                         result
                     }
-                    _ => Err(WasmError::Host(
+                    _ => Err(wasm_error!(WasmErrorInner::Host(
                         RibosomeError::HostFnPermissions(
                             call_context.zome.zome_name().clone(),
                             call_context.function_name().clone(),
                             "call".into(),
                         )
                         .to_string(),
-                    )),
+                    ))),
                 }
             }))
             .await

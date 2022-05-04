@@ -43,7 +43,7 @@ pub fn update<'a>(
                         .put_countersigned(Some(call_context.zome.clone()), entry, chain_top_ordering)
                         .await
                         .map_err(|source_chain_error| {
-                            WasmError::Host(source_chain_error.to_string())
+                            wasm_error!(WasmErrorInner::Host(source_chain_error.to_string()))
                         })
                 }),
                 _ => {
@@ -55,7 +55,7 @@ pub fn update<'a>(
                         ribosome
                             .zome_to_id(&call_context.zome)
                             .map_err(|source_chain_error| {
-                                WasmError::Host(source_chain_error.to_string())
+                                wasm_error!(WasmErrorInner::Host(source_chain_error.to_string()))
                             })?;
 
                     // extract the entry defs for a zome
@@ -106,18 +106,18 @@ pub fn update<'a>(
                             .put(Some(zome), header_builder, Some(entry), chain_top_ordering)
                             .await
                             .map_err(|source_chain_error| {
-                                WasmError::Host(source_chain_error.to_string())
+                                wasm_error!(WasmErrorInner::Host(source_chain_error.to_string()))
                             })?;
                         Ok(header_hash)
                     })
                 }
             }
         }
-        _ => Err(WasmError::Host(RibosomeError::HostFnPermissions(
+        _ => Err(wasm_error!(WasmErrorInner::Host(RibosomeError::HostFnPermissions(
             call_context.zome.zome_name().clone(),
             call_context.function_name().clone(),
             "update".into()
-        ).to_string()))
+        ).to_string())))
     }
 }
 

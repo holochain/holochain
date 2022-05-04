@@ -28,11 +28,11 @@ pub fn x_salsa20_poly1305_decrypt(
                 }
             )
         },
-        _ => Err(WasmError::Host(RibosomeError::HostFnPermissions(
+        _ => Err(wasm_error!(WasmErrorInner::Host(RibosomeError::HostFnPermissions(
             call_context.zome.zome_name().clone(),
             call_context.function_name().clone(),
             "x_salsa20_poly1305_decrypt".into()
-        ).to_string()))
+        ).to_string())))
     }
 }
 

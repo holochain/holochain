@@ -24,17 +24,17 @@ pub fn query(
                 .expect("Must have source chain to query the source chain")
                 .query(input)
                 .await
-                .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?;
+                .map_err(|source_chain_error| wasm_error!(WasmErrorInner::Host(source_chain_error.to_string())))?;
             Ok(elements)
         }),
-        _ => Err(WasmError::Host(
+        _ => Err(wasm_error!(WasmErrorInner::Host(
             RibosomeError::HostFnPermissions(
                 call_context.zome.zome_name().clone(),
                 call_context.function_name().clone(),
                 "query".into(),
             )
             .to_string(),
-        )),
+        ))),
     }
 }
 

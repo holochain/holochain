@@ -28,17 +28,17 @@ pub fn schedule(
                         input.into(),
                     ));
                 })
-                .map_err(|e| WasmError::Host(e.to_string()))?;
+                .map_err(|e| wasm_error!(WasmErrorInner::Host(e.to_string())))?;
             Ok(())
         }
-        _ => Err(WasmError::Host(
+        _ => Err(wasm_error!(WasmErrorInner::Host(
             RibosomeError::HostFnPermissions(
                 call_context.zome.zome_name().clone(),
                 call_context.function_name().clone(),
                 "schedule".into(),
             )
             .to_string(),
-        )),
+        ))),
     }
 }
 

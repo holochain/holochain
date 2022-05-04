@@ -22,15 +22,15 @@ pub fn sign(
                 .sign(input.key, input.data.into_vec().into())
                 .await
         })
-        .map_err(|keystore_error| WasmError::Host(keystore_error.to_string())),
-        _ => Err(WasmError::Host(
+        .map_err(|keystore_error| wasm_error!(WasmErrorInner::Host(keystore_error.to_string()))),
+        _ => Err(wasm_error!(WasmErrorInner::Host(
             RibosomeError::HostFnPermissions(
                 call_context.zome.zome_name().clone(),
                 call_context.function_name().clone(),
                 "sign".into(),
             )
             .to_string(),
-        )),
+        ))),
     }
 }
 

@@ -51,7 +51,7 @@ pub fn accept_countersigning_preflight_request<'a>(
                     .accept_countersigning_preflight_request(input.clone(), agent_index)
                     .await
                     .map_err(|source_chain_error| {
-                        WasmError::Host(source_chain_error.to_string())
+                        wasm_error!(WasmErrorInner::Host(source_chain_error.to_string()))
                     })?;
                 let signature: Signature = match call_context
                     .host_context
@@ -82,24 +82,24 @@ pub fn accept_countersigning_preflight_request<'a>(
                         {
                             error!(?unlock_result);
                         }
-                        return Err(WasmError::Host(e.to_string()));
+                        return Err(wasm_error!(WasmErrorInner::Host(e.to_string())));
                     }
                 };
 
                 Ok(PreflightRequestAcceptance::Accepted(
                     PreflightResponse::try_new(input, countersigning_agent_state, signature)
-                        .map_err(|e| WasmError::Host(e.to_string()))?,
+                        .map_err(|e| wasm_error!(WasmErrorInner::Host(e.to_string())))?,
                 ))
             })
         }
-        _ => Err(WasmError::Host(
+        _ => Err(wasm_error!(WasmErrorInner::Host(
             RibosomeError::HostFnPermissions(
                 call_context.zome.zome_name().clone(),
                 call_context.function_name().clone(),
                 "accept_countersigning_preflight_request".into(),
             )
             .to_string(),
-        )),
+        ))),
     }
 }
 
@@ -295,7 +295,7 @@ pub mod wasm_test {
             .await;
         assert!(matches!(
             preflight_acceptance_fail,
-            Ok(Err(RibosomeError::WasmError(WasmError::Host(_))))
+            Ok(Err(RibosomeError::WasmError(wasm_error!(WasmErrorInner::Host(_)))))
         ));
 
         // Bob can also accept the preflight request.

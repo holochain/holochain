@@ -113,19 +113,19 @@ fn call_create_entry(_: ()) -> ExternResult<HeaderHash> {
     )?;
 
     match zome_call_response {
-        ZomeCallResponse::Ok(v) => Ok(v.decode()?),
+        ZomeCallResponse::Ok(v) => Ok(v.decode().map_err(|e| wasm_error!(e.into()))?),
         ZomeCallResponse::Unauthorized(cell_id, zome_name, function_name, agent_pubkey) => {
-            Err(WasmError::Guest(format!(
+            Err(wasm_error!(WasmErrorInner::Guest(format!(
                 "Unauthorized: {} {} {} {}",
                 cell_id, zome_name, function_name, agent_pubkey
-            )))
+            ))))
         }
         // Unbounded recursion.
         ZomeCallResponse::NetworkError(_) => call_create_entry(()),
-        ZomeCallResponse::CountersigningSession(e) => Err(WasmError::Guest(format!(
+        ZomeCallResponse::CountersigningSession(e) => Err(wasm_error!(WasmErrorInner::Guest(format!(
             "Countersigning session failed: {}",
             e
-        ))),
+        )))),
     }
 }
 
@@ -140,19 +140,19 @@ fn call_create_entry_remotely(agent: AgentPubKey) -> ExternResult<HeaderHash> {
     )?;
 
     match zome_call_response {
-        ZomeCallResponse::Ok(v) => Ok(v.decode()?),
+        ZomeCallResponse::Ok(v) => Ok(v.decode().map_err(|e| wasm_error!(e.into()))?),
         ZomeCallResponse::Unauthorized(cell_id, zome_name, function_name, agent_pubkey) => {
-            Err(WasmError::Guest(format!(
+            Err(wasm_error!(WasmErrorInner::Guest(format!(
                 "Unauthorized: {} {} {} {}",
                 cell_id, zome_name, function_name, agent_pubkey
-            )))
+            ))))
         }
         // Unbounded recursion.
         ZomeCallResponse::NetworkError(_) => call_create_entry_remotely(agent),
-        ZomeCallResponse::CountersigningSession(e) => Err(WasmError::Guest(format!(
+        ZomeCallResponse::CountersigningSession(e) => Err(wasm_error!(WasmErrorInner::Guest(format!(
             "Countersigning session failed: {}",
             e
-        ))),
+        )))),
     }
 }
 
@@ -173,18 +173,18 @@ fn call_create_entry_remotely_no_rec(agent: AgentPubKey) -> ExternResult<HeaderH
     )?;
 
     match zome_call_response {
-        ZomeCallResponse::Ok(v) => Ok(v.decode()?),
+        ZomeCallResponse::Ok(v) => Ok(v.decode().map_err(|e| wasm_error!(e.into()))?),
         ZomeCallResponse::Unauthorized(cell_id, zome_name, function_name, agent_pubkey) => {
-            Err(WasmError::Guest(format!(
+            Err(wasm_error!(WasmErrorInner::Guest(format!(
                 "Unauthorized: {} {} {} {}",
                 cell_id, zome_name, function_name, agent_pubkey
-            )))
+            ))))
         }
         // Unbounded recursion.
-        ZomeCallResponse::NetworkError(e) => Err(WasmError::Guest(format!("Network Error: {}", e))),
-        ZomeCallResponse::CountersigningSession(e) => Err(WasmError::Guest(format!(
+        ZomeCallResponse::NetworkError(e) => Err(wasm_error!(WasmErrorInner::Guest(format!("Network Error: {}", e)))),
+        ZomeCallResponse::CountersigningSession(e) => Err(wasm_error!(WasmErrorInner::Guest(format!(
             "Countersigning session failed: {}",
             e
-        ))),
+        )))),
     }
 }

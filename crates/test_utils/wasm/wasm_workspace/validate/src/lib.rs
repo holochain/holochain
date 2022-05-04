@@ -50,11 +50,12 @@ impl TryFrom<&Entry> for ThisWasmEntry {
     type Error = WasmError;
     fn try_from(entry: &Entry) -> Result<Self, Self::Error> {
         match entry {
-            Entry::App(eb) => Ok(Self::try_from(SerializedBytes::from(eb.to_owned()))?),
-            _ => Err(SerializedBytesError::Deserialize(
+            Entry::App(eb) => Ok(Self::try_from(SerializedBytes::from(eb.to_owned()))
+                .map_err(|e| wasm_error!(e.into()))?),
+            _ => Err(wasm_error!(SerializedBytesError::Deserialize(
                 "failed to deserialize ThisWasmEntry".into(),
             )
-            .into()),
+            .into())),
         }
     }
 }
@@ -63,14 +64,16 @@ impl TryFrom<&ThisWasmEntry> for Entry {
     type Error = WasmError;
     fn try_from(this_wasm_entry: &ThisWasmEntry) -> Result<Self, Self::Error> {
         Ok(Entry::App(
-            match AppEntryBytes::try_from(SerializedBytes::try_from(this_wasm_entry)?) {
+            match AppEntryBytes::try_from(SerializedBytes::try_from(this_wasm_entry).map_err(|e| wasm_error!(e.into()))?) {
                 Ok(app_entry_bytes) => app_entry_bytes,
                 Err(entry_error) => match entry_error {
                     EntryError::SerializedBytes(serialized_bytes_error) => {
-                        return Err(WasmError::Serialize(serialized_bytes_error))
+                        return Err(wasm_error!(WasmErrorInner::Serialize(
+                            serialized_bytes_error
+                        )))
                     }
                     EntryError::EntryTooLarge(_) => {
-                        return Err(WasmError::Guest(entry_error.to_string()))
+                        return Err(wasm_error!(WasmErrorInner::Guest(entry_error.to_string())))
                     }
                 },
             },

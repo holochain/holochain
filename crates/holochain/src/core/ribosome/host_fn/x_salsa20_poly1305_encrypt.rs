@@ -24,7 +24,7 @@ pub fn x_salsa20_poly1305_encrypt(
             let mut nonce_bytes = [0; holochain_zome_types::x_salsa20_poly1305::nonce::NONCE_BYTES];
             system_random
                 .fill(&mut nonce_bytes)
-                .map_err(|ring_unspecified| WasmError::Host(ring_unspecified.to_string()))?;
+                .map_err(|ring_unspecified| wasm_error!(WasmErrorInner::Host(ring_unspecified.to_string())))?;
 
             // @todo use the real libsodium somehow instead of this rust crate.
             // The main issue here is dependency management - it's not necessarily simple to get libsodium
@@ -35,26 +35,26 @@ pub fn x_salsa20_poly1305_encrypt(
             let lib_nonce = GenericArray::from_slice(&nonce_bytes);
             let lib_encrypted_data = cipher
                 .encrypt(lib_nonce, input.as_data_ref().as_ref())
-                .map_err(|aead_error| WasmError::Host(aead_error.to_string()))?;
+                .map_err(|aead_error| wasm_error!(WasmErrorInner::Host(aead_error.to_string())))?;
 
             Ok(
                 holochain_zome_types::x_salsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData::new(
                     match lib_nonce.as_slice().try_into() {
                         Ok(nonce) => nonce,
-                        Err(secure_primitive_error) => return Err(WasmError::Host(secure_primitive_error.to_string())),
+                        Err(secure_primitive_error) => return Err(wasm_error!(WasmErrorInner::Host(secure_primitive_error.to_string()))),
                     },
                     lib_encrypted_data,
                 ),
             )
         }
-        _ => Err(WasmError::Host(
+        _ => Err(wasm_error!(WasmErrorInner::Host(
             RibosomeError::HostFnPermissions(
                 call_context.zome.zome_name().clone(),
                 call_context.function_name().clone(),
                 "x_salsa20_poly1305_encrypt".into(),
             )
             .to_string(),
-        )),
+        ))),
     }
 }
 

@@ -24,14 +24,14 @@ pub fn verify_signature(
             } = input;
             key.verify_signature_raw(&signature, data.into()).await
         })),
-        _ => Err(WasmError::Host(
+        _ => Err(wasm_error!(WasmErrorInner::Host(
             RibosomeError::HostFnPermissions(
                 call_context.zome.zome_name().clone(),
                 call_context.function_name().clone(),
                 "verify_signature".into(),
             )
             .to_string(),
-        )),
+        ))),
     }
 }
 

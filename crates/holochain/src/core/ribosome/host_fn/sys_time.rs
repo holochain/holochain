@@ -17,14 +17,14 @@ pub fn sys_time(
             non_determinism: Permission::Allow,
             ..
         } => Ok(holochain_zome_types::Timestamp::now()),
-        _ => Err(WasmError::Host(
+        _ => Err(wasm_error!(WasmErrorInner::Host(
             RibosomeError::HostFnPermissions(
                 call_context.zome.zome_name().clone(),
                 call_context.function_name().clone(),
                 "sys_time".into(),
             )
             .to_string(),
-        )),
+        ))),
     }
 }
 

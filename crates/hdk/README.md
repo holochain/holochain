@@ -88,7 +88,7 @@ let result: SerializedBytes = call_remote(
     MyInput
 )?;
 // Get their output
-let output: MyOutput = result.decode()?;
+let output: MyOutput = result.decode().map_err(|e| wasm_error!(e.into()))?;
 // Print their output
 debug!(output);
 ```

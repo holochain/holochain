@@ -38,19 +38,19 @@ pub fn get_details<'a>(
             let results: Result<Vec<_>, _> = results
                 .into_iter()
                 .map(|result| {
-                    result.map_err(|cascade_error| WasmError::Host(cascade_error.to_string()))
+                    result.map_err(|cascade_error| wasm_error!(WasmErrorInner::Host(cascade_error.to_string())))
                 })
                 .collect();
             Ok(results?)
         }
-        _ => Err(WasmError::Host(
+        _ => Err(wasm_error!(WasmErrorInner::Host(
             RibosomeError::HostFnPermissions(
                 call_context.zome.zome_name().clone(),
                 call_context.function_name().clone(),
                 "get_details".into(),
             )
             .to_string(),
-        )),
+        ))),
     }
 }
 

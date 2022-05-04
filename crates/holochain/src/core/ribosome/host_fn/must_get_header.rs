@@ -35,7 +35,7 @@ pub fn must_get_header<'a>(
                 match cascade
                     .retrieve_header(header_hash.clone(), NetworkGetOptions::must_get_options())
                     .await
-                    .map_err(|cascade_error| WasmError::Host(cascade_error.to_string()))?
+                    .map_err(|cascade_error| wasm_error!(WasmErrorInner::Host(cascade_error.to_string())))?
                 {
                     Some(header) => Ok(header),
                     None => match call_context.host_context {
@@ -43,44 +43,44 @@ pub fn must_get_header<'a>(
                         | HostContext::GenesisSelfCheck(_)
                         | HostContext::MigrateAgent(_)
                         | HostContext::PostCommit(_)
-                        | HostContext::ZomeCall(_) => Err(WasmError::Host(format!(
+                        | HostContext::ZomeCall(_) => Err(wasm_error!(WasmErrorInner::Host(format!(
                             "Failed to get SignedHeaderHashed {}",
                             header_hash
-                        ))),
+                        )))),
                         HostContext::Init(_) => RuntimeError::raise(Box::new(
-                            WasmError::HostShortCircuit(holochain_serialized_bytes::encode(
+                            wasm_error!(WasmErrorInner::HostShortCircuit(holochain_serialized_bytes::encode(
                                 &ExternIO::encode(InitCallbackResult::UnresolvedDependencies(
                                     vec![header_hash.into()],
                                 ))?,
                             )?),
-                        )),
+                        ))),
                         HostContext::Validate(_) => RuntimeError::raise(Box::new(
-                            WasmError::HostShortCircuit(holochain_serialized_bytes::encode(
+                            wasm_error!(WasmErrorInner::HostShortCircuit(holochain_serialized_bytes::encode(
                                 &ExternIO::encode(ValidateCallbackResult::UnresolvedDependencies(
                                     vec![header_hash.into()],
                                 ))?,
                             )?),
-                        )),
+                        ))),
                         HostContext::ValidationPackage(_) => {
-                            RuntimeError::raise(Box::new(WasmError::HostShortCircuit(
+                            RuntimeError::raise(Box::new(wasm_error!(WasmErrorInner::HostShortCircuit(
                                 holochain_serialized_bytes::encode(&ExternIO::encode(
                                     ValidationPackageCallbackResult::UnresolvedDependencies(vec![
                                         header_hash.into(),
                                     ]),
                                 )?)?,
-                            )))
+                            ))))
                         }
                     },
                 }
             })
         }
-        _ => Err(WasmError::Host(
+        _ => Err(wasm_error!(WasmErrorInner::Host(
             RibosomeError::HostFnPermissions(
                 call_context.zome.zome_name().clone(),
                 call_context.function_name().clone(),
                 "must_get_header".into(),
             )
             .to_string(),
-        )),
+        ))),
     }
 }

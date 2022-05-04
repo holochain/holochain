@@ -295,9 +295,11 @@ impl Path {
                     HdkLinkType::Paths,
                     LinkTag::new(match self.leaf() {
                         None => <Vec<u8>>::with_capacity(0),
-                        Some(component) => {
-                            UnsafeBytes::from(SerializedBytes::try_from(component)?).into()
-                        }
+                        Some(component) => UnsafeBytes::from(
+                            SerializedBytes::try_from(component)
+                                .map_err(|e| wasm_error!(e.into()))?,
+                        )
+                        .into(),
                     }),
                 )?;
             }
@@ -345,7 +347,7 @@ impl Path {
                     Ok(Some(
                         SerializedBytes::from(UnsafeBytes::from(component_bytes.to_vec()))
                             .try_into()
-                            .map_err(WasmError::Serialize)?,
+                            .map_err(|e: SerializedBytesError| wasm_error!(e.into()))?,
                     ))
                 }
             })

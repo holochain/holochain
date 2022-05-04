@@ -51,19 +51,19 @@ pub fn delete<'a>(
                     )
                     .await
                     .map_err(|source_chain_error| {
-                        WasmError::Host(source_chain_error.to_string())
+                        wasm_error!(WasmErrorInner::Host(source_chain_error.to_string()))
                     })?;
                 Ok(header_hash)
             })
         }
-        _ => Err(WasmError::Host(
+        _ => Err(wasm_error!(WasmErrorInner::Host(
             RibosomeError::HostFnPermissions(
                 call_context.zome.zome_name().clone(),
                 call_context.function_name().clone(),
                 "delete".into(),
             )
             .to_string(),
-        )),
+        ))),
     }
 }
 
@@ -103,7 +103,7 @@ pub(crate) fn get_original_address<'a>(
             None => Err(RibosomeError::ElementDeps(address.into())),
         }
     })
-    .map_err(|ribosome_error| WasmError::Host(ribosome_error.to_string()))
+    .map_err(|ribosome_error| wasm_error!(WasmErrorInner::Host(ribosome_error.to_string())))
 }
 
 #[cfg(test)]
