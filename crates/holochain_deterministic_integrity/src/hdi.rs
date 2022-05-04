@@ -55,7 +55,9 @@ pub struct ErrHdi;
 
 impl ErrHdi {
     fn err<T>() -> ExternResult<T> {
-        Err(wasm_error!(WasmErrorInner::Guest(HDI_NOT_REGISTERED.to_string())))
+        Err(wasm_error!(WasmErrorInner::Guest(
+            HDI_NOT_REGISTERED.to_string()
+        )))
     }
 }
 

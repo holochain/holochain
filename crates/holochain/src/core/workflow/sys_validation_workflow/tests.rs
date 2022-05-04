@@ -337,7 +337,9 @@ async fn dodgy_bob(bob_cell_id: &CellId, handle: &ConductorHandle, dna_file: &Dn
             ChainTopOrdering::default(),
         )
         .await
-        .map_err(|source_chain_error| wasm_error!(WasmErrorInner::Host(source_chain_error.to_string())))
+        .map_err(|source_chain_error| {
+            wasm_error!(WasmErrorInner::Host(source_chain_error.to_string()))
+        })
         .unwrap();
     workspace_lock.flush(&call_data.network).await.unwrap();
 
