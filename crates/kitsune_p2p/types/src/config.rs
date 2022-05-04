@@ -192,6 +192,16 @@ pub mod tuning_params_struct {
         /// by the `SSLKEYLOGFILE` environment variable, or do nothing if
         /// it is not set, or is not writable.
         danger_tls_keylog: String = "no_keylog".to_string(),
+
+        /// Set the cutoff time when gossip switches over from recent
+        /// to historical gossip. This is dangerous, because gossip may not be
+        /// possible with nodes using a different setting for this threshold.
+        /// Do not change this except in testing environments.
+        /// [Default: 1 hour]
+        danger_gossip_recent_threshold_secs: u64 = super::RECENT_THRESHOLD_DEFAULT.as_secs(),
+
+        /// Don't publish ops, only rely on gossip. Useful for testing the efficacy of gossip.
+        disable_publish: bool = false,
     }
 
     impl KitsuneP2pTuningParams {

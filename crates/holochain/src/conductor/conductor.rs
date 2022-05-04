@@ -135,6 +135,9 @@ where
     /// The collection of cells associated with this Conductor
     cells: RwShare<HashMap<CellId, CellItem<CA>>>,
 
+    /// The config used to create this Conductor
+    pub config: ConductorConfig,
+
     /// The map of dna hash spaces.
     pub(super) spaces: Spaces,
 
@@ -1248,6 +1251,7 @@ fn query_dht_ops_from_statement(
 impl Conductor {
     #[allow(clippy::too_many_arguments)]
     async fn new(
+        config: ConductorConfig,
         dna_store: RwShare<DnaStore>,
         keystore: MetaLairClient,
         holochain_p2p: holochain_p2p::HolochainP2pRef,
@@ -1257,6 +1261,7 @@ impl Conductor {
         Ok(Self {
             spaces,
             cells: RwShare::new(HashMap::new()),
+            config,
             shutting_down: Arc::new(AtomicBool::new(false)),
             app_interfaces: RwShare::new(HashMap::new()),
             task_manager: RwShare::new(None),
@@ -1493,6 +1498,7 @@ mod builder {
                 tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
 
             let conductor = Conductor::new(
+                config.clone(),
                 dna_store,
                 keystore,
                 holochain_p2p,
@@ -1654,6 +1660,7 @@ mod builder {
                 tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
 
             let conductor = Conductor::new(
+                self.config.clone(),
                 RwShare::new(self.dna_store),
                 keystore,
                 holochain_p2p,
