@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20220504.234446
+
+## [holochain\_cli-0.0.36](crates/holochain_cli/CHANGELOG.md#0.0.36)
+
+## [holochain\_cli\_sandbox-0.0.32](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.32)
+
+## [holochain-0.0.138](crates/holochain/CHANGELOG.md#0.0.138)
+
+## [holochain\_conductor\_api-0.0.38](crates/holochain_conductor_api/CHANGELOG.md#0.0.38)
+
+## [holochain\_cascade-0.0.38](crates/holochain_cascade/CHANGELOG.md#0.0.38)
+
+## [holochain\_state-0.0.38](crates/holochain_state/CHANGELOG.md#0.0.38)
+
+## [holochain\_wasm\_test\_utils-0.0.37](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.37)
+
 # 20220429.205522
 
 - Docs: Fix intra-doc links in all crates [\#1323](https://github.com/holochain/holochain/pull/1323)
