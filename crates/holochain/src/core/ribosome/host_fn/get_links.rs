@@ -6,7 +6,7 @@ use futures::StreamExt;
 use holochain_cascade::Cascade;
 use holochain_p2p::actor::GetLinksOptions;
 use holochain_types::prelude::*;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]
@@ -15,7 +15,7 @@ pub fn get_links<'a>(
     ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     inputs: Vec<GetLinksInput>,
-) -> Result<Vec<Vec<Link>>, WasmError> {
+) -> Result<Vec<Vec<Link>>, RuntimeError> {
     let num_requests = inputs.len();
     tracing::debug!("Starting with {} requests.", num_requests);
     match HostFnAccess::from(&call_context.host_context()) {

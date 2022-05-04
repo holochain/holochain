@@ -2,7 +2,7 @@ use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holo_hash::encode::blake2b_n;
 use holo_hash::HasHash;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 use holochain_zome_types::prelude::*;
 use std::sync::Arc;
 use tiny_keccak::{Hasher, Keccak, Sha3};
@@ -11,7 +11,7 @@ pub fn hash(
     _ribosome: Arc<impl RibosomeT>,
     _call_context: Arc<CallContext>,
     input: HashInput,
-) -> Result<HashOutput, WasmError> {
+) -> Result<HashOutput, RuntimeError> {
     Ok(match input {
         HashInput::Entry(entry) => HashOutput::Entry(
             holochain_zome_types::entry::EntryHashed::from_content_sync(entry).into_hash(),

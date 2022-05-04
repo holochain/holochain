@@ -1,7 +1,7 @@
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 use ring::rand::SecureRandom;
 use std::sync::Arc;
 use crate::core::ribosome::HostFnAccess;
@@ -12,7 +12,7 @@ pub fn random_bytes(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: u32,
-) -> Result<Bytes, WasmError> {
+) -> Result<Bytes, RuntimeError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess{ non_determinism: Permission::Allow, .. } => {
             let system_random = ring::rand::SystemRandom::new();

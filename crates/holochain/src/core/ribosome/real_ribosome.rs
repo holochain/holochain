@@ -97,13 +97,13 @@ struct HostFnBuilder {
 }
 
 impl HostFnBuilder {
-    const SIGNATURE: ([Type; 2], [Type; 0]) = ([Type::I32, Type::I32], []);
+    const SIGNATURE: ([Type; 2], [Type; 1]) = ([Type::I32, Type::I32], [Type::I64]);
 
     fn with_host_function<I: 'static, O: 'static>(
         &self,
         ns: &mut Exports,
         host_function_name: &str,
-        host_function: fn(Arc<RealRibosome>, Arc<CallContext>, I) -> Result<O, WasmError>,
+        host_function: fn(Arc<RealRibosome>, Arc<CallContext>, I) -> Result<O, RuntimeError>,
     ) -> &Self
     where
         I: serde::de::DeserializeOwned + std::fmt::Debug,
@@ -454,7 +454,7 @@ macro_rules! do_callback {
                         zome.into(),
                         extern_io.decode().map_err(|e| wasm_error!(e.into()))?,
                     ),
-                    Err((zome, RibosomeError::WasmError(wasm_error))) => (
+                    Err((zome, RibosomeError::WasmRuntimeError(wasm_error))) => (
                         zome.into(),
                         <$callback_result>::try_from_wasm_error(wasm_error)?,
                     ),
@@ -491,9 +491,13 @@ impl RibosomeT for RealRibosome {
                     .map_err(|e| wasm_error!(WasmErrorInner::Host(e.to_string())))?
                 {
                     EntryDefsResult::Err(zome, error_string) => {
-                        return Err(RibosomeError::WasmError(wasm_error!(WasmErrorInner::Host(
-                            format!("{}: {}", zome, error_string)
-                        ))))
+                        return Err(RibosomeError::WasmRuntimeError(
+                            wasm_error!(WasmErrorInner::Host(format!(
+                                "{}: {}",
+                                zome, error_string
+                            )))
+                            .into(),
+                        ))
                     }
                     EntryDefsResult::Defs(defs) => match defs.get(zome.zome_name()) {
                         Some(entry_defs) => entry_defs.clone(),
@@ -547,7 +551,7 @@ impl RibosomeT for RealRibosome {
                     // because it builds guards against memory leaks and handles imports correctly
                     let (instance, context_key) = self.instance(call_context)?;
 
-                    let result: Result<ExternIO, WasmError> = holochain_wasmer_host::guest::call(
+                    let result: Result<ExternIO, RuntimeError> = holochain_wasmer_host::guest::call(
                         instance.clone(),
                         to_call.as_ref(),
                         // be aware of this clone!

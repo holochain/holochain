@@ -5,7 +5,7 @@ use crate::core::ribosome::RibosomeT;
 use holochain_cascade::error::CascadeResult;
 use holochain_cascade::Cascade;
 use holochain_types::prelude::*;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]
@@ -13,7 +13,7 @@ pub fn delete_link<'a>(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: DeleteLinkInput,
-) -> Result<HeaderHash, WasmError> {
+) -> Result<HeaderHash, RuntimeError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess {
             write_workspace: Permission::Allow,

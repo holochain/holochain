@@ -2,7 +2,7 @@ use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 use crate::core::ribosome::RibosomeError;
 use std::sync::Arc;
 
@@ -11,7 +11,7 @@ pub fn agent_info<'a>(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     _input: (),
-) -> Result<AgentInfo, WasmError> {
+) -> Result<AgentInfo, RuntimeError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess {
             agent_info: Permission::Allow,

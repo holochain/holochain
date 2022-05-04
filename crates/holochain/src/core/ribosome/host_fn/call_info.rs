@@ -2,7 +2,7 @@ use crate::core::ribosome::CallContext;
 use crate::core::ribosome::InvocationAuth;
 use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 use holochain_zome_types::info::CallInfo;
 use crate::core::ribosome::RibosomeError;
 use std::sync::Arc;
@@ -11,7 +11,7 @@ pub fn call_info(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     _input: (),
-) -> Result<CallInfo, WasmError> {
+) -> Result<CallInfo, RuntimeError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess {
             bindings: Permission::Allow,

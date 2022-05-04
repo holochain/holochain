@@ -2,9 +2,9 @@ use super::create::extract_entry_def;
 use super::delete::get_original_address;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
-use crate::core::ribosome::RibosomeT;
-use holochain_wasmer_host::prelude::WasmError;
 use crate::core::ribosome::RibosomeError;
+use crate::core::ribosome::RibosomeT;
+use holochain_wasmer_host::prelude::*;
 
 use holochain_types::prelude::*;
 use std::sync::Arc;
@@ -14,7 +14,7 @@ pub fn update<'a>(
     ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: UpdateInput,
-) -> Result<HeaderHash, WasmError> {
+) -> Result<HeaderHash, RuntimeError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess {
             write_workspace: Permission::Allow,
@@ -40,10 +40,14 @@ pub fn update<'a>(
                         .source_chain()
                         .as_ref()
                         .expect("Must have source chain if write_workspace access is given")
-                        .put_countersigned(Some(call_context.zome.clone()), entry, chain_top_ordering)
+                        .put_countersigned(
+                            Some(call_context.zome.clone()),
+                            entry,
+                            chain_top_ordering,
+                        )
                         .await
                         .map_err(|source_chain_error| {
-                            wasm_error!(WasmErrorInner::Host(source_chain_error.to_string()))
+                            wasm_error!(WasmErrorInner::Host(source_chain_error.to_string())).into()
                         })
                 }),
                 _ => {
@@ -113,11 +117,14 @@ pub fn update<'a>(
                 }
             }
         }
-        _ => Err(wasm_error!(WasmErrorInner::Host(RibosomeError::HostFnPermissions(
-            call_context.zome.zome_name().clone(),
-            call_context.function_name().clone(),
-            "update".into()
-        ).to_string())))
+        _ => Err(wasm_error!(WasmErrorInner::Host(
+            RibosomeError::HostFnPermissions(
+                call_context.zome.zome_name().clone(),
+                call_context.function_name().clone(),
+                "update".into()
+            )
+            .to_string()
+        ))),
     }
 }
 

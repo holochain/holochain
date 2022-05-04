@@ -1,17 +1,16 @@
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
-use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_types::prelude::*;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 
 pub fn verify_signature(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: VerifySignature,
-) -> Result<bool, WasmError> {
+) -> Result<bool, RuntimeError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess {
             keystore_deterministic: Permission::Allow,
@@ -31,7 +30,8 @@ pub fn verify_signature(
                 "verify_signature".into(),
             )
             .to_string(),
-        ))),
+        ))
+        .into()),
     }
 }
 

@@ -3,7 +3,7 @@ use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 use tracing::error;
 
@@ -12,7 +12,7 @@ pub fn accept_countersigning_preflight_request<'a>(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: PreflightRequest,
-) -> Result<PreflightRequestAcceptance, WasmError> {
+) -> Result<PreflightRequestAcceptance, RuntimeError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess {
             agent_info: Permission::Allow,
@@ -295,7 +295,7 @@ pub mod wasm_test {
             .await;
         assert!(matches!(
             preflight_acceptance_fail,
-            Ok(Err(RibosomeError::WasmError(wasm_error!(WasmErrorInner::Host(_)))))
+            Ok(Err(RibosomeError::WasmRuntimeError(wasm_error!(WasmErrorInner::Host(_))).into()))
         ));
 
         // Bob can also accept the preflight request.

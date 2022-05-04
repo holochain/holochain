@@ -1,10 +1,9 @@
-use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsInvocation;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeT;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 
 use holochain_types::prelude::*;
 use std::sync::Arc;
@@ -15,7 +14,7 @@ pub fn create<'a>(
     ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: CreateInput,
-) -> Result<HeaderHash, WasmError> {
+) -> Result<HeaderHash, RuntimeError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess {
             write_workspace: Permission::Allow,

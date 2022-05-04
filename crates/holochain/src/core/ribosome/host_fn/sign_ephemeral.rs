@@ -3,7 +3,7 @@ use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 use ring::rand::SecureRandom;
 use ring::rand::SystemRandom;
 use ring::signature::Ed25519KeyPair;
@@ -14,7 +14,7 @@ pub fn sign_ephemeral(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: SignEphemeral,
-) -> Result<EphemeralSignatures, WasmError> {
+) -> Result<EphemeralSignatures, RuntimeError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess {
             keystore: Permission::Allow,

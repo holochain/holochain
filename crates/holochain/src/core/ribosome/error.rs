@@ -8,7 +8,7 @@ use holochain_cascade::error::CascadeError;
 use holochain_serialized_bytes::prelude::SerializedBytesError;
 use holochain_state::source_chain::SourceChainError;
 use holochain_types::prelude::*;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 use holochain_zome_types::inline_zome::error::InlineZomeError;
 use thiserror::Error;
 use tokio::task::JoinError;
@@ -20,9 +20,9 @@ pub enum RibosomeError {
     #[error("Dna error while working with Ribosome: {0}")]
     DnaError(#[from] DnaError),
 
-    /// Wasm error while working with Ribosome.
-    #[error("Wasm error while working with Ribosome: {0}")]
-    WasmError(#[from] WasmError),
+    /// Wasm runtime error while working with Ribosome.
+    #[error("Wasm runtime error while working with Ribosome: {0}")]
+    WasmRuntimeError(#[from] RuntimeError),
 
     /// Serialization error while working with Ribosome.
     #[error("Serialization error while working with Ribosome: {0}")]

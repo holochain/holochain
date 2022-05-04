@@ -3,7 +3,7 @@ use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_cascade::error::CascadeError;
 use holochain_cascade::Cascade;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 
 use crate::core::ribosome::HostFnAccess;
 use holo_hash::EntryHash;
@@ -16,7 +16,7 @@ pub fn delete<'a>(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: DeleteInput,
-) -> Result<HeaderHash, WasmError> {
+) -> Result<HeaderHash, RuntimeError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess {
             write_workspace: Permission::Allow,
@@ -63,7 +63,7 @@ pub fn delete<'a>(
                 "delete".into(),
             )
             .to_string(),
-        ))),
+        )).into()),
     }
 }
 

@@ -5,7 +5,7 @@ use crate::core::ribosome::RibosomeT;
 use futures::StreamExt;
 use holochain_cascade::Cascade;
 use holochain_types::prelude::*;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]
@@ -14,7 +14,7 @@ pub fn get<'a>(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     inputs: Vec<GetInput>,
-) -> Result<Vec<Option<Element>>, WasmError> {
+) -> Result<Vec<Option<Element>>, RuntimeError> {
     let num_requests = inputs.len();
     tracing::debug!("Starting with {} requests.", num_requests);
     match HostFnAccess::from(&call_context.host_context()) {

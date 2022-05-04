@@ -4,7 +4,7 @@ use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_types::access::Permission;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 use holochain_zome_types::signal::RemoteSignal;
 use holochain_zome_types::zome::FunctionName;
 use std::sync::Arc;
@@ -15,7 +15,7 @@ pub fn remote_signal(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: RemoteSignal,
-) -> Result<(), WasmError> {
+) -> Result<(), RuntimeError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess {
             write_network: Permission::Allow,
@@ -51,7 +51,7 @@ pub fn remote_signal(
                 "remote_signal".into(),
             )
             .to_string(),
-        ))),
+        )).into()),
     }
 }
 

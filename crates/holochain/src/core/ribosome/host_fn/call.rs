@@ -6,14 +6,14 @@ use crate::core::ribosome::ZomeCall;
 use futures::future::join_all;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_types::prelude::*;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 
 pub fn call(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     inputs: Vec<Call>,
-) -> Result<Vec<ZomeCallResponse>, WasmError> {
+) -> Result<Vec<ZomeCallResponse>, RuntimeError> {
     let results: Vec<Result<ZomeCallResponse, WasmError>> =
         tokio_helper::block_forever_on(async move {
             join_all(inputs.into_iter().map(|input| async {

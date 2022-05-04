@@ -5,7 +5,7 @@ use crate::core::ribosome::RibosomeT;
 use futures::future::join_all;
 use holochain_cascade::Cascade;
 use holochain_types::prelude::*;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]
@@ -13,7 +13,7 @@ pub fn get_details<'a>(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     inputs: Vec<GetInput>,
-) -> Result<Vec<Option<Details>>, WasmError> {
+) -> Result<Vec<Option<Details>>, RuntimeError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess {
             read_workspace: Permission::Allow,
@@ -38,7 +38,9 @@ pub fn get_details<'a>(
             let results: Result<Vec<_>, _> = results
                 .into_iter()
                 .map(|result| {
-                    result.map_err(|cascade_error| wasm_error!(WasmErrorInner::Host(cascade_error.to_string())))
+                    result.map_err(|cascade_error| {
+                        wasm_error!(WasmErrorInner::Host(cascade_error.to_string()))
+                    })
                 })
                 .collect();
             Ok(results?)
@@ -50,16 +52,17 @@ pub fn get_details<'a>(
                 "get_details".into(),
             )
             .to_string(),
-        ))),
+        ))
+        .into()),
     }
 }
 
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
+    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use hdk::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
-    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_get_details_test() {
@@ -137,7 +140,11 @@ pub mod wasm_test {
 
         let one_b: HeaderHash = conductor.call(&alice, "inc", zero_a.clone()).await;
         let header_details_2: Vec<Option<Details>> = conductor
-            .call(&alice, "header_details", vec![zero_a.clone(), one_b.clone()])
+            .call(
+                &alice,
+                "header_details",
+                vec![zero_a.clone(), one_b.clone()],
+            )
             .await;
         let entry_details_2: Vec<Option<Details>> = conductor
             .call(

@@ -4,7 +4,7 @@ use std::sync::Arc;
 use xsalsa20poly1305::aead::{generic_array::GenericArray, Aead, NewAead};
 use xsalsa20poly1305::XSalsa20Poly1305;
 use holochain_types::prelude::*;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
 
@@ -12,7 +12,7 @@ pub fn x_salsa20_poly1305_decrypt(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: XSalsa20Poly1305Decrypt,
-) -> Result<Option<XSalsa20Poly1305Data>, WasmError> {
+) -> Result<Option<XSalsa20Poly1305Data>, RuntimeError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess{ keystore_deterministic: Permission::Allow, .. } => {
             // @todo use a libsodium wrapper instead of an ad-hoc rust implementation.
