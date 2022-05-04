@@ -27,6 +27,7 @@ jobs:
       environment:
          CACHIX_NAME: holochain-ci
          NIXPKGS_ALLOW_UNFREE: 1
+         NIX_CONFIG: "extra-experimental-features = nix-command"
       steps:
          - checkout
          - run:
