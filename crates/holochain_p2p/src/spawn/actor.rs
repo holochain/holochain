@@ -112,9 +112,8 @@ impl WrapEvtSender {
         dna_hash: DnaHash,
         kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
         dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
-    ) -> impl Future<Output = HolochainP2pResult<kitsune_p2p_types::dht_arc::PeerViewBeta>>
-           + 'static
-           + Send {
+    ) -> impl Future<Output = HolochainP2pResult<kitsune_p2p_types::dht::PeerView>> + 'static + Send
+    {
         timing_trace!(
             { self.0.query_peer_density(dna_hash, kitsune_space, dht_arc) },
             "(hp2p:handle) query_peer_density",
@@ -265,16 +264,14 @@ impl WrapEvtSender {
     fn fetch_op_data(
         &self,
         dna_hash: DnaHash,
-        op_hashes: Vec<holo_hash::DhtOpHash>,
+        query: FetchOpDataQuery,
     ) -> impl Future<
         Output = HolochainP2pResult<Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>>,
     >
            + 'static
            + Send {
-        let op_count = op_hashes.len();
         timing_trace!(
-            { self.0.fetch_op_data(dna_hash, op_hashes) },
-            %op_count,
+            { self.0.fetch_op_data(dna_hash, query) },
             "(hp2p:handle) fetch_op_data",
         )
     }
@@ -628,8 +625,7 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
         &mut self,
         space: Arc<kitsune_p2p::KitsuneSpace>,
         dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
-    ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<kitsune_p2p_types::dht_arc::PeerViewBeta>
-    {
+    ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<kitsune_p2p_types::dht::PeerView> {
         let h_space = DnaHash::from_kitsune(&space);
         let evt_sender = self.evt_sender.clone();
         Ok(async move {
@@ -815,21 +811,14 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
         input: kitsune_p2p::event::FetchOpDataEvt,
     ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<Vec<(Arc<kitsune_p2p::KitsuneOpHash>, KOp)>>
     {
-        let kitsune_p2p::event::FetchOpDataEvt { space, op_hashes } = input;
+        let kitsune_p2p::event::FetchOpDataEvt { space, query } = input;
         let space = DnaHash::from_kitsune(&space);
-        let op_hashes = op_hashes
-            .into_iter()
-            .map(|h| DhtOpHash::from_kitsune(&h))
-            // the allowance of clippy::needless_collect refers to the following call
-            .collect::<Vec<_>>();
+        let query = FetchOpDataQuery::from_kitsune(query);
 
         let evt_sender = self.evt_sender.clone();
         Ok(async move {
             let mut out = vec![];
-            for (op_hash, dht_op) in evt_sender
-                .fetch_op_data(space.clone(), op_hashes.clone())
-                .await?
-            {
+            for (op_hash, dht_op) in evt_sender.fetch_op_data(space.clone(), query).await? {
                 out.push((
                     op_hash.into_kitsune(),
                     KitsuneOpData::new(

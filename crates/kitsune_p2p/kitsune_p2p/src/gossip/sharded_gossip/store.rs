@@ -8,7 +8,9 @@ use crate::event::{
     PutAgentInfoSignedEvt, QueryAgentsEvt, QueryOpHashesEvt, TimeWindow, TimeWindowInclusive,
 };
 use crate::types::event::KitsuneP2pEventSender;
+use crate::HostApi;
 use kitsune_p2p_timestamp::Timestamp;
+use kitsune_p2p_types::dht::region_set::RegionSetLtcs;
 use kitsune_p2p_types::{
     agent_info::AgentInfoSigned,
     bin_types::{KOp, KitsuneAgent, KitsuneOpHash, KitsuneSpace},
@@ -256,6 +258,17 @@ pub(super) fn hash_chunks_query(
         },
     );
     Box::pin(f)
+}
+
+pub(super) async fn query_region_set<'a>(
+    host_api: HostApi,
+    space: Arc<KitsuneSpace>,
+    common_arc_set: Arc<DhtArcSet>,
+) -> KitsuneResult<RegionSetLtcs> {
+    host_api
+        .query_region_set(space, common_arc_set)
+        .await
+        .map_err(KitsuneError::other)
 }
 
 /// Add new agent info to the p2p store.

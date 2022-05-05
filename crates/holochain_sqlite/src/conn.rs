@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use crate::{functions::add_custom_functions, prelude::*};
 use holochain_serialized_bytes::prelude::*;
 use once_cell::sync::Lazy;
 use rusqlite::*;
@@ -216,6 +216,8 @@ pub(crate) fn initialize_connection(
         DbSyncLevel::Normal => conn.pragma_update(None, "synchronous", &"1".to_string())?,
         DbSyncLevel::Off => conn.pragma_update(None, "synchronous", &"0".to_string())?,
     }
+
+    add_custom_functions(conn)?;
 
     Ok(())
 }

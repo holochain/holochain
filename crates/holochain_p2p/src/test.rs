@@ -241,7 +241,8 @@ mod tests {
                             dht_arc::DhtArc::full(0.into()),
                             1.0,
                             2,
-                        );
+                        )
+                        .into();
                         respond.r(Ok(async move { Ok(view) }.boxed().into()));
                     }
                     _ => {}
@@ -308,7 +309,8 @@ mod tests {
                             dht_arc::DhtArc::full(0.into()),
                             1.0,
                             2,
-                        );
+                        )
+                        .into();
                         respond.r(Ok(async move { Ok(view) }.boxed().into()));
                     }
                     _ => {}
@@ -366,7 +368,8 @@ mod tests {
                             dht_arc::DhtArc::full(0.into()),
                             1.0,
                             2,
-                        );
+                        )
+                        .into();
                         respond.r(Ok(async move { Ok(view) }.boxed().into()));
                     }
                     _ => {}
@@ -459,7 +462,8 @@ mod tests {
                             dht_arc::DhtArc::full(0.into()),
                             1.0,
                             2,
-                        );
+                        )
+                        .into();
                         respond.r(Ok(async move { Ok(view) }.boxed().into()));
                     }
                     evt => tracing::trace!("unhandled: {:?}", evt),
@@ -551,7 +555,8 @@ mod tests {
                             dht_arc::DhtArc::full(0.into()),
                             1.0,
                             2,
-                        );
+                        )
+                        .into();
                         respond.r(Ok(async move { Ok(view) }.boxed().into()));
                     }
                     _ => {}

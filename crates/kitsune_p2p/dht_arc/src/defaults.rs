@@ -1,7 +1,6 @@
 /// The minimum number of peers before sharding can begin.
 /// This factors in the expected uptime to reach the redundancy target.
-// pub const DEFAULT_MIN_PEERS: usize = (DEFAULT_REDUNDANCY_TARGET as f64 / DEFAULT_UPTIME) as usize;
-pub const DEFAULT_MIN_PEERS: usize = DEFAULT_REDUNDANCY_TARGET;
+pub const DEFAULT_MIN_PEERS: usize = (DEFAULT_REDUNDANCY_TARGET as f64 / DEFAULT_UPTIME) as usize;
 
 /// The minimum number of peers we can consider acceptable to see in our arc
 /// during testing.
