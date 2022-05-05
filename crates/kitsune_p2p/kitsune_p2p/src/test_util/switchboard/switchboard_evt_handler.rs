@@ -86,8 +86,10 @@ impl KitsuneHost for SwitchboardEventHandler {
             let arq_set = ArqBoundsSet::from_dht_arc_set(&topo, &self.sb.strat, &dht_arc_set)
                 .expect("an arq could not be quantized");
 
-            // NOTE: This should techncially be behind the current moment
-            // by however much Recent gossip covers (1 hour).
+            // NOTE: If this were implemented correctly, it would take the recent_threshold
+            //       (default 1 hour) into account, so that historical gossip doesn't overlap
+            //       with recent gossip. But since the Switchboard only runs one gossip type
+            //       at a time, it seems safer to just run historical gossip for all of time.
             let current = Timestamp::now();
             let times =
                 TelescopingTimes::new(TimeQuantum::from_timestamp(&self.sb.topology, current));

@@ -830,13 +830,7 @@ impl ShardedGossipLocal {
                 let mut gossip = Vec::with_capacity(0);
                 let finished = MissingOpsStatus::try_from(finished)?;
 
-                // doesn't work as epxected:
-                // let doing_historic_region_gossip = self
-                //     .get_state(&cert)?
-                //     .map(|s| s.region_set_sent.is_some())
-                //     .unwrap_or_default();
-
-                let _state = match finished {
+                let state = match finished {
                     // This is a single chunk of ops. No need to reply.
                     MissingOpsStatus::ChunkComplete => self.get_state(&cert)?,
                     // This is the last chunk in the batch. Reply with [`OpBloomsBatchReceived`]
@@ -869,14 +863,14 @@ impl ShardedGossipLocal {
                     }
                 };
 
-                // dbg!(&doing_historic_region_gossip, &state.is_some(), ops.len());
-
-                // XXX: TODO: come back to this later after implementing batching for
+                // TODO: come back to this later after implementing batching for
                 //      region gossip, for now I just don't care about the state,
                 //      and just want to handle the incoming ops.
-                // if (doing_historic_region_gossip || state.is_some()) && !ops.is_empty() {
-                self.incoming_missing_ops(ops).await?;
-                // }
+                if (self.gossip_type == GossipType::Historical || state.is_some())
+                    && !ops.is_empty()
+                {
+                    self.incoming_missing_ops(ops).await?;
+                }
                 gossip
             }
             ShardedGossipWire::NoAgents(_) => {
