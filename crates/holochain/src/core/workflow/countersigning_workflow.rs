@@ -5,14 +5,13 @@ use holo_hash::{AgentPubKey, DhtOpHash, HeaderHash};
 use holo_hash::{AnyDhtHash, EntryHash};
 use holochain_keystore::AgentPubKeyExt;
 use holochain_p2p::{HolochainP2pDna, HolochainP2pDnaT};
-use holochain_sqlite::db::{DbKindAuthored, DbKindDht};
 use holochain_state::integrate::authored_ops_to_dht_db;
 use holochain_state::mutations;
 use holochain_state::prelude::{
     current_countersigning_session, SourceChainResult, StateMutationResult, Store,
 };
+use holochain_types::dht_op::DhtOp;
 use holochain_types::signal::{Signal, SystemSignal};
-use holochain_types::{db::DbWrite, dht_op::DhtOp};
 use holochain_zome_types::Timestamp;
 use holochain_zome_types::{Entry, SignedHeader, ZomeCallResponse};
 use kitsune_p2p_types::tx2::tx2_utils::Share;
@@ -136,14 +135,16 @@ pub(crate) async fn countersigning_workflow(
 
 /// An incoming countersigning session success.
 pub(crate) async fn countersigning_success(
-    authored_db: DbWrite<DbKindAuthored>,
-    dht_db: DbWrite<DbKindDht>,
+    space: Space,
     network: &HolochainP2pDna,
     author: AgentPubKey,
     signed_headers: Vec<SignedHeader>,
     trigger: QueueTriggers,
     mut signal: SignalBroadcaster,
 ) -> WorkflowResult<()> {
+    let authored_db = space.authored_db;
+    let dht_db = space.dht_db;
+    let dht_db_cache = space.dht_query_cache;
     let QueueTriggers {
         publish_dht_ops: publish_trigger,
         integrate_dht_ops: integration_trigger,
@@ -255,6 +256,7 @@ pub(crate) async fn countersigning_success(
             this_cell_headers_op_basis_hashes,
             &(authored_db.into()),
             &dht_db,
+            &dht_db_cache,
         )
         .await?;
         integration_trigger.trigger();

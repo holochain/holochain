@@ -291,6 +291,10 @@ pub mod countersigning;
 /// For example, an agent could choose to 'block' another agent and ignore all their updates.
 pub mod entry;
 
+pub use holochain_deterministic_integrity::entry_def_index;
+pub use holochain_deterministic_integrity::entry_defs;
+pub use holochain_deterministic_integrity::entry_type;
+
 pub mod hash;
 
 /// Distributed Hash Tables (DHTs) are fundamentally all key/value stores (content addressable).

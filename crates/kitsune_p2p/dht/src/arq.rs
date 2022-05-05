@@ -98,7 +98,7 @@ impl ArqStart for SpaceOffset {
 /// about the original Location data associated with each Arq.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Arq<S: ArqStart = Loc> {
-    /// Location around which this coverage is centered
+    /// The "start" defines the left edge of the arq
     pub start: S,
     /// The level of quantization. Total length is `2^power * count`.
     /// The power must be between 0 and 31, inclusive (power of 32 causes overflow)

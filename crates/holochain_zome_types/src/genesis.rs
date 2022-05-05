@@ -5,23 +5,10 @@
 //! joining to ensure that they can catch any problems they can before being
 //! subject to the scrutiny of their peers and facing possible rejection.
 
-use crate::DnaDef;
-use holo_hash::AgentPubKey;
-use holochain_serialized_bytes::prelude::*;
+//! For more details see [`holochain_integrity_types::genesis`].
 
-/// App-specific payload for proving membership in the membrane of the app
-pub type MembraneProof = SerializedBytes;
+#[doc(no_inline)]
+pub use holochain_integrity_types::genesis;
 
-/// Data passed into the genesis_self_check callback for verifying the initial
-/// chain entries
-#[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes)]
-pub struct GenesisSelfCheckData {
-    /// The Dna header (1st element)
-    pub dna_def: DnaDef,
-
-    /// The proof of membership provided by the AgentValidationPkg (2nd element)
-    pub membrane_proof: Option<MembraneProof>,
-
-    /// The 3rd element of the chain, the agent key
-    pub agent_key: AgentPubKey,
-}
+#[doc(inline)]
+pub use holochain_integrity_types::genesis::*;

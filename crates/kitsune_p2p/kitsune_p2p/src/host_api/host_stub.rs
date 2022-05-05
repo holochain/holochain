@@ -1,9 +1,9 @@
-use crate::KitsuneHostPanicky;
+use crate::KitsuneHostDefaultError;
 
 /// Dummy host impl for plumbing
 pub struct HostStub;
 
-impl KitsuneHostPanicky for HostStub {
+impl KitsuneHostDefaultError for HostStub {
     const NAME: &'static str = "HostStub";
 }
 

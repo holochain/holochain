@@ -47,13 +47,13 @@ rec {
       gh
       nixpkgs-fmt
       cargo-sweep
+      crate2nix
     ]);
   };
 
   release = coreDev.overrideAttrs (attrs: {
     nativeBuildInputs = attrs.nativeBuildInputs ++ (with holonix.pkgs; [
       niv
-      crate2nix
       (import ../crates/release-automation/default.nix { })
     ]);
   });
