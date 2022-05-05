@@ -653,7 +653,7 @@ jobs:
           MM_CHANNEL_ID: "cdxeytdc97ff3e1jbdzgyfcduo"
         run: |
           if [[ "${STATUS}" == "success" ]]; then
-            holochain_status="success :white_check_mark: [log](${WORKFLOW_RUN_URL}) [tag](https://github.com/holochain/holochain/releases/tag/${TAG})"
+            holochain_status="success :white_check_mark: [log](${WORKFLOW_RUN_URL}), [tag](https://github.com/holochain/holochain/releases/tag/${TAG})"
           elif [[ "${RELEASABLE_CRATES}" == "false" ]]; then
             holochain_status="no changes to release :ballot_box_with_check: [log](${WORKFLOW_RUN_URL})"
           else
