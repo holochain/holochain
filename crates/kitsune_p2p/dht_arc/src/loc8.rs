@@ -34,11 +34,11 @@ impl From<i32> for Loc8 {
     }
 }
 
-// impl From<i8> for Loc8 {
-//     fn from(i: i8) -> Self {
-//         (i as i32).into()
-//     }
-// }
+impl From<i8> for Loc8 {
+    fn from(i: i8) -> Self {
+        (i as i32).into()
+    }
+}
 
 impl PartialEq for Loc8 {
     fn eq(&self, other: &Self) -> bool {
@@ -95,11 +95,6 @@ impl Loc8 {
         }
     }
 
-    pub fn to_unsigned(mut self) -> Self {
-        self.sign = false;
-        self
-    }
-
     pub fn set<L: Into<Loc8>, I: IntoIterator<Item = L>>(it: I) -> BTreeSet<Self> {
         it.into_iter().map(Into::into).collect()
     }
@@ -132,17 +127,13 @@ impl DhtLocation {
     /// suitable for use as a hash type.
     #[cfg(feature = "test_utils")]
     pub fn to_representative_test_bytes_36(&self) -> Vec<u8> {
-        let mut bytes: Vec<u8> = self
-            .as_u32()
+        self.as_u32()
             .to_le_bytes()
             .iter()
             .cycle()
             .take(36)
             .copied()
-            .collect();
-        // to distinguish the 0 location from an empty hash
-        bytes[0] = 255;
-        bytes
+            .collect()
     }
 }
 

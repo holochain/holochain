@@ -27,9 +27,6 @@ enum QueuedOps {
     /// A remote nodes bloom filter that has been adjusted
     /// to the remaining time window to fetch the remaining hashes.
     Bloom(TimedBloomFilter),
-    // pair(maackle, freesig): Consider adding a variant like this if implementing
-    // a "cursor" into a partial region query
-    // Regions(RegionSetCursor),
 }
 
 impl ShardedGossipLocal {
@@ -118,7 +115,7 @@ impl ShardedGossipLocal {
             self.evt_sender
                 .fetch_op_data(FetchOpDataEvt {
                     space: self.space.clone(),
-                    query: FetchOpDataEvtQuery::Hashes(missing_hashes.clone()),
+                    op_hashes: missing_hashes.clone(),
                 })
                 .await
                 .map_err(KitsuneError::other)?
@@ -178,7 +175,6 @@ impl ShardedGossipLocal {
 }
 
 /// Separate gossip into chunks to keep messages under the max size.
-// pair(maackle, freesig): can use this for chunking, see above fn for use
 fn into_chunks(gossip: &mut Vec<ShardedGossipWire>, ops: Vec<KOp>, complete: u8) {
     let mut chunk = Vec::with_capacity(ops.len());
     let mut size = 0;

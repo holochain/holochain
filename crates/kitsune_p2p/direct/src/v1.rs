@@ -5,7 +5,9 @@ use crate::*;
 use futures::future::{BoxFuture, FutureExt};
 use futures::stream::StreamExt;
 use ghost_actor::GhostControlSender;
+use kitsune_p2p::dht_arc::DhtArcSet;
 use kitsune_p2p::test_util::hash_op_data;
+use kitsune_p2p_types::box_fut;
 //use ghost_actor::dependencies::tracing;
 use crate::types::direct::*;
 use kitsune_p2p::actor::{BroadcastTo, KitsuneP2pSender};
@@ -281,9 +283,7 @@ impl AsKitsuneDirect for Kd1 {
     }
 }
 
-impl KitsuneHostDefaultError for Kd1 {
-    const NAME: &'static str = "Kd1";
-
+impl KitsuneHost for Kd1 {
     fn get_agent_info_signed(
         &self,
         input: GetAgentInfoSignedEvt,
@@ -301,6 +301,23 @@ impl KitsuneHostDefaultError for Kd1 {
         }
         .boxed()
         .into()
+    }
+
+    /// Extrapolated Peer Coverage
+    fn peer_extrapolated_coverage(
+        &self,
+        _space: Arc<KitsuneSpace>,
+        _dht_arc_set: DhtArcSet,
+    ) -> KitsuneHostResult<Vec<f64>> {
+        box_fut(Err("Kd1 just returns errors for some methods".into()))
+    }
+
+    fn record_metrics(
+        &self,
+        _space: Arc<KitsuneSpace>,
+        _records: Vec<MetricRecord>,
+    ) -> KitsuneHostResult<()> {
+        box_fut(Err("Kd1 just returns errors for some methods".into()))
     }
 }
 
@@ -772,7 +789,7 @@ async fn handle_query_peer_density(
     kdirect: Arc<Kd1>,
     space: Arc<KitsuneSpace>,
     dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
-) -> KdResult<kitsune_p2p_types::dht::PeerView> {
+) -> KdResult<kitsune_p2p_types::dht_arc::PeerViewBeta> {
     let root = KdHash::from_kitsune_space(&space);
     let density = kdirect.persist.query_peer_density(root, dht_arc).await?;
     Ok(density)
@@ -907,7 +924,9 @@ async fn handle_fetch_op_data(
     kdirect: Arc<Kd1>,
     input: FetchOpDataEvt,
 ) -> KdResult<Vec<(Arc<KitsuneOpHash>, KOp)>> {
-    let FetchOpDataEvt { space, query, .. } = input;
+    let FetchOpDataEvt {
+        space, op_hashes, ..
+    } = input;
 
     let mut out = Vec::new();
     let root = KdHash::from_kitsune_space(&space);
@@ -918,26 +937,21 @@ async fn handle_fetch_op_data(
         .await
         .map_err(KdError::other)?;
 
-    match query {
-        FetchOpDataEvtQuery::Hashes(hashes) => {
-            for op_hash in hashes {
-                for info in &agent_info_list {
-                    let agent = info.agent().clone();
-                    let hash = KdHash::from_kitsune_op_hash(&op_hash);
-                    if let Ok(entry) = kdirect
-                        .persist
-                        .get_entry(root.clone(), agent.clone(), hash)
-                        .await
-                    {
-                        out.push((
-                            op_hash.clone(),
-                            KitsuneOpData::new(entry.as_wire_data_ref().to_vec()),
-                        ));
-                    }
-                }
+    for op_hash in op_hashes {
+        for info in &agent_info_list {
+            let agent = info.agent().clone();
+            let hash = KdHash::from_kitsune_op_hash(&op_hash);
+            if let Ok(entry) = kdirect
+                .persist
+                .get_entry(root.clone(), agent.clone(), hash)
+                .await
+            {
+                out.push((
+                    op_hash.clone(),
+                    KitsuneOpData::new(entry.as_wire_data_ref().to_vec()),
+                ));
             }
         }
-        FetchOpDataEvtQuery::Regions(_coords) => unimplemented!(),
     }
 
     Ok(out)

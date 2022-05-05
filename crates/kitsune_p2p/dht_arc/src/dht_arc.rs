@@ -96,6 +96,15 @@ impl DhtArc {
         }
     }
 
+    /// Update the half length based on a PeerView reading.
+    /// This will converge on a new target instead of jumping directly
+    /// to the new target and is designed to be called at a given rate
+    /// with more recent peer views.
+    pub fn update_length(&mut self, view: &PeerView) {
+        let new_length = (U32_LEN as f64 * view.next_coverage(self.coverage())) as u64;
+        *self = Self::from_start_and_len(self.start_loc(), new_length)
+    }
+
     pub fn inner(self) -> DhtArcRange {
         self.0
     }
@@ -127,10 +136,6 @@ impl DhtArc {
         let end = end.into();
         let a = DhtArcRange::from_bounds(start, end);
         Self::from_parts(a, start)
-    }
-
-    pub fn update_length(&mut self, new_length: u64) {
-        *self = Self::from_start_and_len(self.start_loc(), new_length)
     }
 
     /// Get the range of the arc
@@ -448,7 +453,7 @@ pub fn full_to_half_len(full_len: u64) -> u32 {
 pub fn half_to_full_len(half_len: u32) -> u64 {
     if half_len == 0 {
         0
-    } else if half_len >= MAX_HALF_LENGTH {
+    } else if half_len == MAX_HALF_LENGTH {
         U32_LEN
     } else {
         (half_len as u64 * 2).wrapping_sub(1)

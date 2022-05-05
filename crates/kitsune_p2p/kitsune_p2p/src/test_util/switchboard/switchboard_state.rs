@@ -4,6 +4,7 @@ use crate::gossip::sharded_gossip::{BandwidthThrottle, GossipType, ShardedGossip
 use crate::test_util::spawn_handler;
 use crate::types::gossip::*;
 use crate::types::wire;
+use crate::HostStub;
 use futures::stream::StreamExt;
 use ghost_actor::dependencies::tracing;
 use ghost_actor::GhostResult;
@@ -14,9 +15,6 @@ use kitsune_p2p_types::agent_info::agent_info_helper::{AgentInfoEncode, AgentMet
 use kitsune_p2p_types::agent_info::{AgentInfoInner, AgentInfoSigned};
 use kitsune_p2p_types::bin_types::*;
 use kitsune_p2p_types::config::KitsuneP2pTuningParams;
-use kitsune_p2p_types::dht::prelude::power_and_count_from_length;
-use kitsune_p2p_types::dht::spacetime::Topology;
-use kitsune_p2p_types::dht::{ArqBounds, ArqStrat};
 use kitsune_p2p_types::dht_arc::loc8::Loc8;
 use kitsune_p2p_types::dht_arc::{DhtArc, DhtArcRange, DhtLocation};
 use kitsune_p2p_types::metrics::metric_task;
@@ -47,7 +45,7 @@ static ZERO_SPACE: once_cell::sync::Lazy<Arc<KitsuneSpace>> =
 /// represents the shared state across all nodes in a space.
 ///
 /// This is essentially an Arc<Clone<SwitchboardState>>, which is passed to
-/// SwitchboardEventHandler and is also accessible to your test, so that you can
+/// SwitchboardEventHandler and is alsoaccessible to your test, so that you can
 /// manually modify state while gossip is modifying the same state.
 ///
 /// When calling `add_node(s)`, a new gossip module is created, a task is
@@ -56,8 +54,6 @@ static ZERO_SPACE: once_cell::sync::Lazy<Arc<KitsuneSpace>> =
 /// in the process.
 #[derive(Clone)]
 pub struct Switchboard {
-    pub(super) strat: ArqStrat,
-    pub(super) topology: Topology,
     inner: Share<SwitchboardState>,
     gossip_type: GossipType,
 }
@@ -70,10 +66,8 @@ impl Switchboard {
     //   both gossip loops to share the same state.
     //   Or, this could be modified to take a list of GossipTypes, so that
     //   multiple loops will be created internally.
-    pub fn new(topology: Topology, gossip_type: GossipType) -> Self {
+    pub fn new(gossip_type: GossipType) -> Self {
         Self {
-            strat: ArqStrat::default(),
-            topology,
             inner: Share::new(SwitchboardState::default()),
             gossip_type,
         }
@@ -127,7 +121,7 @@ impl Switchboard {
         let ep_hnd = ep.handle().clone();
 
         let evt_handler = SwitchboardEventHandler::new(ep_hnd.clone(), self.clone());
-        let host_api = Arc::new(evt_handler.clone());
+        let host = HostStub::new();
         let (evt_sender, handler_task) = spawn_handler(evt_handler.clone()).await;
 
         let bandwidth = Arc::new(BandwidthThrottle::new(1000.0, 1000.0));
@@ -137,15 +131,16 @@ impl Switchboard {
             space.clone(),
             ep_hnd.clone(),
             evt_sender,
-            host_api,
+            host,
             self.gossip_type,
             bandwidth,
             Default::default(),
-            true,
         );
-        let gossip_module = GossipModule(gossip.clone());
+        let gossip = GossipModule(gossip);
+        let gossip2 = gossip.clone();
 
         let ep_task = metric_task(async move {
+            dbg!("begin metric task");
             while let Some(evt) = ep.next().await {
                 match evt {
                     // what other messages do i need to handle?
@@ -159,7 +154,7 @@ impl Switchboard {
                                 let data: Vec<u8> = data.into();
                                 let data: Box<[u8]> = data.into_boxed_slice();
 
-                                gossip_module.incoming_gossip(con, url, data)?
+                                gossip2.incoming_gossip(con, url, data)?
                             }
                             _ => unimplemented!(),
                         }
@@ -458,7 +453,6 @@ impl SwitchboardState {
             .ops
             .keys()
             .copied()
-            .map(Loc8::to_unsigned)
             .collect()
     }
 
@@ -531,7 +525,7 @@ impl SwitchboardState {
 /// of DhtArcRange, but we use the agent's Loc8 location as their
 /// unique identifier. This allows specification of agents in
 /// terms of arcs.
-#[derive(Debug, Clone, derive_more::AsRef)]
+#[derive(Clone, derive_more::AsRef)]
 pub struct SwitchboardAgent {
     pub(super) loc: Loc8,
     initial_arc: DhtArcRange<Loc8>,
@@ -562,21 +556,15 @@ impl SwitchboardAgent {
 
     /// Construct an agent from arc bounds.
     /// The agent's location is taken as the midpoint of the arc.
-    pub fn from_start_and_len<L: Into<Loc8>>(topo: &Topology, start: L, len: u8) -> Self {
+    pub fn from_start_and_half_len<L: Into<Loc8>>(start: L, half_len: u8) -> Self {
         let start: Loc8 = start.into();
-        let initial_arc = if len == 0 {
+        let initial_arc = if half_len == 0 {
             DhtArcRange::Empty
         } else {
-            let end = Loc8::from((start.as_u8().wrapping_add(len)) as i32);
+            let len = half_len * 2 - 1;
+            let end = Loc8::from((start.as_u8().wrapping_add(len).wrapping_sub(1)) as i8);
             DhtArcRange::Bounded(start, end)
         };
-
-        {
-            let canonical = initial_arc.canonical();
-            let (power, _count) = power_and_count_from_length(&topo.space, canonical.length(), 16);
-            ArqBounds::from_interval(topo, power, canonical)
-                .unwrap_or_else(|| panic!("Arc is not quantizable. Power is {}", power));
-        }
 
         Self {
             loc: start,
@@ -603,7 +591,7 @@ pub struct NodeEntry {
     /// The ops held by this node.
     /// Other data for this op can be found in SwitchboardSpace::ops
     pub(super) ops: HashMap<Loc8, NodeOpEntry>,
-    pub(super) gossip: Arc<ShardedGossip>,
+    pub(super) gossip: GossipModule,
 }
 
 impl NodeEntry {

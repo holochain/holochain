@@ -9,29 +9,13 @@ use holochain_keystore::MetaLairClient;
 /// - The Signature matches the Header
 /// - If the header references an Entry, the Entry will exist and be of the appropriate hash
 /// - If the header does not reference an Entry, the entry will be None
-pub fn valid_dht_op<'a>(
-    keystore: MetaLairClient,
-    author: AgentPubKey,
-    must_be_public: bool,
-) -> Facts<'static, DhtOp> {
+pub fn valid_dht_op(keystore: MetaLairClient) -> Facts<'static, DhtOp> {
     facts![
-        brute(
-            "Header type matches Entry existence, and is public if exists",
-            move |op: &DhtOp| {
-                let header = op.header();
-                let h = header.entry_data();
-                let e = op.entry();
-                dbg!(&h, &e);
-                match (h, e) {
-                    (Some((_entry_hash, entry_type)), Some(_e)) => {
-                        // Ensure that entries are public
-                        !must_be_public || entry_type.visibility().is_public()
-                    }
-                    (None, None) => true,
-                    _ => false,
-                }
-            }
-        ),
+        brute("Header type matches Entry existence", |op: &DhtOp| {
+            let has_header = op.header().entry_data().is_some();
+            let has_entry = op.entry().is_some();
+            has_header == has_entry
+        }),
         mapped(
             "If there is entry data, the header must point to it",
             |op: &DhtOp| {
@@ -48,11 +32,6 @@ pub fn valid_dht_op<'a>(
                     facts![always()]
                 }
             }
-        ),
-        lens(
-            "The author is the one specified",
-            DhtOp::author_mut,
-            eq_(author)
         ),
         mapped("The Signature matches the Header", move |op: &DhtOp| {
             use holochain_keystore::AgentPubKeyExt;
@@ -99,7 +78,8 @@ mod tests {
         let op2 = DhtOp::StoreElement(se.clone(), he.clone(), None);
         let op3 = DhtOp::StoreElement(sn.clone(), hn.clone(), Some(Box::new(e.clone())));
         let op4 = DhtOp::StoreElement(sn.clone(), hn.clone(), None);
-        let fact = valid_dht_op(keystore, agent, false);
+
+        let fact = valid_dht_op(keystore);
 
         fact.check(&op1).unwrap();
         assert!(fact.check(&op2).is_err());
@@ -109,51 +89,6 @@ mod tests {
 }
 
 impl DhtOp {
-    /// Mutable access to the Author
-    pub fn author_mut(&mut self) -> &mut AgentPubKey {
-        match self {
-            DhtOp::StoreElement(_, h, _) => h.author_mut(),
-            DhtOp::StoreEntry(_, h, _) => h.author_mut(),
-            DhtOp::RegisterAgentActivity(_, h) => h.author_mut(),
-            DhtOp::RegisterUpdatedContent(_, h, _) => &mut h.author,
-            DhtOp::RegisterUpdatedElement(_, h, _) => &mut h.author,
-            DhtOp::RegisterDeletedBy(_, h) => &mut h.author,
-            DhtOp::RegisterDeletedEntryHeader(_, h) => &mut h.author,
-            DhtOp::RegisterAddLink(_, h) => &mut h.author,
-            DhtOp::RegisterRemoveLink(_, h) => &mut h.author,
-        }
-    }
-
-    /// Access to the Timestamp
-    pub fn timestamp(&self) -> Timestamp {
-        match self {
-            DhtOp::StoreElement(_, h, _) => h.timestamp(),
-            DhtOp::StoreEntry(_, h, _) => h.timestamp(),
-            DhtOp::RegisterAgentActivity(_, h) => h.timestamp(),
-            DhtOp::RegisterUpdatedContent(_, h, _) => h.timestamp,
-            DhtOp::RegisterUpdatedElement(_, h, _) => h.timestamp,
-            DhtOp::RegisterDeletedBy(_, h) => h.timestamp,
-            DhtOp::RegisterDeletedEntryHeader(_, h) => h.timestamp,
-            DhtOp::RegisterAddLink(_, h) => h.timestamp,
-            DhtOp::RegisterRemoveLink(_, h) => h.timestamp,
-        }
-    }
-
-    /// Mutable access to the Timestamp
-    pub fn timestamp_mut(&mut self) -> &mut Timestamp {
-        match self {
-            DhtOp::StoreElement(_, h, _) => h.timestamp_mut(),
-            DhtOp::StoreEntry(_, h, _) => h.timestamp_mut(),
-            DhtOp::RegisterAgentActivity(_, h) => h.timestamp_mut(),
-            DhtOp::RegisterUpdatedContent(_, h, _) => &mut h.timestamp,
-            DhtOp::RegisterUpdatedElement(_, h, _) => &mut h.timestamp,
-            DhtOp::RegisterDeletedBy(_, h) => &mut h.timestamp,
-            DhtOp::RegisterDeletedEntryHeader(_, h) => &mut h.timestamp,
-            DhtOp::RegisterAddLink(_, h) => &mut h.timestamp,
-            DhtOp::RegisterRemoveLink(_, h) => &mut h.timestamp,
-        }
-    }
-
     /// Mutable access to the Signature
     pub fn signature_mut(&mut self) -> &mut Signature {
         match self {

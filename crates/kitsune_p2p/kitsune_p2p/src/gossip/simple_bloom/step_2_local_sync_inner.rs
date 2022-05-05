@@ -195,7 +195,7 @@ async fn data_map_get(
             let mut op = evt_sender
                 .fetch_op_data(FetchOpDataEvt {
                     space: space.clone(),
-                    query: vec![key.clone()].into(),
+                    op_hashes: vec![key.clone()],
                 })
                 .await
                 .map_err(KitsuneError::other)?;

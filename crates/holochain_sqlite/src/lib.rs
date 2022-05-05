@@ -9,7 +9,6 @@ pub mod db;
 pub mod error;
 pub mod exports;
 pub mod fatal;
-pub mod functions;
 pub mod prelude;
 pub mod schema;
 pub mod sql;

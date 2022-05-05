@@ -1,45 +1,27 @@
 //! Implementation of the Kitsune Host API
 
-mod query_region_set;
-
 use std::sync::Arc;
 
-use super::{dna_store::DnaStore, space::Spaces};
 use futures::FutureExt;
 use holo_hash::DnaHash;
-use holochain_p2p::{
-    dht::{spacetime::Topology, ArqStrat},
-    DnaHashExt,
-};
-use holochain_types::{db::PermittedConn, prelude::DnaError, share::RwShare};
+use holochain_p2p::DnaHashExt;
 use kitsune_p2p::{
     agent_store::AgentInfoSigned, event::GetAgentInfoSignedEvt, KitsuneHost, KitsuneHostResult,
 };
-use kitsune_p2p_types::config::KitsuneP2pTuningParams;
+
+use super::space::Spaces;
+use holochain_types::db::PermittedConn;
 
 /// Implementation of the Kitsune Host API.
 /// Lets Kitsune make requests of Holochain
 pub struct KitsuneHostImpl {
     spaces: Spaces,
-    dna_store: RwShare<DnaStore>,
-    tuning_params: KitsuneP2pTuningParams,
-    strat: ArqStrat,
 }
 
 impl KitsuneHostImpl {
     /// Constructor
-    pub fn new(
-        spaces: Spaces,
-        dna_store: RwShare<DnaStore>,
-        tuning_params: KitsuneP2pTuningParams,
-        strat: ArqStrat,
-    ) -> Arc<Self> {
-        Arc::new(Self {
-            spaces,
-            dna_store,
-            tuning_params,
-            strat,
-        })
+    pub fn new(spaces: Spaces) -> Arc<Self> {
+        Arc::new(Self { spaces })
     }
 }
 
@@ -95,38 +77,5 @@ impl KitsuneHost for KitsuneHostImpl {
         }
         .boxed()
         .into()
-    }
-
-    fn query_region_set(
-        &self,
-        space: Arc<kitsune_p2p::KitsuneSpace>,
-        dht_arc_set: Arc<holochain_p2p::dht_arc::DhtArcSet>,
-    ) -> KitsuneHostResult<holochain_p2p::dht::region_set::RegionSetLtcs> {
-        let dna_hash = DnaHash::from_kitsune(&space);
-        async move {
-            let topology = self.get_topology(space.clone()).await?;
-            let db = self.spaces.authored_db(&dna_hash)?;
-            Ok(query_region_set::query_region_set(
-                db,
-                topology,
-                &self.strat,
-                dht_arc_set,
-                &self.tuning_params,
-            )
-            .await?)
-        }
-        .boxed()
-        .into()
-    }
-
-    fn get_topology(&self, space: Arc<kitsune_p2p::KitsuneSpace>) -> KitsuneHostResult<Topology> {
-        let dna_hash = DnaHash::from_kitsune(&space);
-        let dna_def = self
-            .dna_store
-            .share_mut(|ds| ds.get_dna_def(&dna_hash))
-            .ok_or_else(|| DnaError::DnaMissing(dna_hash));
-        async move { Ok(Topology::standard(dna_def?.origin_time)) }
-            .boxed()
-            .into()
     }
 }

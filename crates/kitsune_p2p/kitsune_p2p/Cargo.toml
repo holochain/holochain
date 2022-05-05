@@ -49,11 +49,8 @@ maplit = { version = "1", optional = true }
 mockall = { version = "0.10.2", optional = true }
 
 [dev-dependencies]
-# include self with test_utils feature, to allow integration tests to run properly
-kitsune_p2p = { path = ".", features = ["test_utils"]}
-
+kitsune_p2p_bootstrap = { path = "../bootstrap" }
 contrafact = { version = "0.1.0-dev.1" }
-kitsune_p2p_bootstrap = { version = "0.0.10", path = "../bootstrap" }
 kitsune_p2p_timestamp = { version = "0.0.9", path = "../timestamp", features = ["now", "arbitrary"] }
 kitsune_p2p_types = { version = "0.0.23", path = "../types", features = ["test_utils"] }
 maplit = "1"
@@ -78,5 +75,3 @@ mock_network = [
   "kitsune_p2p_types/test_utils",
   "mockall",
 ]
-
-# [workspace]

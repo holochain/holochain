@@ -3,7 +3,7 @@
 
 use crate::*;
 use holochain_zome_types::signature::Signature;
-use kitsune_p2p::{agent_store::AgentInfoSigned, dht::region::RegionBounds, event::*};
+use kitsune_p2p::{agent_store::AgentInfoSigned, event::*};
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 /// The data required for a get request.
@@ -100,30 +100,6 @@ impl From<&actor::GetActivityOptions> for GetActivityOptions {
     }
 }
 
-/// Multiple ways to fetch op data
-#[derive(Debug, derive_more::From)]
-pub enum FetchOpDataQuery {
-    /// Fetch all ops with the hashes specified
-    Hashes(Vec<holo_hash::DhtOpHash>),
-    /// Fetch all ops within the time and space bounds specified
-    Regions(Vec<RegionBounds>),
-}
-
-impl FetchOpDataQuery {
-    /// Convert from the kitsune form of this query
-    pub fn from_kitsune(kit: FetchOpDataEvtQuery) -> Self {
-        match kit {
-            FetchOpDataEvtQuery::Hashes(hashes) => Self::Hashes(
-                hashes
-                    .into_iter()
-                    .map(|h| DhtOpHash::from_kitsune(&h))
-                    .collect::<Vec<_>>(),
-            ),
-            FetchOpDataEvtQuery::Regions(coords) => Self::Regions(coords),
-        }
-    }
-}
-
 ghost_actor::ghost_chan! {
     /// The HolochainP2pEvent stream allows handling events generated from
     /// the HolochainP2p actor.
@@ -149,7 +125,7 @@ ghost_actor::ghost_chan! {
         fn query_agent_info_signed_near_basis(dna_hash: DnaHash, kitsune_space: Arc<kitsune_p2p::KitsuneSpace>, basis_loc: u32, limit: u32) -> Vec<AgentInfoSigned>;
 
         /// Query the peer density of a space for a given [`DhtArc`].
-        fn query_peer_density(dna_hash: DnaHash, kitsune_space: Arc<kitsune_p2p::KitsuneSpace>, dht_arc: kitsune_p2p_types::dht_arc::DhtArc) -> kitsune_p2p_types::dht::PeerView;
+        fn query_peer_density(dna_hash: DnaHash, kitsune_space: Arc<kitsune_p2p::KitsuneSpace>, dht_arc: kitsune_p2p_types::dht_arc::DhtArc) -> kitsune_p2p_types::dht_arc::PeerViewBeta;
 
         /// A remote node is attempting to make a remote call on us.
         fn call_remote(
@@ -234,7 +210,7 @@ ghost_actor::ghost_chan! {
         /// The p2p module needs access to the content for a given set of DhtOpHashes.
         fn fetch_op_data(
             dna_hash: DnaHash,
-            query: FetchOpDataQuery,
+            op_hashes: Vec<holo_hash::DhtOpHash>,
         ) -> Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>;
 
         /// P2p operations require cryptographic signatures and validation.

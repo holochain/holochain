@@ -91,7 +91,6 @@ sd-notify = "0.3.0"
 [dev-dependencies]
 anyhow = "1.0.26"
 assert_cmd = "1.0.1"
-contrafact = "0.1.0-dev.1"
 criterion = { version = "0.3", features = [ "async_tokio" ] }
 kitsune_p2p_bootstrap = { version = "0.0.10", path = "../kitsune_p2p/bootstrap" }
 maplit = "1"

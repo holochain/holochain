@@ -4,16 +4,16 @@ use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
 use holochain_conductor_api::AgentInfoDump;
 use holochain_conductor_api::P2pAgentsDump;
-use holochain_p2p::dht::spacetime::Topology;
-use holochain_p2p::dht::PeerStrat;
-use holochain_p2p::dht::PeerView;
 use holochain_p2p::dht_arc::DhtArc;
+use holochain_p2p::dht_arc::PeerStratBeta;
+use holochain_p2p::dht_arc::PeerViewBeta;
 use holochain_p2p::kitsune_p2p::agent_store::AgentInfoSigned;
 use holochain_p2p::AgentPubKeyExt;
 use holochain_sqlite::prelude::*;
 use holochain_state::prelude::StateMutationResult;
 use holochain_state::prelude::StateQueryResult;
 use holochain_zome_types::CellId;
+use kitsune_p2p::KitsuneBinType;
 use std::sync::Arc;
 use thiserror::Error;
 
@@ -187,17 +187,20 @@ pub async fn list_all_agent_info_signed_near_basis(
 /// a given [`DhtArc`]
 pub async fn query_peer_density(
     env: DbRead<DbKindP2pAgents>,
-    topology: Topology,
     kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
     dht_arc: DhtArc,
-) -> ConductorResult<PeerView> {
+) -> ConductorResult<PeerViewBeta> {
     let now = now();
     let arcs = run_query(env, move |mut conn| Ok(conn.p2p_list_agents()?)).await?;
     let arcs: Vec<_> = arcs
         .into_iter()
         .filter_map(|v| {
-            if v.space == kitsune_space && !is_expired(now, &v) {
-                Some(v.storage_arc)
+            if dht_arc.contains(v.agent.get_loc()) {
+                if v.space == kitsune_space && !is_expired(now, &v) {
+                    Some(v.storage_arc)
+                } else {
+                    None
+                }
             } else {
                 None
             }
@@ -205,7 +208,7 @@ pub async fn query_peer_density(
         .collect();
 
     // contains is already checked in the iterator
-    Ok(PeerStrat::default().view(topology, dht_arc, arcs.as_slice()))
+    Ok(PeerStratBeta::default().view_unchecked(dht_arc, arcs.as_slice()))
 }
 
 /// Put single agent info into store

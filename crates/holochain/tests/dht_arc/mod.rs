@@ -37,9 +37,9 @@ async fn test_arc_redundancy() {
         for _ in 0..40 {
             for i in 0..peers.len() {
                 let p = peers.clone();
-                let mut arc = peers.get_mut(i).unwrap();
-                let view = PeerStratAlpha::default().view(*arc, p.as_slice());
-                view.update_arc(&mut arc);
+                let arc = peers.get_mut(i).unwrap();
+                let view = PeerStratAlpha::default().view(*arc, p.as_slice()).into();
+                arc.update_length(&view);
             }
 
             assert!(!check_for_gaps(peers.clone()));
@@ -85,9 +85,9 @@ async fn test_arc_redundancy_all() {
         for _ in 0..40 {
             for i in 0..peers.len() {
                 let p = peers.clone();
-                let mut arc = peers.get_mut(i).unwrap();
-                let view = PeerStratAlpha::default().view(*arc, p.as_slice());
-                view.update_arc(&mut arc);
+                let arc = peers.get_mut(i).unwrap();
+                let view = PeerStratAlpha::default().view(*arc, p.as_slice()).into();
+                arc.update_length(&view);
             }
 
             let r = check_redundancy(peers.clone());
@@ -150,9 +150,11 @@ async fn test_join_leave() {
     let converge = |peers: &mut Vec<DhtArc>| {
         for i in 0..peers.len() {
             let p = peers.clone();
-            let mut arc = peers.get_mut(i).unwrap();
-            let view = PeerStratAlpha::default().view(arc.clone(), p.as_slice());
-            view.update_arc(&mut arc);
+            let arc = peers.get_mut(i).unwrap();
+            let view = PeerStratAlpha::default()
+                .view(arc.clone(), p.as_slice())
+                .into();
+            arc.update_length(&view);
         }
     };
     let mut peers = get_peers(num_peers, &coverages, keystore.clone()).await;

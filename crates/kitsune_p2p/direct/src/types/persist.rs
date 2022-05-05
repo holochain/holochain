@@ -53,7 +53,7 @@ pub trait AsKdPersist: 'static + Send + Sync {
         &self,
         root: KdHash,
         dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
-    ) -> BoxFuture<'static, KdResult<kitsune_p2p_types::dht::PeerView>>;
+    ) -> BoxFuture<'static, KdResult<kitsune_p2p_types::dht_arc::PeerViewBeta>>;
 
     /// Store entry
     fn store_entry(
@@ -176,7 +176,8 @@ impl KdPersist {
         &self,
         root: KdHash,
         dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
-    ) -> impl Future<Output = KdResult<kitsune_p2p_types::dht::PeerView>> + 'static + Send {
+    ) -> impl Future<Output = KdResult<kitsune_p2p_types::dht_arc::PeerViewBeta>> + 'static + Send
+    {
         AsKdPersist::query_peer_density(&*self.0, root, dht_arc)
     }
 

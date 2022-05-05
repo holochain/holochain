@@ -155,6 +155,44 @@ fn test_check_redundancy() {
     assert_eq!(check_redundancy(peers), 4);
 }
 
+#[test]
+#[ignore = "too brittle"]
+fn test_peer_gaps() {
+    let converge = |peers: &mut Vec<DhtArc>| {
+        let strat: PeerStrat = PeerStratAlpha {
+            check_gaps: true,
+            ..Default::default()
+        }
+        .into();
+        let mut gaps = true;
+        for _ in 0..40 {
+            for i in 0..peers.len() {
+                let p = peers.clone();
+                let arc = peers.get_mut(i).unwrap();
+                let view = strat.view(*arc, p.as_slice());
+                arc.update_length(&view);
+            }
+            if gaps {
+                gaps = check_for_gaps(peers.clone());
+            } else {
+                let bucket = DhtArcBucket::new(peers[0].clone(), peers.clone());
+                assert!(!check_for_gaps(peers.clone()), "{}", bucket.to_ascii(64));
+            }
+        }
+    };
+    let mut peers = even_dist_peers(DEFAULT_MIN_PEERS * 10, &[MAX_HALF_LENGTH / 4]);
+    converge(&mut peers);
+    for arc in peers {
+        assert_between((arc.coverage() * 100.0).round() / 100.0, 0.1, 0.15);
+    }
+
+    let mut peers = even_dist_peers(DEFAULT_MIN_PEERS, &[20]);
+    converge(&mut peers);
+    for arc in peers {
+        assert_eq!((arc.coverage() * 10.0).round() / 10.0, 1.0);
+    }
+}
+
 pub(crate) fn even_dist_peers(num: usize, half_lens: &[u32]) -> Vec<DhtArc> {
     let mut hl = half_lens.iter();
     let iter = std::iter::repeat_with(|| hl.next().unwrap_or(&half_lens[0]));

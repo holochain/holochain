@@ -27,7 +27,7 @@ impl ShardedGossipLocal {
             tuning_params: Default::default(),
             space,
             evt_sender,
-            host_api: host,
+            _host: host,
             inner: Share::new(inner),
             closing: std::sync::atomic::AtomicBool::new(false),
         }

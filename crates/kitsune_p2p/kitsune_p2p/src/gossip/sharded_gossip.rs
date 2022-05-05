@@ -13,9 +13,7 @@ use governor::state::{InMemoryState, NotKeyed};
 use governor::RateLimiter;
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::codec::Codec;
-use kitsune_p2p_types::combinators::second;
 use kitsune_p2p_types::config::*;
-use kitsune_p2p_types::dht::region_set::RegionSetLtcs;
 use kitsune_p2p_types::dht_arc::{DhtArcRange, DhtArcSet};
 use kitsune_p2p_types::metrics::*;
 use kitsune_p2p_types::tx2::tx2_api::*;
@@ -66,7 +64,7 @@ pub(crate) mod tests;
 /// with the constant in PoolBuf which cannot be set at runtime)
 /// ^^ obviously we're no longer following the above advice..
 ///    in the case of the pool buf management, any gossips larger than
-///    16,000,000 will now be shrunk resulting in additional memory thrashing
+///    16000 will now be shrunk resulting in additional memory thrashing
 const MAX_SEND_BUF_BYTES: usize = 16_000_000;
 
 /// The timeout for a gossip round if there is no contact. One minute.
@@ -110,15 +108,9 @@ pub struct ShardedGossip {
     // The endpoint to use for all outgoing comms
     ep_hnd: Tx2EpHnd<wire::Wire>,
     /// The internal mutable state
-    pub(crate) state: Share<ShardedGossipState>,
+    inner: Share<ShardedGossipState>,
     /// Bandwidth for incoming and outgoing gossip.
     bandwidth: Arc<BandwidthThrottle>,
-}
-
-impl std::fmt::Debug for ShardedGossip {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("ShardedGossip{...}").finish()
-    }
 }
 
 /// Basic statistic for gossip loop processing performance.
@@ -160,25 +152,19 @@ impl ShardedGossip {
         space: Arc<KitsuneSpace>,
         ep_hnd: Tx2EpHnd<wire::Wire>,
         evt_sender: EventSender,
-        host_api: HostApi,
+        host: HostApi,
         gossip_type: GossipType,
         bandwidth: Arc<BandwidthThrottle>,
         metrics: MetricsSync,
-        enable_history: bool,
     ) -> Arc<Self> {
-        let state = if enable_history {
-            ShardedGossipState::with_history()
-        } else {
-            Default::default()
-        };
         let this = Arc::new(Self {
             ep_hnd,
-            state: Share::new(state),
+            inner: Share::new(Default::default()),
             gossip: ShardedGossipLocal {
                 tuning_params,
                 space,
                 evt_sender,
-                host_api,
+                _host: host,
                 inner: Share::new(ShardedGossipLocalState::new(metrics)),
                 gossip_type,
                 closing: AtomicBool::new(false),
@@ -264,8 +250,8 @@ impl ShardedGossip {
                     vec![ShardedGossipWire::error(e.to_string())]
                 }
             };
-            self.state.share_mut(|i, _| {
-                i.push_outgoing(outgoing.into_iter().map(|msg| {
+            self.inner.share_mut(|i, _| {
+                i.outgoing.extend(outgoing.into_iter().map(|msg| {
                     (
                         con.peer_cert(),
                         HowToConnect::Con(con.clone(), remote_url.clone()),
@@ -292,8 +278,8 @@ impl ShardedGossip {
     async fn run_one_iteration(&self) {
         match self.gossip.try_initiate().await {
             Ok(Some(outgoing)) => {
-                if let Err(err) = self.state.share_mut(|i, _| {
-                    i.push_outgoing([outgoing]);
+                if let Err(err) = self.inner.share_mut(|i, _| {
+                    i.outgoing.push_back(outgoing);
                     Ok(())
                 }) {
                     tracing::error!(
@@ -312,7 +298,11 @@ impl ShardedGossip {
     }
 
     fn pop_queues(&self) -> KitsuneResult<(Option<Incoming>, Option<Outgoing>)> {
-        self.state.share_mut(move |inner, _| Ok(inner.pop()))
+        self.inner.share_mut(move |inner, _| {
+            let incoming = inner.incoming.pop_front();
+            let outgoing = inner.outgoing.pop_front();
+            Ok((incoming, outgoing))
+        })
     }
 
     /// Log the statistics for the gossip loop.
@@ -331,7 +321,7 @@ impl ShardedGossip {
                 .checked_div(stats.count)
                 .unwrap_or_default();
             let lens = self
-                .state
+                .inner
                 .share_mut(|i, _| Ok((i.incoming.len(), i.outgoing.len())))
                 .map(|(i, o)| format!("Queues: Incoming: {}, Outgoing {}", i, o))
                 .unwrap_or_else(|_| "Queues empty".to_string());
@@ -355,7 +345,7 @@ pub struct ShardedGossipLocal {
     tuning_params: KitsuneP2pTuningParams,
     space: Arc<KitsuneSpace>,
     evt_sender: EventSender,
-    host_api: HostApi,
+    _host: HostApi,
     inner: Share<ShardedGossipLocalState>,
     closing: AtomicBool,
 }
@@ -468,59 +458,11 @@ impl ShardedGossipLocalState {
     }
 }
 
-/// The incoming and outgoing queues for [`ShardedGossip`]
-#[derive(Default, Clone, Debug)]
-pub struct ShardedGossipQueues {
+/// The internal mutable state for [`ShardedGossip`]
+#[derive(Default)]
+pub struct ShardedGossipState {
     incoming: VecDeque<Incoming>,
     outgoing: VecDeque<Outgoing>,
-}
-
-/// The internal mutable state for [`ShardedGossip`]
-#[derive(Default, derive_more::Deref)]
-pub(crate) struct ShardedGossipState {
-    /// The incoming and outgoing queues
-    #[deref]
-    queues: ShardedGossipQueues,
-    /// If Some, these queues are never cleared, and contain every message
-    /// ever sent and received, for diagnostics and debugging.
-    history: Option<ShardedGossipQueues>,
-}
-
-impl ShardedGossipState {
-    /// Construct state with history queues
-    pub fn with_history() -> Self {
-        Self {
-            queues: Default::default(),
-            history: Some(Default::default()),
-        }
-    }
-
-    #[cfg(feature = "test_utils")]
-    #[allow(dead_code)]
-    pub fn get_history(&self) -> Option<ShardedGossipQueues> {
-        self.history.clone()
-    }
-
-    pub fn push_incoming<I: Clone + IntoIterator<Item = Incoming>>(&mut self, incoming: I) {
-        if let Some(history) = &mut self.history {
-            history.incoming.extend(incoming.clone().into_iter());
-        }
-        self.queues.incoming.extend(incoming.into_iter());
-    }
-
-    pub fn push_outgoing<I: Clone + IntoIterator<Item = Outgoing>>(&mut self, outgoing: I) {
-        if let Some(history) = &mut self.history {
-            history.outgoing.extend(outgoing.clone().into_iter());
-        }
-        self.queues.outgoing.extend(outgoing.into_iter());
-    }
-
-    pub fn pop(&mut self) -> (Option<Incoming>, Option<Outgoing>) {
-        (
-            self.queues.incoming.pop_front(),
-            self.queues.outgoing.pop_front(),
-        )
-    }
 }
 
 /// The state representing a single active ongoing "round" of gossip with a
@@ -537,9 +479,6 @@ pub struct RoundState {
     /// We've received the last op bloom filter from our partner
     /// (the one with `finished` == true)
     received_all_incoming_ops_blooms: bool,
-    /// Received all responses to OpRegions, which is the batched set of Op data
-    /// in the diff of regions
-    has_pending_historical_op_data: bool,
     /// There are still op blooms to send because the previous
     /// batch was too big to send in a single gossip iteration.
     bloom_batch_cursor: Option<Timestamp>,
@@ -550,9 +489,6 @@ pub struct RoundState {
     last_touch: Instant,
     /// Amount of time before a round is considered expired.
     round_timeout: std::time::Duration,
-    /// The RegionSet we will send to our gossip partner during Historical
-    /// gossip (will be None for Recent).
-    region_set_sent: Option<RegionSetLtcs>,
 }
 
 impl ShardedGossipLocal {
@@ -567,14 +503,14 @@ impl ShardedGossipLocal {
     /// Calculate the time range for a gossip round.
     fn calculate_time_range(&self) -> TimeWindow {
         const NOW: Duration = Duration::from_secs(0);
-        let threshold = Duration::from_secs(self.tuning_params.danger_gossip_recent_threshold_secs);
+        const HOUR: Duration = Duration::from_secs(60 * 60);
         match self.gossip_type {
-            GossipType::Recent => time_range(threshold, NOW),
+            GossipType::Recent => time_range(HOUR, NOW),
             GossipType::Historical => {
                 let one_hour_ago = std::time::UNIX_EPOCH
                     .elapsed()
                     .expect("Your clock is set before unix epoch")
-                    - threshold;
+                    - HOUR;
                 Timestamp::from_micros(0)
                     ..Timestamp::from_micros(
                         one_hour_ago
@@ -590,19 +526,16 @@ impl ShardedGossipLocal {
         &self,
         remote_agent_list: Vec<AgentInfoSigned>,
         common_arc_set: Arc<DhtArcSet>,
-        region_set_sent: Option<RegionSetLtcs>,
     ) -> KitsuneResult<RoundState> {
         Ok(RoundState {
             remote_agent_list,
             common_arc_set,
             num_sent_ops_blooms: 0,
             received_all_incoming_ops_blooms: false,
-            has_pending_historical_op_data: false,
             bloom_batch_cursor: None,
             ops_batch_queue: OpsBatchQueue::new(),
             last_touch: Instant::now(),
             round_timeout: ROUND_TIMEOUT,
-            region_set_sent,
         })
     }
 
@@ -674,8 +607,6 @@ impl ShardedGossipLocal {
             let update_state = |state: &mut RoundState| {
                 let num_ops_blooms = state.num_sent_ops_blooms.saturating_sub(1);
                 state.num_sent_ops_blooms = num_ops_blooms;
-                // NOTE: there is only ever one "batch" of OpRegions
-                state.has_pending_historical_op_data = false;
                 state.is_finished()
             };
             if i.round_map
@@ -742,7 +673,7 @@ impl ShardedGossipLocal {
                 }
                 Vec::with_capacity(0)
             }
-            ShardedGossipWire::OpBlooms(OpBlooms {
+            ShardedGossipWire::Ops(Ops {
                 missing_hashes,
                 finished,
             }) => {
@@ -775,7 +706,7 @@ impl ShardedGossipLocal {
                     None => Vec::with_capacity(0),
                 }
             }
-            ShardedGossipWire::OpBloomsBatchReceived(_) => match self.get_state(&cert)? {
+            ShardedGossipWire::OpsBatchReceived(_) => match self.get_state(&cert)? {
                 Some(state) => {
                     // The last ops batch has been received by the
                     // remote node so now send the next batch.
@@ -787,62 +718,16 @@ impl ShardedGossipLocal {
                 }
                 None => Vec::with_capacity(0),
             },
-            ShardedGossipWire::OpRegions(OpRegions { region_set }) => {
-                if let Some(state) = self.incoming_ops_finished(&cert)? {
-                    if let Some(sent) = state.region_set_sent.clone() {
-                        let diff_regions = sent.diff(region_set).map_err(KitsuneError::other)?;
-                        let topo = self
-                            .host_api
-                            .get_topology(self.space.clone())
-                            .await
-                            .map_err(KitsuneError::other)?;
-                        let bounds: Vec<_> = diff_regions
-                            .into_iter()
-                            .map(|r| r.coords.to_bounds(&topo))
-                            .collect();
-                        // TODO: make region set diffing more robust to different times / arc power levels.
-
-                        let ops = self
-                            .evt_sender
-                            .fetch_op_data(FetchOpDataEvt {
-                                space: self.space.clone(),
-                                query: FetchOpDataEvtQuery::Regions(bounds),
-                            })
-                            .await
-                            .map_err(KitsuneError::other)?
-                            .into_iter()
-                            .map(second)
-                            .collect();
-
-                        // FIXME: batching
-                        vec![ShardedGossipWire::missing_ops(ops, 2)]
-                    } else {
-                        tracing::error!(
-                            "We received OpRegions gossip without sending any ourselves"
-                        );
-                        vec![]
-                    }
-                } else {
-                    vec![]
-                }
-            }
             ShardedGossipWire::MissingOps(MissingOps { ops, finished }) => {
                 let mut gossip = Vec::with_capacity(0);
                 let finished = MissingOpsStatus::try_from(finished)?;
-
-                // doesn't work as epxected:
-                // let doing_historic_region_gossip = self
-                //     .get_state(&cert)?
-                //     .map(|s| s.region_set_sent.is_some())
-                //     .unwrap_or_default();
-
-                let _state = match finished {
+                let state = match finished {
                     // This is a single chunk of ops. No need to reply.
                     MissingOpsStatus::ChunkComplete => self.get_state(&cert)?,
-                    // This is the last chunk in the batch. Reply with [`OpBloomsBatchReceived`]
+                    // This is the last chunk in the batch. Reply with [`OpsBatchReceived`]
                     // to get the next batch of missing ops.
                     MissingOpsStatus::BatchComplete => {
-                        gossip = vec![ShardedGossipWire::op_blooms_batch_received()];
+                        gossip = vec![ShardedGossipWire::ops_batch_received()];
                         self.get_state(&cert)?
                     }
                     // All the batches of missing ops for the bloom this node sent
@@ -868,15 +753,9 @@ impl ShardedGossipLocal {
                         state
                     }
                 };
-
-                // dbg!(&doing_historic_region_gossip, &state.is_some(), ops.len());
-
-                // XXX: TODO: come back to this later after implementing batching for
-                //      region gossip, for now I just don't care about the state,
-                //      and just want to handle the incoming ops.
-                // if (doing_historic_region_gossip || state.is_some()) && !ops.is_empty() {
-                self.incoming_missing_ops(ops).await?;
-                // }
+                if state.is_some() && !ops.is_empty() {
+                    self.incoming_missing_ops(ops).await?;
+                }
                 gossip
             }
             ShardedGossipWire::NoAgents(_) => {
@@ -959,7 +838,6 @@ impl RoundState {
     /// - This node has no queued missing ops to send to the remote node.
     fn is_finished(&self) -> bool {
         self.num_sent_ops_blooms == 0
-            && !self.has_pending_historical_op_data
             && self.received_all_incoming_ops_blooms
             && self.bloom_batch_cursor.is_none()
             && self.ops_batch_queue.is_empty()
@@ -1016,7 +894,7 @@ pub enum MissingOpsStatus {
     /// There are more chunks in this batch to come. No reply is needed.
     ChunkComplete = 0,
     /// This chunk is done but there are more batches
-    /// to come and you should reply with [`OpBloomsBatchReceived`]
+    /// to come and you should reply with [`OpsBatchReceived`]
     /// when you are ready to get the next batch.
     BatchComplete = 1,
     /// This is the final batch of missing ops and there
@@ -1059,18 +937,12 @@ kitsune_p2p_types::write_codec_enum! {
             agents.0: Vec<Arc<AgentInfoSigned>>,
         },
 
-        /// Send Op Bloom filters
-        OpBlooms(0x50) {
+        /// Send Ops Bloom
+        Ops(0x50) {
             /// The bloom filter for op data
             missing_hashes.0: EncodedTimedBloomFilter,
             /// Is this the last bloom to be sent?
             finished.1: bool,
-        },
-
-        /// Send Op region hashes
-        OpRegions(0x51) {
-            /// The region hashes for all common ops
-            region_set.0: RegionSetLtcs,
         },
 
         /// Any ops that were missing from the remote bloom.
@@ -1082,14 +954,14 @@ kitsune_p2p_types::write_codec_enum! {
             /// If the amount of missing ops is larger then the
             /// [`ShardedGossipLocal::UPPER_BATCH_BOUND`] then the set of
             /// missing ops chunks will be sent in batches.
-            /// Each batch will require a reply message of [`OpBloomsBatchReceived`]
+            /// Each batch will require a reply message of [`OpsBatchReceived`]
             /// in order to get the next batch.
             /// This is to prevent overloading the receiver with too much
             /// incoming data.
             ///
             /// 0: There is more chunks in this batch to come. No reply is needed.
             /// 1: This chunk is done but there is more batches
-            /// to come and you should reply with [`OpBloomsBatchReceived`]
+            /// to come and you should reply with [`OpsBatchReceived`]
             /// when you are ready to get the next batch.
             /// 2: This is the final missing ops and there
             /// are no more ops to come. No reply is needed.
@@ -1123,7 +995,7 @@ kitsune_p2p_types::write_codec_enum! {
         /// I have received a complete batch of
         /// missing ops and I am ready to receive the
         /// next batch.
-        OpBloomsBatchReceived(0x13) {
+        OpsBatchReceived(0x13) {
         },
     }
 }
@@ -1139,7 +1011,7 @@ impl AsGossipModule for ShardedGossip {
         let (bytes, gossip) =
             ShardedGossipWire::decode_ref(&gossip_data).map_err(KitsuneError::other)?;
         let new_initiate = matches!(gossip, ShardedGossipWire::Initiate(_));
-        self.state.share_mut(move |i, _| {
+        self.inner.share_mut(move |i, _| {
             let overloaded = i.incoming.len() > 20;
             if overloaded {
                 tracing::warn!(
@@ -1149,13 +1021,14 @@ impl AsGossipModule for ShardedGossip {
             }
             // If we are overloaded then return busy to any new initiates.
             if overloaded && new_initiate {
-                i.push_outgoing([(
+                i.outgoing.push_back((
                     con.peer_cert(),
                     HowToConnect::Con(con, remote_url),
                     ShardedGossipWire::busy(),
-                )]);
+                ));
             } else {
-                i.push_incoming([(con, remote_url, gossip, bytes as usize)]);
+                i.incoming
+                    .push_back((con, remote_url, gossip, bytes as usize));
             }
             Ok(())
         })
@@ -1223,7 +1096,6 @@ impl AsGossipModuleFactory for ShardedRecentGossipFactory {
             GossipType::Recent,
             self.bandwidth.clone(),
             metrics,
-            false,
         ))
     }
 }
@@ -1257,7 +1129,6 @@ impl AsGossipModuleFactory for ShardedHistoricalGossipFactory {
             GossipType::Historical,
             self.bandwidth.clone(),
             metrics,
-            false,
         ))
     }
 }

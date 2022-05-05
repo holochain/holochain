@@ -47,7 +47,7 @@ impl ShardedGossipLocal {
         }
 
         // Get the local intervals.
-        let local_agent_arcs: Vec<_> =
+        let local_agent_arcs =
             store::local_agent_arcs(&self.evt_sender, &self.space, &local_agents)
                 .await?
                 .into_iter()
@@ -58,7 +58,7 @@ impl ShardedGossipLocal {
 
         // Generate the bloom filters and new state.
         let state = self
-            .generate_blooms_or_regions(
+            .generate_blooms(
                 remote_agent_list.clone(),
                 local_agent_arcs,
                 remote_arc_set,
