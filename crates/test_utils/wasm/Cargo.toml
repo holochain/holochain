@@ -1,6 +1,6 @@
 [package]
 name = "holochain_wasm_test_utils"
-version = "0.0.37-dev.0"
+version = "0.0.37"
 authors = [ "thedavidmeister", "thedavidmeister@gmail.com" ]
 edition = "2021"
 description = "Utilities for Wasm testing for Holochain"
