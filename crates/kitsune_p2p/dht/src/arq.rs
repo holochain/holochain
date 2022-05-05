@@ -109,13 +109,19 @@ impl ArqStart for SpaceOffset {
 /// - one which has a definite starting DhtLocation associated with it,
 /// - and one which does not.
 ///
-/// The first flavor is significant
+/// The first flavor is used to represent Arqs which belong to Agents. It's important
+/// to record the actual absolute Location of the Arq, because the exact location
+/// determines the starting Chunk when requantizing to higher and lower levels.
+///
+/// The second flavor is mainly used to represent the intersections and unions of Arqs.
+/// In this case, there is no definite location associated, so we want to forget
+/// about the original Location data associated with each Arq.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Arq<S: ArqStart = Loc> {
     /// The "start" defines the left edge of the arq
     pub start: S,
-    /// The level of quantization. Total ArqBounds length is `2^power * count`.
-    /// The power must be between 0 and 31, inclusive.
+    /// The level of quantization. Total length is `2^power * count`.
+    /// The power must be between 0 and 31, inclusive (power of 32 causes overflow)
     pub power: u8,
     /// The number of unit lengths.
     /// We never expect the count to be less than 4 or so, and not much larger
