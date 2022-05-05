@@ -20,7 +20,7 @@ use crate::prelude::Txn;
 
 pub mod mutations_helpers;
 
-/// Create a [TestEnv] of [`DbKindAuthored`], backed by a temp directory.
+/// Create a [`TestDb`] of [`DbKindAuthored`], backed by a temp directory.
 pub fn test_authored_db() -> TestDb<DbKindAuthored> {
     test_authored_db_with_id(1)
 }
@@ -33,7 +33,7 @@ pub fn test_authored_db_with_dna_hash(hash: DnaHash) -> TestDb<DbKindAuthored> {
     test_db(DbKindAuthored(Arc::new(hash)))
 }
 
-/// Create a [TestEnv] of [`DbKindDht`], backed by a temp directory.
+/// Create a [`TestDb`] of [`DbKindDht`], backed by a temp directory.
 pub fn test_dht_db() -> TestDb<DbKindDht> {
     test_dht_db_with_id(1)
 }
@@ -46,7 +46,7 @@ pub fn test_dht_db_with_dna_hash(hash: DnaHash) -> TestDb<DbKindDht> {
     test_db(DbKindDht(Arc::new(hash)))
 }
 
-/// Create a [TestEnv] of [`DbKindCache`], backed by a temp directory.
+/// Create a [`TestDb`] of [`DbKindCache`], backed by a temp directory.
 pub fn test_cache_db() -> TestDb<DbKindCache> {
     test_cache_db_with_id(1)
 }
@@ -59,22 +59,22 @@ pub fn test_cache_db_with_dna_hash(hash: DnaHash) -> TestDb<DbKindCache> {
     test_db(DbKindCache(Arc::new(hash)))
 }
 
-/// Create a [TestEnv] of [DbKindConductor], backed by a temp directory.
+/// Create a [`TestDb`] of [DbKindConductor], backed by a temp directory.
 pub fn test_conductor_db() -> TestDb<DbKindConductor> {
     test_db(DbKindConductor)
 }
 
-/// Create a [TestEnv] of [DbKindWasm], backed by a temp directory.
+/// Create a [`TestDb`] of [DbKindWasm], backed by a temp directory.
 pub fn test_wasm_db() -> TestDb<DbKindWasm> {
     test_db(DbKindWasm)
 }
 
-/// Create a [TestEnv] of [DbKindP2pAgentStore], backed by a temp directory.
+/// Create a [`TestDb`] of [`DbKindP2pAgents`], backed by a temp directory.
 pub fn test_p2p_agents_db() -> TestDb<DbKindP2pAgents> {
     test_db(DbKindP2pAgents(Arc::new(KitsuneSpace(vec![0; 36]))))
 }
 
-/// Create a [TestEnv] of [DbKindP2pMetrics], backed by a temp directory.
+/// Create a [`TestDb`] of [DbKindP2pMetrics], backed by a temp directory.
 pub fn test_p2p_metrics_db() -> TestDb<DbKindP2pMetrics> {
     test_db(DbKindP2pMetrics(Arc::new(KitsuneSpace(vec![0; 36]))))
 }

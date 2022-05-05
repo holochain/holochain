@@ -170,12 +170,12 @@ pub enum SecurePrimitiveError {
 /// @todo given how impossible it is for wasm to protect its memory from the host, it would make
 /// more sense to:
 ///
-///  - use key exchange protocols like libsodium kx https://libsodium.gitbook.io/doc/key_exchange.
+///  - use key exchange protocols like libsodium kx <https://libsodium.gitbook.io/doc/key_exchange>.
 ///  - keep secrets inside lair with all algorithms behind an API, wasm only has access to opaque
 ///    references to the secret data.
 ///
 /// @todo implement explicit zeroing, moving and copying of memory for sensitive data.
-///       - e.g. the secrecy crate https://crates.io/crates/secrecy
+///       - e.g. the secrecy crate <https://crates.io/crates/secrecy>
 macro_rules! secure_primitive {
     ($t:ty, $len:expr) => {
         $crate::fixed_array_serialization!($t, $len);

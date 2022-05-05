@@ -27,6 +27,7 @@ jobs:
       environment:
          CACHIX_NAME: holochain-ci
          NIXPKGS_ALLOW_UNFREE: 1
+         NIX_CONFIG: "extra-experimental-features = nix-command"
       steps:
          - checkout
          - run:
@@ -59,6 +60,29 @@ jobs:
               name: Run the static checks
               no_output_timeout: 30m
               command: nix-shell --fallback --pure --argstr flavor "coreDev" --run hc-static-checks
+
+   rustdoc-build-test:
+      docker:
+         - image: holochain/holochain:circle.build.develop
+           auth:
+              username: $DOCKER_USER
+              password: $DOCKER_PASS
+      resource_class: xlarge
+      environment:
+         CACHIX_NAME: holochain-ci
+         NIXPKGS_ALLOW_UNFREE: 1
+         RUSTDOCFLAGS: -Dwarnings
+      steps:
+         - checkout
+         - run:
+              name: Unset CircleCI's forced conversion of HTTPS->SSH
+              command: git config --global --unset "url.ssh://git@github.com.insteadof"
+         - run:
+              name: Set up Nix cache
+              command: $(nix-build . --fallback --no-link -A pkgs.ci.ciSetupNixConf)/bin/hc-ci-setup-nix-conf.sh
+         - run:
+              name: Build docs with rustdoc
+              command: nix-shell --fallback --pure --keep RUSTDOCFLAGS --argstr flavor "coreDev" --run "cargo doc"
 
    standard-test:
       docker:
@@ -174,12 +198,12 @@ jobs:
               command: echo
 
 workflows:
-   version: 2.1
    tests:
       jobs:
          - merge-release-test
          # - merge-release-test-mac
          - standard-test
+         - rustdoc-build-test
          - hc-static-checks
          - slow-test
          - wasm-test
@@ -187,6 +211,7 @@ workflows:
          - ci-jobs-succeed:
               requires:
                  - standard-test
+                 - rustdoc-build-test
                  - hc-static-checks
                  - slow-test
                  - wasm-test

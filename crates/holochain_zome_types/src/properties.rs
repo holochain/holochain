@@ -3,7 +3,7 @@
 
 use holochain_serialized_bytes::prelude::*;
 
-/// A type to allow json values to be used as [SerializedBytes]
+/// A type to allow json values to be used as [`derive@SerializedBytes`]
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct YamlProperties(serde_yaml::Value);
 

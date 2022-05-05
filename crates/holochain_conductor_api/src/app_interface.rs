@@ -151,7 +151,7 @@ impl From<&InstalledApp> for InstalledAppInfo {
     }
 }
 
-/// A flat, slightly more API-friendly representation of [`InstalledAppStatus`]
+/// A flat, slightly more API-friendly representation of [`InstalledAppInfo`]
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(rename_all = "snake_case")]
 pub enum InstalledAppInfoStatus {
