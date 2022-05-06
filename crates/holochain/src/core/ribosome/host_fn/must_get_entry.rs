@@ -69,7 +69,7 @@ pub fn must_get_entry<'a>(
                                 .map_err(|e| wasm_error!(e.into()))?,
                             )
                         ))),
-                        HostContext::ValidationPackage(_) => RuntimeError::raise(Box::new(
+                        HostContext::ValidationPackage(_) => Err(
                             wasm_error!(WasmErrorInner::HostShortCircuit(
                                 holochain_serialized_bytes::encode(
                                     &ExternIO::encode(
@@ -79,9 +79,9 @@ pub fn must_get_entry<'a>(
                                     )
                                     .map_err(|e| wasm_error!(e.into()))?
                                 )
-                                .map_err(|e| wasm_error!(e.into()))?,
-                            )),
-                        )),
+                                .map_err(|e| -> RuntimeError { wasm_error!(e.into()).into() })?,
+                            )).into()
+                        ),
                     },
                 }
             })

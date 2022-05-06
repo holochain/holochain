@@ -37,7 +37,9 @@ pub fn x_25519_x_salsa20_poly1305_encrypt(
                     cipher.to_vec(),
                 ))
             })
-            .map_err(|keystore_error| wasm_error!(WasmErrorInner::Host(keystore_error.to_string())))
+            .map_err(|keystore_error| -> RuntimeError {
+                wasm_error!(WasmErrorInner::Host(keystore_error.to_string())).into()
+            })
         }
         _ => Err(wasm_error!(WasmErrorInner::Host(
             RibosomeError::HostFnPermissions(
@@ -46,7 +48,8 @@ pub fn x_25519_x_salsa20_poly1305_encrypt(
                 "x_25519_x_salsa20_poly1305_encrypt".into(),
             )
             .to_string(),
-        ))),
+        ))
+        .into()),
     }
 }
 

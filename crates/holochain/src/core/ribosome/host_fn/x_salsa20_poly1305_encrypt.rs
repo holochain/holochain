@@ -24,7 +24,9 @@ pub fn x_salsa20_poly1305_encrypt(
             let mut nonce_bytes = [0; holochain_zome_types::x_salsa20_poly1305::nonce::NONCE_BYTES];
             system_random
                 .fill(&mut nonce_bytes)
-                .map_err(|ring_unspecified| wasm_error!(WasmErrorInner::Host(ring_unspecified.to_string())))?;
+                .map_err(|ring_unspecified| -> RuntimeError {
+                    wasm_error!(WasmErrorInner::Host(ring_unspecified.to_string()).into()).into()
+                })?;
 
             // @todo use the real libsodium somehow instead of this rust crate.
             // The main issue here is dependency management - it's not necessarily simple to get libsodium
@@ -35,13 +37,15 @@ pub fn x_salsa20_poly1305_encrypt(
             let lib_nonce = GenericArray::from_slice(&nonce_bytes);
             let lib_encrypted_data = cipher
                 .encrypt(lib_nonce, input.as_data_ref().as_ref())
-                .map_err(|aead_error| wasm_error!(WasmErrorInner::Host(aead_error.to_string())))?;
+                .map_err(|aead_error| -> RuntimeError {
+                    wasm_error!(WasmErrorInner::Host(aead_error.to_string())).into()
+                })?;
 
             Ok(
                 holochain_zome_types::x_salsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData::new(
                     match lib_nonce.as_slice().try_into() {
                         Ok(nonce) => nonce,
-                        Err(secure_primitive_error) => return Err(wasm_error!(WasmErrorInner::Host(secure_primitive_error.to_string()))),
+                        Err(secure_primitive_error) => return Err(wasm_error!(WasmErrorInner::Host(secure_primitive_error.to_string())).into()),
                     },
                     lib_encrypted_data,
                 ),
@@ -54,7 +58,8 @@ pub fn x_salsa20_poly1305_encrypt(
                 "x_salsa20_poly1305_encrypt".into(),
             )
             .to_string(),
-        ))),
+        ))
+        .into()),
     }
 }
 
@@ -62,9 +67,9 @@ pub fn x_salsa20_poly1305_encrypt(
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
 
+    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use hdk::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
-    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
 
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "test_utils")]

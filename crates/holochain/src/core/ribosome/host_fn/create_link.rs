@@ -43,12 +43,21 @@ pub fn create_link<'a>(
                     .source_chain()
                     .as_ref()
                     .expect("Must have source chain if write_workspace access is given")
-                    .put(Some(call_context.zome.clone()), header_builder, None, chain_top_ordering)
+                    .put(
+                        Some(call_context.zome.clone()),
+                        header_builder,
+                        None,
+                        chain_top_ordering,
+                    )
                     .await?;
                 Ok::<HeaderHash, RibosomeError>(header_hash)
             }))
-            .map_err(|join_error| wasm_error!(WasmErrorInner::Host(join_error.to_string())))?
-            .map_err(|ribosome_error| wasm_error!(WasmErrorInner::Host(ribosome_error.to_string())))?;
+            .map_err(|join_error| -> RuntimeError {
+                wasm_error!(WasmErrorInner::Host(join_error.to_string())).into()
+            })?
+            .map_err(|ribosome_error| -> RuntimeError {
+                wasm_error!(WasmErrorInner::Host(ribosome_error.to_string())).into()
+            })?;
 
             // return the hash of the committed link
             // note that validation is handled by the workflow
@@ -56,11 +65,15 @@ pub fn create_link<'a>(
             // being atomic
             Ok(header_hash)
         }
-        _ => Err(wasm_error!(WasmErrorInner::Host(RibosomeError::HostFnPermissions(
-            call_context.zome.zome_name().clone(),
-            call_context.function_name().clone(),
-            "create_link".into()
-        ).to_string())))
+        _ => Err(wasm_error!(WasmErrorInner::Host(
+            RibosomeError::HostFnPermissions(
+                call_context.zome.zome_name().clone(),
+                call_context.function_name().clone(),
+                "create_link".into()
+            )
+            .to_string()
+        ))
+        .into()),
     }
 }
 

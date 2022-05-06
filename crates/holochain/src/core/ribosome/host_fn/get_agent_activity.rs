@@ -6,6 +6,7 @@ use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 use crate::core::ribosome::HostFnAccess;
+use crate::core::ribosome::RibosomeError;
 
 pub fn get_agent_activity(
     _ribosome: Arc<impl RibosomeT>,

@@ -22,12 +22,12 @@ pub fn create_x25519_keypair(
                 .await
                 .map(|k| (*k).into())
         })
-        .map_err(|keystore_error| wasm_error!(WasmErrorInner::Host(keystore_error.to_string()))),
+        .map_err(|keystore_error| wasm_error!(WasmErrorInner::Host(keystore_error.to_string())).into()),
         _ => Err(wasm_error!(WasmErrorInner::Host(RibosomeError::HostFnPermissions(
             call_context.zome.zome_name().clone(),
             call_context.function_name().clone(),
             "create_x25519_keypair".into()
-        ).to_string())))
+        ).to_string())).into())
     }
 }
 

@@ -42,7 +42,7 @@ pub fn agent_info<'a>(
             call_context.zome.zome_name().clone(),
             call_context.function_name().clone(),
             "agent_info".into()
-        ).to_string())))
+        ).to_string())).into())
     }
 }
 

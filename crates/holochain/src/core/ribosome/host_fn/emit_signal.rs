@@ -5,6 +5,7 @@ use holochain_types::prelude::*;
 use std::sync::Arc;
 use holochain_wasmer_host::prelude::*;
 use crate::core::ribosome::HostFnAccess;
+use crate::core::ribosome::RibosomeError;
 
 pub fn emit_signal(
     ribosome: Arc<impl RibosomeT>,

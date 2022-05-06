@@ -20,7 +20,8 @@ pub fn hash(
             holochain_zome_types::header::HeaderHashed::from_content_sync(header).into_hash(),
         ),
         HashInput::Blake2B(data, output_len) => HashOutput::Blake2B(
-            blake2b_n(&data, output_len as usize).map_err(|e| wasm_error!(WasmErrorInner::Host(e.to_string())))?,
+            blake2b_n(&data, output_len as usize)
+                .map_err(|e| -> RuntimeError { wasm_error!(WasmErrorInner::Host(e.to_string())).into() })?,
         ),
         HashInput::Keccak256(data) => HashOutput::Keccak256({
             let mut output = [0u8; 32];
@@ -40,7 +41,8 @@ pub fn hash(
             return Err(wasm_error!(WasmErrorInner::Host(format!(
                 "Unimplemented hashing algorithm {:?}",
                 input
-            ))))
+            )))
+            .into())
         }
     })
 }

@@ -32,7 +32,7 @@ pub fn x_salsa20_poly1305_decrypt(
             call_context.zome.zome_name().clone(),
             call_context.function_name().clone(),
             "x_salsa20_poly1305_decrypt".into()
-        ).to_string())))
+        ).to_string())).into())
     }
 }
 

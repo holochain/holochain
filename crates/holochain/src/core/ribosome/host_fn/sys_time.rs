@@ -5,6 +5,7 @@ use holochain_types::access::Permission;
 use holochain_wasmer_host::prelude::*;
 use holochain_zome_types::Timestamp;
 use std::sync::Arc;
+use crate::core::ribosome::RibosomeError;
 
 pub fn sys_time(
     _ribosome: Arc<impl RibosomeT>,

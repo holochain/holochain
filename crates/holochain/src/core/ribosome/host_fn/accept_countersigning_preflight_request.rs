@@ -110,11 +110,11 @@ pub mod wasm_test {
     use crate::conductor::api::ZomeCall;
     use crate::conductor::CellError;
     use crate::core::ribosome::error::RibosomeError;
+    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use crate::core::workflow::error::WorkflowError;
     use hdk::prelude::*;
     use holochain_state::source_chain::SourceChainError;
     use holochain_wasm_test_utils::TestWasm;
-    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
 
     /// Allow ChainLocked error, panic on anything else
     fn expect_chain_locked(
@@ -295,7 +295,9 @@ pub mod wasm_test {
             .await;
         assert!(matches!(
             preflight_acceptance_fail,
-            Ok(Err(RibosomeError::WasmRuntimeError(wasm_error!(WasmErrorInner::Host(_))).into()))
+            Ok(Err(RibosomeError::WasmRuntimeError(
+                WasmError{ error: WasmErrorInner::Host(_), .. }
+            )))
         ));
 
         // Bob can also accept the preflight request.

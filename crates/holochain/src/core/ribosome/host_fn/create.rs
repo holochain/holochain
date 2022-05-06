@@ -2,6 +2,7 @@ use crate::core::ribosome::guest_callback::entry_defs::EntryDefsInvocation;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
+use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
 use holochain_wasmer_host::prelude::*;
 
@@ -38,8 +39,8 @@ pub fn create<'a>(
                             chain_top_ordering,
                         )
                         .await
-                        .map_err(|source_chain_error| {
-                            wasm_error!(WasmErrorInner::Host(source_chain_error.to_string()))
+                        .map_err(|source_chain_error| -> RuntimeError {
+                            wasm_error!(WasmErrorInner::Host(source_chain_error.to_string())).into()
                         })
                 }),
                 _ => {
@@ -95,8 +96,8 @@ pub fn create<'a>(
                                 chain_top_ordering,
                             )
                             .await
-                            .map_err(|source_chain_error| {
-                                wasm_error!(WasmErrorInner::Host(source_chain_error.to_string()))
+                            .map_err(|source_chain_error| -> RuntimeError {
+                                wasm_error!(WasmErrorInner::Host(source_chain_error.to_string())).into()
                             })
                     })
                 }
@@ -109,7 +110,7 @@ pub fn create<'a>(
                 "create".into(),
             )
             .to_string(),
-        ))),
+        )).into()),
     }
 }
 

@@ -14,7 +14,7 @@ pub fn call(
     call_context: Arc<CallContext>,
     inputs: Vec<Call>,
 ) -> Result<Vec<ZomeCallResponse>, RuntimeError> {
-    let results: Vec<Result<ZomeCallResponse, WasmError>> =
+    let results: Vec<Result<ZomeCallResponse, RuntimeError>> =
         tokio_helper::block_forever_on(async move {
             join_all(inputs.into_iter().map(|input| async {
                 // The line below was added when migrating to rust edition 2021, per
@@ -54,7 +54,7 @@ pub fn call(
                             .agent_pubkey()
                             .clone();
 
-                        let result: Result<ZomeCallResponse, WasmError> = match target {
+                        let result: Result<ZomeCallResponse, RuntimeError> = match target {
                             CallTarget::NetworkAgent(target_agent) => {
                                 match call_context
                                     .host_context()
@@ -69,10 +69,10 @@ pub fn call(
                                     )
                                     .await
                                 {
-                                    Ok(serialized_bytes) => {
-                                        ZomeCallResponse::try_from(serialized_bytes)
-                                            .map_err(|e| wasm_error!(e.into()))
-                                    }
+                                    Ok(serialized_bytes) => ZomeCallResponse::try_from(
+                                        serialized_bytes,
+                                    )
+                                    .map_err(|e| -> RuntimeError { wasm_error!(e.into()).into() }),
                                     Err(e) => Ok(ZomeCallResponse::NetworkError(e.to_string())),
                                 }
                             }
@@ -108,12 +108,14 @@ pub fn call(
                                     .await
                                 {
                                     Ok(Ok(zome_call_response)) => Ok(zome_call_response),
-                                    Ok(Err(ribosome_error)) => {
-                                        Err(wasm_error!(WasmErrorInner::Host(ribosome_error.to_string())))
-                                    }
-                                    Err(conductor_api_error) => {
-                                        Err(wasm_error!(WasmErrorInner::Host(conductor_api_error.to_string())))
-                                    }
+                                    Ok(Err(ribosome_error)) => Err(wasm_error!(
+                                        WasmErrorInner::Host(ribosome_error.to_string())
+                                    )
+                                    .into()),
+                                    Err(conductor_api_error) => Err(wasm_error!(
+                                        WasmErrorInner::Host(conductor_api_error.to_string())
+                                    )
+                                    .into()),
                                 }
                             }
                         };
@@ -126,7 +128,8 @@ pub fn call(
                             "call".into(),
                         )
                         .to_string(),
-                    ))),
+                    ))
+                    .into()),
                 }
             }))
             .await

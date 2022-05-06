@@ -76,7 +76,7 @@ pub fn call_info(
             call_context.zome.zome_name().clone(),
             call_context.function_name().clone(),
             "call_info".into()
-        ).to_string())))
+        ).to_string())).into())
     }
 }
 

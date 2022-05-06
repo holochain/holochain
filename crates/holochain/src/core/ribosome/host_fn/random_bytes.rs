@@ -12,7 +12,7 @@ pub fn random_bytes(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: u32,
-) -> Result<Bytes, RuntimeError> {
+) -> Result<holochain_types::prelude::Bytes, RuntimeError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess{ non_determinism: Permission::Allow, .. } => {
             let system_random = ring::rand::SystemRandom::new();
@@ -21,7 +21,7 @@ pub fn random_bytes(
                 .fill(&mut bytes)
                 .map_err(|ring_unspecified_error| wasm_error!(WasmErrorInner::Host(ring_unspecified_error.to_string())))?;
 
-            Ok(Bytes::from(bytes))
+            Ok(bytes.into())
         },
         _ => Err(wasm_error!(WasmErrorInner::Host(RibosomeError::HostFnPermissions(
             call_context.zome.zome_name().clone(),

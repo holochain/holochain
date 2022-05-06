@@ -5,6 +5,7 @@ use holochain_keystore::AgentPubKeyExt;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
+use crate::core::ribosome::RibosomeError;
 
 pub fn verify_signature(
     _ribosome: Arc<impl RibosomeT>,

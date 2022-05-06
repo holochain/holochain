@@ -34,8 +34,8 @@ pub fn must_get_valid_element<'a>(
                 match cascade
                     .get_header_details(header_hash.clone(), GetOptions::content())
                     .await
-                    .map_err(|cascade_error| {
-                        wasm_error!(WasmErrorInner::Host(cascade_error.to_string()))
+                    .map_err(|cascade_error| -> RuntimeError {
+                        wasm_error!(WasmErrorInner::Host(cascade_error.to_string())).into()
                     })? {
                     Some(ElementDetails {
                         element,
@@ -49,44 +49,50 @@ pub fn must_get_valid_element<'a>(
                         | HostContext::PostCommit(_)
                         | HostContext::ZomeCall(_) => Err(wasm_error!(WasmErrorInner::Host(
                             format!("Failed to get Element {}", header_hash)
-                        ))),
-                        HostContext::Init(_) => RuntimeError::raise(Box::new(wasm_error!(
-                            WasmErrorInner::HostShortCircuit(
-                                holochain_serialized_bytes::encode(
-                                    &ExternIO::encode(InitCallbackResult::UnresolvedDependencies(
-                                        vec![header_hash.into()],
-                                    ))
-                                    .map_err(|e| wasm_error!(e.into()))?,
-                                )
-                                .map_err(|e| wasm_error!(e.into()))?
+                        ))
+                        .into()),
+                        HostContext::Init(_) => Err(wasm_error!(WasmErrorInner::HostShortCircuit(
+                            holochain_serialized_bytes::encode(
+                                &ExternIO::encode(InitCallbackResult::UnresolvedDependencies(
+                                    vec![header_hash.into()],
+                                ))
+                                .map_err(|e| -> RuntimeError { wasm_error!(e.into()).into() })?,
                             )
-                        ))),
-                        HostContext::Validate(_) => RuntimeError::raise(Box::new(wasm_error!(
-                            WasmErrorInner::HostShortCircuit(
+                            .map_err(|e| -> RuntimeError { wasm_error!(e.into()).into() })?
+                        ))
+                        .into()),
+                        HostContext::Validate(_) => {
+                            Err(wasm_error!(WasmErrorInner::HostShortCircuit(
                                 holochain_serialized_bytes::encode(
                                     &ExternIO::encode(
                                         ValidateCallbackResult::UnresolvedDependencies(vec![
                                             header_hash.into()
                                         ],)
                                     )
-                                    .map_err(|e| wasm_error!(e.into()))?,
+                                    .map_err(
+                                        |e| -> RuntimeError { wasm_error!(e.into()).into() }
+                                    )?,
                                 )
-                                .map_err(|e| wasm_error!(e.into()))?
-                            )
-                        ))),
-                        HostContext::ValidationPackage(_) => RuntimeError::raise(Box::new(
-                            wasm_error!(WasmErrorInner::HostShortCircuit(
+                                .map_err(|e| -> RuntimeError { wasm_error!(e.into()).into() })?
+                            ))
+                            .into())
+                        }
+                        HostContext::ValidationPackage(_) => {
+                            Err(wasm_error!(WasmErrorInner::HostShortCircuit(
                                 holochain_serialized_bytes::encode(
                                     &ExternIO::encode(
                                         ValidationPackageCallbackResult::UnresolvedDependencies(
                                             vec![header_hash.into(),]
                                         ),
                                     )
-                                    .map_err(|e| wasm_error!(e.into()))?
+                                    .map_err(
+                                        |e| -> RuntimeError { wasm_error!(e.into()).into() }
+                                    )?
                                 )
-                                .map_err(|e| wasm_error!(e.into()))?,
-                            )),
-                        )),
+                                .map_err(|e| -> RuntimeError { wasm_error!(e.into()).into() })?,
+                            ))
+                            .into())
+                        }
                     },
                 }
             })
@@ -98,6 +104,7 @@ pub fn must_get_valid_element<'a>(
                 "must_get_valid_element".into(),
             )
             .to_string(),
-        ))),
+        ))
+        .into()),
     }
 }
