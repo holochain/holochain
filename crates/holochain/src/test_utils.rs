@@ -814,6 +814,6 @@ pub async fn force_publish_dht_ops(
             )?)
         })
         .await?;
-    publish_trigger.trigger("force_publish_dht_ops");
+    publish_trigger.trigger(&"force_publish_dht_ops");
     Ok(())
 }

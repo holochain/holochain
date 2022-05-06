@@ -40,7 +40,7 @@ pub fn spawn_integrate_dht_ops_consumer(
             {
                 Ok(WorkComplete::Incomplete) => {
                     tracing::debug!("Work incomplete, retriggering workflow");
-                    trigger_self.trigger("retrigger")
+                    trigger_self.trigger(&"retrigger")
                 }
                 Err(err) => handle_workflow_error(err)?,
                 _ => (),

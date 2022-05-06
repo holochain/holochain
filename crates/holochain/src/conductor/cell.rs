@@ -208,7 +208,7 @@ impl Cell {
             .get_queue_consumer_workflows()
             .integration_trigger(Arc::new(id.dna_hash().clone()))
         {
-            trigger.trigger("genesis");
+            trigger.trigger(&"genesis");
         }
         Ok(())
     }

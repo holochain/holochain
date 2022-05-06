@@ -209,7 +209,7 @@ pub async fn incoming_dht_ops_workflow(
                     }
 
                     // trigger validation of queued ops
-                    sys_validation_trigger.trigger("incoming_dht_ops_workflow");
+                    sys_validation_trigger.trigger(&"incoming_dht_ops_workflow");
 
                     maybe_batch = batch_check_end(&incoming_ops_batch);
                 }
