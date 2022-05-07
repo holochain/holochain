@@ -42,11 +42,13 @@ pub fn get<'a>(
                     .collect()
                     .await
                 });
-            let results: Result<Vec<_>, _> = results
+            let results: Result<Vec<_>, RuntimeError> = results
                 .into_iter()
                 .map(|result| match result {
                     Ok(v) => Ok(v),
-                    Err(cascade_error) => Err(wasm_error!(WasmErrorInner::Host(cascade_error.to_string()))),
+                    Err(cascade_error) => {
+                        Err(wasm_error!(WasmErrorInner::Host(cascade_error.to_string())).into())
+                    }
                 })
                 .collect();
             let results = results?;
@@ -65,7 +67,8 @@ pub fn get<'a>(
                 "get".into(),
             )
             .to_string(),
-        ))),
+        ))
+        .into()),
     }
 }
 

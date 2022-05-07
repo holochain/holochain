@@ -22,7 +22,9 @@ pub fn sign(
                 .sign(input.key, input.data.into_vec().into())
                 .await
         })
-        .map_err(|keystore_error| wasm_error!(WasmErrorInner::Host(keystore_error.to_string()))),
+        .map_err(|keystore_error| -> RuntimeError {
+            wasm_error!(WasmErrorInner::Host(keystore_error.to_string())).into()
+        }),
         _ => Err(wasm_error!(WasmErrorInner::Host(
             RibosomeError::HostFnPermissions(
                 call_context.zome.zome_name().clone(),
@@ -30,7 +32,7 @@ pub fn sign(
                 "sign".into(),
             )
             .to_string(),
-        ))),
+        )).into()),
     }
 }
 

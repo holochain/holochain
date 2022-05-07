@@ -25,7 +25,7 @@ pub fn x_salsa20_poly1305_encrypt(
             system_random
                 .fill(&mut nonce_bytes)
                 .map_err(|ring_unspecified| -> RuntimeError {
-                    wasm_error!(WasmErrorInner::Host(ring_unspecified.to_string()).into()).into()
+                    wasm_error!(WasmErrorInner::Host(ring_unspecified.to_string())).into()
                 })?;
 
             // @todo use the real libsodium somehow instead of this rust crate.

@@ -22,10 +22,13 @@ pub fn sign_ephemeral(
         } => {
             let rng = SystemRandom::new();
             let mut seed = [0; 32];
-            rng.fill(&mut seed)
-                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?;
-            let ephemeral_keypair = Ed25519KeyPair::from_seed_unchecked(&seed)
-                .map_err(|e| wasm_error!(WasmErrorInner::Host(e.to_string())))?;
+            rng.fill(&mut seed).map_err(|e| -> RuntimeError {
+                wasm_error!(WasmErrorInner::Guest(e.to_string())).into()
+            })?;
+            let ephemeral_keypair =
+                Ed25519KeyPair::from_seed_unchecked(&seed).map_err(|e| -> RuntimeError {
+                    wasm_error!(WasmErrorInner::Host(e.to_string())).into()
+                })?;
 
             let signatures: Result<Vec<Signature>, _> = input
                 .into_inner()
@@ -34,7 +37,9 @@ pub fn sign_ephemeral(
                 .collect();
 
             Ok(EphemeralSignatures {
-                signatures: signatures.map_err(|e| wasm_error!(WasmErrorInner::Host(e.to_string())))?,
+                signatures: signatures.map_err(|e| -> RuntimeError {
+                    wasm_error!(WasmErrorInner::Host(e.to_string())).into()
+                })?,
                 key: AgentPubKey::from_raw_32(ephemeral_keypair.public_key().as_ref().to_vec()),
             })
         }
@@ -45,7 +50,8 @@ pub fn sign_ephemeral(
                 "sign_ephemeral".into(),
             )
             .to_string(),
-        ))),
+        ))
+        .into()),
     }
 }
 

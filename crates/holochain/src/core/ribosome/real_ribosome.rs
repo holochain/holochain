@@ -161,10 +161,10 @@ impl HostFnBuilder {
                                     WasmError {
                                         error: WasmErrorInner::HostShortCircuit(_),
                                         ..
-                                    } => return Err(runtime_error),
+                                    } => return Err(wasm_error.into()),
                                     _ => Err(wasm_error),
                                 },
-                                _ => return Err(runtime_error),
+                                Err(runtime_error) => return Err(runtime_error),
                             },
                             Ok(o) => Result::<_, WasmError>::Ok(o),
                         })?
@@ -444,13 +444,14 @@ macro_rules! do_callback {
                 match call_iterator.next() {
                     Ok(Some((zome, extern_io))) => (
                         zome.into(),
-                        extern_io.decode().map_err(|e| -> RuntimeError {
-                            wasm_error!(e.into()).into()
-                        })?,
+                        extern_io
+                            .decode()
+                            .map_err(|e| -> RuntimeError { wasm_error!(e.into()).into() })?,
                     ),
                     Err((zome, RibosomeError::WasmRuntimeError(runtime_error))) => (
                         zome.into(),
-                        <$callback_result>::try_from_wasm_error(runtime_error.downcast()?).map_err(|e| -> RuntimeError { e.into() })?,
+                        <$callback_result>::try_from_wasm_error(runtime_error.downcast()?)
+                            .map_err(|e| -> RuntimeError { e.into() })?,
                     ),
                     Err((_zome, other_error)) => return Err(other_error),
                     Ok(None) => break,

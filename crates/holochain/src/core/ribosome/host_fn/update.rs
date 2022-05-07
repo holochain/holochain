@@ -46,7 +46,7 @@ pub fn update<'a>(
                             chain_top_ordering,
                         )
                         .await
-                        .map_err(|source_chain_error| {
+                        .map_err(|source_chain_error| -> RuntimeError {
                             wasm_error!(WasmErrorInner::Host(source_chain_error.to_string())).into()
                         })
                 }),
@@ -55,12 +55,11 @@ pub fn update<'a>(
                     let entry_hash = EntryHash::with_data_sync(&entry);
 
                     // extract the zome position
-                    let header_zome_id =
-                        ribosome
-                            .zome_to_id(&call_context.zome)
-                            .map_err(|source_chain_error| {
-                                wasm_error!(WasmErrorInner::Host(source_chain_error.to_string()))
-                            })?;
+                    let header_zome_id = ribosome.zome_to_id(&call_context.zome).map_err(
+                        |source_chain_error| -> RuntimeError {
+                            wasm_error!(WasmErrorInner::Host(source_chain_error.to_string())).into()
+                        },
+                    )?;
 
                     // extract the entry defs for a zome
                     let entry_type = match entry_def_id {
@@ -109,8 +108,9 @@ pub fn update<'a>(
                         let header_hash = source_chain
                             .put(Some(zome), header_builder, Some(entry), chain_top_ordering)
                             .await
-                            .map_err(|source_chain_error| {
+                            .map_err(|source_chain_error| -> RuntimeError {
                                 wasm_error!(WasmErrorInner::Host(source_chain_error.to_string()))
+                                    .into()
                             })?;
                         Ok(header_hash)
                     })
@@ -124,7 +124,8 @@ pub fn update<'a>(
                 "update".into()
             )
             .to_string()
-        ))),
+        ))
+        .into()),
     }
 }
 

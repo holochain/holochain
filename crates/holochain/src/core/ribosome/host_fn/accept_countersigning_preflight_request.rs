@@ -50,8 +50,8 @@ pub fn accept_countersigning_preflight_request<'a>(
                     .expect("Must have source chain if write_workspace access is given")
                     .accept_countersigning_preflight_request(input.clone(), agent_index)
                     .await
-                    .map_err(|source_chain_error| {
-                        wasm_error!(WasmErrorInner::Host(source_chain_error.to_string()))
+                    .map_err(|source_chain_error| -> RuntimeError {
+                        wasm_error!(WasmErrorInner::Host(source_chain_error.to_string())).into()
                     })?;
                 let signature: Signature = match call_context
                     .host_context
@@ -61,7 +61,8 @@ pub fn accept_countersigning_preflight_request<'a>(
                         PreflightResponse::encode_fields_for_signature(
                             &input,
                             &countersigning_agent_state,
-                        )?
+                        )
+                        .map_err(|e| -> RuntimeError { wasm_error!(e.into()).into() })?
                         .into(),
                     )
                     .await
@@ -82,13 +83,15 @@ pub fn accept_countersigning_preflight_request<'a>(
                         {
                             error!(?unlock_result);
                         }
-                        return Err(wasm_error!(WasmErrorInner::Host(e.to_string())));
+                        return Err(wasm_error!(WasmErrorInner::Host(e.to_string())).into());
                     }
                 };
 
                 Ok(PreflightRequestAcceptance::Accepted(
                     PreflightResponse::try_new(input, countersigning_agent_state, signature)
-                        .map_err(|e| wasm_error!(WasmErrorInner::Host(e.to_string())))?,
+                        .map_err(|e| -> RuntimeError {
+                            wasm_error!(WasmErrorInner::Host(e.to_string())).into()
+                        })?,
                 ))
             })
         }
@@ -99,7 +102,8 @@ pub fn accept_countersigning_preflight_request<'a>(
                 "accept_countersigning_preflight_request".into(),
             )
             .to_string(),
-        ))),
+        ))
+        .into()),
     }
 }
 
@@ -115,6 +119,7 @@ pub mod wasm_test {
     use hdk::prelude::*;
     use holochain_state::source_chain::SourceChainError;
     use holochain_wasm_test_utils::TestWasm;
+    use holochain_wasmer_host::prelude::*;
 
     /// Allow ChainLocked error, panic on anything else
     fn expect_chain_locked(
@@ -295,9 +300,7 @@ pub mod wasm_test {
             .await;
         assert!(matches!(
             preflight_acceptance_fail,
-            Ok(Err(RibosomeError::WasmRuntimeError(
-                WasmError{ error: WasmErrorInner::Host(_), .. }
-            )))
+            Ok(Err(RibosomeError::WasmRuntimeError(RuntimeError { .. })))
         ));
 
         // Bob can also accept the preflight request.

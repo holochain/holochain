@@ -50,11 +50,13 @@ pub fn get_links<'a>(
                 .collect()
                 .await
             });
-            let results: Result<Vec<_>, _> = results
+            let results: Result<Vec<_>, RuntimeError> = results
                 .into_iter()
                 .map(|result| match result {
                     Ok(links_vec) => Ok(links_vec),
-                    Err(cascade_error) => Err(wasm_error!(WasmErrorInner::Host(cascade_error.to_string()))),
+                    Err(cascade_error) => {
+                        Err(wasm_error!(WasmErrorInner::Host(cascade_error.to_string())).into())
+                    }
                 })
                 .collect();
             let results = results?;
@@ -74,7 +76,8 @@ pub fn get_links<'a>(
                 "get_links".into(),
             )
             .to_string(),
-        ))),
+        ))
+        .into()),
     }
 }
 
@@ -217,10 +220,7 @@ pub mod slow_tests {
         let header_hash: HeaderHash = conductor.call(&alice, "create_baseless_link", ()).await;
         let links: Vec<Link> = conductor.call(&alice, "get_baseless_links", ()).await;
 
-        assert_eq!(
-            links[0].create_link_hash,
-            header_hash
-        );
+        assert_eq!(links[0].create_link_hash, header_hash);
         assert_eq!(
             links[0].target,
             EntryHash::from_raw_32([2_u8; 32].to_vec()).into(),
@@ -234,13 +234,12 @@ pub mod slow_tests {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::Link).await;
 
-        let header_hash: HeaderHash = conductor.call(&alice, "create_external_base_link", ()).await;
+        let header_hash: HeaderHash = conductor
+            .call(&alice, "create_external_base_link", ())
+            .await;
         let links: Vec<Link> = conductor.call(&alice, "get_external_links", ()).await;
 
-        assert_eq!(
-            links[0].create_link_hash,
-            header_hash
-        );
+        assert_eq!(links[0].create_link_hash, header_hash);
     }
 
     #[tokio::test(flavor = "multi_thread")]

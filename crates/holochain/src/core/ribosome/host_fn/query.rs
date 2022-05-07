@@ -24,7 +24,9 @@ pub fn query(
                 .expect("Must have source chain to query the source chain")
                 .query(input)
                 .await
-                .map_err(|source_chain_error| wasm_error!(WasmErrorInner::Host(source_chain_error.to_string())))?;
+                .map_err(|source_chain_error| -> RuntimeError {
+                    wasm_error!(WasmErrorInner::Host(source_chain_error.to_string())).into()
+                })?;
             Ok(elements)
         }),
         _ => Err(wasm_error!(WasmErrorInner::Host(
@@ -34,17 +36,17 @@ pub fn query(
                 "query".into(),
             )
             .to_string(),
-        ))),
+        )).into()),
     }
 }
 
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod slow_tests {
-    use hdk::prelude::*;
-    use query::ChainQueryFilter;
     use crate::core::ribosome::wasm_test::RibosomeTestFixture;
+    use hdk::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
+    use query::ChainQueryFilter;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn query_smoke_test() {

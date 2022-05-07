@@ -34,8 +34,8 @@ pub fn must_get_header<'a>(
                 match cascade
                     .retrieve_header(header_hash.clone(), NetworkGetOptions::must_get_options())
                     .await
-                    .map_err(|cascade_error| {
-                        wasm_error!(WasmErrorInner::Host(cascade_error.to_string()))
+                    .map_err(|cascade_error| -> RuntimeError {
+                        wasm_error!(WasmErrorInner::Host(cascade_error.to_string())).into()
                     })? {
                     Some(header) => Ok(header),
                     None => match call_context.host_context {
@@ -45,44 +45,41 @@ pub fn must_get_header<'a>(
                         | HostContext::PostCommit(_)
                         | HostContext::ZomeCall(_) => Err(wasm_error!(WasmErrorInner::Host(
                             format!("Failed to get SignedHeaderHashed {}", header_hash)
-                        ))),
-                        HostContext::Init(_) => RuntimeError::raise(Box::new(wasm_error!(
-                            WasmErrorInner::HostShortCircuit(
-                                holochain_serialized_bytes::encode(
-                                    &ExternIO::encode(InitCallbackResult::UnresolvedDependencies(
-                                        vec![header_hash.into()],
-                                    ))
-                                    .map_err(|e| wasm_error!(e.into()))?,
-                                )
-                                .map_err(|e| wasm_error!(e.into()))?
+                        ))
+                        .into()),
+                        HostContext::Init(_) => Err(wasm_error!(WasmErrorInner::HostShortCircuit(
+                            holochain_serialized_bytes::encode(
+                                &ExternIO::encode(InitCallbackResult::UnresolvedDependencies(
+                                    vec![header_hash.into()],
+                                ))
+                                .map_err(|e| -> RuntimeError { wasm_error!(e.into()).into() })?,
                             )
-                        ))),
-                        HostContext::Validate(_) => RuntimeError::raise(Box::new(wasm_error!(
-                            WasmErrorInner::HostShortCircuit(
-                                holochain_serialized_bytes::encode(
-                                    &ExternIO::encode(
-                                        ValidateCallbackResult::UnresolvedDependencies(vec![
-                                            header_hash.into()
-                                        ],)
-                                    )
-                                    .map_err(|e| wasm_error!(e.into()))?,
-                                )
-                                .map_err(|e| wasm_error!(e.into()))?
+                            .map_err(|e| -> RuntimeError { wasm_error!(e.into()).into() })?
+                        ))
+                        .into()),
+                        HostContext::Validate(_) => Err(wasm_error!(WasmErrorInner::HostShortCircuit(
+                            holochain_serialized_bytes::encode(
+                                &ExternIO::encode(ValidateCallbackResult::UnresolvedDependencies(
+                                    vec![header_hash.into()],
+                                ))
+                                .map_err(|e| -> RuntimeError { wasm_error!(e.into()).into() })?,
                             )
-                        ))),
-                        HostContext::ValidationPackage(_) => RuntimeError::raise(Box::new(
-                            wasm_error!(WasmErrorInner::HostShortCircuit(
+                            .map_err(|e| -> RuntimeError { wasm_error!(e.into()).into() })?
+                        ))
+                        .into()),
+                        HostContext::ValidationPackage(_) =>
+                           Err(wasm_error!(WasmErrorInner::HostShortCircuit(
                                 holochain_serialized_bytes::encode(
                                     &ExternIO::encode(
                                         ValidationPackageCallbackResult::UnresolvedDependencies(
                                             vec![header_hash.into(),]
                                         ),
                                     )
-                                    .map_err(|e| wasm_error!(e.into()))?
+                                    .map_err(|e| -> RuntimeError { wasm_error!(e.into()).into() })?
                                 )
-                                .map_err(|e| wasm_error!(e.into()))?,
-                            )),
-                        )),
+                                .map_err(|e| -> RuntimeError { wasm_error!(e.into()).into() })?,
+                            ))
+                            .into())
                     },
                 }
             })
@@ -94,6 +91,6 @@ pub fn must_get_header<'a>(
                 "must_get_header".into(),
             )
             .to_string(),
-        ))),
+        )).into()),
     }
 }
