@@ -4,6 +4,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Udpate lair to 0.1.3 - largely just documentation updates, but also re-introduces some dependency pinning to fix mismatch client/server version check [\#1377](https://github.com/holochain/holochain/pull/1377)
+
+## 0.0.138
+
 ## 0.0.137
 
 - Docs: Fix intra-doc links in all crates [\#1323](https://github.com/holochain/holochain/pull/1323)

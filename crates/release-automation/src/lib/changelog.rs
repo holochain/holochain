@@ -7,7 +7,6 @@ use comrak::nodes::{AstNode, NodeValue};
 use comrak::{format_commonmark, parse_document, Arena, ComrakOptions};
 use log::{debug, trace, warn};
 use once_cell::unsync::OnceCell;
-use semver::Version;
 use serde::Deserialize;
 use std::io::Write;
 use std::ops::Add;
@@ -1069,10 +1068,10 @@ pub(crate) fn cmd(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tests::workspace_mocker::{
-        example_workspace_1, example_workspace_1_aggregated_changelog,
+    use crate::{
+        crate_selection::CrateStateFlags,
+        tests::workspace_mocker::{example_workspace_1, example_workspace_1_aggregated_changelog},
     };
-    use crate::CrateStateFlags;
     use comrak::*;
     use enumflags2::make_bitflags;
 
