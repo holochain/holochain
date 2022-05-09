@@ -39,6 +39,7 @@ async fn can_update_state() {
     })
     .unwrap();
     let conductor = Conductor::new(
+        Default::default(),
         dna_store,
         keystore,
         holochain_p2p,
@@ -91,6 +92,7 @@ async fn can_add_clone_cell_to_app() {
     .unwrap();
 
     let conductor = Conductor::new(
+        Default::default(),
         dna_store,
         keystore,
         holochain_p2p,
@@ -168,6 +170,7 @@ async fn app_ids_are_unique() {
     })
     .unwrap();
     let conductor = Conductor::new(
+        Default::default(),
         dna_store,
         test_keystore(),
         holochain_p2p,

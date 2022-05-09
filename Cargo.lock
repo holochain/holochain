@@ -1797,9 +1797,9 @@ dependencies = [
 
 [[package]]
 name = "hc_seed_bundle"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ae01760e90dcdb62fb1b82ac79c8cf8da5cf727fc72efc771c59491d9a96a6bf"
+checksum = "0cd58bbdef35b067ac8628d1aefab03083f95c976a592f3fb4c57afa8ab392eb"
 dependencies = [
  "futures",
  "one_err",
@@ -3039,7 +3039,7 @@ dependencies = [
  "kitsune_p2p_dht",
  "kitsune_p2p_dht_arc",
  "lair_keystore_api 0.0.10",
- "lair_keystore_api 0.1.1",
+ "lair_keystore_api 0.1.3",
  "lru",
  "mockall 0.10.2",
  "nanoid 0.3.0",
@@ -3106,9 +3106,9 @@ dependencies = [
 
 [[package]]
 name = "lair_keystore_api"
-version = "0.1.1"
+version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "600142edf1ab2ca63e5606cc88b30611c9adc51748d7d12e94410abacd3c750a"
+checksum = "31d52f8d74a3a7c50667fd881e3ea8e7efd8c44774280afdeb0541fc71c13cbe"
 dependencies = [
  "base64",
  "dunce",

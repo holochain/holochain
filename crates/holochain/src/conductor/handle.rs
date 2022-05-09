@@ -65,6 +65,7 @@ use crate::core::workflow::ZomeCallResult;
 use derive_more::From;
 use futures::future::FutureExt;
 use futures::StreamExt;
+use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_conductor_api::AppStatusFilter;
 use holochain_conductor_api::FullStateDump;
 use holochain_conductor_api::InstalledAppInfo;
@@ -176,6 +177,9 @@ pub trait ConductorHandleT: Send + Sync {
 
     /// Get the running queue consumer workflows per [`DnaHash`] map.
     fn get_queue_consumer_workflows(&self) -> QueueConsumerMap;
+
+    /// Get the conductor config
+    fn get_config(&self) -> &ConductorConfig;
 
     /// Return the JoinHandle for all managed tasks, which when resolved will
     /// signal that the Conductor has completely shut down.
@@ -590,6 +594,10 @@ impl ConductorHandleT for ConductorHandleImpl {
         self.conductor
             .dna_store()
             .share_ref(|ds| ds.get_entry_def(key))
+    }
+
+    fn get_config(&self) -> &ConductorConfig {
+        &self.conductor.config
     }
 
     #[instrument(skip(self))]

@@ -206,6 +206,9 @@ pub mod tuning_params_struct {
         /// Do not change this except in testing environments.
         /// [Default: 1 hour]
         danger_gossip_recent_threshold_secs: u64 = super::RECENT_THRESHOLD_DEFAULT.as_secs(),
+
+        /// Don't publish ops, only rely on gossip. Useful for testing the efficacy of gossip.
+        disable_publish: bool = false,
     }
 
     impl KitsuneP2pTuningParams {

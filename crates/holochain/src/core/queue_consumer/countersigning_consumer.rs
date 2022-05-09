@@ -28,7 +28,10 @@ pub(crate) fn spawn_countersigning_consumer(
 
             // Run the workflow
             match countersigning_workflow(&space, &dna_network, &trigger_sys).await {
-                Ok(WorkComplete::Incomplete) => trigger_self.trigger(),
+                Ok(WorkComplete::Incomplete) => {
+                    tracing::debug!("Work incomplete, retriggering workflow");
+                    trigger_self.trigger(&"retrigger")
+                }
                 Err(err) => handle_workflow_error(err)?,
                 _ => (),
             };
