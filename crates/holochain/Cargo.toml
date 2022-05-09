@@ -163,3 +163,6 @@ db-encryption = ['holochain_sqlite/db-encryption']
 # Compile SQLite from source rather than depending on a library.
 # Incompatible with "db-encryption"
 no-deps = ['holochain_sqlite/no-deps']
+
+# Extremely verbose wasm memory read/write logging
+wasmer_debug_memory = ["holochain_wasmer_host/debug_memory"]
