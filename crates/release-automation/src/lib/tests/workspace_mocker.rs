@@ -1,6 +1,6 @@
 use crate::*;
 
-use anyhow::Context;
+use anyhow::{bail, Context};
 use cargo_test_support::git::{self, Repository};
 use cargo_test_support::{Project, ProjectBuilder};
 use educe::Educe;
