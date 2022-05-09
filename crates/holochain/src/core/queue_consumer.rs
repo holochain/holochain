@@ -437,18 +437,18 @@ impl InitialQueueTriggers {
 
     /// Initialize all the workflows once.
     pub fn initialize_workflows(self) {
-        self.sys_validation.trigger();
-        self.app_validation.trigger();
-        self.integrate_dht_ops.trigger();
-        self.publish_dht_ops.trigger();
-        self.validation_receipt.trigger();
+        self.sys_validation.trigger(&"init");
+        self.app_validation.trigger(&"init");
+        self.integrate_dht_ops.trigger(&"init");
+        self.publish_dht_ops.trigger(&"init");
+        self.validation_receipt.trigger(&"init");
     }
 }
 /// The means of nudging a queue consumer to tell it to look for more work
 #[derive(Clone)]
 pub struct TriggerSender {
     /// The actual trigger sender.
-    trigger: broadcast::Sender<()>,
+    trigger: broadcast::Sender<&'static &'static str>,
     /// Reset the back off loop if there is one.
     reset_back_off: Option<Arc<AtomicBool>>,
     /// Pause / resume the back off loop if there is one.
@@ -458,7 +458,7 @@ pub struct TriggerSender {
 /// The receiving end of a queue trigger channel
 pub struct TriggerReceiver {
     /// The actual trigger.
-    rx: broadcast::Receiver<()>,
+    rx: broadcast::Receiver<&'static &'static str>,
     /// If there is a back off loop, should
     /// the trigger reset the back off.
     reset_on_trigger: bool,
@@ -528,8 +528,8 @@ impl TriggerSender {
 
     /// Lazily nudge the consumer task, ignoring the case where the consumer
     /// already has a pending trigger signal
-    pub fn trigger(&self) {
-        if self.trigger.send(()).is_err() {
+    pub fn trigger(&self, context: &'static &'static str) {
+        if self.trigger.send(context).is_err() {
             tracing::warn!(
                 "Queue consumer trigger was sent while Cell is shutting down: ignoring."
             );
@@ -562,7 +562,7 @@ impl TriggerSender {
     pub fn resume_loop_now(&self) {
         if let Some(pause) = &self.pause_back_off {
             if pause.fetch_and(false, Ordering::AcqRel) {
-                self.trigger();
+                self.trigger(&"resume_loop_now");
             }
         }
     }
@@ -655,9 +655,14 @@ impl TriggerReceiver {
 }
 
 /// Create a future that will be ok with either a recv or a lagged.
-async fn rx_fut(rx: &mut broadcast::Receiver<()>) -> Result<(), QueueTriggerClosedError> {
+async fn rx_fut(
+    rx: &mut broadcast::Receiver<&'static &'static str>,
+) -> Result<(), QueueTriggerClosedError> {
     match rx.recv().await {
-        Ok(_) => Ok(()),
+        Ok(context) => {
+            tracing::trace!(msg = "trigger received", ?context);
+            Ok(())
+        }
         Err(broadcast::error::RecvError::Closed) => Err(QueueTriggerClosedError),
         Err(broadcast::error::RecvError::Lagged(_)) => Ok(()),
     }
