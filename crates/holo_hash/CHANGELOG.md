@@ -4,8 +4,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.0.25
+
 - Add `Into<AnyLinkableHash>` impl for `EntryHashB64` and `HeaderHashB64`
-- Add some helpful methods for converting from a "composite" hash type (`AnyDhtHash` or `AnyLinkableHash`) into their respective primitive types:
+- Add some helpful methods for converting from a “composite” hash type (`AnyDhtHash` or `AnyLinkableHash`) into their respective primitive types:
   - `AnyDhtHash::into_primitive()`, returns an enum
   - `AnyDhtHash::into_entry_hash()`, returns `Option<EntryHash>`
   - `AnyDhtHash::into_header_hash()`, returns `Option<HeaderHash>`

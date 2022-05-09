@@ -6,6 +6,72 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20220509.093844
+
+## [holochain\_cli-0.0.37](crates/holochain_cli/CHANGELOG.md#0.0.37)
+
+## [holochain\_cli\_sandbox-0.0.33](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.33)
+
+## [holochain\_cli\_bundle-0.0.33](crates/holochain_cli_bundle/CHANGELOG.md#0.0.33)
+
+## [holochain-0.0.139](crates/holochain/CHANGELOG.md#0.0.139)
+
+- Udpate lair to 0.1.3 - largely just documentation updates, but also re-introduces some dependency pinning to fix mismatch client/server version check [\#1377](https://github.com/holochain/holochain/pull/1377)
+
+## [holochain\_websocket-0.0.37](crates/holochain_websocket/CHANGELOG.md#0.0.37)
+
+## [holochain\_test\_wasm\_common-0.0.33](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.33)
+
+## [holochain\_conductor\_api-0.0.39](crates/holochain_conductor_api/CHANGELOG.md#0.0.39)
+
+## [holochain\_cascade-0.0.39](crates/holochain_cascade/CHANGELOG.md#0.0.39)
+
+## [holochain\_state-0.0.39](crates/holochain_state/CHANGELOG.md#0.0.39)
+
+## [holochain\_wasm\_test\_utils-0.0.38](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.38)
+
+## [holochain\_p2p-0.0.37](crates/holochain_p2p/CHANGELOG.md#0.0.37)
+
+## [kitsune\_p2p\_bootstrap-0.0.11](crates/kitsune_p2p_bootstrap/CHANGELOG.md#0.0.11)
+
+## [holochain\_types-0.0.37](crates/holochain_types/CHANGELOG.md#0.0.37)
+
+## [holochain\_keystore-0.0.37](crates/holochain_keystore/CHANGELOG.md#0.0.37)
+
+## [holochain\_sqlite-0.0.37](crates/holochain_sqlite/CHANGELOG.md#0.0.37)
+
+## [kitsune\_p2p-0.0.32](crates/kitsune_p2p/CHANGELOG.md#0.0.32)
+
+## [kitsune\_p2p\_proxy-0.0.24](crates/kitsune_p2p_proxy/CHANGELOG.md#0.0.24)
+
+## [kitsune\_p2p\_transport\_quic-0.0.24](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.0.24)
+
+## [kitsune\_p2p\_types-0.0.24](crates/kitsune_p2p_types/CHANGELOG.md#0.0.24)
+
+## [hdk-0.0.132](crates/hdk/CHANGELOG.md#0.0.132)
+
+- hdk: Provide `Into<AnyLinkableHash>` impl for `EntryHash` and `HeaderHash`. This allows `create_link` and `get_links` to be used directly with EntryHash and HeaderHash arguments, rather than needing to construct an `AnyLinkableHash` explicitly.
+
+## [holochain\_zome\_types-0.0.33](crates/holochain_zome_types/CHANGELOG.md#0.0.33)
+
+## [holochain\_deterministic\_integrity-0.0.5](crates/holochain_deterministic_integrity/CHANGELOG.md#0.0.5)
+
+## [hdk\_derive-0.0.33](crates/hdk_derive/CHANGELOG.md#0.0.33)
+
+## [holochain\_integrity\_types-0.0.5](crates/holochain_integrity_types/CHANGELOG.md#0.0.5)
+
+## [holo\_hash-0.0.25](crates/holo_hash/CHANGELOG.md#0.0.25)
+
+- Add `Into<AnyLinkableHash>` impl for `EntryHashB64` and `HeaderHashB64`
+- Add some helpful methods for converting from a “composite” hash type (`AnyDhtHash` or `AnyLinkableHash`) into their respective primitive types:
+  - `AnyDhtHash::into_primitive()`, returns an enum
+  - `AnyDhtHash::into_entry_hash()`, returns `Option<EntryHash>`
+  - `AnyDhtHash::into_header_hash()`, returns `Option<HeaderHash>`
+  - `AnyLinkableHash::into_primitive()`, returns an enum
+  - `AnyLinkableHash::into_entry_hash()`, returns `Option<EntryHash>`
+  - `AnyLinkableHash::into_header_hash()`, returns `Option<HeaderHash>`
+  - `AnyLinkableHash::into_external_hash()`, returns `Option<ExternalHash>`
+
 # 20220505.103150
 
 ## [holochain\_cli-0.0.36](crates/holochain_cli/CHANGELOG.md#0.0.36)
