@@ -329,7 +329,6 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
                     // dbg!(&b);
                     sb.ops.iter().filter_map(move |(loc, o)| {
                         let contains = b.contains(&DhtLocation::from(*loc), &o.timestamp);
-                        // dbg!((&loc, &o.timestamp, contains));
                         contains.then(|| (o.hash.clone(), KitsuneOpData::new(vec![loc.as_u8()])))
                     })
                 })

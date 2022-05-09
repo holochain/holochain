@@ -21,7 +21,6 @@ pub fn valid_dht_op<'a>(
                 let header = op.header();
                 let h = header.entry_data();
                 let e = op.entry();
-                dbg!(&h, &e);
                 match (h, e) {
                     (Some((_entry_hash, entry_type)), Some(_e)) => {
                         // Ensure that entries are public

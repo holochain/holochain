@@ -29,7 +29,7 @@ impl Aggregate<RegionHash, Vec<u8>> for AggregateXor {
         } else {
             Err(Error::UserFunctionError(
                 format!(
-                    "REDUCE_XOR can only handle BLOBs of 32 bytes, but encountered one of {} bytes",
+                    "REDUCE_XOR can only handle BLOBs of 39 bytes, but encountered one of {} bytes",
                     len
                 )
                 .into(),

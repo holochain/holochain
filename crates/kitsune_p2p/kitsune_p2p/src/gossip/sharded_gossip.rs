@@ -800,7 +800,7 @@ impl ShardedGossipLocal {
                             .into_iter()
                             .map(|r| r.coords.to_bounds(&topo))
                             .collect();
-                        // TODO: make region set diffing more robust to different times / arc power levels.
+                        // TODO: make region set diffing more robust to different times (arc power differences are already handled)
 
                         let ops = self
                             .evt_sender
