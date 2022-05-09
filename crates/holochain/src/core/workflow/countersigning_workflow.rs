@@ -95,7 +95,7 @@ pub(crate) fn incoming_countersigning(
 
     // Trigger the workflow if we have new ops.
     if should_trigger {
-        trigger.trigger();
+        trigger.trigger(&"incoming_countersigning");
     }
     Ok(())
 }
@@ -259,7 +259,7 @@ pub(crate) async fn countersigning_success(
             &dht_db_cache,
         )
         .await?;
-        integration_trigger.trigger();
+        integration_trigger.trigger(&"countersigning_success");
         // Publish other signers agent activity ops to their agent activity authorities.
         for SignedHeader(header, signature) in signed_headers {
             if *header.author() == author {
@@ -280,7 +280,7 @@ pub(crate) async fn countersigning_success(
             entry_hash,
         )))?;
 
-        publish_trigger.trigger();
+        publish_trigger.trigger(&"publish countersigning_success");
     }
     Ok(())
 }

@@ -18,7 +18,7 @@ async fn test_trigger() {
 
     let (tx, mut rx) = TriggerSender::new();
     let jh = tokio::spawn(async move { rx.listen().await.unwrap() });
-    tx.trigger();
+    tx.trigger(&"");
 
     // This should be joined because the trigger was called.
     let r = jh.await;
@@ -33,8 +33,8 @@ async fn test_trigger() {
     });
     // Calling trigger twice before a listen should only
     // cause one listen to progress.
-    tx.trigger();
-    tx.trigger();
+    tx.trigger(&"");
+    tx.trigger(&"");
 
     // This should timeout because the second listen should not pass.
     let r = tokio::time::timeout(Duration::from_millis(100), jh).await;
@@ -130,7 +130,7 @@ async fn test_reset_on_trigger() {
             && timer.elapsed() < Duration::from_secs(60 * 2 + 1)
     );
 
-    tx.trigger();
+    tx.trigger(&"");
 
     // There should be one trigger immediately.
     let timer = tokio::time::Instant::now();
@@ -185,7 +185,7 @@ async fn test_concurrency() {
     let jh = tokio::spawn(async move { rx.listen().await.unwrap() });
     // - Make sure listen has been called already.
     tokio::time::sleep(Duration::from_millis(10)).await;
-    tx.trigger();
+    tx.trigger(&"");
     jh.await.unwrap();
     assert!(timer.elapsed() < Duration::from_millis(20));
 
@@ -278,7 +278,7 @@ async fn publish_loop() {
     );
 
     // - Triggering publish causes it to run again.
-    ts.trigger();
+    ts.trigger(&"");
 
     let timer = tokio::time::Instant::now();
     trigger_recv.listen().await.unwrap();
@@ -365,7 +365,7 @@ async fn publish_loop() {
         .unwrap();
 
     // - Publish runs due to a trigger.
-    ts.trigger();
+    ts.trigger(&"");
     let timer = tokio::time::Instant::now();
     trigger_recv.listen().await.unwrap();
     assert!(timer.elapsed() < Duration::from_secs(1));
