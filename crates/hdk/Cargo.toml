@@ -1,6 +1,6 @@
 [package]
 name = "hdk"
-version = "0.0.131"
+version = "0.0.132-dev.0"
 description = "The Holochain HDK"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain/tree/develop/crates/hdk"
@@ -27,13 +27,13 @@ test_utils = [
 properties = ["holochain_zome_types/properties"]
 
 [dependencies]
-holochain_deterministic_integrity = { version = "0.0.4", path = "../holochain_deterministic_integrity" }
-hdk_derive = { version = "0.0.32", path = "../hdk_derive" }
-holo_hash = { version = "0.0.24", path = "../holo_hash" }
+holochain_deterministic_integrity = { version = "0.0.5-dev.0", path = "../holochain_deterministic_integrity" }
+hdk_derive = { version = "0.0.33-dev.0", path = "../hdk_derive" }
+holo_hash = { version = "0.0.25-dev.0", path = "../holo_hash" }
 holochain_wasmer_guest = "=0.0.77"
 # it's important that we depend on holochain_zome_types with no default
 # features, both here AND in hdk_derive, to reduce code bloat
-holochain_zome_types = { version = "0.0.32", path = "../holochain_zome_types", default-features = false }
+holochain_zome_types = { version = "0.0.33-dev.0", path = "../holochain_zome_types", default-features = false }
 paste = "=1.0.5"
 serde = "1.0"
 serde_bytes = "0.11"
