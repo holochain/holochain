@@ -26,8 +26,28 @@ jobs:
               --substituters 'https://cache.nixos.org https://cachix.cachix.org' \
               --trusted-public-keys 'cachix.cachix.org-1:eWNHQldwUO7G2VkjpnjDbWwy4KQ/HNxht7H4SSoMckM= cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY='
 
+      - name: Fetch cargo related state and build files
+        uses: steveeJ-forks/actions-cache/restore@main
+        with:
+          path: |
+            /tmp/holochain_repo/.cargo/bin/
+            /tmp/holochain_repo/.cargo/registry/index/
+            /tmp/holochain_repo/.cargo/registry/cache/
+            /tmp/holochain_repo/.cargo/git/db/
+            /tmp/holochain_repo/target/
+          key: ${{ runner.os }}-test-${{ matrix.testCommand.name }}-${{ github.run_id }}
+          restore-keys: |
+            ${{ runner.os }}-test-cargo-test-slow
+            ${{ runner.os }}-test
+            ${{ runner.os }}-prepare
+          required: false
+
       - name: Checkout repository
         uses: actions/checkout@v2.4.0
+      - name: Move cargo related state and build files
+        run: |
+          mv -f /tmp/holochain_repo/.cargo ./
+          mv -f /tmp/holochain_repo/target/ ./
       - name: Set NIX_PATH (FIXME)
         run: echo NIX_PATH=nixpkgs=$(./scripts/nix_path.sh) >> $GITHUB_ENV
       - name: Setup upterm session
