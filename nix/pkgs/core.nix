@@ -45,6 +45,16 @@ rec {
     cargo test ''${CARGO_TEST_ARGS:-} -p holochain --features slow_tests,test_utils,build_wasms,db-encryption --profile fast-test -- --nocapture
   '';
 
+  hcSlowTestsIter = writeShellScriptBin "hc-test-slow-iter" ''
+    set -euo pipefail
+    export RUST_BACKTRACE=1
+
+    for i in `seq 1 ''${1}`; do
+      echo -n "$i: "
+      time env RUST_TEST_THREADS=$i hc-test-slow > /dev/null 2>&1
+    done
+  '';
+
   hcWasmTests = writeShellScriptBin "hc-test-wasm" ''
     set -euxo pipefail
     export RUST_BACKTRACE=1
