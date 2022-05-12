@@ -42,19 +42,7 @@ rec {
 
     # alas, we cannot specify --features in the virtual workspace
     # run the specific slow tests in the holochain crate
-    for i in $(((RANDOM % NUM_JOBS) + 1)) $NUM_JOBS 1 ; do
-      if env \
-        RUST_TEST_THREADS=$i \
-        cargo test ''${CARGO_TEST_ARGS:-} -p holochain --features slow_tests,test_utils,build_wasms,db-encryption --profile fast-test -- --nocapture
-      then
-        echo succeeded with RUST_TEST_THREADS=$i
-        exit 0
-      else
-        export LAST_STATUS=$?
-      fi
-    done
-
-    exit $LAST_STATUS
+    cargo test ''${CARGO_TEST_ARGS:-} -p holochain --features slow_tests,test_utils,build_wasms,db-encryption --profile fast-test -- --nocapture
   '';
 
   hcWasmTests = writeShellScriptBin "hc-test-wasm" ''
