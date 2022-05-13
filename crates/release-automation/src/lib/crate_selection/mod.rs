@@ -293,6 +293,8 @@ pub(crate) enum CrateStateFlags {
     MissingLicense,
     /// Has a dependency that contains '*'
     HasWildcardDependency,
+    /// Has a dev-dependency that contains '*'
+    HasWildcardDevDependency,
     /// One of the manifest keywords is too long
     ManifestKeywordExceeds20Chars,
     ManifestKeywordContainsInvalidChar,
@@ -776,7 +778,10 @@ impl<'a> ReleaseWorkspace<'a> {
 
                         for dep in member.package().dependencies() {
                             if dep.version_req().to_string().contains('*') {
-                                insert_state!(CrateStateFlags::HasWildcardDependency);
+                                insert_state!(match dep.kind() {
+                                    CargoDepKind::Normal | CargoDepKind::Build => CrateStateFlags::HasWildcardDependency,
+                                    CargoDepKind::Development => CrateStateFlags::HasWildcardDevDependency,
+                                });
                             }
                         }
                     }
