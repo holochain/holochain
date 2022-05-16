@@ -1,0 +1,17 @@
+[package]
+name = "test_wasm_the_incredible_halt"
+version = "0.0.1"
+authors = [ "thedavidmeister", "thedavidmeister@gmail.com" ]
+edition = "2021"
+
+[lib]
+name = "test_wasm_the_incredible_halt"
+crate-type = [ "cdylib", "rlib" ]
+
+[dependencies]
+serde = "1.0"
+hdk = { path = "../../../../hdk" }
+
+[features]
+default = []
+mock = ["hdk/mock"]

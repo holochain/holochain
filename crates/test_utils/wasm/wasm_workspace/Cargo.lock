@@ -1958,6 +1958,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_wasm_the_incredible_halt"
+version = "0.0.1"
+dependencies = [
+ "hdk",
+ "serde",
+]
+
+[[package]]
 name = "test_wasm_update_entry"
 version = "0.0.1"
 dependencies = [

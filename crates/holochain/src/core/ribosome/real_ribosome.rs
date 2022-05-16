@@ -682,6 +682,7 @@ pub mod wasm_test {
     use hdk::prelude::*;
     use holochain_types::prelude::AgentPubKeyFixturator;
     use holochain_wasm_test_utils::TestWasm;
+    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
 
     #[tokio::test(flavor = "multi_thread")]
     /// Basic checks that we can call externs internally and externally the way we want using the
@@ -736,5 +737,18 @@ pub mod wasm_test {
         } else {
             unreachable!();
         }
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn the_incredible_halt_test() {
+        observability::test_run().ok();
+        let RibosomeTestFixture {
+            conductor,
+            alice,
+            ..
+        } = RibosomeTestFixture::new(TestWasm::TheIncredibleHalt).await;
+
+        // This will run infinitely unless our metering kicks in and traps it.
+        let _: () = conductor.call(&alice, "smash", ()).await;
     }
 }

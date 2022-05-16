@@ -36,6 +36,7 @@ members = [
     "ser_regression",
     "sign",
     "sys_time",
+    "the_incredible_halt",
     "update_entry",
     "validate",
     "validate_invalid",
