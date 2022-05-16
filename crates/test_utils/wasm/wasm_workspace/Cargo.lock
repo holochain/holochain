@@ -625,7 +625,7 @@ dependencies = [
 
 [[package]]
 name = "hdk"
-version = "0.0.131"
+version = "0.0.132"
 dependencies = [
  "hdk_derive",
  "holo_hash",
@@ -643,7 +643,7 @@ dependencies = [
 
 [[package]]
 name = "hdk_derive"
-version = "0.0.32"
+version = "0.0.33"
 dependencies = [
  "holochain_integrity_types",
  "paste",
@@ -672,7 +672,7 @@ dependencies = [
 
 [[package]]
 name = "holo_hash"
-version = "0.0.24"
+version = "0.0.25"
 dependencies = [
  "base64",
  "blake2b_simd",
@@ -690,7 +690,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_deterministic_integrity"
-version = "0.0.4"
+version = "0.0.5"
 dependencies = [
  "hdk_derive",
  "holo_hash",
@@ -703,7 +703,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_integrity_types"
-version = "0.0.4"
+version = "0.0.5"
 dependencies = [
  "holo_hash",
  "holochain_serialized_bytes",
@@ -749,7 +749,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_test_wasm_common"
-version = "0.0.32"
+version = "0.0.33"
 dependencies = [
  "hdk",
  "serde",
@@ -784,7 +784,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_zome_types"
-version = "0.0.32"
+version = "0.0.33"
 dependencies = [
  "fixt",
  "holo_hash",
