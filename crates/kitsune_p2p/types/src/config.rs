@@ -192,6 +192,9 @@ pub mod tuning_params_struct {
         /// by the `SSLKEYLOGFILE` environment variable, or do nothing if
         /// it is not set, or is not writable.
         danger_tls_keylog: String = "no_keylog".to_string(),
+
+        /// Don't publish ops, only rely on gossip. Useful for testing the efficacy of gossip.
+        disable_publish: bool = false,
     }
 
     impl KitsuneP2pTuningParams {
