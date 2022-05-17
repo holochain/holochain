@@ -602,7 +602,7 @@ async fn mock_network_sharded_gossip() {
                                     ShardedGossipWire::AlreadyInProgress(_) => (),
                                     ShardedGossipWire::Busy(_) => (),
                                     ShardedGossipWire::Error(_) => (),
-                                    ShardedGossipWire::OpBloomsBatchReceived(_) => (),
+                                    ShardedGossipWire::OpBatchReceived(_) => (),
                                 }
                             }
                         }
@@ -1104,7 +1104,7 @@ async fn mock_network_sharding() {
                                     ShardedGossipWire::AlreadyInProgress(_) => (),
                                     ShardedGossipWire::Busy(_) => (),
                                     ShardedGossipWire::Error(_) => (),
-                                    ShardedGossipWire::OpBloomsBatchReceived(_) => (),
+                                    ShardedGossipWire::OpBatchReceived(_) => (),
                                 }
                             }
                         }

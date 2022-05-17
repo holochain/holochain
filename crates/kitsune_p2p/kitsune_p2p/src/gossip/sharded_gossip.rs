@@ -775,7 +775,7 @@ impl ShardedGossipLocal {
                     None => Vec::with_capacity(0),
                 }
             }
-            ShardedGossipWire::OpBloomsBatchReceived(_) => match self.get_state(&cert)? {
+            ShardedGossipWire::OpBatchReceived(_) => match self.get_state(&cert)? {
                 Some(state) => {
                     // The last ops batch has been received by the
                     // remote node so now send the next batch.
@@ -801,10 +801,10 @@ impl ShardedGossipLocal {
                 let state = match finished {
                     // This is a single chunk of ops. No need to reply.
                     MissingOpsStatus::ChunkComplete => self.get_state(&cert)?,
-                    // This is the last chunk in the batch. Reply with [`OpBloomsBatchReceived`]
+                    // This is the last chunk in the batch. Reply with [`OpBatchReceived`]
                     // to get the next batch of missing ops.
                     MissingOpsStatus::BatchComplete => {
-                        gossip = vec![ShardedGossipWire::op_blooms_batch_received()];
+                        gossip = vec![ShardedGossipWire::op_batch_received()];
                         self.get_state(&cert)?
                     }
                     // All the batches of missing ops for the bloom this node sent
@@ -979,7 +979,7 @@ pub enum MissingOpsStatus {
     /// There are more chunks in this batch to come. No reply is needed.
     ChunkComplete = 0,
     /// This chunk is done but there are more batches
-    /// to come and you should reply with [`OpBloomsBatchReceived`]
+    /// to come and you should reply with [`OpBatchReceived`]
     /// when you are ready to get the next batch.
     BatchComplete = 1,
     /// This is the final batch of missing ops and there
@@ -1045,14 +1045,14 @@ kitsune_p2p_types::write_codec_enum! {
             /// If the amount of missing ops is larger then the
             /// [`ShardedGossipLocal::UPPER_BATCH_BOUND`] then the set of
             /// missing ops chunks will be sent in batches.
-            /// Each batch will require a reply message of [`OpBloomsBatchReceived`]
+            /// Each batch will require a reply message of [`OpBatchReceived`]
             /// in order to get the next batch.
             /// This is to prevent overloading the receiver with too much
             /// incoming data.
             ///
             /// 0: There is more chunks in this batch to come. No reply is needed.
             /// 1: This chunk is done but there is more batches
-            /// to come and you should reply with [`OpBloomsBatchReceived`]
+            /// to come and you should reply with [`OpBatchReceived`]
             /// when you are ready to get the next batch.
             /// 2: This is the final missing ops and there
             /// are no more ops to come. No reply is needed.
@@ -1061,33 +1061,33 @@ kitsune_p2p_types::write_codec_enum! {
             finished.1: u8,
         },
 
-        /// The node you are trying to gossip with has no agents anymore.
-        NoAgents(0x80) {
+        /// I have received a complete batch of
+        /// missing ops and I am ready to receive the
+        /// next batch.
+        OpBatchReceived(0x61) {
         },
 
-        /// You have sent a stale initiate to a node
-        /// that already has an active round with you.
-        AlreadyInProgress(0x90) {
+
+        /// The node you are gossiping with has hit an error condition
+        /// and failed to respond to a request.
+        Error(0xa0) {
+            /// The error message.
+            message.0: String,
         },
 
         /// The node currently is gossiping with too many
         /// other nodes and is too busy to accept your initiate.
         /// Please try again later.
-        Busy(0x11) {
+        Busy(0xa1) {
         },
 
-        /// The node you are gossiping with has hit an error condition
-        /// and failed to respond to a request.
-        Error(0x12) {
-            /// The error message.
-            message.0: String,
+        /// The node you are trying to gossip with has no agents anymore.
+        NoAgents(0xa2) {
         },
 
-        /// I have received a complete batch of
-        /// missing ops and I am ready to receive the
-        /// next batch.
-        // TODO: rename to OpBatchReceived
-        OpBloomsBatchReceived(0x13) {
+        /// You have sent a stale initiate to a node
+        /// that already has an active round with you.
+        AlreadyInProgress(0xa3) {
         },
     }
 }
