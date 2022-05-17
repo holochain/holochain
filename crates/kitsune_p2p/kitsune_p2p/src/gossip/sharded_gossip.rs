@@ -759,7 +759,7 @@ impl ShardedGossipLocal {
                                 bloom: None,
                                 time: time_window,
                             };
-                            self.incoming_ops(state, filter, None).await?
+                            self.incoming_op_bloom(state, filter, None).await?
                         }
                         EncodedTimedBloomFilter::HaveHashes {
                             filter,
@@ -769,7 +769,7 @@ impl ShardedGossipLocal {
                                 bloom: Some(decode_bloom_filter(&filter)),
                                 time: time_window,
                             };
-                            self.incoming_ops(state, filter, None).await?
+                            self.incoming_op_bloom(state, filter, None).await?
                         }
                     },
                     None => Vec::with_capacity(0),
@@ -789,39 +789,7 @@ impl ShardedGossipLocal {
             },
             ShardedGossipWire::OpRegions(OpRegions { region_set }) => {
                 if let Some(state) = self.incoming_ops_finished(&cert)? {
-                    if let Some(sent) = state.region_set_sent.clone() {
-                        let diff_regions = sent.diff(region_set).map_err(KitsuneError::other)?;
-                        let topo = self
-                            .host_api
-                            .get_topology(self.space.clone())
-                            .await
-                            .map_err(KitsuneError::other)?;
-                        let bounds: Vec<_> = diff_regions
-                            .into_iter()
-                            .map(|r| r.coords.to_bounds(&topo))
-                            .collect();
-                        // TODO: make region set diffing more robust to different times (arc power differences are already handled)
-
-                        let ops = self
-                            .evt_sender
-                            .fetch_op_data(FetchOpDataEvt {
-                                space: self.space.clone(),
-                                query: FetchOpDataEvtQuery::Regions(bounds),
-                            })
-                            .await
-                            .map_err(KitsuneError::other)?
-                            .into_iter()
-                            .map(second)
-                            .collect();
-
-                        // FIXME: batching
-                        vec![ShardedGossipWire::missing_ops(ops, 2)]
-                    } else {
-                        tracing::error!(
-                            "We received OpRegions gossip without sending any ourselves"
-                        );
-                        vec![]
-                    }
+                    self.incoming_regions(state, region_set, None).await?
                 } else {
                     vec![]
                 }

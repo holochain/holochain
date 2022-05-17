@@ -36,7 +36,7 @@ impl ShardedGossipLocal {
     /// Incoming ops bloom.
     /// - Send back chunks of missing ops.
     /// - Don't send a chunk larger then MAX_SEND_BUF_SIZE.
-    pub(super) async fn incoming_ops(
+    pub(super) async fn incoming_op_bloom(
         &self,
         state: RoundState,
         mut remote_bloom: TimedBloomFilter,
@@ -70,6 +70,45 @@ impl ShardedGossipLocal {
             .await
     }
 
+    pub(super) async fn incoming_regions(
+        &self,
+        state: RoundState,
+        region_set: RegionSetLtcs,
+        mut queue_id: Option<usize>,
+    ) -> KitsuneResult<Vec<ShardedGossipWire>> {
+        Ok(if let Some(sent) = state.region_set_sent.clone() {
+            let diff_regions = sent.diff(region_set).map_err(KitsuneError::other)?;
+            let topo = self
+                .host_api
+                .get_topology(self.space.clone())
+                .await
+                .map_err(KitsuneError::other)?;
+            let bounds: Vec<_> = diff_regions
+                .into_iter()
+                .map(|r| r.coords.to_bounds(&topo))
+                .collect();
+            // TODO: make region set diffing more robust to different times (arc power differences are already handled)
+
+            let ops = self
+                .evt_sender
+                .fetch_op_data(FetchOpDataEvt {
+                    space: self.space.clone(),
+                    query: FetchOpDataEvtQuery::Regions(bounds),
+                })
+                .await
+                .map_err(KitsuneError::other)?
+                .into_iter()
+                .map(second)
+                .collect();
+
+            // FIXME: batching
+            vec![ShardedGossipWire::missing_ops(ops, 2)]
+        } else {
+            tracing::error!("We received OpRegions gossip without sending any ourselves");
+            vec![]
+        })
+    }
+
     /// Generate the next batch of missing ops.
     pub(super) async fn next_missing_ops_batch(
         &self,
@@ -90,7 +129,8 @@ impl ShardedGossipLocal {
             // The next batch is a bloom so the hashes need to be fetched before
             // fetching the hashes.
             Some((queue_id, QueuedOps::Bloom(remote_bloom))) => {
-                self.incoming_ops(state, remote_bloom, Some(queue_id)).await
+                self.incoming_op_bloom(state, remote_bloom, Some(queue_id))
+                    .await
             }
             // Nothing is queued so this node is done.
             None => Ok(vec![ShardedGossipWire::missing_ops(
