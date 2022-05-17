@@ -651,7 +651,10 @@ impl ShardedGossipLocal {
         })
     }
 
-    fn incoming_ops_finished(&self, state_id: &StateKey) -> KitsuneResult<Option<RoundState>> {
+    fn incoming_op_blooms_finished(
+        &self,
+        state_id: &StateKey,
+    ) -> KitsuneResult<Option<RoundState>> {
         self.inner.share_mut(|i, _| {
             let finished = i
                 .round_map
@@ -747,7 +750,7 @@ impl ShardedGossipLocal {
                 finished,
             }) => {
                 let state = if finished {
-                    self.incoming_ops_finished(&cert)?
+                    self.incoming_op_blooms_finished(&cert)?
                 } else {
                     self.get_state(&cert)?
                 };
@@ -775,21 +778,9 @@ impl ShardedGossipLocal {
                     None => Vec::with_capacity(0),
                 }
             }
-            ShardedGossipWire::OpBatchReceived(_) => match self.get_state(&cert)? {
-                Some(state) => {
-                    // The last ops batch has been received by the
-                    // remote node so now send the next batch.
-                    let r = self.next_missing_ops_batch(state.clone()).await?;
-                    if state.is_finished() {
-                        self.remove_state(&cert, false)?;
-                    }
-                    r
-                }
-                None => Vec::with_capacity(0),
-            },
             ShardedGossipWire::OpRegions(OpRegions { region_set }) => {
-                if let Some(state) = self.incoming_ops_finished(&cert)? {
-                    self.incoming_regions(state, region_set, None).await?
+                if let Some(state) = self.incoming_op_blooms_finished(&cert)? {
+                    self.queue_incoming_regions(state, region_set).await?
                 } else {
                     vec![]
                 }
@@ -842,6 +833,18 @@ impl ShardedGossipLocal {
                 }
                 gossip
             }
+            ShardedGossipWire::OpBatchReceived(_) => match self.get_state(&cert)? {
+                Some(state) => {
+                    // The last ops batch has been received by the
+                    // remote node so now send the next batch.
+                    let r = self.next_missing_ops_batch(state.clone()).await?;
+                    if state.is_finished() {
+                        self.remove_state(&cert, false)?;
+                    }
+                    r
+                }
+                None => Vec::with_capacity(0),
+            },
             ShardedGossipWire::NoAgents(_) => {
                 tracing::warn!("No agents to gossip with on the node {:?}", cert);
                 self.remove_state(&cert, true)?;
