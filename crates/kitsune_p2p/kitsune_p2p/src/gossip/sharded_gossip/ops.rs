@@ -76,37 +76,41 @@ impl ShardedGossipLocal {
         region_set: RegionSetLtcs,
         mut queue_id: Option<usize>,
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
-        Ok(if let Some(sent) = state.region_set_sent.clone() {
-            let diff_regions = sent.diff(region_set).map_err(KitsuneError::other)?;
-            let topo = self
-                .host_api
-                .get_topology(self.space.clone())
-                .await
-                .map_err(KitsuneError::other)?;
-            let bounds: Vec<_> = diff_regions
-                .into_iter()
-                .map(|r| r.coords.to_bounds(&topo))
-                .collect();
-            // TODO: make region set diffing more robust to different times (arc power differences are already handled)
+        Ok(
+            if let Some(sent) = state.region_set_sent.map(|r| (*r).clone()) {
+                let diff_regions = sent
+                    .diff((region_set).clone())
+                    .map_err(KitsuneError::other)?;
+                let topo = self
+                    .host_api
+                    .get_topology(self.space.clone())
+                    .await
+                    .map_err(KitsuneError::other)?;
+                let bounds: Vec<_> = diff_regions
+                    .into_iter()
+                    .map(|r| r.coords.to_bounds(&topo))
+                    .collect();
+                // TODO: make region set diffing more robust to different times (arc power differences are already handled)
 
-            let ops = self
-                .evt_sender
-                .fetch_op_data(FetchOpDataEvt {
-                    space: self.space.clone(),
-                    query: FetchOpDataEvtQuery::Regions(bounds),
-                })
-                .await
-                .map_err(KitsuneError::other)?
-                .into_iter()
-                .map(second)
-                .collect();
+                let ops = self
+                    .evt_sender
+                    .fetch_op_data(FetchOpDataEvt {
+                        space: self.space.clone(),
+                        query: FetchOpDataEvtQuery::Regions(bounds),
+                    })
+                    .await
+                    .map_err(KitsuneError::other)?
+                    .into_iter()
+                    .map(second)
+                    .collect();
 
-            // FIXME: batching
-            vec![ShardedGossipWire::missing_ops(ops, 2)]
-        } else {
-            tracing::error!("We received OpRegions gossip without sending any ourselves");
-            vec![]
-        })
+                // FIXME: batching
+                vec![ShardedGossipWire::missing_ops(ops, 2)]
+            } else {
+                tracing::error!("We received OpRegions gossip without sending any ourselves");
+                vec![]
+            },
+        )
     }
 
     /// Generate the next batch of missing ops.

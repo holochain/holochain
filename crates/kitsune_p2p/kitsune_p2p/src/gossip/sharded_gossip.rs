@@ -552,7 +552,7 @@ pub struct RoundState {
     round_timeout: std::time::Duration,
     /// The RegionSet we will send to our gossip partner during Historical
     /// gossip (will be None for Recent).
-    region_set_sent: Option<RegionSetLtcs>,
+    region_set_sent: Option<Arc<RegionSetLtcs>>,
 }
 
 impl ShardedGossipLocal {
@@ -602,7 +602,7 @@ impl ShardedGossipLocal {
             ops_batch_queue: OpsBatchQueue::new(),
             last_touch: Instant::now(),
             round_timeout: ROUND_TIMEOUT,
-            region_set_sent,
+            region_set_sent: region_set_sent.map(Arc::new),
         })
     }
 
