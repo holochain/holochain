@@ -14,6 +14,35 @@ pub struct OpsBatchQueueInner {
     /// is used to give the queues unique ids.
     next_id: usize,
     queues: HashMap<usize, VecDeque<QueuedOps>>,
+    region_queue: VecDeque<Region>,
+}
+
+/// Identify the next items to process from the region queue.
+/// Returns a tuple with the following items:
+/// - The regions for which op data needs to be queried and sent in this batch
+/// - An optional region which is too large and needs to be split up and pushed back
+///   onto this queue
+pub fn get_region_queue_batch(
+    queue: &mut VecDeque<Region>,
+    batch_size: u32,
+) -> (Vec<Region>, Option<Region>) {
+    let mut size = 0;
+    let mut to_fetch = vec![];
+    let mut to_split = None;
+    while let Some(region) = queue.pop_front() {
+        if region.data.size > batch_size {
+            to_split = Some(region);
+            break;
+        }
+        size += region.data.size;
+        if size > batch_size {
+            queue.push_front(region);
+            break;
+        } else {
+            to_fetch.push(region);
+        }
+    }
+    (to_fetch, to_split)
 }
 
 /// Queued missing ops hashes can either
@@ -109,32 +138,10 @@ impl ShardedGossipLocal {
             .map_err(KitsuneError::other)?;
 
         let (to_fetch, to_split, finished) = state.ops_batch_queue.share_mut(|mut queues, _| {
-            let mut size = 0;
-            let mut to_fetch = vec![];
-            let mut to_split = None;
-            let mut finished = true;
-            let mut q = queues.queues.get_mut(&queue_id).expect("Queue must exist");
-            while let Some(queued) = q.pop_front() {
-                if let QueuedOps::Region(region) = queued {
-                    if region.data.size as usize > MAX_SEND_BUF_BYTES {
-                        to_split = Some(region);
-                        finished = false;
-                        break;
-                    }
-                    size += region.data.size as usize;
-                    if size > MAX_SEND_BUF_BYTES {
-                        // save this for next iteration
-                        q.push_front(QueuedOps::Region(region));
-                        finished = false;
-                        break;
-                    } else {
-                        to_fetch.push(region);
-                    }
-                } else {
-                    unreachable!("This queue only contains regions.")
-                }
-            }
-            Ok((to_fetch, to_split, finished))
+            Ok(get_region_queue_batch(
+                &mut queues.region_queue,
+                MAX_SEND_BUF_BYTES as u32,
+            ))
         })?;
 
         let bounds: Vec<_> = to_fetch
@@ -144,6 +151,8 @@ impl ShardedGossipLocal {
         // TODO: make region set diffing more robust to different times (arc power differences are already handled)
 
         todo!("split up big region");
+
+        self.evt_sender.
 
         let ops = self
             .evt_sender

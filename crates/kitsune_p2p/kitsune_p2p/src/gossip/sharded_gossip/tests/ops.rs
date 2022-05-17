@@ -5,30 +5,7 @@ use kitsune_p2p_types::dht::{
     region::{Region, RegionCoords, RegionData},
 };
 
-fn region_queue_iteration(
-    queue: &mut VecDeque<Region>,
-    batch_size: u32,
-) -> (Vec<Region>, Option<Region>, bool) {
-    let mut size = 0;
-    let mut to_fetch = vec![];
-    let mut to_split = None;
-    let mut finished = true;
-    while let Some(region) = queue.pop_front() {
-        if region.data.size > batch_size {
-            to_split = Some(region);
-            break;
-        }
-        size += region.data.size;
-        if size > batch_size {
-            queue.push_front(region);
-            finished = false;
-            break;
-        } else {
-            to_fetch.push(region);
-        }
-    }
-    (to_fetch, to_split, finished)
-}
+use crate::gossip::sharded_gossip::ops::get_region_queue_batch;
 
 fn fake_region(count: u32, size: u32) -> Region {
     Region {
@@ -44,12 +21,11 @@ fn fake_region(count: u32, size: u32) -> Region {
     }
 }
 
-fn run(queue: &mut VecDeque<Region>, batch_size: u32) -> (Vec<u32>, Option<u32>, bool) {
-    let (fetch, split, fin) = region_queue_iteration(queue, batch_size);
+fn run(queue: &mut VecDeque<Region>, batch_size: u32) -> (Vec<u32>, Option<u32>) {
+    let (fetch, split) = get_region_queue_batch(queue, batch_size);
     (
         fetch.into_iter().map(|r| r.data.size).collect(),
         split.map(|r| r.data.size),
-        fin,
     )
 }
 
@@ -73,21 +49,21 @@ fn test_region_queue() {
 
     let r = run(&mut queue, BATCH_SIZE);
     assert_eq!(queue.len(), initial_len - 2);
-    assert_eq!(r, (vec![1000, 2000], None, false));
+    assert_eq!(r, (vec![1000, 2000], None));
 
     let r = run(&mut queue, BATCH_SIZE);
     assert_eq!(queue.len(), initial_len - 4);
-    assert_eq!(r, (vec![3000], Some(5000), false));
+    assert_eq!(r, (vec![3000], Some(5000)));
 
     let r = run(&mut queue, BATCH_SIZE);
     assert_eq!(queue.len(), initial_len - 5);
-    assert_eq!(r, (vec![], Some(8000), false));
+    assert_eq!(r, (vec![], Some(8000)));
 
     let r = run(&mut queue, BATCH_SIZE);
     assert_eq!(queue.len(), initial_len - 7);
-    assert_eq!(r, (vec![1000, 2000], None, false));
+    assert_eq!(r, (vec![1000, 2000], None));
 
     let r = run(&mut queue, BATCH_SIZE);
     assert_eq!(queue.len(), 0);
-    assert_eq!(r, (vec![3000], None, true));
+    assert_eq!(r, (vec![3000], None));
 }
