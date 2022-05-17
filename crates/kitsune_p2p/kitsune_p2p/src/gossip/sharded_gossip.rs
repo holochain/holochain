@@ -742,7 +742,7 @@ impl ShardedGossipLocal {
                 }
                 Vec::with_capacity(0)
             }
-            ShardedGossipWire::OpBlooms(OpBlooms {
+            ShardedGossipWire::OpBloom(OpBloom {
                 missing_hashes,
                 finished,
             }) => {
@@ -1022,8 +1022,8 @@ kitsune_p2p_types::write_codec_enum! {
             agents.0: Vec<Arc<AgentInfoSigned>>,
         },
 
-        /// Send Op Bloom filters
-        OpBlooms(0x50) {
+        /// Send Op Bloom filter
+        OpBloom(0x50) {
             /// The bloom filter for op data
             missing_hashes.0: EncodedTimedBloomFilter,
             /// Is this the last bloom to be sent?
