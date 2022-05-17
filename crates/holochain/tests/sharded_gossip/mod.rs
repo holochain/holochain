@@ -456,7 +456,7 @@ async fn mock_network_sharded_gossip() {
                                                 time_window: window,
                                             }
                                         } else {
-                                            let filter = create_ops_bloom(this_agent_hashes);
+                                            let filter = create_op_bloom(this_agent_hashes);
 
                                             EncodedTimedBloomFilter::HaveHashes {
                                                 time_window: window,
@@ -987,7 +987,7 @@ async fn mock_network_sharding() {
                                                 time_window: window,
                                             }
                                         } else {
-                                            let filter = create_ops_bloom(this_agent_hashes);
+                                            let filter = create_op_bloom(this_agent_hashes);
 
                                             EncodedTimedBloomFilter::HaveHashes {
                                                 time_window: window,

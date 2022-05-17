@@ -533,10 +533,10 @@ pub struct RoundState {
     common_arc_set: Arc<DhtArcSet>,
     /// Number of ops blooms we have sent for this round, which is also the
     /// number of MissingOps sets we expect in response
-    num_sent_ops_blooms: u8,
+    num_sent_op_blooms: u8,
     /// We've received the last op bloom filter from our partner
     /// (the one with `finished` == true)
-    received_all_incoming_ops_blooms: bool,
+    received_all_incoming_op_blooms: bool,
     /// Received all responses to OpRegions, which is the batched set of Op data
     /// in the diff of regions
     has_pending_historical_op_data: bool,
@@ -595,8 +595,8 @@ impl ShardedGossipLocal {
         Ok(RoundState {
             remote_agent_list,
             common_arc_set,
-            num_sent_ops_blooms: 0,
-            received_all_incoming_ops_blooms: false,
+            num_sent_op_blooms: 0,
+            received_all_incoming_op_blooms: false,
             has_pending_historical_op_data: false,
             bloom_batch_cursor: None,
             ops_batch_queue: OpsBatchQueue::new(),
@@ -657,7 +657,7 @@ impl ShardedGossipLocal {
                 .round_map
                 .get_mut(state_id)
                 .map(|state| {
-                    state.received_all_incoming_ops_blooms = true;
+                    state.received_all_incoming_op_blooms = true;
                     state.is_finished()
                 })
                 .unwrap_or(true);
@@ -669,11 +669,11 @@ impl ShardedGossipLocal {
         })
     }
 
-    fn decrement_ops_blooms(&self, state_id: &StateKey) -> KitsuneResult<Option<RoundState>> {
+    fn decrement_op_blooms(&self, state_id: &StateKey) -> KitsuneResult<Option<RoundState>> {
         self.inner.share_mut(|i, _| {
             let update_state = |state: &mut RoundState| {
-                let num_ops_blooms = state.num_sent_ops_blooms.saturating_sub(1);
-                state.num_sent_ops_blooms = num_ops_blooms;
+                let num_op_blooms = state.num_sent_op_blooms.saturating_sub(1);
+                state.num_sent_op_blooms = num_op_blooms;
                 // NOTE: there is only ever one "batch" of OpRegions
                 state.has_pending_historical_op_data = false;
                 state.is_finished()
@@ -844,14 +844,15 @@ impl ShardedGossipLocal {
                     MissingOpsStatus::AllComplete => {
                         // This node can decrement the number of outstanding ops bloom replies
                         // it is waiting for.
-                        let mut state = self.decrement_ops_blooms(&cert)?;
+                        let mut state = self.decrement_op_blooms(&cert)?;
 
                         // If there are more blooms to send because this node had to batch the blooms
                         // and all the outstanding blooms have been received then this node will send
                         // the next batch of ops blooms starting from the saved cursor.
-                        if let Some(state) = state.as_mut().filter(|s| {
-                            s.bloom_batch_cursor.is_some() && s.num_sent_ops_blooms == 0
-                        }) {
+                        if let Some(state) = state
+                            .as_mut()
+                            .filter(|s| s.bloom_batch_cursor.is_some() && s.num_sent_op_blooms == 0)
+                        {
                             // We will be producing some gossip so we need to allocate.
                             gossip = Vec::new();
                             // Generate the next ops blooms batch.
@@ -941,9 +942,9 @@ impl ShardedGossipLocal {
 }
 
 impl RoundState {
-    fn increment_sent_ops_blooms(&mut self) -> u8 {
-        self.num_sent_ops_blooms += 1;
-        self.num_sent_ops_blooms
+    fn increment_sent_op_blooms(&mut self) -> u8 {
+        self.num_sent_op_blooms += 1;
+        self.num_sent_op_blooms
     }
 
     /// A round is finished if:
@@ -952,9 +953,9 @@ impl RoundState {
     /// - This node has no saved ops bloom batch cursor.
     /// - This node has no queued missing ops to send to the remote node.
     fn is_finished(&self) -> bool {
-        self.num_sent_ops_blooms == 0
+        self.num_sent_op_blooms == 0
             && !self.has_pending_historical_op_data
-            && self.received_all_incoming_ops_blooms
+            && self.received_all_incoming_op_blooms
             && self.bloom_batch_cursor.is_none()
             && self.ops_batch_queue.is_empty()
     }
@@ -1117,6 +1118,7 @@ kitsune_p2p_types::write_codec_enum! {
         /// I have received a complete batch of
         /// missing ops and I am ready to receive the
         /// next batch.
+        // TODO: rename to OpBatchReceived
         OpBloomsBatchReceived(0x13) {
         },
     }

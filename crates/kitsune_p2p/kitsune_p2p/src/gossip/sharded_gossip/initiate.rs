@@ -254,7 +254,7 @@ impl ShardedGossipLocal {
             window.start = cursor;
         }
         let blooms = self
-            .generate_ops_blooms_for_time_window(&state.common_arc_set, window)
+            .generate_op_blooms_for_time_window(&state.common_arc_set, window)
             .await?;
 
         let blooms = match blooms {
@@ -293,7 +293,7 @@ impl ShardedGossipLocal {
                 // that hold the arc so request all the ops the remote holds.
                 None => EncodedTimedBloomFilter::MissingAllHashes { time_window },
             };
-            state.increment_sent_ops_blooms();
+            state.increment_sent_op_blooms();
 
             // Check if this is the final time window and the final bloom for this window.
             if i == len - 1 && state.bloom_batch_cursor.is_none() {
