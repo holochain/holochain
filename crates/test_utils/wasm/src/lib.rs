@@ -190,7 +190,9 @@ impl From<TestWasm> for DnaWasm {
             }
             TestWasm::Sign => get_code("wasm32-unknown-unknown/release/test_wasm_sign.wasm"),
             TestWasm::SysTime => get_code("wasm32-unknown-unknown/release/test_wasm_sys_time.wasm"),
-            TestWasm::TheIncredibleHalt => get_code("wasm32-unknown-unknown/release/test_wasm_the_incredible_halt.wasm"),
+            TestWasm::TheIncredibleHalt => {
+                get_code("wasm32-unknown-unknown/release/test_wasm_the_incredible_halt.wasm")
+            }
             TestWasm::Update => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_update_entry.wasm")
             }

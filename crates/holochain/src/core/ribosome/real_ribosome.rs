@@ -70,6 +70,12 @@ use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCallInvocation;
 use fallible_iterator::FallibleIterator;
 use holochain_types::prelude::*;
+use wasmer_middlewares::Metering;
+use holochain_wasmer_host::module::SerializedModuleCache;
+use crate::core::ribosome::real_ribosome::wasmparser::Operator;
+// This is here because there were errors about different crate versions
+// without it.
+use kitsune_p2p_types::dependencies::lair_keystore_api::dependencies::parking_lot::lock_api::RwLock;
 
 use holochain_wasmer_host::prelude::*;
 use once_cell::sync::Lazy;
@@ -224,6 +230,21 @@ impl RealRibosome {
     }
 
     pub fn module(&self, zome_name: &ZomeName) -> RibosomeResult<Arc<Module>> {
+        if holochain_wasmer_host::module::SERIALIZED_MODULE_CACHE
+            .get()
+            .is_none()
+        {
+            holochain_wasmer_host::module::SERIALIZED_MODULE_CACHE.set(RwLock::new(
+                SerializedModuleCache::default_with_cranelift(Self::cranelift_fn()),
+            ))
+            // An error here means the cell is full when we tried to set it, so
+            // some other thread must have done something in between the get
+            // above and the set here. In this case we don't care as we don't
+            // have any competing code paths that could set it to something
+            // unexpected.
+            .ok();
+        }
+
         Ok(holochain_wasmer_host::module::MODULE_CACHE.write().get(
             self.wasm_cache_key(zome_name)?,
             &*self.dna_file.get_wasm_for_zome(zome_name)?.code(),
@@ -347,6 +368,18 @@ impl RealRibosome {
         // Fallback to creating the instance.
         let instance = fallback(context_key)?;
         Ok((instance, context_key))
+    }
+
+    fn cranelift_fn() -> fn() -> Cranelift {
+        || {
+            let cost_function = |_operator: &Operator| -> u64 { 1 };
+            // @todo 10 giga-ops is totally arbitrary cutoff so we probably
+            // want to make the limit configurable somehow.
+            let metering = Arc::new(Metering::new(10_000_000_000, cost_function));
+            let mut cranelift = Cranelift::default();
+            cranelift.canonicalize_nans(true).push_middleware(metering);
+            cranelift
+        }
     }
 
     fn imports(&self, context_key: u64, store: &Store) -> ImportObject {
@@ -675,6 +708,7 @@ impl RibosomeT for RealRibosome {
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
+    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use crate::core::ribosome::ZomeCall;
     use crate::sweettest::SweetConductor;
     use crate::sweettest::SweetDnaFile;
@@ -682,7 +716,6 @@ pub mod wasm_test {
     use hdk::prelude::*;
     use holochain_types::prelude::AgentPubKeyFixturator;
     use holochain_wasm_test_utils::TestWasm;
-    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
 
     #[tokio::test(flavor = "multi_thread")]
     /// Basic checks that we can call externs internally and externally the way we want using the
@@ -743,12 +776,11 @@ pub mod wasm_test {
     async fn the_incredible_halt_test() {
         observability::test_run().ok();
         let RibosomeTestFixture {
-            conductor,
-            alice,
-            ..
+            conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::TheIncredibleHalt).await;
 
         // This will run infinitely unless our metering kicks in and traps it.
-        let _: () = conductor.call(&alice, "smash", ()).await;
+        let result: Result<(), _> = conductor.call_fallible(&alice, "smash", ()).await;
+        assert!(result.is_err());
     }
 }

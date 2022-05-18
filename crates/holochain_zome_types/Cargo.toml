@@ -23,7 +23,7 @@ serde_yaml = { version = "0.8", optional = true }
 subtle = "2"
 thiserror = "1.0.22"
 tracing = "0.1"
-holochain_wasmer_common = "=0.0.79"
+holochain_wasmer_common = "=0.0.80"
 
 # fixturator dependencies
 fixt = { version = "0.0.11", path = "../fixt", optional = true }
