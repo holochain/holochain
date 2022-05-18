@@ -674,7 +674,7 @@ async fn gather_published_data(
 async fn request_published_ops(
     db: &DbRead<DbKindAuthored>,
 ) -> StateQueryResult<Vec<(DhtLocation, KitsuneOpHash)>> {
-    Ok(db
+    db
         .async_reader(|txn| {
             // Collect all ops except StoreEntry's that are private.
             let r = txn
@@ -703,7 +703,7 @@ async fn request_published_ops(
                 .collect::<Result<_, _>>()?;
             StateQueryResult::Ok(r)
         })
-        .await?)
+        .await
 }
 
 /// Request the storage arc for the given agent.
