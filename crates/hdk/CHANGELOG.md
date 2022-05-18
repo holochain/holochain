@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Fixed hdk dependency which disabled tracing by default. If you have not seen output from HDK's `trace` in a while, this is why, and now it is fixed.
+
 ## 0.0.133
 
 ## 0.0.132
