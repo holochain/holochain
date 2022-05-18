@@ -47,6 +47,8 @@ let
       '';
 
       crate2nix = import sources.crate2nix.outPath { };
+
+      cargo-nextest = (import sources.nixos-unstable { }).cargo-nextest;
     })
 
   ];
