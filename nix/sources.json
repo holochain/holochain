@@ -22,5 +22,17 @@
         "type": "tarball",
         "url": "https://github.com/holochain/holonix/archive/8242e5148fab82c6259af93d4aac9267a4eac6ba.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
+    "nixos-unstable": {
+        "branch": "nixos-unstable",
+        "description": "Nix Packages collection",
+        "homepage": "",
+        "owner": "nixos",
+        "repo": "nixpkgs",
+        "rev": "1d7db1b9e4cf1ee075a9f52e5c36f7b9f4207502",
+        "sha256": "1w7nrdq5pgmyc5p8lb86ljb3by02dhcmrc008hvaa4s45mf6p8qn",
+        "type": "tarball",
+        "url": "https://github.com/nixos/nixpkgs/archive/1d7db1b9e4cf1ee075a9f52e5c36f7b9f4207502.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     }
 }
