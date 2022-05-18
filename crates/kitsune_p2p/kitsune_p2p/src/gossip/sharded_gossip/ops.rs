@@ -137,7 +137,7 @@ impl ShardedGossipLocal {
             .await
             .map_err(KitsuneError::other)?;
 
-        let (to_fetch, to_split, finished) = state.ops_batch_queue.share_mut(|mut queues, _| {
+        let (to_fetch, to_split) = state.ops_batch_queue.share_mut(|mut queues, _| {
             Ok(get_region_queue_batch(
                 &mut queues.region_queue,
                 MAX_SEND_BUF_BYTES as u32,
@@ -152,8 +152,6 @@ impl ShardedGossipLocal {
 
         todo!("split up big region");
 
-        self.evt_sender.
-
         let ops = self
             .evt_sender
             .fetch_op_data(FetchOpDataEvt {
@@ -166,7 +164,7 @@ impl ShardedGossipLocal {
             .map(second)
             .collect();
 
-        let finished = if finished { 2 } else { 1 };
+        let finished = if todo!() { 2 } else { 1 };
         Ok(vec![ShardedGossipWire::missing_ops(ops, finished)])
     }
 
@@ -347,6 +345,7 @@ impl OpsBatchQueueInner {
         Self {
             next_id: 0,
             queues: HashMap::new(),
+            region_queue: VecDeque::new(),
         }
     }
 
