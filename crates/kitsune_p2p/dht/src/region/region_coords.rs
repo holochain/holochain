@@ -29,6 +29,29 @@ impl RegionCoords {
         self.space.contains_quantum(topo, coords.space)
             && self.time.contains_quantum(topo, coords.time)
     }
+
+    /// Split this region into 4 equal subregions, if possible.
+    /// If one dimension is quantum, bisect the non-quantum dimension.
+    /// If both dimensions are quantum, return None.
+    pub fn quadrisect(self) -> Option<Vec<Self>> {
+        let Self { space, time } = self;
+        let (ss, ts) = match (space.bisect(), time.bisect()) {
+            (Some(ss), Some(ts)) => Some((ss.to_vec(), ts.to_vec())),
+            (Some(ss), None) => Some((ss.to_vec(), vec![time])),
+            (None, Some(ts)) => Some((vec![space], ts.to_vec())),
+            (None, None) => None,
+        }?;
+        Some(
+            ss.into_iter()
+                .flat_map(|s| {
+                    ts.iter().map(move |t| RegionCoords {
+                        space: s.clone(),
+                        time: t.clone(),
+                    })
+                })
+                .collect(),
+        )
+    }
 }
 
 /// A region specified in absolute coords, rather than quantum coords.
@@ -92,6 +115,37 @@ mod tests {
         assert_eq!(
             b.t.1,
             Timestamp::from_str("2022-01-01T17:19:59.999999Z").unwrap()
+        );
+    }
+
+    #[test]
+    fn test_quadrisect() {
+        assert_eq!(
+            RegionCoords::new(SpaceSegment::new(12, 100), TimeSegment::new(4, 12)).quadrisect(),
+            Some(vec![
+                RegionCoords::new(SpaceSegment::new(11, 200), TimeSegment::new(3, 24)),
+                RegionCoords::new(SpaceSegment::new(11, 200), TimeSegment::new(3, 25)),
+                RegionCoords::new(SpaceSegment::new(11, 201), TimeSegment::new(3, 24)),
+                RegionCoords::new(SpaceSegment::new(11, 201), TimeSegment::new(3, 25)),
+            ])
+        );
+        assert_eq!(
+            RegionCoords::new(SpaceSegment::new(12, 100), TimeSegment::new(0, 12)).quadrisect(),
+            Some(vec![
+                RegionCoords::new(SpaceSegment::new(11, 200), TimeSegment::new(0, 12)),
+                RegionCoords::new(SpaceSegment::new(11, 201), TimeSegment::new(0, 12)),
+            ])
+        );
+        assert_eq!(
+            RegionCoords::new(SpaceSegment::new(0, 100), TimeSegment::new(4, 12)).quadrisect(),
+            Some(vec![
+                RegionCoords::new(SpaceSegment::new(0, 100), TimeSegment::new(3, 24)),
+                RegionCoords::new(SpaceSegment::new(0, 100), TimeSegment::new(3, 25)),
+            ])
+        );
+        assert_eq!(
+            RegionCoords::new(SpaceSegment::new(0, 100), TimeSegment::new(0, 12)).quadrisect(),
+            None
         );
     }
 }

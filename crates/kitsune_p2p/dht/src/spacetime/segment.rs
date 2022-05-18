@@ -171,16 +171,16 @@ impl<O: Offset> Segment<O> {
     }
 
     /// Split a segment in half
-    pub fn halve(self) -> Option<(Self, Self)> {
+    pub fn bisect(&self) -> Option<[Self; 2]> {
         if self.power == 0 {
             // Can't split a quantum value (a leaf has no children)
             None
         } else {
             let power = self.power - 1;
-            Some((
+            Some([
                 Segment::new(power, O::from(*self.offset * 2)),
                 Segment::new(power, O::from(*self.offset * 2 + 1)),
-            ))
+            ])
         }
     }
 }
