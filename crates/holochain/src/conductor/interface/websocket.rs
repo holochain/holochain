@@ -149,7 +149,9 @@ async fn recv_incoming_admin_msgs<A: InterfaceApi>(
         .for_each_concurrent(4096, move |msg| {
             let api = api.clone();
             async move {
-                if let Err(e) = handle_incoming_message(msg, api.clone()).await { error!(error = &e as &dyn std::error::Error) }
+                if let Err(e) = handle_incoming_message(msg, api.clone()).await {
+                    error!(error = &e as &dyn std::error::Error)
+                }
             }
         })
         .await;
