@@ -21,16 +21,15 @@ fn fake_region(count: u32, size: u32) -> Region {
     }
 }
 
-fn run(queue: &mut VecDeque<Region>, batch_size: u32) -> (Vec<u32>, Option<u32>) {
-    let (fetch, split) = get_region_queue_batch(queue, batch_size);
-    (
-        fetch.into_iter().map(|r| r.data.size).collect(),
-        split.map(|r| r.data.size),
-    )
-}
-
 #[test]
 fn test_region_queue() {
+    fn run(queue: &mut VecDeque<Region>, batch_size: u32) -> Vec<u32> {
+        get_region_queue_batch(queue, batch_size)
+            .into_iter()
+            .map(|r| r.data.size)
+            .collect()
+    }
+
     const BATCH_SIZE: u32 = 4000;
     let mut queue: VecDeque<_> = vec![
         fake_region(1, 1000),
@@ -49,21 +48,25 @@ fn test_region_queue() {
 
     let r = run(&mut queue, BATCH_SIZE);
     assert_eq!(queue.len(), initial_len - 2);
-    assert_eq!(r, (vec![1000, 2000], None));
+    assert_eq!(r, (vec![1000, 2000]));
 
     let r = run(&mut queue, BATCH_SIZE);
     assert_eq!(queue.len(), initial_len - 4);
-    assert_eq!(r, (vec![3000], Some(5000)));
+    assert_eq!(r, (vec![3000]));
 
     let r = run(&mut queue, BATCH_SIZE);
     assert_eq!(queue.len(), initial_len - 5);
-    assert_eq!(r, (vec![], Some(8000)));
+    assert_eq!(r, (vec![5000]));
+
+    let r = run(&mut queue, BATCH_SIZE);
+    assert_eq!(queue.len(), initial_len - 6);
+    assert_eq!(r, (vec![8000]));
 
     let r = run(&mut queue, BATCH_SIZE);
     assert_eq!(queue.len(), initial_len - 7);
-    assert_eq!(r, (vec![1000, 2000], None));
+    assert_eq!(r, (vec![1000, 2000]));
 
     let r = run(&mut queue, BATCH_SIZE);
     assert_eq!(queue.len(), 0);
-    assert_eq!(r, (vec![3000], None));
+    assert_eq!(r, (vec![3000]));
 }

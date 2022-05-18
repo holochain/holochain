@@ -76,6 +76,17 @@ impl KitsuneHost for SwitchboardEventHandler {
         box_fut(Ok(()))
     }
 
+    fn query_size_limited_regions(
+        &self,
+        _space: Arc<KitsuneSpace>,
+        _size_limit: u32,
+        regions: Vec<dht::region::Region>,
+    ) -> crate::KitsuneHostResult<Vec<dht::region::Region>> {
+        // This false implementation will work fine as long as we're not trying
+        // to test situations with regions with a large byte count getting broken up
+        box_fut(Ok(regions))
+    }
+
     fn query_region_set(
         &self,
         space: Arc<KitsuneSpace>,

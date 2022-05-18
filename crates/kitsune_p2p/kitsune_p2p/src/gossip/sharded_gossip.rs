@@ -13,7 +13,6 @@ use governor::state::{InMemoryState, NotKeyed};
 use governor::RateLimiter;
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::codec::Codec;
-use kitsune_p2p_types::combinators::second;
 use kitsune_p2p_types::config::*;
 use kitsune_p2p_types::dht::region_set::RegionSetLtcs;
 use kitsune_p2p_types::dht_arc::{DhtArcRange, DhtArcSet};

@@ -28,7 +28,7 @@ pub async fn query_region_set(
             let mut stmt = txn.prepare_cached(sql).map_err(DatabaseError::from)?;
             DatabaseResult::Ok(
                 coords.into_region_set(|(_, coords)| {
-                    query_region_coords(&mut stmt, &topology, coords)
+                    query_region_data(&mut stmt, &topology, coords)
                 })?,
             )
         })
@@ -37,7 +37,7 @@ pub async fn query_region_set(
     Ok(region_set)
 }
 
-fn query_region_coords(
+pub(super) fn query_region_data(
     stmt: &mut rusqlite::CachedStatement,
     topology: &Topology,
     coords: RegionCoords,

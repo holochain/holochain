@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use kitsune_p2p_types::{
     bin_types::KitsuneSpace,
-    dht::{region_set::RegionSetLtcs, spacetime::Topology},
+    dht::{region::Region, region_set::RegionSetLtcs, spacetime::Topology},
     dht_arc::DhtArcSet,
 };
 
@@ -35,6 +35,16 @@ pub trait KitsuneHost: 'static + Send + Sync {
         space: Arc<KitsuneSpace>,
         dht_arc_set: Arc<DhtArcSet>,
     ) -> KitsuneHostResult<RegionSetLtcs>;
+
+    /// Given an input list of regions, return a list of equal or greater length
+    /// such that each region's size is less than the `size_limit`, by recursively
+    /// subdividing regions which are over the size limit.
+    fn query_size_limited_regions(
+        &self,
+        space: Arc<KitsuneSpace>,
+        size_limit: u32,
+        regions: Vec<Region>,
+    ) -> KitsuneHostResult<Vec<Region>>;
 
     /// Record a set of metric records
     fn record_metrics(

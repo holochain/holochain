@@ -123,6 +123,10 @@ pub mod tuning_params_struct {
         /// given Op.
         gossip_redundancy_target: f64 = 100.0,
 
+        /// The max number of bytes of op data to send in a single message.
+        /// Payloads larger than this are split into multiple batches.
+        gossip_max_batch_size: u32 = 16_000_000,
+
         /// Should gossip dynamically resize storage arcs?
         gossip_dynamic_arcs: bool = true,
 

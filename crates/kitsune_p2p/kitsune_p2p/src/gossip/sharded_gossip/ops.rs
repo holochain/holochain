@@ -18,31 +18,24 @@ pub struct OpsBatchQueueInner {
 }
 
 /// Identify the next items to process from the region queue.
-/// Returns a tuple with the following items:
-/// - The regions for which op data needs to be queried and sent in this batch
-/// - An optional region which is too large and needs to be split up and pushed back
-///   onto this queue
-pub fn get_region_queue_batch(
-    queue: &mut VecDeque<Region>,
-    batch_size: u32,
-) -> (Vec<Region>, Option<Region>) {
+/// Always returns at least one item if the queue is not empty, regardless of size constraints.
+/// The total size of regions returned will be less than the batch size, unless the first item
+/// on its own is larger than the batch size.
+pub fn get_region_queue_batch(queue: &mut VecDeque<Region>, batch_size: u32) -> Vec<Region> {
     let mut size = 0;
     let mut to_fetch = vec![];
-    let mut to_split = None;
+    let mut first = true;
     while let Some(region) = queue.pop_front() {
-        if region.data.size > batch_size {
-            to_split = Some(region);
-            break;
-        }
         size += region.data.size;
-        if size > batch_size {
-            queue.push_front(region);
-            break;
-        } else {
+        if first || size <= batch_size {
             to_fetch.push(region);
         }
+        first = false;
+        if size > batch_size {
+            break;
+        }
     }
-    (to_fetch, to_split)
+    to_fetch
 }
 
 /// Queued missing ops hashes can either
@@ -56,9 +49,6 @@ enum QueuedOps {
     /// A remote nodes bloom filter that has been adjusted
     /// to the remaining time window to fetch the remaining hashes.
     Bloom(TimedBloomFilter),
-    // pair(maackle, freesig): Consider adding a variant like this if implementing
-    // a "cursor" into a partial region query
-    Region(Region),
 }
 
 impl ShardedGossipLocal {
@@ -106,19 +96,34 @@ impl ShardedGossipLocal {
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
         Ok(
             if let Some(sent) = state.region_set_sent.as_ref().map(|r| (**r).clone()) {
+                // because of the order of arguments, the diff regions will contain the data
+                // from *our* side, not our partner's.
                 let diff_regions = sent
                     .diff((region_set).clone())
                     .map_err(KitsuneError::other)?;
 
-                let queue_id = state.ops_batch_queue.0.share_mut(|queue, _| {
-                    let id = queue.new_id();
-                    for region in diff_regions {
-                        queue.push_back(Some(id), QueuedOps::Region(region));
+                // subdivide any regions which are too large to fit in a batch.
+                // TODO: PERF: this does a DB query per region, and potentially many more for large
+                // regions which need to be split many times. Check to make sure this
+                // doesn't become a hotspot.
+                let limited_regions = self
+                    .host_api
+                    .query_size_limited_regions(
+                        self.space.clone(),
+                        self.tuning_params.gossip_max_batch_size,
+                        diff_regions,
+                    )
+                    .await
+                    .map_err(KitsuneError::other)?;
+
+                state.ops_batch_queue.0.share_mut(|queue, _| {
+                    for region in limited_regions {
+                        queue.region_queue.push_back(region)
                     }
-                    Ok(id)
+                    Ok(())
                 })?;
 
-                self.process_next_region_batch(state, queue_id).await?
+                self.process_next_region_batch(state).await?
             } else {
                 tracing::error!("We received OpRegions gossip without sending any ourselves");
                 vec![]
@@ -129,7 +134,6 @@ impl ShardedGossipLocal {
     pub(super) async fn process_next_region_batch(
         &self,
         state: RoundState,
-        queue_id: usize,
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
         let topo = self
             .host_api
@@ -137,11 +141,12 @@ impl ShardedGossipLocal {
             .await
             .map_err(KitsuneError::other)?;
 
-        let (to_fetch, to_split) = state.ops_batch_queue.share_mut(|mut queues, _| {
-            Ok(get_region_queue_batch(
+        let (to_fetch, finished) = state.ops_batch_queue.share_mut(|queues, _| {
+            let items = get_region_queue_batch(
                 &mut queues.region_queue,
-                MAX_SEND_BUF_BYTES as u32,
-            ))
+                self.tuning_params.gossip_max_batch_size,
+            );
+            Ok((items, queues.region_queue.is_empty()))
         })?;
 
         let bounds: Vec<_> = to_fetch
@@ -149,8 +154,6 @@ impl ShardedGossipLocal {
             .map(|r| r.coords.to_bounds(&topo))
             .collect();
         // TODO: make region set diffing more robust to different times (arc power differences are already handled)
-
-        todo!("split up big region");
 
         let ops = self
             .evt_sender
@@ -164,8 +167,8 @@ impl ShardedGossipLocal {
             .map(second)
             .collect();
 
-        let finished = if todo!() { 2 } else { 1 };
-        Ok(vec![ShardedGossipWire::missing_ops(ops, finished)])
+        let finished_val = if finished { 2 } else { 1 };
+        Ok(vec![ShardedGossipWire::missing_ops(ops, finished_val)])
     }
 
     /// Generate the next batch of missing ops.
@@ -173,33 +176,34 @@ impl ShardedGossipLocal {
         &self,
         state: RoundState,
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
-        // Pop the next queued batch.
-        let next_batch = state
-            .ops_batch_queue
-            .0
-            .share_mut(|queue, _| Ok(queue.pop_front()))?;
+        match self.gossip_type {
+            GossipType::Historical => self.process_next_region_batch(state).await,
+            GossipType::Recent => {
+                // Pop the next queued batch.
+                let next_batch = state
+                    .ops_batch_queue
+                    .0
+                    .share_mut(|queue, _| Ok(queue.pop_front()))?;
 
-        match next_batch {
-            // The next batch is hashes, batch them into ops using the queue id.
-            Some((queue_id, QueuedOps::Hashes(missing_hashes))) => {
-                self.batch_missing_ops_from_bloom(state, missing_hashes, Some(queue_id))
-                    .await
+                match next_batch {
+                    // The next batch is hashes, batch them into ops using the queue id.
+                    Some((queue_id, QueuedOps::Hashes(missing_hashes))) => {
+                        self.batch_missing_ops_from_bloom(state, missing_hashes, Some(queue_id))
+                            .await
+                    }
+                    // The next batch is a bloom so the hashes need to be fetched before
+                    // fetching the hashes.
+                    Some((queue_id, QueuedOps::Bloom(remote_bloom))) => {
+                        self.incoming_op_bloom(state, remote_bloom, Some(queue_id))
+                            .await
+                    }
+                    // Nothing is queued so this node is done.
+                    None => Ok(vec![ShardedGossipWire::missing_ops(
+                        Vec::with_capacity(0),
+                        MissingOpsStatus::AllComplete as u8,
+                    )]),
+                }
             }
-            // The next batch is a bloom so the hashes need to be fetched before
-            // fetching the hashes.
-            Some((queue_id, QueuedOps::Bloom(remote_bloom))) => {
-                self.incoming_op_bloom(state, remote_bloom, Some(queue_id))
-                    .await
-            }
-            // The
-            Some((queue_id, QueuedOps::Region(region))) => {
-                todo!()
-            }
-            // Nothing is queued so this node is done.
-            None => Ok(vec![ShardedGossipWire::missing_ops(
-                Vec::with_capacity(0),
-                MissingOpsStatus::AllComplete as u8,
-            )]),
         }
     }
 

@@ -62,6 +62,23 @@ pub trait KitsuneHostDefaultError: KitsuneHost {
         .into()))
     }
 
+    /// Given an input list of regions, return a list of equal or greater length
+    /// such that each region's size is less than the `size_limit`, by recursively
+    /// subdividing regions which are over the size limit.
+    fn query_size_limited_regions(
+        &self,
+        _space: Arc<KitsuneSpace>,
+        _size_limit: u32,
+        _regions: Vec<Region>,
+    ) -> KitsuneHostResult<Vec<Region>> {
+        box_fut(Err(format!(
+            "error for unimplemented KitsuneHost test behavior: method {} of {}",
+            "query_size_limited_regions",
+            Self::NAME
+        )
+        .into()))
+    }
+
     fn get_topology(&self, _space: Arc<KitsuneSpace>) -> KitsuneHostResult<Topology> {
         box_fut(Err(format!(
             "error for unimplemented KitsuneHost test behavior: method {} of {}",
@@ -94,6 +111,15 @@ impl<T: KitsuneHostDefaultError> KitsuneHost for T {
         records: Vec<MetricRecord>,
     ) -> KitsuneHostResult<()> {
         KitsuneHostDefaultError::record_metrics(self, space, records)
+    }
+
+    fn query_size_limited_regions(
+        &self,
+        space: Arc<KitsuneSpace>,
+        size_limit: u32,
+        regions: Vec<Region>,
+    ) -> crate::KitsuneHostResult<Vec<Region>> {
+        KitsuneHostDefaultError::query_size_limited_regions(self, space, size_limit, regions)
     }
 
     fn query_region_set(
