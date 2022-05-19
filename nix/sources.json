@@ -23,6 +23,18 @@
         "url": "https://github.com/holochain/holonix/archive/8242e5148fab82c6259af93d4aac9267a4eac6ba.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
+    "nextest": {
+        "branch": "terminate_slow_tests",
+        "description": "A next-generation test runner for Rust.",
+        "homepage": "https://nexte.st",
+        "owner": "steveej-forks",
+        "repo": "nextest",
+        "rev": "b3fbec73cdb6ae2ba121c7bcd6ee608a35781395",
+        "sha256": "0phswg4qdfaar3gdcgjkrn52jnajdqghsrqp3vwj7dq267b7djsj",
+        "type": "tarball",
+        "url": "https://github.com/steveej-forks/nextest/archive/b3fbec73cdb6ae2ba121c7bcd6ee608a35781395.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
     "nixos-unstable": {
         "branch": "nixos-unstable",
         "description": "Nix Packages collection",
