@@ -65,6 +65,7 @@ use crate::core::workflow::ZomeCallResult;
 use derive_more::From;
 use futures::future::FutureExt;
 use futures::StreamExt;
+use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_conductor_api::AppStatusFilter;
 use holochain_conductor_api::FullStateDump;
 use holochain_conductor_api::InstalledAppInfo;
@@ -176,6 +177,9 @@ pub trait ConductorHandleT: Send + Sync {
 
     /// Get the running queue consumer workflows per [`DnaHash`] map.
     fn get_queue_consumer_workflows(&self) -> QueueConsumerMap;
+
+    /// Get the conductor config
+    fn get_config(&self) -> &ConductorConfig;
 
     /// Return the JoinHandle for all managed tasks, which when resolved will
     /// signal that the Conductor has completely shut down.
@@ -592,6 +596,10 @@ impl ConductorHandleT for ConductorHandleImpl {
             .share_ref(|ds| ds.get_entry_def(key))
     }
 
+    fn get_config(&self) -> &ConductorConfig {
+        &self.conductor.config
+    }
+
     #[instrument(skip(self))]
     async fn dispatch_holochain_p2p_event(
         &self,
@@ -647,7 +655,7 @@ impl ConductorHandleT for ConductorHandleImpl {
                 let db = { self.p2p_agents_db(&dna_hash) };
                 let permit = db.conn_permit().await;
                 let res = tokio::task::spawn_blocking(move || {
-                    let mut conn = db.from_permit(permit)?;
+                    let mut conn = db.with_permit(permit)?;
                     conn.p2p_gossip_query_agents(since_ms, until_ms, (*arc_set).clone())
                 })
                 .await;
