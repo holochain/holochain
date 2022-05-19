@@ -1,6 +1,6 @@
 [package]
 name = "kitsune_p2p_bootstrap"
-version = "0.0.11"
+version = "0.0.12-dev.0"
 description = "Bootstrap server written in rust for kitsune nodes to find each other"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
