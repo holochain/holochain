@@ -54,7 +54,7 @@
 //!
 //! ### Topology and Quantum Coordinates
 //!
-//! The quantization is specified by a parameter called the [`Topology`]. This
+//! The quantization is specified by a parameter called the [`Topology`](spacetime::Topology). This
 //! construct defines how the quantized grid is overlaid onto spacetime, and specifies
 //! how to transform between "absolute" coordinates (Locations and Timestamps) and
 //! "quantum" coordinates (grid cells).
