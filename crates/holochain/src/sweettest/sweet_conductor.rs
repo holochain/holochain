@@ -454,11 +454,11 @@ impl SweetConductor {
 pub async fn websocket_client_by_port(
     port: u16,
 ) -> WebsocketResult<(WebsocketSender, WebsocketReceiver)> {
-    Ok(holochain_websocket::connect(
+    holochain_websocket::connect(
         url2::url2!("ws://127.0.0.1:{}", port),
         Arc::new(WebsocketConfig::default()),
     )
-    .await?)
+    .await
 }
 
 impl Drop for SweetConductor {

@@ -25,10 +25,10 @@ pub(super) async fn all_agent_info(
     evt_sender: &EventSender,
     space: &Arc<KitsuneSpace>,
 ) -> KitsuneResult<Vec<AgentInfoSigned>> {
-    Ok(evt_sender
+    evt_sender
         .query_agents(QueryAgentsEvt::new(space.clone()))
         .await
-        .map_err(KitsuneError::other)?)
+        .map_err(KitsuneError::other)
 }
 
 /// Get all `AgentInfoSigned` for agents in a space.
@@ -38,10 +38,10 @@ pub(super) async fn query_agent_info(
     agents: &HashSet<Arc<KitsuneAgent>>,
 ) -> KitsuneResult<Vec<AgentInfoSigned>> {
     let query = QueryAgentsEvt::new(space.clone()).by_agents(agents.clone());
-    Ok(evt_sender
+    evt_sender
         .query_agents(query)
         .await
-        .map_err(KitsuneError::other)?)
+        .map_err(KitsuneError::other)
 }
 
 /// Get the arc intervals for specified agent, paired with their respective agent.
@@ -111,7 +111,7 @@ pub(super) async fn all_op_hashes_within_arcset(
     max_ops: usize,
     include_limbo: bool,
 ) -> KitsuneResult<Option<(Vec<Arc<KitsuneOpHash>>, TimeWindowInclusive)>> {
-    Ok(evt_sender
+    evt_sender
         .query_op_hashes(QueryOpHashesEvt {
             space: space.clone(),
             arc_set: common_arc_set,
@@ -120,7 +120,7 @@ pub(super) async fn all_op_hashes_within_arcset(
             include_limbo,
         })
         .await
-        .map_err(KitsuneError::other)?)
+        .map_err(KitsuneError::other)
 }
 
 /// A chunk of hashes.

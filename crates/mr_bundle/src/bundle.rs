@@ -120,7 +120,7 @@ where
 
     /// Load a Bundle into memory from a file
     pub async fn read_from_file(path: &Path) -> MrBundleResult<Self> {
-        Ok(Self::decode(&ffs::read(path).await?)?)
+        Self::decode(&ffs::read(path).await?)
     }
 
     /// Write a Bundle to a file

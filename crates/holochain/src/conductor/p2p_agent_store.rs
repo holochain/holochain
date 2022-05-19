@@ -143,7 +143,7 @@ where
 {
     let permit = db.conn_permit().await;
     let r = tokio::task::spawn_blocking(move || {
-        let conn = db.from_permit(permit)?;
+        let conn = db.with_permit(permit)?;
         f(conn)
     })
     .await??;
@@ -309,7 +309,7 @@ mod tests {
         p2p_put(&db, &agent_info_signed).await.unwrap();
 
         let ret = db
-            .from_permit(db.conn_permit().await)
+            .with_permit(db.conn_permit().await)
             .unwrap()
             .p2p_get_agent(&agent_info_signed.agent)
             .unwrap();
@@ -325,7 +325,7 @@ mod tests {
 
         // - Check no data in the store to start
         let count = db
-            .from_permit(db.conn_permit().await)
+            .with_permit(db.conn_permit().await)
             .unwrap()
             .p2p_list_agents()
             .unwrap()

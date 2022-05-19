@@ -115,17 +115,17 @@ pub struct PConnGuard(#[shrinkwrap(main_field)] pub PConn, OwnedSemaphorePermit)
 pub struct PConnPermit(OwnedSemaphorePermit);
 
 pub trait PermittedConn {
-    fn from_permit(&self, permit: PConnPermit) -> DatabaseResult<PConnGuard>;
+    fn with_permit(&self, permit: PConnPermit) -> DatabaseResult<PConnGuard>;
 }
 
 impl<Kind: DbKindT> PermittedConn for DbRead<Kind> {
-    fn from_permit(&self, permit: PConnPermit) -> DatabaseResult<PConnGuard> {
+    fn with_permit(&self, permit: PConnPermit) -> DatabaseResult<PConnGuard> {
         Ok(PConnGuard(self.conn()?, permit.0))
     }
 }
 
 impl<Kind: DbKindT> PermittedConn for DbWrite<Kind> {
-    fn from_permit(&self, permit: PConnPermit) -> DatabaseResult<PConnGuard> {
+    fn with_permit(&self, permit: PConnPermit) -> DatabaseResult<PConnGuard> {
         Ok(PConnGuard(self.conn()?, permit.0))
     }
 }
