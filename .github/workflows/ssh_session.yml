@@ -46,8 +46,12 @@ jobs:
         uses: actions/checkout@v2.4.0
       - name: Move cargo related state and build files
         run: |
-          mv -f /tmp/holochain_repo/.cargo ./
-          mv -f /tmp/holochain_repo/target/ ./
+          if [[ -e /tmp/holochain_repo/.cargo ]]; then
+            mv -f /tmp/holochain_repo/.cargo ./
+          fi
+          if [[ -e /tmp/holochain_repo/target ]]; then
+            mv -f /tmp/holochain_repo/target/ ./
+          fi
       - name: Set NIX_PATH (FIXME)
         run: echo NIX_PATH=nixpkgs=$(./scripts/nix_path.sh) >> $GITHUB_ENV
       - name: Setup upterm session
