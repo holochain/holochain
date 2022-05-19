@@ -42,7 +42,12 @@ rec {
 
     # alas, we cannot specify --features in the virtual workspace
     # run the specific slow tests in the holochain crate
-    cargo nextest ''${@:-run} ''${CARGO_TEST_ARGS:-} -p holochain --features slow_tests,test_utils,build_wasms,db-encryption --cargo-profile fast-test
+
+    # cargo nextest ''${@:-run} ''${CARGO_TEST_ARGS:-} -p holochain --features slow_tests,test_utils,build_wasms,db-encryption --cargo-profile fast-test
+
+    export RUST_TEST_TIME_INTEGRATION=120000,240000
+    export RUST_TEST_TIME_UNIT=60000,120000
+    cargo test ''${CARGO_TEST_ARGS:-} -p holochain --features slow_tests,test_utils,build_wasms,db-encryption --profile fast-test -- -Z unstable-options --ensure-time
   '';
 
   hcSlowTestsIter = writeShellScriptBin "hc-test-slow-iter" ''
