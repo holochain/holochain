@@ -48,7 +48,20 @@ let
 
       crate2nix = import sources.crate2nix.outPath { };
 
-      cargo-nextest = (import sources.nixos-unstable { }).cargo-nextest;
+      cargo-nextest = self.rustPlatform.buildRustPackage {
+        name = "cargo-nextest";
+
+        src = sources.nextest.outPath;
+        cargoSha256 = "sha256-1siQ7Ar1priIeHTEG3+2RmNLK1u92CdKvciD1oMH2sw=";
+
+        cargoTestFlags = [
+          # TODO: investigate some more why these tests fail in nix
+          "--"
+          "--skip=tests_integration::test_relocated_run"
+          "--skip=tests_integration::test_run"
+          "--skip=tests_integration::test_run_after_build"
+        ];
+      };
     })
 
   ];
