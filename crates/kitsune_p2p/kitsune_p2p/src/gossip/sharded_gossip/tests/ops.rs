@@ -51,15 +51,15 @@ fn test_region_queue() {
     assert_eq!(r, (vec![1000, 2000]));
 
     let r = run(&mut queue, BATCH_SIZE);
-    assert_eq!(queue.len(), initial_len - 4);
+    assert_eq!(queue.len(), initial_len - 3);
     assert_eq!(r, (vec![3000]));
 
     let r = run(&mut queue, BATCH_SIZE);
-    assert_eq!(queue.len(), initial_len - 5);
+    assert_eq!(queue.len(), initial_len - 4);
     assert_eq!(r, (vec![5000]));
 
     let r = run(&mut queue, BATCH_SIZE);
-    assert_eq!(queue.len(), initial_len - 6);
+    assert_eq!(queue.len(), initial_len - 5);
     assert_eq!(r, (vec![8000]));
 
     let r = run(&mut queue, BATCH_SIZE);

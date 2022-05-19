@@ -25,10 +25,10 @@ pub fn get_region_queue_batch(queue: &mut VecDeque<Region>, batch_size: u32) -> 
     let mut size = 0;
     let mut to_fetch = vec![];
     let mut first = true;
-    while let Some(region) = queue.pop_front() {
+    while let Some(region) = queue.front() {
         size += region.data.size;
         if first || size <= batch_size {
-            to_fetch.push(region);
+            to_fetch.push(queue.pop_front().unwrap());
         }
         first = false;
         if size > batch_size {
