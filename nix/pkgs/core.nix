@@ -68,7 +68,7 @@ rec {
 
     # alas, we cannot specify --features in the virtual workspace
     # run the specific slow tests in the holochain crate
-    cargo nextest ''${@:-run} ''${CARGO_TEST_ARGS:-} -p holochain --features slow_tests,test_utils,build_wasms,db-encryption --cargo-profile fast-test
+    cargo nextest ''${@:-run --test-threads=2} ''${CARGO_TEST_ARGS:-} -p holochain --features slow_tests,test_utils,build_wasms,db-encryption --cargo-profile fast-test
   '';
 
   hcSlowTestsIter = writeShellScriptBin "hc-test-slow-iter" ''
