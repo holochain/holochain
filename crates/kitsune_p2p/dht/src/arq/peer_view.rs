@@ -225,7 +225,7 @@ impl PeerViewQ {
     ///     average the same as our target coverage
     ///
     /// More detail on these assumptions here:
-    /// https://hackmd.io/@hololtd/r1IAIbr5Y/https%3A%2F%2Fhackmd.io%2FK_fkBj6XQO2rCUZRRL9n2g
+    /// <https://hackmd.io/@hololtd/r1IAIbr5Y/https%3A%2F%2Fhackmd.io%2FK_fkBj6XQO2rCUZRRL9n2g>
     pub fn update_arq_with_stats(&self, topo: &Topology, arq: &mut Arq) -> UpdateArqStats {
         let (cov, num_peers) = self.extrapolated_coverage_and_filtered_count(arq);
 

@@ -54,7 +54,7 @@ impl Topology {
         }
     }
 
-    /// Standard dimensions with the [`HOLOCHAIN_EPOCH`] as the time origin
+    /// Standard dimensions with the [`HOLOCHAIN_EPOCH`](Timestamp::HOLOCHAIN_EPOCH) as the time origin
     pub fn standard_epoch() -> Self {
         Self::standard(Timestamp::HOLOCHAIN_EPOCH)
     }
