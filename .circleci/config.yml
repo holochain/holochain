@@ -128,7 +128,7 @@ jobs:
          - run:
               name: Run the slow tests
               no_output_timeout: 30m
-              command: nix-shell --fallback --pure --argstr flavor "coreDev" --run hc-test-slow
+              command: nix-shell --fallback --pure --argstr flavor "coreDev" --run hc-test-slow-nextest
 
    wasm-test:
       docker:

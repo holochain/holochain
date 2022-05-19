@@ -1,0 +1,18 @@
+# "retries" defines the number of times a test should be retried. If set to a
+# non-zero value, tests that succeed on a subsequent attempt will be marked as
+# non-flaky. Can be overridden through the `--retries` option.
+retries = 2
+
+status-level = "all"
+
+# Treat a test that takes longer than this as slow, and print a message.
+slow-timeout = "30s"
+
+# Number of slow-timeout periods to tolerate before terminating a test.
+slow-timeout-tolerance = 2
+
+# * "immediate-final": output failures as soon as they happen and at the end of
+#   the test run
+failure-output = "immediate"
+
+fail-fast = false
