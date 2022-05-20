@@ -463,7 +463,17 @@ async fn update_arc_length(
     arc: &mut DhtArc,
 ) -> KitsuneP2pResult<()> {
     let view = evt_sender.query_peer_density(space.clone(), *arc).await?;
+
+    let cov_before = arc.coverage() * 100.0;
+    tracing::info!("Updating arc for space {:?}:", space);
+    tracing::info!("Before: {:2.1}% |{}|", cov_before, arc.to_ascii(64));
+
     view.update_arc(arc);
+
+    let cov_after = arc.coverage() * 100.0;
+    tracing::info!("After:  {:2.1}% |{}|", cov_after, arc.to_ascii(64));
+    tracing::info!("Diff: {:-2.2}%", cov_after - cov_before);
+
     Ok(())
 }
 

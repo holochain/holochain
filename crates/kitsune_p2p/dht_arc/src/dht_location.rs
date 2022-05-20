@@ -181,7 +181,6 @@ pub(crate) fn loc_upscale(len: usize, v: i32) -> u32 {
 }
 
 /// Scale a u32 DhtLocation down into a smaller space (specified by `len`)
-#[cfg(any(test, feature = "test_utils"))]
 pub(crate) fn loc_downscale(len: usize, d: DhtLocation) -> usize {
     let max = crate::FULL_LEN_F;
     let lenf = len as f64;

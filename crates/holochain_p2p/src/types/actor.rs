@@ -246,7 +246,7 @@ ghost_actor::ghost_chan! {
             dht_hash: holo_hash::AnyDhtHash,
             ops: Vec<holochain_types::dht_op::DhtOp>,
             timeout_ms: Option<u64>,
-        ) -> ();
+        ) -> usize;
 
         /// Request a validation package.
         fn get_validation_package(input: GetValidationPackage) -> ValidationPackageResponse;

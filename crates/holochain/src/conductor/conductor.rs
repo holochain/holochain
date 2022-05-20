@@ -718,7 +718,7 @@ impl Conductor {
         self.cells.share_mut(|cells| {
             for cell in new_cells {
                 let cell_id = cell.id().clone();
-                tracing::info!(?cell_id, "ADD CELL");
+                tracing::debug!(?cell_id, "added cell");
                 cells.insert(
                     cell_id,
                     CellItem {
@@ -1668,8 +1668,8 @@ mod builder {
                 tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
 
             let conductor = Conductor::new(
-self.config.clone(),
-dna_store,
+                self.config.clone(),
+                dna_store,
                 keystore,
                 holochain_p2p,
                 spaces,
