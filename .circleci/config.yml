@@ -197,37 +197,39 @@ jobs:
               name: echo
               command: echo
 
-# workflows:
-   # tests:
-      # jobs:
-         # - merge-release-test
-         # # - merge-release-test-mac
-         # - standard-test
-         # - rustdoc-build-test
-         # - hc-static-checks
-         # - slow-test
-         # - wasm-test
-         # # - merge-test-mac
-         # - ci-jobs-succeed:
-         #      requires:
-         #         - standard-test
-         #         - rustdoc-build-test
-         #         - hc-static-checks
-         #         - slow-test
-         #         - wasm-test
-         #         - merge-release-test
+workflows:
+   tests:
+      when:
+         false
+      jobs:
+         - merge-release-test
+         # - merge-release-test-mac
+         - standard-test
+         - rustdoc-build-test
+         - hc-static-checks
+         - slow-test
+         - wasm-test
+         # - merge-test-mac
+         - ci-jobs-succeed:
+              requires:
+                 - standard-test
+                 - rustdoc-build-test
+                 - hc-static-checks
+                 - slow-test
+                 - wasm-test
+                 - merge-release-test
 
-   # docker-builds:
-   #    triggers:
-   #       - schedule:
-   #            cron: "0 0 * * *"
-   #            filters:
-   #               branches:
-   #                  only:
-   #                     - develop
-   #                     - master
-   #    jobs:
-   #       - docker-build-latest
-   #       - docker-build-circle-build:
-   #            requires:
-   #               - docker-build-latest
+   docker-builds:
+      triggers:
+         - schedule:
+              cron: "0 0 * * *"
+              filters:
+                 branches:
+                    only:
+                       - develop
+                       - master
+      jobs:
+         - docker-build-latest
+         - docker-build-circle-build:
+              requires:
+                 - docker-build-latest
