@@ -165,7 +165,6 @@ pub enum AdminRequest {
 
     #[deprecated = "alias for EnableApp"]
     ActivateApp {
-        /// The app ID to enable
         installed_app_id: InstalledAppId,
     },
 
@@ -184,7 +183,6 @@ pub enum AdminRequest {
 
     #[deprecated = "alias for DisableApp"]
     DeactivateApp {
-        /// The [`InstalledAppId`] to disable
         installed_app_id: InstalledAppId,
     },
 
