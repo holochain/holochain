@@ -181,6 +181,7 @@ jobs:
               macos-latest: 1
             run: |
               nix-shell \
+              --keep CARGO_NEXTEST_ARGS \
               --keep CARGO_TEST_ARGS \
               --fallback --pure --argstr flavor "coreDev" --run hc-test-slow-nextest
 
@@ -347,6 +348,7 @@ jobs:
         if: ${{ matrix.testCommand.restoresCargoCache == true }}
         env:
           CARGO_TEST_ARGS: "--no-run"
+          CARGO_NEXTEST_ARGS: "list"
         run: |
           set -e
           source "${HOLOCHAIN_RELEASE_SH}"
