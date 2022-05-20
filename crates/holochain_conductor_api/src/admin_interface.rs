@@ -215,7 +215,7 @@ pub enum AdminRequest {
     ///
     /// # Returns
     ///
-    /// [`AdminResponse::AppInterfacesListed`], a list of web socket ports that can
+    /// [`AdminResponse::AppInterfacesListed`], a list of websocket ports that can
     /// process [`AppRequest`]s.
     ///
     /// [`AttachAppInterface`]: AdminRequest::AttachAppInterface
