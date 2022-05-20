@@ -114,6 +114,10 @@ pub mod tuning_params_struct {
         /// [Default: 5 minute]
         gossip_peer_on_error_next_gossip_delay_ms: u32 = 1000 * 60 * 5,
 
+        /// How often should we update and publish our agent info?
+        /// [Default: 5 minutes]
+        gossip_agent_info_update_interval_ms: u32 = 1000 * 60 * 5,
+
         /// How frequently we should locally sync when there is
         /// no new data. Agents arc can change so this shouldn't
         /// be too long. [Default: 1 minutes]
