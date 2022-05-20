@@ -15,7 +15,7 @@ use holochain_sqlite::db::{p2p_put_single, AsP2pStateTxExt};
 use holochain_state::prelude::from_blob;
 use holochain_state::test_utils::fresh_reader_test;
 use holochain_types::dht_op::{DhtOp, DhtOpHashed, DhtOpType};
-use holochain_types::inline_zome::InlineZomeSet;
+use holochain_types::inline_zome::{InlineEntryTypes, InlineZomeSet};
 use holochain_types::prelude::DnaFile;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use kitsune_p2p::KitsuneP2pConfig;
@@ -544,13 +544,12 @@ fn get_authored_ops(
 pub async fn data_zome(integrity_uuid: String, coordinator_uuid: String) -> DnaFile {
     let integrity_zome_name = "integrity_zome1";
     let coordinator_zome_name = "zome1";
-    let entry_def = EntryDef::default_with_id("entrydef");
 
     let zomes = InlineZomeSet::new(
         [(
             integrity_zome_name,
             integrity_uuid.clone(),
-            vec![entry_def.clone()],
+            InlineEntryTypes::entry_defs(),
         )],
         [(coordinator_zome_name, coordinator_uuid)],
     )
@@ -558,10 +557,9 @@ pub async fn data_zome(integrity_uuid: String, coordinator_uuid: String) -> DnaF
         coordinator_zome_name,
         "create_many",
         move |api, entries: Vec<Entry>| {
-            let entry_def_id: EntryDefId = entry_def.id.clone();
             for entry in entries {
                 api.create(CreateInput::new(
-                    (integrity_zome_name, entry_def_id.clone()).into(),
+                    InlineZomeSet::get_entry_location(&api, InlineEntryTypes::A),
                     entry,
                     ChainTopOrdering::default(),
                 ))?;

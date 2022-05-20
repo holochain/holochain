@@ -66,15 +66,16 @@ where
 /// ```
 ///
 /// See [`get`] and [`get_details`] for more information on CRUD.
-pub fn create_entry<I, E>(input: I) -> ExternResult<HeaderHash>
+pub fn create_entry<I, E, E2>(input: I) -> ExternResult<HeaderHash>
 where
-    I: ToAppEntryDefName,
-    I: ToZomeName,
+    EntryDefIndex: for<'a> TryFrom<&'a I, Error = E2>,
     Entry: TryFrom<I, Error = E>,
     WasmError: From<E>,
+    WasmError: From<E2>,
 {
+    let entry_def_index = EntryDefIndex::try_from(&input)?;
     let create_input = CreateInput::new(
-        EntryDefLocation::app(input.zome_name(), input.entry_def_name()),
+        EntryDefLocation::app(entry_def_index),
         input.try_into()?,
         ChainTopOrdering::default(),
     );

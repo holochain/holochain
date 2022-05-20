@@ -9,6 +9,7 @@ use crate::conductor::interface::SignalBroadcaster;
 use crate::conductor::ConductorHandle;
 use crate::core::queue_consumer::QueueTriggers;
 use crate::core::ribosome::real_ribosome::RealRibosome;
+use crate::core::ribosome::RibosomeT;
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
 use holochain_keystore::MetaLairClient;
@@ -52,7 +53,7 @@ impl CellHostFnCaller {
         let triggers = handle.get_cell_triggers(cell_id).unwrap();
         let cell_conductor_api = CellConductorApi::new(handle.clone(), cell_id.clone());
 
-        let ribosome = RealRibosome::new(dna_file.clone());
+        let ribosome = handle.get_ribosome(dna_file.dna_hash()).unwrap();
         let signal_tx = handle.signal_broadcaster().await;
         CellHostFnCaller {
             cell_id: cell_id.clone(),

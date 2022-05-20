@@ -5,17 +5,14 @@ use integrity_zome::Post;
 use integrity_zome::PrivMsg;
 use test_wasm_integrity_zome as integrity_zome;
 
-#[hdk_entry_zomes]
-enum EntryZomes {
-    IntegrityZome(integrity_zome::EntryTypes),
-}
+
 
 fn post() -> Post {
     Post("foo".into())
 }
 
-fn new_post() -> EntryZomes {
-    EntryZomes::IntegrityZome(EntryTypes::Post(Post("foo".into())))
+fn new_post() -> EntryTypes {
+    EntryTypes::Post(Post("foo".into()))
 }
 
 fn msg() -> Msg {
@@ -27,7 +24,7 @@ fn create_entry(_: ()) -> ExternResult<HeaderHash> {
     let post = new_post();
     HDK.with(|h| {
         h.borrow().create(CreateInput::new(
-            (&post).into(),
+            EntryDefIndex::try_from(&post)?,
             post.try_into().unwrap(),
             // This is used to test many conductors thrashing creates between
             // each other so we want to avoid retries that make the test take
@@ -39,7 +36,7 @@ fn create_entry(_: ()) -> ExternResult<HeaderHash> {
 
 #[hdk_extern]
 fn create_post(post: Post) -> ExternResult<HeaderHash> {
-    hdk::prelude::create_entry(&EntryZomes::IntegrityZome(EntryTypes::Post(post)))
+    hdk::prelude::create_entry(&EntryTypes::Post(post))
 }
 
 #[hdk_extern]
@@ -72,14 +69,12 @@ fn get_post(hash: HeaderHash) -> ExternResult<Option<Element>> {
 
 #[hdk_extern]
 fn create_msg(_: ()) -> ExternResult<HeaderHash> {
-    hdk::prelude::create_entry(EntryZomes::IntegrityZome(EntryTypes::Msg(msg())))
+    hdk::prelude::create_entry(EntryTypes::Msg(msg()))
 }
 
 #[hdk_extern]
 fn create_priv_msg(_: ()) -> ExternResult<HeaderHash> {
-    hdk::prelude::create_entry(&EntryZomes::IntegrityZome(EntryTypes::PrivMsg(PrivMsg(
-        "Don't tell anyone".into(),
-    ))))
+    hdk::prelude::create_entry(&EntryTypes::PrivMsg(PrivMsg("Don't tell anyone".into())))
 }
 
 #[hdk_extern]

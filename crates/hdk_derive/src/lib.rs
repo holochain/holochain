@@ -1,6 +1,7 @@
 #![crate_type = "proc-macro"]
 
 use proc_macro::TokenStream;
+use proc_macro_error::proc_macro_error;
 use quote::TokenStreamExt;
 use syn::parse::Parse;
 use syn::parse::ParseStream;
@@ -15,9 +16,8 @@ mod entry_helper;
 mod entry_zomes;
 mod link_types;
 mod link_zomes;
-mod to_app_entry_def_name;
 mod to_link_type_query;
-mod to_zome_name;
+mod to_local_types;
 mod unit_enum;
 mod util;
 
@@ -237,19 +237,9 @@ pub fn hdk_extern(attrs: TokenStream, item: TokenStream) -> TokenStream {
     }
 }
 
-#[proc_macro_derive(ToZomeName, attributes(zome_name))]
-pub fn derive_to_zome_name(input: TokenStream) -> TokenStream {
-    to_zome_name::derive(input)
-}
-
 #[proc_macro_derive(ToLinkTypeQuery)]
 pub fn derive_to_link_type_query(input: TokenStream) -> TokenStream {
     to_link_type_query::derive(input)
-}
-
-#[proc_macro_derive(ToAppEntryDefName, attributes(entry_def_name))]
-pub fn derive_to_app_entry_def_name(input: TokenStream) -> TokenStream {
-    to_app_entry_def_name::derive(input)
 }
 
 #[proc_macro_derive(EntryDefRegistration, attributes(entry_def))]
@@ -257,7 +247,7 @@ pub fn derive_entry_def_registration(input: TokenStream) -> TokenStream {
     entry_def_registration::derive(input)
 }
 
-#[proc_macro_derive(UnitEnum)]
+#[proc_macro_derive(UnitEnum, attributes(unit_enum))]
 pub fn derive_to_unit_enum(input: TokenStream) -> TokenStream {
     unit_enum::derive(input)
 }
@@ -270,6 +260,12 @@ pub fn hdk_entry_defs(attrs: TokenStream, code: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn hdk_link_types(attrs: TokenStream, code: TokenStream) -> TokenStream {
     link_types::build(attrs, code)
+}
+
+#[proc_macro_error]
+#[proc_macro_attribute]
+pub fn hdk_to_local_types(attrs: TokenStream, code: TokenStream) -> TokenStream {
+    to_local_types::build(attrs, code)
 }
 
 #[proc_macro_attribute]

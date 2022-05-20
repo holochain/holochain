@@ -1713,6 +1713,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "78cc372d058dcf6d5ecd98510e7fbc9e5aec4d21de70f65fea8fecebcd881bd4"
 
 [[package]]
+name = "glob"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9b919933a397b79c37e33b77bb2aa3dc8eb6e165ad809e58ff75bc7db2e34574"
+
+[[package]]
 name = "gloo-timers"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1826,6 +1832,7 @@ dependencies = [
  "thiserror",
  "tracing",
  "tracing-core",
+ "trybuild",
 ]
 
 [[package]]
@@ -1837,6 +1844,7 @@ dependencies = [
  "heck 0.4.0",
  "holochain_integrity_types",
  "paste",
+ "proc-macro-error",
  "proc-macro2",
  "quote",
  "syn",
@@ -2806,7 +2814,6 @@ dependencies = [
  "ghost_actor 0.3.0-alpha.4",
  "governor",
  "itertools 0.10.3",
- "kitsune_p2p_bootstrap",
  "kitsune_p2p_mdns",
  "kitsune_p2p_proxy",
  "kitsune_p2p_timestamp",
@@ -6129,6 +6136,21 @@ name = "try-lock"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "59547bce71d9c38b83d9c0e92b6066c4253371f15005def0c30d9657f50c7642"
+
+[[package]]
+name = "trybuild"
+version = "1.0.61"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7fc92f558afb6d1d7c6f175eb8d615b8ef49c227543e68e19c123d4ee43d8a7d"
+dependencies = [
+ "glob",
+ "once_cell",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "termcolor",
+ "toml",
+]
 
 [[package]]
 name = "tungstenite"

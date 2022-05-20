@@ -1,7 +1,7 @@
+use std::borrow::Borrow;
 use std::borrow::Cow;
 
 use crate::validate::RequiredValidationType;
-use crate::EntryDefIndex;
 use holochain_serialized_bytes::prelude::*;
 
 const DEFAULT_REQUIRED_VALIDATIONS: u8 = 5;
@@ -156,15 +156,6 @@ impl EntryDef {
     }
 }
 
-impl EntryDefs {
-    pub fn entry_def_index_from_id(&self, entry_def_id: EntryDefId) -> Option<EntryDefIndex> {
-        self.0
-            .iter()
-            .position(|entry_def| entry_def.id == entry_def_id)
-            .map(|u_size| EntryDefIndex(u_size as u8))
-    }
-}
-
 impl std::ops::Index<usize> for EntryDefs {
     type Output = EntryDef;
     fn index(&self, i: usize) -> &Self::Output {
@@ -228,6 +219,30 @@ impl From<AppEntryDef> for EntryDef {
             id: app.name.into(),
             visibility: app.visibility,
             required_validations: app.required_validations,
+            required_validation_type: Default::default(),
+        }
+    }
+}
+
+impl Borrow<str> for AppEntryDefName {
+    fn borrow(&self) -> &str {
+        self.0.borrow()
+    }
+}
+
+impl std::fmt::Display for AppEntryDefName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+#[cfg(any(test, feature = "test_utils"))]
+impl Default for EntryDef {
+    fn default() -> Self {
+        Self {
+            id: EntryDefId::App(AppEntryDefName(Default::default())),
+            visibility: Default::default(),
+            required_validations: Default::default(),
             required_validation_type: Default::default(),
         }
     }

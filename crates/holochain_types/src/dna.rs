@@ -8,6 +8,7 @@ mod dna_file;
 mod dna_manifest;
 mod dna_store;
 
+#[allow(missing_docs)]
 pub mod error;
 pub mod wasm;
 pub use dna_bundle::*;

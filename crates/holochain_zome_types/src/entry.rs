@@ -6,9 +6,7 @@
 //! entry_types, and special entries, like deletion_entry and cap_entry.
 
 use crate::header::ChainTopOrdering;
-use holochain_integrity_types::AppEntryDefName;
-use holochain_integrity_types::EntryDefId;
-use holochain_integrity_types::ZomeName;
+use holochain_integrity_types::EntryDefIndex;
 use holochain_serialized_bytes::prelude::*;
 
 mod app_entry_bytes;
@@ -19,36 +17,20 @@ pub use holochain_integrity_types::entry::*;
 #[derive(
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
 )]
-/// Either a full [`AppEntryDefLocation`] or one of:
+/// Either an [`EntryDefIndex`] or one of:
 /// - [`EntryType::CapGrant`](crate::prelude::EntryType::CapGrant)
 /// - [`EntryType::CapClaim`](crate::prelude::EntryType::CapClaim)
-/// Which don't have a location.
+/// Which don't have an index.
 pub enum EntryDefLocation {
-    /// App defined entries always come from a
-    /// specific integrity zomes.
-    App(AppEntryDefLocation),
+    /// App defined entries always have a unique [`u8`] index
+    /// within the Dna.
+    App(EntryDefIndex),
     /// [`crate::EntryDefId::CapClaim`] is committed to and
     /// validated by all integrity zomes in the dna.
     CapClaim,
     /// [`crate::EntryDefId::CapGrant`] is committed to and
     /// validated by all integrity zomes in the dna.
     CapGrant,
-}
-
-#[derive(
-    Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
-)]
-/// A full location of where to find an [`AppEntryDef`](crate::prelude::AppEntryDef)
-/// within the dna's zomes.
-///
-/// The [`ZomeName`] must be unique to the [`DnaDef`](crate::prelude::DnaDef).
-/// The [`AppEntryDefName`] must be unique to the zome.
-pub struct AppEntryDefLocation {
-    /// The name of the integrity zome that defines
-    /// and validates the below definition.
-    pub zome: ZomeName,
-    /// The unique name for this entry definition.
-    pub entry: AppEntryDefName,
 }
 
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
@@ -113,7 +95,7 @@ pub enum GetStrategy {
 /// Zome input to create an entry.
 #[derive(PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct CreateInput {
-    /// The location this entry will be committed to.
+    /// The global type index committed to if this entry has one.
     pub entry_location: EntryDefLocation,
     /// Entry body.
     pub entry: crate::entry::Entry,
@@ -124,12 +106,12 @@ pub struct CreateInput {
 impl CreateInput {
     /// Constructor.
     pub fn new(
-        entry_location: EntryDefLocation,
+        entry_location: impl Into<EntryDefLocation>,
         entry: crate::entry::Entry,
         chain_top_ordering: ChainTopOrdering,
     ) -> Self {
         Self {
-            entry_location,
+            entry_location: entry_location.into(),
             entry,
             chain_top_ordering,
         }
@@ -216,53 +198,13 @@ impl From<holo_hash::HeaderHash> for DeleteInput {
 
 impl EntryDefLocation {
     /// Create an [`EntryDefLocation::App`].
-    pub fn app(
-        zome_name: impl Into<ZomeName>,
-        app_entry_def_name: impl Into<AppEntryDefName>,
-    ) -> Self {
-        Self::App(AppEntryDefLocation {
-            zome: zome_name.into(),
-            entry: app_entry_def_name.into(),
-        })
+    pub fn app(entry_def_index: impl Into<EntryDefIndex>) -> Self {
+        Self::App(entry_def_index.into())
     }
 }
 
-impl From<(ZomeName, EntryDefId)> for EntryDefLocation {
-    fn from((zome, e): (ZomeName, EntryDefId)) -> Self {
-        match e {
-            EntryDefId::App(entry) => Self::App(AppEntryDefLocation { zome, entry }),
-            EntryDefId::CapClaim => Self::CapClaim,
-            EntryDefId::CapGrant => Self::CapGrant,
-        }
-    }
-}
-
-impl From<(&str, EntryDefId)> for EntryDefLocation {
-    fn from((z, e): (&str, EntryDefId)) -> Self {
-        Self::from((ZomeName::from(z), e))
-    }
-}
-
-impl From<(String, EntryDefId)> for EntryDefLocation {
-    fn from((z, e): (String, EntryDefId)) -> Self {
-        Self::from((ZomeName::from(z), e))
-    }
-}
-
-impl From<(ZomeName, &str)> for EntryDefLocation {
-    fn from((zome, e): (ZomeName, &str)) -> Self {
-        Self::App(AppEntryDefLocation {
-            zome,
-            entry: e.to_string().into(),
-        })
-    }
-}
-
-impl From<(ZomeName, String)> for EntryDefLocation {
-    fn from((zome, e): (ZomeName, String)) -> Self {
-        Self::App(AppEntryDefLocation {
-            zome,
-            entry: e.into(),
-        })
+impl From<EntryDefIndex> for EntryDefLocation {
+    fn from(i: EntryDefIndex) -> Self {
+        EntryDefLocation::App(i)
     }
 }

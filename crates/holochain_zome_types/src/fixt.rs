@@ -179,8 +179,13 @@ fixturator!(
 );
 
 fixturator!(
+    ScopedZomeTypes;
+    constructor fn default();;
+);
+
+fixturator!(
     ZomeInfo;
-    constructor fn new(ZomeName, ZomeId, SerializedBytes, EntryDefs, FunctionNameVec);
+    constructor fn new(ZomeName, ZomeId, SerializedBytes, EntryDefs, FunctionNameVec, ScopedZomeTypes);
 );
 
 fixturator!(

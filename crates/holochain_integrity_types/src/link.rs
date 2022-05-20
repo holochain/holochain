@@ -1,4 +1,8 @@
+use std::borrow::Cow;
+
 use holochain_serialized_bytes::prelude::*;
+
+use crate::GlobalZomeTypeId;
 #[derive(
     Debug,
     Copy,
@@ -24,6 +28,11 @@ impl LinkType {
         self.0
     }
 }
+
+#[derive(
+    Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+)]
+pub struct LinkTypeName(pub Cow<'static, str>);
 
 /// Opaque tag for the link applied at the app layer, used to differentiate
 /// between different semantics and validation rules for different links
@@ -79,5 +88,29 @@ impl std::ops::Deref for LinkType {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl From<&'static str> for LinkTypeName {
+    fn from(s: &'static str) -> Self {
+        LinkTypeName(s.into())
+    }
+}
+
+impl From<String> for LinkTypeName {
+    fn from(s: String) -> Self {
+        LinkTypeName(s.into())
+    }
+}
+
+impl From<u8> for LinkType {
+    fn from(t: u8) -> Self {
+        Self(t)
+    }
+}
+
+impl From<LinkType> for GlobalZomeTypeId {
+    fn from(v: LinkType) -> Self {
+        Self(v.0)
     }
 }

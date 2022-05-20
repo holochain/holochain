@@ -24,6 +24,7 @@ expander = "0.0.6"
 # it's important that we depend on holochain_zome_types with no default
 # features, both here AND in holochain_deterministic_integrity, to reduce code bloat
 holochain_integrity_types = { version = "0.0.1", path = "../holochain_integrity_types", default-features = false }
+proc-macro-error = "1.0.4"
 
 [features]
 default = []

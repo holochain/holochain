@@ -71,6 +71,8 @@ use crate::core::ribosome::ZomeCallInvocation;
 use fallible_iterator::FallibleIterator;
 use holochain_types::prelude::*;
 
+use holochain_types::zome_types::GlobalZomeTypes;
+use holochain_types::zome_types::ZomeTypesError;
 use holochain_wasmer_host::prelude::*;
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
@@ -86,6 +88,12 @@ pub struct RealRibosome {
     //      - is already in the wasm cache, and only include the DnaDef portion
     //      - here in the ribosome.
     pub dna_file: DnaFile,
+
+    /// Entry and link types for each integrity zome.
+    pub zome_types: Arc<GlobalZomeTypes>,
+
+    /// Dependencies for every zome.
+    pub zome_dependencies: Arc<HashMap<ZomeName, Vec<ZomeId>>>,
 }
 
 struct HostFnBuilder {
@@ -208,12 +216,94 @@ fn context_key_from_key(key: &[u8; 32]) -> u64 {
 
 impl RealRibosome {
     /// Create a new instance
-    pub fn new(dna_file: DnaFile) -> Self {
-        Self { dna_file }
+    pub async fn new(dna_file: DnaFile) -> RibosomeResult<Self> {
+        let ribosome = Self {
+            dna_file,
+            zome_types: Default::default(),
+            zome_dependencies: Default::default(),
+        };
+        let (ribosome, result) = tokio::task::spawn_blocking(move || {
+            let r = ribosome.run_entry_defs(EntryDefsHostAccess, EntryDefsInvocation);
+            (ribosome, r)
+        })
+        .await?;
+        let map = match result? {
+            EntryDefsResult::Defs(mut zomes) => {
+                let iter = ribosome
+                    .dna_def()
+                    .integrity_zomes
+                    .iter()
+                    .map(|(zome_name, _)| {
+                        let entry_def_count = zomes
+                            .remove(zome_name)
+                            .map(|defs| {
+                                defs.into_iter()
+                                    .filter(|EntryDef { id, .. }| matches!(id, EntryDefId::App(_)))
+                                    .count()
+                            })
+                            .unwrap_or(0);
+                        let link_type_count = 0;
+                        // FIXME: Use try_into for u8 conversion and handle error.
+                        (
+                            EntryDefIndex(entry_def_count as u8),
+                            LinkType(link_type_count as u8),
+                        )
+                    });
+                GlobalZomeTypes::from_ordered_iterator(iter)
+            }
+            EntryDefsResult::Err(_, _) => todo!(),
+        };
+
+        let zome_types = Arc::new(map?);
+
+        let zome_dependencies = ribosome
+            .dna_def()
+            .all_zomes()
+            .map(|(zome_name, def)| {
+                let integrity_zomes: HashMap<_, _> = ribosome
+                    .dna_def()
+                    .integrity_zomes
+                    .iter()
+                    .enumerate()
+                    .map(|(i, (n, _))| (n.clone(), i))
+                    .collect();
+                let mut dependencies = Vec::new();
+
+                if integrity_zomes.len() == 1 {
+                    // If there's only one integrity zome we add it to this zome and are done.
+                    dependencies.push(ZomeId(0));
+                } else {
+                    // Integrity zomes need to have themselves as a dependency.
+                    if ribosome.dna_def().is_integrity_zome(zome_name) {
+                        let id = ZomeId(integrity_zomes.get(zome_name).copied()?.try_into().ok()?);
+                        dependencies.push(id);
+                    }
+                    for name in def.dependencies() {
+                        let id = ZomeId(integrity_zomes.get(name).copied()?.try_into().ok()?);
+                        dependencies.push(id);
+                    }
+                }
+
+                Some((zome_name.clone(), dependencies))
+            })
+            .collect::<Option<HashMap<_, _>>>()
+            // FIXME: Add error
+            .unwrap();
+
+        Ok(Self {
+            dna_file: ribosome.dna_file,
+            zome_types,
+            zome_dependencies: Arc::new(zome_dependencies),
+        })
     }
 
-    pub fn dna_file(&self) -> &DnaFile {
-        &self.dna_file
+    #[cfg(any(test, feature = "test_utils"))]
+    pub fn empty(dna_file: DnaFile) -> Self {
+        Self {
+            dna_file,
+            zome_types: Default::default(),
+            zome_dependencies: Default::default(),
+        }
     }
 
     pub fn module(&self, zome_name: &ZomeName) -> RibosomeResult<Arc<Module>> {
@@ -433,6 +523,13 @@ impl RealRibosome {
 
         imports
     }
+
+    pub fn get_zome_dependencies(&self, zome_name: &ZomeName) -> RibosomeResult<&[ZomeId]> {
+        Ok(self
+            .zome_dependencies
+            .get(zome_name)
+            .ok_or_else(|| ZomeTypesError::MissingDependenciesForZome(zome_name.clone()))?)
+    }
 }
 
 /// General purpose macro which relies heavily on various impls of the form:
@@ -471,6 +568,8 @@ impl RibosomeT for RealRibosome {
     }
 
     fn zome_info(&self, zome: Zome) -> RibosomeResult<ZomeInfo> {
+        let zome_dependencies = self.get_zome_dependencies(zome.zome_name())?;
+        let zome_types = self.zome_types.re_scope(zome_dependencies)?;
         Ok(ZomeInfo {
             name: zome.zome_name().clone(),
             id: self
@@ -508,9 +607,10 @@ impl RibosomeT for RealRibosome {
                         extern_fns.sort();
                         extern_fns
                     }
-                    ZomeDef::Inline(zome) => zome.0.callbacks(),
+                    ZomeDef::Inline { inline_zome, .. } => inline_zome.0.callbacks(),
                 }
             },
+            zome_types,
         })
     }
 
@@ -559,7 +659,9 @@ impl RibosomeT for RealRibosome {
                     Ok(None)
                 }
             }
-            ZomeDef::Inline(zome) => {
+            ZomeDef::Inline {
+                inline_zome: zome, ..
+            } => {
                 let input = invocation.clone().host_input()?;
                 let api = HostFnApi::new(Arc::new(self.clone()), Arc::new(call_context));
                 let result = zome.0.maybe_call(Box::new(api), to_call, input)?;
@@ -662,6 +764,18 @@ impl RibosomeT for RealRibosome {
             invocation,
             ValidationPackageCallbackResult
         )
+    }
+
+    fn zome_types(&self) -> &Arc<GlobalZomeTypes> {
+        &self.zome_types
+    }
+
+    fn dna_hash(&self) -> &DnaHash {
+        self.dna_file.dna_hash()
+    }
+
+    fn dna_file(&self) -> &DnaFile {
+        &self.dna_file
     }
 }
 

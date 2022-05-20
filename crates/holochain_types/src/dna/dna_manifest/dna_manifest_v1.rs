@@ -96,6 +96,20 @@ pub struct ZomeManifest {
     /// The location of the wasm for this zome
     #[serde(flatten)]
     pub location: ZomeLocation,
+
+    /// The integrity zomes this zome depends on.
+    /// The order of these must match the order the types
+    /// are used in the zome.
+    pub dependencies: Option<Vec<ZomeDependency>>,
+}
+
+/// Manifest for integrity zomes that another zome
+/// depends on.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub struct ZomeDependency {
+    /// The name of the integrity zome this zome depends on.
+    pub name: ZomeName,
 }
 
 /// Alias for a suitable representation of zome location
@@ -121,11 +135,13 @@ mod tests {
                 name: "1".into(),
                 hash: None,
                 location: ZomeLocation::Path(PathBuf::from("/test/1.wasm")),
+                dependencies: None,
             }],
             coordinator: vec![ZomeManifest {
                 name: "2".into(),
                 hash: None,
                 location: ZomeLocation::Path(PathBuf::from("/test/2.wasm")),
+                dependencies: None,
             }],
         };
         let s = serde_yaml::to_string(&all_zomes).unwrap();

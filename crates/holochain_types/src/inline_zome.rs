@@ -14,6 +14,28 @@ pub struct InlineZomeSet {
     pub coordinator_zomes: HashMap<&'static str, InlineCoordinatorZome>,
 }
 
+#[allow(missing_docs)]
+#[repr(u8)]
+/// Some black entry types to use for testing.
+pub enum InlineEntryTypes {
+    A,
+    B,
+    C,
+}
+
+impl InlineEntryTypes {
+    /// Create the entry defs for tese types.
+    pub fn entry_defs() -> Vec<EntryDef> {
+        vec![Default::default(); 3]
+    }
+}
+
+impl From<InlineEntryTypes> for LocalZomeTypeId {
+    fn from(t: InlineEntryTypes) -> Self {
+        Self(t as u8)
+    }
+}
+
 impl InlineZomeSet {
     /// Create a set of integrity and coordinators zomes.
     pub fn new<I, C>(integrity: I, coordinators: C) -> Self
@@ -137,6 +159,19 @@ impl InlineZomeSet {
                 .map(|(n, z)| CoordinatorZome::new((*n).into(), z.into()))
                 .collect(),
         )
+    }
+
+    /// Get the entry def location for committing an entry.
+    pub fn get_entry_location(api: &BoxApi, index: impl Into<LocalZomeTypeId>) -> EntryDefLocation {
+        let r: EntryDefIndex = api
+            .zome_info(())
+            .unwrap()
+            .zome_types
+            .entries
+            .to_global_scope(index)
+            .unwrap()
+            .into();
+        r.into()
     }
 }
 

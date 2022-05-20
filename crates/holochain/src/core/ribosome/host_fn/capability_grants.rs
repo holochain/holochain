@@ -58,7 +58,7 @@ pub mod wasm_test {
         assert_eq!(entry_secret, secret);
     }
 
-    // MAYBE: [ B-03669 ] can move this to an integration test (may need to switch to using a DnaStore)
+    // MAYBE: [ B-03669 ] can move this to an integration test (may need to switch to using a RibosomeStore)
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_authorized_call() -> anyhow::Result<()> {
         observability::test_run().ok();

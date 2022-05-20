@@ -48,7 +48,7 @@ newtype_fixturator!(FnComponents<Vec<String>>);
 
 fixturator!(
     RealRibosome;
-    constructor fn new(DnaFile);
+    constructor fn empty(DnaFile);
 );
 
 impl Iterator for RealRibosomeFixturator<curve::Zomes> {
@@ -67,7 +67,11 @@ impl Iterator for RealRibosomeFixturator<curve::Zomes> {
                 .collect(),
         );
 
-        let ribosome = RealRibosome::new(dna_file);
+        let ribosome = RealRibosome {
+            dna_file,
+            zome_types: Default::default(),
+            zome_dependencies: Default::default(),
+        };
 
         // warm the module cache for each wasm in the ribosome
         for zome in self.0.curve.0.clone() {

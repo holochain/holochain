@@ -144,7 +144,10 @@ pub enum ZomeDef {
     /// A zome defined by Rust closures. Cannot be deserialized.
     #[serde(skip_deserializing)]
     #[cfg(feature = "full-dna-def")]
-    Inline(self::inline_zome::DynInlineZome),
+    Inline {
+        inline_zome: self::inline_zome::DynInlineZome,
+        dependencies: Vec<ZomeName>,
+    },
 }
 
 #[derive(Serialize, Deserialize, Hash, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -170,7 +173,7 @@ impl From<ZomeDef> for ZomeDefSerialized {
             ZomeDef::Wasm(zome) => Self::Wasm(zome),
 
             #[cfg(feature = "full-dna-def")]
-            ZomeDef::Inline(zome) => Self::InlineUid(zome.0.uuid().clone()),
+            ZomeDef::Inline { inline_zome, .. } => Self::InlineUid(inline_zome.0.uuid().clone()),
         }
     }
 }
@@ -190,28 +193,40 @@ impl CoordinatorZomeDef {
 #[cfg(feature = "full-dna-def")]
 impl From<InlineIntegrityZome> for ZomeDef {
     fn from(iz: InlineIntegrityZome) -> Self {
-        Self::Inline(inline_zome::DynInlineZome(Arc::new(iz)))
+        Self::Inline {
+            inline_zome: inline_zome::DynInlineZome(Arc::new(iz)),
+            dependencies: Default::default(),
+        }
     }
 }
 
 #[cfg(feature = "full-dna-def")]
 impl From<InlineIntegrityZome> for IntegrityZomeDef {
     fn from(iz: InlineIntegrityZome) -> Self {
-        Self(ZomeDef::Inline(inline_zome::DynInlineZome(Arc::new(iz))))
+        Self(ZomeDef::Inline {
+            inline_zome: inline_zome::DynInlineZome(Arc::new(iz)),
+            dependencies: Default::default(),
+        })
     }
 }
 
 #[cfg(feature = "full-dna-def")]
 impl From<crate::InlineCoordinatorZome> for ZomeDef {
     fn from(iz: crate::InlineCoordinatorZome) -> Self {
-        Self::Inline(inline_zome::DynInlineZome(Arc::new(iz)))
+        Self::Inline {
+            inline_zome: inline_zome::DynInlineZome(Arc::new(iz)),
+            dependencies: Default::default(),
+        }
     }
 }
 
 #[cfg(feature = "full-dna-def")]
 impl From<crate::InlineCoordinatorZome> for CoordinatorZomeDef {
     fn from(iz: crate::InlineCoordinatorZome) -> Self {
-        Self(ZomeDef::Inline(inline_zome::DynInlineZome(Arc::new(iz))))
+        Self(ZomeDef::Inline {
+            inline_zome: inline_zome::DynInlineZome(Arc::new(iz)),
+            dependencies: Default::default(),
+        })
     }
 }
 
@@ -223,9 +238,18 @@ impl ZomeDef {
     //     the arg is unused.
     pub fn wasm_hash(&self, _zome_name: &ZomeName) -> ZomeResult<holo_hash::WasmHash> {
         match self {
-            ZomeDef::Wasm(WasmZome { wasm_hash }) => Ok(wasm_hash.clone()),
+            ZomeDef::Wasm(WasmZome { wasm_hash, .. }) => Ok(wasm_hash.clone()),
             #[cfg(feature = "full-dna-def")]
-            ZomeDef::Inline(_) => Err(ZomeError::NonWasmZome(_zome_name.clone())),
+            ZomeDef::Inline { .. } => Err(ZomeError::NonWasmZome(_zome_name.clone())),
+        }
+    }
+
+    /// Get the dependencies of this zome.
+    pub fn dependencies(&self) -> &[ZomeName] {
+        match self {
+            ZomeDef::Wasm(WasmZome { dependencies, .. }) => &dependencies[..],
+            #[cfg(feature = "full-dna-def")]
+            ZomeDef::Inline { dependencies, .. } => &dependencies[..],
         }
     }
 }
@@ -283,19 +307,27 @@ impl<'a> arbitrary::Arbitrary<'a> for CoordinatorZomeDef {
 pub struct WasmZome {
     /// The WasmHash representing the WASM byte code for this zome.
     pub wasm_hash: holo_hash::WasmHash,
+    /// Integrity zomes this zome depends on.
+    pub dependencies: Vec<ZomeName>,
 }
 
 impl WasmZome {
     /// Constructor
     pub fn new(wasm_hash: holo_hash::WasmHash) -> Self {
-        Self { wasm_hash }
+        Self {
+            wasm_hash,
+            dependencies: Default::default(),
+        }
     }
 }
 
 impl ZomeDef {
     /// create a Zome from a holo_hash WasmHash instead of a holo_hash one
     pub fn from_hash(wasm_hash: holo_hash::WasmHash) -> Self {
-        Self::Wasm(WasmZome { wasm_hash })
+        Self::Wasm(WasmZome {
+            wasm_hash,
+            dependencies: Default::default(),
+        })
     }
 }
 

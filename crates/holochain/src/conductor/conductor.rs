@@ -13,7 +13,6 @@ pub use self::share::RwShare;
 use super::api::RealAppInterfaceApi;
 use super::config::AdminInterfaceConfig;
 use super::config::InterfaceDriver;
-use super::dna_store::DnaStore;
 use super::entry_def_store::get_entry_defs;
 use super::error::ConductorError;
 use super::handle::ConductorHandleImpl;
@@ -28,6 +27,7 @@ use super::manager::ManagedTaskAdd;
 use super::manager::ManagedTaskHandle;
 use super::manager::TaskManagerRunHandle;
 use super::paths::DatabaseRootPath;
+use super::ribosome_store::RibosomeStore;
 use super::space::Space;
 use super::space::Spaces;
 use super::state::AppInterfaceId;
@@ -155,7 +155,7 @@ where
     pub(super) task_manager: RwShare<Option<TaskManagerClient>>,
 
     /// Placeholder for what will be the real DNA/Wasm cache
-    dna_store: RwShare<DnaStore>,
+    dna_store: RwShare<RibosomeStore>,
 
     /// Access to private keys for signing and encryption.
     keystore: MetaLairClient,
@@ -246,7 +246,7 @@ impl Conductor {
         }
     }
 
-    pub(super) fn dna_store(&self) -> &RwShare<DnaStore> {
+    pub(super) fn dna_store(&self) -> &RwShare<RibosomeStore> {
         &self.dna_store
     }
 
@@ -416,16 +416,16 @@ impl Conductor {
 
     pub(super) async fn register_dna_wasm(
         &self,
-        dna: DnaFile,
+        ribosome: RealRibosome,
     ) -> ConductorResult<Vec<(EntryDefBufferKey, EntryDef)>> {
-        let is_full_wasm_dna = dna
+        let is_full_wasm_dna = ribosome
             .dna_def()
             .all_zomes()
             .all(|(_, zome_def)| matches!(zome_def, ZomeDef::Wasm(_)));
 
         // Only install wasm if the DNA is composed purely of WasmZomes (no InlineZomes)
         if is_full_wasm_dna {
-            Ok(self.put_wasm(dna.clone()).await?)
+            Ok(self.put_wasm(ribosome).await?)
         } else {
             Ok(Vec::with_capacity(0))
         }
@@ -435,8 +435,8 @@ impl Conductor {
         self.dna_store.share_mut(|d| d.add_entry_defs(entry_defs));
     }
 
-    pub(super) fn register_phenotype(&self, dna: DnaFile) {
-        self.dna_store.share_mut(|d| d.add_dna(dna));
+    pub(super) fn register_phenotype(&self, ribosome: RealRibosome) {
+        self.dna_store.share_mut(|d| d.add_ribosome(ribosome));
     }
 
     pub(super) fn get_queue_consumer_workflows(&self) -> QueueConsumerMap {
@@ -469,8 +469,8 @@ impl Conductor {
     /// Instantiate a Ribosome for use with a DNA
     pub(crate) fn get_ribosome(&self, dna_hash: &DnaHash) -> ConductorResult<RealRibosome> {
         self.dna_store
-            .share_ref(|d| match d.get_dna_file(dna_hash) {
-                Some(dna) => Ok(RealRibosome::new(dna)),
+            .share_ref(|d| match d.get_ribosome(dna_hash) {
+                Some(r) => Ok(r),
                 None => Err(DnaError::DnaMissing(dna_hash.to_owned()).into()),
             })
     }
@@ -773,7 +773,8 @@ impl Conductor {
                 .modify_phenotype(random_uid(), properties)
         })?;
         let child_dna_hash = child_dna.dna_hash().to_owned();
-        self.register_phenotype(child_dna);
+        let child_ribosome = RealRibosome::new(child_dna).await?;
+        self.register_phenotype(child_ribosome);
         let (_, cell_id) = self
             .update_state_prime(move |mut state| {
                 if let Some(app) = state.installed_apps_mut().get_mut(&app_id) {
@@ -792,7 +793,7 @@ impl Conductor {
     pub(super) async fn load_wasms_into_dna_files(
         &self,
     ) -> ConductorResult<(
-        impl IntoIterator<Item = (DnaHash, DnaFile)>,
+        impl IntoIterator<Item = (DnaHash, RealRibosome)>,
         impl IntoIterator<Item = (EntryDefBufferKey, EntryDef)>,
     )> {
         let db = &self.spaces.wasm_db;
@@ -837,7 +838,8 @@ impl Conductor {
                         let wasms = wasms.collect::<Vec<_>>();
                         async move {
                             let dna_file = DnaFile::new(dna_def.into_content(), wasms).await?;
-                            ConductorResult::Ok((dna_file.dna_hash().clone(), dna_file))
+                            let ribosome = RealRibosome::new(dna_file).await?;
+                            ConductorResult::Ok((ribosome.dna_hash().clone(), ribosome))
                         }
                     })
                     // This needs to happen due to the environment not being Send
@@ -908,16 +910,22 @@ impl Conductor {
 
     pub(super) async fn put_wasm(
         &self,
-        dna: DnaFile,
+        ribosome: RealRibosome,
     ) -> ConductorResult<Vec<(EntryDefBufferKey, EntryDef)>> {
-        let zome_defs = get_entry_defs(dna.clone())?;
-        let code = dna.code().clone().into_iter().map(|(_, c)| c);
-        self.put_wasm_code(dna, code, zome_defs).await
+        let dna_def = ribosome.dna_def().clone();
+        let code = ribosome
+            .dna_file()
+            .code()
+            .clone()
+            .into_iter()
+            .map(|(_, c)| c);
+        let zome_defs = get_entry_defs(ribosome).await?;
+        self.put_wasm_code(dna_def, code, zome_defs).await
     }
 
     pub(super) async fn put_wasm_code(
         &self,
-        dna: DnaFile,
+        dna: DnaDefHashed,
         code: impl Iterator<Item = wasm::DnaWasm>,
         zome_defs: Vec<(EntryDefBufferKey, EntryDef)>,
     ) -> ConductorResult<Vec<(EntryDefBufferKey, EntryDef)>> {
@@ -939,8 +947,8 @@ impl Conductor {
                         holochain_state::entry_def::put(txn, key, &entry_def)?;
                     }
 
-                    if !holochain_state::dna_def::contains(txn, dna.dna_hash())? {
-                        holochain_state::dna_def::put(txn, dna.dna_def().clone())?;
+                    if !holochain_state::dna_def::contains(txn, dna.as_hash())? {
+                        holochain_state::dna_def::put(txn, dna.into_content())?;
                     }
                     StateMutationResult::Ok(())
                 }
@@ -1246,7 +1254,7 @@ fn query_dht_ops_from_statement(
 impl Conductor {
     #[allow(clippy::too_many_arguments)]
     async fn new(
-        dna_store: RwShare<DnaStore>,
+        dna_store: RwShare<RibosomeStore>,
         keystore: MetaLairClient,
         holochain_p2p: holochain_p2p::HolochainP2pRef,
         spaces: Spaces,
@@ -1366,9 +1374,9 @@ impl Conductor {
 
 mod builder {
     use super::*;
-    use crate::conductor::dna_store::DnaStore;
     use crate::conductor::handle::DevSettings;
     use crate::conductor::kitsune_host_impl::KitsuneHostImpl;
+    use crate::conductor::ribosome_store::RibosomeStore;
     use crate::conductor::ConductorHandle;
 
     /// A configurable Builder for Conductor and sometimes ConductorHandle
@@ -1376,8 +1384,8 @@ mod builder {
     pub struct ConductorBuilder {
         /// The configuration
         pub config: ConductorConfig,
-        /// The DnaStore (mockable)
-        pub dna_store: DnaStore,
+        /// The RibosomeStore (mockable)
+        pub dna_store: RibosomeStore,
         /// For new lair, passphrase is required
         pub passphrase: Option<sodoken::BufRead>,
         /// Optional keystore override

@@ -9,7 +9,7 @@ name = "test_wasm_hdk_extern"
 crate-type = [ "cdylib", "rlib" ]
 
 [[example]]
-name = "integrity_test_wasm_extern"
+name = "integrity_test_wasm_hdk_extern"
 path = "src/integrity.rs"
 crate-type = ["cdylib", "rlib"]
 

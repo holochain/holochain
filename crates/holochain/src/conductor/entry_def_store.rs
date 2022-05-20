@@ -9,7 +9,6 @@ use crate::core::ribosome::RibosomeT;
 use error::EntryDefStoreError;
 use error::EntryDefStoreResult;
 use holo_hash::*;
-use holochain_serialized_bytes::prelude::*;
 use holochain_types::prelude::*;
 use std::collections::HashMap;
 
@@ -29,14 +28,15 @@ pub(crate) async fn get_entry_def(
     let key = EntryDefBufferKey::new(zome, entry_def_index);
     let entry_def = conductor_handle.get_entry_def(&key);
     let dna_hash = dna_def.as_hash();
-    let dna_file = conductor_handle
-        .get_dna_file(dna_hash)
-        .ok_or_else(|| EntryDefStoreError::DnaFileMissing(dna_hash.clone()))?;
+    let ribosome = conductor_handle
+        .get_ribosome(dna_hash)
+        .map_err(|_| EntryDefStoreError::DnaFileMissing(dna_hash.clone()))?;
 
     // If it's not found run the ribosome and get the entry defs
     match &entry_def {
         Some(_) => Ok(entry_def),
-        None => Ok(get_entry_defs(dna_file)?
+        None => Ok(get_entry_defs(ribosome)
+            .await?
             .get(entry_def_index.index())
             .map(|(_, v)| v.clone())),
     }
@@ -56,24 +56,31 @@ pub(crate) async fn get_entry_def_from_ids(
     }
 }
 
-#[tracing::instrument(skip(dna))]
+#[tracing::instrument(skip(ribosome))]
 /// Get all the [EntryDef] for this dna
-pub(crate) fn get_entry_defs(
-    dna: DnaFile,
+pub(crate) async fn get_entry_defs(
+    ribosome: RealRibosome,
 ) -> EntryDefStoreResult<Vec<(EntryDefBufferKey, EntryDef)>> {
     let invocation = EntryDefsInvocation;
 
     // Get the zomes hashes
-    let zomes = dna
-        .dna()
+    let zomes = ribosome
+        .dna_def()
         .integrity_zomes
         .iter()
         .cloned()
-        .map(|(zome_name, zome)| (zome_name, zome))
+        .enumerate()
+        .map(|(i, (zome_name, zome))| (zome_name, (ZomeId(i as u8), zome)))
         .collect::<HashMap<_, _>>();
 
-    let ribosome = RealRibosome::new(dna);
-    match ribosome.run_entry_defs(EntryDefsHostAccess, invocation)? {
+    let (ribosome, result) = tokio::task::spawn_blocking(move || {
+        let r = ribosome.run_entry_defs(EntryDefsHostAccess, invocation);
+        (ribosome, r)
+    })
+    .await?;
+
+    let zome_types_map = ribosome.zome_types();
+    match result? {
         EntryDefsResult::Defs(map) => {
             // Turn the defs map into a vec of keys and entry defs
             map.into_iter()
@@ -82,21 +89,26 @@ pub(crate) fn get_entry_defs(
                     zomes.get(&zome_name).map(|zome| (zome.clone(), entry_defs))
                 })
                 // Get each entry def and pair with a key
-                .flat_map(|(zome, entry_defs)| {
+                .flat_map(|((zome_id, zome), entry_defs)| {
                     entry_defs
                         .into_iter()
                         .enumerate()
-                        .map(move |(i, entry_def)| {
-                            let s = tracing::debug_span!("entry_def");
-                            let _g = s.enter();
-                            tracing::debug!(?entry_def);
+                        .map(move |(local_index, entry_def)| {
+                            let entry_def_position = u8::try_from(local_index)
+                                .ok()
+                                .and_then(|local_type_id| {
+                                    zome_types_map
+                                        .re_scope(&[zome_id])
+                                        .ok()?
+                                        .entries
+                                        .to_global_scope(local_type_id)
+                                })
+                                .ok_or(EntryDefStoreError::EntryTypeMissing)?;
+
                             Ok((
                                 EntryDefBufferKey {
                                     zome: zome.clone(),
-                                    // Entry positions are stored as u8 so we can't have more then 255
-                                    entry_def_position: u8::try_from(i)
-                                        .map_err(|_| EntryDefStoreError::TooManyEntryDefs)?
-                                        .into(),
+                                    entry_def_position: entry_def_position.into(),
                                 },
                                 entry_def,
                             ))

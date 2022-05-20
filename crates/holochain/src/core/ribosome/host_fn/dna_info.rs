@@ -50,13 +50,10 @@ pub mod test {
     use holochain_zome_types::prelude::*;
 
     async fn test_conductor(properties: SerializedBytes) -> (SweetConductor, SweetZome) {
-        let (dna_file, _, _) = SweetDnaFile::from_test_wasms(
-            random_uid(),
-            vec![TestWasm::ZomeInfo],
-            properties,
-        )
-        .await
-        .unwrap();
+        let (dna_file, _, _) =
+            SweetDnaFile::from_test_wasms(random_uid(), vec![TestWasm::ZomeInfo], properties)
+                .await
+                .unwrap();
 
         let alice_pubkey = fixt!(AgentPubKey, Predictable, 0);
         let bob_pubkey = fixt!(AgentPubKey, Predictable, 1);

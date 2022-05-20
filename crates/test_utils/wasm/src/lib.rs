@@ -358,10 +358,14 @@ impl From<TestWasm> for TestWasmPair<IntegrityZomeDef, CoordinatorZomeDef> {
             integrity,
             coordinator,
         } = TestWasmPair::<PathBuf>::from(test_wasm);
+        let TestWasmPair {
+            integrity: dep_name,
+            ..
+        } = TestWasmPair::<ZomeName>::from(test_wasm);
         tokio_helper::block_forever_on(async move {
             TestWasmPair {
-                integrity: path_to_def(integrity).await.into(),
-                coordinator: path_to_def(coordinator).await.into(),
+                integrity: path_to_def(integrity, Default::default()).await.into(),
+                coordinator: path_to_def(coordinator, vec![dep_name]).await.into(),
             }
         })
     }
@@ -388,14 +392,14 @@ impl From<TestWasm> for IntegrityZome {
     fn from(test_wasm: TestWasm) -> Self {
         let TestWasmPair { integrity, .. } = TestWasmPair::<PathBuf>::from(test_wasm);
 
-        let def = tokio_helper::block_forever_on(path_to_def(integrity));
+        let def = tokio_helper::block_forever_on(path_to_def(integrity, Default::default()));
         Self::new(test_wasm.into(), def.into())
     }
 }
 
 impl From<TestIntegrityWasm> for IntegrityZome {
     fn from(t: TestIntegrityWasm) -> Self {
-        let def = tokio_helper::block_forever_on(path_to_def(t.into()));
+        let def = tokio_helper::block_forever_on(path_to_def(t.into(), Default::default()));
         Self::new(t.into(), def.into())
     }
 }
@@ -403,20 +407,37 @@ impl From<TestIntegrityWasm> for IntegrityZome {
 impl From<TestWasm> for CoordinatorZome {
     fn from(test_wasm: TestWasm) -> Self {
         let TestWasmPair { coordinator, .. } = TestWasmPair::<PathBuf>::from(test_wasm);
-        let def = tokio_helper::block_forever_on(path_to_def(coordinator));
+        let TestWasmPair {
+            integrity: dep_name,
+            ..
+        } = TestWasmPair::<ZomeName>::from(test_wasm);
+        let def = tokio_helper::block_forever_on(path_to_def(coordinator, vec![dep_name]));
         Self::new(test_wasm.into(), def.into())
     }
 }
 
+impl From<TestCoordinatorWasm> for TestIntegrityWasm {
+    fn from(t: TestCoordinatorWasm) -> Self {
+        match t {
+            TestCoordinatorWasm::CoordinatorZome | TestCoordinatorWasm::CoordinatorZomeUpdate => {
+                Self::IntegrityZome
+            }
+        }
+    }
+}
 impl From<TestCoordinatorWasm> for CoordinatorZome {
     fn from(t: TestCoordinatorWasm) -> Self {
-        let def = tokio_helper::block_forever_on(path_to_def(t.into()));
+        let dep_name: ZomeName = TestIntegrityWasm::from(t).into();
+        let def = tokio_helper::block_forever_on(path_to_def(t.into(), vec![dep_name]));
         Self::new(t.into(), def.into())
     }
 }
 
-async fn path_to_def(path: PathBuf) -> ZomeDef {
+async fn path_to_def(path: PathBuf, dependencies: Vec<ZomeName>) -> ZomeDef {
     let wasm = DnaWasm::from(get_code(path));
     let wasm_hash = WasmHash::with_data(&wasm).await;
-    ZomeDef::Wasm(WasmZome { wasm_hash })
+    ZomeDef::Wasm(WasmZome {
+        wasm_hash,
+        dependencies,
+    })
 }

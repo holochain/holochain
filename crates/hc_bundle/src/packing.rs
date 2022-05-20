@@ -75,7 +75,7 @@ fn dir_to_bundle_path(dir_path: &Path, name: String, extension: &str) -> HcBundl
 
 #[cfg(test)]
 mod tests {
-    use holochain_types::prelude::DnaManifest;
+    use holochain_types::prelude::ValidatedDnaManifest;
     use mr_bundle::error::{MrBundleError, UnpackingError};
 
     use super::*;
@@ -117,9 +117,10 @@ zomes:
         // in the parent directory
         std::fs::write(tmpdir.path().join("zome-3.wasm"), &[7, 8, 9]).unwrap();
 
-        let (bundle_path, bundle) = pack::<DnaManifest>(&dir, None, "test_dna".to_string())
-            .await
-            .unwrap();
+        let (bundle_path, bundle) =
+            pack::<ValidatedDnaManifest>(&dir, None, "test_dna".to_string())
+                .await
+                .unwrap();
 
         // Ensure the bundle path was generated as expected
         assert!(bundle_path.is_file());
@@ -130,7 +131,7 @@ zomes:
 
         // Unpack without forcing, which will fail
         matches::assert_matches!(
-            unpack::<DnaManifest>(
+            unpack::<ValidatedDnaManifest>(
                 "dna",
                 &bundle_path,
                 Some(bundle_path.parent().unwrap().to_path_buf()),
@@ -142,7 +143,7 @@ zomes:
             ),),)
         );
         // Now unpack with forcing to overwrite original directory
-        unpack::<DnaManifest>(
+        unpack::<ValidatedDnaManifest>(
             "dna",
             &bundle_path,
             Some(bundle_path.parent().unwrap().to_path_buf()),
@@ -151,7 +152,7 @@ zomes:
         .await
         .unwrap();
 
-        let (bundle_path, bundle) = pack::<DnaManifest>(
+        let (bundle_path, bundle) = pack::<ValidatedDnaManifest>(
             &dir,
             Some(dir.parent().unwrap().to_path_buf()),
             "test_dna".to_string(),
@@ -162,7 +163,7 @@ zomes:
         // Now remove the directory altogether, unpack again, and check that
         // all of the same files are present
         std::fs::remove_dir_all(&dir).unwrap();
-        unpack::<DnaManifest>("dna", &bundle_path, Some(dir.to_owned()), false)
+        unpack::<ValidatedDnaManifest>("dna", &bundle_path, Some(dir.to_owned()), false)
             .await
             .unwrap();
         assert!(dir.join("zome-1.wasm").is_file());

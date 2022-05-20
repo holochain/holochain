@@ -1,6 +1,4 @@
 use crate::core::ribosome::error::RibosomeError;
-use crate::core::ribosome::guest_callback::entry_defs::EntryDefsInvocation;
-use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeT;
@@ -27,13 +25,20 @@ pub fn create<'a>(
                 chain_top_ordering,
             } = input;
 
-            let zome = match &entry_location {
-                EntryDefLocation::App(location) => Some(
-                    ribosome
-                        .dna_def()
-                        .get_integrity_zome(&location.zome)
-                        .map_err(|zome_error| WasmError::Host(zome_error.to_string()))?,
-                ),
+            // TODO: This can be removed when we remove zome ids from headers.
+            let zome_id = match &entry_location {
+                EntryDefLocation::App(entry_index) => {
+                    match ribosome.zome_types().find_zome_id_from_entry(&entry_index) {
+                        Some(i) => Some(i),
+                        None => {
+                            return Err(WasmError::Host(format!(
+                                "Entry index {} not found in DNA {}",
+                                entry_index.0,
+                                ribosome.dna_hash()
+                            )))
+                        }
+                    }
+                }
                 EntryDefLocation::CapClaim | EntryDefLocation::CapGrant => None,
             };
 
@@ -58,25 +63,20 @@ pub fn create<'a>(
 
                     // extract the entry defs for a zome
                     let entry_type = match entry_location {
-                        EntryDefLocation::App(AppEntryDefLocation {
-                            entry: app_entry_def_name,
-                            ..
-                        }) => {
-                            let zome = zome
-                                .as_ref()
+                        EntryDefLocation::App(entry_def_index) => {
+                            let integrity_zomes = &ribosome.dna_def().content.integrity_zomes;
+                            let header_zome_id = zome_id
                                 .expect("Zome can never be none for a EntryDefLocation::App");
-                            // extract the zome position
-                            let header_zome_id = ribosome
-                                .zome_name_to_id(zome.zome_name())
-                                .expect("Failed to get ID for current zome");
-                            let (header_entry_def_id, entry_visibility) = extract_entry_def(
-                                ribosome,
-                                call_context.clone(),
+                            let (zome_name, zome) = integrity_zomes.get(header_zome_id.0 as usize)
+                                    .ok_or_else(|| WasmError::Guest(format!("Tried to get zome id {} but there are only {} integrity zomes", header_zome_id.0, integrity_zomes.len())))?;
+                            let entry_visibility = get_entry_visibility(
+                                call_context.as_ref(),
+                                zome_name,
                                 zome.clone(),
-                                app_entry_def_name.into(),
+                                entry_def_index,
                             )?;
                             let app_entry_type = AppEntryType::new(
-                                header_entry_def_id,
+                                entry_def_index,
                                 header_zome_id,
                                 entry_visibility,
                             );
@@ -124,44 +124,33 @@ pub fn create<'a>(
     }
 }
 
-pub fn extract_entry_def(
-    ribosome: Arc<impl RibosomeT>,
-    call_context: Arc<CallContext>,
-    zome: IntegrityZome,
-    entry_def_id: EntryDefId,
-) -> Result<(holochain_zome_types::header::EntryDefIndex, EntryVisibility), WasmError> {
-    let app_entry_type = match ribosome
-        .run_entry_defs((&call_context.host_context).into(), EntryDefsInvocation)
-        .map_err(|ribosome_error| WasmError::Host(ribosome_error.to_string()))?
-    {
-        // the ribosome returned some defs
-        EntryDefsResult::Defs(defs) => {
-            let maybe_entry_defs = defs.get(zome.zome_name());
-            match maybe_entry_defs {
-                // convert the entry def id string into a numeric position in the defs
-                Some(entry_defs) => {
-                    entry_defs
-                        .entry_def_index_from_id(entry_def_id.clone())
-                        .map(|index| {
-                            // build an app entry type from the entry def at the found position
-                            (index, entry_defs[index.0 as usize].visibility)
-                        })
-                }
-                None => None,
-            }
-        }
-        _ => None,
+fn get_entry_visibility(
+    call_context: &CallContext,
+    zome_name: &ZomeName,
+    zome: IntegrityZomeDef,
+    entry_def_position: EntryDefIndex,
+) -> Result<EntryVisibility, WasmError> {
+    let key = EntryDefBufferKey {
+        zome,
+        entry_def_position,
     };
-    match app_entry_type {
-        Some(app_entry_type) => Ok(app_entry_type),
-        None => Err(WasmError::Host(
-            RibosomeError::EntryDefs(
-                zome.zome_name().clone(),
-                format!("entry def not found for {:?}", entry_def_id),
+    call_context
+        .host_context()
+        .call_zome_handle()
+        .get_entry_def(&key)
+        .map(|e| e.visibility)
+        .ok_or_else(|| {
+            WasmError::Host(
+                RibosomeError::EntryDefs(
+                    zome_name.clone(),
+                    format!(
+                        "entry def not found for entry index {}",
+                        entry_def_position.0
+                    ),
+                )
+                .to_string(),
             )
-            .to_string(),
-        )),
-    }
+        })
 }
 
 #[cfg(test)]
@@ -198,7 +187,7 @@ pub mod wasm_test {
         call_context.host_context = host_access.into();
         let app_entry = EntryFixturator::new(AppEntry).next().unwrap();
         let input = CreateInput::new(
-            EntryDefLocation::app(TestWasm::Create, "post"),
+            EntryDefLocation::app(0.into()),
             app_entry.clone(),
             ChainTopOrdering::default(),
         );

@@ -233,7 +233,7 @@ impl From<String> for Path {
 
 impl Path {
     /// Attach a [`ZomeName`] to this path
-    /// so it's location is known for commits.
+    /// so its location is known for commits.
     pub fn locate(self, zome_name: impl Into<ZomeName>) -> LocatedPath {
         LocatedPath(zome_name.into(), self)
     }

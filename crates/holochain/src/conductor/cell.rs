@@ -554,7 +554,7 @@ impl Cell {
             None => return Ok(None.into()),
         };
 
-        let ribosome = self.get_ribosome().await?;
+        let ribosome = self.get_ribosome()?;
 
         // This agent is the author so get the validation package from the source chain
         if header.author() == self.id.agent_pubkey() {
@@ -806,7 +806,7 @@ impl Cell {
 
         let conductor_handle = self.conductor_handle.clone();
         let signal_tx = self.signal_broadcaster().await;
-        let ribosome = self.get_ribosome().await?;
+        let ribosome = self.get_ribosome()?;
         let invocation =
             ZomeCallInvocation::try_from_interface_call(self.conductor_api.clone(), call).await?;
 
@@ -867,11 +867,9 @@ impl Cell {
         let conductor_handle = self.conductor_handle.clone();
 
         // get the dna
-        let dna_file = conductor_handle
-            .get_dna_file(id.dna_hash())
-            .ok_or_else(|| DnaError::DnaMissing(id.dna_hash().to_owned()))?;
+        let ribosome = self.get_ribosome()?;
 
-        let dna_def = dna_file.dna_def().clone();
+        let dna_def = ribosome.dna_def().clone();
 
         // Create the workspace
         let workspace = SourceChainWorkspace::init_as_root(
@@ -881,7 +879,7 @@ impl Cell {
             self.cache().clone(),
             keystore.clone(),
             id.agent_pubkey().clone(),
-            Arc::new(dna_def),
+            Arc::new(dna_def.into_content()),
         )
         .await?;
 
@@ -890,9 +888,6 @@ impl Cell {
             return Ok(());
         }
         trace!("running init");
-
-        // Get the ribosome
-        let ribosome = RealRibosome::new(dna_file);
 
         let signal_tx = self.signal_broadcaster().await;
 
@@ -936,11 +931,11 @@ impl Cell {
     }
 
     /// Instantiate a Ribosome for use by this Cell's workflows
-    pub(crate) async fn get_ribosome(&self) -> CellResult<RealRibosome> {
-        match self.conductor_api.get_dna(self.dna_hash()) {
-            Some(dna) => Ok(RealRibosome::new(dna)),
-            None => Err(DnaError::DnaMissing(self.dna_hash().to_owned()).into()),
-        }
+    pub(crate) fn get_ribosome(&self) -> CellResult<RealRibosome> {
+        Ok(self
+            .conductor_handle
+            .get_ribosome(self.dna_hash())
+            .map_err(|_| DnaError::DnaMissing(self.dna_hash().to_owned()))?)
     }
 
     /// Accessor for the p2p_agents_db backing this Cell

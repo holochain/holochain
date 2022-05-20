@@ -47,7 +47,7 @@ impl From<&InitHostAccess> for HostFnAccess {
 
 impl Invocation for InitInvocation {
     fn zomes(&self) -> ZomesToInvoke {
-        ZomesToInvoke::AllIntegrity
+        ZomesToInvoke::All
     }
     fn fn_components(&self) -> FnComponents {
         vec!["init".into()].into()

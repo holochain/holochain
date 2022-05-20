@@ -29,7 +29,7 @@ use matches::assert_matches;
 #[tokio::test(flavor = "multi_thread")]
 async fn can_update_state() {
     let db_dir = test_db_dir();
-    let dna_store = DnaStore::new();
+    let dna_store = RibosomeStore::new();
     let keystore = test_keystore();
     let holochain_p2p = holochain_p2p::stub_network().await;
     let (post_commit_sender, _post_commit_receiver) =
@@ -78,7 +78,7 @@ async fn can_add_clone_cell_to_app() {
     let dna = fake_valid_dna_file("");
     let cell_id = CellId::new(dna.dna_hash().to_owned(), agent.clone());
 
-    let dna_store = DnaStore::new();
+    let dna_store = RibosomeStore::new();
     let (post_commit_sender, _post_commit_receiver) =
         tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
     let spaces = Spaces::new(db_dir.path().to_path_buf().into(), Default::default()).unwrap();
@@ -106,7 +106,7 @@ async fn can_add_clone_cell_to_app() {
         vec![&"role_id".to_string()]
     );
 
-    conductor.register_phenotype(dna);
+    conductor.register_phenotype(RealRibosome::empty(dna));
     conductor
         .update_state(move |mut state| {
             state
@@ -151,7 +151,7 @@ async fn can_add_clone_cell_to_app() {
 #[tokio::test(flavor = "multi_thread")]
 async fn app_ids_are_unique() {
     let db_dir = test_db_dir();
-    let dna_store = DnaStore::new();
+    let dna_store = RibosomeStore::new();
     let holochain_p2p = holochain_p2p::stub_network().await;
     let (post_commit_sender, _post_commit_receiver) =
         tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
@@ -983,7 +983,6 @@ async fn test_init_concurrency() {
         let zome = cell.zome("zome");
         let num_iters = num_iters.clone();
         tokio::spawn(async move {
-            println!("i: {:?}", _i);
             num_iters.fetch_add(1, Ordering::SeqCst);
             let _: () = conductor.call(&zome, "zomefunc", ()).await;
         })

@@ -7,6 +7,7 @@
 
 // This allow is here because #[automock] automaticaly creates a struct without
 // documentation, and there seems to be no way to add docs to it after the fact
+#[allow(missing_docs)]
 pub mod error;
 pub mod guest_callback;
 pub mod host_fn;
@@ -42,8 +43,10 @@ use holochain_serialized_bytes::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
 use holochain_types::prelude::*;
+use holochain_types::zome_types::GlobalZomeTypes;
 use mockall::automock;
 use std::iter::Iterator;
+use std::sync::Arc;
 
 use self::guest_callback::{
     entry_defs::EntryDefsInvocation, genesis_self_check::GenesisSelfCheckResult,
@@ -460,6 +463,10 @@ impl From<&ZomeCallHostAccess> for HostFnAccess {
 pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
     fn dna_def(&self) -> &DnaDefHashed;
 
+    fn dna_hash(&self) -> &DnaHash;
+
+    fn dna_file(&self) -> &DnaFile;
+
     fn zome_info(&self, zome: Zome) -> RibosomeResult<ZomeInfo>;
 
     fn zomes_to_invoke(&self, zomes_to_invoke: ZomesToInvoke) -> Vec<Zome> {
@@ -571,6 +578,8 @@ pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
         access: ZomeCallHostAccess,
         invocation: ZomeCallInvocation,
     ) -> RibosomeResult<ZomeCallResponse>;
+
+    fn zome_types(&self) -> &Arc<GlobalZomeTypes>;
 }
 
 #[cfg(test)]
