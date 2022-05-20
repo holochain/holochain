@@ -190,6 +190,8 @@ jobs:
               box: circle.build
 
    ci-jobs-succeed:
+      when:
+         false
       docker:
          - image: bash
       steps:
