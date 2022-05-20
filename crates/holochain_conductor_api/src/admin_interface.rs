@@ -164,9 +164,7 @@ pub enum AdminRequest {
     },
 
     #[deprecated = "alias for EnableApp"]
-    ActivateApp {
-        installed_app_id: InstalledAppId,
-    },
+    ActivateApp { installed_app_id: InstalledAppId },
 
     /// Changes the specified app from an enabled to a disabled state in the conductor.
     ///
@@ -182,9 +180,7 @@ pub enum AdminRequest {
     },
 
     #[deprecated = "alias for DisableApp"]
-    DeactivateApp {
-        installed_app_id: InstalledAppId,
-    },
+    DeactivateApp { installed_app_id: InstalledAppId },
 
     StartApp {
         /// The app ID to (re)start

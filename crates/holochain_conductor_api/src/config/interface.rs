@@ -18,7 +18,7 @@ pub struct AdminInterfaceConfig {
 /// **NB**: This struct is used in both [`ConductorConfig`]
 /// and [`ConductorState`],
 /// so any change to the serialization strategy is a breaking change.
-/// 
+///
 /// [`ConductorConfig`]: crate::conductor::ConductorConfig
 /// [`ConductorState`]: https://docs.rs/holochain/latest/holochain/conductor/state/struct.ConductorState.html
 #[derive(Clone, Deserialize, Serialize, Debug, PartialEq)]

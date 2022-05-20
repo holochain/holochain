@@ -48,12 +48,12 @@ pub struct ConductorConfig {
 
     #[serde(default)]
     /// Override the default database synchronous strategy.
-    /// 
+    ///
     /// See [sqlite documentation] for information about database sync levels.
     /// See [`DbSyncStrategy`] for details.
     /// This is best left at its default value unless you know what you
     /// are doing.
-    /// 
+    ///
     /// [sqlite documentation]: https://www.sqlite.org/pragma.html#pragma_synchronous
     pub db_sync_strategy: DbSyncStrategy,
     //
