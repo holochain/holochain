@@ -5,345 +5,346 @@ use kitsune_p2p::agent_store::AgentInfoSigned;
 
 use crate::{FullStateDump, InstalledAppInfo};
 
-/// Represents the available conductor functions to call over an Admin interface
+/// Represents the available conductor functions to call over an admin interface
 /// and will result in a corresponding [`AdminResponse`] message being sent back over the
 /// interface connection.
+///
 /// Enum variants follow a general convention of `verb_noun` as opposed to
-/// the `noun_verb` of `AdminResponse`.
+/// the `noun_verb` of responses.
 ///
 /// Expects a serialized object with any contents of the enum on a key `data`
 /// and the enum variant on a key `type`, e.g.
 /// `{ type: 'enable_app', data: { installed_app_id: 'test_app' } }`
 ///
-/// [`AdminResponse`]: enum.AdminResponse.html
+/// # Errors
+///
+/// Returns an [`AdminResponse::Error`] with a reason why the request failed.
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(rename_all = "snake_case", tag = "type", content = "data")]
 pub enum AdminRequest {
-    /// Set up and register one or more new Admin interfaces
-    /// as specified by a list of configurations. See [`AdminInterfaceConfig`]
-    /// for details on the configuration.
+    /// Set up and register one or more new admin interfaces
+    /// as specified by a list of configurations. See
+    /// [`AdminInterfaceConfig`] for details on the configuration.
     ///
-    /// Will be responded to with an [`AdminResponse::AdminInterfacesAdded`]
-    /// or an [`AdminResponse::Error`]
+    /// # Returns
     ///
-    /// [`AdminInterfaceConfig`]: ../config/struct.AdminInterfaceConfig.html
-    /// [`AdminResponse::AdminInterfacesAdded`]: enum.AdminResponse.html#variant.AdminInterfacesAdded
-    /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
+    /// [`AdminResponse::AdminInterfacesAdded`]
+    ///
+    /// [`AdminInterfaceConfig`]: super::AdminInterfaceConfig
     AddAdminInterfaces(Vec<crate::config::AdminInterfaceConfig>),
 
-    /// Register a DNA for later use in InstallApp
-    /// Stores the given DNA into the holochain dnas database and returns the hash of the DNA
-    /// Will be responded to with an [`AdminResponse::DnaRegistered`]
-    /// or an [`AdminResponse::Error`]
+    /// Register a DNA for later use in [`InstallApp`].
     ///
-    /// [`RegisterDnaPayload`]: ../../../holochain_types/app/struct.RegisterDnaPayload.html
-    /// [`AdminResponse::DnaRegistered`]: enum.AdminResponse.html#variant.DnaRegistered
+    /// Stores the given DNA into the Holochain DNA database and returns the hash of it.
+    ///
+    /// # Returns
+    ///
+    /// [`AdminResponse::DnaRegistered`]
+    ///
+    /// [`InstallApp`]: AdminRequest::InstallApp
     RegisterDna(Box<RegisterDnaPayload>),
 
-    /// "Clone" a DNA (in the biological sense), thus creating a new Cell.
+    /// Clone a DNA (in the biological sense), thus creating a new `Cell`.
     ///
     /// Using the provided, already-registered DNA, create a new DNA with a unique
-    /// UID and the specified properties, create a new Cell from this cloned DNA,
-    /// and add the Cell to the specified App.
+    /// ID and the specified properties, create a new cell from this cloned DNA,
+    /// and add the cell to the specified app.
     ///
-    /// Will be responded to with an [`AdminResponse::DnaCloned`]
-    /// or an [`AdminResponse::Error`]
+    /// # Returns
     ///
-    /// [`CreateCloneCellPayload`]: ../../../holochain_types/app/struct.CreateCloneCellPayload.html
-    /// [`AdminResponse::DnaCloned`]: enum.AdminResponse.html#variant.DnaCloned
+    /// [`AdminResponse::CloneCellCreated`]
     CreateCloneCell(Box<CreateCloneCellPayload>),
 
-    /// Install an app from a list of `Dna` paths.
-    /// Triggers genesis to be run on all `Cell`s and to be stored.
-    /// An `App` is intended for use by
-    /// one and only one Agent and for that reason it takes an `AgentPubKey` and
-    /// installs all the Dnas with that `AgentPubKey` forming new `Cell`s.
+    /// Install an app from a list of DNA paths.
+    ///
+    /// Triggers genesis to be run on all cells and to be stored.
+    /// An app is intended for use by
+    /// one and only one agent and for that reason it takes an `AgentPubKey` and
+    /// installs all the DNAs with that `AgentPubKey` forming new Cells.
     /// See [`InstallAppPayload`] for full details on the configuration.
     ///
-    /// Note that the new `App` will not be enabled automatically after installation
-    /// and can be enabled by calling [`AdminRequest::EnableApp`].
+    /// Note that the new app will not be enabled automatically after installation
+    /// and can be enabled by calling [`EnableApp`].
     ///
-    /// Will be responded to with an [`AdminResponse::AppInstalled`]
-    /// or an [`AdminResponse::Error`]
+    /// # Returns
     ///
-    /// [`InstallAppPayload`]: ../../../holochain_types/app/struct.InstallAppPayload.html
-    /// [`AdminRequest::EnableApp`]: enum.AdminRequest.html#variant.EnableApp
-    /// [`AdminResponse::AppInstalled`]: enum.AdminResponse.html#variant.AppInstalled
-    /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
+    /// [`AdminResponse::AppInstalled`]
+    ///
+    /// [`EnableApp`]: AdminRequest::EnableApp
     InstallApp(Box<InstallAppPayload>),
 
     /// Install an app using an [`AppBundle`].
     ///
-    /// Triggers genesis to be run on all `Cell`s and to be stored.
-    /// An `App` is intended for use by
+    /// Triggers genesis to be run on all Cells and to be stored.
+    /// An app is intended for use by
     /// one and only one Agent and for that reason it takes an `AgentPubKey` and
-    /// installs all the Dnas with that `AgentPubKey` forming new `Cell`s.
+    /// installs all the DNAs with that `AgentPubKey`, forming new cells.
     /// See [`InstallAppBundlePayload`] for full details on the configuration.
     ///
-    /// Note that the new `App` will not be enabled automatically after installation
-    /// and can be enabled by calling [`AdminRequest::EnableApp`].
+    /// Note that the new app will not be enabled automatically after installation
+    /// and can be enabled by calling [`EnableApp`].
     ///
-    /// Will be responded to with an [`AdminResponse::AppInstalled`]
-    /// or an [`AdminResponse::Error`]
+    /// # Returns
     ///
-    /// [`InstallAppBundlePayload`]: ../../../holochain_types/app/struct.InstallAppBundlePayload.html
-    /// [`AdminRequest::EnableApp`]: enum.AdminRequest.html#variant.EnableApp
-    /// [`AdminResponse::AppInstalled`]: enum.AdminResponse.html#variant.AppInstalled
-    /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
+    /// [`AdminResponse::AppInstalled`]
+    ///
+    /// [`EnableApp`]: AdminRequest::EnableApp
     InstallAppBundle(Box<InstallAppBundlePayload>),
 
-    /// Uninstalls the `App` specified by argument `installed_app_id` from the conductor,
-    /// meaning that the app will be removed from the list of installed apps, and any Cells
+    /// Uninstalls the app specified by argument `installed_app_id` from the conductor.
+    ///
+    /// The app will be removed from the list of installed apps, and any cells
     /// which were referenced only by this app will be disabled and removed, clearing up
     /// any persisted data.
     /// Cells which are still referenced by other installed apps will not be removed.
     ///
-    /// Will be responded to with an [`AdminResponse::AppUninstalled`]
-    /// or an [`AdminResponse::Error`]
+    /// # Returns
     ///
-    /// [`AdminResponse::AppUninstalled`]: enum.AdminResponse.html#variant.AppUninstalled
-    /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
+    /// [`AdminResponse::AppUninstalled`]
     UninstallApp {
-        /// The InstalledAppId to uninstall
+        /// The app ID to uninstall
         installed_app_id: InstalledAppId,
     },
 
-    /// List the hashes of all installed `Dna`s.
-    /// Takes no arguments.
+    /// List the hashes of all installed DNAs.
     ///
-    /// Will be responded to with an [`AdminResponse::DnasListed`]
-    /// or an [`AdminResponse::Error`]
+    /// # Returns
     ///
-    /// [`AdminResponse::DnasListed`]: enum.AdminResponse.html#variant.DnasListed
-    /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
+    /// [`AdminResponse::DnasListed`]
     ListDnas,
 
-    /// Generate a new AgentPubKey.
-    /// Takes no arguments.
+    /// Generate a new [`AgentPubKey`].
     ///
-    /// Will be responded to with an [`AdminResponse::AgentPubKeyGenerated`]
-    /// or an [`AdminResponse::Error`]
+    /// # Returns
     ///
-    /// [`AdminResponse::AgentPubKeyGenerated`]: enum.AdminResponse.html#variant.AgentPubKeyGenerated
-    /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
+    /// [`AdminResponse::AgentPubKeyGenerated`]
     GenerateAgentPubKey,
 
-    /// List all the cell ids in the conductor.
-    /// Takes no arguments.
+    /// List all the cell IDs in the conductor.
     ///
-    /// Will be responded to with an [`AdminResponse::CellIdsListed`]
-    /// or an [`AdminResponse::Error`]
+    /// # Returns
     ///
-    /// [`AdminResponse::CellIdsListed`]: enum.AdminResponse.html#variant.CellIdsListed
-    /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
+    /// [`AdminResponse::CellIdsListed`]
     ListCellIds,
 
-    /// List the ids of all the enabled Apps in the conductor.
-    /// Takes no arguments.
+    /// List the IDs of all enabled apps in the conductor.
     ///
-    /// Will be responded to with an [`AdminResponse::ActiveAppsListed`]
-    /// or an [`AdminResponse::Error`]
+    /// # Returns
     ///
-    /// [`AdminResponse::ActiveAppsListed`]: enum.AdminResponse.html#variant.ActiveAppsListed
-    /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
+    /// [`AdminResponse::ActiveAppsListed`]
     ListEnabledApps,
 
-    /// DEPRECATED. Alias for ListEnabledApps.
     #[deprecated = "alias for ListEnabledApps"]
     ListActiveApps,
 
-    /// List the ids of the Apps that are installed in the conductor, returning their information.
-    /// If `status_filter` is `Some(_)`, it will return only the `Apps` with the specified status
+    /// List the apps and their information that are installed in the conductor.
     ///
-    /// Will be responded to with an [`AdminResponse::AppsListed`]
-    /// or an [`AdminResponse::Error`]
+    /// If `status_filter` is `Some(_)`, it will return only the apps with the specified status.
     ///
-    /// [`AdminResponse::AppsListed`]: enum.AdminResponse.html#variant.AppsListed
-    /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
+    /// # Returns
+    ///
+    /// [`AdminResponse::AppsListed`]
     ListApps {
+        /// An optional status to filter the list of apps by
         status_filter: Option<AppStatusFilter>,
     },
 
-    /// Changes the `App` specified by argument `installed_app_id` from a disabled state to an enabled state in the conductor,
-    /// meaning that Zome calls can now be made and the `App` will be loaded on a reboot of the conductor.
+    /// Changes the specified app from a disabled to an enabled state in the conductor.
+    ///
     /// It is likely to want to call this after calling [`AdminRequest::InstallApp`], since a freshly
-    /// installed `App` is not activated automatically.
+    /// installed app is not enabled automatically. When an app is enabled,
+    /// zomes can be called and it will be loaded on a reboot of the conductor.
     ///
-    /// Will be responded to with an [`AdminResponse::AppEnabled`]
-    /// or an [`AdminResponse::Error`]
+    /// # Returns
     ///
-    /// [`AdminRequest::InstallApp`]: enum.AdminRequest.html#variant.InstallApp
-    /// [`AdminResponse::AppEnabled`]: enum.AdminResponse.html#variant.AppEnabled
-    /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
+    /// [`AdminResponse::AppEnabled`]
     EnableApp {
-        /// The InstalledAppId to enable
+        /// The app ID to enable
         installed_app_id: InstalledAppId,
     },
 
-    /// DEPRECATED. Alias for EnableApp.
     #[deprecated = "alias for EnableApp"]
     ActivateApp {
-        /// The InstalledAppId to enable
+        /// The app ID to enable
         installed_app_id: InstalledAppId,
     },
 
-    /// Changes the `App` specified by argument `installed_app_id` from an enabled state to a disabled state in the conductor,
-    /// meaning that Zome calls can no longer be made, and the `App` will not be loaded on a
-    /// reboot of the conductor.
+    /// Changes the specified app from an enabled to a disabled state in the conductor.
     ///
-    /// Will be responded to with an [`AdminResponse::AppDisabled`]
-    /// or an [`AdminResponse::Error`]
+    /// When an app is disabled, zome calls can no longer be made, and the app will not be
+    /// loaded on a reboot of the conductor.
     ///
-    /// [`AdminResponse::AppDisabled`]: enum.AdminResponse.html#variant.AppDisabled
-    /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
+    /// # Returns
+    ///
+    /// [`AdminResponse::AppDisabled`]
     DisableApp {
-        /// The InstalledAppId to disable
+        /// The app ID to disable
         installed_app_id: InstalledAppId,
     },
 
-    /// DEPRECATED. Alias for DisableApp.
     #[deprecated = "alias for DisableApp"]
     DeactivateApp {
-        /// The InstalledAppId to disable
+        /// The [`InstalledAppId`] to disable
         installed_app_id: InstalledAppId,
     },
 
     StartApp {
-        /// The InstalledAppId to (re)start
+        /// The app ID to (re)start
         installed_app_id: InstalledAppId,
     },
 
-    /// Open up a new websocket interface at the networking port
-    /// (optionally) specified by argument `port` (or using any free port if argument `port` is `None`)
-    /// over which you can then use the [`AppRequest`](super::AppRequest) API.
-    /// Any active `App` will be callable via this interface.
-    /// The successful [`AdminResponse::AppInterfaceAttached`] message will contain
-    /// the port chosen by the conductor if `None` was passed.
+    /// Open up a new websocket for processing [`AppRequest`]s.
     ///
-    /// Will be responded to with an [`AdminResponse::AppInterfaceAttached`]
-    /// or an [`AdminResponse::Error`]
+    /// Any active app will be callable via the attached app interface.
     ///
-    /// [`AdminResponse::AppInterfaceAttached`]: enum.AdminResponse.html#variant.AppInterfaceAttached
-    /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
+    /// # Returns
+    ///
+    /// [`AdminResponse::AppInterfaceAttached`]
+    ///
+    /// # Arguments
+    ///
+    /// Optionally a `port` parameter can be passed to this request. If it is `None`,
+    /// a free port is chosen by the conductor.
+    /// The response will contain the port chosen by the conductor if `None` was passed.
+    ///
+    /// [`AppRequest`]: super::AppRequest
     AttachAppInterface {
-        /// Optional port, use None to let the
-        /// OS choose a free port
+        /// Optional port number
         port: Option<u16>,
     },
 
-    /// List all the app interfaces currently attached with [`AdminRequest::AttachAppInterface`].
+    /// List all the app interfaces currently attached with [`AttachAppInterface`].
+    ///
+    /// # Returns
+    ///
+    /// [`AdminResponse::AppInterfacesListed`], a list of web socket ports that can
+    /// process [`AppRequest`]s.
+    ///
+    /// [`AttachAppInterface`]: AdminRequest::AttachAppInterface
+    /// [`AppRequest`]: super::AppRequest
     ListAppInterfaces,
 
-    /// Dump the state of the `Cell` specified by argument `cell_id`,
+    /// Dump the state of the cell specified by argument `cell_id`,
     /// including its chain, as a string containing JSON.
     ///
-    /// Will be responded to with an [`AdminResponse::StateDumped`]
-    /// or an [`AdminResponse::Error`]
+    /// # Returns
     ///
-    /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
-    /// [`AdminResponse::StateDumped`]: enum.AdminResponse.html#variant.StateDumped
+    /// [`AdminResponse::StateDumped`]
     DumpState {
-        /// The `CellId` for which to dump state
+        /// The cell ID for which to dump state
         cell_id: Box<CellId>,
     },
 
-    /// Dump the full state of the `Cell` specified by argument `cell_id`,
+    /// Dump the full state of the Cell specified by argument `cell_id`,
     /// including its chain and DHT shard, as a string containing JSON.
     ///
-    /// Warning: this API call is subject to change, and will not be available to hApps.
+    /// **Warning**: this API call is subject to change, and will not be available to hApps.
     /// This is meant to be used by introspection tooling.
     ///
     /// Note that the response to this call can be very big, as it's requesting for
-    /// the full database of the Cell.
+    /// the full database of the cell.
     ///
-    /// Also note that while DHT Ops about private entries will be returned (like `StoreElement`),
+    /// Also note that while DHT ops about private entries will be returned (like `StoreElement`),
     /// the entry in itself will be missing, as it's not actually stored publicly in the DHT shard.
     ///
-    /// Will be responded to with an [`AdminResponse::FullStateDumped`]
-    /// or an [`AdminResponse::Error`]
+    /// # Returns
     ///
-    /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
-    /// [`AdminResponse::FullStateDumped`]: enum.AdminResponse.html#variant.FullStateDumped
+    /// [`AdminResponse::FullStateDumped`]
     DumpFullState {
-        /// The `CellId` for which to dump state
+        /// The cell ID for which to dump the state
         cell_id: Box<CellId>,
-        /// The last seen DhtOp RowId, returned in [`AdminRequest::DumpFullState`]
-        /// Only DhtOps with RowId greater than the cursor will be returned
+        /// The last seen DhtOp RowId, returned in the full dump state.
+        /// Only DhtOps with RowId greater than the cursor will be returned.
         dht_ops_cursor: Option<u64>,
     },
 
     /// Dump the network metrics tracked by kitsune.
+    ///
+    /// # Returns
+    ///
+    /// [`AdminResponse::NetworkMetricsDumped`]
     DumpNetworkMetrics {
-        /// If set, limit the metrics dumped to a single dna hash space.
+        /// If set, limits the metrics dumped to a single DNA hash space.
         dna_hash: Option<DnaHash>,
     },
 
-    /// Add a list [AgentInfoSigned] to this conductor's peer store.
-    /// This is another way of finding peers on a dht.
+    /// Add a list of agents to this conductor's peer store.
     ///
-    /// This can be useful for testing.
+    /// This is a way of shortcutting peer discovery and is useful for testing.
     ///
     /// It is also helpful if you know other
     /// agents on the network and they can send you
     /// their agent info.
+    ///
+    /// # Returns
+    ///
+    /// [`AdminResponse::AgentInfoAdded`]
     AddAgentInfo {
-        /// Vec of signed agent info to add to peer store
+        /// list of signed agent info to add to peer store
         agent_infos: Vec<AgentInfoSigned>,
     },
 
-    /// Request the [AgentInfoSigned] stored in this conductor's
+    /// Request the [`AgentInfoSigned`] stored in this conductor's
     /// peer store.
     ///
     /// You can:
-    /// - Get all agent info by leaving cell id to None.
-    /// - Get a specific agent info by setting the cell id.
+    /// - Get all agent info by leaving `cell_id` to `None`.
+    /// - Get a specific agent info by setting the `cell_id`.
     ///
     /// This is how you can send your agent info to another agent.
     /// It is also useful for testing across networks.
+    ///
+    /// # Returns
+    ///
+    /// [`AdminResponse::AgentInfoRequested`]
     RequestAgentInfo {
-        /// Optionally choose a specific agent info
+        /// Optionally choose the agent info of a specific cell.
         cell_id: Option<CellId>,
     },
 
     /// Insert [`Element`]s into the source chain of the [`CellId`].
     ///
     /// All elements must be authored and signed by the same agent.
-    /// The [`DnaFile`] (but not necessarily the cell) must already be installed.
+    /// The [`DnaFile`] (but not necessarily the cell) must already be installed
     /// on this conductor.
     ///
     /// Care is needed when using this command as it can result in
     /// an invalid chain.
     /// Additionally, if conflicting source chain elements are
-    /// inserted, on different nodes then the chain will be forked.
+    /// inserted on different nodes, then the chain will be forked.
     ///
-    /// If an invalid or forked chain is inserted,
-    /// and then pushed to the DHT, then this can't be undone.
+    /// If an invalid or forked chain is inserted
+    /// and then pushed to the DHT, it can't be undone.
     ///
     /// Note that the cell does not need to exist to run this command.
     /// It is possible to insert elements into a source chain before
     /// the cell is created. This can be used to restore from backup.
     ///
-    /// If the cell is installed it is best to call [`AdminRequest::DisableApp`]
-    /// before running this command as otherwise the chain head may move.
-    /// If `truncate` is true the chain head is not checked and any new
+    /// If the cell is installed, it is best to call [`AdminRequest::DisableApp`]
+    /// before running this command, as otherwise the chain head may move.
+    /// If `truncate` is true, the chain head is not checked and any new
     /// elements will be lost.
+    ///
+    /// # Returns
+    ///
+    /// [`AdminResponse::ElementsAdded`]
     AddElements {
         /// The cell that the elements are being inserted into.
         cell_id: CellId,
         /// If this is true then all elements in the source chain will be
         /// removed before the new elements are inserted.
-        /// WARNING this cannot be undone. Use with care!
+        /// **Warning**: this cannot be undone. Use with care!
         ///
-        /// If this is false then the elements will be appended to the end
+        /// If this is `false`, then the elements will be appended to the end
         /// of the source chain.
         truncate: bool,
-        /// If this is true then the elements will be validated before insertion.
-        /// This is much slower but is useful for verify the chain is valid.
+        /// If this is `true`, then the elements will be validated before insertion.
+        /// This is much slower but is useful for verifying the chain is valid.
         ///
-        /// If this is false then elements will be inserted as is.
+        /// If this is `false`, then elements will be inserted as is.
         /// This could lead to an invalid chain.
         validate: bool,
-        /// The elements to inserted into the source chain.
+        /// The elements to be inserted into the source chain.
         elements: Vec<Element>,
     },
 }
@@ -355,8 +356,6 @@ pub enum AdminRequest {
 /// Will serialize as an object with any contents of the enum on a key `data`
 /// and the enum variant on a key `type`, e.g.
 /// `{ type: 'app_interface_attached', data: { port: 4000 } }`
-///
-/// [`AdminRequest`]: enum.AdminRequest.html
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[cfg_attr(test, derive(Clone))]
 #[serde(rename_all = "snake_case", tag = "type", content = "data")]
@@ -364,108 +363,73 @@ pub enum AdminResponse {
     /// Can occur in response to any [`AdminRequest`].
     ///
     /// There has been an error during the handling of the request.
-    /// See [`ExternalApiWireError`] for variants.
-    ///
-    /// [`AdminRequest`]: enum.AdminRequest.html
-    /// [`ExternalApiWireError`]: error/enum.ExternalApiWireError.html
     Error(ExternalApiWireError),
 
     /// The successful response to an [`AdminRequest::RegisterDna`]
-    ///
-    /// [`AdminRequest::RegisterDna`]: enum.AdminRequest.html#variant.RegisterDna
     DnaRegistered(DnaHash),
 
     /// The successful response to an [`AdminRequest::InstallApp`].
     ///
-    /// The resulting [`InstalledAppInfo`] contains the App id,
+    /// The resulting [`InstalledAppInfo`] contains the app ID,
     /// the [`AppRoleId`]s and, most usefully, the new [`CellId`]s
-    /// of the newly installed `Dna`s. See the [`InstalledAppInfo`] docs for details.
-    ///
-    /// [`AdminRequest::InstallApp`]: enum.AdminRequest.html#variant.InstallApp
-    /// [`InstalledAppInfo`]: ../../../holochain_types/app/struct.InstalledAppInfo.html
-    /// [`AppRoleId`]: ../../../holochain_types/app/type.AppRoleId.html
-    /// [`CellId`]: ../../../holochain_types/cell/struct.CellId.html
+    /// of the newly installed DNAs.
     AppInstalled(InstalledAppInfo),
 
     /// The successful response to an [`AdminRequest::InstallAppBundle`].
     ///
-    /// The resulting [`InstalledAppInfo`] contains the App id,
+    /// The resulting [`InstalledAppInfo`] contains the app ID,
     /// the [`AppRoleId`]s and, most usefully, the new [`CellId`]s
-    /// of the newly installed `Dna`s. See the [`InstalledAppInfo`] docs for details.
-    ///
-    /// [`AdminRequest::InstallApp`]: enum.AdminRequest.html#variant.InstallApp
-    /// [`InstalledAppInfo`]: ../../../holochain_types/app/struct.InstalledAppInfo.html
-    /// [`AppRoleId`]: ../../../holochain_types/app/type.AppRoleId.html
-    /// [`CellId`]: ../../../holochain_types/cell/struct.CellId.html
+    /// of the newly installed DNAs.
     AppBundleInstalled(InstalledAppInfo),
 
-    /// The succesful response to an [`AdminRequest::UninstallApp`].
+    /// The successful response to an [`AdminRequest::UninstallApp`].
     ///
-    /// It means the `App` was uninstalled successfully.
-    ///
-    /// [`AdminRequest::UninstallApp`]: enum.AdminRequest.html#variant.UninstallApp
+    /// It means the app was uninstalled successfully.
     AppUninstalled,
 
     /// The successful response to an [`AdminRequest::CreateCloneCell`].
     ///
     /// The response contains the [`CellId`] of the newly created clone.
-    ///
-    /// [`AdminRequest::CreateCloneCell`]: enum.AdminRequest.html#variant.CreateCloneCell
-    /// [`CellId`]: ../../../holochain_types/cell/struct.CellId.html
     CloneCellCreated(CellId),
 
-    /// The succesful response to an [`AdminRequest::AddAdminInterfaces`].
+    /// The successful response to an [`AdminRequest::AddAdminInterfaces`].
     ///
-    /// It means the `AdminInterface`s have successfully been added
-    ///
-    /// [`AdminRequest::AddAdminInterfaces`]: enum.AdminRequest.html#variant.AddAdminInterfaces
+    /// It means the `AdminInterface`s have successfully been added.
     AdminInterfacesAdded,
 
-    /// The succesful response to an [`AdminRequest::GenerateAgentPubKey`].
+    /// The successful response to an [`AdminRequest::GenerateAgentPubKey`].
     ///
-    /// Contains a new `AgentPubKey` generated by the Keystore
-    ///
-    /// [`AdminRequest::GenerateAgentPubKey`]: enum.AdminRequest.html#variant.GenerateAgentPubKey
+    /// Contains a new [`AgentPubKey`] generated by the keystore.
     AgentPubKeyGenerated(AgentPubKey),
 
     /// The successful response to an [`AdminRequest::ListDnas`].
     ///
-    /// Contains a list of the hashes of all installed `Dna`s
-    ///
-    /// [`AdminRequest::ListDnas`]: enum.AdminRequest.html#variant.ListDnas
+    /// Contains a list of the hashes of all installed DNAs.
     DnasListed(Vec<DnaHash>),
 
-    /// The succesful response to an [`AdminRequest::ListCellIds`].
+    /// The successful response to an [`AdminRequest::ListCellIds`].
     ///
-    /// Contains a list of all the `Cell` ids in the conductor
-    ///
-    /// [`AdminRequest::ListCellIds`]: enum.AdminRequest.html#variant.ListCellIds
+    /// Contains a list of all the cell IDs in the conductor.
     CellIdsListed(Vec<CellId>),
 
-    /// The succesful response to an [`AdminRequest::ListEnabledApps`].
+    /// The successful response to an [`AdminRequest::ListEnabledApps`].
     ///
-    /// Contains a list of all the active `App` ids in the conductor
-    ///
-    /// [`AdminRequest::ListEnabledApps`]: enum.AdminRequest.html#variant.ListEnabledApps
+    /// Contains a list of all the active app IDs in the conductor.
     EnabledAppsListed(Vec<InstalledAppId>),
 
     #[deprecated = "alias for EnabledAppsListed"]
     ActiveAppsListed(Vec<InstalledAppId>),
 
-    /// The succesful response to an [`AdminRequest::ListApps`].
+    /// The successful response to an [`AdminRequest::ListApps`].
     ///
-    /// Contains a list of the `InstalledAppInfo` of the installed `Apps` in the conductor
-    ///
-    /// [`AdminRequest::ListApps`]: enum.AdminRequest.html#variant.ListApps
+    /// Contains a list of the `InstalledAppInfo` of the installed apps in the conductor.
     AppsListed(Vec<InstalledAppInfo>),
 
-    /// The succesful response to an [`AdminRequest::AttachAppInterface`].
+    /// The successful response to an [`AdminRequest::AttachAppInterface`].
     ///
     /// `AppInterfaceApi` successfully attached.
-    /// Contains the port number that was selected (if not specified) by Holochain
-    /// for running this App interface
-    ///
-    /// [`AdminRequest::AttachAppInterface`]: enum.AdminRequest.html#variant.AttachAppInterface
+    /// If no port was specified in the request, contains the port number that was
+    /// selected by the conductor for running this app interface.
     AppInterfaceAttached {
         /// Networking port of the new `AppInterfaceApi`
         port: u16,
@@ -474,13 +438,11 @@ pub enum AdminResponse {
     /// The list of attached app interfaces.
     AppInterfacesListed(Vec<u16>),
 
-    /// The succesful response to an [`AdminRequest::EnableApp`].
+    /// The successful response to an [`AdminRequest::EnableApp`].
     ///
-    /// It means the `App` was enabled successfully. If it was possible to
-    /// put the app in a Running state, it will be Running, otherwise it will
-    /// be Paused.
-    ///
-    /// [`AdminRequest::EnableApp`]: enum.AdminRequest.html#variant.EnableApp
+    /// It means the app was enabled successfully. If it was possible to
+    /// put the app in a running state, it will be running, otherwise it will
+    /// be paused.
     AppEnabled {
         app: InstalledAppInfo,
         errors: Vec<(CellId, String)>,
@@ -492,62 +454,51 @@ pub enum AdminResponse {
         errors: Vec<(CellId, String)>,
     },
 
-    /// The succesful response to an [`AdminRequest::DisableApp`].
+    /// The successful response to an [`AdminRequest::DisableApp`].
     ///
-    /// It means the `App` was disabled successfully.
-    ///
-    /// [`AdminRequest::DisableApp`]: enum.AdminRequest.html#variant.DisableApp
+    /// It means the app was disabled successfully.
     AppDisabled,
 
-    /// The succesful response to an [`AdminRequest::StartApp`].
+    /// The successful response to an [`AdminRequest::StartApp`].
     ///
-    /// The boolean determines whether or not the was actually started.
-    /// If false, it was because the app was in a disabled state, or the app
+    /// The boolean determines whether or not the app was actually started.
+    /// If `false`, it was because the app was in a disabled state, or the app
     /// failed to start.
     /// TODO: add reason why app couldn't start
-    ///
-    /// [`AdminRequest::StartApp`]: enum.AdminRequest.html#variant.StartApp
     AppStarted(bool),
-
     #[deprecated = "alias for AppDisabled"]
     AppDeactivated,
 
-    /// The succesful response to an [`AdminRequest::DumpState`].
+    /// The successful response to an [`AdminRequest::DumpState`].
     ///
     /// The result contains a string of serialized JSON data which can be deserialized to access the
-    /// full state dump, and inspect the source chain.
-    ///
-    /// [`AdminRequest::DumpState`]: enum.AdminRequest.html#variant.DumpState
+    /// full state dump and inspect the source chain.
     StateDumped(String),
 
-    /// The succesful response to an [`AdminRequest::DumpFullState`].
+    /// The successful response to an [`AdminRequest::DumpFullState`].
     ///
     /// The result contains a string of serialized JSON data which can be deserialized to access the
-    /// full state dump, and inspect the source chain.
+    /// full state dump and inspect the source chain.
     ///
-    /// Note that this result can be very big, as it's requesting for the full database of the Cell.
-    ///
-    /// [`AdminRequest::DumpFullState`]: enum.AdminRequest.html#variant.DumpFullState
+    /// Note that this result can be very big, as it's requesting the full database of the cell.
     FullStateDumped(FullStateDump),
 
     /// The successful result of a call to [`AdminRequest::DumpNetworkMetrics`].
-    /// The string is a json blob of the metrics results.
+    ///
+    /// The string is a JSON blob of the metrics results.
     NetworkMetricsDumped(String),
 
-    /// The succesful response to an [`AdminRequest::AddAgentInfo`].
+    /// The successful response to an [`AdminRequest::AddAgentInfo`].
     ///
     /// This means the agent info was successfully added to the peer store.
-    ///
-    /// [`AdminRequest::AddAgentInfo`]: enum.AdminRequest.html#variant.AddAgentInfo
     AgentInfoAdded,
 
-    /// The succesful response to an [`AdminRequest::RequestAgentInfo`].
+    /// The successful response to an [`AdminRequest::RequestAgentInfo`].
     ///
     /// This is all the agent info that was found for the request.
-    ///
-    /// [`AdminRequest::RequestAgentInfo`]: enum.AdminRequest.html#variant.RequestAgentInfo
     AgentInfoRequested(Vec<AgentInfoSigned>),
 
+    /// The successful response to an [`AdminRequest::AddElements`].
     ElementsAdded,
 }
 
@@ -562,15 +513,15 @@ pub enum ExternalApiWireError {
     // to react to using code (i.e. not just print)
     /// Any internal error
     InternalError(String),
-    /// The input to the api failed to Deseralize
+    /// The input to the API failed to deseralize.
     Deserialization(String),
-    /// The dna path provided was invalid
+    /// The DNA path provided was invalid.
     DnaReadError(String),
-    /// There was an error in the ribosome
+    /// There was an error in the ribosome.
     RibosomeError(String),
-    /// Error activating app
+    /// Error activating app.
     ActivateApp(String),
-    /// The zome call is unauthorized
+    /// The zome call is unauthorized.
     ZomeCallUnauthorized(String),
     /// A countersigning session has failed.
     CountersigningSessionError(String),
