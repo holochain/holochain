@@ -61,7 +61,7 @@ impl<M: Manifest> Bundle<M> {
         .await
         .into_iter()
         .collect::<Result<Vec<_>, _>>()?;
-        Ok(Bundle::new(manifest, resources, base_path)?)
+        Bundle::new(manifest, resources, base_path)
     }
 }
 
