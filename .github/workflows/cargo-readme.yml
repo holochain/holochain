@@ -36,8 +36,7 @@ jobs:
         with:
           crate: cargo-readme
           use-tool-cache: true
-
-      - run: cargo
+        run: cargo readme
 
 
 
