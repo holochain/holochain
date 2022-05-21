@@ -35,7 +35,7 @@ jobs:
         uses: actions-rs/install@v0.1
         with:
           crate: cargo-readme
-          version: latest
+          use-tool-cache: true
 
       - run: cargo
 
