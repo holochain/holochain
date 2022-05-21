@@ -13,8 +13,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Build README
+      - name: Install cargo readme
         uses: actions-rs/cargo@v1
         with:
-          command: readme
-          # args: --release --all-features
+          command: install
+          args: readme
