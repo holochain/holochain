@@ -38,8 +38,7 @@ jobs:
           use-tool-cache: true
 
       - name: Generate README
-        run: cargo readme
-
+        run: cargo readme -i crates/hdk/src/lib.rs
 
 
       # - name: Setup tmate session
