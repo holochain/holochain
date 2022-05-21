@@ -3,14 +3,18 @@ name: cargo-readme
 on:
   push
   # push:
-    # branches:
-    #   - main
-    #   - develop
-    #   - feat/readme/cargo-readme-workflow
+  # branches:
+  #   - main
+  #   - develop
+  #   - feat/readme/cargo-readme-workflow
 
 jobs:
   generate-readmes:
     runs-on: ubuntu-latest
 
     steps:
-      - run: echo hello
+      - name: Build README
+        uses: actions-rs/cargo@v1
+        with:
+          command: readme
+          # args: --release --all-features
