@@ -28,24 +28,19 @@ jobs:
       #       ${{ runner.os }}-build-${{ env.cache-name }}-
       #       ${{ runner.os }}-build-
       #       ${{ runner.os }}-
-      - name: Cache cargo
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
 
-      - uses: Swatinem/rust-cache@v1
-      
-      - name: Install cargo-readme
-        run: cargo install cargo-readme
+      # - uses: actions/checkout@v2
+
+      - name: Generate README
+        uses: actions-rs/install@v0.1
+        with:
+          crate: cargo-readme
+          version: latest
+
+      - run: cargo
+
 
 
       # - name: Setup tmate session
       #   uses: mxschmitt/action-tmate@v3
-
-      - name: Generate README
-        run: cargo
-          # args:
-          #   - i
-          #   - 
 
