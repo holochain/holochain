@@ -18,6 +18,14 @@ jobs:
         with:
           command: install
           args: readme
-      
-      - name: Setup tmate session
-        uses: mxschmitt/action-tmate@v3
+
+      - name: Generate README
+        uses: actions-rs/cargo@v1
+        with:
+          command: readme
+          # args:
+          #   - i
+          #   - 
+
+      # - name: Setup tmate session
+      #   uses: mxschmitt/action-tmate@v3
