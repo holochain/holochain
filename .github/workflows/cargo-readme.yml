@@ -19,11 +19,12 @@ jobs:
           command: install
           args: cargo-readme
 
-      - name: Generate README
-        run: cargo readme
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
+
+      # - name: Generate README
+      #   run: cargo readme
           # args:
           #   - i
           #   - 
 
-      - name: Setup tmate session
-        uses: mxschmitt/action-tmate@v3
