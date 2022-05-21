@@ -33,17 +33,18 @@ jobs:
         with:
           profile: minimal
           toolchain: stable
+
+      - uses: Swatinem/rust-cache@v1
       
       - name: Install cargo-readme
         run: cargo install cargo-readme
 
-      - uses: Swatinem/rust-cache@v1
 
       # - name: Setup tmate session
       #   uses: mxschmitt/action-tmate@v3
 
       - name: Generate README
-        run: cargo readme
+        run: cargo
           # args:
           #   - i
           #   - 
