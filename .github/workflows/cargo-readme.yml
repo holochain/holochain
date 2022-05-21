@@ -13,14 +13,34 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Install cargo-readme
-        uses: actions-rs/cargo@v1
-        with:
-          command: install
-          args: cargo-readme
+      # - name: Install cargo-readme
+      #   uses: actions-rs/cargo@v1
+      #   with:
+      #     command: install
+      #     args: cargo-readme
 
-      - name: Setup tmate session
-        uses: mxschmitt/action-tmate@v3
+      # - name: Cache cargo-readme
+      #   uses: actions/cache@v3
+      #   with:
+      #     path: ~/.cargo/bin/cargo-readme
+      #     key: ${{ runner.os }}-cargo-readme
+      #     restore-keys: |
+      #       ${{ runner.os }}-build-${{ env.cache-name }}-
+      #       ${{ runner.os }}-build-
+      #       ${{ runner.os }}-
+      - name: Cache cargo
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+      
+      - name: Install cargo-readme
+        run: cargo install cargo-readme
+
+      - uses: Swatinem/rust-cache@v1
+
+      # - name: Setup tmate session
+      #   uses: mxschmitt/action-tmate@v3
 
       # - name: Generate README
       #   run: cargo readme
