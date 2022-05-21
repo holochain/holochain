@@ -31,11 +31,13 @@ jobs:
 
       # - uses: actions/checkout@v2
 
-      - name: Generate README
+      - name: Set up cargo-readme
         uses: actions-rs/install@v0.1
         with:
           crate: cargo-readme
           use-tool-cache: true
+
+      - name: Generate README
         run: cargo readme
 
 
