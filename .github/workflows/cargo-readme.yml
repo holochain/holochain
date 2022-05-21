@@ -20,9 +20,7 @@ jobs:
           args: readme
 
       - name: Generate README
-        uses: actions-rs/cargo@v1
-        with:
-          command: readme
+        run: cargo readme
           # args:
           #   - i
           #   - 
