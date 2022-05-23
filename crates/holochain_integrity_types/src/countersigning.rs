@@ -113,9 +113,15 @@ pub struct PreflightRequest {
     app_entry_hash: EntryHash,
     /// The agents that are participating in this countersignature session.
     signing_agents: CounterSigningAgents,
-    /// The agent that must receive and include all other headers in their own header.
-    /// @todo implement enzymes
-    enzyme_index: Option<u8>,
+    /// The optional additional M of N signers.
+    /// If there are additional signers then M MUST be the majority of N.
+    /// If there are additional signers then the enzyme MUST be used and is the
+    /// first signer in BOTH signing_agents and optional_signing_agents.
+    optional_signing_agents: CounterSigningAgents,
+    /// The first signing agent (index 0) is acting as an enzyme.
+    /// If true AND optional_signing_agents are set then the first agent MUST
+    /// be the same in both signing_agents and optional_signing_agents.
+    enzymatic: bool,
     /// The session times.
     /// Session headers must all have the same timestamp, which is the session offset.
     session_times: CounterSigningSessionTimes,
@@ -131,7 +137,8 @@ impl PreflightRequest {
     pub fn try_new(
         app_entry_hash: EntryHash,
         signing_agents: CounterSigningAgents,
-        enzyme_index: Option<u8>,
+        optional_signing_agents: CounterSigningAgents,
+        enzymatic: bool,
         session_times: CounterSigningSessionTimes,
         header_base: HeaderBase,
         preflight_bytes: PreflightBytes,
@@ -139,7 +146,8 @@ impl PreflightRequest {
         let preflight_request = Self {
             app_entry_hash,
             signing_agents,
-            enzyme_index,
+            optional_signing_agents,
+            enzymatic,
             session_times,
             header_base,
             preflight_bytes,
@@ -149,7 +157,7 @@ impl PreflightRequest {
     }
     /// Combined integrity checks.
     pub fn check_integrity(&self) -> Result<(), CounterSigningError> {
-        self.check_enzyme_index()?;
+        self.check_enzyme()?;
         self.session_times().check_integrity()?;
         self.check_agents()?;
         Ok(())
@@ -191,21 +199,23 @@ impl PreflightRequest {
         Ok(())
     }
 
-    /// Verify the enzyme index is in bounds of the signing agent if set.
-    pub fn check_enzyme_index(&self) -> Result<(), CounterSigningError> {
-        match self.enzyme_index() {
-            Some(index) => {
-                if (*index as usize) < self.signing_agents().len() {
-                    Ok(())
-                } else {
-                    Err(CounterSigningError::EnzymeIndex(
-                        self.signing_agents().len(),
-                        *index as usize,
-                    ))
-                }
-            }
-            None => Ok(()),
+    /// Verify everything about the enzyme.
+    pub fn check_enzyme(&self) -> Result<(), CounterSigningError> {
+        // Enzymatic optional signing agents MUST match the first signer in
+        // both the signing agents and optional signing agents.
+        if self.enzymatic
+            && self.optional_signing_agents.len() > 0
+            && self.signing_agents[0] != self.optional_signing_agents[0]
+        {
+            return Err(CounterSigningError::EnzymeMismatch(
+                self.signing_agents[0].0.clone(),
+                self.optional_signing_agents[0].0.clone(),
+            ));
         }
+        if !self.enzymatic && self.optional_signing_agents.len() > 0 {
+            return Err(CounterSigningError::NonEnzymaticOptionalSigners);
+        }
+        Ok(())
     }
 
     /// Signing agents accessor.
@@ -220,14 +230,14 @@ impl PreflightRequest {
     }
 
     /// Enzyme index accessor.
-    pub fn enzyme_index(&self) -> &Option<u8> {
-        &self.enzyme_index
+    pub fn enzymatic(&self) -> bool {
+        self.enzymatic
     }
 
     /// Mutable enzyme index accessor for testing.
     #[cfg(feature = "test_utils")]
-    pub fn enzyme_index_mut(&mut self) -> &mut Option<u8> {
-        &mut self.enzyme_index
+    pub fn enzymatic_mut(&mut self) -> &mut bool {
+        &mut self.enzymatic
     }
 
     /// Session times accessor.

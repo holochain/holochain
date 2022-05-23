@@ -9,8 +9,10 @@ pub enum CounterSigningError {
     CounterSigningSessionResponsesLength(usize, usize),
     /// Session response agents all need to be in the correct positions.
     CounterSigningSessionResponsesOrder(u8, usize),
-    /// Enzyme index must be one of the signers if set.
-    EnzymeIndex(usize, usize),
+    /// Enzyme must match for required and optional signers if set.
+    EnzymeMismatch(holo_hash::AgentPubKey, holo_hash::AgentPubKey),
+    /// If there are optional signers the session MUST be enzymatic.
+    NonEnzymaticOptionalSigners,
     /// Agents length cannot be longer than max or less than min.
     AgentsLength(usize),
     /// There cannot be duplicates in the agents list.
@@ -33,7 +35,7 @@ impl core::fmt::Display for CounterSigningError {
             ),
             CounterSigningError::CounterSigningSessionResponsesLength(resp, num_agents) => {
                 write!(f,
-                    "The countersigning session responses ({}) did not match the number of signing agents ({})", 
+                    "The countersigning session responses ({}) did not match the number of signing agents ({})",
                     resp,
                     num_agents
                 )
@@ -42,11 +44,12 @@ impl core::fmt::Display for CounterSigningError {
                     "The countersigning session response with agent index {} was found in index position {}",
                     index, pos
             ),
-            CounterSigningError::EnzymeIndex(len, index) => write!(f,
-                "The enzyme index {} is out of bounds for signing agents list of length {}",
-                index, len
+            CounterSigningError::EnzymeMismatch(required_signer, optional_signer) => write!(f,
+                "The enzyme is mismatche for required signer {} and optional signer {}",
+                required_signer, optional_signer
 
             ),
+            CounterSigningError::NonEnzymaticOptionalSigners => write!(f, "There are optional signers without an enzyme."),
             CounterSigningError::AgentsLength(len) => {
                 write!(f, "The signing agents list is too long or short {}", len)
             }
