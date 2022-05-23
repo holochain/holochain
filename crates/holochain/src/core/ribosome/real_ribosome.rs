@@ -64,15 +64,15 @@ use crate::core::ribosome::host_fn::x_25519_x_salsa20_poly1305_encrypt::x_25519_
 use crate::core::ribosome::host_fn::x_salsa20_poly1305_decrypt::x_salsa20_poly1305_decrypt;
 use crate::core::ribosome::host_fn::x_salsa20_poly1305_encrypt::x_salsa20_poly1305_encrypt;
 use crate::core::ribosome::host_fn::zome_info::zome_info;
+use crate::core::ribosome::real_ribosome::wasmparser::Operator;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCallInvocation;
 use fallible_iterator::FallibleIterator;
 use holochain_types::prelude::*;
-use wasmer_middlewares::Metering;
 use holochain_wasmer_host::module::SerializedModuleCache;
-use crate::core::ribosome::real_ribosome::wasmparser::Operator;
+use wasmer_middlewares::Metering;
 // This is here because there were errors about different crate versions
 // without it.
 use kitsune_p2p_types::dependencies::lair_keystore_api::dependencies::parking_lot::lock_api::RwLock;
@@ -234,15 +234,16 @@ impl RealRibosome {
             .get()
             .is_none()
         {
-            holochain_wasmer_host::module::SERIALIZED_MODULE_CACHE.set(RwLock::new(
-                SerializedModuleCache::default_with_cranelift(Self::cranelift_fn()),
-            ))
-            // An error here means the cell is full when we tried to set it, so
-            // some other thread must have done something in between the get
-            // above and the set here. In this case we don't care as we don't
-            // have any competing code paths that could set it to something
-            // unexpected.
-            .ok();
+            holochain_wasmer_host::module::SERIALIZED_MODULE_CACHE
+                .set(RwLock::new(SerializedModuleCache::default_with_cranelift(
+                    Self::cranelift_fn(),
+                )))
+                // An error here means the cell is full when we tried to set it, so
+                // some other thread must have done something in between the get
+                // above and the set here. In this case we don't care as we don't
+                // have any competing code paths that could set it to something
+                // unexpected.
+                .ok();
         }
 
         Ok(holochain_wasmer_host::module::MODULE_CACHE.write().get(
