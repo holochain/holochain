@@ -102,6 +102,8 @@ impl ShardedGossipLocal {
                     .diff((region_set).clone())
                     .map_err(KitsuneError::other)?;
 
+                tracing::trace!("region diffs ({}): {:?}", diff_regions.len(), diff_regions);
+
                 // subdivide any regions which are too large to fit in a batch.
                 // TODO: PERF: this does a DB query per region, and potentially many more for large
                 // regions which need to be split many times. Check to make sure this
