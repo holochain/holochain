@@ -15,6 +15,10 @@ pub enum CounterSigningError {
     NonEnzymaticOptionalSigners,
     /// Agents length cannot be longer than max or less than min.
     AgentsLength(usize),
+    /// Optional agents length cannot be shorter then minimum.
+    OptionalAgentsLength(u8, usize),
+    /// Optional agents length must be majority of the signers list.
+    MinOptionalAgents(u8, usize),
     /// There cannot be duplicates in the agents list.
     AgentsDupes(Vec<holo_hash::AgentPubKey>),
     /// The session times must validate.
@@ -52,7 +56,13 @@ impl core::fmt::Display for CounterSigningError {
             CounterSigningError::NonEnzymaticOptionalSigners => write!(f, "There are optional signers without an enzyme."),
             CounterSigningError::AgentsLength(len) => {
                 write!(f, "The signing agents list is too long or short {}", len)
-            }
+            },
+            CounterSigningError::OptionalAgentsLength(min, len) => {
+                write!(f, "The optional signing agents list length is {} which is less than the minimum {} required to sign", len, min)
+            },
+            CounterSigningError::MinOptionalAgents(min, len) => {
+                write!(f, "The minimum optional agents {} is not a majority of {}", min, len)
+            },
             CounterSigningError::AgentsDupes(agents) => write!(
                 f,
                 "The signing agents list contains duplicates {:?}",
