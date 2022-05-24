@@ -206,10 +206,19 @@ jobs:
       #         crate detect-missing-releaseheadings
       #       '
       
-      - name: Generate crate READMEs from Rust doc comments
-        uses: ./.github/workflows/cargo-readme.yml
+      - name: Install cargo-readme
+        uses: actions-rs/cargo@v1
         with:
-          repo: ${{ inputs.HOLOCHAIN_REPO }}
+          command: install
+          args: cargo-readme
+
+      - name: Generate README for crate hdk
+        run: cd crates/hdk && cargo readme
+
+      # - name: Generate crate READMEs from Rust doc comments
+      #   uses: ./.github/workflows/cargo-readme.yml
+      #   with:
+      #     repo: ${{ inputs.HOLOCHAIN_REPO }}
           # BRANCH: ${{ inputs.HOLOCHAIN_SOURCE_BRANCH }}
 
       # - name: Bump the crate versions for the release
