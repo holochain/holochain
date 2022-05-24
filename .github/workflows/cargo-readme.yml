@@ -19,29 +19,7 @@ jobs:
           command: install
           args: cargo-readme
 
-      # - name: Cache cargo-readme
-      #   uses: actions/cache@v3
-      #   with:
-      #     path: ~/.cargo/bin/cargo-readme
-      #     key: ${{ runner.os }}-cargo-readme
-      #     restore-keys: |
-      #       ${{ runner.os }}-build-${{ env.cache-name }}-
-      #       ${{ runner.os }}-build-
-      #       ${{ runner.os }}-
-
-
-      # - name: Set up cargo-readme
-      #   uses: actions-rs/install@v0.1
-      #   with:
-      #     crate: cargo-readme
-      #     use-tool-cache: true
-
       - uses: actions/checkout@v2
 
       - name: Generate README for crate hdk
         run: cd crates/hdk && cargo readme
-
-
-      # - name: Setup tmate session
-      #   uses: mxschmitt/action-tmate@v3
-
