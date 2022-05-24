@@ -4,7 +4,7 @@
 //! reference to a Keystore. MetaLairClient allows async generation of keypairs,
 //! and usage of those keypairs, reference by the public AgentPubKey.
 //!
-//! # Example
+//! # Examples
 //!
 //! ```
 //! use holo_hash::AgentPubKey;
