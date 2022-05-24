@@ -206,7 +206,8 @@ jobs:
       #         crate detect-missing-releaseheadings
       #       '
       
-      # - name:
+      - name: Generate crate READMEs from Rust doc comments
+        uses: ./.github/workflows/cargo-readme.yml
 
       # - name: Bump the crate versions for the release
       #   id: bump-versions
