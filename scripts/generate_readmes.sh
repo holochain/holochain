@@ -1,6 +1,6 @@
 #!/bin/sh
 
-crates_to_document=(hdk holochain_keystore)
+crates_to_document=("hdk" "holochain_keystore")
 
 for crate in "${crates_to_document[@]}"; do
     echo 'generating README for crate' "$crate";
