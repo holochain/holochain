@@ -19,7 +19,7 @@ jobs:
           command: install
           args: cargo-readme
 
-      # - uses: actions/checkout@v2
+      - uses: actions/checkout@v2
 
       - name: Generate README for crate hdk
         run: cd crates/hdk && cargo readme
