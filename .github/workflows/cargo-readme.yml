@@ -1,7 +1,12 @@
 name: cargo-readme
 
 on:
-  push
+  workflow_call:
+    inputs:
+      REPO:
+        type: string
+        required: false
+        default: "./"
   # push:
   # branches:
   #   - main
@@ -19,7 +24,10 @@ jobs:
           command: install
           args: cargo-readme
 
-      - uses: actions/checkout@v2
+      # - uses: actions/checkout@v2
 
-      - name: Generate README for crate hdk
-        run: cd crates/hdk && cargo readme
+      - name: Setup tmate session if build and test run failed
+        uses: mxschmitt/action-tmate@v3
+
+      # - name: Generate README for crate hdk
+      #   run: cd crates/hdk && cargo readme

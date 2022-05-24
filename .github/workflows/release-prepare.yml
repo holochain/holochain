@@ -208,6 +208,9 @@ jobs:
       
       - name: Generate crate READMEs from Rust doc comments
         uses: ./.github/workflows/cargo-readme.yml
+        with:
+          REPO: ${{ inputs.HOLOCHAIN_REPO }}
+          # BRANCH: ${{ inputs.HOLOCHAIN_SOURCE_BRANCH }}
 
       # - name: Bump the crate versions for the release
       #   id: bump-versions
