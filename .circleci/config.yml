@@ -12,6 +12,9 @@ commands:
          - run: ./docker/login.sh
          - run:
               no_output_timeout: 45m
+              environment:
+                 CACHIX_NAME: holochain-ci
+                 NIX_CONFIG: "extra-experimental-features = nix-command"
               command: ./docker/build.sh << parameters.box >> $CIRCLE_BRANCH
          - run:
               no_output_timeout: 30m
