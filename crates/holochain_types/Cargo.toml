@@ -1,6 +1,6 @@
 [package]
 name = "holochain_types"
-version = "0.0.38"
+version = "0.0.39-dev.0"
 description = "Holochain common types"
 license-file = "LICENSE_CAL-1.0"
 homepage = "https://github.com/holochain/holochain"
@@ -24,15 +24,15 @@ either = "1.5"
 fixt = { path = "../fixt", version = "0.0.11"}
 flate2 = "1.0.14"
 futures = "0.3"
-holo_hash = { version = "0.0.25", path = "../holo_hash", features = ["encoding"] }
-holochain_keystore = { version = "0.0.38", path = "../holochain_keystore" }
+holo_hash = { version = "0.0.26-dev.0", path = "../holo_hash", features = ["encoding"] }
+holochain_keystore = { version = "0.0.39-dev.0", path = "../holochain_keystore" }
 holochain_serialized_bytes = "=0.0.51"
-holochain_sqlite = { path = "../holochain_sqlite", version = "0.0.38"}
-holochain_zome_types = { path = "../holochain_zome_types", version = "0.0.33", features = ["full"] }
+holochain_sqlite = { path = "../holochain_sqlite", version = "0.0.39-dev.0"}
+holochain_zome_types = { path = "../holochain_zome_types", version = "0.0.34-dev.0", features = ["full"] }
 itertools = { version = "0.10" }
 lazy_static = "1.4.0"
 mockall = "0.10.2"
-mr_bundle = { path = "../mr_bundle", features = ["packing"], version = "0.0.11"}
+mr_bundle = { path = "../mr_bundle", features = ["packing"], version = "0.0.12-dev.0"}
 must_future = "0.1.1"
 nanoid = "0.3"
 observability = "0.1.3"
