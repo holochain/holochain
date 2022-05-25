@@ -1,4 +1,4 @@
-FROM holochain/holonix:latest
+FROM nixos/nix:latest
 
 WORKDIR /holochain/build
 ENV NIX_ENV_PREFIX /holochain/build
