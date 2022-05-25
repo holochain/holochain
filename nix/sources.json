@@ -29,10 +29,10 @@
         "homepage": "https://nexte.st",
         "owner": "steveej-forks",
         "repo": "nextest",
-        "rev": "b3fbec73cdb6ae2ba121c7bcd6ee608a35781395",
-        "sha256": "0phswg4qdfaar3gdcgjkrn52jnajdqghsrqp3vwj7dq267b7djsj",
+        "rev": "a54bbc6ad7caa65908e42491e3f55d7b426385aa",
+        "sha256": "1cvj3ksqxlx0nv8d0xia7kff5p2ajww5nksmhk5z0l8iaq6pnkg1",
         "type": "tarball",
-        "url": "https://github.com/steveej-forks/nextest/archive/b3fbec73cdb6ae2ba121c7bcd6ee608a35781395.tar.gz",
+        "url": "https://github.com/steveej-forks/nextest/archive/a54bbc6ad7caa65908e42491e3f55d7b426385aa.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "nixos-unstable": {

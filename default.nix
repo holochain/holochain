@@ -52,7 +52,7 @@ let
         name = "cargo-nextest";
 
         src = sources.nextest.outPath;
-        cargoSha256 = "sha256-1siQ7Ar1priIeHTEG3+2RmNLK1u92CdKvciD1oMH2sw=";
+        cargoSha256 = "sha256-8zJxGSlGp65BwLGEm5lb38CJZd1thAAKIKBQXMUaKRA=";
 
         cargoTestFlags = [
           # TODO: investigate some more why these tests fail in nix
