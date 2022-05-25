@@ -129,6 +129,10 @@ jobs:
               name: Run the slow tests
               no_output_timeout: 30m
               command: nix-shell --fallback --pure --argstr flavor "coreDev" --run hc-test-slow-nextest
+         - run:
+              name: push to cachix
+              command: $(nix-build . --fallback --no-link -A pkgs.ci.ciCachixPush)/bin/hc-ci-cachix-push.sh
+              when: always
 
    wasm-test:
       docker:
