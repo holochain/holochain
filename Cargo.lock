@@ -1891,7 +1891,7 @@ dependencies = [
 
 [[package]]
 name = "holochain"
-version = "0.0.141"
+version = "0.0.142"
 dependencies = [
  "anyhow",
  "arbitrary",
