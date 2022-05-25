@@ -49,8 +49,12 @@ rec {
       then
         echo succeeded with RUST_TEST_THREADS=$i
         exit 0
+      else
+        export LAST_STATUS=$?
       fi
     done
+
+    exit $LAST_STATUS
   '';
 
   hcWasmTests = writeShellScriptBin "hc-test-wasm" ''
