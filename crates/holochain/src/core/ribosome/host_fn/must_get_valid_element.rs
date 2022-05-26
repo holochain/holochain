@@ -47,6 +47,7 @@ pub fn must_get_valid_element<'a>(
                         | HostContext::GenesisSelfCheck(_)
                         | HostContext::MigrateAgent(_)
                         | HostContext::PostCommit(_)
+                        | HostContext::Weigh(_)
                         | HostContext::ZomeCall(_) => Err(WasmError::Host(format!(
                             "Failed to get Element {}",
                             header_hash

@@ -4,6 +4,9 @@ use super::guest_callback::migrate_agent::MigrateAgentHostAccess;
 use super::guest_callback::post_commit::PostCommitHostAccess;
 use super::guest_callback::validate::ValidateHostAccess;
 use super::guest_callback::validation_package::ValidationPackageHostAccess;
+use super::guest_callback::weigh::WeighHostAccess;
+use super::guest_callback::weigh::WeighInvocation;
+use super::guest_callback::weigh::WeighResult;
 use super::host_fn::get_agent_activity::get_agent_activity;
 use super::host_fn::HostFnApi;
 use super::HostContext;
@@ -72,6 +75,7 @@ use fallible_iterator::FallibleIterator;
 use holochain_types::prelude::*;
 
 use holochain_wasmer_host::prelude::*;
+use holochain_zome_types::rate_limit::WeighCallbackResult;
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::sync::atomic::AtomicU64;
@@ -625,6 +629,14 @@ impl RibosomeT for RealRibosome {
         invocation: ValidateInvocation,
     ) -> RibosomeResult<ValidateResult> {
         do_callback!(self, host_access, invocation, ValidateCallbackResult)
+    }
+
+    fn run_weigh(
+        &self,
+        host_access: WeighHostAccess,
+        invocation: WeighInvocation,
+    ) -> RibosomeResult<WeighResult> {
+        do_callback!(self, host_access, invocation, WeighCallbackResult)
     }
 
     fn run_init(

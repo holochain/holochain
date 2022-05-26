@@ -50,6 +50,7 @@ pub enum TestWasm {
     ValidateCreateLinkValid,
     ValidationPackageFail,
     ValidationPackageSuccess,
+    Weigh,
     WhoAmI,
     ZomeInfo,
 }
@@ -99,6 +100,7 @@ impl From<TestWasm> for ZomeName {
             TestWasm::ValidateCreateLinkValid => "validate_link_add_valid",
             TestWasm::ValidationPackageFail => "validation_package_fail",
             TestWasm::ValidationPackageSuccess => "validation_package_success",
+            TestWasm::Weigh => "weigh",
             TestWasm::WhoAmI => "whoami",
             TestWasm::ZomeInfo => "zome_info",
             TestWasm::CoordinatorZome => "coordinator_zome",
@@ -215,6 +217,7 @@ impl From<TestWasm> for DnaWasm {
             TestWasm::ValidationPackageSuccess => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_validation_package_success.wasm")
             }
+            TestWasm::Weigh => get_code("wasm32-unknown-unknown/release/test_wasm_weigh.wasm"),
             TestWasm::WhoAmI => get_code("wasm32-unknown-unknown/release/test_wasm_whoami.wasm"),
             TestWasm::ZomeInfo => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_zome_info.wasm")

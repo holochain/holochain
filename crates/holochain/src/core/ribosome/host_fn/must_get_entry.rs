@@ -42,6 +42,7 @@ pub fn must_get_entry<'a>(
                         | HostContext::GenesisSelfCheck(_)
                         | HostContext::MigrateAgent(_)
                         | HostContext::PostCommit(_)
+                        | HostContext::Weigh(_)
                         | HostContext::ZomeCall(_) => Err(WasmError::Host(format!(
                             "Failed to get EntryHashed {}",
                             entry_hash
