@@ -4,6 +4,9 @@ use holochain_serialized_bytes::prelude::*;
 
 use crate::{CreateLink, Entry};
 
+mod bucket;
+pub use bucket::*;
+
 /// Input to the `weigh` callback
 #[derive(Clone, PartialEq, Serialize, Deserialize, SerializedBytes, Debug)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
@@ -15,7 +18,7 @@ pub enum WeighInput {
 }
 
 /// A bucket ID, for rate limiting
-pub type RateBucket = u8;
+pub type RateBucketId = u8;
 
 /// The weight of this header, for rate limiting
 pub type RateWeight = u8;
@@ -39,7 +42,7 @@ pub type RateBytes = u8;
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[allow(missing_docs)]
 pub struct LinkRateData {
-    pub rate_bucket: RateBucket,
+    pub rate_bucket: RateBucketId,
     pub rate_weight: RateWeight,
 }
 
@@ -68,7 +71,7 @@ impl Default for LinkRateData {
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[allow(missing_docs)]
 pub struct EntryRateData {
-    pub rate_bucket: RateBucket,
+    pub rate_bucket: RateBucketId,
     pub rate_weight: RateWeight,
     pub rate_bytes: RateBytes,
 }

@@ -1,7 +1,7 @@
 //! The result of the `weigh` callback
 
 use crate::CallbackResult;
-use holochain_integrity_types::rate_limit::{RateBucket, RateWeight};
+use holochain_integrity_types::rate_limit::{RateBucketId, RateWeight};
 use holochain_serialized_bytes::prelude::*;
 use holochain_wasmer_common::WasmError;
 
@@ -11,7 +11,7 @@ pub use holochain_integrity_types::rate_limit::*;
 #[derive(Clone, PartialEq, Serialize, Deserialize, SerializedBytes, Debug)]
 pub struct WeighCallbackResult {
     /// The ascribed bucket id
-    pub rate_bucket: RateBucket,
+    pub rate_bucket: RateBucketId,
     /// The ascribed weight
     pub rate_weight: RateWeight,
 }
