@@ -54,9 +54,6 @@ jobs:
       steps:
          - checkout
          - run:
-              name: Unset CircleCI's forced conversion of HTTPS->SSH
-              command: git config --global --unset "url.ssh://git@github.com.insteadof"
-         - run:
               name: Set up Nix cache
               command: $(nix-build . --fallback --no-link -A pkgs.ci.ciSetupNixConf)/bin/hc-ci-setup-nix-conf.sh
          - run:
@@ -78,9 +75,6 @@ jobs:
       steps:
          - checkout
          - run:
-              name: Unset CircleCI's forced conversion of HTTPS->SSH
-              command: git config --global --unset "url.ssh://git@github.com.insteadof"
-         - run:
               name: Set up Nix cache
               command: $(nix-build . --fallback --no-link -A pkgs.ci.ciSetupNixConf)/bin/hc-ci-setup-nix-conf.sh
          - run:
@@ -99,9 +93,6 @@ jobs:
          NIXPKGS_ALLOW_UNFREE: 1
       steps:
          - checkout
-         - run:
-              name: Unset CircleCI's forced conversion of HTTPS->SSH
-              command: git config --global --unset "url.ssh://git@github.com.insteadof"
          - run:
               name: Set up Nix cache
               command: $(nix-build . --fallback --no-link -A pkgs.ci.ciSetupNixConf)/bin/hc-ci-setup-nix-conf.sh
@@ -123,9 +114,6 @@ jobs:
       steps:
          - checkout
          - run:
-              name: Unset CircleCI's forced conversion of HTTPS->SSH
-              command: git config --global --unset "url.ssh://git@github.com.insteadof"
-         - run:
               name: Set up Nix cache
               command: $(nix-build . --fallback --no-link -A pkgs.ci.ciSetupNixConf)/bin/hc-ci-setup-nix-conf.sh
          - run:
@@ -145,9 +133,6 @@ jobs:
          NIXPKGS_ALLOW_UNFREE: 1
       steps:
          - checkout
-         - run:
-              name: Unset CircleCI's forced conversion of HTTPS->SSH
-              command: git config --global --unset "url.ssh://git@github.com.insteadof"
          - run:
               name: Set up Nix cache
               command: $(nix-build . --fallback --no-link -A pkgs.ci.ciSetupNixConf)/bin/hc-ci-setup-nix-conf.sh
