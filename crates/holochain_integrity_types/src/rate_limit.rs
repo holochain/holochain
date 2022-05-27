@@ -41,12 +41,12 @@ pub type RateBytes = u8;
 )]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[allow(missing_docs)]
-pub struct LinkRateData {
+pub struct LinkWeight {
     pub rate_bucket: RateBucketId,
     pub rate_weight: RateWeight,
 }
 
-impl Default for LinkRateData {
+impl Default for LinkWeight {
     fn default() -> Self {
         Self {
             rate_bucket: 255,
@@ -70,13 +70,13 @@ impl Default for LinkRateData {
 )]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[allow(missing_docs)]
-pub struct EntryRateData {
+pub struct EntryWeight {
     pub rate_bucket: RateBucketId,
     pub rate_weight: RateWeight,
     pub rate_bytes: RateBytes,
 }
 
-impl Default for EntryRateData {
+impl Default for EntryWeight {
     fn default() -> Self {
         Self {
             rate_bucket: 255,
