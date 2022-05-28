@@ -85,3 +85,12 @@ impl Default for EntryWeight {
         }
     }
 }
+
+impl From<EntryWeight> for LinkWeight {
+    fn from(w: EntryWeight) -> Self {
+        Self {
+            rate_bucket: w.rate_bucket,
+            rate_weight: w.rate_weight,
+        }
+    }
+}

@@ -231,6 +231,22 @@ impl Header {
     pub fn is_genesis(&self) -> bool {
         self.header_seq() < POST_GENESIS_SEQ_THRESHOLD
     }
+
+    pub fn weight(&self) -> LinkWeight {
+        match self {
+            Self::CreateLink(CreateLink { weight, .. }) => weight.clone(),
+            Self::Delete(Delete { weight, .. }) => weight.clone(),
+            Self::Create(Create { weight, .. }) => weight.clone().into(),
+            Self::Update(Update { weight, .. }) => weight.clone().into(),
+            // all others are weightless
+            Self::Dna(Dna { .. })
+            | Self::AgentValidationPkg(AgentValidationPkg { .. })
+            | Self::InitZomesComplete(InitZomesComplete { .. })
+            | Self::DeleteLink(DeleteLink { .. })
+            | Self::CloseChain(CloseChain { .. })
+            | Self::OpenChain(OpenChain { .. }) => Default::default(),
+        }
+    }
 }
 
 impl_hashable_content!(Header, Header);
