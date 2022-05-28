@@ -965,6 +965,8 @@ pub async fn genesis(
         prev_header: avh_addr,
         entry_type: header::EntryType::AgentPubKey,
         entry_hash: agent_pubkey.clone().into(),
+        // AgentPubKey is weightless
+        weight: Default::default(),
     });
     let agent_header = HeaderHashed::from_content_sync(agent_header);
     let agent_header = SignedHeaderHashed::sign(&keystore, agent_header).await?;
@@ -1381,6 +1383,7 @@ pub mod tests {
         let create = builder::Create {
             entry_type: EntryType::App(fixt!(AppEntryType)),
             entry_hash: eh1.clone(),
+            weight: Default::default(),
         };
         let h1 = chain_1
             .put(
@@ -1397,6 +1400,7 @@ pub mod tests {
         let create = builder::Create {
             entry_type: EntryType::App(fixt!(AppEntryType)),
             entry_hash: entry_hash_err.clone(),
+            weight: Default::default(),
         };
         chain_2
             .put(
@@ -1417,6 +1421,7 @@ pub mod tests {
                 EntryVisibility::Private,
             )),
             entry_hash: eh2.clone(),
+            weight: Default::default(),
         };
         let old_h2 = chain_3
             .put(
@@ -1546,6 +1551,7 @@ pub mod tests {
             let header_builder = builder::Create {
                 entry_type: EntryType::CapGrant,
                 entry_hash: entry_hash.clone(),
+                weight: Default::default(),
             };
             let header = chain
                 .put(
@@ -1612,6 +1618,7 @@ pub mod tests {
                 entry_hash: entry_hash.clone(),
                 original_header_address,
                 original_entry_address,
+                weight: Default::default(),
             };
             let header = chain
                 .put(
@@ -1678,6 +1685,7 @@ pub mod tests {
             let header_builder = builder::Delete {
                 deletes_address: updated_header_hash,
                 deletes_entry_address: updated_entry_hash,
+                weight: Default::default(),
             };
             chain
                 .put(
@@ -1820,6 +1828,7 @@ pub mod tests {
         let create = builder::Create {
             entry_type: EntryType::App(fixt!(AppEntryType)),
             entry_hash: EntryHash::with_data_sync(&entry),
+            weight: Default::default(),
         };
         let h1 = source_chain
             .put(
@@ -1834,6 +1843,7 @@ pub mod tests {
         let create = builder::Create {
             entry_type: EntryType::App(fixt!(AppEntryType)),
             entry_hash: EntryHash::with_data_sync(&entry),
+            weight: Default::default(),
         };
         let h2 = source_chain
             .put(Some(zome), create, Some(entry), ChainTopOrdering::default())

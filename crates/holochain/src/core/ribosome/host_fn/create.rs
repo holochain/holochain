@@ -71,10 +71,13 @@ pub fn create<'a>(
                         EntryDefId::CapClaim => EntryType::CapClaim,
                     };
 
+                    let weight = todo!("weigh this item in wasm");
+
                     // build a header for the entry being committed
                     let header_builder = builder::Create {
                         entry_type,
                         entry_hash,
+                        weight,
                     };
 
                     // return the hash of the committed entry

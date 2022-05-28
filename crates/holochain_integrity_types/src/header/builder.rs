@@ -5,6 +5,8 @@ use crate::header::HeaderInner;
 use crate::header::ZomeId;
 use crate::link::LinkTag;
 use crate::link::LinkType;
+use crate::EntryWeight;
+use crate::LinkWeight;
 use crate::MembraneProof;
 use header::Dna;
 use holo_hash::AgentPubKey;
@@ -53,18 +55,27 @@ pub trait HeaderBuilder<H: HeaderInner>: Sized {
 }
 
 macro_rules! builder_variant {
-    ( $name: ident { $($field: ident : $t: ty),* $(,)? } ) => {
+    ( $name: ident { $($field: ident : $t: ty),* $( $(,)? | $($dfield: ident : $dt: ty),* )? $(,)? } ) => {
 
         #[derive(Clone, Debug, PartialEq, Eq)]
         pub struct $name {
-            $(pub $field : $t),*
+            $(pub $field : $t,)*
+            $( $(pub $dfield : $dt),* )?
         }
 
         #[allow(clippy::new_without_default)]
         impl $name {
             pub fn new($($field : $t),* ) -> Self {
                 Self {
-                    $($field),*
+                    $($field,)*
+                    $( $($dfield : Default::default()),* )?
+                }
+            }
+
+            pub fn new_full($($field : $t,)* $( $($dfield : $dt),* )? ) -> Self {
+                Self {
+                    $($field,)*
+                    $( $($dfield),* )?
                 }
             }
         }
@@ -83,7 +94,8 @@ macro_rules! builder_variant {
                     timestamp,
                     header_seq,
                     prev_header,
-                    $($field : self.$field),*
+                    $($field : self.$field,)*
+                    $( $($dfield : self.$dfield),* )?
                 }
             }
         }
@@ -108,7 +120,8 @@ macro_rules! builder_variant {
                     timestamp,
                     header_seq,
                     prev_header,
-                    $($field),*
+                    $($field,)*
+                    $( $($dfield : Default::default()),* )?
                 }
             }
         }
@@ -123,6 +136,8 @@ builder_variant!(CreateLink {
     zome_id: ZomeId,
     link_type: LinkType,
     tag: LinkTag,
+    | // use defaults:
+    weight: LinkWeight,
 });
 
 builder_variant!(DeleteLink {
@@ -141,6 +156,8 @@ builder_variant!(CloseChain {
 builder_variant!(Create {
     entry_type: EntryType,
     entry_hash: EntryHash,
+    | // use defaults:
+    weight: EntryWeight,
 });
 
 builder_variant!(Update {
@@ -149,11 +166,17 @@ builder_variant!(Update {
 
     entry_type: EntryType,
     entry_hash: EntryHash,
+
+    | // use defaults:
+    weight: EntryWeight,
 });
 
 builder_variant!(Delete {
     deletes_address: HeaderHash,
     deletes_entry_address: EntryHash,
+
+    | // use defaults:
+    weight: LinkWeight,
 });
 
 builder_variant!(AgentValidationPkg {

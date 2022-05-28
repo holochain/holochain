@@ -478,6 +478,7 @@ fn valid_chain_test() {
         prev_header: headers[0].to_hash(),
         entry_type: fixt!(EntryType),
         entry_hash: fixt!(EntryHash),
+        weight: Default::default(),
     })));
     headers.push(HeaderHashed::from_content_sync(Header::Create(Create {
         author: author.clone(),
@@ -486,6 +487,7 @@ fn valid_chain_test() {
         prev_header: headers[1].to_hash(),
         entry_type: fixt!(EntryType),
         entry_hash: fixt!(EntryHash),
+        weight: Default::default(),
     })));
     // Valid chain passes.
     validate_chain(headers.iter(), &None).expect("Valid chain");
@@ -499,6 +501,7 @@ fn valid_chain_test() {
         prev_header: headers[0].to_hash(),
         entry_type: fixt!(EntryType),
         entry_hash: fixt!(EntryHash),
+        weight: Default::default(),
     })));
     let err = validate_chain(fork.iter(), &None).expect_err("Forked chain");
     assert!(matches!(
@@ -528,6 +531,7 @@ fn valid_chain_test() {
         prev_header: headers[0].to_hash(),
         entry_type: fixt!(EntryType),
         entry_hash: fixt!(EntryHash),
+        weight: Default::default(),
     }));
     let err = validate_chain(wrong_root.iter(), &None).expect_err("Wrong root");
     assert!(matches!(

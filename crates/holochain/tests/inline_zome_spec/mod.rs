@@ -523,6 +523,7 @@ async fn insert_source_chain() {
             EntryVisibility::Public,
         )),
         entry_hash: EntryHash::with_data_sync(&entry),
+        weight: Default::default(),
     };
     let shh = SignedHeaderHashed::with_presigned(
         HeaderHashed::from_content_sync(header.clone().into()),

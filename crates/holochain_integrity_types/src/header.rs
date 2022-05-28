@@ -2,6 +2,8 @@ use crate::entry_def::EntryVisibility;
 use crate::link::LinkTag;
 use crate::link::LinkType;
 use crate::timestamp::Timestamp;
+use crate::EntryWeight;
+use crate::LinkWeight;
 use crate::MembraneProof;
 use holo_hash::impl_hashable_content;
 use holo_hash::AgentPubKey;
@@ -357,6 +359,8 @@ pub struct CreateLink {
     pub zome_id: ZomeId,
     pub link_type: LinkType,
     pub tag: LinkTag,
+
+    pub weight: LinkWeight,
 }
 
 /// Declares that a previously made Link should be nullified and considered removed.
@@ -414,6 +418,8 @@ pub struct Create {
 
     pub entry_type: EntryType,
     pub entry_hash: EntryHash,
+
+    pub weight: EntryWeight,
 }
 
 /// A header which specifies that some new Entry content is intended to be an
@@ -441,6 +447,8 @@ pub struct Update {
 
     pub entry_type: EntryType,
     pub entry_hash: EntryHash,
+
+    pub weight: EntryWeight,
 }
 
 /// Declare that a previously published Header should be nullified and
@@ -460,6 +468,8 @@ pub struct Delete {
     /// Address of the Element being deleted
     pub deletes_address: HeaderHash,
     pub deletes_entry_address: EntryHash,
+
+    pub weight: LinkWeight,
 }
 
 /// Placeholder for future when we want to have updates on headers

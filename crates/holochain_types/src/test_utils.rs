@@ -106,6 +106,7 @@ pub async fn fake_unique_element(
 
         entry_type: EntryType::App(app_entry_type),
         entry_hash: entry.as_hash().to_owned(),
+        weight: Default::default(),
     });
 
     Ok((

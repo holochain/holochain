@@ -41,6 +41,7 @@ pub fn delete<'a>(
                 let header_builder = builder::Delete {
                     deletes_address: deletes_header_hash,
                     deletes_entry_address,
+                    weight: todo!("weigh this item in wasm"),
                 };
                 let header_hash = source_chain
                     .put(
@@ -128,7 +129,9 @@ pub mod wasm_test {
             None => unreachable!(),
         }
 
-        let _: HeaderHash = conductor.call(&alice, "delete_via_hash", thing_a.clone()).await;
+        let _: HeaderHash = conductor
+            .call(&alice, "delete_via_hash", thing_a.clone())
+            .await;
 
         let get_thing: Option<Element> = conductor.call(&alice, "reed", thing_a).await;
         match get_thing {
