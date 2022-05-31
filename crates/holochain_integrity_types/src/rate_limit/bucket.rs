@@ -56,7 +56,7 @@ impl BucketState {
 
     /// Process an item with the given weight at the given time.
     /// Bucket overflow or nonmonotonic timestamp causes an error.
-    pub fn change(mut self, weight: RateWeight, timestamp: Timestamp) -> RateBucketResult<Self> {
+    pub fn change(&mut self, weight: RateWeight, timestamp: Timestamp) -> RateBucketResult<()> {
         let drain_amount = if let Some(last_access) = self.last_access {
             if timestamp <= last_access {
                 Err(RateBucketError::NonMonotonicTimestamp(
@@ -76,7 +76,7 @@ impl BucketState {
         if self.level > self.params.capacity {
             Err(RateBucketError::BucketOverflow(self.index))
         } else {
-            Ok(self)
+            Ok(())
         }
     }
 }
@@ -97,10 +97,10 @@ mod tests {
         });
         let mil = 1000;
         let mut b = BucketState::new(p, 0);
-        b = b.change(100, Timestamp::from_micros(mil * 0)).unwrap();
+        b.change(100, Timestamp::from_micros(mil * 0)).unwrap();
         assert_eq!(b.level, 100);
 
-        b = b.change(1, Timestamp::from_micros(mil * 10)).unwrap();
+        b.change(1, Timestamp::from_micros(mil * 10)).unwrap();
         assert_eq!(b.level, 1);
     }
 
@@ -113,7 +113,7 @@ mod tests {
         });
         let mil = 1000;
         let mut b = BucketState::new(p, 0);
-        b = b.change(50, Timestamp::from_micros(mil * 1000)).unwrap();
+        b.change(50, Timestamp::from_micros(mil * 1000)).unwrap();
         assert_eq!(
             dbg!(b.change(1, Timestamp::from_micros(mil * 999))),
             Err(RateBucketError::NonMonotonicTimestamp(
@@ -133,18 +133,18 @@ mod tests {
         let mil = 1000;
         let mut b = BucketState::new(p, 0);
 
-        b = b.change(200, Timestamp::from_micros(mil * 0)).unwrap();
+        b.change(200, Timestamp::from_micros(mil * 0)).unwrap();
         assert_eq!(b.level, 200);
-        b = b.change(200, Timestamp::from_micros(mil * 100)).unwrap();
+        b.change(200, Timestamp::from_micros(mil * 100)).unwrap();
         assert_eq!(b.level, 400 - 10);
-        b = b.change(200, Timestamp::from_micros(mil * 200)).unwrap();
+        b.change(200, Timestamp::from_micros(mil * 200)).unwrap();
         assert_eq!(b.level, 600 - 20);
-        b = b.change(200, Timestamp::from_micros(mil * 300)).unwrap();
+        b.change(200, Timestamp::from_micros(mil * 300)).unwrap();
         assert_eq!(b.level, 800 - 30);
-        b = b.change(200, Timestamp::from_micros(mil * 400)).unwrap();
+        b.change(200, Timestamp::from_micros(mil * 400)).unwrap();
         assert_eq!(b.level, 1000 - 40);
 
-        b = b.change(50, Timestamp::from_micros(mil * 500)).unwrap();
+        b.change(50, Timestamp::from_micros(mil * 500)).unwrap();
         assert_eq!(b.level, 1000);
         // bucket is exactly full now.
 

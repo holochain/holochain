@@ -5,6 +5,8 @@ use crate::RateBucketId;
 /// Errors involving app entry creation
 #[derive(Debug, Clone, PartialEq)]
 pub enum RateBucketError {
+    /// The bucket index was not defined
+    BucketIdMissing(RateBucketId),
     /// The bucket has overflowed its capacity
     BucketOverflow(RateBucketId),
     /// A bucket attempted to process an item with an earlier timestamp than the last
@@ -16,6 +18,7 @@ pub enum RateBucketError {
 impl std::error::Error for RateBucketError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
+            RateBucketError::BucketIdMissing(_) => None,
             RateBucketError::BucketOverflow(_) => None,
             RateBucketError::NonMonotonicTimestamp(_, _) => None,
             RateBucketError::TimestampError(e) => e.source(),
@@ -32,6 +35,11 @@ impl From<TimestampError> for RateBucketError {
 impl core::fmt::Display for RateBucketError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            RateBucketError::BucketIdMissing(id) => write!(
+                f,
+                "There is no bucket defined at index {0}.",
+                id,
+            ),
             RateBucketError::BucketOverflow(id) => write!(
                 f,
                 "The bucket at index {0} overflowed. Rate limit exceeded.",
