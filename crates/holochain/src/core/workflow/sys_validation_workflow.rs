@@ -842,6 +842,7 @@ impl SysValidationWorkspace {
         };
         Ok(!chain_not_empty)
     }
+
     pub async fn header_seq_is_empty(&self, header: &Header) -> SourceChainResult<bool> {
         let author = header.author().clone();
         let seq = header.header_seq();
@@ -888,6 +889,7 @@ impl SysValidationWorkspace {
         };
         Ok(!header_seq_is_not_empty)
     }
+
     /// Create a cascade with local data only
     pub fn local_cascade(&self) -> Cascade {
         let cascade = Cascade::empty().with_dht(self.dht_db.clone());

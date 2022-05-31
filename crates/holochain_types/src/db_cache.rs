@@ -1,5 +1,6 @@
 //! # Database Cache
 //! This is an in-memory cache that is used to store the state of the DHT database.
+
 use crate::dht_op::DhtOpType;
 use crate::share::RwShare;
 use error::*;
@@ -15,6 +16,8 @@ mod tests;
 
 #[allow(missing_docs)]
 pub mod error;
+
+pub mod rate_limit;
 
 #[derive(Clone)]
 /// This cache allows us to track selected database queries that

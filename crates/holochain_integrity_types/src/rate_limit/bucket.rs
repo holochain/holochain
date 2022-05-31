@@ -34,7 +34,7 @@ pub struct RateLimits(Vec<RateLimit>);
 impl RateLimits {
     /// Process an item, letting the bucket states change
     pub fn change(&mut self, header: &Header) -> Result<(), String> {
-        let weight = header.weight();
+        let weight = header.rate_data();
         self.0
             .get_mut(weight.rate_bucket as usize)
             .map(|b| b.change(weight.rate_weight, header.timestamp()))

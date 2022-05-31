@@ -232,7 +232,7 @@ impl Header {
         self.header_seq() < POST_GENESIS_SEQ_THRESHOLD
     }
 
-    pub fn weight(&self) -> LinkWeight {
+    pub fn rate_data(&self) -> LinkWeight {
         match self {
             Self::CreateLink(CreateLink { weight, .. }) => weight.clone(),
             Self::Delete(Delete { weight, .. }) => weight.clone(),
