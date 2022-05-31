@@ -1,0 +1,51 @@
+use kitsune_p2p_timestamp::{Timestamp, TimestampError};
+
+use crate::RateBucketId;
+
+/// Errors involving app entry creation
+#[derive(Debug, Clone, PartialEq)]
+pub enum RateBucketError {
+    /// The bucket has overflowed its capacity
+    BucketOverflow(RateBucketId),
+    /// A bucket attempted to process an item with an earlier timestamp than the last
+    NonMonotonicTimestamp(Timestamp, Timestamp),
+    /// Other Timestamp error
+    TimestampError(TimestampError),
+}
+
+impl std::error::Error for RateBucketError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            RateBucketError::BucketOverflow(_) => None,
+            RateBucketError::NonMonotonicTimestamp(_, _) => None,
+            RateBucketError::TimestampError(e) => e.source(),
+        }
+    }
+}
+
+impl From<TimestampError> for RateBucketError {
+    fn from(e: TimestampError) -> Self {
+        Self::TimestampError(e)
+    }
+}
+
+impl core::fmt::Display for RateBucketError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            RateBucketError::BucketOverflow(id) => write!(
+                f,
+                "The bucket at index {0} overflowed. Rate limit exceeded.",
+                id,
+            ),
+            RateBucketError::NonMonotonicTimestamp(t1, t2) => write!(
+                f,
+                "Tried to process a timestamp which was behind the previous one. previous={:?}, current={:?}",
+                t1, t2,
+            ),
+            RateBucketError::TimestampError(e) => e.fmt(f)
+        }
+    }
+}
+
+/// Result type for RateBucketError
+pub type RateBucketResult<T> = Result<T, RateBucketError>;

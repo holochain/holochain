@@ -6,6 +6,8 @@ use crate::{CreateLink, Entry};
 
 mod bucket;
 pub use bucket::*;
+mod error;
+pub use error::*;
 
 /// Input to the `weigh` callback
 #[derive(Clone, PartialEq, Serialize, Deserialize, SerializedBytes, Debug)]
@@ -25,6 +27,9 @@ pub type RateWeight = u8;
 
 /// The normalized total size of this header, for rate limiting
 pub type RateBytes = u8;
+
+/// The amount that a bucket is "filled"
+pub type RateBucketCapacity = u32;
 
 /// Combination of two rate limiting data types, for convenience
 #[derive(
