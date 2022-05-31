@@ -13,7 +13,7 @@ readmes_updated=$?
 if [[ "$readmes_updated" == 1 ]]; then
     echo 'READMEs have been updated, committing changes'
     git config user.name release-ci
-    git config user.email jost.schulte@holo.host
-    git push
-    git commit -am "docs(github): generated READMEs from doc comments"
+    git config user.email ci@holo.host
+    git commit -am "docs(crate-level): generated READMEs from doc comments"
+    git push --dry-run
 fi

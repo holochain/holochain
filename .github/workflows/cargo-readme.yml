@@ -1,12 +1,7 @@
 name: cargo-readme
 
 on:
-  workflow_call:
-    inputs:
-      repo:
-        type: string
-        required: false
-        default: "./"
+  workflow_call
   # push:
   # branches:
   #   - main
@@ -27,8 +22,8 @@ jobs:
 
       - uses: actions/checkout@v2
 
-      - name: Setup tmate session
-        uses: mxschmitt/action-tmate@v3
+      # - name: Setup tmate session
+        # uses: mxschmitt/action-tmate@v3
 
-      # - name: Generate READMEs
-        # run: ./scripts/generate_readmes.sh
+      - name: Generate READMEs
+        run: ./scripts/generate_readmes.sh
