@@ -18,6 +18,7 @@ mod tests;
 pub mod error;
 
 pub mod rate_limit;
+use rate_limit::RateLimitDbCache;
 
 #[derive(Clone)]
 /// This cache allows us to track selected database queries that
@@ -30,6 +31,8 @@ pub struct DhtDbQueryCache {
     dht_db: DbRead<DbKindDht>,
     /// The cache of agent activity queries.
     activity: Arc<tokio::sync::OnceCell<ActivityCache>>,
+    /// The cache of rate-limiting state.
+    rate_limits: RwShare<RateLimitDbCache>,
 }
 
 type ActivityCache = RwShare<HashMap<Arc<AgentPubKey>, ActivityState>>;
