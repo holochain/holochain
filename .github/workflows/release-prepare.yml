@@ -206,17 +206,14 @@ jobs:
       #         crate detect-missing-releaseheadings
       #       '
 
-      - name: Install cargo-readme
-        uses: actions-rs/cargo@v1
-        with:
-          command: install
-          args: cargo-readme
+      # - name: Install cargo-readme
+      #   uses: actions-rs/cargo@v1
+      #   with:
+      #     command: install
+      #     args: cargo-readme
 
-      - name: Setup tmate session if build and test run failed
-        uses: mxschmitt/action-tmate@v3
-
-      - name: Generate crate READMEs from Rust doc comments
-        run: ./scripts/generate_readmes.sh
+      # - name: Generate crate READMEs from Rust doc comments
+      #   run: ./scripts/generate_readmes.sh
 
       # - name: Bump the crate versions for the release
       #   id: bump-versions

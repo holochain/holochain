@@ -146,6 +146,9 @@ jobs:
       CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
       HRA_GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN}}
 
+  cargo-readme:
+    uses: ./.github/workflows/cargo-readme.yml
+
   # test:
   #   if: ${{ github.event_name != 'pull_request' }}
   #   needs: [vars, prepare]

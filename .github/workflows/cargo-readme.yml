@@ -25,10 +25,10 @@ jobs:
           command: install
           args: cargo-readme
 
-      # - uses: actions/checkout@v2
+      - uses: actions/checkout@v2
 
       - name: Setup tmate session if build and test run failed
         uses: mxschmitt/action-tmate@v3
 
-      # - name: Generate README for crate hdk
-      #   run: cd crates/hdk && cargo readme
+      - name: Generate READMEs
+        # run: ./scripts/generate_readmes.sh
