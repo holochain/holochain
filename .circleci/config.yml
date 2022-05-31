@@ -33,6 +33,7 @@ jobs:
          NIX_CONFIG: "extra-experimental-features = nix-command"
       steps:
          - checkout
+         - run: git config --global --unset url.ssh://git@github.com.insteadof
          - run:
               name: Set up Nix cache
               command: $(nix-build . --fallback --no-link -A pkgs.ci.ciSetupNixConf)/bin/hc-ci-setup-nix-conf.sh
@@ -53,6 +54,7 @@ jobs:
          NIXPKGS_ALLOW_UNFREE: 1
       steps:
          - checkout
+         - run: git config --global --unset url.ssh://git@github.com.insteadof
          - run:
               name: Set up Nix cache
               command: $(nix-build . --fallback --no-link -A pkgs.ci.ciSetupNixConf)/bin/hc-ci-setup-nix-conf.sh
@@ -74,6 +76,7 @@ jobs:
          RUSTDOCFLAGS: -Dwarnings
       steps:
          - checkout
+         - run: git config --global --unset url.ssh://git@github.com.insteadof
          - run:
               name: Set up Nix cache
               command: $(nix-build . --fallback --no-link -A pkgs.ci.ciSetupNixConf)/bin/hc-ci-setup-nix-conf.sh
@@ -93,6 +96,7 @@ jobs:
          NIXPKGS_ALLOW_UNFREE: 1
       steps:
          - checkout
+         - run: git config --global --unset url.ssh://git@github.com.insteadof
          - run:
               name: Set up Nix cache
               command: $(nix-build . --fallback --no-link -A pkgs.ci.ciSetupNixConf)/bin/hc-ci-setup-nix-conf.sh
@@ -113,6 +117,7 @@ jobs:
          NIXPKGS_ALLOW_UNFREE: 1
       steps:
          - checkout
+         - run: git config --global --unset url.ssh://git@github.com.insteadof
          - run:
               name: Set up Nix cache
               command: $(nix-build . --fallback --no-link -A pkgs.ci.ciSetupNixConf)/bin/hc-ci-setup-nix-conf.sh
@@ -133,6 +138,7 @@ jobs:
          NIXPKGS_ALLOW_UNFREE: 1
       steps:
          - checkout
+         - run: git config --global --unset url.ssh://git@github.com.insteadof
          - run:
               name: Set up Nix cache
               command: $(nix-build . --fallback --no-link -A pkgs.ci.ciSetupNixConf)/bin/hc-ci-setup-nix-conf.sh
@@ -151,6 +157,7 @@ jobs:
          NIXPKGS_ALLOW_UNFREE: 1
       steps:
          - checkout
+         - run: git config --global --unset url.ssh://git@github.com.insteadof
          - run:
               name: Test on mac
               no_output_timeout: 30m
