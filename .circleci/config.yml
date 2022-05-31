@@ -12,9 +12,6 @@ commands:
          - run: ./docker/login.sh
          - run:
               no_output_timeout: 45m
-              environment:
-                 CACHIX_NAME: holochain-ci
-                 NIX_CONFIG: "extra-experimental-features = nix-command"
               command: ./docker/build.sh << parameters.box >> $CIRCLE_BRANCH
          - run:
               no_output_timeout: 30m
@@ -54,6 +51,9 @@ jobs:
       steps:
          - checkout
          - run:
+              name: Unset CircleCI's forced conversion of HTTPS->SSH
+              command: git config --global --unset "url.ssh://git@github.com.insteadof"
+         - run:
               name: Set up Nix cache
               command: $(nix-build . --fallback --no-link -A pkgs.ci.ciSetupNixConf)/bin/hc-ci-setup-nix-conf.sh
          - run:
@@ -75,6 +75,9 @@ jobs:
       steps:
          - checkout
          - run:
+              name: Unset CircleCI's forced conversion of HTTPS->SSH
+              command: git config --global --unset "url.ssh://git@github.com.insteadof"
+         - run:
               name: Set up Nix cache
               command: $(nix-build . --fallback --no-link -A pkgs.ci.ciSetupNixConf)/bin/hc-ci-setup-nix-conf.sh
          - run:
@@ -93,6 +96,9 @@ jobs:
          NIXPKGS_ALLOW_UNFREE: 1
       steps:
          - checkout
+         - run:
+              name: Unset CircleCI's forced conversion of HTTPS->SSH
+              command: git config --global --unset "url.ssh://git@github.com.insteadof"
          - run:
               name: Set up Nix cache
               command: $(nix-build . --fallback --no-link -A pkgs.ci.ciSetupNixConf)/bin/hc-ci-setup-nix-conf.sh
@@ -114,6 +120,9 @@ jobs:
       steps:
          - checkout
          - run:
+              name: Unset CircleCI's forced conversion of HTTPS->SSH
+              command: git config --global --unset "url.ssh://git@github.com.insteadof"
+         - run:
               name: Set up Nix cache
               command: $(nix-build . --fallback --no-link -A pkgs.ci.ciSetupNixConf)/bin/hc-ci-setup-nix-conf.sh
          - run:
@@ -133,6 +142,9 @@ jobs:
          NIXPKGS_ALLOW_UNFREE: 1
       steps:
          - checkout
+         - run:
+              name: Unset CircleCI's forced conversion of HTTPS->SSH
+              command: git config --global --unset "url.ssh://git@github.com.insteadof"
          - run:
               name: Set up Nix cache
               command: $(nix-build . --fallback --no-link -A pkgs.ci.ciSetupNixConf)/bin/hc-ci-setup-nix-conf.sh
@@ -187,8 +199,6 @@ jobs:
 
 workflows:
    tests:
-      when:
-         false
       jobs:
          - merge-release-test
          # - merge-release-test-mac
@@ -198,14 +208,14 @@ workflows:
          - slow-test
          - wasm-test
          # - merge-test-mac
-         # - ci-jobs-succeed:
-         #      requires:
-         #         - standard-test
-         #         - rustdoc-build-test
-         #         - hc-static-checks
-         #         - slow-test
-         #         - wasm-test
-         #         - merge-release-test
+         - ci-jobs-succeed:
+              requires:
+                 - standard-test
+                 - rustdoc-build-test
+                 - hc-static-checks
+                 - slow-test
+                 - wasm-test
+                 - merge-release-test
 
    docker-builds:
       triggers:

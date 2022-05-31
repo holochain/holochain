@@ -15,5 +15,5 @@ if [[ "$readmes_updated" == 1 ]]; then
     git config user.name release-ci
     git config user.email ci@holo.host
     git commit -am "docs(crate-level): generated READMEs from doc comments"
-    git push --dry-run
+    git push origin develop
 fi
