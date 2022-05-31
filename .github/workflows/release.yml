@@ -358,6 +358,7 @@ jobs:
           nix-shell --run "cargo fetch --locked"
 
           ${{ matrix.testCommand.run }}
+        continue-on-error: ${{ matrix.platform != 'ubuntu-latest' && matrix.testCommand.ignoreErrorOnNonUbuntu == true }}
 
       - name: ${{ matrix.testCommand.name }} (run)
         uses: nick-fields/retry@v2
