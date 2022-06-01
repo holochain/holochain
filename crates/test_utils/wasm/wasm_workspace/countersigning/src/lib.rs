@@ -47,6 +47,7 @@ fn create_an_invalid_thing(_: ()) -> ExternResult<HeaderHash> {
 
 fn create_countersigned(
     responses: Vec<PreflightResponse>,
+    optional_responses: Vec<PreflightResponse>,
     thing: Thing,
 ) -> ExternResult<HeaderHash> {
     HDK.with(|h| {
@@ -54,7 +55,7 @@ fn create_countersigned(
             (&thing).into(),
             Entry::CounterSign(
                 Box::new(
-                    CounterSigningSessionData::try_from_responses(responses).map_err(
+                    CounterSigningSessionData::try_from_responses(responses, optional_responses).map_err(
                         |countersigning_error| wasm_error!(WasmErrorInner::Guest(countersigning_error.to_string())),
                     )?,
                 ),
@@ -70,22 +71,27 @@ fn create_countersigned(
 fn create_an_invalid_countersigned_thing(
     responses: Vec<PreflightResponse>,
 ) -> ExternResult<HeaderHash> {
-    create_countersigned(responses, Thing::Invalid)
+    create_countersigned(responses, vec![], Thing::Invalid)
 }
 
 #[hdk_extern]
 fn create_a_countersigned_thing(responses: Vec<PreflightResponse>) -> ExternResult<HeaderHash> {
-    create_countersigned(responses, Thing::Valid)
+    create_countersigned(responses, vec![], Thing::Valid)
 }
 
 fn generate_preflight_request(
     agents: Vec<(AgentPubKey, Vec<Role>)>,
+    optional_agents: Vec<(AgentPubKey, Vec<Role>)>,
+    minimum_optional_agents: u8,
+    enzymatic: bool,
     thing: Thing,
 ) -> ExternResult<PreflightRequest> {
     PreflightRequest::try_new(
         hash_entry(thing)?,
         agents,
-        None,
+        optional_agents,
+        minimum_optional_agents,
+        enzymatic,
         session_times_from_millis(5000)?,
         HeaderBase::Create(CreateBase::new(entry_type!(Thing)?)),
         PreflightBytes(vec![]),
@@ -97,14 +103,14 @@ fn generate_preflight_request(
 fn generate_countersigning_preflight_request(
     agents: Vec<(AgentPubKey, Vec<Role>)>,
 ) -> ExternResult<PreflightRequest> {
-    generate_preflight_request(agents, Thing::Valid)
+    generate_preflight_request(agents, vec![], 0, false, Thing::Valid)
 }
 
 #[hdk_extern]
 fn generate_invalid_countersigning_preflight_request(
     agents: Vec<(AgentPubKey, Vec<Role>)>,
 ) -> ExternResult<PreflightRequest> {
-    generate_preflight_request(agents, Thing::Invalid)
+    generate_preflight_request(agents, vec![], 0, false, Thing::Invalid)
 }
 
 #[hdk_extern]

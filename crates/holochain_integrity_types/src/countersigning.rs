@@ -255,6 +255,17 @@ impl PreflightRequest {
         &mut self.signing_agents
     }
 
+    /// Optional signing agents accessor.
+    pub fn optional_signing_agents(&self) -> &CounterSigningAgents {
+        &self.optional_signing_agents
+    }
+
+    /// Mutable optional signing agents accessor for testing.
+    #[cfg(feature = "test_utils")]
+    pub fn optional_signing_agents_mut(&mut self) -> &mut CounterSigningAgents {
+        &mut self.optional_signing_agents
+    }
+
     /// Enzyme index accessor.
     pub fn enzymatic(&self) -> bool {
         self.enzymatic
@@ -526,24 +537,32 @@ impl Header {
 pub struct CounterSigningSessionData {
     preflight_request: PreflightRequest,
     responses: Vec<(CounterSigningAgentState, Signature)>,
+    optional_responses: Vec<(CounterSigningAgentState, Signature)>,
 }
 
 impl CounterSigningSessionData {
     /// Attempt to build session data from a vector of responses.
     pub fn try_from_responses(
         responses: Vec<PreflightResponse>,
+        optional_responses: Vec<PreflightResponse>,
     ) -> Result<Self, CounterSigningError> {
-        let preflight_response = responses
+        let preflight_request = responses
             .get(0)
             .ok_or(CounterSigningError::MissingResponse)?
-            .to_owned();
-        let responses: Vec<(CounterSigningAgentState, Signature)> = responses
-            .into_iter()
-            .map(|response| (response.agent_state.clone(), response.signature))
-            .collect();
+            .to_owned()
+            .request;
+        let convert_responses =
+            |rs: Vec<PreflightResponse>| -> Vec<(CounterSigningAgentState, Signature)> {
+                rs.into_iter()
+                    .map(|response| (response.agent_state.clone(), response.signature))
+                    .collect()
+            };
+        let responses = convert_responses(responses);
+        let optional_responses = convert_responses(optional_responses);
         Ok(Self {
-            preflight_request: preflight_response.request,
+            preflight_request,
             responses,
+            optional_responses,
         })
     }
 
@@ -574,13 +593,18 @@ impl CounterSigningSessionData {
         entry_hash: EntryHash,
     ) -> Result<Vec<Header>, CounterSigningError> {
         let mut headers = vec![];
-        for (agent, _role) in self.preflight_request.signing_agents().iter() {
-            headers.push(Header::from_countersigning_data(
-                entry_hash.clone(),
-                self,
-                agent.clone(),
-            )?);
-        }
+        let mut build_headers = |countersigning_agents: &CounterSigningAgents| -> Result<(), _> {
+            for (agent, _role) in countersigning_agents.iter() {
+                headers.push(Header::from_countersigning_data(
+                    entry_hash.clone(),
+                    self,
+                    agent.clone(),
+                )?);
+            }
+            Ok(())
+        };
+        build_headers(self.preflight_request.signing_agents())?;
+        build_headers(self.preflight_request.optional_signing_agents())?;
         Ok(headers)
     }
 
@@ -588,10 +612,12 @@ impl CounterSigningSessionData {
     pub fn try_new(
         preflight_request: PreflightRequest,
         responses: Vec<(CounterSigningAgentState, Signature)>,
+        optional_responses: Vec<(CounterSigningAgentState, Signature)>,
     ) -> Result<Self, CounterSigningError> {
         let session_data = Self {
             preflight_request,
             responses,
+            optional_responses,
         };
         session_data.check_integrity()?;
         Ok(session_data)
