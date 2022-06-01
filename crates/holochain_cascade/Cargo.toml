@@ -1,6 +1,6 @@
 [package]
 name = "holochain_cascade"
-version = "0.0.41"
+version = "0.0.42-dev.0"
 description = "Logic for cascading updates to Holochain state and network interaction"
 license-file = "LICENSE_CAL-1.0"
 homepage = "https://github.com/holochain/holochain"
@@ -15,17 +15,17 @@ fallible-iterator = "0.2"
 fixt = { version = "0.0.11", path = "../fixt" }
 futures = "0.3"
 ghost_actor = "=0.3.0-alpha.4"
-hdk = { version = "0.0.134", path = "../hdk" }
-hdk_derive = { version = "0.0.34", path = "../hdk_derive" }
-holo_hash = { version = "0.0.26", path = "../holo_hash", features = ["full"] }
-holochain_sqlite = { version = "0.0.39", path = "../holochain_sqlite" }
-holochain_p2p = { version = "0.0.39", path = "../holochain_p2p" }
+hdk = { version = "0.0.135-dev.0", path = "../hdk" }
+hdk_derive = { version = "0.0.35-dev.0", path = "../hdk_derive" }
+holo_hash = { version = "0.0.27-dev.0", path = "../holo_hash", features = ["full"] }
+holochain_sqlite = { version = "0.0.40-dev.0", path = "../holochain_sqlite" }
+holochain_p2p = { version = "0.0.40-dev.0", path = "../holochain_p2p" }
 holochain_serialized_bytes = "=0.0.51"
-holochain_state = { version = "0.0.41", path = "../holochain_state" }
-holochain_types = { version = "0.0.39", path = "../holochain_types" }
-holochain_zome_types = { version = "0.0.34", path = "../holochain_zome_types" }
+holochain_state = { version = "0.0.42-dev.0", path = "../holochain_state" }
+holochain_types = { version = "0.0.40-dev.0", path = "../holochain_types" }
+holochain_zome_types = { version = "0.0.35-dev.0", path = "../holochain_zome_types" }
 observability = "0.1.3"
-kitsune_p2p = { version = "0.0.34", path = "../kitsune_p2p/kitsune_p2p" }
+kitsune_p2p = { version = "0.0.35-dev.0", path = "../kitsune_p2p/kitsune_p2p" }
 serde = { version = "1.0", features = [ "derive" ] }
 serde_derive = "1.0"
 tokio = { version = "1.11", features = [ "full" ] }
