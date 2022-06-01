@@ -1912,4 +1912,108 @@ pub mod tests {
 
         Ok(())
     }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn source_chain_query() {
+        let test_db = test_authored_db();
+        let dht_db = test_dht_db();
+        let dht_db_cache = DhtDbQueryCache::new(dht_db.to_db().into());
+        let keystore = test_keystore();
+        let vault = test_db.to_db();
+        let alice = keystore.new_sign_keypair_random().await.unwrap();
+        let bob = keystore.new_sign_keypair_random().await.unwrap();
+        let dna_hash = fixt!(DnaHash);
+
+        genesis(
+            vault.clone().into(),
+            dht_db.to_db(),
+            &dht_db_cache,
+            keystore.clone(),
+            dna_hash.clone(),
+            alice.clone(),
+            None,
+        )
+        .await
+        .unwrap();
+
+        genesis(
+            vault.clone().into(),
+            dht_db.to_db(),
+            &dht_db_cache,
+            keystore.clone(),
+            dna_hash.clone(),
+            bob.clone(),
+            None,
+        )
+        .await
+        .unwrap();
+
+        let chain = SourceChain::new(vault, dht_db.to_db(), dht_db_cache, keystore, alice)
+            .await
+            .unwrap();
+
+        let elements = chain.query(ChainQueryFilter::default()).await.unwrap();
+
+        // All of the range queries which should return a full set of elements
+        let full_ranges = [
+            ChainQueryFilterRange::Unbounded,
+            ChainQueryFilterRange::HeaderSeqRange(0, 2),
+            ChainQueryFilterRange::HeaderHashRange(
+                elements[0].header_address().clone(),
+                elements[2].header_address().clone(),
+            ),
+            ChainQueryFilterRange::HeaderHashTerminated(elements[2].header_address().clone(), 2),
+        ];
+
+        // A variety of combinations of query parameters
+        let cases = [
+            ((None, None, vec![]), 3),
+            ((Some(HeaderType::Dna), None, vec![]), 1),
+            ((None, Some(EntryType::AgentPubKey), vec![]), 1),
+            ((Some(HeaderType::Create), None, vec![]), 1),
+            (
+                (
+                    Some(HeaderType::Create),
+                    Some(EntryType::AgentPubKey),
+                    vec![],
+                ),
+                1,
+            ),
+            (
+                (
+                    Some(HeaderType::Create),
+                    Some(EntryType::AgentPubKey),
+                    vec![elements[2].header().entry_hash().unwrap().clone()],
+                ),
+                1,
+            ),
+        ];
+
+        // Test all permutations of cases defined with all full range queries,
+        // and both boolean values of `include_entries`.
+        for ((header_type, entry_type, entry_hashes), num_expected) in cases {
+            let entry_hashes = if entry_hashes.is_empty() {
+                None
+            } else {
+                Some(entry_hashes.into_iter().collect())
+            };
+            for sequence_range in full_ranges.clone() {
+                for include_entries in [true, false] {
+                    let query = ChainQueryFilter {
+                        sequence_range: sequence_range.clone(),
+                        header_type: header_type.clone(),
+                        entry_type: entry_type.clone(),
+                        entry_hashes: entry_hashes.clone(),
+                        include_entries,
+                    };
+                    let actual = chain.query(query.clone()).await.unwrap().len();
+                    assert_eq!(
+                        actual, num_expected,
+                        "Expected {} items but got {} with filter {:?}",
+                        num_expected, actual, query
+                    );
+                }
+            }
+        }
+    }
 }

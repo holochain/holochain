@@ -61,7 +61,8 @@ impl Default for ChainQueryFilterRange {
 #[derive(
     serde::Serialize, serde::Deserialize, SerializedBytes, Default, PartialEq, Clone, Debug,
 )]
-#[non_exhaustive]
+// TODO: get feedback on whether it's OK to remove non_exhaustive
+// #[non_exhaustive]
 pub struct ChainQueryFilter {
     /// Limit the results to a range of elements according to their headers.
     pub sequence_range: ChainQueryFilterRange,
