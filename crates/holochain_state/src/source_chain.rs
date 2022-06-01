@@ -699,7 +699,8 @@ where
                 WHERE
                 Header.author = :author
                 AND
-                (:range_start IS NULL AND :range_end IS NULL AND :range_start_hash IS NULL AND :range_end_hash IS NULL AND :range_prior_count IS NULL)
+                (
+                    (:range_start IS NULL AND :range_end IS NULL AND :range_start_hash IS NULL AND :range_end_hash IS NULL AND :range_prior_count IS NULL)
                 ",
                     );
                     sql.push_str(match query.sequence_range {
@@ -723,6 +724,7 @@ where
                     });
                     sql.push_str(
                         "
+                )
                 AND
                 (:entry_type IS NULL OR Header.entry_type = :entry_type)
                 AND
@@ -1948,21 +1950,24 @@ pub mod tests {
         .await
         .unwrap();
 
+        test_db.dump_tmp();
+
         let chain = SourceChain::new(vault, dht_db.to_db(), dht_db_cache, keystore, alice)
             .await
             .unwrap();
 
         let elements = chain.query(ChainQueryFilter::default()).await.unwrap();
+        dbg!(&elements);
 
         // All of the range queries which should return a full set of elements
         let full_ranges = [
             ChainQueryFilterRange::Unbounded,
             ChainQueryFilterRange::HeaderSeqRange(0, 2),
-            ChainQueryFilterRange::HeaderHashRange(
-                elements[0].header_address().clone(),
-                elements[2].header_address().clone(),
-            ),
-            ChainQueryFilterRange::HeaderHashTerminated(elements[2].header_address().clone(), 2),
+            // ChainQueryFilterRange::HeaderHashRange(
+            //     elements[0].header_address().clone(),
+            //     elements[2].header_address().clone(),
+            // ),
+            // ChainQueryFilterRange::HeaderHashTerminated(elements[2].header_address().clone(), 2),
         ];
 
         // A variety of combinations of query parameters
