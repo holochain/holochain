@@ -633,7 +633,8 @@ jobs:
   all-jobs-succeed:
     if: ${{ always() && github.event_name != 'pull_request' }}
     runs-on: "ubuntu-latest"
-    needs: [vars, prepare, test, finalize]
+    # needs: [vars, prepare, test, finalize]
+    needs: [vars, prepare]
     steps:
       - name: Check status
         id: check-status
