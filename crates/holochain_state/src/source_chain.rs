@@ -662,6 +662,14 @@ where
     /// used by the `query` host function, which crosses the wasm boundary
     // FIXME: This query needs to be tested.
     pub async fn query(&self, query: QueryFilter) -> SourceChainResult<Vec<Element>> {
+        if query.sequence_range != ChainQueryFilterRange::Unbounded
+            && (query.header_type.is_some()
+                || query.entry_type.is_some()
+                || query.entry_hashes.is_some()
+                || query.include_entries)
+        {
+            return Err(SourceChainError::UnsupportedQuery(query));
+        }
         let author = self.author.clone();
         let public_only = self.public_only;
         let mut elements = self
@@ -710,16 +718,16 @@ where
                         ChainQueryFilterRange::HeaderHashRange(_, _) => "
                         OR (
                             Header.seq BETWEEN
-                            (SELECT Header.seq WHERE Header.hash = :range_start_hash)
+                            (SELECT Header.seq from Header WHERE Header.hash = :range_start_hash)
                             AND
-                            (SELECT Header.seq WHERE Header.hash = :range_end_hash)
+                            (SELECT Header.seq from Header WHERE Header.hash = :range_end_hash)
                         )",
                         ChainQueryFilterRange::HeaderHashTerminated(_, _) => "
                         OR (
                             Header.seq BETWEEN
-                            (SELECT Header.seq WHERE Header.hash = :range_end_hash) - :range_prior_count
+                            (SELECT Header.seq from Header WHERE Header.hash = :range_end_hash) - :range_prior_count
                             AND
-                            (SELECT Header.seq WHERE Header.hash = :range_end_hash)
+                            (SELECT Header.seq from Header WHERE Header.hash = :range_end_hash)
                         )",
                     });
                     sql.push_str(
@@ -1952,35 +1960,38 @@ pub mod tests {
 
         test_db.dump_tmp();
 
-        let chain = SourceChain::new(vault, dht_db.to_db(), dht_db_cache, keystore, alice)
+        let chain = SourceChain::new(vault, dht_db.to_db(), dht_db_cache, keystore, alice.clone())
             .await
             .unwrap();
 
         let elements = chain.query(ChainQueryFilter::default()).await.unwrap();
-        dbg!(&elements);
 
         // All of the range queries which should return a full set of elements
         let full_ranges = [
             ChainQueryFilterRange::Unbounded,
             ChainQueryFilterRange::HeaderSeqRange(0, 2),
-            // ChainQueryFilterRange::HeaderHashRange(
-            //     elements[0].header_address().clone(),
-            //     elements[2].header_address().clone(),
-            // ),
-            // ChainQueryFilterRange::HeaderHashTerminated(elements[2].header_address().clone(), 2),
+            ChainQueryFilterRange::HeaderHashRange(
+                elements[0].header_address().clone(),
+                elements[2].header_address().clone(),
+            ),
+            ChainQueryFilterRange::HeaderHashTerminated(elements[2].header_address().clone(), 2),
         ];
 
         // A variety of combinations of query parameters
         let cases = [
-            ((None, None, vec![]), 3),
-            ((Some(HeaderType::Dna), None, vec![]), 1),
-            ((None, Some(EntryType::AgentPubKey), vec![]), 1),
-            ((Some(HeaderType::Create), None, vec![]), 1),
+            ((None, None, vec![], false), 3),
+            ((None, None, vec![], true), 3),
+            ((Some(HeaderType::Dna), None, vec![], false), 1),
+            ((None, Some(EntryType::AgentPubKey), vec![], false), 1),
+            ((None, Some(EntryType::AgentPubKey), vec![], true), 1),
+            ((Some(HeaderType::Create), None, vec![], false), 1),
+            ((Some(HeaderType::Create), None, vec![], true), 1),
             (
                 (
                     Some(HeaderType::Create),
                     Some(EntryType::AgentPubKey),
                     vec![],
+                    false,
                 ),
                 1,
             ),
@@ -1989,6 +2000,7 @@ pub mod tests {
                     Some(HeaderType::Create),
                     Some(EntryType::AgentPubKey),
                     vec![elements[2].header().entry_hash().unwrap().clone()],
+                    true,
                 ),
                 1,
             ),
@@ -1996,24 +2008,36 @@ pub mod tests {
 
         // Test all permutations of cases defined with all full range queries,
         // and both boolean values of `include_entries`.
-        for ((header_type, entry_type, entry_hashes), num_expected) in cases {
+        for ((header_type, entry_type, entry_hashes, include_entries), num_expected) in cases {
             let entry_hashes = if entry_hashes.is_empty() {
                 None
             } else {
                 Some(entry_hashes.into_iter().collect())
             };
             for sequence_range in full_ranges.clone() {
-                for include_entries in [true, false] {
-                    let query = ChainQueryFilter {
-                        sequence_range: sequence_range.clone(),
-                        header_type: header_type.clone(),
-                        entry_type: entry_type.clone(),
-                        entry_hashes: entry_hashes.clone(),
-                        include_entries,
-                    };
-                    let actual = chain.query(query.clone()).await.unwrap().len();
+                let query = ChainQueryFilter {
+                    sequence_range: sequence_range.clone(),
+                    header_type: header_type.clone(),
+                    entry_type: entry_type.clone(),
+                    entry_hashes: entry_hashes.clone(),
+                    include_entries,
+                };
+                if sequence_range != ChainQueryFilterRange::Unbounded
+                    && (header_type.is_some()
+                        || entry_type.is_some()
+                        || entry_hashes.is_some()
+                        || include_entries)
+                {
+                    assert!(matches!(
+                        chain.query(query.clone()).await,
+                        Err(SourceChainError::UnsupportedQuery(_))
+                    ));
+                } else {
+                    let queried = chain.query(query.clone()).await.unwrap();
+                    let actual = queried.len();
+                    assert!(queried.iter().all(|e| e.header().author() == &alice));
                     assert_eq!(
-                        actual, num_expected,
+                        num_expected, actual,
                         "Expected {} items but got {} with filter {:?}",
                         num_expected, actual, query
                     );

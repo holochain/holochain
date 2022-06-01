@@ -225,6 +225,7 @@ impl ChainQueryFilter {
                     .collect::<HashMap<HeaderHash, HeaderHashed>>();
                 let mut filtered_headers = Vec::new();
                 let mut maybe_next_header = header_hashmap.remove(end);
+
                 while let Some(next_header) = maybe_next_header {
                     maybe_next_header = next_header
                         .as_content()
