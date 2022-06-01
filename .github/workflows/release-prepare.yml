@@ -266,6 +266,12 @@ jobs:
           echo "::set-output name=version_compat::${VERSION_COMPAT}"
           echo "::set-output name=release_branch::${RELEASE_BRANCH}"
 
+      - name: Generate READMEs
+        run: ./scripts/generate_readmes.sh
+
+      - name: Debug term
+        uses: mxschmitt/action-tmate@v3
+
       - name: Merge release branch to main
         run: |
           source "${HOLOCHAIN_RELEASE_SH}"
