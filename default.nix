@@ -47,6 +47,21 @@ let
       '';
 
       crate2nix = import sources.crate2nix.outPath { };
+
+      cargo-nextest = self.rustPlatform.buildRustPackage {
+        name = "cargo-nextest";
+
+        src = sources.nextest.outPath;
+        cargoSha256 = "sha256-8zJxGSlGp65BwLGEm5lb38CJZd1thAAKIKBQXMUaKRA=";
+
+        cargoTestFlags = [
+          # TODO: investigate some more why these tests fail in nix
+          "--"
+          "--skip=tests_integration::test_relocated_run"
+          "--skip=tests_integration::test_run"
+          "--skip=tests_integration::test_run_after_build"
+        ];
+      };
     })
 
   ];
