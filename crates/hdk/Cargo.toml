@@ -2,8 +2,7 @@
 name = "hdk"
 version = "0.0.135"
 description = "The Holochain HDK"
-license = "LICENSE_CAL-1.0"
-license-file = "LICENSE_CAL-1.0"
+license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain/tree/develop/crates/hdk"
 documentation = "https://docs.rs/hdk"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
