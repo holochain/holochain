@@ -267,7 +267,7 @@ jobs:
           echo "::set-output name=release_branch::${RELEASE_BRANCH}"
 
       - name: Generate crate READMEs from Rust doc comments
-        run: nix-shell --pure --run ./scripts/generate_readmes.sh
+        run: nix-shell --pure --argstr flavor release --run "./scripts/generate_readmes.sh"
 
       - name: Debug term
         uses: mxschmitt/action-tmate@v3
