@@ -430,7 +430,7 @@ async fn commit_invalid(
 
     // Produce and publish these commits
     let triggers = handle.get_cell_triggers(&bob_cell_id).unwrap();
-    triggers.publish_dht_ops.trigger();
+    triggers.publish_dht_ops.trigger(&"commit_invalid");
     (invalid_header_hash, entry_hash)
 }
 
@@ -457,7 +457,7 @@ async fn commit_invalid_post(
 
     // Produce and publish these commits
     let triggers = handle.get_cell_triggers(&bob_cell_id).unwrap();
-    triggers.publish_dht_ops.trigger();
+    triggers.publish_dht_ops.trigger(&"commit_invalid_post");
     (invalid_header_hash, entry_hash)
 }
 
@@ -473,6 +473,6 @@ async fn call_zome_directly(
 
     // Produce and publish these commits
     let triggers = handle.get_cell_triggers(&bob_cell_id).unwrap();
-    triggers.publish_dht_ops.trigger();
+    triggers.publish_dht_ops.trigger(&"call_zome_directly");
     output
 }

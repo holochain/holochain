@@ -6,11 +6,35 @@ default_unreleasable: true
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased](https://github.com/holochain/holochain/compare/hdk-v0.0.100...HEAD)
+## Unreleased
 
-- hdk: Adds external hash type for data that has a DHT location but does not exist on the DHT [#1298](https://github.com/holochain/holochain/pull/1298)
-- hdk: Adds compound hash type for linkable hashes [#1308](https://github.com/holochain/holochain/pull/1308)
-- hdk: Missing dependencies are fetched async for validation [#1268](https://github.com/holochain/holochain/pull/1268)
+## 0.0.135
+
+## 0.0.134
+
+## 0.0.133
+
+## 0.0.132
+
+- hdk: Provide `Into<AnyLinkableHash>` impl for `EntryHash` and `HeaderHash`. This allows `create_link` and `get_links` to be used directly with EntryHash and HeaderHash arguments, rather than needing to construct an `AnyLinkableHash` explicitly.
+
+## 0.0.131
+
+- Docs: Fix intra-doc links in all crates [\#1323](https://github.com/holochain/holochain/pull/1323)
+
+## 0.0.130
+
+## 0.0.129
+
+## 0.0.128
+
+*NOTE: this release has not been published to crates.io*
+
+- hdk: Adds external hash type for data that has a DHT location but does not exist on the DHT [\#1298](https://github.com/holochain/holochain/pull/1298)
+- hdk: Adds compound hash type for linkable hashes [\#1308](https://github.com/holochain/holochain/pull/1308)
+- hdk: Missing dependencies are fetched async for validation [\#1268](https://github.com/holochain/holochain/pull/1268)
+
+## 0.0.127
 
 ## 0.0.126
 
@@ -98,14 +122,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - hdk: Now supports deserializing countersigned entries in app entry `try_from`
 
 - hdk: implements multi-call for:
-
+  
   - `remote_call`
   - `call`
   - `get`
   - `get_details`
   - `get_links`
   - `get_link_details`
-
+  
   We strictly only needed `remote_call` for countersigning, but feedback from the community was that having to sequentially loop over these common HDK functions is a pain point, so we enabled all of them to be async over a vector of inputs.
 
 ## 0.0.102

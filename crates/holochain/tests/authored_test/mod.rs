@@ -47,7 +47,7 @@ async fn authored_test() {
 
     // publish these commits
     let triggers = handle.get_cell_triggers(&alice_call_data.cell_id).unwrap();
-    triggers.publish_dht_ops.trigger();
+    triggers.publish_dht_ops.trigger(&"");
 
     // Alice commits the entry
     fresh_reader_test(alice_call_data.authored_db.clone(), |txn| {
@@ -121,7 +121,7 @@ async fn authored_test() {
 
     // Produce and publish these commits
     let triggers = handle.get_cell_triggers(&bob_call_data.cell_id).unwrap();
-    triggers.publish_dht_ops.trigger();
+    triggers.publish_dht_ops.trigger(&"");
 
     fresh_reader_test(bob_call_data.authored_db.clone(), |txn| {
         let basis: AnyDhtHash = entry_hash.clone().into();

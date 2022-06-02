@@ -36,7 +36,6 @@ pub trait HdiT: Send + Sync {
     fn dna_info(&self, dna_info_input: ()) -> ExternResult<DnaInfo>;
     fn zome_info(&self, zome_info_input: ()) -> ExternResult<ZomeInfo>;
     // Trace
-    #[cfg(feature = "trace")]
     fn trace(&self, trace_msg: TraceMsg) -> ExternResult<()>;
     // XSalsa20Poly1305
     fn x_salsa20_poly1305_decrypt(
@@ -83,7 +82,6 @@ impl HdiT for ErrHdi {
         Self::err()
     }
     // Trace
-    #[cfg(feature = "trace")]
     fn trace(&self, _: TraceMsg) -> ExternResult<()> {
         Self::err()
     }
@@ -149,9 +147,14 @@ impl HdiT for HostHdi {
     fn zome_info(&self, _: ()) -> ExternResult<ZomeInfo> {
         host_call::<(), ZomeInfo>(__zome_info, ())
     }
-    #[cfg(feature = "trace")]
     fn trace(&self, trace_msg: TraceMsg) -> ExternResult<()> {
-        host_call::<TraceMsg, ()>(__trace, trace_msg)
+        if cfg!(feature = "trace") {
+            host_call::<TraceMsg, ()>(__trace, trace_msg)
+        } else {
+            Err(WasmError::Guest(
+                "`trace()` can only be used when the \"trace\" cargo feature is set (it is off by default).".to_string(),
+            ))
+        }
     }
     fn x_salsa20_poly1305_decrypt(
         &self,

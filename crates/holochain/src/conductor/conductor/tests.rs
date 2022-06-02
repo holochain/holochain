@@ -36,6 +36,7 @@ async fn can_update_state() {
         tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
     let spaces = Spaces::new(db_dir.path().to_path_buf().into(), Default::default()).unwrap();
     let conductor = Conductor::new(
+        Default::default(),
         dna_store,
         keystore,
         holochain_p2p,
@@ -84,6 +85,7 @@ async fn can_add_clone_cell_to_app() {
     let spaces = Spaces::new(db_dir.path().to_path_buf().into(), Default::default()).unwrap();
 
     let conductor = Conductor::new(
+        Default::default(),
         dna_store,
         keystore,
         holochain_p2p,
@@ -157,6 +159,7 @@ async fn app_ids_are_unique() {
         tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
     let spaces = Spaces::new(db_dir.path().to_path_buf().into(), Default::default()).unwrap();
     let conductor = Conductor::new(
+        Default::default(),
         dna_store,
         test_keystore(),
         holochain_p2p,

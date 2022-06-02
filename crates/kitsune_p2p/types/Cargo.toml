@@ -1,6 +1,6 @@
 [package]
 name = "kitsune_p2p_types"
-version = "0.0.22"
+version = "0.0.24"
 description = "types subcrate for kitsune-p2p"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -11,8 +11,8 @@ categories = [ "network-programming" ]
 edition = "2021"
 
 [dependencies]
-lair_keystore_api_0_0 = { version = "=0.0.9", package = "lair_keystore_api" }
-lair_keystore_api = "=0.1.0"
+lair_keystore_api_0_0 = { version = "=0.0.10", package = "lair_keystore_api" }
+lair_keystore_api = "=0.1.3"
 base64 = "0.13"
 derive_more = "0.99.7"
 futures = "0.3"

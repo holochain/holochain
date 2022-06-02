@@ -38,8 +38,8 @@ fn add_valid_link_inner() -> ExternResult<HeaderHash> {
     create_entry(&EntryZomes::maybe_linkable(MaybeLinkable::AlwaysLinkable))?;
 
     create_link(
-        always_linkable_entry_hash.clone().into(),
-        always_linkable_entry_hash.into(),
+        always_linkable_entry_hash.clone(),
+        always_linkable_entry_hash,
         LinkZomes::any(),
         (),
     )
@@ -64,8 +64,8 @@ fn add_invalid_link_inner() -> ExternResult<HeaderHash> {
     create_entry(&EntryZomes::maybe_linkable(MaybeLinkable::NeverLinkable))?;
 
     create_link(
-        never_linkable_entry_hash.into(),
-        always_linkable_entry_hash.into(),
+        never_linkable_entry_hash,
+        always_linkable_entry_hash,
         LinkZomes::any(),
         (),
     )

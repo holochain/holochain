@@ -1,6 +1,6 @@
 use crate::*;
 
-use anyhow::Context;
+use anyhow::{bail, Context};
 use cargo_test_support::git::{self, Repository};
 use cargo_test_support::{Project, ProjectBuilder};
 use educe::Educe;
@@ -37,6 +37,7 @@ pub(crate) struct MockProject {
     pub(crate) description: Option<String>,
     #[educe(Default(expression = r##"Some("Apache-2.0".to_string())"##))]
     pub(crate) license: Option<String>,
+    pub(crate) keywords: Vec<String>,
 }
 
 pub(crate) struct WorkspaceMocker {
@@ -125,6 +126,13 @@ impl WorkspaceMocker {
                         },
                     );
 
+                    let keywords = project
+                        .keywords
+                        .iter()
+                        .map(|keyword| format!(r#""{}""#, keyword))
+                        .collect::<Vec<_>>()
+                        .join(",");
+
                     let project_builder = project_builder
                         .file(
                             format!("crates/{}/Cargo.toml", &name),
@@ -138,6 +146,7 @@ impl WorkspaceMocker {
                                 {license}
                                 homepage = "https://github.com/holochain/holochain"
                                 documentation = "https://github.com/holochain/holochain"
+                                keywords = [{keywords}]
 
                                 [dependencies]
                                 {dependencies}
@@ -159,6 +168,7 @@ impl WorkspaceMocker {
                                     .unwrap_or_default(),
                                 dependencies = dependencies,
                                 dev_dependencies = dev_dependencies,
+                                keywords = keywords,
                             ),
                         )
                         .file(
@@ -667,7 +677,9 @@ pub(crate) fn example_workspace_4<'a>() -> Fallible<WorkspaceMocker> {
             name: "wildcard_dependency".to_string(),
             version: "0.0.1".to_string(),
             dependencies: vec![],
-            dev_dependencies: vec![r#"criterion = '*'"#.to_string()],
+            dev_dependencies: vec![
+                r#"wildcard_dependency = {path = ".", version = '*'}"#.to_string()
+            ],
             excluded: false,
             ty: workspace_mocker::MockProjectType::Bin,
             changelog: Some(indoc::formatdoc!(
@@ -703,6 +715,55 @@ pub(crate) fn example_workspace_4<'a>() -> Fallible<WorkspaceMocker> {
                 "#
             )),
             license: None,
+            ..Default::default()
+        },
+        MockProject {
+            name: "keyword_invalid_char".to_string(),
+            version: "0.0.1".to_string(),
+            dependencies: vec![],
+            excluded: false,
+            ty: workspace_mocker::MockProjectType::Bin,
+            changelog: Some(indoc::formatdoc!(
+                r#"
+                # Changelog
+                "#
+            )),
+            keywords: vec!["1nvalid".to_string()],
+            ..Default::default()
+        },
+        MockProject {
+            name: "keyword_toolong".to_string(),
+            version: "0.0.1".to_string(),
+            dependencies: vec![],
+            excluded: false,
+            ty: workspace_mocker::MockProjectType::Bin,
+            changelog: Some(indoc::formatdoc!(
+                r#"
+                # Changelog
+                "#
+            )),
+            keywords: vec!["toolongtoolongtoolongtoolongtoolong".to_string()],
+            ..Default::default()
+        },
+        MockProject {
+            name: "keyword_toomany".to_string(),
+            version: "0.0.1".to_string(),
+            dependencies: vec![],
+            excluded: false,
+            ty: workspace_mocker::MockProjectType::Bin,
+            changelog: Some(indoc::formatdoc!(
+                r#"
+                # Changelog
+                "#
+            )),
+            keywords: vec![
+                "one".to_string(),
+                "two".to_string(),
+                "three".to_string(),
+                "four".to_string(),
+                "five".to_string(),
+                "many".to_string(),
+            ],
             ..Default::default()
         },
     ];

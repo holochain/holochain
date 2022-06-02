@@ -48,13 +48,13 @@ use crate::prelude::*;
 /// time, which might rely on agents providing snapshots of links to public keys (i.e. representing
 /// the roughtime ecosystem itself in a happ).
 ///
-/// See https://blog.cloudflare.com/roughtime/
+/// See <https://blog.cloudflare.com/roughtime/>
 ///
 /// @todo
 /// Another option is to use proof of work style constructions to roughly throttle the speed that
 /// things can be done without relying on absolute times, or even that users experience the same
 /// throttling due to differences in CPU/GPU performance on the POW algorithm.
-/// See https://zkga.me/ uses this as a game mechanic
+/// See <https://zkga.me/> uses this as a game mechanic
 ///
 /// @todo
 /// Other p2p type time syncing algorithms that allow peers to adjust their clock offsets to agree

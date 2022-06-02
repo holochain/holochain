@@ -6,6 +6,407 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20220601.012853
+
+## [holochain\_cli-0.0.40](crates/holochain_cli/CHANGELOG.md#0.0.40)
+
+## [holochain\_cli\_sandbox-0.0.36](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.36)
+
+## [holochain\_cli\_bundle-0.0.36](crates/holochain_cli_bundle/CHANGELOG.md#0.0.36)
+
+## [holochain-0.0.142](crates/holochain/CHANGELOG.md#0.0.142)
+
+## [holochain\_websocket-0.0.39](crates/holochain_websocket/CHANGELOG.md#0.0.39)
+
+## [holochain\_test\_wasm\_common-0.0.36](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.36)
+
+## [holochain\_conductor\_api-0.0.42](crates/holochain_conductor_api/CHANGELOG.md#0.0.42)
+
+## [holochain\_wasm\_test\_utils-0.0.41](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.41)
+
+## [holochain\_cascade-0.0.42](crates/holochain_cascade/CHANGELOG.md#0.0.42)
+
+## [holochain\_state-0.0.42](crates/holochain_state/CHANGELOG.md#0.0.42)
+
+## [holochain\_p2p-0.0.40](crates/holochain_p2p/CHANGELOG.md#0.0.40)
+
+## [holochain\_types-0.0.40](crates/holochain_types/CHANGELOG.md#0.0.40)
+
+## [holochain\_keystore-0.0.40](crates/holochain_keystore/CHANGELOG.md#0.0.40)
+
+## [holochain\_sqlite-0.0.40](crates/holochain_sqlite/CHANGELOG.md#0.0.40)
+
+## [kitsune\_p2p-0.0.35](crates/kitsune_p2p/CHANGELOG.md#0.0.35)
+
+## [hdk-0.0.135](crates/hdk/CHANGELOG.md#0.0.135)
+
+## [holochain\_zome\_types-0.0.35](crates/holochain_zome_types/CHANGELOG.md#0.0.35)
+
+## [holochain\_deterministic\_integrity-0.0.8](crates/holochain_deterministic_integrity/CHANGELOG.md#0.0.8)
+
+## [hdk\_derive-0.0.35](crates/hdk_derive/CHANGELOG.md#0.0.35)
+
+## [holochain\_integrity\_types-0.0.7](crates/holochain_integrity_types/CHANGELOG.md#0.0.7)
+
+## [holo\_hash-0.0.27](crates/holo_hash/CHANGELOG.md#0.0.27)
+
+# 20220525.012131
+
+## [holochain\_cli-0.0.39](crates/holochain_cli/CHANGELOG.md#0.0.39)
+
+## [holochain\_cli\_sandbox-0.0.35](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.35)
+
+## [holochain\_cli\_bundle-0.0.35](crates/holochain_cli_bundle/CHANGELOG.md#0.0.35)
+
+## [holochain-0.0.141](crates/holochain/CHANGELOG.md#0.0.141)
+
+## [holochain\_test\_wasm\_common-0.0.35](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.35)
+
+## [holochain\_conductor\_api-0.0.41](crates/holochain_conductor_api/CHANGELOG.md#0.0.41)
+
+- Docs: Unify and clean up docs for admin and app interface and conductor config. [\#1391](https://github.com/holochain/holochain/pull/1391)
+
+## [holochain\_wasm\_test\_utils-0.0.40](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.40)
+
+## [holochain\_cascade-0.0.41](crates/holochain_cascade/CHANGELOG.md#0.0.41)
+
+## [holochain\_state-0.0.41](crates/holochain_state/CHANGELOG.md#0.0.41)
+
+## [holochain\_p2p-0.0.39](crates/holochain_p2p/CHANGELOG.md#0.0.39)
+
+## [holochain\_types-0.0.39](crates/holochain_types/CHANGELOG.md#0.0.39)
+
+## [holochain\_keystore-0.0.39](crates/holochain_keystore/CHANGELOG.md#0.0.39)
+
+## [holochain\_sqlite-0.0.39](crates/holochain_sqlite/CHANGELOG.md#0.0.39)
+
+## [kitsune\_p2p-0.0.34](crates/kitsune_p2p/CHANGELOG.md#0.0.34)
+
+## [mr\_bundle-0.0.12](crates/mr_bundle/CHANGELOG.md#0.0.12)
+
+## [hdk-0.0.134](crates/hdk/CHANGELOG.md#0.0.134)
+
+## [holochain\_zome\_types-0.0.34](crates/holochain_zome_types/CHANGELOG.md#0.0.34)
+
+## [holochain\_deterministic\_integrity-0.0.7](crates/holochain_deterministic_integrity/CHANGELOG.md#0.0.7)
+
+- Fix broken wasm tracing. [PR](https://github.com/holochain/holochain/pull/1389).
+
+## [hdk\_derive-0.0.34](crates/hdk_derive/CHANGELOG.md#0.0.34)
+
+## [holochain\_integrity\_types-0.0.6](crates/holochain_integrity_types/CHANGELOG.md#0.0.6)
+
+## [holo\_hash-0.0.26](crates/holo_hash/CHANGELOG.md#0.0.26)
+
+# 20220518.010753
+
+## [holochain\_cli-0.0.38](crates/holochain_cli/CHANGELOG.md#0.0.38)
+
+## [holochain\_cli\_sandbox-0.0.34](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.34)
+
+## [holochain\_cli\_bundle-0.0.34](crates/holochain_cli_bundle/CHANGELOG.md#0.0.34)
+
+## [holochain-0.0.140](crates/holochain/CHANGELOG.md#0.0.140)
+
+## [holochain\_websocket-0.0.38](crates/holochain_websocket/CHANGELOG.md#0.0.38)
+
+## [holochain\_test\_wasm\_common-0.0.34](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.34)
+
+## [holochain\_conductor\_api-0.0.40](crates/holochain_conductor_api/CHANGELOG.md#0.0.40)
+
+## [holochain\_wasm\_test\_utils-0.0.39](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.39)
+
+## [holochain\_cascade-0.0.40](crates/holochain_cascade/CHANGELOG.md#0.0.40)
+
+## [holochain\_state-0.0.40](crates/holochain_state/CHANGELOG.md#0.0.40)
+
+## [holochain\_p2p-0.0.38](crates/holochain_p2p/CHANGELOG.md#0.0.38)
+
+## [holochain\_types-0.0.38](crates/holochain_types/CHANGELOG.md#0.0.38)
+
+## [holochain\_keystore-0.0.38](crates/holochain_keystore/CHANGELOG.md#0.0.38)
+
+## [holochain\_sqlite-0.0.38](crates/holochain_sqlite/CHANGELOG.md#0.0.38)
+
+## [kitsune\_p2p-0.0.33](crates/kitsune_p2p/CHANGELOG.md#0.0.33)
+
+## [hdk-0.0.133](crates/hdk/CHANGELOG.md#0.0.133)
+
+## [holochain\_deterministic\_integrity-0.0.6](crates/holochain_deterministic_integrity/CHANGELOG.md#0.0.6)
+
+# 20220511.012519
+
+## [holochain\_cli-0.0.37](crates/holochain_cli/CHANGELOG.md#0.0.37)
+
+## [holochain\_cli\_sandbox-0.0.33](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.33)
+
+## [holochain\_cli\_bundle-0.0.33](crates/holochain_cli_bundle/CHANGELOG.md#0.0.33)
+
+## [holochain-0.0.139](crates/holochain/CHANGELOG.md#0.0.139)
+
+- Udpate lair to 0.1.3 - largely just documentation updates, but also re-introduces some dependency pinning to fix mismatch client/server version check [\#1377](https://github.com/holochain/holochain/pull/1377)
+
+## [holochain\_websocket-0.0.37](crates/holochain_websocket/CHANGELOG.md#0.0.37)
+
+## [holochain\_test\_wasm\_common-0.0.33](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.33)
+
+## [holochain\_conductor\_api-0.0.39](crates/holochain_conductor_api/CHANGELOG.md#0.0.39)
+
+## [holochain\_cascade-0.0.39](crates/holochain_cascade/CHANGELOG.md#0.0.39)
+
+## [holochain\_state-0.0.39](crates/holochain_state/CHANGELOG.md#0.0.39)
+
+## [holochain\_wasm\_test\_utils-0.0.38](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.38)
+
+## [holochain\_p2p-0.0.37](crates/holochain_p2p/CHANGELOG.md#0.0.37)
+
+## [kitsune\_p2p\_bootstrap-0.0.11](crates/kitsune_p2p_bootstrap/CHANGELOG.md#0.0.11)
+
+## [holochain\_types-0.0.37](crates/holochain_types/CHANGELOG.md#0.0.37)
+
+## [holochain\_keystore-0.0.37](crates/holochain_keystore/CHANGELOG.md#0.0.37)
+
+## [holochain\_sqlite-0.0.37](crates/holochain_sqlite/CHANGELOG.md#0.0.37)
+
+## [kitsune\_p2p-0.0.32](crates/kitsune_p2p/CHANGELOG.md#0.0.32)
+
+## [kitsune\_p2p\_proxy-0.0.24](crates/kitsune_p2p_proxy/CHANGELOG.md#0.0.24)
+
+## [kitsune\_p2p\_transport\_quic-0.0.24](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.0.24)
+
+## [kitsune\_p2p\_types-0.0.24](crates/kitsune_p2p_types/CHANGELOG.md#0.0.24)
+
+## [hdk-0.0.132](crates/hdk/CHANGELOG.md#0.0.132)
+
+- hdk: Provide `Into<AnyLinkableHash>` impl for `EntryHash` and `HeaderHash`. This allows `create_link` and `get_links` to be used directly with EntryHash and HeaderHash arguments, rather than needing to construct an `AnyLinkableHash` explicitly.
+
+## [holochain\_zome\_types-0.0.33](crates/holochain_zome_types/CHANGELOG.md#0.0.33)
+
+## [holochain\_deterministic\_integrity-0.0.5](crates/holochain_deterministic_integrity/CHANGELOG.md#0.0.5)
+
+## [hdk\_derive-0.0.33](crates/hdk_derive/CHANGELOG.md#0.0.33)
+
+## [holochain\_integrity\_types-0.0.5](crates/holochain_integrity_types/CHANGELOG.md#0.0.5)
+
+## [holo\_hash-0.0.25](crates/holo_hash/CHANGELOG.md#0.0.25)
+
+- Add `Into<AnyLinkableHash>` impl for `EntryHashB64` and `HeaderHashB64`
+- Add some helpful methods for converting from a “composite” hash type (`AnyDhtHash` or `AnyLinkableHash`) into their respective primitive types:
+  - `AnyDhtHash::into_primitive()`, returns an enum
+  - `AnyDhtHash::into_entry_hash()`, returns `Option<EntryHash>`
+  - `AnyDhtHash::into_header_hash()`, returns `Option<HeaderHash>`
+  - `AnyLinkableHash::into_primitive()`, returns an enum
+  - `AnyLinkableHash::into_entry_hash()`, returns `Option<EntryHash>`
+  - `AnyLinkableHash::into_header_hash()`, returns `Option<HeaderHash>`
+  - `AnyLinkableHash::into_external_hash()`, returns `Option<ExternalHash>`
+
+# 20220505.103150
+
+## [holochain\_cli-0.0.36](crates/holochain_cli/CHANGELOG.md#0.0.36)
+
+## [holochain\_cli\_sandbox-0.0.32](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.32)
+
+## [holochain-0.0.138](crates/holochain/CHANGELOG.md#0.0.138)
+
+## [holochain\_conductor\_api-0.0.38](crates/holochain_conductor_api/CHANGELOG.md#0.0.38)
+
+## [holochain\_cascade-0.0.38](crates/holochain_cascade/CHANGELOG.md#0.0.38)
+
+## [holochain\_state-0.0.38](crates/holochain_state/CHANGELOG.md#0.0.38)
+
+## [holochain\_wasm\_test\_utils-0.0.37](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.37)
+
+# 20220429.205522
+
+- Docs: Fix intra-doc links in all crates [\#1323](https://github.com/holochain/holochain/pull/1323)
+
+## [holochain\_cli-0.0.35](crates/holochain_cli/CHANGELOG.md#0.0.35)
+
+## [holochain\_cli\_sandbox-0.0.31](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.31)
+
+## [holochain\_cli\_bundle-0.0.32](crates/holochain_cli_bundle/CHANGELOG.md#0.0.32)
+
+## [holochain-0.0.137](crates/holochain/CHANGELOG.md#0.0.137)
+
+- Docs: Fix intra-doc links in all crates [\#1323](https://github.com/holochain/holochain/pull/1323)
+- Update legacy lair to 0.0.10 - allowing “panicky” flag [\#1349](https://github.com/holochain/holochain/pull/1349)
+- Udpate lair to 0.1.1 - allowing usage in path with whitespace [\#1349](https://github.com/holochain/holochain/pull/1349)
+
+## [holochain\_websocket-0.0.36](crates/holochain_websocket/CHANGELOG.md#0.0.36)
+
+## [holochain\_test\_wasm\_common-0.0.32](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.32)
+
+## [holochain\_conductor\_api-0.0.37](crates/holochain_conductor_api/CHANGELOG.md#0.0.37)
+
+- Docs: Fix intra-doc links in crates `holochain_conductor_api` and `holochain_state` [\#1323](https://github.com/holochain/holochain/pull/1323)
+
+## [holochain\_cascade-0.0.37](crates/holochain_cascade/CHANGELOG.md#0.0.37)
+
+## [holochain\_state-0.0.37](crates/holochain_state/CHANGELOG.md#0.0.37)
+
+- Docs: Fix intra-doc links in crates `holochain_conductor_api` and `holochain_state` [\#1323](https://github.com/holochain/holochain/pull/1323)
+
+## [holochain\_wasm\_test\_utils-0.0.36](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.36)
+
+## [holochain\_p2p-0.0.36](crates/holochain_p2p/CHANGELOG.md#0.0.36)
+
+## [kitsune\_p2p\_bootstrap-0.0.10](crates/kitsune_p2p_bootstrap/CHANGELOG.md#0.0.10)
+
+## [holochain\_types-0.0.36](crates/holochain_types/CHANGELOG.md#0.0.36)
+
+## [holochain\_keystore-0.0.36](crates/holochain_keystore/CHANGELOG.md#0.0.36)
+
+## [holochain\_sqlite-0.0.36](crates/holochain_sqlite/CHANGELOG.md#0.0.36)
+
+## [kitsune\_p2p-0.0.31](crates/kitsune_p2p/CHANGELOG.md#0.0.31)
+
+## [kitsune\_p2p\_proxy-0.0.23](crates/kitsune_p2p_proxy/CHANGELOG.md#0.0.23)
+
+## [kitsune\_p2p\_transport\_quic-0.0.23](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.0.23)
+
+## [kitsune\_p2p\_types-0.0.23](crates/kitsune_p2p_types/CHANGELOG.md#0.0.23)
+
+## [mr\_bundle-0.0.11](crates/mr_bundle/CHANGELOG.md#0.0.11)
+
+## [holochain\_util-0.0.10](crates/holochain_util/CHANGELOG.md#0.0.10)
+
+## [hdk-0.0.131](crates/hdk/CHANGELOG.md#0.0.131)
+
+- Docs: Fix intra-doc links in all crates [\#1323](https://github.com/holochain/holochain/pull/1323)
+
+## [holochain\_zome\_types-0.0.32](crates/holochain_zome_types/CHANGELOG.md#0.0.32)
+
+- Docs: Fix intra-doc links in all crates [\#1323](https://github.com/holochain/holochain/pull/1323)
+
+## [holochain\_deterministic\_integrity-0.0.4](crates/holochain_deterministic_integrity/CHANGELOG.md#0.0.4)
+
+## [hdk\_derive-0.0.32](crates/hdk_derive/CHANGELOG.md#0.0.32)
+
+## [holochain\_integrity\_types-0.0.4](crates/holochain_integrity_types/CHANGELOG.md#0.0.4)
+
+- Docs: Fix intra-doc links in all crates [\#1323](https://github.com/holochain/holochain/pull/1323)
+
+## [kitsune\_p2p\_timestamp-0.0.9](crates/kitsune_p2p_timestamp/CHANGELOG.md#0.0.9)
+
+## [holo\_hash-0.0.24](crates/holo_hash/CHANGELOG.md#0.0.24)
+
+## [fixt-0.0.11](crates/fixt/CHANGELOG.md#0.0.11)
+
+- Docs: Fix intra-doc links in all crates [\#1323](https://github.com/holochain/holochain/pull/1323)
+
+# 20220421.145237
+
+## [holochain\_cli-0.0.34](crates/holochain_cli/CHANGELOG.md#0.0.34)
+
+## [holochain\_cli\_sandbox-0.0.30](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.30)
+
+## [holochain\_cli\_bundle-0.0.31](crates/holochain_cli_bundle/CHANGELOG.md#0.0.31)
+
+## [holochain-0.0.136](crates/holochain/CHANGELOG.md#0.0.136)
+
+## [holochain\_websocket-0.0.35](crates/holochain_websocket/CHANGELOG.md#0.0.35)
+
+## [holochain\_test\_wasm\_common-0.0.31](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.31)
+
+## [holochain\_conductor\_api-0.0.36](crates/holochain_conductor_api/CHANGELOG.md#0.0.36)
+
+## [holochain\_cascade-0.0.36](crates/holochain_cascade/CHANGELOG.md#0.0.36)
+
+## [holochain\_state-0.0.36](crates/holochain_state/CHANGELOG.md#0.0.36)
+
+## [holochain\_wasm\_test\_utils-0.0.35](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.35)
+
+## [holochain\_p2p-0.0.35](crates/holochain_p2p/CHANGELOG.md#0.0.35)
+
+## [holochain\_types-0.0.35](crates/holochain_types/CHANGELOG.md#0.0.35)
+
+## [holochain\_keystore-0.0.35](crates/holochain_keystore/CHANGELOG.md#0.0.35)
+
+## [holochain\_sqlite-0.0.35](crates/holochain_sqlite/CHANGELOG.md#0.0.35)
+
+## [hdk-0.0.130](crates/hdk/CHANGELOG.md#0.0.130)
+
+## [holochain\_zome\_types-0.0.31](crates/holochain_zome_types/CHANGELOG.md#0.0.31)
+
+## [holochain\_deterministic\_integrity-0.0.3](crates/holochain_deterministic_integrity/CHANGELOG.md#0.0.3)
+
+## [hdk\_derive-0.0.31](crates/hdk_derive/CHANGELOG.md#0.0.31)
+
+## [holochain\_integrity\_types-0.0.3](crates/holochain_integrity_types/CHANGELOG.md#0.0.3)
+
+# 20220414.075333
+
+## [holochain\_cli-0.0.33](crates/holochain_cli/CHANGELOG.md#0.0.33)
+
+## [holochain\_cli\_sandbox-0.0.29](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.29)
+
+## [holochain-0.0.135](crates/holochain/CHANGELOG.md#0.0.135)
+
+## [holochain\_test\_wasm\_common-0.0.30](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.30)
+
+## [holochain\_conductor\_api-0.0.35](crates/holochain_conductor_api/CHANGELOG.md#0.0.35)
+
+## [holochain\_cascade-0.0.35](crates/holochain_cascade/CHANGELOG.md#0.0.35)
+
+## [holochain\_state-0.0.35](crates/holochain_state/CHANGELOG.md#0.0.35)
+
+## [hdk-0.0.129](crates/hdk/CHANGELOG.md#0.0.129)
+
+## [holochain\_deterministic\_integrity-0.0.2](crates/holochain_deterministic_integrity/CHANGELOG.md#0.0.2)
+
+# 20220413.011152
+
+## [holochain\_cli-0.0.32](crates/holochain_cli/CHANGELOG.md#0.0.32)
+
+- Fixed broken links in Rust docs [\#1284](https://github.com/holochain/holochain/pull/1284)
+
+## [holochain\_cli\_sandbox-0.0.28](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.28)
+
+- `hc sandbox` command for installing happs was limited to 16mb websocket message limit and would error if given a large happ bundle. now it won’t.  [\#1322](https://github.com/holochain/holochain/pull/1322)
+- Fixed broken links in Rust docs [\#1284](https://github.com/holochain/holochain/pull/1284)
+
+## [holochain\_cli\_bundle-0.0.30](crates/holochain_cli_bundle/CHANGELOG.md#0.0.30)
+
+## [holochain-0.0.134](crates/holochain/CHANGELOG.md#0.0.134)
+
+## [holochain\_websocket-0.0.34](crates/holochain_websocket/CHANGELOG.md#0.0.34)
+
+## [holochain\_test\_wasm\_common-0.0.29](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.29)
+
+## [holochain\_conductor\_api-0.0.34](crates/holochain_conductor_api/CHANGELOG.md#0.0.34)
+
+## [holochain\_cascade-0.0.34](crates/holochain_cascade/CHANGELOG.md#0.0.34)
+
+## [holochain\_state-0.0.34](crates/holochain_state/CHANGELOG.md#0.0.34)
+
+## [holochain\_wasm\_test\_utils-0.0.34](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.34)
+
+## [holochain\_p2p-0.0.34](crates/holochain_p2p/CHANGELOG.md#0.0.34)
+
+## [kitsune\_p2p\_bootstrap-0.0.9](crates/kitsune_p2p_bootstrap/CHANGELOG.md#0.0.9)
+
+## [holochain\_types-0.0.34](crates/holochain_types/CHANGELOG.md#0.0.34)
+
+## [holochain\_keystore-0.0.34](crates/holochain_keystore/CHANGELOG.md#0.0.34)
+
+## [holochain\_sqlite-0.0.34](crates/holochain_sqlite/CHANGELOG.md#0.0.34)
+
+## [kitsune\_p2p-0.0.30](crates/kitsune_p2p/CHANGELOG.md#0.0.30)
+
+## [hdk-0.0.128](crates/hdk/CHANGELOG.md#0.0.128)
+
+- hdk: Adds external hash type for data that has a DHT location but does not exist on the DHT [\#1298](https://github.com/holochain/holochain/pull/1298)
+- hdk: Adds compound hash type for linkable hashes [\#1308](https://github.com/holochain/holochain/pull/1308)
+- hdk: Missing dependencies are fetched async for validation [\#1268](https://github.com/holochain/holochain/pull/1268)
+
+## [holochain\_zome\_types-0.0.30](crates/holochain_zome_types/CHANGELOG.md#0.0.30)
+
+## [holochain\_deterministic\_integrity-0.0.1](crates/holochain_deterministic_integrity/CHANGELOG.md#0.0.1)
+
+## [hdk\_derive-0.0.30](crates/hdk_derive/CHANGELOG.md#0.0.30)
+
+## [holochain\_integrity\_types-0.0.2](crates/holochain_integrity_types/CHANGELOG.md#0.0.2)
+
 # 20220406.010602
 
 ## [holochain\_cli\_bundle-0.0.29](crates/holochain_cli_bundle/CHANGELOG.md#0.0.29)
@@ -1930,8 +2331,6 @@ This will include the hdk-0.0.100 release.
 - hdk: fixup the autogenerated hdk documentation.
 
 # 20210226.155101
-
-## Global
 
 This release was initiated for publishing the HDK at version *0.0.100-alpha.1*. We are in the process of redefining the release process around this repository so rough edges are still expected at this point.
 

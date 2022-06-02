@@ -1,10 +1,12 @@
+use kitsune_p2p_types::box_fut;
+
 use super::*;
 
 /// A supertrait of KitsuneHost convenient for defining test handlers.
 /// Allows only specifying the methods you care about, and letting all the rest
-/// panic if called
-pub trait KitsuneHostPanicky: KitsuneHost {
-    /// Name to be printed out on unimplemented panic
+/// throw errors if called
+pub trait KitsuneHostDefaultError: KitsuneHost {
+    /// Name to be printed out on unimplemented error
     const NAME: &'static str;
 
     /// We need to get previously stored agent info.
@@ -12,10 +14,12 @@ pub trait KitsuneHostPanicky: KitsuneHost {
         &self,
         _input: GetAgentInfoSignedEvt,
     ) -> KitsuneHostResult<Option<crate::types::agent_store::AgentInfoSigned>> {
-        unimplemented!(
-            "default panic for unimplemented KitsuneHost test behavior: {}",
+        box_fut(Err(format!(
+            "error for unimplemented KitsuneHost test behavior: method {} of {}",
+            "get_agent_info_signed",
             Self::NAME
         )
+        .into()))
     }
 
     /// Extrapolated Peer Coverage
@@ -24,10 +28,12 @@ pub trait KitsuneHostPanicky: KitsuneHost {
         _space: Arc<KitsuneSpace>,
         _dht_arc_set: DhtArcSet,
     ) -> KitsuneHostResult<Vec<f64>> {
-        unimplemented!(
-            "default panic for unimplemented KitsuneHost test behavior: {}",
+        box_fut(Err(format!(
+            "error for unimplemented KitsuneHost test behavior: method {} of {}",
+            "peer_extrapolated_coverage",
             Self::NAME
         )
+        .into()))
     }
 
     /// Record a set of metric records
@@ -36,19 +42,21 @@ pub trait KitsuneHostPanicky: KitsuneHost {
         _space: Arc<KitsuneSpace>,
         _records: Vec<MetricRecord>,
     ) -> KitsuneHostResult<()> {
-        unimplemented!(
-            "default panic for unimplemented KitsuneHost test behavior: {}",
+        box_fut(Err(format!(
+            "error for unimplemented KitsuneHost test behavior: method {} of {}",
+            "record_metrics",
             Self::NAME
         )
+        .into()))
     }
 }
 
-impl<T: KitsuneHostPanicky> KitsuneHost for T {
+impl<T: KitsuneHostDefaultError> KitsuneHost for T {
     fn get_agent_info_signed(
         &self,
         input: GetAgentInfoSignedEvt,
     ) -> KitsuneHostResult<Option<crate::types::agent_store::AgentInfoSigned>> {
-        KitsuneHostPanicky::get_agent_info_signed(self, input)
+        KitsuneHostDefaultError::get_agent_info_signed(self, input)
     }
 
     fn peer_extrapolated_coverage(
@@ -56,7 +64,7 @@ impl<T: KitsuneHostPanicky> KitsuneHost for T {
         space: Arc<KitsuneSpace>,
         dht_arc_set: DhtArcSet,
     ) -> KitsuneHostResult<Vec<f64>> {
-        KitsuneHostPanicky::peer_extrapolated_coverage(self, space, dht_arc_set)
+        KitsuneHostDefaultError::peer_extrapolated_coverage(self, space, dht_arc_set)
     }
 
     fn record_metrics(
@@ -64,6 +72,6 @@ impl<T: KitsuneHostPanicky> KitsuneHost for T {
         space: Arc<KitsuneSpace>,
         records: Vec<MetricRecord>,
     ) -> KitsuneHostResult<()> {
-        KitsuneHostPanicky::record_metrics(self, space, records)
+        KitsuneHostDefaultError::record_metrics(self, space, records)
     }
 }

@@ -240,7 +240,7 @@ dependencies = [
 
 [[package]]
 name = "fixt"
-version = "0.0.10"
+version = "0.0.11"
 dependencies = [
  "holochain_serialized_bytes",
  "lazy_static",
@@ -410,7 +410,7 @@ checksum = "ab5ef0d4909ef3724cc8cce6ccc8572c5c817592e9285f5464f8e86f8bd3726e"
 
 [[package]]
 name = "hdk"
-version = "0.0.128-dev.0"
+version = "0.0.134"
 dependencies = [
  "hdk_derive",
  "holo_hash",
@@ -428,7 +428,7 @@ dependencies = [
 
 [[package]]
 name = "hdk_derive"
-version = "0.0.29"
+version = "0.0.34"
 dependencies = [
  "darling",
  "expander",
@@ -458,7 +458,7 @@ checksum = "2540771e65fc8cb83cd6e8a237f70c319bd5c29f78ed1084ba5d50eeac86f7f9"
 
 [[package]]
 name = "holo_hash"
-version = "0.0.23"
+version = "0.0.26"
 dependencies = [
  "base64",
  "blake2b_simd",
@@ -476,7 +476,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_deterministic_integrity"
-version = "0.0.1"
+version = "0.0.7"
 dependencies = [
  "hdk_derive",
  "holo_hash",
@@ -485,11 +485,13 @@ dependencies = [
  "paste",
  "serde",
  "serde_bytes",
+ "tracing",
+ "tracing-core",
 ]
 
 [[package]]
 name = "holochain_integrity_types"
-version = "0.0.1"
+version = "0.0.6"
 dependencies = [
  "holo_hash",
  "holochain_serialized_bytes",
@@ -535,7 +537,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_test_wasm_common"
-version = "0.0.28"
+version = "0.0.35"
 dependencies = [
  "hdk",
  "serde",
@@ -568,7 +570,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_zome_types"
-version = "0.0.29"
+version = "0.0.34"
 dependencies = [
  "fixt",
  "holo_hash",
@@ -653,7 +655,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_timestamp"
-version = "0.0.8"
+version = "0.0.9"
 dependencies = [
  "chrono",
  "serde",

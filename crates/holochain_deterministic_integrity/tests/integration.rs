@@ -485,6 +485,10 @@ fn set_zome_types(entries: Vec<Range<u8>>, links: Vec<Range<u8>>) {
         ) -> ExternResult<Option<XSalsa20Poly1305Data>> {
             todo!()
         }
+
+        fn trace(&self, trace_msg: TraceMsg) -> ExternResult<()> {
+            todo!()
+        }
     }
     set_hdi(TestHdi(ScopedZomeTypesSet {
         entries: ScopedZomeTypes(

@@ -185,7 +185,7 @@ pub(crate) fn initialize_connection(
     conn: &mut Connection,
     synchronous_level: DbSyncLevel,
 ) -> rusqlite::Result<()> {
-    // tell SQLite to wait this long during write contention
+    // Tell SQLite to wait this long during write contention.
     conn.busy_timeout(SQLITE_BUSY_TIMEOUT)?;
 
     #[cfg(feature = "db-encryption")]
@@ -229,7 +229,7 @@ fn get_encryption_key_shim() -> [u8; 32] {
     ]
 }
 
-/// Singleton Connection.
+/// Singleton Connection
 #[derive(shrinkwraprs::Shrinkwrap)]
 #[shrinkwrap(mutable, unsafe_ignore_visibility)]
 pub struct PConn {

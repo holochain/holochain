@@ -25,8 +25,8 @@ fn create_channel(name: String) -> ExternResult<EntryHash> {
     create_entry(&EntryTypes::Channel(channel))?;
     debug!("sb in channel {:?}", sb);
     create_link(
-        path.path_entry_hash()?.into(),
-        channel_hash.clone().into(),
+        path.path_entry_hash()?,
+        channel_hash.clone(),
         LinkTypes::Any,
         (),
     )?;
@@ -43,11 +43,6 @@ fn create_message(input: CreateMessageInput) -> ExternResult<EntryHash> {
     let message = ChannelMessage::new(content);
     let message_hash = hash_entry(&message)?;
     create_entry(&EntryTypes::ChannelMessage(message))?;
-    create_link(
-        channel_hash.into(),
-        message_hash.clone().into(),
-        LinkTypes::Any,
-        (),
-    )?;
+    create_link(channel_hash, message_hash.clone(), LinkTypes::Any, ())?;
     Ok(message_hash)
 }

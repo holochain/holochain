@@ -44,7 +44,7 @@ pub enum DnaError {
     ZomeError(#[from] ZomeError),
 
     /// std::io::Error
-    /// we don't #[from] the std::io::Error directly because it doesn't implement Clone
+    /// we don't `#[from]` the std::io::Error directly because it doesn't implement Clone
     #[error("std::io::Error: {0}")]
     StdIoError(String),
 

@@ -108,11 +108,11 @@ pub async fn call_zome_fn<S>(
     .next()
     .unwrap()
     .into();
-    let request = AppRequest::ZomeCallInvocation(Box::new(call));
+    let request = AppRequest::ZomeCall(Box::new(call));
     let response = app_tx.request(request);
     let call_response = check_timeout(response, 6000).await;
     trace!(?call_response);
-    assert_matches!(call_response, AppResponse::ZomeCallInvocation(_));
+    assert_matches!(call_response, AppResponse::ZomeCall(_));
 }
 
 pub async fn attach_app_interface(client: &mut WebsocketSender, port: Option<u16>) -> u16 {

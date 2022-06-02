@@ -141,6 +141,7 @@ jobs:
     secrets:
       CACHIX_SIGNING_KEY: ${{ secrets.CACHIX_AUTH_TOKEN }}
       CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
+      HRA_GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN}}
 
   test:
     if: ${{ github.event_name != 'pull_request' }}
@@ -163,30 +164,27 @@ jobs:
             maxBuildSpace: true
             timeout_minutes: 6
             max_attempts:
-              ubuntu-latest: 10
-              macos-latest: 10
+              ubuntu-latest: 2
+              macos-latest: 2
             run: |
               nix-shell \
-                --keep NUM_JOBS \
-                --keep CARGO_BUILD_JOBS \
+                --keep CARGO_NEXTEST_ARGS \
                 --keep CARGO_TEST_ARGS \
-                --fallback --pure --argstr flavor "coreDev" --run hc-test-standard
+                --fallback --pure --argstr flavor "coreDev" --run hc-test-standard-nextest
 
           - name: cargo-test-slow
             restoresCargoCache: true
             savesCargoCache: true
             ignoreErrorOnNonUbuntu: true
-            timeout_minutes: 30
+            timeout_minutes: 12
             max_attempts:
-              ubuntu-latest: 10
-              macos-latest: 1
+              ubuntu-latest: 2
+              macos-latest: 2
             run: |
               nix-shell \
-              --keep NUM_JOBS \
-              --keep CARGO_BUILD_JOBS \
+              --keep CARGO_NEXTEST_ARGS \
               --keep CARGO_TEST_ARGS \
-              --keep RUST_TEST_THREADS \
-              --fallback --pure --argstr flavor "coreDev" --run hc-test-slow
+              --fallback --pure --argstr flavor "coreDev" --run hc-test-slow-nextest
 
           - name: cargo-test-static
             restoresCargoCache: true
@@ -198,8 +196,6 @@ jobs:
               macos-latest: 1
             run: |
               nix-shell \
-                --keep NUM_JOBS \
-                --keep CARGO_BUILD_JOBS \
                 --keep CARGO_TEST_ARGS \
                 --fallback --pure --argstr flavor "coreDev" --run hc-static-checks
 
@@ -213,8 +209,6 @@ jobs:
               macos-latest: 1
             run: |
               nix-shell \
-                --keep NUM_JOBS \
-                --keep CARGO_BUILD_JOBS \
                 --keep CARGO_TEST_ARGS \
                 --fallback --pure --argstr flavor "coreDev" --run hc-test-wasm
 
@@ -354,9 +348,8 @@ jobs:
       - name: ${{ matrix.testCommand.name }} (build only)
         if: ${{ matrix.testCommand.restoresCargoCache == true }}
         env:
-          # NUM_JOBS: ""
-          # CARGO_BUILD_JOBS: ""
           CARGO_TEST_ARGS: "--no-run"
+          CARGO_NEXTEST_ARGS: "list"
         run: |
           set -e
           source "${HOLOCHAIN_RELEASE_SH}"
@@ -365,12 +358,11 @@ jobs:
           nix-shell --run "cargo fetch --locked"
 
           ${{ matrix.testCommand.run }}
+        continue-on-error: ${{ matrix.platform != 'ubuntu-latest' && matrix.testCommand.ignoreErrorOnNonUbuntu == true }}
 
       - name: ${{ matrix.testCommand.name }} (run)
         uses: nick-fields/retry@v2
         env:
-          # NUM_JOBS: ""
-          # CARGO_BUILD_JOBS: ""
           HOLOCHAIN_NIXPKGS_SOURCE_BRANCH: ${{ needs.vars.outputs.holochain_nixpkgs_source_branch }}
           HOLONIX_SOURCE_BRANCH: ${{ needs.vars.outputs.holonix_source_branch }}
         with:
@@ -485,6 +477,48 @@ jobs:
 
           git push origin main --tags
 
+      - name: Push the release branch
+        run: |
+          source ${HOLOCHAIN_RELEASE_SH}
+          cd "${HOLOCHAIN_REPO}"
+          git checkout ${RELEASE_BRANCH}
+          git push origin ${RELEASE_BRANCH}
+
+      - name: Create a pull-request towards the develop branch
+        id: cpr
+        env:
+          GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN }}
+        run: |
+          set -euE -o pipefail
+
+          source ${HOLOCHAIN_RELEASE_SH}
+          cd "${HOLOCHAIN_REPO}"
+
+          gh pr create \
+            --title "Merge ${RELEASE_BRANCH} back into ${HOLOCHAIN_SOURCE_BRANCH}" \
+            --label release \
+            --label "autoupdate:opt-in" \
+            --base ${HOLOCHAIN_SOURCE_BRANCH} --head "${RELEASE_BRANCH}" \
+            --body 'Please double-check the consistency of the CHANGELOG.md files' 2>&1 | tee gh-pr-create.log
+            # --reviewer "holochain/core-dev" \
+
+          pull_request_number="$(tail -n1 gh-pr-create.log | grep -oE '[0-9]+$')"
+          echo "::set-output name=pull-request-number::${pull_request_number}"
+
+      - name: Enable Pull Request Automerge
+        if: ${{ needs.vars.outputs.dry_run == 'false' }}
+        uses: peter-evans/enable-pull-request-automerge@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN}}
+          pull-request-number: ${{ steps.cpr.outputs.pull-request-number }}
+          merge-method: merge
+      - name: Auto approve Pull Request
+        if: ${{ needs.vars.outputs.dry_run == 'false' }}
+        uses: juliangruber/approve-pull-request-action@v1
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          number: ${{ steps.cpr.outputs.pull-request-number }}
+
       - name: Publish crates
         if: ${{ needs.vars.outputs.dry_run == 'false' }}
         env:
@@ -512,47 +546,6 @@ jobs:
           gh release create "${TAG:?}" \
             --title "holochain ${VERSION:?}" \
             --notes "***Please read [this release's top-level CHANGELOG](https://github.com/holochain/holochain/blob/main/CHANGELOG.md#$(sed -E 's/(release-|\.)//g' <<<"${RELEASE_BRANCH:?}")) to see the full list of crates that were released together.***"
-
-      - name: Push the release branch
-        run: |
-          source ${HOLOCHAIN_RELEASE_SH}
-          cd "${HOLOCHAIN_REPO}"
-          git checkout ${RELEASE_BRANCH}
-          git push origin ${RELEASE_BRANCH}
-
-      - name: Create a pull-request towards the develop branch
-        id: cpr
-        env:
-          GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN }}
-        run: |
-          set -euE -o pipefail
-
-          source ${HOLOCHAIN_RELEASE_SH}
-          cd "${HOLOCHAIN_REPO}"
-
-          gh pr create \
-            --title "Merge ${RELEASE_BRANCH} back into ${HOLOCHAIN_SOURCE_BRANCH}" \
-            --label release \
-            --base ${HOLOCHAIN_SOURCE_BRANCH} --head "${RELEASE_BRANCH}" \
-            --body 'Please double-check the consistency of the CHANGELOG.md files' 2>&1 | tee gh-pr-create.log
-            # --reviewer "holochain/core-dev" \
-
-          pull_request_number="$(tail -n1 gh-pr-create.log | grep -oE '[0-9]+$')"
-          echo "::set-output name=pull-request-number::${pull_request_number}"
-
-      - name: Enable Pull Request Automerge
-        if: ${{ needs.vars.outputs.dry_run == 'false' }}
-        uses: peter-evans/enable-pull-request-automerge@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN}}
-          pull-request-number: ${{ steps.cpr.outputs.pull-request-number }}
-          merge-method: merge
-      - name: Auto approve Pull Request
-        if: ${{ needs.vars.outputs.dry_run == 'false' }}
-        uses: juliangruber/approve-pull-request-action@v1
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          number: ${{ steps.cpr.outputs.pull-request-number }}
 
       - name: Setup upterm session
         uses: lhotari/action-upterm@v1
@@ -615,6 +608,28 @@ jobs:
           data=$(jq -n --compact-output '{"channel_id":env.MM_CHANNEL_ID, "message":env.message, "props":{"version":env.VERSION}}')
           curl -X POST -H "Authorization: Bearer ${HRA_MATTERMOST_TOKEN}" -d "$data" https://chat.holochain.org/api/v4/posts
 
+      - name: Trigger status event
+        if: always()
+        shell: bash
+        continue-on-error: true
+        env:
+          STATUS: ${{ steps.check-status.outcome }}
+          WORKFLOW_RUN_URL: "https://github.com/holochain/holochain/actions/runs/${{ github.run_id }}"
+        run: |
+          set -x
+
+          data=$(jq -n --compact-output '{
+            "state":env.STATUS,
+            "target_url":env.WORKFLOW_RUN_URL,
+            "description":"release workflow completed",
+            "context":"github-actions/relelase-holochain"
+          }')
+          curl -L -X POST \
+            -H "Content-Type: application/json" \
+            -H "Authorization: token ${{ secrets.HRA_GITHUB_TOKEN}}" \
+            -d "$data" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/statuses/${{ github.sha }}"
+
   all-jobs-succeed:
     if: ${{ always() && github.event_name != 'pull_request' }}
     runs-on: "ubuntu-latest"
@@ -636,14 +651,17 @@ jobs:
           WORKFLOW_RUN_URL: "https://github.com/holochain/holochain/actions/runs/${{ github.run_id }}"
           HRA_MATTERMOST_TOKEN: ${{ secrets.HRA_MATTERMOST_TOKEN }}
           DRY_RUN: "${{ needs.vars.outputs.dry_run }}"
+          RELEASABLE_CRATES: ${{ needs.prepare.outputs.releasable_crates }}
 
           # dev/HC-releases
           MM_CHANNEL_ID: "cdxeytdc97ff3e1jbdzgyfcduo"
         run: |
           if [[ "${STATUS}" == "success" ]]; then
-            holochain_status=":white_check_mark: [log](${WORKFLOW_RUN_URL}), [tag](https://github.com/holochain/holochain/releases/tag/${TAG})"
+            holochain_status="success :white_check_mark: [log](${WORKFLOW_RUN_URL}), [tag](https://github.com/holochain/holochain/releases/tag/${TAG})"
+          elif [[ "${RELEASABLE_CRATES}" == "false" ]]; then
+            holochain_status="no changes to release :ballot_box_with_check: [log](${WORKFLOW_RUN_URL})"
           else
-            holochain_status=":x: [log](${WORKFLOW_RUN_URL})"
+            holochain_status="failure :x: [log](${WORKFLOW_RUN_URL})"
           fi
 
           mode="release-mode"

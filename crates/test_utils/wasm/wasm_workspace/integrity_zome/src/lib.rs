@@ -127,7 +127,6 @@ fn call_zome_info(zome_info_input: ()) -> ExternResult<ZomeInfo> {
     HDI.with(|i| i.borrow().zome_info(zome_info_input))
 }
 // Trace
-#[cfg(feature = "trace")]
 #[hdk_extern]
 fn call_trace(trace_msg: TraceMsg) -> ExternResult<()> {
     HDI.with(|i| i.borrow().trace(trace_msg))

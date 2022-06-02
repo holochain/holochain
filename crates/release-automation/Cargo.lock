@@ -2088,6 +2088,7 @@ dependencies = [
  "fancy-regex",
  "git2",
  "indoc",
+ "itertools",
  "linked-hash-map",
  "linked_hash_set",
  "log",

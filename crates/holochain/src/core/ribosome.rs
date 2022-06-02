@@ -570,7 +570,7 @@ pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
     ) -> RibosomeResult<()>;
 
     /// Helper function for running a validation callback. Calls
-    /// [`do_callback!`] under the hood.
+    /// private fn `do_callback!` under the hood.
     fn run_validate(
         &self,
         access: ValidateHostAccess,

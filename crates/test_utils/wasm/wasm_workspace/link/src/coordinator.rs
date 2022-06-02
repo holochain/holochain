@@ -246,8 +246,8 @@ fn commit_existing_path(_: ()) -> ExternResult<()> {
     if let Some(parent) = path.parent() {
         parent.ensure()?;
         hdk::prelude::create_link(
-            parent.path_entry_hash()?.into(),
-            path.path_entry_hash()?.into(),
+            parent.path_entry_hash()?,
+            path.path_entry_hash()?,
             LinkTypes::SomeLinks,
             LinkTag::new(
                 match path.leaf() {

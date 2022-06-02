@@ -348,7 +348,7 @@ pub mod hash_path;
 /// Maps a Rust function to an extern that WASM can expose to the Holochain host.
 ///
 /// Annotate any compatible function with `#[hdk_extern]` to expose it to Holochain as a WASM extern.
-/// The [ `map_extern!` ] macro is used internally by the `#[hdk_extern]` attribute.
+/// The [`map_extern!`](crate::map_extern!) macro is used internally by the `#[hdk_extern]` attribute.
 ///
 /// Compatible functions:
 ///

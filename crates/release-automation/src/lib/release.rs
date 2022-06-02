@@ -613,12 +613,14 @@ impl PublishError {
     }
 }
 
-pub(crate) mod crates_index_helper {
+/// module that implements helper functionality for the crates_index crate
+pub mod crates_index_helper {
     use super::*;
 
     static CRATES_IO_INDEX: OnceCell<Mutex<crates_index::Index>> = OnceCell::new();
 
-    pub(crate) fn index(update: bool) -> Fallible<&'static Mutex<crates_index::Index>> {
+    /// retrieves the statically saved index with the option to force an update.
+    pub fn index(update: bool) -> Fallible<&'static Mutex<crates_index::Index>> {
         let first_run = CRATES_IO_INDEX.get().is_none();
 
         let crates_io_index = CRATES_IO_INDEX.get_or_try_init(|| -> Fallible<_> {

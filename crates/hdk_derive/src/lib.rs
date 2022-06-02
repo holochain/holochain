@@ -212,7 +212,7 @@ pub fn hdk_extern(attrs: TokenStream, item: TokenStream) -> TokenStream {
     let input_type = if let Some(syn::FnArg::Typed(pat_type)) = item_fn.sig.inputs.first() {
         pat_type.ty.clone()
     } else {
-        unreachable!();
+        panic!("hdk_extern functions must take a single parameter");
     };
     let output_type = if let syn::ReturnType::Type(_, ref ty) = item_fn.sig.output {
         ty.clone()

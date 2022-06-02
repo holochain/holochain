@@ -4,6 +4,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased](https://github.com/holochain/holochain/holochain_zome_types-v0.0.2-alpha.1...HEAD)
 
+## 0.0.35
+
+## 0.0.34
+
+## 0.0.33
+
+## 0.0.32
+
+- Docs: Fix intra-doc links in all crates [\#1323](https://github.com/holochain/holochain/pull/1323)
+
+## 0.0.31
+
+## 0.0.30
+
 ## 0.0.29
 
 ## 0.0.28

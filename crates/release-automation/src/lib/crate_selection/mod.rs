@@ -14,6 +14,7 @@ use enumflags2::{bitflags, BitFlags};
 use linked_hash_map::LinkedHashMap;
 use linked_hash_set::LinkedHashSet;
 use once_cell::unsync::{Lazy, OnceCell};
+use regex::Regex;
 use semver::Version;
 use std::cell::Cell;
 use std::collections::{BTreeSet, HashMap, HashSet};
@@ -260,7 +261,7 @@ pub(crate) struct SelectionCriteria {
 
 /// Defines detailed crate's state in terms of the release process.
 #[bitflags]
-#[repr(u16)]
+#[repr(u32)]
 #[derive(enum_utils::FromStr, Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum CrateStateFlags {
     /// matches a package filter
@@ -292,6 +293,12 @@ pub(crate) enum CrateStateFlags {
     MissingLicense,
     /// Has a dependency that contains '*'
     HasWildcardDependency,
+    /// Has a dev-dependency that contains '*'
+    HasWildcardDevDependency,
+    /// One of the manifest keywords is too long
+    ManifestKeywordExceeds20Chars,
+    ManifestKeywordContainsInvalidChar,
+    ManifestKeywordsMoreThan5,
 }
 
 /// Defines the meta states that can be derived from the more detailed `CrateStateFlags`.
@@ -331,6 +338,9 @@ impl CrateState {
             | MissingDescription
             | MissingLicense
             | HasWildcardDependency
+            | ManifestKeywordExceeds20Chars
+            | ManifestKeywordContainsInvalidChar
+            | ManifestKeywordsMoreThan5
     });
 
     pub(crate) fn new(
@@ -593,6 +603,8 @@ impl<'a> ReleaseWorkspace<'a> {
                 ..Default::default()
             };
 
+            let keyword_validation_re = Regex::new("^[a-zA-Z][a-zA-Z_\\-0-9]+$").unwrap();
+
             for member in self.members()? {
 
                 // helper macros to access the desired state
@@ -619,6 +631,18 @@ impl<'a> ReleaseWorkspace<'a> {
 
                     if metadata.description.is_none() {
                         insert_state!(CrateStateFlags::MissingDescription);
+                    }
+
+                    // see https://doc.rust-lang.org/cargo/reference/manifest.html?highlight=keywords#the-keywords-field
+                    // Note: crates.io has a maximum of 5 keywords. Each keyword must be ASCII text, start with a letter, and only contain letters, numbers, _ or -, and have at most 20 characters.
+                    if metadata.keywords.iter().any(|keyword| keyword.len() > 20) {
+                        insert_state!(CrateStateFlags::ManifestKeywordExceeds20Chars);
+                    }
+                    if metadata.keywords.iter().any(|keyword| !keyword_validation_re.is_match(keyword)) {
+                        insert_state!(CrateStateFlags::ManifestKeywordContainsInvalidChar);
+                    }
+                    if metadata.keywords.len() > 5 {
+                        insert_state!(CrateStateFlags::ManifestKeywordsMoreThan5);
                     }
                 }
 
@@ -754,7 +778,10 @@ impl<'a> ReleaseWorkspace<'a> {
 
                         for dep in member.package().dependencies() {
                             if dep.version_req().to_string().contains('*') {
-                                insert_state!(CrateStateFlags::HasWildcardDependency);
+                                insert_state!(match dep.kind() {
+                                    CargoDepKind::Normal | CargoDepKind::Build => CrateStateFlags::HasWildcardDependency,
+                                    CargoDepKind::Development => CrateStateFlags::HasWildcardDevDependency,
+                                });
                             }
                         }
                     }

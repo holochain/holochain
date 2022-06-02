@@ -31,7 +31,7 @@ pub use rng::rng;
 /// their inner types by constructing an inner Fixturator directly with the outer index passed in.
 /// If we can always assume the inner fixturators can be efficiently constructed at any index this
 /// allows us to efficiently compose fixturators.
-/// See [ `newtype_fixturator!` ] macro defined below for an example of this.
+/// See [ `newtype_fixturator!` ](newtype_fixturator) macro defined below for an example of this.
 ///
 /// Fixturator implements Clone for convenience but note that this will clone the current index.
 ///
@@ -62,7 +62,7 @@ impl<Curve, Item> Fixturator<Item, Curve> {
     /// raw calls are a little verbose, e.g. `Fixturator::<u32, Predictable>::new(Predictable, 0)`
     /// the starting index is exposed to facilitate wrapper structs to delegate their indexes to
     /// internal Fixturators
-    /// See [ `newtype_fixturator!` ] macro below for an example of this
+    /// See [`newtype_fixturator!`](newtype_fixturator) macro below for an example of this
     pub fn new(curve: Curve, start: usize) -> Self {
         Fixturator::<Item, Curve> {
             curve,
@@ -713,7 +713,7 @@ macro_rules! wasm_io_fixturator {
 
 #[macro_export]
 /// Creates a simple way to generate enums that use the strum way of iterating
-/// https://docs.rs/strum/0.18.0/strum/
+/// <https://docs.rs/strum/0.18.0/strum/>
 /// iterates over all the variants (Predictable) or selects random variants (Unpredictable)
 /// You do still need to BYO "empty" variant as the macro doesn't know what to use there
 macro_rules! enum_fixturator {

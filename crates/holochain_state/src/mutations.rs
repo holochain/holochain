@@ -88,7 +88,7 @@ macro_rules! dht_op_update {
     }};
 }
 
-/// Insert a [`DhtOp`] into the [`Scratch`].
+/// Insert a [`DhtOp`](holochain_types::dht_op::DhtOp) into the [`Scratch`].
 pub fn insert_op_scratch(
     scratch: &mut Scratch,
     zome: Option<CoordinatorZome>,
@@ -128,7 +128,7 @@ pub fn insert_element_scratch(
     }
 }
 
-/// Insert a [`DhtOp`] into the database.
+/// Insert a [`DhtOp`](holochain_types::dht_op::DhtOp) into the database.
 pub fn insert_op(txn: &mut Transaction, op: &DhtOpHashed) -> StateMutationResult<()> {
     let hash = op.as_hash();
     let op = op.as_content();
@@ -211,7 +211,7 @@ pub fn insert_validation_receipt(
     Ok(())
 }
 
-/// Insert a [`DnaWasm`] into the database.
+/// Insert a [`DnaWasm`](holochain_types::prelude::DnaWasm) into the database.
 pub fn insert_wasm(txn: &mut Transaction, wasm: DnaWasmHashed) -> StateMutationResult<()> {
     let (wasm, hash) = wasm.into_inner();
     sql_insert!(txn, Wasm, {
@@ -245,7 +245,8 @@ pub fn insert_entry_def(
     Ok(())
 }
 
-/// Insert [`ConductorState`] into the database.
+/// Insert [`ConductorState`](https://docs.rs/holochain/latest/holochain/conductor/state/struct.ConductorState.html)
+/// into the database.
 pub fn insert_conductor_state(
     txn: &mut Transaction,
     bytes: SerializedBytes,
@@ -258,7 +259,7 @@ pub fn insert_conductor_state(
     Ok(())
 }
 
-/// Set the validation status of a [`DhtOp`] in the database.
+/// Set the validation status of a [`DhtOp`](holochain_types::dht_op::DhtOp) in the database.
 pub fn set_validation_status(
     txn: &mut Transaction,
     hash: &DhtOpHash,
@@ -269,7 +270,7 @@ pub fn set_validation_status(
     })?;
     Ok(())
 }
-/// Set the integration dependency of a [`DhtOp`] in the database.
+/// Set the integration dependency of a [`DhtOp`](holochain_types::dht_op::DhtOp) in the database.
 pub fn set_dependency(
     txn: &mut Transaction,
     hash: &DhtOpHash,
@@ -291,7 +292,7 @@ pub fn set_dependency(
     Ok(())
 }
 
-/// Set the whether or not a receipt is required of a [`DhtOp`] in the database.
+/// Set the whether or not a receipt is required of a [`DhtOp`](holochain_types::dht_op::DhtOp) in the database.
 pub fn set_require_receipt(
     txn: &mut Transaction,
     hash: &DhtOpHash,
@@ -303,7 +304,7 @@ pub fn set_require_receipt(
     Ok(())
 }
 
-/// Set the validation stage of a [`DhtOp`] in the database.
+/// Set the validation stage of a [`DhtOp`](holochain_types::dht_op::DhtOp) in the database.
 pub fn set_validation_stage(
     txn: &mut Transaction,
     hash: &DhtOpHash,
@@ -336,7 +337,7 @@ pub fn set_validation_stage(
     Ok(())
 }
 
-/// Set when a [`DhtOp`] was integrated.
+/// Set when a [`DhtOp`](holochain_types::dht_op::DhtOp) was integrated.
 pub fn set_when_integrated(
     txn: &mut Transaction,
     hash: &DhtOpHash,
@@ -348,7 +349,7 @@ pub fn set_when_integrated(
     Ok(())
 }
 
-/// Set when a [`DhtOp`] was last publish time
+/// Set when a [`DhtOp`](holochain_types::dht_op::DhtOp) was last publish time
 pub fn set_last_publish_time(
     txn: &mut Transaction,
     hash: &DhtOpHash,
@@ -360,7 +361,7 @@ pub fn set_last_publish_time(
     Ok(())
 }
 
-/// Set withhold publish for a [`DhtOp`].
+/// Set withhold publish for a [`DhtOp`](holochain_types::dht_op::DhtOp).
 pub fn set_withhold_publish(txn: &mut Transaction, hash: &DhtOpHash) -> StateMutationResult<()> {
     dht_op_update!(txn, hash, {
         "withhold_publish": true,
@@ -368,7 +369,7 @@ pub fn set_withhold_publish(txn: &mut Transaction, hash: &DhtOpHash) -> StateMut
     Ok(())
 }
 
-/// Unset withhold publish for a [`DhtOp`].
+/// Unset withhold publish for a [`DhtOp`](holochain_types::dht_op::DhtOp).
 pub fn unset_withhold_publish(txn: &mut Transaction, hash: &DhtOpHash) -> StateMutationResult<()> {
     dht_op_update!(txn, hash, {
         "withhold_publish": Null,
@@ -376,7 +377,7 @@ pub fn unset_withhold_publish(txn: &mut Transaction, hash: &DhtOpHash) -> StateM
     Ok(())
 }
 
-/// Set the receipt count for a [`DhtOp`].
+/// Set the receipt count for a [`DhtOp`](holochain_types::dht_op::DhtOp).
 pub fn set_receipts_complete(
     txn: &mut Transaction,
     hash: &DhtOpHash,
