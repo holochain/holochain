@@ -188,6 +188,21 @@ pub async fn check_valid_if_dna(
     }
 }
 
+/// Check that app rate limit has not been exceeded
+pub async fn check_rate_limit(
+    action: &Action,
+    workspace: &SysValidationWorkspace,
+) -> SysValidationResult<()> {
+    let state = if let Some(h) = action.prev_action() {
+        workspace.get_rate_limit_state(h).await?
+    } else {
+        None
+    }
+    .unwrap_or_default();
+    let bucket_level = state.get(action.rate_bucket);
+    todo!()
+}
+
 /// Check if there are other actions at this
 /// sequence number
 pub async fn check_chain_rollback(

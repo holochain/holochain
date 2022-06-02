@@ -20,6 +20,9 @@ pub enum DatabaseError {
     )]
     NoPrivateDb(String),
 
+    #[error("The database is in an unexpected state. Detail: {0}")]
+    IntegrityError(String),
+
     #[error("Error encoding to MsgPack: {0}")]
     MsgPackEncodeError(#[from] rmp_serde::encode::Error),
 

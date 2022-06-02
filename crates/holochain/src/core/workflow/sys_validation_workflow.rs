@@ -576,10 +576,11 @@ async fn register_agent_activity(
             workspace,
             network,
             incoming_dht_ops_sender,
-            |_| Ok(()),
+            |el| Ok(()),
         )
         .await?;
     }
+    check_rate_limit(action, workspace).await?;
     check_chain_rollback(action, workspace).await?;
     Ok(())
 }
@@ -903,6 +904,45 @@ impl SysValidationWorkspace {
         };
         Ok(!action_seq_is_not_empty)
     }
+
+    pub async fn get_rate_limit_state(
+        &self,
+        action_hash: &ActionHash,
+    ) -> SourceChainResult<Option<RateBucketLevels>> {
+        let state = self
+            .dht_db
+            .async_reader({
+                let hash = hash.clone();
+                move |txn| {
+                    // If no rows returned, this is a Holochain logic or database
+                    // integrity error that needs to be fixed.
+                    DatabaseResult::Ok(
+                        txn.query_row(
+                            "
+                            SELECT rate_bucket_state
+                            FROM Action
+                            WHERE hash = :hash
+                            LIMIT 1
+                            ",
+                            named_params! {
+                                ":hash": action_hash,
+                            },
+                            |row| row.get(0),
+                        )
+                        .optional()?
+                        .ok_or_else(|| {
+                            DatabaseError::IntegrityError(format!(
+                                "Action missing for hash {:?}",
+                                action_hash
+                            ))
+                        })?,
+                    )
+                }
+            })
+            .await?;
+        Ok(state)
+    }
+
     /// Create a cascade with local data only
     pub fn local_cascade(&self) -> Cascade {
         let cascade = Cascade::empty().with_dht(self.dht_db.clone());

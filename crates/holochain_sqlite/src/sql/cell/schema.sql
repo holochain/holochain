@@ -64,7 +64,11 @@ CREATE TABLE IF NOT EXISTS Action (
     membrane_proof   BLOB           NULL,
 
     -- OpenChain / CloseChain
-    prev_dna_hash    BLOB           NULL
+    prev_dna_hash    BLOB           NULL,
+
+    -- Rate limiting intermediate state
+    rate_bucket_id        INTEGER        NOT NULL,
+    rate_bucket_state     BLOB           NOT NULL
 
     -- We can't have any of these constraint because
     -- the record authority doesn't get the create link for a remove link. @freesig
