@@ -10,6 +10,7 @@ pub struct Msg(pub String);
 pub struct PrivMsg(pub String);
 
 #[hdk_entry_defs]
+#[unit_enum(EntryTypesUnit)]
 pub enum EntryTypes {
     #[entry_def(required_validations = 5)]
     Post(Post),
@@ -19,9 +20,13 @@ pub enum EntryTypes {
     PrivMsg(PrivMsg),
 }
 
+#[hdk_link_types]
+pub enum LinkTypes {
+    Post,
+}
+
 #[cfg_attr(feature = "integrity", hdk_extern)]
 pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
-    let this_zome = zome_info()?;
     if let Op::StoreEntry {
         header:
             SignedHashed {
@@ -33,21 +38,19 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
         entry,
     } = op
     {
-        let _: fn(Post) -> EntryTypes = EntryTypes::Post;
-        if header
+        header
             .app_entry_type()
-            .filter(|app_entry_type| {
-                this_zome.matches_entry_def_id(
-                    app_entry_type,
-                    EntryTypes::variant_to_entry_def_id(EntryTypes::Post),
-                )
-            })
-            .map_or(Ok(false), |_| {
-                Post::try_from(entry).map(|post| &post.0 == "Banana")
-            })?
-        {
-            return Ok(ValidateCallbackResult::Invalid("No Bananas!".to_string()));
-        }
+            .map(|AppEntryType { id, .. }| id)
+            .map_or(
+                Ok(ValidateCallbackResult::Valid),
+                |id| match EntryTypes::try_from_global_type(*id, &entry)? {
+                    Some(EntryTypes::Post(post)) if post.0 == "Banana" => {
+                        Ok(ValidateCallbackResult::Invalid("No Bananas!".to_string()))
+                    }
+                    _ => Ok(ValidateCallbackResult::Valid),
+                },
+            )
+    } else {
+        Ok(ValidateCallbackResult::Valid)
     }
-    Ok(ValidateCallbackResult::Valid)
 }

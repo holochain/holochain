@@ -5,11 +5,22 @@
 use holochain_zome_types::prelude::*;
 use rusqlite::types::ToSqlOutput;
 
+#[cfg(test)]
+mod test;
+
 /// A helper trait for types we can't implement [`rusqlite::ToSql`]
 /// for due to the orphan rule.
 pub trait AsSql<'a> {
     /// Convert this type to sql which might fail.
     fn as_sql(&'a self) -> SqlOutput<'a>;
+}
+
+/// A trait to convert a reference of a
+/// type to a sql statement for use in
+/// [`rusqlite::Connection`] prepare.
+pub trait ToSqlStatement {
+    /// Convert the reference to a statement.
+    fn to_sql_statement(&self) -> String;
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -72,5 +83,49 @@ impl<'a> From<&'a LinkTag> for SqlOutput<'a> {
 impl<'a, 'b> From<&'b ZomeId> for SqlOutput<'a> {
     fn from(d: &'b ZomeId) -> Self {
         Self(d.0.into())
+    }
+}
+
+impl ToSqlStatement for LinkTypeRange {
+    fn to_sql_statement(&self) -> String {
+        match self {
+            LinkTypeRange::Full => String::new(),
+            LinkTypeRange::Empty => " AND false ".to_string(),
+            LinkTypeRange::Inclusive(range) => match range.start().0.cmp(&range.end().0) {
+                std::cmp::Ordering::Less => {
+                    if range.start().0 == 0 && range.end().0 == u8::MAX {
+                        LinkTypeRange::Full.to_sql_statement()
+                    } else {
+                        format!(
+                            " AND link_type BETWEEN {} AND {} ",
+                            range.start().0,
+                            range.end().0
+                        )
+                    }
+                }
+                std::cmp::Ordering::Equal => format!(" AND link_type = {} ", range.start().0),
+                std::cmp::Ordering::Greater => LinkTypeRange::Empty.to_sql_statement(),
+            },
+        }
+    }
+}
+
+impl ToSqlStatement for LinkTypeRanges {
+    fn to_sql_statement(&self) -> String {
+        if self.0.iter().any(|r| {
+            matches!(r, LinkTypeRange::Empty)
+                || matches!(r, LinkTypeRange::Inclusive(inner) if inner.is_empty())
+        }) {
+            " AND false ".to_string()
+        } else {
+            let mut out: Vec<String> = self
+                .0
+                .iter()
+                .map(ToSqlStatement::to_sql_statement)
+                .collect();
+            out.sort_unstable();
+            out.dedup();
+            out.into_iter().collect()
+        }
     }
 }

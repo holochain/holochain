@@ -10,7 +10,7 @@ use std::sync::Arc;
 /// create element
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn create<'a>(
-    ribosome: Arc<impl RibosomeT>,
+    _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: CreateInput,
 ) -> Result<HeaderHash, WasmError> {
@@ -21,26 +21,10 @@ pub fn create<'a>(
         } => {
             let CreateInput {
                 entry_location,
+                entry_visibility,
                 entry,
                 chain_top_ordering,
             } = input;
-
-            // TODO: This can be removed when we remove zome ids from headers.
-            let zome_id = match &entry_location {
-                EntryDefLocation::App(entry_index) => {
-                    match ribosome.zome_types().find_zome_id_from_entry(&entry_index) {
-                        Some(i) => Some(i),
-                        None => {
-                            return Err(WasmError::Host(format!(
-                                "Entry index {} not found in DNA {}",
-                                entry_index.0,
-                                ribosome.dna_hash()
-                            )))
-                        }
-                    }
-                }
-                EntryDefLocation::CapClaim | EntryDefLocation::CapGrant => None,
-            };
 
             // Countersigned entries have different header handling.
             match entry {
@@ -64,22 +48,8 @@ pub fn create<'a>(
                     // extract the entry defs for a zome
                     let entry_type = match entry_location {
                         EntryDefLocation::App(entry_def_index) => {
-                            let integrity_zomes = &ribosome.dna_def().content.integrity_zomes;
-                            let header_zome_id = zome_id
-                                .expect("Zome can never be none for a EntryDefLocation::App");
-                            let (zome_name, zome) = integrity_zomes.get(header_zome_id.0 as usize)
-                                    .ok_or_else(|| WasmError::Guest(format!("Tried to get zome id {} but there are only {} integrity zomes", header_zome_id.0, integrity_zomes.len())))?;
-                            let entry_visibility = get_entry_visibility(
-                                call_context.as_ref(),
-                                zome_name,
-                                zome.clone(),
-                                entry_def_index,
-                            )?;
-                            let app_entry_type = AppEntryType::new(
-                                entry_def_index,
-                                header_zome_id,
-                                entry_visibility,
-                            );
+                            let app_entry_type =
+                                AppEntryType::new(entry_def_index, entry_visibility);
                             EntryType::App(app_entry_type)
                         }
                         EntryDefLocation::CapGrant => EntryType::CapGrant,
@@ -124,35 +94,6 @@ pub fn create<'a>(
     }
 }
 
-fn get_entry_visibility(
-    call_context: &CallContext,
-    zome_name: &ZomeName,
-    zome: IntegrityZomeDef,
-    entry_def_position: EntryDefIndex,
-) -> Result<EntryVisibility, WasmError> {
-    let key = EntryDefBufferKey {
-        zome,
-        entry_def_position,
-    };
-    call_context
-        .host_context()
-        .call_zome_handle()
-        .get_entry_def(&key)
-        .map(|e| e.visibility)
-        .ok_or_else(|| {
-            WasmError::Host(
-                RibosomeError::EntryDefs(
-                    zome_name.clone(),
-                    format!(
-                        "entry def not found for entry index {}",
-                        entry_def_position.0
-                    ),
-                )
-                .to_string(),
-            )
-        })
-}
-
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
@@ -187,7 +128,8 @@ pub mod wasm_test {
         call_context.host_context = host_access.into();
         let app_entry = EntryFixturator::new(AppEntry).next().unwrap();
         let input = CreateInput::new(
-            EntryDefLocation::app(0.into()),
+            EntryDefLocation::app(0),
+            EntryVisibility::Public,
             app_entry.clone(),
             ChainTopOrdering::default(),
         );

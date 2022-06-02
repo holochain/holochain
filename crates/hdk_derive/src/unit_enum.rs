@@ -1,9 +1,13 @@
+use darling::util::PathList;
 use darling::FromMeta;
 use proc_macro::TokenStream;
 
 use darling::FromDeriveInput;
 use darling::FromVariant;
+use proc_macro_error::abort;
 use syn::parse_macro_input;
+
+use crate::util::get_unit_ident;
 
 #[derive(FromVariant)]
 struct VarOpts {
@@ -15,39 +19,35 @@ struct VarOpts {
 struct EnumName(syn::Ident);
 
 #[derive(FromDeriveInput)]
-#[darling(forward_attrs(unit_enum))]
+#[darling(attributes(unit_attrs), forward_attrs(unit_enum))]
 struct Opts {
     ident: syn::Ident,
     attrs: Vec<syn::Attribute>,
     data: darling::ast::Data<VarOpts, darling::util::Ignored>,
+    #[darling(default)]
+    forward: PathList,
 }
 
 pub fn derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input);
-    let opts = Opts::from_derive_input(&input).expect("Wrong options");
-    let Opts { ident, attrs, data } = opts;
-
-    let unit_ident = match darling::util::parse_attribute_to_meta_list(
-        attrs.first().expect("Must have 'unit_enum' attribute"),
-    ) {
-        Ok(syn::MetaList { path, nested, .. }) if path.is_ident("unit_enum") => {
-            match nested.first() {
-                Some(syn::NestedMeta::Meta(syn::Meta::Path(path))) => path
-                    .get_ident()
-                    .expect("Failed to parse meta to ident")
-                    .clone(),
-                _ => todo!(),
-            }
-        }
-        _ => todo!(),
+    let opts = match Opts::from_derive_input(&input) {
+        Ok(o) => o,
+        Err(e) => abort!(e.span(), e),
     };
+    let Opts {
+        ident,
+        attrs,
+        data,
+        forward,
+    } = opts;
 
     let variants = match data {
         darling::ast::Data::Enum(variants) => variants,
-        _ => todo!(),
+        _ => abort!(ident, "UnitEnum can only be derived on Enums"),
     };
 
-    // let unit_ident = quote::format_ident!("Unit{}", ident);
+    let unit_ident = get_unit_ident(&attrs);
+
     let units: proc_macro2::TokenStream = variants
         .iter()
         .map(|VarOpts { ident, .. }| quote::quote! {#ident,})
@@ -71,6 +71,12 @@ pub fn derive(input: TokenStream) -> TokenStream {
         )
         .collect();
 
+    let unit_attrs: proc_macro2::TokenStream = forward
+        .to_vec()
+        .into_iter()
+        .map(|a| quote::quote! {#[#a] })
+        .collect();
+
     let output = quote::quote! {
         impl UnitEnum for #ident {
             type Unit = #unit_ident;
@@ -80,14 +86,19 @@ pub fn derive(input: TokenStream) -> TokenStream {
                     #units_match
                 }
             }
-            fn index(&self) -> usize {
-                self.to_unit() as usize
-            }
         }
 
+        #unit_attrs
         #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
         pub enum #unit_ident {
             #units
+        }
+
+        impl #unit_ident {
+            pub fn iter() -> impl Iterator<Item = Self> {
+                use #unit_ident::*;
+                [#units].into_iter()
+            }
         }
     };
     output.into()

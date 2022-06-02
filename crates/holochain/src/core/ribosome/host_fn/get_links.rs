@@ -10,9 +10,9 @@ use holochain_wasmer_host::prelude::WasmError;
 use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]
-#[tracing::instrument(skip(ribosome, call_context), fields(?call_context.zome, function = ?call_context.function_name))]
+#[tracing::instrument(skip(_ribosome, call_context), fields(?call_context.zome, function = ?call_context.function_name))]
 pub fn get_links<'a>(
-    ribosome: Arc<impl RibosomeT>,
+    _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     inputs: Vec<GetLinksInput>,
 ) -> Result<Vec<Vec<Link>>, WasmError> {
@@ -28,27 +28,13 @@ pub fn get_links<'a>(
                     futures::stream::iter(inputs.into_iter().map(|input| async {
                         let GetLinksInput {
                             base_address,
-                            type_location,
+                            link_type,
                             tag_prefix,
                         } = input;
 
-                        let location = type_location.map_or(Ok(None), |location| {
-                            let (zome_name, link_type) = match location {
-                                LinkTypeQuery::AllTypes(zome_name) => (zome_name, None),
-                                LinkTypeQuery::SingleType(zome_name, link_type) => {
-                                    (zome_name, Some(link_type))
-                                }
-                            };
-                            ribosome.zome_name_to_id(&zome_name).map(|zome_id| {
-                                Some(match link_type {
-                                    Some(lt) => LinkTypeQuery::SingleType(zome_id, lt),
-                                    None => LinkTypeQuery::AllTypes(zome_id),
-                                })
-                            })
-                        })?;
                         let key = WireLinkKey {
                             base: base_address,
-                            type_query: location,
+                            type_query: Some(link_type),
                             tag: tag_prefix,
                         };
                         Ok(Cascade::from_workspace_network(
@@ -155,12 +141,14 @@ pub mod slow_tests {
             )
             .await;
 
+        let expect = Path::from(vec![
+            hdk::hash_path::path::Component::new(hdk::hash_path::anchor::ROOT.to_vec()),
+            hdk::hash_path::path::Component::from("foo".as_bytes().to_vec()),
+            hdk::hash_path::path::Component::from("bar".as_bytes().to_vec()),
+        ]);
         assert_eq!(
-            anchor_address_one.get_raw_32().to_vec(),
-            vec![
-                174, 222, 191, 173, 245, 226, 135, 240, 9, 44, 238, 112, 158, 41, 73, 28, 175, 94,
-                206, 82, 82, 109, 9, 156, 73, 22, 188, 213, 148, 21, 234, 45
-            ],
+            anchor_address_one,
+            EntryHash::with_data_sync(&Entry::App(AppEntryBytes(expect.try_into().unwrap())))
         );
 
         // anchor foo baz
@@ -172,28 +160,29 @@ pub mod slow_tests {
             )
             .await;
 
+        let expect = Path::from(vec![
+            hdk::hash_path::path::Component::new(hdk::hash_path::anchor::ROOT.to_vec()),
+            hdk::hash_path::path::Component::from("foo".as_bytes().to_vec()),
+            hdk::hash_path::path::Component::from("baz".as_bytes().to_vec()),
+        ]);
         assert_eq!(
-            anchor_address_two.get_raw_32().to_vec(),
-            vec![
-                21, 114, 154, 43, 189, 82, 166, 104, 159, 55, 86, 94, 68, 245, 79, 49, 187, 175,
-                236, 67, 38, 216, 232, 239, 18, 83, 98, 200, 136, 198, 232, 117
-            ],
+            anchor_address_two,
+            EntryHash::with_data_sync(&Entry::App(AppEntryBytes(expect.try_into().unwrap())))
         );
 
         let list_anchor_type_addresses_output: EntryHashes = conductor
             .call(&alice, "list_anchor_type_addresses", ())
             .await;
 
+        let expect = Path::from(vec![
+            hdk::hash_path::path::Component::new(hdk::hash_path::anchor::ROOT.to_vec()),
+            hdk::hash_path::path::Component::from("foo".as_bytes().to_vec()),
+        ]);
         // should be 1 anchor type, "foo"
         assert_eq!(list_anchor_type_addresses_output.0.len(), 1,);
         assert_eq!(
-            (list_anchor_type_addresses_output.0)[0]
-                .get_raw_32()
-                .to_vec(),
-            vec![
-                5, 114, 66, 208, 85, 124, 76, 245, 245, 255, 31, 76, 173, 73, 168, 139, 56, 20, 93,
-                162, 167, 43, 203, 164, 172, 158, 29, 43, 74, 254, 81, 241
-            ],
+            (list_anchor_type_addresses_output.0)[0],
+            EntryHash::with_data_sync(&Entry::App(AppEntryBytes(expect.try_into().unwrap())))
         );
 
         let list_anchor_addresses_output: EntryHashes = conductor
@@ -234,7 +223,7 @@ pub mod slow_tests {
         assert_eq!(links[0].create_link_hash, header_hash);
         assert_eq!(
             links[0].target,
-            EntryHash::from_raw_32([2_u8; 32].to_vec()).into(),
+            EntryHash::from_raw_36([2_u8; 36].to_vec()).into(),
         );
     }
 

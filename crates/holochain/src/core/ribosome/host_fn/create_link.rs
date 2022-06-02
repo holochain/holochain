@@ -21,29 +21,26 @@ pub fn create_link<'a>(
             let CreateLinkInput {
                 base_address,
                 target_address,
-                type_location,
+                link_type,
                 tag,
                 chain_top_ordering,
             } = input;
 
-            let zome = ribosome
-                .dna_def()
-                .get_integrity_zome(&type_location.zome)
-                .map_err(|zome_error| WasmError::Host(zome_error.to_string()))?;
-
-            // extract the zome position
-            let zome_id = ribosome
-                .zome_name_to_id(zome.zome_name())
-                .expect("Failed to get ID for current zome");
+            // TODO: This can be removed when we remove zome ids from headers.
+            let zome_id = match ribosome.zome_types().find_zome_id_from_link(&link_type) {
+                Some(i) => i,
+                None => {
+                    return Err(WasmError::Host(format!(
+                        "Link type {} not found in DNA {}",
+                        link_type.0,
+                        ribosome.dna_hash()
+                    )))
+                }
+            };
 
             // Construct the link add
-            let header_builder = builder::CreateLink::new(
-                base_address,
-                target_address,
-                zome_id,
-                type_location.link,
-                tag,
-            );
+            let header_builder =
+                builder::CreateLink::new(base_address, target_address, zome_id, link_type, tag);
 
             let header_hash = tokio_helper::block_forever_on(tokio::task::spawn(async move {
                 // push the header into the source chain

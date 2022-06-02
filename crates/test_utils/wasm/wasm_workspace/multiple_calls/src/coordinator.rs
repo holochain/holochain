@@ -1,17 +1,11 @@
 use crate::integrity::*;
 use hdk::prelude::*;
-use EntryZomes::*;
-
-#[hdk_entry_zomes]
-enum EntryZomes {
-    IntegrityMultipleCells(EntryTypes),
-}
 
 #[hdk_extern]
 fn create_entry_multiple(n: u32) -> ExternResult<()> {
     for i in 0..n {
         debug!("{}", i);
-        create_entry(&IntegrityMultipleCells(EntryTypes::Post(Val(i))))?;
+        create_entry(&EntryTypes::Post(Val(i)))?;
     }
 
     Ok(())
@@ -45,7 +39,7 @@ pub struct TwoInt(pub u32, pub u32);
 fn slow_fn(n: TwoInt) -> ExternResult<()> {
     for i in 0..n.1 {
         debug!("zome call: {} get call number: {}", n.0, i);
-        get_links(hash_entry(&Val(i))?.into(), None, None)?;
+        get_links(hash_entry(&Val(i))?.into(), .., None)?;
     }
     Ok(())
 }

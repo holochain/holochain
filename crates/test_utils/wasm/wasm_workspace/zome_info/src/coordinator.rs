@@ -2,17 +2,6 @@ use crate::integrity::*;
 use hdk::prelude::*;
 use serde_yaml::Value;
 
-#[hdk_entry_zomes]
-enum EntryZomes {
-    IntegrityZomeInfo(EntryTypes),
-}
-
-impl EntryZomes {
-    fn thing() -> Self {
-        Self::IntegrityZomeInfo(EntryTypes::Thing(Thing))
-    }
-}
-
 #[hdk_extern]
 fn set_access(_: ()) -> ExternResult<()> {
     let mut functions: GrantedFunctions = BTreeSet::new();
@@ -37,7 +26,7 @@ fn zome_info(_: ()) -> ExternResult<ZomeInfo> {
 fn call_info(_: ()) -> ExternResult<CallInfo> {
     // Commit something here so we can show the as_at won't shift in the call
     // info returned.
-    create_entry(EntryZomes::thing())?;
+    create_entry(EntryTypes::Thing(Thing))?;
     hdk::prelude::call_info()
 }
 

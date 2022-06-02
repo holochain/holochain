@@ -1,11 +1,6 @@
 use crate::integrity::*;
 use hdk::prelude::*;
 
-#[hdk_entry_zomes]
-enum EntryZomes {
-    IntegrityAgentInfo(EntryTypes),
-}
-
 #[hdk_extern]
 fn call_info(_: ()) -> ExternResult<CallInfo> {
     hdk::prelude::call_info()
@@ -13,7 +8,7 @@ fn call_info(_: ()) -> ExternResult<CallInfo> {
 
 #[hdk_extern]
 fn agent_info(_: ()) -> ExternResult<AgentInfo> {
-    hdk::prelude::create_entry(EntryZomes::IntegrityAgentInfo(EntryTypes::Thing(Thing)))?;
+    hdk::prelude::create_entry(EntryTypes::Thing(Thing))?;
     hdk::prelude::agent_info()
 }
 

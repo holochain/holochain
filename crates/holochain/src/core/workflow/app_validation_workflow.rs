@@ -446,13 +446,13 @@ where
                     ..
                 },
             ..
-        } => entry_creation_zomes_to_invoke(header, ribosome.dna_def())?,
+        } => entry_creation_zomes_to_invoke(header, ribosome)?,
         Op::RegisterUpdate {
             original_header, ..
         }
         | Op::RegisterDelete {
             original_header, ..
-        } => entry_creation_zomes_to_invoke(original_header, ribosome.dna_def())?,
+        } => entry_creation_zomes_to_invoke(original_header, ribosome)?,
         Op::RegisterCreateLink {
             create_link:
                 SignedHashed {
@@ -486,7 +486,7 @@ where
 
 pub fn entry_creation_zomes_to_invoke(
     header: &EntryCreationHeader,
-    dna_def: &DnaDef,
+    ribosome: &impl RibosomeT,
 ) -> AppValidationOutcome<ZomesToInvoke> {
     match header {
         EntryCreationHeader::Create(Create {
@@ -497,7 +497,9 @@ pub fn entry_creation_zomes_to_invoke(
             entry_type: EntryType::App(aet),
             ..
         }) => {
-            let zome = zome_id_to_zome(aet.zome_id(), dna_def)?;
+            let zome = ribosome.find_zome_from_entry(&aet.id()).ok_or_else(|| {
+                Outcome::rejected(&format!("Zome does not exist for {:?}", aet.id()))
+            })?;
             Ok(ZomesToInvoke::One(zome.erase_type()))
         }
         _ => Ok(ZomesToInvoke::AllIntegrity),

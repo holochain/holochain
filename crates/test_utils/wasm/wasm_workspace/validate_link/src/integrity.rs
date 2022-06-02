@@ -8,13 +8,14 @@ pub enum MaybeLinkable {
 }
 
 #[hdk_entry_defs]
+#[unit_enum(EntryTypesUnit)]
 pub enum EntryTypes {
     MaybeLinkable(MaybeLinkable),
 }
 
 #[hdk_link_types]
 pub enum LinkTypes {
-    Any = HdkLinkType::Any as u8,
+    Any,
 }
 
 #[hdk_extern]

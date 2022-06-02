@@ -15,8 +15,8 @@ pub enum AutonomicProcess {
 /// rather than at the next scheduled time
 pub enum AutonomicCue {
     // /// Cue sent when it is known that entries are ready for initial publishing,
-// /// i.e. after committing new entries to your source chain
-// Publish(Address),
+    // /// i.e. after committing new entries to your source chain
+    // Publish(Address),
 }
 
 impl From<AutonomicCue> for AutonomicProcess {

@@ -1,9 +1,7 @@
 use holochain_deterministic_integrity::prelude::*;
 
 /// an example inner value that can be serialized into the contents of Entry::App()
-#[derive(
-    Deserialize, Serialize, SerializedBytes, Debug, EntryDefRegistration, ToAppEntryDefName,
-)]
+#[derive(Deserialize, Serialize, SerializedBytes, Debug, EntryDefRegistration)]
 pub enum ThisWasmEntry {
     #[entry_def(required_validations = 5)]
     AlwaysValidates,
@@ -42,14 +40,44 @@ impl TryFrom<&ThisWasmEntry> for Entry {
         ))
     }
 }
+
+impl From<&ThisWasmEntry> for LocalZomeTypeId {
+    fn from(_: &ThisWasmEntry) -> Self {
+        Self(0)
+    }
+}
+
+impl TryFrom<&ThisWasmEntry> for EntryDefIndex {
+    type Error = WasmError;
+
+    fn try_from(value: &ThisWasmEntry) -> Result<Self, Self::Error> {
+        zome_info()?
+            .zome_types
+            .entries
+            .to_global_scope(value)
+            .map(Self::from)
+            .ok_or_else(|| {
+                WasmError::Guest(
+                    "ThisWasmEntry did not map to an EntryDefIndex within this scope".to_string(),
+                )
+            })
+    }
+}
 #[hdk_extern]
 pub fn entry_defs(_: ()) -> ExternResult<EntryDefsCallbackResult> {
-    Ok(EntryDefsCallbackResult::from(
-        ThisWasmEntry::ENTRY_DEFS
-            .iter()
-            .map(|a| EntryDef::from(a.clone()))
-            .collect::<Vec<_>>(),
-    ))
+    Ok(EntryDefsCallbackResult::from(vec![EntryDef::from(
+        ThisWasmEntry::ENTRY_DEFS[0].clone(),
+    )]))
+}
+
+#[no_mangle]
+pub fn __num_entry_types() -> u8 {
+    1
+}
+
+#[no_mangle]
+pub fn __num_link_types() -> u8 {
+    0
 }
 
 #[hdk_extern]
@@ -66,22 +94,14 @@ fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 },
             entry,
         } => match header.app_entry_type() {
-            Some(app_entry_type) => {
-                let this_zome = zome_info()?;
-                let matches_entry_def = this_zome.matches_entry_def_id(
-                    app_entry_type,
-                    ThisWasmEntry::ENTRY_DEFS[ThisWasmEntry::AlwaysValidates as usize]
-                        .name
-                        .clone()
-                        .into(),
-                ) || this_zome.matches_entry_def_id(
-                    app_entry_type,
-                    ThisWasmEntry::ENTRY_DEFS[ThisWasmEntry::NeverValidates as usize]
-                        .name
-                        .clone()
-                        .into(),
-                );
-                if matches_entry_def {
+            Some(AppEntryType { id, .. }) => {
+                if zome_info()?
+                    .zome_types
+                    .entries
+                    .to_local_scope(*id)
+                    .filter(|l| l.0 == 0)
+                    .is_some()
+                {
                     let entry = ThisWasmEntry::try_from(&entry)?;
                     match entry {
                         ThisWasmEntry::AlwaysValidates => Ok(ValidateCallbackResult::Valid),

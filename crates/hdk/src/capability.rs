@@ -30,6 +30,7 @@ use crate::prelude::*;
 pub fn create_cap_claim(cap_claim_entry: CapClaimEntry) -> ExternResult<HeaderHash> {
     create(CreateInput::new(
         EntryDefLocation::CapClaim,
+        EntryVisibility::Private,
         Entry::CapClaim(cap_claim_entry),
         ChainTopOrdering::default(),
     ))
@@ -123,6 +124,7 @@ pub fn create_cap_claim(cap_claim_entry: CapClaimEntry) -> ExternResult<HeaderHa
 pub fn create_cap_grant(cap_grant_entry: CapGrantEntry) -> ExternResult<HeaderHash> {
     create(CreateInput::new(
         EntryDefLocation::CapGrant,
+        EntryVisibility::Private,
         Entry::CapGrant(cap_grant_entry),
         ChainTopOrdering::default(),
     ))

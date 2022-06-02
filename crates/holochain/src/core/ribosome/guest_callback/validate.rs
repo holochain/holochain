@@ -289,7 +289,7 @@ mod slow_tests {
         };
 
         let zomes_to_invoke =
-            ZomesToInvoke::One(IntegrityZome::from(TestWasm::ValidateValid).erase_type());
+            ZomesToInvoke::One(IntegrityZome::from(TestWasm::ValidateInvalid).erase_type());
         let validate_invocation = ValidateInvocation::new(zomes_to_invoke, &op).unwrap();
 
         let result = ribosome

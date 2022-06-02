@@ -9,20 +9,20 @@ use holochain_types::dht_op::DhtOpType;
 use holochain_types::link::WireCreateLink;
 use holochain_types::link::WireDeleteLink;
 use holochain_types::link::WireLinkOps;
+use holochain_types::sql::ToSqlStatement;
 use holochain_zome_types::HasValidationStatus;
 use holochain_zome_types::Header;
 use holochain_zome_types::Judged;
 use holochain_zome_types::LinkTag;
-use holochain_zome_types::LinkTypeQuery;
+use holochain_zome_types::LinkTypeRanges;
 use holochain_zome_types::SignedHeader;
-use holochain_zome_types::ZomeId;
 
 use super::WireLinkKey;
 
 #[derive(Debug, Clone)]
 pub struct GetLinksOpsQuery {
     base: Arc<AnyLinkableHash>,
-    type_query: Option<LinkTypeQuery<ZomeId>>,
+    type_query: Option<LinkTypeRanges>,
     tag: Option<Arc<LinkTag>>,
 }
 
@@ -84,25 +84,15 @@ impl Query for GetLinksOpsQuery {
                 common_query, tag
             );
         }
-        if let Some(link_type) = &self.type_query {
+        if let Some(ranges) = &self.type_query {
             common_query = format!(
                 "
                 {}
-                AND
-                Header.zome_id = :zome_id
-                ",
-                common_query
-            );
-            if let LinkTypeQuery::SingleType(_, _) = link_type {
-                common_query = format!(
-                    "
                 {}
-                AND
-                Header.link_type = :link_type
                 ",
-                    common_query
-                );
-            }
+                common_query,
+                ranges.to_sql_statement(),
+            );
         }
         let create_query = format!("{}{}", create, common_query);
         let sub_create_query = format!("{}{}", sub_create, common_query);
@@ -124,35 +114,12 @@ impl Query for GetLinksOpsQuery {
     }
 
     fn params(&self) -> Vec<Params> {
-        match &self.type_query {
-            Some(LinkTypeQuery::AllTypes(zome_id)) => {
-                named_params! {
-                    ":create": DhtOpType::RegisterAddLink,
-                    ":delete": DhtOpType::RegisterRemoveLink,
-                    ":base_hash": self.base,
-                    ":zome_id": **zome_id,
-                }
-            }
-            .to_vec(),
-            Some(LinkTypeQuery::SingleType(zome_id, link_type)) => {
-                named_params! {
-                    ":create": DhtOpType::RegisterAddLink,
-                    ":delete": DhtOpType::RegisterRemoveLink,
-                    ":base_hash": self.base,
-                    ":zome_id": **zome_id,
-                    ":link_type": **link_type,
-                }
-            }
-            .to_vec(),
-            None => {
-                named_params! {
-                    ":create": DhtOpType::RegisterAddLink,
-                    ":delete": DhtOpType::RegisterRemoveLink,
-                    ":base_hash": self.base,
-                }
-            }
-            .to_vec(),
+        named_params! {
+            ":create": DhtOpType::RegisterAddLink,
+            ":delete": DhtOpType::RegisterRemoveLink,
+            ":base_hash": self.base,
         }
+        .to_vec()
     }
 
     fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Item>> {

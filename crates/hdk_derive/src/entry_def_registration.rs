@@ -4,6 +4,7 @@ use proc_macro::TokenStream;
 
 use darling::FromDeriveInput;
 use darling::FromVariant;
+use proc_macro_error::abort;
 use syn::parse_macro_input;
 
 #[derive(FromVariant)]
@@ -26,7 +27,10 @@ struct Opts {
 
 pub fn derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input);
-    let opts = Opts::from_derive_input(&input).expect("Wrong options");
+    let opts = match Opts::from_derive_input(&input) {
+        Ok(o) => o,
+        Err(e) => abort!(e.span(), e),
+    };
     let Opts { ident, data } = opts;
 
     let inner: proc_macro2::TokenStream = match data {
@@ -41,8 +45,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
                      ..
                  }| {
                     let id = crate::util::to_snake_name(name, &v_ident);
-                    let visibility =
-                        parse_visibility(visibility).expect("Failed to parse visibility");
+                    let visibility = parse_visibility(&v_ident, visibility);
                     let required_validations =
                         required_validations.unwrap_or_else(|| RequiredValidations::default().0);
                     quote::quote! {
@@ -55,7 +58,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
                 },
             )
             .collect(),
-        _ => todo!("Make real error"),
+        _ => abort!(ident, "EntryDefRegistration can only be derived on Enums"),
     };
 
     let output = quote::quote! {
@@ -69,17 +72,15 @@ pub fn derive(input: TokenStream) -> TokenStream {
     output.into()
 }
 
-fn parse_visibility(variant: Option<String>) -> darling::Result<proc_macro2::TokenStream> {
+fn parse_visibility(ident: &syn::Ident, variant: Option<String>) -> proc_macro2::TokenStream {
     let variant = match variant {
         Some(v) => v,
-        None => return Ok(default_visibility()),
+        None => return default_visibility(),
     };
     match variant.as_str() {
-        "public" => Ok(quote::quote! {EntryVisibility::Public}),
-        "private" => Ok(quote::quote! {EntryVisibility::Private}),
-        _ => Err(darling::Error::custom(
-            "EntryVisibility can only be `public` or `private`",
-        )),
+        "public" => quote::quote! {EntryVisibility::Public},
+        "private" => quote::quote! {EntryVisibility::Private},
+        _ => abort!(ident, "EntryVisibility can only be `public` or `private`"),
     }
 }
 

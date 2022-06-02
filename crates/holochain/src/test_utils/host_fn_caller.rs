@@ -32,7 +32,10 @@ use unwrap_to::unwrap_to;
 // Useful for when you want to commit something
 // that will match entry defs
 pub const POST_ID: &str = "post";
+/// FIXME: This is wrong because it depends on if it is the only integrity zome.
+pub const POST_INDEX: EntryDefIndex = EntryDefIndex(0);
 pub const MSG_ID: &str = "msg";
+pub const MSG_INDEX: EntryDefIndex = EntryDefIndex(1);
 pub const VALID_ID: &str = "always_validates";
 pub const INVALID_ID: &str = "never_validates";
 
@@ -208,9 +211,15 @@ impl HostFnCaller {
         &self,
         entry: Entry,
         entry_def_id: E,
+        visibility: EntryVisibility,
     ) -> HeaderHash {
         let (ribosome, call_context, workspace_lock) = self.unpack().await;
-        let input = CreateInput::new(entry_def_id.into(), entry, ChainTopOrdering::default());
+        let input = CreateInput::new(
+            entry_def_id.into(),
+            visibility,
+            entry,
+            ChainTopOrdering::default(),
+        );
         let output = host_fn::create::create(ribosome, call_context, input).unwrap();
 
         // Write
@@ -276,14 +285,14 @@ impl HostFnCaller {
         &self,
         base: AnyLinkableHash,
         target: AnyLinkableHash,
-        zome_name: impl Into<ZomeName>,
+        link_type: impl Into<LinkType>,
         link_tag: LinkTag,
     ) -> HeaderHash {
         let (ribosome, call_context, workspace_lock) = self.unpack().await;
         let input = CreateLinkInput::new(
             base,
             target,
-            LinkTypeLocation::new(zome_name, HdkLinkType::Any),
+            link_type.into(),
             link_tag,
             ChainTopOrdering::default(),
         );
@@ -315,7 +324,7 @@ impl HostFnCaller {
     pub async fn get_links<'env>(
         &self,
         base: AnyLinkableHash,
-        type_query: Option<LinkTypeQuery>,
+        type_query: LinkTypeRanges,
         link_tag: Option<LinkTag>,
         _options: GetLinksOptions,
     ) -> Vec<Link> {
@@ -338,7 +347,7 @@ impl HostFnCaller {
     pub async fn get_link_details<'env>(
         &self,
         base: AnyLinkableHash,
-        type_query: Option<LinkTypeQuery>,
+        type_query: LinkTypeRanges,
         tag: LinkTag,
         _options: GetLinksOptions,
     ) -> Vec<(SignedHeaderHashed, Vec<SignedHeaderHashed>)> {

@@ -56,7 +56,6 @@ pub mod wasm_test {
     use crate::fixt::EntryFixturator;
     use crate::fixt::RealRibosomeFixturator;
     use ::fixt::prelude::*;
-    use hdk::hash_path::path::Component;
     use hdk::prelude::*;
     use holo_hash::EntryHash;
     use holochain_wasm_test_utils::TestWasm;
@@ -188,23 +187,5 @@ pub mod wasm_test {
             .await;
 
         assert_eq!(entry_hash_output, hash_output);
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    /// the hash path underlying anchors wraps entry_hash
-    async fn ribosome_hash_path_pwd_test() {
-        observability::test_run().ok();
-        let RibosomeTestFixture {
-            conductor, alice, ..
-        } = RibosomeTestFixture::new(TestWasm::HashPath).await;
-        let input = "foo.bar".to_string();
-        let output: EntryHash = conductor.call(&alice, "path_entry_hash", input).await;
-
-        let expected_path =
-            hdk::hash_path::path::Path::from(vec![Component::from("foo"), Component::from("bar")]);
-
-        let path_entry_hash = expected_path.path_entry_hash().unwrap();
-
-        assert_eq!(path_entry_hash.into_inner(), output.into_inner(),);
     }
 }

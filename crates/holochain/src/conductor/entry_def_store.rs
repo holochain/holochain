@@ -21,13 +21,12 @@ pub mod error;
 pub(crate) async fn get_entry_def(
     entry_def_index: EntryDefIndex,
     zome: IntegrityZomeDef,
-    dna_def: &DnaDefHashed,
+    dna_hash: &DnaHash,
     conductor_handle: &dyn ConductorHandleT,
 ) -> EntryDefStoreResult<Option<EntryDef>> {
     // Try to get the entry def from the entry def store
     let key = EntryDefBufferKey::new(zome, entry_def_index);
     let entry_def = conductor_handle.get_entry_def(&key);
-    let dna_hash = dna_def.as_hash();
     let ribosome = conductor_handle
         .get_ribosome(dna_hash)
         .map_err(|_| EntryDefStoreError::DnaFileMissing(dna_hash.clone()))?;
@@ -37,20 +36,36 @@ pub(crate) async fn get_entry_def(
         Some(_) => Ok(entry_def),
         None => Ok(get_entry_defs(ribosome)
             .await?
-            .get(entry_def_index.index())
+            .into_iter()
+            .find(
+                |(
+                    EntryDefBufferKey {
+                        entry_def_position, ..
+                    },
+                    _,
+                )| *entry_def_position == entry_def_index,
+            )
             .map(|(_, v)| v.clone())),
     }
 }
 
 pub(crate) async fn get_entry_def_from_ids(
-    zome_id: ZomeId,
     entry_def_index: EntryDefIndex,
-    dna_def: &DnaDefHashed,
+    dna_hash: &DnaHash,
     conductor_handle: &dyn ConductorHandleT,
 ) -> EntryDefStoreResult<Option<EntryDef>> {
-    match dna_def.integrity_zomes.get(zome_id.index()) {
-        Some((_, zome)) => {
-            get_entry_def(entry_def_index, zome.clone(), dna_def, conductor_handle).await
+    let ribosome = conductor_handle
+        .get_ribosome(dna_hash)
+        .map_err(|_| EntryDefStoreError::DnaFileMissing(dna_hash.clone()))?;
+    match ribosome.find_zome_from_entry(&entry_def_index) {
+        Some(zome) => {
+            get_entry_def(
+                entry_def_index,
+                zome.into_inner().1,
+                dna_hash,
+                conductor_handle,
+            )
+            .await
         }
         None => Ok(None),
     }

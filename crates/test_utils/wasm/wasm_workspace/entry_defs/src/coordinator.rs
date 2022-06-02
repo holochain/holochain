@@ -3,10 +3,14 @@ use hdk::prelude::*;
 
 #[hdk_extern]
 pub fn assert_indexes(_: ()) -> ExternResult<()> {
-    assert_eq!(EntryDefIndex(0), EntryTypes::Post(Post).entry_def_index());
+    // Note that this only works if there is a single integrity zome.
+    assert_eq!(
+        EntryDefIndex(0),
+        EntryDefIndex::try_from(EntryTypes::Post(Post))?
+    );
     assert_eq!(
         EntryDefIndex(1),
-        EntryTypes::Comment(Comment).entry_def_index()
+        EntryDefIndex::try_from(EntryTypes::Comment(Comment))?
     );
     Ok(())
 }

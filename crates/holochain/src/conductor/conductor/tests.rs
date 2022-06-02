@@ -227,7 +227,7 @@ async fn test_list_running_apps_for_cell_id() {
     observability::test_run().ok();
 
     let mk_dna = |name: &'static str| async move {
-        let zome = InlineIntegrityZome::new_unique(Vec::new());
+        let zome = InlineIntegrityZome::new_unique(Vec::new(), 0);
         SweetDnaFile::unique_from_inline_zomes((name, zome).into())
             .await
             .unwrap()
@@ -288,7 +288,7 @@ async fn common_genesis_test_app(
     conductor: &mut SweetConductor,
     custom_zomes: impl Into<InlineZomeSet>,
 ) -> ConductorApiResult<SweetApp> {
-    let hardcoded_zome = InlineIntegrityZome::new_unique(Vec::new());
+    let hardcoded_zome = InlineIntegrityZome::new_unique(Vec::new(), 0);
 
     // Just a strong reminder that we need to be careful once we start using existing Cells:
     // When a Cell panics or fails validation in general, we want to disable all Apps touching that Cell.
@@ -316,7 +316,7 @@ async fn common_genesis_test_app(
 #[tokio::test(flavor = "multi_thread")]
 async fn test_uninstall_app() {
     observability::test_run().ok();
-    let zome = InlineIntegrityZome::new_unique(Vec::new());
+    let zome = InlineIntegrityZome::new_unique(Vec::new(), 0);
     let mut conductor = SweetConductor::from_standard_config().await;
     common_genesis_test_app(&mut conductor, ("custom", zome))
         .await
@@ -350,7 +350,7 @@ async fn test_uninstall_app() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_reconciliation_idempotency() {
     observability::test_run().ok();
-    let zome = InlineIntegrityZome::new_unique(Vec::new());
+    let zome = InlineIntegrityZome::new_unique(Vec::new(), 0);
     let mut conductor = SweetConductor::from_standard_config().await;
     common_genesis_test_app(&mut conductor, ("custom", zome))
         .await
@@ -512,12 +512,13 @@ pub(crate) fn simple_create_entry_zome() -> InlineZomeSet {
         "integrity_create_entry",
         "create_entry",
         vec![unit_entry_def.clone()],
+        0,
     )
     .callback("create_entry", "create", move |api, ()| {
-        let entry_def_id: EntryDefId = unit_entry_def.id.clone();
         let entry = Entry::app(().try_into().unwrap()).unwrap();
         let hash = api.create(CreateInput::new(
-            ("integrity_create_entry", entry_def_id).into(),
+            InlineZomeSet::get_entry_location(&api, 0),
+            EntryVisibility::Public,
             entry,
             ChainTopOrdering::default(),
         ))?;
@@ -582,7 +583,7 @@ async fn test_reenable_app() {
 
     // - We can still make a zome call after reactivation
     let _: HeaderHash = conductor
-        .call_fallible(&cell.zome("custom"), "create", ())
+        .call_fallible(&cell.zome("create_entry"), "create", ())
         .await
         .unwrap();
 
@@ -604,8 +605,8 @@ async fn test_reenable_app() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_installation_fails_if_genesis_self_check_is_invalid() {
     observability::test_run().ok();
-    let bad_zome = InlineZomeSet::new_unique_single("integrity", "custom", Vec::new()).callback(
-        "custom",
+    let bad_zome = InlineZomeSet::new_unique_single("integrity", "custom", Vec::new(), 0).callback(
+        "integrity",
         "genesis_self_check",
         |_api, _data: GenesisSelfCheckData| {
             Ok(GenesisSelfCheckResult::Invalid(
@@ -633,7 +634,7 @@ async fn test_bad_entry_validation_after_genesis_returns_zome_call_error() {
     observability::test_run().ok();
     let unit_entry_def = EntryDef::default_with_id("unit");
     let bad_zome =
-        InlineZomeSet::new_unique_single("integrity", "custom", vec![unit_entry_def.clone()])
+        InlineZomeSet::new_unique_single("integrity", "custom", vec![unit_entry_def.clone()], 0)
             .callback("integrity", "validate", |_api, op: Op| match op {
                 Op::StoreEntry { header, .. }
                     if header.hashed.content.app_entry_type().is_some() =>
@@ -645,10 +646,10 @@ async fn test_bad_entry_validation_after_genesis_returns_zome_call_error() {
                 _ => Ok(ValidateResult::Valid),
             })
             .callback("custom", "create", move |api, ()| {
-                let entry_def_id: EntryDefId = unit_entry_def.id.clone();
                 let entry = Entry::app(().try_into().unwrap()).unwrap();
                 let hash = api.create(CreateInput::new(
-                    ("integrity", entry_def_id).into(),
+                    InlineZomeSet::get_entry_location(&api, 0),
+                    EntryVisibility::Public,
                     entry,
                     ChainTopOrdering::default(),
                 ))?;
@@ -692,7 +693,7 @@ async fn test_apps_disable_on_panic_after_genesis() {
     observability::test_run().ok();
     let unit_entry_def = EntryDef::default_with_id("unit");
     let bad_zome =
-        InlineZomeSet::new_unique_single("integrity", "custom", vec![unit_entry_def.clone()])
+        InlineZomeSet::new_unique_single("integrity", "custom", vec![unit_entry_def.clone()], 0)
             // We need a different validation callback that doesn't happen inline
             // so we can cause failure in it. But it must also be after genesis.
             .callback("integrity", "validate", |_api, op: Op| {
@@ -708,10 +709,10 @@ async fn test_apps_disable_on_panic_after_genesis() {
                 }
             })
             .callback("custom", "create", move |api, ()| {
-                let entry_def_id: EntryDefId = unit_entry_def.id.clone();
                 let entry = Entry::app(().try_into().unwrap()).unwrap();
                 let hash = api.create(CreateInput::new(
-                    ("integrity", entry_def_id).into(),
+                    InlineZomeSet::get_entry_location(&api, 0),
+                    EntryVisibility::Public,
                     entry,
                     ChainTopOrdering::default(),
                 ))?;
@@ -815,7 +816,7 @@ async fn test_cell_and_app_status_reconciliation() {
     use AppStatusFx::*;
     use AppStatusKind::*;
     use CellStatus::*;
-    let mk_zome = || ("zome", InlineIntegrityZome::new_unique(Vec::new()));
+    let mk_zome = || ("zome", InlineIntegrityZome::new_unique(Vec::new(), 0));
     let dnas = [
         mk_dna(mk_zome()).await.unwrap().0,
         mk_dna(mk_zome()).await.unwrap().0,
@@ -887,7 +888,7 @@ async fn test_cell_and_app_status_reconciliation() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_app_status_filters() {
     observability::test_run().ok();
-    let zome = InlineIntegrityZome::new_unique(Vec::new());
+    let zome = InlineIntegrityZome::new_unique(Vec::new(), 0);
     let dnas = [mk_dna(("dna", zome)).await.unwrap().0];
 
     let mut conductor = SweetConductor::from_standard_config().await;
@@ -960,7 +961,7 @@ async fn test_init_concurrency() {
     let num_inits_clone = num_inits.clone();
     let num_calls_clone = num_calls.clone();
 
-    let zome = InlineZomeSet::new_unique_single("integrity", "zome", vec![])
+    let zome = InlineZomeSet::new_unique_single("integrity", "zome", vec![], 0)
         .callback("zome", "init", move |_, ()| {
             num_inits.clone().fetch_add(1, Ordering::SeqCst);
             Ok(InitCallbackResult::Pass)

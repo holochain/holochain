@@ -306,7 +306,7 @@ impl Db {
                     Db::MetaLinkEmpty(link_add) => {
                         let query = GetLinksQuery::new(
                             link_add.base_address.clone(),
-                            Some(LinkTypeQuery::AllTypes(link_add.zome_id)),
+                            Some((..).into()),
                             Some(link_add.tag.clone()),
                         );
                         let res = query.run(Txn::from(&txn)).unwrap();

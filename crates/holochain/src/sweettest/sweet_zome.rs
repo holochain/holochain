@@ -34,11 +34,14 @@ impl SweetEasyInline {
 
     /// Create a single integrity zome with the [`ZomeName`] "integrity"
     /// and coordinator zome with the [`ZomeName`] Coordinator.
-    pub fn new(entry_defs: Vec<EntryDef>) -> Self {
-        Self(InlineZomeSet::new_unique(
-            [(Self::INTEGRITY, entry_defs)],
-            [Self::COORDINATOR],
-        ))
+    pub fn new(entry_defs: Vec<EntryDef>, num_link_types: u8) -> Self {
+        Self(
+            InlineZomeSet::new_unique(
+                [(Self::INTEGRITY, entry_defs, num_link_types)],
+                [Self::COORDINATOR],
+            )
+            .with_dependency(Self::COORDINATOR, Self::INTEGRITY),
+        )
     }
 
     /// Add a callback to the integrity zome.

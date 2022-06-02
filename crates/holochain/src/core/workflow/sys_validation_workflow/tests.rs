@@ -223,7 +223,8 @@ async fn bob_links_in_a_legit_way(
     call_data
         .commit_entry(
             base.clone().try_into().unwrap(),
-            (TestWasm::Create.integrity_zome_name(), POST_ID),
+            POST_INDEX,
+            EntryVisibility::Public,
         )
         .await;
 
@@ -231,7 +232,8 @@ async fn bob_links_in_a_legit_way(
     call_data
         .commit_entry(
             target.clone().try_into().unwrap(),
-            (TestWasm::Create.integrity_zome_name(), POST_ID),
+            POST_INDEX,
+            EntryVisibility::Public,
         )
         .await;
 
@@ -241,7 +243,7 @@ async fn bob_links_in_a_legit_way(
         .create_link(
             base_entry_hash.clone().into(),
             target_entry_hash.clone().into(),
-            TestWasm::Create.integrity_zome_name(),
+            LinkType(0),
             link_tag.clone(),
         )
         .await;
@@ -276,7 +278,8 @@ async fn bob_makes_a_large_link(
     let original_header_address = call_data
         .commit_entry(
             base.clone().try_into().unwrap(),
-            (TestWasm::Create.integrity_zome_name(), POST_ID),
+            POST_INDEX,
+            EntryVisibility::Public,
         )
         .await;
 
@@ -284,7 +287,8 @@ async fn bob_makes_a_large_link(
     call_data
         .commit_entry(
             target.clone().try_into().unwrap(),
-            (TestWasm::Create.integrity_zome_name(), POST_ID),
+            POST_INDEX,
+            EntryVisibility::Public,
         )
         .await;
 
@@ -294,7 +298,7 @@ async fn bob_makes_a_large_link(
         .create_link(
             base_entry_hash.clone().into(),
             target_entry_hash.clone().into(),
-            TestWasm::Create.integrity_zome_name(),
+            LinkType(0),
             link_tag.clone(),
         )
         .await;
@@ -322,7 +326,8 @@ async fn dodgy_bob(bob_cell_id: &CellId, handle: &ConductorHandle, dna_file: &Dn
     call_data
         .commit_entry(
             legit_entry.clone().try_into().unwrap(),
-            (TestWasm::Create.integrity_zome_name(), POST_ID),
+            POST_INDEX,
+            EntryVisibility::Public,
         )
         .await;
 

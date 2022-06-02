@@ -568,7 +568,9 @@ mod tests {
         );
         let link_key = WireLinkKey {
             base: hash.into(),
-            type_query: Some(LinkTypeQuery::AllTypes(0.into())),
+            type_query: Some(LinkTypeRanges(vec![LinkTypeRange::Inclusive(
+                LinkType(0)..=LinkType(0),
+            )])),
             tag: None,
         };
 

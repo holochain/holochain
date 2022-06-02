@@ -1,12 +1,10 @@
 use hdk::prelude::*;
+use integrity::*;
 
-#[derive(ToZomeName)]
-enum Zomes {
-    IntegrityQuery,
-}
+mod integrity;
 
 fn path(s: &str) -> ExternResult<EntryHash> {
-    let path = Path::from(s).locate(Zomes::IntegrityQuery);
+    let path = Path::from(s).try_into_typed(LinkTypes::Query)?;
     path.ensure()?;
     path.path_entry_hash()
 }

@@ -1,5 +1,3 @@
-use std::borrow::Borrow;
-
 use holochain_deterministic_integrity::prelude::*;
 
 #[hdk_entry_helper]
@@ -19,98 +17,6 @@ pub enum EntryTypes {
     Msg(Msg),
     #[entry_def(required_validations = 5, visibility = "private")]
     PrivMsg(PrivMsg),
-}
-
-impl TryFrom<LocalZomeTypeId> for UnitEntryTypes {
-    type Error = WasmError;
-
-    fn try_from(value: LocalZomeTypeId) -> Result<Self, Self::Error> {
-        Self::iter()
-            .find(|u| LocalZomeTypeId::from(*u) == value)
-            .ok_or_else(|| {
-                WasmError::Guest(format!(
-                    "local index {} does not match any {}",
-                    value.0, "UnitEntryTypes"
-                ))
-            })
-    }
-}
-
-impl UnitEntryTypes {
-    fn iter() -> impl Iterator<Item = Self> {
-        vec![Self::Post, Self::Msg, Self::PrivMsg].into_iter()
-    }
-}
-
-impl From<UnitEntryTypes> for LocalZomeTypeId {
-    fn from(v: UnitEntryTypes) -> Self {
-        match v {
-            UnitEntryTypes::Post => LocalZomeTypeId(0),
-            UnitEntryTypes::Msg => LocalZomeTypeId(1),
-            UnitEntryTypes::PrivMsg => LocalZomeTypeId(2),
-        }
-    }
-}
-
-pub trait EntryTypesHelper: Sized {
-    fn try_from_local_type<I>(type_index: I, entry: &Entry) -> Result<Self, WasmError>
-    where
-        LocalZomeTypeId: From<I>;
-    fn try_from_global_type<I>(type_index: I, entry: &Entry) -> Result<Self, WasmError>
-    where
-        GlobalZomeTypeId: From<I>;
-}
-
-impl EntryTypesHelper for EntryTypes {
-    fn try_from_local_type<I>(type_index: I, entry: &Entry) -> Result<Self, WasmError>
-    where
-        LocalZomeTypeId: From<I>,
-    {
-        match UnitEntryTypes::try_from(LocalZomeTypeId::from(type_index))? {
-            UnitEntryTypes::Post => Ok(Self::Post(Post::try_from(entry)?)),
-            UnitEntryTypes::Msg => Ok(Self::Msg(Msg::try_from(entry)?)),
-            UnitEntryTypes::PrivMsg => Ok(Self::PrivMsg(PrivMsg::try_from(entry)?)),
-        }
-    }
-    fn try_from_global_type<I>(type_index: I, entry: &Entry) -> Result<Self, WasmError>
-    where
-        GlobalZomeTypeId: From<I>,
-    {
-        let index: GlobalZomeTypeId = type_index.into();
-        match zome_info()?.zome_types.entries.to_local_scope(index) {
-            Some(local_index) => Self::try_from_local_type(local_index, &entry),
-            _ => Err(WasmError::Guest(format!(
-                "global index {} does not map to any local scope for this zome",
-                index.0
-            ))),
-        }
-    }
-}
-
-impl TryFrom<&EntryTypes> for EntryDefIndex {
-    type Error = WasmError;
-
-    fn try_from(value: &EntryTypes) -> Result<Self, Self::Error> {
-        zome_info()?
-            .zome_types
-            .entries
-            .to_global_scope(value.to_unit())
-            .map(Self::from)
-            .ok_or_else(|| {
-                WasmError::Guest(format!(
-                    "local type {:?} does not match any types in global scope",
-                    value.to_unit()
-                ))
-            })
-    }
-}
-
-impl TryFrom<&&EntryTypes> for EntryDefIndex {
-    type Error = WasmError;
-
-    fn try_from(value: &&EntryTypes) -> Result<Self, Self::Error> {
-        Self::try_from(*value)
-    }
 }
 
 #[hdk_extern]
@@ -148,9 +54,10 @@ fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             {
                 Some(local_type_index) => {
                     match EntryTypes::try_from_local_type(local_type_index, &entry)? {
-                        EntryTypes::Post(_) => (),
-                        EntryTypes::Msg(_) => (),
-                        EntryTypes::PrivMsg(_) => (),
+                        Some(EntryTypes::Post(_)) => (),
+                        Some(EntryTypes::Msg(_)) => (),
+                        Some(EntryTypes::PrivMsg(_)) => (),
+                        None => (),
                     }
                 }
                 None => (),
@@ -167,14 +74,16 @@ fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 None => (),
             }
             match EntryTypes::try_from_global_type(*entry_def_index, &entry)? {
-                EntryTypes::Post(_) => (),
-                EntryTypes::Msg(_) => (),
-                EntryTypes::PrivMsg(_) => (),
+                Some(EntryTypes::Post(_)) => (),
+                Some(EntryTypes::Msg(_)) => (),
+                Some(EntryTypes::PrivMsg(_)) => (),
+                None => (),
             }
             match EntryTypes::try_from_local_type(UnitEntryTypes::Post, &entry)? {
-                EntryTypes::Post(_) => (),
-                EntryTypes::Msg(_) => (),
-                EntryTypes::PrivMsg(_) => (),
+                Some(EntryTypes::Post(_)) => (),
+                Some(EntryTypes::Msg(_)) => (),
+                Some(EntryTypes::PrivMsg(_)) => (),
+                None => (),
             }
         }
     }
@@ -317,6 +226,7 @@ pub mod test {
                     id: 0.into(),
                     entry_defs: EntryDefs(vec![]),
                     extern_fns: vec![],
+                    zome_types: Default::default(),
                 })
             }
         });

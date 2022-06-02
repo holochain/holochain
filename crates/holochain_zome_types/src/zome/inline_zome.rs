@@ -40,6 +40,9 @@ pub struct InlineZome<T> {
     /// The collection of closures which define this zome.
     /// These callbacks are directly called by the Ribosome.
     pub(super) callbacks: HashMap<FunctionName, InlineZomeFn>,
+
+    /// Global values for this zomes.
+    pub(super) globals: HashMap<String, u8>,
 }
 
 impl<T> InlineZome<T> {
@@ -49,6 +52,7 @@ impl<T> InlineZome<T> {
             _t: PhantomData,
             uuid: uuid.into(),
             callbacks: HashMap::new(),
+            globals: HashMap::new(),
         }
     }
 
@@ -93,18 +97,27 @@ impl<T> InlineZome<T> {
     pub fn uuid(&self) -> String {
         self.uuid.clone()
     }
+
+    pub fn set_global(mut self, name: impl Into<String>, val: u8) -> Self {
+        self.globals.insert(name.into(), val);
+        self
+    }
 }
 
 impl InlineIntegrityZome {
     /// Create a new integrity zome with the given UID
-    pub fn new<S: Into<String>>(uuid: S, entry_defs: Vec<EntryDef>) -> Self {
+    pub fn new<S: Into<String>>(uuid: S, entry_defs: Vec<EntryDef>, num_link_types: u8) -> Self {
+        let num_entry_types = entry_defs.len();
         let entry_defs_callback =
             move |_, _: ()| Ok(EntryDefsCallbackResult::Defs(entry_defs.clone().into()));
-        Self::new_inner(uuid).callback("entry_defs", Box::new(entry_defs_callback))
+        Self::new_inner(uuid)
+            .callback("entry_defs", Box::new(entry_defs_callback))
+            .set_global("__num_entry_types", num_entry_types.try_into().unwrap())
+            .set_global("__num_link_types", num_link_types)
     }
     /// Create a new integrity zome with a unique random UID
-    pub fn new_unique(entry_defs: Vec<EntryDef>) -> Self {
-        Self::new(nanoid::nanoid!(), entry_defs)
+    pub fn new_unique(entry_defs: Vec<EntryDef>, num_link_types: u8) -> Self {
+        Self::new(nanoid::nanoid!(), entry_defs, num_link_types)
     }
 }
 
@@ -137,6 +150,8 @@ pub trait InlineZomeT: std::fmt::Debug {
 
     /// Accessor
     fn uuid(&self) -> String;
+
+    fn get_global(&self, name: &str) -> Option<u8>;
 }
 
 /// An inline zome function takes a Host API and an input, and produces an output.
@@ -159,6 +174,10 @@ impl<T: std::fmt::Debug> InlineZomeT for InlineZome<T> {
 
     fn uuid(&self) -> String {
         self.uuid()
+    }
+
+    fn get_global(&self, name: &str) -> Option<u8> {
+        self.globals.get(name).copied()
     }
 }
 
@@ -229,7 +248,7 @@ mod tests {
     #[test]
     #[allow(unused_variables, unreachable_code)]
     fn can_create_inline_dna() {
-        let zome = InlineIntegrityZome::new("", vec![]).callback("zome_fn_1", |api, a: ()| {
+        let zome = InlineIntegrityZome::new("", vec![], 0).callback("zome_fn_1", |api, a: ()| {
             let hash: AnyDhtHash = todo!();
             Ok(api
                 .get(vec![GetInput::new(hash, GetOptions::default())])

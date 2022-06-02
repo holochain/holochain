@@ -102,8 +102,6 @@ pub mod test {
 
     test_entry_impl!(Something);
 
-    const ENTRY_DEF_ID: &str = "something";
-
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_must_get_entry_test<'a>() {
         observability::test_run().ok();
@@ -117,10 +115,7 @@ pub mod test {
 
         let entry = Entry::try_from(Something(vec![1, 2, 3])).unwrap();
         let header_hash = alice_host_fn_caller
-            .commit_entry(
-                entry.clone(),
-                (TestWasm::MustGet.integrity_zome_name(), ENTRY_DEF_ID),
-            )
+            .commit_entry(entry.clone(), EntryDefIndex(0), EntryVisibility::Public)
             .await;
 
         let dht_db = conductor

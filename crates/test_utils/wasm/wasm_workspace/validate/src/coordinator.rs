@@ -1,19 +1,12 @@
 use crate::integrity::*;
 use hdk::prelude::*;
 
-#[derive(ToZomeName)]
-enum EntryZomes {
-    IntegrityValidate,
-}
-
 impl TryFrom<&ThisWasmEntry> for CreateInput {
     type Error = WasmError;
     fn try_from(this_wasm_entry: &ThisWasmEntry) -> Result<Self, Self::Error> {
         Ok(Self::new(
-            EntryDefLocation::App(AppEntryDefLocation {
-                zome: EntryZomes::IntegrityValidate.into(),
-                entry: this_wasm_entry.entry_def_name(),
-            }),
+            EntryDefIndex::try_from(this_wasm_entry)?,
+            EntryVisibility::Public,
             Entry::try_from(this_wasm_entry)?,
             ChainTopOrdering::default(),
         ))

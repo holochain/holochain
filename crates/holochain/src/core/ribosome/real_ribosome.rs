@@ -216,43 +216,34 @@ fn context_key_from_key(key: &[u8; 32]) -> u64 {
 
 impl RealRibosome {
     /// Create a new instance
-    pub async fn new(dna_file: DnaFile) -> RibosomeResult<Self> {
+    pub fn new(dna_file: DnaFile) -> RibosomeResult<Self> {
         let ribosome = Self {
             dna_file,
             zome_types: Default::default(),
             zome_dependencies: Default::default(),
         };
-        let (ribosome, result) = tokio::task::spawn_blocking(move || {
-            let r = ribosome.run_entry_defs(EntryDefsHostAccess, EntryDefsInvocation);
-            (ribosome, r)
-        })
-        .await?;
-        let map = match result? {
-            EntryDefsResult::Defs(mut zomes) => {
-                let iter = ribosome
-                    .dna_def()
-                    .integrity_zomes
-                    .iter()
-                    .map(|(zome_name, _)| {
-                        let entry_def_count = zomes
-                            .remove(zome_name)
-                            .map(|defs| {
-                                defs.into_iter()
-                                    .filter(|EntryDef { id, .. }| matches!(id, EntryDefId::App(_)))
-                                    .count()
-                            })
-                            .unwrap_or(0);
-                        let link_type_count = 0;
-                        // FIXME: Use try_into for u8 conversion and handle error.
-                        (
-                            EntryDefIndex(entry_def_count as u8),
-                            LinkType(link_type_count as u8),
-                        )
-                    });
-                GlobalZomeTypes::from_ordered_iterator(iter)
-            }
-            EntryDefsResult::Err(_, _) => todo!(),
-        };
+        let iter = ribosome
+            .dna_def()
+            .integrity_zomes
+            .iter()
+            .map(|(name, zome)| {
+                let zome = Zome::new(name.clone(), zome.clone().erase_type());
+                let num_entry_types = match ribosome.get_const_fn(&zome, "__num_entry_types")? {
+                    Some(i) => EntryDefIndex(
+                        u8::try_from(i).map_err(|_| ZomeTypesError::EntryTypeIndexOverflow)?,
+                    ),
+                    None => EntryDefIndex(0),
+                };
+                let num_link_types = match ribosome.get_const_fn(&zome, "__num_link_types")? {
+                    Some(i) => LinkType(
+                        u8::try_from(i).map_err(|_| ZomeTypesError::LinkTypeIndexOverflow)?,
+                    ),
+                    None => LinkType(0),
+                };
+                RibosomeResult::Ok((num_entry_types, num_link_types))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let map = GlobalZomeTypes::from_ordered_iterator(iter.into_iter());
 
         let zome_types = Arc::new(map?);
 
@@ -275,20 +266,36 @@ impl RealRibosome {
                 } else {
                     // Integrity zomes need to have themselves as a dependency.
                     if ribosome.dna_def().is_integrity_zome(zome_name) {
-                        let id = ZomeId(integrity_zomes.get(zome_name).copied()?.try_into().ok()?);
+                        let id = ZomeId(
+                            integrity_zomes
+                                .get(zome_name)
+                                .copied()
+                                .ok_or(ZomeTypesError::MissingDependenciesForZome(
+                                    zome_name.clone(),
+                                ))?
+                                .try_into()
+                                .map_err(|_| ZomeTypesError::ZomeIndexOverflow)?,
+                        );
                         dependencies.push(id);
                     }
                     for name in def.dependencies() {
-                        let id = ZomeId(integrity_zomes.get(name).copied()?.try_into().ok()?);
+                        let id = ZomeId(
+                            integrity_zomes
+                                .get(name)
+                                .copied()
+                                .ok_or(ZomeTypesError::MissingDependenciesForZome(
+                                    zome_name.clone(),
+                                ))?
+                                .try_into()
+                                .map_err(|_| ZomeTypesError::ZomeIndexOverflow)?,
+                        );
                         dependencies.push(id);
                     }
                 }
 
-                Some((zome_name.clone(), dependencies))
+                Ok((zome_name.clone(), dependencies))
             })
-            .collect::<Option<HashMap<_, _>>>()
-            // FIXME: Add error
-            .unwrap();
+            .collect::<RibosomeResult<HashMap<_, _>>>()?;
 
         Ok(Self {
             dna_file: ribosome.dna_file,
@@ -587,10 +594,18 @@ impl RibosomeT for RealRibosome {
                             zome, error_string
                         ))))
                     }
-                    EntryDefsResult::Defs(defs) => match defs.get(zome.zome_name()) {
-                        Some(entry_defs) => entry_defs.clone(),
-                        None => Vec::new().into(),
-                    },
+                    EntryDefsResult::Defs(defs) => {
+                        let vec = zome_dependencies
+                            .iter()
+                            .filter_map(|zome_id| {
+                                self.dna_def().integrity_zomes.get(zome_id.0 as usize)
+                            })
+                            .flat_map(|(zome_name, _)| {
+                                defs.get(zome_name).map(|e| e.0.clone()).unwrap_or_default()
+                            })
+                            .collect::<Vec<_>>();
+                        vec.into()
+                    }
                 }
             },
             extern_fns: {
@@ -602,6 +617,10 @@ impl RibosomeT for RealRibosome {
                             .info()
                             .exports
                             .iter()
+                            .filter(|(name, _)| {
+                                name.as_str() != "__num_entry_types"
+                                    && name.as_str() != "__num_link_types"
+                            })
                             .map(|(name, _index)| FunctionName::new(name))
                             .collect();
                         extern_fns.sort();
@@ -667,6 +686,49 @@ impl RibosomeT for RealRibosome {
                 let result = zome.0.maybe_call(Box::new(api), to_call, input)?;
                 Ok(result)
             }
+        }
+    }
+
+    fn get_const_fn(&self, zome: &Zome, name: &str) -> Result<Option<u8>, RibosomeError> {
+        // Create a blank context as this is not actually used.
+        let call_context = CallContext {
+            zome: zome.clone(),
+            function_name: name.into(),
+            host_context: HostContext::EntryDefs(EntryDefsHostAccess {}),
+            auth: super::InvocationAuth::LocalCallback,
+        };
+
+        match zome.zome_def() {
+            ZomeDef::Wasm(_) => {
+                let module = self.module(zome.zome_name())?;
+                if module.exports().functions().any(|f| {
+                    f.name() == name
+                        && f.ty().params().is_empty()
+                        && f.ty().results() == &[Type::I32]
+                }) {
+                    let (instance, context_key) = self.instance(call_context)?;
+
+                    let result = instance
+                        .lock()
+                        .exports
+                        .get_native_function::<(), u8>(name)
+                        .ok()
+                        .map_or(Ok(None), |func| Ok(Some(func.call()?)))
+                        .map_err(|e: RuntimeError| WasmError::Host(format!("{}", e)))?;
+
+                    // Remove the blank context.
+                    CONTEXT_MAP.lock().remove(&context_key);
+
+                    Ok(result)
+                } else {
+                    // the func doesn't exist
+                    // the callback is not implemented
+                    Ok(None)
+                }
+            }
+            ZomeDef::Inline {
+                inline_zome: zome, ..
+            } => Ok(zome.0.get_global(name)),
         }
     }
 
@@ -776,6 +838,32 @@ impl RibosomeT for RealRibosome {
 
     fn dna_file(&self) -> &DnaFile {
         &self.dna_file
+    }
+
+    fn find_zome_from_entry(&self, entry_index: &EntryDefIndex) -> Option<IntegrityZome> {
+        self.zome_types
+            .find_zome_id_from_entry(entry_index)
+            .and_then(|zome_id| {
+                self.dna_file
+                    .dna_def()
+                    .integrity_zomes
+                    .get(zome_id.0 as usize)
+                    .cloned()
+                    .map(|(name, def)| IntegrityZome::new(name, def))
+            })
+    }
+
+    fn find_zome_from_link(&self, link_index: &LinkType) -> Option<IntegrityZome> {
+        self.zome_types
+            .find_zome_id_from_link(link_index)
+            .and_then(|zome_id| {
+                self.dna_file
+                    .dna_def()
+                    .integrity_zomes
+                    .get(zome_id.0 as usize)
+                    .cloned()
+                    .map(|(name, def)| IntegrityZome::new(name, def))
+            })
     }
 }
 

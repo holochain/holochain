@@ -7,6 +7,7 @@ use super::error::ConductorApiResult;
 use crate::conductor::interface::SignalBroadcaster;
 use crate::conductor::ConductorHandle;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitArgs;
+use crate::core::ribosome::real_ribosome::RealRibosome;
 use crate::core::workflow::ZomeCallResult;
 use async_trait::async_trait;
 use holo_hash::DnaHash;
@@ -87,6 +88,12 @@ impl CellConductorApiT for CellConductorApi {
             .ok_or_else(|| ConductorApiError::DnaMissing(self.cell_id.dna_hash().clone()))
     }
 
+    fn get_this_ribosome(&self) -> ConductorApiResult<RealRibosome> {
+        Ok(self
+            .conductor_handle
+            .get_ribosome(self.cell_id.dna_hash())?)
+    }
+
     fn get_zome(&self, dna_hash: &DnaHash, zome_name: &ZomeName) -> ConductorApiResult<Zome> {
         Ok(self
             .get_dna(dna_hash)
@@ -139,6 +146,9 @@ pub trait CellConductorApiT: Send + Sync + Sized {
 
     /// Get the [`Dna`](holochain_types::prelude::Dna) of this cell from the [`RibosomeStore`](crate::conductor::dna_store::RibosomeStore)
     fn get_this_dna(&self) -> ConductorApiResult<DnaFile>;
+
+    /// Get the [`RealRibosome`] of this cell from the [`RibosomeStore`](crate::conductor::dna_store::RibosomeStore)
+    fn get_this_ribosome(&self) -> ConductorApiResult<RealRibosome>;
 
     /// Get a [`Zome`](holochain_types::prelude::Zome) from this cell's Dna
     fn get_zome(&self, dna_hash: &DnaHash, zome_name: &ZomeName) -> ConductorApiResult<Zome>;

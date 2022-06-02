@@ -1,9 +1,7 @@
 use hdk::prelude::*;
+use integrity::LinkTypes;
 
-#[derive(ToZomeName)]
-enum Zomes {
-    IntegrityHashPath,
-}
+mod integrity;
 
 #[hdk_extern]
 fn path_entry_hash(path_string: String) -> ExternResult<EntryHash> {
@@ -12,15 +10,16 @@ fn path_entry_hash(path_string: String) -> ExternResult<EntryHash> {
 
 #[hdk_extern]
 fn exists(path_string: String) -> ExternResult<bool> {
-    Path::from(path_string)
-        .locate(Zomes::IntegrityHashPath)
-        .exists()
+    debug!(%path_string);
+    let p = Path::from(path_string).try_into_typed(LinkTypes::Path)?;
+    debug!(?p);
+    p.exists()
 }
 
 #[hdk_extern]
 fn ensure(path_string: String) -> ExternResult<()> {
     Path::from(path_string)
-        .locate(Zomes::IntegrityHashPath)
+        .try_into_typed(LinkTypes::Path)?
         .ensure()
 }
 
@@ -32,13 +31,13 @@ fn delete_link(delete_link: HeaderHash) -> ExternResult<HeaderHash> {
 #[hdk_extern]
 fn children(path_string: String) -> ExternResult<Vec<Link>> {
     Path::from(path_string)
-        .locate(Zomes::IntegrityHashPath)
+        .try_into_typed(LinkTypes::Path)?
         .children()
 }
 
 #[hdk_extern]
 fn children_details(path_string: String) -> ExternResult<LinkDetails> {
     Path::from(path_string)
-        .locate(Zomes::IntegrityHashPath)
+        .try_into_typed(LinkTypes::Path)?
         .children_details()
 }

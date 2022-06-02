@@ -53,11 +53,7 @@ impl Invocation for ValidationPackageInvocation {
     fn fn_components(&self) -> FnComponents {
         // @todo zome_id is a u8, is this really an ergonomic way for us to interact with
         // entry types at the happ code level?
-        vec![
-            "validation_package".into(),
-            format!("{}", self.app_entry_type.zome_id()),
-        ]
-        .into()
+        vec!["validation_package".into()].into()
     }
     fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
         ExternIO::encode(self.app_entry_type)
@@ -218,10 +214,7 @@ mod test {
 
         let mut expected = vec![
             "validation_package".to_string(),
-            format!(
-                "validation_package_{}",
-                validation_package_invocation.app_entry_type.zome_id()
-            ),
+            format!("validation_package"),
         ];
         for fn_component in validation_package_invocation.fn_components() {
             assert_eq!(fn_component, expected.pop().unwrap(),);

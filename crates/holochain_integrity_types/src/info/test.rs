@@ -1,7 +1,7 @@
 use super::*;
 
-fn make_scope(ranges: Vec<Range<u8>>) -> ScopedZomeType {
-    ScopedZomeType(
+fn make_scope(ranges: Vec<Range<u8>>) -> ScopedZomeTypes {
+    ScopedZomeTypes(
         ranges
             .into_iter()
             .map(|r| GlobalZomeTypeId(r.start)..GlobalZomeTypeId(r.end))

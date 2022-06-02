@@ -5,8 +5,6 @@ use integrity_zome::Post;
 use integrity_zome::PrivMsg;
 use test_wasm_integrity_zome as integrity_zome;
 
-
-
 fn post() -> Post {
     Post("foo".into())
 }
@@ -25,6 +23,7 @@ fn create_entry(_: ()) -> ExternResult<HeaderHash> {
     HDK.with(|h| {
         h.borrow().create(CreateInput::new(
             EntryDefIndex::try_from(&post)?,
+            EntryVisibility::from(&post),
             post.try_into().unwrap(),
             // This is used to test many conductors thrashing creates between
             // each other so we want to avoid retries that make the test take

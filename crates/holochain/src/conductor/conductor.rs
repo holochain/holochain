@@ -773,7 +773,7 @@ impl Conductor {
                 .modify_phenotype(random_uid(), properties)
         })?;
         let child_dna_hash = child_dna.dna_hash().to_owned();
-        let child_ribosome = RealRibosome::new(child_dna).await?;
+        let child_ribosome = RealRibosome::new(child_dna)?;
         self.register_phenotype(child_ribosome);
         let (_, cell_id) = self
             .update_state_prime(move |mut state| {
@@ -838,7 +838,7 @@ impl Conductor {
                         let wasms = wasms.collect::<Vec<_>>();
                         async move {
                             let dna_file = DnaFile::new(dna_def.into_content(), wasms).await?;
-                            let ribosome = RealRibosome::new(dna_file).await?;
+                            let ribosome = RealRibosome::new(dna_file)?;
                             ConductorResult::Ok((ribosome.dna_hash().clone(), ribosome))
                         }
                     })

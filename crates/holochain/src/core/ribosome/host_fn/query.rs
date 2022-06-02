@@ -60,6 +60,6 @@ pub mod slow_tests {
             .call(&alice, "query", ChainQueryFilter::default())
             .await;
 
-        assert_eq!(elements.len(), 6);
+        assert_eq!(elements.len(), 4);
     }
 }

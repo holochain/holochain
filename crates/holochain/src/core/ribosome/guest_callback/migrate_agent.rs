@@ -48,7 +48,7 @@ impl From<&MigrateAgentHostAccess> for HostFnAccess {
 
 impl Invocation for MigrateAgentInvocation {
     fn zomes(&self) -> ZomesToInvoke {
-        ZomesToInvoke::AllIntegrity
+        ZomesToInvoke::All
     }
     fn fn_components(&self) -> FnComponents {
         vec![
@@ -193,10 +193,7 @@ mod test {
         let migrate_agent_invocation = MigrateAgentInvocationFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();
-        assert_eq!(
-            ZomesToInvoke::AllIntegrity,
-            migrate_agent_invocation.zomes(),
-        );
+        assert_eq!(ZomesToInvoke::All, migrate_agent_invocation.zomes(),);
     }
 
     #[test]

@@ -7,6 +7,7 @@
 
 use crate::header::ChainTopOrdering;
 use holochain_integrity_types::EntryDefIndex;
+use holochain_integrity_types::EntryVisibility;
 use holochain_serialized_bytes::prelude::*;
 
 mod app_entry_bytes;
@@ -97,6 +98,8 @@ pub enum GetStrategy {
 pub struct CreateInput {
     /// The global type index committed to if this entry has one.
     pub entry_location: EntryDefLocation,
+    /// The visibility of this entry.
+    pub entry_visibility: EntryVisibility,
     /// Entry body.
     pub entry: crate::entry::Entry,
     /// ChainTopBehaviour for the write.
@@ -107,11 +110,13 @@ impl CreateInput {
     /// Constructor.
     pub fn new(
         entry_location: impl Into<EntryDefLocation>,
+        entry_visibility: EntryVisibility,
         entry: crate::entry::Entry,
         chain_top_ordering: ChainTopOrdering,
     ) -> Self {
         Self {
             entry_location: entry_location.into(),
+            entry_visibility,
             entry,
             chain_top_ordering,
         }

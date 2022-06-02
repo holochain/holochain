@@ -560,7 +560,7 @@ impl ConductorHandleT for ConductorHandleImpl {
     }
 
     async fn register_dna(&self, dna: DnaFile) -> ConductorResult<()> {
-        let ribosome = RealRibosome::new(dna).await?;
+        let ribosome = RealRibosome::new(dna)?;
         self.register_genotype(ribosome.clone()).await?;
         self.conductor.register_phenotype(ribosome);
         Ok(())

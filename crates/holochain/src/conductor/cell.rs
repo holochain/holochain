@@ -706,18 +706,13 @@ impl Cell {
         // If the header has an app entry type get the entry def
         // from the conductor.
         let required_receipt_count = match header.as_ref().and_then(|h| h.0.entry_type()) {
-            Some(EntryType::App(entry_type)) => {
-                let zome_index = u8::from(entry_type.zome_id()) as usize;
-                let dna_file = self.conductor_api.get_this_dna().map_err(Box::new)?;
-                let zome = dna_file
-                    .dna()
-                    .integrity_zomes
-                    .get(zome_index)
-                    .map(|(_, z)| z.clone());
+            Some(EntryType::App(AppEntryType { id, .. })) => {
+                let ribosome = self.conductor_api.get_this_ribosome().map_err(Box::new)?;
+                let zome = ribosome.find_zome_from_entry(id);
                 match zome {
                     Some(zome) => self
                         .conductor_api
-                        .get_entry_def(&EntryDefBufferKey::new(zome, entry_type.id()))
+                        .get_entry_def(&EntryDefBufferKey::new(zome.into_inner().1, *id))
                         .map(|e| u8::from(e.required_validations)),
                     None => None,
                 }

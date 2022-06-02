@@ -11,6 +11,7 @@ use holochain_zome_types::Entry;
 use holochain::test_utils::conductor_setup::ConductorTestData;
 use holochain::test_utils::host_fn_caller::*;
 use holochain::test_utils::wait_for_integration;
+use holochain_zome_types::EntryVisibility;
 use rusqlite::named_params;
 
 /// - Alice commits an entry and it is in their authored store
@@ -39,7 +40,8 @@ async fn authored_test() {
         .get_api(TestWasm::Create)
         .commit_entry(
             entry.clone().try_into().unwrap(),
-            (TestWasm::Create.integrity_zome_name(), POST_ID),
+            POST_INDEX,
+            EntryVisibility::Public,
         )
         .await;
 
@@ -112,7 +114,8 @@ async fn authored_test() {
         .get_api(TestWasm::Create)
         .commit_entry(
             entry.clone().try_into().unwrap(),
-            (TestWasm::Create.integrity_zome_name(), POST_ID),
+            POST_INDEX,
+            EntryVisibility::Public,
         )
         .await;
 

@@ -208,7 +208,4 @@ pub trait UnitEnum {
 
     /// Turn this type into it's unit enum.
     fn to_unit(&self) -> Self::Unit;
-
-    /// Get the index of this enum variant.
-    fn index(&self) -> usize;
 }

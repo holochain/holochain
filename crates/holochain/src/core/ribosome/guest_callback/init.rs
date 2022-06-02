@@ -190,7 +190,7 @@ mod test {
         let init_invocation = InitInvocationFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();
-        assert_eq!(ZomesToInvoke::AllIntegrity, init_invocation.zomes(),);
+        assert_eq!(ZomesToInvoke::All, init_invocation.zomes(),);
     }
 
     #[test]

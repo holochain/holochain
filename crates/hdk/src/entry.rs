@@ -69,13 +69,16 @@ where
 pub fn create_entry<I, E, E2>(input: I) -> ExternResult<HeaderHash>
 where
     EntryDefIndex: for<'a> TryFrom<&'a I, Error = E2>,
+    EntryVisibility: for<'a> From<&'a I>,
     Entry: TryFrom<I, Error = E>,
     WasmError: From<E>,
     WasmError: From<E2>,
 {
     let entry_def_index = EntryDefIndex::try_from(&input)?;
+    let visibility = EntryVisibility::from(&input);
     let create_input = CreateInput::new(
         EntryDefLocation::app(entry_def_index),
+        visibility,
         input.try_into()?,
         ChainTopOrdering::default(),
     );

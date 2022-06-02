@@ -79,6 +79,10 @@ impl CoordinatorZome {
             def: self.def.erase_type(),
         }
     }
+
+    pub fn set_dependency(&mut self, zome_name: impl Into<ZomeName>) {
+        self.def.set_dependency(zome_name);
+    }
 }
 
 impl From<(ZomeName, ZomeDef)> for Zome {
@@ -187,6 +191,13 @@ impl IntegrityZomeDef {
 impl CoordinatorZomeDef {
     pub fn as_any_zome_def(&self) -> &ZomeDef {
         &self.0
+    }
+    pub fn set_dependency(&mut self, zome_name: impl Into<ZomeName>) {
+        match &mut self.0 {
+            ZomeDef::Wasm(WasmZome { dependencies, .. }) => dependencies.push(zome_name.into()),
+            #[cfg(feature = "full-dna-def")]
+            ZomeDef::Inline { dependencies, .. } => dependencies.push(zome_name.into()),
+        }
     }
 }
 

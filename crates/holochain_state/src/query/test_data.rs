@@ -126,12 +126,12 @@ impl LinkTestData {
         let base_query = GetLinksQuery::base(base_hash.clone().into());
         let tag_query = GetLinksQuery::new(
             base_hash.clone().into(),
-            Some(LinkTypeQuery::AllTypes(create_link.zome_id)),
+            Some(LinkTypeRange::Full.into()),
             Some(create_link.tag.clone()),
         );
         let details_tag_query = GetLinkDetailsQuery::new(
             base_hash.clone().into(),
-            Some(LinkTypeQuery::AllTypes(create_link.zome_id)),
+            Some(LinkTypeRange::Full.into()),
             Some(create_link.tag.clone()),
         );
 
@@ -161,16 +161,8 @@ impl EntryTestData {
         let entry_hash = EntryHash::with_data_sync(&entry);
         create.entry_hash = entry_hash.clone();
         update.entry_hash = entry_hash.clone();
-        create.entry_type = EntryType::App(AppEntryType::new(
-            0.into(),
-            0.into(),
-            EntryVisibility::Public,
-        ));
-        update.entry_type = EntryType::App(AppEntryType::new(
-            0.into(),
-            0.into(),
-            EntryVisibility::Public,
-        ));
+        create.entry_type = EntryType::App(AppEntryType::new(0.into(), EntryVisibility::Public));
+        update.entry_type = EntryType::App(AppEntryType::new(0.into(), EntryVisibility::Public));
 
         let create_hash = HeaderHash::with_data_sync(&Header::Create(create.clone()));
 

@@ -423,7 +423,8 @@ async fn commit_invalid(
     let invalid_header_hash = call_data
         .commit_entry(
             entry.clone().try_into().unwrap(),
-            (TestWasm::Validate.integrity_zome_name(), INVALID_ID),
+            EntryDefIndex(0),
+            EntryVisibility::Public,
         )
         .await;
 
@@ -449,7 +450,8 @@ async fn commit_invalid_post(
     let invalid_header_hash = call_data
         .commit_entry(
             entry.clone().try_into().unwrap(),
-            (TestWasm::Create.integrity_zome_name(), POST_ID),
+            POST_INDEX,
+            EntryVisibility::Public,
         )
         .await;
 

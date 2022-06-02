@@ -193,6 +193,7 @@ async fn sharded_consistency() {
 async fn private_entries_dont_leak() {
     use holochain::sweettest::SweetEasyInline;
     use holochain::test_utils::consistency_10s;
+    use holochain_types::inline_zome::InlineZomeSet;
 
     let _g = observability::test_run().ok();
     let mut entry_def = EntryDef::default_with_id("entrydef");
@@ -201,12 +202,12 @@ async fn private_entries_dont_leak() {
     #[derive(Serialize, Deserialize, Debug, SerializedBytes)]
     struct PrivateEntry;
 
-    let zome = SweetEasyInline::new(vec![entry_def.clone()])
+    let zome = SweetEasyInline::new(vec![entry_def.clone()], 0)
         .callback("create", move |api, _: ()| {
-            let entry_def_id: EntryDefId = entry_def.id.clone();
             let entry = Entry::app(PrivateEntry {}.try_into().unwrap()).unwrap();
             let hash = api.create(CreateInput::new(
-                (SweetEasyInline::INTEGRITY, entry_def_id).into(),
+                InlineZomeSet::get_entry_location(&api, 0),
+                EntryVisibility::Private,
                 entry,
                 ChainTopOrdering::default(),
             ))?;

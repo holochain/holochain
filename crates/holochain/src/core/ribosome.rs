@@ -499,6 +499,10 @@ pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
         }
     }
 
+    fn find_zome_from_entry(&self, entry_index: &EntryDefIndex) -> Option<IntegrityZome>;
+
+    fn find_zome_from_link(&self, entry_index: &LinkType) -> Option<IntegrityZome>;
+
     fn call_iterator<I: Invocation + 'static>(
         &self,
         host_context: HostContext,
@@ -512,6 +516,8 @@ pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
         zome: &Zome,
         to_call: &FunctionName,
     ) -> Result<Option<ExternIO>, RibosomeError>;
+
+    fn get_const_fn(&self, zome: &Zome, name: &str) -> Result<Option<u8>, RibosomeError>;
 
     /// @todo list out all the available callbacks and maybe cache them somewhere
     fn list_callbacks(&self) {
@@ -586,6 +592,7 @@ pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
 pub mod wasm_test {
     use crate::core::ribosome::FnComponents;
     use crate::sweettest::SweetAgents;
+    use crate::sweettest::SweetCell;
     use crate::sweettest::SweetConductor;
     use crate::sweettest::SweetDnaFile;
     use crate::sweettest::SweetZome;
@@ -614,6 +621,8 @@ pub mod wasm_test {
         pub bob_pubkey: AgentPubKey,
         pub alice: SweetZome,
         pub bob: SweetZome,
+        pub alice_cell: SweetCell,
+        pub bob_cell: SweetCell,
         pub alice_host_fn_caller: HostFnCaller,
         pub bob_host_fn_caller: HostFnCaller,
     }
@@ -636,18 +645,26 @@ pub mod wasm_test {
                 .await
                 .unwrap();
 
-            let ((alice,), (bob,)) = apps.into_tuples();
+            let ((alice_cell,), (bob_cell,)) = apps.into_tuples();
 
-            let alice_host_fn_caller =
-                HostFnCaller::create_for_zome(alice.cell_id(), &conductor.handle(), &dna_file, 0)
-                    .await;
+            let alice_host_fn_caller = HostFnCaller::create_for_zome(
+                alice_cell.cell_id(),
+                &conductor.handle(),
+                &dna_file,
+                0,
+            )
+            .await;
 
-            let bob_host_fn_caller =
-                HostFnCaller::create_for_zome(bob.cell_id(), &conductor.handle(), &dna_file, 0)
-                    .await;
+            let bob_host_fn_caller = HostFnCaller::create_for_zome(
+                bob_cell.cell_id(),
+                &conductor.handle(),
+                &dna_file,
+                0,
+            )
+            .await;
 
-            let alice = alice.zome(test_wasm);
-            let bob = bob.zome(test_wasm);
+            let alice = alice_cell.zome(test_wasm);
+            let bob = bob_cell.zome(test_wasm);
 
             Self {
                 conductor,
@@ -655,6 +672,8 @@ pub mod wasm_test {
                 bob_pubkey,
                 alice,
                 bob,
+                alice_cell,
+                bob_cell,
                 alice_host_fn_caller,
                 bob_host_fn_caller,
             }

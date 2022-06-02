@@ -69,7 +69,7 @@ mod tests {
     fn zome(agents: Vec<AgentPubKey>, num_signals: Arc<AtomicUsize>) -> InlineZomeSet {
         let entry_def = EntryDef::default_with_id("entrydef");
 
-        SweetEasyInline::new(vec![entry_def.clone()])
+        SweetEasyInline::new(vec![entry_def.clone()], 0)
             .callback("signal_others", move |api, ()| {
                 let signal = ExternIO::encode("Hey").unwrap();
                 let signal = RemoteSignal {
@@ -96,13 +96,15 @@ mod tests {
                 };
                 api.create(CreateInput::new(
                     EntryDefLocation::CapGrant,
+                    EntryVisibility::Private,
                     Entry::CapGrant(cap_grant_entry),
                     ChainTopOrdering::default(),
                 ))
                 .unwrap();
 
                 Ok(InitCallbackResult::Pass)
-            }).into()
+            })
+            .into()
     }
 
     #[tokio::test(flavor = "multi_thread")]

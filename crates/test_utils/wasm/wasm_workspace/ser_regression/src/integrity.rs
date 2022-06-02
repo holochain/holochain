@@ -14,6 +14,7 @@ pub struct ChannelMessage {
 }
 
 #[hdk_entry_defs]
+#[unit_enum(EntryTypesUnit)]
 pub enum EntryTypes {
     Channel(Channel),
     ChannelMessage(ChannelMessage),
@@ -21,5 +22,6 @@ pub enum EntryTypes {
 
 #[hdk_link_types]
 pub enum LinkTypes {
-    Any = HdkLinkType::Any as u8,
+    Any,
+    Path,
 }

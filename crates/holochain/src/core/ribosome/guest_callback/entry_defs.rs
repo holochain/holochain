@@ -231,7 +231,7 @@ mod slow_tests {
             result,
             EntryDefsResult::Defs({
                 let mut tree = BTreeMap::new();
-                let zome_name: ZomeName = "entry_defs".into();
+                let zome_name: ZomeName = "integrity_entry_defs".into();
                 let defs: EntryDefs = vec![
                     EntryDef {
                         id: "post".into(),

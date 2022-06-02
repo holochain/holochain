@@ -23,6 +23,7 @@ use crate::core::ribosome::InvocationAuth;
 use crate::core::ribosome::ZomeCallHostAccess;
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::ribosome::ZomesToInvoke;
+use crate::sweettest::SweetDnaFile;
 use crate::test_utils::fake_genesis;
 use ::fixt::prelude::*;
 pub use holo_hash::fixt::*;
@@ -55,23 +56,14 @@ impl Iterator for RealRibosomeFixturator<curve::Zomes> {
     type Item = RealRibosome;
 
     fn next(&mut self) -> Option<Self::Item> {
-        // @todo fixturate this
-        let dna_file = fake_dna_zomes(
-            &StringFixturator::new(Unpredictable).next().unwrap(),
-            self.0
-                .curve
-                .0
-                .clone()
-                .into_iter()
-                .map(|t| (t.into(), t.into()))
-                .collect(),
-        );
+        let input = self.0.curve.0.clone();
+        let uuid = StringFixturator::new(Unpredictable).next().unwrap();
+        let (dna_file, _, _) = tokio_helper::block_forever_on(async move {
+            SweetDnaFile::from_test_wasms(uuid, input, Default::default()).await
+        })
+        .unwrap();
 
-        let ribosome = RealRibosome {
-            dna_file,
-            zome_types: Default::default(),
-            zome_dependencies: Default::default(),
-        };
+        let ribosome = RealRibosome::new(dna_file).unwrap();
 
         // warm the module cache for each wasm in the ribosome
         for zome in self.0.curve.0.clone() {

@@ -1,19 +1,11 @@
 #![warn(missing_docs)]
 //! Information about the current zome and dna.
-use std::borrow::Borrow;
-use std::collections::HashMap;
 use std::ops::Range;
 
 use crate::header::ZomeId;
 use crate::zome::ZomeName;
-use crate::AppEntryDefName;
-use crate::AppEntryType;
-use crate::EntryDefId;
-use crate::EntryDefIndex;
 use crate::EntryDefs;
 use crate::FunctionName;
-use crate::LinkType;
-use crate::LinkTypeName;
 use holo_hash::DnaHash;
 use holochain_serialized_bytes::prelude::*;
 
@@ -32,7 +24,7 @@ pub struct ZomeInfo {
     // @todo make this include function signatures when they exist.
     pub extern_fns: Vec<FunctionName>,
     /// Zome types in scope for this zome.
-    pub zome_types: ScopedZomeTypes,
+    pub zome_types: ScopedZomeTypesSet,
 }
 
 impl ZomeInfo {
@@ -43,7 +35,7 @@ impl ZomeInfo {
         properties: SerializedBytes,
         entry_defs: EntryDefs,
         extern_fns: Vec<FunctionName>,
-        zome_types: ScopedZomeTypes,
+        zome_types: ScopedZomeTypesSet,
     ) -> Self {
         Self {
             name,
@@ -53,15 +45,6 @@ impl ZomeInfo {
             extern_fns,
             zome_types,
         }
-    }
-
-    /// Check if an [`AppEntryType`] matches the [`EntryDefId`] provided for this zome.
-    pub fn matches_entry_def_id(&self, entry_type: &AppEntryType, id: EntryDefId) -> bool {
-        self.entry_defs
-            .0
-            .get(entry_type.id.index())
-            .map_or(false, |stored_id| stored_id.id == id)
-            && self.id == entry_type.zome_id
     }
 }
 
@@ -79,21 +62,18 @@ pub struct DnaInfo {
     pub zome_names: Vec<ZomeName>,
 }
 
-// #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
-// /// Mapping from [`ZomeId`] to
-// /// - Entries: [`AppEntryDefName`] -> [`EntryDefIndex`].
-// /// - Links: [`LinkTypeName`] -> [`LinkType`].
-// pub struct ZomeTypesMap(pub HashMap<ZomeId, ZomeTypes>);
-
 #[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, PartialEq, Default)]
-/// A set of zome types with their name space paths.
-pub struct ScopedZomeTypes {
-    pub entries: ScopedZomeType,
-    pub links: ScopedZomeType,
+/// The set of entry and link [`GlobalZomeTypeId`]s in scope for the calling zome.
+pub struct ScopedZomeTypesSet {
+    /// All the entry [`GlobalZomeTypeId`]s in scope for this zome.
+    pub entries: ScopedZomeTypes,
+    /// All the link [`GlobalZomeTypeId`]s in scope for this zome.
+    pub links: ScopedZomeTypes,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, PartialEq, Default)]
-pub struct ScopedZomeType(pub Vec<Range<GlobalZomeTypeId>>);
+/// A set of [`GlobalZomeTypeId`] ranges that are in scope for the calling zome.
+pub struct ScopedZomeTypes(pub Vec<Range<GlobalZomeTypeId>>);
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 /// An opaque type identifier that the guest uses to
@@ -105,7 +85,8 @@ pub struct GlobalZomeTypeId(pub u8);
 /// uniquely identify an app defined entry or link type.
 pub struct LocalZomeTypeId(pub u8);
 
-impl ScopedZomeType {
+impl ScopedZomeTypes {
+    /// Convert a [`GlobalZomeTypeId`] to a [`LocalZomeTypeId`].
     pub fn to_local_scope(&self, index: impl Into<GlobalZomeTypeId>) -> Option<LocalZomeTypeId> {
         let index = index.into();
         let mut total_len: u8 = 0;
@@ -120,6 +101,7 @@ impl ScopedZomeType {
                 })
         })
     }
+    /// Convert a [`LocalZomeTypeId`] to a [`GlobalZomeTypeId`].
     pub fn to_global_scope(&self, index: impl Into<LocalZomeTypeId>) -> Option<GlobalZomeTypeId> {
         let index: LocalZomeTypeId = index.into();
         let mut total_len: u8 = 0;
@@ -135,62 +117,6 @@ impl ScopedZomeType {
         })
     }
 }
-// #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
-// /// Entry and link types for a zome.
-// pub struct ZomeTypes {
-//     /// Map of [`AppEntryDefName`] to [`EntryDefIndex`].
-//     pub entry: HashMap<AppEntryDefName, EntryDefIndex>,
-//     /// Map of [`LinkTypeName`] to [`LinkType`].
-//     pub link: HashMap<LinkTypeName, LinkType>,
-// }
-
-// impl std::ops::Deref for ZomeTypesMap {
-//     type Target = HashMap<ZomeId, ZomeTypes>;
-
-//     fn deref(&self) -> &Self::Target {
-//         &self.0
-//     }
-// }
-
-// impl ZomeTypesMap {
-//     /// Get the [`EntryDefIndex`] for a [`ZomeId`] and [`AppEntryDefName`]
-//     /// if there is one.
-//     pub fn get_entry_index<Z, E>(&self, zome_id: &Z, entry_name: &E) -> Option<EntryDefIndex>
-//     where
-//         ZomeId: Borrow<Z>,
-//         Z: std::hash::Hash + Eq,
-//         AppEntryDefName: Borrow<E>,
-//         E: std::hash::Hash + Eq + ?Sized,
-//     {
-//         self.get(zome_id)
-//             .and_then(|z| z.entry.get(entry_name).copied())
-//     }
-
-//     /// Get the [`LinkType`] for a [`ZomeId`] and [`LinkTypeName`]
-//     /// if there is one.
-//     pub fn get_link_type<Z, L>(&self, zome_id: &Z, link_name: &L) -> Option<LinkType>
-//     where
-//         ZomeId: Borrow<Z>,
-//         Z: std::hash::Hash + Eq,
-//         LinkTypeName: Borrow<L>,
-//         L: std::hash::Hash + Eq,
-//     {
-//         self.get(zome_id)
-//             .and_then(|z| z.link.get(link_name).copied())
-//     }
-
-//     /// Find the [`ZomeId`] for a given [`EntryDefIndex`].
-//     pub fn entry_index_to_zome_id(&self, index: &EntryDefIndex) -> Option<ZomeId> {
-//         self.iter()
-//             .find_map(|(id, zome_types)| zome_types.entry.values().any(|i| i == index).then(|| *id))
-//     }
-
-//     /// Find the [`ZomeId`] for a given [`LinkType`].
-//     pub fn link_type_to_zome_id<I>(&self, index: &LinkType) -> Option<ZomeId> {
-//         self.iter()
-//             .find_map(|(id, zome_types)| zome_types.link.values().any(|i| i == index).then(|| *id))
-//     }
-// }
 
 impl From<u8> for GlobalZomeTypeId {
     fn from(v: u8) -> Self {
@@ -202,4 +128,20 @@ impl From<u8> for LocalZomeTypeId {
     fn from(v: u8) -> Self {
         Self(v)
     }
+}
+
+#[doc(hidden)]
+/// This is an internally used trait for checking
+/// enum lengths at compile time.
+pub trait EnumLen<const L: u8> {
+    const ENUM_LEN: u8 = L;
+}
+
+#[doc(hidden)]
+/// This is an internally used trait for checking
+/// enum variant lengths at compile time.
+pub trait EnumVariantLen<const V: u8> {
+    const ENUM_VARIANT_START: u8;
+    const ENUM_VARIANT_INNER_LEN: u8;
+    const ENUM_VARIANT_LEN: u8 = Self::ENUM_VARIANT_START + Self::ENUM_VARIANT_INNER_LEN;
 }

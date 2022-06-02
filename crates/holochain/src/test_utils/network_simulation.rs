@@ -550,6 +550,7 @@ pub async fn data_zome(integrity_uuid: String, coordinator_uuid: String) -> DnaF
             integrity_zome_name,
             integrity_uuid.clone(),
             InlineEntryTypes::entry_defs(),
+            0,
         )],
         [(coordinator_zome_name, coordinator_uuid)],
     )
@@ -560,6 +561,7 @@ pub async fn data_zome(integrity_uuid: String, coordinator_uuid: String) -> DnaF
             for entry in entries {
                 api.create(CreateInput::new(
                     InlineZomeSet::get_entry_location(&api, InlineEntryTypes::A),
+                    EntryVisibility::Public,
                     entry,
                     ChainTopOrdering::default(),
                 ))?;

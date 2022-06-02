@@ -1,8 +1,15 @@
 use hdk::prelude::*;
 
-#[derive(ToZomeName)]
 enum Zomes {
     CreateEntry,
+}
+
+impl From<Zomes> for ZomeName {
+    fn from(z: Zomes) -> Self {
+        match z {
+            Zomes::CreateEntry => ZomeName("create_entry".into()),
+        }
+    }
 }
 
 #[hdk_extern]

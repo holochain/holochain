@@ -8,6 +8,7 @@ use crate::test_utils::setup_app_with_names;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
+use holochain_wasm_test_utils::TestWasmPair;
 use holochain_wasm_test_utils::TestZomes;
 use holochain_zome_types::cell::CellId;
 use std::convert::TryFrom;
@@ -16,6 +17,10 @@ use std::convert::TryFrom;
 async fn direct_validation_test() {
     observability::test_run().ok();
 
+    let TestWasmPair::<DnaWasm> {
+        integrity,
+        coordinator,
+    } = TestWasm::Update.into();
     let dna_file = DnaFile::new(
         DnaDef {
             name: "direct_validation_test".to_string(),
@@ -25,7 +30,7 @@ async fn direct_validation_test() {
             integrity_zomes: vec![TestZomes::from(TestWasm::Update).integrity.into_inner()],
             coordinator_zomes: vec![TestZomes::from(TestWasm::Update).coordinator.into_inner()],
         },
-        vec![TestWasm::Update.into()],
+        [integrity, coordinator],
     )
     .await
     .unwrap();

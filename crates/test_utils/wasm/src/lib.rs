@@ -393,7 +393,11 @@ impl From<TestWasm> for IntegrityZome {
         let TestWasmPair { integrity, .. } = TestWasmPair::<PathBuf>::from(test_wasm);
 
         let def = tokio_helper::block_forever_on(path_to_def(integrity, Default::default()));
-        Self::new(test_wasm.into(), def.into())
+        let TestWasmPair {
+            integrity: zome_name,
+            ..
+        } = TestWasmPair::<ZomeName>::from(test_wasm);
+        Self::new(zome_name, def.into())
     }
 }
 

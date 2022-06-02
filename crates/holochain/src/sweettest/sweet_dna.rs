@@ -152,20 +152,30 @@ impl SweetDnaFile {
     /// Create a DnaFile from a collection of InlineZomes (no Wasm)
     pub async fn from_inline_zomes(
         uid: String,
-        zomes: InlineZomeSet,
+        mut zomes: InlineZomeSet,
     ) -> DnaResult<(DnaFile, Vec<IntegrityZome>, Vec<CoordinatorZome>)> {
+        let coordinator_zomes: Vec<CoordinatorZome> = zomes
+            .coordinator_zomes
+            .into_iter()
+            .map(|(n, z)| (n.into(), z.into()))
+            .map(|t| {
+                let dep = zomes.dependencies.remove(&t.0);
+                let mut z: CoordinatorZome = t.into();
+                if let Some(dep) = dep {
+                    z.set_dependency(dep);
+                }
+                z
+            })
+            .collect();
         Self::from_zomes(
             uid,
             zomes
-                .integrity_zomes
+                .integrity_order
                 .into_iter()
+                .map(|n| zomes.integrity_zomes.remove_entry(n).unwrap())
                 .map(|(n, z)| (n.into(), z.into()))
                 .collect(),
-            zomes
-                .coordinator_zomes
-                .into_iter()
-                .map(|(n, z)| (n.into(), z.into()))
-                .collect(),
+            coordinator_zomes,
             Vec::<wasm::DnaWasm>::with_capacity(0),
             SerializedBytes::default(),
         )

@@ -10,13 +10,17 @@ pub struct InlineZomeSet {
     /// The set of inline zomes that will be installed as the integrity zomes.
     /// Only these affect the [`DnaHash`](holo_hash::DnaHash).
     pub integrity_zomes: HashMap<&'static str, InlineIntegrityZome>,
+    /// The order of the integrity zomes.
+    pub integrity_order: Vec<&'static str>,
     /// The set of inline zomes that will be installed as the coordinator zomes.
     pub coordinator_zomes: HashMap<&'static str, InlineCoordinatorZome>,
+    /// The integrity zome dependencies for coordinator zomes.
+    /// This is not needed if there is only a single integrity zome.
+    pub dependencies: HashMap<ZomeName, ZomeName>,
 }
 
 #[allow(missing_docs)]
-#[repr(u8)]
-/// Some black entry types to use for testing.
+/// Some blank entry types to use for testing.
 pub enum InlineEntryTypes {
     A,
     B,
@@ -40,36 +44,48 @@ impl InlineZomeSet {
     /// Create a set of integrity and coordinators zomes.
     pub fn new<I, C>(integrity: I, coordinators: C) -> Self
     where
-        I: IntoIterator<Item = (&'static str, String, Vec<EntryDef>)>,
+        I: IntoIterator<Item = (&'static str, String, Vec<EntryDef>, u8)>,
         C: IntoIterator<Item = (&'static str, String)>,
     {
+        let integrity_zomes: Vec<_> = integrity
+            .into_iter()
+            .map(|(zome_name, uuid, e, links)| {
+                (zome_name, InlineIntegrityZome::new(uuid, e, links))
+            })
+            .collect();
+        let integrity_order: Vec<_> = integrity_zomes.iter().map(|(n, _)| n.clone()).collect();
+        assert_eq!(integrity_order.len(), integrity_zomes.len());
         Self {
-            integrity_zomes: integrity
-                .into_iter()
-                .map(|(zome_name, uuid, e)| (zome_name, InlineIntegrityZome::new(uuid, e)))
-                .collect(),
+            integrity_zomes: integrity_zomes.into_iter().collect(),
+            integrity_order,
             coordinator_zomes: coordinators
                 .into_iter()
                 .map(|(zome_name, uuid)| (zome_name, InlineCoordinatorZome::new(uuid)))
                 .collect(),
+            ..Default::default()
         }
     }
 
     /// Create a set of integrity and coordinators zomes.
     pub fn new_unique<I, C>(integrity: I, coordinators: C) -> Self
     where
-        I: IntoIterator<Item = (&'static str, Vec<EntryDef>)>,
+        I: IntoIterator<Item = (&'static str, Vec<EntryDef>, u8)>,
         C: IntoIterator<Item = &'static str>,
     {
+        let integrity_zomes: Vec<_> = integrity
+            .into_iter()
+            .map(|(zome_name, e, links)| (zome_name, InlineIntegrityZome::new_unique(e, links)))
+            .collect();
+        let integrity_order: Vec<_> = integrity_zomes.iter().map(|(n, _)| n.clone()).collect();
+        assert_eq!(integrity_order.len(), integrity_zomes.len());
         Self {
-            integrity_zomes: integrity
-                .into_iter()
-                .map(|(zome_name, e)| (zome_name, InlineIntegrityZome::new_unique(e)))
-                .collect(),
+            integrity_zomes: integrity_zomes.into_iter().collect(),
+            integrity_order,
             coordinator_zomes: coordinators
                 .into_iter()
                 .map(|zome_name| (zome_name, InlineCoordinatorZome::new_unique()))
                 .collect(),
+            ..Default::default()
         }
     }
 
@@ -80,9 +96,15 @@ impl InlineZomeSet {
         integrity_uuid: impl Into<String>,
         coordinator_uuid: impl Into<String>,
         entry_defs: Vec<EntryDef>,
+        num_link_types: u8,
     ) -> Self {
         Self::new(
-            [(integrity_zome_name, integrity_uuid.into(), entry_defs)],
+            [(
+                integrity_zome_name,
+                integrity_uuid.into(),
+                entry_defs,
+                num_link_types,
+            )],
             [(coordinator_zome_name, coordinator_uuid.into())],
         )
     }
@@ -92,8 +114,12 @@ impl InlineZomeSet {
         integrity_zome_name: &'static str,
         coordinator_zome_name: &'static str,
         entry_defs: Vec<EntryDef>,
+        num_link_types: u8,
     ) -> Self {
-        Self::new_unique([(integrity_zome_name, entry_defs)], [coordinator_zome_name])
+        Self::new_unique(
+            [(integrity_zome_name, entry_defs, num_link_types)],
+            [coordinator_zome_name],
+        )
     }
 
     /// Add a callback to a zome with the given name.
@@ -110,6 +136,8 @@ impl InlineZomeSet {
         let Self {
             mut integrity_zomes,
             mut coordinator_zomes,
+            dependencies,
+            integrity_order,
         } = self;
 
         match integrity_zomes.remove_entry(zome_name) {
@@ -124,7 +152,9 @@ impl InlineZomeSet {
 
         Self {
             integrity_zomes,
+            integrity_order,
             coordinator_zomes,
+            dependencies,
         }
     }
 
@@ -144,11 +174,13 @@ impl InlineZomeSet {
                 panic!("InlineZomeSet contains duplicate key {} on merge.", k);
             }
         }
+        self.integrity_order.extend(other.integrity_order);
+        self.dependencies.extend(other.dependencies);
         self
     }
 
     /// Get the inner zomes
-    pub fn into_zomes(self) -> (Vec<IntegrityZome>, Vec<CoordinatorZome>) {
+    pub fn into_zomes(mut self) -> (Vec<IntegrityZome>, Vec<CoordinatorZome>) {
         (
             self.integrity_zomes
                 .into_iter()
@@ -156,9 +188,29 @@ impl InlineZomeSet {
                 .collect(),
             self.coordinator_zomes
                 .into_iter()
-                .map(|(n, z)| CoordinatorZome::new((*n).into(), z.into()))
+                .map(|(n, z)| {
+                    let mut z = CoordinatorZome::new((*n).into(), z.into());
+                    let dep = self.dependencies.remove(z.zome_name());
+                    if let Some(dep) = dep {
+                        z.set_dependency(dep);
+                    }
+                    z
+                })
                 .collect(),
         )
+    }
+
+    /// Add a dependency for an coordinator zome
+    pub fn with_dependency(mut self, from: &'static str, to: &'static str) -> Self {
+        assert!(
+            self.coordinator_zomes.contains_key(from),
+            "{} -> {}",
+            to,
+            from
+        );
+        assert!(self.integrity_zomes.contains_key(to), "{} -> {}", to, from);
+        self.dependencies.insert(from.into(), to.into());
+        self
     }
 
     /// Get the entry def location for committing an entry.
@@ -179,8 +231,10 @@ impl From<(&'static str, InlineIntegrityZome)> for InlineZomeSet {
     fn from((z, e): (&'static str, InlineIntegrityZome)) -> Self {
         let mut integrity_zomes = HashMap::new();
         integrity_zomes.insert(z, e);
+        let integrity_order = vec![z];
         Self {
             integrity_zomes,
+            integrity_order,
             ..Default::default()
         }
     }

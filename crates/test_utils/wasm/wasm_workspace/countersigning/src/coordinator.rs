@@ -1,30 +1,26 @@
 use crate::integrity::*;
 use hdk::prelude::*;
-use EntryZomes::*;
-
-#[hdk_entry_zomes]
-enum EntryZomes {
-    IntegrityCountersigning(EntryTypes),
-}
 
 #[hdk_extern]
 fn create_a_thing(_: ()) -> ExternResult<HeaderHash> {
-    create_entry(&IntegrityCountersigning(EntryTypes::Thing(Thing::Valid)))
+    create_entry(&EntryTypes::Thing(Thing::Valid))
 }
 
 #[hdk_extern]
 fn create_an_invalid_thing(_: ()) -> ExternResult<HeaderHash> {
-    create_entry(&IntegrityCountersigning(EntryTypes::Thing(Thing::Invalid)))
+    create_entry(&EntryTypes::Thing(Thing::Invalid))
 }
 
 fn create_countersigned(
     responses: Vec<PreflightResponse>,
     thing: Thing,
 ) -> ExternResult<HeaderHash> {
-    let thing = EntryZomes::IntegrityCountersigning(EntryTypes::Thing(thing));
-    let location = (&thing).into();
+    let thing = EntryTypes::Thing(thing);
+    let entry_def_index = EntryDefIndex::try_from(&thing)?;
+    let visibility = EntryVisibility::from(&thing);
+
     let thing = match thing {
-        IntegrityCountersigning(EntryTypes::Thing(t)) => t,
+        EntryTypes::Thing(t) => t,
     };
 
     let entry = Entry::CounterSign(
@@ -37,7 +33,8 @@ fn create_countersigned(
     );
     HDK.with(|h| {
         h.borrow().create(CreateInput::new(
-            location,
+            entry_def_index,
+            visibility,
             entry,
             // Countersigned entries MUST have strict ordering.
             ChainTopOrdering::Strict,
@@ -62,8 +59,8 @@ fn generate_preflight_request(
     thing: Thing,
 ) -> ExternResult<PreflightRequest> {
     let hash = hash_entry(&thing)?;
-    let thing = EntryZomes::IntegrityCountersigning(EntryTypes::Thing(thing));
-    let entry_type = thing.entry_type()?;
+    let thing = EntryTypes::Thing(thing);
+    let entry_type = thing.try_into()?;
     PreflightRequest::try_new(
         hash,
         agents,

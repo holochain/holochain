@@ -23,7 +23,8 @@ fn create_entry(_: ()) -> ExternResult<HeaderHash> {
     let post = new_post();
     HDK.with(|h| {
         h.borrow().create(CreateInput::new(
-            (&post).into(),
+            EntryDefIndex::try_from(&post)?,
+            EntryVisibility::from(&post),
             post.try_into().unwrap(),
             // This is used to test many conductors thrashing creates between
             // each other so we want to avoid retries that make the test take

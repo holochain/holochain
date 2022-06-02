@@ -14,7 +14,7 @@ use holochain_zome_types::inline_zome::BoxApi;
 struct BaseTarget(AnyLinkableHash, AnyLinkableHash);
 
 fn links_zome() -> InlineZomeSet {
-    InlineZomeSet::new_unique([("integrity_links", vec![])], ["links"])
+    InlineZomeSet::new_unique([("integrity_links", vec![], 1)], ["links"])
         .callback(
             "links",
             "create_link",
@@ -22,7 +22,7 @@ fn links_zome() -> InlineZomeSet {
                 let hash = api.create_link(CreateLinkInput::new(
                     base_target.0,
                     base_target.1,
-                    LinkTypeLocation::new("integrity_links", LinkType::new(0)),
+                    LinkType::new(0),
                     ().into(),
                     ChainTopOrdering::default(),
                 ))?;
@@ -33,11 +33,7 @@ fn links_zome() -> InlineZomeSet {
             "links",
             "get_links",
             move |api: BoxApi, base: AnyLinkableHash| -> InlineZomeResult<Vec<Vec<Link>>> {
-                Ok(api.get_links(vec![GetLinksInput::new(
-                    base,
-                    Some(LinkTypeQuery::AllTypes("integrity_links".into())),
-                    None,
-                )])?)
+                Ok(api.get_links(vec![GetLinksInput::new(base, (..).into(), None)])?)
             },
         )
 }

@@ -49,22 +49,22 @@ fn simple_crud_zome() -> InlineZomeSet {
     let string_entry_def = EntryDef::default_with_id("string");
     let unit_entry_def = EntryDef::default_with_id("unit");
 
-    SweetEasyInline::new(vec![string_entry_def.clone(), unit_entry_def.clone()])
+    SweetEasyInline::new(vec![string_entry_def.clone(), unit_entry_def.clone()], 0)
         .callback("create_string", move |api, s: AppString| {
-            let entry_def_id: EntryDefId = string_entry_def.id.clone();
             let entry = Entry::app(AppString::from(s).try_into().unwrap()).unwrap();
             let hash = api.create(CreateInput::new(
-                (SweetEasyInline::INTEGRITY, entry_def_id).into(),
+                InlineZomeSet::get_entry_location(&api, 0),
+                EntryVisibility::Public,
                 entry,
                 ChainTopOrdering::default(),
             ))?;
             Ok(hash)
         })
         .callback("create_unit", move |api, ()| {
-            let entry_def_id: EntryDefId = unit_entry_def.id.clone();
             let entry = Entry::app(().try_into().unwrap()).unwrap();
             let hash = api.create(CreateInput::new(
-                (SweetEasyInline::INTEGRITY, entry_def_id).into(),
+                InlineZomeSet::get_entry_location(&api, 1),
+                EntryVisibility::Public,
                 entry,
                 ChainTopOrdering::default(),
             ))?;
@@ -373,12 +373,12 @@ async fn signal_subscription() {
 fn simple_validation_zome() -> InlineZomeSet {
     let entry_def = EntryDef::default_with_id("string");
 
-    SweetEasyInline::new(vec![entry_def.clone()])
+    SweetEasyInline::new(vec![entry_def.clone()], 0)
         .callback("create", move |api, s: AppString| {
-            let entry_def_id: EntryDefId = entry_def.id.clone();
             let entry = Entry::app(s.try_into().unwrap()).unwrap();
             let hash = api.create(CreateInput::new(
-                (SweetEasyInline::INTEGRITY, entry_def_id).into(),
+                InlineZomeSet::get_entry_location(&api, 0),
+                EntryVisibility::Public,
                 entry,
                 ChainTopOrdering::default(),
             ))?;
@@ -463,7 +463,7 @@ async fn can_call_real_zomes_too() {
     coordinator.push(TestWasm::Create.into());
 
     let (dna, _, _) =
-        SweetDnaFile::unique_from_zomes(integrity, coordinator, vec![TestWasm::Create])
+        SweetDnaFile::unique_from_zomes(integrity, coordinator, TestWasm::Create.into())
             .await
             .unwrap();
 
@@ -543,11 +543,7 @@ async fn insert_source_chain() {
         timestamp: Timestamp::now(),
         header_seq: 4,
         prev_header: chain.last().unwrap().0.clone(),
-        entry_type: EntryType::App(AppEntryType::new(
-            1.into(),
-            0.into(),
-            EntryVisibility::Public,
-        )),
+        entry_type: EntryType::App(AppEntryType::new(1.into(), EntryVisibility::Public)),
         entry_hash: EntryHash::with_data_sync(&entry),
     };
     let shh = SignedHeaderHashed::with_presigned(

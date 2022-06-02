@@ -55,7 +55,7 @@ async fn ser_regression_test() {
                 .coordinator
                 .into_inner()],
         },
-        vec![TestWasm::SerRegression.into()],
+        <Vec<DnaWasm>>::from(TestWasm::SerRegression),
     )
     .await
     .unwrap();

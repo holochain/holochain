@@ -43,7 +43,7 @@ pub struct WireLinkKey {
     /// Base the links are on.
     pub base: AnyLinkableHash,
     /// The zome the links are in.
-    pub type_query: Option<LinkTypeQuery<ZomeId>>,
+    pub type_query: Option<LinkTypeRanges>,
     /// Optionally specify a tag for more specific queries.
     pub tag: Option<LinkTag>,
 }

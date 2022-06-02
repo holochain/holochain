@@ -58,13 +58,8 @@ pub(super) async fn get_as_author(
     };
 
     //Get entry def
-    let entry_def = get_entry_def_from_ids(
-        app_entry_type.zome_id(),
-        app_entry_type.id(),
-        ribosome.dna_def(),
-        conductor_handle,
-    )
-    .await?;
+    let entry_def =
+        get_entry_def_from_ids(app_entry_type.id(), ribosome.dna_hash(), conductor_handle).await?;
 
     // Get the required validation package
     let required_validation_type = match entry_def {
@@ -161,13 +156,8 @@ pub(super) async fn get_as_authority(
     };
 
     //Get entry def
-    let entry_def = get_entry_def_from_ids(
-        app_entry_type.zome_id(),
-        app_entry_type.id(),
-        dna_file.dna(),
-        conductor_handle,
-    )
-    .await?;
+    let entry_def =
+        get_entry_def_from_ids(app_entry_type.id(), dna_file.dna_hash(), conductor_handle).await?;
 
     // Get the required validation package
     let required_validation_type = match entry_def {

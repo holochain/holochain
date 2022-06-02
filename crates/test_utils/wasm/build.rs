@@ -17,10 +17,10 @@ fn main() {
     // Since we use local paths, changes to those crates will not affect the
     // Cargo.toml, so we check each upstream local source directory directly.
     for dir in parse_cargo_toml_local_dependency_paths() {
-        println!("cargo:rerun-if-changed={}", dir);
         for item in walkdir::WalkDir::new(dir)
             .into_iter()
             .filter_map(|e| e.ok())
+            .filter(|e| e.file_type().is_file())
         {
             println!("cargo:rerun-if-changed={}", item.path().display());
         }
@@ -35,6 +35,7 @@ fn main() {
                 .unwrap_or(false)
         })
         .filter_map(|e| e.ok())
+        .filter(|e| e.file_type().is_file())
     {
         println!("cargo:rerun-if-changed={}", item.path().display());
     }

@@ -13,7 +13,7 @@ pub struct GetLinkDetailsQuery {
 impl GetLinkDetailsQuery {
     pub fn new(
         base: AnyLinkableHash,
-        type_query: Option<LinkTypeQuery<ZomeId>>,
+        type_query: Option<LinkTypeRanges>,
         tag: Option<LinkTag>,
     ) -> Self {
         Self {
@@ -52,16 +52,14 @@ impl Query for GetLinkDetailsQuery {
         let f = move |header: &QueryData<Self>| match header.header() {
             Header::CreateLink(CreateLink {
                 base_address,
-                zome_id,
                 tag,
                 link_type,
                 ..
             }) => {
                 *base_address == *base_filter
-                    && type_query_filter.as_ref().map_or(true, |z| match z {
-                        LinkTypeQuery::AllTypes(z) => *zome_id == *z,
-                        LinkTypeQuery::SingleType(z, lt) => *zome_id == *z && *link_type == *lt,
-                    })
+                    && type_query_filter
+                        .as_ref()
+                        .map_or(true, |z| z.contains(link_type))
                     && tag_filter
                         .as_ref()
                         .map_or(true, |t| LinksQuery::tag_to_hex(tag).starts_with(&(**t)))

@@ -9,6 +9,7 @@ pub struct Tick;
 pub struct Tock;
 
 #[hdk_entry_defs]
+#[unit_enum(EntryTypesUnit)]
 pub enum EntryTypes {
     Tick(Tick),
     Tock(Tock),

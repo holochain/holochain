@@ -5,6 +5,9 @@ use holochain_wasmer_guest::*;
 use holochain_zome_types::link::LinkTag;
 use std::str::FromStr;
 
+#[cfg(all(test, feature = "mock"))]
+mod test;
+
 /// Allows for "foo.bar.baz" to automatically move to/from ["foo", "bar", "baz"] components.
 /// Technically it's moving each string component in as bytes.
 /// If this is a problem for you simply build the components yourself as a Vec<Vec<u8>>.
@@ -146,6 +149,15 @@ impl TryFrom<&Component> for String {
 #[repr(transparent)]
 pub struct Path(Vec<Component>);
 
+#[derive(Clone, Debug, PartialEq, serde::Deserialize, serde::Serialize, SerializedBytes)]
+/// A [`LinkType`] applied to a [`Path`].
+/// All links committed from this path will
+/// have this link type.
+pub struct TypedPath {
+    pub link_type: LinkType,
+    pub path: Path,
+}
+
 pub struct LocatedPath(ZomeName, Path);
 
 /// Wrap components vector.
@@ -232,10 +244,20 @@ impl From<String> for Path {
 }
 
 impl Path {
-    /// Attach a [`ZomeName`] to this path
-    /// so its location is known for commits.
-    pub fn locate(self, zome_name: impl Into<ZomeName>) -> LocatedPath {
-        LocatedPath(zome_name.into(), self)
+    /// Attach a [`LinkType`] to this path
+    /// so its type is known for commits.
+    pub fn into_typed(self, link_type: impl Into<LinkType>) -> TypedPath {
+        TypedPath::new(link_type, self)
+    }
+
+    /// Attach a [`LinkType`] to this path
+    /// so its type is known for commits.
+    pub fn try_into_typed<TY, E>(self, link_type: TY) -> Result<TypedPath, WasmError>
+    where
+        LinkType: TryFrom<TY, Error = E>,
+        WasmError: From<E>,
+    {
+        Ok(TypedPath::new(LinkType::try_from(link_type)?, self))
     }
     /// What is the hash for the current [ `Path` ]?
     pub fn path_entry_hash(&self) -> ExternResult<holo_hash::EntryHash> {
@@ -253,25 +275,46 @@ impl Path {
     pub fn leaf(&self) -> Option<&Component> {
         self.0.last()
     }
+
+    pub fn make_tag(&self) -> ExternResult<LinkTag> {
+        Ok(LinkTag::new(match self.leaf() {
+            None => <Vec<u8>>::with_capacity(0),
+            Some(component) => UnsafeBytes::from(SerializedBytes::try_from(component)?).into(),
+        }))
+    }
+
+    pub fn is_root(&self) -> bool {
+        self.0.len() == 1
+    }
 }
 
-impl LocatedPath {
-    pub fn new(zome_name: ZomeName, path: Path) -> Self {
-        Self(zome_name, path)
+impl TypedPath {
+    pub fn new(link_type: impl Into<LinkType>, path: Path) -> Self {
+        Self {
+            link_type: link_type.into(),
+            path,
+        }
     }
     /// Does an entry exist at the hash we expect?
     pub fn exists(&self) -> ExternResult<bool> {
-        let link_tag = LinkTag::new(match self.leaf() {
-            None => <Vec<u8>>::with_capacity(0),
-            Some(component) => UnsafeBytes::from(SerializedBytes::try_from(component)?).into(),
-        });
-        Ok(get_links(
-            self.path_entry_hash()?.into(),
-            Some(self.link_type()),
-            Some(link_tag),
-        )?
-        .first()
-        .is_some())
+        if self.0.is_empty() {
+            Ok(false)
+        } else if self.is_root() {
+            Ok(true)
+        } else {
+            let parent = self
+                .parent()
+                .expect("Must have parent if not empty or root");
+            let this_paths_hash: AnyLinkableHash = self.path_entry_hash()?.into();
+            let exists = get_links(
+                parent.path_entry_hash()?.into(),
+                self.link_type,
+                Some(self.make_tag()?),
+            )?
+            .iter()
+            .any(|Link { target, .. }| *target == this_paths_hash);
+            Ok(exists)
+        }
     }
 
     /// Recursively touch this and every parent that doesn't exist yet.
@@ -282,16 +325,8 @@ impl LocatedPath {
                 create_link(
                     parent.path_entry_hash()?.into(),
                     self.path_entry_hash()?.into(),
-                    LinkTypeLocation {
-                        zome: self.0.clone(),
-                        link: HdkLinkType::Paths.into(),
-                    },
-                    LinkTag::new(match self.leaf() {
-                        None => <Vec<u8>>::with_capacity(0),
-                        Some(component) => {
-                            UnsafeBytes::from(SerializedBytes::try_from(component)?).into()
-                        }
-                    }),
+                    self.link_type,
+                    self.make_tag()?,
                 )?;
             }
         }
@@ -300,9 +335,10 @@ impl LocatedPath {
 
     /// The parent of the current path is simply the path truncated one level.
     pub fn parent(&self) -> Option<Self> {
-        if self.1.as_ref().len() > 1 {
-            let parent_vec: Vec<Component> = self.1.as_ref()[0..self.1.as_ref().len() - 1].to_vec();
-            Some(Path::from(parent_vec).locate(self.0.clone()))
+        if self.path.as_ref().len() > 1 {
+            let parent_vec: Vec<Component> =
+                self.path.as_ref()[0..self.path.as_ref().len() - 1].to_vec();
+            Some(Path::from(parent_vec).into_typed(self.link_type))
         } else {
             None
         }
@@ -312,8 +348,7 @@ impl LocatedPath {
     /// Only returns links between paths, not to other entries that might have their own links.
     pub fn children(&self) -> ExternResult<Vec<holochain_zome_types::link::Link>> {
         Self::ensure(self)?;
-        let mut unwrapped =
-            get_links(self.path_entry_hash()?.into(), Some(self.link_type()), None)?;
+        let mut unwrapped = get_links(self.path_entry_hash()?.into(), self.link_type, None)?;
         // Only need one of each hash to build the tree.
         unwrapped.sort_unstable_by(|a, b| a.tag.cmp(&b.tag));
         unwrapped.dedup_by(|a, b| a.tag.eq(&b.tag));
@@ -327,7 +362,7 @@ impl LocatedPath {
     /// `Component` is encoded into the link tag. To build a full child path
     /// the parent path + child link must be combined, which this function does
     /// to produce each child, by using `&self` as that parent.
-    pub fn children_paths(&self) -> ExternResult<Vec<Path>> {
+    pub fn children_paths(&self) -> ExternResult<Vec<Self>> {
         let children = self.children()?;
         let components: ExternResult<Vec<Option<Component>>> = children
             .into_iter()
@@ -347,11 +382,11 @@ impl LocatedPath {
         Ok(components?
             .into_iter()
             .map(|maybe_component| {
-                let mut new_path = self.1.clone();
+                let mut new_path = self.path.clone();
                 if let Some(component) = maybe_component {
                     new_path.append_component(component);
                 }
-                new_path
+                new_path.into_typed(self.link_type)
             })
             .collect())
     }
@@ -360,30 +395,23 @@ impl LocatedPath {
         Self::ensure(self)?;
         get_link_details(
             self.path_entry_hash()?.into(),
-            Some(self.link_type()),
+            self.link_type,
             Some(holochain_zome_types::link::LinkTag::new([])),
         )
     }
-
-    fn link_type(&self) -> Box<dyn ToLinkTypeQuery> {
-        Box::new(LinkTypeQuery::SingleType(
-            self.0.clone(),
-            HdkLinkType::Paths.into(),
-        ))
-    }
 }
 
-impl std::ops::Deref for LocatedPath {
+impl std::ops::Deref for TypedPath {
     type Target = Path;
 
     fn deref(&self) -> &Self::Target {
-        &self.1
+        &self.path
     }
 }
 
-impl From<LocatedPath> for Path {
-    fn from(p: LocatedPath) -> Self {
-        p.1
+impl From<TypedPath> for Path {
+    fn from(p: TypedPath) -> Self {
+        p.path
     }
 }
 
