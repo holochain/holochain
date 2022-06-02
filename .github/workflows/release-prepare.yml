@@ -190,61 +190,61 @@ jobs:
           ## limits ssh access and adds the ssh public keys of the listed GitHub users
           limit-access-to-users: steveeJ,jost-s,freesig,neonphog,thedavidmeister,maackle
 
-      # - name: Detect missing release headings
-      #   run: |
-      #     set -ex
-      #     source "${HOLOCHAIN_RELEASE_SH}"
-      #     cd "${HOLOCHAIN_REPO}"
+      - name: Detect missing release headings
+        run: |
+          set -ex
+          source "${HOLOCHAIN_RELEASE_SH}"
+          cd "${HOLOCHAIN_REPO}"
 
-      #     nix-shell --argstr flavor release --pure --run '
-      #       set -e
+          nix-shell --argstr flavor release --pure --run '
+            set -e
 
-      #       release-automation \
-      #         --workspace-path=$PWD \
-      #         --log-level=debug \
-      #         crate detect-missing-releaseheadings
-      #       '
+            release-automation \
+              --workspace-path=$PWD \
+              --log-level=debug \
+              crate detect-missing-releaseheadings
+            '
 
-      # - name: Bump the crate versions for the release
-      #   id: bump-versions
-      #   run: |
-      #     set -ex
-      #     source "${HOLOCHAIN_RELEASE_SH}"
-      #     cd "${HOLOCHAIN_REPO}"
+      - name: Bump the crate versions for the release
+        id: bump-versions
+        run: |
+          set -ex
+          source "${HOLOCHAIN_RELEASE_SH}"
+          cd "${HOLOCHAIN_REPO}"
 
-      #     nix-shell --argstr flavor release --pure --run '
-      #       set -e
-      #       cargo sweep -s
+          nix-shell --argstr flavor release --pure --run '
+            set -e
+            cargo sweep -s
 
-      #       release-automation \
-      #         --workspace-path=$PWD \
-      #         --log-level=debug \
-      #         release \
-      #           --force-branch-creation \
-      #           --steps=CreateReleaseBranch
+            release-automation \
+              --workspace-path=$PWD \
+              --log-level=debug \
+              release \
+                --force-branch-creation \
+                --steps=CreateReleaseBranch
 
-      #       release-automation \
-      #         --workspace-path=$PWD \
-      #         crate apply-dev-versions --commit --no-verify
+            release-automation \
+              --workspace-path=$PWD \
+              crate apply-dev-versions --commit --no-verify
 
-      #       release-automation \
-      #         --workspace-path=$PWD \
-      #         --log-level=debug \
-      #         release \
-      #           --no-verify-pre \
-      #           --force-tag-creation \
-      #           --match-filter="^(holochain|holochain_cli|kitsune_p2p_proxy)$" \
-      #           --disallowed-version-reqs=">=0.1" \
-      #           --steps=BumpReleaseVersions
+            release-automation \
+              --workspace-path=$PWD \
+              --log-level=debug \
+              release \
+                --no-verify-pre \
+                --force-tag-creation \
+                --match-filter="^(holochain|holochain_cli|kitsune_p2p_proxy)$" \
+                --disallowed-version-reqs=">=0.1" \
+                --steps=BumpReleaseVersions
 
-      #       cargo sweep -f
-      #       '
+            cargo sweep -f
+            '
 
-      #     if ! git diff --exit-code --quiet ${HOLOCHAIN_SOURCE_BRANCH:?}; then
-      #       echo "::set-output name=releasable_crates::true"
-      #     else
-      #       echo "::set-output name=releasable_crates::false"
-      #     fi
+          if ! git diff --exit-code --quiet ${HOLOCHAIN_SOURCE_BRANCH:?}; then
+            echo "::set-output name=releasable_crates::true"
+          else
+            echo "::set-output name=releasable_crates::false"
+          fi
 
       - name: Append to the environment file and set outputs
         id: write-env-and-tag
