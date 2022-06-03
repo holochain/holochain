@@ -5,6 +5,15 @@
 /// 32 bytes
 pub type Hash32 = [u8; 32];
 
+/// Get the 32 byte slice of a larger slice representing hash data
+pub fn hash_slice_32(v: &[u8]) -> &[u8] {
+    if v.len() == 36 || v.len() == 39 {
+        &v[4..36]
+    } else {
+        &v[..]
+    }
+}
+
 /// Get a fake hash, for testing only.
 #[cfg(feature = "test_utils")]
 pub fn fake_hash() -> Hash32 {
