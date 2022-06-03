@@ -73,7 +73,7 @@ impl GlobalZomeTypes {
                     .0
                     .get(zome_id.0 as usize)
                     .cloned()
-                    .ok_or_else(|| ZomeTypesError::MissingZomeType(*zome_id))
+                    .ok_or(ZomeTypesError::MissingZomeType(*zome_id))
             })
             .collect::<ZomeTypesResult<Vec<_>>>()?;
         let links = zomes
@@ -83,7 +83,7 @@ impl GlobalZomeTypes {
                     .0
                     .get(zome_id.0 as usize)
                     .cloned()
-                    .ok_or_else(|| ZomeTypesError::MissingZomeType(*zome_id))
+                    .ok_or(ZomeTypesError::MissingZomeType(*zome_id))
             })
             .collect::<ZomeTypesResult<Vec<_>>>()?;
         Ok(ScopedZomeTypesSet {

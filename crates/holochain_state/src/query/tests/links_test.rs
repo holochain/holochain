@@ -136,6 +136,40 @@ impl TestData {
         assert_eq!(val, &[self.expected_link.clone()], "{}", test);
     }
 
+    fn is_on_type<'a>(&'a self, test: &'static str) {
+        let query = GetLinksQuery::new(
+            self.base_hash.clone().into(),
+            Some(self.link_type.into()),
+            None,
+        );
+        let val = fresh_reader_test(self.env.clone(), |txn| {
+            query
+                .run(DbScratch::new(&[&txn], &self.scratch))
+                .unwrap()
+                .contains(&self.expected_link)
+        });
+        assert!(
+            val,
+            "Results should contain link: {:?} in test: {}",
+            self.expected_link, test
+        );
+    }
+
+    fn is_on_type_query<'a>(&'a self, type_query: LinkTypeRanges, test: &'static str) {
+        let query = GetLinksQuery::new(self.base_hash.clone().into(), Some(type_query), None);
+        let val = fresh_reader_test(self.env.clone(), |txn| {
+            query
+                .run(DbScratch::new(&[&txn], &self.scratch))
+                .unwrap()
+                .contains(&self.expected_link)
+        });
+        assert!(
+            val,
+            "Results should contain link: {:?} in test: {}",
+            self.expected_link, test
+        );
+    }
+
     fn only_on_half_tag<'a>(&'a self, test: &'static str) {
         let tag_len = self.tag.0.len();
         // Make sure there is at least some tag
@@ -197,6 +231,17 @@ impl TestData {
             ChainTopOrdering::default(),
         );
     }
+    fn add_link_given_scratch(&mut self, scratch: &mut Scratch) {
+        let header = SignedHeaderHashed::from_content_sync(SignedHeader(
+            Header::CreateLink(self.link_add.clone()),
+            fixt!(Signature),
+        ));
+        scratch.add_header(
+            Some(fixt!(CoordinatorZome)),
+            header,
+            ChainTopOrdering::default(),
+        );
+    }
     fn delete_link(&self) {
         let op = DhtOpHashed::from_content_sync(DhtOp::RegisterRemoveLink(
             fixt!(Signature),
@@ -246,6 +291,30 @@ impl TestData {
                 );
             });
         }
+        assert_eq!(val, expected, "{}", test);
+    }
+
+    fn only_these_on_query<'a>(
+        td: &'a [Self],
+        scratch: &Scratch,
+        query: impl Into<LinkTypeRanges>,
+        test: &'static str,
+    ) {
+        // Check all base hash are the same
+        for d in td {
+            assert_eq!(d.base_hash, td[0].base_hash, "{}", test);
+        }
+        let base_hash = td[0].base_hash.clone();
+        let expected = td
+            .iter()
+            .map(|d| d.expected_link.clone())
+            .collect::<HashSet<_>>();
+        let query = GetLinksQuery::new(base_hash.clone().into(), Some(query.into()), None);
+        let val: HashSet<_> = fresh_reader_test(td[0].env.clone(), |txn| {
+            query.run(DbScratch::new(&[&txn], &scratch)).unwrap()
+        })
+        .into_iter()
+        .collect();
         assert_eq!(val, expected, "{}", test);
     }
 
@@ -673,4 +742,170 @@ async fn links_on_same_tag() {
         TestData::only_these_on_full_key(&partial_td[..], here!("check all return on same base"));
         TestData::only_these_on_half_key(&partial_td[..], here!("check all return on same base"));
     }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn links_on_same_type() {
+    observability::test_run().ok();
+    let test_db = test_dht_db();
+    let arc = test_db.to_db();
+
+    let mut td = fixtures(arc.clone(), 10);
+    let base_hash = td[0].base_hash.clone();
+    let link_type = td[0].link_type;
+
+    for d in td.iter_mut() {
+        d.base_hash = base_hash.clone();
+        d.link_type = link_type;
+        d.link_add.base_address = base_hash.clone().into();
+        d.link_add.link_type = link_type;
+
+        // Create the new hash
+        let (_, link_add_hash): (_, HeaderHash) =
+            HeaderHashed::from_content_sync(Header::CreateLink(d.link_add.clone())).into();
+        d.expected_link.create_link_hash = link_add_hash.clone();
+    }
+
+    for d in &mut td {
+        d.add_link_scratch();
+    }
+    for d in &td {
+        d.is_on_type(here!("Each link is returned for a type"));
+        d.is_on_type_query((..).into(), here!("Each link is returned for a type"));
+        d.is_on_type_query(
+            d.link_type.clone().into(),
+            here!("Each link is returned for a type"),
+        );
+        d.is_on_type_query(
+            LinkTypeRanges(vec![(d.link_type.clone()..=d.link_type.clone()).into()]),
+            here!("Each link is returned for a type"),
+        );
+    }
+    for d in &mut td {
+        d.add_link();
+    }
+    for d in &td {
+        d.is_on_type(here!("Each link is returned for a type"));
+        d.is_on_type_query((..).into(), here!("Each link is returned for a type"));
+        d.is_on_type_query(
+            d.link_type.clone().into(),
+            here!("Each link is returned for a type"),
+        );
+        d.is_on_type_query(
+            LinkTypeRanges(vec![(d.link_type.clone()..=d.link_type.clone()).into()]),
+            here!("Each link is returned for a type"),
+        );
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn link_type_ranges() {
+    observability::test_run().ok();
+    let test_db = test_dht_db();
+    let arc = test_db.to_db();
+
+    let mut td = fixtures(arc.clone(), 10);
+    let base_hash = td[0].base_hash.clone();
+    let mut scratch = Scratch::new();
+
+    for (i, d) in td.iter_mut().enumerate() {
+        d.base_hash = base_hash.clone();
+        d.link_type = LinkType(i as u8);
+        d.link_add.base_address = base_hash.clone().into();
+        d.link_add.link_type = LinkType(i as u8);
+
+        // Create the new hash
+        let link_add_hash = HeaderHash::with_data_sync(&Header::CreateLink(d.link_add.clone()));
+        d.expected_link.create_link_hash = link_add_hash.clone();
+    }
+
+    // Add
+    for d in &mut td {
+        d.add_link_given_scratch(&mut scratch);
+    }
+    TestData::only_these_on_query(&td, &scratch, .., here!("all return on full range"));
+    TestData::only_these_on_query(
+        &td[0..=0],
+        &scratch,
+        LinkTypeRange::from(LinkType(0)..=LinkType(0)),
+        here!("only single on single range"),
+    );
+    TestData::only_these_on_query(
+        &td[4..=9],
+        &scratch,
+        LinkTypeRange::from(LinkType(4)..=LinkType(9)),
+        here!("range matches"),
+    );
+    let partial_td = &td[2..5]
+        .iter()
+        .chain(&td[7..9])
+        .cloned()
+        .collect::<Vec<_>>();
+    TestData::only_these_on_query(
+        &partial_td[..],
+        &scratch,
+        LinkTypeRanges(vec![
+            LinkTypeRange::from(LinkType(2)),
+            LinkTypeRange::from(LinkType(3)),
+            LinkTypeRange::from(LinkType(8)),
+            LinkTypeRange::from(LinkType(7)),
+            LinkTypeRange::from(LinkType(4)),
+        ]),
+        here!("individual types"),
+    );
+    let partial_td = &td[2..5]
+        .iter()
+        .chain(&td[7..9])
+        .cloned()
+        .collect::<Vec<_>>();
+    TestData::only_these_on_query(
+        &partial_td[..],
+        &scratch,
+        LinkTypeRanges(vec![
+            LinkTypeRange::from(LinkType(7)..=LinkType(8)),
+            LinkTypeRange::from(LinkType(2)..=LinkType(4)),
+        ]),
+        here!("individual types"),
+    );
+    for d in &mut td {
+        d.add_link();
+    }
+    TestData::only_these_on_query(&td, &Scratch::new(), .., here!("all return on full range"));
+    TestData::only_these_on_query(
+        &td[0..=0],
+        &Scratch::new(),
+        LinkTypeRange::from(LinkType(0)..=LinkType(0)),
+        here!("all return on full range"),
+    );
+    let partial_td = &td[2..5]
+        .iter()
+        .chain(&td[7..9])
+        .cloned()
+        .collect::<Vec<_>>();
+    TestData::only_these_on_query(
+        &partial_td[..],
+        &scratch,
+        LinkTypeRanges(vec![
+            LinkTypeRange::from(LinkType(7)..=LinkType(8)),
+            LinkTypeRange::from(LinkType(2)..=LinkType(4)),
+        ]),
+        here!("individual types"),
+    );
+    let partial_td = &td[2..5]
+        .iter()
+        .chain(&td[7..9])
+        .cloned()
+        .collect::<Vec<_>>();
+    TestData::only_these_on_query(
+        &partial_td[..],
+        &Scratch::new(),
+        LinkTypeRanges(vec![
+            LinkTypeRange::from(LinkType(2)),
+            LinkTypeRange::from(LinkType(3)),
+            LinkTypeRange::from(LinkType(8)),
+            LinkTypeRange::from(LinkType(7)),
+            LinkTypeRange::from(LinkType(4)),
+        ]),
+        here!("individual types"),
+    );
 }

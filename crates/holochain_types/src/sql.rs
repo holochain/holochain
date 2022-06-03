@@ -90,20 +90,20 @@ impl ToSqlStatement for LinkTypeRange {
     fn to_sql_statement(&self) -> String {
         match self {
             LinkTypeRange::Full => String::new(),
-            LinkTypeRange::Empty => " AND false ".to_string(),
+            LinkTypeRange::Empty => " false ".to_string(),
             LinkTypeRange::Inclusive(range) => match range.start().0.cmp(&range.end().0) {
                 std::cmp::Ordering::Less => {
                     if range.start().0 == 0 && range.end().0 == u8::MAX {
                         LinkTypeRange::Full.to_sql_statement()
                     } else {
                         format!(
-                            " AND link_type BETWEEN {} AND {} ",
+                            " link_type BETWEEN {} AND {} ",
                             range.start().0,
                             range.end().0
                         )
                     }
                 }
-                std::cmp::Ordering::Equal => format!(" AND link_type = {} ", range.start().0),
+                std::cmp::Ordering::Equal => format!(" link_type = {} ", range.start().0),
                 std::cmp::Ordering::Greater => LinkTypeRange::Empty.to_sql_statement(),
             },
         }
@@ -117,15 +117,23 @@ impl ToSqlStatement for LinkTypeRanges {
                 || matches!(r, LinkTypeRange::Inclusive(inner) if inner.is_empty())
         }) {
             " AND false ".to_string()
+        } else if self.0.iter().all(|r| {
+            matches!(r, LinkTypeRange::Full) || matches!(r, LinkTypeRange::Inclusive(r) if r.start().0 == 0 && r.end().0 == u8::MAX)
+        }) {
+            String::new()
         } else {
             let mut out: Vec<String> = self
                 .0
                 .iter()
                 .map(ToSqlStatement::to_sql_statement)
+                .filter(|s| !s.is_empty())
                 .collect();
             out.sort_unstable();
             out.dedup();
-            out.into_iter().collect()
+
+            let mut out = out.into_iter().flat_map(|s| [s, " OR ".to_string()]).collect::<Vec<String>>();
+            out.pop();
+            format!(" AND ( {} ) ", out.into_iter().collect::<String>())
         }
     }
 }

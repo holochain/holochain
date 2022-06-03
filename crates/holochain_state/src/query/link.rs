@@ -77,7 +77,7 @@ impl LinksQuery {
             ",
             Self::common_query_string()
         );
-        s = Self::add_query(s, type_query);
+        s = Self::add_type_query(s, type_query);
         Self::add_tag(s, tag)
     }
     fn add_tag(q: String, tag: Option<String>) -> String {
@@ -93,10 +93,12 @@ impl LinksQuery {
             None => q,
         }
     }
-    fn add_query(q: String, type_query: &Option<LinkTypeRanges>) -> String {
+    fn add_type_query(q: String, type_query: &Option<LinkTypeRanges>) -> String {
         match type_query {
             Some(link_type) => {
-                format!("{} {} ", q, link_type.to_sql_statement())
+                let r = format!("{} {} ", q, link_type.to_sql_statement());
+                eprintln!("{}", link_type.to_sql_statement());
+                r
             }
             _ => q,
         }
@@ -109,7 +111,7 @@ impl LinksQuery {
             ",
             Self::common_query_string()
         );
-        sub_create_query = Self::add_query(sub_create_query, type_query);
+        sub_create_query = Self::add_type_query(sub_create_query, type_query);
         sub_create_query = Self::add_tag(sub_create_query, tag);
         let delete_query = format!(
             "
