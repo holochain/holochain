@@ -11,7 +11,7 @@ This repository contains the Holochain core libraries.
 
 ## Code Status
 
-This code is in alpha. It is not for production use. We will be frequently and heavily restructuring code APIs and data chains until Beta.
+This code is in alpha. It is not for production use, and currently makes no security guarantees. We will be frequently and heavily restructuring code APIs and data chains until Beta.
 
 **We are supporting Linux and macOS at this time**. You may or may not be able to build and run Holochain on Windows.
 We will be supporting it in the future.
