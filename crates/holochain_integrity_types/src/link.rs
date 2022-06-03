@@ -246,7 +246,7 @@ where
             .into_iter()
             .map(TryInto::<LinkTypeRange>::try_into)
             .collect::<Result<Vec<_>, _>>()
-            .map(|r| Self(r))
+            .map(Self)
     }
 }
 
@@ -261,7 +261,7 @@ where
             .into_iter()
             .map(TryInto::<LinkTypeRange>::try_into)
             .collect::<Result<Vec<_>, _>>()
-            .map(|r| Self(r))
+            .map(Self)
     }
 }
 
@@ -273,10 +273,10 @@ where
 
     fn try_from(value: &[T; N]) -> Result<Self, Self::Error> {
         value
-            .into_iter()
+            .iter()
             .map(TryInto::<LinkTypeRange>::try_into)
             .collect::<Result<Vec<_>, _>>()
-            .map(|r| Self(r))
+            .map(Self)
     }
 }
 
@@ -288,9 +288,9 @@ where
 
     fn try_from(value: &'a [T]) -> Result<Self, Self::Error> {
         value
-            .into_iter()
+            .iter()
             .map(TryInto::<LinkTypeRange>::try_into)
             .collect::<Result<Vec<_>, _>>()
-            .map(|r| Self(r))
+            .map(Self)
     }
 }

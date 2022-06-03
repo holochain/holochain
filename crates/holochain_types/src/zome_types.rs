@@ -40,10 +40,15 @@ impl GlobalZomeTypes {
                         .0
                         .last()
                         .map(|r| r.end)
-                        .unwrap_or(0.into());
+                        .unwrap_or(GlobalZomeTypeId(0));
                     let end = start.0.checked_add(num_entry_types.0)?.into();
                     zome_types.entries.0.push(start..end);
-                    let start = zome_types.links.0.last().map(|r| r.end).unwrap_or(0.into());
+                    let start = zome_types
+                        .links
+                        .0
+                        .last()
+                        .map(|r| r.end)
+                        .unwrap_or(GlobalZomeTypeId(0));
                     let end = start.0.checked_add(num_link_types.0)?.into();
                     zome_types.links.0.push(start..end);
                     Some(zome_types)

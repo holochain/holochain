@@ -72,8 +72,8 @@ pub fn derive(input: TokenStream) -> TokenStream {
         .collect();
 
     let unit_attrs: proc_macro2::TokenStream = forward
-        .to_vec()
-        .into_iter()
+        .iter()
+        .cloned()
         .map(|a| quote::quote! {#[#a] })
         .collect();
 

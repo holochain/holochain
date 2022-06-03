@@ -177,7 +177,7 @@ impl From<ZomeDef> for ZomeDefSerialized {
             ZomeDef::Wasm(zome) => Self::Wasm(zome),
 
             #[cfg(feature = "full-dna-def")]
-            ZomeDef::Inline { inline_zome, .. } => Self::InlineUid(inline_zome.0.uuid().clone()),
+            ZomeDef::Inline { inline_zome, .. } => Self::InlineUid(inline_zome.0.uuid()),
         }
     }
 }

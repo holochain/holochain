@@ -53,7 +53,7 @@ impl InlineZomeSet {
                 (zome_name, InlineIntegrityZome::new(uuid, e, links))
             })
             .collect();
-        let integrity_order: Vec<_> = integrity_zomes.iter().map(|(n, _)| n.clone()).collect();
+        let integrity_order: Vec<_> = integrity_zomes.iter().map(|(n, _)| *n).collect();
         assert_eq!(integrity_order.len(), integrity_zomes.len());
         Self {
             integrity_zomes: integrity_zomes.into_iter().collect(),
@@ -76,7 +76,7 @@ impl InlineZomeSet {
             .into_iter()
             .map(|(zome_name, e, links)| (zome_name, InlineIntegrityZome::new_unique(e, links)))
             .collect();
-        let integrity_order: Vec<_> = integrity_zomes.iter().map(|(n, _)| n.clone()).collect();
+        let integrity_order: Vec<_> = integrity_zomes.iter().map(|(n, _)| *n).collect();
         assert_eq!(integrity_order.len(), integrity_zomes.len());
         Self {
             integrity_zomes: integrity_zomes.into_iter().collect(),

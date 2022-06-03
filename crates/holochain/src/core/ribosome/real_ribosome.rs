@@ -229,15 +229,11 @@ impl RealRibosome {
             .map(|(name, zome)| {
                 let zome = Zome::new(name.clone(), zome.clone().erase_type());
                 let num_entry_types = match ribosome.get_const_fn(&zome, "__num_entry_types")? {
-                    Some(i) => EntryDefIndex(
-                        u8::try_from(i).map_err(|_| ZomeTypesError::EntryTypeIndexOverflow)?,
-                    ),
+                    Some(i) => EntryDefIndex(i),
                     None => EntryDefIndex(0),
                 };
                 let num_link_types = match ribosome.get_const_fn(&zome, "__num_link_types")? {
-                    Some(i) => LinkType(
-                        u8::try_from(i).map_err(|_| ZomeTypesError::LinkTypeIndexOverflow)?,
-                    ),
+                    Some(i) => LinkType(i),
                     None => LinkType(0),
                 };
                 RibosomeResult::Ok((num_entry_types, num_link_types))
@@ -270,9 +266,9 @@ impl RealRibosome {
                             integrity_zomes
                                 .get(zome_name)
                                 .copied()
-                                .ok_or(ZomeTypesError::MissingDependenciesForZome(
-                                    zome_name.clone(),
-                                ))?
+                                .ok_or_else(|| {
+                                    ZomeTypesError::MissingDependenciesForZome(zome_name.clone())
+                                })?
                                 .try_into()
                                 .map_err(|_| ZomeTypesError::ZomeIndexOverflow)?,
                         );
@@ -283,9 +279,9 @@ impl RealRibosome {
                             integrity_zomes
                                 .get(name)
                                 .copied()
-                                .ok_or(ZomeTypesError::MissingDependenciesForZome(
-                                    zome_name.clone(),
-                                ))?
+                                .ok_or_else(|| {
+                                    ZomeTypesError::MissingDependenciesForZome(zome_name.clone())
+                                })?
                                 .try_into()
                                 .map_err(|_| ZomeTypesError::ZomeIndexOverflow)?,
                         );
@@ -704,7 +700,7 @@ impl RibosomeT for RealRibosome {
                 if module.exports().functions().any(|f| {
                     f.name() == name
                         && f.ty().params().is_empty()
-                        && f.ty().results() == &[Type::I32]
+                        && f.ty().results() == [Type::I32]
                 }) {
                     let (instance, context_key) = self.instance(call_context)?;
 

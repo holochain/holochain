@@ -192,7 +192,7 @@ impl ConductorTestData {
                     .map(|z| z.coordinator.into_inner())
                     .collect(),
             },
-            zomes.into_iter().flat_map(|t| Vec::<DnaWasm>::from(t)),
+            zomes.into_iter().flat_map(Vec::<DnaWasm>::from),
         )
         .await
         .unwrap();

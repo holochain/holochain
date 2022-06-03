@@ -45,7 +45,7 @@ pub(crate) async fn get_entry_def(
                     _,
                 )| *entry_def_position == entry_def_index,
             )
-            .map(|(_, v)| v.clone())),
+            .map(|(_, v)| v)),
     }
 }
 

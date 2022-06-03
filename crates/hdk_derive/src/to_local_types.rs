@@ -76,7 +76,7 @@ fn no_nesting(
                 },
             )| {
                 let index = index_to_u8(index);
-                let ignore = ignore_enum_data(&fields);
+                let ignore = ignore_enum_data(fields);
                 quote::quote! {#ident::#v_ident #ignore => LocalZomeTypeId(#index),}
             },
         )

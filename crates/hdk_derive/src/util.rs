@@ -18,7 +18,7 @@ pub fn ignore_enum_data(fields: &Fields) -> proc_macro2::TokenStream {
     }
 }
 
-pub fn get_unit_ident(attrs: &Vec<syn::Attribute>) -> syn::Ident {
+pub fn get_unit_ident(attrs: &[syn::Attribute]) -> syn::Ident {
     attrs
         .iter()
         .find(|a| {
