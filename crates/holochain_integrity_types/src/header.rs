@@ -374,7 +374,6 @@ pub struct CreateLink {
 
     pub base_address: AnyLinkableHash,
     pub target_address: AnyLinkableHash,
-    pub zome_id: ZomeId,
     pub link_type: LinkType,
     pub tag: LinkTag,
 }

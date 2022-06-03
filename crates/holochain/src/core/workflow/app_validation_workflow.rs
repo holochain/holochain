@@ -463,11 +463,11 @@ where
                     ..
                 },
             ..
-        } => create_link_zomes_to_invoke(header, ribosome.dna_def())?,
+        } => create_link_zomes_to_invoke(header, ribosome)?,
         Op::RegisterDeleteLink {
             create_link: header,
             ..
-        } => create_link_zomes_to_invoke(header, ribosome.dna_def())?,
+        } => create_link_zomes_to_invoke(header, ribosome)?,
     };
 
     let invocation = ValidateInvocation::new(zomes_to_invoke, op)
@@ -508,20 +508,17 @@ pub fn entry_creation_zomes_to_invoke(
 
 fn create_link_zomes_to_invoke(
     create_link: &CreateLink,
-    dna_def: &DnaDef,
+    ribosome: &impl RibosomeT,
 ) -> AppValidationOutcome<ZomesToInvoke> {
-    let zome = zome_id_to_zome(create_link.zome_id, dna_def)?;
+    let zome = ribosome
+        .find_zome_from_link(&create_link.link_type)
+        .ok_or_else(|| {
+            Outcome::rejected(&format!(
+                "Zome does not exist for {:?}",
+                create_link.link_type
+            ))
+        })?;
     Ok(ZomesToInvoke::One(zome.erase_type()))
-}
-
-fn zome_id_to_zome(zome_id: ZomeId, dna_def: &DnaDef) -> AppValidationResult<IntegrityZome> {
-    let zome_index = u8::from(zome_id) as usize;
-    Ok(dna_def
-        .integrity_zomes
-        .get(zome_index)
-        .ok_or(AppValidationError::ZomeId(zome_id))?
-        .clone()
-        .into())
 }
 
 #[async_recursion::async_recursion]

@@ -88,7 +88,6 @@ impl TestData {
         let mut link_add = fixt!(CreateLink);
         link_add.base_address = original_entry_hash.clone().into();
         link_add.target_address = new_entry_hash.clone().into();
-        link_add.zome_id = fixt!(ZomeId);
         link_add.tag = fixt!(LinkTag);
 
         let link_add_hash = HeaderHashed::from_content_sync(link_add.clone().into()).into_hash();

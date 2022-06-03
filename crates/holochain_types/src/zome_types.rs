@@ -30,32 +30,36 @@ impl GlobalZomeTypes {
     where
         I: IntoIterator<Item = (EntryDefIndex, LinkType)>,
     {
-        let r = ordered_iterator
-            .into_iter()
-            .try_fold(
-                ScopedZomeTypesSet::default(),
-                |mut zome_types, (num_entry_types, num_link_types)| {
-                    let start = zome_types
-                        .entries
-                        .0
-                        .last()
-                        .map(|r| r.end)
-                        .unwrap_or(GlobalZomeTypeId(0));
-                    let end = start.0.checked_add(num_entry_types.0)?.into();
-                    zome_types.entries.0.push(start..end);
-                    let start = zome_types
-                        .links
-                        .0
-                        .last()
-                        .map(|r| r.end)
-                        .unwrap_or(GlobalZomeTypeId(0));
-                    let end = start.0.checked_add(num_link_types.0)?.into();
-                    zome_types.links.0.push(start..end);
-                    Some(zome_types)
-                },
-            )
-            // FIXME: Make error
-            .unwrap();
+        let r = ordered_iterator.into_iter().try_fold(
+            ScopedZomeTypesSet::default(),
+            |mut zome_types, (num_entry_types, num_link_types)| {
+                let start = zome_types
+                    .entries
+                    .0
+                    .last()
+                    .map(|r| r.end)
+                    .unwrap_or(GlobalZomeTypeId(0));
+                let end = start
+                    .0
+                    .checked_add(num_entry_types.0)
+                    .ok_or(ZomeTypesError::EntryTypeIndexOverflow)?
+                    .into();
+                zome_types.entries.0.push(start..end);
+                let start = zome_types
+                    .links
+                    .0
+                    .last()
+                    .map(|r| r.end)
+                    .unwrap_or(GlobalZomeTypeId(0));
+                let end = start
+                    .0
+                    .checked_add(num_link_types.0)
+                    .ok_or(ZomeTypesError::EntryTypeIndexOverflow)?
+                    .into();
+                zome_types.links.0.push(start..end);
+                Ok(zome_types)
+            },
+        )?;
         Ok(GlobalZomeTypes(r))
     }
 
@@ -64,16 +68,24 @@ impl GlobalZomeTypes {
         let Self(ScopedZomeTypesSet { entries, links }) = self;
         let entries = zomes
             .iter()
-            .map(|zome_id| entries.0.get(zome_id.0 as usize).cloned())
-            .collect::<Option<Vec<_>>>()
-            // FIXME: Make error
-            .unwrap();
+            .map(|zome_id| {
+                entries
+                    .0
+                    .get(zome_id.0 as usize)
+                    .cloned()
+                    .ok_or_else(|| ZomeTypesError::MissingZomeType(*zome_id))
+            })
+            .collect::<ZomeTypesResult<Vec<_>>>()?;
         let links = zomes
             .iter()
-            .map(|zome_id| links.0.get(zome_id.0 as usize).cloned())
-            .collect::<Option<Vec<_>>>()
-            // FIXME: Make error
-            .unwrap();
+            .map(|zome_id| {
+                links
+                    .0
+                    .get(zome_id.0 as usize)
+                    .cloned()
+                    .ok_or_else(|| ZomeTypesError::MissingZomeType(*zome_id))
+            })
+            .collect::<ZomeTypesResult<Vec<_>>>()?;
         Ok(ScopedZomeTypesSet {
             entries: ScopedZomeTypes(entries),
             links: ScopedZomeTypes(links),

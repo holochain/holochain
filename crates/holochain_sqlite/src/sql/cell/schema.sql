@@ -53,7 +53,6 @@ CREATE TABLE IF NOT EXISTS Header (
     -- NB: basis_hash can't be foreign key, since it could map to either
     --     Entry or Header
     base_hash        BLOB           NULL,
-    zome_id          INTEGER        NULL,
     link_type        INTEGER        NULL,
     tag              BLOB           NULL,
 

@@ -250,7 +250,7 @@ impl TestData {
     }
 
     fn only_these_on_full_key<'a>(td: &'a [Self], test: &'static str) {
-        // Check all base hash, zome_id, tag are the same
+        // Check all base hash, link type, tag are the same
         for d in td {
             assert_eq!(d.base_hash, td[0].base_hash, "{}", test);
             assert_eq!(d.link_type, td[0].link_type, "{}", test);

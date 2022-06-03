@@ -9,7 +9,7 @@ use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn create_link<'a>(
-    ribosome: Arc<impl RibosomeT>,
+    _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: CreateLinkInput,
 ) -> Result<HeaderHash, WasmError> {
@@ -26,21 +26,9 @@ pub fn create_link<'a>(
                 chain_top_ordering,
             } = input;
 
-            // TODO: This can be removed when we remove zome ids from headers.
-            let zome_id = match ribosome.zome_types().find_zome_id_from_link(&link_type) {
-                Some(i) => i,
-                None => {
-                    return Err(WasmError::Host(format!(
-                        "Link type {} not found in DNA {}",
-                        link_type.0,
-                        ribosome.dna_hash()
-                    )))
-                }
-            };
-
             // Construct the link add
             let header_builder =
-                builder::CreateLink::new(base_address, target_address, zome_id, link_type, tag);
+                builder::CreateLink::new(base_address, target_address, link_type, tag);
 
             let header_hash = tokio_helper::block_forever_on(tokio::task::spawn(async move {
                 // push the header into the source chain

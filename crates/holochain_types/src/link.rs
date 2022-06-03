@@ -86,7 +86,6 @@ pub struct WireCreateLink {
     pub prev_header: HeaderHash,
 
     pub target_address: AnyLinkableHash,
-    pub zome_id: ZomeId,
     pub link_type: LinkType,
     pub tag: Option<LinkTag>,
     pub signature: Signature,
@@ -120,7 +119,6 @@ impl WireCreateLink {
             header_seq: h.header_seq,
             prev_header: h.prev_header,
             target_address: h.target_address,
-            zome_id: h.zome_id,
             link_type: h.link_type,
             tag: if tag { Some(h.tag) } else { None },
             signature,
@@ -156,7 +154,6 @@ impl WireCreateLink {
             prev_header: self.prev_header,
             base_address: key.base.clone(),
             target_address: self.target_address,
-            zome_id: self.zome_id,
             link_type: self.link_type,
             tag,
         });

@@ -51,8 +51,6 @@ impl Invocation for ValidationPackageInvocation {
         ZomesToInvoke::One(self.zome.to_owned().erase_type())
     }
     fn fn_components(&self) -> FnComponents {
-        // @todo zome_id is a u8, is this really an ergonomic way for us to interact with
-        // entry types at the happ code level?
         vec!["validation_package".into()].into()
     }
     fn host_input(self) -> Result<ExternIO, SerializedBytesError> {

@@ -1,3 +1,4 @@
+use holochain_zome_types::ZomeId;
 use holochain_zome_types::ZomeName;
 use thiserror::Error;
 
@@ -11,6 +12,8 @@ pub enum ZomeTypesError {
     LinkTypeIndexOverflow,
     #[error("Missing dependencies for zome {0}")]
     MissingDependenciesForZome(ZomeName),
+    #[error("Missing type scope for zome id {0}")]
+    MissingZomeType(ZomeId),
 }
 
 pub type ZomeTypesResult<T> = Result<T, ZomeTypesError>;
