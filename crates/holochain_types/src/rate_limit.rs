@@ -7,15 +7,37 @@
 /// as at a particular Header. The out-of-range indexability allows for a sparser
 /// representation when buckets are empty. In particular, it allows an empty
 /// Vec to be used when all buckets are empty.
+#[derive(Default, Clone)]
 pub struct RateBucketLevels(Vec<RateBucketCapacity>);
 
 pub use holochain_zome_types::rate_limit::*;
+use itertools::Itertools;
 
 impl RateBucketLevels {
     /// The the level of the bucket an index. If the index is beyond the range
     /// of known values, 0 is returned.
     pub fn get(&self, index: u8) -> RateBucketCapacity {
         self.0.get(index as usize).copied().unwrap_or_default()
+    }
+
+    /// Set a bucket value, resizing the vec if necessary.
+    pub fn set(&mut self, index: u8, level: RateBucketCapacity) {
+        let index = index as usize;
+        if self.0.len() < index + 1 {
+            self.0.resize(index + 1, 0);
+        }
+        self.0[index] = level;
+        if self.0.len() >= index + 1 {
+            let reduction = self
+                .0
+                .iter()
+                .rev()
+                .find_position(|i| **i > 0)
+                .map(|(i, _)| i)
+                // If all values are 0, resize the vec to 0 length
+                .unwrap_or(self.0.len());
+            self.0.resize(self.0.len() - reduction, 0);
+        }
     }
 
     /// Reconstruct from a flattened byte array using big-endian values
@@ -84,5 +106,42 @@ impl rusqlite::types::FromSql for RateBucketLevels {
 impl rusqlite::ToSql for RateBucketLevels {
     fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput> {
         Ok(rusqlite::types::ToSqlOutput::Owned(self.to_bytes().into()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn bucket_resizing() {
+        let mut buckets = RateBucketLevels::default();
+        assert_eq!(buckets.0.len(), 0);
+        assert_eq!(buckets.get(1), 0);
+        assert_eq!(buckets.get(3), 0);
+        assert_eq!(buckets.get(5), 0);
+        buckets.set(3, 3);
+        assert_eq!(buckets.0.len(), 4);
+        assert_eq!(buckets.get(1), 0);
+        assert_eq!(buckets.get(2), 0);
+        assert_eq!(buckets.get(3), 3);
+        buckets.set(1, 1);
+        assert_eq!(buckets.0.len(), 4);
+        assert_eq!(buckets.get(1), 1);
+        assert_eq!(buckets.get(2), 0);
+        assert_eq!(buckets.get(3), 3);
+        buckets.set(3, 0);
+        assert_eq!(buckets.0.len(), 2);
+        assert_eq!(buckets.get(1), 1);
+        assert_eq!(buckets.get(2), 0);
+        assert_eq!(buckets.get(3), 0);
+        buckets.set(5, 5);
+        assert_eq!(buckets.0.len(), 6);
+        assert_eq!(buckets.get(1), 1);
+        assert_eq!(buckets.get(3), 0);
+        assert_eq!(buckets.get(5), 5);
+        buckets.set(1, 0);
+        buckets.set(5, 0);
+        assert_eq!(buckets.0.len(), 0);
     }
 }

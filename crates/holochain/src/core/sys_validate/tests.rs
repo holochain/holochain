@@ -312,7 +312,7 @@ async fn check_link_tag_size_test() {
     assert_matches!(
         check_tag_size(&huge),
         Err(SysValidationError::ValidationOutcome(
-            ValidationOutcome::TagTooLarge(_, _)
+            ValidationOutcome::TagTooLarge(_)
         ))
     );
 }

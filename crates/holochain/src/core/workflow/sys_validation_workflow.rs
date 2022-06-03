@@ -25,6 +25,7 @@ use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::prelude::*;
 use holochain_zome_types::Entry;
 use holochain_zome_types::ValidationStatus;
+use rusqlite::OptionalExtension;
 use rusqlite::Transaction;
 use std::convert::TryInto;
 use std::sync::Arc;
@@ -287,7 +288,7 @@ fn handle_failed(error: ValidationOutcome) -> Outcome {
         ValidationOutcome::EntryTooLarge(_, _) => Rejected,
         ValidationOutcome::EntryType => Rejected,
         ValidationOutcome::EntryVisibility(_) => Rejected,
-        ValidationOutcome::TagTooLarge(_, _) => Rejected,
+        ValidationOutcome::TagTooLarge(_) => Rejected,
         ValidationOutcome::NotCreateLink(_) => Rejected,
         ValidationOutcome::NotNewEntry(_) => Rejected,
         ValidationOutcome::NotHoldingDep(dep) => AwaitingOpDep(dep),
@@ -301,6 +302,7 @@ fn handle_failed(error: ValidationOutcome) -> Outcome {
         ValidationOutcome::VerifySignature(_, _) => Rejected,
         ValidationOutcome::ZomeId(_) => Rejected,
         ValidationOutcome::CounterSigningError(_) => Rejected,
+        ValidationOutcome::RateLimitExceeded(_) => Rejected,
     }
 }
 
@@ -580,7 +582,7 @@ async fn register_agent_activity(
         )
         .await?;
     }
-    check_rate_limit(action, workspace).await?;
+    check_rate_limit(todo!(), action, workspace).await?;
     check_chain_rollback(action, workspace).await?;
     Ok(())
 }
@@ -908,18 +910,18 @@ impl SysValidationWorkspace {
     pub async fn get_rate_limit_state(
         &self,
         action_hash: &ActionHash,
-    ) -> SourceChainResult<Option<RateBucketLevels>> {
+    ) -> SourceChainResult<(Timestamp, RateBucketLevels)> {
         let state = self
             .dht_db
             .async_reader({
-                let hash = hash.clone();
+                let action_hash = action_hash.clone();
                 move |txn| {
                     // If no rows returned, this is a Holochain logic or database
                     // integrity error that needs to be fixed.
                     DatabaseResult::Ok(
                         txn.query_row(
                             "
-                            SELECT rate_bucket_state
+                            SELECT timestamp, rate_bucket_state
                             FROM Action
                             WHERE hash = :hash
                             LIMIT 1
@@ -927,7 +929,7 @@ impl SysValidationWorkspace {
                             named_params! {
                                 ":hash": action_hash,
                             },
-                            |row| row.get(0),
+                            |row| Ok((row.get("timestamp")?, row.get("rate_bucket_state")?)),
                         )
                         .optional()?
                         .ok_or_else(|| {
@@ -941,6 +943,34 @@ impl SysValidationWorkspace {
             })
             .await?;
         Ok(state)
+    }
+
+    pub async fn set_rate_limit_state(
+        &self,
+        action_hash: &ActionHash,
+        buckets: RateBucketLevels,
+    ) -> SourceChainResult<()> {
+        self.dht_db
+            .async_reader({
+                let action_hash = action_hash.clone();
+                move |txn| {
+                    // If no rows returned, this is a Holochain logic or database
+                    // integrity error that needs to be fixed.
+                    DatabaseResult::Ok(txn.execute(
+                        "
+                            UPDATE Action
+                            SET rate_bucket_state = :buckets
+                            WHERE hash = :action_hash
+                            ",
+                        named_params! {
+                            ":action_hash": action_hash,
+                            ":buckets": buckets,
+                        },
+                    )?)
+                }
+            })
+            .await?;
+        Ok(())
     }
 
     /// Create a cascade with local data only

@@ -190,17 +190,35 @@ pub async fn check_valid_if_dna(
 
 /// Check that app rate limit has not been exceeded
 pub async fn check_rate_limit(
+    params: &RateLimit,
     action: &Action,
     workspace: &SysValidationWorkspace,
 ) -> SysValidationResult<()> {
+    let rate_data = action.rate_data();
     let state = if let Some(h) = action.prev_action() {
-        workspace.get_rate_limit_state(h).await?
+        Some(workspace.get_rate_limit_state(h).await?)
     } else {
         None
-    }
-    .unwrap_or_default();
-    let bucket_level = state.get(action.rate_bucket);
-    todo!()
+    };
+    let prev = state
+        .as_ref()
+        .map(|(t, s)| (s.get(rate_data.bucket_id), *t));
+
+    // The rate limit check occurs here.
+    let level = next_bucket_level(params, prev, rate_data.units, action.timestamp()).map_err(
+        |e| match e {
+            RateBucketError::BucketOverflow => {
+                SysValidationError::from(ValidationOutcome::RateLimitExceeded(action.clone()))
+            }
+            e => SysValidationError::from(e),
+        },
+    )?;
+    let mut buckets: RateBucketLevels = state.map(|(t, s)| s).unwrap_or_default();
+    buckets.set(rate_data.bucket_id, level);
+
+    let hash = ActionHash::with_data_sync(action);
+    workspace.set_rate_limit_state(&hash, buckets).await?;
+    Ok(())
 }
 
 /// Check if there are other actions at this
@@ -348,7 +366,7 @@ pub fn check_tag_size(tag: &LinkTag) -> SysValidationResult<()> {
     if size < MAX_TAG_SIZE {
         Ok(())
     } else {
-        Err(ValidationOutcome::TagTooLarge(size, MAX_TAG_SIZE).into())
+        Err(ValidationOutcome::TagTooLarge(size).into())
     }
 }
 

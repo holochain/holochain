@@ -47,6 +47,8 @@ pub enum SysValidationError {
     #[error(transparent)]
     ValidationOutcome(#[from] ValidationOutcome),
     #[error(transparent)]
+    RateBucketError(#[from] RateBucketError),
+    #[error(transparent)]
     WorkflowError(#[from] Box<WorkflowError>),
     #[error(transparent)]
     WorkspaceError(#[from] WorkspaceError),
@@ -118,8 +120,11 @@ pub enum ValidationOutcome {
     EntryType,
     #[error("The app entry type {0:?} visibility didn't match the zome")]
     EntryVisibility(AppEntryType),
-    #[error("The link tag size {0} was bigger then the MAX_TAG_SIZE {1}")]
-    TagTooLarge(usize, usize),
+    #[error(
+        "The link tag size {0} was bigger than the MAX_TAG_SIZE {}",
+        MAX_TAG_SIZE
+    )]
+    TagTooLarge(usize),
     #[error("The action {0:?} was expected to be a link add action")]
     NotCreateLink(ActionHash),
     #[error("The action was expected to be a new entry action but was a {0:?}")]
@@ -132,6 +137,8 @@ pub enum ValidationOutcome {
     PrevActionError(#[from] PrevActionError),
     #[error("StoreEntry should not be gossiped for private entries")]
     PrivateEntry,
+    #[error("The app-defined rate limit was exceeded for action {0:?}")]
+    RateLimitExceeded(Action),
     #[error("Update original EntryType: {0:?} doesn't match new EntryType {1:?}")]
     UpdateTypeMismatch(EntryType, EntryType),
     #[error("Signature {0:?} failed to verify for Action {1:?}")]
