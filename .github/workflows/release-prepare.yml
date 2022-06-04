@@ -205,6 +205,13 @@ jobs:
               crate detect-missing-releaseheadings
             '
 
+      - name: Generate crate READMEs from doc comments
+        run: |
+          source "${HOLOCHAIN_RELEASE_SH}"
+          cd "${HOLOCHAIN_REPO}"
+          
+          nix-shell --pure --argstr flavor release --run "./scripts/generate_readmes.sh"
+
       - name: Bump the crate versions for the release
         id: bump-versions
         run: |
@@ -265,13 +272,6 @@ jobs:
           echo "::set-output name=version::${VERSION}"
           echo "::set-output name=version_compat::${VERSION_COMPAT}"
           echo "::set-output name=release_branch::${RELEASE_BRANCH}"
-
-      - name: Generate crate READMEs from Rust doc comments
-        run: |
-          source "${HOLOCHAIN_RELEASE_SH}"
-          cd "${HOLOCHAIN_REPO}"
-          
-          nix-shell --pure --argstr flavor release --run "./scripts/generate_readmes.sh"
 
       - name: Merge release branch to main
         run: |
