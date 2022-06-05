@@ -1,6 +1,6 @@
 [package]
 name = "holochain_keystore"
-version = "0.0.41-dev.0"
+version = "0.0.41"
 description = "keystore for libsodium keypairs"
 license = "CAL-1.0"
 homepage = "https://github.com/holochain/holochain"
