@@ -1,0 +1,22 @@
+---
+manifest_version: "1"
+name: multi integrity dna
+uid: 00000000-0000-0000-0000-000000000000
+properties: ~
+origin_time: 2022-02-11T23:05:19.470323Z
+zomes:
+  integrity:
+    - name: zome1
+      bundled: ../dna1/zomes/zome1.wasm
+    - name: zome2
+      bundled: ../dna2/zomes/zome1.wasm
+  coordinator:
+    - name: zome3
+      bundled: ../dna1/zomes/zome2.wasm
+      dependencies:
+        - name: zome1
+    - name: zome4
+      bundled: ../dna2/zomes/zome2.wasm
+      dependencies:
+        - name: zome1
+        - name: zome2

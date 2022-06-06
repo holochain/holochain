@@ -5,6 +5,6 @@ uid: 00000000-0000-0000-0000-000000000000
 properties: ~
 zomes:
   - name: zome1
-    bundled: ./zome1.wasm
+    bundled: ./zomes/zome1.wasm
   - name: zome2
-    bundled: ./zome2.wasm
+    bundled: ./zomes/zome2.wasm

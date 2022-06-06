@@ -48,6 +48,10 @@ impl<T> Zome<T> {
         &self.name
     }
 
+    pub fn zome_name_mut(&mut self) -> &mut ZomeName {
+        &mut self.name
+    }
+
     /// Accessor
     pub fn zome_def(&self) -> &T {
         &self.def

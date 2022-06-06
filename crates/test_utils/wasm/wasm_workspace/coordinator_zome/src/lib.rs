@@ -19,18 +19,28 @@ fn msg() -> Msg {
 
 #[hdk_extern]
 fn create_entry(_: ()) -> ExternResult<HeaderHash> {
+    debug!("{}", line!());
     let post = new_post();
-    HDK.with(|h| {
+    debug!("{}", line!());
+    let index = EntryDefIndex::try_from(&post)?;
+    debug!("{}", line!());
+    let vis = EntryVisibility::from(&post);
+    debug!("{}", line!());
+    let entry = post.try_into().unwrap();
+    debug!("{}", line!());
+    let r = HDK.with(|h| {
         h.borrow().create(CreateInput::new(
-            EntryDefIndex::try_from(&post)?,
-            EntryVisibility::from(&post),
-            post.try_into().unwrap(),
+            index,
+            vis,
+            entry,
             // This is used to test many conductors thrashing creates between
             // each other so we want to avoid retries that make the test take
             // a long time.
             ChainTopOrdering::Relaxed,
         ))
-    })
+    });
+    debug!("{}", line!());
+    r
 }
 
 #[hdk_extern]

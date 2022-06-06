@@ -76,26 +76,34 @@ impl DnaBundle {
 
         let integrity_zomes = data[0]
             .iter()
-            .map(|(zome_name, hash, _)| {
+            .map(|(zome_name, hash, _, dependencies)| {
                 (
                     zome_name.clone(),
-                    ZomeDef::Wasm(WasmZome::new(hash.clone())).into(),
+                    ZomeDef::Wasm(WasmZome {
+                        wasm_hash: hash.clone(),
+                        dependencies: dependencies.clone(),
+                    })
+                    .into(),
                 )
             })
             .collect();
         let coordinator_zomes = data[1]
             .iter()
-            .map(|(zome_name, hash, _)| {
+            .map(|(zome_name, hash, _, dependencies)| {
                 (
                     zome_name.clone(),
-                    ZomeDef::Wasm(WasmZome::new(hash.clone())).into(),
+                    ZomeDef::Wasm(WasmZome {
+                        wasm_hash: hash.clone(),
+                        dependencies: dependencies.clone(),
+                    })
+                    .into(),
                 )
             })
             .collect();
         let code: BTreeMap<_, _> = data
             .into_iter()
             .flatten()
-            .map(|(_, hash, wasm)| (hash, wasm))
+            .map(|(_, hash, wasm, _)| (hash, wasm))
             .collect();
 
         let wasms = WasmMap::from(code);
@@ -220,7 +228,7 @@ impl DnaBundle {
 async fn hash_bytes(
     zomes: impl Iterator<Item = ZomeManifest>,
     resources: &mut HashMap<Location, ResourceBytes>,
-) -> DnaResult<Vec<(ZomeName, WasmHash, DnaWasm)>> {
+) -> DnaResult<Vec<(ZomeName, WasmHash, DnaWasm, Vec<ZomeName>)>> {
     let iter = zomes.map(|z| {
         let bytes = resources
             .remove(&z.location)
@@ -228,6 +236,9 @@ async fn hash_bytes(
         let zome_name = z.name;
         let expected_hash = z.hash.map(WasmHash::from);
         let wasm = DnaWasm::from(bytes);
+        let dependencies = z.dependencies.map_or(Vec::with_capacity(0), |deps| {
+            deps.into_iter().map(|d| d.name).collect()
+        });
         async move {
             let hash = wasm.to_hash().await;
             if let Some(expected) = expected_hash {
@@ -235,7 +246,7 @@ async fn hash_bytes(
                     return Err(DnaError::WasmHashMismatch(expected, hash));
                 }
             }
-            DnaResult::Ok((zome_name, hash, wasm))
+            DnaResult::Ok((zome_name, hash, wasm, dependencies))
         }
     });
     futures::stream::iter(iter)

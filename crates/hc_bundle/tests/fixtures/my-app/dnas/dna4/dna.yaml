@@ -6,7 +6,7 @@ properties: ~
 zomes:
   integrity:
     - name: zome1
-      bundled: ../dna2/zome1.wasm
+      bundled: ../dna2/zomes/zome1.wasm
   coordinator:
     - name: zome2
-      bundled: ../dna2/zome2.wasm
+      bundled: ../dna2/zomes/zome2.wasm
