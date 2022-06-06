@@ -27,7 +27,6 @@ pub trait ToAppEntryDefName {
 }
 
 /// Trait for binding static [`EntryDef`] property access for a type.
-/// See [`register_entry`]
 pub trait EntryDefRegistration {
     const ENTRY_DEFS: &'static [AppEntryDef];
 }

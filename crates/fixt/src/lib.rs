@@ -839,7 +839,7 @@ mod tests {
             match empty_fixturator.next().unwrap() {
                 VariantFoo::A(s) => assert_eq!(s, ""),
                 VariantFoo::B(n) => assert_eq!(n, 0),
-                VariantFoo::C(b) => assert!(b),
+                VariantFoo::C(b) => assert!(!b),
             }
         }
     }

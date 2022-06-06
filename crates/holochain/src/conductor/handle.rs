@@ -148,10 +148,10 @@ pub trait ConductorHandleT: Send + Sync {
     /// Get the list of hashes of installed Dnas in this Conductor
     fn list_dnas(&self) -> Vec<DnaHash>;
 
-    /// Get a [`DnaDef`](holochain_types::prelude::DnaDef) from the [`RibosomeStore`](crate::conductor::dna_store::RibosomeStore)
+    /// Get a [`DnaDef`](holochain_types::prelude::DnaDef) from the [`RibosomeStore`](crate::conductor::ribosome_store::RibosomeStore)
     fn get_dna_def(&self, hash: &DnaHash) -> Option<DnaDef>;
 
-    /// Get a [`DnaFile`](holochain_types::dna::DnaFile) from the [`RibosomeStore`](crate::conductor::dna_store::RibosomeStore)
+    /// Get a [`DnaFile`](holochain_types::dna::DnaFile) from the [`RibosomeStore`](crate::conductor::ribosome_store::RibosomeStore)
     fn get_dna_file(&self, hash: &DnaHash) -> Option<DnaFile>;
 
     /// Get an instance of a [`RealRibosome`](crate::core::ribosome::real_ribosome::RealRibosome) for the DnaHash

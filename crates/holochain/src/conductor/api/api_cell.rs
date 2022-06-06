@@ -141,13 +141,13 @@ pub trait CellConductorApiT: Send + Sync + Sized {
     /// attached app interface
     async fn signal_broadcaster(&self) -> SignalBroadcaster;
 
-    /// Get a [`Dna`](holochain_types::prelude::Dna) from the [`RibosomeStore`](crate::conductor::dna_store::RibosomeStore)
+    /// Get a [`Dna`](holochain_types::prelude::Dna) from the [`RibosomeStore`](crate::conductor::ribosome_store::RibosomeStore)
     fn get_dna(&self, dna_hash: &DnaHash) -> Option<DnaFile>;
 
-    /// Get the [`Dna`](holochain_types::prelude::Dna) of this cell from the [`RibosomeStore`](crate::conductor::dna_store::RibosomeStore)
+    /// Get the [`Dna`](holochain_types::prelude::Dna) of this cell from the [`RibosomeStore`](crate::conductor::ribosome_store::RibosomeStore)
     fn get_this_dna(&self) -> ConductorApiResult<DnaFile>;
 
-    /// Get the [`RealRibosome`] of this cell from the [`RibosomeStore`](crate::conductor::dna_store::RibosomeStore)
+    /// Get the [`RealRibosome`] of this cell from the [`RibosomeStore`](crate::conductor::ribosome_store::RibosomeStore)
     fn get_this_ribosome(&self) -> ConductorApiResult<RealRibosome>;
 
     /// Get a [`Zome`](holochain_types::prelude::Zome) from this cell's Dna

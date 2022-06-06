@@ -140,9 +140,6 @@ impl TryFrom<&Component> for String {
 /// i.e. the ahead-of-time predictability of the hashes of a given path allows us to travel "up"
 /// the tree and the linking functionality of the holochain DHT allows us to travel "down" the tree
 /// after at least one DHT participant has followed the path "up".
-/// Note that the `Path` is not literally committed and/or linked from/to as
-/// base and target. For this the [ `PathEntry` ] exists, which achieves a
-/// constant size for the DHT representation of each node of the `Path`.
 #[derive(
     Clone, Debug, PartialEq, Default, serde::Deserialize, serde::Serialize, SerializedBytes,
 )]
