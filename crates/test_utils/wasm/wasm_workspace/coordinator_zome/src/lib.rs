@@ -19,16 +19,11 @@ fn msg() -> Msg {
 
 #[hdk_extern]
 fn create_entry(_: ()) -> ExternResult<HeaderHash> {
-    debug!("{}", line!());
     let post = new_post();
-    debug!("{}", line!());
     let index = EntryDefIndex::try_from(&post)?;
-    debug!("{}", line!());
     let vis = EntryVisibility::from(&post);
-    debug!("{}", line!());
     let entry = post.try_into().unwrap();
-    debug!("{}", line!());
-    let r = HDK.with(|h| {
+    HDK.with(|h| {
         h.borrow().create(CreateInput::new(
             index,
             vis,
@@ -38,9 +33,7 @@ fn create_entry(_: ()) -> ExternResult<HeaderHash> {
             // a long time.
             ChainTopOrdering::Relaxed,
         ))
-    });
-    debug!("{}", line!());
-    r
+    })
 }
 
 #[hdk_extern]

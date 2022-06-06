@@ -79,15 +79,11 @@ async fn test_coordinator_zome_hot_swap() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_coordinator_zome_hot_swap_multi_integrity() {
-    let s = std::time::Instant::now();
     let mut conductor = SweetConductor::from_config(Default::default()).await;
     let mut second_integrity = IntegrityZome::from(TestIntegrityWasm::IntegrityZome);
     second_integrity.zome_name_mut().0 = "2".into();
     let (_, second_coordinator) =
         CoordinatorZome::from(TestCoordinatorWasm::CoordinatorZome).into_inner();
-
-    dbg!(s.elapsed());
-    let s = std::time::Instant::now();
 
     let second_coordinator = match second_coordinator.erase_type() {
         ZomeDef::Wasm(WasmZome {
@@ -126,16 +122,10 @@ async fn test_coordinator_zome_hot_swap_multi_integrity() {
     .await
     .unwrap();
 
-    dbg!(s.elapsed());
-    let s = std::time::Instant::now();
-
     let dna_hash = dna.dna_hash().clone();
 
     let app = conductor.setup_app("app", &[dna]).await.unwrap();
     let cells = app.into_cells();
-
-    dbg!(s.elapsed());
-    let s = std::time::Instant::now();
 
     let hash: HeaderHash = conductor
         .call(
@@ -145,15 +135,9 @@ async fn test_coordinator_zome_hot_swap_multi_integrity() {
         )
         .await;
 
-    dbg!(s.elapsed());
-    let s = std::time::Instant::now();
-
     let hash2: HeaderHash = conductor
         .call(&cells[0].zome("2_coord"), "create_entry", ())
         .await;
-
-    dbg!(s.elapsed());
-    let s = std::time::Instant::now();
 
     let element: Option<Element> = conductor
         .call(
@@ -163,16 +147,10 @@ async fn test_coordinator_zome_hot_swap_multi_integrity() {
         )
         .await;
 
-    dbg!(s.elapsed());
-    let s = std::time::Instant::now();
-
     assert!(element.is_some());
     let element: Option<Element> = conductor
         .call(&cells[0].zome("2_coord"), "get_entry", ())
         .await;
-
-    dbg!(s.elapsed());
-    let s = std::time::Instant::now();
 
     assert!(element.is_some());
 
@@ -186,9 +164,6 @@ async fn test_coordinator_zome_hot_swap_multi_integrity() {
         .await
         .unwrap();
 
-    dbg!(s.elapsed());
-    let s = std::time::Instant::now();
-
     let element: Option<Element> = conductor
         .call(
             &cells[0].zome(TestCoordinatorWasm::CoordinatorZomeUpdate),
@@ -196,9 +171,6 @@ async fn test_coordinator_zome_hot_swap_multi_integrity() {
             hash,
         )
         .await;
-
-    dbg!(s.elapsed());
-    let s = std::time::Instant::now();
 
     assert!(element.is_some());
 
@@ -211,9 +183,6 @@ async fn test_coordinator_zome_hot_swap_multi_integrity() {
     })
     .into();
 
-    dbg!(s.elapsed());
-    let s = std::time::Instant::now();
-
     conductor
         .hot_swap_coordinators(
             &dna_hash,
@@ -223,14 +192,9 @@ async fn test_coordinator_zome_hot_swap_multi_integrity() {
         .await
         .unwrap();
 
-    dbg!(s.elapsed());
-    let s = std::time::Instant::now();
-
     let element: Option<Element> = conductor
         .call(&cells[0].zome("2_coord"), "get_entry", hash2)
         .await;
-
-    dbg!(s.elapsed());
 
     assert!(element.is_some());
 }
