@@ -1,8 +1,6 @@
 use crate::element::SignedHeaderHashed;
 use crate::ChainTopOrdering;
 use holo_hash::HeaderHash;
-use holochain_integrity_types::ToZomeName;
-use holochain_integrity_types::ZomeName;
 use holochain_serialized_bytes::prelude::*;
 
 pub use holochain_integrity_types::link::*;
@@ -28,17 +26,6 @@ pub struct Link {
     pub tag: LinkTag,
     /// The hash of this link's create header
     pub create_link_hash: HeaderHash,
-}
-
-#[derive(
-    Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
-)]
-/// The location of the links being queried.
-pub enum LinkTypeQuery<Z = ZomeName> {
-    /// All link types in this zome.
-    AllTypes(Z),
-    /// Only this link type in this zome.
-    SingleType(Z, LinkType),
 }
 
 /// Zome IO inner type for link creation.
@@ -128,19 +115,5 @@ impl From<LinkDetails> for CreateLinkWithDeleteLinks {
 impl LinkDetails {
     pub fn into_inner(self) -> CreateLinkWithDeleteLinks {
         self.into()
-    }
-}
-
-impl ToZomeName for LinkTypeQuery {
-    fn zome_name(&self) -> ZomeName {
-        match self {
-            LinkTypeQuery::AllTypes(z) | LinkTypeQuery::SingleType(z, _) => z.clone(),
-        }
-    }
-}
-
-impl From<ZomeName> for LinkTypeQuery {
-    fn from(z: ZomeName) -> Self {
-        LinkTypeQuery::AllTypes(z)
     }
 }

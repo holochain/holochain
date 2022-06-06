@@ -90,7 +90,6 @@ pub use holo_hash::HoloHashed;
 pub use holochain_deterministic_integrity;
 pub use holochain_deterministic_integrity::map_extern_infallible;
 pub use holochain_deterministic_integrity::prelude::app_entry;
-pub use holochain_deterministic_integrity::prelude::register_entry;
 pub use holochain_wasmer_guest::*;
 pub use holochain_zome_types;
 pub use holochain_zome_types::prelude::*;

@@ -214,126 +214,6 @@ macro_rules! app_entry {
     };
 }
 
-/// Implements a whole lot of sane defaults for a struct or enum that should behave as an entry,
-/// *without* implementing the app entry conversion interface.
-///
-/// This allows crates to easily define a struct as an entry separately to binding that struct
-/// as an entry type in a dependent crate.
-///
-/// For most normal applications, you should use the [`entry_def!`] macro instead.
-#[macro_export]
-macro_rules! register_entry {
-    ( $t:ident $def:expr ) => {
-        // impl $crate::prelude::EntryDefRegistration for $t {
-        //     fn entry_def(&self) -> $crate::prelude::EntryDef {
-        //         $def
-        //     }
-
-        //     fn entry_def_id(&self) -> $crate::prelude::EntryDefId {
-        //         self.entry_def().id
-        //     }
-
-        //     fn entry_visibility(&self) -> $crate::prelude::EntryVisibility {
-        //         self.entry_def().visibility
-        //     }
-
-        //     fn required_validations(&self) -> $crate::prelude::RequiredValidations {
-        //         self.entry_def().required_validations
-        //     }
-        // }
-
-        // impl<'a> $crate::prelude::EntryDefRegistration for &'a $t {
-        //     fn entry_def(&self) -> $crate::prelude::EntryDef {
-        //         $def
-        //     }
-
-        //     fn entry_def_id(&self) -> $crate::prelude::EntryDefId {
-        //         self.entry_def().id
-        //     }
-
-        //     fn entry_visibility(&self) -> $crate::prelude::EntryVisibility {
-        //         self.entry_def().visibility
-        //     }
-
-        //     fn required_validations(&self) -> $crate::prelude::RequiredValidations {
-        //         self.entry_def().required_validations
-        //     }
-        // }
-
-        // impl From<$t> for $crate::prelude::EntryDef
-        // where
-        //     $t: $crate::prelude::EntryDefRegistration,
-        // {
-        //     fn from(n: $t) -> Self {
-        //         n.entry_def()
-        //     }
-        // }
-
-        // impl From<&$t> for $crate::prelude::EntryDef
-        // where
-        //     $t: $crate::prelude::EntryDefRegistration,
-        // {
-        //     fn from(n: &$t) -> Self {
-        //         n.entry_def()
-        //     }
-        // }
-
-        // impl From<$t> for $crate::prelude::EntryDefId
-        // where
-        //     $t: $crate::prelude::EntryDefRegistration,
-        // {
-        //     fn from(n: $t) -> Self {
-        //         n.entry_def_id()
-        //     }
-        // }
-
-        // impl From<&$t> for $crate::prelude::EntryDefId
-        // where
-        //     $t: $crate::prelude::EntryDefRegistration,
-        // {
-        //     fn from(n: &$t) -> Self {
-        //         n.entry_def_id()
-        //     }
-        // }
-
-        // impl From<$t> for $crate::prelude::EntryVisibility
-        // where
-        //     $t: $crate::prelude::EntryDefRegistration,
-        // {
-        //     fn from(n: $t) -> Self {
-        //         n.entry_visibility()
-        //     }
-        // }
-
-        // impl From<&$t> for $crate::prelude::EntryVisibility
-        // where
-        //     $t: $crate::prelude::EntryDefRegistration,
-        // {
-        //     fn from(n: &$t) -> Self {
-        //         n.entry_visibility()
-        //     }
-        // }
-
-        // impl From<$t> for $crate::prelude::RequiredValidations
-        // where
-        //     $t: $crate::prelude::EntryDefRegistration,
-        // {
-        //     fn from(n: $t) -> Self {
-        //         n.required_validations()
-        //     }
-        // }
-
-        // impl From<&$t> for $crate::prelude::RequiredValidations
-        // where
-        //     $t: $crate::prelude::EntryDefRegistration,
-        // {
-        //     fn from(n: &$t) -> Self {
-        //         n.required_validations()
-        //     }
-        // }
-    };
-}
-
 /// Implements a whole lot of sane defaults for a struct or enum that should behave as an entry.
 /// All the entry def fields are available as dedicated methods on the type and matching From impls
 /// are provided for each. This allows for both Foo::entry_def() and EntryDef::from(Foo::new())
@@ -376,7 +256,6 @@ macro_rules! register_entry {
 macro_rules! entry_def {
     ( $t:ident $def:expr ) => {
         app_entry!($t);
-        register_entry!($t $def);
     };
 }
 

@@ -18,7 +18,6 @@ pub use crate::map_extern;
 pub use crate::map_extern::ExternResult;
 pub use crate::map_extern_infallible;
 pub use crate::map_extern_preamble;
-pub use crate::register_entry;
 pub use crate::x_salsa20_poly1305::x_25519_x_salsa20_poly1305_decrypt;
 pub use crate::x_salsa20_poly1305::x_salsa20_poly1305_decrypt;
 pub use hdk_derive;

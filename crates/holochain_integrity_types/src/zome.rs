@@ -22,12 +22,6 @@ impl<'a> arbitrary::Arbitrary<'a> for ZomeName {
     }
 }
 
-/// A trait for converting a value to a [`ZomeName`].
-pub trait ToZomeName {
-    /// Converts the value to a [`ZomeName`].
-    fn zome_name(&self) -> ZomeName;
-}
-
 impl ZomeName {
     /// Create an unknown zome name.
     pub fn unknown() -> Self {
@@ -98,35 +92,5 @@ impl From<&str> for FunctionName {
 impl AsRef<str> for FunctionName {
     fn as_ref(&self) -> &str {
         self.0.as_ref()
-    }
-}
-
-impl ToZomeName for &ZomeName {
-    fn zome_name(&self) -> ZomeName {
-        (*self).clone()
-    }
-}
-
-impl ToZomeName for ZomeName {
-    fn zome_name(&self) -> ZomeName {
-        self.clone()
-    }
-}
-
-impl ToZomeName for &str {
-    fn zome_name(&self) -> ZomeName {
-        ZomeName::new(self)
-    }
-}
-
-impl ToZomeName for &String {
-    fn zome_name(&self) -> ZomeName {
-        ZomeName::new(self)
-    }
-}
-
-impl ToZomeName for String {
-    fn zome_name(&self) -> ZomeName {
-        ZomeName::new(self)
     }
 }
