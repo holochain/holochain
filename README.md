@@ -7,25 +7,29 @@
 # Holochain
 
 Holochain is an open-source framework to develop peer-to-peer applications with high levels of security, reliability, and performance.
+
 This repository contains the Holochain core libraries.
 
 ## Code Status
 
-This code is in alpha. It is not for production use, and currently makes no security guarantees. We will be frequently and heavily restructuring code APIs and data chains until Beta.
+This code is in Alpha. It is not for production use, and currently makes no security guarantees. We will be frequently and heavily restructuring code APIs and data chains until Beta.
 
-**We are supporting Linux and macOS at this time**. You may or may not be able to build and run Holochain on Windows.
-We will be supporting it in the future.
+## Supported OSes
 
-## Holochain Development and Usage
+* **Linux**: Top-tier. Weekly releases pass CI tests for the conductor, development tools, and Holonix development environment.
+* **macOS**: Currently no CI tests are being run, but developers usually report weekly releases work fine via the Holonix development environment.
+* **Windows**: Currently no CI tests are being run, but developers usually report weekly releases published to crates.io work fine.
 
-### Running Holochain applications (hApps)
+## Running Holochain applications (hApps)
 
-Holochain apps can be installed and run using the [Holochain Launcher](https://github.com/holochain/launcher). Refer to the Github repository
-for instructions on how to obtain and use it.
+[Holochain Launcher](https://github.com/holochain/launcher), the distribution of Holochain for end-users, is supported on all three major desktop platforms.
+Holochain apps can be installed and run with it. Refer to the Github repository for instructions on how to obtain and use it.
+
+## Holochain Development
 
 ### Developing Holochain applications (hApps)
 
-Looking to write a hApp yourself? You need to set up your development environment and then can scaffold your hApp. Refer to the
+Looking to write a hApp yourself? After setting up your development environment, you can scaffold your hApp. Refer to the
 [Holochain Dev Tools Guide](https://developer.holochain.org/install) to set up your environment, and see
 [how hApps are scaffolded](https://developer.holochain.org/happ-setup/#scaffolding-a-new-happ) for creating a hApp template.
 
@@ -80,11 +84,11 @@ Database created.
 Conductor ready.
 ```
 
-As well as creating the config file this process also instantiates the database.   If you provide a config file on first run with just the `-c` flag `holochain` will also initialize the environment even if not in interactive mode.
+As well as creating the config file, this process also instantiates the database. If you provide a config file on first run with just the `-c` flag, `holochain` will also initialize the environment even if not in interactive mode.
 
 ## License
 
-Copyright (C) 2019, Holochain Foundation
+Copyright (C) 2019-2022, Holochain Foundation
 
 This program is free software: you can redistribute it and/or modify it under the terms of the license
 provided in the LICENSE file (CAL-1.0). This program is distributed in the hope that it will be useful,
