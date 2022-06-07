@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Fixed `hdk::query`, which was showing some incorrect behavior:
   - When using `ChainQueryFilterRange::HeaderHashRange`, extraneous elements from other authors could be returned.
   - Certain combinations of filters, like hash-bounded ranges and header type filters, are currently implemented incorrectly and lead to undefined behavior. Filter combinations which are unsupported now result in `SourceChainError::UnsupportedQuery`.
+- Docs: Crate README generated from crate level doc comments [\#1392](https://github.com/holochain/holochain/pull/1392).
 
 ## 0.0.135
 
