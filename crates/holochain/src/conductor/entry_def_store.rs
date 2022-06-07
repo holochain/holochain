@@ -49,28 +49,6 @@ pub(crate) async fn get_entry_def(
     }
 }
 
-pub(crate) async fn get_entry_def_from_ids(
-    entry_def_index: EntryDefIndex,
-    dna_hash: &DnaHash,
-    conductor_handle: &dyn ConductorHandleT,
-) -> EntryDefStoreResult<Option<EntryDef>> {
-    let ribosome = conductor_handle
-        .get_ribosome(dna_hash)
-        .map_err(|_| EntryDefStoreError::DnaFileMissing(dna_hash.clone()))?;
-    match ribosome.find_zome_from_entry(&entry_def_index) {
-        Some(zome) => {
-            get_entry_def(
-                entry_def_index,
-                zome.into_inner().1,
-                dna_hash,
-                conductor_handle,
-            )
-            .await
-        }
-        None => Ok(None),
-    }
-}
-
 #[tracing::instrument(skip(ribosome))]
 /// Get all the [EntryDef] for this dna
 pub(crate) async fn get_entry_defs(
@@ -165,13 +143,11 @@ mod tests {
             id: "post".into(),
             visibility: EntryVisibility::Public,
             required_validations: 5.into(),
-            required_validation_type: Default::default(),
         };
         let comment_def = EntryDef {
             id: "comment".into(),
             visibility: EntryVisibility::Private,
             required_validations: 5.into(),
-            required_validation_type: Default::default(),
         };
         let dna_wasm = DnaWasmHashed::from_content(TestWasm::EntryDefs.into())
             .await

@@ -11,7 +11,6 @@ use super::space::Space;
 use crate::conductor::api::CellConductorApi;
 use crate::conductor::api::CellConductorApiT;
 use crate::conductor::cell::error::CellResult;
-use crate::conductor::entry_def_store::get_entry_def_from_ids;
 use crate::conductor::handle::ConductorHandle;
 use crate::core::queue_consumer::spawn_queue_consumer_tasks;
 use crate::core::queue_consumer::InitialQueueTriggers;
@@ -570,13 +569,7 @@ impl Cell {
             )
             .await
         } else {
-            validation_package::get_as_authority(
-                header,
-                db,
-                &ribosome.dna_file,
-                self.conductor_handle.as_ref(),
-            )
-            .await
+            validation_package::get_as_authority(header, db).await
         }
     }
 

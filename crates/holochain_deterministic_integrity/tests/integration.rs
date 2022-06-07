@@ -227,19 +227,16 @@ fn entry_defs_overrides() {
                 id: "hey".into(),
                 visibility: Default::default(),
                 required_validations: Default::default(),
-                required_validation_type: Default::default()
             },
             EntryDef {
                 id: "b".into(),
                 visibility: EntryVisibility::Private,
                 required_validations: Default::default(),
-                required_validation_type: Default::default()
             },
             EntryDef {
                 id: "c".into(),
                 visibility: Default::default(),
                 required_validations: RequiredValidations(10),
-                required_validation_type: Default::default()
             },
         ]))
     );
@@ -266,19 +263,16 @@ fn entry_defs_default() {
                 id: "a".into(),
                 visibility: Default::default(),
                 required_validations: Default::default(),
-                required_validation_type: Default::default()
             },
             EntryDef {
                 id: "b".into(),
                 visibility: Default::default(),
                 required_validations: Default::default(),
-                required_validation_type: Default::default()
             },
             EntryDef {
                 id: "c".into(),
                 visibility: Default::default(),
                 required_validations: Default::default(),
-                required_validation_type: Default::default()
             },
         ]))
     );

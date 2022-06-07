@@ -34,8 +34,6 @@ impl Parse for EntryDef {
         let mut required_validations =
             holochain_integrity_types::entry_def::RequiredValidations::default();
         let mut visibility = holochain_integrity_types::entry_def::EntryVisibility::default();
-        let mut required_validation_type =
-            holochain_integrity_types::validate::RequiredValidationType::default();
 
         let vars = Punctuated::<syn::MetaNameValue, syn::Token![,]>::parse_terminated(input)?;
         for var in vars {
@@ -58,30 +56,6 @@ impl Parse for EntryDef {
                         }
                         _ => unreachable!(),
                     },
-                    "required_validation_type" => {
-                        match var.lit {
-                            syn::Lit::Str(s) => required_validation_type = match s.value().as_str()
-                            {
-                                "custom" => {
-                                    holochain_integrity_types::validate::RequiredValidationType::Custom
-                                }
-                                "element" => {
-                                    holochain_integrity_types::validate::RequiredValidationType::Element
-                                }
-                                "sub_chain" => {
-                                    holochain_integrity_types::validate::RequiredValidationType::SubChain
-                                }
-                                "full" => {
-                                    holochain_integrity_types::validate::RequiredValidationType::Full
-                                }
-                                _ => unreachable!(
-                                    "Invalid required_validation_type
-                                    Options are: entry, sub_chain, full and custom"
-                                ),
-                            },
-                            _ => unreachable!(),
-                        };
-                    }
                     "visibility" => {
                         match var.lit {
                             syn::Lit::Str(s) => visibility = match s.value().as_str() {
@@ -104,7 +78,6 @@ impl Parse for EntryDef {
             id,
             visibility,
             required_validations,
-            required_validation_type,
         }))
     }
 }
@@ -169,14 +142,12 @@ impl quote::ToTokens for EntryDef {
         let id = EntryDefId(self.0.id.clone());
         let visibility = EntryVisibility(self.0.visibility);
         let required_validations = RequiredValidations(self.0.required_validations);
-        let required_validation_type = RequiredValidationType(self.0.required_validation_type);
 
         tokens.append_all(quote::quote! {
             holochain_deterministic_integrity::prelude::EntryDef {
                 id: #id,
                 visibility: #visibility,
                 required_validations: #required_validations,
-                required_validation_type: #required_validation_type,
             }
         });
     }

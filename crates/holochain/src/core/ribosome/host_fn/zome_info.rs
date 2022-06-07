@@ -56,13 +56,11 @@ pub mod test {
                     id: "post".into(),
                     visibility: Default::default(),
                     required_validations: Default::default(),
-                    required_validation_type: Default::default(),
                 },
                 EntryDef {
                     id: "comment".into(),
                     visibility: EntryVisibility::Private,
                     required_validations: Default::default(),
-                    required_validation_type: Default::default(),
                 }
             ]
             .into(),

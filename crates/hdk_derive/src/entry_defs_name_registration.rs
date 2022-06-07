@@ -175,7 +175,7 @@ pub fn build(attrs: TokenStream, input: TokenStream) -> TokenStream {
 
             fn try_from(value: #unit_ident) -> Result<Self, Self::Error> {
                 let id = value.try_into()?;
-                let def: AppEntryDef = value.into();
+                let def: EntryDef = value.into();
                 Ok(Self {
                     id,
                     visibility: def.visibility,
@@ -183,7 +183,7 @@ pub fn build(attrs: TokenStream, input: TokenStream) -> TokenStream {
             }
         }
 
-        impl From<#unit_ident> for AppEntryDef {
+        impl From<#unit_ident> for EntryDef {
             fn from(v: #unit_ident) -> Self {
                 let i: LocalZomeTypeId = v.into();
                 #ident::ENTRY_DEFS[i.0 as usize].clone()

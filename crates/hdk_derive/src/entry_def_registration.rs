@@ -49,8 +49,8 @@ pub fn derive(input: TokenStream) -> TokenStream {
                     let required_validations =
                         required_validations.unwrap_or_else(|| RequiredValidations::default().0);
                     quote::quote! {
-                        AppEntryDef {
-                            name: AppEntryDefName::from_str(#id),
+                        EntryDef {
+                            id: EntryDefId::App(AppEntryDefName::from_str(#id)),
                             visibility: #visibility,
                             required_validations: RequiredValidations(#required_validations),
                         },
@@ -63,10 +63,10 @@ pub fn derive(input: TokenStream) -> TokenStream {
 
     let output = quote::quote! {
         impl EntryDefRegistration for #ident {
-            const ENTRY_DEFS: &'static [AppEntryDef] = &[#inner];
+            const ENTRY_DEFS: &'static [EntryDef] = &[#inner];
         }
         impl EntryDefRegistration for &#ident {
-            const ENTRY_DEFS: &'static [AppEntryDef] = &#ident::ENTRY_DEFS;
+            const ENTRY_DEFS: &'static [EntryDef] = &#ident::ENTRY_DEFS;
         }
     };
     output.into()
