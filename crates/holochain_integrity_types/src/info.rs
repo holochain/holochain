@@ -1,6 +1,5 @@
-#![warn(missing_docs)]
 //! Information about the current zome and dna.
-use std::ops::Range;
+use core::ops::Range;
 
 use crate::header::ZomeId;
 use crate::zome::ZomeName;
@@ -23,7 +22,7 @@ pub struct ZomeInfo {
     pub entry_defs: EntryDefs,
     // @todo make this include function signatures when they exist.
     pub extern_fns: Vec<FunctionName>,
-    /// Zome types in scope for this zome.
+    /// All the zome types that are in scope for this zome.
     pub zome_types: ScopedZomeTypesSet,
 }
 
