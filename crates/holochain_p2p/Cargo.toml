@@ -1,6 +1,6 @@
 [package]
 name = "holochain_p2p"
-version = "0.0.37"
+version = "0.0.40"
 description = "holochain specific wrapper around more generic p2p module"
 license-file = "LICENSE_CAL-1.0"
 homepage = "https://github.com/holochain/holochain"
@@ -15,12 +15,12 @@ async-trait = "0.1"
 fixt = { path = "../fixt", version = "0.0.11"}
 futures = "0.3"
 ghost_actor = "=0.3.0-alpha.4"
-holo_hash = { version = "0.0.25", path = "../holo_hash" }
-holochain_keystore = { version = "0.0.37", path = "../holochain_keystore" }
+holo_hash = { version = "0.0.27", path = "../holo_hash" }
+holochain_keystore = { version = "0.0.40", path = "../holochain_keystore" }
 holochain_serialized_bytes = "=0.0.51"
-holochain_types = { version = "0.0.37", path = "../holochain_types" }
-holochain_zome_types = { version = "0.0.33", path = "../holochain_zome_types" }
-kitsune_p2p = { version = "0.0.32", path = "../kitsune_p2p/kitsune_p2p" }
+holochain_types = { version = "0.0.40", path = "../holochain_types" }
+holochain_zome_types = { version = "0.0.35", path = "../holochain_zome_types" }
+kitsune_p2p = { version = "0.0.35", path = "../kitsune_p2p/kitsune_p2p" }
 kitsune_p2p_types = { version = "0.0.24", path = "../kitsune_p2p/types" }
 mockall = "0.10.2"
 observability = "0.1.3"
