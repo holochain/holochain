@@ -1,5 +1,6 @@
 use super::*;
 
+/// Make a new ScopedZomeTypes.
 fn make_scope(ranges: Vec<Range<u8>>) -> ScopedZomeTypes {
     ScopedZomeTypes(
         ranges
@@ -10,6 +11,7 @@ fn make_scope(ranges: Vec<Range<u8>>) -> ScopedZomeTypes {
 }
 
 #[test]
+/// Check that local types can convert to global types.
 fn check_to_global_scope() {
     let scope = make_scope(vec![5..9, 3..5]);
     let check = |local: u8, expect: u8| {
@@ -52,6 +54,7 @@ fn check_to_global_scope() {
 }
 
 #[test]
+/// Check that global types can convert to local types.
 fn check_to_local_scope() {
     let scope = make_scope(vec![5..9, 3..5]);
     let check = |global: u8, expect: u8| {

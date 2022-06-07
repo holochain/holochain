@@ -63,37 +63,59 @@ pub struct DnaInfo {
 
 #[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, PartialEq, Default)]
 /// The set of entry and link [`GlobalZomeTypeId`]s in scope for the calling zome.
+///
+/// This allows the caller to convert from [`LocalZomeTypeId`] to [`GlobalZomeTypeId`]
+/// and back again.
 pub struct ScopedZomeTypesSet {
     /// All the entry [`GlobalZomeTypeId`]s in scope for this zome.
+    /// Converts from [`EntryDefIndex`](crate::header::EntryDefIndex) to [`LocalZomeTypeId`].
     pub entries: ScopedZomeTypes,
     /// All the link [`GlobalZomeTypeId`]s in scope for this zome.
+    /// Converts from [`LinkType`](crate::link::LinkType) to [`LocalZomeTypeId`].
     pub links: ScopedZomeTypes,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, PartialEq, Default)]
 /// A set of [`GlobalZomeTypeId`] ranges that are in scope for the calling zome.
+///
+/// For each integrity zome that this zome depends on there is a range of global
+/// zome types. Integrity zomes always depend on themselves.
 pub struct ScopedZomeTypes(pub Vec<Range<GlobalZomeTypeId>>);
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
-/// An opaque type identifier that the guest uses to
+/// An opaque type identifier that the host uses to
 /// uniquely identify an app defined entry or link type.
 pub struct GlobalZomeTypeId(pub u8);
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 /// An opaque type identifier that the guest uses to
-/// uniquely identify an app defined entry or link type.
+/// uniquely identify an app defined entry or link type
+/// within a single zome.
 pub struct LocalZomeTypeId(pub u8);
 
 impl ScopedZomeTypes {
-    /// Convert a [`GlobalZomeTypeId`] to a [`LocalZomeTypeId`].
+    /// Convert a [`Into<GlobalZomeTypeId>`] to a [`LocalZomeTypeId`].
+    /// If the the [`GlobalZomeTypeId`] is in scope for the calling zome,
+    /// then this will return a [`LocalZomeTypeId`].
     pub fn to_local_scope(&self, index: impl Into<GlobalZomeTypeId>) -> Option<LocalZomeTypeId> {
         let index = index.into();
+
+        // Track the total local length as we iterate over the ranges.
         let mut total_len: u8 = 0;
+
+        // Iterate over all ranges in scope.
         self.0.iter().find_map(|range| {
+            // Add the length of this range to the total length.
             total_len = total_len.checked_add(range.end.0.checked_sub(range.start.0)?)?;
+
+            // Check if the range contains the global index.
             range
                 .contains(&index)
+                // Then map the starting point of this range to the local scope
+                // by subtracting the total length of this range from the total
+                // accumulated length.
                 .then(|| (range.end.0 as i16) - (total_len as i16))
+                // Then convert the local index to by subtracting the offset.
                 .and_then(|offset| {
                     let i = (index.0 as i16) - offset;
                     Some(LocalZomeTypeId(u8::try_from(i).ok()?))
@@ -101,16 +123,25 @@ impl ScopedZomeTypes {
         })
     }
     /// Convert a [`LocalZomeTypeId`] to a [`GlobalZomeTypeId`].
+    /// If the the [`LocalZomeTypeId`] maps to a [`GlobalZomeTypeId`] in scope for the calling zome,
+    /// then this will return a [`GlobalZomeTypeId`].
     pub fn to_global_scope(&self, index: impl Into<LocalZomeTypeId>) -> Option<GlobalZomeTypeId> {
         let index: LocalZomeTypeId = index.into();
+
         let mut total_len: u8 = 0;
+
         self.0.iter().find_map(|range| {
+            // Add the length of this range to the total length.
             total_len = total_len.checked_add(range.end.0.checked_sub(range.start.0)?)?;
+
+            // If the total length is less than the local index, then we know
+            // this index is within our local scope.
             (index.0 < total_len)
+                // Then calculate the offset from local to global scope.
                 .then(|| (range.end.0 as i16) - (total_len as i16))
+                // Then add the offset to the local index to get the global index.
                 .and_then(|offset| {
                     let i = (index.0 as i16) + offset;
-
                     Some(GlobalZomeTypeId(u8::try_from(i).ok()?))
                 })
         })
@@ -132,15 +163,26 @@ impl From<u8> for LocalZomeTypeId {
 #[doc(hidden)]
 /// This is an internally used trait for checking
 /// enum lengths at compile time.
+/// This is used by proc macros in the
+/// `hdk_derive` crate and should not be used directly.
 pub trait EnumLen<const L: u8> {
+    /// The total length of an enum (possibly recusively)
+    /// known at compile time.
     const ENUM_LEN: u8 = L;
 }
 
 #[doc(hidden)]
 /// This is an internally used trait for checking
 /// enum variant lengths at compile time.
+/// This is used by proc macros in the
+/// `hdk_derive` crate and should not be used directly.
+/// `V` is the variant index.
 pub trait EnumVariantLen<const V: u8> {
+    /// The starting point of this enum variant.
     const ENUM_VARIANT_START: u8;
+    /// The length of this enum variant.
+    /// This could include the recusive length of a nested enum.
     const ENUM_VARIANT_INNER_LEN: u8;
+    /// The ending point of this variant.
     const ENUM_VARIANT_LEN: u8 = Self::ENUM_VARIANT_START + Self::ENUM_VARIANT_INNER_LEN;
 }

@@ -150,7 +150,7 @@ pub(super) async fn get_as_authority(
     // FIXME: Remove this completely.
     let required_validation_type = RequiredValidationType::default();
 
-    let cascade = Cascade::empty().with_dht(env.clone());
+    let cascade = Cascade::empty().with_dht(env);
 
     // Gather the package
     match required_validation_type {

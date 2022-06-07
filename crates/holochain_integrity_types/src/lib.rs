@@ -198,8 +198,8 @@ macro_rules! secure_primitive {
     };
 }
 
-/// A utility trait for associating an enum with
-/// data with it's unit equivalent.
+/// A utility trait for associating a data enum
+/// with a unit enum that has the same variants.
 pub trait UnitEnum {
     /// An enum with the same variants as the implementor
     /// but without any data.

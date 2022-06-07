@@ -28,14 +28,21 @@ impl LinkType {
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+/// A range of [`LinkType`] for quering links.
 pub enum LinkTypeRange {
+    /// Filter out all link types.
+    /// This is only useful for combining with other ranges.
     Empty,
+    /// Return links of any type.
     Full,
+    /// Return links that are within the given range.
     Inclusive(core::ops::RangeInclusive<LinkType>),
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+/// A list of [`LinkTypeRanges`] for quering links.
 pub struct LinkTypeRanges(pub Vec<LinkTypeRange>);
+
 /// Opaque tag for the link applied at the app layer, used to differentiate
 /// between different semantics and validation rules for different links
 #[derive(
