@@ -96,7 +96,7 @@ pub enum GetStrategy {
 /// Zome input to create an entry.
 #[derive(PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct CreateInput {
-    /// The global type index committed to if this entry has one.
+    /// The global type index for this entry (if it has one).
     pub entry_location: EntryDefLocation,
     /// The visibility of this entry.
     pub entry_visibility: EntryVisibility,

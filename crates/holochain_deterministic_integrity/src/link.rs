@@ -3,11 +3,16 @@ use core::ops::RangeBounds;
 
 use crate::prelude::*;
 
+/// A helper trait for creating [`LinkTypeRanges`] that match the local zome's
+/// type scope.
+///
+/// This is implemented by the [`hdk_link_types`] proc_macro.
 pub trait LinkTypesHelper<const L: u8, const LEN: usize>: EnumLen<L>
 where
     Self: Into<LocalZomeTypeId>,
     Self: std::fmt::Debug + Clone + Copy + Sized + PartialEq + PartialOrd + 'static,
 {
+    /// Create a [`LinkTypeRanges`] from a range of this traits implementor.
     fn range(
         range: impl RangeBounds<Self> + 'static + std::fmt::Debug,
     ) -> Box<dyn FnOnce() -> Result<LinkTypeRanges, WasmError>> {
@@ -20,6 +25,7 @@ where
         Box::new(f)
     }
 
+    #[doc(hidden)]
     fn find_variant(
         mut filter: impl FnMut(&Self) -> bool,
         range: &(impl std::ops::RangeBounds<Self> + 'static + std::fmt::Debug),
@@ -52,5 +58,7 @@ where
             None => Ok(LinkTypeRange::Empty),
         }
     }
+
+    /// Iterate over all variants of this enum.
     fn iter() -> IntoIter<Self, LEN>;
 }

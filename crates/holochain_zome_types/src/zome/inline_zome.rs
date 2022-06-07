@@ -16,8 +16,10 @@ pub mod error;
 pub type BoxApi = Box<dyn HostFnApiT>;
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+/// A type marker for an integrity [`InlineZome`].
 pub struct IntegrityZomeMarker;
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+/// A type marker for a coordinator [`InlineZome`].
 pub struct CoordinatorZomeMarker;
 
 pub type InlineIntegrityZome = InlineZome<IntegrityZomeMarker>;
@@ -41,7 +43,7 @@ pub struct InlineZome<T> {
     /// These callbacks are directly called by the Ribosome.
     pub(super) callbacks: HashMap<FunctionName, InlineZomeFn>,
 
-    /// Global values for this zomes.
+    /// Global values for this zome.
     pub(super) globals: HashMap<String, u8>,
 }
 
@@ -98,6 +100,7 @@ impl<T> InlineZome<T> {
         self.uuid.clone()
     }
 
+    /// Set a global value for this zome.
     pub fn set_global(mut self, name: impl Into<String>, val: u8) -> Self {
         self.globals.insert(name.into(), val);
         self
@@ -133,6 +136,7 @@ impl InlineCoordinatorZome {
 }
 
 #[derive(Debug, Clone)]
+/// An inline zome clonable type object.
 pub struct DynInlineZome(pub Arc<dyn InlineZomeT + Send + Sync>);
 
 pub trait InlineZomeT: std::fmt::Debug {
@@ -151,6 +155,7 @@ pub trait InlineZomeT: std::fmt::Debug {
     /// Accessor
     fn uuid(&self) -> String;
 
+    /// Get a global value for this zome.
     fn get_global(&self, name: &str) -> Option<u8>;
 }
 

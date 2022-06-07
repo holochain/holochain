@@ -84,6 +84,7 @@ impl CoordinatorZome {
         }
     }
 
+    /// Add a dependency to this zome.
     pub fn set_dependency(&mut self, zome_name: impl Into<ZomeName>) {
         self.def.set_dependency(zome_name);
     }
@@ -193,9 +194,12 @@ impl IntegrityZomeDef {
 }
 
 impl CoordinatorZomeDef {
+    /// Use this as any [`ZomeDef`].
     pub fn as_any_zome_def(&self) -> &ZomeDef {
         &self.0
     }
+
+    /// Add a dependency to this zome.
     pub fn set_dependency(&mut self, zome_name: impl Into<ZomeName>) {
         match &mut self.0 {
             ZomeDef::Wasm(WasmZome { dependencies, .. }) => dependencies.push(zome_name.into()),

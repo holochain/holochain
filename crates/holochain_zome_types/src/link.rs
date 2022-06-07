@@ -42,14 +42,14 @@ impl CreateLinkInput {
     pub fn new(
         base_address: holo_hash::AnyLinkableHash,
         target_address: holo_hash::AnyLinkableHash,
-        type_location: LinkType,
+        link_type: LinkType,
         tag: LinkTag,
         chain_top_ordering: ChainTopOrdering,
     ) -> Self {
         Self {
             base_address,
             target_address,
-            link_type: type_location,
+            link_type,
             tag,
             chain_top_ordering,
         }
@@ -76,6 +76,7 @@ impl DeleteLinkInput {
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub struct GetLinksInput {
     pub base_address: holo_hash::AnyLinkableHash,
+    /// Ranges of links to include in this query.
     pub link_type: LinkTypeRanges,
     pub tag_prefix: Option<crate::link::LinkTag>,
 }

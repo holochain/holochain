@@ -104,6 +104,8 @@ pub fn must_get_valid_element(header_hash: HeaderHash) -> ExternResult<Element> 
 }
 
 /// Helper trait for deserializing [`Entry`]s to the correct type.
+///
+/// This is implemented by the [`hdk_entry_defs`] proc_macro.
 pub trait EntryTypesHelper: Sized {
     /// Check if the [`LocalZomeTypeId`] matches one of the Self [`LocalZomeTypeId`]'s and if
     /// it does deserialize the [`Entry`] into that types.

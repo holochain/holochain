@@ -8,10 +8,10 @@ use crate::zome::error::ZomeError;
 #[cfg(feature = "full-dna-def")]
 use holo_hash::*;
 
-/// Zomes need to be an ordered map from ZomeName to a Zome
+/// Ordered list of integrity zomes in this DNA.
 pub type IntegrityZomes = Vec<(ZomeName, zome::IntegrityZomeDef)>;
 
-/// Zomes need to be an ordered map from ZomeName to a Zome
+/// Ordered list of coordinator zomes in this DNA.
 pub type CoordinatorZomes = Vec<(ZomeName, zome::CoordinatorZomeDef)>;
 
 /// Placeholder for a real UID type
@@ -58,6 +58,7 @@ pub struct DnaDef {
 }
 
 #[derive(Serialize, Debug, PartialEq, Eq)]
+/// A reference to for creating the hash for [`DnaDef`].
 struct DnaDefHash<'a> {
     name: &'a String,
     uid: &'a String,

@@ -1,3 +1,5 @@
+//! Tests for the proc macros defined in [`hdk_derive`] that are
+//! used at the integrity level.
 use std::ops::Range;
 
 use holochain_deterministic_integrity::prelude::*;
