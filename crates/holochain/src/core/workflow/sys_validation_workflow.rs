@@ -842,6 +842,7 @@ impl SysValidationWorkspace {
         };
         Ok(!chain_not_empty)
     }
+
     pub async fn header_seq_is_empty(&self, header: &Header) -> SourceChainResult<bool> {
         let author = header.author().clone();
         let seq = header.header_seq();

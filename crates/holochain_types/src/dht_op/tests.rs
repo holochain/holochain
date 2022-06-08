@@ -71,23 +71,22 @@ impl ElementTest {
     }
 
     fn create_element(&mut self) -> (Create, Element) {
-        let entry_create = builder::Create {
-            entry_type: self.entry_type.clone(),
-            entry_hash: self.entry_hash.clone(),
-        }
-        .build(self.commons.next().unwrap());
+        let entry_create = builder::Create::new(self.entry_type.clone(), self.entry_hash.clone())
+            .build(self.commons.next().unwrap())
+            .weightless();
         let element = self.to_element(entry_create.clone().into(), Some(self.entry.clone()));
         (entry_create, element)
     }
 
     fn update_element(&mut self) -> (Update, Element) {
-        let entry_update = builder::Update {
-            original_entry_address: self.original_entry_hash.clone(),
-            entry_type: self.entry_type.clone(),
-            entry_hash: self.entry_hash.clone(),
-            original_header_address: self.header_hash.clone().into(),
-        }
-        .build(self.commons.next().unwrap());
+        let entry_update = builder::Update::new(
+            self.original_entry_hash.clone(),
+            self.header_hash.clone().into(),
+            self.entry_type.clone(),
+            self.entry_hash.clone(),
+        )
+        .build(self.commons.next().unwrap())
+        .weightless();
         let element = self.to_element(entry_update.clone().into(), Some(self.entry.clone()));
         (entry_update, element)
     }
@@ -143,11 +142,9 @@ impl ElementTest {
     }
 
     fn entry_delete(&mut self) -> (Element, Vec<DhtOp>) {
-        let entry_delete = builder::Delete {
-            deletes_address: self.header_hash.clone(),
-            deletes_entry_address: self.entry_hash.clone(),
-        }
-        .build(self.commons.next().unwrap());
+        let entry_delete = builder::Delete::new(self.header_hash.clone(), self.entry_hash.clone())
+            .build(self.commons.next().unwrap())
+            .weightless();
         let element = self.to_element(entry_delete.clone().into(), None);
         let header: Header = entry_delete.clone().into();
 

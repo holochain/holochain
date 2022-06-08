@@ -45,6 +45,7 @@ pub mod prelude;
 #[cfg(feature = "properties")]
 pub mod properties;
 pub mod query;
+pub mod rate_limit;
 pub mod request;
 /// Schedule functions to run outside a direct zome call.
 pub mod schedule;

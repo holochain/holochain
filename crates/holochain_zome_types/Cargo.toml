@@ -62,7 +62,7 @@ full-dna-def = ["derive_builder", "nanoid", "shrinkwraprs"]
 
 full = ["default", "rusqlite", "num_enum", "kitsune_p2p_timestamp/full", "properties"]
 
-fixturators = ["fixt", "rand", "strum", "holo_hash/fixturators", ]
+fixturators = ["fixt", "rand", "strum", "holo_hash/fixturators", "holochain_integrity_types/test_utils"]
 
 properties = ["serde_yaml"]
 

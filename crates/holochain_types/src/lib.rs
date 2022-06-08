@@ -31,6 +31,7 @@ pub mod link;
 mod macros;
 pub mod metadata;
 pub mod prelude;
+pub mod rate_limit;
 pub mod share;
 pub mod signal;
 #[warn(missing_docs)]

@@ -435,12 +435,13 @@ pub enum HeaderBase {
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct CreateBase {
     entry_type: EntryType,
+    weight: EntryRateWeight,
 }
 
 impl CreateBase {
     /// Constructor.
-    pub fn new(entry_type: EntryType) -> Self {
-        Self { entry_type }
+    pub fn new(entry_type: EntryType, weight: EntryRateWeight) -> Self {
+        Self { entry_type, weight }
     }
 }
 
@@ -451,6 +452,7 @@ pub struct UpdateBase {
     original_header_address: HeaderHash,
     original_entry_address: EntryHash,
     entry_type: EntryType,
+    weight: EntryRateWeight,
 }
 
 impl Header {
@@ -461,23 +463,26 @@ impl Header {
         author: AgentPubKey,
     ) -> Result<Self, CounterSigningError> {
         let agent_state = session_data.agent_state_for_agent(&author)?;
-        Ok(match session_data.preflight_request().header_base() {
-            HeaderBase::Create(create_base) => Header::Create(Create {
+        let preflight = session_data.preflight_request();
+        Ok(match preflight.header_base() {
+            HeaderBase::Create(base) => Header::Create(Create {
                 author,
                 timestamp: session_data.to_timestamp(),
                 header_seq: agent_state.header_seq + 1,
                 prev_header: agent_state.chain_top.clone(),
-                entry_type: create_base.entry_type.clone(),
+                entry_type: base.entry_type.clone(),
+                weight: base.weight.clone(),
                 entry_hash,
             }),
-            HeaderBase::Update(update_base) => Header::Update(Update {
+            HeaderBase::Update(base) => Header::Update(Update {
                 author,
                 timestamp: session_data.to_timestamp(),
                 header_seq: agent_state.header_seq + 1,
                 prev_header: agent_state.chain_top.clone(),
-                original_header_address: update_base.original_header_address.clone(),
-                original_entry_address: update_base.original_entry_address.clone(),
-                entry_type: update_base.entry_type.clone(),
+                original_header_address: base.original_header_address.clone(),
+                original_entry_address: base.original_entry_address.clone(),
+                entry_type: base.entry_type.clone(),
+                weight: base.weight.clone(),
                 entry_hash,
             }),
         })

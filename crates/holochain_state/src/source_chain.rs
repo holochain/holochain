@@ -42,7 +42,7 @@ use holochain_zome_types::HeaderBuilder;
 use holochain_zome_types::HeaderBuilderCommon;
 use holochain_zome_types::HeaderExt;
 use holochain_zome_types::HeaderHashed;
-use holochain_zome_types::HeaderInner;
+use holochain_zome_types::HeaderUnweighed;
 use holochain_zome_types::MembraneProof;
 use holochain_zome_types::PreflightRequest;
 use holochain_zome_types::QueryFilter;
@@ -180,11 +180,22 @@ impl SourceChain {
         }
     }
 
-    pub async fn put<H: HeaderInner, B: HeaderBuilder<H>>(
+    pub async fn put<U: HeaderUnweighed<Weight = ()>, B: HeaderBuilder<U>>(
         &self,
         header_builder: B,
         maybe_entry: Option<Entry>,
         chain_top_ordering: ChainTopOrdering,
+    ) -> SourceChainResult<HeaderHash> {
+        self.put_weighed(header_builder, maybe_entry, chain_top_ordering, ())
+            .await
+    }
+
+    pub async fn put_weighed<W, U: HeaderUnweighed<Weight = W>, B: HeaderBuilder<U>>(
+        &self,
+        header_builder: B,
+        maybe_entry: Option<Entry>,
+        chain_top_ordering: ChainTopOrdering,
+        weight: W,
     ) -> SourceChainResult<HeaderHash> {
         let (prev_header, chain_head_seq, chain_head_timestamp) = self.chain_head()?;
         let header_seq = chain_head_seq + 1;
@@ -207,7 +218,7 @@ impl SourceChain {
             prev_header,
         };
         self.put_with_header(
-            header_builder.build(common).into(),
+            header_builder.build(common).weighed(weight).into(),
             maybe_entry,
             chain_top_ordering,
         )
@@ -957,6 +968,8 @@ pub async fn genesis(
         prev_header: avh_addr,
         entry_type: header::EntryType::AgentPubKey,
         entry_hash: agent_pubkey.clone().into(),
+        // AgentPubKey is weightless
+        weight: Default::default(),
     });
     let agent_header = HeaderHashed::from_content_sync(agent_header);
     let agent_header = SignedHeaderHashed::sign(&keystore, agent_header).await?;
@@ -1070,55 +1083,55 @@ pub fn current_countersigning_session(
     }
 }
 
-#[cfg(test)]
-async fn _put_db<H: HeaderInner, B: HeaderBuilder<H>>(
-    vault: holochain_types::db::DbWrite<DbKindAuthored>,
-    keystore: &MetaLairClient,
-    author: Arc<AgentPubKey>,
-    header_builder: B,
-    maybe_entry: Option<Entry>,
-) -> SourceChainResult<HeaderHash> {
-    let (prev_header, last_header_seq, _) =
-        fresh_reader_test!(vault, |txn| { chain_head_db(&txn, author.clone()) })?;
-    let header_seq = last_header_seq + 1;
+// #[cfg(test)]
+// async fn _put_db<H: holochain_zome_types::HeaderUnweighed, B: HeaderBuilder<H>>(
+//     vault: holochain_types::db::DbWrite<DbKindAuthored>,
+//     keystore: &MetaLairClient,
+//     author: Arc<AgentPubKey>,
+//     header_builder: B,
+//     maybe_entry: Option<Entry>,
+// ) -> SourceChainResult<HeaderHash> {
+//     let (prev_header, last_header_seq, _) =
+//         fresh_reader_test!(vault, |txn| { chain_head_db(&txn, author.clone()) })?;
+//     let header_seq = last_header_seq + 1;
 
-    let common = HeaderBuilderCommon {
-        author: (*author).clone(),
-        timestamp: Timestamp::now(),
-        header_seq,
-        prev_header: prev_header.clone(),
-    };
-    let header = header_builder.build(common).into();
-    let header = HeaderHashed::from_content_sync(header);
-    let header = SignedHeaderHashed::sign(keystore, header).await?;
-    let element = Element::new(header, maybe_entry);
-    let ops = produce_op_lights_from_elements(vec![&element])?;
-    let (header, entry) = element.into_inner();
-    let entry = entry.into_option();
-    let hash = header.as_hash().clone();
-    vault.conn()?.with_commit_sync(|txn: &mut Transaction| {
-        let (new_head, new_seq, new_timestamp) = chain_head_db(txn, author.clone())?;
-        if new_head != prev_header {
-            let entries = match (entry, header.header().entry_hash()) {
-                (Some(e), Some(entry_hash)) => {
-                    vec![holochain_types::EntryHashed::with_pre_hashed(
-                        e,
-                        entry_hash.clone(),
-                    )]
-                }
-                _ => vec![],
-            };
-            return Err(SourceChainError::HeadMoved(
-                vec![header],
-                entries,
-                Some(prev_header),
-                Some((new_head, new_seq, new_timestamp)),
-            ));
-        }
-        SourceChainResult::Ok(put_raw(txn, header, ops, entry)?)
-    })?;
-    Ok(hash)
-}
+//     let common = HeaderBuilderCommon {
+//         author: (*author).clone(),
+//         timestamp: Timestamp::now(),
+//         header_seq,
+//         prev_header: prev_header.clone(),
+//     };
+//     let header = header_builder.build(common).into();
+//     let header = HeaderHashed::from_content_sync(header);
+//     let header = SignedHeaderHashed::sign(keystore, header).await?;
+//     let element = Element::new(header, maybe_entry);
+//     let ops = produce_op_lights_from_elements(vec![&element])?;
+//     let (header, entry) = element.into_inner();
+//     let entry = entry.into_option();
+//     let hash = header.as_hash().clone();
+//     vault.conn()?.with_commit_sync(|txn: &mut Transaction| {
+//         let (new_head, new_seq, new_timestamp) = chain_head_db(txn, author.clone())?;
+//         if new_head != prev_header {
+//             let entries = match (entry, header.header().entry_hash()) {
+//                 (Some(e), Some(entry_hash)) => {
+//                     vec![holochain_types::EntryHashed::with_pre_hashed(
+//                         e,
+//                         entry_hash.clone(),
+//                     )]
+//                 }
+//                 _ => vec![],
+//             };
+//             return Err(SourceChainError::HeadMoved(
+//                 vec![header],
+//                 entries,
+//                 Some(prev_header),
+//                 Some((new_head, new_seq, new_timestamp)),
+//             ));
+//         }
+//         SourceChainResult::Ok(put_raw(txn, header, ops, entry)?)
+//     })?;
+//     Ok(hash)
+// }
 
 /// dump the entire source chain as a pretty-printed json string
 pub async fn dump_state(

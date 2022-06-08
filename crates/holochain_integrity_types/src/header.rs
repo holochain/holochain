@@ -4,8 +4,10 @@ use crate::entry_def::EntryVisibility;
 use crate::link::LinkTag;
 use crate::link::LinkType;
 use crate::timestamp::Timestamp;
+use crate::EntryRateWeight;
 use crate::GlobalZomeTypeId;
 use crate::MembraneProof;
+use crate::RateWeight;
 use holo_hash::impl_hashable_content;
 use holo_hash::AgentPubKey;
 use holo_hash::AnyLinkableHash;
@@ -70,14 +72,7 @@ pub type HeaderHashed = HoloHashed<Header>;
 
 /// a utility wrapper to write intos for our data types
 macro_rules! write_into_header {
-    ($($n:ident),*,) => {
-        $(
-            impl HeaderInner for $n {
-                fn into_header(self) -> Header {
-                    Header::$n(self)
-                }
-            }
-        )*
+    ($($n:ident $(<$w : ty>)?),*,) => {
 
         /// A unit enum which just maps onto the different Header variants,
         /// without containing any extra data
@@ -112,12 +107,28 @@ macro_rules! write_into_header {
 }
 
 /// A trait to specify the common parts of a Header
-pub trait HeaderInner {
+pub trait HeaderWeighed {
+    type Unweighed: HeaderUnweighed;
+    type Weight: Default;
+
     /// Get a full header from the subset
     fn into_header(self) -> Header;
+    fn unweighed(self) -> Self::Unweighed;
 }
 
-impl<I: HeaderInner> From<I> for Header {
+/// A trait to specify the common parts of a Header
+pub trait HeaderUnweighed: Sized {
+    type Weighed: HeaderWeighed;
+    type Weight: Default;
+
+    /// Get a full header from the subset
+    fn weighed(self, weight: Self::Weight) -> Self::Weighed;
+    fn weightless(self) -> Self::Weighed {
+        self.weighed(Default::default())
+    }
+}
+
+impl<I: HeaderWeighed> From<I> for Header {
     fn from(i: I) -> Self {
         i.into_header()
     }
@@ -127,13 +138,15 @@ write_into_header! {
     Dna,
     AgentValidationPkg,
     InitZomesComplete,
-    CreateLink,
-    DeleteLink,
     OpenChain,
     CloseChain,
-    Create,
-    Update,
-    Delete,
+
+    Create<EntryRateWeight>,
+    Update<EntryRateWeight>,
+    Delete<RateWeight>,
+
+    CreateLink<RateWeight>,
+    DeleteLink,
 }
 
 /// a utility macro just to not have to type in the match statement everywhere.
@@ -248,6 +261,22 @@ impl Header {
 
     pub fn is_genesis(&self) -> bool {
         self.header_seq() < POST_GENESIS_SEQ_THRESHOLD
+    }
+
+    pub fn rate_data(&self) -> RateWeight {
+        match self {
+            Self::CreateLink(CreateLink { weight, .. }) => weight.clone(),
+            Self::Delete(Delete { weight, .. }) => weight.clone(),
+            Self::Create(Create { weight, .. }) => weight.clone().into(),
+            Self::Update(Update { weight, .. }) => weight.clone().into(),
+            // all others are weightless
+            Self::Dna(Dna { .. })
+            | Self::AgentValidationPkg(AgentValidationPkg { .. })
+            | Self::InitZomesComplete(InitZomesComplete { .. })
+            | Self::DeleteLink(DeleteLink { .. })
+            | Self::CloseChain(CloseChain { .. })
+            | Self::OpenChain(OpenChain { .. }) => Default::default(),
+        }
     }
 }
 
@@ -366,7 +395,7 @@ pub struct InitZomesComplete {
 /// Declares that a metadata Link should be made between two EntryHashes
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-pub struct CreateLink {
+pub struct CreateLink<W = RateWeight> {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
     pub header_seq: u32,
@@ -376,6 +405,26 @@ pub struct CreateLink {
     pub target_address: AnyLinkableHash,
     pub link_type: LinkType,
     pub tag: LinkTag,
+
+    pub weight: W,
+}
+
+impl From<CreateLink> for CreateLink<()> {
+    fn from(c: CreateLink) -> Self {
+        CreateLink {
+            author: c.author,
+            timestamp: c.timestamp,
+            header_seq: c.header_seq,
+            prev_header: c.prev_header,
+
+            base_address: c.base_address,
+            target_address: c.target_address,
+            link_type: c.link_type,
+            tag: c.tag,
+
+            weight: (),
+        }
+    }
 }
 
 /// Declares that a previously made Link should be nullified and considered removed.
@@ -425,7 +474,7 @@ pub struct CloseChain {
 /// referenced by multiple such headers.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-pub struct Create {
+pub struct Create<W = EntryRateWeight> {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
     pub header_seq: u32,
@@ -433,6 +482,8 @@ pub struct Create {
 
     pub entry_type: EntryType,
     pub entry_hash: EntryHash,
+
+    pub weight: W,
 }
 
 /// A header which specifies that some new Entry content is intended to be an
@@ -449,7 +500,7 @@ pub struct Create {
 /// or how to break the loop.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-pub struct Update {
+pub struct Update<W = EntryRateWeight> {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
     pub header_seq: u32,
@@ -460,6 +511,8 @@ pub struct Update {
 
     pub entry_type: EntryType,
     pub entry_hash: EntryHash,
+
+    pub weight: W,
 }
 
 /// Declare that a previously published Header should be nullified and
@@ -470,7 +523,7 @@ pub struct Update {
 /// Headers are marked deleted.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-pub struct Delete {
+pub struct Delete<W = RateWeight> {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
     pub header_seq: u32,
@@ -479,6 +532,8 @@ pub struct Delete {
     /// Address of the Element being deleted
     pub deletes_address: HeaderHash,
     pub deletes_entry_address: EntryHash,
+
+    pub weight: W,
 }
 
 /// Placeholder for future when we want to have updates on headers
