@@ -83,14 +83,16 @@ pub mod wasm_test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn wasm_trace_test() {
-        CAPTURE.store(true, std::sync::atomic::Ordering::SeqCst);
         observability::test_run().ok();
         let RibosomeTestFixture {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::Debug).await;
 
+        CAPTURE.store(true, std::sync::atomic::Ordering::SeqCst);
         let _: () = conductor.call(&alice, "debug", ()).await;
+        CAPTURE.store(false, std::sync::atomic::Ordering::SeqCst);
         let r: Vec<_> = CAPTURED.lock().unwrap().clone();
+
         let expect = vec![
             TraceMsg {
                 msg: "test_wasm_debug:debug/src/lib.rs:5 tracing works!".to_string(),
@@ -113,7 +115,8 @@ pub mod wasm_test {
                 level: holochain_types::prelude::Level::ERROR,
             },
             TraceMsg {
-                msg: "test_wasm_debug:debug/src/lib.rs:10 foo = \"fields\"; bar = \"work\"; too".to_string(),
+                msg: "test_wasm_debug:debug/src/lib.rs:10 foo = \"fields\"; bar = \"work\"; too"
+                    .to_string(),
                 level: holochain_types::prelude::Level::DEBUG,
             },
         ];
