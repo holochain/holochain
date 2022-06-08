@@ -122,6 +122,7 @@ impl ScopedZomeTypes {
                 })
         })
     }
+    
     /// Convert a [`LocalZomeTypeId`] to a [`GlobalZomeTypeId`].
     /// If the the [`LocalZomeTypeId`] maps to a [`GlobalZomeTypeId`] in scope for the calling zome,
     /// then this will return a [`GlobalZomeTypeId`].
