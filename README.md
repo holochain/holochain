@@ -10,22 +10,22 @@ Holochain is an open-source framework to develop peer-to-peer applications with 
 
 This repository contains the Holochain core libraries.
 
-## Code Status
-
-This code is in Alpha. It is not for production use, and currently makes no security guarantees. We will be frequently and heavily restructuring code APIs and data chains until Beta.
-
-## Supported OSes
-
-* **Linux**: Top-tier. Weekly releases pass CI tests for the conductor, development tools, and Holonix development environment.
-* **macOS**: Currently no CI tests are being run, but developers usually report weekly releases work fine via the Holonix development environment.
-* **Windows**: Currently no CI tests are being run, but developers usually report weekly releases published to crates.io work fine.
-
 ## Running Holochain applications (hApps)
 
 [Holochain Launcher](https://github.com/holochain/launcher), the distribution of Holochain for end-users, is supported on all three major desktop platforms.
 Holochain apps can be installed and run with it. Refer to the Github repository for instructions on how to obtain and use it.
 
 ## Holochain Development
+
+### Code Status
+
+This code is in Alpha. It is not for production use, and currently makes no security guarantees. We will be frequently and heavily restructuring code APIs and data chains until Beta.
+
+### Supported OSes
+
+* **Linux**: Top-tier. Weekly releases pass CI tests for the conductor, development tools, and Holonix development environment.
+* **macOS**: Currently no CI tests are being run, but developers usually report weekly releases work fine via the Holonix development environment.
+* **Windows**: Currently no CI tests are being run, but developers usually report weekly releases published to crates.io work fine.
 
 ### Developing Holochain applications (hApps)
 
