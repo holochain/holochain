@@ -103,23 +103,45 @@ macro_rules! write_into_header {
     };
 }
 
-/// A trait to specify the common parts of a Header
+/// A trait to unify the "inner" parts of a Header, i.e. the structs inside
+/// the Header enum's variants. This trait is used for the "weighed" version
+/// of each struct, i.e. the version without weight information erased.
+///
+/// Header types with no weight are considered "weighed" and "unweighed" at the
+/// same time, but types with weight have distinct types for the weighed and
+/// unweighed versions.
 pub trait HeaderWeighed {
     type Unweighed: HeaderUnweighed;
     type Weight: Default;
 
-    /// Get a full header from the subset
+    /// Construct the full Header enum with this variant.
     fn into_header(self) -> Header;
+
+    /// Erase the rate limiting weight info, creating an "unweighed" version
+    /// of this header. This is used primarily by validators who need to run the
+    /// `weigh` callback on a header they received, and want to make sure their
+    /// callback is not using the predefined weight to influence the result.
     fn unweighed(self) -> Self::Unweighed;
 }
 
-/// A trait to specify the common parts of a Header
+/// A trait to unify the "inner" parts of a Header, i.e. the structs inside
+/// the Header enum's variants. This trait is used for the "unweighed" version
+/// of each struct, i.e. the version with weight information erased.
+///
+/// Header types with no weight are considered "weighed" and "unweighed" at the
+/// same time, but types with weight have distinct types for the weighed and
+/// unweighed versions.
 pub trait HeaderUnweighed: Sized {
     type Weighed: HeaderWeighed;
     type Weight: Default;
 
-    /// Get a full header from the subset
+    /// Add a weight to this unweighed header, making it "weighed".
+    /// The weight is determined by the `weigh` callback, which is run on the
+    /// unweighed version of this header.
     fn weighed(self, weight: Self::Weight) -> Self::Weighed;
+
+    /// Add zero weight to this unweighed header, making it "weighed".
+    #[cfg(feature = "test_utils")]
     fn weightless(self) -> Self::Weighed {
         self.weighed(Default::default())
     }
@@ -255,7 +277,7 @@ impl Header {
             | Self::InitZomesComplete(InitZomesComplete { .. })
             | Self::DeleteLink(DeleteLink { .. })
             | Self::CloseChain(CloseChain { .. })
-            | Self::OpenChain(OpenChain { .. }) => Default::default(),
+            | Self::OpenChain(OpenChain { .. }) => RateWeight::default(),
         }
     }
 }
