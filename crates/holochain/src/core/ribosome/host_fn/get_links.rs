@@ -82,8 +82,6 @@ pub fn get_links<'a>(
 #[cfg(feature = "slow_tests")]
 pub mod slow_tests {
     use crate::core::ribosome::wasm_test::RibosomeTestFixture;
-    use crate::test_utils::wait_for_integration_1m;
-    use crate::test_utils::WaitOps;
     use hdk::prelude::*;
     use holochain_test_wasm_common::*;
     use holochain_wasm_test_utils::TestWasm;
@@ -111,11 +109,11 @@ pub mod slow_tests {
 
         assert!(exists_output);
 
-        let foo_bar: holo_hash::EntryHash = conductor
+        let foo_bar: holo_hash::AnyLinkableHash = conductor
             .call(&alice, "path_entry_hash", "foo.bar".to_string())
             .await;
 
-        let foo_baz: holo_hash::EntryHash = conductor
+        let foo_baz: holo_hash::AnyLinkableHash = conductor
             .call(&alice, "path_entry_hash", "foo.baz".to_string())
             .await;
 
@@ -219,8 +217,30 @@ pub mod slow_tests {
         let header_hash: HeaderHash = conductor.call(&alice, "create_baseless_link", ()).await;
         let links: Vec<Link> = conductor.call(&alice, "get_baseless_links", ()).await;
 
-        assert_eq!(links[0].create_link_hash, header_hash);
-        assert_eq!(links[0].target, EntryHash::from_raw_32([2_u8; 32].to_vec()),);
+        assert_eq!(
+            links[0].create_link_hash,
+            header_hash
+        );
+        assert_eq!(
+            links[0].target,
+            EntryHash::from_raw_32([2_u8; 32].to_vec()).into(),
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn external_get_links() {
+        observability::test_run().ok();
+        let RibosomeTestFixture {
+            conductor, alice, ..
+        } = RibosomeTestFixture::new(TestWasm::Link).await;
+
+        let header_hash: HeaderHash = conductor.call(&alice, "create_external_base_link", ()).await;
+        let links: Vec<Link> = conductor.call(&alice, "get_external_links", ()).await;
+
+        assert_eq!(
+            links[0].create_link_hash,
+            header_hash
+        );
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -255,21 +275,12 @@ pub mod slow_tests {
     async fn dup_path_test() {
         observability::test_run().ok();
         let RibosomeTestFixture {
-            conductor,
-            alice,
-            alice_host_fn_caller,
-            ..
+            conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::Link).await;
 
         for _ in 0..2 {
             let _result: () = conductor.call(&alice, "commit_existing_path", ()).await;
         }
-
-        let mut expected_count = WaitOps::start() + WaitOps::path(1);
-        // Plus one length path for the commit existing.
-        expected_count += WaitOps::ENTRY + WaitOps::LINK;
-
-        wait_for_integration_1m(&alice_host_fn_caller.dht_db, expected_count).await;
 
         let links: Vec<hdk::prelude::Link> = conductor.call(&alice, "get_long_path", ()).await;
         assert_eq!(links.len(), 1);

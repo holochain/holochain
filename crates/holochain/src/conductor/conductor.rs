@@ -135,6 +135,9 @@ where
     /// The collection of cells associated with this Conductor
     cells: RwShare<HashMap<CellId, CellItem<CA>>>,
 
+    /// The config used to create this Conductor
+    pub config: ConductorConfig,
+
     /// The map of dna hash spaces.
     pub(super) spaces: Spaces,
 
@@ -1082,15 +1085,14 @@ pub(super) async fn genesis_cells(
     conductor_handle: ConductorHandle,
 ) -> ConductorResult<()> {
     let cells_tasks = cell_ids_with_proofs.into_iter().map(|(cell_id, proof)| {
-        let authored_db = conductor
-            .get_or_create_authored_db(cell_id.dna_hash())
-            .map_err(|e| CellError::FailedToCreateAuthoredDb(e.into()));
-        let dht_db = conductor
-            .get_or_create_dht_db(cell_id.dna_hash())
-            .map_err(|e| CellError::FailedToCreateDhtDb(e.into()));
+        let space = conductor
+            .get_or_create_space(cell_id.dna_hash())
+            .map_err(|e| CellError::FailedToCreateDnaSpace(e.into()));
         async {
-            let authored_db = authored_db?;
-            let dht_db = dht_db?;
+            let space = space?;
+            let authored_db = space.authored_db;
+            let dht_db = space.dht_db;
+            let dht_db_cache = space.dht_query_cache;
             let conductor_handle = conductor_handle.clone();
             let cell_id_inner = cell_id.clone();
             let ribosome = conductor_handle
@@ -1102,6 +1104,7 @@ pub(super) async fn genesis_cells(
                     conductor_handle,
                     authored_db,
                     dht_db,
+                    dht_db_cache,
                     ribosome,
                     proof,
                 )
@@ -1248,6 +1251,7 @@ fn query_dht_ops_from_statement(
 impl Conductor {
     #[allow(clippy::too_many_arguments)]
     async fn new(
+        config: ConductorConfig,
         dna_store: RwShare<DnaStore>,
         keystore: MetaLairClient,
         holochain_p2p: holochain_p2p::HolochainP2pRef,
@@ -1257,6 +1261,7 @@ impl Conductor {
         Ok(Self {
             spaces,
             cells: RwShare::new(HashMap::new()),
+            config,
             shutting_down: Arc::new(AtomicBool::new(false)),
             app_interfaces: RwShare::new(HashMap::new()),
             task_manager: RwShare::new(None),
@@ -1493,6 +1498,7 @@ mod builder {
                 tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
 
             let conductor = Conductor::new(
+                config.clone(),
                 dna_store,
                 keystore,
                 holochain_p2p,
@@ -1654,6 +1660,7 @@ mod builder {
                 tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
 
             let conductor = Conductor::new(
+                self.config.clone(),
                 RwShare::new(self.dna_store),
                 keystore,
                 holochain_p2p,

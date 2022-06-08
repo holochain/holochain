@@ -1,21 +1,25 @@
 //! A microsecond-precision UTC timestamp for use in Holochain's headers.
+#![deny(missing_docs)]
 
 #[allow(missing_docs)]
 mod error;
+#[cfg(feature = "chrono")]
 mod human;
 
+#[cfg(feature = "chrono")]
 pub use human::*;
 
-use std::{
-    convert::TryFrom,
-    fmt,
-    ops::{Add, Sub},
-    str::FromStr,
-};
-
+use core::ops::{Add, Sub};
 use serde::{Deserialize, Serialize};
+use std::convert::{TryFrom, TryInto};
 
 pub use crate::error::{TimestampError, TimestampResult};
+
+#[cfg(feature = "chrono")]
+pub(crate) use chrono_ext::*;
+
+#[cfg(feature = "chrono")]
+mod chrono_ext;
 
 /// One million
 pub const MM: i64 = 1_000_000;
@@ -40,107 +44,11 @@ pub const MM: i64 = 1_000_000;
 /// supported by WASM; however, holochain_types provides a Timestamp::now() method.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Deserialize, Serialize)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(not(feature = "chrono"), derive(Debug))]
 pub struct Timestamp(
-    i64, // microseconds from UNIX Epoch, positive or negative
+    /// Microseconds from UNIX Epoch, positive or negative
+    pub i64,
 );
-
-pub(crate) type DateTime = chrono::DateTime<chrono::Utc>;
-
-/// Display as RFC3339 Date+Time for sane value ranges (0000-9999AD).  Beyond that, format
-/// as (seconds, nanoseconds) tuple (output and parsing of large +/- years is unreliable).
-impl fmt::Display for Timestamp {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let ce = -(62167219200 * MM)..=(253402214400 * MM);
-        if ce.contains(&self.0) {
-            if let Ok(ts) = chrono::DateTime::<chrono::Utc>::try_from(self) {
-                return write!(
-                    f,
-                    "{}",
-                    ts.to_rfc3339_opts(chrono::SecondsFormat::AutoSi, true)
-                );
-            }
-        }
-        // Outside 0000-01-01 to 9999-12-31; Display raw value tuple, or not a valid DateTime<Utc>;
-        // Display raw value tuple
-        write!(f, "({}μs)", self.0)
-    }
-}
-
-impl fmt::Debug for Timestamp {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Timestamp({})", self)
-    }
-}
-
-impl From<DateTime> for Timestamp {
-    fn from(t: DateTime) -> Self {
-        std::convert::From::from(&t)
-    }
-}
-
-impl From<&DateTime> for Timestamp {
-    fn from(t: &DateTime) -> Self {
-        let t = t.naive_utc();
-        Timestamp(t.timestamp() * MM + t.timestamp_subsec_nanos() as i64 / 1000)
-    }
-}
-
-// Implementation note: There are *no* infallible conversions from a Timestamp to a DateTime.  These
-// may panic in from_timestamp due to out-of-range secs or nsecs, making all code using/displaying a
-// Timestamp this way dangerously fragile!  Use try_from, and handle any failures.
-
-impl TryFrom<Timestamp> for DateTime {
-    type Error = TimestampError;
-
-    fn try_from(t: Timestamp) -> Result<Self, Self::Error> {
-        std::convert::TryFrom::try_from(&t)
-    }
-}
-
-impl TryFrom<&Timestamp> for DateTime {
-    type Error = TimestampError;
-
-    fn try_from(t: &Timestamp) -> Result<Self, Self::Error> {
-        let (secs, nsecs) = t.as_seconds_and_nanos();
-        let t = chrono::naive::NaiveDateTime::from_timestamp_opt(secs, nsecs)
-            .ok_or(TimestampError::Overflow)?;
-        Ok(chrono::DateTime::from_utc(t, chrono::Utc))
-    }
-}
-
-impl FromStr for Timestamp {
-    type Err = TimestampError;
-
-    fn from_str(t: &str) -> Result<Self, Self::Err> {
-        let t = chrono::DateTime::parse_from_rfc3339(t)?;
-        let t = chrono::DateTime::from_utc(t.naive_utc(), chrono::Utc);
-        Ok(t.into())
-    }
-}
-
-impl TryFrom<String> for Timestamp {
-    type Error = TimestampError;
-
-    fn try_from(t: String) -> Result<Self, Self::Error> {
-        Timestamp::from_str(t.as_ref())
-    }
-}
-
-impl TryFrom<&String> for Timestamp {
-    type Error = TimestampError;
-
-    fn try_from(t: &String) -> Result<Self, Self::Error> {
-        Timestamp::from_str(t.as_ref())
-    }
-}
-
-impl TryFrom<&str> for Timestamp {
-    type Error = TimestampError;
-
-    fn try_from(t: &str) -> Result<Self, Self::Error> {
-        Timestamp::from_str(t)
-    }
-}
 
 /// Timestamp +/- Into<core::time::Duration>: Anything that can be converted into a
 /// core::time::Duration can be used as an overflow-checked offset (unsigned) for a Timestamp.  A
@@ -190,15 +98,6 @@ impl Timestamp {
     /// Jan 1, 2022, 12:00:00 AM UTC
     pub const HOLOCHAIN_EPOCH: Timestamp = Timestamp(1640995200000000);
 
-    /// Returns the current system time as a Timestamp.
-    ///
-    /// This is behind a feature because we need Timestamp to be WASM compatible, and
-    /// chrono doesn't have a now() implementation for WASM.
-    #[cfg(feature = "now")]
-    pub fn now() -> Timestamp {
-        Timestamp::from(chrono::offset::Utc::now())
-    }
-
     /// Largest possible Timestamp.
     pub fn max() -> Timestamp {
         Timestamp(i64::MAX)
@@ -226,25 +125,8 @@ impl Timestamp {
         (secs, nsecs as u32)
     }
 
-    /// Compute signed difference between two Timestamp, returning `None` if overflow occurred, or
-    /// Some(chrono::Duration).  Produces Duration for differences of up to +/- i64::MIN/MAX
-    /// microseconds.
-    pub fn checked_difference_signed(&self, rhs: &Timestamp) -> Option<chrono::Duration> {
-        Some(chrono::Duration::microseconds(self.0.checked_sub(rhs.0)?))
-    }
-
-    /// Add a signed chrono::Duration{ secs: i64, nanos: i32 } to a Timestamp.
-    pub fn checked_add_signed(&self, rhs: &chrono::Duration) -> Option<Timestamp> {
-        Some(Self(self.0.checked_add(rhs.num_microseconds()?)?))
-    }
-
-    /// Subtracts a chrono::Duration from a Timestamp
-    pub fn checked_sub_signed(&self, rhs: &chrono::Duration) -> Option<Timestamp> {
-        self.checked_add_signed(&-*rhs)
-    }
-
     /// Add unsigned core::time::Duration{ secs: u64, nanos: u32 } to a Timestamp.  See:
-    /// https://doc.rust-lang.org/src/core/time.rs.html#53-56
+    /// <https://doc.rust-lang.org/src/core/time.rs.html#53-56>
     pub fn checked_add(&self, rhs: &core::time::Duration) -> Option<Timestamp> {
         let micros = rhs.as_micros();
         if micros <= i64::MAX as u128 {
@@ -274,6 +156,11 @@ impl Timestamp {
         self.checked_sub(rhs).unwrap_or(Self::MIN)
     }
 
+    /// Create a [`Timestamp`] from a [`core::time::Duration`] saturating at i64::MAX.
+    pub fn saturating_from_dur(duration: &core::time::Duration) -> Self {
+        Timestamp(std::cmp::min(duration.as_micros(), i64::MAX as u128) as i64)
+    }
+
     /// Convert this timestamp to fit into a SQLite integer which is an i64.
     /// The value will be clamped to the valid range supported by SQLite
     pub fn into_sql_lossy(self) -> Self {
@@ -281,15 +168,16 @@ impl Timestamp {
     }
 }
 
-/// Distance between two Timestamps as a chrono::Duration (subject to overflow).  A Timestamp
-/// represents a *signed* distance from the UNIX Epoch (1970-01-01T00:00:00Z).  A chrono::Duration
-/// is limited to +/- i64::MIN/MAX microseconds.
-impl Sub<Timestamp> for Timestamp {
-    type Output = TimestampResult<chrono::Duration>;
+impl TryFrom<core::time::Duration> for Timestamp {
+    type Error = error::TimestampError;
 
-    fn sub(self, rhs: Timestamp) -> Self::Output {
-        self.checked_difference_signed(&rhs)
-            .ok_or(TimestampError::Overflow)
+    fn try_from(value: core::time::Duration) -> Result<Self, Self::Error> {
+        Ok(Timestamp(
+            value
+                .as_micros()
+                .try_into()
+                .map_err(|_| error::TimestampError::Overflow)?,
+        ))
     }
 }
 

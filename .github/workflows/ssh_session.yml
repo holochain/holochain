@@ -1,0 +1,66 @@
+name: SSH session
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: "target platform"
+        required: false
+        default: "macos-latest"
+        type: string
+
+jobs:
+  ssh-session:
+    runs-on: ${{ github.event.inputs.platform }}
+    steps:
+      - name: Install nix
+        uses: cachix/install-nix-action@v16
+      - name: Setup cachix
+        uses: cachix/cachix-action@v10
+        with:
+          name: holochain-ci
+          signingKey: "${{ secrets.CACHIX_SIGNING_KEY }}"
+          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
+          installCommand: |
+            nix-env -if https://github.com/cachix/cachix/tarball/master \
+              --substituters 'https://cache.nixos.org https://cachix.cachix.org' \
+              --trusted-public-keys 'cachix.cachix.org-1:eWNHQldwUO7G2VkjpnjDbWwy4KQ/HNxht7H4SSoMckM= cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY='
+
+      - name: Fetch cargo related state and build files
+        uses: steveeJ-forks/actions-cache/restore@main
+        with:
+          path: |
+            /tmp/holochain_repo/.cargo/bin/
+            /tmp/holochain_repo/.cargo/registry/index/
+            /tmp/holochain_repo/.cargo/registry/cache/
+            /tmp/holochain_repo/.cargo/git/db/
+            /tmp/holochain_repo/target/
+          key: ${{ runner.os }}-test-${{ matrix.testCommand.name }}-${{ github.run_id }}
+          restore-keys: |
+            ${{ runner.os }}-test-cargo-test-slow
+            ${{ runner.os }}-test
+            ${{ runner.os }}-prepare
+          required: false
+
+      - name: Checkout repository
+        uses: actions/checkout@v2.4.0
+      - name: Move cargo related state and build files
+        run: |
+          if [[ -e /tmp/holochain_repo/.cargo ]]; then
+            mv -f /tmp/holochain_repo/.cargo ./
+          fi
+          if [[ -e /tmp/holochain_repo/target ]]; then
+            mv -f /tmp/holochain_repo/target/ ./
+          fi
+      - name: Set NIX_PATH (FIXME)
+        run: echo NIX_PATH=nixpkgs=$(./scripts/nix_path.sh) >> $GITHUB_ENV
+      - name: Setup upterm session
+        uses: lhotari/action-upterm@v1
+        env:
+          HRA_GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN}}
+          HRA_MATTERMOST_TOKEN: ${{ secrets.HRA_MATTERMOST_TOKEN }}
+        with:
+          ## limits ssh access and adds the ssh public key for the user which triggered the workflow
+          limit-access-to-actor: true
+          ## limits ssh access and adds the ssh public keys of the listed GitHub users
+          limit-access-to-users: steveeJ,jost-s,freesig,neonphog,thedavidmeister,maackle

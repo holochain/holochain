@@ -41,6 +41,16 @@ pub fn spawn_publish_dht_ops_consumer(
                 }
             }
 
+            if conductor_handle
+                .get_config()
+                .network
+                .as_ref()
+                .map(|c| c.tuning_params.disable_publish)
+                .unwrap_or(false)
+            {
+                continue;
+            }
+
             // Run the workflow
             match publish_dht_ops_workflow(
                 env.clone(),
@@ -50,7 +60,10 @@ pub fn spawn_publish_dht_ops_consumer(
             )
             .await
             {
-                Ok(WorkComplete::Incomplete) => trigger_self.trigger(),
+                Ok(WorkComplete::Incomplete) => {
+                    tracing::debug!("Work incomplete, retriggering workflow");
+                    trigger_self.trigger(&"retrigger")
+                }
                 Err(err) => handle_workflow_error(err)?,
                 _ => (),
             };

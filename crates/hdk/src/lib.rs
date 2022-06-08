@@ -291,6 +291,10 @@ pub mod countersigning;
 /// For example, an agent could choose to 'block' another agent and ignore all their updates.
 pub mod entry;
 
+pub use holochain_deterministic_integrity::entry_def_index;
+pub use holochain_deterministic_integrity::entry_defs;
+pub use holochain_deterministic_integrity::entry_type;
+
 pub mod hash;
 
 /// Distributed Hash Tables (DHTs) are fundamentally all key/value stores (content addressable).
@@ -344,7 +348,7 @@ pub mod hash_path;
 /// Maps a Rust function to an extern that WASM can expose to the Holochain host.
 ///
 /// Annotate any compatible function with `#[hdk_extern]` to expose it to Holochain as a WASM extern.
-/// The [ `map_extern!` ] macro is used internally by the `#[hdk_extern]` attribute.
+/// The [`map_extern!`](crate::map_extern!) macro is used internally by the `#[hdk_extern]` attribute.
 ///
 /// Compatible functions:
 ///

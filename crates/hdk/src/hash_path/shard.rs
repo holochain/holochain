@@ -164,13 +164,14 @@ impl From<(&ShardStrategy, &str)> for Path {
         ))
     }
 }
-/// [ `&String` ] wrapper mimicing [ `&str` ] for [ `Path` ] building.
+
+/// [`&String`](std::string::String) wrapper mimicking [`&str`] for [`Path`] building.
 impl From<(&ShardStrategy, &String)> for Path {
     fn from((strategy, s): (&ShardStrategy, &String)) -> Path {
         Path::from((strategy, s.as_str()))
     }
 }
-// [ `String` ] wrapper mimicing [ `&str` ] for [ `Path` ] building.
+// [`String`] wrapper mimicking [`&str`] for [`Path`] building.
 impl From<(&ShardStrategy, String)> for Path {
     fn from((strategy, s): (&ShardStrategy, String)) -> Path {
         Path::from((strategy, s.as_str()))

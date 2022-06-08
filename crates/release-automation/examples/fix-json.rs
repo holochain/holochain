@@ -22,7 +22,7 @@ mod types {
     }
 }
 
-fn get_clippy_output() -> Result<PathBuf, Error> {
+fn get_clippy_output() -> Result<String, Error> {
     let mut cmd = std::process::Command::new("cargo");
     cmd.args(&[
         "clippy",
@@ -64,12 +64,7 @@ fn get_clippy_output() -> Result<PathBuf, Error> {
             .join(",\n  ")
     );
 
-    // TODO: make this path configurable
-    let path = PathBuf::from("clippy.json");
-
-    std::fs::File::create(&path)?.write_all(sanitized.as_bytes())?;
-
-    Ok(path)
+    Ok(sanitized)
 }
 
 fn main() -> Result<(), Error> {
@@ -87,8 +82,7 @@ fn main() -> Result<(), Error> {
         iterations += 1;
         log::info!("[{}] running clippy...", iterations);
 
-        let json_file = get_clippy_output()?;
-        let json = std::fs::read_to_string(json_file)?;
+        let json = get_clippy_output()?;
 
         // we're only interested in the "compiler-message" reason, so we can use a single struct.
         // see: https://stackoverflow.com/questions/67702612/how-to-ignore-unknown-enum-variant-while-deserializing
@@ -173,8 +167,6 @@ fn main() -> Result<(), Error> {
         suggestions_processed += new_suggestions_processed;
         suggestions_processed_successfully += new_suggestions_processed_successfully;
     }
-
-    std::fs::remove_file("clippy.json")?;
 
     log::info!(
         "{} iterations. suggestions processed {}, of which successful: {}",

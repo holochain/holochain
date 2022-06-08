@@ -42,8 +42,8 @@ where
     /// absolute local paths. If this assertion fails,
     /// **resource resolution will panic!**
     //
-    // TODO: Represent this with types more solidly, perhaps breaking this
-    //       struct into two versions for each case.
+    // MAYBE: Represent this with types more solidly, perhaps breaking this
+    //        struct into two versions for each case.
     #[serde(skip)]
     root_dir: Option<PathBuf>,
 }
@@ -120,7 +120,7 @@ where
 
     /// Load a Bundle into memory from a file
     pub async fn read_from_file(path: &Path) -> MrBundleResult<Self> {
-        Ok(Self::decode(&ffs::read(path).await?)?)
+        Self::decode(&ffs::read(path).await?)
     }
 
     /// Write a Bundle to a file

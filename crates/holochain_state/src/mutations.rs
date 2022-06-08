@@ -16,6 +16,7 @@ use holochain_types::dht_op::{DhtOpHashed, DhtOpType};
 use holochain_types::prelude::DhtOpError;
 use holochain_types::prelude::DnaDefHashed;
 use holochain_types::prelude::DnaWasmHashed;
+use holochain_types::sql::AsSql;
 use holochain_zome_types::entry::EntryHashed;
 use holochain_zome_types::*;
 use std::str::FromStr;
@@ -87,7 +88,7 @@ macro_rules! dht_op_update {
     }};
 }
 
-/// Insert a [`DhtOp`] into the [`Scratch`].
+/// Insert a [`DhtOp`](holochain_types::dht_op::DhtOp) into the [`Scratch`].
 pub fn insert_op_scratch(
     scratch: &mut Scratch,
     zome: Option<Zome>,
@@ -127,7 +128,7 @@ pub fn insert_element_scratch(
     }
 }
 
-/// Insert a [`DhtOp`] into the database.
+/// Insert a [`DhtOp`](holochain_types::dht_op::DhtOp) into the database.
 pub fn insert_op(txn: &mut Transaction, op: &DhtOpHashed) -> StateMutationResult<()> {
     let hash = op.as_hash();
     let op = op.as_content();
@@ -210,7 +211,7 @@ pub fn insert_validation_receipt(
     Ok(())
 }
 
-/// Insert a [`DnaWasm`] into the database.
+/// Insert a [`DnaWasm`](holochain_types::prelude::DnaWasm) into the database.
 pub fn insert_wasm(txn: &mut Transaction, wasm: DnaWasmHashed) -> StateMutationResult<()> {
     let (wasm, hash) = wasm.into_inner();
     sql_insert!(txn, Wasm, {
@@ -244,7 +245,8 @@ pub fn insert_entry_def(
     Ok(())
 }
 
-/// Insert [`ConductorState`] into the database.
+/// Insert [`ConductorState`](https://docs.rs/holochain/latest/holochain/conductor/state/struct.ConductorState.html)
+/// into the database.
 pub fn insert_conductor_state(
     txn: &mut Transaction,
     bytes: SerializedBytes,
@@ -257,7 +259,7 @@ pub fn insert_conductor_state(
     Ok(())
 }
 
-/// Set the validation status of a [`DhtOp`] in the database.
+/// Set the validation status of a [`DhtOp`](holochain_types::dht_op::DhtOp) in the database.
 pub fn set_validation_status(
     txn: &mut Transaction,
     hash: &DhtOpHash,
@@ -268,7 +270,7 @@ pub fn set_validation_status(
     })?;
     Ok(())
 }
-/// Set the integration dependency of a [`DhtOp`] in the database.
+/// Set the integration dependency of a [`DhtOp`](holochain_types::dht_op::DhtOp) in the database.
 pub fn set_dependency(
     txn: &mut Transaction,
     hash: &DhtOpHash,
@@ -290,7 +292,7 @@ pub fn set_dependency(
     Ok(())
 }
 
-/// Set the whether or not a receipt is required of a [`DhtOp`] in the database.
+/// Set the whether or not a receipt is required of a [`DhtOp`](holochain_types::dht_op::DhtOp) in the database.
 pub fn set_require_receipt(
     txn: &mut Transaction,
     hash: &DhtOpHash,
@@ -302,7 +304,7 @@ pub fn set_require_receipt(
     Ok(())
 }
 
-/// Set the validation stage of a [`DhtOp`] in the database.
+/// Set the validation stage of a [`DhtOp`](holochain_types::dht_op::DhtOp) in the database.
 pub fn set_validation_stage(
     txn: &mut Transaction,
     hash: &DhtOpHash,
@@ -335,7 +337,7 @@ pub fn set_validation_stage(
     Ok(())
 }
 
-/// Set when a [`DhtOp`] was integrated.
+/// Set when a [`DhtOp`](holochain_types::dht_op::DhtOp) was integrated.
 pub fn set_when_integrated(
     txn: &mut Transaction,
     hash: &DhtOpHash,
@@ -347,7 +349,7 @@ pub fn set_when_integrated(
     Ok(())
 }
 
-/// Set when a [`DhtOp`] was last publish time
+/// Set when a [`DhtOp`](holochain_types::dht_op::DhtOp) was last publish time
 pub fn set_last_publish_time(
     txn: &mut Transaction,
     hash: &DhtOpHash,
@@ -359,7 +361,7 @@ pub fn set_last_publish_time(
     Ok(())
 }
 
-/// Set withhold publish for a [`DhtOp`].
+/// Set withhold publish for a [`DhtOp`](holochain_types::dht_op::DhtOp).
 pub fn set_withhold_publish(txn: &mut Transaction, hash: &DhtOpHash) -> StateMutationResult<()> {
     dht_op_update!(txn, hash, {
         "withhold_publish": true,
@@ -367,7 +369,7 @@ pub fn set_withhold_publish(txn: &mut Transaction, hash: &DhtOpHash) -> StateMut
     Ok(())
 }
 
-/// Unset withhold publish for a [`DhtOp`].
+/// Unset withhold publish for a [`DhtOp`](holochain_types::dht_op::DhtOp).
 pub fn unset_withhold_publish(txn: &mut Transaction, hash: &DhtOpHash) -> StateMutationResult<()> {
     dht_op_update!(txn, hash, {
         "withhold_publish": Null,
@@ -375,7 +377,7 @@ pub fn unset_withhold_publish(txn: &mut Transaction, hash: &DhtOpHash) -> StateM
     Ok(())
 }
 
-/// Set the receipt count for a [`DhtOp`].
+/// Set the receipt count for a [`DhtOp`](holochain_types::dht_op::DhtOp).
 pub fn set_receipts_complete(
     txn: &mut Transaction,
     hash: &DhtOpHash,
@@ -405,6 +407,7 @@ pub fn insert_header(
     let header = header.header();
     let signed_header = SignedHeaderRef(header, signature);
     let header_type = header.header_type();
+    let header_type = header_type.as_sql();
     let header_seq = header.header_seq();
     let author = header.author().clone();
     let prev_hash = header.prev_header().cloned();
@@ -417,20 +420,20 @@ pub fn insert_header(
         Header::CreateLink(create_link) => {
             sql_insert!(txn, Header, {
                 "hash": hash,
-                "type": header_type ,
+                "type": header_type,
                 "seq": header_seq,
                 "author": author,
                 "prev_hash": prev_hash,
                 "base_hash": create_link.base_address,
                 "zome_id": create_link.zome_id.index() as u32,
-                "tag": create_link.tag,
+                "tag": create_link.tag.as_sql(),
                 "blob": to_blob(&signed_header)?,
             })?;
         }
         Header::DeleteLink(delete_link) => {
             sql_insert!(txn, Header, {
                 "hash": hash,
-                "type": header_type ,
+                "type": header_type,
                 "seq": header_seq,
                 "author": author,
                 "prev_hash": prev_hash,
@@ -441,12 +444,12 @@ pub fn insert_header(
         Header::Create(create) => {
             sql_insert!(txn, Header, {
                 "hash": hash,
-                "type": header_type ,
+                "type": header_type,
                 "seq": header_seq,
                 "author": author,
                 "prev_hash": prev_hash,
                 "entry_hash": create.entry_hash,
-                "entry_type": create.entry_type,
+                "entry_type": create.entry_type.as_sql(),
                 "private_entry": private,
                 "blob": to_blob(&signed_header)?,
             })?;
@@ -454,7 +457,7 @@ pub fn insert_header(
         Header::Delete(delete) => {
             sql_insert!(txn, Header, {
                 "hash": hash,
-                "type": header_type ,
+                "type": header_type,
                 "seq": header_seq,
                 "author": author,
                 "prev_hash": prev_hash,
@@ -466,12 +469,12 @@ pub fn insert_header(
         Header::Update(update) => {
             sql_insert!(txn, Header, {
                 "hash": hash,
-                "type": header_type ,
+                "type": header_type,
                 "seq": header_seq,
                 "author": author,
                 "prev_hash": prev_hash,
                 "entry_hash": update.entry_hash,
-                "entry_type": update.entry_type,
+                "entry_type": update.entry_type.as_sql(),
                 "original_entry_hash": update.original_entry_address,
                 "original_header_hash": update.original_header_address,
                 "private_entry": private,
@@ -485,7 +488,7 @@ pub fn insert_header(
         | Header::CloseChain(_) => {
             sql_insert!(txn, Header, {
                 "hash": hash,
-                "type": header_type ,
+                "type": header_type,
                 "seq": header_seq,
                 "author": author,
                 "prev_hash": prev_hash,

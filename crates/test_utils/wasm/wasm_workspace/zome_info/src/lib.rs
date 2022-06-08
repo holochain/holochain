@@ -167,7 +167,7 @@ fn dna_info_nested(_: ()) -> ExternResult<Option<i64>> {
     Ok(MaybePropertiesDirect::try_from(hdk::prelude::dna_info()?.properties)?.0.and_then(|properties| properties.baz["foo"]["bar"].as_i64()))
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "mock"))]
 pub mod tests {
     use hdk::prelude::*;
     use ::fixt::prelude::*;

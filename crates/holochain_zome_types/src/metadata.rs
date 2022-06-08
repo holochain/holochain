@@ -26,9 +26,9 @@ pub struct ElementDetails {
     pub element: Element,
     /// The validation status of this element.
     pub validation_status: ValidationStatus,
-    /// Any [Delete] on this element.
+    /// Any [`Delete`](crate::header::Delete) on this element.
     pub deletes: Vec<SignedHeaderHashed>,
-    /// Any [Update] on this element.
+    /// Any [`Update`](crate::header::Update) on this element.
     pub updates: Vec<SignedHeaderHashed>,
 }
 
@@ -39,11 +39,12 @@ pub struct EntryDetails {
     pub entry: Entry,
     /// ## Create relationships.
     /// These are the headers that created this entry.
-    /// They can be either a [Create] or an [Update] header
+    /// They can be either a [`Create`](crate::header::Create) or an
+    /// [`Update`](crate::header::Update) header
     /// where the `entry_hash` field is the hash of
     /// the above entry.
     ///
-    /// You can make an [Element] from any of these
+    /// You can make an [`Element`] from any of these
     /// and the entry.
     pub headers: Vec<SignedHeaderHashed>,
     /// Rejected create relationships.

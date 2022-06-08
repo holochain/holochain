@@ -6,6 +6,9 @@ edition = "2021"
 documentation = "https://docs.rs/release-automation"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+name = "release_automation"
+path = "src/lib/mod.rs"
 
 [dependencies]
 comrak = "0.10"
@@ -37,6 +40,7 @@ thiserror = "1"
 regex = "1.5"
 crates_io_api = "0.7"
 crates-index = "0.18"
+itertools = "0.10"
 
 # used for the example clippy fix-json
 rustfix = "0.6"

@@ -149,9 +149,8 @@ async fn recv_incoming_admin_msgs<A: InterfaceApi>(
         .for_each_concurrent(4096, move |msg| {
             let api = api.clone();
             async move {
-                match handle_incoming_message(msg, api.clone()).await {
-                    Err(e) => error!(error = &e as &dyn std::error::Error),
-                    Ok(()) => {}
+                if let Err(e) = handle_incoming_message(msg, api.clone()).await {
+                    error!(error = &e as &dyn std::error::Error)
                 }
             }
         })
@@ -275,7 +274,7 @@ pub mod test {
 
     async fn setup_admin_fake_cells(
         dnas: Vec<DnaFile>,
-        cell_ids_with_proofs: Vec<(CellId, Option<SerializedBytes>)>,
+        cell_ids_with_proofs: Vec<(CellId, Option<MembraneProof>)>,
     ) -> (Arc<TempDir>, ConductorHandle) {
         let db_dir = test_db_dir();
         let conductor_handle = ConductorBuilder::new()

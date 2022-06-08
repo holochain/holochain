@@ -149,7 +149,6 @@ pub struct Path(Vec<Component>);
 
 entry_def!(Path EntryDef {
     id: "hdk.path".into(),
-    crdt_type: CrdtType,
     required_validations: RequiredValidations::default(),
     visibility: EntryVisibility::Public,
     required_validation_type: RequiredValidationType::default(),
@@ -159,14 +158,14 @@ entry_def!(Path EntryDef {
 /// This is what is committed and shared on the DHT to build links off as their
 /// base and target. If we committed the `Path` directly then the size of each
 /// node entry content would be the size of all the components of the path.
-/// Given that `ensure` populates all the ancestor nodes committing [ A, B, C ]
-/// would create entries with content [ A ], [ A, B ], [ A, B, C ]. For deep
+/// Given that `ensure` populates all the ancestor nodes committing `[ A, B, C ]`
+/// would create entries with content `[ A ]`, `[ A, B ]`, `[ A, B, C ]`. For deep
 /// paths, or paths with a large component (in bytes) at any node, this would
 /// create a lot of redundant data in every descendent entry.
 /// Instead, we commit a `PathEntry` so each node is constant size, just the
 /// hash of the full `Path` up to that point. This means that committing
 /// `PathEntry` instead of `Path` for `[A, B, C]` results in entries with
-/// content [ HashA ], [ HashAB ], [ HashABC ]. Note that if A + B + C is much
+/// content `[ HashA ]`, `[ HashAB ]`, `[ HashABC ]`. Note that if A + B + C is much
 /// less than the size of a holochain hash (~40 bytes) then this approach is
 /// worse than simply committing the `Path` but in practise this is often not
 /// the case, and `PathEntry` becomes a more scalable generalised solution.
@@ -181,7 +180,6 @@ impl PathEntry {
 
 entry_def!(PathEntry EntryDef {
     id: "hdk.path_entry".into(),
-    crdt_type: CrdtType,
     required_validations: RequiredValidations::default(),
     visibility: EntryVisibility::Public,
     required_validation_type: RequiredValidationType::default(),

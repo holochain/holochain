@@ -10,7 +10,7 @@ use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::inline_zome::BoxApi;
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, SerializedBytes, derive_more::From)]
-struct BaseTarget(EntryHash, EntryHash);
+struct BaseTarget(AnyLinkableHash, AnyLinkableHash);
 
 fn links_zome() -> InlineZome {
     InlineZome::new_unique(vec![])
@@ -26,7 +26,7 @@ fn links_zome() -> InlineZome {
         })
         .callback(
             "get_links",
-            move |api: BoxApi, base: EntryHash| -> InlineZomeResult<Vec<Vec<Link>>> {
+            move |api: BoxApi, base: AnyLinkableHash| -> InlineZomeResult<Vec<Vec<Link>>> {
                 Ok(api.get_links(vec![GetLinksInput::new(base, None)])?)
             },
         )
@@ -58,8 +58,8 @@ async fn many_agents_can_reach_consistency_agent_links() {
     // Must have integrated or be able to get the agent key to link from it
     consistency_10s(&cells[..]).await;
 
-    let base: EntryHash = cells[0].agent_pubkey().clone().into();
-    let target: EntryHash = cells[1].agent_pubkey().clone().into();
+    let base: AnyLinkableHash = cells[0].agent_pubkey().clone().into();
+    let target: AnyLinkableHash = cells[1].agent_pubkey().clone().into();
 
     let _: HeaderHash = conductor
         .call(

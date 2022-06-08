@@ -40,38 +40,46 @@ async fn check_hashed_type() {
 
 #[test]
 fn holo_hash_parse() {
+    let expected_loc = 3_860_645_936_u32;
     let h = DnaHash::try_from("uhC0kWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm").unwrap();
-    assert_eq!(3_860_645_936 as u32, h.get_loc());
+    assert_eq!(expected_loc, h.get_loc());
     assert_eq!(
         "DnaHash(uhC0kWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm)",
         &format!("{:?}", h),
     );
 
     let h = NetIdHash::try_from("uhCIkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm").unwrap();
-    assert_eq!(3_860_645_936, h.get_loc());
+    assert_eq!(expected_loc, h.get_loc());
     assert_eq!(
         "NetIdHash(uhCIkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm)",
         &format!("{:?}", h),
     );
 
     let h = HeaderHash::try_from("uhCkkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm").unwrap();
-    assert_eq!(3_860_645_936, h.get_loc());
+    assert_eq!(expected_loc, h.get_loc());
     assert_eq!(
         "HeaderHash(uhCkkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm)",
         &format!("{:?}", h),
     );
 
     let h = EntryHash::try_from("uhCEkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm").unwrap();
-    assert_eq!(3_860_645_936, h.get_loc());
+    assert_eq!(expected_loc, h.get_loc());
     assert_eq!(
         "EntryHash(uhCEkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm)",
         &format!("{:?}", h),
     );
 
     let h = DhtOpHash::try_from("uhCQkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm").unwrap();
-    assert_eq!(3_860_645_936, h.get_loc());
+    assert_eq!(expected_loc, h.get_loc());
     assert_eq!(
         "DhtOpHash(uhCQkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm)",
+        &format!("{:?}", h),
+    );
+
+    let h = ExternalHash::try_from("uhC8kWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm").unwrap();
+    assert_eq!(expected_loc, h.get_loc());
+    assert_eq!(
+        "ExternalHash(uhC8kWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm)",
         &format!("{:?}", h),
     );
 }

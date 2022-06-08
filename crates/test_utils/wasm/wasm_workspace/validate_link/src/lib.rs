@@ -14,8 +14,10 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op {
         // This is a pretty pointless example as everything is valid.
         Op::RegisterCreateLink { create_link } => {
-            let base: MaybeLinkable = must_get_entry(<(CreateLink,)>::from(create_link.clone()).0.base_address)?.try_into()?;
-            let target: MaybeLinkable = must_get_entry(<(CreateLink,)>::from(create_link).0.target_address)?.try_into()?;
+            let base: MaybeLinkable =
+                must_get_entry(create_link.hashed.content.base_address.into())?.try_into()?;
+            let target: MaybeLinkable =
+                must_get_entry(create_link.hashed.content.target_address.into())?.try_into()?;
             Ok(match base {
                 MaybeLinkable::AlwaysLinkable => match target {
                     MaybeLinkable::AlwaysLinkable => ValidateCallbackResult::Valid,
@@ -25,7 +27,8 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             })
         }
         Op::RegisterDeleteLink { create_link, .. } => {
-            let base: MaybeLinkable = must_get_entry(create_link.base_address)?.try_into()?;
+            let base: MaybeLinkable =
+                must_get_entry(create_link.base_address.into())?.try_into()?;
             Ok(match base {
                 MaybeLinkable::AlwaysLinkable => ValidateCallbackResult::Valid,
                 _ => ValidateCallbackResult::Invalid("base never validates".to_string()),
@@ -75,7 +78,12 @@ fn add_invalid_link_inner() -> ExternResult<HeaderHash> {
     create_entry(&MaybeLinkable::AlwaysLinkable)?;
     create_entry(&MaybeLinkable::NeverLinkable)?;
 
-    create_link(never_linkable_entry_hash, always_linkable_entry_hash, HdkLinkType::Any, ())
+    create_link(
+        never_linkable_entry_hash,
+        always_linkable_entry_hash,
+        HdkLinkType::Any,
+        (),
+    )
 }
 
 #[hdk_extern]

@@ -233,15 +233,17 @@ async fn bob_links_in_a_legit_way(
     // Link the entries
     let link_add_address = call_data
         .create_link(
-            base_entry_hash.clone(),
-            target_entry_hash.clone(),
+            base_entry_hash.clone().into(),
+            target_entry_hash.clone().into(),
             link_tag.clone(),
         )
         .await;
 
     // Produce and publish these commits
     let triggers = handle.get_cell_triggers(&bob_cell_id).unwrap();
-    triggers.publish_dht_ops.trigger();
+    triggers
+        .publish_dht_ops
+        .trigger(&"bob_links_in_a_legit_way");
     link_add_address
 }
 
@@ -279,8 +281,8 @@ async fn bob_makes_a_large_link(
     // Commit a large header
     let link_add_address = call_data
         .create_link(
-            base_entry_hash.clone(),
-            target_entry_hash.clone(),
+            base_entry_hash.clone().into(),
+            target_entry_hash.clone().into(),
             link_tag.clone(),
         )
         .await;
@@ -297,7 +299,7 @@ async fn bob_makes_a_large_link(
 
     // Produce and publish these commits
     let triggers = handle.get_cell_triggers(&bob_cell_id).unwrap();
-    triggers.publish_dht_ops.trigger();
+    triggers.publish_dht_ops.trigger(&"bob_makes_a_large_link");
     (bad_update_header, bad_update_entry_hash, link_add_address)
 }
 
@@ -314,7 +316,7 @@ async fn dodgy_bob(bob_cell_id: &CellId, handle: &ConductorHandle, dna_file: &Dn
     // on to the source chain and flush the workspace.
     let (_ribosome, call_context, workspace_lock) = call_data.unpack().await;
     // garbage addresses.
-    let base_address = EntryHash::from_raw_32([1_u8; 32].to_vec());
+    let base_address: AnyLinkableHash = EntryHash::from_raw_32([1_u8; 32].to_vec()).into();
     let link_add_address = HeaderHash::from_raw_32([2_u8; 32].to_vec());
 
     let source_chain = call_context
@@ -343,7 +345,7 @@ async fn dodgy_bob(bob_cell_id: &CellId, handle: &ConductorHandle, dna_file: &Dn
 
     // Produce and publish these commits
     let triggers = handle.get_cell_triggers(&bob_cell_id).unwrap();
-    triggers.publish_dht_ops.trigger();
+    triggers.publish_dht_ops.trigger(&"dodgy_bob");
 }
 
 //////////////////////

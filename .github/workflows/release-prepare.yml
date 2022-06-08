@@ -33,6 +33,8 @@ on:
         type: string
         required: true
     secrets:
+      HRA_GITHUB_TOKEN:
+        required: true
       CACHIX_SIGNING_KEY:
         required: true
       CACHIX_AUTH_TOKEN:
@@ -42,6 +44,12 @@ on:
       releasable_crates:
         description: "whether there are any releaseable crates"
         value: ${{ jobs.prepare.outputs.releasable_crates }}
+      version:
+        description: "which holochain version, if one, will be released"
+        value: ${{ jobs.prepare.outputs.version }}
+      tag:
+        description: "which holochain tag, if one, will be released"
+        value: ${{ jobs.prepare.outputs.tag }}
 
 jobs:
   prepare:
@@ -58,13 +66,13 @@ jobs:
       releasable_crates: ${{ steps.bump-versions.outputs.releasable_crates }}
 
     steps:
-      # - name: Maximize build space
-      #   # uses: easimon/maximize-build-space@master
-      #   uses: AdityaGarg8/remove-unwanted-software@v1
-      #   with:
-      #     remove-dotnet: true
-      #     remove-android: true
-      #     remove-haskell: true
+      - name: Maximize build space
+        # uses: easimon/maximize-build-space@master
+        uses: AdityaGarg8/remove-unwanted-software@v1
+        with:
+          remove-dotnet: true
+          remove-android: true
+          remove-haskell: true
       - name: Checkout repository
         uses: actions/checkout@v2.4.0
       - name: Install nix
@@ -136,6 +144,8 @@ jobs:
           cat ${HOLOCHAIN_RELEASE_SH}
 
       - name: Prepare the holochain repository
+        env:
+          HRA_GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN }}
         run: |
           set -eE -o pipefail
           source "${HOLOCHAIN_RELEASE_SH}"
@@ -154,6 +164,9 @@ jobs:
 
           cp -v $HOME/work/holochain/holochain/.git/config .git/config
 
+          # use our custom token for more permissions, e.g. "workflow" which is needed to push workflow files
+          git config --local "http.https://github.com/.extraheader" "AUTHORIZATION: basic $(echo -n pat:${HRA_GITHUB_TOKEN} | base64)"
+
           git fetch --all --tags --prune --prune-tags --force
           git checkout --force -B ${HOLOCHAIN_SOURCE_BRANCH} remotes/origin/${HOLOCHAIN_SOURCE_BRANCH}
 
@@ -165,6 +178,39 @@ jobs:
           if [[ -n "${obsolete_branches}" ]]; then
             git branch -D ${obsolete_branches}
           fi
+
+      - name: Setup upterm session
+        uses: lhotari/action-upterm@v1
+        if: ${{ failure() && needs.vars.outputs.debug == 'true' }}
+        env:
+          HRA_GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN }}
+        with:
+          ## limits ssh access and adds the ssh public key for the user which triggered the workflow
+          limit-access-to-actor: true
+          ## limits ssh access and adds the ssh public keys of the listed GitHub users
+          limit-access-to-users: steveeJ,jost-s,freesig,neonphog,thedavidmeister,maackle
+
+      - name: Detect missing release headings
+        run: |
+          set -ex
+          source "${HOLOCHAIN_RELEASE_SH}"
+          cd "${HOLOCHAIN_REPO}"
+
+          nix-shell --argstr flavor release --pure --run '
+            set -e
+
+            release-automation \
+              --workspace-path=$PWD \
+              --log-level=debug \
+              crate detect-missing-releaseheadings
+            '
+
+      - name: Generate crate READMEs from doc comments
+        run: |
+          source "${HOLOCHAIN_RELEASE_SH}"
+          cd "${HOLOCHAIN_REPO}"
+          
+          nix-shell --pure --argstr flavor release --run "./scripts/generate_readmes.sh"
 
       - name: Bump the crate versions for the release
         id: bump-versions

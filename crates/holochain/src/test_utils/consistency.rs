@@ -674,12 +674,11 @@ async fn gather_published_data(
 async fn request_published_ops(
     db: &DbRead<DbKindAuthored>,
 ) -> StateQueryResult<Vec<(DhtLocation, KitsuneOpHash)>> {
-    Ok(db
-        .async_reader(|txn| {
-            // Collect all ops except StoreEntry's that are private.
-            let r = txn
-                .prepare(
-                    "
+    db.async_reader(|txn| {
+        // Collect all ops except StoreEntry's that are private.
+        let r = txn
+            .prepare(
+                "
                     SELECT
                     DhtOp.hash as dht_op_hash,
                     DhtOp.storage_center_loc as loc
@@ -689,21 +688,21 @@ async fn request_published_ops(
                     WHERE
                     (DhtOp.type != :store_entry OR Header.private_entry = 0)
                 ",
-                )?
-                .query_map(
-                    named_params! {
-                        ":store_entry": DhtOpType::StoreEntry,
-                    },
-                    |row| {
-                        let h: DhtOpHash = row.get("dht_op_hash")?;
-                        let loc: u32 = row.get("loc")?;
-                        Ok((loc.into(), h.into_kitsune_raw()))
-                    },
-                )?
-                .collect::<Result<_, _>>()?;
-            StateQueryResult::Ok(r)
-        })
-        .await?)
+            )?
+            .query_map(
+                named_params! {
+                    ":store_entry": DhtOpType::StoreEntry,
+                },
+                |row| {
+                    let h: DhtOpHash = row.get("dht_op_hash")?;
+                    let loc: u32 = row.get("loc")?;
+                    Ok((loc.into(), h.into_kitsune_raw()))
+                },
+            )?
+            .collect::<Result<_, _>>()?;
+        StateQueryResult::Ok(r)
+    })
+    .await
 }
 
 /// Request the storage arc for the given agent.
