@@ -1,15 +1,53 @@
 use mockall::predicate::eq;
 
+use crate::hash_path::path::root_hash;
 use crate::prelude::*;
 
 #[test]
-/// Test that a root path always exists and an ensure is a noop.
-fn root_is_noop() {
-    assert!(Path::from("foo").into_typed(LinkType(0)).exists().unwrap());
+/// Test that a root path always doesn't exist until it is ensured.
+fn root_ensures() {
     let mut mock = MockHdkT::new();
-    mock.expect_create_link().never();
+    mock.expect_hash().returning(hash_entry_mock);
     set_hdk(mock);
+
+    let mut mock = MockHdkT::new();
+    mock.expect_hash().returning(hash_entry_mock);
+    mock.expect_get_links()
+        .times(2)
+        .returning(|_| Ok(vec![vec![]]));
+    mock.expect_create_link()
+        .once()
+        .with(eq(CreateLinkInput {
+            base_address: root_hash().unwrap(),
+            target_address: Path::from("foo").path_entry_hash().unwrap().into(),
+            link_type: LinkType(0),
+            tag: Path::from("foo").make_tag().unwrap(),
+            chain_top_ordering: Default::default(),
+        }))
+        .returning(|_| Ok(HeaderHash::from_raw_36(vec![0; 36])));
+    set_hdk(mock);
+
+    assert!(!Path::from("foo").into_typed(LinkType(0)).exists().unwrap());
     Path::from("foo").into_typed(LinkType(0)).ensure().unwrap();
+
+    let mut mock = MockHdkT::new();
+    mock.expect_hash().returning(hash_entry_mock);
+    mock.expect_get_links()
+        .once()
+        .with(eq(vec![GetLinksInput {
+            base_address: root_hash().unwrap(),
+            link_type: LinkType(0).into(),
+            tag_prefix: Some(Path::from("foo").make_tag().unwrap()),
+        }]))
+        .returning(|_| {
+            Ok(vec![vec![Link {
+                target: Path::from("foo").path_entry_hash().unwrap().into(),
+                timestamp: Timestamp::now(),
+                tag: Path::from("foo").make_tag().unwrap(),
+                create_link_hash: HeaderHash::from_raw_36(vec![0; 36]),
+            }]])
+        });
+    set_hdk(mock);
     assert!(Path::from("foo").into_typed(LinkType(0)).exists().unwrap());
 }
 
@@ -21,9 +59,9 @@ fn parent_path_committed() {
     set_hdk(mock);
 
     let mut mock = MockHdkT::new();
-    mock.expect_hash().times(4).returning(hash_entry_mock);
+    mock.expect_hash().times(8).returning(hash_entry_mock);
     mock.expect_get_links()
-        .once()
+        .times(2)
         .returning(|_| Ok(vec![vec![]]));
     mock.expect_create_link()
         .once()
@@ -32,6 +70,16 @@ fn parent_path_committed() {
             target_address: Path::from("foo.bar").path_entry_hash().unwrap().into(),
             link_type: LinkType(0),
             tag: Path::from("bar").make_tag().unwrap(),
+            chain_top_ordering: Default::default(),
+        }))
+        .returning(|_| Ok(HeaderHash::from_raw_36(vec![0; 36])));
+    mock.expect_create_link()
+        .once()
+        .with(eq(CreateLinkInput {
+            base_address: root_hash().unwrap(),
+            target_address: Path::from("foo").path_entry_hash().unwrap().into(),
+            link_type: LinkType(0),
+            tag: Path::from("foo").make_tag().unwrap(),
             chain_top_ordering: Default::default(),
         }))
         .returning(|_| Ok(HeaderHash::from_raw_36(vec![0; 36])));
@@ -47,9 +95,9 @@ fn parent_path_committed() {
     set_hdk(mock);
 
     let mut mock = MockHdkT::new();
-    mock.expect_hash().times(8).returning(hash_entry_mock);
+    mock.expect_hash().times(12).returning(hash_entry_mock);
     mock.expect_get_links()
-        .times(2)
+        .times(3)
         .returning(|_| Ok(vec![vec![]]));
     mock.expect_create_link()
         .once()
@@ -71,6 +119,16 @@ fn parent_path_committed() {
             chain_top_ordering: Default::default(),
         }))
         .returning(|_| Ok(HeaderHash::from_raw_36(vec![0; 36])));
+    mock.expect_create_link()
+        .once()
+        .with(eq(CreateLinkInput {
+            base_address: root_hash().unwrap(),
+            target_address: Path::from("foo").path_entry_hash().unwrap().into(),
+            link_type: LinkType(0),
+            tag: Path::from("foo").make_tag().unwrap(),
+            chain_top_ordering: Default::default(),
+        }))
+        .returning(|_| Ok(HeaderHash::from_raw_36(vec![0; 36])));
     set_hdk(mock);
 
     Path::from("foo.bar.baz")
@@ -84,21 +142,15 @@ fn parent_path_committed() {
 fn paths_exists() {
     let mut mock = MockHdkT::new();
     mock.expect_hash().returning(hash_entry_mock);
-    set_hdk(mock);
-
-    let mut mock = MockHdkT::new();
-    mock.expect_hash().returning(hash_entry_mock);
 
     // Return no links.
     mock.expect_get_links().returning(|_| Ok(vec![vec![]]));
     set_hdk(mock);
 
-    // Root paths always exist.
-    assert!(Path::from("foo").into_typed(LinkType(0)).exists().unwrap());
-    assert!(Path::from("bar").into_typed(LinkType(0)).exists().unwrap());
-    assert!(Path::from("baz").into_typed(LinkType(0)).exists().unwrap());
-
-    // Non-root paths do not exist.
+    // Paths do not exist.
+    assert!(!Path::from("foo").into_typed(LinkType(0)).exists().unwrap());
+    assert!(!Path::from("bar").into_typed(LinkType(0)).exists().unwrap());
+    assert!(!Path::from("baz").into_typed(LinkType(0)).exists().unwrap());
     assert!(!Path::from("foo.bar")
         .into_typed(LinkType(0))
         .exists()
@@ -163,6 +215,12 @@ fn children() {
     set_hdk(mock);
 
     // Create some links to return.
+    let foo = Link {
+        target: Path::from("foo").path_entry_hash().unwrap().into(),
+        timestamp: Timestamp::now(),
+        tag: Path::from("foo").make_tag().unwrap(),
+        create_link_hash: HeaderHash::from_raw_36(vec![0; 36]),
+    };
     let foo_bar = Link {
         target: Path::from("foo.bar").path_entry_hash().unwrap().into(),
         timestamp: Timestamp::now(),
@@ -195,6 +253,17 @@ fn children() {
     // ${base} -[${tag}]-> ${target}
     let mut mock = MockHdkT::new();
     mock.expect_hash().returning(hash_entry_mock);
+    // ROOT -[foo]-> foo
+    mock.expect_get_links()
+        .with(eq(vec![GetLinksInput {
+            base_address: root_hash().unwrap(),
+            link_type: LinkType(0).into(),
+            tag_prefix: Some(Path::from("foo").make_tag().unwrap()),
+        }]))
+        .returning({
+            let foo = foo.clone();
+            move |_| Ok(vec![vec![foo.clone()]])
+        });
     // foo -[bar]-> foo.bar
     mock.expect_get_links()
         .with(eq(vec![GetLinksInput {

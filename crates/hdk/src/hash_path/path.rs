@@ -8,6 +8,17 @@ use std::str::FromStr;
 #[cfg(all(test, feature = "mock"))]
 mod test;
 
+/// Root for all paths.
+pub const ROOT: &[u8; 2] = &[0x00, 0x01];
+
+pub fn root_hash() -> ExternResult<AnyLinkableHash> {
+    hash_entry(Entry::App(
+        AppEntryBytes::try_from(SerializedBytes::from(UnsafeBytes::from(ROOT.to_vec())))
+            .expect("This cannot fail as it's under the max entry bytes"),
+    ))
+    .map(Into::into)
+}
+
 /// Allows for "foo.bar.baz" to automatically move to/from ["foo", "bar", "baz"] components.
 /// Technically it's moving each string component in as bytes.
 /// If this is a problem for you simply build the components yourself as a Vec<Vec<u8>>.
@@ -300,7 +311,11 @@ impl TypedPath {
         if self.0.is_empty() {
             Ok(false)
         } else if self.is_root() {
-            Ok(true)
+            let this_paths_hash: AnyLinkableHash = self.path_entry_hash()?.into();
+            let exists = get_links(root_hash()?, self.link_type, Some(self.make_tag()?))?
+                .iter()
+                .any(|Link { target, .. }| *target == this_paths_hash);
+            Ok(exists)
         } else {
             let parent = self
                 .parent()
@@ -320,7 +335,14 @@ impl TypedPath {
     /// Recursively touch this and every parent that doesn't exist yet.
     pub fn ensure(&self) -> ExternResult<()> {
         if !self.exists()? {
-            if let Some(parent) = self.parent() {
+            if self.is_root() {
+                create_link(
+                    root_hash()?,
+                    self.path_entry_hash()?,
+                    self.link_type,
+                    self.make_tag()?,
+                )?;
+            } else if let Some(parent) = self.parent() {
                 parent.ensure()?;
                 create_link(
                     parent.path_entry_hash()?,
