@@ -1035,7 +1035,7 @@ async fn mock_network_sharding() {
     let mock_network: AdapterFactory = Arc::new(mock_network);
 
     // Setup the bootstrap.
-    let bootstrap = run_bootstrap(data.agent_to_info.values().cloned()).await;
+    let (bootstrap, _shutdown) = run_bootstrap(data.agent_to_info.values().cloned()).await;
     // Setup the network.
     let mut tuning =
         kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
@@ -1119,9 +1119,11 @@ async fn mock_network_sharding() {
 }
 
 #[cfg(feature = "test_utils")]
-async fn run_bootstrap(peer_data: impl Iterator<Item = AgentInfoSigned>) -> Url2 {
+async fn run_bootstrap(
+    peer_data: impl Iterator<Item = AgentInfoSigned>,
+) -> (Url2, kitsune_p2p_bootstrap::BootstrapShutdown) {
     let mut url = url2::url2!("http://127.0.0.1:0");
-    let (driver, addr) = kitsune_p2p_bootstrap::run(([127, 0, 0, 1], 0), vec![])
+    let (driver, addr, shutdown) = kitsune_p2p_bootstrap::run(([127, 0, 0, 1], 0), vec![])
         .await
         .unwrap();
     tokio::spawn(driver);
@@ -1130,7 +1132,7 @@ async fn run_bootstrap(peer_data: impl Iterator<Item = AgentInfoSigned>) -> Url2
     for info in peer_data {
         let _: Option<()> = do_api(url.clone(), "put", info, &client).await.unwrap();
     }
-    url
+    (url, shutdown)
 }
 
 async fn do_api<I: serde::Serialize, O: serde::de::DeserializeOwned>(
