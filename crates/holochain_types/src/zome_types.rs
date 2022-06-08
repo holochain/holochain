@@ -21,6 +21,10 @@ impl GlobalZomeTypes {
     /// the iterators. The iterator must be the same order
     /// as the integrity zomes.
     ///
+    /// This iterator should contain the number of [`EntryDefIndex`] and [`LinkType`]
+    /// for each integrity zome. If the zome does not have any entries or links,
+    /// then it should still have a zero value set.
+    ///
     /// # Correct Usage
     /// You must use an iterator with a deterministic order.
     ///
@@ -63,7 +67,7 @@ impl GlobalZomeTypes {
         Ok(GlobalZomeTypes(r))
     }
 
-    /// TODO
+    /// Create a new zome types map within the scope of the given integrity zomes.
     pub fn re_scope(&self, zomes: &[ZomeId]) -> ZomeTypesResult<ScopedZomeTypesSet> {
         let Self(ScopedZomeTypesSet { entries, links }) = self;
         let entries = zomes
@@ -92,12 +96,12 @@ impl GlobalZomeTypes {
         })
     }
 
-    /// TODO
+    /// Find a [`ZomeId`] from a [`EntryDefIndex`].
     pub fn find_zome_id_from_entry(&self, entry_index: &EntryDefIndex) -> Option<ZomeId> {
         find_zome_id(self.0.entries.0.iter(), &(*entry_index).into())
     }
 
-    /// TODO
+    /// Find a [`ZomeId`] from a [`LinkType`].
     pub fn find_zome_id_from_link(&self, link_index: &LinkType) -> Option<ZomeId> {
         find_zome_id(self.0.links.0.iter(), &(*link_index).into())
     }
