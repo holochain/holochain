@@ -43,7 +43,7 @@ pub fn delete<'a>(
                     deletes_entry_address,
                 };
                 let header_hash = source_chain
-                    .put(
+                    .put_weightless(
                         Some(call_context.zome.clone()),
                         header_builder,
                         None,

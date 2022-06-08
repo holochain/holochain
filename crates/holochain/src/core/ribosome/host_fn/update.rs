@@ -2,9 +2,9 @@ use super::create::extract_entry_def;
 use super::delete::get_original_address;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
+use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
 use holochain_wasmer_host::prelude::WasmError;
-use crate::core::ribosome::RibosomeError;
 
 use holochain_types::prelude::*;
 use std::sync::Arc;
@@ -40,7 +40,11 @@ pub fn update<'a>(
                         .source_chain()
                         .as_ref()
                         .expect("Must have source chain if write_workspace access is given")
-                        .put_countersigned(Some(call_context.zome.clone()), entry, chain_top_ordering)
+                        .put_countersigned(
+                            Some(call_context.zome.clone()),
+                            entry,
+                            chain_top_ordering,
+                        )
                         .await
                         .map_err(|source_chain_error| {
                             WasmError::Host(source_chain_error.to_string())
@@ -103,7 +107,12 @@ pub fn update<'a>(
                             .expect("Must have source chain if write_workspace access is given");
                         // push the header and the entry into the source chain
                         let header_hash = source_chain
-                            .put(Some(zome), header_builder, Some(entry), chain_top_ordering)
+                            .put_weightless(
+                                Some(zome),
+                                header_builder,
+                                Some(entry),
+                                chain_top_ordering,
+                            )
                             .await
                             .map_err(|source_chain_error| {
                                 WasmError::Host(source_chain_error.to_string())
@@ -113,11 +122,14 @@ pub fn update<'a>(
                 }
             }
         }
-        _ => Err(WasmError::Host(RibosomeError::HostFnPermissions(
-            call_context.zome.zome_name().clone(),
-            call_context.function_name().clone(),
-            "update".into()
-        ).to_string()))
+        _ => Err(WasmError::Host(
+            RibosomeError::HostFnPermissions(
+                call_context.zome.zome_name().clone(),
+                call_context.function_name().clone(),
+                "update".into(),
+            )
+            .to_string(),
+        )),
     }
 }
 

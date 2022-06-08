@@ -89,7 +89,7 @@ pub fn create<'a>(
                             .source_chain()
                             .as_ref()
                             .expect("Must have source chain if write_workspace access is given")
-                            .put(
+                            .put_weightless(
                                 Some(call_context.zome.clone()),
                                 header_builder,
                                 Some(input.into_entry()),

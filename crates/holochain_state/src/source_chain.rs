@@ -184,7 +184,11 @@ impl SourceChain {
         }
     }
 
-    pub async fn put<W, U: HeaderUnweighed<Weight = ()>, B: HeaderBuilder<U>>(
+    /// Put a new element at the end of the source chain, using a HeaderBuilder
+    /// for a header type which has no weight data.
+    /// If needing to `put` a header with weight data, use
+    /// [`SourceChain::put_weighed`] instead.
+    pub async fn put<U: HeaderUnweighed<Weight = ()>, B: HeaderBuilder<U>>(
         &self,
         zome: Option<Zome>,
         header_builder: B,
@@ -195,6 +199,8 @@ impl SourceChain {
             .await
     }
 
+    /// Put a new element at the end of the source chain, using a HeaderBuilder
+    /// and the specified weight for rate limiting.
     pub async fn put_weighed<W, U: HeaderUnweighed<Weight = W>, B: HeaderBuilder<U>>(
         &self,
         zome: Option<Zome>,
@@ -228,6 +234,24 @@ impl SourceChain {
             header_builder.build(common).weighed(weight).into(),
             maybe_entry,
             chain_top_ordering,
+        )
+        .await
+    }
+
+    #[cfg(feature = "test_utils")]
+    pub async fn put_weightless<W: Default, U: HeaderUnweighed<Weight = W>, B: HeaderBuilder<U>>(
+        &self,
+        zome: Option<Zome>,
+        header_builder: B,
+        maybe_entry: Option<Entry>,
+        chain_top_ordering: ChainTopOrdering,
+    ) -> SourceChainResult<HeaderHash> {
+        self.put_weighed(
+            zome,
+            header_builder,
+            maybe_entry,
+            chain_top_ordering,
+            Default::default(),
         )
         .await
     }
@@ -1093,7 +1117,7 @@ pub fn current_countersigning_session(
 }
 
 #[cfg(test)]
-async fn _put_db<H: HeaderWeighed, B: HeaderBuilder<H>>(
+async fn _put_db<H: holochain_zome_types::HeaderUnweighed, B: HeaderBuilder<H>>(
     vault: holochain_types::db::DbWrite<DbKindAuthored>,
     keystore: &MetaLairClient,
     author: Arc<AgentPubKey>,
@@ -1110,7 +1134,7 @@ async fn _put_db<H: HeaderWeighed, B: HeaderBuilder<H>>(
         header_seq,
         prev_header: prev_header.clone(),
     };
-    let header = header_builder.build(common).into();
+    let header = header_builder.build(common).weightless().into();
     let header = HeaderHashed::from_content_sync(header);
     let header = SignedHeaderHashed::sign(keystore, header).await?;
     let element = Element::new(header, maybe_entry);
@@ -1397,7 +1421,7 @@ pub mod tests {
             entry_hash: eh1.clone(),
         };
         let h1 = chain_1
-            .put(
+            .put_weightless(
                 None,
                 create,
                 Some(entry_1.clone()),
@@ -1413,7 +1437,7 @@ pub mod tests {
             entry_hash: entry_hash_err.clone(),
         };
         chain_2
-            .put(
+            .put_weightless(
                 None,
                 create,
                 Some(entry_err.clone()),
@@ -1433,7 +1457,7 @@ pub mod tests {
             entry_hash: eh2.clone(),
         };
         let old_h2 = chain_3
-            .put(
+            .put_weightless(
                 None,
                 create,
                 Some(entry_2.clone()),
@@ -1562,7 +1586,7 @@ pub mod tests {
                 entry_hash: entry_hash.clone(),
             };
             let header = chain
-                .put(
+                .put_weightless(
                     Some(zome.clone()),
                     header_builder,
                     Some(entry),
@@ -1628,7 +1652,7 @@ pub mod tests {
                 original_entry_address,
             };
             let header = chain
-                .put(
+                .put_weightless(
                     Some(zome.clone()),
                     header_builder,
                     Some(entry),
@@ -1694,7 +1718,7 @@ pub mod tests {
                 deletes_entry_address: updated_entry_hash,
             };
             chain
-                .put(
+                .put_weightless(
                     Some(zome),
                     header_builder,
                     None,
@@ -1836,7 +1860,7 @@ pub mod tests {
             entry_hash: EntryHash::with_data_sync(&entry),
         };
         let h1 = source_chain
-            .put(
+            .put_weightless(
                 Some(zome.clone()),
                 create,
                 Some(entry),
@@ -1850,7 +1874,7 @@ pub mod tests {
             entry_hash: EntryHash::with_data_sync(&entry),
         };
         let h2 = source_chain
-            .put(Some(zome), create, Some(entry), ChainTopOrdering::default())
+            .put_weightless(Some(zome), create, Some(entry), ChainTopOrdering::default())
             .await
             .unwrap();
         source_chain.flush(&mock).await.unwrap();
