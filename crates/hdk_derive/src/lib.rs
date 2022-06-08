@@ -226,6 +226,7 @@ pub fn hdk_entry_defs(attrs: TokenStream, code: TokenStream) -> TokenStream {
     entry_defs::build(attrs, code)
 }
 
+/// Implements all the required types needed for a `LinkTypes` enum.
 #[proc_macro_error]
 #[proc_macro_attribute]
 pub fn hdk_link_types(attrs: TokenStream, code: TokenStream) -> TokenStream {
