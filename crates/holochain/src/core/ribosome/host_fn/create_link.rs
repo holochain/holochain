@@ -38,7 +38,7 @@ pub fn create_link<'a>(
                     .source_chain()
                     .as_ref()
                     .expect("Must have source chain if write_workspace access is given")
-                    .put(header_builder, None, chain_top_ordering)
+                    .put_weightless(header_builder, None, chain_top_ordering)
                     .await?;
                 Ok::<HeaderHash, RibosomeError>(header_hash)
             }))

@@ -68,7 +68,7 @@ pub fn update<'a>(
                             .expect("Must have source chain if write_workspace access is given");
                         // push the header and the entry into the source chain
                         let header_hash = source_chain
-                            .put(header_builder, Some(entry), chain_top_ordering)
+                            .put_weightless(header_builder, Some(entry), chain_top_ordering)
                             .await
                             .map_err(|source_chain_error| -> RuntimeError {
                                 wasm_error!(WasmErrorInner::Host(source_chain_error.to_string()))

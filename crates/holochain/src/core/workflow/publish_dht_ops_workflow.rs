@@ -413,7 +413,7 @@ mod tests {
                 .unwrap();
                 // Produces 3 ops but minus 1 for store entry so 2 ops.
                 let original_header_address = source_chain
-                    .put(
+                    .put_weightless(
                         builder::Create {
                             entry_type: ec_entry_type,
                             entry_hash: original_entry_hash.clone(),
@@ -426,7 +426,7 @@ mod tests {
 
                 // Produces 5 ops but minus 1 for store entry so 4 ops.
                 let entry_update_hash = source_chain
-                    .put(
+                    .put_weightless(
                         builder::Update {
                             entry_type: eu_entry_type,
                             entry_hash: new_entry_hash,

@@ -74,7 +74,7 @@ pub fn create<'a>(
                             .source_chain()
                             .as_ref()
                             .expect("Must have source chain if write_workspace access is given")
-                            .put(header_builder, Some(entry), chain_top_ordering)
+                            .put_weightless(header_builder, Some(entry), chain_top_ordering)
                             .await
                             .map_err(|source_chain_error| -> RuntimeError {
                                 wasm_error!(WasmErrorInner::Host(source_chain_error.to_string()))

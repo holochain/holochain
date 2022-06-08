@@ -180,6 +180,10 @@ impl SourceChain {
         }
     }
 
+    /// Put a new element at the end of the source chain, using a HeaderBuilder
+    /// for a header type which has no weight data.
+    /// If needing to `put` a header with weight data, use
+    /// [`SourceChain::put_weighed`] instead.
     pub async fn put<U: HeaderUnweighed<Weight = ()>, B: HeaderBuilder<U>>(
         &self,
         header_builder: B,
@@ -190,6 +194,8 @@ impl SourceChain {
             .await
     }
 
+    /// Put a new element at the end of the source chain, using a HeaderBuilder
+    /// and the specified weight for rate limiting.
     pub async fn put_weighed<W, U: HeaderUnweighed<Weight = W>, B: HeaderBuilder<U>>(
         &self,
         header_builder: B,
@@ -221,6 +227,22 @@ impl SourceChain {
             header_builder.build(common).weighed(weight).into(),
             maybe_entry,
             chain_top_ordering,
+        )
+        .await
+    }
+
+    #[cfg(feature = "test_utils")]
+    pub async fn put_weightless<W: Default, U: HeaderUnweighed<Weight = W>, B: HeaderBuilder<U>>(
+        &self,
+        header_builder: B,
+        maybe_entry: Option<Entry>,
+        chain_top_ordering: ChainTopOrdering,
+    ) -> SourceChainResult<HeaderHash> {
+        self.put_weighed(
+            header_builder,
+            maybe_entry,
+            chain_top_ordering,
+            Default::default(),
         )
         .await
     }
@@ -1083,55 +1105,55 @@ pub fn current_countersigning_session(
     }
 }
 
-// #[cfg(test)]
-// async fn _put_db<H: holochain_zome_types::HeaderUnweighed, B: HeaderBuilder<H>>(
-//     vault: holochain_types::db::DbWrite<DbKindAuthored>,
-//     keystore: &MetaLairClient,
-//     author: Arc<AgentPubKey>,
-//     header_builder: B,
-//     maybe_entry: Option<Entry>,
-// ) -> SourceChainResult<HeaderHash> {
-//     let (prev_header, last_header_seq, _) =
-//         fresh_reader_test!(vault, |txn| { chain_head_db(&txn, author.clone()) })?;
-//     let header_seq = last_header_seq + 1;
+#[cfg(test)]
+async fn _put_db<H: holochain_zome_types::HeaderUnweighed, B: HeaderBuilder<H>>(
+    vault: holochain_types::db::DbWrite<DbKindAuthored>,
+    keystore: &MetaLairClient,
+    author: Arc<AgentPubKey>,
+    header_builder: B,
+    maybe_entry: Option<Entry>,
+) -> SourceChainResult<HeaderHash> {
+    let (prev_header, last_header_seq, _) =
+        fresh_reader_test!(vault, |txn| { chain_head_db(&txn, author.clone()) })?;
+    let header_seq = last_header_seq + 1;
 
-//     let common = HeaderBuilderCommon {
-//         author: (*author).clone(),
-//         timestamp: Timestamp::now(),
-//         header_seq,
-//         prev_header: prev_header.clone(),
-//     };
-//     let header = header_builder.build(common).into();
-//     let header = HeaderHashed::from_content_sync(header);
-//     let header = SignedHeaderHashed::sign(keystore, header).await?;
-//     let element = Element::new(header, maybe_entry);
-//     let ops = produce_op_lights_from_elements(vec![&element])?;
-//     let (header, entry) = element.into_inner();
-//     let entry = entry.into_option();
-//     let hash = header.as_hash().clone();
-//     vault.conn()?.with_commit_sync(|txn: &mut Transaction| {
-//         let (new_head, new_seq, new_timestamp) = chain_head_db(txn, author.clone())?;
-//         if new_head != prev_header {
-//             let entries = match (entry, header.header().entry_hash()) {
-//                 (Some(e), Some(entry_hash)) => {
-//                     vec![holochain_types::EntryHashed::with_pre_hashed(
-//                         e,
-//                         entry_hash.clone(),
-//                     )]
-//                 }
-//                 _ => vec![],
-//             };
-//             return Err(SourceChainError::HeadMoved(
-//                 vec![header],
-//                 entries,
-//                 Some(prev_header),
-//                 Some((new_head, new_seq, new_timestamp)),
-//             ));
-//         }
-//         SourceChainResult::Ok(put_raw(txn, header, ops, entry)?)
-//     })?;
-//     Ok(hash)
-// }
+    let common = HeaderBuilderCommon {
+        author: (*author).clone(),
+        timestamp: Timestamp::now(),
+        header_seq,
+        prev_header: prev_header.clone(),
+    };
+    let header = header_builder.build(common).weightless().into();
+    let header = HeaderHashed::from_content_sync(header);
+    let header = SignedHeaderHashed::sign(keystore, header).await?;
+    let element = Element::new(header, maybe_entry);
+    let ops = produce_op_lights_from_elements(vec![&element])?;
+    let (header, entry) = element.into_inner();
+    let entry = entry.into_option();
+    let hash = header.as_hash().clone();
+    vault.conn()?.with_commit_sync(|txn: &mut Transaction| {
+        let (new_head, new_seq, new_timestamp) = chain_head_db(txn, author.clone())?;
+        if new_head != prev_header {
+            let entries = match (entry, header.header().entry_hash()) {
+                (Some(e), Some(entry_hash)) => {
+                    vec![holochain_types::EntryHashed::with_pre_hashed(
+                        e,
+                        entry_hash.clone(),
+                    )]
+                }
+                _ => vec![],
+            };
+            return Err(SourceChainError::HeadMoved(
+                vec![header],
+                entries,
+                Some(prev_header),
+                Some((new_head, new_seq, new_timestamp)),
+            ));
+        }
+        SourceChainResult::Ok(put_raw(txn, header, ops, entry)?)
+    })?;
+    Ok(hash)
+}
 
 /// dump the entire source chain as a pretty-printed json string
 pub async fn dump_state(
@@ -1370,7 +1392,7 @@ pub mod tests {
             entry_hash: eh1.clone(),
         };
         let h1 = chain_1
-            .put(create, Some(entry_1.clone()), ChainTopOrdering::Strict)
+            .put_weightless(create, Some(entry_1.clone()), ChainTopOrdering::Strict)
             .await
             .unwrap();
 
@@ -1381,7 +1403,7 @@ pub mod tests {
             entry_hash: entry_hash_err.clone(),
         };
         chain_2
-            .put(create, Some(entry_err.clone()), ChainTopOrdering::Strict)
+            .put_weightless(create, Some(entry_err.clone()), ChainTopOrdering::Strict)
             .await
             .unwrap();
 
@@ -1395,7 +1417,7 @@ pub mod tests {
             entry_hash: eh2.clone(),
         };
         let old_h2 = chain_3
-            .put(create, Some(entry_2.clone()), ChainTopOrdering::Relaxed)
+            .put_weightless(create, Some(entry_2.clone()), ChainTopOrdering::Relaxed)
             .await
             .unwrap();
 
@@ -1518,7 +1540,7 @@ pub mod tests {
                 entry_hash: entry_hash.clone(),
             };
             let header = chain
-                .put(header_builder, Some(entry), ChainTopOrdering::default())
+                .put_weightless(header_builder, Some(entry), ChainTopOrdering::default())
                 .await?;
 
             chain.flush(&mock).await.unwrap();
@@ -1579,7 +1601,7 @@ pub mod tests {
                 original_entry_address,
             };
             let header = chain
-                .put(header_builder, Some(entry), ChainTopOrdering::default())
+                .put_weightless(header_builder, Some(entry), ChainTopOrdering::default())
                 .await?;
 
             chain.flush(&mock).await.unwrap();
@@ -1640,7 +1662,7 @@ pub mod tests {
                 deletes_entry_address: updated_entry_hash,
             };
             chain
-                .put(header_builder, None, ChainTopOrdering::default())
+                .put_weightless(header_builder, None, ChainTopOrdering::default())
                 .await?;
 
             chain.flush(&mock).await.unwrap();
@@ -1776,7 +1798,7 @@ pub mod tests {
             entry_hash: EntryHash::with_data_sync(&entry),
         };
         let h1 = source_chain
-            .put(create, Some(entry), ChainTopOrdering::default())
+            .put_weightless(create, Some(entry), ChainTopOrdering::default())
             .await
             .unwrap();
         let entry = Entry::App(fixt!(AppEntryBytes));
@@ -1785,7 +1807,7 @@ pub mod tests {
             entry_hash: EntryHash::with_data_sync(&entry),
         };
         let h2 = source_chain
-            .put(create, Some(entry), ChainTopOrdering::default())
+            .put_weightless(create, Some(entry), ChainTopOrdering::default())
             .await
             .unwrap();
         source_chain.flush(&mock).await.unwrap();

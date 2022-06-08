@@ -545,6 +545,7 @@ async fn insert_source_chain() {
         prev_header: chain.last().unwrap().0.clone(),
         entry_type: EntryType::App(AppEntryType::new(1.into(), EntryVisibility::Public)),
         entry_hash: EntryHash::with_data_sync(&entry),
+        weight: Default::default(),
     };
     let shh = SignedHeaderHashed::with_presigned(
         HeaderHashed::from_content_sync(header.clone().into()),
