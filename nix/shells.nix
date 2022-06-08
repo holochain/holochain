@@ -3,6 +3,7 @@
 , mkShell
 , rustup
 , coreutils
+, cargo-nextest
 
 , holonix
 , hcToplevelDir
@@ -41,6 +42,9 @@ rec {
   # * CI scripts
   coreDev = hcMkShell {
     nativeBuildInputs = builtins.attrValues (pkgs.core)
+      ++ [
+      cargo-nextest
+    ]
       ++ (with holonix.pkgs;[
       sqlcipher
       gdb
@@ -54,6 +58,7 @@ rec {
   release = coreDev.overrideAttrs (attrs: {
     nativeBuildInputs = attrs.nativeBuildInputs ++ (with holonix.pkgs; [
       niv
+      cargo-readme
       (import ../crates/release-automation/default.nix { })
     ]);
   });

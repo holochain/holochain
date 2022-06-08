@@ -29,7 +29,20 @@ rec {
 
     # run all the non-slow cargo tests
     cargo build --features 'build' -p holochain_wasm_test_utils
-    cargo test ''${CARGO_TEST_ARGS:-} --workspace --exclude holochain --exclude release-automation --lib --tests --profile fast-test -- --nocapture
+    cargo test ''${CARGO_TEST_ARGS:-} --workspace --exclude holochain --lib --tests --profile fast-test -- --nocapture
+  '';
+
+  hcStandardTestsNextest = writeShellScriptBin "hc-test-standard-nextest" ''
+    set -euxo pipefail
+    export RUST_BACKTRACE=1
+
+    # limit parallel jobs to reduce memory consumption
+    export NUM_JOBS=''${NUM_JOBS:-8}
+    export CARGO_BUILD_JOBS=''${CARGO_BUILD_JOBS:-8}
+
+    # run all the non-slow cargo tests
+    cargo build --features 'build' -p holochain_wasm_test_utils
+    cargo nextest ''${CARGO_NEXTEST_ARGS:-run --test-threads=2} --workspace --exclude holochain --lib --tests --cargo-profile fast-test
   '';
 
   hcSlowTests = writeShellScriptBin "hc-test-slow" ''
@@ -42,19 +55,30 @@ rec {
 
     # alas, we cannot specify --features in the virtual workspace
     # run the specific slow tests in the holochain crate
-    for i in $(((RANDOM % NUM_JOBS) + 1)) $NUM_JOBS 1 ; do
-      if env \
-        RUST_TEST_THREADS=$i \
-        cargo test ''${CARGO_TEST_ARGS:-} -p holochain --features slow_tests,test_utils,build_wasms,db-encryption --profile fast-test -- --nocapture
-      then
-        echo succeeded with RUST_TEST_THREADS=$i
-        exit 0
-      else
-        export LAST_STATUS=$?
-      fi
-    done
+    cargo test ''${CARGO_TEST_ARGS:-} -p holochain --features slow_tests,test_utils,build_wasms,db-encryption --profile fast-test -- --nocapture
+  '';
 
-    exit $LAST_STATUS
+  hcSlowTestsNextest = writeShellScriptBin "hc-test-slow-nextest" ''
+    set -euxo pipefail
+    export RUST_BACKTRACE=1
+
+    # limit parallel jobs to reduce memory consumption
+    export NUM_JOBS=''${NUM_JOBS:-8}
+    export CARGO_BUILD_JOBS=''${CARGO_BUILD_JOBS:-8}
+
+    # alas, we cannot specify --features in the virtual workspace
+    # run the specific slow tests in the holochain crate
+    cargo nextest ''${CARGO_NEXTEST_ARGS:-run --test-threads=2} -p holochain --features slow_tests,test_utils,build_wasms,db-encryption --cargo-profile fast-test
+  '';
+
+  hcSlowTestsIter = writeShellScriptBin "hc-test-slow-iter" ''
+    set -euo pipefail
+    export RUST_BACKTRACE=1
+
+    for i in `seq 1 ''${1}`; do
+      echo -n "$i: "
+      time env RUST_TEST_THREADS=$i hc-test-slow > /dev/null 2>&1
+    done
   '';
 
   hcWasmTests = writeShellScriptBin "hc-test-wasm" ''
