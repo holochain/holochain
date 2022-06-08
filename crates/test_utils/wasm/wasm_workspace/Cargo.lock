@@ -12,6 +12,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "arbitrary"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c38b6b6b79f671c25e1a3e785b7b82d7562ffc9cd3efdc98627e5668a2472490"
+dependencies = [
+ "derive_arbitrary",
+]
+
+[[package]]
 name = "arrayref"
 version = "0.3.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -119,6 +128,17 @@ name = "convert_case"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6245d59a3e82a7fc217c5828a6692dbc6dfb63a0c8c90495621f7b9d79704a0e"
+
+[[package]]
+name = "derive_arbitrary"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "98e23c06c035dac87bd802d98f368df73a7f2cb05a66ffbd1f377e821fac4af9"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
 
 [[package]]
 name = "derive_more"
@@ -301,7 +321,7 @@ checksum = "ab5ef0d4909ef3724cc8cce6ccc8572c5c817592e9285f5464f8e86f8bd3726e"
 
 [[package]]
 name = "hdk"
-version = "0.0.134"
+version = "0.0.135"
 dependencies = [
  "hdk_derive",
  "holo_hash",
@@ -319,7 +339,7 @@ dependencies = [
 
 [[package]]
 name = "hdk_derive"
-version = "0.0.34"
+version = "0.0.35"
 dependencies = [
  "holochain_integrity_types",
  "paste",
@@ -339,8 +359,9 @@ dependencies = [
 
 [[package]]
 name = "holo_hash"
-version = "0.0.26"
+version = "0.0.27"
 dependencies = [
+ "arbitrary",
  "base64",
  "blake2b_simd",
  "derive_more",
@@ -357,7 +378,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_deterministic_integrity"
-version = "0.0.7"
+version = "0.0.8"
 dependencies = [
  "hdk_derive",
  "holo_hash",
@@ -372,8 +393,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_integrity_types"
-version = "0.0.6"
+version = "0.0.7"
 dependencies = [
+ "arbitrary",
  "holo_hash",
  "holochain_serialized_bytes",
  "kitsune_p2p_timestamp",
@@ -397,6 +419,7 @@ version = "0.0.51"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9805b3e01e7b5c144782a0823db4dc895fec18a9ccd45a492ce7c7bf157a9e38"
 dependencies = [
+ "arbitrary",
  "holochain_serialized_bytes_derive",
  "rmp-serde",
  "serde",
@@ -418,7 +441,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_test_wasm_common"
-version = "0.0.35"
+version = "0.0.36"
 dependencies = [
  "hdk",
  "serde",
@@ -451,7 +474,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_zome_types"
-version = "0.0.34"
+version = "0.0.35"
 dependencies = [
  "fixt",
  "holo_hash",
@@ -532,6 +555,7 @@ dependencies = [
 name = "kitsune_p2p_timestamp"
 version = "0.0.9"
 dependencies = [
+ "arbitrary",
  "chrono",
  "serde",
 ]

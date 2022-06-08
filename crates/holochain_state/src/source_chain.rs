@@ -42,7 +42,7 @@ use holochain_zome_types::HeaderBuilder;
 use holochain_zome_types::HeaderBuilderCommon;
 use holochain_zome_types::HeaderExt;
 use holochain_zome_types::HeaderHashed;
-use holochain_zome_types::HeaderInner;
+use holochain_zome_types::HeaderUnweighed;
 use holochain_zome_types::MembraneProof;
 use holochain_zome_types::PreflightRequest;
 use holochain_zome_types::QueryFilter;
@@ -184,12 +184,24 @@ impl SourceChain {
         }
     }
 
-    pub async fn put<H: HeaderInner, B: HeaderBuilder<H>>(
+    pub async fn put<W, U: HeaderUnweighed<Weight = ()>, B: HeaderBuilder<U>>(
         &self,
         zome: Option<Zome>,
         header_builder: B,
         maybe_entry: Option<Entry>,
         chain_top_ordering: ChainTopOrdering,
+    ) -> SourceChainResult<HeaderHash> {
+        self.put_weighed(zome, header_builder, maybe_entry, chain_top_ordering, ())
+            .await
+    }
+
+    pub async fn put_weighed<W, U: HeaderUnweighed<Weight = W>, B: HeaderBuilder<U>>(
+        &self,
+        zome: Option<Zome>,
+        header_builder: B,
+        maybe_entry: Option<Entry>,
+        chain_top_ordering: ChainTopOrdering,
+        weight: W,
     ) -> SourceChainResult<HeaderHash> {
         let (prev_header, chain_head_seq, chain_head_timestamp) = self.chain_head()?;
         let header_seq = chain_head_seq + 1;
@@ -213,7 +225,7 @@ impl SourceChain {
         };
         self.put_with_header(
             zome,
-            header_builder.build(common).into(),
+            header_builder.build(common).weighed(weight).into(),
             maybe_entry,
             chain_top_ordering,
         )
@@ -965,6 +977,8 @@ pub async fn genesis(
         prev_header: avh_addr,
         entry_type: header::EntryType::AgentPubKey,
         entry_hash: agent_pubkey.clone().into(),
+        // AgentPubKey is weightless
+        weight: Default::default(),
     });
     let agent_header = HeaderHashed::from_content_sync(agent_header);
     let agent_header = SignedHeaderHashed::sign(&keystore, agent_header).await?;
@@ -1079,7 +1093,7 @@ pub fn current_countersigning_session(
 }
 
 #[cfg(test)]
-async fn _put_db<H: HeaderInner, B: HeaderBuilder<H>>(
+async fn _put_db<H: HeaderWeighed, B: HeaderBuilder<H>>(
     vault: holochain_types::db::DbWrite<DbKindAuthored>,
     keystore: &MetaLairClient,
     author: Arc<AgentPubKey>,

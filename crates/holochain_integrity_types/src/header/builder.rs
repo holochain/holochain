@@ -1,11 +1,14 @@
 use super::EntryType;
 use super::Timestamp;
 use crate::header;
-use crate::header::HeaderInner;
 use crate::header::ZomeId;
 use crate::link::LinkTag;
 use crate::link::LinkType;
+use crate::EntryRateWeight;
+use crate::HeaderUnweighed;
+use crate::HeaderWeighed;
 use crate::MembraneProof;
+use crate::RateWeight;
 use header::Dna;
 use holo_hash::AgentPubKey;
 use holo_hash::AnyLinkableHash;
@@ -48,24 +51,154 @@ impl HeaderBuilderCommon {
 /// there is no Agent associated with the source chain, and also the fact that
 /// the Dna header has no prev_entry causes a special case that need not be
 /// dealt with. SourceChain::genesis already handles genesis in one fell swoop.
-pub trait HeaderBuilder<H: HeaderInner>: Sized {
-    fn build(self, common: HeaderBuilderCommon) -> H;
+pub trait HeaderBuilder<U: HeaderUnweighed>: Sized {
+    fn build(self, common: HeaderBuilderCommon) -> U;
 }
 
 macro_rules! builder_variant {
-    ( $name: ident { $($field: ident : $t: ty),* $(,)? } ) => {
+    ( $name: ident <$weight : ty> { $($field: ident : $t: ty),* $(,)? } ) => {
+        // builder_variant!($name {
+        //     $($field: $t),*
+        //     |
+        //     weight: $weight
+        // });
 
         #[derive(Clone, Debug, PartialEq, Eq)]
         pub struct $name {
-            $(pub $field : $t),*
+            $(pub $field : $t,)*
+        }
+
+
+        #[allow(clippy::new_without_default)]
+        impl $name {
+            pub fn new($($field : $t),* ) -> Self {
+                Self {
+                    $($field,)*
+                }
+            }
+        }
+
+        impl HeaderBuilder<header::$name<()>> for $name {
+            fn build(self, common: HeaderBuilderCommon) -> header::$name<()> {
+                let HeaderBuilderCommon {
+                    author,
+                    timestamp,
+                    header_seq,
+                    prev_header,
+                } = common;
+
+                header::$name {
+                    weight: (),
+                    author,
+                    timestamp,
+                    header_seq,
+                    prev_header,
+                    $($field : self.$field,)*
+                }
+            }
+        }
+
+
+        impl HeaderWeighed for header::$name {
+            type Unweighed = header::$name<()>;
+            type Weight = $weight;
+
+            fn into_header(self) -> header::Header {
+                header::Header::$name(self)
+            }
+
+            fn unweighed(self) -> header::$name<()> {
+                header::$name::<()> {
+                    weight: (),
+                    author: self.author,
+                    timestamp: self.timestamp,
+                    header_seq: self.header_seq,
+                    prev_header: self.prev_header,
+                    $($field: self.$field),*
+                }
+            }
+        }
+
+        impl HeaderUnweighed for header::$name<()> {
+            type Weighed = header::$name;
+            type Weight = $weight;
+
+            fn weighed(self, weight: $weight) -> header::$name {
+                header::$name {
+                    weight,
+                    author: self.author,
+                    timestamp: self.timestamp,
+                    header_seq: self.header_seq,
+                    prev_header: self.prev_header,
+                    $($field: self.$field),*
+                }
+            }
+        }
+
+
+        // impl From<($name, HeaderBuilderCommon)> for header::$name {
+        //     fn from((n, h): ($name, HeaderBuilderCommon)) -> header::$name {
+        //         n.build(h)
+        //     }
+        // }
+
+        #[cfg(feature = "test_utils")]
+        impl header::$name {
+            pub fn from_builder(common: HeaderBuilderCommon, $($field : $t),*) -> Self {
+                let builder = $name {
+                    $($field,)*
+                };
+
+                builder.build(common).weighed(Default::default())
+            }
+        }
+    };
+
+    ( $name: ident { $($field: ident : $t: ty),* $( $(,)? | $($dfield: ident : $dt: ty),* )? $(,)? } ) => {
+
+        #[derive(Clone, Debug, PartialEq, Eq)]
+        pub struct $name {
+            $(pub $field : $t,)*
+            $( $(pub $dfield : $dt),* )?
         }
 
         #[allow(clippy::new_without_default)]
         impl $name {
             pub fn new($($field : $t),* ) -> Self {
                 Self {
-                    $($field),*
+                    $($field,)*
+                    $( $($dfield : Default::default()),* )?
                 }
+            }
+
+            pub fn new_full($($field : $t,)* $( $($dfield : $dt),* )? ) -> Self {
+                Self {
+                    $($field,)*
+                    $( $($dfield),* )?
+                }
+            }
+        }
+
+        impl HeaderWeighed for header::$name {
+            type Unweighed = header::$name;
+            type Weight = ();
+
+            fn into_header(self) -> header::Header {
+                header::Header::$name(self)
+            }
+
+            fn unweighed(self) -> Self::Unweighed {
+                self
+            }
+
+        }
+
+        impl HeaderUnweighed for header::$name {
+            type Weighed = header::$name;
+            type Weight = ();
+
+            fn weighed(self, _weight: ()) -> header::$name {
+                self
             }
         }
 
@@ -83,7 +216,8 @@ macro_rules! builder_variant {
                     timestamp,
                     header_seq,
                     prev_header,
-                    $($field : self.$field),*
+                    $($field : self.$field,)*
+                    $( $($dfield : self.$dfield),* )?
                 }
             }
         }
@@ -93,23 +227,16 @@ macro_rules! builder_variant {
                 n.build(h)
             }
         }
+
+        #[cfg(feature = "test_utils")]
         impl header::$name {
             pub fn from_builder(common: HeaderBuilderCommon, $($field : $t),*) -> Self {
-                let HeaderBuilderCommon {
-                    author,
-                    timestamp,
-                    header_seq,
-                    prev_header,
-                } = common;
+                let builder = $name {
+                    $($field,)*
+                    $( $($dfield : Default::default()),* )?
+                };
 
-                #[allow(clippy::inconsistent_struct_constructor)]
-                header::$name {
-                    author,
-                    timestamp,
-                    header_seq,
-                    prev_header,
-                    $($field),*
-                }
+                builder.build(common)
             }
         }
     }
@@ -117,7 +244,7 @@ macro_rules! builder_variant {
 
 builder_variant!(InitZomesComplete {});
 
-builder_variant!(CreateLink {
+builder_variant!(CreateLink<RateWeight> {
     base_address: AnyLinkableHash,
     target_address: AnyLinkableHash,
     zome_id: ZomeId,
@@ -138,12 +265,12 @@ builder_variant!(CloseChain {
     new_dna_hash: DnaHash,
 });
 
-builder_variant!(Create {
+builder_variant!(Create<EntryRateWeight> {
     entry_type: EntryType,
     entry_hash: EntryHash,
 });
 
-builder_variant!(Update {
+builder_variant!(Update<EntryRateWeight> {
     original_entry_address: EntryHash,
     original_header_address: HeaderHash,
 
@@ -151,7 +278,7 @@ builder_variant!(Update {
     entry_hash: EntryHash,
 });
 
-builder_variant!(Delete {
+builder_variant!(Delete<RateWeight> {
     deletes_address: HeaderHash,
     deletes_entry_address: EntryHash,
 });
@@ -160,14 +287,39 @@ builder_variant!(AgentValidationPkg {
     membrane_proof: Option<MembraneProof>,
 });
 
+/// The Dna header can't implement HeaderBuilder because it lacks a
+/// `prev_header` field, so this helper is provided as a special case
+#[cfg(feature = "test_utils")]
 impl Dna {
-    /// The Dna header can't implement HeaderBuilder because it lacks a
-    /// `prev_header` field, so this helper is provided as a special case
     pub fn from_builder(hash: DnaHash, builder: HeaderBuilderCommon) -> Self {
         Self {
             author: builder.author,
             timestamp: builder.timestamp,
             hash,
         }
+    }
+}
+
+// some more manual implementations for Dna
+
+impl HeaderWeighed for Dna {
+    type Unweighed = Dna;
+    type Weight = ();
+
+    fn into_header(self) -> header::Header {
+        header::Header::Dna(self)
+    }
+
+    fn unweighed(self) -> Self::Unweighed {
+        self
+    }
+}
+
+impl HeaderUnweighed for Dna {
+    type Weighed = Dna;
+    type Weight = ();
+
+    fn weighed(self, _weight: ()) -> Dna {
+        self
     }
 }

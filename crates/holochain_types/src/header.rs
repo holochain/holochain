@@ -68,6 +68,7 @@ pub struct WireCreate {
     pub header_seq: u32,
     pub prev_header: HeaderHash,
     pub signature: Signature,
+    pub weight: EntryRateWeight,
 }
 
 /// The minimum unique data for Update headers
@@ -83,6 +84,7 @@ pub struct WireUpdate {
     pub original_entry_address: EntryHash,
     pub original_header_address: HeaderHash,
     pub signature: Signature,
+    pub weight: EntryRateWeight,
 }
 
 /// This type is used when sending updates from the
@@ -109,6 +111,7 @@ pub struct WireUpdateRelationship {
     /// The entry type of the entry that this header created
     pub new_entry_type: EntryType,
     pub signature: Signature,
+    pub weight: EntryRateWeight,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
@@ -177,6 +180,7 @@ impl From<(Create, Signature)> for WireCreate {
             header_seq: ec.header_seq,
             prev_header: ec.prev_header,
             signature,
+            weight: ec.weight,
         }
     }
 }
@@ -191,6 +195,7 @@ impl From<(Update, Signature)> for WireUpdate {
             original_entry_address: eu.original_entry_address,
             original_header_address: eu.original_header_address,
             signature,
+            weight: eu.weight,
         }
     }
 }
@@ -225,6 +230,7 @@ impl WireUpdateRelationship {
             original_entry_address,
             entry_type: self.new_entry_type,
             entry_hash: self.new_entry_address,
+            weight: self.weight,
         };
         SignedHeader(Header::Update(eu), self.signature)
     }
@@ -286,6 +292,7 @@ impl TryFrom<SignedHeaderHashed> for WireUpdate {
             prev_header: d.prev_header,
             original_entry_address: d.original_entry_address,
             original_header_address: d.original_header_address,
+            weight: d.weight,
         })
     }
 }
@@ -312,6 +319,7 @@ impl TryFrom<SignedHeader> for WireUpdateRelationship {
             original_header_address: d.original_header_address,
             new_entry_address: d.entry_hash,
             new_entry_type: d.entry_type,
+            weight: d.weight,
         })
     }
 }
@@ -335,6 +343,7 @@ impl WireNewEntryHeader {
                     timestamp: ec.timestamp,
                     header_seq: ec.header_seq,
                     prev_header: ec.prev_header,
+                    weight: ec.weight,
                     entry_type,
                     entry_hash,
                 };
@@ -349,6 +358,7 @@ impl WireNewEntryHeader {
                     prev_header: eu.prev_header,
                     original_entry_address: eu.original_entry_address,
                     original_header_address: eu.original_header_address,
+                    weight: eu.weight,
                     entry_type,
                     entry_hash,
                 };

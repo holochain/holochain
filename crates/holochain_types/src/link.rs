@@ -90,6 +90,7 @@ pub struct WireCreateLink {
     pub tag: Option<LinkTag>,
     pub signature: Signature,
     pub validation_status: ValidationStatus,
+    pub weight: RateWeight,
 }
 
 #[allow(missing_docs)]
@@ -123,6 +124,7 @@ impl WireCreateLink {
             tag: if tag { Some(h.tag) } else { None },
             signature,
             validation_status,
+            weight: h.weight,
         }
     }
     /// Condense down a create link op for the wire without a tag.
@@ -156,6 +158,7 @@ impl WireCreateLink {
             target_address: self.target_address,
             zome_id: key.zome_id,
             link_type: self.link_type,
+            weight: self.weight,
             tag,
         });
         let signature = self.signature;
