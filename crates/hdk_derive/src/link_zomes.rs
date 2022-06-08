@@ -92,7 +92,7 @@ pub fn build(_attrs: TokenStream, input: TokenStream) -> TokenStream {
             }
         }
 
-        impl LinkTypesHelper<{ #ident::len() }, { #ident::len() as usize }> for #ident {
+        impl LinkTypesHelper<{ #ident::len() as usize }> for #ident {
             fn range(
                 range: impl std::ops::RangeBounds<Self> + 'static + std::fmt::Debug,
             ) -> Box<dyn FnOnce() -> Result<LinkTypeRanges, WasmError>> {

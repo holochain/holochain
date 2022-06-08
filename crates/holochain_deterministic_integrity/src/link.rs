@@ -7,7 +7,7 @@ use crate::prelude::*;
 /// type scope.
 ///
 /// This is implemented by the [`hdk_link_types`] proc_macro.
-pub trait LinkTypesHelper<const L: u8, const LEN: usize>: EnumLen<L>
+pub trait LinkTypesHelper<const LEN: usize>: EnumLen
 where
     Self: Into<LocalZomeTypeId>,
     Self: std::fmt::Debug + Clone + Copy + Sized + PartialEq + PartialOrd + 'static,

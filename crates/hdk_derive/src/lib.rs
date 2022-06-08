@@ -238,12 +238,28 @@ pub fn hdk_to_local_types(attrs: TokenStream, code: TokenStream) -> TokenStream 
     to_local_types::build(attrs, code)
 }
 
+/// Implements `impl TryFrom<Self> for GlobalZomeTypeId`
+/// by calling `zome_info` and getting the types in scope
+/// for the calling zome then calling `to_global_scope`.
+///
+/// `Self` must be mapped to a `EntryDefIndex`.
+///
+/// # Attributes
+/// Takes no attributes.
 #[proc_macro_error]
 #[proc_macro_attribute]
 pub fn hdk_to_global_entry_types(attrs: TokenStream, code: TokenStream) -> TokenStream {
     to_global_types::build_entry(attrs, code)
 }
 
+/// Implements `impl TryFrom<Self> for GlobalZomeTypeId`
+/// by calling `zome_info` and getting the types in scope
+/// for the calling zome then calling `to_global_scope`.
+///
+/// `Self` must be mapped to a `LinkType`.
+///
+/// # Attributes
+/// Takes no attributes.
 #[proc_macro_error]
 #[proc_macro_attribute]
 pub fn hdk_to_global_link_types(attrs: TokenStream, code: TokenStream) -> TokenStream {
@@ -252,7 +268,7 @@ pub fn hdk_to_global_link_types(attrs: TokenStream, code: TokenStream) -> TokenS
 
 #[proc_macro_error]
 #[proc_macro_attribute]
-pub fn entry_defs_name_registration(attrs: TokenStream, code: TokenStream) -> TokenStream {
+pub fn hdk_entry_defs_name_registration(attrs: TokenStream, code: TokenStream) -> TokenStream {
     entry_defs_name_registration::build(attrs, code)
 }
 

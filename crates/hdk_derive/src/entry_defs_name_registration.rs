@@ -247,7 +247,9 @@ pub fn build(attrs: TokenStream, input: TokenStream) -> TokenStream {
             }
         }
 
-        impl EnumLen<{<#ident as UnitEnum>::Unit::ENUM_LEN}> for #ident {}
+        impl EnumLen for #ident {
+            const ENUM_LEN: u8 = <#ident as UnitEnum>::Unit::ENUM_LEN;
+        }
     };
     output.into()
 }

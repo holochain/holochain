@@ -122,7 +122,7 @@ impl ScopedZomeTypes {
                 })
         })
     }
-    
+
     /// Convert a [`LocalZomeTypeId`] to a [`GlobalZomeTypeId`].
     /// If the the [`LocalZomeTypeId`] maps to a [`GlobalZomeTypeId`] in scope for the calling zome,
     /// then this will return a [`GlobalZomeTypeId`].
@@ -166,10 +166,10 @@ impl From<u8> for LocalZomeTypeId {
 /// enum lengths at compile time.
 /// This is used by proc macros in the
 /// `hdk_derive` crate and should not be used directly.
-pub trait EnumLen<const L: u8> {
+pub trait EnumLen {
     /// The total length of an enum (possibly recusively)
     /// known at compile time.
-    const ENUM_LEN: u8 = L;
+    const ENUM_LEN: u8;
 }
 
 #[doc(hidden)]
