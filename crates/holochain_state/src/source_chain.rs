@@ -35,6 +35,7 @@ use holochain_zome_types::CounterSigningAgentState;
 use holochain_zome_types::CounterSigningSessionData;
 use holochain_zome_types::Element;
 use holochain_zome_types::Entry;
+use holochain_zome_types::EntryRateWeight;
 use holochain_zome_types::EntryVisibility;
 use holochain_zome_types::GrantedFunction;
 use holochain_zome_types::Header;
@@ -165,11 +166,17 @@ impl SourceChain {
         &self,
         entry: Entry,
         chain_top_ordering: ChainTopOrdering,
+        weight: EntryRateWeight,
     ) -> SourceChainResult<HeaderHash> {
         let entry_hash = EntryHash::with_data_sync(&entry);
         if let Entry::CounterSign(ref session_data, _) = entry {
             self.put_with_header(
-                Header::from_countersigning_data(entry_hash, session_data, (*self.author).clone())?,
+                Header::from_countersigning_data(
+                    entry_hash,
+                    session_data,
+                    (*self.author).clone(),
+                    weight,
+                )?,
                 Some(entry),
                 chain_top_ordering,
             )

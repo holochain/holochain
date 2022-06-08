@@ -317,7 +317,8 @@ async fn validate_op_inner(
                 // Retrieve for all other headers on countersigned entry.
                 if let Entry::CounterSign(session_data, _) = &**entry {
                     let entry_hash = EntryHash::with_data_sync(&**entry);
-                    for header in session_data.build_header_set(entry_hash)? {
+                    let weight = header.rate_data();
+                    for header in session_data.build_header_set(entry_hash, weight)? {
                         let hh = HeaderHash::with_data_sync(&header);
                         if workspace
                             .full_cascade(network.clone())
@@ -349,7 +350,7 @@ async fn validate_op_inner(
             if let Entry::CounterSign(session_data, _) = &**entry {
                 let dependency_check = |_original_element: &Element| Ok(());
                 let entry_hash = EntryHash::with_data_sync(&**entry);
-                for header in session_data.build_header_set(entry_hash)? {
+                for header in session_data.build_header_set(entry_hash, weight)? {
                     check_and_hold_store_element(
                         &HeaderHash::with_data_sync(&header),
                         workspace,
@@ -519,18 +520,23 @@ async fn sys_validate_element_inner(
 
     match maybe_entry {
         Some(Entry::CounterSign(session, _)) => {
-            let entry_hash = EntryHash::with_data_sync(maybe_entry.unwrap());
-            for header in session.build_header_set(entry_hash)? {
-                validate(
-                    &header,
-                    maybe_entry,
-                    workspace,
-                    network.clone(),
-                    conductor_handle,
-                )
-                .await?;
+            if Some(weight) = header.entry_rate_data() {
+                let entry_hash = EntryHash::with_data_sync(maybe_entry.unwrap());
+                for header in session.build_header_set(entry_hash, weight)? {
+                    validate(
+                        &header,
+                        maybe_entry,
+                        workspace,
+                        network.clone(),
+                        conductor_handle,
+                    )
+                    .await?;
+                }
+                Ok(())
+            } else {
+                tracing::error!("Got countersigning entry without rate assigned. This should be impossible. But, let's see what happens.");
+                validate(header, maybe_entry, workspace, network, conductor_handle).await
             }
-            Ok(())
         }
         _ => validate(header, maybe_entry, workspace, network, conductor_handle).await,
     }

@@ -29,6 +29,8 @@ pub fn update<'a>(
             let (original_entry_address, entry_type) =
                 get_original_entry_data(call_context.clone(), original_header_address.clone())?;
 
+            let weight = todo!("weigh element");
+
             // Countersigned entries have different header handling.
             match entry {
                 Entry::CounterSign(_, _) => tokio_helper::block_forever_on(async move {
@@ -38,7 +40,7 @@ pub fn update<'a>(
                         .source_chain()
                         .as_ref()
                         .expect("Must have source chain if write_workspace access is given")
-                        .put_countersigned(entry, chain_top_ordering)
+                        .put_countersigned(entry, chain_top_ordering, weight)
                         .await
                         .map_err(|source_chain_error| -> RuntimeError {
                             wasm_error!(WasmErrorInner::Host(source_chain_error.to_string())).into()

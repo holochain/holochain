@@ -435,13 +435,12 @@ pub enum HeaderBase {
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct CreateBase {
     entry_type: EntryType,
-    weight: EntryRateWeight,
 }
 
 impl CreateBase {
     /// Constructor.
-    pub fn new(entry_type: EntryType, weight: EntryRateWeight) -> Self {
-        Self { entry_type, weight }
+    pub fn new(entry_type: EntryType) -> Self {
+        Self { entry_type }
     }
 }
 
@@ -452,7 +451,6 @@ pub struct UpdateBase {
     original_header_address: HeaderHash,
     original_entry_address: EntryHash,
     entry_type: EntryType,
-    weight: EntryRateWeight,
 }
 
 impl Header {
@@ -461,6 +459,7 @@ impl Header {
         entry_hash: EntryHash,
         session_data: &CounterSigningSessionData,
         author: AgentPubKey,
+        weight: EntryRateWeight,
     ) -> Result<Self, CounterSigningError> {
         let agent_state = session_data.agent_state_for_agent(&author)?;
         let preflight = session_data.preflight_request();
@@ -471,7 +470,7 @@ impl Header {
                 header_seq: agent_state.header_seq + 1,
                 prev_header: agent_state.chain_top.clone(),
                 entry_type: base.entry_type.clone(),
-                weight: base.weight.clone(),
+                weight,
                 entry_hash,
             }),
             HeaderBase::Update(base) => Header::Update(Update {
@@ -482,7 +481,7 @@ impl Header {
                 original_header_address: base.original_header_address.clone(),
                 original_entry_address: base.original_entry_address.clone(),
                 entry_type: base.entry_type.clone(),
-                weight: base.weight.clone(),
+                weight,
                 entry_hash,
             }),
         })
@@ -541,6 +540,7 @@ impl CounterSigningSessionData {
     pub fn build_header_set(
         &self,
         entry_hash: EntryHash,
+        weight: EntryRateWeight,
     ) -> Result<Vec<Header>, CounterSigningError> {
         let mut headers = vec![];
         for (agent, _role) in self.preflight_request.signing_agents().iter() {
@@ -548,6 +548,7 @@ impl CounterSigningSessionData {
                 entry_hash.clone(),
                 self,
                 agent.clone(),
+                weight.clone(),
             )?);
         }
         Ok(headers)
