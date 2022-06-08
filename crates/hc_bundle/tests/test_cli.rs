@@ -120,6 +120,8 @@ async fn test_integrity() {
 }
 
 #[tokio::test]
+/// Test that a manifest with multiple integrity zomes and dependencies parses
+/// to the correct dna file.
 async fn test_multi_integrity() {
     let pack_dna = |path| async move {
         let mut cmd = Command::cargo_bin("hc-dna").unwrap();
@@ -132,6 +134,7 @@ async fn test_multi_integrity() {
 
     let (dna, _) = pack_dna("tests/fixtures/my-app/dnas/dna5").await;
 
+    // The actual wasm hashes of the fake zomes.
     let wasm_hash = WasmHash::from_raw_39_panicky(vec![
         132, 42, 36, 217, 5, 131, 6, 203, 162, 51, 6, 34, 63, 247, 21, 77, 60, 106, 98, 53, 59, 98,
         172, 222, 143, 105, 210, 10, 5, 56, 152, 102, 178, 159, 162, 69, 249, 162, 67,
@@ -140,6 +143,8 @@ async fn test_multi_integrity() {
         132, 42, 36, 235, 225, 55, 255, 141, 140, 72, 148, 154, 141, 124, 248, 185, 142, 62, 218,
         220, 85, 73, 201, 54, 10, 30, 191, 206, 93, 108, 142, 140, 201, 164, 225, 20, 241, 98, 16,
     ]);
+
+    // Create the expected dependencies on the coordinator zomes.
     let s = "2022-02-11T23:05:19.470323Z";
     let origin_time = Timestamp::from_str(s).unwrap();
     let expected = DnaDef {

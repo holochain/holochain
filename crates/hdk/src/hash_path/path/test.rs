@@ -3,6 +3,7 @@ use mockall::predicate::eq;
 use crate::prelude::*;
 
 #[test]
+/// Test that a root path always exists and an ensure is a noop.
 fn root_is_noop() {
     assert!(Path::from("foo").into_typed(LinkType(0)).exists().unwrap());
     let mut mock = MockHdkT::new();
@@ -13,6 +14,7 @@ fn root_is_noop() {
 }
 
 #[test]
+/// Check the the parent of a path is linked by ensure.
 fn parent_path_committed() {
     let mut mock = MockHdkT::new();
     mock.expect_hash().returning(hash_entry_mock);
@@ -78,6 +80,7 @@ fn parent_path_committed() {
 }
 
 #[test]
+/// Check path exists behavior is correct.
 fn paths_exists() {
     let mut mock = MockHdkT::new();
     mock.expect_hash().returning(hash_entry_mock);
@@ -85,13 +88,17 @@ fn paths_exists() {
 
     let mut mock = MockHdkT::new();
     mock.expect_hash().returning(hash_entry_mock);
+
+    // Return no links.
     mock.expect_get_links().returning(|_| Ok(vec![vec![]]));
     set_hdk(mock);
 
+    // Root paths always exist.
     assert!(Path::from("foo").into_typed(LinkType(0)).exists().unwrap());
     assert!(Path::from("bar").into_typed(LinkType(0)).exists().unwrap());
     assert!(Path::from("baz").into_typed(LinkType(0)).exists().unwrap());
 
+    // Non-root paths do not exist.
     assert!(!Path::from("foo.bar")
         .into_typed(LinkType(0))
         .exists()
@@ -103,6 +110,8 @@ fn paths_exists() {
 
     let mut mock = MockHdkT::new();
     mock.expect_hash().returning(hash_entry_mock);
+
+    // Return links that match the input.
     mock.expect_get_links()
         .once()
         .with(eq(vec![GetLinksInput {
@@ -135,6 +144,7 @@ fn paths_exists() {
         });
     set_hdk(mock);
 
+    // Both non-root paths exist now.
     assert!(Path::from("foo.bar")
         .into_typed(LinkType(0))
         .exists()
@@ -146,11 +156,13 @@ fn paths_exists() {
 }
 
 #[test]
+// Check path children behavior is correct.
 fn children() {
     let mut mock = MockHdkT::new();
     mock.expect_hash().returning(hash_entry_mock);
     set_hdk(mock);
 
+    // Create some links to return.
     let foo_bar = Link {
         target: Path::from("foo.bar").path_entry_hash().unwrap().into(),
         timestamp: Timestamp::now(),
@@ -179,6 +191,8 @@ fn children() {
         create_link_hash: HeaderHash::from_raw_36(vec![0; 36]),
     };
 
+    // Return links that match the input.
+    // ${base} -[${tag}]-> ${target}
     let mut mock = MockHdkT::new();
     mock.expect_hash().returning(hash_entry_mock);
     // foo -[bar]-> foo.bar
@@ -270,6 +284,7 @@ fn children() {
         .returning(|_| Ok(vec![vec![]]));
     set_hdk(mock);
 
+    // These have no children.
     assert_eq!(
         Path::from("foo.bar.baz")
             .into_typed(LinkType(0))
@@ -286,6 +301,7 @@ fn children() {
         vec![]
     );
 
+    // These have on child.
     assert_eq!(
         Path::from("foo.bar")
             .into_typed(LinkType(0))
@@ -302,6 +318,7 @@ fn children() {
         vec![Path::from("foo.bar2.baz2").into_typed(LinkType(0))]
     );
 
+    // This has two children.
     assert_eq!(
         Path::from("foo")
             .into_typed(LinkType(0))
@@ -314,6 +331,7 @@ fn children() {
     );
 }
 
+// Utility to create correct hashing for mocks.
 fn hash_entry_mock(input: HashInput) -> ExternResult<HashOutput> {
     match input {
         HashInput::Entry(e) => Ok(HashOutput::Entry(EntryHash::with_data_sync(&e))),

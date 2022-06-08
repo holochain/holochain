@@ -151,11 +151,11 @@ pub struct Path(Vec<Component>);
 /// All links committed from this path will
 /// have this link type.
 pub struct TypedPath {
+    /// The [`LinkType`] applied to this [`Path`].
     pub link_type: LinkType,
+    /// The [`Path`] that is using this [`LinkType`].
     pub path: Path,
 }
-
-pub struct LocatedPath(ZomeName, Path);
 
 /// Wrap components vector.
 impl From<Vec<Component>> for Path {
@@ -242,13 +242,13 @@ impl From<String> for Path {
 
 impl Path {
     /// Attach a [`LinkType`] to this path
-    /// so its type is known for commits.
+    /// so its type is known for [`create_link`] and [`get_links`].
     pub fn into_typed(self, link_type: impl Into<LinkType>) -> TypedPath {
         TypedPath::new(link_type, self)
     }
 
-    /// Attach a [`LinkType`] to this path
-    /// so its type is known for commits.
+    /// Try attaching a [`LinkType`] to this path
+    /// so its type is known for [`create_link`] and [`get_links`].
     pub fn try_into_typed<TY, E>(self, link_type: TY) -> Result<TypedPath, WasmError>
     where
         LinkType: TryFrom<TY, Error = E>,
@@ -273,6 +273,7 @@ impl Path {
         self.0.last()
     }
 
+    /// Make the [`LinkTag`] for this [`Path`].
     pub fn make_tag(&self) -> ExternResult<LinkTag> {
         Ok(LinkTag::new(match self.leaf() {
             None => <Vec<u8>>::with_capacity(0),
@@ -280,12 +281,14 @@ impl Path {
         }))
     }
 
+    /// Check if this [`Path`] is the root.
     pub fn is_root(&self) -> bool {
         self.0.len() == 1
     }
 }
 
 impl TypedPath {
+    /// CReate a new [`TypedPath`] by attaching [`LinkType`] to a [`Path`].
     pub fn new(link_type: impl Into<LinkType>, path: Path) -> Self {
         Self {
             link_type: link_type.into(),

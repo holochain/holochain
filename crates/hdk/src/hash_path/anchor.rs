@@ -206,12 +206,6 @@ fn hash_path_anchor_path() {
     }
 }
 
-// #[cfg(test)]
-// #[test]
-// fn hash_path_anchor_entry_def() {
-//     assert_eq!(PathEntry::ENTRY_DEFS, Anchor::ENTRY_DEFS,);
-// }
-
 #[cfg(test)]
 #[test]
 fn hash_path_anchor_from_path() {
