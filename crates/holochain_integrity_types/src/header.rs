@@ -271,6 +271,7 @@ impl Header {
             Self::Delete(Delete { weight, .. }) => weight.clone(),
             Self::Create(Create { weight, .. }) => weight.clone().into(),
             Self::Update(Update { weight, .. }) => weight.clone().into(),
+
             // all others are weightless
             Self::Dna(Dna { .. })
             | Self::AgentValidationPkg(AgentValidationPkg { .. })
@@ -278,6 +279,26 @@ impl Header {
             | Self::DeleteLink(DeleteLink { .. })
             | Self::CloseChain(CloseChain { .. })
             | Self::OpenChain(OpenChain { .. }) => RateWeight::default(),
+        }
+    }
+
+    pub fn entry_rate_data(&self) -> Option<EntryRateWeight> {
+        match self {
+            Self::Create(Create { weight, .. }) => Some(weight.clone()),
+            Self::Update(Update { weight, .. }) => Some(weight.clone()),
+
+            // There is a weight, but it doesn't have the extra info that
+            // Entry rate data has, so return None
+            Self::CreateLink(CreateLink { .. }) => None,
+            Self::Delete(Delete { .. }) => None,
+
+            // all others are weightless, so return zero weight
+            Self::Dna(Dna { .. })
+            | Self::AgentValidationPkg(AgentValidationPkg { .. })
+            | Self::InitZomesComplete(InitZomesComplete { .. })
+            | Self::DeleteLink(DeleteLink { .. })
+            | Self::CloseChain(CloseChain { .. })
+            | Self::OpenChain(OpenChain { .. }) => Some(EntryRateWeight::default()),
         }
     }
 }

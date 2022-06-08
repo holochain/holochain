@@ -24,6 +24,7 @@ use holochain_types::dht_op::OpOrder;
 use holochain_types::dht_op::UniqueForm;
 use holochain_types::element::SignedHeaderHashedExt;
 use holochain_types::sql::AsSql;
+use holochain_zome_types::EntryRateWeight;
 use holochain_zome_types::header;
 use holochain_zome_types::query::ChainQueryFilterRange;
 use holochain_zome_types::CapAccess;
@@ -168,12 +169,18 @@ impl SourceChain {
         zome: Option<Zome>,
         entry: Entry,
         chain_top_ordering: ChainTopOrdering,
+        weight: EntryRateWeight,
     ) -> SourceChainResult<HeaderHash> {
         let entry_hash = EntryHash::with_data_sync(&entry);
         if let Entry::CounterSign(ref session_data, _) = entry {
             self.put_with_header(
                 zome,
-                Header::from_countersigning_data(entry_hash, session_data, (*self.author).clone())?,
+                Header::from_countersigning_data(
+                    entry_hash,
+                    session_data,
+                    (*self.author).clone(),
+                    weight,
+                )?,
                 Some(entry),
                 chain_top_ordering,
             )

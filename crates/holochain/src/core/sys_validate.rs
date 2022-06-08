@@ -59,8 +59,11 @@ pub fn check_countersigning_session_data_contains_header(
     session_data: &CounterSigningSessionData,
     header: NewEntryHeaderRef<'_>,
 ) -> SysValidationResult<()> {
+    let weight = match header {
+        NewEntryRef::Create(h) | NewEntryRef::Update(h) => h.weight,
+    };
     let header_is_in_session = session_data
-        .build_header_set(entry_hash)
+        .build_header_set(entry_hash, weight)
         .map_err(SysValidationError::from)?
         .iter()
         .any(|session_header| match (&header, session_header) {
