@@ -24,15 +24,15 @@
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "nextest": {
-        "branch": "terminate_slow_tests",
+        "branch": "main",
         "description": "A next-generation test runner for Rust.",
         "homepage": "https://nexte.st",
-        "owner": "steveej-forks",
+        "owner": "nextest-rs",
         "repo": "nextest",
-        "rev": "a54bbc6ad7caa65908e42491e3f55d7b426385aa",
-        "sha256": "1cvj3ksqxlx0nv8d0xia7kff5p2ajww5nksmhk5z0l8iaq6pnkg1",
+        "rev": "cc1ebea104e5705097c9f8da69023bf80d03dd6a",
+        "sha256": "1in972hzhy2zrf18v7a5m2pgll4znk9ipyzv1nih9vp5m2sg5nlx",
         "type": "tarball",
-        "url": "https://github.com/steveej-forks/nextest/archive/a54bbc6ad7caa65908e42491e3f55d7b426385aa.tar.gz",
+        "url": "https://github.com/nextest-rs/nextest/archive/cc1ebea104e5705097c9f8da69023bf80d03dd6a.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "nixos-unstable": {
