@@ -132,9 +132,6 @@
 //!
 //! - `fn entry_defs(_: ()) -> ExternResult<EntryDefs>`:
 //!   - `EntryDefs` is a vector defining all entries used by this app.
-//!   - The `entry_defs![]` macro simplifies this to something resembling `vec![]`.
-//!   - The `#[hdk_entry]` attribute simplifies generating entry definitions for a struct or enum.
-//!   - The `entry_def_index!` macro converts a def id like "post" to an `EntryDefIndex` by calling this callback _inside the guest_.
 //!   - All zomes in a DNA define all their entries at the same time for the host
 //!   - All entry defs are combined into a single ordered list per zone and exposed to tooling such as DNA generation
 //!   - Entry defs are referenced by `u8` numerical position externally and in DHT headers and by id/name e.g. "post" in sparse callbacks
@@ -291,9 +288,7 @@ pub mod countersigning;
 /// For example, an agent could choose to 'block' another agent and ignore all their updates.
 pub mod entry;
 
-pub use holochain_deterministic_integrity::entry_def_index;
 pub use holochain_deterministic_integrity::entry_defs;
-pub use holochain_deterministic_integrity::entry_type;
 
 pub mod hash;
 

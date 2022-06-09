@@ -154,25 +154,6 @@ impl quote::ToTokens for EntryDef {
 }
 
 #[proc_macro_attribute]
-pub fn hdk_entry(attrs: TokenStream, code: TokenStream) -> TokenStream {
-    let item = syn::parse_macro_input!(code as syn::Item);
-
-    let struct_ident = match item.clone() {
-        syn::Item::Struct(item_struct) => item_struct.ident,
-        syn::Item::Enum(item_enum) => item_enum.ident,
-        _ => unimplemented!(),
-    };
-    let entry_def = syn::parse_macro_input!(attrs as EntryDef);
-
-    (quote::quote! {
-        #[derive(serde::Serialize, serde::Deserialize, holochain_deterministic_integrity::prelude::SerializedBytes, std::fmt::Debug)]
-        #item
-        holochain_deterministic_integrity::prelude::entry_def!(#struct_ident #entry_def);
-    })
-    .into()
-}
-
-#[proc_macro_attribute]
 pub fn hdk_extern(attrs: TokenStream, item: TokenStream) -> TokenStream {
     // extern mapping is only valid for functions
     let item_fn = syn::parse_macro_input!(item as syn::ItemFn);
@@ -220,6 +201,30 @@ pub fn derive_to_unit_enum(input: TokenStream) -> TokenStream {
     unit_enum::derive(input)
 }
 
+/// Declares your integrity zomes entry types.
+///
+/// # Attributes
+/// - `unit_enum(TypeName)`: Defines the unit version of this enum.
+/// - `entry_def(name: String, required_validations: u8, visibility: String)`: Defines an entry type.
+///   - name: The name of the entry definition (optional).
+///     Defaults to the name of the enum variant.
+///   - required_validations: The number of validations required before this entry
+///     will not be published anymore (optional). Defaults to 5.
+///   - visibility: The visibility of this entry.
+///     ["public" | "private"] Default is "public".
+///
+/// # Examples
+/// ```ignore
+/// #[hdk_entry_defs]
+/// #[unit_enum(UnitEntryTypes)]
+/// pub enum EntryTypes {
+///     Post(Post),
+///     #[entry_def(required_validations = 5)]
+///     Msg(Msg),
+///     #[entry_def(name = "hidden_msg", required_validations = 5, visibility = "private")]
+///     PrivMsg(PrivMsg),
+/// }
+/// ```
 #[proc_macro_error]
 #[proc_macro_attribute]
 pub fn hdk_entry_defs(attrs: TokenStream, code: TokenStream) -> TokenStream {
@@ -291,6 +296,17 @@ pub fn hdk_link_zomes(attrs: TokenStream, code: TokenStream) -> TokenStream {
     link_zomes::build(attrs, code)
 }
 
+/// Helper for entry data types.
+///
+/// # Implements
+/// - `#[derive(Serialize, Deserialize, SerializedBytes, Debug)]`
+/// - `holochain_deterministic_integrity::app_entry!`
+///
+/// # Examples
+/// ```ignore
+/// #[hdk_entry_helper]
+/// pub struct Post(pub String);
+/// ```
 #[proc_macro_error]
 #[proc_macro_attribute]
 pub fn hdk_entry_helper(attrs: TokenStream, code: TokenStream) -> TokenStream {

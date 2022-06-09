@@ -1,5 +1,10 @@
 //! The Holochain Deterministic Integrity
 
+pub use hdk_derive::hdk_entry_defs;
+pub use hdk_derive::hdk_entry_helper;
+pub use hdk_derive::hdk_extern;
+pub use hdk_derive::hdk_link_types;
+
 /// Working with app and system entries.
 ///
 /// Most Holochain applications will define their own app entry types.

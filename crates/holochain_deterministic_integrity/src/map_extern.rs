@@ -17,6 +17,7 @@ pub fn make_subscriber() -> impl Drop {
     Noop
 }
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! map_extern_preamble {
     ( $guest_ptr:ident, $len:ident, $inner:ident, $input:ty, $output:ty ) => {
@@ -67,6 +68,7 @@ pub fn encode_to_guestptrlen<T: std::fmt::Debug + Serialize>(v: T) -> GuestPtrLe
 ///  // ... do stuff to respond to incoming calls from the host to "foo"
 /// }
 /// ```
+#[doc(hidden)]
 #[macro_export]
 macro_rules! map_extern {
     ( $name:tt, $f:ident, $input:ty, $output:ty ) => {
@@ -87,6 +89,7 @@ macro_rules! map_extern {
     };
 }
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! map_extern_infallible {
     ( $name:tt, $f:ident, $input:ty, $output:ty ) => {

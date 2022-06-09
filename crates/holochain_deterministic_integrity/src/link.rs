@@ -3,6 +3,11 @@ use core::ops::RangeBounds;
 
 use crate::prelude::*;
 
+pub use hdk_derive::hdk_link_types;
+
+#[cfg(doc)]
+pub mod examples;
+
 /// A helper trait for creating [`LinkTypeRanges`] that match the local zome's
 /// type scope.
 ///

@@ -5,10 +5,7 @@ pub use crate::entry::must_get_entry;
 pub use crate::entry::must_get_header;
 pub use crate::entry::must_get_valid_element;
 pub use crate::entry::EntryTypesHelper;
-pub use crate::entry_def;
-pub use crate::entry_def_index;
 pub use crate::entry_defs;
-pub use crate::entry_type;
 pub use crate::hash::*;
 pub use crate::hdi::*;
 pub use crate::info::dna_info;
@@ -21,7 +18,6 @@ pub use crate::map_extern_preamble;
 pub use crate::x_salsa20_poly1305::x_25519_x_salsa20_poly1305_decrypt;
 pub use crate::x_salsa20_poly1305::x_salsa20_poly1305_decrypt;
 pub use hdk_derive;
-pub use hdk_derive::hdk_entry;
 pub use hdk_derive::hdk_entry_defs;
 pub use hdk_derive::hdk_entry_defs_conversions;
 pub use hdk_derive::hdk_entry_helper;
@@ -58,6 +54,7 @@ pub use tracing::{debug, error, info, instrument, trace, warn};
 /// Needed as a noop for map_extern! when trace is off.
 pub use crate::error;
 
+#[doc(hidden)]
 #[cfg(not(feature = "trace"))]
 #[macro_export]
 /// Needed as a noop for map_extern! when trace is off.
@@ -69,6 +66,7 @@ macro_rules! error {
 pub use mockall;
 
 // This needs to be called at least once _somewhere_ and is idempotent.
+#[doc(hidden)]
 #[macro_export]
 macro_rules! holochain_externs {
     () => {
