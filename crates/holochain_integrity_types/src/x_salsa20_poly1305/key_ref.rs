@@ -1,70 +1,91 @@
 use holochain_serialized_bytes::prelude::*;
+use std::sync::Arc;
 
 /// Key refs represent shared secrets stored in the keystore.
 /// They can either be user-specified, or auto-generated at time of
 /// secret creation, or ingestion.
-#[derive(Debug)]
-pub struct KeyRef(Box<str>);
+#[derive(Debug, Clone, SerializedBytes)]
+pub struct XSalsa20Poly1305KeyRef(Arc<[u8]>);
 
-impl std::ops::Deref for KeyRef {
-    type Target = str;
+impl serde::Serialize for XSalsa20Poly1305KeyRef {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_bytes(&self.0)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for XSalsa20Poly1305KeyRef {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let inner: Vec<u8> = serde::Deserialize::deserialize(deserializer)?;
+        Ok(Self(inner.into_boxed_slice().into()))
+    }
+}
+
+impl std::ops::Deref for XSalsa20Poly1305KeyRef {
+    type Target = [u8];
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl AsRef<str> for KeyRef {
-    fn as_ref(&self) -> &str {
+impl AsRef<[u8]> for XSalsa20Poly1305KeyRef {
+    fn as_ref(&self) -> &[u8] {
         &self.0
     }
 }
 
-impl std::borrow::Borrow<str> for KeyRef {
-    fn borrow(&self) -> &str {
+impl std::borrow::Borrow<[u8]> for XSalsa20Poly1305KeyRef {
+    fn borrow(&self) -> &[u8] {
         &self.0
     }
 }
 
-impl PartialEq for KeyRef {
+impl PartialEq for XSalsa20Poly1305KeyRef {
     fn eq(&self, other: &Self) -> bool {
         use subtle::ConstantTimeEq;
-        self.0.as_bytes().ct_eq(&other.0.as_bytes()).into()
+        self.0.ct_eq(&other.0).into()
     }
 }
 
-impl Eq for KeyRef {}
+impl Eq for XSalsa20Poly1305KeyRef {}
 
-impl From<&str> for KeyRef {
+impl From<&[u8]> for XSalsa20Poly1305KeyRef {
     #[inline(always)]
-    fn from(s: &str) -> Self {
-        s.to_string().into()
+    fn from(b: &[u8]) -> Self {
+        b.to_vec().into()
     }
 }
 
-impl From<&String> for KeyRef {
+impl<const N: usize> From<[u8; N]> for XSalsa20Poly1305KeyRef {
     #[inline(always)]
-    fn from(s: &String) -> Self {
-        s.clone().into()
+    fn from(b: [u8; N]) -> Self {
+        b.to_vec().into()
     }
 }
 
-impl From<String> for KeyRef {
+impl From<&Vec<u8>> for XSalsa20Poly1305KeyRef {
     #[inline(always)]
-    fn from(s: String) -> Self {
-        Self(s.into_boxed_str())
+    fn from(b: &Vec<u8>) -> Self {
+        b.clone().into()
     }
 }
 
-/// Key refs are the same length as the keys themselves.
-/// The key ref is just a sha256 of the key. There are no benefits, only downsides, to having
-/// either a larger or smaller set of outputs (ref size) vs. the set of inputs (key size).
-pub const KEY_REF_BYTES: usize = 32;
+impl From<Vec<u8>> for XSalsa20Poly1305KeyRef {
+    #[inline(always)]
+    fn from(b: Vec<u8>) -> Self {
+        b.into_boxed_slice().into()
+    }
+}
 
-#[derive(Clone, Copy, SerializedBytes)]
-pub struct XSalsa20Poly1305KeyRef([u8; KEY_REF_BYTES]);
-pub type SecretBoxKeyRef = XSalsa20Poly1305KeyRef;
-
-// Key refs need to be exactly the length of the key ref bytes hash, not doing so could cause
-// problems.
-crate::secure_primitive!(XSalsa20Poly1305KeyRef, KEY_REF_BYTES);
+impl From<Box<[u8]>> for XSalsa20Poly1305KeyRef {
+    #[inline(always)]
+    fn from(b: Box<[u8]>) -> Self {
+        Self(b.into())
+    }
+}

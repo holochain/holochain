@@ -74,12 +74,10 @@ pub mod wasm_test {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::XSalsa20Poly1305).await;
 
-        let key_ref = XSalsa20Poly1305KeyRef::from(
-            [1; holochain_zome_types::x_salsa20_poly1305::key_ref::KEY_REF_BYTES],
-        );
+        let key_ref = XSalsa20Poly1305KeyRef::from([1; 32]);
         let data = XSalsa20Poly1305Data::from(vec![1, 2, 3, 4]);
         let input = holochain_zome_types::x_salsa20_poly1305::XSalsa20Poly1305Encrypt::new(
-            key_ref,
+            key_ref.clone(),
             data.clone(),
         );
         let output: XSalsa20Poly1305EncryptedData = conductor

@@ -1,12 +1,7 @@
 use crate::prelude::*;
 pub use holochain_deterministic_integrity::x_salsa20_poly1305::*;
 
-/// Generate a new x25519 keypair in lair from entropy.
-/// Only the pubkey is returned from lair because the secret key never leaves lair.
-/// @todo ability to export secrets from lair in encrypted format to send to other agents.
-pub fn create_x25519_keypair() -> ExternResult<X25519PubKey> {
-    HDK.with(|h| h.borrow().create_x25519_keypair(()))
-}
+// -- secretbox encryption -- //
 
 /// Generate a new secure random shared secret suitable for encrypting and
 /// decrypting using x_salsa20_poly1305_{en,de}crypt.
@@ -16,8 +11,8 @@ pub fn create_x25519_keypair() -> ExternResult<X25519PubKey> {
 /// If `Ok`, this function will return the KeyRef by which the shared
 /// secret may be accessed.
 pub fn x_salsa20_poly1305_shared_secret_create_random(
-    _key_ref: Option<KeyRef>,
-) -> ExternResult<KeyRef> {
+    _key_ref: Option<XSalsa20Poly1305KeyRef>,
+) -> ExternResult<XSalsa20Poly1305KeyRef> {
     todo!()
 }
 
@@ -26,7 +21,7 @@ pub fn x_salsa20_poly1305_shared_secret_create_random(
 pub fn x_salsa20_poly1305_shared_secret_export(
     _sender: X25519PubKey,
     _recipient: X25519PubKey,
-    _key_ref: KeyRef,
+    _key_ref: XSalsa20Poly1305KeyRef,
 ) -> ExternResult<XSalsa20Poly1305EncryptedData> {
     todo!()
 }
@@ -45,8 +40,8 @@ pub fn x_salsa20_poly1305_shared_secret_ingest(
     _recipient: X25519PubKey,
     _sender: X25519PubKey,
     _encrypted_data: XSalsa20Poly1305EncryptedData,
-    _key_ref: Option<KeyRef>,
-) -> ExternResult<KeyRef> {
+    _key_ref: Option<XSalsa20Poly1305KeyRef>,
+) -> ExternResult<XSalsa20Poly1305KeyRef> {
     todo!()
 }
 
@@ -89,6 +84,15 @@ pub fn x_salsa20_poly1305_encrypt(
         h.borrow()
             .x_salsa20_poly1305_encrypt(XSalsa20Poly1305Encrypt::new(key_ref, data))
     })
+}
+
+// -- curve25519 box encryption -- //
+
+/// Generate a new x25519 keypair in lair from entropy.
+/// Only the pubkey is returned from lair because the secret key never leaves lair.
+/// @todo ability to export secrets from lair in encrypted format to send to other agents.
+pub fn create_x25519_keypair() -> ExternResult<X25519PubKey> {
+    HDK.with(|h| h.borrow().create_x25519_keypair(()))
 }
 
 /// Libsodium keypair based authenticated encryption: box.
