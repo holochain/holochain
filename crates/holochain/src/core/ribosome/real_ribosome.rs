@@ -217,17 +217,23 @@ fn context_key_from_key(key: &[u8; 32]) -> u64 {
 impl RealRibosome {
     /// Create a new instance
     pub fn new(dna_file: DnaFile) -> RibosomeResult<Self> {
+        // Create an empty ribosome.
         let ribosome = Self {
             dna_file,
             zome_types: Default::default(),
             zome_dependencies: Default::default(),
         };
+
+        // Collect the number of entry and link types
+        // for each integrity zome.
         let iter = ribosome
             .dna_def()
             .integrity_zomes
             .iter()
             .map(|(name, zome)| {
                 let zome = Zome::new(name.clone(), zome.clone().erase_type());
+
+                // Call the const functions that return the number of types.
                 let num_entry_types = match ribosome.get_const_fn(&zome, "__num_entry_types")? {
                     Some(i) => EntryDefIndex(i),
                     None => EntryDefIndex(0),
@@ -239,21 +245,27 @@ impl RealRibosome {
                 RibosomeResult::Ok((num_entry_types, num_link_types))
             })
             .collect::<Result<Vec<_>, _>>()?;
+
+        // Create the global zome types from the totals.
         let map = GlobalZomeTypes::from_ordered_iterator(iter.into_iter());
 
         let zome_types = Arc::new(map?);
 
+        // Create a map of integrity zome names to ZomeIds.
+        let integrity_zomes: HashMap<_, _> = ribosome
+            .dna_def()
+            .integrity_zomes
+            .iter()
+            .enumerate()
+            .map(|(i, (n, _))| Some((n.clone(), ZomeId(i.try_into().ok()?))))
+            .collect::<Option<_>>()
+            .ok_or_else(|| ZomeTypesError::ZomeIndexOverflow)?;
+
+        // Collect the dependencies for each zome.
         let zome_dependencies = ribosome
             .dna_def()
             .all_zomes()
             .map(|(zome_name, def)| {
-                let integrity_zomes: HashMap<_, _> = ribosome
-                    .dna_def()
-                    .integrity_zomes
-                    .iter()
-                    .enumerate()
-                    .map(|(i, (n, _))| (n.clone(), i))
-                    .collect();
                 let mut dependencies = Vec::new();
 
                 if integrity_zomes.len() == 1 {
@@ -262,29 +274,17 @@ impl RealRibosome {
                 } else {
                     // Integrity zomes need to have themselves as a dependency.
                     if ribosome.dna_def().is_integrity_zome(zome_name) {
-                        let id = ZomeId(
-                            integrity_zomes
-                                .get(zome_name)
-                                .copied()
-                                .ok_or_else(|| {
-                                    ZomeTypesError::MissingDependenciesForZome(zome_name.clone())
-                                })?
-                                .try_into()
-                                .map_err(|_| ZomeTypesError::ZomeIndexOverflow)?,
-                        );
+                        // Get the ZomeId for this zome.
+                        let id = integrity_zomes.get(zome_name).copied().ok_or_else(|| {
+                            ZomeTypesError::MissingDependenciesForZome(zome_name.clone())
+                        })?;
                         dependencies.push(id);
                     }
                     for name in def.dependencies() {
-                        let id = ZomeId(
-                            integrity_zomes
-                                .get(name)
-                                .copied()
-                                .ok_or_else(|| {
-                                    ZomeTypesError::MissingDependenciesForZome(zome_name.clone())
-                                })?
-                                .try_into()
-                                .map_err(|_| ZomeTypesError::ZomeIndexOverflow)?,
-                        );
+                        // Get the ZomeId for this dependency.
+                        let id = integrity_zomes.get(name).copied().ok_or_else(|| {
+                            ZomeTypesError::MissingDependenciesForZome(zome_name.clone())
+                        })?;
                         dependencies.push(id);
                     }
                 }
@@ -571,8 +571,11 @@ impl RibosomeT for RealRibosome {
     }
 
     fn zome_info(&self, zome: Zome) -> RibosomeResult<ZomeInfo> {
+        // Get the dependencies for this zome.
         let zome_dependencies = self.get_zome_dependencies(zome.zome_name())?;
+        // Scope the zome types to these dependencies.
         let zome_types = self.zome_types.re_scope(zome_dependencies)?;
+
         Ok(ZomeInfo {
             name: zome.zome_name().clone(),
             id: self
@@ -697,6 +700,8 @@ impl RibosomeT for RealRibosome {
         match zome.zome_def() {
             ZomeDef::Wasm(_) => {
                 let module = self.module(zome.zome_name())?;
+
+                // Check if the wasm has a function that matches this type.
                 if module.exports().functions().any(|f| {
                     f.name() == name
                         && f.ty().params().is_empty()
@@ -704,6 +709,7 @@ impl RibosomeT for RealRibosome {
                 }) {
                     let (instance, context_key) = self.instance(call_context)?;
 
+                    // Call the function as a native function.
                     let result = instance
                         .lock()
                         .exports

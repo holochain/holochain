@@ -517,6 +517,14 @@ pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
         to_call: &FunctionName,
     ) -> Result<Option<ExternIO>, RibosomeError>;
 
+    /// Get a value from a const wasm function.
+    ///
+    /// This is really a stand in until Rust can properly support
+    /// const wasm values.
+    ///
+    /// This allows getting values from wasm without the need for any translation.
+    /// The same technique can be used with the wasmer cli to validate these
+    /// values without needing to make holochain a dependency.
     fn get_const_fn(&self, zome: &Zome, name: &str) -> Result<Option<u8>, RibosomeError>;
 
     /// @todo list out all the available callbacks and maybe cache them somewhere

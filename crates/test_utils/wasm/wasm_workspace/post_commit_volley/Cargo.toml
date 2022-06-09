@@ -9,7 +9,7 @@ name = "test_wasm_post_commit_volley"
 crate-type = [ "cdylib", "rlib" ]
 
 [[example]]
-name = "integrity_test_wasm_post_volley"
+name = "integrity_test_wasm_post_commit_volley"
 path = "src/integrity.rs"
 crate-type = ["cdylib", "rlib"]
 

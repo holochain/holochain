@@ -7,6 +7,7 @@ use syn::ItemEnum;
 use crate::util::get_single_tuple_variant;
 
 pub fn build(_attrs: TokenStream, input: TokenStream) -> TokenStream {
+    // Parse the input.
     let input = parse_macro_input!(input as Item);
     let (ident, variants) = match &input {
         Item::Enum(ItemEnum {
