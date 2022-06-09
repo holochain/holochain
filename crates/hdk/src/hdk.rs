@@ -63,11 +63,28 @@ pub trait HdkT: HdiT {
     fn schedule(&self, scheduled_fn: String) -> ExternResult<()>;
     fn sleep(&self, wake_after: std::time::Duration) -> ExternResult<()>;
     // XSalsa20Poly1305
-    fn create_x25519_keypair(&self, create_x25519_keypair_input: ()) -> ExternResult<X25519PubKey>;
+    fn x_salsa20_poly1305_shared_secret_create_random(
+        &self,
+        key_ref: Option<XSalsa20Poly1305KeyRef>,
+    ) -> ExternResult<XSalsa20Poly1305KeyRef>;
+    fn x_salsa20_poly1305_shared_secret_export(
+        &self,
+        sender: X25519PubKey,
+        recipient: X25519PubKey,
+        key_ref: XSalsa20Poly1305KeyRef,
+    ) -> ExternResult<XSalsa20Poly1305EncryptedData>;
+    fn x_salsa20_poly1305_shared_secret_ingest(
+        &self,
+        recipient: X25519PubKey,
+        sender: X25519PubKey,
+        encrypted_data: XSalsa20Poly1305EncryptedData,
+        key_ref: Option<XSalsa20Poly1305KeyRef>,
+    ) -> ExternResult<XSalsa20Poly1305KeyRef>;
     fn x_salsa20_poly1305_encrypt(
         &self,
         x_salsa20_poly1305_encrypt: XSalsa20Poly1305Encrypt,
     ) -> ExternResult<XSalsa20Poly1305EncryptedData>;
+    fn create_x25519_keypair(&self, create_x25519_keypair_input: ()) -> ExternResult<X25519PubKey>;
     fn x_25519_x_salsa20_poly1305_encrypt(
         &self,
         x_25519_x_salsa20_poly1305_encrypt: X25519XSalsa20Poly1305Encrypt,
@@ -121,11 +138,28 @@ mockall::mock! {
         fn schedule(&self, scheduled_fn: String) -> ExternResult<()>;
         fn sleep(&self, wake_after: std::time::Duration) -> ExternResult<()>;
         // XSalsa20Poly1305
-        fn create_x25519_keypair(&self, create_x25519_keypair_input: ()) -> ExternResult<X25519PubKey>;
+        fn x_salsa20_poly1305_shared_secret_create_random(
+            &self,
+            key_ref: Option<XSalsa20Poly1305KeyRef>,
+        ) -> ExternResult<XSalsa20Poly1305KeyRef>;
+        fn x_salsa20_poly1305_shared_secret_export(
+            &self,
+            sender: X25519PubKey,
+            recipient: X25519PubKey,
+            key_ref: XSalsa20Poly1305KeyRef,
+        ) -> ExternResult<XSalsa20Poly1305EncryptedData>;
+        fn x_salsa20_poly1305_shared_secret_ingest(
+            &self,
+            recipient: X25519PubKey,
+            sender: X25519PubKey,
+            encrypted_data: XSalsa20Poly1305EncryptedData,
+            key_ref: Option<XSalsa20Poly1305KeyRef>,
+        ) -> ExternResult<XSalsa20Poly1305KeyRef>;
         fn x_salsa20_poly1305_encrypt(
             &self,
             x_salsa20_poly1305_encrypt: XSalsa20Poly1305Encrypt,
         ) -> ExternResult<XSalsa20Poly1305EncryptedData>;
+        fn create_x25519_keypair(&self, create_x25519_keypair_input: ()) -> ExternResult<X25519PubKey>;
         fn x_25519_x_salsa20_poly1305_encrypt(
             &self,
             x_25519_x_salsa20_poly1305_encrypt: X25519XSalsa20Poly1305Encrypt,
@@ -311,10 +345,29 @@ impl HdkT for ErrHdk {
         Self::err()
     }
     // XSalsa20Poly1305
-    fn create_x25519_keypair(
+    fn x_salsa20_poly1305_shared_secret_create_random(
         &self,
-        _create_x25519_keypair_input: (),
-    ) -> ExternResult<X25519PubKey> {
+        _key_ref: Option<XSalsa20Poly1305KeyRef>,
+    ) -> ExternResult<XSalsa20Poly1305KeyRef> {
+        Self::err()
+    }
+
+    fn x_salsa20_poly1305_shared_secret_export(
+        &self,
+        _sender: X25519PubKey,
+        _recipient: X25519PubKey,
+        _key_ref: XSalsa20Poly1305KeyRef,
+    ) -> ExternResult<XSalsa20Poly1305EncryptedData> {
+        Self::err()
+    }
+
+    fn x_salsa20_poly1305_shared_secret_ingest(
+        &self,
+        _recipient: X25519PubKey,
+        _sender: X25519PubKey,
+        _encrypted_data: XSalsa20Poly1305EncryptedData,
+        _key_ref: Option<XSalsa20Poly1305KeyRef>,
+    ) -> ExternResult<XSalsa20Poly1305KeyRef> {
         Self::err()
     }
 
@@ -322,6 +375,13 @@ impl HdkT for ErrHdk {
         &self,
         _x_salsa20_poly1305_encrypt: XSalsa20Poly1305Encrypt,
     ) -> ExternResult<XSalsa20Poly1305EncryptedData> {
+        Self::err()
+    }
+
+    fn create_x25519_keypair(
+        &self,
+        _create_x25519_keypair_input: (),
+    ) -> ExternResult<X25519PubKey> {
         Self::err()
     }
 
@@ -476,9 +536,33 @@ impl HdkT for HostHdk {
     fn sleep(&self, wake_after: std::time::Duration) -> ExternResult<()> {
         host_call::<std::time::Duration, ()>(__sleep, wake_after)
     }
-    fn create_x25519_keypair(&self, _: ()) -> ExternResult<X25519PubKey> {
-        host_call::<(), X25519PubKey>(__create_x25519_keypair, ())
+
+    fn x_salsa20_poly1305_shared_secret_create_random(
+        &self,
+        _key_ref: Option<XSalsa20Poly1305KeyRef>,
+    ) -> ExternResult<XSalsa20Poly1305KeyRef> {
+        todo!()
     }
+
+    fn x_salsa20_poly1305_shared_secret_export(
+        &self,
+        _sender: X25519PubKey,
+        _recipient: X25519PubKey,
+        _key_ref: XSalsa20Poly1305KeyRef,
+    ) -> ExternResult<XSalsa20Poly1305EncryptedData> {
+        todo!()
+    }
+
+    fn x_salsa20_poly1305_shared_secret_ingest(
+        &self,
+        _recipient: X25519PubKey,
+        _sender: X25519PubKey,
+        _encrypted_data: XSalsa20Poly1305EncryptedData,
+        _key_ref: Option<XSalsa20Poly1305KeyRef>,
+    ) -> ExternResult<XSalsa20Poly1305KeyRef> {
+        todo!()
+    }
+
     fn x_salsa20_poly1305_encrypt(
         &self,
         x_salsa20_poly1305_encrypt: XSalsa20Poly1305Encrypt,
@@ -488,6 +572,11 @@ impl HdkT for HostHdk {
             x_salsa20_poly1305_encrypt,
         )
     }
+
+    fn create_x25519_keypair(&self, _: ()) -> ExternResult<X25519PubKey> {
+        host_call::<(), X25519PubKey>(__create_x25519_keypair, ())
+    }
+
     fn x_25519_x_salsa20_poly1305_encrypt(
         &self,
         x_25519_x_salsa20_poly1305_encrypt: X25519XSalsa20Poly1305Encrypt,

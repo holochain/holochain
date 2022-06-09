@@ -21,8 +21,11 @@ impl<'de> serde::Deserialize<'de> for XSalsa20Poly1305KeyRef {
     where
         D: serde::Deserializer<'de>,
     {
-        let inner: Vec<u8> = serde::Deserialize::deserialize(deserializer)?;
-        Ok(Self(inner.into_boxed_slice().into()))
+        #[derive(serde::Deserialize)]
+        #[serde(transparent)]
+        struct I(#[serde(with = "serde_bytes")] Vec<u8>);
+        let inner: I = serde::Deserialize::deserialize(deserializer)?;
+        Ok(Self(inner.0.into_boxed_slice().into()))
     }
 }
 
