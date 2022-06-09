@@ -6,7 +6,35 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20220609.140638
+
 - Docs: Update OS support in repository README and link to developer environment setup.
+
+## [holochain\_cli-0.0.42](crates/holochain_cli/CHANGELOG.md#0.0.42)
+
+## [holochain\_cli\_sandbox-0.0.38](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.38)
+
+## [holochain\_cli\_bundle-0.0.38](crates/holochain_cli_bundle/CHANGELOG.md#0.0.38)
+
+## [holochain-0.0.144](crates/holochain/CHANGELOG.md#0.0.144)
+
+## [holochain\_conductor\_api-0.0.44](crates/holochain_conductor_api/CHANGELOG.md#0.0.44)
+
+## [holochain\_wasm\_test\_utils-0.0.43](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.43)
+
+## [holochain\_cascade-0.0.44](crates/holochain_cascade/CHANGELOG.md#0.0.44)
+
+## [holochain\_state-0.0.44](crates/holochain_state/CHANGELOG.md#0.0.44)
+
+## [holochain\_p2p-0.0.42](crates/holochain_p2p/CHANGELOG.md#0.0.42)
+
+## [holochain\_types-0.0.42](crates/holochain_types/CHANGELOG.md#0.0.42)
+
+## [holochain\_keystore-0.0.42](crates/holochain_keystore/CHANGELOG.md#0.0.42)
+
+## [holochain\_sqlite-0.0.41](crates/holochain_sqlite/CHANGELOG.md#0.0.41)
+
+## [kitsune\_p2p-0.0.36](crates/kitsune_p2p/CHANGELOG.md#0.0.36)
 
 # 20220608.011447
 

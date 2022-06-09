@@ -1886,7 +1886,7 @@ dependencies = [
 
 [[package]]
 name = "holochain"
-version = "0.0.143"
+version = "0.0.144"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -1975,7 +1975,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cascade"
-version = "0.0.43"
+version = "0.0.44"
 dependencies = [
  "async-trait",
  "derive_more",
@@ -2008,7 +2008,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli"
-version = "0.0.41"
+version = "0.0.42"
 dependencies = [
  "anyhow",
  "futures",
@@ -2021,7 +2021,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_bundle"
-version = "0.0.37"
+version = "0.0.38"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -2042,7 +2042,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_sandbox"
-version = "0.0.37"
+version = "0.0.38"
 dependencies = [
  "ansi_term 0.12.1",
  "anyhow",
@@ -2068,7 +2068,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_conductor_api"
-version = "0.0.43"
+version = "0.0.44"
 dependencies = [
  "derive_more",
  "directories 2.0.2",
@@ -2123,7 +2123,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_keystore"
-version = "0.0.41"
+version = "0.0.42"
 dependencies = [
  "base64",
  "ghost_actor 0.3.0-alpha.4",
@@ -2153,7 +2153,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_p2p"
-version = "0.0.41"
+version = "0.0.42"
 dependencies = [
  "async-trait",
  "fixt",
@@ -2206,7 +2206,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_sqlite"
-version = "0.0.40"
+version = "0.0.41"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2254,7 +2254,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_state"
-version = "0.0.43"
+version = "0.0.44"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -2307,7 +2307,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_types"
-version = "0.0.41"
+version = "0.0.42"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -2374,7 +2374,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasm_test_utils"
-version = "0.0.42"
+version = "0.0.43"
 dependencies = [
  "holochain_types",
  "holochain_util",
@@ -2762,7 +2762,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p"
-version = "0.0.35"
+version = "0.0.36"
 dependencies = [
  "arbitrary",
  "arrayref",
