@@ -67,7 +67,8 @@ pub(crate) fn incoming_countersigning(
             if let Entry::CounterSign(session_data, _) = entry.as_ref() {
                 let entry_hash = EntryHash::with_data_sync(&**entry);
                 // Get the required headers for this session.
-                let header_set = session_data.build_header_set(entry_hash)?;
+                let weight = todo!("weigh element");
+                let header_set = session_data.build_header_set(entry_hash, weight)?;
 
                 // Get the expires time for this session.
                 let expires = *session_data.preflight_request().session_times().end();
@@ -226,7 +227,8 @@ pub(crate) async fn countersigning_success(
             if let Some((cs_entry_hash, cs)) = current_countersigning_session(txn, Arc::new(author.clone()))? {
                 // Check we have the right session.
                 if cs_entry_hash == entry_hash {
-                    let stored_headers = cs.build_header_set(entry_hash)?;
+                    let weight = todo!("weigh element");
+                    let stored_headers = cs.build_header_set(entry_hash, weight)?;
                     if stored_headers.len() == incoming_headers.len() {
                         // Check all stored header hashes match an incoming header hash.
                         if stored_headers.iter().all(|h| {

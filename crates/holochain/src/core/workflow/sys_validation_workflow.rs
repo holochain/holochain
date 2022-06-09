@@ -317,7 +317,9 @@ async fn validate_op_inner(
                 // Retrieve for all other headers on countersigned entry.
                 if let Entry::CounterSign(session_data, _) = &**entry {
                     let entry_hash = EntryHash::with_data_sync(&**entry);
-                    let weight = header.rate_data();
+                    let weight = header
+                        .entry_rate_data()
+                        .ok_or_else(|| SysValidationError::NonEntryHeader(header.clone()))?;
                     for header in session_data.build_header_set(entry_hash, weight)? {
                         let hh = HeaderHash::with_data_sync(&header);
                         if workspace
@@ -350,6 +352,10 @@ async fn validate_op_inner(
             if let Entry::CounterSign(session_data, _) = &**entry {
                 let dependency_check = |_original_element: &Element| Ok(());
                 let entry_hash = EntryHash::with_data_sync(&**entry);
+                let weight = match header {
+                    NewEntryHeader::Create(h) => h.weight.clone(),
+                    NewEntryHeader::Update(h) => h.weight.clone(),
+                };
                 for header in session_data.build_header_set(entry_hash, weight)? {
                     check_and_hold_store_element(
                         &HeaderHash::with_data_sync(&header),
@@ -520,7 +526,7 @@ async fn sys_validate_element_inner(
 
     match maybe_entry {
         Some(Entry::CounterSign(session, _)) => {
-            if Some(weight) = header.entry_rate_data() {
+            if let Some(weight) = header.entry_rate_data() {
                 let entry_hash = EntryHash::with_data_sync(maybe_entry.unwrap());
                 for header in session.build_header_set(entry_hash, weight)? {
                     validate(
