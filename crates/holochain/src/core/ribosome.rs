@@ -12,6 +12,10 @@ pub mod guest_callback;
 pub mod host_fn;
 pub mod real_ribosome;
 
+use self::{
+    error::RibosomeError,
+    guest_callback::genesis_self_check::{GenesisSelfCheckHostAccess, GenesisSelfCheckInvocation},
+};
 use crate::conductor::api::CellConductorApi;
 use crate::conductor::api::CellConductorReadHandle;
 use crate::conductor::api::ZomeCall;
@@ -26,7 +30,13 @@ use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageInvocation;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
+use crate::core::ribosome::guest_callback::weigh::WeighHostAccess;
+use crate::core::ribosome::guest_callback::weigh::WeighInvocation;
+use crate::core::ribosome::guest_callback::weigh::WeighResult;
 use crate::core::ribosome::guest_callback::CallIterator;
+use crate::core::ribosome::guest_callback::{
+    entry_defs::EntryDefsInvocation, genesis_self_check::GenesisSelfCheckResult,
+};
 use derive_more::Constructor;
 use error::RibosomeResult;
 use guest_callback::entry_defs::EntryDefsHostAccess;
@@ -44,14 +54,6 @@ use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
 use holochain_types::prelude::*;
 use mockall::automock;
 use std::iter::Iterator;
-
-use self::guest_callback::{
-    entry_defs::EntryDefsInvocation, genesis_self_check::GenesisSelfCheckResult,
-};
-use self::{
-    error::RibosomeError,
-    guest_callback::genesis_self_check::{GenesisSelfCheckHostAccess, GenesisSelfCheckInvocation},
-};
 
 #[derive(Clone)]
 pub struct CallContext {
@@ -102,6 +104,7 @@ pub enum HostContext {
     PostCommit(PostCommitHostAccess), // MAYBE: add emit_signal access here?
     Validate(ValidateHostAccess),
     ValidationPackage(ValidationPackageHostAccess),
+    Weigh(WeighHostAccess),
     ZomeCall(ZomeCallHostAccess),
 }
 
@@ -116,6 +119,7 @@ impl From<&HostContext> for HostFnAccess {
             HostContext::MigrateAgent(access) => access.into(),
             HostContext::ValidationPackage(access) => access.into(),
             HostContext::PostCommit(access) => access.into(),
+            HostContext::Weigh(access) => access.into(),
         }
     }
 }
@@ -545,6 +549,12 @@ pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
         access: ValidateHostAccess,
         invocation: ValidateInvocation,
     ) -> RibosomeResult<ValidateResult>;
+
+    fn run_weigh(
+        &self,
+        host_access: WeighHostAccess,
+        invocation: WeighInvocation,
+    ) -> RibosomeResult<WeighResult>;
 
     /// Runs the specified zome fn. Returns the cursor used by HDK,
     /// so that it can be passed on to source chain manager for transactional writes

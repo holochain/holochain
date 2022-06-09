@@ -45,6 +45,7 @@ members = [
     "validate_valid",
     "validation_package_fail",
     "validation_package_success",
+    "weigh",
     "whoami",
     "zome_info",
 ]
