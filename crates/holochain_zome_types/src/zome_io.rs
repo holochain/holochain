@@ -141,6 +141,18 @@ wasm_io_types! {
 
     fn verify_signature (zt::signature::VerifySignature) -> bool;
 
+    fn x_salsa20_poly1305_shared_secret_create_random(
+        Option<zt::x_salsa20_poly1305::key_ref::XSalsa20Poly1305KeyRef>
+    ) -> zt::x_salsa20_poly1305::key_ref::XSalsa20Poly1305KeyRef;
+
+    fn x_salsa20_poly1305_shared_secret_export(
+        zt::x_salsa20_poly1305::XSalsa20Poly1305SharedSecretExport
+    ) -> zt::x_salsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData;
+
+    fn x_salsa20_poly1305_shared_secret_ingest(
+        zt::x_salsa20_poly1305::XSalsa20Poly1305SharedSecretIngest
+    ) -> zt::x_salsa20_poly1305::key_ref::XSalsa20Poly1305KeyRef;
+
     fn x_salsa20_poly1305_encrypt(
         zt::x_salsa20_poly1305::XSalsa20Poly1305Encrypt
     ) -> zt::x_salsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData;

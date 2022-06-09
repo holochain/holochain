@@ -69,16 +69,11 @@ pub trait HdkT: HdiT {
     ) -> ExternResult<XSalsa20Poly1305KeyRef>;
     fn x_salsa20_poly1305_shared_secret_export(
         &self,
-        sender: X25519PubKey,
-        recipient: X25519PubKey,
-        key_ref: XSalsa20Poly1305KeyRef,
+        x_salsa20_poly1305_shared_secret_export: XSalsa20Poly1305SharedSecretExport,
     ) -> ExternResult<XSalsa20Poly1305EncryptedData>;
     fn x_salsa20_poly1305_shared_secret_ingest(
         &self,
-        recipient: X25519PubKey,
-        sender: X25519PubKey,
-        encrypted_data: XSalsa20Poly1305EncryptedData,
-        key_ref: Option<XSalsa20Poly1305KeyRef>,
+        x_salsa20_poly1305_shared_secret_ingest: XSalsa20Poly1305SharedSecretIngest,
     ) -> ExternResult<XSalsa20Poly1305KeyRef>;
     fn x_salsa20_poly1305_encrypt(
         &self,
@@ -144,16 +139,11 @@ mockall::mock! {
         ) -> ExternResult<XSalsa20Poly1305KeyRef>;
         fn x_salsa20_poly1305_shared_secret_export(
             &self,
-            sender: X25519PubKey,
-            recipient: X25519PubKey,
-            key_ref: XSalsa20Poly1305KeyRef,
+            x_salsa20_poly1305_shared_secret_export: XSalsa20Poly1305SharedSecretExport,
         ) -> ExternResult<XSalsa20Poly1305EncryptedData>;
         fn x_salsa20_poly1305_shared_secret_ingest(
             &self,
-            recipient: X25519PubKey,
-            sender: X25519PubKey,
-            encrypted_data: XSalsa20Poly1305EncryptedData,
-            key_ref: Option<XSalsa20Poly1305KeyRef>,
+            x_salsa20_poly1305_shared_secret_ingest: XSalsa20Poly1305SharedSecretIngest,
         ) -> ExternResult<XSalsa20Poly1305KeyRef>;
         fn x_salsa20_poly1305_encrypt(
             &self,
@@ -354,19 +344,14 @@ impl HdkT for ErrHdk {
 
     fn x_salsa20_poly1305_shared_secret_export(
         &self,
-        _sender: X25519PubKey,
-        _recipient: X25519PubKey,
-        _key_ref: XSalsa20Poly1305KeyRef,
+        _x_salsa20_poly1305_shared_secret_export: XSalsa20Poly1305SharedSecretExport,
     ) -> ExternResult<XSalsa20Poly1305EncryptedData> {
         Self::err()
     }
 
     fn x_salsa20_poly1305_shared_secret_ingest(
         &self,
-        _recipient: X25519PubKey,
-        _sender: X25519PubKey,
-        _encrypted_data: XSalsa20Poly1305EncryptedData,
-        _key_ref: Option<XSalsa20Poly1305KeyRef>,
+        _x_salsa20_poly1305_shared_secret_ingest: XSalsa20Poly1305SharedSecretIngest,
     ) -> ExternResult<XSalsa20Poly1305KeyRef> {
         Self::err()
     }
@@ -539,28 +524,32 @@ impl HdkT for HostHdk {
 
     fn x_salsa20_poly1305_shared_secret_create_random(
         &self,
-        _key_ref: Option<XSalsa20Poly1305KeyRef>,
+        key_ref: Option<XSalsa20Poly1305KeyRef>,
     ) -> ExternResult<XSalsa20Poly1305KeyRef> {
-        todo!()
+        host_call::<Option<XSalsa20Poly1305KeyRef>, XSalsa20Poly1305KeyRef>(
+            __x_salsa20_poly1305_shared_secret_create_random,
+            key_ref,
+        )
     }
 
     fn x_salsa20_poly1305_shared_secret_export(
         &self,
-        _sender: X25519PubKey,
-        _recipient: X25519PubKey,
-        _key_ref: XSalsa20Poly1305KeyRef,
+        x_salsa20_poly1305_shared_secret_export: XSalsa20Poly1305SharedSecretExport,
     ) -> ExternResult<XSalsa20Poly1305EncryptedData> {
-        todo!()
+        host_call::<XSalsa20Poly1305SharedSecretExport, XSalsa20Poly1305EncryptedData>(
+            __x_salsa20_poly1305_shared_secret_export,
+            x_salsa20_poly1305_shared_secret_export,
+        )
     }
 
     fn x_salsa20_poly1305_shared_secret_ingest(
         &self,
-        _recipient: X25519PubKey,
-        _sender: X25519PubKey,
-        _encrypted_data: XSalsa20Poly1305EncryptedData,
-        _key_ref: Option<XSalsa20Poly1305KeyRef>,
+        x_salsa20_poly1305_shared_secret_ingest: XSalsa20Poly1305SharedSecretIngest,
     ) -> ExternResult<XSalsa20Poly1305KeyRef> {
-        todo!()
+        host_call::<XSalsa20Poly1305SharedSecretIngest, XSalsa20Poly1305KeyRef>(
+            __x_salsa20_poly1305_shared_secret_ingest,
+            x_salsa20_poly1305_shared_secret_ingest,
+        )
     }
 
     fn x_salsa20_poly1305_encrypt(
