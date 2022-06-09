@@ -23,6 +23,7 @@ pub fn create<'a>(
         } => {
             let entry = AsRef::<Entry>::as_ref(&input);
             let chain_top_ordering = *input.chain_top_ordering();
+            let weight = todo!("weigh element");
 
             // Countersigned entries have different header handling.
             match entry {
@@ -37,6 +38,7 @@ pub fn create<'a>(
                             Some(call_context.zome.clone()),
                             input.into_entry(),
                             chain_top_ordering,
+                            weight,
                         )
                         .await
                         .map_err(|source_chain_error| {

@@ -31,6 +31,8 @@ pub fn update<'a>(
                 chain_top_ordering,
             } = create_input;
 
+            let weight = todo!("weigh element");
+
             // Countersigned entries have different header handling.
             match entry {
                 Entry::CounterSign(_, _) => tokio_helper::block_forever_on(async move {
@@ -44,6 +46,7 @@ pub fn update<'a>(
                             Some(call_context.zome.clone()),
                             entry,
                             chain_top_ordering,
+                            weight,
                         )
                         .await
                         .map_err(|source_chain_error| {
