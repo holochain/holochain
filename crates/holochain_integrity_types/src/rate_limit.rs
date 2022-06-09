@@ -4,8 +4,12 @@ use holochain_serialized_bytes::prelude::*;
 
 use crate::{Create, CreateLink, Delete, Entry, Update};
 
-/// Input to the `weigh` callback. Includes an "unweighed" header, and Entry
-/// if applicable.
+mod bucket;
+pub use bucket::*;
+mod error;
+pub use error::*;
+
+/// Input to the `weigh` callback
 #[derive(Clone, PartialEq, Serialize, Deserialize, SerializedBytes, Debug)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum WeighInput {
