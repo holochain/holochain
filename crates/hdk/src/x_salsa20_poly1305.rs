@@ -11,19 +11,27 @@ pub use holochain_deterministic_integrity::x_salsa20_poly1305::*;
 /// If `Ok`, this function will return the KeyRef by which the shared
 /// secret may be accessed.
 pub fn x_salsa20_poly1305_shared_secret_create_random(
-    _key_ref: Option<XSalsa20Poly1305KeyRef>,
+    key_ref: Option<XSalsa20Poly1305KeyRef>,
 ) -> ExternResult<XSalsa20Poly1305KeyRef> {
-    todo!()
+    HDK.with(|h| {
+        h.borrow()
+            .x_salsa20_poly1305_shared_secret_create_random(key_ref)
+    })
 }
 
 /// Using the Libsodium box algorithm, encrypt a shared secret so that it
 /// may be forwarded to another specific peer.
 pub fn x_salsa20_poly1305_shared_secret_export(
-    _sender: X25519PubKey,
-    _recipient: X25519PubKey,
-    _key_ref: XSalsa20Poly1305KeyRef,
+    sender: X25519PubKey,
+    recipient: X25519PubKey,
+    key_ref: XSalsa20Poly1305KeyRef,
 ) -> ExternResult<XSalsa20Poly1305EncryptedData> {
-    todo!()
+    HDK.with(|h| {
+        h.borrow()
+            .x_salsa20_poly1305_shared_secret_export(XSalsa20Poly1305SharedSecretExport::new(
+                sender, recipient, key_ref,
+            ))
+    })
 }
 
 /// Using the Libsodium box algorithm, decrypt a shared secret, storing it
@@ -37,12 +45,20 @@ pub fn x_salsa20_poly1305_shared_secret_export(
 /// If `Ok`, this function will return the KeyRef by which the shared
 /// secret may be accessed.
 pub fn x_salsa20_poly1305_shared_secret_ingest(
-    _recipient: X25519PubKey,
-    _sender: X25519PubKey,
-    _encrypted_data: XSalsa20Poly1305EncryptedData,
-    _key_ref: Option<XSalsa20Poly1305KeyRef>,
+    recipient: X25519PubKey,
+    sender: X25519PubKey,
+    encrypted_data: XSalsa20Poly1305EncryptedData,
+    key_ref: Option<XSalsa20Poly1305KeyRef>,
 ) -> ExternResult<XSalsa20Poly1305KeyRef> {
-    todo!()
+    HDK.with(|h| {
+        h.borrow()
+            .x_salsa20_poly1305_shared_secret_ingest(XSalsa20Poly1305SharedSecretIngest::new(
+                recipient,
+                sender,
+                encrypted_data,
+                key_ref,
+            ))
+    })
 }
 
 /// Libsodium secret-key authenticated encryption: secretbox.

@@ -40,7 +40,7 @@ pub struct XSalsa20Poly1305SharedSecretIngest {
     recipient: X25519PubKey,
     sender: X25519PubKey,
     encrypted_data: crate::x_salsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData,
-    key_ref: crate::x_salsa20_poly1305::key_ref::XSalsa20Poly1305KeyRef,
+    key_ref: Option<crate::x_salsa20_poly1305::key_ref::XSalsa20Poly1305KeyRef>,
 }
 
 impl XSalsa20Poly1305SharedSecretIngest {
@@ -48,7 +48,7 @@ impl XSalsa20Poly1305SharedSecretIngest {
         recipient: X25519PubKey,
         sender: X25519PubKey,
         encrypted_data: crate::x_salsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData,
-        key_ref: crate::x_salsa20_poly1305::key_ref::XSalsa20Poly1305KeyRef,
+        key_ref: Option<crate::x_salsa20_poly1305::key_ref::XSalsa20Poly1305KeyRef>,
     ) -> Self {
         Self {
             recipient,
@@ -72,7 +72,9 @@ impl XSalsa20Poly1305SharedSecretIngest {
         &self.encrypted_data
     }
 
-    pub fn as_key_ref_ref(&self) -> &crate::x_salsa20_poly1305::key_ref::XSalsa20Poly1305KeyRef {
+    pub fn as_key_ref_ref(
+        &self,
+    ) -> &Option<crate::x_salsa20_poly1305::key_ref::XSalsa20Poly1305KeyRef> {
         &self.key_ref
     }
 }

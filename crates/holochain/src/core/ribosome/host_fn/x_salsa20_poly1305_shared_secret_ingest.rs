@@ -35,6 +35,16 @@ pub fn x_salsa20_poly1305_shared_secret_ingest(
 
                 // this is a temp requirement until we do the
                 // actual lair integration
+                // safer to do it this way, then when we relax
+                // the requirement, we wont break anyone's hApp code.
+                if let Some(key_ref) = input.as_key_ref_ref().as_ref() {
+                    if key_ref.as_ref() != res.as_ref() {
+                        return Err("TempErrKeyRefMismatchKey".into());
+                    }
+                }
+
+                // this is a temp requirement until we do the
+                // actual lair integration
                 if res.len() != 32 {
                     return Err("TempErrKeyRefLen".into());
                 }
