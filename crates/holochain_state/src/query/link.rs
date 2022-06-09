@@ -96,9 +96,7 @@ impl LinksQuery {
     fn add_type_query(q: String, type_query: &Option<LinkTypeRanges>) -> String {
         match type_query {
             Some(link_type) => {
-                let r = format!("{} {} ", q, link_type.to_sql_statement());
-                eprintln!("{}", link_type.to_sql_statement());
-                r
+                format!("{} {} ", q, link_type.to_sql_statement())
             }
             _ => q,
         }

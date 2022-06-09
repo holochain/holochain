@@ -11,6 +11,8 @@ use holochain_zome_types::ZomeId;
 
 #[allow(missing_docs)]
 mod error;
+#[cfg(test)]
+mod test;
 
 /// Zome types at the global scope for a DNA.
 #[derive(Clone, Debug, PartialEq, Default)]
@@ -58,7 +60,7 @@ impl GlobalZomeTypes {
                 let end = start
                     .0
                     .checked_add(num_link_types.0)
-                    .ok_or(ZomeTypesError::EntryTypeIndexOverflow)?
+                    .ok_or(ZomeTypesError::LinkTypeIndexOverflow)?
                     .into();
                 zome_types.links.0.push(start..end);
                 Ok(zome_types)
@@ -117,73 +119,4 @@ fn find_zome_id<'iter>(
             .then(|| i)
             .and_then(|i| Some(ZomeId(i.try_into().ok()?)))
     })
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn construction_is_deterministic() {
-        let zome_types = vec![
-            (EntryDefIndex(3), LinkType(2)),
-            (EntryDefIndex(0), LinkType(0)),
-            (EntryDefIndex(5), LinkType(1)),
-            (EntryDefIndex(12), LinkType(0)),
-        ];
-
-        assert_eq!(
-            GlobalZomeTypes::from_ordered_iterator(zome_types.clone()).unwrap(),
-            GlobalZomeTypes::from_ordered_iterator(zome_types.clone()).unwrap(),
-        );
-
-        let mut expect = GlobalZomeTypes::default();
-
-        expect
-            .0
-            .entries
-            .0
-            .push(GlobalZomeTypeId(0)..GlobalZomeTypeId(3));
-        expect
-            .0
-            .entries
-            .0
-            .push(GlobalZomeTypeId(3)..GlobalZomeTypeId(3));
-        expect
-            .0
-            .entries
-            .0
-            .push(GlobalZomeTypeId(3)..GlobalZomeTypeId(8));
-        expect
-            .0
-            .entries
-            .0
-            .push(GlobalZomeTypeId(8)..GlobalZomeTypeId(20));
-
-        expect
-            .0
-            .links
-            .0
-            .push(GlobalZomeTypeId(0)..GlobalZomeTypeId(2));
-        expect
-            .0
-            .links
-            .0
-            .push(GlobalZomeTypeId(2)..GlobalZomeTypeId(2));
-        expect
-            .0
-            .links
-            .0
-            .push(GlobalZomeTypeId(2)..GlobalZomeTypeId(3));
-        expect
-            .0
-            .links
-            .0
-            .push(GlobalZomeTypeId(3)..GlobalZomeTypeId(3));
-
-        assert_eq!(
-            GlobalZomeTypes::from_ordered_iterator(zome_types).unwrap(),
-            expect
-        )
-    }
 }
