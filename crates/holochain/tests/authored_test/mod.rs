@@ -36,14 +36,14 @@ async fn authored_test() {
     let entry = Post("Hi there".into());
     let entry_hash = EntryHash::with_data_sync(&Entry::try_from(entry.clone()).unwrap());
     // 3
-    alice_call_data
-        .get_api(TestWasm::Create)
-        .commit_entry(
-            entry.clone().try_into().unwrap(),
-            POST_INDEX,
-            EntryVisibility::Public,
-        )
-        .await;
+    let h = alice_call_data.get_api(TestWasm::Create);
+    let entry_index = h.get_entry_type(TestWasm::Create, POST_INDEX);
+    h.commit_entry(
+        entry.clone().try_into().unwrap(),
+        entry_index,
+        EntryVisibility::Public,
+    )
+    .await;
 
     // publish these commits
     let triggers = handle.get_cell_triggers(&alice_call_data.cell_id).unwrap();
@@ -110,14 +110,14 @@ async fn authored_test() {
     });
 
     // Now bob commits the entry
-    bob_call_data
-        .get_api(TestWasm::Create)
-        .commit_entry(
-            entry.clone().try_into().unwrap(),
-            POST_INDEX,
-            EntryVisibility::Public,
-        )
-        .await;
+    let h = bob_call_data.get_api(TestWasm::Create);
+    let entry_index = h.get_entry_type(TestWasm::Create, POST_INDEX);
+    h.commit_entry(
+        entry.clone().try_into().unwrap(),
+        entry_index,
+        EntryVisibility::Public,
+    )
+    .await;
 
     // Produce and publish these commits
     let triggers = handle.get_cell_triggers(&bob_call_data.cell_id).unwrap();

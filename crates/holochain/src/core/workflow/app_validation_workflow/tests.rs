@@ -446,11 +446,12 @@ async fn commit_invalid_post(
     let entry_hash = EntryHash::with_data_sync(&Entry::try_from(entry.clone()).unwrap());
     // Create call data for the 3rd zome Create
     let call_data = HostFnCaller::create_for_zome(bob_cell_id, handle, dna_file, 2).await;
+    let entry_index = call_data.get_entry_type(TestWasm::Create, POST_INDEX);
     // 9
     let invalid_header_hash = call_data
         .commit_entry(
             entry.clone().try_into().unwrap(),
-            POST_INDEX,
+            entry_index,
             EntryVisibility::Public,
         )
         .await;

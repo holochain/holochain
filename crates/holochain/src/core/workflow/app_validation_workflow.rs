@@ -498,6 +498,7 @@ pub fn entry_creation_zomes_to_invoke(
             ..
         }) => {
             let zome = ribosome.find_zome_from_entry(&aet.id()).ok_or_else(|| {
+                // TODO: Should this be rejected or an error?
                 Outcome::rejected(&format!("Zome does not exist for {:?}", aet.id()))
             })?;
             Ok(ZomesToInvoke::One(zome.erase_type()))
@@ -513,6 +514,7 @@ fn create_link_zomes_to_invoke(
     let zome = ribosome
         .find_zome_from_link(&create_link.link_type)
         .ok_or_else(|| {
+            // TODO: Should this be rejected or an error?
             Outcome::rejected(&format!(
                 "Zome does not exist for {:?}",
                 create_link.link_type

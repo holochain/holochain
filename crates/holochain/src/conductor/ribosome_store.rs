@@ -5,7 +5,6 @@ use tracing::*;
 
 use crate::core::ribosome::{error::RibosomeResult, real_ribosome::RealRibosome, RibosomeT};
 
-/// Placeholder for real dna store
 #[derive(Default, Debug)]
 pub struct RibosomeStore {
     ribosomes: HashMap<DnaHash, RealRibosome>,

@@ -32,10 +32,9 @@ use unwrap_to::unwrap_to;
 // Useful for when you want to commit something
 // that will match entry defs
 pub const POST_ID: &str = "post";
-/// FIXME: This is wrong because it depends on if it is the only integrity zome.
-pub const POST_INDEX: EntryDefIndex = EntryDefIndex(0);
+pub const POST_INDEX: LocalZomeTypeId = LocalZomeTypeId(0);
 pub const MSG_ID: &str = "msg";
-pub const MSG_INDEX: EntryDefIndex = EntryDefIndex(1);
+pub const MSG_INDEX: LocalZomeTypeId = LocalZomeTypeId(1);
 pub const VALID_ID: &str = "always_validates";
 pub const INVALID_ID: &str = "never_validates";
 
@@ -207,6 +206,40 @@ impl HostFnCaller {
 }
 
 impl HostFnCaller {
+    pub fn get_entry_type(
+        &self,
+        zome: impl Into<ZomeName>,
+        local_index: impl Into<LocalZomeTypeId>,
+    ) -> EntryDefIndex {
+        let zome_dependencies = self.ribosome.get_zome_dependencies(&zome.into()).unwrap();
+        let zome_types = self
+            .ribosome
+            .zome_types()
+            .re_scope(zome_dependencies)
+            .unwrap();
+        zome_types
+            .entries
+            .to_global_scope(local_index)
+            .unwrap()
+            .into()
+    }
+    pub fn get_link_type(
+        &self,
+        zome: impl Into<ZomeName>,
+        local_index: impl Into<LocalZomeTypeId>,
+    ) -> LinkType {
+        let zome_dependencies = self.ribosome.get_zome_dependencies(&zome.into()).unwrap();
+        let zome_types = self
+            .ribosome
+            .zome_types()
+            .re_scope(zome_dependencies)
+            .unwrap();
+        zome_types
+            .links
+            .to_global_scope(local_index)
+            .unwrap()
+            .into()
+    }
     pub async fn commit_entry<E: Into<EntryDefLocation>>(
         &self,
         entry: Entry,

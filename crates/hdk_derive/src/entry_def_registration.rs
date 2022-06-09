@@ -44,7 +44,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
                      required_validations,
                      ..
                  }| {
-                    let id = crate::util::to_snake_name(name, &v_ident);
+                    let id = crate::util::to_snake_case(name, &v_ident);
                     let visibility = parse_visibility(&v_ident, visibility);
                     let required_validations =
                         required_validations.unwrap_or_else(|| RequiredValidations::default().0);
