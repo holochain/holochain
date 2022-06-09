@@ -10,17 +10,3 @@ pub enum AutonomicProcess {
     /// Push out new hold requests if the health is too low.
     HealthCheck,
 }
-
-// / A cue that the autonomic system should perform one of its functions now,
-// / rather than at the next scheduled time
-// pub enum AutonomicCue {
-// /// Cue sent when it is known that entries are ready for initial publishing,
-// /// i.e. after committing new entries to your source chain
-// Publish(Address),
-// }
-
-// impl From<AutonomicCue> for AutonomicProcess {
-//     fn from(cue: AutonomicCue) -> AutonomicProcess {
-//         match cue {}
-//     }
-// }

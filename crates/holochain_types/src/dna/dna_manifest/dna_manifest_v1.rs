@@ -38,7 +38,6 @@ pub struct DnaManifestV1 {
 
     /// An array of zomes associated with your DNA.
     /// The order is significant: it determines initialization order.
-    // pub zomes: Vec<ZomeManifest>,
     #[serde_as(as = "PickFirst<(_, FromInto<Vec<ZomeManifest>>)>")]
     pub zomes: AllZomes,
 }
@@ -47,9 +46,9 @@ pub struct DnaManifestV1 {
 #[serde(rename_all = "snake_case")]
 /// Integrity and coordinator zomes.
 pub struct AllZomes {
-    /// TODO
+    /// The integrity zome manifests.
     pub integrity: Vec<ZomeManifest>,
-    /// TODO
+    /// The coordinator zome manifests.
     #[serde(default)]
     pub coordinator: Vec<ZomeManifest>,
 }

@@ -86,7 +86,7 @@ impl DnaFile {
         })
     }
 
-    /// Host swap coordinator zomes for this dna.
+    /// Hot swap coordinator zomes for this dna.
     pub async fn hot_swap_coordinators(
         &mut self,
         coordinator_zomes: CoordinatorZomes,

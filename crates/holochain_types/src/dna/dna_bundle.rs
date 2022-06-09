@@ -175,6 +175,13 @@ impl DnaBundle {
             .integrity_zomes
             .into_iter()
             .filter_map(|(name, zome)| {
+                let dependencies = zome
+                    .as_any_zome_def()
+                    .dependencies()
+                    .iter()
+                    .cloned()
+                    .map(|name| ZomeDependency { name })
+                    .collect();
                 zome.wasm_hash(&name).ok().map(|hash| {
                     let hash = WasmHashB64::from(hash);
                     let filename = format!("{}", hash);
@@ -182,8 +189,7 @@ impl DnaBundle {
                         name,
                         hash: Some(hash),
                         location: Location::Bundled(PathBuf::from(filename)),
-                        // FIXME: This should not be default
-                        dependencies: Default::default(),
+                        dependencies: Some(dependencies),
                     }
                 })
             })
@@ -192,6 +198,13 @@ impl DnaBundle {
             .coordinator_zomes
             .into_iter()
             .filter_map(|(name, zome)| {
+                let dependencies = zome
+                    .as_any_zome_def()
+                    .dependencies()
+                    .iter()
+                    .cloned()
+                    .map(|name| ZomeDependency { name })
+                    .collect();
                 zome.wasm_hash(&name).ok().map(|hash| {
                     let hash = WasmHashB64::from(hash);
                     let filename = format!("{}", hash);
@@ -199,8 +212,7 @@ impl DnaBundle {
                         name,
                         hash: Some(hash),
                         location: Location::Bundled(PathBuf::from(filename)),
-                        // FIXME: This should not be default
-                        dependencies: Default::default(),
+                        dependencies: Some(dependencies),
                     }
                 })
             })
@@ -256,6 +268,7 @@ async fn hash_bytes(
         .into_iter()
         .collect()
 }
+
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;

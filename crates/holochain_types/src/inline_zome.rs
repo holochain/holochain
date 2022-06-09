@@ -66,7 +66,7 @@ impl InlineZomeSet {
         }
     }
 
-    /// Create a set of integrity and coordinators zomes.
+    /// Create a unique set of integrity and coordinators zomes.
     pub fn new_unique<I, C>(integrity: I, coordinators: C) -> Self
     where
         I: IntoIterator<Item = (&'static str, Vec<EntryDef>, u8)>,
@@ -200,7 +200,7 @@ impl InlineZomeSet {
         )
     }
 
-    /// Add a dependency for an coordinator zome
+    /// Add a integrity dependency for a coordinator zome
     pub fn with_dependency(mut self, from: &'static str, to: &'static str) -> Self {
         assert!(
             self.coordinator_zomes.contains_key(from),
