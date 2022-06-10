@@ -47,13 +47,13 @@ pub type CloseCb = Box<dyn FnOnce(u32, &str) -> BoxFuture<'static, ()> + 'static
 pub async fn new_quick_bootstrap_v1(
     _tuning_params: KitsuneP2pTuningParams,
 ) -> KdResult<(TxUrl, KitsuneDirectDriver, CloseCb)> {
-    let (driver, addr) = kitsune_p2p_bootstrap::run(([0, 0, 0, 0], 0), vec![])
+    let (driver, addr, shutdown) = kitsune_p2p_bootstrap::run(([0, 0, 0, 0], 0), vec![])
         .await
         .map_err(KdError::other)?;
 
-    let close_cb: CloseCb = Box::new(|_code, _reason| {
+    let close_cb: CloseCb = Box::new(move |_code, _reason| {
         async move {
-            // TODO - figure out how to shut down bootstrap server
+            shutdown();
         }
         .boxed()
     });

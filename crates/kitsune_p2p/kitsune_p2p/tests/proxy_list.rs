@@ -42,13 +42,13 @@ async fn test_integrated_proxy_list() {
 
     // -- set up bootstrap -- //
 
-    let (driver, bootstrap_url) =
+    let (driver, bootstrap_url, bootstrap_shutdown) =
         kitsune_p2p_bootstrap::run(([127, 0, 0, 1], 0), vec![proxy_url.as_str().into()])
             .await
             .unwrap();
     let bootstrap_url = url2::Url2::parse(format!("http://{}", bootstrap_url));
 
-    tokio::task::spawn(driver);
+    let bootstrap_task = tokio::task::spawn(driver);
 
     println!("bootstrap_url: {}", bootstrap_url);
 
@@ -95,6 +95,7 @@ async fn test_integrated_proxy_list() {
 
     use kitsune_p2p_types::dependencies::ghost_actor::GhostControlSender;
     actor.ghost_actor_shutdown_immediate().await.unwrap();
-    // TODO: shutdown bootstrap server
+    bootstrap_shutdown();
+    bootstrap_task.await.unwrap();
     hnd.close(0, "").await;
 }

@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+- Docs: Update OS support in repository README and link to developer environment setup.
+
 # 20220608.011447
 
 ## [holochain\_cli-0.0.41](crates/holochain_cli/CHANGELOG.md#0.0.41)
