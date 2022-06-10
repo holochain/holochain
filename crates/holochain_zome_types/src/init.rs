@@ -10,7 +10,7 @@ use holochain_wasmer_common::WasmError;
 /// This is the aggregated result of all of the DNA's zome initializations.
 /// If any zome fails to initialize, the DNA initialization at large will fail.
 ///
-/// [See HDK documentation on init callback.](https://docs.rs/hdk/latest/hdk/index.html#workflow-callbacks)
+/// [See HDK documentation on init callback.](https://docs.rs/hdk/latest/hdk/index.html#internal-callbacks)
 ///
 /// # Examples
 ///

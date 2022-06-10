@@ -73,6 +73,8 @@
 //!
 //! And every host function defined by Holochain has a convenience wrapper in HDK that does the type juggling for you.
 //!
+//! ## Extern callbacks
+//!
 //! To extend a Rust function so that it can be called by the host, add the [`hdk_extern!`] attribute.
 //!
 //! - The function must take _one_ argument that implements `serde::Serialize + std::fmt::Debug`
@@ -100,7 +102,7 @@
 //! Most externs are simply available to external processes and must be called explicitly e.g. via RPC over websockets.
 //! The external process only needs to ensure the input and output data is handled correctly as messagepack.
 //!
-//! ## Workflow callbacks
+//! ## Internal callbacks
 //!
 //! Some externs function as callbacks the host will call at key points in Holochain internal system workflows.
 //! These callbacks allow the guest to define how the host proceeds at those decision points.
@@ -114,46 +116,45 @@
 //!
 //! - [`fn entry_defs(_: ()) -> ExternResult<EntryDefs>`](entry_defs):
 //!   - `EntryDefs` is a vector defining all entries used by this app.
-//!   - The `entry_defs![]` macro simplifies this to something resembling `vec![]`.
+//!   - Use the [`entry_defs![]`](entry_defs) macro as a simplified way of defining app entries, resembling `vec![]`.
 //!   - The `#[hdk_entry]` attribute simplifies generating entry definitions for a struct or enum.
 //!   - The `entry_def_index!` macro converts a def id like "post" to an `EntryDefIndex` by calling this callback _inside the guest_.
-//!   - All zomes in a DNA define all their entries at the same time for the host
-//!   - All entry defs are combined into a single ordered list per zone and exposed to tooling such as DNA generation
-//!   - Entry defs are referenced by `u8` numerical position externally and in DHT headers and by id/name e.g. "post" in sparse callbacks
+//!   - All zomes in a DNA define all their entries at the same time for the host.
+//!   - All entry defs are combined into a single ordered list per zome and exposed to tooling such as DNA generation.
+//!   - Entry defs are referenced by `u8` numerical position externally and in DHT headers, and by id/name e.g. "post" in sparse callbacks.
 //! - `fn init(_: ()) -> ExternResult<InitCallbackResult>`:
-//!   - Lazy execution - only runs when the zome is first called.
-//!   - Allows the guest to pass/fail/retry initialization with `InitCallbackResult`
-//!   - All zomes in a DNA init at the same time
-//!   - Any failure fails initialization for the DNA, any retry (missing dependencies) causes the DNA to retry
-//!   - Failure overrides retry
-//!   - [InitCallbackResult](holochain_zome_types::init::InitCallbackResult)
+//!   - Allows the guest to pass/fail/retry initialization with [`InitCallbackResult`](holochain_zome_types::init::InitCallbackResult).
+//!   - Lazy execution - only runs when any zome of the DNA is first called.
+//!   - All zomes in a DNA init at the same time.
+//!   - Any zome failure fails initialization for the DNA, any zome retry (missing dependencies) causes the DNA to retry.
+//!   - Failure overrides retry.
 //!   - See [`create_cap_grant`](crate::capability::create_cap_grant) for an explanation of how to set up capabilities in `init`.
 //! - `fn migrate_agent_{{ open|close }} -> ExternResult<MigrateAgentCallbackResult>`:
-//!   - Allows the guest to pass/fail a migration attempt to/from another DNA
-//!   - Open runs when an agent is starting a new source chain from an old one
-//!   - Close runs when an agent is deprecating an old source chain in favour of a new one
-//!   - All zomes in a DNA migrate at the same time
-//!   - Any failure fails the migration
+//!   - Allows the guest to pass/fail a migration attempt to/from another DNA.
+//!   - Open runs when an agent is starting a new source chain from an old one.
+//!   - Close runs when an agent is deprecating an old source chain in favour of a new one.
+//!   - All zomes in a DNA migrate at the same time.
+//!   - Any failure fails the migration.
 //! - `fn post_commit(headers: Vec<SignedHeaderHashed>)`:
-//!   - Executes after the WASM call that originated the commits so not bound by the original atomic transaction
-//!   - Input is all the header hashes that were committed
-//!   - The zome that originated the commits is called
+//!   - Executes after the WASM call that originated the commits so not bound by the original atomic transaction.
+//!   - Input is all the header hashes that were committed.
+//!   - The zome that originated the commits is called.
 //! - `fn validate_create_link(create_link_data: ValidateCreateLinkData) -> ExternResult<ValidateLinkCallbackResult>`:
-//!   - Allows the guest to pass/fail/retry link creation validation
-//!   - Only the zome that created the link is called
+//!   - Allows the guest to pass/fail/retry link creation validation.
+//!   - Only the zome that created the link is called.
 //! - `fn validate_delete_link(delete_link_data: ValidateDeleteLinkData) -> ExternResult<ValidateLinkCallbackResult>`:
-//!   - Allows the guest to pass/fail/retry link deletion validation
-//!   - Only the zome that deleted the link is called
+//!   - Allows the guest to pass/fail/retry link deletion validation.
+//!   - Only the zome that deleted the link is called.
 //! - `fn validate_{{ create|update|delete }}_{{ agent|entry }}_{{ <entry_id> }}(validate_data: ValidateData) -> ExternResult<ValidateCallbackResult>`:
-//!   - Allows the guest to pass/fail/retry entry validation
-//!   - <entry_id> is the entry id defined by entry defs e.g. "comment"
-//!   - Only the originating zome is called
-//!   - Failure overrides retry
+//!   - Allows the guest to pass/fail/retry entry validation.
+//!   - <entry_id> is the entry id defined by entry defs e.g. "comment".
+//!   - Only the originating zome is called.
+//!   - Failure overrides retry.
 //! - `fn validation_package_{{ <entry_id> }}(entry_type: AppEntryType) -> ExternResult<ValidationPackageCallbackResult>`:
-//!   - Allows the guest to build a validation package for the given entry type
-//!   - Can pass/retry/fail/not-implemented in reverse override order
-//!   - <entry_id> is the entry id defined by entry defs e.g. "comment"
-//!   - Only the originating zome is called
+//!   - Allows the guest to build a validation package for the given entry type.
+//!   - Can pass/retry/fail/not-implemented in reverse override order.
+//!   - <entry_id> is the entry id defined by entry defs e.g. "comment".
+//!   - Only the originating zome is called.
 //!
 //!
 //! # HDK has layers 🧅
