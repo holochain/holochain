@@ -29,7 +29,7 @@
 //! Each example WASM is a minimal demonstration of specific HDK functionality, such as generating random data, creating entries or defining validation callbacks.
 //! Some of the examples are very contrived, none are intended as production grade hApp examples, but do highlight key functionality.
 //!
-//! 
+//!
 //! # HDK structure 🧱
 //!
 //! HDK implements several key features:
@@ -50,18 +50,18 @@
 //!
 //! Generally these features are structured logically into modules but there are some affordances to the layering of abstractions.
 //!
-//! 
+//!
 //! # HDK is based on callbacks 👂
 //!
 //! The only way to execute logic inside WASM is by having the host (conductor) call a function that is marked as an `extern` by the guest (WASM).
-//! 
+//!
 //! > Note: From the perspective of hApp development in WASM, the "guest" is the WASM and the "host" is the running Holochain conductor.
 //! The host is _not_ the "host operating system" in this context.
 //!
 //! Similarly, the only way for the guest to do anything other than process data and calculations is to call functions the host provides to the guest at runtime.
 //!
 //! The latter are all defined by the Holochain conductor and implemented by HDK for you, but the former need to all be defined by your application.
-//! 
+//!
 //! > Any WASM that does _not_ use the HDK will need to define placeholders for and the interface to the host functions.
 //!
 //! All host functions can be called directly as:
@@ -101,7 +101,7 @@
 //! The external process only needs to ensure the input and output data is handled correctly as messagepack.
 //!
 //! ## Workflow callbacks
-//! 
+//!
 //! Some externs function as callbacks the host will call at key points in Holochain internal system workflows.
 //! These callbacks allow the guest to define how the host proceeds at those decision points.
 //! Callbacks are simply called by name and they are "sparse" in that they are matched incrementally from the most specific
@@ -155,7 +155,7 @@
 //!   - <entry_id> is the entry id defined by entry defs e.g. "comment"
 //!   - Only the originating zome is called
 //!
-//! 
+//!
 //! # HDK has layers 🧅
 //!
 //! HDK is designed in layers so that there is some kind of 80/20 rule.
@@ -177,7 +177,7 @@
 //! The lowest layer is the structs and serialization that define how the host and the guest communicate.
 //! You cannot change this but you can reimplement it in your language of choice (e.g. Haskell?) by referencing the Rust zome types and extern function signatures.
 //!
-//! 
+//!
 //! # HDK is atomic on the source chain ⚛
 //!
 //! All writes to the source chain are atomic within a single extern/callback call.
@@ -191,7 +191,7 @@
 //!
 //! Use a post commit hook and signals or remote calls if you need to notify other agents about completed commits.
 //!
-//! 
+//!
 //! # HDK should be pinned 📌
 //!
 //! The basic functionality of the HDK is to communicate with the Holochain conductor using a specific typed interface.
@@ -213,7 +213,7 @@
 //!
 //! You do _not_ need to pin _all_ your Rust dependencies, just those that take part in defining the host/guest interface.
 //!
-//! 
+//!
 //! # HDK is integrated with rust tracing for better debugging 🐛
 //!
 //! Every extern defined with the [`hdk_extern!`] attribute registers a [tracing subscriber](https://crates.io/crates/tracing-subscriber) that works in WASM.
@@ -226,7 +226,7 @@
 //!
 //! The most common internal errors, such as invalid deserialization between WASM and external processes, are traced as `error!` by default.
 //!
-//! 
+//!
 //! # HDK requires explicit error handling between the guest and host ⚠
 //!
 //! All calls to functions provided by the host can fail to execute cleanly, at the least serialization could always fail.
@@ -238,7 +238,7 @@
 //!
 //! The `Result` from the host in the case of host calls indicates whether the execution _completed_ successfully and is _in addition to_ other Result-like enums.
 //! For example, a remote call can be `Ok` from the host's perspective but contain an [ `crate::prelude::ZomeCallResponse::Unauthorized` ] "failure" enum variant from the remote agent, both need to be handled in context.
-//! 
+//!
 //! [`hdk_extern!`]: hdk_derive::hdk_extern
 
 /// Capability claims and grants.
@@ -387,7 +387,7 @@ pub mod hash_path;
 /// - Error handling for all the above
 ///
 /// If you want to do something different to the default you will need to understand and reimplement all the above.
-/// 
+///
 /// [`hdk_extern!`]: hdk_derive::hdk_extern
 pub mod map_extern;
 
@@ -503,7 +503,7 @@ pub mod p2p;
 ///
 /// This module defines a [ `trace::WasmSubscriber` ] that forwards all tracing macro calls to another subscriber on the host.
 /// The logging level can be changed for the host at runtime using the `WASM_LOG` environment variable that works exactly as `RUST_LOG` for other tracing.
-/// 
+///
 /// [`hdk_extern!`]: hdk_derive::hdk_extern
 pub mod trace;
 
