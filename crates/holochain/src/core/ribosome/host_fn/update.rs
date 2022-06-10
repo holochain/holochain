@@ -52,7 +52,7 @@ pub fn update<'a>(
                         let zome = call_context.zome.clone();
 
                         let header = ribosome
-                            .weigh_countersigning_header(unweighed, entry.clone(), zome.clone())
+                            .weigh_countersigning_header(unweighed, entry.clone())
                             .map_err(|e| WasmError::Host(e.to_string()))?;
 
                         source_chain

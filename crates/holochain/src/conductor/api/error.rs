@@ -77,6 +77,10 @@ pub enum ConductorApiError {
     #[error(transparent)]
     CellError(#[from] CellError),
 
+    /// Ribosome error
+    #[error(transparent)]
+    RibosomeError(#[from] RibosomeError),
+
     /// App error
     #[error(transparent)]
     AppError(#[from] AppError),

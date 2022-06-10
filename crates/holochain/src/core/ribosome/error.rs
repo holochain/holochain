@@ -77,6 +77,10 @@ pub enum RibosomeError {
 
     /// ident
     #[error(transparent)]
+    CounterSigningError(#[from] CounterSigningError),
+
+    /// ident
+    #[error(transparent)]
     JoinError(#[from] JoinError),
 
     /// ident

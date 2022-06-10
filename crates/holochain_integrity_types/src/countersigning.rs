@@ -454,7 +454,7 @@ pub struct UpdateBase {
 }
 
 /// An unweighed header calculated from a countersigning session
-#[derive(PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum UnweighedCountersigningHeader {
     /// A Create header (without weight)
     Create(Create<()>),

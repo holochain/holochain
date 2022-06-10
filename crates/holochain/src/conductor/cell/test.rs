@@ -1,6 +1,7 @@
 use crate::conductor::manager::spawn_task_manager;
 use crate::conductor::space::TestSpaces;
 use crate::core::ribosome::guest_callback::genesis_self_check::GenesisSelfCheckResult;
+use crate::core::ribosome::real_ribosome::RealRibosome;
 use crate::core::ribosome::MockRibosomeT;
 use crate::core::workflow::incoming_dht_ops_workflow::op_exists;
 use crate::fixt::DnaFileFixturator;
@@ -89,7 +90,13 @@ async fn test_cell_handle_publish() {
 
     spaces
         .spaces
-        .handle_publish(&dna, true, false, vec![op.clone()])
+        .handle_publish(
+            &dna,
+            true,
+            false,
+            vec![op.clone()],
+            &RealRibosome::new(dna_file),
+        )
         .await
         .unwrap();
 

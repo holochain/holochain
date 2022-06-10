@@ -1,3 +1,5 @@
+use crate::UnweighedCountersigningHeader;
+
 /// Errors related to the secure primitive macro.
 #[derive(Debug)]
 pub enum CounterSigningError {
@@ -5,6 +7,8 @@ pub enum CounterSigningError {
     AgentIndexOutOfBounds,
     /// An empty vector was used to build session data.
     MissingResponse,
+    /// The header does not correspond to an app entry type.
+    HeaderNotAppEntry(Box<UnweighedCountersigningHeader>),
     /// Session responses needs to be same length as the signing agents.
     CounterSigningSessionResponsesLength(usize, usize),
     /// Session response agents all need to be in the correct positions.
@@ -31,9 +35,14 @@ impl core::fmt::Display for CounterSigningError {
                 f,
                 "Attempted to build CounterSigningSessionData with an empty response vector."
             ),
+            CounterSigningError::HeaderNotAppEntry(h) => write!(
+                f,
+                "The countersigning header does not correspond to an app entry type: {:?}.",
+                h
+            ),
             CounterSigningError::CounterSigningSessionResponsesLength(resp, num_agents) => {
                 write!(f,
-                    "The countersigning session responses ({}) did not match the number of signing agents ({})", 
+                    "The countersigning session responses ({}) did not match the number of signing agents ({})",
                     resp,
                     num_agents
                 )

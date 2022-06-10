@@ -26,6 +26,7 @@ use tracing::instrument;
 
 use crate::core::{
     queue_consumer::QueueConsumerMap,
+    ribosome::real_ribosome::RealRibosome,
     workflow::{
         countersigning_workflow::{incoming_countersigning, CountersigningWorkspace},
         incoming_dht_ops_workflow::{
@@ -379,6 +380,7 @@ impl Spaces {
         request_validation_receipt: bool,
         countersigning_session: bool,
         ops: Vec<holochain_types::dht_op::DhtOp>,
+        ribosome: &RealRibosome,
     ) -> ConductorResult<()> {
         use futures::StreamExt;
         let ops = futures::stream::iter(ops.into_iter().map(|op| {
@@ -404,7 +406,7 @@ impl Spaces {
                 // If the workflow has not been spawned yet we can't handle incoming messages.
                 None => return Ok(()),
             };
-            incoming_countersigning(ops, &workspace, trigger)?;
+            incoming_countersigning(ops, &workspace, trigger, ribosome)?;
         } else {
             let space = self.get_or_create_space(dna_hash)?;
             let trigger = match self

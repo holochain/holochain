@@ -21,6 +21,7 @@ use crate::conductor::interface::SignalBroadcaster;
 use crate::conductor::space::Space;
 use crate::core::queue_consumer::{QueueTriggers, TriggerSender, WorkComplete};
 use crate::core::ribosome::real_ribosome::RealRibosome;
+use crate::core::ribosome::RibosomeT;
 
 use super::{error::WorkflowResult, incoming_dht_ops_workflow::incoming_dht_ops_workflow};
 
@@ -56,6 +57,7 @@ pub(crate) fn incoming_countersigning(
     ops: Vec<(DhtOpHash, DhtOp)>,
     workspace: &CountersigningWorkspace,
     trigger: TriggerSender,
+    ribosome: &RealRibosome,
 ) -> WorkflowResult<()> {
     let mut should_trigger = false;
 
@@ -77,14 +79,11 @@ pub(crate) fn incoming_countersigning(
                 // If the headers have different entry hashes they will fail validation.
                 if let Some(entry_hash) = header_set.first().map(|h| h.entry_hash().clone()) {
                     // Hash the required headers.
-                    let required_headers: Vec<_> = header_set
-                        .into_iter()
-                        .map(|h| {
-                            let weight = todo!("weigh element");
-                            let h = h.weighed(weight);
-                            HeaderHash::with_data_sync(&h)
-                        })
-                        .collect();
+                    let mut required_headers = vec![];
+                    for h in header_set {
+                        let h = ribosome.weigh_countersigning_header(h, (**entry).to_owned())?;
+                        required_headers.push(HeaderHash::with_data_sync(&h));
+                    }
 
                     // Check if already timed out.
                     if holochain_zome_types::Timestamp::now() < expires {
@@ -146,7 +145,6 @@ pub(crate) async fn countersigning_success(
     signed_headers: Vec<SignedHeader>,
     trigger: QueueTriggers,
     mut signal: SignalBroadcaster,
-    ribosome: RealRibosome,
 ) -> WorkflowResult<()> {
     let authored_db = space.authored_db;
     let dht_db = space.dht_db;

@@ -723,6 +723,7 @@ impl ConductorHandleT for ConductorHandleImpl {
                 ops,
                 ..
             } => {
+                let ribosome = self.get_ribosome(&dna_hash)?;
                 async {
                     let res = self
                         .conductor
@@ -732,6 +733,7 @@ impl ConductorHandleT for ConductorHandleImpl {
                             request_validation_receipt,
                             countersigning_session,
                             ops,
+                            &ribosome,
                         )
                         .await
                         .map_err(holochain_p2p::HolochainP2pError::other);

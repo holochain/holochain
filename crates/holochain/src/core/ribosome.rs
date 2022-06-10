@@ -569,9 +569,14 @@ pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
         &self,
         h: UnweighedCountersigningHeader,
         entry: Entry,
-        zome: Zome,
     ) -> RibosomeResult<EntryCreationHeader> {
         // TODO: use serialized entry as input
+        let zome_id = h.zome_id().ok_or_else(|| {
+            RibosomeError::from(CounterSigningError::HeaderNotAppEntry(Box::new(h.clone())))
+        })?;
+        let zome = self.dna_def().get_zome_by_index(&zome_id).map_err(|_| {
+            RibosomeError::ZomeNotExists(format!("Zome at index {:?}", zome_id).into())
+        })?;
         let entry_size = SerializedBytes::try_from(&entry)?.bytes().len();
         let input = match &h {
             UnweighedCountersigningHeader::Create(h) => WeighInput::Create(h.clone(), entry),

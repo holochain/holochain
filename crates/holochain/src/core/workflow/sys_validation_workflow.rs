@@ -323,12 +323,8 @@ async fn validate_op_inner(
                 if let Entry::CounterSign(session_data, _) = &**entry {
                     let entry_hash = EntryHash::with_data_sync(&**entry);
                     for header in session_data.build_header_set(entry_hash)? {
-                        let header = if let Some(zome_id) = header.zome_id() {
-                            let zome = workspace.dna_def.get_zome_by_index(&zome_id)?;
-                            ribosome.weigh_countersigning_header(header, (**entry).clone(), zome)?
-                        } else {
-                            header.weighed(Default::default())
-                        };
+                        let header =
+                            ribosome.weigh_countersigning_header(header, (**entry).clone())?;
                         let hh = HeaderHash::with_data_sync(&header);
                         if workspace
                             .full_cascade(network.clone())
@@ -361,12 +357,7 @@ async fn validate_op_inner(
                 let dependency_check = |_original_element: &Element| Ok(());
                 let entry_hash = EntryHash::with_data_sync(&**entry);
                 for header in session_data.build_header_set(entry_hash)? {
-                    let header = if let Some(zome_id) = header.zome_id() {
-                        let zome = workspace.dna_def.get_zome_by_index(&zome_id)?;
-                        ribosome.weigh_countersigning_header(header, (**entry).clone(), zome)?
-                    } else {
-                        header.weighed(Default::default())
-                    };
+                    let header = ribosome.weigh_countersigning_header(header, (**entry).clone())?;
                     check_and_hold_store_element(
                         &HeaderHash::with_data_sync(&header),
                         workspace,
@@ -543,12 +534,7 @@ async fn sys_validate_element_inner(
                 .get_ribosome(dna_hash)
                 .map_err(|_| SysValidationError::DnaMissing(dna_hash.clone()))?;
             for header in session.build_header_set(entry_hash)? {
-                let header = if let Some(zome_id) = header.zome_id() {
-                    let zome = workspace.dna_def.get_zome_by_index(&zome_id)?;
-                    ribosome.weigh_countersigning_header(header, entry.clone(), zome)?
-                } else {
-                    header.weighed(Default::default())
-                };
+                let header = ribosome.weigh_countersigning_header(header, entry.clone())?;
                 validate(
                     &header.into(),
                     maybe_entry,
