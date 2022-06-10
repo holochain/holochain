@@ -150,6 +150,15 @@ impl DnaDef {
             .ok_or_else(|| ZomeError::ZomeNotFound(format!("Zome '{}' not found", &zome_name,)))
     }
 
+    /// Get all the [`CoordinatorZome`]s for this dna
+    pub fn get_all_coordinators(&self) -> Vec<zome::CoordinatorZome> {
+        self.coordinator_zomes
+            .iter()
+            .cloned()
+            .map(|(name, def)| CoordinatorZome::new(name, def))
+            .collect()
+    }
+
     /// Return a Zome, error if not a WasmZome
     pub fn get_wasm_zome(&self, zome_name: &ZomeName) -> Result<&zome::WasmZome, ZomeError> {
         self.all_zomes()

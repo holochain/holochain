@@ -1336,7 +1336,6 @@ impl ConductorHandleT for ConductorHandleImpl {
                     for el in elements.clone() {
                         holochain_state::prelude::insert_element_scratch(
                             scratch,
-                            None,
                             el,
                             Default::default(),
                         );

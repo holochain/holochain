@@ -10,7 +10,6 @@ use holochain_sqlite::db::ReadAccess;
 use holochain_types::db::DbRead;
 use holochain_types::db::DbWrite;
 use holochain_types::db_cache::DhtDbQueryCache;
-use holochain_zome_types::CoordinatorZome;
 use holochain_zome_types::DnaDef;
 use holochain_zome_types::SignedHeaderHashed;
 
@@ -56,7 +55,7 @@ impl HostFnWorkspace {
     pub async fn flush(
         self,
         network: &(dyn HolochainP2pDnaT + Send + Sync),
-    ) -> SourceChainResult<Vec<(Option<CoordinatorZome>, SignedHeaderHashed)>> {
+    ) -> SourceChainResult<Vec<SignedHeaderHashed>> {
         match self.source_chain {
             Some(sc) => sc.flush(network).await,
             None => Ok(Vec::with_capacity(0)),

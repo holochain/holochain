@@ -355,7 +355,7 @@ async fn dodgy_bob(bob_cell_id: &CellId, handle: &ConductorHandle, dna_file: &Dn
         base_address,
     };
     let _header_hash = source_chain
-        .put(None, header_builder, None, ChainTopOrdering::default())
+        .put(header_builder, None, ChainTopOrdering::default())
         .await
         .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))
         .unwrap();

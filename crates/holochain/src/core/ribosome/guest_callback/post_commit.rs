@@ -11,7 +11,6 @@ use holochain_serialized_bytes::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_types::prelude::*;
-use itertools::Itertools;
 
 pub const POST_COMMIT_CHANNEL_BOUND: usize = 100;
 pub const POST_COMMIT_CONCURRENT_LIMIT: usize = 5;
@@ -80,37 +79,24 @@ pub async fn send_post_commit(
     workspace: SourceChainWorkspace,
     network: HolochainP2pDna,
     keystore: MetaLairClient,
-    zomed_headers: Vec<(Option<CoordinatorZome>, SignedHeaderHashed)>,
+    headers: Vec<SignedHeaderHashed>,
+    zomes: Vec<CoordinatorZome>,
 ) -> Result<(), tokio::sync::mpsc::error::SendError<()>> {
     let cell_id = workspace.source_chain().cell_id();
-    let groups = zomed_headers
-        .iter()
-        .group_by(|(zome, _shh)| zome.clone())
-        .into_iter()
-        .map(|(maybe_zome, group)| {
-            (
-                maybe_zome,
-                group.map(|(_maybe_zome, shh)| shh.clone()).collect(),
-            )
-        })
-        .collect::<Vec<(Option<CoordinatorZome>, Vec<SignedHeaderHashed>)>>();
 
-    for (maybe_zome, headers) in groups {
-        if let Some(zome) = maybe_zome {
-            let zome = zome.clone();
-            conductor_handle
-                .post_commit_permit()
-                .await?
-                .send(PostCommitArgs {
-                    host_access: PostCommitHostAccess {
-                        workspace: workspace.clone().into(),
-                        keystore: keystore.clone(),
-                        network: network.clone(),
-                    },
-                    invocation: PostCommitInvocation::new(zome, headers),
-                    cell_id: cell_id.clone(),
-                });
-        }
+    for zome in zomes {
+        conductor_handle
+            .post_commit_permit()
+            .await?
+            .send(PostCommitArgs {
+                host_access: PostCommitHostAccess {
+                    workspace: workspace.clone().into(),
+                    keystore: keystore.clone(),
+                    network: network.clone(),
+                },
+                invocation: PostCommitInvocation::new(zome, headers.clone()),
+                cell_id: cell_id.clone(),
+            });
     }
     Ok(())
 }

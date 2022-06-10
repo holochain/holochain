@@ -21,7 +21,7 @@ pub enum SourceChainError {
         "Attempted to commit a bundle to the source chain, but the source chain head has moved since the bundle began. Bundle head: {2:?}, Current head: {3:?}"
     )]
     HeadMoved(
-        Vec<(Option<CoordinatorZome>, SignedHeaderHashed)>,
+        Vec<SignedHeaderHashed>,
         Vec<EntryHashed>,
         Option<HeaderHash>,
         Option<(HeaderHash, u32, Timestamp)>,

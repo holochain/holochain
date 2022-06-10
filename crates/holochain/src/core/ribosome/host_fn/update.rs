@@ -38,7 +38,7 @@ pub fn update<'a>(
                         .source_chain()
                         .as_ref()
                         .expect("Must have source chain if write_workspace access is given")
-                        .put_countersigned(None, entry, chain_top_ordering)
+                        .put_countersigned(entry, chain_top_ordering)
                         .await
                         .map_err(|source_chain_error| {
                             WasmError::Host(source_chain_error.to_string())
@@ -68,7 +68,7 @@ pub fn update<'a>(
                             .expect("Must have source chain if write_workspace access is given");
                         // push the header and the entry into the source chain
                         let header_hash = source_chain
-                            .put(None, header_builder, Some(entry), chain_top_ordering)
+                            .put(header_builder, Some(entry), chain_top_ordering)
                             .await
                             .map_err(|source_chain_error| {
                                 WasmError::Host(source_chain_error.to_string())

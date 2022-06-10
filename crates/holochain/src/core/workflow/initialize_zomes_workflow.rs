@@ -48,6 +48,7 @@ where
     Ribosome: RibosomeT + Clone + 'static,
 {
     let conductor_handle = args.conductor_handle.clone();
+    let coordinators = args.ribosome.dna_def().get_all_coordinators();
     let result =
         initialize_zomes_workflow_inner(workspace.clone(), network.clone(), keystore.clone(), args)
             .await?;
@@ -59,12 +60,14 @@ where
         let flushed_headers = HostFnWorkspace::from(workspace.clone())
             .flush(&network)
             .await?;
+
         send_post_commit(
             conductor_handle,
             workspace,
             network,
             keystore,
             flushed_headers,
+            coordinators,
         )
         .await?;
     }
@@ -109,7 +112,6 @@ where
     tokio::task::spawn(async move {
         ws.source_chain()
             .put(
-                None,
                 builder::InitZomesComplete {},
                 None,
                 ChainTopOrdering::Strict,

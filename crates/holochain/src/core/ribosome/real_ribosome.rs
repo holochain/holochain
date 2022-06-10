@@ -259,7 +259,7 @@ impl RealRibosome {
             .enumerate()
             .map(|(i, (n, _))| Some((n.clone(), ZomeId(i.try_into().ok()?))))
             .collect::<Option<_>>()
-            .ok_or_else(|| ZomeTypesError::ZomeIndexOverflow)?;
+            .ok_or(ZomeTypesError::ZomeIndexOverflow)?;
 
         // Collect the dependencies for each zome.
         let zome_dependencies = ribosome

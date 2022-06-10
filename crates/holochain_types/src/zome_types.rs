@@ -109,6 +109,7 @@ impl GlobalZomeTypes {
     }
 }
 
+// TODO: Optimize this using a BTree.
 fn find_zome_id<'iter>(
     iter: impl Iterator<Item = &'iter Range<GlobalZomeTypeId>>,
     index: &GlobalZomeTypeId,
