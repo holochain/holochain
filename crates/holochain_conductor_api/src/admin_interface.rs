@@ -5,43 +5,35 @@ use kitsune_p2p::agent_store::AgentInfoSigned;
 
 use crate::{FullStateDump, InstalledAppInfo};
 
-/// Represents the available conductor functions to call over an admin interface
-/// and will result in a corresponding [`AdminResponse`] message being sent back over the
-/// interface connection.
+/// Represents the available conductor functions to call over an admin interface.
 ///
 /// Enum variants follow a general convention of `verb_noun` as opposed to
 /// the `noun_verb` of responses.
 ///
-/// Expects a serialized object with any contents of the enum on a key `data`
-/// and the enum variant on a key `type`, e.g.
-/// `{ type: 'enable_app', data: { installed_app_id: 'test_app' } }`
-///
 /// # Errors
 ///
 /// Returns an [`AdminResponse::Error`] with a reason why the request failed.
+// Expects a serialized object with any contents of the enum on a key `data`
+// and the enum variant on a key `type`, e.g.
+// `{ type: 'enable_app', data: { installed_app_id: 'test_app' } }`
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(rename_all = "snake_case", tag = "type", content = "data")]
 pub enum AdminRequest {
     /// Set up and register one or more new admin interfaces
-    /// as specified by a list of configurations. See
-    /// [`AdminInterfaceConfig`] for details on the configuration.
+    /// as specified by a list of configurations.
     ///
     /// # Returns
     ///
     /// [`AdminResponse::AdminInterfacesAdded`]
-    ///
-    /// [`AdminInterfaceConfig`]: super::AdminInterfaceConfig
     AddAdminInterfaces(Vec<crate::config::AdminInterfaceConfig>),
 
-    /// Register a DNA for later use in [`InstallApp`].
+    /// Register a DNA for later app installation.
     ///
     /// Stores the given DNA into the Holochain DNA database and returns the hash of it.
     ///
     /// # Returns
     ///
     /// [`AdminResponse::DnaRegistered`]
-    ///
-    /// [`InstallApp`]: AdminRequest::InstallApp
     RegisterDna(Box<RegisterDnaPayload>),
 
     /// Clone a DNA (in the biological sense), thus creating a new `Cell`.
