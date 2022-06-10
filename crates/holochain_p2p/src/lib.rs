@@ -27,7 +27,7 @@ pub use kitsune_p2p;
 /// I.e. a sender that is tied to a specific cell.
 pub trait HolochainP2pDnaT {
     /// owned getter
-    fn dna_hash(&self) -> DnaHash;
+    fn dna_hash(&self) -> &DnaHash;
 
     /// The p2p module must be informed at runtime which dna/agent pairs it should be tracking.
     async fn join(
@@ -147,8 +147,8 @@ pub struct HolochainP2pDna {
 #[async_trait::async_trait]
 impl HolochainP2pDnaT for HolochainP2pDna {
     /// owned getter
-    fn dna_hash(&self) -> DnaHash {
-        (*self.dna_hash).clone()
+    fn dna_hash(&self) -> &DnaHash {
+        &self.dna_hash
     }
 
     /// The p2p module must be informed at runtime which dna/agent pairs it should be tracking.

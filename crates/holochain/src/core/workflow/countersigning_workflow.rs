@@ -12,14 +12,15 @@ use holochain_state::prelude::{
 };
 use holochain_types::dht_op::DhtOp;
 use holochain_types::signal::{Signal, SystemSignal};
-use holochain_zome_types::Timestamp;
 use holochain_zome_types::{Entry, SignedHeader, ZomeCallResponse};
+use holochain_zome_types::{Timestamp, UnweighedCountersigningHeader};
 use kitsune_p2p_types::tx2::tx2_utils::Share;
 use rusqlite::{named_params, Transaction};
 
 use crate::conductor::interface::SignalBroadcaster;
 use crate::conductor::space::Space;
 use crate::core::queue_consumer::{QueueTriggers, TriggerSender, WorkComplete};
+use crate::core::ribosome::real_ribosome::RealRibosome;
 
 use super::{error::WorkflowResult, incoming_dht_ops_workflow::incoming_dht_ops_workflow};
 
@@ -67,19 +68,22 @@ pub(crate) fn incoming_countersigning(
             if let Entry::CounterSign(session_data, _) = entry.as_ref() {
                 let entry_hash = EntryHash::with_data_sync(&**entry);
                 // Get the required headers for this session.
-                let weight = todo!("weigh element");
-                let header_set = session_data.build_header_set(entry_hash, weight)?;
+                let header_set = session_data.build_header_set(entry_hash)?;
 
                 // Get the expires time for this session.
                 let expires = *session_data.preflight_request().session_times().end();
 
                 // Get the entry hash from a header.
                 // If the headers have different entry hashes they will fail validation.
-                if let Some(entry_hash) = header_set.first().and_then(|h| h.entry_hash().cloned()) {
+                if let Some(entry_hash) = header_set.first().map(|h| h.entry_hash().clone()) {
                     // Hash the required headers.
                     let required_headers: Vec<_> = header_set
                         .into_iter()
-                        .map(|h| HeaderHash::with_data_sync(&h))
+                        .map(|h| {
+                            let weight = todo!("weigh element");
+                            let h = h.weighed(weight);
+                            HeaderHash::with_data_sync(&h)
+                        })
                         .collect();
 
                     // Check if already timed out.
@@ -142,6 +146,7 @@ pub(crate) async fn countersigning_success(
     signed_headers: Vec<SignedHeader>,
     trigger: QueueTriggers,
     mut signal: SignalBroadcaster,
+    ribosome: RealRibosome,
 ) -> WorkflowResult<()> {
     let authored_db = space.authored_db;
     let dht_db = space.dht_db;
@@ -216,7 +221,7 @@ pub(crate) async fn countersigning_success(
     // Hash headers.
     let incoming_headers: Vec<_> = signed_headers
         .iter()
-        .map(|SignedHeader(h, _)| HeaderHash::with_data_sync(h))
+        .map(|SignedHeader(h, _)| UnweighedCountersigningHeader::from_header(h.clone()))
         .collect();
 
     let result = authored_db
@@ -227,13 +232,11 @@ pub(crate) async fn countersigning_success(
             if let Some((cs_entry_hash, cs)) = current_countersigning_session(txn, Arc::new(author.clone()))? {
                 // Check we have the right session.
                 if cs_entry_hash == entry_hash {
-                    let weight = todo!("weigh element");
-                    let stored_headers = cs.build_header_set(entry_hash, weight)?;
+                    let stored_headers = cs.build_header_set(entry_hash)?;
                     if stored_headers.len() == incoming_headers.len() {
                         // Check all stored header hashes match an incoming header hash.
                         if stored_headers.iter().all(|h| {
-                            let h = HeaderHash::with_data_sync(h);
-                            incoming_headers.iter().any(|i| *i == h)
+                            incoming_headers.iter().any(|i| i.as_ref() == Some(h))
                         }) {
                             // All checks have passed so unlock the chain.
                             mutations::unlock_chain(txn, &author)?;

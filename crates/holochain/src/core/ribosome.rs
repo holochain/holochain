@@ -552,7 +552,7 @@ pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
 
     fn run_weigh(
         &self,
-        host_access: WeighHostAccess,
+        // host_access: WeighHostAccess,
         invocation: WeighInvocation,
     ) -> RibosomeResult<WeighResult>;
 
@@ -563,6 +563,24 @@ pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
         access: ZomeCallHostAccess,
         invocation: ZomeCallInvocation,
     ) -> RibosomeResult<ZomeCallResponse>;
+
+    /// Convenience function to weigh an unweighed countersigning header
+    fn weigh_countersigning_header(
+        &self,
+        h: UnweighedCountersigningHeader,
+        entry: Entry,
+        zome: Zome,
+    ) -> RibosomeResult<EntryCreationHeader> {
+        // TODO: use serialized entry as input
+        let entry_size = SerializedBytes::try_from(&entry)?.bytes().len();
+        let input = match &h {
+            UnweighedCountersigningHeader::Create(h) => WeighInput::Create(h.clone(), entry),
+            UnweighedCountersigningHeader::Update(h) => WeighInput::Update(h.clone(), entry),
+        };
+        let weight = RateWeight::from(self.run_weigh(WeighInvocation::new(zome, input))?);
+        let weight = EntryRateWeight::from_weight_and_size(weight, entry_size);
+        Ok(h.weighed(weight))
+    }
 }
 
 #[cfg(test)]

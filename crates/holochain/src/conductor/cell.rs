@@ -530,6 +530,7 @@ impl Cell {
             signed_headers,
             self.queue_triggers.clone(),
             self.conductor_api.signal_broadcaster().await,
+            RealRibosome::new(self.conductor_api.get_this_dna().map_err(Box::new)?),
         )
         .await
         .map_err(Box::new)?)

@@ -26,15 +26,6 @@ mod error;
 #[cfg(test)]
 mod tests;
 
-/// 16mb limit on Entries due to websocket limits.
-/// Consider splitting large entries up.
-pub const MAX_ENTRY_SIZE: usize = 16_000_000;
-
-/// 1kb limit on LinkTags.
-/// Tags are used as keys to the database to allow
-/// fast lookup so they should be small.
-pub const MAX_TAG_SIZE: usize = 1000;
-
 /// Verify the signature for this header
 pub async fn verify_header_signature(sig: &Signature, header: &Header) -> SysValidationResult<()> {
     if header.author().verify_signature(sig, header).await {
@@ -59,21 +50,19 @@ pub fn check_countersigning_session_data_contains_header(
     session_data: &CounterSigningSessionData,
     header: NewEntryHeaderRef<'_>,
 ) -> SysValidationResult<()> {
-    let weight = match header {
-        NewEntryHeaderRef::Create(h) => h.weight.clone(),
-        NewEntryHeaderRef::Update(h) => h.weight.clone(),
-    };
     let header_is_in_session = session_data
-        .build_header_set(entry_hash, weight)
+        .build_header_set(entry_hash)
         .map_err(SysValidationError::from)?
         .iter()
         .any(|session_header| match (&header, session_header) {
-            (NewEntryHeaderRef::Create(create), Header::Create(session_create)) => {
-                create == &session_create
-            }
-            (NewEntryHeaderRef::Update(update), Header::Update(session_update)) => {
-                update == &session_update
-            }
+            (
+                NewEntryHeaderRef::Create(create),
+                UnweighedCountersigningHeader::Create(session_create),
+            ) => (*create).to_owned().unweighed() == *session_create,
+            (
+                NewEntryHeaderRef::Update(update),
+                UnweighedCountersigningHeader::Update(session_update),
+            ) => (*update).to_owned().unweighed() == *session_update,
             _ => false,
         });
     if !header_is_in_session {

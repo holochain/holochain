@@ -633,9 +633,10 @@ impl RibosomeT for RealRibosome {
 
     fn run_weigh(
         &self,
-        host_access: WeighHostAccess,
+        // host_access: WeighHostAccess,
         invocation: WeighInvocation,
     ) -> RibosomeResult<WeighResult> {
+        let host_access = WeighHostAccess {};
         do_callback!(self, host_access, invocation, WeighCallbackResult)
     }
 

@@ -33,3 +33,12 @@ impl Default for WeighCallbackResult {
         }
     }
 }
+
+impl From<WeighCallbackResult> for RateWeight {
+    fn from(r: WeighCallbackResult) -> Self {
+        Self {
+            bucket_id: r.bucket_id,
+            units: r.units,
+        }
+    }
+}

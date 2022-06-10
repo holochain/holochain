@@ -11,7 +11,6 @@ use crate::core::queue_consumer::WorkComplete;
 use crate::core::ribosome::guest_callback::validate::ValidateHostAccess;
 use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
-use crate::core::ribosome::real_ribosome::RealRibosome;
 use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomesToInvoke;
 use error::AppValidationResult;
@@ -418,13 +417,11 @@ async fn validate_op_outer(
     // Get the workspace for the validation calls
     let host_fn_workspace = workspace.validation_workspace().await?;
 
-    // Get the dna file
-    let dna_file = conductor_handle
-        .get_dna_file(dna_hash.as_ref())
-        .ok_or_else(|| AppValidationError::DnaMissing((*dna_hash).clone()))?;
-
     // Create the ribosome
-    let ribosome = RealRibosome::new(dna_file);
+    let ribosome = conductor_handle
+        .get_ribosome(dna_hash.as_ref())
+        .map_err(|_| AppValidationError::DnaMissing((*dna_hash).clone()))?;
+
     validate_op(op, host_fn_workspace, network, &ribosome).await
 }
 
@@ -516,13 +513,9 @@ fn create_link_zomes_to_invoke(
 }
 
 fn zome_id_to_zome(zome_id: ZomeId, dna_def: &DnaDef) -> AppValidationResult<Zome> {
-    let zome_index = u8::from(zome_id) as usize;
-    Ok(dna_def
-        .zomes
-        .get(zome_index)
-        .ok_or(AppValidationError::ZomeId(zome_id))?
-        .clone()
-        .into())
+    dna_def
+        .get_zome_by_index(&zome_id)
+        .map_err(|_| AppValidationError::ZomeId(zome_id))
 }
 
 #[async_recursion::async_recursion]

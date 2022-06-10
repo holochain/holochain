@@ -32,7 +32,7 @@ impl core::fmt::Display for EntryError {
                 f,
                 "Attempted to create an Entry whose size exceeds the limit.\nEntry size: {}\nLimit: {}",
                 bytes,
-                ENTRY_SIZE_LIMIT
+                MAX_ENTRY_SIZE
             ),
             EntryError::SerializedBytes(s) => s.fmt(f),
         }

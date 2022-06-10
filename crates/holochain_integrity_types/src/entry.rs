@@ -22,8 +22,10 @@ mod error;
 pub use app_entry_bytes::*;
 pub use error::*;
 
-/// Entries larger than this number of bytes cannot be created
-pub const ENTRY_SIZE_LIMIT: usize = 16 * 1000 * 1000; // 16MiB
+/// 16mb limit on Entries due to websocket limits.
+/// Entries larger than this number of bytes cannot be created.
+/// Consider splitting large entries up.
+pub const MAX_ENTRY_SIZE: usize = 16_000_000; // 16MiB
 
 /// The data type written to the source chain when explicitly granting a capability.
 /// NB: this is not simply `CapGrant`, because the `CapGrant::ChainAuthor`

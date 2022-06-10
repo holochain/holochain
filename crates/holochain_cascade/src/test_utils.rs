@@ -175,7 +175,7 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         Ok(self.authority)
     }
 
-    fn dna_hash(&self) -> holo_hash::DnaHash {
+    fn dna_hash(&self) -> &holo_hash::DnaHash {
         todo!()
     }
 
@@ -353,7 +353,7 @@ impl HolochainP2pDnaT for MockNetwork {
         self.0.lock().await.authority_for_hash(dht_hash).await
     }
 
-    fn dna_hash(&self) -> holo_hash::DnaHash {
+    fn dna_hash(&self) -> &holo_hash::DnaHash {
         todo!()
     }
 

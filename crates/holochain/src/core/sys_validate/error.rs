@@ -3,6 +3,7 @@ use std::convert::TryFrom;
 use super::SourceChainError;
 use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::entry_def_store::error::EntryDefStoreError;
+use crate::core::ribosome::error::RibosomeError;
 use crate::core::validation::OutcomeOrError;
 use crate::core::workflow::error::WorkflowError;
 use crate::from_sub_error;
@@ -36,6 +37,10 @@ pub enum SysValidationError {
     KeystoreError(#[from] KeystoreError),
     #[error(transparent)]
     SourceChainError(#[from] SourceChainError),
+    #[error(transparent)]
+    RibosomeError(#[from] RibosomeError),
+    #[error(transparent)]
+    ZomeError(#[from] ZomeError),
     #[error("Dna is missing for this hash {0:?}. Cannot validate without dna.")]
     DnaMissing(DnaHash),
     // NOTE: can remove this if SysValidationResult is replaced with SysValidationOutcome
@@ -47,8 +52,6 @@ pub enum SysValidationError {
     WorkspaceError(#[from] WorkspaceError),
     #[error(transparent)]
     ConductorApiError(#[from] Box<ConductorApiError>),
-    #[error("Expected Entry-based Header, but got: {0:?}")]
-    NonEntryHeader(Header),
 }
 
 impl From<CounterSigningError> for SysValidationError {

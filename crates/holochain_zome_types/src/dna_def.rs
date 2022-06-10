@@ -75,6 +75,15 @@ impl DnaDef {
             .ok_or_else(|| ZomeError::ZomeNotFound(format!("Zome '{}' not found", &zome_name,)))
     }
 
+    /// Return a Zome by its index
+    pub fn get_zome_by_index(&self, zome_id: &ZomeId) -> Result<zome::Zome, ZomeError> {
+        self.zomes
+            .get(zome_id.0 as usize)
+            .cloned()
+            .map(|(name, def)| Zome::new(name, def))
+            .ok_or_else(|| ZomeError::ZomeNotFound(format!("Zome at index {} not found", zome_id)))
+    }
+
     /// Return a Zome, error if not a WasmZome
     pub fn get_wasm_zome(&self, zome_name: &ZomeName) -> Result<&zome::WasmZome, ZomeError> {
         self.zomes

@@ -1,9 +1,9 @@
+use crate::conductor::ConductorHandle;
 use crate::holochain_wasmer_host::prelude::WasmError;
 use crate::sweettest::SweetConductorBatch;
 use crate::sweettest::SweetDnaFile;
 use crate::test_utils::host_fn_caller::*;
 use crate::test_utils::wait_for_integration;
-use crate::{conductor::ConductorHandle, core::MAX_TAG_SIZE};
 use ::fixt::prelude::*;
 use hdk::prelude::LinkTag;
 use holo_hash::AnyDhtHash;

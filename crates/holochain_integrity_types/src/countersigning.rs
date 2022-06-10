@@ -453,27 +453,43 @@ pub struct UpdateBase {
     entry_type: EntryType,
 }
 
-impl Header {
+/// An unweighed header calculated from a countersigning session
+#[derive(PartialEq, Eq)]
+pub enum UnweighedCountersigningHeader {
+    /// A Create header (without weight)
+    Create(Create<()>),
+    /// An Update header (without weight)
+    Update(Update<()>),
+}
+
+impl UnweighedCountersigningHeader {
+    /// Add a weight to this unweighed header
+    pub fn weighed(self, weight: EntryRateWeight) -> EntryCreationHeader {
+        match self {
+            Self::Create(h) => EntryCreationHeader::Create(h.weighed(weight)),
+            Self::Update(h) => EntryCreationHeader::Update(h.weighed(weight)),
+        }
+    }
+
     /// Construct a Header from the HeaderBase and associated session data.
     pub fn from_countersigning_data(
         entry_hash: EntryHash,
         session_data: &CounterSigningSessionData,
         author: AgentPubKey,
-        weight: EntryRateWeight,
     ) -> Result<Self, CounterSigningError> {
         let agent_state = session_data.agent_state_for_agent(&author)?;
         let preflight = session_data.preflight_request();
         Ok(match preflight.header_base() {
-            HeaderBase::Create(base) => Header::Create(Create {
+            HeaderBase::Create(base) => Self::Create(Create {
                 author,
                 timestamp: session_data.to_timestamp(),
                 header_seq: agent_state.header_seq + 1,
                 prev_header: agent_state.chain_top.clone(),
                 entry_type: base.entry_type.clone(),
-                weight,
+                weight: (),
                 entry_hash,
             }),
-            HeaderBase::Update(base) => Header::Update(Update {
+            HeaderBase::Update(base) => Self::Update(Update {
                 author,
                 timestamp: session_data.to_timestamp(),
                 header_seq: agent_state.header_seq + 1,
@@ -481,10 +497,40 @@ impl Header {
                 original_header_address: base.original_header_address.clone(),
                 original_entry_address: base.original_entry_address.clone(),
                 entry_type: base.entry_type.clone(),
-                weight,
+                weight: (),
                 entry_hash,
             }),
         })
+    }
+
+    /// If the header is Create or Update, convert to a weight-erased
+    /// [`UnweighedCountersigningHeader`]
+    pub fn from_header(header: Header) -> Option<Self> {
+        match header {
+            Header::Create(h) => Some(Self::Create(h.unweighed())),
+            Header::Update(h) => Some(Self::Update(h.unweighed())),
+            _ => None,
+        }
+    }
+
+    /// Access the entry hash
+    pub fn entry_hash(&self) -> &EntryHash {
+        match self {
+            Self::Create(h) => &h.entry_hash,
+            Self::Update(h) => &h.entry_hash,
+        }
+    }
+
+    /// Access the zome id, if applicable
+    pub fn zome_id(&self) -> Option<ZomeId> {
+        let et = match self {
+            Self::Create(h) => &h.entry_type,
+            Self::Update(h) => &h.entry_type,
+        };
+        match et {
+            EntryType::App(aet) => Some(aet.zome_id()),
+            _ => None,
+        }
     }
 }
 
@@ -540,15 +586,13 @@ impl CounterSigningSessionData {
     pub fn build_header_set(
         &self,
         entry_hash: EntryHash,
-        weight: EntryRateWeight,
-    ) -> Result<Vec<Header>, CounterSigningError> {
+    ) -> Result<Vec<UnweighedCountersigningHeader>, CounterSigningError> {
         let mut headers = vec![];
         for (agent, _role) in self.preflight_request.signing_agents().iter() {
-            headers.push(Header::from_countersigning_data(
+            headers.push(UnweighedCountersigningHeader::from_countersigning_data(
                 entry_hash.clone(),
                 self,
                 agent.clone(),
-                weight.clone(),
             )?);
         }
         Ok(headers)

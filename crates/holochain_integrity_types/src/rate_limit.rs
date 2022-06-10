@@ -2,7 +2,7 @@
 
 use holochain_serialized_bytes::prelude::*;
 
-use crate::{Create, CreateLink, Delete, Entry, Update};
+use crate::{Create, CreateLink, Delete, Entry, Update, MAX_ENTRY_SIZE};
 
 mod bucket;
 pub use bucket::*;
@@ -100,6 +100,18 @@ impl From<EntryRateWeight> for RateWeight {
         Self {
             bucket_id: w.bucket_id,
             units: w.units,
+        }
+    }
+}
+
+impl EntryRateWeight {
+    /// Add the rate_bytes field to a RateWeight to produce an EntryRateWeight
+    pub fn from_weight_and_size(w: RateWeight, size: usize) -> Self {
+        let rate_bytes = (255 * size / MAX_ENTRY_SIZE).min(255) as u8;
+        Self {
+            bucket_id: w.bucket_id,
+            units: w.units,
+            rate_bytes,
         }
     }
 }

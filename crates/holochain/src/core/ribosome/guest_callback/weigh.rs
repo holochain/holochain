@@ -18,8 +18,8 @@ pub struct WeighInvocation {
 }
 
 impl WeighInvocation {
-    pub fn new(zome: Zome, input: WeighInput) -> Result<Self, SerializedBytesError> {
-        Ok(Self { zome, input })
+    pub fn new(zome: Zome, input: WeighInput) -> Self {
+        Self { zome, input }
     }
 }
 
@@ -56,6 +56,12 @@ impl Invocation for WeighInvocation {
 #[derive(Clone, PartialEq, Debug, derive_more::Deref, Default)]
 pub struct WeighResult(WeighCallbackResult);
 
+impl From<WeighResult> for RateWeight {
+    fn from(r: WeighResult) -> Self {
+        r.0.into()
+    }
+}
+
 impl From<Vec<(ZomeName, WeighCallbackResult)>> for WeighResult {
     fn from(mut results: Vec<(ZomeName, WeighCallbackResult)>) -> Self {
         assert!(
@@ -73,7 +79,7 @@ impl<'a> arbitrary::Arbitrary<'a> for WeighInvocation {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         let zome = Zome::arbitrary(u)?;
         let input = WeighInput::arbitrary(u)?;
-        Ok(Self::new(zome, input).unwrap())
+        Ok(Self::new(zome, input))
     }
 }
 
@@ -101,7 +107,7 @@ mod test {
         let mut u = Unstructured::new(&NOISE);
         let input = WeighInput::arbitrary(&mut u).unwrap();
         let weigh_invocation =
-            WeighInvocation::new(Zome::arbitrary(&mut u).unwrap(), input.clone()).unwrap();
+            WeighInvocation::new(Zome::arbitrary(&mut u).unwrap(), input.clone());
 
         let host_input = weigh_invocation.clone().host_input().unwrap();
 
@@ -113,7 +119,6 @@ mod test {
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
     use super::WeighResult;
-    use crate::core::ribosome::guest_callback::weigh::WeighHostAccess;
     use crate::core::ribosome::guest_callback::weigh::WeighInvocation;
     use crate::core::ribosome::RibosomeT;
     use crate::fixt::curve::Zomes;
@@ -133,9 +138,7 @@ mod slow_tests {
             .unwrap();
         weigh_invocation.zome = TestWasm::Foo.into();
 
-        let result = ribosome
-            .run_weigh(WeighHostAccess {}, weigh_invocation)
-            .unwrap();
+        let result = ribosome.run_weigh(weigh_invocation).unwrap();
         assert_eq!(result, WeighResult::default(),);
     }
 
@@ -153,9 +156,7 @@ mod slow_tests {
             .next()
             .unwrap();
 
-        let result = ribosome
-            .run_weigh(WeighHostAccess {}, weigh_invocation)
-            .unwrap();
+        let result = ribosome.run_weigh(weigh_invocation).unwrap();
         assert_eq!(
             result,
             WeighResult(WeighCallbackResult {

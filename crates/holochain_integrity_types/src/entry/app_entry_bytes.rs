@@ -1,5 +1,5 @@
 use super::EntryError;
-use super::ENTRY_SIZE_LIMIT;
+use super::MAX_ENTRY_SIZE;
 use holochain_serialized_bytes::prelude::*;
 
 /// Newtype for the bytes comprising an App entry
@@ -39,7 +39,7 @@ impl TryFrom<SerializedBytes> for AppEntryBytes {
 
     fn try_from(sb: SerializedBytes) -> Result<Self, EntryError> {
         let size = sb.bytes().len();
-        if size > ENTRY_SIZE_LIMIT {
+        if size > MAX_ENTRY_SIZE {
             Err(EntryError::EntryTooLarge(size))
         } else {
             Ok(Self(sb))

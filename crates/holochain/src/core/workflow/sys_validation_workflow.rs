@@ -7,6 +7,7 @@ use crate::conductor::space::Space;
 use crate::conductor::ConductorHandle;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::queue_consumer::WorkComplete;
+use crate::core::ribosome::RibosomeT;
 use crate::core::sys_validate::check_and_hold_store_element;
 use crate::core::sys_validate::*;
 use crate::core::validation::*;
@@ -310,6 +311,10 @@ async fn validate_op_inner(
     conductor_handle: &dyn ConductorHandleT,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
 ) -> SysValidationResult<()> {
+    let dna_hash = network.dna_hash();
+    let ribosome = conductor_handle
+        .get_ribosome(dna_hash)
+        .map_err(|_| SysValidationError::DnaMissing(dna_hash.clone()))?;
     match op {
         DhtOp::StoreElement(_, header, entry) => {
             store_element(header, workspace, network.clone()).await?;
@@ -317,10 +322,13 @@ async fn validate_op_inner(
                 // Retrieve for all other headers on countersigned entry.
                 if let Entry::CounterSign(session_data, _) = &**entry {
                     let entry_hash = EntryHash::with_data_sync(&**entry);
-                    let weight = header
-                        .entry_rate_data()
-                        .ok_or_else(|| SysValidationError::NonEntryHeader(header.clone()))?;
-                    for header in session_data.build_header_set(entry_hash, weight)? {
+                    for header in session_data.build_header_set(entry_hash)? {
+                        let header = if let Some(zome_id) = header.zome_id() {
+                            let zome = workspace.dna_def.get_zome_by_index(&zome_id)?;
+                            ribosome.weigh_countersigning_header(header, (**entry).clone(), zome)?
+                        } else {
+                            header.weighed(Default::default())
+                        };
                         let hh = HeaderHash::with_data_sync(&header);
                         if workspace
                             .full_cascade(network.clone())
@@ -352,11 +360,13 @@ async fn validate_op_inner(
             if let Entry::CounterSign(session_data, _) = &**entry {
                 let dependency_check = |_original_element: &Element| Ok(());
                 let entry_hash = EntryHash::with_data_sync(&**entry);
-                let weight = match header {
-                    NewEntryHeader::Create(h) => h.weight.clone(),
-                    NewEntryHeader::Update(h) => h.weight.clone(),
-                };
-                for header in session_data.build_header_set(entry_hash, weight)? {
+                for header in session_data.build_header_set(entry_hash)? {
+                    let header = if let Some(zome_id) = header.zome_id() {
+                        let zome = workspace.dna_def.get_zome_by_index(&zome_id)?;
+                        ribosome.weigh_countersigning_header(header, (**entry).clone(), zome)?
+                    } else {
+                        header.weighed(Default::default())
+                    };
                     check_and_hold_store_element(
                         &HeaderHash::with_data_sync(&header),
                         workspace,
@@ -526,23 +536,29 @@ async fn sys_validate_element_inner(
 
     match maybe_entry {
         Some(Entry::CounterSign(session, _)) => {
-            if let Some(weight) = header.entry_rate_data() {
-                let entry_hash = EntryHash::with_data_sync(maybe_entry.unwrap());
-                for header in session.build_header_set(entry_hash, weight)? {
-                    validate(
-                        &header,
-                        maybe_entry,
-                        workspace,
-                        network.clone(),
-                        conductor_handle,
-                    )
-                    .await?;
-                }
-                Ok(())
-            } else {
-                tracing::error!("Got countersigning entry without rate assigned. This should be impossible. But, let's see what happens.");
-                validate(header, maybe_entry, workspace, network, conductor_handle).await
+            let entry = maybe_entry.unwrap();
+            let entry_hash = EntryHash::with_data_sync(entry);
+            let dna_hash = network.dna_hash();
+            let ribosome = conductor_handle
+                .get_ribosome(dna_hash)
+                .map_err(|_| SysValidationError::DnaMissing(dna_hash.clone()))?;
+            for header in session.build_header_set(entry_hash)? {
+                let header = if let Some(zome_id) = header.zome_id() {
+                    let zome = workspace.dna_def.get_zome_by_index(&zome_id)?;
+                    ribosome.weigh_countersigning_header(header, entry.clone(), zome)?
+                } else {
+                    header.weighed(Default::default())
+                };
+                validate(
+                    &header.into(),
+                    maybe_entry,
+                    workspace,
+                    network.clone(),
+                    conductor_handle,
+                )
+                .await?;
             }
+            Ok(())
         }
         _ => validate(header, maybe_entry, workspace, network, conductor_handle).await,
     }

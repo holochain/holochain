@@ -499,7 +499,7 @@ pub struct CloseChain {
 /// referenced by multiple such headers.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-pub struct Create<W = EntryRateWeight> {
+pub struct Create<W: Clone = EntryRateWeight> {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
     pub header_seq: u32,
@@ -525,7 +525,7 @@ pub struct Create<W = EntryRateWeight> {
 /// or how to break the loop.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-pub struct Update<W = EntryRateWeight> {
+pub struct Update<W: Clone = EntryRateWeight> {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
     pub header_seq: u32,
