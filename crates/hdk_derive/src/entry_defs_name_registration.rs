@@ -221,6 +221,37 @@ pub fn build(attrs: TokenStream, input: TokenStream) -> TokenStream {
             }
         }
 
+        impl TryFrom<&EntryDefIndex> for #unit_ident {
+            type Error = WasmError;
+
+            fn try_from(index: &EntryDefIndex) -> Result<Self, Self::Error> {
+                let index: GlobalZomeTypeId = (*index).into();
+                Self::try_from(index)
+            }
+        }
+
+        impl TryFrom<EntryDefIndex> for #unit_ident {
+            type Error = WasmError;
+
+            fn try_from(index: EntryDefIndex) -> Result<Self, Self::Error> {
+                Self::try_from(&index)
+            }
+        }
+
+        impl TryFrom<GlobalZomeTypeId> for #unit_ident {
+            type Error = WasmError;
+
+            fn try_from(index: GlobalZomeTypeId) -> Result<Self, Self::Error> {
+                match zome_info()?.zome_types.entries.to_local_scope(index) {
+                    Some(local_index) => Self::try_from(local_index),
+                    _ => Err(WasmError::Guest(format!(
+                        "global index {:?} does not map to any local scope for this zome",
+                        index
+                    ))),
+                }
+            }
+        }
+
         impl EntryTypesHelper for #ident {
             fn try_from_local_type<I>(type_index: I, entry: &Entry) -> Result<Option<Self>, WasmError>
             where
