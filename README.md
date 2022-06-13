@@ -23,9 +23,25 @@ This code is in Alpha. It is not for production use, and currently makes no secu
 
 ### Supported OSes
 
-* **Linux**: Top-tier. Weekly releases pass CI tests for the conductor, development tools, and Holonix development environment.
-* **macOS**: Currently no CI tests are being run, but developers usually report weekly releases work fine via the Holonix development environment.
-* **Windows**: Currently no CI tests are being run, but developers usually report weekly releases published to crates.io work fine.
+#### Linux
+
+* Launcher binaries
+* binaries via crates.io
+* nix package and holonix shell, including execution of binary within holonix CI
+* full functionality test on CI
+
+#### macOS (x86-64 only, no ARM)
+
+* Launcher binaries
+* binaries via crates.io
+* nix package and holonix shell, including execution of binary within holonix CI
+* no functionality tests beyond binary execution
+
+#### Windows
+
+* Launcher binaries
+* binaries via crates.io
+* no functionality tests
 
 ### Developing Holochain applications (hApps)
 
