@@ -187,7 +187,7 @@ fn dna_info_nested(_: ()) -> ExternResult<Option<i64>> {
 
 #[cfg(all(test, feature = "mock"))]
 pub mod tests {
-    use fixt::prelude::*;
+    use ::fixt::prelude::*;
     use hdk::prelude::*;
 
     #[test]
