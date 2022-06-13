@@ -26,11 +26,13 @@ pub const PRUNE_EXPIRED_FREQ: std::time::Duration = std::time::Duration::from_se
 
 pub type BootstrapDriver = futures::future::BoxFuture<'static, ()>;
 
+pub type BootstrapShutdown = Box<dyn FnOnce() + 'static + Send>;
+
 /// Run a bootstrap with the default prune frequency [`PRUNE_EXPIRED_FREQ`].
 pub async fn run(
     addr: impl Into<SocketAddr> + 'static,
     proxy_list: Vec<String>,
-) -> Result<(BootstrapDriver, SocketAddr), String> {
+) -> Result<(BootstrapDriver, SocketAddr, BootstrapShutdown), String> {
     run_with_prune_freq(addr, proxy_list, PRUNE_EXPIRED_FREQ).await
 }
 
@@ -39,8 +41,9 @@ pub async fn run_with_prune_freq(
     addr: impl Into<SocketAddr> + 'static,
     proxy_list: Vec<String>,
     prune_frequency: std::time::Duration,
-) -> Result<(BootstrapDriver, SocketAddr), String> {
+) -> Result<(BootstrapDriver, SocketAddr, BootstrapShutdown), String> {
     let store = Store::new(proxy_list);
+
     {
         let store = store.clone();
         tokio::task::spawn(async move {
@@ -50,15 +53,24 @@ pub async fn run_with_prune_freq(
             }
         });
     }
+
     let boot = now::now()
         .or(put::put(store.clone()))
         .or(random::random(store.clone()))
         .or(proxy_list::proxy_list(store.clone()))
         .or(clear::clear(store));
-    match warp::serve(boot).try_bind_ephemeral(addr) {
+
+    let (s, r) = tokio::sync::oneshot::channel();
+    let shutdown = Box::new(move || {
+        let _ = s.send(());
+    });
+
+    match warp::serve(boot).try_bind_with_graceful_shutdown(addr, async move {
+        let _ = r.await;
+    }) {
         Ok((addr, server)) => {
             let driver = futures::future::FutureExt::boxed(server);
-            Ok((driver, addr))
+            Ok((driver, addr, shutdown))
         }
         Err(e) => Err(format!("Failed to bind socket: {:?}", e)),
     }

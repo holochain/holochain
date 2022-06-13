@@ -42,6 +42,17 @@ pub use tracing;
 #[cfg(feature = "trace")]
 pub use tracing::{debug, error, info, instrument, trace, warn};
 
+#[cfg(not(feature = "trace"))]
+/// Needed as a noop for map_extern! when trace is off.
+pub use crate::error;
+
+#[cfg(not(feature = "trace"))]
+#[macro_export]
+/// Needed as a noop for map_extern! when trace is off.
+macro_rules! error {
+    ($($field:tt)*) => {};
+}
+
 #[cfg(feature = "mock")]
 pub use mockall;
 

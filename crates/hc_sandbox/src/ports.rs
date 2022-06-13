@@ -51,11 +51,11 @@ pub(crate) async fn get_admin_api(port: u16) -> WebsocketResult<WebsocketSender>
 async fn websocket_client_by_port(
     port: u16,
 ) -> WebsocketResult<(WebsocketSender, WebsocketReceiver)> {
-    Ok(ws::connect(
+    ws::connect(
         url2!("ws://127.0.0.1:{}", port),
         Arc::new(WebsocketConfig::default()),
     )
-    .await?)
+    .await
 }
 
 pub(crate) fn random_admin_port(config: &mut ConductorConfig) {
