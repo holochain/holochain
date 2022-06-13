@@ -41,12 +41,12 @@ pub fn build(_attrs: TokenStream, input: TokenStream) -> TokenStream {
             type Error = WasmError;
             fn try_from(t: &#ident) -> Result<Self, Self::Error> {
                 #try_from_sb
-                AppEntryBytes::try_from(result?).map_err(|entry_error| match entry_error {
+                AppEntryBytes::try_from(result.map_err(|e| wasm_error!(e.into()))?).map_err(|entry_error| match entry_error {
                     EntryError::SerializedBytes(serialized_bytes_error) => {
-                        WasmError::Serialize(serialized_bytes_error)
+                        wasm_error!(WasmErrorInner::Serialize(serialized_bytes_error))
                     }
                     EntryError::EntryTooLarge(_) => {
-                        WasmError::Guest(entry_error.to_string())
+                        wasm_error!(WasmErrorInner::Guest(entry_error.to_string()))
                     }
                 })
             }

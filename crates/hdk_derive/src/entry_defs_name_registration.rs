@@ -197,10 +197,10 @@ pub fn build(attrs: TokenStream, input: TokenStream) -> TokenStream {
                 Self::iter()
                     .find(|u| LocalZomeTypeId::from(*u) == value)
                     .ok_or_else(|| {
-                        WasmError::Guest(format!(
+                        wasm_error!(WasmErrorInner::Guest(format!(
                             "local index {} does not match any variant of {}",
                             value.0, stringify!(#unit_ident)
-                        ))
+                        )))
                     })
             }
         }
@@ -244,10 +244,10 @@ pub fn build(attrs: TokenStream, input: TokenStream) -> TokenStream {
             fn try_from(index: GlobalZomeTypeId) -> Result<Self, Self::Error> {
                 match zome_info()?.zome_types.entries.to_local_scope(index) {
                     Some(local_index) => Self::try_from(local_index),
-                    _ => Err(WasmError::Guest(format!(
+                    _ => Err(wasm_error!(WasmErrorInner::Guest(format!(
                         "global index {:?} does not map to any local scope for this zome",
                         index
-                    ))),
+                    )))),
                 }
             }
         }
@@ -270,10 +270,10 @@ pub fn build(attrs: TokenStream, input: TokenStream) -> TokenStream {
                 let index: GlobalZomeTypeId = type_index.into();
                 match zome_info()?.zome_types.entries.to_local_scope(index) {
                     Some(local_index) => Self::try_from_local_type(local_index, &entry),
-                    _ => Err(WasmError::Guest(format!(
+                    _ => Err(wasm_error!(WasmErrorInner::Guest(format!(
                         "global index {} does not map to any local scope for this zome",
                         index.0
-                    ))),
+                    )))),
                 }
             }
         }

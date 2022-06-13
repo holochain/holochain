@@ -17,7 +17,11 @@ fn get_entry_multiple(n: u32) -> ExternResult<hdk::prelude::Bytes> {
     'test_loop: for i in 0..n {
         match get(hash_entry(&Val(i))?, GetOptions::content())? {
             Some(element) => {
-                match element.entry().to_app_option::<Val>()? {
+                match element
+                    .entry()
+                    .to_app_option::<Val>()
+                    .map_err(|e| wasm_error!(e.into()))?
+                {
                     Some(v) => bytes.append(&mut v.0.to_le_bytes().to_vec()),
                     // couldn't succeed to get so let's return what we have and let the test
                     // harness decide what that means

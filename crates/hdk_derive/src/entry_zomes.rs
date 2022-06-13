@@ -129,10 +129,10 @@ pub fn build(_attrs: TokenStream, input: TokenStream) -> TokenStream {
                 let value = LocalZomeTypeId::from(type_index).0;
                 #index_to_variant
 
-                Err(WasmError::Guest(format!(
+                Err(wasm_error!(WasmErrorInner::Guest(format!(
                     "local type index {} does not map to any the entry types for this zome",
                     value
-                )))
+                ))))
             }
             fn try_from_global_type<I>(type_index: I, entry: &Entry) -> Result<Option<Self>, WasmError>
             where
@@ -141,10 +141,10 @@ pub fn build(_attrs: TokenStream, input: TokenStream) -> TokenStream {
                 let index: GlobalZomeTypeId = type_index.into();
                 match zome_info()?.zome_types.entries.to_local_scope(index) {
                     Some(local_index) => Self::try_from_local_type(local_index, &entry),
-                    _ => Err(WasmError::Guest(format!(
+                    _ => Err(wasm_error!(WasmErrorInner::Guest(format!(
                         "global index {} does not map to any local scope for this zome",
                         index.0
-                    ))),
+                    )))),
                 }
             }
         }

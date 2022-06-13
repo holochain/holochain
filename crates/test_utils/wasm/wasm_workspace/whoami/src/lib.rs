@@ -46,7 +46,7 @@ fn whoarethey(agent_pubkey: AgentPubKey) -> ExternResult<AgentInfo> {
     )?;
     match zome_call_response {
         // The decode() type needs to match the return type of "whoami"
-        ZomeCallResponse::Ok(v) => Ok(v.decode()?),
+        ZomeCallResponse::Ok(v) => Ok(v.decode().map_err(|e| wasm_error!(e.into()))?),
         // This should be handled in real code.
         _ => unreachable!(),
     }
@@ -65,7 +65,7 @@ fn who_are_they_local(cell_id: CellId) -> ExternResult<AgentInfo> {
         &(),
     )?;
     match zome_call_response {
-        ZomeCallResponse::Ok(v) => Ok(v.decode()?),
+        ZomeCallResponse::Ok(v) => Ok(v.decode().map_err(|e| wasm_error!(e.into()))?),
         // This should be handled in real code.
         _ => unreachable!(),
     }
@@ -84,7 +84,7 @@ fn call_create_entry(cell_id: CellId) -> ExternResult<HeaderHash> {
         &(),
     )?;
     match zome_call_response {
-        ZomeCallResponse::Ok(v) => Ok(v.decode()?),
+        ZomeCallResponse::Ok(v) => Ok(v.decode().map_err(|e| wasm_error!(e.into()))?),
         // This should be handled in real code.
         _ => unreachable!(),
     }

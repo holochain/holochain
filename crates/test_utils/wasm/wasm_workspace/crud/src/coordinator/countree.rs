@@ -54,7 +54,7 @@ impl CounTree {
     /// this is silly as being offline resets the counter >.<
     pub fn incsert(header_hash: HeaderHash) -> ExternResult<HeaderHash> {
         let current: CounTree = match get(header_hash.clone(), GetOptions::latest())? {
-            Some(element) => match element.entry().to_app_option()? {
+            Some(element) => match element.entry().to_app_option().map_err(|e| wasm_error!(e.into()))? {
                 Some(v) => v,
                 None => return Self::new(),
             },

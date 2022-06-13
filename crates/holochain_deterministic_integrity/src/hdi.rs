@@ -54,7 +54,9 @@ pub struct ErrHdi;
 
 impl ErrHdi {
     fn err<T>() -> ExternResult<T> {
-        Err(WasmError::Guest(HDI_NOT_REGISTERED.to_string()))
+        Err(wasm_error!(WasmErrorInner::Guest(
+            HDI_NOT_REGISTERED.to_string()
+        )))
     }
 }
 
@@ -151,9 +153,9 @@ impl HdiT for HostHdi {
         if cfg!(feature = "trace") {
             host_call::<TraceMsg, ()>(__trace, trace_msg)
         } else {
-            Err(WasmError::Guest(
+            Err(wasm_error!(WasmErrorInner::Guest(
                 "`trace()` can only be used when the \"trace\" cargo feature is set (it is off by default).".to_string(),
-            ))
+            )))
         }
     }
     fn x_salsa20_poly1305_decrypt(

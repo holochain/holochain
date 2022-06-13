@@ -1,6 +1,6 @@
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 
 /// list all the grants stored locally in the chain filtered by tag
@@ -9,7 +9,7 @@ pub fn capability_grants(
     _ribosome: Arc<impl RibosomeT>,
     _call_context: Arc<CallContext>,
     _input: (),
-) -> Result<(), WasmError> {
+) -> Result<(), RuntimeError> {
     unimplemented!();
 }
 

@@ -54,10 +54,10 @@ fn build(category: Category, input: TokenStream) -> TokenStream {
                     // Convert to global scope or return an error.
                     .to_global_scope(value)
                     .ok_or_else(|| {
-                        WasmError::Guest(format!(
+                        wasm_error!(WasmErrorInner::Guest(format!(
                             "Value {:?} does not map to a global entry type for current scope.",
                             value
-                        ))
+                        )))
                     })
             }
         }

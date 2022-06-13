@@ -1,18 +1,18 @@
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
-use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
 use holo_hash::HasHash;
 use holochain_types::prelude::*;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 use holochain_zome_types::info::DnaInfo;
 use std::sync::Arc;
+use crate::core::ribosome::RibosomeError;
 
 pub fn dna_info(
     ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     _input: (),
-) -> Result<DnaInfo, WasmError> {
+) -> Result<DnaInfo, RuntimeError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess {
             bindings_deterministic: Permission::Allow,
@@ -28,14 +28,15 @@ pub fn dna_info(
                 .map(|(zome_name, _zome_def)| zome_name.to_owned())
                 .collect(),
         }),
-        _ => Err(WasmError::Host(
+        _ => Err(wasm_error!(WasmErrorInner::Host(
             RibosomeError::HostFnPermissions(
                 call_context.zome.zome_name().clone(),
                 call_context.function_name().clone(),
                 "dna_info".into(),
             )
             .to_string(),
-        )),
+        ))
+        .into()),
     }
 }
 

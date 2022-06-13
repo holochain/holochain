@@ -26,7 +26,7 @@ fn create_countersigned(
     let entry = Entry::CounterSign(
         Box::new(
             CounterSigningSessionData::try_from_responses(responses).map_err(
-                |countersigning_error| WasmError::Guest(countersigning_error.to_string()),
+                |countersigning_error| wasm_error!(WasmErrorInner::Guest(countersigning_error.to_string())),
             )?,
         ),
         thing.try_into()?,
@@ -69,7 +69,7 @@ fn generate_preflight_request(
         HeaderBase::Create(CreateBase::new(entry_type)),
         PreflightBytes(vec![]),
     )
-    .map_err(|e| WasmError::Guest(e.to_string()))
+    .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))
 }
 
 #[hdk_extern]

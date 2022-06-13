@@ -45,16 +45,16 @@ where
                     .find(|t| range.contains(t))
                     .unwrap_or(start);
                 let start = zome_types.links.to_global_scope(start).ok_or_else(|| {
-                    WasmError::Guest(format!(
+                   wasm_error!(WasmErrorInner::Guest(format!(
                         "Unable to map start of range local zome type {:?} to global zome type scope",
                         start
-                    ))
+                    )))
                 })?;
                 let end = zome_types.links.to_global_scope(end).ok_or_else(|| {
-                    WasmError::Guest(format!(
+                    wasm_error!(WasmErrorInner::Guest(format!(
                         "Unable to map end of range local zome type {:?} to global zome type scope",
                         end
-                    ))
+                    )))
                 })?;
                 Ok(LinkTypeRange::Inclusive(
                     LinkType::from(start)..=LinkType::from(end),

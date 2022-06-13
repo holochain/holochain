@@ -2,7 +2,7 @@ use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 
 use holochain_types::prelude::*;
 use std::sync::Arc;
@@ -12,7 +12,7 @@ pub fn create_link<'a>(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: CreateLinkInput,
-) -> Result<HeaderHash, WasmError> {
+) -> Result<HeaderHash, RuntimeError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess {
             write_workspace: Permission::Allow,
@@ -42,8 +42,12 @@ pub fn create_link<'a>(
                     .await?;
                 Ok::<HeaderHash, RibosomeError>(header_hash)
             }))
-            .map_err(|join_error| WasmError::Host(join_error.to_string()))?
-            .map_err(|ribosome_error| WasmError::Host(ribosome_error.to_string()))?;
+            .map_err(|join_error| -> RuntimeError {
+                wasm_error!(WasmErrorInner::Host(join_error.to_string())).into()
+            })?
+            .map_err(|ribosome_error| -> RuntimeError {
+                wasm_error!(WasmErrorInner::Host(ribosome_error.to_string())).into()
+            })?;
 
             // return the hash of the committed link
             // note that validation is handled by the workflow
@@ -51,14 +55,15 @@ pub fn create_link<'a>(
             // being atomic
             Ok(header_hash)
         }
-        _ => Err(WasmError::Host(
+        _ => Err(wasm_error!(WasmErrorInner::Host(
             RibosomeError::HostFnPermissions(
                 call_context.zome.zome_name().clone(),
                 call_context.function_name().clone(),
-                "create_link".into(),
+                "create_link".into()
             )
-            .to_string(),
-        )),
+            .to_string()
+        ))
+        .into()),
     }
 }
 

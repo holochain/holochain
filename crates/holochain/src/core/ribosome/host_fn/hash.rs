@@ -2,7 +2,7 @@ use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holo_hash::encode::blake2b_n;
 use holo_hash::HasHash;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 use holochain_zome_types::prelude::*;
 use std::sync::Arc;
 use tiny_keccak::{Hasher, Keccak, Sha3};
@@ -11,7 +11,7 @@ pub fn hash(
     _ribosome: Arc<impl RibosomeT>,
     _call_context: Arc<CallContext>,
     input: HashInput,
-) -> Result<HashOutput, WasmError> {
+) -> Result<HashOutput, RuntimeError> {
     Ok(match input {
         HashInput::Entry(entry) => HashOutput::Entry(
             holochain_zome_types::entry::EntryHashed::from_content_sync(entry).into_hash(),
@@ -20,7 +20,8 @@ pub fn hash(
             holochain_zome_types::header::HeaderHashed::from_content_sync(header).into_hash(),
         ),
         HashInput::Blake2B(data, output_len) => HashOutput::Blake2B(
-            blake2b_n(&data, output_len as usize).map_err(|e| WasmError::Host(e.to_string()))?,
+            blake2b_n(&data, output_len as usize)
+                .map_err(|e| -> RuntimeError { wasm_error!(WasmErrorInner::Host(e.to_string())).into() })?,
         ),
         HashInput::Keccak256(data) => HashOutput::Keccak256({
             let mut output = [0u8; 32];
@@ -37,10 +38,11 @@ pub fn hash(
             output.into()
         }),
         _ => {
-            return Err(WasmError::Host(format!(
+            return Err(wasm_error!(WasmErrorInner::Host(format!(
                 "Unimplemented hashing algorithm {:?}",
                 input
             )))
+            .into())
         }
     })
 }

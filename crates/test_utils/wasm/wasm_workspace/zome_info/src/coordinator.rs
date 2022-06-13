@@ -39,10 +39,12 @@ fn remote_call_info(agent: AgentPubKey) -> ExternResult<CallInfo> {
         None,
         &(),
     )? {
-        ZomeCallResponse::Ok(extern_io) => Ok(extern_io.decode()?),
+        ZomeCallResponse::Ok(extern_io) => {
+            Ok(extern_io.decode().map_err(|e| wasm_error!(e.into()))?)
+        }
         not_ok => {
             tracing::warn!(?not_ok);
-            Err(WasmError::Guest(format!("{:?}", not_ok)))
+            Err(wasm_error!(WasmErrorInner::Guest(format!("{:?}", not_ok))))
         }
     }
 }
@@ -56,10 +58,12 @@ fn remote_remote_call_info(agent: AgentPubKey) -> ExternResult<CallInfo> {
         None,
         agent_info()?.agent_initial_pubkey,
     )? {
-        ZomeCallResponse::Ok(extern_io) => Ok(extern_io.decode()?),
+        ZomeCallResponse::Ok(extern_io) => {
+            Ok(extern_io.decode().map_err(|e| wasm_error!(e.into()))?)
+        }
         not_ok => {
             tracing::warn!(?not_ok);
-            Err(WasmError::Guest(format!("{:?}", not_ok)))
+            Err(wasm_error!(WasmErrorInner::Guest(format!("{:?}", not_ok))))
         }
     }
 }
@@ -106,7 +110,12 @@ fn dna_info(_: ()) -> ExternResult<DnaInfo> {
 /// keys is relatively poor in `rmpv` compared to `serde_yaml`.
 #[hdk_extern]
 fn dna_info_value(k: String) -> ExternResult<serde_yaml::Value> {
-    Ok(YamlProperties::try_from(hdk::prelude::dna_info()?.properties)?.into_inner()[k].clone())
+    Ok(
+        YamlProperties::try_from(hdk::prelude::dna_info()?.properties)
+            .map_err(|e| wasm_error!(e.into()))?
+            .into_inner()[k]
+            .clone(),
+    )
 }
 
 /// Yaml doesn't enforce the type of any value.
@@ -149,7 +158,8 @@ struct MaybePropertiesDirect(Option<PropertiesDirect>);
 #[hdk_extern]
 fn dna_info_foo_direct(_: ()) -> ExternResult<Option<Foo>> {
     Ok(
-        MaybePropertiesDirect::try_from(hdk::prelude::dna_info()?.properties)?
+        MaybePropertiesDirect::try_from(hdk::prelude::dna_info()?.properties)
+            .map_err(|e| wasm_error!(e.into()))?
             .0
             .and_then(|properties| properties.foo),
     )
@@ -158,7 +168,8 @@ fn dna_info_foo_direct(_: ()) -> ExternResult<Option<Foo>> {
 #[hdk_extern]
 fn dna_info_bar_direct(_: ()) -> ExternResult<Option<String>> {
     Ok(
-        MaybePropertiesDirect::try_from(hdk::prelude::dna_info()?.properties)?
+        MaybePropertiesDirect::try_from(hdk::prelude::dna_info()?.properties)
+            .map_err(|e| wasm_error!(e.into()))?
             .0
             .and_then(|properties| properties.bar),
     )
@@ -167,7 +178,8 @@ fn dna_info_bar_direct(_: ()) -> ExternResult<Option<String>> {
 #[hdk_extern]
 fn dna_info_nested(_: ()) -> ExternResult<Option<i64>> {
     Ok(
-        MaybePropertiesDirect::try_from(hdk::prelude::dna_info()?.properties)?
+        MaybePropertiesDirect::try_from(hdk::prelude::dna_info()?.properties)
+            .map_err(|e| wasm_error!(e.into()))?
             .0
             .and_then(|properties| properties.baz["foo"]["bar"].as_i64()),
     )
@@ -175,7 +187,7 @@ fn dna_info_nested(_: ()) -> ExternResult<Option<i64>> {
 
 #[cfg(all(test, feature = "mock"))]
 pub mod tests {
-    use ::fixt::prelude::*;
+    use fixt::prelude::*;
     use hdk::prelude::*;
 
     #[test]

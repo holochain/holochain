@@ -81,7 +81,7 @@
 //! - The function must return an `ExternResult` where the success value implements `serde::Serialize + std::fmt::Debug`
 //! - The function must have a unique name across all externs as they share a global namespace in WASM
 //! - Everything inside the function is Rust-as-usual including `?` to interact with `ExternResult` that fails as `WasmError`
-//! - Use the `WasmError::Guest` variant for failure conditions that the host or external processes needs to be aware of
+//! - Use the `WasmErrorInner::Guest` variant for failure conditions that the host or external processes needs to be aware of
 //! - Externed functions can be called as normal by other functions inside the same WASM
 //!
 //! For example:

@@ -29,7 +29,7 @@ where
                 zome_name.into(),
                 fn_name,
                 cap_secret,
-                ExternIO::encode(payload)?,
+                ExternIO::encode(payload).map_err(|e| wasm_error!(e.into()))?,
             )])
         })?
         .into_iter()
@@ -78,7 +78,7 @@ where
                 zome.into(),
                 fn_name,
                 cap_secret,
-                ExternIO::encode(payload)?,
+                ExternIO::encode(payload).map_err(|e| wasm_error!(e.into()))?,
             )])
         })?
         .into_iter()
@@ -100,8 +100,9 @@ where
     I: serde::Serialize + std::fmt::Debug,
 {
     HDK.with(|h| {
-        h.borrow()
-            .emit_signal(AppSignal::new(ExternIO::encode(input)?))
+        h.borrow().emit_signal(AppSignal::new(
+            ExternIO::encode(input).map_err(|e| wasm_error!(e.into()))?,
+        ))
     })
 }
 
@@ -138,7 +139,7 @@ where
 {
     HDK.with(|h| {
         h.borrow().remote_signal(RemoteSignal {
-            signal: ExternIO::encode(input)?,
+            signal: ExternIO::encode(input).map_err(|e| wasm_error!(e.into()))?,
             agents,
         })
     })
