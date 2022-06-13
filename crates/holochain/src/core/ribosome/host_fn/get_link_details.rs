@@ -6,7 +6,7 @@ use futures::future::join_all;
 use holochain_cascade::Cascade;
 use holochain_p2p::actor::GetLinksOptions;
 use holochain_types::prelude::*;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]
@@ -14,7 +14,7 @@ pub fn get_link_details<'a>(
     ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     inputs: Vec<GetLinksInput>,
-) -> Result<Vec<LinkDetails>, WasmError> {
+) -> Result<Vec<LinkDetails>, RuntimeError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess {
             read_workspace: Permission::Allow,
@@ -43,33 +43,36 @@ pub fn get_link_details<'a>(
                 }))
                 .await
             });
-            let results: Result<Vec<_>, _> = results
+            let results: Result<Vec<_>, RuntimeError> = results
                 .into_iter()
                 .map(|result| match result {
                     Ok(v) => Ok(v.into()),
-                    Err(cascade_error) => Err(WasmError::Host(cascade_error.to_string())),
+                    Err(cascade_error) => {
+                        Err(wasm_error!(WasmErrorInner::Host(cascade_error.to_string())).into())
+                    }
                 })
                 .collect();
             Ok(results?)
         }
-        _ => Err(WasmError::Host(
+        _ => Err(wasm_error!(WasmErrorInner::Host(
             RibosomeError::HostFnPermissions(
                 call_context.zome.zome_name().clone(),
                 call_context.function_name().clone(),
                 "get_link_details".into(),
             )
             .to_string(),
-        )),
+        ))
+        .into()),
     }
 }
 
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod slow_tests {
+    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::element::SignedHeaderHashed;
     use holochain_zome_types::Header;
-    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_entry_hash_path_children_details() {
@@ -113,8 +116,9 @@ pub mod slow_tests {
 
         let to_remove_hash = to_remove.as_hash().clone();
 
-        let _remove_hash: holo_hash::HeaderHash =
-            conductor.call(&alice, "delete_link", to_remove_hash.clone()).await;
+        let _remove_hash: holo_hash::HeaderHash = conductor
+            .call(&alice, "delete_link", to_remove_hash.clone())
+            .await;
 
         let children_details_output_2: holochain_zome_types::link::LinkDetails = conductor
             .call(&alice, "children_details", "foo".to_string())

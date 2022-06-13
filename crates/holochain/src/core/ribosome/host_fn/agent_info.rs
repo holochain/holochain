@@ -2,7 +2,7 @@ use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 use crate::core::ribosome::RibosomeError;
 use std::sync::Arc;
 
@@ -11,7 +11,7 @@ pub fn agent_info<'a>(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     _input: (),
-) -> Result<AgentInfo, WasmError> {
+) -> Result<AgentInfo, RuntimeError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess {
             agent_info: Permission::Allow,
@@ -35,14 +35,14 @@ pub fn agent_info<'a>(
                     .as_ref()
                     .expect("Must have source chain if agent_info access is given")
                     .chain_head()
-                    .map_err(|e| WasmError::Host(e.to_string()))?,
+                    .map_err(|e| wasm_error!(WasmErrorInner::Host(e.to_string())))?,
             })
         }
-        _ => Err(WasmError::Host(RibosomeError::HostFnPermissions(
+        _ => Err(wasm_error!(WasmErrorInner::Host(RibosomeError::HostFnPermissions(
             call_context.zome.zome_name().clone(),
             call_context.function_name().clone(),
             "agent_info".into()
-        ).to_string()))
+        ).to_string())).into())
     }
 }
 
