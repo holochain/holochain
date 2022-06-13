@@ -6,15 +6,16 @@ fn duplicate_zome_names_is_an_error() {
 ---
 manifest_version: "1"
 name: test_dna
-zomes:
-  integrity:
+integrity:
+  zomes:
     - name: zome1
       bundled: zome-1.wasm
     - name: zome1
       bundled: nested/zome-2.wasm
     - name: zome3
       path: ../zome-3.wasm
-  coordinator:
+coordinator:
+  zomes:
     - name: zome4
       bundled: zome-4.wasm
     - name: zome5
@@ -34,8 +35,8 @@ fn dependency_not_pointing_at_integrity_zome_is_error() {
 ---
 manifest_version: "1"
 name: test_dna
-zomes:
-  integrity:
+integrity:
+  zomes:
     - name: zome1
       bundled: zome-1.wasm
       dependencies:
@@ -44,7 +45,8 @@ zomes:
       bundled: nested/zome-2.wasm
     - name: zome3
       path: ../zome-3.wasm
-  coordinator:
+coordinator:
+  zomes:
     - name: zome4
       bundled: zome-4.wasm
     - name: zome5
@@ -62,8 +64,8 @@ zomes:
 ---
 manifest_version: "1"
 name: test_dna
-zomes:
-  integrity:
+integrity:
+  zomes:
     - name: zome1
       bundled: zome-1.wasm
     - name: zome2
@@ -73,7 +75,8 @@ zomes:
         - name: zome4
     - name: zome3
       path: ../zome-3.wasm
-  coordinator:
+coordinator:
+  zomes:
     - name: zome4
       bundled: zome-4.wasm
     - name: zome5
@@ -91,8 +94,8 @@ zomes:
 ---
 manifest_version: "1"
 name: test_dna
-zomes:
-  integrity:
+integrity:
+  zomes:
     - name: zome1
       bundled: zome-1.wasm
     - name: zome2
@@ -102,7 +105,8 @@ zomes:
         - name: zome2
     - name: zome3
       path: ../zome-3.wasm
-  coordinator:
+coordinator:
+  zomes:
     - name: zome4
       bundled: zome-4.wasm
     - name: zome5

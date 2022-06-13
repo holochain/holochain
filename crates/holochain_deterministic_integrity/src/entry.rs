@@ -3,7 +3,7 @@ use crate::prelude::*;
 pub use hdk_derive::hdk_entry_defs;
 pub use hdk_derive::hdk_entry_helper;
 
-// #[cfg(doc)]
+#[cfg(doc)]
 pub mod examples;
 
 /// MUST get an EntryHashed at a given EntryHash.

@@ -93,18 +93,19 @@ mod tests {
 ---
 manifest_version: "1"
 name: test_dna
-uid: blablabla
-origin_time: 2022-02-11T23:29:00.789576Z
-properties:
-  some: 42
-  props: yay
-zomes:
-  - name: zome1
-    bundled: zome-1.wasm
-  - name: zome2
-    bundled: nested/zome-2.wasm
-  - name: zome3
-    path: ../zome-3.wasm
+integrity:
+    uid: blablabla
+    origin_time: 2022-02-11T23:29:00.789576Z
+    properties:
+      some: 42
+      props: yay
+    zomes:
+      - name: zome1
+        bundled: zome-1.wasm
+      - name: zome2
+        bundled: nested/zome-2.wasm
+      - name: zome3
+        path: ../zome-3.wasm
         "#;
 
         // Create files in working directory

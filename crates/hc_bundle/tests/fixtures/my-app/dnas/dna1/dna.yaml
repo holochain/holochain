@@ -1,11 +1,12 @@
 ---
 manifest_version: "1"
 name: a dna
-uid: 00000000-0000-0000-0000-000000000000
-properties: ~
-origin_time: 2022-02-11T23:29:00.789576Z
-zomes:
-  - name: zome1
-    bundled: ./zomes/zome1.wasm
-  - name: zome2
-    bundled: ./zomes/zome2.wasm
+integrity:
+  uid: 00000000-0000-0000-0000-000000000000
+  properties: ~
+  origin_time: 2022-02-11T23:29:00.789576Z
+  zomes:
+    - name: zome1
+      bundled: ./zomes/zome1.wasm
+    - name: zome2
+      bundled: ./zomes/zome2.wasm

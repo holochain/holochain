@@ -67,9 +67,9 @@ impl DnaBundle {
         let data = match &self.manifest().0 {
             DnaManifest::V1(manifest) => {
                 let integrity =
-                    hash_bytes(manifest.zomes.integrity.iter().cloned(), &mut resources).await?;
+                    hash_bytes(manifest.integrity.zomes.iter().cloned(), &mut resources).await?;
                 let coordinator =
-                    hash_bytes(manifest.zomes.coordinator.iter().cloned(), &mut resources).await?;
+                    hash_bytes(manifest.coordinator.zomes.iter().cloned(), &mut resources).await?;
                 [integrity, coordinator]
             }
         };
@@ -123,11 +123,11 @@ impl DnaBundle {
             DnaManifest::V1(manifest) => {
                 let mut dna_def = DnaDef {
                     name: manifest.name.clone(),
-                    uid: manifest.uid.clone().unwrap_or_default(),
+                    uid: manifest.integrity.uid.clone().unwrap_or_default(),
                     properties: SerializedBytes::try_from(
-                        manifest.properties.clone().unwrap_or_default(),
+                        manifest.integrity.properties.clone().unwrap_or_default(),
                     )?,
-                    origin_time: manifest.origin_time.into(),
+                    origin_time: manifest.integrity.origin_time.into(),
                     integrity_zomes,
                     coordinator_zomes,
                 };
@@ -141,13 +141,15 @@ impl DnaBundle {
                     // Otherwise, record the original hash first, for version comparisons.
                     let original_hash = DnaHash::with_data_sync(&dna_def);
 
-                    let props = manifest.properties.as_ref();
+                    let props = manifest.integrity.properties.as_ref();
                     let properties: SerializedBytes = properties
                         .as_ref()
                         .or(props)
                         .map(SerializedBytes::try_from)
                         .unwrap_or_else(|| SerializedBytes::try_from(()))?;
-                    let uid = uid.or_else(|| manifest.uid.clone()).unwrap_or_default();
+                    let uid = uid
+                        .or_else(|| manifest.integrity.uid.clone())
+                        .unwrap_or_default();
 
                     dna_def.uid = uid;
                     dna_def.properties = properties;
@@ -217,21 +219,20 @@ impl DnaBundle {
                 })
             })
             .collect();
-        let zomes = AllZomes {
-            integrity,
-            coordinator,
-        };
         Ok(DnaManifestCurrent {
             name: dna_def.name,
-            uid: Some(dna_def.uid),
-            properties: Some(dna_def.properties.try_into().map_err(|e| {
-                DnaError::DnaFileToBundleConversionError(format!(
-                    "DnaDef properties were not YAML-deserializable: {}",
-                    e
-                ))
-            })?),
-            origin_time: dna_def.origin_time.into(),
-            zomes,
+            integrity: IntegrityManifest {
+                uid: Some(dna_def.uid),
+                properties: Some(dna_def.properties.try_into().map_err(|e| {
+                    DnaError::DnaFileToBundleConversionError(format!(
+                        "DnaDef properties were not YAML-deserializable: {}",
+                        e
+                    ))
+                })?),
+                origin_time: dna_def.origin_time.into(),
+                zomes: integrity,
+            },
+            coordinator: CoordinatorManifest { zomes: coordinator },
         }
         .into())
     }
@@ -285,11 +286,11 @@ mod tests {
         let hash2 = DnaWasm::from(wasm2.clone()).to_hash().await;
         let mut manifest = DnaManifestCurrent {
             name: "name".into(),
-            uid: Some("original uid".to_string()),
-            properties: Some(serde_yaml::Value::Null.into()),
-            origin_time: Timestamp::HOLOCHAIN_EPOCH.into(),
-            zomes: AllZomes {
-                integrity: vec![
+            integrity: IntegrityManifest {
+                uid: Some("original uid".to_string()),
+                properties: Some(serde_yaml::Value::Null.into()),
+                origin_time: Timestamp::HOLOCHAIN_EPOCH.into(),
+                zomes: vec![
                     ZomeManifest {
                         name: "zome1".into(),
                         hash: None,
@@ -304,8 +305,8 @@ mod tests {
                         dependencies: Default::default(),
                     },
                 ],
-                coordinator: vec![],
             },
+            coordinator: CoordinatorManifest { zomes: vec![] },
         };
         let resources = vec![(path1, wasm1), (path2, wasm2)];
 
@@ -323,7 +324,7 @@ mod tests {
         );
 
         // - Correct the hash and try again
-        manifest.zomes.integrity[1].hash = Some(hash2.into());
+        manifest.integrity.zomes[1].hash = Some(hash2.into());
         let bundle: DnaBundle = mr_bundle::Bundle::new_unchecked(
             manifest.clone().try_into().unwrap(),
             resources.clone(),

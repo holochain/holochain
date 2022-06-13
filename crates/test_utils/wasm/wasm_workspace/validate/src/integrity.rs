@@ -63,22 +63,6 @@ impl TryFrom<&ThisWasmEntry> for EntryDefIndex {
             })
     }
 }
-#[hdk_extern]
-pub fn entry_defs(_: ()) -> ExternResult<EntryDefsCallbackResult> {
-    Ok(EntryDefsCallbackResult::from(vec![EntryDef::from(
-        ThisWasmEntry::ENTRY_DEFS[0].clone(),
-    )]))
-}
-
-#[no_mangle]
-pub fn __num_entry_types() -> u8 {
-    1
-}
-
-#[no_mangle]
-pub fn __num_link_types() -> u8 {
-    0
-}
 
 #[hdk_extern]
 fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {

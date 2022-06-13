@@ -30,7 +30,7 @@ pub struct ValidatedDnaManifest(pub(super) DnaManifest);
 impl mr_bundle::Manifest for ValidatedDnaManifest {
     fn locations(&self) -> Vec<mr_bundle::Location> {
         match &self.0 {
-            DnaManifest::V1(m) => m.zomes.iter().map(|zome| zome.location.clone()).collect(),
+            DnaManifest::V1(m) => m.all_zomes().map(|zome| zome.location.clone()).collect(),
         }
     }
 
@@ -51,22 +51,30 @@ impl DnaManifest {
         uid: Option<String>,
         properties: Option<YamlProperties>,
         origin_time: HumanTimestamp,
-        zomes: AllZomes,
+        integrity_zomes: Vec<ZomeManifest>,
+        coordinator_zomes: Vec<ZomeManifest>,
     ) -> Self {
-        DnaManifestCurrent::new(name, uid, properties, origin_time, zomes).into()
+        DnaManifestCurrent::new(
+            name,
+            IntegrityManifest::new(uid, properties, origin_time, integrity_zomes),
+            CoordinatorManifest {
+                zomes: coordinator_zomes,
+            },
+        )
+        .into()
     }
 
     /// Getter for properties
     pub fn properties(&self) -> Option<YamlProperties> {
         match self {
-            DnaManifest::V1(manifest) => manifest.properties.clone(),
+            DnaManifest::V1(manifest) => manifest.integrity.properties.clone(),
         }
     }
 
     /// Getter for uid
     pub fn uid(&self) -> Option<String> {
         match self {
-            DnaManifest::V1(manifest) => manifest.uid.clone(),
+            DnaManifest::V1(manifest) => manifest.integrity.uid.clone(),
         }
     }
 
@@ -85,10 +93,10 @@ impl TryFrom<DnaManifest> for ValidatedDnaManifest {
         match &value {
             DnaManifest::V1(m) => {
                 let integrity_zome_names: HashSet<_> =
-                    m.zomes.integrity.iter().map(|z| z.name.clone()).collect();
+                    m.integrity.zomes.iter().map(|z| z.name.clone()).collect();
                 // Check there are no duplicate zome names.
                 let mut names = HashSet::new();
-                for z in m.zomes.iter() {
+                for z in m.all_zomes() {
                     if !names.insert(z.name.clone()) {
                         return Err(DnaError::DuplicateZomeNames(z.name.to_string()));
                     }
