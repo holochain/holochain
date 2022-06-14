@@ -3,7 +3,7 @@ use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 use tracing::error;
 
@@ -12,7 +12,7 @@ pub fn accept_countersigning_preflight_request<'a>(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: PreflightRequest,
-) -> Result<PreflightRequestAcceptance, WasmError> {
+) -> Result<PreflightRequestAcceptance, RuntimeError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess {
             agent_info: Permission::Allow,
@@ -50,8 +50,8 @@ pub fn accept_countersigning_preflight_request<'a>(
                     .expect("Must have source chain if write_workspace access is given")
                     .accept_countersigning_preflight_request(input.clone(), agent_index)
                     .await
-                    .map_err(|source_chain_error| {
-                        WasmError::Host(source_chain_error.to_string())
+                    .map_err(|source_chain_error| -> RuntimeError {
+                        wasm_error!(WasmErrorInner::Host(source_chain_error.to_string())).into()
                     })?;
                 let signature: Signature = match call_context
                     .host_context
@@ -61,7 +61,8 @@ pub fn accept_countersigning_preflight_request<'a>(
                         PreflightResponse::encode_fields_for_signature(
                             &input,
                             &countersigning_agent_state,
-                        )?
+                        )
+                        .map_err(|e| -> RuntimeError { wasm_error!(e.into()).into() })?
                         .into(),
                     )
                     .await
@@ -82,24 +83,27 @@ pub fn accept_countersigning_preflight_request<'a>(
                         {
                             error!(?unlock_result);
                         }
-                        return Err(WasmError::Host(e.to_string()));
+                        return Err(wasm_error!(WasmErrorInner::Host(e.to_string())).into());
                     }
                 };
 
                 Ok(PreflightRequestAcceptance::Accepted(
                     PreflightResponse::try_new(input, countersigning_agent_state, signature)
-                        .map_err(|e| WasmError::Host(e.to_string()))?,
+                        .map_err(|e| -> RuntimeError {
+                            wasm_error!(WasmErrorInner::Host(e.to_string())).into()
+                        })?,
                 ))
             })
         }
-        _ => Err(WasmError::Host(
+        _ => Err(wasm_error!(WasmErrorInner::Host(
             RibosomeError::HostFnPermissions(
                 call_context.zome.zome_name().clone(),
                 call_context.function_name().clone(),
                 "accept_countersigning_preflight_request".into(),
             )
             .to_string(),
-        )),
+        ))
+        .into()),
     }
 }
 
@@ -110,11 +114,12 @@ pub mod wasm_test {
     use crate::conductor::api::ZomeCall;
     use crate::conductor::CellError;
     use crate::core::ribosome::error::RibosomeError;
+    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use crate::core::workflow::error::WorkflowError;
     use hdk::prelude::*;
     use holochain_state::source_chain::SourceChainError;
     use holochain_wasm_test_utils::TestWasm;
-    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
+    use holochain_wasmer_host::prelude::*;
 
     /// Allow ChainLocked error, panic on anything else
     fn expect_chain_locked(
@@ -295,7 +300,7 @@ pub mod wasm_test {
             .await;
         assert!(matches!(
             preflight_acceptance_fail,
-            Ok(Err(RibosomeError::WasmError(WasmError::Host(_))))
+            Ok(Err(RibosomeError::WasmRuntimeError(RuntimeError { .. })))
         ));
 
         // Bob can also accept the preflight request.

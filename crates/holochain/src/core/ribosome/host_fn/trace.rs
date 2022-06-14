@@ -1,7 +1,7 @@
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 use once_cell::unsync::Lazy;
 use std::sync::Arc;
 use tracing::*;
@@ -32,7 +32,7 @@ pub fn trace(
     _ribosome: Arc<impl RibosomeT>,
     _call_context: Arc<CallContext>,
     input: TraceMsg,
-) -> Result<(), WasmError> {
+) -> Result<(), RuntimeError> {
     // Avoid dialing out to the environment on every trace.
     let wasm_log = Lazy::new(|| {
         std::env::var("WASM_LOG").unwrap_or_else(|_| "[wasm_trace]=debug".to_string())

@@ -6,15 +6,15 @@ use crate::core::ribosome::ZomeCall;
 use futures::future::join_all;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_types::prelude::*;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 
 pub fn call(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     inputs: Vec<Call>,
-) -> Result<Vec<ZomeCallResponse>, WasmError> {
-    let results: Vec<Result<ZomeCallResponse, WasmError>> =
+) -> Result<Vec<ZomeCallResponse>, RuntimeError> {
+    let results: Vec<Result<ZomeCallResponse, RuntimeError>> =
         tokio_helper::block_forever_on(async move {
             join_all(inputs.into_iter().map(|input| async {
                 // The line below was added when migrating to rust edition 2021, per
@@ -54,7 +54,7 @@ pub fn call(
                             .agent_pubkey()
                             .clone();
 
-                        let result: Result<ZomeCallResponse, WasmError> = match target {
+                        let result: Result<ZomeCallResponse, RuntimeError> = match target {
                             CallTarget::NetworkAgent(target_agent) => {
                                 match call_context
                                     .host_context()
@@ -69,10 +69,10 @@ pub fn call(
                                     )
                                     .await
                                 {
-                                    Ok(serialized_bytes) => {
-                                        ZomeCallResponse::try_from(serialized_bytes)
-                                            .map_err(WasmError::from)
-                                    }
+                                    Ok(serialized_bytes) => ZomeCallResponse::try_from(
+                                        serialized_bytes,
+                                    )
+                                    .map_err(|e| -> RuntimeError { wasm_error!(e.into()).into() }),
                                     Err(e) => Ok(ZomeCallResponse::NetworkError(e.to_string())),
                                 }
                             }
@@ -108,25 +108,28 @@ pub fn call(
                                     .await
                                 {
                                     Ok(Ok(zome_call_response)) => Ok(zome_call_response),
-                                    Ok(Err(ribosome_error)) => {
-                                        Err(WasmError::Host(ribosome_error.to_string()))
-                                    }
-                                    Err(conductor_api_error) => {
-                                        Err(WasmError::Host(conductor_api_error.to_string()))
-                                    }
+                                    Ok(Err(ribosome_error)) => Err(wasm_error!(
+                                        WasmErrorInner::Host(ribosome_error.to_string())
+                                    )
+                                    .into()),
+                                    Err(conductor_api_error) => Err(wasm_error!(
+                                        WasmErrorInner::Host(conductor_api_error.to_string())
+                                    )
+                                    .into()),
                                 }
                             }
                         };
                         result
                     }
-                    _ => Err(WasmError::Host(
+                    _ => Err(wasm_error!(WasmErrorInner::Host(
                         RibosomeError::HostFnPermissions(
                             call_context.zome.zome_name().clone(),
                             call_context.function_name().clone(),
                             "call".into(),
                         )
                         .to_string(),
-                    )),
+                    ))
+                    .into()),
                 }
             }))
             .await

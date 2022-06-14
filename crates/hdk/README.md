@@ -31,7 +31,6 @@ At the time of writing there were about 40 example/test WASMs that can be browse
 Each example WASM is a minimal demonstration of specific HDK functionality, such as generating random data, creating entries or defining validation callbacks.
 Some of the examples are very contrived, none are intended as production grade hApp examples, but do highlight key functionality.
 
-
 #### HDK has layers 🧅
 
 HDK is designed in layers so that there is some kind of 80/20 rule.

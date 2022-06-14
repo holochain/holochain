@@ -53,13 +53,20 @@ impl TryFrom<&Path> for Anchor {
             if components[0] == Component::new(ROOT.to_vec()) {
                 Ok(Anchor {
                     anchor_type: std::str::from_utf8(components[1].as_ref())
-                        .map_err(|e| SerializedBytesError::Deserialize(e.to_string()))?
+                        .map_err(|e| {
+                            wasm_error!(SerializedBytesError::Deserialize(e.to_string()).into())
+                        })?
                         .to_string(),
                     anchor_text: {
                         match components.get(2) {
                             Some(component) => Some(
                                 std::str::from_utf8(component.as_ref())
-                                    .map_err(|e| SerializedBytesError::Deserialize(e.to_string()))?
+                                    .map_err(|e| {
+                                        wasm_error!(SerializedBytesError::Deserialize(
+                                            e.to_string()
+                                        )
+                                        .into())
+                                    })?
                                     .to_string(),
                             ),
                             None => None,
@@ -67,17 +74,20 @@ impl TryFrom<&Path> for Anchor {
                     },
                 })
             } else {
-                Err(WasmError::Serialize(SerializedBytesError::Deserialize(
-                    format!(
+                Err(wasm_error!(WasmErrorInner::Serialize(
+                    SerializedBytesError::Deserialize(format!(
                         "Bad anchor path root {:0?} should be {:1?}",
                         components[0].as_ref(),
                         ROOT,
-                    ),
+                    ),)
                 )))
             }
         } else {
-            Err(WasmError::Serialize(SerializedBytesError::Deserialize(
-                format!("Bad anchor path length {}", components.len()),
+            Err(wasm_error!(WasmErrorInner::Serialize(
+                SerializedBytesError::Deserialize(format!(
+                    "Bad anchor path length {}",
+                    components.len()
+                ),)
             )))
         }
     }
@@ -140,8 +150,8 @@ pub fn list_anchor_tags(anchor_type: String) -> ExternResult<Vec<String>> {
         .map(|path| match Anchor::try_from(&path) {
             Ok(anchor) => match anchor.anchor_text {
                 Some(text) => Ok(text),
-                None => Err(WasmError::Serialize(SerializedBytesError::Deserialize(
-                    "missing anchor text".into(),
+                None => Err(wasm_error!(WasmErrorInner::Serialize(
+                    SerializedBytesError::Deserialize("missing anchor text".into(),)
                 ))),
             },
             Err(e) => Err(e),

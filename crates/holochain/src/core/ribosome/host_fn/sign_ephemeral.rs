@@ -3,7 +3,7 @@ use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 use ring::rand::SecureRandom;
 use ring::rand::SystemRandom;
 use ring::signature::Ed25519KeyPair;
@@ -14,7 +14,7 @@ pub fn sign_ephemeral(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: SignEphemeral,
-) -> Result<EphemeralSignatures, WasmError> {
+) -> Result<EphemeralSignatures, RuntimeError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess {
             keystore: Permission::Allow,
@@ -22,10 +22,13 @@ pub fn sign_ephemeral(
         } => {
             let rng = SystemRandom::new();
             let mut seed = [0; 32];
-            rng.fill(&mut seed)
-                .map_err(|e| WasmError::Guest(e.to_string()))?;
-            let ephemeral_keypair = Ed25519KeyPair::from_seed_unchecked(&seed)
-                .map_err(|e| WasmError::Host(e.to_string()))?;
+            rng.fill(&mut seed).map_err(|e| -> RuntimeError {
+                wasm_error!(WasmErrorInner::Guest(e.to_string())).into()
+            })?;
+            let ephemeral_keypair =
+                Ed25519KeyPair::from_seed_unchecked(&seed).map_err(|e| -> RuntimeError {
+                    wasm_error!(WasmErrorInner::Host(e.to_string())).into()
+                })?;
 
             let signatures: Result<Vec<Signature>, _> = input
                 .into_inner()
@@ -34,18 +37,21 @@ pub fn sign_ephemeral(
                 .collect();
 
             Ok(EphemeralSignatures {
-                signatures: signatures.map_err(|e| WasmError::Host(e.to_string()))?,
+                signatures: signatures.map_err(|e| -> RuntimeError {
+                    wasm_error!(WasmErrorInner::Host(e.to_string())).into()
+                })?,
                 key: AgentPubKey::from_raw_32(ephemeral_keypair.public_key().as_ref().to_vec()),
             })
         }
-        _ => Err(WasmError::Host(
+        _ => Err(wasm_error!(WasmErrorInner::Host(
             RibosomeError::HostFnPermissions(
                 call_context.zome.zome_name().clone(),
                 call_context.function_name().clone(),
                 "sign_ephemeral".into(),
             )
             .to_string(),
-        )),
+        ))
+        .into()),
     }
 }
 

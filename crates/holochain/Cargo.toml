@@ -31,7 +31,7 @@ holochain_sqlite = { version = "0.0.40", path = "../holochain_sqlite" }
 holochain_serialized_bytes = "=0.0.51"
 holochain_state = { version = "0.0.43", path = "../holochain_state" }
 holochain_types = { version = "0.0.41", path = "../holochain_types" }
-holochain_wasmer_host = "=0.0.77"
+holochain_wasmer_host = "=0.0.79"
 holochain_websocket = { version = "0.0.39", path = "../holochain_websocket" }
 holochain_zome_types = { version = "0.0.35", path = "../holochain_zome_types", features = ["full"] }
 human-panic = "1.0.3"
@@ -163,3 +163,6 @@ db-encryption = ['holochain_sqlite/db-encryption']
 # Compile SQLite from source rather than depending on a library.
 # Incompatible with "db-encryption"
 no-deps = ['holochain_sqlite/no-deps']
+
+# Extremely verbose wasm memory read/write logging
+wasmer_debug_memory = ["holochain_wasmer_host/debug_memory"]
