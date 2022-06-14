@@ -6,7 +6,61 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20220614.234815
+
 - Docs: Update OS support in repository README and link to developer environment setup.
+
+## [holochain\_cli-0.0.42](crates/holochain_cli/CHANGELOG.md#0.0.42)
+
+## [holochain\_cli\_sandbox-0.0.38](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.38)
+
+## [holochain\_cli\_bundle-0.0.38](crates/holochain_cli_bundle/CHANGELOG.md#0.0.38)
+
+## [holochain-0.0.144](crates/holochain/CHANGELOG.md#0.0.144)
+
+- Add functional stub for `x_salsa20_poly1305_shared_secret_create_random` [\#1410](https://github.com/holochain/holochain/pull/1410)
+- Add functional stub for `x_salsa20_poly1305_shared_secret_export` [\#1410](https://github.com/holochain/holochain/pull/1410)
+- Add functional stub for `x_salsa20_poly1305_shared_secret_ingest` [\#1410](https://github.com/holochain/holochain/pull/1410)
+
+## [holochain\_test\_wasm\_common-0.0.38](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.38)
+
+## [holochain\_conductor\_api-0.0.44](crates/holochain_conductor_api/CHANGELOG.md#0.0.44)
+
+## [holochain\_wasm\_test\_utils-0.0.43](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.43)
+
+## [holochain\_cascade-0.0.44](crates/holochain_cascade/CHANGELOG.md#0.0.44)
+
+## [holochain\_state-0.0.44](crates/holochain_state/CHANGELOG.md#0.0.44)
+
+## [holochain\_p2p-0.0.42](crates/holochain_p2p/CHANGELOG.md#0.0.42)
+
+## [holochain\_types-0.0.42](crates/holochain_types/CHANGELOG.md#0.0.42)
+
+## [holochain\_keystore-0.0.42](crates/holochain_keystore/CHANGELOG.md#0.0.42)
+
+## [holochain\_sqlite-0.0.41](crates/holochain_sqlite/CHANGELOG.md#0.0.41)
+
+## [kitsune\_p2p-0.0.36](crates/kitsune_p2p/CHANGELOG.md#0.0.36)
+
+## [hdk-0.0.137](crates/hdk/CHANGELOG.md#0.0.137)
+
+- hdk: Use newest wasmer and introduces `wasm_error!` macro to capture line numbers for wasm errors [\#1380](https://github.com/holochain/holochain/pull/1380)
+- Docs: Restructure main page sections and add several intra-doc lnks [\#1418](https://github.com/holochain/holochain/pull/1418)
+- hdk: Add functional stub for `x_salsa20_poly1305_shared_secret_create_random` [\#1410](https://github.com/holochain/holochain/pull/1410)
+- hdk: Add functional stub for `x_salsa20_poly1305_shared_secret_export` [\#1410](https://github.com/holochain/holochain/pull/1410)
+- hdk: Add functional stub for `x_salsa20_poly1305_shared_secret_ingest` [\#1410](https://github.com/holochain/holochain/pull/1410)
+
+## [holochain\_zome\_types-0.0.36](crates/holochain_zome_types/CHANGELOG.md#0.0.36)
+
+- Docs: Describe init callback and link to WASM examples [\#1418](https://github.com/holochain/holochain/pull/1418)
+
+## [holochain\_deterministic\_integrity-0.0.9](crates/holochain_deterministic_integrity/CHANGELOG.md#0.0.9)
+
+## [hdk\_derive-0.0.36](crates/hdk_derive/CHANGELOG.md#0.0.36)
+
+## [holochain\_integrity\_types-0.0.8](crates/holochain_integrity_types/CHANGELOG.md#0.0.8)
+
+- KeyRef (opaque reference to a secretbox shared secret) is now an unsized byte slice [\#1410](https://github.com/holochain/holochain/pull/1410)
 
 # 20220608.011447
 
