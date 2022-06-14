@@ -68,10 +68,7 @@ fn generate_preflight_request(
         agents,
         None,
         session_times_from_millis(5000)?,
-        HeaderBase::Create(CreateBase::new(
-            entry_type,
-            todo!("do we really put the weight here?"),
-        )),
+        HeaderBase::Create(CreateBase::new(entry_type)),
         PreflightBytes(vec![]),
     )
     .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))
