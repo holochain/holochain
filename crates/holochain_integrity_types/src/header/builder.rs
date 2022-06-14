@@ -56,11 +56,6 @@ pub trait HeaderBuilder<U: HeaderUnweighed>: Sized {
 
 macro_rules! builder_variant {
     ( $name: ident <$weight : ty> { $($field: ident : $t: ty),* $(,)? } ) => {
-        // builder_variant!($name {
-        //     $($field: $t),*
-        //     |
-        //     weight: $weight
-        // });
 
         #[derive(Clone, Debug, PartialEq, Eq)]
         pub struct $name {
@@ -133,13 +128,6 @@ macro_rules! builder_variant {
                 }
             }
         }
-
-
-        // impl From<($name, HeaderBuilderCommon)> for header::$name {
-        //     fn from((n, h): ($name, HeaderBuilderCommon)) -> header::$name {
-        //         n.build(h)
-        //     }
-        // }
 
         #[cfg(feature = "test_utils")]
         impl header::$name {

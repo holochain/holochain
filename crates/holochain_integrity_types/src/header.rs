@@ -452,24 +452,6 @@ pub struct CreateLink<W = RateWeight> {
     pub weight: W,
 }
 
-impl From<CreateLink> for CreateLink<()> {
-    fn from(c: CreateLink) -> Self {
-        CreateLink {
-            author: c.author,
-            timestamp: c.timestamp,
-            header_seq: c.header_seq,
-            prev_header: c.prev_header,
-
-            base_address: c.base_address,
-            target_address: c.target_address,
-            link_type: c.link_type,
-            tag: c.tag,
-
-            weight: (),
-        }
-    }
-}
-
 /// Declares that a previously made Link should be nullified and considered removed.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
