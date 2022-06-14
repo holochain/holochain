@@ -242,11 +242,21 @@ impl RealRibosome {
 
                 // Call the const functions that return the number of types.
                 let num_entry_types = match ribosome.get_const_fn(&zome, "__num_entry_types")? {
-                    Some(i) => EntryDefIndex(i),
+                    Some(i) => {
+                        let i: u8 = i
+                            .try_into()
+                            .map_err(|_| ZomeTypesError::EntryTypeIndexOverflow)?;
+                        EntryDefIndex(i)
+                    }
                     None => EntryDefIndex(0),
                 };
                 let num_link_types = match ribosome.get_const_fn(&zome, "__num_link_types")? {
-                    Some(i) => LinkType(i),
+                    Some(i) => {
+                        let i: u8 = i
+                            .try_into()
+                            .map_err(|_| ZomeTypesError::LinkTypeIndexOverflow)?;
+                        LinkType(i)
+                    }
                     None => LinkType(0),
                 };
                 RibosomeResult::Ok((num_entry_types, num_link_types))
@@ -695,7 +705,7 @@ impl RibosomeT for RealRibosome {
         }
     }
 
-    fn get_const_fn(&self, zome: &Zome, name: &str) -> Result<Option<u8>, RibosomeError> {
+    fn get_const_fn(&self, zome: &Zome, name: &str) -> Result<Option<i32>, RibosomeError> {
         // Create a blank context as this is not actually used.
         let call_context = CallContext {
             zome: zome.clone(),
@@ -720,7 +730,7 @@ impl RibosomeT for RealRibosome {
                     let result = instance
                         .lock()
                         .exports
-                        .get_native_function::<(), u8>(name)
+                        .get_native_function::<(), i32>(name)
                         .ok()
                         .map_or(Ok(None), |func| Ok(Some(func.call()?)))
                         .map_err(|e: RuntimeError| {
@@ -741,7 +751,7 @@ impl RibosomeT for RealRibosome {
             }
             ZomeDef::Inline {
                 inline_zome: zome, ..
-            } => Ok(zome.0.get_global(name)),
+            } => Ok(zome.0.get_global(name).map(|i| i as i32)),
         }
     }
 

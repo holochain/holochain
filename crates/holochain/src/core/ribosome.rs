@@ -525,7 +525,7 @@ pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
     /// This allows getting values from wasm without the need for any translation.
     /// The same technique can be used with the wasmer cli to validate these
     /// values without needing to make holochain a dependency.
-    fn get_const_fn(&self, zome: &Zome, name: &str) -> Result<Option<u8>, RibosomeError>;
+    fn get_const_fn(&self, zome: &Zome, name: &str) -> Result<Option<i32>, RibosomeError>;
 
     /// @todo list out all the available callbacks and maybe cache them somewhere
     fn list_callbacks(&self) {

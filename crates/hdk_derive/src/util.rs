@@ -46,7 +46,7 @@ pub fn get_unit_ident(attrs: &[syn::Attribute]) -> syn::Ident {
 pub fn index_to_u8(index: usize) -> u8 {
     match u8::try_from(index) {
         Ok(i) => i,
-        Err(_) => abort_call_site!("Can only have a maximum of 256 enum variants"),
+        Err(_) => abort_call_site!("Can only have a maximum of 255 enum variants"),
     }
 }
 
