@@ -45,6 +45,11 @@ on:
         required: false
         default: "true"
         type: string
+      skip_test:
+        description: "skip the holochain test suite"
+        required: false
+        default: "false"
+        type: string
 
   pull_request: {}
 
@@ -68,6 +73,7 @@ jobs:
       holochain_source_branch: ${{ steps.eval.outputs.holochain_source_branch }}
       dry_run: ${{ steps.eval.outputs.dry_run }}
       debug: ${{ steps.eval.outputs.debug }}
+      skip_test: ${{ steps.eval.outputs.skip_hc_tests }}
     steps:
       - name: evaluate variables
         id: eval
@@ -80,6 +86,7 @@ jobs:
           input_holochain_source_branch: ${{ github.event.inputs.holochain_source_branch }}
           input_dry_run: ${{ github.event.inputs.dry_run}}
           input_debug: ${{ github.event.inputs.debug }}
+          input_skip_test: ${{ github.event.inputs.skip_hc_tests }}
         run: |
           set -x
 
@@ -123,6 +130,12 @@ jobs:
             echo "::set-output name=debug::false"
           else
             echo "::set-output name=debug::true"
+          fi
+
+          if [[ ${input_skip_test} != "" ]]; then
+            echo "::set-output name=skip_test::${input_skip_hc_tests}"
+          else
+            echo "::set-output name=skip_test::false"
           fi
 
           echo "::set-output name=HOLOCHAIN_REPO::/tmp/holochain_repo"
@@ -279,7 +292,7 @@ jobs:
       - name: Maximize build space
         # uses: easimon/maximize-build-space@master
         uses: AdityaGarg8/remove-unwanted-software@v1
-        if: ${{ matrix.platform == 'ubuntu-latest' && matrix.testCommand.maxBuildSpace == true }}
+        if: ${{ matrix.platform == 'ubuntu-latest' && matrix.testCommand.maxBuildSpace == true && needs.vars.outputs.skip_test == 'false' }}
         with:
           remove-dotnet: true
           remove-android: true
@@ -346,7 +359,7 @@ jobs:
             '
 
       - name: ${{ matrix.testCommand.name }} (build only)
-        if: ${{ matrix.testCommand.restoresCargoCache == true }}
+        if: ${{ matrix.testCommand.restoresCargoCache == true && needs.vars.outputs.skip_test == 'false' }}
         env:
           CARGO_TEST_ARGS: "--no-run"
           CARGO_NEXTEST_ARGS: "list"
@@ -361,6 +374,7 @@ jobs:
         continue-on-error: ${{ matrix.platform != 'ubuntu-latest' && matrix.testCommand.ignoreErrorOnNonUbuntu == true }}
 
       - name: ${{ matrix.testCommand.name }} (run)
+        if: ${{ needs.vars.outputs.skip_test == 'false' }}
         uses: nick-fields/retry@v2
         env:
           HOLOCHAIN_NIXPKGS_SOURCE_BRANCH: ${{ needs.vars.outputs.holochain_nixpkgs_source_branch }}
@@ -377,7 +391,7 @@ jobs:
         continue-on-error: ${{ matrix.platform != 'ubuntu-latest' && matrix.testCommand.ignoreErrorOnNonUbuntu == true }}
 
       - name: Garbage-collect cache
-        if: ${{ always() && matrix.testCommand.savesCargoCache == true }}
+        if: ${{ always() && matrix.testCommand.savesCargoCache == true && needs.vars.outputs.skip_test == 'false' }}
         run: |
           set -e
           source "${HOLOCHAIN_RELEASE_SH}"
@@ -388,7 +402,7 @@ jobs:
 
       - name: Cache cargo related build files
         uses: steveeJ-forks/actions-cache/save@main
-        if: ${{ always() && matrix.testCommand.savesCargoCache == true }}
+        if: ${{ always() && matrix.testCommand.savesCargoCache == true && needs.vars.outputs.skip_test == 'false' }}
         with:
           path: |
             /tmp/holochain_repo/.cargo/bin/
