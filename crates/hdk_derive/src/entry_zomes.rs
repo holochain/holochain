@@ -14,7 +14,7 @@ pub fn build(_attrs: TokenStream, input: TokenStream) -> TokenStream {
         Item::Enum(ItemEnum {
             ident, variants, ..
         }) => (ident, variants),
-        _ => abort!(input, "hdk_entry_zomes can only be used on Enums"),
+        _ => abort!(input, "hdk_dependent_entry_types can only be used on Enums"),
     };
 
     let index_to_variant: proc_macro2::TokenStream = variants

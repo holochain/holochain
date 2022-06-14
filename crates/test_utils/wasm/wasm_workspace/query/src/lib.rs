@@ -4,7 +4,7 @@ use integrity::*;
 mod integrity;
 
 fn path(s: &str) -> ExternResult<EntryHash> {
-    let path = Path::from(s).try_into_typed(LinkTypes::Query)?;
+    let path = Path::from(s).typed(LinkTypes::Query)?;
     path.ensure()?;
     path.path_entry_hash()
 }

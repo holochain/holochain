@@ -55,13 +55,13 @@ mod integrity_zomes {
     }
 }
 
-#[hdk_entry_zomes]
+#[hdk_dependent_entry_types]
 enum EntryZomes {
     A(integrity_zomes::integrity_a::EntryTypes),
     B(integrity_zomes::integrity_b::EntryTypes),
 }
 
-#[hdk_link_zomes]
+#[hdk_dependent_link_types]
 enum LinkZomes {
     A(integrity_zomes::integrity_a::LinkTypes),
     B(integrity_zomes::integrity_b::LinkTypes),

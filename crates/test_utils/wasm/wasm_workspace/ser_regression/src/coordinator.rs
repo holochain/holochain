@@ -3,7 +3,7 @@ use hdk::prelude::*;
 
 fn channels_path() -> Path {
     let path = Path::from("channels")
-        .try_into_typed(LinkTypes::Path)
+        .typed(LinkTypes::Path)
         .unwrap();
     path.ensure().expect("Couldn't ensure path");
     path.into()

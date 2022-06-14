@@ -2,7 +2,7 @@ use crate::integrity::*;
 use hdk::prelude::*;
 use EntryZomes::*;
 
-#[hdk_entry_zomes]
+#[hdk_dependent_entry_types]
 enum EntryZomes {
     IntegrityHashEntry(EntryTypes),
 }

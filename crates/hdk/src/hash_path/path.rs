@@ -260,7 +260,7 @@ impl Path {
 
     /// Try attaching a [`LinkType`] to this path
     /// so its type is known for [`create_link`] and [`get_links`].
-    pub fn try_into_typed<TY, E>(self, link_type: TY) -> Result<TypedPath, WasmError>
+    pub fn typed<TY, E>(self, link_type: TY) -> Result<TypedPath, WasmError>
     where
         LinkType: TryFrom<TY, Error = E>,
         WasmError: From<E>,

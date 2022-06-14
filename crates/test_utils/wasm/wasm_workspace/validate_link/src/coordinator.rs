@@ -1,12 +1,12 @@
 use crate::integrity::*;
 use hdk::prelude::*;
 
-#[hdk_entry_zomes]
+#[hdk_dependent_entry_types]
 enum EntryZomes {
     IntegrityValidLink(EntryTypes),
 }
 
-#[hdk_link_zomes]
+#[hdk_dependent_link_types]
 enum LinkZomes {
     IntegrityValidLink(LinkTypes),
 }

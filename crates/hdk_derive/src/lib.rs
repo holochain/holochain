@@ -286,13 +286,13 @@ pub fn hdk_entry_defs_conversions(attrs: TokenStream, code: TokenStream) -> Toke
 
 #[proc_macro_error]
 #[proc_macro_attribute]
-pub fn hdk_entry_zomes(attrs: TokenStream, code: TokenStream) -> TokenStream {
+pub fn hdk_dependent_entry_types(attrs: TokenStream, code: TokenStream) -> TokenStream {
     entry_zomes::build(attrs, code)
 }
 
 #[proc_macro_error]
 #[proc_macro_attribute]
-pub fn hdk_link_zomes(attrs: TokenStream, code: TokenStream) -> TokenStream {
+pub fn hdk_dependent_link_types(attrs: TokenStream, code: TokenStream) -> TokenStream {
     link_zomes::build(attrs, code)
 }
 

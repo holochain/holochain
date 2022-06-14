@@ -29,7 +29,7 @@ use matches::assert_matches;
 #[tokio::test(flavor = "multi_thread")]
 async fn can_update_state() {
     let db_dir = test_db_dir();
-    let dna_store = RibosomeStore::new();
+    let ribosome_store = RibosomeStore::new();
     let keystore = test_keystore();
     let holochain_p2p = holochain_p2p::stub_network().await;
     let (post_commit_sender, _post_commit_receiver) =
@@ -37,7 +37,7 @@ async fn can_update_state() {
     let spaces = Spaces::new(db_dir.path().to_path_buf().into(), Default::default()).unwrap();
     let conductor = Conductor::new(
         Default::default(),
-        dna_store,
+        ribosome_store,
         keystore,
         holochain_p2p,
         spaces,
@@ -79,14 +79,14 @@ async fn can_add_clone_cell_to_app() {
     let dna = fake_valid_dna_file("");
     let cell_id = CellId::new(dna.dna_hash().to_owned(), agent.clone());
 
-    let dna_store = RibosomeStore::new();
+    let ribosome_store = RibosomeStore::new();
     let (post_commit_sender, _post_commit_receiver) =
         tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
     let spaces = Spaces::new(db_dir.path().to_path_buf().into(), Default::default()).unwrap();
 
     let conductor = Conductor::new(
         Default::default(),
-        dna_store,
+        ribosome_store,
         keystore,
         holochain_p2p,
         spaces,
@@ -153,14 +153,14 @@ async fn can_add_clone_cell_to_app() {
 #[tokio::test(flavor = "multi_thread")]
 async fn app_ids_are_unique() {
     let db_dir = test_db_dir();
-    let dna_store = RibosomeStore::new();
+    let ribosome_store = RibosomeStore::new();
     let holochain_p2p = holochain_p2p::stub_network().await;
     let (post_commit_sender, _post_commit_receiver) =
         tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
     let spaces = Spaces::new(db_dir.path().to_path_buf().into(), Default::default()).unwrap();
     let conductor = Conductor::new(
         Default::default(),
-        dna_store,
+        ribosome_store,
         test_keystore(),
         holochain_p2p,
         spaces,

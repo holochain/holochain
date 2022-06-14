@@ -1,14 +1,14 @@
 use crate::integrity::LinkTypes;
 use hdk::prelude::*;
 
-#[hdk_link_zomes]
+#[hdk_dependent_link_types]
 enum LinkZomes {
     IntegrityLink(LinkTypes),
     IntegrityLink2(LinkTypes),
 }
 
 fn path(s: &str) -> ExternResult<AnyLinkableHash> {
-    let path = Path::from(s).try_into_typed(LinkTypes::SomeLinks)?;
+    let path = Path::from(s).typed(LinkTypes::SomeLinks)?;
     path.ensure()?;
     Ok(path.path_entry_hash()?.into())
 }
@@ -242,7 +242,7 @@ fn delete_all_links(_: ()) -> ExternResult<()> {
 /// in partitions so this test just shows that it's safe to do so.
 #[hdk_extern]
 fn commit_existing_path(_: ()) -> ExternResult<()> {
-    let path = Path::from("a.c").try_into_typed(LinkTypes::SomeLinks)?;
+    let path = Path::from("a.c").typed(LinkTypes::SomeLinks)?;
     if let Some(parent) = path.parent() {
         parent.ensure()?;
         hdk::prelude::create_link(
@@ -267,6 +267,6 @@ fn commit_existing_path(_: ()) -> ExternResult<()> {
 #[hdk_extern]
 fn get_long_path(_: ()) -> ExternResult<Vec<Link>> {
     Path::from("a")
-        .try_into_typed(LinkTypes::SomeLinks)?
+        .typed(LinkTypes::SomeLinks)?
         .children()
 }

@@ -2,7 +2,7 @@ use hdk::prelude::*;
 use integrity_zome::Post;
 use test_wasm_integrity_zome as integrity_zome;
 
-#[hdk_entry_zomes]
+#[hdk_dependent_entry_types]
 enum EntryZomes {
     IntegrityZome(integrity_zome::EntryTypes),
 }

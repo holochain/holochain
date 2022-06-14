@@ -158,7 +158,7 @@ where
     pub(super) task_manager: RwShare<Option<TaskManagerClient>>,
 
     /// Placeholder for what will be the real DNA/Wasm cache
-    dna_store: RwShare<RibosomeStore>,
+    ribosome_store: RwShare<RibosomeStore>,
 
     /// Access to private keys for signing and encryption.
     keystore: MetaLairClient,
@@ -249,8 +249,8 @@ impl Conductor {
         }
     }
 
-    pub(super) fn dna_store(&self) -> &RwShare<RibosomeStore> {
-        &self.dna_store
+    pub(super) fn ribosome_store(&self) -> &RwShare<RibosomeStore> {
+        &self.ribosome_store
     }
 
     /// Broadcasts the shutdown signal to all managed tasks.
@@ -435,11 +435,12 @@ impl Conductor {
     }
 
     pub(super) fn register_dna_entry_defs(&self, entry_defs: Vec<(EntryDefBufferKey, EntryDef)>) {
-        self.dna_store.share_mut(|d| d.add_entry_defs(entry_defs));
+        self.ribosome_store
+            .share_mut(|d| d.add_entry_defs(entry_defs));
     }
 
     pub(super) fn register_phenotype(&self, ribosome: RealRibosome) {
-        self.dna_store.share_mut(|d| d.add_ribosome(ribosome));
+        self.ribosome_store.share_mut(|d| d.add_ribosome(ribosome));
     }
 
     pub(super) fn get_queue_consumer_workflows(&self) -> QueueConsumerMap {
@@ -471,7 +472,7 @@ impl Conductor {
 
     /// Instantiate a Ribosome for use with a DNA
     pub(crate) fn get_ribosome(&self, dna_hash: &DnaHash) -> ConductorResult<RealRibosome> {
-        self.dna_store
+        self.ribosome_store
             .share_ref(|d| match d.get_ribosome(dna_hash) {
                 Some(r) => Ok(r),
                 None => Err(DnaError::DnaMissing(dna_hash.to_owned()).into()),
@@ -751,7 +752,7 @@ impl Conductor {
         role_id: AppRoleId,
         properties: YamlProperties,
     ) -> ConductorResult<CellId> {
-        let dna_store = &self.dna_store;
+        let ribosome_store = &self.ribosome_store;
         let (_, parent_dna_hash) = self
             .update_state_prime({
                 let app_id = app_id.clone();
@@ -770,7 +771,7 @@ impl Conductor {
                 }
             })
             .await?;
-        let child_dna = dna_store.share_ref(|ds| {
+        let child_dna = ribosome_store.share_ref(|ds| {
             ds.get_dna_file(&parent_dna_hash)
                 .ok_or(DnaError::DnaMissing(parent_dna_hash))?
                 .modify_phenotype(random_uid(), properties)
@@ -1258,7 +1259,7 @@ impl Conductor {
     #[allow(clippy::too_many_arguments)]
     async fn new(
         config: ConductorConfig,
-        dna_store: RwShare<RibosomeStore>,
+        ribosome_store: RwShare<RibosomeStore>,
         keystore: MetaLairClient,
         holochain_p2p: holochain_p2p::HolochainP2pRef,
         spaces: Spaces,
@@ -1272,7 +1273,7 @@ impl Conductor {
             app_interfaces: RwShare::new(HashMap::new()),
             task_manager: RwShare::new(None),
             admin_websocket_ports: RwShare::new(Vec::new()),
-            dna_store,
+            ribosome_store,
             keystore,
             holochain_p2p,
             post_commit,
@@ -1390,7 +1391,7 @@ mod builder {
         /// The configuration
         pub config: ConductorConfig,
         /// The RibosomeStore (mockable)
-        pub dna_store: RibosomeStore,
+        pub ribosome_store: RibosomeStore,
         /// For new lair, passphrase is required
         pub passphrase: Option<sodoken::BufRead>,
         /// Optional keystore override
@@ -1476,10 +1477,12 @@ mod builder {
             let env_path = self.config.environment_path.clone();
 
             let Self {
-                dna_store, config, ..
+                ribosome_store,
+                config,
+                ..
             } = self;
 
-            let dna_store = RwShare::new(dna_store);
+            let ribosome_store = RwShare::new(ribosome_store);
 
             let network_config = match &config.network {
                 None => holochain_p2p::kitsune_p2p::KitsuneP2pConfig::default(),
@@ -1505,7 +1508,7 @@ mod builder {
 
             let conductor = Conductor::new(
                 config.clone(),
-                dna_store,
+                ribosome_store,
                 keystore,
                 holochain_p2p,
                 spaces,
@@ -1667,7 +1670,7 @@ mod builder {
 
             let conductor = Conductor::new(
                 self.config.clone(),
-                RwShare::new(self.dna_store),
+                RwShare::new(self.ribosome_store),
                 keystore,
                 holochain_p2p,
                 spaces,

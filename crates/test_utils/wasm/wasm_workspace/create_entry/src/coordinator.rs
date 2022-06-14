@@ -1,7 +1,7 @@
 use crate::integrity::*;
 use hdk::prelude::*;
 
-#[hdk_entry_zomes]
+#[hdk_dependent_entry_types]
 enum EntryZomes {
     IntegrityCreateEntry(crate::integrity::EntryTypes),
 }

@@ -2,7 +2,7 @@ use hdk::prelude::*;
 
 mod countree;
 
-#[hdk_entry_zomes]
+#[hdk_dependent_entry_types]
 enum EntryZomes {
     IntegrityCrud(crate::integrity::EntryTypes),
 }

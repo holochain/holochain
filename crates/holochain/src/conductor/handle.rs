@@ -580,7 +580,7 @@ impl ConductorHandleT for ConductorHandleImpl {
         // same dna concurrently.
         let mut ribosome =
             self.conductor
-                .dna_store()
+                .ribosome_store()
                 .share_ref(|d| match d.get_ribosome(hash) {
                     Some(dna) => Ok(dna),
                     None => Err(DnaError::DnaMissing(hash.to_owned())),
@@ -601,7 +601,7 @@ impl ConductorHandleT for ConductorHandleImpl {
 
         // Update RibosomeStore.
         self.conductor
-            .dna_store()
+            .ribosome_store()
             .share_mut(|d| d.add_ribosome(ribosome));
 
         // TODO: Remove old wasm code? (Maybe this needs to be done on restart as it could be in use).
@@ -611,7 +611,7 @@ impl ConductorHandleT for ConductorHandleImpl {
 
     async fn load_dnas(&self) -> ConductorResult<()> {
         let (ribosomes, entry_defs) = self.conductor.load_wasms_into_dna_files().await?;
-        self.conductor.dna_store().share_mut(|ds| {
+        self.conductor.ribosome_store().share_mut(|ds| {
             ds.add_ribosomes(ribosomes);
             ds.add_entry_defs(entry_defs);
         });
@@ -619,18 +619,18 @@ impl ConductorHandleT for ConductorHandleImpl {
     }
 
     fn list_dnas(&self) -> Vec<DnaHash> {
-        self.conductor.dna_store().share_ref(|ds| ds.list())
+        self.conductor.ribosome_store().share_ref(|ds| ds.list())
     }
 
     fn get_dna_def(&self, hash: &DnaHash) -> Option<DnaDef> {
         self.conductor
-            .dna_store()
+            .ribosome_store()
             .share_ref(|ds| ds.get_dna_def(hash))
     }
 
     fn get_dna_file(&self, hash: &DnaHash) -> Option<DnaFile> {
         self.conductor
-            .dna_store()
+            .ribosome_store()
             .share_ref(|ds| ds.get_dna_file(hash))
     }
 
@@ -640,7 +640,7 @@ impl ConductorHandleT for ConductorHandleImpl {
 
     fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef> {
         self.conductor
-            .dna_store()
+            .ribosome_store()
             .share_ref(|ds| ds.get_entry_def(key))
     }
 

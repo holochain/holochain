@@ -11,7 +11,7 @@ fn path_entry_hash(path_string: String) -> ExternResult<EntryHash> {
 #[hdk_extern]
 fn exists(path_string: String) -> ExternResult<bool> {
     debug!(%path_string);
-    let p = Path::from(path_string).try_into_typed(LinkTypes::Path)?;
+    let p = Path::from(path_string).typed(LinkTypes::Path)?;
     debug!(?p);
     p.exists()
 }
@@ -19,7 +19,7 @@ fn exists(path_string: String) -> ExternResult<bool> {
 #[hdk_extern]
 fn ensure(path_string: String) -> ExternResult<()> {
     Path::from(path_string)
-        .try_into_typed(LinkTypes::Path)?
+        .typed(LinkTypes::Path)?
         .ensure()
 }
 
@@ -31,13 +31,13 @@ fn delete_link(delete_link: HeaderHash) -> ExternResult<HeaderHash> {
 #[hdk_extern]
 fn children(path_string: String) -> ExternResult<Vec<Link>> {
     Path::from(path_string)
-        .try_into_typed(LinkTypes::Path)?
+        .typed(LinkTypes::Path)?
         .children()
 }
 
 #[hdk_extern]
 fn children_details(path_string: String) -> ExternResult<LinkDetails> {
     Path::from(path_string)
-        .try_into_typed(LinkTypes::Path)?
+        .typed(LinkTypes::Path)?
         .children_details()
 }
