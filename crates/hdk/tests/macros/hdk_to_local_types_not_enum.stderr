@@ -1,0 +1,8 @@
+error: The `to_local_types` macro can only be used on enums.
+
+         = help: Make this an enum.
+
+ --> tests/macros/hdk_to_local_types_not_enum.rs:5:1
+  |
+5 | struct Foo;
+  | ^^^^^^^^^^^

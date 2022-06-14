@@ -22,7 +22,7 @@
 //! This is an example of a public agent key hash, displayed as a byte array in
 //! decimal notation:
 //!
-//! ```
+//! ```text
 //! 132  32  36  39 218 126  34  87
 //! 204 165 227 255  29 236 160  66
 //! 221 163 168 112 215 187 143 152
@@ -39,7 +39,7 @@
 //! [Base64 scheme](https://developer.mozilla.org/en-US/docs/Glossary/Base64).
 //! Encoding the example public agent key in Base64 results in:
 //!
-//! ```
+//! ```text
 //! hCAkJ9p+IlfMpeP/HeygQt2jqHDXu4+YRAQezq3L0m9nz3wCa0Mh
 //! ```
 //!
@@ -55,7 +55,7 @@
 //! (see [RFC4648](https://datatracker.ietf.org/doc/html/rfc4648#section-5)).
 //! The example public agent key becomes:
 //!
-//! ```
+//! ```text
 //! uhCAkJ9p-IlfMpeP_HeygQt2jqHDXu4-YRAQezq3L0m9nz3wCa0Mh
 //! ```
 //!

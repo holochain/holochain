@@ -1,7 +1,6 @@
 use super::EntryType;
 use super::Timestamp;
 use crate::header;
-use crate::header::ZomeId;
 use crate::link::LinkTag;
 use crate::link::LinkType;
 use crate::EntryRateWeight;
@@ -247,7 +246,6 @@ builder_variant!(InitZomesComplete {});
 builder_variant!(CreateLink<RateWeight> {
     base_address: AnyLinkableHash,
     target_address: AnyLinkableHash,
-    zome_id: ZomeId,
     link_type: LinkType,
     tag: LinkTag,
 });

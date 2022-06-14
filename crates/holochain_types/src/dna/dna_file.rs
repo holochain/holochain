@@ -3,6 +3,10 @@ use crate::prelude::*;
 use holo_hash::*;
 use holochain_zome_types::ZomeName;
 use std::collections::BTreeMap;
+use std::collections::HashMap;
+
+#[cfg(test)]
+mod test;
 
 /// Wasms need to be an ordered map from WasmHash to a wasm::DnaWasm
 #[derive(
@@ -80,6 +84,62 @@ impl DnaFile {
             dna,
             code: code.into(),
         })
+    }
+
+    /// Hot swap coordinator zomes for this dna.
+    pub async fn hot_swap_coordinators(
+        &mut self,
+        coordinator_zomes: CoordinatorZomes,
+        wasms: Vec<wasm::DnaWasm>,
+    ) -> Result<Vec<WasmHash>, DnaError> {
+        // Get the previous coordinators.
+        let previous_coordinators = std::mem::replace(
+            &mut self.dna.content.coordinator_zomes,
+            Vec::with_capacity(0),
+        );
+
+        // Save the order they were installed.
+        let mut coordinator_order: Vec<_> = previous_coordinators
+            .iter()
+            .map(|(n, _)| n.clone())
+            .collect();
+
+        // Turn into a map.
+        let mut coordinators: HashMap<_, _> = previous_coordinators.into_iter().collect();
+
+        let mut old_wasm_hashes = Vec::with_capacity(coordinator_zomes.len());
+
+        // For each new coordinator insert it to the map.
+        for (name, def) in coordinator_zomes {
+            match coordinators.insert(name.clone(), def) {
+                Some(replaced_coordinator) => {
+                    // If this is replacing a previous coordinator then
+                    // remove the old wasm.
+                    let wasm_hash = replaced_coordinator.wasm_hash(&name)?;
+                    self.code.0.remove(&wasm_hash);
+                    old_wasm_hashes.push(wasm_hash);
+                }
+                None => {
+                    // If this is a brand new coordinator then add it
+                    // to the order.
+                    coordinator_order.push(name);
+                }
+            }
+        }
+
+        // Insert all the new wasms.
+        for wasm in wasms {
+            let wasm_hash = holo_hash::WasmHash::with_data(&wasm).await;
+            self.code.0.insert(wasm_hash, wasm);
+        }
+
+        // Insert all the coordinators in the correct order.
+        self.dna.content.coordinator_zomes = coordinator_order
+            .into_iter()
+            .filter_map(|name| coordinators.remove_entry(&name))
+            .collect();
+
+        Ok(old_wasm_hashes)
     }
 
     /// Construct a DnaFile from its constituent parts

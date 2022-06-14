@@ -1,8 +1,11 @@
+use std::borrow::Borrow;
+
 use crate::entry_def::EntryVisibility;
 use crate::link::LinkTag;
 use crate::link::LinkType;
 use crate::timestamp::Timestamp;
 use crate::EntryRateWeight;
+use crate::GlobalZomeTypeId;
 use crate::MembraneProof;
 use crate::RateWeight;
 use holo_hash::impl_hashable_content;
@@ -191,6 +194,23 @@ impl Header {
     // TODO: DRY: possibly create an `EntryData` struct which is used by both
     // Create and Update
     pub fn entry_data(&self) -> Option<(&EntryHash, &EntryType)> {
+        match self {
+            Self::Create(Create {
+                entry_hash,
+                entry_type,
+                ..
+            }) => Some((entry_hash, entry_type)),
+            Self::Update(Update {
+                entry_hash,
+                entry_type,
+                ..
+            }) => Some((entry_hash, entry_type)),
+            _ => None,
+        }
+    }
+
+    /// Pull out the entry data by move.
+    pub fn into_entry_data(self) -> Option<(EntryHash, EntryType)> {
         match self {
             Self::Create(Create {
                 entry_hash,
@@ -426,7 +446,6 @@ pub struct CreateLink<W = RateWeight> {
 
     pub base_address: AnyLinkableHash,
     pub target_address: AnyLinkableHash,
-    pub zome_id: ZomeId,
     pub link_type: LinkType,
     pub tag: LinkTag,
 
@@ -443,7 +462,6 @@ impl From<CreateLink> for CreateLink<()> {
 
             base_address: c.base_address,
             target_address: c.target_address,
-            zome_id: c.zome_id,
             link_type: c.link_type,
             tag: c.tag,
 
@@ -619,13 +637,7 @@ impl std::fmt::Display for EntryType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             EntryType::AgentPubKey => writeln!(f, "AgentPubKey"),
-            EntryType::App(aet) => writeln!(
-                f,
-                "App({:?}, {}, {:?})",
-                aet.id(),
-                aet.zome_id(),
-                aet.visibility()
-            ),
+            EntryType::App(aet) => writeln!(f, "App({:?}, {:?})", aet.id(), aet.visibility()),
             EntryType::CapClaim => writeln!(f, "CapClaim"),
             EntryType::CapGrant => writeln!(f, "CapGrant"),
         }
@@ -637,31 +649,21 @@ impl std::fmt::Display for EntryType {
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct AppEntryType {
     /// u8 identifier of what entry type this is
-    /// this needs to match the position of the entry type returned by entry defs
+    /// this is a unique global identifier across the
+    /// DNA for this type. It is a [`GlobalZomeTypeId`].
     pub id: EntryDefIndex,
-    /// u8 identifier of what zome this is for
-    /// this needs to be shared across the dna
-    /// comes from the numeric index position of a zome in dna config
-    pub zome_id: ZomeId,
     // @todo don't do this, use entry defs instead
     /// The visibility of this app entry.
     pub visibility: EntryVisibility,
 }
 
 impl AppEntryType {
-    pub fn new(id: EntryDefIndex, zome_id: ZomeId, visibility: EntryVisibility) -> Self {
-        Self {
-            id,
-            zome_id,
-            visibility,
-        }
+    pub fn new(id: EntryDefIndex, visibility: EntryVisibility) -> Self {
+        Self { id, visibility }
     }
 
     pub fn id(&self) -> EntryDefIndex {
         self.id
-    }
-    pub fn zome_id(&self) -> ZomeId {
-        self.zome_id
     }
     pub fn visibility(&self) -> &EntryVisibility {
         &self.visibility
@@ -671,13 +673,6 @@ impl AppEntryType {
 impl From<EntryDefIndex> for u8 {
     fn from(ei: EntryDefIndex) -> Self {
         ei.0
-    }
-}
-
-impl EntryDefIndex {
-    /// Use as an index into a slice
-    pub fn index(&self) -> usize {
-        self.0 as usize
     }
 }
 
@@ -693,5 +688,23 @@ impl std::ops::Deref for ZomeId {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl Borrow<u8> for ZomeId {
+    fn borrow(&self) -> &u8 {
+        &self.0
+    }
+}
+
+impl From<EntryDefIndex> for GlobalZomeTypeId {
+    fn from(v: EntryDefIndex) -> Self {
+        Self(v.0)
+    }
+}
+
+impl From<GlobalZomeTypeId> for EntryDefIndex {
+    fn from(v: GlobalZomeTypeId) -> Self {
+        Self(v.0)
     }
 }

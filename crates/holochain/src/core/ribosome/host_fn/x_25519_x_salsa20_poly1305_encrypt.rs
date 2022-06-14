@@ -3,14 +3,14 @@ use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 
 pub fn x_25519_x_salsa20_poly1305_encrypt(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: X25519XSalsa20Poly1305Encrypt,
-) -> Result<XSalsa20Poly1305EncryptedData, WasmError> {
+) -> Result<XSalsa20Poly1305EncryptedData, RuntimeError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess {
             keystore: Permission::Allow,
@@ -37,16 +37,19 @@ pub fn x_25519_x_salsa20_poly1305_encrypt(
                     cipher.to_vec(),
                 ))
             })
-            .map_err(|keystore_error| WasmError::Host(keystore_error.to_string()))
+            .map_err(|keystore_error| -> RuntimeError {
+                wasm_error!(WasmErrorInner::Host(keystore_error.to_string())).into()
+            })
         }
-        _ => Err(WasmError::Host(
+        _ => Err(wasm_error!(WasmErrorInner::Host(
             RibosomeError::HostFnPermissions(
                 call_context.zome.zome_name().clone(),
                 call_context.function_name().clone(),
                 "x_25519_x_salsa20_poly1305_encrypt".into(),
             )
             .to_string(),
-        )),
+        ))
+        .into()),
     }
 }
 

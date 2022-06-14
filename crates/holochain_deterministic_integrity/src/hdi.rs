@@ -19,7 +19,6 @@ thread_local!(pub static HDI: RefCell<Rc<dyn HdiT>> = RefCell::new(Rc::new(HostH
 /// mock_hdi.expect_foo().times(1).etc().etc();
 /// set_hdi(mock_hdi);
 /// ```
-// #[cfg_attr(feature = "mock", automock)]
 pub trait HdiT: Send + Sync {
     // Ed25519
     fn verify_signature(&self, verify_signature: VerifySignature) -> ExternResult<bool>;
@@ -55,7 +54,9 @@ pub struct ErrHdi;
 
 impl ErrHdi {
     fn err<T>() -> ExternResult<T> {
-        Err(WasmError::Guest(HDI_NOT_REGISTERED.to_string()))
+        Err(wasm_error!(WasmErrorInner::Guest(
+            HDI_NOT_REGISTERED.to_string()
+        )))
     }
 }
 
@@ -152,9 +153,9 @@ impl HdiT for HostHdi {
         if cfg!(feature = "trace") {
             host_call::<TraceMsg, ()>(__trace, trace_msg)
         } else {
-            Err(WasmError::Guest(
+            Err(wasm_error!(WasmErrorInner::Guest(
                 "`trace()` can only be used when the \"trace\" cargo feature is set (it is off by default).".to_string(),
-            ))
+            )))
         }
     }
     fn x_salsa20_poly1305_decrypt(
@@ -177,17 +178,12 @@ impl HdiT for HostHdi {
     }
 }
 
-/// At any time the global HDI can be set to a different holochain_deterministic_integrity.
+/// At any time the global HDI can be set to a different HDI.
 /// Generally this is only useful during rust unit testing.
 /// When executing wasm without the `mock` feature, the host will be assumed.
-pub fn set_hdi<H: 'static>(holochain_deterministic_integrity: H) -> Rc<dyn HdiT>
+pub fn set_hdi<H: 'static>(hdi: H) -> Rc<dyn HdiT>
 where
     H: HdiT,
 {
-    HDI.with(|h| {
-        std::mem::replace(
-            &mut *h.borrow_mut(),
-            Rc::new(holochain_deterministic_integrity),
-        )
-    })
+    HDI.with(|h| std::mem::replace(&mut *h.borrow_mut(), Rc::new(hdi)))
 }

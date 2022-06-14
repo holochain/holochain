@@ -417,7 +417,7 @@ async fn validate_op_outer(
     // Get the workspace for the validation calls
     let host_fn_workspace = workspace.validation_workspace().await?;
 
-    // Create the ribosome
+    // Get the ribosome
     let ribosome = conductor_handle
         .get_ribosome(dna_hash.as_ref())
         .map_err(|_| AppValidationError::DnaMissing((*dna_hash).clone()))?;
@@ -435,7 +435,7 @@ where
     R: RibosomeT,
 {
     let zomes_to_invoke = match op {
-        Op::RegisterAgentActivity { .. } | Op::StoreElement { .. } => ZomesToInvoke::All,
+        Op::RegisterAgentActivity { .. } | Op::StoreElement { .. } => ZomesToInvoke::AllIntegrity,
         Op::StoreEntry {
             header:
                 SignedHashed {
@@ -446,13 +446,13 @@ where
                     ..
                 },
             ..
-        } => entry_creation_zomes_to_invoke(header, ribosome.dna_def())?,
+        } => entry_creation_zomes_to_invoke(header, ribosome)?,
         Op::RegisterUpdate {
             original_header, ..
         }
         | Op::RegisterDelete {
             original_header, ..
-        } => entry_creation_zomes_to_invoke(original_header, ribosome.dna_def())?,
+        } => entry_creation_zomes_to_invoke(original_header, ribosome)?,
         Op::RegisterCreateLink {
             create_link:
                 SignedHashed {
@@ -463,11 +463,11 @@ where
                     ..
                 },
             ..
-        } => create_link_zomes_to_invoke(header, ribosome.dna_def())?,
+        } => create_link_zomes_to_invoke(header, ribosome)?,
         Op::RegisterDeleteLink {
             create_link: header,
             ..
-        } => create_link_zomes_to_invoke(header, ribosome.dna_def())?,
+        } => create_link_zomes_to_invoke(header, ribosome)?,
     };
 
     let invocation = ValidateInvocation::new(zomes_to_invoke, op)
@@ -486,7 +486,7 @@ where
 
 pub fn entry_creation_zomes_to_invoke(
     header: &EntryCreationHeader,
-    dna_def: &DnaDef,
+    ribosome: &impl RibosomeT,
 ) -> AppValidationOutcome<ZomesToInvoke> {
     match header {
         EntryCreationHeader::Create(Create {
@@ -497,19 +497,28 @@ pub fn entry_creation_zomes_to_invoke(
             entry_type: EntryType::App(aet),
             ..
         }) => {
-            let zome = zome_id_to_zome(aet.zome_id(), dna_def)?;
-            Ok(ZomesToInvoke::One(zome))
+            let zome = ribosome.find_zome_from_entry(&aet.id()).ok_or_else(|| {
+                Outcome::rejected(&format!("Zome does not exist for {:?}", aet.id()))
+            })?;
+            Ok(ZomesToInvoke::One(zome.erase_type()))
         }
-        _ => Ok(ZomesToInvoke::All),
+        _ => Ok(ZomesToInvoke::AllIntegrity),
     }
 }
 
 fn create_link_zomes_to_invoke(
     create_link: &CreateLink,
-    dna_def: &DnaDef,
+    ribosome: &impl RibosomeT,
 ) -> AppValidationOutcome<ZomesToInvoke> {
-    let zome = zome_id_to_zome(create_link.zome_id, dna_def)?;
-    Ok(ZomesToInvoke::One(zome))
+    let zome = ribosome
+        .find_zome_from_link(&create_link.link_type)
+        .ok_or_else(|| {
+            Outcome::rejected(&format!(
+                "Zome does not exist for {:?}",
+                create_link.link_type
+            ))
+        })?;
+    Ok(ZomesToInvoke::One(zome.erase_type()))
 }
 
 fn zome_id_to_zome(zome_id: ZomeId, dna_def: &DnaDef) -> AppValidationResult<Zome> {

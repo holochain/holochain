@@ -2,7 +2,7 @@ use crate::element::Element;
 use crate::CallbackResult;
 use holo_hash::AnyDhtHash;
 use holochain_serialized_bytes::prelude::*;
-use holochain_wasmer_common::WasmError;
+use holochain_wasmer_common::*;
 
 pub use holochain_integrity_types::validate::*;
 
@@ -31,18 +31,20 @@ impl CallbackResult for ValidateCallbackResult {
         matches!(self, ValidateCallbackResult::Invalid(_))
     }
     fn try_from_wasm_error(wasm_error: WasmError) -> Result<Self, WasmError> {
-        match wasm_error {
-            WasmError::Guest(_) | WasmError::Serialize(_) | WasmError::Deserialize(_) => {
+        match wasm_error.error {
+            WasmErrorInner::Guest(_)
+            | WasmErrorInner::Serialize(_)
+            | WasmErrorInner::Deserialize(_) => {
                 Ok(ValidateCallbackResult::Invalid(wasm_error.to_string()))
             }
-            WasmError::Host(_)
-            | WasmError::HostShortCircuit(_)
-            | WasmError::GuestResultHandling(_)
-            | WasmError::Compile(_)
-            | WasmError::CallError(_)
-            | WasmError::PointerMap
-            | WasmError::ErrorWhileError
-            | WasmError::Memory => Err(wasm_error),
+            WasmErrorInner::Host(_)
+            | WasmErrorInner::HostShortCircuit(_)
+            | WasmErrorInner::GuestResultHandling(_)
+            | WasmErrorInner::Compile(_)
+            | WasmErrorInner::CallError(_)
+            | WasmErrorInner::PointerMap
+            | WasmErrorInner::ErrorWhileError
+            | WasmErrorInner::Memory => Err(wasm_error),
         }
     }
 }
@@ -62,18 +64,20 @@ impl CallbackResult for ValidationPackageCallbackResult {
         matches!(self, ValidationPackageCallbackResult::Fail(_))
     }
     fn try_from_wasm_error(wasm_error: WasmError) -> Result<Self, WasmError> {
-        match wasm_error {
-            WasmError::Guest(_) | WasmError::Serialize(_) | WasmError::Deserialize(_) => Ok(
-                ValidationPackageCallbackResult::Fail(wasm_error.to_string()),
-            ),
-            WasmError::Host(_)
-            | WasmError::HostShortCircuit(_)
-            | WasmError::GuestResultHandling(_)
-            | WasmError::Compile(_)
-            | WasmError::CallError(_)
-            | WasmError::PointerMap
-            | WasmError::ErrorWhileError
-            | WasmError::Memory => Err(wasm_error),
+        match wasm_error.error {
+            WasmErrorInner::Guest(_)
+            | WasmErrorInner::Serialize(_)
+            | WasmErrorInner::Deserialize(_) => Ok(ValidationPackageCallbackResult::Fail(
+                wasm_error.to_string(),
+            )),
+            WasmErrorInner::Host(_)
+            | WasmErrorInner::HostShortCircuit(_)
+            | WasmErrorInner::GuestResultHandling(_)
+            | WasmErrorInner::Compile(_)
+            | WasmErrorInner::CallError(_)
+            | WasmErrorInner::PointerMap
+            | WasmErrorInner::ErrorWhileError
+            | WasmErrorInner::Memory => Err(wasm_error),
         }
     }
 }

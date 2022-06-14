@@ -8,10 +8,16 @@ edition = "2021"
 name = "test_wasm_ser_regression"
 crate-type = [ "cdylib", "rlib" ]
 
+[[example]]
+name = "integrity_test_wasm_ser_regression"
+path = "src/integrity.rs"
+crate-type = ["cdylib", "rlib"]
+
 [dependencies]
 derive_more = "0.99.11"
 serde = "1.0"
 hdk = { path = "../../../../hdk" }
+holochain_deterministic_integrity = { path = "../../../../holochain_deterministic_integrity" }
 
 [features]
 default = []

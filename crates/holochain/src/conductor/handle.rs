@@ -137,13 +137,21 @@ pub trait ConductorHandleT: Send + Sync {
     /// Install a [`DnaFile`](holochain_types::dna::DnaFile) in this Conductor
     async fn register_dna(&self, dna: DnaFile) -> ConductorResult<()>;
 
+    /// Hot swap coordinator zomes on an existing dna.
+    async fn hot_swap_coordinators(
+        &self,
+        hash: &DnaHash,
+        coordinator_zomes: CoordinatorZomes,
+        wasms: Vec<wasm::DnaWasm>,
+    ) -> ConductorResult<()>;
+
     /// Get the list of hashes of installed Dnas in this Conductor
     fn list_dnas(&self) -> Vec<DnaHash>;
 
-    /// Get a [`DnaDef`](holochain_types::prelude::DnaDef) from the [`DnaStore`](crate::conductor::dna_store::DnaStore)
+    /// Get a [`DnaDef`](holochain_types::prelude::DnaDef) from the [`RibosomeStore`](crate::conductor::ribosome_store::RibosomeStore)
     fn get_dna_def(&self, hash: &DnaHash) -> Option<DnaDef>;
 
-    /// Get a [`DnaFile`](holochain_types::dna::DnaFile) from the [`DnaStore`](crate::conductor::dna_store::DnaStore)
+    /// Get a [`DnaFile`](holochain_types::dna::DnaFile) from the [`RibosomeStore`](crate::conductor::ribosome_store::RibosomeStore)
     fn get_dna_file(&self, hash: &DnaHash) -> Option<DnaFile>;
 
     /// Get an instance of a [`RealRibosome`](crate::core::ribosome::real_ribosome::RealRibosome) for the DnaHash
@@ -415,7 +423,7 @@ pub trait ConductorHandleT: Send + Sync {
     // and using generics seems problematic with mockall::automock.
     // Something like this would be desirable, but ultimately doesn't work.
     //
-    // type DS: Send + Sync + DnaStore;
+    // type DS: Send + Sync + RibosomeStore;
     //
     // /// Get immutable access to the inner conductor state via a read lock
     // async fn conductor<F, T>(&self, f: F) -> ConductorApiResult<T>
@@ -556,33 +564,73 @@ impl ConductorHandleT for ConductorHandleImpl {
     }
 
     async fn register_dna(&self, dna: DnaFile) -> ConductorResult<()> {
-        self.register_genotype(dna.clone()).await?;
-        self.conductor.register_phenotype(dna);
+        let ribosome = RealRibosome::new(dna)?;
+        self.register_genotype(ribosome.clone()).await?;
+        self.conductor.register_phenotype(ribosome);
+        Ok(())
+    }
+
+    async fn hot_swap_coordinators(
+        &self,
+        hash: &DnaHash,
+        coordinator_zomes: CoordinatorZomes,
+        wasms: Vec<wasm::DnaWasm>,
+    ) -> ConductorResult<()> {
+        // Note this isn't really concurrent safe. It would be a race condition to hotswap the
+        // same dna concurrently.
+        let mut ribosome =
+            self.conductor
+                .ribosome_store()
+                .share_ref(|d| match d.get_ribosome(hash) {
+                    Some(dna) => Ok(dna),
+                    None => Err(DnaError::DnaMissing(hash.to_owned())),
+                })?;
+        let _old_wasms = ribosome
+            .dna_file
+            .hot_swap_coordinators(coordinator_zomes.clone(), wasms.clone())
+            .await?;
+
+        // Add new wasm code to db.
+        self.conductor
+            .put_wasm_code(
+                ribosome.dna_def().clone(),
+                wasms.into_iter(),
+                Vec::with_capacity(0),
+            )
+            .await?;
+
+        // Update RibosomeStore.
+        self.conductor
+            .ribosome_store()
+            .share_mut(|d| d.add_ribosome(ribosome));
+
+        // TODO: Remove old wasm code? (Maybe this needs to be done on restart as it could be in use).
+
         Ok(())
     }
 
     async fn load_dnas(&self) -> ConductorResult<()> {
-        let (dnas, entry_defs) = self.conductor.load_wasms_into_dna_files().await?;
-        self.conductor.dna_store().share_mut(|ds| {
-            ds.add_dnas(dnas);
+        let (ribosomes, entry_defs) = self.conductor.load_wasms_into_dna_files().await?;
+        self.conductor.ribosome_store().share_mut(|ds| {
+            ds.add_ribosomes(ribosomes);
             ds.add_entry_defs(entry_defs);
         });
         Ok(())
     }
 
     fn list_dnas(&self) -> Vec<DnaHash> {
-        self.conductor.dna_store().share_ref(|ds| ds.list())
+        self.conductor.ribosome_store().share_ref(|ds| ds.list())
     }
 
     fn get_dna_def(&self, hash: &DnaHash) -> Option<DnaDef> {
         self.conductor
-            .dna_store()
+            .ribosome_store()
             .share_ref(|ds| ds.get_dna_def(hash))
     }
 
     fn get_dna_file(&self, hash: &DnaHash) -> Option<DnaFile> {
         self.conductor
-            .dna_store()
+            .ribosome_store()
             .share_ref(|ds| ds.get_dna_file(hash))
     }
 
@@ -592,7 +640,7 @@ impl ConductorHandleT for ConductorHandleImpl {
 
     fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef> {
         self.conductor
-            .dna_store()
+            .ribosome_store()
             .share_ref(|ds| ds.get_entry_def(key))
     }
 
@@ -1260,10 +1308,7 @@ impl ConductorHandleT for ConductorHandleImpl {
         // Validate the elements.
         if validate {
             // Create the ribosome.
-            let ribosome = self
-                .get_dna_file(cell_id.dna_hash())
-                .map(RealRibosome::new)
-                .ok_or_else(|| DnaError::DnaMissing(cell_id.dna_hash().to_owned()))?;
+            let ribosome = self.get_ribosome(cell_id.dna_hash())?;
 
             // Create a raw source chain to validate against because
             // genesis may not have been run yet.
@@ -1293,7 +1338,6 @@ impl ConductorHandleT for ConductorHandleImpl {
                     for el in elements.clone() {
                         holochain_state::prelude::insert_element_scratch(
                             scratch,
-                            None,
                             el,
                             Default::default(),
                         );
@@ -1489,8 +1533,8 @@ impl ConductorHandleImpl {
     }
 
     /// Install just the "code parts" (the wasm and entry defs) of a dna
-    async fn register_genotype(&self, dna: DnaFile) -> ConductorResult<()> {
-        let entry_defs = self.conductor.register_dna_wasm(dna).await?;
+    async fn register_genotype(&self, ribosome: RealRibosome) -> ConductorResult<()> {
+        let entry_defs = self.conductor.register_dna_wasm(ribosome).await?;
         self.conductor.register_dna_entry_defs(entry_defs);
         Ok(())
     }

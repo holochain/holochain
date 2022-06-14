@@ -106,7 +106,7 @@ mod tests {
             .expect_zomes()
             .times(1)
             .in_sequence(&mut sequence)
-            .return_const(ZomesToInvoke::All);
+            .return_const(ZomesToInvoke::AllIntegrity);
 
         ribosome
             // this should happen inside the CallIterator constructor

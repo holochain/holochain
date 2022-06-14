@@ -9,7 +9,8 @@ pub use bucket::*;
 mod error;
 pub use error::*;
 
-/// Input to the `weigh` callback
+/// Input to the `weigh` callback. Includes an "unweighed" header, and Entry
+/// if applicable.
 #[derive(Clone, PartialEq, Serialize, Deserialize, SerializedBytes, Debug)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum WeighInput {

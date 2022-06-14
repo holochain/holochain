@@ -1,9 +1,10 @@
 use hdk::prelude::*;
+use integrity::*;
 
-entry_defs![PathEntry::entry_def()];
+mod integrity;
 
 fn path(s: &str) -> ExternResult<EntryHash> {
-    let path = Path::from(s);
+    let path = Path::from(s).typed(LinkTypes::Query)?;
     path.ensure()?;
     path.path_entry_hash()
 }

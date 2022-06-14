@@ -11,19 +11,18 @@ use holochain_serialized_bytes::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_types::prelude::*;
-use itertools::Itertools;
 
 pub const POST_COMMIT_CHANNEL_BOUND: usize = 100;
 pub const POST_COMMIT_CONCURRENT_LIMIT: usize = 5;
 
 #[derive(Clone)]
 pub struct PostCommitInvocation {
-    zome: Zome,
+    zome: CoordinatorZome,
     headers: Vec<SignedHeaderHashed>,
 }
 
 impl PostCommitInvocation {
-    pub fn new(zome: Zome, headers: Vec<SignedHeaderHashed>) -> Self {
+    pub fn new(zome: CoordinatorZome, headers: Vec<SignedHeaderHashed>) -> Self {
         Self { zome, headers }
     }
 }
@@ -55,7 +54,7 @@ impl From<&PostCommitHostAccess> for HostFnAccess {
 
 impl Invocation for PostCommitInvocation {
     fn zomes(&self) -> ZomesToInvoke {
-        ZomesToInvoke::One(self.zome.to_owned())
+        ZomesToInvoke::OneCoordinator(self.zome.to_owned())
     }
     fn fn_components(&self) -> FnComponents {
         vec!["post_commit".into()].into()
@@ -80,37 +79,24 @@ pub async fn send_post_commit(
     workspace: SourceChainWorkspace,
     network: HolochainP2pDna,
     keystore: MetaLairClient,
-    zomed_headers: Vec<(Option<Zome>, SignedHeaderHashed)>,
+    headers: Vec<SignedHeaderHashed>,
+    zomes: Vec<CoordinatorZome>,
 ) -> Result<(), tokio::sync::mpsc::error::SendError<()>> {
     let cell_id = workspace.source_chain().cell_id();
-    let groups = zomed_headers
-        .iter()
-        .group_by(|(zome, _shh)| zome.clone())
-        .into_iter()
-        .map(|(maybe_zome, group)| {
-            (
-                maybe_zome,
-                group.map(|(_maybe_zome, shh)| shh.clone()).collect(),
-            )
-        })
-        .collect::<Vec<(Option<Zome>, Vec<SignedHeaderHashed>)>>();
 
-    for (maybe_zome, headers) in groups {
-        if let Some(zome) = maybe_zome {
-            let zome = zome.clone();
-            conductor_handle
-                .post_commit_permit()
-                .await?
-                .send(PostCommitArgs {
-                    host_access: PostCommitHostAccess {
-                        workspace: workspace.clone().into(),
-                        keystore: keystore.clone(),
-                        network: network.clone(),
-                    },
-                    invocation: PostCommitInvocation::new(zome, headers),
-                    cell_id: cell_id.clone(),
-                });
-        }
+    for zome in zomes {
+        conductor_handle
+            .post_commit_permit()
+            .await?
+            .send(PostCommitArgs {
+                host_access: PostCommitHostAccess {
+                    workspace: workspace.clone().into(),
+                    keystore: keystore.clone(),
+                    network: network.clone(),
+                },
+                invocation: PostCommitInvocation::new(zome, headers.clone()),
+                cell_id: cell_id.clone(),
+            });
     }
     Ok(())
 }
@@ -147,7 +133,10 @@ mod test {
             .next()
             .unwrap();
         let zome = post_commit_invocation.zome.clone();
-        assert_eq!(ZomesToInvoke::One(zome), post_commit_invocation.zomes(),);
+        assert_eq!(
+            ZomesToInvoke::OneCoordinator(zome),
+            post_commit_invocation.zomes(),
+        );
     }
 
     #[test]
@@ -200,7 +189,7 @@ mod slow_tests {
         let mut post_commit_invocation = PostCommitInvocationFixturator::new(::fixt::Empty)
             .next()
             .unwrap();
-        post_commit_invocation.zome = TestWasm::Foo.into();
+        post_commit_invocation.zome = CoordinatorZome::from(TestWasm::Foo);
 
         let result = ribosome
             .run_post_commit(host_access, post_commit_invocation)
@@ -219,7 +208,7 @@ mod slow_tests {
         let mut post_commit_invocation = PostCommitInvocationFixturator::new(::fixt::Empty)
             .next()
             .unwrap();
-        post_commit_invocation.zome = TestWasm::PostCommitSuccess.into();
+        post_commit_invocation.zome = CoordinatorZome::from(TestWasm::PostCommitSuccess);
 
         let result = ribosome
             .run_post_commit(host_access, post_commit_invocation)

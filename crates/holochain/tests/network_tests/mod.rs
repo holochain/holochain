@@ -187,12 +187,12 @@ async fn get_from_another_agent() {
     let bob_cell_id = CellId::new(dna_file.dna_hash().to_owned(), bob_agent_id.clone());
     let bob_installed_cell = InstalledCell::new(bob_cell_id.clone(), "bob_handle".into());
 
-    let mut dna_store = MockDnaStore::single_dna(dna_file, 2, 2);
-    dna_store.expect_get_entry_def().return_const(None);
+    let mut ribosome_store = MockRibosomeStore::single_dna(dna_file, 2, 2);
+    ribosome_store.expect_get_entry_def().return_const(None);
 
     let (_tmpdir, _app_api, handle) = setup_app(
         vec![(alice_installed_cell, None), (bob_installed_cell, None)],
-        dna_store,
+        ribosome_store,
     )
     .await;
 
@@ -321,12 +321,12 @@ async fn get_links_from_another_agent() {
     let bob_cell_id = CellId::new(dna_file.dna_hash().to_owned(), bob_agent_id.clone());
     let bob_installed_cell = InstalledCell::new(bob_cell_id.clone(), "bob_handle".into());
 
-    let mut dna_store = MockDnaStore::single_dna(dna_file, 2, 2);
-    dna_store.expect_get_entry_def().return_const(None);
+    let mut ribosome_store = MockRibosomeStore::single_dna(dna_file, 2, 2);
+    ribosome_store.expect_get_entry_def().return_const(None);
 
     let (_tmpdir, _app_api, handle) = setup_app(
         vec![(alice_installed_cell, None), (bob_installed_cell, None)],
-        dna_store,
+        ribosome_store,
     )
     .await;
 

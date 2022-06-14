@@ -2,6 +2,7 @@ mod agent_scaling;
 mod authored_test;
 mod dht_arc;
 mod inline_zome_spec;
+mod integrity_zome;
 mod multi_conductor;
 mod network_tests;
 mod new_lair;

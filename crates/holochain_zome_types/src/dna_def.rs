@@ -8,8 +8,11 @@ use crate::zome::error::ZomeError;
 #[cfg(feature = "full-dna-def")]
 use holo_hash::*;
 
-/// Zomes need to be an ordered map from ZomeName to a Zome
-pub type Zomes = Vec<(ZomeName, zome::ZomeDef)>;
+/// Ordered list of integrity zomes in this DNA.
+pub type IntegrityZomes = Vec<(ZomeName, zome::IntegrityZomeDef)>;
+
+/// Ordered list of coordinator zomes in this DNA.
+pub type CoordinatorZomes = Vec<(ZomeName, zome::CoordinatorZomeDef)>;
 
 /// Placeholder for a real UID type
 pub type Uid = String;
@@ -47,31 +50,103 @@ pub struct DnaDef {
     pub origin_time: Timestamp,
 
     /// A vector of zomes associated with your DNA.
-    pub zomes: Zomes,
+    pub integrity_zomes: IntegrityZomes,
+
+    /// A vector of zomes that do not affect
+    /// the [`DnaHash`].
+    pub coordinator_zomes: CoordinatorZomes,
+}
+
+#[derive(Serialize, Debug, PartialEq, Eq)]
+/// A reference to for creating the hash for [`DnaDef`].
+struct DnaDefHash<'a> {
+    name: &'a String,
+    uid: &'a String,
+    properties: &'a SerializedBytes,
+    integrity_zomes: &'a IntegrityZomes,
 }
 
 #[cfg(feature = "test_utils")]
 impl DnaDef {
     /// Create a DnaDef with a random UID, useful for testing
-    pub fn unique_from_zomes(zomes: Vec<Zome>) -> DnaDef {
-        let zomes = zomes.into_iter().map(|z| z.into_inner()).collect();
+    pub fn unique_from_zomes(
+        integrity: Vec<IntegrityZome>,
+        coordinator: Vec<CoordinatorZome>,
+    ) -> DnaDef {
+        let integrity = integrity.into_iter().map(|z| z.into_inner()).collect();
+        let coordinator = coordinator.into_iter().map(|z| z.into_inner()).collect();
         DnaDefBuilder::default()
-            .zomes(zomes)
+            .integrity_zomes(integrity)
+            .coordinator_zomes(coordinator)
             .random_uid()
             .build()
             .unwrap()
     }
 }
 
+impl DnaDef {
+    /// Get all zomes including the integrity and coordinator zomes.
+    pub fn all_zomes(&self) -> impl Iterator<Item = (&ZomeName, &zome::ZomeDef)> {
+        self.integrity_zomes
+            .iter()
+            .map(|(n, def)| (n, def.as_any_zome_def()))
+            .chain(
+                self.coordinator_zomes
+                    .iter()
+                    .map(|(n, def)| (n, def.as_any_zome_def())),
+            )
+    }
+}
+
 #[cfg(feature = "full-dna-def")]
 impl DnaDef {
-    /// Return a Zome
-    pub fn get_zome(&self, zome_name: &ZomeName) -> Result<zome::Zome, ZomeError> {
-        self.zomes
+    /// Find an integrity zome from a [`ZomeName`].
+    pub fn get_integrity_zome(
+        &self,
+        zome_name: &ZomeName,
+    ) -> Result<zome::IntegrityZome, ZomeError> {
+        self.integrity_zomes
             .iter()
             .find(|(name, _)| name == zome_name)
             .cloned()
-            .map(|(name, def)| Zome::new(name, def))
+            .map(|(name, def)| IntegrityZome::new(name, def))
+            .ok_or_else(|| ZomeError::ZomeNotFound(format!("Zome '{}' not found", &zome_name,)))
+    }
+
+    /// Check if a zome is an integrity zome.
+    pub fn is_integrity_zome(&self, zome_name: &ZomeName) -> bool {
+        self.integrity_zomes
+            .iter()
+            .any(|(name, _)| name == zome_name)
+    }
+
+    /// Find a coordinator zome from a [`ZomeName`].
+    pub fn get_coordinator_zome(
+        &self,
+        zome_name: &ZomeName,
+    ) -> Result<zome::CoordinatorZome, ZomeError> {
+        self.coordinator_zomes
+            .iter()
+            .find(|(name, _)| name == zome_name)
+            .cloned()
+            .map(|(name, def)| CoordinatorZome::new(name, def))
+            .ok_or_else(|| ZomeError::ZomeNotFound(format!("Zome '{}' not found", &zome_name,)))
+    }
+
+    /// Find a any zome from a [`ZomeName`].
+    pub fn get_zome(&self, zome_name: &ZomeName) -> Result<zome::Zome, ZomeError> {
+        self.integrity_zomes
+            .iter()
+            .find(|(name, _)| name == zome_name)
+            .cloned()
+            .map(|(name, def)| Zome::new(name, def.erase_type()))
+            .or_else(|| {
+                self.coordinator_zomes
+                    .iter()
+                    .find(|(name, _)| name == zome_name)
+                    .cloned()
+                    .map(|(name, def)| Zome::new(name, def.erase_type()))
+            })
             .ok_or_else(|| ZomeError::ZomeNotFound(format!("Zome '{}' not found", &zome_name,)))
     }
 
@@ -84,11 +159,19 @@ impl DnaDef {
             .ok_or_else(|| ZomeError::ZomeNotFound(format!("Zome at index {} not found", zome_id)))
     }
 
+    /// Get all the [`CoordinatorZome`]s for this dna
+    pub fn get_all_coordinators(&self) -> Vec<zome::CoordinatorZome> {
+        self.coordinator_zomes
+            .iter()
+            .cloned()
+            .map(|(name, def)| CoordinatorZome::new(name, def))
+            .collect()
+    }
+
     /// Return a Zome, error if not a WasmZome
     pub fn get_wasm_zome(&self, zome_name: &ZomeName) -> Result<&zome::WasmZome, ZomeError> {
-        self.zomes
-            .iter()
-            .find(|(name, _)| name == zome_name)
+        self.all_zomes()
+            .find(|(name, _)| *name == zome_name)
             .map(|(_, def)| def)
             .ok_or_else(|| ZomeError::ZomeNotFound(format!("Zome '{}' not found", &zome_name,)))
             .and_then(|def| {
@@ -130,4 +213,26 @@ impl DnaDefBuilder {
 pub type DnaDefHashed = HoloHashed<DnaDef>;
 
 #[cfg(feature = "full-dna-def")]
-impl_hashable_content!(DnaDef, Dna);
+impl HashableContent for DnaDef {
+    type HashType = holo_hash::hash_type::Dna;
+
+    fn hash_type(&self) -> Self::HashType {
+        holo_hash::hash_type::Dna::new()
+    }
+
+    fn hashable_content(&self) -> HashableContentBytes {
+        let hash = DnaDefHash {
+            name: &self.name,
+            uid: &self.uid,
+            properties: &self.properties,
+            integrity_zomes: &self.integrity_zomes,
+        };
+        HashableContentBytes::Content(
+            holochain_serialized_bytes::UnsafeBytes::from(
+                holochain_serialized_bytes::encode(&hash)
+                    .expect("Could not serialize HashableContent"),
+            )
+            .into(),
+        )
+    }
+}

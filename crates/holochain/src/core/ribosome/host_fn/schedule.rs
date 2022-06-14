@@ -2,14 +2,14 @@ use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 
 pub fn schedule(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: String,
-) -> Result<(), WasmError> {
+) -> Result<(), RuntimeError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess {
             write_workspace: Permission::Allow,
@@ -28,17 +28,17 @@ pub fn schedule(
                         input.into(),
                     ));
                 })
-                .map_err(|e| WasmError::Host(e.to_string()))?;
+                .map_err(|e| wasm_error!(WasmErrorInner::Host(e.to_string())))?;
             Ok(())
         }
-        _ => Err(WasmError::Host(
+        _ => Err(wasm_error!(WasmErrorInner::Host(
             RibosomeError::HostFnPermissions(
                 call_context.zome.zome_name().clone(),
                 call_context.function_name().clone(),
                 "schedule".into(),
             )
             .to_string(),
-        )),
+        )).into()),
     }
 }
 

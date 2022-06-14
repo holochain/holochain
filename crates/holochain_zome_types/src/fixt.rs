@@ -64,18 +64,14 @@ fixturator!(
 
 fixturator!(
     AppEntryType;
-    constructor fn new(U8, U8, EntryVisibility);
+    constructor fn new(U8, EntryVisibility);
 );
 
 impl Iterator for AppEntryTypeFixturator<EntryVisibility> {
     type Item = AppEntryType;
     fn next(&mut self) -> Option<Self::Item> {
         let app_entry = AppEntryTypeFixturator::new(Unpredictable).next().unwrap();
-        Some(AppEntryType::new(
-            app_entry.id(),
-            app_entry.zome_id(),
-            self.0.curve,
-        ))
+        Some(AppEntryType::new(app_entry.id(), self.0.curve))
     }
 }
 
@@ -94,7 +90,7 @@ fixturator!(
 
 fixturator!(
     CreateLink;
-    constructor fn from_builder(HeaderBuilderCommon, AnyLinkableHash, AnyLinkableHash, u8, LinkType, LinkTag);
+    constructor fn from_builder(HeaderBuilderCommon, AnyLinkableHash, AnyLinkableHash, LinkType, LinkTag);
 );
 
 fixturator!(
@@ -109,7 +105,7 @@ pub struct KnownCreateLink {
     pub base_address: AnyLinkableHash,
     pub target_address: AnyLinkableHash,
     pub tag: LinkTag,
-    pub zome_id: ZomeId,
+    pub link_type: LinkType,
 }
 
 pub struct KnownDeleteLink {
@@ -124,7 +120,7 @@ impl Iterator for CreateLinkFixturator<KnownCreateLink> {
         f.base_address = self.0.curve.base_address.clone();
         f.target_address = self.0.curve.target_address.clone();
         f.tag = self.0.curve.tag.clone();
-        f.zome_id = self.0.curve.zome_id;
+        f.link_type = self.0.curve.link_type;
         Some(f)
     }
 }
@@ -179,8 +175,13 @@ fixturator!(
 );
 
 fixturator!(
+    ScopedZomeTypesSet;
+    constructor fn default();;
+);
+
+fixturator!(
     ZomeInfo;
-    constructor fn new(ZomeName, ZomeId, SerializedBytes, EntryDefs, FunctionNameVec);
+    constructor fn new(ZomeName, ZomeId, SerializedBytes, EntryDefs, FunctionNameVec, ScopedZomeTypesSet);
 );
 
 fixturator!(
@@ -473,7 +474,7 @@ fixturator!(
 
 fixturator!(
     EntryDef;
-    constructor fn new(EntryDefId, EntryVisibility, RequiredValidations, RequiredValidationType);
+    constructor fn new(EntryDefId, EntryVisibility, RequiredValidations);
 );
 
 fixturator!(
@@ -537,7 +538,7 @@ fixturator! {
     };
     curve PublicCurve {
         let aet = fixt!(AppEntryType);
-        EntryType::App(AppEntryType::new(aet.id(), aet.zome_id(), EntryVisibility::Public))
+        EntryType::App(AppEntryType::new(aet.id(), EntryVisibility::Public))
     };
 }
 
@@ -669,20 +670,53 @@ fixturator!(
 );
 
 fixturator!(
-    Zomes;
+    IntegrityZome;
+    constructor fn new(ZomeName, IntegrityZomeDef);
+);
+
+fixturator!(
+    IntegrityZomes;
     curve Empty Vec::new();
     curve Unpredictable {
         // @todo implement unpredictable zomes
-        ZomesFixturator::new(Empty).next().unwrap()
+        IntegrityZomesFixturator::new(Empty).next().unwrap()
     };
     curve Predictable {
         // @todo implement predictable zomes
-        ZomesFixturator::new(Empty).next().unwrap()
+        IntegrityZomesFixturator::new(Empty).next().unwrap()
+    };
+);
+
+fixturator!(
+    CoordinatorZome;
+    constructor fn new(ZomeName, CoordinatorZomeDef);
+);
+
+fixturator!(
+    CoordinatorZomes;
+    curve Empty Vec::new();
+    curve Unpredictable {
+        // @todo implement unpredictable zomes
+        CoordinatorZomesFixturator::new(Empty).next().unwrap()
+    };
+    curve Predictable {
+        // @todo implement predictable zomes
+        CoordinatorZomesFixturator::new(Empty).next().unwrap()
     };
 );
 
 fixturator!(
     ZomeDef;
+    constructor fn from_hash(WasmHash);
+);
+
+fixturator!(
+    IntegrityZomeDef;
+    constructor fn from_hash(WasmHash);
+);
+
+fixturator!(
+    CoordinatorZomeDef;
     constructor fn from_hash(WasmHash);
 );
 
@@ -699,7 +733,10 @@ fixturator!(
             .next()
             .unwrap(),
         origin_time: Timestamp::HOLOCHAIN_EPOCH,
-        zomes: ZomesFixturator::new_indexed(Empty, get_fixt_index!())
+        integrity_zomes: IntegrityZomesFixturator::new_indexed(Empty, get_fixt_index!())
+            .next()
+            .unwrap(),
+        coordinator_zomes: CoordinatorZomesFixturator::new_indexed(Empty, get_fixt_index!())
             .next()
             .unwrap(),
     };
@@ -715,7 +752,10 @@ fixturator!(
             .next()
             .unwrap(),
         origin_time: Timestamp::HOLOCHAIN_EPOCH,
-        zomes: ZomesFixturator::new_indexed(Unpredictable, get_fixt_index!())
+        integrity_zomes: IntegrityZomesFixturator::new_indexed(Unpredictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+        coordinator_zomes: CoordinatorZomesFixturator::new_indexed(Empty, get_fixt_index!())
             .next()
             .unwrap(),
     };
@@ -731,7 +771,10 @@ fixturator!(
             .next()
             .unwrap(),
         origin_time: Timestamp::HOLOCHAIN_EPOCH,
-        zomes: ZomesFixturator::new_indexed(Predictable, get_fixt_index!())
+        integrity_zomes: IntegrityZomesFixturator::new_indexed(Predictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+        coordinator_zomes: CoordinatorZomesFixturator::new_indexed(Empty, get_fixt_index!())
             .next()
             .unwrap(),
     };

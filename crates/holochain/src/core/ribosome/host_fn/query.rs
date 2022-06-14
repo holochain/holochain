@@ -3,14 +3,14 @@ use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 
 pub fn query(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: ChainQueryFilter,
-) -> Result<Vec<Element>, WasmError> {
+) -> Result<Vec<Element>, RuntimeError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess {
             read_workspace: Permission::Allow,
@@ -24,27 +24,29 @@ pub fn query(
                 .expect("Must have source chain to query the source chain")
                 .query(input)
                 .await
-                .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?;
+                .map_err(|source_chain_error| -> RuntimeError {
+                    wasm_error!(WasmErrorInner::Host(source_chain_error.to_string())).into()
+                })?;
             Ok(elements)
         }),
-        _ => Err(WasmError::Host(
+        _ => Err(wasm_error!(WasmErrorInner::Host(
             RibosomeError::HostFnPermissions(
                 call_context.zome.zome_name().clone(),
                 call_context.function_name().clone(),
                 "query".into(),
             )
             .to_string(),
-        )),
+        )).into()),
     }
 }
 
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod slow_tests {
-    use hdk::prelude::*;
-    use query::ChainQueryFilter;
     use crate::core::ribosome::wasm_test::RibosomeTestFixture;
+    use hdk::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
+    use query::ChainQueryFilter;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn query_smoke_test() {
