@@ -2,7 +2,7 @@ use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holo_hash::encode::blake2b_n;
 use holo_hash::HasHash;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 use holochain_zome_types::prelude::*;
 use std::sync::Arc;
 use tiny_keccak::{Hasher, Keccak, Sha3};
@@ -11,7 +11,7 @@ pub fn hash(
     _ribosome: Arc<impl RibosomeT>,
     _call_context: Arc<CallContext>,
     input: HashInput,
-) -> Result<HashOutput, WasmError> {
+) -> Result<HashOutput, RuntimeError> {
     Ok(match input {
         HashInput::Entry(entry) => HashOutput::Entry(
             holochain_zome_types::entry::EntryHashed::from_content_sync(entry).into_hash(),
@@ -20,7 +20,8 @@ pub fn hash(
             holochain_zome_types::header::HeaderHashed::from_content_sync(header).into_hash(),
         ),
         HashInput::Blake2B(data, output_len) => HashOutput::Blake2B(
-            blake2b_n(&data, output_len as usize).map_err(|e| WasmError::Host(e.to_string()))?,
+            blake2b_n(&data, output_len as usize)
+                .map_err(|e| -> RuntimeError { wasm_error!(WasmErrorInner::Host(e.to_string())).into() })?,
         ),
         HashInput::Keccak256(data) => HashOutput::Keccak256({
             let mut output = [0u8; 32];
@@ -37,10 +38,11 @@ pub fn hash(
             output.into()
         }),
         _ => {
-            return Err(WasmError::Host(format!(
+            return Err(wasm_error!(WasmErrorInner::Host(format!(
                 "Unimplemented hashing algorithm {:?}",
                 input
             )))
+            .into())
         }
     })
 }
@@ -56,7 +58,6 @@ pub mod wasm_test {
     use crate::fixt::EntryFixturator;
     use crate::fixt::RealRibosomeFixturator;
     use ::fixt::prelude::*;
-    use hdk::hash_path::path::Component;
     use hdk::prelude::*;
     use holo_hash::EntryHash;
     use holochain_wasm_test_utils::TestWasm;
@@ -188,31 +189,5 @@ pub mod wasm_test {
             .await;
 
         assert_eq!(entry_hash_output, hash_output);
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    /// the hash path underlying anchors wraps entry_hash
-    async fn ribosome_hash_path_pwd_test() {
-        observability::test_run().ok();
-        let RibosomeTestFixture {
-            conductor, alice, ..
-        } = RibosomeTestFixture::new(TestWasm::HashPath).await;
-        let input = "foo.bar".to_string();
-        let output: EntryHash = conductor.call(&alice, "path_entry_hash", input).await;
-
-        let expected_path =
-            hdk::hash_path::path::Path::from(vec![Component::from("foo"), Component::from("bar")]);
-
-        let path_hash = holochain_zome_types::entry::EntryHashed::from_content_sync(
-            Entry::try_from(expected_path).unwrap(),
-        )
-        .into_hash();
-
-        let path_entry_hash = holochain_zome_types::entry::EntryHashed::from_content_sync(
-            Entry::try_from(PathEntry::new(path_hash)).unwrap(),
-        )
-        .into_hash();
-
-        assert_eq!(path_entry_hash.into_inner(), output.into_inner(),);
     }
 }

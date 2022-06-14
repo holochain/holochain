@@ -1,6 +1,7 @@
 use super::*;
 use crate::conductor::handle::MockConductorHandleT;
 use crate::conductor::space::TestSpaces;
+use crate::core::ribosome::real_ribosome::RealRibosome;
 use crate::test_utils::fake_genesis;
 use ::fixt::prelude::*;
 use error::SysValidationError;
@@ -12,7 +13,7 @@ use holochain_state::prelude::test_authored_db;
 use holochain_state::prelude::test_cache_db;
 use holochain_state::prelude::test_dht_db;
 use holochain_types::db_cache::DhtDbQueryCache;
-use holochain_wasm_test_utils::TestWasm;
+use holochain_wasm_test_utils::*;
 use holochain_zome_types::Header;
 use matches::assert_matches;
 use observability;
@@ -319,6 +320,10 @@ async fn check_link_tag_size_test() {
 #[tokio::test(flavor = "multi_thread")]
 async fn check_app_entry_type_test() {
     observability::test_run().ok();
+    let TestWasmPair::<DnaWasm> {
+        integrity,
+        coordinator,
+    } = TestWasm::EntryDefs.into();
     // Setup test data
     let dna_file = DnaFile::new(
         DnaDef {
@@ -326,24 +331,30 @@ async fn check_app_entry_type_test() {
             uid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
             properties: SerializedBytes::try_from(()).unwrap(),
             origin_time: Timestamp::HOLOCHAIN_EPOCH,
-            zomes: vec![TestWasm::EntryDefs.into()].into(),
+            integrity_zomes: vec![TestZomes::from(TestWasm::EntryDefs).integrity.into_inner()],
+            coordinator_zomes: vec![TestZomes::from(TestWasm::EntryDefs)
+                .coordinator
+                .into_inner()],
         },
-        vec![TestWasm::EntryDefs.into()],
+        [integrity, coordinator],
     )
     .await
     .unwrap();
     let dna_hash = dna_file.dna_hash().to_owned().clone();
+    let ribosome = RealRibosome::new(dna_file).unwrap();
     let mut entry_def = fixt!(EntryDef);
     entry_def.visibility = EntryVisibility::Public;
 
     // Setup mock conductor
     let mut conductor_handle = MockConductorHandleT::new();
     // # No dna or entry def
-    conductor_handle.expect_get_entry_def().return_const(None);
-    conductor_handle.expect_get_dna_file().return_const(None);
+    let dh = dna_hash.clone();
+    conductor_handle
+        .expect_get_ribosome()
+        .returning(move |_| Err(DnaError::DnaMissing(dh.to_owned()).into()));
 
     // ## Dna is missing
-    let aet = AppEntryType::new(0.into(), 0.into(), EntryVisibility::Public);
+    let aet = AppEntryType::new(0.into(), EntryVisibility::Public);
     assert_matches!(
         check_app_entry_type(&dna_hash, &aet, &conductor_handle).await,
         Err(SysValidationError::DnaMissing(_))
@@ -352,11 +363,14 @@ async fn check_app_entry_type_test() {
     // # Dna but no entry def in buffer
     // ## ZomeId out of range
     conductor_handle.checkpoint();
-    conductor_handle.expect_get_entry_def().return_const(None);
+    let r = ribosome.clone();
     conductor_handle
-        .expect_get_dna_file()
-        .return_const(Some(dna_file.clone()));
-    let aet = AppEntryType::new(0.into(), 1.into(), EntryVisibility::Public);
+        .expect_get_ribosome()
+        .returning(move |_| Ok(r.clone()));
+    conductor_handle.expect_get_entry_def().return_const(None);
+
+    // ## EntryId is out of range
+    let aet = AppEntryType::new(10.into(), EntryVisibility::Public);
     assert_matches!(
         check_app_entry_type(&dna_hash, &aet, &conductor_handle).await,
         Err(SysValidationError::ValidationOutcome(
@@ -364,22 +378,13 @@ async fn check_app_entry_type_test() {
         ))
     );
 
-    // ## EntryId is out of range
-    let aet = AppEntryType::new(10.into(), 0.into(), EntryVisibility::Public);
-    assert_matches!(
-        check_app_entry_type(&dna_hash, &aet, &conductor_handle).await,
-        Err(SysValidationError::ValidationOutcome(
-            ValidationOutcome::EntryDefId(_)
-        ))
-    );
-
     // ## EntryId is in range for dna
-    let aet = AppEntryType::new(0.into(), 0.into(), EntryVisibility::Public);
+    let aet = AppEntryType::new(0.into(), EntryVisibility::Public);
     assert_matches!(
         check_app_entry_type(&dna_hash, &aet, &conductor_handle).await,
         Ok(_)
     );
-    let aet = AppEntryType::new(0.into(), 0.into(), EntryVisibility::Private);
+    let aet = AppEntryType::new(0.into(), EntryVisibility::Private);
     assert_matches!(
         check_app_entry_type(&dna_hash, &aet, &conductor_handle).await,
         Err(SysValidationError::ValidationOutcome(
@@ -393,7 +398,7 @@ async fn check_app_entry_type_test() {
         .return_const(Some(entry_def));
 
     // ## Can get the entry from the entry def
-    let aet = AppEntryType::new(0.into(), 0.into(), EntryVisibility::Public);
+    let aet = AppEntryType::new(0.into(), EntryVisibility::Public);
     assert_matches!(
         check_app_entry_type(&dna_hash, &aet, &conductor_handle).await,
         Ok(_)
@@ -427,7 +432,7 @@ async fn incoming_ops_filters_private_entry() {
     let private_entry = fixt!(Entry);
     let mut create = fixt!(Create);
     let author = keystore.new_sign_keypair_random().await.unwrap();
-    let aet = AppEntryType::new(0.into(), 0.into(), EntryVisibility::Private);
+    let aet = AppEntryType::new(0.into(), EntryVisibility::Private);
     create.entry_type = EntryType::App(aet);
     create.entry_hash = EntryHash::with_data_sync(&private_entry);
     create.author = author.clone();

@@ -6,6 +6,40 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+- Docs: Update OS support in repository README and link to developer environment setup.
+
+# 20220608.011447
+
+## [holochain\_cli-0.0.41](crates/holochain_cli/CHANGELOG.md#0.0.41)
+
+## [holochain\_cli\_sandbox-0.0.37](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.37)
+
+## [holochain\_cli\_bundle-0.0.37](crates/holochain_cli_bundle/CHANGELOG.md#0.0.37)
+
+## [holochain-0.0.143](crates/holochain/CHANGELOG.md#0.0.143)
+
+## [holochain\_test\_wasm\_common-0.0.37](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.37)
+
+## [holochain\_conductor\_api-0.0.43](crates/holochain_conductor_api/CHANGELOG.md#0.0.43)
+
+## [holochain\_wasm\_test\_utils-0.0.42](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.42)
+
+## [holochain\_cascade-0.0.43](crates/holochain_cascade/CHANGELOG.md#0.0.43)
+
+## [holochain\_state-0.0.43](crates/holochain_state/CHANGELOG.md#0.0.43)
+
+## [holochain\_p2p-0.0.41](crates/holochain_p2p/CHANGELOG.md#0.0.41)
+
+## [holochain\_types-0.0.41](crates/holochain_types/CHANGELOG.md#0.0.41)
+
+## [holochain\_keystore-0.0.41](crates/holochain_keystore/CHANGELOG.md#0.0.41)
+
+- Docs: Crate README generated from crate level doc comments [\#1392](https://github.com/holochain/holochain/pull/1392).
+
+## [hdk-0.0.136](crates/hdk/CHANGELOG.md#0.0.136)
+
+- Docs: Crate README generated from crate level doc comments [\#1392](https://github.com/holochain/holochain/pull/1392).
+
 # 20220601.012853
 
 ## [holochain\_cli-0.0.40](crates/holochain_cli/CHANGELOG.md#0.0.40)

@@ -15,27 +15,21 @@ fn sign_ephemeral(_: ()) -> ExternResult<Vec<EphemeralSignatures>> {
         // Can use normal sign_ephemeral if all the types are the same.
         hdk::prelude::sign_ephemeral(vec![One([1, 2]), One([3, 4])])?,
         // Need to use raw if the types are different.
-        hdk::prelude::sign_ephemeral_raw(
-            vec![
-                holochain_serialized_bytes::encode(&One([1, 2]))?,
-                holochain_serialized_bytes::encode(&Two([2, 3]))?,
-            ]
-        )?
+        hdk::prelude::sign_ephemeral_raw(vec![
+            holochain_serialized_bytes::encode(&One([1, 2])).map_err(|e| wasm_error!(e.into()))?,
+            holochain_serialized_bytes::encode(&Two([2, 3])).map_err(|e| wasm_error!(e.into()))?,
+        ])?,
     ])
 }
 
 #[hdk_extern]
-fn verify_signature_raw(
-    verify_signature_input: VerifySignature,
-) -> ExternResult<bool> {
+fn verify_signature_raw(verify_signature_input: VerifySignature) -> ExternResult<bool> {
     let VerifySignature {
         key,
         signature,
         data,
     } = verify_signature_input;
-    hdk::prelude::verify_signature_raw(
-        key, signature, data,
-    )
+    hdk::prelude::verify_signature_raw(key, signature, data)
 }
 
 #[derive(serde::Serialize, std::fmt::Debug, Clone)]
@@ -45,11 +39,8 @@ struct SomeStruct {
 }
 
 #[hdk_extern]
-fn verify_signature(
-    agent_pub_key: AgentPubKey,
-) -> ExternResult<()> {
-
-    let some_struct = SomeStruct{
+fn verify_signature(agent_pub_key: AgentPubKey) -> ExternResult<()> {
+    let some_struct = SomeStruct {
         foo: String::from("Foo"),
         bar: 100,
     };
@@ -59,12 +50,16 @@ fn verify_signature(
         Err(error) => {
             tracing::error!(?agent_pub_key, ?some_struct, ?error);
             return Err(error);
-        },
+        }
     };
 
     tracing::debug!(?signature);
 
-    let verify = match hdk::prelude::verify_signature(agent_pub_key.clone(), signature.clone(), some_struct.clone()) {
+    let verify = match hdk::prelude::verify_signature(
+        agent_pub_key.clone(),
+        signature.clone(),
+        some_struct.clone(),
+    ) {
         Ok(v) => v,
         Err(error) => {
             tracing::error!(?agent_pub_key, ?some_struct, ?signature, ?error);
@@ -74,12 +69,16 @@ fn verify_signature(
 
     assert!(verify);
 
-    let bad_struct = SomeStruct{
+    let bad_struct = SomeStruct {
         foo: String::from("foo"),
         bar: 100,
     };
 
-    let not_verify = match hdk::prelude::verify_signature(agent_pub_key.clone(), signature.clone(), bad_struct.clone()) {
+    let not_verify = match hdk::prelude::verify_signature(
+        agent_pub_key.clone(),
+        signature.clone(),
+        bad_struct.clone(),
+    ) {
         Ok(v) => v,
         Err(error) => {
             tracing::error!(?agent_pub_key, ?bad_struct, ?signature, ?error);
@@ -94,8 +93,8 @@ fn verify_signature(
 
 #[cfg(all(test, feature = "mock"))]
 pub mod tests {
-    use hdk::prelude::*;
     use ::fixt::prelude::{fixt, Predictable};
+    use hdk::prelude::*;
 
     #[test]
     fn sign_ephemeral_smoke() {
@@ -104,7 +103,8 @@ pub mod tests {
         let pubkey = fixt!(AgentPubKey);
         let signatures: Vec<Signature> = SignatureFixturator::new(Predictable).take(2).collect();
 
-        mock_hdk.expect_sign_ephemeral()
+        mock_hdk
+            .expect_sign_ephemeral()
             .times(2)
             .return_const(Ok(EphemeralSignatures {
                 key: pubkey.clone(),

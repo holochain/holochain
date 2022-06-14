@@ -17,7 +17,7 @@ async fn test_validation_receipt() {
 
     let mut conductors = SweetConductorBatch::from_standard_config(NUM_CONDUCTORS).await;
 
-    let (dna_file, _) = SweetDnaFile::unique_from_inline_zome("zome1", simple_create_read_zome())
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_create_read_zome())
         .await
         .unwrap();
 
@@ -27,7 +27,9 @@ async fn test_validation_receipt() {
     let ((alice,), (bobbo,), (carol,)) = apps.into_tuples();
 
     // Call the "create" zome fn on Alice's app
-    let hash: HeaderHash = conductors[0].call(&alice.zome("zome1"), "create", ()).await;
+    let hash: HeaderHash = conductors[0]
+        .call(&alice.zome("simple"), "create", ())
+        .await;
 
     consistency_10s(&[&alice, &bobbo, &carol]).await;
 

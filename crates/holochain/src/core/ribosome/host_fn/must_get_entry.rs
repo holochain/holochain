@@ -5,7 +5,6 @@ use crate::core::ribosome::RibosomeT;
 use holochain_cascade::Cascade;
 use holochain_p2p::actor::GetOptions as NetworkGetOptions;
 use holochain_types::prelude::*;
-use holochain_wasmer_host::prelude::WasmError;
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 
@@ -14,7 +13,7 @@ pub fn must_get_entry<'a>(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: MustGetEntryInput,
-) -> Result<EntryHashed, WasmError> {
+) -> Result<EntryHashed, RuntimeError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess {
             read_workspace_deterministic: Permission::Allow,
@@ -31,58 +30,76 @@ pub fn must_get_entry<'a>(
                         call_context.host_context.network().clone(),
                     ),
                 };
-                match cascade
+                let result: Result<_, RuntimeError> = match cascade
                     .retrieve_entry(entry_hash.clone(), NetworkGetOptions::must_get_options())
                     .await
-                    .map_err(|cascade_error| WasmError::Host(cascade_error.to_string()))?
-                {
+                    .map_err(|cascade_error| -> RuntimeError {
+                        wasm_error!(WasmErrorInner::Host(cascade_error.to_string())).into()
+                    })? {
                     Some(entry) => Ok(entry),
                     None => match call_context.host_context {
                         HostContext::EntryDefs(_)
                         | HostContext::GenesisSelfCheck(_)
                         | HostContext::MigrateAgent(_)
                         | HostContext::PostCommit(_)
-                        | HostContext::ZomeCall(_) => Err(WasmError::Host(format!(
-                            "Failed to get EntryHashed {}",
-                            entry_hash
-                        ))),
-                        HostContext::Init(_) => RuntimeError::raise(Box::new(
-                            WasmError::HostShortCircuit(holochain_serialized_bytes::encode(
+                        | HostContext::ZomeCall(_) => Err(wasm_error!(WasmErrorInner::Host(
+                            format!("Failed to get EntryHashed {}", entry_hash)
+                        ))
+                        .into()),
+                        HostContext::Init(_) => Err(wasm_error!(WasmErrorInner::HostShortCircuit(
+                            holochain_serialized_bytes::encode(
                                 &ExternIO::encode(InitCallbackResult::UnresolvedDependencies(
                                     vec![entry_hash.into()],
-                                ))?,
-                            )?),
-                        )),
+                                ))
+                                .map_err(|e| -> RuntimeError { wasm_error!(e.into()).into() })?,
+                            )
+                            .map_err(|e| -> RuntimeError { wasm_error!(e.into()).into() })?
+                        ))
+                        .into()),
                         HostContext::Validate(_) => {
-                            RuntimeError::raise(Box::new(WasmError::HostShortCircuit(
-                                holochain_serialized_bytes::encode(&ExternIO::encode(
-                                    &ValidateCallbackResult::UnresolvedDependencies(vec![
-                                        entry_hash.into(),
-                                    ]),
-                                )?)?,
-                            )))
+                            Err(wasm_error!(WasmErrorInner::HostShortCircuit(
+                                holochain_serialized_bytes::encode(
+                                    &ExternIO::encode(
+                                        &ValidateCallbackResult::UnresolvedDependencies(vec![
+                                            entry_hash.into(),
+                                        ]),
+                                    )
+                                    .map_err(
+                                        |e| -> RuntimeError { wasm_error!(e.into()).into() }
+                                    )?
+                                )
+                                .map_err(|e| -> RuntimeError { wasm_error!(e.into()).into() })?,
+                            ))
+                            .into())
                         }
                         HostContext::ValidationPackage(_) => {
-                            RuntimeError::raise(Box::new(WasmError::HostShortCircuit(
-                                holochain_serialized_bytes::encode(&ExternIO::encode(
-                                    ValidationPackageCallbackResult::UnresolvedDependencies(vec![
-                                        entry_hash.into(),
-                                    ]),
-                                )?)?,
-                            )))
+                            Err(wasm_error!(WasmErrorInner::HostShortCircuit(
+                                holochain_serialized_bytes::encode(
+                                    &ExternIO::encode(
+                                        ValidationPackageCallbackResult::UnresolvedDependencies(
+                                            vec![entry_hash.into(),]
+                                        ),
+                                    )
+                                    .map_err(|e| wasm_error!(e.into()))?
+                                )
+                                .map_err(|e| -> RuntimeError { wasm_error!(e.into()).into() })?,
+                            ))
+                            .into())
                         }
                     },
-                }
+                };
+                result
             })
         }
-        _ => Err(WasmError::Host(
+        _ => Err(wasm_error!(WasmErrorInner::Host(
             RibosomeError::HostFnPermissions(
                 call_context.zome.zome_name().clone(),
                 call_context.function_name().clone(),
                 "must_get_entry".into(),
             )
             .to_string(),
-        )),
+        ))
+        .into()),
     }
 }
 
@@ -102,8 +119,6 @@ pub mod test {
 
     test_entry_impl!(Something);
 
-    const ENTRY_DEF_ID: &str = "something";
-
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_must_get_entry_test<'a>() {
         observability::test_run().ok();
@@ -117,7 +132,7 @@ pub mod test {
 
         let entry = Entry::try_from(Something(vec![1, 2, 3])).unwrap();
         let header_hash = alice_host_fn_caller
-            .commit_entry(entry.clone(), ENTRY_DEF_ID)
+            .commit_entry(entry.clone(), EntryDefIndex(0), EntryVisibility::Public)
             .await;
 
         let dht_db = conductor

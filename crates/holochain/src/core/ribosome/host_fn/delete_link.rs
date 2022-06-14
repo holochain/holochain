@@ -5,7 +5,7 @@ use crate::core::ribosome::RibosomeT;
 use holochain_cascade::error::CascadeResult;
 use holochain_cascade::Cascade;
 use holochain_types::prelude::*;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]
@@ -13,7 +13,7 @@ pub fn delete_link<'a>(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: DeleteLinkInput,
-) -> Result<HeaderHash, WasmError> {
+) -> Result<HeaderHash, RuntimeError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess {
             write_workspace: Permission::Allow,
@@ -43,7 +43,9 @@ pub fn delete_link<'a>(
                             .map(|el| el.into_inner().0),
                     )
                 })
-                .map_err(|cascade_error| WasmError::Host(cascade_error.to_string()))?;
+                .map_err(|cascade_error| -> RuntimeError {
+                    wasm_error!(WasmErrorInner::Host(cascade_error.to_string())).into()
+                })?;
 
             let base_address = match maybe_add_link {
                 Some(add_link_signed_header_hash) => {
@@ -63,7 +65,9 @@ pub fn delete_link<'a>(
                 // network connection dropped out)
                 None => Err(RibosomeError::ElementDeps(address.clone().into())),
             }
-            .map_err(|ribosome_error| WasmError::Host(ribosome_error.to_string()))?;
+            .map_err(|ribosome_error| -> RuntimeError {
+                wasm_error!(WasmErrorInner::Host(ribosome_error.to_string())).into()
+            })?;
 
             let source_chain = call_context
                 .host_context
@@ -71,7 +75,6 @@ pub fn delete_link<'a>(
                 .source_chain()
                 .as_ref()
                 .expect("Must have source chain if write_workspace access is given");
-            let zome = call_context.zome.clone();
 
             // handle timeouts at the source chain layer
 
@@ -82,22 +85,23 @@ pub fn delete_link<'a>(
                     base_address,
                 };
                 let header_hash = source_chain
-                    .put(Some(zome), header_builder, None, chain_top_ordering)
+                    .put(header_builder, None, chain_top_ordering)
                     .await
-                    .map_err(|source_chain_error| {
-                        WasmError::Host(source_chain_error.to_string())
+                    .map_err(|source_chain_error| -> RuntimeError {
+                        wasm_error!(WasmErrorInner::Host(source_chain_error.to_string())).into()
                     })?;
                 Ok(header_hash)
             })
         }
-        _ => Err(WasmError::Host(
+        _ => Err(wasm_error!(WasmErrorInner::Host(
             RibosomeError::HostFnPermissions(
                 call_context.zome.zome_name().clone(),
                 call_context.function_name().clone(),
                 "delete_link".into(),
             )
             .to_string(),
-        )),
+        ))
+        .into()),
     }
 }
 

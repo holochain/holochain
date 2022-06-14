@@ -17,7 +17,7 @@ pub mod inline_zome;
 use error::ZomeResult;
 
 #[cfg(feature = "full-dna-def")]
-use self::inline_zome::InlineZome;
+use crate::InlineIntegrityZome;
 #[cfg(feature = "full-dna-def")]
 use error::ZomeError;
 #[cfg(feature = "full-dna-def")]
@@ -27,15 +27,19 @@ use std::sync::Arc;
 #[derive(Serialize, Deserialize, Hash, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[cfg_attr(feature = "full-dna-def", derive(shrinkwraprs::Shrinkwrap))]
 #[cfg_attr(feature = "test_utils", derive(arbitrary::Arbitrary))]
-pub struct Zome {
+pub struct Zome<T = ZomeDef> {
     name: ZomeName,
     #[cfg_attr(feature = "full-dna-def", shrinkwrap(main_field))]
-    def: ZomeDef,
+    def: T,
 }
 
-impl Zome {
+pub type IntegrityZome = Zome<IntegrityZomeDef>;
+
+pub type CoordinatorZome = Zome<CoordinatorZomeDef>;
+
+impl<T> Zome<T> {
     /// Constructor
-    pub fn new(name: ZomeName, def: ZomeDef) -> Self {
+    pub fn new(name: ZomeName, def: T) -> Self {
         Self { name, def }
     }
 
@@ -44,14 +48,45 @@ impl Zome {
         &self.name
     }
 
+    pub fn zome_name_mut(&mut self) -> &mut ZomeName {
+        &mut self.name
+    }
+
     /// Accessor
-    pub fn zome_def(&self) -> &ZomeDef {
+    pub fn zome_def(&self) -> &T {
         &self.def
     }
 
     /// Split into components
-    pub fn into_inner(self) -> (ZomeName, ZomeDef) {
+    pub fn into_inner(self) -> (ZomeName, T) {
         (self.name, self.def)
+    }
+}
+
+impl IntegrityZome {
+    /// Erase the type of [`Zome`] because you no longer
+    /// need to know if this is an integrity or coordinator def.
+    pub fn erase_type(self) -> Zome {
+        Zome {
+            name: self.name,
+            def: self.def.erase_type(),
+        }
+    }
+}
+
+impl CoordinatorZome {
+    /// Erase the type of [`Zome`] because you no longer
+    /// need to know if this is an integrity or coordinator def.
+    pub fn erase_type(self) -> Zome {
+        Zome {
+            name: self.name,
+            def: self.def.erase_type(),
+        }
+    }
+
+    /// Add a dependency to this zome.
+    pub fn set_dependency(&mut self, zome_name: impl Into<ZomeName>) {
+        self.def.set_dependency(zome_name);
     }
 }
 
@@ -61,20 +96,38 @@ impl From<(ZomeName, ZomeDef)> for Zome {
     }
 }
 
-impl From<Zome> for (ZomeName, ZomeDef) {
-    fn from(zome: Zome) -> Self {
+impl From<(ZomeName, IntegrityZomeDef)> for IntegrityZome {
+    fn from(pair: (ZomeName, IntegrityZomeDef)) -> Self {
+        Self::new(pair.0, pair.1)
+    }
+}
+
+impl From<(ZomeName, CoordinatorZomeDef)> for CoordinatorZome {
+    fn from(pair: (ZomeName, CoordinatorZomeDef)) -> Self {
+        Self::new(pair.0, pair.1)
+    }
+}
+
+impl<T> From<Zome<T>> for (ZomeName, T) {
+    fn from(zome: Zome<T>) -> Self {
         zome.into_inner()
     }
 }
 
-impl From<Zome> for ZomeName {
-    fn from(zome: Zome) -> Self {
+impl<T> From<Zome<T>> for ZomeName {
+    fn from(zome: Zome<T>) -> Self {
         zome.name
     }
 }
 
-impl From<Zome> for ZomeDef {
-    fn from(zome: Zome) -> Self {
+impl From<IntegrityZome> for IntegrityZomeDef {
+    fn from(zome: IntegrityZome) -> Self {
+        zome.def
+    }
+}
+
+impl From<CoordinatorZome> for CoordinatorZomeDef {
+    fn from(zome: CoordinatorZome) -> Self {
         zome.def
     }
 }
@@ -100,8 +153,17 @@ pub enum ZomeDef {
     /// A zome defined by Rust closures. Cannot be deserialized.
     #[serde(skip_deserializing)]
     #[cfg(feature = "full-dna-def")]
-    Inline(Arc<InlineZome>),
+    Inline {
+        inline_zome: self::inline_zome::DynInlineZome,
+        dependencies: Vec<ZomeName>,
+    },
 }
+
+#[derive(Serialize, Deserialize, Hash, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct IntegrityZomeDef(ZomeDef);
+
+#[derive(Serialize, Deserialize, Hash, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct CoordinatorZomeDef(ZomeDef);
 
 /// The serialized form of a ZomeDef, which is identical for Wasm zomes, but
 /// unwraps InlineZomes to just a bare UID.
@@ -120,15 +182,70 @@ impl From<ZomeDef> for ZomeDefSerialized {
             ZomeDef::Wasm(zome) => Self::Wasm(zome),
 
             #[cfg(feature = "full-dna-def")]
-            ZomeDef::Inline(zome) => Self::InlineUid(zome.uuid.clone()),
+            ZomeDef::Inline { inline_zome, .. } => Self::InlineUid(inline_zome.0.uuid()),
+        }
+    }
+}
+
+impl IntegrityZomeDef {
+    pub fn as_any_zome_def(&self) -> &ZomeDef {
+        &self.0
+    }
+}
+
+impl CoordinatorZomeDef {
+    /// Use this as any [`ZomeDef`].
+    pub fn as_any_zome_def(&self) -> &ZomeDef {
+        &self.0
+    }
+
+    /// Add a dependency to this zome.
+    pub fn set_dependency(&mut self, zome_name: impl Into<ZomeName>) {
+        match &mut self.0 {
+            ZomeDef::Wasm(WasmZome { dependencies, .. }) => dependencies.push(zome_name.into()),
+            #[cfg(feature = "full-dna-def")]
+            ZomeDef::Inline { dependencies, .. } => dependencies.push(zome_name.into()),
         }
     }
 }
 
 #[cfg(feature = "full-dna-def")]
-impl From<InlineZome> for ZomeDef {
-    fn from(iz: InlineZome) -> Self {
-        Self::Inline(Arc::new(iz))
+impl From<InlineIntegrityZome> for ZomeDef {
+    fn from(iz: InlineIntegrityZome) -> Self {
+        Self::Inline {
+            inline_zome: inline_zome::DynInlineZome(Arc::new(iz)),
+            dependencies: Default::default(),
+        }
+    }
+}
+
+#[cfg(feature = "full-dna-def")]
+impl From<InlineIntegrityZome> for IntegrityZomeDef {
+    fn from(iz: InlineIntegrityZome) -> Self {
+        Self(ZomeDef::Inline {
+            inline_zome: inline_zome::DynInlineZome(Arc::new(iz)),
+            dependencies: Default::default(),
+        })
+    }
+}
+
+#[cfg(feature = "full-dna-def")]
+impl From<crate::InlineCoordinatorZome> for ZomeDef {
+    fn from(iz: crate::InlineCoordinatorZome) -> Self {
+        Self::Inline {
+            inline_zome: inline_zome::DynInlineZome(Arc::new(iz)),
+            dependencies: Default::default(),
+        }
+    }
+}
+
+#[cfg(feature = "full-dna-def")]
+impl From<crate::InlineCoordinatorZome> for CoordinatorZomeDef {
+    fn from(iz: crate::InlineCoordinatorZome) -> Self {
+        Self(ZomeDef::Inline {
+            inline_zome: inline_zome::DynInlineZome(Arc::new(iz)),
+            dependencies: Default::default(),
+        })
     }
 }
 
@@ -140,10 +257,43 @@ impl ZomeDef {
     //     the arg is unused.
     pub fn wasm_hash(&self, _zome_name: &ZomeName) -> ZomeResult<holo_hash::WasmHash> {
         match self {
-            ZomeDef::Wasm(WasmZome { wasm_hash }) => Ok(wasm_hash.clone()),
+            ZomeDef::Wasm(WasmZome { wasm_hash, .. }) => Ok(wasm_hash.clone()),
             #[cfg(feature = "full-dna-def")]
-            ZomeDef::Inline(_) => Err(ZomeError::NonWasmZome(_zome_name.clone())),
+            ZomeDef::Inline { .. } => Err(ZomeError::NonWasmZome(_zome_name.clone())),
         }
+    }
+
+    /// Get the dependencies of this zome.
+    pub fn dependencies(&self) -> &[ZomeName] {
+        match self {
+            ZomeDef::Wasm(WasmZome { dependencies, .. }) => &dependencies[..],
+            #[cfg(feature = "full-dna-def")]
+            ZomeDef::Inline { dependencies, .. } => &dependencies[..],
+        }
+    }
+}
+
+impl IntegrityZomeDef {
+    pub fn wasm_hash(&self, zome_name: &ZomeName) -> ZomeResult<holo_hash::WasmHash> {
+        self.0.wasm_hash(zome_name)
+    }
+}
+
+impl CoordinatorZomeDef {
+    pub fn wasm_hash(&self, zome_name: &ZomeName) -> ZomeResult<holo_hash::WasmHash> {
+        self.0.wasm_hash(zome_name)
+    }
+}
+
+impl From<ZomeDef> for IntegrityZomeDef {
+    fn from(z: ZomeDef) -> Self {
+        Self(z)
+    }
+}
+
+impl From<ZomeDef> for CoordinatorZomeDef {
+    fn from(z: ZomeDef) -> Self {
+        Self(z)
     }
 }
 
@@ -151,6 +301,20 @@ impl ZomeDef {
 impl<'a> arbitrary::Arbitrary<'a> for ZomeDef {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         Ok(Self::Wasm(WasmZome::arbitrary(u)?))
+    }
+}
+
+#[cfg(feature = "test_utils")]
+impl<'a> arbitrary::Arbitrary<'a> for IntegrityZomeDef {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        Ok(Self(ZomeDef::Wasm(WasmZome::arbitrary(u)?)))
+    }
+}
+
+#[cfg(feature = "test_utils")]
+impl<'a> arbitrary::Arbitrary<'a> for CoordinatorZomeDef {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        Ok(Self(ZomeDef::Wasm(WasmZome::arbitrary(u)?)))
     }
 }
 
@@ -162,18 +326,50 @@ impl<'a> arbitrary::Arbitrary<'a> for ZomeDef {
 pub struct WasmZome {
     /// The WasmHash representing the WASM byte code for this zome.
     pub wasm_hash: holo_hash::WasmHash,
+    /// Integrity zomes this zome depends on.
+    pub dependencies: Vec<ZomeName>,
 }
 
 impl WasmZome {
     /// Constructor
     pub fn new(wasm_hash: holo_hash::WasmHash) -> Self {
-        Self { wasm_hash }
+        Self {
+            wasm_hash,
+            dependencies: Default::default(),
+        }
     }
 }
 
 impl ZomeDef {
     /// create a Zome from a holo_hash WasmHash instead of a holo_hash one
     pub fn from_hash(wasm_hash: holo_hash::WasmHash) -> Self {
-        Self::Wasm(WasmZome { wasm_hash })
+        Self::Wasm(WasmZome {
+            wasm_hash,
+            dependencies: Default::default(),
+        })
+    }
+}
+
+impl IntegrityZomeDef {
+    pub fn from_hash(wasm_hash: holo_hash::WasmHash) -> Self {
+        Self(ZomeDef::from_hash(wasm_hash))
+    }
+
+    /// Erase the type of [`ZomeDef`] because you no longer
+    /// need to know if this is an integrity or coordinator def.
+    pub fn erase_type(self) -> ZomeDef {
+        self.0
+    }
+}
+
+impl CoordinatorZomeDef {
+    pub fn from_hash(wasm_hash: holo_hash::WasmHash) -> Self {
+        Self(ZomeDef::from_hash(wasm_hash))
+    }
+
+    /// Erase the type of [`ZomeDef`] because you no longer
+    /// need to know if this is an integrity or coordinator def.
+    pub fn erase_type(self) -> ZomeDef {
+        self.0
     }
 }

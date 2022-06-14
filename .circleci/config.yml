@@ -247,14 +247,16 @@ workflows:
       jobs:
          - merge-release-test
          # - merge-release-test-mac
-         - standard-test
          - standard-test-nextest
          - rustdoc-build-test
          - hc-static-checks
-         - slow-test
          - slow-test-nextest
          - wasm-test
          # - merge-test-mac
+
+         # disable these for now as the cargo native test runner is unreliable for us
+         # - standard-test
+         # - slow-test
          - ci-jobs-succeed:
               requires:
                  - standard-test-nextest

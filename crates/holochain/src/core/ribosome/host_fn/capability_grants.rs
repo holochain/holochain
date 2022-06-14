@@ -1,6 +1,6 @@
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 
 /// list all the grants stored locally in the chain filtered by tag
@@ -9,7 +9,7 @@ pub fn capability_grants(
     _ribosome: Arc<impl RibosomeT>,
     _call_context: Arc<CallContext>,
     _input: (),
-) -> Result<(), WasmError> {
+) -> Result<(), RuntimeError> {
     unimplemented!();
 }
 
@@ -58,7 +58,7 @@ pub mod wasm_test {
         assert_eq!(entry_secret, secret);
     }
 
-    // MAYBE: [ B-03669 ] can move this to an integration test (may need to switch to using a DnaStore)
+    // MAYBE: [ B-03669 ] can move this to an integration test (may need to switch to using a RibosomeStore)
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_authorized_call() -> anyhow::Result<()> {
         observability::test_run().ok();

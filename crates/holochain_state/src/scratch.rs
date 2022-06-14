@@ -34,7 +34,7 @@ use holochain_zome_types::ScheduledFn;
 /// Cascade.
 #[derive(Debug, Clone, Default)]
 pub struct Scratch {
-    zomed_headers: Vec<(Option<Zome>, SignedHeaderHashed)>,
+    headers: Vec<SignedHeaderHashed>,
     entries: HashMap<EntryHash, Arc<Entry>>,
     chain_top_ordering: ChainTopOrdering,
     scheduled_fns: Vec<ScheduledFn>,
@@ -75,29 +75,24 @@ impl Scratch {
         }
     }
 
-    pub fn add_header(
-        &mut self,
-        zome: Option<Zome>,
-        item: SignedHeaderHashed,
-        chain_top_ordering: ChainTopOrdering,
-    ) {
+    pub fn add_header(&mut self, item: SignedHeaderHashed, chain_top_ordering: ChainTopOrdering) {
         self.respect_chain_top_ordering(chain_top_ordering);
         let seq = item.header().header_seq();
         match &mut self.chain_head {
             Some((h, i)) => {
                 if seq > *h {
                     *h = seq;
-                    *i = self.zomed_headers.len();
+                    *i = self.headers.len();
                 }
             }
-            h @ None => *h = Some((seq, self.zomed_headers.len())),
+            h @ None => *h = Some((seq, self.headers.len())),
         }
-        self.zomed_headers.push((zome, item));
+        self.headers.push(item);
     }
 
     pub fn chain_head(&self) -> Option<(HeaderHash, u32, Timestamp)> {
         self.chain_head.as_ref().and_then(|(_, i)| {
-            self.zomed_headers.get(*i).map(|(_, h)| {
+            self.headers.get(*i).map(|h| {
                 (
                     h.header_address().clone(),
                     h.header().header_seq(),
@@ -114,13 +109,7 @@ impl Scratch {
     }
 
     pub fn as_filter(&self, f: impl Fn(&SignedHeaderHashed) -> bool) -> FilteredScratch {
-        let headers = self
-            .zomed_headers
-            .iter()
-            .map(|(_zome, shh)| shh)
-            .filter(|&shh| f(shh))
-            .cloned()
-            .collect();
+        let headers = self.headers.iter().filter(|&shh| f(shh)).cloned().collect();
         FilteredScratch { headers }
     }
 
@@ -129,19 +118,19 @@ impl Scratch {
     }
 
     pub fn len(&self) -> usize {
-        self.zomed_headers.len()
+        self.headers.len()
     }
 
     pub fn is_empty(&self) -> bool {
-        self.zomed_headers.is_empty() && self.scheduled_fns.is_empty()
+        self.headers.is_empty() && self.scheduled_fns.is_empty()
     }
 
     pub fn headers(&self) -> impl Iterator<Item = &SignedHeaderHashed> {
-        self.zomed_headers.iter().map(|(_zome, shh)| shh)
+        self.headers.iter()
     }
 
     pub fn elements(&self) -> impl Iterator<Item = Element> + '_ {
-        self.zomed_headers.iter().cloned().map(move |(_, shh)| {
+        self.headers.iter().cloned().map(move |shh| {
             let entry = shh
                 .header()
                 .entry_hash()
@@ -156,7 +145,7 @@ impl Scratch {
     }
 
     pub fn num_headers(&self) -> usize {
-        self.zomed_headers.len()
+        self.headers.len()
     }
 
     fn get_exact_element(
@@ -196,11 +185,9 @@ impl Scratch {
     }
 
     /// Drain out all the headers.
-    pub fn drain_zomed_headers(
-        &mut self,
-    ) -> impl Iterator<Item = (Option<Zome>, SignedHeaderHashed)> + '_ {
+    pub fn drain_headers(&mut self) -> impl Iterator<Item = SignedHeaderHashed> + '_ {
         self.chain_head = None;
-        self.zomed_headers.drain(..)
+        self.headers.drain(..)
     }
 
     /// Drain out all the entries.

@@ -1,12 +1,10 @@
 #![cfg(feature = "test_utils")]
 
-use std::sync::Arc;
-
 use ::fixt::prelude::*;
 use hdk::prelude::*;
 use holochain::{
     conductor::api::error::ConductorApiResult,
-    sweettest::{SweetAgents, SweetConductor, SweetDnaFile},
+    sweettest::{SweetAgents, SweetConductor, SweetDnaFile, SweetEasyInline},
 };
 use holochain::{
     conductor::{api::error::ConductorApiError, CellError},
@@ -19,7 +17,7 @@ use holochain::{
 use holochain::{core::SourceChainError, test_utils::display_agent_infos};
 use holochain_keystore::MetaLairClient;
 use holochain_state::prelude::{fresh_reader_test, StateMutationError, Store, Txn};
-use holochain_types::prelude::*;
+use holochain_types::{inline_zome::InlineZomeSet, prelude::*};
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::{element::ElementEntry, op::Op};
 use matches::assert_matches;
@@ -47,26 +45,26 @@ impl AppString {
 }
 
 /// An InlineZome with simple Create and Read operations
-fn simple_crud_zome() -> InlineZome {
+fn simple_crud_zome() -> InlineZomeSet {
     let string_entry_def = EntryDef::default_with_id("string");
     let unit_entry_def = EntryDef::default_with_id("unit");
 
-    InlineZome::new_unique(vec![string_entry_def.clone(), unit_entry_def.clone()])
+    SweetEasyInline::new(vec![string_entry_def.clone(), unit_entry_def.clone()], 0)
         .callback("create_string", move |api, s: AppString| {
-            let entry_def_id: EntryDefId = string_entry_def.id.clone();
             let entry = Entry::app(AppString::from(s).try_into().unwrap()).unwrap();
             let hash = api.create(CreateInput::new(
-                entry_def_id,
+                InlineZomeSet::get_entry_location(&api, 0),
+                EntryVisibility::Public,
                 entry,
                 ChainTopOrdering::default(),
             ))?;
             Ok(hash)
         })
         .callback("create_unit", move |api, ()| {
-            let entry_def_id: EntryDefId = unit_entry_def.id.clone();
             let entry = Entry::app(().try_into().unwrap()).unwrap();
             let hash = api.create(CreateInput::new(
-                entry_def_id,
+                InlineZomeSet::get_entry_location(&api, 1),
+                EntryVisibility::Public,
                 entry,
                 ChainTopOrdering::default(),
             ))?;
@@ -88,6 +86,7 @@ fn simple_crud_zome() -> InlineZome {
             api.emit_signal(AppSignal::new(ExternIO::encode(()).unwrap()))
                 .map_err(Into::into)
         })
+        .0
 }
 
 /// Simple scenario involving two agents using the same DNA
@@ -95,7 +94,7 @@ fn simple_crud_zome() -> InlineZome {
 #[cfg(feature = "test_utils")]
 async fn inline_zome_2_agents_1_dna() -> anyhow::Result<()> {
     // Bundle the single zome into a DnaFile
-    let (dna_file, _) = SweetDnaFile::unique_from_inline_zome("zome1", simple_crud_zome()).await?;
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await?;
 
     // Create a Conductor
     let mut conductor = SweetConductor::from_standard_config().await;
@@ -113,7 +112,7 @@ async fn inline_zome_2_agents_1_dna() -> anyhow::Result<()> {
 
     // Call the "create" zome fn on Alice's app
     let hash: HeaderHash = conductor
-        .call(&alice.zome("zome1"), "create_unit", ())
+        .call(&alice.zome(SweetEasyInline::COORDINATOR), "create_unit", ())
         .await;
 
     // Wait long enough for Bob to receive gossip
@@ -124,7 +123,9 @@ async fn inline_zome_2_agents_1_dna() -> anyhow::Result<()> {
     .await;
 
     // Verify that bobbo can run "read" on his cell and get alice's Header
-    let elements: Vec<Option<Element>> = conductor.call(&bobbo.zome("zome1"), "read", hash).await;
+    let elements: Vec<Option<Element>> = conductor
+        .call(&bobbo.zome(SweetEasyInline::COORDINATOR), "read", hash)
+        .await;
     let element = elements
         .into_iter()
         .next()
@@ -148,8 +149,8 @@ async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
     observability::test_run().ok();
     let mut conductor = SweetConductor::from_standard_config().await;
 
-    let (dna_foo, _) = SweetDnaFile::unique_from_inline_zome("foozome", simple_crud_zome()).await?;
-    let (dna_bar, _) = SweetDnaFile::unique_from_inline_zome("barzome", simple_crud_zome()).await?;
+    let (dna_foo, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await?;
+    let (dna_bar, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await?;
 
     let agents = SweetAgents::get(conductor.keystore(), 3).await;
 
@@ -169,10 +170,18 @@ async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
     // END SETUP
 
     let hash_foo: HeaderHash = conductor
-        .call(&alice_foo.zome("foozome"), "create_unit", ())
+        .call(
+            &alice_foo.zome(SweetEasyInline::COORDINATOR),
+            "create_unit",
+            (),
+        )
         .await;
     let hash_bar: HeaderHash = conductor
-        .call(&alice_bar.zome("barzome"), "create_unit", ())
+        .call(
+            &alice_bar.zome(SweetEasyInline::COORDINATOR),
+            "create_unit",
+            (),
+        )
         .await;
 
     // Two different DNAs, so HeaderHashes should be different.
@@ -190,7 +199,11 @@ async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
     // Verify that bobbo can run "read" on his cell and get alice's Header
     // on the "foo" DNA
     let elements: Vec<Option<Element>> = conductor
-        .call(&bobbo_foo.zome("foozome"), "read", hash_foo)
+        .call(
+            &bobbo_foo.zome(SweetEasyInline::COORDINATOR),
+            "read",
+            hash_foo,
+        )
         .await;
     let element = elements
         .into_iter()
@@ -207,7 +220,11 @@ async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
     // on the "bar" DNA
     // Let's do it with the SweetZome instead of the SweetCell too, for fun
     let elements: Vec<Option<Element>> = conductor
-        .call(&carol_bar.zome("barzome"), "read", hash_bar)
+        .call(
+            &carol_bar.zome(SweetEasyInline::COORDINATOR),
+            "read",
+            hash_bar,
+        )
         .await;
     let element = elements
         .into_iter()
@@ -231,8 +248,8 @@ async fn invalid_cell() -> anyhow::Result<()> {
     observability::test_run().ok();
     let mut conductor = SweetConductor::from_standard_config().await;
 
-    let (dna_foo, _) = SweetDnaFile::unique_from_inline_zome("foozome", simple_crud_zome()).await?;
-    let (dna_bar, _) = SweetDnaFile::unique_from_inline_zome("barzome", simple_crud_zome()).await?;
+    let (dna_foo, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await?;
+    let (dna_bar, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await?;
 
     // let agents = SweetAgents::get(conductor.keystore(), 2).await;
 
@@ -260,7 +277,7 @@ async fn invalid_cell() -> anyhow::Result<()> {
 async fn get_deleted() -> anyhow::Result<()> {
     observability::test_run().ok();
     // Bundle the single zome into a DnaFile
-    let (dna_file, _) = SweetDnaFile::unique_from_inline_zome("zome1", simple_crud_zome()).await?;
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await?;
 
     // Create a Conductor
     let mut conductor = SweetConductor::from_config(Default::default()).await;
@@ -278,14 +295,18 @@ async fn get_deleted() -> anyhow::Result<()> {
 
     // Call the "create" zome fn on Alice's app
     let hash: HeaderHash = conductor
-        .call(&alice.zome("zome1"), "create_unit", ())
+        .call(&alice.zome(SweetEasyInline::COORDINATOR), "create_unit", ())
         .await;
     let mut expected_count = WaitOps::start() + WaitOps::ENTRY;
 
     wait_for_integration_1m(alice.dht_db(), expected_count).await;
 
     let elements: Vec<Option<Element>> = conductor
-        .call(&alice.zome("zome1"), "read", hash.clone())
+        .call(
+            &alice.zome(SweetEasyInline::COORDINATOR),
+            "read",
+            hash.clone(),
+        )
         .await;
     let element = elements
         .into_iter()
@@ -301,14 +322,22 @@ async fn get_deleted() -> anyhow::Result<()> {
     let entry_hash = element.header().entry_hash().unwrap();
 
     let _: HeaderHash = conductor
-        .call(&alice.zome("zome1"), "delete", hash.clone())
+        .call(
+            &alice.zome(SweetEasyInline::COORDINATOR),
+            "delete",
+            hash.clone(),
+        )
         .await;
 
     expected_count += WaitOps::DELETE;
     wait_for_integration_1m(alice.dht_db(), expected_count).await;
 
     let elements: Vec<Option<Element>> = conductor
-        .call(&alice.zome("zome1"), "read_entry", entry_hash)
+        .call(
+            &alice.zome(SweetEasyInline::COORDINATOR),
+            "read_entry",
+            entry_hash,
+        )
         .await;
     assert!(elements.into_iter().next().unwrap().is_none());
 
@@ -321,12 +350,12 @@ async fn signal_subscription() {
     observability::test_run().ok();
     const N: usize = 10;
 
-    let (dna_file, _) = SweetDnaFile::unique_from_inline_zome("zome1", simple_crud_zome())
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome())
         .await
         .unwrap();
     let mut conductor = SweetConductor::from_config(Default::default()).await;
     let app = conductor.setup_app("app", &[dna_file]).await.unwrap();
-    let zome = &app.cells()[0].zome("zome1");
+    let zome = &app.cells()[0].zome(SweetEasyInline::COORDINATOR);
 
     let signals = conductor.signals().take(N);
 
@@ -341,15 +370,15 @@ async fn signal_subscription() {
 }
 
 /// Simple zome which contains a validation rule which can fail
-fn simple_validation_zome() -> InlineZome {
+fn simple_validation_zome() -> InlineZomeSet {
     let entry_def = EntryDef::default_with_id("string");
 
-    InlineZome::new_unique(vec![entry_def.clone()])
+    SweetEasyInline::new(vec![entry_def.clone()], 0)
         .callback("create", move |api, s: AppString| {
-            let entry_def_id: EntryDefId = entry_def.id.clone();
             let entry = Entry::app(s.try_into().unwrap()).unwrap();
             let hash = api.create(CreateInput::new(
-                entry_def_id,
+                InlineZomeSet::get_entry_location(&api, 0),
+                EntryVisibility::Public,
                 entry,
                 ChainTopOrdering::default(),
             ))?;
@@ -359,7 +388,7 @@ fn simple_validation_zome() -> InlineZome {
             api.get(vec![GetInput::new(hash.into(), GetOptions::default())])
                 .map_err(Into::into)
         })
-        .callback("validate", |_api, data: Op| {
+        .integrity_callback("validate", |_api, data: Op| {
             let s = match data {
                 Op::StoreEntry {
                     entry: Entry::App(bytes),
@@ -373,22 +402,21 @@ fn simple_validation_zome() -> InlineZome {
                 Ok(ValidateResult::Valid)
             }
         })
+        .0
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn simple_validation() -> anyhow::Result<()> {
-    let (dna_file, _) =
-        SweetDnaFile::unique_from_inline_zome("zome", simple_validation_zome()).await?;
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_validation_zome()).await?;
     let mut conductor = SweetConductor::from_standard_config().await;
     let (alice, bobbo) = SweetAgents::two(conductor.keystore()).await;
     let apps = conductor
         .setup_app_for_agents("app", &[alice.clone(), bobbo.clone()], &[dna_file])
         .await
         .unwrap();
-    let ((alice,), (bobbo,)) = apps.into_tuples();
+    let ((alice,), (_bobbo,)) = apps.into_tuples();
 
-    let alice = alice.zome("zome");
-    let _bobbo = bobbo.zome("zome");
+    let alice = alice.zome(SweetEasyInline::COORDINATOR);
 
     // This call passes validation
     let h1: HeaderHash = conductor.call(&alice, "create", AppString::new("A")).await;
@@ -430,16 +458,14 @@ async fn can_call_real_zomes_too() {
 
     let mut conductor = SweetConductor::from_standard_config().await;
     let agent = SweetAgents::one(conductor.keystore()).await;
-    let inline_zome = simple_crud_zome();
-    let (dna, _) = SweetDnaFile::unique_from_zomes(
-        vec![
-            ("inline".into(), ZomeDef::Inline(Arc::new(inline_zome))),
-            TestWasm::Create.into(),
-        ],
-        vec![TestWasm::Create.into()],
-    )
-    .await
-    .unwrap();
+    let (mut integrity, mut coordinator) = simple_crud_zome().into_zomes();
+    integrity.push(TestWasm::Create.into());
+    coordinator.push(TestWasm::Create.into());
+
+    let (dna, _, _) =
+        SweetDnaFile::unique_from_zomes(integrity, coordinator, TestWasm::Create.into())
+            .await
+            .unwrap();
 
     let app = conductor
         .setup_app_for_agent("app1", agent.clone(), &[dna.clone()])
@@ -449,7 +475,7 @@ async fn can_call_real_zomes_too() {
     let (cell,) = app.into_tuple();
 
     let hash: HeaderHash = conductor
-        .call(&cell.zome("inline"), "create_unit", ())
+        .call(&cell.zome(SweetEasyInline::COORDINATOR), "create_unit", ())
         .await;
 
     let el: Option<Element> = conductor
@@ -461,7 +487,7 @@ async fn can_call_real_zomes_too() {
 #[tokio::test(flavor = "multi_thread")]
 /// Test that elements can be manually inserted into a source chain.
 async fn insert_source_chain() {
-    let (dna_file, _) = SweetDnaFile::unique_from_inline_zome("zome", simple_crud_zome())
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome())
         .await
         .unwrap();
     let mut conductor = SweetConductor::from_standard_config().await;
@@ -471,7 +497,7 @@ async fn insert_source_chain() {
         .unwrap();
     let (alice,) = apps.into_tuple();
 
-    let zome = alice.zome("zome");
+    let zome = alice.zome(SweetEasyInline::COORDINATOR);
 
     // Trigger init.
     let _: Vec<Option<Element>> = conductor
@@ -517,11 +543,7 @@ async fn insert_source_chain() {
         timestamp: Timestamp::now(),
         header_seq: 4,
         prev_header: chain.last().unwrap().0.clone(),
-        entry_type: EntryType::App(AppEntryType::new(
-            1.into(),
-            0.into(),
-            EntryVisibility::Public,
-        )),
+        entry_type: EntryType::App(AppEntryType::new(1.into(), EntryVisibility::Public)),
         entry_hash: EntryHash::with_data_sync(&entry),
         weight: Default::default(),
     };
@@ -701,7 +723,7 @@ async fn make_element(keystore: &MetaLairClient, header: Header) -> Element {
 #[tokio::test(flavor = "multi_thread")]
 async fn call_non_existing_zome_fails_gracefully() -> anyhow::Result<()> {
     // Bundle the single zome into a DnaFile
-    let (dna_file, _) = SweetDnaFile::unique_from_inline_zome("zome1", simple_crud_zome()).await?;
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await?;
 
     // Create a Conductor
     let mut conductor = SweetConductor::from_standard_config().await;

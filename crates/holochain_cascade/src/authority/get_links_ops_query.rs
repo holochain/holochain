@@ -9,19 +9,20 @@ use holochain_types::dht_op::DhtOpType;
 use holochain_types::link::WireCreateLink;
 use holochain_types::link::WireDeleteLink;
 use holochain_types::link::WireLinkOps;
+use holochain_types::sql::ToSqlStatement;
 use holochain_zome_types::HasValidationStatus;
 use holochain_zome_types::Header;
 use holochain_zome_types::Judged;
 use holochain_zome_types::LinkTag;
+use holochain_zome_types::LinkTypeRanges;
 use holochain_zome_types::SignedHeader;
-use holochain_zome_types::ZomeId;
 
 use super::WireLinkKey;
 
 #[derive(Debug, Clone)]
 pub struct GetLinksOpsQuery {
     base: Arc<AnyLinkableHash>,
-    zome_id: ZomeId,
+    type_query: Option<LinkTypeRanges>,
     tag: Option<Arc<LinkTag>>,
 }
 
@@ -29,7 +30,7 @@ impl GetLinksOpsQuery {
     pub fn new(key: WireLinkKey) -> Self {
         Self {
             base: Arc::new(key.base),
-            zome_id: key.zome_id,
+            type_query: key.type_query,
             tag: key.tag.map(Arc::new),
         }
     }
@@ -62,30 +63,37 @@ impl Query for GetLinksOpsQuery {
         let sub_create = "
             SELECT Header.hash FROM DhtOp
         ";
-        let common = "
+        let mut common_query = "
             JOIN Header On DhtOp.header_hash = Header.hash
             WHERE DhtOp.type = :create
             AND
             Header.base_hash = :base_hash
             AND
-            Header.zome_id = :zome_id
-            AND
             DhtOp.when_integrated IS NOT NULL
-        ";
-        let common_query = match &self.tag {
-            Some(tag) => {
-                let tag = Self::tag_to_hex(tag.as_ref());
-                format!(
-                    "
+        "
+        .to_string();
+
+        if let Some(tag) = &self.tag {
+            let tag = Self::tag_to_hex(tag.as_ref());
+            common_query = format!(
+                "
                     {}
                     AND
                     HEX(Header.tag) LIKE '{}%'
                 ",
-                    common, tag
-                )
-            }
-            None => common.into(),
-        };
+                common_query, tag
+            );
+        }
+        if let Some(ranges) = &self.type_query {
+            common_query = format!(
+                "
+                {}
+                {}
+                ",
+                common_query,
+                ranges.to_sql_statement(),
+            );
+        }
         let create_query = format!("{}{}", create, common_query);
         let sub_create_query = format!("{}{}", sub_create, common_query);
         let delete_query = format!(
@@ -106,13 +114,10 @@ impl Query for GetLinksOpsQuery {
     }
 
     fn params(&self) -> Vec<Params> {
-        {
-            named_params! {
-                ":create": DhtOpType::RegisterAddLink,
-                ":delete": DhtOpType::RegisterRemoveLink,
-                ":base_hash": self.base,
-                ":zome_id": *self.zome_id,
-            }
+        named_params! {
+            ":create": DhtOpType::RegisterAddLink,
+            ":delete": DhtOpType::RegisterRemoveLink,
+            ":base_hash": self.base,
         }
         .to_vec()
     }

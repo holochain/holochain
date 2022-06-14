@@ -27,7 +27,7 @@ use std::time::Duration;
 async fn app_validation_workflow_test() {
     observability::test_run().ok();
 
-    let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![
+    let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![
         TestWasm::Validate,
         TestWasm::ValidateLink,
         TestWasm::Create,
@@ -269,8 +269,13 @@ async fn run_test(
         assert_eq!(num_valid(&txn), expected_count - 1);
     });
 
-    let invocation =
-        new_invocation(&bob_cell_id, "add_invalid_link", (), TestWasm::ValidateLink).unwrap();
+    let invocation = new_invocation(
+        &bob_cell_id,
+        "add_invalid_link",
+        (),
+        TestWasm::ValidateLink.coordinator_zome(),
+    )
+    .unwrap();
     let invalid_link_hash: HeaderHash =
         call_zome_directly(&bob_cell_id, &conductors[1].handle(), dna_file, invocation)
             .await
@@ -301,7 +306,7 @@ async fn run_test(
         &bob_cell_id,
         "remove_valid_link",
         (),
-        TestWasm::ValidateLink,
+        TestWasm::ValidateLink.coordinator_zome(),
     )
     .unwrap();
     call_zome_directly(&bob_cell_id, &conductors[1].handle(), dna_file, invocation).await;
@@ -330,7 +335,7 @@ async fn run_test(
         &bob_cell_id,
         "remove_invalid_link",
         (),
-        TestWasm::ValidateLink,
+        TestWasm::ValidateLink.coordinator_zome(),
     )
     .unwrap();
     let invalid_remove_hash: HeaderHash =
@@ -416,7 +421,11 @@ async fn commit_invalid(
     let call_data = HostFnCaller::create(bob_cell_id, handle, dna_file).await;
     // 4
     let invalid_header_hash = call_data
-        .commit_entry(entry.clone().try_into().unwrap(), INVALID_ID)
+        .commit_entry(
+            entry.clone().try_into().unwrap(),
+            EntryDefIndex(0),
+            EntryVisibility::Public,
+        )
         .await;
 
     // Produce and publish these commits
@@ -437,9 +446,14 @@ async fn commit_invalid_post(
     let entry_hash = EntryHash::with_data_sync(&Entry::try_from(entry.clone()).unwrap());
     // Create call data for the 3rd zome Create
     let call_data = HostFnCaller::create_for_zome(bob_cell_id, handle, dna_file, 2).await;
+    let entry_index = call_data.get_entry_type(TestWasm::Create, POST_INDEX);
     // 9
     let invalid_header_hash = call_data
-        .commit_entry(entry.clone().try_into().unwrap(), POST_ID)
+        .commit_entry(
+            entry.clone().try_into().unwrap(),
+            entry_index,
+            EntryVisibility::Public,
+        )
         .await;
 
     // Produce and publish these commits
