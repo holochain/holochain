@@ -1,3 +1,4 @@
+use crate::core::ribosome::weigh_placeholder;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
@@ -26,7 +27,7 @@ pub fn create<'a>(
                 chain_top_ordering,
             } = input;
 
-            let weight = todo!("weigh element");
+            let weight = weigh_placeholder();
 
             // Countersigned entries have different header handling.
             match entry {
