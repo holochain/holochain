@@ -475,8 +475,6 @@ jobs:
 
           git push origin main
 
-          git push origin main --tags
-
       - name: Push the release branch
         run: |
           source ${HOLOCHAIN_RELEASE_SH}
@@ -534,6 +532,19 @@ jobs:
               release \
                 --steps=PublishToCratesIo,AddOwnersToCratesIo
             '
+
+      - name: Push the tags
+        if: ${{ needs.vars.outputs.dry_run == 'false' }}
+        run: |
+          set -e
+          source ${HOLOCHAIN_RELEASE_SH}
+          cd "${HOLOCHAIN_REPO}"
+
+          git status
+
+          # TODO: double-check if the branch needs to be changed here
+
+          git push origin main --tags
 
       - name: Create a github release
         if: ${{ needs.vars.outputs.dry_run == 'false' }}
