@@ -71,7 +71,6 @@ pub fn x_salsa20_poly1305_shared_secret_ingest(
 ///  - Wasm memory is NOT secure, a compromised host can steal the key.
 ///  - The key is SECRET, anyone with the key and nonce can read the encrypted message.
 ///  - The nonce is PUBLIC and UNIQUE, it must NEVER be re-used (so we don't allow it to be set).
-///  - It is STRONGLY RECOMMENDED to use [ `TryFromRandom` ] for the key for every message.
 ///  - Secretbox is designed for 'small' data, break large data into chunks with unique nonces.
 ///  - Secretbox is NOT quantum resistant.
 ///
