@@ -75,16 +75,17 @@ pub mod wasm_test {
     #[cfg(feature = "test_utils")]
     async fn invoke_import_xsalsa20_poly1305_encrypt_test() {
         observability::test_run().ok();
+
+        const KEYLEN: usize = 32;
+
         let RibosomeTestFixture {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::XSalsa20Poly1305).await;
 
-        let key_ref = XSalsa20Poly1305KeyRef::from(
-            [1; holochain_zome_types::x_salsa20_poly1305::key_ref::KEY_REF_BYTES],
-        );
+        let key_ref = XSalsa20Poly1305KeyRef::from([1; KEYLEN]);
         let data = XSalsa20Poly1305Data::from(vec![1, 2, 3, 4]);
         let input = holochain_zome_types::x_salsa20_poly1305::XSalsa20Poly1305Encrypt::new(
-            key_ref,
+            key_ref.clone(),
             data.clone(),
         );
         let output: XSalsa20Poly1305EncryptedData = conductor
@@ -103,7 +104,7 @@ pub mod wasm_test {
             .await;
         assert_eq!(&decrypt_output, &Some(data),);
 
-        let bad_key_ref = XSalsa20Poly1305KeyRef::from([2; 32]);
+        let bad_key_ref = XSalsa20Poly1305KeyRef::from([2; KEYLEN]);
         let bad_output: Option<XSalsa20Poly1305Data> = conductor
             .call(
                 &alice,
