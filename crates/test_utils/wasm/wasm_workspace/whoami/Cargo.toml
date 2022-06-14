@@ -8,6 +8,11 @@ edition = "2021"
 name = "test_wasm_whoami"
 crate-type = [ "cdylib", "rlib" ]
 
+[[example]]
+name = "integrity_test_wasm_whoami"
+path = "src/integrity.rs"
+crate-type = ["cdylib", "rlib"]
+
 [dependencies]
 hdk = { path = "../../../../hdk" }
 holochain_test_wasm_common = { path = "../../../wasm_common" }

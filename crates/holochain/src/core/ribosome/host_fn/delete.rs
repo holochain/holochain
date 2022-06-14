@@ -3,7 +3,7 @@ use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_cascade::error::CascadeError;
 use holochain_cascade::Cascade;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 
 use crate::core::ribosome::HostFnAccess;
 use holo_hash::EntryHash;
@@ -16,7 +16,7 @@ pub fn delete<'a>(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: DeleteInput,
-) -> Result<HeaderHash, WasmError> {
+) -> Result<HeaderHash, RuntimeError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess {
             write_workspace: Permission::Allow,
@@ -26,8 +26,8 @@ pub fn delete<'a>(
                 deletes_header_hash,
                 chain_top_ordering,
             } = input;
-            let deletes_entry_address =
-                get_original_address(call_context.clone(), deletes_header_hash.clone())?;
+            let (deletes_entry_address, _) =
+                get_original_entry_data(call_context.clone(), deletes_header_hash.clone())?;
 
             let host_access = call_context.host_context();
 
@@ -43,35 +43,30 @@ pub fn delete<'a>(
                     deletes_entry_address,
                 };
                 let header_hash = source_chain
-                    .put_weightless(
-                        Some(call_context.zome.clone()),
-                        header_builder,
-                        None,
-                        chain_top_ordering,
-                    )
+                    .put_weightless(header_builder, None, chain_top_ordering)
                     .await
                     .map_err(|source_chain_error| {
-                        WasmError::Host(source_chain_error.to_string())
+                        wasm_error!(WasmErrorInner::Host(source_chain_error.to_string()))
                     })?;
                 Ok(header_hash)
             })
         }
-        _ => Err(WasmError::Host(
+        _ => Err(wasm_error!(WasmErrorInner::Host(
             RibosomeError::HostFnPermissions(
                 call_context.zome.zome_name().clone(),
                 call_context.function_name().clone(),
                 "delete".into(),
             )
             .to_string(),
-        )),
+        ))
+        .into()),
     }
 }
 
-#[allow(clippy::extra_unused_lifetimes)]
-pub(crate) fn get_original_address<'a>(
+pub(crate) fn get_original_entry_data(
     call_context: Arc<CallContext>,
     address: HeaderHash,
-) -> Result<EntryHash, WasmError> {
+) -> Result<(EntryHash, EntryType), WasmError> {
     let network = call_context.host_context.network().clone();
     let workspace = call_context.host_context.workspace();
 
@@ -94,16 +89,19 @@ pub(crate) fn get_original_address<'a>(
             .transpose()?;
 
         match maybe_original_element {
-            Some(original_element_signed_header_hash) => {
-                match original_element_signed_header_hash.header().entry_data() {
-                    Some((entry_hash, _)) => Ok(entry_hash.clone()),
-                    _ => Err(RibosomeError::ElementDeps(address.into())),
-                }
-            }
+            Some(SignedHeaderHashed {
+                hashed: HeaderHashed {
+                    content: header, ..
+                },
+                ..
+            }) => match header.into_entry_data() {
+                Some((entry_hash, entry_type)) => Ok((entry_hash, entry_type)),
+                _ => Err(RibosomeError::ElementDeps(address.into())),
+            },
             None => Err(RibosomeError::ElementDeps(address.into())),
         }
     })
-    .map_err(|ribosome_error| WasmError::Host(ribosome_error.to_string()))
+    .map_err(|ribosome_error| wasm_error!(WasmErrorInner::Host(ribosome_error.to_string())))
 }
 
 #[cfg(test)]
@@ -128,7 +126,9 @@ pub mod wasm_test {
             None => unreachable!(),
         }
 
-        let _: HeaderHash = conductor.call(&alice, "delete_via_hash", thing_a.clone()).await;
+        let _: HeaderHash = conductor
+            .call(&alice, "delete_via_hash", thing_a.clone())
+            .await;
 
         let get_thing: Option<Element> = conductor.call(&alice, "reed", thing_a).await;
         match get_thing {

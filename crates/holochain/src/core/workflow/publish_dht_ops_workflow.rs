@@ -361,7 +361,6 @@ mod tests {
                 let keystore = holochain_state::test_utils::test_keystore();
                 let dht_db = test_dht_db();
                 let db = test_db.to_db();
-                let zome = fixt!(Zome);
 
                 let dna = fixt!(DnaHash);
                 let filter_events = |evt: &_| match evt {
@@ -415,7 +414,6 @@ mod tests {
                 // Produces 3 ops but minus 1 for store entry so 2 ops.
                 let original_header_address = source_chain
                     .put_weightless(
-                        Some(zome.clone()),
                         builder::Create {
                             entry_type: ec_entry_type,
                             entry_hash: original_entry_hash.clone(),
@@ -429,7 +427,6 @@ mod tests {
                 // Produces 5 ops but minus 1 for store entry so 4 ops.
                 let entry_update_hash = source_chain
                     .put_weightless(
-                        Some(zome.clone()),
                         builder::Update {
                             entry_type: eu_entry_type,
                             entry_hash: new_entry_hash,

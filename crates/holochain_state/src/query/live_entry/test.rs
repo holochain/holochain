@@ -5,7 +5,6 @@ use holochain_sqlite::schema::SCHEMA_CELL;
 use crate::mutations::insert_op_scratch;
 use crate::prelude::mutations_helpers::insert_valid_integrated_op;
 use crate::query::test_data::EntryTestData;
-use ::fixt::prelude::*;
 
 use super::*;
 
@@ -15,7 +14,6 @@ async fn can_handle_update_in_scratch() {
     let mut scratch = Scratch::new();
     let mut conn = Connection::open_in_memory().unwrap();
     SCHEMA_CELL.initialize(&mut conn, None).unwrap();
-    let zome = fixt!(Zome);
 
     let mut txn = conn
         .transaction_with_behavior(TransactionBehavior::Exclusive)
@@ -36,7 +34,6 @@ async fn can_handle_update_in_scratch() {
     // - Add to the scratch
     insert_op_scratch(
         &mut scratch,
-        Some(zome),
         td.update_store_entry_op.clone(),
         ChainTopOrdering::default(),
     )

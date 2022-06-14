@@ -166,7 +166,7 @@ impl Consumer {
 
 async fn setup() -> (Producer, Consumer, Others) {
     let (tx, rx) = tokio::sync::mpsc::channel(1);
-    let (dna, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Anchor])
+    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Anchor])
         .await
         .unwrap();
     let config = || {

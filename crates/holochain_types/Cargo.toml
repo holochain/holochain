@@ -1,6 +1,6 @@
 [package]
 name = "holochain_types"
-version = "0.0.40"
+version = "0.0.41"
 description = "Holochain common types"
 license-file = "LICENSE_CAL-1.0"
 homepage = "https://github.com/holochain/holochain"
@@ -25,7 +25,7 @@ fixt = { path = "../fixt", version = "0.0.11"}
 flate2 = "1.0.14"
 futures = "0.3"
 holo_hash = { version = "0.0.27", path = "../holo_hash", features = ["encoding"] }
-holochain_keystore = { version = "0.0.40", path = "../holochain_keystore" }
+holochain_keystore = { version = "0.0.41", path = "../holochain_keystore" }
 holochain_serialized_bytes = "=0.0.51"
 holochain_sqlite = { path = "../holochain_sqlite", version = "0.0.40"}
 holochain_zome_types = { path = "../holochain_zome_types", version = "0.0.35", features = ["full"] }
@@ -43,6 +43,7 @@ rusqlite = { version = "0.26" }
 serde = { version = "1.0", features = [ "derive", "rc" ] }
 serde_bytes = "0.11"
 serde_derive = "1.0"
+serde_with = "1.12.0"
 serde_yaml = "0.8"
 shrinkwraprs = "0.3.0"
 strum = "0.18.0"
@@ -64,7 +65,7 @@ arbitrary = "1.0"
 maplit = "1"
 matches = "0.1"
 serde_json = "1"
-test-case = "1.2.1"
+test-case = "2.1.0"
 tokio = { version = "1.11", features = [ "full" ] }
 
 [features]

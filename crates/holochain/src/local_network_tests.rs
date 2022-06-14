@@ -18,6 +18,7 @@ use holochain_keystore::AgentPubKeyExt;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
+use holochain_wasm_test_utils::TestZomes;
 use holochain_zome_types::ZomeCallResponse;
 use kitsune_p2p::KitsuneP2pConfig;
 use matches::assert_matches;
@@ -32,7 +33,7 @@ use tracing::debug_span;
 #[tokio::test(flavor = "multi_thread")]
 async fn conductors_call_remote(num_conductors: usize) {
     observability::test_run().ok();
-    let (dna, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create])
+    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create])
         .await
         .unwrap();
     let mut conductors = SweetConductorBatch::from_standard_config(num_conductors).await;
@@ -452,7 +453,18 @@ async fn setup(
             uid,
             properties: SerializedBytes::try_from(()).unwrap(),
             origin_time: Timestamp::HOLOCHAIN_EPOCH,
-            zomes: zomes.clone().into_iter().map(Into::into).collect(),
+            integrity_zomes: zomes
+                .clone()
+                .into_iter()
+                .map(TestZomes::from)
+                .map(|z| z.integrity.into_inner())
+                .collect(),
+            coordinator_zomes: zomes
+                .clone()
+                .into_iter()
+                .map(TestZomes::from)
+                .map(|z| z.coordinator.into_inner())
+                .collect(),
         },
         zomes.into_iter().map(Into::into),
     )

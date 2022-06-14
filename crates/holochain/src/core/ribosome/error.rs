@@ -1,4 +1,3 @@
-#![deny(missing_docs)]
 //! Errors occurring during a [`RealRibosome`](crate::core::ribosome::real_ribosome::RealRibosome) call
 
 use crate::conductor::api::error::ConductorApiError;
@@ -8,7 +7,7 @@ use holochain_cascade::error::CascadeError;
 use holochain_serialized_bytes::prelude::SerializedBytesError;
 use holochain_state::source_chain::SourceChainError;
 use holochain_types::prelude::*;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 use holochain_zome_types::inline_zome::error::InlineZomeError;
 use thiserror::Error;
 use tokio::task::JoinError;
@@ -20,9 +19,9 @@ pub enum RibosomeError {
     #[error("Dna error while working with Ribosome: {0}")]
     DnaError(#[from] DnaError),
 
-    /// Wasm error while working with Ribosome.
-    #[error("Wasm error while working with Ribosome: {0}")]
-    WasmError(#[from] WasmError),
+    /// Wasm runtime error while working with Ribosome.
+    #[error("Wasm runtime error while working with Ribosome: {0}")]
+    WasmRuntimeError(#[from] RuntimeError),
 
     /// Serialization error while working with Ribosome.
     #[error("Serialization error while working with Ribosome: {0}")]
@@ -98,6 +97,9 @@ pub enum RibosomeError {
     /// Zome function doesn't have permissions to call a Host function.
     #[error("Host function {2} cannot be called from zome function {1} in zome {0}")]
     HostFnPermissions(ZomeName, FunctionName, String),
+
+    #[error(transparent)]
+    ZomeTypesError(#[from] holochain_types::zome_types::ZomeTypesError),
 }
 
 impl From<xsalsa20poly1305::aead::Error> for RibosomeError {

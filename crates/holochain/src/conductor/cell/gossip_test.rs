@@ -22,7 +22,7 @@ async fn gossip_test() {
             ..Default::default()
         });
     }
-    let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Anchor])
+    let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Anchor])
         .await
         .unwrap();
 
@@ -73,7 +73,7 @@ async fn agent_info_test() {
             ..Default::default()
         });
     }
-    let (dna_file, _) = SweetDnaFile::unique_from_inline_zome("zome1", simple_create_read_zome())
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_create_read_zome())
         .await
         .unwrap();
 

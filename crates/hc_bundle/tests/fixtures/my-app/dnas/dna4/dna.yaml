@@ -1,0 +1,13 @@
+---
+manifest_version: "1"
+name: integrity dna
+integrity:
+  uid: 00000000-0000-0000-0000-000000000000
+  properties: ~
+  zomes:
+    - name: zome1
+      bundled: ../dna2/zomes/zome1.wasm
+coordinator:
+  zomes:
+    - name: zome2
+      bundled: ../dna2/zomes/zome2.wasm
