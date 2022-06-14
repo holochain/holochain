@@ -7,13 +7,13 @@
 
 use crate::header::ChainTopOrdering;
 use holochain_integrity_types::EntryDefIndex;
-use holochain_integrity_types::EntryVisibility;
 use holochain_serialized_bytes::prelude::*;
 
 mod app_entry_bytes;
 pub use app_entry_bytes::*;
 
 pub use holochain_integrity_types::entry::*;
+use holochain_wasmer_common::WasmError;
 
 #[derive(
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
@@ -96,46 +96,35 @@ pub enum GetStrategy {
 /// Zome input to create an entry.
 #[derive(PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct CreateInput {
-    /// The global type index for this entry (if it has one).
-    pub entry_location: EntryDefLocation,
-    /// The visibility of this entry.
-    pub entry_visibility: EntryVisibility,
-    /// Entry body.
-    pub entry: crate::entry::Entry,
+    /// The data for creating this element.
+    pub builder: ElementBuilder,
     /// ChainTopBehaviour for the write.
     pub chain_top_ordering: ChainTopOrdering,
 }
 
 impl CreateInput {
     /// Constructor.
-    pub fn new(
-        entry_location: impl Into<EntryDefLocation>,
-        entry_visibility: EntryVisibility,
-        entry: crate::entry::Entry,
+    pub fn new<E>(
+        builder: impl TryInto<ElementBuilder, Error = E>,
         chain_top_ordering: ChainTopOrdering,
-    ) -> Self {
-        Self {
-            entry_location: entry_location.into(),
-            entry_visibility,
-            entry,
+    ) -> Result<Self, WasmError>
+    where
+        WasmError: From<E>,
+    {
+        Ok(Self {
+            builder: builder.try_into()?,
             chain_top_ordering,
-        }
+        })
     }
 
     /// Consume into an Entry.
     pub fn into_entry(self) -> Entry {
-        self.entry
+        self.builder.into()
     }
 
     /// Accessor.
     pub fn chain_top_ordering(&self) -> &ChainTopOrdering {
         &self.chain_top_ordering
-    }
-}
-
-impl AsRef<crate::Entry> for CreateInput {
-    fn as_ref(&self) -> &crate::Entry {
-        &self.entry
     }
 }
 

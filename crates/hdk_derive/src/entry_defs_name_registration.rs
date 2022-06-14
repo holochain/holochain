@@ -156,6 +156,44 @@ pub fn build(attrs: TokenStream, input: TokenStream) -> TokenStream {
             }
         }
 
+        impl TryFrom<&#ident> for AppEntry {
+            type Error = WasmError;
+
+            fn try_from(value: &#ident) -> Result<Self, Self::Error> {
+                Ok(
+                    AppEntry {
+                        entry_def_index: (&value).try_into()?,
+                        visibility: (&value).try_into()?,
+                        entry: value.try_into()?,
+                    }
+                )
+            }
+        }
+
+        impl TryFrom<#ident> for AppEntry {
+            type Error = WasmError;
+
+            fn try_from(value: #ident) -> Result<Self, Self::Error> {
+                Self::try_from(&value)
+            }
+        }
+
+        impl TryFrom<&#ident> for ElementBuilder {
+            type Error = WasmError;
+
+            fn try_from(value: &#ident) -> Result<Self, Self::Error> {
+                Ok(ElementBuilder::App(value.try_into()?))
+            }
+        }
+
+        impl TryFrom<#ident> for ElementBuilder {
+            type Error = WasmError;
+
+            fn try_from(value: #ident) -> Result<Self, Self::Error> {
+                Self::try_from(&value)
+            }
+        }
+
         impl From<#unit_ident> for EntryVisibility {
             fn from(v: #unit_ident) -> Self {
                 #ident::ENTRY_DEFS[LocalZomeTypeId::from(v).0 as usize].visibility

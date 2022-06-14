@@ -9,6 +9,8 @@ use crate::capability::CapClaim;
 use crate::capability::CapGrant;
 use crate::capability::ZomeCallCapGrant;
 use crate::countersigning::CounterSigningSessionData;
+use crate::EntryDefIndex;
+use crate::EntryVisibility;
 use holo_hash::hash_type;
 use holo_hash::AgentPubKey;
 use holo_hash::EntryHash;
@@ -45,23 +47,58 @@ impl From<EntryHashed> for Entry {
 }
 
 /// Structure holding the entry portion of a chain element.
+pub type Entry = EntryImpl<AppEntryBytes>;
+
+/// Data for building a [`Element`](crate::element::Element).
+pub type ElementBuilder = EntryImpl<AppEntry>;
+
+/// Inner implementation of an [`Entry`].
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[serde(tag = "entry_type", content = "entry")]
-pub enum Entry {
+pub enum EntryImpl<T = AppEntryBytes>
+where
+    T: AppEntryData,
+{
     /// The `Agent` system entry, the third entry of every source chain,
     /// which grants authoring capability for this agent.
     Agent(AgentPubKey),
     /// The application entry data for entries that aren't system created entries
-    App(AppEntryBytes),
+    App(T),
     /// Application entry data for entries that need countersigning to move forward multiple chains together.
-    CounterSign(Box<CounterSigningSessionData>, AppEntryBytes),
+    CounterSign(Box<CounterSigningSessionData>, T),
     /// The capability claim system entry which allows committing a granted permission
     /// for later use
     CapClaim(CapClaimEntry),
     /// The capability grant system entry which allows granting of application defined
     /// capabilities
     CapGrant(CapGrantEntry),
+}
+
+/// A trait that represents the set of types that
+/// can be used as data for an app entry.
+/// This is a sealed trait and **cannot** be implemented
+/// on user defined types.
+pub trait AppEntryData: sealed::Sealed {}
+
+mod sealed {
+    pub trait Sealed {}
+}
+
+impl AppEntryData for AppEntryBytes {}
+impl sealed::Sealed for AppEntryBytes {}
+impl AppEntryData for AppEntry {}
+impl sealed::Sealed for AppEntry {}
+
+#[derive(PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize)]
+/// The data needed to build an [`Entry`] and it's [`Header`](crate::header::Header).
+pub struct AppEntry {
+    /// The global zome type identifier for this entry.
+    pub entry_def_index: EntryDefIndex,
+    /// The visibility for this entry.
+    pub visibility: EntryVisibility,
+    /// The actual data for this entry.
+    pub entry: AppEntryBytes,
 }
 
 impl Entry {
@@ -171,5 +208,17 @@ impl MustGetHeaderInput {
     /// Consumes self for inner.
     pub fn into_inner(self) -> HeaderHash {
         self.0
+    }
+}
+
+impl From<ElementBuilder> for Entry {
+    fn from(b: ElementBuilder) -> Self {
+        match b {
+            EntryImpl::Agent(a) => Entry::Agent(a),
+            EntryImpl::App(a) => Entry::App(a.entry),
+            EntryImpl::CounterSign(c, a) => Entry::CounterSign(c, a.entry),
+            EntryImpl::CapClaim(c) => Entry::CapClaim(c),
+            EntryImpl::CapGrant(g) => Entry::CapGrant(g),
+        }
     }
 }

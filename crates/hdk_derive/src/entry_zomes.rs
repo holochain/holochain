@@ -45,6 +45,20 @@ pub fn build(_attrs: TokenStream, input: TokenStream) -> TokenStream {
         )
         .collect();
 
+    let try_into_app_bytes: proc_macro2::TokenStream = variants
+        .into_iter()
+        .map(
+            |syn::Variant {
+                 ident: v_ident,
+                 fields,
+                 ..
+             }| {
+                get_single_tuple_variant(v_ident, fields);
+                quote::quote! {#ident::#v_ident (v) => AppEntryBytes::try_from(v),}
+            },
+        )
+        .collect();
+
     let into_visibility: proc_macro2::TokenStream = variants
         .into_iter()
         .map(
@@ -80,6 +94,24 @@ pub fn build(_attrs: TokenStream, input: TokenStream) -> TokenStream {
 
             fn try_from(value: #ident) -> Result<Self, Self::Error> {
                 Entry::try_from(&value)
+            }
+        }
+
+        impl TryFrom<&#ident> for AppEntryBytes {
+            type Error = WasmError;
+
+            fn try_from(value: &#ident) -> Result<Self, Self::Error> {
+                match value {
+                    #try_into_app_bytes
+                }
+            }
+        }
+
+        impl TryFrom<#ident> for AppEntryBytes {
+            type Error = WasmError;
+
+            fn try_from(value: #ident) -> Result<Self, Self::Error> {
+                Self::try_from(&value)
             }
         }
 
@@ -121,6 +153,43 @@ pub fn build(_attrs: TokenStream, input: TokenStream) -> TokenStream {
             }
         }
 
+        impl TryFrom<&#ident> for AppEntry {
+            type Error = WasmError;
+
+            fn try_from(value: &#ident) -> Result<Self, Self::Error> {
+                Ok(
+                    AppEntry {
+                        entry_def_index: (&value).try_into()?,
+                        visibility: (&value).try_into()?,
+                        entry: value.try_into()?,
+                    }
+                )
+            }
+        }
+
+        impl TryFrom<#ident> for AppEntry {
+            type Error = WasmError;
+
+            fn try_from(value: #ident) -> Result<Self, Self::Error> {
+                Self::try_from(&value)
+            }
+        }
+
+        impl TryFrom<&#ident> for ElementBuilder {
+            type Error = WasmError;
+
+            fn try_from(value: &#ident) -> Result<Self, Self::Error> {
+                Ok(ElementBuilder::App(value.try_into()?))
+            }
+        }
+
+        impl TryFrom<#ident> for ElementBuilder {
+            type Error = WasmError;
+
+            fn try_from(value: #ident) -> Result<Self, Self::Error> {
+                Self::try_from(&value)
+            }
+        }
         impl EntryTypesHelper for #ident {
             fn try_from_local_type<I>(type_index: I, entry: &Entry) -> Result<Option<Self>, WasmError>
             where
