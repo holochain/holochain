@@ -94,6 +94,9 @@ pub enum RibosomeError {
     #[error("xsalsa20poly1305 error {0}")]
     Aead(String),
 
+    #[error("Can't find zome for entry type: {0:?}")]
+    NoZomeForEntryType(EntryType),
+
     /// ident
     #[error(transparent)]
     SecurePrimitive(#[from] holochain_zome_types::SecurePrimitiveError),

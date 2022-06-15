@@ -520,6 +520,14 @@ impl UnweighedCountersigningHeader {
             Self::Update(h) => &h.entry_hash,
         }
     }
+
+    /// Access the entry type
+    pub fn entry_type(&self) -> &EntryType {
+        match self {
+            Self::Create(h) => &h.entry_type,
+            Self::Update(h) => &h.entry_type,
+        }
+    }
 }
 
 /// All the data required for a countersigning session.
