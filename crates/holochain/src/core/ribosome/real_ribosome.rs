@@ -1015,7 +1015,21 @@ pub mod wasm_test {
         } = RibosomeTestFixture::new(TestWasm::TheIncredibleHalt).await;
 
         // This will run infinitely unless our metering kicks in and traps it.
-        let result: Result<(), _> = conductor.call_fallible(&alice, "smash", ()).await;
-        assert!(result.is_err());
+        // Also we stop it running after 10 seconds.
+        let result: Result<Result<(), _>, _> = tokio::time::timeout(
+            std::time::Duration::from_millis(10000),
+            conductor.call_fallible(&alice, "smash", ()),
+        )
+        .await;
+        assert!(result.unwrap().is_err());
+
+        // The same thing will happen when we commit an entry due to a loop in
+        // the validation logic.
+        let create_result: Result<Result<(), _>, _> = tokio::time::timeout(
+            std::time::Duration::from_millis(10000),
+            conductor.call_fallible(&alice, "create_a_thing", ()),
+        )
+        .await;
+        assert!(create_result.unwrap().is_err());
     }
 }
