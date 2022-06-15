@@ -10,7 +10,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `LinkTypesHelper` helper trait for creating `LinkTypeRanges` that fit the current local scope.
 ### Removed
 - `register_entry!` macro as it is no longer needed. Use `hdk_derive::hdk_entry_defs`.
-### Changed
 
 ## 0.0.8
 
