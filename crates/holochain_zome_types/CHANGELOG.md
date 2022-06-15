@@ -8,7 +8,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Added
 - `ZomeDef` now holds dependencies for the zome.
 - `EntryDefLocation` is either an `EntryDefIndex` or a `CapClaim` or a `CapGrant`.
-### Removed
 ### Changed
 - Zomes are now generic over integrity and coordinator.
 - `ZomeDef` is now wrapped in either `IntegrityZomeDef` or `CoordinatorZomeDef`.
