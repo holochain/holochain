@@ -1,5 +1,17 @@
 use hdk::prelude::*;
 
+enum Zomes {
+    CreateEntry,
+}
+
+impl From<Zomes> for ZomeName {
+    fn from(z: Zomes) -> Self {
+        match z {
+            Zomes::CreateEntry => ZomeName("create_entry".into()),
+        }
+    }
+}
+
 #[hdk_extern]
 fn set_access(_: ()) -> ExternResult<()> {
     let mut functions: GrantedFunctions = BTreeSet::new();
@@ -66,7 +78,7 @@ fn who_are_they_local(cell_id: CellId) -> ExternResult<AgentInfo> {
 fn call_create_entry(cell_id: CellId) -> ExternResult<HeaderHash> {
     let zome_call_response: ZomeCallResponse = call(
         CallTargetCell::Other(cell_id),
-        "create_entry".to_string().into(),
+        Zomes::CreateEntry,
         "create_entry".to_string().into(),
         None,
         &(),

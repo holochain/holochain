@@ -6,12 +6,33 @@
 //! entry_types, and special entries, like deletion_entry and cap_entry.
 
 use crate::header::ChainTopOrdering;
+use holochain_integrity_types::EntryDefIndex;
+use holochain_integrity_types::EntryVisibility;
 use holochain_serialized_bytes::prelude::*;
 
 mod app_entry_bytes;
 pub use app_entry_bytes::*;
 
 pub use holochain_integrity_types::entry::*;
+
+#[derive(
+    Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
+/// Either an [`EntryDefIndex`] or one of:
+/// - [`EntryType::CapGrant`](crate::prelude::EntryType::CapGrant)
+/// - [`EntryType::CapClaim`](crate::prelude::EntryType::CapClaim)
+/// Which don't have an index.
+pub enum EntryDefLocation {
+    /// App defined entries always have a unique [`u8`] index
+    /// within the Dna.
+    App(EntryDefIndex),
+    /// [`crate::EntryDefId::CapClaim`] is committed to and
+    /// validated by all integrity zomes in the dna.
+    CapClaim,
+    /// [`crate::EntryDefId::CapGrant`] is committed to and
+    /// validated by all integrity zomes in the dna.
+    CapGrant,
+}
 
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
 /// Options for controlling how get works
@@ -75,8 +96,10 @@ pub enum GetStrategy {
 /// Zome input to create an entry.
 #[derive(PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct CreateInput {
-    /// EntryDefId for the created entry.
-    pub entry_def_id: crate::entry_def::EntryDefId,
+    /// The global type index for this entry (if it has one).
+    pub entry_location: EntryDefLocation,
+    /// The visibility of this entry.
+    pub entry_visibility: EntryVisibility,
     /// Entry body.
     pub entry: crate::entry::Entry,
     /// ChainTopBehaviour for the write.
@@ -86,12 +109,14 @@ pub struct CreateInput {
 impl CreateInput {
     /// Constructor.
     pub fn new(
-        entry_def_id: crate::entry_def::EntryDefId,
+        entry_location: impl Into<EntryDefLocation>,
+        entry_visibility: EntryVisibility,
         entry: crate::entry::Entry,
         chain_top_ordering: ChainTopOrdering,
     ) -> Self {
         Self {
-            entry_def_id,
+            entry_location: entry_location.into(),
+            entry_visibility,
             entry,
             chain_top_ordering,
         }
@@ -111,12 +136,6 @@ impl CreateInput {
 impl AsRef<crate::Entry> for CreateInput {
     fn as_ref(&self) -> &crate::Entry {
         &self.entry
-    }
-}
-
-impl AsRef<crate::EntryDefId> for CreateInput {
-    fn as_ref(&self) -> &crate::EntryDefId {
-        &self.entry_def_id
     }
 }
 
@@ -144,18 +163,10 @@ impl GetInput {
 pub struct UpdateInput {
     /// Header of the element being updated.
     pub original_header_address: holo_hash::HeaderHash,
-    /// Create portion of the update.
-    pub create_input: CreateInput,
-}
-
-impl UpdateInput {
-    /// Constructor.
-    pub fn new(original_header_address: holo_hash::HeaderHash, create_input: CreateInput) -> Self {
-        Self {
-            original_header_address,
-            create_input,
-        }
-    }
+    /// Entry body.
+    pub entry: crate::entry::Entry,
+    /// ChainTopBehaviour for the write.
+    pub chain_top_ordering: ChainTopOrdering,
 }
 
 /// Zome input for all delete operations.
@@ -187,5 +198,18 @@ impl From<holo_hash::HeaderHash> for DeleteInput {
             deletes_header_hash,
             chain_top_ordering: ChainTopOrdering::default(),
         }
+    }
+}
+
+impl EntryDefLocation {
+    /// Create an [`EntryDefLocation::App`].
+    pub fn app(entry_def_index: impl Into<EntryDefIndex>) -> Self {
+        Self::App(entry_def_index.into())
+    }
+}
+
+impl From<EntryDefIndex> for EntryDefLocation {
+    fn from(i: EntryDefIndex) -> Self {
+        EntryDefLocation::App(i)
     }
 }

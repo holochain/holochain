@@ -29,7 +29,8 @@ use crate::prelude::*;
 /// Delegating agency to grantee claimants is a serious responsibility!
 pub fn create_cap_claim(cap_claim_entry: CapClaimEntry) -> ExternResult<HeaderHash> {
     create(CreateInput::new(
-        EntryDefId::CapClaim,
+        EntryDefLocation::CapClaim,
+        EntryVisibility::Private,
         Entry::CapClaim(cap_claim_entry),
         ChainTopOrdering::default(),
     ))
@@ -122,7 +123,8 @@ pub fn create_cap_claim(cap_claim_entry: CapClaimEntry) -> ExternResult<HeaderHa
 /// the secrets are [`CapAccess::Assigned`] Bob can track and update exactly who has access to his externs.
 pub fn create_cap_grant(cap_grant_entry: CapGrantEntry) -> ExternResult<HeaderHash> {
     create(CreateInput::new(
-        EntryDefId::CapGrant,
+        EntryDefLocation::CapGrant,
+        EntryVisibility::Private,
         Entry::CapGrant(cap_grant_entry),
         ChainTopOrdering::default(),
     ))
@@ -190,12 +192,9 @@ pub fn update_cap_grant(
     old_grant_header_hash: HeaderHash,
     new_grant_value: CapGrantEntry,
 ) -> ExternResult<HeaderHash> {
-    update(
-        old_grant_header_hash,
-        CreateInput::new(
-            EntryDefId::CapGrant,
-            Entry::CapGrant(new_grant_value),
-            ChainTopOrdering::default(),
-        ),
-    )
+    update(UpdateInput {
+        original_header_address: old_grant_header_hash,
+        entry: Entry::CapGrant(new_grant_value),
+        chain_top_ordering: ChainTopOrdering::default(),
+    })
 }

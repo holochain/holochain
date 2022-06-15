@@ -14,7 +14,7 @@ async fn sys_validation_agent_activity_test() {
 
     let mut conductors = SweetConductorBatch::from_standard_config(2).await;
 
-    let (dna_file, _) = SweetDnaFile::unique_from_inline_zome("zome1", simple_create_read_zome())
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_create_read_zome())
         .await
         .unwrap();
 
@@ -22,11 +22,11 @@ async fn sys_validation_agent_activity_test() {
     let ((cell_1,), (cell_2,)) = apps.into_tuples();
 
     let a: HeaderHash = conductors[0]
-        .call(&cell_1.zome("zome1"), "create", ())
+        .call(&cell_1.zome("simple"), "create", ())
         .await;
 
     let b: HeaderHash = conductors[0]
-        .call(&cell_1.zome("zome1"), "create", ())
+        .call(&cell_1.zome("simple"), "create", ())
         .await;
 
     let changed = cell_1

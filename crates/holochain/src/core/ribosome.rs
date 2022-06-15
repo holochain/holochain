@@ -7,6 +7,7 @@
 
 // This allow is here because #[automock] automaticaly creates a struct without
 // documentation, and there seems to be no way to add docs to it after the fact
+#[allow(missing_docs)]
 pub mod error;
 pub mod guest_callback;
 pub mod host_fn;
@@ -42,8 +43,10 @@ use holochain_serialized_bytes::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
 use holochain_types::prelude::*;
+use holochain_types::zome_types::GlobalZomeTypes;
 use mockall::automock;
 use std::iter::Iterator;
+use std::sync::Arc;
 
 use self::guest_callback::{
     entry_defs::EntryDefsInvocation, genesis_self_check::GenesisSelfCheckResult,
@@ -242,13 +245,27 @@ impl FnComponents {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(test, derive(arbitrary::Arbitrary))]
 pub enum ZomesToInvoke {
+    /// All the integrity zomes.
+    AllIntegrity,
+    /// All integrity and coordinator zomes.
     All,
+    /// A single zome of unknown type.
     One(Zome),
+    /// A single integrity zome.
+    OneIntegrity(IntegrityZome),
+    /// A single coordinator zome.
+    OneCoordinator(CoordinatorZome),
 }
 
 impl ZomesToInvoke {
     pub fn one(zome: Zome) -> Self {
         Self::One(zome)
+    }
+    pub fn one_integrity(zome: IntegrityZome) -> Self {
+        Self::OneIntegrity(zome)
+    }
+    pub fn one_coordinator(zome: CoordinatorZome) -> Self {
+        Self::OneCoordinator(zome)
     }
 }
 
@@ -446,33 +463,45 @@ impl From<&ZomeCallHostAccess> for HostFnAccess {
 pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
     fn dna_def(&self) -> &DnaDefHashed;
 
+    fn dna_hash(&self) -> &DnaHash;
+
+    fn dna_file(&self) -> &DnaFile;
+
     fn zome_info(&self, zome: Zome) -> RibosomeResult<ZomeInfo>;
 
     fn zomes_to_invoke(&self, zomes_to_invoke: ZomesToInvoke) -> Vec<Zome> {
         match zomes_to_invoke {
+            ZomesToInvoke::AllIntegrity => self
+                .dna_def()
+                .integrity_zomes
+                .iter()
+                .map(|(n, d)| (n.clone(), d.clone().erase_type()).into())
+                .collect(),
             ZomesToInvoke::All => self
                 .dna_def()
-                .zomes
-                .iter()
-                .cloned()
-                .map(Into::into)
+                .all_zomes()
+                .map(|(n, d)| (n.clone(), d.clone()).into())
                 .collect(),
             ZomesToInvoke::One(zome) => vec![zome],
+            ZomesToInvoke::OneIntegrity(zome) => vec![zome.erase_type()],
+            ZomesToInvoke::OneCoordinator(zome) => vec![zome.erase_type()],
         }
     }
 
-    fn zome_to_id(&self, zome: &Zome) -> RibosomeResult<ZomeId> {
-        let zome_name = zome.zome_name();
+    fn zome_name_to_id(&self, zome_name: &ZomeName) -> RibosomeResult<ZomeId> {
         match self
             .dna_def()
-            .zomes
-            .iter()
+            .all_zomes()
             .position(|(name, _)| name == zome_name)
         {
             Some(index) => Ok(holochain_zome_types::header::ZomeId::from(index as u8)),
             None => Err(RibosomeError::ZomeNotExists(zome_name.to_owned())),
         }
     }
+
+    fn find_zome_from_entry(&self, entry_index: &EntryDefIndex) -> Option<IntegrityZome>;
+
+    fn find_zome_from_link(&self, entry_index: &LinkType) -> Option<IntegrityZome>;
 
     fn call_iterator<I: Invocation + 'static>(
         &self,
@@ -487,6 +516,16 @@ pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
         zome: &Zome,
         to_call: &FunctionName,
     ) -> Result<Option<ExternIO>, RibosomeError>;
+
+    /// Get a value from a const wasm function.
+    ///
+    /// This is really a stand in until Rust can properly support
+    /// const wasm values.
+    ///
+    /// This allows getting values from wasm without the need for any translation.
+    /// The same technique can be used with the wasmer cli to validate these
+    /// values without needing to make holochain a dependency.
+    fn get_const_fn(&self, zome: &Zome, name: &str) -> Result<Option<i32>, RibosomeError>;
 
     /// @todo list out all the available callbacks and maybe cache them somewhere
     fn list_callbacks(&self) {
@@ -553,12 +592,15 @@ pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
         access: ZomeCallHostAccess,
         invocation: ZomeCallInvocation,
     ) -> RibosomeResult<ZomeCallResponse>;
+
+    fn zome_types(&self) -> &Arc<GlobalZomeTypes>;
 }
 
 #[cfg(test)]
 pub mod wasm_test {
     use crate::core::ribosome::FnComponents;
     use crate::sweettest::SweetAgents;
+    use crate::sweettest::SweetCell;
     use crate::sweettest::SweetConductor;
     use crate::sweettest::SweetDnaFile;
     use crate::sweettest::SweetZome;
@@ -587,13 +629,15 @@ pub mod wasm_test {
         pub bob_pubkey: AgentPubKey,
         pub alice: SweetZome,
         pub bob: SweetZome,
+        pub alice_cell: SweetCell,
+        pub bob_cell: SweetCell,
         pub alice_host_fn_caller: HostFnCaller,
         pub bob_host_fn_caller: HostFnCaller,
     }
 
     impl RibosomeTestFixture {
         pub async fn new(test_wasm: TestWasm) -> Self {
-            let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![test_wasm])
+            let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![test_wasm])
                 .await
                 .unwrap();
 
@@ -609,18 +653,26 @@ pub mod wasm_test {
                 .await
                 .unwrap();
 
-            let ((alice,), (bob,)) = apps.into_tuples();
+            let ((alice_cell,), (bob_cell,)) = apps.into_tuples();
 
-            let alice_host_fn_caller =
-                HostFnCaller::create_for_zome(alice.cell_id(), &conductor.handle(), &dna_file, 0)
-                    .await;
+            let alice_host_fn_caller = HostFnCaller::create_for_zome(
+                alice_cell.cell_id(),
+                &conductor.handle(),
+                &dna_file,
+                0,
+            )
+            .await;
 
-            let bob_host_fn_caller =
-                HostFnCaller::create_for_zome(bob.cell_id(), &conductor.handle(), &dna_file, 0)
-                    .await;
+            let bob_host_fn_caller = HostFnCaller::create_for_zome(
+                bob_cell.cell_id(),
+                &conductor.handle(),
+                &dna_file,
+                0,
+            )
+            .await;
 
-            let alice = alice.zome(test_wasm);
-            let bob = bob.zome(test_wasm);
+            let alice = alice_cell.zome(test_wasm);
+            let bob = bob_cell.zome(test_wasm);
 
             Self {
                 conductor,
@@ -628,6 +680,8 @@ pub mod wasm_test {
                 bob_pubkey,
                 alice,
                 bob,
+                alice_cell,
+                bob_cell,
                 alice_host_fn_caller,
                 bob_host_fn_caller,
             }

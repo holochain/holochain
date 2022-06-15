@@ -10,7 +10,6 @@ pub use crate::crdt::*;
 pub use crate::dna_def::*;
 pub use crate::element::*;
 pub use crate::entry::*;
-pub use crate::entry::*;
 pub use crate::entry_def::*;
 pub use crate::genesis::*;
 pub use crate::hash::*;
@@ -45,6 +44,7 @@ pub use crate::zome::*;
 pub use crate::zome_io::ExternIO;
 pub use crate::zome_io::*;
 pub use crate::*;
+pub use holochain_integrity_types::UnitEnum;
 
 #[cfg(feature = "full-dna-def")]
 pub use crate::zome::inline_zome::error::*;

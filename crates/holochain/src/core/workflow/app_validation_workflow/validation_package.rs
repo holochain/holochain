@@ -62,12 +62,8 @@ pub fn get_as_author_custom(
         _ => return Ok(None),
     };
 
-    let zome = match ribosome
-        .dna_def()
-        .zomes
-        .get(app_entry_type.zome_id().index())
-    {
-        Some(zome_tuple) => zome_tuple.clone().into(),
+    let zome = match ribosome.find_zome_from_entry(&app_entry_type.id()) {
+        Some(zome_tuple) => zome_tuple,
         None => {
             warn!(
                 msg = "Tried to get custom validation package for header with invalid zome_id",

@@ -91,7 +91,6 @@ macro_rules! dht_op_update {
 /// Insert a [`DhtOp`](holochain_types::dht_op::DhtOp) into the [`Scratch`].
 pub fn insert_op_scratch(
     scratch: &mut Scratch,
-    zome: Option<Zome>,
     op: DhtOpHashed,
     chain_top_ordering: ChainTopOrdering,
 ) -> StateMutationResult<()> {
@@ -111,18 +110,17 @@ pub fn insert_op_scratch(
     }
     let header_hashed = HeaderHashed::with_pre_hashed(header, op_light.header_hash().to_owned());
     let header_hashed = SignedHeaderHashed::with_presigned(header_hashed, signature);
-    scratch.add_header(zome, header_hashed, chain_top_ordering);
+    scratch.add_header(header_hashed, chain_top_ordering);
     Ok(())
 }
 
 pub fn insert_element_scratch(
     scratch: &mut Scratch,
-    zome: Option<Zome>,
     element: Element,
     chain_top_ordering: ChainTopOrdering,
 ) {
     let (header, entry) = element.into_inner();
-    scratch.add_header(zome, header, chain_top_ordering);
+    scratch.add_header(header, chain_top_ordering);
     if let Some(entry) = entry.into_option() {
         scratch.add_entry(EntryHashed::from_content_sync(entry), chain_top_ordering);
     }
@@ -425,7 +423,7 @@ pub fn insert_header(
                 "author": author,
                 "prev_hash": prev_hash,
                 "base_hash": create_link.base_address,
-                "zome_id": create_link.zome_id.index() as u32,
+                "link_type": create_link.link_type.0,
                 "tag": create_link.tag.as_sql(),
                 "blob": to_blob(&signed_header)?,
             })?;
@@ -629,7 +627,7 @@ pub fn reschedule_expired(
             },
             |row| {
                 Ok((
-                    ZomeName(row.get(0)?),
+                    ZomeName(row.get::<_, String>(0)?.into()),
                     FunctionName(row.get(1)?),
                     row.get(2)?,
                 ))

@@ -9,7 +9,7 @@ use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn create_link<'a>(
-    ribosome: Arc<impl RibosomeT>,
+    _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: CreateLinkInput,
 ) -> Result<HeaderHash, RuntimeError> {
@@ -26,14 +26,9 @@ pub fn create_link<'a>(
                 chain_top_ordering,
             } = input;
 
-            // extract the zome position
-            let zome_id = ribosome
-                .zome_to_id(&call_context.zome)
-                .expect("Failed to get ID for current zome");
-
             // Construct the link add
             let header_builder =
-                builder::CreateLink::new(base_address, target_address, zome_id, link_type, tag);
+                builder::CreateLink::new(base_address, target_address, link_type, tag);
 
             let header_hash = tokio_helper::block_forever_on(tokio::task::spawn(async move {
                 // push the header into the source chain
@@ -43,12 +38,7 @@ pub fn create_link<'a>(
                     .source_chain()
                     .as_ref()
                     .expect("Must have source chain if write_workspace access is given")
-                    .put(
-                        Some(call_context.zome.clone()),
-                        header_builder,
-                        None,
-                        chain_top_ordering,
-                    )
+                    .put(header_builder, None, chain_top_ordering)
                     .await?;
                 Ok::<HeaderHash, RibosomeError>(header_hash)
             }))

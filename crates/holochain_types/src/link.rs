@@ -43,7 +43,7 @@ pub struct WireLinkKey {
     /// Base the links are on.
     pub base: AnyLinkableHash,
     /// The zome the links are in.
-    pub zome_id: ZomeId,
+    pub type_query: Option<LinkTypeRanges>,
     /// Optionally specify a tag for more specific queries.
     pub tag: Option<LinkTag>,
 }
@@ -154,7 +154,6 @@ impl WireCreateLink {
             prev_header: self.prev_header,
             base_address: key.base.clone(),
             target_address: self.target_address,
-            zome_id: key.zome_id,
             link_type: self.link_type,
             tag,
         });

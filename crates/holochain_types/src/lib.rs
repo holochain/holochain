@@ -26,6 +26,7 @@ pub mod element;
 pub mod entry;
 pub mod fixt;
 pub mod header;
+pub mod inline_zome;
 pub mod link;
 mod macros;
 pub mod metadata;
@@ -36,6 +37,7 @@ pub mod signal;
 pub mod sql;
 pub mod validate;
 pub mod web_app;
+pub mod zome_types;
 
 pub mod test_utils;
 
