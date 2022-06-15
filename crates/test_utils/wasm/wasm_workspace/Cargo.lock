@@ -826,9 +826,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasmer_common"
-version = "0.0.79"
+version = "0.0.80"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "083cd6a81f004bb8b6365ac4c52feacdbe7623ef0ef12c1f9ca6ab6b8fe864f3"
+checksum = "b9475ce2cd820534f537619635d128a79bc973d307a5b1b58f06b0f1282aa613"
 dependencies = [
  "holochain_serialized_bytes",
  "serde",
@@ -840,9 +840,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasmer_guest"
-version = "0.0.79"
+version = "0.0.80"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "43f4a00f5c1b14b7fd697ca8166a940f41d085c750df4b8eb59141c9884188e2"
+checksum = "aee0b3eb36f5d6a008898ec7e25ca948cebb3f9b67d201f3a3333a90af4c25a6"
 dependencies = [
  "holochain_serialized_bytes",
  "holochain_wasmer_common",
@@ -2046,6 +2046,15 @@ name = "test_wasm_sys_time"
 version = "0.0.1"
 dependencies = [
  "hdk",
+ "serde",
+]
+
+[[package]]
+name = "test_wasm_the_incredible_halt"
+version = "0.0.1"
+dependencies = [
+ "hdk",
+ "holochain_deterministic_integrity",
  "serde",
 ]
 

@@ -4,6 +4,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+### Integrity / Coordinator Changes [\#1325](https://github.com/holochain/holochain/pull/1325) 
+### Added
+- `EntryTypesHelper` helper trait for deserializing to the correct `Entry`.
+- `LinkTypesHelper` helper trait for creating `LinkTypeRanges` that fit the current local scope.
+### Removed
+- `register_entry!` macro as it is no longer needed. Use `hdk_derive::hdk_entry_defs`.
+
 ## 0.0.8
 
 ## 0.0.7

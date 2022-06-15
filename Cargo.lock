@@ -2060,6 +2060,7 @@ dependencies = [
  "url2",
  "url_serde",
  "uuid 0.7.4",
+ "wasmer-middlewares",
  "xsalsa20poly1305",
 ]
 
@@ -2477,9 +2478,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasmer_common"
-version = "0.0.79"
+version = "0.0.80"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "083cd6a81f004bb8b6365ac4c52feacdbe7623ef0ef12c1f9ca6ab6b8fe864f3"
+checksum = "b9475ce2cd820534f537619635d128a79bc973d307a5b1b58f06b0f1282aa613"
 dependencies = [
  "holochain_serialized_bytes",
  "serde",
@@ -2491,9 +2492,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasmer_guest"
-version = "0.0.79"
+version = "0.0.80"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "43f4a00f5c1b14b7fd697ca8166a940f41d085c750df4b8eb59141c9884188e2"
+checksum = "aee0b3eb36f5d6a008898ec7e25ca948cebb3f9b67d201f3a3333a90af4c25a6"
 dependencies = [
  "holochain_serialized_bytes",
  "holochain_wasmer_common",
@@ -2504,9 +2505,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasmer_host"
-version = "0.0.79"
+version = "0.0.80"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f0f3c2dbef204c378aadc25b7c60ad8dbf6e0aee8a9527c0dcbe9bb5ca4dfb8a"
+checksum = "8e371fb7aa78f4f18d11d33512f4dfa4b753b1c159a9a8b50cc5d1a8496ae259"
 dependencies = [
  "bimap",
  "holochain_serialized_bytes",
@@ -6803,6 +6804,18 @@ dependencies = [
  "wasmer-types",
  "wasmer-vm",
  "winapi",
+]
+
+[[package]]
+name = "wasmer-middlewares"
+version = "2.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "be816528dd62f037ae935977b643bb4237e10be9e32826e2f3eb1f911eaccc97"
+dependencies = [
+ "loupe",
+ "wasmer",
+ "wasmer-types",
+ "wasmer-vm",
 ]
 
 [[package]]
