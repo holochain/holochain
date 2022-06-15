@@ -63,6 +63,9 @@ use crate::core::ribosome::host_fn::x_25519_x_salsa20_poly1305_decrypt::x_25519_
 use crate::core::ribosome::host_fn::x_25519_x_salsa20_poly1305_encrypt::x_25519_x_salsa20_poly1305_encrypt;
 use crate::core::ribosome::host_fn::x_salsa20_poly1305_decrypt::x_salsa20_poly1305_decrypt;
 use crate::core::ribosome::host_fn::x_salsa20_poly1305_encrypt::x_salsa20_poly1305_encrypt;
+use crate::core::ribosome::host_fn::x_salsa20_poly1305_shared_secret_create_random::x_salsa20_poly1305_shared_secret_create_random;
+use crate::core::ribosome::host_fn::x_salsa20_poly1305_shared_secret_export::x_salsa20_poly1305_shared_secret_export;
+use crate::core::ribosome::host_fn::x_salsa20_poly1305_shared_secret_ingest::x_salsa20_poly1305_shared_secret_ingest;
 use crate::core::ribosome::host_fn::zome_info::zome_info;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::Invocation;
@@ -474,7 +477,21 @@ impl RealRibosome {
             .with_host_function(&mut ns, "__verify_signature", verify_signature)
             .with_host_function(&mut ns, "__sign", sign)
             .with_host_function(&mut ns, "__sign_ephemeral", sign_ephemeral)
-            .with_host_function(&mut ns, "__create_x25519_keypair", create_x25519_keypair)
+            .with_host_function(
+                &mut ns,
+                "__x_salsa20_poly1305_shared_secret_create_random",
+                x_salsa20_poly1305_shared_secret_create_random,
+            )
+            .with_host_function(
+                &mut ns,
+                "__x_salsa20_poly1305_shared_secret_export",
+                x_salsa20_poly1305_shared_secret_export,
+            )
+            .with_host_function(
+                &mut ns,
+                "__x_salsa20_poly1305_shared_secret_ingest",
+                x_salsa20_poly1305_shared_secret_ingest,
+            )
             .with_host_function(
                 &mut ns,
                 "__x_salsa20_poly1305_encrypt",
@@ -485,6 +502,7 @@ impl RealRibosome {
                 "__x_salsa20_poly1305_decrypt",
                 x_salsa20_poly1305_decrypt,
             )
+            .with_host_function(&mut ns, "__create_x25519_keypair", create_x25519_keypair)
             .with_host_function(
                 &mut ns,
                 "__x_25519_x_salsa20_poly1305_encrypt",
