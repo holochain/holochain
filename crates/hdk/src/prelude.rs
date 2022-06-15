@@ -60,6 +60,9 @@ pub use crate::x_salsa20_poly1305::x_25519_x_salsa20_poly1305_decrypt;
 pub use crate::x_salsa20_poly1305::x_25519_x_salsa20_poly1305_encrypt;
 pub use crate::x_salsa20_poly1305::x_salsa20_poly1305_decrypt;
 pub use crate::x_salsa20_poly1305::x_salsa20_poly1305_encrypt;
+pub use crate::x_salsa20_poly1305::x_salsa20_poly1305_shared_secret_create_random;
+pub use crate::x_salsa20_poly1305::x_salsa20_poly1305_shared_secret_export;
+pub use crate::x_salsa20_poly1305::x_salsa20_poly1305_shared_secret_ingest;
 pub use hdk_derive;
 pub use hdk_derive::hdk_dependent_entry_types;
 pub use hdk_derive::hdk_dependent_link_types;
@@ -143,6 +146,9 @@ macro_rules! holochain_externs {
             __delete,
             __schedule,
             __sleep,
+            __x_salsa20_poly1305_shared_secret_create_random,
+            __x_salsa20_poly1305_shared_secret_export,
+            __x_salsa20_poly1305_shared_secret_ingest,
             __x_salsa20_poly1305_encrypt,
             __x_salsa20_poly1305_decrypt,
             __x_25519_x_salsa20_poly1305_encrypt,

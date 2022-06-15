@@ -44,7 +44,8 @@ impl CallbackResult for ValidateCallbackResult {
             | WasmErrorInner::CallError(_)
             | WasmErrorInner::PointerMap
             | WasmErrorInner::ErrorWhileError
-            | WasmErrorInner::Memory => Err(wasm_error),
+            | WasmErrorInner::Memory
+            | WasmErrorInner::UninitializedSerializedModuleCache => Err(wasm_error),
         }
     }
 }
@@ -77,7 +78,8 @@ impl CallbackResult for ValidationPackageCallbackResult {
             | WasmErrorInner::CallError(_)
             | WasmErrorInner::PointerMap
             | WasmErrorInner::ErrorWhileError
-            | WasmErrorInner::Memory => Err(wasm_error),
+            | WasmErrorInner::Memory
+            | WasmErrorInner::UninitializedSerializedModuleCache => Err(wasm_error),
         }
     }
 }

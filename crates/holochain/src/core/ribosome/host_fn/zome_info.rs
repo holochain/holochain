@@ -76,6 +76,8 @@ pub mod test {
                 FunctionName::new("assert_indexes"),
                 FunctionName::new("entry_defs"),
                 FunctionName::new("memory"),
+                FunctionName::new("wasmer_metering_points_exhausted"),
+                FunctionName::new("wasmer_metering_remaining_points"),
                 FunctionName::new("zome_info"),
             ],
         );
