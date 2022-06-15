@@ -75,7 +75,7 @@ use holochain_wasmer_host::module::SerializedModuleCache;
 use wasmer_middlewares::Metering;
 // This is here because there were errors about different crate versions
 // without it.
-use ::parking_lot::lock_api::RwLock;
+use kitsune_p2p_types::dependencies::lair_keystore_api::dependencies::parking_lot::lock_api::RwLock;
 
 use holochain_wasmer_host::prelude::*;
 use once_cell::sync::Lazy;
