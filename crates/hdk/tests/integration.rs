@@ -121,9 +121,9 @@ fn combine_integrity_zomes() {
 
     assert!(matches!(
         EntryZomes::try_from_global_type(0u8, &Entry::try_from(integrity_zomes::A {}).unwrap()),
-        Ok(Some(EntryZomes::A(
+        Ok(EntryCheck::Found(ParseEntry::Valid(EntryZomes::A(
             integrity_zomes::integrity_a::EntryTypes::A(integrity_zomes::A {})
-        )))
+        ))))
     ));
 }
 

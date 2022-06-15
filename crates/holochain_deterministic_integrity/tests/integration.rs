@@ -323,15 +323,21 @@ fn entry_defs_to_entry_type_index() {
 
     assert!(matches!(
         integrity_a::EntryTypes::try_from_global_type(0u8, &Entry::try_from(A {}).unwrap()),
-        Ok(Some(integrity_a::EntryTypes::A(A {})))
+        Ok(EntryCheck::Found(ParseEntry::Valid(
+            integrity_a::EntryTypes::A(A {})
+        )))
     ));
     assert!(matches!(
         integrity_a::EntryTypes::try_from_global_type(1u8, &Entry::try_from(B {}).unwrap()),
-        Ok(Some(integrity_a::EntryTypes::B(B {})))
+        Ok(EntryCheck::Found(ParseEntry::Valid(
+            integrity_a::EntryTypes::B(B {})
+        )))
     ));
     assert!(matches!(
         integrity_a::EntryTypes::try_from_global_type(2u8, &Entry::try_from(C {}).unwrap()),
-        Ok(Some(integrity_a::EntryTypes::C(C {})))
+        Ok(EntryCheck::Found(ParseEntry::Valid(
+            integrity_a::EntryTypes::C(C {})
+        )))
     ));
 
     // Set the integrity_b scope.
@@ -373,15 +379,21 @@ fn entry_defs_to_entry_type_index() {
 
     assert!(matches!(
         integrity_b::EntryTypes::try_from_global_type(3u8, &Entry::try_from(A {}).unwrap()),
-        Ok(Some(integrity_b::EntryTypes::A(A {})))
+        Ok(EntryCheck::Found(ParseEntry::Valid(
+            integrity_b::EntryTypes::A(A {})
+        )))
     ));
     assert!(matches!(
         integrity_b::EntryTypes::try_from_global_type(4u8, &Entry::try_from(B {}).unwrap()),
-        Ok(Some(integrity_b::EntryTypes::B(B {})))
+        Ok(EntryCheck::Found(ParseEntry::Valid(
+            integrity_b::EntryTypes::B(B {})
+        )))
     ));
     assert!(matches!(
         integrity_b::EntryTypes::try_from_global_type(5u8, &Entry::try_from(C {}).unwrap()),
-        Ok(Some(integrity_b::EntryTypes::C(C {})))
+        Ok(EntryCheck::Found(ParseEntry::Valid(
+            integrity_b::EntryTypes::C(C {})
+        )))
     ));
 }
 

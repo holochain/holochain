@@ -15,6 +15,16 @@ use holochain_serialized_bytes::prelude::*;
 #[repr(transparent)]
 pub struct ZomeName(pub Cow<'static, str>);
 
+/// Type for checking if zome types are in scope
+/// and match a given user defined type.
+pub enum ZomeTypeCheck<T = ()> {
+    /// The type does not match any global
+    /// type that is in scope for this zome.
+    NotInScope,
+    /// Found the type.
+    Found(T),
+}
+
 #[cfg(feature = "arbitrary")]
 impl<'a> arbitrary::Arbitrary<'a> for ZomeName {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {

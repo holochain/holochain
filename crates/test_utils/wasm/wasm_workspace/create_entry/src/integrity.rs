@@ -44,7 +44,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             .map_or(
                 Ok(ValidateCallbackResult::Valid),
                 |id| match EntryTypes::try_from_global_type(*id, &entry)? {
-                    Some(EntryTypes::Post(post)) if post.0 == "Banana" => {
+                    EntryCheck::Found(ParseEntry::Valid(EntryTypes::Post(post)))
+                        if post.0 == "Banana" =>
+                    {
                         Ok(ValidateCallbackResult::Invalid("No Bananas!".to_string()))
                     }
                     _ => Ok(ValidateCallbackResult::Valid),

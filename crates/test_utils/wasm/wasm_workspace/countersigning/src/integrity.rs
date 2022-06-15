@@ -35,16 +35,14 @@ fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryType::App(AppEntryType { id, .. }) => Some(id),
                 _ => None,
             }) {
-                Some(id) => match EntryTypes::try_from_global_type(*id, &entry) {
-                    Ok(Some(EntryTypes::Thing(thing))) => Ok(thing.into()),
-                    Ok(None) => Ok(ValidateCallbackResult::Valid),
-                    Err(WasmError {
-                        error: WasmErrorInner::Deserialize(_),
-                        ..
-                    }) => Ok(ValidateCallbackResult::Invalid(
-                        "Failed to deserialize entry".to_string(),
-                    )),
-                    Err(e) => Err(e),
+                Some(id) => match EntryTypes::try_from_global_type(*id, &entry)? {
+                    EntryCheck::Found(ParseEntry::Valid(EntryTypes::Thing(thing))) => {
+                        Ok(thing.into())
+                    }
+                    EntryCheck::NotInScope => Ok(ValidateCallbackResult::Valid),
+                    EntryCheck::Found(ParseEntry::Failed(error)) => Ok(
+                        ValidateCallbackResult::Invalid("Failed to deserialize entry".to_string()),
+                    ),
                 },
                 None => Ok(ValidateCallbackResult::Valid),
             }

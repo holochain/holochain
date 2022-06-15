@@ -9,6 +9,7 @@ use crate::capability::CapClaim;
 use crate::capability::CapGrant;
 use crate::capability::ZomeCallCapGrant;
 use crate::countersigning::CounterSigningSessionData;
+use crate::ZomeTypeCheck;
 use holo_hash::hash_type;
 use holo_hash::AgentPubKey;
 use holo_hash::EntryHash;
@@ -63,6 +64,17 @@ pub enum Entry {
     /// capabilities
     CapGrant(CapGrantEntry),
 }
+
+/// The outcome of deserializing [`Entry`] bytes to a user defined type.
+pub enum ParseEntry<T> {
+    /// The bytes successfully deserialized into `T`.
+    Valid(T),
+    /// The bytes failed to parse because of the given reason.
+    Failed(String),
+}
+
+/// The outcome of type checking and parsing a header and entry.
+pub type EntryCheck<T> = ZomeTypeCheck<ParseEntry<T>>;
 
 impl Entry {
     /// If this entry represents a capability grant, return a `CapGrant`.

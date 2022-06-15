@@ -115,12 +115,12 @@ pub fn must_get_valid_element(header_hash: HeaderHash) -> ExternResult<Element> 
 pub trait EntryTypesHelper: Sized {
     /// Check if the [`LocalZomeTypeId`] matches one of the Self [`LocalZomeTypeId`]'s and if
     /// it does deserialize the [`Entry`] into that types.
-    fn try_from_local_type<I>(type_index: I, entry: &Entry) -> Result<Option<Self>, WasmError>
+    fn try_from_local_type<I>(type_index: I, entry: &Entry) -> EntryCheck<Self>
     where
         LocalZomeTypeId: From<I>;
     /// Check if the [`GlobalZomeTypeId`] maps to a [`LocalZomeTypeId`] declared by Self and if
     /// it does deserialize the [`Entry`] into that types.
-    fn try_from_global_type<I>(type_index: I, entry: &Entry) -> Result<Option<Self>, WasmError>
+    fn try_from_global_type<I>(type_index: I, entry: &Entry) -> Result<EntryCheck<Self>, WasmError>
     where
         GlobalZomeTypeId: From<I>;
 }

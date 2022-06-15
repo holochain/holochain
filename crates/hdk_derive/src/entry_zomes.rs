@@ -25,7 +25,12 @@ pub fn build(_attrs: TokenStream, input: TokenStream) -> TokenStream {
             let ty = &get_single_tuple_variant(v_ident, fields).ty;
             quote::quote! {
                 if ((<#ident as EnumVariantLen<#i>>::ENUM_VARIANT_START)..(<#ident as EnumVariantLen<#i>>::ENUM_VARIANT_LEN)).contains(&value) {
-                    return Ok(#ty::try_from_local_type::<LocalZomeTypeId>(LocalZomeTypeId(value), entry)?.map(Self::#v_ident));
+                    let out = match #ty::try_from_local_type::<LocalZomeTypeId>(LocalZomeTypeId(value), entry) {
+                        EntryCheck::Found(ParseEntry::Valid(t)) => EntryCheck::Found(ParseEntry::Valid(Self::#v_ident(t))),
+                        EntryCheck::Found(ParseEntry::Failed(r)) => EntryCheck::Found(ParseEntry::Failed(r)),
+                        EntryCheck::NotInScope => EntryCheck::NotInScope,
+                    };
+                    return out;
                 }
             }
         })
@@ -122,29 +127,23 @@ pub fn build(_attrs: TokenStream, input: TokenStream) -> TokenStream {
         }
 
         impl EntryTypesHelper for #ident {
-            fn try_from_local_type<I>(type_index: I, entry: &Entry) -> Result<Option<Self>, WasmError>
+            fn try_from_local_type<I>(type_index: I, entry: &Entry) -> EntryCheck<Self>
             where
                 LocalZomeTypeId: From<I>,
             {
                 let value = LocalZomeTypeId::from(type_index).0;
                 #index_to_variant
 
-                Err(wasm_error!(WasmErrorInner::Guest(format!(
-                    "local type index {} does not map to any the entry types for this zome",
-                    value
-                ))))
+                EntryCheck::NotInScope
             }
-            fn try_from_global_type<I>(type_index: I, entry: &Entry) -> Result<Option<Self>, WasmError>
+            fn try_from_global_type<I>(type_index: I, entry: &Entry) -> Result<EntryCheck<Self>, WasmError>
             where
                 GlobalZomeTypeId: From<I>,
             {
                 let index: GlobalZomeTypeId = type_index.into();
                 match zome_info()?.zome_types.entries.to_local_scope(index) {
-                    Some(local_index) => Self::try_from_local_type(local_index, &entry),
-                    _ => Err(wasm_error!(WasmErrorInner::Guest(format!(
-                        "global index {} does not map to any local scope for this zome",
-                        index.0
-                    )))),
+                    Some(local_index) => Ok(Self::try_from_local_type(local_index, &entry)),
+                    None => Ok(EntryCheck::NotInScope),
                 }
             }
         }

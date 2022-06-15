@@ -53,11 +53,12 @@ fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 .to_local_scope(*entry_def_index)
             {
                 Some(local_type_index) => {
-                    match EntryTypes::try_from_local_type(local_type_index, &entry)? {
-                        Some(EntryTypes::Post(_)) => (),
-                        Some(EntryTypes::Msg(_)) => (),
-                        Some(EntryTypes::PrivMsg(_)) => (),
-                        None => (),
+                    match EntryTypes::try_from_local_type(local_type_index, &entry) {
+                        EntryCheck::Found(ParseEntry::Valid(EntryTypes::Post(_))) => (),
+                        EntryCheck::Found(ParseEntry::Valid(EntryTypes::Msg(_))) => (),
+                        EntryCheck::Found(ParseEntry::Valid(EntryTypes::PrivMsg(_))) => (),
+                        EntryCheck::Found(ParseEntry::Failed(_)) => (),
+                        EntryCheck::NotInScope => (),
                     }
                 }
                 None => (),
@@ -74,16 +75,18 @@ fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 None => (),
             }
             match EntryTypes::try_from_global_type(*entry_def_index, &entry)? {
-                Some(EntryTypes::Post(_)) => (),
-                Some(EntryTypes::Msg(_)) => (),
-                Some(EntryTypes::PrivMsg(_)) => (),
-                None => (),
+                EntryCheck::Found(ParseEntry::Valid(EntryTypes::Post(_))) => (),
+                EntryCheck::Found(ParseEntry::Valid(EntryTypes::Msg(_))) => (),
+                EntryCheck::Found(ParseEntry::Valid(EntryTypes::PrivMsg(_))) => (),
+                EntryCheck::Found(ParseEntry::Failed(_)) => (),
+                EntryCheck::NotInScope => (),
             }
-            match EntryTypes::try_from_local_type(UnitEntryTypes::Post, &entry)? {
-                Some(EntryTypes::Post(_)) => (),
-                Some(EntryTypes::Msg(_)) => (),
-                Some(EntryTypes::PrivMsg(_)) => (),
-                None => (),
+            match EntryTypes::try_from_local_type(UnitEntryTypes::Post, &entry) {
+                EntryCheck::Found(ParseEntry::Valid(EntryTypes::Post(_))) => (),
+                EntryCheck::Found(ParseEntry::Valid(EntryTypes::Msg(_))) => (),
+                EntryCheck::Found(ParseEntry::Valid(EntryTypes::PrivMsg(_))) => (),
+                EntryCheck::Found(ParseEntry::Failed(_)) => (),
+                EntryCheck::NotInScope => (),
             }
         }
     }
