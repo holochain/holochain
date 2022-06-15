@@ -142,17 +142,11 @@
 //! - `fn validate_delete_link(delete_link_data: ValidateDeleteLinkData) -> ExternResult<ValidateLinkCallbackResult>`:
 //!   - Allows the guest to pass/fail/retry link deletion validation.
 //!   - Only the zome that deleted the link is called.
-//! - `fn validate_{{ create|update|delete }}_{{ agent|entry }}_{{ <entry_id> }}(validate_data: ValidateData) -> ExternResult<ValidateCallbackResult>`:
-//!   - Allows the guest to pass/fail/retry entry validation.
-//!   - <entry_id> is the entry id defined by entry defs e.g. "comment".
+//! - `fn validate(op: Op) -> ExternResult<ValidateCallbackResult>`:
+//!   - Allows the guest to pass/fail/retry any operation.
 //!   - Only the originating zome is called.
 //!   - Failure overrides retry.
-//! - `fn validation_package_{{ <entry_id> }}(entry_type: AppEntryType) -> ExternResult<ValidationPackageCallbackResult>`:
-//!   - Allows the guest to build a validation package for the given entry type.
-//!   - Can pass/retry/fail/not-implemented in reverse override order.
-//!   - <entry_id> is the entry id defined by entry defs e.g. "comment".
-//!   - Only the originating zome is called.
-//!
+//!   - See [`validate`](holochain_deterministic_integrity::prelude::validate) for more details.
 //!
 //! # HDK has layers 🧅
 //!
