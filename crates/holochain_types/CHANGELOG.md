@@ -13,7 +13,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `DnaManifest` verifies that all zome names are unique.
 - `DnaManifest` verifies that dependency names exists and are integrity zomes.
 - `DnaFile` can hot swap coordinator zomes. Existing zomes are replaced and new zome names are appended.
-### Removed
 ### Changed
 - `DnaStore` is now a `RibosomeStore`.
 - `DnaManifest` now has an integrity key for all values that will change the dna hash.
