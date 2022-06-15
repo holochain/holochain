@@ -1,28 +1,23 @@
 use holochain_deterministic_integrity::prelude::*;
 
-#[hdk_entry(
-    id = "post",
-    required_validations = 5,
-    required_validation_type = "full"
-)]
+#[hdk_entry_helper]
 pub struct Post(pub String);
-
-#[hdk_entry(
-    id = "msg",
-    required_validations = 5,
-    required_validation_type = "sub_chain"
-)]
+#[hdk_entry_helper]
 pub struct Msg(pub String);
 
-#[hdk_entry(
-    id = "priv_msg",
-    required_validations = 5,
-    required_validation_type = "full",
-    visibility = "private"
-)]
+#[hdk_entry_helper]
 pub struct PrivMsg(pub String);
 
-entry_defs![Post::entry_def(), Msg::entry_def(), PrivMsg::entry_def()];
+#[hdk_entry_defs]
+#[unit_enum(UnitEntryTypes)]
+pub enum EntryTypes {
+    #[entry_def(required_validations = 5)]
+    Post(Post), // "post"
+    #[entry_def(required_validations = 5)]
+    Msg(Msg),
+    #[entry_def(required_validations = 5, visibility = "private")]
+    PrivMsg(PrivMsg),
+}
 
 #[hdk_extern]
 fn genesis_self_check(data: GenesisSelfCheckData) -> ExternResult<ValidateCallbackResult> {
@@ -36,7 +31,6 @@ fn genesis_self_check(data: GenesisSelfCheckData) -> ExternResult<ValidateCallba
 
 #[hdk_extern]
 fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
-    let this_zome = zome_info()?;
     if let Op::StoreEntry {
         header:
             SignedHashed {
@@ -48,16 +42,49 @@ fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
         entry,
     } = op
     {
-        if header
-            .app_entry_type()
-            .filter(|app_entry_type| {
-                this_zome.matches_entry_def_id(app_entry_type, Post::entry_def_id())
-            })
-            .map_or(Ok(false), |_| {
-                Post::try_from(entry).map(|post| &post.0 == "Banana")
-            })?
+        if let Some(AppEntryType {
+            id: entry_def_index,
+            ..
+        }) = header.app_entry_type()
         {
-            return Ok(ValidateCallbackResult::Invalid("No Bananas!".to_string()));
+            match zome_info()?
+                .zome_types
+                .entries
+                .to_local_scope(*entry_def_index)
+            {
+                Some(local_type_index) => {
+                    match EntryTypes::try_from_local_type(local_type_index, &entry)? {
+                        Some(EntryTypes::Post(_)) => (),
+                        Some(EntryTypes::Msg(_)) => (),
+                        Some(EntryTypes::PrivMsg(_)) => (),
+                        None => (),
+                    }
+                }
+                None => (),
+            }
+            match zome_info()?
+                .zome_types
+                .entries
+                .to_local_scope(*entry_def_index)
+            {
+                Some(local_index) => match local_index.try_into() {
+                    Ok(UnitEntryTypes::Post) => (),
+                    _ => (),
+                },
+                None => (),
+            }
+            match EntryTypes::try_from_global_type(*entry_def_index, &entry)? {
+                Some(EntryTypes::Post(_)) => (),
+                Some(EntryTypes::Msg(_)) => (),
+                Some(EntryTypes::PrivMsg(_)) => (),
+                None => (),
+            }
+            match EntryTypes::try_from_local_type(UnitEntryTypes::Post, &entry)? {
+                Some(EntryTypes::Post(_)) => (),
+                Some(EntryTypes::Msg(_)) => (),
+                Some(EntryTypes::PrivMsg(_)) => (),
+                None => (),
+            }
         }
     }
     Ok(ValidateCallbackResult::Valid)
@@ -100,7 +127,6 @@ fn call_zome_info(zome_info_input: ()) -> ExternResult<ZomeInfo> {
     HDI.with(|i| i.borrow().zome_info(zome_info_input))
 }
 // Trace
-#[cfg(feature = "trace")]
 #[hdk_extern]
 fn call_trace(trace_msg: TraceMsg) -> ExternResult<()> {
     HDI.with(|i| i.borrow().trace(trace_msg))
@@ -199,6 +225,7 @@ pub mod test {
                     id: 0.into(),
                     entry_defs: EntryDefs(vec![]),
                     extern_fns: vec![],
+                    zome_types: Default::default(),
                 })
             }
         });

@@ -320,7 +320,7 @@ where
         let results = tokio::task::spawn_blocking(move || {
             let mut conns = conns
                 .into_iter()
-                .map(|(permit, conn)| conn.from_permit(permit))
+                .map(|(permit, conn)| conn.with_permit(permit))
                 .collect::<DatabaseResult<Vec<_>>>()?;
             let mut txns = Vec::with_capacity(conns.len());
             for conn in &mut conns {
@@ -347,7 +347,7 @@ where
     {
         let find = |permit, conn: Box<dyn PermittedConn + Send>, mut f: F| async move {
             tokio::task::spawn_blocking(move || {
-                let mut conn = conn.from_permit(permit)?;
+                let mut conn = conn.with_permit(permit)?;
                 let txn = conn.transaction().map_err(StateQueryError::from)?;
                 let txn = Txn::from(&txn);
                 let r = f(&txn)?;
@@ -667,10 +667,10 @@ where
                 async move { cascade.dht_get(hash, options).await }
             }
         });
-        Ok(futures::stream::iter(iter)
+        futures::stream::iter(iter)
             .buffer_unordered(10)
             .try_collect()
-            .await?)
+            .await
     }
 
     #[instrument(skip(self))]
@@ -719,7 +719,7 @@ where
         if !authority {
             self.fetch_links(key.clone(), options).await?;
         }
-        let query = GetLinksQuery::new(key.base, key.zome_id, key.tag);
+        let query = GetLinksQuery::new(key.base, key.type_query, key.tag);
         let results = self.cascading(query).await?;
         Ok(results)
     }
@@ -736,7 +736,7 @@ where
         if !authority {
             self.fetch_links(key.clone(), options).await?;
         }
-        let query = GetLinkDetailsQuery::new(key.base, key.zome_id, key.tag);
+        let query = GetLinkDetailsQuery::new(key.base, key.type_query, key.tag);
         let results = self.cascading(query).await?;
         Ok(results)
     }

@@ -36,7 +36,7 @@ impl KitsuneHost for KitsuneHostImpl {
             use holochain_sqlite::db::AsP2pAgentStoreConExt;
             let permit = db.conn_permit().await;
             let task = tokio::task::spawn_blocking(move || {
-                let mut conn = db.from_permit(permit)?;
+                let mut conn = db.with_permit(permit)?;
                 conn.p2p_extrapolated_coverage(dht_arc_set)
             })
             .await;
@@ -56,7 +56,7 @@ impl KitsuneHost for KitsuneHostImpl {
             use holochain_sqlite::db::AsP2pMetricStoreConExt;
             let permit = db.conn_permit().await;
             let task = tokio::task::spawn_blocking(move || {
-                let mut conn = db.from_permit(permit)?;
+                let mut conn = db.with_permit(permit)?;
                 conn.p2p_log_metrics(records)
             })
             .await;

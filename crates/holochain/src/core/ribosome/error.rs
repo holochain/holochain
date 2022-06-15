@@ -1,4 +1,3 @@
-#![deny(missing_docs)]
 //! Errors occurring during a [`RealRibosome`](crate::core::ribosome::real_ribosome::RealRibosome) call
 
 use crate::conductor::api::error::ConductorApiError;
@@ -98,6 +97,9 @@ pub enum RibosomeError {
     /// Zome function doesn't have permissions to call a Host function.
     #[error("Host function {2} cannot be called from zome function {1} in zome {0}")]
     HostFnPermissions(ZomeName, FunctionName, String),
+
+    #[error(transparent)]
+    ZomeTypesError(#[from] holochain_types::zome_types::ZomeTypesError),
 }
 
 impl From<xsalsa20poly1305::aead::Error> for RibosomeError {

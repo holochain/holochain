@@ -164,25 +164,27 @@ jobs:
             maxBuildSpace: true
             timeout_minutes: 6
             max_attempts:
-              ubuntu-latest: 10
-              macos-latest: 10
+              ubuntu-latest: 2
+              macos-latest: 2
             run: |
               nix-shell \
+                --keep CARGO_NEXTEST_ARGS \
                 --keep CARGO_TEST_ARGS \
-                --fallback --pure --argstr flavor "coreDev" --run hc-test-standard
+                --fallback --pure --argstr flavor "coreDev" --run hc-test-standard-nextest
 
           - name: cargo-test-slow
             restoresCargoCache: true
             savesCargoCache: true
             ignoreErrorOnNonUbuntu: true
-            timeout_minutes: 15
+            timeout_minutes: 12
             max_attempts:
-              ubuntu-latest: 60
-              macos-latest: 1
+              ubuntu-latest: 2
+              macos-latest: 2
             run: |
               nix-shell \
+              --keep CARGO_NEXTEST_ARGS \
               --keep CARGO_TEST_ARGS \
-              --fallback --pure --argstr flavor "coreDev" --run hc-test-slow
+              --fallback --pure --argstr flavor "coreDev" --run hc-test-slow-nextest
 
           - name: cargo-test-static
             restoresCargoCache: true
@@ -347,6 +349,7 @@ jobs:
         if: ${{ matrix.testCommand.restoresCargoCache == true }}
         env:
           CARGO_TEST_ARGS: "--no-run"
+          CARGO_NEXTEST_ARGS: "list"
         run: |
           set -e
           source "${HOLOCHAIN_RELEASE_SH}"
@@ -355,6 +358,7 @@ jobs:
           nix-shell --run "cargo fetch --locked"
 
           ${{ matrix.testCommand.run }}
+        continue-on-error: ${{ matrix.platform != 'ubuntu-latest' && matrix.testCommand.ignoreErrorOnNonUbuntu == true }}
 
       - name: ${{ matrix.testCommand.name }} (run)
         uses: nick-fields/retry@v2
@@ -471,8 +475,6 @@ jobs:
 
           git push origin main
 
-          git push origin main --tags
-
       - name: Push the release branch
         run: |
           source ${HOLOCHAIN_RELEASE_SH}
@@ -530,6 +532,17 @@ jobs:
               release \
                 --steps=PublishToCratesIo,AddOwnersToCratesIo
             '
+
+      - name: Push the tags
+        if: ${{ needs.vars.outputs.dry_run == 'false' }}
+        run: |
+          set -e
+          source ${HOLOCHAIN_RELEASE_SH}
+          cd "${HOLOCHAIN_REPO}"
+
+          git status
+
+          git push origin main --tags
 
       - name: Create a github release
         if: ${{ needs.vars.outputs.dry_run == 'false' }}

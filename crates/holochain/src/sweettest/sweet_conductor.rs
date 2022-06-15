@@ -64,7 +64,7 @@ pub fn standard_config() -> ConductorConfig {
 
 impl SweetConductor {
     /// Create a SweetConductor from an already-built ConductorHandle and environments
-    /// DnaStore
+    /// RibosomeStore
     /// The conductor will be supplied with a single test AppInterface named
     /// "sweet-interface" so that signals may be emitted
     pub async fn new(
@@ -450,11 +450,11 @@ impl SweetConductor {
 pub async fn websocket_client_by_port(
     port: u16,
 ) -> WebsocketResult<(WebsocketSender, WebsocketReceiver)> {
-    Ok(holochain_websocket::connect(
+    holochain_websocket::connect(
         url2::url2!("ws://127.0.0.1:{}", port),
         Arc::new(WebsocketConfig::default()),
     )
-    .await?)
+    .await
 }
 
 impl Drop for SweetConductor {

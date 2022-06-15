@@ -8,10 +8,16 @@ edition = "2021"
 name = "test_wasm_multiple_calls"
 crate-type = [ "cdylib", "rlib" ]
 
+[[example]]
+name = "integrity_test_wasm_multiple_calls"
+path = "src/integrity.rs"
+crate-type = ["cdylib", "rlib"]
+
 [dependencies]
 serde = "1.0"
 holochain_test_wasm_common = { path = "../../../wasm_common" }
 hdk = { path = "../../../../hdk" }
+holochain_deterministic_integrity = { path = "../../../../holochain_deterministic_integrity" }
 
 [features]
 default = []

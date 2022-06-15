@@ -221,7 +221,7 @@ pub mod wasm_test {
     async fn bridge_call() {
         observability::test_run().ok();
 
-        let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create])
+        let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create])
             .await
             .unwrap();
 
@@ -234,7 +234,7 @@ pub mod wasm_test {
             .unwrap();
         let ((alice,), (_bobbo,)) = apps.into_tuples();
 
-        let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::WhoAmI])
+        let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::WhoAmI])
             .await
             .unwrap();
         let apps = conductor

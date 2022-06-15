@@ -116,7 +116,7 @@ pub fn holo_dht_location_bytes(data: &[u8]) -> Vec<u8> {
 pub fn blake2b_n(data: &[u8], length: usize) -> Result<Vec<u8>, HoloHashError> {
     // blake2b_simd does an assert on the hash length and we allow happ devs
     // to set this so we have to put a result guarding against the bounds.
-    if length < 1 || blake2b_simd::OUTBYTES < length {
+    if !(1..=blake2b_simd::OUTBYTES).contains(&length) {
         return Err(HoloHashError::BadHashSize);
     }
     Ok(blake2b_simd::Params::new()

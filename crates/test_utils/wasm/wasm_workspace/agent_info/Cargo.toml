@@ -8,14 +8,21 @@ edition = "2021"
 name = "test_wasm_agent_info"
 crate-type = [ "cdylib", "rlib" ]
 
+[[example]]
+name = "integrity_test_wasm_agent_info"
+path = "src/integrity.rs"
+crate-type = ["cdylib", "rlib"]
+
 [dependencies]
-hdk = { path = "../../../../hdk" }
+hdk = { path = "../../../../hdk", optional = true }
 serde = "1.0"
+holochain_deterministic_integrity = { path = "../../../../holochain_deterministic_integrity" }
 
 [dev-dependencies]
 hdk = { path = "../../../../hdk", features = ["fixturators"] }
 fixt = { path = "../../../../fixt" }
 
 [features]
-default = []
+default = ["hdk"]
+integrity = []
 mock = ["hdk/mock"]

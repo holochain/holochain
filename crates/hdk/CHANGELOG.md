@@ -8,6 +8,35 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- hdk: Use newest wasmer and introduces `wasm_error!` macro to capture line numbers for wasm errors [\#1380](https://github.com/holochain/holochain/pull/1380)
+- Docs: Restructure main page sections and add several intra-doc lnks [\#1418](https://github.com/holochain/holochain/pull/1418)
+- hdk: Add functional stub for `x_salsa20_poly1305_shared_secret_create_random` [\#1410](https://github.com/holochain/holochain/pull/1410)
+- hdk: Add functional stub for `x_salsa20_poly1305_shared_secret_export` [\#1410](https://github.com/holochain/holochain/pull/1410)
+- hdk: Add functional stub for `x_salsa20_poly1305_shared_secret_ingest` [\#1410](https://github.com/holochain/holochain/pull/1410)
+
+### Integrity / Coordinator Changes [\#1325](https://github.com/holochain/holochain/pull/1325) 
+### Added
+- `get_links` and `get_link_details` take a `TryInto<LinkTypesRages>`. See the link test wasm for examples.
+### Removed
+- `entry_def_index` and `entry_type` macros are no longer needed.
+### Changed
+- `call` and `call_remote` now take an `Into<ZomeName>` instead of a `ZomeName`.
+- `create_link` takes a `TryInto<LinkType>` instead of an `Into<LinkType>`.
+- `update` takes `UpdateInput` instead of a `HeaderHash` and `CreateInput`.
+- `create_entry` takes a type that can try into an `EntryDefIndex` and `EntryVisibility` instead of implementing `EntryDefRegistration`.
+- `update_entry` takes the previous header hash and a try into `Entry` instead of a `EntryDefRegistration`.
+- `Path` now must be `typed(LinkType)` to use any functionality that creates or gets links. 
+
+## 0.0.136
+
+- Docs: Crate README generated from crate level doc comments [\#1392](https://github.com/holochain/holochain/pull/1392).
+
+## 0.0.135
+
+## 0.0.134
+
+## 0.0.133
+
 ## 0.0.132
 
 - hdk: Provide `Into<AnyLinkableHash>` impl for `EntryHash` and `HeaderHash`. This allows `create_link` and `get_links` to be used directly with EntryHash and HeaderHash arguments, rather than needing to construct an `AnyLinkableHash` explicitly.
@@ -116,14 +145,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - hdk: Now supports deserializing countersigned entries in app entry `try_from`
 
 - hdk: implements multi-call for:
-  
+
   - `remote_call`
   - `call`
   - `get`
   - `get_details`
   - `get_links`
   - `get_link_details`
-  
+
   We strictly only needed `remote_call` for countersigning, but feedback from the community was that having to sequentially loop over these common HDK functions is a pain point, so we enabled all of them to be async over a vector of inputs.
 
 ## 0.0.102

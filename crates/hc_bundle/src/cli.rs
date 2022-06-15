@@ -1,7 +1,7 @@
 #![forbid(missing_docs)]
 //! Binary `hc-dna` command executable.
 
-use holochain_types::prelude::{AppManifest, DnaManifest};
+use holochain_types::prelude::{AppManifest, DnaManifest, ValidatedDnaManifest};
 use holochain_types::web_app::WebAppManifest;
 use holochain_util::ffs;
 use mr_bundle::Manifest;
@@ -205,7 +205,7 @@ impl HcDnaBundle {
             Self::Pack { path, output } => {
                 let name = get_dna_name(&path).await?;
                 let (bundle_path, _) =
-                    crate::packing::pack::<DnaManifest>(&path, output, name).await?;
+                    crate::packing::pack::<ValidatedDnaManifest>(&path, output, name).await?;
                 println!("Wrote bundle {}", bundle_path.to_string_lossy());
             }
             Self::Unpack {
@@ -213,9 +213,13 @@ impl HcDnaBundle {
                 output,
                 force,
             } => {
-                let dir_path =
-                    crate::packing::unpack::<DnaManifest>(DNA_BUNDLE_EXT, &path, output, force)
-                        .await?;
+                let dir_path = crate::packing::unpack::<ValidatedDnaManifest>(
+                    DNA_BUNDLE_EXT,
+                    &path,
+                    output,
+                    force,
+                )
+                .await?;
                 println!("Unpacked to directory {}", dir_path.to_string_lossy());
             }
         }
@@ -285,7 +289,7 @@ impl HcWebAppBundle {
 
 async fn get_dna_name(manifest_path: &Path) -> HcBundleResult<String> {
     let manifest_path = manifest_path.to_path_buf();
-    let manifest_path = manifest_path.join(&DnaManifest::path());
+    let manifest_path = manifest_path.join(&ValidatedDnaManifest::path());
     let manifest_yaml = ffs::read_to_string(&manifest_path).await?;
     let manifest: DnaManifest = serde_yaml::from_str(&manifest_yaml)?;
     Ok(manifest.name())

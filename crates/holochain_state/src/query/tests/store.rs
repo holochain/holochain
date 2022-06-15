@@ -6,7 +6,6 @@ async fn exists() {
     let mut scratch = Scratch::new();
     let mut conn = Connection::open_in_memory().unwrap();
     SCHEMA_CELL.initialize(&mut conn, None).unwrap();
-    let zome = fixt!(Zome);
 
     let mut txn = conn
         .transaction_with_behavior(TransactionBehavior::Exclusive)
@@ -15,7 +14,6 @@ async fn exists() {
     let td = EntryTestData::new();
     insert_op_scratch(
         &mut scratch,
-        Some(zome),
         td.store_entry_op.clone(),
         ChainTopOrdering::default(),
     )

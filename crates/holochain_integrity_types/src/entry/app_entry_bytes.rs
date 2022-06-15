@@ -5,7 +5,7 @@ use holochain_serialized_bytes::prelude::*;
 /// Newtype for the bytes comprising an App entry
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-pub struct AppEntryBytes(SerializedBytes);
+pub struct AppEntryBytes(pub SerializedBytes);
 
 impl AppEntryBytes {
     /// Get the inner SerializedBytes

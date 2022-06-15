@@ -76,16 +76,20 @@ impl DeleteLinkInput {
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub struct GetLinksInput {
     pub base_address: holo_hash::AnyLinkableHash,
+    /// Ranges of links to include in this query.
+    pub link_type: LinkTypeRanges,
     pub tag_prefix: Option<crate::link::LinkTag>,
 }
 
 impl GetLinksInput {
     pub fn new(
         base_address: holo_hash::AnyLinkableHash,
+        link_type: LinkTypeRanges,
         tag_prefix: Option<crate::link::LinkTag>,
     ) -> Self {
         Self {
             base_address,
+            link_type,
             tag_prefix,
         }
     }

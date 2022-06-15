@@ -1,53 +1,73 @@
+[![Project](https://img.shields.io/badge/Project-Holochain-blue.svg?style=flat-square)](http://holochain.org/)
+[![Forum](https://img.shields.io/badge/Forum-forum%2eholochain%2enet-blue.svg?style=flat-square)](https://forum.holochain.org)
+[![License: CAL 1.0](https://img.shields.io/badge/License-CAL%201.0-blue.svg)](https://github.com/holochain/cryptographic-autonomy-license)
+![Test](https://github.com/holochain/holochain-client-js/actions/workflows/test.yml/badge.svg?branch=main)
+[![Twitter Follow](https://img.shields.io/twitter/follow/holochain.svg?style=social&label=Follow)](https://twitter.com/holochain)
+
 # Holochain
 
-[![Project](https://img.shields.io/badge/project-holochain-blue.svg?style=flat-square)](http://holochain.org/)
-[![Forum](https://img.shields.io/badge/chat-forum%2eholochain%2enet-blue.svg?style=flat-square)](https://forum.holochain.org)
-[![Chat](https://img.shields.io/badge/chat-chat%2eholochain%2enet-blue.svg?style=flat-square)](https://chat.holochain.org)
+Holochain is an open-source framework to develop peer-to-peer applications with high levels of security, reliability, and performance.
 
-[![Twitter Follow](https://img.shields.io/twitter/follow/holochain.svg?style=social&label=Follow)](https://twitter.com/holochain)
-License: [![License: CAL 1.0](https://img.shields.io/badge/License-CAL%201.0-blue.svg)](https://github.com/holochain/cryptographic-autonomy-license)
+This repository contains the Holochain core libraries.
 
-This repository contains the core Holochain libraries and binaries.
+## Running Holochain applications (hApps)
 
-This is the most recent and well maintained version of Holochain with a refactored state model (you may see references to it as Holochain RSM).
+[Holochain Launcher](https://github.com/holochain/launcher), the distribution of Holochain for end-users, is supported on all three major desktop platforms.
+Holochain apps can be installed and run with it. Refer to the Github repository for instructions on how to obtain and use it.
 
-## Code Status
+## Holochain Development
 
-This code is in alpha. It is not for production use. The code is guaranteed NOT secure.
+### Code Status
 
-We will be frequently and heavily restructuring code APIs and data chains until Beta.
+This code is in Alpha. It is not for production use, and currently makes no security guarantees. We will be frequently and heavily restructuring code APIs and data chains until Beta.
 
-**We are currently only supporting Linux at this time**. You may or may not be able to successfully build and run Holochain on macOS or Windows. We will definitely be rolling out support for these OSes in the future, but in the meantime please use Linux for development!
+### Supported OSes
 
-## Making the Holochain binaries available in your shell
-There are a number of contexts and purposes you might be running in which yield different ways to access binaries.
+#### Linux
 
+* Launcher binaries
+* binaries via crates.io
+* nix package and holonix shell, including execution of binary within holonix CI
+* full functionality test on CI
 
-### Using nix-shell on a local clone
-Assuming you have [installed the nix shell](https://nixos.wiki/wiki/Nix_Installation_Guide):
+#### macOS (x86-64 only, no ARM)
 
-```
-nix-shell --argstr flavor happDev
-```
+* Launcher binaries
+* binaries via crates.io
+* nix package and holonix shell, including execution of binary within holonix CI
+* no functionality tests beyond binary execution
 
-This nix-shell flavor installs wrapper binaries for `holochain` and `hc` that will automatically compile and run the binaries.  This is very useful if you are tracking changes in the holochain repo because when you check out a new rev, running holochain will compile automatically to the version at that rev.
+#### Windows
 
-### Building with a pre-installed cargo
+* Launcher binaries
+* binaries via crates.io
+* no functionality tests
 
-Another way to install the `holochain` and `hc` binaries (if the previous didn't work) is by using rust
+### Developing Holochain applications (hApps)
 
-[Install Rust](https://www.rust-lang.org/tools/install)
+Looking to write a hApp yourself? After setting up your development environment, you can scaffold your hApp. Refer to the
+[Holochain Dev Tools Guide](https://developer.holochain.org/install) to set up your environment, and see
+[how hApps are scaffolded](https://developer.holochain.org/happ-setup/#scaffolding-a-new-happ) for creating a hApp template.
 
-Install holochain binaries:
-```
-cargo install --path crates/holochain
-cargo install --path crates/hc
-```
+Furthermore there's a tutorial on how to [build a hApp](https://github.com/holochain/happ-build-tutorial) as well as
+[how to call it from a client](https://github.com/holochain/happ-client-call-tutorial).
 
-be sure to add `$HOME/.cargo/bin` to your PATH to be able to run the installed binaries
+### Contributing to Holochain (this repository)
 
+Holochain is an open source project. We welcome all sorts of participation and are actively working on increasing surface area to accept it. Please see our [contributing guidelines](/CONTRIBUTING.md) for our general practices and protocols on participating in the community, as well as specific expectations around things like code formatting, testing practices, continuous integration, etc.
 
-## Usage
+> Connect with us on [Discord](https://discord.gg/MwPvM4Vffg) and [our forum](https://forum.holochain.org).
+
+#### Development environment setup
+
+The recommended way to set up your development environment is to use the [Holochain Dev Tools](https://developer.holochain.org/install), also called "Holonix".
+Holonix is a specification of the necessary tools and libraries to write and build hApps, based on Nix. This guarantees a deterministic development
+environment across machines and operating systems.
+
+For a reference on how to set up your environment without Holonix, see the corresponding installation instructions at
+[Install Holochain without Holonix](https://developer.holochain.org/install-without-holonix).
+
+### Usage
 
 ``` bash
 $ holochain --help
@@ -65,7 +85,7 @@ OPTIONS:
             Path to a YAML file containing conductor configuration
 ```
 
-Running `holochain` requires a config file.  You can generate one in the default configuration file locations using interactive mode:
+Running `holochain` requires a config file. You can generate one in the default configuration file locations using interactive mode:
 
 ``` bash
 $ holochain -i
@@ -80,90 +100,13 @@ Database created.
 Conductor ready.
 ```
 
-As well as creating the config file this process also instantiates the database.   If you provide a config file on first run with just the `-c` flag `holochain` will also initialize the environment even if not in interactive mode.
-
-## Documentation for Application Developers
-
-- [Read the HDK API docs](https://docs.rs/hdk)
-- [Get started developing hApps](https://github.com/holochain/happ-build-tutorial/)
-- [Read the wasm API docs](./crates/hdk/README.md)
-
-## Environment for Development on this Project
-
-Assuming you have [installed the nix shell](https://nixos.wiki/wiki/Nix_Installation_Guide):
-
-```
-git clone git@github.com:holochain/holochain.git
-cd holochain
-nix-shell
-hc-merge-test
-```
-
-This will compile holochain and run all the tests.
-
-If you get an error while running `nix-shell` about ngrok having an unfree license, you can fix that by running,
-
-```
-mkdir -p ~/.config/nixpkgs/
-echo "{ allowUnfree = true; }" >> ~/.config/nixpkgs/config.nix
-```
-
-We have an all-in-one development environment including (among other things):
-
-- The correct version and sane environment variables of cargo/rust
-- Node for working with tryorama
-- Scaffolding, build and deployment scripts
-- Prebuilt binaries of core for various operating systems (soon)
-- Shared libs such as libsodium
-
-It is called [Holonix](https://github.com/holochain/holonix) and you should use it.
-
-It has plenty of documentation and functionality and can be used across Windows, Mac, and Linux.
-(Although Holochain itself currently only supports Linux.)
-It is based on the development tools provided by [NixOS](http://nixos.org/).
-
-It is suitable for use in hackathons and 'serious' development for a long-term,
-production grade development team.
-
-If you want to maintain your own development environment then we can only offer
-rough advice, because anything we say today could be out of date tomorrow:
-
-- Use a recent stable version of rust
-- Use node 12x+ for clientside work
-- Install any relevant shared libs like libsodium
-- Write your own scaffolding, build and development tools
-- Plan for dependency management as we ship new binaries
-
-### Advanced nix-shell usage
-
-#### Custom rust version
-
-The shell function in this repository takes a `rustVersion` argument that works in the following way:
-
-```shell
-$ nix-shell --arg rustVersion '{ track = "nightly"; version = "2021-07-01"; }' --run "rustc --version"
-Using /home/steveej/src/holo/holochain as target prefix...
-rustc 1.55.0-nightly (868c702d0 2021-06-30)
-```
-
-### Additional Documentation
-
-Build the holochain docs:
-```bash
-cargo doc --manifest-path=crates/holochain/Cargo.toml --open
-```
-
-## Contribute
-Holochain is an open source project.  We welcome all sorts of participation and are actively working on increasing surface area to accept it.  Please see our [contributing guidelines](/CONTRIBUTING.md) for our general practices and protocols on participating in the community, as well as specific expectations around things like code formatting, testing practices, continuous integration, etc.
-
-* Connect with us on our [forum](https://forum.holochain.org)
+As well as creating the config file, this process also instantiates the database. If you provide a config file on first run with just the `-c` flag, `holochain` will also initialize the environment even if not in interactive mode.
 
 ## License
- [![License: CAL 1.0](https://img.shields.io/badge/License-CAL%201.0-blue.svg)](https://github.com/holochain/cryptographic-autonomy-license)
 
-Copyright (C) 2019 - 2021, Holochain Foundation
+Copyright (C) 2019-2022, Holochain Foundation
 
 This program is free software: you can redistribute it and/or modify it under the terms of the license
-provided in the LICENSE file (CAL-1.0).  This program is distributed in the hope that it will be useful,
+provided in the LICENSE file (CAL-1.0). This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
 PURPOSE.
