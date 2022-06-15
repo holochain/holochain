@@ -4,6 +4,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased](https://github.com/holochain/holochain/holochain_zome_types-v0.0.2-alpha.1...HEAD)
 
+- Bump wasmer to 0.0.80 [\#1386](https://github.com/holochain/holochain/pull/1386)
+
 ### Integrity / Coordinator Changes [\#1325](https://github.com/holochain/holochain/pull/1325) 
 ### Added
 - `ZomeDef` now holds dependencies for the zome.
