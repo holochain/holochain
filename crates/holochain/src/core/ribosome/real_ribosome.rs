@@ -63,13 +63,22 @@ use crate::core::ribosome::host_fn::x_25519_x_salsa20_poly1305_decrypt::x_25519_
 use crate::core::ribosome::host_fn::x_25519_x_salsa20_poly1305_encrypt::x_25519_x_salsa20_poly1305_encrypt;
 use crate::core::ribosome::host_fn::x_salsa20_poly1305_decrypt::x_salsa20_poly1305_decrypt;
 use crate::core::ribosome::host_fn::x_salsa20_poly1305_encrypt::x_salsa20_poly1305_encrypt;
+use crate::core::ribosome::host_fn::x_salsa20_poly1305_shared_secret_create_random::x_salsa20_poly1305_shared_secret_create_random;
+use crate::core::ribosome::host_fn::x_salsa20_poly1305_shared_secret_export::x_salsa20_poly1305_shared_secret_export;
+use crate::core::ribosome::host_fn::x_salsa20_poly1305_shared_secret_ingest::x_salsa20_poly1305_shared_secret_ingest;
 use crate::core::ribosome::host_fn::zome_info::zome_info;
+use crate::core::ribosome::real_ribosome::wasmparser::Operator as WasmOperator;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCallInvocation;
 use fallible_iterator::FallibleIterator;
 use holochain_types::prelude::*;
+use holochain_wasmer_host::module::SerializedModuleCache;
+use wasmer_middlewares::Metering;
+// This is here because there were errors about different crate versions
+// without it.
+use kitsune_p2p_types::dependencies::lair_keystore_api::dependencies::parking_lot::lock_api::RwLock;
 
 use holochain_types::zome_types::GlobalZomeTypes;
 use holochain_types::zome_types::ZomeTypesError;
@@ -327,6 +336,22 @@ impl RealRibosome {
     }
 
     pub fn module(&self, zome_name: &ZomeName) -> RibosomeResult<Arc<Module>> {
+        if holochain_wasmer_host::module::SERIALIZED_MODULE_CACHE
+            .get()
+            .is_none()
+        {
+            holochain_wasmer_host::module::SERIALIZED_MODULE_CACHE
+                .set(RwLock::new(SerializedModuleCache::default_with_cranelift(
+                    Self::cranelift,
+                )))
+                // An error here means the cell is full when we tried to set it, so
+                // some other thread must have done something in between the get
+                // above and the set here. In this case we don't care as we don't
+                // have any competing code paths that could set it to something
+                // unexpected.
+                .ok();
+        }
+
         Ok(holochain_wasmer_host::module::MODULE_CACHE.write().get(
             self.wasm_cache_key(zome_name)?,
             &*self.dna_file.get_wasm_for_zome(zome_name)?.code(),
@@ -452,6 +477,16 @@ impl RealRibosome {
         Ok((instance, context_key))
     }
 
+    pub fn cranelift() -> Cranelift {
+        let cost_function = |_operator: &WasmOperator| -> u64 { 1 };
+        // @todo 10 giga-ops is totally arbitrary cutoff so we probably
+        // want to make the limit configurable somehow.
+        let metering = Arc::new(Metering::new(10_000_000_000, cost_function));
+        let mut cranelift = Cranelift::default();
+        cranelift.canonicalize_nans(true).push_middleware(metering);
+        cranelift
+    }
+
     fn imports(&self, context_key: u64, store: &Store) -> ImportObject {
         let db = Env::default();
         let mut imports = imports! {};
@@ -474,7 +509,21 @@ impl RealRibosome {
             .with_host_function(&mut ns, "__verify_signature", verify_signature)
             .with_host_function(&mut ns, "__sign", sign)
             .with_host_function(&mut ns, "__sign_ephemeral", sign_ephemeral)
-            .with_host_function(&mut ns, "__create_x25519_keypair", create_x25519_keypair)
+            .with_host_function(
+                &mut ns,
+                "__x_salsa20_poly1305_shared_secret_create_random",
+                x_salsa20_poly1305_shared_secret_create_random,
+            )
+            .with_host_function(
+                &mut ns,
+                "__x_salsa20_poly1305_shared_secret_export",
+                x_salsa20_poly1305_shared_secret_export,
+            )
+            .with_host_function(
+                &mut ns,
+                "__x_salsa20_poly1305_shared_secret_ingest",
+                x_salsa20_poly1305_shared_secret_ingest,
+            )
             .with_host_function(
                 &mut ns,
                 "__x_salsa20_poly1305_encrypt",
@@ -485,6 +534,7 @@ impl RealRibosome {
                 "__x_salsa20_poly1305_decrypt",
                 x_salsa20_poly1305_decrypt,
             )
+            .with_host_function(&mut ns, "__create_x25519_keypair", create_x25519_keypair)
             .with_host_function(
                 &mut ns,
                 "__x_25519_x_salsa20_poly1305_encrypt",
@@ -893,6 +943,7 @@ impl RibosomeT for RealRibosome {
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
+    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use crate::core::ribosome::ZomeCall;
     use crate::sweettest::SweetConductor;
     use crate::sweettest::SweetDnaFile;
@@ -954,5 +1005,31 @@ pub mod wasm_test {
         } else {
             unreachable!();
         }
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn the_incredible_halt_test() {
+        observability::test_run().ok();
+        let RibosomeTestFixture {
+            conductor, alice, ..
+        } = RibosomeTestFixture::new(TestWasm::TheIncredibleHalt).await;
+
+        // This will run infinitely unless our metering kicks in and traps it.
+        // Also we stop it running after 10 seconds.
+        let result: Result<Result<(), _>, _> = tokio::time::timeout(
+            std::time::Duration::from_millis(10000),
+            conductor.call_fallible(&alice, "smash", ()),
+        )
+        .await;
+        assert!(result.unwrap().is_err());
+
+        // The same thing will happen when we commit an entry due to a loop in
+        // the validation logic.
+        let create_result: Result<Result<(), _>, _> = tokio::time::timeout(
+            std::time::Duration::from_millis(10000),
+            conductor.call_fallible(&alice, "create_a_thing", ()),
+        )
+        .await;
+        assert!(create_result.unwrap().is_err());
     }
 }

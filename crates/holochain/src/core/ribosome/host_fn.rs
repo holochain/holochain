@@ -73,7 +73,17 @@ host_fn_api_impls! {
     // Returns HeaderHash of the newly created element.
     fn create (zt::entry::CreateInput) -> holo_hash::HeaderHash;
 
-    fn create_x25519_keypair(()) -> holochain_zome_types::x_salsa20_poly1305::x25519::X25519PubKey;
+    fn x_salsa20_poly1305_shared_secret_create_random(
+        Option<zt::x_salsa20_poly1305::key_ref::XSalsa20Poly1305KeyRef>
+    ) -> zt::x_salsa20_poly1305::key_ref::XSalsa20Poly1305KeyRef;
+
+    fn x_salsa20_poly1305_shared_secret_export(
+        zt::x_salsa20_poly1305::XSalsa20Poly1305SharedSecretExport
+    ) -> zt::x_salsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData;
+
+    fn x_salsa20_poly1305_shared_secret_ingest(
+        zt::x_salsa20_poly1305::XSalsa20Poly1305SharedSecretIngest
+    ) -> zt::x_salsa20_poly1305::key_ref::XSalsa20Poly1305KeyRef;
 
     fn x_salsa20_poly1305_encrypt(
         holochain_zome_types::x_salsa20_poly1305::XSalsa20Poly1305Encrypt
@@ -82,6 +92,8 @@ host_fn_api_impls! {
     fn x_salsa20_poly1305_decrypt(
         holochain_zome_types::x_salsa20_poly1305::XSalsa20Poly1305Decrypt
     ) -> Option<holochain_zome_types::x_salsa20_poly1305::data::XSalsa20Poly1305Data>;
+
+    fn create_x25519_keypair(()) -> holochain_zome_types::x_salsa20_poly1305::x25519::X25519PubKey;
 
     // Sender, Recipient, Data.
     fn x_25519_x_salsa20_poly1305_encrypt (holochain_zome_types::x_salsa20_poly1305::X25519XSalsa20Poly1305Encrypt) -> holochain_zome_types::x_salsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData;
