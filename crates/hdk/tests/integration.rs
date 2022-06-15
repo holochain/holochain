@@ -510,6 +510,7 @@ fn set_zome_types_and_compare(entries: Vec<Range<u8>>, links: Vec<Range<u8>>, co
                     .map(|r| GlobalZomeTypeId(r.start)..GlobalZomeTypeId(r.end))
                     .collect(),
             ),
+            rate_limits: Default::default(),
         };
 
         let info = ZomeInfo {

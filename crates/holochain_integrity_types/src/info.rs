@@ -73,6 +73,9 @@ pub struct ScopedZomeTypesSet {
     /// All the link [`GlobalZomeTypeId`]s in scope for this zome.
     /// Converts from [`LinkType`](crate::link::LinkType) to [`LocalZomeTypeId`].
     pub links: ScopedZomeTypes,
+    /// All the rate limiting buckets defined across the DNA.
+    /// Converts from [`RateBucketId`](crate::rate_limit::RateBucketId) to [`LocalRateBucketId`].
+    pub rate_limits: ScopedZomeTypes,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, PartialEq, Default)]
@@ -146,6 +149,11 @@ impl ScopedZomeTypes {
                     Some(GlobalZomeTypeId(u8::try_from(i).ok()?))
                 })
         })
+    }
+
+    /// Get the range at the given index
+    pub fn get(&self, zome_id: &ZomeId) -> Option<Range<GlobalZomeTypeId>> {
+        self.0.get(zome_id.0 as usize).cloned()
     }
 }
 

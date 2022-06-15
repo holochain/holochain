@@ -14,7 +14,11 @@ fn make_set(entries: &[Range<u8>], links: &[Range<u8>]) -> GlobalZomeTypes {
             .map(|r| GlobalZomeTypeId(r.start)..GlobalZomeTypeId(r.end))
             .collect(),
     );
-    GlobalZomeTypes(ScopedZomeTypesSet { entries, links })
+    GlobalZomeTypes(ScopedZomeTypesSet {
+        entries,
+        links,
+        rate_limits: Default::default(),
+    })
 }
 
 #[test_case(vec![] => make_set(&[], &[]))]

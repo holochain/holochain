@@ -71,14 +71,16 @@ impl GlobalZomeTypes {
 
     /// Create a new zome types map within the scope of the given integrity zomes.
     pub fn re_scope(&self, zomes: &[ZomeId]) -> ZomeTypesResult<ScopedZomeTypesSet> {
-        let Self(ScopedZomeTypesSet { entries, links }) = self;
+        let Self(ScopedZomeTypesSet {
+            entries,
+            links,
+            rate_limits,
+        }) = self;
         let entries = zomes
             .iter()
             .map(|zome_id| {
                 entries
-                    .0
-                    .get(zome_id.0 as usize)
-                    .cloned()
+                    .get(&zome_id)
                     .ok_or(ZomeTypesError::MissingZomeType(*zome_id))
             })
             .collect::<ZomeTypesResult<Vec<_>>>()?;
@@ -86,15 +88,22 @@ impl GlobalZomeTypes {
             .iter()
             .map(|zome_id| {
                 links
-                    .0
-                    .get(zome_id.0 as usize)
-                    .cloned()
+                    .get(&zome_id)
+                    .ok_or(ZomeTypesError::MissingZomeType(*zome_id))
+            })
+            .collect::<ZomeTypesResult<Vec<_>>>()?;
+        let rate_limits = zomes
+            .iter()
+            .map(|zome_id| {
+                rate_limits
+                    .get(&zome_id)
                     .ok_or(ZomeTypesError::MissingZomeType(*zome_id))
             })
             .collect::<ZomeTypesResult<Vec<_>>>()?;
         Ok(ScopedZomeTypesSet {
             entries: ScopedZomeTypes(entries),
             links: ScopedZomeTypes(links),
+            rate_limits: ScopedZomeTypes(rate_limits),
         })
     }
 

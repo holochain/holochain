@@ -499,5 +499,6 @@ fn set_zome_types(entries: Vec<Range<u8>>, links: Vec<Range<u8>>) {
                 .map(|r| GlobalZomeTypeId(r.start)..GlobalZomeTypeId(r.end))
                 .collect(),
         ),
+        rate_limits: Default::default(),
     }));
 }

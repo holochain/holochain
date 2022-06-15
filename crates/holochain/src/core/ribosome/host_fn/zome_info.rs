@@ -86,6 +86,7 @@ pub mod test {
             ScopedZomeTypesSet {
                 entries: ScopedZomeTypes(vec![GlobalZomeTypeId(0)..GlobalZomeTypeId(2)]),
                 links: ScopedZomeTypes(vec![GlobalZomeTypeId(0)..GlobalZomeTypeId(0)]),
+                rate_limits: Default::default(),
             }
         );
     }
