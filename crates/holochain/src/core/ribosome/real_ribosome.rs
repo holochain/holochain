@@ -373,7 +373,7 @@ impl RealRibosome {
 
     fn cranelift_fn() -> fn() -> Cranelift {
         || {
-            let cost_function = |_operator: &Operator| -> u64 { 1 };
+            let cost_function = |_operator: &WasmOperator| -> u64 { 1 };
             // @todo 10 giga-ops is totally arbitrary cutoff so we probably
             // want to make the limit configurable somehow.
             let metering = Arc::new(Metering::new(10_000_000_000, cost_function));
