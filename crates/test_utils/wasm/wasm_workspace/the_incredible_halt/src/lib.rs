@@ -2,6 +2,6 @@ use hdk::prelude::*;
 
 #[hdk_extern]
 fn smash(_: ()) -> ExternResult<()> {
-    while true {}
+    loop {}
     Ok(())
 }
