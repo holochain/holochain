@@ -40,7 +40,7 @@ fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                         Ok(thing.into())
                     }
                     EntryCheck::NotInScope => Ok(ValidateCallbackResult::Valid),
-                    EntryCheck::Found(ParseEntry::Failed(error)) => Ok(
+                    EntryCheck::Found(ParseEntry::Failed(_)) => Ok(
                         ValidateCallbackResult::Invalid("Failed to deserialize entry".to_string()),
                     ),
                 },
