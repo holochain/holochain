@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn get_link_details<'a>(
-    ribosome: Arc<impl RibosomeT>,
+    _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     inputs: Vec<GetLinksInput>,
 ) -> Result<Vec<LinkDetails>, RuntimeError> {
@@ -20,29 +20,29 @@ pub fn get_link_details<'a>(
             read_workspace: Permission::Allow,
             ..
         } => {
-            let results: Vec<Result<Vec<_>, _>> = tokio_helper::block_forever_on(async move {
-                join_all(inputs.into_iter().map(|input| async {
-                    let GetLinksInput {
-                        base_address,
-                        tag_prefix,
-                    } = input;
-                    let zome_id = ribosome
-                        .zome_to_id(&call_context.zome)
-                        .expect("Failed to get ID for current zome.");
-                    let key = WireLinkKey {
-                        base: base_address,
-                        zome_id,
-                        tag: tag_prefix,
-                    };
-                    Cascade::from_workspace_network(
-                        &call_context.host_context.workspace(),
-                        call_context.host_context.network().to_owned(),
-                    )
-                    .get_link_details(key, GetLinksOptions::default())
+            let results: Vec<Result<Vec<_>, RibosomeError>> =
+                tokio_helper::block_forever_on(async move {
+                    join_all(inputs.into_iter().map(|input| async {
+                        let GetLinksInput {
+                            base_address,
+                            link_type,
+                            tag_prefix,
+                        } = input;
+
+                        let key = WireLinkKey {
+                            base: base_address,
+                            type_query: Some(link_type),
+                            tag: tag_prefix,
+                        };
+                        Ok(Cascade::from_workspace_network(
+                            &call_context.host_context.workspace(),
+                            call_context.host_context.network().to_owned(),
+                        )
+                        .get_link_details(key, GetLinksOptions::default())
+                        .await?)
+                    }))
                     .await
-                }))
-                .await
-            });
+                });
             let results: Result<Vec<_>, RuntimeError> = results
                 .into_iter()
                 .map(|result| match result {
@@ -85,6 +85,7 @@ pub mod slow_tests {
         let _: () = conductor
             .call(&alice, "ensure", "foo.bar".to_string())
             .await;
+
         let _: () = conductor
             .call(&alice, "ensure", "foo.bar".to_string())
             .await;

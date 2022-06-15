@@ -75,7 +75,6 @@ pub fn delete_link<'a>(
                 .source_chain()
                 .as_ref()
                 .expect("Must have source chain if write_workspace access is given");
-            let zome = call_context.zome.clone();
 
             // handle timeouts at the source chain layer
 
@@ -86,7 +85,7 @@ pub fn delete_link<'a>(
                     base_address,
                 };
                 let header_hash = source_chain
-                    .put(Some(zome), header_builder, None, chain_top_ordering)
+                    .put(header_builder, None, chain_top_ordering)
                     .await
                     .map_err(|source_chain_error| -> RuntimeError {
                         wasm_error!(WasmErrorInner::Host(source_chain_error.to_string())).into()

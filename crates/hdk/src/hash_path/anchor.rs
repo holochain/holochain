@@ -24,9 +24,6 @@ pub struct Anchor {
     pub anchor_text: Option<String>,
 }
 
-// Provide all the default entry conventions for anchors.
-entry_def!(Anchor PathEntry::entry_def());
-
 /// Anchors are just a special case of path, so we can move from anchor to path losslessly.
 /// We simply format the anchor structure into a string that works with the path string handling.
 impl From<&Anchor> for Path {
@@ -95,20 +92,28 @@ impl TryFrom<&Path> for Anchor {
 
 /// Simple string interface to simple string based paths.
 /// a.k.a "the anchor pattern" that predates paths by a few years.
-pub fn anchor(anchor_type: String, anchor_text: String) -> ExternResult<holo_hash::EntryHash> {
+pub fn anchor(
+    link_type: impl Into<LinkType>,
+    anchor_type: String,
+    anchor_text: String,
+) -> ExternResult<holo_hash::EntryHash> {
     let path: Path = (&Anchor {
         anchor_type,
         anchor_text: Some(anchor_text),
     })
         .into();
+    let path = path.into_typed(link_type);
     path.ensure()?;
     path.path_entry_hash()
 }
 
 /// Returns every entry hash in a vector from the root of an anchor.
 /// Hashes are sorted in the same way that paths sort children.
-pub fn list_anchor_type_addresses() -> ExternResult<Vec<AnyLinkableHash>> {
+pub fn list_anchor_type_addresses(
+    link_type: impl Into<LinkType>,
+) -> ExternResult<Vec<AnyLinkableHash>> {
     let links = Path::from(vec![Component::new(ROOT.to_vec())])
+        .into_typed(link_type)
         .children()?
         .into_iter()
         .map(|link| link.target)
@@ -119,13 +124,17 @@ pub fn list_anchor_type_addresses() -> ExternResult<Vec<AnyLinkableHash>> {
 /// Returns every entry hash in a vector from the second level of an anchor.
 /// Uses the string argument to build the path from the root.
 /// Hashes are sorted in the same way that paths sort children.
-pub fn list_anchor_addresses(anchor_type: String) -> ExternResult<Vec<AnyLinkableHash>> {
+pub fn list_anchor_addresses(
+    link_type: impl Into<LinkType>,
+    anchor_type: String,
+) -> ExternResult<Vec<AnyLinkableHash>> {
     let path: Path = (&Anchor {
         anchor_type,
         anchor_text: None,
     })
         .into();
     let links = path
+        .into_typed(link_type)
         .children()?
         .into_iter()
         .map(|link| link.target)
@@ -137,17 +146,21 @@ pub fn list_anchor_addresses(anchor_type: String) -> ExternResult<Vec<AnyLinkabl
 /// tags are a single array of bytes, so to get an external interface that is somewhat backwards
 /// compatible we need to rebuild the anchors from the paths serialized into the links and then
 /// return them.
-pub fn list_anchor_tags(anchor_type: String) -> ExternResult<Vec<String>> {
+pub fn list_anchor_tags(
+    link_type: impl Into<LinkType>,
+    anchor_type: String,
+) -> ExternResult<Vec<String>> {
     let path: Path = (&Anchor {
         anchor_type,
         anchor_text: None,
     })
         .into();
+    let path = path.into_typed(link_type);
     path.ensure()?;
     let hopefully_anchor_tags: Result<Vec<String>, WasmError> = path
         .children_paths()?
         .into_iter()
-        .map(|path| match Anchor::try_from(&path) {
+        .map(|path| match Anchor::try_from(&path.path) {
             Ok(anchor) => match anchor.anchor_text {
                 Some(text) => Ok(text),
                 None => Err(wasm_error!(WasmErrorInner::Serialize(
@@ -201,21 +214,6 @@ fn hash_path_anchor_path() {
                 .into(),
         );
     }
-}
-
-#[cfg(test)]
-#[test]
-fn hash_path_anchor_entry_def() {
-    assert_eq!(PathEntry::entry_def_id(), Anchor::entry_def_id(),);
-
-    assert_eq!(
-        PathEntry::required_validations(),
-        Anchor::required_validations(),
-    );
-
-    assert_eq!(PathEntry::entry_visibility(), Anchor::entry_visibility(),);
-
-    assert_eq!(PathEntry::entry_def(), Anchor::entry_def(),);
 }
 
 #[cfg(test)]

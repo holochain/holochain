@@ -27,7 +27,7 @@ use std::time::Duration;
 async fn sys_validation_workflow_test() {
     observability::test_run().ok();
 
-    let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create])
+    let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create])
         .await
         .unwrap();
 
@@ -219,14 +219,23 @@ async fn bob_links_in_a_legit_way(
     let target_entry_hash = Entry::try_from(target.clone()).unwrap().to_hash();
     let link_tag = fixt!(LinkTag);
     let call_data = HostFnCaller::create(bob_cell_id, handle, dna_file).await;
+    let entry_index = call_data.get_entry_type(TestWasm::Create, POST_INDEX);
     // 3
     call_data
-        .commit_entry(base.clone().try_into().unwrap(), POST_ID)
+        .commit_entry(
+            base.clone().try_into().unwrap(),
+            entry_index.clone(),
+            EntryVisibility::Public,
+        )
         .await;
 
     // 4
     call_data
-        .commit_entry(target.clone().try_into().unwrap(), POST_ID)
+        .commit_entry(
+            target.clone().try_into().unwrap(),
+            entry_index,
+            EntryVisibility::Public,
+        )
         .await;
 
     // 5
@@ -235,6 +244,7 @@ async fn bob_links_in_a_legit_way(
         .create_link(
             base_entry_hash.clone().into(),
             target_entry_hash.clone().into(),
+            LinkType(0),
             link_tag.clone(),
         )
         .await;
@@ -266,15 +276,24 @@ async fn bob_makes_a_large_link(
     let link_tag = LinkTag(bytes);
 
     let call_data = HostFnCaller::create(bob_cell_id, handle, dna_file).await;
+    let entry_index = call_data.get_entry_type(TestWasm::Create, POST_INDEX);
 
     // 6
     let original_header_address = call_data
-        .commit_entry(base.clone().try_into().unwrap(), POST_ID)
+        .commit_entry(
+            base.clone().try_into().unwrap(),
+            entry_index.clone(),
+            EntryVisibility::Public,
+        )
         .await;
 
     // 7
     call_data
-        .commit_entry(target.clone().try_into().unwrap(), POST_ID)
+        .commit_entry(
+            target.clone().try_into().unwrap(),
+            entry_index.clone(),
+            EntryVisibility::Public,
+        )
         .await;
 
     // 8
@@ -283,6 +302,7 @@ async fn bob_makes_a_large_link(
         .create_link(
             base_entry_hash.clone().into(),
             target_entry_hash.clone().into(),
+            LinkType(0),
             link_tag.clone(),
         )
         .await;
@@ -292,7 +312,6 @@ async fn bob_makes_a_large_link(
     let bad_update_header = call_data
         .update_entry(
             bad_update.clone().try_into().unwrap(),
-            MSG_ID,
             original_header_address,
         )
         .await;
@@ -306,10 +325,15 @@ async fn bob_makes_a_large_link(
 async fn dodgy_bob(bob_cell_id: &CellId, handle: &ConductorHandle, dna_file: &DnaFile) {
     let legit_entry = Post("Bob is the best and I'll link to proof so you can check".into());
     let call_data = HostFnCaller::create(bob_cell_id, handle, dna_file).await;
+    let entry_index = call_data.get_entry_type(TestWasm::Create, POST_INDEX);
 
     // 11
     call_data
-        .commit_entry(legit_entry.clone().try_into().unwrap(), POST_ID)
+        .commit_entry(
+            legit_entry.clone().try_into().unwrap(),
+            entry_index.clone(),
+            EntryVisibility::Public,
+        )
         .await;
 
     // Delete a link that doesn't exist buy pushing garbage addresses straight
@@ -325,19 +349,13 @@ async fn dodgy_bob(bob_cell_id: &CellId, handle: &ConductorHandle, dna_file: &Dn
         .source_chain()
         .as_ref()
         .expect("Must have source chain if write_workspace access is given");
-    let zome = call_context.zome.clone();
 
     let header_builder = builder::DeleteLink {
         link_add_address,
         base_address,
     };
     let _header_hash = source_chain
-        .put(
-            Some(zome),
-            header_builder,
-            None,
-            ChainTopOrdering::default(),
-        )
+        .put(header_builder, None, ChainTopOrdering::default())
         .await
         .map_err(|source_chain_error| {
             wasm_error!(WasmErrorInner::Host(source_chain_error.to_string()))

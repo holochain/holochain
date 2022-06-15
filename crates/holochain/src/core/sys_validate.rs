@@ -2,6 +2,7 @@
 //! This module contains all the checks we run for sys validation
 
 use super::queue_consumer::TriggerSender;
+use super::ribosome::RibosomeT;
 use super::workflow::incoming_dht_ops_workflow::incoming_dht_ops_workflow;
 use super::workflow::sys_validation_workflow::SysValidationWorkspace;
 use crate::conductor::entry_def_store::get_entry_def;
@@ -263,23 +264,20 @@ pub async fn check_app_entry_type(
     entry_type: &AppEntryType,
     conductor: &dyn ConductorHandleT,
 ) -> SysValidationResult<EntryDef> {
-    let zome_index = u8::from(entry_type.zome_id()) as usize;
     // We want to be careful about holding locks open to the conductor api
     // so calls are made in blocks
-    let dna_file = conductor
-        .get_dna_file(dna_hash)
-        .ok_or_else(|| SysValidationError::DnaMissing(dna_hash.clone()))?;
+    let ribosome = conductor
+        .get_ribosome(dna_hash)
+        .map_err(|_| SysValidationError::DnaMissing(dna_hash.clone()))?;
 
     // Check if the zome is found
-    let zome = dna_file
-        .dna()
-        .zomes
-        .get(zome_index)
+    let zome = ribosome
+        .find_zome_from_entry(&entry_type.id())
         .ok_or_else(|| ValidationOutcome::ZomeId(entry_type.clone()))?
-        .clone()
+        .into_inner()
         .1;
 
-    let entry_def = get_entry_def(entry_type.id(), zome, dna_file.dna(), conductor).await?;
+    let entry_def = get_entry_def(entry_type.id(), zome, dna_hash, conductor).await?;
 
     // Check the visibility and return
     match entry_def {

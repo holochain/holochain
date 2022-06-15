@@ -9,12 +9,12 @@ use super::AppBundle;
 async fn app_bundle_fixture() -> (AppBundle, DnaFile) {
     let dna_wasm = DnaWasmHashed::from_content(DnaWasm::new_invalid()).await;
     let fake_wasms = vec![dna_wasm.clone().into_content()];
-    let fake_zomes = vec![Zome::new(
+    let fake_zomes = vec![IntegrityZome::new(
         "hi".into(),
-        ZomeDef::Wasm(WasmZome::new(dna_wasm.as_hash().clone())),
+        ZomeDef::Wasm(WasmZome::new(dna_wasm.as_hash().clone())).into(),
     )];
-    let dna_def_1 = DnaDef::unique_from_zomes(fake_zomes.clone());
-    let dna_def_2 = DnaDef::unique_from_zomes(fake_zomes);
+    let dna_def_1 = DnaDef::unique_from_zomes(fake_zomes.clone(), vec![]);
+    let dna_def_2 = DnaDef::unique_from_zomes(fake_zomes, vec![]);
 
     let dna1 = DnaFile::new(dna_def_1, fake_wasms.clone()).await.unwrap();
     let dna2 = DnaFile::new(dna_def_2, fake_wasms.clone()).await.unwrap();

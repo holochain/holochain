@@ -23,7 +23,7 @@ pub fn dna_info(
             properties: ribosome.dna_def().properties.clone(),
             zome_names: ribosome
                 .dna_def()
-                .zomes
+                .integrity_zomes
                 .iter()
                 .map(|(zome_name, _zome_def)| zome_name.to_owned())
                 .collect(),
@@ -51,7 +51,7 @@ pub mod test {
     use holochain_zome_types::prelude::*;
 
     async fn test_conductor(properties: SerializedBytes) -> (SweetConductor, SweetZome) {
-        let (dna_file, _) =
+        let (dna_file, _, _) =
             SweetDnaFile::from_test_wasms(random_uid(), vec![TestWasm::ZomeInfo], properties)
                 .await
                 .unwrap();

@@ -26,8 +26,8 @@ pub fn delete<'a>(
                 deletes_header_hash,
                 chain_top_ordering,
             } = input;
-            let deletes_entry_address =
-                get_original_address(call_context.clone(), deletes_header_hash.clone())?;
+            let (deletes_entry_address, _) =
+                get_original_entry_data(call_context.clone(), deletes_header_hash.clone())?;
 
             let host_access = call_context.host_context();
 
@@ -43,12 +43,7 @@ pub fn delete<'a>(
                     deletes_entry_address,
                 };
                 let header_hash = source_chain
-                    .put(
-                        Some(call_context.zome.clone()),
-                        header_builder,
-                        None,
-                        chain_top_ordering,
-                    )
+                    .put(header_builder, None, chain_top_ordering)
                     .await
                     .map_err(|source_chain_error| {
                         wasm_error!(WasmErrorInner::Host(source_chain_error.to_string()))
@@ -67,11 +62,10 @@ pub fn delete<'a>(
     }
 }
 
-#[allow(clippy::extra_unused_lifetimes)]
-pub(crate) fn get_original_address<'a>(
+pub(crate) fn get_original_entry_data(
     call_context: Arc<CallContext>,
     address: HeaderHash,
-) -> Result<EntryHash, WasmError> {
+) -> Result<(EntryHash, EntryType), WasmError> {
     let network = call_context.host_context.network().clone();
     let workspace = call_context.host_context.workspace();
 
@@ -94,12 +88,15 @@ pub(crate) fn get_original_address<'a>(
             .transpose()?;
 
         match maybe_original_element {
-            Some(original_element_signed_header_hash) => {
-                match original_element_signed_header_hash.header().entry_data() {
-                    Some((entry_hash, _)) => Ok(entry_hash.clone()),
-                    _ => Err(RibosomeError::ElementDeps(address.into())),
-                }
-            }
+            Some(SignedHeaderHashed {
+                hashed: HeaderHashed {
+                    content: header, ..
+                },
+                ..
+            }) => match header.into_entry_data() {
+                Some((entry_hash, entry_type)) => Ok((entry_hash, entry_type)),
+                _ => Err(RibosomeError::ElementDeps(address.into())),
+            },
             None => Err(RibosomeError::ElementDeps(address.into())),
         }
     })
@@ -128,7 +125,9 @@ pub mod wasm_test {
             None => unreachable!(),
         }
 
-        let _: HeaderHash = conductor.call(&alice, "delete_via_hash", thing_a.clone()).await;
+        let _: HeaderHash = conductor
+            .call(&alice, "delete_via_hash", thing_a.clone())
+            .await;
 
         let get_thing: Option<Element> = conductor.call(&alice, "reed", thing_a).await;
         match get_thing {

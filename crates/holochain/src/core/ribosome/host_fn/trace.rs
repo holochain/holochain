@@ -82,6 +82,7 @@ pub mod wasm_test {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "Doesn't work concurrently"]
     async fn wasm_trace_test() {
         CAPTURE.store(true, std::sync::atomic::Ordering::SeqCst);
         observability::test_run().ok();

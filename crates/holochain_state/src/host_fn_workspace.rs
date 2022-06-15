@@ -17,7 +17,6 @@ use crate::prelude::SourceChain;
 use crate::prelude::SourceChainError;
 use crate::prelude::SourceChainResult;
 use crate::scratch::SyncScratch;
-use holochain_zome_types::Zome;
 
 #[derive(Clone)]
 pub struct HostFnWorkspace<
@@ -56,7 +55,7 @@ impl HostFnWorkspace {
     pub async fn flush(
         self,
         network: &(dyn HolochainP2pDnaT + Send + Sync),
-    ) -> SourceChainResult<Vec<(Option<Zome>, SignedHeaderHashed)>> {
+    ) -> SourceChainResult<Vec<SignedHeaderHashed>> {
         match self.source_chain {
             Some(sc) => sc.flush(network).await,
             None => Ok(Vec::with_capacity(0)),

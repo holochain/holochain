@@ -8,7 +8,6 @@ use crate::core::workflow::app_validation_workflow::validation_package::get_as_a
 use holochain_cascade::Cascade;
 use holochain_p2p::HolochainP2pDna;
 use holochain_types::db_cache::DhtDbQueryCache;
-use holochain_types::dna::DnaFile;
 use holochain_zome_types::HeaderHashed;
 
 #[instrument(skip(
@@ -57,20 +56,9 @@ pub(super) async fn get_as_author(
         _ => return Ok(None.into()),
     };
 
-    //Get entry def
-    let entry_def = get_entry_def_from_ids(
-        app_entry_type.zome_id(),
-        app_entry_type.id(),
-        ribosome.dna_def(),
-        conductor_handle,
-    )
-    .await?;
-
     // Get the required validation package
-    let required_validation_type = match entry_def {
-        Some(ed) => ed.required_validation_type,
-        None => return Ok(None.into()),
-    };
+    // FIXME: Remove this completely.
+    let required_validation_type = RequiredValidationType::default();
 
     // Gather the package
     match required_validation_type {
@@ -144,8 +132,6 @@ pub(super) async fn get_as_author(
 pub(super) async fn get_as_authority(
     header: HeaderHashed,
     env: DbRead<DbKindDht>,
-    dna_file: &DnaFile,
-    conductor_handle: &dyn ConductorHandleT,
 ) -> CellResult<ValidationPackageResponse> {
     // Get author and hash
     let (header, header_hash) = header.into_inner();
@@ -160,22 +146,11 @@ pub(super) async fn get_as_authority(
         _ => return Ok(None.into()),
     };
 
-    //Get entry def
-    let entry_def = get_entry_def_from_ids(
-        app_entry_type.zome_id(),
-        app_entry_type.id(),
-        dna_file.dna(),
-        conductor_handle,
-    )
-    .await?;
-
     // Get the required validation package
-    let required_validation_type = match entry_def {
-        Some(ed) => ed.required_validation_type,
-        None => return Ok(None.into()),
-    };
+    // FIXME: Remove this completely.
+    let required_validation_type = RequiredValidationType::default();
 
-    let cascade = Cascade::empty().with_dht(env.clone());
+    let cascade = Cascade::empty().with_dht(env);
 
     // Gather the package
     match required_validation_type {

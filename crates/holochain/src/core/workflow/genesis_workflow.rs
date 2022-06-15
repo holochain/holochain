@@ -71,11 +71,11 @@ where
     let DnaDef {
         name,
         properties,
-        zomes,
+        integrity_zomes,
         ..
     } = &ribosome.dna_def().content;
     let dna_info = DnaInfo {
-        zome_names: zomes.iter().map(|(n, _)| n.clone()).collect(),
+        zome_names: integrity_zomes.iter().map(|(n, _)| n.clone()).collect(),
         name: name.clone(),
         hash: dna_hash,
         properties: properties.clone(),

@@ -8,6 +8,11 @@ edition = "2021"
 name = "test_wasm_sign"
 crate-type = [ "cdylib", "rlib" ]
 
+[[example]]
+name = "integrity_test_wasm_sign"
+path = "src/integrity.rs"
+crate-type = ["cdylib", "rlib"]
+
 [dependencies]
 hdk = { path = "../../../../hdk" }
 serde = "1.0"

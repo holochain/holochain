@@ -52,7 +52,7 @@ async fn fullsync_sharded_gossip() -> anyhow::Result<()> {
         });
     }
 
-    let (dna_file, _) = SweetDnaFile::unique_from_inline_zome("zome1", simple_create_read_zome())
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_create_read_zome())
         .await
         .unwrap();
 
@@ -62,7 +62,9 @@ async fn fullsync_sharded_gossip() -> anyhow::Result<()> {
     let ((alice,), (bobbo,)) = apps.into_tuples();
 
     // Call the "create" zome fn on Alice's app
-    let hash: HeaderHash = conductors[0].call(&alice.zome("zome1"), "create", ()).await;
+    let hash: HeaderHash = conductors[0]
+        .call(&alice.zome("simple"), "create", ())
+        .await;
     let all_cells = vec![&alice, &bobbo];
 
     // Wait long enough for Bob to receive gossip
@@ -71,7 +73,9 @@ async fn fullsync_sharded_gossip() -> anyhow::Result<()> {
     // holochain_state::prelude::dump_tmp(&p2p);
     // holochain_state::prelude::dump_tmp(&alice.env());
     // Verify that bobbo can run "read" on his cell and get alice's Header
-    let element: Option<Element> = conductors[1].call(&bobbo.zome("zome1"), "read", hash).await;
+    let element: Option<Element> = conductors[1]
+        .call(&bobbo.zome("simple"), "read", hash)
+        .await;
     let element = element.expect("Element was None: bobbo couldn't `get` it");
 
     // Assert that the Element bobbo sees matches what alice committed
@@ -114,7 +118,7 @@ async fn fullsync_sharded_local_gossip() -> anyhow::Result<()> {
         ..Default::default()
     });
 
-    let (dna_file, _) = SweetDnaFile::unique_from_inline_zome("zome1", simple_create_read_zome())
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_create_read_zome())
         .await
         .unwrap();
 
@@ -129,14 +133,14 @@ async fn fullsync_sharded_local_gossip() -> anyhow::Result<()> {
     let (bobbo,) = bobbo.into_tuple();
 
     // Call the "create" zome fn on Alice's app
-    let hash: HeaderHash = conductor.call(&alice.zome("zome1"), "create", ()).await;
+    let hash: HeaderHash = conductor.call(&alice.zome("simple"), "create", ()).await;
     let all_cells = vec![&alice, &bobbo];
 
     // Wait long enough for Bob to receive gossip
     consistency_10s(&all_cells).await;
 
     // Verify that bobbo can run "read" on his cell and get alice's Header
-    let element: Option<Element> = conductor.call(&bobbo.zome("zome1"), "read", hash).await;
+    let element: Option<Element> = conductor.call(&bobbo.zome("simple"), "read", hash).await;
     let element = element.expect("Element was None: bobbo couldn't `get` it");
 
     // Assert that the Element bobbo sees matches what alice committed
@@ -200,7 +204,7 @@ async fn mock_network_sharded_gossip() {
 
     // We have to use the same dna that was used to generate the test data.
     // This is a short coming I hope to overcome in future versions.
-    let dna_file = data_zome(data.uuid.clone()).await;
+    let dna_file = data_zome(data.integrity_uuid.clone(), data.coordinator_uuid.clone()).await;
 
     // We are pretending that all simulated agents have all other agents (except the real agent)
     // for this test.
@@ -719,7 +723,7 @@ async fn mock_network_sharding() {
 
     // We have to use the same dna that was used to generate the test data.
     // This is a short coming I hope to overcome in future versions.
-    let dna_file = data_zome(data.uuid.clone()).await;
+    let dna_file = data_zome(data.integrity_uuid.clone(), data.coordinator_uuid.clone()).await;
 
     // We are pretending that all simulated agents have all other agents (except the real agent)
     // for this test.
