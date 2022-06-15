@@ -64,7 +64,7 @@ use crate::core::ribosome::host_fn::x_25519_x_salsa20_poly1305_encrypt::x_25519_
 use crate::core::ribosome::host_fn::x_salsa20_poly1305_decrypt::x_salsa20_poly1305_decrypt;
 use crate::core::ribosome::host_fn::x_salsa20_poly1305_encrypt::x_salsa20_poly1305_encrypt;
 use crate::core::ribosome::host_fn::zome_info::zome_info;
-use crate::core::ribosome::real_ribosome::wasmparser::Operator;
+use crate::core::ribosome::real_ribosome::wasmparser::Operator as WasmOperator;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::RibosomeT;
