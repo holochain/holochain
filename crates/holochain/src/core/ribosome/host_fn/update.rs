@@ -10,7 +10,7 @@ use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn update<'a>(
-    _ribosome: Arc<impl RibosomeT>,
+    ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: UpdateInput,
 ) -> Result<HeaderHash, RuntimeError> {
@@ -22,20 +22,15 @@ pub fn update<'a>(
             // destructure the args out into an app type def id and entry
             let UpdateInput {
                 original_header_address,
-                create_input,
-                ..
-            } = input;
-            let CreateInput {
-                entry_def_id,
                 ref entry,
                 chain_top_ordering,
-                ..
-            } = create_input;
+            } = input;
 
             let (original_entry_address, entry_type) =
                 get_original_entry_data(call_context.clone(), original_header_address.clone())?;
 
-            let weight = todo!("weigh element");
+            // build the entry hash
+            let entry_hash = EntryHash::with_data_sync(entry);
 
             // Countersigned entries have different header handling.
             match entry {
@@ -48,30 +43,27 @@ pub fn update<'a>(
                             .as_ref()
                             .expect("Must have source chain if write_workspace access is given");
 
-                        let entry_hash = EntryHash::with_data_sync(entry);
                         let unweighed = UnweighedCountersigningHeader::from_countersigning_data(
                             entry_hash,
                             session_data,
                             (*source_chain.author()).clone(),
                         )
-                        .map_err(|e| WasmError::Host(e.to_string()))?;
+                        .map_err(|e| wasm_error!(WasmErrorInner::Host(e.to_string())))?;
 
                         let header = ribosome
                             .weigh_countersigning_header(unweighed, entry.clone())
-                            .map_err(|e| WasmError::Host(e.to_string()))?;
+                            .map_err(|e| wasm_error!(WasmErrorInner::Host(e.to_string())))?;
 
                         source_chain
                             .put_with_header(header.into(), Some(entry.clone()), chain_top_ordering)
                             .await
                             .map_err(|source_chain_error| {
-                                WasmError::Host(source_chain_error.to_string())
+                                wasm_error!(WasmErrorInner::Host(source_chain_error.to_string()))
+                                    .into()
                             })
                     })
                 }
                 _ => {
-                    // build the entry hash
-                    let entry_hash = EntryHash::with_data_sync(entry);
-
                     // build a header for the entry being updated
                     let header_builder = builder::Update {
                         original_entry_address,

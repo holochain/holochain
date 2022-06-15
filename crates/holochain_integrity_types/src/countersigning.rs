@@ -520,18 +520,6 @@ impl UnweighedCountersigningHeader {
             Self::Update(h) => &h.entry_hash,
         }
     }
-
-    /// Access the zome id, if applicable
-    pub fn zome_id(&self) -> Option<ZomeId> {
-        let et = match self {
-            Self::Create(h) => &h.entry_type,
-            Self::Update(h) => &h.entry_type,
-        };
-        match et {
-            EntryType::App(aet) => Some(aet.zome_id()),
-            _ => None,
-        }
-    }
 }
 
 /// All the data required for a countersigning session.

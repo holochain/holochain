@@ -51,6 +51,7 @@ use holochain_zome_types::Signature;
 use holochain_zome_types::SignedHeader;
 use holochain_zome_types::SignedHeaderHashed;
 use holochain_zome_types::Timestamp;
+use holochain_zome_types::UnweighedCountersigningHeader;
 
 use crate::chain_lock::is_chain_locked;
 use crate::chain_lock::is_lock_expired;
@@ -171,12 +172,13 @@ impl SourceChain {
         let entry_hash = EntryHash::with_data_sync(&entry);
         if let Entry::CounterSign(ref session_data, _) = entry {
             self.put_with_header(
-                Header::from_countersigning_data(
+                UnweighedCountersigningHeader::from_countersigning_data(
                     entry_hash,
                     session_data,
                     (*self.author).clone(),
-                    weight,
-                )?,
+                )?
+                .weighed(weight)
+                .into(),
                 Some(entry),
                 chain_top_ordering,
             )

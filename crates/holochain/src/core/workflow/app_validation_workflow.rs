@@ -521,12 +521,6 @@ fn create_link_zomes_to_invoke(
     Ok(ZomesToInvoke::One(zome.erase_type()))
 }
 
-fn zome_id_to_zome(zome_id: ZomeId, dna_def: &DnaDef) -> AppValidationResult<Zome> {
-    dna_def
-        .get_zome_by_index(&zome_id)
-        .map_err(|_| AppValidationError::ZomeId(zome_id))
-}
-
 #[async_recursion::async_recursion]
 async fn run_validation_callback_inner<R>(
     invocation: ValidateInvocation,

@@ -12,13 +12,13 @@ use holochain_zome_types::rate_limit::WeighCallbackResult;
 /// An invocation of the weigh callback function.
 pub struct WeighInvocation {
     /// The zome this invocation will invoke.
-    zome: Zome,
+    zome: IntegrityZome,
     /// The thing to be weighed.
     input: WeighInput,
 }
 
 impl WeighInvocation {
-    pub fn new(zome: Zome, input: WeighInput) -> Self {
+    pub fn new(zome: IntegrityZome, input: WeighInput) -> Self {
         Self { zome, input }
     }
 }
@@ -40,7 +40,7 @@ impl From<&WeighHostAccess> for HostFnAccess {
 
 impl Invocation for WeighInvocation {
     fn zomes(&self) -> ZomesToInvoke {
-        ZomesToInvoke::One(self.zome.clone())
+        ZomesToInvoke::OneIntegrity(self.zome.clone())
     }
     fn fn_components(&self) -> FnComponents {
         vec!["weigh".to_string()].into()
@@ -77,7 +77,7 @@ impl From<Vec<(ZomeName, WeighCallbackResult)>> for WeighResult {
 #[cfg(test)]
 impl<'a> arbitrary::Arbitrary<'a> for WeighInvocation {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        let zome = Zome::arbitrary(u)?;
+        let zome = IntegrityZome::arbitrary(u)?;
         let input = WeighInput::arbitrary(u)?;
         Ok(Self::new(zome, input))
     }
@@ -107,7 +107,7 @@ mod test {
         let mut u = Unstructured::new(&NOISE);
         let input = WeighInput::arbitrary(&mut u).unwrap();
         let weigh_invocation =
-            WeighInvocation::new(Zome::arbitrary(&mut u).unwrap(), input.clone());
+            WeighInvocation::new(IntegrityZome::arbitrary(&mut u).unwrap(), input.clone());
 
         let host_input = weigh_invocation.clone().host_input().unwrap();
 

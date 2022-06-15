@@ -150,15 +150,6 @@ impl DnaDef {
             .ok_or_else(|| ZomeError::ZomeNotFound(format!("Zome '{}' not found", &zome_name,)))
     }
 
-    /// Return a Zome by its index
-    pub fn get_zome_by_index(&self, zome_id: &ZomeId) -> Result<zome::Zome, ZomeError> {
-        self.zomes
-            .get(zome_id.0 as usize)
-            .cloned()
-            .map(|(name, def)| Zome::new(name, def))
-            .ok_or_else(|| ZomeError::ZomeNotFound(format!("Zome at index {} not found", zome_id)))
-    }
-
     /// Get all the [`CoordinatorZome`]s for this dna
     pub fn get_all_coordinators(&self) -> Vec<zome::CoordinatorZome> {
         self.coordinator_zomes

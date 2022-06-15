@@ -10,7 +10,7 @@ use std::sync::Arc;
 /// create element
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn create<'a>(
-    _ribosome: Arc<impl RibosomeT>,
+    ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: CreateInput,
 ) -> Result<HeaderHash, RuntimeError> {
@@ -22,9 +22,12 @@ pub fn create<'a>(
             let CreateInput {
                 entry_location,
                 entry_visibility,
-                entry,
+                ref entry,
                 chain_top_ordering,
             } = input;
+
+            // build the entry hash
+            let entry_hash = EntryHash::with_data_sync(entry);
 
             // Countersigned entries have different header handling.
             match entry {
@@ -37,30 +40,27 @@ pub fn create<'a>(
                             .as_ref()
                             .expect("Must have source chain if write_workspace access is given");
 
-                        let entry_hash = EntryHash::with_data_sync(&entry);
                         let unweighed = UnweighedCountersigningHeader::from_countersigning_data(
                             entry_hash,
                             session_data,
                             (*source_chain.author()).clone(),
                         )
-                        .map_err(|e| WasmError::Host(e.to_string()))?;
+                        .map_err(|e| wasm_error!(WasmErrorInner::Host(e.to_string())))?;
 
                         let header = ribosome
                             .weigh_countersigning_header(unweighed, entry.clone())
-                            .map_err(|e| WasmError::Host(e.to_string()))?;
+                            .map_err(|e| wasm_error!(WasmErrorInner::Host(e.to_string())))?;
 
                         source_chain
                             .put_with_header(header.into(), Some(entry.clone()), chain_top_ordering)
                             .await
                             .map_err(|source_chain_error| {
-                                WasmError::Host(source_chain_error.to_string())
+                                wasm_error!(WasmErrorInner::Host(source_chain_error.to_string()))
+                                    .into()
                             })
                     })
                 }
                 _ => {
-                    // build the entry hash
-                    let entry_hash = EntryHash::with_data_sync(&entry);
-
                     // extract the entry defs for a zome
                     let entry_type = match entry_location {
                         EntryDefLocation::App(entry_def_index) => {
@@ -90,7 +90,7 @@ pub fn create<'a>(
                             .source_chain()
                             .as_ref()
                             .expect("Must have source chain if write_workspace access is given")
-                            .put_weightless(header_builder, Some(entry), chain_top_ordering)
+                            .put_weightless(header_builder, Some(entry.clone()), chain_top_ordering)
                             .await
                             .map_err(|source_chain_error| -> RuntimeError {
                                 wasm_error!(WasmErrorInner::Host(source_chain_error.to_string()))

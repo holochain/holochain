@@ -95,7 +95,7 @@ async fn test_cell_handle_publish() {
             true,
             false,
             vec![op.clone()],
-            &RealRibosome::new(dna_file),
+            &RealRibosome::new(dna_file).unwrap(),
         )
         .await
         .unwrap();
