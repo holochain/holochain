@@ -88,6 +88,7 @@ impl BucketState {
             weight,
             timestamp,
         )?;
+        self.last_access = Some(timestamp);
         Ok(())
     }
 }
