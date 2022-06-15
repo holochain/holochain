@@ -41,7 +41,8 @@ impl CallbackResult for InitCallbackResult {
             | WasmErrorInner::CallError(_)
             | WasmErrorInner::PointerMap
             | WasmErrorInner::ErrorWhileError
-            | WasmErrorInner::Memory => Err(wasm_error),
+            | WasmErrorInner::Memory
+            | WasmErrorInner::UninitializedSerializedModuleCache => Err(wasm_error),
         }
     }
 }
