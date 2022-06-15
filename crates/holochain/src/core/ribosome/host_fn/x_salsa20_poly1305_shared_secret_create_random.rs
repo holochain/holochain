@@ -1,11 +1,11 @@
+use super::*;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
-use holochain_types::prelude::*;
-use holochain_wasmer_host::prelude::*;
-use ring::rand::SecureRandom;
 use std::sync::Arc;
+
+const DEF_REF_SIZE: usize = 32;
 
 pub fn x_salsa20_poly1305_shared_secret_create_random(
     _ribosome: Arc<impl RibosomeT>,
@@ -16,32 +16,26 @@ pub fn x_salsa20_poly1305_shared_secret_create_random(
         HostFnAccess {
             keystore: Permission::Allow,
             ..
-        } => {
-            // TODO - once we actually implement this in lair,
-            //        generate a new random seed in lair rather
-            //        than just treating the key_ref as the
-            //        seed itself as we're doing here
-            match input {
-                Some(key_ref) => {
-                    // this is a temp requirement until we do the
-                    // actual lair integration
-                    if key_ref.len() != 32 {
-                        return Err(wasm_error!(WasmErrorInner::Host("TempErrKeyRefLen".into())).into());
-                    }
-                    Ok(key_ref)
-                }
-                None => {
-                    let system_random = ring::rand::SystemRandom::new();
-                    let mut key_ref = [0; 32];
-                    system_random
-                        .fill(&mut key_ref)
-                        .map_err(|ring_unspecified| {
-                            wasm_error!(WasmErrorInner::Host(ring_unspecified.to_string()))
-                        })?;
-                    Ok(key_ref.into())
-                }
-            }
-        }
+        } => tokio_helper::block_forever_on(async move {
+            let key_ref = match input {
+                Some(key_ref) => key_ref,
+                None => rand_utf8::rand_utf8(
+                    &mut rand::thread_rng(),
+                    DEF_REF_SIZE,
+                ).as_bytes().to_vec().into(),
+            };
+
+            let tag = key_ref.to_tag();
+
+            call_context
+                .host_context
+                .keystore()
+                .new_shared_secret(tag)
+                .await?;
+
+            holochain_keystore::LairResult::Ok(key_ref)
+        })
+        .map_err(|keystore_error| wasm_error!(WasmErrorInner::Host(keystore_error.to_string())).into()),
         _ => Err(wasm_error!(WasmErrorInner::Host(
             RibosomeError::HostFnPermissions(
                 call_context.zome.zome_name().clone(),

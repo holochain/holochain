@@ -56,7 +56,7 @@ impl MetaLairClient {
                 }
                 Self::NewLair(client) => {
                     let tag = nanoid::nanoid!();
-                    let info = client.new_seed(tag.into(), None).await?;
+                    let info = client.new_seed(tag.into(), None, false).await?;
                     let pub_key =
                         holo_hash::AgentPubKey::from_raw_32(info.ed25519_pub_key.0.to_vec());
                     Ok(pub_key)
@@ -98,6 +98,26 @@ impl MetaLairClient {
         }
     }
 
+    /// Construct a new randomized shared secret, associated with given tag
+    pub fn new_shared_secret(
+        &self,
+        tag: Arc<str>,
+    ) -> impl Future<Output = LairResult<()>> + 'static + Send {
+        let this = self.clone();
+        async move {
+            match this {
+                Self::Legacy(_) => Err("LegacyLairDoesNotSupportSharedSecrets".into()),
+                Self::NewLair(client) => {
+                    // shared secrets are exportable
+                    // (it's hard to make them useful otherwise : )
+                    let exportable = true;
+                    let _info = client.new_seed(tag, None, exportable).await?;
+                    Ok(())
+                }
+            }
+        }
+    }
+
     /// Construct a new randomized encryption keypair
     pub fn new_x25519_keypair_random(
         &self,
@@ -114,7 +134,7 @@ impl MetaLairClient {
                 }
                 Self::NewLair(client) => {
                     let tag = nanoid::nanoid!();
-                    let info = client.new_seed(tag.into(), None).await?;
+                    let info = client.new_seed(tag.into(), None, false).await?;
                     let pub_key = info.x25519_pub_key;
                     Ok(pub_key)
                 }
