@@ -189,6 +189,7 @@ jobs:
             restoresCargoCache: true
             savesCargoCache: true
             ignoreErrorOnNonUbuntu: true
+            maxBuildSpace: true
             timeout_minutes: 12
             max_attempts:
               ubuntu-latest: 2
