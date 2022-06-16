@@ -4,6 +4,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.0.42
+
 ## 0.0.41
 
 - Docs: Crate README generated from crate level doc comments [\#1392](https://github.com/holochain/holochain/pull/1392).
