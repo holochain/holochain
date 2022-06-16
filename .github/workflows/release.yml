@@ -305,6 +305,7 @@ jobs:
         uses: cachix/install-nix-action@v16
       - name: Setup cachix
         uses: cachix/cachix-action@v10
+        continue-on-error: ${{ github.event_name != 'pull_request' }}
         with:
           name: holochain-ci
           signingKey: "${{ secrets.CACHIX_SIGNING_KEY }}"
