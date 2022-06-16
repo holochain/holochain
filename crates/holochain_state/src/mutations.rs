@@ -399,7 +399,7 @@ pub fn insert_action(
     action: &SignedActionHashed,
 ) -> StateMutationResult<()> {
     #[derive(Serialize, Debug)]
-    struct SignedActionRef<'a>(&'a action, &'a Signature);
+    struct SignedActionRef<'a>(&'a Action, &'a Signature);
     let hash = action.as_hash();
     let signature = action.signature();
     let action = action.action();

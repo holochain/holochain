@@ -531,9 +531,9 @@ impl DhtOpLight {
 pub enum UniqueForm<'a> {
     // As an optimization, we don't include signatures. They would be redundant
     // with actions and therefore would waste hash/comparison time to include.
-    StoreElement(&'a action),
+    StoreElement(&'a Action),
     StoreEntry(&'a NewEntryAction),
-    RegisterAgentActivity(&'a action),
+    RegisterAgentActivity(&'a Action),
     RegisterUpdatedContent(&'a action::Update),
     RegisterUpdatedElement(&'a action::Update),
     RegisterDeletedBy(&'a action::Delete),
@@ -705,7 +705,7 @@ pub fn produce_op_lights_from_element_group(
 
 /// Data minimal clone (no cloning entries) cheap &Element to DhtOpLight conversion
 fn produce_op_lights_from_parts<'a>(
-    actions_and_hashes: impl Iterator<Item = (&'a ActionHash, &'a action)>,
+    actions_and_hashes: impl Iterator<Item = (&'a ActionHash, &'a Action)>,
     maybe_entry_hash: Option<&EntryHash>,
 ) -> DhtOpResult<Vec<DhtOpLight>> {
     let iter = actions_and_hashes.map(|(head, hash)| (head, hash, maybe_entry_hash.cloned()));
@@ -714,7 +714,7 @@ fn produce_op_lights_from_parts<'a>(
 
 /// Produce op lights from iter of (action hash, action, maybe entry).
 pub fn produce_op_lights_from_iter<'a>(
-    iter: impl Iterator<Item = (&'a ActionHash, &'a action, Option<EntryHash>)>,
+    iter: impl Iterator<Item = (&'a ActionHash, &'a Action, Option<EntryHash>)>,
 ) -> DhtOpResult<Vec<DhtOpLight>> {
     let mut ops = Vec::new();
 

@@ -427,9 +427,9 @@ impl TryFrom<Action> for NewEntryAction {
     }
 }
 
-impl<'a> TryFrom<&'a action> for NewEntryActionRef<'a> {
+impl<'a> TryFrom<&'a Action> for NewEntryActionRef<'a> {
     type Error = WrongActionError;
-    fn try_from(value: &'a action) -> Result<Self, Self::Error> {
+    fn try_from(value: &'a Action) -> Result<Self, Self::Error> {
         match value {
             Action::Create(h) => Ok(NewEntryActionRef::Create(h)),
             Action::Update(h) => Ok(NewEntryActionRef::Update(h)),
