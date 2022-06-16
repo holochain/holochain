@@ -2030,6 +2030,7 @@ name = "test_wasm_the_incredible_halt"
 version = "0.0.1"
 dependencies = [
  "hdk",
+ "holochain_deterministic_integrity",
  "serde",
 ]
 

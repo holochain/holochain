@@ -229,6 +229,9 @@ impl From<TestWasm> for PathBuf {
             }
             TestWasm::Sign => "wasm32-unknown-unknown/release/test_wasm_sign.wasm",
             TestWasm::SysTime => "wasm32-unknown-unknown/release/test_wasm_sys_time.wasm",
+            TestWasm::TheIncredibleHalt => {
+                "wasm32-unknown-unknown/release/test_wasm_the_incredible_halt.wasm"
+            }
             TestWasm::Update => "wasm32-unknown-unknown/release/test_wasm_update_entry.wasm",
             TestWasm::Validate => "wasm32-unknown-unknown/release/test_wasm_validate.wasm",
             TestWasm::ValidateLink => "wasm32-unknown-unknown/release/test_wasm_validate_link.wasm",

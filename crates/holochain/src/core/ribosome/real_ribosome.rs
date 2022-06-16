@@ -67,7 +67,7 @@ use crate::core::ribosome::host_fn::x_salsa20_poly1305_shared_secret_create_rand
 use crate::core::ribosome::host_fn::x_salsa20_poly1305_shared_secret_export::x_salsa20_poly1305_shared_secret_export;
 use crate::core::ribosome::host_fn::x_salsa20_poly1305_shared_secret_ingest::x_salsa20_poly1305_shared_secret_ingest;
 use crate::core::ribosome::host_fn::zome_info::zome_info;
-use crate::core::ribosome::real_ribosome::wasmparser::Operator;
+use crate::core::ribosome::real_ribosome::wasmparser::Operator as WasmOperator;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::RibosomeT;
@@ -342,7 +342,7 @@ impl RealRibosome {
         {
             holochain_wasmer_host::module::SERIALIZED_MODULE_CACHE
                 .set(RwLock::new(SerializedModuleCache::default_with_cranelift(
-                    Self::cranelift_fn(),
+                    Self::cranelift,
                 )))
                 // An error here means the cell is full when we tried to set it, so
                 // some other thread must have done something in between the get
@@ -477,16 +477,14 @@ impl RealRibosome {
         Ok((instance, context_key))
     }
 
-    fn cranelift_fn() -> fn() -> Cranelift {
-        || {
-            let cost_function = |_operator: &Operator| -> u64 { 1 };
-            // @todo 10 giga-ops is totally arbitrary cutoff so we probably
-            // want to make the limit configurable somehow.
-            let metering = Arc::new(Metering::new(10_000_000_000, cost_function));
-            let mut cranelift = Cranelift::default();
-            cranelift.canonicalize_nans(true).push_middleware(metering);
-            cranelift
-        }
+    pub fn cranelift() -> Cranelift {
+        let cost_function = |_operator: &WasmOperator| -> u64 { 1 };
+        // @todo 10 giga-ops is totally arbitrary cutoff so we probably
+        // want to make the limit configurable somehow.
+        let metering = Arc::new(Metering::new(10_000_000_000, cost_function));
+        let mut cranelift = Cranelift::default();
+        cranelift.canonicalize_nans(true).push_middleware(metering);
+        cranelift
     }
 
     fn imports(&self, context_key: u64, store: &Store) -> ImportObject {
@@ -1017,7 +1015,21 @@ pub mod wasm_test {
         } = RibosomeTestFixture::new(TestWasm::TheIncredibleHalt).await;
 
         // This will run infinitely unless our metering kicks in and traps it.
-        let result: Result<(), _> = conductor.call_fallible(&alice, "smash", ()).await;
-        assert!(result.is_err());
+        // Also we stop it running after 10 seconds.
+        let result: Result<Result<(), _>, _> = tokio::time::timeout(
+            std::time::Duration::from_millis(10000),
+            conductor.call_fallible(&alice, "smash", ()),
+        )
+        .await;
+        assert!(result.unwrap().is_err());
+
+        // The same thing will happen when we commit an entry due to a loop in
+        // the validation logic.
+        let create_result: Result<Result<(), _>, _> = tokio::time::timeout(
+            std::time::Duration::from_millis(10000),
+            conductor.call_fallible(&alice, "create_a_thing", ()),
+        )
+        .await;
+        assert!(create_result.unwrap().is_err());
     }
 }

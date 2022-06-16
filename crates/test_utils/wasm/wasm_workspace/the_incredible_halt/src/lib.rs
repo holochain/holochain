@@ -1,6 +1,7 @@
-use hdk::prelude::*;
+pub mod integrity;
 
-#[hdk_extern]
-fn smash(_: ()) -> ExternResult<()> {
-    loop {}
-}
+#[cfg(not(feature = "integrity"))]
+pub mod coordinator;
+
+#[cfg(not(feature = "integrity"))]
+pub use coordinator::*;
