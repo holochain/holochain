@@ -179,17 +179,6 @@ jobs:
             git branch -D ${obsolete_branches}
           fi
 
-      - name: Setup upterm session
-        uses: lhotari/action-upterm@v1
-        if: ${{ failure() && needs.vars.outputs.debug == 'true' }}
-        env:
-          HRA_GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN }}
-        with:
-          ## limits ssh access and adds the ssh public key for the user which triggered the workflow
-          limit-access-to-actor: true
-          ## limits ssh access and adds the ssh public keys of the listed GitHub users
-          limit-access-to-users: steveeJ,jost-s,freesig,neonphog,thedavidmeister,maackle
-
       - name: Detect missing release headings
         run: |
           set -ex
@@ -307,6 +296,8 @@ jobs:
       - name: Setup upterm session
         uses: lhotari/action-upterm@v1
         if: ${{ failure() && inputs.debug == 'true' }}
+        env:
+          HRA_GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN }}
         with:
           ## limits ssh access and adds the ssh public key for the user which triggered the workflow
           limit-access-to-actor: true
