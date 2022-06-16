@@ -32,6 +32,8 @@ pub(crate) async fn get_entry_def(
         .map_err(|_| EntryDefStoreError::DnaFileMissing(dna_hash.clone()))?;
 
     // If it's not found run the ribosome and get the entry defs
+    // TODO: make this actually lazily loads the wasm such that if this fn is
+    //       called twice, this path is not taken the first time
     match &entry_def {
         Some(_) => Ok(entry_def),
         None => Ok(get_entry_defs(ribosome)
