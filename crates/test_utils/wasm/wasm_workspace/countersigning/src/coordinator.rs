@@ -25,7 +25,7 @@ fn create_countersigned(
 
     let entry = Entry::CounterSign(
         Box::new(
-            CounterSigningSessionData::try_from_responses(responses).map_err(
+            CounterSigningSessionData::try_from_responses(responses, vec![]).map_err(
                 |countersigning_error| wasm_error!(WasmErrorInner::Guest(countersigning_error.to_string())),
             )?,
         ),
@@ -64,7 +64,9 @@ fn generate_preflight_request(
     PreflightRequest::try_new(
         hash,
         agents,
-        None,
+        vec![],
+        0,
+        false,
         session_times_from_millis(5000)?,
         HeaderBase::Create(CreateBase::new(entry_type)),
         PreflightBytes(vec![]),

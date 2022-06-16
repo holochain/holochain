@@ -207,7 +207,9 @@ impl PreflightRequest {
             ));
         }
         // Minimum optional signers must be a majority.
-        if (self.minimum_optional_signing_agents * 2) as usize <= self.optional_signing_agents.len()
+        if (
+            self.minimum_optional_signing_agents * 2) as usize
+                <= self.optional_signing_agents.len() && self.optional_signing_agents.len() > 0
         {
             return Err(CounterSigningError::MinOptionalAgents(
                 self.minimum_optional_signing_agents,
