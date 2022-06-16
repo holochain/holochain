@@ -19,9 +19,13 @@ use crate::{RateBucketCapacity, RateBucketError, RateBucketResult, RateUnits};
 /// `drain_amount / drain_interval_ms`.
 #[derive(Debug, PartialEq, Eq, Clone, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct RateLimit {
-    capacity: RateBucketCapacity,
-    drain_amount: RateBucketCapacity,
-    drain_interval_ms: u32,
+    /// The total capacity of the bucket, i.e. when this level is reached, the
+    /// rate limit is exceeded
+    pub capacity: RateBucketCapacity,
+    /// How many units "leak" from the bucket per time interval
+    pub drain_amount: RateBucketCapacity,
+    /// How long is the time interval used to measure the "leak" rate?
+    pub drain_interval_ms: u32,
 }
 
 /// Calculate the next level of a bucket from the previous state.

@@ -43,6 +43,7 @@ pub fn must_get_header<'a>(
                         | HostContext::GenesisSelfCheck(_)
                         | HostContext::MigrateAgent(_)
                         | HostContext::PostCommit(_)
+                        | HostContext::RateLimits(_)
                         | HostContext::Weigh(_)
                         | HostContext::ZomeCall(_) => Err(wasm_error!(WasmErrorInner::Host(
                             format!("Failed to get SignedHeaderHashed {}", header_hash)

@@ -3,9 +3,11 @@ pub mod genesis_self_check;
 pub mod init;
 pub mod migrate_agent;
 pub mod post_commit;
+pub mod rate_limits;
 pub mod validate;
 pub mod validation_package;
 pub mod weigh;
+
 use super::HostContext;
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::FnComponents;

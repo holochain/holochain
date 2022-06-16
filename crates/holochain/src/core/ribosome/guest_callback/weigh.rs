@@ -6,7 +6,7 @@ use crate::core::ribosome::ZomesToInvoke;
 use derive_more::Constructor;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::prelude::*;
-use holochain_zome_types::rate_limit::WeighCallbackResult;
+use holochain_zome_types::weigh::WeighCallbackResult;
 
 #[derive(Clone, Debug)]
 /// An invocation of the weigh callback function.
@@ -127,7 +127,6 @@ mod slow_tests {
     use arbitrary::Unstructured;
     use holochain_types::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::rate_limit::WeighCallbackResult;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_weigh_unimplemented() {

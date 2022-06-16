@@ -35,6 +35,7 @@ pub use crate::timestamp::*;
 pub use crate::trace::*;
 pub use crate::validate::*;
 pub use crate::warrant::*;
+pub use crate::weigh::*;
 pub use crate::x_salsa20_poly1305::data::*;
 pub use crate::x_salsa20_poly1305::encrypted_data::*;
 pub use crate::x_salsa20_poly1305::key_ref::*;

@@ -49,6 +49,7 @@ pub enum TestWasm {
     RandomBytes,
     Schedule,
     XSalsa20Poly1305,
+    RateLimits,
     SerRegression,
     Sign,
     SysTime,
@@ -144,6 +145,7 @@ impl From<TestWasm> for ZomeName {
             TestWasm::PostCommitVolley => "post_commit_volley",
             TestWasm::Query => "query",
             TestWasm::RandomBytes => "random_bytes",
+            TestWasm::RateLimits => "rate_limits",
             TestWasm::Schedule => "schedule",
             TestWasm::XSalsa20Poly1305 => "x_salsa20_poly1305",
             TestWasm::SerRegression => "ser_regression",
@@ -222,6 +224,7 @@ impl From<TestWasm> for PathBuf {
             }
             TestWasm::Query => "wasm32-unknown-unknown/release/test_wasm_query.wasm",
             TestWasm::RandomBytes => "wasm32-unknown-unknown/release/test_wasm_random_bytes.wasm",
+            TestWasm::RateLimits => "wasm32-unknown-unknown/release/test_wasm_rate_limits.wasm",
             TestWasm::Schedule => "wasm32-unknown-unknown/release/test_wasm_schedule.wasm",
             TestWasm::XSalsa20Poly1305 => {
                 "wasm32-unknown-unknown/release/test_wasm_x_salsa20_poly1305.wasm"

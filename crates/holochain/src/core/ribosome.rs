@@ -15,7 +15,10 @@ pub mod real_ribosome;
 
 use self::{
     error::RibosomeError,
-    guest_callback::genesis_self_check::{GenesisSelfCheckHostAccess, GenesisSelfCheckInvocation},
+    guest_callback::{
+        genesis_self_check::{GenesisSelfCheckHostAccess, GenesisSelfCheckInvocation},
+        rate_limits::{RateLimitsHostAccess, RateLimitsInvocation, RateLimitsResult},
+    },
 };
 use crate::conductor::api::CellConductorApi;
 use crate::conductor::api::CellConductorReadHandle;
@@ -105,6 +108,7 @@ pub enum HostContext {
     Init(InitHostAccess),
     MigrateAgent(MigrateAgentHostAccess),
     PostCommit(PostCommitHostAccess), // MAYBE: add emit_signal access here?
+    RateLimits(RateLimitsHostAccess),
     Validate(ValidateHostAccess),
     ValidationPackage(ValidationPackageHostAccess),
     Weigh(WeighHostAccess),
@@ -120,6 +124,7 @@ impl From<&HostContext> for HostFnAccess {
             HostContext::Init(access) => access.into(),
             HostContext::EntryDefs(access) => access.into(),
             HostContext::MigrateAgent(access) => access.into(),
+            HostContext::RateLimits(access) => access.into(),
             HostContext::ValidationPackage(access) => access.into(),
             HostContext::PostCommit(access) => access.into(),
             HostContext::Weigh(access) => access.into(),
@@ -588,6 +593,12 @@ pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
         access: ValidateHostAccess,
         invocation: ValidateInvocation,
     ) -> RibosomeResult<ValidateResult>;
+
+    fn run_rate_limits(
+        &self,
+        // host_access: RateLimitsHostAccess,
+        invocation: RateLimitsInvocation,
+    ) -> RibosomeResult<RateLimitsResult>;
 
     fn run_weigh(
         &self,

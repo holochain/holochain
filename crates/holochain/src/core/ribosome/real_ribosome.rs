@@ -2,6 +2,9 @@ use super::guest_callback::entry_defs::EntryDefsHostAccess;
 use super::guest_callback::init::InitHostAccess;
 use super::guest_callback::migrate_agent::MigrateAgentHostAccess;
 use super::guest_callback::post_commit::PostCommitHostAccess;
+use super::guest_callback::rate_limits::RateLimitsHostAccess;
+use super::guest_callback::rate_limits::RateLimitsInvocation;
+use super::guest_callback::rate_limits::RateLimitsResult;
 use super::guest_callback::validate::ValidateHostAccess;
 use super::guest_callback::validation_package::ValidationPackageHostAccess;
 use super::guest_callback::weigh::WeighHostAccess;
@@ -86,7 +89,6 @@ use kitsune_p2p_types::dependencies::lair_keystore_api::dependencies::parking_lo
 use holochain_types::zome_types::GlobalZomeTypes;
 use holochain_types::zome_types::ZomeTypesError;
 use holochain_wasmer_host::prelude::*;
-use holochain_zome_types::rate_limit::WeighCallbackResult;
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::sync::atomic::AtomicU64;
@@ -866,6 +868,15 @@ impl RibosomeT for RealRibosome {
         invocation: ValidateInvocation,
     ) -> RibosomeResult<ValidateResult> {
         do_callback!(self, host_access, invocation, ValidateCallbackResult)
+    }
+
+    fn run_rate_limits(
+        &self,
+        // host_access: RateLimitsHostAccess,
+        invocation: RateLimitsInvocation,
+    ) -> RibosomeResult<RateLimitsResult> {
+        let host_access = RateLimitsHostAccess {};
+        do_callback!(self, host_access, invocation, RateLimitsCallbackResult)
     }
 
     fn run_weigh(

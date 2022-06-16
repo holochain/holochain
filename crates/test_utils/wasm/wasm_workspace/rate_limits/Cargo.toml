@@ -1,0 +1,17 @@
+[package]
+name = "test_wasm_rate_limits"
+version = "0.0.1"
+authors = [ "michael.dougherty@holo.host" ]
+edition = "2021"
+
+[lib]
+name = "test_wasm_rate_limits"
+crate-type = [ "cdylib", "rlib" ]
+
+[dependencies]
+serde = "1.0"
+hdk = { path = "../../../../hdk" }
+
+[features]
+default = []
+mock = ["hdk/mock"]

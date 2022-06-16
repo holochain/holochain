@@ -31,6 +31,7 @@ members = [
     "post_commit_volley",
     "query",
     "random_bytes",
+    "rate_limits",
     "schedule",
     "x_salsa20_poly1305",
     "ser_regression",
