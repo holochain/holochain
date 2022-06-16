@@ -151,7 +151,7 @@ impl Record {
         &self.signed_action.hashed
     }
 
-    /// Access the Entry portion of this record as an RecordEntry,
+    /// Access the Entry portion of this record as a RecordEntry,
     /// which includes the context around the presence or absence of the entry.
     pub fn entry(&self) -> &RecordEntry {
         &self.entry
@@ -185,7 +185,7 @@ impl RecordEntry {
     /// Provides deserialized app entry if it exists
     ///
     /// same as as_option but handles deserialization
-    /// anything other than RecordEntry::Present returns None
+    /// anything other tha RecordEntry::Present returns None
     /// a present entry that fails to deserialize cleanly is an error
     /// a present entry that deserializes cleanly is returned as the provided type A
     pub fn to_app_option<A: TryFrom<SerializedBytes, Error = SerializedBytesError>>(
@@ -200,7 +200,7 @@ impl RecordEntry {
     /// Provides CapGrantEntry if it exists
     ///
     /// same as as_option but handles cap grants
-    /// anything other than RecordEntry::Present for a Entry::CapGrant returns None
+    /// anything other tha RecordEntry::Present for a Entry::CapGrant returns None
     pub fn to_grant_option(&self) -> Option<crate::entry::CapGrantEntry> {
         match self.as_option() {
             Some(Entry::CapGrant(cap_grant_entry)) => Some(cap_grant_entry.to_owned()),

@@ -82,7 +82,7 @@ pub struct SourceChain<AuthorDb = DbWrite<DbKindAuthored>, DhtDb = DbWrite<DbKin
 pub type SourceChainRead = SourceChain<DbRead<DbKindAuthored>, DbRead<DbKindDht>>;
 
 // TODO fix this.  We shouldn't really have nil values but this would
-// show if the database is corrupted and doesn't have an record
+// show if the database is corrupted and doesn't have a record
 #[derive(Serialize, Debug, Clone, Deserialize)]
 pub struct SourceChainJsonDump {
     pub records: Vec<SourceChainJsonRecord>,

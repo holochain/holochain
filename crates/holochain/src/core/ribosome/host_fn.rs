@@ -133,7 +133,7 @@ host_fn_api_impls! {
     // Hash data on the host.
     fn hash (zt::hash::HashInput) -> zt::hash::HashOutput;
 
-    // Retreive an record from the DHT or short circuit.
+    // Retreive a record from the DHT or short circuit.
     fn must_get_valid_record (zt::entry::MustGetValidRecordInput) -> Record;
 
     // Retreive a entry from the DHT or short circuit.

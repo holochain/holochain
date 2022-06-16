@@ -89,7 +89,7 @@ pub enum DhtOp {
     RegisterUpdatedContent(Signature, action::Update, Option<Box<Entry>>),
 
     #[display(fmt = "RegisterUpdatedRecord")]
-    /// Op for updating an record.
+    /// Op for updating a record.
     /// This is sent to the record authority.
     RegisterUpdatedRecord(Signature, action::Update, Option<Box<Entry>>),
 

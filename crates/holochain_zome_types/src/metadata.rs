@@ -8,7 +8,7 @@ use holochain_serialized_bytes::prelude::*;
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, SerializedBytes)]
 #[serde(tag = "type", content = "content")]
 /// Return type for get_details calls.
-/// ActionHash returns an Record.
+/// ActionHash returns a Record.
 /// EntryHash returns an Entry.
 pub enum Details {
     /// Variant asking for a specific record
@@ -19,7 +19,7 @@ pub enum Details {
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, SerializedBytes)]
 /// A specific Record with any deletes
-/// This is all the metadata available for an record.
+/// This is all the metadata available for a record.
 pub struct RecordDetails {
     /// The specific record.
     /// Either a Create or an Update.

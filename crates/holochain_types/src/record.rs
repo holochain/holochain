@@ -180,7 +180,7 @@ impl<'a> RecordGroup<'a> {
         self.rejected.iter().map(|shh| shh.action_address())
     }
 
-    /// Create an record group from wire actions and an entry
+    /// Create a record group from wire actions and an entry
     pub fn from_wire_records<I: IntoIterator<Item = WireActionStatus<WireNewEntryAction>>>(
         actions_iter: I,
         entry_type: EntryType,

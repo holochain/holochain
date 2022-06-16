@@ -194,7 +194,7 @@ pub mod wasm_test {
                     None => {
                         // this is the delete so it should be none
                     }
-                    _ => panic!("delete had an record"),
+                    _ => panic!("delete had a record"),
                 }
             }
             _ => panic!("no record"),

@@ -12,7 +12,7 @@ pub mod examples;
 /// For example, an invalid Record could be published and `must_get_entry` would return the EntryHashed.
 ///
 /// This may be useful during validation callbacks where the validity and relevance of some content can be
-/// asserted by the CURRENT validation callback independent of an Record. This behaviour avoids the potential for
+/// asserted by the CURRENT validation callback independent of a Record. This behaviour avoids the potential for
 /// eclipse attacks to lie about the validity of some data and cause problems for a hApp.
 /// If you NEED to know that a dependency is valid in order for the current validation logic
 /// (e.g. inductive validation of a tree) then `must_get_valid_record` is likely what you need.
@@ -82,7 +82,7 @@ pub fn must_get_action(action_hash: ActionHash) -> ExternResult<SignedActionHash
 /// It does not take many hops to reach the point where an attacker needs to eclipse the entire network to lie about Record validity.
 ///
 /// @TODO We keep signed receipts from authorities serving up "valid records".
-/// - If we ever discover an record we were told is valid is invalid we can retroactively look to warrant authorities
+/// - If we ever discover a record we were told is valid is invalid we can retroactively look to warrant authorities
 /// - We can async (e.g. in a background task) be recursively validating Record dependencies ourselves, following hops until there is no room for lies
 /// - We can with small probability recursively validate to several hops inline to discourage potential eclipse attacks with a credible immediate threat
 ///
@@ -175,7 +175,7 @@ macro_rules! app_entry {
                     RecordEntry::Present(entry) => Self::try_from(entry)?,
                     _ => return Err(
                         $crate::prelude::wasm_error!(
-                        $crate::prelude::WasmErrorInner::Guest(format!("Tried to deserialize an record, expecting it to contain entry data, but there was none. Record ActionHash: {}", record.signed_action.hashed.hash))),
+                        $crate::prelude::WasmErrorInner::Guest(format!("Tried to deserialize a record, expecting it to contain entry data, but there was none. Record ActionHash: {}", record.signed_action.hashed.hash))),
                     )
                 })
             }

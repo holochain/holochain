@@ -16,7 +16,7 @@ use crate::dht_op::DhtOpType;
 use crate::dht_op::RenderedOp;
 use crate::dht_op::RenderedOps;
 
-/// Convenience function for when you have an RecordEntry but need
+/// Convenience function for when you have a RecordEntry but need
 /// a Option EntryHashed
 pub fn option_entry_hashed(entry: RecordEntry) -> Option<EntryHashed> {
     match entry {

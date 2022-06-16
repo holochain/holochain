@@ -434,7 +434,7 @@ async fn validate_op_inner(
 
 #[instrument(skip(record, call_zome_workspace, network, conductor_handle))]
 /// Direct system validation call that takes
-/// an Record instead of an op.
+/// a Record instead of an op.
 /// Does not require holding dependencies.
 /// Will not await dependencies and instead returns
 /// that outcome immediately.

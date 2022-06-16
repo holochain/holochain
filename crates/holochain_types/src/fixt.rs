@@ -80,7 +80,7 @@ fn new_entry_record(entry: Entry, action_type: ActionType, index: usize) -> Reco
             let (shh, _) = record.into_inner();
             Record::new(shh, Some(entry))
         }
-        _ => panic!("You choose {:?} for an Record with en Entry", action_type),
+        _ => panic!("You choose {:?} for a Record with en Entry", action_type),
     }
 }
 

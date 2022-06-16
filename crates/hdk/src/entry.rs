@@ -152,14 +152,14 @@ where
     update(input)
 }
 
-/// Gets an record for a given entry or action hash.
+/// Gets a record for a given entry or action hash.
 ///
 /// The behaviour of get changes subtly per the _type of the passed hash_.
 /// An action hash returns the record for that action, i.e. action+entry or action+None.
 /// An entry hash returns the "oldest live" record, i.e. action+entry.
 ///
 /// An record is no longer live once it is referenced by a valid delete record.
-/// An update to an record does not change its liveness.
+/// An update to a record does not change its liveness.
 /// See [`get_details`] for more information about how CRUD records reference each other.
 ///
 /// Note: [`get`] __always triggers and blocks on a network call__.
@@ -179,7 +179,7 @@ where
 /// Note: "oldest live" only relates to disambiguating many creates and updates from many authors
 ///       pointing to a single entry, it is not the "current value" of an entry in a CRUD sense.
 ///       e.g. If "foo" is created then updated to "bar", a [`get`] on the hash of "foo" will return
-///            "foo" as part of an record with the "oldest live" action.
+///            "foo" as part of a record with the "oldest live" action.
 ///            To discover "bar" the agent needs to call `get_details` and decide how it wants to
 ///            collapse many potential creates, updates and deletes down into a single or filtered
 ///            set of updates, to "walk the tree".
@@ -211,7 +211,7 @@ where
         .unwrap())
 }
 
-/// Get an record and its details for the entry or action hash passed in.
+/// Get a record and its details for the entry or action hash passed in.
 /// Returns [`None`] if the entry/action does not exist.
 /// The details returned are a contextual mix of records and action hashes.
 ///

@@ -75,7 +75,7 @@ wasm_io_types! {
     // Action hash of the CreateLink record.
     fn delete_link (zt::link::DeleteLinkInput) -> holo_hash::ActionHash;
 
-    // Delete an record.
+    // Delete a record.
     fn delete (zt::entry::DeleteInput) -> holo_hash::ActionHash;
 
     // Action hash of the newly committed record.
@@ -97,7 +97,7 @@ wasm_io_types! {
     // Hash data on the host.
     fn hash (zt::hash::HashInput) -> zt::hash::HashOutput;
 
-    // Retreive an record from the DHT or short circuit.
+    // Retreive a record from the DHT or short circuit.
     fn must_get_valid_record (zt::entry::MustGetValidRecordInput) -> zt::record::Record;
 
     // Retreive a entry from the DHT or short circuit.
