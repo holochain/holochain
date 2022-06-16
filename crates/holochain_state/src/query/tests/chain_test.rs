@@ -1,8 +1,8 @@
 use crate::test_utils::{test_cell_db, TestEnv};
 use ::fixt::prelude::*;
 use fallible_iterator::FallibleIterator;
-use holo_hash::AgentPubKey;
 use holo_hash::ActionHash;
+use holo_hash::AgentPubKey;
 use holochain_sqlite::db::ReadManager;
 use holochain_types::prelude::*;
 use holochain_zome_types::test_utils::fake_agent_pubkey_1;

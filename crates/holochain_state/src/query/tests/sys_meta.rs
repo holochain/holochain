@@ -3,15 +3,15 @@ mod tests {
     use ::fixt::prelude::*;
     use holo_hash::fixt::*;
     use holo_hash::*;
-    use holochain_types::fixt::ActionBuilderCommonFixturator;
     use holochain_types::action::NewEntryAction;
+    use holochain_types::fixt::ActionBuilderCommonFixturator;
     use holochain_types::{env::DbWrite, fixt::AppEntryTypeFixturator};
     use holochain_zome_types::action;
     use holochain_zome_types::action::builder;
-    use holochain_zome_types::action::Delete;
-    use holochain_zome_types::action::EntryType;
     use holochain_zome_types::action::ActionBuilder;
     use holochain_zome_types::action::ActionBuilderCommon;
+    use holochain_zome_types::action::Delete;
+    use holochain_zome_types::action::EntryType;
     use holochain_zome_types::ActionHashed;
 
     struct TestFixtures {

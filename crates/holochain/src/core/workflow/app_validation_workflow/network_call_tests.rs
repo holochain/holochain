@@ -1,6 +1,6 @@
 use fallible_iterator::FallibleIterator;
-use hdk::prelude::Record;
 use hdk::prelude::EntryType;
+use hdk::prelude::Record;
 use hdk::prelude::ValidationPackage;
 use holo_hash::ActionHash;
 use holochain_p2p::actor::GetActivityOptions;
@@ -20,10 +20,10 @@ use crate::test_utils::wait_for_integration;
 use holochain_cascade::Cascade;
 use holochain_cascade::DbPair;
 use holochain_cascade::DbPairMut;
-use holochain_state::record_buf::RecordBuf;
 use holochain_state::metadata::ChainItemKey;
 use holochain_state::metadata::MetadataBuf;
 use holochain_state::metadata::MetadataBufT;
+use holochain_state::record_buf::RecordBuf;
 use holochain_state::source_chain::SourceChain;
 
 const NUM_COMMITS: usize = 5;
