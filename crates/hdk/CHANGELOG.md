@@ -10,6 +10,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - hdk: Use newest wasmer and introduces `wasm_error!` macro to capture line numbers for wasm errors [\#1380](https://github.com/holochain/holochain/pull/1380)
 - Docs: Restructure main page sections and add several intra-doc lnks [\#1418](https://github.com/holochain/holochain/pull/1418)
+- hdk: Add functional stub for `x_salsa20_poly1305_shared_secret_create_random` [\#1410](https://github.com/holochain/holochain/pull/1410)
+- hdk: Add functional stub for `x_salsa20_poly1305_shared_secret_export` [\#1410](https://github.com/holochain/holochain/pull/1410)
+- hdk: Add functional stub for `x_salsa20_poly1305_shared_secret_ingest` [\#1410](https://github.com/holochain/holochain/pull/1410)
+- Bump wasmer to 0.0.80 [\#1386](https://github.com/holochain/holochain/pull/1386)
+
+### Integrity / Coordinator Changes [\#1325](https://github.com/holochain/holochain/pull/1325) 
+### Added
+- `get_links` and `get_link_details` take a `TryInto<LinkTypesRages>`. See the link test wasm for examples.
+### Removed
+- `entry_def_index` and `entry_type` macros are no longer needed.
+### Changed
+- `call` and `call_remote` now take an `Into<ZomeName>` instead of a `ZomeName`.
+- `create_link` takes a `TryInto<LinkType>` instead of an `Into<LinkType>`.
+- `update` takes `UpdateInput` instead of a `HeaderHash` and `CreateInput`.
+- `create_entry` takes a type that can try into an `EntryDefIndex` and `EntryVisibility` instead of implementing `EntryDefRegistration`.
+- `update_entry` takes the previous header hash and a try into `Entry` instead of a `EntryDefRegistration`.
+- `Path` now must be `typed(LinkType)` to use any functionality that creates or gets links. 
 
 ## 0.0.136
 
