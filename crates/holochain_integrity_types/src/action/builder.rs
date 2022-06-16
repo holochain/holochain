@@ -39,7 +39,7 @@ impl ActionBuilderCommon {
 /// Builder for non-genesis Actions
 ///
 /// SourceChain::put takes one of these rather than a raw Action, so that it
-/// can inject the proper values via `ActionBuilderCommon`, rather than requiring
+/// can inject the proper values vian `ActionBuilderCommon`, rather than requiring
 /// surrounding code to construct a proper Action outside of the context of
 /// the SourceChain.
 ///

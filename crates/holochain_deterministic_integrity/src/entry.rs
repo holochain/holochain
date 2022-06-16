@@ -41,7 +41,7 @@ pub fn must_get_entry(entry_hash: EntryHash) -> ExternResult<EntryHashed> {
 /// The SignedActionHashed is NOT guaranteed to be a valid (or even validated) Element.
 /// For example, an invalid Action could be published and `must_get_action` would return the `SignedActionHashed`.
 ///
-/// This may be useful during validation callbacks where the validity depends on a Action existing regardless of its associated Entry.
+/// This may be useful during validation callbacks where the validity depends on an action existing regardless of its associated Entry.
 /// For example, we may simply need to check that the author is the same for two referenced Actions.
 ///
 /// `must_get_action` is available in contexts such as validation where both determinism and network access is desirable.

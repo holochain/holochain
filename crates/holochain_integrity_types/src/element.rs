@@ -26,7 +26,7 @@ pub struct Element {
     pub entry: ElementEntry,
 }
 
-/// Represents the different ways the entry_address reference within a Action
+/// Represents the different ways the entry_address reference within an action
 /// can be intepreted
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
@@ -39,7 +39,7 @@ pub enum ElementEntry {
     /// The Action does not contain an entry_address reference.
     NotApplicable,
     /// The Action has an entry but was stored without it.
-    /// This can happen when you receive gossip of just a action
+    /// This can happen when you receive gossip of just an action
     /// when the action type is a [`crate::EntryCreationAction`]
     NotStored,
 }
@@ -89,7 +89,7 @@ impl Element {
             (None, Some(EntryVisibility::Private)) => ElementEntry::Hidden,
             (None, None) => ElementEntry::NotApplicable,
             (Some(_), None) => {
-                unreachable!("Entry is present for a Action type which has no entry reference")
+                unreachable!("Entry is present for an action type which has no entry reference")
             }
             (None, Some(EntryVisibility::Public)) => ElementEntry::NotStored,
         };

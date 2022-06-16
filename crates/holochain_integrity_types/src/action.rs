@@ -111,7 +111,7 @@ macro_rules! write_into_action {
     };
 }
 
-/// A trait to specify the common parts of a Action
+/// A trait to specify the common parts of an action
 pub trait ActionInner {
     /// Get a full action from the subset
     fn into_action(self) -> Action;
@@ -352,7 +352,7 @@ pub struct AgentValidationPkg {
     pub membrane_proof: Option<MembraneProof>,
 }
 
-/// A action which declares that all zome init functions have successfully
+/// An action which declares that all zome init functions have successfully
 /// completed, and the chain is ready for commits. Contains no explicit data.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
@@ -421,7 +421,7 @@ pub struct CloseChain {
     pub new_dna_hash: DnaHash,
 }
 
-/// A action which "speaks" Entry content into being. The same content can be
+/// An action which "speaks" Entry content into being. The same content can be
 /// referenced by multiple such actions.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
@@ -435,7 +435,7 @@ pub struct Create {
     pub entry_hash: EntryHash,
 }
 
-/// A action which specifies that some new Entry content is intended to be an
+/// An action which specifies that some new Entry content is intended to be an
 /// update to some old Entry.
 ///
 /// This action semantically updates an entry to a new entry.

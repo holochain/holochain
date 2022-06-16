@@ -20,7 +20,7 @@ pub type DhtOpHash = HoloHash<hash_type::DhtOp>;
 /// The hash of an Entry.
 pub type EntryHash = HoloHash<hash_type::Entry>;
 
-/// The hash of a Action
+/// The hash of an action
 pub type ActionHash = HoloHash<hash_type::Action>;
 
 /// The hash of a network ID

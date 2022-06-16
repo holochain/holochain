@@ -6,12 +6,12 @@ use holochain_serialized_bytes::prelude::*;
 /// Metadata that can be requested on a basis
 pub struct MetadataRequest {
     /// Get all the actions on an entry.
-    /// Invalid request on a action.
+    /// Invalid request on an action.
     pub all_valid_actions: bool,
     // TODO: Implement after validation
     /// Placeholder
     pub all_invalid_actions: bool,
-    /// Get all the deletes on a action
+    /// Get all the deletes on an action
     pub all_deletes: bool,
     /// Get all the updates on an entry or action
     pub all_updates: bool,

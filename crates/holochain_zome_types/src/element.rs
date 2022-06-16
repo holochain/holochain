@@ -12,7 +12,7 @@ pub use holochain_integrity_types::element::*;
 #[cfg(feature = "test_utils")]
 pub mod facts;
 
-/// A combination of a Action and its signature.
+/// A combination of an action and its signature.
 ///
 /// Has implementations From and Into its tuple form.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]

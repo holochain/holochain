@@ -313,7 +313,7 @@ async fn chain_sequence_head_moved_triggers_no_error_if_clean() -> anyhow::Resul
         .unwrap()
         .with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
 
-    // Modify the chain without adding a action -- this succeeds
+    // Modify the chain without adding an action -- this succeeds
     let task1 = tokio::spawn(async move {
         let mut buf = ChainSequenceBuf::new(arc1.clone().into())?;
         buf.complete_dht_op(0)?;
@@ -328,7 +328,7 @@ async fn chain_sequence_head_moved_triggers_no_error_if_clean() -> anyhow::Resul
             .with_commit(|mut writer| buf.flush_to_txn(&mut writer))
     });
 
-    // Add a action to the chain -- there is no collision, so this succeeds
+    // Add an action to the chain -- there is no collision, so this succeeds
     let task2 = tokio::spawn(async move {
         rx1.await.unwrap();
         let mut buf = ChainSequenceBuf::new(arc2.clone().into())?;

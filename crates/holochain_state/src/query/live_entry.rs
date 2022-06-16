@@ -113,7 +113,7 @@ impl Query for GetLiveEntryQuery {
     where
         S: Store,
     {
-        // If we have author authority then find a action from this author.
+        // If we have author authority then find an action from this author.
         let authored_action = self.1.as_ref().map(|a| a.as_ref()).and_then(|a| {
             state
                 .creates

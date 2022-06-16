@@ -98,7 +98,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "can't be tested until redirects are implemented"]
-    /// Test that a action can be redirected a single hop
+    /// Test that an action can be redirected a single hop
     async fn test_redirect_action_one_hop() -> anyhow::Result<()> {
         // let test_db = test_cell_db();
         // let arc = test_db.env();
@@ -123,7 +123,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "can't be tested until redirects are implemented"]
-    /// Test that a action can be redirected three hops
+    /// Test that an action can be redirected three hops
     async fn test_redirect_action_three_hops() -> anyhow::Result<()> {
         // let test_db = test_cell_db();
         // let arc = test_db.env();
@@ -248,7 +248,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "can't be tested until redirects are implemented"]
-    /// Test that a action can be redirected a single hop
+    /// Test that an action can be redirected a single hop
     async fn test_redirect_action_and_entry() -> anyhow::Result<()> {
         // let test_db = test_cell_db();
         // let arc = test_db.env();

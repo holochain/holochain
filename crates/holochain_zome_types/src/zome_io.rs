@@ -103,7 +103,7 @@ wasm_io_types! {
     // Retreive a entry from the DHT or short circuit.
     fn must_get_entry (zt::entry::MustGetEntryInput) -> zt::entry::EntryHashed;
 
-    // Retrieve a action from the DHT or short circuit.
+    // Retrieve an action from the DHT or short circuit.
     fn must_get_action (zt::entry::MustGetActionInput) -> zt::SignedActionHashed;
 
     // Query the source chain for data.

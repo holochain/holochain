@@ -374,7 +374,7 @@ async fn dodgy_bob(bob_cell_id: &CellId, handle: &ConductorHandle, dna_file: &Dn
 // These are tests that I think might break
 // validation but are too hard to write currently
 
-// 1. Delete points to a action that isn't a NewEntryType.
+// 1. Delete points to an action that isn't a NewEntryType.
 // ## Comments
 // I think this will fail RegisterDeleteBy but pass as StoreElement
 // which is wrong.

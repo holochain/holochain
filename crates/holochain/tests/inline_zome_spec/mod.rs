@@ -536,7 +536,7 @@ async fn insert_source_chain() {
     // Last seq should be 3.
     assert_eq!(chain.last().unwrap().1, 3);
 
-    // Inject a action with the wrong author.
+    // Inject an action with the wrong author.
     let entry = Entry::app(().try_into().unwrap()).unwrap();
     let mut action = Create {
         author: fixt!(AgentPubKey),

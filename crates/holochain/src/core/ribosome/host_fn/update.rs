@@ -48,7 +48,7 @@ pub fn update<'a>(
                     // build the entry hash
                     let entry_hash = EntryHash::with_data_sync(&entry);
 
-                    // build a action for the entry being updated
+                    // build an action for the entry being updated
                     let action_builder = builder::Update {
                         original_entry_address,
                         original_action_address,

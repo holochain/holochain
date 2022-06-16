@@ -22,11 +22,11 @@ pub mod facts;
     Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash, derive_more::From,
 )]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-/// A action of one of the two types that create a new entry.
+/// An action of one of the two types that create a new entry.
 pub enum NewEntryAction {
-    /// A action which simply creates a new entry
+    /// An action which simply creates a new entry
     Create(Create),
-    /// A action which creates a new entry that is semantically related to a
+    /// An action which creates a new entry that is semantically related to a
     /// previously created entry or action
     Update(Update),
 }
@@ -40,7 +40,7 @@ pub enum NewEntryActionRef<'a> {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Ord, PartialOrd)]
-/// A action of one of the two types that create a new entry.
+/// An action of one of the two types that create a new entry.
 pub enum WireNewEntryAction {
     Create(WireCreate),
     Update(WireUpdate),
@@ -49,7 +49,7 @@ pub enum WireNewEntryAction {
 #[derive(
     Debug, Clone, derive_more::Constructor, Serialize, Deserialize, PartialEq, Eq, Ord, PartialOrd,
 )]
-/// A action of one of the two types that create a new entry.
+/// An action of one of the two types that create a new entry.
 pub struct WireActionStatus<W> {
     /// Skinny action for sending over the wire.
     pub action: W,
@@ -427,9 +427,9 @@ impl TryFrom<Action> for NewEntryAction {
     }
 }
 
-impl<'a> TryFrom<&'a Action> for NewEntryActionRef<'a> {
+impl<'a> TryFrom<&'a action> for NewEntryActionRef<'a> {
     type Error = WrongActionError;
-    fn try_from(value: &'a Action) -> Result<Self, Self::Error> {
+    fn try_from(value: &'a action) -> Result<Self, Self::Error> {
         match value {
             Action::Create(h) => Ok(NewEntryActionRef::Create(h)),
             Action::Update(h) => Ok(NewEntryActionRef::Update(h)),

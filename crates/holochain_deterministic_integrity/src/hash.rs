@@ -166,7 +166,7 @@ use crate::prelude::*;
 /// chain. Every host function that commits an entry returns the new [`ActionHash`]. The [`ActionHash`] can
 /// also be used with [`must_get_action`] etc. to retreive a _specific_ element from the DHT rather than the
 /// oldest live element.
-/// However there is no way to _generate_ a action hash directly from a action from inside wasm.
+/// However there is no way to _generate_ an action hash directly from an action from inside wasm.
 /// [`Element`] values (entry+action pairs returned by [`must_get_action`] etc.) contain prehashed action structs
 /// called [`ActionHashed`], which is composed of a [`ActionHash`] alongside the "raw" [`Action`] value. Generally the pre-hashing is
 /// more efficient than hashing actions ad-hoc as hashing always needs to be done at the database
@@ -205,7 +205,7 @@ where
     }
 }
 
-/// Hash a `Action` into a `ActionHash`.
+/// Hash an `Action` into an `ActionHash`.
 ///
 /// [`hash_entry`] has more of a discussion around different hash types and how
 /// they are used within the HDI.

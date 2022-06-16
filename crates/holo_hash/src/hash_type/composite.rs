@@ -15,7 +15,7 @@ use holochain_serialized_bytes::prelude::*;
 pub enum AnyDht {
     /// The hash of an Entry
     Entry,
-    /// The hash of a Action
+    /// The hash of an action
     Action,
 }
 
@@ -85,7 +85,7 @@ impl From<AnyDhtSerial> for AnyDht {
 pub enum AnyLinkable {
     /// The hash of an Entry
     Entry,
-    /// The hash of a Action
+    /// The hash of an action
     Action,
     /// The hash of an External thing.
     External,

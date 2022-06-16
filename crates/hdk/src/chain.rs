@@ -19,7 +19,7 @@ pub fn get_agent_activity(
 
 /// Walks the source chain in ascending order (oldest to latest) filtering by action and/or entry type
 ///
-/// Given a action and entry type, returns an [ `Vec<Element>` ]
+/// Given an action and entry type, returns an [ `Vec<Element>` ]
 ///
 /// @todo document this better with examples after we make query do all the things we want.
 /// @todo implement cap grant/claim usage in terms of query

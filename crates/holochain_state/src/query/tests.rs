@@ -174,7 +174,7 @@ async fn get_entry() {
     assert!(r.is_none());
 }
 
-/// Test that `insert_op` also inserts a action and potentially an entry
+/// Test that `insert_op` also inserts an action and potentially an entry
 #[tokio::test(flavor = "multi_thread")]
 async fn insert_op_equivalence() {
     observability::test_run().ok();

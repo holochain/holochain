@@ -72,7 +72,7 @@ pub(crate) fn incoming_countersigning(
                 // Get the expires time for this session.
                 let expires = *session_data.preflight_request().session_times().end();
 
-                // Get the entry hash from a action.
+                // Get the entry hash from an action.
                 // If the actions have different entry hashes they will fail validation.
                 if let Some(entry_hash) = action_set.first().and_then(|h| h.entry_hash().cloned()) {
                     // Hash the required actions.

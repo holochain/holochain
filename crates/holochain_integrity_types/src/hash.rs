@@ -17,7 +17,7 @@ crate::secure_primitive!(Hash512Bits, 64);
 pub enum HashInput {
     /// Hash an Entry.
     Entry(Entry),
-    /// Hash a Action.
+    /// Hash an action.
     Action(Action),
     /// Blake2b is the native Holochain hashing algorithm and compatible with
     /// e.g. Polkadot and Zcash.

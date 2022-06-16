@@ -242,7 +242,7 @@ pub struct RawGetEntryResponse {
     /// just the hashes of actions to delete
     // TODO: Perf could just send the ActionHash of the
     // action being deleted but we would need to only ever store
-    // if there was a action delete in our MetadataBuf and
+    // if there was an action delete in our MetadataBuf and
     // not the delete action hash as we do now.
     pub deletes: Vec<WireActionStatus<WireDelete>>,
     /// Any updates on this entry.
@@ -262,7 +262,7 @@ impl RawGetEntryResponse {
     /// elements all have the same entry. This is not checked
     /// due to the performance cost.
     /// ### Panics
-    /// If the elements are not a action of Create or EntryDelete
+    /// If the elements are not an action of Create or EntryDelete
     /// or there is no entry or the entry hash is different
     pub fn from_elements<E>(
         elements: E,

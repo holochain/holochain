@@ -56,7 +56,7 @@ pub fn create<'a>(
                         EntryDefLocation::CapClaim => EntryType::CapClaim,
                     };
 
-                    // build a action for the entry being committed
+                    // build an action for the entry being committed
                     let action_builder = builder::Create {
                         entry_type,
                         entry_hash,

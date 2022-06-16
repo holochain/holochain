@@ -36,7 +36,7 @@ pub mod facts;
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum DhtOp {
     #[display(fmt = "StoreElement")]
-    /// Used to notify the authority for a action that it has been created.
+    /// Used to notify the authority for an action that it has been created.
     ///
     /// Conceptually, authorities receiving this `DhtOp` do three things:
     ///
@@ -94,11 +94,11 @@ pub enum DhtOp {
     RegisterUpdatedElement(Signature, action::Update, Option<Box<Entry>>),
 
     #[display(fmt = "RegisterDeletedBy")]
-    /// Op for registering a Action deletion with the Action authority
+    /// Op for registering an action deletion with the Action authority
     RegisterDeletedBy(Signature, action::Delete),
 
     #[display(fmt = "RegisterDeletedEntryAction")]
-    /// Op for registering a Action deletion with the Entry authority, so that
+    /// Op for registering an action deletion with the Entry authority, so that
     /// the Entry can be marked Dead if all of its Actions have been deleted
     RegisterDeletedEntryAction(Signature, action::Delete),
 
@@ -531,9 +531,9 @@ impl DhtOpLight {
 pub enum UniqueForm<'a> {
     // As an optimization, we don't include signatures. They would be redundant
     // with actions and therefore would waste hash/comparison time to include.
-    StoreElement(&'a Action),
+    StoreElement(&'a action),
     StoreEntry(&'a NewEntryAction),
-    RegisterAgentActivity(&'a Action),
+    RegisterAgentActivity(&'a action),
     RegisterUpdatedContent(&'a action::Update),
     RegisterUpdatedElement(&'a action::Update),
     RegisterDeletedBy(&'a action::Delete),
@@ -705,7 +705,7 @@ pub fn produce_op_lights_from_element_group(
 
 /// Data minimal clone (no cloning entries) cheap &Element to DhtOpLight conversion
 fn produce_op_lights_from_parts<'a>(
-    actions_and_hashes: impl Iterator<Item = (&'a ActionHash, &'a Action)>,
+    actions_and_hashes: impl Iterator<Item = (&'a ActionHash, &'a action)>,
     maybe_entry_hash: Option<&EntryHash>,
 ) -> DhtOpResult<Vec<DhtOpLight>> {
     let iter = actions_and_hashes.map(|(head, hash)| (head, hash, maybe_entry_hash.cloned()));
@@ -714,7 +714,7 @@ fn produce_op_lights_from_parts<'a>(
 
 /// Produce op lights from iter of (action hash, action, maybe entry).
 pub fn produce_op_lights_from_iter<'a>(
-    iter: impl Iterator<Item = (&'a ActionHash, &'a Action, Option<EntryHash>)>,
+    iter: impl Iterator<Item = (&'a ActionHash, &'a action, Option<EntryHash>)>,
 ) -> DhtOpResult<Vec<DhtOpLight>> {
     let mut ops = Vec::new();
 

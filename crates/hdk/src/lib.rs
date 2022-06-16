@@ -476,7 +476,7 @@ pub mod info;
 ///
 /// Links also support short (about 500 bytes) binary data to encode contextual data on a domain specific basis.
 ///
-/// __Links are not entries__, there is only a action with no associated entry, so links cannot reference other links or maintain or participate in a revision history.
+/// __Links are not entries__, there is only an action with no associated entry, so links cannot reference other links or maintain or participate in a revision history.
 pub mod link;
 
 /// Methods for interacting with peers in the same DHT network.

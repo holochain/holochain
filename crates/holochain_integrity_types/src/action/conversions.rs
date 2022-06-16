@@ -29,7 +29,7 @@ pub struct WrongActionError(pub String);
 
 impl std::fmt::Display for WrongActionError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Tried to unwrap a Action to the wrong variant")
+        write!(f, "Tried to unwrap an action to the wrong variant")
     }
 }
 
@@ -45,9 +45,9 @@ impl TryFrom<Action> for Update {
     }
 }
 
-impl<'a> TryFrom<&'a Action> for &'a Update {
+impl<'a> TryFrom<&'a action> for &'a Update {
     type Error = WrongActionError;
-    fn try_from(value: &'a Action) -> Result<Self, Self::Error> {
+    fn try_from(value: &'a action) -> Result<Self, Self::Error> {
         match value {
             Action::Update(h) => Ok(h),
             _ => Err(WrongActionError(format!("{:?}", value))),
@@ -65,9 +65,9 @@ impl TryFrom<Action> for Delete {
     }
 }
 
-impl<'a> TryFrom<&'a Action> for &'a Delete {
+impl<'a> TryFrom<&'a action> for &'a Delete {
     type Error = WrongActionError;
-    fn try_from(value: &'a Action) -> Result<Self, Self::Error> {
+    fn try_from(value: &'a action) -> Result<Self, Self::Error> {
         match value {
             Action::Delete(h) => Ok(h),
             _ => Err(WrongActionError(format!("{:?}", value))),
@@ -85,9 +85,9 @@ impl TryFrom<Action> for CreateLink {
     }
 }
 
-impl<'a> TryFrom<&'a Action> for &'a CreateLink {
+impl<'a> TryFrom<&'a action> for &'a CreateLink {
     type Error = WrongActionError;
-    fn try_from(value: &'a Action) -> Result<Self, Self::Error> {
+    fn try_from(value: &'a action) -> Result<Self, Self::Error> {
         match value {
             Action::CreateLink(h) => Ok(h),
             _ => Err(WrongActionError(format!("{:?}", value))),
@@ -105,9 +105,9 @@ impl TryFrom<Action> for DeleteLink {
     }
 }
 
-impl<'a> TryFrom<&'a Action> for &'a DeleteLink {
+impl<'a> TryFrom<&'a action> for &'a DeleteLink {
     type Error = WrongActionError;
-    fn try_from(value: &'a Action) -> Result<Self, Self::Error> {
+    fn try_from(value: &'a action) -> Result<Self, Self::Error> {
         match value {
             Action::DeleteLink(h) => Ok(h),
             _ => Err(WrongActionError(format!("{:?}", value))),

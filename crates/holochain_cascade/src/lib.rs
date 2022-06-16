@@ -541,7 +541,7 @@ where
         let query: GetElementDetailsQuery =
             self.construct_query_with_data_access(action_hash.clone());
 
-        // DESIGN: we can short circuit if we have any local deletes on a action.
+        // DESIGN: we can short circuit if we have any local deletes on an action.
         // Is this bad because we will not go back to the network until our
         // cache is cleared. Could someone create an attack based on this fact?
 
@@ -585,7 +585,7 @@ where
         let authority = self.am_i_an_authority(action_hash.clone().into()).await?;
         let query: GetLiveElementQuery = self.construct_query_with_data_access(action_hash.clone());
 
-        // DESIGN: we can short circuit if we have any local deletes on a action.
+        // DESIGN: we can short circuit if we have any local deletes on an action.
         // Is this bad because we will not go back to the network until our
         // cache is cleared. Could someone create an attack based on this fact?
 

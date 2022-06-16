@@ -25,9 +25,9 @@ pub struct MetadataSet {
     // TODO: Implement after validation
     /// Placeholder
     pub invalid_actions: BTreeSet<TimedActionHash>,
-    /// Deletes on a action
+    /// Deletes on an action
     pub deletes: BTreeSet<TimedActionHash>,
-    /// Updates on a action or entry
+    /// Updates on an action or entry
     pub updates: BTreeSet<TimedActionHash>,
     /// The status of an entry from an authority.
     /// This is simply a faster way of determining if

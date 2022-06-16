@@ -43,7 +43,7 @@ Composite hash types are used in contexts when one of several primitive hash typ
 
 `EntryHash`: used to hash Entries. An Entry can hash to either a `ContentHash` or an `AgentPubKey`.
 
-`AnyDhtHash`: used to hash arbitrary DHT data. DHT data is either a Action or an Entry, therefore AnyDhtHash can refer to either a `ActionHash` or an `EntryHash`.
+`AnyDhtHash`: used to hash arbitrary DHT data. DHT data is either an action or an Entry, therefore AnyDhtHash can refer to either an `ActionHash` or an `EntryHash`.
 
 ## Serialization
 

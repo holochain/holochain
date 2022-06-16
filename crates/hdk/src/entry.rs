@@ -155,7 +155,7 @@ where
 /// Gets an element for a given entry or action hash.
 ///
 /// The behaviour of get changes subtly per the _type of the passed hash_.
-/// A action hash returns the element for that action, i.e. action+entry or action+None.
+/// An action hash returns the element for that action, i.e. action+entry or action+None.
 /// An entry hash returns the "oldest live" element, i.e. action+entry.
 ///
 /// An element is no longer live once it is referenced by a valid delete element.
@@ -218,7 +218,7 @@ where
 /// Note: The return details will be inferred by the hash type passed in, be careful to pass in the
 ///       correct hash type for the details you want.
 ///
-/// Note: If a action hash is passed in the element returned is the specified element.
+/// Note: If an action hash is passed in the element returned is the specified element.
 ///       If an entry hash is passed in all the actions (so implicitly all the elements) are
 ///       returned for the entry that matches that hash.
 ///       See [`get`] for more information about what "oldest live" means.
@@ -234,7 +234,7 @@ where
 /// Full elements are returned for direct references to the passed hash.
 /// Action hashes are returned for references to references to the passed hash.
 ///
-/// [`Details`] for a action hash return:
+/// [`Details`] for an action hash return:
 /// - the element for this action hash if it exists
 /// - all update and delete _elements_ that reference that specified action
 ///
@@ -253,7 +253,7 @@ where
 ///       so they cannot reference or be referenced by CRUD, so are immutable or have their own
 ///       mutation logic (e.g. link create/delete) and will not be included in [`get_details`] results
 ///       e.g. the DNA itself, links, migrations, etc.
-///       However the element will still be returned by [`get_details`] if a action hash is passed,
+///       However the element will still be returned by [`get_details`] if an action hash is passed,
 ///       these non-entry elements will have [`None`] as the entry value.
 pub fn get_details<H: Into<AnyDhtHash>>(
     hash: H,

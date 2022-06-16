@@ -6,7 +6,7 @@ use holo_hash::*;
 
 type Pair = (Action, Option<Entry>);
 
-/// Fact: Given a pair of a action and optional Entry:
+/// Fact: Given a pair of an action and optional Entry:
 /// - If the action references an Entry, the Entry will exist and be of the appropriate hash
 /// - If the action does not references an Entry, the entry will be None
 //
