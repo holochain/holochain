@@ -10,7 +10,6 @@ use error::RecordGroupResult;
 use holochain_keystore::KeystoreError;
 use holochain_keystore::LairResult;
 use holochain_keystore::MetaLairClient;
-use holochain_serialized_bytes::prelude::*;
 use holochain_zome_types::entry::EntryHashed;
 use std::borrow::Cow;
 use std::collections::BTreeSet;
