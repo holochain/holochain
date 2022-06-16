@@ -1,4 +1,24 @@
-//! The Holochain Deterministic Integrity
+//! Holochain Deterministic Integrity (HDI) is Holochain's data model and integrity toolset for
+//! writing zomes.
+//! 
+//! The logic of a Holochain DNA can be divided into two parts: integrity and coordination.
+//! Integrity is the part of the hApp that ensures that data is correct and coherent. Again this
+//! can be broken down into two parts - data definition and data validation.
+//! 
+//! The DNA's data model is defined in integrity zomes. They comprise all data type definitions
+//! as well as relationships between those types. They're purely a definition and do not contain
+//! functions to manipulate the data. Therefore a hApp's data model is encapsulated
+//! and completely independent of the domain logic, which is encoded in coordinator zomes.
+//! 
+//! Advantages of this approach are:
+//! * The DNA hash is constant as long as the integrity zomes remain the same. Changes to the
+//! domain logic, enclosed in coordinator zomes, do not affect the DNA hash. As a result, DNAs
+//! and therefore hApps can be constantly modified without creating a new peer network on every
+//! deployment.
+//! * Integrity zomes can be shared among DNAs. Any coordinator zome can import an integrity
+//! zome's data types and implement functions for data manipulation. This composability of
+//! integrity and coordinator zomes allows for a multitude of permutations with shared integrity
+//! zomes, i. e. a shared data model.
 
 pub use hdk_derive::hdk_entry_defs;
 pub use hdk_derive::hdk_entry_helper;

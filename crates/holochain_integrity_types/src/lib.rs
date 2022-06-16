@@ -5,7 +5,7 @@
 //! typically included as a dependency in Holochain Zomes, which are
 //! distributed as chunks of Wasm.
 //!
-//! This crate is also designed to be deterministic and more stable then
+//! This crate is also designed to be deterministic and more stable than
 //! the higher level crates.
 
 #![deny(missing_docs)]
