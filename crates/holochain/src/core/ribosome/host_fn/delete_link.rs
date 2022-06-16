@@ -13,7 +13,7 @@ pub fn delete_link<'a>(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: DeleteLinkInput,
-) -> Result<HeaderHash, RuntimeError> {
+) -> Result<ActionHash, RuntimeError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess {
             write_workspace: Permission::Allow,
@@ -23,17 +23,17 @@ pub fn delete_link<'a>(
                 address,
                 chain_top_ordering,
             } = input;
-            // get the base address from the add link header
+            // get the base address from the add link action
             // don't allow the wasm developer to get this wrong
             // it is never valid to have divergent base address for add/remove links
             // the subconscious will validate the base address match but we need to fetch it here to
-            // include it in the remove link header
+            // include it in the remove link action
             let network = call_context.host_context.network().clone();
             let call_context_2 = call_context.clone();
 
             // handle timeouts at the network layer
             let address_2 = address.clone();
-            let maybe_add_link: Option<SignedHeaderHashed> =
+            let maybe_add_link: Option<SignedActionHashed> =
                 tokio_helper::block_forever_on(async move {
                     let workspace = call_context_2.host_context.workspace();
                     CascadeResult::Ok(
@@ -48,18 +48,18 @@ pub fn delete_link<'a>(
                 })?;
 
             let base_address = match maybe_add_link {
-                Some(add_link_signed_header_hash) => {
-                    match add_link_signed_header_hash.header() {
-                        Header::CreateLink(link_add_header) => {
-                            Ok(link_add_header.base_address.clone())
+                Some(add_link_signed_action_hash) => {
+                    match add_link_signed_action_hash.action() {
+                        Action::CreateLink(link_add_action) => {
+                            Ok(link_add_action.base_address.clone())
                         }
-                        // the add link header hash provided was found but didn't point to an AddLink
-                        // header (it is something else) so we cannot proceed
+                        // the add link action hash provided was found but didn't point to an AddLink
+                        // action (it is something else) so we cannot proceed
                         _ => Err(RibosomeError::ElementDeps(address.clone().into())),
                     }
                 }
-                // the add link header hash could not be found
-                // it's unlikely that a wasm call would have a valid add link header hash from "somewhere"
+                // the add link action hash could not be found
+                // it's unlikely that a wasm call would have a valid add link action hash from "somewhere"
                 // that isn't also discoverable in either the cache or DHT, but it _is_ possible so we have
                 // to fail in that case (e.g. the local cache could have GC'd at the same moment the
                 // network connection dropped out)
@@ -80,17 +80,17 @@ pub fn delete_link<'a>(
 
             // add a DeleteLink to the source chain
             tokio_helper::block_forever_on(async move {
-                let header_builder = builder::DeleteLink {
+                let action_builder = builder::DeleteLink {
                     link_add_address: address,
                     base_address,
                 };
-                let header_hash = source_chain
-                    .put(header_builder, None, chain_top_ordering)
+                let action_hash = source_chain
+                    .put(action_builder, None, chain_top_ordering)
                     .await
                     .map_err(|source_chain_error| -> RuntimeError {
                         wasm_error!(WasmErrorInner::Host(source_chain_error.to_string())).into()
                     })?;
-                Ok(header_hash)
+                Ok(action_hash)
             })
         }
         _ => Err(wasm_error!(WasmErrorInner::Host(
@@ -110,7 +110,7 @@ pub fn delete_link<'a>(
 pub mod slow_tests {
     use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use hdk::prelude::*;
-    use holo_hash::HeaderHash;
+    use holo_hash::ActionHash;
     use holochain_wasm_test_utils::TestWasm;
 
     #[tokio::test(flavor = "multi_thread")]
@@ -126,9 +126,9 @@ pub mod slow_tests {
         assert!(links.len() == 0);
 
         // add a couple of links
-        let mut link_headers: Vec<HeaderHash> = Vec::new();
+        let mut link_actions: Vec<ActionHash> = Vec::new();
         for _ in 0..2 {
-            link_headers.push(conductor.call(&alice, "create_link", ()).await)
+            link_actions.push(conductor.call(&alice, "create_link", ()).await)
         }
 
         let links: Vec<Link> = conductor.call(&alice, "get_links", ()).await;
@@ -136,8 +136,8 @@ pub mod slow_tests {
         assert!(links.len() == 2);
 
         // remove a link
-        let _: HeaderHash = conductor
-            .call(&alice, "delete_link", link_headers[0].clone())
+        let _: ActionHash = conductor
+            .call(&alice, "delete_link", link_actions[0].clone())
             .await;
 
         let links: Vec<Link> = conductor.call(&alice, "get_links", ()).await;
@@ -145,8 +145,8 @@ pub mod slow_tests {
         assert!(links.len() == 1);
 
         // remove a link
-        let _: HeaderHash = conductor
-            .call(&alice, "delete_link", link_headers[1].clone())
+        let _: ActionHash = conductor
+            .call(&alice, "delete_link", link_actions[1].clone())
             .await;
 
         let links: Vec<Link> = conductor.call(&alice, "get_links", ()).await;
@@ -154,8 +154,8 @@ pub mod slow_tests {
         assert!(links.len() == 0);
 
         // Add some links then delete them all
-        let _h: HeaderHash = conductor.call(&alice, "create_link", ()).await;
-        let _h: HeaderHash = conductor.call(&alice, "create_link", ()).await;
+        let _h: ActionHash = conductor.call(&alice, "create_link", ()).await;
+        let _h: ActionHash = conductor.call(&alice, "create_link", ()).await;
 
         let links: Vec<Link> = conductor.call(&alice, "get_links", ()).await;
 

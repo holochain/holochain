@@ -1,51 +1,51 @@
 //! Defines a Element, the basic unit of Holochain data.
 
+use crate::action::conversions::WrongActionError;
+use crate::action::ActionHashed;
+use crate::action::CreateLink;
+use crate::action::DeleteLink;
 use crate::entry_def::EntryVisibility;
-use crate::header::conversions::WrongHeaderError;
-use crate::header::CreateLink;
-use crate::header::DeleteLink;
-use crate::header::HeaderHashed;
 use crate::signature::Signature;
+use crate::Action;
 use crate::Entry;
-use crate::Header;
+use holo_hash::ActionHash;
 use holo_hash::HashableContent;
-use holo_hash::HeaderHash;
 use holo_hash::HoloHashOf;
 use holo_hash::HoloHashed;
 use holochain_serialized_bytes::prelude::*;
 
-/// a chain element containing the signed header along with the
-/// entry if the header type has one.
+/// a chain element containing the signed action along with the
+/// entry if the action type has one.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct Element {
-    /// The signed header for this element
-    pub signed_header: SignedHeaderHashed,
-    /// If there is an entry associated with this header it will be here.
+    /// The signed action for this element
+    pub signed_action: SignedActionHashed,
+    /// If there is an entry associated with this action it will be here.
     /// If not, there will be an enum variant explaining the reason.
     pub entry: ElementEntry,
 }
 
-/// Represents the different ways the entry_address reference within a Header
+/// Represents the different ways the entry_address reference within a Action
 /// can be intepreted
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum ElementEntry {
-    /// The Header has an entry_address reference, and the Entry is accessible.
+    /// The Action has an entry_address reference, and the Entry is accessible.
     Present(Entry),
-    /// The Header has an entry_address reference, but we are in a public
+    /// The Action has an entry_address reference, but we are in a public
     /// context and the entry is private.
     Hidden,
-    /// The Header does not contain an entry_address reference.
+    /// The Action does not contain an entry_address reference.
     NotApplicable,
-    /// The Header has an entry but was stored without it.
-    /// This can happen when you receive gossip of just a header
-    /// when the header type is a [`crate::EntryCreationHeader`]
+    /// The Action has an entry but was stored without it.
+    /// This can happen when you receive gossip of just a action
+    /// when the action type is a [`crate::EntryCreationAction`]
     NotStored,
 }
 
-/// The hashed header and the signature that signed it
-pub type SignedHeaderHashed = SignedHashed<Header>;
+/// The hashed action and the signature that signed it
+pub type SignedActionHashed = SignedHashed<Action>;
 
 #[derive(Clone, Debug, Eq, Serialize, Deserialize)]
 /// Any content that has been hashed and signed.
@@ -60,13 +60,13 @@ where
 }
 
 impl Element {
-    /// Mutable reference to the Header content.
+    /// Mutable reference to the Action content.
     /// This is useless and dangerous in production usage.
-    /// Guaranteed to make hashes and signatures mismatch whatever the Header is mutated to (at least).
+    /// Guaranteed to make hashes and signatures mismatch whatever the Action is mutated to (at least).
     /// This may be useful for tests that rely heavily on mocked and fixturated data.
     #[cfg(feature = "test_utils")]
-    pub fn as_header_mut(&mut self) -> &mut Header {
-        &mut self.signed_header.hashed.content
+    pub fn as_action_mut(&mut self) -> &mut Action {
+        &mut self.signed_action.hashed.content
     }
 
     /// Mutable reference to the ElementEntry.
@@ -79,9 +79,9 @@ impl Element {
     }
 
     /// Raw element constructor.  Used only when we know that the values are valid.
-    pub fn new(signed_header: SignedHeaderHashed, maybe_entry: Option<Entry>) -> Self {
-        let maybe_visibility = signed_header
-            .header()
+    pub fn new(signed_action: SignedActionHashed, maybe_entry: Option<Entry>) -> Self {
+        let maybe_visibility = signed_action
+            .action()
             .entry_data()
             .map(|(_, entry_type)| entry_type.visibility());
         let entry = match (maybe_entry, maybe_visibility) {
@@ -89,12 +89,12 @@ impl Element {
             (None, Some(EntryVisibility::Private)) => ElementEntry::Hidden,
             (None, None) => ElementEntry::NotApplicable,
             (Some(_), None) => {
-                unreachable!("Entry is present for a Header type which has no entry reference")
+                unreachable!("Entry is present for a Action type which has no entry reference")
             }
             (None, Some(EntryVisibility::Public)) => ElementEntry::NotStored,
         };
         Self {
-            signed_header,
+            signed_action,
             entry,
         }
     }
@@ -103,8 +103,8 @@ impl Element {
     /// to Hidden so that it cannot be leaked
     pub fn privatized(self) -> Self {
         let entry = if let Some(EntryVisibility::Private) = self
-            .signed_header
-            .header()
+            .signed_action
+            .action()
             .entry_data()
             .map(|(_, entry_type)| entry_type.visibility())
         {
@@ -116,39 +116,39 @@ impl Element {
             self.entry
         };
         Self {
-            signed_header: self.signed_header,
+            signed_action: self.signed_action,
             entry,
         }
     }
 
     /// Break this element into its components
-    pub fn into_inner(self) -> (SignedHeaderHashed, ElementEntry) {
-        (self.signed_header, self.entry)
+    pub fn into_inner(self) -> (SignedActionHashed, ElementEntry) {
+        (self.signed_action, self.entry)
     }
 
-    /// The inner signed-header
-    pub fn signed_header(&self) -> &SignedHeaderHashed {
-        &self.signed_header
+    /// The inner signed-action
+    pub fn signed_action(&self) -> &SignedActionHashed {
+        &self.signed_action
     }
 
-    /// Access the signature from this element's signed header
+    /// Access the signature from this element's signed action
     pub fn signature(&self) -> &Signature {
-        self.signed_header.signature()
+        self.signed_action.signature()
     }
 
-    /// Access the header address from this element's signed header
-    pub fn header_address(&self) -> &HeaderHash {
-        self.signed_header.header_address()
+    /// Access the action address from this element's signed action
+    pub fn action_address(&self) -> &ActionHash {
+        self.signed_action.action_address()
     }
 
-    /// Access the Header from this element's signed header
-    pub fn header(&self) -> &Header {
-        self.signed_header.header()
+    /// Access the Action from this element's signed action
+    pub fn action(&self) -> &Action {
+        self.signed_action.action()
     }
 
-    /// Access the HeaderHashed from this element's signed header portion
-    pub fn header_hashed(&self) -> &HeaderHashed {
-        &self.signed_header.hashed
+    /// Access the ActionHashed from this element's signed action portion
+    pub fn action_hashed(&self) -> &ActionHashed {
+        &self.signed_action.hashed
     }
 
     /// Access the Entry portion of this element as an ElementEntry,
@@ -266,31 +266,31 @@ where
     }
 }
 
-impl SignedHeaderHashed {
-    /// Access the Header Hash.
-    pub fn header_address(&self) -> &HeaderHash {
+impl SignedActionHashed {
+    /// Access the Action Hash.
+    pub fn action_address(&self) -> &ActionHash {
         &self.hashed.hash
     }
 
-    /// Access the Header portion.
-    pub fn header(&self) -> &Header {
+    /// Access the Action portion.
+    pub fn action(&self) -> &Action {
         &self.hashed.content
     }
 
-    /// Create a new SignedHeaderHashed from a type that implements into `Header` and
+    /// Create a new SignedActionHashed from a type that implements into `Action` and
     /// has the same hash bytes.
     /// The caller must make sure the hash does not change.
     pub fn raw_from_same_hash<T>(other: SignedHashed<T>) -> Self
     where
-        T: Into<Header>,
-        T: HashableContent<HashType = holo_hash::hash_type::Header>,
+        T: Into<Action>,
+        T: HashableContent<HashType = holo_hash::hash_type::Action>,
     {
         let SignedHashed {
             hashed: HoloHashed { content, hash },
             signature,
         } = other;
-        let header = content.into();
-        let hashed = HeaderHashed::with_pre_hashed(header, hash);
+        let action = content.into();
+        let hashed = ActionHashed::with_pre_hashed(action, hash);
         Self { hashed, signature }
     }
 }
@@ -304,15 +304,15 @@ where
     }
 }
 
-impl From<HeaderHashed> for Header {
-    fn from(header_hashed: HeaderHashed) -> Header {
-        header_hashed.into_content()
+impl From<ActionHashed> for Action {
+    fn from(action_hashed: ActionHashed) -> Action {
+        action_hashed.into_content()
     }
 }
 
-impl From<SignedHeaderHashed> for Header {
-    fn from(signed_header_hashed: SignedHeaderHashed) -> Header {
-        HeaderHashed::from(signed_header_hashed).into()
+impl From<SignedActionHashed> for Action {
+    fn from(signed_action_hashed: SignedActionHashed) -> Action {
+        ActionHashed::from(signed_action_hashed).into()
     }
 }
 
@@ -323,7 +323,7 @@ impl From<Element> for Option<Entry> {
 }
 
 impl TryFrom<Element> for CreateLink {
-    type Error = WrongHeaderError;
+    type Error = WrongActionError;
     fn try_from(value: Element) -> Result<Self, Self::Error> {
         value
             .into_inner()
@@ -336,7 +336,7 @@ impl TryFrom<Element> for CreateLink {
 }
 
 impl TryFrom<Element> for DeleteLink {
-    type Error = WrongHeaderError;
+    type Error = WrongActionError;
     fn try_from(value: Element) -> Result<Self, Self::Error> {
         value
             .into_inner()

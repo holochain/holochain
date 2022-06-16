@@ -44,8 +44,8 @@ use crate::core::ribosome::host_fn::get_details::get_details;
 use crate::core::ribosome::host_fn::get_link_details::get_link_details;
 use crate::core::ribosome::host_fn::get_links::get_links;
 use crate::core::ribosome::host_fn::hash::hash;
+use crate::core::ribosome::host_fn::must_get_action::must_get_action;
 use crate::core::ribosome::host_fn::must_get_entry::must_get_entry;
-use crate::core::ribosome::host_fn::must_get_header::must_get_header;
 use crate::core::ribosome::host_fn::must_get_valid_element::must_get_valid_element;
 use crate::core::ribosome::host_fn::query::query;
 use crate::core::ribosome::host_fn::random_bytes::random_bytes;
@@ -561,7 +561,7 @@ impl RealRibosome {
             .with_host_function(&mut ns, "__get_link_details", get_link_details)
             .with_host_function(&mut ns, "__get_agent_activity", get_agent_activity)
             .with_host_function(&mut ns, "__must_get_entry", must_get_entry)
-            .with_host_function(&mut ns, "__must_get_header", must_get_header)
+            .with_host_function(&mut ns, "__must_get_action", must_get_action)
             .with_host_function(&mut ns, "__must_get_valid_element", must_get_valid_element)
             .with_host_function(
                 &mut ns,

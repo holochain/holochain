@@ -1,5 +1,7 @@
 //! Common types
 
+pub use crate::action::conversions::*;
+pub use crate::action::*;
 pub use crate::agent_activity::*;
 pub use crate::bytes::*;
 pub use crate::call::*;
@@ -13,8 +15,6 @@ pub use crate::entry::*;
 pub use crate::entry_def::*;
 pub use crate::genesis::*;
 pub use crate::hash::*;
-pub use crate::header::conversions::*;
-pub use crate::header::*;
 pub use crate::info::*;
 pub use crate::init::*;
 pub use crate::judged::*;

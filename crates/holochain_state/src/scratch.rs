@@ -3,16 +3,16 @@ use std::sync::Arc;
 use std::sync::Mutex;
 
 use holo_hash::hash_type::AnyDht;
+use holo_hash::ActionHash;
 use holo_hash::AnyDhtHash;
 use holo_hash::EntryHash;
-use holo_hash::HeaderHash;
 use holochain_keystore::KeystoreError;
 use holochain_types::prelude::*;
 use holochain_zome_types::entry::EntryHashed;
 use holochain_zome_types::ChainTopOrdering;
 use holochain_zome_types::Element;
 use holochain_zome_types::Entry;
-use holochain_zome_types::SignedHeaderHashed;
+use holochain_zome_types::SignedActionHashed;
 use holochain_zome_types::TimestampError;
 use thiserror::Error;
 
@@ -24,17 +24,17 @@ use crate::query::StmtIter;
 use crate::query::Store;
 use holochain_zome_types::ScheduledFn;
 
-/// The "scratch" is an in-memory space to stage Headers to be committed at the
+/// The "scratch" is an in-memory space to stage Actions to be committed at the
 /// end of the CallZome workflow.
 ///
 /// This space must also be queryable: specifically, it needs to be combined
-/// into queries into the database which return Headers. This is done by
+/// into queries into the database which return Actions. This is done by
 /// a simple filter on the scratch space, and then chaining that iterator
-/// onto the iterators over the Headers in the database(s) produced by the
+/// onto the iterators over the Actions in the database(s) produced by the
 /// Cascade.
 #[derive(Debug, Clone, Default)]
 pub struct Scratch {
-    headers: Vec<SignedHeaderHashed>,
+    actions: Vec<SignedActionHashed>,
     entries: HashMap<EntryHash, Arc<Entry>>,
     chain_top_ordering: ChainTopOrdering,
     scheduled_fns: Vec<ScheduledFn>,
@@ -46,7 +46,7 @@ pub struct SyncScratch(Arc<Mutex<Scratch>>);
 
 // MD: hmm, why does this need to be a separate type? Why collect into this?
 pub struct FilteredScratch {
-    headers: Vec<SignedHeaderHashed>,
+    actions: Vec<SignedActionHashed>,
 }
 
 impl Scratch {
@@ -75,28 +75,28 @@ impl Scratch {
         }
     }
 
-    pub fn add_header(&mut self, item: SignedHeaderHashed, chain_top_ordering: ChainTopOrdering) {
+    pub fn add_action(&mut self, item: SignedActionHashed, chain_top_ordering: ChainTopOrdering) {
         self.respect_chain_top_ordering(chain_top_ordering);
-        let seq = item.header().header_seq();
+        let seq = item.action().action_seq();
         match &mut self.chain_head {
             Some((h, i)) => {
                 if seq > *h {
                     *h = seq;
-                    *i = self.headers.len();
+                    *i = self.actions.len();
                 }
             }
-            h @ None => *h = Some((seq, self.headers.len())),
+            h @ None => *h = Some((seq, self.actions.len())),
         }
-        self.headers.push(item);
+        self.actions.push(item);
     }
 
-    pub fn chain_head(&self) -> Option<(HeaderHash, u32, Timestamp)> {
+    pub fn chain_head(&self) -> Option<(ActionHash, u32, Timestamp)> {
         self.chain_head.as_ref().and_then(|(_, i)| {
-            self.headers.get(*i).map(|h| {
+            self.actions.get(*i).map(|h| {
                 (
-                    h.header_address().clone(),
-                    h.header().header_seq(),
-                    h.header().timestamp(),
+                    h.action_address().clone(),
+                    h.action().action_seq(),
+                    h.action().timestamp(),
                 )
             })
         })
@@ -108,9 +108,9 @@ impl Scratch {
         self.entries.insert(hash, Arc::new(entry));
     }
 
-    pub fn as_filter(&self, f: impl Fn(&SignedHeaderHashed) -> bool) -> FilteredScratch {
-        let headers = self.headers.iter().filter(|&shh| f(shh)).cloned().collect();
-        FilteredScratch { headers }
+    pub fn as_filter(&self, f: impl Fn(&SignedActionHashed) -> bool) -> FilteredScratch {
+        let actions = self.actions.iter().filter(|&shh| f(shh)).cloned().collect();
+        FilteredScratch { actions }
     }
 
     pub fn into_sync(self) -> SyncScratch {
@@ -118,21 +118,21 @@ impl Scratch {
     }
 
     pub fn len(&self) -> usize {
-        self.headers.len()
+        self.actions.len()
     }
 
     pub fn is_empty(&self) -> bool {
-        self.headers.is_empty() && self.scheduled_fns.is_empty()
+        self.actions.is_empty() && self.scheduled_fns.is_empty()
     }
 
-    pub fn headers(&self) -> impl Iterator<Item = &SignedHeaderHashed> {
-        self.headers.iter()
+    pub fn actions(&self) -> impl Iterator<Item = &SignedActionHashed> {
+        self.actions.iter()
     }
 
     pub fn elements(&self) -> impl Iterator<Item = Element> + '_ {
-        self.headers.iter().cloned().map(move |shh| {
+        self.actions.iter().cloned().map(move |shh| {
             let entry = shh
-                .header()
+                .action()
                 .entry_hash()
                 .and_then(|eh| self.entries.get(eh).map(|e| (**e).clone()));
             Element::new(shh, entry)
@@ -144,17 +144,17 @@ impl Scratch {
         self.entries.iter()
     }
 
-    pub fn num_headers(&self) -> usize {
-        self.headers.len()
+    pub fn num_actions(&self) -> usize {
+        self.actions.len()
     }
 
     fn get_exact_element(
         &self,
-        hash: &HeaderHash,
+        hash: &ActionHash,
     ) -> StateQueryResult<Option<holochain_zome_types::Element>> {
-        Ok(self.get_header(hash)?.map(|shh| {
+        Ok(self.get_action(hash)?.map(|shh| {
             let entry = shh
-                .header()
+                .action()
                 .entry_hash()
                 .and_then(|eh| self.get_entry(eh).ok());
             Element::new(shh, entry.flatten())
@@ -167,9 +167,9 @@ impl Scratch {
     ) -> StateQueryResult<Option<holochain_zome_types::Element>> {
         let r = self.get_entry(hash)?.and_then(|entry| {
             let shh = self
-                .headers()
+                .actions()
                 .find(|&h| {
-                    h.header()
+                    h.action()
                         .entry_hash()
                         .map(|eh| eh == hash)
                         .unwrap_or(false)
@@ -184,10 +184,10 @@ impl Scratch {
         self.scheduled_fns.drain(..)
     }
 
-    /// Drain out all the headers.
-    pub fn drain_headers(&mut self) -> impl Iterator<Item = SignedHeaderHashed> + '_ {
+    /// Drain out all the actions.
+    pub fn drain_actions(&mut self) -> impl Iterator<Item = SignedActionHashed> + '_ {
         self.chain_head = None;
-        self.headers.drain(..)
+        self.actions.drain(..)
     }
 
     /// Drain out all the entries.
@@ -230,21 +230,21 @@ impl Store for Scratch {
         Ok(self.entries.contains_key(hash))
     }
 
-    fn contains_header(&self, hash: &HeaderHash) -> StateQueryResult<bool> {
-        Ok(self.headers().any(|h| h.header_address() == hash))
+    fn contains_action(&self, hash: &ActionHash) -> StateQueryResult<bool> {
+        Ok(self.actions().any(|h| h.action_address() == hash))
     }
 
-    fn get_header(&self, hash: &HeaderHash) -> StateQueryResult<Option<SignedHeaderHashed>> {
+    fn get_action(&self, hash: &ActionHash) -> StateQueryResult<Option<SignedActionHashed>> {
         Ok(self
-            .headers()
-            .find(|&h| h.header_address() == hash)
+            .actions()
+            .find(|&h| h.action_address() == hash)
             .cloned())
     }
 
     fn get_element(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Element>> {
         match *hash.hash_type() {
             AnyDht::Entry => self.get_any_element(&hash.clone().into()),
-            AnyDht::Header => self.get_exact_element(&hash.clone().into()),
+            AnyDht::Action => self.get_exact_element(&hash.clone().into()),
         }
     }
 
@@ -274,14 +274,14 @@ impl Store for Scratch {
 }
 
 impl FilteredScratch {
-    pub fn drain(&mut self) -> impl Iterator<Item = SignedHeaderHashed> + '_ {
-        self.headers.drain(..)
+    pub fn drain(&mut self) -> impl Iterator<Item = SignedActionHashed> + '_ {
+        self.actions.drain(..)
     }
 }
 
 impl<Q> Stores<Q> for Scratch
 where
-    Q: Query<Item = Judged<SignedHeaderHashed>>,
+    Q: Query<Item = Judged<SignedActionHashed>>,
 {
     type O = FilteredScratch;
 
@@ -290,8 +290,8 @@ where
     }
 }
 
-impl StoresIter<Judged<SignedHeaderHashed>> for FilteredScratch {
-    fn iter(&mut self) -> StateQueryResult<StmtIter<'_, Judged<SignedHeaderHashed>>> {
+impl StoresIter<Judged<SignedActionHashed>> for FilteredScratch {
+    fn iter(&mut self) -> StateQueryResult<StmtIter<'_, Judged<SignedActionHashed>>> {
         // We are assuming data in the scratch space is valid even though
         // it hasn't been validated yet because if it does fail validation
         // then this transaction will be rolled back.
@@ -311,7 +311,7 @@ pub enum ScratchError {
     Keystore(#[from] KeystoreError),
 
     #[error(transparent)]
-    Header(#[from] HeaderError),
+    Action(#[from] ActionError),
 
     /// Other
     #[error("Other: {0}")]

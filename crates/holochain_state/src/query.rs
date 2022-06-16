@@ -2,11 +2,11 @@ use crate::scratch::FilteredScratch;
 use crate::scratch::Scratch;
 use fallible_iterator::FallibleIterator;
 use holo_hash::hash_type::AnyDht;
+use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holo_hash::AnyDhtHash;
 use holo_hash::DhtOpHash;
 use holo_hash::EntryHash;
-use holo_hash::HeaderHash;
 use holochain_serialized_bytes::prelude::*;
 use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::Row;
@@ -18,12 +18,12 @@ use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::dht_op::DhtOpType;
 use holochain_types::prelude::HasValidationStatus;
 use holochain_types::prelude::Judged;
+use holochain_zome_types::ActionHashed;
 use holochain_zome_types::Element;
 use holochain_zome_types::Entry;
 use holochain_zome_types::EntryVisibility;
-use holochain_zome_types::HeaderHashed;
-use holochain_zome_types::SignedHeader;
-use holochain_zome_types::SignedHeaderHashed;
+use holochain_zome_types::SignedAction;
+use holochain_zome_types::SignedActionHashed;
 use serde::de::DeserializeOwned;
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -68,8 +68,8 @@ pub type Params<'a> = (&'a str, &'a dyn holochain_sqlite::rusqlite::ToSql);
 /// A common accumulator type used by folds to collapse queries down to a
 /// simpler structure, i.e. to let deletions annihilate creations.
 pub struct Maps<T> {
-    pub creates: HashMap<HeaderHash, T>,
-    pub deletes: HashSet<HeaderHash>,
+    pub creates: HashMap<ActionHash, T>,
+    pub deletes: HashSet<ActionHash>,
 }
 
 impl<T> Maps<T> {
@@ -155,7 +155,7 @@ pub trait Store {
     /// Get an [`Entry`] from this store.
     /// - Will return any public entry.
     /// - If an author is provided
-    /// and a header for this entry matches
+    /// and a action for this entry matches
     /// the author then any entry will be return
     /// regardless of visibility .
     fn get_public_or_authored_entry(
@@ -164,8 +164,8 @@ pub trait Store {
         author: Option<&AgentPubKey>,
     ) -> StateQueryResult<Option<Entry>>;
 
-    /// Get an [`SignedHeaderHashed`] from this store.
-    fn get_header(&self, hash: &HeaderHash) -> StateQueryResult<Option<SignedHeaderHashed>>;
+    /// Get an [`SignedActionHashed`] from this store.
+    fn get_action(&self, hash: &ActionHash) -> StateQueryResult<Option<SignedActionHashed>>;
 
     /// Get an [`Element`] from this store.
     fn get_element(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Element>>;
@@ -182,15 +182,15 @@ pub trait Store {
     fn contains_hash(&self, hash: &AnyDhtHash) -> StateQueryResult<bool> {
         match *hash.hash_type() {
             AnyDht::Entry => self.contains_entry(&hash.clone().into()),
-            AnyDht::Header => self.contains_header(&hash.clone().into()),
+            AnyDht::Action => self.contains_action(&hash.clone().into()),
         }
     }
 
     /// Check if an entry is contained in the store
     fn contains_entry(&self, hash: &EntryHash) -> StateQueryResult<bool>;
 
-    /// Check if a header is contained in the store
-    fn contains_header(&self, hash: &HeaderHash) -> StateQueryResult<bool>;
+    /// Check if a action is contained in the store
+    fn contains_action(&self, hash: &ActionHash) -> StateQueryResult<bool>;
 }
 
 /// Each Stores implementation has its own custom way of iterating over itself,
@@ -221,7 +221,7 @@ pub struct DbScratch<'borrow, 'txn> {
 
 pub struct DbScratchIter<'stmt, Q>
 where
-    Q: Query<Item = Judged<SignedHeaderHashed>>,
+    Q: Query<Item = Judged<SignedActionHashed>>,
 {
     stmts: QueryStmts<'stmt, Q>,
     filtered_scratch: FilteredScratch,
@@ -287,12 +287,12 @@ impl<'stmt> Store for Txn<'stmt, '_> {
         }
     }
 
-    fn contains_header(&self, hash: &HeaderHash) -> StateQueryResult<bool> {
+    fn contains_action(&self, hash: &ActionHash) -> StateQueryResult<bool> {
         let exists = self.txn.query_row_named(
             "
             SELECT
             EXISTS(
-                SELECT 1 FROM Header
+                SELECT 1 FROM Action
                 WHERE hash = :hash
             )
             ",
@@ -315,25 +315,25 @@ impl<'stmt> Store for Txn<'stmt, '_> {
         }
     }
 
-    fn get_header(&self, hash: &HeaderHash) -> StateQueryResult<Option<SignedHeaderHashed>> {
+    fn get_action(&self, hash: &ActionHash) -> StateQueryResult<Option<SignedActionHashed>> {
         let shh = self.txn.query_row_named(
             "
             SELECT
-            Header.blob, Header.hash
-            FROM Header
+            Action.blob, Action.hash
+            FROM Action
             WHERE hash = :hash
             ",
             named_params! {
                 ":hash": hash,
             },
             |row| {
-                let header =
-                    from_blob::<SignedHeader>(row.get(row.as_ref().column_index("blob")?)?);
-                Ok(header.and_then(|header| {
-                    let SignedHeader(header, signature) = header;
-                    let hash: HeaderHash = row.get(row.as_ref().column_index("hash")?)?;
-                    let header = HeaderHashed::with_pre_hashed(header, hash);
-                    let shh = SignedHeaderHashed::with_presigned(header, signature);
+                let action =
+                    from_blob::<SignedAction>(row.get(row.as_ref().column_index("blob")?)?);
+                Ok(action.and_then(|action| {
+                    let SignedAction(action, signature) = action;
+                    let hash: ActionHash = row.get(row.as_ref().column_index("hash")?)?;
+                    let action = ActionHashed::with_pre_hashed(action, hash);
+                    let shh = SignedActionHashed::with_presigned(action, signature);
                     Ok(shh)
                 }))
             },
@@ -348,7 +348,7 @@ impl<'stmt> Store for Txn<'stmt, '_> {
     fn get_element(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Element>> {
         match *hash.hash_type() {
             AnyDht::Entry => self.get_any_element(&hash.clone().into()),
-            AnyDht::Header => self.get_exact_element(&hash.clone().into()),
+            AnyDht::Action => self.get_exact_element(&hash.clone().into()),
         }
     }
 
@@ -371,9 +371,9 @@ impl<'stmt> Store for Txn<'stmt, '_> {
                         .map(|el| Element::new(el.into_inner().0, None))),
                 },
             },
-            AnyDht::Header => Ok(self.get_exact_element(&hash.clone().into())?.map(|el| {
+            AnyDht::Action => Ok(self.get_exact_element(&hash.clone().into())?.map(|el| {
                 // Filter out the entry if it's private.
-                let is_private_entry = el.header().entry_type().map_or(false, |et| {
+                let is_private_entry = el.action().entry_type().map_or(false, |et| {
                     matches!(et.visibility(), EntryVisibility::Private)
                 });
                 if is_private_entry {
@@ -387,27 +387,27 @@ impl<'stmt> Store for Txn<'stmt, '_> {
 }
 
 impl<'stmt> Txn<'stmt, '_> {
-    fn get_exact_element(&self, hash: &HeaderHash) -> StateQueryResult<Option<Element>> {
+    fn get_exact_element(&self, hash: &ActionHash) -> StateQueryResult<Option<Element>> {
         let element = self.txn.query_row_named(
             "
             SELECT
-            Header.blob AS header_blob, Header.hash, Entry.blob as entry_blob
-            FROM Header
-            LEFT JOIN Entry ON Header.entry_hash = Entry.hash
+            Action.blob AS action_blob, Action.hash, Entry.blob as entry_blob
+            FROM Action
+            LEFT JOIN Entry ON Action.entry_hash = Entry.hash
             WHERE
-            Header.hash = :hash
+            Action.hash = :hash
             ",
             named_params! {
                 ":hash": hash,
             },
             |row| {
-                let header =
-                    from_blob::<SignedHeader>(row.get(row.as_ref().column_index("header_blob")?)?);
-                Ok(header.and_then(|header| {
-                    let SignedHeader(header, signature) = header;
-                    let hash: HeaderHash = row.get(row.as_ref().column_index("hash")?)?;
-                    let header = HeaderHashed::with_pre_hashed(header, hash);
-                    let shh = SignedHeaderHashed::with_presigned(header, signature);
+                let action =
+                    from_blob::<SignedAction>(row.get(row.as_ref().column_index("action_blob")?)?);
+                Ok(action.and_then(|action| {
+                    let SignedAction(action, signature) = action;
+                    let hash: ActionHash = row.get(row.as_ref().column_index("hash")?)?;
+                    let action = ActionHashed::with_pre_hashed(action, hash);
+                    let shh = SignedActionHashed::with_presigned(action, signature);
                     let entry: Option<Vec<u8>> =
                         row.get(row.as_ref().column_index("entry_blob")?)?;
                     let entry = match entry {
@@ -428,9 +428,9 @@ impl<'stmt> Txn<'stmt, '_> {
         let element = self.txn.query_row_named(
             "
             SELECT
-            Header.blob AS header_blob, Header.hash, Entry.blob as entry_blob
-            FROM Header
-            JOIN Entry ON Header.entry_hash = Entry.hash
+            Action.blob AS action_blob, Action.hash, Entry.blob as entry_blob
+            FROM Action
+            JOIN Entry ON Action.entry_hash = Entry.hash
             WHERE
             Entry.hash = :hash
             ",
@@ -438,13 +438,13 @@ impl<'stmt> Txn<'stmt, '_> {
                 ":hash": hash,
             },
             |row| {
-                let header =
-                    from_blob::<SignedHeader>(row.get(row.as_ref().column_index("header_blob")?)?);
-                Ok(header.and_then(|header| {
-                    let SignedHeader(header, signature) = header;
-                    let hash: HeaderHash = row.get(row.as_ref().column_index("hash")?)?;
-                    let header = HeaderHashed::with_pre_hashed(header, hash);
-                    let shh = SignedHeaderHashed::with_presigned(header, signature);
+                let action =
+                    from_blob::<SignedAction>(row.get(row.as_ref().column_index("action_blob")?)?);
+                Ok(action.and_then(|action| {
+                    let SignedAction(action, signature) = action;
+                    let hash: ActionHash = row.get(row.as_ref().column_index("hash")?)?;
+                    let action = ActionHashed::with_pre_hashed(action, hash);
+                    let shh = SignedActionHashed::with_presigned(action, signature);
                     let entry: Option<Vec<u8>> =
                         row.get(row.as_ref().column_index("entry_blob")?)?;
                     let entry = match entry {
@@ -466,25 +466,25 @@ impl<'stmt> Txn<'stmt, '_> {
         let element = self.txn.query_row_named(
             "
             SELECT
-            Header.blob AS header_blob, Header.hash, Entry.blob as entry_blob
-            FROM Header
-            JOIN Entry ON Header.entry_hash = Entry.hash
+            Action.blob AS action_blob, Action.hash, Entry.blob as entry_blob
+            FROM Action
+            JOIN Entry ON Action.entry_hash = Entry.hash
             WHERE
             Entry.hash = :hash
             AND
-            Header.private_entry = 0
+            Action.private_entry = 0
             ",
             named_params! {
                 ":hash": hash,
             },
             |row| {
-                let header =
-                    from_blob::<SignedHeader>(row.get(row.as_ref().column_index("header_blob")?)?);
-                Ok(header.and_then(|header| {
-                    let SignedHeader(header, signature) = header;
-                    let hash: HeaderHash = row.get(row.as_ref().column_index("hash")?)?;
-                    let header = HeaderHashed::with_pre_hashed(header, hash);
-                    let shh = SignedHeaderHashed::with_presigned(header, signature);
+                let action =
+                    from_blob::<SignedAction>(row.get(row.as_ref().column_index("action_blob")?)?);
+                Ok(action.and_then(|action| {
+                    let SignedAction(action, signature) = action;
+                    let hash: ActionHash = row.get(row.as_ref().column_index("hash")?)?;
+                    let action = ActionHashed::with_pre_hashed(action, hash);
+                    let shh = SignedActionHashed::with_presigned(action, signature);
                     let entry: Option<Vec<u8>> =
                         row.get(row.as_ref().column_index("entry_blob")?)?;
                     let entry = match entry {
@@ -510,26 +510,26 @@ impl<'stmt> Txn<'stmt, '_> {
         let element = self.txn.query_row_named(
             "
             SELECT
-            Header.blob AS header_blob, Header.hash, Entry.blob as entry_blob
-            FROM Header
-            JOIN Entry ON Header.entry_hash = Entry.hash
+            Action.blob AS action_blob, Action.hash, Entry.blob as entry_blob
+            FROM Action
+            JOIN Entry ON Action.entry_hash = Entry.hash
             WHERE
             Entry.hash = :hash
             AND
-            Header.author = :author
+            Action.author = :author
             ",
             named_params! {
                 ":hash": hash,
                 ":author": author,
             },
             |row| {
-                let header =
-                    from_blob::<SignedHeader>(row.get(row.as_ref().column_index("header_blob")?)?);
-                Ok(header.and_then(|header| {
-                    let SignedHeader(header, signature) = header;
-                    let hash: HeaderHash = row.get(row.as_ref().column_index("hash")?)?;
-                    let header = HeaderHashed::with_pre_hashed(header, hash);
-                    let shh = SignedHeaderHashed::with_presigned(header, signature);
+                let action =
+                    from_blob::<SignedAction>(row.get(row.as_ref().column_index("action_blob")?)?);
+                Ok(action.and_then(|action| {
+                    let SignedAction(action, signature) = action;
+                    let hash: ActionHash = row.get(row.as_ref().column_index("hash")?)?;
+                    let action = ActionHashed::with_pre_hashed(action, hash);
+                    let shh = SignedActionHashed::with_presigned(action, signature);
                     let entry: Option<Vec<u8>> =
                         row.get(row.as_ref().column_index("entry_blob")?)?;
                     let entry = match entry {
@@ -589,9 +589,9 @@ impl<'stmt> Store for Txns<'stmt, '_> {
         Ok(false)
     }
 
-    fn contains_header(&self, hash: &HeaderHash) -> StateQueryResult<bool> {
+    fn contains_action(&self, hash: &ActionHash) -> StateQueryResult<bool> {
         for txn in &self.txns {
-            let r = txn.contains_header(hash)?;
+            let r = txn.contains_action(hash)?;
             if r {
                 return Ok(r);
             }
@@ -599,9 +599,9 @@ impl<'stmt> Store for Txns<'stmt, '_> {
         Ok(false)
     }
 
-    fn get_header(&self, hash: &HeaderHash) -> StateQueryResult<Option<SignedHeaderHashed>> {
+    fn get_action(&self, hash: &ActionHash) -> StateQueryResult<Option<SignedActionHashed>> {
         for txn in &self.txns {
-            let r = txn.get_header(hash)?;
+            let r = txn.get_action(hash)?;
             if r.is_some() {
                 return Ok(r);
             }
@@ -658,7 +658,7 @@ impl<'stmt, Q: Query> StoresIter<Q::Item> for QueryStmts<'stmt, Q> {
 
 impl<'borrow, 'txn, Q> Stores<Q> for DbScratch<'borrow, 'txn>
 where
-    Q: Query<Item = Judged<SignedHeaderHashed>>,
+    Q: Query<Item = Judged<SignedActionHashed>>,
 {
     type O = DbScratchIter<'borrow, Q>;
 
@@ -689,19 +689,19 @@ impl<'borrow, 'txn> Store for DbScratch<'borrow, 'txn> {
         }
     }
 
-    fn contains_header(&self, hash: &HeaderHash) -> StateQueryResult<bool> {
-        let r = self.txns.contains_header(hash)?;
+    fn contains_action(&self, hash: &ActionHash) -> StateQueryResult<bool> {
+        let r = self.txns.contains_action(hash)?;
         if !r {
-            self.scratch.contains_header(hash)
+            self.scratch.contains_action(hash)
         } else {
             Ok(r)
         }
     }
 
-    fn get_header(&self, hash: &HeaderHash) -> StateQueryResult<Option<SignedHeaderHashed>> {
-        let r = self.txns.get_header(hash)?;
+    fn get_action(&self, hash: &ActionHash) -> StateQueryResult<Option<SignedActionHashed>> {
+        let r = self.txns.get_action(hash)?;
         if r.is_none() {
-            self.scratch.get_header(hash)
+            self.scratch.get_action(hash)
         } else {
             Ok(r)
         }
@@ -747,7 +747,7 @@ impl<'borrow, 'txn> Store for DbScratch<'borrow, 'txn> {
 
 impl<'stmt, Q> StoresIter<Q::Item> for DbScratchIter<'stmt, Q>
 where
-    Q: Query<Item = Judged<SignedHeaderHashed>>,
+    Q: Query<Item = Judged<SignedActionHashed>>,
 {
     fn iter(&mut self) -> StateQueryResult<StmtIter<'_, Q::Item>> {
         Ok(Box::new(
@@ -841,28 +841,28 @@ impl<'stmt, 'iter, Q: Query> QueryStmt<'stmt, Q> {
     }
 }
 
-pub fn row_blob_and_hash_to_header(
+pub fn row_blob_and_hash_to_action(
     blob_index: &'static str,
     hash_index: &'static str,
-) -> impl Fn(&Row) -> StateQueryResult<SignedHeaderHashed> {
+) -> impl Fn(&Row) -> StateQueryResult<SignedActionHashed> {
     move |row| {
-        let header = from_blob::<SignedHeader>(row.get(blob_index)?)?;
-        let SignedHeader(header, signature) = header;
-        let hash: HeaderHash = row.get(row.as_ref().column_index(hash_index)?)?;
-        let header = HeaderHashed::with_pre_hashed(header, hash);
-        let shh = SignedHeaderHashed::with_presigned(header, signature);
+        let action = from_blob::<SignedAction>(row.get(blob_index)?)?;
+        let SignedAction(action, signature) = action;
+        let hash: ActionHash = row.get(row.as_ref().column_index(hash_index)?)?;
+        let action = ActionHashed::with_pre_hashed(action, hash);
+        let shh = SignedActionHashed::with_presigned(action, signature);
         Ok(shh)
     }
 }
 
-pub fn row_blob_to_header(
+pub fn row_blob_to_action(
     blob_index: &'static str,
-) -> impl Fn(&Row) -> StateQueryResult<SignedHeaderHashed> {
+) -> impl Fn(&Row) -> StateQueryResult<SignedActionHashed> {
     move |row| {
-        let header = from_blob::<SignedHeader>(row.get(blob_index)?)?;
-        let SignedHeader(header, signature) = header;
-        let header = HeaderHashed::from_content_sync(header);
-        let shh = SignedHeaderHashed::with_presigned(header, signature);
+        let action = from_blob::<SignedAction>(row.get(blob_index)?)?;
+        let SignedAction(action, signature) = action;
+        let action = ActionHashed::from_content_sync(action);
+        let shh = SignedActionHashed::with_presigned(action, signature);
         Ok(shh)
     }
 }
@@ -911,10 +911,10 @@ pub fn get_public_entry_from_db(
     let entry = txn.query_row_named(
         "
         SELECT Entry.blob AS entry_blob FROM Entry
-        JOIN Header ON Header.entry_hash = Entry.hash
+        JOIN Action ON Action.entry_hash = Entry.hash
         WHERE Entry.hash = :entry_hash
         AND
-        Header.private_entry = 0
+        Action.private_entry = 0
         ",
         named_params! {
             ":entry_hash": entry_hash,
@@ -947,9 +947,9 @@ pub fn get_public_op_from_db(
             ":hash": op_hash,
         },
         |row| {
-            let header = from_blob::<SignedHeader>(row.get("header_blob")?)?;
+            let action = from_blob::<SignedAction>(row.get("action_blob")?)?;
             let op_type: DhtOpType = row.get("type")?;
-            if header
+            if action
                 .0
                 .entry_type()
                 .map_or(false, |et| *et.visibility() == EntryVisibility::Private)
@@ -960,7 +960,7 @@ pub fn get_public_op_from_db(
             let hash: DhtOpHash = row.get("hash")?;
             // Check the entry isn't private before gossiping it.
             let mut entry: Option<Entry> = None;
-            if header
+            if action
                 .0
                 .entry_type()
                 .filter(|et| *et.visibility() == EntryVisibility::Public)
@@ -972,7 +972,7 @@ pub fn get_public_op_from_db(
                     None => None,
                 };
             }
-            let op = DhtOp::from_type(op_type, header, entry)?;
+            let op = DhtOp::from_type(op_type, action, entry)?;
             StateQueryResult::Ok(Some(DhtOpHashed::with_pre_hashed(op, hash)))
         },
     );

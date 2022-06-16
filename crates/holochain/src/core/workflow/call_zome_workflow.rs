@@ -75,7 +75,7 @@ where
     if should_write {
         let is_empty = workspace.source_chain().is_empty()?;
         let countersigning_op = workspace.source_chain().countersigning_op()?;
-        let flushed_headers: Vec<SignedHeaderHashed> = HostFnWorkspace::from(workspace.clone())
+        let flushed_actions: Vec<SignedActionHashed> = HostFnWorkspace::from(workspace.clone())
             .flush(&network)
             .await?;
         if !is_empty {
@@ -101,7 +101,7 @@ where
                 workspace,
                 network,
                 keystore,
-                flushed_headers,
+                flushed_actions,
                 vec![coordinator_zome],
             )
             .await?;
@@ -235,7 +235,7 @@ where
     let mut cascade =
         holochain_cascade::Cascade::from_workspace_network(&workspace, network.clone());
     for mut chain_element in to_app_validate {
-        for op_type in header_to_op_types(chain_element.header()) {
+        for op_type in action_to_op_types(chain_element.action()) {
             let op =
                 app_validation_workflow::element_to_op(chain_element, op_type, &mut cascade).await;
 

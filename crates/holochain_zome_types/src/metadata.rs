@@ -1,6 +1,6 @@
 //! Metadata types for use in wasm
 use crate::element::Element;
-use crate::element::SignedHeaderHashed;
+use crate::element::SignedActionHashed;
 use crate::validate::ValidationStatus;
 use crate::Entry;
 use holochain_serialized_bytes::prelude::*;
@@ -8,7 +8,7 @@ use holochain_serialized_bytes::prelude::*;
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, SerializedBytes)]
 #[serde(tag = "type", content = "content")]
 /// Return type for get_details calls.
-/// HeaderHash returns an Element.
+/// ActionHash returns an Element.
 /// EntryHash returns an Entry.
 pub enum Details {
     /// Variant asking for a specific element
@@ -26,10 +26,10 @@ pub struct ElementDetails {
     pub element: Element,
     /// The validation status of this element.
     pub validation_status: ValidationStatus,
-    /// Any [`Delete`](crate::header::Delete) on this element.
-    pub deletes: Vec<SignedHeaderHashed>,
-    /// Any [`Update`](crate::header::Update) on this element.
-    pub updates: Vec<SignedHeaderHashed>,
+    /// Any [`Delete`](crate::action::Delete) on this element.
+    pub deletes: Vec<SignedActionHashed>,
+    /// Any [`Update`](crate::action::Update) on this element.
+    pub updates: Vec<SignedActionHashed>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, SerializedBytes)]
@@ -38,23 +38,23 @@ pub struct EntryDetails {
     /// The data
     pub entry: Entry,
     /// ## Create relationships.
-    /// These are the headers that created this entry.
-    /// They can be either a [`Create`](crate::header::Create) or an
-    /// [`Update`](crate::header::Update) header
+    /// These are the actions that created this entry.
+    /// They can be either a [`Create`](crate::action::Create) or an
+    /// [`Update`](crate::action::Update) action
     /// where the `entry_hash` field is the hash of
     /// the above entry.
     ///
     /// You can make an [`Element`] from any of these
     /// and the entry.
-    pub headers: Vec<SignedHeaderHashed>,
+    pub actions: Vec<SignedActionHashed>,
     /// Rejected create relationships.
-    /// These are also the headers that created this entry.
+    /// These are also the actions that created this entry.
     /// but did not pass validation.
-    pub rejected_headers: Vec<SignedHeaderHashed>,
+    pub rejected_actions: Vec<SignedActionHashed>,
     /// ## Delete relationships
     /// These are the deletes that have the
     /// `deletes_entry_address` set to the above Entry.
-    pub deletes: Vec<SignedHeaderHashed>,
+    pub deletes: Vec<SignedActionHashed>,
     /// ## Update relationships.
     /// These are the updates that have the
     /// `original_entry_address` set to the above Entry.
@@ -62,9 +62,9 @@ pub struct EntryDetails {
     /// This is just the relationship and you will need call get
     /// if you want to get the new Entry (the entry on the `entry_hash` field).
     ///
-    /// You **cannot** make an [Element] from these headers
+    /// You **cannot** make an [Element] from these actions
     /// and the above entry.
-    pub updates: Vec<SignedHeaderHashed>,
+    pub updates: Vec<SignedActionHashed>,
     /// The status of this entry currently
     /// according to your view of the metadata
     pub entry_dht_status: EntryDhtStatus,
@@ -73,9 +73,9 @@ pub struct EntryDetails {
 /// The status of an [Entry] in the Dht
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub enum EntryDhtStatus {
-    /// This [Entry] has active headers
+    /// This [Entry] has active actions
     Live,
-    /// This [Entry] has no headers that have not been deleted
+    /// This [Entry] has no actions that have not been deleted
     Dead,
     /// This [Entry] is awaiting validation
     Pending,
@@ -87,6 +87,6 @@ pub enum EntryDhtStatus {
     Conflict,
     /// **not implemented** The author has withdrawn their publication of this element.
     Withdrawn,
-    /// **not implemented** We have agreed to drop this [Entry] content from the system. Header can stay with no entry
+    /// **not implemented** We have agreed to drop this [Entry] content from the system. Action can stay with no entry
     Purged,
 }

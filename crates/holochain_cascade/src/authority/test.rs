@@ -10,7 +10,7 @@ use holochain_types::activity::ChainItems;
 fn options() -> holochain_p2p::event::GetOptions {
     holochain_p2p::event::GetOptions {
         follow_redirects: false,
-        all_live_headers_with_metadata: true,
+        all_live_actions_with_metadata: true,
         request_type: Default::default(),
     }
 }
@@ -36,7 +36,7 @@ async fn get_entry() {
     };
     assert_eq!(result, expected);
 
-    fill_db(&db.to_db(), td.delete_entry_header_op.clone());
+    fill_db(&db.to_db(), td.delete_entry_action_op.clone());
 
     let result = handle_get_entry(db.to_db().into(), td.hash.clone(), options.clone())
         .await
@@ -78,7 +78,7 @@ async fn get_element() {
         .await
         .unwrap();
     let expected = WireElementOps {
-        header: Some(td.wire_create.clone()),
+        action: Some(td.wire_create.clone()),
         deletes: vec![],
         updates: vec![],
         entry: Some(td.entry.clone()),
@@ -91,7 +91,7 @@ async fn get_element() {
         .await
         .unwrap();
     let expected = WireElementOps {
-        header: Some(td.wire_create.clone()),
+        action: Some(td.wire_create.clone()),
         deletes: vec![td.wire_delete.clone()],
         updates: vec![],
         entry: Some(td.entry.clone()),
@@ -104,7 +104,7 @@ async fn get_element() {
         .await
         .unwrap();
     let expected = WireElementOps {
-        header: Some(td.wire_create.clone()),
+        action: Some(td.wire_create.clone()),
         deletes: vec![td.wire_delete.clone()],
         updates: vec![td.wire_update.clone()],
         entry: Some(td.entry.clone()),
@@ -115,13 +115,13 @@ async fn get_element() {
 
     let result = handle_get_element(
         db.to_db().into(),
-        td.any_header_hash.clone(),
+        td.any_action_hash.clone(),
         options.clone(),
     )
     .await
     .unwrap();
     let expected = WireElementOps {
-        header: Some(td.any_header.clone()),
+        action: Some(td.any_action.clone()),
         deletes: vec![],
         updates: vec![],
         entry: td.any_entry.clone(),
@@ -145,7 +145,7 @@ async fn retrieve_element() {
         .await
         .unwrap();
     let expected = WireElementOps {
-        header: Some(td.wire_create.clone()),
+        action: Some(td.wire_create.clone()),
         deletes: vec![],
         updates: vec![],
         entry: Some(td.entry.clone()),
@@ -206,7 +206,7 @@ async fn get_agent_activity() {
     let options = actor::GetActivityOptions {
         include_valid_activity: true,
         include_rejected_activity: false,
-        include_full_headers: false,
+        include_full_actions: false,
         ..Default::default()
     };
 
@@ -234,7 +234,7 @@ async fn get_agent_activity() {
 
     let filter = td
         .query_filter
-        .sequence_range(ChainQueryFilterRange::HeaderSeqRange(0, 19));
+        .sequence_range(ChainQueryFilterRange::ActionSeqRange(0, 19));
     let result = handle_get_agent_activity(
         db.to_db().into(),
         td.agent.clone(),

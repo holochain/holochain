@@ -386,7 +386,7 @@ fn entry_defs_to_entry_type_index() {
 }
 
 #[test]
-fn link_types_from_header() {
+fn link_types_from_action() {
     #[hdk_link_types(skip_no_mangle = true)]
     pub enum LinkTypes {
         A,
@@ -438,10 +438,10 @@ fn set_zome_types(entries: Vec<Range<u8>>, links: Vec<Range<u8>>) {
             todo!()
         }
 
-        fn must_get_header(
+        fn must_get_action(
             &self,
-            must_get_header_input: MustGetHeaderInput,
-        ) -> ExternResult<SignedHeaderHashed> {
+            must_get_action_input: MustGetActionInput,
+        ) -> ExternResult<SignedActionHashed> {
             todo!()
         }
 

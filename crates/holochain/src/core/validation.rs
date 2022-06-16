@@ -41,7 +41,7 @@ pub enum DhtOpOrder {
     RegisterUpdatedContent(holochain_zome_types::timestamp::Timestamp),
     RegisterUpdatedElement(holochain_zome_types::timestamp::Timestamp),
     RegisterDeletedBy(holochain_zome_types::timestamp::Timestamp),
-    RegisterDeletedEntryHeader(holochain_zome_types::timestamp::Timestamp),
+    RegisterDeletedEntryAction(holochain_zome_types::timestamp::Timestamp),
     RegisterAddLink(holochain_zome_types::timestamp::Timestamp),
     RegisterRemoveLink(holochain_zome_types::timestamp::Timestamp),
 }
@@ -85,7 +85,7 @@ impl From<&DhtOp> for DhtOpOrder {
             DhtOp::RegisterUpdatedContent(_, h, _) => RegisterUpdatedContent(h.timestamp),
             DhtOp::RegisterUpdatedElement(_, h, _) => RegisterUpdatedElement(h.timestamp),
             DhtOp::RegisterDeletedBy(_, h) => RegisterDeletedBy(h.timestamp),
-            DhtOp::RegisterDeletedEntryHeader(_, h) => RegisterDeletedEntryHeader(h.timestamp),
+            DhtOp::RegisterDeletedEntryAction(_, h) => RegisterDeletedEntryAction(h.timestamp),
             DhtOp::RegisterAddLink(_, h) => RegisterAddLink(h.timestamp),
             DhtOp::RegisterRemoveLink(_, h) => RegisterRemoveLink(h.timestamp),
         }

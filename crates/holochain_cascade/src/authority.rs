@@ -7,8 +7,8 @@ use self::{
 };
 
 use super::error::CascadeResult;
+use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
-use holo_hash::HeaderHash;
 use holochain_state::query::Query;
 use holochain_state::query::Txn;
 use holochain_types::prelude::*;
@@ -39,7 +39,7 @@ pub async fn handle_get_entry(
 #[tracing::instrument(skip(env))]
 pub async fn handle_get_element(
     env: DbRead<DbKindDht>,
-    hash: HeaderHash,
+    hash: ActionHash,
     options: holochain_p2p::event::GetOptions,
 ) -> CascadeResult<WireElementOps> {
     let query = GetElementOpsQuery::new(hash, options);
@@ -55,7 +55,7 @@ pub async fn handle_get_agent_activity(
     agent: AgentPubKey,
     query: ChainQueryFilter,
     options: holochain_p2p::event::GetActivityOptions,
-) -> CascadeResult<AgentActivityResponse<HeaderHash>> {
+) -> CascadeResult<AgentActivityResponse<ActionHash>> {
     let query = GetAgentActivityQuery::new(agent, query, options);
     let results = env
         .async_reader(move |txn| query.run(Txn::from(&txn)))

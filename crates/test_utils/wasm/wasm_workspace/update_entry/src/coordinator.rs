@@ -8,7 +8,7 @@ enum EntryZomes {
 }
 
 #[hdk_extern]
-fn create_entry(_: ()) -> ExternResult<HeaderHash> {
+fn create_entry(_: ()) -> ExternResult<ActionHash> {
     hdk::prelude::create_entry(&IntegrityUpdateEntry(post()))
 }
 
@@ -18,14 +18,14 @@ fn get_entry(_: ()) -> ExternResult<Option<Element>> {
 }
 
 #[hdk_extern]
-fn update_entry(_: ()) -> ExternResult<HeaderHash> {
-    let header_hash = hdk::prelude::create_entry(&IntegrityUpdateEntry(post()))?;
-    hdk::prelude::update_entry(header_hash, &post())
+fn update_entry(_: ()) -> ExternResult<ActionHash> {
+    let action_hash = hdk::prelude::create_entry(&IntegrityUpdateEntry(post()))?;
+    hdk::prelude::update_entry(action_hash, &post())
 }
 
 #[hdk_extern]
 /// Updates to a different entry, this will fail
-fn invalid_update_entry(_: ()) -> ExternResult<HeaderHash> {
-    let header_hash = hdk::prelude::create_entry(&IntegrityUpdateEntry(post()))?;
-    hdk::prelude::update_entry(header_hash, &msg())
+fn invalid_update_entry(_: ()) -> ExternResult<ActionHash> {
+    let action_hash = hdk::prelude::create_entry(&IntegrityUpdateEntry(post()))?;
+    hdk::prelude::update_entry(action_hash, &msg())
 }

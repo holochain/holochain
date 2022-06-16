@@ -14,7 +14,7 @@ use holo_hash::hash_type::AnyDht;
 use holo_hash::AnyDhtHash;
 use holo_hash::EntryHash;
 use holo_hash::HasHash;
-use holo_hash::HeaderHash;
+use holo_hash::ActionHash;
 use holochain::conductor::interface::websocket::test_utils::setup_app;
 use holochain::core::workflow::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertResult;
 use holochain::core::workflow::CallZomeWorkspace;
@@ -37,7 +37,7 @@ use holochain_types::prelude::*;
 
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::Entry;
-use holochain_zome_types::HeaderHashed;
+use holochain_zome_types::ActionHashed;
 use maplit::btreeset;
 use observability;
 use std::collections::BTreeMap;
@@ -78,7 +78,7 @@ async fn get_updates_cache() {
 
         // Call fetch element
         cascade
-            .fetch_element_via_header(expected.0.clone().into(), Default::default())
+            .fetch_element_via_action(expected.0.clone().into(), Default::default())
             .await
             .unwrap();
     }
@@ -89,7 +89,7 @@ async fn get_updates_cache() {
         .get_element(&expected.0)
         .unwrap()
         .unwrap();
-    assert_eq!(result.header(), expected.1.header());
+    assert_eq!(result.action(), expected.1.action());
     assert_eq!(result.entry(), expected.1.entry());
 
     shutdown.clean().await;
@@ -136,8 +136,8 @@ async fn get_meta_updates_meta_cache() {
     };
 
     // Check the returned element is correct
-    assert_eq!(returned.headers.len(), 1);
-    assert_eq!(returned.headers.into_iter().next().unwrap(), expected.1);
+    assert_eq!(returned.actions.len(), 1);
+    assert_eq!(returned.actions.into_iter().next().unwrap(), expected.1);
     let result = {
         let mut g = db.conn();
 let mut reader = g.reader().unwrap();
@@ -145,7 +145,7 @@ let mut reader = g.reader().unwrap();
         // Check the cache has been updated
         workspace
             .meta_cache
-            .get_headers(
+            .get_actions(
                 &mut reader,
                 match expected.0.hash_type().clone() {
                     hash_type::AnyDht::Entry => expected.0.clone().into(),
@@ -201,16 +201,16 @@ async fn get_from_another_agent() {
     // Bob store element
     let entry = Post("Bananas are good for you".into());
     let entry_hash = Entry::try_from(entry.clone()).unwrap().to_hash();
-    let header_hash = {
+    let action_hash = {
         let call_data = HostFnCaller::create(&bob_cell_id, &handle, &dna_file).await;
-        let header_hash = call_data
+        let action_hash = call_data
             .commit_entry(entry.clone().try_into().unwrap(), POST_ID)
             .await;
 
         // Bob is not an authority yet
         // Make Bob an "authority"
-        fake_authority(header_hash.clone().into(), &call_data).await;
-        header_hash
+        fake_authority(action_hash.clone().into(), &call_data).await;
+        action_hash
     };
 
     // Alice get element from bob
@@ -221,12 +221,12 @@ async fn get_from_another_agent() {
             .await
     };
 
-    let (signed_header, ret_entry) = element.unwrap().into_inner();
+    let (signed_action, ret_entry) = element.unwrap().into_inner();
 
-    // TODO: Check signed header is the same header
+    // TODO: Check signed action is the same action
 
     // Check Bob is the author
-    assert_eq!(*signed_header.header().author(), bob_agent_id);
+    assert_eq!(*signed_action.action().author(), bob_agent_id);
 
     // Check entry is the same
     let ret_entry: Post = ret_entry.into_option().unwrap().try_into().unwrap();
@@ -235,14 +235,14 @@ async fn get_from_another_agent() {
     let new_entry = Post("Bananas are bendy".into());
     let (remove_hash, update_hash) = {
         let call_data = HostFnCaller::create(&bob_cell_id, &handle, &dna_file).await;
-        let remove_hash = call_data.delete_entry(header_hash.clone()).await;
+        let remove_hash = call_data.delete_entry(action_hash.clone()).await;
 
         fake_authority(remove_hash.clone().into(), &call_data).await;
         let update_hash = call_data
             .update_entry(
                 new_entry.clone().try_into().unwrap(),
                 POST_ID,
-                header_hash.clone(),
+                action_hash.clone(),
             )
             .await;
         fake_authority(update_hash.clone().into(), &call_data).await;
@@ -250,45 +250,45 @@ async fn get_from_another_agent() {
     };
 
     // Alice get element from bob
-    let (entry_details, header_details) = {
+    let (entry_details, action_details) = {
         let call_data = HostFnCaller::create(&alice_cell_id, &handle, &dna_file).await;
         debug!(the_entry_hash = ?entry_hash);
         let entry_details = call_data
             .get_details(entry_hash.into(), options.clone())
             .await
             .unwrap();
-        let header_details = call_data
-            .get_details(header_hash.clone().into(), options.clone())
+        let action_details = call_data
+            .get_details(action_hash.clone().into(), options.clone())
             .await
             .unwrap();
-        (entry_details, header_details)
+        (entry_details, action_details)
     };
 
     let entry_details = unwrap_to!(entry_details => Details::Entry).clone();
-    let header_details = unwrap_to!(header_details => Details::Element).clone();
+    let action_details = unwrap_to!(action_details => Details::Element).clone();
 
     assert_eq!(Post::try_from(entry_details.entry).unwrap(), entry);
-    assert_eq!(entry_details.headers.len(), 1);
+    assert_eq!(entry_details.actions.len(), 1);
     assert_eq!(entry_details.deletes.len(), 1);
     assert_eq!(entry_details.updates.len(), 1);
     assert_eq!(entry_details.entry_dht_status, EntryDhtStatus::Dead);
     assert_eq!(
-        *entry_details.headers.get(0).unwrap().header_address(),
-        header_hash
+        *entry_details.actions.get(0).unwrap().action_address(),
+        action_hash
     );
     assert_eq!(
-        *entry_details.deletes.get(0).unwrap().header_address(),
+        *entry_details.deletes.get(0).unwrap().action_address(),
         remove_hash
     );
     assert_eq!(
-        *entry_details.updates.get(0).unwrap().header_address(),
+        *entry_details.updates.get(0).unwrap().action_address(),
         update_hash
     );
 
-    assert_eq!(header_details.deletes.len(), 1);
-    assert_eq!(*header_details.element.header_address(), header_hash);
+    assert_eq!(action_details.deletes.len(), 1);
+    assert_eq!(*action_details.element.action_address(), action_hash);
     assert_eq!(
-        *entry_details.deletes.get(0).unwrap().header_address(),
+        *entry_details.deletes.get(0).unwrap().action_address(),
         remove_hash
     );
 
@@ -340,16 +340,16 @@ async fn get_links_from_another_agent() {
     let link_tag = fixt!(LinkTag);
     let link_add_hash = {
         let call_data = HostFnCaller::create(&bob_cell_id, &handle, &dna_file).await;
-        let base_header_hash = call_data
+        let base_action_hash = call_data
             .commit_entry(base.clone().try_into().unwrap(), POST_ID)
             .await;
 
-        let target_header_hash = call_data
+        let target_action_hash = call_data
             .commit_entry(target.clone().try_into().unwrap(), POST_ID)
             .await;
 
-        fake_authority(target_header_hash.clone().into(), &call_data).await;
-        fake_authority(base_header_hash.clone().into(), &call_data).await;
+        fake_authority(target_action_hash.clone().into(), &call_data).await;
+        fake_authority(base_action_hash.clone().into(), &call_data).await;
 
         // Link the entries
         let link_add_hash = call_data
@@ -410,14 +410,14 @@ async fn get_links_from_another_agent() {
     let (link_add, link_removes) = links.get(0).unwrap().clone();
     assert_eq!(link_removes.len(), 1);
     let link_remove = link_removes.get(0).unwrap().clone();
-    let link_remove = unwrap_to::unwrap_to!(link_remove.header() => Header::DeleteLink).clone();
-    let link_add = unwrap_to::unwrap_to!(link_add.header() => Header::CreateLink).clone();
+    let link_remove = unwrap_to::unwrap_to!(link_remove.action() => Action::DeleteLink).clone();
+    let link_add = unwrap_to::unwrap_to!(link_add.action() => Action::CreateLink).clone();
     assert_eq!(link_add.tag, link_tag);
     assert_eq!(link_add.target_address, target_entry_hash);
     assert_eq!(link_add.base_address, base_entry_hash);
     assert_eq!(
         link_remove.link_add_address,
-        HeaderHash::with_data_sync(&Header::CreateLink(link_add))
+        ActionHash::with_data_sync(&Action::CreateLink(link_add))
     );
 
     let shutdown = handle.take_shutdown_handle().await.unwrap();
@@ -456,11 +456,11 @@ impl Shutdown {
 /// Run a test network handler which accepts two data sources to draw from.
 /// It only handles Get and GetMeta requests.
 /// - When handling a Get, it pulls the corresponding Element from the `element_fixt_store`
-/// - When handling a GetMeta, it pulls the corresponding `TimedHeaderHash` from the `meta_fixt_store
-///    and constructs a `MetadataSet` containing only that single `TimedHeaderHash`
+/// - When handling a GetMeta, it pulls the corresponding `TimedActionHash` from the `meta_fixt_store
+///    and constructs a `MetadataSet` containing only that single `TimedActionHash`
 async fn run_fixt_network(
-    element_fixt_store: BTreeMap<HeaderHash, Element>,
-    meta_fixt_store: BTreeMap<AnyDhtHash, TimedHeaderHash>,
+    element_fixt_store: BTreeMap<ActionHash, Element>,
+    meta_fixt_store: BTreeMap<AnyDhtHash, TimedActionHash>,
 ) -> (HolochainP2pDna, Shutdown) {
     // Create the network
     let (network, mut recv, dna_network) = test_network(None, None).await;
@@ -481,7 +481,7 @@ async fn run_fixt_network(
                         dht_hash, respond, ..
                     } => {
                         let dht_hash = match dht_hash.hash_type() {
-                            AnyDht::Header => dht_hash.into(),
+                            AnyDht::Action => dht_hash.into(),
                             _ => unreachable!(),
                         };
 
@@ -489,7 +489,7 @@ async fn run_fixt_network(
                             .get(&dht_hash)
                             .cloned()
                             .map(|element| {
-                                GetElementResponse::GetHeader(Some(Box::new(
+                                GetElementResponse::GetAction(Some(Box::new(
                                     WireElement::from_element(
                                         ElementStatus::new(element, ValidationStatus::Valid),
                                         vec![],
@@ -509,12 +509,12 @@ async fn run_fixt_network(
                         respond,
                         ..
                     } => {
-                        let header_hash = meta_fixt_store.get(&dht_hash).cloned().unwrap();
+                        let action_hash = meta_fixt_store.get(&dht_hash).cloned().unwrap();
                         let metadata = MetadataSet {
-                            headers: btreeset! {header_hash},
+                            actions: btreeset! {action_hash},
                             deletes: btreeset! {},
                             updates: btreeset! {},
-                            invalid_headers: btreeset! {},
+                            invalid_actions: btreeset! {},
                             entry_dht_status: None,
                         };
                         respond.respond(Ok(async move { Ok(metadata.try_into().unwrap()) }
@@ -538,8 +538,8 @@ async fn run_fixt_network(
 */
 
 async fn generate_fixt_store() -> (
-    BTreeMap<HeaderHash, Element>,
-    BTreeMap<AnyDhtHash, TimedHeaderHash>,
+    BTreeMap<ActionHash, Element>,
+    BTreeMap<AnyDhtHash, TimedActionHash>,
 ) {
     let mut store = BTreeMap::new();
     let mut meta_store = BTreeMap::new();
@@ -552,17 +552,17 @@ async fn generate_fixt_store() -> (
         .unwrap();
     element_create.entry_type = entry_type;
     element_create.entry_hash = entry_hash.clone();
-    let header = HeaderHashed::from_content_sync(Header::Create(element_create));
-    let hash = header.as_hash().clone();
-    let signed_header = SignedHeaderHashed::with_presigned(header, fixt!(Signature));
+    let action = ActionHashed::from_content_sync(Action::Create(element_create));
+    let hash = action.as_hash().clone();
+    let signed_action = SignedActionHashed::with_presigned(action, fixt!(Signature));
     meta_store.insert(
         entry_hash.into(),
-        TimedHeaderHash {
+        TimedActionHash {
             timestamp: Timestamp::now(),
-            header_hash: hash.clone(),
+            action_hash: hash.clone(),
         },
     );
-    store.insert(hash, Element::new(signed_header, Some(entry)));
+    store.insert(hash, Element::new(signed_action, Some(entry)));
     (store, meta_store)
 }
 

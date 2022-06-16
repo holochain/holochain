@@ -2,11 +2,11 @@ use crate::authority;
 use crate::authority::get_element_query::GetElementOpsQuery;
 use crate::authority::get_entry_ops_query::GetEntryOpsQuery;
 use holo_hash::hash_type::AnyDht;
+use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holo_hash::AnyDhtHash;
 use holo_hash::EntryHash;
 use holo_hash::HasHash;
-use holo_hash::HeaderHash;
 use holochain_p2p::actor;
 use holochain_p2p::dht_arc::DhtArc;
 use holochain_p2p::HolochainP2pDnaT;
@@ -35,10 +35,10 @@ use holochain_types::link::WireLinkOps;
 use holochain_types::metadata::MetadataSet;
 use holochain_types::prelude::ValidationPackageResponse;
 use holochain_types::prelude::WireEntryOps;
-use holochain_zome_types::HeaderHashed;
+use holochain_zome_types::ActionHashed;
 use holochain_zome_types::QueryFilter;
-use holochain_zome_types::SignedHeader;
-use holochain_zome_types::SignedHeaderHashed;
+use holochain_zome_types::SignedAction;
+use holochain_zome_types::SignedActionHashed;
 use holochain_zome_types::Timestamp;
 use holochain_zome_types::TryInto;
 use holochain_zome_types::ValidationStatus;
@@ -87,7 +87,7 @@ impl HolochainP2pDnaT for PassThroughNetwork {
     async fn get_validation_package(
         &self,
         _request_from: AgentPubKey,
-        _header_hash: HeaderHash,
+        _action_hash: ActionHash,
     ) -> actor::HolochainP2pResult<ValidationPackageResponse> {
         todo!()
     }
@@ -111,7 +111,7 @@ impl HolochainP2pDnaT for PassThroughNetwork {
                     out.push(WireOps::Entry(r));
                 }
             }
-            AnyDht::Header => {
+            AnyDht::Action => {
                 for env in &self.envs {
                     let r = authority::handle_get_element(
                         env.clone(),
@@ -152,7 +152,7 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         agent: AgentPubKey,
         query: QueryFilter,
         options: actor::GetActivityOptions,
-    ) -> actor::HolochainP2pResult<Vec<AgentActivityResponse<HeaderHash>>> {
+    ) -> actor::HolochainP2pResult<Vec<AgentActivityResponse<ActionHash>>> {
         let mut out = Vec::new();
         for env in &self.envs {
             let r = authority::handle_get_agent_activity(
@@ -213,7 +213,7 @@ impl HolochainP2pDnaT for PassThroughNetwork {
     async fn countersigning_authority_response(
         &self,
         _agents: Vec<AgentPubKey>,
-        _response: Vec<holochain_zome_types::SignedHeader>,
+        _response: Vec<holochain_zome_types::SignedAction>,
     ) -> actor::HolochainP2pResult<()> {
         todo!()
     }
@@ -300,12 +300,12 @@ impl HolochainP2pDnaT for MockNetwork {
     async fn get_validation_package(
         &self,
         request_from: AgentPubKey,
-        header_hash: HeaderHash,
+        action_hash: ActionHash,
     ) -> actor::HolochainP2pResult<ValidationPackageResponse> {
         self.0
             .lock()
             .await
-            .get_validation_package(request_from, header_hash)
+            .get_validation_package(request_from, action_hash)
             .await
     }
 
@@ -338,7 +338,7 @@ impl HolochainP2pDnaT for MockNetwork {
         agent: AgentPubKey,
         query: QueryFilter,
         options: actor::GetActivityOptions,
-    ) -> actor::HolochainP2pResult<Vec<AgentActivityResponse<HeaderHash>>> {
+    ) -> actor::HolochainP2pResult<Vec<AgentActivityResponse<ActionHash>>> {
         self.0
             .lock()
             .await
@@ -391,7 +391,7 @@ impl HolochainP2pDnaT for MockNetwork {
     async fn countersigning_authority_response(
         &self,
         _agents: Vec<AgentPubKey>,
-        _response: Vec<holochain_zome_types::SignedHeader>,
+        _response: Vec<holochain_zome_types::SignedAction>,
     ) -> actor::HolochainP2pResult<()> {
         todo!()
     }
@@ -425,11 +425,11 @@ impl HolochainP2pDnaT for MockNetwork {
     }
 }
 
-pub fn wire_to_shh<T: TryInto<SignedHeader> + Clone>(op: &T) -> SignedHeaderHashed {
+pub fn wire_to_shh<T: TryInto<SignedAction> + Clone>(op: &T) -> SignedActionHashed {
     let r = op.clone().try_into();
     match r {
-        Ok(SignedHeader(header, signature)) => {
-            SignedHeaderHashed::with_presigned(HeaderHashed::from_content_sync(header), signature)
+        Ok(SignedAction(action, signature)) => {
+            SignedActionHashed::with_presigned(ActionHashed::from_content_sync(action), signature)
         }
         Err(_) => unreachable!(),
     }
@@ -448,7 +448,7 @@ pub fn handle_get_entry_txn(
 /// Utility for network simulation response to get element.
 pub fn handle_get_element_txn(
     txn: &Transaction<'_>,
-    hash: HeaderHash,
+    hash: ActionHash,
     options: holochain_p2p::event::GetOptions,
 ) -> WireElementOps {
     let query = GetElementOpsQuery::new(hash, options);
@@ -463,6 +463,6 @@ pub fn handle_get_txn(
 ) -> WireOps {
     match *hash.hash_type() {
         AnyDht::Entry => WireOps::Entry(handle_get_entry_txn(txn, hash.into(), options)),
-        AnyDht::Header => WireOps::Element(handle_get_element_txn(txn, hash.into(), options)),
+        AnyDht::Action => WireOps::Element(handle_get_element_txn(txn, hash.into(), options)),
     }
 }

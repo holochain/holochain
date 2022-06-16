@@ -150,7 +150,7 @@ pub mod wasm_test {
         } = RibosomeTestFixture::new(TestWasm::CounterSigning).await;
 
         // Before preflight Alice can commit
-        let _: HeaderHash = conductor.call(&alice, "create_a_thing", ()).await;
+        let _: ActionHash = conductor.call(&alice, "create_a_thing", ()).await;
 
         let preflight_request: PreflightRequest = conductor
             .call(
@@ -164,7 +164,7 @@ pub mod wasm_test {
             .await;
 
         // Before accepting preflight Alice can commit
-        let _: HeaderHash = conductor.call(&alice, "create_a_thing", ()).await;
+        let _: ActionHash = conductor.call(&alice, "create_a_thing", ()).await;
 
         // Alice can accept the preflight request.
         let alice_acceptance: PreflightRequestAcceptance = conductor
@@ -226,7 +226,7 @@ pub mod wasm_test {
             })
             .await;
         assert!(matches!(countersign_fail_create_alice, Err(_)));
-        let _: HeaderHash = conductor.call(&alice, "create_a_thing", ()).await;
+        let _: ActionHash = conductor.call(&alice, "create_a_thing", ()).await;
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -244,7 +244,7 @@ pub mod wasm_test {
         } = RibosomeTestFixture::new(TestWasm::CounterSigning).await;
 
         // Before the preflight creation of things should work.
-        let _: HeaderHash = conductor.call(&alice, "create_a_thing", ()).await;
+        let _: ActionHash = conductor.call(&alice, "create_a_thing", ()).await;
 
         // Alice can create multiple preflight requests.
         let preflight_request: PreflightRequest = conductor
@@ -269,7 +269,7 @@ pub mod wasm_test {
             .await;
 
         // Alice can still create things before the preflight is accepted.
-        let _: HeaderHash = conductor.call(&alice, "create_a_thing", ()).await;
+        let _: ActionHash = conductor.call(&alice, "create_a_thing", ()).await;
 
         // Alice can accept the preflight request.
         let alice_acceptance: PreflightRequestAcceptance = conductor
@@ -347,7 +347,7 @@ pub mod wasm_test {
 
         // Creating the correct countersigned entry will NOT immediately unlock
         // the chain (it needs Bob to countersign).
-        let countersigned_header_hash_alice: HeaderHash = conductor
+        let countersigned_action_hash_alice: ActionHash = conductor
             .call(
                 &alice,
                 "create_a_countersigned_thing",
@@ -398,35 +398,35 @@ pub mod wasm_test {
         expect_chain_locked(thing_fail_create_bob);
 
         // After bob commits the same countersigned entry he can unlock his chain.
-        let countersigned_header_hash_bob: HeaderHash = conductor
+        let countersigned_action_hash_bob: ActionHash = conductor
             .call(
                 &bob,
                 "create_a_countersigned_thing",
                 vec![alice_response, bob_response],
             )
             .await;
-        let _: HeaderHash = conductor.call(&alice, "create_a_thing", ()).await;
-        let _: HeaderHash = conductor.call(&bob, "create_a_thing", ()).await;
+        let _: ActionHash = conductor.call(&alice, "create_a_thing", ()).await;
+        let _: ActionHash = conductor.call(&bob, "create_a_thing", ()).await;
 
-        // Header get must not error.
-        let countersigned_header_bob: SignedHeaderHashed = conductor
+        // Action get must not error.
+        let countersigned_action_bob: SignedActionHashed = conductor
             .call(
                 &bob,
-                "must_get_header",
-                countersigned_header_hash_bob.clone(),
+                "must_get_action",
+                countersigned_action_hash_bob.clone(),
             )
             .await;
-        let countersigned_header_alice: SignedHeaderHashed = conductor
+        let countersigned_action_alice: SignedActionHashed = conductor
             .call(
                 &alice,
-                "must_get_header",
-                countersigned_header_hash_alice.clone(),
+                "must_get_action",
+                countersigned_action_hash_alice.clone(),
             )
             .await;
 
         // Entry get must not error.
         if let Some((countersigned_entry_hash_bob, _)) =
-            countersigned_header_bob.header().entry_data()
+            countersigned_action_bob.action().entry_data()
         {
             let _countersigned_entry_bob: EntryHashed = conductor
                 .call(&bob, "must_get_entry", countersigned_entry_hash_bob)
@@ -440,7 +440,7 @@ pub mod wasm_test {
             .call(
                 &bob,
                 "must_get_valid_element",
-                countersigned_header_hash_bob,
+                countersigned_action_hash_bob,
             )
             .await;
 
@@ -458,7 +458,7 @@ pub mod wasm_test {
         assert_eq!(alice_activity.valid_activity.len(), 8);
         assert_eq!(
             &alice_activity.valid_activity[6].1,
-            countersigned_header_alice.header_address(),
+            countersigned_action_alice.action_address(),
         );
 
         let bob_activity: AgentActivity = conductor
@@ -475,7 +475,7 @@ pub mod wasm_test {
         assert_eq!(bob_activity.valid_activity.len(), 6);
         assert_eq!(
             &bob_activity.valid_activity[4].1,
-            countersigned_header_bob.header_address(),
+            countersigned_action_bob.action_address(),
         );
     }
 }

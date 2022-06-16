@@ -1,5 +1,7 @@
 //! Common types
 
+pub use crate::action::conversions::*;
+pub use crate::action::*;
 pub use crate::capability::*;
 pub use crate::countersigning::*;
 pub use crate::element::*;
@@ -7,8 +9,6 @@ pub use crate::entry::*;
 pub use crate::entry_def::*;
 pub use crate::genesis::*;
 pub use crate::hash::*;
-pub use crate::header::conversions::*;
-pub use crate::header::*;
 pub use crate::info::*;
 pub use crate::link::*;
 pub use crate::op::*;

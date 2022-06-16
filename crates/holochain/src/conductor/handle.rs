@@ -1325,7 +1325,7 @@ impl ConductorHandleT for ConductorHandleImpl {
 
             // Validate the chain.
             crate::core::validate_chain(
-                elements.iter().map(|e| e.header_hashed()),
+                elements.iter().map(|e| e.action_hashed()),
                 &persisted_chain_head.clone().filter(|_| !truncate),
             )
             .map_err(|e| SourceChainError::InvalidCommit(e.to_string()))?;
@@ -1363,7 +1363,7 @@ impl ConductorHandleT for ConductorHandleImpl {
                 let ops = produce_op_lights_from_elements(vec![&el])?;
                 // Check have the same author as cell.
                 let (shh, entry) = el.into_inner();
-                if shh.header().author() != cell_id.agent_pubkey() {
+                if shh.action().author() != cell_id.agent_pubkey() {
                     return Err(StateMutationError::AuthorsMustMatch);
                 }
                 Ok((shh, ops, entry.into_option()))
@@ -1378,7 +1378,7 @@ impl ConductorHandleT for ConductorHandleImpl {
                     // Truncate the chain if requested.
                     if truncate {
                         txn.execute(
-                            "DELETE FROM Header WHERE author = ?",
+                            "DELETE FROM Action WHERE author = ?",
                             [cell_id.agent_pubkey()],
                         )
                         .map_err(StateMutationError::from)?;

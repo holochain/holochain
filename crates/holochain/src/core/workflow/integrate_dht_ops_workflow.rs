@@ -52,7 +52,7 @@ pub async fn integrate_dht_ops_workflow(
                 .execute(named_params! {
                     ":when_integrated": time,
                     ":updated_content": DhtOpType::RegisterUpdatedContent,
-                    ":deleted_entry_header": DhtOpType::RegisterDeletedEntryHeader,
+                    ":deleted_entry_action": DhtOpType::RegisterDeletedEntryAction,
                     ":store_entry": DhtOpType::StoreEntry,
                 })?;
             total += changed;

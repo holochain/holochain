@@ -27,7 +27,7 @@ async fn test_validation_receipt() {
     let ((alice,), (bobbo,), (carol,)) = apps.into_tuples();
 
     // Call the "create" zome fn on Alice's app
-    let hash: HeaderHash = conductors[0]
+    let hash: ActionHash = conductors[0]
         .call(&alice.zome("simple"), "create", ())
         .await;
 

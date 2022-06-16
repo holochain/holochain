@@ -31,7 +31,7 @@ async fn get_activity() {
     let options = holochain_p2p::actor::GetActivityOptions {
         include_valid_activity: true,
         include_rejected_activity: false,
-        include_full_headers: true,
+        include_full_actions: true,
         ..Default::default()
     };
 

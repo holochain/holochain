@@ -19,7 +19,7 @@ pub fn must_get_valid_element<'a>(
             read_workspace_deterministic: Permission::Allow,
             ..
         } => {
-            let header_hash = input.into_inner();
+            let action_hash = input.into_inner();
 
             // timeouts must be handled by the network
             tokio_helper::block_forever_on(async move {
@@ -32,7 +32,7 @@ pub fn must_get_valid_element<'a>(
                     ),
                 };
                 match cascade
-                    .get_header_details(header_hash.clone(), GetOptions::content())
+                    .get_action_details(action_hash.clone(), GetOptions::content())
                     .await
                     .map_err(|cascade_error| -> RuntimeError {
                         wasm_error!(WasmErrorInner::Host(cascade_error.to_string())).into()
@@ -48,13 +48,13 @@ pub fn must_get_valid_element<'a>(
                         | HostContext::MigrateAgent(_)
                         | HostContext::PostCommit(_)
                         | HostContext::ZomeCall(_) => Err(wasm_error!(WasmErrorInner::Host(
-                            format!("Failed to get Element {}", header_hash)
+                            format!("Failed to get Element {}", action_hash)
                         ))
                         .into()),
                         HostContext::Init(_) => Err(wasm_error!(WasmErrorInner::HostShortCircuit(
                             holochain_serialized_bytes::encode(
                                 &ExternIO::encode(InitCallbackResult::UnresolvedDependencies(
-                                    vec![header_hash.into()],
+                                    vec![action_hash.into()],
                                 ))
                                 .map_err(|e| -> RuntimeError { wasm_error!(e.into()).into() })?,
                             )
@@ -66,7 +66,7 @@ pub fn must_get_valid_element<'a>(
                                 holochain_serialized_bytes::encode(
                                     &ExternIO::encode(
                                         ValidateCallbackResult::UnresolvedDependencies(vec![
-                                            header_hash.into()
+                                            action_hash.into()
                                         ],)
                                     )
                                     .map_err(
@@ -82,7 +82,7 @@ pub fn must_get_valid_element<'a>(
                                 holochain_serialized_bytes::encode(
                                     &ExternIO::encode(
                                         ValidationPackageCallbackResult::UnresolvedDependencies(
-                                            vec![header_hash.into(),]
+                                            vec![action_hash.into(),]
                                         ),
                                     )
                                     .map_err(

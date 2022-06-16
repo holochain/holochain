@@ -11,7 +11,7 @@ use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::dht_op::DhtOpType;
 use holochain_zome_types::Entry;
 use holochain_zome_types::EntryVisibility;
-use holochain_zome_types::SignedHeader;
+use holochain_zome_types::SignedAction;
 use rusqlite::named_params;
 use rusqlite::Transaction;
 
@@ -39,19 +39,19 @@ pub async fn get_ops_to_publish(
             let mut stmt = txn.prepare(
                 "
             SELECT
-            Header.blob as header_blob,
+            Action.blob as action_blob,
             Entry.blob as entry_blob,
             DhtOp.type as dht_type,
             DhtOp.hash as dht_hash
-            FROM Header
+            FROM Action
             JOIN
-            DhtOp ON DhtOp.header_hash = Header.hash
+            DhtOp ON DhtOp.action_hash = Action.hash
             LEFT JOIN
-            Entry ON Header.entry_hash = Entry.hash
+            Entry ON Action.entry_hash = Entry.hash
             WHERE
-            Header.author = :author
+            Action.author = :author
             AND
-            (DhtOp.type != :store_entry OR Header.private_entry = 0)
+            (DhtOp.type != :store_entry OR Action.private_entry = 0)
             AND
             DhtOp.withhold_publish IS NULL
             AND
@@ -67,10 +67,10 @@ pub async fn get_ops_to_publish(
                     ":store_entry": DhtOpType::StoreEntry,
                 },
                 |row| {
-                    let header = from_blob::<SignedHeader>(row.get("header_blob")?)?;
+                    let action = from_blob::<SignedAction>(row.get("action_blob")?)?;
                     let op_type: DhtOpType = row.get("dht_type")?;
                     let hash: DhtOpHash = row.get("dht_hash")?;
-                    let entry = match header.0.entry_type().map(|et| et.visibility()) {
+                    let entry = match action.0.entry_type().map(|et| et.visibility()) {
                         Some(EntryVisibility::Public) => {
                             let entry: Option<Vec<u8>> = row.get("entry_blob")?;
                             match entry {
@@ -81,7 +81,7 @@ pub async fn get_ops_to_publish(
                         _ => None,
                     };
                     WorkflowResult::Ok(DhtOpHashed::with_pre_hashed(
-                        DhtOp::from_type(op_type, header, entry)?,
+                        DhtOp::from_type(op_type, action, entry)?,
                         hash,
                     ))
                 },
@@ -99,13 +99,13 @@ pub fn num_still_needing_publish(txn: &Transaction) -> WorkflowResult<usize> {
         "
         SELECT
         COUNT(DhtOp.rowid) as num_ops
-        FROM Header
+        FROM Action
         JOIN
-        DhtOp ON DhtOp.header_hash = Header.hash
+        DhtOp ON DhtOp.action_hash = Action.hash
         WHERE
         DhtOp.receipts_complete IS NULL
         AND
-        (DhtOp.type != :store_entry OR Header.private_entry = 0)
+        (DhtOp.type != :store_entry OR Action.private_entry = 0)
         ",
         named_params! {
             ":store_entry": DhtOpType::StoreEntry,
@@ -127,12 +127,12 @@ mod tests {
     use holochain_state::prelude::set_last_publish_time;
     use holochain_state::prelude::set_receipts_complete;
     use holochain_state::prelude::test_authored_db;
+    use holochain_types::action::NewEntryAction;
     use holochain_types::dht_op::DhtOpHashed;
-    use holochain_types::header::NewEntryHeader;
     use holochain_zome_types::fixt::*;
+    use holochain_zome_types::Action;
     use holochain_zome_types::EntryType;
     use holochain_zome_types::EntryVisibility;
-    use holochain_zome_types::Header;
 
     use super::*;
 
@@ -172,18 +172,18 @@ mod tests {
     ) -> DhtOpHashed {
         let this_agent = consistent_data.this_agent.clone();
         let entry = Entry::App(fixt!(AppEntryBytes));
-        let mut header = fixt!(Create);
-        header.author = this_agent.clone();
-        header.entry_hash = EntryHash::with_data_sync(&entry);
+        let mut action = fixt!(Create);
+        action.author = this_agent.clone();
+        action.entry_hash = EntryHash::with_data_sync(&entry);
         if facts.private {
             // - Private: true
-            header.entry_type = AppEntryTypeFixturator::new(EntryVisibility::Private)
+            action.entry_type = AppEntryTypeFixturator::new(EntryVisibility::Private)
                 .map(EntryType::App)
                 .next()
                 .unwrap();
         } else {
             // - Private: false
-            header.entry_type = AppEntryTypeFixturator::new(EntryVisibility::Public)
+            action.entry_type = AppEntryTypeFixturator::new(EntryVisibility::Public)
                 .map(EntryType::App)
                 .next()
                 .unwrap();
@@ -191,7 +191,7 @@ mod tests {
 
         // - IsThisAgent: false.
         if !facts.is_this_agent {
-            header.author = fixt!(AgentPubKey);
+            action.author = fixt!(AgentPubKey);
         }
 
         let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
@@ -206,13 +206,13 @@ mod tests {
         let state = if facts.store_entry {
             DhtOpHashed::from_content_sync(DhtOp::StoreEntry(
                 fixt!(Signature),
-                NewEntryHeader::Create(header.clone()),
+                NewEntryAction::Create(action.clone()),
                 Box::new(entry.clone()),
             ))
         } else {
             DhtOpHashed::from_content_sync(DhtOp::StoreElement(
                 fixt!(Signature),
-                Header::Create(header.clone()),
+                Action::Create(action.clone()),
                 Some(Box::new(entry.clone())),
             ))
         };

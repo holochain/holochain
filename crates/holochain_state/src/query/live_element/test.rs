@@ -22,7 +22,7 @@ async fn can_handle_update_in_scratch() {
     let td = ElementTestData::new();
     let query = GetLiveElementQuery::with_private_data_access(
         td.update_hash,
-        Arc::new(td.update_store_element_op.header().author().clone()),
+        Arc::new(td.update_store_element_op.action().author().clone()),
     );
 
     // - Create an entry on main db.
@@ -32,7 +32,7 @@ async fn can_handle_update_in_scratch() {
         .unwrap()
         .expect("Element not found");
     assert_eq!(*r.entry().as_option().unwrap(), td.entry);
-    assert_eq!(*r.header(), *td.update_header.header());
+    assert_eq!(*r.action(), *td.update_action.action());
 
     // - Add to the scratch
     insert_op_scratch(
@@ -46,5 +46,5 @@ async fn can_handle_update_in_scratch() {
         .unwrap()
         .expect("Element not found");
     assert_eq!(*r.entry().as_option().unwrap(), td.entry);
-    assert_eq!(*r.header(), *td.update_header.header());
+    assert_eq!(*r.action(), *td.update_action.action());
 }

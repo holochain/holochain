@@ -13,6 +13,7 @@
 #![allow(clippy::ptr_arg)]
 
 pub mod access;
+pub mod action;
 pub mod activity;
 pub mod app;
 pub mod autonomic;
@@ -25,7 +26,6 @@ pub mod dna;
 pub mod element;
 pub mod entry;
 pub mod fixt;
-pub mod header;
 pub mod inline_zome;
 pub mod link;
 mod macros;

@@ -1,9 +1,9 @@
 //! Defines a Element, the basic unit of Holochain data.
 
-use crate::header::WireDelete;
-use crate::header::WireHeaderStatus;
-use crate::header::WireNewEntryHeader;
-use crate::header::WireUpdateRelationship;
+use crate::action::WireActionStatus;
+use crate::action::WireDelete;
+use crate::action::WireNewEntryAction;
+use crate::action::WireUpdateRelationship;
 use crate::prelude::*;
 use error::ElementGroupError;
 use error::ElementGroupResult;
@@ -22,11 +22,11 @@ pub mod error;
 /// A condensed version of get element request.
 /// This saves bandwidth by removing duplicated and implied data.
 pub struct WireElementOps {
-    /// The header this request was for.
-    pub header: Option<Judged<SignedHeader>>,
-    /// Any deletes on the header.
+    /// The action this request was for.
+    pub action: Option<Judged<SignedAction>>,
+    /// Any deletes on the action.
     pub deletes: Vec<Judged<WireDelete>>,
-    /// Any updates on the header.
+    /// Any updates on the action.
     pub updates: Vec<Judged<WireUpdateRelationship>>,
     /// The entry if there is one.
     pub entry: Option<Entry>,
@@ -40,21 +40,21 @@ impl WireElementOps {
     /// Render these ops to their full types.
     pub fn render(self) -> DhtOpResult<RenderedOps> {
         let Self {
-            header,
+            action,
             deletes,
             updates,
             entry,
         } = self;
         let mut ops = Vec::with_capacity(1 + deletes.len() + updates.len());
-        if let Some(header) = header {
-            let status = header.validation_status();
-            let SignedHeader(header, signature) = header.data;
+        if let Some(action) = action {
+            let status = action.validation_status();
+            let SignedAction(action, signature) = action.data;
             // TODO: If they only need the metadata because they already have
             // the content we could just send the entry hash instead of the
-            // SignedHeader.
-            let entry_hash = header.entry_hash().cloned();
+            // SignedAction.
+            let entry_hash = action.entry_hash().cloned();
             ops.push(RenderedOp::new(
-                header,
+                action,
                 signature,
                 status,
                 DhtOpType::StoreElement,
@@ -64,10 +64,10 @@ impl WireElementOps {
                     let status = op.validation_status();
                     let op = op.data;
                     let signature = op.signature;
-                    let header = Header::Delete(op.delete);
+                    let action = Action::Delete(op.delete);
 
                     ops.push(RenderedOp::new(
-                        header,
+                        action,
                         signature,
                         status,
                         DhtOpType::RegisterDeletedBy,
@@ -75,11 +75,11 @@ impl WireElementOps {
                 }
                 for op in updates {
                     let status = op.validation_status();
-                    let SignedHeader(header, signature) =
-                        op.data.into_signed_header(entry_hash.clone());
+                    let SignedAction(action, signature) =
+                        op.data.into_signed_action(entry_hash.clone());
 
                     ops.push(RenderedOp::new(
-                        header,
+                        action,
                         signature,
                         status,
                         DhtOpType::RegisterUpdatedElement,
@@ -98,23 +98,23 @@ impl WireElementOps {
 /// Element without the hashes for sending across the network
 /// TODO: Remove this as it's no longer needed.
 pub struct WireElement {
-    /// The signed header for this element
-    signed_header: SignedHeader,
-    /// If there is an entry associated with this header it will be here
+    /// The signed action for this element
+    signed_action: SignedAction,
+    /// If there is an entry associated with this action it will be here
     maybe_entry: Option<Entry>,
     /// The validation status of this element.
     validation_status: ValidationStatus,
-    /// All deletes on this header
-    deletes: Vec<WireHeaderStatus<WireDelete>>,
+    /// All deletes on this action
+    deletes: Vec<WireActionStatus<WireDelete>>,
     /// Any updates on this entry.
-    updates: Vec<WireHeaderStatus<WireUpdateRelationship>>,
+    updates: Vec<WireActionStatus<WireUpdateRelationship>>,
 }
 
 /// A group of elements with a common entry
 #[derive(Debug, Clone)]
 pub struct ElementGroup<'a> {
-    headers: Vec<Cow<'a, SignedHeaderHashed>>,
-    rejected: Vec<Cow<'a, SignedHeaderHashed>>,
+    actions: Vec<Cow<'a, SignedActionHashed>>,
+    rejected: Vec<Cow<'a, SignedActionHashed>>,
     entry: Cow<'a, EntryHashed>,
 }
 
@@ -128,27 +128,27 @@ pub struct ElementStatus {
 }
 
 impl<'a> ElementGroup<'a> {
-    /// Get the headers and header hashes
-    pub fn headers_and_hashes(&self) -> impl Iterator<Item = (&HeaderHash, &Header)> {
-        self.headers
+    /// Get the actions and action hashes
+    pub fn actions_and_hashes(&self) -> impl Iterator<Item = (&ActionHash, &Action)> {
+        self.actions
             .iter()
-            .map(|shh| shh.header_address())
-            .zip(self.headers.iter().map(|shh| shh.header()))
+            .map(|shh| shh.action_address())
+            .zip(self.actions.iter().map(|shh| shh.action()))
     }
     /// true if len is zero
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
-    /// Amount of headers
+    /// Amount of actions
     pub fn len(&self) -> usize {
-        self.headers.len()
+        self.actions.len()
     }
     /// The entry's visibility
     pub fn visibility(&self) -> ElementGroupResult<&EntryVisibility> {
-        self.headers
+        self.actions
             .first()
             .ok_or(ElementGroupError::Empty)?
-            .header()
+            .action()
             .entry_data()
             .map(|(_, et)| et.visibility())
             .ok_or(ElementGroupError::MissingEntryData)
@@ -161,32 +161,32 @@ impl<'a> ElementGroup<'a> {
     pub fn entry_hashed(&self) -> EntryHashed {
         self.entry.clone().into_owned()
     }
-    /// Get owned iterator of signed headers
-    pub fn owned_signed_headers(&self) -> impl Iterator<Item = SignedHeaderHashed> + 'a {
-        self.headers
+    /// Get owned iterator of signed actions
+    pub fn owned_signed_actions(&self) -> impl Iterator<Item = SignedActionHashed> + 'a {
+        self.actions
             .clone()
             .into_iter()
             .chain(self.rejected.clone().into_iter())
             .map(|shh| shh.into_owned())
     }
 
-    /// Get the valid header hashes
-    pub fn valid_hashes(&self) -> impl Iterator<Item = &HeaderHash> {
-        self.headers.iter().map(|shh| shh.header_address())
+    /// Get the valid action hashes
+    pub fn valid_hashes(&self) -> impl Iterator<Item = &ActionHash> {
+        self.actions.iter().map(|shh| shh.action_address())
     }
 
-    /// Get the rejected header hashes
-    pub fn rejected_hashes(&self) -> impl Iterator<Item = &HeaderHash> {
-        self.rejected.iter().map(|shh| shh.header_address())
+    /// Get the rejected action hashes
+    pub fn rejected_hashes(&self) -> impl Iterator<Item = &ActionHash> {
+        self.rejected.iter().map(|shh| shh.action_address())
     }
 
-    /// Create an element group from wire headers and an entry
-    pub fn from_wire_elements<I: IntoIterator<Item = WireHeaderStatus<WireNewEntryHeader>>>(
-        headers_iter: I,
+    /// Create an element group from wire actions and an entry
+    pub fn from_wire_elements<I: IntoIterator<Item = WireActionStatus<WireNewEntryAction>>>(
+        actions_iter: I,
         entry_type: EntryType,
         entry: Entry,
     ) -> ElementGroupResult<ElementGroup<'a>> {
-        let iter = headers_iter.into_iter();
+        let iter = actions_iter.into_iter();
         let mut valid = Vec::with_capacity(iter.size_hint().0);
         let mut rejected = Vec::with_capacity(iter.size_hint().0);
         let entry = entry.into_hashed();
@@ -195,19 +195,19 @@ impl<'a> ElementGroup<'a> {
         for wire in iter {
             match wire.validation_status {
                 ValidationStatus::Valid => valid.push(Cow::Owned(
-                    wire.header
-                        .into_header(entry_type.clone(), entry_hash.clone()),
+                    wire.action
+                        .into_action(entry_type.clone(), entry_hash.clone()),
                 )),
                 ValidationStatus::Rejected => rejected.push(Cow::Owned(
-                    wire.header
-                        .into_header(entry_type.clone(), entry_hash.clone()),
+                    wire.action
+                        .into_action(entry_type.clone(), entry_hash.clone()),
                 )),
                 ValidationStatus::Abandoned => todo!(),
             }
         }
 
         Ok(Self {
-            headers: valid,
+            actions: valid,
             rejected,
             entry,
         })
@@ -226,7 +226,7 @@ pub enum GetElementResponse {
     GetEntryCollapsed,
     /// Get a single element
     /// Can be combined with other metadata monotonically
-    GetHeader(Option<Box<WireElement>>),
+    GetAction(Option<Box<WireElement>>),
 }
 
 /// This type gives full metadata that can be combined
@@ -234,24 +234,24 @@ pub enum GetElementResponse {
 // in the most compact way that also avoids multiple calls.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
 pub struct RawGetEntryResponse {
-    /// The live headers from this authority.
-    /// These can be collapsed to NewEntryHeaderLight
+    /// The live actions from this authority.
+    /// These can be collapsed to NewEntryActionLight
     /// Which omits the EntryHash and EntryType,
     /// saving 32 bytes each
-    pub live_headers: BTreeSet<WireHeaderStatus<WireNewEntryHeader>>,
-    /// just the hashes of headers to delete
-    // TODO: Perf could just send the HeaderHash of the
-    // header being deleted but we would need to only ever store
-    // if there was a header delete in our MetadataBuf and
-    // not the delete header hash as we do now.
-    pub deletes: Vec<WireHeaderStatus<WireDelete>>,
+    pub live_actions: BTreeSet<WireActionStatus<WireNewEntryAction>>,
+    /// just the hashes of actions to delete
+    // TODO: Perf could just send the ActionHash of the
+    // action being deleted but we would need to only ever store
+    // if there was a action delete in our MetadataBuf and
+    // not the delete action hash as we do now.
+    pub deletes: Vec<WireActionStatus<WireDelete>>,
     /// Any updates on this entry.
-    /// Note you will need to ask for "all_live_headers_with_metadata"
+    /// Note you will need to ask for "all_live_actions_with_metadata"
     /// to get this back
-    pub updates: Vec<WireHeaderStatus<WireUpdateRelationship>>,
-    /// The entry shared across all headers
+    pub updates: Vec<WireActionStatus<WireUpdateRelationship>>,
+    /// The entry shared across all actions
     pub entry: Entry,
-    /// The entry_type shared across all headers
+    /// The entry_type shared across all actions
     pub entry_type: EntryType,
 }
 
@@ -262,63 +262,63 @@ impl RawGetEntryResponse {
     /// elements all have the same entry. This is not checked
     /// due to the performance cost.
     /// ### Panics
-    /// If the elements are not a header of Create or EntryDelete
+    /// If the elements are not a action of Create or EntryDelete
     /// or there is no entry or the entry hash is different
     pub fn from_elements<E>(
         elements: E,
-        deletes: Vec<WireHeaderStatus<WireDelete>>,
-        updates: Vec<WireHeaderStatus<WireUpdateRelationship>>,
+        deletes: Vec<WireActionStatus<WireDelete>>,
+        updates: Vec<WireActionStatus<WireUpdateRelationship>>,
     ) -> Option<Self>
     where
         E: IntoIterator<Item = ElementStatus>,
     {
         let mut elements = elements.into_iter();
         elements.next().map(|ElementStatus { element, status }| {
-            let mut live_headers = BTreeSet::new();
-            let (new_entry_header, entry_type, entry) = Self::from_element(element);
-            live_headers.insert(WireHeaderStatus::new(new_entry_header, status));
+            let mut live_actions = BTreeSet::new();
+            let (new_entry_action, entry_type, entry) = Self::from_element(element);
+            live_actions.insert(WireActionStatus::new(new_entry_action, status));
             let r = Self {
-                live_headers,
+                live_actions,
                 deletes,
                 updates,
                 entry,
                 entry_type,
             };
             elements.fold(r, |mut response, ElementStatus { element, status }| {
-                let (new_entry_header, entry_type, entry) = Self::from_element(element);
+                let (new_entry_action, entry_type, entry) = Self::from_element(element);
                 debug_assert_eq!(response.entry, entry);
                 debug_assert_eq!(response.entry_type, entry_type);
                 response
-                    .live_headers
-                    .insert(WireHeaderStatus::new(new_entry_header, status));
+                    .live_actions
+                    .insert(WireActionStatus::new(new_entry_action, status));
                 response
             })
         })
     }
 
-    fn from_element(element: Element) -> (WireNewEntryHeader, EntryType, Entry) {
+    fn from_element(element: Element) -> (WireNewEntryAction, EntryType, Entry) {
         let (shh, entry) = element.into_inner();
         let entry = entry
             .into_option()
             .expect("Get entry responses cannot be created without entries");
-        let (header, signature) = shh.into_inner();
-        let (new_entry_header, entry_type) = match header.into_content() {
-            Header::Create(ec) => {
+        let (action, signature) = shh.into_inner();
+        let (new_entry_action, entry_type) = match action.into_content() {
+            Action::Create(ec) => {
                 let et = ec.entry_type.clone();
-                (WireNewEntryHeader::Create((ec, signature).into()), et)
+                (WireNewEntryAction::Create((ec, signature).into()), et)
             }
-            Header::Update(eu) => {
+            Action::Update(eu) => {
                 let et = eu.entry_type.clone();
-                (WireNewEntryHeader::Update((eu, signature).into()), et)
+                (WireNewEntryAction::Update((eu, signature).into()), et)
             }
             h => panic!(
-                "Get entry responses cannot be created from headers
+                "Get entry responses cannot be created from actions
                     other then Create or Update.
                     Tried to with: {:?}",
                 h
             ),
         };
-        (new_entry_header, entry_type, entry)
+        (new_entry_action, entry_type, entry)
     }
 }
 
@@ -333,56 +333,56 @@ pub trait ElementExt {
 impl ElementExt for Element {
     /// Validates a chain element
     async fn validate(&self) -> Result<(), KeystoreError> {
-        self.signed_header().validate().await?;
+        self.signed_action().validate().await?;
 
         //TODO: make sure that any cases around entry existence are valid:
-        //      SourceChainError::InvalidStructure(HeaderAndEntryMismatch(address)),
+        //      SourceChainError::InvalidStructure(ActionAndEntryMismatch(address)),
         Ok(())
     }
 }
 
 /// Extension trait to keep zome types minimal
 #[async_trait::async_trait]
-pub trait SignedHeaderHashedExt {
+pub trait SignedActionHashedExt {
     /// Create a hash from data
-    fn from_content_sync(signed_header: SignedHeader) -> SignedHeaderHashed;
+    fn from_content_sync(signed_action: SignedAction) -> SignedActionHashed;
     /// Sign some content
     #[allow(clippy::new_ret_no_self)]
     async fn sign(
         keystore: &MetaLairClient,
-        header: HeaderHashed,
-    ) -> LairResult<SignedHeaderHashed>;
+        action: ActionHashed,
+    ) -> LairResult<SignedActionHashed>;
     /// Validate the data
     async fn validate(&self) -> Result<(), KeystoreError>;
 }
 
 #[allow(missing_docs)]
 #[async_trait::async_trait]
-impl SignedHeaderHashedExt for SignedHeaderHashed {
-    fn from_content_sync(signed_header: SignedHeader) -> Self
+impl SignedActionHashedExt for SignedActionHashed {
+    fn from_content_sync(signed_action: SignedAction) -> Self
     where
         Self: Sized,
     {
-        let (header, signature) = signed_header.into();
-        Self::with_presigned(header.into_hashed(), signature)
+        let (action, signature) = signed_action.into();
+        Self::with_presigned(action.into_hashed(), signature)
     }
-    /// SignedHeader constructor
-    async fn sign(keystore: &MetaLairClient, header: HeaderHashed) -> LairResult<Self> {
-        let signature = header.author().sign(keystore, &*header).await?;
-        Ok(Self::with_presigned(header, signature))
+    /// SignedAction constructor
+    async fn sign(keystore: &MetaLairClient, action: ActionHashed) -> LairResult<Self> {
+        let signature = action.author().sign(keystore, &*action).await?;
+        Ok(Self::with_presigned(action, signature))
     }
 
-    /// Validates a signed header
+    /// Validates a signed action
     async fn validate(&self) -> Result<(), KeystoreError> {
         if !self
-            .header()
+            .action()
             .author()
-            .verify_signature(self.signature(), self.header())
+            .verify_signature(self.signature(), self.action())
             .await
         {
             return Err(KeystoreError::InvalidSignature(
                 self.signature().clone(),
-                format!("header {:?}", self.header_address()),
+                format!("action {:?}", self.action_address()),
             ));
         }
         Ok(())
@@ -392,15 +392,15 @@ impl SignedHeaderHashedExt for SignedHeaderHashed {
 impl WireElement {
     /// Convert into a [Element], deletes and updates when receiving from the network
     pub fn into_parts(self) -> (ElementStatus, Vec<ElementStatus>, Vec<ElementStatus>) {
-        let entry_hash = self.signed_header.header().entry_hash().cloned();
-        let header = Element::new(
-            SignedHeaderHashed::from_content_sync(self.signed_header),
+        let entry_hash = self.signed_action.action().entry_hash().cloned();
+        let action = Element::new(
+            SignedActionHashed::from_content_sync(self.signed_action),
             self.maybe_entry,
         );
         let deletes = self
             .deletes
             .into_iter()
-            .map(WireHeaderStatus::<WireDelete>::into_element_status)
+            .map(WireActionStatus::<WireDelete>::into_element_status)
             .collect();
         let updates = self
             .updates
@@ -408,12 +408,12 @@ impl WireElement {
             .map(|u| {
                 let entry_hash = entry_hash
                     .clone()
-                    .expect("Updates cannot be on headers that do not have entries");
+                    .expect("Updates cannot be on actions that do not have entries");
                 u.into_element_status(entry_hash)
             })
             .collect();
         (
-            ElementStatus::new(header, self.validation_status),
+            ElementStatus::new(action, self.validation_status),
             deletes,
             updates,
         )
@@ -421,13 +421,13 @@ impl WireElement {
     /// Convert from a [Element] when sending to the network
     pub fn from_element(
         e: ElementStatus,
-        deletes: Vec<WireHeaderStatus<WireDelete>>,
-        updates: Vec<WireHeaderStatus<WireUpdateRelationship>>,
+        deletes: Vec<WireActionStatus<WireDelete>>,
+        updates: Vec<WireActionStatus<WireUpdateRelationship>>,
     ) -> Self {
         let ElementStatus { element, status } = e;
-        let (signed_header, maybe_entry) = element.into_inner();
+        let (signed_action, maybe_entry) = element.into_inner();
         Self {
-            signed_header: signed_header.into(),
+            signed_action: signed_action.into(),
             // TODO: consider refactoring WireElement to use ElementEntry
             // instead of Option<Entry>
             maybe_entry: maybe_entry.into_option(),
@@ -439,8 +439,8 @@ impl WireElement {
 
     /// Get the entry hash if there is one
     pub fn entry_hash(&self) -> Option<&EntryHash> {
-        self.signed_header
-            .header()
+        self.signed_action
+            .action()
             .entry_data()
             .map(|(hash, _)| hash)
     }
@@ -448,33 +448,33 @@ impl WireElement {
 
 #[cfg(test)]
 mod tests {
-    use super::SignedHeader;
-    use super::SignedHeaderHashed;
+    use super::SignedAction;
+    use super::SignedActionHashed;
     use crate::prelude::*;
     use ::fixt::prelude::*;
     use holo_hash::HasHash;
     use holo_hash::HoloHashed;
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn test_signed_header_roundtrip() {
+    async fn test_signed_action_roundtrip() {
         let signature = SignatureFixturator::new(Unpredictable).next().unwrap();
-        let header = HeaderFixturator::new(Unpredictable).next().unwrap();
-        let signed_header = SignedHeader(header, signature);
-        let hashed: HoloHashed<SignedHeader> = HoloHashed::from_content_sync(signed_header);
+        let action = ActionFixturator::new(Unpredictable).next().unwrap();
+        let signed_action = SignedAction(action, signature);
+        let hashed: HoloHashed<SignedAction> = HoloHashed::from_content_sync(signed_action);
         let HoloHashed {
-            content: SignedHeader(header, signature),
+            content: SignedAction(action, signature),
             hash,
         } = hashed.clone();
-        let shh = SignedHeaderHashed {
-            hashed: HeaderHashed::with_pre_hashed(header, hash),
+        let shh = SignedActionHashed {
+            hashed: ActionHashed::with_pre_hashed(action, hash),
             signature,
         };
 
-        assert_eq!(shh.header_address(), hashed.as_hash());
+        assert_eq!(shh.action_address(), hashed.as_hash());
 
         let round = HoloHashed {
-            content: SignedHeader(shh.header().clone(), shh.signature().clone()),
-            hash: shh.header_address().clone(),
+            content: SignedAction(shh.action().clone(), shh.signature().clone()),
+            hash: shh.action_address().clone(),
         };
 
         assert_eq!(hashed, round);

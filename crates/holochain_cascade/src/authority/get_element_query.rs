@@ -1,32 +1,32 @@
 use std::sync::Arc;
 
-use holo_hash::HeaderHash;
+use holo_hash::ActionHash;
 use holochain_p2p::event::GetOptions;
 use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::Row;
 use holochain_state::query::prelude::*;
 use holochain_state::query::StateQueryError;
+use holochain_types::action::WireUpdateRelationship;
 use holochain_types::dht_op::DhtOpType;
 use holochain_types::element::WireElementOps;
-use holochain_types::header::WireUpdateRelationship;
 use holochain_zome_types::HasValidationStatus;
 use holochain_zome_types::Judged;
-use holochain_zome_types::SignedHeader;
+use holochain_zome_types::SignedAction;
 use holochain_zome_types::TryFrom;
 use holochain_zome_types::TryInto;
 
 #[derive(Debug, Clone)]
-pub struct GetElementOpsQuery(HeaderHash, GetOptions);
+pub struct GetElementOpsQuery(ActionHash, GetOptions);
 
 impl GetElementOpsQuery {
-    pub fn new(hash: HeaderHash, request: GetOptions) -> Self {
+    pub fn new(hash: ActionHash, request: GetOptions) -> Self {
         Self(hash, request)
     }
 }
 
 pub struct Item {
     op_type: DhtOpType,
-    header: SignedHeader,
+    action: SignedAction,
 }
 
 impl Query for GetElementOpsQuery {
@@ -37,13 +37,13 @@ impl Query for GetElementOpsQuery {
     fn query(&self) -> String {
         let request_type = self.1.request_type.clone();
         let query = "
-            SELECT Header.blob AS header_blob, DhtOp.type AS dht_type,
+            SELECT Action.blob AS action_blob, DhtOp.type AS dht_type,
             DhtOp.validation_status AS status
             FROM DhtOp
-            JOIN Header On DhtOp.header_hash = Header.hash
+            JOIN Action On DhtOp.action_hash = Action.hash
             WHERE DhtOp.type IN (:store_element, :delete, :update)
             AND
-            DhtOp.basis_hash = :header_hash
+            DhtOp.basis_hash = :action_hash
         ";
         let is_integrated = "
             AND
@@ -64,18 +64,18 @@ impl Query for GetElementOpsQuery {
             ":store_element": DhtOpType::StoreElement,
             ":delete": DhtOpType::RegisterDeletedBy,
             ":update": DhtOpType::RegisterUpdatedElement,
-            ":header_hash": self.0,
+            ":action_hash": self.0,
         };
         params.to_vec()
     }
 
     fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Item>> {
         let f = |row: &Row| {
-            let header =
-                from_blob::<SignedHeader>(row.get(row.as_ref().column_index("header_blob")?)?)?;
+            let action =
+                from_blob::<SignedAction>(row.get(row.as_ref().column_index("action_blob")?)?)?;
             let op_type = row.get(row.as_ref().column_index("dht_type")?)?;
             let validation_status = row.get(row.as_ref().column_index("status")?)?;
-            Ok(Judged::raw(Item { op_type, header }, validation_status))
+            Ok(Judged::raw(Item { op_type, action }, validation_status))
         };
         Arc::new(f)
     }
@@ -87,21 +87,21 @@ impl Query for GetElementOpsQuery {
     fn fold(&self, mut state: Self::State, dht_op: Self::Item) -> StateQueryResult<Self::State> {
         match &dht_op.data.op_type {
             DhtOpType::StoreElement => {
-                if state.header.is_none() {
-                    state.header = Some(dht_op.map(|d| d.header));
+                if state.action.is_none() {
+                    state.action = Some(dht_op.map(|d| d.action));
                 }
             }
             DhtOpType::RegisterDeletedBy => {
                 let status = dht_op.validation_status();
                 state
                     .deletes
-                    .push(Judged::raw(dht_op.data.header.try_into()?, status));
+                    .push(Judged::raw(dht_op.data.action.try_into()?, status));
             }
             DhtOpType::RegisterUpdatedElement => {
                 let status = dht_op.validation_status();
-                let header = dht_op.data.header;
+                let action = dht_op.data.action;
                 state.updates.push(Judged::raw(
-                    WireUpdateRelationship::try_from(header)?,
+                    WireUpdateRelationship::try_from(action)?,
                     status,
                 ));
             }
@@ -114,7 +114,7 @@ impl Query for GetElementOpsQuery {
     where
         S: Store,
     {
-        let entry_hash = state.header.as_ref().and_then(|wire_op| {
+        let entry_hash = state.action.as_ref().and_then(|wire_op| {
             wire_op
                 .data
                 .0

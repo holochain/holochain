@@ -14,8 +14,8 @@ fn temperature() -> Temperature {
 #[hdk_extern]
 fn twenty_three_degrees_entry_hash(_: ()) -> ExternResult<EntryHash> {
     let temp = temperature();
-    let header_hash: HeaderHash = create_entry(&IntegrityHashEntry(EntryTypes::Temperature(temp)))?;
-    let element: Element = get(header_hash, GetOptions::content())?.unwrap();
+    let action_hash: ActionHash = create_entry(&IntegrityHashEntry(EntryTypes::Temperature(temp)))?;
+    let element: Element = get(action_hash, GetOptions::content())?.unwrap();
     match element.entry() {
         ElementEntry::Present(entry) => hdk::prelude::hash_entry(entry.clone()),
         _ => unreachable!(),
@@ -34,7 +34,7 @@ fn hash_entry(entry: Entry) -> ExternResult<EntryHash> {
 
 #[cfg(all(test, feature = "mock"))]
 pub mod tests {
-    use ::fixt::prelude::*;
+    use fixt::prelude::*;
     use hdk::prelude::*;
 
     #[test]

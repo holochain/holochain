@@ -24,16 +24,16 @@ impl LinkZomes {
 }
 
 #[hdk_extern]
-fn must_get_valid_element(header_hash: HeaderHash) -> ExternResult<Element> {
-    hdk::prelude::must_get_valid_element(header_hash)
+fn must_get_valid_element(action_hash: ActionHash) -> ExternResult<Element> {
+    hdk::prelude::must_get_valid_element(action_hash)
 }
 
 #[hdk_extern]
-fn add_valid_link(_: ()) -> ExternResult<HeaderHash> {
+fn add_valid_link(_: ()) -> ExternResult<ActionHash> {
     add_valid_link_inner()
 }
 
-fn add_valid_link_inner() -> ExternResult<HeaderHash> {
+fn add_valid_link_inner() -> ExternResult<ActionHash> {
     let always_linkable_entry_hash = hash_entry(&MaybeLinkable::AlwaysLinkable)?;
     create_entry(&EntryZomes::maybe_linkable(MaybeLinkable::AlwaysLinkable))?;
 
@@ -46,17 +46,17 @@ fn add_valid_link_inner() -> ExternResult<HeaderHash> {
 }
 
 #[hdk_extern]
-fn remove_valid_link(_: ()) -> ExternResult<HeaderHash> {
+fn remove_valid_link(_: ()) -> ExternResult<ActionHash> {
     let valid_link = add_valid_link_inner()?;
     delete_link(valid_link)
 }
 
 #[hdk_extern]
-fn add_invalid_link(_: ()) -> ExternResult<HeaderHash> {
+fn add_invalid_link(_: ()) -> ExternResult<ActionHash> {
     add_invalid_link_inner()
 }
 
-fn add_invalid_link_inner() -> ExternResult<HeaderHash> {
+fn add_invalid_link_inner() -> ExternResult<ActionHash> {
     let always_linkable_entry_hash = hash_entry(&MaybeLinkable::AlwaysLinkable)?;
     let never_linkable_entry_hash = hash_entry(&MaybeLinkable::NeverLinkable)?;
 
@@ -72,7 +72,7 @@ fn add_invalid_link_inner() -> ExternResult<HeaderHash> {
 }
 
 #[hdk_extern]
-fn remove_invalid_link(_: ()) -> ExternResult<HeaderHash> {
+fn remove_invalid_link(_: ()) -> ExternResult<ActionHash> {
     let valid_link = add_invalid_link_inner()?;
     delete_link(valid_link)
 }

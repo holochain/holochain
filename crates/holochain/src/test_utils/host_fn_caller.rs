@@ -14,9 +14,9 @@ use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCallHostAccess;
 use crate::core::ribosome::ZomeCallInvocation;
 use hdk::prelude::*;
+use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holo_hash::AnyDhtHash;
-use holo_hash::HeaderHash;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::actor::GetLinksOptions;
 use holochain_p2p::actor::HolochainP2pRefToDna;
@@ -245,7 +245,7 @@ impl HostFnCaller {
         entry: Entry,
         entry_def_id: E,
         visibility: EntryVisibility,
-    ) -> HeaderHash {
+    ) -> ActionHash {
         let (ribosome, call_context, workspace_lock) = self.unpack().await;
         let input = CreateInput::new(
             entry_def_id.into(),
@@ -261,7 +261,7 @@ impl HostFnCaller {
         output
     }
 
-    pub async fn delete_entry<'env>(&self, input: DeleteInput) -> HeaderHash {
+    pub async fn delete_entry<'env>(&self, input: DeleteInput) -> ActionHash {
         let (ribosome, call_context, workspace_lock) = self.unpack().await;
         let output = {
             let r = host_fn::delete::delete(ribosome, call_context, input);
@@ -281,11 +281,11 @@ impl HostFnCaller {
     pub async fn update_entry(
         &self,
         entry: Entry,
-        original_header_address: HeaderHash,
-    ) -> HeaderHash {
+        original_action_address: ActionHash,
+    ) -> ActionHash {
         let (ribosome, call_context, workspace_lock) = self.unpack().await;
         let input = UpdateInput {
-            original_header_address,
+            original_action_address,
             entry,
             chain_top_ordering: Default::default(),
         };
@@ -320,7 +320,7 @@ impl HostFnCaller {
         target: AnyLinkableHash,
         link_type: impl Into<LinkType>,
         link_tag: LinkTag,
-    ) -> HeaderHash {
+    ) -> ActionHash {
         let (ribosome, call_context, workspace_lock) = self.unpack().await;
         let input = CreateLinkInput::new(
             base,
@@ -337,7 +337,7 @@ impl HostFnCaller {
         output
     }
 
-    pub async fn delete_link<'env>(&self, link_add_hash: HeaderHash) -> HeaderHash {
+    pub async fn delete_link<'env>(&self, link_add_hash: ActionHash) -> ActionHash {
         let (ribosome, call_context, workspace_lock) = self.unpack().await;
         let output = {
             host_fn::delete_link::delete_link(
@@ -383,7 +383,7 @@ impl HostFnCaller {
         type_query: LinkTypeRanges,
         tag: LinkTag,
         _options: GetLinksOptions,
-    ) -> Vec<(SignedHeaderHashed, Vec<SignedHeaderHashed>)> {
+    ) -> Vec<(SignedActionHashed, Vec<SignedActionHashed>)> {
         let (ribosome, call_context, workspace_lock) = self.unpack().await;
         let input = GetLinksInput::new(base, type_query, Some(tag));
         let output = {

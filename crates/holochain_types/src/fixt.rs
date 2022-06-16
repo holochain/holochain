@@ -2,7 +2,7 @@
 
 #![allow(missing_docs)]
 
-use crate::header::NewEntryHeader;
+use crate::action::NewEntryAction;
 use crate::prelude::*;
 use ::fixt::prelude::*;
 use rand::seq::IteratorRandom;
@@ -26,7 +26,7 @@ fixturator!(
 );
 
 fixturator!(
-    NewEntryHeader;
+    NewEntryAction;
     variants [
         Create(Create)
         Update(Update)
@@ -34,27 +34,27 @@ fixturator!(
 
 
     curve PublicCurve {
-        match fixt!(NewEntryHeader) {
-            NewEntryHeader::Create(_) => NewEntryHeader::Create(fixt!(Create, PublicCurve)),
-            NewEntryHeader::Update(_) => NewEntryHeader::Update(fixt!(Update, PublicCurve)),
+        match fixt!(NewEntryAction) {
+            NewEntryAction::Create(_) => NewEntryAction::Create(fixt!(Create, PublicCurve)),
+            NewEntryAction::Update(_) => NewEntryAction::Update(fixt!(Update, PublicCurve)),
         }
     };
 
     curve EntryType {
-        match fixt!(NewEntryHeader) {
-            NewEntryHeader::Create(_) => {
+        match fixt!(NewEntryAction) {
+            NewEntryAction::Create(_) => {
                 let ec = CreateFixturator::new_indexed(get_fixt_curve!(), get_fixt_index!()).next().unwrap();
-                NewEntryHeader::Create(ec)
+                NewEntryAction::Create(ec)
             },
-            NewEntryHeader::Update(_) => {
+            NewEntryAction::Update(_) => {
                 let eu = UpdateFixturator::new_indexed(get_fixt_curve!(), get_fixt_index!()).next().unwrap();
-                NewEntryHeader::Update(eu)
+                NewEntryAction::Update(eu)
             },
         }
     };
 );
 
-fn new_entry_element(entry: Entry, header_type: HeaderType, index: usize) -> Element {
+fn new_entry_element(entry: Entry, action_type: ActionType, index: usize) -> Element {
     let et = match entry {
         Entry::App(_) | Entry::CounterSign(_, _) => EntryType::App(
             AppEntryTypeFixturator::new_indexed(Unpredictable, index)
@@ -65,34 +65,34 @@ fn new_entry_element(entry: Entry, header_type: HeaderType, index: usize) -> Ele
         Entry::CapClaim(_) => EntryType::CapClaim,
         Entry::CapGrant(_) => EntryType::CapGrant,
     };
-    match header_type {
-        HeaderType::Create => {
+    match action_type {
+        ActionType::Create => {
             let c = CreateFixturator::new_indexed(et, index).next().unwrap();
-            let c = NewEntryHeader::Create(c);
+            let c = NewEntryAction::Create(c);
             let element: Element = ElementFixturator::new_indexed(c, index).next().unwrap();
             let (shh, _) = element.into_inner();
             Element::new(shh, Some(entry))
         }
-        HeaderType::Update => {
+        ActionType::Update => {
             let u = UpdateFixturator::new_indexed(et, index).next().unwrap();
-            let u = NewEntryHeader::Update(u);
+            let u = NewEntryAction::Update(u);
             let element: Element = ElementFixturator::new_indexed(u, index).next().unwrap();
             let (shh, _) = element.into_inner();
             Element::new(shh, Some(entry))
         }
-        _ => panic!("You choose {:?} for an Element with en Entry", header_type),
+        _ => panic!("You choose {:?} for an Element with en Entry", action_type),
     }
 }
 
-type NewEntryElement = (Entry, HeaderType);
+type NewEntryElement = (Entry, ActionType);
 
 // NB: Element is defined in holochain_zome_types, but I don't know if it's possible to define
 //     new Curves on fixturators in other crates, so we have the definition in this crate so that
 //     all Curves can be defined at once -MD
 fixturator!(
     Element;
-    vanilla fn element_with_no_entry(Signature, Header);
-    curve NewEntryHeader {
+    vanilla fn element_with_no_entry(Signature, Action);
+    curve NewEntryAction {
         let s = SignatureFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap();
         element_with_no_entry(s, get_fixt_curve!().into())
     };
@@ -103,7 +103,7 @@ fixturator!(
             Entry::CapClaim(_) => EntryType::CapClaim,
             Entry::CapGrant(_) => EntryType::CapGrant,
         };
-        let new = NewEntryHeaderFixturator::new_indexed(et, get_fixt_index!()).next().unwrap();
+        let new = NewEntryActionFixturator::new_indexed(et, get_fixt_index!()).next().unwrap();
         let (shh, _) = ElementFixturator::new_indexed(new, get_fixt_index!()).next().unwrap().into_inner();
         Element::new(shh, Some(get_fixt_curve!()))
     };

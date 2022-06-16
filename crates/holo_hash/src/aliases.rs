@@ -20,8 +20,8 @@ pub type DhtOpHash = HoloHash<hash_type::DhtOp>;
 /// The hash of an Entry.
 pub type EntryHash = HoloHash<hash_type::Entry>;
 
-/// The hash of a Header
-pub type HeaderHash = HoloHash<hash_type::Header>;
+/// The hash of a Action
+pub type ActionHash = HoloHash<hash_type::Action>;
 
 /// The hash of a network ID
 pub type NetIdHash = HoloHash<hash_type::NetId>;
@@ -35,7 +35,7 @@ pub type ExternalHash = HoloHash<hash_type::External>;
 // COMPOSITE HASH TYPES
 
 /// The hash of anything referrable in the DHT.
-/// This is a composite of either an EntryHash or a HeaderHash
+/// This is a composite of either an EntryHash or a ActionHash
 pub type AnyDhtHash = HoloHash<hash_type::AnyDht>;
 
 /// The hash of anything linkable.
@@ -45,16 +45,16 @@ pub type AnyLinkableHash = HoloHash<hash_type::AnyLinkable>;
 pub enum AnyDhtHashPrimitive {
     /// This is an EntryHash
     Entry(EntryHash),
-    /// This is a HeaderHash
-    Header(HeaderHash),
+    /// This is a ActionHash
+    Action(ActionHash),
 }
 
 /// The primitive hash types represented by this composite hash
 pub enum AnyLinkableHashPrimitive {
     /// This is an EntryHash
     Entry(EntryHash),
-    /// This is a HeaderHash
-    Header(HeaderHash),
+    /// This is a ActionHash
+    Action(ActionHash),
     /// This is an ExternalHash
     External(ExternalHash),
 }
@@ -66,8 +66,8 @@ impl AnyLinkableHash {
             hash_type::AnyLinkable::Entry => {
                 AnyLinkableHashPrimitive::Entry(self.retype(hash_type::Entry))
             }
-            hash_type::AnyLinkable::Header => {
-                AnyLinkableHashPrimitive::Header(self.retype(hash_type::Header))
+            hash_type::AnyLinkable::Action => {
+                AnyLinkableHashPrimitive::Action(self.retype(hash_type::Action))
             }
             hash_type::AnyLinkable::External => {
                 AnyLinkableHashPrimitive::External(self.retype(hash_type::External))
@@ -84,10 +84,10 @@ impl AnyLinkableHash {
         }
     }
 
-    /// If this hash represents a HeaderHash, return it, else None
-    pub fn into_header_hash(self) -> Option<HeaderHash> {
-        if *self.hash_type() == hash_type::AnyLinkable::Header {
-            Some(self.retype(hash_type::Header))
+    /// If this hash represents a ActionHash, return it, else None
+    pub fn into_action_hash(self) -> Option<ActionHash> {
+        if *self.hash_type() == hash_type::AnyLinkable::Action {
+            Some(self.retype(hash_type::Action))
         } else {
             None
         }
@@ -108,8 +108,8 @@ impl AnyDhtHash {
     pub fn into_primitive(self) -> AnyDhtHashPrimitive {
         match self.hash_type() {
             hash_type::AnyDht::Entry => AnyDhtHashPrimitive::Entry(self.retype(hash_type::Entry)),
-            hash_type::AnyDht::Header => {
-                AnyDhtHashPrimitive::Header(self.retype(hash_type::Header))
+            hash_type::AnyDht::Action => {
+                AnyDhtHashPrimitive::Action(self.retype(hash_type::Action))
             }
         }
     }
@@ -123,10 +123,10 @@ impl AnyDhtHash {
         }
     }
 
-    /// If this hash represents a HeaderHash, return it, else None
-    pub fn into_header_hash(self) -> Option<HeaderHash> {
-        if *self.hash_type() == hash_type::AnyDht::Header {
-            Some(self.retype(hash_type::Header))
+    /// If this hash represents a ActionHash, return it, else None
+    pub fn into_action_hash(self) -> Option<ActionHash> {
+        if *self.hash_type() == hash_type::AnyDht::Action {
+            Some(self.retype(hash_type::Action))
         } else {
             None
         }
@@ -139,9 +139,9 @@ impl From<AnyLinkableHash> for AnyDhtHash {
     }
 }
 
-impl From<HeaderHash> for AnyDhtHash {
-    fn from(hash: HeaderHash) -> Self {
-        hash.retype(hash_type::AnyDht::Header)
+impl From<ActionHash> for AnyDhtHash {
+    fn from(hash: ActionHash) -> Self {
+        hash.retype(hash_type::AnyDht::Action)
     }
 }
 
@@ -159,9 +159,9 @@ impl From<AgentPubKey> for AnyDhtHash {
     }
 }
 
-impl From<AnyDhtHash> for HeaderHash {
+impl From<AnyDhtHash> for ActionHash {
     fn from(hash: AnyDhtHash) -> Self {
-        hash.retype(hash_type::Header)
+        hash.retype(hash_type::Action)
     }
 }
 
@@ -171,9 +171,9 @@ impl From<AnyDhtHash> for EntryHash {
     }
 }
 
-impl From<HeaderHash> for AnyLinkableHash {
-    fn from(hash: HeaderHash) -> Self {
-        hash.retype(hash_type::AnyLinkable::Header)
+impl From<ActionHash> for AnyLinkableHash {
+    fn from(hash: ActionHash) -> Self {
+        hash.retype(hash_type::AnyLinkable::Action)
     }
 }
 
@@ -195,9 +195,9 @@ impl From<ExternalHash> for AnyLinkableHash {
     }
 }
 
-impl From<AnyLinkableHash> for HeaderHash {
+impl From<AnyLinkableHash> for ActionHash {
     fn from(hash: AnyLinkableHash) -> Self {
-        hash.retype(hash_type::Header)
+        hash.retype(hash_type::Action)
     }
 }
 

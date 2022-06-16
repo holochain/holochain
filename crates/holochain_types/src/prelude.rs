@@ -8,6 +8,7 @@ pub use std::convert::TryFrom;
 pub use std::convert::TryInto;
 
 pub use crate::access::*;
+pub use crate::action::*;
 pub use crate::activity::*;
 pub use crate::app::error::*;
 pub use crate::app::*;
@@ -23,7 +24,6 @@ pub use crate::dna::*;
 pub use crate::element::error::*;
 pub use crate::element::*;
 pub use crate::entry::*;
-pub use crate::header::*;
 pub use crate::link::*;
 pub use crate::metadata::*;
 pub use crate::signal::*;

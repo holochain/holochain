@@ -5,7 +5,7 @@
 //! For now, Publish links on private entries
 // TODO: B-01827 Make story about: later consider adding a flag to make a link private and not publish it.
 //       Even for those private links, we may need to publish them to the author of the private entry
-//       (and we'd have to reference its header  which actually exists on the DHT to make that work,
+//       (and we'd have to reference its action  which actually exists on the DHT to make that work,
 //       rather than the entry which does not exist on the DHT).
 //!
 //!
@@ -412,7 +412,7 @@ mod tests {
                 .await
                 .unwrap();
                 // Produces 3 ops but minus 1 for store entry so 2 ops.
-                let original_header_address = source_chain
+                let original_action_address = source_chain
                     .put(
                         builder::Create {
                             entry_type: ec_entry_type,
@@ -430,7 +430,7 @@ mod tests {
                         builder::Update {
                             entry_type: eu_entry_type,
                             entry_hash: new_entry_hash,
-                            original_header_address: original_header_address.clone(),
+                            original_action_address: original_action_address.clone(),
                             original_entry_address: original_entry_hash,
                         },
                         Some(new_entry),
@@ -440,13 +440,13 @@ mod tests {
                     .unwrap();
 
                 source_chain.flush(&dna_network).await.unwrap();
-                let (entry_create_header, entry_update_header) = db
+                let (entry_create_action, entry_update_action) = db
                     .conn()
                     .unwrap()
                     .with_commit_test(|writer| {
                         let store = Txn::from(writer);
-                        let ech = store.get_header(&original_header_address).unwrap().unwrap();
-                        let euh = store.get_header(&entry_update_hash).unwrap().unwrap();
+                        let ech = store.get_action(&original_action_address).unwrap().unwrap();
+                        let euh = store.get_action(&entry_update_hash).unwrap().unwrap();
                         (ech, euh)
                     })
                     .unwrap();
@@ -461,10 +461,10 @@ mod tests {
                 let expected = {
                     let mut map = HashMap::new();
                     // Op is expected to not contain the Entry even though the above contains the entry
-                    let (entry_create_header, sig) = entry_create_header.into_inner();
+                    let (entry_create_action, sig) = entry_create_action.into_inner();
                     let expected_op = DhtOp::RegisterAgentActivity(
                         sig.clone(),
-                        entry_create_header.clone().into_content(),
+                        entry_create_action.clone().into_content(),
                     );
                     let op_hash = expected_op.to_hash();
                     map.insert(
@@ -474,7 +474,7 @@ mod tests {
 
                     let expected_op = DhtOp::StoreElement(
                         sig,
-                        entry_create_header.into_content().try_into().unwrap(),
+                        entry_create_action.into_content().try_into().unwrap(),
                         None,
                     );
                     let op_hash = expected_op.to_hash();
@@ -483,18 +483,18 @@ mod tests {
 
                     // Create RegisterUpdatedContent
                     // Op is expected to not contain the Entry
-                    let (entry_update_header, sig) = entry_update_header.into_inner();
-                    let entry_update_header: Update =
-                        entry_update_header.into_content().try_into().unwrap();
+                    let (entry_update_action, sig) = entry_update_action.into_inner();
+                    let entry_update_action: Update =
+                        entry_update_action.into_content().try_into().unwrap();
                     let expected_op =
-                        DhtOp::StoreElement(sig.clone(), entry_update_header.clone().into(), None);
+                        DhtOp::StoreElement(sig.clone(), entry_update_action.clone().into(), None);
                     let op_hash = expected_op.to_hash();
 
                     map.insert(op_hash, (expected_op, store_element_count.clone()));
 
                     let expected_op = DhtOp::RegisterUpdatedContent(
                         sig.clone(),
-                        entry_update_header.clone(),
+                        entry_update_action.clone(),
                         None,
                     );
                     let op_hash = expected_op.to_hash();
@@ -502,7 +502,7 @@ mod tests {
                     map.insert(op_hash, (expected_op, register_replaced_by_count.clone()));
                     let expected_op = DhtOp::RegisterUpdatedElement(
                         sig.clone(),
-                        entry_update_header.clone(),
+                        entry_update_action.clone(),
                         None,
                     );
                     let op_hash = expected_op.to_hash();
@@ -511,7 +511,7 @@ mod tests {
                         op_hash,
                         (expected_op, register_updated_element_count.clone()),
                     );
-                    let expected_op = DhtOp::RegisterAgentActivity(sig, entry_update_header.into());
+                    let expected_op = DhtOp::RegisterAgentActivity(sig, entry_update_action.into());
                     let op_hash = expected_op.to_hash();
                     map.insert(
                         op_hash,

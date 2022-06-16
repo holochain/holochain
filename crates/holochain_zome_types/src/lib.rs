@@ -10,6 +10,8 @@
 #![deny(missing_docs)]
 
 #[allow(missing_docs)]
+pub mod action;
+#[allow(missing_docs)]
 pub mod agent_activity;
 pub mod bytes;
 #[allow(missing_docs)]
@@ -27,8 +29,6 @@ pub mod entry_def;
 pub mod genesis;
 #[allow(missing_docs)]
 pub mod hash;
-#[allow(missing_docs)]
-pub mod header;
 #[allow(missing_docs)]
 pub mod info;
 #[allow(missing_docs)]
@@ -73,8 +73,8 @@ pub mod fixt;
 #[cfg(feature = "test_utils")]
 pub mod test_utils;
 
+pub use action::Action;
 pub use entry::Entry;
-pub use header::Header;
 pub use prelude::*;
 /// Re-exported dependencies
 pub mod dependencies {

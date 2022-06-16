@@ -12,18 +12,18 @@ use crate::prelude::*;
 ///
 /// System times can be considered "secure" or "insecure" situationally, some things to consider:
 ///
-/// - the host signing times into chain headers is using the same clock in the host_fn call so the
+/// - the host signing times into chain actions is using the same clock in the host_fn call so the
 ///   the sys_time returned by a function for inclusion in an entry will always be less than or
-///   equal to the time in the header of that entry unless:
+///   equal to the time in the action of that entry unless:
 ///     - the user manually changed the system time backwards between this host_fn being called and
 ///       an entry using it being committed (NTP avoids making time go backward by stretching it)
 ///     - the sys_time call ran on a different machine, e.g. via a call_remote, to the machine that
 ///       commits it into an entry
 ///   so your app can decide to implement validation logic that fails any sys time that comes after
-///   the time signed in the header if that makes sense.
-/// - the times in the headers of the local source chain must increase monotonically and all
-///   headers are pushed to the neighbourhood of the agent publishing them, so the agent activity
-///   authorities will immediately warrant any headers running chronologically backwards
+///   the time signed in the action if that makes sense.
+/// - the times in the actions of the local source chain must increase monotonically and all
+///   actions are pushed to the neighbourhood of the agent publishing them, so the agent activity
+///   authorities will immediately warrant any actions running chronologically backwards
 /// - the times within a single element may be relatively secure but are easy to manipulate in an
 ///   absolute sense, the user can simply change their system clock before attempting a commit to
 ///   any time that is equal to or later than their current chain head

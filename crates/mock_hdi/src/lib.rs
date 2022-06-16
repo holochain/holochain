@@ -42,10 +42,10 @@ use holochain_deterministic_integrity::prelude::*;
         fn verify_signature(&self, verify_signature: VerifySignature) -> ExternResult<bool>;
         fn hash(&self, hash_input: HashInput) -> ExternResult<HashOutput>;
         fn must_get_entry(&self, must_get_entry_input: MustGetEntryInput) -> ExternResult<EntryHashed>;
-        fn must_get_header(
+        fn must_get_action(
             &self,
-            must_get_header_input: MustGetHeaderInput,
-        ) -> ExternResult<SignedHeaderHashed>;
+            must_get_action_input: MustGetActionInput,
+        ) -> ExternResult<SignedActionHashed>;
         fn must_get_valid_element(
             &self,
             must_get_valid_element_input: MustGetValidElementInput,

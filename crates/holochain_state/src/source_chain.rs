@@ -5,11 +5,11 @@ use crate::integrate::authored_ops_to_dht_db_without_check;
 use crate::scratch::ScratchError;
 use crate::scratch::SyncScratchError;
 use async_recursion::async_recursion;
+use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holo_hash::DhtOpHash;
 use holo_hash::DnaHash;
 use holo_hash::HasHash;
-use holo_hash::HeaderHash;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_sqlite::rusqlite::Transaction;
@@ -22,10 +22,16 @@ use holochain_types::dht_op::DhtOp;
 use holochain_types::dht_op::DhtOpLight;
 use holochain_types::dht_op::OpOrder;
 use holochain_types::dht_op::UniqueForm;
-use holochain_types::element::SignedHeaderHashedExt;
+use holochain_types::element::SignedActionHashedExt;
 use holochain_types::sql::AsSql;
-use holochain_zome_types::header;
+use holochain_zome_types::action;
 use holochain_zome_types::query::ChainQueryFilterRange;
+use holochain_zome_types::Action;
+use holochain_zome_types::ActionBuilder;
+use holochain_zome_types::ActionBuilderCommon;
+use holochain_zome_types::ActionExt;
+use holochain_zome_types::ActionHashed;
+use holochain_zome_types::ActionInner;
 use holochain_zome_types::CapAccess;
 use holochain_zome_types::CapGrant;
 use holochain_zome_types::CapSecret;
@@ -37,18 +43,12 @@ use holochain_zome_types::Element;
 use holochain_zome_types::Entry;
 use holochain_zome_types::EntryVisibility;
 use holochain_zome_types::GrantedFunction;
-use holochain_zome_types::Header;
-use holochain_zome_types::HeaderBuilder;
-use holochain_zome_types::HeaderBuilderCommon;
-use holochain_zome_types::HeaderExt;
-use holochain_zome_types::HeaderHashed;
-use holochain_zome_types::HeaderInner;
 use holochain_zome_types::MembraneProof;
 use holochain_zome_types::PreflightRequest;
 use holochain_zome_types::QueryFilter;
 use holochain_zome_types::Signature;
-use holochain_zome_types::SignedHeader;
-use holochain_zome_types::SignedHeaderHashed;
+use holochain_zome_types::SignedAction;
+use holochain_zome_types::SignedActionHashed;
 use holochain_zome_types::Timestamp;
 
 use crate::chain_lock::is_chain_locked;
@@ -73,7 +73,7 @@ pub struct SourceChain<AuthorDb = DbWrite<DbKindAuthored>, DhtDb = DbWrite<DbKin
     keystore: MetaLairClient,
     author: Arc<AgentPubKey>,
     persisted_seq: u32,
-    persisted_head: HeaderHash,
+    persisted_head: ActionHash,
     persisted_timestamp: Timestamp,
     public_only: bool,
 }
@@ -92,8 +92,8 @@ pub struct SourceChainJsonDump {
 #[derive(Serialize, Debug, Clone, Deserialize)]
 pub struct SourceChainJsonElement {
     pub signature: Signature,
-    pub header_address: HeaderHash,
-    pub header: Header,
+    pub action_address: ActionHash,
+    pub action: Action,
     pub entry: Option<Entry>,
 }
 
@@ -146,16 +146,16 @@ impl SourceChain {
         Ok(countersigning_agent_state)
     }
 
-    pub async fn put_with_header(
+    pub async fn put_with_action(
         &self,
-        header: Header,
+        action: Action,
         maybe_entry: Option<Entry>,
         chain_top_ordering: ChainTopOrdering,
-    ) -> SourceChainResult<HeaderHash> {
-        let header = HeaderHashed::from_content_sync(header);
-        let hash = header.as_hash().clone();
-        let header = SignedHeaderHashed::sign(&self.keystore, header).await?;
-        let element = Element::new(header, maybe_entry);
+    ) -> SourceChainResult<ActionHash> {
+        let action = ActionHashed::from_content_sync(action);
+        let hash = action.as_hash().clone();
+        let action = SignedActionHashed::sign(&self.keystore, action).await?;
+        let element = Element::new(action, maybe_entry);
         self.scratch
             .apply(|scratch| insert_element_scratch(scratch, element, chain_top_ordering))?;
         Ok(hash)
@@ -165,11 +165,11 @@ impl SourceChain {
         &self,
         entry: Entry,
         chain_top_ordering: ChainTopOrdering,
-    ) -> SourceChainResult<HeaderHash> {
+    ) -> SourceChainResult<ActionHash> {
         let entry_hash = EntryHash::with_data_sync(&entry);
         if let Entry::CounterSign(ref session_data, _) = entry {
-            self.put_with_header(
-                Header::from_countersigning_data(entry_hash, session_data, (*self.author).clone())?,
+            self.put_with_action(
+                Action::from_countersigning_data(entry_hash, session_data, (*self.author).clone())?,
                 Some(entry),
                 chain_top_ordering,
             )
@@ -180,17 +180,17 @@ impl SourceChain {
         }
     }
 
-    pub async fn put<H: HeaderInner, B: HeaderBuilder<H>>(
+    pub async fn put<H: ActionInner, B: ActionBuilder<H>>(
         &self,
-        header_builder: B,
+        action_builder: B,
         maybe_entry: Option<Entry>,
         chain_top_ordering: ChainTopOrdering,
-    ) -> SourceChainResult<HeaderHash> {
-        let (prev_header, chain_head_seq, chain_head_timestamp) = self.chain_head()?;
-        let header_seq = chain_head_seq + 1;
+    ) -> SourceChainResult<ActionHash> {
+        let (prev_action, chain_head_seq, chain_head_timestamp) = self.chain_head()?;
+        let action_seq = chain_head_seq + 1;
 
-        // Build the header.
-        let common = HeaderBuilderCommon {
+        // Build the action.
+        let common = ActionBuilderCommon {
             author: (*self.author).clone(),
             // If the current time is equal to the current chain head timestamp,
             // or even has drifted to be before it, just set the next timestamp
@@ -203,11 +203,11 @@ impl SourceChain {
                 Timestamp::now(),
                 (chain_head_timestamp + std::time::Duration::from_micros(1))?,
             ),
-            header_seq,
-            prev_header,
+            action_seq,
+            prev_action,
         };
-        self.put_with_header(
-            header_builder.build(common).into(),
+        self.put_with_action(
+            action_builder.build(common).into(),
             maybe_entry,
             chain_top_ordering,
         )
@@ -218,19 +218,19 @@ impl SourceChain {
     pub async fn flush(
         &self,
         network: &(dyn HolochainP2pDnaT + Send + Sync),
-    ) -> SourceChainResult<Vec<SignedHeaderHashed>> {
+    ) -> SourceChainResult<Vec<SignedActionHashed>> {
         // Nothing to write
         if self.scratch.apply(|s| s.is_empty())? {
             return Ok(Vec::new());
         }
-        let (scheduled_fns, headers, ops, entries) = self.scratch.apply_and_then(|scratch| {
-            let (headers, ops) =
-                build_ops_from_headers(scratch.drain_headers().collect::<Vec<_>>())?;
+        let (scheduled_fns, actions, ops, entries) = self.scratch.apply_and_then(|scratch| {
+            let (actions, ops) =
+                build_ops_from_actions(scratch.drain_actions().collect::<Vec<_>>())?;
 
             // Drain out any entries.
             let entries = scratch.drain_entries().collect::<Vec<_>>();
             let scheduled_fns = scratch.drain_scheduled_fns().collect::<Vec<_>>();
-            SourceChainResult::Ok((scheduled_fns, headers, ops, entries))
+            SourceChainResult::Ok((scheduled_fns, actions, ops, entries))
         })?;
 
         let maybe_countersigned_entry = entries
@@ -238,7 +238,7 @@ impl SourceChain {
             .map(|entry| entry.as_content())
             .find(|entry| matches!(entry, Entry::CounterSign(_, _)));
 
-        if matches!(maybe_countersigned_entry, Some(Entry::CounterSign(_, _))) && headers.len() != 1
+        if matches!(maybe_countersigned_entry, Some(Entry::CounterSign(_, _))) && actions.len() != 1
         {
             return Err(SourceChainError::DirtyCounterSigningWrite);
         }
@@ -252,7 +252,7 @@ impl SourceChain {
             .map(|op| (op.1.clone(), op.0.dht_basis().clone()))
             .collect::<Vec<_>>();
 
-        // Write the entries, headers and ops to the database in one transaction.
+        // Write the entries, actions and ops to the database in one transaction.
         let author = self.author.clone();
         let persisted_head = self.persisted_head.clone();
         match self
@@ -265,13 +265,13 @@ impl SourceChain {
                 // As at check.
                 let (new_persisted_head, new_head_seq, new_timestamp) =
                     chain_head_db(txn, author.clone())?;
-                if headers.last().is_none() {
+                if actions.last().is_none() {
                     // Nothing to write
                     return Ok(Vec::new());
                 }
                 if persisted_head != new_persisted_head {
                     return Err(SourceChainError::HeadMoved(
-                        headers,
+                        actions,
                         entries,
                         Some(persisted_head),
                         Some((new_persisted_head, new_head_seq, new_timestamp)),
@@ -294,8 +294,8 @@ impl SourceChain {
                 for entry in entries {
                     insert_entry(txn, entry.as_hash(), entry.as_content())?;
                 }
-                for shh in headers.iter() {
-                    insert_header(txn, shh)?;
+                for shh in actions.iter() {
+                    insert_action(txn, shh)?;
                 }
                 for (op, op_hash, op_order, timestamp, _) in &ops {
                     insert_op_lite_into_authored(txn, op, op_hash, op_order, timestamp)?;
@@ -305,12 +305,12 @@ impl SourceChain {
                         set_withhold_publish(txn, op_hash)?;
                     }
                 }
-                SourceChainResult::Ok(headers)
+                SourceChainResult::Ok(actions)
             })
             .await
         {
             Err(SourceChainError::HeadMoved(
-                headers,
+                actions,
                 entries,
                 old_head,
                 Some((new_persisted_head, new_head_seq, new_timestamp)),
@@ -332,17 +332,17 @@ impl SourceChain {
                         (*self.author).clone(),
                     )
                     .await?;
-                    let rebased_headers = rebase_headers_on(
+                    let rebased_actions = rebase_actions_on(
                         &keystore,
-                        headers,
+                        actions,
                         new_persisted_head,
                         new_head_seq,
                         new_timestamp,
                     )
                     .await?;
                     child_chain.scratch.apply(move |scratch| {
-                        for header in rebased_headers {
-                            scratch.add_header(header, ChainTopOrdering::Relaxed);
+                        for action in rebased_actions {
+                            scratch.add_action(action, ChainTopOrdering::Relaxed);
                         }
                         for entry in entries {
                             scratch.add_entry(entry, ChainTopOrdering::Relaxed);
@@ -351,14 +351,14 @@ impl SourceChain {
                     child_chain.flush(network).await
                 } else {
                     Err(SourceChainError::HeadMoved(
-                        headers,
+                        actions,
                         entries,
                         old_head,
                         Some((new_persisted_head, new_head_seq, new_timestamp)),
                     ))
                 }
             }
-            Ok(headers) => {
+            Ok(actions) => {
                 authored_ops_to_dht_db(
                     network,
                     ops_to_integrate,
@@ -367,7 +367,7 @@ impl SourceChain {
                     &self.dht_db_cache,
                 )
                 .await?;
-                SourceChainResult::Ok(headers)
+                SourceChainResult::Ok(actions)
             }
             result => result,
         }
@@ -429,7 +429,7 @@ where
             .await
             .unwrap_or_else(|_| {
                 (
-                    HeaderHash::from_raw_32(vec![0u8; 32]),
+                    ActionHash::from_raw_32(vec![0u8; 32]),
                     0,
                     Timestamp::from_micros(0),
                 )
@@ -504,7 +504,7 @@ where
 
     /// Accessor for the chain head that will be used at flush time to check
     /// the "as at" for ordering integrity etc.
-    pub fn persisted_chain_head(&self) -> (HeaderHash, u32, Timestamp) {
+    pub fn persisted_chain_head(&self) -> (ActionHash, u32, Timestamp) {
         (
             self.persisted_head.clone(),
             self.persisted_seq,
@@ -512,7 +512,7 @@ where
         )
     }
 
-    pub fn chain_head(&self) -> SourceChainResult<(HeaderHash, u32, Timestamp)> {
+    pub fn chain_head(&self) -> SourceChainResult<(ActionHash, u32, Timestamp)> {
         // Check scratch for newer head.
         Ok(self.scratch.apply(|scratch| {
             scratch
@@ -546,31 +546,31 @@ where
         let valid_cap_grant = self
             .vault
             .async_reader(move |txn| {
-                let not_referenced_header = "
+                let not_referenced_action = "
             SELECT COUNT(H_REF.hash)
-            FROM Header AS H_REF
-            JOIN DhtOp AS D_REF ON D_REF.header_hash = H_REF.hash
+            FROM Action AS H_REF
+            JOIN DhtOp AS D_REF ON D_REF.action_hash = H_REF.hash
             WHERE
             H_REF.author = :author
             AND
-            (H_REF.original_header_hash = Header.hash
+            (H_REF.original_action_hash = Action.hash
             OR
-            H_REF.deletes_header_hash = Header.hash)
+            H_REF.deletes_action_hash = Action.hash)
             ";
                 let sql = format!(
                     "
                 SELECT DISTINCT Entry.blob
                 FROM Entry
-                JOIN Header ON Header.entry_hash = Entry.hash
-                JOIN DhtOp ON Header.hash = DhtOp.header_hash
+                JOIN Action ON Action.entry_hash = Entry.hash
+                JOIN DhtOp ON Action.hash = DhtOp.action_hash
                 WHERE
-                Header.author = :author
+                Action.author = :author
                 AND
                 Entry.access_type IS NOT NULL
                 AND
                 ({}) = 0
                 ",
-                    not_referenced_header
+                    not_referenced_action
                 );
                 txn.prepare(&sql)?
                     .query_and_then(
@@ -649,7 +649,7 @@ where
         Ok(valid_cap_grant)
     }
 
-    /// Query Headers in the source chain.
+    /// Query Actions in the source chain.
     /// This returns a Vec rather than an iterator because it is intended to be
     /// used by the `query` host function, which crosses the wasm boundary
     // FIXME: This query needs to be tested.
@@ -663,7 +663,7 @@ where
                 move |txn| {
                     let mut sql = "
                 SELECT DISTINCT
-                Header.hash AS header_hash, Header.blob AS header_blob
+                Action.hash AS action_hash, Action.blob AS action_blob
             "
                     .to_string();
                     if query.include_entries {
@@ -675,51 +675,51 @@ where
                     }
                     sql.push_str(
                         "
-                FROM Header
+                FROM Action
                 ",
                     );
                     if query.include_entries {
                         sql.push_str(
                             "
-                    LEFT JOIN Entry On Header.entry_hash = Entry.hash
+                    LEFT JOIN Entry On Action.entry_hash = Entry.hash
                     ",
                         );
                     }
                     sql.push_str(
                         "
-                JOIN DhtOp On DhtOp.header_hash = Header.hash
+                JOIN DhtOp On DhtOp.action_hash = Action.hash
                 WHERE
-                Header.author = :author
+                Action.author = :author
                 AND
                 (:range_start IS NULL AND :range_end IS NULL AND :range_start_hash IS NULL AND :range_end_hash IS NULL AND :range_prior_count IS NULL)
                 ",
                     );
                     sql.push_str(match query.sequence_range {
                         ChainQueryFilterRange::Unbounded => "",
-                        ChainQueryFilterRange::HeaderSeqRange(_, _) => "
-                        OR (Header.seq BETWEEN :range_start AND :range_end)",
-                        ChainQueryFilterRange::HeaderHashRange(_, _) => "
+                        ChainQueryFilterRange::ActionSeqRange(_, _) => "
+                        OR (Action.seq BETWEEN :range_start AND :range_end)",
+                        ChainQueryFilterRange::ActionHashRange(_, _) => "
                         OR (
-                            Header.seq BETWEEN
-                            (SELECT Header.seq WHERE Header.hash = :range_start_hash)
+                            Action.seq BETWEEN
+                            (SELECT Action.seq WHERE Action.hash = :range_start_hash)
                             AND
-                            (SELECT Header.seq WHERE Header.hash = :range_end_hash)
+                            (SELECT Action.seq WHERE Action.hash = :range_end_hash)
                         )",
-                        ChainQueryFilterRange::HeaderHashTerminated(_, _) => "
+                        ChainQueryFilterRange::ActionHashTerminated(_, _) => "
                         OR (
-                            Header.seq BETWEEN
-                            (SELECT Header.seq WHERE Header.hash = :range_end_hash) - :range_prior_count
+                            Action.seq BETWEEN
+                            (SELECT Action.seq WHERE Action.hash = :range_end_hash) - :range_prior_count
                             AND
-                            (SELECT Header.seq WHERE Header.hash = :range_end_hash)
+                            (SELECT Action.seq WHERE Action.hash = :range_end_hash)
                         )",
                     });
                     sql.push_str(
                         "
                 AND
-                (:entry_type IS NULL OR Header.entry_type = :entry_type)
+                (:entry_type IS NULL OR Action.entry_type = :entry_type)
                 AND
-                (:header_type IS NULL OR Header.type = :header_type)
-                ORDER BY Header.seq ASC
+                (:action_type IS NULL OR Action.type = :action_type)
+                ORDER BY Action.seq ASC
                 ",
                     );
                     let mut stmt = txn.prepare(&sql)?;
@@ -728,38 +728,38 @@ where
                         named_params! {
                                 ":author": author.as_ref(),
                                 ":entry_type": query.entry_type.as_sql(),
-                                ":header_type": query.header_type.as_sql(),
+                                ":action_type": query.action_type.as_sql(),
                                 ":range_start": match query.sequence_range {
-                                    ChainQueryFilterRange::HeaderSeqRange(start, _) => Some(start),
+                                    ChainQueryFilterRange::ActionSeqRange(start, _) => Some(start),
                                     _ => None,
                                 },
                                 ":range_end": match query.sequence_range {
-                                    ChainQueryFilterRange::HeaderSeqRange(_, end) => Some(end),
+                                    ChainQueryFilterRange::ActionSeqRange(_, end) => Some(end),
                                     _ => None,
                                 },
                                 ":range_start_hash": match &query.sequence_range {
-                                    ChainQueryFilterRange::HeaderHashRange(start_hash, _) => Some(start_hash.clone()),
+                                    ChainQueryFilterRange::ActionHashRange(start_hash, _) => Some(start_hash.clone()),
                                     _ => None,
                                 },
                                 ":range_end_hash": match &query.sequence_range {
-                                    ChainQueryFilterRange::HeaderHashRange(_, end_hash)
-                                    | ChainQueryFilterRange::HeaderHashTerminated(end_hash, _) => Some(end_hash.clone()),
+                                    ChainQueryFilterRange::ActionHashRange(_, end_hash)
+                                    | ChainQueryFilterRange::ActionHashTerminated(end_hash, _) => Some(end_hash.clone()),
                                     _ => None,
                                 },
                                 ":range_prior_count": match query.sequence_range {
-                                    ChainQueryFilterRange::HeaderHashTerminated(_, prior_count) => Some(prior_count),
+                                    ChainQueryFilterRange::ActionHashTerminated(_, prior_count) => Some(prior_count),
                                     _ => None,
                                 },
                             },
                             |row| {
-                                let header = from_blob::<SignedHeader>(row.get("header_blob")?)?;
-                                let SignedHeader(header, signature) = header;
-                                let private_entry = header
+                                let action = from_blob::<SignedAction>(row.get("action_blob")?)?;
+                                let SignedAction(action, signature) = action;
+                                let private_entry = action
                                     .entry_type()
                                     .map_or(false, |e| *e.visibility() == EntryVisibility::Private);
-                                let hash: HeaderHash = row.get("header_hash")?;
-                                let header = HeaderHashed::with_pre_hashed(header, hash);
-                                let shh = SignedHeaderHashed::with_presigned(header, signature);
+                                let hash: ActionHash = row.get("action_hash")?;
+                                let action = ActionHashed::with_pre_hashed(action, hash);
+                                let shh = SignedActionHashed::with_presigned(action, signature);
                                 let entry =
                                     if query.include_entries && (!private_entry || !public_only) {
                                         let entry: Option<Vec<u8>> = row.get("entry_blob")?;
@@ -780,16 +780,16 @@ where
             .await?;
         self.scratch.apply(|scratch| {
             let mut scratch_elements: Vec<_> = scratch
-                .headers()
+                .actions()
                 .filter_map(|shh| {
-                    let entry = match shh.header().entry_hash() {
+                    let entry = match shh.action().entry_hash() {
                         Some(eh) if query.include_entries => scratch.get_entry(eh).ok()?,
                         _ => None,
                     };
                     Some(Element::new(shh.clone(), entry))
                 })
                 .collect();
-            scratch_elements.sort_unstable_by_key(|e| e.header().header_seq());
+            scratch_elements.sort_unstable_by_key(|e| e.action().action_seq());
 
             elements.extend(scratch_elements);
         })?;
@@ -813,9 +813,9 @@ where
                 .find(|e| matches!(**e.1, Entry::CounterSign(_, _)))
                 .and_then(|(entry_hash, entry)| {
                     scratch
-                        .headers()
+                        .actions()
                         .find(|shh| {
-                            shh.header()
+                            shh.action()
                                 .entry_hash()
                                 .map(|eh| eh == entry_hash)
                                 .unwrap_or(false)
@@ -823,7 +823,7 @@ where
                         .and_then(|shh| {
                             Some(DhtOp::StoreEntry(
                                 shh.signature().clone(),
-                                shh.header().clone().try_into().ok()?,
+                                shh.action().clone().try_into().ok()?,
                                 Box::new((**entry).clone()),
                             ))
                         })
@@ -843,73 +843,73 @@ pub fn lock_for_entry(entry: Option<&Entry>) -> SourceChainResult<Vec<u8>> {
 }
 
 #[allow(clippy::complexity)]
-fn build_ops_from_headers(
-    headers: Vec<SignedHeaderHashed>,
+fn build_ops_from_actions(
+    actions: Vec<SignedActionHashed>,
 ) -> SourceChainResult<(
-    Vec<SignedHeaderHashed>,
+    Vec<SignedActionHashed>,
     Vec<(DhtOpLight, DhtOpHash, OpOrder, Timestamp, Dependency)>,
 )> {
-    // Headers end up back in here.
-    let mut headers_output = Vec::with_capacity(headers.len());
+    // Actions end up back in here.
+    let mut actions_output = Vec::with_capacity(actions.len());
     // The op related data ends up here.
-    let mut ops = Vec::with_capacity(headers.len());
+    let mut ops = Vec::with_capacity(actions.len());
 
-    // Loop through each header and produce op related data.
-    for shh in headers {
-        // &HeaderHash, &Header, EntryHash are needed to produce the ops.
-        let entry_hash = shh.header().entry_hash().cloned();
-        let item = (shh.as_hash(), shh.header(), entry_hash);
+    // Loop through each action and produce op related data.
+    for shh in actions {
+        // &ActionHash, &Action, EntryHash are needed to produce the ops.
+        let entry_hash = shh.action().entry_hash().cloned();
+        let item = (shh.as_hash(), shh.action(), entry_hash);
         let ops_inner = produce_op_lights_from_iter(vec![item].into_iter())?;
 
-        // Break apart the SignedHeaderHashed.
-        let (header, sig) = shh.into_inner();
-        let (header, hash) = header.into_inner();
+        // Break apart the SignedActionHashed.
+        let (action, sig) = shh.into_inner();
+        let (action, hash) = action.into_inner();
 
-        // We need to take the header by value and put it back each loop.
-        let mut h = Some(header);
+        // We need to take the action by value and put it back each loop.
+        let mut h = Some(action);
         for op in ops_inner {
             let op_type = op.get_type();
-            // Header is required by value to produce the DhtOpHash.
-            let (header, op_hash) = UniqueForm::op_hash(op_type, h.expect("This can't be empty"))?;
-            let op_order = OpOrder::new(op_type, header.timestamp());
-            let timestamp = header.timestamp();
-            // Put the header back by value.
-            let dependency = get_dependency(op_type, &header);
-            h = Some(header);
+            // Action is required by value to produce the DhtOpHash.
+            let (action, op_hash) = UniqueForm::op_hash(op_type, h.expect("This can't be empty"))?;
+            let op_order = OpOrder::new(op_type, action.timestamp());
+            let timestamp = action.timestamp();
+            // Put the action back by value.
+            let dependency = get_dependency(op_type, &action);
+            h = Some(action);
             // Collect the DhtOpLight, DhtOpHash and OpOrder.
             ops.push((op, op_hash, op_order, timestamp, dependency));
         }
 
-        // Put the SignedHeaderHashed back together.
-        let shh = SignedHeaderHashed::with_presigned(
-            HeaderHashed::with_pre_hashed(h.expect("This can't be empty"), hash),
+        // Put the SignedActionHashed back together.
+        let shh = SignedActionHashed::with_presigned(
+            ActionHashed::with_pre_hashed(h.expect("This can't be empty"), hash),
             sig,
         );
-        // Put the header back in the list.
-        headers_output.push(shh);
+        // Put the action back in the list.
+        actions_output.push(shh);
     }
-    Ok((headers_output, ops))
+    Ok((actions_output, ops))
 }
 
-async fn rebase_headers_on(
+async fn rebase_actions_on(
     keystore: &MetaLairClient,
-    mut headers: Vec<SignedHeaderHashed>,
-    mut rebase_header: HeaderHash,
+    mut actions: Vec<SignedActionHashed>,
+    mut rebase_action: ActionHash,
     mut rebase_seq: u32,
     mut rebase_timestamp: Timestamp,
-) -> Result<Vec<SignedHeaderHashed>, ScratchError> {
-    headers.sort_by_key(|shh| shh.header().header_seq());
-    for shh in headers.iter_mut() {
-        let mut header = shh.header().clone();
-        header.rebase_on(rebase_header.clone(), rebase_seq, rebase_timestamp)?;
-        rebase_seq = header.header_seq();
-        rebase_timestamp = header.timestamp();
-        let hh = HeaderHashed::from_content_sync(header);
-        rebase_header = hh.as_hash().clone();
-        let new_shh = SignedHeaderHashed::sign(keystore, hh).await?;
+) -> Result<Vec<SignedActionHashed>, ScratchError> {
+    actions.sort_by_key(|shh| shh.action().action_seq());
+    for shh in actions.iter_mut() {
+        let mut action = shh.action().clone();
+        action.rebase_on(rebase_action.clone(), rebase_seq, rebase_timestamp)?;
+        rebase_seq = action.action_seq();
+        rebase_timestamp = action.timestamp();
+        let hh = ActionHashed::from_content_sync(action);
+        rebase_action = hh.as_hash().clone();
+        let new_shh = SignedActionHashed::sign(keystore, hh).await?;
         *shh = new_shh;
     }
-    Ok(headers)
+    Ok(actions)
 }
 
 pub async fn genesis(
@@ -921,64 +921,64 @@ pub async fn genesis(
     agent_pubkey: AgentPubKey,
     membrane_proof: Option<MembraneProof>,
 ) -> SourceChainResult<()> {
-    let dna_header = Header::Dna(header::Dna {
+    let dna_action = Action::Dna(action::Dna {
         author: agent_pubkey.clone(),
         timestamp: Timestamp::now(),
         hash: dna_hash,
     });
-    let dna_header = HeaderHashed::from_content_sync(dna_header);
-    let dna_header = SignedHeaderHashed::sign(&keystore, dna_header).await?;
-    let dna_header_address = dna_header.as_hash().clone();
-    let element = Element::new(dna_header, None);
+    let dna_action = ActionHashed::from_content_sync(dna_action);
+    let dna_action = SignedActionHashed::sign(&keystore, dna_action).await?;
+    let dna_action_address = dna_action.as_hash().clone();
+    let element = Element::new(dna_action, None);
     let dna_ops = produce_op_lights_from_elements(vec![&element])?;
-    let (dna_header, _) = element.into_inner();
+    let (dna_action, _) = element.into_inner();
 
     // create the agent validation entry and add it directly to the store
-    let agent_validation_header = Header::AgentValidationPkg(header::AgentValidationPkg {
+    let agent_validation_action = Action::AgentValidationPkg(action::AgentValidationPkg {
         author: agent_pubkey.clone(),
         timestamp: Timestamp::now(),
-        header_seq: 1,
-        prev_header: dna_header_address,
+        action_seq: 1,
+        prev_action: dna_action_address,
         membrane_proof,
     });
-    let agent_validation_header = HeaderHashed::from_content_sync(agent_validation_header);
-    let agent_validation_header =
-        SignedHeaderHashed::sign(&keystore, agent_validation_header).await?;
-    let avh_addr = agent_validation_header.as_hash().clone();
-    let element = Element::new(agent_validation_header, None);
+    let agent_validation_action = ActionHashed::from_content_sync(agent_validation_action);
+    let agent_validation_action =
+        SignedActionHashed::sign(&keystore, agent_validation_action).await?;
+    let avh_addr = agent_validation_action.as_hash().clone();
+    let element = Element::new(agent_validation_action, None);
     let avh_ops = produce_op_lights_from_elements(vec![&element])?;
-    let (agent_validation_header, _) = element.into_inner();
+    let (agent_validation_action, _) = element.into_inner();
 
     // create a agent chain element and add it directly to the store
-    let agent_header = Header::Create(header::Create {
+    let agent_action = Action::Create(action::Create {
         author: agent_pubkey.clone(),
         timestamp: Timestamp::now(),
-        header_seq: 2,
-        prev_header: avh_addr,
-        entry_type: header::EntryType::AgentPubKey,
+        action_seq: 2,
+        prev_action: avh_addr,
+        entry_type: action::EntryType::AgentPubKey,
         entry_hash: agent_pubkey.clone().into(),
     });
-    let agent_header = HeaderHashed::from_content_sync(agent_header);
-    let agent_header = SignedHeaderHashed::sign(&keystore, agent_header).await?;
-    let element = Element::new(agent_header, Some(Entry::Agent(agent_pubkey)));
+    let agent_action = ActionHashed::from_content_sync(agent_action);
+    let agent_action = SignedActionHashed::sign(&keystore, agent_action).await?;
+    let element = Element::new(agent_action, Some(Entry::Agent(agent_pubkey)));
     let agent_ops = produce_op_lights_from_elements(vec![&element])?;
-    let (agent_header, agent_entry) = element.into_inner();
+    let (agent_action, agent_entry) = element.into_inner();
     let agent_entry = agent_entry.into_option();
 
     let mut ops_to_integrate = Vec::new();
 
     let ops_to_integrate = authored
         .async_commit(move |txn| {
-            ops_to_integrate.extend(source_chain::put_raw(txn, dna_header, dna_ops, None)?);
+            ops_to_integrate.extend(source_chain::put_raw(txn, dna_action, dna_ops, None)?);
             ops_to_integrate.extend(source_chain::put_raw(
                 txn,
-                agent_validation_header,
+                agent_validation_action,
                 avh_ops,
                 None,
             )?);
             ops_to_integrate.extend(source_chain::put_raw(
                 txn,
-                agent_header,
+                agent_action,
                 agent_ops,
                 agent_entry,
             )?);
@@ -992,33 +992,33 @@ pub async fn genesis(
 
 pub fn put_raw(
     txn: &mut Transaction,
-    shh: SignedHeaderHashed,
+    shh: SignedActionHashed,
     ops: Vec<DhtOpLight>,
     entry: Option<Entry>,
 ) -> StateMutationResult<Vec<DhtOpHash>> {
-    let (header, signature) = shh.into_inner();
-    let (header, hash) = header.into_inner();
-    let mut header = Some(header);
+    let (action, signature) = shh.into_inner();
+    let (action, hash) = action.into_inner();
+    let mut action = Some(action);
     let mut hashes = Vec::with_capacity(ops.len());
     let mut ops_to_integrate = Vec::with_capacity(ops.len());
     for op in &ops {
         let op_type = op.get_type();
         let (h, op_hash) =
-            UniqueForm::op_hash(op_type, header.take().expect("This can't be empty"))?;
+            UniqueForm::op_hash(op_type, action.take().expect("This can't be empty"))?;
         let op_order = OpOrder::new(op_type, h.timestamp());
         let timestamp = h.timestamp();
-        header = Some(h);
+        action = Some(h);
         hashes.push((op_hash.clone(), op_order, timestamp));
         ops_to_integrate.push(op_hash);
     }
-    let shh = SignedHeaderHashed::with_presigned(
-        HeaderHashed::with_pre_hashed(header.expect("This can't be empty"), hash),
+    let shh = SignedActionHashed::with_presigned(
+        ActionHashed::with_pre_hashed(action.expect("This can't be empty"), hash),
         signature,
     );
     if let Some(entry) = entry {
         insert_entry(txn, &EntryHash::with_data_sync(&entry), &entry)?;
     }
-    insert_header(txn, &shh)?;
+    insert_action(txn, &shh)?;
     for (op, (op_hash, op_order, timestamp)) in ops.into_iter().zip(hashes) {
         insert_op_lite(txn, &op, &op_hash, &op_order, &timestamp)?;
     }
@@ -1029,12 +1029,12 @@ pub fn put_raw(
 pub fn chain_head_db(
     txn: &Transaction,
     author: Arc<AgentPubKey>,
-) -> SourceChainResult<(HeaderHash, u32, Timestamp)> {
+) -> SourceChainResult<(ActionHash, u32, Timestamp)> {
     let chain_head = ChainHeadQuery::new(author);
-    let (prev_header, last_header_seq, last_header_timestamp) = chain_head
+    let (prev_action, last_action_seq, last_action_timestamp) = chain_head
         .run(Txn::from(txn))?
         .ok_or(SourceChainError::ChainEmpty)?;
-    Ok((prev_header, last_header_seq, last_header_timestamp))
+    Ok((prev_action, last_action_seq, last_action_timestamp))
 }
 
 /// Check if there is a current countersigning session and if so, return the
@@ -1057,7 +1057,7 @@ pub fn current_countersigning_session(
                     None => return Ok(None),
                 };
                 let (shh, ee) = element.into_inner();
-                Ok(match (shh.header().entry_hash(), ee.into_option()) {
+                Ok(match (shh.action().entry_hash(), ee.into_option()) {
                     (Some(entry_hash), Some(Entry::CounterSign(cs, _))) => {
                         Some((entry_hash.to_owned(), *cs))
                     }
@@ -1071,35 +1071,35 @@ pub fn current_countersigning_session(
 }
 
 #[cfg(test)]
-async fn _put_db<H: HeaderInner, B: HeaderBuilder<H>>(
+async fn _put_db<H: ActionInner, B: ActionBuilder<H>>(
     vault: holochain_types::db::DbWrite<DbKindAuthored>,
     keystore: &MetaLairClient,
     author: Arc<AgentPubKey>,
-    header_builder: B,
+    action_builder: B,
     maybe_entry: Option<Entry>,
-) -> SourceChainResult<HeaderHash> {
-    let (prev_header, last_header_seq, _) =
+) -> SourceChainResult<ActionHash> {
+    let (prev_action, last_action_seq, _) =
         fresh_reader_test!(vault, |txn| { chain_head_db(&txn, author.clone()) })?;
-    let header_seq = last_header_seq + 1;
+    let action_seq = last_action_seq + 1;
 
-    let common = HeaderBuilderCommon {
+    let common = ActionBuilderCommon {
         author: (*author).clone(),
         timestamp: Timestamp::now(),
-        header_seq,
-        prev_header: prev_header.clone(),
+        action_seq,
+        prev_action: prev_action.clone(),
     };
-    let header = header_builder.build(common).into();
-    let header = HeaderHashed::from_content_sync(header);
-    let header = SignedHeaderHashed::sign(keystore, header).await?;
-    let element = Element::new(header, maybe_entry);
+    let action = action_builder.build(common).into();
+    let action = ActionHashed::from_content_sync(action);
+    let action = SignedActionHashed::sign(keystore, action).await?;
+    let element = Element::new(action, maybe_entry);
     let ops = produce_op_lights_from_elements(vec![&element])?;
-    let (header, entry) = element.into_inner();
+    let (action, entry) = element.into_inner();
     let entry = entry.into_option();
-    let hash = header.as_hash().clone();
+    let hash = action.as_hash().clone();
     vault.conn()?.with_commit_sync(|txn: &mut Transaction| {
         let (new_head, new_seq, new_timestamp) = chain_head_db(txn, author.clone())?;
-        if new_head != prev_header {
-            let entries = match (entry, header.header().entry_hash()) {
+        if new_head != prev_action {
+            let entries = match (entry, action.action().entry_hash()) {
                 (Some(e), Some(entry_hash)) => {
                     vec![holochain_types::EntryHashed::with_pre_hashed(
                         e,
@@ -1109,13 +1109,13 @@ async fn _put_db<H: HeaderInner, B: HeaderBuilder<H>>(
                 _ => vec![],
             };
             return Err(SourceChainError::HeadMoved(
-                vec![header],
+                vec![action],
                 entries,
-                Some(prev_header),
+                Some(prev_action),
                 Some((new_head, new_seq, new_timestamp)),
             ));
         }
-        SourceChainResult::Ok(put_raw(txn, header, ops, entry)?)
+        SourceChainResult::Ok(put_raw(txn, action, ops, entry)?)
     })?;
     Ok(hash)
 }
@@ -1131,14 +1131,14 @@ pub async fn dump_state(
                 .prepare(
                     "
                 SELECT DISTINCT
-                Header.blob AS header_blob, Entry.blob AS entry_blob,
-                Header.hash AS header_hash
-                FROM Header
-                JOIN DhtOp ON DhtOp.header_hash = Header.hash
-                LEFT JOIN Entry ON Header.entry_hash = Entry.hash
+                Action.blob AS action_blob, Entry.blob AS entry_blob,
+                Action.hash AS action_hash
+                FROM Action
+                JOIN DhtOp ON DhtOp.action_hash = Action.hash
+                LEFT JOIN Entry ON Action.entry_hash = Entry.hash
                 WHERE
-                Header.author = :author
-                ORDER BY Header.seq ASC
+                Action.author = :author
+                ORDER BY Action.seq ASC
                 ",
                 )?
                 .query_and_then(
@@ -1146,8 +1146,8 @@ pub async fn dump_state(
                         ":author": author,
                     },
                     |row| {
-                        let SignedHeader(header, signature) = from_blob(row.get("header_blob")?)?;
-                        let header_address = row.get("header_hash")?;
+                        let SignedAction(action, signature) = from_blob(row.get("action_blob")?)?;
+                        let action_address = row.get("action_hash")?;
                         let entry: Option<Vec<u8>> = row.get("entry_blob")?;
                         let entry: Option<Entry> = match entry {
                             Some(entry) => Some(from_blob(entry)?),
@@ -1155,8 +1155,8 @@ pub async fn dump_state(
                         };
                         StateQueryResult::Ok(SourceChainJsonElement {
                             signature,
-                            header_address,
-                            header,
+                            action_address,
+                            action,
                             entry,
                         })
                     },
@@ -1165,9 +1165,9 @@ pub async fn dump_state(
             let published_ops_count = txn.query_row(
                 "
                 SELECT COUNT(DhtOp.hash) FROM DhtOp
-                JOIN Header ON DhtOp.header_hash = Header.hash
+                JOIN Action ON DhtOp.action_hash = Action.hash
                 WHERE
-                Header.author = :author
+                Action.author = :author
                 AND
                 last_publish_time IS NOT NULL
                 ",
@@ -1261,17 +1261,17 @@ pub mod tests {
         )
         .await?;
 
-        let header_builder = builder::CloseChain {
+        let action_builder = builder::CloseChain {
             new_dna_hash: fixt!(DnaHash),
         };
         chain_1
-            .put(header_builder.clone(), None, ChainTopOrdering::Strict)
+            .put(action_builder.clone(), None, ChainTopOrdering::Strict)
             .await?;
         chain_2
-            .put(header_builder.clone(), None, ChainTopOrdering::Strict)
+            .put(action_builder.clone(), None, ChainTopOrdering::Strict)
             .await?;
         chain_3
-            .put(header_builder, None, ChainTopOrdering::Relaxed)
+            .put(action_builder, None, ChainTopOrdering::Relaxed)
             .await?;
 
         let author = Arc::new(alice);
@@ -1405,7 +1405,7 @@ pub mod tests {
             .async_commit(move |txn: &mut Transaction| chain_head_db(&txn, author_2.clone()))
             .await?;
 
-        // not equal since header hash change due to rebasing
+        // not equal since action hash change due to rebasing
         assert_ne!(h2, old_h2);
         assert_eq!(seq, 4);
 
@@ -1489,7 +1489,7 @@ pub mod tests {
             );
         }
 
-        let (original_header_address, original_entry_address) = {
+        let (original_action_address, original_entry_address) = {
             let chain = SourceChain::new(
                 db.clone().into(),
                 dht_db.to_db(),
@@ -1500,17 +1500,17 @@ pub mod tests {
             .await?;
             let (entry, entry_hash) =
                 EntryHashed::from_content_sync(Entry::CapGrant(grant.clone())).into_inner();
-            let header_builder = builder::Create {
+            let action_builder = builder::Create {
                 entry_type: EntryType::CapGrant,
                 entry_hash: entry_hash.clone(),
             };
-            let header = chain
-                .put(header_builder, Some(entry), ChainTopOrdering::default())
+            let action = chain
+                .put(action_builder, Some(entry), ChainTopOrdering::default())
                 .await?;
 
             chain.flush(&mock).await.unwrap();
 
-            (header, entry_hash)
+            (action, entry_hash)
         };
 
         {
@@ -1548,7 +1548,7 @@ pub mod tests {
         let updated_access = CapAccess::from((updated_secret.clone().unwrap(), assignees));
         let updated_grant = ZomeCallCapGrant::new("tag".into(), updated_access.clone(), functions);
 
-        let (updated_header_hash, updated_entry_hash) = {
+        let (updated_action_hash, updated_entry_hash) = {
             let chain = SourceChain::new(
                 db.clone().into(),
                 dht_db.to_db(),
@@ -1559,19 +1559,19 @@ pub mod tests {
             .await?;
             let (entry, entry_hash) =
                 EntryHashed::from_content_sync(Entry::CapGrant(updated_grant.clone())).into_inner();
-            let header_builder = builder::Update {
+            let action_builder = builder::Update {
                 entry_type: EntryType::CapGrant,
                 entry_hash: entry_hash.clone(),
-                original_header_address,
+                original_action_address,
                 original_entry_address,
             };
-            let header = chain
-                .put(header_builder, Some(entry), ChainTopOrdering::default())
+            let action = chain
+                .put(action_builder, Some(entry), ChainTopOrdering::default())
                 .await?;
 
             chain.flush(&mock).await.unwrap();
 
-            (header, entry_hash)
+            (action, entry_hash)
         };
 
         {
@@ -1622,12 +1622,12 @@ pub mod tests {
                 alice.clone(),
             )
             .await?;
-            let header_builder = builder::Delete {
-                deletes_address: updated_header_hash,
+            let action_builder = builder::Delete {
+                deletes_address: updated_action_hash,
                 deletes_entry_address: updated_entry_hash,
             };
             chain
-                .put(header_builder, None, ChainTopOrdering::default())
+                .put(action_builder, None, ChainTopOrdering::default())
                 .await?;
 
             chain.flush(&mock).await.unwrap();
@@ -1789,8 +1789,8 @@ pub mod tests {
                 .get_element(&h2.clone().into())
                 .expect("error retrieving")
                 .expect("entry not found");
-            assert_eq!(h1, *h1_element_fetched.header_address());
-            assert_eq!(h2, *h2_element_fetched.header_address());
+            assert_eq!(h1, *h1_element_fetched.action_address());
+            assert_eq!(h2, *h2_element_fetched.action_address());
         });
 
         // check that you can iterate on the chain
@@ -1805,8 +1805,8 @@ pub mod tests {
         .unwrap();
         let res = source_chain.query(QueryFilter::new()).await.unwrap();
         assert_eq!(res.len(), 5);
-        assert_eq!(*res[3].header_address(), h1);
-        assert_eq!(*res[4].header_address(), h2);
+        assert_eq!(*res[3].action_address(), h1);
+        assert_eq!(*res[4].action_address(), h2);
 
         Ok(())
     }
@@ -1835,11 +1835,11 @@ pub mod tests {
         let json = serde_json::to_string_pretty(&json)?;
         let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
 
-        assert_eq!(parsed["elements"][0]["header"]["type"], "Dna");
+        assert_eq!(parsed["elements"][0]["action"]["type"], "Dna");
         assert_eq!(parsed["elements"][0]["entry"], serde_json::Value::Null);
 
-        assert_eq!(parsed["elements"][2]["header"]["type"], "Create");
-        assert_eq!(parsed["elements"][2]["header"]["entry_type"], "AgentPubKey");
+        assert_eq!(parsed["elements"][2]["action"]["type"], "Create");
+        assert_eq!(parsed["elements"][2]["action"]["entry_type"], "AgentPubKey");
         assert_eq!(parsed["elements"][2]["entry"]["entry_type"], "Agent");
         assert_ne!(
             parsed["elements"][2]["entry"]["entry"],

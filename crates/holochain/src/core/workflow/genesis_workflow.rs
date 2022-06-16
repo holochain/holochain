@@ -139,11 +139,11 @@ impl GenesisWorkspace {
                 let count: u32 = txn.query_row(
                     "
                 SELECT
-                COUNT(Header.hash)
-                FROM Header
-                JOIN DhtOp ON DhtOp.header_hash = Header.hash
+                COUNT(Action.hash)
+                FROM Action
+                JOIN DhtOp ON DhtOp.action_hash = Action.hash
                 WHERE
-                Header.author = :author
+                Action.author = :author
                 LIMIT 3
                 ",
                     named_params! {
@@ -169,7 +169,7 @@ pub mod tests {
     use holochain_state::{prelude::test_authored_db, source_chain::SourceChain};
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_dna_file;
-    use holochain_zome_types::Header;
+    use holochain_zome_types::Action;
     use matches::assert_matches;
     use observability;
 
@@ -217,20 +217,20 @@ pub mod tests {
             )
             .await
             .unwrap();
-            let headers = source_chain
+            let actions = source_chain
                 .query(Default::default())
                 .await
                 .unwrap()
                 .into_iter()
-                .map(|e| e.header().clone())
+                .map(|e| e.action().clone())
                 .collect::<Vec<_>>();
 
             assert_matches!(
-                headers.as_slice(),
+                actions.as_slice(),
                 [
-                    Header::Dna(_),
-                    Header::AgentValidationPkg(_),
-                    Header::Create(_)
+                    Action::Dna(_),
+                    Action::AgentValidationPkg(_),
+                    Action::Create(_)
                 ]
             );
         }
@@ -273,15 +273,15 @@ Functions / Workflows:
 
 - initialize databases, save to conductor runtime config.
 
-- commit DNA entry (w/ special enum header with NULL  prev_header)
+- commit DNA entry (w/ special enum action with NULL  prev_action)
 
-- commit CapGrant for author (agent key) (w/ normal header)
+- commit CapGrant for author (agent key) (w/ normal action)
 
 
 
     fn commit_DNA
 
-    fn produce_header
+    fn produce_action
 
 
 
@@ -297,9 +297,9 @@ Examples / Tests / Acceptance Criteria:
 
 Persisted X Changes to Store Y (data & structure):
 
-- source chain HEAD 2 new headers
+- source chain HEAD 2 new actions
 
-- CAS commit headers and genesis entries: DNA & Author Capabilities Grant (Agent Key)
+- CAS commit actions and genesis entries: DNA & Author Capabilities Grant (Agent Key)
 
 
 

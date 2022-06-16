@@ -12,8 +12,8 @@ pub struct GetValidationPackage {
     pub dna_hash: DnaHash,
     /// Request the package from this agent.
     pub request_from: AgentPubKey,
-    /// Request the package for this Header
-    pub header_hash: HeaderHash,
+    /// Request the package for this Action
+    pub action_hash: ActionHash,
 }
 
 #[derive(Clone, Debug)]
@@ -52,9 +52,9 @@ pub struct GetOptions {
     pub follow_redirects: bool,
 
     /// ```[Remote]```
-    /// Return all live headers even if there is deletes.
+    /// Return all live actions even if there is deletes.
     /// Useful for metadata calls.
-    pub all_live_headers_with_metadata: bool,
+    pub all_live_actions_with_metadata: bool,
 
     /// ```[Remote]```
     /// The type of data this get request requires.
@@ -69,7 +69,7 @@ impl Default for GetOptions {
             as_race: true,
             race_timeout_ms: None,
             follow_redirects: true,
-            all_live_headers_with_metadata: false,
+            all_live_actions_with_metadata: false,
             request_type: Default::default(),
         }
     }
@@ -86,7 +86,7 @@ impl GetOptions {
             race_timeout_ms: None,
             // Never redirect as the returned value must always match the hash.
             follow_redirects: false,
-            all_live_headers_with_metadata: false,
+            all_live_actions_with_metadata: false,
             // Redundant with retrieve_entry internals.
             request_type: GetRequest::Pending,
         }
@@ -178,17 +178,17 @@ pub struct GetActivityOptions {
     /// get found.
     pub retry_gets: u8,
     /// ```[Remote]```
-    /// Include the all valid activity headers in the response.
+    /// Include the all valid activity actions in the response.
     /// If this is false the call becomes a lightweight response with
-    /// just the chain status and highest observed header.
+    /// just the chain status and highest observed action.
     /// This is useful when you want to ask an authority about the
-    /// status of a chain but do not need all the headers.
+    /// status of a chain but do not need all the actions.
     pub include_valid_activity: bool,
-    /// Include any rejected headers in the response.
+    /// Include any rejected actions in the response.
     pub include_rejected_activity: bool,
-    /// Include the full signed headers and hashes in the response
+    /// Include the full signed actions and hashes in the response
     /// instead of just the hashes.
-    pub include_full_headers: bool,
+    pub include_full_actions: bool,
 }
 
 impl Default for GetActivityOptions {
@@ -198,7 +198,7 @@ impl Default for GetActivityOptions {
             retry_gets: 0,
             include_valid_activity: true,
             include_rejected_activity: false,
-            include_full_headers: false,
+            include_full_actions: false,
         }
     }
 }
@@ -278,7 +278,7 @@ ghost_actor::ghost_chan! {
             agent: AgentPubKey,
             query: ChainQueryFilter,
             options: GetActivityOptions,
-        ) -> Vec<AgentActivityResponse<HeaderHash>>;
+        ) -> Vec<AgentActivityResponse<ActionHash>>;
 
         /// Send a validation receipt to a remote node.
         fn send_validation_receipt(dna_hash: DnaHash, to_agent: AgentPubKey, receipt: SerializedBytes) -> ();
@@ -294,7 +294,7 @@ ghost_actor::ghost_chan! {
         fn countersigning_authority_response(
             dna_hash: DnaHash,
             agents: Vec<AgentPubKey>,
-            signed_headers: Vec<SignedHeader>,
+            signed_actions: Vec<SignedAction>,
         ) -> ();
 
         /// Dump network metrics.

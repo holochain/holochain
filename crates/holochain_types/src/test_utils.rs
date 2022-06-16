@@ -1,7 +1,7 @@
 //! Some common testing helpers.
 
 use crate::dna::wasm::DnaWasm;
-use crate::element::SignedHeaderHashedExt;
+use crate::element::SignedActionHashedExt;
 use crate::fixt::*;
 use crate::prelude::*;
 use holochain_keystore::MetaLairClient;
@@ -95,28 +95,28 @@ pub fn fake_cap_secret() -> CapSecret {
     [0; CAP_SECRET_BYTES].into()
 }
 
-/// Create a fake SignedHeaderHashed and EntryHashed pair with random content
+/// Create a fake SignedActionHashed and EntryHashed pair with random content
 pub async fn fake_unique_element(
     keystore: &MetaLairClient,
     agent_key: AgentPubKey,
     visibility: EntryVisibility,
-) -> anyhow::Result<(SignedHeaderHashed, EntryHashed)> {
+) -> anyhow::Result<(SignedActionHashed, EntryHashed)> {
     let content: SerializedBytes =
         UnsafeBytes::from(nanoid::nanoid!().as_bytes().to_owned()).into();
     let entry = Entry::App(content.try_into().unwrap()).into_hashed();
     let app_entry_type = AppEntryTypeFixturator::new(visibility).next().unwrap();
-    let header_1 = Header::Create(Create {
+    let action_1 = Action::Create(Create {
         author: agent_key,
         timestamp: Timestamp::now(),
-        header_seq: 0,
-        prev_header: fake_header_hash(1),
+        action_seq: 0,
+        prev_action: fake_action_hash(1),
 
         entry_type: EntryType::App(app_entry_type),
         entry_hash: entry.as_hash().to_owned(),
     });
 
     Ok((
-        SignedHeaderHashed::sign(keystore, header_1.into_hashed()).await?,
+        SignedActionHashed::sign(keystore, action_1.into_hashed()).await?,
         entry,
     ))
 }

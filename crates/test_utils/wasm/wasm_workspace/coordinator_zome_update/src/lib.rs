@@ -8,12 +8,12 @@ enum EntryZomes {
 }
 
 #[hdk_extern]
-fn get_entry(hash: HeaderHash) -> ExternResult<Option<Element>> {
+fn get_entry(hash: ActionHash) -> ExternResult<Option<Element>> {
     get(hash, GetOptions::content())
 }
 
 #[hdk_extern]
-fn create_post(post: Post) -> ExternResult<HeaderHash> {
+fn create_post(post: Post) -> ExternResult<ActionHash> {
     hdk::prelude::create_entry(&EntryZomes::IntegrityZome(
         integrity_zome::EntryTypes::Post(post),
     ))

@@ -9,17 +9,17 @@ use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]
-pub fn must_get_header<'a>(
+pub fn must_get_action<'a>(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
-    input: MustGetHeaderInput,
-) -> Result<SignedHeaderHashed, RuntimeError> {
+    input: MustGetActionInput,
+) -> Result<SignedActionHashed, RuntimeError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess {
             read_workspace_deterministic: Permission::Allow,
             ..
         } => {
-            let header_hash = input.into_inner();
+            let action_hash = input.into_inner();
 
             // timeouts must be handled by the network
             tokio_helper::block_forever_on(async move {
@@ -32,25 +32,25 @@ pub fn must_get_header<'a>(
                     ),
                 };
                 match cascade
-                    .retrieve_header(header_hash.clone(), NetworkGetOptions::must_get_options())
+                    .retrieve_action(action_hash.clone(), NetworkGetOptions::must_get_options())
                     .await
                     .map_err(|cascade_error| -> RuntimeError {
                         wasm_error!(WasmErrorInner::Host(cascade_error.to_string())).into()
                     })? {
-                    Some(header) => Ok(header),
+                    Some(action) => Ok(action),
                     None => match call_context.host_context {
                         HostContext::EntryDefs(_)
                         | HostContext::GenesisSelfCheck(_)
                         | HostContext::MigrateAgent(_)
                         | HostContext::PostCommit(_)
                         | HostContext::ZomeCall(_) => Err(wasm_error!(WasmErrorInner::Host(
-                            format!("Failed to get SignedHeaderHashed {}", header_hash)
+                            format!("Failed to get SignedActionHashed {}", action_hash)
                         ))
                         .into()),
                         HostContext::Init(_) => Err(wasm_error!(WasmErrorInner::HostShortCircuit(
                             holochain_serialized_bytes::encode(
                                 &ExternIO::encode(InitCallbackResult::UnresolvedDependencies(
-                                    vec![header_hash.into()],
+                                    vec![action_hash.into()],
                                 ))
                                 .map_err(|e| -> RuntimeError { wasm_error!(e.into()).into() })?,
                             )
@@ -60,7 +60,7 @@ pub fn must_get_header<'a>(
                         HostContext::Validate(_) => Err(wasm_error!(WasmErrorInner::HostShortCircuit(
                             holochain_serialized_bytes::encode(
                                 &ExternIO::encode(ValidateCallbackResult::UnresolvedDependencies(
-                                    vec![header_hash.into()],
+                                    vec![action_hash.into()],
                                 ))
                                 .map_err(|e| -> RuntimeError { wasm_error!(e.into()).into() })?,
                             )
@@ -72,7 +72,7 @@ pub fn must_get_header<'a>(
                                 holochain_serialized_bytes::encode(
                                     &ExternIO::encode(
                                         ValidationPackageCallbackResult::UnresolvedDependencies(
-                                            vec![header_hash.into(),]
+                                            vec![action_hash.into(),]
                                         ),
                                     )
                                     .map_err(|e| -> RuntimeError { wasm_error!(e.into()).into() })?
@@ -88,7 +88,7 @@ pub fn must_get_header<'a>(
             RibosomeError::HostFnPermissions(
                 call_context.zome.zome_name().clone(),
                 call_context.function_name().clone(),
-                "must_get_header".into(),
+                "must_get_action".into(),
             )
             .to_string(),
         )).into()),

@@ -14,7 +14,7 @@ use holochain_p2p::HolochainP2pDna;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_types::prelude::*;
-use holochain_zome_types::header::builder;
+use holochain_zome_types::action::builder;
 use tracing::*;
 
 #[derive(Constructor)]
@@ -57,7 +57,7 @@ where
 
     // only commit if the result was successful
     if result == InitResult::Pass {
-        let flushed_headers = HostFnWorkspace::from(workspace.clone())
+        let flushed_actions = HostFnWorkspace::from(workspace.clone())
             .flush(&network)
             .await?;
 
@@ -66,7 +66,7 @@ where
             workspace,
             network,
             keystore,
-            flushed_headers,
+            flushed_actions,
             coordinators,
         )
         .await?;
@@ -149,7 +149,7 @@ pub mod tests {
     use holochain_types::prelude::DnaDefHashed;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::fake_agent_pubkey_1;
-    use holochain_zome_types::Header;
+    use holochain_zome_types::Action;
     use matches::assert_matches;
 
     async fn get_chain(cell: &SweetCell, keystore: MetaLairClient) -> SourceChain {
@@ -222,8 +222,8 @@ pub mod tests {
         // Check init is added to the workspace
         let scratch = workspace.source_chain().snapshot().unwrap();
         assert_matches!(
-            scratch.headers().next().unwrap().header(),
-            Header::InitZomesComplete(_)
+            scratch.actions().next().unwrap().action(),
+            Action::InitZomesComplete(_)
         );
     }
 
@@ -250,14 +250,14 @@ pub mod tests {
             3
         );
 
-        let _: HeaderHash = conductor.call(&zome, "create_entry", ()).await;
+        let _: ActionHash = conductor.call(&zome, "create_entry", ()).await;
 
         let source_chain = get_chain(&cell, keystore.clone()).await;
         // - Ensure that the InitZomesComplete element got committed after the
         //   element committed during init()
         assert_matches!(
-            source_chain.query(Default::default()).await.unwrap()[4].header(),
-            Header::InitZomesComplete(_)
+            source_chain.query(Default::default()).await.unwrap()[4].action(),
+            Action::InitZomesComplete(_)
         );
     }
 
@@ -276,13 +276,13 @@ pub mod tests {
         assert_eq!(get_chain(&cell, keystore.clone()).await.len().unwrap(), 3);
 
         // - Ensure that the chain does not advance due to init failing
-        let r: Result<HeaderHash, _> = conductor.call_fallible(&zome, "create_entry", ()).await;
+        let r: Result<ActionHash, _> = conductor.call_fallible(&zome, "create_entry", ()).await;
         assert!(r.is_err());
         let source_chain = get_chain(&cell, keystore.clone());
         assert_eq!(source_chain.await.len().unwrap(), 3);
 
         // - Ensure idempotence of the above
-        let r: Result<HeaderHash, _> = conductor.call_fallible(&zome, "create_entry", ()).await;
+        let r: Result<ActionHash, _> = conductor.call_fallible(&zome, "create_entry", ()).await;
         assert!(r.is_err());
         let source_chain = get_chain(&cell, keystore.clone());
         assert_eq!(source_chain.await.len().unwrap(), 3);
@@ -317,13 +317,13 @@ pub mod tests {
         assert_eq!(get_chain(&cell, keystore.clone()).await.len().unwrap(), 3);
 
         // - Ensure that the chain does not advance due to init failing
-        let r: Result<HeaderHash, _> = conductor.call_fallible(&zome, "create_entry", ()).await;
+        let r: Result<ActionHash, _> = conductor.call_fallible(&zome, "create_entry", ()).await;
         assert!(r.is_err());
         let source_chain = get_chain(&cell, keystore.clone());
         assert_eq!(source_chain.await.len().unwrap(), 3);
 
         // - Ensure idempotence of the above
-        let r: Result<HeaderHash, _> = conductor.call_fallible(&zome, "create_entry", ()).await;
+        let r: Result<ActionHash, _> = conductor.call_fallible(&zome, "create_entry", ()).await;
         assert!(r.is_err());
         let source_chain = get_chain(&cell, keystore.clone());
         assert_eq!(source_chain.await.len().unwrap(), 3);

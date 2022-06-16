@@ -24,10 +24,10 @@ pub trait HdiT: Send + Sync {
     fn verify_signature(&self, verify_signature: VerifySignature) -> ExternResult<bool>;
     fn hash(&self, hash_input: HashInput) -> ExternResult<HashOutput>;
     fn must_get_entry(&self, must_get_entry_input: MustGetEntryInput) -> ExternResult<EntryHashed>;
-    fn must_get_header(
+    fn must_get_action(
         &self,
-        must_get_header_input: MustGetHeaderInput,
-    ) -> ExternResult<SignedHeaderHashed>;
+        must_get_action_input: MustGetActionInput,
+    ) -> ExternResult<SignedActionHashed>;
     fn must_get_valid_element(
         &self,
         must_get_valid_element_input: MustGetValidElementInput,
@@ -71,7 +71,7 @@ impl HdiT for ErrHdi {
     fn must_get_entry(&self, _: MustGetEntryInput) -> ExternResult<EntryHashed> {
         Self::err()
     }
-    fn must_get_header(&self, _: MustGetHeaderInput) -> ExternResult<SignedHeaderHashed> {
+    fn must_get_action(&self, _: MustGetActionInput) -> ExternResult<SignedActionHashed> {
         Self::err()
     }
     fn must_get_valid_element(&self, _: MustGetValidElementInput) -> ExternResult<Element> {
@@ -125,13 +125,13 @@ impl HdiT for HostHdi {
     fn must_get_entry(&self, must_get_entry_input: MustGetEntryInput) -> ExternResult<EntryHashed> {
         host_call::<MustGetEntryInput, EntryHashed>(__must_get_entry, must_get_entry_input)
     }
-    fn must_get_header(
+    fn must_get_action(
         &self,
-        must_get_header_input: MustGetHeaderInput,
-    ) -> ExternResult<SignedHeaderHashed> {
-        host_call::<MustGetHeaderInput, SignedHeaderHashed>(
-            __must_get_header,
-            must_get_header_input,
+        must_get_action_input: MustGetActionInput,
+    ) -> ExternResult<SignedActionHashed> {
+        host_call::<MustGetActionInput, SignedActionHashed>(
+            __must_get_action,
+            must_get_action_input,
         )
     }
     fn must_get_valid_element(

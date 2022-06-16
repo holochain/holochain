@@ -21,7 +21,7 @@ async fn entry_scratch_same_as_sql() {
     let td = EntryTestData::new();
     let query = GetEntryDetailsQuery::with_private_data_access(
         td.hash.clone(),
-        Arc::new(td.store_entry_op.header().author().clone()),
+        Arc::new(td.store_entry_op.action().author().clone()),
     );
     insert_op_scratch(
         &mut scratch,
@@ -54,8 +54,8 @@ async fn element_scratch_same_as_sql() {
 
     let td = ElementTestData::new();
     let query = GetElementDetailsQuery::with_private_data_access(
-        td.header.as_hash().clone(),
-        Arc::new(td.store_element_op.header().author().clone()),
+        td.action.as_hash().clone(),
+        Arc::new(td.store_element_op.action().author().clone()),
     );
     insert_op_scratch(
         &mut scratch,

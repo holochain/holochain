@@ -30,18 +30,18 @@ async fn assert_can_get<N: HolochainP2pDnaT + Clone + Send + 'static>(
         .unwrap()
         .expect("Failed to get entry");
 
-    assert_eq!(*r.header_address(), td_entry.create_hash);
-    assert_eq!(r.header().entry_hash(), Some(&td_entry.hash));
+    assert_eq!(*r.action_address(), td_entry.create_hash);
+    assert_eq!(r.action().entry_hash(), Some(&td_entry.hash));
 
-    // - Get via header hash
+    // - Get via action hash
     let r = cascade
-        .dht_get(td_element.any_header_hash.clone().into(), options.clone())
+        .dht_get(td_element.any_action_hash.clone().into(), options.clone())
         .await
         .unwrap()
         .expect("Failed to get element");
 
-    assert_eq!(*r.header_address(), td_element.any_header_hash);
-    assert_eq!(r.header().entry_hash(), td_element.any_entry_hash.as_ref());
+    assert_eq!(*r.action_address(), td_element.any_action_hash);
+    assert_eq!(r.action().entry_hash(), td_element.any_entry_hash.as_ref());
 
     // - Get details via entry hash
     let r = cascade
@@ -52,12 +52,12 @@ async fn assert_can_get<N: HolochainP2pDnaT + Clone + Send + 'static>(
 
     let expected = Details::Entry(EntryDetails {
         entry: td_entry.entry.entry.clone(),
-        headers: vec![td_entry
+        actions: vec![td_entry
             .wire_create
             .data
             .clone()
-            .into_header(td_entry.entry.entry_type.clone(), td_entry.hash.clone())],
-        rejected_headers: vec![],
+            .into_action(td_entry.entry.entry_type.clone(), td_entry.hash.clone())],
+        rejected_actions: vec![],
         deletes: vec![],
         updates: vec![],
         entry_dht_status: EntryDhtStatus::Live,
@@ -65,9 +65,9 @@ async fn assert_can_get<N: HolochainP2pDnaT + Clone + Send + 'static>(
 
     assert_eq!(r, expected);
 
-    // - Get details via header hash
+    // - Get details via action hash
     let r = cascade
-        .get_details(td_element.any_header_hash.clone().into(), options.clone())
+        .get_details(td_element.any_action_hash.clone().into(), options.clone())
         .await
         .unwrap()
         .expect("Failed to get element details");
@@ -95,9 +95,9 @@ async fn assert_is_none<N: HolochainP2pDnaT + Clone + Send + 'static>(
 
     assert!(r.is_none());
 
-    // - Get via header hash
+    // - Get via action hash
     let r = cascade
-        .dht_get(td_element.any_header_hash.clone().into(), options.clone())
+        .dht_get(td_element.any_action_hash.clone().into(), options.clone())
         .await
         .unwrap();
 
@@ -111,9 +111,9 @@ async fn assert_is_none<N: HolochainP2pDnaT + Clone + Send + 'static>(
 
     assert!(r.is_none());
 
-    // - Get details via header hash
+    // - Get details via action hash
     let r = cascade
-        .get_details(td_element.any_header_hash.clone().into(), options.clone())
+        .get_details(td_element.any_action_hash.clone().into(), options.clone())
         .await
         .unwrap();
 
@@ -134,9 +134,9 @@ async fn assert_rejected<N: HolochainP2pDnaT + Clone + Send + 'static>(
 
     assert!(r.is_none());
 
-    // - Get via header hash
+    // - Get via action hash
     let r = cascade
-        .dht_get(td_element.any_header_hash.clone().into(), options.clone())
+        .dht_get(td_element.any_action_hash.clone().into(), options.clone())
         .await
         .unwrap();
 
@@ -150,12 +150,12 @@ async fn assert_rejected<N: HolochainP2pDnaT + Clone + Send + 'static>(
 
     let expected = Details::Entry(EntryDetails {
         entry: td_entry.entry.entry.clone(),
-        headers: vec![],
-        rejected_headers: vec![td_entry
+        actions: vec![],
+        rejected_actions: vec![td_entry
             .wire_create
             .data
             .clone()
-            .into_header(td_entry.entry.entry_type.clone(), td_entry.hash.clone())],
+            .into_action(td_entry.entry.entry_type.clone(), td_entry.hash.clone())],
         deletes: vec![],
         updates: vec![],
         entry_dht_status: EntryDhtStatus::Dead,
@@ -165,7 +165,7 @@ async fn assert_rejected<N: HolochainP2pDnaT + Clone + Send + 'static>(
 
     let r = cascade
         .get_details(
-            td_element.any_header_hash.clone().into(),
+            td_element.any_action_hash.clone().into(),
             Default::default(),
         )
         .await
@@ -194,18 +194,18 @@ async fn assert_can_retrieve<N: HolochainP2pDnaT + Clone + Send + 'static>(
         .unwrap()
         .expect("Failed to retrieve element");
 
-    assert_eq!(*r.header_address(), td_entry.create_hash);
-    assert_eq!(r.header().entry_hash(), Some(&td_entry.hash));
+    assert_eq!(*r.action_address(), td_entry.create_hash);
+    assert_eq!(r.action().entry_hash(), Some(&td_entry.hash));
 
-    // - Retrieve via header hash
+    // - Retrieve via action hash
     let r = cascade
         .retrieve(td_entry.create_hash.clone().into(), options.clone().into())
         .await
         .unwrap()
         .expect("Failed to retrieve element");
 
-    assert_eq!(*r.header_address(), td_entry.create_hash);
-    assert_eq!(r.header().entry_hash(), Some(&td_entry.hash));
+    assert_eq!(*r.action_address(), td_entry.create_hash);
+    assert_eq!(r.action().entry_hash(), Some(&td_entry.hash));
 
     // - Retrieve entry
     let r = cascade
@@ -216,12 +216,12 @@ async fn assert_can_retrieve<N: HolochainP2pDnaT + Clone + Send + 'static>(
 
     assert_eq!(*r.as_hash(), td_entry.hash);
 
-    // - Retrieve header
+    // - Retrieve action
     let r = cascade
-        .retrieve_header(td_entry.create_hash.clone(), options.clone().into())
+        .retrieve_action(td_entry.create_hash.clone(), options.clone().into())
         .await
         .unwrap()
-        .expect("Failed to retrieve header");
+        .expect("Failed to retrieve action");
 
     assert_eq!(*r.as_hash(), td_entry.create_hash);
 }

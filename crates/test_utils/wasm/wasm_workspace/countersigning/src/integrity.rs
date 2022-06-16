@@ -27,11 +27,11 @@ fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
         Op::StoreElement {
             element:
                 Element {
-                    signed_header,
+                    signed_action,
                     entry: ElementEntry::Present(entry),
                 },
         } => {
-            match signed_header.header().entry_type().and_then(|et| match et {
+            match signed_action.action().entry_type().and_then(|et| match et {
                 EntryType::App(AppEntryType { id, .. }) => Some(id),
                 _ => None,
             }) {

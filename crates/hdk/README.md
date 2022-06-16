@@ -120,7 +120,7 @@ The callbacks are:
   - `EntryDefs` is a vector defining all entries used by this app.
   - All zomes in a DNA define all their entries at the same time for the host.
   - All entry defs are combined into a single ordered list per zome and exposed to tooling such as DNA generation.
-  - Entry defs are referenced by `u8` numerical position externally and in DHT headers, and by id/name e.g. "post" in sparse callbacks.
+  - Entry defs are referenced by `u8` numerical position externally and in DHT actions, and by id/name e.g. "post" in sparse callbacks.
 - `fn init(_: ()) -> ExternResult<InitCallbackResult>`:
   - Allows the guest to pass/fail/retry initialization with [`InitCallbackResult`](holochain_zome_types::init::InitCallbackResult).
   - Lazy execution - only runs when any zome of the DNA is first called.
@@ -134,9 +134,9 @@ The callbacks are:
   - Close runs when an agent is deprecating an old source chain in favour of a new one.
   - All zomes in a DNA migrate at the same time.
   - Any failure fails the migration.
-- `fn post_commit(headers: Vec<SignedHeaderHashed>)`:
+- `fn post_commit(actions: Vec<SignedActionHashed>)`:
   - Executes after the WASM call that originated the commits so not bound by the original atomic transaction.
-  - Input is all the header hashes that were committed.
+  - Input is all the action hashes that were committed.
   - The zome that originated the commits is called.
 - `fn validate_create_link(create_link_data: ValidateCreateLinkData) -> ExternResult<ValidateLinkCallbackResult>`:
   - Allows the guest to pass/fail/retry link creation validation.

@@ -1,4 +1,4 @@
-use holo_hash::HeaderHash;
+use holo_hash::ActionHash;
 use holo_hash::WasmHash;
 use holochain::sweettest::*;
 use holochain_types::prelude::DnaWasm;
@@ -32,7 +32,7 @@ async fn test_coordinator_zome_hot_swap() {
     let cells = app.into_cells();
 
     println!("Create entry from the coordinator zome into the integrity zome.");
-    let hash: HeaderHash = conductor
+    let hash: ActionHash = conductor
         .call(
             &cells[0].zome(TestCoordinatorWasm::CoordinatorZome),
             "create_entry",
@@ -127,7 +127,7 @@ async fn test_coordinator_zome_hot_swap_multi_integrity() {
     let app = conductor.setup_app("app", &[dna]).await.unwrap();
     let cells = app.into_cells();
 
-    let hash: HeaderHash = conductor
+    let hash: ActionHash = conductor
         .call(
             &cells[0].zome(TestCoordinatorWasm::CoordinatorZome),
             "create_entry",
@@ -135,7 +135,7 @@ async fn test_coordinator_zome_hot_swap_multi_integrity() {
         )
         .await;
 
-    let hash2: HeaderHash = conductor
+    let hash2: ActionHash = conductor
         .call(&cells[0].zome("2_coord"), "create_entry", ())
         .await;
 

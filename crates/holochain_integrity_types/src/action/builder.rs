@@ -1,54 +1,54 @@
 use super::EntryType;
 use super::Timestamp;
-use crate::header;
-use crate::header::HeaderInner;
+use crate::action;
+use crate::action::ActionInner;
 use crate::link::LinkTag;
 use crate::link::LinkType;
 use crate::MembraneProof;
-use header::Dna;
+use action::Dna;
+use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holo_hash::AnyLinkableHash;
 use holo_hash::DnaHash;
 use holo_hash::EntryHash;
-use holo_hash::HeaderHash;
 
 #[derive(Clone, Debug)]
-pub struct HeaderBuilderCommon {
+pub struct ActionBuilderCommon {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
-    pub header_seq: u32,
-    pub prev_header: HeaderHash,
+    pub action_seq: u32,
+    pub prev_action: ActionHash,
 }
 
-impl HeaderBuilderCommon {
+impl ActionBuilderCommon {
     pub fn new(
         author: AgentPubKey,
         timestamp: Timestamp,
-        header_seq: u32,
-        prev_header: HeaderHash,
+        action_seq: u32,
+        prev_action: ActionHash,
     ) -> Self {
         Self {
             author,
             timestamp,
-            header_seq,
-            prev_header,
+            action_seq,
+            prev_action,
         }
     }
 }
 
-/// Builder for non-genesis Headers
+/// Builder for non-genesis Actions
 ///
-/// SourceChain::put takes one of these rather than a raw Header, so that it
-/// can inject the proper values via `HeaderBuilderCommon`, rather than requiring
-/// surrounding code to construct a proper Header outside of the context of
+/// SourceChain::put takes one of these rather than a raw Action, so that it
+/// can inject the proper values via `ActionBuilderCommon`, rather than requiring
+/// surrounding code to construct a proper Action outside of the context of
 /// the SourceChain.
 ///
-/// This builder does not build pre-genesis Headers, because prior to genesis
+/// This builder does not build pre-genesis Actions, because prior to genesis
 /// there is no Agent associated with the source chain, and also the fact that
-/// the Dna header has no prev_entry causes a special case that need not be
+/// the Dna action has no prev_entry causes a special case that need not be
 /// dealt with. SourceChain::genesis already handles genesis in one fell swoop.
-pub trait HeaderBuilder<H: HeaderInner>: Sized {
-    fn build(self, common: HeaderBuilderCommon) -> H;
+pub trait ActionBuilder<H: ActionInner>: Sized {
+    fn build(self, common: ActionBuilderCommon) -> H;
 }
 
 macro_rules! builder_variant {
@@ -68,45 +68,45 @@ macro_rules! builder_variant {
             }
         }
 
-        impl HeaderBuilder<header::$name> for $name {
-            fn build(self, common: HeaderBuilderCommon) -> header::$name {
-                let HeaderBuilderCommon {
+        impl ActionBuilder<action::$name> for $name {
+            fn build(self, common: ActionBuilderCommon) -> action::$name {
+                let ActionBuilderCommon {
                     author,
                     timestamp,
-                    header_seq,
-                    prev_header,
+                    action_seq,
+                    prev_action,
                 } = common;
 
-                header::$name {
+                action::$name {
                     author,
                     timestamp,
-                    header_seq,
-                    prev_header,
+                    action_seq,
+                    prev_action,
                     $($field : self.$field),*
                 }
             }
         }
 
-        impl From<($name, HeaderBuilderCommon)> for header::$name {
-            fn from((n, h): ($name, HeaderBuilderCommon)) -> header::$name {
+        impl From<($name, ActionBuilderCommon)> for action::$name {
+            fn from((n, h): ($name, ActionBuilderCommon)) -> action::$name {
                 n.build(h)
             }
         }
-        impl header::$name {
-            pub fn from_builder(common: HeaderBuilderCommon, $($field : $t),*) -> Self {
-                let HeaderBuilderCommon {
+        impl action::$name {
+            pub fn from_builder(common: ActionBuilderCommon, $($field : $t),*) -> Self {
+                let ActionBuilderCommon {
                     author,
                     timestamp,
-                    header_seq,
-                    prev_header,
+                    action_seq,
+                    prev_action,
                 } = common;
 
                 #[allow(clippy::inconsistent_struct_constructor)]
-                header::$name {
+                action::$name {
                     author,
                     timestamp,
-                    header_seq,
-                    prev_header,
+                    action_seq,
+                    prev_action,
                     $($field),*
                 }
             }
@@ -124,7 +124,7 @@ builder_variant!(CreateLink {
 });
 
 builder_variant!(DeleteLink {
-    link_add_address: HeaderHash,
+    link_add_address: ActionHash,
     base_address: AnyLinkableHash,
 });
 
@@ -143,14 +143,14 @@ builder_variant!(Create {
 
 builder_variant!(Update {
     original_entry_address: EntryHash,
-    original_header_address: HeaderHash,
+    original_action_address: ActionHash,
 
     entry_type: EntryType,
     entry_hash: EntryHash,
 });
 
 builder_variant!(Delete {
-    deletes_address: HeaderHash,
+    deletes_address: ActionHash,
     deletes_entry_address: EntryHash,
 });
 
@@ -159,9 +159,9 @@ builder_variant!(AgentValidationPkg {
 });
 
 impl Dna {
-    /// The Dna header can't implement HeaderBuilder because it lacks a
-    /// `prev_header` field, so this helper is provided as a special case
-    pub fn from_builder(hash: DnaHash, builder: HeaderBuilderCommon) -> Self {
+    /// The Dna action can't implement ActionBuilder because it lacks a
+    /// `prev_action` field, so this helper is provided as a special case
+    pub fn from_builder(hash: DnaHash, builder: ActionBuilderCommon) -> Self {
         Self {
             author: builder.author,
             timestamp: builder.timestamp,

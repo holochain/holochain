@@ -13,21 +13,21 @@ impl TryFrom<&ThisWasmEntry> for CreateInput {
     }
 }
 
-fn _commit_validate(to_commit: ThisWasmEntry) -> ExternResult<HeaderHash> {
+fn _commit_validate(to_commit: ThisWasmEntry) -> ExternResult<ActionHash> {
     create((&to_commit).try_into()?)
 }
 
 #[hdk_extern]
-fn must_get_valid_element(header_hash: HeaderHash) -> ExternResult<Element> {
-    hdk::prelude::must_get_valid_element(header_hash)
+fn must_get_valid_element(action_hash: ActionHash) -> ExternResult<Element> {
+    hdk::prelude::must_get_valid_element(action_hash)
 }
 
 #[hdk_extern]
-fn always_validates(_: ()) -> ExternResult<HeaderHash> {
+fn always_validates(_: ()) -> ExternResult<ActionHash> {
     _commit_validate(ThisWasmEntry::AlwaysValidates)
 }
 
 #[hdk_extern]
-fn never_validates(_: ()) -> ExternResult<HeaderHash> {
+fn never_validates(_: ()) -> ExternResult<ActionHash> {
     _commit_validate(ThisWasmEntry::NeverValidates)
 }

@@ -13,32 +13,32 @@ impl std::ops::Add for CounTree {
 
 impl CounTree {
     #[allow(clippy::new_ret_no_self)]
-    /// ensures that a default countree exists and returns the header
-    pub fn new() -> ExternResult<HeaderHash> {
+    /// ensures that a default countree exists and returns the action
+    pub fn new() -> ExternResult<ActionHash> {
         Self::ensure(Self::default())
     }
 
-    /// commits if not exists else returns found header
-    /// produces redundant headers in a partition
-    pub fn ensure(countree: CounTree) -> ExternResult<HeaderHash> {
+    /// commits if not exists else returns found action
+    /// produces redundant actions in a partition
+    pub fn ensure(countree: CounTree) -> ExternResult<ActionHash> {
         match get(hash_entry(&countree)?, GetOptions::latest())? {
-            Some(element) => Ok(element.header_address().to_owned()),
+            Some(element) => Ok(element.action_address().to_owned()),
             None => create_entry(&IntegrityCrud(EntryTypes::Countree(countree))),
         }
     }
 
-    pub fn header_details(header_hashes: Vec<HeaderHash>) -> ExternResult<Vec<Option<Details>>> {
+    pub fn action_details(action_hashes: Vec<ActionHash>) -> ExternResult<Vec<Option<Details>>> {
         HDK.with(|h| {
             h.borrow().get_details(
-                header_hashes
+                action_hashes
                     .into_iter()
-                    .map(|header_hash| GetInput::new(header_hash.into(), GetOptions::latest()))
+                    .map(|action_hash| GetInput::new(action_hash.into(), GetOptions::latest()))
                     .collect(),
             )
         })
     }
 
-    /// return the Option<Details> for the entry hash from the header
+    /// return the Option<Details> for the entry hash from the action
     pub fn entry_details(entry_hashes: Vec<EntryHash>) -> ExternResult<Vec<Option<Details>>> {
         HDK.with(|h| {
             h.borrow().get_details(
@@ -50,21 +50,25 @@ impl CounTree {
         })
     }
 
-    /// increments the given header hash by 1 or creates it if not found
+    /// increments the given action hash by 1 or creates it if not found
     /// this is silly as being offline resets the counter >.<
-    pub fn incsert(header_hash: HeaderHash) -> ExternResult<HeaderHash> {
-        let current: CounTree = match get(header_hash.clone(), GetOptions::latest())? {
-            Some(element) => match element.entry().to_app_option().map_err(|e| wasm_error!(e.into()))? {
+    pub fn incsert(action_hash: ActionHash) -> ExternResult<ActionHash> {
+        let current: CounTree = match get(action_hash.clone(), GetOptions::latest())? {
+            Some(element) => match element
+                .entry()
+                .to_app_option()
+                .map_err(|e| wasm_error!(e.into()))?
+            {
                 Some(v) => v,
                 None => return Self::new(),
             },
             None => return Self::new(),
         };
 
-        update_entry(header_hash, &(current + CounTree(1)))
+        update_entry(action_hash, &(current + CounTree(1)))
     }
 
-    pub fn dec(header_hash: HeaderHash) -> ExternResult<HeaderHash> {
-        delete_entry(header_hash)
+    pub fn dec(action_hash: ActionHash) -> ExternResult<ActionHash> {
+        delete_entry(action_hash)
     }
 }

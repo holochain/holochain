@@ -4,9 +4,9 @@ use thiserror::Error;
 pub enum ElementGroupError {
     #[error("Created an ElementGroup without an entry")]
     MissingEntry,
-    #[error("Created an ElementGroup with a header without entry data")]
+    #[error("Created an ElementGroup with a action without entry data")]
     MissingEntryData,
-    #[error("Created an ElementGroup with no headers")]
+    #[error("Created an ElementGroup with no actions")]
     Empty,
 }
 

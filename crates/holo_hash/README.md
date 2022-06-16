@@ -26,13 +26,13 @@ Each primitive HashType has a unique 3-byte prefix associated with it, to easily
 | DhtOp     | DhtOpHash      | uhCQk  |
 | Dna       | DnaHash        | uhC0k  |
 | NetId     | NetIdHash      | uhCIk  |
-| Header    | HeaderHash     | uhCkk  |
+| Action    | ActionHash     | uhCkk  |
 | Wasm      | DnaWasmHash    | uhCok  |
 
-The "HoloHash alias" column lists the type aliases provided to refer to each type of HoloHash. For instance, `HeaderHash` is the following type alias:
+The "HoloHash alias" column lists the type aliases provided to refer to each type of HoloHash. For instance, `ActionHash` is the following type alias:
 
 ```rust
-pub type HeaderHash = HoloHash<hash_type::Header>;
+pub type ActionHash = HoloHash<hash_type::Action>;
 ```
 
 (the prefixes listed are the base64 representations)
@@ -43,7 +43,7 @@ Composite hash types are used in contexts when one of several primitive hash typ
 
 `EntryHash`: used to hash Entries. An Entry can hash to either a `ContentHash` or an `AgentPubKey`.
 
-`AnyDhtHash`: used to hash arbitrary DHT data. DHT data is either a Header or an Entry, therefore AnyDhtHash can refer to either a `HeaderHash` or an `EntryHash`.
+`AnyDhtHash`: used to hash arbitrary DHT data. DHT data is either a Action or an Entry, therefore AnyDhtHash can refer to either a `ActionHash` or an `EntryHash`.
 
 ## Serialization
 

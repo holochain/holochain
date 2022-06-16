@@ -16,7 +16,7 @@ pub type MembraneProof = std::sync::Arc<SerializedBytes>;
 /// chain entries
 #[derive(Debug, Serialize, Deserialize, SerializedBytes)]
 pub struct GenesisSelfCheckData {
-    /// The Dna header (1st element)
+    /// The Dna action (1st element)
     pub dna_info: DnaInfo,
 
     /// The proof of membership provided by the AgentValidationPkg (2nd element)

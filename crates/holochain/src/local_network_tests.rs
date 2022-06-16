@@ -12,8 +12,8 @@ use crate::test_utils::setup_app_with_network;
 use crate::test_utils::wait_for_integration_with_others;
 use futures::StreamExt;
 use hdk::prelude::CellId;
+use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
-use holo_hash::HeaderHash;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_types::prelude::*;
@@ -56,7 +56,7 @@ async fn conductors_call_remote(num_conductors: usize) {
                     if agent == *cell.agent_pubkey() {
                         continue;
                     }
-                    let _: HeaderHash = conductor
+                    let _: ActionHash = conductor
                         .call(
                             &cell.zome(TestWasm::Create),
                             "call_create_entry_remotely_no_rec",
@@ -261,7 +261,7 @@ async fn conductors_gossip_inner(
     )
     .await;
 
-    let headers = init_all(&handles[..]).await;
+    let actions = init_all(&handles[..]).await;
 
     let second_handles = setup(
         zomes.clone(),
@@ -294,7 +294,7 @@ async fn conductors_gossip_inner(
     // 3 ops per create plus 7 for genesis + 2 for init + 2 for cap
     let mut expected_count = num_committers * (3 + 7 + 2 + 2) + num_conductors * 7;
     for (i, handle) in second_handles.iter().enumerate() {
-        check_gossip(handle, &all_handles, &headers, expected_count, line!(), i).await;
+        check_gossip(handle, &all_handles, &actions, expected_count, line!(), i).await;
         // Add 4 ops for each init
         expected_count += 4;
     }
@@ -320,7 +320,7 @@ async fn conductors_gossip_inner(
 
     expected_count += new_conductors * 7;
     for (i, handle) in third_handles.iter().enumerate() {
-        check_gossip(handle, &all_handles, &headers, expected_count, line!(), i).await;
+        check_gossip(handle, &all_handles, &actions, expected_count, line!(), i).await;
         // Add 4 ops for each init
         expected_count += 4;
     }
@@ -330,13 +330,13 @@ async fn conductors_gossip_inner(
     let all_handles = third_handles.iter().collect::<Vec<_>>();
 
     for (i, handle) in third_handles.iter().enumerate() {
-        check_gossip(handle, &all_handles, &headers, expected_count, line!(), i).await;
+        check_gossip(handle, &all_handles, &actions, expected_count, line!(), i).await;
     }
 
     shutdown(third_handles).await;
 }
 
-async fn init_all(handles: &[TestHandle]) -> Vec<HeaderHash> {
+async fn init_all(handles: &[TestHandle]) -> Vec<ActionHash> {
     let mut futures = Vec::with_capacity(handles.len());
     for (i, h) in handles.iter().cloned().enumerate() {
         let f = async move {
@@ -353,21 +353,21 @@ async fn init_all(handles: &[TestHandle]) -> Vec<HeaderHash> {
         let f = tokio::task::spawn(f);
         futures.push(f);
     }
-    let mut headers = Vec::with_capacity(handles.len());
+    let mut actions = Vec::with_capacity(handles.len());
     for f in futures {
         let result = f.await.unwrap();
-        let result: HeaderHash = unwrap_to::unwrap_to!(result => ZomeCallResponse::Ok)
+        let result: ActionHash = unwrap_to::unwrap_to!(result => ZomeCallResponse::Ok)
             .decode()
             .unwrap();
-        headers.push(result);
+        actions.push(result);
     }
-    headers
+    actions
 }
 
 async fn check_gossip(
     handle: &TestHandle,
     all_handles: &[&TestHandle],
-    posts: &[HeaderHash],
+    posts: &[ActionHash],
     expected_count: usize,
     line: u32,
     i: usize,

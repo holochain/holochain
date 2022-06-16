@@ -3,7 +3,7 @@ use crate::here;
 use crate::prelude::mutations_helpers::insert_valid_integrated_op;
 use crate::prelude::*;
 use holochain_types::db::DbWrite;
-use holochain_types::element::SignedHeaderHashedExt;
+use holochain_types::element::SignedActionHashedExt;
 use observability;
 
 #[derive(Clone)]
@@ -43,8 +43,8 @@ fn fixtures(env: DbWrite<DbKindDht>, n: usize) -> Vec<TestData> {
         let link_add = CreateLinkFixturator::new(link_add).next().unwrap();
 
         // Create the expected link result
-        let (_, link_add_hash): (_, HeaderHash) =
-            HeaderHashed::from_content_sync(Header::CreateLink(link_add.clone())).into();
+        let (_, link_add_hash): (_, ActionHash) =
+            ActionHashed::from_content_sync(Action::CreateLink(link_add.clone())).into();
 
         let expected_link = Link {
             create_link_hash: link_add_hash.clone(),
@@ -87,7 +87,7 @@ impl TestData {
     fn with_same_keys(mut td: Self) -> Self {
         td.link_add.timestamp = holochain_zome_types::Timestamp::now().into();
         let link_add_hash =
-            HeaderHashed::from_content_sync(Header::CreateLink(td.link_add.clone())).into_hash();
+            ActionHashed::from_content_sync(Action::CreateLink(td.link_add.clone())).into_hash();
         td.link_remove.link_add_address = link_add_hash.clone();
         td.expected_link.timestamp = td.link_add.timestamp.clone().into();
         td.expected_link.create_link_hash = link_add_hash;
@@ -221,18 +221,18 @@ impl TestData {
             .unwrap();
     }
     fn add_link_scratch(&mut self) {
-        let header = SignedHeaderHashed::from_content_sync(SignedHeader(
-            Header::CreateLink(self.link_add.clone()),
+        let action = SignedActionHashed::from_content_sync(SignedAction(
+            Action::CreateLink(self.link_add.clone()),
             fixt!(Signature),
         ));
-        self.scratch.add_header(header, ChainTopOrdering::default());
+        self.scratch.add_action(action, ChainTopOrdering::default());
     }
     fn add_link_given_scratch(&mut self, scratch: &mut Scratch) {
-        let header = SignedHeaderHashed::from_content_sync(SignedHeader(
-            Header::CreateLink(self.link_add.clone()),
+        let action = SignedActionHashed::from_content_sync(SignedAction(
+            Action::CreateLink(self.link_add.clone()),
             fixt!(Signature),
         ));
-        scratch.add_header(header, ChainTopOrdering::default());
+        scratch.add_action(action, ChainTopOrdering::default());
     }
     fn delete_link(&self) {
         let op = DhtOpHashed::from_content_sync(DhtOp::RegisterRemoveLink(
@@ -246,14 +246,14 @@ impl TestData {
             .unwrap();
     }
     fn delete_link_scratch(&mut self) {
-        let header = SignedHeaderHashed::from_content_sync(SignedHeader(
-            Header::DeleteLink(self.link_remove.clone()),
+        let action = SignedActionHashed::from_content_sync(SignedAction(
+            Action::DeleteLink(self.link_remove.clone()),
             fixt!(Signature),
         ));
-        self.scratch.add_header(header, ChainTopOrdering::default());
+        self.scratch.add_action(action, ChainTopOrdering::default());
     }
     fn clear_scratch(&mut self) {
-        self.scratch.drain_headers().for_each(|_| ());
+        self.scratch.drain_actions().for_each(|_| ());
     }
 
     fn only_these_on_base<'a>(td: &'a [Self], test: &'static str) {
@@ -475,7 +475,7 @@ async fn multiple_links() {
         for d in td[0..5].iter().chain(&td[6..]) {
             d.only_on_full_key(here!("all except 5 scratch"));
         }
-        // Can't add back the same header because removes are tombstones
+        // Can't add back the same action because removes are tombstones
         // so add one with the same key
         let new_td = TestData::with_same_keys(td[5].clone());
         td[5] = new_td;
@@ -589,8 +589,8 @@ async fn links_on_same_base() {
         d.base_hash = base_hash.clone();
         d.link_add.base_address = base_hash.clone().into();
         // Create the new hash
-        let (_, link_add_hash): (_, HeaderHash) =
-            HeaderHashed::from_content_sync(Header::CreateLink(d.link_add.clone())).into();
+        let (_, link_add_hash): (_, ActionHash) =
+            ActionHashed::from_content_sync(Action::CreateLink(d.link_add.clone())).into();
         d.expected_link.create_link_hash = link_add_hash.clone();
         d.link_remove.link_add_address = link_add_hash;
         d.link_remove.base_address = base_hash.clone().into();
@@ -687,8 +687,8 @@ async fn links_on_same_tag() {
         d.link_remove.base_address = base_hash.clone().into();
 
         // Create the new hash
-        let (_, link_add_hash): (_, HeaderHash) =
-            HeaderHashed::from_content_sync(Header::CreateLink(d.link_add.clone())).into();
+        let (_, link_add_hash): (_, ActionHash) =
+            ActionHashed::from_content_sync(Action::CreateLink(d.link_add.clone())).into();
         d.expected_link.create_link_hash = link_add_hash.clone();
         d.expected_link.tag = tag.clone();
         d.link_remove.link_add_address = link_add_hash;
@@ -749,8 +749,8 @@ async fn links_on_same_type() {
         d.link_add.link_type = link_type;
 
         // Create the new hash
-        let (_, link_add_hash): (_, HeaderHash) =
-            HeaderHashed::from_content_sync(Header::CreateLink(d.link_add.clone())).into();
+        let (_, link_add_hash): (_, ActionHash) =
+            ActionHashed::from_content_sync(Action::CreateLink(d.link_add.clone())).into();
         d.expected_link.create_link_hash = link_add_hash.clone();
     }
 
@@ -803,7 +803,7 @@ async fn link_type_ranges() {
         d.link_add.link_type = LinkType(i as u8);
 
         // Create the new hash
-        let link_add_hash = HeaderHash::with_data_sync(&Header::CreateLink(d.link_add.clone()));
+        let link_add_hash = ActionHash::with_data_sync(&Action::CreateLink(d.link_add.clone()));
         d.expected_link.create_link_hash = link_add_hash.clone();
     }
 
