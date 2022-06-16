@@ -118,6 +118,58 @@ impl MetaLairClient {
         }
     }
 
+    /// Export a shared secret identified by `tag` using box encryption.
+    pub fn shared_secret_export(
+        &self,
+        tag: Arc<str>,
+        sender_pub_key: X25519PubKey,
+        recipient_pub_key: X25519PubKey,
+    ) -> impl Future<Output = LairResult<([u8; 24], Arc<[u8]>)>> + 'static + Send {
+        let this = self.clone();
+        async move {
+            match this {
+                Self::Legacy(_) => Err("LegacyLairDoesNotSupportSharedSecrets".into()),
+                Self::NewLair(client) => Ok(client
+                    .export_seed_by_tag(tag, sender_pub_key, recipient_pub_key, None)
+                    .await?),
+            }
+        }
+    }
+
+    /// Import a shared secret to be indentified by `tag` using box decryption.
+    pub fn shared_secret_import(
+        &self,
+        sender_pub_key: X25519PubKey,
+        recipient_pub_key: X25519PubKey,
+        nonce: [u8; 24],
+        cipher: Arc<[u8]>,
+        tag: Arc<str>,
+    ) -> impl Future<Output = LairResult<()>> + 'static + Send {
+        let this = self.clone();
+        async move {
+            match this {
+                Self::Legacy(_) => Err("LegacyLairDoesNotSupportSharedSecrets".into()),
+                Self::NewLair(client) => {
+                    // shared secrets are exportable
+                    // (it's hard to make them useful otherwise : )
+                    let exportable = true;
+                    let _info = client
+                        .import_seed(
+                            sender_pub_key,
+                            recipient_pub_key,
+                            None,
+                            nonce,
+                            cipher,
+                            tag,
+                            exportable,
+                        )
+                        .await?;
+                    Ok(())
+                }
+            }
+        }
+    }
+
     /// Construct a new randomized encryption keypair
     pub fn new_x25519_keypair_random(
         &self,

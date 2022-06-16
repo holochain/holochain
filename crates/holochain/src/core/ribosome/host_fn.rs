@@ -4,6 +4,9 @@ use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 
+/// default size for KeyRefs
+const DEF_REF_SIZE: usize = 32;
+
 pub(crate) trait KeyRefExt: Sized {
     fn to_tag(&self) -> Arc<str>;
     //fn from_tag<R: AsRef<str>>(tag: R) -> Result<Self, RuntimeError>;

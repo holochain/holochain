@@ -1,9 +1,8 @@
+use super::*;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
-use holochain_types::prelude::*;
-use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 
 pub fn x_salsa20_poly1305_shared_secret_ingest(
@@ -17,6 +16,16 @@ pub fn x_salsa20_poly1305_shared_secret_ingest(
             ..
         } => {
             tokio_helper::block_forever_on(async move {
+                let key_ref = match input.as_key_ref_ref() {
+                    Some(key_ref) => key_ref.clone(),
+                    None => rand_utf8::rand_utf8(
+                        &mut rand::thread_rng(),
+                        DEF_REF_SIZE,
+                    ).as_bytes().to_vec().into(),
+                };
+
+                let tag = key_ref.to_tag();
+
                 let mut s_pk: [u8; 32] = [0; 32];
                 s_pk.copy_from_slice(input.as_sender_ref().as_ref());
                 let mut r_pk: [u8; 32] = [0; 32];
@@ -27,34 +36,19 @@ pub fn x_salsa20_poly1305_shared_secret_ingest(
                 nonce.copy_from_slice(edata.as_nonce_ref().as_ref());
                 let data = edata.as_encrypted_data_ref().to_vec();
 
-                let res = call_context
+                call_context
                     .host_context
                     .keystore()
-                    .crypto_box_xsalsa_open(s_pk.into(), r_pk.into(), nonce, data.into())
+                    .shared_secret_import(
+                        s_pk.into(),
+                        r_pk.into(),
+                        nonce,
+                        data.into(),
+                        tag,
+                    )
                     .await?;
 
-                // this is a temp requirement until we do the
-                // actual lair integration
-                // safer to do it this way, then when we relax
-                // the requirement, we wont break anyone's hApp code.
-                if let Some(key_ref) = input.as_key_ref_ref().as_ref() {
-                    if key_ref.as_ref() != res.as_ref() {
-                        return Err("TempErrKeyRefMismatchKey".into());
-                    }
-                }
-
-                // this is a temp requirement until we do the
-                // actual lair integration
-                if res.len() != 32 {
-                    return Err("TempErrKeyRefLen".into());
-                }
-
-                // TODO - once we actually implement this in lair,
-                //        insert this shared secret in lair
-                //        and return the key_ref, rather than using
-                //        the secret AS the key_ref like we're doing here
-
-                holochain_keystore::LairResult::Ok(res.as_ref().into())
+                holochain_keystore::LairResult::Ok(key_ref)
             })
             .map_err(|keystore_error| wasm_error!(WasmErrorInner::Host(keystore_error.to_string())).into())
         }

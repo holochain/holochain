@@ -5,8 +5,6 @@ use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
 use std::sync::Arc;
 
-const DEF_REF_SIZE: usize = 32;
-
 pub fn x_salsa20_poly1305_shared_secret_create_random(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
