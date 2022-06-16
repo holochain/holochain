@@ -28,7 +28,7 @@ pub fn websocket_concurrent_install(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("websocket");
     for (i, j) in NUM_DNA_CONCURRENCY {
-        group.throughput(Throughput::Elements(*i as u64 * *j as u64));
+        group.throughput(Throughput::Records(*i as u64 * *j as u64));
 
         group.sample_size(10);
         group.measurement_time(Duration::from_secs(20));

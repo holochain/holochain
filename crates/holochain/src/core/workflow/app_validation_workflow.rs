@@ -265,18 +265,18 @@ async fn app_validation_workflow_inner(
     })
 }
 
-pub async fn element_to_op(
-    element: Element,
+pub async fn record_to_op(
+    record: Record,
     op_type: DhtOpType,
     cascade: &mut Cascade,
 ) -> AppValidationOutcome<(Op, Option<Entry>)> {
     use DhtOpType::*;
     let mut activity_entry = None;
-    let (shh, entry) = element.into_inner();
+    let (shh, entry) = record.into_inner();
     let mut entry = entry.into_option();
     let action = shh.into();
     // Register agent activity doesn't store the entry so we need to
-    // save it so we can reconstruct the element later.
+    // save it so we can reconstruct the record later.
     if matches!(op_type, RegisterAgentActivity) {
         activity_entry = entry.take();
     }
@@ -284,38 +284,38 @@ pub async fn element_to_op(
     Ok((dhtop_to_op(dht_op, cascade).await?, activity_entry))
 }
 
-pub fn op_to_element(op: Op, activity_entry: Option<Entry>) -> Element {
+pub fn op_to_record(op: Op, activity_entry: Option<Entry>) -> Record {
     match op {
-        Op::StoreElement { element } => element,
+        Op::StoreRecord { record } => record,
         Op::StoreEntry { action, entry } => {
-            Element::new(SignedActionHashed::raw_from_same_hash(action), Some(entry))
+            Record::new(SignedActionHashed::raw_from_same_hash(action), Some(entry))
         }
         Op::RegisterUpdate {
             update, new_entry, ..
-        } => Element::new(
+        } => Record::new(
             SignedActionHashed::raw_from_same_hash(update),
             Some(new_entry),
         ),
         Op::RegisterDelete { delete, .. } => {
-            Element::new(SignedActionHashed::raw_from_same_hash(delete), None)
+            Record::new(SignedActionHashed::raw_from_same_hash(delete), None)
         }
-        Op::RegisterAgentActivity { action } => Element::new(
+        Op::RegisterAgentActivity { action } => Record::new(
             SignedActionHashed::raw_from_same_hash(action),
             activity_entry,
         ),
         Op::RegisterCreateLink { create_link, .. } => {
-            Element::new(SignedActionHashed::raw_from_same_hash(create_link), None)
+            Record::new(SignedActionHashed::raw_from_same_hash(create_link), None)
         }
         Op::RegisterDeleteLink { delete_link, .. } => {
-            Element::new(SignedActionHashed::raw_from_same_hash(delete_link), None)
+            Record::new(SignedActionHashed::raw_from_same_hash(delete_link), None)
         }
     }
 }
 
 async fn dhtop_to_op(op: DhtOp, cascade: &mut Cascade) -> AppValidationOutcome<Op> {
     let op = match op {
-        DhtOp::StoreElement(signature, action, entry) => Op::StoreElement {
-            element: Element::new(
+        DhtOp::StoreRecord(signature, action, entry) => Op::StoreRecord {
+            record: Record::new(
                 SignedActionHashed::with_presigned(
                     ActionHashed::from_content_sync(action),
                     signature,
@@ -334,7 +334,7 @@ async fn dhtop_to_op(op: DhtOp, cascade: &mut Cascade) -> AppValidationOutcome<O
             ),
         },
         DhtOp::RegisterUpdatedContent(signature, update, entry)
-        | DhtOp::RegisterUpdatedElement(signature, update, entry) => {
+        | DhtOp::RegisterUpdatedRecord(signature, update, entry) => {
             let new_entry = match entry {
                 Some(entry) => *entry,
                 None => cascade
@@ -435,7 +435,7 @@ where
     R: RibosomeT,
 {
     let zomes_to_invoke = match op {
-        Op::RegisterAgentActivity { .. } | Op::StoreElement { .. } => ZomesToInvoke::AllIntegrity,
+        Op::RegisterAgentActivity { .. } | Op::StoreRecord { .. } => ZomesToInvoke::AllIntegrity,
         Op::StoreEntry {
             action:
                 SignedHashed {
@@ -554,7 +554,7 @@ where
                     let mut cascade =
                         Cascade::from_workspace_network(&cascade_workspace, network.clone());
                     cascade
-                        .fetch_element(hash.clone(), NetworkGetOptions::must_get_options())
+                        .fetch_record(hash.clone(), NetworkGetOptions::must_get_options())
                         .await?;
                     Ok(hash)
                 });

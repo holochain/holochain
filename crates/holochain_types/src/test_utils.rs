@@ -1,9 +1,9 @@
 //! Some common testing helpers.
 
 use crate::dna::wasm::DnaWasm;
-use crate::element::SignedActionHashedExt;
 use crate::fixt::*;
 use crate::prelude::*;
+use crate::record::SignedActionHashedExt;
 use holochain_keystore::MetaLairClient;
 use std::path::PathBuf;
 
@@ -96,7 +96,7 @@ pub fn fake_cap_secret() -> CapSecret {
 }
 
 /// Create a fake SignedActionHashed and EntryHashed pair with random content
-pub async fn fake_unique_element(
+pub async fn fake_unique_record(
     keystore: &MetaLairClient,
     agent_key: AgentPubKey,
     visibility: EntryVisibility,

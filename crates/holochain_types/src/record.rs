@@ -1,12 +1,12 @@
-//! Defines a Element, the basic unit of Holochain data.
+//! Defines a Record, the basic unit of Holochain data.
 
 use crate::action::WireActionStatus;
 use crate::action::WireDelete;
 use crate::action::WireNewEntryAction;
 use crate::action::WireUpdateRelationship;
 use crate::prelude::*;
-use error::ElementGroupError;
-use error::ElementGroupResult;
+use error::RecordGroupError;
+use error::RecordGroupResult;
 use holochain_keystore::KeystoreError;
 use holochain_keystore::LairResult;
 use holochain_keystore::MetaLairClient;
@@ -19,9 +19,9 @@ use std::collections::BTreeSet;
 pub mod error;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes, Default)]
-/// A condensed version of get element request.
+/// A condensed version of get record request.
 /// This saves bandwidth by removing duplicated and implied data.
-pub struct WireElementOps {
+pub struct WireRecordOps {
     /// The action this request was for.
     pub action: Option<Judged<SignedAction>>,
     /// Any deletes on the action.
@@ -32,8 +32,8 @@ pub struct WireElementOps {
     pub entry: Option<Entry>,
 }
 
-impl WireElementOps {
-    /// Create an empty set of wire element ops.
+impl WireRecordOps {
+    /// Create an empty set of wire record ops.
     pub fn new() -> Self {
         Self::default()
     }
@@ -57,7 +57,7 @@ impl WireElementOps {
                 action,
                 signature,
                 status,
-                DhtOpType::StoreElement,
+                DhtOpType::StoreRecord,
             )?);
             if let Some(entry_hash) = entry_hash {
                 for op in deletes {
@@ -82,7 +82,7 @@ impl WireElementOps {
                         action,
                         signature,
                         status,
-                        DhtOpType::RegisterUpdatedElement,
+                        DhtOpType::RegisterUpdatedRecord,
                     )?);
                 }
             }
@@ -95,14 +95,14 @@ impl WireElementOps {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
-/// Element without the hashes for sending across the network
+/// Record without the hashes for sending across the network
 /// TODO: Remove this as it's no longer needed.
-pub struct WireElement {
-    /// The signed action for this element
+pub struct WireRecord {
+    /// The signed action for this record
     signed_action: SignedAction,
     /// If there is an entry associated with this action it will be here
     maybe_entry: Option<Entry>,
-    /// The validation status of this element.
+    /// The validation status of this record.
     validation_status: ValidationStatus,
     /// All deletes on this action
     deletes: Vec<WireActionStatus<WireDelete>>,
@@ -110,24 +110,24 @@ pub struct WireElement {
     updates: Vec<WireActionStatus<WireUpdateRelationship>>,
 }
 
-/// A group of elements with a common entry
+/// A group of records with a common entry
 #[derive(Debug, Clone)]
-pub struct ElementGroup<'a> {
+pub struct RecordGroup<'a> {
     actions: Vec<Cow<'a, SignedActionHashed>>,
     rejected: Vec<Cow<'a, SignedActionHashed>>,
     entry: Cow<'a, EntryHashed>,
 }
 
-/// Element with it's status
+/// Record with it's status
 #[derive(Debug, Clone, derive_more::Constructor)]
-pub struct ElementStatus {
-    /// The element this status applies to.
-    pub element: Element,
-    /// Validation status of this element.
+pub struct RecordStatus {
+    /// The record this status applies to.
+    pub record: Record,
+    /// Validation status of this record.
     pub status: ValidationStatus,
 }
 
-impl<'a> ElementGroup<'a> {
+impl<'a> RecordGroup<'a> {
     /// Get the actions and action hashes
     pub fn actions_and_hashes(&self) -> impl Iterator<Item = (&ActionHash, &Action)> {
         self.actions
@@ -144,14 +144,14 @@ impl<'a> ElementGroup<'a> {
         self.actions.len()
     }
     /// The entry's visibility
-    pub fn visibility(&self) -> ElementGroupResult<&EntryVisibility> {
+    pub fn visibility(&self) -> RecordGroupResult<&EntryVisibility> {
         self.actions
             .first()
-            .ok_or(ElementGroupError::Empty)?
+            .ok_or(RecordGroupError::Empty)?
             .action()
             .entry_data()
             .map(|(_, et)| et.visibility())
-            .ok_or(ElementGroupError::MissingEntryData)
+            .ok_or(RecordGroupError::MissingEntryData)
     }
     /// The entry hash
     pub fn entry_hash(&self) -> &EntryHash {
@@ -180,12 +180,12 @@ impl<'a> ElementGroup<'a> {
         self.rejected.iter().map(|shh| shh.action_address())
     }
 
-    /// Create an element group from wire actions and an entry
-    pub fn from_wire_elements<I: IntoIterator<Item = WireActionStatus<WireNewEntryAction>>>(
+    /// Create an record group from wire actions and an entry
+    pub fn from_wire_records<I: IntoIterator<Item = WireActionStatus<WireNewEntryAction>>>(
         actions_iter: I,
         entry_type: EntryType,
         entry: Entry,
-    ) -> ElementGroupResult<ElementGroup<'a>> {
+    ) -> RecordGroupResult<RecordGroup<'a>> {
         let iter = actions_iter.into_iter();
         let mut valid = Vec::with_capacity(iter.size_hint().0);
         let mut rejected = Vec::with_capacity(iter.size_hint().0);
@@ -217,16 +217,16 @@ impl<'a> ElementGroup<'a> {
 /// Responses from a dht get.
 /// These vary is size depending on the level of metadata required
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
-pub enum GetElementResponse {
+pub enum GetRecordResponse {
     /// Can be combined with any other metadata monotonically
     GetEntryFull(Option<Box<RawGetEntryResponse>>),
     /// Placeholder for more optimized get
     GetEntryPartial,
     /// Placeholder for more optimized get
     GetEntryCollapsed,
-    /// Get a single element
+    /// Get a single record
     /// Can be combined with other metadata monotonically
-    GetAction(Option<Box<WireElement>>),
+    GetAction(Option<Box<WireRecord>>),
 }
 
 /// This type gives full metadata that can be combined
@@ -256,26 +256,26 @@ pub struct RawGetEntryResponse {
 }
 
 impl RawGetEntryResponse {
-    /// Creates the response from a set of chain elements
+    /// Creates the response from a set of chain records
     /// that share the same entry with any deletes.
     /// Note: It's the callers responsibility to check that
-    /// elements all have the same entry. This is not checked
+    /// records all have the same entry. This is not checked
     /// due to the performance cost.
     /// ### Panics
-    /// If the elements are not an action of Create or EntryDelete
+    /// If the records are not an action of Create or EntryDelete
     /// or there is no entry or the entry hash is different
-    pub fn from_elements<E>(
-        elements: E,
+    pub fn from_records<E>(
+        records: E,
         deletes: Vec<WireActionStatus<WireDelete>>,
         updates: Vec<WireActionStatus<WireUpdateRelationship>>,
     ) -> Option<Self>
     where
-        E: IntoIterator<Item = ElementStatus>,
+        E: IntoIterator<Item = RecordStatus>,
     {
-        let mut elements = elements.into_iter();
-        elements.next().map(|ElementStatus { element, status }| {
+        let mut records = records.into_iter();
+        records.next().map(|RecordStatus { record, status }| {
             let mut live_actions = BTreeSet::new();
-            let (new_entry_action, entry_type, entry) = Self::from_element(element);
+            let (new_entry_action, entry_type, entry) = Self::from_record(record);
             live_actions.insert(WireActionStatus::new(new_entry_action, status));
             let r = Self {
                 live_actions,
@@ -284,8 +284,8 @@ impl RawGetEntryResponse {
                 entry,
                 entry_type,
             };
-            elements.fold(r, |mut response, ElementStatus { element, status }| {
-                let (new_entry_action, entry_type, entry) = Self::from_element(element);
+            records.fold(r, |mut response, RecordStatus { record, status }| {
+                let (new_entry_action, entry_type, entry) = Self::from_record(record);
                 debug_assert_eq!(response.entry, entry);
                 debug_assert_eq!(response.entry_type, entry_type);
                 response
@@ -296,8 +296,8 @@ impl RawGetEntryResponse {
         })
     }
 
-    fn from_element(element: Element) -> (WireNewEntryAction, EntryType, Entry) {
-        let (shh, entry) = element.into_inner();
+    fn from_record(record: Record) -> (WireNewEntryAction, EntryType, Entry) {
+        let (shh, entry) = record.into_inner();
         let entry = entry
             .into_option()
             .expect("Get entry responses cannot be created without entries");
@@ -324,14 +324,14 @@ impl RawGetEntryResponse {
 
 /// Extension trait to keep zome types minimal
 #[async_trait::async_trait]
-pub trait ElementExt {
+pub trait RecordExt {
     /// Validate the signature matches the data
     async fn validate(&self) -> Result<(), KeystoreError>;
 }
 
 #[async_trait::async_trait]
-impl ElementExt for Element {
-    /// Validates a chain element
+impl RecordExt for Record {
+    /// Validates a chain record
     async fn validate(&self) -> Result<(), KeystoreError> {
         self.signed_action().validate().await?;
 
@@ -389,18 +389,18 @@ impl SignedActionHashedExt for SignedActionHashed {
     }
 }
 
-impl WireElement {
-    /// Convert into a [Element], deletes and updates when receiving from the network
-    pub fn into_parts(self) -> (ElementStatus, Vec<ElementStatus>, Vec<ElementStatus>) {
+impl WireRecord {
+    /// Convert into a [Record], deletes and updates when receiving from the network
+    pub fn into_parts(self) -> (RecordStatus, Vec<RecordStatus>, Vec<RecordStatus>) {
         let entry_hash = self.signed_action.action().entry_hash().cloned();
-        let action = Element::new(
+        let action = Record::new(
             SignedActionHashed::from_content_sync(self.signed_action),
             self.maybe_entry,
         );
         let deletes = self
             .deletes
             .into_iter()
-            .map(WireActionStatus::<WireDelete>::into_element_status)
+            .map(WireActionStatus::<WireDelete>::into_record_status)
             .collect();
         let updates = self
             .updates
@@ -409,26 +409,26 @@ impl WireElement {
                 let entry_hash = entry_hash
                     .clone()
                     .expect("Updates cannot be on actions that do not have entries");
-                u.into_element_status(entry_hash)
+                u.into_record_status(entry_hash)
             })
             .collect();
         (
-            ElementStatus::new(action, self.validation_status),
+            RecordStatus::new(action, self.validation_status),
             deletes,
             updates,
         )
     }
-    /// Convert from a [Element] when sending to the network
-    pub fn from_element(
-        e: ElementStatus,
+    /// Convert from a [Record] when sending to the network
+    pub fn from_record(
+        e: RecordStatus,
         deletes: Vec<WireActionStatus<WireDelete>>,
         updates: Vec<WireActionStatus<WireUpdateRelationship>>,
     ) -> Self {
-        let ElementStatus { element, status } = e;
-        let (signed_action, maybe_entry) = element.into_inner();
+        let RecordStatus { record, status } = e;
+        let (signed_action, maybe_entry) = record.into_inner();
         Self {
             signed_action: signed_action.into(),
-            // TODO: consider refactoring WireElement to use ElementEntry
+            // TODO: consider refactoring WireRecord to use RecordEntry
             // instead of Option<Entry>
             maybe_entry: maybe_entry.into_option(),
             validation_status: status,

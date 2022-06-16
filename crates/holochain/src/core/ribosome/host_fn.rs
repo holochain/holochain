@@ -70,7 +70,7 @@ host_fn_api_impls! {
     // The EntryDefId determines how a create is handled on the host side.
     // CapGrant and CapClaim are handled natively.
     // App entries are referenced by entry defs then SerializedBytes stuffed into an Entry::App.
-    // Returns ActionHash of the newly created element.
+    // Returns ActionHash of the newly created record.
     fn create (zt::entry::CreateInput) -> holo_hash::ActionHash;
 
     fn x_salsa20_poly1305_shared_secret_create_random(
@@ -107,10 +107,10 @@ host_fn_api_impls! {
     // Delete an entry.
     fn delete (zt::entry::DeleteInput) -> holo_hash::ActionHash;
 
-    // Delete a CreateLink element.
+    // Delete a CreateLink record.
     fn delete_link (zt::link::DeleteLinkInput) -> holo_hash::ActionHash;
 
-    // Action hash of the newly committed element.
+    // Action hash of the newly committed record.
     // Emit a Signal::App to subscribers on the interface
     fn emit_signal (zt::signal::AppSignal) -> ();
 
@@ -119,7 +119,7 @@ host_fn_api_impls! {
     fn trace (zt::trace::TraceMsg) -> ();
 
     // Attempt to get a live entry from the cascade.
-    fn get (Vec<zt::entry::GetInput>) -> Vec<Option<zt::element::Element>>;
+    fn get (Vec<zt::entry::GetInput>) -> Vec<Option<zt::record::Record>>;
 
     fn get_agent_activity (zt::agent_activity::GetAgentActivityInput) -> zt::query::AgentActivity;
 
@@ -133,8 +133,8 @@ host_fn_api_impls! {
     // Hash data on the host.
     fn hash (zt::hash::HashInput) -> zt::hash::HashOutput;
 
-    // Retreive an element from the DHT or short circuit.
-    fn must_get_valid_element (zt::entry::MustGetValidElementInput) -> Element;
+    // Retreive an record from the DHT or short circuit.
+    fn must_get_valid_record (zt::entry::MustGetValidRecordInput) -> Record;
 
     // Retreive a entry from the DHT or short circuit.
     fn must_get_entry (zt::entry::MustGetEntryInput) -> EntryHashed;
@@ -146,7 +146,7 @@ host_fn_api_impls! {
     fn accept_countersigning_preflight_request(zt::countersigning::PreflightRequest) -> zt::countersigning::PreflightRequestAcceptance;
 
     // Query the source chain for data.
-    fn query (zt::query::ChainQueryFilter) -> Vec<Element>;
+    fn query (zt::query::ChainQueryFilter) -> Vec<Record>;
 
     // the length of random bytes to create
     fn random_bytes (u32) -> zt::bytes::Bytes;
@@ -176,7 +176,7 @@ host_fn_api_impls! {
     // Current system time, in the opinion of the host, as a `Duration`.
     fn sys_time (()) -> zt::timestamp::Timestamp;
 
-    // Same as  but also takes the ActionHash of the updated element.
+    // Same as  but also takes the ActionHash of the updated record.
     fn update (zt::entry::UpdateInput) -> holo_hash::ActionHash;
 
     fn verify_signature (zt::signature::VerifySignature) -> bool;

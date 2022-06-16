@@ -100,10 +100,10 @@ impl Expected {
         self.0.insert(event);
     }
 
-    fn activity_and_element_all_zomes(&mut self, mut event: Event) {
+    fn activity_and_record_all_zomes(&mut self, mut event: Event) {
         event.op_type = DhtOpType::RegisterAgentActivity;
         self.all_zomes(event.clone());
-        event.op_type = DhtOpType::StoreElement;
+        event.op_type = DhtOpType::StoreRecord;
         self.all_zomes(event.clone());
     }
 
@@ -114,12 +114,12 @@ impl Expected {
         }
     }
 
-    fn activity_and_element_for_zomes(&mut self, mut event: Event, zomes: &[&'static str]) {
+    fn activity_and_record_for_zomes(&mut self, mut event: Event, zomes: &[&'static str]) {
         event.op_type = DhtOpType::RegisterAgentActivity;
 
         self.zomes(event.clone(), zomes);
 
-        event.op_type = DhtOpType::StoreElement;
+        event.op_type = DhtOpType::StoreRecord;
 
         self.zomes(event.clone(), zomes);
     }
@@ -129,19 +129,19 @@ impl Expected {
             action: ActionLocation::expected(agent, ActionType::Dna, 0),
             ..Default::default()
         };
-        self.activity_and_element_for_zomes(event.clone(), zomes);
+        self.activity_and_record_for_zomes(event.clone(), zomes);
 
         let event = Event {
             action: ActionLocation::expected(agent, ActionType::AgentValidationPkg, 1),
             ..Default::default()
         };
-        self.activity_and_element_for_zomes(event.clone(), zomes);
+        self.activity_and_record_for_zomes(event.clone(), zomes);
 
         let mut event = Event {
             action: ActionLocation::expected(agent, ActionType::Create, 2),
             ..Default::default()
         };
-        self.activity_and_element_for_zomes(event.clone(), zomes);
+        self.activity_and_record_for_zomes(event.clone(), zomes);
 
         event.op_type = DhtOpType::StoreEntry;
         self.zomes(event.clone(), zomes);
@@ -152,7 +152,7 @@ impl Expected {
             action: ActionLocation::expected(agent, ActionType::InitZomesComplete, 3),
             ..Default::default()
         };
-        self.activity_and_element_all_zomes(event.clone());
+        self.activity_and_record_all_zomes(event.clone());
     }
 }
 
@@ -196,9 +196,9 @@ async fn app_validation_ops() {
          events: tokio::sync::mpsc::Sender<Event>| {
             move |_api: BoxApi, op: Op| {
                 let event = match op {
-                    Op::StoreElement { element } => Event {
-                        action: ActionLocation::new(element.action().clone(), &agents),
-                        op_type: DhtOpType::StoreElement,
+                    Op::StoreRecord { record } => Event {
+                        action: ActionLocation::new(record.action().clone(), &agents),
+                        op_type: DhtOpType::StoreRecord,
                         called_zome: zome,
                         with_entry_def_index: None,
                     },
@@ -382,7 +382,7 @@ async fn app_validation_ops() {
         action: ActionLocation::expected(ALICE, ActionType::Create, 4),
         ..Default::default()
     };
-    expected.activity_and_element_all_zomes(event.clone());
+    expected.activity_and_record_all_zomes(event.clone());
 
     let entry_def_id = conductors[0]
         .get_ribosome(dna_file_a.dna_hash())

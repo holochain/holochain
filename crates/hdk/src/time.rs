@@ -24,7 +24,7 @@ use crate::prelude::*;
 /// - the times in the actions of the local source chain must increase monotonically and all
 ///   actions are pushed to the neighbourhood of the agent publishing them, so the agent activity
 ///   authorities will immediately warrant any actions running chronologically backwards
-/// - the times within a single element may be relatively secure but are easy to manipulate in an
+/// - the times within a single record may be relatively secure but are easy to manipulate in an
 ///   absolute sense, the user can simply change their system clock before attempting a commit to
 ///   any time that is equal to or later than their current chain head
 ///

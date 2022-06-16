@@ -19,7 +19,7 @@ use holochain_keystore::MetaLairClient;
 use holochain_state::prelude::{fresh_reader_test, StateMutationError, Store, Txn};
 use holochain_types::{inline_zome::InlineZomeSet, prelude::*};
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::{element::ElementEntry, op::Op};
+use holochain_zome_types::{op::Op, record::RecordEntry};
 use matches::assert_matches;
 use tokio_stream::StreamExt;
 
@@ -123,20 +123,20 @@ async fn inline_zome_2_agents_1_dna() -> anyhow::Result<()> {
     .await;
 
     // Verify that bobbo can run "read" on his cell and get alice's Action
-    let elements: Vec<Option<Element>> = conductor
+    let records: Vec<Option<Record>> = conductor
         .call(&bobbo.zome(SweetEasyInline::COORDINATOR), "read", hash)
         .await;
-    let element = elements
+    let record = records
         .into_iter()
         .next()
         .unwrap()
-        .expect("Element was None: bobbo couldn't `get` it");
+        .expect("Record was None: bobbo couldn't `get` it");
 
-    // Assert that the Element bobbo sees matches what alice committed
-    assert_eq!(element.action().author(), alice.agent_pubkey());
+    // Assert that the Record bobbo sees matches what alice committed
+    assert_eq!(record.action().author(), alice.agent_pubkey());
     assert_eq!(
-        *element.entry(),
-        ElementEntry::Present(Entry::app(().try_into().unwrap()).unwrap())
+        *record.entry(),
+        RecordEntry::Present(Entry::app(().try_into().unwrap()).unwrap())
     );
 
     Ok(())
@@ -198,43 +198,43 @@ async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
 
     // Verify that bobbo can run "read" on his cell and get alice's Action
     // on the "foo" DNA
-    let elements: Vec<Option<Element>> = conductor
+    let records: Vec<Option<Record>> = conductor
         .call(
             &bobbo_foo.zome(SweetEasyInline::COORDINATOR),
             "read",
             hash_foo,
         )
         .await;
-    let element = elements
+    let record = records
         .into_iter()
         .next()
         .unwrap()
-        .expect("Element was None: bobbo couldn't `get` it");
-    assert_eq!(element.action().author(), alice_foo.agent_pubkey());
+        .expect("Record was None: bobbo couldn't `get` it");
+    assert_eq!(record.action().author(), alice_foo.agent_pubkey());
     assert_eq!(
-        *element.entry(),
-        ElementEntry::Present(Entry::app(().try_into().unwrap()).unwrap())
+        *record.entry(),
+        RecordEntry::Present(Entry::app(().try_into().unwrap()).unwrap())
     );
 
     // Verify that carol can run "read" on her cell and get alice's Action
     // on the "bar" DNA
     // Let's do it with the SweetZome instead of the SweetCell too, for fun
-    let elements: Vec<Option<Element>> = conductor
+    let records: Vec<Option<Record>> = conductor
         .call(
             &carol_bar.zome(SweetEasyInline::COORDINATOR),
             "read",
             hash_bar,
         )
         .await;
-    let element = elements
+    let record = records
         .into_iter()
         .next()
         .unwrap()
-        .expect("Element was None: carol couldn't `get` it");
-    assert_eq!(element.action().author(), alice_bar.agent_pubkey());
+        .expect("Record was None: carol couldn't `get` it");
+    assert_eq!(record.action().author(), alice_bar.agent_pubkey());
     assert_eq!(
-        *element.entry(),
-        ElementEntry::Present(Entry::app(().try_into().unwrap()).unwrap())
+        *record.entry(),
+        RecordEntry::Present(Entry::app(().try_into().unwrap()).unwrap())
     );
 
     Ok(())
@@ -301,25 +301,25 @@ async fn get_deleted() -> anyhow::Result<()> {
 
     wait_for_integration_1m(alice.dht_db(), expected_count).await;
 
-    let elements: Vec<Option<Element>> = conductor
+    let records: Vec<Option<Record>> = conductor
         .call(
             &alice.zome(SweetEasyInline::COORDINATOR),
             "read",
             hash.clone(),
         )
         .await;
-    let element = elements
+    let record = records
         .into_iter()
         .next()
         .unwrap()
-        .expect("Element was None: bobbo couldn't `get` it");
+        .expect("Record was None: bobbo couldn't `get` it");
 
-    assert_eq!(element.action().author(), alice.agent_pubkey());
+    assert_eq!(record.action().author(), alice.agent_pubkey());
     assert_eq!(
-        *element.entry(),
-        ElementEntry::Present(Entry::app(().try_into().unwrap()).unwrap())
+        *record.entry(),
+        RecordEntry::Present(Entry::app(().try_into().unwrap()).unwrap())
     );
-    let entry_hash = element.action().entry_hash().unwrap();
+    let entry_hash = record.action().entry_hash().unwrap();
 
     let _: ActionHash = conductor
         .call(
@@ -332,14 +332,14 @@ async fn get_deleted() -> anyhow::Result<()> {
     expected_count += WaitOps::DELETE;
     wait_for_integration_1m(alice.dht_db(), expected_count).await;
 
-    let elements: Vec<Option<Element>> = conductor
+    let records: Vec<Option<Record>> = conductor
         .call(
             &alice.zome(SweetEasyInline::COORDINATOR),
             "read_entry",
             entry_hash,
         )
         .await;
-    assert!(elements.into_iter().next().unwrap().is_none());
+    assert!(records.into_iter().next().unwrap().is_none());
 
     Ok(())
 }
@@ -420,7 +420,7 @@ async fn simple_validation() -> anyhow::Result<()> {
 
     // This call passes validation
     let h1: ActionHash = conductor.call(&alice, "create", AppString::new("A")).await;
-    let e1s: Vec<Option<Element>> = conductor.call(&alice, "read", &h1).await;
+    let e1s: Vec<Option<Record>> = conductor.call(&alice, "read", &h1).await;
     let e1 = e1s.into_iter().next().unwrap();
     let s1: AppString = e1.unwrap().entry().to_app_option().unwrap().unwrap();
     assert_eq!(s1, AppString::new("A"));
@@ -478,14 +478,14 @@ async fn can_call_real_zomes_too() {
         .call(&cell.zome(SweetEasyInline::COORDINATOR), "create_unit", ())
         .await;
 
-    let el: Option<Element> = conductor
+    let el: Option<Record> = conductor
         .call(&cell.zome("create_entry"), "get_post", hash.clone())
         .await;
     assert_eq!(el.unwrap().action_address(), &hash)
 }
 
 #[tokio::test(flavor = "multi_thread")]
-/// Test that elements can be manually inserted into a source chain.
+/// Test that records can be manually inserted into a source chain.
 async fn insert_source_chain() {
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome())
         .await
@@ -500,7 +500,7 @@ async fn insert_source_chain() {
     let zome = alice.zome(SweetEasyInline::COORDINATOR);
 
     // Trigger init.
-    let _: Vec<Option<Element>> = conductor
+    let _: Vec<Option<Record>> = conductor
         .call(
             &zome,
             "read_entry",
@@ -524,11 +524,11 @@ async fn insert_source_chain() {
 
     // Get the source chain.
     let chain = get_chain(alice.authored_db().clone());
-    let original_elements: Vec<_> = fresh_reader_test(alice.authored_db().clone(), |txn| {
+    let original_records: Vec<_> = fresh_reader_test(alice.authored_db().clone(), |txn| {
         let txn: Txn = (&txn).into();
         chain
             .iter()
-            .map(|h| txn.get_element(&h.0.clone().into()).unwrap().unwrap())
+            .map(|h| txn.get_record(&h.0.clone().into()).unwrap().unwrap())
             .collect()
     });
     // Chain should be 4 long.
@@ -550,10 +550,10 @@ async fn insert_source_chain() {
         ActionHashed::from_content_sync(action.clone().into()),
         fixt!(Signature),
     );
-    let element = Element::new(shh, Some(entry.clone()));
+    let record = Record::new(shh, Some(entry.clone()));
     let result = conductor
         .clone()
-        .insert_elements_into_source_chain(alice.cell_id().clone(), false, false, vec![element])
+        .insert_records_into_source_chain(alice.cell_id().clone(), false, false, vec![record])
         .await;
     // This gets rejected.
     assert!(matches!(
@@ -566,11 +566,11 @@ async fn insert_source_chain() {
     // Insert with correct author.
     action.author = alice.agent_pubkey().clone();
 
-    let element = make_element(&conductor.keystore(), action.clone().into()).await;
-    let hash = element.action_address().clone();
+    let record = make_record(&conductor.keystore(), action.clone().into()).await;
+    let hash = record.action_address().clone();
     conductor
         .clone()
-        .insert_elements_into_source_chain(alice.cell_id().clone(), false, false, vec![element])
+        .insert_records_into_source_chain(alice.cell_id().clone(), false, false, vec![record])
         .await
         .expect("Should pass with valid agent");
 
@@ -584,15 +584,15 @@ async fn insert_source_chain() {
     action.action_seq = 3;
     action.prev_action = chain[2].0.clone();
 
-    let element = make_element(&conductor.keystore(), action.clone().into()).await;
-    let hash = element.action_address().clone();
+    let record = make_record(&conductor.keystore(), action.clone().into()).await;
+    let hash = record.action_address().clone();
     let result = conductor
         .clone()
-        .insert_elements_into_source_chain(
+        .insert_records_into_source_chain(
             alice.cell_id().clone(),
             false,
             false,
-            vec![element.clone()],
+            vec![record.clone()],
         )
         .await;
 
@@ -608,11 +608,11 @@ async fn insert_source_chain() {
     // Insert with truncation on.
     let result = conductor
         .clone()
-        .insert_elements_into_source_chain(
+        .insert_records_into_source_chain(
             alice.cell_id().clone(),
             true,
             false,
-            vec![element.clone()],
+            vec![record.clone()],
         )
         .await;
 
@@ -626,14 +626,14 @@ async fn insert_source_chain() {
     // The new action will be in the chain
     assert!(chain.iter().any(|i| i.0 == hash));
 
-    // Restore the original elements
+    // Restore the original records
     let result = conductor
         .clone()
-        .insert_elements_into_source_chain(
+        .insert_records_into_source_chain(
             alice.cell_id().clone(),
             true,
             false,
-            original_elements.clone(),
+            original_records.clone(),
         )
         .await;
 
@@ -647,32 +647,32 @@ async fn insert_source_chain() {
     // Make the action a fork
     action.action_seq = 2;
     action.prev_action = chain[1].0.clone();
-    let element = make_element(&conductor.keystore(), action.clone().into()).await;
+    let record = make_record(&conductor.keystore(), action.clone().into()).await;
 
     // Insert an invalid action with validation on.
     let result = conductor
         .clone()
-        .insert_elements_into_source_chain(
+        .insert_records_into_source_chain(
             alice.cell_id().clone(),
             false,
             true,
-            vec![element.clone()],
+            vec![record.clone()],
         )
         .await;
 
     // Fork is detected
     assert!(result.is_err());
 
-    // Restore and validate the original elements
+    // Restore and validate the original records
     conductor
         .clone()
-        .insert_elements_into_source_chain(
+        .insert_records_into_source_chain(
             alice.cell_id().clone(),
             true,
             true,
-            original_elements.clone(),
+            original_records.clone(),
         )
-        // Restoring the original elements is ok because they
+        // Restoring the original records is ok because they
         // will pass validation.
         .await
         .expect("Should restore original chain");
@@ -686,11 +686,11 @@ async fn insert_source_chain() {
     // Insert the chain from the original conductor.
     conductor
         .clone()
-        .insert_elements_into_source_chain(
+        .insert_records_into_source_chain(
             alice.cell_id().clone(),
             true,
             true,
-            original_elements.clone(),
+            original_records.clone(),
         )
         .await
         .expect("Can cold start");
@@ -707,7 +707,7 @@ async fn insert_source_chain() {
     assert_eq!(chain.last().unwrap().1, 3);
 }
 
-async fn make_element(keystore: &MetaLairClient, action: Action) -> Element {
+async fn make_record(keystore: &MetaLairClient, action: Action) -> Record {
     let shh = SignedActionHashed::sign(
         keystore,
         ActionHashed::from_content_sync(action.clone().into()),
@@ -715,7 +715,7 @@ async fn make_element(keystore: &MetaLairClient, action: Action) -> Element {
     .await
     .unwrap();
     let entry = Entry::app(().try_into().unwrap()).unwrap();
-    Element::new(shh, Some(entry.clone()))
+    Record::new(shh, Some(entry.clone()))
 }
 
 /// Simple scenario involving two agents using the same DNA

@@ -109,12 +109,12 @@ fn call_must_get_action(
     HDI.with(|i| i.borrow().must_get_action(must_get_action_input))
 }
 #[hdk_extern]
-fn call_must_get_valid_element(
-    must_get_valid_element_input: MustGetValidElementInput,
-) -> ExternResult<Element> {
+fn call_must_get_valid_record(
+    must_get_valid_record_input: MustGetValidRecordInput,
+) -> ExternResult<Record> {
     HDI.with(|i| {
         i.borrow()
-            .must_get_valid_element(must_get_valid_element_input)
+            .must_get_valid_record(must_get_valid_record_input)
     })
 }
 // Info
@@ -200,9 +200,9 @@ pub mod test {
             move |_| Ok(dna.clone())
         });
 
-        mock_hdi.expect_must_get_valid_element().once().returning({
+        mock_hdi.expect_must_get_valid_record().once().returning({
             let dna = dna.clone();
-            move |_| Ok(Element::new(dna.clone(), None))
+            move |_| Ok(Record::new(dna.clone(), None))
         });
 
         mock_hdi.expect_dna_info().once().returning({
@@ -245,7 +245,7 @@ pub mod test {
 
         call_must_get_action(MustGetActionInput(empty_action_hash.clone())).unwrap();
 
-        call_must_get_valid_element(MustGetValidElementInput(empty_action_hash.clone())).unwrap();
+        call_must_get_valid_record(MustGetValidRecordInput(empty_action_hash.clone())).unwrap();
 
         call_dna_info(()).unwrap();
 

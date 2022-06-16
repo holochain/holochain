@@ -228,7 +228,7 @@ impl Db {
                                     AND basis_hash = :basis
                                     AND action_hash = :hash
                                     AND validation_status = :status
-                                    AND (type = :update_content OR type = :update_element)
+                                    AND (type = :update_content OR type = :update_record)
                                 )
                                 ",
                                 named_params! {
@@ -236,7 +236,7 @@ impl Db {
                                     ":hash": hash,
                                     ":status": ValidationStatus::Valid,
                                     ":update_content": DhtOpType::RegisterUpdatedContent,
-                                    ":update_element": DhtOpType::RegisterUpdatedElement,
+                                    ":update_record": DhtOpType::RegisterUpdatedRecord,
                                 },
                                 |row| row.get(0),
                             )
@@ -401,13 +401,13 @@ fn register_agent_activity(mut a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) 
     (pre_state, expect, "register agent activity")
 }
 
-fn register_updated_element(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
-    let original_op = DhtOp::StoreElement(
+fn register_updated_record(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
+    let original_op = DhtOp::StoreRecord(
         a.signature.clone(),
         a.original_action.clone().into(),
         Some(a.original_entry.clone().into()),
     );
-    let op = DhtOp::RegisterUpdatedElement(
+    let op = DhtOp::RegisterUpdatedRecord(
         a.signature.clone(),
         a.entry_update_action.clone(),
         Some(a.new_entry.clone().into()),
@@ -420,7 +420,7 @@ fn register_updated_element(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
             a.entry_update_action.clone().into(),
         ),
     ];
-    (pre_state, expect, "register updated element")
+    (pre_state, expect, "register updated record")
 }
 
 fn register_replaced_by_for_entry(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
@@ -465,7 +465,7 @@ fn register_deleted_by(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
 }
 
 fn register_deleted_action_by(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
-    let original_op = DhtOp::StoreElement(
+    let original_op = DhtOp::StoreRecord(
         a.signature.clone(),
         a.original_action.clone().into(),
         Some(a.original_entry.clone().into()),
@@ -524,7 +524,7 @@ async fn test_ops_state() {
     let tests = [
         register_agent_activity,
         register_replaced_by_for_entry,
-        register_updated_element,
+        register_updated_record,
         register_deleted_by,
         register_deleted_action_by,
         register_delete_link,

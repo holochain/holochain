@@ -7,7 +7,7 @@ use crate::conductor::space::Space;
 use crate::conductor::ConductorHandle;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::queue_consumer::WorkComplete;
-use crate::core::sys_validate::check_and_hold_store_element;
+use crate::core::sys_validate::check_and_hold_store_record;
 use crate::core::sys_validate::*;
 use crate::core::validation::*;
 use error::WorkflowResult;
@@ -181,7 +181,7 @@ async fn sys_validation_workflow_inner(
                             // action. We have neither that's why where here.
                             //
                             // We need to be holding the dependency because
-                            // we were meant to get a StoreElement or StoreEntry or
+                            // we were meant to get a StoreRecord or StoreEntry or
                             // RegisterAgentActivity or RegisterAddLink.
                             let status = ValidationLimboStatus::AwaitingSysDeps(missing_dep);
                             put_validation_limbo(txn, &op_hash, status)?;
@@ -311,8 +311,8 @@ async fn validate_op_inner(
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
 ) -> SysValidationResult<()> {
     match op {
-        DhtOp::StoreElement(_, action, entry) => {
-            store_element(action, workspace, network.clone()).await?;
+        DhtOp::StoreRecord(_, action, entry) => {
+            store_record(action, workspace, network.clone()).await?;
             if let Some(entry) = entry {
                 // Retrieve for all other actions on countersigned entry.
                 if let Entry::CounterSign(session_data, _) = &**entry {
@@ -347,10 +347,10 @@ async fn validate_op_inner(
         DhtOp::StoreEntry(_, action, entry) => {
             // Check and hold for all other actions on countersigned entry.
             if let Entry::CounterSign(session_data, _) = &**entry {
-                let dependency_check = |_original_element: &Element| Ok(());
+                let dependency_check = |_original_record: &Record| Ok(());
                 let entry_hash = EntryHash::with_data_sync(&**entry);
                 for action in session_data.build_action_set(entry_hash)? {
-                    check_and_hold_store_element(
+                    check_and_hold_store_record(
                         &ActionHash::with_data_sync(&action),
                         workspace,
                         network.clone(),
@@ -371,13 +371,13 @@ async fn validate_op_inner(
             .await?;
 
             let action = action.clone().into();
-            store_element(&action, workspace, network).await?;
+            store_record(&action, workspace, network).await?;
             Ok(())
         }
         DhtOp::RegisterAgentActivity(_, action) => {
             register_agent_activity(action, workspace, network.clone(), incoming_dht_ops_sender)
                 .await?;
-            store_element(action, workspace, network).await?;
+            store_record(action, workspace, network).await?;
             Ok(())
         }
         DhtOp::RegisterUpdatedContent(_, action, entry) => {
@@ -396,8 +396,8 @@ async fn validate_op_inner(
 
             Ok(())
         }
-        DhtOp::RegisterUpdatedElement(_, action, entry) => {
-            register_updated_element(action, workspace, network.clone(), incoming_dht_ops_sender)
+        DhtOp::RegisterUpdatedRecord(_, action, entry) => {
+            register_updated_record(action, workspace, network.clone(), incoming_dht_ops_sender)
                 .await?;
             if let Some(entry) = entry {
                 store_entry(
@@ -432,28 +432,28 @@ async fn validate_op_inner(
     }
 }
 
-#[instrument(skip(element, call_zome_workspace, network, conductor_handle))]
+#[instrument(skip(record, call_zome_workspace, network, conductor_handle))]
 /// Direct system validation call that takes
-/// an Element instead of an op.
+/// an Record instead of an op.
 /// Does not require holding dependencies.
 /// Will not await dependencies and instead returns
 /// that outcome immediately.
-pub async fn sys_validate_element(
-    element: &Element,
+pub async fn sys_validate_record(
+    record: &Record,
     call_zome_workspace: &HostFnWorkspace,
     network: HolochainP2pDna,
     conductor_handle: &dyn ConductorHandleT,
 ) -> SysValidationOutcome<()> {
-    trace!(?element);
+    trace!(?record);
     // Create a SysValidationWorkspace with the scratches from the CallZomeWorkspace
     let workspace = SysValidationWorkspace::from(call_zome_workspace);
     let result =
-        match sys_validate_element_inner(element, &workspace, network, conductor_handle).await {
+        match sys_validate_record_inner(record, &workspace, network, conductor_handle).await {
             // Validation succeeded
             Ok(_) => Ok(()),
             // Validation failed so exit with that outcome
             Err(SysValidationError::ValidationOutcome(validation_outcome)) => {
-                error!(msg = "Direct validation failed", ?element);
+                error!(msg = "Direct validation failed", ?record);
                 validation_outcome.into_outcome()
             }
             // An error occurred so return it
@@ -463,15 +463,15 @@ pub async fn sys_validate_element(
     result
 }
 
-async fn sys_validate_element_inner(
-    element: &Element,
+async fn sys_validate_record_inner(
+    record: &Record,
     workspace: &SysValidationWorkspace,
     network: HolochainP2pDna,
     conductor_handle: &dyn ConductorHandleT,
 ) -> SysValidationResult<()> {
-    let signature = element.signature();
-    let action = element.action();
-    let maybe_entry = element.entry().as_option();
+    let signature = record.signature();
+    let action = record.action();
+    let maybe_entry = record.entry().as_option();
     counterfeit_check(signature, action).await?;
 
     async fn validate(
@@ -482,7 +482,7 @@ async fn sys_validate_element_inner(
         conductor_handle: &dyn ConductorHandleT,
     ) -> SysValidationResult<()> {
         let incoming_dht_ops_sender = None;
-        store_element(action, workspace, network.clone()).await?;
+        store_record(action, workspace, network.clone()).await?;
         if let Some((maybe_entry, EntryVisibility::Public)) =
             &maybe_entry.and_then(|e| action.entry_type().map(|et| (e, et.visibility())))
         {
@@ -570,7 +570,7 @@ async fn register_agent_activity(
     Ok(())
 }
 
-async fn store_element(
+async fn store_record(
     action: &Action,
     workspace: &SysValidationWorkspace,
     network: HolochainP2pDna,
@@ -645,7 +645,7 @@ async fn register_updated_content(
     let original_action_address = &entry_update.original_action_address;
 
     let dependency_check =
-        |original_element: &Element| update_check(entry_update, original_element.action());
+        |original_record: &Record| update_check(entry_update, original_record.action());
     check_and_hold_store_entry(
         original_action_address,
         workspace,
@@ -657,7 +657,7 @@ async fn register_updated_content(
     Ok(())
 }
 
-async fn register_updated_element(
+async fn register_updated_record(
     entry_update: &Update,
     workspace: &SysValidationWorkspace,
     network: HolochainP2pDna,
@@ -667,9 +667,9 @@ async fn register_updated_element(
     let original_action_address = &entry_update.original_action_address;
 
     let dependency_check =
-        |original_element: &Element| update_check(entry_update, original_element.action());
+        |original_record: &Record| update_check(entry_update, original_record.action());
 
-    check_and_hold_store_element(
+    check_and_hold_store_record(
         original_action_address,
         workspace,
         network,
@@ -681,19 +681,19 @@ async fn register_updated_element(
 }
 
 async fn register_deleted_by(
-    element_delete: &Delete,
+    record_delete: &Delete,
     workspace: &SysValidationWorkspace,
     network: HolochainP2pDna,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
-    let removed_action_address = &element_delete.deletes_address;
+    let removed_action_address = &record_delete.deletes_address;
 
     // Checks
     let dependency_check =
-        |removed_action: &Element| check_new_entry_action(removed_action.action());
+        |removed_action: &Record| check_new_entry_action(removed_action.action());
 
-    check_and_hold_store_element(
+    check_and_hold_store_record(
         removed_action_address,
         workspace,
         network,
@@ -705,17 +705,17 @@ async fn register_deleted_by(
 }
 
 async fn register_deleted_entry_action(
-    element_delete: &Delete,
+    record_delete: &Delete,
     workspace: &SysValidationWorkspace,
     network: HolochainP2pDna,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
-    let removed_action_address = &element_delete.deletes_address;
+    let removed_action_address = &record_delete.deletes_address;
 
     // Checks
     let dependency_check =
-        |removed_action: &Element| check_new_entry_action(removed_action.action());
+        |removed_action: &Record| check_new_entry_action(removed_action.action());
 
     check_and_hold_store_entry(
         removed_action_address,

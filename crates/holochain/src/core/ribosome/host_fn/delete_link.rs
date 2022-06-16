@@ -55,7 +55,7 @@ pub fn delete_link<'a>(
                         }
                         // the add link action hash provided was found but didn't point to an AddLink
                         // action (it is something else) so we cannot proceed
-                        _ => Err(RibosomeError::ElementDeps(address.clone().into())),
+                        _ => Err(RibosomeError::RecordDeps(address.clone().into())),
                     }
                 }
                 // the add link action hash could not be found
@@ -63,7 +63,7 @@ pub fn delete_link<'a>(
                 // that isn't also discoverable in either the cache or DHT, but it _is_ possible so we have
                 // to fail in that case (e.g. the local cache could have GC'd at the same moment the
                 // network connection dropped out)
-                None => Err(RibosomeError::ElementDeps(address.clone().into())),
+                None => Err(RibosomeError::RecordDeps(address.clone().into())),
             }
             .map_err(|ribosome_error| -> RuntimeError {
                 wasm_error!(WasmErrorInner::Host(ribosome_error.to_string())).into()

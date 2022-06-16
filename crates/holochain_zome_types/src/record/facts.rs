@@ -1,4 +1,4 @@
-//! Facts for Elements
+//! Facts for Records
 
 use crate::prelude::*;
 use contrafact::*;
@@ -17,7 +17,7 @@ type Pair = (Action, Option<Entry>);
 // Alternatively, this might be an argument for making contrafact work with immutable values
 // instead of mutable references.
 //
-// At least we can use this as a reference to write the same logic for DhtOp and Element,
+// At least we can use this as a reference to write the same logic for DhtOp and Record,
 // which require the same sort of checks.
 
 pub fn action_and_entry_match() -> Facts<'static, Pair> {

@@ -66,7 +66,7 @@ CREATE TABLE IF NOT EXISTS Action (
     prev_dna_hash    BLOB           NULL
 
     -- We can't have any of these constraint because
-    -- the element authority doesn't get the create link for a remove link. @freesig
+    -- the record authority doesn't get the create link for a remove link. @freesig
     -- FOREIGN KEY(entry_hash) REFERENCES Entry(hash)
     -- FOREIGN KEY(original_entry_hash) REFERENCES Entry(hash),
     -- FOREIGN KEY(original_action_hash) REFERENCES Action(hash),

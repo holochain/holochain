@@ -19,9 +19,9 @@ use holochain_types::dht_op::DhtOpType;
 use holochain_types::prelude::HasValidationStatus;
 use holochain_types::prelude::Judged;
 use holochain_zome_types::ActionHashed;
-use holochain_zome_types::Element;
 use holochain_zome_types::Entry;
 use holochain_zome_types::EntryVisibility;
+use holochain_zome_types::Record;
 use holochain_zome_types::SignedAction;
 use holochain_zome_types::SignedActionHashed;
 use serde::de::DeserializeOwned;
@@ -37,13 +37,13 @@ mod test_data;
 mod tests;
 
 pub mod chain_head;
-pub mod element_details;
 pub mod entry_details;
 pub mod error;
 pub mod link;
 pub mod link_details;
-pub mod live_element;
 pub mod live_entry;
+pub mod live_record;
+pub mod record_details;
 
 pub mod prelude {
     pub use super::from_blob;
@@ -167,16 +167,16 @@ pub trait Store {
     /// Get an [`SignedActionHashed`] from this store.
     fn get_action(&self, hash: &ActionHash) -> StateQueryResult<Option<SignedActionHashed>>;
 
-    /// Get an [`Element`] from this store.
-    fn get_element(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Element>>;
+    /// Get an [`Record`] from this store.
+    fn get_record(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Record>>;
 
-    /// Get an [`Element`] from this store that is either public or
+    /// Get an [`Record`] from this store that is either public or
     /// authored by the given key.
-    fn get_public_or_authored_element(
+    fn get_public_or_authored_record(
         &self,
         hash: &AnyDhtHash,
         author: Option<&AgentPubKey>,
-    ) -> StateQueryResult<Option<Element>>;
+    ) -> StateQueryResult<Option<Record>>;
 
     /// Check if a hash is contained in the store
     fn contains_hash(&self, hash: &AnyDhtHash) -> StateQueryResult<bool> {
@@ -252,7 +252,7 @@ impl<'stmt> Store for Txn<'stmt, '_> {
                 // If no public entry is found try to find
                 // any authored by this agent.
                 Some(author) => Ok(self
-                    .get_any_authored_element(hash, author)?
+                    .get_any_authored_record(hash, author)?
                     .and_then(|el| el.into_inner().1.into_option())),
                 None => Ok(None),
             },
@@ -345,39 +345,39 @@ impl<'stmt> Store for Txn<'stmt, '_> {
         }
     }
 
-    fn get_element(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Element>> {
+    fn get_record(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Record>> {
         match *hash.hash_type() {
-            AnyDht::Entry => self.get_any_element(&hash.clone().into()),
-            AnyDht::Action => self.get_exact_element(&hash.clone().into()),
+            AnyDht::Entry => self.get_any_record(&hash.clone().into()),
+            AnyDht::Action => self.get_exact_record(&hash.clone().into()),
         }
     }
 
-    fn get_public_or_authored_element(
+    fn get_public_or_authored_record(
         &self,
         hash: &AnyDhtHash,
         author: Option<&AgentPubKey>,
-    ) -> StateQueryResult<Option<Element>> {
+    ) -> StateQueryResult<Option<Record>> {
         match *hash.hash_type() {
-            // Try to get a public element.
-            AnyDht::Entry => match self.get_any_public_element(&hash.clone().into())? {
+            // Try to get a public record.
+            AnyDht::Entry => match self.get_any_public_record(&hash.clone().into())? {
                 Some(el) => Ok(Some(el)),
                 None => match author {
-                    // If there are none try to get a private authored element.
-                    Some(author) => self.get_any_authored_element(&hash.clone().into(), author),
-                    // If there are no private authored elements then try to get any element and
+                    // If there are none try to get a private authored record.
+                    Some(author) => self.get_any_authored_record(&hash.clone().into(), author),
+                    // If there are no private authored records then try to get any record and
                     // remove the entry.
                     None => Ok(self
-                        .get_any_element(&hash.clone().into())?
-                        .map(|el| Element::new(el.into_inner().0, None))),
+                        .get_any_record(&hash.clone().into())?
+                        .map(|el| Record::new(el.into_inner().0, None))),
                 },
             },
-            AnyDht::Action => Ok(self.get_exact_element(&hash.clone().into())?.map(|el| {
+            AnyDht::Action => Ok(self.get_exact_record(&hash.clone().into())?.map(|el| {
                 // Filter out the entry if it's private.
                 let is_private_entry = el.action().entry_type().map_or(false, |et| {
                     matches!(et.visibility(), EntryVisibility::Private)
                 });
                 if is_private_entry {
-                    Element::new(el.into_inner().0, None)
+                    Record::new(el.into_inner().0, None)
                 } else {
                     el
                 }
@@ -387,8 +387,8 @@ impl<'stmt> Store for Txn<'stmt, '_> {
 }
 
 impl<'stmt> Txn<'stmt, '_> {
-    fn get_exact_element(&self, hash: &ActionHash) -> StateQueryResult<Option<Element>> {
-        let element = self.txn.query_row_named(
+    fn get_exact_record(&self, hash: &ActionHash) -> StateQueryResult<Option<Record>> {
+        let record = self.txn.query_row_named(
             "
             SELECT
             Action.blob AS action_blob, Action.hash, Entry.blob as entry_blob
@@ -414,18 +414,18 @@ impl<'stmt> Txn<'stmt, '_> {
                         Some(entry) => Some(from_blob::<Entry>(entry)?),
                         None => None,
                     };
-                    Ok(Element::new(shh, entry))
+                    Ok(Record::new(shh, entry))
                 }))
             },
         );
-        if let Err(holochain_sqlite::rusqlite::Error::QueryReturnedNoRows) = &element {
+        if let Err(holochain_sqlite::rusqlite::Error::QueryReturnedNoRows) = &record {
             Ok(None)
         } else {
-            Ok(Some(element??))
+            Ok(Some(record??))
         }
     }
-    fn get_any_element(&self, hash: &EntryHash) -> StateQueryResult<Option<Element>> {
-        let element = self.txn.query_row_named(
+    fn get_any_record(&self, hash: &EntryHash) -> StateQueryResult<Option<Record>> {
+        let record = self.txn.query_row_named(
             "
             SELECT
             Action.blob AS action_blob, Action.hash, Entry.blob as entry_blob
@@ -451,19 +451,19 @@ impl<'stmt> Txn<'stmt, '_> {
                         Some(entry) => Some(from_blob::<Entry>(entry)?),
                         None => None,
                     };
-                    Ok(Element::new(shh, entry))
+                    Ok(Record::new(shh, entry))
                 }))
             },
         );
-        if let Err(holochain_sqlite::rusqlite::Error::QueryReturnedNoRows) = &element {
+        if let Err(holochain_sqlite::rusqlite::Error::QueryReturnedNoRows) = &record {
             Ok(None)
         } else {
-            Ok(Some(element??))
+            Ok(Some(record??))
         }
     }
 
-    fn get_any_public_element(&self, hash: &EntryHash) -> StateQueryResult<Option<Element>> {
-        let element = self.txn.query_row_named(
+    fn get_any_public_record(&self, hash: &EntryHash) -> StateQueryResult<Option<Record>> {
+        let record = self.txn.query_row_named(
             "
             SELECT
             Action.blob AS action_blob, Action.hash, Entry.blob as entry_blob
@@ -491,23 +491,23 @@ impl<'stmt> Txn<'stmt, '_> {
                         Some(entry) => Some(from_blob::<Entry>(entry)?),
                         None => None,
                     };
-                    Ok(Element::new(shh, entry))
+                    Ok(Record::new(shh, entry))
                 }))
             },
         );
-        if let Err(holochain_sqlite::rusqlite::Error::QueryReturnedNoRows) = &element {
+        if let Err(holochain_sqlite::rusqlite::Error::QueryReturnedNoRows) = &record {
             Ok(None)
         } else {
-            Ok(Some(element??))
+            Ok(Some(record??))
         }
     }
 
-    fn get_any_authored_element(
+    fn get_any_authored_record(
         &self,
         hash: &EntryHash,
         author: &AgentPubKey,
-    ) -> StateQueryResult<Option<Element>> {
-        let element = self.txn.query_row_named(
+    ) -> StateQueryResult<Option<Record>> {
+        let record = self.txn.query_row_named(
             "
             SELECT
             Action.blob AS action_blob, Action.hash, Entry.blob as entry_blob
@@ -536,14 +536,14 @@ impl<'stmt> Txn<'stmt, '_> {
                         Some(entry) => Some(from_blob::<Entry>(entry)?),
                         None => None,
                     };
-                    Ok(Element::new(shh, entry))
+                    Ok(Record::new(shh, entry))
                 }))
             },
         );
-        if let Err(holochain_sqlite::rusqlite::Error::QueryReturnedNoRows) = &element {
+        if let Err(holochain_sqlite::rusqlite::Error::QueryReturnedNoRows) = &record {
             Ok(None)
         } else {
-            Ok(Some(element??))
+            Ok(Some(record??))
         }
     }
 }
@@ -609,9 +609,9 @@ impl<'stmt> Store for Txns<'stmt, '_> {
         Ok(None)
     }
 
-    fn get_element(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Element>> {
+    fn get_record(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Record>> {
         for txn in &self.txns {
-            let r = txn.get_element(hash)?;
+            let r = txn.get_record(hash)?;
             if r.is_some() {
                 return Ok(r);
             }
@@ -633,13 +633,13 @@ impl<'stmt> Store for Txns<'stmt, '_> {
         Ok(None)
     }
 
-    fn get_public_or_authored_element(
+    fn get_public_or_authored_record(
         &self,
         hash: &AnyDhtHash,
         author: Option<&AgentPubKey>,
-    ) -> StateQueryResult<Option<Element>> {
+    ) -> StateQueryResult<Option<Record>> {
         for txn in &self.txns {
-            let r = txn.get_public_or_authored_element(hash, author)?;
+            let r = txn.get_public_or_authored_record(hash, author)?;
             if r.is_some() {
                 return Ok(r);
             }
@@ -707,10 +707,10 @@ impl<'borrow, 'txn> Store for DbScratch<'borrow, 'txn> {
         }
     }
 
-    fn get_element(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Element>> {
-        let r = self.txns.get_element(hash)?;
+    fn get_record(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Record>> {
+        let r = self.txns.get_record(hash)?;
         if r.is_none() {
-            self.scratch.get_element(hash)
+            self.scratch.get_record(hash)
         } else {
             Ok(r)
         }
@@ -730,15 +730,15 @@ impl<'borrow, 'txn> Store for DbScratch<'borrow, 'txn> {
         }
     }
 
-    fn get_public_or_authored_element(
+    fn get_public_or_authored_record(
         &self,
         hash: &AnyDhtHash,
         author: Option<&AgentPubKey>,
-    ) -> StateQueryResult<Option<Element>> {
-        let r = self.txns.get_public_or_authored_element(hash, author)?;
+    ) -> StateQueryResult<Option<Record>> {
+        let r = self.txns.get_public_or_authored_record(hash, author)?;
         if r.is_none() {
-            // Elements in the scratch are authored by definition.
-            self.scratch.get_element(hash)
+            // Records in the scratch are authored by definition.
+            self.scratch.get_record(hash)
         } else {
             Ok(r)
         }

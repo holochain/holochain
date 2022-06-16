@@ -345,13 +345,13 @@ pub trait ConductorHandleT: Send + Sync {
     /// allowing individual Cells to be shut down.
     async fn remove_cells(&self, cell_ids: &[CellId]);
 
-    /// Inject elements into a source chain for a cell.
-    async fn insert_elements_into_source_chain(
+    /// Inject records into a source chain for a cell.
+    async fn insert_records_into_source_chain(
         self: Arc<Self>,
         cell_id: CellId,
         truncate: bool,
         validate: bool,
-        elements: Vec<Element>,
+        records: Vec<Record>,
     ) -> ConductorApiResult<()>;
 
     /// Retrieve the authored environment for this dna. FOR TESTING ONLY.
@@ -1276,12 +1276,12 @@ impl ConductorHandleT for ConductorHandleImpl {
         self.conductor.remove_cells(cell_ids.to_vec()).await
     }
 
-    async fn insert_elements_into_source_chain(
+    async fn insert_records_into_source_chain(
         self: Arc<Self>,
         cell_id: CellId,
         truncate: bool,
         validate: bool,
-        elements: Vec<Element>,
+        records: Vec<Record>,
     ) -> ConductorApiResult<()> {
         // Get or create the space for this cell.
         // Note: This doesn't require the cell be installed.
@@ -1303,7 +1303,7 @@ impl ConductorHandleT for ConductorHandleImpl {
             .holochain_p2p()
             .to_dna(cell_id.dna_hash().clone());
 
-        // Validate the elements.
+        // Validate the records.
         if validate {
             // Create the ribosome.
             let ribosome = self.get_ribosome(cell_id.dna_hash())?;
@@ -1325,16 +1325,16 @@ impl ConductorHandleT for ConductorHandleImpl {
 
             // Validate the chain.
             crate::core::validate_chain(
-                elements.iter().map(|e| e.action_hashed()),
+                records.iter().map(|e| e.action_hashed()),
                 &persisted_chain_head.clone().filter(|_| !truncate),
             )
             .map_err(|e| SourceChainError::InvalidCommit(e.to_string()))?;
 
-            // Add the elements to the source chain so we can validate them.
+            // Add the records to the source chain so we can validate them.
             sc.scratch()
                 .apply(|scratch| {
-                    for el in elements.clone() {
-                        holochain_state::prelude::insert_element_scratch(
+                    for el in records.clone() {
+                        holochain_state::prelude::insert_record_scratch(
                             scratch,
                             el,
                             Default::default(),
@@ -1343,7 +1343,7 @@ impl ConductorHandleT for ConductorHandleImpl {
                 })
                 .map_err(SourceChainError::from)?;
 
-            // Run the individual element validations.
+            // Run the individual record validations.
             crate::core::workflow::inline_validation(
                 workspace.clone(),
                 network.clone(),
@@ -1356,11 +1356,11 @@ impl ConductorHandleT for ConductorHandleImpl {
         let authored_db = space.authored_db;
         let dht_db = space.dht_db;
 
-        // Produce the op lights for each element.
-        let data = elements
+        // Produce the op lights for each record.
+        let data = records
             .into_iter()
             .map(|el| {
-                let ops = produce_op_lights_from_elements(vec![&el])?;
+                let ops = produce_op_lights_from_records(vec![&el])?;
                 // Check have the same author as cell.
                 let (shh, entry) = el.into_inner();
                 if shh.action().author() != cell_id.agent_pubkey() {
@@ -1370,7 +1370,7 @@ impl ConductorHandleT for ConductorHandleImpl {
             })
             .collect::<StateMutationResult<Vec<_>>>()?;
 
-        // Commit the elements to the source chain.
+        // Commit the records to the source chain.
         let ops_to_integrate = authored_db
             .async_commit({
                 let cell_id = cell_id.clone();
@@ -1401,7 +1401,7 @@ impl ConductorHandleT for ConductorHandleImpl {
                     }
                     let mut ops_to_integrate = Vec::new();
 
-                    // Commit the elements and ops to the authored db.
+                    // Commit the records and ops to the authored db.
                     for (shh, ops, entry) in data {
                         // Clippy is wrong :(
                         #[allow(clippy::needless_collect)]

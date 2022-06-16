@@ -71,7 +71,7 @@ pub fn get_link_details<'a>(
 pub mod slow_tests {
     use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::element::SignedActionHashed;
+    use holochain_zome_types::record::SignedActionHashed;
     use holochain_zome_types::Action;
 
     #[tokio::test(flavor = "multi_thread")]

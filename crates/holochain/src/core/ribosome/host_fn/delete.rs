@@ -72,13 +72,13 @@ pub(crate) fn get_original_entry_data(
 
     tokio_helper::block_forever_on(async move {
         let mut cascade = Cascade::from_workspace_network(&workspace, network);
-        let maybe_original_element: Option<SignedActionHashed> = cascade
+        let maybe_original_record: Option<SignedActionHashed> = cascade
             .get_details(address.clone().into(), GetOptions::content())
             .await?
             .map(|el| {
                 match el {
-                    holochain_zome_types::metadata::Details::Element(e) => {
-                        Ok(e.element.into_inner().0)
+                    holochain_zome_types::metadata::Details::Record(e) => {
+                        Ok(e.record.into_inner().0)
                     }
                     // Should not be trying to get original actions via EntryHash
                     holochain_zome_types::metadata::Details::Entry(_) => {
@@ -88,7 +88,7 @@ pub(crate) fn get_original_entry_data(
             })
             .transpose()?;
 
-        match maybe_original_element {
+        match maybe_original_record {
             Some(SignedActionHashed {
                 hashed: ActionHashed {
                     content: action, ..
@@ -96,9 +96,9 @@ pub(crate) fn get_original_entry_data(
                 ..
             }) => match action.into_entry_data() {
                 Some((entry_hash, entry_type)) => Ok((entry_hash, entry_type)),
-                _ => Err(RibosomeError::ElementDeps(address.into())),
+                _ => Err(RibosomeError::RecordDeps(address.into())),
             },
-            None => Err(RibosomeError::ElementDeps(address.into())),
+            None => Err(RibosomeError::RecordDeps(address.into())),
         }
     })
     .map_err(|ribosome_error| wasm_error!(WasmErrorInner::Host(ribosome_error.to_string())))
@@ -119,9 +119,9 @@ pub mod wasm_test {
         } = RibosomeTestFixture::new(TestWasm::Crd).await;
 
         let thing_a: ActionHash = conductor.call(&alice, "create", ()).await;
-        let get_thing: Option<Element> = conductor.call(&alice, "reed", thing_a.clone()).await;
+        let get_thing: Option<Record> = conductor.call(&alice, "reed", thing_a.clone()).await;
         match get_thing {
-            Some(element) => assert!(element.entry().as_option().is_some()),
+            Some(record) => assert!(record.entry().as_option().is_some()),
 
             None => unreachable!(),
         }
@@ -130,7 +130,7 @@ pub mod wasm_test {
             .call(&alice, "delete_via_hash", thing_a.clone())
             .await;
 
-        let get_thing: Option<Element> = conductor.call(&alice, "reed", thing_a).await;
+        let get_thing: Option<Record> = conductor.call(&alice, "reed", thing_a).await;
         match get_thing {
             None => {
                 // this is what we want, deletion => None for a get

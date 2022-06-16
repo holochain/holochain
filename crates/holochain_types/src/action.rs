@@ -6,9 +6,9 @@
 
 #![allow(missing_docs)]
 
-use crate::element::ElementStatus;
-use crate::element::SignedActionHashedExt;
 use crate::prelude::*;
+use crate::record::RecordStatus;
+use crate::record::SignedActionHashedExt;
 use conversions::WrongActionError;
 use derive_more::From;
 use holo_hash::EntryHash;
@@ -196,8 +196,8 @@ impl From<(Update, Signature)> for WireUpdate {
 }
 
 impl WireDelete {
-    pub fn into_element(self) -> Element {
-        Element::new(
+    pub fn into_record(self) -> Record {
+        Record::new(
             SignedActionHashed::from_content_sync(SignedAction(self.delete.into(), self.signature)),
             None,
         )
@@ -205,10 +205,10 @@ impl WireDelete {
 }
 
 impl WireUpdateRelationship {
-    /// Recreate the Update Element without an Entry.
+    /// Recreate the Update Record without an Entry.
     /// Useful for creating dht ops
-    pub fn into_element(self, original_entry_address: EntryHash) -> Element {
-        Element::new(
+    pub fn into_record(self, original_entry_address: EntryHash) -> Record {
+        Record::new(
             SignedActionHashed::from_content_sync(self.into_signed_action(original_entry_address)),
             None,
         )
@@ -317,9 +317,9 @@ impl TryFrom<SignedAction> for WireUpdateRelationship {
 }
 
 impl WireNewEntryAction {
-    pub fn into_element(self, entry_type: EntryType, entry: Entry) -> Element {
+    pub fn into_record(self, entry_type: EntryType, entry: Entry) -> Record {
         let entry_hash = EntryHash::with_data_sync(&entry);
-        Element::new(self.into_action(entry_type, entry_hash), Some(entry))
+        Record::new(self.into_action(entry_type, entry_hash), Some(entry))
     }
 
     pub fn into_action(self, entry_type: EntryType, entry_hash: EntryHash) -> SignedActionHashed {
@@ -359,23 +359,23 @@ impl WireNewEntryAction {
 }
 
 impl WireActionStatus<WireNewEntryAction> {
-    pub fn into_element_status(self, entry_type: EntryType, entry: Entry) -> ElementStatus {
-        ElementStatus::new(
-            self.action.into_element(entry_type, entry),
+    pub fn into_record_status(self, entry_type: EntryType, entry: Entry) -> RecordStatus {
+        RecordStatus::new(
+            self.action.into_record(entry_type, entry),
             self.validation_status,
         )
     }
 }
 
 impl WireActionStatus<WireUpdateRelationship> {
-    pub fn into_element_status(self, entry_hash: EntryHash) -> ElementStatus {
-        ElementStatus::new(self.action.into_element(entry_hash), self.validation_status)
+    pub fn into_record_status(self, entry_hash: EntryHash) -> RecordStatus {
+        RecordStatus::new(self.action.into_record(entry_hash), self.validation_status)
     }
 }
 
 impl WireActionStatus<WireDelete> {
-    pub fn into_element_status(self) -> ElementStatus {
-        ElementStatus::new(self.action.into_element(), self.validation_status)
+    pub fn into_record_status(self) -> RecordStatus {
+        RecordStatus::new(self.action.into_record(), self.validation_status)
     }
 }
 

@@ -29,7 +29,7 @@ use holochain_sqlite::db::ReadManager;
 use holochain_sqlite::prelude::BufferedStore;
 use holochain_sqlite::prelude::IntegratedPrefix;
 use holochain_sqlite::prelude::WriteManager;
-use holochain_state::element_buf::ElementBuf;
+use holochain_state::record_buf::RecordBuf;
 use holochain_state::metadata::MetadataBuf;
 use holochain_state::metadata::MetadataBufT;
 use holochain_types::prelude::*;
@@ -61,8 +61,8 @@ async fn get_updates_cache() {
     let test_db = test_cell_db();
     let db = test_db.db();
 
-    let (element_fixt_store, _) = generate_fixt_store().await;
-    let expected = element_fixt_store
+    let (record_fixt_store, _) = generate_fixt_store().await;
+    let expected = record_fixt_store
         .iter()
         .next()
         .map(|(h, e)| (h.clone(), e.clone()))
@@ -70,23 +70,23 @@ async fn get_updates_cache() {
 
     // Create the cascade
     let mut workspace = CallZomeWorkspace::new(db.clone().into()).unwrap();
-    let (network, shutdown) = run_fixt_network(element_fixt_store, BTreeMap::new()).await;
+    let (network, shutdown) = run_fixt_network(record_fixt_store, BTreeMap::new()).await;
 
     {
         // Construct the cascade with a network
         let mut cascade = workspace.cascade(network);
 
-        // Call fetch element
+        // Call fetch record
         cascade
-            .fetch_element_via_action(expected.0.clone().into(), Default::default())
+            .fetch_record_via_action(expected.0.clone().into(), Default::default())
             .await
             .unwrap();
     }
 
     // Check the cache has been updated
     let result = workspace
-        .element_cache
-        .get_element(&expected.0)
+        .record_cache
+        .get_record(&expected.0)
         .unwrap()
         .unwrap();
     assert_eq!(result.action(), expected.1.action());
@@ -125,7 +125,7 @@ async fn get_meta_updates_meta_cache() {
         // Create GetMetaOptions
         let options = GetMetaOptions::default();
 
-        // Call fetch element
+        // Call fetch record
         cascade
             .fetch_meta(expected.0.clone().into(), options)
             .await
@@ -135,7 +135,7 @@ async fn get_meta_updates_meta_cache() {
             .unwrap()
     };
 
-    // Check the returned element is correct
+    // Check the returned record is correct
     assert_eq!(returned.actions.len(), 1);
     assert_eq!(returned.actions.into_iter().next().unwrap(), expected.1);
     let result = {
@@ -198,7 +198,7 @@ async fn get_from_another_agent() {
 
     let options = GetOptions::latest();
 
-    // Bob store element
+    // Bob store record
     let entry = Post("Bananas are good for you".into());
     let entry_hash = Entry::try_from(entry.clone()).unwrap().to_hash();
     let action_hash = {
@@ -213,15 +213,15 @@ async fn get_from_another_agent() {
         action_hash
     };
 
-    // Alice get element from bob
-    let element = {
+    // Alice get record from bob
+    let record = {
         let call_data = HostFnCaller::create(&alice_cell_id, &handle, &dna_file).await;
         call_data
             .get(entry_hash.clone().into(), options.clone())
             .await
     };
 
-    let (signed_action, ret_entry) = element.unwrap().into_inner();
+    let (signed_action, ret_entry) = record.unwrap().into_inner();
 
     // TODO: Check signed action is the same action
 
@@ -249,7 +249,7 @@ async fn get_from_another_agent() {
         (remove_hash, update_hash)
     };
 
-    // Alice get element from bob
+    // Alice get record from bob
     let (entry_details, action_details) = {
         let call_data = HostFnCaller::create(&alice_cell_id, &handle, &dna_file).await;
         debug!(the_entry_hash = ?entry_hash);
@@ -265,7 +265,7 @@ async fn get_from_another_agent() {
     };
 
     let entry_details = unwrap_to!(entry_details => Details::Entry).clone();
-    let action_details = unwrap_to!(action_details => Details::Element).clone();
+    let action_details = unwrap_to!(action_details => Details::Record).clone();
 
     assert_eq!(Post::try_from(entry_details.entry).unwrap(), entry);
     assert_eq!(entry_details.actions.len(), 1);
@@ -286,7 +286,7 @@ async fn get_from_another_agent() {
     );
 
     assert_eq!(action_details.deletes.len(), 1);
-    assert_eq!(*action_details.element.action_address(), action_hash);
+    assert_eq!(*action_details.record.action_address(), action_hash);
     assert_eq!(
         *entry_details.deletes.get(0).unwrap().action_address(),
         remove_hash
@@ -455,11 +455,11 @@ impl Shutdown {
 /*
 /// Run a test network handler which accepts two data sources to draw from.
 /// It only handles Get and GetMeta requests.
-/// - When handling a Get, it pulls the corresponding Element from the `element_fixt_store`
+/// - When handling a Get, it pulls the corresponding Record from the `record_fixt_store`
 /// - When handling a GetMeta, it pulls the corresponding `TimedActionHash` from the `meta_fixt_store
 ///    and constructs a `MetadataSet` containing only that single `TimedActionHash`
 async fn run_fixt_network(
-    element_fixt_store: BTreeMap<ActionHash, Element>,
+    record_fixt_store: BTreeMap<ActionHash, Record>,
     meta_fixt_store: BTreeMap<AnyDhtHash, TimedActionHash>,
 ) -> (HolochainP2pDna, Shutdown) {
     // Create the network
@@ -485,13 +485,13 @@ async fn run_fixt_network(
                             _ => unreachable!(),
                         };
 
-                        let chain_element = element_fixt_store
+                        let chain_record = record_fixt_store
                             .get(&dht_hash)
                             .cloned()
-                            .map(|element| {
-                                GetElementResponse::GetAction(Some(Box::new(
-                                    WireElement::from_element(
-                                        ElementStatus::new(element, ValidationStatus::Valid),
+                            .map(|record| {
+                                GetRecordResponse::GetAction(Some(Box::new(
+                                    WireRecord::from_record(
+                                        RecordStatus::new(record, ValidationStatus::Valid),
                                         vec![],
                                         vec![],
                                     ),
@@ -500,7 +500,7 @@ async fn run_fixt_network(
                                 .unwrap()
                             })
                             .unwrap();
-                        respond.respond(Ok(async move { Ok(chain_element) }.boxed().into()));
+                        respond.respond(Ok(async move { Ok(chain_record) }.boxed().into()));
                     }
                     GetMeta {
                         dht_hash,
@@ -538,21 +538,21 @@ async fn run_fixt_network(
 */
 
 async fn generate_fixt_store() -> (
-    BTreeMap<ActionHash, Element>,
+    BTreeMap<ActionHash, Record>,
     BTreeMap<AnyDhtHash, TimedActionHash>,
 ) {
     let mut store = BTreeMap::new();
     let mut meta_store = BTreeMap::new();
     let entry = EntryFixturator::new(AppEntry).next().unwrap();
     let entry_hash = EntryHashed::from_content_sync(entry.clone()).into_hash();
-    let mut element_create = fixt!(Create);
+    let mut record_create = fixt!(Create);
     let entry_type = AppEntryTypeFixturator::new(EntryVisibility::Public)
         .map(EntryType::App)
         .next()
         .unwrap();
-    element_create.entry_type = entry_type;
-    element_create.entry_hash = entry_hash.clone();
-    let action = ActionHashed::from_content_sync(Action::Create(element_create));
+    record_create.entry_type = entry_type;
+    record_create.entry_hash = entry_hash.clone();
+    let action = ActionHashed::from_content_sync(Action::Create(record_create));
     let hash = action.as_hash().clone();
     let signed_action = SignedActionHashed::with_presigned(action, fixt!(Signature));
     meta_store.insert(
@@ -562,26 +562,26 @@ async fn generate_fixt_store() -> (
             action_hash: hash.clone(),
         },
     );
-    store.insert(hash, Element::new(signed_action, Some(entry)));
+    store.insert(hash, Record::new(signed_action, Some(entry)));
     (store, meta_store)
 }
 
 async fn fake_authority(hash: AnyDhtHash, call_data: &HostFnCaller) {
     // Check bob can get the entry
-    let element = call_data
+    let record = call_data
         .get(hash.clone().into(), GetOptions::content())
         .await
         .unwrap();
 
-    let mut element_vault = ElementBuf::vault(call_data.db.clone().into(), false).unwrap();
+    let mut record_vault = RecordBuf::vault(call_data.db.clone().into(), false).unwrap();
     let mut meta_vault = MetadataBuf::vault(call_data.db.clone().into()).unwrap();
 
     // Write to the meta vault to fake being an authority
-    let (shh, e) = element.clone().into_inner();
-    element_vault.put(shh, option_entry_hashed(e)).unwrap();
+    let (shh, e) = record.clone().into_inner();
+    record_vault.put(shh, option_entry_hashed(e)).unwrap();
 
     // TODO: figure this out
-    integrate_to_integrated(&element, &element_vault, &mut meta_vault)
+    integrate_to_integrated(&record, &record_vault, &mut meta_vault)
         .await
         .unwrap();
 
@@ -590,21 +590,21 @@ async fn fake_authority(hash: AnyDhtHash, call_data: &HostFnCaller) {
         .conn()
         .unwrap()
         .with_commit(|writer| {
-            element_vault.flush_to_txn(writer)?;
+            record_vault.flush_to_txn(writer)?;
             meta_vault.flush_to_txn(writer)
         })
         .unwrap();
 }
 
 async fn integrate_to_integrated<C: MetadataBufT<IntegratedPrefix>>(
-    element: &Element,
-    element_store: &ElementBuf<IntegratedPrefix>,
+    record: &Record,
+    record_store: &RecordBuf<IntegratedPrefix>,
     meta_store: &mut C,
 ) -> DhtOpConvertResult<()> {
     // Produce the light directly
-    for op in produce_op_lights_from_elements(vec![element])? {
-        // we don't integrate element data, because it is already in our vault.
-        integrate_single_metadata(op, element_store, meta_store)?
+    for op in produce_op_lights_from_records(vec![record])? {
+        // we don't integrate record data, because it is already in our vault.
+        integrate_single_metadata(op, record_store, meta_store)?
     }
     Ok(())
 }

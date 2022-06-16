@@ -1,4 +1,4 @@
-//! Defines a Element, the basic unit of Holochain data.
+//! Defines a Record, the basic unit of Holochain data.
 
 use crate::action::conversions::WrongActionError;
 use crate::action::ActionHashed;
@@ -14,23 +14,23 @@ use holo_hash::HoloHashOf;
 use holo_hash::HoloHashed;
 use holochain_serialized_bytes::prelude::*;
 
-/// a chain element containing the signed action along with the
+/// a chain record containing the signed action along with the
 /// entry if the action type has one.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-pub struct Element {
-    /// The signed action for this element
+pub struct Record {
+    /// The signed action for this record
     pub signed_action: SignedActionHashed,
     /// If there is an entry associated with this action it will be here.
     /// If not, there will be an enum variant explaining the reason.
-    pub entry: ElementEntry,
+    pub entry: RecordEntry,
 }
 
 /// Represents the different ways the entry_address reference within an action
 /// can be intepreted
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-pub enum ElementEntry {
+pub enum RecordEntry {
     /// The Action has an entry_address reference, and the Entry is accessible.
     Present(Entry),
     /// The Action has an entry_address reference, but we are in a public
@@ -59,7 +59,7 @@ where
     pub signature: Signature,
 }
 
-impl Element {
+impl Record {
     /// Mutable reference to the Action content.
     /// This is useless and dangerous in production usage.
     /// Guaranteed to make hashes and signatures mismatch whatever the Action is mutated to (at least).
@@ -69,29 +69,29 @@ impl Element {
         &mut self.signed_action.hashed.content
     }
 
-    /// Mutable reference to the ElementEntry.
+    /// Mutable reference to the RecordEntry.
     /// This is useless and dangerous in production usage.
-    /// Guaranteed to make hashes and signatures mismatch whatever the ElementEntry is mutated to (at least).
+    /// Guaranteed to make hashes and signatures mismatch whatever the RecordEntry is mutated to (at least).
     /// This may be useful for tests that rely heavily on mocked and fixturated data.
     #[cfg(feature = "test_utils")]
-    pub fn as_entry_mut(&mut self) -> &mut ElementEntry {
+    pub fn as_entry_mut(&mut self) -> &mut RecordEntry {
         &mut self.entry
     }
 
-    /// Raw element constructor.  Used only when we know that the values are valid.
+    /// Raw record constructor.  Used only when we know that the values are valid.
     pub fn new(signed_action: SignedActionHashed, maybe_entry: Option<Entry>) -> Self {
         let maybe_visibility = signed_action
             .action()
             .entry_data()
             .map(|(_, entry_type)| entry_type.visibility());
         let entry = match (maybe_entry, maybe_visibility) {
-            (Some(entry), Some(_)) => ElementEntry::Present(entry),
-            (None, Some(EntryVisibility::Private)) => ElementEntry::Hidden,
-            (None, None) => ElementEntry::NotApplicable,
+            (Some(entry), Some(_)) => RecordEntry::Present(entry),
+            (None, Some(EntryVisibility::Private)) => RecordEntry::Hidden,
+            (None, None) => RecordEntry::NotApplicable,
             (Some(_), None) => {
                 unreachable!("Entry is present for an action type which has no entry reference")
             }
-            (None, Some(EntryVisibility::Public)) => ElementEntry::NotStored,
+            (None, Some(EntryVisibility::Public)) => RecordEntry::NotStored,
         };
         Self {
             signed_action,
@@ -99,7 +99,7 @@ impl Element {
         }
     }
 
-    /// If the Element contains private entry data, set the ElementEntry
+    /// If the Record contains private entry data, set the RecordEntry
     /// to Hidden so that it cannot be leaked
     pub fn privatized(self) -> Self {
         let entry = if let Some(EntryVisibility::Private) = self
@@ -109,7 +109,7 @@ impl Element {
             .map(|(_, entry_type)| entry_type.visibility())
         {
             match self.entry {
-                ElementEntry::Present(_) => ElementEntry::Hidden,
+                RecordEntry::Present(_) => RecordEntry::Hidden,
                 other => other,
             }
         } else {
@@ -121,8 +121,8 @@ impl Element {
         }
     }
 
-    /// Break this element into its components
-    pub fn into_inner(self) -> (SignedActionHashed, ElementEntry) {
+    /// Break this record into its components
+    pub fn into_inner(self) -> (SignedActionHashed, RecordEntry) {
         (self.signed_action, self.entry)
     }
 
@@ -131,40 +131,40 @@ impl Element {
         &self.signed_action
     }
 
-    /// Access the signature from this element's signed action
+    /// Access the signature from this record's signed action
     pub fn signature(&self) -> &Signature {
         self.signed_action.signature()
     }
 
-    /// Access the action address from this element's signed action
+    /// Access the action address from this record's signed action
     pub fn action_address(&self) -> &ActionHash {
         self.signed_action.action_address()
     }
 
-    /// Access the Action from this element's signed action
+    /// Access the Action from this record's signed action
     pub fn action(&self) -> &Action {
         self.signed_action.action()
     }
 
-    /// Access the ActionHashed from this element's signed action portion
+    /// Access the ActionHashed from this record's signed action portion
     pub fn action_hashed(&self) -> &ActionHashed {
         &self.signed_action.hashed
     }
 
-    /// Access the Entry portion of this element as an ElementEntry,
+    /// Access the Entry portion of this record as an RecordEntry,
     /// which includes the context around the presence or absence of the entry.
-    pub fn entry(&self) -> &ElementEntry {
+    pub fn entry(&self) -> &RecordEntry {
         &self.entry
     }
 }
 
-impl ElementEntry {
+impl RecordEntry {
     /// Provides entry data by reference if it exists
     ///
     /// Collapses the enum down to the two possibilities of
     /// extant or nonextant Entry data
     pub fn as_option(&self) -> Option<&Entry> {
-        if let ElementEntry::Present(ref entry) = self {
+        if let RecordEntry::Present(ref entry) = self {
             Some(entry)
         } else {
             None
@@ -175,7 +175,7 @@ impl ElementEntry {
     /// Collapses the enum down to the two possibilities of
     /// extant or nonextant Entry data
     pub fn into_option(self) -> Option<Entry> {
-        if let ElementEntry::Present(entry) = self {
+        if let RecordEntry::Present(entry) = self {
             Some(entry)
         } else {
             None
@@ -185,7 +185,7 @@ impl ElementEntry {
     /// Provides deserialized app entry if it exists
     ///
     /// same as as_option but handles deserialization
-    /// anything other than ElementEntry::Present returns None
+    /// anything other than RecordEntry::Present returns None
     /// a present entry that fails to deserialize cleanly is an error
     /// a present entry that deserializes cleanly is returned as the provided type A
     pub fn to_app_option<A: TryFrom<SerializedBytes, Error = SerializedBytesError>>(
@@ -200,7 +200,7 @@ impl ElementEntry {
     /// Provides CapGrantEntry if it exists
     ///
     /// same as as_option but handles cap grants
-    /// anything other than ElementEntry::Present for a Entry::CapGrant returns None
+    /// anything other than RecordEntry::Present for a Entry::CapGrant returns None
     pub fn to_grant_option(&self) -> Option<crate::entry::CapGrantEntry> {
         match self.as_option() {
             Some(Entry::CapGrant(cap_grant_entry)) => Some(cap_grant_entry.to_owned()),
@@ -316,15 +316,15 @@ impl From<SignedActionHashed> for Action {
     }
 }
 
-impl From<Element> for Option<Entry> {
-    fn from(e: Element) -> Self {
+impl From<Record> for Option<Entry> {
+    fn from(e: Record) -> Self {
         e.entry.into_option()
     }
 }
 
-impl TryFrom<Element> for CreateLink {
+impl TryFrom<Record> for CreateLink {
     type Error = WrongActionError;
-    fn try_from(value: Element) -> Result<Self, Self::Error> {
+    fn try_from(value: Record) -> Result<Self, Self::Error> {
         value
             .into_inner()
             .0
@@ -335,9 +335,9 @@ impl TryFrom<Element> for CreateLink {
     }
 }
 
-impl TryFrom<Element> for DeleteLink {
+impl TryFrom<Record> for DeleteLink {
     type Error = WrongActionError;
-    fn try_from(value: Element) -> Result<Self, Self::Error> {
+    fn try_from(value: Record) -> Result<Self, Self::Error> {
         value
             .into_inner()
             .0

@@ -1,4 +1,4 @@
-use crate::element::SignedActionHashed;
+use crate::record::SignedActionHashed;
 use crate::ChainTopOrdering;
 use holo_hash::ActionHash;
 use holochain_serialized_bytes::prelude::*;

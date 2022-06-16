@@ -15,9 +15,9 @@ fn temperature() -> Temperature {
 fn twenty_three_degrees_entry_hash(_: ()) -> ExternResult<EntryHash> {
     let temp = temperature();
     let action_hash: ActionHash = create_entry(&IntegrityHashEntry(EntryTypes::Temperature(temp)))?;
-    let element: Element = get(action_hash, GetOptions::content())?.unwrap();
-    match element.entry() {
-        ElementEntry::Present(entry) => hdk::prelude::hash_entry(entry.clone()),
+    let record: Record = get(action_hash, GetOptions::content())?.unwrap();
+    match record.entry() {
+        RecordEntry::Present(entry) => hdk::prelude::hash_entry(entry.clone()),
         _ => unreachable!(),
     }
 }

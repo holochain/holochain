@@ -60,7 +60,7 @@ wasm_io_types! {
     // @todo Get the capability for the current zome call.
     fn capability_info (()) -> ();
 
-    // Returns ActionHash of the newly created element.
+    // Returns ActionHash of the newly created record.
     fn create (zt::entry::CreateInput) -> holo_hash::ActionHash;
 
     // Create a link between two entries.
@@ -72,13 +72,13 @@ wasm_io_types! {
     // TraceMsg includes line numbers. so the wasm tells the host about it's own code structure.
     fn trace (zt::trace::TraceMsg) -> ();
 
-    // Action hash of the CreateLink element.
+    // Action hash of the CreateLink record.
     fn delete_link (zt::link::DeleteLinkInput) -> holo_hash::ActionHash;
 
-    // Delete an element.
+    // Delete an record.
     fn delete (zt::entry::DeleteInput) -> holo_hash::ActionHash;
 
-    // Action hash of the newly committed element.
+    // Action hash of the newly committed record.
     // Emit a Signal::App to subscribers on the interface
     fn emit_signal (zt::signal::AppSignal) -> ();
 
@@ -92,13 +92,13 @@ wasm_io_types! {
     fn get_links (Vec<zt::link::GetLinksInput>) -> Vec<Vec<zt::link::Link>>;
 
     // Attempt to get a live entry from the cascade.
-    fn get (Vec<zt::entry::GetInput>) -> Vec<Option<zt::element::Element>>;
+    fn get (Vec<zt::entry::GetInput>) -> Vec<Option<zt::record::Record>>;
 
     // Hash data on the host.
     fn hash (zt::hash::HashInput) -> zt::hash::HashOutput;
 
-    // Retreive an element from the DHT or short circuit.
-    fn must_get_valid_element (zt::entry::MustGetValidElementInput) -> zt::element::Element;
+    // Retreive an record from the DHT or short circuit.
+    fn must_get_valid_record (zt::entry::MustGetValidRecordInput) -> zt::record::Record;
 
     // Retreive a entry from the DHT or short circuit.
     fn must_get_entry (zt::entry::MustGetEntryInput) -> zt::entry::EntryHashed;
@@ -107,7 +107,7 @@ wasm_io_types! {
     fn must_get_action (zt::entry::MustGetActionInput) -> zt::SignedActionHashed;
 
     // Query the source chain for data.
-    fn query (zt::query::ChainQueryFilter) -> Vec<crate::Element>;
+    fn query (zt::query::ChainQueryFilter) -> Vec<crate::Record>;
 
     // the length of random bytes to create
     fn random_bytes (u32) -> zt::bytes::Bytes;
@@ -136,7 +136,7 @@ wasm_io_types! {
     // Current system time, in the opinion of the host, as a `Timestamp`.
     fn sys_time (()) -> zt::timestamp::Timestamp;
 
-    // Same as  but also takes the ActionHash of the updated element.
+    // Same as  but also takes the ActionHash of the updated record.
     fn update (zt::entry::UpdateInput) -> holo_hash::ActionHash;
 
     fn verify_signature (zt::signature::VerifySignature) -> bool;

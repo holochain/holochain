@@ -23,7 +23,6 @@ pub mod db;
 pub mod db_cache;
 pub mod dht_op;
 pub mod dna;
-pub mod element;
 pub mod entry;
 pub mod fixt;
 pub mod inline_zome;
@@ -31,6 +30,7 @@ pub mod link;
 mod macros;
 pub mod metadata;
 pub mod prelude;
+pub mod record;
 pub mod share;
 pub mod signal;
 #[warn(missing_docs)]

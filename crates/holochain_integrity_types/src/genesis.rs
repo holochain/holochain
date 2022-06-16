@@ -1,5 +1,5 @@
 //! Types related to the genesis process whereby a user commits their initial
-//! elements and validates them to the best of their ability. Full validation
+//! records and validates them to the best of their ability. Full validation
 //! may not be possible if network access is required, so they perform a
 //! "self-check" (as in "check yourself before you wreck yourself") before
 //! joining to ensure that they can catch any problems they can before being
@@ -16,12 +16,12 @@ pub type MembraneProof = std::sync::Arc<SerializedBytes>;
 /// chain entries
 #[derive(Debug, Serialize, Deserialize, SerializedBytes)]
 pub struct GenesisSelfCheckData {
-    /// The Dna action (1st element)
+    /// The Dna action (1st record)
     pub dna_info: DnaInfo,
 
-    /// The proof of membership provided by the AgentValidationPkg (2nd element)
+    /// The proof of membership provided by the AgentValidationPkg (2nd record)
     pub membrane_proof: Option<MembraneProof>,
 
-    /// The 3rd element of the chain, the agent key
+    /// The 3rd record of the chain, the agent key
     pub agent_key: AgentPubKey,
 }

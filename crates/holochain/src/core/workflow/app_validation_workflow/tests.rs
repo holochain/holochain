@@ -389,7 +389,7 @@ async fn run_test_entry_def_id(
     let invalid_entry_hash: AnyDhtHash = invalid_entry_hash.into();
 
     // Integration should have 3 ops in it
-    // StoreEntry and StoreElement should be invalid.
+    // StoreEntry and StoreRecord should be invalid.
     let expected_count = 3 + expected_count;
     let alice_db = conductors[0].get_dht_db(&alice_cell_id.dna_hash()).unwrap();
     wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt).await;

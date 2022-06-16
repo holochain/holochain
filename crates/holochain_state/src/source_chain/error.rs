@@ -62,12 +62,12 @@ pub enum SourceChainError {
     #[error("SerdeJson Error: {0}")]
     SerdeJsonError(String),
 
-    /// Element signature doesn't validate against the action
-    #[error("Element signature is invalid")]
+    /// Record signature doesn't validate against the action
+    #[error("Record signature is invalid")]
     InvalidSignature,
 
-    /// Element previous action reference is invalid
-    #[error("Element previous action reference is invalid: {0}")]
+    /// Record previous action reference is invalid
+    #[error("Record previous action reference is invalid: {0}")]
     InvalidPreviousAction(String),
 
     #[error("InvalidCommit error: {0}")]
@@ -88,12 +88,12 @@ pub enum SourceChainError {
     #[error("Required the scratch space to be empty but contained values")]
     ScratchNotFresh,
 
-    /// Element signature doesn't validate against the action
-    #[error("Element associated with action {0} was not found on the source chain")]
-    ElementMissing(String),
+    /// Record signature doesn't validate against the action
+    #[error("Record associated with action {0} was not found on the source chain")]
+    RecordMissing(String),
 
     #[error(transparent)]
-    ElementGroupError(#[from] ElementGroupError),
+    RecordGroupError(#[from] RecordGroupError),
 
     #[error(transparent)]
     StateMutationError(#[from] StateMutationError),
@@ -140,7 +140,7 @@ pub enum ChainInvalidReason {
     #[error("A valid chain always begins with a Dna entry, followed by an Agent entry.")]
     GenesisDataMissing,
 
-    #[error("A genesis element contains incorrect data.")]
+    #[error("A genesis record contains incorrect data.")]
     MalformedGenesisData,
 
     #[error("A chain action and its corresponding entry have a discrepancy. Entry address: {0}")]

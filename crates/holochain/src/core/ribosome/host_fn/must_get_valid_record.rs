@@ -9,11 +9,11 @@ use holochain_zome_types::GetOptions;
 use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]
-pub fn must_get_valid_element<'a>(
+pub fn must_get_valid_record<'a>(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
-    input: MustGetValidElementInput,
-) -> Result<Element, RuntimeError> {
+    input: MustGetValidRecordInput,
+) -> Result<Record, RuntimeError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess {
             read_workspace_deterministic: Permission::Allow,
@@ -37,18 +37,18 @@ pub fn must_get_valid_element<'a>(
                     .map_err(|cascade_error| -> RuntimeError {
                         wasm_error!(WasmErrorInner::Host(cascade_error.to_string())).into()
                     })? {
-                    Some(ElementDetails {
-                        element,
+                    Some(RecordDetails {
+                        record,
                         validation_status: ValidationStatus::Valid,
                         ..
-                    }) => Ok(element),
+                    }) => Ok(record),
                     _ => match call_context.host_context {
                         HostContext::EntryDefs(_)
                         | HostContext::GenesisSelfCheck(_)
                         | HostContext::MigrateAgent(_)
                         | HostContext::PostCommit(_)
                         | HostContext::ZomeCall(_) => Err(wasm_error!(WasmErrorInner::Host(
-                            format!("Failed to get Element {}", action_hash)
+                            format!("Failed to get Record {}", action_hash)
                         ))
                         .into()),
                         HostContext::Init(_) => Err(wasm_error!(WasmErrorInner::HostShortCircuit(
@@ -101,7 +101,7 @@ pub fn must_get_valid_element<'a>(
             RibosomeError::HostFnPermissions(
                 call_context.zome.zome_name().clone(),
                 call_context.function_name().clone(),
-                "must_get_valid_element".into(),
+                "must_get_valid_record".into(),
             )
             .to_string(),
         ))

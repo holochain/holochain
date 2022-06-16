@@ -62,8 +62,8 @@ pub(super) async fn get_as_author(
 
     // Gather the package
     match required_validation_type {
-        RequiredValidationType::Element => {
-            // TODO: I'm not sure if we should handle this case, it seems like they should already have the element
+        RequiredValidationType::Record => {
+            // TODO: I'm not sure if we should handle this case, it seems like they should already have the record
             Ok(None.into())
         }
         RequiredValidationType::SubChain => Ok(Some(
@@ -76,8 +76,8 @@ pub(super) async fn get_as_author(
         RequiredValidationType::Custom => {
             let cascade = Cascade::empty().with_authored(authored_db.clone());
 
-            if let Some(elements) = cascade.get_validation_package_local(action_hashed.as_hash())? {
-                return Ok(Some(ValidationPackage::new(elements)).into());
+            if let Some(records) = cascade.get_validation_package_local(action_hashed.as_hash())? {
+                return Ok(Some(ValidationPackage::new(records)).into());
             }
 
             let workspace_lock = HostFnWorkspace::new(
@@ -154,8 +154,8 @@ pub(super) async fn get_as_authority(
 
     // Gather the package
     match required_validation_type {
-        RequiredValidationType::Element => {
-            // TODO: I'm not sure if we should handle this case, it seems like they should already have the element
+        RequiredValidationType::Record => {
+            // TODO: I'm not sure if we should handle this case, it seems like they should already have the record
             Ok(None.into())
         }
         RequiredValidationType::SubChain => {
@@ -168,12 +168,12 @@ pub(super) async fn get_as_authority(
                 ));
 
             // Collect and return the sub chain
-            let elements = match cascade.get_validation_package_local(&action_hash)? {
-                Some(elements) => elements,
+            let records = match cascade.get_validation_package_local(&action_hash)? {
+                Some(records) => records,
                 None => return Ok(None.into()),
             };
 
-            Ok(Some(ValidationPackage::new(query.filter_elements(elements))).into())
+            Ok(Some(ValidationPackage::new(query.filter_records(records))).into())
         }
         RequiredValidationType::Full => {
             let query = &ChainQueryFilter::default()
@@ -184,20 +184,20 @@ pub(super) async fn get_as_authority(
                 ));
 
             // Collect and return the sub chain
-            let elements = match cascade.get_validation_package_local(&action_hash)? {
-                Some(elements) => elements,
+            let records = match cascade.get_validation_package_local(&action_hash)? {
+                Some(records) => records,
                 None => return Ok(None.into()),
             };
 
-            Ok(Some(ValidationPackage::new(query.filter_elements(elements))).into())
+            Ok(Some(ValidationPackage::new(query.filter_records(records))).into())
         }
         RequiredValidationType::Custom => {
-            let elements = match cascade.get_validation_package_local(&action_hash)? {
-                Some(elements) => elements,
+            let records = match cascade.get_validation_package_local(&action_hash)? {
+                Some(records) => records,
                 None => return Ok(None.into()),
             };
 
-            Ok(Some(ValidationPackage::new(elements)).into())
+            Ok(Some(ValidationPackage::new(records)).into())
         }
     }
 }

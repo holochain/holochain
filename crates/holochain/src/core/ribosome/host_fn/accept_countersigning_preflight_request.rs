@@ -435,13 +435,9 @@ pub mod wasm_test {
             unreachable!();
         }
 
-        // Element get must not error.
-        let _countersigned_element_bob: Element = conductor
-            .call(
-                &bob,
-                "must_get_valid_element",
-                countersigned_action_hash_bob,
-            )
+        // Record get must not error.
+        let _countersigned_record_bob: Record = conductor
+            .call(&bob, "must_get_valid_record", countersigned_action_hash_bob)
             .await;
 
         let alice_activity: AgentActivity = conductor

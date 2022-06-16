@@ -1,8 +1,8 @@
 use hdk::prelude::*;
 
 #[hdk_extern]
-fn must_get_valid_element(action_hash: ActionHash) -> ExternResult<Element> {
-    hdk::prelude::must_get_valid_element(action_hash)
+fn must_get_valid_record(action_hash: ActionHash) -> ExternResult<Record> {
+    hdk::prelude::must_get_valid_record(action_hash)
 }
 
 #[hdk_extern]

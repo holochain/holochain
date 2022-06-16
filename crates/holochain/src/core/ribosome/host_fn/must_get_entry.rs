@@ -140,15 +140,15 @@ pub mod test {
             .get_dht_db(alice.cell_id().dna_hash())
             .unwrap();
 
-        // When we first get the element it will return because we haven't yet
+        // When we first get the record it will return because we haven't yet
         // set the validation status.
-        let element: Element = conductor
-            .call(&bob, "must_get_valid_element", action_hash.clone())
+        let record: Record = conductor
+            .call(&bob, "must_get_valid_record", action_hash.clone())
             .await;
 
-        let signature = element.signature().clone();
-        let action = element.action().clone();
-        let maybe_entry_box: Option<Box<Entry>> = element
+        let signature = record.signature().clone();
+        let action = record.action().clone();
+        let maybe_entry_box: Option<Box<Entry>> = record
             .entry()
             .as_option()
             .cloned()
@@ -158,7 +158,7 @@ pub mod test {
             NewEntryAction::try_from(action.clone()).unwrap(),
             maybe_entry_box.clone().unwrap(),
         ));
-        let element_state = DhtOpHashed::from_content_sync(DhtOp::StoreElement(
+        let record_state = DhtOpHashed::from_content_sync(DhtOp::StoreRecord(
             signature,
             action.clone(),
             maybe_entry_box,
@@ -167,7 +167,7 @@ pub mod test {
             .conn()
             .unwrap()
             .with_commit_sync(|txn| {
-                set_validation_status(txn, element_state.as_hash(), ValidationStatus::Rejected)
+                set_validation_status(txn, record_state.as_hash(), ValidationStatus::Rejected)
                     .unwrap();
                 set_validation_status(txn, entry_state.as_hash(), ValidationStatus::Rejected)
             })
@@ -187,11 +187,11 @@ pub mod test {
             .await;
         assert_eq!(must_get_action.action(), &action,);
 
-        // Must get VALID element ONLY returns the element if it is valid.
-        let must_get_valid_element: Result<Element, _> = conductor
-            .call_fallible(&bob, "must_get_valid_element", action_hash)
+        // Must get VALID record ONLY returns the record if it is valid.
+        let must_get_valid_record: Result<Record, _> = conductor
+            .call_fallible(&bob, "must_get_valid_record", action_hash)
             .await;
-        assert!(must_get_valid_element.is_err());
+        assert!(must_get_valid_record.is_err());
 
         let bad_entry_hash = EntryHash::from_raw_32(vec![1; 32]);
         let bad_must_get_entry: Result<EntryHashed, _> = conductor

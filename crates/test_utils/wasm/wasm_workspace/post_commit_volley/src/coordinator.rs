@@ -45,6 +45,6 @@ fn post_commit(shhs: Vec<SignedActionHashed>) {
 }
 
 #[hdk_extern]
-fn query(_: ()) -> ExternResult<Vec<Element>> {
+fn query(_: ()) -> ExternResult<Vec<Record>> {
     hdk::prelude::query(ChainQueryFilter::default().entry_type(EntryTypesUnit::Ping.try_into()?))
 }

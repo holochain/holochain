@@ -22,7 +22,7 @@ impl GetLiveEntryQuery {
 impl Query for GetLiveEntryQuery {
     type Item = Judged<SignedActionHashed>;
     type State = Maps<SignedActionHashed>;
-    type Output = Option<Element>;
+    type Output = Option<Record>;
 
     fn query(&self) -> String {
         "
@@ -138,10 +138,10 @@ impl Query for GetLiveEntryQuery {
                     .ok_or_else(|| DhtOpError::ActionWithoutEntry(action.action().clone()))?;
                 // If this action is authored then we can get an authored entry.
                 let author = is_authored.then(|| action.action().author());
-                let element = stores
+                let record = stores
                     .get_public_or_authored_entry(entry_hash, author)?
-                    .map(|entry| Element::new(action, Some(entry)));
-                Ok(element)
+                    .map(|entry| Record::new(action, Some(entry)));
+                Ok(record)
             }
             None => Ok(None),
         }

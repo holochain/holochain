@@ -341,12 +341,12 @@ mod tests {
     /// - Add / Remove links: Currently publish all.
     /// ## Explication
     /// This test is a little big so a quick run down:
-    /// 1. All ops that can contain entries are created with entries (StoreElement, StoreEntry and RegisterUpdatedContent)
+    /// 1. All ops that can contain entries are created with entries (StoreRecord, StoreEntry and RegisterUpdatedContent)
     /// 2. Then we create identical versions of these ops without the entires (set to None) (expect StoreEntry)
     /// 3. The workflow is run and the ops are sent to the network receiver
     /// 4. We check that the correct number of ops are received (so we know there were no other ops sent)
     /// 5. StoreEntry is __not__ expected so would show up as an extra if it was produced
-    /// 6. Every op that is received (StoreElement and RegisterUpdatedContent) is checked to match the expected versions (entries removed)
+    /// 6. Every op that is received (StoreRecord and RegisterUpdatedContent) is checked to match the expected versions (entries removed)
     /// 7. Each op also has a count to check for duplicates
     #[test_case(1)]
     #[test_case(10)]
@@ -401,7 +401,7 @@ mod tests {
                     .unwrap();
                 let author = fake_agent_pubkey_1();
 
-                // Put data in elements
+                // Put data in records
                 let source_chain = SourceChain::new(
                     db.clone().into(),
                     dht_db.to_db(),
@@ -452,10 +452,10 @@ mod tests {
                     .unwrap();
 
                 // Gather the expected op hashes, ops and basis
-                // We are only expecting Store Element and Register Replaced By ops and nothing else
-                let store_element_count = Arc::new(AtomicU32::new(0));
+                // We are only expecting Store Record and Register Replaced By ops and nothing else
+                let store_record_count = Arc::new(AtomicU32::new(0));
                 let register_replaced_by_count = Arc::new(AtomicU32::new(0));
-                let register_updated_element_count = Arc::new(AtomicU32::new(0));
+                let register_updated_record_count = Arc::new(AtomicU32::new(0));
                 let register_agent_activity_count = Arc::new(AtomicU32::new(0));
 
                 let expected = {
@@ -472,14 +472,14 @@ mod tests {
                         (expected_op, register_agent_activity_count.clone()),
                     );
 
-                    let expected_op = DhtOp::StoreElement(
+                    let expected_op = DhtOp::StoreRecord(
                         sig,
                         entry_create_action.into_content().try_into().unwrap(),
                         None,
                     );
                     let op_hash = expected_op.to_hash();
 
-                    map.insert(op_hash, (expected_op, store_element_count.clone()));
+                    map.insert(op_hash, (expected_op, store_record_count.clone()));
 
                     // Create RegisterUpdatedContent
                     // Op is expected to not contain the Entry
@@ -487,10 +487,10 @@ mod tests {
                     let entry_update_action: Update =
                         entry_update_action.into_content().try_into().unwrap();
                     let expected_op =
-                        DhtOp::StoreElement(sig.clone(), entry_update_action.clone().into(), None);
+                        DhtOp::StoreRecord(sig.clone(), entry_update_action.clone().into(), None);
                     let op_hash = expected_op.to_hash();
 
-                    map.insert(op_hash, (expected_op, store_element_count.clone()));
+                    map.insert(op_hash, (expected_op, store_record_count.clone()));
 
                     let expected_op = DhtOp::RegisterUpdatedContent(
                         sig.clone(),
@@ -500,7 +500,7 @@ mod tests {
                     let op_hash = expected_op.to_hash();
 
                     map.insert(op_hash, (expected_op, register_replaced_by_count.clone()));
-                    let expected_op = DhtOp::RegisterUpdatedElement(
+                    let expected_op = DhtOp::RegisterUpdatedRecord(
                         sig.clone(),
                         entry_update_action.clone(),
                         None,
@@ -509,7 +509,7 @@ mod tests {
 
                     map.insert(
                         op_hash,
-                        (expected_op, register_updated_element_count.clone()),
+                        (expected_op, register_updated_record_count.clone()),
                     );
                     let expected_op = DhtOp::RegisterAgentActivity(sig, entry_update_action.into());
                     let op_hash = expected_op.to_hash();
@@ -608,9 +608,9 @@ mod tests {
                 );
                 assert_eq!(
                     num_agents * 1,
-                    register_updated_element_count.load(Ordering::SeqCst)
+                    register_updated_record_count.load(Ordering::SeqCst)
                 );
-                assert_eq!(num_agents * 2, store_element_count.load(Ordering::SeqCst));
+                assert_eq!(num_agents * 2, store_record_count.load(Ordering::SeqCst));
                 assert_eq!(
                     num_agents * 2,
                     register_agent_activity_count.load(Ordering::SeqCst)

@@ -1,8 +1,8 @@
 //! # Dht Operational Transforms
 
 use crate::{
-    Action, ActionRef, AppEntryType, Create, CreateLink, Delete, DeleteLink, Element, Entry,
-    EntryType, SignedActionHashed, SignedHashed, Update,
+    Action, ActionRef, AppEntryType, Create, CreateLink, Delete, DeleteLink, Entry, EntryType,
+    Record, SignedActionHashed, SignedHashed, Update,
 };
 use holo_hash::{ActionHash, AgentPubKey, EntryHash, HashableContent};
 use holochain_serialized_bytes::prelude::*;
@@ -16,7 +16,7 @@ use kitsune_p2p_timestamp::Timestamp;
 ///
 /// ## Producing Operations
 /// The following is a list of the operations that can be produced by each [`Action`]:
-/// - Every [`Action`] produces a [`Op::RegisterAgentActivity`] and a [`Op::StoreElement`].
+/// - Every [`Action`] produces a [`Op::RegisterAgentActivity`] and a [`Op::StoreRecord`].
 /// - [`Action::Create`] also produces a [`Op::StoreEntry`].
 /// - [`Action::Update`] also produces a [`Op::StoreEntry`] and a [`Op::RegisterUpdate`].
 /// - [`Action::Delete`] also produces a [`Op::RegisterDelete`].
@@ -27,7 +27,7 @@ use kitsune_p2p_timestamp::Timestamp;
 /// There are three types of authorities in Holochain:
 ///
 /// #### The Action Authority
-/// This set of authorities receives the [`Op::StoreElement`].
+/// This set of authorities receives the [`Op::StoreRecord`].
 /// This is where you can implement your own logic for checking
 /// that it is valid to store any of the [`Action`] variants
 /// according to your own applications rules.
@@ -53,7 +53,7 @@ use kitsune_p2p_timestamp::Timestamp;
 /// This set of authorities receives the [`Op::RegisterAgentActivity`].
 /// This is where you can implement your own logic for checking that it is valid to
 /// add a new [`Action`] to an agent source chain.
-/// You are not validating the individual element but the entire agents source chain.
+/// You are not validating the individual record but the entire agents source chain.
 ///
 /// ##### Author
 /// When authoring a new [`Action`] to your source chain, the
@@ -77,13 +77,13 @@ use kitsune_p2p_timestamp::Timestamp;
 /// Operations beginning with `Register` are concerned with registering
 /// metadata about the data.
 pub enum Op {
-    /// Stores a new [`Element`] in the DHT.
+    /// Stores a new [`Record`] in the DHT.
     /// This is the act of creating a new [`Action`]
     /// and publishing it to the DHT.
     /// Note that not all [`Action`]s contain an [`Entry`].
-    StoreElement {
-        /// The [`Element`] to store.
-        element: Element,
+    StoreRecord {
+        /// The [`Record`] to store.
+        record: Record,
     },
     /// Stores a new [`Entry`] in the DHT.
     /// This is the act of creating a either a [`Action::Create`] or

@@ -54,7 +54,7 @@ fixturator!(
     };
 );
 
-fn new_entry_element(entry: Entry, action_type: ActionType, index: usize) -> Element {
+fn new_entry_record(entry: Entry, action_type: ActionType, index: usize) -> Record {
     let et = match entry {
         Entry::App(_) | Entry::CounterSign(_, _) => EntryType::App(
             AppEntryTypeFixturator::new_indexed(Unpredictable, index)
@@ -69,32 +69,32 @@ fn new_entry_element(entry: Entry, action_type: ActionType, index: usize) -> Ele
         ActionType::Create => {
             let c = CreateFixturator::new_indexed(et, index).next().unwrap();
             let c = NewEntryAction::Create(c);
-            let element: Element = ElementFixturator::new_indexed(c, index).next().unwrap();
-            let (shh, _) = element.into_inner();
-            Element::new(shh, Some(entry))
+            let record: Record = RecordFixturator::new_indexed(c, index).next().unwrap();
+            let (shh, _) = record.into_inner();
+            Record::new(shh, Some(entry))
         }
         ActionType::Update => {
             let u = UpdateFixturator::new_indexed(et, index).next().unwrap();
             let u = NewEntryAction::Update(u);
-            let element: Element = ElementFixturator::new_indexed(u, index).next().unwrap();
-            let (shh, _) = element.into_inner();
-            Element::new(shh, Some(entry))
+            let record: Record = RecordFixturator::new_indexed(u, index).next().unwrap();
+            let (shh, _) = record.into_inner();
+            Record::new(shh, Some(entry))
         }
-        _ => panic!("You choose {:?} for an Element with en Entry", action_type),
+        _ => panic!("You choose {:?} for an Record with en Entry", action_type),
     }
 }
 
-type NewEntryElement = (Entry, ActionType);
+type NewEntryRecord = (Entry, ActionType);
 
-// NB: Element is defined in holochain_zome_types, but I don't know if it's possible to define
+// NB: Record is defined in holochain_zome_types, but I don't know if it's possible to define
 //     new Curves on fixturators in other crates, so we have the definition in this crate so that
 //     all Curves can be defined at once -MD
 fixturator!(
-    Element;
-    vanilla fn element_with_no_entry(Signature, Action);
+    Record;
+    vanilla fn record_with_no_entry(Signature, Action);
     curve NewEntryAction {
         let s = SignatureFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap();
-        element_with_no_entry(s, get_fixt_curve!().into())
+        record_with_no_entry(s, get_fixt_curve!().into())
     };
     curve Entry {
         let et = match get_fixt_curve!() {
@@ -104,10 +104,10 @@ fixturator!(
             Entry::CapGrant(_) => EntryType::CapGrant,
         };
         let new = NewEntryActionFixturator::new_indexed(et, get_fixt_index!()).next().unwrap();
-        let (shh, _) = ElementFixturator::new_indexed(new, get_fixt_index!()).next().unwrap().into_inner();
-        Element::new(shh, Some(get_fixt_curve!()))
+        let (shh, _) = RecordFixturator::new_indexed(new, get_fixt_index!()).next().unwrap().into_inner();
+        Record::new(shh, Some(get_fixt_curve!()))
     };
-    curve NewEntryElement {
-        new_entry_element(get_fixt_curve!().0, get_fixt_curve!().1, get_fixt_index!())
+    curve NewEntryRecord {
+        new_entry_record(get_fixt_curve!().0, get_fixt_curve!().1, get_fixt_index!())
     };
 );

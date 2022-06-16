@@ -34,12 +34,12 @@ pub enum Dependency {
 
 pub fn get_dependency(op_type: DhtOpType, action: &Action) -> Dependency {
     match op_type {
-        DhtOpType::StoreElement | DhtOpType::StoreEntry => Dependency::Null,
+        DhtOpType::StoreRecord | DhtOpType::StoreEntry => Dependency::Null,
         DhtOpType::RegisterAgentActivity => action
             .prev_action()
             .map(|p| Dependency::Action(p.clone()))
             .unwrap_or_else(|| Dependency::Null),
-        DhtOpType::RegisterUpdatedContent | DhtOpType::RegisterUpdatedElement => match action {
+        DhtOpType::RegisterUpdatedContent | DhtOpType::RegisterUpdatedRecord => match action {
             Action::Update(update) => Dependency::Action(update.original_action_address.clone()),
             _ => Dependency::Null,
         },
@@ -114,12 +114,12 @@ pub fn insert_op_scratch(
     Ok(())
 }
 
-pub fn insert_element_scratch(
+pub fn insert_record_scratch(
     scratch: &mut Scratch,
-    element: Element,
+    record: Record,
     chain_top_ordering: ChainTopOrdering,
 ) {
-    let (action, entry) = element.into_inner();
+    let (action, entry) = record.into_inner();
     scratch.add_action(action, chain_top_ordering);
     if let Some(entry) = entry.into_option() {
         scratch.add_entry(EntryHashed::from_content_sync(entry), chain_top_ordering);

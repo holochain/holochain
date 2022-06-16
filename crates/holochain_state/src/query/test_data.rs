@@ -35,9 +35,9 @@ pub struct EntryTestData {
     pub update_action: SignedActionHashed,
 }
 
-pub struct ElementTestData {
-    pub store_element_op: DhtOpHashed,
-    pub update_store_element_op: DhtOpHashed,
+pub struct RecordTestData {
+    pub store_record_op: DhtOpHashed,
+    pub update_store_record_op: DhtOpHashed,
     pub delete_by_op: DhtOpHashed,
     pub entry: Entry,
     pub action: SignedActionHashed,
@@ -212,7 +212,7 @@ impl EntryTestData {
     }
 }
 
-impl ElementTestData {
+impl RecordTestData {
     pub fn new() -> Self {
         let mut create = fixt!(Create);
         let mut update = fixt!(Update);
@@ -229,7 +229,7 @@ impl ElementTestData {
         delete.deletes_address = create_hash.clone();
 
         let signature = fixt!(Signature);
-        let store_element_op = DhtOpHashed::from_content_sync(DhtOp::StoreElement(
+        let store_record_op = DhtOpHashed::from_content_sync(DhtOp::StoreRecord(
             signature.clone(),
             Action::Create(create.clone()),
             Some(Box::new(entry.clone())),
@@ -247,7 +247,7 @@ impl ElementTestData {
         ));
 
         let signature = fixt!(Signature);
-        let update_store_element_op = DhtOpHashed::from_content_sync(DhtOp::StoreElement(
+        let update_store_record_op = DhtOpHashed::from_content_sync(DhtOp::StoreRecord(
             signature.clone(),
             Action::Update(update.clone()),
             Some(Box::new(entry.clone())),
@@ -259,9 +259,9 @@ impl ElementTestData {
         );
 
         Self {
-            store_element_op,
+            store_record_op,
             action,
-            update_store_element_op,
+            update_store_record_op,
             update_action,
             entry,
             delete_by_op,

@@ -76,14 +76,14 @@ pub mod wasm_test {
         struct CounTree(u32);
 
         let check = |details: &Option<Details>, count, delete| match details {
-            Some(Details::Element(ref element_details)) => {
-                match element_details.element.entry().to_app_option::<CounTree>() {
+            Some(Details::Record(ref record_details)) => {
+                match record_details.record.entry().to_app_option::<CounTree>() {
                     Ok(Some(CounTree(u))) => assert_eq!(u, count),
                     _ => panic!("failed to deserialize {:?}, {}, {}", details, count, delete),
                 }
-                assert_eq!(element_details.deletes.len(), delete);
+                assert_eq!(record_details.deletes.len(), delete);
             }
-            _ => panic!("no element"),
+            _ => panic!("no record"),
         };
 
         let check_entry = |details: &Option<Details>, count, update, delete, line| match details {
@@ -189,15 +189,15 @@ pub mod wasm_test {
         check_entry(&entry_details_4[2], 2, 0, 0, line!());
 
         match action_details_4[2] {
-            Some(Details::Element(ref element_details)) => {
-                match element_details.element.entry().as_option() {
+            Some(Details::Record(ref record_details)) => {
+                match record_details.record.entry().as_option() {
                     None => {
                         // this is the delete so it should be none
                     }
-                    _ => panic!("delete had an element"),
+                    _ => panic!("delete had an record"),
                 }
             }
-            _ => panic!("no element"),
+            _ => panic!("no record"),
         }
     }
 }

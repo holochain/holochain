@@ -445,10 +445,10 @@ fn set_zome_types(entries: Vec<Range<u8>>, links: Vec<Range<u8>>) {
             todo!()
         }
 
-        fn must_get_valid_element(
+        fn must_get_valid_record(
             &self,
-            must_get_valid_element_input: MustGetValidElementInput,
-        ) -> ExternResult<Element> {
+            must_get_valid_record_input: MustGetValidRecordInput,
+        ) -> ExternResult<Record> {
             todo!()
         }
 

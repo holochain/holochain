@@ -67,13 +67,11 @@ pub async fn integrate_dht_ops_workflow(
                 })?;
             total += changed;
             let changed = txn
-                .prepare_cached(
-                    holochain_sqlite::sql::sql_cell::UPDATE_INTEGRATE_DEP_STORE_ELEMENT,
-                )?
+                .prepare_cached(holochain_sqlite::sql::sql_cell::UPDATE_INTEGRATE_DEP_STORE_RECORD)?
                 .execute(named_params! {
                     ":when_integrated": time,
-                    ":store_element": DhtOpType::StoreElement,
-                    ":updated_element": DhtOpType::RegisterUpdatedElement,
+                    ":store_record": DhtOpType::StoreRecord,
+                    ":updated_record": DhtOpType::RegisterUpdatedRecord,
                     ":deleted_by": DhtOpType::RegisterDeletedBy,
                 })?;
             total += changed;

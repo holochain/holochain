@@ -16,13 +16,13 @@ use holochain_sqlite::rusqlite::Transaction;
 use holochain_types::db::DbRead;
 use holochain_types::db::DbWrite;
 use holochain_types::db_cache::DhtDbQueryCache;
-use holochain_types::dht_op::produce_op_lights_from_elements;
 use holochain_types::dht_op::produce_op_lights_from_iter;
+use holochain_types::dht_op::produce_op_lights_from_records;
 use holochain_types::dht_op::DhtOp;
 use holochain_types::dht_op::DhtOpLight;
 use holochain_types::dht_op::OpOrder;
 use holochain_types::dht_op::UniqueForm;
-use holochain_types::element::SignedActionHashedExt;
+use holochain_types::record::SignedActionHashedExt;
 use holochain_types::sql::AsSql;
 use holochain_zome_types::action;
 use holochain_zome_types::query::ChainQueryFilterRange;
@@ -39,13 +39,13 @@ use holochain_zome_types::CellId;
 use holochain_zome_types::ChainTopOrdering;
 use holochain_zome_types::CounterSigningAgentState;
 use holochain_zome_types::CounterSigningSessionData;
-use holochain_zome_types::Element;
 use holochain_zome_types::Entry;
 use holochain_zome_types::EntryVisibility;
 use holochain_zome_types::GrantedFunction;
 use holochain_zome_types::MembraneProof;
 use holochain_zome_types::PreflightRequest;
 use holochain_zome_types::QueryFilter;
+use holochain_zome_types::Record;
 use holochain_zome_types::Signature;
 use holochain_zome_types::SignedAction;
 use holochain_zome_types::SignedActionHashed;
@@ -82,15 +82,15 @@ pub struct SourceChain<AuthorDb = DbWrite<DbKindAuthored>, DhtDb = DbWrite<DbKin
 pub type SourceChainRead = SourceChain<DbRead<DbKindAuthored>, DbRead<DbKindDht>>;
 
 // TODO fix this.  We shouldn't really have nil values but this would
-// show if the database is corrupted and doesn't have an element
+// show if the database is corrupted and doesn't have an record
 #[derive(Serialize, Debug, Clone, Deserialize)]
 pub struct SourceChainJsonDump {
-    pub elements: Vec<SourceChainJsonElement>,
+    pub records: Vec<SourceChainJsonRecord>,
     pub published_ops_count: usize,
 }
 
 #[derive(Serialize, Debug, Clone, Deserialize)]
-pub struct SourceChainJsonElement {
+pub struct SourceChainJsonRecord {
     pub signature: Signature,
     pub action_address: ActionHash,
     pub action: Action,
@@ -155,9 +155,9 @@ impl SourceChain {
         let action = ActionHashed::from_content_sync(action);
         let hash = action.as_hash().clone();
         let action = SignedActionHashed::sign(&self.keystore, action).await?;
-        let element = Element::new(action, maybe_entry);
+        let record = Record::new(action, maybe_entry);
         self.scratch
-            .apply(|scratch| insert_element_scratch(scratch, element, chain_top_ordering))?;
+            .apply(|scratch| insert_record_scratch(scratch, record, chain_top_ordering))?;
         Ok(hash)
     }
 
@@ -487,11 +487,11 @@ where
 
     /// This has to clone all the data because we can't return
     /// references to constructed data.
-    // TODO: Maybe we should store data as elements in the scratch?
-    // TODO: document that this is only the elements in the SCRATCH, not the
+    // TODO: Maybe we should store data as records in the scratch?
+    // TODO: document that this is only the records in the SCRATCH, not the
     //       entire source chain!
-    pub fn scratch_elements(&self) -> SourceChainResult<Vec<Element>> {
-        Ok(self.scratch.apply(|scratch| scratch.elements().collect())?)
+    pub fn scratch_records(&self) -> SourceChainResult<Vec<Record>> {
+        Ok(self.scratch.apply(|scratch| scratch.records().collect())?)
     }
 
     pub fn has_initialized(&self) -> SourceChainResult<bool> {
@@ -653,10 +653,10 @@ where
     /// This returns a Vec rather than an iterator because it is intended to be
     /// used by the `query` host function, which crosses the wasm boundary
     // FIXME: This query needs to be tested.
-    pub async fn query(&self, query: QueryFilter) -> SourceChainResult<Vec<Element>> {
+    pub async fn query(&self, query: QueryFilter) -> SourceChainResult<Vec<Record>> {
         let author = self.author.clone();
         let public_only = self.public_only;
-        let mut elements = self
+        let mut records = self
             .vault
             .async_reader({
                 let query = query.clone();
@@ -723,7 +723,7 @@ where
                 ",
                     );
                     let mut stmt = txn.prepare(&sql)?;
-                    let elements = stmt
+                    let records = stmt
                         .query_and_then(
                         named_params! {
                                 ":author": author.as_ref(),
@@ -770,30 +770,30 @@ where
                                     } else {
                                         None
                                     };
-                                StateQueryResult::Ok(Element::new(shh, entry))
+                                StateQueryResult::Ok(Record::new(shh, entry))
                             },
                         )?
                         .collect::<StateQueryResult<Vec<_>>>();
-                    elements
+                    records
                 }
             })
             .await?;
         self.scratch.apply(|scratch| {
-            let mut scratch_elements: Vec<_> = scratch
+            let mut scratch_records: Vec<_> = scratch
                 .actions()
                 .filter_map(|shh| {
                     let entry = match shh.action().entry_hash() {
                         Some(eh) if query.include_entries => scratch.get_entry(eh).ok()?,
                         _ => None,
                     };
-                    Some(Element::new(shh.clone(), entry))
+                    Some(Record::new(shh.clone(), entry))
                 })
                 .collect();
-            scratch_elements.sort_unstable_by_key(|e| e.action().action_seq());
+            scratch_records.sort_unstable_by_key(|e| e.action().action_seq());
 
-            elements.extend(scratch_elements);
+            records.extend(scratch_records);
         })?;
-        Ok(query.filter_elements(elements))
+        Ok(query.filter_records(records))
     }
 
     pub async fn is_chain_locked(&self, lock: Vec<u8>) -> SourceChainResult<bool> {
@@ -929,9 +929,9 @@ pub async fn genesis(
     let dna_action = ActionHashed::from_content_sync(dna_action);
     let dna_action = SignedActionHashed::sign(&keystore, dna_action).await?;
     let dna_action_address = dna_action.as_hash().clone();
-    let element = Element::new(dna_action, None);
-    let dna_ops = produce_op_lights_from_elements(vec![&element])?;
-    let (dna_action, _) = element.into_inner();
+    let record = Record::new(dna_action, None);
+    let dna_ops = produce_op_lights_from_records(vec![&record])?;
+    let (dna_action, _) = record.into_inner();
 
     // create the agent validation entry and add it directly to the store
     let agent_validation_action = Action::AgentValidationPkg(action::AgentValidationPkg {
@@ -945,11 +945,11 @@ pub async fn genesis(
     let agent_validation_action =
         SignedActionHashed::sign(&keystore, agent_validation_action).await?;
     let avh_addr = agent_validation_action.as_hash().clone();
-    let element = Element::new(agent_validation_action, None);
-    let avh_ops = produce_op_lights_from_elements(vec![&element])?;
-    let (agent_validation_action, _) = element.into_inner();
+    let record = Record::new(agent_validation_action, None);
+    let avh_ops = produce_op_lights_from_records(vec![&record])?;
+    let (agent_validation_action, _) = record.into_inner();
 
-    // create a agent chain element and add it directly to the store
+    // create a agent chain record and add it directly to the store
     let agent_action = Action::Create(action::Create {
         author: agent_pubkey.clone(),
         timestamp: Timestamp::now(),
@@ -960,9 +960,9 @@ pub async fn genesis(
     });
     let agent_action = ActionHashed::from_content_sync(agent_action);
     let agent_action = SignedActionHashed::sign(&keystore, agent_action).await?;
-    let element = Element::new(agent_action, Some(Entry::Agent(agent_pubkey)));
-    let agent_ops = produce_op_lights_from_elements(vec![&element])?;
-    let (agent_action, agent_entry) = element.into_inner();
+    let record = Record::new(agent_action, Some(Entry::Agent(agent_pubkey)));
+    let agent_ops = produce_op_lights_from_records(vec![&record])?;
+    let (agent_action, agent_entry) = record.into_inner();
     let agent_entry = agent_entry.into_option();
 
     let mut ops_to_integrate = Vec::new();
@@ -1052,11 +1052,11 @@ pub fn current_countersigning_session(
             Ok((hash, _, _)) => {
                 let txn: Txn = txn.into();
                 // Get the session data from the database.
-                let element = match txn.get_element(&hash.into())? {
-                    Some(element) => element,
+                let record = match txn.get_record(&hash.into())? {
+                    Some(record) => record,
                     None => return Ok(None),
                 };
-                let (shh, ee) = element.into_inner();
+                let (shh, ee) = record.into_inner();
                 Ok(match (shh.action().entry_hash(), ee.into_option()) {
                     (Some(entry_hash), Some(Entry::CounterSign(cs, _))) => {
                         Some((entry_hash.to_owned(), *cs))
@@ -1091,9 +1091,9 @@ async fn _put_db<H: ActionInner, B: ActionBuilder<H>>(
     let action = action_builder.build(common).into();
     let action = ActionHashed::from_content_sync(action);
     let action = SignedActionHashed::sign(keystore, action).await?;
-    let element = Element::new(action, maybe_entry);
-    let ops = produce_op_lights_from_elements(vec![&element])?;
-    let (action, entry) = element.into_inner();
+    let record = Record::new(action, maybe_entry);
+    let ops = produce_op_lights_from_records(vec![&record])?;
+    let (action, entry) = record.into_inner();
     let entry = entry.into_option();
     let hash = action.as_hash().clone();
     vault.conn()?.with_commit_sync(|txn: &mut Transaction| {
@@ -1127,7 +1127,7 @@ pub async fn dump_state(
 ) -> Result<SourceChainJsonDump, SourceChainError> {
     Ok(vault
         .async_reader(move |txn| {
-            let elements = txn
+            let records = txn
                 .prepare(
                     "
                 SELECT DISTINCT
@@ -1153,7 +1153,7 @@ pub async fn dump_state(
                             Some(entry) => Some(from_blob(entry)?),
                             None => None,
                         };
-                        StateQueryResult::Ok(SourceChainJsonElement {
+                        StateQueryResult::Ok(SourceChainJsonRecord {
                             signature,
                             action_address,
                             action,
@@ -1177,7 +1177,7 @@ pub async fn dump_state(
                 |row| row.get(0),
             )?;
             StateQueryResult::Ok(SourceChainJsonDump {
-                elements,
+                records,
                 published_ops_count,
             })
         })
@@ -1410,22 +1410,22 @@ pub mod tests {
         assert_eq!(seq, 4);
 
         fresh_reader_test!(db, |txn| {
-            // get the full element
+            // get the full record
             let store = Txn::from(&txn);
-            let h1_element_entry_fetched = store
-                .get_element(&h1.clone().into())
+            let h1_record_entry_fetched = store
+                .get_record(&h1.clone().into())
                 .expect("error retrieving")
                 .expect("entry not found")
                 .into_inner()
                 .1;
-            let h2_element_entry_fetched = store
-                .get_element(&h2.clone().into())
+            let h2_record_entry_fetched = store
+                .get_record(&h2.clone().into())
                 .expect("error retrieving")
                 .expect("entry not found")
                 .into_inner()
                 .1;
-            assert_eq!(ElementEntry::Present(entry_1), h1_element_entry_fetched);
-            assert_eq!(ElementEntry::Present(entry_2), h2_element_entry_fetched);
+            assert_eq!(RecordEntry::Present(entry_1), h1_record_entry_fetched);
+            assert_eq!(RecordEntry::Present(entry_2), h2_record_entry_fetched);
         });
 
         Ok(())
@@ -1779,18 +1779,18 @@ pub mod tests {
 
         fresh_reader_test!(vault, |txn| {
             assert_eq!(chain_head_db(&txn, author.clone()).unwrap().0, h2);
-            // get the full element
+            // get the full record
             let store = Txn::from(&txn);
-            let h1_element_fetched = store
-                .get_element(&h1.clone().into())
+            let h1_record_fetched = store
+                .get_record(&h1.clone().into())
                 .expect("error retrieving")
                 .expect("entry not found");
-            let h2_element_fetched = store
-                .get_element(&h2.clone().into())
+            let h2_record_fetched = store
+                .get_record(&h2.clone().into())
                 .expect("error retrieving")
                 .expect("entry not found");
-            assert_eq!(h1, *h1_element_fetched.action_address());
-            assert_eq!(h2, *h2_element_fetched.action_address());
+            assert_eq!(h1, *h1_record_fetched.action_address());
+            assert_eq!(h2, *h2_record_fetched.action_address());
         });
 
         // check that you can iterate on the chain
@@ -1835,14 +1835,14 @@ pub mod tests {
         let json = serde_json::to_string_pretty(&json)?;
         let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
 
-        assert_eq!(parsed["elements"][0]["action"]["type"], "Dna");
-        assert_eq!(parsed["elements"][0]["entry"], serde_json::Value::Null);
+        assert_eq!(parsed["records"][0]["action"]["type"], "Dna");
+        assert_eq!(parsed["records"][0]["entry"], serde_json::Value::Null);
 
-        assert_eq!(parsed["elements"][2]["action"]["type"], "Create");
-        assert_eq!(parsed["elements"][2]["action"]["entry_type"], "AgentPubKey");
-        assert_eq!(parsed["elements"][2]["entry"]["entry_type"], "Agent");
+        assert_eq!(parsed["records"][2]["action"]["type"], "Create");
+        assert_eq!(parsed["records"][2]["action"]["entry_type"], "AgentPubKey");
+        assert_eq!(parsed["records"][2]["entry"]["entry_type"], "Agent");
         assert_ne!(
-            parsed["elements"][2]["entry"]["entry"],
+            parsed["records"][2]["entry"]["entry"],
             serde_json::Value::Null
         );
 

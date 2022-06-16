@@ -395,7 +395,7 @@ async fn check_gossip(
         let invocation =
             new_zome_call(&handle.cell_id, "get_post", hash, TestWasm::Create).unwrap();
         let result = handle.call_zome(invocation).await.unwrap().unwrap();
-        let result: Option<Element> = unwrap_to::unwrap_to!(result => ZomeCallResponse::Ok)
+        let result: Option<Record> = unwrap_to::unwrap_to!(result => ZomeCallResponse::Ok)
             .decode()
             .unwrap();
         let s = debug_span!("check_gossip", ?line, ?i, ?hash);

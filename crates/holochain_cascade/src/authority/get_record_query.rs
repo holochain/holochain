@@ -8,7 +8,7 @@ use holochain_state::query::prelude::*;
 use holochain_state::query::StateQueryError;
 use holochain_types::action::WireUpdateRelationship;
 use holochain_types::dht_op::DhtOpType;
-use holochain_types::element::WireElementOps;
+use holochain_types::record::WireRecordOps;
 use holochain_zome_types::HasValidationStatus;
 use holochain_zome_types::Judged;
 use holochain_zome_types::SignedAction;
@@ -16,9 +16,9 @@ use holochain_zome_types::TryFrom;
 use holochain_zome_types::TryInto;
 
 #[derive(Debug, Clone)]
-pub struct GetElementOpsQuery(ActionHash, GetOptions);
+pub struct GetRecordOpsQuery(ActionHash, GetOptions);
 
-impl GetElementOpsQuery {
+impl GetRecordOpsQuery {
     pub fn new(hash: ActionHash, request: GetOptions) -> Self {
         Self(hash, request)
     }
@@ -29,9 +29,9 @@ pub struct Item {
     action: SignedAction,
 }
 
-impl Query for GetElementOpsQuery {
+impl Query for GetRecordOpsQuery {
     type Item = Judged<Item>;
-    type State = WireElementOps;
+    type State = WireRecordOps;
     type Output = Self::State;
 
     fn query(&self) -> String {
@@ -41,7 +41,7 @@ impl Query for GetElementOpsQuery {
             DhtOp.validation_status AS status
             FROM DhtOp
             JOIN Action On DhtOp.action_hash = Action.hash
-            WHERE DhtOp.type IN (:store_element, :delete, :update)
+            WHERE DhtOp.type IN (:store_record, :delete, :update)
             AND
             DhtOp.basis_hash = :action_hash
         ";
@@ -61,9 +61,9 @@ impl Query for GetElementOpsQuery {
 
     fn params(&self) -> Vec<Params> {
         let params = named_params! {
-            ":store_element": DhtOpType::StoreElement,
+            ":store_record": DhtOpType::StoreRecord,
             ":delete": DhtOpType::RegisterDeletedBy,
-            ":update": DhtOpType::RegisterUpdatedElement,
+            ":update": DhtOpType::RegisterUpdatedRecord,
             ":action_hash": self.0,
         };
         params.to_vec()
@@ -81,12 +81,12 @@ impl Query for GetElementOpsQuery {
     }
 
     fn init_fold(&self) -> StateQueryResult<Self::State> {
-        Ok(WireElementOps::new())
+        Ok(WireRecordOps::new())
     }
 
     fn fold(&self, mut state: Self::State, dht_op: Self::Item) -> StateQueryResult<Self::State> {
         match &dht_op.data.op_type {
-            DhtOpType::StoreElement => {
+            DhtOpType::StoreRecord => {
                 if state.action.is_none() {
                     state.action = Some(dht_op.map(|d| d.action));
                 }
@@ -97,7 +97,7 @@ impl Query for GetElementOpsQuery {
                     .deletes
                     .push(Judged::raw(dht_op.data.action.try_into()?, status));
             }
-            DhtOpType::RegisterUpdatedElement => {
+            DhtOpType::RegisterUpdatedRecord => {
                 let status = dht_op.validation_status();
                 let action = dht_op.data.action;
                 state.updates.push(Judged::raw(

@@ -1,4 +1,4 @@
-//! Defines a Element, the basic unit of Holochain data.
+//! Defines a Record, the basic unit of Holochain data.
 
 use crate::signature::Signature;
 use crate::Action;
@@ -7,7 +7,7 @@ use holo_hash::HashableContent;
 use holo_hash::HashableContentBytes;
 use holochain_serialized_bytes::prelude::*;
 
-pub use holochain_integrity_types::element::*;
+pub use holochain_integrity_types::record::*;
 
 #[cfg(feature = "test_utils")]
 pub mod facts;

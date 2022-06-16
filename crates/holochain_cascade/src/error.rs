@@ -16,7 +16,7 @@ pub enum CascadeError {
     DatabaseError(#[from] DatabaseError),
 
     #[error(transparent)]
-    ElementGroupError(#[from] ElementGroupError),
+    RecordGroupError(#[from] RecordGroupError),
 
     #[error(transparent)]
     ActionError(#[from] ActionError),
@@ -68,7 +68,7 @@ pub enum AuthorityDataError {
     WrongActionError(#[from] WrongActionError),
     #[error(transparent)]
     ActionError(#[from] ActionError),
-    #[error("Missing element data: {0:?}")]
+    #[error("Missing record data: {0:?}")]
     MissingData(String),
     #[error("Missing metadata: {0:?}")]
     MissingMetadata(String),

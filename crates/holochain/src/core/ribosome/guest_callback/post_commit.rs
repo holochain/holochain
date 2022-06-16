@@ -237,11 +237,11 @@ mod slow_tests {
 
         tokio::time::sleep(std::time::Duration::from_millis(600)).await;
 
-        let alice_query: Vec<Element> = conductor.call(&alice, "query", ()).await;
+        let alice_query: Vec<Record> = conductor.call(&alice, "query", ()).await;
 
         assert_eq!(alice_query.len(), 5);
 
-        let bob_query: Vec<Element> = conductor.call(&bob, "query", ()).await;
+        let bob_query: Vec<Record> = conductor.call(&bob, "query", ()).await;
 
         assert_eq!(bob_query.len(), 4);
 

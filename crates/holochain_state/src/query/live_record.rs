@@ -10,18 +10,18 @@ use super::*;
 mod test;
 
 #[derive(Debug, Clone)]
-pub struct GetLiveElementQuery(ActionHash, Option<Arc<AgentPubKey>>);
+pub struct GetLiveRecordQuery(ActionHash, Option<Arc<AgentPubKey>>);
 
-impl GetLiveElementQuery {
+impl GetLiveRecordQuery {
     pub fn new(hash: ActionHash) -> Self {
         Self(hash, None)
     }
 }
 
-impl Query for GetLiveElementQuery {
+impl Query for GetLiveRecordQuery {
     type Item = Judged<SignedActionHashed>;
     type State = (Option<SignedActionHashed>, HashSet<ActionHash>);
-    type Output = Option<Element>;
+    type Output = Option<Record>;
 
     fn query(&self) -> String {
         "
@@ -37,9 +37,9 @@ impl Query for GetLiveElementQuery {
     }
     fn params(&self) -> Vec<Params> {
         let params = named_params! {
-            ":create_type": DhtOpType::StoreElement,
+            ":create_type": DhtOpType::StoreRecord,
             ":delete_type": DhtOpType::RegisterDeletedBy,
-            ":update_type": DhtOpType::RegisterUpdatedElement,
+            ":update_type": DhtOpType::RegisterUpdatedRecord,
             ":status": ValidationStatus::Valid,
             ":action_hash": self.0,
         };
@@ -107,14 +107,14 @@ impl Query for GetLiveElementQuery {
                         .filter(|a| *a == action.action().author());
                     entry = stores.get_public_or_authored_entry(entry_hash, author)?;
                 }
-                Ok(Some(Element::new(action, entry)))
+                Ok(Some(Record::new(action, entry)))
             }
             None => Ok(None),
         }
     }
 }
 
-impl PrivateDataQuery for GetLiveElementQuery {
+impl PrivateDataQuery for GetLiveRecordQuery {
     type Hash = ActionHash;
 
     fn with_private_data_access(hash: Self::Hash, author: Arc<AgentPubKey>) -> Self {

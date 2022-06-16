@@ -210,7 +210,7 @@ mod tests {
                 Box::new(entry.clone()),
             ))
         } else {
-            DhtOpHashed::from_content_sync(DhtOp::StoreElement(
+            DhtOpHashed::from_content_sync(DhtOp::StoreRecord(
                 fixt!(Signature),
                 Action::Create(action.clone()),
                 Some(Box::new(entry.clone())),

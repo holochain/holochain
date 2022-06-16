@@ -3,7 +3,7 @@ use crate::here;
 use crate::prelude::mutations_helpers::insert_valid_integrated_op;
 use crate::prelude::*;
 use holochain_types::db::DbWrite;
-use holochain_types::element::SignedActionHashedExt;
+use holochain_types::record::SignedActionHashedExt;
 use observability;
 
 #[derive(Clone)]

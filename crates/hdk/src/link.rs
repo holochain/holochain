@@ -24,7 +24,7 @@ pub use holochain_deterministic_integrity::link::*;
 /// Crud:
 ///
 /// - creates reference a single entry
-/// - updates and deletes reference create/update elements by both their entry+action
+/// - updates and deletes reference create/update records by both their entry+action
 /// - creates, updates and deletes all have different functions, network ops and validation logic
 /// - is cryptographically guaranteed to be a DAG (not-circular) because they include actions
 /// - model "mutability" for a single thing/identity in an immutable/append-only way
@@ -78,7 +78,7 @@ where
     })
 }
 
-/// Delete a specific link creation element.
+/// Delete a specific link creation record.
 ///
 /// Links are defined by a [OR-Set CRDT](https://en.wikipedia.org/wiki/Conflict-free_replicated_data_type#OR-Set_(Observed-Remove_Set))
 /// of "Creates" and "Deletes".

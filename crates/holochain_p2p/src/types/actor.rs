@@ -172,9 +172,9 @@ pub struct GetActivityOptions {
     /// Note - if all requests time-out you will receive an empty result,
     /// not a timeout error.
     pub timeout_ms: Option<u64>,
-    /// Number of times to retry getting elements in parallel.
+    /// Number of times to retry getting records in parallel.
     /// For a small dht a large parallel get can overwhelm a single
-    /// agent and it can be worth retrying the elements that didn't
+    /// agent and it can be worth retrying the records that didn't
     /// get found.
     pub retry_gets: u8,
     /// ```[Remote]```

@@ -21,11 +21,11 @@ pub use crate::dht_op::*;
 pub use crate::dna::error::*;
 pub use crate::dna::wasm::*;
 pub use crate::dna::*;
-pub use crate::element::error::*;
-pub use crate::element::*;
 pub use crate::entry::*;
 pub use crate::link::*;
 pub use crate::metadata::*;
+pub use crate::record::error::*;
+pub use crate::record::*;
 pub use crate::signal::*;
 pub use crate::validate::*;
 

@@ -10,8 +10,8 @@ use holochain_keystore::KeystoreError;
 use holochain_types::prelude::*;
 use holochain_zome_types::entry::EntryHashed;
 use holochain_zome_types::ChainTopOrdering;
-use holochain_zome_types::Element;
 use holochain_zome_types::Entry;
+use holochain_zome_types::Record;
 use holochain_zome_types::SignedActionHashed;
 use holochain_zome_types::TimestampError;
 use thiserror::Error;
@@ -129,13 +129,13 @@ impl Scratch {
         self.actions.iter()
     }
 
-    pub fn elements(&self) -> impl Iterator<Item = Element> + '_ {
+    pub fn records(&self) -> impl Iterator<Item = Record> + '_ {
         self.actions.iter().cloned().map(move |shh| {
             let entry = shh
                 .action()
                 .entry_hash()
                 .and_then(|eh| self.entries.get(eh).map(|e| (**e).clone()));
-            Element::new(shh, entry)
+            Record::new(shh, entry)
         })
     }
 
@@ -148,23 +148,23 @@ impl Scratch {
         self.actions.len()
     }
 
-    fn get_exact_element(
+    fn get_exact_record(
         &self,
         hash: &ActionHash,
-    ) -> StateQueryResult<Option<holochain_zome_types::Element>> {
+    ) -> StateQueryResult<Option<holochain_zome_types::Record>> {
         Ok(self.get_action(hash)?.map(|shh| {
             let entry = shh
                 .action()
                 .entry_hash()
                 .and_then(|eh| self.get_entry(eh).ok());
-            Element::new(shh, entry.flatten())
+            Record::new(shh, entry.flatten())
         }))
     }
 
-    fn get_any_element(
+    fn get_any_record(
         &self,
         hash: &EntryHash,
-    ) -> StateQueryResult<Option<holochain_zome_types::Element>> {
+    ) -> StateQueryResult<Option<holochain_zome_types::Record>> {
         let r = self.get_entry(hash)?.and_then(|entry| {
             let shh = self
                 .actions()
@@ -175,7 +175,7 @@ impl Scratch {
                         .unwrap_or(false)
                 })?
                 .clone();
-            Some(Element::new(shh, Some(entry)))
+            Some(Record::new(shh, Some(entry)))
         });
         Ok(r)
     }
@@ -241,10 +241,10 @@ impl Store for Scratch {
             .cloned())
     }
 
-    fn get_element(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Element>> {
+    fn get_record(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Record>> {
         match *hash.hash_type() {
-            AnyDht::Entry => self.get_any_element(&hash.clone().into()),
-            AnyDht::Action => self.get_exact_element(&hash.clone().into()),
+            AnyDht::Entry => self.get_any_record(&hash.clone().into()),
+            AnyDht::Action => self.get_exact_record(&hash.clone().into()),
         }
     }
 
@@ -261,15 +261,15 @@ impl Store for Scratch {
     }
 
     /// It doesn't make sense to search for
-    /// a different authored element in a scratch
+    /// a different authored record in a scratch
     /// then the scratches author so this is
-    /// the same as `get_element`.
-    fn get_public_or_authored_element(
+    /// the same as `get_record`.
+    fn get_public_or_authored_record(
         &self,
         hash: &AnyDhtHash,
         _author: Option<&AgentPubKey>,
-    ) -> StateQueryResult<Option<Element>> {
-        self.get_element(hash)
+    ) -> StateQueryResult<Option<Record>> {
+        self.get_record(hash)
     }
 }
 

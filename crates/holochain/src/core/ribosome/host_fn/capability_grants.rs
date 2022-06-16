@@ -45,10 +45,10 @@ pub mod wasm_test {
         let action: ActionHash = conductor
             .call(&alice, "transferable_cap_grant", secret)
             .await;
-        let maybe_element: Option<Element> = conductor.call(&alice, "get_entry", action).await;
-        let entry_secret: CapSecret = maybe_element
-            .and_then(|element| {
-                let cap_grant_entry = element.entry().to_grant_option().unwrap();
+        let maybe_record: Option<Record> = conductor.call(&alice, "get_entry", action).await;
+        let entry_secret: CapSecret = maybe_record
+            .and_then(|record| {
+                let cap_grant_entry = record.entry().to_grant_option().unwrap();
                 match cap_grant_entry.access {
                     CapAccess::Transferable { secret, .. } => Some(secret),
                     _ => None,
@@ -114,12 +114,12 @@ pub mod wasm_test {
             .call(&bob, "roll_cap_grant", original_grant_hash)
             .await;
 
-        let output: Option<Element> = conductor
+        let output: Option<Record> = conductor
             .call(&bob, "get_entry", new_grant_action_hash.clone())
             .await;
 
         let new_secret: CapSecret = match output {
-            Some(element) => match element.entry().to_grant_option() {
+            Some(record) => match record.entry().to_grant_option() {
                 Some(zome_call_cap_grant) => match zome_call_cap_grant.access {
                     CapAccess::Transferable { secret, .. } => secret,
                     _ => unreachable!(),
