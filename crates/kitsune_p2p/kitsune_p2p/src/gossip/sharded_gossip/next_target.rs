@@ -167,7 +167,7 @@ mod tests {
             .take(39)
             .map(char::from)
             .collect();
-        let port = rng.gen_range(5000, 6000);
+        let port = rng.gen_range(5000..6000);
 
         url2::url2!(
             "kitsune-proxy://{}mqcw/kitsune-quic/h/localhost/p/{}/-",

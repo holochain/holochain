@@ -24,7 +24,7 @@ kitsune_p2p = { version = "0.0.35", path = "../kitsune_p2p/kitsune_p2p" }
 kitsune_p2p_types = { version = "0.0.24", path = "../kitsune_p2p/types" }
 mockall = "0.10.2"
 observability = "0.1.3"
-rand = "0.7"
+rand = "0.8.5"
 serde = { version = "1.0", features = ["derive"] }
 serde_bytes = "0.11"
 serde_json = { version = "1.0.51", features = [ "preserve_order" ] }
