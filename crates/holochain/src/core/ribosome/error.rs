@@ -39,12 +39,12 @@ pub enum RibosomeError {
     #[error("An error with entry defs in zome '{0}': {1}")]
     EntryDefs(ZomeName, String),
 
-    /// a mandatory dependency for an element doesn't exist
+    /// a mandatory dependency for a record doesn't exist
     /// for example a remove link ribosome call needs to find the add link in order to infer the
     /// correct base and this dependent relationship exists before even subconscious validation
     /// kicks in
-    #[error("A mandatory element is missing, dht hash: {0}")]
-    ElementDeps(AnyDhtHash),
+    #[error("A mandatory record is missing, dht hash: {0}")]
+    RecordDeps(AnyDhtHash),
 
     /// ident
     #[error("Unspecified ring error")]

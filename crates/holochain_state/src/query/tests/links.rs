@@ -20,8 +20,8 @@ async fn link_queries_are_ordered_by_timestamp() {
     assert_eq!(
         links,
         vec![
-            (td.create_link_header.clone(), vec![]),
-            (td.later_create_link_header.clone(), vec![])
+            (td.create_link_action.clone(), vec![]),
+            (td.later_create_link_action.clone(), vec![])
         ]
     );
 }

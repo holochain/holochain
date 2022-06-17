@@ -1,12 +1,12 @@
 use crate::timestamp::Timestamp;
-pub use builder::HeaderBuilder;
-pub use builder::HeaderBuilderCommon;
-use conversions::WrongHeaderError;
-use holo_hash::HeaderHash;
+pub use builder::ActionBuilder;
+pub use builder::ActionBuilderCommon;
+use conversions::WrongActionError;
+use holo_hash::ActionHash;
 use holochain_serialized_bytes::prelude::*;
 use thiserror::Error;
 
-pub use holochain_integrity_types::header::*;
+pub use holochain_integrity_types::action::*;
 
 #[cfg(any(test, feature = "test_utils"))]
 pub use facts::*;
@@ -16,18 +16,18 @@ pub mod builder;
 pub mod facts;
 
 #[derive(Error, Debug)]
-pub enum HeaderError {
-    #[error("Tried to create a NewEntryHeader with a type that isn't a Create or Update")]
+pub enum ActionError {
+    #[error("Tried to create a NewEntryAction with a type that isn't a Create or Update")]
     NotNewEntry,
     #[error(transparent)]
-    WrongHeaderError(#[from] WrongHeaderError),
+    WrongActionError(#[from] WrongActionError),
     #[error("{0}")]
     Rebase(String),
 }
 
 #[derive(PartialEq, Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum ChainTopOrdering {
-    /// Relaxed chain top ordering REWRITES HEADERS INLINE during a flush of
+    /// Relaxed chain top ordering REWRITES ACTIONS INLINE during a flush of
     /// the source chain to sit on top of the current chain top. The "as at"
     /// of the zome call initial state is completely ignored.
     /// This may be significantly more efficient if you are CERTAIN that none
@@ -37,7 +37,7 @@ pub enum ChainTopOrdering {
     /// was written or revoked that would have invalidated the zome call that
     /// wrote data after the revocation, etc.
     /// The efficiency of relaxed ordering comes from simply rehashing and
-    /// signing headers on the new chain top during flush, avoiding the
+    /// signing actions on the new chain top during flush, avoiding the
     /// overhead of the client, websockets, zome call instance, wasm execution,
     /// validation, etc. that would result from handling a `HeadMoved` error
     /// via an external driver.
@@ -62,86 +62,86 @@ impl Default for ChainTopOrdering {
     }
 }
 
-pub trait HeaderExt {
+pub trait ActionExt {
     fn rebase_on(
         &mut self,
-        new_prev_header: HeaderHash,
+        new_prev_action: ActionHash,
         new_prev_seq: u32,
         new_prev_timestamp: Timestamp,
-    ) -> Result<(), HeaderError>;
+    ) -> Result<(), ActionError>;
 }
 
-impl HeaderExt for Header {
+impl ActionExt for Action {
     fn rebase_on(
         &mut self,
-        new_prev_header: HeaderHash,
+        new_prev_action: ActionHash,
         new_prev_seq: u32,
         new_prev_timestamp: Timestamp,
-    ) -> Result<(), HeaderError> {
+    ) -> Result<(), ActionError> {
         let new_seq = new_prev_seq + 1;
         let new_timestamp = self.timestamp().max(
             (new_prev_timestamp + std::time::Duration::from_nanos(1))
-                .map_err(|e| HeaderError::Rebase(e.to_string()))?,
+                .map_err(|e| ActionError::Rebase(e.to_string()))?,
         );
         match self {
-            Self::Dna(_) => return Err(HeaderError::Rebase("Rebased a DNA Header".to_string())),
+            Self::Dna(_) => return Err(ActionError::Rebase("Rebased a DNA Action".to_string())),
             Self::AgentValidationPkg(AgentValidationPkg {
                 timestamp,
-                header_seq,
-                prev_header,
+                action_seq,
+                prev_action,
                 ..
             })
             | Self::InitZomesComplete(InitZomesComplete {
                 timestamp,
-                header_seq,
-                prev_header,
+                action_seq,
+                prev_action,
                 ..
             })
             | Self::CreateLink(CreateLink {
                 timestamp,
-                header_seq,
-                prev_header,
+                action_seq,
+                prev_action,
                 ..
             })
             | Self::DeleteLink(DeleteLink {
                 timestamp,
-                header_seq,
-                prev_header,
+                action_seq,
+                prev_action,
                 ..
             })
             | Self::Delete(Delete {
                 timestamp,
-                header_seq,
-                prev_header,
+                action_seq,
+                prev_action,
                 ..
             })
             | Self::CloseChain(CloseChain {
                 timestamp,
-                header_seq,
-                prev_header,
+                action_seq,
+                prev_action,
                 ..
             })
             | Self::OpenChain(OpenChain {
                 timestamp,
-                header_seq,
-                prev_header,
+                action_seq,
+                prev_action,
                 ..
             })
             | Self::Create(Create {
                 timestamp,
-                header_seq,
-                prev_header,
+                action_seq,
+                prev_action,
                 ..
             })
             | Self::Update(Update {
                 timestamp,
-                header_seq,
-                prev_header,
+                action_seq,
+                prev_action,
                 ..
             }) => {
                 *timestamp = new_timestamp;
-                *header_seq = new_seq;
-                *prev_header = new_prev_header;
+                *action_seq = new_seq;
+                *prev_action = new_prev_action;
             }
         };
         Ok(())

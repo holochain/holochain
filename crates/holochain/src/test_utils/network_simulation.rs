@@ -483,21 +483,21 @@ fn get_ops(txn: &mut Transaction<'_>) -> HashMap<Arc<DhtOpHash>, DhtOpHashed> {
     txn.prepare(
         "
                 SELECT DhtOp.hash, DhtOp.type AS dht_type,
-                Header.blob AS header_blob, Entry.blob AS entry_blob
+                Action.blob AS action_blob, Entry.blob AS entry_blob
                 FROM DHtOp
-                JOIN Header ON DhtOp.header_hash = Header.hash
-                LEFT JOIN Entry ON Header.entry_hash = Entry.hash
+                JOIN Action ON DhtOp.action_hash = Action.hash
+                LEFT JOIN Entry ON Action.entry_hash = Entry.hash
             ",
     )
     .unwrap()
     .query_map([], |row| {
-        let header = from_blob::<SignedHeader>(row.get("header_blob")?).unwrap();
+        let action = from_blob::<SignedAction>(row.get("action_blob")?).unwrap();
         let op_type: DhtOpType = row.get("dht_type")?;
         let hash: DhtOpHash = row.get("hash")?;
         // Check the entry isn't private before gossiping it.
         let e: Option<Vec<u8>> = row.get("entry_blob")?;
         let entry = e.map(|entry| from_blob::<Entry>(entry).unwrap());
-        let op = DhtOp::from_type(op_type, header, entry).unwrap();
+        let op = DhtOp::from_type(op_type, action, entry).unwrap();
         let op = DhtOpHashed::with_pre_hashed(op, hash.clone());
         Ok((Arc::new(hash), op))
     })
@@ -513,23 +513,23 @@ fn get_authored_ops(
     txn.prepare(
         "
                 SELECT DhtOp.hash, DhtOp.type AS dht_type,
-                Header.blob AS header_blob, Entry.blob AS entry_blob
+                Action.blob AS action_blob, Entry.blob AS entry_blob
                 FROM DHtOp
-                JOIN Header ON DhtOp.header_hash = Header.hash
-                LEFT JOIN Entry ON Header.entry_hash = Entry.hash
+                JOIN Action ON DhtOp.action_hash = Action.hash
+                LEFT JOIN Entry ON Action.entry_hash = Entry.hash
                 WHERE
-                Header.author = ?
+                Action.author = ?
             ",
     )
     .unwrap()
     .query_map([author], |row| {
-        let header = from_blob::<SignedHeader>(row.get("header_blob")?).unwrap();
+        let action = from_blob::<SignedAction>(row.get("action_blob")?).unwrap();
         let op_type: DhtOpType = row.get("dht_type")?;
         let hash: DhtOpHash = row.get("hash")?;
         // Check the entry isn't private before gossiping it.
         let e: Option<Vec<u8>> = row.get("entry_blob")?;
         let entry = e.map(|entry| from_blob::<Entry>(entry).unwrap());
-        let op = DhtOp::from_type(op_type, header, entry).unwrap();
+        let op = DhtOp::from_type(op_type, action, entry).unwrap();
         let op = DhtOpHashed::with_pre_hashed(op, hash.clone());
         Ok((Arc::new(hash), op))
     })
@@ -541,7 +541,7 @@ fn get_authored_ops(
 /// The zome to use for this simulation.
 /// Currently this is a limitation of this prototype that
 /// you must use the data generation zome in the actual simulation
-/// so the Dna element matches.
+/// so the Dna record matches.
 /// Hopefully this limitation can be overcome in the future.
 pub async fn data_zome(integrity_uuid: String, coordinator_uuid: String) -> DnaFile {
     let integrity_zome_name = "integrity_zome1";
@@ -571,7 +571,7 @@ pub async fn data_zome(integrity_uuid: String, coordinator_uuid: String) -> DnaF
             Ok(())
         },
     )
-    .callback(coordinator_zome_name, "read", |api, hash: HeaderHash| {
+    .callback(coordinator_zome_name, "read", |api, hash: ActionHash| {
         api.get(vec![GetInput::new(hash.into(), GetOptions::default())])
             .map(|e| e.into_iter().next().unwrap())
             .map_err(Into::into)

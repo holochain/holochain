@@ -12,11 +12,11 @@ use crate::countersigning::CounterSigningSessionData;
 use crate::EntryDefIndex;
 use crate::EntryVisibility;
 use holo_hash::hash_type;
+use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holo_hash::EntryHash;
 use holo_hash::HashableContent;
 use holo_hash::HashableContentBytes;
-use holo_hash::HeaderHash;
 use holochain_serialized_bytes::prelude::*;
 
 mod app_entry_bytes;
@@ -46,11 +46,11 @@ impl From<EntryHashed> for Entry {
     }
 }
 
-/// Structure holding the entry portion of a chain element.
+/// Structure holding the entry portion of a chain record.
 pub type Entry = EntryImpl<AppEntryBytes>;
 
-/// Data for building a [`Element`](crate::element::Element).
-pub type ElementBuilder = EntryImpl<AppEntry>;
+/// Data for building a [`Record`](crate::record::Record).
+pub type RecordBuilder = EntryImpl<AppEntry>;
 
 /// Inner implementation of an [`Entry`].
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
@@ -163,18 +163,18 @@ impl HashableContent for Entry {
     }
 }
 
-/// Zome input for must_get_valid_element.
+/// Zome input for must_get_valid_record.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub struct MustGetValidElementInput(pub HeaderHash);
+pub struct MustGetValidRecordInput(pub ActionHash);
 
-impl MustGetValidElementInput {
+impl MustGetValidRecordInput {
     /// Constructor.
-    pub fn new(header_hash: HeaderHash) -> Self {
-        Self(header_hash)
+    pub fn new(action_hash: ActionHash) -> Self {
+        Self(action_hash)
     }
 
     /// Consumes self for inner.
-    pub fn into_inner(self) -> HeaderHash {
+    pub fn into_inner(self) -> ActionHash {
         self.0
     }
 }
@@ -195,24 +195,24 @@ impl MustGetEntryInput {
     }
 }
 
-/// Zome input for must_get_header.
+/// Zome input for must_get_action.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub struct MustGetHeaderInput(pub HeaderHash);
+pub struct MustGetActionInput(pub ActionHash);
 
-impl MustGetHeaderInput {
+impl MustGetActionInput {
     /// Constructor.
-    pub fn new(header_hash: HeaderHash) -> Self {
-        Self(header_hash)
+    pub fn new(action_hash: ActionHash) -> Self {
+        Self(action_hash)
     }
 
     /// Consumes self for inner.
-    pub fn into_inner(self) -> HeaderHash {
+    pub fn into_inner(self) -> ActionHash {
         self.0
     }
 }
 
-impl From<ElementBuilder> for Entry {
-    fn from(b: ElementBuilder) -> Self {
+impl From<RecordBuilder> for Entry {
+    fn from(b: RecordBuilder) -> Self {
         match b {
             EntryImpl::Agent(a) => Entry::Agent(a),
             EntryImpl::App(a) => Entry::App(a.entry),

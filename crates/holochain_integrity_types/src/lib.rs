@@ -10,22 +10,22 @@
 
 #![deny(missing_docs)]
 
+#[allow(missing_docs)]
+pub mod action;
 pub mod capability;
 pub mod countersigning;
-pub mod element;
 pub mod entry;
 #[allow(missing_docs)]
 pub mod entry_def;
 pub mod genesis;
 #[allow(missing_docs)]
 pub mod hash;
-#[allow(missing_docs)]
-pub mod header;
 pub mod info;
 #[allow(missing_docs)]
 pub mod link;
 pub mod op;
 pub mod prelude;
+pub mod record;
 pub mod signature;
 pub use kitsune_p2p_timestamp as timestamp;
 #[allow(missing_docs)]
@@ -38,8 +38,8 @@ pub mod zome_io;
 
 pub mod trace;
 
+pub use action::Action;
 pub use entry::Entry;
-pub use header::Header;
 pub use prelude::*;
 
 /// Re-exported dependencies

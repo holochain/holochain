@@ -3,9 +3,9 @@ SELECT
   MAX(seq)
 FROM
   DhtOp
-  JOIN Header ON DhtOp.header_hash = Header.hash
+  JOIN Action ON DhtOp.action_hash = Action.hash
 WHERE
   DhtOp.when_integrated IS NOT NULL
   AND DhtOp.type = :register_activity
 GROUP BY
-  Header.author
+  Action.author

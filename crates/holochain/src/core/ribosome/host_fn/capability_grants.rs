@@ -42,13 +42,13 @@ pub mod wasm_test {
         } = RibosomeTestFixture::new(TestWasm::Capability).await;
 
         let secret: CapSecret = conductor.call(&alice, "cap_secret", ()).await;
-        let header: HeaderHash = conductor
+        let action: ActionHash = conductor
             .call(&alice, "transferable_cap_grant", secret)
             .await;
-        let maybe_element: Option<Element> = conductor.call(&alice, "get_entry", header).await;
-        let entry_secret: CapSecret = maybe_element
-            .and_then(|element| {
-                let cap_grant_entry = element.entry().to_grant_option().unwrap();
+        let maybe_record: Option<Record> = conductor.call(&alice, "get_entry", action).await;
+        let entry_secret: CapSecret = maybe_record
+            .and_then(|record| {
+                let cap_grant_entry = record.entry().to_grant_option().unwrap();
                 match cap_grant_entry.access {
                     CapAccess::Transferable { secret, .. } => Some(secret),
                     _ => None,
@@ -89,7 +89,7 @@ pub mod wasm_test {
 
         // BOB COMMITS A TRANSFERABLE GRANT WITH THE SECRET SHARED WITH ALICE
 
-        let original_grant_hash: HeaderHash = conductor
+        let original_grant_hash: ActionHash = conductor
             .call(&bob, "transferable_cap_grant", original_secret)
             .await;
 
@@ -110,23 +110,23 @@ pub mod wasm_test {
 
         // BOB ROLLS THE GRANT SO ONLY THE NEW ONE WILL WORK FOR ALICE
 
-        let new_grant_header_hash: HeaderHash = conductor
+        let new_grant_action_hash: ActionHash = conductor
             .call(&bob, "roll_cap_grant", original_grant_hash)
             .await;
 
-        let output: Option<Element> = conductor
-            .call(&bob, "get_entry", new_grant_header_hash.clone())
+        let output: Option<Record> = conductor
+            .call(&bob, "get_entry", new_grant_action_hash.clone())
             .await;
 
         let new_secret: CapSecret = match output {
-            Some(element) => match element.entry().to_grant_option() {
+            Some(record) => match record.entry().to_grant_option() {
                 Some(zome_call_cap_grant) => match zome_call_cap_grant.access {
                     CapAccess::Transferable { secret, .. } => secret,
                     _ => unreachable!(),
                 },
                 _ => unreachable!(),
             },
-            _ => unreachable!("Couldn't get {:?}", new_grant_header_hash),
+            _ => unreachable!("Couldn't get {:?}", new_grant_action_hash),
         };
 
         let output: ZomeCallResponse = conductor
@@ -150,8 +150,8 @@ pub mod wasm_test {
 
         // BOB DELETES THE GRANT SO NO SECRETS WORK
 
-        let _: HeaderHash = conductor
-            .call(&bob, "delete_cap_grant", new_grant_header_hash)
+        let _: ActionHash = conductor
+            .call(&bob, "delete_cap_grant", new_grant_action_hash)
             .await;
 
         let output: ZomeCallResponse = conductor

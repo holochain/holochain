@@ -75,7 +75,7 @@ macro_rules! meta_mock {
         holochain_state::metadata::MockMetadataBuf::new()
     }};
     ($fun:ident) => {{
-        let d: Vec<holochain_types::metadata::TimedHeaderHash> = Vec::new();
+        let d: Vec<holochain_types::metadata::TimedActionHash> = Vec::new();
         meta_mock!($fun, d)
     }};
     ($fun:ident, $data:expr) => {{
@@ -86,7 +86,7 @@ macro_rules! meta_mock {
                     $data
                         .clone()
                         .into_iter()
-                        .map(holochain_types::metadata::TimedHeaderHash::from)
+                        .map(holochain_types::metadata::TimedActionHash::from)
                         .map(Ok),
                 )))
             }
@@ -102,7 +102,7 @@ macro_rules! meta_mock {
                         $data
                             .clone()
                             .into_iter()
-                            .map(holochain_types::metadata::TimedHeaderHash::from)
+                            .map(holochain_types::metadata::TimedActionHash::from)
                             .map(Ok),
                     )))
                 } else {
@@ -110,7 +110,7 @@ macro_rules! meta_mock {
                     data.clear();
                     Ok(Box::new(fallible_iterator::convert(
                         data.into_iter()
-                            .map(holochain_types::metadata::TimedHeaderHash::from)
+                            .map(holochain_types::metadata::TimedActionHash::from)
                             .map(Ok),
                     )))
                 }
@@ -534,13 +534,13 @@ fn get_published_ops<Db: ReadAccess<DbKindAuthored>>(
         txn.prepare(
             "
             SELECT
-            DhtOp.type, Header.hash, Header.blob
+            DhtOp.type, Action.hash, Action.blob
             FROM DhtOp
             JOIN
-            Header ON DhtOp.header_hash = Header.hash
+            Action ON DhtOp.action_hash = Action.hash
             WHERE
-            Header.author = :author
-            AND (DhtOp.type != :store_entry OR Header.private_entry = 0)
+            Action.author = :author
+            AND (DhtOp.type != :store_entry OR Action.private_entry = 0)
         ",
         )
         .unwrap()
@@ -551,9 +551,9 @@ fn get_published_ops<Db: ReadAccess<DbKindAuthored>>(
             },
             |row| {
                 let op_type: DhtOpType = row.get("type")?;
-                let hash: HeaderHash = row.get("hash")?;
-                let header: SignedHeader = from_blob(row.get("blob")?)?;
-                Ok(DhtOpLight::from_type(op_type, hash, &header.0)?)
+                let hash: ActionHash = row.get("hash")?;
+                let action: SignedAction = from_blob(row.get("blob")?)?;
+                Ok(DhtOpLight::from_type(op_type, hash, &action.0)?)
             },
         )
         .unwrap()
@@ -670,18 +670,18 @@ pub async fn wait_for_integration_with_others<Db: ReadAccess<DbKindDht>>(
 pub fn show_authored<Db: ReadAccess<DbKindAuthored>>(envs: &[&Db]) {
     for (i, &db) in envs.iter().enumerate() {
         fresh_reader_test(db.clone(), |txn| {
-            txn.prepare("SELECT DISTINCT Header.seq, Header.type, Header.entry_hash FROM Header JOIN DhtOp ON Header.hash = DhtOp.hash")
+            txn.prepare("SELECT DISTINCT Action.seq, Action.type, Action.entry_hash FROM Action JOIN DhtOp ON Action.hash = DhtOp.hash")
             .unwrap()
             .query_map([], |row| {
-                let header_type: String = row.get("type")?;
+                let action_type: String = row.get("type")?;
                 let seq: u32 = row.get("seq")?;
                 let entry: Option<EntryHash> = row.get("entry_hash")?;
-                Ok((header_type, seq, entry))
+                Ok((action_type, seq, entry))
             })
             .unwrap()
             .for_each(|r|{
-                let (header_type, seq, entry) = r.unwrap();
-                tracing::debug!(chain = %i, %seq, ?header_type, ?entry);
+                let (action_type, seq, entry) = r.unwrap();
+                tracing::debug!(chain = %i, %seq, ?action_type, ?entry);
             });
         });
     }
@@ -829,7 +829,7 @@ pub trait CreateInputBuilder {
         chain_top_ordering: ChainTopOrdering,
     ) -> CreateInput {
         let builder = match entry {
-            Entry::App(entry) => ElementBuilder::App(AppEntry {
+            Entry::App(entry) => RecordBuilder::App(AppEntry {
                 entry_def_index,
                 entry,
                 visibility,
@@ -845,8 +845,8 @@ pub trait CreateInputBuilder {
     /// Create an cap create input.
     fn cap(entry: Entry) -> CreateInput {
         let builder = match entry {
-            Entry::CapClaim(c) => ElementBuilder::CapClaim(c),
-            Entry::CapGrant(g) => ElementBuilder::CapGrant(g),
+            Entry::CapClaim(c) => RecordBuilder::CapClaim(c),
+            Entry::CapGrant(g) => RecordBuilder::CapGrant(g),
             _ => panic!("Tried to construct an cap entryCreateInput with mismatching entry"),
         };
         CreateInput {

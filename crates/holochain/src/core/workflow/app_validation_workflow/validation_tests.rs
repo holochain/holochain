@@ -3,11 +3,11 @@ use std::{
     fmt::Write,
 };
 
-use holo_hash::{AgentPubKey, HeaderHash};
+use holo_hash::{ActionHash, AgentPubKey};
 use holochain_types::{dht_op::DhtOpType, inline_zome::InlineZomeSet};
 use holochain_zome_types::{
-    AppEntryType, BoxApi, ChainTopOrdering, CreateInput, Entry, EntryDef, EntryDefIndex,
-    EntryVisibility, Header, HeaderType, Op, TryInto, ZomeId,
+    Action, ActionType, AppEntryType, BoxApi, ChainTopOrdering, CreateInput, Entry, EntryDef,
+    EntryDefIndex, EntryVisibility, Op, TryInto, ZomeId,
 };
 
 use crate::{
@@ -26,7 +26,7 @@ const BOB: &'static str = "BOB";
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
 struct Event {
-    header: HeaderLocation,
+    action: ActionLocation,
     op_type: DhtOpType,
     called_zome: &'static str,
     with_entry_def_index: Option<EntryDefIndex>,
@@ -35,7 +35,7 @@ struct Event {
 impl Default for Event {
     fn default() -> Self {
         Self {
-            header: Default::default(),
+            action: Default::default(),
             op_type: DhtOpType::RegisterAgentActivity,
             called_zome: Default::default(),
             with_entry_def_index: Default::default(),
@@ -44,9 +44,9 @@ impl Default for Event {
 }
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Default)]
-struct HeaderLocation {
+struct ActionLocation {
     agent: &'static str,
-    header_type: String,
+    action_type: String,
     seq: u32,
 }
 
@@ -56,33 +56,33 @@ impl std::fmt::Display for Event {
             Some(e) => write!(
                 f,
                 "{}:{}:{}:entry_id({})",
-                self.called_zome, self.op_type, self.header, e.0
+                self.called_zome, self.op_type, self.action, e.0
             ),
-            None => write!(f, "{}:{}:{}", self.called_zome, self.op_type, self.header),
+            None => write!(f, "{}:{}:{}", self.called_zome, self.op_type, self.action),
         }
     }
 }
 
-impl std::fmt::Display for HeaderLocation {
+impl std::fmt::Display for ActionLocation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}:{}:{}", self.agent, self.header_type, self.seq)
+        write!(f, "{}:{}:{}", self.agent, self.action_type, self.seq)
     }
 }
 
-impl HeaderLocation {
-    fn new(header: impl Into<Header>, agents: &HashMap<AgentPubKey, &'static str>) -> Self {
-        let header = header.into();
+impl ActionLocation {
+    fn new(action: impl Into<Action>, agents: &HashMap<AgentPubKey, &'static str>) -> Self {
+        let action = action.into();
         Self {
-            agent: agents.get(header.author()).unwrap(),
-            header_type: header.header_type().to_string(),
-            seq: header.header_seq(),
+            agent: agents.get(action.author()).unwrap(),
+            action_type: action.action_type().to_string(),
+            seq: action.action_seq(),
         }
     }
 
-    fn expected(agent: &'static str, header_type: HeaderType, seq: u32) -> Self {
+    fn expected(agent: &'static str, action_type: ActionType, seq: u32) -> Self {
         Self {
             agent,
-            header_type: header_type.to_string(),
+            action_type: action_type.to_string(),
             seq,
         }
     }
@@ -101,10 +101,10 @@ impl Expected {
         self.0.insert(event);
     }
 
-    fn activity_and_element_all_zomes(&mut self, mut event: Event) {
+    fn activity_and_record_all_zomes(&mut self, mut event: Event) {
         event.op_type = DhtOpType::RegisterAgentActivity;
         self.all_zomes(event.clone());
-        event.op_type = DhtOpType::StoreElement;
+        event.op_type = DhtOpType::StoreRecord;
         self.all_zomes(event.clone());
     }
 
@@ -115,34 +115,34 @@ impl Expected {
         }
     }
 
-    fn activity_and_element_for_zomes(&mut self, mut event: Event, zomes: &[&'static str]) {
+    fn activity_and_record_for_zomes(&mut self, mut event: Event, zomes: &[&'static str]) {
         event.op_type = DhtOpType::RegisterAgentActivity;
 
         self.zomes(event.clone(), zomes);
 
-        event.op_type = DhtOpType::StoreElement;
+        event.op_type = DhtOpType::StoreRecord;
 
         self.zomes(event.clone(), zomes);
     }
 
     fn genesis(&mut self, agent: &'static str, zomes: &[&'static str]) {
         let event = Event {
-            header: HeaderLocation::expected(agent, HeaderType::Dna, 0),
+            action: ActionLocation::expected(agent, ActionType::Dna, 0),
             ..Default::default()
         };
-        self.activity_and_element_for_zomes(event.clone(), zomes);
+        self.activity_and_record_for_zomes(event.clone(), zomes);
 
         let event = Event {
-            header: HeaderLocation::expected(agent, HeaderType::AgentValidationPkg, 1),
+            action: ActionLocation::expected(agent, ActionType::AgentValidationPkg, 1),
             ..Default::default()
         };
-        self.activity_and_element_for_zomes(event.clone(), zomes);
+        self.activity_and_record_for_zomes(event.clone(), zomes);
 
         let mut event = Event {
-            header: HeaderLocation::expected(agent, HeaderType::Create, 2),
+            action: ActionLocation::expected(agent, ActionType::Create, 2),
             ..Default::default()
         };
-        self.activity_and_element_for_zomes(event.clone(), zomes);
+        self.activity_and_record_for_zomes(event.clone(), zomes);
 
         event.op_type = DhtOpType::StoreEntry;
         self.zomes(event.clone(), zomes);
@@ -150,10 +150,10 @@ impl Expected {
 
     fn init(&mut self, agent: &'static str) {
         let event = Event {
-            header: HeaderLocation::expected(agent, HeaderType::InitZomesComplete, 3),
+            action: ActionLocation::expected(agent, ActionType::InitZomesComplete, 3),
             ..Default::default()
         };
-        self.activity_and_element_all_zomes(event.clone());
+        self.activity_and_record_all_zomes(event.clone());
     }
 }
 
@@ -197,20 +197,20 @@ async fn app_validation_ops() {
          events: tokio::sync::mpsc::Sender<Event>| {
             move |_api: BoxApi, op: Op| {
                 let event = match op {
-                    Op::StoreElement { element } => Event {
-                        header: HeaderLocation::new(element.header().clone(), &agents),
-                        op_type: DhtOpType::StoreElement,
+                    Op::StoreRecord { record } => Event {
+                        action: ActionLocation::new(record.action().clone(), &agents),
+                        op_type: DhtOpType::StoreRecord,
                         called_zome: zome,
                         with_entry_def_index: None,
                     },
-                    Op::StoreEntry { header, .. } => {
+                    Op::StoreEntry { action, .. } => {
                         let with_entry_def_index =
-                            match header.hashed.content.app_entry_type().cloned() {
+                            match action.hashed.content.app_entry_type().cloned() {
                                 Some(AppEntryType { id, .. }) => Some(id),
                                 _ => None,
                             };
                         Event {
-                            header: HeaderLocation::new(header.hashed.content.clone(), &agents),
+                            action: ActionLocation::new(action.hashed.content.clone(), &agents),
                             op_type: DhtOpType::StoreEntry,
                             called_zome: zome,
                             with_entry_def_index,
@@ -218,15 +218,15 @@ async fn app_validation_ops() {
                     }
                     Op::RegisterUpdate {
                         update,
-                        original_header,
+                        original_action,
                         ..
                     } => {
-                        let with_entry_def_index = match original_header.app_entry_type().cloned() {
+                        let with_entry_def_index = match original_action.app_entry_type().cloned() {
                             Some(AppEntryType { id, .. }) => Some(id),
                             _ => None,
                         };
                         Event {
-                            header: HeaderLocation::new(update.hashed.content.clone(), &agents),
+                            action: ActionLocation::new(update.hashed.content.clone(), &agents),
                             op_type: DhtOpType::RegisterUpdatedContent,
                             called_zome: zome,
                             with_entry_def_index,
@@ -234,34 +234,34 @@ async fn app_validation_ops() {
                     }
                     Op::RegisterDelete {
                         delete,
-                        original_header,
+                        original_action,
                         ..
                     } => {
-                        let with_entry_def_index = match original_header.app_entry_type().cloned() {
+                        let with_entry_def_index = match original_action.app_entry_type().cloned() {
                             Some(AppEntryType { id, .. }) => Some(id),
                             _ => None,
                         };
                         Event {
-                            header: HeaderLocation::new(delete.hashed.content.clone(), &agents),
+                            action: ActionLocation::new(delete.hashed.content.clone(), &agents),
                             op_type: DhtOpType::RegisterDeletedBy,
                             called_zome: zome,
                             with_entry_def_index,
                         }
                     }
-                    Op::RegisterAgentActivity { header } => Event {
-                        header: HeaderLocation::new(header.header().clone(), &agents),
+                    Op::RegisterAgentActivity { action } => Event {
+                        action: ActionLocation::new(action.action().clone(), &agents),
                         op_type: DhtOpType::RegisterAgentActivity,
                         called_zome: zome,
                         with_entry_def_index: None,
                     },
                     Op::RegisterCreateLink { create_link, .. } => Event {
-                        header: HeaderLocation::new(create_link.hashed.content.clone(), &agents),
+                        action: ActionLocation::new(create_link.hashed.content.clone(), &agents),
                         op_type: DhtOpType::RegisterAddLink,
                         called_zome: zome,
                         with_entry_def_index: None,
                     },
                     Op::RegisterDeleteLink { delete_link, .. } => Event {
-                        header: HeaderLocation::new(delete_link.hashed.content.clone(), &agents),
+                        action: ActionLocation::new(delete_link.hashed.content.clone(), &agents),
                         op_type: DhtOpType::RegisterRemoveLink,
                         called_zome: zome,
                         with_entry_def_index: None,
@@ -366,7 +366,7 @@ async fn app_validation_ops() {
     let (bob,) = app.into_tuple();
     conductors.exchange_peer_info().await;
 
-    let _: HeaderHash = conductors[0]
+    let _: ActionHash = conductors[0]
         .call(&alice.zome("zome1"), "create_a", ())
         .await;
 
@@ -380,10 +380,10 @@ async fn app_validation_ops() {
     expected.init(ALICE);
 
     let mut event = Event {
-        header: HeaderLocation::expected(ALICE, HeaderType::Create, 4),
+        action: ActionLocation::expected(ALICE, ActionType::Create, 4),
         ..Default::default()
     };
-    expected.activity_and_element_all_zomes(event.clone());
+    expected.activity_and_record_all_zomes(event.clone());
 
     let entry_def_id = conductors[0]
         .get_ribosome(dna_file_a.dna_hash())

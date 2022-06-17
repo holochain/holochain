@@ -60,10 +60,10 @@ impl LinksQuery {
 
     fn common_query_string() -> &'static str {
         "
-            JOIN Header On DhtOp.header_hash = Header.hash
+            JOIN Action On DhtOp.action_hash = Action.hash
             WHERE DhtOp.type = :create
             AND
-            Header.base_hash = :base_hash
+            Action.base_hash = :base_hash
             AND
             DhtOp.validation_status = :status
             AND DhtOp.when_integrated IS NOT NULL
@@ -72,7 +72,7 @@ impl LinksQuery {
     fn create_query_string(type_query: &Option<LinkTypeRanges>, tag: Option<String>) -> String {
         let mut s = format!(
             "
-            SELECT Header.blob AS header_blob FROM DhtOp
+            SELECT Action.blob AS action_blob FROM DhtOp
             {}
             ",
             Self::common_query_string()
@@ -86,7 +86,7 @@ impl LinksQuery {
                 format!(
                     "{}
                     AND
-                    HEX(Header.tag) like '{}%'",
+                    HEX(Action.tag) like '{}%'",
                     q, tag
                 )
             }
@@ -104,7 +104,7 @@ impl LinksQuery {
     fn delete_query_string(type_query: &Option<LinkTypeRanges>, tag: Option<String>) -> String {
         let mut sub_create_query = format!(
             "
-            SELECT Header.hash FROM DhtOp
+            SELECT Action.hash FROM DhtOp
             {}
             ",
             Self::common_query_string()
@@ -113,11 +113,11 @@ impl LinksQuery {
         sub_create_query = Self::add_tag(sub_create_query, tag);
         let delete_query = format!(
             "
-            SELECT Header.blob AS header_blob FROM DhtOp
-            JOIN Header On DhtOp.header_hash = Header.hash
+            SELECT Action.blob AS action_blob FROM DhtOp
+            JOIN Action On DhtOp.action_hash = Action.hash
             WHERE DhtOp.type = :delete
             AND
-            Header.create_link_hash IN ({})
+            Action.create_link_hash IN ({})
             AND
             DhtOp.validation_status = :status
             AND
@@ -160,7 +160,7 @@ impl GetLinksQuery {
 }
 
 impl Query for GetLinksQuery {
-    type Item = Judged<SignedHeaderHashed>;
+    type Item = Judged<SignedActionHashed>;
     type State = Maps<Link>;
     type Output = Vec<Link>;
     fn query(&self) -> String {
@@ -176,7 +176,7 @@ impl Query for GetLinksQuery {
     }
 
     fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Item>> {
-        let f = row_blob_to_header("header_blob");
+        let f = row_blob_to_action("action_blob");
         // Data is valid because it is filtered in the sql query.
         Arc::new(move |row| Ok(Judged::valid(f(row)?)))
     }
@@ -186,8 +186,8 @@ impl Query for GetLinksQuery {
         let base_filter = query.base.clone();
         let type_query_filter = query.type_query.clone();
         let tag_filter = query.tag.clone();
-        let f = move |header: &QueryData<Self>| match header.header() {
-            Header::CreateLink(CreateLink {
+        let f = move |action: &QueryData<Self>| match action.action() {
+            Action::CreateLink(CreateLink {
                 base_address,
                 tag,
                 link_type,
@@ -201,7 +201,7 @@ impl Query for GetLinksQuery {
                         .as_ref()
                         .map_or(true, |t| LinksQuery::tag_to_hex(tag).starts_with(&(**t)))
             }
-            Header::DeleteLink(DeleteLink { base_address, .. }) => *base_address == *base_filter,
+            Action::DeleteLink(DeleteLink { base_address, .. }) => *base_address == *base_filter,
             _ => false,
         };
         Box::new(f)
@@ -209,21 +209,21 @@ impl Query for GetLinksQuery {
 
     fn fold(&self, mut state: Self::State, data: Self::Item) -> StateQueryResult<Self::State> {
         let shh = data.data;
-        let (header, _) = shh.into_inner();
-        let (header, hash) = header.into_inner();
-        match header {
-            Header::CreateLink(create_link) => {
+        let (action, _) = shh.into_inner();
+        let (action, hash) = action.into_inner();
+        match action {
+            Action::CreateLink(create_link) => {
                 if !state.deletes.contains(&hash) {
                     state
                         .creates
-                        .insert(hash, link_from_header(Header::CreateLink(create_link))?);
+                        .insert(hash, link_from_action(Action::CreateLink(create_link))?);
                 }
             }
-            Header::DeleteLink(delete_link) => {
+            Action::DeleteLink(delete_link) => {
                 state.creates.remove(&delete_link.link_add_address);
                 state.deletes.insert(delete_link.link_add_address);
             }
-            _ => return Err(StateQueryError::UnexpectedHeader(header.header_type())),
+            _ => return Err(StateQueryError::UnexpectedAction(action.action_type())),
         }
         Ok(state)
     }
@@ -238,15 +238,15 @@ impl Query for GetLinksQuery {
     }
 }
 
-fn link_from_header(header: Header) -> StateQueryResult<Link> {
-    let hash = HeaderHash::with_data_sync(&header);
-    match header {
-        Header::CreateLink(header) => Ok(Link {
-            target: header.target_address,
-            timestamp: header.timestamp,
-            tag: header.tag,
+fn link_from_action(action: Action) -> StateQueryResult<Link> {
+    let hash = ActionHash::with_data_sync(&action);
+    match action {
+        Action::CreateLink(action) => Ok(Link {
+            target: action.target_address,
+            timestamp: action.timestamp,
+            tag: action.tag,
             create_link_hash: hash,
         }),
-        _ => Err(StateQueryError::UnexpectedHeader(header.header_type())),
+        _ => Err(StateQueryError::UnexpectedAction(action.action_type())),
     }
 }

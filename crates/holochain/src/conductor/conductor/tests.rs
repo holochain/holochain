@@ -586,7 +586,7 @@ async fn test_reenable_app() {
     let (_, cell) = app.into_tuple();
 
     // - We can still make a zome call after reactivation
-    let _: HeaderHash = conductor
+    let _: ActionHash = conductor
         .call_fallible(&cell.zome("create_entry"), "create", ())
         .await
         .unwrap();
@@ -640,8 +640,8 @@ async fn test_bad_entry_validation_after_genesis_returns_zome_call_error() {
     let bad_zome =
         InlineZomeSet::new_unique_single("integrity", "custom", vec![unit_entry_def.clone()], 0)
             .callback("integrity", "validate", |_api, op: Op| match op {
-                Op::StoreEntry { header, .. }
-                    if header.hashed.content.app_entry_type().is_some() =>
+                Op::StoreEntry { action, .. }
+                    if action.hashed.content.app_entry_type().is_some() =>
                 {
                     Ok(ValidateResult::Invalid(
                         "intentional invalid result for testing".into(),
@@ -667,7 +667,7 @@ async fn test_bad_entry_validation_after_genesis_returns_zome_call_error() {
 
     let (_, cell_bad) = app.into_tuple();
 
-    let result: ConductorApiResult<HeaderHash> = conductor
+    let result: ConductorApiResult<ActionHash> = conductor
         .call_fallible(&cell_bad.zome("custom"), "create", ())
         .await;
 
@@ -702,8 +702,8 @@ async fn test_apps_disable_on_panic_after_genesis() {
             // so we can cause failure in it. But it must also be after genesis.
             .callback("integrity", "validate", |_api, op: Op| {
                 match op {
-                    Op::StoreEntry { header, .. }
-                        if header.hashed.content.app_entry_type().is_some() =>
+                    Op::StoreEntry { action, .. }
+                        if action.hashed.content.app_entry_type().is_some() =>
                     {
                         // Trigger a deserialization error
                         let _: Entry = SerializedBytes::try_from(())?.try_into()?;
@@ -730,7 +730,7 @@ async fn test_apps_disable_on_panic_after_genesis() {
 
     let (_, cell_bad) = app.into_tuple();
 
-    let _: ConductorApiResult<HeaderHash> = conductor
+    let _: ConductorApiResult<ActionHash> = conductor
         .call_fallible(&cell_bad.zome("custom"), "create", ())
         .await;
 

@@ -42,14 +42,14 @@ use holochain_deterministic_integrity::prelude::*;
         fn verify_signature(&self, verify_signature: VerifySignature) -> ExternResult<bool>;
         fn hash(&self, hash_input: HashInput) -> ExternResult<HashOutput>;
         fn must_get_entry(&self, must_get_entry_input: MustGetEntryInput) -> ExternResult<EntryHashed>;
-        fn must_get_header(
+        fn must_get_action(
             &self,
-            must_get_header_input: MustGetHeaderInput,
-        ) -> ExternResult<SignedHeaderHashed>;
-        fn must_get_valid_element(
+            must_get_action_input: MustGetActionInput,
+        ) -> ExternResult<SignedActionHashed>;
+        fn must_get_valid_record(
             &self,
-            must_get_valid_element_input: MustGetValidElementInput,
-        ) -> ExternResult<Element>;
+            must_get_valid_record_input: MustGetValidRecordInput,
+        ) -> ExternResult<Record>;
         // Info
         fn dna_info(&self, dna_info_input: ()) -> ExternResult<DnaInfo>;
         fn zome_info(&self, zome_info_input: ()) -> ExternResult<ZomeInfo>;

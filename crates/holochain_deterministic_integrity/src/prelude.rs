@@ -1,9 +1,9 @@
 pub use crate::app_entry;
 pub use crate::ed25519::verify_signature;
 pub use crate::ed25519::verify_signature_raw;
+pub use crate::entry::must_get_action;
 pub use crate::entry::must_get_entry;
-pub use crate::entry::must_get_header;
-pub use crate::entry::must_get_valid_element;
+pub use crate::entry::must_get_valid_record;
 pub use crate::entry::EntryTypesHelper;
 pub use crate::entry_defs;
 pub use crate::hash::*;
@@ -29,6 +29,7 @@ pub use hdk_derive::hdk_to_local_types;
 pub use hdk_derive::EntryDefRegistration;
 pub use hdk_derive::UnitEnum;
 pub use holo_hash;
+pub use holo_hash::ActionHash;
 pub use holo_hash::AgentPubKey;
 pub use holo_hash::AnyDhtHash;
 pub use holo_hash::AnyLinkableHash;
@@ -36,7 +37,6 @@ pub use holo_hash::EntryHash;
 pub use holo_hash::EntryHashes;
 pub use holo_hash::ExternalHash;
 pub use holo_hash::HasHash;
-pub use holo_hash::HeaderHash;
 pub use holo_hash::HoloHash;
 pub use holo_hash::HoloHashed;
 pub use holochain_integrity_types;
@@ -78,8 +78,8 @@ macro_rules! holochain_externs {
             __zome_info,
             __dna_info,
             __must_get_entry,
-            __must_get_valid_element,
-            __must_get_header,
+            __must_get_valid_record,
+            __must_get_action,
             __x_salsa20_poly1305_decrypt,
             __x_25519_x_salsa20_poly1305_decrypt
         );

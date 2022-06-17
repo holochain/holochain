@@ -364,8 +364,8 @@ pub fn dump_db(txn: &Transaction) {
             }
         }
     };
-    tracing::debug!("Headers:");
-    let stmt = txn.prepare("SELECT * FROM Header").unwrap();
+    tracing::debug!("Actions:");
+    let stmt = txn.prepare("SELECT * FROM Action").unwrap();
     dump(stmt);
 
     tracing::debug!("Entries:");

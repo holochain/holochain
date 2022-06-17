@@ -1,27 +1,27 @@
-//! Defines a Element, the basic unit of Holochain data.
+//! Defines a Record, the basic unit of Holochain data.
 
 use crate::signature::Signature;
-use crate::Header;
+use crate::Action;
 use holo_hash::hash_type;
 use holo_hash::HashableContent;
 use holo_hash::HashableContentBytes;
 use holochain_serialized_bytes::prelude::*;
 
-pub use holochain_integrity_types::element::*;
+pub use holochain_integrity_types::record::*;
 
 #[cfg(feature = "test_utils")]
 pub mod facts;
 
-/// A combination of a Header and its signature.
+/// A combination of an action and its signature.
 ///
 /// Has implementations From and Into its tuple form.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-pub struct SignedHeader(pub Header, pub Signature);
+pub struct SignedAction(pub Action, pub Signature);
 
-impl SignedHeader {
-    /// Accessor for the Header
-    pub fn header(&self) -> &Header {
+impl SignedAction {
+    /// Accessor for the Action
+    pub fn action(&self) -> &Action {
         &self.0
     }
 
@@ -31,11 +31,11 @@ impl SignedHeader {
     }
 }
 
-impl HashableContent for SignedHeader {
-    type HashType = hash_type::Header;
+impl HashableContent for SignedAction {
+    type HashType = hash_type::Action;
 
     fn hash_type(&self) -> Self::HashType {
-        hash_type::Header
+        hash_type::Action
     }
 
     fn hashable_content(&self) -> HashableContentBytes {
@@ -47,20 +47,20 @@ impl HashableContent for SignedHeader {
     }
 }
 
-impl From<(Header, Signature)> for SignedHeader {
-    fn from((h, s): (Header, Signature)) -> Self {
+impl From<(Action, Signature)> for SignedAction {
+    fn from((h, s): (Action, Signature)) -> Self {
         Self(h, s)
     }
 }
 
-impl From<SignedHeader> for (Header, Signature) {
-    fn from(s: SignedHeader) -> Self {
+impl From<SignedAction> for (Action, Signature) {
+    fn from(s: SignedAction) -> Self {
         (s.0, s.1)
     }
 }
 
-impl From<SignedHeaderHashed> for SignedHeader {
-    fn from(shh: SignedHeaderHashed) -> SignedHeader {
+impl From<SignedActionHashed> for SignedAction {
+    fn from(shh: SignedActionHashed) -> SignedAction {
         (shh.hashed.content, shh.signature).into()
     }
 }
