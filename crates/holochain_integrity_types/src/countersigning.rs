@@ -454,7 +454,7 @@ pub struct UpdateBase {
 }
 
 impl Action {
-    /// Construct a Action from the ActionBase and associated session data.
+    /// Construct an Action from the ActionBase and associated session data.
     pub fn from_countersigning_data(
         entry_hash: EntryHash,
         session_data: &CounterSigningSessionData,

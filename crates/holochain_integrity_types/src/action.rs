@@ -21,7 +21,7 @@ use holochain_serialized_bytes::prelude::*;
 pub mod builder;
 pub mod conversions;
 
-/// Any action with a action_seq less than this value is part of an record
+/// Any action with a action_seq less than this value is part of a record
 /// created during genesis. Anything with this seq or higher was created
 /// after genesis.
 pub const POST_GENESIS_SEQ_THRESHOLD: u32 = 3;
@@ -106,7 +106,7 @@ macro_rules! write_into_action {
     };
 }
 
-/// A trait to unify the "inner" parts of a Action, i.e. the structs inside
+/// A trait to unify the "inner" parts of an Action, i.e. the structs inside
 /// the Action enum's variants. This trait is used for the "weighed" version
 /// of each struct, i.e. the version without weight information erased.
 ///
@@ -122,12 +122,12 @@ pub trait ActionWeighed {
 
     /// Erase the rate limiting weight info, creating an "unweighed" version
     /// of this action. This is used primarily by validators who need to run the
-    /// `weigh` callback on a action they received, and want to make sure their
+    /// `weigh` callback on an action they received, and want to make sure their
     /// callback is not using the predefined weight to influence the result.
     fn unweighed(self) -> Self::Unweighed;
 }
 
-/// A trait to unify the "inner" parts of a Action, i.e. the structs inside
+/// A trait to unify the "inner" parts of an Action, i.e. the structs inside
 /// the Action enum's variants. This trait is used for the "unweighed" version
 /// of each struct, i.e. the version with weight information erased.
 ///
