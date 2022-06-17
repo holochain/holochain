@@ -214,16 +214,14 @@ impl InlineZomeSet {
     }
 
     /// Get the entry def location for committing an entry.
-    pub fn get_entry_location(api: &BoxApi, index: impl Into<LocalZomeTypeId>) -> EntryDefLocation {
-        let r: EntryDefIndex = api
-            .zome_info(())
+    pub fn get_entry_type(api: &BoxApi, index: impl Into<LocalZomeTypeId>) -> EntryDefIndex {
+        api.zome_info(())
             .unwrap()
             .zome_types
             .entries
             .to_global_scope(index)
             .unwrap()
-            .into();
-        r.into()
+            .into()
     }
 }
 

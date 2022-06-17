@@ -5,6 +5,7 @@ use hdk::prelude::*;
 use holochain::{
     conductor::api::error::ConductorApiResult,
     sweettest::{SweetAgents, SweetConductor, SweetDnaFile, SweetEasyInline},
+    test_utils::CreateInputBuilder,
 };
 use holochain::{
     conductor::{api::error::ConductorApiError, CellError},
@@ -52,8 +53,8 @@ fn simple_crud_zome() -> InlineZomeSet {
     SweetEasyInline::new(vec![string_entry_def.clone(), unit_entry_def.clone()], 0)
         .callback("create_string", move |api, s: AppString| {
             let entry = Entry::app(AppString::from(s).try_into().unwrap()).unwrap();
-            let hash = api.create(CreateInput::new(
-                InlineZomeSet::get_entry_location(&api, 0),
+            let hash = api.create(CreateInput::app_entry(
+                InlineZomeSet::get_entry_type(&api, 0),
                 EntryVisibility::Public,
                 entry,
                 ChainTopOrdering::default(),
@@ -62,8 +63,8 @@ fn simple_crud_zome() -> InlineZomeSet {
         })
         .callback("create_unit", move |api, ()| {
             let entry = Entry::app(().try_into().unwrap()).unwrap();
-            let hash = api.create(CreateInput::new(
-                InlineZomeSet::get_entry_location(&api, 1),
+            let hash = api.create(CreateInput::app_entry(
+                InlineZomeSet::get_entry_type(&api, 1),
                 EntryVisibility::Public,
                 entry,
                 ChainTopOrdering::default(),
@@ -376,8 +377,8 @@ fn simple_validation_zome() -> InlineZomeSet {
     SweetEasyInline::new(vec![entry_def.clone()], 0)
         .callback("create", move |api, s: AppString| {
             let entry = Entry::app(s.try_into().unwrap()).unwrap();
-            let hash = api.create(CreateInput::new(
-                InlineZomeSet::get_entry_location(&api, 0),
+            let hash = api.create(CreateInput::app_entry(
+                InlineZomeSet::get_entry_type(&api, 0),
                 EntryVisibility::Public,
                 entry,
                 ChainTopOrdering::default(),

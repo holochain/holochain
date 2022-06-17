@@ -21,15 +21,19 @@ use holochain_wasmer_common::WasmError;
 /// Either an [`EntryDefIndex`] or one of:
 /// - [`EntryType::CapGrant`](crate::prelude::EntryType::CapGrant)
 /// - [`EntryType::CapClaim`](crate::prelude::EntryType::CapClaim)
+/// - [`EntryType::AgentPubKey`](crate::prelude::EntryType::AgentPubKey)
 /// Which don't have an index.
 pub enum EntryDefLocation {
+    /// [`crate::EntryType::AgentPubKey`] is committed to and
+    /// validated by all integrity zomes in the dna.
+    Agent,
     /// App defined entries always have a unique [`u8`] index
     /// within the Dna.
     App(EntryDefIndex),
-    /// [`crate::EntryDefId::CapClaim`] is committed to and
+    /// [`crate::EntryType::CapClaim`] is committed to and
     /// validated by all integrity zomes in the dna.
     CapClaim,
-    /// [`crate::EntryDefId::CapGrant`] is committed to and
+    /// [`crate::EntryType::CapGrant`] is committed to and
     /// validated by all integrity zomes in the dna.
     CapGrant,
 }

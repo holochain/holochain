@@ -446,6 +446,51 @@ impl WireElement {
     }
 }
 
+/// Helper trait for the [`ElementBuilder`].
+pub trait ElementBuilderHelper {
+    /// Build this element into it's parts for constructing an [`Element`].
+    fn build(self) -> (EntryDefLocation, EntryVisibility, Entry);
+}
+
+impl ElementBuilderHelper for ElementBuilder {
+    fn build(self) -> (EntryDefLocation, EntryVisibility, Entry) {
+        match self {
+            ElementBuilder::Agent(a) => (
+                EntryDefLocation::Agent,
+                EntryVisibility::Public,
+                Entry::Agent(a),
+            ),
+            ElementBuilder::App(AppEntry {
+                entry_def_index,
+                visibility,
+                entry,
+            }) => (entry_def_index.into(), visibility, Entry::App(entry)),
+            ElementBuilder::CounterSign(
+                s,
+                AppEntry {
+                    entry_def_index,
+                    visibility,
+                    entry,
+                },
+            ) => (
+                entry_def_index.into(),
+                visibility,
+                Entry::CounterSign(s, entry),
+            ),
+            ElementBuilder::CapClaim(c) => (
+                EntryDefLocation::Agent,
+                EntryVisibility::Private,
+                Entry::CapClaim(c),
+            ),
+            ElementBuilder::CapGrant(g) => (
+                EntryDefLocation::Agent,
+                EntryVisibility::Private,
+                Entry::CapGrant(g),
+            ),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::SignedHeader;

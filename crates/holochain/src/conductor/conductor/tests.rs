@@ -8,6 +8,7 @@ use crate::conductor::api::error::ConductorApiError;
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
 use crate::sweettest::*;
 use crate::test_utils::fake_valid_dna_file;
+use crate::test_utils::CreateInputBuilder;
 use crate::{
     assert_eq_retry_10s, core::ribosome::guest_callback::genesis_self_check::GenesisSelfCheckResult,
 };
@@ -519,8 +520,8 @@ pub(crate) fn simple_create_entry_zome() -> InlineZomeSet {
     )
     .callback("create_entry", "create", move |api, ()| {
         let entry = Entry::app(().try_into().unwrap()).unwrap();
-        let hash = api.create(CreateInput::new(
-            InlineZomeSet::get_entry_location(&api, 0),
+        let hash = api.create(CreateInput::app_entry(
+            InlineZomeSet::get_entry_type(&api, 0),
             EntryVisibility::Public,
             entry,
             ChainTopOrdering::default(),
@@ -650,8 +651,8 @@ async fn test_bad_entry_validation_after_genesis_returns_zome_call_error() {
             })
             .callback("custom", "create", move |api, ()| {
                 let entry = Entry::app(().try_into().unwrap()).unwrap();
-                let hash = api.create(CreateInput::new(
-                    InlineZomeSet::get_entry_location(&api, 0),
+                let hash = api.create(CreateInput::app_entry(
+                    InlineZomeSet::get_entry_type(&api, 0),
                     EntryVisibility::Public,
                     entry,
                     ChainTopOrdering::default(),
@@ -713,8 +714,8 @@ async fn test_apps_disable_on_panic_after_genesis() {
             })
             .callback("custom", "create", move |api, ()| {
                 let entry = Entry::app(().try_into().unwrap()).unwrap();
-                let hash = api.create(CreateInput::new(
-                    InlineZomeSet::get_entry_location(&api, 0),
+                let hash = api.create(CreateInput::app_entry(
+                    InlineZomeSet::get_entry_type(&api, 0),
                     EntryVisibility::Public,
                     entry,
                     ChainTopOrdering::default(),

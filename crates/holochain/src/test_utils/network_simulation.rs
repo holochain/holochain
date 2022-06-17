@@ -28,6 +28,8 @@ use rusqlite::{params, Connection, OptionalExtension, Transaction};
 use crate::conductor::handle::DevSettingsDelta;
 use crate::sweettest::{SweetConductor, SweetDnaFile};
 
+use super::CreateInputBuilder;
+
 #[derive(SerializedBytes, serde::Serialize, serde::Deserialize, Debug)]
 /// Data to use to simulate a dht network.
 pub struct MockNetworkData {
@@ -559,8 +561,8 @@ pub async fn data_zome(integrity_uuid: String, coordinator_uuid: String) -> DnaF
         "create_many",
         move |api, entries: Vec<Entry>| {
             for entry in entries {
-                api.create(CreateInput::new(
-                    InlineZomeSet::get_entry_location(&api, InlineEntryTypes::A),
+                api.create(CreateInput::app_entry(
+                    InlineZomeSet::get_entry_type(&api, InlineEntryTypes::A),
                     EntryVisibility::Public,
                     entry,
                     ChainTopOrdering::default(),

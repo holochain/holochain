@@ -11,8 +11,9 @@ use holochain_zome_types::{
 };
 
 use crate::{
-    core::ribosome::guest_callback::validate::ValidateResult, sweettest::*,
-    test_utils::consistency_10s,
+    core::ribosome::guest_callback::validate::ValidateResult,
+    sweettest::*,
+    test_utils::{consistency_10s, CreateInputBuilder},
 };
 
 const ZOME_A_0: &'static str = "ZOME_A_0";
@@ -166,8 +167,8 @@ async fn app_validation_ops() {
     let call_back_a = |_zome_name: &'static str| {
         move |api: BoxApi, ()| {
             let entry = Entry::app(().try_into().unwrap()).unwrap();
-            let hash = api.create(CreateInput::new(
-                InlineZomeSet::get_entry_location(&api, 0),
+            let hash = api.create(CreateInput::app_entry(
+                InlineZomeSet::get_entry_type(&api, 0),
                 EntryVisibility::Public,
                 entry,
                 ChainTopOrdering::default(),
@@ -178,8 +179,8 @@ async fn app_validation_ops() {
     let call_back_b = |_zome_name: &'static str| {
         move |api: BoxApi, ()| {
             let entry = Entry::app(().try_into().unwrap()).unwrap();
-            let hash = api.create(CreateInput::new(
-                InlineZomeSet::get_entry_location(&api, 0),
+            let hash = api.create(CreateInput::app_entry(
+                InlineZomeSet::get_entry_type(&api, 0),
                 EntryVisibility::Public,
                 entry,
                 ChainTopOrdering::default(),

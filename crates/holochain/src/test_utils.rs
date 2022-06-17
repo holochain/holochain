@@ -37,6 +37,7 @@ use holochain_state::test_utils::fresh_reader_test;
 use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
+use holochain_zome_types::entry::AppEntry;
 use kitsune_p2p::KitsuneP2pConfig;
 use rusqlite::named_params;
 use std::path::Path;
@@ -817,3 +818,42 @@ pub async fn force_publish_dht_ops(
     publish_trigger.trigger(&"force_publish_dht_ops");
     Ok(())
 }
+
+/// Helper trait for building [`CreateInput`] for tests.
+pub trait CreateInputBuilder {
+    /// Create an app entry create input.
+    fn app_entry(
+        entry_def_index: EntryDefIndex,
+        visibility: EntryVisibility,
+        entry: Entry,
+        chain_top_ordering: ChainTopOrdering,
+    ) -> CreateInput {
+        let builder = match entry {
+            Entry::App(entry) => ElementBuilder::App(AppEntry {
+                entry_def_index,
+                entry,
+                visibility,
+            }),
+            _ => panic!("Tried to construct an app entry CreateInput with mismatching entry"),
+        };
+        CreateInput {
+            builder,
+            chain_top_ordering,
+        }
+    }
+
+    /// Create an cap create input.
+    fn cap(entry: Entry) -> CreateInput {
+        let builder = match entry {
+            Entry::CapClaim(c) => ElementBuilder::CapClaim(c),
+            Entry::CapGrant(g) => ElementBuilder::CapGrant(g),
+            _ => panic!("Tried to construct an cap entryCreateInput with mismatching entry"),
+        };
+        CreateInput {
+            builder,
+            chain_top_ordering: ChainTopOrdering::Strict,
+        }
+    }
+}
+
+impl CreateInputBuilder for CreateInput {}

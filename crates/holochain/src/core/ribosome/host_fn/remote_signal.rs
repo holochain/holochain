@@ -51,7 +51,8 @@ pub fn remote_signal(
                 "remote_signal".into(),
             )
             .to_string(),
-        )).into()),
+        ))
+        .into()),
     }
 }
 
@@ -62,6 +63,7 @@ mod tests {
 
     use super::*;
     use crate::sweettest::*;
+    use crate::test_utils::CreateInputBuilder;
     use futures::future;
     use hdk::prelude::*;
     use holochain_types::inline_zome::InlineZomeSet;
@@ -94,13 +96,8 @@ mod tests {
                     access: ().into(),
                     functions,
                 };
-                api.create(CreateInput::new(
-                    EntryDefLocation::CapGrant,
-                    EntryVisibility::Private,
-                    Entry::CapGrant(cap_grant_entry),
-                    ChainTopOrdering::default(),
-                ))
-                .unwrap();
+                api.create(CreateInput::cap(Entry::CapGrant(cap_grant_entry)))
+                    .unwrap();
 
                 Ok(InitCallbackResult::Pass)
             })

@@ -20,11 +20,11 @@ pub fn create<'a>(
             ..
         } => {
             let CreateInput {
-                entry_location,
-                entry_visibility,
-                entry,
+                builder,
                 chain_top_ordering,
             } = input;
+
+            let (entry_location, entry_visibility, entry) = builder.build();
 
             // Countersigned entries have different header handling.
             match entry {
@@ -47,6 +47,7 @@ pub fn create<'a>(
 
                     // extract the entry defs for a zome
                     let entry_type = match entry_location {
+                        EntryDefLocation::Agent => EntryType::AgentPubKey,
                         EntryDefLocation::App(entry_def_index) => {
                             let app_entry_type =
                                 AppEntryType::new(entry_def_index, entry_visibility);
@@ -103,6 +104,7 @@ pub mod wasm_test {
     use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use crate::fixt::*;
     use crate::sweettest::*;
+    use crate::test_utils::CreateInputBuilder;
     use ::fixt::prelude::*;
     use hdk::prelude::*;
     use holo_hash::AnyDhtHash;
@@ -129,8 +131,8 @@ pub mod wasm_test {
         let host_access_2 = host_access.clone();
         call_context.host_context = host_access.into();
         let app_entry = EntryFixturator::new(AppEntry).next().unwrap();
-        let input = CreateInput::new(
-            EntryDefLocation::app(0),
+        let input = CreateInput::app_entry(
+            0.into(),
             EntryVisibility::Public,
             app_entry.clone(),
             ChainTopOrdering::default(),

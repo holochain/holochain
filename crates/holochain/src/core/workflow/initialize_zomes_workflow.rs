@@ -138,6 +138,7 @@ pub mod tests {
     use crate::fixt::MetaLairClientFixturator;
     use crate::sweettest::*;
     use crate::test_utils::fake_genesis;
+    use crate::test_utils::CreateInputBuilder;
     use ::fixt::prelude::*;
     use fixt::Unpredictable;
     use holochain_p2p::HolochainP2pDnaFixturator;
@@ -291,16 +292,11 @@ pub mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn commit_during_init_one_zome_unimplemented_one_fails() {
         let zome_fail = SweetEasyInline::new(vec![], 0).callback("init", |api, _: ()| {
-            api.create(CreateInput::new(
-                EntryDefLocation::CapGrant,
-                EntryVisibility::Private,
-                Entry::CapGrant(CapGrantEntry {
-                    tag: "".into(),
-                    access: ().into(),
-                    functions: vec![("no-init".into(), "xxx".into())].into_iter().collect(),
-                }),
-                ChainTopOrdering::default(),
-            ))?;
+            api.create(CreateInput::cap(Entry::CapGrant(CapGrantEntry {
+                tag: "".into(),
+                access: ().into(),
+                functions: vec![("no-init".into(), "xxx".into())].into_iter().collect(),
+            })))?;
             Ok(InitCallbackResult::Fail("reason".into()))
         });
         let zomes =

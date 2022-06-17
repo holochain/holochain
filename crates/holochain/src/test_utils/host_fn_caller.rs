@@ -28,6 +28,8 @@ use holochain_zome_types::AgentActivity;
 use std::sync::Arc;
 use unwrap_to::unwrap_to;
 
+use super::CreateInputBuilder;
+
 // Commit entry types //
 // Useful for when you want to commit something
 // that will match entry defs
@@ -240,14 +242,14 @@ impl HostFnCaller {
             .unwrap()
             .into()
     }
-    pub async fn commit_entry<E: Into<EntryDefLocation>>(
+    pub async fn commit_entry<E: Into<EntryDefIndex>>(
         &self,
         entry: Entry,
         entry_def_id: E,
         visibility: EntryVisibility,
     ) -> HeaderHash {
         let (ribosome, call_context, workspace_lock) = self.unpack().await;
-        let input = CreateInput::new(
+        let input = CreateInput::app_entry(
             entry_def_id.into(),
             visibility,
             entry,
