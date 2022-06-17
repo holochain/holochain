@@ -27,9 +27,9 @@ async fn can_handle_update_in_scratch() {
         .query
         .run(Txn::from(&txn))
         .unwrap()
-        .expect("Element not found");
+        .expect("Record not found");
     assert_eq!(*r.entry().as_option().unwrap(), td.entry);
-    assert_eq!(*r.header(), *td.update_header.header());
+    assert_eq!(*r.action(), *td.update_action.action());
 
     // - Add to the scratch
     insert_op_scratch(
@@ -42,7 +42,7 @@ async fn can_handle_update_in_scratch() {
         .query
         .run(scratch.clone())
         .unwrap()
-        .expect("Element not found");
+        .expect("Record not found");
     assert_eq!(*r.entry().as_option().unwrap(), td.entry);
-    assert_eq!(*r.header(), *td.update_header.header());
+    assert_eq!(*r.action(), *td.update_action.action());
 }

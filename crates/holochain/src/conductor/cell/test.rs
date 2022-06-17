@@ -10,7 +10,7 @@ use ::fixt::prelude::*;
 use holo_hash::HasHash;
 use holochain_state::test_utils::test_keystore;
 use holochain_types::prelude::*;
-use holochain_zome_types::header;
+use holochain_zome_types::action;
 use std::sync::Arc;
 use tokio::sync;
 
@@ -78,14 +78,14 @@ async fn test_cell_handle_publish() {
     .await
     .unwrap();
 
-    let header = header::Header::Dna(header::Dna {
+    let action = action::Action::Dna(action::Dna {
         author: agent.clone(),
         timestamp: Timestamp::now().into(),
         hash: dna.clone(),
     });
-    let hh = HeaderHashed::from_content_sync(header.clone());
-    let shh = SignedHeaderHashed::sign(&keystore, hh).await.unwrap();
-    let op = DhtOp::StoreElement(shh.signature().clone(), header.clone(), None);
+    let hh = ActionHashed::from_content_sync(action.clone());
+    let shh = SignedActionHashed::sign(&keystore, hh).await.unwrap();
+    let op = DhtOp::StoreRecord(shh.signature().clone(), action.clone(), None);
     let op_hash = DhtOpHashed::from_content_sync(op.clone()).into_hash();
 
     spaces

@@ -8,21 +8,21 @@ pub mod examples;
 
 /// MUST get an EntryHashed at a given EntryHash.
 ///
-/// The EntryHashed is NOT guaranteed to be associated with a valid (or even validated) Header/Element.
-/// For example, an invalid Element could be published and `must_get_entry` would return the EntryHashed.
+/// The EntryHashed is NOT guaranteed to be associated with a valid (or even validated) Action/Record.
+/// For example, an invalid Record could be published and `must_get_entry` would return the EntryHashed.
 ///
 /// This may be useful during validation callbacks where the validity and relevance of some content can be
-/// asserted by the CURRENT validation callback independent of an Element. This behaviour avoids the potential for
+/// asserted by the CURRENT validation callback independent of a Record. This behaviour avoids the potential for
 /// eclipse attacks to lie about the validity of some data and cause problems for a hApp.
 /// If you NEED to know that a dependency is valid in order for the current validation logic
-/// (e.g. inductive validation of a tree) then `must_get_valid_element` is likely what you need.
+/// (e.g. inductive validation of a tree) then `must_get_valid_record` is likely what you need.
 ///
 /// `must_get_entry` is available in contexts such as validation where both determinism and network access is desirable.
 ///
 /// An EntryHashed will NOT be returned if:
 /// - @TODO It is PURGED (community redacted entry)
-/// - @TODO ALL headers pointing to it are WITHDRAWN by the authors
-/// - ALL headers pointing to it are ABANDONED by ALL authorities due to validation failure
+/// - @TODO ALL actions pointing to it are WITHDRAWN by the authors
+/// - ALL actions pointing to it are ABANDONED by ALL authorities due to validation failure
 /// - Nobody knows about it on the currently visible network
 ///
 /// If an EntryHashed fails to be returned:
@@ -36,61 +36,61 @@ pub fn must_get_entry(entry_hash: EntryHash) -> ExternResult<EntryHashed> {
     })
 }
 
-/// MUST get a SignedHeaderHashed at a given HeaderHash.
+/// MUST get a SignedActionHashed at a given ActionHash.
 ///
-/// The SignedHeaderHashed is NOT guaranteed to be a valid (or even validated) Element.
-/// For example, an invalid Header could be published and `must_get_header` would return the `SignedHeaderHashed`.
+/// The SignedActionHashed is NOT guaranteed to be a valid (or even validated) Record.
+/// For example, an invalid Action could be published and `must_get_action` would return the `SignedActionHashed`.
 ///
-/// This may be useful during validation callbacks where the validity depends on a Header existing regardless of its associated Entry.
-/// For example, we may simply need to check that the author is the same for two referenced Headers.
+/// This may be useful during validation callbacks where the validity depends on an action existing regardless of its associated Entry.
+/// For example, we may simply need to check that the author is the same for two referenced Actions.
 ///
-/// `must_get_header` is available in contexts such as validation where both determinism and network access is desirable.
+/// `must_get_action` is available in contexts such as validation where both determinism and network access is desirable.
 ///
-/// A `SignedHeaderHashed` will NOT be returned if:
+/// A `SignedActionHashed` will NOT be returned if:
 ///
-/// - @TODO The header is WITHDRAWN by the author
-/// - @TODO The header is ABANDONED by ALL authorities
+/// - @TODO The action is WITHDRAWN by the author
+/// - @TODO The action is ABANDONED by ALL authorities
 /// - Nobody knows about it on the currently visible network
 ///
-/// If a `SignedHeaderHashed` fails to be returned:
+/// If a `SignedActionHashed` fails to be returned:
 ///
 /// - Callbacks will return early with `UnresolvedDependencies`
 /// - Zome calls will receive a `WasmError` from the host
-pub fn must_get_header(header_hash: HeaderHash) -> ExternResult<SignedHeaderHashed> {
+pub fn must_get_action(action_hash: ActionHash) -> ExternResult<SignedActionHashed> {
     HDI.with(|h| {
         h.borrow()
-            .must_get_header(MustGetHeaderInput::new(header_hash))
+            .must_get_action(MustGetActionInput::new(action_hash))
     })
 }
 
-/// MUST get a VALID Element at a given HeaderHash.
+/// MUST get a VALID Record at a given ActionHash.
 ///
-/// The Element is guaranteed to be valid.
-/// More accurately the Element is guarantee to be consistently reported as valid by the visible network.
+/// The Record is guaranteed to be valid.
+/// More accurately the Record is guarantee to be consistently reported as valid by the visible network.
 ///
 /// The validity requirement makes this more complex but notably enables inductive validation of arbitrary graph structures.
-/// For example "If this Element is valid, and its parent is valid, up to the root, then the whole tree of Elements is valid".
+/// For example "If this Record is valid, and its parent is valid, up to the root, then the whole tree of Records is valid".
 ///
-/// If at least one authority (1 of N trust) claims the Element is invalid then a conflict resolution/warranting round will be triggered.
+/// If at least one authority (1 of N trust) claims the Record is invalid then a conflict resolution/warranting round will be triggered.
 ///
-/// In the case of a total eclipse (every visible authority is lying) then we cannot immediately detect an invalid Element.
-/// Unlike `must_get_entry` and `must_get_header` we cannot simply inspect the cryptographic integrity to know this.
+/// In the case of a total eclipse (every visible authority is lying) then we cannot immediately detect an invalid Record.
+/// Unlike `must_get_entry` and `must_get_action` we cannot simply inspect the cryptographic integrity to know this.
 ///
-/// In theory we can run validation of the returned Element ourselves, which itself may be based on `must_get_X` calls.
-/// If there is a large nested graph of `must_get_valid_element` calls this could be extremely heavy.
+/// In theory we can run validation of the returned Record ourselves, which itself may be based on `must_get_X` calls.
+/// If there is a large nested graph of `must_get_valid_record` calls this could be extremely heavy.
 /// Note though that each "hop" in recursive validation is routed to a completely different set of authorities.
-/// It does not take many hops to reach the point where an attacker needs to eclipse the entire network to lie about Element validity.
+/// It does not take many hops to reach the point where an attacker needs to eclipse the entire network to lie about Record validity.
 ///
-/// @TODO We keep signed receipts from authorities serving up "valid elements".
-/// - If we ever discover an element we were told is valid is invalid we can retroactively look to warrant authorities
-/// - We can async (e.g. in a background task) be recursively validating Element dependencies ourselves, following hops until there is no room for lies
+/// @TODO We keep signed receipts from authorities serving up "valid records".
+/// - If we ever discover a record we were told is valid is invalid we can retroactively look to warrant authorities
+/// - We can async (e.g. in a background task) be recursively validating Record dependencies ourselves, following hops until there is no room for lies
 /// - We can with small probability recursively validate to several hops inline to discourage potential eclipse attacks with a credible immediate threat
 ///
-/// If you do not care about validity and simply want a pair of Header+Entry data, then use both `must_get_header` and `must_get_entry` together.
+/// If you do not care about validity and simply want a pair of Action+Entry data, then use both `must_get_action` and `must_get_entry` together.
 ///
-/// `must_get_valid_element` is available in contexts such as validation where both determinism and network access is desirable.
+/// `must_get_valid_record` is available in contexts such as validation where both determinism and network access is desirable.
 ///
-/// An `Element` will not be returned if:
+/// An `Record` will not be returned if:
 ///
 /// - @TODO It is WITHDRAWN by the author
 /// - @TODO The Entry is PURGED by the community
@@ -98,14 +98,14 @@ pub fn must_get_header(header_hash: HeaderHash) -> ExternResult<SignedHeaderHash
 /// - If ANY authority (1 of N trust) OR ourselves (0 of N trust) believes it INVALID
 /// - Nobody knows about it on the visible network
 ///
-/// If an `Element` fails to be returned:
+/// If an `Record` fails to be returned:
 ///
 /// - Callbacks will return early with `UnresolvedDependencies`
 /// - Zome calls will receive a `WasmError` from the host
-pub fn must_get_valid_element(header_hash: HeaderHash) -> ExternResult<Element> {
+pub fn must_get_valid_record(action_hash: ActionHash) -> ExternResult<Record> {
     HDI.with(|h| {
         h.borrow()
-            .must_get_valid_element(MustGetValidElementInput::new(header_hash))
+            .must_get_valid_record(MustGetValidRecordInput::new(action_hash))
     })
 }
 
@@ -168,23 +168,23 @@ macro_rules! app_entry {
             }
         }
 
-        impl TryFrom<&$crate::prelude::Element> for $t {
+        impl TryFrom<&$crate::prelude::Record> for $t {
             type Error = $crate::prelude::WasmError;
-            fn try_from(element: &$crate::prelude::Element) -> Result<Self, Self::Error> {
-                Ok(match &element.entry {
-                    ElementEntry::Present(entry) => Self::try_from(entry)?,
+            fn try_from(record: &$crate::prelude::Record) -> Result<Self, Self::Error> {
+                Ok(match &record.entry {
+                    RecordEntry::Present(entry) => Self::try_from(entry)?,
                     _ => return Err(
                         $crate::prelude::wasm_error!(
-                        $crate::prelude::WasmErrorInner::Guest(format!("Tried to deserialize an element, expecting it to contain entry data, but there was none. Element HeaderHash: {}", element.signed_header.hashed.hash))),
+                        $crate::prelude::WasmErrorInner::Guest(format!("Tried to deserialize a record, expecting it to contain entry data, but there was none. Record ActionHash: {}", record.signed_action.hashed.hash))),
                     )
                 })
             }
         }
 
-        impl TryFrom<$crate::prelude::Element> for $t {
+        impl TryFrom<$crate::prelude::Record> for $t {
             type Error = $crate::prelude::WasmError;
-            fn try_from(element: $crate::prelude::Element) -> Result<Self, Self::Error> {
-                (&element).try_into()
+            fn try_from(record: $crate::prelude::Record) -> Result<Self, Self::Error> {
+                (&record).try_into()
             }
         }
 

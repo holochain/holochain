@@ -34,12 +34,12 @@ fn targetless() -> ExternResult<AnyLinkableHash> {
 }
 
 #[hdk_extern]
-fn create_link(_: ()) -> ExternResult<HeaderHash> {
+fn create_link(_: ()) -> ExternResult<ActionHash> {
     hdk::prelude::create_link(base()?, target()?, LinkTypes::SomeLinks, ())
 }
 
 #[hdk_extern]
-fn create_nested_link(_: ()) -> ExternResult<HeaderHash> {
+fn create_nested_link(_: ()) -> ExternResult<ActionHash> {
     hdk::prelude::create_link(
         base()?,
         target()?,
@@ -49,22 +49,22 @@ fn create_nested_link(_: ()) -> ExternResult<HeaderHash> {
 }
 
 #[hdk_extern]
-fn create_baseless_link(_: ()) -> ExternResult<HeaderHash> {
+fn create_baseless_link(_: ()) -> ExternResult<ActionHash> {
     hdk::prelude::create_link(baseless()?, targetless()?, LinkTypes::SomeLinks, ())
 }
 
 #[hdk_extern]
-fn create_external_base_link(_: ()) -> ExternResult<HeaderHash> {
+fn create_external_base_link(_: ()) -> ExternResult<ActionHash> {
     hdk::prelude::create_link(external()?, base()?, LinkTypes::SomeLinks, ())
 }
 
 #[hdk_extern]
-fn create_back_link(_: ()) -> ExternResult<HeaderHash> {
+fn create_back_link(_: ()) -> ExternResult<ActionHash> {
     hdk::prelude::create_link(target()?, base()?, LinkTypes::SomeLinks, ())
 }
 
 #[hdk_extern]
-fn delete_link(input: HeaderHash) -> ExternResult<HeaderHash> {
+fn delete_link(input: ActionHash) -> ExternResult<ActionHash> {
     hdk::prelude::delete_link(input)
 }
 
@@ -266,7 +266,5 @@ fn commit_existing_path(_: ()) -> ExternResult<()> {
 
 #[hdk_extern]
 fn get_long_path(_: ()) -> ExternResult<Vec<Link>> {
-    Path::from("a")
-        .typed(LinkTypes::SomeLinks)?
-        .children()
+    Path::from("a").typed(LinkTypes::SomeLinks)?.children()
 }

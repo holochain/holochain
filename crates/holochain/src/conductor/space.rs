@@ -19,7 +19,7 @@ use holochain_types::{
     db_cache::DhtDbQueryCache,
     dht_op::{DhtOp, DhtOpType},
 };
-use holochain_zome_types::{Entry, EntryVisibility, SignedHeader, Timestamp};
+use holochain_zome_types::{Entry, EntryVisibility, SignedAction, Timestamp};
 use kitsune_p2p::event::{TimeWindow, TimeWindowInclusive};
 use rusqlite::named_params;
 use tracing::instrument;
@@ -316,11 +316,11 @@ impl Spaces {
                     let r = txn.query_row_and_then(
                         "
                             SELECT DhtOp.hash, DhtOp.type AS dht_type,
-                            Header.blob AS header_blob, Entry.blob AS entry_blob,
-                            LENGTH(Header.blob) as header_size, LENGTH(Entry.blob) as entry_size
+                            Action.blob AS action_blob, Entry.blob AS entry_blob,
+                            LENGTH(Action.blob) as action_size, LENGTH(Entry.blob) as entry_size
                             FROM DHtOp
-                            JOIN Header ON DhtOp.header_hash = Header.hash
-                            LEFT JOIN Entry ON Header.entry_hash = Entry.hash
+                            JOIN Action ON DhtOp.action_hash = Action.hash
+                            LEFT JOIN Entry ON Action.entry_hash = Entry.hash
                             WHERE
                             DhtOp.hash = ?
                             AND
@@ -328,15 +328,15 @@ impl Spaces {
                         ",
                         [hash],
                         |row| {
-                            let header_bytes: Option<usize> = row.get("header_size")?;
+                            let action_bytes: Option<usize> = row.get("action_size")?;
                             let entry_bytes: Option<usize> = row.get("entry_size")?;
-                            let bytes = header_bytes.unwrap_or(0) + entry_bytes.unwrap_or(0);
-                            let header = from_blob::<SignedHeader>(row.get("header_blob")?)?;
+                            let bytes = action_bytes.unwrap_or(0) + entry_bytes.unwrap_or(0);
+                            let action = from_blob::<SignedAction>(row.get("action_blob")?)?;
                             let op_type: DhtOpType = row.get("dht_type")?;
                             let hash: DhtOpHash = row.get("hash")?;
                             // Check the entry isn't private before gossiping it.
                             let mut entry: Option<Entry> = None;
-                            if header
+                            if action
                                 .0
                                 .entry_type()
                                 .filter(|et| *et.visibility() == EntryVisibility::Public)
@@ -348,7 +348,7 @@ impl Spaces {
                                     None => None,
                                 };
                             }
-                            let op = DhtOp::from_type(op_type, header, entry)?;
+                            let op = DhtOp::from_type(op_type, action, entry)?;
                             StateQueryResult::Ok(((hash, op), bytes))
                         },
                     );

@@ -7,6 +7,6 @@ fn smash(_: ()) -> ExternResult<()> {
 }
 
 #[hdk_extern]
-fn create_a_thing(_: ()) -> ExternResult<HeaderHash> {
+fn create_a_thing(_: ()) -> ExternResult<ActionHash> {
     create_entry(&EntryTypes::Thing(Thing))
 }

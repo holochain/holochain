@@ -17,12 +17,12 @@ async fn incoming_ops_to_limbo() {
     let mut op_list = Vec::new();
 
     for _ in 0..10 {
-        let mut header = fixt!(CreateLink);
-        header.author = author.clone();
-        let header = Header::CreateLink(header);
-        let signature = author.sign(&keystore, &header).await.unwrap();
+        let mut action = fixt!(CreateLink);
+        action.author = author.clone();
+        let action = Action::CreateLink(action);
+        let signature = author.sign(&keystore, &action).await.unwrap();
 
-        let op = DhtOp::RegisterAgentActivity(signature, header);
+        let op = DhtOp::RegisterAgentActivity(signature, action);
         let hash = DhtOpHash::with_data_sync(&op);
         hash_list.push(hash.clone());
         op_list.push((hash, op));

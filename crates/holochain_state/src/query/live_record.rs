@@ -10,26 +10,26 @@ use super::*;
 mod test;
 
 #[derive(Debug, Clone)]
-pub struct GetLiveElementQuery(HeaderHash, Option<Arc<AgentPubKey>>);
+pub struct GetLiveRecordQuery(ActionHash, Option<Arc<AgentPubKey>>);
 
-impl GetLiveElementQuery {
-    pub fn new(hash: HeaderHash) -> Self {
+impl GetLiveRecordQuery {
+    pub fn new(hash: ActionHash) -> Self {
         Self(hash, None)
     }
 }
 
-impl Query for GetLiveElementQuery {
-    type Item = Judged<SignedHeaderHashed>;
-    type State = (Option<SignedHeaderHashed>, HashSet<HeaderHash>);
-    type Output = Option<Element>;
+impl Query for GetLiveRecordQuery {
+    type Item = Judged<SignedActionHashed>;
+    type State = (Option<SignedActionHashed>, HashSet<ActionHash>);
+    type Output = Option<Record>;
 
     fn query(&self) -> String {
         "
-        SELECT Header.blob AS header_blob
+        SELECT Action.blob AS action_blob
         FROM DhtOp
-        JOIN Header On DhtOp.header_hash = Header.hash
+        JOIN Action On DhtOp.action_hash = Action.hash
         WHERE DhtOp.type IN (:create_type, :delete_type, :update_type)
-        AND DhtOp.basis_hash = :header_hash
+        AND DhtOp.basis_hash = :action_hash
         AND DhtOp.validation_status = :status
         AND DhtOp.when_integrated IS NOT NULL
         "
@@ -37,31 +37,31 @@ impl Query for GetLiveElementQuery {
     }
     fn params(&self) -> Vec<Params> {
         let params = named_params! {
-            ":create_type": DhtOpType::StoreElement,
+            ":create_type": DhtOpType::StoreRecord,
             ":delete_type": DhtOpType::RegisterDeletedBy,
-            ":update_type": DhtOpType::RegisterUpdatedElement,
+            ":update_type": DhtOpType::RegisterUpdatedRecord,
             ":status": ValidationStatus::Valid,
-            ":header_hash": self.0,
+            ":action_hash": self.0,
         };
         params.to_vec()
     }
 
     fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Item>> {
-        let f = row_blob_to_header("header_blob");
+        let f = row_blob_to_action("action_blob");
         // Data is valid because it is filtered in the sql query.
         Arc::new(move |row| Ok(Judged::valid(f(row)?)))
     }
 
     fn as_filter(&self) -> Box<dyn Fn(&QueryData<Self>) -> bool> {
-        let header_filter = self.0.clone();
-        let f = move |header: &QueryData<Self>| {
-            if *header.header_address() == header_filter {
+        let action_filter = self.0.clone();
+        let f = move |action: &QueryData<Self>| {
+            if *action.action_address() == action_filter {
                 true
-            } else if let Header::Delete(Delete {
+            } else if let Action::Delete(Delete {
                 deletes_address, ..
-            }) = header.header()
+            }) = action.action()
             {
-                *deletes_address == header_filter
+                *deletes_address == action_filter
             } else {
                 false
             }
@@ -80,9 +80,9 @@ impl Query for GetLiveElementQuery {
             if !state.1.contains(hash) {
                 state.0 = Some(shh);
             }
-        } else if let Header::Delete(delete) = shh.header() {
-            let header = state.0.take();
-            if let Some(h) = header {
+        } else if let Action::Delete(delete) = shh.action() {
+            let action = state.0.take();
+            if let Some(h) = action {
                 if *h.as_hash() != delete.deletes_address {
                     state.0 = Some(h);
                 }
@@ -97,25 +97,25 @@ impl Query for GetLiveElementQuery {
         S: Store,
     {
         match state.0 {
-            Some(header) => {
+            Some(action) => {
                 let mut entry = None;
-                if let Some(entry_hash) = header.header().entry_hash() {
+                if let Some(entry_hash) = action.action().entry_hash() {
                     let author = self
                         .1
                         .as_ref()
                         .map(|a| a.as_ref())
-                        .filter(|a| *a == header.header().author());
+                        .filter(|a| *a == action.action().author());
                     entry = stores.get_public_or_authored_entry(entry_hash, author)?;
                 }
-                Ok(Some(Element::new(header, entry)))
+                Ok(Some(Record::new(action, entry)))
             }
             None => Ok(None),
         }
     }
 }
 
-impl PrivateDataQuery for GetLiveElementQuery {
-    type Hash = HeaderHash;
+impl PrivateDataQuery for GetLiveRecordQuery {
+    type Hash = ActionHash;
 
     fn with_private_data_access(hash: Self::Hash, author: Arc<AgentPubKey>) -> Self {
         Self(hash, Some(author))

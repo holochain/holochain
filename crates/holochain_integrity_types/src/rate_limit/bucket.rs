@@ -9,9 +9,9 @@ use crate::{RateBucketCapacity, RateBucketError, RateBucketResult, RateUnits};
 /// This struct defines such a "bucket".
 ///
 /// Each bucket has a certain fixed capacity, and starts out empty (level=0).
-/// Each Header has a bucket and weight assigned to it, and when that Header is
+/// Each Action has a bucket and weight assigned to it, and when that Action is
 /// authored, it adds an amount of units equal to is weight to its assigned bucket.
-/// If a Header causes a bucket's level to exceed its `capacity`, that Header
+/// If a Action causes a bucket's level to exceed its `capacity`, that Action
 /// is invalid.
 ///
 /// Every `drain_interval_ms`, the bucket's level is reduced by `drain_amount`.
@@ -58,7 +58,7 @@ pub fn next_bucket_level(
 }
 
 /// Tracks the current level of a bucket, and calculates the next level given
-/// an incoming header.
+/// an incoming action.
 ///
 /// Mainly useful for testing, as a way to observe the effects of multiple
 /// bucket state changes.
@@ -164,10 +164,10 @@ mod tests {
         );
     }
 
-    // fn make_headers<H: Iterator<Item = (bool, Timestamp, u8, u8)>>(
+    // fn make_actions<H: Iterator<Item = (bool, Timestamp, u8, u8)>>(
     //     u: &mut Unstructured,
     //     hs: H,
-    // ) -> Vec<Header> {
+    // ) -> Vec<Action> {
     //     hs.map(|(e, t, b, w)| {
     //         if e {
     //             let mut h = Create::arbitrary(u).unwrap();

@@ -24,7 +24,7 @@ fn root_ensures() {
             tag: Path::from("foo").make_tag().unwrap(),
             chain_top_ordering: Default::default(),
         }))
-        .returning(|_| Ok(HeaderHash::from_raw_36(vec![0; 36])));
+        .returning(|_| Ok(ActionHash::from_raw_36(vec![0; 36])));
     set_hdk(mock);
 
     assert!(!Path::from("foo").into_typed(LinkType(0)).exists().unwrap());
@@ -44,7 +44,7 @@ fn root_ensures() {
                 target: Path::from("foo").path_entry_hash().unwrap().into(),
                 timestamp: Timestamp::now(),
                 tag: Path::from("foo").make_tag().unwrap(),
-                create_link_hash: HeaderHash::from_raw_36(vec![0; 36]),
+                create_link_hash: ActionHash::from_raw_36(vec![0; 36]),
             }]])
         });
     set_hdk(mock);
@@ -72,7 +72,7 @@ fn parent_path_committed() {
             tag: Path::from("bar").make_tag().unwrap(),
             chain_top_ordering: Default::default(),
         }))
-        .returning(|_| Ok(HeaderHash::from_raw_36(vec![0; 36])));
+        .returning(|_| Ok(ActionHash::from_raw_36(vec![0; 36])));
     mock.expect_create_link()
         .once()
         .with(eq(CreateLinkInput {
@@ -82,7 +82,7 @@ fn parent_path_committed() {
             tag: Path::from("foo").make_tag().unwrap(),
             chain_top_ordering: Default::default(),
         }))
-        .returning(|_| Ok(HeaderHash::from_raw_36(vec![0; 36])));
+        .returning(|_| Ok(ActionHash::from_raw_36(vec![0; 36])));
     set_hdk(mock);
 
     Path::from("foo.bar")
@@ -108,7 +108,7 @@ fn parent_path_committed() {
             tag: Path::from("baz").make_tag().unwrap(),
             chain_top_ordering: Default::default(),
         }))
-        .returning(|_| Ok(HeaderHash::from_raw_36(vec![0; 36])));
+        .returning(|_| Ok(ActionHash::from_raw_36(vec![0; 36])));
     mock.expect_create_link()
         .once()
         .with(eq(CreateLinkInput {
@@ -118,7 +118,7 @@ fn parent_path_committed() {
             tag: Path::from("bar").make_tag().unwrap(),
             chain_top_ordering: Default::default(),
         }))
-        .returning(|_| Ok(HeaderHash::from_raw_36(vec![0; 36])));
+        .returning(|_| Ok(ActionHash::from_raw_36(vec![0; 36])));
     mock.expect_create_link()
         .once()
         .with(eq(CreateLinkInput {
@@ -128,7 +128,7 @@ fn parent_path_committed() {
             tag: Path::from("foo").make_tag().unwrap(),
             chain_top_ordering: Default::default(),
         }))
-        .returning(|_| Ok(HeaderHash::from_raw_36(vec![0; 36])));
+        .returning(|_| Ok(ActionHash::from_raw_36(vec![0; 36])));
     set_hdk(mock);
 
     Path::from("foo.bar.baz")
@@ -176,7 +176,7 @@ fn paths_exists() {
                 target: Path::from("foo.bar").path_entry_hash().unwrap().into(),
                 timestamp: Timestamp::now(),
                 tag: Path::from("bar").make_tag().unwrap(),
-                create_link_hash: HeaderHash::from_raw_36(vec![0; 36]),
+                create_link_hash: ActionHash::from_raw_36(vec![0; 36]),
             }]])
         });
     mock.expect_get_links()
@@ -191,7 +191,7 @@ fn paths_exists() {
                 target: Path::from("foo.bar.baz").path_entry_hash().unwrap().into(),
                 timestamp: Timestamp::now(),
                 tag: Path::from("baz").make_tag().unwrap(),
-                create_link_hash: HeaderHash::from_raw_36(vec![0; 36]),
+                create_link_hash: ActionHash::from_raw_36(vec![0; 36]),
             }]])
         });
     set_hdk(mock);
@@ -219,25 +219,25 @@ fn children() {
         target: Path::from("foo").path_entry_hash().unwrap().into(),
         timestamp: Timestamp::now(),
         tag: Path::from("foo").make_tag().unwrap(),
-        create_link_hash: HeaderHash::from_raw_36(vec![0; 36]),
+        create_link_hash: ActionHash::from_raw_36(vec![0; 36]),
     };
     let foo_bar = Link {
         target: Path::from("foo.bar").path_entry_hash().unwrap().into(),
         timestamp: Timestamp::now(),
         tag: Path::from("bar").make_tag().unwrap(),
-        create_link_hash: HeaderHash::from_raw_36(vec![0; 36]),
+        create_link_hash: ActionHash::from_raw_36(vec![0; 36]),
     };
     let foo_bar2 = Link {
         target: Path::from("foo.bar2").path_entry_hash().unwrap().into(),
         timestamp: Timestamp::now(),
         tag: Path::from("bar2").make_tag().unwrap(),
-        create_link_hash: HeaderHash::from_raw_36(vec![0; 36]),
+        create_link_hash: ActionHash::from_raw_36(vec![0; 36]),
     };
     let foo_bar_baz = Link {
         target: Path::from("foo.bar.baz").path_entry_hash().unwrap().into(),
         timestamp: Timestamp::now(),
         tag: Path::from("baz").make_tag().unwrap(),
-        create_link_hash: HeaderHash::from_raw_36(vec![0; 36]),
+        create_link_hash: ActionHash::from_raw_36(vec![0; 36]),
     };
     let foo_bar2_baz2 = Link {
         target: Path::from("foo.bar2.baz2")
@@ -246,7 +246,7 @@ fn children() {
             .into(),
         timestamp: Timestamp::now(),
         tag: Path::from("baz2").make_tag().unwrap(),
-        create_link_hash: HeaderHash::from_raw_36(vec![0; 36]),
+        create_link_hash: ActionHash::from_raw_36(vec![0; 36]),
     };
 
     // Return links that match the input.

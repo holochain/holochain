@@ -1,8 +1,8 @@
 use crate::test_utils::{test_cell_db, TestEnv};
 use ::fixt::prelude::*;
 use fallible_iterator::FallibleIterator;
+use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
-use holo_hash::HeaderHash;
 use holochain_sqlite::db::ReadManager;
 use holochain_types::prelude::*;
 use holochain_zome_types::test_utils::fake_agent_pubkey_1;
@@ -25,12 +25,12 @@ fn setup() -> (TestEnv, MetadataBuf, Create, Create, AgentPubKey) {
 fn add_chain_status_test() {
     // - Invalid overwrites valid
     let prev_status = Valid(ChainHead {
-        header_seq: 1,
-        hash: fixt!(HeaderHash),
+        action_seq: 1,
+        hash: fixt!(ActionHash),
     });
     let incoming_status = Invalid(ChainHead {
-        header_seq: 1,
-        hash: fixt!(HeaderHash),
+        action_seq: 1,
+        hash: fixt!(ActionHash),
     });
     assert_eq!(
         add_chain_status(prev_status, incoming_status.clone()),
@@ -39,8 +39,8 @@ fn add_chain_status_test() {
 
     // - Invalid overwrites any invalids later in the chain.
     let prev_status = Invalid(ChainHead {
-        header_seq: 2,
-        hash: fixt!(HeaderHash),
+        action_seq: 2,
+        hash: fixt!(ActionHash),
     });
     assert_eq!(
         add_chain_status(prev_status.clone(), incoming_status.clone()),
@@ -55,8 +55,8 @@ fn add_chain_status_test() {
     // - Invalid overwrites any forks later in the chain.
     let prev_status = Forked(ChainFork {
         fork_seq: 2,
-        first_header: fixt!(HeaderHash),
-        second_header: fixt!(HeaderHash),
+        first_action: fixt!(ActionHash),
+        second_action: fixt!(ActionHash),
     });
     assert_eq!(
         add_chain_status(prev_status.clone(), incoming_status.clone()),
@@ -71,13 +71,13 @@ fn add_chain_status_test() {
     // - Forked overwrites any forks later in the chain.
     let prev_status = Forked(ChainFork {
         fork_seq: 2,
-        first_header: fixt!(HeaderHash),
-        second_header: fixt!(HeaderHash),
+        first_action: fixt!(ActionHash),
+        second_action: fixt!(ActionHash),
     });
     let incoming_status = Forked(ChainFork {
         fork_seq: 1,
-        first_header: fixt!(HeaderHash),
-        second_header: fixt!(HeaderHash),
+        first_action: fixt!(ActionHash),
+        second_action: fixt!(ActionHash),
     });
     assert_eq!(
         add_chain_status(prev_status.clone(), incoming_status.clone()),
@@ -91,13 +91,13 @@ fn add_chain_status_test() {
 
     // - Forked overwrites any invalid later in the chain.
     let prev_status = Invalid(ChainHead {
-        header_seq: 2,
-        hash: fixt!(HeaderHash),
+        action_seq: 2,
+        hash: fixt!(ActionHash),
     });
     let incoming_status = Forked(ChainFork {
         fork_seq: 1,
-        first_header: fixt!(HeaderHash),
-        second_header: fixt!(HeaderHash),
+        first_action: fixt!(ActionHash),
+        second_action: fixt!(ActionHash),
     });
     assert_eq!(
         add_chain_status(prev_status.clone(), incoming_status.clone()),
@@ -109,14 +109,14 @@ fn add_chain_status_test() {
         None
     );
 
-    // - Later Valid headers overwrite earlier Valid.
+    // - Later Valid actions overwrite earlier Valid.
     let prev_status = Valid(ChainHead {
-        header_seq: 1,
-        hash: fixt!(HeaderHash),
+        action_seq: 1,
+        hash: fixt!(ActionHash),
     });
     let incoming_status = Valid(ChainHead {
-        header_seq: 2,
-        hash: fixt!(HeaderHash),
+        action_seq: 2,
+        hash: fixt!(ActionHash),
     });
     assert_eq!(
         add_chain_status(prev_status, incoming_status.clone()),
@@ -124,19 +124,19 @@ fn add_chain_status_test() {
     );
 
     // - If there are two Valid status at the same seq num then insert an Fork.
-    let hashes: Vec<_> = HeaderHashFixturator::new(Predictable).take(2).collect();
+    let hashes: Vec<_> = ActionHashFixturator::new(Predictable).take(2).collect();
     let prev_status = Valid(ChainHead {
-        header_seq: 1,
+        action_seq: 1,
         hash: hashes[0].clone(),
     });
     let incoming_status = Valid(ChainHead {
-        header_seq: 1,
+        action_seq: 1,
         hash: hashes[1].clone(),
     });
     let expected = Forked(ChainFork {
         fork_seq: 1,
-        first_header: hashes[0].clone(),
-        second_header: hashes[1].clone(),
+        first_action: hashes[0].clone(),
+        second_action: hashes[1].clone(),
     });
     assert_eq!(
         add_chain_status(prev_status, incoming_status),
@@ -145,26 +145,26 @@ fn add_chain_status_test() {
 
     // Empty doesn't overwrite
     let prev_status = Valid(ChainHead {
-        header_seq: 1,
-        hash: fixt!(HeaderHash),
+        action_seq: 1,
+        hash: fixt!(ActionHash),
     });
     assert_eq!(add_chain_status(prev_status, ChainStatus::Empty), None);
 
     // Same doesn't overwrite
     let prev_status = Valid(ChainHead {
-        header_seq: 1,
-        hash: fixt!(HeaderHash),
+        action_seq: 1,
+        hash: fixt!(ActionHash),
     });
     assert_eq!(add_chain_status(prev_status.clone(), prev_status), None);
     let prev_status = Forked(ChainFork {
         fork_seq: 2,
-        first_header: fixt!(HeaderHash),
-        second_header: fixt!(HeaderHash),
+        first_action: fixt!(ActionHash),
+        second_action: fixt!(ActionHash),
     });
     assert_eq!(add_chain_status(prev_status.clone(), prev_status), None);
     let prev_status = Invalid(ChainHead {
-        header_seq: 2,
-        hash: fixt!(HeaderHash),
+        action_seq: 2,
+        hash: fixt!(ActionHash),
     });
     assert_eq!(add_chain_status(prev_status.clone(), prev_status), None);
 }
@@ -172,8 +172,8 @@ fn add_chain_status_test() {
 #[tokio::test(flavor = "multi_thread")]
 async fn check_different_seq_num_on_separate_queries() {
     let (_te, mut meta_buf, mut h1, mut h2, agent_pubkey) = setup();
-    h1.header_seq = 1;
-    h2.header_seq = 2;
+    h1.action_seq = 1;
+    h2.action_seq = 2;
     meta_buf
         .register_activity(&h1.into(), ValidationStatus::Valid)
         .unwrap();
@@ -225,10 +225,10 @@ async fn check_different_seq_num_on_separate_queries() {
 #[tokio::test(flavor = "multi_thread")]
 async fn check_equal_seq_num_on_same_query() {
     let (_te, mut meta_buf, mut h1, mut h2, agent_pubkey) = setup();
-    h1.header_seq = 1;
-    h2.header_seq = 1;
-    let h1: Header = h1.into();
-    let h2: Header = h2.into();
+    h1.action_seq = 1;
+    h2.action_seq = 1;
+    let h1: Action = h1.into();
+    let h2: Action = h2.into();
     meta_buf
         .register_activity(&h1, ValidationStatus::Valid)
         .unwrap();
@@ -289,9 +289,9 @@ async fn check_equal_seq_num_on_same_query() {
 #[tokio::test(flavor = "multi_thread")]
 async fn chain_item_keys_ser() {
     let (_te, mut meta_buf, mut h, _, agent_pubkey) = setup();
-    h.header_seq = 1;
-    let h = Header::Create(h);
-    let expect_hash = HeaderHash::with_data_sync(&h);
+    h.action_seq = 1;
+    let h = Action::Create(h);
+    let expect_hash = ActionHash::with_data_sync(&h);
     meta_buf
         .register_activity(&h, ValidationStatus::Valid)
         .unwrap();
@@ -309,24 +309,24 @@ async fn chain_item_keys_ser() {
         );
 
         let k = ChainItemKey::AgentStatusSequence(agent_pubkey.clone(), ValidationStatus::Valid, 1);
-        let mut headers: Vec<_> = meta_buf
+        let mut actions: Vec<_> = meta_buf
             .get_activity(&mut reader, k)
             .unwrap()
             .collect()
             .unwrap();
-        assert_eq!(headers.len(), 1);
+        assert_eq!(actions.len(), 1);
         println!("expect hash {:?}", expect_hash.clone().into_inner());
-        assert_eq!(headers.pop().unwrap().header_hash, expect_hash);
+        assert_eq!(actions.pop().unwrap().action_hash, expect_hash);
     });
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn check_large_seq_queries() {
     let (_te, mut meta_buf, mut h1, mut h2, agent_pubkey) = setup();
-    h1.header_seq = 256;
-    h2.header_seq = 1;
-    let h1_hash = HeaderHash::with_data_sync(&Header::Create(h1.clone()));
-    let h2_hash = HeaderHash::with_data_sync(&Header::Create(h2.clone()));
+    h1.action_seq = 256;
+    h2.action_seq = 1;
+    let h1_hash = ActionHash::with_data_sync(&Action::Create(h1.clone()));
+    let h2_hash = ActionHash::with_data_sync(&Action::Create(h2.clone()));
 
     meta_buf
         .register_activity(&h1.into(), ValidationStatus::Valid)

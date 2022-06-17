@@ -79,7 +79,7 @@ pub trait HolochainP2pDnaT {
     async fn get_validation_package(
         &self,
         request_from: AgentPubKey,
-        header_hash: HeaderHash,
+        action_hash: ActionHash,
     ) -> actor::HolochainP2pResult<ValidationPackageResponse>;
 
     /// Get an entry from the DHT.
@@ -109,7 +109,7 @@ pub trait HolochainP2pDnaT {
         agent: AgentPubKey,
         query: ChainQueryFilter,
         options: actor::GetActivityOptions,
-    ) -> actor::HolochainP2pResult<Vec<AgentActivityResponse<HeaderHash>>>;
+    ) -> actor::HolochainP2pResult<Vec<AgentActivityResponse<ActionHash>>>;
 
     /// Send a validation receipt to a remote node.
     async fn send_validation_receipt(
@@ -129,7 +129,7 @@ pub trait HolochainP2pDnaT {
     async fn countersigning_authority_response(
         &self,
         agents: Vec<AgentPubKey>,
-        response: Vec<SignedHeader>,
+        response: Vec<SignedAction>,
     ) -> actor::HolochainP2pResult<()>;
 
     /// New data has been integrated and is ready for gossiping.
@@ -241,18 +241,18 @@ impl HolochainP2pDnaT for HolochainP2pDna {
     async fn get_validation_package(
         &self,
         request_from: AgentPubKey,
-        header_hash: HeaderHash,
+        action_hash: ActionHash,
     ) -> actor::HolochainP2pResult<ValidationPackageResponse> {
         self.sender
             .get_validation_package(actor::GetValidationPackage {
                 dna_hash: (*self.dna_hash).clone(),
                 request_from,
-                header_hash,
+                action_hash,
             })
             .await
     }
 
-    /// Get [`DhtOp::StoreElement`] or [`DhtOp::StoreEntry`] from the DHT.
+    /// Get [`DhtOp::StoreRecord`] or [`DhtOp::StoreEntry`] from the DHT.
     async fn get(
         &self,
         dht_hash: holo_hash::AnyDhtHash,
@@ -292,7 +292,7 @@ impl HolochainP2pDnaT for HolochainP2pDna {
         agent: AgentPubKey,
         query: ChainQueryFilter,
         options: actor::GetActivityOptions,
-    ) -> actor::HolochainP2pResult<Vec<AgentActivityResponse<HeaderHash>>> {
+    ) -> actor::HolochainP2pResult<Vec<AgentActivityResponse<ActionHash>>> {
         self.sender
             .get_agent_activity((*self.dna_hash).clone(), agent, query, options)
             .await
@@ -322,7 +322,7 @@ impl HolochainP2pDnaT for HolochainP2pDna {
     async fn countersigning_authority_response(
         &self,
         agents: Vec<AgentPubKey>,
-        response: Vec<SignedHeader>,
+        response: Vec<SignedAction>,
     ) -> actor::HolochainP2pResult<()> {
         self.sender
             .countersigning_authority_response((*self.dna_hash).clone(), agents, response)

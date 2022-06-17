@@ -1233,9 +1233,9 @@ fn query_dht_ops_from_statement(
 
     let r: Vec<DhtOp> = stmt
         .query_and_then([], |row| {
-            let header = from_blob::<SignedHeader>(row.get("header_blob")?)?;
+            let action = from_blob::<SignedAction>(row.get("action_blob")?)?;
             let op_type: DhtOpType = row.get("dht_type")?;
-            let entry = match header.0.entry_type().map(|et| et.visibility()) {
+            let entry = match action.0.entry_type().map(|et| et.visibility()) {
                 Some(EntryVisibility::Public) => {
                     let entry: Option<Vec<u8>> = row.get("entry_blob")?;
                     match entry {
@@ -1245,7 +1245,7 @@ fn query_dht_ops_from_statement(
                 }
                 _ => None,
             };
-            Ok(DhtOp::from_type(op_type, header, entry)?)
+            Ok(DhtOp::from_type(op_type, action, entry)?)
         })?
         .collect::<StateQueryResult<Vec<_>>>()?;
     Ok(r)

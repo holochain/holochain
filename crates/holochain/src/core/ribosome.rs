@@ -498,7 +498,7 @@ pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
             .all_zomes()
             .position(|(name, _)| name == zome_name)
         {
-            Some(index) => Ok(holochain_zome_types::header::ZomeId::from(index as u8)),
+            Some(index) => Ok(holochain_zome_types::action::ZomeId::from(index as u8)),
             None => Err(RibosomeError::ZomeNotExists(zome_name.to_owned())),
         }
     }
@@ -605,12 +605,12 @@ pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
 
     fn zome_types(&self) -> &Arc<GlobalZomeTypes>;
 
-    /// Convenience function to weigh an unweighed countersigning header
-    fn weigh_countersigning_header(
+    /// Convenience function to weigh an unweighed countersigning action
+    fn weigh_countersigning_action(
         &self,
-        h: UnweighedCountersigningHeader,
+        h: UnweighedCountersigningAction,
         entry: Entry,
-    ) -> RibosomeResult<EntryCreationHeader> {
+    ) -> RibosomeResult<EntryCreationAction> {
         // TODO: use serialized entry as input
         let zome = match h.entry_type() {
             EntryType::App(aet) => self.find_zome_from_entry(&aet.id),
@@ -620,8 +620,8 @@ pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
 
         let entry_size = SerializedBytes::try_from(&entry)?.bytes().len();
         let input = match &h {
-            UnweighedCountersigningHeader::Create(h) => WeighInput::Create(h.clone(), entry),
-            UnweighedCountersigningHeader::Update(h) => WeighInput::Update(h.clone(), entry),
+            UnweighedCountersigningAction::Create(h) => WeighInput::Create(h.clone(), entry),
+            UnweighedCountersigningAction::Update(h) => WeighInput::Update(h.clone(), entry),
         };
         let weight = RateWeight::from(self.run_weigh(WeighInvocation::new(zome, input))?);
         let weight = EntryRateWeight::from_weight_and_size(weight, entry_size);
