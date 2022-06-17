@@ -220,10 +220,10 @@ pub mod slow_tests {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::Link).await;
 
-        let header_hash: HeaderHash = conductor.call(&alice, "create_baseless_link", ()).await;
+        let action_hash: ActionHash = conductor.call(&alice, "create_baseless_link", ()).await;
         let links: Vec<Link> = conductor.call(&alice, "get_baseless_links", ()).await;
 
-        assert_eq!(links[0].create_link_hash, header_hash);
+        assert_eq!(links[0].create_link_hash, action_hash);
         assert_eq!(
             links[0].target,
             EntryHash::from_raw_36([2_u8; 36].to_vec()).into(),
@@ -237,12 +237,12 @@ pub mod slow_tests {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::Link).await;
 
-        let header_hash: HeaderHash = conductor
+        let action_hash: ActionHash = conductor
             .call(&alice, "create_external_base_link", ())
             .await;
         let links: Vec<Link> = conductor.call(&alice, "get_external_links", ()).await;
 
-        assert_eq!(links[0].create_link_hash, header_hash);
+        assert_eq!(links[0].create_link_hash, action_hash);
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -252,8 +252,8 @@ pub mod slow_tests {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::Link).await;
 
-        let _: HeaderHash = conductor.call(&alice, "create_link", ()).await;
-        let _: HeaderHash = conductor.call(&alice, "create_back_link", ()).await;
+        let _: ActionHash = conductor.call(&alice, "create_link", ()).await;
+        let _: ActionHash = conductor.call(&alice, "create_back_link", ()).await;
         let forward_links: Vec<Link> = conductor.call(&alice, "get_links", ()).await;
         let back_links: Vec<Link> = conductor.call(&alice, "get_back_links", ()).await;
         let links_bidi: Vec<Vec<Link>> = conductor.call(&alice, "get_links_bidi", ()).await;

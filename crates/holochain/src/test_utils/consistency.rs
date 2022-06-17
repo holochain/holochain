@@ -684,9 +684,9 @@ async fn request_published_ops(
                     DhtOp.storage_center_loc as loc
                     FROM DhtOp
                     JOIN
-                    Header ON DhtOp.header_hash = Header.hash
+                    Action ON DhtOp.action_hash = Action.hash
                     WHERE
-                    (DhtOp.type != :store_entry OR Header.private_entry = 0)
+                    (DhtOp.type != :store_entry OR Action.private_entry = 0)
                 ",
             )?
             .query_map(

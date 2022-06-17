@@ -274,14 +274,14 @@ mod slow_tests {
 
         let agent = AgentPubKey::arbitrary(&mut u).unwrap();
         let entry = Entry::Agent(agent);
-        let mut header = Create::arbitrary(&mut u).unwrap();
-        header.entry_type = EntryType::AgentPubKey;
-        header.entry_hash = EntryHash::with_data_sync(&entry);
+        let mut action = Create::arbitrary(&mut u).unwrap();
+        action.entry_type = EntryType::AgentPubKey;
+        action.entry_hash = EntryHash::with_data_sync(&entry);
 
-        let op = Op::StoreElement {
-            element: Element::new(
-                SignedHeaderHashed::with_presigned(
-                    HeaderHashed::from_content_sync(header.into()),
+        let op = Op::StoreRecord {
+            record: Record::new(
+                SignedActionHashed::with_presigned(
+                    ActionHashed::from_content_sync(action.into()),
                     Signature::arbitrary(&mut u).unwrap(),
                 ),
                 Some(entry),
@@ -305,12 +305,12 @@ mod slow_tests {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::Validate).await;
 
-        let output: HeaderHash = conductor.call(&alice, "always_validates", ()).await;
-        let _output_element: Element = conductor
-            .call(&alice, "must_get_valid_element", output)
+        let output: ActionHash = conductor.call(&alice, "always_validates", ()).await;
+        let _output_record: Record = conductor
+            .call(&alice, "must_get_valid_record", output)
             .await;
 
-        let invalid_output: Result<HeaderHash, _> =
+        let invalid_output: Result<ActionHash, _> =
             conductor.call_fallible(&alice, "never_validates", ()).await;
         assert!(invalid_output.is_err());
     }

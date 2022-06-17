@@ -233,9 +233,9 @@ pub async fn incoming_dht_ops_workflow(
 #[instrument(skip(op))]
 /// If this op fails the counterfeit check it should be dropped
 async fn should_keep(op: &DhtOp) -> WorkflowResult<()> {
-    let header = op.header();
+    let action = op.action();
     let signature = op.signature();
-    Ok(counterfeit_check(signature, &header).await?)
+    Ok(counterfeit_check(signature, &action).await?)
 }
 
 fn add_to_pending(

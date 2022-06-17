@@ -131,7 +131,7 @@ pub mod test {
         } = RibosomeTestFixture::new(TestWasm::MustGet).await;
 
         let entry = Entry::try_from(Something(vec![1, 2, 3])).unwrap();
-        let header_hash = alice_host_fn_caller
+        let action_hash = alice_host_fn_caller
             .commit_entry(entry.clone(), EntryDefIndex(0), EntryVisibility::Public)
             .await;
 
@@ -140,34 +140,34 @@ pub mod test {
             .get_dht_db(alice.cell_id().dna_hash())
             .unwrap();
 
-        // When we first get the element it will return because we haven't yet
+        // When we first get the record it will return because we haven't yet
         // set the validation status.
-        let element: Element = conductor
-            .call(&bob, "must_get_valid_element", header_hash.clone())
+        let record: Record = conductor
+            .call(&bob, "must_get_valid_record", action_hash.clone())
             .await;
 
-        let signature = element.signature().clone();
-        let header = element.header().clone();
-        let maybe_entry_box: Option<Box<Entry>> = element
+        let signature = record.signature().clone();
+        let action = record.action().clone();
+        let maybe_entry_box: Option<Box<Entry>> = record
             .entry()
             .as_option()
             .cloned()
             .map(|entry| Box::new(entry));
         let entry_state = DhtOpHashed::from_content_sync(DhtOp::StoreEntry(
             signature.clone(),
-            NewEntryHeader::try_from(header.clone()).unwrap(),
+            NewEntryAction::try_from(action.clone()).unwrap(),
             maybe_entry_box.clone().unwrap(),
         ));
-        let element_state = DhtOpHashed::from_content_sync(DhtOp::StoreElement(
+        let record_state = DhtOpHashed::from_content_sync(DhtOp::StoreRecord(
             signature,
-            header.clone(),
+            action.clone(),
             maybe_entry_box,
         ));
         dht_db
             .conn()
             .unwrap()
             .with_commit_sync(|txn| {
-                set_validation_status(txn, element_state.as_hash(), ValidationStatus::Rejected)
+                set_validation_status(txn, record_state.as_hash(), ValidationStatus::Rejected)
                     .unwrap();
                 set_validation_status(txn, entry_state.as_hash(), ValidationStatus::Rejected)
             })
@@ -176,22 +176,22 @@ pub mod test {
         // Must get entry returns the entry if it exists regardless of the
         // validation status.
         let must_get_entry: EntryHashed = conductor
-            .call(&bob, "must_get_entry", header.entry_hash().clone())
+            .call(&bob, "must_get_entry", action.entry_hash().clone())
             .await;
         assert_eq!(Entry::from(must_get_entry), entry,);
 
-        // Must get header returns the header if it exists regardless of the
+        // Must get action returns the action if it exists regardless of the
         // validation status.
-        let must_get_header: SignedHeaderHashed = conductor
-            .call(&bob, "must_get_header", header_hash.clone())
+        let must_get_action: SignedActionHashed = conductor
+            .call(&bob, "must_get_action", action_hash.clone())
             .await;
-        assert_eq!(must_get_header.header(), &header,);
+        assert_eq!(must_get_action.action(), &action,);
 
-        // Must get VALID element ONLY returns the element if it is valid.
-        let must_get_valid_element: Result<Element, _> = conductor
-            .call_fallible(&bob, "must_get_valid_element", header_hash)
+        // Must get VALID record ONLY returns the record if it is valid.
+        let must_get_valid_record: Result<Record, _> = conductor
+            .call_fallible(&bob, "must_get_valid_record", action_hash)
             .await;
-        assert!(must_get_valid_element.is_err());
+        assert!(must_get_valid_record.is_err());
 
         let bad_entry_hash = EntryHash::from_raw_32(vec![1; 32]);
         let bad_must_get_entry: Result<EntryHashed, _> = conductor
@@ -199,10 +199,10 @@ pub mod test {
             .await;
         assert!(bad_must_get_entry.is_err());
 
-        let bad_header_hash = HeaderHash::from_raw_32(vec![2; 32]);
-        let bad_must_get_header: Result<SignedHeaderHashed, _> = conductor
-            .call_fallible(&bob, "must_get_header", bad_header_hash)
+        let bad_action_hash = ActionHash::from_raw_32(vec![2; 32]);
+        let bad_must_get_action: Result<SignedActionHashed, _> = conductor
+            .call_fallible(&bob, "must_get_action", bad_action_hash)
             .await;
-        assert!(bad_must_get_header.is_err());
+        assert!(bad_must_get_action.is_err());
     }
 }

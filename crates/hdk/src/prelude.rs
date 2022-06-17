@@ -19,9 +19,9 @@ pub use crate::entry::delete;
 pub use crate::entry::delete_entry;
 pub use crate::entry::get;
 pub use crate::entry::get_details;
+pub use crate::entry::must_get_action;
 pub use crate::entry::must_get_entry;
-pub use crate::entry::must_get_header;
-pub use crate::entry::must_get_valid_element;
+pub use crate::entry::must_get_valid_record;
 pub use crate::entry::update;
 pub use crate::entry::update_entry;
 pub use crate::entry::EntryTypesHelper;
@@ -77,6 +77,7 @@ pub use hdk_derive::hdk_to_local_types;
 pub use hdk_derive::EntryDefRegistration;
 pub use hdk_derive::UnitEnum;
 pub use holo_hash;
+pub use holo_hash::ActionHash;
 pub use holo_hash::AgentPubKey;
 pub use holo_hash::AnyDhtHash;
 pub use holo_hash::AnyLinkableHash;
@@ -84,7 +85,6 @@ pub use holo_hash::EntryHash;
 pub use holo_hash::EntryHashes;
 pub use holo_hash::ExternalHash;
 pub use holo_hash::HasHash;
-pub use holo_hash::HeaderHash;
 pub use holo_hash::HoloHash;
 pub use holo_hash::HoloHashed;
 pub use holochain_deterministic_integrity;
@@ -131,8 +131,8 @@ macro_rules! holochain_externs {
             __get_link_details,
             __get_agent_activity,
             __must_get_entry,
-            __must_get_valid_element,
-            __must_get_header,
+            __must_get_valid_record,
+            __must_get_action,
             __accept_countersigning_preflight_request,
             __query,
             __call_remote,

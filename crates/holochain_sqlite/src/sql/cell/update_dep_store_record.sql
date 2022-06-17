@@ -6,16 +6,16 @@ SET
 WHERE
   validation_stage = 3
   AND validation_status IS NOT NULL
-  AND DhtOp.type IN (:updated_element, :deleted_by)
+  AND DhtOp.type IN (:updated_record, :deleted_by)
   AND EXISTS(
     SELECT
       1
     FROM
       DhtOp AS OP_DEP
     WHERE
-      OP_DEP.header_hash = DhtOp.dependency
+      OP_DEP.action_hash = DhtOp.dependency
       AND OP_DEP.when_integrated IS NOT NULL
-      AND OP_DEP.type = :store_element
+      AND OP_DEP.type = :store_record
     LIMIT
       1
   )

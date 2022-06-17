@@ -16,14 +16,14 @@ fn set_access(_: ()) -> ExternResult<()> {
 }
 
 #[hdk_extern]
-fn ping(agent: AgentPubKey) -> ExternResult<HeaderHash> {
+fn ping(agent: AgentPubKey) -> ExternResult<ActionHash> {
     create_entry(EntryTypes::Ping(Ping(agent)))
 }
 
 #[hdk_extern(infallible)]
-fn post_commit(shhs: Vec<SignedHeaderHashed>) {
+fn post_commit(shhs: Vec<SignedActionHashed>) {
     if let Ok(ping) =
-        Ping::try_from(must_get_entry(shhs[0].header().entry_hash().unwrap().clone()).unwrap())
+        Ping::try_from(must_get_entry(shhs[0].action().entry_hash().unwrap().clone()).unwrap())
     {
         if hdk::prelude::query(
             ChainQueryFilter::default().entry_type(EntryTypesUnit::Ping.try_into().unwrap()),
@@ -45,6 +45,6 @@ fn post_commit(shhs: Vec<SignedHeaderHashed>) {
 }
 
 #[hdk_extern]
-fn query(_: ()) -> ExternResult<Vec<Element>> {
+fn query(_: ()) -> ExternResult<Vec<Record>> {
     hdk::prelude::query(ChainQueryFilter::default().entry_type(EntryTypesUnit::Ping.try_into()?))
 }

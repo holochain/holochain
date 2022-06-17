@@ -118,7 +118,7 @@
 //!   - `EntryDefs` is a vector defining all entries used by this app.
 //!   - All zomes in a DNA define all their entries at the same time for the host.
 //!   - All entry defs are combined into a single ordered list per zome and exposed to tooling such as DNA generation.
-//!   - Entry defs are referenced by `u8` numerical position externally and in DHT headers, and by id/name e.g. "post" in sparse callbacks.
+//!   - Entry defs are referenced by `u8` numerical position externally and in DHT actions, and by id/name e.g. "post" in sparse callbacks.
 //! - `fn init(_: ()) -> ExternResult<InitCallbackResult>`:
 //!   - Allows the guest to pass/fail/retry initialization with [`InitCallbackResult`](holochain_zome_types::init::InitCallbackResult).
 //!   - Lazy execution - only runs when any zome of the DNA is first called.
@@ -132,9 +132,9 @@
 //!   - Close runs when an agent is deprecating an old source chain in favour of a new one.
 //!   - All zomes in a DNA migrate at the same time.
 //!   - Any failure fails the migration.
-//! - `fn post_commit(headers: Vec<SignedHeaderHashed>)`:
+//! - `fn post_commit(actions: Vec<SignedActionHashed>)`:
 //!   - Executes after the WASM call that originated the commits so not bound by the original atomic transaction.
-//!   - Input is all the header hashes that were committed.
+//!   - Input is all the action hashes that were committed.
 //!   - The zome that originated the commits is called.
 //! - `fn validate_create_link(create_link_data: ValidateCreateLinkData) -> ExternResult<ValidateLinkCallbackResult>`:
 //!   - Allows the guest to pass/fail/retry link creation validation.
@@ -318,7 +318,7 @@ pub mod countersigning;
 /// App entries are all entries that are not system entries.
 /// They are defined in the `entry_defs` callback and then the application can call CRUD functions with them.
 ///
-/// CRUD in Holochain is represented as a graph/tree of Elements referencing each other (via Header hashes) representing new states of a shared identity.
+/// CRUD in Holochain is represented as a graph/tree of Records referencing each other (via Action hashes) representing new states of a shared identity.
 /// Because the network is always subject to the possibility of partitions, there is no way to assert an objective truth about the 'current' or 'real' value that all participants will agree on.
 /// This is a key difference between Holochain and blockchains.
 /// Where blockchains define a consensus algorithm that brings all participants as close as possible to a single value while Holochain lets each participant discover their own truth.
@@ -447,22 +447,22 @@ pub use paste;
 ///
 /// Interacting with a source chain is very different to the DHT.
 ///
-/// - Source chains have a linear history guaranteed by header hashes
-/// - Source chains have a single owner/author signing every chain element
-/// - Source chains can be iterated over from most recent back to genesis by following the header hashes as references
+/// - Source chains have a linear history guaranteed by action hashes
+/// - Source chains have a single owner/author signing every chain record
+/// - Source chains can be iterated over from most recent back to genesis by following the action hashes as references
 /// - Source chains contain interspersed system and application entries
-/// - Source chains contain both private (local only) and public (broadcast to DHT) elements
+/// - Source chains contain both private (local only) and public (broadcast to DHT) records
 ///
 /// There is a small DSL provided by `query` that allows for inspecting the current agent's local source chain.
 /// Typically it will be faster, more direct and efficient to query local data than dial out to the network.
 /// It is also possible to query local private entries.
 ///
 /// Agent activity for any other agent on the network can be fetched.
-/// The agent activity is _only the headers_ of the remote agent's source chain.
+/// The agent activity is _only the actions_ of the remote agent's source chain.
 /// Agent activity allows efficient building of the history of an agent.
 /// Agent activity is retrieved from a dedicated neighbourhood near the agent.
 /// The agent's neighbourhood also maintains a passive security net that guards against attempted chain forks and/or rollbacks.
-/// The same query DSL for local chain queries is used to filter remote agent activity headers.
+/// The same query DSL for local chain queries is used to filter remote agent activity actions.
 pub mod chain;
 
 /// Create and verify signatures for serializable Rust structures and raw binary data.
@@ -502,13 +502,13 @@ pub mod info;
 /// - Have a base and target entry
 /// - Can either exist or be deleted (i.e. there is no revision history, deleting removes a link permanently)
 /// - Many links can point from/to the same entry
-/// - Links reference entry hashes not headers
+/// - Links reference entry hashes not actions
 ///
 /// Links are retrived from the DHT by performing [ `link::get_links` ] or [ `link::get_link_details` ] against the _base_ of a link.
 ///
 /// Links also support short (about 500 bytes) binary data to encode contextual data on a domain specific basis.
 ///
-/// __Links are not entries__, there is only a header with no associated entry, so links cannot reference other links or maintain or participate in a revision history.
+/// __Links are not entries__, there is only an action with no associated entry, so links cannot reference other links or maintain or participate in a revision history.
 pub mod link;
 
 /// Methods for interacting with peers in the same DHT network.

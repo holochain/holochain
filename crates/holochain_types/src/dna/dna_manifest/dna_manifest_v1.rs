@@ -63,7 +63,7 @@ pub struct IntegrityManifest {
 
     /// The time used to denote the origin of the network, used to calculate
     /// time windows during gossip.
-    /// All Header timestamps must come after this time.
+    /// All Action timestamps must come after this time.
     #[serde(default = "default_origin_time")]
     pub origin_time: HumanTimestamp,
 

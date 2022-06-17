@@ -1,15 +1,15 @@
 //! Fixturators for zome types
 
+use crate::action::*;
 use crate::capability::*;
 use crate::crdt::CrdtType;
-use crate::element::Element;
-use crate::element::SignedHeaderHashed;
 use crate::entry::AppEntryBytes;
 use crate::entry_def::EntryVisibility;
-use crate::header::*;
 use crate::link::LinkTag;
 use crate::migrate_agent::MigrateAgent;
 use crate::prelude::*;
+use crate::record::Record;
+use crate::record::SignedActionHashed;
 use crate::signature::Signature;
 use crate::timestamp::Timestamp;
 use crate::validate::RequiredValidationType;
@@ -59,7 +59,7 @@ fixturator!(
 
 fixturator!(
     RequiredValidationType;
-    unit variants [ Element SubChain Full ] empty Element;
+    unit variants [ Record SubChain Full ] empty Record;
 );
 
 fixturator!(
@@ -79,18 +79,18 @@ impl Iterator for AppEntryTypeFixturator<EntryVisibility> {
 pub type MaybeMembraneProof = Option<Arc<SerializedBytes>>;
 
 fixturator!(
-    HeaderBuilderCommon;
-    constructor fn new(AgentPubKey, Timestamp, u32, HeaderHash);
+    ActionBuilderCommon;
+    constructor fn new(AgentPubKey, Timestamp, u32, ActionHash);
 );
 
 fixturator!(
     DeleteLink;
-    constructor fn from_builder(HeaderBuilderCommon, HeaderHash, AnyLinkableHash);
+    constructor fn from_builder(ActionBuilderCommon, ActionHash, AnyLinkableHash);
 );
 
 fixturator!(
     CreateLink;
-    constructor fn from_builder(HeaderBuilderCommon, AnyLinkableHash, AnyLinkableHash, LinkType, LinkTag);
+    constructor fn from_builder(ActionBuilderCommon, AnyLinkableHash, AnyLinkableHash, LinkType, LinkTag);
 );
 
 fixturator!(
@@ -109,7 +109,7 @@ pub struct KnownCreateLink {
 }
 
 pub struct KnownDeleteLink {
-    pub link_add_address: holo_hash::HeaderHash,
+    pub link_add_address: holo_hash::ActionHash,
     pub base_address: AnyLinkableHash,
 }
 
@@ -139,7 +139,7 @@ impl Iterator for DeleteLinkFixturator<KnownDeleteLink> {
 #[derive(Clone)]
 pub struct AppEntry;
 
-/// A curve to make headers have public entry types
+/// A curve to make actions have public entry types
 #[derive(Clone)]
 pub struct PublicCurve;
 
@@ -189,17 +189,17 @@ fixturator!(
     curve Empty AgentInfo {
         agent_initial_pubkey: fixt!(AgentPubKey, Empty),
         agent_latest_pubkey: fixt!(AgentPubKey, Empty),
-        chain_head: (fixt!(HeaderHash, Empty), fixt!(u32, Empty), fixt!(Timestamp, Empty)),
+        chain_head: (fixt!(ActionHash, Empty), fixt!(u32, Empty), fixt!(Timestamp, Empty)),
     };
     curve Unpredictable AgentInfo {
         agent_initial_pubkey: fixt!(AgentPubKey, Unpredictable),
         agent_latest_pubkey: fixt!(AgentPubKey, Unpredictable),
-        chain_head: (fixt!(HeaderHash, Unpredictable), fixt!(u32, Unpredictable), fixt!(Timestamp, Unpredictable)),
+        chain_head: (fixt!(ActionHash, Unpredictable), fixt!(u32, Unpredictable), fixt!(Timestamp, Unpredictable)),
     };
     curve Predictable AgentInfo {
         agent_initial_pubkey: fixt!(AgentPubKey, Predictable),
         agent_latest_pubkey: fixt!(AgentPubKey, Predictable),
-        chain_head: (fixt!(HeaderHash, Predictable), fixt!(u32, Predictable), fixt!(Timestamp, Predictable)),
+        chain_head: (fixt!(ActionHash, Predictable), fixt!(u32, Predictable), fixt!(Timestamp, Predictable)),
     };
 );
 
@@ -411,10 +411,10 @@ fixturator!(
     variants [ ChainAuthor(AgentPubKey) RemoteAgent(ZomeCallCapGrant) ];
 );
 
-pub fn element_with_no_entry(signature: Signature, header: Header) -> Element {
+pub fn record_with_no_entry(signature: Signature, action: Action) -> Record {
     let shh =
-        SignedHeaderHashed::with_presigned(HeaderHashed::from_content_sync(header), signature);
-    Element::new(shh, None)
+        SignedActionHashed::with_presigned(ActionHashed::from_content_sync(action), signature);
+    Record::new(shh, None)
 }
 
 fixturator!(
@@ -503,7 +503,7 @@ fixturator!(
 
 fixturator!(
     Dna;
-    constructor fn from_builder(DnaHash, HeaderBuilderCommon);
+    constructor fn from_builder(DnaHash, ActionBuilderCommon);
 );
 
 fixturator! {
@@ -544,27 +544,27 @@ fixturator! {
 
 fixturator!(
     AgentValidationPkg;
-    constructor fn from_builder(HeaderBuilderCommon, MaybeMembraneProof);
+    constructor fn from_builder(ActionBuilderCommon, MaybeMembraneProof);
 );
 
 fixturator!(
     InitZomesComplete;
-    constructor fn from_builder(HeaderBuilderCommon);
+    constructor fn from_builder(ActionBuilderCommon);
 );
 
 fixturator!(
     OpenChain;
-    constructor fn from_builder(HeaderBuilderCommon, DnaHash);
+    constructor fn from_builder(ActionBuilderCommon, DnaHash);
 );
 
 fixturator!(
     CloseChain;
-    constructor fn from_builder(HeaderBuilderCommon, DnaHash);
+    constructor fn from_builder(ActionBuilderCommon, DnaHash);
 );
 
 fixturator!(
     Create;
-    constructor fn from_builder(HeaderBuilderCommon, EntryType, EntryHash);
+    constructor fn from_builder(ActionBuilderCommon, EntryType, EntryHash);
 
     curve PublicCurve {
         let mut ec = fixt!(Create);
@@ -591,7 +591,7 @@ type EntryTypeEntryHash = (EntryType, EntryHash);
 
 fixturator!(
     Update;
-    constructor fn from_builder(HeaderBuilderCommon, EntryHash, HeaderHash, EntryType, EntryHash);
+    constructor fn from_builder(ActionBuilderCommon, EntryHash, ActionHash, EntryType, EntryHash);
 
     curve PublicCurve {
         let mut eu = fixt!(Update);
@@ -626,11 +626,11 @@ fixturator!(
 
 fixturator!(
     Delete;
-    constructor fn from_builder(HeaderBuilderCommon, HeaderHash, EntryHash);
+    constructor fn from_builder(ActionBuilderCommon, ActionHash, EntryHash);
 );
 
 fixturator!(
-    Header;
+    Action;
     variants [
         Dna(Dna)
         AgentValidationPkg(AgentValidationPkg)
@@ -645,23 +645,23 @@ fixturator!(
     ];
 
     curve PublicCurve {
-        match fixt!(Header) {
-            Header::Create(_) => Header::Create(fixt!(Create, PublicCurve)),
-            Header::Update(_) => Header::Update(fixt!(Update, PublicCurve)),
+        match fixt!(Action) {
+            Action::Create(_) => Action::Create(fixt!(Create, PublicCurve)),
+            Action::Update(_) => Action::Update(fixt!(Update, PublicCurve)),
             other_type => other_type,
         }
     };
 );
 
 fixturator!(
-    HeaderHashed;
-    constructor fn from_content_sync(Header);
+    ActionHashed;
+    constructor fn from_content_sync(Action);
 );
 
 fixturator!(
     with_vec 0 5;
-    SignedHeaderHashed;
-    constructor fn with_presigned(HeaderHashed, Signature);
+    SignedActionHashed;
+    constructor fn with_presigned(ActionHashed, Signature);
 );
 
 fixturator!(

@@ -8,34 +8,34 @@ use std::fmt::Debug;
 use super::*;
 
 #[derive(Debug, Clone)]
-pub struct GetElementDetailsQuery(HeaderHash, Option<Arc<AgentPubKey>>);
+pub struct GetRecordDetailsQuery(ActionHash, Option<Arc<AgentPubKey>>);
 
-impl GetElementDetailsQuery {
-    pub fn new(hash: HeaderHash) -> Self {
+impl GetRecordDetailsQuery {
+    pub fn new(hash: ActionHash) -> Self {
         Self(hash, None)
     }
 }
 
 #[derive(Debug)]
 pub struct State {
-    header: Option<SignedHeaderHashed>,
-    rejected_header: Option<SignedHeaderHashed>,
-    deletes: HashSet<SignedHeaderHashed>,
-    updates: HashSet<SignedHeaderHashed>,
+    action: Option<SignedActionHashed>,
+    rejected_action: Option<SignedActionHashed>,
+    deletes: HashSet<SignedActionHashed>,
+    updates: HashSet<SignedActionHashed>,
 }
 
-impl Query for GetElementDetailsQuery {
-    type Item = Judged<SignedHeaderHashed>;
+impl Query for GetRecordDetailsQuery {
+    type Item = Judged<SignedActionHashed>;
     type State = State;
-    type Output = Option<ElementDetails>;
+    type Output = Option<RecordDetails>;
 
     fn query(&self) -> String {
         "
-        SELECT Header.blob AS header_blob, DhtOp.validation_status AS status
+        SELECT Action.blob AS action_blob, DhtOp.validation_status AS status
         FROM DhtOp
-        JOIN Header On DhtOp.header_hash = Header.hash
+        JOIN Action On DhtOp.action_hash = Action.hash
         WHERE DhtOp.type IN (:create_type, :delete_type, :update_type)
-        AND DhtOp.basis_hash = :header_hash
+        AND DhtOp.basis_hash = :action_hash
         AND DhtOp.when_integrated IS NOT NULL
         AND DhtOp.validation_status IS NOT NULL
         "
@@ -43,21 +43,21 @@ impl Query for GetElementDetailsQuery {
     }
     fn params(&self) -> Vec<Params> {
         let params = named_params! {
-            ":create_type": DhtOpType::StoreElement,
+            ":create_type": DhtOpType::StoreRecord,
             ":delete_type": DhtOpType::RegisterDeletedBy,
-            ":update_type": DhtOpType::RegisterUpdatedElement,
-            ":header_hash": self.0,
+            ":update_type": DhtOpType::RegisterUpdatedRecord,
+            ":action_hash": self.0,
         };
         params.to_vec()
     }
 
     fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Item>> {
         let f = |row: &Row| {
-            let header =
-                from_blob::<SignedHeader>(row.get(row.as_ref().column_index("header_blob")?)?)?;
-            let SignedHeader(header, signature) = header;
-            let header = HeaderHashed::from_content_sync(header);
-            let shh = SignedHeaderHashed::with_presigned(header, signature);
+            let action =
+                from_blob::<SignedAction>(row.get(row.as_ref().column_index("action_blob")?)?)?;
+            let SignedAction(action, signature) = action;
+            let action = ActionHashed::from_content_sync(action);
+            let shh = SignedActionHashed::with_presigned(action, signature);
             let status = row.get(row.as_ref().column_index("status")?)?;
             let r = Judged::new(shh, status);
             Ok(r)
@@ -66,20 +66,20 @@ impl Query for GetElementDetailsQuery {
     }
 
     fn as_filter(&self) -> Box<dyn Fn(&QueryData<Self>) -> bool> {
-        let header_filter = self.0.clone();
-        let f = move |header: &QueryData<Self>| {
-            let header = &header;
-            if *header.header_address() == header_filter {
+        let action_filter = self.0.clone();
+        let f = move |action: &QueryData<Self>| {
+            let action = &action;
+            if *action.action_address() == action_filter {
                 true
             } else {
-                match header.header() {
-                    Header::Delete(Delete {
+                match action.action() {
+                    Action::Delete(Delete {
                         deletes_address, ..
-                    }) => *deletes_address == header_filter,
-                    Header::Update(Update {
-                        original_header_address,
+                    }) => *deletes_address == action_filter,
+                    Action::Update(Update {
+                        original_action_address,
                         ..
-                    }) => *original_header_address == header_filter,
+                    }) => *original_action_address == action_filter,
                     _ => false,
                 }
             }
@@ -89,8 +89,8 @@ impl Query for GetElementDetailsQuery {
 
     fn init_fold(&self) -> StateQueryResult<Self::State> {
         Ok(State {
-            header: Default::default(),
-            rejected_header: Default::default(),
+            action: Default::default(),
+            rejected_action: Default::default(),
             deletes: Default::default(),
             updates: Default::default(),
         })
@@ -99,26 +99,26 @@ impl Query for GetElementDetailsQuery {
     fn fold(&self, mut state: Self::State, item: Self::Item) -> StateQueryResult<Self::State> {
         let (shh, validation_status) = item.into();
         if *shh.as_hash() == self.0 {
-            if state.header.is_none() && state.rejected_header.is_none() {
+            if state.action.is_none() && state.rejected_action.is_none() {
                 match validation_status {
                     Some(ValidationStatus::Valid) => {
-                        state.header = Some(shh);
+                        state.action = Some(shh);
                     }
                     Some(ValidationStatus::Rejected) => {
-                        state.rejected_header = Some(shh);
+                        state.rejected_action = Some(shh);
                     }
                     _ => (),
                 }
             }
         } else {
-            match shh.header() {
-                Header::Update(Update {
-                    original_header_address,
+            match shh.action() {
+                Action::Update(Update {
+                    original_action_address,
                     ..
-                }) if *original_header_address == self.0 => {
+                }) if *original_action_address == self.0 => {
                     state.updates.insert(shh);
                 }
-                Header::Delete(Delete {
+                Action::Delete(Delete {
                     deletes_address, ..
                 }) if *deletes_address == self.0 => {
                     state.deletes.insert(shh);
@@ -135,13 +135,13 @@ impl Query for GetElementDetailsQuery {
         S: Store,
     {
         let State {
-            header,
-            rejected_header,
+            action,
+            rejected_action,
             deletes,
             updates,
         } = state;
 
-        let (header, validation_status) = match (header, rejected_header) {
+        let (action, validation_status) = match (action, rejected_action) {
             (None, None) => return Ok(None),
             (None, Some(h)) => (h, ValidationStatus::Rejected),
             (Some(h), None) => (h, ValidationStatus::Valid),
@@ -153,17 +153,17 @@ impl Query for GetElementDetailsQuery {
         };
 
         let mut entry = None;
-        if let Some(entry_hash) = header.header().entry_hash() {
+        if let Some(entry_hash) = action.action().entry_hash() {
             let author = self
                 .1
                 .as_ref()
                 .map(|a| a.as_ref())
-                .filter(|a| *a == header.header().author());
+                .filter(|a| *a == action.action().author());
             entry = stores.get_public_or_authored_entry(entry_hash, author)?;
         }
-        let element = Element::new(header, entry);
-        let details = ElementDetails {
-            element,
+        let record = Record::new(action, entry);
+        let details = RecordDetails {
+            record,
             validation_status,
             deletes: deletes.into_iter().collect(),
             updates: updates.into_iter().collect(),
@@ -172,8 +172,8 @@ impl Query for GetElementDetailsQuery {
     }
 }
 
-impl PrivateDataQuery for GetElementDetailsQuery {
-    type Hash = HeaderHash;
+impl PrivateDataQuery for GetRecordDetailsQuery {
+    type Hash = ActionHash;
 
     fn with_private_data_access(hash: Self::Hash, author: Arc<AgentPubKey>) -> Self {
         Self(hash, Some(author))

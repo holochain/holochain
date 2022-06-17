@@ -6,7 +6,7 @@ use holochain_types::{
     dht_op::{DhtOp, DhtOpHashed, DhtOpType},
     prelude::DhtOpResult,
 };
-use holochain_zome_types::{EntryVisibility, SignedHeader};
+use holochain_zome_types::{EntryVisibility, SignedAction};
 
 use crate::{prelude::*, query::get_public_op_from_db};
 
@@ -68,15 +68,15 @@ pub async fn authored_ops_to_dht_db_without_check(
         })
         .await?;
     for op in activity {
-        let dependency = get_dependency(op.get_type(), &op.header());
+        let dependency = get_dependency(op.get_type(), &op.action());
 
         if matches!(dependency, Dependency::Null) {
             let _ = dht_db_cache
-                .set_activity_to_integrated(op.header().author(), op.header().header_seq())
+                .set_activity_to_integrated(op.action().author(), op.action().action_seq())
                 .await;
         } else {
             dht_db_cache
-                .set_activity_ready_to_integrate(op.header().author(), op.header().header_seq())
+                .set_activity_ready_to_integrate(op.action().author(), op.action().action_seq())
                 .await?;
         }
     }
@@ -95,7 +95,7 @@ fn insert_locally_validated_op(
     let op = filter_private_entry(op)?;
     let hash = op.as_hash();
 
-    let dependency = get_dependency(op.get_type(), &op.header());
+    let dependency = get_dependency(op.get_type(), &op.action());
     let op_type = op.get_type();
 
     // Insert the op.
@@ -121,16 +121,16 @@ fn insert_locally_validated_op(
 }
 
 fn filter_private_entry(op: DhtOpHashed) -> DhtOpResult<DhtOpHashed> {
-    let is_private_entry = op.header().entry_type().map_or(false, |et| {
+    let is_private_entry = op.action().entry_type().map_or(false, |et| {
         matches!(et.visibility(), EntryVisibility::Private)
     });
 
     if is_private_entry && op.entry().is_some() {
         let (op, hash) = op.into_inner();
         let op_type = op.get_type();
-        let (signature, header, _) = op.into_inner();
+        let (signature, action, _) = op.into_inner();
         Ok(DhtOpHashed::with_pre_hashed(
-            DhtOp::from_type(op_type, SignedHeader(header, signature), None)?,
+            DhtOp::from_type(op_type, SignedAction(action, signature), None)?,
             hash,
         ))
     } else {
@@ -139,7 +139,7 @@ fn filter_private_entry(op: DhtOpHashed) -> DhtOpResult<DhtOpHashed> {
 }
 
 fn is_private_store_entry(op: &DhtOp) -> bool {
-    op.header()
+    op.action()
         .entry_type()
         .map_or(false, |et| *et.visibility() == EntryVisibility::Private)
         && op.get_type() == DhtOpType::StoreEntry
