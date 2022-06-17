@@ -409,7 +409,7 @@ fn link_zomes_get_links() {
 }
 
 #[test]
-fn link_zomes_from_header() {
+fn link_zomes_from_action() {
     use integrity_zomes::*;
     set_zome_types(vec![], vec![50..53, 100..103]);
     assert_eq!(
@@ -525,11 +525,11 @@ fn set_zome_types_and_compare(entries: Vec<Range<u8>>, links: Vec<Range<u8>>, co
     });
     mock_hdk
         .expect_create()
-        .returning(|_| Ok(HeaderHash::from_raw_36(vec![0u8; 36])));
+        .returning(|_| Ok(ActionHash::from_raw_36(vec![0u8; 36])));
     if !matches!(compare, Compare::CreateLink(_)) {
         mock_hdk
             .expect_create_link()
-            .returning(|_| Ok(HeaderHash::from_raw_36(vec![0u8; 36])));
+            .returning(|_| Ok(ActionHash::from_raw_36(vec![0u8; 36])));
     }
     if !matches!(compare, Compare::GetLinks(_)) {
         mock_hdk.expect_get_links().returning(|_| {
@@ -537,7 +537,7 @@ fn set_zome_types_and_compare(entries: Vec<Range<u8>>, links: Vec<Range<u8>>, co
                 target: base(),
                 timestamp: Timestamp(0),
                 tag: ().into(),
-                create_link_hash: HeaderHash::from_raw_36(vec![0u8; 36]),
+                create_link_hash: ActionHash::from_raw_36(vec![0u8; 36]),
             }]])
         });
     }
@@ -555,7 +555,7 @@ fn set_zome_types_and_compare(entries: Vec<Range<u8>>, links: Vec<Range<u8>>, co
                         target: base(),
                         timestamp: Timestamp(0),
                         tag: ().into(),
-                        create_link_hash: HeaderHash::from_raw_36(vec![0u8; 36]),
+                        create_link_hash: ActionHash::from_raw_36(vec![0u8; 36]),
                     }]])
                 });
         }
@@ -563,7 +563,7 @@ fn set_zome_types_and_compare(entries: Vec<Range<u8>>, links: Vec<Range<u8>>, co
             mock_hdk
                 .expect_create_link()
                 .withf(move |CreateLinkInput { link_type, .. }| *link_type == l)
-                .returning(|_| Ok(HeaderHash::from_raw_36(vec![0u8; 36])));
+                .returning(|_| Ok(ActionHash::from_raw_36(vec![0u8; 36])));
         }
         Compare::Nothing => (),
     }

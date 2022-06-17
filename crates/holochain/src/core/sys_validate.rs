@@ -19,7 +19,7 @@ pub(super) use error::*;
 pub use holo_hash::*;
 pub use holochain_state::source_chain::SourceChainError;
 pub use holochain_state::source_chain::SourceChainResult;
-pub use holochain_zome_types::HeaderHashed;
+pub use holochain_zome_types::ActionHashed;
 pub use holochain_zome_types::Timestamp;
 
 #[allow(missing_docs)]
@@ -27,13 +27,13 @@ mod error;
 #[cfg(test)]
 mod tests;
 
-/// Verify the signature for this header
-pub async fn verify_header_signature(sig: &Signature, header: &Header) -> SysValidationResult<()> {
-    if header.author().verify_signature(sig, header).await {
+/// Verify the signature for this action
+pub async fn verify_action_signature(sig: &Signature, action: &Action) -> SysValidationResult<()> {
+    if action.author().verify_signature(sig, action).await {
         Ok(())
     } else {
         Err(SysValidationError::ValidationOutcome(
-            ValidationOutcome::Counterfeit((*sig).clone(), (*header).clone()),
+            ValidationOutcome::Counterfeit((*sig).clone(), (*action).clone()),
         ))
     }
 }
@@ -45,32 +45,32 @@ pub async fn author_key_is_valid(_author: &AgentPubKey) -> SysValidationResult<(
     Ok(())
 }
 
-/// Verify the countersigning session contains the specified header.
-pub fn check_countersigning_session_data_contains_header(
+/// Verify the countersigning session contains the specified action.
+pub fn check_countersigning_session_data_contains_action(
     entry_hash: EntryHash,
     session_data: &CounterSigningSessionData,
-    header: NewEntryHeaderRef<'_>,
+    action: NewEntryActionRef<'_>,
 ) -> SysValidationResult<()> {
-    let header_is_in_session = session_data
-        .build_header_set(entry_hash)
+    let action_is_in_session = session_data
+        .build_action_set(entry_hash)
         .map_err(SysValidationError::from)?
         .iter()
-        .any(|session_header| match (&header, session_header) {
+        .any(|session_action| match (&action, session_action) {
             (
-                NewEntryHeaderRef::Create(create),
-                UnweighedCountersigningHeader::Create(session_create),
+                NewEntryActionRef::Create(create),
+                UnweighedCountersigningAction::Create(session_create),
             ) => (*create).to_owned().unweighed() == *session_create,
             (
-                NewEntryHeaderRef::Update(update),
-                UnweighedCountersigningHeader::Update(session_update),
+                NewEntryActionRef::Update(update),
+                UnweighedCountersigningAction::Update(session_update),
             ) => (*update).to_owned().unweighed() == *session_update,
             _ => false,
         });
-    if !header_is_in_session {
+    if !action_is_in_session {
         Err(SysValidationError::ValidationOutcome(
-            ValidationOutcome::HeaderNotInCounterSigningSession(
+            ValidationOutcome::ActionNotInCounterSigningSession(
                 session_data.to_owned(),
-                header.to_new_entry_header(),
+                action.to_new_entry_action(),
             ),
         ))
     } else {
@@ -119,10 +119,10 @@ pub async fn check_countersigning_preflight_response_signature(
 pub async fn check_countersigning_session_data(
     entry_hash: EntryHash,
     session_data: &CounterSigningSessionData,
-    header: NewEntryHeaderRef<'_>,
+    action: NewEntryActionRef<'_>,
 ) -> SysValidationResult<()> {
     session_data.check_integrity()?;
-    check_countersigning_session_data_contains_header(entry_hash, session_data, header)?;
+    check_countersigning_session_data_contains_action(entry_hash, session_data, action)?;
 
     let tasks: Vec<_> = session_data
         .responses()
@@ -145,40 +145,40 @@ pub async fn check_countersigning_session_data(
     }
 }
 
-/// Check that previous header makes sense
-/// for this header.
+/// Check that previous action makes sense
+/// for this action.
 /// If not Dna then cannot be root of chain
-/// and must have previous header
-pub fn check_prev_header(header: &Header) -> SysValidationResult<()> {
-    match &header {
-        Header::Dna(_) => Ok(()),
+/// and must have previous action
+pub fn check_prev_action(action: &Action) -> SysValidationResult<()> {
+    match &action {
+        Action::Dna(_) => Ok(()),
         _ => {
-            if header.header_seq() > 0 {
-                header
-                    .prev_header()
-                    .ok_or(PrevHeaderError::MissingPrev)
+            if action.action_seq() > 0 {
+                action
+                    .prev_action()
+                    .ok_or(PrevActionError::MissingPrev)
                     .map_err(ValidationOutcome::from)?;
                 Ok(())
             } else {
-                Err(PrevHeaderError::InvalidRoot).map_err(|e| ValidationOutcome::from(e).into())
+                Err(PrevActionError::InvalidRoot).map_err(|e| ValidationOutcome::from(e).into())
             }
         }
     }
 }
 
-/// Check that Dna headers are only added to empty source chains
+/// Check that Dna actions are only added to empty source chains
 pub async fn check_valid_if_dna(
-    header: &Header,
+    action: &Action,
     workspace: &SysValidationWorkspace,
 ) -> SysValidationResult<()> {
-    match header {
-        Header::Dna(_) => {
-            if !workspace.is_chain_empty(header.author()).await? {
-                Err(PrevHeaderError::InvalidRoot).map_err(|e| ValidationOutcome::from(e).into())
-            } else if header.timestamp() < workspace.dna_def().origin_time {
-                // If the Dna timestamp is ahead of the origin time, every other header
-                // will be inductively so also due to the prev_header check
-                Err(PrevHeaderError::InvalidRootOriginTime)
+    match action {
+        Action::Dna(_) => {
+            if !workspace.is_chain_empty(action.author()).await? {
+                Err(PrevActionError::InvalidRoot).map_err(|e| ValidationOutcome::from(e).into())
+            } else if action.timestamp() < workspace.dna_def().origin_time {
+                // If the Dna timestamp is ahead of the origin time, every other action
+                // will be inductively so also due to the prev_action check
+                Err(PrevActionError::InvalidRootOriginTime)
                     .map_err(|e| ValidationOutcome::from(e).into())
             } else {
                 Ok(())
@@ -188,13 +188,13 @@ pub async fn check_valid_if_dna(
     }
 }
 
-/// Check if there are other headers at this
+/// Check if there are other actions at this
 /// sequence number
 pub async fn check_chain_rollback(
-    header: &Header,
+    action: &Action,
     workspace: &SysValidationWorkspace,
 ) -> SysValidationResult<()> {
-    let empty = workspace.header_seq_is_empty(header).await?;
+    let empty = workspace.action_seq_is_empty(action).await?;
 
     // Ok or log warning
     if empty {
@@ -202,43 +202,43 @@ pub async fn check_chain_rollback(
     } else {
         // TODO: implement real rollback detection once we know what that looks like
         tracing::error!(
-            "Chain rollback detected at position {} for agent {:?} from header {:?}",
-            header.header_seq(),
-            header.author(),
-            header,
+            "Chain rollback detected at position {} for agent {:?} from action {:?}",
+            action.action_seq(),
+            action.author(),
+            action,
         );
         Ok(())
     }
 }
 
 /// Placeholder for future spam check.
-/// Check header timestamps don't exceed MAX_PUBLISH_FREQUENCY
-pub async fn check_spam(_header: &Header) -> SysValidationResult<()> {
+/// Check action timestamps don't exceed MAX_PUBLISH_FREQUENCY
+pub async fn check_spam(_action: &Action) -> SysValidationResult<()> {
     Ok(())
 }
 
-/// Check previous header timestamp is before this header
-pub fn check_prev_timestamp(header: &Header, prev_header: &Header) -> SysValidationResult<()> {
-    if header.timestamp() > prev_header.timestamp() {
+/// Check previous action timestamp is before this action
+pub fn check_prev_timestamp(action: &Action, prev_action: &Action) -> SysValidationResult<()> {
+    if action.timestamp() > prev_action.timestamp() {
         Ok(())
     } else {
-        Err(PrevHeaderError::Timestamp).map_err(|e| ValidationOutcome::from(e).into())
+        Err(PrevActionError::Timestamp).map_err(|e| ValidationOutcome::from(e).into())
     }
 }
 
-/// Check the previous header is one less than the current
-pub fn check_prev_seq(header: &Header, prev_header: &Header) -> SysValidationResult<()> {
-    let header_seq = header.header_seq();
-    let prev_seq = prev_header.header_seq();
-    if header_seq > 0 && prev_seq == header_seq - 1 {
+/// Check the previous action is one less than the current
+pub fn check_prev_seq(action: &Action, prev_action: &Action) -> SysValidationResult<()> {
+    let action_seq = action.action_seq();
+    let prev_seq = prev_action.action_seq();
+    if action_seq > 0 && prev_seq == action_seq - 1 {
         Ok(())
     } else {
-        Err(PrevHeaderError::InvalidSeq(header_seq, prev_seq))
+        Err(PrevActionError::InvalidSeq(action_seq, prev_seq))
             .map_err(|e| ValidationOutcome::from(e).into())
     }
 }
 
-/// Check the entry variant matches the variant in the headers entry type
+/// Check the entry variant matches the variant in the actions entry type
 pub fn check_entry_type(entry_type: &EntryType, entry: &Entry) -> SysValidationResult<()> {
     match (entry_type, entry) {
         (EntryType::AgentPubKey, Entry::Agent(_)) => Ok(()),
@@ -293,7 +293,7 @@ pub fn check_not_private(entry_def: &EntryDef) -> SysValidationResult<()> {
     }
 }
 
-/// Check the headers entry hash matches the hash of the entry
+/// Check the actions entry hash matches the hash of the entry
 pub async fn check_entry_hash(hash: &EntryHash, entry: &Entry) -> SysValidationResult<()> {
     if *hash == EntryHash::with_data_sync(entry) {
         Ok(())
@@ -302,12 +302,12 @@ pub async fn check_entry_hash(hash: &EntryHash, entry: &Entry) -> SysValidationR
     }
 }
 
-/// Check the header should have an entry.
+/// Check the action should have an entry.
 /// Is either a Create or Update
-pub fn check_new_entry_header(header: &Header) -> SysValidationResult<()> {
-    match header {
-        Header::Create(_) | Header::Update(_) => Ok(()),
-        _ => Err(ValidationOutcome::NotNewEntry(header.clone()).into()),
+pub fn check_new_entry_action(action: &Action) -> SysValidationResult<()> {
+    match action {
+        Action::Create(_) | Action::Update(_) => Ok(()),
+        _ => Err(ValidationOutcome::NotNewEntry(action.clone()).into()),
     }
 }
 
@@ -341,187 +341,187 @@ pub fn check_tag_size(tag: &LinkTag) -> SysValidationResult<()> {
 /// original and new entry.
 pub fn check_update_reference(
     eu: &Update,
-    original_entry_header: &NewEntryHeaderRef<'_>,
+    original_entry_action: &NewEntryActionRef<'_>,
 ) -> SysValidationResult<()> {
-    if eu.entry_type == *original_entry_header.entry_type() {
+    if eu.entry_type == *original_entry_action.entry_type() {
         Ok(())
     } else {
         Err(ValidationOutcome::UpdateTypeMismatch(
             eu.entry_type.clone(),
-            original_entry_header.entry_type().clone(),
+            original_entry_action.entry_type().clone(),
         )
         .into())
     }
 }
 
-/// Validate a chain of headers with an optional starting point.
+/// Validate a chain of actions with an optional starting point.
 pub fn validate_chain<'iter>(
-    mut headers: impl Iterator<Item = &'iter HeaderHashed>,
-    persisted_chain_head: &Option<(HeaderHash, u32)>,
+    mut actions: impl Iterator<Item = &'iter ActionHashed>,
+    persisted_chain_head: &Option<(ActionHash, u32)>,
 ) -> SysValidationResult<()> {
     // Check the chain starts in a valid way.
-    let mut last_item = match headers.next() {
-        Some(HeaderHashed {
+    let mut last_item = match actions.next() {
+        Some(ActionHashed {
             hash,
-            content: header,
+            content: action,
         }) => {
             match persisted_chain_head {
                 Some((prev_hash, prev_seq)) => {
-                    check_prev_header_chain(prev_hash, *prev_seq, header)
+                    check_prev_action_chain(prev_hash, *prev_seq, action)
                         .map_err(ValidationOutcome::from)?;
                 }
                 None => {
-                    // If there's no persisted chain head, then the first header
+                    // If there's no persisted chain head, then the first action
                     // must be a DNA.
-                    if !matches!(header, Header::Dna(_)) {
-                        return Err(ValidationOutcome::from(PrevHeaderError::InvalidRoot).into());
+                    if !matches!(action, Action::Dna(_)) {
+                        return Err(ValidationOutcome::from(PrevActionError::InvalidRoot).into());
                     }
                 }
             }
-            let seq = header.header_seq();
+            let seq = action.action_seq();
             (hash, seq)
         }
         None => return Ok(()),
     };
 
-    for HeaderHashed {
+    for ActionHashed {
         hash,
-        content: header,
-    } in headers
+        content: action,
+    } in actions
     {
         // Check each item of the chain is valid.
-        check_prev_header_chain(last_item.0, last_item.1, header)
+        check_prev_action_chain(last_item.0, last_item.1, action)
             .map_err(ValidationOutcome::from)?;
-        last_item = (hash, header.header_seq());
+        last_item = (hash, action.action_seq());
     }
     Ok(())
 }
 
-// Check the header is valid for the previous header.
-fn check_prev_header_chain(
-    prev_header_hash: &HeaderHash,
-    prev_header_seq: u32,
-    header: &Header,
-) -> Result<(), PrevHeaderError> {
+// Check the action is valid for the previous action.
+fn check_prev_action_chain(
+    prev_action_hash: &ActionHash,
+    prev_action_seq: u32,
+    action: &Action,
+) -> Result<(), PrevActionError> {
     // DNA cannot appear later in the chain.
-    if matches!(header, Header::Dna(_)) {
-        Err(PrevHeaderError::InvalidRoot)
-    } else if header.prev_header().map_or(true, |p| p != prev_header_hash) {
+    if matches!(action, Action::Dna(_)) {
+        Err(PrevActionError::InvalidRoot)
+    } else if action.prev_action().map_or(true, |p| p != prev_action_hash) {
         // Check the prev hash matches.
-        Err(PrevHeaderError::HashMismatch)
-    } else if header
-        .header_seq()
+        Err(PrevActionError::HashMismatch)
+    } else if action
+        .action_seq()
         .checked_sub(1)
-        .map_or(true, |s| prev_header_seq != s)
+        .map_or(true, |s| prev_action_seq != s)
     {
         // Check the prev seq is one less.
-        Err(PrevHeaderError::InvalidSeq(
-            header.header_seq(),
-            prev_header_seq,
+        Err(PrevActionError::InvalidSeq(
+            action.action_seq(),
+            prev_action_seq,
         ))
     } else {
         Ok(())
     }
 }
 
-/// If we are not holding this header then
+/// If we are not holding this action then
 /// retrieve it and send it as a RegisterAddLink DhtOp
 /// to our incoming_dht_ops_workflow.
 ///
-/// Apply a checks callback to the Element.
+/// Apply a checks callback to the Record.
 ///
 /// Additionally sys validation will be triggered to
 /// run again if we weren't holding it.
 pub async fn check_and_hold_register_add_link<F>(
-    hash: &HeaderHash,
+    hash: &ActionHash,
     workspace: &SysValidationWorkspace,
     network: HolochainP2pDna,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
     f: F,
 ) -> SysValidationResult<()>
 where
-    F: FnOnce(&Element) -> SysValidationResult<()>,
+    F: FnOnce(&Record) -> SysValidationResult<()>,
 {
     let source = check_and_hold(hash, workspace, network).await?;
     f(source.as_ref())?;
-    if let (Some(incoming_dht_ops_sender), Source::Network(element)) =
+    if let (Some(incoming_dht_ops_sender), Source::Network(record)) =
         (incoming_dht_ops_sender, source)
     {
         incoming_dht_ops_sender
-            .send_register_add_link(element)
+            .send_register_add_link(record)
             .await?;
     }
     Ok(())
 }
 
-/// If we are not holding this header then
+/// If we are not holding this action then
 /// retrieve it and send it as a RegisterAgentActivity DhtOp
 /// to our incoming_dht_ops_workflow.
 ///
-/// Apply a checks callback to the Element.
+/// Apply a checks callback to the Record.
 ///
 /// Additionally sys validation will be triggered to
 /// run again if we weren't holding it.
 pub async fn check_and_hold_register_agent_activity<F>(
-    hash: &HeaderHash,
+    hash: &ActionHash,
     workspace: &SysValidationWorkspace,
     network: HolochainP2pDna,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
     f: F,
 ) -> SysValidationResult<()>
 where
-    F: FnOnce(&Element) -> SysValidationResult<()>,
+    F: FnOnce(&Record) -> SysValidationResult<()>,
 {
     let source = check_and_hold(hash, workspace, network).await?;
     f(source.as_ref())?;
-    if let (Some(incoming_dht_ops_sender), Source::Network(element)) =
+    if let (Some(incoming_dht_ops_sender), Source::Network(record)) =
         (incoming_dht_ops_sender, source)
     {
         incoming_dht_ops_sender
-            .send_register_agent_activity(element)
+            .send_register_agent_activity(record)
             .await?;
     }
     Ok(())
 }
 
-/// If we are not holding this header then
+/// If we are not holding this action then
 /// retrieve it and send it as a StoreEntry DhtOp
 /// to our incoming_dht_ops_workflow.
 ///
-/// Apply a checks callback to the Element.
+/// Apply a checks callback to the Record.
 ///
 /// Additionally sys validation will be triggered to
 /// run again if we weren't holding it.
 pub async fn check_and_hold_store_entry<F>(
-    hash: &HeaderHash,
+    hash: &ActionHash,
     workspace: &SysValidationWorkspace,
     network: HolochainP2pDna,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
     f: F,
 ) -> SysValidationResult<()>
 where
-    F: FnOnce(&Element) -> SysValidationResult<()>,
+    F: FnOnce(&Record) -> SysValidationResult<()>,
 {
     let source = check_and_hold(hash, workspace, network).await?;
     f(source.as_ref())?;
-    if let (Some(incoming_dht_ops_sender), Source::Network(element)) =
+    if let (Some(incoming_dht_ops_sender), Source::Network(record)) =
         (incoming_dht_ops_sender, source)
     {
-        incoming_dht_ops_sender.send_store_entry(element).await?;
+        incoming_dht_ops_sender.send_store_entry(record).await?;
     }
     Ok(())
 }
 
 /// If we are not holding this entry then
-/// retrieve any element at this EntryHash
+/// retrieve any record at this EntryHash
 /// and send it as a StoreEntry DhtOp
 /// to our incoming_dht_ops_workflow.
 ///
 /// Note this is different to check_and_hold_store_entry
-/// because it gets the Element via an EntryHash which
-/// means it will be any Element.
+/// because it gets the Record via an EntryHash which
+/// means it will be any Record.
 ///
-/// Apply a checks callback to the Element.
+/// Apply a checks callback to the Record.
 ///
 /// Additionally sys validation will be triggered to
 /// run again if we weren't holding it.
@@ -533,42 +533,42 @@ pub async fn check_and_hold_any_store_entry<F>(
     f: F,
 ) -> SysValidationResult<()>
 where
-    F: FnOnce(&Element) -> SysValidationResult<()>,
+    F: FnOnce(&Record) -> SysValidationResult<()>,
 {
     let source = check_and_hold(hash, workspace, network).await?;
     f(source.as_ref())?;
-    if let (Some(incoming_dht_ops_sender), Source::Network(element)) =
+    if let (Some(incoming_dht_ops_sender), Source::Network(record)) =
         (incoming_dht_ops_sender, source)
     {
-        incoming_dht_ops_sender.send_store_entry(element).await?;
+        incoming_dht_ops_sender.send_store_entry(record).await?;
     }
     Ok(())
 }
 
-/// If we are not holding this header then
-/// retrieve it and send it as a StoreElement DhtOp
+/// If we are not holding this action then
+/// retrieve it and send it as a StoreRecord DhtOp
 /// to our incoming_dht_ops_workflow.
 ///
-/// Apply a checks callback to the Element.
+/// Apply a checks callback to the Record.
 ///
 /// Additionally sys validation will be triggered to
 /// run again if we weren't holding it.
-pub async fn check_and_hold_store_element<F>(
-    hash: &HeaderHash,
+pub async fn check_and_hold_store_record<F>(
+    hash: &ActionHash,
     workspace: &SysValidationWorkspace,
     network: HolochainP2pDna,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
     f: F,
 ) -> SysValidationResult<()>
 where
-    F: FnOnce(&Element) -> SysValidationResult<()>,
+    F: FnOnce(&Record) -> SysValidationResult<()>,
 {
     let source = check_and_hold(hash, workspace, network).await?;
     f(source.as_ref())?;
-    if let (Some(incoming_dht_ops_sender), Source::Network(element)) =
+    if let (Some(incoming_dht_ops_sender), Source::Network(record)) =
         (incoming_dht_ops_sender, source)
     {
-        incoming_dht_ops_sender.send_store_element(element).await?;
+        incoming_dht_ops_sender.send_store_record(record).await?;
     }
     Ok(())
 }
@@ -587,10 +587,10 @@ impl IncomingDhtOpSender {
     /// Sends the op to the incoming workflow
     async fn send_op(
         self,
-        element: Element,
-        make_op: fn(Element) -> Option<(DhtOpHash, DhtOp)>,
+        record: Record,
+        make_op: fn(Record) -> Option<(DhtOpHash, DhtOp)>,
     ) -> SysValidationResult<()> {
-        if let Some(op) = make_op(element) {
+        if let Some(op) = make_op(record) {
             let ops = vec![op];
             incoming_dht_ops_workflow(self.space.as_ref(), self.sys_validation_trigger, ops, false)
                 .await
@@ -598,39 +598,39 @@ impl IncomingDhtOpSender {
         }
         Ok(())
     }
-    async fn send_store_element(self, element: Element) -> SysValidationResult<()> {
-        self.send_op(element, make_store_element).await
+    async fn send_store_record(self, record: Record) -> SysValidationResult<()> {
+        self.send_op(record, make_store_record).await
     }
-    async fn send_store_entry(self, element: Element) -> SysValidationResult<()> {
-        let is_public_entry = element.header().entry_type().map_or(false, |et| {
+    async fn send_store_entry(self, record: Record) -> SysValidationResult<()> {
+        let is_public_entry = record.action().entry_type().map_or(false, |et| {
             matches!(et.visibility(), EntryVisibility::Public)
         });
         if is_public_entry {
-            self.send_op(element, make_store_entry).await?;
+            self.send_op(record, make_store_entry).await?;
         }
         Ok(())
     }
-    async fn send_register_add_link(self, element: Element) -> SysValidationResult<()> {
-        self.send_op(element, make_register_add_link).await
+    async fn send_register_add_link(self, record: Record) -> SysValidationResult<()> {
+        self.send_op(record, make_register_add_link).await
     }
-    async fn send_register_agent_activity(self, element: Element) -> SysValidationResult<()> {
-        self.send_op(element, make_register_agent_activity).await
+    async fn send_register_agent_activity(self, record: Record) -> SysValidationResult<()> {
+        self.send_op(record, make_register_agent_activity).await
     }
 }
 
-/// Where the element was found.
+/// Where the record was found.
 enum Source {
     /// Locally because we are holding it or
     /// because we will be soon
-    Local(Element),
+    Local(Record),
     /// On the network.
     /// This means we aren't holding it so
     /// we should add it to our incoming ops
-    Network(Element),
+    Network(Record),
 }
 
-impl AsRef<Element> for Source {
-    fn as_ref(&self) -> &Element {
+impl AsRef<Record> for Source {
+    fn as_ref(&self) -> &Record {
         match self {
             Source::Local(el) | Source::Network(el) => el,
         }
@@ -667,87 +667,87 @@ async fn check_and_hold<I: Into<AnyDhtHash> + Clone>(
     }
 }
 
-/// Make a StoreElement DhtOp from an Element.
+/// Make a StoreRecord DhtOp from a Record.
 /// Note that this can fail if the op is missing an
 /// Entry when it was supposed to have one.
 ///
 /// Because adding ops to incoming limbo while we are checking them
 /// is only faster then waiting for them through gossip we don't care enough
 /// to return an error.
-fn make_store_element(element: Element) -> Option<(DhtOpHash, DhtOp)> {
+fn make_store_record(record: Record) -> Option<(DhtOpHash, DhtOp)> {
     // Extract the data
-    let (shh, element_entry) = element.privatized().into_inner();
-    let (header, signature) = shh.into_inner();
-    let header = header.into_content();
+    let (shh, record_entry) = record.privatized().into_inner();
+    let (action, signature) = shh.into_inner();
+    let action = action.into_content();
 
     // Check the entry
-    let maybe_entry_box = element_entry.into_option().map(Box::new);
+    let maybe_entry_box = record_entry.into_option().map(Box::new);
 
     // Create the hash and op
-    let op = DhtOp::StoreElement(signature, header, maybe_entry_box);
+    let op = DhtOp::StoreRecord(signature, action, maybe_entry_box);
     let hash = op.to_hash();
     Some((hash, op))
 }
 
-/// Make a StoreEntry DhtOp from an Element.
+/// Make a StoreEntry DhtOp from a Record.
 /// Note that this can fail if the op is missing an Entry or
-/// the header is the wrong type.
+/// the action is the wrong type.
 ///
 /// Because adding ops to incoming limbo while we are checking them
 /// is only faster then waiting for them through gossip we don't care enough
 /// to return an error.
-fn make_store_entry(element: Element) -> Option<(DhtOpHash, DhtOp)> {
+fn make_store_entry(record: Record) -> Option<(DhtOpHash, DhtOp)> {
     // Extract the data
-    let (shh, element_entry) = element.into_inner();
-    let (header, signature) = shh.into_inner();
+    let (shh, record_entry) = record.into_inner();
+    let (action, signature) = shh.into_inner();
 
     // Check the entry and exit early if it's not there
-    let entry_box = element_entry.into_option()?.into();
-    // If the header is the wrong type exit early
-    let header = header.into_content().try_into().ok()?;
+    let entry_box = record_entry.into_option()?.into();
+    // If the action is the wrong type exit early
+    let action = action.into_content().try_into().ok()?;
 
     // Create the hash and op
-    let op = DhtOp::StoreEntry(signature, header, entry_box);
+    let op = DhtOp::StoreEntry(signature, action, entry_box);
     let hash = op.to_hash();
     Some((hash, op))
 }
 
-/// Make a RegisterAddLink DhtOp from an Element.
-/// Note that this can fail if the header is the wrong type
+/// Make a RegisterAddLink DhtOp from a Record.
+/// Note that this can fail if the action is the wrong type
 ///
 /// Because adding ops to incoming limbo while we are checking them
 /// is only faster then waiting for them through gossip we don't care enough
 /// to return an error.
-fn make_register_add_link(element: Element) -> Option<(DhtOpHash, DhtOp)> {
+fn make_register_add_link(record: Record) -> Option<(DhtOpHash, DhtOp)> {
     // Extract the data
-    let (shh, _) = element.into_inner();
-    let (header, signature) = shh.into_inner();
+    let (shh, _) = record.into_inner();
+    let (action, signature) = shh.into_inner();
 
-    // If the header is the wrong type exit early
-    let header = header.into_content().try_into().ok()?;
+    // If the action is the wrong type exit early
+    let action = action.into_content().try_into().ok()?;
 
     // Create the hash and op
-    let op = DhtOp::RegisterAddLink(signature, header);
+    let op = DhtOp::RegisterAddLink(signature, action);
     let hash = op.to_hash();
     Some((hash, op))
 }
 
-/// Make a RegisterAgentActivity DhtOp from an Element.
-/// Note that this can fail if the header is the wrong type
+/// Make a RegisterAgentActivity DhtOp from a Record.
+/// Note that this can fail if the action is the wrong type
 ///
 /// Because adding ops to incoming limbo while we are checking them
 /// is only faster then waiting for them through gossip we don't care enough
 /// to return an error.
-fn make_register_agent_activity(element: Element) -> Option<(DhtOpHash, DhtOp)> {
+fn make_register_agent_activity(record: Record) -> Option<(DhtOpHash, DhtOp)> {
     // Extract the data
-    let (shh, _) = element.into_inner();
-    let (header, signature) = shh.into_inner();
+    let (shh, _) = record.into_inner();
+    let (action, signature) = shh.into_inner();
 
-    // If the header is the wrong type exit early
-    let header = header.into_content();
+    // If the action is the wrong type exit early
+    let action = action.into_content();
 
     // Create the hash and op
-    let op = DhtOp::RegisterAgentActivity(signature, header);
+    let op = DhtOp::RegisterAgentActivity(signature, action);
     let hash = op.to_hash();
     Some((hash, op))
 }

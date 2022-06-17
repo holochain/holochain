@@ -7,13 +7,13 @@ use holochain_wasmer_host::prelude::*;
 use holochain_types::prelude::*;
 use std::sync::Arc;
 
-/// create element
+/// create record
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn create<'a>(
     ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: CreateInput,
-) -> Result<HeaderHash, RuntimeError> {
+) -> Result<ActionHash, RuntimeError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess {
             write_workspace: Permission::Allow,
@@ -29,7 +29,7 @@ pub fn create<'a>(
             // build the entry hash
             let entry_hash = EntryHash::with_data_sync(entry);
 
-            // Countersigned entries have different header handling.
+            // Countersigned entries have different action handling.
             match entry {
                 Entry::CounterSign(ref session_data, _) => {
                     tokio_helper::block_forever_on(async move {
@@ -40,19 +40,19 @@ pub fn create<'a>(
                             .as_ref()
                             .expect("Must have source chain if write_workspace access is given");
 
-                        let unweighed = UnweighedCountersigningHeader::from_countersigning_data(
+                        let unweighed = UnweighedCountersigningAction::from_countersigning_data(
                             entry_hash,
                             session_data,
                             (*source_chain.author()).clone(),
                         )
                         .map_err(|e| wasm_error!(WasmErrorInner::Host(e.to_string())))?;
 
-                        let header = ribosome
-                            .weigh_countersigning_header(unweighed, entry.clone())
+                        let action = ribosome
+                            .weigh_countersigning_action(unweighed, entry.clone())
                             .map_err(|e| wasm_error!(WasmErrorInner::Host(e.to_string())))?;
 
                         source_chain
-                            .put_with_header(header.into(), Some(entry.clone()), chain_top_ordering)
+                            .put_with_action(action.into(), Some(entry.clone()), chain_top_ordering)
                             .await
                             .map_err(|source_chain_error| {
                                 wasm_error!(WasmErrorInner::Host(source_chain_error.to_string()))
@@ -72,8 +72,8 @@ pub fn create<'a>(
                         EntryDefLocation::CapClaim => EntryType::CapClaim,
                     };
 
-                    // build a header for the entry being committed
-                    let header_builder = builder::Create {
+                    // build an action for the entry being committed
+                    let action_builder = builder::Create {
                         entry_type,
                         entry_hash,
                     };
@@ -83,14 +83,14 @@ pub fn create<'a>(
                     // if the validation fails this commit will be rolled back by virtue of the DB transaction
                     // being atomic
                     tokio_helper::block_forever_on(async move {
-                        // push the header and the entry into the source chain
+                        // push the action and the entry into the source chain
                         call_context
                             .host_context
                             .workspace_write()
                             .source_chain()
                             .as_ref()
                             .expect("Must have source chain if write_workspace access is given")
-                            .put_weightless(header_builder, Some(entry.clone()), chain_top_ordering)
+                            .put_weightless(action_builder, Some(entry.clone()), chain_top_ordering)
                             .await
                             .map_err(|source_chain_error| -> RuntimeError {
                                 wasm_error!(WasmErrorInner::Host(source_chain_error.to_string()))
@@ -154,7 +154,7 @@ pub mod wasm_test {
 
         let output = create(Arc::new(ribosome), Arc::new(call_context), input).unwrap();
 
-        // the chain head should be the committed entry header
+        // the chain head should be the committed entry action
         let chain_head = tokio_helper::block_forever_on(async move {
             // The line below was added when migrating to rust edition 2021, per
             // https://doc.rust-lang.org/edition-guide/rust-2021/disjoint-capture-in-closures.html#migration
@@ -182,12 +182,12 @@ pub mod wasm_test {
         } = RibosomeTestFixture::new(TestWasm::Create).await;
 
         // get the result of a commit entry
-        let _output: HeaderHash = conductor.call(&alice, "create_entry", ()).await;
+        let _output: ActionHash = conductor.call(&alice, "create_entry", ()).await;
 
         // entry should be gettable.
-        let round: Option<Element> = conductor.call(&alice, "get_entry", ()).await;
+        let round: Option<Record> = conductor.call(&alice, "get_entry", ()).await;
 
-        let round_twice: Vec<Option<Element>> = conductor.call(&alice, "get_entry_twice", ()).await;
+        let round_twice: Vec<Option<Record>> = conductor.call(&alice, "get_entry_twice", ()).await;
 
         let bytes: Vec<u8> = match round.clone().and_then(|el| el.into()) {
             Some(holochain_zome_types::entry::Entry::App(entry_bytes)) => {

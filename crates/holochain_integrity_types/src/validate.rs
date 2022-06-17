@@ -16,8 +16,8 @@ pub enum ValidateCallbackResult {
     Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
 )]
 pub enum RequiredValidationType {
-    /// Just the element (default)
-    Element,
+    /// Just the record (default)
+    Record,
     /// All chain items of the same entry type
     SubChain,
     /// The entire chain
@@ -28,6 +28,6 @@ pub enum RequiredValidationType {
 
 impl Default for RequiredValidationType {
     fn default() -> Self {
-        Self::Element
+        Self::Record
     }
 }

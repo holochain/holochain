@@ -12,7 +12,7 @@ pub fn create_link<'a>(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: CreateLinkInput,
-) -> Result<HeaderHash, RuntimeError> {
+) -> Result<ActionHash, RuntimeError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess {
             write_workspace: Permission::Allow,
@@ -27,20 +27,20 @@ pub fn create_link<'a>(
             } = input;
 
             // Construct the link add
-            let header_builder =
+            let action_builder =
                 builder::CreateLink::new(base_address, target_address, link_type, tag);
 
-            let header_hash = tokio_helper::block_forever_on(tokio::task::spawn(async move {
-                // push the header into the source chain
-                let header_hash = call_context
+            let action_hash = tokio_helper::block_forever_on(tokio::task::spawn(async move {
+                // push the action into the source chain
+                let action_hash = call_context
                     .host_context
                     .workspace_write()
                     .source_chain()
                     .as_ref()
                     .expect("Must have source chain if write_workspace access is given")
-                    .put_weightless(header_builder, None, chain_top_ordering)
+                    .put_weightless(action_builder, None, chain_top_ordering)
                     .await?;
-                Ok::<HeaderHash, RibosomeError>(header_hash)
+                Ok::<ActionHash, RibosomeError>(action_hash)
             }))
             .map_err(|join_error| -> RuntimeError {
                 wasm_error!(WasmErrorInner::Host(join_error.to_string())).into()
@@ -53,7 +53,7 @@ pub fn create_link<'a>(
             // note that validation is handled by the workflow
             // if the validation fails this commit will be rolled back by virtue of the DB transaction
             // being atomic
-            Ok(header_hash)
+            Ok(action_hash)
         }
         _ => Err(wasm_error!(WasmErrorInner::Host(
             RibosomeError::HostFnPermissions(
