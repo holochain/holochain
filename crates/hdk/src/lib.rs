@@ -2,8 +2,13 @@
 //!
 //! Functions of a Holochain application (hApp) can be organized into reusable components. In Holochain terminology these components are called "zomes".
 //! One or multiple zomes are compiled into a WebAssembly (WASM) binary, referred to as a DNA. All of the DNAs of an application are bundled to a hApp.
+//! In short, that structure is __hApp -> DNA -> zome -> function__.
 //!
-//! hApps are required to produce and validate data deterministically, which is stored in a content-addressable manner retrieved by hash value.
+//! hApps are required to produce and validate data deterministically. All data is stored in a content-addressable manner, retrieved by hash value.
+//! There's a data model and a domain logic part to each hApp. In Holochain, the data model is defined in integrity zomes and the domain logic is
+//! written in coordinator zomes. See Coordinator zomes further down and
+//! [Holochain Deterministic Integrity](holochain_deterministic_integrity) for more information.
+//! 
 //! Since hApps are run as a binary on the hosting system, they must be sandboxed to prevent execution of insecure commands.
 //! Instead of writing and maintaining a custom format and specification for these artifacts as well as a runtime environment to execute them,
 //! Holochain makes use of WASM as the format of its applications. WASM binaries meet the aforementioned requirements as per the
@@ -11,7 +16,7 @@
 //!
 //! hApps can be installed on a device that's running a so-called conductor, Holochain's runtime. Clients can then call each zome's functions via Remote Procedure Calls (RPC).
 //! Holochain employs websocket ports for these RPCs, served by the conductor. Calls are made either from a client on localhost or from other nodes on the network.
-//! The zome function to be executed must be specified in each call. Every zome function in turn defines the response it returns to the client as part of a zome's code.
+//! The zome function to be executed must be specified in each call. Every zome function defines the response it returns to the client.
 //! [More info on Holochain's architecture](https://developer.holochain.org/concepts/2_application_architecture)
 //!
 //! Low-level communication between the conductor and WASM binaries, like typing and serialization of data, is encapsulated by the HDK.
@@ -29,13 +34,18 @@
 //! Each example WASM is a minimal demonstration of specific HDK functionality, such as generating random data, creating entries or defining validation callbacks.
 //! Some of the examples are very contrived, none are intended as production grade hApp examples, but do highlight key functionality.
 //!
-//!
+//! # Coordinator zomes 🐜
+//! 
+//! Coordinator zomes are the counterpart of integrity zomes in a DNA. They contain the domain logic of how data is read and written.
+//! Whereas data is defined and validated in integrity zomes, functions to manipulate data are implemented in coordinator zomes.
+//! 
 //! # HDK structure 🧱
 //!
 //! HDK implements several key features:
 //!
 //! - Base HDKT trait for standardisation, mocking, unit testing support: [`hdk`] module
 //! - Capabilities and function level access control: [`capability`] module
+//! - [Holochain Deterministic Integrity (HDI)](holochain_deterministic_integrity)
 //! - Application data and entry definitions for the source chain and DHT: [`entry`] module and [`entry_defs`] callback
 //! - Referencing/linking entries on the DHT together into a graph structure: [`link`] module
 //! - Defining tree-like structures out of links and entries for discoverability and scalability: [`hash_path`] module
@@ -296,6 +306,7 @@ pub mod countersigning;
 /// For example, an agent could choose to 'block' another agent and ignore all their updates.
 pub mod entry;
 
+pub use holochain_deterministic_integrity;
 pub use holochain_deterministic_integrity::entry_defs;
 
 pub mod hash;
