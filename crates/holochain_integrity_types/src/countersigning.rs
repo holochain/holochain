@@ -231,7 +231,7 @@ impl PreflightRequest {
         // Enzymatic optional signing agents MUST match the first signer in
         // both the signing agents and optional signing agents.
         if self.enzymatic
-            && self.optional_signing_agents.is_empty()
+            && !self.optional_signing_agents.is_empty()
             && self.signing_agents[0] != self.optional_signing_agents[0]
         {
             return Err(CounterSigningError::EnzymeMismatch(
