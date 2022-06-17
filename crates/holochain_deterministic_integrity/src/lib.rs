@@ -1,20 +1,20 @@
 //! Holochain Deterministic Integrity (HDI) is Holochain's data model and integrity toolset for
 //! writing zomes.
-//! 
+//!
 //! The logic of a Holochain DNA can be divided into two parts: integrity and coordination.
 //! Integrity is the part of the hApp that ensures that data is correct and coherent. Again this
 //! can be broken down into two parts - data definition and data validation.
-//! 
+//!
 //! # Data definition
-//! 
+//!
 //! The DNA's data model is defined in integrity zomes. They comprise all data type definitions
 //! as well as relationships between those types. Integrity zomes are purely definitions and do
 //! not contain functions to manipulate the data. Therefore a hApp's data model is encapsulated
 //! and completely independent of the domain logic, which is encoded in coordinator zomes.
-//! 
+//!
 //! Taking a database as an analogy, an integrity zome is similar to the schema of a database.
 //! Coordinator zomes, in contrast, provide functionality to query and write to the database.
-//! 
+//!
 //! Advantages of this approach are:
 //! * The DNA hash is constant as long as the integrity zomes remain the same. Changes to the
 //! domain logic, enclosed in coordinator zomes, do not affect the DNA hash. As a result, DNAs
@@ -24,9 +24,9 @@
 //! zome's data types and implement functions for data manipulation. This composability of
 //! integrity and coordinator zomes allows for a multitude of permutations with shared integrity
 //! zomes, i. e. a shared data model.
-//! 
+//!
 //! # Data validation
-//! 
+//!
 //! The second fundamental part of integrity zomes is data validation. For every operation that
 //! can be performed on the data, a validation rule can be specified. Both data types and data
 //! values can be validated. All of these validation rules are written in a central callback
@@ -44,7 +44,7 @@ pub use hdk_derive::hdk_link_types;
 /// App entries are all entries that are not system entries.
 /// They are defined in the `entry_defs` callback and then the application can call CRUD functions with them.
 ///
-/// CRUD in Holochain is represented as a graph/tree of Elements referencing each other (via Header hashes) representing new states of a shared identity.
+/// CRUD in Holochain is represented as a graph/tree of Records referencing each other (via Action hashes) representing new states of a shared identity.
 /// Because the network is always subject to the possibility of partitions, there is no way to assert an objective truth about the 'current' or 'real' value that all participants will agree on.
 /// This is a key difference between Holochain and blockchains.
 /// Where blockchains define a consensus algorithm that brings all participants as close as possible to a single value while Holochain lets each participant discover their own truth.

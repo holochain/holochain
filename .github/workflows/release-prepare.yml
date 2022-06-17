@@ -79,6 +79,7 @@ jobs:
         uses: cachix/install-nix-action@v16
       - name: Setup cachix
         uses: cachix/cachix-action@v10
+        continue-on-error: ${{ github.event_name != 'pull_request' }}
         with:
           name: holochain-ci
           signingKey: "${{ secrets.CACHIX_SIGNING_KEY }}"
@@ -179,17 +180,6 @@ jobs:
             git branch -D ${obsolete_branches}
           fi
 
-      - name: Setup upterm session
-        uses: lhotari/action-upterm@v1
-        if: ${{ failure() && needs.vars.outputs.debug == 'true' }}
-        env:
-          HRA_GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN }}
-        with:
-          ## limits ssh access and adds the ssh public key for the user which triggered the workflow
-          limit-access-to-actor: true
-          ## limits ssh access and adds the ssh public keys of the listed GitHub users
-          limit-access-to-users: steveeJ,jost-s,freesig,neonphog,thedavidmeister,maackle
-
       - name: Detect missing release headings
         run: |
           set -ex
@@ -209,7 +199,6 @@ jobs:
         run: |
           source "${HOLOCHAIN_RELEASE_SH}"
           cd "${HOLOCHAIN_REPO}"
-          
           nix-shell --pure --argstr flavor release --run "./scripts/generate_readmes.sh"
 
       - name: Bump the crate versions for the release
@@ -307,6 +296,8 @@ jobs:
       - name: Setup upterm session
         uses: lhotari/action-upterm@v1
         if: ${{ failure() && inputs.debug == 'true' }}
+        env:
+          HRA_GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN }}
         with:
           ## limits ssh access and adds the ssh public key for the user which triggered the workflow
           limit-access-to-actor: true

@@ -14,7 +14,7 @@ fn agent_info(_: ()) -> ExternResult<AgentInfo> {
 
 #[cfg(all(test, feature = "mock"))]
 pub mod test {
-    use ::fixt::prelude::*;
+    use fixt::prelude::*;
     use hdk::prelude::*;
 
     #[test]
@@ -26,7 +26,7 @@ pub mod test {
         mock_hdk
             .expect_create()
             .times(1)
-            .return_once(move |_| Ok(fixt!(HeaderHash)));
+            .return_once(move |_| Ok(fixt!(ActionHash)));
         mock_hdk
             .expect_agent_info()
             .with(hdk::prelude::mockall::predicate::eq(()))

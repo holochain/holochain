@@ -18,9 +18,9 @@ pub fn fake_dna_hash(name: u8) -> DnaHash {
     fake_holo_hash(name, hash_type::Dna::new())
 }
 
-/// A fixture HeaderHash for unit testing.
-pub fn fake_header_hash(name: u8) -> HeaderHash {
-    fake_holo_hash(name, hash_type::Header::new())
+/// A fixture ActionHash for unit testing.
+pub fn fake_action_hash(name: u8) -> ActionHash {
+    fake_holo_hash(name, hash_type::Action::new())
 }
 
 /// A fixture DhtOpHash for unit testing.

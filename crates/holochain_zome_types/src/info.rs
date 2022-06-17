@@ -1,8 +1,8 @@
 use crate::CapGrant;
 use crate::FunctionName;
 use crate::Timestamp;
+use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
-use holo_hash::HeaderHash;
 use holochain_serialized_bytes::prelude::*;
 
 pub use holochain_integrity_types::info::*;
@@ -18,14 +18,14 @@ pub struct AgentInfo {
     /// Same as the initial pubkey if it has never been changed.
     /// The agent can revoke an old key and replace it with a new one, the latest appears here.
     pub agent_latest_pubkey: AgentPubKey,
-    pub chain_head: (HeaderHash, u32, Timestamp),
+    pub chain_head: (ActionHash, u32, Timestamp),
 }
 
 impl AgentInfo {
     pub fn new(
         agent_initial_pubkey: AgentPubKey,
         agent_latest_pubkey: AgentPubKey,
-        chain_head: (HeaderHash, u32, Timestamp),
+        chain_head: (ActionHash, u32, Timestamp),
     ) -> Self {
         Self {
             agent_initial_pubkey,
@@ -44,6 +44,6 @@ pub struct CallInfo {
     pub function_name: FunctionName,
     /// Chain head as at the call start.
     /// This will not change within a call even if the chain is written to.
-    pub as_at: (HeaderHash, u32, Timestamp),
+    pub as_at: (ActionHash, u32, Timestamp),
     pub cap_grant: CapGrant,
 }

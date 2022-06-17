@@ -17,10 +17,10 @@ type TestDhtOpHashed = HoloHashed<TestDhtOp>;
 
 /// test struct
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, SerializedBytes)]
-struct TestHeader(String);
+struct TestAction(String);
 
 impl_hashable_content!(TestDhtOp, DhtOp);
-impl_hashable_content!(TestHeader, Header);
+impl_hashable_content!(TestAction, Action);
 
 #[tokio::test(flavor = "multi_thread")]
 async fn check_hashed_type() {
@@ -55,10 +55,10 @@ fn holo_hash_parse() {
         &format!("{:?}", h),
     );
 
-    let h = HeaderHash::try_from("uhCkkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm").unwrap();
+    let h = ActionHash::try_from("uhCkkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm").unwrap();
     assert_eq!(expected_loc, h.get_loc());
     assert_eq!(
-        "HeaderHash(uhCkkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm)",
+        "ActionHash(uhCkkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm)",
         &format!("{:?}", h),
     );
 
@@ -89,7 +89,7 @@ async fn agent_id_as_bytes() {
     tokio::task::spawn(async move {
         let hash = vec![0xdb; 32];
         let hash: &[u8] = &hash;
-        let agent_id = HeaderHash::from_raw_32(hash.to_vec());
+        let agent_id = ActionHash::from_raw_32(hash.to_vec());
         assert_eq!(hash, agent_id.get_bytes());
     })
     .await
@@ -99,7 +99,7 @@ async fn agent_id_as_bytes() {
 #[tokio::test(flavor = "multi_thread")]
 async fn agent_id_prehash_display() {
     tokio::task::spawn(async move {
-        let agent_id = HeaderHash::from_raw_32(vec![0xdb; 32]);
+        let agent_id = ActionHash::from_raw_32(vec![0xdb; 32]);
         assert_eq!(
             "uhCkk29vb29vb29vb29vb29vb29vb29vb29vb29vb29vb29uTp5Iv",
             &format!("{}", agent_id.to_string()),
@@ -111,17 +111,17 @@ async fn agent_id_prehash_display() {
 
 #[test]
 fn agent_id_try_parse() {
-    let agent_id: HeaderHash =
-        HeaderHash::try_from("uhCkkdwAAuHr_AKFTzF2vjvVzlkWTOxdAhqZ00jcBe9GZQs77BSjQ").unwrap();
+    let agent_id: ActionHash =
+        ActionHash::try_from("uhCkkdwAAuHr_AKFTzF2vjvVzlkWTOxdAhqZ00jcBe9GZQs77BSjQ").unwrap();
     assert_eq!(3_492_283_899, agent_id.get_loc());
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn agent_id_debug() {
     tokio::task::spawn(async move {
-        let agent_id = TestHeader("hi".to_string()).to_hash();
+        let agent_id = TestAction("hi".to_string()).to_hash();
         assert_eq!(
-            "HeaderHash(uhCkkdwAAuHr_AKFTzF2vjvVzlkWTOxdAhqZ00jcBe9GZQs77BSjQ)",
+            "ActionHash(uhCkkdwAAuHr_AKFTzF2vjvVzlkWTOxdAhqZ00jcBe9GZQs77BSjQ)",
             &format!("{:?}", agent_id),
         );
     })
@@ -132,7 +132,7 @@ async fn agent_id_debug() {
 #[tokio::test(flavor = "multi_thread")]
 async fn agent_id_display() {
     tokio::task::spawn(async move {
-        let agent_id = TestHeader("hi".to_string()).to_hash();
+        let agent_id = TestAction("hi".to_string()).to_hash();
         assert_eq!(
             "uhCkkdwAAuHr_AKFTzF2vjvVzlkWTOxdAhqZ00jcBe9GZQs77BSjQ",
             &format!("{}", agent_id.to_string()),
@@ -145,7 +145,7 @@ async fn agent_id_display() {
 #[tokio::test(flavor = "multi_thread")]
 async fn agent_id_loc() {
     tokio::task::spawn(async move {
-        let agent_id = TestHeader("hi".to_string()).to_hash();
+        let agent_id = TestAction("hi".to_string()).to_hash();
         assert_eq!(3_492_283_899, agent_id.get_loc());
     })
     .await

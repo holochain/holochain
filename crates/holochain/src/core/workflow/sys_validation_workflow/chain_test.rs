@@ -21,11 +21,11 @@ async fn sys_validation_agent_activity_test() {
     let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
     let ((cell_1,), (cell_2,)) = apps.into_tuples();
 
-    let a: HeaderHash = conductors[0]
+    let a: ActionHash = conductors[0]
         .call(&cell_1.zome("simple"), "create", ())
         .await;
 
-    let b: HeaderHash = conductors[0]
+    let b: ActionHash = conductors[0]
         .call(&cell_1.zome("simple"), "create", ())
         .await;
 
@@ -33,7 +33,7 @@ async fn sys_validation_agent_activity_test() {
         .dht_db()
         .async_commit(|txn| {
             DatabaseResult::Ok(txn.execute(
-                "UPDATE Header SET seq = 4 WHERE hash = ? OR hash = ?",
+                "UPDATE Action SET seq = 4 WHERE hash = ? OR hash = ?",
                 [a, b],
             )?)
         })

@@ -6,7 +6,7 @@ use holochain_types::dht_op::DhtOp;
 use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::dht_op::DhtOpType;
 use holochain_zome_types::Entry;
-use holochain_zome_types::SignedHeader;
+use holochain_zome_types::SignedAction;
 
 pub use crate::core::validation::DhtOpOrder;
 use crate::core::workflow::error::WorkflowResult;
@@ -31,15 +31,15 @@ async fn get_ops_to_validate(
 ) -> WorkflowResult<Vec<DhtOpHashed>> {
     let mut sql = "
         SELECT
-        Header.blob as header_blob,
+        Action.blob as action_blob,
         Entry.blob as entry_blob,
         DhtOp.type as dht_type,
         DhtOp.hash as dht_hash
         FROM DhtOp
         JOIN
-        Header ON DhtOp.header_hash = Header.hash
+        Action ON DhtOp.action_hash = Action.hash
         LEFT JOIN
-        Entry ON Header.entry_hash = Entry.hash
+        Entry ON Action.entry_hash = Entry.hash
         "
     .to_string();
     if system {
@@ -82,7 +82,7 @@ async fn get_ops_to_validate(
     db.async_reader(move |txn| {
         let mut stmt = txn.prepare(&sql)?;
         let r = stmt.query_and_then([], |row| {
-            let header = from_blob::<SignedHeader>(row.get("header_blob")?)?;
+            let action = from_blob::<SignedAction>(row.get("action_blob")?)?;
             let op_type: DhtOpType = row.get("dht_type")?;
             let hash: DhtOpHash = row.get("dht_hash")?;
             let entry: Option<Vec<u8>> = row.get("entry_blob")?;
@@ -91,7 +91,7 @@ async fn get_ops_to_validate(
                 None => None,
             };
             WorkflowResult::Ok(DhtOpHashed::with_pre_hashed(
-                DhtOp::from_type(op_type, header, entry)?,
+                DhtOp::from_type(op_type, action, entry)?,
                 hash,
             ))
         })?;
@@ -115,7 +115,7 @@ mod tests {
     use holochain_types::dht_op::DhtOpHashed;
     use holochain_types::dht_op::OpOrder;
     use holochain_zome_types::fixt::*;
-    use holochain_zome_types::Header;
+    use holochain_zome_types::Action;
     use holochain_zome_types::Signature;
     use holochain_zome_types::ValidationStatus;
     use holochain_zome_types::NOISE;
@@ -143,7 +143,7 @@ mod tests {
         // Sorted by OpOrder
         r_sorted.sort_by_key(|d| {
             let op_type = d.as_content().get_type();
-            let timestamp = d.as_content().header().timestamp();
+            let timestamp = d.as_content().action().timestamp();
             OpOrder::new(op_type, timestamp)
         });
         assert_eq!(r, r_sorted);
@@ -155,7 +155,7 @@ mod tests {
     fn create_and_insert_op(db: &DbWrite<DbKindDht>, facts: Facts) -> DhtOpHashed {
         let state = DhtOpHashed::from_content_sync(DhtOp::RegisterAgentActivity(
             fixt!(Signature),
-            fixt!(Header),
+            fixt!(Action),
         ));
 
         db.conn()
@@ -229,7 +229,7 @@ mod tests {
         let db = db.to_db();
         let op = DhtOpHashed::from_content_sync(DhtOp::RegisterAgentActivity(
             Signature::arbitrary(&mut u).unwrap(),
-            Header::arbitrary(&mut u).unwrap(),
+            Action::arbitrary(&mut u).unwrap(),
         ));
 
         db.async_commit(move |txn| {
