@@ -678,7 +678,7 @@ async fn check_and_hold<I: Into<AnyDhtHash> + Clone>(
     }
 }
 
-/// Make a StoreRecord DhtOp from an Record.
+/// Make a StoreRecord DhtOp from a Record.
 /// Note that this can fail if the op is missing an
 /// Entry when it was supposed to have one.
 ///
@@ -700,7 +700,7 @@ fn make_store_record(record: Record) -> Option<(DhtOpHash, DhtOp)> {
     Some((hash, op))
 }
 
-/// Make a StoreEntry DhtOp from an Record.
+/// Make a StoreEntry DhtOp from a Record.
 /// Note that this can fail if the op is missing an Entry or
 /// the action is the wrong type.
 ///
@@ -723,7 +723,7 @@ fn make_store_entry(record: Record) -> Option<(DhtOpHash, DhtOp)> {
     Some((hash, op))
 }
 
-/// Make a RegisterAddLink DhtOp from an Record.
+/// Make a RegisterAddLink DhtOp from a Record.
 /// Note that this can fail if the action is the wrong type
 ///
 /// Because adding ops to incoming limbo while we are checking them
@@ -743,7 +743,7 @@ fn make_register_add_link(record: Record) -> Option<(DhtOpHash, DhtOp)> {
     Some((hash, op))
 }
 
-/// Make a RegisterAgentActivity DhtOp from an Record.
+/// Make a RegisterAgentActivity DhtOp from a Record.
 /// Note that this can fail if the action is the wrong type
 ///
 /// Because adding ops to incoming limbo while we are checking them

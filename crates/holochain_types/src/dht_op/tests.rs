@@ -237,7 +237,7 @@ async fn test_all_ops() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_dht_basis() {
-    // Create a action that points to an entry
+    // Create an action that points to an entry
     let original_action = fixt!(Create);
     let expected_entry_hash: AnyDhtHash = original_action.entry_hash.clone().into();
 
