@@ -83,4 +83,17 @@ pub mod wasm_test {
 
         assert_ne!(&vec![0; LEN as usize], &output.to_vec());
     }
+
+    #[tokio::test(flavor = "multi_thread")]
+    /// we can get some random data out of the fn via. a wasm call
+    async fn ribosome_rand_random_bytes_test() {
+        observability::test_run().ok();
+        let RibosomeTestFixture {
+            conductor, alice, ..
+        } = RibosomeTestFixture::new(TestWasm::RandomBytes).await;
+        const LEN: u32 = 5;
+        let output: hdk::prelude::Bytes = conductor.call(&alice, "rand_random_bytes", LEN).await;
+
+        assert_ne!(&vec![0; LEN as usize], &output.to_vec());
+    }
 }
