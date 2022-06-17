@@ -6,9 +6,9 @@ use crate::test_utils::host_fn_caller::*;
 use crate::test_utils::new_invocation;
 use crate::test_utils::new_zome_call;
 use crate::test_utils::wait_for_integration;
+use holo_hash::ActionHash;
 use holo_hash::AnyDhtHash;
 use holo_hash::EntryHash;
-use holo_hash::HeaderHash;
 use holochain_state::prelude::fresh_reader_test;
 use holochain_state::prelude::from_blob;
 use holochain_state::prelude::StateQueryResult;
@@ -68,13 +68,13 @@ const SELECT: &'static str = "SELECT count(hash) FROM DhtOp WHERE";
 // These are the expected invalid ops
 fn expected_invalid_entry(
     txn: &Transaction,
-    invalid_header_hash: &HeaderHash,
+    invalid_action_hash: &ActionHash,
     invalid_entry_hash: &AnyDhtHash,
 ) -> bool {
     let sql = format!(
         "
         {}
-        type = :store_entry AND header_hash = :invalid_header_hash
+        type = :store_entry AND action_hash = :invalid_action_hash
             AND basis_hash = :invalid_entry_hash AND validation_status = :rejected
     ",
         SELECT
@@ -84,7 +84,7 @@ fn expected_invalid_entry(
         .query_row(
             &sql,
             named_params! {
-                ":invalid_header_hash": invalid_header_hash,
+                ":invalid_action_hash": invalid_action_hash,
                 ":invalid_entry_hash": invalid_entry_hash,
                 ":store_entry": DhtOpType::StoreEntry,
                 ":rejected": ValidationStatus::Rejected,
@@ -96,11 +96,11 @@ fn expected_invalid_entry(
 }
 
 // Now we expect an invalid link
-fn expected_invalid_link(txn: &Transaction, invalid_link_hash: &HeaderHash) -> bool {
+fn expected_invalid_link(txn: &Transaction, invalid_link_hash: &ActionHash) -> bool {
     let sql = format!(
         "
         {}
-        type = :create_link AND header_hash = :invalid_link_hash
+        type = :create_link AND action_hash = :invalid_link_hash
             AND validation_status = :rejected
     ",
         SELECT
@@ -121,11 +121,11 @@ fn expected_invalid_link(txn: &Transaction, invalid_link_hash: &HeaderHash) -> b
 }
 
 // Now we're trying to remove an invalid link
-fn expected_invalid_remove_link(txn: &Transaction, invalid_remove_hash: &HeaderHash) -> bool {
+fn expected_invalid_remove_link(txn: &Transaction, invalid_remove_hash: &ActionHash) -> bool {
     let sql = format!(
         "
         {}
-        (type = :delete_link AND header_hash = :invalid_remove_hash
+        (type = :delete_link AND action_hash = :invalid_remove_hash
             AND validation_status = :rejected)
     ",
         SELECT
@@ -159,9 +159,9 @@ fn limbo_is_empty(txn: &Transaction) -> bool {
 fn show_limbo(txn: &Transaction) -> Vec<DhtOpLight> {
     txn.prepare(
         "
-        SELECT DhtOp.type, Header.hash, Header.blob
+        SELECT DhtOp.type, Action.hash, Action.blob
         FROM DhtOp
-        JOIN Header ON DhtOp.header_hash = Header.hash
+        JOIN Action ON DhtOp.action_hash = Action.hash
         WHERE
         when_integrated IS NULL
     ",
@@ -169,9 +169,9 @@ fn show_limbo(txn: &Transaction) -> Vec<DhtOpLight> {
     .unwrap()
     .query_and_then([], |row| {
         let op_type: DhtOpType = row.get("type")?;
-        let hash: HeaderHash = row.get("hash")?;
-        let header: SignedHeader = from_blob(row.get("blob")?)?;
-        Ok(DhtOpLight::from_type(op_type, hash, &header.0)?)
+        let hash: ActionHash = row.get("hash")?;
+        let action: SignedAction = from_blob(row.get("blob")?)?;
+        Ok(DhtOpLight::from_type(op_type, hash, &action.0)?)
     })
     .unwrap()
     .collect::<StateQueryResult<Vec<DhtOpLight>>>()
@@ -221,7 +221,7 @@ async fn run_test(
         assert_eq!(num_valid(&txn), expected_count);
     });
 
-    let (invalid_header_hash, invalid_entry_hash) =
+    let (invalid_action_hash, invalid_entry_hash) =
         commit_invalid(&bob_cell_id, &conductors[1].handle(), dna_file).await;
     let invalid_entry_hash: AnyDhtHash = invalid_entry_hash.into();
 
@@ -239,7 +239,7 @@ async fn run_test(
 
         assert!(expected_invalid_entry(
             &txn,
-            &invalid_header_hash,
+            &invalid_action_hash,
             &invalid_entry_hash
         ));
         // Expect having one invalid op for the store entry.
@@ -262,7 +262,7 @@ async fn run_test(
 
         assert!(expected_invalid_entry(
             &txn,
-            &invalid_header_hash,
+            &invalid_action_hash,
             &invalid_entry_hash
         ));
         // Expect having one invalid op for the store entry.
@@ -276,7 +276,7 @@ async fn run_test(
         TestWasm::ValidateLink.coordinator_zome(),
     )
     .unwrap();
-    let invalid_link_hash: HeaderHash =
+    let invalid_link_hash: ActionHash =
         call_zome_directly(&bob_cell_id, &conductors[1].handle(), dna_file, invocation)
             .await
             .decode()
@@ -294,7 +294,7 @@ async fn run_test(
 
         assert!(expected_invalid_entry(
             &txn,
-            &invalid_header_hash,
+            &invalid_action_hash,
             &invalid_entry_hash
         ));
         assert!(expected_invalid_link(&txn, &invalid_link_hash));
@@ -323,7 +323,7 @@ async fn run_test(
 
         assert!(expected_invalid_entry(
             &txn,
-            &invalid_header_hash,
+            &invalid_action_hash,
             &invalid_entry_hash
         ));
         assert!(expected_invalid_link(&txn, &invalid_link_hash));
@@ -338,7 +338,7 @@ async fn run_test(
         TestWasm::ValidateLink.coordinator_zome(),
     )
     .unwrap();
-    let invalid_remove_hash: HeaderHash =
+    let invalid_remove_hash: ActionHash =
         call_zome_directly(&bob_cell_id, &conductors[1].handle(), dna_file, invocation)
             .await
             .decode()
@@ -356,7 +356,7 @@ async fn run_test(
 
         assert!(expected_invalid_entry(
             &txn,
-            &invalid_header_hash,
+            &invalid_action_hash,
             &invalid_entry_hash
         ));
         assert!(expected_invalid_link(&txn, &invalid_link_hash));
@@ -384,12 +384,12 @@ async fn run_test_entry_def_id(
     let num_attempts = 100;
     let delay_per_attempt = Duration::from_millis(100);
 
-    let (invalid_header_hash, invalid_entry_hash) =
+    let (invalid_action_hash, invalid_entry_hash) =
         commit_invalid_post(&bob_cell_id, &conductors[1].handle(), dna_file).await;
     let invalid_entry_hash: AnyDhtHash = invalid_entry_hash.into();
 
     // Integration should have 3 ops in it
-    // StoreEntry and StoreElement should be invalid.
+    // StoreEntry and StoreRecord should be invalid.
     let expected_count = 3 + expected_count;
     let alice_db = conductors[0].get_dht_db(&alice_cell_id.dna_hash()).unwrap();
     wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt).await;
@@ -401,7 +401,7 @@ async fn run_test_entry_def_id(
 
         assert!(expected_invalid_entry(
             &txn,
-            &invalid_header_hash,
+            &invalid_action_hash,
             &invalid_entry_hash
         ));
         // Expect having two invalid ops for the two store entries plus the 3 from the previous test.
@@ -415,12 +415,12 @@ async fn commit_invalid(
     bob_cell_id: &CellId,
     handle: &ConductorHandle,
     dna_file: &DnaFile,
-) -> (HeaderHash, EntryHash) {
+) -> (ActionHash, EntryHash) {
     let entry = ThisWasmEntry::NeverValidates;
     let entry_hash = EntryHash::with_data_sync(&Entry::try_from(entry.clone()).unwrap());
     let call_data = HostFnCaller::create(bob_cell_id, handle, dna_file).await;
     // 4
-    let invalid_header_hash = call_data
+    let invalid_action_hash = call_data
         .commit_entry(
             entry.clone().try_into().unwrap(),
             EntryDefIndex(0),
@@ -431,7 +431,7 @@ async fn commit_invalid(
     // Produce and publish these commits
     let triggers = handle.get_cell_triggers(&bob_cell_id).unwrap();
     triggers.publish_dht_ops.trigger(&"commit_invalid");
-    (invalid_header_hash, entry_hash)
+    (invalid_action_hash, entry_hash)
 }
 
 // Need to "hack holochain" because otherwise the invalid
@@ -440,7 +440,7 @@ async fn commit_invalid_post(
     bob_cell_id: &CellId,
     handle: &ConductorHandle,
     dna_file: &DnaFile,
-) -> (HeaderHash, EntryHash) {
+) -> (ActionHash, EntryHash) {
     // Bananas are not allowed
     let entry = Post("Banana".into());
     let entry_hash = EntryHash::with_data_sync(&Entry::try_from(entry.clone()).unwrap());
@@ -448,7 +448,7 @@ async fn commit_invalid_post(
     let call_data = HostFnCaller::create_for_zome(bob_cell_id, handle, dna_file, 2).await;
     let entry_index = call_data.get_entry_type(TestWasm::Create, POST_INDEX);
     // 9
-    let invalid_header_hash = call_data
+    let invalid_action_hash = call_data
         .commit_entry(
             entry.clone().try_into().unwrap(),
             entry_index,
@@ -459,7 +459,7 @@ async fn commit_invalid_post(
     // Produce and publish these commits
     let triggers = handle.get_cell_triggers(&bob_cell_id).unwrap();
     triggers.publish_dht_ops.trigger(&"commit_invalid_post");
-    (invalid_header_hash, entry_hash)
+    (invalid_action_hash, entry_hash)
 }
 
 async fn call_zome_directly(

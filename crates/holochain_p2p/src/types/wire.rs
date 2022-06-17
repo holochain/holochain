@@ -61,10 +61,10 @@ pub enum WireMessage {
         options: event::GetActivityOptions,
     },
     GetValidationPackage {
-        header_hash: HeaderHash,
+        action_hash: ActionHash,
     },
     CountersigningAuthorityResponse {
-        signed_headers: Vec<SignedHeader>,
+        signed_actions: Vec<SignedAction>,
     },
 }
 
@@ -140,11 +140,11 @@ impl WireMessage {
             options,
         }
     }
-    pub fn get_validation_package(header_hash: HeaderHash) -> WireMessage {
-        Self::GetValidationPackage { header_hash }
+    pub fn get_validation_package(action_hash: ActionHash) -> WireMessage {
+        Self::GetValidationPackage { action_hash }
     }
 
-    pub fn countersigning_authority_response(signed_headers: Vec<SignedHeader>) -> WireMessage {
-        Self::CountersigningAuthorityResponse { signed_headers }
+    pub fn countersigning_authority_response(signed_actions: Vec<SignedAction>) -> WireMessage {
+        Self::CountersigningAuthorityResponse { signed_actions }
     }
 }

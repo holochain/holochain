@@ -18,21 +18,17 @@ fn exists(path_string: String) -> ExternResult<bool> {
 
 #[hdk_extern]
 fn ensure(path_string: String) -> ExternResult<()> {
-    Path::from(path_string)
-        .typed(LinkTypes::Path)?
-        .ensure()
+    Path::from(path_string).typed(LinkTypes::Path)?.ensure()
 }
 
 #[hdk_extern]
-fn delete_link(delete_link: HeaderHash) -> ExternResult<HeaderHash> {
+fn delete_link(delete_link: ActionHash) -> ExternResult<ActionHash> {
     hdk::prelude::delete_link(delete_link)
 }
 
 #[hdk_extern]
 fn children(path_string: String) -> ExternResult<Vec<Link>> {
-    Path::from(path_string)
-        .typed(LinkTypes::Path)?
-        .children()
+    Path::from(path_string).typed(LinkTypes::Path)?.children()
 }
 
 #[hdk_extern]

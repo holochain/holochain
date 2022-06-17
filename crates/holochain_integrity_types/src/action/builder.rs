@@ -1,57 +1,57 @@
 use super::EntryType;
 use super::Timestamp;
-use crate::header;
+use crate::action;
 use crate::link::LinkTag;
 use crate::link::LinkType;
+use crate::ActionUnweighed;
+use crate::ActionWeighed;
 use crate::EntryRateWeight;
-use crate::HeaderUnweighed;
-use crate::HeaderWeighed;
 use crate::MembraneProof;
 use crate::RateWeight;
-use header::Dna;
+use action::Dna;
+use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holo_hash::AnyLinkableHash;
 use holo_hash::DnaHash;
 use holo_hash::EntryHash;
-use holo_hash::HeaderHash;
 
 #[derive(Clone, Debug)]
-pub struct HeaderBuilderCommon {
+pub struct ActionBuilderCommon {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
-    pub header_seq: u32,
-    pub prev_header: HeaderHash,
+    pub action_seq: u32,
+    pub prev_action: ActionHash,
 }
 
-impl HeaderBuilderCommon {
+impl ActionBuilderCommon {
     pub fn new(
         author: AgentPubKey,
         timestamp: Timestamp,
-        header_seq: u32,
-        prev_header: HeaderHash,
+        action_seq: u32,
+        prev_action: ActionHash,
     ) -> Self {
         Self {
             author,
             timestamp,
-            header_seq,
-            prev_header,
+            action_seq,
+            prev_action,
         }
     }
 }
 
-/// Builder for non-genesis Headers
+/// Builder for non-genesis Actions
 ///
-/// SourceChain::put takes one of these rather than a raw Header, so that it
-/// can inject the proper values via `HeaderBuilderCommon`, rather than requiring
-/// surrounding code to construct a proper Header outside of the context of
+/// SourceChain::put takes one of these rather than a raw Action, so that it
+/// can inject the proper values via `ActionBuilderCommon`, rather than requiring
+/// surrounding code to construct a proper Action outside of the context of
 /// the SourceChain.
 ///
-/// This builder does not build pre-genesis Headers, because prior to genesis
+/// This builder does not build pre-genesis Actions, because prior to genesis
 /// there is no Agent associated with the source chain, and also the fact that
-/// the Dna header has no prev_entry causes a special case that need not be
+/// the Dna action has no prev_entry causes a special case that need not be
 /// dealt with. SourceChain::genesis already handles genesis in one fell swoop.
-pub trait HeaderBuilder<U: HeaderUnweighed>: Sized {
-    fn build(self, common: HeaderBuilderCommon) -> U;
+pub trait ActionBuilder<U: ActionUnweighed>: Sized {
+    fn build(self, common: ActionBuilderCommon) -> U;
 }
 
 macro_rules! builder_variant {
@@ -77,73 +77,73 @@ macro_rules! builder_variant {
             }
         }
 
-        impl HeaderBuilder<header::$name<()>> for $name {
-            fn build(self, common: HeaderBuilderCommon) -> header::$name<()> {
-                let HeaderBuilderCommon {
+        impl ActionBuilder<action::$name<()>> for $name {
+            fn build(self, common: ActionBuilderCommon) -> action::$name<()> {
+                let ActionBuilderCommon {
                     author,
                     timestamp,
-                    header_seq,
-                    prev_header,
+                    action_seq,
+                    prev_action,
                 } = common;
 
-                header::$name {
+                action::$name {
                     weight: (),
                     author,
                     timestamp,
-                    header_seq,
-                    prev_header,
+                    action_seq,
+                    prev_action,
                     $($field : self.$field,)*
                 }
             }
         }
 
 
-        impl HeaderWeighed for header::$name {
-            type Unweighed = header::$name<()>;
+        impl ActionWeighed for action::$name {
+            type Unweighed = action::$name<()>;
             type Weight = $weight;
 
-            fn into_header(self) -> header::Header {
-                header::Header::$name(self)
+            fn into_action(self) -> action::Action {
+                action::Action::$name(self)
             }
 
-            fn unweighed(self) -> header::$name<()> {
-                header::$name::<()> {
+            fn unweighed(self) -> action::$name<()> {
+                action::$name::<()> {
                     weight: (),
                     author: self.author,
                     timestamp: self.timestamp,
-                    header_seq: self.header_seq,
-                    prev_header: self.prev_header,
+                    action_seq: self.action_seq,
+                    prev_action: self.prev_action,
                     $($field: self.$field),*
                 }
             }
         }
 
-        impl HeaderUnweighed for header::$name<()> {
-            type Weighed = header::$name;
+        impl ActionUnweighed for action::$name<()> {
+            type Weighed = action::$name;
             type Weight = $weight;
 
-            fn weighed(self, weight: $weight) -> header::$name {
-                header::$name {
+            fn weighed(self, weight: $weight) -> action::$name {
+                action::$name {
                     weight,
                     author: self.author,
                     timestamp: self.timestamp,
-                    header_seq: self.header_seq,
-                    prev_header: self.prev_header,
+                    action_seq: self.action_seq,
+                    prev_action: self.prev_action,
                     $($field: self.$field),*
                 }
             }
         }
 
 
-        // impl From<($name, HeaderBuilderCommon)> for header::$name {
-        //     fn from((n, h): ($name, HeaderBuilderCommon)) -> header::$name {
+        // impl From<($name, ActionBuilderCommon)> for action::$name {
+        //     fn from((n, h): ($name, ActionBuilderCommon)) -> action::$name {
         //         n.build(h)
         //     }
         // }
 
         #[cfg(feature = "test_utils")]
-        impl header::$name {
-            pub fn from_builder(common: HeaderBuilderCommon, $($field : $t),*) -> Self {
+        impl action::$name {
+            pub fn from_builder(common: ActionBuilderCommon, $($field : $t),*) -> Self {
                 let builder = $name {
                     $($field,)*
                 };
@@ -178,12 +178,12 @@ macro_rules! builder_variant {
             }
         }
 
-        impl HeaderWeighed for header::$name {
-            type Unweighed = header::$name;
+        impl ActionWeighed for action::$name {
+            type Unweighed = action::$name;
             type Weight = ();
 
-            fn into_header(self) -> header::Header {
-                header::Header::$name(self)
+            fn into_action(self) -> action::Action {
+                action::Action::$name(self)
             }
 
             fn unweighed(self) -> Self::Unweighed {
@@ -192,44 +192,44 @@ macro_rules! builder_variant {
 
         }
 
-        impl HeaderUnweighed for header::$name {
-            type Weighed = header::$name;
+        impl ActionUnweighed for action::$name {
+            type Weighed = action::$name;
             type Weight = ();
 
-            fn weighed(self, _weight: ()) -> header::$name {
+            fn weighed(self, _weight: ()) -> action::$name {
                 self
             }
         }
 
-        impl HeaderBuilder<header::$name> for $name {
-            fn build(self, common: HeaderBuilderCommon) -> header::$name {
-                let HeaderBuilderCommon {
+        impl ActionBuilder<action::$name> for $name {
+            fn build(self, common: ActionBuilderCommon) -> action::$name {
+                let ActionBuilderCommon {
                     author,
                     timestamp,
-                    header_seq,
-                    prev_header,
+                    action_seq,
+                    prev_action,
                 } = common;
 
-                header::$name {
+                action::$name {
                     author,
                     timestamp,
-                    header_seq,
-                    prev_header,
+                    action_seq,
+                    prev_action,
                     $($field : self.$field,)*
                     $( $($dfield : self.$dfield),* )?
                 }
             }
         }
 
-        impl From<($name, HeaderBuilderCommon)> for header::$name {
-            fn from((n, h): ($name, HeaderBuilderCommon)) -> header::$name {
+        impl From<($name, ActionBuilderCommon)> for action::$name {
+            fn from((n, h): ($name, ActionBuilderCommon)) -> action::$name {
                 n.build(h)
             }
         }
 
         #[cfg(feature = "test_utils")]
-        impl header::$name {
-            pub fn from_builder(common: HeaderBuilderCommon, $($field : $t),*) -> Self {
+        impl action::$name {
+            pub fn from_builder(common: ActionBuilderCommon, $($field : $t),*) -> Self {
                 let builder = $name {
                     $($field,)*
                     $( $($dfield : Default::default()),* )?
@@ -251,7 +251,7 @@ builder_variant!(CreateLink<RateWeight> {
 });
 
 builder_variant!(DeleteLink {
-    link_add_address: HeaderHash,
+    link_add_address: ActionHash,
     base_address: AnyLinkableHash,
 });
 
@@ -270,14 +270,14 @@ builder_variant!(Create<EntryRateWeight> {
 
 builder_variant!(Update<EntryRateWeight> {
     original_entry_address: EntryHash,
-    original_header_address: HeaderHash,
+    original_action_address: ActionHash,
 
     entry_type: EntryType,
     entry_hash: EntryHash,
 });
 
 builder_variant!(Delete<RateWeight> {
-    deletes_address: HeaderHash,
+    deletes_address: ActionHash,
     deletes_entry_address: EntryHash,
 });
 
@@ -285,11 +285,11 @@ builder_variant!(AgentValidationPkg {
     membrane_proof: Option<MembraneProof>,
 });
 
-/// The Dna header can't implement HeaderBuilder because it lacks a
-/// `prev_header` field, so this helper is provided as a special case
+/// The Dna action can't implement ActionBuilder because it lacks a
+/// `prev_action` field, so this helper is provided as a special case
 #[cfg(feature = "test_utils")]
 impl Dna {
-    pub fn from_builder(hash: DnaHash, builder: HeaderBuilderCommon) -> Self {
+    pub fn from_builder(hash: DnaHash, builder: ActionBuilderCommon) -> Self {
         Self {
             author: builder.author,
             timestamp: builder.timestamp,
@@ -300,12 +300,12 @@ impl Dna {
 
 // some more manual implementations for Dna
 
-impl HeaderWeighed for Dna {
+impl ActionWeighed for Dna {
     type Unweighed = Dna;
     type Weight = ();
 
-    fn into_header(self) -> header::Header {
-        header::Header::Dna(self)
+    fn into_action(self) -> action::Action {
+        action::Action::Dna(self)
     }
 
     fn unweighed(self) -> Self::Unweighed {
@@ -313,7 +313,7 @@ impl HeaderWeighed for Dna {
     }
 }
 
-impl HeaderUnweighed for Dna {
+impl ActionUnweighed for Dna {
     type Weighed = Dna;
     type Weight = ();
 

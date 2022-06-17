@@ -54,8 +54,8 @@ async fn authored_test() {
         let basis: AnyDhtHash = entry_hash.clone().into();
         let has_authored_entry: bool = txn
             .query_row(
-                "SELECT EXISTS(SELECT 1 FROM DhtOp JOIN Header ON DhtOp.header_hash = Header.hash
-                    WHERE basis_hash = :hash AND Header.author = :author)",
+                "SELECT EXISTS(SELECT 1 FROM DhtOp JOIN Action ON DhtOp.action_hash = Action.hash
+                    WHERE basis_hash = :hash AND Action.author = :author)",
                 named_params! {
                     ":hash": basis,
                     ":author": alice_call_data.cell_id.agent_pubkey(),
@@ -83,8 +83,8 @@ async fn authored_test() {
         let basis: AnyDhtHash = entry_hash.clone().into();
         let has_authored_entry: bool = txn
             .query_row(
-                "SELECT EXISTS(SELECT 1 FROM DhtOp JOIN Header ON DhtOp.header_hash = Header.hash
-                    WHERE basis_hash = :hash AND Header.author = :author)",
+                "SELECT EXISTS(SELECT 1 FROM DhtOp JOIN Action ON DhtOp.action_hash = Action.hash
+                    WHERE basis_hash = :hash AND Action.author = :author)",
                 named_params! {
                     ":hash": basis,
                     ":author": bob_call_data.cell_id.agent_pubkey(),
@@ -127,8 +127,8 @@ async fn authored_test() {
         let basis: AnyDhtHash = entry_hash.clone().into();
         let has_authored_entry: bool = txn
             .query_row(
-                "SELECT EXISTS(SELECT 1 FROM DhtOp JOIN Header ON DhtOp.header_hash = Header.hash
-                    WHERE basis_hash = :hash AND Header.author = :author)",
+                "SELECT EXISTS(SELECT 1 FROM DhtOp JOIN Action ON DhtOp.action_hash = Action.hash
+                    WHERE basis_hash = :hash AND Action.author = :author)",
                 named_params! {
                     ":hash": basis,
                     ":author": bob_call_data.cell_id.agent_pubkey(),
