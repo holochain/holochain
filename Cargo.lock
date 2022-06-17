@@ -1881,6 +1881,7 @@ dependencies = [
 [[package]]
 name = "hc_seed_bundle"
 version = "0.1.2"
+source = "git+https://github.com/holochain/lair.git?branch=secretbox#a21c49be3a87e46b3fe968ab309f99299454e05c"
 dependencies = [
  "futures",
  "one_err",
@@ -3134,6 +3135,7 @@ dependencies = [
 [[package]]
 name = "lair_keystore_api"
 version = "0.0.11"
+source = "git+https://github.com/holochain/lair.git?branch=release-0.0.x-bump-sodoken#9e22964464021ad422a475efbff92b2d87906c9b"
 dependencies = [
  "arbitrary",
  "blake2b_simd 0.5.11",
@@ -3164,6 +3166,7 @@ dependencies = [
 [[package]]
 name = "lair_keystore_api"
 version = "0.2.0"
+source = "git+https://github.com/holochain/lair.git?branch=secretbox#a21c49be3a87e46b3fe968ab309f99299454e05c"
 dependencies = [
  "base64",
  "dunce",
@@ -3186,6 +3189,7 @@ dependencies = [
 [[package]]
 name = "lair_keystore_client"
 version = "0.0.11"
+source = "git+https://github.com/holochain/lair.git?branch=release-0.0.x-bump-sodoken#9e22964464021ad422a475efbff92b2d87906c9b"
 dependencies = [
  "futures",
  "ghost_actor 0.3.0-alpha.4",
@@ -5677,9 +5681,9 @@ dependencies = [
 
 [[package]]
 name = "sodoken"
-version = "0.0.3"
+version = "0.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3dbca8105a18acd5a470c8fba038ae5ebb98f480ca733f6f8a36985c762d1d43"
+checksum = "55a56bf1094466dc909027680d3974e4a73c1fe5aa7fa116a43c71c37decb699"
 dependencies = [
  "libc",
  "libsodium-sys-stable",

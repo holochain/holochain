@@ -65,8 +65,11 @@ codegen-units = 16
 # observability = { git = "https://github.com/freesig/observability.git", branch = "main" }
 # ghost_actor = { path = "../ghost_actor/crates/ghost_actor" }
 # ghost_actor = { git = "https://github.com/holochain/ghost_actor.git", branch = "add_observability" }
-lair_keystore_api = { path = "../lair/crates/lair_keystore_api" }
-lair_keystore_api_0_0 = { path = "../lair_0_0/crates/lair_keystore_api", package = "lair_keystore_api" }
-lair_keystore_client_0_0 = { path = "../lair_0_0/crates/lair_keystore_client", package = "lair_keystore_client" }
+#lair_keystore_api = { path = "../lair/crates/lair_keystore_api" }
+#lair_keystore_api_0_0 = { path = "../lair_0_0/crates/lair_keystore_api", package = "lair_keystore_api" }
+#lair_keystore_client_0_0 = { path = "../lair_0_0/crates/lair_keystore_client", package = "lair_keystore_client" }
+lair_keystore_api = { git = "https://github.com/holochain/lair.git", branch = "secretbox" }
+lair_keystore_api_0_0 = { git = "https://github.com/holochain/lair.git", branch = "release-0.0.x-bump-sodoken", package = "lair_keystore_api" }
+lair_keystore_client_0_0 = { git = "https://github.com/holochain/lair.git", branch = "release-0.0.x-bump-sodoken", package = "lair_keystore_client" }
 # observability = { path = "../../rust/observability" }
 # r2d2_sqlite = { path = "../r2d2-sqlite" }
