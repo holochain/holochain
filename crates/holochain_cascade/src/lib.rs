@@ -8,10 +8,10 @@ use std::sync::Arc;
 
 use error::CascadeResult;
 use holo_hash::hash_type::AnyDht;
+use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holo_hash::AnyDhtHash;
 use holo_hash::EntryHash;
-use holo_hash::HeaderHash;
 use holochain_p2p::actor::GetActivityOptions;
 use holochain_p2p::actor::GetLinksOptions;
 use holochain_p2p::actor::GetOptions as NetworkGetOptions;
@@ -22,19 +22,19 @@ use holochain_state::host_fn_workspace::HostFnStores;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::mutations::set_validation_status;
 use holochain_state::prelude::*;
-use holochain_state::query::element_details::GetElementDetailsQuery;
 use holochain_state::query::entry_details::GetEntryDetailsQuery;
 use holochain_state::query::link::GetLinksQuery;
 use holochain_state::query::link_details::GetLinkDetailsQuery;
-use holochain_state::query::live_element::GetLiveElementQuery;
 use holochain_state::query::live_entry::GetLiveEntryQuery;
+use holochain_state::query::live_record::GetLiveRecordQuery;
+use holochain_state::query::record_details::GetRecordDetailsQuery;
 use holochain_state::query::DbScratch;
 use holochain_state::query::PrivateDataQuery;
 use holochain_state::query::StateQueryError;
 use holochain_state::scratch::SyncScratch;
 use holochain_types::prelude::*;
+use mutations::insert_action;
 use mutations::insert_entry;
-use mutations::insert_header;
 use mutations::insert_op_lite;
 use tracing::*;
 
@@ -201,12 +201,12 @@ where
         let RenderedOp {
             op_light,
             op_hash,
-            header,
+            action,
             validation_status,
         } = op;
-        let op_order = OpOrder::new(op_light.get_type(), header.header().timestamp());
-        let timestamp = header.header().timestamp();
-        insert_header(txn, header)?;
+        let op_order = OpOrder::new(op_light.get_type(), action.action().timestamp());
+        let timestamp = action.action().timestamp();
+        insert_action(txn, action)?;
         insert_op_lite(txn, op_light, op_hash, &op_order, &timestamp)?;
         if let Some(status) = validation_status {
             set_validation_status(txn, op_hash, *status)?;
@@ -261,7 +261,7 @@ where
     }
 
     #[instrument(skip(self, options))]
-    pub async fn fetch_element(
+    pub async fn fetch_record(
         &mut self,
         hash: AnyDhtHash,
         options: NetworkGetOptions,
@@ -269,7 +269,7 @@ where
         let network = ok_or_return!(self.network.as_mut());
         let results = network
             .get(hash, options.clone())
-            .instrument(debug_span!("fetch_element::network_get"))
+            .instrument(debug_span!("fetch_record::network_get"))
             .await?;
 
         self.merge_ops_into_cache(results).await?;
@@ -296,14 +296,14 @@ where
         agent: AgentPubKey,
         query: ChainQueryFilter,
         options: GetActivityOptions,
-    ) -> CascadeResult<Vec<AgentActivityResponse<HeaderHash>>> {
+    ) -> CascadeResult<Vec<AgentActivityResponse<ActionHash>>> {
         let network = ok_or_return!(self.network.as_mut(), Vec::with_capacity(0));
         Ok(network.get_agent_activity(agent, query, options).await?)
     }
 
     async fn cascading<Q>(&mut self, query: Q) -> CascadeResult<Q::Output>
     where
-        Q: Query<Item = Judged<SignedHeaderHashed>> + Send + 'static,
+        Q: Query<Item = Judged<SignedActionHashed>> + Send + 'static,
         <Q as holochain_state::prelude::Query>::Output: Send + 'static,
     {
         let mut conns: Vec<(_, Box<dyn PermittedConn + Send>)> = Vec::with_capacity(3);
@@ -412,7 +412,7 @@ where
             return Ok(result.map(EntryHashed::from_content_sync));
         }
         options.request_type = holochain_p2p::event::GetRequest::Pending;
-        self.fetch_element(hash.clone().into(), options).await?;
+        self.fetch_record(hash.clone().into(), options).await?;
 
         // Check if we have the data now after the network call.
         let private_data = self.private_data.clone();
@@ -430,28 +430,28 @@ where
         Ok(result.map(EntryHashed::from_content_sync))
     }
 
-    /// Retrieve [`SignedHeaderHashed`] from either locally or from an authority.
+    /// Retrieve [`SignedActionHashed`] from either locally or from an authority.
     /// Data might not have been validated yet by the authority.
-    pub async fn retrieve_header(
+    pub async fn retrieve_action(
         &mut self,
-        hash: HeaderHash,
+        hash: ActionHash,
         mut options: NetworkGetOptions,
-    ) -> CascadeResult<Option<SignedHeaderHashed>> {
+    ) -> CascadeResult<Option<SignedActionHashed>> {
         let result = self
             .find_map({
                 let hash = hash.clone();
-                move |store| Ok(store.get_header(&hash)?)
+                move |store| Ok(store.get_action(&hash)?)
             })
             .await?;
         if result.is_some() {
             return Ok(result);
         }
         options.request_type = holochain_p2p::event::GetRequest::Pending;
-        self.fetch_element(hash.clone().into(), options).await?;
+        self.fetch_record(hash.clone().into(), options).await?;
 
         // Check if we have the data now after the network call.
         let result = self
-            .find_map(move |store| Ok(store.get_header(&hash)?))
+            .find_map(move |store| Ok(store.get_action(&hash)?))
             .await?;
         Ok(result)
     }
@@ -462,13 +462,13 @@ where
         &mut self,
         hash: AnyDhtHash,
         mut options: NetworkGetOptions,
-    ) -> CascadeResult<Option<Element>> {
+    ) -> CascadeResult<Option<Record>> {
         let private_data = self.private_data.clone();
         let result = self
             .find_map({
                 let hash = hash.clone();
                 move |store| {
-                    Ok(store.get_public_or_authored_element(
+                    Ok(store.get_public_or_authored_record(
                         &hash,
                         private_data.as_ref().map(|a| a.as_ref()),
                     )?)
@@ -479,13 +479,13 @@ where
             return Ok(result);
         }
         options.request_type = holochain_p2p::event::GetRequest::Pending;
-        self.fetch_element(hash.clone(), options).await?;
+        self.fetch_record(hash.clone(), options).await?;
 
         let private_data = self.private_data.clone();
         // Check if we have the data now after the network call.
         let result = self
             .find_map(move |store| {
-                Ok(store.get_public_or_authored_element(
+                Ok(store.get_public_or_authored_record(
                     &hash,
                     private_data.as_ref().map(|a| a.as_ref()),
                 )?)
@@ -521,8 +521,7 @@ where
         // If we are not in the process of authoring this hash or its
         // authority we need a network call.
         if !(authoring || authority) {
-            self.fetch_element(entry_hash.into(), options.into())
-                .await?;
+            self.fetch_record(entry_hash.into(), options.into()).await?;
         }
 
         // Check if we have the data now after the network call.
@@ -531,17 +530,17 @@ where
     }
 
     #[instrument(skip(self, options))]
-    pub async fn get_header_details(
+    pub async fn get_action_details(
         &mut self,
-        header_hash: HeaderHash,
+        action_hash: ActionHash,
         options: GetOptions,
-    ) -> CascadeResult<Option<ElementDetails>> {
-        let authoring = self.am_i_authoring(&header_hash.clone().into())?;
-        let authority = self.am_i_an_authority(header_hash.clone().into()).await?;
-        let query: GetElementDetailsQuery =
-            self.construct_query_with_data_access(header_hash.clone());
+    ) -> CascadeResult<Option<RecordDetails>> {
+        let authoring = self.am_i_authoring(&action_hash.clone().into())?;
+        let authority = self.am_i_an_authority(action_hash.clone().into()).await?;
+        let query: GetRecordDetailsQuery =
+            self.construct_query_with_data_access(action_hash.clone());
 
-        // DESIGN: we can short circuit if we have any local deletes on a header.
+        // DESIGN: we can short circuit if we have any local deletes on an action.
         // Is this bad because we will not go back to the network until our
         // cache is cleared. Could someone create an attack based on this fact?
 
@@ -562,7 +561,7 @@ where
         // If we are not in the process of authoring this hash or its
         // authority we need a network call.
         if !(authoring || authority) {
-            self.fetch_element(header_hash.into(), options.into())
+            self.fetch_record(action_hash.into(), options.into())
                 .await?;
         }
 
@@ -572,20 +571,20 @@ where
     }
 
     #[instrument(skip(self, options))]
-    /// Returns the [Element] for this [HeaderHash] if it is live
+    /// Returns the [Record] for this [ActionHash] if it is live
     /// by getting the latest available metadata from authorities
     /// combined with this agents authored data.
-    /// _Note: Deleted headers are a tombstone set_
-    pub async fn dht_get_header(
+    /// _Note: Deleted actions are a tombstone set_
+    pub async fn dht_get_action(
         &mut self,
-        header_hash: HeaderHash,
+        action_hash: ActionHash,
         options: GetOptions,
-    ) -> CascadeResult<Option<Element>> {
-        let authoring = self.am_i_authoring(&header_hash.clone().into())?;
-        let authority = self.am_i_an_authority(header_hash.clone().into()).await?;
-        let query: GetLiveElementQuery = self.construct_query_with_data_access(header_hash.clone());
+    ) -> CascadeResult<Option<Record>> {
+        let authoring = self.am_i_authoring(&action_hash.clone().into())?;
+        let authority = self.am_i_an_authority(action_hash.clone().into()).await?;
+        let query: GetLiveRecordQuery = self.construct_query_with_data_access(action_hash.clone());
 
-        // DESIGN: we can short circuit if we have any local deletes on a header.
+        // DESIGN: we can short circuit if we have any local deletes on an action.
         // Is this bad because we will not go back to the network until our
         // cache is cleared. Could someone create an attack based on this fact?
 
@@ -606,7 +605,7 @@ where
         // If we are not in the process of authoring this hash or its
         // authority we need a network call.
         if !(authoring || authority) {
-            self.fetch_element(header_hash.into(), options.into())
+            self.fetch_record(action_hash.into(), options.into())
                 .await?;
         }
 
@@ -616,13 +615,13 @@ where
     }
 
     #[instrument(skip(self, options))]
-    /// Returns the oldest live [Element] for this [EntryHash] by getting the
+    /// Returns the oldest live [Record] for this [EntryHash] by getting the
     /// latest available metadata from authorities combined with this agents authored data.
     pub async fn dht_get_entry(
         &mut self,
         entry_hash: EntryHash,
         options: GetOptions,
-    ) -> CascadeResult<Option<Element>> {
+    ) -> CascadeResult<Option<Record>> {
         let authoring = self.am_i_authoring(&entry_hash.clone().into())?;
         let authority = self.am_i_an_authority(entry_hash.clone().into()).await?;
         let query: GetLiveEntryQuery = self.construct_query_with_data_access(entry_hash.clone());
@@ -644,8 +643,7 @@ where
         // If we are not in the process of authoring this hash or its
         // authority we need a network call.
         if !(authoring || authority) {
-            self.fetch_element(entry_hash.into(), options.into())
-                .await?;
+            self.fetch_record(entry_hash.into(), options.into()).await?;
         }
 
         // Check if we have the data now after the network call.
@@ -657,7 +655,7 @@ where
         &mut self,
         hashes: I,
         options: GetOptions,
-    ) -> CascadeResult<Vec<Option<Element>>> {
+    ) -> CascadeResult<Vec<Option<Record>>> {
         use futures::stream::StreamExt;
         use futures::stream::TryStreamExt;
         let iter = hashes.into_iter().map({
@@ -682,10 +680,10 @@ where
         &mut self,
         hash: AnyDhtHash,
         options: GetOptions,
-    ) -> CascadeResult<Option<Element>> {
+    ) -> CascadeResult<Option<Record>> {
         match *hash.hash_type() {
             AnyDht::Entry => self.dht_get_entry(hash.into(), options).await,
-            AnyDht::Header => self.dht_get_header(hash.into(), options).await,
+            AnyDht::Action => self.dht_get_action(hash.into(), options).await,
         }
     }
 
@@ -700,10 +698,10 @@ where
                 .get_entry_details(hash.into(), options)
                 .await?
                 .map(Details::Entry)),
-            AnyDht::Header => Ok(self
-                .get_header_details(hash.into(), options)
+            AnyDht::Action => Ok(self
+                .get_action_details(hash.into(), options)
                 .await?
-                .map(Details::Element)),
+                .map(Details::Record)),
         }
     }
 
@@ -725,13 +723,13 @@ where
     }
 
     #[instrument(skip(self, key, options))]
-    /// Return all CreateLink headers
-    /// and DeleteLink headers ordered by time.
+    /// Return all CreateLink actions
+    /// and DeleteLink actions ordered by time.
     pub async fn get_link_details(
         &mut self,
         key: WireLinkKey,
         options: GetLinksOptions,
-    ) -> CascadeResult<Vec<(SignedHeaderHashed, Vec<SignedHeaderHashed>)>> {
+    ) -> CascadeResult<Vec<(SignedActionHashed, Vec<SignedActionHashed>)>> {
         let authority = self.am_i_an_authority(key.base.clone().into()).await?;
         if !authority {
             self.fetch_links(key.clone(), options).await?;
@@ -747,17 +745,17 @@ where
     /// Options:
     /// - include_valid_activity will include the valid chain hashes.
     /// - include_rejected_activity will include the invalid chain hashes.
-    /// - include_full_headers will fetch the valid headers in parallel (requires include_valid_activity)
+    /// - include_full_actions will fetch the valid actions in parallel (requires include_valid_activity)
     /// Query:
-    /// - include_entries will also fetch the entries in parallel (requires include_full_headers)
+    /// - include_entries will also fetch the entries in parallel (requires include_full_actions)
     /// - sequence_range will get all the activity in the exclusive range
-    /// - header_type and entry_type will filter the activity (requires include_full_headers)
+    /// - action_type and entry_type will filter the activity (requires include_full_actions)
     pub async fn get_agent_activity(
         &mut self,
         agent: AgentPubKey,
         query: ChainQueryFilter,
         options: GetActivityOptions,
-    ) -> CascadeResult<AgentActivityResponse<Element>> {
+    ) -> CascadeResult<AgentActivityResponse<Record>> {
         let status_only = !options.include_rejected_activity && !options.include_valid_activity;
         // DESIGN: Evaluate if it's ok to **not** go to another authority for agent activity?
         let authority = self.am_i_an_authority(agent.clone().into()).await?;
@@ -765,7 +763,7 @@ where
             let results = self
                 .fetch_agent_activity(agent.clone(), query.clone(), options.clone())
                 .await?;
-            let merged_response: AgentActivityResponse<HeaderHash> =
+            let merged_response: AgentActivityResponse<ActionHash> =
                 agent_activity::merge_activities(agent.clone(), &options, results)?;
             merged_response
         } else {
@@ -797,12 +795,12 @@ where
             return Ok(AgentActivityResponse::status_only(merged_response));
         }
 
-        // If they don't want the full headers then just return the hashes.
-        if !options.include_full_headers {
+        // If they don't want the full actions then just return the hashes.
+        if !options.include_full_actions {
             return Ok(AgentActivityResponse::hashes_only(merged_response));
         }
 
-        // If they need the full headers then we will do concurrent gets.
+        // If they need the full actions then we will do concurrent gets.
         let AgentActivityResponse {
             agent,
             valid_activity,
@@ -812,7 +810,7 @@ where
         } = merged_response;
         let valid_activity = match valid_activity {
             ChainItems::Hashes(hashes) => {
-                // If we can't get one of the headers then don't return any.
+                // If we can't get one of the actions then don't return any.
                 // DESIGN: Is this the correct choice?
                 let maybe_chain: Option<Vec<_>> = self
                     .get_concurrent(
@@ -824,7 +822,7 @@ where
                     .collect();
                 match maybe_chain {
                     Some(mut chain) => {
-                        chain.sort_unstable_by_key(|el| el.header().header_seq());
+                        chain.sort_unstable_by_key(|el| el.action().action_seq());
                         ChainItems::Full(chain)
                     }
                     None => ChainItems::Full(Vec::with_capacity(0)),
@@ -835,7 +833,7 @@ where
         };
         let rejected_activity = match rejected_activity {
             ChainItems::Hashes(hashes) => {
-                // If we can't get one of the headers then don't return any.
+                // If we can't get one of the actions then don't return any.
                 // DESIGN: Is this the correct choice?
                 let maybe_chain: Option<Vec<_>> = self
                     .get_concurrent(
@@ -847,7 +845,7 @@ where
                     .collect();
                 match maybe_chain {
                     Some(mut chain) => {
-                        chain.sort_unstable_by_key(|el| el.header().header_seq());
+                        chain.sort_unstable_by_key(|el| el.action().action_seq());
                         ChainItems::Full(chain)
                     }
                     None => ChainItems::Full(Vec::with_capacity(0)),
@@ -870,15 +868,15 @@ where
     /// Get the validation package if it is cached without going to the network
     pub fn get_validation_package_local(
         &self,
-        _hash: &HeaderHash,
-    ) -> CascadeResult<Option<Vec<Element>>> {
+        _hash: &ActionHash,
+    ) -> CascadeResult<Option<Vec<Record>>> {
         Ok(None)
     }
 
     pub async fn get_validation_package(
         &mut self,
         _agent: AgentPubKey,
-        _header: &HeaderHashed,
+        _action: &ActionHashed,
     ) -> CascadeResult<Option<ValidationPackage>> {
         Ok(None)
     }

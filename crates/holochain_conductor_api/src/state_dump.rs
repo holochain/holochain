@@ -98,8 +98,8 @@ impl std::fmt::Display for JsonDump {
         )?;
         writeln!(
             f,
-            "Elements authored: {}, Ops published: {}",
-            s.elements.len(),
+            "Records authored: {}, Ops published: {}",
+            s.records.len(),
             s.published_ops_count
         )
     }

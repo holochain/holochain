@@ -62,7 +62,7 @@ async fn fullsync_sharded_gossip() -> anyhow::Result<()> {
     let ((alice,), (bobbo,)) = apps.into_tuples();
 
     // Call the "create" zome fn on Alice's app
-    let hash: HeaderHash = conductors[0]
+    let hash: ActionHash = conductors[0]
         .call(&alice.zome("simple"), "create", ())
         .await;
     let all_cells = vec![&alice, &bobbo];
@@ -72,17 +72,17 @@ async fn fullsync_sharded_gossip() -> anyhow::Result<()> {
     // let p2p = conductors[0].envs().p2p().lock().values().next().cloned().unwrap();
     // holochain_state::prelude::dump_tmp(&p2p);
     // holochain_state::prelude::dump_tmp(&alice.env());
-    // Verify that bobbo can run "read" on his cell and get alice's Header
-    let element: Option<Element> = conductors[1]
+    // Verify that bobbo can run "read" on his cell and get alice's Action
+    let record: Option<Record> = conductors[1]
         .call(&bobbo.zome("simple"), "read", hash)
         .await;
-    let element = element.expect("Element was None: bobbo couldn't `get` it");
+    let record = record.expect("Record was None: bobbo couldn't `get` it");
 
-    // Assert that the Element bobbo sees matches what alice committed
-    assert_eq!(element.header().author(), alice.agent_pubkey());
+    // Assert that the Record bobbo sees matches what alice committed
+    assert_eq!(record.action().author(), alice.agent_pubkey());
     assert_eq!(
-        *element.entry(),
-        ElementEntry::Present(Entry::app(().try_into().unwrap()).unwrap())
+        *record.entry(),
+        RecordEntry::Present(Entry::app(().try_into().unwrap()).unwrap())
     );
 
     Ok(())
@@ -133,21 +133,21 @@ async fn fullsync_sharded_local_gossip() -> anyhow::Result<()> {
     let (bobbo,) = bobbo.into_tuple();
 
     // Call the "create" zome fn on Alice's app
-    let hash: HeaderHash = conductor.call(&alice.zome("simple"), "create", ()).await;
+    let hash: ActionHash = conductor.call(&alice.zome("simple"), "create", ()).await;
     let all_cells = vec![&alice, &bobbo];
 
     // Wait long enough for Bob to receive gossip
     consistency_10s(&all_cells).await;
 
-    // Verify that bobbo can run "read" on his cell and get alice's Header
-    let element: Option<Element> = conductor.call(&bobbo.zome("simple"), "read", hash).await;
-    let element = element.expect("Element was None: bobbo couldn't `get` it");
+    // Verify that bobbo can run "read" on his cell and get alice's Action
+    let record: Option<Record> = conductor.call(&bobbo.zome("simple"), "read", hash).await;
+    let record = record.expect("Record was None: bobbo couldn't `get` it");
 
-    // Assert that the Element bobbo sees matches what alice committed
-    assert_eq!(element.header().author(), alice.agent_pubkey());
+    // Assert that the Record bobbo sees matches what alice committed
+    assert_eq!(record.action().author(), alice.agent_pubkey());
     assert_eq!(
-        *element.entry(),
-        ElementEntry::Present(Entry::app(().try_into().unwrap()).unwrap())
+        *record.entry(),
+        RecordEntry::Present(Entry::app(().try_into().unwrap()).unwrap())
     );
 
     Ok(())
@@ -383,7 +383,7 @@ async fn mock_network_sharded_gossip() {
                                             .hashes_authority_for(&agent)
                                             .into_iter()
                                             .filter(|h| {
-                                                window.contains(&data.ops[h].header().timestamp())
+                                                window.contains(&data.ops[h].action().timestamp())
                                             })
                                             .map(|k| data.op_hash_to_kit[&k].clone())
                                             .collect();
@@ -427,7 +427,7 @@ async fn mock_network_sharded_gossip() {
                                         let num_this_agent_hashes = this_agent_hashes.len();
                                         let hashes = this_agent_hashes.iter().map(|h| {
                                             (
-                                                data.ops[h].header().timestamp(),
+                                                data.ops[h].action().timestamp(),
                                                 &data.op_hash_to_kit[h],
                                             )
                                         });
@@ -695,7 +695,7 @@ async fn mock_network_sharding() {
     use holochain_p2p::AgentPubKeyExt;
     use holochain_state::prelude::*;
     use holochain_types::dht_op::WireOps;
-    use holochain_types::element::WireElementOps;
+    use holochain_types::record::WireRecordOps;
     use kitsune_p2p::gossip::sharded_gossip::test_utils::check_agent_boom;
     use kitsune_p2p::TransportConfig;
     use kitsune_p2p_types::tx2::tx2_adapter::AdapterFactory;
@@ -791,8 +791,8 @@ async fn mock_network_sharding() {
                                     options,
                                 );
                                 match &ops {
-                                    WireOps::Element(WireElementOps { header, .. }) => {
-                                        if header.is_some() {
+                                    WireOps::Record(WireRecordOps { action, .. }) => {
+                                        if action.is_some() {
                                             // eprintln!("Got get hit!");
                                         } else {
                                             eprintln!("Data is missing!");
@@ -804,7 +804,7 @@ async fn mock_network_sharding() {
                             } else {
                                 num_misses.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                                 // eprintln!("Get sent to wrong agent!");
-                                WireOps::Element(WireElementOps::default())
+                                WireOps::Record(WireRecordOps::default())
                             };
                             let ops: Vec<u8> =
                                 UnsafeBytes::from(SerializedBytes::try_from(ops).unwrap()).into();
@@ -901,7 +901,7 @@ async fn mock_network_sharding() {
                                             .hashes_authority_for(&agent)
                                             .into_iter()
                                             .filter(|h| {
-                                                window.contains(&data.ops[h].header().timestamp())
+                                                window.contains(&data.ops[h].action().timestamp())
                                             })
                                             .map(|k| data.op_hash_to_kit[&k].clone())
                                             .collect();
@@ -948,7 +948,7 @@ async fn mock_network_sharding() {
                                         let this_agent_hashes = data.hashes_authority_for(&agent);
                                         let hashes = this_agent_hashes.iter().map(|h| {
                                             (
-                                                data.ops[h].header().timestamp(),
+                                                data.ops[h].action().timestamp(),
                                                 &data.op_hash_to_kit[h],
                                             )
                                         });
@@ -1084,34 +1084,34 @@ async fn mock_network_sharding() {
         }
     });
 
-    let num_headers = data.ops.len();
+    let num_actions = data.ops.len();
     loop {
         let mut count = 0;
 
         for (_i, hash) in data
             .ops
             .values()
-            .map(|op| HeaderHash::with_data_sync(&op.header()))
+            .map(|op| ActionHash::with_data_sync(&op.action()))
             .enumerate()
         {
-            let element: Option<Element> = conductor.call(&alice.zome("zome1"), "read", hash).await;
-            if element.is_some() {
+            let record: Option<Record> = conductor.call(&alice.zome("zome1"), "read", hash).await;
+            if record.is_some() {
                 count += 1;
             }
             // let gets = num_gets.load(std::sync::atomic::Ordering::Relaxed);
             // let misses = num_misses.load(std::sync::atomic::Ordering::Relaxed);
             // eprintln!(
             //     "checked {:.2}%, got {:.2}%, missed {:.2}%",
-            //     i as f64 / num_headers as f64 * 100.0,
-            //     count as f64 / num_headers as f64 * 100.0,
+            //     i as f64 / num_actions as f64 * 100.0,
+            //     count as f64 / num_actions as f64 * 100.0,
             //     misses as f64 / gets as f64 * 100.0
             // );
         }
         eprintln!(
             "DONE got {:.2}%, {} out of {}",
-            count as f64 / num_headers as f64 * 100.0,
+            count as f64 / num_actions as f64 * 100.0,
             count,
-            num_headers
+            num_actions
         );
 
         tokio::time::sleep(std::time::Duration::from_secs(10)).await;

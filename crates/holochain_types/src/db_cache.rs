@@ -47,9 +47,9 @@ pub struct ActivityState {
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
 /// The state of an agent's activity.
 pub struct ActivityBounds {
-    /// The highest agent activity header sequence that is already integrated.
+    /// The highest agent activity action sequence that is already integrated.
     pub integrated: Option<u32>,
-    /// The highest consecutive header sequence number that is ready to integrate.
+    /// The highest consecutive action sequence number that is ready to integrate.
     pub ready_to_integrate: Option<u32>,
 }
 
@@ -255,12 +255,12 @@ impl DhtDbQueryCache {
     pub async fn set_activity_ready_to_integrate(
         &self,
         agent: &AgentPubKey,
-        header_sequence: u32,
+        action_sequence: u32,
     ) -> DbCacheResult<()> {
         self.new_activity_inner(
             agent,
             ActivityBounds {
-                ready_to_integrate: Some(header_sequence),
+                ready_to_integrate: Some(action_sequence),
                 ..Default::default()
             },
         )
@@ -271,12 +271,12 @@ impl DhtDbQueryCache {
     pub async fn set_activity_to_integrated(
         &self,
         agent: &AgentPubKey,
-        header_sequence: u32,
+        action_sequence: u32,
     ) -> DbCacheResult<()> {
         self.new_activity_inner(
             agent,
             ActivityBounds {
-                integrated: Some(header_sequence),
+                integrated: Some(action_sequence),
                 ..Default::default()
             },
         )

@@ -1,14 +1,14 @@
 use super::*;
 
-impl NewEntryHeader {
-    pub fn header_seq_mut(&mut self) -> &mut u32 {
+impl NewEntryAction {
+    pub fn action_seq_mut(&mut self) -> &mut u32 {
         match self {
             Self::Create(Create {
-                ref mut header_seq, ..
-            }) => header_seq,
+                ref mut action_seq, ..
+            }) => action_seq,
             Self::Update(Update {
-                ref mut header_seq, ..
-            }) => header_seq,
+                ref mut action_seq, ..
+            }) => action_seq,
         }
     }
 

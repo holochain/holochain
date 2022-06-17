@@ -62,8 +62,8 @@ fn via_display(data: &impl std::fmt::Display) -> SqlOutput {
     SqlOutput(ToSqlOutput::Owned(data.to_string().into()))
 }
 
-impl<'a> From<&'a HeaderType> for SqlOutput<'a> {
-    fn from(d: &'a HeaderType) -> Self {
+impl<'a> From<&'a ActionType> for SqlOutput<'a> {
+    fn from(d: &'a ActionType) -> Self {
         via_display(d)
     }
 }
@@ -144,7 +144,7 @@ impl ToSqlStatement for LinkTypeRanges {
             out.sort_unstable();
             out.dedup();
 
-            // Interleave with `OR`. 
+            // Interleave with `OR`.
             let mut out = out.into_iter().flat_map(|s| [s, " OR ".to_string()]).collect::<Vec<String>>();
 
             // Remove the last `OR`.

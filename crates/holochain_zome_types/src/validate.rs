@@ -1,4 +1,4 @@
-use crate::element::Element;
+use crate::record::Record;
 use crate::CallbackResult;
 use holo_hash::AnyDhtHash;
 use holochain_serialized_bytes::prelude::*;
@@ -6,7 +6,7 @@ use holochain_wasmer_common::*;
 
 pub use holochain_integrity_types::validate::*;
 
-/// The validation status for an op or element
+/// The validation status for an op or record
 /// much of this happens in the subconscious
 /// an entry missing validation dependencies may cycle through Pending many times before finally
 /// reaching a final validation state or being abandoned
@@ -51,7 +51,7 @@ impl CallbackResult for ValidateCallbackResult {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
-pub struct ValidationPackage(pub Vec<Element>);
+pub struct ValidationPackage(pub Vec<Record>);
 
 #[derive(Clone, PartialEq, Serialize, Deserialize, SerializedBytes, Debug)]
 pub enum ValidationPackageCallbackResult {
@@ -85,8 +85,8 @@ impl CallbackResult for ValidationPackageCallbackResult {
 }
 
 impl ValidationPackage {
-    pub fn new(elements: Vec<Element>) -> Self {
-        Self(elements)
+    pub fn new(records: Vec<Record>) -> Self {
+        Self(records)
     }
 }
 

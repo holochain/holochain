@@ -8,19 +8,19 @@
 use holo_hash::*;
 use holochain_zome_types::prelude::*;
 
+use crate::action::WireDelete;
+use crate::action::WireNewEntryAction;
+use crate::action::WireUpdateRelationship;
 use crate::dht_op::error::DhtOpResult;
 use crate::dht_op::DhtOpType;
 use crate::dht_op::RenderedOp;
 use crate::dht_op::RenderedOps;
-use crate::header::WireDelete;
-use crate::header::WireNewEntryHeader;
-use crate::header::WireUpdateRelationship;
 
-/// Convenience function for when you have an ElementEntry but need
+/// Convenience function for when you have a RecordEntry but need
 /// a Option EntryHashed
-pub fn option_entry_hashed(entry: ElementEntry) -> Option<EntryHashed> {
+pub fn option_entry_hashed(entry: RecordEntry) -> Option<EntryHashed> {
     match entry {
-        ElementEntry::Present(e) => Some(EntryHashed::from_content_sync(e)),
+        RecordEntry::Present(e) => Some(EntryHashed::from_content_sync(e)),
         _ => None,
     }
 }
@@ -29,24 +29,24 @@ pub fn option_entry_hashed(entry: ElementEntry) -> Option<EntryHashed> {
 /// Condensed data needed for a get entry request.
 // TODO: Could use actual compression to get even smaller.
 pub struct WireEntryOps {
-    /// Any headers that created this entry.
-    pub creates: Vec<Judged<WireNewEntryHeader>>,
+    /// Any actions that created this entry.
+    pub creates: Vec<Judged<WireNewEntryAction>>,
     /// Any deletes that deleted this entry.
     // TODO: Can remove the entry hash from [`WireDelete`]
     // to save more data.
     pub deletes: Vec<Judged<WireDelete>>,
     /// Any updates on this entry.
     pub updates: Vec<Judged<WireUpdateRelationship>>,
-    /// The entry data shared across all headers.
+    /// The entry data shared across all actions.
     pub entry: Option<EntryData>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
 /// All entry data common to an get entry request.
 pub struct EntryData {
-    /// The entry shared across all headers.
+    /// The entry shared across all actions.
     pub entry: Entry,
-    /// The entry_type shared across all headers.
+    /// The entry_type shared across all actions.
     pub entry_type: EntryType,
 }
 
@@ -69,12 +69,12 @@ impl WireEntryOps {
                 let entry_hashed = EntryHashed::from_content_sync(entry);
                 for op in creates {
                     let status = op.validation_status();
-                    let SignedHeader(header, signature) = op
+                    let SignedAction(action, signature) = op
                         .data
-                        .into_signed_header(entry_type.clone(), entry_hashed.as_hash().clone());
+                        .into_signed_action(entry_type.clone(), entry_hashed.as_hash().clone());
 
                     ops.push(RenderedOp::new(
-                        header,
+                        action,
                         signature,
                         status,
                         DhtOpType::StoreEntry,
@@ -84,22 +84,22 @@ impl WireEntryOps {
                     let status = op.validation_status();
                     let op = op.data;
                     let signature = op.signature;
-                    let header = Header::Delete(op.delete);
+                    let action = Action::Delete(op.delete);
 
                     ops.push(RenderedOp::new(
-                        header,
+                        action,
                         signature,
                         status,
-                        DhtOpType::RegisterDeletedEntryHeader,
+                        DhtOpType::RegisterDeletedEntryAction,
                     )?);
                 }
                 for op in updates {
                     let status = op.validation_status();
-                    let SignedHeader(header, signature) =
-                        op.data.into_signed_header(entry_hashed.as_hash().clone());
+                    let SignedAction(action, signature) =
+                        op.data.into_signed_action(entry_hashed.as_hash().clone());
 
                     ops.push(RenderedOp::new(
-                        header,
+                        action,
                         signature,
                         status,
                         DhtOpType::RegisterUpdatedContent,

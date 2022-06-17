@@ -67,7 +67,7 @@ async fn many_agents_can_reach_consistency_agent_links() {
     let base: AnyLinkableHash = cells[0].agent_pubkey().clone().into();
     let target: AnyLinkableHash = cells[1].agent_pubkey().clone().into();
 
-    let _: HeaderHash = conductor
+    let _: ActionHash = conductor
         .call(
             &alice,
             "create_link",
@@ -112,7 +112,7 @@ async fn many_agents_can_reach_consistency_normal_links() {
     let cells = apps.cells_flattened();
     let alice = cells[0].zome(TestWasm::Link);
 
-    let _: HeaderHash = conductor.call(&alice, "create_link", ()).await;
+    let _: ActionHash = conductor.call(&alice, "create_link", ()).await;
 
     consistency_10s(&cells[..]).await;
 

@@ -498,7 +498,7 @@ pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
             .all_zomes()
             .position(|(name, _)| name == zome_name)
         {
-            Some(index) => Ok(holochain_zome_types::header::ZomeId::from(index as u8)),
+            Some(index) => Ok(holochain_zome_types::action::ZomeId::from(index as u8)),
             None => Err(RibosomeError::ZomeNotExists(zome_name.to_owned())),
         }
     }
