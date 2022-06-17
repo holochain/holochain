@@ -170,6 +170,41 @@ impl MetaLairClient {
         }
     }
 
+    /// Encrypt using a shared secret / xsalsa20poly1305 secretbox.
+    pub fn shared_secret_encrypt(
+        &self,
+        tag: Arc<str>,
+        data: Arc<[u8]>,
+    ) -> impl Future<Output = LairResult<([u8; 24], Arc<[u8]>)>> + 'static + Send {
+        let this = self.clone();
+        async move {
+            match this {
+                Self::Legacy(_) => Err("LegacyLairDoesNotSupportSharedSecrets".into()),
+                Self::NewLair(client) => client.secretbox_xsalsa_by_tag(tag, None, data).await,
+            }
+        }
+    }
+
+    /// Decrypt using a shared secret / xsalsa20poly1305 secretbox.
+    pub fn shared_secret_decrypt(
+        &self,
+        tag: Arc<str>,
+        nonce: [u8; 24],
+        cipher: Arc<[u8]>,
+    ) -> impl Future<Output = LairResult<Arc<[u8]>>> + 'static + Send {
+        let this = self.clone();
+        async move {
+            match this {
+                Self::Legacy(_) => Err("LegacyLairDoesNotSupportSharedSecrets".into()),
+                Self::NewLair(client) => {
+                    client
+                        .secretbox_xsalsa_open_by_tag(tag, None, nonce, cipher)
+                        .await
+                }
+            }
+        }
+    }
+
     /// Construct a new randomized encryption keypair
     pub fn new_x25519_keypair_random(
         &self,

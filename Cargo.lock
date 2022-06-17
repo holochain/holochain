@@ -2059,7 +2059,6 @@ dependencies = [
  "rand 0.8.5",
  "rand-utf8",
  "reqwest",
- "ring",
  "rpassword",
  "rusqlite",
  "sd-notify",
@@ -2088,7 +2087,6 @@ dependencies = [
  "url_serde",
  "uuid 0.7.4",
  "wasmer-middlewares",
- "xsalsa20poly1305",
 ]
 
 [[package]]

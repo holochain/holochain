@@ -1,14 +1,9 @@
+use super::*;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
-use holochain_types::prelude::*;
-use holochain_wasmer_host::prelude::*;
-use ring::rand::SecureRandom;
-use std::convert::TryInto;
 use std::sync::Arc;
-use xsalsa20poly1305::aead::{generic_array::GenericArray, Aead, NewAead};
-use xsalsa20poly1305::XSalsa20Poly1305;
 
 pub fn x_salsa20_poly1305_encrypt(
     _ribosome: Arc<impl RibosomeT>,
@@ -20,36 +15,26 @@ pub fn x_salsa20_poly1305_encrypt(
             keystore: Permission::Allow,
             ..
         } => {
-            let system_random = ring::rand::SystemRandom::new();
-            let mut nonce_bytes = [0; holochain_zome_types::x_salsa20_poly1305::nonce::NONCE_BYTES];
-            system_random
-                .fill(&mut nonce_bytes)
-                .map_err(|ring_unspecified| -> RuntimeError {
-                    wasm_error!(WasmErrorInner::Host(ring_unspecified.to_string())).into()
-                })?;
+            tokio_helper::block_forever_on(async move {
+                let key_ref = input.as_key_ref_ref().clone();
+                let tag = key_ref.to_tag();
 
-            // @todo use the real libsodium somehow instead of this rust crate.
-            // The main issue here is dependency management - it's not necessarily simple to get libsodium
-            // reliably on consumer devices, e.g. we might want to statically link it somewhere.
-            // @todo this key ref should be an opaque ref to lair and the encrypt should happen in lair.
-            let lib_key = GenericArray::from_slice(input.as_key_ref_ref().as_ref());
-            let cipher = XSalsa20Poly1305::new(lib_key);
-            let lib_nonce = GenericArray::from_slice(&nonce_bytes);
-            let lib_encrypted_data = cipher
-                .encrypt(lib_nonce, input.as_data_ref().as_ref())
-                .map_err(|aead_error| -> RuntimeError {
-                    wasm_error!(WasmErrorInner::Host(aead_error.to_string())).into()
-                })?;
+                let data = input.as_data_ref().as_ref().to_vec();
 
-            Ok(
-                holochain_zome_types::x_salsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData::new(
-                    match lib_nonce.as_slice().try_into() {
-                        Ok(nonce) => nonce,
-                        Err(secure_primitive_error) => return Err(wasm_error!(WasmErrorInner::Host(secure_primitive_error.to_string())).into()),
-                    },
-                    lib_encrypted_data,
-                ),
-            )
+                let (nonce, cipher) = call_context
+                    .host_context
+                    .keystore()
+                    .shared_secret_encrypt(tag, data.into())
+                    .await?;
+
+                holochain_keystore::LairResult::Ok(XSalsa20Poly1305EncryptedData::new(
+                    nonce.into(),
+                    cipher.to_vec(),
+                ))
+            })
+            .map_err(|keystore_error| -> RuntimeError {
+                wasm_error!(WasmErrorInner::Host(keystore_error.to_string())).into()
+            })
         }
         _ => Err(wasm_error!(WasmErrorInner::Host(
             RibosomeError::HostFnPermissions(
