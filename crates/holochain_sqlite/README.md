@@ -35,7 +35,7 @@ See the [buffer] crate for implementations.
 
 #### Strong typing
 
-All BufferedStores are strongly typed. All keys and values must be de/serializable, and so de/serialization happens automatically when getting and putting items into stores. As a consequence, the source chain CAS is split into two separate DBs: one for Entries, and one for Headers.
+All BufferedStores are strongly typed. All keys and values must be de/serializable, and so de/serialization happens automatically when getting and putting items into stores. As a consequence, the source chain CAS is split into two separate DBs: one for Entries, and one for Actions.
 
 ### Workspaces
 

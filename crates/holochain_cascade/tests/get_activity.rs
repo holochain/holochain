@@ -31,7 +31,7 @@ async fn get_activity() {
     let options = holochain_p2p::actor::GetActivityOptions {
         include_valid_activity: true,
         include_rejected_activity: false,
-        include_full_headers: true,
+        include_full_actions: true,
         ..Default::default()
     };
 
@@ -48,7 +48,7 @@ async fn get_activity() {
 
     let expected = AgentActivityResponse {
         agent: td.agent.clone(),
-        valid_activity: td.valid_elements.clone(),
+        valid_activity: td.valid_records.clone(),
         rejected_activity: ChainItems::NotRequested,
         status: ChainStatus::Valid(td.chain_head.clone()),
         highest_observed: Some(td.highest_observed.clone()),

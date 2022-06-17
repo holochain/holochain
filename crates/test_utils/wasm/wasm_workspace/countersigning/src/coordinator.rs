@@ -2,19 +2,19 @@ use crate::integrity::*;
 use hdk::prelude::*;
 
 #[hdk_extern]
-fn create_a_thing(_: ()) -> ExternResult<HeaderHash> {
+fn create_a_thing(_: ()) -> ExternResult<ActionHash> {
     create_entry(&EntryTypes::Thing(Thing::Valid))
 }
 
 #[hdk_extern]
-fn create_an_invalid_thing(_: ()) -> ExternResult<HeaderHash> {
+fn create_an_invalid_thing(_: ()) -> ExternResult<ActionHash> {
     create_entry(&EntryTypes::Thing(Thing::Invalid))
 }
 
 fn create_countersigned(
     responses: Vec<PreflightResponse>,
     thing: Thing,
-) -> ExternResult<HeaderHash> {
+) -> ExternResult<ActionHash> {
     let thing = EntryTypes::Thing(thing);
     let entry_def_index = EntryDefIndex::try_from(&thing)?;
     let visibility = EntryVisibility::from(&thing);
@@ -45,12 +45,12 @@ fn create_countersigned(
 #[hdk_extern]
 fn create_an_invalid_countersigned_thing(
     responses: Vec<PreflightResponse>,
-) -> ExternResult<HeaderHash> {
+) -> ExternResult<ActionHash> {
     create_countersigned(responses, Thing::Invalid)
 }
 
 #[hdk_extern]
-fn create_a_countersigned_thing(responses: Vec<PreflightResponse>) -> ExternResult<HeaderHash> {
+fn create_a_countersigned_thing(responses: Vec<PreflightResponse>) -> ExternResult<ActionHash> {
     create_countersigned(responses, Thing::Valid)
 }
 
@@ -68,7 +68,7 @@ fn generate_preflight_request(
         0,
         false,
         session_times_from_millis(5000)?,
-        HeaderBase::Create(CreateBase::new(entry_type)),
+        ActionBase::Create(CreateBase::new(entry_type)),
         PreflightBytes(vec![]),
     )
     .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))
@@ -96,8 +96,8 @@ fn accept_countersigning_preflight_request(
 }
 
 #[hdk_extern]
-fn must_get_header(header_hash: HeaderHash) -> ExternResult<SignedHeaderHashed> {
-    hdk::prelude::must_get_header(header_hash)
+fn must_get_action(action_hash: ActionHash) -> ExternResult<SignedActionHashed> {
+    hdk::prelude::must_get_action(action_hash)
 }
 
 #[hdk_extern]
@@ -106,8 +106,8 @@ fn must_get_entry(entry_hash: EntryHash) -> ExternResult<EntryHashed> {
 }
 
 #[hdk_extern]
-fn must_get_valid_element(header_hash: HeaderHash) -> ExternResult<Element> {
-    hdk::prelude::must_get_valid_element(header_hash)
+fn must_get_valid_record(action_hash: ActionHash) -> ExternResult<Record> {
+    hdk::prelude::must_get_valid_record(action_hash)
 }
 
 #[hdk_extern]

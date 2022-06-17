@@ -19,7 +19,7 @@ fn msg() -> Msg {
 }
 
 #[hdk_extern]
-fn create_entry(_: ()) -> ExternResult<HeaderHash> {
+fn create_entry(_: ()) -> ExternResult<ActionHash> {
     let post = new_post();
     HDK.with(|h| {
         h.borrow().create(CreateInput::new(
@@ -35,24 +35,24 @@ fn create_entry(_: ()) -> ExternResult<HeaderHash> {
 }
 
 #[hdk_extern]
-fn create_post(post: Post) -> ExternResult<HeaderHash> {
+fn create_post(post: Post) -> ExternResult<ActionHash> {
     hdk::prelude::create_entry(&EntryZomes::IntegrityCreateEntry(
         crate::integrity::EntryTypes::Post(post),
     ))
 }
 
 #[hdk_extern]
-fn delete_post(post_hash: HeaderHash) -> ExternResult<HeaderHash> {
+fn delete_post(post_hash: ActionHash) -> ExternResult<ActionHash> {
     hdk::prelude::delete_entry(post_hash)
 }
 
 #[hdk_extern]
-fn get_entry(_: ()) -> ExternResult<Option<Element>> {
+fn get_entry(_: ()) -> ExternResult<Option<Record>> {
     get(hash_entry(&post())?, GetOptions::content())
 }
 
 #[hdk_extern]
-fn get_entry_twice(_: ()) -> ExternResult<Vec<Option<Element>>> {
+fn get_entry_twice(_: ()) -> ExternResult<Vec<Option<Record>>> {
     HDK.with(|h| {
         h.borrow().get(vec![
             GetInput::new(
@@ -65,19 +65,19 @@ fn get_entry_twice(_: ()) -> ExternResult<Vec<Option<Element>>> {
 }
 
 #[hdk_extern]
-fn get_post(hash: HeaderHash) -> ExternResult<Option<Element>> {
+fn get_post(hash: ActionHash) -> ExternResult<Option<Record>> {
     get(hash, GetOptions::content())
 }
 
 #[hdk_extern]
-fn create_msg(_: ()) -> ExternResult<HeaderHash> {
+fn create_msg(_: ()) -> ExternResult<ActionHash> {
     use EntryTypes::*;
     use EntryZomes::*;
     hdk::prelude::create_entry(IntegrityCreateEntry(Msg(msg())))
 }
 
 #[hdk_extern]
-fn create_priv_msg(_: ()) -> ExternResult<HeaderHash> {
+fn create_priv_msg(_: ()) -> ExternResult<ActionHash> {
     use EntryTypes::*;
     use EntryZomes::*;
     hdk::prelude::create_entry(&IntegrityCreateEntry(PrivMsg(crate::integrity::PrivMsg(
@@ -111,7 +111,7 @@ fn init(_: ()) -> ExternResult<InitCallbackResult> {
 /// create another post through a
 /// call
 #[hdk_extern]
-fn call_create_entry(_: ()) -> ExternResult<HeaderHash> {
+fn call_create_entry(_: ()) -> ExternResult<ActionHash> {
     // Create an entry directly via. the hdk.
     hdk::prelude::create_entry(&new_post())?;
     // Create an entry via a `call`.
@@ -140,7 +140,7 @@ fn call_create_entry(_: ()) -> ExternResult<HeaderHash> {
 }
 
 #[hdk_extern]
-fn call_create_entry_remotely(agent: AgentPubKey) -> ExternResult<HeaderHash> {
+fn call_create_entry_remotely(agent: AgentPubKey) -> ExternResult<ActionHash> {
     let zome_call_response: ZomeCallResponse = call_remote(
         agent.clone(),
         zome_info()?.name,
@@ -166,13 +166,13 @@ fn call_create_entry_remotely(agent: AgentPubKey) -> ExternResult<HeaderHash> {
 }
 
 #[hdk_extern]
-fn must_get_valid_element(header_hash: HeaderHash) -> ExternResult<Element> {
-    hdk::prelude::must_get_valid_element(header_hash)
+fn must_get_valid_record(action_hash: ActionHash) -> ExternResult<Record> {
+    hdk::prelude::must_get_valid_record(action_hash)
 }
 
 /// Same as above but doesn't recurse on network errors.
 #[hdk_extern]
-fn call_create_entry_remotely_no_rec(agent: AgentPubKey) -> ExternResult<HeaderHash> {
+fn call_create_entry_remotely_no_rec(agent: AgentPubKey) -> ExternResult<ActionHash> {
     let zome_call_response: ZomeCallResponse = call_remote(
         agent.clone(),
         zome_info()?.name,

@@ -1,6 +1,6 @@
-use crate::element::SignedHeaderHashed;
+use crate::record::SignedActionHashed;
 use crate::ChainTopOrdering;
-use holo_hash::HeaderHash;
+use holo_hash::ActionHash;
 use holochain_serialized_bytes::prelude::*;
 
 pub use holochain_integrity_types::link::*;
@@ -24,8 +24,8 @@ pub struct Link {
     pub timestamp: crate::Timestamp,
     /// A tag used to find this link
     pub tag: LinkTag,
-    /// The hash of this link's create header
-    pub create_link_hash: HeaderHash,
+    /// The hash of this link's create action
+    pub create_link_hash: ActionHash,
 }
 
 /// Zome IO inner type for link creation.
@@ -59,13 +59,13 @@ impl CreateLinkInput {
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub struct DeleteLinkInput {
     /// Address of the link being deleted.
-    pub address: holo_hash::HeaderHash,
+    pub address: holo_hash::ActionHash,
     /// Chain top ordering rules for writes.
     pub chain_top_ordering: ChainTopOrdering,
 }
 
 impl DeleteLinkInput {
-    pub fn new(address: holo_hash::HeaderHash, chain_top_ordering: ChainTopOrdering) -> Self {
+    pub fn new(address: holo_hash::ActionHash, chain_top_ordering: ChainTopOrdering) -> Self {
         Self {
             address,
             chain_top_ordering,
@@ -95,7 +95,7 @@ impl GetLinksInput {
     }
 }
 
-type CreateLinkWithDeleteLinks = Vec<(SignedHeaderHashed, Vec<SignedHeaderHashed>)>;
+type CreateLinkWithDeleteLinks = Vec<(SignedActionHashed, Vec<SignedActionHashed>)>;
 #[derive(Clone, PartialEq, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 /// CreateLinks with and DeleteLinks on them
 /// `[CreateLink, [DeleteLink]]`

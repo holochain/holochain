@@ -16,13 +16,14 @@ pub fn hash(
         HashInput::Entry(entry) => HashOutput::Entry(
             holochain_zome_types::entry::EntryHashed::from_content_sync(entry).into_hash(),
         ),
-        HashInput::Header(header) => HashOutput::Header(
-            holochain_zome_types::header::HeaderHashed::from_content_sync(header).into_hash(),
+        HashInput::Action(action) => HashOutput::Action(
+            holochain_zome_types::action::ActionHashed::from_content_sync(action).into_hash(),
         ),
-        HashInput::Blake2B(data, output_len) => HashOutput::Blake2B(
-            blake2b_n(&data, output_len as usize)
-                .map_err(|e| -> RuntimeError { wasm_error!(WasmErrorInner::Host(e.to_string())).into() })?,
-        ),
+        HashInput::Blake2B(data, output_len) => {
+            HashOutput::Blake2B(blake2b_n(&data, output_len as usize).map_err(
+                |e| -> RuntimeError { wasm_error!(WasmErrorInner::Host(e.to_string())).into() },
+            )?)
+        }
         HashInput::Keccak256(data) => HashOutput::Keccak256({
             let mut output = [0u8; 32];
             let mut hasher = Keccak::v256();
@@ -92,20 +93,20 @@ pub mod wasm_test {
 
         assert_eq!(*entry_output.hash_type(), holo_hash::hash_type::Entry);
 
-        let header_input = HashInput::Header(fixt!(Header));
+        let action_input = HashInput::Action(fixt!(Action));
 
-        let header_output: HeaderHash = match hash(
+        let action_output: ActionHash = match hash(
             Arc::clone(&ribosome),
             Arc::clone(&call_context),
-            header_input,
+            action_input,
         )
         .unwrap()
         {
-            HashOutput::Header(output) => output,
+            HashOutput::Action(output) => output,
             _ => unreachable!(),
         };
 
-        assert_eq!(*header_output.hash_type(), holo_hash::hash_type::Header);
+        assert_eq!(*action_output.hash_type(), holo_hash::hash_type::Action);
 
         let blake2b_input = HashInput::Blake2B(vec![1, 2, 3], 5);
 

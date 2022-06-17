@@ -5,7 +5,7 @@
 //! It defines serialization behaviour for entries. Here you can find the complete list of
 //! entry_types, and special entries, like deletion_entry and cap_entry.
 
-use crate::header::ChainTopOrdering;
+use crate::action::ChainTopOrdering;
 use holochain_integrity_types::EntryDefIndex;
 use holochain_integrity_types::EntryVisibility;
 use holochain_serialized_bytes::prelude::*;
@@ -161,8 +161,8 @@ impl GetInput {
 /// Zome input type for all update operations.
 #[derive(PartialEq, Debug, Deserialize, Serialize, Clone)]
 pub struct UpdateInput {
-    /// Header of the element being updated.
-    pub original_header_address: holo_hash::HeaderHash,
+    /// Action of the record being updated.
+    pub original_action_address: holo_hash::ActionHash,
     /// Entry body.
     pub entry: crate::entry::Entry,
     /// ChainTopBehaviour for the write.
@@ -172,8 +172,8 @@ pub struct UpdateInput {
 /// Zome input for all delete operations.
 #[derive(PartialEq, Debug, Deserialize, Serialize, Clone)]
 pub struct DeleteInput {
-    /// Header of the element being deleted.
-    pub deletes_header_hash: holo_hash::HeaderHash,
+    /// Action of the record being deleted.
+    pub deletes_action_hash: holo_hash::ActionHash,
     /// Chain top ordering behaviour for the delete.
     pub chain_top_ordering: ChainTopOrdering,
 }
@@ -181,21 +181,21 @@ pub struct DeleteInput {
 impl DeleteInput {
     /// Constructor.
     pub fn new(
-        deletes_header_hash: holo_hash::HeaderHash,
+        deletes_action_hash: holo_hash::ActionHash,
         chain_top_ordering: ChainTopOrdering,
     ) -> Self {
         Self {
-            deletes_header_hash,
+            deletes_action_hash,
             chain_top_ordering,
         }
     }
 }
 
-impl From<holo_hash::HeaderHash> for DeleteInput {
+impl From<holo_hash::ActionHash> for DeleteInput {
     /// Sets [`ChainTopOrdering`] to `default` = `Strict` when created from a hash.
-    fn from(deletes_header_hash: holo_hash::HeaderHash) -> Self {
+    fn from(deletes_action_hash: holo_hash::ActionHash) -> Self {
         Self {
-            deletes_header_hash,
+            deletes_action_hash,
             chain_top_ordering: ChainTopOrdering::default(),
         }
     }

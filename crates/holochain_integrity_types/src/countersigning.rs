@@ -4,19 +4,19 @@ use std::iter::FromIterator;
 use std::time::Duration;
 
 use crate::prelude::*;
+use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holo_hash::EntryHash;
-use holo_hash::HeaderHash;
 use holochain_serialized_bytes::SerializedBytesError;
 
-/// The timestamps on headers for a session use this offset relative to the session start time.
-/// This makes it easier for agents to accept a preflight request with headers that are after their current chain top, after network latency.
-pub const SESSION_HEADER_TIME_OFFSET: Duration = Duration::from_millis(1000);
+/// The timestamps on actions for a session use this offset relative to the session start time.
+/// This makes it easier for agents to accept a preflight request with actions that are after their current chain top, after network latency.
+pub const SESSION_ACTION_TIME_OFFSET: Duration = Duration::from_millis(1000);
 
 /// Maximum time in the future the session start can be in the opinion of the participating agent.
-/// As the header will be `SESSION_HEADER_TIME_OFFSET` after the session start we include that here.
+/// As the action will be `SESSION_ACTION_TIME_OFFSET` after the session start we include that here.
 pub const SESSION_TIME_FUTURE_MAX: Duration =
-    Duration::from_millis(5000 + SESSION_HEADER_TIME_OFFSET.as_millis() as u64);
+    Duration::from_millis(5000 + SESSION_ACTION_TIME_OFFSET.as_millis() as u64);
 
 /// Need at least two to countersign.
 pub const MIN_COUNTERSIGNING_AGENTS: usize = 2;
@@ -26,7 +26,7 @@ pub const MAX_COUNTERSIGNING_AGENTS: usize = 8;
 pub use error::CounterSigningError;
 mod error;
 
-/// Every countersigning session must complete a full set of headers between the start and end times to be valid.
+/// Every countersigning session must complete a full set of actions between the start and end times to be valid.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct CounterSigningSessionTimes {
@@ -42,11 +42,11 @@ impl CounterSigningSessionTimes {
         Ok(session_times)
     }
 
-    /// Verify the difference between the end and start time is larger than the session header time offset.
+    /// Verify the difference between the end and start time is larger than the session action time offset.
     pub fn check_integrity(&self) -> Result<(), CounterSigningError> {
         let times_are_valid = &Timestamp::from_micros(0) < self.start()
             && self.start()
-                <= &(self.end() - SESSION_HEADER_TIME_OFFSET).map_err(|_| {
+                <= &(self.end() - SESSION_ACTION_TIME_OFFSET).map_err(|_| {
                     CounterSigningError::CounterSigningSessionTimes((*self).clone())
                 })?;
         if times_are_valid {
@@ -126,11 +126,11 @@ pub struct PreflightRequest {
     /// be the same in both signing_agents and optional_signing_agents.
     enzymatic: bool,
     /// The session times.
-    /// Session headers must all have the same timestamp, which is the session offset.
+    /// Session actions must all have the same timestamp, which is the session offset.
     session_times: CounterSigningSessionTimes,
-    /// The header information that is shared by all agents.
-    /// Contents depend on the header type, create, update, etc.
-    header_base: HeaderBase,
+    /// The action information that is shared by all agents.
+    /// Contents depend on the action type, create, update, etc.
+    action_base: ActionBase,
     /// The preflight bytes for session.
     preflight_bytes: PreflightBytes,
 }
@@ -145,7 +145,7 @@ impl PreflightRequest {
         minimum_optional_signing_agents: u8,
         enzymatic: bool,
         session_times: CounterSigningSessionTimes,
-        header_base: HeaderBase,
+        action_base: ActionBase,
         preflight_bytes: PreflightBytes,
     ) -> Result<Self, CounterSigningError> {
         let preflight_request = Self {
@@ -155,7 +155,7 @@ impl PreflightRequest {
             minimum_optional_signing_agents,
             enzymatic,
             session_times,
-            header_base,
+            action_base,
             preflight_bytes,
         };
         preflight_request.check_integrity()?;
@@ -290,15 +290,15 @@ impl PreflightRequest {
         &mut self.session_times
     }
 
-    /// Header base accessor.
-    pub fn header_base(&self) -> &HeaderBase {
-        &self.header_base
+    /// Action base accessor.
+    pub fn action_base(&self) -> &ActionBase {
+        &self.action_base
     }
 
-    /// Mutable header base accessor for testing.
+    /// Mutable action base accessor for testing.
     #[cfg(feature = "test_utils")]
-    pub fn header_base_mut(&mut self) -> &mut HeaderBase {
-        &mut self.header_base
+    pub fn action_base_mut(&mut self) -> &mut ActionBase {
+        &mut self.action_base
     }
 
     /// Preflight bytes accessor.
@@ -415,18 +415,18 @@ pub struct CounterSigningAgentState {
     /// The index of the agent in the preflight request agent vector.
     agent_index: u8,
     /// The current (frozen) top of the agent's local chain.
-    chain_top: HeaderHash,
-    /// The header sequence of the agent's chain top.
-    header_seq: u32,
+    chain_top: ActionHash,
+    /// The action sequence of the agent's chain top.
+    action_seq: u32,
 }
 
 impl CounterSigningAgentState {
     /// Constructor.
-    pub fn new(agent_index: u8, chain_top: HeaderHash, header_seq: u32) -> Self {
+    pub fn new(agent_index: u8, chain_top: ActionHash, action_seq: u32) -> Self {
         Self {
             agent_index,
             chain_top,
-            header_seq,
+            action_seq,
         }
     }
 
@@ -442,44 +442,44 @@ impl CounterSigningAgentState {
     }
 
     /// Chain top accessor.
-    pub fn chain_top(&self) -> &HeaderHash {
+    pub fn chain_top(&self) -> &ActionHash {
         &self.chain_top
     }
 
     /// Mutable chain top accessor for testing.
     #[cfg(feature = "test_utils")]
-    pub fn chain_top_mut(&mut self) -> &mut HeaderHash {
+    pub fn chain_top_mut(&mut self) -> &mut ActionHash {
         &mut self.chain_top
     }
 
-    /// Header seq accessor.
-    pub fn header_seq(&self) -> &u32 {
-        &self.header_seq
+    /// Action seq accessor.
+    pub fn action_seq(&self) -> &u32 {
+        &self.action_seq
     }
 
-    /// Mutable header seq accessor for testing.
+    /// Mutable action seq accessor for testing.
     #[cfg(feature = "test_utils")]
-    pub fn header_seq_mut(&mut self) -> &mut u32 {
-        &mut self.header_seq
+    pub fn action_seq_mut(&mut self) -> &mut u32 {
+        &mut self.action_seq
     }
 }
 
-/// Enum to mirror Header for all the shared data required to build session headers.
+/// Enum to mirror Action for all the shared data required to build session actions.
 /// Does NOT hold any agent specific information.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-pub enum HeaderBase {
-    /// Mirrors Header::Create.
+pub enum ActionBase {
+    /// Mirrors Action::Create.
     Create(CreateBase),
-    /// Mirrors Header::Update.
+    /// Mirrors Action::Update.
     Update(UpdateBase),
-    // @todo - These headers don't have entries so there's nowhere obvious to put the CounterSigningSessionData.
+    // @todo - These actions don't have entries so there's nowhere obvious to put the CounterSigningSessionData.
     // Delete(DeleteBase),
     // DeleteLink(DeleteLinkBase),
     // CreateLink(CreateLinkBase),
 }
 
-/// Base data for Create headers.
+/// Base data for Create actions.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct CreateBase {
@@ -493,38 +493,38 @@ impl CreateBase {
     }
 }
 
-/// Base data for Update headers.
+/// Base data for Update actions.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct UpdateBase {
-    original_header_address: HeaderHash,
+    original_action_address: ActionHash,
     original_entry_address: EntryHash,
     entry_type: EntryType,
 }
 
-impl Header {
-    /// Construct a Header from the HeaderBase and associated session data.
+impl Action {
+    /// Construct an action from the ActionBase and associated session data.
     pub fn from_countersigning_data(
         entry_hash: EntryHash,
         session_data: &CounterSigningSessionData,
         author: AgentPubKey,
     ) -> Result<Self, CounterSigningError> {
         let agent_state = session_data.agent_state_for_agent(&author)?;
-        Ok(match session_data.preflight_request().header_base() {
-            HeaderBase::Create(create_base) => Header::Create(Create {
+        Ok(match session_data.preflight_request().action_base() {
+            ActionBase::Create(create_base) => Action::Create(Create {
                 author,
                 timestamp: session_data.to_timestamp(),
-                header_seq: agent_state.header_seq + 1,
-                prev_header: agent_state.chain_top.clone(),
+                action_seq: agent_state.action_seq + 1,
+                prev_action: agent_state.chain_top.clone(),
                 entry_type: create_base.entry_type.clone(),
                 entry_hash,
             }),
-            HeaderBase::Update(update_base) => Header::Update(Update {
+            ActionBase::Update(update_base) => Action::Update(Update {
                 author,
                 timestamp: session_data.to_timestamp(),
-                header_seq: agent_state.header_seq + 1,
-                prev_header: agent_state.chain_top.clone(),
-                original_header_address: update_base.original_header_address.clone(),
+                action_seq: agent_state.action_seq + 1,
+                prev_action: agent_state.chain_top.clone(),
+                original_action_address: update_base.original_action_address.clone(),
                 original_entry_address: update_base.original_entry_address.clone(),
                 entry_type: update_base.entry_type.clone(),
                 entry_hash,
@@ -587,17 +587,17 @@ impl CounterSigningSessionData {
         }
     }
 
-    /// Attempt to map countersigning session data to a set of headers.
-    /// A given countersigning session always maps to the same ordered set of headers or an error.
-    /// Note the headers are not signed as the intent is to build headers for other agents without their private keys.
-    pub fn build_header_set(
+    /// Attempt to map countersigning session data to a set of actions.
+    /// A given countersigning session always maps to the same ordered set of actions or an error.
+    /// Note the actions are not signed as the intent is to build actions for other agents without their private keys.
+    pub fn build_action_set(
         &self,
         entry_hash: EntryHash,
-    ) -> Result<Vec<Header>, CounterSigningError> {
-        let mut headers = vec![];
-        let mut build_headers = |countersigning_agents: &CounterSigningAgents| -> Result<(), _> {
+    ) -> Result<Vec<Action>, CounterSigningError> {
+        let mut actions = vec![];
+        let mut build_actions = |countersigning_agents: &CounterSigningAgents| -> Result<(), _> {
             for (agent, _role) in countersigning_agents.iter() {
-                headers.push(Header::from_countersigning_data(
+                actions.push(Action::from_countersigning_data(
                     entry_hash.clone(),
                     self,
                     agent.clone(),
@@ -605,9 +605,9 @@ impl CounterSigningSessionData {
             }
             Ok(())
         };
-        build_headers(self.preflight_request.signing_agents())?;
-        build_headers(self.preflight_request.optional_signing_agents())?;
-        Ok(headers)
+        build_actions(self.preflight_request.signing_agents())?;
+        build_actions(self.preflight_request.optional_signing_agents())?;
+        Ok(actions)
     }
 
     /// Fallible constructor.
@@ -652,9 +652,9 @@ impl CounterSigningSessionData {
     }
 
     /// Construct a Timestamp from countersigning session data.
-    /// Ostensibly used for the Header because the session itself covers a time range.
+    /// Ostensibly used for the Action because the session itself covers a time range.
     pub fn to_timestamp(&self) -> Timestamp {
-        (self.preflight_request().session_times().start() + SESSION_HEADER_TIME_OFFSET)
+        (self.preflight_request().session_times().start() + SESSION_ACTION_TIME_OFFSET)
             .unwrap_or(Timestamp::MAX)
     }
 
@@ -696,7 +696,7 @@ pub mod test {
     use super::CounterSigningError;
     use super::CounterSigningSessionTimes;
     use super::PreflightRequest;
-    use super::SESSION_HEADER_TIME_OFFSET;
+    use super::SESSION_ACTION_TIME_OFFSET;
     use crate::Role;
     use arbitrary::Arbitrary;
 
@@ -720,7 +720,7 @@ pub mod test {
         ));
 
         // Shifting the end forward by the session offset will _almost_ fix it.
-        *session_times.end_mut() = (session_times.end() + SESSION_HEADER_TIME_OFFSET).unwrap();
+        *session_times.end_mut() = (session_times.end() + SESSION_ACTION_TIME_OFFSET).unwrap();
         assert!(matches!(
             session_times.check_integrity(),
             Err(CounterSigningError::CounterSigningSessionTimes(_))
@@ -731,7 +731,7 @@ pub mod test {
             (session_times.start() + core::time::Duration::from_millis(1)).unwrap();
         assert_eq!(session_times.check_integrity().unwrap(), (),);
 
-        // making the diff between start and end less than the header offset will break it again.
+        // making the diff between start and end less than the action offset will break it again.
         *session_times.start_mut() =
             (session_times.start() + core::time::Duration::from_millis(1)).unwrap();
         assert!(matches!(
@@ -796,12 +796,13 @@ pub mod test {
 
     #[test]
     pub fn test_check_countersigning_preflight_request_agents_dupes() {
-        let data: Vec<_> = (0u8..255).cycle().take(1000).collect();
-        let mut u = arbitrary::Unstructured::new(&data);
+        let mut u = arbitrary::Unstructured::new(&[0; 1000]);
         let mut preflight_request = PreflightRequest::arbitrary(&mut u).unwrap();
 
-        let alice = AgentPubKey::arbitrary(&mut u).unwrap();
-        let bob = AgentPubKey::arbitrary(&mut u).unwrap();
+        let data: Vec<_> = (0u8..255).cycle().take(100000).collect();
+        let mut uk = arbitrary::Unstructured::new(&data);
+        let alice = AgentPubKey::arbitrary(&mut uk).unwrap();
+        let bob = AgentPubKey::arbitrary(&mut uk).unwrap();
 
         assert_eq!(preflight_request.check_agents_dupes().unwrap(), (),);
 
