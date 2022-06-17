@@ -36,4 +36,4 @@ pub fn x_salsa20_poly1305_decrypt(
     }
 }
 
-// Tests for the decrypt round trip are in xsalsa20_poly1305_encrypt.
+// Tests for the shared secret round trip are in xsalsa20_poly1305_encrypt.

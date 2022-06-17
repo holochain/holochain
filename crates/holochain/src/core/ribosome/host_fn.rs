@@ -9,7 +9,6 @@ const DEF_REF_SIZE: usize = 32;
 
 pub(crate) trait KeyRefExt: Sized {
     fn to_tag(&self) -> Arc<str>;
-    //fn from_tag<R: AsRef<str>>(tag: R) -> Result<Self, RuntimeError>;
 }
 
 impl KeyRefExt for XSalsa20Poly1305KeyRef {
@@ -18,16 +17,6 @@ impl KeyRefExt for XSalsa20Poly1305KeyRef {
         let tag = unsafe { String::from_utf8_unchecked(tag) };
         tag.into_boxed_str().into()
     }
-
-    /*
-    fn from_tag<R: AsRef<str>>(tag: R) -> Result<Self, RuntimeError> {
-        subtle_encoding::base64::decode(tag.as_ref())
-            .map_err(|subtle_error| {
-                wasm_error!(WasmErrorInner::Host(subtle_error.to_string())).into()
-            })
-            .map(Into::into)
-    }
-    */
 }
 
 pub struct HostFnApi<Ribosome: RibosomeT> {

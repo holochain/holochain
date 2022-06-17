@@ -44,3 +44,5 @@ pub fn x_salsa20_poly1305_shared_secret_create_random(
         )).into()),
     }
 }
+
+// Tests for the shared secret round trip are in xsalsa20_poly1305_encrypt.
