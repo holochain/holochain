@@ -6,8 +6,8 @@ use holochain_p2p::actor::GetActivityOptions;
 pub(crate) fn merge_activities(
     agent: AgentPubKey,
     options: &GetActivityOptions,
-    results: Vec<AgentActivityResponse<HeaderHash>>,
-) -> CascadeResult<AgentActivityResponse<HeaderHash>> {
+    results: Vec<AgentActivityResponse<ActionHash>>,
+) -> CascadeResult<AgentActivityResponse<ActionHash>> {
     if !options.include_rejected_activity && !options.include_valid_activity {
         return Ok(merge_status_only(agent, results));
     }
@@ -17,8 +17,8 @@ pub(crate) fn merge_activities(
 fn merge_hashes(
     agent: AgentPubKey,
     options: &GetActivityOptions,
-    results: Vec<AgentActivityResponse<HeaderHash>>,
-) -> AgentActivityResponse<HeaderHash> {
+    results: Vec<AgentActivityResponse<ActionHash>>,
+) -> AgentActivityResponse<ActionHash> {
     let mut valid = HashSet::new();
     let mut rejected = HashSet::new();
     let mut merged_highest_observed = None;
@@ -40,14 +40,14 @@ fn merge_hashes(
                 merged_highest_observed = Some(h);
             }
             (Some(a), Some(b)) => {
-                let c = if a.header_seq > b.header_seq { a } else { b };
+                let c = if a.action_seq > b.action_seq { a } else { b };
                 merged_highest_observed = Some(c);
             }
         }
 
         match valid_activity {
             ChainItems::Full(_) => {
-                // TODO: BACKLOG: Currently not handling full headers from
+                // TODO: BACKLOG: Currently not handling full actions from
                 // the activity authority.
             }
             ChainItems::Hashes(hashes) => {
@@ -57,7 +57,7 @@ fn merge_hashes(
         }
         match rejected_activity {
             ChainItems::Full(_) => {
-                // TODO: BACKLOG: Currently not handling full headers from
+                // TODO: BACKLOG: Currently not handling full actions from
                 // the activity authority.
             }
             ChainItems::Hashes(hashes) => {
@@ -87,12 +87,12 @@ fn merge_hashes(
     }
 }
 
-type ValidHashes = Vec<(u32, HeaderHash)>;
-type RejectedHashes = Vec<(u32, HeaderHash)>;
+type ValidHashes = Vec<(u32, ActionHash)>;
+type RejectedHashes = Vec<(u32, ActionHash)>;
 
 fn compute_chain_status(
-    valid: HashSet<(u32, HeaderHash)>,
-    rejected: HashSet<(u32, HeaderHash)>,
+    valid: HashSet<(u32, ActionHash)>,
+    rejected: HashSet<(u32, ActionHash)>,
 ) -> (ChainStatus, ValidHashes, RejectedHashes) {
     let mut valid: Vec<_> = valid.into_iter().collect();
     let mut rejected: Vec<_> = rejected.into_iter().collect();
@@ -105,12 +105,12 @@ fn compute_chain_status(
         if status.is_none() {
             let fork = valid_out
                 .last()
-                .and_then(|v: &(u32, HeaderHash)| if seq == v.0 { Some(v) } else { None });
+                .and_then(|v: &(u32, ActionHash)| if seq == v.0 { Some(v) } else { None });
             if let Some(fork) = fork {
                 status = Some(ChainStatus::Forked(ChainFork {
                     fork_seq: seq,
-                    first_header: hash.clone(),
-                    second_header: fork.1.clone(),
+                    first_action: hash.clone(),
+                    second_action: fork.1.clone(),
                 }));
             }
         }
@@ -121,7 +121,7 @@ fn compute_chain_status(
     if status.is_none() {
         if let Some((s, h)) = rejected.first() {
             status = Some(ChainStatus::Invalid(ChainHead {
-                header_seq: *s,
+                action_seq: *s,
                 hash: h.clone(),
             }));
         }
@@ -133,7 +133,7 @@ fn compute_chain_status(
         } else {
             let last = valid_out.last().expect("Safe due to is_empty check");
             ChainStatus::Valid(ChainHead {
-                header_seq: last.0,
+                action_seq: last.0,
                 hash: last.1.clone(),
             })
         }
@@ -143,8 +143,8 @@ fn compute_chain_status(
 
 fn merge_status_only(
     agent: AgentPubKey,
-    results: Vec<AgentActivityResponse<HeaderHash>>,
-) -> AgentActivityResponse<HeaderHash> {
+    results: Vec<AgentActivityResponse<ActionHash>>,
+) -> AgentActivityResponse<ActionHash> {
     let mut merged_status = None;
     let mut merged_highest_observed = None;
     for result in results {
@@ -163,7 +163,7 @@ fn merge_status_only(
                 merged_highest_observed = Some(h);
             }
             (Some(a), Some(b)) => {
-                let c = if a.header_seq > b.header_seq { a } else { b };
+                let c = if a.action_seq > b.action_seq { a } else { b };
                 merged_highest_observed = Some(c);
             }
         }
@@ -185,7 +185,7 @@ fn merge_status_only(
                     merged_status = Some(ChainStatus::Invalid(c));
                 }
                 (ChainStatus::Valid(a), ChainStatus::Valid(b)) => {
-                    let c = if a.header_seq > b.header_seq { a } else { b };
+                    let c = if a.action_seq > b.action_seq { a } else { b };
                     merged_status = Some(ChainStatus::Valid(c));
                 }
                 (ChainStatus::Valid(_), ChainStatus::Forked(c))
@@ -205,18 +205,18 @@ fn merge_status_only(
                     merged_status = Some(ChainStatus::Forked(c));
                 }
                 (ChainStatus::Invalid(a), ChainStatus::Invalid(b)) => {
-                    let c = if a.header_seq < b.header_seq { a } else { b };
+                    let c = if a.action_seq < b.action_seq { a } else { b };
                     merged_status = Some(ChainStatus::Invalid(c));
                 }
                 (ChainStatus::Forked(a), ChainStatus::Invalid(b)) => {
-                    if a.fork_seq < b.header_seq {
+                    if a.fork_seq < b.action_seq {
                         merged_status = Some(ChainStatus::Forked(a));
                     } else {
                         merged_status = Some(ChainStatus::Invalid(b));
                     };
                 }
                 (ChainStatus::Invalid(a), ChainStatus::Forked(b)) => {
-                    if a.header_seq < b.fork_seq {
+                    if a.action_seq < b.fork_seq {
                         merged_status = Some(ChainStatus::Invalid(a));
                     } else {
                         merged_status = Some(ChainStatus::Forked(b));

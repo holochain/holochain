@@ -36,24 +36,24 @@ fn cap_grant_entry(secret: CapSecret) -> ExternResult<CapGrantEntry> {
 }
 
 #[hdk_extern]
-pub fn transferable_cap_grant(secret: CapSecret) -> ExternResult<HeaderHash> {
+pub fn transferable_cap_grant(secret: CapSecret) -> ExternResult<ActionHash> {
     create_cap_grant(cap_grant_entry(secret)?)
 }
 
 #[hdk_extern]
-pub fn roll_cap_grant(header_hash: HeaderHash) -> ExternResult<HeaderHash> {
+pub fn roll_cap_grant(action_hash: ActionHash) -> ExternResult<ActionHash> {
     let secret = CapSecret::try_from_random()?;
-    update_cap_grant(header_hash, cap_grant_entry(secret)?)
+    update_cap_grant(action_hash, cap_grant_entry(secret)?)
 }
 
 #[hdk_extern]
-pub fn delete_cap_grant(header_hash: HeaderHash) -> ExternResult<HeaderHash> {
-    hdk::prelude::delete_cap_grant(header_hash)
+pub fn delete_cap_grant(action_hash: ActionHash) -> ExternResult<ActionHash> {
+    hdk::prelude::delete_cap_grant(action_hash)
 }
 
 #[hdk_extern]
-fn get_entry(header_hash: HeaderHash) -> ExternResult<Option<Element>> {
-    get(header_hash, GetOptions::latest())
+fn get_entry(action_hash: ActionHash) -> ExternResult<Option<Record>> {
+    get(action_hash, GetOptions::latest())
 }
 
 #[hdk_extern]
@@ -64,7 +64,7 @@ fn another_cap_grant(_: ()) -> ExternResult<()> {
 /// accepts a cap claim and commits it to the local chain
 /// intended to
 #[hdk_extern]
-fn accept_cap_claim(claim: CapClaim) -> ExternResult<HeaderHash> {
+fn accept_cap_claim(claim: CapClaim) -> ExternResult<ActionHash> {
     create_cap_claim(claim)
 }
 

@@ -185,7 +185,7 @@ mod tests {
 
         let op = DhtOpHashed::from_content_sync(DhtOp::RegisterAgentActivity(
             fixt!(Signature),
-            fixt!(Header),
+            fixt!(Action),
         ));
         let test_op_hash = op.as_hash().clone();
         env.conn()

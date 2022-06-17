@@ -8,13 +8,13 @@ enum EntryZomes {
 }
 
 #[hdk_extern]
-fn new(_: ()) -> ExternResult<HeaderHash> {
+fn new(_: ()) -> ExternResult<ActionHash> {
     countree::CounTree::new()
 }
 
 #[hdk_extern]
-fn header_details(header_hashes: Vec<HeaderHash>) -> ExternResult<Vec<Option<Details>>> {
-    countree::CounTree::header_details(header_hashes)
+fn action_details(action_hashes: Vec<ActionHash>) -> ExternResult<Vec<Option<Details>>> {
+    countree::CounTree::action_details(action_hashes)
 }
 
 #[hdk_extern]
@@ -28,11 +28,11 @@ fn entry_hash(countree: countree::CounTree) -> ExternResult<EntryHash> {
 }
 
 #[hdk_extern]
-fn inc(header_hash: HeaderHash) -> ExternResult<HeaderHash> {
-    countree::CounTree::incsert(header_hash)
+fn inc(action_hash: ActionHash) -> ExternResult<ActionHash> {
+    countree::CounTree::incsert(action_hash)
 }
 
 #[hdk_extern]
-fn dec(header_hash: HeaderHash) -> ExternResult<HeaderHash> {
-    countree::CounTree::dec(header_hash)
+fn dec(action_hash: ActionHash) -> ExternResult<ActionHash> {
+    countree::CounTree::dec(action_hash)
 }
