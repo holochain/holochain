@@ -2,6 +2,8 @@
 
 use crate::encode::holo_dht_location_bytes;
 use crate::hash_type;
+use crate::ActionHash;
+use crate::ActionHashB64;
 use crate::AgentPubKey;
 use crate::AgentPubKeyB64;
 use crate::AnyDhtHash;
@@ -14,8 +16,6 @@ use crate::DnaHash;
 use crate::DnaHashB64;
 use crate::EntryHash;
 use crate::EntryHashB64;
-use crate::HeaderHash;
-use crate::HeaderHashB64;
 use crate::NetIdHash;
 use crate::NetIdHashB64;
 use crate::WasmHash;
@@ -36,15 +36,15 @@ pub type HashTypeAnyLinkable = hash_type::AnyLinkable;
 
 fixturator!(
     HashTypeAnyDht;
-    curve Empty HashTypeAnyDht::Header;
-    curve Unpredictable HashTypeAnyDht::Header;
-    curve Predictable HashTypeAnyDht::Header;
+    curve Empty HashTypeAnyDht::Action;
+    curve Unpredictable HashTypeAnyDht::Action;
+    curve Predictable HashTypeAnyDht::Action;
 );
 
 fixturator!(
     HashTypeAnyLinkable;
     curve Empty HashTypeAnyLinkable::External;
-    curve Unpredictable HashTypeAnyLinkable::Header;
+    curve Unpredictable HashTypeAnyLinkable::Action;
     curve Predictable HashTypeAnyLinkable::Entry;
 );
 
@@ -135,12 +135,12 @@ fixturator!(
 
 fixturator!(
     with_vec 0 5;
-    HeaderHash;
+    ActionHash;
     constructor fn from_raw_36(ThirtySixHashBytes);
 );
 fixturator!(
-    HeaderHashB64;
-    constructor fn new(HeaderHash);
+    ActionHashB64;
+    constructor fn new(ActionHash);
 );
 
 fixturator!(

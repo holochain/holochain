@@ -10,13 +10,13 @@ pub fn query(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: ChainQueryFilter,
-) -> Result<Vec<Element>, RuntimeError> {
+) -> Result<Vec<Record>, RuntimeError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess {
             read_workspace: Permission::Allow,
             ..
         } => tokio_helper::block_forever_on(async move {
-            let elements: Vec<Element> = call_context
+            let records: Vec<Record> = call_context
                 .host_context
                 .workspace()
                 .source_chain()
@@ -27,7 +27,7 @@ pub fn query(
                 .map_err(|source_chain_error| -> RuntimeError {
                     wasm_error!(WasmErrorInner::Host(source_chain_error.to_string())).into()
                 })?;
-            Ok(elements)
+            Ok(records)
         }),
         _ => Err(wasm_error!(WasmErrorInner::Host(
             RibosomeError::HostFnPermissions(
@@ -36,7 +36,8 @@ pub fn query(
                 "query".into(),
             )
             .to_string(),
-        )).into()),
+        ))
+        .into()),
     }
 }
 
@@ -58,10 +59,10 @@ pub mod slow_tests {
         let _hash_a: EntryHash = conductor.call(&alice, "add_path", "a".to_string()).await;
         let _hash_b: EntryHash = conductor.call(&alice, "add_path", "b".to_string()).await;
 
-        let elements: Vec<Element> = conductor
+        let records: Vec<Record> = conductor
             .call(&alice, "query", ChainQueryFilter::default())
             .await;
 
-        assert_eq!(elements.len(), 6);
+        assert_eq!(records.len(), 6);
     }
 }

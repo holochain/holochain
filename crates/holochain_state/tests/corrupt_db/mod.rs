@@ -11,7 +11,7 @@ use holochain_types::{
     db::DbWrite,
     dht_op::{DhtOp, DhtOpHashed},
 };
-use holochain_zome_types::{Header, Signature};
+use holochain_zome_types::{Action, Signature};
 use tempfile::TempDir;
 
 #[tokio::test(flavor = "multi_thread")]
@@ -79,7 +79,7 @@ fn create_corrupt_db<Kind: DbKindT>(kind: Kind, u: &mut arbitrary::Unstructured)
         .unwrap();
     let op = DhtOpHashed::from_content_sync(DhtOp::RegisterAgentActivity(
         Signature::arbitrary(u).unwrap(),
-        Header::arbitrary(u).unwrap(),
+        Action::arbitrary(u).unwrap(),
     ));
     let mut txn = conn
         .transaction_with_behavior(holochain_sqlite::rusqlite::TransactionBehavior::Exclusive)

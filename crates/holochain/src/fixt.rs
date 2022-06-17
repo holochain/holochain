@@ -180,7 +180,7 @@ fixturator!(
 
 // fixturator!(
 //     LinkMetaVal;
-//     constructor fn new(HeaderHash, EntryHash, Timestamp, u8, LinkTag);
+//     constructor fn new(ActionHash, EntryHash, Timestamp, u8, LinkTag);
 // );
 
 // impl Iterator for LinkMetaValFixturator<(EntryHash, LinkTag)> {
@@ -393,7 +393,7 @@ fixturator!(
 
 fixturator!(
     PostCommitInvocation;
-    constructor fn new(CoordinatorZome, SignedHeaderHashedVec);
+    constructor fn new(CoordinatorZome, SignedActionHashedVec);
 );
 
 fixturator!(

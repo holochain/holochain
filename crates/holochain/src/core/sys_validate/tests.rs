@@ -14,50 +14,50 @@ use holochain_state::prelude::test_cache_db;
 use holochain_state::prelude::test_dht_db;
 use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_wasm_test_utils::*;
-use holochain_zome_types::Header;
+use holochain_zome_types::Action;
 use matches::assert_matches;
 use observability;
 use std::convert::TryFrom;
 
 #[tokio::test(flavor = "multi_thread")]
-async fn verify_header_signature_test() {
+async fn verify_action_signature_test() {
     let keystore = holochain_state::test_utils::test_keystore();
     let author = fake_agent_pubkey_1();
-    let mut header = fixt!(CreateLink);
-    header.author = author.clone();
-    let header = Header::CreateLink(header);
-    let real_signature = author.sign(&keystore, &header).await.unwrap();
+    let mut action = fixt!(CreateLink);
+    action.author = author.clone();
+    let action = Action::CreateLink(action);
+    let real_signature = author.sign(&keystore, &action).await.unwrap();
     let wrong_signature = Signature([1_u8; 64]);
 
     assert_matches!(
-        verify_header_signature(&wrong_signature, &header).await,
+        verify_action_signature(&wrong_signature, &action).await,
         Err(SysValidationError::ValidationOutcome(
             ValidationOutcome::Counterfeit(_, _)
         ))
     );
 
     assert_matches!(
-        verify_header_signature(&real_signature, &header).await,
+        verify_action_signature(&real_signature, &action).await,
         Ok(())
     );
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn check_previous_header() {
-    let mut header = fixt!(CreateLink);
-    header.prev_header = fixt!(HeaderHash);
-    header.header_seq = 1;
-    assert_matches!(check_prev_header(&header.clone().into()), Ok(()));
-    header.header_seq = 0;
+async fn check_previous_action() {
+    let mut action = fixt!(CreateLink);
+    action.prev_action = fixt!(ActionHash);
+    action.action_seq = 1;
+    assert_matches!(check_prev_action(&action.clone().into()), Ok(()));
+    action.action_seq = 0;
     assert_matches!(
-        check_prev_header(&header.clone().into()),
+        check_prev_action(&action.clone().into()),
         Err(SysValidationError::ValidationOutcome(
-            ValidationOutcome::PrevHeaderError(PrevHeaderError::InvalidRoot)
+            ValidationOutcome::PrevActionError(PrevActionError::InvalidRoot)
         ))
     );
     // Dna is always ok because of the type system
-    let header = fixt!(Dna);
-    assert_matches!(check_prev_header(&header.into()), Ok(()));
+    let action = fixt!(Dna);
+    assert_matches!(check_prev_action(&action.into()), Ok(()));
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -68,13 +68,13 @@ async fn check_valid_if_dna_test() {
     let keystore = test_keystore();
     let db = tmp.to_db();
     // Test data
-    let _activity_return = vec![fixt!(HeaderHash)];
+    let _activity_return = vec![fixt!(ActionHash)];
 
     let mut dna_def = fixt!(DnaDef);
     dna_def.origin_time = Timestamp::MIN;
 
     // Empty store not dna
-    let header = fixt!(CreateLink);
+    let action = fixt!(CreateLink);
     let cache: DhtDbQueryCache = tmp_dht.to_db().into();
     let mut workspace = SysValidationWorkspace::new(
         db.clone().into(),
@@ -85,24 +85,24 @@ async fn check_valid_if_dna_test() {
     );
 
     assert_matches!(
-        check_valid_if_dna(&header.clone().into(), &workspace).await,
+        check_valid_if_dna(&action.clone().into(), &workspace).await,
         Ok(())
     );
-    let mut header = fixt!(Dna);
+    let mut action = fixt!(Dna);
 
     assert_matches!(
-        check_valid_if_dna(&header.clone().into(), &workspace).await,
+        check_valid_if_dna(&action.clone().into(), &workspace).await,
         Ok(())
     );
 
-    // - Test that an origin_time in the future leads to invalid Dna header commit
+    // - Test that an origin_time in the future leads to invalid Dna action commit
     let dna_def_original = workspace.dna_def();
     dna_def.origin_time = Timestamp::MAX;
     workspace.dna_def = Arc::new(dna_def);
     assert_matches!(
-        check_valid_if_dna(&header.clone().into(), &workspace).await,
+        check_valid_if_dna(&action.clone().into(), &workspace).await,
         Err(SysValidationError::ValidationOutcome(
-            ValidationOutcome::PrevHeaderError(PrevHeaderError::InvalidRootOriginTime)
+            ValidationOutcome::PrevActionError(PrevActionError::InvalidRootOriginTime)
         ))
     );
     workspace.dna_def = dna_def_original;
@@ -117,77 +117,77 @@ async fn check_valid_if_dna_test() {
         .execute("UPDATE DhtOp SET when_integrated = 0", [])
         .unwrap();
 
-    header.author = fake_agent_pubkey_1();
+    action.author = fake_agent_pubkey_1();
 
     cache
-        .set_all_activity_to_integrated(vec![(Arc::new(header.author.clone()), 0..=2)])
+        .set_all_activity_to_integrated(vec![(Arc::new(action.author.clone()), 0..=2)])
         .await
         .unwrap();
 
     assert_matches!(
-        check_valid_if_dna(&header.clone().into(), &workspace).await,
+        check_valid_if_dna(&action.clone().into(), &workspace).await,
         Err(SysValidationError::ValidationOutcome(
-            ValidationOutcome::PrevHeaderError(PrevHeaderError::InvalidRoot)
+            ValidationOutcome::PrevActionError(PrevActionError::InvalidRoot)
         ))
     );
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn check_previous_timestamp() {
-    let mut header = fixt!(CreateLink);
-    let mut prev_header = fixt!(CreateLink);
-    header.timestamp = Timestamp::now().into();
+    let mut action = fixt!(CreateLink);
+    let mut prev_action = fixt!(CreateLink);
+    action.timestamp = Timestamp::now().into();
     let before = chrono::Utc::now() - chrono::Duration::weeks(1);
     let after = chrono::Utc::now() + chrono::Duration::weeks(1);
 
-    prev_header.timestamp = Timestamp::from(before).into();
-    let r = check_prev_timestamp(&header.clone().into(), &prev_header.clone().into());
+    prev_action.timestamp = Timestamp::from(before).into();
+    let r = check_prev_timestamp(&action.clone().into(), &prev_action.clone().into());
     assert_matches!(r, Ok(()));
 
-    prev_header.timestamp = Timestamp::from(after).into();
-    let r = check_prev_timestamp(&header.clone().into(), &prev_header.clone().into());
+    prev_action.timestamp = Timestamp::from(after).into();
+    let r = check_prev_timestamp(&action.clone().into(), &prev_action.clone().into());
     assert_matches!(
         r,
         Err(SysValidationError::ValidationOutcome(
-            ValidationOutcome::PrevHeaderError(PrevHeaderError::Timestamp)
+            ValidationOutcome::PrevActionError(PrevActionError::Timestamp)
         ))
     );
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn check_previous_seq() {
-    let mut header = fixt!(CreateLink);
-    let mut prev_header = fixt!(CreateLink);
+    let mut action = fixt!(CreateLink);
+    let mut prev_action = fixt!(CreateLink);
 
-    header.header_seq = 2;
-    prev_header.header_seq = 1;
+    action.action_seq = 2;
+    prev_action.action_seq = 1;
     assert_matches!(
-        check_prev_seq(&header.clone().into(), &prev_header.clone().into()),
+        check_prev_seq(&action.clone().into(), &prev_action.clone().into()),
         Ok(())
     );
 
-    prev_header.header_seq = 2;
+    prev_action.action_seq = 2;
     assert_matches!(
-        check_prev_seq(&header.clone().into(), &prev_header.clone().into()),
+        check_prev_seq(&action.clone().into(), &prev_action.clone().into()),
         Err(SysValidationError::ValidationOutcome(
-            ValidationOutcome::PrevHeaderError(PrevHeaderError::InvalidSeq(_, _)),
+            ValidationOutcome::PrevActionError(PrevActionError::InvalidSeq(_, _)),
         ),)
     );
 
-    prev_header.header_seq = 3;
+    prev_action.action_seq = 3;
     assert_matches!(
-        check_prev_seq(&header.clone().into(), &prev_header.clone().into()),
+        check_prev_seq(&action.clone().into(), &prev_action.clone().into()),
         Err(SysValidationError::ValidationOutcome(
-            ValidationOutcome::PrevHeaderError(PrevHeaderError::InvalidSeq(_, _)),
+            ValidationOutcome::PrevActionError(PrevActionError::InvalidSeq(_, _)),
         ),)
     );
 
-    header.header_seq = 0;
-    prev_header.header_seq = 0;
+    action.action_seq = 0;
+    prev_action.action_seq = 0;
     assert_matches!(
-        check_prev_seq(&header.clone().into(), &prev_header.clone().into()),
+        check_prev_seq(&action.clone().into(), &prev_action.clone().into()),
         Err(SysValidationError::ValidationOutcome(
-            ValidationOutcome::PrevHeaderError(PrevHeaderError::InvalidSeq(_, _)),
+            ValidationOutcome::PrevActionError(PrevActionError::InvalidSeq(_, _)),
         ),)
     );
 }
@@ -221,12 +221,12 @@ async fn check_entry_hash_test() {
     let mut ec = fixt!(Create);
     let entry = fixt!(Entry);
     let hash = EntryHash::with_data_sync(&entry);
-    let header: Header = ec.clone().into();
+    let action: Action = ec.clone().into();
 
     // First check it should have an entry
-    assert_matches!(check_new_entry_header(&header), Ok(()));
+    assert_matches!(check_new_entry_action(&action), Ok(()));
     // Safe to unwrap if new entry
-    let eh = header.entry_data().map(|(h, _)| h).unwrap();
+    let eh = action.entry_data().map(|(h, _)| h).unwrap();
     assert_matches!(
         check_entry_hash(&eh, &entry).await,
         Err(SysValidationError::ValidationOutcome(
@@ -235,12 +235,12 @@ async fn check_entry_hash_test() {
     );
 
     ec.entry_hash = hash;
-    let header: Header = ec.clone().into();
+    let action: Action = ec.clone().into();
 
-    let eh = header.entry_data().map(|(h, _)| h).unwrap();
+    let eh = action.entry_data().map(|(h, _)| h).unwrap();
     assert_matches!(check_entry_hash(&eh, &entry).await, Ok(()));
     assert_matches!(
-        check_new_entry_header(&fixt!(CreateLink).into()),
+        check_new_entry_action(&fixt!(CreateLink).into()),
         Err(SysValidationError::ValidationOutcome(
             ValidationOutcome::NotNewEntry(_)
         ))
@@ -274,7 +274,7 @@ async fn check_update_reference_test() {
     eu.entry_type = et_app_1;
 
     assert_matches!(
-        check_update_reference(&eu, &NewEntryHeaderRef::from(&ec)),
+        check_update_reference(&eu, &NewEntryActionRef::from(&ec)),
         Ok(())
     );
 
@@ -282,7 +282,7 @@ async fn check_update_reference_test() {
     ec.entry_type = et_app_2;
 
     assert_matches!(
-        check_update_reference(&eu, &NewEntryHeaderRef::from(&ec)),
+        check_update_reference(&eu, &NewEntryActionRef::from(&ec)),
         Err(SysValidationError::ValidationOutcome(
             ValidationOutcome::UpdateTypeMismatch(_, _)
         ))
@@ -292,7 +292,7 @@ async fn check_update_reference_test() {
     eu.entry_type = et_cap;
 
     assert_matches!(
-        check_update_reference(&eu, &NewEntryHeaderRef::from(&ec)),
+        check_update_reference(&eu, &NewEntryActionRef::from(&ec)),
         Err(SysValidationError::ValidationOutcome(
             ValidationOutcome::UpdateTypeMismatch(_, _)
         ))
@@ -436,12 +436,12 @@ async fn incoming_ops_filters_private_entry() {
     create.entry_type = EntryType::App(aet);
     create.entry_hash = EntryHash::with_data_sync(&private_entry);
     create.author = author.clone();
-    let header = Header::Create(create);
-    let signature = author.sign(&keystore, &header).await.unwrap();
+    let action = Action::Create(create);
+    let signature = author.sign(&keystore, &action).await.unwrap();
 
     let shh =
-        SignedHeaderHashed::with_presigned(HeaderHashed::from_content_sync(header), signature);
-    let el = Element::new(shh, Some(private_entry));
+        SignedActionHashed::with_presigned(ActionHashed::from_content_sync(action), signature);
+    let el = Record::new(shh, Some(private_entry));
 
     let ops_sender = IncomingDhtOpSender::new(space.clone(), tx.clone());
     ops_sender.send_store_entry(el.clone()).await.unwrap();
@@ -452,7 +452,7 @@ async fn incoming_ops_filters_private_entry() {
     assert_eq!(num_ops, 0);
 
     let ops_sender = IncomingDhtOpSender::new(space.clone(), tx.clone());
-    ops_sender.send_store_element(el.clone()).await.unwrap();
+    ops_sender.send_store_record(el.clone()).await.unwrap();
     let num_ops: usize = fresh_reader_test(vault.clone(), |txn| {
         txn.query_row("SELECT COUNT(rowid) FROM DhtOp", [], |row| row.get(0))
             .unwrap()
@@ -470,129 +470,129 @@ async fn incoming_ops_filters_private_entry() {
 fn valid_chain_test() {
     let author = fixt!(AgentPubKey);
     // Create a valid chain.
-    let mut headers = vec![];
-    headers.push(HeaderHashed::from_content_sync(Header::Dna(Dna {
+    let mut actions = vec![];
+    actions.push(ActionHashed::from_content_sync(Action::Dna(Dna {
         author: author.clone(),
         timestamp: Timestamp::from_micros(0),
         hash: fixt!(DnaHash),
     })));
-    headers.push(HeaderHashed::from_content_sync(Header::Create(Create {
+    actions.push(ActionHashed::from_content_sync(Action::Create(Create {
         author: author.clone(),
         timestamp: Timestamp::from_micros(1),
-        header_seq: 1,
-        prev_header: headers[0].to_hash(),
+        action_seq: 1,
+        prev_action: actions[0].to_hash(),
         entry_type: fixt!(EntryType),
         entry_hash: fixt!(EntryHash),
     })));
-    headers.push(HeaderHashed::from_content_sync(Header::Create(Create {
+    actions.push(ActionHashed::from_content_sync(Action::Create(Create {
         author: author.clone(),
         timestamp: Timestamp::from_micros(2),
-        header_seq: 2,
-        prev_header: headers[1].to_hash(),
+        action_seq: 2,
+        prev_action: actions[1].to_hash(),
         entry_type: fixt!(EntryType),
         entry_hash: fixt!(EntryHash),
     })));
     // Valid chain passes.
-    validate_chain(headers.iter(), &None).expect("Valid chain");
+    validate_chain(actions.iter(), &None).expect("Valid chain");
 
     // Create a forked chain.
-    let mut fork = headers.clone();
-    fork.push(HeaderHashed::from_content_sync(Header::Create(Create {
+    let mut fork = actions.clone();
+    fork.push(ActionHashed::from_content_sync(Action::Create(Create {
         author: author.clone(),
         timestamp: Timestamp::from_micros(10),
-        header_seq: 1,
-        prev_header: headers[0].to_hash(),
+        action_seq: 1,
+        prev_action: actions[0].to_hash(),
         entry_type: fixt!(EntryType),
         entry_hash: fixt!(EntryHash),
     })));
     let err = validate_chain(fork.iter(), &None).expect_err("Forked chain");
     assert!(matches!(
         err,
-        SysValidationError::ValidationOutcome(ValidationOutcome::PrevHeaderError(
-            PrevHeaderError::HashMismatch
+        SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(
+            PrevActionError::HashMismatch
         ))
     ));
 
     // Test a chain with the wrong seq.
-    let mut wrong_seq = headers.clone();
-    *wrong_seq[2].as_content_mut().header_seq_mut().unwrap() = 3;
+    let mut wrong_seq = actions.clone();
+    *wrong_seq[2].as_content_mut().action_seq_mut().unwrap() = 3;
     let err = validate_chain(wrong_seq.iter(), &None).expect_err("Wrong seq");
     assert!(matches!(
         err,
-        SysValidationError::ValidationOutcome(ValidationOutcome::PrevHeaderError(
-            PrevHeaderError::InvalidSeq(_, _)
+        SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(
+            PrevActionError::InvalidSeq(_, _)
         ))
     ));
 
     // Test a wrong root gets rejected.
-    let mut wrong_root = headers.clone();
-    wrong_root[0] = HeaderHashed::from_content_sync(Header::Create(Create {
+    let mut wrong_root = actions.clone();
+    wrong_root[0] = ActionHashed::from_content_sync(Action::Create(Create {
         author: author.clone(),
         timestamp: Timestamp::from_micros(0),
-        header_seq: 0,
-        prev_header: headers[0].to_hash(),
+        action_seq: 0,
+        prev_action: actions[0].to_hash(),
         entry_type: fixt!(EntryType),
         entry_hash: fixt!(EntryHash),
     }));
     let err = validate_chain(wrong_root.iter(), &None).expect_err("Wrong root");
     assert!(matches!(
         err,
-        SysValidationError::ValidationOutcome(ValidationOutcome::PrevHeaderError(
-            PrevHeaderError::InvalidRoot
+        SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(
+            PrevActionError::InvalidRoot
         ))
     ));
 
     // Test without dna at root gets rejected.
-    let mut dna_not_at_root = headers.clone();
-    dna_not_at_root.push(headers[0].clone());
+    let mut dna_not_at_root = actions.clone();
+    dna_not_at_root.push(actions[0].clone());
     let err = validate_chain(dna_not_at_root.iter(), &None).expect_err("Dna not at root");
     assert!(matches!(
         err,
-        SysValidationError::ValidationOutcome(ValidationOutcome::PrevHeaderError(
-            PrevHeaderError::InvalidRoot
+        SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(
+            PrevActionError::InvalidRoot
         ))
     ));
 
     // Test if there is a existing head that a dna in the new chain is rejected.
     let err =
-        validate_chain(headers.iter(), &Some((fixt!(HeaderHash), 0))).expect_err("Dna not at root");
+        validate_chain(actions.iter(), &Some((fixt!(ActionHash), 0))).expect_err("Dna not at root");
     assert!(matches!(
         err,
-        SysValidationError::ValidationOutcome(ValidationOutcome::PrevHeaderError(
-            PrevHeaderError::InvalidRoot
+        SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(
+            PrevActionError::InvalidRoot
         ))
     ));
 
     // Check a sequence that is broken gets rejected.
-    let mut wrong_seq = headers[1..].to_vec();
-    *wrong_seq[0].as_content_mut().header_seq_mut().unwrap() = 3;
-    *wrong_seq[1].as_content_mut().header_seq_mut().unwrap() = 4;
+    let mut wrong_seq = actions[1..].to_vec();
+    *wrong_seq[0].as_content_mut().action_seq_mut().unwrap() = 3;
+    *wrong_seq[1].as_content_mut().action_seq_mut().unwrap() = 4;
     let err = validate_chain(
         wrong_seq.iter(),
-        &Some((wrong_seq[0].prev_header().unwrap().clone(), 0)),
+        &Some((wrong_seq[0].prev_action().unwrap().clone(), 0)),
     )
     .expect_err("Wrong seq");
     assert!(matches!(
         err,
-        SysValidationError::ValidationOutcome(ValidationOutcome::PrevHeaderError(
-            PrevHeaderError::InvalidSeq(_, _)
+        SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(
+            PrevActionError::InvalidSeq(_, _)
         ))
     ));
 
     // Check the correct sequence gets accepted with a root.
-    let correct_seq = headers[1..].to_vec();
+    let correct_seq = actions[1..].to_vec();
     validate_chain(
         correct_seq.iter(),
-        &Some((correct_seq[0].prev_header().unwrap().clone(), 0)),
+        &Some((correct_seq[0].prev_action().unwrap().clone(), 0)),
     )
     .expect("Correct seq");
 
-    let err = validate_chain(correct_seq.iter(), &Some((fixt!(HeaderHash), 0)))
+    let err = validate_chain(correct_seq.iter(), &Some((fixt!(ActionHash), 0)))
         .expect_err("Hash is wrong");
     assert!(matches!(
         err,
-        SysValidationError::ValidationOutcome(ValidationOutcome::PrevHeaderError(
-            PrevHeaderError::HashMismatch
+        SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(
+            PrevActionError::HashMismatch
         ))
     ));
 }

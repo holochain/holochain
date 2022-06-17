@@ -8,10 +8,10 @@ use crate::core::workflow::app_validation_workflow::validation_package::get_as_a
 use holochain_cascade::Cascade;
 use holochain_p2p::HolochainP2pDna;
 use holochain_types::db_cache::DhtDbQueryCache;
-use holochain_zome_types::HeaderHashed;
+use holochain_zome_types::ActionHashed;
 
 #[instrument(skip(
-    header_hashed,
+    action_hashed,
     authored_db,
     dht_db,
     dht_db_cache,
@@ -22,7 +22,7 @@ use holochain_zome_types::HeaderHashed;
 ))]
 #[allow(clippy::too_many_arguments)]
 pub(super) async fn get_as_author(
-    header_hashed: HeaderHashed,
+    action_hashed: ActionHashed,
     authored_db: DbRead<DbKindAuthored>,
     dht_db: DbRead<DbKindDht>,
     dht_db_cache: DhtDbQueryCache,
@@ -31,7 +31,7 @@ pub(super) async fn get_as_author(
     conductor_handle: &dyn ConductorHandleT,
     network: &HolochainP2pDna,
 ) -> CellResult<ValidationPackageResponse> {
-    let header = header_hashed.as_content();
+    let action = action_hashed.as_content();
 
     // Get the source chain with public data only
     // TODO: evaluate if we even need to use a source chain here
@@ -41,18 +41,18 @@ pub(super) async fn get_as_author(
         dht_db.clone(),
         dht_db_cache.clone(),
         conductor_handle.keystore().clone(),
-        header.author().clone(),
+        action.author().clone(),
     )
     .await?;
     source_chain.public_only();
 
-    // Get the header data
-    let (app_entry_type, header_seq) = match header
+    // Get the action data
+    let (app_entry_type, action_seq) = match action
         .entry_type()
         .cloned()
-        .map(|et| (et, header.header_seq()))
+        .map(|et| (et, action.action_seq()))
     {
-        Some((EntryType::App(aet), header_seq)) => (aet, header_seq),
+        Some((EntryType::App(aet), action_seq)) => (aet, action_seq),
         _ => return Ok(None.into()),
     };
 
@@ -62,22 +62,22 @@ pub(super) async fn get_as_author(
 
     // Gather the package
     match required_validation_type {
-        RequiredValidationType::Element => {
-            // TODO: I'm not sure if we should handle this case, it seems like they should already have the element
+        RequiredValidationType::Record => {
+            // TODO: I'm not sure if we should handle this case, it seems like they should already have the record
             Ok(None.into())
         }
         RequiredValidationType::SubChain => Ok(Some(
-            get_as_author_sub_chain(header_seq, app_entry_type, &source_chain).await?,
+            get_as_author_sub_chain(action_seq, app_entry_type, &source_chain).await?,
         )
         .into()),
         RequiredValidationType::Full => {
-            Ok(Some(get_as_author_full(header_seq, &source_chain).await?).into())
+            Ok(Some(get_as_author_full(action_seq, &source_chain).await?).into())
         }
         RequiredValidationType::Custom => {
             let cascade = Cascade::empty().with_authored(authored_db.clone());
 
-            if let Some(elements) = cascade.get_validation_package_local(header_hashed.as_hash())? {
-                return Ok(Some(ValidationPackage::new(elements)).into());
+            if let Some(records) = cascade.get_validation_package_local(action_hashed.as_hash())? {
+                return Ok(Some(ValidationPackage::new(records)).into());
             }
 
             let workspace_lock = HostFnWorkspace::new(
@@ -86,12 +86,12 @@ pub(super) async fn get_as_author(
                 dht_db_cache,
                 cache,
                 conductor_handle.keystore().clone(),
-                Some(header.author().clone()),
+                Some(action.author().clone()),
                 Arc::new(ribosome.dna_def().as_content().clone()),
             )
             .await?;
             let result =
-                match get_as_author_custom(&header_hashed, ribosome, network, workspace_lock)? {
+                match get_as_author_custom(&action_hashed, ribosome, network, workspace_lock)? {
                     Some(result) => result,
                     None => return Ok(None.into()),
                 };
@@ -105,7 +105,7 @@ pub(super) async fn get_as_author(
                     warn!(
                         msg = "Getting custom validation package fail",
                         error = %reason,
-                        ?header
+                        ?action
                     );
                     Ok(None.into())
                 }
@@ -113,14 +113,14 @@ pub(super) async fn get_as_author(
                     info!(
                         msg = "Unresolved dependencies for custom validation package",
                         missing_dependencies = ?deps,
-                        ?header
+                        ?action
                     );
                     Ok(None.into())
                 }
                 ValidationPackageResult::NotImplemented => {
                     error!(
                         msg = "Entry definition specifies a custom validation package but the callback isn't defined",
-                        ?header
+                        ?action
                     );
                     Ok(None.into())
                 }
@@ -130,19 +130,19 @@ pub(super) async fn get_as_author(
 }
 
 pub(super) async fn get_as_authority(
-    header: HeaderHashed,
+    action: ActionHashed,
     env: DbRead<DbKindDht>,
 ) -> CellResult<ValidationPackageResponse> {
     // Get author and hash
-    let (header, header_hash) = header.into_inner();
+    let (action, action_hash) = action.into_inner();
 
-    // Get the header data
-    let (app_entry_type, header_seq) = match header
+    // Get the action data
+    let (app_entry_type, action_seq) = match action
         .entry_type()
         .cloned()
-        .map(|et| (et, header.header_seq()))
+        .map(|et| (et, action.action_seq()))
     {
-        Some((EntryType::App(aet), header_seq)) => (aet, header_seq),
+        Some((EntryType::App(aet), action_seq)) => (aet, action_seq),
         _ => return Ok(None.into()),
     };
 
@@ -154,50 +154,50 @@ pub(super) async fn get_as_authority(
 
     // Gather the package
     match required_validation_type {
-        RequiredValidationType::Element => {
-            // TODO: I'm not sure if we should handle this case, it seems like they should already have the element
+        RequiredValidationType::Record => {
+            // TODO: I'm not sure if we should handle this case, it seems like they should already have the record
             Ok(None.into())
         }
         RequiredValidationType::SubChain => {
             let query = ChainQueryFilter::default()
                 .include_entries(true)
                 .entry_type(EntryType::App(app_entry_type))
-                .sequence_range(ChainQueryFilterRange::HeaderSeqRange(
+                .sequence_range(ChainQueryFilterRange::ActionSeqRange(
                     0,
-                    header_seq.saturating_sub(1),
+                    action_seq.saturating_sub(1),
                 ));
 
             // Collect and return the sub chain
-            let elements = match cascade.get_validation_package_local(&header_hash)? {
-                Some(elements) => elements,
+            let records = match cascade.get_validation_package_local(&action_hash)? {
+                Some(records) => records,
                 None => return Ok(None.into()),
             };
 
-            Ok(Some(ValidationPackage::new(query.filter_elements(elements))).into())
+            Ok(Some(ValidationPackage::new(query.filter_records(records))).into())
         }
         RequiredValidationType::Full => {
             let query = &ChainQueryFilter::default()
                 .include_entries(true)
-                .sequence_range(ChainQueryFilterRange::HeaderSeqRange(
+                .sequence_range(ChainQueryFilterRange::ActionSeqRange(
                     0,
-                    header_seq.saturating_sub(1),
+                    action_seq.saturating_sub(1),
                 ));
 
             // Collect and return the sub chain
-            let elements = match cascade.get_validation_package_local(&header_hash)? {
-                Some(elements) => elements,
+            let records = match cascade.get_validation_package_local(&action_hash)? {
+                Some(records) => records,
                 None => return Ok(None.into()),
             };
 
-            Ok(Some(ValidationPackage::new(query.filter_elements(elements))).into())
+            Ok(Some(ValidationPackage::new(query.filter_records(records))).into())
         }
         RequiredValidationType::Custom => {
-            let elements = match cascade.get_validation_package_local(&header_hash)? {
-                Some(elements) => elements,
+            let records = match cascade.get_validation_package_local(&action_hash)? {
+                Some(records) => records,
                 None => return Ok(None.into()),
             };
 
-            Ok(Some(ValidationPackage::new(elements)).into())
+            Ok(Some(ValidationPackage::new(records)).into())
         }
     }
 }

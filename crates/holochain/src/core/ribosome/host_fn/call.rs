@@ -143,7 +143,7 @@ pub mod wasm_test {
     use crate::sweettest::SweetConductor;
     use crate::sweettest::SweetDnaFile;
     use hdk::prelude::AgentInfo;
-    use holo_hash::HeaderHash;
+    use holo_hash::ActionHash;
     use holochain_state::prelude::fresh_reader_test;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::ZomeCallResponse;
@@ -193,8 +193,8 @@ pub mod wasm_test {
         let result = handle.call_zome(invocation).await;
         assert_matches!(result, Ok(Ok(ZomeCallResponse::Ok(_))));
 
-        // Get the header hash of that entry
-        let header_hash: HeaderHash =
+        // Get the action hash of that entry
+        let action_hash: ActionHash =
             unwrap_to::unwrap_to!(result.unwrap().unwrap() => ZomeCallResponse::Ok)
                 .decode()
                 .unwrap();
@@ -202,9 +202,9 @@ pub mod wasm_test {
         // Check alice's source chain contains the new value
         let has_hash: bool = fresh_reader_test(alice_call_data.authored_db.clone(), |txn| {
             txn.query_row(
-                "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE header_hash = :hash)",
+                "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE action_hash = :hash)",
                 named_params! {
-                    ":hash": header_hash
+                    ":hash": action_hash
                 },
                 |row| row.get(0),
             )
@@ -242,7 +242,7 @@ pub mod wasm_test {
             .await
             .unwrap();
         let ((bobbo2,),) = apps.into_tuples();
-        let header_hash: HeaderHash = conductor
+        let action_hash: ActionHash = conductor
             .call(
                 &bobbo2.zome(TestWasm::WhoAmI),
                 "call_create_entry",
@@ -253,9 +253,9 @@ pub mod wasm_test {
         // Check alice's source chain contains the new value
         let has_hash: bool = fresh_reader_test(alice.dht_db().clone(), |txn| {
             txn.query_row(
-                "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE header_hash = :hash)",
+                "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE action_hash = :hash)",
                 named_params! {
-                    ":hash": header_hash
+                    ":hash": action_hash
                 },
                 |row| row.get(0),
             )

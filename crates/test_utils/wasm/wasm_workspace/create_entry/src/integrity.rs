@@ -28,17 +28,17 @@ pub enum LinkTypes {
 #[cfg_attr(feature = "integrity", hdk_extern)]
 pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     if let Op::StoreEntry {
-        header:
+        action:
             SignedHashed {
                 hashed: HoloHashed {
-                    content: header, ..
+                    content: action, ..
                 },
                 ..
             },
         entry,
     } = op
     {
-        header
+        action
             .app_entry_type()
             .map(|AppEntryType { id, .. }| id)
             .map_or(
