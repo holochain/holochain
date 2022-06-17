@@ -1,44 +1,44 @@
-//! Facts for Elements
+//! Facts for Records
 
 use crate::prelude::*;
 use contrafact::*;
 use holo_hash::*;
 
-type Pair = (Header, Option<Entry>);
+type Pair = (Action, Option<Entry>);
 
-/// Fact: Given a pair of a header and optional Entry:
-/// - If the header references an Entry, the Entry will exist and be of the appropriate hash
-/// - If the header does not references an Entry, the entry will be None
+/// Fact: Given a pair of an action and optional Entry:
+/// - If the action references an Entry, the Entry will exist and be of the appropriate hash
+/// - If the action does not references an Entry, the entry will be None
 //
 // TODO: this Fact is useless until we can write "traversals" in addition to lenses and prisms,
-// because we cannot in general use a lens to extract a `&mut (Header, Option<Entry>)`
-// from any type, and instead need to operate on a `(&mut Header, &mut Option<Entry>)`.
+// because we cannot in general use a lens to extract a `&mut (Action, Option<Entry>)`
+// from any type, and instead need to operate on a `(&mut Action, &mut Option<Entry>)`.
 // (A Traversal is like a lens that can focus on more than one thing at once.)
 // Alternatively, this might be an argument for making contrafact work with immutable values
 // instead of mutable references.
 //
-// At least we can use this as a reference to write the same logic for DhtOp and Element,
+// At least we can use this as a reference to write the same logic for DhtOp and Record,
 // which require the same sort of checks.
 
-pub fn header_and_entry_match() -> Facts<'static, Pair> {
+pub fn action_and_entry_match() -> Facts<'static, Pair> {
     facts![
         brute(
-            "Header type matches Entry existence",
-            |(header, entry): &Pair| {
-                let has_header = header.entry_data().is_some();
+            "Action type matches Entry existence",
+            |(action, entry): &Pair| {
+                let has_action = action.entry_data().is_some();
                 let has_entry = entry.is_some();
-                has_header == has_entry
+                has_action == has_entry
             }
         ),
         mapped(
-            "If there is entry data, the header must point to it",
+            "If there is entry data, the action must point to it",
             |pair: &Pair| {
                 if let Some(entry) = &pair.1 {
                     // NOTE: this could be a `lens` if the previous check were short-circuiting,
                     // but it is possible that this check will run even if the previous check fails,
                     // so use a prism instead.
                     facts![prism(
-                        "header's entry hash",
+                        "action's entry hash",
                         |pair: &mut Pair| pair.0.entry_data_mut().map(|(hash, _)| hash),
                         eq("hash of matching entry", EntryHash::with_data_sync(entry)),
                     )]
@@ -53,26 +53,26 @@ pub fn header_and_entry_match() -> Facts<'static, Pair> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::header::facts as header_facts;
+    use crate::action::facts as action_facts;
     use arbitrary::{Arbitrary, Unstructured};
 
     #[test]
-    fn test_header_and_entry_match() {
+    fn test_action_and_entry_match() {
         let mut uu = Unstructured::new(&crate::NOISE);
         let u = &mut uu;
 
         let e = Entry::arbitrary(u).unwrap();
-        let hn = not_(header_facts::is_new_entry_header()).build(u);
-        let mut he = header_facts::is_new_entry_header().build(u);
+        let hn = not_(action_facts::is_new_entry_action()).build(u);
+        let mut he = action_facts::is_new_entry_action().build(u);
         *he.entry_data_mut().unwrap().0 = EntryHash::with_data_sync(&e);
-        let he = Header::from(he);
+        let he = Action::from(he);
 
         let pair1: Pair = (hn.clone(), None);
         let pair2: Pair = (hn.clone(), Some(e.clone()));
         let pair3: Pair = (he.clone(), None);
         let pair4: Pair = (he.clone(), Some(e.clone()));
 
-        let fact = header_and_entry_match();
+        let fact = action_and_entry_match();
 
         fact.check(&pair1).unwrap();
         assert!(fact.check(&pair2).is_err());

@@ -1,4 +1,4 @@
-//! A microsecond-precision UTC timestamp for use in Holochain's headers.
+//! A microsecond-precision UTC timestamp for use in Holochain's actions.
 #![deny(missing_docs)]
 
 #[allow(missing_docs)]
@@ -24,7 +24,7 @@ mod chrono_ext;
 /// One million
 pub const MM: i64 = 1_000_000;
 
-/// A microsecond-precision UTC timestamp for use in Holochain's headers.
+/// A microsecond-precision UTC timestamp for use in Holochain's actions.
 ///
 /// It is assumed to be untrustworthy:
 /// it may contain times offset from the UNIX epoch with the full +/- i64 range.
@@ -35,7 +35,7 @@ pub const MM: i64 = 1_000_000;
 /// representable by either a chrono::Duration (which limits itself to +/- i64 microseconds), *nor*
 /// by core::time::Duration (which limits itself to +'ve u64 seconds).  Many constructions of these
 /// chrono and core::time types will panic!, so painful measures must be taken to avoid this outcome
-/// -- it is not acceptable for our core Holochain algorithms to panic when accessing DHT Header
+/// -- it is not acceptable for our core Holochain algorithms to panic when accessing DHT Action
 /// information committed by other random Holochain nodes!
 ///
 /// Timestamp implements `Serialize` and `Display` as rfc3339 time strings (if possible).

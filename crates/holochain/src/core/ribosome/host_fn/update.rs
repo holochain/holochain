@@ -14,7 +14,7 @@ pub fn update<'a>(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: UpdateInput,
-) -> Result<HeaderHash, RuntimeError> {
+) -> Result<ActionHash, RuntimeError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess {
             write_workspace: Permission::Allow,
@@ -22,17 +22,17 @@ pub fn update<'a>(
         } => {
             // destructure the args out into an app type def id and entry
             let UpdateInput {
-                original_header_address,
+                original_action_address,
                 entry,
                 chain_top_ordering,
             } = input;
 
             let (original_entry_address, entry_type) =
-                get_original_entry_data(call_context.clone(), original_header_address.clone())?;
+                get_original_entry_data(call_context.clone(), original_action_address.clone())?;
 
             let weight = weigh_placeholder();
 
-            // Countersigned entries have different header handling.
+            // Countersigned entries have different action handling.
             match entry {
                 Entry::CounterSign(_, _) => tokio_helper::block_forever_on(async move {
                     call_context
@@ -51,10 +51,10 @@ pub fn update<'a>(
                     // build the entry hash
                     let entry_hash = EntryHash::with_data_sync(&entry);
 
-                    // build a header for the entry being updated
-                    let header_builder = builder::Update {
+                    // build a action for the entry being updated
+                    let action_builder = builder::Update {
                         original_entry_address,
-                        original_header_address,
+                        original_action_address,
                         entry_type,
                         entry_hash,
                     };
@@ -69,15 +69,15 @@ pub fn update<'a>(
                             .source_chain()
                             .as_ref()
                             .expect("Must have source chain if write_workspace access is given");
-                        // push the header and the entry into the source chain
-                        let header_hash = source_chain
-                            .put_weightless(header_builder, Some(entry), chain_top_ordering)
+                        // push the action and the entry into the source chain
+                        let action_hash = source_chain
+                            .put_weightless(action_builder, Some(entry), chain_top_ordering)
                             .await
                             .map_err(|source_chain_error| -> RuntimeError {
                                 wasm_error!(WasmErrorInner::Host(source_chain_error.to_string()))
                                     .into()
                             })?;
-                        Ok(header_hash)
+                        Ok(action_hash)
                     })
                 }
             }

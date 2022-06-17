@@ -3,12 +3,12 @@ use self::get_entry_ops_query::GetEntryOpsQuery;
 use self::get_links_ops_query::GetLinksOpsQuery;
 use self::{
     get_agent_activity_query::deterministic::DeterministicGetAgentActivityQuery,
-    get_element_query::GetElementOpsQuery,
+    get_record_query::GetRecordOpsQuery,
 };
 
 use super::error::CascadeResult;
+use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
-use holo_hash::HeaderHash;
 use holochain_state::query::Query;
 use holochain_state::query::Txn;
 use holochain_types::prelude::*;
@@ -19,9 +19,9 @@ use tracing::*;
 mod test;
 
 pub(crate) mod get_agent_activity_query;
-pub(crate) mod get_element_query;
 pub(crate) mod get_entry_ops_query;
 pub(crate) mod get_links_ops_query;
+pub(crate) mod get_record_query;
 
 #[instrument(skip(db))]
 pub async fn handle_get_entry(
@@ -37,12 +37,12 @@ pub async fn handle_get_entry(
 }
 
 #[tracing::instrument(skip(env))]
-pub async fn handle_get_element(
+pub async fn handle_get_record(
     env: DbRead<DbKindDht>,
-    hash: HeaderHash,
+    hash: ActionHash,
     options: holochain_p2p::event::GetOptions,
-) -> CascadeResult<WireElementOps> {
-    let query = GetElementOpsQuery::new(hash, options);
+) -> CascadeResult<WireRecordOps> {
+    let query = GetRecordOpsQuery::new(hash, options);
     let results = env
         .async_reader(move |txn| query.run(Txn::from(&txn)))
         .await?;
@@ -55,7 +55,7 @@ pub async fn handle_get_agent_activity(
     agent: AgentPubKey,
     query: ChainQueryFilter,
     options: holochain_p2p::event::GetActivityOptions,
-) -> CascadeResult<AgentActivityResponse<HeaderHash>> {
+) -> CascadeResult<AgentActivityResponse<ActionHash>> {
     let query = GetAgentActivityQuery::new(agent, query, options);
     let results = env
         .async_reader(move |txn| query.run(Txn::from(&txn)))

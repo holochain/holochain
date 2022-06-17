@@ -26,15 +26,15 @@ pub trait HdkT: HdiT {
         &self,
         get_agent_activity_input: GetAgentActivityInput,
     ) -> ExternResult<AgentActivity>;
-    fn query(&self, filter: ChainQueryFilter) -> ExternResult<Vec<Element>>;
+    fn query(&self, filter: ChainQueryFilter) -> ExternResult<Vec<Record>>;
     // Ed25519
     fn sign(&self, sign: Sign) -> ExternResult<Signature>;
     fn sign_ephemeral(&self, sign_ephemeral: SignEphemeral) -> ExternResult<EphemeralSignatures>;
     // Entry
-    fn create(&self, create_input: CreateInput) -> ExternResult<HeaderHash>;
-    fn update(&self, update_input: UpdateInput) -> ExternResult<HeaderHash>;
-    fn delete(&self, delete_input: DeleteInput) -> ExternResult<HeaderHash>;
-    fn get(&self, get_input: Vec<GetInput>) -> ExternResult<Vec<Option<Element>>>;
+    fn create(&self, create_input: CreateInput) -> ExternResult<ActionHash>;
+    fn update(&self, update_input: UpdateInput) -> ExternResult<ActionHash>;
+    fn delete(&self, delete_input: DeleteInput) -> ExternResult<ActionHash>;
+    fn get(&self, get_input: Vec<GetInput>) -> ExternResult<Vec<Option<Record>>>;
     fn get_details(&self, get_input: Vec<GetInput>) -> ExternResult<Vec<Option<Details>>>;
     // CounterSigning
     fn accept_countersigning_preflight_request(
@@ -45,8 +45,8 @@ pub trait HdkT: HdiT {
     fn agent_info(&self, agent_info_input: ()) -> ExternResult<AgentInfo>;
     fn call_info(&self, call_info_input: ()) -> ExternResult<CallInfo>;
     // Link
-    fn create_link(&self, create_link_input: CreateLinkInput) -> ExternResult<HeaderHash>;
-    fn delete_link(&self, delete_link_input: DeleteLinkInput) -> ExternResult<HeaderHash>;
+    fn create_link(&self, create_link_input: CreateLinkInput) -> ExternResult<ActionHash>;
+    fn delete_link(&self, delete_link_input: DeleteLinkInput) -> ExternResult<ActionHash>;
     fn get_links(&self, get_links_input: Vec<GetLinksInput>) -> ExternResult<Vec<Vec<Link>>>;
     fn get_link_details(
         &self,
@@ -96,15 +96,15 @@ mockall::mock! {
             &self,
             get_agent_activity_input: GetAgentActivityInput,
         ) -> ExternResult<AgentActivity>;
-        fn query(&self, filter: ChainQueryFilter) -> ExternResult<Vec<Element>>;
+        fn query(&self, filter: ChainQueryFilter) -> ExternResult<Vec<Record>>;
         // Ed25519
         fn sign(&self, sign: Sign) -> ExternResult<Signature>;
         fn sign_ephemeral(&self, sign_ephemeral: SignEphemeral) -> ExternResult<EphemeralSignatures>;
         // Entry
-        fn create(&self, create_input: CreateInput) -> ExternResult<HeaderHash>;
-        fn update(&self, update_input: UpdateInput) -> ExternResult<HeaderHash>;
-        fn delete(&self, delete_input: DeleteInput) -> ExternResult<HeaderHash>;
-        fn get(&self, get_input: Vec<GetInput>) -> ExternResult<Vec<Option<Element>>>;
+        fn create(&self, create_input: CreateInput) -> ExternResult<ActionHash>;
+        fn update(&self, update_input: UpdateInput) -> ExternResult<ActionHash>;
+        fn delete(&self, delete_input: DeleteInput) -> ExternResult<ActionHash>;
+        fn get(&self, get_input: Vec<GetInput>) -> ExternResult<Vec<Option<Record>>>;
         fn get_details(&self, get_input: Vec<GetInput>) -> ExternResult<Vec<Option<Details>>>;
         // CounterSigning
         fn accept_countersigning_preflight_request(
@@ -115,8 +115,8 @@ mockall::mock! {
         fn agent_info(&self, agent_info_input: ()) -> ExternResult<AgentInfo>;
         fn call_info(&self, call_info_input: ()) -> ExternResult<CallInfo>;
         // Link
-        fn create_link(&self, create_link_input: CreateLinkInput) -> ExternResult<HeaderHash>;
-        fn delete_link(&self, delete_link_input: DeleteLinkInput) -> ExternResult<HeaderHash>;
+        fn create_link(&self, create_link_input: CreateLinkInput) -> ExternResult<ActionHash>;
+        fn delete_link(&self, delete_link_input: DeleteLinkInput) -> ExternResult<ActionHash>;
         fn get_links(&self, get_links_input: Vec<GetLinksInput>) -> ExternResult<Vec<Vec<Link>>>;
         fn get_link_details(
             &self,
@@ -161,14 +161,14 @@ mockall::mock! {
         fn verify_signature(&self, verify_signature: VerifySignature) -> ExternResult<bool>;
         fn hash(&self, hash_input: HashInput) -> ExternResult<HashOutput>;
         fn must_get_entry(&self, must_get_entry_input: MustGetEntryInput) -> ExternResult<EntryHashed>;
-        fn must_get_header(
+        fn must_get_action(
             &self,
-            must_get_header_input: MustGetHeaderInput,
-        ) -> ExternResult<SignedHeaderHashed>;
-        fn must_get_valid_element(
+            must_get_action_input: MustGetActionInput,
+        ) -> ExternResult<SignedActionHashed>;
+        fn must_get_valid_record(
             &self,
-            must_get_valid_element_input: MustGetValidElementInput,
-        ) -> ExternResult<Element>;
+            must_get_valid_record_input: MustGetValidRecordInput,
+        ) -> ExternResult<Record>;
         // Info
         fn dna_info(&self, dna_info_input: ()) -> ExternResult<DnaInfo>;
         fn zome_info(&self, zome_info_input: ()) -> ExternResult<ZomeInfo>;
@@ -216,17 +216,17 @@ impl HdiT for ErrHdk {
         Self::err()
     }
 
-    fn must_get_header(
+    fn must_get_action(
         &self,
-        _must_get_header_input: MustGetHeaderInput,
-    ) -> ExternResult<SignedHeaderHashed> {
+        _must_get_action_input: MustGetActionInput,
+    ) -> ExternResult<SignedActionHashed> {
         Self::err()
     }
 
-    fn must_get_valid_element(
+    fn must_get_valid_record(
         &self,
-        _must_get_valid_element_input: MustGetValidElementInput,
-    ) -> ExternResult<Element> {
+        _must_get_valid_record_input: MustGetValidRecordInput,
+    ) -> ExternResult<Record> {
         Self::err()
     }
 
@@ -262,7 +262,7 @@ impl HdkT for ErrHdk {
     fn get_agent_activity(&self, _: GetAgentActivityInput) -> ExternResult<AgentActivity> {
         Self::err()
     }
-    fn query(&self, _: ChainQueryFilter) -> ExternResult<Vec<Element>> {
+    fn query(&self, _: ChainQueryFilter) -> ExternResult<Vec<Record>> {
         Self::err()
     }
     fn sign(&self, _: Sign) -> ExternResult<Signature> {
@@ -271,16 +271,16 @@ impl HdkT for ErrHdk {
     fn sign_ephemeral(&self, _: SignEphemeral) -> ExternResult<EphemeralSignatures> {
         Self::err()
     }
-    fn create(&self, _: CreateInput) -> ExternResult<HeaderHash> {
+    fn create(&self, _: CreateInput) -> ExternResult<ActionHash> {
         Self::err()
     }
-    fn update(&self, _: UpdateInput) -> ExternResult<HeaderHash> {
+    fn update(&self, _: UpdateInput) -> ExternResult<ActionHash> {
         Self::err()
     }
-    fn delete(&self, _: DeleteInput) -> ExternResult<HeaderHash> {
+    fn delete(&self, _: DeleteInput) -> ExternResult<ActionHash> {
         Self::err()
     }
-    fn get(&self, _: Vec<GetInput>) -> ExternResult<Vec<Option<Element>>> {
+    fn get(&self, _: Vec<GetInput>) -> ExternResult<Vec<Option<Record>>> {
         Self::err()
     }
     fn get_details(&self, _: Vec<GetInput>) -> ExternResult<Vec<Option<Details>>> {
@@ -300,10 +300,10 @@ impl HdkT for ErrHdk {
         Self::err()
     }
     // Link
-    fn create_link(&self, _: CreateLinkInput) -> ExternResult<HeaderHash> {
+    fn create_link(&self, _: CreateLinkInput) -> ExternResult<ActionHash> {
         Self::err()
     }
-    fn delete_link(&self, _: DeleteLinkInput) -> ExternResult<HeaderHash> {
+    fn delete_link(&self, _: DeleteLinkInput) -> ExternResult<ActionHash> {
         Self::err()
     }
     fn get_links(&self, _: Vec<GetLinksInput>) -> ExternResult<Vec<Vec<Link>>> {
@@ -397,17 +397,17 @@ impl HdiT for HostHdk {
     fn must_get_entry(&self, must_get_entry_input: MustGetEntryInput) -> ExternResult<EntryHashed> {
         HostHdi::new().must_get_entry(must_get_entry_input)
     }
-    fn must_get_header(
+    fn must_get_action(
         &self,
-        must_get_header_input: MustGetHeaderInput,
-    ) -> ExternResult<SignedHeaderHashed> {
-        HostHdi::new().must_get_header(must_get_header_input)
+        must_get_action_input: MustGetActionInput,
+    ) -> ExternResult<SignedActionHashed> {
+        HostHdi::new().must_get_action(must_get_action_input)
     }
-    fn must_get_valid_element(
+    fn must_get_valid_record(
         &self,
-        must_get_valid_element_input: MustGetValidElementInput,
-    ) -> ExternResult<Element> {
-        HostHdi::new().must_get_valid_element(must_get_valid_element_input)
+        must_get_valid_record_input: MustGetValidRecordInput,
+    ) -> ExternResult<Record> {
+        HostHdi::new().must_get_valid_record(must_get_valid_record_input)
     }
     fn dna_info(&self, _: ()) -> ExternResult<DnaInfo> {
         HostHdi::new().dna_info(())
@@ -447,8 +447,8 @@ impl HdkT for HostHdk {
             get_agent_activity_input,
         )
     }
-    fn query(&self, filter: ChainQueryFilter) -> ExternResult<Vec<Element>> {
-        host_call::<ChainQueryFilter, Vec<Element>>(__query, filter)
+    fn query(&self, filter: ChainQueryFilter) -> ExternResult<Vec<Record>> {
+        host_call::<ChainQueryFilter, Vec<Record>>(__query, filter)
     }
     fn sign(&self, sign: Sign) -> ExternResult<Signature> {
         host_call::<Sign, Signature>(__sign, sign)
@@ -456,17 +456,17 @@ impl HdkT for HostHdk {
     fn sign_ephemeral(&self, sign_ephemeral: SignEphemeral) -> ExternResult<EphemeralSignatures> {
         host_call::<SignEphemeral, EphemeralSignatures>(__sign_ephemeral, sign_ephemeral)
     }
-    fn create(&self, create_input: CreateInput) -> ExternResult<HeaderHash> {
-        host_call::<CreateInput, HeaderHash>(__create, create_input)
+    fn create(&self, create_input: CreateInput) -> ExternResult<ActionHash> {
+        host_call::<CreateInput, ActionHash>(__create, create_input)
     }
-    fn update(&self, update_input: UpdateInput) -> ExternResult<HeaderHash> {
-        host_call::<UpdateInput, HeaderHash>(__update, update_input)
+    fn update(&self, update_input: UpdateInput) -> ExternResult<ActionHash> {
+        host_call::<UpdateInput, ActionHash>(__update, update_input)
     }
-    fn delete(&self, hash: DeleteInput) -> ExternResult<HeaderHash> {
-        host_call::<DeleteInput, HeaderHash>(__delete, hash)
+    fn delete(&self, hash: DeleteInput) -> ExternResult<ActionHash> {
+        host_call::<DeleteInput, ActionHash>(__delete, hash)
     }
-    fn get(&self, get_inputs: Vec<GetInput>) -> ExternResult<Vec<Option<Element>>> {
-        host_call::<Vec<GetInput>, Vec<Option<Element>>>(__get, get_inputs)
+    fn get(&self, get_inputs: Vec<GetInput>) -> ExternResult<Vec<Option<Record>>> {
+        host_call::<Vec<GetInput>, Vec<Option<Record>>>(__get, get_inputs)
     }
     fn get_details(&self, get_inputs: Vec<GetInput>) -> ExternResult<Vec<Option<Details>>> {
         host_call::<Vec<GetInput>, Vec<Option<Details>>>(__get_details, get_inputs)
@@ -487,11 +487,11 @@ impl HdkT for HostHdk {
     fn call_info(&self, _: ()) -> ExternResult<CallInfo> {
         host_call::<(), CallInfo>(__call_info, ())
     }
-    fn create_link(&self, create_link_input: CreateLinkInput) -> ExternResult<HeaderHash> {
-        host_call::<CreateLinkInput, HeaderHash>(__create_link, create_link_input)
+    fn create_link(&self, create_link_input: CreateLinkInput) -> ExternResult<ActionHash> {
+        host_call::<CreateLinkInput, ActionHash>(__create_link, create_link_input)
     }
-    fn delete_link(&self, delete_link_input: DeleteLinkInput) -> ExternResult<HeaderHash> {
-        host_call::<DeleteLinkInput, HeaderHash>(__delete_link, delete_link_input)
+    fn delete_link(&self, delete_link_input: DeleteLinkInput) -> ExternResult<ActionHash> {
+        host_call::<DeleteLinkInput, ActionHash>(__delete_link, delete_link_input)
     }
     fn get_links(&self, get_links_input: Vec<GetLinksInput>) -> ExternResult<Vec<Vec<Link>>> {
         host_call::<Vec<GetLinksInput>, Vec<Vec<Link>>>(__get_links, get_links_input)

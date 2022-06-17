@@ -75,7 +75,7 @@ fn who_are_they_local(cell_id: CellId) -> ExternResult<AgentInfo> {
 /// The cell id must point to a cell which includes
 /// the "create_entry" zome.
 #[hdk_extern]
-fn call_create_entry(cell_id: CellId) -> ExternResult<HeaderHash> {
+fn call_create_entry(cell_id: CellId) -> ExternResult<ActionHash> {
     let zome_call_response: ZomeCallResponse = call(
         CallTargetCell::Other(cell_id),
         Zomes::CreateEntry,

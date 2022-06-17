@@ -486,7 +486,7 @@ dependencies = [
 
 [[package]]
 name = "fixt"
-version = "0.0.11"
+version = "0.0.12"
 dependencies = [
  "holochain_serialized_bytes",
  "lazy_static",
@@ -680,7 +680,7 @@ dependencies = [
 
 [[package]]
 name = "hdk"
-version = "0.0.136"
+version = "0.0.137"
 dependencies = [
  "hdk_derive",
  "holo_hash",
@@ -698,7 +698,7 @@ dependencies = [
 
 [[package]]
 name = "hdk_derive"
-version = "0.0.35"
+version = "0.0.36"
 dependencies = [
  "darling 0.14.1",
  "heck 0.4.0",
@@ -736,7 +736,7 @@ dependencies = [
 
 [[package]]
 name = "holo_hash"
-version = "0.0.27"
+version = "0.0.28"
 dependencies = [
  "arbitrary",
  "base64",
@@ -755,7 +755,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_deterministic_integrity"
-version = "0.0.8"
+version = "0.0.9"
 dependencies = [
  "hdk_derive",
  "holo_hash",
@@ -770,7 +770,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_integrity_types"
-version = "0.0.7"
+version = "0.0.8"
 dependencies = [
  "arbitrary",
  "holo_hash",
@@ -818,7 +818,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_test_wasm_common"
-version = "0.0.37"
+version = "0.0.38"
 dependencies = [
  "hdk",
  "serde",
@@ -853,7 +853,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_zome_types"
-version = "0.0.35"
+version = "0.0.36"
 dependencies = [
  "fixt",
  "holo_hash",
