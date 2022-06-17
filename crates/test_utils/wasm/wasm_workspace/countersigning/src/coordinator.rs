@@ -23,7 +23,7 @@ fn create_countersigned(
         EntryTypes::Thing(t) => t,
     };
 
-    let entry = Entry::CounterSign(
+    let entry = RecordBuilder::CounterSign(
         Box::new(
             CounterSigningSessionData::try_from_responses(responses).map_err(
                 |countersigning_error| {
@@ -31,16 +31,18 @@ fn create_countersigned(
                 },
             )?,
         ),
-        thing.try_into()?,
-    );
-    HDK.with(|h| {
-        h.borrow().create(CreateInput::new(
+        AppEntry {
             entry_def_index,
             visibility,
-            entry,
+            entry: thing.try_into()?,
+        },
+    );
+    HDK.with(|h| {
+        h.borrow().create(CreateInput {
+            builder: entry,
             // Countersigned entries MUST have strict ordering.
-            ChainTopOrdering::Strict,
-        ))
+            chain_top_ordering: ChainTopOrdering::Strict,
+        })
     })
 }
 

@@ -23,14 +23,16 @@ fn create_entry(_: ()) -> ExternResult<ActionHash> {
     let post = new_post();
     HDK.with(|h| {
         h.borrow().create(CreateInput::new(
-            EntryDefIndex::try_from(&post)?,
-            EntryVisibility::from(&post),
-            post.try_into().unwrap(),
+            RecordBuilder::App(AppEntry {
+                entry_def_index: EntryDefIndex::try_from(&post)?,
+                visibility: EntryVisibility::from(&post),
+                entry: post.try_into().unwrap(),
+            }),
             // This is used to test many conductors thrashing creates between
             // each other so we want to avoid retries that make the test take
             // a long time.
             ChainTopOrdering::Relaxed,
-        ))
+        )?)
     })
 }
 

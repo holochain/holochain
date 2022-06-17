@@ -4,12 +4,14 @@ use hdk::prelude::*;
 impl TryFrom<&ThisWasmEntry> for CreateInput {
     type Error = WasmError;
     fn try_from(this_wasm_entry: &ThisWasmEntry) -> Result<Self, Self::Error> {
-        Ok(Self::new(
-            EntryDefIndex::try_from(this_wasm_entry)?,
-            EntryVisibility::Public,
-            Entry::try_from(this_wasm_entry)?,
+        Self::new(
+            RecordBuilder::App(AppEntry {
+                entry_def_index: EntryDefIndex::try_from(this_wasm_entry)?,
+                visibility: EntryVisibility::Public,
+                entry: AppEntryBytes::try_from(this_wasm_entry)?,
+            }),
             ChainTopOrdering::default(),
-        ))
+        )
     }
 }
 

@@ -19,13 +19,15 @@ use hdk::prelude::*;
 fn scheduled_fn(_: Option<Schedule>) -> Option<Schedule> {
     if HDK
         .with(|h| {
-            h.borrow().create(CreateInput::new(
-                EntryDefIndex::try_from(EntryTypesUnit::Tick)?,
-                EntryVisibility::Public,
-                Tick.try_into().unwrap(),
+            h.borrow().create(CreateInput {
+                builder: RecordBuilder::App(AppEntry {
+                    entry_def_index: EntryDefIndex::try_from(EntryTypesUnit::Tick)?,
+                    visibility: EntryVisibility::Public,
+                    entry: Tick.try_into().unwrap(),
+                }),
                 // This will be running concurrently with cron_scheduled_fn.
-                ChainTopOrdering::Relaxed,
-            ))
+                chain_top_ordering: ChainTopOrdering::Relaxed,
+            })
         })
         .is_err()
     {
@@ -48,12 +50,14 @@ fn scheduled_fn(_: Option<Schedule>) -> Option<Schedule> {
 fn cron_scheduled_fn(_: Option<Schedule>) -> Option<Schedule> {
     HDK.with(|h| {
         h.borrow().create(CreateInput::new(
-            EntryDefIndex::try_from(EntryTypesUnit::Tock)?,
-            EntryVisibility::Public,
-            Tock.try_into().unwrap(),
+            RecordBuilder::App(AppEntry {
+                entry_def_index: EntryDefIndex::try_from(EntryTypesUnit::Tock)?,
+                visibility: EntryVisibility::Public,
+                entry: Tock.try_into().unwrap(),
+            }),
             // This will be running concurrently with scheduled_fn.
             ChainTopOrdering::Relaxed,
-        ))
+        )?)
     })
     .ok();
     Some(Schedule::Persisted("* * * * * * *".to_string()))
