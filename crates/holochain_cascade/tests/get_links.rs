@@ -41,7 +41,7 @@ async fn links_not_authority() {
         .await
         .unwrap();
 
-    assert_eq!(r, vec![(td.create_link_header.clone(), vec![]),]);
+    assert_eq!(r, vec![(td.create_link_action.clone(), vec![]),]);
 
     fill_db(&authority.to_db(), td.delete_link_op.clone());
 
@@ -60,8 +60,8 @@ async fn links_not_authority() {
     assert_eq!(
         r,
         vec![(
-            td.create_link_header.clone(),
-            vec![td.delete_link_header.clone()]
+            td.create_link_action.clone(),
+            vec![td.delete_link_action.clone()]
         ),]
     );
 }

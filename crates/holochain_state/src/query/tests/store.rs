@@ -23,10 +23,10 @@ async fn exists() {
         .contains_hash(&td.hash.clone().into())
         .unwrap());
     assert!(Txn::from(&txn)
-        .contains_hash(&td.header.as_hash().clone().into())
+        .contains_hash(&td.action.as_hash().clone().into())
         .unwrap());
     assert!(scratch.contains_hash(&td.hash.clone().into()).unwrap());
     assert!(scratch
-        .contains_hash(&td.header.as_hash().clone().into())
+        .contains_hash(&td.action.as_hash().clone().into())
         .unwrap());
 }

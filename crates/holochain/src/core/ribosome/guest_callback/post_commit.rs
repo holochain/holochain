@@ -18,12 +18,12 @@ pub const POST_COMMIT_CONCURRENT_LIMIT: usize = 5;
 #[derive(Clone)]
 pub struct PostCommitInvocation {
     zome: CoordinatorZome,
-    headers: Vec<SignedHeaderHashed>,
+    actions: Vec<SignedActionHashed>,
 }
 
 impl PostCommitInvocation {
-    pub fn new(zome: CoordinatorZome, headers: Vec<SignedHeaderHashed>) -> Self {
-        Self { zome, headers }
+    pub fn new(zome: CoordinatorZome, actions: Vec<SignedActionHashed>) -> Self {
+        Self { zome, actions }
     }
 }
 
@@ -60,7 +60,7 @@ impl Invocation for PostCommitInvocation {
         vec!["post_commit".into()].into()
     }
     fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
-        ExternIO::encode(self.headers)
+        ExternIO::encode(self.actions)
     }
     fn auth(&self) -> InvocationAuth {
         InvocationAuth::LocalCallback
@@ -70,7 +70,7 @@ impl Invocation for PostCommitInvocation {
 impl TryFrom<PostCommitInvocation> for ExternIO {
     type Error = SerializedBytesError;
     fn try_from(post_commit_invocation: PostCommitInvocation) -> Result<Self, Self::Error> {
-        ExternIO::encode(&post_commit_invocation.headers)
+        ExternIO::encode(&post_commit_invocation.actions)
     }
 }
 
@@ -79,7 +79,7 @@ pub async fn send_post_commit(
     workspace: SourceChainWorkspace,
     network: HolochainP2pDna,
     keystore: MetaLairClient,
-    headers: Vec<SignedHeaderHashed>,
+    actions: Vec<SignedActionHashed>,
     zomes: Vec<CoordinatorZome>,
 ) -> Result<(), tokio::sync::mpsc::error::SendError<()>> {
     let cell_id = workspace.source_chain().cell_id();
@@ -94,7 +94,7 @@ pub async fn send_post_commit(
                     keystore: keystore.clone(),
                     network: network.clone(),
                 },
-                invocation: PostCommitInvocation::new(zome, headers.clone()),
+                invocation: PostCommitInvocation::new(zome, actions.clone()),
                 cell_id: cell_id.clone(),
             });
     }
@@ -161,7 +161,7 @@ mod test {
 
         assert_eq!(
             host_input,
-            ExternIO::encode(HeaderHashVecFixturator::new(::fixt::Empty).next().unwrap()).unwrap(),
+            ExternIO::encode(ActionHashVecFixturator::new(::fixt::Empty).next().unwrap()).unwrap(),
         );
     }
 }
@@ -233,15 +233,15 @@ mod slow_tests {
 
         let _set_access: () = conductor.call::<_, (), _>(&bob, "set_access", ()).await;
 
-        let _ping: HeaderHash = conductor.call(&alice, "ping", bob_pubkey).await;
+        let _ping: ActionHash = conductor.call(&alice, "ping", bob_pubkey).await;
 
         tokio::time::sleep(std::time::Duration::from_millis(600)).await;
 
-        let alice_query: Vec<Element> = conductor.call(&alice, "query", ()).await;
+        let alice_query: Vec<Record> = conductor.call(&alice, "query", ()).await;
 
         assert_eq!(alice_query.len(), 5);
 
-        let bob_query: Vec<Element> = conductor.call(&bob, "query", ()).await;
+        let bob_query: Vec<Record> = conductor.call(&bob, "query", ()).await;
 
         assert_eq!(bob_query.len(), 4);
 

@@ -4,7 +4,7 @@ use holochain_serialized_bytes::prelude::*;
 
 use crate::{Create, CreateLink, Delete, Entry, Update};
 
-/// Input to the `weigh` callback. Includes an "unweighed" header, and Entry
+/// Input to the `weigh` callback. Includes an "unweighed" action, and Entry
 /// if applicable.
 #[derive(Clone, PartialEq, Serialize, Deserialize, SerializedBytes, Debug)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
@@ -22,10 +22,10 @@ pub enum WeighInput {
 /// A bucket ID, for rate limiting
 pub type RateBucketId = u8;
 
-/// The weight of this header, for rate limiting
+/// The weight of this action, for rate limiting
 pub type RateUnits = u8;
 
-/// The normalized total size of this header, for rate limiting
+/// The normalized total size of this action, for rate limiting
 pub type RateBytes = u8;
 
 /// The amount that a bucket is "filled"

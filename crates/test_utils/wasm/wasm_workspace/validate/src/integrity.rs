@@ -90,16 +90,16 @@ pub fn __num_link_types() -> u8 {
 fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op {
         Op::StoreEntry {
-            header:
+            action:
                 SignedHashed {
                     hashed:
                         HoloHashed {
-                            content: header, ..
+                            content: action, ..
                         },
                     ..
                 },
             entry,
-        } => match header.app_entry_type() {
+        } => match action.app_entry_type() {
             Some(AppEntryType { id, .. }) => {
                 if zome_info()?
                     .zome_types
@@ -118,7 +118,7 @@ fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 } else {
                     Ok(ValidateCallbackResult::Invalid(format!(
                         "Not a ThisWasmEntry but a {:?}",
-                        header.entry_type()
+                        action.entry_type()
                     )))
                 }
             }

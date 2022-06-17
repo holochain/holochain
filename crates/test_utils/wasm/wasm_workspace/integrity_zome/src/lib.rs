@@ -32,10 +32,10 @@ fn genesis_self_check(data: GenesisSelfCheckData) -> ExternResult<ValidateCallba
 #[hdk_extern]
 fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     if let Op::StoreEntry {
-        header:
+        action:
             SignedHashed {
                 hashed: HoloHashed {
-                    content: header, ..
+                    content: action, ..
                 },
                 ..
             },
@@ -45,7 +45,7 @@ fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
         if let Some(AppEntryType {
             id: entry_def_index,
             ..
-        }) = header.app_entry_type()
+        }) = action.app_entry_type()
         {
             match zome_info()?
                 .zome_types
@@ -103,18 +103,18 @@ fn call_must_get_entry(must_get_entry_input: MustGetEntryInput) -> ExternResult<
     HDI.with(|i| i.borrow().must_get_entry(must_get_entry_input))
 }
 #[hdk_extern]
-fn call_must_get_header(
-    must_get_header_input: MustGetHeaderInput,
-) -> ExternResult<SignedHeaderHashed> {
-    HDI.with(|i| i.borrow().must_get_header(must_get_header_input))
+fn call_must_get_action(
+    must_get_action_input: MustGetActionInput,
+) -> ExternResult<SignedActionHashed> {
+    HDI.with(|i| i.borrow().must_get_action(must_get_action_input))
 }
 #[hdk_extern]
-fn call_must_get_valid_element(
-    must_get_valid_element_input: MustGetValidElementInput,
-) -> ExternResult<Element> {
+fn call_must_get_valid_record(
+    must_get_valid_record_input: MustGetValidRecordInput,
+) -> ExternResult<Record> {
     HDI.with(|i| {
         i.borrow()
-            .must_get_valid_element(must_get_valid_element_input)
+            .must_get_valid_record(must_get_valid_record_input)
     })
 }
 // Info
@@ -160,7 +160,7 @@ pub mod test {
     fn test_all_holochain_deterministic_integrity() {
         let mut mock_hdi = holochain_mock_hdi::MockHdiT::new();
         let empty_agent_key = AgentPubKey::from_raw_36(vec![0u8; 36]);
-        let empty_header_hash = HeaderHash::from_raw_36(vec![0u8; 36]);
+        let empty_action_hash = ActionHash::from_raw_36(vec![0u8; 36]);
         let empty_dna_hash = DnaHash::from_raw_36(vec![0u8; 36]);
 
         mock_hdi
@@ -183,26 +183,26 @@ pub mod test {
             }
         });
 
-        let dna = SignedHeaderHashed::with_presigned(
-            HeaderHashed::with_pre_hashed(
-                Header::Dna(Dna {
+        let dna = SignedActionHashed::with_presigned(
+            ActionHashed::with_pre_hashed(
+                Action::Dna(Dna {
                     author: empty_agent_key.clone(),
                     timestamp: Timestamp::from_micros(0),
                     hash: empty_dna_hash.clone(),
                 }),
-                empty_header_hash.clone(),
+                empty_action_hash.clone(),
             ),
             Signature([0u8; 64]),
         );
 
-        mock_hdi.expect_must_get_header().once().returning({
+        mock_hdi.expect_must_get_action().once().returning({
             let dna = dna.clone();
             move |_| Ok(dna.clone())
         });
 
-        mock_hdi.expect_must_get_valid_element().once().returning({
+        mock_hdi.expect_must_get_valid_record().once().returning({
             let dna = dna.clone();
-            move |_| Ok(Element::new(dna.clone(), None))
+            move |_| Ok(Record::new(dna.clone(), None))
         });
 
         mock_hdi.expect_dna_info().once().returning({
@@ -243,9 +243,9 @@ pub mod test {
 
         call_must_get_entry(MustGetEntryInput(empty_agent_key.clone().into())).unwrap();
 
-        call_must_get_header(MustGetHeaderInput(empty_header_hash.clone())).unwrap();
+        call_must_get_action(MustGetActionInput(empty_action_hash.clone())).unwrap();
 
-        call_must_get_valid_element(MustGetValidElementInput(empty_header_hash.clone())).unwrap();
+        call_must_get_valid_record(MustGetValidRecordInput(empty_action_hash.clone())).unwrap();
 
         call_dna_info(()).unwrap();
 

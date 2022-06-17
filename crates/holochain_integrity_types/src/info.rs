@@ -1,7 +1,7 @@
 //! Information about the current zome and dna.
 use core::ops::Range;
 
-use crate::header::ZomeId;
+use crate::action::ZomeId;
 use crate::zome::ZomeName;
 use crate::EntryDefs;
 use crate::FunctionName;
@@ -68,7 +68,7 @@ pub struct DnaInfo {
 /// and back again.
 pub struct ScopedZomeTypesSet {
     /// All the entry [`GlobalZomeTypeId`]s in scope for this zome.
-    /// Converts from [`EntryDefIndex`](crate::header::EntryDefIndex) to [`LocalZomeTypeId`].
+    /// Converts from [`EntryDefIndex`](crate::action::EntryDefIndex) to [`LocalZomeTypeId`].
     pub entries: ScopedZomeTypes,
     /// All the link [`GlobalZomeTypeId`]s in scope for this zome.
     /// Converts from [`LinkType`](crate::link::LinkType) to [`LocalZomeTypeId`].
