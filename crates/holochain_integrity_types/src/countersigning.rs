@@ -206,8 +206,8 @@ impl PreflightRequest {
                 self.optional_signing_agents.len(),
             ));
         }
-        // Minimum optional signers must be a majority.
-        if (self.minimum_optional_signing_agents * 2) as usize <= self.optional_signing_agents.len()
+        // Minimum optional signers must be at least half the total signers.
+        if ((self.minimum_optional_signing_agents * 2) as usize) < self.optional_signing_agents.len()
             && !self.optional_signing_agents.is_empty()
         {
             return Err(CounterSigningError::MinOptionalAgents(
@@ -265,6 +265,17 @@ impl PreflightRequest {
     #[cfg(feature = "test_utils")]
     pub fn optional_signing_agents_mut(&mut self) -> &mut CounterSigningAgents {
         &mut self.optional_signing_agents
+    }
+
+    /// Minimum optional signing agents accessor.
+    pub fn minimum_optional_signing_agents(&self) -> &u8 {
+        &self.minimum_optional_signing_agents
+    }
+
+    /// Mutable minimum optional signing agents accessor for testing.
+    #[cfg(feature = "test_utils")]
+    pub fn minimum_optional_signing_agents_mut(&mut self) -> &mut u8 {
+        &mut self.minimum_optional_signing_agents
     }
 
     /// Enzyme index accessor.
@@ -740,30 +751,93 @@ pub mod test {
     }
 
     #[test]
+    pub fn test_check_countersigning_preflight_request_optional_agents() {
+        let mut u = arbitrary::Unstructured::new(&[0; 1000]);
+        let mut preflight_request = PreflightRequest::arbitrary(&mut u).unwrap();
+
+        // Empty optional agents is a pass.
+        assert_eq!(preflight_request.check_agents_optional().unwrap(), ());
+
+        // Adding a single agent with a minimum of zero is a fail.
+        let data: Vec<_> = (0u8..255).cycle().take(100000).collect();
+        let mut uk = arbitrary::Unstructured::new(&data);
+        let alice = AgentPubKey::arbitrary(&mut uk).unwrap();
+
+        (*preflight_request.optional_signing_agents_mut()).push((alice.clone(), vec![]));
+
+        assert!(matches!(preflight_request.check_agents_optional(), Err(CounterSigningError::MinOptionalAgents(0, 1))));
+
+        // 1 of 1 is a pass
+
+        *preflight_request.minimum_optional_signing_agents_mut() = 1;
+
+        assert_eq!(preflight_request.check_agents_optional().unwrap(), ());
+
+        // 1 of 2 optional agents is a pass
+        (*preflight_request.optional_signing_agents_mut()).push((alice.clone(), vec![]));
+
+        assert_eq!(preflight_request.check_agents_optional().unwrap(), ());
+
+        // 1 of 3 optional agents is a fail
+        (*preflight_request.optional_signing_agents_mut()).push((alice.clone(), vec![]));
+
+        assert!(matches!(preflight_request.check_agents_optional(), Err(CounterSigningError::MinOptionalAgents(1, 3))));
+
+        // 2 of 3 optional agents is a pass
+        *preflight_request.minimum_optional_signing_agents_mut() = 2;
+
+        assert_eq!(preflight_request.check_agents_optional().unwrap(), ());
+
+        // 4 of 3 optional agents is a fail
+        *preflight_request.minimum_optional_signing_agents_mut() = 4;
+
+        assert!(matches!(preflight_request.check_agents_optional(), Err(CounterSigningError::OptionalAgentsLength(4, 3))));
+    }
+
+    #[test]
     pub fn test_check_countersigning_preflight_request_enzyme() {
         let mut u = arbitrary::Unstructured::new(&[0; 1000]);
-        let preflight_request = PreflightRequest::arbitrary(&mut u).unwrap();
+        let mut preflight_request = PreflightRequest::arbitrary(&mut u).unwrap();
 
-        dbg!(&preflight_request);
+        // Non enzymatic with no signers is always pass.
+        assert_eq!(preflight_request.check_enzyme().unwrap(), ());
 
-        // // None is always a pass.
-        // assert_eq!(preflight_request.check_enzyme_index().unwrap(), ());
+        let data: Vec<_> = (0u8..255).cycle().take(100000).collect();
+        let mut uk = arbitrary::Unstructured::new(&data);
+        let alice = AgentPubKey::arbitrary(&mut uk).unwrap();
+        let bob = AgentPubKey::arbitrary(&mut uk).unwrap();
 
-        // let alice = AgentPubKey::arbitrary(&mut u).unwrap();
-        // (*preflight_request.signing_agents_mut()).push((alice.clone(), vec![]));
+        // Non enzymatic with signers and no optional signers is a pass.
+        (*preflight_request.signing_agents_mut()).push((alice.clone(), vec![]));
 
-        // // 0 is the first signing agent so is a valid enzyme.
-        // *preflight_request.enzyme_index_mut() = Some(0);
+        assert_eq!(preflight_request.check_enzyme().unwrap(), (),);
 
-        // assert_eq!(preflight_request.check_enzyme_index().unwrap(), (),);
+        // Non enzymatic with optional signers is a fail.
+        (*preflight_request.optional_signing_agents_mut()).push((alice.clone(), vec![]));
 
-        // // 1 is out of bounds for zero signing agents.
-        // *preflight_request.enzyme_index_mut() = Some(1);
+        assert!(matches!(
+            preflight_request.check_enzyme(),
+            Err(CounterSigningError::NonEnzymaticOptionalSigners),
+        ));
 
-        // assert!(matches!(
-        //     preflight_request.check_enzyme_index(),
-        //     Err(CounterSigningError::EnzymeIndex(_, _))
-        // ));
+        // Enzymatic with zero optional signers is a pass.
+        *preflight_request.optional_signing_agents_mut() = vec![];
+        *preflight_request.enzymatic_mut() = true;
+
+        assert_eq!(preflight_request.check_enzyme().unwrap(), ());
+
+        // Enzymatic with optional signers is a pass.
+        *preflight_request.optional_signing_agents_mut() = vec![(alice.clone(), vec![])];
+
+        assert_eq!(preflight_request.check_enzyme().unwrap(), ());
+
+        // Enzymatic with first signer mismatch is a fail.
+        *preflight_request.optional_signing_agents_mut() = vec![(bob.clone(), vec![])];
+
+        assert!(matches!(
+            preflight_request.check_enzyme(),
+            Err(CounterSigningError::EnzymeMismatch(_, _)),
+        ));
     }
 
     #[test]
