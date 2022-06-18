@@ -207,7 +207,8 @@ impl PreflightRequest {
             ));
         }
         // Minimum optional signers must be at least half the total signers.
-        if ((self.minimum_optional_signing_agents * 2) as usize) < self.optional_signing_agents.len()
+        if ((self.minimum_optional_signing_agents * 2) as usize)
+            < self.optional_signing_agents.len()
             && !self.optional_signing_agents.is_empty()
         {
             return Err(CounterSigningError::MinOptionalAgents(
@@ -765,7 +766,10 @@ pub mod test {
 
         (*preflight_request.optional_signing_agents_mut()).push((alice.clone(), vec![]));
 
-        assert!(matches!(preflight_request.check_agents_optional(), Err(CounterSigningError::MinOptionalAgents(0, 1))));
+        assert!(matches!(
+            preflight_request.check_agents_optional(),
+            Err(CounterSigningError::MinOptionalAgents(0, 1))
+        ));
 
         // 1 of 1 is a pass
 
@@ -781,7 +785,10 @@ pub mod test {
         // 1 of 3 optional agents is a fail
         (*preflight_request.optional_signing_agents_mut()).push((alice.clone(), vec![]));
 
-        assert!(matches!(preflight_request.check_agents_optional(), Err(CounterSigningError::MinOptionalAgents(1, 3))));
+        assert!(matches!(
+            preflight_request.check_agents_optional(),
+            Err(CounterSigningError::MinOptionalAgents(1, 3))
+        ));
 
         // 2 of 3 optional agents is a pass
         *preflight_request.minimum_optional_signing_agents_mut() = 2;
@@ -791,7 +798,10 @@ pub mod test {
         // 4 of 3 optional agents is a fail
         *preflight_request.minimum_optional_signing_agents_mut() = 4;
 
-        assert!(matches!(preflight_request.check_agents_optional(), Err(CounterSigningError::OptionalAgentsLength(4, 3))));
+        assert!(matches!(
+            preflight_request.check_agents_optional(),
+            Err(CounterSigningError::OptionalAgentsLength(4, 3))
+        ));
     }
 
     #[test]
