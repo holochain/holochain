@@ -29,7 +29,8 @@
 //! The HDK is used in all the WASMs used to test Holochain itself.
 //! As they are used directly by tests in CI they are guaranteed to compile and work for at least the tests we define against them.
 //!
-//! At the time of writing there were about 40 example/test WASMs that can be browsed [on Github](https://github.com/holochain/holochain/tree/develop/crates/test_utils/wasm/wasm_workspace).
+//! At the time of writing there were about 40 example/test WASMs that can be browsed
+//! [on Github](https://github.com/holochain/holochain/tree/develop/crates/test_utils/wasm/wasm_workspace).
 //!
 //! Each example WASM is a minimal demonstration of specific HDK functionality, such as generating random data, creating entries or defining validation callbacks.
 //! Some of the examples are very contrived, none are intended as production grade hApp examples, but do highlight key functionality.
@@ -38,6 +39,9 @@
 //!
 //! Coordinator zomes are the counterpart of integrity zomes in a DNA. They contain the domain logic of how data is read and written.
 //! Whereas data is defined and validated in integrity zomes, functions to manipulate data are implemented in coordinator zomes.
+//! 
+//! An example coordinator zome can be found in the wasm workspace of the Holochain repository:
+//! <https://github.com/holochain/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/coordinator_zome/src/lib.rs>.
 //!
 //! # HDK structure 🧱
 //!
