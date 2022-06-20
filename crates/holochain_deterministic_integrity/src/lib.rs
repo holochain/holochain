@@ -2,11 +2,12 @@
 //! writing zomes.
 //!
 //! The logic of a Holochain DNA can be divided into two parts: integrity and coordination.
-//! Integrity is the part of the hApp that ensures that data is correct and coherent. Again this
-//! can be broken down into two parts - data definition and data validation.
-//! 
+//! Integrity is the part of the hApp that defines the data structure and validates data
+//! types and values. Coordination encompasses the domain logic and implements the functions
+//! to manipulate data.
+//!
 //! # Examples
-//! 
+//!
 //! An example of an integrity zome with data definition and data validation can be found in the
 //! wasm workspace of the Holochain repository:
 //! <https://github.com/holochain/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/integrity_zome/src/lib.rs>.

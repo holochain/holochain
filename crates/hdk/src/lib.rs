@@ -39,7 +39,7 @@
 //!
 //! Coordinator zomes are the counterpart of integrity zomes in a DNA. They contain the domain logic of how data is read and written.
 //! Whereas data is defined and validated in integrity zomes, functions to manipulate data are implemented in coordinator zomes.
-//! 
+//!
 //! An example coordinator zome can be found in the wasm workspace of the Holochain repository:
 //! <https://github.com/holochain/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/coordinator_zome/src/lib.rs>.
 //!
