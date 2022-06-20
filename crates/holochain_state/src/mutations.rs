@@ -16,6 +16,7 @@ use holochain_types::dht_op::{DhtOpHashed, DhtOpType};
 use holochain_types::prelude::DhtOpError;
 use holochain_types::prelude::DnaDefHashed;
 use holochain_types::prelude::DnaWasmHashed;
+use holochain_types::rate_limit::RateBucketLevels;
 use holochain_types::sql::AsSql;
 use holochain_zome_types::entry::EntryHashed;
 use holochain_zome_types::*;
@@ -145,9 +146,11 @@ pub fn insert_op(txn: &mut Transaction, op: &DhtOpHashed) -> StateMutationResult
     let action_hashed = ActionHashed::with_pre_hashed(action, op_light.action_hash().to_owned());
     let action_hashed = SignedActionHashed::with_presigned(action_hashed, signature);
     let op_order = OpOrder::new(op_light.get_type(), action_hashed.action().timestamp());
+    let rate_limit_state = todo!("pass in bucket state?");
     insert_action(txn, &action_hashed)?;
     insert_op_lite(txn, &op_light, hash, &op_order, &timestamp)?;
     set_dependency(txn, hash, dependency)?;
+    set_rate_limit_state(txn, op_light.action_hash(), rate_limit_state)?;
     Ok(())
 }
 
@@ -290,6 +293,27 @@ pub fn set_dependency(
     Ok(())
 }
 
+pub fn set_rate_limit_state(
+    txn: &mut Transaction<'_>,
+    action_hash: &ActionHash,
+    buckets: RateBucketLevels,
+) -> StateMutationResult<()> {
+    // If no rows returned, this is a Holochain logic or database
+    // integrity error that needs to be fixed.
+    txn.execute(
+        "
+        UPDATE Action
+        SET rate_bucket_state = :buckets
+        WHERE hash = :action_hash
+        ",
+        named_params! {
+            ":action_hash": action_hash,
+            ":buckets": buckets,
+        },
+    )?;
+    Ok(())
+}
+
 /// Set the whether or not a receipt is required of a [`DhtOp`](holochain_types::dht_op::DhtOp) in the database.
 pub fn set_require_receipt(
     txn: &mut Transaction,
@@ -393,7 +417,7 @@ pub fn set_receipts_complete(
     Ok(())
 }
 
-/// Insert a [`Action`] into the database.
+/// Insert an [`Action`] into the database.
 pub fn insert_action(
     txn: &mut Transaction,
     action: &SignedActionHashed,

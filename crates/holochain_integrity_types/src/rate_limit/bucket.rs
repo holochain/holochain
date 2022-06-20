@@ -28,6 +28,19 @@ pub struct RateLimit {
     pub drain_interval_ms: u32,
 }
 
+impl RateLimit {
+    /// A placeholder "default" rate limit imposed on every DNA, to be replaced
+    /// with the real deal once we have the mechanism in place to track the
+    /// different rate limits across different zomes
+    pub fn placeholder() -> Self {
+        Self {
+            capacity: 1024,
+            drain_amount: 1,
+            drain_interval_ms: 1000,
+        }
+    }
+}
+
 /// Calculate the next level of a bucket from the previous state.
 /// See [`RateLimit`] for details on the bucket algorithm.
 ///

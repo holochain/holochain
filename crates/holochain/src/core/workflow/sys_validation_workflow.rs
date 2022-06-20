@@ -578,11 +578,12 @@ async fn register_agent_activity(
             workspace,
             network,
             incoming_dht_ops_sender,
-            |el| Ok(()),
+            |_| Ok(()),
         )
         .await?;
     }
-    check_rate_limit(todo!(), action, workspace).await?;
+    let rate_limit = RateLimit::placeholder();
+    check_rate_limit(&rate_limit, action, workspace).await?;
     check_chain_rollback(action, workspace).await?;
     Ok(())
 }

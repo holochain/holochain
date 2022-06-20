@@ -193,7 +193,7 @@ pub async fn check_rate_limit(
     params: &RateLimit,
     action: &Action,
     workspace: &SysValidationWorkspace,
-) -> SysValidationResult<()> {
+) -> SysValidationResult<RateBucketLevels> {
     let rate_data = action.rate_data();
     let state = if let Some(h) = action.prev_action() {
         Some(workspace.get_rate_limit_state(h).await?)
@@ -213,12 +213,9 @@ pub async fn check_rate_limit(
             e => SysValidationError::from(e),
         },
     )?;
-    let mut buckets: RateBucketLevels = state.map(|(t, s)| s).unwrap_or_default();
+    let mut buckets: RateBucketLevels = state.map(|(_, s)| s).unwrap_or_default();
     buckets.set(rate_data.bucket_id, level);
-
-    let hash = ActionHash::with_data_sync(action);
-    workspace.set_rate_limit_state(&hash, buckets).await?;
-    Ok(())
+    Ok(buckets)
 }
 
 /// Check if there are other actions at this
