@@ -9,7 +9,8 @@ use crate::core::ribosome::{error::RibosomeResult, real_ribosome::RealRibosome, 
 pub struct RibosomeStore {
     ribosomes: HashMap<DnaHash, RealRibosome>,
     entry_defs: HashMap<EntryDefBufferKey, EntryDef>,
-    rate_limits: HashMap<RateLimitBufferKey, Vec<RateLimit>>,
+    // Placeholder for rate limit store, waiting for refactor of zome_id+entry_def_id first
+    _rate_limits: HashMap<RateLimitBufferKey, Vec<RateLimit>>,
 }
 
 impl RibosomeStore {
@@ -17,7 +18,7 @@ impl RibosomeStore {
         RwShare::new(RibosomeStore {
             ribosomes: HashMap::new(),
             entry_defs: HashMap::new(),
-            rate_limits: HashMap::new(),
+            _rate_limits: HashMap::new(),
         })
     }
 
