@@ -38,7 +38,7 @@ version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fcb51a0695d8f838b1ee009b3fbf66bda078cd64590202a864a8f3e8c4315c47"
 dependencies = [
- "getrandom 0.2.6",
+ "getrandom 0.2.7",
  "once_cell",
  "version_check",
 ]
@@ -479,7 +479,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8129c0ab340c1b0caf6dbc587e814d04ba811e336dcf8fc268c04e047428ebb0"
 dependencies = [
  "bit-vec",
- "getrandom 0.2.6",
+ "getrandom 0.2.7",
  "siphasher",
 ]
 
@@ -1465,8 +1465,8 @@ dependencies = [
  "lazy_static",
  "parking_lot 0.10.2",
  "paste",
- "rand 0.7.3",
- "rand_core 0.5.1",
+ "rand 0.8.5",
+ "rand_core 0.6.3",
  "serde",
  "strum",
  "strum_macros",
@@ -1705,13 +1705,13 @@ dependencies = [
 
 [[package]]
 name = "getrandom"
-version = "0.2.6"
+version = "0.2.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9be70c98951c83b8d2f8f60d7065fa6d5146873094452a1008da8c2f1e4205ad"
+checksum = "4eb1a864a501629691edf6c15a593b7a51eebaa1e8468e9ddc623de7c9b58ec6"
 dependencies = [
  "cfg-if 1.0.0",
  "libc",
- "wasi 0.10.2+wasi-snapshot-preview1",
+ "wasi 0.11.0+wasi-snapshot-preview1",
 ]
 
 [[package]]
@@ -1874,6 +1874,7 @@ name = "hdk"
 version = "0.0.137"
 dependencies = [
  "fixt",
+ "getrandom 0.2.7",
  "hdk_derive",
  "holo_hash",
  "holochain_deterministic_integrity",
@@ -1965,7 +1966,7 @@ dependencies = [
  "holochain_serialized_bytes",
  "kitsune_p2p_dht_arc",
  "must_future",
- "rand 0.7.3",
+ "rand 0.8.5",
  "rusqlite",
  "serde",
  "serde_bytes",
@@ -1994,6 +1995,7 @@ dependencies = [
  "fallible-iterator",
  "fixt",
  "futures",
+ "getrandom 0.2.7",
  "ghost_actor 0.3.0-alpha.4",
  "hdk",
  "holo_hash",
@@ -2031,7 +2033,7 @@ dependencies = [
  "parking_lot 0.10.2",
  "predicates 1.0.8",
  "pretty_assertions 0.6.1",
- "rand 0.7.3",
+ "rand 0.8.5",
  "reqwest",
  "ring",
  "rpassword",
@@ -2260,7 +2262,7 @@ dependencies = [
  "kitsune_p2p_types",
  "mockall 0.10.2",
  "observability",
- "rand 0.7.3",
+ "rand 0.8.5",
  "serde",
  "serde_bytes",
  "serde_json",
@@ -2327,7 +2329,7 @@ dependencies = [
  "pretty_assertions 0.7.2",
  "r2d2",
  "r2d2_sqlite_neonphog",
- "rand 0.7.3",
+ "rand 0.8.5",
  "rmp-serde",
  "rusqlite",
  "scheduled-thread-pool",
@@ -2431,7 +2433,7 @@ dependencies = [
  "nanoid 0.3.0",
  "observability",
  "parking_lot 0.10.2",
- "rand 0.7.3",
+ "rand 0.8.5",
  "regex",
  "rusqlite",
  "serde",
@@ -2574,7 +2576,7 @@ dependencies = [
  "num_enum",
  "once_cell",
  "paste",
- "rand 0.7.3",
+ "rand 0.8.5",
  "rusqlite",
  "serde",
  "serde_bytes",
@@ -2884,7 +2886,7 @@ dependencies = [
  "once_cell",
  "parking_lot 0.11.2",
  "pretty_assertions 0.7.2",
- "rand 0.7.3",
+ "rand 0.8.5",
  "reqwest",
  "serde",
  "serde_bytes",
@@ -2911,7 +2913,7 @@ dependencies = [
  "kitsune_p2p_types",
  "once_cell",
  "parking_lot 0.11.2",
- "rand 0.7.3",
+ "rand 0.8.5",
  "reqwest",
  "rmp-serde",
  "serde",
@@ -4734,7 +4736,7 @@ version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d34f1408f55294453790c48b2f1ebbb1c5b4b7563eb1f418bcfcfdbb06ebb4e7"
 dependencies = [
- "getrandom 0.2.6",
+ "getrandom 0.2.7",
 ]
 
 [[package]]
@@ -4922,7 +4924,7 @@ version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b033d837a7cf162d7993aded9304e30a83213c648b6e389db233191f891e5c2b"
 dependencies = [
- "getrandom 0.2.6",
+ "getrandom 0.2.7",
  "redox_syscall 0.2.13",
  "thiserror",
 ]
@@ -6465,7 +6467,7 @@ version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bc5cf98d8186244414c848017f0e2676b3fcb46807f6668a97dfe67359a3c4b7"
 dependencies = [
- "getrandom 0.2.6",
+ "getrandom 0.2.7",
 ]
 
 [[package]]
@@ -6573,12 +6575,6 @@ name = "wasi"
 version = "0.9.0+wasi-snapshot-preview1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cccddf32554fecc6acb585f82a32a72e28b48f8c4c1883ddfeeeaa96f7d8e519"
-
-[[package]]
-name = "wasi"
-version = "0.10.2+wasi-snapshot-preview1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fd6fbd9a79829dd1ad0cc20627bf1ed606756a7f77edff7b66b7064f9cb327c6"
 
 [[package]]
 name = "wasi"
