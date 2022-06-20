@@ -68,8 +68,8 @@ codegen-units = 16
 #lair_keystore_api = { path = "../lair/crates/lair_keystore_api" }
 #lair_keystore_api_0_0 = { path = "../lair_0_0/crates/lair_keystore_api", package = "lair_keystore_api" }
 #lair_keystore_client_0_0 = { path = "../lair_0_0/crates/lair_keystore_client", package = "lair_keystore_client" }
-lair_keystore_api = { git = "https://github.com/holochain/lair.git", branch = "secretbox" }
-lair_keystore_api_0_0 = { git = "https://github.com/holochain/lair.git", branch = "release-0.0.x-bump-sodoken", package = "lair_keystore_api" }
-lair_keystore_client_0_0 = { git = "https://github.com/holochain/lair.git", branch = "release-0.0.x-bump-sodoken", package = "lair_keystore_client" }
+#lair_keystore_api = { git = "https://github.com/holochain/lair.git", branch = "secretbox" }
+#lair_keystore_api_0_0 = { git = "https://github.com/holochain/lair.git", branch = "release-0.0.x-bump-sodoken", package = "lair_keystore_api" }
+#lair_keystore_client_0_0 = { git = "https://github.com/holochain/lair.git", branch = "release-0.0.x-bump-sodoken", package = "lair_keystore_client" }
 # observability = { path = "../../rust/observability" }
 # r2d2_sqlite = { path = "../r2d2-sqlite" }

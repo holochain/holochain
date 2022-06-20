@@ -1881,7 +1881,8 @@ dependencies = [
 [[package]]
 name = "hc_seed_bundle"
 version = "0.1.2"
-source = "git+https://github.com/holochain/lair.git?branch=secretbox#a21c49be3a87e46b3fe968ab309f99299454e05c"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "93ef427c4f865071cfc85a7741482ecb54cce07059fa2b6a8bdd928fedd68b11"
 dependencies = [
  "futures",
  "one_err",
@@ -3133,7 +3134,8 @@ dependencies = [
 [[package]]
 name = "lair_keystore_api"
 version = "0.0.11"
-source = "git+https://github.com/holochain/lair.git?branch=release-0.0.x-bump-sodoken#9e22964464021ad422a475efbff92b2d87906c9b"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7d3f2fb64691f81c33a26276c8f11ccc6ab10ade5afca45df8629331b9f6a7a0"
 dependencies = [
  "arbitrary",
  "blake2b_simd 0.5.11",
@@ -3164,7 +3166,8 @@ dependencies = [
 [[package]]
 name = "lair_keystore_api"
 version = "0.2.0"
-source = "git+https://github.com/holochain/lair.git?branch=secretbox#a21c49be3a87e46b3fe968ab309f99299454e05c"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1a8a748c7ae6b0449263239f09038f1541874a1d0053d923dc9fa7a6621dd634"
 dependencies = [
  "base64",
  "dunce",
@@ -3187,7 +3190,8 @@ dependencies = [
 [[package]]
 name = "lair_keystore_client"
 version = "0.0.11"
-source = "git+https://github.com/holochain/lair.git?branch=release-0.0.x-bump-sodoken#9e22964464021ad422a475efbff92b2d87906c9b"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "06b1591a47f5db62e30b11a5b83fd9d8194a6c3ef3ab6a160d9333092319b2a2"
 dependencies = [
  "futures",
  "ghost_actor 0.3.0-alpha.4",
