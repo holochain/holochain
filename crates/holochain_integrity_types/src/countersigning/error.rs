@@ -12,7 +12,10 @@ pub enum CounterSigningError {
     /// Session response agents all need to be in the correct positions.
     CounterSigningSessionResponsesOrder(u8, usize),
     /// Enzyme must match for required and optional signers if set.
-    EnzymeMismatch(Option<(holo_hash::AgentPubKey, Vec<Role>)>, Option<(holo_hash::AgentPubKey, Vec<Role>)>),
+    EnzymeMismatch(
+        Option<(holo_hash::AgentPubKey, Vec<Role>)>,
+        Option<(holo_hash::AgentPubKey, Vec<Role>)>,
+    ),
     /// If there are optional signers the session MUST be enzymatic.
     NonEnzymaticOptionalSigners,
     /// Agents length cannot be longer than max or less than min.

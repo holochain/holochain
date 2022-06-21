@@ -192,9 +192,7 @@ impl PreflightRequest {
         {
             Ok(())
         } else {
-            Err(CounterSigningError::AgentsLength(
-                self.signing_agents.len(),
-            ))
+            Err(CounterSigningError::AgentsLength(self.signing_agents.len()))
         }
     }
 
@@ -687,7 +685,9 @@ pub mod test {
         let mut uk = arbitrary::Unstructured::new(&data);
         let alice = AgentPubKey::arbitrary(&mut uk).unwrap();
 
-        preflight_request.optional_signing_agents.push((alice.clone(), vec![]));
+        preflight_request
+            .optional_signing_agents
+            .push((alice.clone(), vec![]));
 
         assert!(matches!(
             preflight_request.check_agents_optional(),
@@ -701,12 +701,16 @@ pub mod test {
         assert_eq!(preflight_request.check_agents_optional().unwrap(), ());
 
         // 1 of 2 optional agents is a pass
-        preflight_request.optional_signing_agents.push((alice.clone(), vec![]));
+        preflight_request
+            .optional_signing_agents
+            .push((alice.clone(), vec![]));
 
         assert_eq!(preflight_request.check_agents_optional().unwrap(), ());
 
         // 1 of 3 optional agents is a fail
-        preflight_request.optional_signing_agents.push((alice.clone(), vec![]));
+        preflight_request
+            .optional_signing_agents
+            .push((alice.clone(), vec![]));
 
         assert!(matches!(
             preflight_request.check_agents_optional(),
@@ -741,12 +745,16 @@ pub mod test {
         let bob = AgentPubKey::arbitrary(&mut uk).unwrap();
 
         // Non enzymatic with signers and no optional signers is a pass.
-        preflight_request.signing_agents.push((alice.clone(), vec![]));
+        preflight_request
+            .signing_agents
+            .push((alice.clone(), vec![]));
 
         assert_eq!(preflight_request.check_enzyme().unwrap(), (),);
 
         // Non enzymatic with optional signers is a fail.
-        preflight_request.optional_signing_agents.push((alice.clone(), vec![]));
+        preflight_request
+            .optional_signing_agents
+            .push((alice.clone(), vec![]));
 
         assert!(matches!(
             preflight_request.check_enzyme(),
@@ -786,7 +794,9 @@ pub mod test {
 
         // One signer is a fail.
         let alice = AgentPubKey::arbitrary(&mut u).unwrap();
-        preflight_request.signing_agents.push((alice.clone(), vec![]));
+        preflight_request
+            .signing_agents
+            .push((alice.clone(), vec![]));
 
         assert!(matches!(
             preflight_request.check_agents_len(),
@@ -812,14 +822,18 @@ pub mod test {
 
         assert_eq!(preflight_request.check_agents_dupes().unwrap(), (),);
 
-        preflight_request.signing_agents.push((alice.clone(), vec![]));
+        preflight_request
+            .signing_agents
+            .push((alice.clone(), vec![]));
         assert_eq!(preflight_request.check_agents_dupes().unwrap(), (),);
 
         preflight_request.signing_agents.push((bob.clone(), vec![]));
         assert_eq!(preflight_request.check_agents_dupes().unwrap(), (),);
 
         // Another alice is a dupe, even if roles are different.
-        preflight_request.signing_agents.push((alice.clone(), vec![Role::new(0_u8)]));
+        preflight_request
+            .signing_agents
+            .push((alice.clone(), vec![Role::new(0_u8)]));
         assert!(matches!(
             preflight_request.check_agents_dupes(),
             Err(CounterSigningError::AgentsDupes(_))
@@ -838,7 +852,10 @@ pub mod test {
         assert_eq!(session_data.check_responses_indexes().unwrap(), ());
 
         // When the signing agents and responses are out of sync it must error.
-        session_data.preflight_request_mut().signing_agents.push((alice.clone(), vec![]));
+        session_data
+            .preflight_request_mut()
+            .signing_agents
+            .push((alice.clone(), vec![]));
         assert!(matches!(
             session_data.check_responses_indexes(),
             Err(CounterSigningError::CounterSigningSessionResponsesLength(
@@ -848,7 +865,10 @@ pub mod test {
         ));
 
         // When signing agents indexes are not in the correct order it must error.
-        session_data.preflight_request_mut().signing_agents.push((bob.clone(), vec![]));
+        session_data
+            .preflight_request_mut()
+            .signing_agents
+            .push((bob.clone(), vec![]));
 
         let alice_state = CounterSigningAgentState::arbitrary(&mut u).unwrap();
         let alice_signature = Signature::arbitrary(&mut u).unwrap();
