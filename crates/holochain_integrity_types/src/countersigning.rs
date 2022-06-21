@@ -30,8 +30,8 @@ mod error;
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct CounterSigningSessionTimes {
-    start: Timestamp,
-    end: Timestamp,
+    pub start: Timestamp,
+    pub end: Timestamp,
 }
 
 impl CounterSigningSessionTimes {
@@ -110,20 +110,20 @@ pub type CounterSigningAgents = Vec<(AgentPubKey, Vec<Role>)>;
 pub struct PreflightRequest {
     /// The hash of the app entry, as if it were not countersigned.
     /// The final entry hash will include the countersigning session.
-    app_entry_hash: EntryHash,
+    pub app_entry_hash: EntryHash,
     /// The agents that are participating in this countersignature session.
-    signing_agents: CounterSigningAgents,
+    pub signing_agents: CounterSigningAgents,
     /// The agent that must receive and include all other actions in their own action.
     /// @todo implement enzymes
-    enzyme_index: Option<u8>,
+    pub enzyme_index: Option<u8>,
     /// The session times.
     /// Session actions must all have the same timestamp, which is the session offset.
-    session_times: CounterSigningSessionTimes,
+    pub session_times: CounterSigningSessionTimes,
     /// The action information that is shared by all agents.
     /// Contents depend on the action type, create, update, etc.
-    action_base: ActionBase,
+    pub action_base: ActionBase,
     /// The preflight bytes for session.
-    preflight_bytes: PreflightBytes,
+    pub preflight_bytes: PreflightBytes,
 }
 
 impl PreflightRequest {
@@ -270,10 +270,10 @@ impl PreflightRequest {
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct PreflightResponse {
     /// The request this is a response to.
-    request: PreflightRequest,
+    pub request: PreflightRequest,
     /// The agent must provide their current chain state, state their position in the preflight and sign everything.
-    agent_state: CounterSigningAgentState,
-    signature: Signature,
+    pub agent_state: CounterSigningAgentState,
+    pub signature: Signature,
 }
 
 impl PreflightResponse {
@@ -448,9 +448,9 @@ impl CreateBase {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct UpdateBase {
-    original_action_address: ActionHash,
-    original_entry_address: EntryHash,
-    entry_type: EntryType,
+    pub original_action_address: ActionHash,
+    pub original_entry_address: EntryHash,
+    pub entry_type: EntryType,
 }
 
 impl Action {
@@ -488,8 +488,8 @@ impl Action {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct CounterSigningSessionData {
-    preflight_request: PreflightRequest,
-    responses: Vec<(CounterSigningAgentState, Signature)>,
+    pub preflight_request: PreflightRequest,
+    pub responses: Vec<(CounterSigningAgentState, Signature)>,
 }
 
 impl CounterSigningSessionData {
