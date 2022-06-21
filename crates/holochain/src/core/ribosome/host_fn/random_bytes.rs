@@ -4,7 +4,6 @@ use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
-use ring::rand::SecureRandom;
 use std::sync::Arc;
 
 /// return n crypto secure random bytes from the standard holochain crypto lib
@@ -18,12 +17,10 @@ pub fn random_bytes(
             non_determinism: Permission::Allow,
             ..
         } => {
-            let system_random = ring::rand::SystemRandom::new();
             let mut bytes = vec![0; input as _];
-            system_random
-                .fill(&mut bytes)
-                .map_err(|ring_unspecified_error| -> RuntimeError {
-                    wasm_error!(WasmErrorInner::Host(ring_unspecified_error.to_string())).into()
+            getrandom::getrandom(&mut bytes)
+                .map_err(|error| -> RuntimeError {
+                    wasm_error!(WasmErrorInner::Host(error.to_string())).into()
                 })?;
 
             Ok(holochain_types::prelude::Bytes::from(bytes))
@@ -83,6 +80,19 @@ pub mod wasm_test {
         } = RibosomeTestFixture::new(TestWasm::RandomBytes).await;
         const LEN: u32 = 5;
         let output: hdk::prelude::Bytes = conductor.call(&alice, "random_bytes", LEN).await;
+
+        assert_ne!(&vec![0; LEN as usize], &output.to_vec());
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    /// we can get some random data out of the fn via. a wasm call
+    async fn ribosome_rand_random_bytes_test() {
+        observability::test_run().ok();
+        let RibosomeTestFixture {
+            conductor, alice, ..
+        } = RibosomeTestFixture::new(TestWasm::RandomBytes).await;
+        const LEN: u32 = 5;
+        let output: hdk::prelude::Bytes = conductor.call(&alice, "rand_random_bytes", LEN).await;
 
         assert_ne!(&vec![0; LEN as usize], &output.to_vec());
     }
