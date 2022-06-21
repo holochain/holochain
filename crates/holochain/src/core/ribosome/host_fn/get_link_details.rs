@@ -31,7 +31,7 @@ pub fn get_link_details<'a>(
 
                         let key = WireLinkKey {
                             base: base_address,
-                            type_query: Some(link_type),
+                            type_query: link_type,
                             tag: tag_prefix,
                         };
                         Ok(Cascade::from_workspace_network(

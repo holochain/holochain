@@ -92,28 +92,38 @@ impl TryFrom<&Path> for Anchor {
 
 /// Simple string interface to simple string based paths.
 /// a.k.a "the anchor pattern" that predates paths by a few years.
-pub fn anchor(
-    link_type: impl Into<LinkType>,
+pub fn anchor<T, E>(
+    link_type: T,
     anchor_type: String,
     anchor_text: String,
-) -> ExternResult<holo_hash::EntryHash> {
+) -> ExternResult<holo_hash::EntryHash>
+where
+    T: Copy,
+    ZomeId: TryFrom<T, Error = E>,
+    LinkType: From<T>,
+    WasmError: From<E>,
+{
     let path: Path = (&Anchor {
         anchor_type,
         anchor_text: Some(anchor_text),
     })
         .into();
-    let path = path.into_typed(link_type);
+    let path = path.typed(link_type)?;
     path.ensure()?;
     path.path_entry_hash()
 }
 
 /// Returns every entry hash in a vector from the root of an anchor.
 /// Hashes are sorted in the same way that paths sort children.
-pub fn list_anchor_type_addresses(
-    link_type: impl Into<LinkType>,
-) -> ExternResult<Vec<AnyLinkableHash>> {
+pub fn list_anchor_type_addresses<T, E>(link_type: T) -> ExternResult<Vec<AnyLinkableHash>>
+where
+    T: Copy,
+    ZomeId: TryFrom<T, Error = E>,
+    LinkType: From<T>,
+    WasmError: From<E>,
+{
     let links = Path::from(vec![Component::new(ROOT.to_vec())])
-        .into_typed(link_type)
+        .typed(link_type)?
         .children()?
         .into_iter()
         .map(|link| link.target)
@@ -124,17 +134,23 @@ pub fn list_anchor_type_addresses(
 /// Returns every entry hash in a vector from the second level of an anchor.
 /// Uses the string argument to build the path from the root.
 /// Hashes are sorted in the same way that paths sort children.
-pub fn list_anchor_addresses(
-    link_type: impl Into<LinkType>,
+pub fn list_anchor_addresses<T, E>(
+    link_type: T,
     anchor_type: String,
-) -> ExternResult<Vec<AnyLinkableHash>> {
+) -> ExternResult<Vec<AnyLinkableHash>>
+where
+    T: Copy,
+    ZomeId: TryFrom<T, Error = E>,
+    LinkType: From<T>,
+    WasmError: From<E>,
+{
     let path: Path = (&Anchor {
         anchor_type,
         anchor_text: None,
     })
         .into();
     let links = path
-        .into_typed(link_type)
+        .typed(link_type)?
         .children()?
         .into_iter()
         .map(|link| link.target)
@@ -146,16 +162,19 @@ pub fn list_anchor_addresses(
 /// tags are a single array of bytes, so to get an external interface that is somewhat backwards
 /// compatible we need to rebuild the anchors from the paths serialized into the links and then
 /// return them.
-pub fn list_anchor_tags(
-    link_type: impl Into<LinkType>,
-    anchor_type: String,
-) -> ExternResult<Vec<String>> {
+pub fn list_anchor_tags<T, E>(link_type: T, anchor_type: String) -> ExternResult<Vec<String>>
+where
+    T: Copy,
+    ZomeId: TryFrom<T, Error = E>,
+    LinkType: From<T>,
+    WasmError: From<E>,
+{
     let path: Path = (&Anchor {
         anchor_type,
         anchor_text: None,
     })
         .into();
-    let path = path.into_typed(link_type);
+    let path = path.typed(link_type)?;
     path.ensure()?;
     let hopefully_anchor_tags: Result<Vec<String>, WasmError> = path
         .children_paths()?

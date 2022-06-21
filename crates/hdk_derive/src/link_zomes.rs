@@ -17,122 +17,97 @@ pub fn build(_attrs: TokenStream, input: TokenStream) -> TokenStream {
     };
     let iter: proc_macro2::TokenStream = variants
         .iter()
-        .map(|syn::Variant { ident, fields, .. }| {
-            let ty = &get_single_tuple_variant(ident, fields).ty;
-            quote::quote! {
-                vec.extend(#ty::iter().map(Self::#ident));
-            }
-        })
+        .map(
+            |syn::Variant {
+                 ident: v_ident,
+                 fields,
+                 ..
+             }| {
+                let ty = &get_single_tuple_variant(v_ident, fields).ty;
+                quote::quote! {
+                    vec.extend(#ty::iter().map(#ident::#v_ident));
+                }
+            },
+        )
         .collect();
 
-    let ranges: proc_macro2::TokenStream = variants
-        .iter()
-        .map(|syn::Variant { ident, fields, .. }| {
-            get_single_tuple_variant(ident, fields);
-            quote::quote! {
-                Self::find_variant(|t| matches!(t, Self::#ident(_)), &range, &zome_types)?,
-            }
-        })
+    let into_link_type: proc_macro2::TokenStream = variants
+        .into_iter()
+        .map(
+            |syn::Variant {
+                 ident: v_ident,
+                 fields,
+                 ..
+             }| {
+                get_single_tuple_variant(v_ident, fields);
+                quote::quote! {#ident::#v_ident (v) => LinkType::from(v),}
+            },
+        )
         .collect();
 
     let output = quote::quote! {
-        #[hdk_to_global_link_types]
         #[hdk_to_local_types(nested = true)]
         #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
         #input
 
-        impl TryFrom<#ident> for LinkType {
+        impl From<&#ident> for LinkType {
+            fn from(value: &#ident) -> Self {
+                match value {
+                    #into_link_type
+                }
+            }
+        }
+
+        impl From<#ident> for LinkType {
+
+            fn from(value: #ident) -> Self {
+                Self::from(&value)
+            }
+        }
+
+        impl TryFrom<#ident> for LinkTypeFilter {
             type Error = WasmError;
 
             fn try_from(value: #ident) -> Result<Self, Self::Error> {
-                Ok(Self(GlobalZomeTypeId::try_from(value)?.0))
+                let z: ZomeId = value.try_into()?;
+                let lt: LinkType = value.into();
+                Ok(LinkTypeFilter::single_type(z, lt))
             }
         }
 
-        impl TryFrom<&#ident> for LinkType {
+        impl TryFrom<&#ident> for LinkTypeFilter {
             type Error = WasmError;
 
             fn try_from(value: &#ident) -> Result<Self, Self::Error> {
-                Ok(Self(GlobalZomeTypeId::try_from(value)?.0))
+                let z: ZomeId = value.try_into()?;
+                let lt: LinkType = value.into();
+                Ok(LinkTypeFilter::single_type(z, lt))
             }
         }
 
-        impl TryFrom<#ident> for LinkTypeRange {
-            type Error = WasmError;
-
-            fn try_from(value: #ident) -> Result<Self, Self::Error> {
-                let lt: LinkType = value.try_into()?;
-                Ok(lt.into())
+        impl LinkTypeFilterExt for #ident {
+            fn try_into_filter(self) -> Result<LinkTypeFilter, WasmError> {
+                self.try_into()
             }
         }
 
-        impl TryFrom<&#ident> for LinkTypeRange {
-            type Error = WasmError;
+        fn iter() -> core::array::IntoIter<#ident, { #ident::len() as usize }> {
+            use #ident::*;
+            let mut vec = Vec::with_capacity(#ident::len() as usize);
 
-            fn try_from(value: &#ident) -> Result<Self, Self::Error> {
-                let lt: LinkType = value.try_into()?;
-                Ok(lt.into())
-            }
-        }
+            #iter
 
-        impl TryFrom<#ident> for LinkTypeRanges {
-            type Error = WasmError;
-
-            fn try_from(value: #ident) -> Result<Self, Self::Error> {
-                let lt: LinkType = value.try_into()?;
-                Ok(Self(vec![lt.into()]))
-            }
-        }
-
-        impl TryFrom<&#ident> for LinkTypeRanges {
-            type Error = WasmError;
-
-            fn try_from(value: &#ident) -> Result<Self, Self::Error> {
-                let lt: LinkType = value.try_into()?;
-                Ok(Self(vec![lt.into()]))
-            }
-        }
-
-        impl LinkTypesHelper<{ #ident::len() as usize }> for #ident {
-            fn range(
-                range: impl std::ops::RangeBounds<Self> + 'static + std::fmt::Debug,
-            ) -> Box<dyn FnOnce() -> Result<LinkTypeRanges, WasmError>> {
-                let zome_types = zome_info().map(|t| t.zome_types);
-                let f = move || {
-                    let zome_types = zome_types?;
-
-                    let vec = vec![
-                        #ranges
-                    ];
-                    if vec.iter().all(|t| matches!(t, LinkTypeRange::Empty)) {
-                        Ok(LinkTypeRanges(vec![LinkTypeRange::Empty]))
-                    } else if vec.iter().all(|t| matches!(t, LinkTypeRange::Full)) {
-                        Ok(LinkTypeRanges(vec![LinkTypeRange::Full]))
-                    } else {
-                        Ok(LinkTypeRanges(vec))
-                    }
-                };
-                Box::new(f)
-            }
-
-            fn iter() -> core::array::IntoIter<Self, { #ident::len() as usize }> {
-                use #ident::*;
-                let mut vec = Vec::with_capacity(#ident::len() as usize);
-
-                #iter
-
-                let arr: [_; LinkZomes::len() as usize] = vec
-                    .try_into()
-                    .expect("This can't fail unless the const generics are wrong");
-                arr.into_iter()
-            }
+            let arr: [_; LinkZomes::len() as usize] = vec
+                .try_into()
+                .expect("This can't fail unless the const generics are wrong");
+            arr.into_iter()
         }
 
         impl TryFrom<LocalZomeTypeId> for #ident {
             type Error = WasmError;
 
             fn try_from(value: LocalZomeTypeId) -> Result<Self, Self::Error> {
-                Self::iter()
+                iter()
                     .find(|u| LocalZomeTypeId::from(*u) == value)
                     .ok_or_else(|| {
                         wasm_error!(WasmErrorInner::Guest(format!(
@@ -151,40 +126,40 @@ pub fn build(_attrs: TokenStream, input: TokenStream) -> TokenStream {
             }
         }
 
-        impl TryFrom<GlobalZomeTypeId> for #ident {
+        impl TryFrom<(ZomeId, LinkType)> for #ident {
             type Error = WasmError;
 
-            fn try_from(index: GlobalZomeTypeId) -> Result<Self, Self::Error> {
-                match zome_info()?.zome_types.links.to_local_scope(index) {
-                    Some(local_index) => Self::try_from(local_index),
+            fn try_from((zome_id, index): (ZomeId, LinkType)) -> Result<Self, Self::Error> {
+                match zome_info()?.zome_types.links.offset(zome_id, index) {
+                    Some(t) => Self::try_from(t),
                     _ => Err(wasm_error!(WasmErrorInner::Guest(format!(
-                        "global index {:?} does not map to any local scope for this zome",
+                        "LinkType {:?} {:?} does not map to any local scope for this zome",
+                        zome_id,
                         index
                     )))),
                 }
             }
         }
 
-        impl TryFrom<&GlobalZomeTypeId> for #ident {
+        impl TryFrom<&#ident> for ZomeId {
             type Error = WasmError;
 
-            fn try_from(index: &GlobalZomeTypeId) -> Result<Self, Self::Error> {
-                Self::try_from(*index)
+            fn try_from(index: &#ident) -> Result<Self, Self::Error> {
+                match zome_info()?.zome_types.links.zome_id(LocalZomeTypeId::from(index)) {
+                    Some(z) => Ok(z),
+                    _ => Err(wasm_error!(WasmErrorInner::Guest(format!(
+                        "ZomeId not found for {:?}",
+                        index
+                    )))),
+                }
             }
         }
 
-        impl TryFrom<LinkType> for #ident {
+        impl TryFrom<#ident> for ZomeId {
             type Error = WasmError;
-            fn try_from(index: LinkType) -> Result<Self, Self::Error> {
-                let index: GlobalZomeTypeId = index.into();
-                Self::try_from(index)
-            }
-        }
 
-        impl TryFrom<&LinkType> for #ident {
-            type Error = WasmError;
-            fn try_from(index: &LinkType) -> Result<Self, Self::Error> {
-                Self::try_from(*index)
+            fn try_from(index: #ident) -> Result<Self, Self::Error> {
+                Self::try_from(&index)
             }
         }
 

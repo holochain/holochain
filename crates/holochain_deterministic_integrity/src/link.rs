@@ -1,69 +1,87 @@
-use core::array::IntoIter;
-use core::ops::RangeBounds;
+use holochain_integrity_types::LinkTypeFilter;
+use holochain_wasmer_guest::WasmError;
 
 use crate::prelude::*;
-
-pub use hdk_derive::hdk_link_types;
 
 #[cfg(doc)]
 pub mod examples;
 
-/// A helper trait for creating [`LinkTypeRanges`] that match the local zome's
-/// type scope.
-///
-/// This is implemented by the [`hdk_link_types`] proc_macro.
-pub trait LinkTypesHelper<const LEN: usize>: EnumLen
+pub trait LinkTypeFilterExt {
+    fn try_into_filter(self) -> Result<LinkTypeFilter, WasmError>;
+}
+
+impl LinkTypeFilterExt for core::ops::RangeFull {
+    fn try_into_filter(self) -> Result<LinkTypeFilter, WasmError> {
+        let out = zome_info()?.zome_types.links.all_dependencies();
+        Ok(LinkTypeFilter::Dependencies(out))
+    }
+}
+
+impl LinkTypeFilterExt for LinkTypeFilter {
+    fn try_into_filter(self) -> Result<LinkTypeFilter, WasmError> {
+        Ok(self)
+    }
+}
+
+impl<T, E> LinkTypeFilterExt for Vec<T>
 where
-    Self: Into<LocalZomeTypeId>,
-    Self: std::fmt::Debug + Clone + Copy + Sized + PartialEq + PartialOrd + 'static,
+    T: TryInto<ZomeId, Error = E>,
+    T: Into<LinkType>,
+    T: Copy,
+    WasmError: From<E>,
 {
-    /// Create a [`LinkTypeRanges`] from a range of this traits implementor.
-    fn range(
-        range: impl RangeBounds<Self> + 'static + std::fmt::Debug,
-    ) -> Box<dyn FnOnce() -> Result<LinkTypeRanges, WasmError>> {
-        let zome_types = zome_info().map(|t| t.zome_types);
-        let f = move || {
-            let zome_types = zome_types?;
-
-            Ok(Self::find_variant(|_| true, &range, &zome_types)?.into())
-        };
-        Box::new(f)
+    fn try_into_filter(self) -> Result<LinkTypeFilter, WasmError> {
+        let mut vec = self
+            .into_iter()
+            .map(|t| Ok((TryInto::<ZomeId>::try_into(t)?, Into::<LinkType>::into(t))))
+            .collect::<Result<Vec<_>, _>>()?;
+        vec.sort_unstable_by_key(|k| k.0);
+        let vec = vec.into_iter().fold(
+            Vec::new(),
+            |mut out: Vec<(ZomeId, Vec<LinkType>)>, (zome_id, link_type)| {
+                match out.last_mut() {
+                    Some(l) if l.0 == zome_id => l.1.push(link_type),
+                    _ => out.push((zome_id, vec![link_type])),
+                }
+                out
+            },
+        );
+        Ok(LinkTypeFilter::Types(vec))
     }
+}
 
-    #[doc(hidden)]
-    fn find_variant(
-        mut filter: impl FnMut(&Self) -> bool,
-        range: &(impl std::ops::RangeBounds<Self> + 'static + std::fmt::Debug),
-        zome_types: &ScopedZomeTypesSet,
-    ) -> Result<LinkTypeRange, WasmError> {
-        let start = Self::iter().filter(&mut filter).find(|t| range.contains(t));
-        match start {
-            Some(start) => {
-                let end = Self::iter()
-                    .filter(&mut filter)
-                    .rev()
-                    .find(|t| range.contains(t))
-                    .unwrap_or(start);
-                let start = zome_types.links.to_global_scope(start).ok_or_else(|| {
-                   wasm_error!(WasmErrorInner::Guest(format!(
-                        "Unable to map start of range local zome type {:?} to global zome type scope",
-                        start
-                    )))
-                })?;
-                let end = zome_types.links.to_global_scope(end).ok_or_else(|| {
-                    wasm_error!(WasmErrorInner::Guest(format!(
-                        "Unable to map end of range local zome type {:?} to global zome type scope",
-                        end
-                    )))
-                })?;
-                Ok(LinkTypeRange::Inclusive(
-                    LinkType::from(start)..=LinkType::from(end),
-                ))
-            }
-            None => Ok(LinkTypeRange::Empty),
-        }
+impl<T, E, const N: usize> LinkTypeFilterExt for [T; N]
+where
+    T: TryInto<ZomeId, Error = E>,
+    T: Into<LinkType>,
+    T: Copy,
+    WasmError: From<E>,
+{
+    fn try_into_filter(self) -> Result<LinkTypeFilter, WasmError> {
+        self.to_vec().try_into_filter()
     }
+}
 
-    /// Iterate over all variants of this enum.
-    fn iter() -> IntoIter<Self, LEN>;
+impl<T, E, const N: usize> LinkTypeFilterExt for &[T; N]
+where
+    T: TryInto<ZomeId, Error = E>,
+    T: Into<LinkType>,
+    T: Copy,
+    WasmError: From<E>,
+{
+    fn try_into_filter(self) -> Result<LinkTypeFilter, WasmError> {
+        self.to_vec().try_into_filter()
+    }
+}
+
+impl<T, E> LinkTypeFilterExt for &[T]
+where
+    T: TryInto<ZomeId, Error = E>,
+    T: Into<LinkType>,
+    T: Copy,
+    WasmError: From<E>,
+{
+    fn try_into_filter(self) -> Result<LinkTypeFilter, WasmError> {
+        self.to_vec().try_into_filter()
+    }
 }

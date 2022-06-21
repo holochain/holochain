@@ -543,7 +543,11 @@ async fn insert_source_chain() {
         timestamp: Timestamp::now(),
         action_seq: 4,
         prev_action: chain.last().unwrap().0.clone(),
-        entry_type: EntryType::App(AppEntryType::new(1.into(), EntryVisibility::Public)),
+        entry_type: EntryType::App(AppEntryType::new(
+            1.into(),
+            0.into(),
+            EntryVisibility::Public,
+        )),
         entry_hash: EntryHash::with_data_sync(&entry),
     };
     let shh = SignedActionHashed::with_presigned(

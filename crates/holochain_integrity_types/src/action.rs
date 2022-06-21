@@ -4,7 +4,7 @@ use crate::entry_def::EntryVisibility;
 use crate::link::LinkTag;
 use crate::link::LinkType;
 use crate::timestamp::Timestamp;
-use crate::GlobalZomeTypeId;
+use crate::LocalZomeTypeId;
 use crate::MembraneProof;
 use holo_hash::impl_hashable_content;
 use holo_hash::ActionHash;
@@ -374,6 +374,7 @@ pub struct CreateLink {
 
     pub base_address: AnyLinkableHash,
     pub target_address: AnyLinkableHash,
+    pub zome_id: ZomeId,
     pub link_type: LinkType,
     pub tag: LinkTag,
 }
@@ -550,22 +551,31 @@ impl std::fmt::Display for EntryType {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct AppEntryType {
-    /// u8 identifier of what entry type this is
-    /// this is a unique global identifier across the
-    /// DNA for this type. It is a [`GlobalZomeTypeId`].
+    /// A unique u8 identifier within a zome for this
+    /// entry type.
+    /// This is a [`LocalZomeTypeId`].
     pub id: EntryDefIndex,
+    /// The id of the zome that defines this entry type.
+    pub zome_id: ZomeId,
     // @todo don't do this, use entry defs instead
     /// The visibility of this app entry.
     pub visibility: EntryVisibility,
 }
 
 impl AppEntryType {
-    pub fn new(id: EntryDefIndex, visibility: EntryVisibility) -> Self {
-        Self { id, visibility }
+    pub fn new(id: EntryDefIndex, zome_id: ZomeId, visibility: EntryVisibility) -> Self {
+        Self {
+            id,
+            zome_id,
+            visibility,
+        }
     }
 
     pub fn id(&self) -> EntryDefIndex {
         self.id
+    }
+    pub fn zome_id(&self) -> ZomeId {
+        self.zome_id
     }
     pub fn visibility(&self) -> &EntryVisibility {
         &self.visibility
@@ -599,14 +609,14 @@ impl Borrow<u8> for ZomeId {
     }
 }
 
-impl From<EntryDefIndex> for GlobalZomeTypeId {
+impl From<EntryDefIndex> for LocalZomeTypeId {
     fn from(v: EntryDefIndex) -> Self {
         Self(v.0)
     }
 }
 
-impl From<GlobalZomeTypeId> for EntryDefIndex {
-    fn from(v: GlobalZomeTypeId) -> Self {
+impl From<LocalZomeTypeId> for EntryDefIndex {
+    fn from(v: LocalZomeTypeId) -> Self {
         Self(v.0)
     }
 }

@@ -18,6 +18,7 @@ path = "src/lib.rs"
 default = []
 trace = ["tracing", "tracing-core", "holochain_integrity_types/tracing"]
 mock = ["hdk_derive/mock", "mockall"]
+test_utils = []
 
 [dependencies]
 hdk_derive = { version = "0.0.36", path = "../hdk_derive" }

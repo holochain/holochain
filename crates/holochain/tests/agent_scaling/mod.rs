@@ -22,6 +22,7 @@ fn links_zome() -> InlineZomeSet {
                 let hash = api.create_link(CreateLinkInput::new(
                     base_target.0,
                     base_target.1,
+                    ZomeId(0),
                     LinkType::new(0),
                     ().into(),
                     ChainTopOrdering::default(),
@@ -33,7 +34,11 @@ fn links_zome() -> InlineZomeSet {
             "links",
             "get_links",
             move |api: BoxApi, base: AnyLinkableHash| -> InlineZomeResult<Vec<Vec<Link>>> {
-                Ok(api.get_links(vec![GetLinksInput::new(base, (..).into(), None)])?)
+                Ok(api.get_links(vec![GetLinksInput::new(
+                    base,
+                    InlineZomeSet::dep_link_filter(&api),
+                    None,
+                )])?)
             },
         )
 }

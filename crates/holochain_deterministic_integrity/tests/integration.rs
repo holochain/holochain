@@ -8,18 +8,22 @@ fn local_type(t: impl Into<LocalZomeTypeId>) -> LocalZomeTypeId {
     t.into()
 }
 
-fn global_type(t: impl TryInto<GlobalZomeTypeId, Error = WasmError>) -> GlobalZomeTypeId {
-    match t.try_into() {
-        Ok(t) => t,
-        Err(e) => panic!("Failed to convert to global zome type id: {:?}", e),
-    }
+fn zome_and_link_type<T>(t: T) -> (ZomeId, LinkType)
+where
+    T: Copy,
+    ZomeId: TryFrom<T, Error = WasmError>,
+    LinkType: From<T>,
+{
+    (t.try_into().unwrap(), t.into())
 }
 
-fn entry_index(t: impl TryInto<EntryDefIndex, Error = WasmError>) -> EntryDefIndex {
-    match t.try_into() {
-        Ok(t) => t,
-        Err(e) => panic!("Failed to convert to entry def index: {:?}", e),
-    }
+fn zome_and_entry_type<T>(t: T) -> (ZomeId, EntryDefIndex)
+where
+    ZomeId: TryFrom<T, Error = WasmError>,
+    EntryDefIndex: for<'a> From<&'a T>,
+{
+    let e = (&t).into();
+    (t.try_into().unwrap(), e)
 }
 
 #[test]
@@ -130,12 +134,10 @@ fn to_local_types_test_nested() {
 }
 
 #[test]
-fn to_global_types_test_unit() {
+fn to_zome_id_test_unit() {
     mod integrity_a {
         use super::*;
-        #[hdk_to_local_types]
-        #[hdk_to_global_entry_types]
-        #[derive(Debug)]
+        #[hdk_link_types(skip_no_mangle = true)]
         pub enum Unit {
             A,
             B,
@@ -145,9 +147,7 @@ fn to_global_types_test_unit() {
 
     mod integrity_b {
         use super::*;
-        #[hdk_to_local_types]
-        #[hdk_to_global_entry_types]
-        #[derive(Debug)]
+        #[hdk_link_types(skip_no_mangle = true)]
         pub enum Unit {
             A,
             B,
@@ -155,19 +155,43 @@ fn to_global_types_test_unit() {
         }
     }
 
-    set_zome_types(vec![0..3], vec![]);
+    set_zome_types(&[], &[(0, 0..3)]);
 
-    assert_eq!(global_type(integrity_a::Unit::A), GlobalZomeTypeId(0u8));
-    assert_eq!(global_type(&integrity_a::Unit::A), GlobalZomeTypeId(0u8));
-    assert_eq!(global_type(integrity_a::Unit::B), GlobalZomeTypeId(1u8));
-    assert_eq!(global_type(integrity_a::Unit::C), GlobalZomeTypeId(2u8));
+    assert_eq!(
+        zome_and_link_type(integrity_a::Unit::A),
+        (ZomeId(0), LinkType(0))
+    );
+    assert_eq!(
+        zome_and_link_type(&integrity_a::Unit::A),
+        (ZomeId(0), LinkType(0))
+    );
+    assert_eq!(
+        zome_and_link_type(integrity_a::Unit::B),
+        (ZomeId(0), LinkType(1))
+    );
+    assert_eq!(
+        zome_and_link_type(integrity_a::Unit::C),
+        (ZomeId(0), LinkType(2))
+    );
 
-    set_zome_types(vec![3..6], vec![]);
+    set_zome_types(&[], &[(1, 0..3)]);
 
-    assert_eq!(global_type(integrity_b::Unit::A), GlobalZomeTypeId(3u8));
-    assert_eq!(global_type(&integrity_b::Unit::A), GlobalZomeTypeId(3u8));
-    assert_eq!(global_type(integrity_b::Unit::B), GlobalZomeTypeId(4u8));
-    assert_eq!(global_type(integrity_b::Unit::C), GlobalZomeTypeId(5u8));
+    assert_eq!(
+        zome_and_link_type(integrity_b::Unit::A),
+        (ZomeId(1), LinkType(0))
+    );
+    assert_eq!(
+        zome_and_link_type(&integrity_b::Unit::A),
+        (ZomeId(1), LinkType(0))
+    );
+    assert_eq!(
+        zome_and_link_type(integrity_b::Unit::B),
+        (ZomeId(1), LinkType(1))
+    );
+    assert_eq!(
+        zome_and_link_type(integrity_b::Unit::C),
+        (ZomeId(1), LinkType(2))
+    );
 }
 
 mod entry_defs_to_entry_type_index_test {
@@ -256,6 +280,7 @@ mod entry_defs_default_mod {
         C(A),
     }
 }
+
 #[test]
 fn entry_defs_default() {
     assert_eq!(
@@ -285,103 +310,87 @@ fn entry_defs_to_entry_type_index() {
     use entry_defs_to_entry_type_index_test::*;
 
     // Set the integrity_a scope.
-    set_zome_types(vec![0..3], vec![]);
+    set_zome_types(&[(0, 0..3)], &[]);
 
     assert_eq!(
-        global_type(integrity_a::EntryTypes::A(A {})),
-        GlobalZomeTypeId(0u8)
+        zome_and_entry_type(integrity_a::EntryTypes::A(A {})),
+        (ZomeId(0u8), EntryDefIndex(0))
     );
     assert_eq!(
-        global_type(&integrity_a::EntryTypes::A(A {})),
-        GlobalZomeTypeId(0u8)
+        zome_and_entry_type(&integrity_a::EntryTypes::A(A {})),
+        (ZomeId(0u8), EntryDefIndex(0))
     );
     assert_eq!(
-        global_type(integrity_a::EntryTypes::B(B {})),
-        GlobalZomeTypeId(1u8)
+        zome_and_entry_type(integrity_a::EntryTypes::B(B {})),
+        (ZomeId(0u8), EntryDefIndex(1))
     );
     assert_eq!(
-        global_type(integrity_a::EntryTypes::C(C {})),
-        GlobalZomeTypeId(2u8)
-    );
-
-    assert_eq!(
-        entry_index(integrity_a::EntryTypes::A(A {})),
-        EntryDefIndex(0u8)
-    );
-    assert_eq!(
-        entry_index(&integrity_a::EntryTypes::A(A {})),
-        EntryDefIndex(0u8)
-    );
-    assert_eq!(
-        entry_index(integrity_a::EntryTypes::B(B {})),
-        EntryDefIndex(1u8)
-    );
-    assert_eq!(
-        entry_index(integrity_a::EntryTypes::C(C {})),
-        EntryDefIndex(2u8)
+        zome_and_entry_type(integrity_a::EntryTypes::C(C {})),
+        (ZomeId(0u8), EntryDefIndex(2))
     );
 
     assert!(matches!(
-        integrity_a::EntryTypes::try_from_global_type(0u8, &Entry::try_from(A {}).unwrap()),
+        integrity_a::EntryTypes::deserialize_from_type(0, 0, &Entry::try_from(A {}).unwrap()),
         Ok(Some(integrity_a::EntryTypes::A(A {})))
     ));
     assert!(matches!(
-        integrity_a::EntryTypes::try_from_global_type(1u8, &Entry::try_from(B {}).unwrap()),
+        integrity_a::EntryTypes::deserialize_from_type(0, 1, &Entry::try_from(A {}).unwrap()),
         Ok(Some(integrity_a::EntryTypes::B(B {})))
     ));
     assert!(matches!(
-        integrity_a::EntryTypes::try_from_global_type(2u8, &Entry::try_from(C {}).unwrap()),
+        integrity_a::EntryTypes::deserialize_from_type(0, 2, &Entry::try_from(A {}).unwrap()),
         Ok(Some(integrity_a::EntryTypes::C(C {})))
     ));
 
+    assert!(matches!(
+        integrity_a::EntryTypes::deserialize_from_type(0, 20, &Entry::try_from(A {}).unwrap()),
+        Ok(None)
+    ));
+    assert!(matches!(
+        integrity_a::EntryTypes::deserialize_from_type(1, 0, &Entry::try_from(A {}).unwrap()),
+        Ok(None)
+    ));
+
     // Set the integrity_b scope.
-    set_zome_types(vec![3..6], vec![]);
+    set_zome_types(&[(1, 0..3)], &[]);
 
     assert_eq!(
-        global_type(integrity_b::EntryTypes::A(A {})),
-        GlobalZomeTypeId(3u8)
+        zome_and_entry_type(integrity_b::EntryTypes::A(A {})),
+        (ZomeId(1u8), EntryDefIndex(0))
     );
     assert_eq!(
-        global_type(&integrity_b::EntryTypes::A(A {})),
-        GlobalZomeTypeId(3u8)
+        zome_and_entry_type(&integrity_b::EntryTypes::A(A {})),
+        (ZomeId(1u8), EntryDefIndex(0))
     );
     assert_eq!(
-        global_type(integrity_b::EntryTypes::B(B {})),
-        GlobalZomeTypeId(4u8)
+        zome_and_entry_type(integrity_b::EntryTypes::B(B {})),
+        (ZomeId(1u8), EntryDefIndex(1))
     );
     assert_eq!(
-        global_type(integrity_b::EntryTypes::C(C {})),
-        GlobalZomeTypeId(5u8)
-    );
-
-    assert_eq!(
-        entry_index(integrity_b::EntryTypes::A(A {})),
-        EntryDefIndex(3u8)
-    );
-    assert_eq!(
-        entry_index(&integrity_b::EntryTypes::A(A {})),
-        EntryDefIndex(3u8)
-    );
-    assert_eq!(
-        entry_index(integrity_b::EntryTypes::B(B {})),
-        EntryDefIndex(4u8)
-    );
-    assert_eq!(
-        entry_index(integrity_b::EntryTypes::C(C {})),
-        EntryDefIndex(5u8)
+        zome_and_entry_type(integrity_b::EntryTypes::C(C {})),
+        (ZomeId(1u8), EntryDefIndex(2))
     );
 
     assert!(matches!(
-        integrity_b::EntryTypes::try_from_global_type(3u8, &Entry::try_from(A {}).unwrap()),
+        integrity_b::EntryTypes::deserialize_from_type(1, 0, &Entry::try_from(A {}).unwrap()),
         Ok(Some(integrity_b::EntryTypes::A(A {})))
     ));
     assert!(matches!(
-        integrity_b::EntryTypes::try_from_global_type(4u8, &Entry::try_from(B {}).unwrap()),
+        integrity_b::EntryTypes::deserialize_from_type(1, 1, &Entry::try_from(A {}).unwrap()),
         Ok(Some(integrity_b::EntryTypes::B(B {})))
     ));
     assert!(matches!(
-        integrity_b::EntryTypes::try_from_global_type(5u8, &Entry::try_from(C {}).unwrap()),
+        integrity_b::EntryTypes::deserialize_from_type(1, 2, &Entry::try_from(A {}).unwrap()),
         Ok(Some(integrity_b::EntryTypes::C(C {})))
+    ));
+
+    assert!(matches!(
+        integrity_b::EntryTypes::deserialize_from_type(0, 20, &Entry::try_from(A {}).unwrap()),
+        Ok(None)
+    ));
+    assert!(matches!(
+        integrity_b::EntryTypes::deserialize_from_type(0, 0, &Entry::try_from(A {}).unwrap()),
+        Ok(None)
     ));
 }
 
@@ -393,18 +402,33 @@ fn link_types_from_action() {
         B,
         C,
     }
-    set_zome_types(vec![], vec![50..53]);
+    set_zome_types(&[], &[(0, 0..3)]);
     assert_eq!(LinkTypes::try_from(LocalZomeTypeId(0)), Ok(LinkTypes::A));
     assert_eq!(LinkTypes::try_from(&LocalZomeTypeId(0)), Ok(LinkTypes::A));
     assert!(matches!(LinkTypes::try_from(LocalZomeTypeId(50)), Err(_)));
     assert_eq!(LinkTypes::try_from(LocalZomeTypeId(1)), Ok(LinkTypes::B));
     assert_eq!(LinkTypes::try_from(LocalZomeTypeId(2)), Ok(LinkTypes::C));
 
-    assert_eq!(LinkTypes::try_from(LinkType(50)), Ok(LinkTypes::A));
-    assert_eq!(LinkTypes::try_from(&LinkType(50)), Ok(LinkTypes::A));
-    assert!(matches!(LinkTypes::try_from(LinkType(0)), Err(_)));
-    assert_eq!(LinkTypes::try_from(LinkType(51)), Ok(LinkTypes::B));
-    assert_eq!(LinkTypes::try_from(LinkType(52)), Ok(LinkTypes::C));
+    assert_eq!(
+        LinkTypes::try_from((ZomeId(0), LinkType(0))),
+        Ok(LinkTypes::A)
+    );
+    assert!(matches!(
+        LinkTypes::try_from((ZomeId(0), LinkType(3))),
+        Err(_)
+    ));
+    assert!(matches!(
+        LinkTypes::try_from((ZomeId(1), LinkType(0))),
+        Err(_)
+    ));
+    assert_eq!(
+        LinkTypes::try_from((ZomeId(0), LinkType(1))),
+        Ok(LinkTypes::B)
+    );
+    assert_eq!(
+        LinkTypes::try_from((ZomeId(0), LinkType(2))),
+        Ok(LinkTypes::C)
+    );
 }
 
 #[test]
@@ -419,7 +443,7 @@ fn link_types_to_global() {
     assert_eq!(__num_link_types(), 3);
 }
 
-fn set_zome_types(entries: Vec<Range<u8>>, links: Vec<Range<u8>>) {
+fn set_zome_types(entries: &[(u8, Range<u8>)], links: &[(u8, Range<u8>)]) {
     struct TestHdi(ScopedZomeTypesSet);
     #[allow(unused_variables)]
     impl HdiT for TestHdi {
@@ -490,13 +514,13 @@ fn set_zome_types(entries: Vec<Range<u8>>, links: Vec<Range<u8>>) {
         entries: ScopedZomeTypes(
             entries
                 .into_iter()
-                .map(|r| GlobalZomeTypeId(r.start)..GlobalZomeTypeId(r.end))
+                .flat_map(|(z, types)| types.clone().map(|t| (LocalZomeTypeId(t), ZomeId(*z))))
                 .collect(),
         ),
         links: ScopedZomeTypes(
             links
                 .into_iter()
-                .map(|r| GlobalZomeTypeId(r.start)..GlobalZomeTypeId(r.end))
+                .flat_map(|(z, types)| types.clone().map(|t| (LocalZomeTypeId(t), ZomeId(*z))))
                 .collect(),
         ),
     }));

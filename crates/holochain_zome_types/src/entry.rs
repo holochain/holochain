@@ -8,6 +8,7 @@
 use crate::action::ChainTopOrdering;
 use holochain_integrity_types::EntryDefIndex;
 use holochain_integrity_types::EntryVisibility;
+use holochain_integrity_types::ZomeId;
 use holochain_serialized_bytes::prelude::*;
 
 mod app_entry_bytes;
@@ -25,13 +26,24 @@ pub use holochain_integrity_types::entry::*;
 pub enum EntryDefLocation {
     /// App defined entries always have a unique [`u8`] index
     /// within the Dna.
-    App(EntryDefIndex),
+    App(AppEntryDefLocation),
     /// [`crate::EntryDefId::CapClaim`] is committed to and
     /// validated by all integrity zomes in the dna.
     CapClaim,
     /// [`crate::EntryDefId::CapGrant`] is committed to and
     /// validated by all integrity zomes in the dna.
     CapGrant,
+}
+
+#[derive(
+    Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
+/// The location of an app entry definition.
+pub struct AppEntryDefLocation {
+    /// The zome that defines this entry type.
+    pub zome_id: ZomeId,
+    /// The entry type within the zome.
+    pub entry_def_index: EntryDefIndex,
 }
 
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
@@ -203,13 +215,10 @@ impl From<holo_hash::ActionHash> for DeleteInput {
 
 impl EntryDefLocation {
     /// Create an [`EntryDefLocation::App`].
-    pub fn app(entry_def_index: impl Into<EntryDefIndex>) -> Self {
-        Self::App(entry_def_index.into())
-    }
-}
-
-impl From<EntryDefIndex> for EntryDefLocation {
-    fn from(i: EntryDefIndex) -> Self {
-        EntryDefLocation::App(i)
+    pub fn app(zome_id: impl Into<ZomeId>, entry_def_index: impl Into<EntryDefIndex>) -> Self {
+        Self::App(AppEntryDefLocation {
+            zome_id: zome_id.into(),
+            entry_def_index: entry_def_index.into(),
+        })
     }
 }

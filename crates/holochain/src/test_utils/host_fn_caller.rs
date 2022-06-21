@@ -210,35 +210,27 @@ impl HostFnCaller {
         &self,
         zome: impl Into<ZomeName>,
         local_index: impl Into<LocalZomeTypeId>,
-    ) -> EntryDefIndex {
+    ) -> ZomeId {
         let zome_dependencies = self.ribosome.get_zome_dependencies(&zome.into()).unwrap();
         let zome_types = self
             .ribosome
             .zome_types()
             .re_scope(zome_dependencies)
             .unwrap();
-        zome_types
-            .entries
-            .to_global_scope(local_index)
-            .unwrap()
-            .into()
+        zome_types.entries.zome_id(local_index).unwrap()
     }
     pub fn get_link_type(
         &self,
         zome: impl Into<ZomeName>,
         local_index: impl Into<LocalZomeTypeId>,
-    ) -> LinkType {
+    ) -> ZomeId {
         let zome_dependencies = self.ribosome.get_zome_dependencies(&zome.into()).unwrap();
         let zome_types = self
             .ribosome
             .zome_types()
             .re_scope(zome_dependencies)
             .unwrap();
-        zome_types
-            .links
-            .to_global_scope(local_index)
-            .unwrap()
-            .into()
+        zome_types.links.zome_id(local_index).unwrap()
     }
     pub async fn commit_entry<E: Into<EntryDefLocation>>(
         &self,
@@ -318,6 +310,7 @@ impl HostFnCaller {
         &self,
         base: AnyLinkableHash,
         target: AnyLinkableHash,
+        zome_id: impl Into<ZomeId>,
         link_type: impl Into<LinkType>,
         link_tag: LinkTag,
     ) -> ActionHash {
@@ -325,6 +318,7 @@ impl HostFnCaller {
         let input = CreateLinkInput::new(
             base,
             target,
+            zome_id.into(),
             link_type.into(),
             link_tag,
             ChainTopOrdering::default(),
@@ -357,7 +351,7 @@ impl HostFnCaller {
     pub async fn get_links<'env>(
         &self,
         base: AnyLinkableHash,
-        type_query: LinkTypeRanges,
+        type_query: LinkTypeFilter,
         link_tag: Option<LinkTag>,
         _options: GetLinksOptions,
     ) -> Vec<Link> {
@@ -380,7 +374,7 @@ impl HostFnCaller {
     pub async fn get_link_details<'env>(
         &self,
         base: AnyLinkableHash,
-        type_query: LinkTypeRanges,
+        type_query: LinkTypeFilter,
         tag: LinkTag,
         _options: GetLinksOptions,
     ) -> Vec<(SignedActionHashed, Vec<SignedActionHashed>)> {

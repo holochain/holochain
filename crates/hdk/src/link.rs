@@ -57,20 +57,25 @@ pub use holochain_deterministic_integrity::link::*;
 /// If you have the hash of the identity entry you can get all the links, if you have the entry or
 /// action hash for any of the creates or updates you can lookup the identity entry hash out of the
 /// body of the create/update entry.
-pub fn create_link<E>(
+pub fn create_link<T, E>(
     base_address: impl Into<AnyLinkableHash>,
     target_address: impl Into<AnyLinkableHash>,
-    link_type: impl TryInto<LinkType, Error = E>,
+    link_type: T,
     tag: impl Into<LinkTag>,
 ) -> ExternResult<ActionHash>
 where
+    T: Copy,
+    ZomeId: TryFrom<T, Error = E>,
+    LinkType: From<T>,
     WasmError: From<E>,
 {
-    let link_type = link_type.try_into()?;
+    let zome_id = link_type.try_into()?;
+    let link_type = link_type.into();
     HDK.with(|h| {
         h.borrow().create_link(CreateLinkInput::new(
             base_address.into(),
             target_address.into(),
+            zome_id,
             link_type,
             tag.into(),
             ChainTopOrdering::default(),
@@ -127,15 +132,12 @@ pub fn delete_link(address: ActionHash) -> ExternResult<ActionHash> {
 /// deleted c.f. get_link_details that returns all the creates and all the deletes together.
 ///
 /// See [ `get_link_details` ].
-pub fn get_links<E>(
+pub fn get_links(
     base: impl Into<AnyLinkableHash>,
-    link_type: impl TryInto<LinkTypeRanges, Error = E>,
+    link_type: impl LinkTypeFilterExt,
     link_tag: Option<LinkTag>,
-) -> ExternResult<Vec<Link>>
-where
-    WasmError: From<E>,
-{
-    let link_type = link_type.try_into()?;
+) -> ExternResult<Vec<Link>> {
+    let link_type = link_type.try_into_filter()?;
     Ok(HDK
         .with(|h| {
             h.borrow()
@@ -165,15 +167,12 @@ where
 /// c.f. get_links that returns only the creates that have not been deleted.
 ///
 /// See [ `get_links` ].
-pub fn get_link_details<E>(
+pub fn get_link_details(
     base: impl Into<AnyLinkableHash>,
-    link_type: impl TryInto<LinkTypeRanges, Error = E>,
+    link_type: impl LinkTypeFilterExt,
     link_tag: Option<LinkTag>,
-) -> ExternResult<LinkDetails>
-where
-    WasmError: From<E>,
-{
-    let link_type = link_type.try_into()?;
+) -> ExternResult<LinkDetails> {
+    let link_type = link_type.try_into_filter()?;
     Ok(HDK
         .with(|h| {
             h.borrow()

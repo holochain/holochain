@@ -475,7 +475,11 @@ mod tests {
             ActionBuilderCommonFixturator::new(Unpredictable)
                 .next()
                 .unwrap(),
-            EntryType::App(AppEntryType::new(0.into(), EntryVisibility::Public)),
+            EntryType::App(AppEntryType::new(
+                0.into(),
+                0.into(),
+                EntryVisibility::Public,
+            )),
             fake_entry_hash(1).into(),
         )
         .into();
@@ -491,7 +495,11 @@ mod tests {
             ActionBuilderCommonFixturator::new(Unpredictable)
                 .next()
                 .unwrap(),
-            EntryType::App(AppEntryType::new(0.into(), EntryVisibility::Public)),
+            EntryType::App(AppEntryType::new(
+                0.into(),
+                0.into(),
+                EntryVisibility::Public,
+            )),
             fake_entry_hash(1).into(),
         )
         .into();

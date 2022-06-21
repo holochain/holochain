@@ -53,7 +53,6 @@ pub fn build(attrs: TokenStream, input: TokenStream) -> TokenStream {
 
     let output = quote::quote! {
         // Add the required derives and attributes.
-        #[hdk_to_global_link_types]
         #[hdk_to_local_types]
         #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
         #input
@@ -62,63 +61,42 @@ pub fn build(attrs: TokenStream, input: TokenStream) -> TokenStream {
         #no_mangle
         pub fn __num_link_types() -> u8 { #ident::len() }
 
-        impl TryFrom<#ident> for LinkType {
+        impl From<#ident> for LinkType {
+            fn from(value: #ident) -> Self {
+                Self(LocalZomeTypeId::from(value).0)
+            }
+        }
+
+        impl From<&#ident> for LinkType {
+
+            fn from(value: &#ident) -> Self {
+                Self(LocalZomeTypeId::from(value).0)
+            }
+        }
+
+        impl TryFrom<#ident> for LinkTypeFilter {
             type Error = WasmError;
 
             fn try_from(value: #ident) -> Result<Self, Self::Error> {
-                Ok(Self(GlobalZomeTypeId::try_from(value)?.0))
+                let z: ZomeId = value.try_into()?;
+                let lt: LinkType = value.into();
+                Ok(LinkTypeFilter::single_type(z, lt))
             }
         }
 
-        impl TryFrom<&#ident> for LinkType {
+        impl TryFrom<&#ident> for LinkTypeFilter {
             type Error = WasmError;
 
             fn try_from(value: &#ident) -> Result<Self, Self::Error> {
-                Ok(Self(GlobalZomeTypeId::try_from(value)?.0))
+                let z: ZomeId = value.try_into()?;
+                let lt: LinkType = value.into();
+                Ok(LinkTypeFilter::single_type(z, lt))
             }
         }
 
-        impl TryFrom<#ident> for LinkTypeRange {
-            type Error = WasmError;
-
-            fn try_from(value: #ident) -> Result<Self, Self::Error> {
-                let lt: LinkType = value.try_into()?;
-                Ok(lt.into())
-            }
-        }
-
-        impl TryFrom<&#ident> for LinkTypeRange {
-            type Error = WasmError;
-
-            fn try_from(value: &#ident) -> Result<Self, Self::Error> {
-                let lt: LinkType = value.try_into()?;
-                Ok(lt.into())
-            }
-        }
-
-        impl TryFrom<#ident> for LinkTypeRanges {
-            type Error = WasmError;
-
-            fn try_from(value: #ident) -> Result<Self, Self::Error> {
-                let lt: LinkType = value.try_into()?;
-                Ok(Self(vec![lt.into()]))
-            }
-        }
-
-        impl TryFrom<&#ident> for LinkTypeRanges {
-            type Error = WasmError;
-
-            fn try_from(value: &#ident) -> Result<Self, Self::Error> {
-                let lt: LinkType = value.try_into()?;
-                Ok(Self(vec![lt.into()]))
-            }
-        }
-
-        // Implement the helper trait.
-        impl LinkTypesHelper<{ #ident::len() as usize }> for #ident {
-            fn iter() -> core::array::IntoIter<Self, { #ident::len() as usize }> {
-                use #ident::*;
-                [#units].into_iter()
+        impl LinkTypeFilterExt for #ident {
+            fn try_into_filter(self) -> Result<LinkTypeFilter, WasmError> {
+                self.try_into()
             }
         }
 
@@ -126,7 +104,7 @@ pub fn build(attrs: TokenStream, input: TokenStream) -> TokenStream {
             type Error = WasmError;
 
             fn try_from(value: LocalZomeTypeId) -> Result<Self, Self::Error> {
-                Self::iter()
+                #ident::iter()
                     .find(|u| LocalZomeTypeId::from(*u) == value)
                     .ok_or_else(|| {
                         wasm_error!(WasmErrorInner::Guest(format!(
@@ -145,43 +123,49 @@ pub fn build(attrs: TokenStream, input: TokenStream) -> TokenStream {
             }
         }
 
-        impl TryFrom<GlobalZomeTypeId> for #ident {
+        impl TryFrom<(ZomeId, LinkType)> for #ident {
             type Error = WasmError;
 
-            fn try_from(index: GlobalZomeTypeId) -> Result<Self, Self::Error> {
-                match zome_info()?.zome_types.links.to_local_scope(index) {
-                    Some(local_index) => Self::try_from(local_index),
+            fn try_from((zome_id, index): (ZomeId, LinkType)) -> Result<Self, Self::Error> {
+                match zome_info()?.zome_types.links.zome_id(index) {
+                    Some(z) if z == zome_id => Self::try_from(LocalZomeTypeId::from(index)),
                     _ => Err(wasm_error!(WasmErrorInner::Guest(format!(
-                        "global index {:?} does not map to any local scope for this zome",
+                        "LinkType {:?} {:?} does not map to any local scope for this zome",
+                        zome_id,
                         index
                     )))),
                 }
             }
         }
 
-        impl TryFrom<&GlobalZomeTypeId> for #ident {
+        impl TryFrom<&#ident> for ZomeId {
             type Error = WasmError;
 
-            fn try_from(index: &GlobalZomeTypeId) -> Result<Self, Self::Error> {
-                Self::try_from(*index)
+            fn try_from(index: &#ident) -> Result<Self, Self::Error> {
+                match zome_info()?.zome_types.links.zome_id(LocalZomeTypeId::from(index)) {
+                    Some(z) => Ok(z),
+                    _ => Err(wasm_error!(WasmErrorInner::Guest(format!(
+                        "ZomeId not found for {:?}",
+                        index
+                    )))),
+                }
             }
         }
 
-        impl TryFrom<LinkType> for #ident {
+        impl TryFrom<#ident> for ZomeId {
             type Error = WasmError;
-            fn try_from(index: LinkType) -> Result<Self, Self::Error> {
-                let index: GlobalZomeTypeId = index.into();
-                Self::try_from(index)
+
+            fn try_from(index: #ident) -> Result<Self, Self::Error> {
+                Self::try_from(&index)
             }
         }
 
-        impl TryFrom<&LinkType> for #ident {
-            type Error = WasmError;
-            fn try_from(index: &LinkType) -> Result<Self, Self::Error> {
-                Self::try_from(*index)
+        impl #ident {
+            pub fn iter() -> impl Iterator<Item = Self> {
+                use #ident::*;
+                [#units].into_iter()
             }
         }
-
     };
     output.into()
 }

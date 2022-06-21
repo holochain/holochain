@@ -1,9 +1,9 @@
 //! Helpers for constructing and using zome types correctly.
-use std::ops::Range;
+use std::collections::HashMap;
+use std::num::NonZeroU8;
 
 pub use error::*;
 use holochain_zome_types::EntryDefIndex;
-use holochain_zome_types::GlobalZomeTypeId;
 use holochain_zome_types::LinkType;
 use holochain_zome_types::ScopedZomeTypes;
 use holochain_zome_types::ScopedZomeTypesSet;
@@ -14,9 +14,14 @@ mod error;
 #[cfg(test)]
 mod test;
 
+/// TODO
+pub type NumZomeTypes = NonZeroU8;
 /// Zome types at the global scope for a DNA.
 #[derive(Clone, Debug, PartialEq, Default)]
-pub struct GlobalZomeTypes(ScopedZomeTypesSet);
+pub struct GlobalZomeTypes {
+    entries: HashMap<ZomeId, NumZomeTypes>,
+    links: HashMap<ZomeId, NumZomeTypes>,
+}
 
 impl GlobalZomeTypes {
     /// Create a new zome types map from the order of
@@ -36,88 +41,48 @@ impl GlobalZomeTypes {
     where
         I: IntoIterator<Item = (EntryDefIndex, LinkType)>,
     {
-        let r = ordered_iterator.into_iter().try_fold(
-            ScopedZomeTypesSet::default(),
-            |mut zome_types, (num_entry_types, num_link_types)| {
-                let start = zome_types
-                    .entries
-                    .0
-                    .last()
-                    .map(|r| r.end)
-                    .unwrap_or(GlobalZomeTypeId(0));
-                let end = start
-                    .0
-                    .checked_add(num_entry_types.0)
-                    .ok_or(ZomeTypesError::EntryTypeIndexOverflow)?
+        let r = ordered_iterator.into_iter().enumerate().try_fold(
+            Self::default(),
+            |mut zome_types, (zome_id, (num_entry_types, num_link_types))| {
+                let zome_id: ZomeId = u8::try_from(zome_id)
+                    .map_err(|_| ZomeTypesError::ZomeIndexOverflow)?
                     .into();
-                zome_types.entries.0.push(start..end);
-                let start = zome_types
-                    .links
-                    .0
-                    .last()
-                    .map(|r| r.end)
-                    .unwrap_or(GlobalZomeTypeId(0));
-                let end = start
-                    .0
-                    .checked_add(num_link_types.0)
-                    .ok_or(ZomeTypesError::LinkTypeIndexOverflow)?
-                    .into();
-                zome_types.links.0.push(start..end);
+                if let Some(num_entry_types) = NonZeroU8::new(num_entry_types.0) {
+                    zome_types.entries.insert(zome_id, num_entry_types);
+                }
+                if let Some(num_link_types) = NonZeroU8::new(num_link_types.0) {
+                    zome_types.links.insert(zome_id, num_link_types);
+                }
                 Ok(zome_types)
             },
         )?;
-        Ok(GlobalZomeTypes(r))
+        Ok(r)
     }
 
     /// Create a new zome types map within the scope of the given integrity zomes.
     pub fn re_scope(&self, zomes: &[ZomeId]) -> ZomeTypesResult<ScopedZomeTypesSet> {
-        let Self(ScopedZomeTypesSet { entries, links }) = self;
         let entries = zomes
             .iter()
-            .map(|zome_id| {
-                entries
-                    .0
-                    .get(zome_id.0 as usize)
-                    .cloned()
-                    .ok_or(ZomeTypesError::MissingZomeType(*zome_id))
-            })
-            .collect::<ZomeTypesResult<Vec<_>>>()?;
+            .filter_map(|zome_id| self.entries.get_key_value(zome_id).map(|(z, l)| (*z, *l)));
+        let entries = new_scope(entries).ok_or(ZomeTypesError::EntryTypeIndexOverflow)?;
         let links = zomes
             .iter()
-            .map(|zome_id| {
-                links
-                    .0
-                    .get(zome_id.0 as usize)
-                    .cloned()
-                    .ok_or(ZomeTypesError::MissingZomeType(*zome_id))
-            })
-            .collect::<ZomeTypesResult<Vec<_>>>()?;
-        Ok(ScopedZomeTypesSet {
-            entries: ScopedZomeTypes(entries),
-            links: ScopedZomeTypes(links),
-        })
-    }
-
-    /// Find a [`ZomeId`] from a [`EntryDefIndex`].
-    pub fn find_zome_id_from_entry(&self, entry_index: &EntryDefIndex) -> Option<ZomeId> {
-        find_zome_id(self.0.entries.0.iter(), &(*entry_index).into())
-    }
-
-    /// Find a [`ZomeId`] from a [`LinkType`].
-    pub fn find_zome_id_from_link(&self, link_index: &LinkType) -> Option<ZomeId> {
-        find_zome_id(self.0.links.0.iter(), &(*link_index).into())
+            .filter_map(|zome_id| self.links.get_key_value(zome_id).map(|(z, l)| (*z, *l)));
+        let links = new_scope(links).ok_or(ZomeTypesError::LinkTypeIndexOverflow)?;
+        Ok(ScopedZomeTypesSet { entries, links })
     }
 }
 
-// TODO: Optimize this using a BTree.
-fn find_zome_id<'iter>(
-    iter: impl Iterator<Item = &'iter Range<GlobalZomeTypeId>>,
-    index: &GlobalZomeTypeId,
-) -> Option<ZomeId> {
-    iter.enumerate().find_map(|(i, range)| {
-        range
-            .contains(index)
-            .then(|| i)
-            .and_then(|i| Some(ZomeId(i.try_into().ok()?)))
-    })
+fn new_scope(iter: impl Iterator<Item = (ZomeId, NumZomeTypes)>) -> Option<ScopedZomeTypes> {
+    let mut total: u8 = 0;
+    let iter = iter
+        .map(|(zome_id, len)| {
+            let len = len.get();
+            total = total.checked_add(len)?;
+            // Safe because len is never zero
+            let last_index = total - 1;
+            Some((last_index.into(), zome_id))
+        })
+        .collect::<Option<_>>()?;
+    Some(ScopedZomeTypes(iter))
 }

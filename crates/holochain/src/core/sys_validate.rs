@@ -272,7 +272,7 @@ pub async fn check_app_entry_type(
 
     // Check if the zome is found
     let zome = ribosome
-        .find_zome_from_entry(&entry_type.id())
+        .get_integrity_zome(&entry_type.zome_id())
         .ok_or_else(|| ValidationOutcome::ZomeId(entry_type.clone()))?
         .into_inner()
         .1;

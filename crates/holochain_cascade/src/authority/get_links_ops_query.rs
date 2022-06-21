@@ -14,7 +14,7 @@ use holochain_zome_types::Action;
 use holochain_zome_types::HasValidationStatus;
 use holochain_zome_types::Judged;
 use holochain_zome_types::LinkTag;
-use holochain_zome_types::LinkTypeRanges;
+use holochain_zome_types::LinkTypeFilter;
 use holochain_zome_types::SignedAction;
 
 use super::WireLinkKey;
@@ -22,7 +22,7 @@ use super::WireLinkKey;
 #[derive(Debug, Clone)]
 pub struct GetLinksOpsQuery {
     base: Arc<AnyLinkableHash>,
-    type_query: Option<LinkTypeRanges>,
+    type_query: LinkTypeFilter,
     tag: Option<Arc<LinkTag>>,
 }
 
@@ -84,16 +84,14 @@ impl Query for GetLinksOpsQuery {
                 common_query, tag
             );
         }
-        if let Some(ranges) = &self.type_query {
-            common_query = format!(
-                "
-                {}
-                {}
-                ",
-                common_query,
-                ranges.to_sql_statement(),
-            );
-        }
+        common_query = format!(
+            "
+            {}
+            {}
+            ",
+            common_query,
+            self.type_query.to_sql_statement(),
+        );
         let create_query = format!("{}{}", create, common_query);
         let sub_create_query = format!("{}{}", sub_create, common_query);
         let delete_query = format!(

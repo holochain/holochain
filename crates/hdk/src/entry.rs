@@ -68,16 +68,18 @@ where
 /// See [`get`] and [`get_details`] for more information on CRUD.
 pub fn create_entry<I, E, E2>(input: I) -> ExternResult<ActionHash>
 where
-    EntryDefIndex: for<'a> TryFrom<&'a I, Error = E2>,
+    ZomeId: for<'a> TryFrom<&'a I, Error = E2>,
+    EntryDefIndex: for<'a> From<&'a I>,
     EntryVisibility: for<'a> From<&'a I>,
     Entry: TryFrom<I, Error = E>,
     WasmError: From<E>,
     WasmError: From<E2>,
 {
-    let entry_def_index = EntryDefIndex::try_from(&input)?;
+    let zome_id = ZomeId::try_from(&input)?;
+    let entry_def_index = EntryDefIndex::from(&input);
     let visibility = EntryVisibility::from(&input);
     let create_input = CreateInput::new(
-        EntryDefLocation::app(entry_def_index),
+        EntryDefLocation::app(zome_id, entry_def_index),
         visibility,
         input.try_into()?,
         ChainTopOrdering::default(),

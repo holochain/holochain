@@ -215,15 +215,42 @@ impl InlineZomeSet {
 
     /// Get the entry def location for committing an entry.
     pub fn get_entry_location(api: &BoxApi, index: impl Into<LocalZomeTypeId>) -> EntryDefLocation {
-        let r: EntryDefIndex = api
+        let index = index.into();
+        let zome_id = api
             .zome_info(())
             .unwrap()
             .zome_types
             .entries
-            .to_global_scope(index)
+            .zome_id(index)
+            .unwrap();
+        EntryDefLocation::App(AppEntryDefLocation {
+            zome_id,
+            entry_def_index: index.into(),
+        })
+    }
+
+    /// Generate a link type filter from a link type.
+    pub fn get_link_filter(api: &BoxApi, index: impl Into<LinkType>) -> LinkTypeFilter {
+        let index = index.into();
+        let zome_id = api
+            .zome_info(())
             .unwrap()
-            .into();
-        r.into()
+            .zome_types
+            .links
+            .zome_id(index)
+            .unwrap();
+        LinkTypeFilter::single_type(zome_id, index)
+    }
+
+    /// Generate a link type filter for all dependencies of the this zome.
+    pub fn dep_link_filter(api: &BoxApi) -> LinkTypeFilter {
+        let zome_ids = api
+            .zome_info(())
+            .unwrap()
+            .zome_types
+            .links
+            .all_dependencies();
+        LinkTypeFilter::Dependencies(zome_ids)
     }
 }
 

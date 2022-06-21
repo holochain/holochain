@@ -1,5 +1,5 @@
 //! Information about the current zome and dna.
-use core::ops::Range;
+use std::collections::BTreeMap;
 
 use crate::action::ZomeId;
 use crate::zome::ZomeName;
@@ -76,84 +76,58 @@ pub struct ScopedZomeTypesSet {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, PartialEq, Default)]
-/// A set of [`GlobalZomeTypeId`] ranges that are in scope for the calling zome.
-///
-/// For each integrity zome that this zome depends on there is a range of global
-/// zome types. Integrity zomes always depend on themselves.
-pub struct ScopedZomeTypes(pub Vec<Range<GlobalZomeTypeId>>);
+/// TODO
+pub struct ScopedZomeTypes(pub BTreeMap<LocalZomeTypeId, ZomeId>);
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
-/// An opaque type identifier that the host uses to
-/// uniquely identify an app defined entry or link type.
-pub struct GlobalZomeTypeId(pub u8);
+impl ScopedZomeTypes {
+    /// TODO
+    pub fn zome_id(&self, index: impl Into<LocalZomeTypeId>) -> Option<ZomeId> {
+        let index = index.into();
+        self.0.range(index..).next().map(|(_, z)| *z)
+    }
+
+    /// TODO
+    pub fn in_scope(&self, index: impl Into<LocalZomeTypeId>, zome_id: impl Into<ZomeId>) -> bool {
+        self.zome_id(index).map_or(false, |z| z == zome_id.into())
+    }
+
+    /// TODO
+    pub fn is_dependency(&self, zome_id: impl Into<ZomeId>) -> bool {
+        let zome_id = zome_id.into();
+        self.0.iter().any(|(_, z)| *z == zome_id)
+    }
+
+    /// TODO
+    pub fn all_dependencies(&self) -> Vec<ZomeId> {
+        let mut out: Vec<_> = self.0.values().into_iter().copied().collect();
+        out.sort_unstable();
+        out.dedup();
+        out
+    }
+
+    /// TODO
+    pub fn offset(
+        &self,
+        zome_id: impl Into<ZomeId>,
+        index: impl Into<LocalZomeTypeId>,
+    ) -> Option<LocalZomeTypeId> {
+        let zome_id = zome_id.into();
+        let index = index.into();
+        self.0
+            .iter()
+            .filter(|(_, z)| **z == zome_id)
+            .map(|(l, _)| *l)
+            .collect::<Vec<_>>()
+            .get(index.0 as usize)
+            .copied()
+    }
+}
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 /// An opaque type identifier that the guest uses to
 /// uniquely identify an app defined entry or link type
 /// within a single zome.
 pub struct LocalZomeTypeId(pub u8);
-
-impl ScopedZomeTypes {
-    /// Convert a [`Into<GlobalZomeTypeId>`] to a [`LocalZomeTypeId`].
-    /// If the the [`GlobalZomeTypeId`] is in scope for the calling zome,
-    /// then this will return a [`LocalZomeTypeId`].
-    pub fn to_local_scope(&self, index: impl Into<GlobalZomeTypeId>) -> Option<LocalZomeTypeId> {
-        let index = index.into();
-
-        // Track the total local length as we iterate over the ranges.
-        let mut total_len: u8 = 0;
-
-        // Iterate over all ranges in scope.
-        self.0.iter().find_map(|range| {
-            // Add the length of this range to the total length.
-            total_len = total_len.checked_add(range.end.0.checked_sub(range.start.0)?)?;
-
-            // Check if the range contains the global index.
-            range
-                .contains(&index)
-                // Then map the starting point of this range to the local scope
-                // by subtracting the total length of this range from the total
-                // accumulated length.
-                .then(|| (range.end.0 as i16) - (total_len as i16))
-                // Then convert the local index to by subtracting the offset.
-                .and_then(|offset| {
-                    let i = (index.0 as i16) - offset;
-                    Some(LocalZomeTypeId(u8::try_from(i).ok()?))
-                })
-        })
-    }
-
-    /// Convert a [`LocalZomeTypeId`] to a [`GlobalZomeTypeId`].
-    /// If the the [`LocalZomeTypeId`] maps to a [`GlobalZomeTypeId`] in scope for the calling zome,
-    /// then this will return a [`GlobalZomeTypeId`].
-    pub fn to_global_scope(&self, index: impl Into<LocalZomeTypeId>) -> Option<GlobalZomeTypeId> {
-        let index: LocalZomeTypeId = index.into();
-
-        let mut total_len: u8 = 0;
-
-        self.0.iter().find_map(|range| {
-            // Add the length of this range to the total length.
-            total_len = total_len.checked_add(range.end.0.checked_sub(range.start.0)?)?;
-
-            // If the total length is less than the local index, then we know
-            // this index is within our local scope.
-            (index.0 < total_len)
-                // Then calculate the offset from local to global scope.
-                .then(|| (range.end.0 as i16) - (total_len as i16))
-                // Then add the offset to the local index to get the global index.
-                .and_then(|offset| {
-                    let i = (index.0 as i16) + offset;
-                    Some(GlobalZomeTypeId(u8::try_from(i).ok()?))
-                })
-        })
-    }
-}
-
-impl From<u8> for GlobalZomeTypeId {
-    fn from(v: u8) -> Self {
-        Self(v)
-    }
-}
 
 impl From<u8> for LocalZomeTypeId {
     fn from(v: u8) -> Self {

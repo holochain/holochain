@@ -1,42 +1,51 @@
-use std::ops::RangeInclusive;
-
 use super::ToSqlStatement;
 use holochain_zome_types::LinkType;
-use holochain_zome_types::LinkTypeRange;
-use holochain_zome_types::LinkTypeRanges;
+use holochain_zome_types::LinkTypeFilter;
+use holochain_zome_types::ZomeId;
 use test_case::test_case;
 
-#[test_case(LinkTypeRange::Empty => " false ".to_string())]
-#[test_case(LinkTypeRange::Full => "".to_string())]
-#[test_case(LinkTypeRange::Inclusive(LinkType(0)..=LinkType(0))=> " link_type = 0 ".to_string())]
-#[test_case(LinkTypeRange::Inclusive(LinkType(1)..=LinkType(0))=> " false ".to_string())]
-#[test_case(LinkTypeRange::Inclusive(LinkType(5)..=LinkType(6))=> " link_type BETWEEN 5 AND 6 ".to_string())]
-fn link_type_range_to_sql(range: LinkTypeRange) -> String {
-    range.to_sql_statement()
+fn make_multi(types: &[(u8, &[u8])]) -> LinkTypeFilter {
+    LinkTypeFilter::Types(
+        types
+            .iter()
+            .map(|(z, t)| (ZomeId(*z), t.iter().map(|t| LinkType(*t)).collect()))
+            .collect(),
+    )
 }
 
-fn make_ranges(ranges: Vec<RangeInclusive<u8>>) -> Vec<LinkTypeRange> {
-    ranges
-        .into_iter()
-        .map(|r| LinkTypeRange::Inclusive(LinkType(*r.start())..=LinkType(*r.end())))
-        .collect()
+#[test_case(make_multi(&[]) => "".to_string())]
+#[test_case(make_multi(&[(0, &[0])]) => " AND ( ( zome_id = 0 AND ( link_type = 0 ) ) ) ".to_string())]
+#[test_case(make_multi(&[(0, &[0]), (1, &[0, 1])]) => " AND ( ( zome_id = 0 AND ( link_type = 0 ) ) OR ( zome_id = 1 AND ( link_type = 0 OR link_type = 1 ) ) ) ".to_string())]
+#[test_case(make_multi(&[(0, &[0, 2, 5])]) => " AND ( ( zome_id = 0 AND ( link_type = 0 OR link_type = 2 OR link_type = 5 ) ) ) ".to_string())]
+#[test_case(LinkTypeFilter::Dependencies(vec![]) => "".to_string())]
+#[test_case(LinkTypeFilter::Dependencies(vec![ZomeId(0)]) => " AND ( zome_id = 0 ) ".to_string())]
+#[test_case(LinkTypeFilter::Dependencies(vec![ZomeId(0), ZomeId(3)]) => " AND ( zome_id = 0 OR zome_id = 3 ) ".to_string())]
+fn link_type_filter_to_sql(filter: LinkTypeFilter) -> String {
+    filter.to_sql_statement()
 }
 
-#[test_case(vec![LinkTypeRange::Empty] => " AND false ".to_string())]
-#[test_case(vec![LinkTypeRange::Empty; 4] => " AND false ".to_string())]
-#[test_case(vec![LinkTypeRange::Full] => "".to_string())]
-#[test_case(vec![LinkTypeRange::Full; 4] => "".to_string())]
-#[test_case(make_ranges(vec![0..=0]) => " AND (  link_type = 0  ) ".to_string())]
-#[test_case(make_ranges(vec![0..=0, 0..=0]) => " AND (  link_type = 0  ) ".to_string())]
-#[test_case(make_ranges(vec![10..=3]) => " AND false ".to_string())]
-#[test_case(make_ranges(vec![10..=3, 0..=1]) => " AND false ".to_string())]
-#[test_case(make_ranges(vec![10..=3, 5..=1]) => " AND false ".to_string())]
-#[test_case(make_ranges(vec![0..=u8::MAX]) => "".to_string())]
-#[test_case(make_ranges(vec![0..=u8::MAX, 5..=1]) => " AND false ".to_string())]
-#[test_case(make_ranges(vec![0..=u8::MAX, 1..=1]) => " AND (  link_type = 1  ) ".to_string())]
-#[test_case(make_ranges(vec![0..=u8::MAX, 1..=1, 5..=5]) => " AND (  link_type = 1  OR  link_type = 5  ) ".to_string())]
-#[test_case(make_ranges(vec![0..=u8::MAX, 1..=1, 5..=6]) => " AND (  link_type = 1  OR  link_type BETWEEN 5 AND 6  ) ".to_string())]
-#[test_case(make_ranges(vec![0..=5, 30..=50, 7..=9]) => " AND (  link_type BETWEEN 0 AND 5  OR  link_type BETWEEN 30 AND 50  OR  link_type BETWEEN 7 AND 9  ) ".to_string())]
-fn link_type_ranges_to_sql(ranges: Vec<LinkTypeRange>) -> String {
-    LinkTypeRanges(ranges).to_sql_statement()
+#[test_case(make_multi(&[]), 0, 0 => false)]
+#[test_case(make_multi(&[(0, &[0])]), 0, 0 => true)]
+#[test_case(make_multi(&[(0, &[0])]), 1, 0 => false)]
+#[test_case(make_multi(&[(0, &[0])]), 1, 1 => false)]
+#[test_case(make_multi(&[(0, &[0])]), 0, 1 => false)]
+#[test_case(make_multi(&[(0, &[0]), (1, &[0, 1])]), 0, 0 => true)]
+#[test_case(make_multi(&[(0, &[0]), (1, &[0, 1])]), 1, 0 => true)]
+#[test_case(make_multi(&[(0, &[0]), (1, &[0, 1])]), 1, 1 => true)]
+#[test_case(make_multi(&[(0, &[0]), (1, &[0, 1])]), 1, 2 => false)]
+#[test_case(make_multi(&[(0, &[0]), (1, &[0, 1])]), 2, 0 => false)]
+#[test_case(make_multi(&[(0, &[0]), (1, &[0, 1])]), 0, 1 => false)]
+#[test_case(make_multi(&[(0, &[0, 2, 5])]), 0, 5 => true)]
+#[test_case(make_multi(&[(0, &[0, 2, 5])]), 0, 6 => false)]
+#[test_case(make_multi(&[(0, &[0, 2, 5])]), 1, 5 => false)]
+#[test_case(LinkTypeFilter::Dependencies(vec![]), 0, 0 => false)]
+#[test_case(LinkTypeFilter::Dependencies(vec![ZomeId(0)]), 0, 0 => true)]
+#[test_case(LinkTypeFilter::Dependencies(vec![ZomeId(0)]), 0, 1 => true)]
+#[test_case(LinkTypeFilter::Dependencies(vec![ZomeId(0)]), 1, 0 => false)]
+#[test_case(LinkTypeFilter::Dependencies(vec![ZomeId(0), ZomeId(3)]), 0, 0 => true)]
+#[test_case(LinkTypeFilter::Dependencies(vec![ZomeId(0), ZomeId(3)]), 3, 0 => true)]
+#[test_case(LinkTypeFilter::Dependencies(vec![ZomeId(0), ZomeId(3)]), 2, 0 => false)]
+#[test_case(LinkTypeFilter::Dependencies(vec![ZomeId(0), ZomeId(3)]), 4, 0 => false)]
+fn link_type_filter_contains(filter: LinkTypeFilter, z: u8, l: u8) -> bool {
+    filter.contains(&ZomeId(z), &LinkType(l))
 }

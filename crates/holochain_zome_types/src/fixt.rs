@@ -64,14 +64,18 @@ fixturator!(
 
 fixturator!(
     AppEntryType;
-    constructor fn new(U8, EntryVisibility);
+    constructor fn new(U8, U8, EntryVisibility);
 );
 
 impl Iterator for AppEntryTypeFixturator<EntryVisibility> {
     type Item = AppEntryType;
     fn next(&mut self) -> Option<Self::Item> {
         let app_entry = AppEntryTypeFixturator::new(Unpredictable).next().unwrap();
-        Some(AppEntryType::new(app_entry.id(), self.0.curve))
+        Some(AppEntryType::new(
+            app_entry.id(),
+            app_entry.zome_id(),
+            self.0.curve,
+        ))
     }
 }
 
@@ -90,7 +94,7 @@ fixturator!(
 
 fixturator!(
     CreateLink;
-    constructor fn from_builder(ActionBuilderCommon, AnyLinkableHash, AnyLinkableHash, LinkType, LinkTag);
+    constructor fn from_builder(ActionBuilderCommon, AnyLinkableHash, AnyLinkableHash, ZomeId, LinkType, LinkTag);
 );
 
 fixturator!(
@@ -538,7 +542,7 @@ fixturator! {
     };
     curve PublicCurve {
         let aet = fixt!(AppEntryType);
-        EntryType::App(AppEntryType::new(aet.id(), EntryVisibility::Public))
+        EntryType::App(AppEntryType::new(aet.id(), aet.zome_id(), EntryVisibility::Public))
     };
 }
 

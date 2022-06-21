@@ -11,6 +11,7 @@ use holochain_zome_types::Entry;
 use holochain::test_utils::conductor_setup::ConductorTestData;
 use holochain::test_utils::host_fn_caller::*;
 use holochain::test_utils::wait_for_integration;
+use holochain_zome_types::EntryDefLocation;
 use holochain_zome_types::EntryVisibility;
 use rusqlite::named_params;
 
@@ -37,10 +38,10 @@ async fn authored_test() {
     let entry_hash = EntryHash::with_data_sync(&Entry::try_from(entry.clone()).unwrap());
     // 3
     let h = alice_call_data.get_api(TestWasm::Create);
-    let entry_index = h.get_entry_type(TestWasm::Create, POST_INDEX);
+    let zome_id = h.get_entry_type(TestWasm::Create, POST_INDEX);
     h.commit_entry(
         entry.clone().try_into().unwrap(),
-        entry_index,
+        EntryDefLocation::app(zome_id, POST_INDEX),
         EntryVisibility::Public,
     )
     .await;
@@ -111,10 +112,10 @@ async fn authored_test() {
 
     // Now bob commits the entry
     let h = bob_call_data.get_api(TestWasm::Create);
-    let entry_index = h.get_entry_type(TestWasm::Create, POST_INDEX);
+    let zome_id = h.get_entry_type(TestWasm::Create, POST_INDEX);
     h.commit_entry(
         entry.clone().try_into().unwrap(),
-        entry_index,
+        EntryDefLocation::app(zome_id, POST_INDEX),
         EntryVisibility::Public,
     )
     .await;

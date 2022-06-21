@@ -24,8 +24,8 @@ pub fn build(_attrs: TokenStream, input: TokenStream) -> TokenStream {
         .map(|(i, syn::Variant { ident: v_ident, fields, .. })| {
             let ty = &get_single_tuple_variant(v_ident, fields).ty;
             quote::quote! {
-                if ((<#ident as EnumVariantLen<#i>>::ENUM_VARIANT_START)..(<#ident as EnumVariantLen<#i>>::ENUM_VARIANT_LEN)).contains(&value) {
-                    return Ok(#ty::try_from_local_type::<LocalZomeTypeId>(LocalZomeTypeId(value), entry)?.map(Self::#v_ident));
+                if ((<#ident as EnumVariantLen<#i>>::ENUM_VARIANT_START)..(<#ident as EnumVariantLen<#i>>::ENUM_VARIANT_LEN)).contains(&offset.0) {
+                    return Ok(Some(Self::#v_ident(#ty::try_from((type_index, entry))?)));
                 }
             }
         })
@@ -45,6 +45,20 @@ pub fn build(_attrs: TokenStream, input: TokenStream) -> TokenStream {
         )
         .collect();
 
+    let into_entry_def_index: proc_macro2::TokenStream = variants
+        .into_iter()
+        .map(
+            |syn::Variant {
+                 ident: v_ident,
+                 fields,
+                 ..
+             }| {
+                get_single_tuple_variant(v_ident, fields);
+                quote::quote! {#ident::#v_ident (v) => EntryDefIndex::from(v),}
+            },
+        )
+        .collect();
+
     let into_visibility: proc_macro2::TokenStream = variants
         .into_iter()
         .map(
@@ -60,7 +74,6 @@ pub fn build(_attrs: TokenStream, input: TokenStream) -> TokenStream {
         .collect();
 
     let output = quote::quote! {
-        #[hdk_to_global_entry_types]
         #[hdk_to_local_types(nested = true)]
         #[derive(Debug)]
         #input
@@ -83,27 +96,23 @@ pub fn build(_attrs: TokenStream, input: TokenStream) -> TokenStream {
             }
         }
 
-        impl TryFrom<&#ident> for EntryDefIndex {
-            type Error = WasmError;
-
-            fn try_from(value: &#ident) -> Result<Self, Self::Error> {
-                Ok(Self(GlobalZomeTypeId::try_from(value)?.0))
+        impl From<&#ident> for EntryDefIndex {
+            fn from(value: &#ident) -> Self {
+                match value {
+                    #into_entry_def_index
+                }
             }
         }
 
-        impl TryFrom<#ident> for EntryDefIndex {
-            type Error = WasmError;
-
-            fn try_from(value: #ident) -> Result<Self, Self::Error> {
-                Self::try_from(&value)
+        impl From<#ident> for EntryDefIndex {
+            fn from(value: #ident) -> Self {
+                Self::from(&value)
             }
         }
 
-        impl TryFrom<&&#ident> for EntryDefIndex {
-            type Error = WasmError;
-
-            fn try_from(value: &&#ident) -> Result<Self, Self::Error> {
-                Self::try_from(*value)
+        impl From<&&#ident> for EntryDefIndex {
+            fn from(value: &&#ident) -> Self {
+                Self::from(*value)
             }
         }
 
@@ -121,30 +130,47 @@ pub fn build(_attrs: TokenStream, input: TokenStream) -> TokenStream {
             }
         }
 
-        impl EntryTypesHelper for #ident {
-            fn try_from_local_type<I>(type_index: I, entry: &Entry) -> Result<Option<Self>, WasmError>
-            where
-                LocalZomeTypeId: From<I>,
-            {
-                let value = LocalZomeTypeId::from(type_index).0;
-                #index_to_variant
+        impl TryFrom<&#ident> for ZomeId {
+            type Error = WasmError;
 
-                Err(wasm_error!(WasmErrorInner::Guest(format!(
-                    "local type index {} does not map to any the entry types for this zome",
-                    value
-                ))))
-            }
-            fn try_from_global_type<I>(type_index: I, entry: &Entry) -> Result<Option<Self>, WasmError>
-            where
-                GlobalZomeTypeId: From<I>,
-            {
-                let index: GlobalZomeTypeId = type_index.into();
-                match zome_info()?.zome_types.entries.to_local_scope(index) {
-                    Some(local_index) => Self::try_from_local_type(local_index, &entry),
+            fn try_from(v: &#ident) -> Result<Self, Self::Error> {
+                match zome_info()?.zome_types.entries.zome_id(LocalZomeTypeId::from(v)) {
+                    Some(z) => Ok(z),
                     _ => Err(wasm_error!(WasmErrorInner::Guest(format!(
-                        "global index {} does not map to any local scope for this zome",
-                        index.0
+                        "ZomeId not found for {:?}",
+                        v
                     )))),
+                }
+            }
+        }
+
+        impl TryFrom<#ident> for ZomeId {
+            type Error = WasmError;
+
+            fn try_from(v: #ident) -> Result<Self, Self::Error> {
+                Self::try_from(&v)
+            }
+        }
+
+        impl EntryTypesHelper for #ident {
+            fn deserialize_from_type<Z, I>(
+                zome_id: Z,
+                type_index: I,
+                entry: &Entry,
+            ) -> Result<Option<Self>, WasmError>
+            where
+                Z: Into<ZomeId>,
+                I: Into<LocalZomeTypeId>
+            {
+                let zome_id = zome_id.into();
+                let type_index = type_index.into();
+                match zome_info()?.zome_types.entries.offset(zome_id, type_index) {
+                    Some(offset) => {
+                        #index_to_variant
+
+                        Ok(None)
+                    }
+                    _ => Ok(None),
                 }
             }
         }

@@ -354,7 +354,7 @@ async fn check_app_entry_type_test() {
         .returning(move |_| Err(DnaError::DnaMissing(dh.to_owned()).into()));
 
     // ## Dna is missing
-    let aet = AppEntryType::new(0.into(), EntryVisibility::Public);
+    let aet = AppEntryType::new(0.into(), 0.into(), EntryVisibility::Public);
     assert_matches!(
         check_app_entry_type(&dna_hash, &aet, &conductor_handle).await,
         Err(SysValidationError::DnaMissing(_))
@@ -370,7 +370,7 @@ async fn check_app_entry_type_test() {
     conductor_handle.expect_get_entry_def().return_const(None);
 
     // ## EntryId is out of range
-    let aet = AppEntryType::new(10.into(), EntryVisibility::Public);
+    let aet = AppEntryType::new(10.into(), 0.into(), EntryVisibility::Public);
     assert_matches!(
         check_app_entry_type(&dna_hash, &aet, &conductor_handle).await,
         Err(SysValidationError::ValidationOutcome(
@@ -379,12 +379,12 @@ async fn check_app_entry_type_test() {
     );
 
     // ## EntryId is in range for dna
-    let aet = AppEntryType::new(0.into(), EntryVisibility::Public);
+    let aet = AppEntryType::new(0.into(), 0.into(), EntryVisibility::Public);
     assert_matches!(
         check_app_entry_type(&dna_hash, &aet, &conductor_handle).await,
         Ok(_)
     );
-    let aet = AppEntryType::new(0.into(), EntryVisibility::Private);
+    let aet = AppEntryType::new(0.into(), 0.into(), EntryVisibility::Private);
     assert_matches!(
         check_app_entry_type(&dna_hash, &aet, &conductor_handle).await,
         Err(SysValidationError::ValidationOutcome(
@@ -398,7 +398,7 @@ async fn check_app_entry_type_test() {
         .return_const(Some(entry_def));
 
     // ## Can get the entry from the entry def
-    let aet = AppEntryType::new(0.into(), EntryVisibility::Public);
+    let aet = AppEntryType::new(0.into(), 0.into(), EntryVisibility::Public);
     assert_matches!(
         check_app_entry_type(&dna_hash, &aet, &conductor_handle).await,
         Ok(_)
@@ -432,7 +432,7 @@ async fn incoming_ops_filters_private_entry() {
     let private_entry = fixt!(Entry);
     let mut create = fixt!(Create);
     let author = keystore.new_sign_keypair_random().await.unwrap();
-    let aet = AppEntryType::new(0.into(), EntryVisibility::Private);
+    let aet = AppEntryType::new(0.into(), 0.into(), EntryVisibility::Private);
     create.entry_type = EntryType::App(aet);
     create.entry_hash = EntryHash::with_data_sync(&private_entry);
     create.author = author.clone();
