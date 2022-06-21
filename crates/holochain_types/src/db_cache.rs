@@ -380,6 +380,7 @@ fn update_activity_inner(prev_state: &mut ActivityState, new_bounds: &ActivityBo
 /// Updates the ready to integrate state of an activity.
 /// This function is a bit complex but is heavily tested and maintains the
 /// chain activity can only be set to ready if it makes sense to.
+// this is where consecutive check happens
 fn update_ready_to_integrate(prev_state: &mut ActivityState, new_ready: Option<u32>) {
     // There is a new chain item that is ready for integration.
     if let Some(new_ready) = new_ready {

@@ -55,6 +55,7 @@ async fn get_ops_to_validate(
             ",
         );
     } else {
+        // TODO: bump stages to match new rate limiting workflow
         sql.push_str(
             "
             WHERE

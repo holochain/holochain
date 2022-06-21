@@ -166,6 +166,7 @@ async fn sys_validation_workflow_inner(
                 for outcome in chunk.into_iter().flatten() {
                     let (op_hash, outcome, dependency) = outcome?;
                     match outcome {
+                        // consider putting rate bucket state here
                         Outcome::Accepted => {
                             total += 1;
                             put_validation_limbo(
@@ -574,6 +575,7 @@ async fn register_agent_activity(
     check_prev_action(action)?;
     check_valid_if_dna(action, workspace).await?;
     let bucket_state = check_rate_limit(&rate_limit, action, workspace).await?;
+    // need to check if prev action not only exists but is valid
     if let Some(prev_action_hash) = prev_action_hash {
         check_and_hold_register_agent_activity(
             prev_action_hash,
@@ -908,6 +910,7 @@ impl SysValidationWorkspace {
         Ok(!action_seq_is_not_empty)
     }
 
+    // problem, this uses a different txn
     pub async fn get_rate_limit_state(
         &self,
         action_hash: &ActionHash,
