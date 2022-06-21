@@ -10,22 +10,22 @@
 
 #![deny(missing_docs)]
 
+#[allow(missing_docs)]
+pub mod action;
 pub mod capability;
 pub mod countersigning;
-pub mod element;
 pub mod entry;
 #[allow(missing_docs)]
 pub mod entry_def;
 pub mod genesis;
 #[allow(missing_docs)]
 pub mod hash;
-#[allow(missing_docs)]
-pub mod header;
 pub mod info;
 #[allow(missing_docs)]
 pub mod link;
 pub mod op;
 pub mod prelude;
+pub mod record;
 pub mod signature;
 pub use kitsune_p2p_timestamp as timestamp;
 #[allow(missing_docs)]
@@ -38,8 +38,8 @@ pub mod zome_io;
 
 pub mod trace;
 
+pub use action::Action;
 pub use entry::Entry;
-pub use header::Header;
 pub use prelude::*;
 
 /// Re-exported dependencies
@@ -196,4 +196,15 @@ macro_rules! secure_primitive {
             }
         }
     };
+}
+
+/// A utility trait for associating a data enum
+/// with a unit enum that has the same variants.
+pub trait UnitEnum {
+    /// An enum with the same variants as the implementor
+    /// but without any data.
+    type Unit;
+
+    /// Turn this type into it's unit enum.
+    fn to_unit(&self) -> Self::Unit;
 }

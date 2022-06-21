@@ -23,6 +23,7 @@ use crate::core::ribosome::InvocationAuth;
 use crate::core::ribosome::ZomeCallHostAccess;
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::ribosome::ZomesToInvoke;
+use crate::sweettest::SweetDnaFile;
 use crate::test_utils::fake_genesis;
 use ::fixt::prelude::*;
 pub use holo_hash::fixt::*;
@@ -48,31 +49,26 @@ newtype_fixturator!(FnComponents<Vec<String>>);
 
 fixturator!(
     RealRibosome;
-    constructor fn new(DnaFile);
+    constructor fn empty(DnaFile);
 );
 
 impl Iterator for RealRibosomeFixturator<curve::Zomes> {
     type Item = RealRibosome;
 
     fn next(&mut self) -> Option<Self::Item> {
-        // @todo fixturate this
-        let dna_file = fake_dna_zomes(
-            &StringFixturator::new(Unpredictable).next().unwrap(),
-            self.0
-                .curve
-                .0
-                .clone()
-                .into_iter()
-                .map(|t| (t.into(), t.into()))
-                .collect(),
-        );
+        let input = self.0.curve.0.clone();
+        let uuid = StringFixturator::new(Unpredictable).next().unwrap();
+        let (dna_file, _, _) = tokio_helper::block_forever_on(async move {
+            SweetDnaFile::from_test_wasms(uuid, input, Default::default()).await
+        })
+        .unwrap();
 
-        let ribosome = RealRibosome::new(dna_file);
+        let ribosome = RealRibosome::new(dna_file).unwrap();
 
         // warm the module cache for each wasm in the ribosome
         for zome in self.0.curve.0.clone() {
             let mut call_context = CallContextFixturator::new(Empty).next().unwrap();
-            call_context.zome = zome.into();
+            call_context.zome = CoordinatorZome::from(zome).erase_type();
             ribosome.module(call_context.zome.zome_name()).unwrap();
         }
 
@@ -95,7 +91,7 @@ fixturator!(
     curve Empty BTreeMap::new().into();
     curve Unpredictable {
         let mut rng = rand::thread_rng();
-        let number_of_wasms = rng.gen_range(0, 5);
+        let number_of_wasms = rng.gen_range(0..5);
 
         let mut wasms = BTreeMap::new();
         let mut dna_wasm_fixturator = DnaWasmFixturator::new(Unpredictable);
@@ -138,17 +134,17 @@ fixturator!(
         // align the wasm hashes across the file and def
         let mut zome_name_fixturator = ZomeNameFixturator::new(Unpredictable);
         let wasms = WasmMapFixturator::new(Unpredictable).next().unwrap();
-        let mut zomes: Zomes = Vec::new();
+        let mut zomes: IntegrityZomes = Vec::new();
         for (hash, _) in wasms {
             zomes.push((
                 zome_name_fixturator.next().unwrap(),
-                ZomeDef::Wasm(WasmZome {
-                    wasm_hash: hash.to_owned(),
-                }),
+                IntegrityZomeDef::from_hash(
+                    hash.to_owned()
+                ),
             ));
         }
         let mut dna_def = DnaDefFixturator::new(Unpredictable).next().unwrap();
-        dna_def.zomes = zomes;
+        dna_def.integrity_zomes = zomes;
         let dna = dna_def.into_hashed();
         DnaFile::from_parts(dna, WasmMapFixturator::new(Unpredictable).next().unwrap())
     };
@@ -159,19 +155,19 @@ fixturator!(
         let wasms = WasmMapFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap();
-        let mut zomes: Zomes = Vec::new();
+        let mut zomes: IntegrityZomes = Vec::new();
         for (hash, _) in wasms {
             zomes.push((
                 zome_name_fixturator.next().unwrap(),
-                ZomeDef::Wasm(WasmZome {
-                    wasm_hash: hash.to_owned(),
-                }),
+                IntegrityZomeDef::from_hash(
+                    hash.to_owned()
+                ),
             ));
         }
         let mut dna_def = DnaDefFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap();
-        dna_def.zomes = zomes;
+        dna_def.integrity_zomes = zomes;
         let dna = dna_def.into_hashed();
         DnaFile::from_parts(
             dna,
@@ -184,7 +180,7 @@ fixturator!(
 
 // fixturator!(
 //     LinkMetaVal;
-//     constructor fn new(HeaderHash, EntryHash, Timestamp, u8, LinkTag);
+//     constructor fn new(ActionHash, EntryHash, Timestamp, u8, LinkTag);
 // );
 
 // impl Iterator for LinkMetaValFixturator<(EntryHash, LinkTag)> {
@@ -397,7 +393,7 @@ fixturator!(
 
 fixturator!(
     PostCommitInvocation;
-    constructor fn new(Zome, SignedHeaderHashedVec);
+    constructor fn new(CoordinatorZome, SignedActionHashedVec);
 );
 
 fixturator!(
@@ -417,7 +413,7 @@ fixturator!(
 
 fixturator!(
     ValidationPackageInvocation;
-    constructor fn new(Zome, AppEntryType);
+    constructor fn new(IntegrityZome, AppEntryType);
 );
 
 fixturator!(
@@ -499,7 +495,7 @@ impl Iterator for ZomeCallInvocationFixturator<NamedInvocation> {
             .next()
             .unwrap();
         ret.cell_id = self.0.curve.0.clone();
-        ret.zome = self.0.curve.1.into();
+        ret.zome = CoordinatorZome::from(self.0.curve.1).erase_type();
         ret.fn_name = self.0.curve.2.clone().into();
         ret.payload = self.0.curve.3.clone();
 

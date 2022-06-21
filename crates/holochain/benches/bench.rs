@@ -9,6 +9,7 @@ use holo_hash::fixt::AgentPubKeyFixturator;
 use holochain::core::ribosome::RibosomeT;
 use holochain::core::ribosome::ZomeCallInvocation;
 use holochain_wasm_test_utils::TestWasm;
+use holochain_wasm_test_utils::TestZomes;
 use once_cell::sync::Lazy;
 use std::sync::Mutex;
 
@@ -73,7 +74,7 @@ pub fn wasm_call_n(c: &mut Criterion) {
             let ha = HOST_ACCESS_FIXTURATOR.lock().unwrap().next().unwrap();
 
             b.iter(|| {
-                let zome: Zome = TestWasm::Bench.into();
+                let zome: Zome = TestZomes::from(TestWasm::Bench).coordinator.erase_type();
                 let i = ZomeCallInvocation {
                     cell_id: CELL_ID.lock().unwrap().clone(),
                     zome: zome.clone(),

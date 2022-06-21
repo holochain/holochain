@@ -4,7 +4,7 @@ use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_types::access::Permission;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 use holochain_zome_types::signal::RemoteSignal;
 use holochain_zome_types::zome::FunctionName;
 use std::sync::Arc;
@@ -15,7 +15,7 @@ pub fn remote_signal(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: RemoteSignal,
-) -> Result<(), WasmError> {
+) -> Result<(), RuntimeError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess {
             write_network: Permission::Allow,
@@ -44,14 +44,14 @@ pub fn remote_signal(
             );
             Ok(())
         }
-        _ => Err(WasmError::Host(
+        _ => Err(wasm_error!(WasmErrorInner::Host(
             RibosomeError::HostFnPermissions(
                 call_context.zome.zome_name().clone(),
                 call_context.function_name().clone(),
                 "remote_signal".into(),
             )
             .to_string(),
-        )),
+        )).into()),
     }
 }
 
@@ -61,15 +61,15 @@ mod tests {
     use std::sync::atomic::Ordering;
 
     use super::*;
-    use crate::sweettest::SweetDnaFile;
-    use crate::sweettest::{SweetAgents, SweetConductorBatch};
+    use crate::sweettest::*;
     use futures::future;
     use hdk::prelude::*;
+    use holochain_types::inline_zome::InlineZomeSet;
 
-    fn zome(agents: Vec<AgentPubKey>, num_signals: Arc<AtomicUsize>) -> InlineZome {
+    fn zome(agents: Vec<AgentPubKey>, num_signals: Arc<AtomicUsize>) -> InlineZomeSet {
         let entry_def = EntryDef::default_with_id("entrydef");
 
-        InlineZome::new_unique(vec![entry_def.clone()])
+        SweetEasyInline::new(vec![entry_def.clone()], 0)
             .callback("signal_others", move |api, ()| {
                 let signal = ExternIO::encode("Hey").unwrap();
                 let signal = RemoteSignal {
@@ -95,7 +95,8 @@ mod tests {
                     functions,
                 };
                 api.create(CreateInput::new(
-                    EntryDefId::CapGrant,
+                    EntryDefLocation::CapGrant,
+                    EntryVisibility::Private,
                     Entry::CapGrant(cap_grant_entry),
                     ChainTopOrdering::default(),
                 ))
@@ -103,6 +104,7 @@ mod tests {
 
                 Ok(InitCallbackResult::Pass)
             })
+            .into()
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -118,12 +120,10 @@ mod tests {
         let agents =
             future::join_all(conductors.iter().map(|c| SweetAgents::one(c.keystore()))).await;
 
-        let (dna_file, _) = SweetDnaFile::unique_from_inline_zome(
-            "zome1",
-            zome(agents.clone(), num_signals.clone()),
-        )
-        .await
-        .unwrap();
+        let (dna_file, _, _) =
+            SweetDnaFile::unique_from_inline_zomes(zome(agents.clone(), num_signals.clone()))
+                .await
+                .unwrap();
 
         let apps = conductors
             .setup_app_for_zipped_agents("app", &agents, &[dna_file.clone().into()])
@@ -141,7 +141,11 @@ mod tests {
         let signals = signals.into_iter().flatten().collect::<Vec<_>>();
 
         let _: () = conductors[0]
-            .call(&cells[0].zome("zome1"), "signal_others", ())
+            .call(
+                &cells[0].zome(SweetEasyInline::COORDINATOR),
+                "signal_others",
+                (),
+            )
             .await;
 
         crate::assert_eq_retry_10s!(num_signals.load(Ordering::SeqCst), NUM_CONDUCTORS);

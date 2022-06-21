@@ -1,7 +1,7 @@
 //! A Cell is an "instance" of Holochain DNA.
 //!
 //! It combines an AgentPubKey with a Dna to create a SourceChain, upon which
-//! Elements can be added. A constructed Cell is guaranteed to have a valid
+//! Records can be added. A constructed Cell is guaranteed to have a valid
 //! SourceChain which has already undergone Genesis.
 
 use super::api::ZomeCall;
@@ -11,7 +11,6 @@ use super::space::Space;
 use crate::conductor::api::CellConductorApi;
 use crate::conductor::api::CellConductorApiT;
 use crate::conductor::cell::error::CellResult;
-use crate::conductor::entry_def_store::get_entry_def_from_ids;
 use crate::conductor::handle::ConductorHandle;
 use crate::core::queue_consumer::spawn_queue_consumer_tasks;
 use crate::core::queue_consumer::InitialQueueTriggers;
@@ -164,7 +163,7 @@ impl Cell {
     }
 
     /// Performs the Genesis workflow the Cell, ensuring that its initial
-    /// elements are committed. This is a prerequisite for any other interaction
+    /// records are committed. This is a prerequisite for any other interaction
     /// with the SourceChain
     pub async fn genesis<Ribosome>(
         id: CellId,
@@ -382,12 +381,12 @@ impl Cell {
             GetValidationPackage {
                 span_context: _,
                 respond,
-                header_hash,
+                action_hash,
                 ..
             } => {
                 async {
                     let res = self
-                        .handle_get_validation_package(header_hash)
+                        .handle_get_validation_package(action_hash)
                         .await
                         .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
@@ -500,12 +499,12 @@ impl Cell {
             }
             CountersigningAuthorityResponse {
                 respond,
-                signed_headers,
+                signed_actions,
                 ..
             } => {
                 async {
                     let res = self
-                        .handle_countersigning_authority_response(signed_headers)
+                        .handle_countersigning_authority_response(signed_actions)
                         .await
                         .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
@@ -517,17 +516,17 @@ impl Cell {
         Ok(())
     }
 
-    #[instrument(skip(self, signed_headers))]
+    #[instrument(skip(self, signed_actions))]
     /// we are receiving a response from a countersigning authority
     async fn handle_countersigning_authority_response(
         &self,
-        signed_headers: Vec<SignedHeader>,
+        signed_actions: Vec<SignedAction>,
     ) -> CellResult<()> {
         Ok(countersigning_success(
             self.space.clone(),
             &self.holochain_p2p_cell,
             self.id.agent_pubkey().clone(),
-            signed_headers,
+            signed_actions,
             self.queue_triggers.clone(),
             self.conductor_api.signal_broadcaster().await,
         )
@@ -540,26 +539,26 @@ impl Cell {
     #[tracing::instrument(skip(self), level = "trace")]
     async fn handle_get_validation_package(
         &self,
-        header_hash: HeaderHash,
+        action_hash: ActionHash,
     ) -> CellResult<ValidationPackageResponse> {
         let db: DbRead<DbKindDht> = self.dht_db().clone().into();
 
-        // Get the header
+        // Get the action
         let mut cascade = Cascade::empty().with_dht(db.clone());
-        let header = match cascade
-            .retrieve_header(header_hash, Default::default())
+        let action = match cascade
+            .retrieve_action(action_hash, Default::default())
             .await?
         {
             Some(shh) => shh.hashed,
             None => return Ok(None.into()),
         };
 
-        let ribosome = self.get_ribosome().await?;
+        let ribosome = self.get_ribosome()?;
 
         // This agent is the author so get the validation package from the source chain
-        if header.author() == self.id.agent_pubkey() {
+        if action.author() == self.id.agent_pubkey() {
             validation_package::get_as_author(
-                header,
+                action,
                 self.space.authored_db.clone().into(),
                 self.dht_db().clone().into(),
                 self.space.dht_query_cache.clone(),
@@ -570,13 +569,7 @@ impl Cell {
             )
             .await
         } else {
-            validation_package::get_as_authority(
-                header,
-                db,
-                &ribosome.dna_file,
-                self.conductor_handle.as_ref(),
-            )
-            .await
+            validation_package::get_as_authority(action, db).await
         }
     }
 
@@ -590,17 +583,17 @@ impl Cell {
         debug!("handling get");
         // TODO: Later we will need more get types but for now
         // we can just have these defaults depending on whether or not
-        // the hash is an entry or header.
+        // the hash is an entry or action.
         // In the future we should use GetOptions to choose which get to run.
         let mut r = match *dht_hash.hash_type() {
             AnyDht::Entry => self
                 .handle_get_entry(dht_hash.into(), options)
                 .await
                 .map(WireOps::Entry),
-            AnyDht::Header => self
-                .handle_get_element(dht_hash.into(), options)
+            AnyDht::Action => self
+                .handle_get_record(dht_hash.into(), options)
                 .await
-                .map(WireOps::Element),
+                .map(WireOps::Record),
         };
         if let Err(e) = &mut r {
             error!(msg = "Error handling a get", ?e, agent = ?self.id.agent_pubkey());
@@ -621,13 +614,13 @@ impl Cell {
     }
 
     #[tracing::instrument(skip(self))]
-    async fn handle_get_element(
+    async fn handle_get_record(
         &self,
-        hash: HeaderHash,
+        hash: ActionHash,
         options: holochain_p2p::event::GetOptions,
-    ) -> CellResult<WireElementOps> {
+    ) -> CellResult<WireRecordOps> {
         let db = self.space.dht_db.clone();
-        authority::handle_get_element(db.into(), hash, options)
+        authority::handle_get_record(db.into(), hash, options)
             .await
             .map_err(Into::into)
     }
@@ -644,8 +637,8 @@ impl Cell {
 
     #[instrument(skip(self, options))]
     /// a remote node is asking us for links
-    // TODO: Right now we are returning all the full headers
-    // We could probably send some smaller types instead of the full headers
+    // TODO: Right now we are returning all the full actions
+    // We could probably send some smaller types instead of the full actions
     // if we are careful.
     async fn handle_get_links(
         &self,
@@ -665,7 +658,7 @@ impl Cell {
         agent: AgentPubKey,
         query: ChainQueryFilter,
         options: holochain_p2p::event::GetActivityOptions,
-    ) -> CellResult<AgentActivityResponse<HeaderHash>> {
+    ) -> CellResult<AgentActivityResponse<ActionHash>> {
         let db = self.space.dht_db.clone();
         authority::handle_get_agent_activity(db.into(), agent, query, options)
             .await
@@ -678,22 +671,22 @@ impl Cell {
         let receipt: SignedValidationReceipt = receipt.try_into()?;
         tracing::debug!(from = ?receipt.receipt.validators, to = ?self.id.agent_pubkey(), hash = ?receipt.receipt.dht_op_hash);
 
-        // Get the header for this op so we can check the entry type.
+        // Get the action for this op so we can check the entry type.
         let hash = receipt.receipt.dht_op_hash.clone();
-        let header: Option<SignedHeader> = self
+        let action: Option<SignedAction> = self
             .space
             .authored_db
             .async_reader(move |txn| {
                 let h: Option<Vec<u8>> = txn
                     .query_row(
-                        "SELECT Header.blob as header_blob
+                        "SELECT Action.blob as action_blob
                     FROM DhtOp
-                    JOIN Header ON Header.hash = DhtOp.header_hash
+                    JOIN Action ON Action.hash = DhtOp.action_hash
                     WHERE DhtOp.hash = :hash",
                         named_params! {
                             ":hash": hash,
                         },
-                        |row| row.get("header_blob"),
+                        |row| row.get("action_blob"),
                     )
                     .optional()?;
                 match h {
@@ -703,17 +696,16 @@ impl Cell {
             })
             .await?;
 
-        // If the header has an app entry type get the entry def
+        // If the action has an app entry type get the entry def
         // from the conductor.
-        let required_receipt_count = match header.as_ref().and_then(|h| h.0.entry_type()) {
-            Some(EntryType::App(entry_type)) => {
-                let zome_index = u8::from(entry_type.zome_id()) as usize;
-                let dna_file = self.conductor_api.get_this_dna().map_err(Box::new)?;
-                let zome = dna_file.dna().zomes.get(zome_index).map(|(_, z)| z.clone());
+        let required_receipt_count = match action.as_ref().and_then(|h| h.0.entry_type()) {
+            Some(EntryType::App(AppEntryType { id, .. })) => {
+                let ribosome = self.conductor_api.get_this_ribosome().map_err(Box::new)?;
+                let zome = ribosome.find_zome_from_entry(id);
                 match zome {
                     Some(zome) => self
                         .conductor_api
-                        .get_entry_def(&EntryDefBufferKey::new(zome, entry_type.id()))
+                        .get_entry_def(&EntryDefBufferKey::new(zome.into_inner().1, *id))
                         .map(|e| u8::from(e.required_validations)),
                     None => None,
                 }
@@ -802,7 +794,7 @@ impl Cell {
 
         let conductor_handle = self.conductor_handle.clone();
         let signal_tx = self.signal_broadcaster().await;
-        let ribosome = self.get_ribosome().await?;
+        let ribosome = self.get_ribosome()?;
         let invocation =
             ZomeCallInvocation::try_from_interface_call(self.conductor_api.clone(), call).await?;
 
@@ -863,11 +855,9 @@ impl Cell {
         let conductor_handle = self.conductor_handle.clone();
 
         // get the dna
-        let dna_file = conductor_handle
-            .get_dna_file(id.dna_hash())
-            .ok_or_else(|| DnaError::DnaMissing(id.dna_hash().to_owned()))?;
+        let ribosome = self.get_ribosome()?;
 
-        let dna_def = dna_file.dna_def().clone();
+        let dna_def = ribosome.dna_def().clone();
 
         // Create the workspace
         let workspace = SourceChainWorkspace::init_as_root(
@@ -877,7 +867,7 @@ impl Cell {
             self.cache().clone(),
             keystore.clone(),
             id.agent_pubkey().clone(),
-            Arc::new(dna_def),
+            Arc::new(dna_def.into_content()),
         )
         .await?;
 
@@ -886,9 +876,6 @@ impl Cell {
             return Ok(());
         }
         trace!("running init");
-
-        // Get the ribosome
-        let ribosome = RealRibosome::new(dna_file);
 
         let signal_tx = self.signal_broadcaster().await;
 
@@ -932,11 +919,11 @@ impl Cell {
     }
 
     /// Instantiate a Ribosome for use by this Cell's workflows
-    pub(crate) async fn get_ribosome(&self) -> CellResult<RealRibosome> {
-        match self.conductor_api.get_dna(self.dna_hash()) {
-            Some(dna) => Ok(RealRibosome::new(dna)),
-            None => Err(DnaError::DnaMissing(self.dna_hash().to_owned()).into()),
-        }
+    pub(crate) fn get_ribosome(&self) -> CellResult<RealRibosome> {
+        Ok(self
+            .conductor_handle
+            .get_ribosome(self.dna_hash())
+            .map_err(|_| DnaError::DnaMissing(self.dna_hash().to_owned()))?)
     }
 
     /// Accessor for the p2p_agents_db backing this Cell

@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS Entry (
 
 -- TODO: some of the NULL fields can be collapsed,
 --       like between Update and Delete
-CREATE TABLE IF NOT EXISTS Header (
+CREATE TABLE IF NOT EXISTS Action (
     hash             BLOB           PRIMARY KEY ON CONFLICT IGNORE,
     type             TEXT           NOT NULL,
     seq              INTEGER        NOT NULL,
@@ -43,19 +43,17 @@ CREATE TABLE IF NOT EXISTS Header (
 
     -- Update
     original_entry_hash   BLOB      NULL,
-    original_header_hash  BLOB      NULL,
+    original_action_hash  BLOB      NULL,
 
     -- Delete
     deletes_entry_hash    BLOB      NULL,
-    deletes_header_hash   BLOB      NULL,
+    deletes_action_hash   BLOB      NULL,
 
     -- CreateLink
     -- NB: basis_hash can't be foreign key, since it could map to either
-    --     Entry or Header
-    -- FIXME: @freesig Actually this can only be an EntryHash.
-    -- Links can't be on headers.
+    --     Entry or Action
     base_hash        BLOB           NULL,
-    zome_id          INTEGER        NULL,
+    link_type        INTEGER        NULL,
     tag              BLOB           NULL,
 
     -- DeleteLink
@@ -68,26 +66,26 @@ CREATE TABLE IF NOT EXISTS Header (
     prev_dna_hash    BLOB           NULL
 
     -- We can't have any of these constraint because
-    -- the element authority doesn't get the create link for a remove link. @freesig
+    -- the record authority doesn't get the create link for a remove link. @freesig
     -- FOREIGN KEY(entry_hash) REFERENCES Entry(hash)
     -- FOREIGN KEY(original_entry_hash) REFERENCES Entry(hash),
-    -- FOREIGN KEY(original_header_hash) REFERENCES Header(hash),
+    -- FOREIGN KEY(original_action_hash) REFERENCES Action(hash),
     -- FOREIGN KEY(deletes_entry_hash) REFERENCES Entry(hash)
-    -- FOREIGN KEY(deletes_header_hash) REFERENCES Header(hash),
-    -- FOREIGN KEY(create_link_hash) REFERENCES Header(hash)
+    -- FOREIGN KEY(deletes_action_hash) REFERENCES Action(hash),
+    -- FOREIGN KEY(create_link_hash) REFERENCES Action(hash)
 );
-CREATE INDEX IF NOT EXISTS Header_type_idx ON Header ( type );
-CREATE INDEX IF NOT EXISTS Header_author ON Header ( author );
-CREATE INDEX IF NOT EXISTS Header_seq_idx ON Header ( seq );
+CREATE INDEX IF NOT EXISTS Action_type_idx ON Action ( type );
+CREATE INDEX IF NOT EXISTS Action_author ON Action ( author );
+CREATE INDEX IF NOT EXISTS Action_seq_idx ON Action ( seq );
 
 
--- NB: basis_hash, header_hash, and entry_hash, in general, will have
+-- NB: basis_hash, action_hash, and entry_hash, in general, will have
 --     duplication of data. Could rethink these a bit.
 CREATE TABLE IF NOT EXISTS DhtOp (
     hash             BLOB           PRIMARY KEY ON CONFLICT IGNORE,
     type             TEXT           NOT NULL,
     basis_hash       BLOB           NOT NULL,
-    header_hash      BLOB           NOT NULL,
+    action_hash      BLOB           NOT NULL,
     require_receipt  INTEGER        NOT NULL,      -- BOOLEAN
 
     storage_center_loc          INTEGER   NOT NULL,
@@ -128,14 +126,14 @@ CREATE TABLE IF NOT EXISTS DhtOp (
     -- TODO: @freesig: Might be hard to index on various timestamps?
     -- is_integrated    INTEGER        NOT NULL,      -- BOOLEAN
 
-    -- NB: I removed this because it's accessible via Header.entry_hash
+    -- NB: I removed this because it's accessible via Action.entry_hash
     -- entry_hash       BLOB           NULL,
 
     -- The integration dependency if there is one.
     dependency          BLOB           NULL,
 
 
-    FOREIGN KEY(header_hash) REFERENCES Header(hash) ON DELETE CASCADE
+    FOREIGN KEY(action_hash) REFERENCES Action(hash) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS DhtOp_type_dep_idx ON DhtOp ( type, dependency );
 CREATE INDEX IF NOT EXISTS DhtOp_type_when_int_idx ON DhtOp ( type, when_integrated );
@@ -144,7 +142,7 @@ CREATE INDEX IF NOT EXISTS DhtOp_stage_type_status_idx ON DhtOp ( validation_sta
 CREATE INDEX IF NOT EXISTS DhtOp_validation_status_idx ON DhtOp ( validation_status );
 CREATE INDEX IF NOT EXISTS DhtOp_authored_timestamp_idx ON DhtOp ( authored_timestamp );
 CREATE INDEX IF NOT EXISTS DhtOp_storage_center_loc_idx ON DhtOp ( storage_center_loc );
-CREATE INDEX IF NOT EXISTS DhtOp_header_hash_idx ON DhtOp ( header_hash );
+CREATE INDEX IF NOT EXISTS DhtOp_action_hash_idx ON DhtOp ( action_hash );
 CREATE INDEX IF NOT EXISTS DhtOp_basis_hash_idx ON DhtOp ( basis_hash );
 
 CREATE TABLE IF NOT EXISTS ValidationReceipt (

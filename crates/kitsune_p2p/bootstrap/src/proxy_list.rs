@@ -7,7 +7,6 @@ pub(crate) fn proxy_list(
     store: Store,
 ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
     warp::post()
-        .and(warp::header::exact("content-type", "application/octet"))
         .and(warp::header::exact("X-Op", "proxy_list"))
         .and(with_store(store))
         .and_then(get_proxy_list)

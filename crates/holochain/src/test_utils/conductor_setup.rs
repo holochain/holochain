@@ -9,6 +9,7 @@ use crate::conductor::interface::SignalBroadcaster;
 use crate::conductor::ConductorHandle;
 use crate::core::queue_consumer::QueueTriggers;
 use crate::core::ribosome::real_ribosome::RealRibosome;
+use crate::core::ribosome::RibosomeT;
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
 use holochain_keystore::MetaLairClient;
@@ -19,6 +20,7 @@ use holochain_state::prelude::test_db_dir;
 use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
+use holochain_wasm_test_utils::TestZomes;
 use kitsune_p2p::KitsuneP2pConfig;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
@@ -51,7 +53,7 @@ impl CellHostFnCaller {
         let triggers = handle.get_cell_triggers(cell_id).unwrap();
         let cell_conductor_api = CellConductorApi::new(handle.clone(), cell_id.clone());
 
-        let ribosome = RealRibosome::new(dna_file.clone());
+        let ribosome = handle.get_ribosome(dna_file.dna_hash()).unwrap();
         let signal_tx = handle.signal_broadcaster().await;
         CellHostFnCaller {
             cell_id: cell_id.clone(),
@@ -177,9 +179,20 @@ impl ConductorTestData {
                 uid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
                 properties: SerializedBytes::try_from(()).unwrap(),
                 origin_time: Timestamp::HOLOCHAIN_EPOCH,
-                zomes: zomes.clone().into_iter().map(Into::into).collect(),
+                integrity_zomes: zomes
+                    .clone()
+                    .into_iter()
+                    .map(TestZomes::from)
+                    .map(|z| z.integrity.into_inner())
+                    .collect(),
+                coordinator_zomes: zomes
+                    .clone()
+                    .into_iter()
+                    .map(TestZomes::from)
+                    .map(|z| z.coordinator.into_inner())
+                    .collect(),
             },
-            zomes.into_iter().map(Into::into),
+            zomes.into_iter().flat_map(Vec::<DnaWasm>::from),
         )
         .await
         .unwrap();

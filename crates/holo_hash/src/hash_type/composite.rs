@@ -15,22 +15,22 @@ use holochain_serialized_bytes::prelude::*;
 pub enum AnyDht {
     /// The hash of an Entry
     Entry,
-    /// The hash of a Header
-    Header,
+    /// The hash of an action
+    Action,
 }
 
 impl HashType for AnyDht {
     fn get_prefix(self) -> &'static [u8] {
         match self {
             AnyDht::Entry => Entry::new().get_prefix(),
-            AnyDht::Header => Header::new().get_prefix(),
+            AnyDht::Action => Action::new().get_prefix(),
         }
     }
 
     fn try_from_prefix(prefix: &[u8]) -> HoloHashResult<Self> {
         match prefix {
             primitive::ENTRY_PREFIX => Ok(AnyDht::Entry),
-            primitive::HEADER_PREFIX => Ok(AnyDht::Header),
+            primitive::ACTION_PREFIX => Ok(AnyDht::Action),
             _ => Err(HoloHashError::BadPrefix(
                 "AnyDht".to_string(),
                 prefix.try_into().expect("3 byte prefix"),
@@ -51,7 +51,7 @@ impl HashTypeAsync for AnyDht {}
 )]
 enum AnyDhtSerial {
     /// The hash of an Entry of EntryType::Agent
-    Header(Header),
+    Action(Action),
     /// The hash of any other EntryType
     Entry(Entry),
 }
@@ -59,7 +59,7 @@ enum AnyDhtSerial {
 impl From<AnyDht> for AnyDhtSerial {
     fn from(t: AnyDht) -> Self {
         match t {
-            AnyDht::Header => AnyDhtSerial::Header(Header),
+            AnyDht::Action => AnyDhtSerial::Action(Action),
             AnyDht::Entry => AnyDhtSerial::Entry(Entry),
         }
     }
@@ -68,7 +68,7 @@ impl From<AnyDht> for AnyDhtSerial {
 impl From<AnyDhtSerial> for AnyDht {
     fn from(t: AnyDhtSerial) -> Self {
         match t {
-            AnyDhtSerial::Header(_) => AnyDht::Header,
+            AnyDhtSerial::Action(_) => AnyDht::Action,
             AnyDhtSerial::Entry(_) => AnyDht::Entry,
         }
     }
@@ -85,8 +85,8 @@ impl From<AnyDhtSerial> for AnyDht {
 pub enum AnyLinkable {
     /// The hash of an Entry
     Entry,
-    /// The hash of a Header
-    Header,
+    /// The hash of an action
+    Action,
     /// The hash of an External thing.
     External,
 }
@@ -104,7 +104,7 @@ impl HashType for AnyLinkable {
     fn get_prefix(self) -> &'static [u8] {
         match self {
             Self::Entry => Entry::new().get_prefix(),
-            Self::Header => Header::new().get_prefix(),
+            Self::Action => Action::new().get_prefix(),
             Self::External => External::new().get_prefix(),
         }
     }
@@ -112,7 +112,7 @@ impl HashType for AnyLinkable {
     fn try_from_prefix(prefix: &[u8]) -> HoloHashResult<Self> {
         match prefix {
             primitive::ENTRY_PREFIX => Ok(AnyLinkable::Entry),
-            primitive::HEADER_PREFIX => Ok(AnyLinkable::Header),
+            primitive::ACTION_PREFIX => Ok(AnyLinkable::Action),
             primitive::EXTERNAL_PREFIX => Ok(AnyLinkable::External),
             _ => Err(HoloHashError::BadPrefix(
                 "AnyLinkable".to_string(),
@@ -134,7 +134,7 @@ impl HashTypeSync for AnyLinkable {}
 )]
 enum AnyLinkableSerial {
     /// The hash of an Entry of EntryType::Agent
-    Header(Header),
+    Action(Action),
     /// The hash of any other EntryType
     Entry(Entry),
     /// The hash of any external thing.
@@ -144,7 +144,7 @@ enum AnyLinkableSerial {
 impl From<AnyLinkable> for AnyLinkableSerial {
     fn from(t: AnyLinkable) -> Self {
         match t {
-            AnyLinkable::Header => Self::Header(Header),
+            AnyLinkable::Action => Self::Action(Action),
             AnyLinkable::Entry => Self::Entry(Entry),
             AnyLinkable::External => Self::External(External),
         }
@@ -154,7 +154,7 @@ impl From<AnyLinkable> for AnyLinkableSerial {
 impl From<AnyLinkableSerial> for AnyLinkable {
     fn from(t: AnyLinkableSerial) -> Self {
         match t {
-            AnyLinkableSerial::Header(_) => Self::Header,
+            AnyLinkableSerial::Action(_) => Self::Action,
             AnyLinkableSerial::Entry(_) => Self::Entry,
             AnyLinkableSerial::External(_) => Self::External,
         }

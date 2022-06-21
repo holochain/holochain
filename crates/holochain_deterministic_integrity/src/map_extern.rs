@@ -1,14 +1,28 @@
 use crate::prelude::*;
 
+#[cfg(feature = "trace")]
+#[doc(hidden)]
+pub fn make_subscriber() -> impl Drop {
+    crate::prelude::tracing::subscriber::set_default(crate::trace::WasmSubscriber::default())
+}
+
+#[cfg(not(feature = "trace"))]
+#[doc(hidden)]
+/// Needed as a noop for map_extern! when trace is off.
+pub fn make_subscriber() -> impl Drop {
+    struct Noop;
+    impl Drop for Noop {
+        fn drop(&mut self) {}
+    }
+    Noop
+}
+
+#[doc(hidden)]
 #[macro_export]
 macro_rules! map_extern_preamble {
     ( $guest_ptr:ident, $len:ident, $inner:ident, $input:ty, $output:ty ) => {
         // Setup tracing.
-        // @TODO feature flag this?
-        #[cfg(feature = "trace")]
-        let _subscriber_guard = $crate::prelude::tracing::subscriber::set_default(
-            $crate::trace::WasmSubscriber::default()
-        );
+        let _subscriber_guard = $crate::map_extern::make_subscriber();
 
         // Deserialize the input from the host.
         let extern_io: $crate::prelude::ExternIO = match $crate::prelude::host_args($guest_ptr, $len) {
@@ -19,9 +33,8 @@ macro_rules! map_extern_preamble {
             Ok(v) => v,
             Err(e) => {
                 let bytes = extern_io.0;
-                #[cfg(feature = "trace")]
                 $crate::prelude::error!(output_type = std::any::type_name::<$output>(), bytes = ?bytes, "{}", e);
-                return $crate::prelude::return_err_ptr($crate::prelude::WasmError::Deserialize(bytes));
+                return $crate::prelude::return_err_ptr($crate::prelude::wasm_error!($crate::prelude::WasmErrorInner::Deserialize(bytes)));
             }
         };
     }
@@ -30,7 +43,9 @@ macro_rules! map_extern_preamble {
 pub fn encode_to_guestptrlen<T: std::fmt::Debug + Serialize>(v: T) -> GuestPtrLen {
     match ExternIO::encode(v) {
         Ok(v) => return_ptr::<ExternIO>(v),
-        Err(serialized_bytes_error) => return_err_ptr(WasmError::Serialize(serialized_bytes_error)),
+        Err(serialized_bytes_error) => return_err_ptr(wasm_error!(WasmErrorInner::Serialize(
+            serialized_bytes_error
+        ))),
     }
 }
 
@@ -55,6 +70,7 @@ pub fn encode_to_guestptrlen<T: std::fmt::Debug + Serialize>(v: T) -> GuestPtrLe
 ///  // ... do stuff to respond to incoming calls from the host to "foo"
 /// }
 /// ```
+#[doc(hidden)]
 #[macro_export]
 macro_rules! map_extern {
     ( $name:tt, $f:ident, $input:ty, $output:ty ) => {
@@ -75,6 +91,7 @@ macro_rules! map_extern {
     };
 }
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! map_extern_infallible {
     ( $name:tt, $f:ident, $input:ty, $output:ty ) => {

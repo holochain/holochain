@@ -3,6 +3,7 @@
 , mkShell
 , rustup
 , coreutils
+, cargo-nextest
 
 , holonix
 , hcToplevelDir
@@ -27,7 +28,13 @@ let
 
           export HC_WASM_CACHE_PATH="$CARGO_TARGET_DIR/.wasm_cache"
           mkdir -p $HC_WASM_CACHE_PATH
-        '';
+        ''
+        # workaround to make cargo-nextest work on darwin
+        # see: https://github.com/nextest-rs/nextest/issues/267
+        + (lib.strings.optionalString stdenv.isDarwin ''
+          export DYLD_FALLBACK_LIBRARY_PATH="$(rustc --print sysroot)/lib"
+        '')
+        ;
       }
 
       input
@@ -41,6 +48,9 @@ rec {
   # * CI scripts
   coreDev = hcMkShell {
     nativeBuildInputs = builtins.attrValues (pkgs.core)
+      ++ [
+      cargo-nextest
+    ]
       ++ (with holonix.pkgs;[
       sqlcipher
       gdb
@@ -54,6 +64,7 @@ rec {
   release = coreDev.overrideAttrs (attrs: {
     nativeBuildInputs = attrs.nativeBuildInputs ++ (with holonix.pkgs; [
       niv
+      cargo-readme
       (import ../crates/release-automation/default.nix { })
     ]);
   });

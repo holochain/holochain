@@ -248,7 +248,7 @@ async fn make_node_inner(data: Option<(usize, TimeWindow)>) -> ShardedGossipLoca
 fn get_time_bounds(
     n: u32,
     window: TimeWindow,
-    elements: impl SliceIndex<[Timestamp], Output = [Timestamp]>,
+    records: impl SliceIndex<[Timestamp], Output = [Timestamp]>,
 ) -> TimeWindow {
     let len = window.end - window.start;
     let step = len.unwrap().to_std().unwrap() / n;
@@ -256,7 +256,7 @@ fn get_time_bounds(
         .map(|i| (window.start + step * i as u32).unwrap())
         .collect::<Vec<_>>();
 
-    let mut iter = times[elements].iter();
+    let mut iter = times[records].iter();
     let start = iter.next().unwrap();
     let mut end = *iter.last().unwrap_or(start);
     end = (end + Duration::from_micros(1)).unwrap();

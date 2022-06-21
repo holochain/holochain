@@ -36,7 +36,7 @@ async fn test_publish() -> anyhow::Result<()> {
     config.network = Some(network);
     let mut conductors = SweetConductorBatch::from_config(NUM_CONDUCTORS, config).await;
 
-    let (dna_file, _) = SweetDnaFile::unique_from_inline_zome("zome1", simple_create_read_zome())
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_create_read_zome())
         .await
         .unwrap();
 
@@ -46,20 +46,24 @@ async fn test_publish() -> anyhow::Result<()> {
     let ((alice,), (bobbo,), (carol,)) = apps.into_tuples();
 
     // Call the "create" zome fn on Alice's app
-    let hash: HeaderHash = conductors[0].call(&alice.zome("zome1"), "create", ()).await;
+    let hash: ActionHash = conductors[0]
+        .call(&alice.zome("simple"), "create", ())
+        .await;
 
     // Wait long enough for Bob to receive gossip
     consistency_10s(&[&alice, &bobbo, &carol]).await;
 
-    // Verify that bobbo can run "read" on his cell and get alice's Header
-    let element: Option<Element> = conductors[1].call(&bobbo.zome("zome1"), "read", hash).await;
-    let element = element.expect("Element was None: bobbo couldn't `get` it");
+    // Verify that bobbo can run "read" on his cell and get alice's Action
+    let record: Option<Record> = conductors[1]
+        .call(&bobbo.zome("simple"), "read", hash)
+        .await;
+    let record = record.expect("Record was None: bobbo couldn't `get` it");
 
-    // Assert that the Element bobbo sees matches what alice committed
-    assert_eq!(element.header().author(), alice.agent_pubkey());
+    // Assert that the Record bobbo sees matches what alice committed
+    assert_eq!(record.action().author(), alice.agent_pubkey());
     assert_eq!(
-        *element.entry(),
-        ElementEntry::Present(Entry::app(().try_into().unwrap()).unwrap())
+        *record.entry(),
+        RecordEntry::Present(Entry::app(().try_into().unwrap()).unwrap())
     );
 
     Ok(())
@@ -75,7 +79,7 @@ async fn multi_conductor() -> anyhow::Result<()> {
 
     let mut conductors = SweetConductorBatch::from_standard_config(NUM_CONDUCTORS).await;
 
-    let (dna_file, _) = SweetDnaFile::unique_from_inline_zome("zome1", simple_create_read_zome())
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_create_read_zome())
         .await
         .unwrap();
 
@@ -85,7 +89,9 @@ async fn multi_conductor() -> anyhow::Result<()> {
     let ((alice,), (bobbo,), (_carol,)) = apps.into_tuples();
 
     // Call the "create" zome fn on Alice's app
-    let hash: HeaderHash = conductors[0].call(&alice.zome("zome1"), "create", ()).await;
+    let hash: ActionHash = conductors[0]
+        .call(&alice.zome("simple"), "create", ())
+        .await;
 
     // Wait long enough for Bob to receive gossip
     wait_for_integration_1m(
@@ -94,15 +100,17 @@ async fn multi_conductor() -> anyhow::Result<()> {
     )
     .await;
 
-    // Verify that bobbo can run "read" on his cell and get alice's Header
-    let element: Option<Element> = conductors[1].call(&bobbo.zome("zome1"), "read", hash).await;
-    let element = element.expect("Element was None: bobbo couldn't `get` it");
+    // Verify that bobbo can run "read" on his cell and get alice's Action
+    let record: Option<Record> = conductors[1]
+        .call(&bobbo.zome("simple"), "read", hash)
+        .await;
+    let record = record.expect("Record was None: bobbo couldn't `get` it");
 
-    // Assert that the Element bobbo sees matches what alice committed
-    assert_eq!(element.header().author(), alice.agent_pubkey());
+    // Assert that the Record bobbo sees matches what alice committed
+    assert_eq!(record.action().author(), alice.agent_pubkey());
     assert_eq!(
-        *element.entry(),
-        ElementEntry::Present(Entry::app(().try_into().unwrap()).unwrap())
+        *record.entry(),
+        RecordEntry::Present(Entry::app(().try_into().unwrap()).unwrap())
     );
 
     // See if we can fetch metric data from bobbo
@@ -144,7 +152,7 @@ async fn sharded_consistency() {
     };
     let mut conductors = SweetConductorBatch::from_config(NUM_CONDUCTORS, config).await;
 
-    let (dna_file, _) = SweetDnaFile::unique_from_inline_zome("zome1", simple_create_read_zome())
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_create_read_zome())
         .await
         .unwrap();
     let dnas = vec![dna_file];
@@ -159,27 +167,33 @@ async fn sharded_consistency() {
     conductors.exchange_peer_info().await;
     conductors.force_all_publish_dht_ops().await;
     // Call the "create" zome fn on Alice's app
-    let hash: HeaderHash = conductors[0].call(&alice.zome("zome1"), "create", ()).await;
+    let hash: ActionHash = conductors[0]
+        .call(&alice.zome("simple"), "create", ())
+        .await;
 
     let conductor_handles: Vec<_> = conductors.iter().map(|c| c.handle()).collect();
     local_machine_session(&conductor_handles, std::time::Duration::from_secs(60)).await;
 
-    // Verify that bobbo can run "read" on his cell and get alice's Header
-    let element: Option<Element> = conductors[1].call(&bobbo.zome("zome1"), "read", hash).await;
-    let element = element.expect("Element was None: bobbo couldn't `get` it");
+    // Verify that bobbo can run "read" on his cell and get alice's Action
+    let record: Option<Record> = conductors[1]
+        .call(&bobbo.zome("simple"), "read", hash)
+        .await;
+    let record = record.expect("Record was None: bobbo couldn't `get` it");
 
-    // Assert that the Element bobbo sees matches what alice committed
-    assert_eq!(element.header().author(), alice.agent_pubkey());
+    // Assert that the Record bobbo sees matches what alice committed
+    assert_eq!(record.action().author(), alice.agent_pubkey());
     assert_eq!(
-        *element.entry(),
-        ElementEntry::Present(Entry::app(().try_into().unwrap()).unwrap())
+        *record.entry(),
+        RecordEntry::Present(Entry::app(().try_into().unwrap()).unwrap())
     );
 }
 
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
 async fn private_entries_dont_leak() {
+    use holochain::sweettest::SweetEasyInline;
     use holochain::test_utils::consistency_10s;
+    use holochain_types::inline_zome::InlineZomeSet;
 
     let _g = observability::test_run().ok();
     let mut entry_def = EntryDef::default_with_id("entrydef");
@@ -188,12 +202,12 @@ async fn private_entries_dont_leak() {
     #[derive(Serialize, Deserialize, Debug, SerializedBytes)]
     struct PrivateEntry;
 
-    let zome = InlineZome::new_unique(vec![entry_def.clone()])
+    let zome = SweetEasyInline::new(vec![entry_def.clone()], 0)
         .callback("create", move |api, _: ()| {
-            let entry_def_id: EntryDefId = entry_def.id.clone();
             let entry = Entry::app(PrivateEntry {}.try_into().unwrap()).unwrap();
             let hash = api.create(CreateInput::new(
-                entry_def_id,
+                InlineZomeSet::get_entry_location(&api, 0),
+                EntryVisibility::Private,
                 entry,
                 ChainTopOrdering::default(),
             ))?;
@@ -210,7 +224,7 @@ async fn private_entries_dont_leak() {
 
     let mut conductors = SweetConductorBatch::from_standard_config(2).await;
 
-    let (dna_file, _) = SweetDnaFile::unique_from_inline_zome("zome1", zome)
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(zome.0)
         .await
         .unwrap();
     let dnas = vec![dna_file];
@@ -221,7 +235,9 @@ async fn private_entries_dont_leak() {
 
     conductors.exchange_peer_info().await;
     // Call the "create" zome fn on Alice's app
-    let hash: HeaderHash = conductors[0].call(&alice.zome("zome1"), "create", ()).await;
+    let hash: ActionHash = conductors[0]
+        .call(&alice.zome(SweetEasyInline::COORDINATOR), "create", ())
+        .await;
 
     consistency_10s(&[&alice, &bobbo]).await;
 
@@ -230,33 +246,35 @@ async fn private_entries_dont_leak() {
 
     check_all_gets_for_private_entry(
         &conductors[0],
-        &alice.zome("zome1"),
+        &alice.zome(SweetEasyInline::COORDINATOR),
         hash.clone(),
         entry_hash.clone(),
     )
     .await;
     check_all_gets_for_private_entry(
         &conductors[1],
-        &bobbo.zome("zome1"),
+        &bobbo.zome(SweetEasyInline::COORDINATOR),
         hash.clone(),
         entry_hash.clone(),
     )
     .await;
 
     // Bobbo creates the same private entry.
-    let bob_hash: HeaderHash = conductors[1].call(&bobbo.zome("zome1"), "create", ()).await;
+    let bob_hash: ActionHash = conductors[1]
+        .call(&bobbo.zome(SweetEasyInline::COORDINATOR), "create", ())
+        .await;
     consistency_10s(&[&alice, &bobbo]).await;
 
     check_all_gets_for_private_entry(
         &conductors[0],
-        &alice.zome("zome1"),
+        &alice.zome(SweetEasyInline::COORDINATOR),
         hash.clone(),
         entry_hash.clone(),
     )
     .await;
     check_all_gets_for_private_entry(
         &conductors[1],
-        &bobbo.zome("zome1"),
+        &bobbo.zome(SweetEasyInline::COORDINATOR),
         hash.clone(),
         entry_hash.clone(),
     )
@@ -264,14 +282,14 @@ async fn private_entries_dont_leak() {
 
     check_all_gets_for_private_entry(
         &conductors[0],
-        &alice.zome("zome1"),
+        &alice.zome(SweetEasyInline::COORDINATOR),
         bob_hash.clone(),
         entry_hash.clone(),
     )
     .await;
     check_all_gets_for_private_entry(
         &conductors[1],
-        &bobbo.zome("zome1"),
+        &bobbo.zome(SweetEasyInline::COORDINATOR),
         bob_hash.clone(),
         entry_hash.clone(),
     )
@@ -286,7 +304,7 @@ async fn private_entries_dont_leak() {
 fn check_for_private_entries<Kind: DbKindT>(env: DbWrite<Kind>) {
     let count: usize = fresh_reader_test(env, |txn| {
         txn.query_row(
-            "select count(header.rowid) from header join entry on header.entry_hash = entry.hash where private_entry = 1",
+            "select count(action.rowid) from action join entry on action.entry_hash = entry.hash where private_entry = 1",
             [],
             |row| row.get(0),
         )
@@ -298,26 +316,26 @@ fn check_for_private_entries<Kind: DbKindT>(env: DbWrite<Kind>) {
 async fn check_all_gets_for_private_entry(
     conductor: &SweetConductor,
     zome: &SweetZome,
-    header_hash: HeaderHash,
+    action_hash: ActionHash,
     entry_hash: EntryHash,
 ) {
-    let mut elements: Vec<Option<Element>> = conductor
-        .call(zome, "get", AnyDhtHash::from(header_hash.clone()))
+    let mut records: Vec<Option<Record>> = conductor
+        .call(zome, "get", AnyDhtHash::from(action_hash.clone()))
         .await;
-    let e: Vec<Option<Element>> = conductor
+    let e: Vec<Option<Record>> = conductor
         .call(zome, "get", AnyDhtHash::from(entry_hash.clone()))
         .await;
-    elements.extend(e);
+    records.extend(e);
     let details: Vec<Option<Details>> = conductor
-        .call(zome, "get_details", AnyDhtHash::from(header_hash.clone()))
+        .call(zome, "get_details", AnyDhtHash::from(action_hash.clone()))
         .await;
-    elements.extend(
+    records.extend(
         details
             .into_iter()
-            .map(|d| d.map(|d| unwrap_to!(d => Details::Element).clone().element)),
+            .map(|d| d.map(|d| unwrap_to!(d => Details::Record).clone().record)),
     );
-    let elements = elements.into_iter().filter_map(|a| a).collect();
-    check_elements_for_private_entry(zome.cell_id().agent_pubkey().clone(), elements);
+    let records = records.into_iter().filter_map(|a| a).collect();
+    check_records_for_private_entry(zome.cell_id().agent_pubkey().clone(), records);
     let entries: Vec<Option<Details>> = conductor
         .call(zome, "get_details", AnyDhtHash::from(entry_hash.clone()))
         .await;
@@ -327,19 +345,19 @@ async fn check_all_gets_for_private_entry(
             None => continue,
         };
         let details = unwrap_to!(entry=> Details::Entry).clone();
-        let headers = details.headers;
-        for header in headers {
-            assert_eq!(header.header().author(), zome.cell_id().agent_pubkey());
+        let actions = details.actions;
+        for action in actions {
+            assert_eq!(action.action().author(), zome.cell_id().agent_pubkey());
         }
     }
 }
 
-fn check_elements_for_private_entry(caller: AgentPubKey, elements: Vec<Element>) {
-    for element in elements {
-        if *element.header().author() == caller {
-            assert_ne!(*element.entry(), ElementEntry::Hidden);
+fn check_records_for_private_entry(caller: AgentPubKey, records: Vec<Record>) {
+    for record in records {
+        if *record.action().author() == caller {
+            assert_ne!(*record.entry(), RecordEntry::Hidden);
         } else {
-            assert_eq!(*element.entry(), ElementEntry::Hidden);
+            assert_eq!(*record.entry(), RecordEntry::Hidden);
         }
     }
 }

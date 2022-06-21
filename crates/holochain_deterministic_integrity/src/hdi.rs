@@ -19,20 +19,19 @@ thread_local!(pub static HDI: RefCell<Rc<dyn HdiT>> = RefCell::new(Rc::new(HostH
 /// mock_hdi.expect_foo().times(1).etc().etc();
 /// set_hdi(mock_hdi);
 /// ```
-// #[cfg_attr(feature = "mock", automock)]
 pub trait HdiT: Send + Sync {
     // Ed25519
     fn verify_signature(&self, verify_signature: VerifySignature) -> ExternResult<bool>;
     fn hash(&self, hash_input: HashInput) -> ExternResult<HashOutput>;
     fn must_get_entry(&self, must_get_entry_input: MustGetEntryInput) -> ExternResult<EntryHashed>;
-    fn must_get_header(
+    fn must_get_action(
         &self,
-        must_get_header_input: MustGetHeaderInput,
-    ) -> ExternResult<SignedHeaderHashed>;
-    fn must_get_valid_element(
+        must_get_action_input: MustGetActionInput,
+    ) -> ExternResult<SignedActionHashed>;
+    fn must_get_valid_record(
         &self,
-        must_get_valid_element_input: MustGetValidElementInput,
-    ) -> ExternResult<Element>;
+        must_get_valid_record_input: MustGetValidRecordInput,
+    ) -> ExternResult<Record>;
     // Info
     fn dna_info(&self, dna_info_input: ()) -> ExternResult<DnaInfo>;
     fn zome_info(&self, zome_info_input: ()) -> ExternResult<ZomeInfo>;
@@ -55,7 +54,9 @@ pub struct ErrHdi;
 
 impl ErrHdi {
     fn err<T>() -> ExternResult<T> {
-        Err(WasmError::Guest(HDI_NOT_REGISTERED.to_string()))
+        Err(wasm_error!(WasmErrorInner::Guest(
+            HDI_NOT_REGISTERED.to_string()
+        )))
     }
 }
 
@@ -70,10 +71,10 @@ impl HdiT for ErrHdi {
     fn must_get_entry(&self, _: MustGetEntryInput) -> ExternResult<EntryHashed> {
         Self::err()
     }
-    fn must_get_header(&self, _: MustGetHeaderInput) -> ExternResult<SignedHeaderHashed> {
+    fn must_get_action(&self, _: MustGetActionInput) -> ExternResult<SignedActionHashed> {
         Self::err()
     }
-    fn must_get_valid_element(&self, _: MustGetValidElementInput) -> ExternResult<Element> {
+    fn must_get_valid_record(&self, _: MustGetValidRecordInput) -> ExternResult<Record> {
         Self::err()
     }
     fn dna_info(&self, _: ()) -> ExternResult<DnaInfo> {
@@ -124,22 +125,22 @@ impl HdiT for HostHdi {
     fn must_get_entry(&self, must_get_entry_input: MustGetEntryInput) -> ExternResult<EntryHashed> {
         host_call::<MustGetEntryInput, EntryHashed>(__must_get_entry, must_get_entry_input)
     }
-    fn must_get_header(
+    fn must_get_action(
         &self,
-        must_get_header_input: MustGetHeaderInput,
-    ) -> ExternResult<SignedHeaderHashed> {
-        host_call::<MustGetHeaderInput, SignedHeaderHashed>(
-            __must_get_header,
-            must_get_header_input,
+        must_get_action_input: MustGetActionInput,
+    ) -> ExternResult<SignedActionHashed> {
+        host_call::<MustGetActionInput, SignedActionHashed>(
+            __must_get_action,
+            must_get_action_input,
         )
     }
-    fn must_get_valid_element(
+    fn must_get_valid_record(
         &self,
-        must_get_valid_element_input: MustGetValidElementInput,
-    ) -> ExternResult<Element> {
-        host_call::<MustGetValidElementInput, Element>(
-            __must_get_valid_element,
-            must_get_valid_element_input,
+        must_get_valid_record_input: MustGetValidRecordInput,
+    ) -> ExternResult<Record> {
+        host_call::<MustGetValidRecordInput, Record>(
+            __must_get_valid_record,
+            must_get_valid_record_input,
         )
     }
     fn dna_info(&self, _: ()) -> ExternResult<DnaInfo> {
@@ -152,9 +153,9 @@ impl HdiT for HostHdi {
         if cfg!(feature = "trace") {
             host_call::<TraceMsg, ()>(__trace, trace_msg)
         } else {
-            Err(WasmError::Guest(
+            Err(wasm_error!(WasmErrorInner::Guest(
                 "`trace()` can only be used when the \"trace\" cargo feature is set (it is off by default).".to_string(),
-            ))
+            )))
         }
     }
     fn x_salsa20_poly1305_decrypt(
@@ -177,17 +178,12 @@ impl HdiT for HostHdi {
     }
 }
 
-/// At any time the global HDI can be set to a different holochain_deterministic_integrity.
+/// At any time the global HDI can be set to a different HDI.
 /// Generally this is only useful during rust unit testing.
 /// When executing wasm without the `mock` feature, the host will be assumed.
-pub fn set_hdi<H: 'static>(holochain_deterministic_integrity: H) -> Rc<dyn HdiT>
+pub fn set_hdi<H: 'static>(hdi: H) -> Rc<dyn HdiT>
 where
     H: HdiT,
 {
-    HDI.with(|h| {
-        std::mem::replace(
-            &mut *h.borrow_mut(),
-            Rc::new(holochain_deterministic_integrity),
-        )
-    })
+    HDI.with(|h| std::mem::replace(&mut *h.borrow_mut(), Rc::new(hdi)))
 }

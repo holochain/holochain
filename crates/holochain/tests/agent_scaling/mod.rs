@@ -5,6 +5,7 @@ use holochain::sweettest::SweetConductor;
 use holochain::sweettest::SweetDnaFile;
 use holochain::test_utils::consistency_10s;
 use holochain_serialized_bytes::prelude::*;
+use holochain_types::inline_zome::InlineZomeSet;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::inline_zome::BoxApi;
@@ -12,22 +13,27 @@ use holochain_zome_types::inline_zome::BoxApi;
 #[derive(serde::Serialize, serde::Deserialize, Debug, SerializedBytes, derive_more::From)]
 struct BaseTarget(AnyLinkableHash, AnyLinkableHash);
 
-fn links_zome() -> InlineZome {
-    InlineZome::new_unique(vec![])
-        .callback("create_link", move |api, base_target: BaseTarget| {
-            let hash = api.create_link(CreateLinkInput::new(
-                base_target.0,
-                base_target.1,
-                LinkType::new(0),
-                ().into(),
-                ChainTopOrdering::default(),
-            ))?;
-            Ok(hash)
-        })
+fn links_zome() -> InlineZomeSet {
+    InlineZomeSet::new_unique([("integrity_links", vec![], 1)], ["links"])
         .callback(
+            "links",
+            "create_link",
+            move |api, base_target: BaseTarget| {
+                let hash = api.create_link(CreateLinkInput::new(
+                    base_target.0,
+                    base_target.1,
+                    LinkType::new(0),
+                    ().into(),
+                    ChainTopOrdering::default(),
+                ))?;
+                Ok(hash)
+            },
+        )
+        .callback(
+            "links",
             "get_links",
             move |api: BoxApi, base: AnyLinkableHash| -> InlineZomeResult<Vec<Vec<Link>>> {
-                Ok(api.get_links(vec![GetLinksInput::new(base, None)])?)
+                Ok(api.get_links(vec![GetLinksInput::new(base, (..).into(), None)])?)
             },
         )
 }
@@ -40,7 +46,7 @@ async fn many_agents_can_reach_consistency_agent_links() {
     observability::test_run().ok();
     const NUM_AGENTS: usize = 20;
 
-    let (dna_file, _) = SweetDnaFile::unique_from_inline_zome("links", links_zome())
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(links_zome())
         .await
         .unwrap();
 
@@ -61,7 +67,7 @@ async fn many_agents_can_reach_consistency_agent_links() {
     let base: AnyLinkableHash = cells[0].agent_pubkey().clone().into();
     let target: AnyLinkableHash = cells[1].agent_pubkey().clone().into();
 
-    let _: HeaderHash = conductor
+    let _: ActionHash = conductor
         .call(
             &alice,
             "create_link",
@@ -91,7 +97,7 @@ async fn many_agents_can_reach_consistency_normal_links() {
     observability::test_run().ok();
     const NUM_AGENTS: usize = 30;
 
-    let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Link])
+    let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Link])
         .await
         .unwrap();
 
@@ -106,7 +112,7 @@ async fn many_agents_can_reach_consistency_normal_links() {
     let cells = apps.cells_flattened();
     let alice = cells[0].zome(TestWasm::Link);
 
-    let _: HeaderHash = conductor.call(&alice, "create_link", ()).await;
+    let _: ActionHash = conductor.call(&alice, "create_link", ()).await;
 
     consistency_10s(&cells[..]).await;
 
@@ -129,7 +135,8 @@ async fn many_agents_can_reach_consistency_normal_links() {
 async fn stuck_conductor_wasm_calls() -> anyhow::Result<()> {
     observability::test_run().ok();
     // Bundle the single zome into a DnaFile
-    let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::MultipleCalls]).await?;
+    let (dna_file, _, _) =
+        SweetDnaFile::unique_from_test_wasms(vec![TestWasm::MultipleCalls]).await?;
 
     // Create a Conductor
     let mut conductor = SweetConductor::from_standard_config().await;

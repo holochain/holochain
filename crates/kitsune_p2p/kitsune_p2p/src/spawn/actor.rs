@@ -173,7 +173,7 @@ impl KitsuneP2pActor {
                                     Some(
                                         proxy_list
                                             .remove(
-                                                rand::thread_rng().gen_range(0, proxy_list.len()),
+                                                rand::thread_rng().gen_range(0..proxy_list.len()),
                                             )
                                             .into(),
                                     )

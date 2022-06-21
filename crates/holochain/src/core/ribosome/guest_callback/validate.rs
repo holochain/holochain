@@ -158,7 +158,7 @@ mod test {
             results.shuffle(&mut rng);
 
             // number of times a callback result appears should not change the final result
-            let number_of_extras = rng.gen_range(0, 5);
+            let number_of_extras = rng.gen_range(0..5);
             for _ in 0..number_of_extras {
                 let maybe_extra = results.choose(&mut rng).cloned();
                 match maybe_extra {
@@ -239,7 +239,8 @@ mod slow_tests {
         let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
             .next()
             .unwrap();
-        validate_invocation.zomes_to_invoke = ZomesToInvoke::One(TestWasm::Foo.into());
+        validate_invocation.zomes_to_invoke =
+            ZomesToInvoke::One(IntegrityZome::from(TestWasm::Foo).erase_type());
 
         let result = ribosome
             .run_validate(fixt!(ValidateHostAccess), validate_invocation)
@@ -254,7 +255,8 @@ mod slow_tests {
         let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateValid]))
             .next()
             .unwrap();
-        validate_invocation.zomes_to_invoke = ZomesToInvoke::One(TestWasm::ValidateValid.into());
+        validate_invocation.zomes_to_invoke =
+            ZomesToInvoke::One(IntegrityZome::from(TestWasm::ValidateValid).erase_type());
 
         let result = ribosome
             .run_validate(fixt!(ValidateHostAccess), validate_invocation)
@@ -272,21 +274,22 @@ mod slow_tests {
 
         let agent = AgentPubKey::arbitrary(&mut u).unwrap();
         let entry = Entry::Agent(agent);
-        let mut header = Create::arbitrary(&mut u).unwrap();
-        header.entry_type = EntryType::AgentPubKey;
-        header.entry_hash = EntryHash::with_data_sync(&entry);
+        let mut action = Create::arbitrary(&mut u).unwrap();
+        action.entry_type = EntryType::AgentPubKey;
+        action.entry_hash = EntryHash::with_data_sync(&entry);
 
-        let op = Op::StoreElement {
-            element: Element::new(
-                SignedHeaderHashed::with_presigned(
-                    HeaderHashed::from_content_sync(header.into()),
+        let op = Op::StoreRecord {
+            record: Record::new(
+                SignedActionHashed::with_presigned(
+                    ActionHashed::from_content_sync(action.into()),
                     Signature::arbitrary(&mut u).unwrap(),
                 ),
                 Some(entry),
             ),
         };
 
-        let zomes_to_invoke = ZomesToInvoke::One(TestWasm::ValidateInvalid.into());
+        let zomes_to_invoke =
+            ZomesToInvoke::One(IntegrityZome::from(TestWasm::ValidateInvalid).erase_type());
         let validate_invocation = ValidateInvocation::new(zomes_to_invoke, &op).unwrap();
 
         let result = ribosome
@@ -302,12 +305,12 @@ mod slow_tests {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::Validate).await;
 
-        let output: HeaderHash = conductor.call(&alice, "always_validates", ()).await;
-        let _output_element: Element = conductor
-            .call(&alice, "must_get_valid_element", output)
+        let output: ActionHash = conductor.call(&alice, "always_validates", ()).await;
+        let _output_record: Record = conductor
+            .call(&alice, "must_get_valid_record", output)
             .await;
 
-        let invalid_output: Result<HeaderHash, _> =
+        let invalid_output: Result<ActionHash, _> =
             conductor.call_fallible(&alice, "never_validates", ()).await;
         assert!(invalid_output.is_err());
     }

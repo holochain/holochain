@@ -1,10 +1,10 @@
 //! Links interrelate entries in a source chain.
 
+use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holo_hash::AnyDhtHash;
 use holo_hash::AnyLinkableHash;
 use holo_hash::EntryHash;
-use holo_hash::HeaderHash;
 use holochain_serialized_bytes::prelude::*;
 use holochain_zome_types::prelude::*;
 use regex::Regex;
@@ -34,7 +34,7 @@ pub enum WireLinkMetaKey {
     /// Search for all links on a base, for a zome and with a tag
     BaseZomeTag(EntryHash, ZomeId, LinkTag),
     /// This will match only the link created with a certain [CreateLink] hash
-    Full(EntryHash, ZomeId, LinkTag, HeaderHash),
+    Full(EntryHash, ZomeId, LinkTag, ActionHash),
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
@@ -43,7 +43,7 @@ pub struct WireLinkKey {
     /// Base the links are on.
     pub base: AnyLinkableHash,
     /// The zome the links are in.
-    pub zome_id: ZomeId,
+    pub type_query: Option<LinkTypeRanges>,
     /// Optionally specify a tag for more specific queries.
     pub tag: Option<LinkTag>,
 }
@@ -82,8 +82,8 @@ impl WireLinkOps {
 pub struct WireCreateLink {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
-    pub header_seq: u32,
-    pub prev_header: HeaderHash,
+    pub action_seq: u32,
+    pub prev_action: ActionHash,
 
     pub target_address: AnyLinkableHash,
     pub link_type: LinkType,
@@ -98,10 +98,10 @@ pub struct WireCreateLink {
 pub struct WireDeleteLink {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
-    pub header_seq: u32,
-    pub prev_header: HeaderHash,
+    pub action_seq: u32,
+    pub prev_action: ActionHash,
 
-    pub link_add_address: HeaderHash,
+    pub link_add_address: ActionHash,
     pub signature: Signature,
     pub validation_status: ValidationStatus,
 }
@@ -116,8 +116,8 @@ impl WireCreateLink {
         Self {
             author: h.author,
             timestamp: h.timestamp,
-            header_seq: h.header_seq,
-            prev_header: h.prev_header,
+            action_seq: h.action_seq,
+            prev_action: h.prev_action,
             target_address: h.target_address,
             link_type: h.link_type,
             tag: if tag { Some(h.tag) } else { None },
@@ -147,21 +147,20 @@ impl WireCreateLink {
             .tag
             .or_else(|| key.tag.clone())
             .ok_or(DhtOpError::LinkKeyTagMissing)?;
-        let header = Header::CreateLink(CreateLink {
+        let action = Action::CreateLink(CreateLink {
             author: self.author,
             timestamp: self.timestamp,
-            header_seq: self.header_seq,
-            prev_header: self.prev_header,
+            action_seq: self.action_seq,
+            prev_action: self.prev_action,
             base_address: key.base.clone(),
             target_address: self.target_address,
-            zome_id: key.zome_id,
             link_type: self.link_type,
             tag,
         });
         let signature = self.signature;
         let validation_status = Some(self.validation_status);
         RenderedOp::new(
-            header,
+            action,
             signature,
             validation_status,
             DhtOpType::RegisterAddLink,
@@ -179,8 +178,8 @@ impl WireDeleteLink {
         Self {
             author: h.author,
             timestamp: h.timestamp,
-            header_seq: h.header_seq,
-            prev_header: h.prev_header,
+            action_seq: h.action_seq,
+            prev_action: h.prev_action,
             signature,
             validation_status,
             link_add_address: h.link_add_address,
@@ -188,25 +187,25 @@ impl WireDeleteLink {
     }
     /// Render these ops to their full types.
     pub fn render(self, key: &WireLinkKey) -> DhtOpResult<RenderedOp> {
-        let header = Header::DeleteLink(DeleteLink {
+        let action = Action::DeleteLink(DeleteLink {
             author: self.author,
             timestamp: self.timestamp,
-            header_seq: self.header_seq,
-            prev_header: self.prev_header,
+            action_seq: self.action_seq,
+            prev_action: self.prev_action,
             base_address: key.base.clone(),
             link_add_address: self.link_add_address,
         });
         let signature = self.signature;
         let validation_status = Some(self.validation_status);
         RenderedOp::new(
-            header,
+            action,
             signature,
             validation_status,
             DhtOpType::RegisterRemoveLink,
         )
     }
 }
-// TODO: Probably don't want to send the whole headers.
+// TODO: Probably don't want to send the whole actions.
 // We could probably come up with a more compact
 // network Wire type in the future
 /// Link response to get links
