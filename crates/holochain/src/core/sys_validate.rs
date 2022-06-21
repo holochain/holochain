@@ -91,7 +91,7 @@ pub async fn check_countersigning_preflight_response_signature(
 ) -> SysValidationResult<()> {
     let signature_is_valid = preflight_response
         .request()
-        .signing_agents()
+        .signing_agents
         .get(*preflight_response.agent_state().agent_index() as usize)
         .ok_or_else(|| {
             SysValidationError::ValidationOutcome(ValidationOutcome::PreflightResponseSignature(

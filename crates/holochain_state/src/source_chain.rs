@@ -122,7 +122,7 @@ impl SourceChain {
         let author = self.author.clone();
         assert_eq!(
             *author,
-            preflight_request.signing_agents()[agent_index as usize].0
+            preflight_request.signing_agents[agent_index as usize].0
         );
 
         let countersigning_agent_state = self
@@ -138,7 +138,7 @@ impl SourceChain {
                     txn,
                     &hashed_preflight_request,
                     author.as_ref(),
-                    preflight_request.session_times().end(),
+                    preflight_request.session_times.end(),
                 )?;
                 SourceChainResult::Ok(countersigning_agent_state)
             })
