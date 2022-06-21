@@ -9,7 +9,7 @@ pub fn insert_valid_integrated_op(
     op: &DhtOpHashed,
 ) -> StateMutationResult<()> {
     let hash = op.as_hash();
-    insert_op(txn, op)?;
+    insert_op(txn, op, None)?;
     set_validation_status(txn, hash, holochain_zome_types::ValidationStatus::Valid)?;
     set_when_integrated(txn, hash, Timestamp::now())?;
 

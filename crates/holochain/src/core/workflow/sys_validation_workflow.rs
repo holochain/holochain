@@ -568,10 +568,12 @@ async fn register_agent_activity(
 ) -> SysValidationResult<()> {
     // Get data ready to validate
     let prev_action_hash = action.prev_action();
+    let rate_limit = RateLimit::placeholder();
 
     // Checks
     check_prev_action(action)?;
     check_valid_if_dna(action, workspace).await?;
+    let bucket_state = check_rate_limit(&rate_limit, action, workspace).await?;
     if let Some(prev_action_hash) = prev_action_hash {
         check_and_hold_register_agent_activity(
             prev_action_hash,
@@ -582,8 +584,6 @@ async fn register_agent_activity(
         )
         .await?;
     }
-    let rate_limit = RateLimit::placeholder();
-    check_rate_limit(&rate_limit, action, workspace).await?;
     check_chain_rollback(action, workspace).await?;
     Ok(())
 }
@@ -944,34 +944,6 @@ impl SysValidationWorkspace {
             })
             .await?;
         Ok(state)
-    }
-
-    pub async fn set_rate_limit_state(
-        &self,
-        action_hash: &ActionHash,
-        buckets: RateBucketLevels,
-    ) -> SourceChainResult<()> {
-        self.dht_db
-            .async_reader({
-                let action_hash = action_hash.clone();
-                move |txn| {
-                    // If no rows returned, this is a Holochain logic or database
-                    // integrity error that needs to be fixed.
-                    DatabaseResult::Ok(txn.execute(
-                        "
-                            UPDATE Action
-                            SET rate_bucket_state = :buckets
-                            WHERE hash = :action_hash
-                            ",
-                        named_params! {
-                            ":action_hash": action_hash,
-                            ":buckets": buckets,
-                        },
-                    )?)
-                }
-            })
-            .await?;
-        Ok(())
     }
 
     /// Create a cascade with local data only

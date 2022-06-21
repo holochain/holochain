@@ -128,7 +128,11 @@ pub fn insert_record_scratch(
 }
 
 /// Insert a [`DhtOp`](holochain_types::dht_op::DhtOp) into the database.
-pub fn insert_op(txn: &mut Transaction, op: &DhtOpHashed) -> StateMutationResult<()> {
+pub fn insert_op(
+    txn: &mut Transaction,
+    op: &DhtOpHashed,
+    bucket_state: Option<RateBucketLevels>,
+) -> StateMutationResult<()> {
     let hash = op.as_hash();
     let op = op.as_content();
     let op_light = op.to_light();
@@ -146,11 +150,12 @@ pub fn insert_op(txn: &mut Transaction, op: &DhtOpHashed) -> StateMutationResult
     let action_hashed = ActionHashed::with_pre_hashed(action, op_light.action_hash().to_owned());
     let action_hashed = SignedActionHashed::with_presigned(action_hashed, signature);
     let op_order = OpOrder::new(op_light.get_type(), action_hashed.action().timestamp());
-    let rate_limit_state = todo!("pass in bucket state?");
     insert_action(txn, &action_hashed)?;
     insert_op_lite(txn, &op_light, hash, &op_order, &timestamp)?;
     set_dependency(txn, hash, dependency)?;
-    set_rate_limit_state(txn, op_light.action_hash(), rate_limit_state)?;
+    if let Some(state) = bucket_state {
+        set_rate_limit_state(txn, op_light.action_hash(), state)?;
+    }
     Ok(())
 }
 

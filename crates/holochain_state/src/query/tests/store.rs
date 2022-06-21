@@ -18,7 +18,7 @@ async fn exists() {
         ChainTopOrdering::default(),
     )
     .unwrap();
-    insert_op(&mut txn, &td.store_entry_op).unwrap();
+    insert_op(&mut txn, &td.store_entry_op, None).unwrap();
     assert!(Txn::from(&txn)
         .contains_hash(&td.hash.clone().into())
         .unwrap());
