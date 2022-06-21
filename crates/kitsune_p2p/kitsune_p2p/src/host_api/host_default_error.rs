@@ -40,7 +40,7 @@ pub trait KitsuneHostDefaultError: KitsuneHost {
     fn record_metrics(
         &self,
         _space: Arc<KitsuneSpace>,
-        _records: Vec<MetricRecord>,
+        _commits: Vec<MetricRecord>,
     ) -> KitsuneHostResult<()> {
         box_fut(Err(format!(
             "error for unimplemented KitsuneHost test behavior: method {} of {}",

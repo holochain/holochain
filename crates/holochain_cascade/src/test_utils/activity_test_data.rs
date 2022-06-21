@@ -16,7 +16,7 @@ pub struct ActivityTestData {
     pub agent: AgentPubKey,
     pub query_filter: ChainQueryFilter,
     pub valid_hashes: ChainItems<ActionHash>,
-    pub valid_records: ChainItems<Record>,
+    pub valid_commits: ChainItems<Commit>,
     pub chain_head: ChainHead,
     pub highest_observed: HighestObserved,
 }
@@ -33,33 +33,33 @@ impl ActivityTestData {
         let to_op =
             |h| DhtOpHashed::from_content_sync(DhtOp::RegisterAgentActivity(fixt!(Signature), h));
 
-        let to_record_and_op = |h: Action| {
+        let to_commit_and_op = |h: Action| {
             let sig = fixt!(Signature);
             // let e = Entry::App(fixt!(AppEntryBytes));
-            let op = DhtOpHashed::from_content_sync(DhtOp::StoreRecord(
+            let op = DhtOpHashed::from_content_sync(DhtOp::StoreCommit(
                 sig.clone(),
                 h.clone(),
                 Some(Box::new(entry.clone())),
             ));
             let shh = SignedActionHashed::with_presigned(ActionHashed::from_content_sync(h), sig);
-            (Record::new(shh, Some(entry.clone())), op)
+            (Commit::new(shh, Some(entry.clone())), op)
         };
 
-        let to_record_dna_op = |h: Action| {
+        let to_commit_dna_op = |h: Action| {
             let sig = fixt!(Signature);
             let op =
-                DhtOpHashed::from_content_sync(DhtOp::StoreRecord(sig.clone(), h.clone(), None));
+                DhtOpHashed::from_content_sync(DhtOp::StoreCommit(sig.clone(), h.clone(), None));
             let shh = SignedActionHashed::with_presigned(ActionHashed::from_content_sync(h), sig);
-            (Record::new(shh, None), op)
+            (Commit::new(shh, None), op)
         };
 
         // The hashes we are expecting to get returned by the below activity set.
         let mut valid_hashes = Vec::new();
 
-        // The records on the chain. Needs to match the activity set.
-        let mut valid_records = Vec::new();
+        // The commits on the chain. Needs to match the activity set.
+        let mut valid_commits = Vec::new();
 
-        // The store record ops for the actual data on the chain which should
+        // The store commit ops for the actual data on the chain which should
         // match the set of activity ops.
         let mut store_ops = Vec::new();
 
@@ -76,8 +76,8 @@ impl ActivityTestData {
         let dna = Action::Dna(dna);
 
         // Insert the dna
-        let (el, op) = to_record_dna_op(dna.clone());
-        valid_records.push(el);
+        let (el, op) = to_commit_dna_op(dna.clone());
+        valid_commits.push(el);
         store_ops.push(op);
         hash_ops.push(to_op(dna.clone()));
 
@@ -99,8 +99,8 @@ impl ActivityTestData {
 
             valid_hashes.push((action_seq, prev_hash.clone()));
 
-            let (el, op) = to_record_and_op(action);
-            valid_records.push(el);
+            let (el, op) = to_commit_and_op(action);
+            valid_commits.push(el);
             store_ops.push(op);
         }
 
@@ -136,7 +136,7 @@ impl ActivityTestData {
             chain_head,
             noise_ops,
             store_ops,
-            valid_records: ChainItems::Full(valid_records),
+            valid_commits: ChainItems::Full(valid_commits),
         }
     }
 }

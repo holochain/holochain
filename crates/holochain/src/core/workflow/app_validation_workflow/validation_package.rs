@@ -18,7 +18,7 @@ pub async fn get_as_author_sub_chain(
     source_chain: &SourceChainRead,
 ) -> SourceChainResult<ValidationPackage> {
     // Collect and return the sub chain
-    let records = source_chain
+    let commits = source_chain
         .query(
             ChainQueryFilter::default()
                 .include_entries(true)
@@ -29,14 +29,14 @@ pub async fn get_as_author_sub_chain(
                 )),
         )
         .await?;
-    Ok(ValidationPackage::new(records))
+    Ok(ValidationPackage::new(commits))
 }
 
 pub async fn get_as_author_full(
     action_seq: u32,
     source_chain: &SourceChainRead,
 ) -> SourceChainResult<ValidationPackage> {
-    let records = source_chain
+    let commits = source_chain
         .query(
             ChainQueryFilter::default()
                 .include_entries(true)
@@ -46,7 +46,7 @@ pub async fn get_as_author_full(
                 )),
         )
         .await?;
-    Ok(ValidationPackage::new(records))
+    Ok(ValidationPackage::new(commits))
 }
 
 pub fn get_as_author_custom(

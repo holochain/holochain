@@ -753,9 +753,9 @@ pub struct AppRoleAssignment {
     /// This also identifies the basis for cloned DNAs, and this is how the
     /// Agent is determined for clones (always the same as the provisioned cell).
     base_cell_id: CellId,
-    /// Records whether the base cell has actually been provisioned or not.
+    /// Commits whether the base cell has actually been provisioned or not.
     /// If true, then `base_cell_id` refers to an actual existing Cell.
-    /// If false, then `base_cell_id` is just recording what that cell will be
+    /// If false, then `base_cell_id` is just commiting what that cell will be
     /// called in the future.
     is_provisioned: bool,
     /// The number of cloned cells allowed

@@ -22,7 +22,7 @@ impl CounTree {
     /// produces redundant actions in a partition
     pub fn ensure(countree: CounTree) -> ExternResult<ActionHash> {
         match get(hash_entry(&countree)?, GetOptions::latest())? {
-            Some(record) => Ok(record.action_address().to_owned()),
+            Some(commit) => Ok(commit.action_address().to_owned()),
             None => create_entry(&IntegrityCrud(EntryTypes::Countree(countree))),
         }
     }
@@ -54,7 +54,7 @@ impl CounTree {
     /// this is silly as being offline resets the counter >.<
     pub fn incsert(action_hash: ActionHash) -> ExternResult<ActionHash> {
         let current: CounTree = match get(action_hash.clone(), GetOptions::latest())? {
-            Some(record) => match record
+            Some(commit) => match commit
                 .entry()
                 .to_app_option()
                 .map_err(|e| wasm_error!(e.into()))?

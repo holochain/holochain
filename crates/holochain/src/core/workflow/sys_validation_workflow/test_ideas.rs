@@ -9,7 +9,7 @@ fn get_rejected_delete_into_cache_as_valid() {
     // - Create a timestamp earlier then the last chain item.
     // - Send this to sys validation results in rejected action.
     // - Send the delete op to Bob.
-    // - Get Alice to retrieve the original record from bob.
-    // - Bob will return the original record as deleted.
-    // - Now Bob has the original record as deleted in their cache.
+    // - Get Alice to retrieve the original commit from bob.
+    // - Bob will return the original commit as deleted.
+    // - Now Bob has the original commit as deleted in their cache.
 }

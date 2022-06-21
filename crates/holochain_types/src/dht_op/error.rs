@@ -8,7 +8,7 @@ use super::DhtOpType;
 
 #[derive(PartialEq, Eq, Clone, Debug, Error)]
 pub enum DhtOpError {
-    #[error("Tried to create a DhtOp from a Record that requires an Entry. Action type {0:?}")]
+    #[error("Tried to create a DhtOp from a Commit that requires an Entry. Action type {0:?}")]
     ActionWithoutEntry(Action),
     #[error(transparent)]
     SerializedBytesError(#[from] SerializedBytesError),

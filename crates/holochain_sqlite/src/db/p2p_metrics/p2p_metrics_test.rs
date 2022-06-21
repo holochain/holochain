@@ -38,7 +38,7 @@ async fn test_p2p_metric_store_sanity() {
     con.p2p_log_metrics(vec![
         // -- reachability quotient -- //
         MetricRecord {
-            kind: MetricRecordKind::ReachabilityQuotient,
+            kind: MetricCommitKind::ReachabilityQuotient,
             agent: Some(rand_agent()),
             recorded_at_utc: Timestamp::MIN,
             expires_at_utc: Timestamp::MAX,
@@ -46,7 +46,7 @@ async fn test_p2p_metric_store_sanity() {
         },
         // -- latency micros -- //
         MetricRecord {
-            kind: MetricRecordKind::LatencyMicros,
+            kind: MetricCommitKind::LatencyMicros,
             agent: Some(rand_agent()),
             recorded_at_utc: Timestamp::MIN,
             expires_at_utc: Timestamp::MAX,
@@ -54,7 +54,7 @@ async fn test_p2p_metric_store_sanity() {
         },
         // -- agg extrap cov -- //
         MetricRecord {
-            kind: MetricRecordKind::AggExtrapCov,
+            kind: MetricCommitKind::AggExtrapCov,
             agent: None,
             recorded_at_utc: Timestamp::MIN,
             expires_at_utc: Timestamp::MAX,

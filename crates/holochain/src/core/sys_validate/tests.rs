@@ -441,7 +441,7 @@ async fn incoming_ops_filters_private_entry() {
 
     let shh =
         SignedActionHashed::with_presigned(ActionHashed::from_content_sync(action), signature);
-    let el = Record::new(shh, Some(private_entry));
+    let el = Commit::new(shh, Some(private_entry));
 
     let ops_sender = IncomingDhtOpSender::new(space.clone(), tx.clone());
     ops_sender.send_store_entry(el.clone()).await.unwrap();
@@ -452,7 +452,7 @@ async fn incoming_ops_filters_private_entry() {
     assert_eq!(num_ops, 0);
 
     let ops_sender = IncomingDhtOpSender::new(space.clone(), tx.clone());
-    ops_sender.send_store_record(el.clone()).await.unwrap();
+    ops_sender.send_store_commit(el.clone()).await.unwrap();
     let num_ops: usize = fresh_reader_test(vault.clone(), |txn| {
         txn.query_row("SELECT COUNT(rowid) FROM DhtOp", [], |row| row.get(0))
             .unwrap()

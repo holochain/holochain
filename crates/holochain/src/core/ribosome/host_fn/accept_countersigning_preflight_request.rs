@@ -435,9 +435,9 @@ pub mod wasm_test {
             unreachable!();
         }
 
-        // Record get must not error.
-        let _countersigned_record_bob: Record = conductor
-            .call(&bob, "must_get_valid_record", countersigned_action_hash_bob)
+        // Commit get must not error.
+        let _countersigned_commit_bob: Commit = conductor
+            .call(&bob, "must_get_valid_commit", countersigned_action_hash_bob)
             .await;
 
         let alice_activity: AgentActivity = conductor

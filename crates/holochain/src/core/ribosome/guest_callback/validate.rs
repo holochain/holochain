@@ -278,8 +278,8 @@ mod slow_tests {
         action.entry_type = EntryType::AgentPubKey;
         action.entry_hash = EntryHash::with_data_sync(&entry);
 
-        let op = Op::StoreRecord {
-            record: Record::new(
+        let op = Op::StoreCommit {
+            commit: Commit::new(
                 SignedActionHashed::with_presigned(
                     ActionHashed::from_content_sync(action.into()),
                     Signature::arbitrary(&mut u).unwrap(),
@@ -306,8 +306,8 @@ mod slow_tests {
         } = RibosomeTestFixture::new(TestWasm::Validate).await;
 
         let output: ActionHash = conductor.call(&alice, "always_validates", ()).await;
-        let _output_record: Record = conductor
-            .call(&alice, "must_get_valid_record", output)
+        let _output_commit: Commit = conductor
+            .call(&alice, "must_get_valid_commit", output)
             .await;
 
         let invalid_output: Result<ActionHash, _> =

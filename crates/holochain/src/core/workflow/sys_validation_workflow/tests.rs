@@ -129,13 +129,13 @@ async fn run_test(
                             AND (
                                 (type = :store_entry AND basis_hash = :bad_update_entry_hash AND action_hash = :bad_update_action)
                                 OR
-                                (type = :store_record AND action_hash = :bad_update_action)
+                                (type = :store_commit AND action_hash = :bad_update_action)
                                 OR
                                 (type = :add_link AND action_hash = :link_add_hash)
                                 OR
                                 (type = :update_content AND action_hash = :bad_update_action)
                                 OR
-                                (type = :update_record AND action_hash = :bad_update_action)
+                                (type = :update_commit AND action_hash = :bad_update_action)
                             )
                         )
                     )
@@ -144,10 +144,10 @@ async fn run_test(
                     ":valid": ValidationStatus::Valid,
                     ":rejected": ValidationStatus::Rejected,
                     ":store_entry": DhtOpType::StoreEntry,
-                    ":store_record": DhtOpType::StoreRecord,
+                    ":store_commit": DhtOpType::StoreCommit,
                     ":add_link": DhtOpType::RegisterAddLink,
                     ":update_content": DhtOpType::RegisterUpdatedContent,
-                    ":update_record": DhtOpType::RegisterUpdatedRecord,
+                    ":update_commit": DhtOpType::RegisterUpdatedCommit,
                     ":bad_update_entry_hash": bad_update_entry_hash,
                     ":bad_update_action": bad_update_action,
                     ":link_add_hash": link_add_hash,
@@ -376,7 +376,7 @@ async fn dodgy_bob(bob_cell_id: &CellId, handle: &ConductorHandle, dna_file: &Dn
 
 // 1. Delete points to an action that isn't a NewEntryType.
 // ## Comments
-// I think this will fail RegisterDeleteBy but pass as StoreRecord
+// I think this will fail RegisterDeleteBy but pass as StoreCommit
 // which is wrong.
 // ## Scenario
 // 1. Commit a Delete Action that points to a valid EntryHash and

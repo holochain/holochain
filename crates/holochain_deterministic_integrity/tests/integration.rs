@@ -445,10 +445,10 @@ fn set_zome_types(entries: Vec<Range<u8>>, links: Vec<Range<u8>>) {
             todo!()
         }
 
-        fn must_get_valid_record(
+        fn must_get_valid_commit(
             &self,
-            must_get_valid_record_input: MustGetValidRecordInput,
-        ) -> ExternResult<Record> {
+            must_get_valid_commit_input: MustGetValidCommitInput,
+        ) -> ExternResult<Commit> {
             todo!()
         }
 

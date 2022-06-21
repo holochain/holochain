@@ -22,12 +22,12 @@ use holochain_state::host_fn_workspace::HostFnStores;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::mutations::set_validation_status;
 use holochain_state::prelude::*;
+use holochain_state::query::commit_details::GetCommitDetailsQuery;
 use holochain_state::query::entry_details::GetEntryDetailsQuery;
 use holochain_state::query::link::GetLinksQuery;
 use holochain_state::query::link_details::GetLinkDetailsQuery;
+use holochain_state::query::live_commit::GetLiveCommitQuery;
 use holochain_state::query::live_entry::GetLiveEntryQuery;
-use holochain_state::query::live_record::GetLiveRecordQuery;
-use holochain_state::query::record_details::GetRecordDetailsQuery;
 use holochain_state::query::DbScratch;
 use holochain_state::query::PrivateDataQuery;
 use holochain_state::query::StateQueryError;
@@ -261,7 +261,7 @@ where
     }
 
     #[instrument(skip(self, options))]
-    pub async fn fetch_record(
+    pub async fn fetch_commit(
         &mut self,
         hash: AnyDhtHash,
         options: NetworkGetOptions,
@@ -269,7 +269,7 @@ where
         let network = ok_or_return!(self.network.as_mut());
         let results = network
             .get(hash, options.clone())
-            .instrument(debug_span!("fetch_record::network_get"))
+            .instrument(debug_span!("fetch_commit::network_get"))
             .await?;
 
         self.merge_ops_into_cache(results).await?;
@@ -412,7 +412,7 @@ where
             return Ok(result.map(EntryHashed::from_content_sync));
         }
         options.request_type = holochain_p2p::event::GetRequest::Pending;
-        self.fetch_record(hash.clone().into(), options).await?;
+        self.fetch_commit(hash.clone().into(), options).await?;
 
         // Check if we have the data now after the network call.
         let private_data = self.private_data.clone();
@@ -447,7 +447,7 @@ where
             return Ok(result);
         }
         options.request_type = holochain_p2p::event::GetRequest::Pending;
-        self.fetch_record(hash.clone().into(), options).await?;
+        self.fetch_commit(hash.clone().into(), options).await?;
 
         // Check if we have the data now after the network call.
         let result = self
@@ -462,13 +462,13 @@ where
         &mut self,
         hash: AnyDhtHash,
         mut options: NetworkGetOptions,
-    ) -> CascadeResult<Option<Record>> {
+    ) -> CascadeResult<Option<Commit>> {
         let private_data = self.private_data.clone();
         let result = self
             .find_map({
                 let hash = hash.clone();
                 move |store| {
-                    Ok(store.get_public_or_authored_record(
+                    Ok(store.get_public_or_authored_commit(
                         &hash,
                         private_data.as_ref().map(|a| a.as_ref()),
                     )?)
@@ -479,13 +479,13 @@ where
             return Ok(result);
         }
         options.request_type = holochain_p2p::event::GetRequest::Pending;
-        self.fetch_record(hash.clone(), options).await?;
+        self.fetch_commit(hash.clone(), options).await?;
 
         let private_data = self.private_data.clone();
         // Check if we have the data now after the network call.
         let result = self
             .find_map(move |store| {
-                Ok(store.get_public_or_authored_record(
+                Ok(store.get_public_or_authored_commit(
                     &hash,
                     private_data.as_ref().map(|a| a.as_ref()),
                 )?)
@@ -521,7 +521,7 @@ where
         // If we are not in the process of authoring this hash or its
         // authority we need a network call.
         if !(authoring || authority) {
-            self.fetch_record(entry_hash.into(), options.into()).await?;
+            self.fetch_commit(entry_hash.into(), options.into()).await?;
         }
 
         // Check if we have the data now after the network call.
@@ -534,10 +534,10 @@ where
         &mut self,
         action_hash: ActionHash,
         options: GetOptions,
-    ) -> CascadeResult<Option<RecordDetails>> {
+    ) -> CascadeResult<Option<CommitDetails>> {
         let authoring = self.am_i_authoring(&action_hash.clone().into())?;
         let authority = self.am_i_an_authority(action_hash.clone().into()).await?;
-        let query: GetRecordDetailsQuery =
+        let query: GetCommitDetailsQuery =
             self.construct_query_with_data_access(action_hash.clone());
 
         // DESIGN: we can short circuit if we have any local deletes on an action.
@@ -561,7 +561,7 @@ where
         // If we are not in the process of authoring this hash or its
         // authority we need a network call.
         if !(authoring || authority) {
-            self.fetch_record(action_hash.into(), options.into())
+            self.fetch_commit(action_hash.into(), options.into())
                 .await?;
         }
 
@@ -571,7 +571,7 @@ where
     }
 
     #[instrument(skip(self, options))]
-    /// Returns the [Record] for this [ActionHash] if it is live
+    /// Returns the [Commit] for this [ActionHash] if it is live
     /// by getting the latest available metadata from authorities
     /// combined with this agents authored data.
     /// _Note: Deleted actions are a tombstone set_
@@ -579,10 +579,10 @@ where
         &mut self,
         action_hash: ActionHash,
         options: GetOptions,
-    ) -> CascadeResult<Option<Record>> {
+    ) -> CascadeResult<Option<Commit>> {
         let authoring = self.am_i_authoring(&action_hash.clone().into())?;
         let authority = self.am_i_an_authority(action_hash.clone().into()).await?;
-        let query: GetLiveRecordQuery = self.construct_query_with_data_access(action_hash.clone());
+        let query: GetLiveCommitQuery = self.construct_query_with_data_access(action_hash.clone());
 
         // DESIGN: we can short circuit if we have any local deletes on an action.
         // Is this bad because we will not go back to the network until our
@@ -605,7 +605,7 @@ where
         // If we are not in the process of authoring this hash or its
         // authority we need a network call.
         if !(authoring || authority) {
-            self.fetch_record(action_hash.into(), options.into())
+            self.fetch_commit(action_hash.into(), options.into())
                 .await?;
         }
 
@@ -615,13 +615,13 @@ where
     }
 
     #[instrument(skip(self, options))]
-    /// Returns the oldest live [Record] for this [EntryHash] by getting the
+    /// Returns the oldest live [Commit] for this [EntryHash] by getting the
     /// latest available metadata from authorities combined with this agents authored data.
     pub async fn dht_get_entry(
         &mut self,
         entry_hash: EntryHash,
         options: GetOptions,
-    ) -> CascadeResult<Option<Record>> {
+    ) -> CascadeResult<Option<Commit>> {
         let authoring = self.am_i_authoring(&entry_hash.clone().into())?;
         let authority = self.am_i_an_authority(entry_hash.clone().into()).await?;
         let query: GetLiveEntryQuery = self.construct_query_with_data_access(entry_hash.clone());
@@ -643,7 +643,7 @@ where
         // If we are not in the process of authoring this hash or its
         // authority we need a network call.
         if !(authoring || authority) {
-            self.fetch_record(entry_hash.into(), options.into()).await?;
+            self.fetch_commit(entry_hash.into(), options.into()).await?;
         }
 
         // Check if we have the data now after the network call.
@@ -655,7 +655,7 @@ where
         &mut self,
         hashes: I,
         options: GetOptions,
-    ) -> CascadeResult<Vec<Option<Record>>> {
+    ) -> CascadeResult<Vec<Option<Commit>>> {
         use futures::stream::StreamExt;
         use futures::stream::TryStreamExt;
         let iter = hashes.into_iter().map({
@@ -680,7 +680,7 @@ where
         &mut self,
         hash: AnyDhtHash,
         options: GetOptions,
-    ) -> CascadeResult<Option<Record>> {
+    ) -> CascadeResult<Option<Commit>> {
         match *hash.hash_type() {
             AnyDht::Entry => self.dht_get_entry(hash.into(), options).await,
             AnyDht::Action => self.dht_get_action(hash.into(), options).await,
@@ -701,7 +701,7 @@ where
             AnyDht::Action => Ok(self
                 .get_action_details(hash.into(), options)
                 .await?
-                .map(Details::Record)),
+                .map(Details::Commit)),
         }
     }
 
@@ -755,7 +755,7 @@ where
         agent: AgentPubKey,
         query: ChainQueryFilter,
         options: GetActivityOptions,
-    ) -> CascadeResult<AgentActivityResponse<Record>> {
+    ) -> CascadeResult<AgentActivityResponse<Commit>> {
         let status_only = !options.include_rejected_activity && !options.include_valid_activity;
         // DESIGN: Evaluate if it's ok to **not** go to another authority for agent activity?
         let authority = self.am_i_an_authority(agent.clone().into()).await?;
@@ -869,7 +869,7 @@ where
     pub fn get_validation_package_local(
         &self,
         _hash: &ActionHash,
-    ) -> CascadeResult<Option<Vec<Record>>> {
+    ) -> CascadeResult<Option<Vec<Commit>>> {
         Ok(None)
     }
 

@@ -1,6 +1,6 @@
 use crate::authority;
+use crate::authority::get_commit_query::GetCommitOpsQuery;
 use crate::authority::get_entry_ops_query::GetEntryOpsQuery;
-use crate::authority::get_record_query::GetRecordOpsQuery;
 use holo_hash::hash_type::AnyDht;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
@@ -25,6 +25,7 @@ use holochain_state::mutations::set_when_integrated;
 use holochain_state::prelude::Query;
 use holochain_state::prelude::Txn;
 use holochain_types::activity::AgentActivityResponse;
+use holochain_types::commit::WireCommitOps;
 use holochain_types::db::DbRead;
 use holochain_types::db::DbWrite;
 use holochain_types::dht_op::DhtOpHashed;
@@ -34,7 +35,6 @@ use holochain_types::link::WireLinkOps;
 use holochain_types::metadata::MetadataSet;
 use holochain_types::prelude::ValidationPackageResponse;
 use holochain_types::prelude::WireEntryOps;
-use holochain_types::record::WireRecordOps;
 use holochain_zome_types::ActionHashed;
 use holochain_zome_types::QueryFilter;
 use holochain_zome_types::SignedAction;
@@ -44,12 +44,12 @@ use holochain_zome_types::TryInto;
 use holochain_zome_types::ValidationStatus;
 
 pub use activity_test_data::*;
+pub use commit_test_data::*;
 pub use entry_test_data::*;
-pub use record_test_data::*;
 
 mod activity_test_data;
+mod commit_test_data;
 mod entry_test_data;
-mod record_test_data;
 
 #[derive(Clone)]
 pub struct PassThroughNetwork {
@@ -113,14 +113,14 @@ impl HolochainP2pDnaT for PassThroughNetwork {
             }
             AnyDht::Action => {
                 for env in &self.envs {
-                    let r = authority::handle_get_record(
+                    let r = authority::handle_get_commit(
                         env.clone(),
                         dht_hash.clone().into(),
                         (&options).into(),
                     )
                     .await
                     .map_err(|e| HolochainP2pError::Other(e.into()))?;
-                    out.push(WireOps::Record(r));
+                    out.push(WireOps::Commit(r));
                 }
             }
         }
@@ -445,13 +445,13 @@ pub fn handle_get_entry_txn(
     query.run(Txn::from(txn)).unwrap()
 }
 
-/// Utility for network simulation response to get record.
-pub fn handle_get_record_txn(
+/// Utility for network simulation response to get commit.
+pub fn handle_get_commit_txn(
     txn: &Transaction<'_>,
     hash: ActionHash,
     options: holochain_p2p::event::GetOptions,
-) -> WireRecordOps {
-    let query = GetRecordOpsQuery::new(hash, options);
+) -> WireCommitOps {
+    let query = GetCommitOpsQuery::new(hash, options);
     query.run(Txn::from(txn)).unwrap()
 }
 
@@ -463,6 +463,6 @@ pub fn handle_get_txn(
 ) -> WireOps {
     match *hash.hash_type() {
         AnyDht::Entry => WireOps::Entry(handle_get_entry_txn(txn, hash.into(), options)),
-        AnyDht::Action => WireOps::Record(handle_get_record_txn(txn, hash.into(), options)),
+        AnyDht::Action => WireOps::Commit(handle_get_commit_txn(txn, hash.into(), options)),
     }
 }

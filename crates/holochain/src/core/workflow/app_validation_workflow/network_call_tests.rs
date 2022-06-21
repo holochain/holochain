@@ -1,6 +1,6 @@
 use fallible_iterator::FallibleIterator;
 use hdk::prelude::EntryType;
-use hdk::prelude::Record;
+use hdk::prelude::Commit;
 use hdk::prelude::ValidationPackage;
 use holo_hash::ActionHash;
 use holochain_p2p::actor::GetActivityOptions;
@@ -23,7 +23,7 @@ use holochain_cascade::DbPairMut;
 use holochain_state::metadata::ChainItemKey;
 use holochain_state::metadata::MetadataBuf;
 use holochain_state::metadata::MetadataBufT;
-use holochain_state::record_buf::RecordBuf;
+use holochain_state::commit_buf::CommitBuf;
 use holochain_state::source_chain::SourceChain;
 
 const NUM_COMMITS: usize = 5;
@@ -49,7 +49,7 @@ async fn get_validation_package_test() {
     let get_action = {
         let db = alice_call_data.db.clone();
         move |action_hash| {
-            let alice_authored = RecordBuf::authored(db.clone().into(), false).unwrap();
+            let alice_authored = CommitBuf::authored(db.clone().into(), false).unwrap();
             alice_authored
                 .get_action(action_hash)
                 .unwrap()
@@ -63,12 +63,12 @@ async fn get_validation_package_test() {
 
     // Expecting every action from the latest to the beginning
     let alice_source_chain = SourceChain::public_only(alice_call_data.db.clone().into()).unwrap();
-    let alice_authored = alice_source_chain.records();
+    let alice_authored = alice_source_chain.commits();
     let expected_package = alice_source_chain
         .iter_back()
         // Skip the actual entry
         .skip(1)
-        .filter_map(|shh| alice_authored.get_record(shh.action_address()))
+        .filter_map(|shh| alice_authored.get_commit(shh.action_address()))
         .collect::<Vec<_>>()
         .unwrap();
 
@@ -110,12 +110,12 @@ async fn get_validation_package_test() {
 
     // Get the package for the private entry, this is still full chain
     let alice_source_chain = SourceChain::public_only(alice_call_data.db.clone().into()).unwrap();
-    let alice_authored = alice_source_chain.records();
+    let alice_authored = alice_source_chain.commits();
     let expected_package = alice_source_chain
         .iter_back()
         // Skip the actual entry
         .skip(1)
-        .filter_map(|shh| alice_authored.get_record(shh.action_address()))
+        .filter_map(|shh| alice_authored.get_commit(shh.action_address()))
         .collect::<Vec<_>>()
         .unwrap();
 
@@ -143,7 +143,7 @@ async fn get_validation_package_test() {
 
     // Get the entry type
     let entry_type = alice_source_chain
-        .get_record(&action_hash)
+        .get_commit(&action_hash)
         .unwrap()
         .expect("Alice should have the entry in their authored because they just committed")
         .action()
@@ -152,12 +152,12 @@ async fn get_validation_package_test() {
         .1
         .clone();
 
-    // Expecting all the records that match this entry type from the latest to the start
+    // Expecting all the commits that match this entry type from the latest to the start
     let alice_source_chain = SourceChain::public_only(alice_call_data.db.clone().into()).unwrap();
-    let alice_authored = alice_source_chain.records();
+    let alice_authored = alice_source_chain.commits();
     let expected_package = alice_source_chain
         .iter_back()
-        .filter_map(|shh| alice_authored.get_record(shh.action_address()))
+        .filter_map(|shh| alice_authored.get_commit(shh.action_address()))
         .filter_map(|el| {
             Ok(el.action().entry_type().cloned().and_then(|et| {
                 if et == entry_type {
@@ -243,13 +243,13 @@ async fn get_agent_activity_test() {
         activity
     };
 
-    // Helper closure for changing to AgentActivityResponse<Record> type
+    // Helper closure for changing to AgentActivityResponse<Commit> type
     let get_expected_cascade = |activity: AgentActivityResponse| {
         let valid_activity = match activity.valid_activity {
             ChainItems::Full(actions) => ChainItems::Full(
                 actions
                     .into_iter()
-                    .map(|shh| Record::new(shh, None))
+                    .map(|shh| Commit::new(shh, None))
                     .collect(),
             ),
             ChainItems::Hashes(h) => ChainItems::Hashes(h),
@@ -259,13 +259,13 @@ async fn get_agent_activity_test() {
             ChainItems::Full(actions) => ChainItems::Full(
                 actions
                     .into_iter()
-                    .map(|shh| Record::new(shh, None))
+                    .map(|shh| Commit::new(shh, None))
                     .collect(),
             ),
             ChainItems::Hashes(h) => ChainItems::Hashes(h),
             ChainItems::NotRequested => ChainItems::NotRequested,
         };
-        let activity: AgentActivityResponse<Record> = AgentActivityResponse {
+        let activity: AgentActivityResponse<Commit> = AgentActivityResponse {
             agent: activity.agent,
             valid_activity,
             rejected_activity,
@@ -324,9 +324,9 @@ async fn get_agent_activity_test() {
     let expected_activity = get_expected();
     assert_eq!(agent_activity, expected_activity);
 
-    let mut record_cache = RecordBuf::cache(alice_call_data.db.clone().into()).unwrap();
+    let mut commit_cache = CommitBuf::cache(alice_call_data.db.clone().into()).unwrap();
     let mut meta_cache = MetadataBuf::cache(alice_call_data.db.clone().into()).unwrap();
-    let cache_data = DbPairMut::new(&mut record_cache, &mut meta_cache);
+    let cache_data = DbPairMut::new(&mut commit_cache, &mut meta_cache);
     let mut cascade = Cascade::empty()
         .with_cache(cache_data)
         .with_network(alice_call_data.network.clone());
@@ -370,8 +370,8 @@ async fn get_agent_activity_test() {
         unwrap_to::unwrap_to!(get_expected_full().valid_activity => ChainItems::Full)
             .into_iter()
             .cloned()
-            // We are expecting the full records with entries
-            .filter_map(|a| alice_source_chain.get_record(a.action_address()).unwrap())
+            // We are expecting the full commits with entries
+            .filter_map(|a| alice_source_chain.get_commit(a.action_address()).unwrap())
             .collect();
 
     assert_eq!(agent_activity, expected_activity);
@@ -416,7 +416,7 @@ async fn get_agent_activity_test() {
     // Get the entry type
     let alice_source_chain = SourceChain::public_only(alice_call_data.db.clone().into()).unwrap();
     let entry_type = alice_source_chain
-        .get_record(&action_hash)
+        .get_commit(&action_hash)
         .unwrap()
         .expect("Alice should have the entry in their authored because they just committed")
         .action()
@@ -463,7 +463,7 @@ async fn get_agent_activity_test() {
                     .unwrap_or(false)
             })
             .cloned()
-            // We are expecting the full records with entries
+            // We are expecting the full commits with entries
             .collect();
     expected_activity.valid_activity = ChainItems::Full(activity);
 
@@ -551,13 +551,13 @@ async fn get_custom_package_test() {
 
     {
         let db: DbRead = bob_call_data.db.clone().into();
-        let record_integrated = RecordBuf::vault(db.clone(), false).unwrap();
+        let commit_integrated = CommitBuf::vault(db.clone(), false).unwrap();
         let meta_integrated = MetadataBuf::vault(db.clone()).unwrap();
-        let mut record_cache = RecordBuf::cache(db.clone()).unwrap();
+        let mut commit_cache = CommitBuf::cache(db.clone()).unwrap();
         let mut meta_cache = MetadataBuf::cache(db.clone()).unwrap();
         let cascade = Cascade::empty()
-            .with_cache(DbPairMut::new(&mut record_cache, &mut meta_cache))
-            .with_integrated(DbPair::new(&record_integrated, &meta_integrated));
+            .with_cache(DbPairMut::new(&mut commit_cache, &mut meta_cache))
+            .with_integrated(DbPair::new(&commit_integrated, &meta_integrated));
 
         let result = cascade
             .get_validation_package_local(shh.action_address())
@@ -679,9 +679,9 @@ async fn check_cascade(
     action_hashed: &ActionHashed,
     call_data: &CellHostFnCaller,
 ) -> Option<ValidationPackage> {
-    let mut record_cache = RecordBuf::cache(call_data.db.clone().into()).unwrap();
+    let mut commit_cache = CommitBuf::cache(call_data.db.clone().into()).unwrap();
     let mut meta_cache = MetadataBuf::cache(call_data.db.clone().into()).unwrap();
-    let cache_data = DbPairMut::new(&mut record_cache, &mut meta_cache);
+    let cache_data = DbPairMut::new(&mut commit_cache, &mut meta_cache);
     let mut cascade = Cascade::empty()
         .with_cache(cache_data)
         .with_network(call_data.network.clone());

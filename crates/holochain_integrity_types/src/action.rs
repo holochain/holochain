@@ -19,7 +19,7 @@ use holochain_serialized_bytes::prelude::*;
 pub mod builder;
 pub mod conversions;
 
-/// Any action with a action_seq less than this value is part of a record
+/// Any action with a action_seq less than this value is part of a commit
 /// created during genesis. Anything with this seq or higher was created
 /// after genesis.
 pub const POST_GENESIS_SEQ_THRESHOLD: u32 = 3;
@@ -476,7 +476,7 @@ pub struct Delete {
     pub action_seq: u32,
     pub prev_action: ActionHash,
 
-    /// Address of the Record being deleted
+    /// Address of the Commit being deleted
     pub deletes_address: ActionHash,
     pub deletes_entry_address: EntryHash,
 }

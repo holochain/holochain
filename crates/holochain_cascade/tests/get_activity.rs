@@ -48,7 +48,7 @@ async fn get_activity() {
 
     let expected = AgentActivityResponse {
         agent: td.agent.clone(),
-        valid_activity: td.valid_records.clone(),
+        valid_activity: td.valid_commits.clone(),
         rejected_activity: ChainItems::NotRequested,
         status: ChainStatus::Valid(td.chain_head.clone()),
         highest_observed: Some(td.highest_observed.clone()),

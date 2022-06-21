@@ -9,11 +9,11 @@ use holochain_zome_types::GetOptions;
 use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]
-pub fn must_get_valid_record<'a>(
+pub fn must_get_valid_commit<'a>(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
-    input: MustGetValidRecordInput,
-) -> Result<Record, RuntimeError> {
+    input: MustGetValidCommitInput,
+) -> Result<Commit, RuntimeError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess {
             read_workspace_deterministic: Permission::Allow,
@@ -37,18 +37,18 @@ pub fn must_get_valid_record<'a>(
                     .map_err(|cascade_error| -> RuntimeError {
                         wasm_error!(WasmErrorInner::Host(cascade_error.to_string())).into()
                     })? {
-                    Some(RecordDetails {
-                        record,
+                    Some(CommitDetails {
+                        commit,
                         validation_status: ValidationStatus::Valid,
                         ..
-                    }) => Ok(record),
+                    }) => Ok(commit),
                     _ => match call_context.host_context {
                         HostContext::EntryDefs(_)
                         | HostContext::GenesisSelfCheck(_)
                         | HostContext::MigrateAgent(_)
                         | HostContext::PostCommit(_)
                         | HostContext::ZomeCall(_) => Err(wasm_error!(WasmErrorInner::Host(
-                            format!("Failed to get Record {}", action_hash)
+                            format!("Failed to get Commit {}", action_hash)
                         ))
                         .into()),
                         HostContext::Init(_) => Err(wasm_error!(WasmErrorInner::HostShortCircuit(
@@ -101,7 +101,7 @@ pub fn must_get_valid_record<'a>(
             RibosomeError::HostFnPermissions(
                 call_context.zome.zome_name().clone(),
                 call_context.function_name().clone(),
-                "must_get_valid_record".into(),
+                "must_get_valid_commit".into(),
             )
             .to_string(),
         ))

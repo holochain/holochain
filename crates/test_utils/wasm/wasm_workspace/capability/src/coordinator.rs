@@ -52,7 +52,7 @@ pub fn delete_cap_grant(action_hash: ActionHash) -> ExternResult<ActionHash> {
 }
 
 #[hdk_extern]
-fn get_entry(action_hash: ActionHash) -> ExternResult<Option<Record>> {
+fn get_entry(action_hash: ActionHash) -> ExternResult<Option<Commit>> {
     get(action_hash, GetOptions::latest())
 }
 

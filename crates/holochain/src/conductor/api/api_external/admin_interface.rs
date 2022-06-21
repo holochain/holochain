@@ -336,17 +336,17 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 self.handle_admin_request_inner(DisableApp { installed_app_id })
                     .await
             }
-            AddRecords {
+            AddCommits {
                 cell_id,
                 truncate,
                 validate,
-                records,
+                commits,
             } => {
                 self.conductor_handle
                     .clone()
-                    .insert_records_into_source_chain(cell_id, truncate, validate, records)
+                    .insert_commits_into_source_chain(cell_id, truncate, validate, commits)
                     .await?;
-                Ok(AdminResponse::RecordsAdded)
+                Ok(AdminResponse::CommitsAdded)
             }
         }
     }

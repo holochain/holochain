@@ -318,7 +318,7 @@ pub mod countersigning;
 /// App entries are all entries that are not system entries.
 /// They are defined in the `entry_defs` callback and then the application can call CRUD functions with them.
 ///
-/// CRUD in Holochain is represented as a graph/tree of Records referencing each other (via Action hashes) representing new states of a shared identity.
+/// CRUD in Holochain is represented as a graph/tree of Commits referencing each other (via Action hashes) representing new states of a shared identity.
 /// Because the network is always subject to the possibility of partitions, there is no way to assert an objective truth about the 'current' or 'real' value that all participants will agree on.
 /// This is a key difference between Holochain and blockchains.
 /// Where blockchains define a consensus algorithm that brings all participants as close as possible to a single value while Holochain lets each participant discover their own truth.
@@ -448,10 +448,10 @@ pub use paste;
 /// Interacting with a source chain is very different to the DHT.
 ///
 /// - Source chains have a linear history guaranteed by action hashes
-/// - Source chains have a single owner/author signing every chain record
+/// - Source chains have a single owner/author signing every chain commit
 /// - Source chains can be iterated over from most recent back to genesis by following the action hashes as references
 /// - Source chains contain interspersed system and application entries
-/// - Source chains contain both private (local only) and public (broadcast to DHT) records
+/// - Source chains contain both private (local only) and public (broadcast to DHT) commits
 ///
 /// There is a small DSL provided by `query` that allows for inspecting the current agent's local source chain.
 /// Typically it will be faster, more direct and efficient to query local data than dial out to the network.

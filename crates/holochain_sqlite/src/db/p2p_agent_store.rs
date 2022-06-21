@@ -12,10 +12,10 @@ use std::sync::Arc;
 /// Extension trait to treat connection instances
 /// as p2p store accessors.
 pub trait AsP2pAgentStoreConExt {
-    /// Get an AgentInfoSigned record from the p2p_store
+    /// Get an AgentInfoSigned commit from the p2p_store
     fn p2p_get_agent(&mut self, agent: &KitsuneAgent) -> DatabaseResult<Option<AgentInfoSigned>>;
 
-    /// List all AgentInfoSigned records within a space in the p2p_agent_store
+    /// List all AgentInfoSigned commits within a space in the p2p_agent_store
     fn p2p_list_agents(&mut self) -> DatabaseResult<Vec<AgentInfoSigned>>;
 
     /// Query agent list for gossip
@@ -40,10 +40,10 @@ pub trait AsP2pAgentStoreConExt {
 /// Extension trait to treat transaction instances
 /// as p2p store accessors.
 pub trait AsP2pStateTxExt {
-    /// Get an AgentInfoSigned record from the p2p_store
+    /// Get an AgentInfoSigned commit from the p2p_store
     fn p2p_get_agent(&self, agent: &KitsuneAgent) -> DatabaseResult<Option<AgentInfoSigned>>;
 
-    /// List all AgentInfoSigned records within a space in the p2p_agent_store
+    /// List all AgentInfoSigned commits within a space in the p2p_agent_store
     fn p2p_list_agents(&self) -> DatabaseResult<Vec<AgentInfoSigned>>;
 
     /// Query agent list for gossip
@@ -92,61 +92,61 @@ impl AsP2pAgentStoreConExt for crate::db::PConnGuard {
     }
 }
 
-/// Put an AgentInfoSigned record into the p2p_store
+/// Put an AgentInfoSigned commit into the p2p_store
 pub async fn p2p_put(
     db: &DbWrite<DbKindP2pAgents>,
     signed: &AgentInfoSigned,
 ) -> DatabaseResult<()> {
-    let record = P2pRecord::from_signed(signed)?;
-    db.async_commit(move |txn| tx_p2p_put(txn, record)).await
+    let commit = P2pCommit::from_signed(signed)?;
+    db.async_commit(move |txn| tx_p2p_put(txn, commit)).await
 }
 
-/// Put an iterator of AgentInfoSigned records into the p2p_store
+/// Put an iterator of AgentInfoSigned commits into the p2p_store
 pub async fn p2p_put_all(
     db: &DbWrite<DbKindP2pAgents>,
     signed: impl Iterator<Item = &AgentInfoSigned>,
 ) -> DatabaseResult<()> {
-    let mut records = Vec::new();
+    let mut commits = Vec::new();
     for s in signed {
-        records.push(P2pRecord::from_signed(s)?);
+        commits.push(P2pCommit::from_signed(s)?);
     }
     db.async_commit(move |txn| {
-        for record in records {
-            tx_p2p_put(txn, record)?;
+        for commit in commits {
+            tx_p2p_put(txn, commit)?;
         }
         Ok(())
     })
     .await
 }
 
-/// Insert a p2p record from within a write transaction.
+/// Insert a p2p commit from within a write transaction.
 pub fn p2p_put_single(txn: &mut Transaction<'_>, signed: &AgentInfoSigned) -> DatabaseResult<()> {
-    let record = P2pRecord::from_signed(signed)?;
-    tx_p2p_put(txn, record)
+    let commit = P2pCommit::from_signed(signed)?;
+    tx_p2p_put(txn, commit)
 }
 
-fn tx_p2p_put(txn: &mut Transaction, record: P2pRecord) -> DatabaseResult<()> {
+fn tx_p2p_put(txn: &mut Transaction, commit: P2pCommit) -> DatabaseResult<()> {
     txn.execute(
         sql_p2p_agent_store::INSERT,
         named_params! {
-            ":agent": &record.agent.0,
+            ":agent": &commit.agent.0,
 
-            ":encoded": &record.encoded,
+            ":encoded": &commit.encoded,
 
-            ":signed_at_ms": &record.signed_at_ms,
-            ":expires_at_ms": &record.expires_at_ms,
-            ":storage_center_loc": &record.storage_center_loc,
+            ":signed_at_ms": &commit.signed_at_ms,
+            ":expires_at_ms": &commit.expires_at_ms,
+            ":storage_center_loc": &commit.storage_center_loc,
 
-            ":is_active": &record.is_active,
+            ":is_active": &commit.is_active,
 
-            ":storage_start_loc": &record.storage_start_loc,
-            ":storage_end_loc": &record.storage_end_loc,
+            ":storage_start_loc": &commit.storage_start_loc,
+            ":storage_end_loc": &commit.storage_end_loc,
         },
     )?;
     Ok(())
 }
 
-/// Prune all expired AgentInfoSigned records from the p2p_store
+/// Prune all expired AgentInfoSigned commits from the p2p_store
 pub async fn p2p_prune(
     db: &DbWrite<DbKindP2pAgents>,
     local_agents: Vec<Arc<KitsuneAgent>>,
@@ -314,9 +314,9 @@ impl AsP2pStateTxExt for Transaction<'_> {
     }
 }
 
-/// Owned data dealing with a full p2p_agent_store record.
+/// Owned data dealing with a full p2p_agent_store commit.
 #[derive(Debug)]
-struct P2pRecord {
+struct P2pCommit {
     agent: Arc<KitsuneAgent>,
 
     // encoded binary
@@ -327,7 +327,7 @@ struct P2pRecord {
     expires_at_ms: i64,
     storage_center_loc: u32,
 
-    // is this record active?
+    // is this commit active?
     is_active: bool,
 
     // generated fields
@@ -344,7 +344,7 @@ pub fn clamp64(u: u64) -> i64 {
     }
 }
 
-impl P2pRecord {
+impl P2pCommit {
     pub fn from_signed(signed: &AgentInfoSigned) -> DatabaseResult<Self> {
         let agent = signed.agent.clone();
 

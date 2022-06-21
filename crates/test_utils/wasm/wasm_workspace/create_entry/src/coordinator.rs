@@ -47,12 +47,12 @@ fn delete_post(post_hash: ActionHash) -> ExternResult<ActionHash> {
 }
 
 #[hdk_extern]
-fn get_entry(_: ()) -> ExternResult<Option<Record>> {
+fn get_entry(_: ()) -> ExternResult<Option<Commit>> {
     get(hash_entry(&post())?, GetOptions::content())
 }
 
 #[hdk_extern]
-fn get_entry_twice(_: ()) -> ExternResult<Vec<Option<Record>>> {
+fn get_entry_twice(_: ()) -> ExternResult<Vec<Option<Commit>>> {
     HDK.with(|h| {
         h.borrow().get(vec![
             GetInput::new(
@@ -65,7 +65,7 @@ fn get_entry_twice(_: ()) -> ExternResult<Vec<Option<Record>>> {
 }
 
 #[hdk_extern]
-fn get_post(hash: ActionHash) -> ExternResult<Option<Record>> {
+fn get_post(hash: ActionHash) -> ExternResult<Option<Commit>> {
     get(hash, GetOptions::content())
 }
 
@@ -166,8 +166,8 @@ fn call_create_entry_remotely(agent: AgentPubKey) -> ExternResult<ActionHash> {
 }
 
 #[hdk_extern]
-fn must_get_valid_record(action_hash: ActionHash) -> ExternResult<Record> {
-    hdk::prelude::must_get_valid_record(action_hash)
+fn must_get_valid_commit(action_hash: ActionHash) -> ExternResult<Commit> {
+    hdk::prelude::must_get_valid_commit(action_hash)
 }
 
 /// Same as above but doesn't recurse on network errors.

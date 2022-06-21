@@ -26,7 +26,9 @@ fn create_countersigned(
     let entry = Entry::CounterSign(
         Box::new(
             CounterSigningSessionData::try_from_responses(responses, vec![]).map_err(
-                |countersigning_error| wasm_error!(WasmErrorInner::Guest(countersigning_error.to_string())),
+                |countersigning_error| {
+                    wasm_error!(WasmErrorInner::Guest(countersigning_error.to_string()))
+                },
             )?,
         ),
         thing.try_into()?,
@@ -106,8 +108,8 @@ fn must_get_entry(entry_hash: EntryHash) -> ExternResult<EntryHashed> {
 }
 
 #[hdk_extern]
-fn must_get_valid_record(action_hash: ActionHash) -> ExternResult<Record> {
-    hdk::prelude::must_get_valid_record(action_hash)
+fn must_get_valid_commit(action_hash: ActionHash) -> ExternResult<Commit> {
+    hdk::prelude::must_get_valid_commit(action_hash)
 }
 
 #[hdk_extern]

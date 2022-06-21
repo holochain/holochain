@@ -24,11 +24,11 @@ pub enum EntryTypes {
 #[hdk_extern]
 fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op {
-        Op::StoreRecord {
-            record:
-                Record {
+        Op::StoreCommit {
+            commit:
+                Commit {
                     signed_action,
-                    entry: RecordEntry::Present(entry),
+                    entry: CommitEntry::Present(entry),
                 },
         } => {
             match signed_action.action().entry_type().and_then(|et| match et {

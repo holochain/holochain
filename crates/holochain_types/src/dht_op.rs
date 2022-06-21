@@ -7,8 +7,8 @@
 use std::str::FromStr;
 
 use crate::action::NewEntryAction;
+use crate::commit::CommitGroup;
 use crate::prelude::*;
-use crate::record::RecordGroup;
 use error::DhtOpError;
 use error::DhtOpResult;
 use holo_hash::*;
@@ -35,17 +35,17 @@ pub mod facts;
 )]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum DhtOp {
-    #[display(fmt = "StoreRecord")]
+    #[display(fmt = "StoreCommit")]
     /// Used to notify the authority for an action that it has been created.
     ///
     /// Conceptually, authorities receiving this `DhtOp` do three things:
     ///
-    /// - Ensure that the record passes validation.
+    /// - Ensure that the commit passes validation.
     /// - Store the action into their DHT shard.
     /// - Store the entry into their CAS.
     ///   - Note: they do not become responsible for keeping the set of
     ///     references from that entry up-to-date.
-    StoreRecord(Signature, Action, Option<Box<Entry>>),
+    StoreCommit(Signature, Action, Option<Box<Entry>>),
 
     #[display(fmt = "StoreEntry")]
     /// Used to notify the authority for an entry that it has been created
@@ -53,7 +53,7 @@ pub enum DhtOp {
     ///
     /// Conceptually, authorities receiving this `DhtOp` do four things:
     ///
-    /// - Ensure that the record passes validation.
+    /// - Ensure that the commit passes validation.
     /// - Store the entry into their DHT shard.
     /// - Store the action into their CAS.
     ///   - Note: they do not become responsible for keeping the set of
@@ -88,10 +88,10 @@ pub enum DhtOp {
     // need to remove the Entry here or add it to link.
     RegisterUpdatedContent(Signature, action::Update, Option<Box<Entry>>),
 
-    #[display(fmt = "RegisterUpdatedRecord")]
-    /// Op for updating a record.
-    /// This is sent to the record authority.
-    RegisterUpdatedRecord(Signature, action::Update, Option<Box<Entry>>),
+    #[display(fmt = "RegisterUpdatedCommit")]
+    /// Op for updating a commit.
+    /// This is sent to the commit authority.
+    RegisterUpdatedCommit(Signature, action::Update, Option<Box<Entry>>),
 
     #[display(fmt = "RegisterDeletedBy")]
     /// Op for registering an action deletion with the Action authority
@@ -119,16 +119,16 @@ type DhtBasis = AnyDhtHash;
 #[allow(missing_docs)]
 #[derive(Clone, Debug, Serialize, Deserialize, derive_more::Display)]
 pub enum DhtOpLight {
-    #[display(fmt = "StoreRecord")]
-    StoreRecord(ActionHash, Option<EntryHash>, DhtBasis),
+    #[display(fmt = "StoreCommit")]
+    StoreCommit(ActionHash, Option<EntryHash>, DhtBasis),
     #[display(fmt = "StoreEntry")]
     StoreEntry(ActionHash, EntryHash, DhtBasis),
     #[display(fmt = "RegisterAgentActivity")]
     RegisterAgentActivity(ActionHash, DhtBasis),
     #[display(fmt = "RegisterUpdatedContent")]
     RegisterUpdatedContent(ActionHash, EntryHash, DhtBasis),
-    #[display(fmt = "RegisterUpdatedRecord")]
-    RegisterUpdatedRecord(ActionHash, EntryHash, DhtBasis),
+    #[display(fmt = "RegisterUpdatedCommit")]
+    RegisterUpdatedCommit(ActionHash, EntryHash, DhtBasis),
     #[display(fmt = "RegisterDeletedBy")]
     RegisterDeletedBy(ActionHash, DhtBasis),
     #[display(fmt = "RegisterDeletedEntryAction")]
@@ -172,16 +172,16 @@ impl std::hash::Hash for DhtOpLight {
     strum_macros::EnumString,
 )]
 pub enum DhtOpType {
-    #[display(fmt = "StoreRecord")]
-    StoreRecord,
+    #[display(fmt = "StoreCommit")]
+    StoreCommit,
     #[display(fmt = "StoreEntry")]
     StoreEntry,
     #[display(fmt = "RegisterAgentActivity")]
     RegisterAgentActivity,
     #[display(fmt = "RegisterUpdatedContent")]
     RegisterUpdatedContent,
-    #[display(fmt = "RegisterUpdatedRecord")]
-    RegisterUpdatedRecord,
+    #[display(fmt = "RegisterUpdatedCommit")]
+    RegisterUpdatedCommit,
     #[display(fmt = "RegisterDeletedBy")]
     RegisterDeletedBy,
     #[display(fmt = "RegisterDeletedEntryAction")]
@@ -216,13 +216,13 @@ impl FromSql for DhtOpType {
 impl DhtOp {
     fn as_unique_form(&self) -> UniqueForm<'_> {
         match self {
-            Self::StoreRecord(_, action, _) => UniqueForm::StoreRecord(action),
+            Self::StoreCommit(_, action, _) => UniqueForm::StoreCommit(action),
             Self::StoreEntry(_, action, _) => UniqueForm::StoreEntry(action),
             Self::RegisterAgentActivity(_, action) => UniqueForm::RegisterAgentActivity(action),
             Self::RegisterUpdatedContent(_, action, _) => {
                 UniqueForm::RegisterUpdatedContent(action)
             }
-            Self::RegisterUpdatedRecord(_, action, _) => UniqueForm::RegisterUpdatedRecord(action),
+            Self::RegisterUpdatedCommit(_, action, _) => UniqueForm::RegisterUpdatedCommit(action),
             Self::RegisterDeletedBy(_, action) => UniqueForm::RegisterDeletedBy(action),
             Self::RegisterDeletedEntryAction(_, action) => {
                 UniqueForm::RegisterDeletedEntryAction(action)
@@ -245,10 +245,10 @@ impl DhtOp {
     ) -> DhtOpLight {
         let basis = self.dht_basis();
         match self {
-            DhtOp::StoreRecord(_, h, _) => {
+            DhtOp::StoreCommit(_, h, _) => {
                 let e = h.entry_data().map(|(e, _)| e.clone());
                 let h = ActionHash::with_data_sync(h);
-                DhtOpLight::StoreRecord(h, e, basis)
+                DhtOpLight::StoreCommit(h, e, basis)
             }
             DhtOp::StoreEntry(_, h, _) => {
                 let e = h.entry().clone();
@@ -264,10 +264,10 @@ impl DhtOp {
                 let h = ActionHash::with_data_sync(&Action::from(h.clone()));
                 DhtOpLight::RegisterUpdatedContent(h, e, basis)
             }
-            DhtOp::RegisterUpdatedRecord(_, h, _) => {
+            DhtOp::RegisterUpdatedCommit(_, h, _) => {
                 let e = h.entry_hash.clone();
                 let h = ActionHash::with_data_sync(&Action::from(h.clone()));
-                DhtOpLight::RegisterUpdatedRecord(h, e, basis)
+                DhtOpLight::RegisterUpdatedCommit(h, e, basis)
             }
             DhtOp::RegisterDeletedBy(_, h) => {
                 let h = ActionHash::with_data_sync(&Action::from(h.clone()));
@@ -291,11 +291,11 @@ impl DhtOp {
     /// Get the signature for this op
     pub fn signature(&self) -> &Signature {
         match self {
-            DhtOp::StoreRecord(s, _, _)
+            DhtOp::StoreCommit(s, _, _)
             | DhtOp::StoreEntry(s, _, _)
             | DhtOp::RegisterAgentActivity(s, _)
             | DhtOp::RegisterUpdatedContent(s, _, _)
-            | DhtOp::RegisterUpdatedRecord(s, _, _)
+            | DhtOp::RegisterUpdatedCommit(s, _, _)
             | DhtOp::RegisterDeletedBy(s, _)
             | DhtOp::RegisterDeletedEntryAction(s, _)
             | DhtOp::RegisterAddLink(s, _)
@@ -306,11 +306,11 @@ impl DhtOp {
     /// Extract inner Signature, Action and Option<Entry> from an op
     pub fn into_inner(self) -> (Signature, Action, Option<Entry>) {
         match self {
-            DhtOp::StoreRecord(s, h, e) => (s, h, e.map(|e| *e)),
+            DhtOp::StoreCommit(s, h, e) => (s, h, e.map(|e| *e)),
             DhtOp::StoreEntry(s, h, e) => (s, h.into(), Some(*e)),
             DhtOp::RegisterAgentActivity(s, h) => (s, h, None),
             DhtOp::RegisterUpdatedContent(s, h, e) => (s, h.into(), e.map(|e| *e)),
-            DhtOp::RegisterUpdatedRecord(s, h, e) => (s, h.into(), e.map(|e| *e)),
+            DhtOp::RegisterUpdatedCommit(s, h, e) => (s, h.into(), e.map(|e| *e)),
             DhtOp::RegisterDeletedBy(s, h) => (s, h.into(), None),
             DhtOp::RegisterDeletedEntryAction(s, h) => (s, h.into(), None),
             DhtOp::RegisterAddLink(s, h) => (s, h.into(), None),
@@ -323,11 +323,11 @@ impl DhtOp {
     /// as some ops don't hold the Action type
     pub fn action(&self) -> Action {
         match self {
-            DhtOp::StoreRecord(_, h, _) => h.clone(),
+            DhtOp::StoreCommit(_, h, _) => h.clone(),
             DhtOp::StoreEntry(_, h, _) => h.clone().into(),
             DhtOp::RegisterAgentActivity(_, h) => h.clone(),
             DhtOp::RegisterUpdatedContent(_, h, _) => h.clone().into(),
-            DhtOp::RegisterUpdatedRecord(_, h, _) => h.clone().into(),
+            DhtOp::RegisterUpdatedCommit(_, h, _) => h.clone().into(),
             DhtOp::RegisterDeletedBy(_, h) => h.clone().into(),
             DhtOp::RegisterDeletedEntryAction(_, h) => h.clone().into(),
             DhtOp::RegisterAddLink(_, h) => h.clone().into(),
@@ -338,10 +338,10 @@ impl DhtOp {
     /// Get the entry from this op, if one exists
     pub fn entry(&self) -> Option<&Entry> {
         match self {
-            DhtOp::StoreRecord(_, _, e) => e.as_ref().map(|b| &**b),
+            DhtOp::StoreCommit(_, _, e) => e.as_ref().map(|b| &**b),
             DhtOp::StoreEntry(_, _, e) => Some(&*e),
             DhtOp::RegisterUpdatedContent(_, _, e) => e.as_ref().map(|b| &**b),
-            DhtOp::RegisterUpdatedRecord(_, _, e) => e.as_ref().map(|b| &**b),
+            DhtOp::RegisterUpdatedCommit(_, _, e) => e.as_ref().map(|b| &**b),
             DhtOp::RegisterAgentActivity(_, _) => None,
             DhtOp::RegisterDeletedBy(_, _) => None,
             DhtOp::RegisterDeletedEntryAction(_, _) => None,
@@ -353,10 +353,10 @@ impl DhtOp {
     /// Get the type as a unit enum, for Display purposes
     pub fn get_type(&self) -> DhtOpType {
         match self {
-            DhtOp::StoreRecord(_, _, _) => DhtOpType::StoreRecord,
+            DhtOp::StoreCommit(_, _, _) => DhtOpType::StoreCommit,
             DhtOp::StoreEntry(_, _, _) => DhtOpType::StoreEntry,
             DhtOp::RegisterUpdatedContent(_, _, _) => DhtOpType::RegisterUpdatedContent,
-            DhtOp::RegisterUpdatedRecord(_, _, _) => DhtOpType::RegisterUpdatedRecord,
+            DhtOp::RegisterUpdatedCommit(_, _, _) => DhtOpType::RegisterUpdatedCommit,
             DhtOp::RegisterAgentActivity(_, _) => DhtOpType::RegisterAgentActivity,
             DhtOp::RegisterDeletedBy(_, _) => DhtOpType::RegisterDeletedBy,
             DhtOp::RegisterDeletedEntryAction(_, _) => DhtOpType::RegisterDeletedEntryAction,
@@ -373,7 +373,7 @@ impl DhtOp {
     ) -> DhtOpResult<Self> {
         let SignedAction(action, signature) = action;
         let r = match op_type {
-            DhtOpType::StoreRecord => DhtOp::StoreRecord(signature, action, entry.map(Box::new)),
+            DhtOpType::StoreCommit => DhtOp::StoreCommit(signature, action, entry.map(Box::new)),
             DhtOpType::StoreEntry => {
                 let entry = entry.ok_or_else(|| DhtOpError::ActionWithoutEntry(action.clone()))?;
                 let action = match action {
@@ -387,8 +387,8 @@ impl DhtOp {
             DhtOpType::RegisterUpdatedContent => {
                 DhtOp::RegisterUpdatedContent(signature, action.try_into()?, entry.map(Box::new))
             }
-            DhtOpType::RegisterUpdatedRecord => {
-                DhtOp::RegisterUpdatedRecord(signature, action.try_into()?, entry.map(Box::new))
+            DhtOpType::RegisterUpdatedCommit => {
+                DhtOp::RegisterUpdatedCommit(signature, action.try_into()?, entry.map(Box::new))
             }
             DhtOpType::RegisterDeletedBy => DhtOp::RegisterDeletedBy(signature, action.try_into()?),
             DhtOpType::RegisterDeletedEntryAction => {
@@ -407,11 +407,11 @@ impl DhtOpLight {
     /// Get the dht basis for where to send this op
     pub fn dht_basis(&self) -> &AnyDhtHash {
         match self {
-            DhtOpLight::StoreRecord(_, _, b)
+            DhtOpLight::StoreCommit(_, _, b)
             | DhtOpLight::StoreEntry(_, _, b)
             | DhtOpLight::RegisterAgentActivity(_, b)
             | DhtOpLight::RegisterUpdatedContent(_, _, b)
-            | DhtOpLight::RegisterUpdatedRecord(_, _, b)
+            | DhtOpLight::RegisterUpdatedCommit(_, _, b)
             | DhtOpLight::RegisterDeletedBy(_, b)
             | DhtOpLight::RegisterDeletedEntryAction(_, b)
             | DhtOpLight::RegisterAddLink(_, b)
@@ -421,11 +421,11 @@ impl DhtOpLight {
     /// Get the action hash from this op
     pub fn action_hash(&self) -> &ActionHash {
         match self {
-            DhtOpLight::StoreRecord(h, _, _)
+            DhtOpLight::StoreCommit(h, _, _)
             | DhtOpLight::StoreEntry(h, _, _)
             | DhtOpLight::RegisterAgentActivity(h, _)
             | DhtOpLight::RegisterUpdatedContent(h, _, _)
-            | DhtOpLight::RegisterUpdatedRecord(h, _, _)
+            | DhtOpLight::RegisterUpdatedCommit(h, _, _)
             | DhtOpLight::RegisterDeletedBy(h, _)
             | DhtOpLight::RegisterDeletedEntryAction(h, _)
             | DhtOpLight::RegisterAddLink(h, _)
@@ -436,10 +436,10 @@ impl DhtOpLight {
     /// Get the type as a unit enum, for Display purposes
     pub fn get_type(&self) -> DhtOpType {
         match self {
-            DhtOpLight::StoreRecord(_, _, _) => DhtOpType::StoreRecord,
+            DhtOpLight::StoreCommit(_, _, _) => DhtOpType::StoreCommit,
             DhtOpLight::StoreEntry(_, _, _) => DhtOpType::StoreEntry,
             DhtOpLight::RegisterUpdatedContent(_, _, _) => DhtOpType::RegisterUpdatedContent,
-            DhtOpLight::RegisterUpdatedRecord(_, _, _) => DhtOpType::RegisterUpdatedRecord,
+            DhtOpLight::RegisterUpdatedCommit(_, _, _) => DhtOpType::RegisterUpdatedCommit,
             DhtOpLight::RegisterAgentActivity(_, _) => DhtOpType::RegisterAgentActivity,
             DhtOpLight::RegisterDeletedBy(_, _) => DhtOpType::RegisterDeletedBy,
             DhtOpLight::RegisterDeletedEntryAction(_, _) => DhtOpType::RegisterDeletedEntryAction,
@@ -455,9 +455,9 @@ impl DhtOpLight {
         action: &Action,
     ) -> DhtOpResult<Self> {
         let op = match op_type {
-            DhtOpType::StoreRecord => {
+            DhtOpType::StoreCommit => {
                 let entry_hash = action.entry_hash().cloned();
-                Self::StoreRecord(action_hash.clone(), entry_hash, action_hash.into())
+                Self::StoreCommit(action_hash.clone(), entry_hash, action_hash.into())
             }
             DhtOpType::StoreEntry => {
                 let entry_hash = action
@@ -480,7 +480,7 @@ impl DhtOpLight {
                 };
                 Self::RegisterUpdatedContent(action_hash, entry_hash, basis.into())
             }
-            DhtOpType::RegisterUpdatedRecord => {
+            DhtOpType::RegisterUpdatedCommit => {
                 let entry_hash = action
                     .entry_hash()
                     .cloned()
@@ -489,7 +489,7 @@ impl DhtOpLight {
                     Action::Update(update) => update.original_entry_address.clone(),
                     _ => return Err(DhtOpError::OpActionMismatch(op_type, action.action_type())),
                 };
-                Self::RegisterUpdatedRecord(action_hash, entry_hash, basis.into())
+                Self::RegisterUpdatedCommit(action_hash, entry_hash, basis.into())
             }
             DhtOpType::RegisterDeletedBy => {
                 let basis = match action {
@@ -529,11 +529,11 @@ impl DhtOpLight {
 pub enum UniqueForm<'a> {
     // As an optimization, we don't include signatures. They would be redundant
     // with actions and therefore would waste hash/comparison time to include.
-    StoreRecord(&'a Action),
+    StoreCommit(&'a Action),
     StoreEntry(&'a NewEntryAction),
     RegisterAgentActivity(&'a Action),
     RegisterUpdatedContent(&'a action::Update),
-    RegisterUpdatedRecord(&'a action::Update),
+    RegisterUpdatedCommit(&'a action::Update),
     RegisterDeletedBy(&'a action::Delete),
     RegisterDeletedEntryAction(&'a action::Delete),
     RegisterAddLink(&'a action::CreateLink),
@@ -543,13 +543,13 @@ pub enum UniqueForm<'a> {
 impl<'a> UniqueForm<'a> {
     fn basis(&'a self) -> AnyDhtHash {
         match self {
-            UniqueForm::StoreRecord(action) => ActionHash::with_data_sync(*action).into(),
+            UniqueForm::StoreCommit(action) => ActionHash::with_data_sync(*action).into(),
             UniqueForm::StoreEntry(action) => action.entry().clone().into(),
             UniqueForm::RegisterAgentActivity(action) => action.author().clone().into(),
             UniqueForm::RegisterUpdatedContent(action) => {
                 action.original_entry_address.clone().into()
             }
-            UniqueForm::RegisterUpdatedRecord(action) => {
+            UniqueForm::RegisterUpdatedCommit(action) => {
                 action.original_action_address.clone().into()
             }
             UniqueForm::RegisterDeletedBy(action) => action.deletes_address.clone().into(),
@@ -564,8 +564,8 @@ impl<'a> UniqueForm<'a> {
     /// Get the dht op hash without cloning the action.
     pub fn op_hash(op_type: DhtOpType, action: Action) -> DhtOpResult<(Action, DhtOpHash)> {
         match op_type {
-            DhtOpType::StoreRecord => {
-                let hash = DhtOpHash::with_data_sync(&UniqueForm::StoreRecord(&action));
+            DhtOpType::StoreCommit => {
+                let hash = DhtOpHash::with_data_sync(&UniqueForm::StoreCommit(&action));
                 Ok((action, hash))
             }
             DhtOpType::StoreEntry => {
@@ -582,9 +582,9 @@ impl<'a> UniqueForm<'a> {
                 let hash = DhtOpHash::with_data_sync(&UniqueForm::RegisterUpdatedContent(&action));
                 Ok((action.into(), hash))
             }
-            DhtOpType::RegisterUpdatedRecord => {
+            DhtOpType::RegisterUpdatedCommit => {
                 let action = action.try_into()?;
-                let hash = DhtOpHash::with_data_sync(&UniqueForm::RegisterUpdatedRecord(&action));
+                let hash = DhtOpHash::with_data_sync(&UniqueForm::RegisterUpdatedCommit(&action));
                 Ok((action.into(), hash))
             }
             DhtOpType::RegisterDeletedBy => {
@@ -612,10 +612,10 @@ impl<'a> UniqueForm<'a> {
     }
 }
 
-/// Produce all DhtOps for a Record
-pub fn produce_ops_from_record(record: &Record) -> DhtOpResult<Vec<DhtOp>> {
-    let op_lights = produce_op_lights_from_records(vec![record])?;
-    let (shh, maybe_entry) = record.clone().into_inner();
+/// Produce all DhtOps for a Commit
+pub fn produce_ops_from_commit(commit: &Commit) -> DhtOpResult<Vec<DhtOp>> {
+    let op_lights = produce_op_lights_from_commits(vec![commit])?;
+    let (shh, maybe_entry) = commit.clone().into_inner();
     let SignedActionHashed {
         hashed: ActionHashed {
             content: action, ..
@@ -629,9 +629,9 @@ pub fn produce_ops_from_record(record: &Record) -> DhtOpResult<Vec<DhtOp>> {
         let signature = signature.clone();
         let action = action.clone();
         let op = match op_light {
-            DhtOpLight::StoreRecord(_, _, _) => {
+            DhtOpLight::StoreCommit(_, _, _) => {
                 let maybe_entry_box = maybe_entry.clone().into_option().map(Box::new);
-                DhtOp::StoreRecord(signature, action, maybe_entry_box)
+                DhtOp::StoreCommit(signature, action, maybe_entry_box)
             }
             DhtOpLight::StoreEntry(_, _, _) => {
                 let new_entry_action = action.clone().try_into()?;
@@ -652,18 +652,18 @@ pub fn produce_ops_from_record(record: &Record) -> DhtOpResult<Vec<DhtOp>> {
                 let maybe_entry_box = maybe_entry.clone().into_option().map(Box::new);
                 DhtOp::RegisterUpdatedContent(signature, entry_update, maybe_entry_box)
             }
-            DhtOpLight::RegisterUpdatedRecord(_, _, _) => {
+            DhtOpLight::RegisterUpdatedCommit(_, _, _) => {
                 let entry_update = action.try_into()?;
                 let maybe_entry_box = maybe_entry.clone().into_option().map(Box::new);
-                DhtOp::RegisterUpdatedRecord(signature, entry_update, maybe_entry_box)
+                DhtOp::RegisterUpdatedCommit(signature, entry_update, maybe_entry_box)
             }
             DhtOpLight::RegisterDeletedEntryAction(_, _) => {
-                let record_delete = action.try_into()?;
-                DhtOp::RegisterDeletedEntryAction(signature, record_delete)
+                let commit_delete = action.try_into()?;
+                DhtOp::RegisterDeletedEntryAction(signature, commit_delete)
             }
             DhtOpLight::RegisterDeletedBy(_, _) => {
-                let record_delete = action.try_into()?;
-                DhtOp::RegisterDeletedBy(signature, record_delete)
+                let commit_delete = action.try_into()?;
+                DhtOp::RegisterDeletedBy(signature, commit_delete)
             }
             DhtOpLight::RegisterAddLink(_, _) => {
                 let link_add = action.try_into()?;
@@ -679,8 +679,8 @@ pub fn produce_ops_from_record(record: &Record) -> DhtOpResult<Vec<DhtOp>> {
     Ok(ops)
 }
 
-/// Produce all the op lights for tese records
-pub fn produce_op_lights_from_records(actions: Vec<&Record>) -> DhtOpResult<Vec<DhtOpLight>> {
+/// Produce all the op lights for tese commits
+pub fn produce_op_lights_from_commits(actions: Vec<&Commit>) -> DhtOpResult<Vec<DhtOpLight>> {
     let actions_and_hashes = actions.into_iter().map(|e| {
         (
             e.action_address(),
@@ -691,17 +691,17 @@ pub fn produce_op_lights_from_records(actions: Vec<&Record>) -> DhtOpResult<Vec<
     produce_op_lights_from_iter(actions_and_hashes)
 }
 
-/// Produce all the op lights from this record group
+/// Produce all the op lights from this commit group
 /// with a shared entry
-pub fn produce_op_lights_from_record_group(
-    records: &RecordGroup<'_>,
+pub fn produce_op_lights_from_commit_group(
+    commits: &CommitGroup<'_>,
 ) -> DhtOpResult<Vec<DhtOpLight>> {
-    let actions_and_hashes = records.actions_and_hashes();
-    let maybe_entry_hash = Some(records.entry_hash());
+    let actions_and_hashes = commits.actions_and_hashes();
+    let maybe_entry_hash = Some(commits.entry_hash());
     produce_op_lights_from_parts(actions_and_hashes, maybe_entry_hash)
 }
 
-/// Data minimal clone (no cloning entries) cheap &Record to DhtOpLight conversion
+/// Data minimal clone (no cloning entries) cheap &Commit to DhtOpLight conversion
 fn produce_op_lights_from_parts<'a>(
     actions_and_hashes: impl Iterator<Item = (&'a ActionHash, &'a Action)>,
     maybe_entry_hash: Option<&EntryHash>,
@@ -721,12 +721,12 @@ pub fn produce_op_lights_from_iter<'a>(
             .into_iter()
             .filter_map(|op_type| {
                 let op_light = match (op_type, action) {
-                    (DhtOpType::StoreRecord, _) => {
-                        let store_record_basis = UniqueForm::StoreRecord(action).basis();
-                        DhtOpLight::StoreRecord(
+                    (DhtOpType::StoreCommit, _) => {
+                        let store_commit_basis = UniqueForm::StoreCommit(action).basis();
+                        DhtOpLight::StoreCommit(
                             action_hash.clone(),
                             maybe_entry_hash.clone(),
-                            store_record_basis,
+                            store_commit_basis,
                         )
                     }
                     (DhtOpType::RegisterAgentActivity, _) => {
@@ -754,11 +754,11 @@ pub fn produce_op_lights_from_iter<'a>(
                             UniqueForm::RegisterUpdatedContent(update).basis(),
                         )
                     }
-                    (DhtOpType::RegisterUpdatedRecord, Action::Update(update)) => {
-                        DhtOpLight::RegisterUpdatedRecord(
+                    (DhtOpType::RegisterUpdatedCommit, Action::Update(update)) => {
+                        DhtOpLight::RegisterUpdatedCommit(
                             action_hash.clone(),
                             maybe_entry_hash.clone()?,
-                            UniqueForm::RegisterUpdatedRecord(update).basis(),
+                            UniqueForm::RegisterUpdatedCommit(update).basis(),
                         )
                     }
                     (DhtOpType::RegisterDeletedBy, Action::Delete(delete)) => {
@@ -802,33 +802,33 @@ pub fn action_to_op_types(action: &Action) -> Vec<DhtOpType> {
         | Action::CloseChain(_)
         | Action::AgentValidationPkg(_)
         | Action::InitZomesComplete(_) => {
-            vec![DhtOpType::StoreRecord, DhtOpType::RegisterAgentActivity]
+            vec![DhtOpType::StoreCommit, DhtOpType::RegisterAgentActivity]
         }
         Action::CreateLink(_) => vec![
-            DhtOpType::StoreRecord,
+            DhtOpType::StoreCommit,
             DhtOpType::RegisterAgentActivity,
             DhtOpType::RegisterAddLink,
         ],
 
         Action::DeleteLink(_) => vec![
-            DhtOpType::StoreRecord,
+            DhtOpType::StoreCommit,
             DhtOpType::RegisterAgentActivity,
             DhtOpType::RegisterRemoveLink,
         ],
         Action::Create(_) => vec![
-            DhtOpType::StoreRecord,
+            DhtOpType::StoreCommit,
             DhtOpType::RegisterAgentActivity,
             DhtOpType::StoreEntry,
         ],
         Action::Update(_) => vec![
-            DhtOpType::StoreRecord,
+            DhtOpType::StoreCommit,
             DhtOpType::RegisterAgentActivity,
             DhtOpType::StoreEntry,
             DhtOpType::RegisterUpdatedContent,
-            DhtOpType::RegisterUpdatedRecord,
+            DhtOpType::RegisterUpdatedCommit,
         ],
         Action::Delete(_) => vec![
-            DhtOpType::StoreRecord,
+            DhtOpType::StoreCommit,
             DhtOpType::RegisterAgentActivity,
             DhtOpType::RegisterDeletedBy,
             DhtOpType::RegisterDeletedEntryAction,
@@ -890,8 +890,8 @@ impl HashableContent for UniqueForm<'_> {
 pub enum WireOps {
     /// Response for get entry.
     Entry(WireEntryOps),
-    /// Response for get record.
-    Record(WireRecordOps),
+    /// Response for get commit.
+    Commit(WireCommitOps),
 }
 
 impl WireOps {
@@ -899,7 +899,7 @@ impl WireOps {
     pub fn render(self) -> DhtOpResult<RenderedOps> {
         match self {
             WireOps::Entry(o) => o.render(),
-            WireOps::Record(o) => o.render(),
+            WireOps::Commit(o) => o.render(),
         }
     }
 }
@@ -960,9 +960,9 @@ pub struct RenderedOps {
 pub enum OpNumericalOrder {
     RegisterAgentActivity = 0,
     StoreEntry,
-    StoreRecord,
+    StoreCommit,
     RegisterUpdatedContent,
-    RegisterUpdatedRecord,
+    RegisterUpdatedCommit,
     RegisterDeletedBy,
     RegisterDeletedEntryAction,
     RegisterAddLink,
@@ -994,11 +994,11 @@ impl OpOrder {
     /// Create a new ordering from a op type and timestamp.
     pub fn new(op_type: DhtOpType, timestamp: holochain_zome_types::timestamp::Timestamp) -> Self {
         let order = match op_type {
-            DhtOpType::StoreRecord => OpNumericalOrder::StoreRecord,
+            DhtOpType::StoreCommit => OpNumericalOrder::StoreCommit,
             DhtOpType::StoreEntry => OpNumericalOrder::StoreEntry,
             DhtOpType::RegisterAgentActivity => OpNumericalOrder::RegisterAgentActivity,
             DhtOpType::RegisterUpdatedContent => OpNumericalOrder::RegisterUpdatedContent,
-            DhtOpType::RegisterUpdatedRecord => OpNumericalOrder::RegisterUpdatedRecord,
+            DhtOpType::RegisterUpdatedCommit => OpNumericalOrder::RegisterUpdatedCommit,
             DhtOpType::RegisterDeletedBy => OpNumericalOrder::RegisterDeletedBy,
             DhtOpType::RegisterDeletedEntryAction => OpNumericalOrder::RegisterDeletedEntryAction,
             DhtOpType::RegisterAddLink => OpNumericalOrder::RegisterAddLink,

@@ -170,7 +170,7 @@ async fn get_entry() {
         td.query.clone(),
     );
     // - There should be no live actions so resolving
-    // returns no record.
+    // returns no commit.
     assert!(r.is_none());
 }
 
@@ -275,7 +275,7 @@ fn get_entry_query<'a, 'b: 'a>(
     txns: &[&'a Transaction<'b>],
     scratch: Option<&Scratch>,
     query: GetLiveEntryQuery,
-) -> Option<Record> {
+) -> Option<Commit> {
     match scratch {
         Some(scratch) => {
             let stores = DbScratch::new(txns, scratch);

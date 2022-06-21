@@ -28,10 +28,10 @@ pub trait HdiT: Send + Sync {
         &self,
         must_get_action_input: MustGetActionInput,
     ) -> ExternResult<SignedActionHashed>;
-    fn must_get_valid_record(
+    fn must_get_valid_commit(
         &self,
-        must_get_valid_record_input: MustGetValidRecordInput,
-    ) -> ExternResult<Record>;
+        must_get_valid_commit_input: MustGetValidCommitInput,
+    ) -> ExternResult<Commit>;
     // Info
     fn dna_info(&self, dna_info_input: ()) -> ExternResult<DnaInfo>;
     fn zome_info(&self, zome_info_input: ()) -> ExternResult<ZomeInfo>;
@@ -74,7 +74,7 @@ impl HdiT for ErrHdi {
     fn must_get_action(&self, _: MustGetActionInput) -> ExternResult<SignedActionHashed> {
         Self::err()
     }
-    fn must_get_valid_record(&self, _: MustGetValidRecordInput) -> ExternResult<Record> {
+    fn must_get_valid_commit(&self, _: MustGetValidCommitInput) -> ExternResult<Commit> {
         Self::err()
     }
     fn dna_info(&self, _: ()) -> ExternResult<DnaInfo> {
@@ -134,13 +134,13 @@ impl HdiT for HostHdi {
             must_get_action_input,
         )
     }
-    fn must_get_valid_record(
+    fn must_get_valid_commit(
         &self,
-        must_get_valid_record_input: MustGetValidRecordInput,
-    ) -> ExternResult<Record> {
-        host_call::<MustGetValidRecordInput, Record>(
-            __must_get_valid_record,
-            must_get_valid_record_input,
+        must_get_valid_commit_input: MustGetValidCommitInput,
+    ) -> ExternResult<Commit> {
+        host_call::<MustGetValidCommitInput, Commit>(
+            __must_get_valid_commit,
+            must_get_valid_commit_input,
         )
     }
     fn dna_info(&self, _: ()) -> ExternResult<DnaInfo> {

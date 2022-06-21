@@ -8,14 +8,14 @@ pub mod examples;
 
 /// MUST get an EntryHashed at a given EntryHash.
 ///
-/// The EntryHashed is NOT guaranteed to be associated with a valid (or even validated) Action/Record.
-/// For example, an invalid Record could be published and `must_get_entry` would return the EntryHashed.
+/// The EntryHashed is NOT guaranteed to be associated with a valid (or even validated) Action/Commit.
+/// For example, an invalid Commit could be published and `must_get_entry` would return the EntryHashed.
 ///
 /// This may be useful during validation callbacks where the validity and relevance of some content can be
-/// asserted by the CURRENT validation callback independent of a Record. This behaviour avoids the potential for
+/// asserted by the CURRENT validation callback independent of a Commit. This behaviour avoids the potential for
 /// eclipse attacks to lie about the validity of some data and cause problems for a hApp.
 /// If you NEED to know that a dependency is valid in order for the current validation logic
-/// (e.g. inductive validation of a tree) then `must_get_valid_record` is likely what you need.
+/// (e.g. inductive validation of a tree) then `must_get_valid_commit` is likely what you need.
 ///
 /// `must_get_entry` is available in contexts such as validation where both determinism and network access is desirable.
 ///
@@ -38,7 +38,7 @@ pub fn must_get_entry(entry_hash: EntryHash) -> ExternResult<EntryHashed> {
 
 /// MUST get a SignedActionHashed at a given ActionHash.
 ///
-/// The SignedActionHashed is NOT guaranteed to be a valid (or even validated) Record.
+/// The SignedActionHashed is NOT guaranteed to be a valid (or even validated) Commit.
 /// For example, an invalid Action could be published and `must_get_action` would return the `SignedActionHashed`.
 ///
 /// This may be useful during validation callbacks where the validity depends on an action existing regardless of its associated Entry.
@@ -63,34 +63,34 @@ pub fn must_get_action(action_hash: ActionHash) -> ExternResult<SignedActionHash
     })
 }
 
-/// MUST get a VALID Record at a given ActionHash.
+/// MUST get a VALID Commit at a given ActionHash.
 ///
-/// The Record is guaranteed to be valid.
-/// More accurately the Record is guarantee to be consistently reported as valid by the visible network.
+/// The Commit is guaranteed to be valid.
+/// More accurately the Commit is guarantee to be consistently reported as valid by the visible network.
 ///
 /// The validity requirement makes this more complex but notably enables inductive validation of arbitrary graph structures.
-/// For example "If this Record is valid, and its parent is valid, up to the root, then the whole tree of Records is valid".
+/// For example "If this Commit is valid, and its parent is valid, up to the root, then the whole tree of Commits is valid".
 ///
-/// If at least one authority (1 of N trust) claims the Record is invalid then a conflict resolution/warranting round will be triggered.
+/// If at least one authority (1 of N trust) claims the Commit is invalid then a conflict resolution/warranting round will be triggered.
 ///
-/// In the case of a total eclipse (every visible authority is lying) then we cannot immediately detect an invalid Record.
+/// In the case of a total eclipse (every visible authority is lying) then we cannot immediately detect an invalid Commit.
 /// Unlike `must_get_entry` and `must_get_action` we cannot simply inspect the cryptographic integrity to know this.
 ///
-/// In theory we can run validation of the returned Record ourselves, which itself may be based on `must_get_X` calls.
-/// If there is a large nested graph of `must_get_valid_record` calls this could be extremely heavy.
+/// In theory we can run validation of the returned Commit ourselves, which itself may be based on `must_get_X` calls.
+/// If there is a large nested graph of `must_get_valid_commit` calls this could be extremely heavy.
 /// Note though that each "hop" in recursive validation is routed to a completely different set of authorities.
-/// It does not take many hops to reach the point where an attacker needs to eclipse the entire network to lie about Record validity.
+/// It does not take many hops to reach the point where an attacker needs to eclipse the entire network to lie about Commit validity.
 ///
-/// @TODO We keep signed receipts from authorities serving up "valid records".
-/// - If we ever discover a record we were told is valid is invalid we can retroactively look to warrant authorities
-/// - We can async (e.g. in a background task) be recursively validating Record dependencies ourselves, following hops until there is no room for lies
+/// @TODO We keep signed receipts from authorities serving up "valid commits".
+/// - If we ever discover a commit we were told is valid is invalid we can retroactively look to warrant authorities
+/// - We can async (e.g. in a background task) be recursively validating Commit dependencies ourselves, following hops until there is no room for lies
 /// - We can with small probability recursively validate to several hops inline to discourage potential eclipse attacks with a credible immediate threat
 ///
 /// If you do not care about validity and simply want a pair of Action+Entry data, then use both `must_get_action` and `must_get_entry` together.
 ///
-/// `must_get_valid_record` is available in contexts such as validation where both determinism and network access is desirable.
+/// `must_get_valid_commit` is available in contexts such as validation where both determinism and network access is desirable.
 ///
-/// An `Record` will not be returned if:
+/// An `Commit` will not be returned if:
 ///
 /// - @TODO It is WITHDRAWN by the author
 /// - @TODO The Entry is PURGED by the community
@@ -98,14 +98,14 @@ pub fn must_get_action(action_hash: ActionHash) -> ExternResult<SignedActionHash
 /// - If ANY authority (1 of N trust) OR ourselves (0 of N trust) believes it INVALID
 /// - Nobody knows about it on the visible network
 ///
-/// If an `Record` fails to be returned:
+/// If an `Commit` fails to be returned:
 ///
 /// - Callbacks will return early with `UnresolvedDependencies`
 /// - Zome calls will receive a `WasmError` from the host
-pub fn must_get_valid_record(action_hash: ActionHash) -> ExternResult<Record> {
+pub fn must_get_valid_commit(action_hash: ActionHash) -> ExternResult<Commit> {
     HDI.with(|h| {
         h.borrow()
-            .must_get_valid_record(MustGetValidRecordInput::new(action_hash))
+            .must_get_valid_commit(MustGetValidCommitInput::new(action_hash))
     })
 }
 
@@ -168,23 +168,23 @@ macro_rules! app_entry {
             }
         }
 
-        impl TryFrom<&$crate::prelude::Record> for $t {
+        impl TryFrom<&$crate::prelude::Commit> for $t {
             type Error = $crate::prelude::WasmError;
-            fn try_from(record: &$crate::prelude::Record) -> Result<Self, Self::Error> {
-                Ok(match &record.entry {
-                    RecordEntry::Present(entry) => Self::try_from(entry)?,
+            fn try_from(commit: &$crate::prelude::Commit) -> Result<Self, Self::Error> {
+                Ok(match &commit.entry {
+                    CommitEntry::Present(entry) => Self::try_from(entry)?,
                     _ => return Err(
                         $crate::prelude::wasm_error!(
-                        $crate::prelude::WasmErrorInner::Guest(format!("Tried to deserialize a record, expecting it to contain entry data, but there was none. Record ActionHash: {}", record.signed_action.hashed.hash))),
+                        $crate::prelude::WasmErrorInner::Guest(format!("Tried to deserialize a commit, expecting it to contain entry data, but there was none. Commit ActionHash: {}", commit.signed_action.hashed.hash))),
                     )
                 })
             }
         }
 
-        impl TryFrom<$crate::prelude::Record> for $t {
+        impl TryFrom<$crate::prelude::Commit> for $t {
             type Error = $crate::prelude::WasmError;
-            fn try_from(record: $crate::prelude::Record) -> Result<Self, Self::Error> {
-                (&record).try_into()
+            fn try_from(commit: $crate::prelude::Commit) -> Result<Self, Self::Error> {
+                (&commit).try_into()
             }
         }
 

@@ -10,12 +10,12 @@ use holochain_zome_types::fixt::*;
 use holochain_zome_types::Action;
 use holochain_zome_types::ActionHashed;
 use holochain_zome_types::AppEntryBytes;
+use holochain_zome_types::Commit;
 use holochain_zome_types::Create;
 use holochain_zome_types::Entry;
 use holochain_zome_types::EntryType;
 use holochain_zome_types::EntryVisibility;
 use holochain_zome_types::Judged;
-use holochain_zome_types::Record;
 use holochain_zome_types::SignedAction;
 use holochain_zome_types::SignedActionHashed;
 use holochain_zome_types::Update;
@@ -23,27 +23,27 @@ use std::convert::TryInto;
 
 use fixt::prelude::*;
 #[derive(Debug)]
-pub struct RecordTestData {
-    pub store_record_op: DhtOpHashed,
+pub struct CommitTestData {
+    pub store_commit_op: DhtOpHashed,
     pub wire_create: Judged<SignedAction>,
     pub create_hash: ActionHash,
     pub deleted_by_op: DhtOpHashed,
     pub wire_delete: Judged<WireDelete>,
     pub delete_hash: ActionHash,
-    pub update_record_op: DhtOpHashed,
+    pub update_commit_op: DhtOpHashed,
     pub wire_update: Judged<WireUpdateRelationship>,
     pub update_hash: ActionHash,
     pub hash: EntryHash,
     pub entry: Entry,
-    pub any_store_record_op: DhtOpHashed,
+    pub any_store_commit_op: DhtOpHashed,
     pub any_action: Judged<SignedAction>,
     pub any_action_hash: ActionHash,
     pub any_entry: Option<Entry>,
     pub any_entry_hash: Option<EntryHash>,
-    pub any_record: Record,
+    pub any_commit: Commit,
 }
 
-impl RecordTestData {
+impl CommitTestData {
     pub fn create() -> Self {
         let mut create = fixt!(Create);
         let mut update = fixt!(Update);
@@ -81,7 +81,7 @@ impl RecordTestData {
         let update_hash = ActionHash::with_data_sync(&update_action);
 
         let signature = fixt!(Signature);
-        let store_record_op = DhtOpHashed::from_content_sync(DhtOp::StoreRecord(
+        let store_commit_op = DhtOpHashed::from_content_sync(DhtOp::StoreCommit(
             signature.clone(),
             create_action.clone(),
             Some(Box::new(entry.clone())),
@@ -96,7 +96,7 @@ impl RecordTestData {
         let wire_delete = Judged::valid(SignedAction(delete_action, signature).try_into().unwrap());
 
         let signature = fixt!(Signature);
-        let update_record_op = DhtOpHashed::from_content_sync(DhtOp::RegisterUpdatedRecord(
+        let update_commit_op = DhtOpHashed::from_content_sync(DhtOp::RegisterUpdatedCommit(
             signature.clone(),
             update,
             Some(Box::new(update_entry)),
@@ -133,13 +133,13 @@ impl RecordTestData {
         let any_action_hash = ActionHash::with_data_sync(&any_action);
 
         let signature = fixt!(Signature);
-        let any_store_record_op = DhtOpHashed::from_content_sync(DhtOp::StoreRecord(
+        let any_store_commit_op = DhtOpHashed::from_content_sync(DhtOp::StoreCommit(
             signature.clone(),
             any_action.clone(),
             any_entry.clone(),
         ));
 
-        let any_record = Record::new(
+        let any_commit = Commit::new(
             SignedActionHashed::with_presigned(
                 ActionHashed::from_content_sync(any_action.clone()),
                 signature.clone(),
@@ -150,9 +150,9 @@ impl RecordTestData {
         let any_action = Judged::valid(SignedAction(any_action, signature));
 
         Self {
-            store_record_op,
+            store_commit_op,
             deleted_by_op,
-            update_record_op,
+            update_commit_op,
             hash: entry_hash,
             entry,
             wire_create,
@@ -161,12 +161,12 @@ impl RecordTestData {
             create_hash,
             delete_hash,
             update_hash,
-            any_store_record_op,
+            any_store_commit_op,
             any_action,
             any_action_hash,
             any_entry: any_entry.map(|e| *e),
             any_entry_hash,
-            any_record,
+            any_commit,
         }
     }
 }

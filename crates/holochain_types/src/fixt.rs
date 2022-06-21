@@ -54,7 +54,7 @@ fixturator!(
     };
 );
 
-fn new_entry_record(entry: Entry, action_type: ActionType, index: usize) -> Record {
+fn new_entry_commit(entry: Entry, action_type: ActionType, index: usize) -> Commit {
     let et = match entry {
         Entry::App(_) | Entry::CounterSign(_, _) => EntryType::App(
             AppEntryTypeFixturator::new_indexed(Unpredictable, index)
@@ -69,32 +69,32 @@ fn new_entry_record(entry: Entry, action_type: ActionType, index: usize) -> Reco
         ActionType::Create => {
             let c = CreateFixturator::new_indexed(et, index).next().unwrap();
             let c = NewEntryAction::Create(c);
-            let record: Record = RecordFixturator::new_indexed(c, index).next().unwrap();
-            let (shh, _) = record.into_inner();
-            Record::new(shh, Some(entry))
+            let commit: Commit = CommitFixturator::new_indexed(c, index).next().unwrap();
+            let (shh, _) = commit.into_inner();
+            Commit::new(shh, Some(entry))
         }
         ActionType::Update => {
             let u = UpdateFixturator::new_indexed(et, index).next().unwrap();
             let u = NewEntryAction::Update(u);
-            let record: Record = RecordFixturator::new_indexed(u, index).next().unwrap();
-            let (shh, _) = record.into_inner();
-            Record::new(shh, Some(entry))
+            let commit: Commit = CommitFixturator::new_indexed(u, index).next().unwrap();
+            let (shh, _) = commit.into_inner();
+            Commit::new(shh, Some(entry))
         }
-        _ => panic!("You choose {:?} for a Record with en Entry", action_type),
+        _ => panic!("You choose {:?} for a Commit with en Entry", action_type),
     }
 }
 
-type NewEntryRecord = (Entry, ActionType);
+type NewEntryCommit = (Entry, ActionType);
 
-// NB: Record is defined in holochain_zome_types, but I don't know if it's possible to define
+// NB: Commit is defined in holochain_zome_types, but I don't know if it's possible to define
 //     new Curves on fixturators in other crates, so we have the definition in this crate so that
 //     all Curves can be defined at once -MD
 fixturator!(
-    Record;
-    vanilla fn record_with_no_entry(Signature, Action);
+    Commit;
+    vanilla fn commit_with_no_entry(Signature, Action);
     curve NewEntryAction {
         let s = SignatureFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap();
-        record_with_no_entry(s, get_fixt_curve!().into())
+        commit_with_no_entry(s, get_fixt_curve!().into())
     };
     curve Entry {
         let et = match get_fixt_curve!() {
@@ -104,10 +104,10 @@ fixturator!(
             Entry::CapGrant(_) => EntryType::CapGrant,
         };
         let new = NewEntryActionFixturator::new_indexed(et, get_fixt_index!()).next().unwrap();
-        let (shh, _) = RecordFixturator::new_indexed(new, get_fixt_index!()).next().unwrap().into_inner();
-        Record::new(shh, Some(get_fixt_curve!()))
+        let (shh, _) = CommitFixturator::new_indexed(new, get_fixt_index!()).next().unwrap().into_inner();
+        Commit::new(shh, Some(get_fixt_curve!()))
     };
-    curve NewEntryRecord {
-        new_entry_record(get_fixt_curve!().0, get_fixt_curve!().1, get_fixt_index!())
+    curve NewEntryCommit {
+        new_entry_commit(get_fixt_curve!().0, get_fixt_curve!().1, get_fixt_index!())
     };
 );

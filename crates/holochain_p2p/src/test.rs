@@ -413,13 +413,13 @@ mod tests {
             .await
             .unwrap();
 
-        let test_1 = WireOps::Record(WireRecordOps {
+        let test_1 = WireOps::Commit(WireCommitOps {
             action: Some(Judged::valid(SignedAction(fixt!(Action), fixt!(Signature)))),
             deletes: vec![],
             updates: vec![],
             entry: None,
         });
-        let test_2 = WireOps::Record(WireRecordOps {
+        let test_2 = WireOps::Commit(WireCommitOps {
             action: Some(Judged::valid(SignedAction(fixt!(Action), fixt!(Signature)))),
             deletes: vec![],
             updates: vec![],

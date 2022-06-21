@@ -539,7 +539,7 @@ fn get_authored_ops(
 /// The zome to use for this simulation.
 /// Currently this is a limitation of this prototype that
 /// you must use the data generation zome in the actual simulation
-/// so the Dna record matches.
+/// so the Dna commit matches.
 /// Hopefully this limitation can be overcome in the future.
 pub async fn data_zome(integrity_uuid: String, coordinator_uuid: String) -> DnaFile {
     let integrity_zome_name = "integrity_zome1";

@@ -10,7 +10,7 @@ fn path(s: &str) -> ExternResult<EntryHash> {
 }
 
 #[hdk_extern]
-fn query(args: QueryFilter) -> ExternResult<Vec<Record>> {
+fn query(args: QueryFilter) -> ExternResult<Vec<Commit>> {
     hdk::prelude::query(args)
 }
 

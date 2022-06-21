@@ -10,13 +10,13 @@ pub fn query(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: ChainQueryFilter,
-) -> Result<Vec<Record>, RuntimeError> {
+) -> Result<Vec<Commit>, RuntimeError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess {
             read_workspace: Permission::Allow,
             ..
         } => tokio_helper::block_forever_on(async move {
-            let records: Vec<Record> = call_context
+            let commits: Vec<Commit> = call_context
                 .host_context
                 .workspace()
                 .source_chain()
@@ -27,7 +27,7 @@ pub fn query(
                 .map_err(|source_chain_error| -> RuntimeError {
                     wasm_error!(WasmErrorInner::Host(source_chain_error.to_string())).into()
                 })?;
-            Ok(records)
+            Ok(commits)
         }),
         _ => Err(wasm_error!(WasmErrorInner::Host(
             RibosomeError::HostFnPermissions(
@@ -59,10 +59,10 @@ pub mod slow_tests {
         let _hash_a: EntryHash = conductor.call(&alice, "add_path", "a".to_string()).await;
         let _hash_b: EntryHash = conductor.call(&alice, "add_path", "b".to_string()).await;
 
-        let records: Vec<Record> = conductor
+        let commits: Vec<Commit> = conductor
             .call(&alice, "query", ChainQueryFilter::default())
             .await;
 
-        assert_eq!(records.len(), 6);
+        assert_eq!(commits.len(), 6);
     }
 }

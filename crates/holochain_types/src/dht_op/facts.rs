@@ -74,10 +74,10 @@ mod tests {
         let se = agent.sign(&keystore, &he).await.unwrap();
         let sn = agent.sign(&keystore, &hn).await.unwrap();
 
-        let op1 = DhtOp::StoreRecord(se.clone(), he.clone(), Some(Box::new(e.clone())));
-        let op2 = DhtOp::StoreRecord(se.clone(), he.clone(), None);
-        let op3 = DhtOp::StoreRecord(sn.clone(), hn.clone(), Some(Box::new(e.clone())));
-        let op4 = DhtOp::StoreRecord(sn.clone(), hn.clone(), None);
+        let op1 = DhtOp::StoreCommit(se.clone(), he.clone(), Some(Box::new(e.clone())));
+        let op2 = DhtOp::StoreCommit(se.clone(), he.clone(), None);
+        let op3 = DhtOp::StoreCommit(sn.clone(), hn.clone(), Some(Box::new(e.clone())));
+        let op4 = DhtOp::StoreCommit(sn.clone(), hn.clone(), None);
 
         let fact = valid_dht_op(keystore);
 
@@ -92,11 +92,11 @@ impl DhtOp {
     /// Mutable access to the Signature
     pub fn signature_mut(&mut self) -> &mut Signature {
         match self {
-            DhtOp::StoreRecord(s, _, _) => s,
+            DhtOp::StoreCommit(s, _, _) => s,
             DhtOp::StoreEntry(s, _, _) => s,
             DhtOp::RegisterAgentActivity(s, _) => s,
             DhtOp::RegisterUpdatedContent(s, _, _) => s,
-            DhtOp::RegisterUpdatedRecord(s, _, _) => s,
+            DhtOp::RegisterUpdatedCommit(s, _, _) => s,
             DhtOp::RegisterDeletedBy(s, _) => s,
             DhtOp::RegisterDeletedEntryAction(s, _) => s,
             DhtOp::RegisterAddLink(s, _) => s,
@@ -107,11 +107,11 @@ impl DhtOp {
     /// Mutable access to the seq of the Action, if applicable
     pub fn action_seq_mut(&mut self) -> Option<&mut u32> {
         match self {
-            DhtOp::StoreRecord(_, ref mut h, _) => h.action_seq_mut(),
+            DhtOp::StoreCommit(_, ref mut h, _) => h.action_seq_mut(),
             DhtOp::StoreEntry(_, ref mut h, _) => Some(h.action_seq_mut()),
             DhtOp::RegisterAgentActivity(_, ref mut h) => h.action_seq_mut(),
             DhtOp::RegisterUpdatedContent(_, ref mut h, _) => Some(&mut h.action_seq),
-            DhtOp::RegisterUpdatedRecord(_, ref mut h, _) => Some(&mut h.action_seq),
+            DhtOp::RegisterUpdatedCommit(_, ref mut h, _) => Some(&mut h.action_seq),
             DhtOp::RegisterDeletedBy(_, ref mut h) => Some(&mut h.action_seq),
             DhtOp::RegisterDeletedEntryAction(_, ref mut h) => Some(&mut h.action_seq),
             DhtOp::RegisterAddLink(_, ref mut h) => Some(&mut h.action_seq),
@@ -122,13 +122,13 @@ impl DhtOp {
     /// Mutable access to the entry data of the Action, if applicable
     pub fn action_entry_data_mut(&mut self) -> Option<(&mut EntryHash, &mut EntryType)> {
         match self {
-            DhtOp::StoreRecord(_, ref mut h, _) => h.entry_data_mut(),
+            DhtOp::StoreCommit(_, ref mut h, _) => h.entry_data_mut(),
             DhtOp::StoreEntry(_, ref mut h, _) => Some(h.entry_data_mut()),
             DhtOp::RegisterAgentActivity(_, ref mut h) => h.entry_data_mut(),
             DhtOp::RegisterUpdatedContent(_, ref mut h, _) => {
                 Some((&mut h.entry_hash, &mut h.entry_type))
             }
-            DhtOp::RegisterUpdatedRecord(_, ref mut h, _) => {
+            DhtOp::RegisterUpdatedCommit(_, ref mut h, _) => {
                 Some((&mut h.entry_hash, &mut h.entry_type))
             }
             _ => None,

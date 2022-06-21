@@ -64,20 +64,20 @@ async fn get_entry() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn get_record() {
+async fn get_commit() {
     observability::test_run().ok();
     let db = test_dht_db();
 
-    let td = RecordTestData::create();
+    let td = CommitTestData::create();
 
-    fill_db(&db.to_db(), td.store_record_op.clone());
+    fill_db(&db.to_db(), td.store_commit_op.clone());
 
     let options = options();
 
-    let result = handle_get_record(db.to_db().into(), td.create_hash.clone(), options.clone())
+    let result = handle_get_commit(db.to_db().into(), td.create_hash.clone(), options.clone())
         .await
         .unwrap();
-    let expected = WireRecordOps {
+    let expected = WireCommitOps {
         action: Some(td.wire_create.clone()),
         deletes: vec![],
         updates: vec![],
@@ -87,10 +87,10 @@ async fn get_record() {
 
     fill_db(&db.to_db(), td.deleted_by_op.clone());
 
-    let result = handle_get_record(db.to_db().into(), td.create_hash.clone(), options.clone())
+    let result = handle_get_commit(db.to_db().into(), td.create_hash.clone(), options.clone())
         .await
         .unwrap();
-    let expected = WireRecordOps {
+    let expected = WireCommitOps {
         action: Some(td.wire_create.clone()),
         deletes: vec![td.wire_delete.clone()],
         updates: vec![],
@@ -98,12 +98,12 @@ async fn get_record() {
     };
     assert_eq!(result, expected);
 
-    fill_db(&db.to_db(), td.update_record_op.clone());
+    fill_db(&db.to_db(), td.update_commit_op.clone());
 
-    let result = handle_get_record(db.to_db().into(), td.create_hash.clone(), options.clone())
+    let result = handle_get_commit(db.to_db().into(), td.create_hash.clone(), options.clone())
         .await
         .unwrap();
-    let expected = WireRecordOps {
+    let expected = WireCommitOps {
         action: Some(td.wire_create.clone()),
         deletes: vec![td.wire_delete.clone()],
         updates: vec![td.wire_update.clone()],
@@ -111,16 +111,16 @@ async fn get_record() {
     };
     assert_eq!(result, expected);
 
-    fill_db(&db.to_db(), td.any_store_record_op.clone());
+    fill_db(&db.to_db(), td.any_store_commit_op.clone());
 
-    let result = handle_get_record(
+    let result = handle_get_commit(
         db.to_db().into(),
         td.any_action_hash.clone(),
         options.clone(),
     )
     .await
     .unwrap();
-    let expected = WireRecordOps {
+    let expected = WireCommitOps {
         action: Some(td.any_action.clone()),
         deletes: vec![],
         updates: vec![],
@@ -130,21 +130,21 @@ async fn get_record() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn retrieve_record() {
+async fn retrieve_commit() {
     observability::test_run().ok();
     let db = test_dht_db();
 
-    let td = RecordTestData::create();
+    let td = CommitTestData::create();
 
-    fill_db_pending(&db.to_db(), td.store_record_op.clone());
+    fill_db_pending(&db.to_db(), td.store_commit_op.clone());
 
     let mut options = options();
     options.request_type = GetRequest::Pending;
 
-    let result = handle_get_record(db.to_db().into(), td.create_hash.clone(), options.clone())
+    let result = handle_get_commit(db.to_db().into(), td.create_hash.clone(), options.clone())
         .await
         .unwrap();
-    let expected = WireRecordOps {
+    let expected = WireCommitOps {
         action: Some(td.wire_create.clone()),
         deletes: vec![],
         updates: vec![],

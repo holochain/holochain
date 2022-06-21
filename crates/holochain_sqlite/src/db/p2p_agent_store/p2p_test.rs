@@ -199,12 +199,12 @@ async fn test_p2p_agent_store_gossip_query_sanity() {
     for agent_info_signed in near {
         use kitsune_p2p::KitsuneBinType;
         let loc = agent_info_signed.agent.get_loc();
-        let record = super::P2pRecord::from_signed(&agent_info_signed).unwrap();
+        let commit = super::P2pCommit::from_signed(&agent_info_signed).unwrap();
         let mut dist = u32::MAX;
         let mut deb = "not reset";
 
-        let start = record.storage_start_loc;
-        let end = record.storage_end_loc;
+        let start = commit.storage_start_loc;
+        let end = commit.storage_end_loc;
 
         match (start, end) {
             (Some(start), Some(end)) => {

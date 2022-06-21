@@ -6,8 +6,7 @@ pub use holochain_deterministic_integrity::entry::*;
 ///
 /// This is used under the hood by [`create_entry`], [`create_cap_grant`] and [`create_cap_claim`].
 ///
-/// The host builds a [`Create`] action for the passed entry value and commits a new record to the
-/// chain.
+/// The host builds a [`Create`] action for the passed entry value and commits to the chain.
 ///
 /// Usually you don't need to use this function directly; it is the most general way to create an
 /// entry and standardizes the internals of higher level create functions.
@@ -36,7 +35,7 @@ pub fn update(input: UpdateInput) -> ExternResult<ActionHash> {
 ///
 /// @todo implement delete_cap_claim
 ///
-/// The host builds a [`Delete`] action for the passed entry and commits a new record to the chain.
+/// The host builds a [`Delete`] action for the passed entry and commits to the chain.
 ///
 /// Usually you don't need to use this function directly; it is the most general way to delete an
 /// entry and standardizes the internals of higher level delete functions.
@@ -87,7 +86,7 @@ where
 
 /// Delete an app entry. Also see [`delete`].
 ///
-/// This function accepts the [`ActionHash`] of the record to delete and optionally an argument to
+/// This function accepts the [`ActionHash`] of the commit to mark deleted and optionally an argument to
 /// specify the [`ChainTopOrdering`]. Refer to [`DeleteInput`] for details.
 ///
 /// ```ignore
@@ -112,17 +111,17 @@ where
 
 /// Update an app entry. Also see [`update`].
 ///
-/// The hash is the [`ActionHash`] of the deleted record, the input is a [`TryInto<CreateInput>`].
+/// The hash is the [`ActionHash`] of the deleted commit, the input is a [`TryInto<CreateInput>`].
 ///
-/// Updates can reference Records which contain Entry data -- namely, Creates and other Updates -- but
-/// not Deletes or system Records.
+/// Updates can reference Commits which contain Entry data -- namely, Creates and other Updates -- but
+/// not Deletes or system Commits.
 ///
-/// As updates can reference records on other agent's source chains across unpredictable network
+/// As updates can reference commits on other agent's source chains across unpredictable network
 /// topologies, they are treated as a tree structure.
 ///
 /// Many updates can point to a single create/update and continue to accumulate as long as agents
-/// author them against that record. It is up to happ developers to decide how to ensure the tree
-/// branches are walked appropriately and that updates point to the correct record, whatever that
+/// author them against that commit. It is up to happ developers to decide how to ensure the tree
+/// branches are walked appropriately and that updates point to the correct commit, whatever that
 /// means for the happ.
 ///
 /// ```ignore
@@ -152,15 +151,15 @@ where
     update(input)
 }
 
-/// Gets a record for a given entry or action hash.
+/// Gets a commit for a given entry or action hash.
 ///
 /// The behaviour of get changes subtly per the _type of the passed hash_.
-/// An action hash returns the record for that action, i.e. action+entry or action+None.
-/// An entry hash returns the "oldest live" record, i.e. action+entry.
+/// An action hash returns the commit for that action, i.e. action+entry or action+None.
+/// An entry hash returns the "oldest live" commit, i.e. action+entry.
 ///
-/// An record is no longer live once it is referenced by a valid delete record.
-/// An update to a record does not change its liveness.
-/// See [`get_details`] for more information about how CRUD records reference each other.
+/// An commit is no longer live once it is referenced by a valid delete commit.
+/// An update to a commit does not change its liveness.
+/// See [`get_details`] for more information about how CRUD commits reference each other.
 ///
 /// Note: [`get`] __always triggers and blocks on a network call__.
 ///       @todo implement a 'get optimistic' that returns based on the current opinion of the world
@@ -174,12 +173,12 @@ where
 ///       always, e.g. consider changing `foo` to `bar` back to `foo`. The entry hashes in a crud
 ///       tree can be circular but the action hashes are never circular.
 ///       In this case, deleting the create for foo would make the second update pointing to foo
-///       the "oldest live" record.
+///       the "oldest live" commit.
 ///
 /// Note: "oldest live" only relates to disambiguating many creates and updates from many authors
 ///       pointing to a single entry, it is not the "current value" of an entry in a CRUD sense.
 ///       e.g. If "foo" is created then updated to "bar", a [`get`] on the hash of "foo" will return
-///            "foo" as part of a record with the "oldest live" action.
+///            "foo" as part of a commit with the "oldest live" action.
 ///            To discover "bar" the agent needs to call `get_details` and decide how it wants to
 ///            collapse many potential creates, updates and deletes down into a single or filtered
 ///            set of updates, to "walk the tree".
@@ -189,15 +188,15 @@ where
 ///            timestamp countersigned by both players represents an opt-in chain of updates with
 ///            support for casual "undo" with player's consent.
 ///       e.g. Domain/user names could be claimed on a "first come, first serve" basis with only
-///            creates and deletes allowed by validation rules, the "oldest live" record _does_
-///            represent the record pointing at the first agent to claim a name, but it could also
+///            creates and deletes allowed by validation rules, the "oldest live" commit _does_
+///            represent the commit pointing at the first agent to claim a name, but it could also
 ///            be checked manually by the app with `get_details`.
 ///
 /// Note: "oldest live" is only as good as the information available to the authorities the agent
 ///       contacts on their current network partition, there could always be an older live entry
 ///       on another partition, and of course the oldest live entry could be deleted and no longer
 ///       be live.
-pub fn get<H>(hash: H, options: GetOptions) -> ExternResult<Option<Record>>
+pub fn get<H>(hash: H, options: GetOptions) -> ExternResult<Option<Commit>>
 where
     AnyDhtHash: From<H>,
 {
@@ -211,36 +210,36 @@ where
         .unwrap())
 }
 
-/// Get a record and its details for the entry or action hash passed in.
+/// Get a commit and its details for the entry or action hash passed in.
 /// Returns [`None`] if the entry/action does not exist.
-/// The details returned are a contextual mix of records and action hashes.
+/// The details returned are a contextual mix of commits and action hashes.
 ///
 /// Note: The return details will be inferred by the hash type passed in, be careful to pass in the
 ///       correct hash type for the details you want.
 ///
-/// Note: If an action hash is passed in the record returned is the specified record.
-///       If an entry hash is passed in all the actions (so implicitly all the records) are
+/// Note: If an action hash is passed in the commit returned is the specified commit.
+///       If an entry hash is passed in all the actions (so implicitly all the commits) are
 ///       returned for the entry that matches that hash.
 ///       See [`get`] for more information about what "oldest live" means.
 ///
 /// The details returned include relevant creates, updates and deletes for the hash passed in.
 ///
-/// Creates are initial action/entry combinations (records) produced by commit_entry! and cannot
+/// Creates are initial action/entry combinations (commits) produced by commit_entry! and cannot
 /// reference other actions.
 /// Updates and deletes both reference a specific action+entry combination.
 /// Updates must reference another create or update action+entry.
 /// Deletes must reference a create or update action+entry (nothing can reference a delete).
 ///
-/// Full records are returned for direct references to the passed hash.
+/// Full commits are returned for direct references to the passed hash.
 /// Action hashes are returned for references to references to the passed hash.
 ///
 /// [`Details`] for an action hash return:
-/// - the record for this action hash if it exists
-/// - all update and delete _records_ that reference that specified action
+/// - the commit for this action hash if it exists
+/// - all update and delete _commits_ that reference that specified action
 ///
 /// [`Details`] for an entry hash return:
-/// - all creates, updates and delete _records_ that reference that entry hash
-/// - all update and delete _records_ that reference the records that reference the entry hash
+/// - all creates, updates and delete _commits_ that reference that entry hash
+/// - all update and delete _commits_ that reference the commits that reference the entry hash
 ///
 /// Note: Entries are just values, so can be referenced by many CRUD actions by many authors.
 ///       e.g. the number 1 or string "foo" can be referenced by anyone publishing CRUD actions at
@@ -249,12 +248,12 @@ where
 ///       a unique hash (e.g. current chain head), timestamp (careful about collisions!), or random
 ///       bytes/uuid (see random_bytes() and the uuid rust crate that supports uuids from bytes).
 ///
-/// Note: There are multiple action types that exist and operate entirely outside of CRUD records
+/// Note: There are multiple action types that exist and operate entirely outside of CRUD commits
 ///       so they cannot reference or be referenced by CRUD, so are immutable or have their own
 ///       mutation logic (e.g. link create/delete) and will not be included in [`get_details`] results
 ///       e.g. the DNA itself, links, migrations, etc.
-///       However the record will still be returned by [`get_details`] if an action hash is passed,
-///       these non-entry records will have [`None`] as the entry value.
+///       However the commit will still be returned by [`get_details`] if an action hash is passed,
+///       these non-entry commits will have [`None`] as the entry value.
 pub fn get_details<H: Into<AnyDhtHash>>(
     hash: H,
     options: GetOptions,

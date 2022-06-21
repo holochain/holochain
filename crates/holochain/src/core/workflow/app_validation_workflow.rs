@@ -265,18 +265,18 @@ async fn app_validation_workflow_inner(
     })
 }
 
-pub async fn record_to_op(
-    record: Record,
+pub async fn commit_to_op(
+    commit: Commit,
     op_type: DhtOpType,
     cascade: &mut Cascade,
 ) -> AppValidationOutcome<(Op, Option<Entry>)> {
     use DhtOpType::*;
     let mut activity_entry = None;
-    let (shh, entry) = record.into_inner();
+    let (shh, entry) = commit.into_inner();
     let mut entry = entry.into_option();
     let action = shh.into();
     // Register agent activity doesn't store the entry so we need to
-    // save it so we can reconstruct the record later.
+    // save it so we can reconstruct the commit later.
     if matches!(op_type, RegisterAgentActivity) {
         activity_entry = entry.take();
     }
@@ -284,38 +284,38 @@ pub async fn record_to_op(
     Ok((dhtop_to_op(dht_op, cascade).await?, activity_entry))
 }
 
-pub fn op_to_record(op: Op, activity_entry: Option<Entry>) -> Record {
+pub fn op_to_commit(op: Op, activity_entry: Option<Entry>) -> Commit {
     match op {
-        Op::StoreRecord { record } => record,
+        Op::StoreCommit { commit } => commit,
         Op::StoreEntry { action, entry } => {
-            Record::new(SignedActionHashed::raw_from_same_hash(action), Some(entry))
+            Commit::new(SignedActionHashed::raw_from_same_hash(action), Some(entry))
         }
         Op::RegisterUpdate {
             update, new_entry, ..
-        } => Record::new(
+        } => Commit::new(
             SignedActionHashed::raw_from_same_hash(update),
             Some(new_entry),
         ),
         Op::RegisterDelete { delete, .. } => {
-            Record::new(SignedActionHashed::raw_from_same_hash(delete), None)
+            Commit::new(SignedActionHashed::raw_from_same_hash(delete), None)
         }
-        Op::RegisterAgentActivity { action } => Record::new(
+        Op::RegisterAgentActivity { action } => Commit::new(
             SignedActionHashed::raw_from_same_hash(action),
             activity_entry,
         ),
         Op::RegisterCreateLink { create_link, .. } => {
-            Record::new(SignedActionHashed::raw_from_same_hash(create_link), None)
+            Commit::new(SignedActionHashed::raw_from_same_hash(create_link), None)
         }
         Op::RegisterDeleteLink { delete_link, .. } => {
-            Record::new(SignedActionHashed::raw_from_same_hash(delete_link), None)
+            Commit::new(SignedActionHashed::raw_from_same_hash(delete_link), None)
         }
     }
 }
 
 async fn dhtop_to_op(op: DhtOp, cascade: &mut Cascade) -> AppValidationOutcome<Op> {
     let op = match op {
-        DhtOp::StoreRecord(signature, action, entry) => Op::StoreRecord {
-            record: Record::new(
+        DhtOp::StoreCommit(signature, action, entry) => Op::StoreCommit {
+            commit: Commit::new(
                 SignedActionHashed::with_presigned(
                     ActionHashed::from_content_sync(action),
                     signature,
@@ -334,7 +334,7 @@ async fn dhtop_to_op(op: DhtOp, cascade: &mut Cascade) -> AppValidationOutcome<O
             ),
         },
         DhtOp::RegisterUpdatedContent(signature, update, entry)
-        | DhtOp::RegisterUpdatedRecord(signature, update, entry) => {
+        | DhtOp::RegisterUpdatedCommit(signature, update, entry) => {
             let new_entry = match entry {
                 Some(entry) => *entry,
                 None => cascade
@@ -435,7 +435,7 @@ where
     R: RibosomeT,
 {
     let zomes_to_invoke = match op {
-        Op::RegisterAgentActivity { .. } | Op::StoreRecord { .. } => ZomesToInvoke::AllIntegrity,
+        Op::RegisterAgentActivity { .. } | Op::StoreCommit { .. } => ZomesToInvoke::AllIntegrity,
         Op::StoreEntry {
             action:
                 SignedHashed {
@@ -554,7 +554,7 @@ where
                     let mut cascade =
                         Cascade::from_workspace_network(&cascade_workspace, network.clone());
                     cascade
-                        .fetch_record(hash.clone(), NetworkGetOptions::must_get_options())
+                        .fetch_commit(hash.clone(), NetworkGetOptions::must_get_options())
                         .await?;
                     Ok(hash)
                 });

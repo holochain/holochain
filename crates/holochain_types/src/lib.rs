@@ -19,6 +19,7 @@ pub mod app;
 pub mod autonomic;
 pub mod chain;
 pub mod combinators;
+pub mod commit;
 pub mod db;
 pub mod db_cache;
 pub mod dht_op;
@@ -30,7 +31,6 @@ pub mod link;
 mod macros;
 pub mod metadata;
 pub mod prelude;
-pub mod record;
 pub mod share;
 pub mod signal;
 #[warn(missing_docs)]

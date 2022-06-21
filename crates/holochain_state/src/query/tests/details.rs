@@ -1,4 +1,4 @@
-use record_details::GetRecordDetailsQuery;
+use commit_details::GetCommitDetailsQuery;
 
 use crate::{
     prelude::mutations_helpers::insert_valid_integrated_op,
@@ -33,16 +33,16 @@ async fn entry_scratch_same_as_sql() {
     let r1 = query
         .run(Txn::from(&txn))
         .unwrap()
-        .expect("Record not found");
+        .expect("Commit not found");
     let r2 = query
         .run(scratch.clone())
         .unwrap()
-        .expect("Record not found");
+        .expect("Commit not found");
     assert_eq!(r1, r2);
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn record_scratch_same_as_sql() {
+async fn commit_scratch_same_as_sql() {
     observability::test_run().ok();
     let mut scratch = Scratch::new();
     let mut conn = Connection::open_in_memory().unwrap();
@@ -52,25 +52,25 @@ async fn record_scratch_same_as_sql() {
         .transaction_with_behavior(TransactionBehavior::Exclusive)
         .unwrap();
 
-    let td = RecordTestData::new();
-    let query = GetRecordDetailsQuery::with_private_data_access(
+    let td = CommitTestData::new();
+    let query = GetCommitDetailsQuery::with_private_data_access(
         td.action.as_hash().clone(),
-        Arc::new(td.store_record_op.action().author().clone()),
+        Arc::new(td.store_commit_op.action().author().clone()),
     );
     insert_op_scratch(
         &mut scratch,
-        td.store_record_op.clone(),
+        td.store_commit_op.clone(),
         ChainTopOrdering::default(),
     )
     .unwrap();
-    insert_valid_integrated_op(&mut txn, &td.store_record_op).unwrap();
+    insert_valid_integrated_op(&mut txn, &td.store_commit_op).unwrap();
     let r1 = query
         .run(Txn::from(&txn))
         .unwrap()
-        .expect("Record not found");
+        .expect("Commit not found");
     let r2 = query
         .run(scratch.clone())
         .unwrap()
-        .expect("Record not found");
+        .expect("Commit not found");
     assert_eq!(r1, r2);
 }

@@ -1,7 +1,7 @@
 //! A Cell is an "instance" of Holochain DNA.
 //!
 //! It combines an AgentPubKey with a Dna to create a SourceChain, upon which
-//! Records can be added. A constructed Cell is guaranteed to have a valid
+//! Commits can be added. A constructed Cell is guaranteed to have a valid
 //! SourceChain which has already undergone Genesis.
 
 use super::api::ZomeCall;
@@ -163,7 +163,7 @@ impl Cell {
     }
 
     /// Performs the Genesis workflow the Cell, ensuring that its initial
-    /// records are committed. This is a prerequisite for any other interaction
+    /// commits are created. This is a prerequisite for any other interaction
     /// with the SourceChain
     pub async fn genesis<Ribosome>(
         id: CellId,
@@ -591,9 +591,9 @@ impl Cell {
                 .await
                 .map(WireOps::Entry),
             AnyDht::Action => self
-                .handle_get_record(dht_hash.into(), options)
+                .handle_get_commit(dht_hash.into(), options)
                 .await
-                .map(WireOps::Record),
+                .map(WireOps::Commit),
         };
         if let Err(e) = &mut r {
             error!(msg = "Error handling a get", ?e, agent = ?self.id.agent_pubkey());
@@ -614,13 +614,13 @@ impl Cell {
     }
 
     #[tracing::instrument(skip(self))]
-    async fn handle_get_record(
+    async fn handle_get_commit(
         &self,
         hash: ActionHash,
         options: holochain_p2p::event::GetOptions,
-    ) -> CellResult<WireRecordOps> {
+    ) -> CellResult<WireCommitOps> {
         let db = self.space.dht_db.clone();
-        authority::handle_get_record(db.into(), hash, options)
+        authority::handle_get_commit(db.into(), hash, options)
             .await
             .map_err(Into::into)
     }

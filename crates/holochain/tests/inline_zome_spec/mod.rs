@@ -19,7 +19,7 @@ use holochain_keystore::MetaLairClient;
 use holochain_state::prelude::{fresh_reader_test, StateMutationError, Store, Txn};
 use holochain_types::{inline_zome::InlineZomeSet, prelude::*};
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::{op::Op, record::RecordEntry};
+use holochain_zome_types::{commit::CommitEntry, op::Op};
 use matches::assert_matches;
 use tokio_stream::StreamExt;
 
@@ -123,20 +123,20 @@ async fn inline_zome_2_agents_1_dna() -> anyhow::Result<()> {
     .await;
 
     // Verify that bobbo can run "read" on his cell and get alice's Action
-    let records: Vec<Option<Record>> = conductor
+    let commits: Vec<Option<Commit>> = conductor
         .call(&bobbo.zome(SweetEasyInline::COORDINATOR), "read", hash)
         .await;
-    let record = records
+    let commit = commits
         .into_iter()
         .next()
         .unwrap()
-        .expect("Record was None: bobbo couldn't `get` it");
+        .expect("Commit was None: bobbo couldn't `get` it");
 
-    // Assert that the Record bobbo sees matches what alice committed
-    assert_eq!(record.action().author(), alice.agent_pubkey());
+    // Assert that the Commit bobbo sees matches what alice committed
+    assert_eq!(commit.action().author(), alice.agent_pubkey());
     assert_eq!(
-        *record.entry(),
-        RecordEntry::Present(Entry::app(().try_into().unwrap()).unwrap())
+        *commit.entry(),
+        CommitEntry::Present(Entry::app(().try_into().unwrap()).unwrap())
     );
 
     Ok(())
@@ -198,43 +198,43 @@ async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
 
     // Verify that bobbo can run "read" on his cell and get alice's Action
     // on the "foo" DNA
-    let records: Vec<Option<Record>> = conductor
+    let commits: Vec<Option<Commit>> = conductor
         .call(
             &bobbo_foo.zome(SweetEasyInline::COORDINATOR),
             "read",
             hash_foo,
         )
         .await;
-    let record = records
+    let commit = commits
         .into_iter()
         .next()
         .unwrap()
-        .expect("Record was None: bobbo couldn't `get` it");
-    assert_eq!(record.action().author(), alice_foo.agent_pubkey());
+        .expect("Commit was None: bobbo couldn't `get` it");
+    assert_eq!(commit.action().author(), alice_foo.agent_pubkey());
     assert_eq!(
-        *record.entry(),
-        RecordEntry::Present(Entry::app(().try_into().unwrap()).unwrap())
+        *commit.entry(),
+        CommitEntry::Present(Entry::app(().try_into().unwrap()).unwrap())
     );
 
     // Verify that carol can run "read" on her cell and get alice's Action
     // on the "bar" DNA
     // Let's do it with the SweetZome instead of the SweetCell too, for fun
-    let records: Vec<Option<Record>> = conductor
+    let commits: Vec<Option<Commit>> = conductor
         .call(
             &carol_bar.zome(SweetEasyInline::COORDINATOR),
             "read",
             hash_bar,
         )
         .await;
-    let record = records
+    let commit = commits
         .into_iter()
         .next()
         .unwrap()
-        .expect("Record was None: carol couldn't `get` it");
-    assert_eq!(record.action().author(), alice_bar.agent_pubkey());
+        .expect("Commit was None: carol couldn't `get` it");
+    assert_eq!(commit.action().author(), alice_bar.agent_pubkey());
     assert_eq!(
-        *record.entry(),
-        RecordEntry::Present(Entry::app(().try_into().unwrap()).unwrap())
+        *commit.entry(),
+        CommitEntry::Present(Entry::app(().try_into().unwrap()).unwrap())
     );
 
     Ok(())
@@ -301,25 +301,25 @@ async fn get_deleted() -> anyhow::Result<()> {
 
     wait_for_integration_1m(alice.dht_db(), expected_count).await;
 
-    let records: Vec<Option<Record>> = conductor
+    let commits: Vec<Option<Commit>> = conductor
         .call(
             &alice.zome(SweetEasyInline::COORDINATOR),
             "read",
             hash.clone(),
         )
         .await;
-    let record = records
+    let commit = commits
         .into_iter()
         .next()
         .unwrap()
-        .expect("Record was None: bobbo couldn't `get` it");
+        .expect("Commit was None: bobbo couldn't `get` it");
 
-    assert_eq!(record.action().author(), alice.agent_pubkey());
+    assert_eq!(commit.action().author(), alice.agent_pubkey());
     assert_eq!(
-        *record.entry(),
-        RecordEntry::Present(Entry::app(().try_into().unwrap()).unwrap())
+        *commit.entry(),
+        CommitEntry::Present(Entry::app(().try_into().unwrap()).unwrap())
     );
-    let entry_hash = record.action().entry_hash().unwrap();
+    let entry_hash = commit.action().entry_hash().unwrap();
 
     let _: ActionHash = conductor
         .call(
@@ -332,14 +332,14 @@ async fn get_deleted() -> anyhow::Result<()> {
     expected_count += WaitOps::DELETE;
     wait_for_integration_1m(alice.dht_db(), expected_count).await;
 
-    let records: Vec<Option<Record>> = conductor
+    let commits: Vec<Option<Commit>> = conductor
         .call(
             &alice.zome(SweetEasyInline::COORDINATOR),
             "read_entry",
             entry_hash,
         )
         .await;
-    assert!(records.into_iter().next().unwrap().is_none());
+    assert!(commits.into_iter().next().unwrap().is_none());
 
     Ok(())
 }
@@ -420,7 +420,7 @@ async fn simple_validation() -> anyhow::Result<()> {
 
     // This call passes validation
     let h1: ActionHash = conductor.call(&alice, "create", AppString::new("A")).await;
-    let e1s: Vec<Option<Record>> = conductor.call(&alice, "read", &h1).await;
+    let e1s: Vec<Option<Commit>> = conductor.call(&alice, "read", &h1).await;
     let e1 = e1s.into_iter().next().unwrap();
     let s1: AppString = e1.unwrap().entry().to_app_option().unwrap().unwrap();
     assert_eq!(s1, AppString::new("A"));
@@ -478,14 +478,14 @@ async fn can_call_real_zomes_too() {
         .call(&cell.zome(SweetEasyInline::COORDINATOR), "create_unit", ())
         .await;
 
-    let el: Option<Record> = conductor
+    let el: Option<Commit> = conductor
         .call(&cell.zome("create_entry"), "get_post", hash.clone())
         .await;
     assert_eq!(el.unwrap().action_address(), &hash)
 }
 
 #[tokio::test(flavor = "multi_thread")]
-/// Test that records can be manually inserted into a source chain.
+/// Test that commits can be manually inserted into a source chain.
 async fn insert_source_chain() {
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome())
         .await
@@ -500,7 +500,7 @@ async fn insert_source_chain() {
     let zome = alice.zome(SweetEasyInline::COORDINATOR);
 
     // Trigger init.
-    let _: Vec<Option<Record>> = conductor
+    let _: Vec<Option<Commit>> = conductor
         .call(
             &zome,
             "read_entry",
@@ -524,11 +524,11 @@ async fn insert_source_chain() {
 
     // Get the source chain.
     let chain = get_chain(alice.authored_db().clone());
-    let original_records: Vec<_> = fresh_reader_test(alice.authored_db().clone(), |txn| {
+    let original_commits: Vec<_> = fresh_reader_test(alice.authored_db().clone(), |txn| {
         let txn: Txn = (&txn).into();
         chain
             .iter()
-            .map(|h| txn.get_record(&h.0.clone().into()).unwrap().unwrap())
+            .map(|h| txn.get_commit(&h.0.clone().into()).unwrap().unwrap())
             .collect()
     });
     // Chain should be 4 long.
@@ -550,10 +550,10 @@ async fn insert_source_chain() {
         ActionHashed::from_content_sync(action.clone().into()),
         fixt!(Signature),
     );
-    let record = Record::new(shh, Some(entry.clone()));
+    let commit = Commit::new(shh, Some(entry.clone()));
     let result = conductor
         .clone()
-        .insert_records_into_source_chain(alice.cell_id().clone(), false, false, vec![record])
+        .insert_commits_into_source_chain(alice.cell_id().clone(), false, false, vec![commit])
         .await;
     // This gets rejected.
     assert!(matches!(
@@ -566,11 +566,11 @@ async fn insert_source_chain() {
     // Insert with correct author.
     action.author = alice.agent_pubkey().clone();
 
-    let record = make_record(&conductor.keystore(), action.clone().into()).await;
-    let hash = record.action_address().clone();
+    let commit = make_commit(&conductor.keystore(), action.clone().into()).await;
+    let hash = commit.action_address().clone();
     conductor
         .clone()
-        .insert_records_into_source_chain(alice.cell_id().clone(), false, false, vec![record])
+        .insert_commits_into_source_chain(alice.cell_id().clone(), false, false, vec![commit])
         .await
         .expect("Should pass with valid agent");
 
@@ -584,15 +584,15 @@ async fn insert_source_chain() {
     action.action_seq = 3;
     action.prev_action = chain[2].0.clone();
 
-    let record = make_record(&conductor.keystore(), action.clone().into()).await;
-    let hash = record.action_address().clone();
+    let commit = make_commit(&conductor.keystore(), action.clone().into()).await;
+    let hash = commit.action_address().clone();
     let result = conductor
         .clone()
-        .insert_records_into_source_chain(
+        .insert_commits_into_source_chain(
             alice.cell_id().clone(),
             false,
             false,
-            vec![record.clone()],
+            vec![commit.clone()],
         )
         .await;
 
@@ -608,11 +608,11 @@ async fn insert_source_chain() {
     // Insert with truncation on.
     let result = conductor
         .clone()
-        .insert_records_into_source_chain(
+        .insert_commits_into_source_chain(
             alice.cell_id().clone(),
             true,
             false,
-            vec![record.clone()],
+            vec![commit.clone()],
         )
         .await;
 
@@ -626,14 +626,14 @@ async fn insert_source_chain() {
     // The new action will be in the chain
     assert!(chain.iter().any(|i| i.0 == hash));
 
-    // Restore the original records
+    // Restore the original commits
     let result = conductor
         .clone()
-        .insert_records_into_source_chain(
+        .insert_commits_into_source_chain(
             alice.cell_id().clone(),
             true,
             false,
-            original_records.clone(),
+            original_commits.clone(),
         )
         .await;
 
@@ -647,32 +647,32 @@ async fn insert_source_chain() {
     // Make the action a fork
     action.action_seq = 2;
     action.prev_action = chain[1].0.clone();
-    let record = make_record(&conductor.keystore(), action.clone().into()).await;
+    let commit = make_commit(&conductor.keystore(), action.clone().into()).await;
 
     // Insert an invalid action with validation on.
     let result = conductor
         .clone()
-        .insert_records_into_source_chain(
+        .insert_commits_into_source_chain(
             alice.cell_id().clone(),
             false,
             true,
-            vec![record.clone()],
+            vec![commit.clone()],
         )
         .await;
 
     // Fork is detected
     assert!(result.is_err());
 
-    // Restore and validate the original records
+    // Restore and validate the original commits
     conductor
         .clone()
-        .insert_records_into_source_chain(
+        .insert_commits_into_source_chain(
             alice.cell_id().clone(),
             true,
             true,
-            original_records.clone(),
+            original_commits.clone(),
         )
-        // Restoring the original records is ok because they
+        // Restoring the original commits is ok because they
         // will pass validation.
         .await
         .expect("Should restore original chain");
@@ -686,11 +686,11 @@ async fn insert_source_chain() {
     // Insert the chain from the original conductor.
     conductor
         .clone()
-        .insert_records_into_source_chain(
+        .insert_commits_into_source_chain(
             alice.cell_id().clone(),
             true,
             true,
-            original_records.clone(),
+            original_commits.clone(),
         )
         .await
         .expect("Can cold start");
@@ -707,7 +707,7 @@ async fn insert_source_chain() {
     assert_eq!(chain.last().unwrap().1, 3);
 }
 
-async fn make_record(keystore: &MetaLairClient, action: Action) -> Record {
+async fn make_commit(keystore: &MetaLairClient, action: Action) -> Commit {
     let shh = SignedActionHashed::sign(
         keystore,
         ActionHashed::from_content_sync(action.clone().into()),
@@ -715,7 +715,7 @@ async fn make_record(keystore: &MetaLairClient, action: Action) -> Record {
     .await
     .unwrap();
     let entry = Entry::app(().try_into().unwrap()).unwrap();
-    Record::new(shh, Some(entry.clone()))
+    Commit::new(shh, Some(entry.clone()))
 }
 
 /// Simple scenario involving two agents using the same DNA

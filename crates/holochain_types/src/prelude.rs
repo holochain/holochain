@@ -15,6 +15,8 @@ pub use crate::app::*;
 pub use crate::autonomic::*;
 pub use crate::chain::*;
 pub use crate::combinators::*;
+pub use crate::commit::error::*;
+pub use crate::commit::*;
 pub use crate::db::*;
 pub use crate::dht_op::error::*;
 pub use crate::dht_op::*;
@@ -24,8 +26,6 @@ pub use crate::dna::*;
 pub use crate::entry::*;
 pub use crate::link::*;
 pub use crate::metadata::*;
-pub use crate::record::error::*;
-pub use crate::record::*;
 pub use crate::signal::*;
 pub use crate::validate::*;
 

@@ -67,14 +67,14 @@ fn schedule(_: ()) -> ExternResult<()> {
 }
 
 #[hdk_extern]
-fn query_tick(_: ()) -> ExternResult<Vec<Record>> {
+fn query_tick(_: ()) -> ExternResult<Vec<Commit>> {
     hdk::prelude::query(
         ChainQueryFilter::default().entry_type(EntryTypesUnit::Tick.try_into().unwrap()),
     )
 }
 
 #[hdk_extern]
-fn query_tock(_: ()) -> ExternResult<Vec<Record>> {
+fn query_tock(_: ()) -> ExternResult<Vec<Commit>> {
     hdk::prelude::query(
         ChainQueryFilter::default().entry_type(EntryTypesUnit::Tock.try_into().unwrap()),
     )

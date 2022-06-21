@@ -253,8 +253,8 @@ pub mod tests {
         let _: ActionHash = conductor.call(&zome, "create_entry", ()).await;
 
         let source_chain = get_chain(&cell, keystore.clone()).await;
-        // - Ensure that the InitZomesComplete record got committed after the
-        //   record committed during init()
+        // - Ensure that the InitZomesComplete commit got committed after the
+        //   commit committed during init()
         assert_matches!(
             source_chain.query(Default::default()).await.unwrap()[4].action(),
             Action::InitZomesComplete(_)

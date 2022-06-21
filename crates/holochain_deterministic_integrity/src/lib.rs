@@ -12,7 +12,7 @@ pub use hdk_derive::hdk_link_types;
 /// App entries are all entries that are not system entries.
 /// They are defined in the `entry_defs` callback and then the application can call CRUD functions with them.
 ///
-/// CRUD in Holochain is represented as a graph/tree of Records referencing each other (via Action hashes) representing new states of a shared identity.
+/// CRUD in Holochain is represented as a graph/tree of Commits referencing each other (via Action hashes) representing new states of a shared identity.
 /// Because the network is always subject to the possibility of partitions, there is no way to assert an objective truth about the 'current' or 'real' value that all participants will agree on.
 /// This is a key difference between Holochain and blockchains.
 /// Where blockchains define a consensus algorithm that brings all participants as close as possible to a single value while Holochain lets each participant discover their own truth.

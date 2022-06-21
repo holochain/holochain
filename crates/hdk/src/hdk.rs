@@ -26,7 +26,7 @@ pub trait HdkT: HdiT {
         &self,
         get_agent_activity_input: GetAgentActivityInput,
     ) -> ExternResult<AgentActivity>;
-    fn query(&self, filter: ChainQueryFilter) -> ExternResult<Vec<Record>>;
+    fn query(&self, filter: ChainQueryFilter) -> ExternResult<Vec<Commit>>;
     // Ed25519
     fn sign(&self, sign: Sign) -> ExternResult<Signature>;
     fn sign_ephemeral(&self, sign_ephemeral: SignEphemeral) -> ExternResult<EphemeralSignatures>;
@@ -34,7 +34,7 @@ pub trait HdkT: HdiT {
     fn create(&self, create_input: CreateInput) -> ExternResult<ActionHash>;
     fn update(&self, update_input: UpdateInput) -> ExternResult<ActionHash>;
     fn delete(&self, delete_input: DeleteInput) -> ExternResult<ActionHash>;
-    fn get(&self, get_input: Vec<GetInput>) -> ExternResult<Vec<Option<Record>>>;
+    fn get(&self, get_input: Vec<GetInput>) -> ExternResult<Vec<Option<Commit>>>;
     fn get_details(&self, get_input: Vec<GetInput>) -> ExternResult<Vec<Option<Details>>>;
     // CounterSigning
     fn accept_countersigning_preflight_request(
@@ -96,7 +96,7 @@ mockall::mock! {
             &self,
             get_agent_activity_input: GetAgentActivityInput,
         ) -> ExternResult<AgentActivity>;
-        fn query(&self, filter: ChainQueryFilter) -> ExternResult<Vec<Record>>;
+        fn query(&self, filter: ChainQueryFilter) -> ExternResult<Vec<Commit>>;
         // Ed25519
         fn sign(&self, sign: Sign) -> ExternResult<Signature>;
         fn sign_ephemeral(&self, sign_ephemeral: SignEphemeral) -> ExternResult<EphemeralSignatures>;
@@ -104,7 +104,7 @@ mockall::mock! {
         fn create(&self, create_input: CreateInput) -> ExternResult<ActionHash>;
         fn update(&self, update_input: UpdateInput) -> ExternResult<ActionHash>;
         fn delete(&self, delete_input: DeleteInput) -> ExternResult<ActionHash>;
-        fn get(&self, get_input: Vec<GetInput>) -> ExternResult<Vec<Option<Record>>>;
+        fn get(&self, get_input: Vec<GetInput>) -> ExternResult<Vec<Option<Commit>>>;
         fn get_details(&self, get_input: Vec<GetInput>) -> ExternResult<Vec<Option<Details>>>;
         // CounterSigning
         fn accept_countersigning_preflight_request(
@@ -165,10 +165,10 @@ mockall::mock! {
             &self,
             must_get_action_input: MustGetActionInput,
         ) -> ExternResult<SignedActionHashed>;
-        fn must_get_valid_record(
+        fn must_get_valid_commit(
             &self,
-            must_get_valid_record_input: MustGetValidRecordInput,
-        ) -> ExternResult<Record>;
+            must_get_valid_commit_input: MustGetValidCommitInput,
+        ) -> ExternResult<Commit>;
         // Info
         fn dna_info(&self, dna_info_input: ()) -> ExternResult<DnaInfo>;
         fn zome_info(&self, zome_info_input: ()) -> ExternResult<ZomeInfo>;
@@ -223,10 +223,10 @@ impl HdiT for ErrHdk {
         Self::err()
     }
 
-    fn must_get_valid_record(
+    fn must_get_valid_commit(
         &self,
-        _must_get_valid_record_input: MustGetValidRecordInput,
-    ) -> ExternResult<Record> {
+        _must_get_valid_commit_input: MustGetValidCommitInput,
+    ) -> ExternResult<Commit> {
         Self::err()
     }
 
@@ -262,7 +262,7 @@ impl HdkT for ErrHdk {
     fn get_agent_activity(&self, _: GetAgentActivityInput) -> ExternResult<AgentActivity> {
         Self::err()
     }
-    fn query(&self, _: ChainQueryFilter) -> ExternResult<Vec<Record>> {
+    fn query(&self, _: ChainQueryFilter) -> ExternResult<Vec<Commit>> {
         Self::err()
     }
     fn sign(&self, _: Sign) -> ExternResult<Signature> {
@@ -280,7 +280,7 @@ impl HdkT for ErrHdk {
     fn delete(&self, _: DeleteInput) -> ExternResult<ActionHash> {
         Self::err()
     }
-    fn get(&self, _: Vec<GetInput>) -> ExternResult<Vec<Option<Record>>> {
+    fn get(&self, _: Vec<GetInput>) -> ExternResult<Vec<Option<Commit>>> {
         Self::err()
     }
     fn get_details(&self, _: Vec<GetInput>) -> ExternResult<Vec<Option<Details>>> {
@@ -403,11 +403,11 @@ impl HdiT for HostHdk {
     ) -> ExternResult<SignedActionHashed> {
         HostHdi::new().must_get_action(must_get_action_input)
     }
-    fn must_get_valid_record(
+    fn must_get_valid_commit(
         &self,
-        must_get_valid_record_input: MustGetValidRecordInput,
-    ) -> ExternResult<Record> {
-        HostHdi::new().must_get_valid_record(must_get_valid_record_input)
+        must_get_valid_commit_input: MustGetValidCommitInput,
+    ) -> ExternResult<Commit> {
+        HostHdi::new().must_get_valid_commit(must_get_valid_commit_input)
     }
     fn dna_info(&self, _: ()) -> ExternResult<DnaInfo> {
         HostHdi::new().dna_info(())
@@ -447,8 +447,8 @@ impl HdkT for HostHdk {
             get_agent_activity_input,
         )
     }
-    fn query(&self, filter: ChainQueryFilter) -> ExternResult<Vec<Record>> {
-        host_call::<ChainQueryFilter, Vec<Record>>(__query, filter)
+    fn query(&self, filter: ChainQueryFilter) -> ExternResult<Vec<Commit>> {
+        host_call::<ChainQueryFilter, Vec<Commit>>(__query, filter)
     }
     fn sign(&self, sign: Sign) -> ExternResult<Signature> {
         host_call::<Sign, Signature>(__sign, sign)
@@ -465,8 +465,8 @@ impl HdkT for HostHdk {
     fn delete(&self, hash: DeleteInput) -> ExternResult<ActionHash> {
         host_call::<DeleteInput, ActionHash>(__delete, hash)
     }
-    fn get(&self, get_inputs: Vec<GetInput>) -> ExternResult<Vec<Option<Record>>> {
-        host_call::<Vec<GetInput>, Vec<Option<Record>>>(__get, get_inputs)
+    fn get(&self, get_inputs: Vec<GetInput>) -> ExternResult<Vec<Option<Commit>>> {
+        host_call::<Vec<GetInput>, Vec<Option<Commit>>>(__get, get_inputs)
     }
     fn get_details(&self, get_inputs: Vec<GetInput>) -> ExternResult<Vec<Option<Details>>> {
         host_call::<Vec<GetInput>, Vec<Option<Details>>>(__get_details, get_inputs)

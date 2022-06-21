@@ -140,7 +140,7 @@ mod tests {
 
         for shh in &shhs[..6] {
             let hash = shh.action_address();
-            let op = DhtOpLight::StoreRecord(hash.clone(), None, hash.clone().into());
+            let op = DhtOpLight::StoreCommit(hash.clone(), None, hash.clone().into());
             let op_order = OpOrder::new(op.get_type(), shh.action().timestamp());
             insert_action(&mut txn, shh).unwrap();
             insert_op_lite(

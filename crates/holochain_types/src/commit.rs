@@ -1,12 +1,12 @@
-//! Defines a Record, the basic unit of Holochain data.
+//! Defines a Commit, the basic unit of Holochain data.
 
 use crate::action::WireActionStatus;
 use crate::action::WireDelete;
 use crate::action::WireNewEntryAction;
 use crate::action::WireUpdateRelationship;
 use crate::prelude::*;
-use error::RecordGroupError;
-use error::RecordGroupResult;
+use error::CommitGroupError;
+use error::CommitGroupResult;
 use holochain_keystore::KeystoreError;
 use holochain_keystore::LairResult;
 use holochain_keystore::MetaLairClient;
@@ -18,9 +18,9 @@ use std::collections::BTreeSet;
 pub mod error;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes, Default)]
-/// A condensed version of get record request.
+/// A condensed version of get commit request.
 /// This saves bandwidth by removing duplicated and implied data.
-pub struct WireRecordOps {
+pub struct WireCommitOps {
     /// The action this request was for.
     pub action: Option<Judged<SignedAction>>,
     /// Any deletes on the action.
@@ -31,8 +31,8 @@ pub struct WireRecordOps {
     pub entry: Option<Entry>,
 }
 
-impl WireRecordOps {
-    /// Create an empty set of wire record ops.
+impl WireCommitOps {
+    /// Create an empty set of wire commit ops.
     pub fn new() -> Self {
         Self::default()
     }
@@ -56,7 +56,7 @@ impl WireRecordOps {
                 action,
                 signature,
                 status,
-                DhtOpType::StoreRecord,
+                DhtOpType::StoreCommit,
             )?);
             if let Some(entry_hash) = entry_hash {
                 for op in deletes {
@@ -81,7 +81,7 @@ impl WireRecordOps {
                         action,
                         signature,
                         status,
-                        DhtOpType::RegisterUpdatedRecord,
+                        DhtOpType::RegisterUpdatedCommit,
                     )?);
                 }
             }
@@ -94,14 +94,14 @@ impl WireRecordOps {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
-/// Record without the hashes for sending across the network
+/// Commit without the hashes for sending across the network
 /// TODO: Remove this as it's no longer needed.
-pub struct WireRecord {
-    /// The signed action for this record
+pub struct WireCommit {
+    /// The signed action for this commit
     signed_action: SignedAction,
     /// If there is an entry associated with this action it will be here
     maybe_entry: Option<Entry>,
-    /// The validation status of this record.
+    /// The validation status of this commit.
     validation_status: ValidationStatus,
     /// All deletes on this action
     deletes: Vec<WireActionStatus<WireDelete>>,
@@ -109,24 +109,24 @@ pub struct WireRecord {
     updates: Vec<WireActionStatus<WireUpdateRelationship>>,
 }
 
-/// A group of records with a common entry
+/// A group of commits with a common entry
 #[derive(Debug, Clone)]
-pub struct RecordGroup<'a> {
+pub struct CommitGroup<'a> {
     actions: Vec<Cow<'a, SignedActionHashed>>,
     rejected: Vec<Cow<'a, SignedActionHashed>>,
     entry: Cow<'a, EntryHashed>,
 }
 
-/// Record with it's status
+/// Commit with it's status
 #[derive(Debug, Clone, derive_more::Constructor)]
-pub struct RecordStatus {
-    /// The record this status applies to.
-    pub record: Record,
-    /// Validation status of this record.
+pub struct CommitStatus {
+    /// The commit this status applies to.
+    pub commit: Commit,
+    /// Validation status of this commit.
     pub status: ValidationStatus,
 }
 
-impl<'a> RecordGroup<'a> {
+impl<'a> CommitGroup<'a> {
     /// Get the actions and action hashes
     pub fn actions_and_hashes(&self) -> impl Iterator<Item = (&ActionHash, &Action)> {
         self.actions
@@ -143,14 +143,14 @@ impl<'a> RecordGroup<'a> {
         self.actions.len()
     }
     /// The entry's visibility
-    pub fn visibility(&self) -> RecordGroupResult<&EntryVisibility> {
+    pub fn visibility(&self) -> CommitGroupResult<&EntryVisibility> {
         self.actions
             .first()
-            .ok_or(RecordGroupError::Empty)?
+            .ok_or(CommitGroupError::Empty)?
             .action()
             .entry_data()
             .map(|(_, et)| et.visibility())
-            .ok_or(RecordGroupError::MissingEntryData)
+            .ok_or(CommitGroupError::MissingEntryData)
     }
     /// The entry hash
     pub fn entry_hash(&self) -> &EntryHash {
@@ -179,12 +179,12 @@ impl<'a> RecordGroup<'a> {
         self.rejected.iter().map(|shh| shh.action_address())
     }
 
-    /// Create a record group from wire actions and an entry
-    pub fn from_wire_records<I: IntoIterator<Item = WireActionStatus<WireNewEntryAction>>>(
+    /// Create a commit group from wire actions and an entry
+    pub fn from_wire_commits<I: IntoIterator<Item = WireActionStatus<WireNewEntryAction>>>(
         actions_iter: I,
         entry_type: EntryType,
         entry: Entry,
-    ) -> RecordGroupResult<RecordGroup<'a>> {
+    ) -> CommitGroupResult<CommitGroup<'a>> {
         let iter = actions_iter.into_iter();
         let mut valid = Vec::with_capacity(iter.size_hint().0);
         let mut rejected = Vec::with_capacity(iter.size_hint().0);
@@ -216,16 +216,16 @@ impl<'a> RecordGroup<'a> {
 /// Responses from a dht get.
 /// These vary is size depending on the level of metadata required
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
-pub enum GetRecordResponse {
+pub enum GetCommitResponse {
     /// Can be combined with any other metadata monotonically
     GetEntryFull(Option<Box<RawGetEntryResponse>>),
     /// Placeholder for more optimized get
     GetEntryPartial,
     /// Placeholder for more optimized get
     GetEntryCollapsed,
-    /// Get a single record
+    /// Get a single commit
     /// Can be combined with other metadata monotonically
-    GetAction(Option<Box<WireRecord>>),
+    GetAction(Option<Box<WireCommit>>),
 }
 
 /// This type gives full metadata that can be combined
@@ -255,26 +255,26 @@ pub struct RawGetEntryResponse {
 }
 
 impl RawGetEntryResponse {
-    /// Creates the response from a set of chain records
+    /// Creates the response from a set of chain commits
     /// that share the same entry with any deletes.
     /// Note: It's the callers responsibility to check that
-    /// records all have the same entry. This is not checked
+    /// commits all have the same entry. This is not checked
     /// due to the performance cost.
     /// ### Panics
-    /// If the records are not an action of Create or EntryDelete
+    /// If the commits are not an action of Create or EntryDelete
     /// or there is no entry or the entry hash is different
-    pub fn from_records<E>(
-        records: E,
+    pub fn from_commits<E>(
+        commits: E,
         deletes: Vec<WireActionStatus<WireDelete>>,
         updates: Vec<WireActionStatus<WireUpdateRelationship>>,
     ) -> Option<Self>
     where
-        E: IntoIterator<Item = RecordStatus>,
+        E: IntoIterator<Item = CommitStatus>,
     {
-        let mut records = records.into_iter();
-        records.next().map(|RecordStatus { record, status }| {
+        let mut commits = commits.into_iter();
+        commits.next().map(|CommitStatus { commit, status }| {
             let mut live_actions = BTreeSet::new();
-            let (new_entry_action, entry_type, entry) = Self::from_record(record);
+            let (new_entry_action, entry_type, entry) = Self::from_commit(commit);
             live_actions.insert(WireActionStatus::new(new_entry_action, status));
             let r = Self {
                 live_actions,
@@ -283,8 +283,8 @@ impl RawGetEntryResponse {
                 entry,
                 entry_type,
             };
-            records.fold(r, |mut response, RecordStatus { record, status }| {
-                let (new_entry_action, entry_type, entry) = Self::from_record(record);
+            commits.fold(r, |mut response, CommitStatus { commit, status }| {
+                let (new_entry_action, entry_type, entry) = Self::from_commit(commit);
                 debug_assert_eq!(response.entry, entry);
                 debug_assert_eq!(response.entry_type, entry_type);
                 response
@@ -295,8 +295,8 @@ impl RawGetEntryResponse {
         })
     }
 
-    fn from_record(record: Record) -> (WireNewEntryAction, EntryType, Entry) {
-        let (shh, entry) = record.into_inner();
+    fn from_commit(commit: Commit) -> (WireNewEntryAction, EntryType, Entry) {
+        let (shh, entry) = commit.into_inner();
         let entry = entry
             .into_option()
             .expect("Get entry responses cannot be created without entries");
@@ -323,14 +323,14 @@ impl RawGetEntryResponse {
 
 /// Extension trait to keep zome types minimal
 #[async_trait::async_trait]
-pub trait RecordExt {
+pub trait CommitExt {
     /// Validate the signature matches the data
     async fn validate(&self) -> Result<(), KeystoreError>;
 }
 
 #[async_trait::async_trait]
-impl RecordExt for Record {
-    /// Validates a chain record
+impl CommitExt for Commit {
+    /// Validates a chain commit
     async fn validate(&self) -> Result<(), KeystoreError> {
         self.signed_action().validate().await?;
 
@@ -388,18 +388,18 @@ impl SignedActionHashedExt for SignedActionHashed {
     }
 }
 
-impl WireRecord {
-    /// Convert into a [Record], deletes and updates when receiving from the network
-    pub fn into_parts(self) -> (RecordStatus, Vec<RecordStatus>, Vec<RecordStatus>) {
+impl WireCommit {
+    /// Convert into a [Commit], deletes and updates when receiving from the network
+    pub fn into_parts(self) -> (CommitStatus, Vec<CommitStatus>, Vec<CommitStatus>) {
         let entry_hash = self.signed_action.action().entry_hash().cloned();
-        let action = Record::new(
+        let action = Commit::new(
             SignedActionHashed::from_content_sync(self.signed_action),
             self.maybe_entry,
         );
         let deletes = self
             .deletes
             .into_iter()
-            .map(WireActionStatus::<WireDelete>::into_record_status)
+            .map(WireActionStatus::<WireDelete>::into_commit_status)
             .collect();
         let updates = self
             .updates
@@ -408,26 +408,26 @@ impl WireRecord {
                 let entry_hash = entry_hash
                     .clone()
                     .expect("Updates cannot be on actions that do not have entries");
-                u.into_record_status(entry_hash)
+                u.into_commit_status(entry_hash)
             })
             .collect();
         (
-            RecordStatus::new(action, self.validation_status),
+            CommitStatus::new(action, self.validation_status),
             deletes,
             updates,
         )
     }
-    /// Convert from a [Record] when sending to the network
-    pub fn from_record(
-        e: RecordStatus,
+    /// Convert from a [Commit] when sending to the network
+    pub fn from_commit(
+        e: CommitStatus,
         deletes: Vec<WireActionStatus<WireDelete>>,
         updates: Vec<WireActionStatus<WireUpdateRelationship>>,
     ) -> Self {
-        let RecordStatus { record, status } = e;
-        let (signed_action, maybe_entry) = record.into_inner();
+        let CommitStatus { commit, status } = e;
+        let (signed_action, maybe_entry) = commit.into_inner();
         Self {
             signed_action: signed_action.into(),
-            // TODO: consider refactoring WireRecord to use RecordEntry
+            // TODO: consider refactoring WireCommit to use CommitEntry
             // instead of Option<Entry>
             maybe_entry: maybe_entry.into_option(),
             validation_status: status,

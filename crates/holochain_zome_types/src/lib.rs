@@ -18,6 +18,7 @@ pub mod bytes;
 pub mod call;
 pub mod capability;
 pub mod cell;
+pub mod commit;
 pub mod countersigning;
 #[allow(missing_docs)]
 pub mod crdt;
@@ -44,7 +45,6 @@ pub mod prelude;
 #[cfg(feature = "properties")]
 pub mod properties;
 pub mod query;
-pub mod record;
 pub mod request;
 /// Schedule functions to run outside a direct zome call.
 pub mod schedule;

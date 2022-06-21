@@ -14,7 +14,7 @@ pub fn get<'a>(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     inputs: Vec<GetInput>,
-) -> Result<Vec<Option<Record>>, RuntimeError> {
+) -> Result<Vec<Option<Commit>>, RuntimeError> {
     let num_requests = inputs.len();
     tracing::debug!("Starting with {} requests.", num_requests);
     match HostFnAccess::from(&call_context.host_context()) {
@@ -22,7 +22,7 @@ pub fn get<'a>(
             read_workspace: Permission::Allow,
             ..
         } => {
-            let results: Vec<Result<Option<Record>, _>> =
+            let results: Vec<Result<Option<Commit>, _>> =
                 tokio_helper::block_forever_on(async move {
                     futures::stream::iter(inputs.into_iter().map(|input| async {
                         let GetInput {

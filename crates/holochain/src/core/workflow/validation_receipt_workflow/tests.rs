@@ -35,10 +35,10 @@ async fn test_validation_receipt() {
 
     // Get op hashes
     let vault = alice.dht_db().clone().into();
-    let record = fresh_store_test(&vault, |store| {
-        store.get_record(&hash.clone().into()).unwrap().unwrap()
+    let commit = fresh_store_test(&vault, |store| {
+        store.get_commit(&hash.clone().into()).unwrap().unwrap()
     });
-    let ops = produce_ops_from_record(&record)
+    let ops = produce_ops_from_commit(&commit)
         .unwrap()
         .into_iter()
         .map(|op| DhtOpHash::with_data_sync(&op))

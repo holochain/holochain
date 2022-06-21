@@ -2,7 +2,7 @@ use super::app_validation_workflow;
 use super::app_validation_workflow::AppValidationError;
 use super::app_validation_workflow::Outcome;
 use super::error::WorkflowResult;
-use super::sys_validation_workflow::sys_validate_record;
+use super::sys_validation_workflow::sys_validate_commit;
 use crate::conductor::api::CellConductorApi;
 use crate::conductor::api::CellConductorApiT;
 use crate::conductor::interface::SignalBroadcaster;
@@ -19,7 +19,7 @@ use holochain_p2p::HolochainP2pDna;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_state::source_chain::SourceChainError;
-use holochain_zome_types::record::Record;
+use holochain_zome_types::commit::Commit;
 
 use holochain_types::prelude::*;
 use tracing::instrument;
@@ -152,10 +152,10 @@ where
             SourceChainError::InvalidCommit(_)
         ))
     ) {
-        let scratch_records = workspace.source_chain().scratch_records()?;
-        if scratch_records.len() == 1 {
+        let scratch_commits = workspace.source_chain().scratch_commits()?;
+        if scratch_commits.len() == 1 {
             let lock = holochain_state::source_chain::lock_for_entry(
-                scratch_records[0].entry().as_option(),
+                scratch_commits[0].entry().as_option(),
             )?;
             if !lock.is_empty()
                 && workspace
@@ -215,18 +215,18 @@ where
     Ribosome: RibosomeT + 'static,
 {
     let to_app_validate = {
-        // collect all the records we need to validate in wasm
-        let scratch_records = workspace.source_chain().scratch_records()?;
-        let mut to_app_validate: Vec<Record> = Vec::with_capacity(scratch_records.len());
-        // Loop forwards through all the new records
-        for record in scratch_records {
-            sys_validate_record(&record, &workspace, network.clone(), &(*conductor_handle))
+        // collect all the commits we need to validate in wasm
+        let scratch_commits = workspace.source_chain().scratch_commits()?;
+        let mut to_app_validate: Vec<Commit> = Vec::with_capacity(scratch_commits.len());
+        // Loop forwards through all the new commits
+        for commit in scratch_commits {
+            sys_validate_commit(&commit, &workspace, network.clone(), &(*conductor_handle))
                 .await
                 // If the was en error exit
                 // If the validation failed, exit with an InvalidCommit
                 // If it was ok continue
                 .or_else(|outcome_or_err| outcome_or_err.invalid_call_zome_commit())?;
-            to_app_validate.push(record);
+            to_app_validate.push(commit);
         }
 
         to_app_validate
@@ -234,10 +234,10 @@ where
 
     let mut cascade =
         holochain_cascade::Cascade::from_workspace_network(&workspace, network.clone());
-    for mut chain_record in to_app_validate {
-        for op_type in action_to_op_types(chain_record.action()) {
+    for mut chain_commit in to_app_validate {
+        for op_type in action_to_op_types(chain_commit.action()) {
             let op =
-                app_validation_workflow::record_to_op(chain_record, op_type, &mut cascade).await;
+                app_validation_workflow::commit_to_op(chain_commit, op_type, &mut cascade).await;
 
             let (op, activity_entry) = match op {
                 Ok(op) => op,
@@ -253,7 +253,7 @@ where
             .await;
             let outcome = outcome.or_else(Outcome::try_from);
             map_outcome(outcome)?;
-            chain_record = app_validation_workflow::op_to_record(op, activity_entry);
+            chain_commit = app_validation_workflow::op_to_commit(op, activity_entry);
         }
     }
 

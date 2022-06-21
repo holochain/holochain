@@ -298,7 +298,7 @@ impl HostFnCaller {
         output
     }
 
-    pub async fn get(&self, entry_hash: AnyDhtHash, options: GetOptions) -> Vec<Option<Record>> {
+    pub async fn get(&self, entry_hash: AnyDhtHash, options: GetOptions) -> Vec<Option<Commit>> {
         let (ribosome, call_context, _) = self.unpack().await;
         let input = GetInput::new(entry_hash, options);
         host_fn::get::get(ribosome, call_context, vec![input]).unwrap()

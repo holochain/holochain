@@ -8,7 +8,7 @@ enum EntryZomes {
 }
 
 #[hdk_extern]
-fn get_entry(hash: ActionHash) -> ExternResult<Option<Record>> {
+fn get_entry(hash: ActionHash) -> ExternResult<Option<Commit>> {
     get(hash, GetOptions::content())
 }
 

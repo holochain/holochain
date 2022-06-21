@@ -315,7 +315,7 @@ impl KitsuneHost for Kd1 {
     fn record_metrics(
         &self,
         _space: Arc<KitsuneSpace>,
-        _records: Vec<MetricRecord>,
+        _commits: Vec<MetricRecord>,
     ) -> KitsuneHostResult<()> {
         box_fut(Err("Kd1 just returns errors for some methods".into()))
     }

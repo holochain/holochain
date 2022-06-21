@@ -61,8 +61,8 @@ impl Scenario {
                 op.facts.last_action = true;
                 [dep, op]
             }
-            DhtOpType::RegisterDeletedBy | DhtOpType::RegisterUpdatedRecord => {
-                let mut dep = Self::without_dep(DhtOpType::StoreRecord);
+            DhtOpType::RegisterDeletedBy | DhtOpType::RegisterUpdatedCommit => {
+                let mut dep = Self::without_dep(DhtOpType::StoreCommit);
                 let mut op = Self::without_dep(op_type);
                 dep.facts.integrated = true;
                 dep.facts.awaiting_integration = false;
@@ -142,10 +142,10 @@ fn create_and_insert_op(
     let Scenario { facts, op } = scenario;
     let entry = matches!(
         op,
-        DhtOpType::StoreRecord
+        DhtOpType::StoreCommit
             | DhtOpType::StoreEntry
             | DhtOpType::RegisterUpdatedContent
-            | DhtOpType::RegisterUpdatedRecord
+            | DhtOpType::RegisterUpdatedCommit
     )
     .then(|| Entry::App(fixt!(AppEntryBytes)));
 
@@ -157,10 +157,10 @@ fn create_and_insert_op(
 
     let mut action: Action = match op {
         DhtOpType::RegisterAgentActivity
-        | DhtOpType::StoreRecord
+        | DhtOpType::StoreCommit
         | DhtOpType::StoreEntry
         | DhtOpType::RegisterUpdatedContent
-        | DhtOpType::RegisterUpdatedRecord => {
+        | DhtOpType::RegisterUpdatedCommit => {
             let mut update = fixt!(Update);
             seq_not_zero(&mut update.action_seq);
             if facts.last_action {
@@ -247,7 +247,7 @@ fn test_data(db: &DbRead<DbKindDht>) -> Expected {
         DhtOpType::RegisterAgentActivity,
         DhtOpType::RegisterRemoveLink,
         DhtOpType::RegisterUpdatedContent,
-        DhtOpType::RegisterUpdatedRecord,
+        DhtOpType::RegisterUpdatedCommit,
         DhtOpType::RegisterDeletedBy,
         DhtOpType::RegisterDeletedEntryAction,
     ];

@@ -44,7 +44,7 @@ impl From<EntryHashed> for Entry {
     }
 }
 
-/// Structure holding the entry portion of a chain record.
+/// Structure holding the entry portion of a chain commit.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[serde(tag = "entry_type", content = "entry")]
@@ -126,11 +126,11 @@ impl HashableContent for Entry {
     }
 }
 
-/// Zome input for must_get_valid_record.
+/// Zome input for must_get_valid_commit.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub struct MustGetValidRecordInput(pub ActionHash);
+pub struct MustGetValidCommitInput(pub ActionHash);
 
-impl MustGetValidRecordInput {
+impl MustGetValidCommitInput {
     /// Constructor.
     pub fn new(action_hash: ActionHash) -> Self {
         Self(action_hash)

@@ -142,7 +142,7 @@ pub fn create_cap_grant(cap_grant_entry: CapGrantEntry) -> ExternResult<ActionHa
 /// There is no `undo` for deletes, a new grant must be created and distributed to reinstate access after a grant deletion.
 /// Immediately means after the wasm successfully completes with no errors or rollbacks as extern calls are transactional/atomic.
 ///
-/// The input to [`delete_cap_grant`] is the [`ActionHash`] of the [`CapGrant`] record to delete and optionally an argument to
+/// The input to [`delete_cap_grant`] is the [`ActionHash`] of the [`CapGrant`] commit to mark deleted and optionally an argument to
 /// specify the [`ChainTopOrdering`]. Refer to [`DeleteInput`] for details.
 ///
 /// Deletes can reference both [`CapGrant`] creates and updates.

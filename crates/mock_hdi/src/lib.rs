@@ -46,10 +46,10 @@ use holochain_deterministic_integrity::prelude::*;
             &self,
             must_get_action_input: MustGetActionInput,
         ) -> ExternResult<SignedActionHashed>;
-        fn must_get_valid_record(
+        fn must_get_valid_commit(
             &self,
-            must_get_valid_record_input: MustGetValidRecordInput,
-        ) -> ExternResult<Record>;
+            must_get_valid_commit_input: MustGetValidCommitInput,
+        ) -> ExternResult<Commit>;
         // Info
         fn dna_info(&self, dna_info_input: ()) -> ExternResult<DnaInfo>;
         fn zome_info(&self, zome_info_input: ()) -> ExternResult<ZomeInfo>;

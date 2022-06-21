@@ -1,6 +1,6 @@
 //! Metadata types for use in wasm
-use crate::record::Record;
-use crate::record::SignedActionHashed;
+use crate::commit::Commit;
+use crate::commit::SignedActionHashed;
 use crate::validate::ValidationStatus;
 use crate::Entry;
 use holochain_serialized_bytes::prelude::*;
@@ -8,27 +8,27 @@ use holochain_serialized_bytes::prelude::*;
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, SerializedBytes)]
 #[serde(tag = "type", content = "content")]
 /// Return type for get_details calls.
-/// ActionHash returns a Record.
+/// ActionHash returns a Commit.
 /// EntryHash returns an Entry.
 pub enum Details {
-    /// Variant asking for a specific record
-    Record(RecordDetails),
+    /// Variant asking for a specific commit
+    Commit(CommitDetails),
     /// Variant asking for any information on data
     Entry(EntryDetails),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, SerializedBytes)]
-/// A specific Record with any deletes
-/// This is all the metadata available for a record.
-pub struct RecordDetails {
-    /// The specific record.
+/// A specific Commit with any deletes
+/// This is all the metadata available for a commit.
+pub struct CommitDetails {
+    /// The specific commit.
     /// Either a Create or an Update.
-    pub record: Record,
-    /// The validation status of this record.
+    pub commit: Commit,
+    /// The validation status of this commit.
     pub validation_status: ValidationStatus,
-    /// Any [`Delete`](crate::action::Delete) on this record.
+    /// Any [`Delete`](crate::action::Delete) on this commit.
     pub deletes: Vec<SignedActionHashed>,
-    /// Any [`Update`](crate::action::Update) on this record.
+    /// Any [`Update`](crate::action::Update) on this commit.
     pub updates: Vec<SignedActionHashed>,
 }
 
@@ -44,7 +44,7 @@ pub struct EntryDetails {
     /// where the `entry_hash` field is the hash of
     /// the above entry.
     ///
-    /// You can make an [`Record`] from any of these
+    /// You can make an [`Commit`] from any of these
     /// and the entry.
     pub actions: Vec<SignedActionHashed>,
     /// Rejected create relationships.
@@ -62,7 +62,7 @@ pub struct EntryDetails {
     /// This is just the relationship and you will need call get
     /// if you want to get the new Entry (the entry on the `entry_hash` field).
     ///
-    /// You **cannot** make an [Record] from these actions
+    /// You **cannot** make an [Commit] from these actions
     /// and the above entry.
     pub updates: Vec<SignedActionHashed>,
     /// The status of this entry currently
@@ -85,7 +85,7 @@ pub enum EntryDhtStatus {
     Abandoned,
     /// **not implemented** There has been a conflict when validating this [Entry]
     Conflict,
-    /// **not implemented** The author has withdrawn their publication of this record.
+    /// **not implemented** The author has withdrawn their publication of this commit.
     Withdrawn,
     /// **not implemented** We have agreed to drop this [Entry] content from the system. Action can stay with no entry
     Purged,

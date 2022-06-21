@@ -435,7 +435,7 @@ fn check_prev_action_chain(
 /// retrieve it and send it as a RegisterAddLink DhtOp
 /// to our incoming_dht_ops_workflow.
 ///
-/// Apply a checks callback to the Record.
+/// Apply a checks callback to the Commit.
 ///
 /// Additionally sys validation will be triggered to
 /// run again if we weren't holding it.
@@ -447,15 +447,15 @@ pub async fn check_and_hold_register_add_link<F>(
     f: F,
 ) -> SysValidationResult<()>
 where
-    F: FnOnce(&Record) -> SysValidationResult<()>,
+    F: FnOnce(&Commit) -> SysValidationResult<()>,
 {
     let source = check_and_hold(hash, workspace, network).await?;
     f(source.as_ref())?;
-    if let (Some(incoming_dht_ops_sender), Source::Network(record)) =
+    if let (Some(incoming_dht_ops_sender), Source::Network(commit)) =
         (incoming_dht_ops_sender, source)
     {
         incoming_dht_ops_sender
-            .send_register_add_link(record)
+            .send_register_add_link(commit)
             .await?;
     }
     Ok(())
@@ -465,7 +465,7 @@ where
 /// retrieve it and send it as a RegisterAgentActivity DhtOp
 /// to our incoming_dht_ops_workflow.
 ///
-/// Apply a checks callback to the Record.
+/// Apply a checks callback to the Commit.
 ///
 /// Additionally sys validation will be triggered to
 /// run again if we weren't holding it.
@@ -477,15 +477,15 @@ pub async fn check_and_hold_register_agent_activity<F>(
     f: F,
 ) -> SysValidationResult<()>
 where
-    F: FnOnce(&Record) -> SysValidationResult<()>,
+    F: FnOnce(&Commit) -> SysValidationResult<()>,
 {
     let source = check_and_hold(hash, workspace, network).await?;
     f(source.as_ref())?;
-    if let (Some(incoming_dht_ops_sender), Source::Network(record)) =
+    if let (Some(incoming_dht_ops_sender), Source::Network(commit)) =
         (incoming_dht_ops_sender, source)
     {
         incoming_dht_ops_sender
-            .send_register_agent_activity(record)
+            .send_register_agent_activity(commit)
             .await?;
     }
     Ok(())
@@ -495,7 +495,7 @@ where
 /// retrieve it and send it as a StoreEntry DhtOp
 /// to our incoming_dht_ops_workflow.
 ///
-/// Apply a checks callback to the Record.
+/// Apply a checks callback to the Commit.
 ///
 /// Additionally sys validation will be triggered to
 /// run again if we weren't holding it.
@@ -507,28 +507,28 @@ pub async fn check_and_hold_store_entry<F>(
     f: F,
 ) -> SysValidationResult<()>
 where
-    F: FnOnce(&Record) -> SysValidationResult<()>,
+    F: FnOnce(&Commit) -> SysValidationResult<()>,
 {
     let source = check_and_hold(hash, workspace, network).await?;
     f(source.as_ref())?;
-    if let (Some(incoming_dht_ops_sender), Source::Network(record)) =
+    if let (Some(incoming_dht_ops_sender), Source::Network(commit)) =
         (incoming_dht_ops_sender, source)
     {
-        incoming_dht_ops_sender.send_store_entry(record).await?;
+        incoming_dht_ops_sender.send_store_entry(commit).await?;
     }
     Ok(())
 }
 
 /// If we are not holding this entry then
-/// retrieve any record at this EntryHash
+/// retrieve any commit at this EntryHash
 /// and send it as a StoreEntry DhtOp
 /// to our incoming_dht_ops_workflow.
 ///
 /// Note this is different to check_and_hold_store_entry
-/// because it gets the Record via an EntryHash which
-/// means it will be any Record.
+/// because it gets the Commit via an EntryHash which
+/// means it will be any Commit.
 ///
-/// Apply a checks callback to the Record.
+/// Apply a checks callback to the Commit.
 ///
 /// Additionally sys validation will be triggered to
 /// run again if we weren't holding it.
@@ -540,27 +540,27 @@ pub async fn check_and_hold_any_store_entry<F>(
     f: F,
 ) -> SysValidationResult<()>
 where
-    F: FnOnce(&Record) -> SysValidationResult<()>,
+    F: FnOnce(&Commit) -> SysValidationResult<()>,
 {
     let source = check_and_hold(hash, workspace, network).await?;
     f(source.as_ref())?;
-    if let (Some(incoming_dht_ops_sender), Source::Network(record)) =
+    if let (Some(incoming_dht_ops_sender), Source::Network(commit)) =
         (incoming_dht_ops_sender, source)
     {
-        incoming_dht_ops_sender.send_store_entry(record).await?;
+        incoming_dht_ops_sender.send_store_entry(commit).await?;
     }
     Ok(())
 }
 
 /// If we are not holding this action then
-/// retrieve it and send it as a StoreRecord DhtOp
+/// retrieve it and send it as a StoreCommit DhtOp
 /// to our incoming_dht_ops_workflow.
 ///
-/// Apply a checks callback to the Record.
+/// Apply a checks callback to the Commit.
 ///
 /// Additionally sys validation will be triggered to
 /// run again if we weren't holding it.
-pub async fn check_and_hold_store_record<F>(
+pub async fn check_and_hold_store_commit<F>(
     hash: &ActionHash,
     workspace: &SysValidationWorkspace,
     network: HolochainP2pDna,
@@ -568,14 +568,14 @@ pub async fn check_and_hold_store_record<F>(
     f: F,
 ) -> SysValidationResult<()>
 where
-    F: FnOnce(&Record) -> SysValidationResult<()>,
+    F: FnOnce(&Commit) -> SysValidationResult<()>,
 {
     let source = check_and_hold(hash, workspace, network).await?;
     f(source.as_ref())?;
-    if let (Some(incoming_dht_ops_sender), Source::Network(record)) =
+    if let (Some(incoming_dht_ops_sender), Source::Network(commit)) =
         (incoming_dht_ops_sender, source)
     {
-        incoming_dht_ops_sender.send_store_record(record).await?;
+        incoming_dht_ops_sender.send_store_commit(commit).await?;
     }
     Ok(())
 }
@@ -594,10 +594,10 @@ impl IncomingDhtOpSender {
     /// Sends the op to the incoming workflow
     async fn send_op(
         self,
-        record: Record,
-        make_op: fn(Record) -> Option<(DhtOpHash, DhtOp)>,
+        commit: Commit,
+        make_op: fn(Commit) -> Option<(DhtOpHash, DhtOp)>,
     ) -> SysValidationResult<()> {
-        if let Some(op) = make_op(record) {
+        if let Some(op) = make_op(commit) {
             let ops = vec![op];
             incoming_dht_ops_workflow(self.space.as_ref(), self.sys_validation_trigger, ops, false)
                 .await
@@ -605,39 +605,39 @@ impl IncomingDhtOpSender {
         }
         Ok(())
     }
-    async fn send_store_record(self, record: Record) -> SysValidationResult<()> {
-        self.send_op(record, make_store_record).await
+    async fn send_store_commit(self, commit: Commit) -> SysValidationResult<()> {
+        self.send_op(commit, make_store_commit).await
     }
-    async fn send_store_entry(self, record: Record) -> SysValidationResult<()> {
-        let is_public_entry = record.action().entry_type().map_or(false, |et| {
+    async fn send_store_entry(self, commit: Commit) -> SysValidationResult<()> {
+        let is_public_entry = commit.action().entry_type().map_or(false, |et| {
             matches!(et.visibility(), EntryVisibility::Public)
         });
         if is_public_entry {
-            self.send_op(record, make_store_entry).await?;
+            self.send_op(commit, make_store_entry).await?;
         }
         Ok(())
     }
-    async fn send_register_add_link(self, record: Record) -> SysValidationResult<()> {
-        self.send_op(record, make_register_add_link).await
+    async fn send_register_add_link(self, commit: Commit) -> SysValidationResult<()> {
+        self.send_op(commit, make_register_add_link).await
     }
-    async fn send_register_agent_activity(self, record: Record) -> SysValidationResult<()> {
-        self.send_op(record, make_register_agent_activity).await
+    async fn send_register_agent_activity(self, commit: Commit) -> SysValidationResult<()> {
+        self.send_op(commit, make_register_agent_activity).await
     }
 }
 
-/// Where the record was found.
+/// Where the commit was found.
 enum Source {
     /// Locally because we are holding it or
     /// because we will be soon
-    Local(Record),
+    Local(Commit),
     /// On the network.
     /// This means we aren't holding it so
     /// we should add it to our incoming ops
-    Network(Record),
+    Network(Commit),
 }
 
-impl AsRef<Record> for Source {
-    fn as_ref(&self) -> &Record {
+impl AsRef<Commit> for Source {
+    fn as_ref(&self) -> &Commit {
         match self {
             Source::Local(el) | Source::Network(el) => el,
         }
@@ -674,42 +674,42 @@ async fn check_and_hold<I: Into<AnyDhtHash> + Clone>(
     }
 }
 
-/// Make a StoreRecord DhtOp from a Record.
+/// Make a StoreCommit DhtOp from a Commit.
 /// Note that this can fail if the op is missing an
 /// Entry when it was supposed to have one.
 ///
 /// Because adding ops to incoming limbo while we are checking them
 /// is only faster then waiting for them through gossip we don't care enough
 /// to return an error.
-fn make_store_record(record: Record) -> Option<(DhtOpHash, DhtOp)> {
+fn make_store_commit(commit: Commit) -> Option<(DhtOpHash, DhtOp)> {
     // Extract the data
-    let (shh, record_entry) = record.privatized().into_inner();
+    let (shh, commit_entry) = commit.privatized().into_inner();
     let (action, signature) = shh.into_inner();
     let action = action.into_content();
 
     // Check the entry
-    let maybe_entry_box = record_entry.into_option().map(Box::new);
+    let maybe_entry_box = commit_entry.into_option().map(Box::new);
 
     // Create the hash and op
-    let op = DhtOp::StoreRecord(signature, action, maybe_entry_box);
+    let op = DhtOp::StoreCommit(signature, action, maybe_entry_box);
     let hash = op.to_hash();
     Some((hash, op))
 }
 
-/// Make a StoreEntry DhtOp from a Record.
+/// Make a StoreEntry DhtOp from a Commit.
 /// Note that this can fail if the op is missing an Entry or
 /// the action is the wrong type.
 ///
 /// Because adding ops to incoming limbo while we are checking them
 /// is only faster then waiting for them through gossip we don't care enough
 /// to return an error.
-fn make_store_entry(record: Record) -> Option<(DhtOpHash, DhtOp)> {
+fn make_store_entry(commit: Commit) -> Option<(DhtOpHash, DhtOp)> {
     // Extract the data
-    let (shh, record_entry) = record.into_inner();
+    let (shh, commit_entry) = commit.into_inner();
     let (action, signature) = shh.into_inner();
 
     // Check the entry and exit early if it's not there
-    let entry_box = record_entry.into_option()?.into();
+    let entry_box = commit_entry.into_option()?.into();
     // If the action is the wrong type exit early
     let action = action.into_content().try_into().ok()?;
 
@@ -719,15 +719,15 @@ fn make_store_entry(record: Record) -> Option<(DhtOpHash, DhtOp)> {
     Some((hash, op))
 }
 
-/// Make a RegisterAddLink DhtOp from a Record.
+/// Make a RegisterAddLink DhtOp from a Commit.
 /// Note that this can fail if the action is the wrong type
 ///
 /// Because adding ops to incoming limbo while we are checking them
 /// is only faster then waiting for them through gossip we don't care enough
 /// to return an error.
-fn make_register_add_link(record: Record) -> Option<(DhtOpHash, DhtOp)> {
+fn make_register_add_link(commit: Commit) -> Option<(DhtOpHash, DhtOp)> {
     // Extract the data
-    let (shh, _) = record.into_inner();
+    let (shh, _) = commit.into_inner();
     let (action, signature) = shh.into_inner();
 
     // If the action is the wrong type exit early
@@ -739,15 +739,15 @@ fn make_register_add_link(record: Record) -> Option<(DhtOpHash, DhtOp)> {
     Some((hash, op))
 }
 
-/// Make a RegisterAgentActivity DhtOp from a Record.
+/// Make a RegisterAgentActivity DhtOp from a Commit.
 /// Note that this can fail if the action is the wrong type
 ///
 /// Because adding ops to incoming limbo while we are checking them
 /// is only faster then waiting for them through gossip we don't care enough
 /// to return an error.
-fn make_register_agent_activity(record: Record) -> Option<(DhtOpHash, DhtOp)> {
+fn make_register_agent_activity(commit: Commit) -> Option<(DhtOpHash, DhtOp)> {
     // Extract the data
-    let (shh, _) = record.into_inner();
+    let (shh, _) = commit.into_inner();
     let (action, signature) = shh.into_inner();
 
     // If the action is the wrong type exit early

@@ -54,16 +54,16 @@ async fn test_publish() -> anyhow::Result<()> {
     consistency_10s(&[&alice, &bobbo, &carol]).await;
 
     // Verify that bobbo can run "read" on his cell and get alice's Action
-    let record: Option<Record> = conductors[1]
+    let commit: Option<Commit> = conductors[1]
         .call(&bobbo.zome("simple"), "read", hash)
         .await;
-    let record = record.expect("Record was None: bobbo couldn't `get` it");
+    let commit = commit.expect("Commit was None: bobbo couldn't `get` it");
 
-    // Assert that the Record bobbo sees matches what alice committed
-    assert_eq!(record.action().author(), alice.agent_pubkey());
+    // Assert that the Commit bobbo sees matches what alice committed
+    assert_eq!(commit.action().author(), alice.agent_pubkey());
     assert_eq!(
-        *record.entry(),
-        RecordEntry::Present(Entry::app(().try_into().unwrap()).unwrap())
+        *commit.entry(),
+        CommitEntry::Present(Entry::app(().try_into().unwrap()).unwrap())
     );
 
     Ok(())
@@ -101,16 +101,16 @@ async fn multi_conductor() -> anyhow::Result<()> {
     .await;
 
     // Verify that bobbo can run "read" on his cell and get alice's Action
-    let record: Option<Record> = conductors[1]
+    let commit: Option<Commit> = conductors[1]
         .call(&bobbo.zome("simple"), "read", hash)
         .await;
-    let record = record.expect("Record was None: bobbo couldn't `get` it");
+    let commit = commit.expect("Commit was None: bobbo couldn't `get` it");
 
-    // Assert that the Record bobbo sees matches what alice committed
-    assert_eq!(record.action().author(), alice.agent_pubkey());
+    // Assert that the Commit bobbo sees matches what alice committed
+    assert_eq!(commit.action().author(), alice.agent_pubkey());
     assert_eq!(
-        *record.entry(),
-        RecordEntry::Present(Entry::app(().try_into().unwrap()).unwrap())
+        *commit.entry(),
+        CommitEntry::Present(Entry::app(().try_into().unwrap()).unwrap())
     );
 
     // See if we can fetch metric data from bobbo
@@ -175,16 +175,16 @@ async fn sharded_consistency() {
     local_machine_session(&conductor_handles, std::time::Duration::from_secs(60)).await;
 
     // Verify that bobbo can run "read" on his cell and get alice's Action
-    let record: Option<Record> = conductors[1]
+    let commit: Option<Commit> = conductors[1]
         .call(&bobbo.zome("simple"), "read", hash)
         .await;
-    let record = record.expect("Record was None: bobbo couldn't `get` it");
+    let commit = commit.expect("Commit was None: bobbo couldn't `get` it");
 
-    // Assert that the Record bobbo sees matches what alice committed
-    assert_eq!(record.action().author(), alice.agent_pubkey());
+    // Assert that the Commit bobbo sees matches what alice committed
+    assert_eq!(commit.action().author(), alice.agent_pubkey());
     assert_eq!(
-        *record.entry(),
-        RecordEntry::Present(Entry::app(().try_into().unwrap()).unwrap())
+        *commit.entry(),
+        CommitEntry::Present(Entry::app(().try_into().unwrap()).unwrap())
     );
 }
 
@@ -319,23 +319,23 @@ async fn check_all_gets_for_private_entry(
     action_hash: ActionHash,
     entry_hash: EntryHash,
 ) {
-    let mut records: Vec<Option<Record>> = conductor
+    let mut commits: Vec<Option<Commit>> = conductor
         .call(zome, "get", AnyDhtHash::from(action_hash.clone()))
         .await;
-    let e: Vec<Option<Record>> = conductor
+    let e: Vec<Option<Commit>> = conductor
         .call(zome, "get", AnyDhtHash::from(entry_hash.clone()))
         .await;
-    records.extend(e);
+    commits.extend(e);
     let details: Vec<Option<Details>> = conductor
         .call(zome, "get_details", AnyDhtHash::from(action_hash.clone()))
         .await;
-    records.extend(
+    commits.extend(
         details
             .into_iter()
-            .map(|d| d.map(|d| unwrap_to!(d => Details::Record).clone().record)),
+            .map(|d| d.map(|d| unwrap_to!(d => Details::Commit).clone().commit)),
     );
-    let records = records.into_iter().filter_map(|a| a).collect();
-    check_records_for_private_entry(zome.cell_id().agent_pubkey().clone(), records);
+    let commits = commits.into_iter().filter_map(|a| a).collect();
+    check_commits_for_private_entry(zome.cell_id().agent_pubkey().clone(), commits);
     let entries: Vec<Option<Details>> = conductor
         .call(zome, "get_details", AnyDhtHash::from(entry_hash.clone()))
         .await;
@@ -352,12 +352,12 @@ async fn check_all_gets_for_private_entry(
     }
 }
 
-fn check_records_for_private_entry(caller: AgentPubKey, records: Vec<Record>) {
-    for record in records {
-        if *record.action().author() == caller {
-            assert_ne!(*record.entry(), RecordEntry::Hidden);
+fn check_commits_for_private_entry(caller: AgentPubKey, commits: Vec<Commit>) {
+    for commit in commits {
+        if *commit.action().author() == caller {
+            assert_ne!(*commit.entry(), CommitEntry::Hidden);
         } else {
-            assert_eq!(*record.entry(), RecordEntry::Hidden);
+            assert_eq!(*commit.entry(), CommitEntry::Hidden);
         }
     }
 }

@@ -16,11 +16,11 @@ use crate::dht_op::DhtOpType;
 use crate::dht_op::RenderedOp;
 use crate::dht_op::RenderedOps;
 
-/// Convenience function for when you have a RecordEntry but need
+/// Convenience function for when you have a CommitEntry but need
 /// a Option EntryHashed
-pub fn option_entry_hashed(entry: RecordEntry) -> Option<EntryHashed> {
+pub fn option_entry_hashed(entry: CommitEntry) -> Option<EntryHashed> {
     match entry {
-        RecordEntry::Present(e) => Some(EntryHashed::from_content_sync(e)),
+        CommitEntry::Present(e) => Some(EntryHashed::from_content_sync(e)),
         _ => None,
     }
 }

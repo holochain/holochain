@@ -62,7 +62,7 @@ impl KitsuneHost for SwitchboardEventHandler {
     fn record_metrics(
         &self,
         _space: Arc<KitsuneSpace>,
-        _records: Vec<MetricRecord>,
+        _commits: Vec<MetricRecord>,
     ) -> crate::KitsuneHostResult<()> {
         box_fut(Ok(()))
     }

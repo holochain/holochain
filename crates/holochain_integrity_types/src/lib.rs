@@ -13,6 +13,7 @@
 #[allow(missing_docs)]
 pub mod action;
 pub mod capability;
+pub mod commit;
 pub mod countersigning;
 pub mod entry;
 #[allow(missing_docs)]
@@ -25,7 +26,6 @@ pub mod info;
 pub mod link;
 pub mod op;
 pub mod prelude;
-pub mod record;
 pub mod signature;
 pub use kitsune_p2p_timestamp as timestamp;
 #[allow(missing_docs)]

@@ -19,7 +19,7 @@ pub fn get_agent_activity(
 
 /// Walks the source chain in ascending order (oldest to latest) filtering by action and/or entry type
 ///
-/// Given an action and entry type, returns an [ `Vec<Record>` ]
+/// Given an action and entry type, returns an [ `Vec<Commit>` ]
 ///
 /// @todo document this better with examples after we make query do all the things we want.
 /// @todo implement cap grant/claim usage in terms of query
@@ -27,6 +27,6 @@ pub fn get_agent_activity(
 /// @todo tie query into validation so we track dependencies e.g. validation packages
 /// @todo decide which direction we want to iterate in (paramaterise query?)
 /// @todo more expresivity generally?
-pub fn query(filter: ChainQueryFilter) -> ExternResult<Vec<Record>> {
+pub fn query(filter: ChainQueryFilter) -> ExternResult<Vec<Commit>> {
     HDK.with(|h| h.borrow().query(filter))
 }

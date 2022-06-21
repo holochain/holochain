@@ -15,7 +15,7 @@ fn create(_: ()) -> ExternResult<ActionHash> {
 
 /// `read` seems to be a reserved worked that causes SIGSEGV invalid memory reference when used as `#[hdk_extern]`
 #[hdk_extern]
-fn reed(action_hash: ActionHash) -> ExternResult<Option<Record>> {
+fn reed(action_hash: ActionHash) -> ExternResult<Option<Commit>> {
     get(action_hash, GetOptions::latest())
 }
 

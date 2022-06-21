@@ -2,14 +2,14 @@
 
 use crate::action::*;
 use crate::capability::*;
+use crate::commit::Commit;
+use crate::commit::SignedActionHashed;
 use crate::crdt::CrdtType;
 use crate::entry::AppEntryBytes;
 use crate::entry_def::EntryVisibility;
 use crate::link::LinkTag;
 use crate::migrate_agent::MigrateAgent;
 use crate::prelude::*;
-use crate::record::Record;
-use crate::record::SignedActionHashed;
 use crate::signature::Signature;
 use crate::timestamp::Timestamp;
 use crate::validate::RequiredValidationType;
@@ -59,7 +59,7 @@ fixturator!(
 
 fixturator!(
     RequiredValidationType;
-    unit variants [ Record SubChain Full ] empty Record;
+    unit variants [ Commit SubChain Full ] empty Commit;
 );
 
 fixturator!(
@@ -411,10 +411,10 @@ fixturator!(
     variants [ ChainAuthor(AgentPubKey) RemoteAgent(ZomeCallCapGrant) ];
 );
 
-pub fn record_with_no_entry(signature: Signature, action: Action) -> Record {
+pub fn commit_with_no_entry(signature: Signature, action: Action) -> Commit {
     let shh =
         SignedActionHashed::with_presigned(ActionHashed::from_content_sync(action), signature);
-    Record::new(shh, None)
+    Commit::new(shh, None)
 }
 
 fixturator!(

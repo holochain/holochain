@@ -2,8 +2,8 @@ use super::*;
 use crate::here;
 use crate::prelude::mutations_helpers::insert_valid_integrated_op;
 use crate::prelude::*;
+use holochain_types::commit::SignedActionHashedExt;
 use holochain_types::db::DbWrite;
-use holochain_types::record::SignedActionHashedExt;
 use observability;
 
 #[derive(Clone)]

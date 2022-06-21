@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 **MAJOR BREAKING CHANGE!** This release includes a rename of two Holochain core concepts, which results in a LOT of changes to public APIs and type names:
 
-- "Element" has been renamed to "Record"
+- "Element" has been renamed to "Commit"
 - "Header" has been renamed to "Action"
 
 All names which include these words have also been renamed accordingly.

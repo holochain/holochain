@@ -214,11 +214,11 @@ pub mod tests {
             conductor.handle().dispatch_scheduled_fns().await;
             i = i + 1;
         }
-        let query_tick: Vec<Record> = conductor.call(&alice, "query_tick", ()).await;
+        let query_tick: Vec<Commit> = conductor.call(&alice, "query_tick", ()).await;
         assert_eq!(query_tick.len(), 5);
 
         // The persistent schedule should run once in second.
-        let query_tock: Vec<Record> = conductor.call(&alice, "query_tock", ()).await;
+        let query_tock: Vec<Commit> = conductor.call(&alice, "query_tock", ()).await;
         assert!(query_tock.len() < 3);
 
         // If Bob does a few ticks and then calls `start_scheduler` the
@@ -226,10 +226,10 @@ pub mod tests {
         // exhaused until the function is rescheduled.
         let _shedule: () = conductor.call(&bob, "schedule", ()).await;
         conductor.handle().dispatch_scheduled_fns().await;
-        let query1: Vec<Record> = conductor.call(&bob, "query_tick", ()).await;
+        let query1: Vec<Commit> = conductor.call(&bob, "query_tick", ()).await;
         assert_eq!(query1.len(), 1);
         conductor.handle().dispatch_scheduled_fns().await;
-        let query2: Vec<Record> = conductor.call(&bob, "query_tick", ()).await;
+        let query2: Vec<Commit> = conductor.call(&bob, "query_tick", ()).await;
         assert_eq!(query2.len(), query1.len() + 1);
 
         // With a fast scheduler bob should clear everything out.
@@ -239,14 +239,14 @@ pub mod tests {
             .await;
 
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-        let q: Vec<Record> = conductor.call(&bob, "query_tick", ()).await;
+        let q: Vec<Commit> = conductor.call(&bob, "query_tick", ()).await;
         assert_eq!(q.len(), query2.len());
 
         // Rescheduling will allow bob catch up to alice.
         let _shedule: () = conductor.call(&bob, "schedule", ()).await;
 
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-        let q2: Vec<Record> = conductor.call(&bob, "query_tick", ()).await;
+        let q2: Vec<Commit> = conductor.call(&bob, "query_tick", ()).await;
         assert_eq!(q2.len(), 5);
 
         Ok(())

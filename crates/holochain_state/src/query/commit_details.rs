@@ -8,9 +8,9 @@ use std::fmt::Debug;
 use super::*;
 
 #[derive(Debug, Clone)]
-pub struct GetRecordDetailsQuery(ActionHash, Option<Arc<AgentPubKey>>);
+pub struct GetCommitDetailsQuery(ActionHash, Option<Arc<AgentPubKey>>);
 
-impl GetRecordDetailsQuery {
+impl GetCommitDetailsQuery {
     pub fn new(hash: ActionHash) -> Self {
         Self(hash, None)
     }
@@ -24,10 +24,10 @@ pub struct State {
     updates: HashSet<SignedActionHashed>,
 }
 
-impl Query for GetRecordDetailsQuery {
+impl Query for GetCommitDetailsQuery {
     type Item = Judged<SignedActionHashed>;
     type State = State;
-    type Output = Option<RecordDetails>;
+    type Output = Option<CommitDetails>;
 
     fn query(&self) -> String {
         "
@@ -43,9 +43,9 @@ impl Query for GetRecordDetailsQuery {
     }
     fn params(&self) -> Vec<Params> {
         let params = named_params! {
-            ":create_type": DhtOpType::StoreRecord,
+            ":create_type": DhtOpType::StoreCommit,
             ":delete_type": DhtOpType::RegisterDeletedBy,
-            ":update_type": DhtOpType::RegisterUpdatedRecord,
+            ":update_type": DhtOpType::RegisterUpdatedCommit,
             ":action_hash": self.0,
         };
         params.to_vec()
@@ -161,9 +161,9 @@ impl Query for GetRecordDetailsQuery {
                 .filter(|a| *a == action.action().author());
             entry = stores.get_public_or_authored_entry(entry_hash, author)?;
         }
-        let record = Record::new(action, entry);
-        let details = RecordDetails {
-            record,
+        let commit = Commit::new(action, entry);
+        let details = CommitDetails {
+            commit,
             validation_status,
             deletes: deletes.into_iter().collect(),
             updates: updates.into_iter().collect(),
@@ -172,7 +172,7 @@ impl Query for GetRecordDetailsQuery {
     }
 }
 
-impl PrivateDataQuery for GetRecordDetailsQuery {
+impl PrivateDataQuery for GetCommitDetailsQuery {
     type Hash = ActionHash;
 
     fn with_private_data_access(hash: Self::Hash, author: Arc<AgentPubKey>) -> Self {

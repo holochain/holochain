@@ -19,9 +19,9 @@ use holochain_types::dht_op::DhtOpType;
 use holochain_types::prelude::HasValidationStatus;
 use holochain_types::prelude::Judged;
 use holochain_zome_types::ActionHashed;
+use holochain_zome_types::Commit;
 use holochain_zome_types::Entry;
 use holochain_zome_types::EntryVisibility;
-use holochain_zome_types::Record;
 use holochain_zome_types::SignedAction;
 use holochain_zome_types::SignedActionHashed;
 use serde::de::DeserializeOwned;
@@ -37,13 +37,13 @@ mod test_data;
 mod tests;
 
 pub mod chain_head;
+pub mod commit_details;
 pub mod entry_details;
 pub mod error;
 pub mod link;
 pub mod link_details;
+pub mod live_commit;
 pub mod live_entry;
-pub mod live_record;
-pub mod record_details;
 
 pub mod prelude {
     pub use super::from_blob;
@@ -167,16 +167,16 @@ pub trait Store {
     /// Get an [`SignedActionHashed`] from this store.
     fn get_action(&self, hash: &ActionHash) -> StateQueryResult<Option<SignedActionHashed>>;
 
-    /// Get an [`Record`] from this store.
-    fn get_record(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Record>>;
+    /// Get an [`Commit`] from this store.
+    fn get_commit(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Commit>>;
 
-    /// Get an [`Record`] from this store that is either public or
+    /// Get an [`Commit`] from this store that is either public or
     /// authored by the given key.
-    fn get_public_or_authored_record(
+    fn get_public_or_authored_commit(
         &self,
         hash: &AnyDhtHash,
         author: Option<&AgentPubKey>,
-    ) -> StateQueryResult<Option<Record>>;
+    ) -> StateQueryResult<Option<Commit>>;
 
     /// Check if a hash is contained in the store
     fn contains_hash(&self, hash: &AnyDhtHash) -> StateQueryResult<bool> {
@@ -252,7 +252,7 @@ impl<'stmt> Store for Txn<'stmt, '_> {
                 // If no public entry is found try to find
                 // any authored by this agent.
                 Some(author) => Ok(self
-                    .get_any_authored_record(hash, author)?
+                    .get_any_authored_commit(hash, author)?
                     .and_then(|el| el.into_inner().1.into_option())),
                 None => Ok(None),
             },
@@ -345,39 +345,39 @@ impl<'stmt> Store for Txn<'stmt, '_> {
         }
     }
 
-    fn get_record(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Record>> {
+    fn get_commit(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Commit>> {
         match *hash.hash_type() {
-            AnyDht::Entry => self.get_any_record(&hash.clone().into()),
-            AnyDht::Action => self.get_exact_record(&hash.clone().into()),
+            AnyDht::Entry => self.get_any_commit(&hash.clone().into()),
+            AnyDht::Action => self.get_exact_commit(&hash.clone().into()),
         }
     }
 
-    fn get_public_or_authored_record(
+    fn get_public_or_authored_commit(
         &self,
         hash: &AnyDhtHash,
         author: Option<&AgentPubKey>,
-    ) -> StateQueryResult<Option<Record>> {
+    ) -> StateQueryResult<Option<Commit>> {
         match *hash.hash_type() {
-            // Try to get a public record.
-            AnyDht::Entry => match self.get_any_public_record(&hash.clone().into())? {
+            // Try to get a public commit.
+            AnyDht::Entry => match self.get_any_public_commit(&hash.clone().into())? {
                 Some(el) => Ok(Some(el)),
                 None => match author {
-                    // If there are none try to get a private authored record.
-                    Some(author) => self.get_any_authored_record(&hash.clone().into(), author),
-                    // If there are no private authored records then try to get any record and
+                    // If there are none try to get a private authored commit.
+                    Some(author) => self.get_any_authored_commit(&hash.clone().into(), author),
+                    // If there are no private authored commits then try to get any commit and
                     // remove the entry.
                     None => Ok(self
-                        .get_any_record(&hash.clone().into())?
-                        .map(|el| Record::new(el.into_inner().0, None))),
+                        .get_any_commit(&hash.clone().into())?
+                        .map(|el| Commit::new(el.into_inner().0, None))),
                 },
             },
-            AnyDht::Action => Ok(self.get_exact_record(&hash.clone().into())?.map(|el| {
+            AnyDht::Action => Ok(self.get_exact_commit(&hash.clone().into())?.map(|el| {
                 // Filter out the entry if it's private.
                 let is_private_entry = el.action().entry_type().map_or(false, |et| {
                     matches!(et.visibility(), EntryVisibility::Private)
                 });
                 if is_private_entry {
-                    Record::new(el.into_inner().0, None)
+                    Commit::new(el.into_inner().0, None)
                 } else {
                     el
                 }
@@ -387,8 +387,8 @@ impl<'stmt> Store for Txn<'stmt, '_> {
 }
 
 impl<'stmt> Txn<'stmt, '_> {
-    fn get_exact_record(&self, hash: &ActionHash) -> StateQueryResult<Option<Record>> {
-        let record = self.txn.query_row_named(
+    fn get_exact_commit(&self, hash: &ActionHash) -> StateQueryResult<Option<Commit>> {
+        let commit = self.txn.query_row_named(
             "
             SELECT
             Action.blob AS action_blob, Action.hash, Entry.blob as entry_blob
@@ -414,18 +414,18 @@ impl<'stmt> Txn<'stmt, '_> {
                         Some(entry) => Some(from_blob::<Entry>(entry)?),
                         None => None,
                     };
-                    Ok(Record::new(shh, entry))
+                    Ok(Commit::new(shh, entry))
                 }))
             },
         );
-        if let Err(holochain_sqlite::rusqlite::Error::QueryReturnedNoRows) = &record {
+        if let Err(holochain_sqlite::rusqlite::Error::QueryReturnedNoRows) = &commit {
             Ok(None)
         } else {
-            Ok(Some(record??))
+            Ok(Some(commit??))
         }
     }
-    fn get_any_record(&self, hash: &EntryHash) -> StateQueryResult<Option<Record>> {
-        let record = self.txn.query_row_named(
+    fn get_any_commit(&self, hash: &EntryHash) -> StateQueryResult<Option<Commit>> {
+        let commit = self.txn.query_row_named(
             "
             SELECT
             Action.blob AS action_blob, Action.hash, Entry.blob as entry_blob
@@ -451,19 +451,19 @@ impl<'stmt> Txn<'stmt, '_> {
                         Some(entry) => Some(from_blob::<Entry>(entry)?),
                         None => None,
                     };
-                    Ok(Record::new(shh, entry))
+                    Ok(Commit::new(shh, entry))
                 }))
             },
         );
-        if let Err(holochain_sqlite::rusqlite::Error::QueryReturnedNoRows) = &record {
+        if let Err(holochain_sqlite::rusqlite::Error::QueryReturnedNoRows) = &commit {
             Ok(None)
         } else {
-            Ok(Some(record??))
+            Ok(Some(commit??))
         }
     }
 
-    fn get_any_public_record(&self, hash: &EntryHash) -> StateQueryResult<Option<Record>> {
-        let record = self.txn.query_row_named(
+    fn get_any_public_commit(&self, hash: &EntryHash) -> StateQueryResult<Option<Commit>> {
+        let commit = self.txn.query_row_named(
             "
             SELECT
             Action.blob AS action_blob, Action.hash, Entry.blob as entry_blob
@@ -491,23 +491,23 @@ impl<'stmt> Txn<'stmt, '_> {
                         Some(entry) => Some(from_blob::<Entry>(entry)?),
                         None => None,
                     };
-                    Ok(Record::new(shh, entry))
+                    Ok(Commit::new(shh, entry))
                 }))
             },
         );
-        if let Err(holochain_sqlite::rusqlite::Error::QueryReturnedNoRows) = &record {
+        if let Err(holochain_sqlite::rusqlite::Error::QueryReturnedNoRows) = &commit {
             Ok(None)
         } else {
-            Ok(Some(record??))
+            Ok(Some(commit??))
         }
     }
 
-    fn get_any_authored_record(
+    fn get_any_authored_commit(
         &self,
         hash: &EntryHash,
         author: &AgentPubKey,
-    ) -> StateQueryResult<Option<Record>> {
-        let record = self.txn.query_row_named(
+    ) -> StateQueryResult<Option<Commit>> {
+        let commit = self.txn.query_row_named(
             "
             SELECT
             Action.blob AS action_blob, Action.hash, Entry.blob as entry_blob
@@ -536,14 +536,14 @@ impl<'stmt> Txn<'stmt, '_> {
                         Some(entry) => Some(from_blob::<Entry>(entry)?),
                         None => None,
                     };
-                    Ok(Record::new(shh, entry))
+                    Ok(Commit::new(shh, entry))
                 }))
             },
         );
-        if let Err(holochain_sqlite::rusqlite::Error::QueryReturnedNoRows) = &record {
+        if let Err(holochain_sqlite::rusqlite::Error::QueryReturnedNoRows) = &commit {
             Ok(None)
         } else {
-            Ok(Some(record??))
+            Ok(Some(commit??))
         }
     }
 }
@@ -609,9 +609,9 @@ impl<'stmt> Store for Txns<'stmt, '_> {
         Ok(None)
     }
 
-    fn get_record(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Record>> {
+    fn get_commit(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Commit>> {
         for txn in &self.txns {
-            let r = txn.get_record(hash)?;
+            let r = txn.get_commit(hash)?;
             if r.is_some() {
                 return Ok(r);
             }
@@ -633,13 +633,13 @@ impl<'stmt> Store for Txns<'stmt, '_> {
         Ok(None)
     }
 
-    fn get_public_or_authored_record(
+    fn get_public_or_authored_commit(
         &self,
         hash: &AnyDhtHash,
         author: Option<&AgentPubKey>,
-    ) -> StateQueryResult<Option<Record>> {
+    ) -> StateQueryResult<Option<Commit>> {
         for txn in &self.txns {
-            let r = txn.get_public_or_authored_record(hash, author)?;
+            let r = txn.get_public_or_authored_commit(hash, author)?;
             if r.is_some() {
                 return Ok(r);
             }
@@ -707,10 +707,10 @@ impl<'borrow, 'txn> Store for DbScratch<'borrow, 'txn> {
         }
     }
 
-    fn get_record(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Record>> {
-        let r = self.txns.get_record(hash)?;
+    fn get_commit(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Commit>> {
+        let r = self.txns.get_commit(hash)?;
         if r.is_none() {
-            self.scratch.get_record(hash)
+            self.scratch.get_commit(hash)
         } else {
             Ok(r)
         }
@@ -730,15 +730,15 @@ impl<'borrow, 'txn> Store for DbScratch<'borrow, 'txn> {
         }
     }
 
-    fn get_public_or_authored_record(
+    fn get_public_or_authored_commit(
         &self,
         hash: &AnyDhtHash,
         author: Option<&AgentPubKey>,
-    ) -> StateQueryResult<Option<Record>> {
-        let r = self.txns.get_public_or_authored_record(hash, author)?;
+    ) -> StateQueryResult<Option<Commit>> {
+        let r = self.txns.get_public_or_authored_commit(hash, author)?;
         if r.is_none() {
-            // Records in the scratch are authored by definition.
-            self.scratch.get_record(hash)
+            // Commits in the scratch are authored by definition.
+            self.scratch.get_commit(hash)
         } else {
             Ok(r)
         }

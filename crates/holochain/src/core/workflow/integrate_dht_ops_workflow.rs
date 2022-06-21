@@ -70,8 +70,8 @@ pub async fn integrate_dht_ops_workflow(
                 .prepare_cached(holochain_sqlite::sql::sql_cell::UPDATE_INTEGRATE_DEP_STORE_RECORD)?
                 .execute(named_params! {
                     ":when_integrated": time,
-                    ":store_record": DhtOpType::StoreRecord,
-                    ":updated_record": DhtOpType::RegisterUpdatedRecord,
+                    ":store_commit": DhtOpType::StoreCommit,
+                    ":updated_commit": DhtOpType::RegisterUpdatedCommit,
                     ":deleted_by": DhtOpType::RegisterDeletedBy,
                 })?;
             total += changed;

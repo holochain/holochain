@@ -16,7 +16,7 @@ pub enum CascadeError {
     DatabaseError(#[from] DatabaseError),
 
     #[error(transparent)]
-    RecordGroupError(#[from] RecordGroupError),
+    CommitGroupError(#[from] CommitGroupError),
 
     #[error(transparent)]
     ActionError(#[from] ActionError),
@@ -68,7 +68,7 @@ pub enum AuthorityDataError {
     WrongActionError(#[from] WrongActionError),
     #[error(transparent)]
     ActionError(#[from] ActionError),
-    #[error("Missing record data: {0:?}")]
+    #[error("Missing commit data: {0:?}")]
     MissingData(String),
     #[error("Missing metadata: {0:?}")]
     MissingMetadata(String),

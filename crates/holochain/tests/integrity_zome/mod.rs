@@ -4,10 +4,10 @@ use holochain::sweettest::*;
 use holochain_types::prelude::DnaWasm;
 use holochain_wasm_test_utils::TestCoordinatorWasm;
 use holochain_wasm_test_utils::TestIntegrityWasm;
+use holochain_zome_types::Commit;
 use holochain_zome_types::CoordinatorZome;
 use holochain_zome_types::CoordinatorZomeDef;
 use holochain_zome_types::IntegrityZome;
-use holochain_zome_types::Record;
 use holochain_zome_types::WasmZome;
 use holochain_zome_types::Zome;
 use holochain_zome_types::ZomeDef;
@@ -42,7 +42,7 @@ async fn test_coordinator_zome_hot_swap() {
     println!("Success!");
 
     println!("Try getting the entry from the coordinator zome.");
-    let record: Option<Record> = conductor
+    let commit: Option<Commit> = conductor
         .call(
             &cells[0].zome(TestCoordinatorWasm::CoordinatorZome),
             "get_entry",
@@ -50,7 +50,7 @@ async fn test_coordinator_zome_hot_swap() {
         )
         .await;
 
-    assert!(record.is_some());
+    assert!(commit.is_some());
     println!("Success!");
 
     println!("Hot swap the coordinator zomes for a totally different coordinator zome (conductor is still running)");
@@ -65,7 +65,7 @@ async fn test_coordinator_zome_hot_swap() {
     println!("Success!");
 
     println!("Try getting the entry from the new coordinator zome.");
-    let record: Option<Record> = conductor
+    let commit: Option<Commit> = conductor
         .call(
             &cells[0].zome(TestCoordinatorWasm::CoordinatorZomeUpdate),
             "get_entry",
@@ -73,7 +73,7 @@ async fn test_coordinator_zome_hot_swap() {
         )
         .await;
 
-    assert!(record.is_some());
+    assert!(commit.is_some());
     println!("Success! Success! Success! ");
 }
 
@@ -139,7 +139,7 @@ async fn test_coordinator_zome_hot_swap_multi_integrity() {
         .call(&cells[0].zome("2_coord"), "create_entry", ())
         .await;
 
-    let record: Option<Record> = conductor
+    let commit: Option<Commit> = conductor
         .call(
             &cells[0].zome(TestCoordinatorWasm::CoordinatorZome),
             "get_entry",
@@ -147,12 +147,12 @@ async fn test_coordinator_zome_hot_swap_multi_integrity() {
         )
         .await;
 
-    assert!(record.is_some());
-    let record: Option<Record> = conductor
+    assert!(commit.is_some());
+    let commit: Option<Commit> = conductor
         .call(&cells[0].zome("2_coord"), "get_entry", ())
         .await;
 
-    assert!(record.is_some());
+    assert!(commit.is_some());
 
     // Add a completely new coordinator with the same dependency
     conductor
@@ -164,7 +164,7 @@ async fn test_coordinator_zome_hot_swap_multi_integrity() {
         .await
         .unwrap();
 
-    let record: Option<Record> = conductor
+    let commit: Option<Commit> = conductor
         .call(
             &cells[0].zome(TestCoordinatorWasm::CoordinatorZomeUpdate),
             "get_entry",
@@ -172,7 +172,7 @@ async fn test_coordinator_zome_hot_swap_multi_integrity() {
         )
         .await;
 
-    assert!(record.is_some());
+    assert!(commit.is_some());
 
     // Replace "2_coord" with different zome but same dependecies.
     let wasm_hash =
@@ -192,9 +192,9 @@ async fn test_coordinator_zome_hot_swap_multi_integrity() {
         .await
         .unwrap();
 
-    let record: Option<Record> = conductor
+    let commit: Option<Commit> = conductor
         .call(&cells[0].zome("2_coord"), "get_entry", hash2)
         .await;
 
-    assert!(record.is_some());
+    assert!(commit.is_some());
 }

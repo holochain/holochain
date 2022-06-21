@@ -21,7 +21,7 @@ pub use crate::entry::get;
 pub use crate::entry::get_details;
 pub use crate::entry::must_get_action;
 pub use crate::entry::must_get_entry;
-pub use crate::entry::must_get_valid_record;
+pub use crate::entry::must_get_valid_commit;
 pub use crate::entry::update;
 pub use crate::entry::update_entry;
 pub use crate::entry::EntryTypesHelper;
@@ -131,7 +131,7 @@ macro_rules! holochain_externs {
             __get_link_details,
             __get_agent_activity,
             __must_get_entry,
-            __must_get_valid_record,
+            __must_get_valid_commit,
             __must_get_action,
             __accept_countersigning_preflight_request,
             __query,

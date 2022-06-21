@@ -10,18 +10,18 @@ use super::*;
 mod test;
 
 #[derive(Debug, Clone)]
-pub struct GetLiveRecordQuery(ActionHash, Option<Arc<AgentPubKey>>);
+pub struct GetLiveCommitQuery(ActionHash, Option<Arc<AgentPubKey>>);
 
-impl GetLiveRecordQuery {
+impl GetLiveCommitQuery {
     pub fn new(hash: ActionHash) -> Self {
         Self(hash, None)
     }
 }
 
-impl Query for GetLiveRecordQuery {
+impl Query for GetLiveCommitQuery {
     type Item = Judged<SignedActionHashed>;
     type State = (Option<SignedActionHashed>, HashSet<ActionHash>);
-    type Output = Option<Record>;
+    type Output = Option<Commit>;
 
     fn query(&self) -> String {
         "
@@ -37,9 +37,9 @@ impl Query for GetLiveRecordQuery {
     }
     fn params(&self) -> Vec<Params> {
         let params = named_params! {
-            ":create_type": DhtOpType::StoreRecord,
+            ":create_type": DhtOpType::StoreCommit,
             ":delete_type": DhtOpType::RegisterDeletedBy,
-            ":update_type": DhtOpType::RegisterUpdatedRecord,
+            ":update_type": DhtOpType::RegisterUpdatedCommit,
             ":status": ValidationStatus::Valid,
             ":action_hash": self.0,
         };
@@ -107,14 +107,14 @@ impl Query for GetLiveRecordQuery {
                         .filter(|a| *a == action.action().author());
                     entry = stores.get_public_or_authored_entry(entry_hash, author)?;
                 }
-                Ok(Some(Record::new(action, entry)))
+                Ok(Some(Commit::new(action, entry)))
             }
             None => Ok(None),
         }
     }
 }
 
-impl PrivateDataQuery for GetLiveRecordQuery {
+impl PrivateDataQuery for GetLiveCommitQuery {
     type Hash = ActionHash;
 
     fn with_private_data_access(hash: Self::Hash, author: Arc<AgentPubKey>) -> Self {

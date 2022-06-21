@@ -58,7 +58,7 @@
 /// Check if chain_head === 'as-at'. If it is not, fail the whole process. It is important that we read after we have opened the write handle since this will lock the handle and we'll avoid race conditions.
 /// Write the new Entries and Actions into the CAS.
 /// Write the new Entries and Actions CRUDstatus=Live to CAS-Meta.
-/// Write the new Actions records on Source Chain, with dht_transforms_completed=false.
+/// Write the new Actions commits on Source Chain, with dht_transforms_completed=false.
 /// Store CRUDstatus=Live in CAS-meta
 /// Write the new chain_head on Source Chain.
 ///

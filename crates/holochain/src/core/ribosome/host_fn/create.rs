@@ -7,7 +7,7 @@ use holochain_wasmer_host::prelude::*;
 use holochain_types::prelude::*;
 use std::sync::Arc;
 
-/// create record
+/// create commit
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn create<'a>(
     _ribosome: Arc<impl RibosomeT>,
@@ -169,9 +169,9 @@ pub mod wasm_test {
         let _output: ActionHash = conductor.call(&alice, "create_entry", ()).await;
 
         // entry should be gettable.
-        let round: Option<Record> = conductor.call(&alice, "get_entry", ()).await;
+        let round: Option<Commit> = conductor.call(&alice, "get_entry", ()).await;
 
-        let round_twice: Vec<Option<Record>> = conductor.call(&alice, "get_entry_twice", ()).await;
+        let round_twice: Vec<Option<Commit>> = conductor.call(&alice, "get_entry_twice", ()).await;
 
         let bytes: Vec<u8> = match round.clone().and_then(|el| el.into()) {
             Some(holochain_zome_types::entry::Entry::App(entry_bytes)) => {

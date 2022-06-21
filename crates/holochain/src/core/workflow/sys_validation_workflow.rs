@@ -7,7 +7,7 @@ use crate::conductor::space::Space;
 use crate::conductor::ConductorHandle;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::queue_consumer::WorkComplete;
-use crate::core::sys_validate::check_and_hold_store_record;
+use crate::core::sys_validate::check_and_hold_store_commit;
 use crate::core::sys_validate::*;
 use crate::core::validation::*;
 use error::WorkflowResult;
@@ -181,7 +181,7 @@ async fn sys_validation_workflow_inner(
                             // action. We have neither that's why where here.
                             //
                             // We need to be holding the dependency because
-                            // we were meant to get a StoreRecord or StoreEntry or
+                            // we were meant to get a StoreCommit or StoreEntry or
                             // RegisterAgentActivity or RegisterAddLink.
                             let status = ValidationLimboStatus::AwaitingSysDeps(missing_dep);
                             put_validation_limbo(txn, &op_hash, status)?;
@@ -311,8 +311,8 @@ async fn validate_op_inner(
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
 ) -> SysValidationResult<()> {
     match op {
-        DhtOp::StoreRecord(_, action, entry) => {
-            store_record(action, workspace, network.clone()).await?;
+        DhtOp::StoreCommit(_, action, entry) => {
+            store_commit(action, workspace, network.clone()).await?;
             if let Some(entry) = entry {
                 // Retrieve for all other actions on countersigned entry.
                 if let Entry::CounterSign(session_data, _) = &**entry {
@@ -347,10 +347,10 @@ async fn validate_op_inner(
         DhtOp::StoreEntry(_, action, entry) => {
             // Check and hold for all other actions on countersigned entry.
             if let Entry::CounterSign(session_data, _) = &**entry {
-                let dependency_check = |_original_record: &Record| Ok(());
+                let dependency_check = |_original_commit: &Commit| Ok(());
                 let entry_hash = EntryHash::with_data_sync(&**entry);
                 for action in session_data.build_action_set(entry_hash)? {
-                    check_and_hold_store_record(
+                    check_and_hold_store_commit(
                         &ActionHash::with_data_sync(&action),
                         workspace,
                         network.clone(),
@@ -371,13 +371,13 @@ async fn validate_op_inner(
             .await?;
 
             let action = action.clone().into();
-            store_record(&action, workspace, network).await?;
+            store_commit(&action, workspace, network).await?;
             Ok(())
         }
         DhtOp::RegisterAgentActivity(_, action) => {
             register_agent_activity(action, workspace, network.clone(), incoming_dht_ops_sender)
                 .await?;
-            store_record(action, workspace, network).await?;
+            store_commit(action, workspace, network).await?;
             Ok(())
         }
         DhtOp::RegisterUpdatedContent(_, action, entry) => {
@@ -396,8 +396,8 @@ async fn validate_op_inner(
 
             Ok(())
         }
-        DhtOp::RegisterUpdatedRecord(_, action, entry) => {
-            register_updated_record(action, workspace, network.clone(), incoming_dht_ops_sender)
+        DhtOp::RegisterUpdatedCommit(_, action, entry) => {
+            register_updated_commit(action, workspace, network.clone(), incoming_dht_ops_sender)
                 .await?;
             if let Some(entry) = entry {
                 store_entry(
@@ -432,28 +432,28 @@ async fn validate_op_inner(
     }
 }
 
-#[instrument(skip(record, call_zome_workspace, network, conductor_handle))]
+#[instrument(skip(commit, call_zome_workspace, network, conductor_handle))]
 /// Direct system validation call that takes
-/// a Record instead of an op.
+/// a Commit instead of an op.
 /// Does not require holding dependencies.
 /// Will not await dependencies and instead returns
 /// that outcome immediately.
-pub async fn sys_validate_record(
-    record: &Record,
+pub async fn sys_validate_commit(
+    commit: &Commit,
     call_zome_workspace: &HostFnWorkspace,
     network: HolochainP2pDna,
     conductor_handle: &dyn ConductorHandleT,
 ) -> SysValidationOutcome<()> {
-    trace!(?record);
+    trace!(?commit);
     // Create a SysValidationWorkspace with the scratches from the CallZomeWorkspace
     let workspace = SysValidationWorkspace::from(call_zome_workspace);
     let result =
-        match sys_validate_record_inner(record, &workspace, network, conductor_handle).await {
+        match sys_validate_commit_inner(commit, &workspace, network, conductor_handle).await {
             // Validation succeeded
             Ok(_) => Ok(()),
             // Validation failed so exit with that outcome
             Err(SysValidationError::ValidationOutcome(validation_outcome)) => {
-                error!(msg = "Direct validation failed", ?record);
+                error!(msg = "Direct validation failed", ?commit);
                 validation_outcome.into_outcome()
             }
             // An error occurred so return it
@@ -463,15 +463,15 @@ pub async fn sys_validate_record(
     result
 }
 
-async fn sys_validate_record_inner(
-    record: &Record,
+async fn sys_validate_commit_inner(
+    commit: &Commit,
     workspace: &SysValidationWorkspace,
     network: HolochainP2pDna,
     conductor_handle: &dyn ConductorHandleT,
 ) -> SysValidationResult<()> {
-    let signature = record.signature();
-    let action = record.action();
-    let maybe_entry = record.entry().as_option();
+    let signature = commit.signature();
+    let action = commit.action();
+    let maybe_entry = commit.entry().as_option();
     counterfeit_check(signature, action).await?;
 
     async fn validate(
@@ -482,7 +482,7 @@ async fn sys_validate_record_inner(
         conductor_handle: &dyn ConductorHandleT,
     ) -> SysValidationResult<()> {
         let incoming_dht_ops_sender = None;
-        store_record(action, workspace, network.clone()).await?;
+        store_commit(action, workspace, network.clone()).await?;
         if let Some((maybe_entry, EntryVisibility::Public)) =
             &maybe_entry.and_then(|e| action.entry_type().map(|et| (e, et.visibility())))
         {
@@ -570,7 +570,7 @@ async fn register_agent_activity(
     Ok(())
 }
 
-async fn store_record(
+async fn store_commit(
     action: &Action,
     workspace: &SysValidationWorkspace,
     network: HolochainP2pDna,
@@ -645,7 +645,7 @@ async fn register_updated_content(
     let original_action_address = &entry_update.original_action_address;
 
     let dependency_check =
-        |original_record: &Record| update_check(entry_update, original_record.action());
+        |original_commit: &Commit| update_check(entry_update, original_commit.action());
     check_and_hold_store_entry(
         original_action_address,
         workspace,
@@ -657,7 +657,7 @@ async fn register_updated_content(
     Ok(())
 }
 
-async fn register_updated_record(
+async fn register_updated_commit(
     entry_update: &Update,
     workspace: &SysValidationWorkspace,
     network: HolochainP2pDna,
@@ -667,9 +667,9 @@ async fn register_updated_record(
     let original_action_address = &entry_update.original_action_address;
 
     let dependency_check =
-        |original_record: &Record| update_check(entry_update, original_record.action());
+        |original_commit: &Commit| update_check(entry_update, original_commit.action());
 
-    check_and_hold_store_record(
+    check_and_hold_store_commit(
         original_action_address,
         workspace,
         network,
@@ -681,19 +681,19 @@ async fn register_updated_record(
 }
 
 async fn register_deleted_by(
-    record_delete: &Delete,
+    commit_delete: &Delete,
     workspace: &SysValidationWorkspace,
     network: HolochainP2pDna,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
-    let removed_action_address = &record_delete.deletes_address;
+    let removed_action_address = &commit_delete.deletes_address;
 
     // Checks
     let dependency_check =
-        |removed_action: &Record| check_new_entry_action(removed_action.action());
+        |removed_action: &Commit| check_new_entry_action(removed_action.action());
 
-    check_and_hold_store_record(
+    check_and_hold_store_commit(
         removed_action_address,
         workspace,
         network,
@@ -705,17 +705,17 @@ async fn register_deleted_by(
 }
 
 async fn register_deleted_entry_action(
-    record_delete: &Delete,
+    commit_delete: &Delete,
     workspace: &SysValidationWorkspace,
     network: HolochainP2pDna,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
-    let removed_action_address = &record_delete.deletes_address;
+    let removed_action_address = &commit_delete.deletes_address;
 
     // Checks
     let dependency_check =
-        |removed_action: &Record| check_new_entry_action(removed_action.action());
+        |removed_action: &Commit| check_new_entry_action(removed_action.action());
 
     check_and_hold_store_entry(
         removed_action_address,

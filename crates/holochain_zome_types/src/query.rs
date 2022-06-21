@@ -7,7 +7,7 @@ use crate::action::ActionType;
 use crate::action::EntryType;
 use crate::warrant::Warrant;
 use crate::ActionHashed;
-use crate::Record;
+use crate::Commit;
 use holo_hash::ActionHash;
 use holo_hash::EntryHash;
 use holo_hash::HasHash;
@@ -24,13 +24,13 @@ pub use holochain_serialized_bytes::prelude::*;
 /// bounded range the final action always points unambiguously at the "correct"
 /// fork that the range is over. Start hashes are not needed to provide this
 /// property so ranges can be hash terminated with a length of preceeding
-/// records to return only. Technically the seq bounded ranges do not imply
+/// commits to return only. Technically the seq bounded ranges do not imply
 /// any fork disambiguation and so could be a range but for simplicity we left
 /// the API symmetrical in boundedness across all enum variants.
 /// @TODO It may be possible to provide/implement RangeBounds in the case that
-/// a full sequence of records/actions is provided but it would need to be
+/// a full sequence of commits/actions is provided but it would need to be
 /// handled as inclusive first, to enforce the integrity of the query, then the
-/// exclusiveness achieved by simply removing the final record after the fact.
+/// exclusiveness achieved by simply removing the final commit after the fact.
 #[derive(serde::Serialize, serde::Deserialize, PartialEq, Clone, Debug)]
 pub enum ChainQueryFilterRange {
     /// Do NOT apply any range filtering for this query.
@@ -44,8 +44,8 @@ pub enum ChainQueryFilterRange {
     /// This CAN be used in validation logic as forks are disambiguated.
     /// Inclusive start and end (unlike std::ops::Range).
     ActionHashRange(ActionHash, ActionHash),
-    /// The terminating action hash and N preceeding records.
-    /// N = 0 returns only the record with this `ActionHash`.
+    /// The terminating action hash and N preceeding commits.
+    /// N = 0 returns only the commit with this `ActionHash`.
     /// This CAN be used in validation logic as forks are not possible when
     /// "looking up" towards genesis from some `ActionHash`.
     ActionHashTerminated(ActionHash, u32),
@@ -63,7 +63,7 @@ impl Default for ChainQueryFilterRange {
 )]
 #[non_exhaustive]
 pub struct ChainQueryFilter {
-    /// Limit the results to a range of records according to their actions.
+    /// Limit the results to a range of commits according to their actions.
     pub sequence_range: ChainQueryFilterRange,
     /// Filter by EntryType
     // NB: if this filter is set, you can't verify the results, so don't
@@ -75,12 +75,12 @@ pub struct ChainQueryFilter {
     // NB: if this filter is set, you can't verify the results, so don't
     //     use this in validation
     pub action_type: Option<ActionType>,
-    /// Include the entries in the records
+    /// Include the entries in the commits
     pub include_entries: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
-/// An agents chain records returned from a agent_activity_query
+/// An agents chain commits returned from a agent_activity_query
 pub struct AgentActivity {
     /// Valid actions on this chain.
     pub valid_activity: Vec<(u32, ActionHash)>,
@@ -200,7 +200,7 @@ impl ChainQueryFilter {
         self
     }
 
-    /// Include the entries in the RecordsVec that is returned.
+    /// Include the entries in the CommitsVec that is returned.
     pub fn include_entries(mut self, include_entries: bool) -> Self {
         self.include_entries = include_entries;
         self
@@ -289,21 +289,21 @@ impl ChainQueryFilter {
             .collect()
     }
 
-    /// Filter a vector of records according to the query.
-    pub fn filter_records(&self, records: Vec<Record>) -> Vec<Record> {
+    /// Filter a vector of commits according to the query.
+    pub fn filter_commits(&self, commits: Vec<Commit>) -> Vec<Commit> {
         let actions = self.filter_actions(
-            records
+            commits
                 .iter()
-                .map(|record| record.action_hashed().clone())
+                .map(|commit| commit.action_hashed().clone())
                 .collect(),
         );
         let action_hashset = actions
             .iter()
             .map(|action| action.as_hash().clone())
             .collect::<HashSet<ActionHash>>();
-        records
+        commits
             .into_iter()
-            .filter(|record| action_hashset.contains(record.action_address()))
+            .filter(|commit| action_hashset.contains(commit.action_address()))
             .collect()
     }
 }

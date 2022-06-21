@@ -37,9 +37,9 @@ macro_rules! from_sub_error {
 pub enum DhtOpOrder {
     RegisterAgentActivity(holochain_zome_types::timestamp::Timestamp),
     StoreEntry(holochain_zome_types::timestamp::Timestamp),
-    StoreRecord(holochain_zome_types::timestamp::Timestamp),
+    StoreCommit(holochain_zome_types::timestamp::Timestamp),
     RegisterUpdatedContent(holochain_zome_types::timestamp::Timestamp),
-    RegisterUpdatedRecord(holochain_zome_types::timestamp::Timestamp),
+    RegisterUpdatedCommit(holochain_zome_types::timestamp::Timestamp),
     RegisterDeletedBy(holochain_zome_types::timestamp::Timestamp),
     RegisterDeletedEntryAction(holochain_zome_types::timestamp::Timestamp),
     RegisterAddLink(holochain_zome_types::timestamp::Timestamp),
@@ -79,11 +79,11 @@ impl From<&DhtOp> for DhtOpOrder {
     fn from(op: &DhtOp) -> Self {
         use DhtOpOrder::*;
         match op {
-            DhtOp::StoreRecord(_, h, _) => StoreRecord(h.timestamp()),
+            DhtOp::StoreCommit(_, h, _) => StoreCommit(h.timestamp()),
             DhtOp::StoreEntry(_, h, _) => StoreEntry(*h.timestamp()),
             DhtOp::RegisterAgentActivity(_, h) => RegisterAgentActivity(h.timestamp()),
             DhtOp::RegisterUpdatedContent(_, h, _) => RegisterUpdatedContent(h.timestamp),
-            DhtOp::RegisterUpdatedRecord(_, h, _) => RegisterUpdatedRecord(h.timestamp),
+            DhtOp::RegisterUpdatedCommit(_, h, _) => RegisterUpdatedCommit(h.timestamp),
             DhtOp::RegisterDeletedBy(_, h) => RegisterDeletedBy(h.timestamp),
             DhtOp::RegisterDeletedEntryAction(_, h) => RegisterDeletedEntryAction(h.timestamp),
             DhtOp::RegisterAddLink(_, h) => RegisterAddLink(h.timestamp),

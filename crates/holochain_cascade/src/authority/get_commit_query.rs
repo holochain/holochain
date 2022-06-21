@@ -7,8 +7,8 @@ use holochain_sqlite::rusqlite::Row;
 use holochain_state::query::prelude::*;
 use holochain_state::query::StateQueryError;
 use holochain_types::action::WireUpdateRelationship;
+use holochain_types::commit::WireCommitOps;
 use holochain_types::dht_op::DhtOpType;
-use holochain_types::record::WireRecordOps;
 use holochain_zome_types::HasValidationStatus;
 use holochain_zome_types::Judged;
 use holochain_zome_types::SignedAction;
@@ -16,9 +16,9 @@ use holochain_zome_types::TryFrom;
 use holochain_zome_types::TryInto;
 
 #[derive(Debug, Clone)]
-pub struct GetRecordOpsQuery(ActionHash, GetOptions);
+pub struct GetCommitOpsQuery(ActionHash, GetOptions);
 
-impl GetRecordOpsQuery {
+impl GetCommitOpsQuery {
     pub fn new(hash: ActionHash, request: GetOptions) -> Self {
         Self(hash, request)
     }
@@ -29,9 +29,9 @@ pub struct Item {
     action: SignedAction,
 }
 
-impl Query for GetRecordOpsQuery {
+impl Query for GetCommitOpsQuery {
     type Item = Judged<Item>;
-    type State = WireRecordOps;
+    type State = WireCommitOps;
     type Output = Self::State;
 
     fn query(&self) -> String {
@@ -41,7 +41,7 @@ impl Query for GetRecordOpsQuery {
             DhtOp.validation_status AS status
             FROM DhtOp
             JOIN Action On DhtOp.action_hash = Action.hash
-            WHERE DhtOp.type IN (:store_record, :delete, :update)
+            WHERE DhtOp.type IN (:store_commit, :delete, :update)
             AND
             DhtOp.basis_hash = :action_hash
         ";
@@ -61,9 +61,9 @@ impl Query for GetRecordOpsQuery {
 
     fn params(&self) -> Vec<Params> {
         let params = named_params! {
-            ":store_record": DhtOpType::StoreRecord,
+            ":store_commit": DhtOpType::StoreCommit,
             ":delete": DhtOpType::RegisterDeletedBy,
-            ":update": DhtOpType::RegisterUpdatedRecord,
+            ":update": DhtOpType::RegisterUpdatedCommit,
             ":action_hash": self.0,
         };
         params.to_vec()
@@ -81,12 +81,12 @@ impl Query for GetRecordOpsQuery {
     }
 
     fn init_fold(&self) -> StateQueryResult<Self::State> {
-        Ok(WireRecordOps::new())
+        Ok(WireCommitOps::new())
     }
 
     fn fold(&self, mut state: Self::State, dht_op: Self::Item) -> StateQueryResult<Self::State> {
         match &dht_op.data.op_type {
-            DhtOpType::StoreRecord => {
+            DhtOpType::StoreCommit => {
                 if state.action.is_none() {
                     state.action = Some(dht_op.map(|d| d.action));
                 }
@@ -97,7 +97,7 @@ impl Query for GetRecordOpsQuery {
                     .deletes
                     .push(Judged::raw(dht_op.data.action.try_into()?, status));
             }
-            DhtOpType::RegisterUpdatedRecord => {
+            DhtOpType::RegisterUpdatedCommit => {
                 let status = dht_op.validation_status();
                 let action = dht_op.data.action;
                 state.updates.push(Judged::raw(

@@ -10,8 +10,8 @@ use holochain_keystore::KeystoreError;
 use holochain_types::prelude::*;
 use holochain_zome_types::entry::EntryHashed;
 use holochain_zome_types::ChainTopOrdering;
+use holochain_zome_types::Commit;
 use holochain_zome_types::Entry;
-use holochain_zome_types::Record;
 use holochain_zome_types::SignedActionHashed;
 use holochain_zome_types::TimestampError;
 use thiserror::Error;
@@ -129,13 +129,13 @@ impl Scratch {
         self.actions.iter()
     }
 
-    pub fn records(&self) -> impl Iterator<Item = Record> + '_ {
+    pub fn commits(&self) -> impl Iterator<Item = Commit> + '_ {
         self.actions.iter().cloned().map(move |shh| {
             let entry = shh
                 .action()
                 .entry_hash()
                 .and_then(|eh| self.entries.get(eh).map(|e| (**e).clone()));
-            Record::new(shh, entry)
+            Commit::new(shh, entry)
         })
     }
 
@@ -148,23 +148,23 @@ impl Scratch {
         self.actions.len()
     }
 
-    fn get_exact_record(
+    fn get_exact_commit(
         &self,
         hash: &ActionHash,
-    ) -> StateQueryResult<Option<holochain_zome_types::Record>> {
+    ) -> StateQueryResult<Option<holochain_zome_types::Commit>> {
         Ok(self.get_action(hash)?.map(|shh| {
             let entry = shh
                 .action()
                 .entry_hash()
                 .and_then(|eh| self.get_entry(eh).ok());
-            Record::new(shh, entry.flatten())
+            Commit::new(shh, entry.flatten())
         }))
     }
 
-    fn get_any_record(
+    fn get_any_commit(
         &self,
         hash: &EntryHash,
-    ) -> StateQueryResult<Option<holochain_zome_types::Record>> {
+    ) -> StateQueryResult<Option<holochain_zome_types::Commit>> {
         let r = self.get_entry(hash)?.and_then(|entry| {
             let shh = self
                 .actions()
@@ -175,7 +175,7 @@ impl Scratch {
                         .unwrap_or(false)
                 })?
                 .clone();
-            Some(Record::new(shh, Some(entry)))
+            Some(Commit::new(shh, Some(entry)))
         });
         Ok(r)
     }
@@ -241,10 +241,10 @@ impl Store for Scratch {
             .cloned())
     }
 
-    fn get_record(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Record>> {
+    fn get_commit(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Commit>> {
         match *hash.hash_type() {
-            AnyDht::Entry => self.get_any_record(&hash.clone().into()),
-            AnyDht::Action => self.get_exact_record(&hash.clone().into()),
+            AnyDht::Entry => self.get_any_commit(&hash.clone().into()),
+            AnyDht::Action => self.get_exact_commit(&hash.clone().into()),
         }
     }
 
@@ -261,15 +261,15 @@ impl Store for Scratch {
     }
 
     /// It doesn't make sense to search for
-    /// a different authored record in a scratch
+    /// a different authored commit in a scratch
     /// then the scratches author so this is
-    /// the same as `get_record`.
-    fn get_public_or_authored_record(
+    /// the same as `get_commit`.
+    fn get_public_or_authored_commit(
         &self,
         hash: &AnyDhtHash,
         _author: Option<&AgentPubKey>,
-    ) -> StateQueryResult<Option<Record>> {
-        self.get_record(hash)
+    ) -> StateQueryResult<Option<Commit>> {
+        self.get_commit(hash)
     }
 }
 

@@ -230,7 +230,7 @@ pub enum AdminRequest {
     /// Note that the response to this call can be very big, as it's requesting for
     /// the full database of the cell.
     ///
-    /// Also note that while DHT ops about private entries will be returned (like `StoreRecord`),
+    /// Also note that while DHT ops about private entries will be returned (like `StoreCommit`),
     /// the entry in itself will be missing, as it's not actually stored publicly in the DHT shard.
     ///
     /// # Returns
@@ -288,50 +288,50 @@ pub enum AdminRequest {
         cell_id: Option<CellId>,
     },
 
-    /// Insert [`Record`]s into the source chain of the [`CellId`].
+    /// Insert [`Commit`]s into the source chain of the [`CellId`].
     ///
-    /// All records must be authored and signed by the same agent.
+    /// All commits must be authored and signed by the same agent.
     /// The [`DnaFile`] (but not necessarily the cell) must already be installed
     /// on this conductor.
     ///
     /// Care is needed when using this command as it can result in
     /// an invalid chain.
-    /// Additionally, if conflicting source chain records are
+    /// Additionally, if conflicting source chain commits are
     /// inserted on different nodes, then the chain will be forked.
     ///
     /// If an invalid or forked chain is inserted
     /// and then pushed to the DHT, it can't be undone.
     ///
     /// Note that the cell does not need to exist to run this command.
-    /// It is possible to insert records into a source chain before
+    /// It is possible to insert commits into a source chain before
     /// the cell is created. This can be used to restore from backup.
     ///
     /// If the cell is installed, it is best to call [`AdminRequest::DisableApp`]
     /// before running this command, as otherwise the chain head may move.
     /// If `truncate` is true, the chain head is not checked and any new
-    /// records will be lost.
+    /// commits will be lost.
     ///
     /// # Returns
     ///
-    /// [`AdminResponse::RecordsAdded`]
-    AddRecords {
-        /// The cell that the records are being inserted into.
+    /// [`AdminResponse::CommitsAdded`]
+    AddCommits {
+        /// The cell that the commits are being inserted into.
         cell_id: CellId,
-        /// If this is true then all records in the source chain will be
-        /// removed before the new records are inserted.
+        /// If this is true then all commits in the source chain will be
+        /// removed before the new commits are inserted.
         /// **Warning**: this cannot be undone. Use with care!
         ///
-        /// If this is `false`, then the records will be appended to the end
+        /// If this is `false`, then the commits will be appended to the end
         /// of the source chain.
         truncate: bool,
-        /// If this is `true`, then the records will be validated before insertion.
+        /// If this is `true`, then the commits will be validated before insertion.
         /// This is much slower but is useful for verifying the chain is valid.
         ///
-        /// If this is `false`, then records will be inserted as is.
+        /// If this is `false`, then commits will be inserted as is.
         /// This could lead to an invalid chain.
         validate: bool,
-        /// The records to be inserted into the source chain.
-        records: Vec<Record>,
+        /// The commits to be inserted into the source chain.
+        commits: Vec<Commit>,
     },
 }
 
@@ -484,8 +484,8 @@ pub enum AdminResponse {
     /// This is all the agent info that was found for the request.
     AgentInfoRequested(Vec<AgentInfoSigned>),
 
-    /// The successful response to an [`AdminRequest::AddRecords`].
-    RecordsAdded,
+    /// The successful response to an [`AdminRequest::AddCommits`].
+    CommitsAdded,
 }
 
 /// Error type that goes over the websocket wire.

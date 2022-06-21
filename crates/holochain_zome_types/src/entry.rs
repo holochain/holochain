@@ -161,7 +161,7 @@ impl GetInput {
 /// Zome input type for all update operations.
 #[derive(PartialEq, Debug, Deserialize, Serialize, Clone)]
 pub struct UpdateInput {
-    /// Action of the record being updated.
+    /// Action of the commit being updated.
     pub original_action_address: holo_hash::ActionHash,
     /// Entry body.
     pub entry: crate::entry::Entry,
@@ -172,7 +172,7 @@ pub struct UpdateInput {
 /// Zome input for all delete operations.
 #[derive(PartialEq, Debug, Deserialize, Serialize, Clone)]
 pub struct DeleteInput {
-    /// Action of the record being deleted.
+    /// Action of the commit being deleted.
     pub deletes_action_hash: holo_hash::ActionHash,
     /// Chain top ordering behaviour for the delete.
     pub chain_top_ordering: ChainTopOrdering,

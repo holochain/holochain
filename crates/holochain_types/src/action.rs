@@ -6,9 +6,9 @@
 
 #![allow(missing_docs)]
 
+use crate::commit::CommitStatus;
+use crate::commit::SignedActionHashedExt;
 use crate::prelude::*;
-use crate::record::RecordStatus;
-use crate::record::SignedActionHashedExt;
 use conversions::WrongActionError;
 use derive_more::From;
 use holo_hash::EntryHash;
@@ -196,8 +196,8 @@ impl From<(Update, Signature)> for WireUpdate {
 }
 
 impl WireDelete {
-    pub fn into_record(self) -> Record {
-        Record::new(
+    pub fn into_commit(self) -> Commit {
+        Commit::new(
             SignedActionHashed::from_content_sync(SignedAction(self.delete.into(), self.signature)),
             None,
         )
@@ -205,10 +205,10 @@ impl WireDelete {
 }
 
 impl WireUpdateRelationship {
-    /// Recreate the Update Record without an Entry.
+    /// Recreate the Update Commit without an Entry.
     /// Useful for creating dht ops
-    pub fn into_record(self, original_entry_address: EntryHash) -> Record {
-        Record::new(
+    pub fn into_commit(self, original_entry_address: EntryHash) -> Commit {
+        Commit::new(
             SignedActionHashed::from_content_sync(self.into_signed_action(original_entry_address)),
             None,
         )
@@ -317,9 +317,9 @@ impl TryFrom<SignedAction> for WireUpdateRelationship {
 }
 
 impl WireNewEntryAction {
-    pub fn into_record(self, entry_type: EntryType, entry: Entry) -> Record {
+    pub fn into_commit(self, entry_type: EntryType, entry: Entry) -> Commit {
         let entry_hash = EntryHash::with_data_sync(&entry);
-        Record::new(self.into_action(entry_type, entry_hash), Some(entry))
+        Commit::new(self.into_action(entry_type, entry_hash), Some(entry))
     }
 
     pub fn into_action(self, entry_type: EntryType, entry_hash: EntryHash) -> SignedActionHashed {
@@ -359,23 +359,23 @@ impl WireNewEntryAction {
 }
 
 impl WireActionStatus<WireNewEntryAction> {
-    pub fn into_record_status(self, entry_type: EntryType, entry: Entry) -> RecordStatus {
-        RecordStatus::new(
-            self.action.into_record(entry_type, entry),
+    pub fn into_commit_status(self, entry_type: EntryType, entry: Entry) -> CommitStatus {
+        CommitStatus::new(
+            self.action.into_commit(entry_type, entry),
             self.validation_status,
         )
     }
 }
 
 impl WireActionStatus<WireUpdateRelationship> {
-    pub fn into_record_status(self, entry_hash: EntryHash) -> RecordStatus {
-        RecordStatus::new(self.action.into_record(entry_hash), self.validation_status)
+    pub fn into_commit_status(self, entry_hash: EntryHash) -> CommitStatus {
+        CommitStatus::new(self.action.into_commit(entry_hash), self.validation_status)
     }
 }
 
 impl WireActionStatus<WireDelete> {
-    pub fn into_record_status(self) -> RecordStatus {
-        RecordStatus::new(self.action.into_record(), self.validation_status)
+    pub fn into_commit_status(self) -> CommitStatus {
+        CommitStatus::new(self.action.into_commit(), self.validation_status)
     }
 }
 

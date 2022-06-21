@@ -6,7 +6,7 @@ use holochain_serialized_bytes::prelude::*;
 use holochain_zome_types::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
-/// An agents chain records returned from a agent_activity_query
+/// An agents chain commits returned from a agent_activity_query
 pub struct AgentActivityResponse<T = SignedActionHashed> {
     /// The agent this activity is for
     pub agent: AgentPubKey,
@@ -80,10 +80,10 @@ pub enum ChainItems<T = SignedActionHashed> {
     NotRequested,
 }
 
-impl From<AgentActivityResponse<Record>> for holochain_zome_types::query::AgentActivity {
-    fn from(a: AgentActivityResponse<Record>) -> Self {
+impl From<AgentActivityResponse<Commit>> for holochain_zome_types::query::AgentActivity {
+    fn from(a: AgentActivityResponse<Commit>) -> Self {
         let valid_activity = match a.valid_activity {
-            ChainItems::Full(records) => records
+            ChainItems::Full(commits) => commits
                 .into_iter()
                 .map(|el| (el.action().action_seq(), el.action_address().clone()))
                 .collect(),
@@ -91,7 +91,7 @@ impl From<AgentActivityResponse<Record>> for holochain_zome_types::query::AgentA
             ChainItems::NotRequested => Vec::new(),
         };
         let rejected_activity = match a.rejected_activity {
-            ChainItems::Full(records) => records
+            ChainItems::Full(commits) => commits
                 .into_iter()
                 .map(|el| (el.action().action_seq(), el.action_address().clone()))
                 .collect(),
