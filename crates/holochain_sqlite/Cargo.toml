@@ -34,7 +34,7 @@ nanoid = "0.3.0"
 num_cpus = "1.13.0"
 page_size = "0.4.2"
 parking_lot = "0.10"
-rand = "0.7"
+rand = "0.8.5"
 r2d2 = "0.8"
 # neonphog fork for updated rusqlite dependency
 r2d2_sqlite = { version = "0.18", package = "r2d2_sqlite_neonphog" }
