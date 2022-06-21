@@ -110,29 +110,29 @@ pub type CounterSigningAgents = Vec<(AgentPubKey, Vec<Role>)>;
 pub struct PreflightRequest {
     /// The hash of the app entry, as if it were not countersigned.
     /// The final entry hash will include the countersigning session.
-    app_entry_hash: EntryHash,
+    pub app_entry_hash: EntryHash,
     /// The agents that are participating in this countersignature session.
-    signing_agents: CounterSigningAgents,
+    pub signing_agents: CounterSigningAgents,
     /// The optional additional M of N signers.
     /// If there are additional signers then M MUST be the majority of N.
     /// If there are additional signers then the enzyme MUST be used and is the
     /// first signer in BOTH signing_agents and optional_signing_agents.
-    optional_signing_agents: CounterSigningAgents,
+    pub optional_signing_agents: CounterSigningAgents,
     /// The M in the M of N signers.
     /// M MUST be strictly greater than than N / 2 and NOT larger than N.
-    minimum_optional_signing_agents: u8,
+    pub minimum_optional_signing_agents: u8,
     /// The first signing agent (index 0) is acting as an enzyme.
     /// If true AND optional_signing_agents are set then the first agent MUST
     /// be the same in both signing_agents and optional_signing_agents.
-    enzymatic: bool,
+    pub enzymatic: bool,
     /// The session times.
     /// Session actions must all have the same timestamp, which is the session offset.
-    session_times: CounterSigningSessionTimes,
+    pub session_times: CounterSigningSessionTimes,
     /// The action information that is shared by all agents.
     /// Contents depend on the action type, create, update, etc.
-    action_base: ActionBase,
+    pub action_base: ActionBase,
     /// The preflight bytes for session.
-    preflight_bytes: PreflightBytes,
+    pub preflight_bytes: PreflightBytes,
 }
 
 impl PreflightRequest {
@@ -164,7 +164,7 @@ impl PreflightRequest {
     /// Combined integrity checks.
     pub fn check_integrity(&self) -> Result<(), CounterSigningError> {
         self.check_enzyme()?;
-        self.session_times().check_integrity()?;
+        self.session_times.check_integrity()?;
         self.check_agents()?;
         Ok(())
     }
@@ -172,12 +172,12 @@ impl PreflightRequest {
     /// Verify there are no duplicate agents to sign.
     pub fn check_agents_dupes(&self) -> Result<(), CounterSigningError> {
         let v: Vec<AgentPubKey> = self
-            .signing_agents()
+            .signing_agents
             .iter()
             .map(|(agent, _roles)| agent.clone())
             .collect();
         if std::collections::HashSet::<AgentPubKey>::from_iter(v.clone()).len()
-            == self.signing_agents().len()
+            == self.signing_agents.len()
         {
             Ok(())
         } else {
@@ -187,13 +187,13 @@ impl PreflightRequest {
 
     /// Verify the number of signing agents is within the correct range.
     pub fn check_agents_len(&self) -> Result<(), CounterSigningError> {
-        if MIN_COUNTERSIGNING_AGENTS <= self.signing_agents().len()
-            && self.signing_agents().len() <= MAX_COUNTERSIGNING_AGENTS
+        if MIN_COUNTERSIGNING_AGENTS <= self.signing_agents.len()
+            && self.signing_agents.len() <= MAX_COUNTERSIGNING_AGENTS
         {
             Ok(())
         } else {
             Err(CounterSigningError::AgentsLength(
-                self.signing_agents().len(),
+                self.signing_agents.len(),
             ))
         }
     }
@@ -233,94 +233,17 @@ impl PreflightRequest {
         // both the signing agents and optional signing agents.
         if self.enzymatic
             && !self.optional_signing_agents.is_empty()
-            && self.signing_agents[0] != self.optional_signing_agents[0]
+            && self.signing_agents.get(0) != self.optional_signing_agents.get(0)
         {
             return Err(CounterSigningError::EnzymeMismatch(
-                self.signing_agents[0].0.clone(),
-                self.optional_signing_agents[0].0.clone(),
+                self.signing_agents.get(0).cloned(),
+                self.optional_signing_agents.get(0).cloned(),
             ));
         }
         if !self.enzymatic && !self.optional_signing_agents.is_empty() {
             return Err(CounterSigningError::NonEnzymaticOptionalSigners);
         }
         Ok(())
-    }
-
-    /// Signing agents accessor.
-    pub fn signing_agents(&self) -> &CounterSigningAgents {
-        &self.signing_agents
-    }
-
-    /// Mutable signing agents accessor for testing.
-    #[cfg(feature = "test_utils")]
-    pub fn signing_agents_mut(&mut self) -> &mut CounterSigningAgents {
-        &mut self.signing_agents
-    }
-
-    /// Optional signing agents accessor.
-    pub fn optional_signing_agents(&self) -> &CounterSigningAgents {
-        &self.optional_signing_agents
-    }
-
-    /// Mutable optional signing agents accessor for testing.
-    #[cfg(feature = "test_utils")]
-    pub fn optional_signing_agents_mut(&mut self) -> &mut CounterSigningAgents {
-        &mut self.optional_signing_agents
-    }
-
-    /// Minimum optional signing agents accessor.
-    pub fn minimum_optional_signing_agents(&self) -> &u8 {
-        &self.minimum_optional_signing_agents
-    }
-
-    /// Mutable minimum optional signing agents accessor for testing.
-    #[cfg(feature = "test_utils")]
-    pub fn minimum_optional_signing_agents_mut(&mut self) -> &mut u8 {
-        &mut self.minimum_optional_signing_agents
-    }
-
-    /// Enzyme index accessor.
-    pub fn enzymatic(&self) -> bool {
-        self.enzymatic
-    }
-
-    /// Mutable enzyme index accessor for testing.
-    #[cfg(feature = "test_utils")]
-    pub fn enzymatic_mut(&mut self) -> &mut bool {
-        &mut self.enzymatic
-    }
-
-    /// Session times accessor.
-    pub fn session_times(&self) -> &CounterSigningSessionTimes {
-        &self.session_times
-    }
-
-    /// Mutable session times accessor for testing.
-    #[cfg(feature = "test_utils")]
-    pub fn session_times_mut(&mut self) -> &mut CounterSigningSessionTimes {
-        &mut self.session_times
-    }
-
-    /// Action base accessor.
-    pub fn action_base(&self) -> &ActionBase {
-        &self.action_base
-    }
-
-    /// Mutable action base accessor for testing.
-    #[cfg(feature = "test_utils")]
-    pub fn action_base_mut(&mut self) -> &mut ActionBase {
-        &mut self.action_base
-    }
-
-    /// Preflight bytes accessor.
-    pub fn preflight_bytes(&self) -> &PreflightBytes {
-        &self.preflight_bytes
-    }
-
-    /// Mutable preflight bytes accessor for testing.
-    #[cfg(feature = "test_utils")]
-    pub fn preflight_bytes_mut(&mut self) -> &mut PreflightBytes {
-        &mut self.preflight_bytes
     }
 }
 
@@ -521,7 +444,7 @@ impl Action {
         author: AgentPubKey,
     ) -> Result<Self, CounterSigningError> {
         let agent_state = session_data.agent_state_for_agent(&author)?;
-        Ok(match session_data.preflight_request().action_base() {
+        Ok(match &session_data.preflight_request().action_base {
             ActionBase::Create(create_base) => Action::Create(Create {
                 author,
                 timestamp: session_data.to_timestamp(),
@@ -586,7 +509,7 @@ impl CounterSigningSessionData {
     ) -> Result<&CounterSigningAgentState, CounterSigningError> {
         match self
             .preflight_request
-            .signing_agents()
+            .signing_agents
             .iter()
             .position(|(pubkey, _)| pubkey == agent)
         {
@@ -616,8 +539,8 @@ impl CounterSigningSessionData {
             }
             Ok(())
         };
-        build_actions(self.preflight_request.signing_agents())?;
-        build_actions(self.preflight_request.optional_signing_agents())?;
+        build_actions(&self.preflight_request.signing_agents)?;
+        build_actions(&self.preflight_request.optional_signing_agents)?;
         Ok(actions)
     }
 
@@ -644,10 +567,10 @@ impl CounterSigningSessionData {
     /// Check that the countersigning session data responses all have the
     /// correct indexes.
     pub fn check_responses_indexes(&self) -> Result<(), CounterSigningError> {
-        if self.preflight_request().signing_agents().len() != self.responses().len() {
+        if self.preflight_request().signing_agents.len() != self.responses().len() {
             Err(CounterSigningError::CounterSigningSessionResponsesLength(
                 self.responses().len(),
-                self.preflight_request().signing_agents().len(),
+                self.preflight_request().signing_agents.len(),
             ))
         } else {
             for (i, (response, _response_signature)) in self.responses().iter().enumerate() {
@@ -665,7 +588,7 @@ impl CounterSigningSessionData {
     /// Construct a Timestamp from countersigning session data.
     /// Ostensibly used for the Action because the session itself covers a time range.
     pub fn to_timestamp(&self) -> Timestamp {
-        (self.preflight_request().session_times().start() + SESSION_ACTION_TIME_OFFSET)
+        (self.preflight_request().session_times.start() + SESSION_ACTION_TIME_OFFSET)
             .unwrap_or(Timestamp::MAX)
     }
 
@@ -764,7 +687,7 @@ pub mod test {
         let mut uk = arbitrary::Unstructured::new(&data);
         let alice = AgentPubKey::arbitrary(&mut uk).unwrap();
 
-        (*preflight_request.optional_signing_agents_mut()).push((alice.clone(), vec![]));
+        preflight_request.optional_signing_agents.push((alice.clone(), vec![]));
 
         assert!(matches!(
             preflight_request.check_agents_optional(),
@@ -773,17 +696,17 @@ pub mod test {
 
         // 1 of 1 is a pass
 
-        *preflight_request.minimum_optional_signing_agents_mut() = 1;
+        preflight_request.minimum_optional_signing_agents = 1;
 
         assert_eq!(preflight_request.check_agents_optional().unwrap(), ());
 
         // 1 of 2 optional agents is a pass
-        (*preflight_request.optional_signing_agents_mut()).push((alice.clone(), vec![]));
+        preflight_request.optional_signing_agents.push((alice.clone(), vec![]));
 
         assert_eq!(preflight_request.check_agents_optional().unwrap(), ());
 
         // 1 of 3 optional agents is a fail
-        (*preflight_request.optional_signing_agents_mut()).push((alice.clone(), vec![]));
+        preflight_request.optional_signing_agents.push((alice.clone(), vec![]));
 
         assert!(matches!(
             preflight_request.check_agents_optional(),
@@ -791,12 +714,12 @@ pub mod test {
         ));
 
         // 2 of 3 optional agents is a pass
-        *preflight_request.minimum_optional_signing_agents_mut() = 2;
+        preflight_request.minimum_optional_signing_agents = 2;
 
         assert_eq!(preflight_request.check_agents_optional().unwrap(), ());
 
         // 4 of 3 optional agents is a fail
-        *preflight_request.minimum_optional_signing_agents_mut() = 4;
+        preflight_request.minimum_optional_signing_agents = 4;
 
         assert!(matches!(
             preflight_request.check_agents_optional(),
@@ -818,12 +741,12 @@ pub mod test {
         let bob = AgentPubKey::arbitrary(&mut uk).unwrap();
 
         // Non enzymatic with signers and no optional signers is a pass.
-        (*preflight_request.signing_agents_mut()).push((alice.clone(), vec![]));
+        preflight_request.signing_agents.push((alice.clone(), vec![]));
 
         assert_eq!(preflight_request.check_enzyme().unwrap(), (),);
 
         // Non enzymatic with optional signers is a fail.
-        (*preflight_request.optional_signing_agents_mut()).push((alice.clone(), vec![]));
+        preflight_request.optional_signing_agents.push((alice.clone(), vec![]));
 
         assert!(matches!(
             preflight_request.check_enzyme(),
@@ -831,18 +754,18 @@ pub mod test {
         ));
 
         // Enzymatic with zero optional signers is a pass.
-        *preflight_request.optional_signing_agents_mut() = vec![];
-        *preflight_request.enzymatic_mut() = true;
+        preflight_request.optional_signing_agents = vec![];
+        preflight_request.enzymatic = true;
 
         assert_eq!(preflight_request.check_enzyme().unwrap(), ());
 
         // Enzymatic with optional signers is a pass.
-        *preflight_request.optional_signing_agents_mut() = vec![(alice.clone(), vec![])];
+        preflight_request.optional_signing_agents = vec![(alice.clone(), vec![])];
 
         assert_eq!(preflight_request.check_enzyme().unwrap(), ());
 
         // Enzymatic with first signer mismatch is a fail.
-        *preflight_request.optional_signing_agents_mut() = vec![(bob.clone(), vec![])];
+        preflight_request.optional_signing_agents = vec![(bob.clone(), vec![])];
 
         assert!(matches!(
             preflight_request.check_enzyme(),
@@ -863,7 +786,7 @@ pub mod test {
 
         // One signer is a fail.
         let alice = AgentPubKey::arbitrary(&mut u).unwrap();
-        (*preflight_request.signing_agents_mut()).push((alice.clone(), vec![]));
+        preflight_request.signing_agents.push((alice.clone(), vec![]));
 
         assert!(matches!(
             preflight_request.check_agents_len(),
@@ -872,7 +795,7 @@ pub mod test {
 
         // Two signers is a pass.
         let bob = AgentPubKey::arbitrary(&mut u).unwrap();
-        (*preflight_request.signing_agents_mut()).push((bob.clone(), vec![]));
+        preflight_request.signing_agents.push((bob.clone(), vec![]));
 
         assert_eq!(preflight_request.check_agents_len().unwrap(), (),);
     }
@@ -889,14 +812,14 @@ pub mod test {
 
         assert_eq!(preflight_request.check_agents_dupes().unwrap(), (),);
 
-        (*preflight_request.signing_agents_mut()).push((alice.clone(), vec![]));
+        preflight_request.signing_agents.push((alice.clone(), vec![]));
         assert_eq!(preflight_request.check_agents_dupes().unwrap(), (),);
 
-        (*preflight_request.signing_agents_mut()).push((bob.clone(), vec![]));
+        preflight_request.signing_agents.push((bob.clone(), vec![]));
         assert_eq!(preflight_request.check_agents_dupes().unwrap(), (),);
 
         // Another alice is a dupe, even if roles are different.
-        (*preflight_request.signing_agents_mut()).push((alice.clone(), vec![Role::new(0_u8)]));
+        preflight_request.signing_agents.push((alice.clone(), vec![Role::new(0_u8)]));
         assert!(matches!(
             preflight_request.check_agents_dupes(),
             Err(CounterSigningError::AgentsDupes(_))
@@ -915,7 +838,7 @@ pub mod test {
         assert_eq!(session_data.check_responses_indexes().unwrap(), ());
 
         // When the signing agents and responses are out of sync it must error.
-        (*session_data.preflight_request_mut().signing_agents_mut()).push((alice.clone(), vec![]));
+        session_data.preflight_request_mut().signing_agents.push((alice.clone(), vec![]));
         assert!(matches!(
             session_data.check_responses_indexes(),
             Err(CounterSigningError::CounterSigningSessionResponsesLength(
@@ -925,7 +848,7 @@ pub mod test {
         ));
 
         // When signing agents indexes are not in the correct order it must error.
-        (*session_data.preflight_request_mut().signing_agents_mut()).push((bob.clone(), vec![]));
+        session_data.preflight_request_mut().signing_agents.push((bob.clone(), vec![]));
 
         let alice_state = CounterSigningAgentState::arbitrary(&mut u).unwrap();
         let alice_signature = Signature::arbitrary(&mut u).unwrap();

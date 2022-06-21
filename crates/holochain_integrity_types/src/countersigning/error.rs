@@ -1,3 +1,5 @@
+use crate::Role;
+
 /// Errors related to the secure primitive macro.
 #[derive(Debug)]
 pub enum CounterSigningError {
@@ -10,7 +12,7 @@ pub enum CounterSigningError {
     /// Session response agents all need to be in the correct positions.
     CounterSigningSessionResponsesOrder(u8, usize),
     /// Enzyme must match for required and optional signers if set.
-    EnzymeMismatch(holo_hash::AgentPubKey, holo_hash::AgentPubKey),
+    EnzymeMismatch(Option<(holo_hash::AgentPubKey, Vec<Role>)>, Option<(holo_hash::AgentPubKey, Vec<Role>)>),
     /// If there are optional signers the session MUST be enzymatic.
     NonEnzymaticOptionalSigners,
     /// Agents length cannot be longer than max or less than min.
@@ -49,7 +51,7 @@ impl core::fmt::Display for CounterSigningError {
                     index, pos
             ),
             CounterSigningError::EnzymeMismatch(required_signer, optional_signer) => write!(f,
-                "The enzyme is mismatche for required signer {} and optional signer {}",
+                "The enzyme is mismatche for required signer {:?} and optional signer {:?}",
                 required_signer, optional_signer
 
             ),
