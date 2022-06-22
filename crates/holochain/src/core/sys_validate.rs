@@ -792,8 +792,14 @@ pub mod test {
         let alice = fixt!(AgentPubKey, Predictable);
         let bob = fixt!(AgentPubKey, Predictable, 1);
 
-        (*preflight_response.request_mut().signing_agents_mut()).push((alice.clone(), vec![]));
-        (*preflight_response.request_mut().signing_agents_mut()).push((bob, vec![]));
+        preflight_response
+            .request_mut()
+            .signing_agents
+            .push((alice.clone(), vec![]));
+        preflight_response
+            .request_mut()
+            .signing_agents
+            .push((bob, vec![]));
 
         *preflight_response.signature_mut() = alice
             .sign_raw(
