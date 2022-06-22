@@ -43,12 +43,7 @@ impl RegionCoords {
         }?;
         Some(
             ss.into_iter()
-                .flat_map(|s| {
-                    ts.iter().map(move |t| RegionCoords {
-                        space: s.clone(),
-                        time: t.clone(),
-                    })
-                })
+                .flat_map(|space| ts.iter().map(move |&time| RegionCoords { space, time }))
                 .collect(),
         )
     }

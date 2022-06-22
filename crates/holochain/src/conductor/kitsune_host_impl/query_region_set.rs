@@ -15,7 +15,7 @@ pub async fn query_region_set(
     dht_arc_set: Arc<DhtArcSet>,
     tuning_params: &KitsuneP2pTuningParams,
 ) -> ConductorResult<RegionSetLtcs> {
-    let arq_set = ArqBoundsSet::from_dht_arc_set(&topology, &strat, &dht_arc_set)
+    let arq_set = ArqBoundsSet::from_dht_arc_set(&topology, strat, &dht_arc_set)
         .expect("arc is not quantizable (FIXME: only use quantized arcs)");
     let recent_threshold =
         std::time::Duration::from_secs(tuning_params.danger_gossip_recent_threshold_secs);
@@ -42,7 +42,7 @@ pub(super) fn query_region_data(
     topology: &Topology,
     coords: RegionCoords,
 ) -> Result<RegionData, DatabaseError> {
-    let bounds = coords.to_bounds(&topology);
+    let bounds = coords.to_bounds(topology);
     let (x0, x1) = bounds.x;
     let (t0, t1) = bounds.t;
     stmt.query_row(

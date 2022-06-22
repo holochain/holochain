@@ -241,7 +241,6 @@ where
                             PeerViewQ::new(Topology::standard_epoch(), ArqStrat::default(), vec![])
                                 .into(),
                         )
-                        .into()
                     }
                     .boxed()
                     .into()));

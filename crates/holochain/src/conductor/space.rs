@@ -135,7 +135,7 @@ impl Spaces {
     /// Create a new empty set of [`DnaHash`] spaces.
     pub fn new(config: &ConductorConfig) -> ConductorResult<Self> {
         let root_db_dir = config.environment_path.clone();
-        let db_sync_strategy = config.db_sync_strategy.clone();
+        let db_sync_strategy = config.db_sync_strategy;
         let db_sync_level = match db_sync_strategy {
             DbSyncStrategy::Fast => DbSyncLevel::Off,
             DbSyncStrategy::Resilient => DbSyncLevel::Normal,
@@ -435,7 +435,7 @@ impl Spaces {
                         .collect::<Result<Vec<Vec<Option<_>>>, _>>()?
                         .into_iter()
                         .flatten()
-                        .filter_map(|x| x)
+                        .flatten()
                         .collect(),
                 )
             })

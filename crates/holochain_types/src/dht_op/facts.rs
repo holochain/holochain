@@ -9,7 +9,7 @@ use holochain_keystore::MetaLairClient;
 /// - The Signature matches the Action
 /// - If the action references an Entry, the Entry will exist and be of the appropriate hash
 /// - If the action does not reference an Entry, the entry will be None
-pub fn valid_dht_op<'a>(
+pub fn valid_dht_op(
     keystore: MetaLairClient,
     author: AgentPubKey,
     must_be_public: bool,
