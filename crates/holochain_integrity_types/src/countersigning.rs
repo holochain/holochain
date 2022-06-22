@@ -435,30 +435,33 @@ pub struct UpdateBase {
 }
 
 impl Action {
-    /// Construct an action from the ActionBase and associated session data.
+    /// Construct an Action from the ActionBase and associated session data.
     pub fn from_countersigning_data(
         entry_hash: EntryHash,
         session_data: &CounterSigningSessionData,
         author: AgentPubKey,
+        weight: EntryRateWeight,
     ) -> Result<Self, CounterSigningError> {
         let agent_state = session_data.agent_state_for_agent(&author)?;
         Ok(match &session_data.preflight_request().action_base {
-            ActionBase::Create(create_base) => Action::Create(Create {
+            ActionBase::Create(base) => Action::Create(Create {
                 author,
                 timestamp: session_data.to_timestamp(),
                 action_seq: agent_state.action_seq + 1,
                 prev_action: agent_state.chain_top.clone(),
-                entry_type: create_base.entry_type.clone(),
+                entry_type: base.entry_type.clone(),
+                weight,
                 entry_hash,
             }),
-            ActionBase::Update(update_base) => Action::Update(Update {
+            ActionBase::Update(base) => Action::Update(Update {
                 author,
                 timestamp: session_data.to_timestamp(),
                 action_seq: agent_state.action_seq + 1,
                 prev_action: agent_state.chain_top.clone(),
-                original_action_address: update_base.original_action_address.clone(),
-                original_entry_address: update_base.original_entry_address.clone(),
-                entry_type: update_base.entry_type.clone(),
+                original_action_address: base.original_action_address.clone(),
+                original_entry_address: base.original_entry_address.clone(),
+                entry_type: base.entry_type.clone(),
+                weight,
                 entry_hash,
             }),
         })
@@ -525,6 +528,7 @@ impl CounterSigningSessionData {
     pub fn build_action_set(
         &self,
         entry_hash: EntryHash,
+        weight: EntryRateWeight,
     ) -> Result<Vec<Action>, CounterSigningError> {
         let mut actions = vec![];
         let mut build_actions = |countersigning_agents: &CounterSigningAgents| -> Result<(), _> {
@@ -533,6 +537,7 @@ impl CounterSigningSessionData {
                     entry_hash.clone(),
                     self,
                     agent.clone(),
+                    weight.clone(),
                 )?);
             }
             Ok(())

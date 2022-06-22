@@ -1,4 +1,5 @@
 use super::delete::get_original_entry_data;
+use crate::core::ribosome::weigh_placeholder;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
@@ -29,6 +30,8 @@ pub fn update<'a>(
             let (original_entry_address, entry_type) =
                 get_original_entry_data(call_context.clone(), original_action_address.clone())?;
 
+            let weight = weigh_placeholder();
+
             // Countersigned entries have different action handling.
             match entry {
                 Entry::CounterSign(_, _) => tokio_helper::block_forever_on(async move {
@@ -38,7 +41,7 @@ pub fn update<'a>(
                         .source_chain()
                         .as_ref()
                         .expect("Must have source chain if write_workspace access is given")
-                        .put_countersigned(entry, chain_top_ordering)
+                        .put_countersigned(entry, chain_top_ordering, weight)
                         .await
                         .map_err(|source_chain_error| -> RuntimeError {
                             wasm_error!(WasmErrorInner::Host(source_chain_error.to_string())).into()
@@ -68,7 +71,7 @@ pub fn update<'a>(
                             .expect("Must have source chain if write_workspace access is given");
                         // push the action and the entry into the source chain
                         let action_hash = source_chain
-                            .put(action_builder, Some(entry), chain_top_ordering)
+                            .put_weightless(action_builder, Some(entry), chain_top_ordering)
                             .await
                             .map_err(|source_chain_error| -> RuntimeError {
                                 wasm_error!(WasmErrorInner::Host(source_chain_error.to_string()))
