@@ -28,7 +28,7 @@ pub type InlineCoordinatorZome = InlineZome<CoordinatorZomeMarker>;
 /// An InlineZome, which consists
 pub struct InlineZome<T> {
     /// Inline zome type marker.
-    _t: PhantomData<T>,
+    pub _t: PhantomData<T>,
     /// Since closures cannot be serialized, we include a UID which
     /// is the only part of an InlineZome that gets serialized.
     /// This uuid becomes part of the determination of the DnaHash
