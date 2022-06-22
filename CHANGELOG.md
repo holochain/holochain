@@ -6,6 +6,74 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20220622.133046
+
+## [holochain\_cli-0.0.43](crates/holochain_cli/CHANGELOG.md#0.0.43)
+
+## [holochain\_cli\_sandbox-0.0.39](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.39)
+
+## [holochain\_cli\_bundle-0.0.39](crates/holochain_cli_bundle/CHANGELOG.md#0.0.39)
+
+## [holochain-0.0.145](crates/holochain/CHANGELOG.md#0.0.145)
+
+**MAJOR BREAKING CHANGE\!** This release includes a rename of two Holochain core concepts, which results in a LOT of changes to public APIs and type names:
+
+- “Element” has been renamed to “Record”
+- “Header” has been renamed to “Action”
+
+All names which include these words have also been renamed accordingly.
+
+As Holochain has evolved, the meaning behind these concepts, as well as our understanding of them, has evolved as well, to the point that the original names are no longer adequate descriptors. We chose new names to help better reflect what these concepts mean, to bring more clarity to how we write and talk about Holochain.
+
+## [holochain\_test\_wasm\_common-0.0.39](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.39)
+
+## [holochain\_conductor\_api-0.0.45](crates/holochain_conductor_api/CHANGELOG.md#0.0.45)
+
+## [holochain\_wasm\_test\_utils-0.0.44](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.44)
+
+## [holochain\_cascade-0.0.45](crates/holochain_cascade/CHANGELOG.md#0.0.45)
+
+## [holochain\_state-0.0.45](crates/holochain_state/CHANGELOG.md#0.0.45)
+
+## [holochain\_p2p-0.0.43](crates/holochain_p2p/CHANGELOG.md#0.0.43)
+
+## [holochain\_types-0.0.43](crates/holochain_types/CHANGELOG.md#0.0.43)
+
+## [holochain\_keystore-0.0.43](crates/holochain_keystore/CHANGELOG.md#0.0.43)
+
+## [holochain\_sqlite-0.0.42](crates/holochain_sqlite/CHANGELOG.md#0.0.42)
+
+## [kitsune\_p2p-0.0.37](crates/kitsune_p2p/CHANGELOG.md#0.0.37)
+
+## [kitsune\_p2p\_proxy-0.0.25](crates/kitsune_p2p_proxy/CHANGELOG.md#0.0.25)
+
+## [kitsune\_p2p\_transport\_quic-0.0.25](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.0.25)
+
+## [kitsune\_p2p\_types-0.0.25](crates/kitsune_p2p_types/CHANGELOG.md#0.0.25)
+
+## [hdk-0.0.138](crates/hdk/CHANGELOG.md#0.0.138)
+
+- hdk: Bump rand version + fix getrandom (used by rand\_core and rand) to fetch randomness from host system when compiled to WebAssembly. [\#1445](https://github.com/holochain/holochain/pull/1445)
+
+## [holochain\_zome\_types-0.0.37](crates/holochain_zome_types/CHANGELOG.md#0.0.37)
+
+## [holochain\_deterministic\_integrity-0.0.10](crates/holochain_deterministic_integrity/CHANGELOG.md#0.0.10)
+
+## [hdk\_derive-0.0.37](crates/hdk_derive/CHANGELOG.md#0.0.37)
+
+## [holochain\_integrity\_types-0.0.9](crates/holochain_integrity_types/CHANGELOG.md#0.0.9)
+
+- Countersigning now accepts optional additional signers but the first must be the enzyme [\#1394](https://github.com/holochain/holochain/pull/1394)
+- The first agent in countersigning is always the enzyme if enzymatic [\#1394](https://github.com/holochain/holochain/pull/1394)
+
+## [kitsune\_p2p\_timestamp-0.0.10](crates/kitsune_p2p_timestamp/CHANGELOG.md#0.0.10)
+
+## [holo\_hash-0.0.29](crates/holo_hash/CHANGELOG.md#0.0.29)
+
+## [kitsune\_p2p\_dht\_arc-0.0.12](crates/kitsune_p2p_dht_arc/CHANGELOG.md#0.0.12)
+
+## [fixt-0.0.13](crates/fixt/CHANGELOG.md#0.0.13)
+
 # 20220616.084359
 
 - Docs: Update OS support in repository README and link to developer environment setup.
