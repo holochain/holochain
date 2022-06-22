@@ -75,7 +75,7 @@ async fn test_region_queries() {
         // timestamp is between 1 and 2 hours ago, which is the historical
         // window
         let op = arbitrary_valid_op(
-            (two_hrs_ago + Duration::from_millis(rand::thread_rng().gen_range(0, hour_ms)))
+            (two_hrs_ago + Duration::from_millis(rand::thread_rng().gen_range(0..hour_ms)))
                 .unwrap(),
         );
         let op = DhtOpHashed::from_content_sync(op);
@@ -89,7 +89,7 @@ async fn test_region_queries() {
         let op2 = arbitrary_valid_op(
             (two_hrs_ago
                 + Duration::from_millis(
-                    hour_ms + rand::thread_rng().gen_range(5 * min_ms, hour_ms),
+                    hour_ms + rand::thread_rng().gen_range(5 * min_ms..hour_ms),
                 ))
             .unwrap(),
         );

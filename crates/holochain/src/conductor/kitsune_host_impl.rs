@@ -5,7 +5,7 @@ mod query_size_limited_regions;
 
 use std::sync::Arc;
 
-use super::{dna_store::DnaStore, space::Spaces};
+use super::{ribosome_store::RibosomeStore, space::Spaces};
 use futures::FutureExt;
 use holo_hash::DnaHash;
 use holochain_p2p::{
@@ -22,7 +22,7 @@ use kitsune_p2p_types::config::KitsuneP2pTuningParams;
 /// Lets Kitsune make requests of Holochain
 pub struct KitsuneHostImpl {
     spaces: Spaces,
-    dna_store: RwShare<DnaStore>,
+    ribosome_store: RwShare<RibosomeStore>,
     tuning_params: KitsuneP2pTuningParams,
     strat: ArqStrat,
 }
@@ -31,13 +31,13 @@ impl KitsuneHostImpl {
     /// Constructor
     pub fn new(
         spaces: Spaces,
-        dna_store: RwShare<DnaStore>,
+        ribosome_store: RwShare<RibosomeStore>,
         tuning_params: KitsuneP2pTuningParams,
         strat: ArqStrat,
     ) -> Arc<Self> {
         Arc::new(Self {
             spaces,
-            dna_store,
+            ribosome_store,
             tuning_params,
             strat,
         })
@@ -142,7 +142,7 @@ impl KitsuneHost for KitsuneHostImpl {
     fn get_topology(&self, space: Arc<kitsune_p2p::KitsuneSpace>) -> KitsuneHostResult<Topology> {
         let dna_hash = DnaHash::from_kitsune(&space);
         let dna_def = self
-            .dna_store
+            .ribosome_store
             .share_mut(|ds| ds.get_dna_def(&dna_hash))
             .ok_or_else(|| DnaError::DnaMissing(dna_hash));
         async move { Ok(Topology::standard(dna_def?.origin_time)) }

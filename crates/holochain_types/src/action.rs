@@ -143,10 +143,10 @@ impl NewEntryAction {
     }
 
     /// Get the timestamp of this action
-    pub fn timestamp(&self) -> &holochain_zome_types::timestamp::Timestamp {
+    pub fn timestamp(&self) -> holochain_zome_types::timestamp::Timestamp {
         match self {
             NewEntryAction::Create(Create { timestamp, .. })
-            | NewEntryAction::Update(Update { timestamp, .. }) => timestamp,
+            | NewEntryAction::Update(Update { timestamp, .. }) => *timestamp,
         }
     }
 }
