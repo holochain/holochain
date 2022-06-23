@@ -13,7 +13,7 @@ use tracing::*;
     space,
     conductor_handle,
     stop,
-    trigger_app_validation,
+    trigger_rate_limiting,
     network,
 ))]
 pub fn spawn_sys_validation_consumer(
@@ -21,7 +21,7 @@ pub fn spawn_sys_validation_consumer(
     space: Space,
     conductor_handle: ConductorHandle,
     mut stop: sync::broadcast::Receiver<()>,
-    trigger_app_validation: TriggerSender,
+    trigger_rate_limiting: TriggerSender,
     network: HolochainP2pDna,
 ) -> (TriggerSender, JoinHandle<ManagedTaskResult>) {
     let (tx, mut rx) = TriggerSender::new();
@@ -42,7 +42,7 @@ pub fn spawn_sys_validation_consumer(
             match sys_validation_workflow(
                 workspace.clone(),
                 space.clone(),
-                trigger_app_validation.clone(),
+                trigger_rate_limiting.clone(),
                 trigger_self.clone(),
                 network.clone(),
                 conductor_handle.clone(),

@@ -48,7 +48,7 @@ mod tests;
 #[instrument(skip(
     workspace,
     space,
-    trigger_app_validation,
+    trigger_rate_limit,
     sys_validation_trigger,
     network,
     conductor_handle
@@ -56,7 +56,7 @@ mod tests;
 pub async fn sys_validation_workflow(
     workspace: Arc<SysValidationWorkspace>,
     space: Arc<Space>,
-    trigger_app_validation: TriggerSender,
+    trigger_rate_limit: TriggerSender,
     sys_validation_trigger: TriggerSender,
     network: HolochainP2pDna,
     conductor_handle: ConductorHandle,
@@ -73,7 +73,7 @@ pub async fn sys_validation_workflow(
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
     // trigger other workflows
-    trigger_app_validation.trigger(&"sys_validation_workflow");
+    trigger_rate_limit.trigger(&"sys_validation_workflow");
 
     Ok(complete)
 }
