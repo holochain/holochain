@@ -1,5 +1,6 @@
 //! # Database Cache
 //! This is an in-memory cache that is used to store the state of the DHT database.
+
 use crate::dht_op::DhtOpType;
 use crate::share::RwShare;
 use error::*;

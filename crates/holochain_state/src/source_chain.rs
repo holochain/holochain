@@ -31,7 +31,7 @@ use holochain_zome_types::ActionBuilder;
 use holochain_zome_types::ActionBuilderCommon;
 use holochain_zome_types::ActionExt;
 use holochain_zome_types::ActionHashed;
-use holochain_zome_types::ActionInner;
+use holochain_zome_types::ActionUnweighed;
 use holochain_zome_types::CapAccess;
 use holochain_zome_types::CapGrant;
 use holochain_zome_types::CapSecret;
@@ -40,6 +40,7 @@ use holochain_zome_types::ChainTopOrdering;
 use holochain_zome_types::CounterSigningAgentState;
 use holochain_zome_types::CounterSigningSessionData;
 use holochain_zome_types::Entry;
+use holochain_zome_types::EntryRateWeight;
 use holochain_zome_types::EntryVisibility;
 use holochain_zome_types::GrantedFunction;
 use holochain_zome_types::MembraneProof;
@@ -122,7 +123,7 @@ impl SourceChain {
         let author = self.author.clone();
         assert_eq!(
             *author,
-            preflight_request.signing_agents()[agent_index as usize].0
+            preflight_request.signing_agents[agent_index as usize].0
         );
 
         let countersigning_agent_state = self
@@ -138,7 +139,7 @@ impl SourceChain {
                     txn,
                     &hashed_preflight_request,
                     author.as_ref(),
-                    preflight_request.session_times().end(),
+                    preflight_request.session_times.end(),
                 )?;
                 SourceChainResult::Ok(countersigning_agent_state)
             })
@@ -165,11 +166,17 @@ impl SourceChain {
         &self,
         entry: Entry,
         chain_top_ordering: ChainTopOrdering,
+        weight: EntryRateWeight,
     ) -> SourceChainResult<ActionHash> {
         let entry_hash = EntryHash::with_data_sync(&entry);
         if let Entry::CounterSign(ref session_data, _) = entry {
             self.put_with_action(
-                Action::from_countersigning_data(entry_hash, session_data, (*self.author).clone())?,
+                Action::from_countersigning_data(
+                    entry_hash,
+                    session_data,
+                    (*self.author).clone(),
+                    weight,
+                )?,
                 Some(entry),
                 chain_top_ordering,
             )
@@ -180,11 +187,28 @@ impl SourceChain {
         }
     }
 
-    pub async fn put<H: ActionInner, B: ActionBuilder<H>>(
+    /// Put a new record at the end of the source chain, using a ActionBuilder
+    /// for an action type which has no weight data.
+    /// If needing to `put` an action with weight data, use
+    /// [`SourceChain::put_weighed`] instead.
+    pub async fn put<U: ActionUnweighed<Weight = ()>, B: ActionBuilder<U>>(
         &self,
         action_builder: B,
         maybe_entry: Option<Entry>,
         chain_top_ordering: ChainTopOrdering,
+    ) -> SourceChainResult<ActionHash> {
+        self.put_weighed(action_builder, maybe_entry, chain_top_ordering, ())
+            .await
+    }
+
+    /// Put a new record at the end of the source chain, using a ActionBuilder
+    /// and the specified weight for rate limiting.
+    pub async fn put_weighed<W, U: ActionUnweighed<Weight = W>, B: ActionBuilder<U>>(
+        &self,
+        action_builder: B,
+        maybe_entry: Option<Entry>,
+        chain_top_ordering: ChainTopOrdering,
+        weight: W,
     ) -> SourceChainResult<ActionHash> {
         let (prev_action, chain_head_seq, chain_head_timestamp) = self.chain_head()?;
         let action_seq = chain_head_seq + 1;
@@ -207,9 +231,25 @@ impl SourceChain {
             prev_action,
         };
         self.put_with_action(
-            action_builder.build(common).into(),
+            action_builder.build(common).weighed(weight).into(),
             maybe_entry,
             chain_top_ordering,
+        )
+        .await
+    }
+
+    #[cfg(feature = "test_utils")]
+    pub async fn put_weightless<W: Default, U: ActionUnweighed<Weight = W>, B: ActionBuilder<U>>(
+        &self,
+        action_builder: B,
+        maybe_entry: Option<Entry>,
+        chain_top_ordering: ChainTopOrdering,
+    ) -> SourceChainResult<ActionHash> {
+        self.put_weighed(
+            action_builder,
+            maybe_entry,
+            chain_top_ordering,
+            Default::default(),
         )
         .await
     }
@@ -957,6 +997,8 @@ pub async fn genesis(
         prev_action: avh_addr,
         entry_type: action::EntryType::AgentPubKey,
         entry_hash: agent_pubkey.clone().into(),
+        // AgentPubKey is weightless
+        weight: Default::default(),
     });
     let agent_action = ActionHashed::from_content_sync(agent_action);
     let agent_action = SignedActionHashed::sign(&keystore, agent_action).await?;
@@ -1071,7 +1113,7 @@ pub fn current_countersigning_session(
 }
 
 #[cfg(test)]
-async fn _put_db<H: ActionInner, B: ActionBuilder<H>>(
+async fn _put_db<H: holochain_zome_types::ActionUnweighed, B: ActionBuilder<H>>(
     vault: holochain_types::db::DbWrite<DbKindAuthored>,
     keystore: &MetaLairClient,
     author: Arc<AgentPubKey>,
@@ -1088,7 +1130,7 @@ async fn _put_db<H: ActionInner, B: ActionBuilder<H>>(
         action_seq,
         prev_action: prev_action.clone(),
     };
-    let action = action_builder.build(common).into();
+    let action = action_builder.build(common).weightless().into();
     let action = ActionHashed::from_content_sync(action);
     let action = SignedActionHashed::sign(keystore, action).await?;
     let record = Record::new(action, maybe_entry);
@@ -1357,7 +1399,7 @@ pub mod tests {
             entry_hash: eh1.clone(),
         };
         let h1 = chain_1
-            .put(create, Some(entry_1.clone()), ChainTopOrdering::Strict)
+            .put_weightless(create, Some(entry_1.clone()), ChainTopOrdering::Strict)
             .await
             .unwrap();
 
@@ -1368,7 +1410,7 @@ pub mod tests {
             entry_hash: entry_hash_err.clone(),
         };
         chain_2
-            .put(create, Some(entry_err.clone()), ChainTopOrdering::Strict)
+            .put_weightless(create, Some(entry_err.clone()), ChainTopOrdering::Strict)
             .await
             .unwrap();
 
@@ -1382,7 +1424,7 @@ pub mod tests {
             entry_hash: eh2.clone(),
         };
         let old_h2 = chain_3
-            .put(create, Some(entry_2.clone()), ChainTopOrdering::Relaxed)
+            .put_weightless(create, Some(entry_2.clone()), ChainTopOrdering::Relaxed)
             .await
             .unwrap();
 
@@ -1505,7 +1547,7 @@ pub mod tests {
                 entry_hash: entry_hash.clone(),
             };
             let action = chain
-                .put(action_builder, Some(entry), ChainTopOrdering::default())
+                .put_weightless(action_builder, Some(entry), ChainTopOrdering::default())
                 .await?;
 
             chain.flush(&mock).await.unwrap();
@@ -1566,7 +1608,7 @@ pub mod tests {
                 original_entry_address,
             };
             let action = chain
-                .put(action_builder, Some(entry), ChainTopOrdering::default())
+                .put_weightless(action_builder, Some(entry), ChainTopOrdering::default())
                 .await?;
 
             chain.flush(&mock).await.unwrap();
@@ -1627,7 +1669,7 @@ pub mod tests {
                 deletes_entry_address: updated_entry_hash,
             };
             chain
-                .put(action_builder, None, ChainTopOrdering::default())
+                .put_weightless(action_builder, None, ChainTopOrdering::default())
                 .await?;
 
             chain.flush(&mock).await.unwrap();
@@ -1763,7 +1805,7 @@ pub mod tests {
             entry_hash: EntryHash::with_data_sync(&entry),
         };
         let h1 = source_chain
-            .put(create, Some(entry), ChainTopOrdering::default())
+            .put_weightless(create, Some(entry), ChainTopOrdering::default())
             .await
             .unwrap();
         let entry = Entry::App(fixt!(AppEntryBytes));
@@ -1772,7 +1814,7 @@ pub mod tests {
             entry_hash: EntryHash::with_data_sync(&entry),
         };
         let h2 = source_chain
-            .put(create, Some(entry), ChainTopOrdering::default())
+            .put_weightless(create, Some(entry), ChainTopOrdering::default())
             .await
             .unwrap();
         source_chain.flush(&mock).await.unwrap();

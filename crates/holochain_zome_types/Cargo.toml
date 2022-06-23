@@ -1,6 +1,6 @@
 [package]
 name = "holochain_zome_types"
-version = "0.0.36"
+version = "0.0.37"
 description = "Holochain zome types"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -12,9 +12,9 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-kitsune_p2p_timestamp = { version = "0.0.9", path = "../kitsune_p2p/timestamp" }
-holochain_integrity_types = { version = "0.0.8", path = "../holochain_integrity_types", features = ["tracing"] }
-holo_hash = { version = "0.0.28", path = "../holo_hash" }
+kitsune_p2p_timestamp = { version = "0.0.10", path = "../kitsune_p2p/timestamp" }
+holochain_integrity_types = { version = "0.0.9", path = "../holochain_integrity_types", features = ["tracing"] }
+holo_hash = { version = "0.0.29", path = "../holo_hash" }
 holochain_serialized_bytes = "=0.0.51"
 paste = "=1.0.5"
 serde = { version = "1.0", features = [ "derive", "rc" ] }
@@ -26,7 +26,7 @@ tracing = "0.1"
 holochain_wasmer_common = "=0.0.80"
 
 # fixturator dependencies
-fixt = { version = "0.0.12", path = "../fixt", optional = true }
+fixt = { version = "0.0.13", path = "../fixt", optional = true }
 strum = { version = "0.18.0", optional = true }
 rand = { version = "0.8.5", optional = true }
 
@@ -62,7 +62,7 @@ full-dna-def = ["derive_builder", "nanoid", "shrinkwraprs"]
 
 full = ["default", "rusqlite", "num_enum", "kitsune_p2p_timestamp/full", "properties"]
 
-fixturators = ["fixt", "rand", "strum", "holo_hash/fixturators", ]
+fixturators = ["fixt", "rand", "strum", "holo_hash/fixturators", "holochain_integrity_types/test_utils"]
 
 properties = ["serde_yaml"]
 
