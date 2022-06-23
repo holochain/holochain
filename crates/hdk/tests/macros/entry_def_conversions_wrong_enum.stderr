@@ -1,0 +1,5 @@
+error: hdk_entry_defs_conversions must only have a single enum tuple
+ --> tests/macros/entry_def_conversions_wrong_enum.rs:5:7
+  |
+5 |     A(A, B),
+  |       ^^^^

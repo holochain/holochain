@@ -60,11 +60,11 @@ wasm_io_types! {
     // @todo Get the capability for the current zome call.
     fn capability_info (()) -> ();
 
-    // Returns HeaderHash of the newly created element.
-    fn create (zt::entry::CreateInput) -> holo_hash::HeaderHash;
+    // Returns ActionHash of the newly created record.
+    fn create (zt::entry::CreateInput) -> holo_hash::ActionHash;
 
     // Create a link between two entries.
-    fn create_link (zt::link::CreateLinkInput) -> holo_hash::HeaderHash;
+    fn create_link (zt::link::CreateLinkInput) -> holo_hash::ActionHash;
 
     fn create_x25519_keypair(()) -> zt::x_salsa20_poly1305::x25519::X25519PubKey;
 
@@ -72,13 +72,13 @@ wasm_io_types! {
     // TraceMsg includes line numbers. so the wasm tells the host about it's own code structure.
     fn trace (zt::trace::TraceMsg) -> ();
 
-    // Header hash of the CreateLink element.
-    fn delete_link (zt::link::DeleteLinkInput) -> holo_hash::HeaderHash;
+    // Action hash of the CreateLink record.
+    fn delete_link (zt::link::DeleteLinkInput) -> holo_hash::ActionHash;
 
-    // Delete an element.
-    fn delete (zt::entry::DeleteInput) -> holo_hash::HeaderHash;
+    // Delete a record.
+    fn delete (zt::entry::DeleteInput) -> holo_hash::ActionHash;
 
-    // Header hash of the newly committed element.
+    // Action hash of the newly committed record.
     // Emit a Signal::App to subscribers on the interface
     fn emit_signal (zt::signal::AppSignal) -> ();
 
@@ -92,22 +92,22 @@ wasm_io_types! {
     fn get_links (Vec<zt::link::GetLinksInput>) -> Vec<Vec<zt::link::Link>>;
 
     // Attempt to get a live entry from the cascade.
-    fn get (Vec<zt::entry::GetInput>) -> Vec<Option<zt::element::Element>>;
+    fn get (Vec<zt::entry::GetInput>) -> Vec<Option<zt::record::Record>>;
 
     // Hash data on the host.
     fn hash (zt::hash::HashInput) -> zt::hash::HashOutput;
 
-    // Retreive an element from the DHT or short circuit.
-    fn must_get_valid_element (zt::entry::MustGetValidElementInput) -> zt::element::Element;
+    // Retreive a record from the DHT or short circuit.
+    fn must_get_valid_record (zt::entry::MustGetValidRecordInput) -> zt::record::Record;
 
     // Retreive a entry from the DHT or short circuit.
     fn must_get_entry (zt::entry::MustGetEntryInput) -> zt::entry::EntryHashed;
 
-    // Retrieve a header from the DHT or short circuit.
-    fn must_get_header (zt::entry::MustGetHeaderInput) -> zt::SignedHeaderHashed;
+    // Retrieve an action from the DHT or short circuit.
+    fn must_get_action (zt::entry::MustGetActionInput) -> zt::SignedActionHashed;
 
     // Query the source chain for data.
-    fn query (zt::query::ChainQueryFilter) -> Vec<crate::Element>;
+    fn query (zt::query::ChainQueryFilter) -> Vec<crate::Record>;
 
     // the length of random bytes to create
     fn random_bytes (u32) -> zt::bytes::Bytes;
@@ -136,10 +136,22 @@ wasm_io_types! {
     // Current system time, in the opinion of the host, as a `Timestamp`.
     fn sys_time (()) -> zt::timestamp::Timestamp;
 
-    // Same as  but also takes the HeaderHash of the updated element.
-    fn update (zt::entry::UpdateInput) -> holo_hash::HeaderHash;
+    // Same as  but also takes the ActionHash of the updated record.
+    fn update (zt::entry::UpdateInput) -> holo_hash::ActionHash;
 
     fn verify_signature (zt::signature::VerifySignature) -> bool;
+
+    fn x_salsa20_poly1305_shared_secret_create_random(
+        Option<zt::x_salsa20_poly1305::key_ref::XSalsa20Poly1305KeyRef>
+    ) -> zt::x_salsa20_poly1305::key_ref::XSalsa20Poly1305KeyRef;
+
+    fn x_salsa20_poly1305_shared_secret_export(
+        zt::x_salsa20_poly1305::XSalsa20Poly1305SharedSecretExport
+    ) -> zt::x_salsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData;
+
+    fn x_salsa20_poly1305_shared_secret_ingest(
+        zt::x_salsa20_poly1305::XSalsa20Poly1305SharedSecretIngest
+    ) -> zt::x_salsa20_poly1305::key_ref::XSalsa20Poly1305KeyRef;
 
     fn x_salsa20_poly1305_encrypt(
         zt::x_salsa20_poly1305::XSalsa20Poly1305Encrypt

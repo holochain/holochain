@@ -1,5 +1,10 @@
 //! The Holochain Deterministic Integrity
 
+pub use hdk_derive::hdk_entry_defs;
+pub use hdk_derive::hdk_entry_helper;
+pub use hdk_derive::hdk_extern;
+pub use hdk_derive::hdk_link_types;
+
 /// Working with app and system entries.
 ///
 /// Most Holochain applications will define their own app entry types.
@@ -7,7 +12,7 @@
 /// App entries are all entries that are not system entries.
 /// They are defined in the `entry_defs` callback and then the application can call CRUD functions with them.
 ///
-/// CRUD in Holochain is represented as a graph/tree of Elements referencing each other (via Header hashes) representing new states of a shared identity.
+/// CRUD in Holochain is represented as a graph/tree of Records referencing each other (via Action hashes) representing new states of a shared identity.
 /// Because the network is always subject to the possibility of partitions, there is no way to assert an objective truth about the 'current' or 'real' value that all participants will agree on.
 /// This is a key difference between Holochain and blockchains.
 /// Where blockchains define a consensus algorithm that brings all participants as close as possible to a single value while Holochain lets each participant discover their own truth.
@@ -117,9 +122,9 @@ pub mod info;
 /// The logging level can be changed for the host at runtime using the `WASM_LOG` environment variable that works exactly as `RUST_LOG` for other tracing.
 pub mod trace;
 
-/// The interface between the host and guest is implemented as an `HdkT` trait.
+/// The interface between the host and guest is implemented as an `HdiT` trait.
 ///
-/// The `set_hdk` function globally sets a `RefCell` to track the current HDI implementation.
+/// The `set_hdi` function globally sets a `RefCell` to track the current HDI implementation.
 /// When the `mock` feature is set then this will default to an HDI that always errors, else a WASM host is assumed to exist.
 /// The `mockall` crate (in prelude with `mock` feature) can be used to generate compatible mocks for unit testing.
 /// See mocking examples in the test WASMs crate, such as `agent_info`.

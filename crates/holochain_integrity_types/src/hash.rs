@@ -1,7 +1,7 @@
 use crate::prelude::*;
+use holo_hash::ActionHash;
 use holo_hash::EntryHash;
 use holo_hash::ExternalHash;
-use holo_hash::HeaderHash;
 
 /// 256 Bit generic hash.
 pub struct Hash256Bits([u8; 32]);
@@ -17,8 +17,8 @@ crate::secure_primitive!(Hash512Bits, 64);
 pub enum HashInput {
     /// Hash an Entry.
     Entry(Entry),
-    /// Hash a Header.
-    Header(Header),
+    /// Hash an action.
+    Action(Action),
     /// Blake2b is the native Holochain hashing algorithm and compatible with
     /// e.g. Polkadot and Zcash.
     /// Second value is the output length of the hash in bytes.
@@ -41,8 +41,8 @@ pub enum HashInput {
 pub enum HashOutput {
     /// Hash of an [`Entry`].
     Entry(EntryHash),
-    /// Hash of a [`Header`].
-    Header(HeaderHash),
+    /// Hash of a [`Action`].
+    Action(ActionHash),
     /// Hash of an external type.
     External(ExternalHash),
     /// Hash of bytes using Blake2b.

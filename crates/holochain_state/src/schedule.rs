@@ -61,7 +61,10 @@ pub fn live_scheduled_fns(
         },
         |row| {
             Ok((
-                ScheduledFn::new(ZomeName(row.get(0)?), FunctionName(row.get(1)?)),
+                ScheduledFn::new(
+                    ZomeName(row.get::<_, String>(0)?.into()),
+                    FunctionName(row.get(1)?),
+                ),
                 row.get(2)?,
             ))
         },

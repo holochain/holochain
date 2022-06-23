@@ -3,7 +3,7 @@ use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 use tracing::error;
 
@@ -12,7 +12,7 @@ pub fn accept_countersigning_preflight_request<'a>(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: PreflightRequest,
-) -> Result<PreflightRequestAcceptance, WasmError> {
+) -> Result<PreflightRequestAcceptance, RuntimeError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess {
             agent_info: Permission::Allow,
@@ -29,13 +29,13 @@ pub fn accept_countersigning_preflight_request<'a>(
             tokio_helper::block_forever_on(async move {
                 if (holochain_zome_types::Timestamp::now() + SESSION_TIME_FUTURE_MAX)
                     .unwrap_or(Timestamp::MAX)
-                    < *input.session_times().start()
+                    < *input.session_times.start()
                 {
                     return Ok(PreflightRequestAcceptance::UnacceptableFutureStart);
                 }
 
                 let agent_index = match input
-                    .signing_agents()
+                    .signing_agents
                     .iter()
                     .position(|(agent, _)| agent == &author)
                 {
@@ -50,8 +50,8 @@ pub fn accept_countersigning_preflight_request<'a>(
                     .expect("Must have source chain if write_workspace access is given")
                     .accept_countersigning_preflight_request(input.clone(), agent_index)
                     .await
-                    .map_err(|source_chain_error| {
-                        WasmError::Host(source_chain_error.to_string())
+                    .map_err(|source_chain_error| -> RuntimeError {
+                        wasm_error!(WasmErrorInner::Host(source_chain_error.to_string())).into()
                     })?;
                 let signature: Signature = match call_context
                     .host_context
@@ -61,7 +61,8 @@ pub fn accept_countersigning_preflight_request<'a>(
                         PreflightResponse::encode_fields_for_signature(
                             &input,
                             &countersigning_agent_state,
-                        )?
+                        )
+                        .map_err(|e| -> RuntimeError { wasm_error!(e.into()).into() })?
                         .into(),
                     )
                     .await
@@ -82,24 +83,27 @@ pub fn accept_countersigning_preflight_request<'a>(
                         {
                             error!(?unlock_result);
                         }
-                        return Err(WasmError::Host(e.to_string()));
+                        return Err(wasm_error!(WasmErrorInner::Host(e.to_string())).into());
                     }
                 };
 
                 Ok(PreflightRequestAcceptance::Accepted(
                     PreflightResponse::try_new(input, countersigning_agent_state, signature)
-                        .map_err(|e| WasmError::Host(e.to_string()))?,
+                        .map_err(|e| -> RuntimeError {
+                            wasm_error!(WasmErrorInner::Host(e.to_string())).into()
+                        })?,
                 ))
             })
         }
-        _ => Err(WasmError::Host(
+        _ => Err(wasm_error!(WasmErrorInner::Host(
             RibosomeError::HostFnPermissions(
                 call_context.zome.zome_name().clone(),
                 call_context.function_name().clone(),
                 "accept_countersigning_preflight_request".into(),
             )
             .to_string(),
-        )),
+        ))
+        .into()),
     }
 }
 
@@ -110,11 +114,12 @@ pub mod wasm_test {
     use crate::conductor::api::ZomeCall;
     use crate::conductor::CellError;
     use crate::core::ribosome::error::RibosomeError;
+    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use crate::core::workflow::error::WorkflowError;
     use hdk::prelude::*;
     use holochain_state::source_chain::SourceChainError;
     use holochain_wasm_test_utils::TestWasm;
-    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
+    use holochain_wasmer_host::prelude::*;
 
     /// Allow ChainLocked error, panic on anything else
     fn expect_chain_locked(
@@ -145,7 +150,7 @@ pub mod wasm_test {
         } = RibosomeTestFixture::new(TestWasm::CounterSigning).await;
 
         // Before preflight Alice can commit
-        let _: HeaderHash = conductor.call(&alice, "create_a_thing", ()).await;
+        let _: ActionHash = conductor.call(&alice, "create_a_thing", ()).await;
 
         let preflight_request: PreflightRequest = conductor
             .call(
@@ -159,7 +164,7 @@ pub mod wasm_test {
             .await;
 
         // Before accepting preflight Alice can commit
-        let _: HeaderHash = conductor.call(&alice, "create_a_thing", ()).await;
+        let _: ActionHash = conductor.call(&alice, "create_a_thing", ()).await;
 
         // Alice can accept the preflight request.
         let alice_acceptance: PreflightRequestAcceptance = conductor
@@ -221,7 +226,7 @@ pub mod wasm_test {
             })
             .await;
         assert!(matches!(countersign_fail_create_alice, Err(_)));
-        let _: HeaderHash = conductor.call(&alice, "create_a_thing", ()).await;
+        let _: ActionHash = conductor.call(&alice, "create_a_thing", ()).await;
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -239,7 +244,7 @@ pub mod wasm_test {
         } = RibosomeTestFixture::new(TestWasm::CounterSigning).await;
 
         // Before the preflight creation of things should work.
-        let _: HeaderHash = conductor.call(&alice, "create_a_thing", ()).await;
+        let _: ActionHash = conductor.call(&alice, "create_a_thing", ()).await;
 
         // Alice can create multiple preflight requests.
         let preflight_request: PreflightRequest = conductor
@@ -264,7 +269,7 @@ pub mod wasm_test {
             .await;
 
         // Alice can still create things before the preflight is accepted.
-        let _: HeaderHash = conductor.call(&alice, "create_a_thing", ()).await;
+        let _: ActionHash = conductor.call(&alice, "create_a_thing", ()).await;
 
         // Alice can accept the preflight request.
         let alice_acceptance: PreflightRequestAcceptance = conductor
@@ -295,7 +300,7 @@ pub mod wasm_test {
             .await;
         assert!(matches!(
             preflight_acceptance_fail,
-            Ok(Err(RibosomeError::WasmError(WasmError::Host(_))))
+            Ok(Err(RibosomeError::WasmRuntimeError(RuntimeError { .. })))
         ));
 
         // Bob can also accept the preflight request.
@@ -342,7 +347,7 @@ pub mod wasm_test {
 
         // Creating the correct countersigned entry will NOT immediately unlock
         // the chain (it needs Bob to countersign).
-        let countersigned_header_hash_alice: HeaderHash = conductor
+        let countersigned_action_hash_alice: ActionHash = conductor
             .call(
                 &alice,
                 "create_a_countersigned_thing",
@@ -393,35 +398,35 @@ pub mod wasm_test {
         expect_chain_locked(thing_fail_create_bob);
 
         // After bob commits the same countersigned entry he can unlock his chain.
-        let countersigned_header_hash_bob: HeaderHash = conductor
+        let countersigned_action_hash_bob: ActionHash = conductor
             .call(
                 &bob,
                 "create_a_countersigned_thing",
                 vec![alice_response, bob_response],
             )
             .await;
-        let _: HeaderHash = conductor.call(&alice, "create_a_thing", ()).await;
-        let _: HeaderHash = conductor.call(&bob, "create_a_thing", ()).await;
+        let _: ActionHash = conductor.call(&alice, "create_a_thing", ()).await;
+        let _: ActionHash = conductor.call(&bob, "create_a_thing", ()).await;
 
-        // Header get must not error.
-        let countersigned_header_bob: SignedHeaderHashed = conductor
+        // Action get must not error.
+        let countersigned_action_bob: SignedActionHashed = conductor
             .call(
                 &bob,
-                "must_get_header",
-                countersigned_header_hash_bob.clone(),
+                "must_get_action",
+                countersigned_action_hash_bob.clone(),
             )
             .await;
-        let countersigned_header_alice: SignedHeaderHashed = conductor
+        let countersigned_action_alice: SignedActionHashed = conductor
             .call(
                 &alice,
-                "must_get_header",
-                countersigned_header_hash_alice.clone(),
+                "must_get_action",
+                countersigned_action_hash_alice.clone(),
             )
             .await;
 
         // Entry get must not error.
         if let Some((countersigned_entry_hash_bob, _)) =
-            countersigned_header_bob.header().entry_data()
+            countersigned_action_bob.action().entry_data()
         {
             let _countersigned_entry_bob: EntryHashed = conductor
                 .call(&bob, "must_get_entry", countersigned_entry_hash_bob)
@@ -430,13 +435,9 @@ pub mod wasm_test {
             unreachable!();
         }
 
-        // Element get must not error.
-        let _countersigned_element_bob: Element = conductor
-            .call(
-                &bob,
-                "must_get_valid_element",
-                countersigned_header_hash_bob,
-            )
+        // Record get must not error.
+        let _countersigned_record_bob: Record = conductor
+            .call(&bob, "must_get_valid_record", countersigned_action_hash_bob)
             .await;
 
         let alice_activity: AgentActivity = conductor
@@ -453,7 +454,7 @@ pub mod wasm_test {
         assert_eq!(alice_activity.valid_activity.len(), 8);
         assert_eq!(
             &alice_activity.valid_activity[6].1,
-            countersigned_header_alice.header_address(),
+            countersigned_action_alice.action_address(),
         );
 
         let bob_activity: AgentActivity = conductor
@@ -470,7 +471,7 @@ pub mod wasm_test {
         assert_eq!(bob_activity.valid_activity.len(), 6);
         assert_eq!(
             &bob_activity.valid_activity[4].1,
-            countersigned_header_bob.header_address(),
+            countersigned_action_bob.action_address(),
         );
     }
 }

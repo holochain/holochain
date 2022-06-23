@@ -8,9 +8,15 @@ edition = "2021"
 name = "test_wasm_post_commit_volley"
 crate-type = [ "cdylib", "rlib" ]
 
+[[example]]
+name = "integrity_test_wasm_post_commit_volley"
+path = "src/integrity.rs"
+crate-type = ["cdylib", "rlib"]
+
 [dependencies]
 serde = "1.0"
 hdk = { path = "../../../../hdk" }
+holochain_deterministic_integrity = { path = "../../../../holochain_deterministic_integrity" }
 
 [features]
 default = []

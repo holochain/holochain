@@ -2,7 +2,7 @@ use super::app_validation_workflow;
 use super::app_validation_workflow::AppValidationError;
 use super::app_validation_workflow::Outcome;
 use super::error::WorkflowResult;
-use super::sys_validation_workflow::sys_validate_element;
+use super::sys_validation_workflow::sys_validate_record;
 use crate::conductor::api::CellConductorApi;
 use crate::conductor::api::CellConductorApiT;
 use crate::conductor::interface::SignalBroadcaster;
@@ -19,7 +19,7 @@ use holochain_p2p::HolochainP2pDna;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_state::source_chain::SourceChainError;
-use holochain_zome_types::element::Element;
+use holochain_zome_types::record::Record;
 
 use holochain_types::prelude::*;
 use tracing::instrument;
@@ -58,6 +58,11 @@ pub async fn call_zome_workflow<Ribosome>(
 where
     Ribosome: RibosomeT + 'static,
 {
+    let coordinator_zome = args
+        .ribosome
+        .dna_def()
+        .get_coordinator_zome(args.invocation.zome.zome_name())
+        .ok();
     let should_write = args.is_root_zome_call;
     let conductor_handle = args.conductor_handle.clone();
     let result =
@@ -70,10 +75,9 @@ where
     if should_write {
         let is_empty = workspace.source_chain().is_empty()?;
         let countersigning_op = workspace.source_chain().countersigning_op()?;
-        let flushed_headers: Vec<(Option<Zome>, SignedHeaderHashed)> =
-            HostFnWorkspace::from(workspace.clone())
-                .flush(&network)
-                .await?;
+        let flushed_actions: Vec<SignedActionHashed> = HostFnWorkspace::from(workspace.clone())
+            .flush(&network)
+            .await?;
         if !is_empty {
             match countersigning_op {
                 Some(op) => {
@@ -90,14 +94,18 @@ where
             }
         }
 
-        send_post_commit(
-            conductor_handle,
-            workspace,
-            network,
-            keystore,
-            flushed_headers,
-        )
-        .await?;
+        // Only send post commit if this is a coordinator zome.
+        if let Some(coordinator_zome) = coordinator_zome {
+            send_post_commit(
+                conductor_handle,
+                workspace,
+                network,
+                keystore,
+                flushed_actions,
+                vec![coordinator_zome],
+            )
+            .await?;
+        }
     }
 
     Ok(result)
@@ -144,10 +152,10 @@ where
             SourceChainError::InvalidCommit(_)
         ))
     ) {
-        let scratch_elements = workspace.source_chain().scratch_elements()?;
-        if scratch_elements.len() == 1 {
+        let scratch_records = workspace.source_chain().scratch_records()?;
+        if scratch_records.len() == 1 {
             let lock = holochain_state::source_chain::lock_for_entry(
-                scratch_elements[0].entry().as_option(),
+                scratch_records[0].entry().as_option(),
             )?;
             if !lock.is_empty()
                 && workspace
@@ -207,18 +215,18 @@ where
     Ribosome: RibosomeT + 'static,
 {
     let to_app_validate = {
-        // collect all the elements we need to validate in wasm
-        let scratch_elements = workspace.source_chain().scratch_elements()?;
-        let mut to_app_validate: Vec<Element> = Vec::with_capacity(scratch_elements.len());
-        // Loop forwards through all the new elements
-        for element in scratch_elements {
-            sys_validate_element(&element, &workspace, network.clone(), &(*conductor_handle))
+        // collect all the records we need to validate in wasm
+        let scratch_records = workspace.source_chain().scratch_records()?;
+        let mut to_app_validate: Vec<Record> = Vec::with_capacity(scratch_records.len());
+        // Loop forwards through all the new records
+        for record in scratch_records {
+            sys_validate_record(&record, &workspace, network.clone(), &(*conductor_handle))
                 .await
                 // If the was en error exit
                 // If the validation failed, exit with an InvalidCommit
                 // If it was ok continue
                 .or_else(|outcome_or_err| outcome_or_err.invalid_call_zome_commit())?;
-            to_app_validate.push(element);
+            to_app_validate.push(record);
         }
 
         to_app_validate
@@ -226,10 +234,10 @@ where
 
     let mut cascade =
         holochain_cascade::Cascade::from_workspace_network(&workspace, network.clone());
-    for mut chain_element in to_app_validate {
-        for op_type in header_to_op_types(chain_element.header()) {
+    for mut chain_record in to_app_validate {
+        for op_type in action_to_op_types(chain_record.action()) {
             let op =
-                app_validation_workflow::element_to_op(chain_element, op_type, &mut cascade).await;
+                app_validation_workflow::record_to_op(chain_record, op_type, &mut cascade).await;
 
             let (op, activity_entry) = match op {
                 Ok(op) => op,
@@ -245,7 +253,7 @@ where
             .await;
             let outcome = outcome.or_else(Outcome::try_from);
             map_outcome(outcome)?;
-            chain_element = app_validation_workflow::op_to_element(op, activity_entry);
+            chain_record = app_validation_workflow::op_to_record(op, activity_entry);
         }
     }
 

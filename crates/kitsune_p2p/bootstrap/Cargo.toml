@@ -13,12 +13,12 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-clap = "3.1.6"
+clap = "=3.1.18"
 futures = "0.3.15"
-kitsune_p2p_types = { version = "0.0.24", path = "../types" }
+kitsune_p2p_types = { version = "0.0.25", path = "../types" }
 once_cell = "1.7.2"
 parking_lot = "0.11"
-rand = "0.7"
+rand = "0.8.5"
 rmp-serde = "0.15"
 serde = { version = "1", features = [ "derive", "rc" ] }
 serde_bytes = "0.11"
@@ -28,7 +28,7 @@ warp = "0.3"
 
 [dev-dependencies]
 kitsune_p2p = { path = "../kitsune_p2p" }
-fixt = { path = "../../fixt" ,version = "0.0.11"}
+fixt = { path = "../../fixt" ,version = "0.0.13"}
 criterion = "0.3"
 reqwest = "0.11.2"
 

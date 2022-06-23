@@ -115,6 +115,9 @@ pub enum ConductorError {
     #[error(transparent)]
     RusqliteError(#[from] rusqlite::Error),
 
+    #[error(transparent)]
+    RibosomeError(#[from] crate::core::ribosome::error::RibosomeError),
+
     /// Other
     #[error("Other: {0}")]
     Other(Box<dyn std::error::Error + Send + Sync>),

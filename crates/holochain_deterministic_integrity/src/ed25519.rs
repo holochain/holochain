@@ -15,8 +15,10 @@ where
     D: serde::Serialize + std::fmt::Debug,
 {
     HDI.with(|h| {
-        h.borrow()
-            .verify_signature(VerifySignature::new(key.into(), signature.into(), data)?)
+        h.borrow().verify_signature(
+            VerifySignature::new(key.into(), signature.into(), data)
+                .map_err(|e| wasm_error!(e.into()))?,
+        )
     })
 }
 

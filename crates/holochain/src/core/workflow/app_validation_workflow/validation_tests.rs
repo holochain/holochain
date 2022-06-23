@@ -3,11 +3,11 @@ use std::{
     fmt::Write,
 };
 
-use holo_hash::{AgentPubKey, HeaderHash};
-use holochain_types::dht_op::DhtOpType;
+use holo_hash::{ActionHash, AgentPubKey};
+use holochain_types::{dht_op::DhtOpType, inline_zome::InlineZomeSet};
 use holochain_zome_types::{
-    AppEntryType, BoxApi, ChainTopOrdering, CreateInput, Entry, EntryDef, EntryDefId,
-    EntryDefIndex, Header, HeaderType, InlineZome, Op, TryInto, ZomeId,
+    Action, ActionType, AppEntryType, BoxApi, ChainTopOrdering, CreateInput, Entry, EntryDef,
+    EntryDefIndex, EntryVisibility, Op, TryInto, ZomeId,
 };
 
 use crate::{
@@ -25,70 +25,63 @@ const BOB: &'static str = "BOB";
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
 struct Event {
-    header: HeaderLocation,
+    action: ActionLocation,
     op_type: DhtOpType,
     called_zome: &'static str,
-    with_zome_index: Option<ZomeId>,
     with_entry_def_index: Option<EntryDefIndex>,
 }
 
 impl Default for Event {
     fn default() -> Self {
         Self {
-            header: Default::default(),
+            action: Default::default(),
             op_type: DhtOpType::RegisterAgentActivity,
             called_zome: Default::default(),
-            with_zome_index: Default::default(),
             with_entry_def_index: Default::default(),
         }
     }
 }
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Default)]
-struct HeaderLocation {
+struct ActionLocation {
     agent: &'static str,
-    header_type: String,
+    action_type: String,
     seq: u32,
 }
 
 impl std::fmt::Display for Event {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match (&self.with_zome_index, &self.with_entry_def_index) {
-            (Some(z), None) => write!(
+        match &self.with_entry_def_index {
+            Some(e) => write!(
                 f,
-                "{}:{}:{}:zome_id({})",
-                self.called_zome, self.op_type, self.header, z
+                "{}:{}:{}:entry_id({})",
+                self.called_zome, self.op_type, self.action, e.0
             ),
-            (Some(z), Some(e)) => write!(
-                f,
-                "{}:{}:{}:zome_id({}):entry_id({})",
-                self.called_zome, self.op_type, self.header, z, e.0
-            ),
-            _ => write!(f, "{}:{}:{}", self.called_zome, self.op_type, self.header),
+            None => write!(f, "{}:{}:{}", self.called_zome, self.op_type, self.action),
         }
     }
 }
 
-impl std::fmt::Display for HeaderLocation {
+impl std::fmt::Display for ActionLocation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}:{}:{}", self.agent, self.header_type, self.seq)
+        write!(f, "{}:{}:{}", self.agent, self.action_type, self.seq)
     }
 }
 
-impl HeaderLocation {
-    fn new(header: impl Into<Header>, agents: &HashMap<AgentPubKey, &'static str>) -> Self {
-        let header = header.into();
+impl ActionLocation {
+    fn new(action: impl Into<Action>, agents: &HashMap<AgentPubKey, &'static str>) -> Self {
+        let action = action.into();
         Self {
-            agent: agents.get(header.author()).unwrap(),
-            header_type: header.header_type().to_string(),
-            seq: header.header_seq(),
+            agent: agents.get(action.author()).unwrap(),
+            action_type: action.action_type().to_string(),
+            seq: action.action_seq(),
         }
     }
 
-    fn expected(agent: &'static str, header_type: HeaderType, seq: u32) -> Self {
+    fn expected(agent: &'static str, action_type: ActionType, seq: u32) -> Self {
         Self {
             agent,
-            header_type: header_type.to_string(),
+            action_type: action_type.to_string(),
             seq,
         }
     }
@@ -107,10 +100,10 @@ impl Expected {
         self.0.insert(event);
     }
 
-    fn activity_and_element_all_zomes(&mut self, mut event: Event) {
+    fn activity_and_record_all_zomes(&mut self, mut event: Event) {
         event.op_type = DhtOpType::RegisterAgentActivity;
         self.all_zomes(event.clone());
-        event.op_type = DhtOpType::StoreElement;
+        event.op_type = DhtOpType::StoreRecord;
         self.all_zomes(event.clone());
     }
 
@@ -121,34 +114,34 @@ impl Expected {
         }
     }
 
-    fn activity_and_element_for_zomes(&mut self, mut event: Event, zomes: &[&'static str]) {
+    fn activity_and_record_for_zomes(&mut self, mut event: Event, zomes: &[&'static str]) {
         event.op_type = DhtOpType::RegisterAgentActivity;
 
         self.zomes(event.clone(), zomes);
 
-        event.op_type = DhtOpType::StoreElement;
+        event.op_type = DhtOpType::StoreRecord;
 
         self.zomes(event.clone(), zomes);
     }
 
     fn genesis(&mut self, agent: &'static str, zomes: &[&'static str]) {
         let event = Event {
-            header: HeaderLocation::expected(agent, HeaderType::Dna, 0),
+            action: ActionLocation::expected(agent, ActionType::Dna, 0),
             ..Default::default()
         };
-        self.activity_and_element_for_zomes(event.clone(), zomes);
+        self.activity_and_record_for_zomes(event.clone(), zomes);
 
         let event = Event {
-            header: HeaderLocation::expected(agent, HeaderType::AgentValidationPkg, 1),
+            action: ActionLocation::expected(agent, ActionType::AgentValidationPkg, 1),
             ..Default::default()
         };
-        self.activity_and_element_for_zomes(event.clone(), zomes);
+        self.activity_and_record_for_zomes(event.clone(), zomes);
 
         let mut event = Event {
-            header: HeaderLocation::expected(agent, HeaderType::Create, 2),
+            action: ActionLocation::expected(agent, ActionType::Create, 2),
             ..Default::default()
         };
-        self.activity_and_element_for_zomes(event.clone(), zomes);
+        self.activity_and_record_for_zomes(event.clone(), zomes);
 
         event.op_type = DhtOpType::StoreEntry;
         self.zomes(event.clone(), zomes);
@@ -156,10 +149,10 @@ impl Expected {
 
     fn init(&mut self, agent: &'static str) {
         let event = Event {
-            header: HeaderLocation::expected(agent, HeaderType::InitZomesComplete, 3),
+            action: ActionLocation::expected(agent, ActionType::InitZomesComplete, 3),
             ..Default::default()
         };
-        self.activity_and_element_all_zomes(event.clone());
+        self.activity_and_record_all_zomes(event.clone());
     }
 }
 
@@ -170,26 +163,24 @@ async fn app_validation_ops() {
     observability::test_run().ok();
     let entry_def_a = EntryDef::default_with_id("a");
     let entry_def_b = EntryDef::default_with_id("b");
-    let call_back_a = || {
-        let entry_def_a = entry_def_a.clone();
+    let call_back_a = |_zome_name: &'static str| {
         move |api: BoxApi, ()| {
-            let entry_def_id: EntryDefId = entry_def_a.id.clone();
             let entry = Entry::app(().try_into().unwrap()).unwrap();
             let hash = api.create(CreateInput::new(
-                entry_def_id,
+                InlineZomeSet::get_entry_location(&api, 0),
+                EntryVisibility::Public,
                 entry,
                 ChainTopOrdering::default(),
             ))?;
             Ok(hash)
         }
     };
-    let call_back_b = || {
-        let entry_def_b = entry_def_b.clone();
+    let call_back_b = |_zome_name: &'static str| {
         move |api: BoxApi, ()| {
-            let entry_def_id: EntryDefId = entry_def_b.id.clone();
             let entry = Entry::app(().try_into().unwrap()).unwrap();
             let hash = api.create(CreateInput::new(
-                entry_def_id,
+                InlineZomeSet::get_entry_location(&api, 0),
+                EntryVisibility::Public,
                 entry,
                 ChainTopOrdering::default(),
             ))?;
@@ -205,85 +196,73 @@ async fn app_validation_ops() {
          events: tokio::sync::mpsc::Sender<Event>| {
             move |_api: BoxApi, op: Op| {
                 let event = match op {
-                    Op::StoreElement { element } => Event {
-                        header: HeaderLocation::new(element.header().clone(), &agents),
-                        op_type: DhtOpType::StoreElement,
+                    Op::StoreRecord { record } => Event {
+                        action: ActionLocation::new(record.action().clone(), &agents),
+                        op_type: DhtOpType::StoreRecord,
                         called_zome: zome,
-                        with_zome_index: None,
                         with_entry_def_index: None,
                     },
-                    Op::StoreEntry { header, .. } => {
-                        let (with_zome_index, with_entry_def_index) =
-                            match header.hashed.content.app_entry_type().cloned() {
-                                Some(AppEntryType { id, zome_id, .. }) => (Some(zome_id), Some(id)),
-                                _ => (None, None),
+                    Op::StoreEntry { action, .. } => {
+                        let with_entry_def_index =
+                            match action.hashed.content.app_entry_type().cloned() {
+                                Some(AppEntryType { id, .. }) => Some(id),
+                                _ => None,
                             };
                         Event {
-                            header: HeaderLocation::new(header.hashed.content.clone(), &agents),
+                            action: ActionLocation::new(action.hashed.content.clone(), &agents),
                             op_type: DhtOpType::StoreEntry,
                             called_zome: zome,
-                            with_zome_index,
                             with_entry_def_index,
                         }
                     }
                     Op::RegisterUpdate {
                         update,
-                        original_header,
+                        original_action,
                         ..
                     } => {
-                        let (with_zome_index, with_entry_def_index) =
-                            match original_header.app_entry_type().cloned() {
-                                Some(AppEntryType { id, zome_id, .. }) => (Some(zome_id), Some(id)),
-                                _ => (None, None),
-                            };
+                        let with_entry_def_index = match original_action.app_entry_type().cloned() {
+                            Some(AppEntryType { id, .. }) => Some(id),
+                            _ => None,
+                        };
                         Event {
-                            header: HeaderLocation::new(update.hashed.content.clone(), &agents),
+                            action: ActionLocation::new(update.hashed.content.clone(), &agents),
                             op_type: DhtOpType::RegisterUpdatedContent,
                             called_zome: zome,
-                            with_zome_index,
                             with_entry_def_index,
                         }
                     }
                     Op::RegisterDelete {
                         delete,
-                        original_header,
+                        original_action,
                         ..
                     } => {
-                        let (with_zome_index, with_entry_def_index) =
-                            match original_header.app_entry_type().cloned() {
-                                Some(AppEntryType { id, zome_id, .. }) => (Some(zome_id), Some(id)),
-                                _ => (None, None),
-                            };
+                        let with_entry_def_index = match original_action.app_entry_type().cloned() {
+                            Some(AppEntryType { id, .. }) => Some(id),
+                            _ => None,
+                        };
                         Event {
-                            header: HeaderLocation::new(delete.hashed.content.clone(), &agents),
+                            action: ActionLocation::new(delete.hashed.content.clone(), &agents),
                             op_type: DhtOpType::RegisterDeletedBy,
                             called_zome: zome,
-                            with_zome_index,
                             with_entry_def_index,
                         }
                     }
-                    Op::RegisterAgentActivity { header } => Event {
-                        header: HeaderLocation::new(header.header().clone(), &agents),
+                    Op::RegisterAgentActivity { action } => Event {
+                        action: ActionLocation::new(action.action().clone(), &agents),
                         op_type: DhtOpType::RegisterAgentActivity,
                         called_zome: zome,
-                        with_zome_index: None,
                         with_entry_def_index: None,
                     },
                     Op::RegisterCreateLink { create_link, .. } => Event {
-                        header: HeaderLocation::new(create_link.hashed.content.clone(), &agents),
+                        action: ActionLocation::new(create_link.hashed.content.clone(), &agents),
                         op_type: DhtOpType::RegisterAddLink,
                         called_zome: zome,
-                        with_zome_index: Some(create_link.hashed.content.zome_id),
                         with_entry_def_index: None,
                     },
-                    Op::RegisterDeleteLink {
-                        create_link,
-                        delete_link,
-                    } => Event {
-                        header: HeaderLocation::new(delete_link.hashed.content.clone(), &agents),
+                    Op::RegisterDeleteLink { delete_link, .. } => Event {
+                        action: ActionLocation::new(delete_link.hashed.content.clone(), &agents),
                         op_type: DhtOpType::RegisterRemoveLink,
                         called_zome: zome,
-                        with_zome_index: Some(create_link.zome_id),
                         with_entry_def_index: None,
                     },
                 };
@@ -295,57 +274,83 @@ async fn app_validation_ops() {
     let mut conductors = SweetConductorBatch::from_standard_config(2).await;
     let alice = SweetAgents::one(conductors[0].keystore()).await;
     let bob = SweetAgents::one(conductors[1].keystore()).await;
-    let mut zomes = Vec::new();
 
     let mut agents = HashMap::new();
     agents.insert(alice.clone(), ALICE);
     agents.insert(bob.clone(), BOB);
 
-    zomes.push((
-        "zome1",
-        InlineZome::new("a", vec![entry_def_a.clone(), entry_def_b.clone()])
-            .callback("create_a", call_back_a())
-            .callback("create_b", call_back_b())
-            .callback(
-                "validate",
-                validation_callback(ZOME_A_0, agents.clone(), events_tx.clone()),
+    let zomes = InlineZomeSet::new(
+        [
+            (
+                "integrity_zome1",
+                "integrity_a".to_string(),
+                vec![entry_def_a.clone(), entry_def_b.clone()],
+                0,
             ),
-    ));
-    zomes.push((
-        "zome2",
-        InlineZome::new("b", vec![entry_def_a.clone(), entry_def_b.clone()])
-            .callback("create_a", call_back_a())
-            .callback("create_b", call_back_b())
-            .callback(
-                "validate",
-                validation_callback(ZOME_A_1, agents.clone(), events_tx.clone()),
+            (
+                "integrity_zome2",
+                "integrity_b".to_string(),
+                vec![entry_def_a.clone(), entry_def_b.clone()],
+                0,
             ),
-    ));
-    let (dna_file_a, _) = SweetDnaFile::from_inline_zomes("".into(), zomes)
+        ],
+        [("zome1", "a".to_string()), ("zome2", "b".to_string())],
+    )
+    .with_dependency("zome1", "integrity_zome1")
+    .with_dependency("zome2", "integrity_zome2")
+    .callback("zome1", "create_a", call_back_a("integrity_zome1"))
+    .callback("zome1", "create_b", call_back_b("integrity_zome1"))
+    .callback(
+        "integrity_zome1",
+        "validate",
+        validation_callback(ZOME_A_0, agents.clone(), events_tx.clone()),
+    )
+    .callback("zome2", "create_a", call_back_a("integrity_zome2"))
+    .callback("zome2", "create_b", call_back_b("integrity_zome2"))
+    .callback(
+        "integrity_zome2",
+        "validate",
+        validation_callback(ZOME_A_1, agents.clone(), events_tx.clone()),
+    );
+    let (dna_file_a, _, _) = SweetDnaFile::from_inline_zomes("".into(), zomes)
         .await
         .unwrap();
-    let mut zomes = Vec::new();
-    zomes.push((
-        "zome1",
-        InlineZome::new("a", vec![entry_def_a.clone(), entry_def_b.clone()])
-            .callback("create_a", call_back_a())
-            .callback("create_b", call_back_b())
-            .callback(
-                "validate",
-                validation_callback(ZOME_B_0, agents.clone(), events_tx.clone()),
+
+    let zomes = InlineZomeSet::new(
+        [
+            (
+                "integrity_zome1",
+                "integrity_a".to_string(),
+                vec![entry_def_a.clone(), entry_def_b.clone()],
+                0,
             ),
-    ));
-    zomes.push((
-        "zome2",
-        InlineZome::new("b", vec![entry_def_a.clone(), entry_def_b.clone()])
-            .callback("create_a", call_back_a())
-            .callback("create_b", call_back_b())
-            .callback(
-                "validate",
-                validation_callback(ZOME_B_1, agents.clone(), events_tx.clone()),
+            (
+                "integrity_zome2",
+                "integrity_b".to_string(),
+                vec![entry_def_a.clone(), entry_def_b.clone()],
+                0,
             ),
-    ));
-    let (dna_file_b, _) = SweetDnaFile::from_inline_zomes("".into(), zomes)
+        ],
+        [("zome1", "a".to_string()), ("zome2", "b".to_string())],
+    )
+    .with_dependency("zome1", "integrity_zome1")
+    .with_dependency("zome2", "integrity_zome2")
+    .callback("zome1", "create_a", call_back_a("integrity_zome1"))
+    .callback("zome1", "create_b", call_back_b("integrity_zome2"))
+    .callback(
+        "integrity_zome1",
+        "validate",
+        validation_callback(ZOME_B_0, agents.clone(), events_tx.clone()),
+    )
+    .callback("zome2", "create_a", call_back_a("integrity_zome2"))
+    .callback("zome2", "create_b", call_back_b("integrity_zome2"))
+    .callback(
+        "integrity_zome2",
+        "validate",
+        validation_callback(ZOME_B_1, agents.clone(), events_tx.clone()),
+    );
+
+    let (dna_file_b, _, _) = SweetDnaFile::from_inline_zomes("".into(), zomes)
         .await
         .unwrap();
     let app = conductors[0]
@@ -360,7 +365,7 @@ async fn app_validation_ops() {
     let (bob,) = app.into_tuple();
     conductors.exchange_peer_info().await;
 
-    let _: HeaderHash = conductors[0]
+    let _: ActionHash = conductors[0]
         .call(&alice.zome("zome1"), "create_a", ())
         .await;
 
@@ -374,15 +379,24 @@ async fn app_validation_ops() {
     expected.init(ALICE);
 
     let mut event = Event {
-        header: HeaderLocation::expected(ALICE, HeaderType::Create, 4),
+        action: ActionLocation::expected(ALICE, ActionType::Create, 4),
         ..Default::default()
     };
-    expected.activity_and_element_all_zomes(event.clone());
+    expected.activity_and_record_all_zomes(event.clone());
+
+    let entry_def_id = conductors[0]
+        .get_ribosome(dna_file_a.dna_hash())
+        .unwrap()
+        .zome_types
+        .re_scope(&[ZomeId(0)])
+        .unwrap()
+        .entries
+        .to_global_scope(0)
+        .unwrap();
 
     event.op_type = DhtOpType::StoreEntry;
     event.called_zome = ZOME_A_0;
-    event.with_zome_index = Some(0.into());
-    event.with_entry_def_index = Some(0.into());
+    event.with_entry_def_index = Some(entry_def_id.into());
     expected.0.insert(event.clone());
 
     event.called_zome = ZOME_B_0;

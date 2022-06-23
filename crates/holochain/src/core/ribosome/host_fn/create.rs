@@ -1,30 +1,35 @@
-use crate::core::ribosome::error::RibosomeError;
-use crate::core::ribosome::guest_callback::entry_defs::EntryDefsInvocation;
-use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
+use crate::core::ribosome::weigh_placeholder;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
+use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 
 use holochain_types::prelude::*;
 use std::sync::Arc;
 
-/// create element
+/// create record
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn create<'a>(
-    ribosome: Arc<impl RibosomeT>,
+    _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: CreateInput,
-) -> Result<HeaderHash, WasmError> {
+) -> Result<ActionHash, RuntimeError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess {
             write_workspace: Permission::Allow,
             ..
         } => {
-            let entry = AsRef::<Entry>::as_ref(&input);
-            let chain_top_ordering = *input.chain_top_ordering();
+            let CreateInput {
+                entry_location,
+                entry_visibility,
+                entry,
+                chain_top_ordering,
+            } = input;
 
-            // Countersigned entries have different header handling.
+            let weight = weigh_placeholder();
+
+            // Countersigned entries have different action handling.
             match entry {
                 Entry::CounterSign(_, _) => tokio_helper::block_forever_on(async move {
                     call_context
@@ -33,46 +38,29 @@ pub fn create<'a>(
                         .source_chain()
                         .as_ref()
                         .expect("Must have source chain if write_workspace access is given")
-                        .put_countersigned(
-                            Some(call_context.zome.clone()),
-                            input.into_entry(),
-                            chain_top_ordering,
-                        )
+                        .put_countersigned(entry, chain_top_ordering, weight)
                         .await
-                        .map_err(|source_chain_error| {
-                            WasmError::Host(source_chain_error.to_string())
+                        .map_err(|source_chain_error| -> RuntimeError {
+                            wasm_error!(WasmErrorInner::Host(source_chain_error.to_string())).into()
                         })
                 }),
                 _ => {
                     // build the entry hash
-                    let entry_hash = EntryHash::with_data_sync(AsRef::<Entry>::as_ref(&input));
-
-                    // extract the zome position
-                    let header_zome_id = ribosome
-                        .zome_to_id(&call_context.zome)
-                        .expect("Failed to get ID for current zome");
+                    let entry_hash = EntryHash::with_data_sync(&entry);
 
                     // extract the entry defs for a zome
-                    let entry_type = match AsRef::<EntryDefId>::as_ref(&input) {
-                        EntryDefId::App(entry_def_id) => {
-                            let (header_entry_def_id, entry_visibility) = extract_entry_def(
-                                ribosome,
-                                call_context.clone(),
-                                entry_def_id.to_owned().into(),
-                            )?;
-                            let app_entry_type = AppEntryType::new(
-                                header_entry_def_id,
-                                header_zome_id,
-                                entry_visibility,
-                            );
+                    let entry_type = match entry_location {
+                        EntryDefLocation::App(entry_def_index) => {
+                            let app_entry_type =
+                                AppEntryType::new(entry_def_index, entry_visibility);
                             EntryType::App(app_entry_type)
                         }
-                        EntryDefId::CapGrant => EntryType::CapGrant,
-                        EntryDefId::CapClaim => EntryType::CapClaim,
+                        EntryDefLocation::CapGrant => EntryType::CapGrant,
+                        EntryDefLocation::CapClaim => EntryType::CapClaim,
                     };
 
-                    // build a header for the entry being committed
-                    let header_builder = builder::Create {
+                    // build an action for the entry being committed
+                    let action_builder = builder::Create {
                         entry_type,
                         entry_hash,
                     };
@@ -82,74 +70,32 @@ pub fn create<'a>(
                     // if the validation fails this commit will be rolled back by virtue of the DB transaction
                     // being atomic
                     tokio_helper::block_forever_on(async move {
-                        // push the header and the entry into the source chain
+                        // push the action and the entry into the source chain
                         call_context
                             .host_context
                             .workspace_write()
                             .source_chain()
                             .as_ref()
                             .expect("Must have source chain if write_workspace access is given")
-                            .put(
-                                Some(call_context.zome.clone()),
-                                header_builder,
-                                Some(input.into_entry()),
-                                chain_top_ordering,
-                            )
+                            .put_weightless(action_builder, Some(entry), chain_top_ordering)
                             .await
-                            .map_err(|source_chain_error| {
-                                WasmError::Host(source_chain_error.to_string())
+                            .map_err(|source_chain_error| -> RuntimeError {
+                                wasm_error!(WasmErrorInner::Host(source_chain_error.to_string()))
+                                    .into()
                             })
                     })
                 }
             }
         }
-        _ => Err(WasmError::Host(
+        _ => Err(wasm_error!(WasmErrorInner::Host(
             RibosomeError::HostFnPermissions(
                 call_context.zome.zome_name().clone(),
                 call_context.function_name().clone(),
                 "create".into(),
             )
             .to_string(),
-        )),
-    }
-}
-
-pub fn extract_entry_def(
-    ribosome: Arc<impl RibosomeT>,
-    call_context: Arc<CallContext>,
-    entry_def_id: EntryDefId,
-) -> Result<(holochain_zome_types::header::EntryDefIndex, EntryVisibility), WasmError> {
-    let app_entry_type = match ribosome
-        .run_entry_defs((&call_context.host_context).into(), EntryDefsInvocation)
-        .map_err(|ribosome_error| WasmError::Host(ribosome_error.to_string()))?
-    {
-        // the ribosome returned some defs
-        EntryDefsResult::Defs(defs) => {
-            let maybe_entry_defs = defs.get(call_context.zome.zome_name());
-            match maybe_entry_defs {
-                // convert the entry def id string into a numeric position in the defs
-                Some(entry_defs) => {
-                    entry_defs
-                        .entry_def_index_from_id(entry_def_id.clone())
-                        .map(|index| {
-                            // build an app entry type from the entry def at the found position
-                            (index, entry_defs[index.0 as usize].visibility)
-                        })
-                }
-                None => None,
-            }
-        }
-        _ => None,
-    };
-    match app_entry_type {
-        Some(app_entry_type) => Ok(app_entry_type),
-        None => Err(WasmError::Host(
-            RibosomeError::EntryDefs(
-                call_context.zome.zome_name().clone(),
-                format!("entry def not found for {:?}", entry_def_id),
-            )
-            .to_string(),
-        )),
+        ))
+        .into()),
     }
 }
 
@@ -167,6 +113,7 @@ pub mod wasm_test {
     use holochain_state::source_chain::SourceChainResult;
     use holochain_types::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
+    use holochain_wasm_test_utils::TestWasmPair;
     use observability;
     use std::sync::Arc;
 
@@ -178,17 +125,23 @@ pub mod wasm_test {
                 .next()
                 .unwrap();
         let mut call_context = CallContextFixturator::new(Unpredictable).next().unwrap();
-        call_context.zome = TestWasm::Create.into();
+        call_context.zome = TestWasmPair::<IntegrityZome, CoordinatorZome>::from(TestWasm::Create)
+            .coordinator
+            .erase_type();
         let host_access = fixt!(ZomeCallHostAccess, Predictable);
         let host_access_2 = host_access.clone();
         call_context.host_context = host_access.into();
         let app_entry = EntryFixturator::new(AppEntry).next().unwrap();
-        let entry_def_id = EntryDefId::App("post".into());
-        let input = CreateInput::new(entry_def_id, app_entry.clone(), ChainTopOrdering::default());
+        let input = CreateInput::new(
+            EntryDefLocation::app(0),
+            EntryVisibility::Public,
+            app_entry.clone(),
+            ChainTopOrdering::default(),
+        );
 
         let output = create(Arc::new(ribosome), Arc::new(call_context), input).unwrap();
 
-        // the chain head should be the committed entry header
+        // the chain head should be the committed entry action
         let chain_head = tokio_helper::block_forever_on(async move {
             // The line below was added when migrating to rust edition 2021, per
             // https://doc.rust-lang.org/edition-guide/rust-2021/disjoint-capture-in-closures.html#migration
@@ -216,12 +169,12 @@ pub mod wasm_test {
         } = RibosomeTestFixture::new(TestWasm::Create).await;
 
         // get the result of a commit entry
-        let _output: HeaderHash = conductor.call(&alice, "create_entry", ()).await;
+        let _output: ActionHash = conductor.call(&alice, "create_entry", ()).await;
 
         // entry should be gettable.
-        let round: Option<Element> = conductor.call(&alice, "get_entry", ()).await;
+        let round: Option<Record> = conductor.call(&alice, "get_entry", ()).await;
 
-        let round_twice: Vec<Option<Element>> = conductor.call(&alice, "get_entry_twice", ()).await;
+        let round_twice: Vec<Option<Record>> = conductor.call(&alice, "get_entry_twice", ()).await;
 
         let bytes: Vec<u8> = match round.clone().and_then(|el| el.into()) {
             Some(holochain_zome_types::entry::Entry::App(entry_bytes)) => {
@@ -245,7 +198,7 @@ pub mod wasm_test {
 
         observability::test_run().unwrap();
         let mut conductor = SweetConductor::from_standard_config().await;
-        let (dna, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::MultipleCalls])
+        let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::MultipleCalls])
             .await
             .unwrap();
 

@@ -6,15 +6,15 @@ use crate::core::ribosome::ZomeCall;
 use futures::future::join_all;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_types::prelude::*;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 
 pub fn call(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     inputs: Vec<Call>,
-) -> Result<Vec<ZomeCallResponse>, WasmError> {
-    let results: Vec<Result<ZomeCallResponse, WasmError>> =
+) -> Result<Vec<ZomeCallResponse>, RuntimeError> {
+    let results: Vec<Result<ZomeCallResponse, RuntimeError>> =
         tokio_helper::block_forever_on(async move {
             join_all(inputs.into_iter().map(|input| async {
                 // The line below was added when migrating to rust edition 2021, per
@@ -54,7 +54,7 @@ pub fn call(
                             .agent_pubkey()
                             .clone();
 
-                        let result: Result<ZomeCallResponse, WasmError> = match target {
+                        let result: Result<ZomeCallResponse, RuntimeError> = match target {
                             CallTarget::NetworkAgent(target_agent) => {
                                 match call_context
                                     .host_context()
@@ -69,10 +69,10 @@ pub fn call(
                                     )
                                     .await
                                 {
-                                    Ok(serialized_bytes) => {
-                                        ZomeCallResponse::try_from(serialized_bytes)
-                                            .map_err(WasmError::from)
-                                    }
+                                    Ok(serialized_bytes) => ZomeCallResponse::try_from(
+                                        serialized_bytes,
+                                    )
+                                    .map_err(|e| -> RuntimeError { wasm_error!(e.into()).into() }),
                                     Err(e) => Ok(ZomeCallResponse::NetworkError(e.to_string())),
                                 }
                             }
@@ -108,25 +108,28 @@ pub fn call(
                                     .await
                                 {
                                     Ok(Ok(zome_call_response)) => Ok(zome_call_response),
-                                    Ok(Err(ribosome_error)) => {
-                                        Err(WasmError::Host(ribosome_error.to_string()))
-                                    }
-                                    Err(conductor_api_error) => {
-                                        Err(WasmError::Host(conductor_api_error.to_string()))
-                                    }
+                                    Ok(Err(ribosome_error)) => Err(wasm_error!(
+                                        WasmErrorInner::Host(ribosome_error.to_string())
+                                    )
+                                    .into()),
+                                    Err(conductor_api_error) => Err(wasm_error!(
+                                        WasmErrorInner::Host(conductor_api_error.to_string())
+                                    )
+                                    .into()),
                                 }
                             }
                         };
                         result
                     }
-                    _ => Err(WasmError::Host(
+                    _ => Err(wasm_error!(WasmErrorInner::Host(
                         RibosomeError::HostFnPermissions(
                             call_context.zome.zome_name().clone(),
                             call_context.function_name().clone(),
                             "call".into(),
                         )
                         .to_string(),
-                    )),
+                    ))
+                    .into()),
                 }
             }))
             .await
@@ -140,7 +143,7 @@ pub mod wasm_test {
     use crate::sweettest::SweetConductor;
     use crate::sweettest::SweetDnaFile;
     use hdk::prelude::AgentInfo;
-    use holo_hash::HeaderHash;
+    use holo_hash::ActionHash;
     use holochain_state::prelude::fresh_reader_test;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::ZomeCallResponse;
@@ -190,8 +193,8 @@ pub mod wasm_test {
         let result = handle.call_zome(invocation).await;
         assert_matches!(result, Ok(Ok(ZomeCallResponse::Ok(_))));
 
-        // Get the header hash of that entry
-        let header_hash: HeaderHash =
+        // Get the action hash of that entry
+        let action_hash: ActionHash =
             unwrap_to::unwrap_to!(result.unwrap().unwrap() => ZomeCallResponse::Ok)
                 .decode()
                 .unwrap();
@@ -199,9 +202,9 @@ pub mod wasm_test {
         // Check alice's source chain contains the new value
         let has_hash: bool = fresh_reader_test(alice_call_data.authored_db.clone(), |txn| {
             txn.query_row(
-                "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE header_hash = :hash)",
+                "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE action_hash = :hash)",
                 named_params! {
-                    ":hash": header_hash
+                    ":hash": action_hash
                 },
                 |row| row.get(0),
             )
@@ -218,7 +221,7 @@ pub mod wasm_test {
     async fn bridge_call() {
         observability::test_run().ok();
 
-        let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create])
+        let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create])
             .await
             .unwrap();
 
@@ -231,7 +234,7 @@ pub mod wasm_test {
             .unwrap();
         let ((alice,), (_bobbo,)) = apps.into_tuples();
 
-        let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::WhoAmI])
+        let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::WhoAmI])
             .await
             .unwrap();
         let apps = conductor
@@ -239,7 +242,7 @@ pub mod wasm_test {
             .await
             .unwrap();
         let ((bobbo2,),) = apps.into_tuples();
-        let header_hash: HeaderHash = conductor
+        let action_hash: ActionHash = conductor
             .call(
                 &bobbo2.zome(TestWasm::WhoAmI),
                 "call_create_entry",
@@ -250,9 +253,9 @@ pub mod wasm_test {
         // Check alice's source chain contains the new value
         let has_hash: bool = fresh_reader_test(alice.dht_db().clone(), |txn| {
             txn.query_row(
-                "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE header_hash = :hash)",
+                "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE action_hash = :hash)",
                 named_params! {
-                    ":hash": header_hash
+                    ":hash": action_hash
                 },
                 |row| row.get(0),
             )

@@ -5,7 +5,7 @@ use crate::core::ribosome::RibosomeT;
 use futures::StreamExt;
 use holochain_cascade::Cascade;
 use holochain_types::prelude::*;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]
@@ -14,7 +14,7 @@ pub fn get<'a>(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     inputs: Vec<GetInput>,
-) -> Result<Vec<Option<Element>>, WasmError> {
+) -> Result<Vec<Option<Record>>, RuntimeError> {
     let num_requests = inputs.len();
     tracing::debug!("Starting with {} requests.", num_requests);
     match HostFnAccess::from(&call_context.host_context()) {
@@ -22,7 +22,7 @@ pub fn get<'a>(
             read_workspace: Permission::Allow,
             ..
         } => {
-            let results: Vec<Result<Option<Element>, _>> =
+            let results: Vec<Result<Option<Record>, _>> =
                 tokio_helper::block_forever_on(async move {
                     futures::stream::iter(inputs.into_iter().map(|input| async {
                         let GetInput {
@@ -42,11 +42,13 @@ pub fn get<'a>(
                     .collect()
                     .await
                 });
-            let results: Result<Vec<_>, _> = results
+            let results: Result<Vec<_>, RuntimeError> = results
                 .into_iter()
                 .map(|result| match result {
                     Ok(v) => Ok(v),
-                    Err(cascade_error) => Err(WasmError::Host(cascade_error.to_string())),
+                    Err(cascade_error) => {
+                        Err(wasm_error!(WasmErrorInner::Host(cascade_error.to_string())).into())
+                    }
                 })
                 .collect();
             let results = results?;
@@ -58,14 +60,15 @@ pub fn get<'a>(
             );
             Ok(results)
         }
-        _ => Err(WasmError::Host(
+        _ => Err(wasm_error!(WasmErrorInner::Host(
             RibosomeError::HostFnPermissions(
                 call_context.zome.zome_name().clone(),
                 call_context.function_name().clone(),
                 "get".into(),
             )
             .to_string(),
-        )),
+        ))
+        .into()),
     }
 }
 

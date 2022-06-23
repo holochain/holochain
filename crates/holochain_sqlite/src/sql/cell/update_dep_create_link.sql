@@ -13,7 +13,7 @@ WHERE
     FROM
       DhtOp AS OP_DEP
     WHERE
-      OP_DEP.header_hash = DhtOp.dependency
+      OP_DEP.action_hash = DhtOp.dependency
       AND OP_DEP.when_integrated IS NOT NULL
       AND OP_DEP.type = :create_link
     LIMIT
