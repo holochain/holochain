@@ -50,16 +50,17 @@ one_err = "0.0.5"
 parking_lot = "0.10"
 predicates = "1.0.4"
 rand = "0.8.5"
-ring = "0.16"
+rand-utf8 = "0.0.1"
 rpassword = "5.0.1"
 rusqlite = { version = "0.26" }
 serde = { version = "1.0", features = [ "derive" ] }
 serde_json = { version = "1.0.51", features = [ "preserve_order" ] }
 serde_yaml = "0.8"
 shrinkwraprs = "0.3.0"
-sodoken = "=0.0.1"
+sodoken = "=0.0.4"
 structopt = "0.3.11"
 strum = "0.18.0"
+subtle-encoding = "0.5"
 tempfile = "3.3"
 thiserror = "1.0.22"
 tokio = { version = "1.11", features = [ "full"] }
@@ -73,7 +74,6 @@ url = "1.7.2"
 url2 = "0.0.6"
 url_serde = "0.2.0"
 uuid = { version = "0.7", features = [ "serde", "v4" ] }
-xsalsa20poly1305 = "0.6.0"
 holochain_wasm_test_utils = { version = "0.0.44", path = "../test_utils/wasm" }
 tiny-keccak = { version = "2.0.2", features = ["keccak", "sha3"] }
 async-recursion = "0.3"

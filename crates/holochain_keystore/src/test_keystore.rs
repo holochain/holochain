@@ -130,16 +130,16 @@ pub async fn spawn_test_keystore() -> LairResult<MetaLairClient> {
     // get the store and inject test seeds
     let store = keystore.store().await?;
     store
-        .insert_seed(s(SEED_1).into(), TEST_AGENT_PK_1.into())
+        .insert_seed(s(SEED_1).into(), TEST_AGENT_PK_1.into(), false)
         .await?;
     store
-        .insert_seed(s(SEED_2).into(), TEST_AGENT_PK_2.into())
+        .insert_seed(s(SEED_2).into(), TEST_AGENT_PK_2.into(), false)
         .await?;
     store
-        .insert_seed(s(SEED_3).into(), TEST_AGENT_PK_3.into())
+        .insert_seed(s(SEED_3).into(), TEST_AGENT_PK_3.into(), false)
         .await?;
     store
-        .insert_seed(s(SEED_4).into(), TEST_AGENT_PK_4.into())
+        .insert_seed(s(SEED_4).into(), TEST_AGENT_PK_4.into(), false)
         .await?;
 
     // return the client
