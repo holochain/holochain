@@ -549,6 +549,7 @@ async fn insert_source_chain() {
             EntryVisibility::Public,
         )),
         entry_hash: EntryHash::with_data_sync(&entry),
+        weight: Default::default(),
     };
     let shh = SignedActionHashed::with_presigned(
         ActionHashed::from_content_sync(action.clone().into()),

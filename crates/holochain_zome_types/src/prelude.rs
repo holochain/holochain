@@ -25,6 +25,7 @@ pub use crate::op::*;
 pub use crate::properties::*;
 pub use crate::query::ChainQueryFilter as QueryFilter;
 pub use crate::query::*;
+pub use crate::rate_limit::*;
 pub use crate::record::*;
 pub use crate::request::*;
 pub use crate::schedule::*;

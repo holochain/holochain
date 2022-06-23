@@ -594,6 +594,11 @@ pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
     fn zome_types(&self) -> &Arc<GlobalZomeTypes>;
 }
 
+/// Placeholder for weighing. Currently produces zero weight.
+pub fn weigh_placeholder() -> EntryRateWeight {
+    EntryRateWeight::default()
+}
+
 #[cfg(test)]
 pub mod wasm_test {
     use crate::core::ribosome::FnComponents;

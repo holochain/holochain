@@ -11,6 +11,7 @@ pub use crate::hash::*;
 pub use crate::info::*;
 pub use crate::link::*;
 pub use crate::op::*;
+pub use crate::rate_limit::*;
 pub use crate::record::*;
 pub use crate::signature::*;
 pub use crate::timestamp::*;
