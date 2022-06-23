@@ -39,11 +39,18 @@ async fn test_region_queries() {
     .unwrap();
     let keystore = test_keystore();
     let agent = keystore.new_sign_keypair_random().await.unwrap();
-    let two_hrs_ago = (Timestamp::now() - Duration::from_secs(60 * 60 * 2)).unwrap();
 
-    // - The origin time is two hours ago
     let mut dna_def = DnaDef::arbitrary(&mut u).unwrap();
-    dna_def.origin_time = two_hrs_ago.clone();
+    let topo = dna_def.topology();
+    let tq = Duration::from_micros(topo.time.quantum as u64);
+    let tq5 = Duration::from_micros(topo.time.quantum as u64 * 5);
+    dbg!(&tq, &topo);
+
+    let five_quanta_ago = (Timestamp::now() - tq5).unwrap();
+    let tq_ms = tq.as_millis() as u64;
+
+    // - The origin time is two time quanta ago
+    dna_def.origin_time = five_quanta_ago.clone();
 
     // Builds an arbitrary valid op at the given timestamp
     let mut arbitrary_valid_op = |timestamp: Timestamp| -> DhtOp {
@@ -56,7 +63,6 @@ async fn test_region_queries() {
     };
 
     let dna_def = DnaDefHashed::from_content_sync(dna_def);
-    let topo = dna_def.topology();
     let db = spaces.dht_db(dna_def.as_hash()).unwrap();
     let mut ops = vec![];
 
@@ -68,14 +74,11 @@ async fn test_region_queries() {
     let region_sum: RegionData = region_set.regions().map(|r| r.data).sum();
     assert_eq!(region_sum.count as usize, 0);
 
-    let min_ms = 1000 * 60;
-    let hour_ms = min_ms * 60;
-
     for _ in 0..NUM_OPS {
-        // timestamp is between 1 and 2 hours ago, which is the historical
+        // timestamp is between 1 and 5 time quanta ago, which is the historical
         // window
         let op = arbitrary_valid_op(
-            (two_hrs_ago + Duration::from_millis(rand::thread_rng().gen_range(0..hour_ms)))
+            (five_quanta_ago + Duration::from_millis(rand::thread_rng().gen_range(0..tq_ms * 4)))
                 .unwrap(),
         );
         let op = DhtOpHashed::from_content_sync(op);
@@ -84,13 +87,9 @@ async fn test_region_queries() {
 
         // also construct ops which are in the recent time window,
         // to test that these ops don't get returned in region queries.
-        // There is a 5 min overlap between historical and recent time windows
-        // (1 time quantum) so we make sure to account for that here also.
         let op2 = arbitrary_valid_op(
-            (two_hrs_ago
-                + Duration::from_millis(
-                    hour_ms + rand::thread_rng().gen_range(5 * min_ms..hour_ms),
-                ))
+            (five_quanta_ago
+                + Duration::from_millis(rand::thread_rng().gen_range(tq_ms * 4..tq_ms * 5)))
             .unwrap(),
         );
         let op2 = DhtOpHashed::from_content_sync(op2);
@@ -100,6 +99,8 @@ async fn test_region_queries() {
         .handle_fetch_op_regions(&dna_def, DhtArcSet::Full)
         .await
         .unwrap();
+
+    dbg!(&region_set);
 
     // - Check that the aggregate of all region data matches expectations
     let region_sum: RegionData = region_set.regions().map(|r| r.data).sum();
@@ -115,7 +116,7 @@ async fn test_region_queries() {
             dna_def.as_hash(),
             region_set
                 .regions()
-                .map(|r| r.coords.to_bounds(&topo))
+                .map(|r| dbg!(r.coords).to_bounds(&topo))
                 .collect(),
         )
         .await

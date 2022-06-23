@@ -101,7 +101,7 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
         conductor::handle::DevSettingsDelta, test_utils::inline_zomes::batch_create_zome,
     };
 
-    let _g = observability::test_run().ok();
+    // let _g = observability::test_run().ok();
 
     const NUM_CONDUCTORS: usize = 3;
     const NUM_OPS: usize = 100;
@@ -129,7 +129,11 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
 
     // Call the "create" zome fn on Alice's app
     let hashes: Vec<ActionHash> = conductors[0]
-        .call(&alice.zome("zome1"), "create_batch", NUM_OPS)
+        .call(
+            &alice.zome(holochain::sweettest::SweetEasyInline::COORDINATOR),
+            "create_batch",
+            NUM_OPS,
+        )
         .await;
     let all_cells = vec![&alice, &bobbo, &carol];
 
@@ -162,9 +166,13 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
     assert_eq!(all_op_hashes[1].len(), all_op_hashes[2].len());
     assert_eq!(all_op_hashes[1], all_op_hashes[2]);
 
-    // Verify that bobbo can run "read" on his cell and get alice's Header
+    // Verify that bobbo can run "read" on his cell and get alice's Action
     let element: Option<Record> = conductors[1]
-        .call(&bobbo.zome("zome1"), "read", hashes[0].clone())
+        .call(
+            &bobbo.zome(holochain::sweettest::SweetEasyInline::COORDINATOR),
+            "read",
+            hashes[0].clone(),
+        )
         .await;
     let element = element.expect("Record was None: bobbo couldn't `get` it");
 

@@ -284,8 +284,8 @@ impl Spaces {
         };
         let results = db
             .async_reader(move |txn| {
-                let hashes = txn
-                    .prepare_cached(&sql)?
+                let mut stmt = txn.prepare_cached(&sql)?;
+                let hashes = stmt
                     .query_map(
                         named_params! {
                             ":from": start,

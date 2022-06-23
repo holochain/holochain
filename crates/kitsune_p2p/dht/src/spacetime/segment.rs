@@ -213,6 +213,8 @@ pub(super) fn bounds<N: From<u32>>(
     offset: SpaceOffset,
     count: u32,
 ) -> (N, N) {
+    debug_assert_ne!(dim.quantum, 0);
+    debug_assert_ne!(count, 0);
     let q = dim.quantum.wrapping_mul(pow2(power));
     let start = offset.wrapping_mul(q);
     let len = count.wrapping_mul(q);
@@ -225,6 +227,8 @@ pub(super) fn bounds64<N: From<i64>>(
     offset: TimeOffset,
     count: u32,
 ) -> (N, N) {
+    debug_assert_ne!(dim.quantum, 0);
+    debug_assert_ne!(count, 0);
     let q = dim.quantum as i64 * 2i64.pow(power.into());
     let start = (*offset as i64).wrapping_mul(q);
     let len = (count as i64).wrapping_mul(q);
