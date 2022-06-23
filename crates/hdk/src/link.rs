@@ -64,13 +64,13 @@ pub fn create_link<T, E>(
     tag: impl Into<LinkTag>,
 ) -> ExternResult<ActionHash>
 where
-    T: Copy,
-    ZomeId: TryFrom<T, Error = E>,
-    LinkType: From<T>,
+    ScopedLinkType: TryFrom<T, Error = E>,
     WasmError: From<E>,
 {
-    let zome_id = link_type.try_into()?;
-    let link_type = link_type.into();
+    let ScopedLinkType {
+        zome_id,
+        zome_type: link_type,
+    } = link_type.try_into()?;
     HDK.with(|h| {
         h.borrow().create_link(CreateLinkInput::new(
             base_address.into(),

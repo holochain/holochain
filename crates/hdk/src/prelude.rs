@@ -71,7 +71,7 @@ pub use hdk_derive::hdk_entry_defs_conversions;
 pub use hdk_derive::hdk_entry_helper;
 pub use hdk_derive::hdk_extern;
 pub use hdk_derive::hdk_link_types;
-pub use hdk_derive::hdk_to_local_types;
+pub use hdk_derive::hdk_to_coordinates;
 pub use hdk_derive::EntryDefRegistration;
 pub use hdk_derive::UnitEnum;
 pub use holo_hash;

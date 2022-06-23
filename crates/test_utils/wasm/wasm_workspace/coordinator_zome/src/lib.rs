@@ -20,7 +20,7 @@ fn msg() -> Msg {
 #[hdk_extern]
 fn create_entry(_: ()) -> ExternResult<ActionHash> {
     let post = new_post();
-    let index = EntryDefIndex::try_from(&post)?;
+    let index = ScopedEntryDefIndex::try_from(&post)?;
     let vis = EntryVisibility::from(&post);
     let entry = post.try_into().unwrap();
     HDK.with(|h| {

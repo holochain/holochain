@@ -36,8 +36,6 @@ pub fn zome_info(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod test {
-    use std::collections::BTreeMap;
-
     use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::prelude::*;
@@ -83,14 +81,13 @@ pub mod test {
                 FunctionName::new("zome_info"),
             ],
         );
-        let mut map = BTreeMap::new();
-        map.insert(LocalZomeTypeId(0), ZomeId(0));
-        map.insert(LocalZomeTypeId(1), ZomeId(0));
+        let entries = vec![(ZomeId(0), vec![EntryDefIndex(0), EntryDefIndex(1)])];
+        let links = vec![(ZomeId(0), vec![])];
         assert_eq!(
             zome_info.zome_types,
             ScopedZomeTypesSet {
-                entries: ScopedZomeTypes(map),
-                links: ScopedZomeTypes(Default::default()),
+                entries: ScopedZomeTypes(entries),
+                links: ScopedZomeTypes(links),
             }
         );
     }

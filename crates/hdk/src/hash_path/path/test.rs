@@ -3,7 +3,10 @@ use mockall::predicate::eq;
 use crate::hash_path::path::root_hash;
 use crate::prelude::*;
 
-const LINK_TYPE: (ZomeId, LinkType) = (ZomeId(0), LinkType(0));
+const LINK_TYPE: ScopedLinkType = ScopedLinkType {
+    zome_id: ZomeId(0),
+    zome_type: LinkType(0),
+};
 
 #[test]
 /// Test that a root path always doesn't exist until it is ensured.

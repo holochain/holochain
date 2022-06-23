@@ -219,7 +219,9 @@ async fn bob_links_in_a_legit_way(
     let target_entry_hash = Entry::try_from(target.clone()).unwrap().to_hash();
     let link_tag = fixt!(LinkTag);
     let call_data = HostFnCaller::create(bob_cell_id, handle, dna_file).await;
-    let zome_id = call_data.get_entry_type(TestWasm::Create, POST_INDEX);
+    let zome_id = call_data
+        .get_entry_type(TestWasm::Create, POST_INDEX)
+        .zome_id;
     // 3
     call_data
         .commit_entry(
@@ -277,7 +279,9 @@ async fn bob_makes_a_large_link(
     let link_tag = LinkTag(bytes);
 
     let call_data = HostFnCaller::create(bob_cell_id, handle, dna_file).await;
-    let zome_id = call_data.get_entry_type(TestWasm::Create, POST_INDEX);
+    let zome_id = call_data
+        .get_entry_type(TestWasm::Create, POST_INDEX)
+        .zome_id;
 
     // 6
     let original_action_address = call_data
@@ -327,7 +331,9 @@ async fn bob_makes_a_large_link(
 async fn dodgy_bob(bob_cell_id: &CellId, handle: &ConductorHandle, dna_file: &DnaFile) {
     let legit_entry = Post("Bob is the best and I'll link to proof so you can check".into());
     let call_data = HostFnCaller::create(bob_cell_id, handle, dna_file).await;
-    let zome_id = call_data.get_entry_type(TestWasm::Create, POST_INDEX);
+    let zome_id = call_data
+        .get_entry_type(TestWasm::Create, POST_INDEX)
+        .zome_id;
 
     // 11
     call_data

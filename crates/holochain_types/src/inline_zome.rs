@@ -34,9 +34,12 @@ impl InlineEntryTypes {
     }
 }
 
-impl From<InlineEntryTypes> for LocalZomeTypeId {
+impl From<InlineEntryTypes> for ZomeEntryTypesKey {
     fn from(t: InlineEntryTypes) -> Self {
-        Self(t as u8)
+        Self {
+            zome_index: 0.into(),
+            type_index: (t as u8).into(),
+        }
     }
 }
 
@@ -214,32 +217,33 @@ impl InlineZomeSet {
     }
 
     /// Get the entry def location for committing an entry.
-    pub fn get_entry_location(api: &BoxApi, index: impl Into<LocalZomeTypeId>) -> EntryDefLocation {
-        let index = index.into();
-        let zome_id = api
+    pub fn get_entry_location(
+        api: &BoxApi,
+        index: impl Into<ZomeEntryTypesKey>,
+    ) -> EntryDefLocation {
+        let scoped_type = api
             .zome_info(())
             .unwrap()
             .zome_types
             .entries
-            .zome_id(index)
+            .get(index)
             .unwrap();
         EntryDefLocation::App(AppEntryDefLocation {
-            zome_id,
-            entry_def_index: index.into(),
+            zome_id: scoped_type.zome_id,
+            entry_def_index: scoped_type.zome_type,
         })
     }
 
     /// Generate a link type filter from a link type.
-    pub fn get_link_filter(api: &BoxApi, index: impl Into<LinkType>) -> LinkTypeFilter {
-        let index = index.into();
-        let zome_id = api
+    pub fn get_link_filter(api: &BoxApi, index: impl Into<ZomeLinkTypesKey>) -> LinkTypeFilter {
+        let scoped_type = api
             .zome_info(())
             .unwrap()
             .zome_types
             .links
-            .zome_id(index)
+            .get(index)
             .unwrap();
-        LinkTypeFilter::single_type(zome_id, index)
+        LinkTypeFilter::single_type(scoped_type.zome_id, scoped_type.zome_type)
     }
 
     /// Generate a link type filter for all dependencies of the this zome.
@@ -249,7 +253,8 @@ impl InlineZomeSet {
             .unwrap()
             .zome_types
             .links
-            .all_dependencies();
+            .dependencies()
+            .collect();
         LinkTypeFilter::Dependencies(zome_ids)
     }
 }

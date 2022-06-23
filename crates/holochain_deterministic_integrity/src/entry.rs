@@ -117,12 +117,12 @@ pub trait EntryTypesHelper: Sized {
     /// it does deserialize the [`Entry`] into that types.
     fn deserialize_from_type<Z, I>(
         zome_id: Z,
-        type_index: I,
+        entry_def_index: I,
         entry: &Entry,
     ) -> Result<Option<Self>, WasmError>
     where
         Z: Into<ZomeId>,
-        I: Into<LocalZomeTypeId>;
+        I: Into<EntryDefIndex>;
 }
 
 /// Implements conversion traits to allow a struct to be handled as an app entry.

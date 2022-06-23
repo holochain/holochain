@@ -16,7 +16,7 @@ mod entry_helper;
 mod entry_zomes;
 mod link_types;
 mod link_zomes;
-mod to_local_types;
+mod to_coordinates;
 mod unit_enum;
 mod util;
 
@@ -239,8 +239,8 @@ pub fn hdk_link_types(attrs: TokenStream, code: TokenStream) -> TokenStream {
 
 #[proc_macro_error]
 #[proc_macro_attribute]
-pub fn hdk_to_local_types(attrs: TokenStream, code: TokenStream) -> TokenStream {
-    to_local_types::build(attrs, code)
+pub fn hdk_to_coordinates(attrs: TokenStream, code: TokenStream) -> TokenStream {
+    to_coordinates::build(attrs, code)
 }
 
 #[proc_macro_error]

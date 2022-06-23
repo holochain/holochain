@@ -637,7 +637,7 @@ impl RibosomeT for RealRibosome {
         // Get the dependencies for this zome.
         let zome_dependencies = self.get_zome_dependencies(zome.zome_name())?;
         // Scope the zome types to these dependencies.
-        let zome_types = self.zome_types.re_scope(zome_dependencies)?;
+        let zome_types = self.zome_types.re_scope(zome_dependencies);
 
         Ok(ZomeInfo {
             name: zome.zome_name().clone(),

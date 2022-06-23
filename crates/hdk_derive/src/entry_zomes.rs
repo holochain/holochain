@@ -17,18 +17,36 @@ pub fn build(_attrs: TokenStream, input: TokenStream) -> TokenStream {
         _ => abort!(input, "hdk_dependent_entry_types can only be used on Enums"),
     };
 
-    let index_to_variant: proc_macro2::TokenStream = variants
+    let key_to_variant: proc_macro2::TokenStream = variants
         .iter()
         .enumerate()
-        .map(|(i, v)|(index_to_u8(i), v))
-        .map(|(i, syn::Variant { ident: v_ident, fields, .. })| {
-            let ty = &get_single_tuple_variant(v_ident, fields).ty;
-            quote::quote! {
-                if ((<#ident as EnumVariantLen<#i>>::ENUM_VARIANT_START)..(<#ident as EnumVariantLen<#i>>::ENUM_VARIANT_LEN)).contains(&offset.0) {
-                    return Ok(Some(Self::#v_ident(#ty::try_from((type_index, entry))?)));
+        .map(|(i, v)| (index_to_u8(i), v))
+        .map(
+            |(
+                i,
+                syn::Variant {
+                    ident: v_ident,
+                    fields,
+                    ..
+                },
+            )| {
+                let ty = &get_single_tuple_variant(v_ident, fields).ty;
+                quote::quote! {
+                    ZomeTypesKey {
+                        zome_index: ZomeDependencyIndex(#i),
+                        type_index,
+                    } => {
+                        let key = ZomeTypesKey {
+                            zome_index: 0.into(),
+                            type_index,
+                        };
+                        <#ty as UnitEnum>::Unit::iter()
+                            .find_map(|unit| (ZomeEntryTypesKey::from(unit) == key).then(|| unit))
+                            .map_or(Ok(None), |unit| Ok(Some(Self::#v_ident(#ty::try_from((unit, entry))?))))
+                    }
                 }
-            }
-        })
+            },
+        )
         .collect();
 
     let try_into_entry: proc_macro2::TokenStream = variants
@@ -41,20 +59,6 @@ pub fn build(_attrs: TokenStream, input: TokenStream) -> TokenStream {
              }| {
                 get_single_tuple_variant(v_ident, fields);
                 quote::quote! {#ident::#v_ident (v) => Entry::try_from(v),}
-            },
-        )
-        .collect();
-
-    let into_entry_def_index: proc_macro2::TokenStream = variants
-        .into_iter()
-        .map(
-            |syn::Variant {
-                 ident: v_ident,
-                 fields,
-                 ..
-             }| {
-                get_single_tuple_variant(v_ident, fields);
-                quote::quote! {#ident::#v_ident (v) => EntryDefIndex::from(v),}
             },
         )
         .collect();
@@ -74,7 +78,7 @@ pub fn build(_attrs: TokenStream, input: TokenStream) -> TokenStream {
         .collect();
 
     let output = quote::quote! {
-        #[hdk_to_local_types(nested = true)]
+        #[hdk_to_coordinates(nested = true, entry = true)]
         #[derive(Debug)]
         #input
 
@@ -96,23 +100,33 @@ pub fn build(_attrs: TokenStream, input: TokenStream) -> TokenStream {
             }
         }
 
-        impl From<&#ident> for EntryDefIndex {
-            fn from(value: &#ident) -> Self {
-                match value {
-                    #into_entry_def_index
+        impl TryFrom<&#ident> for ScopedEntryDefIndex {
+            type Error = WasmError;
+
+            fn try_from(value: &#ident) -> Result<Self, Self::Error> {
+                match zome_info()?.zome_types.entries.get(value) {
+                    Some(t) => Ok(t),
+                    _ => Err(wasm_error!(WasmErrorInner::Guest(format!(
+                        "{:?} does not map to any ZomeId and EntryDefIndex that is in scope for this zome.",
+                        value
+                    )))),
                 }
             }
         }
 
-        impl From<#ident> for EntryDefIndex {
-            fn from(value: #ident) -> Self {
-                Self::from(&value)
+        impl TryFrom<#ident> for ScopedEntryDefIndex {
+            type Error = WasmError;
+
+            fn try_from(value: #ident) -> Result<Self, Self::Error> {
+                Self::try_from(&value)
             }
         }
 
-        impl From<&&#ident> for EntryDefIndex {
-            fn from(value: &&#ident) -> Self {
-                Self::from(*value)
+        impl TryFrom<&&#ident> for ScopedEntryDefIndex {
+            type Error = WasmError;
+
+            fn try_from(value: &&#ident) -> Result<Self, Self::Error> {
+                Self::try_from(*value)
             }
         }
 
@@ -130,45 +144,26 @@ pub fn build(_attrs: TokenStream, input: TokenStream) -> TokenStream {
             }
         }
 
-        impl TryFrom<&#ident> for ZomeId {
-            type Error = WasmError;
-
-            fn try_from(v: &#ident) -> Result<Self, Self::Error> {
-                match zome_info()?.zome_types.entries.zome_id(LocalZomeTypeId::from(v)) {
-                    Some(z) => Ok(z),
-                    _ => Err(wasm_error!(WasmErrorInner::Guest(format!(
-                        "ZomeId not found for {:?}",
-                        v
-                    )))),
-                }
-            }
-        }
-
-        impl TryFrom<#ident> for ZomeId {
-            type Error = WasmError;
-
-            fn try_from(v: #ident) -> Result<Self, Self::Error> {
-                Self::try_from(&v)
-            }
-        }
-
         impl EntryTypesHelper for #ident {
             fn deserialize_from_type<Z, I>(
                 zome_id: Z,
-                type_index: I,
+                entry_def_index: I,
                 entry: &Entry,
             ) -> Result<Option<Self>, WasmError>
             where
                 Z: Into<ZomeId>,
-                I: Into<LocalZomeTypeId>
+                I: Into<EntryDefIndex>
             {
-                let zome_id = zome_id.into();
-                let type_index = type_index.into();
-                match zome_info()?.zome_types.entries.offset(zome_id, type_index) {
-                    Some(offset) => {
-                        #index_to_variant
-
-                        Ok(None)
+                let scoped_type = ScopedEntryDefIndex {
+                    zome_id: zome_id.into(),
+                    zome_type: entry_def_index.into(),
+                };
+                match zome_info()?.zome_types.entries.find_key(scoped_type) {
+                    Some(key) => {
+                        match key {
+                            #key_to_variant
+                            _ => Ok(None),
+                        }
                     }
                     _ => Ok(None),
                 }

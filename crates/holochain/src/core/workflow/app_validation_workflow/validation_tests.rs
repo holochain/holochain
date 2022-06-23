@@ -169,7 +169,7 @@ async fn app_validation_ops() {
         move |api: BoxApi, ()| {
             let entry = Entry::app(().try_into().unwrap()).unwrap();
             let hash = api.create(CreateInput::new(
-                InlineZomeSet::get_entry_location(&api, 0),
+                InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
                 EntryVisibility::Public,
                 entry,
                 ChainTopOrdering::default(),
@@ -181,7 +181,7 @@ async fn app_validation_ops() {
         move |api: BoxApi, ()| {
             let entry = Entry::app(().try_into().unwrap()).unwrap();
             let hash = api.create(CreateInput::new(
-                InlineZomeSet::get_entry_location(&api, 0),
+                InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
                 EntryVisibility::Public,
                 entry,
                 ChainTopOrdering::default(),

@@ -1,6 +1,5 @@
 //! Helpers for constructing and using zome types correctly.
 use std::collections::HashMap;
-use std::num::NonZeroU8;
 
 pub use error::*;
 use holochain_zome_types::EntryDefIndex;
@@ -15,7 +14,7 @@ mod error;
 mod test;
 
 /// TODO
-pub type NumZomeTypes = NonZeroU8;
+pub type NumZomeTypes = u8;
 /// Zome types at the global scope for a DNA.
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct GlobalZomeTypes {
@@ -47,12 +46,8 @@ impl GlobalZomeTypes {
                 let zome_id: ZomeId = u8::try_from(zome_id)
                     .map_err(|_| ZomeTypesError::ZomeIndexOverflow)?
                     .into();
-                if let Some(num_entry_types) = NonZeroU8::new(num_entry_types.0) {
-                    zome_types.entries.insert(zome_id, num_entry_types);
-                }
-                if let Some(num_link_types) = NonZeroU8::new(num_link_types.0) {
-                    zome_types.links.insert(zome_id, num_link_types);
-                }
+                zome_types.entries.insert(zome_id, num_entry_types.0);
+                zome_types.links.insert(zome_id, num_link_types.0);
                 Ok(zome_types)
             },
         )?;
@@ -60,29 +55,25 @@ impl GlobalZomeTypes {
     }
 
     /// Create a new zome types map within the scope of the given integrity zomes.
-    pub fn re_scope(&self, zomes: &[ZomeId]) -> ZomeTypesResult<ScopedZomeTypesSet> {
+    pub fn re_scope(&self, zomes: &[ZomeId]) -> ScopedZomeTypesSet {
         let entries = zomes
             .iter()
             .filter_map(|zome_id| self.entries.get_key_value(zome_id).map(|(z, l)| (*z, *l)));
-        let entries = new_scope(entries).ok_or(ZomeTypesError::EntryTypeIndexOverflow)?;
+        let entries = new_scope(entries);
         let links = zomes
             .iter()
             .filter_map(|zome_id| self.links.get_key_value(zome_id).map(|(z, l)| (*z, *l)));
-        let links = new_scope(links).ok_or(ZomeTypesError::LinkTypeIndexOverflow)?;
-        Ok(ScopedZomeTypesSet { entries, links })
+        let links = new_scope(links);
+        ScopedZomeTypesSet { entries, links }
     }
 }
 
-fn new_scope(iter: impl Iterator<Item = (ZomeId, NumZomeTypes)>) -> Option<ScopedZomeTypes> {
-    let mut total: u8 = 0;
+fn new_scope<T>(iter: impl Iterator<Item = (ZomeId, NumZomeTypes)>) -> ScopedZomeTypes<T>
+where
+    T: From<u8>,
+{
     let iter = iter
-        .map(|(zome_id, len)| {
-            let len = len.get();
-            total = total.checked_add(len)?;
-            // Safe because len is never zero
-            let last_index = total - 1;
-            Some((last_index.into(), zome_id))
-        })
-        .collect::<Option<_>>()?;
-    Some(ScopedZomeTypes(iter))
+        .map(|(zome_id, len)| (zome_id, (0..len).map(Into::into).collect()))
+        .collect();
+    ScopedZomeTypes(iter)
 }

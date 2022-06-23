@@ -1,4 +1,3 @@
-use crate::LocalZomeTypeId;
 use crate::ZomeId;
 use holochain_serialized_bytes::prelude::*;
 
@@ -121,18 +120,6 @@ impl std::ops::Deref for LinkType {
 impl From<u8> for LinkType {
     fn from(t: u8) -> Self {
         Self(t)
-    }
-}
-
-impl From<LinkType> for LocalZomeTypeId {
-    fn from(v: LinkType) -> Self {
-        Self(v.0)
-    }
-}
-
-impl From<LocalZomeTypeId> for LinkType {
-    fn from(v: LocalZomeTypeId) -> Self {
-        Self(v.0)
     }
 }
 

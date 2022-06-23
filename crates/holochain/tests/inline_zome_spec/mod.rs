@@ -53,7 +53,7 @@ fn simple_crud_zome() -> InlineZomeSet {
         .callback("create_string", move |api, s: AppString| {
             let entry = Entry::app(AppString::from(s).try_into().unwrap()).unwrap();
             let hash = api.create(CreateInput::new(
-                InlineZomeSet::get_entry_location(&api, 0),
+                InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
                 EntryVisibility::Public,
                 entry,
                 ChainTopOrdering::default(),
@@ -63,7 +63,7 @@ fn simple_crud_zome() -> InlineZomeSet {
         .callback("create_unit", move |api, ()| {
             let entry = Entry::app(().try_into().unwrap()).unwrap();
             let hash = api.create(CreateInput::new(
-                InlineZomeSet::get_entry_location(&api, 1),
+                InlineZomeSet::get_entry_location(&api, EntryDefIndex(1)),
                 EntryVisibility::Public,
                 entry,
                 ChainTopOrdering::default(),
@@ -377,7 +377,7 @@ fn simple_validation_zome() -> InlineZomeSet {
         .callback("create", move |api, s: AppString| {
             let entry = Entry::app(s.try_into().unwrap()).unwrap();
             let hash = api.create(CreateInput::new(
-                InlineZomeSet::get_entry_location(&api, 0),
+                InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
                 EntryVisibility::Public,
                 entry,
                 ChainTopOrdering::default(),

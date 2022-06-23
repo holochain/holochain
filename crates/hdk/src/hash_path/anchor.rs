@@ -98,9 +98,7 @@ pub fn anchor<T, E>(
     anchor_text: String,
 ) -> ExternResult<holo_hash::EntryHash>
 where
-    T: Copy,
-    ZomeId: TryFrom<T, Error = E>,
-    LinkType: From<T>,
+    ScopedLinkType: TryFrom<T, Error = E>,
     WasmError: From<E>,
 {
     let path: Path = (&Anchor {
@@ -117,9 +115,7 @@ where
 /// Hashes are sorted in the same way that paths sort children.
 pub fn list_anchor_type_addresses<T, E>(link_type: T) -> ExternResult<Vec<AnyLinkableHash>>
 where
-    T: Copy,
-    ZomeId: TryFrom<T, Error = E>,
-    LinkType: From<T>,
+    ScopedLinkType: TryFrom<T, Error = E>,
     WasmError: From<E>,
 {
     let links = Path::from(vec![Component::new(ROOT.to_vec())])
@@ -139,9 +135,7 @@ pub fn list_anchor_addresses<T, E>(
     anchor_type: String,
 ) -> ExternResult<Vec<AnyLinkableHash>>
 where
-    T: Copy,
-    ZomeId: TryFrom<T, Error = E>,
-    LinkType: From<T>,
+    ScopedLinkType: TryFrom<T, Error = E>,
     WasmError: From<E>,
 {
     let path: Path = (&Anchor {
@@ -164,9 +158,7 @@ where
 /// return them.
 pub fn list_anchor_tags<T, E>(link_type: T, anchor_type: String) -> ExternResult<Vec<String>>
 where
-    T: Copy,
-    ZomeId: TryFrom<T, Error = E>,
-    LinkType: From<T>,
+    ScopedLinkType: TryFrom<T, Error = E>,
     WasmError: From<E>,
 {
     let path: Path = (&Anchor {

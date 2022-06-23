@@ -38,7 +38,7 @@ async fn authored_test() {
     let entry_hash = EntryHash::with_data_sync(&Entry::try_from(entry.clone()).unwrap());
     // 3
     let h = alice_call_data.get_api(TestWasm::Create);
-    let zome_id = h.get_entry_type(TestWasm::Create, POST_INDEX);
+    let zome_id = h.get_entry_type(TestWasm::Create, POST_INDEX).zome_id;
     h.commit_entry(
         entry.clone().try_into().unwrap(),
         EntryDefLocation::app(zome_id, POST_INDEX),
@@ -112,7 +112,7 @@ async fn authored_test() {
 
     // Now bob commits the entry
     let h = bob_call_data.get_api(TestWasm::Create);
-    let zome_id = h.get_entry_type(TestWasm::Create, POST_INDEX);
+    let zome_id = h.get_entry_type(TestWasm::Create, POST_INDEX).zome_id;
     h.commit_entry(
         entry.clone().try_into().unwrap(),
         EntryDefLocation::app(zome_id, POST_INDEX),

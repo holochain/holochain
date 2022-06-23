@@ -13,11 +13,13 @@ use crate::util::ignore_enum_data;
 use crate::util::index_to_u8;
 
 #[derive(Debug, FromMeta)]
-/// Type for parsing the `#[hdk_to_local_types(nested = true)]`
+/// Type for parsing the `#[hdk_to_coordinates(nested = true)]`
 /// attribute into. Defaults to false.
 pub struct MacroArgs {
     #[darling(default)]
     nested: bool,
+    #[darling(default)]
+    entry: bool,
 }
 
 pub fn build(args: TokenStream, input: TokenStream) -> TokenStream {
@@ -31,22 +33,27 @@ pub fn build(args: TokenStream, input: TokenStream) -> TokenStream {
             ident, variants, ..
         }) => (ident, variants),
         r => {
-            abort!(r, "The `to_local_types` macro can only be used on enums."; help = "Make this an enum.";)
+            abort!(r, "The `hdk_to_coordinates` macro can only be used on enums."; help = "Make this an enum.";)
         }
     };
 
     // Check if this is the nested version or not.
-    let nested = match MacroArgs::from_list(&attr_args) {
-        Ok(a) => a.nested,
+    let (nested, entry) = match MacroArgs::from_list(&attr_args) {
+        Ok(a) => (a.nested, a.entry),
         Err(e) => abort!(e.span(), "{}", e),
     };
 
+    let entry_or_link = if entry {
+        quote::quote! {EntryDefIndex}
+    } else {
+        quote::quote! {LinkType}
+    };
     // Generate the output for mapping between variants
     // and local types.
     let variant_to_index = if nested {
-        nesting(ident, variants)
+        nesting(ident, variants, entry_or_link.clone())
     } else {
-        no_nesting(ident, variants)
+        no_nesting(ident, variants, entry_or_link.clone())
     };
 
     let output = quote::quote! {
@@ -55,7 +62,7 @@ pub fn build(args: TokenStream, input: TokenStream) -> TokenStream {
         #variant_to_index
 
         // Add the owned from.
-        impl From<#ident> for LocalZomeTypeId {
+        impl From<#ident> for ZomeTypesKey<#entry_or_link> {
             fn from(t: #ident) -> Self {
                 Self::from(&t)
             }
@@ -69,6 +76,7 @@ pub fn build(args: TokenStream, input: TokenStream) -> TokenStream {
 fn no_nesting(
     ident: &syn::Ident,
     variants: &Punctuated<Variant, syn::token::Comma>,
+    entry_or_link: proc_macro2::TokenStream,
 ) -> proc_macro2::TokenStream {
     // Get the total number of variants for this enum.
     let variant_len = index_to_u8(variants.len());
@@ -91,13 +99,13 @@ fn no_nesting(
                 // Generate output that ignores any nested data.
                 let ignore = ignore_enum_data(fields);
                 // Generate the match branch.
-                quote::quote! {#ident::#v_ident #ignore => LocalZomeTypeId(#index),}
+                quote::quote! {#ident::#v_ident #ignore => ZomeTypesKey::<#entry_or_link>{ zome_index: 0.into(), type_index: #index.into() },}
             },
         )
         .collect();
 
     quote::quote! {
-        impl From<&#ident> for LocalZomeTypeId {
+        impl From<&#ident> for ZomeTypesKey<#entry_or_link> {
             fn from(t: &#ident) -> Self {
                 match t {
                     // Use the generated match branches here.
@@ -126,6 +134,7 @@ fn no_nesting(
 fn nesting(
     ident: &syn::Ident,
     variants: &Punctuated<Variant, syn::token::Comma>,
+    entry_or_link: proc_macro2::TokenStream,
 ) -> proc_macro2::TokenStream {
     // Generate inner match arms for `impl From<&Self> for LocalZomeTypeId`
     let inner_from: proc_macro2::TokenStream = variants
@@ -153,9 +162,7 @@ fn nesting(
                             // This arms `LocalZomeTypeId` is the starting point of this variant
                             // plus the fields `LocalZomeTypeId`.
                             quote::quote! {
-                                #ident::#v_ident { #inner_ident, ..}  => {
-                                    Self(<#ident as EnumVariantLen<#enum_index>>::ENUM_VARIANT_START + Self::from(#inner_ident).0)
-                                }
+                                #ident::#v_ident { #inner_ident, ..} => Self{ zome_index: #enum_index.into(), type_index: Self::from(#inner_ident).type_index },
                             }
                         }
                         None => abort!(v_ident, "Struct style enum needs at least one field."),
@@ -166,17 +173,13 @@ fn nesting(
                         // This arms `LocalZomeTypeId` is the starting point of this variant
                         // plus the fields `LocalZomeTypeId`.
                         quote::quote! {
-                            #ident::#v_ident (inner_ident)  => {
-                                Self(<#ident as EnumVariantLen<#enum_index>>::ENUM_VARIANT_START + Self::from(inner_ident).0)
-                            }
+                            #ident::#v_ident (inner_ident) => Self{ zome_index: #enum_index.into(), type_index: Self::from(inner_ident).type_index },
                         }
                     }
                     syn::Fields::Unit => {
                         // A unit variant is simply the starting variant point.
                         quote::quote! {
-                            #ident::#v_ident  => {
-                                Self(<#ident as EnumVariantLen<#enum_index>>::ENUM_VARIANT_START)
-                            }
+                            #ident::#v_ident => Self{ zome_index: #enum_index.into(), type_index: 0.into() },
                         }
                     },
                 }
@@ -256,7 +259,7 @@ fn nesting(
 
         #enum_variant_len
 
-        impl From<&#ident> for LocalZomeTypeId {
+        impl From<&#ident> for ZomeTypesKey<#entry_or_link> {
             fn from(n: &#ident) -> Self {
                 match n {
                     #inner_from

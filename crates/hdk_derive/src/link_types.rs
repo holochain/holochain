@@ -53,7 +53,7 @@ pub fn build(attrs: TokenStream, input: TokenStream) -> TokenStream {
 
     let output = quote::quote! {
         // Add the required derives and attributes.
-        #[hdk_to_local_types]
+        #[hdk_to_coordinates(entry = false)]
         #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
         #input
 
@@ -61,16 +61,39 @@ pub fn build(attrs: TokenStream, input: TokenStream) -> TokenStream {
         #no_mangle
         pub fn __num_link_types() -> u8 { #ident::len() }
 
-        impl From<#ident> for LinkType {
-            fn from(value: #ident) -> Self {
-                Self(LocalZomeTypeId::from(value).0)
+        impl TryFrom<&#ident> for ScopedLinkType {
+            type Error = WasmError;
+
+            fn try_from(value: &#ident) -> Result<Self, Self::Error> {
+                match zome_info()?.zome_types.links.get(value) {
+                    Some(t) => Ok(t),
+                    _ => Err(wasm_error!(WasmErrorInner::Guest(format!(
+                        "{:?} does not map to any ZomeId and LinkType that is in scope for this zome.",
+                        value
+                    )))),
+                }
             }
         }
 
-        impl From<&#ident> for LinkType {
+        impl TryFrom<ScopedLinkType> for #ident {
+            type Error = WasmError;
 
-            fn from(value: &#ident) -> Self {
-                Self(LocalZomeTypeId::from(value).0)
+            fn try_from(value: ScopedLinkType) -> Result<Self, Self::Error> {
+                match zome_info()?.zome_types.links.find(Self::iter(), value) {
+                    Some(t) => Ok(t),
+                    _ => Err(wasm_error!(WasmErrorInner::Guest(format!(
+                        "{:?} does not map to any link defined by this type.",
+                        value
+                    )))),
+                }
+            }
+        }
+
+        impl TryFrom<#ident> for ScopedLinkType {
+            type Error = WasmError;
+
+            fn try_from(value: #ident) -> Result<Self, Self::Error> {
+                Self::try_from(&value)
             }
         }
 
@@ -78,9 +101,7 @@ pub fn build(attrs: TokenStream, input: TokenStream) -> TokenStream {
             type Error = WasmError;
 
             fn try_from(value: #ident) -> Result<Self, Self::Error> {
-                let z: ZomeId = value.try_into()?;
-                let lt: LinkType = value.into();
-                Ok(LinkTypeFilter::single_type(z, lt))
+                Self::try_from(&value)
             }
         }
 
@@ -88,75 +109,17 @@ pub fn build(attrs: TokenStream, input: TokenStream) -> TokenStream {
             type Error = WasmError;
 
             fn try_from(value: &#ident) -> Result<Self, Self::Error> {
-                let z: ZomeId = value.try_into()?;
-                let lt: LinkType = value.into();
-                Ok(LinkTypeFilter::single_type(z, lt))
+                let ScopedLinkType {
+                    zome_id,
+                    zome_type,
+                } = value.try_into()?;
+                Ok(LinkTypeFilter::single_type(zome_id, zome_type))
             }
         }
 
         impl LinkTypeFilterExt for #ident {
             fn try_into_filter(self) -> Result<LinkTypeFilter, WasmError> {
                 self.try_into()
-            }
-        }
-
-        impl TryFrom<LocalZomeTypeId> for #ident {
-            type Error = WasmError;
-
-            fn try_from(value: LocalZomeTypeId) -> Result<Self, Self::Error> {
-                #ident::iter()
-                    .find(|u| LocalZomeTypeId::from(*u) == value)
-                    .ok_or_else(|| {
-                        wasm_error!(WasmErrorInner::Guest(format!(
-                            "local index {:?} does not match any variant of {}",
-                            value, stringify!(#ident)
-                        )))
-                    })
-            }
-        }
-
-        impl TryFrom<&LocalZomeTypeId> for #ident {
-            type Error = WasmError;
-
-            fn try_from(value: &LocalZomeTypeId) -> Result<Self, Self::Error> {
-                Self::try_from(*value)
-            }
-        }
-
-        impl TryFrom<(ZomeId, LinkType)> for #ident {
-            type Error = WasmError;
-
-            fn try_from((zome_id, index): (ZomeId, LinkType)) -> Result<Self, Self::Error> {
-                match zome_info()?.zome_types.links.zome_id(index) {
-                    Some(z) if z == zome_id => Self::try_from(LocalZomeTypeId::from(index)),
-                    _ => Err(wasm_error!(WasmErrorInner::Guest(format!(
-                        "LinkType {:?} {:?} does not map to any local scope for this zome",
-                        zome_id,
-                        index
-                    )))),
-                }
-            }
-        }
-
-        impl TryFrom<&#ident> for ZomeId {
-            type Error = WasmError;
-
-            fn try_from(index: &#ident) -> Result<Self, Self::Error> {
-                match zome_info()?.zome_types.links.zome_id(LocalZomeTypeId::from(index)) {
-                    Some(z) => Ok(z),
-                    _ => Err(wasm_error!(WasmErrorInner::Guest(format!(
-                        "ZomeId not found for {:?}",
-                        index
-                    )))),
-                }
-            }
-        }
-
-        impl TryFrom<#ident> for ZomeId {
-            type Error = WasmError;
-
-            fn try_from(index: #ident) -> Result<Self, Self::Error> {
-                Self::try_from(&index)
             }
         }
 

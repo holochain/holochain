@@ -520,7 +520,7 @@ pub(crate) fn simple_create_entry_zome() -> InlineZomeSet {
     .callback("create_entry", "create", move |api, ()| {
         let entry = Entry::app(().try_into().unwrap()).unwrap();
         let hash = api.create(CreateInput::new(
-            InlineZomeSet::get_entry_location(&api, 0),
+            InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
             EntryVisibility::Public,
             entry,
             ChainTopOrdering::default(),
@@ -651,7 +651,7 @@ async fn test_bad_entry_validation_after_genesis_returns_zome_call_error() {
             .callback("custom", "create", move |api, ()| {
                 let entry = Entry::app(().try_into().unwrap()).unwrap();
                 let hash = api.create(CreateInput::new(
-                    InlineZomeSet::get_entry_location(&api, 0),
+                    InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
                     EntryVisibility::Public,
                     entry,
                     ChainTopOrdering::default(),
@@ -714,7 +714,7 @@ async fn test_apps_disable_on_panic_after_genesis() {
             .callback("custom", "create", move |api, ()| {
                 let entry = Entry::app(().try_into().unwrap()).unwrap();
                 let hash = api.create(CreateInput::new(
-                    InlineZomeSet::get_entry_location(&api, 0),
+                    InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
                     EntryVisibility::Public,
                     entry,
                     ChainTopOrdering::default(),

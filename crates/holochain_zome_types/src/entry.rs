@@ -8,6 +8,7 @@
 use crate::action::ChainTopOrdering;
 use holochain_integrity_types::EntryDefIndex;
 use holochain_integrity_types::EntryVisibility;
+use holochain_integrity_types::ScopedEntryDefIndex;
 use holochain_integrity_types::ZomeId;
 use holochain_serialized_bytes::prelude::*;
 
@@ -220,5 +221,20 @@ impl EntryDefLocation {
             zome_id: zome_id.into(),
             entry_def_index: entry_def_index.into(),
         })
+    }
+}
+
+impl From<ScopedEntryDefIndex> for AppEntryDefLocation {
+    fn from(s: ScopedEntryDefIndex) -> Self {
+        Self {
+            zome_id: s.zome_id,
+            entry_def_index: s.zome_type,
+        }
+    }
+}
+
+impl From<ScopedEntryDefIndex> for EntryDefLocation {
+    fn from(s: ScopedEntryDefIndex) -> Self {
+        Self::App(s.into())
     }
 }

@@ -374,6 +374,14 @@ async fn check_app_entry_type_test() {
     assert_matches!(
         check_app_entry_type(&dna_hash, &aet, &conductor_handle).await,
         Err(SysValidationError::ValidationOutcome(
+            ValidationOutcome::EntryDefId(_)
+        ))
+    );
+
+    let aet = AppEntryType::new(0.into(), 100.into(), EntryVisibility::Public);
+    assert_matches!(
+        check_app_entry_type(&dna_hash, &aet, &conductor_handle).await,
+        Err(SysValidationError::ValidationOutcome(
             ValidationOutcome::ZomeId(_)
         ))
     );

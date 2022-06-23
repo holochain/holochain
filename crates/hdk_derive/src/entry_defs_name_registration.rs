@@ -61,7 +61,7 @@ pub fn build(attrs: TokenStream, input: TokenStream) -> TokenStream {
 
     let output = quote::quote! {
         #[derive(EntryDefRegistration, UnitEnum)]
-        #[unit_attrs(forward(hdk_to_local_types))]
+        #[unit_attrs(forward(hdk_to_coordinates(entry = true)))]
         #input
 
         #hdk_extern
@@ -76,7 +76,21 @@ pub fn build(attrs: TokenStream, input: TokenStream) -> TokenStream {
         #no_mangle
         pub fn __num_entry_types() -> u8 { #unit_ident::len() }
 
-        impl TryFrom<&#ident> for ZomeId {
+        impl TryFrom<&#unit_ident> for ScopedEntryDefIndex {
+            type Error = WasmError;
+
+            fn try_from(value: &#unit_ident) -> Result<Self, Self::Error> {
+                match zome_info()?.zome_types.entries.get(value) {
+                    Some(t) => Ok(t),
+                    _ => Err(wasm_error!(WasmErrorInner::Guest(format!(
+                        "{:?} does not map to any ZomeId and EntryDefIndex that is in scope for this zome.",
+                        value
+                    )))),
+                }
+            }
+        }
+
+        impl TryFrom<&#ident> for ScopedEntryDefIndex {
             type Error = WasmError;
 
             fn try_from(value: &#ident) -> Result<Self, Self::Error> {
@@ -84,7 +98,37 @@ pub fn build(attrs: TokenStream, input: TokenStream) -> TokenStream {
             }
         }
 
-        impl TryFrom<#ident> for ZomeId {
+        impl TryFrom<&&#ident> for ScopedEntryDefIndex {
+            type Error = WasmError;
+
+            fn try_from(value: &&#ident) -> Result<Self, Self::Error> {
+                Self::try_from(value.to_unit())
+            }
+        }
+
+        impl TryFrom<ScopedEntryDefIndex> for #unit_ident {
+            type Error = WasmError;
+
+            fn try_from(value: ScopedEntryDefIndex) -> Result<Self, Self::Error> {
+                match zome_info()?.zome_types.entries.find(Self::iter(), value) {
+                    Some(t) => Ok(t),
+                    _ => Err(wasm_error!(WasmErrorInner::Guest(format!(
+                        "{:?} does not map to any link defined by this type.",
+                        value
+                    )))),
+                }
+            }
+        }
+
+        impl TryFrom<#unit_ident> for ScopedEntryDefIndex {
+            type Error = WasmError;
+
+            fn try_from(value: #unit_ident) -> Result<Self, Self::Error> {
+                Self::try_from(&value)
+            }
+        }
+
+        impl TryFrom<#ident> for ScopedEntryDefIndex {
             type Error = WasmError;
 
             fn try_from(value: #ident) -> Result<Self, Self::Error> {
@@ -92,33 +136,15 @@ pub fn build(attrs: TokenStream, input: TokenStream) -> TokenStream {
             }
         }
 
-        impl From<&#ident> for EntryDefIndex {
-            fn from(value: &#ident) -> Self {
-                Self(LocalZomeTypeId::from(value.to_unit()).0)
+        impl From<&#ident> for ZomeEntryTypesKey {
+            fn from(v: &#ident) -> Self {
+                v.to_unit().into()
             }
         }
 
-        impl From<#ident> for EntryDefIndex {
-            fn from(value: #ident) -> Self {
-                Self::from(&value)
-            }
-        }
-
-        impl From<&&#ident> for EntryDefIndex {
-            fn from(value: &&#ident) -> Self {
-                Self::from(*value)
-            }
-        }
-
-        impl From<&#ident> for LocalZomeTypeId {
-            fn from(t: &#ident) -> Self {
-                Self::from(t.to_unit())
-            }
-        }
-
-        impl From<#ident> for LocalZomeTypeId {
-            fn from(t: #ident) -> Self {
-                Self::from(&t)
+        impl From<#ident> for ZomeEntryTypesKey {
+            fn from(v: #ident) -> Self {
+                v.to_unit().into()
             }
         }
 
@@ -152,7 +178,7 @@ pub fn build(attrs: TokenStream, input: TokenStream) -> TokenStream {
 
         impl From<#unit_ident> for EntryVisibility {
             fn from(v: #unit_ident) -> Self {
-                #ident::ENTRY_DEFS[LocalZomeTypeId::from(v).0 as usize].visibility
+                #ident::ENTRY_DEFS[ZomeEntryTypesKey::from(v).type_index.index()].visibility
             }
         }
 
@@ -168,8 +194,10 @@ pub fn build(attrs: TokenStream, input: TokenStream) -> TokenStream {
             type Error = WasmError;
 
             fn try_from(value: #unit_ident) -> Result<Self, Self::Error> {
-                let id = value.into();
-                let zome_id = value.try_into()?;
+                let ScopedEntryDefIndex {
+                    zome_id,
+                    zome_type: id,
+                } = value.try_into()?;
                 let def: EntryDef = value.into();
                 Ok(Self {
                     id,
@@ -181,103 +209,34 @@ pub fn build(attrs: TokenStream, input: TokenStream) -> TokenStream {
 
         impl From<#unit_ident> for EntryDef {
             fn from(v: #unit_ident) -> Self {
-                let i: LocalZomeTypeId = v.into();
-                #ident::ENTRY_DEFS[i.0 as usize].clone()
+                let i = ZomeEntryTypesKey::from(v).type_index;
+                #ident::ENTRY_DEFS[i.index()].clone()
             }
         }
 
-        impl TryFrom<LocalZomeTypeId> for #unit_ident {
+        impl TryFrom<(#unit_ident, &Entry)> for #ident {
             type Error = WasmError;
 
-            fn try_from(value: LocalZomeTypeId) -> Result<Self, Self::Error> {
-                Self::iter()
-                    .find(|u| LocalZomeTypeId::from(*u) == value)
-                    .ok_or_else(|| {
-                        wasm_error!(WasmErrorInner::Guest(format!(
-                            "local index {} does not match any variant of {}",
-                            value.0, stringify!(#unit_ident)
-                        )))
-                    })
-            }
-        }
-
-        impl From<&#unit_ident> for EntryDefIndex {
-            fn from(value: &#unit_ident) -> Self {
-                Self(LocalZomeTypeId::from(value).0)
-            }
-        }
-
-        impl From<#unit_ident> for EntryDefIndex {
-            fn from(value: #unit_ident) -> Self {
-                Self::from(&value)
-            }
-        }
-
-        impl TryFrom<&#unit_ident> for ZomeId {
-            type Error = WasmError;
-
-            fn try_from(unit: &#unit_ident) -> Result<Self, Self::Error> {
-                match zome_info()?.zome_types.entries.zome_id(LocalZomeTypeId::from(unit)) {
-                    Some(z) => Ok(z),
-                    _ => Err(wasm_error!(WasmErrorInner::Guest(format!(
-                        "ZomeId not found for {:?}",
-                        unit
-                    )))),
-                }
-            }
-        }
-
-        impl TryFrom<#unit_ident> for ZomeId {
-            type Error = WasmError;
-
-            fn try_from(unit: #unit_ident) -> Result<Self, Self::Error> {
-                Self::try_from(&unit)
-            }
-        }
-
-        impl TryFrom<(ZomeId, EntryDefIndex)> for #unit_ident {
-            type Error = WasmError;
-
-            fn try_from((zome_id, index): (ZomeId, EntryDefIndex)) -> Result<Self, Self::Error> {
-                match zome_info()?.zome_types.entries.zome_id(index) {
-                    Some(z) if z == zome_id => Self::try_from(LocalZomeTypeId::from(index)),
-                    _ => Err(wasm_error!(WasmErrorInner::Guest(format!(
-                        "EntryDefIndex {:?} {:?} does not map to any local scope for this zome",
-                        zome_id,
-                        index
-                    )))),
-                }
-            }
-        }
-
-        impl TryFrom<(LocalZomeTypeId, &Entry)> for #ident {
-            type Error = WasmError;
-
-            fn try_from((type_index, entry): (LocalZomeTypeId, &Entry)) -> Result<Self, Self::Error> {
-                let unit = <#ident as UnitEnum>::Unit::try_from(type_index)?;
+            fn try_from((unit, entry): (#unit_ident, &Entry)) -> Result<Self, Self::Error> {
                 match unit {
                     #units_to_full
                 }
-
             }
-
         }
-
         impl EntryTypesHelper for #ident {
             fn deserialize_from_type<Z, I>(
                 zome_id: Z,
-                type_index: I,
+                entry_def_index: I,
                 entry: &Entry,
             ) -> Result<Option<Self>, WasmError>
             where
                 Z: Into<ZomeId>,
-                I: Into<LocalZomeTypeId>
+                I: Into<EntryDefIndex>
             {
-                let zome_id = zome_id.into();
-                let type_index = type_index.into();
-                match zome_info()?.zome_types.entries.zome_id(type_index) {
-                    Some(z) if z == zome_id => {
-                        Ok(Some((type_index, entry).try_into()?))
+                let s = ScopedEntryDefIndex{ zome_id: zome_id.into(), zome_type: entry_def_index.into() };
+                match zome_info()?.zome_types.entries.find(#unit_ident::iter(), s) {
+                    Some(unit) => {
+                        Ok(Some((unit, entry).try_into()?))
                     }
                     _ => Ok(None),
                 }

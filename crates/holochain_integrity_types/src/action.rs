@@ -4,7 +4,6 @@ use crate::entry_def::EntryVisibility;
 use crate::link::LinkTag;
 use crate::link::LinkType;
 use crate::timestamp::Timestamp;
-use crate::LocalZomeTypeId;
 use crate::MembraneProof;
 use holo_hash::impl_hashable_content;
 use holo_hash::ActionHash;
@@ -606,17 +605,5 @@ impl std::ops::Deref for ZomeId {
 impl Borrow<u8> for ZomeId {
     fn borrow(&self) -> &u8 {
         &self.0
-    }
-}
-
-impl From<EntryDefIndex> for LocalZomeTypeId {
-    fn from(v: EntryDefIndex) -> Self {
-        Self(v.0)
-    }
-}
-
-impl From<LocalZomeTypeId> for EntryDefIndex {
-    fn from(v: LocalZomeTypeId) -> Self {
-        Self(v.0)
     }
 }
