@@ -81,7 +81,7 @@ fn no_nesting(
     // Get the total number of variants for this enum.
     let variant_len = index_to_u8(variants.len());
 
-    // Create match branches for each variant that map to the `LocalZomeTypeId`.
+    // Create match branches for each variant that map to the `ZomeTypesKey`.
     let variant_to_index: proc_macro2::TokenStream = variants
         .iter()
         .enumerate()
@@ -136,7 +136,7 @@ fn nesting(
     variants: &Punctuated<Variant, syn::token::Comma>,
     entry_or_link: proc_macro2::TokenStream,
 ) -> proc_macro2::TokenStream {
-    // Generate inner match arms for `impl From<&Self> for LocalZomeTypeId`
+    // Generate inner match arms for `impl From<&Self> for ZomeTypesKey`
     let inner_from: proc_macro2::TokenStream = variants
         .iter()
         .enumerate()
@@ -152,15 +152,13 @@ fn nesting(
                 // Get this variants index as u8.
                 let enum_index = index_to_u8(enum_index);
 
-                // Map inner fields to a `LocalZomeTypeId`.
+                // Map inner fields to a `ZomeTypesKey`.
                 match fields {
                     syn::Fields::Named(syn::FieldsNamed { named, .. }) =>
                     // Get the first fields identifier.
                     match named.iter().next().and_then(|syn::Field{ident, ..}| ident.as_ref())
                     {
                         Some(inner_ident) => {
-                            // This arms `LocalZomeTypeId` is the starting point of this variant
-                            // plus the fields `LocalZomeTypeId`.
                             quote::quote! {
                                 #ident::#v_ident { #inner_ident, ..} => Self{ zome_index: #enum_index.into(), type_index: Self::from(#inner_ident).type_index },
                             }
@@ -170,8 +168,6 @@ fn nesting(
                     syn::Fields::Unnamed(syn::FieldsUnnamed { .. }) => {
                         // Check there is only a single tuple variant.
                         get_single_tuple_variant(v_ident, fields);
-                        // This arms `LocalZomeTypeId` is the starting point of this variant
-                        // plus the fields `LocalZomeTypeId`.
                         quote::quote! {
                             #ident::#v_ident (inner_ident) => Self{ zome_index: #enum_index.into(), type_index: Self::from(inner_ident).type_index },
                         }

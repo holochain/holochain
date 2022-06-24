@@ -632,7 +632,6 @@ impl std::fmt::Display for EntryType {
 pub struct AppEntryType {
     /// A unique u8 identifier within a zome for this
     /// entry type.
-    /// This is a [`LocalZomeTypeId`].
     pub id: EntryDefIndex,
     /// The id of the zome that defines this entry type.
     pub zome_id: ZomeId,
