@@ -89,14 +89,22 @@ pub fn generate_ideal_coverage(
         .map(|i| {
             let center =
                 ((i as f64 / nf) + (2.0 * jitter * rng.gen::<f64>()) - jitter).rem_euclid(1.0);
-
             unit_arq(topo, strat, center, len)
         })
         .collect();
 
     let cov = actual_coverage(topo, peers.iter());
-    let min = (target / (strat.buffer / 2.0 + 1.0)).floor();
-    let max = (min * (strat.buffer + 1.0)).ceil();
+    // this equation for min is derived from solving for min in terms of buf and target, using
+    // the system of equations:
+    //     max = min * (buf + 1)
+    //     target = (min + max) / 2
+    let min = 2.0 * target / (strat.buffer + 2.0);
+    let max = min * (strat.buffer + 1.0);
+    // When this is perfect, fudge factor can be 1.0. Otherwise, choose a small value >1 like 1.05,
+    // to accomodate values slightly out of range.
+    let fudge = 1.0;
+    let min = (min / fudge).floor();
+    let max = (max * fudge).ceil();
     assert!(
         min <= cov && cov <= max,
         "Ideal coverage was generated incorrectly: !({} <= {} <= {})",
