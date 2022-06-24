@@ -1,3 +1,4 @@
+use crate::core::ribosome::weigh_placeholder;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
@@ -25,6 +26,7 @@ pub fn create<'a>(
             } = input;
 
             let (entry_location, entry_visibility, entry) = unpack_entry_input(input);
+            let weight = weigh_placeholder();
 
             // Countersigned entries have different action handling.
             match entry {
@@ -35,7 +37,7 @@ pub fn create<'a>(
                         .source_chain()
                         .as_ref()
                         .expect("Must have source chain if write_workspace access is given")
-                        .put_countersigned(entry, chain_top_ordering)
+                        .put_countersigned(entry, chain_top_ordering, weight)
                         .await
                         .map_err(|source_chain_error| -> RuntimeError {
                             wasm_error!(WasmErrorInner::Host(source_chain_error.to_string())).into()
@@ -75,7 +77,7 @@ pub fn create<'a>(
                             .source_chain()
                             .as_ref()
                             .expect("Must have source chain if write_workspace access is given")
-                            .put(action_builder, Some(entry), chain_top_ordering)
+                            .put_weightless(action_builder, Some(entry), chain_top_ordering)
                             .await
                             .map_err(|source_chain_error| -> RuntimeError {
                                 wasm_error!(WasmErrorInner::Host(source_chain_error.to_string()))

@@ -257,7 +257,7 @@ async fn sharded_4way_historical() {
         .map(|o| {
             (
                 o,
-                Timestamp::from_micros(rand::thread_rng().gen_range(0, now)),
+                Timestamp::from_micros(rand::thread_rng().gen_range(0..now)),
             )
         })
         .collect();

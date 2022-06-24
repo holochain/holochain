@@ -317,7 +317,10 @@ async fn validate_op_inner(
                 // Retrieve for all other actions on countersigned entry.
                 if let Entry::CounterSign(session_data, _) = &**entry {
                     let entry_hash = EntryHash::with_data_sync(&**entry);
-                    for action in session_data.build_action_set(entry_hash)? {
+                    let weight = action
+                        .entry_rate_data()
+                        .ok_or_else(|| SysValidationError::NonEntryAction(action.clone()))?;
+                    for action in session_data.build_action_set(entry_hash, weight)? {
                         let hh = ActionHash::with_data_sync(&action);
                         if workspace
                             .full_cascade(network.clone())
@@ -349,7 +352,11 @@ async fn validate_op_inner(
             if let Entry::CounterSign(session_data, _) = &**entry {
                 let dependency_check = |_original_record: &Record| Ok(());
                 let entry_hash = EntryHash::with_data_sync(&**entry);
-                for action in session_data.build_action_set(entry_hash)? {
+                let weight = match action {
+                    NewEntryAction::Create(h) => h.weight.clone(),
+                    NewEntryAction::Update(h) => h.weight.clone(),
+                };
+                for action in session_data.build_action_set(entry_hash, weight)? {
                     check_and_hold_store_record(
                         &ActionHash::with_data_sync(&action),
                         workspace,
@@ -519,18 +526,23 @@ async fn sys_validate_record_inner(
 
     match maybe_entry {
         Some(Entry::CounterSign(session, _)) => {
-            let entry_hash = EntryHash::with_data_sync(maybe_entry.unwrap());
-            for action in session.build_action_set(entry_hash)? {
-                validate(
-                    &action,
-                    maybe_entry,
-                    workspace,
-                    network.clone(),
-                    conductor_handle,
-                )
-                .await?;
+            if let Some(weight) = action.entry_rate_data() {
+                let entry_hash = EntryHash::with_data_sync(maybe_entry.unwrap());
+                for action in session.build_action_set(entry_hash, weight)? {
+                    validate(
+                        &action,
+                        maybe_entry,
+                        workspace,
+                        network.clone(),
+                        conductor_handle,
+                    )
+                    .await?;
+                }
+                Ok(())
+            } else {
+                tracing::error!("Got countersigning entry without rate assigned. This should be impossible. But, let's see what happens.");
+                validate(action, maybe_entry, workspace, network, conductor_handle).await
             }
-            Ok(())
         }
         _ => validate(action, maybe_entry, workspace, network, conductor_handle).await,
     }
@@ -842,6 +854,7 @@ impl SysValidationWorkspace {
         };
         Ok(!chain_not_empty)
     }
+
     pub async fn action_seq_is_empty(&self, action: &Action) -> SourceChainResult<bool> {
         let author = action.author().clone();
         let seq = action.action_seq();

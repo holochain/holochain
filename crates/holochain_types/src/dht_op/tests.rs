@@ -71,23 +71,22 @@ impl RecordTest {
     }
 
     fn create_record(&mut self) -> (Create, Record) {
-        let entry_create = builder::Create {
-            entry_type: self.entry_type.clone(),
-            entry_hash: self.entry_hash.clone(),
-        }
-        .build(self.commons.next().unwrap());
+        let entry_create = builder::Create::new(self.entry_type.clone(), self.entry_hash.clone())
+            .build(self.commons.next().unwrap())
+            .weightless();
         let record = self.to_record(entry_create.clone().into(), Some(self.entry.clone()));
         (entry_create, record)
     }
 
     fn update_record(&mut self) -> (Update, Record) {
-        let entry_update = builder::Update {
-            original_entry_address: self.original_entry_hash.clone(),
-            entry_type: self.entry_type.clone(),
-            entry_hash: self.entry_hash.clone(),
-            original_action_address: self.action_hash.clone().into(),
-        }
-        .build(self.commons.next().unwrap());
+        let entry_update = builder::Update::new(
+            self.original_entry_hash.clone(),
+            self.action_hash.clone().into(),
+            self.entry_type.clone(),
+            self.entry_hash.clone(),
+        )
+        .build(self.commons.next().unwrap())
+        .weightless();
         let record = self.to_record(entry_update.clone().into(), Some(self.entry.clone()));
         (entry_update, record)
     }
@@ -143,11 +142,9 @@ impl RecordTest {
     }
 
     fn entry_delete(&mut self) -> (Record, Vec<DhtOp>) {
-        let entry_delete = builder::Delete {
-            deletes_address: self.action_hash.clone(),
-            deletes_entry_address: self.entry_hash.clone(),
-        }
-        .build(self.commons.next().unwrap());
+        let entry_delete = builder::Delete::new(self.action_hash.clone(), self.entry_hash.clone())
+            .build(self.commons.next().unwrap())
+            .weightless();
         let record = self.to_record(entry_delete.clone().into(), None);
         let action: Action = entry_delete.clone().into();
 

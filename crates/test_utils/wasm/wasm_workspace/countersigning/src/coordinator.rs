@@ -25,10 +25,8 @@ fn create_countersigned(
 
     let entry = EntryInput::CounterSign(
         Box::new(
-            CounterSigningSessionData::try_from_responses(responses).map_err(
-                |countersigning_error| {
-                    wasm_error!(WasmErrorInner::Guest(countersigning_error.to_string()))
-                },
+            CounterSigningSessionData::try_from_responses(responses, vec![]).map_err(
+                |countersigning_error| wasm_error!(WasmErrorInner::Guest(countersigning_error.to_string())),
             )?,
         ),
         AppEntry {
@@ -68,7 +66,9 @@ fn generate_preflight_request(
     PreflightRequest::try_new(
         hash,
         agents,
-        None,
+        vec![],
+        0,
+        false,
         session_times_from_millis(5000)?,
         ActionBase::Create(CreateBase::new(entry_type)),
         PreflightBytes(vec![]),
