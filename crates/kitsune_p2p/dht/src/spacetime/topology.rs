@@ -22,6 +22,10 @@ pub struct Topology {
     pub time: Dimension,
     /// The origin of time, meaning the 0th quantum contains this Timestamp.
     pub time_origin: Timestamp,
+    /// Ignore any data which lies after `Timestamp::now() - time_cutoff`.
+    /// This is so that historical quantized gossip does not overlap with
+    /// recent gossip.
+    pub time_cutoff: Duration,
 }
 
 impl Topology {
@@ -32,6 +36,7 @@ impl Topology {
             space: Dimension::unit(),
             time: Dimension::unit(),
             time_origin,
+            time_cutoff: Duration::ZERO,
         }
     }
 
@@ -42,27 +47,34 @@ impl Topology {
             space: Dimension::unit(),
             time: Dimension::unit(),
             time_origin: Timestamp::from_micros(0),
+            time_cutoff: Duration::ZERO,
         }
     }
 
     /// Standard dimensions with the given time origin
-    pub fn standard(time_origin: Timestamp) -> Self {
+    pub fn standard(time_origin: Timestamp, time_cutoff: Duration) -> Self {
         Self {
             space: Dimension::standard_space(),
             time: Dimension::standard_time(),
             time_origin,
+            time_cutoff,
         }
     }
 
     /// Standard dimensions with the [`HOLOCHAIN_EPOCH`](Timestamp::HOLOCHAIN_EPOCH) as the time origin
-    pub fn standard_epoch() -> Self {
-        Self::standard(Timestamp::HOLOCHAIN_EPOCH)
+    pub fn standard_epoch(time_cutoff: Duration) -> Self {
+        Self::standard(Timestamp::HOLOCHAIN_EPOCH, time_cutoff)
+    }
+
+    /// Standard dimensions with the [`HOLOCHAIN_EPOCH`](Timestamp::HOLOCHAIN_EPOCH) as the time origin
+    pub fn standard_epoch_full() -> Self {
+        Self::standard(Timestamp::HOLOCHAIN_EPOCH, Duration::ZERO)
     }
 
     /// Standard dimensions with a zero time origin
     #[cfg(feature = "test_utils")]
     pub fn standard_zero() -> Self {
-        Self::standard(Timestamp::ZERO)
+        Self::standard(Timestamp::ZERO, Duration::ZERO)
     }
 
     /// Returns the space quantum which contains this location

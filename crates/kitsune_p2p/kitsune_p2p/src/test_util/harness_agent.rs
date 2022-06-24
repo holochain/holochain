@@ -62,7 +62,7 @@ pub(crate) async fn spawn_test_agent(
     ),
     KitsuneP2pError,
 > {
-    let topology = Topology::standard_epoch();
+    let topology = Topology::standard_epoch_full();
     let host = HarnessHost::new();
     let (p2p, evt) = spawn_kitsune_p2p(
         config,

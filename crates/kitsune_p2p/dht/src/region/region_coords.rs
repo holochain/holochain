@@ -99,7 +99,7 @@ mod tests {
     #[test]
     fn region_bounds_regressions() {
         use std::str::FromStr;
-        let topo = Topology::standard_epoch();
+        let topo = Topology::standard_epoch_full();
         let b =
             RegionCoords::new(SpaceSegment::new(12, 100), TimeSegment::new(4, 12)).to_bounds(&topo);
 

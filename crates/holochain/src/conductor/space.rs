@@ -334,7 +334,11 @@ impl Spaces {
         use holo_hash::HasHash;
         let dna_hash = dna_def.as_hash();
         let sql = holochain_sqlite::sql::sql_cell::FETCH_OP_REGION;
-        let topology = dna_def.topology();
+        let cutoff = self
+            .network_config
+            .tuning_params
+            .danger_gossip_recent_threshold();
+        let topology = dna_def.topology(cutoff);
         let max_chunks = ArqStrat::default().max_chunks();
         let arq_set = ArqBoundsSet::new(
             dht_arc_set

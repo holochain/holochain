@@ -202,7 +202,9 @@ where
     let mut tuning =
         kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
     tuning.tx2_implicit_timeout_ms = 500;
-    config.tuning_params = std::sync::Arc::new(tuning);
+    let tuning = std::sync::Arc::new(tuning);
+    let cutoff = tuning.danger_gossip_recent_threshold();
+    config.tuning_params = tuning;
 
     let (network, mut recv) = spawn_holochain_p2p(
         config,
@@ -237,10 +239,12 @@ where
                 }
                 QueryPeerDensity { respond, .. } => {
                     respond.r(Ok(async move {
-                        Ok(
-                            PeerViewQ::new(Topology::standard_epoch(), ArqStrat::default(), vec![])
-                                .into(),
+                        Ok(PeerViewQ::new(
+                            Topology::standard_epoch(cutoff),
+                            ArqStrat::default(),
+                            vec![],
                         )
+                        .into())
                     }
                     .boxed()
                     .into()));

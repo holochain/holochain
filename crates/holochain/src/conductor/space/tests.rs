@@ -41,7 +41,7 @@ async fn test_region_queries() {
     let agent = keystore.new_sign_keypair_random().await.unwrap();
 
     let mut dna_def = DnaDef::arbitrary(&mut u).unwrap();
-    let topo = dna_def.topology();
+    let topo = dna_def.topology(Duration::ZERO);
     let tq = Duration::from_micros(topo.time.quantum as u64);
     let tq5 = Duration::from_micros(topo.time.quantum as u64 * 5);
     dbg!(&tq, &topo);
@@ -49,7 +49,7 @@ async fn test_region_queries() {
     let five_quanta_ago = (Timestamp::now() - tq5).unwrap();
     let tq_ms = tq.as_millis() as u64;
 
-    // - The origin time is two time quanta ago
+    // - The origin time is five time quanta ago
     dna_def.origin_time = five_quanta_ago.clone();
 
     // Builds an arbitrary valid op at the given timestamp

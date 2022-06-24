@@ -222,6 +222,11 @@ pub mod tuning_params_struct {
             crate::KitsuneTimeout::from_millis(self.tx2_implicit_timeout_ms as u64)
         }
 
+        /// Get the gossip recent threshold param as a proper Duration
+        pub fn danger_gossip_recent_threshold(&self) -> std::time::Duration {
+            std::time::Duration::from_secs(self.danger_gossip_recent_threshold_secs)
+        }
+
         /// returns true if we should initialize a tls keylog
         /// based on the `SSLKEYLOGFILE` environment variable
         pub fn use_env_tls_keylog(&self) -> bool {

@@ -736,10 +736,17 @@ impl ConductorHandleT for ConductorHandleImpl {
                 respond,
                 ..
             } => {
+                let cutoff = self
+                    .get_config()
+                    .network
+                    .clone()
+                    .unwrap_or_default()
+                    .tuning_params
+                    .danger_gossip_recent_threshold();
                 let topo = self
                     .get_dna_def(&dna_hash)
                     .ok_or_else(|| DnaError::DnaMissing(dna_hash.clone()))?
-                    .topology();
+                    .topology(cutoff);
                 let db = { self.p2p_agents_db(&dna_hash) };
                 let res = query_peer_density(db.into(), topo, kitsune_space, dht_arc)
                     .await

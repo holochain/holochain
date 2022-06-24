@@ -193,7 +193,7 @@ mod tests {
     #[test]
     fn to_bounds_standard_topo() {
         let origin = Timestamp::ZERO;
-        let topo = Topology::standard(origin.clone());
+        let topo = Topology::standard(origin.clone(), Duration::ZERO);
         let epoch = origin.as_micros();
         let xq = topo.space.quantum;
         let tq = topo.time.quantum as i64;
@@ -230,7 +230,7 @@ mod tests {
 
     #[test]
     fn test_contains_normalized() {
-        let topo = Topology::standard_epoch();
+        let topo = Topology::standard_epoch_full();
         let m = pow2(topo.space.bit_depth);
         let s = SpaceSegment::new(2, m + 5);
         let bounds = s.quantum_bounds(&topo);

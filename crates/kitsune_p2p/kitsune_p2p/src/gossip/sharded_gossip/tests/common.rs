@@ -105,7 +105,7 @@ async fn standard_responses(
     let infos = agents.iter().map(|(_, i)| i.clone()).collect::<Vec<_>>();
     let host_api = StandardResponsesHostApi {
         infos: infos.clone(),
-        topology: Topology::standard_epoch(),
+        topology: Topology::standard_epoch_full(),
         strat: ArqStrat::default(),
         with_data,
     };

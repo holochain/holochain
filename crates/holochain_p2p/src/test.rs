@@ -566,6 +566,6 @@ mod tests {
     }
 
     fn test_peer_view() -> PeerView {
-        PeerViewQ::new(Topology::standard_epoch(), ArqStrat::default(), vec![]).into()
+        PeerViewQ::new(Topology::standard_epoch_full(), ArqStrat::default(), vec![]).into()
     }
 }

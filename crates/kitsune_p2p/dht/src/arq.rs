@@ -523,7 +523,7 @@ mod tests {
             assert!(!is_full(&topo, 2, 2u32.pow(30) - 1));
         }
         {
-            let topo = Topology::standard_epoch();
+            let topo = Topology::standard_epoch_full();
             assert!(!is_full(&topo, 31 - 12, 1));
             assert!(is_full(&topo, 31 - 12, 2));
 
@@ -602,7 +602,7 @@ mod tests {
     #[test_case(128 * 2u64.pow(24), (15, 16))]
     #[test_case((128 + 16) * 2u64.pow(24), (16, 9))]
     fn test_power_and_count_from_length(len: u64, expected: (u8, u32)) {
-        let topo = Topology::standard_epoch();
+        let topo = Topology::standard_epoch_full();
         let (p, c) = power_and_count_from_length(&topo.space, len, 16);
         assert_eq!((p, c), expected);
         assert_eq!(
@@ -618,7 +618,7 @@ mod tests {
             // We use powers from 0 to 16 because with standard space topology,
             // the quantum size is 2^12, and the max count is 16 which is 2^4,
             // so any power greater than 16 could result in an overflow.
-            let topo = Topology::standard_epoch();
+            let topo = Topology::standard_epoch_full();
             let a = Arq::new(power, Loc::from(loc), SpaceOffset(count));
             let (left, right) = a.to_edge_locs(&topo);
             let p = pow2(power);
@@ -630,7 +630,7 @@ mod tests {
 
         #[test]
         fn test_preserve_ordering_for_bounds(mut centers: Vec<u32>, count in 0u32..8, power in 0u8..16) {
-            let topo = Topology::standard_epoch();
+            let topo = Topology::standard_epoch_full();
 
             // given a list of sorted centerpoints
             centers.sort();
@@ -681,7 +681,7 @@ mod tests {
 
         #[test]
         fn dht_arc_roundtrip_standard_topo(center: u32, pow in 0..16u8, count in 0..8u32) {
-            let topo = Topology::standard_epoch();
+            let topo = Topology::standard_epoch_full();
             let length = count as u64 * 2u64.pow(pow as u32) / 2 * 2;
             let strat = ArqStrat::default();
             let arq = approximate_arq(&topo, &strat, center.into(), length);
@@ -693,7 +693,7 @@ mod tests {
 
         #[test]
         fn arc_interval_roundtrip(center: u32, pow in 0..16u8, count in 0..8u32) {
-            let topo = Topology::standard_epoch();
+            let topo = Topology::standard_epoch_full();
             let length = count as u64 * 2u64.pow(pow as u32) / 2 * 2;
             let strat = ArqStrat::default();
             let arq = approximate_arq(&topo, &strat, center.into(), length).to_bounds(&topo);

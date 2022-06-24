@@ -1,5 +1,7 @@
 //! Defines DnaDef struct
 
+use std::time::Duration;
+
 use super::zome;
 use crate::prelude::*;
 
@@ -185,8 +187,8 @@ impl DnaDef {
     }
 
     /// Get the topology to use for kitsune gossip
-    pub fn topology(&self) -> kitsune_p2p_dht::spacetime::Topology {
-        kitsune_p2p_dht::spacetime::Topology::standard(self.origin_time)
+    pub fn topology(&self, cutoff: Duration) -> kitsune_p2p_dht::spacetime::Topology {
+        kitsune_p2p_dht::spacetime::Topology::standard(self.origin_time, cutoff)
     }
 }
 
