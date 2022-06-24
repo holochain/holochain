@@ -57,6 +57,8 @@ fn root_ensures() {
             Ok(vec![vec![Link {
                 target: Path::from("foo").path_entry_hash().unwrap().into(),
                 timestamp: Timestamp::now(),
+                zome_id: 0.into(),
+                link_type: 0.into(),
                 tag: Path::from("foo").make_tag().unwrap(),
                 create_link_hash: ActionHash::from_raw_36(vec![0; 36]),
             }]])
@@ -214,6 +216,8 @@ fn paths_exists() {
             Ok(vec![vec![Link {
                 target: Path::from("foo.bar").path_entry_hash().unwrap().into(),
                 timestamp: Timestamp::now(),
+                zome_id: 0.into(),
+                link_type: 0.into(),
                 tag: Path::from("bar").make_tag().unwrap(),
                 create_link_hash: ActionHash::from_raw_36(vec![0; 36]),
             }]])
@@ -229,6 +233,8 @@ fn paths_exists() {
             Ok(vec![vec![Link {
                 target: Path::from("foo.bar.baz").path_entry_hash().unwrap().into(),
                 timestamp: Timestamp::now(),
+                zome_id: 0.into(),
+                link_type: 0.into(),
                 tag: Path::from("baz").make_tag().unwrap(),
                 create_link_hash: ActionHash::from_raw_36(vec![0; 36]),
             }]])
@@ -259,24 +265,32 @@ fn children() {
     let foo = Link {
         target: Path::from("foo").path_entry_hash().unwrap().into(),
         timestamp: Timestamp::now(),
+        zome_id: 0.into(),
+        link_type: 0.into(),
         tag: Path::from("foo").make_tag().unwrap(),
         create_link_hash: ActionHash::from_raw_36(vec![0; 36]),
     };
     let foo_bar = Link {
         target: Path::from("foo.bar").path_entry_hash().unwrap().into(),
         timestamp: Timestamp::now(),
+        zome_id: 0.into(),
+        link_type: 0.into(),
         tag: Path::from("bar").make_tag().unwrap(),
         create_link_hash: ActionHash::from_raw_36(vec![0; 36]),
     };
     let foo_bar2 = Link {
         target: Path::from("foo.bar2").path_entry_hash().unwrap().into(),
         timestamp: Timestamp::now(),
+        zome_id: 0.into(),
+        link_type: 0.into(),
         tag: Path::from("bar2").make_tag().unwrap(),
         create_link_hash: ActionHash::from_raw_36(vec![0; 36]),
     };
     let foo_bar_baz = Link {
         target: Path::from("foo.bar.baz").path_entry_hash().unwrap().into(),
         timestamp: Timestamp::now(),
+        zome_id: 0.into(),
+        link_type: 0.into(),
         tag: Path::from("baz").make_tag().unwrap(),
         create_link_hash: ActionHash::from_raw_36(vec![0; 36]),
     };
@@ -286,6 +300,8 @@ fn children() {
             .unwrap()
             .into(),
         timestamp: Timestamp::now(),
+        zome_id: 0.into(),
+        link_type: 0.into(),
         tag: Path::from("baz2").make_tag().unwrap(),
         create_link_hash: ActionHash::from_raw_36(vec![0; 36]),
     };
