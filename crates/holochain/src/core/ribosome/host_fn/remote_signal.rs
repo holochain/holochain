@@ -63,7 +63,7 @@ mod tests {
 
     use super::*;
     use crate::sweettest::*;
-    use crate::test_utils::CreateInputBuilder;
+    use crate::test_utils::CreateInputExt;
     use futures::future;
     use hdk::prelude::*;
     use holochain_types::inline_zome::InlineZomeSet;

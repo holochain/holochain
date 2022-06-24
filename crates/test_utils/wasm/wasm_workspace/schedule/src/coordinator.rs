@@ -1,26 +1,12 @@
 use crate::integrity::*;
 use hdk::prelude::*;
 
-// #[hdk_dependent_entry_types]
-// enum EntryZomes {
-//     IntegritySchedule(EntryTypes),
-// }
-
-// impl EntryZomes {
-//     fn tick() -> Self {
-//         Self::IntegritySchedule(EntryTypes::Tick(Tick))
-//     }
-//     fn tock() -> Self {
-//         Self::IntegritySchedule(EntryTypes::Tock(Tock))
-//     }
-// }
-
 #[hdk_extern(infallible)]
 fn scheduled_fn(_: Option<Schedule>) -> Option<Schedule> {
     if HDK
         .with(|h| {
             h.borrow().create(CreateInput {
-                builder: RecordBuilder::App(AppEntry {
+                input: EntryInput::App(AppEntry {
                     entry_def_index: EntryDefIndex::try_from(EntryTypesUnit::Tick)?,
                     visibility: EntryVisibility::Public,
                     entry: Tick.try_into().unwrap(),
@@ -50,7 +36,7 @@ fn scheduled_fn(_: Option<Schedule>) -> Option<Schedule> {
 fn cron_scheduled_fn(_: Option<Schedule>) -> Option<Schedule> {
     HDK.with(|h| {
         h.borrow().create(CreateInput::new(
-            RecordBuilder::App(AppEntry {
+            EntryInput::App(AppEntry {
                 entry_def_index: EntryDefIndex::try_from(EntryTypesUnit::Tock)?,
                 visibility: EntryVisibility::Public,
                 entry: Tock.try_into().unwrap(),

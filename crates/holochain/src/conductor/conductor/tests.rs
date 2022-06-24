@@ -8,7 +8,7 @@ use crate::conductor::api::error::ConductorApiError;
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
 use crate::sweettest::*;
 use crate::test_utils::fake_valid_dna_file;
-use crate::test_utils::CreateInputBuilder;
+use crate::test_utils::CreateInputExt;
 use crate::{
     assert_eq_retry_10s, core::ribosome::guest_callback::genesis_self_check::GenesisSelfCheckResult,
 };

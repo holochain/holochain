@@ -28,7 +28,7 @@ use rusqlite::{params, Connection, OptionalExtension, Transaction};
 use crate::conductor::handle::DevSettingsDelta;
 use crate::sweettest::{SweetConductor, SweetDnaFile};
 
-use super::CreateInputBuilder;
+use super::CreateInputExt;
 
 #[derive(SerializedBytes, serde::Serialize, serde::Deserialize, Debug)]
 /// Data to use to simulate a dht network.

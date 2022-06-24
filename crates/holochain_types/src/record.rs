@@ -10,7 +10,6 @@ use error::RecordGroupResult;
 use holochain_keystore::KeystoreError;
 use holochain_keystore::LairResult;
 use holochain_keystore::MetaLairClient;
-use holochain_zome_types::entry::AppEntry;
 use holochain_zome_types::entry::EntryHashed;
 use std::borrow::Cow;
 use std::collections::BTreeSet;
@@ -443,51 +442,6 @@ impl WireRecord {
             .action()
             .entry_data()
             .map(|(hash, _)| hash)
-    }
-}
-
-/// Helper trait for the [`RecordBuilder`].
-pub trait RecordBuilderHelper {
-    /// Build this element into it's parts for constructing an [`Element`].
-    fn build(self) -> (EntryDefLocation, EntryVisibility, Entry);
-}
-
-impl RecordBuilderHelper for RecordBuilder {
-    fn build(self) -> (EntryDefLocation, EntryVisibility, Entry) {
-        match self {
-            RecordBuilder::Agent(a) => (
-                EntryDefLocation::Agent,
-                EntryVisibility::Public,
-                Entry::Agent(a),
-            ),
-            RecordBuilder::App(AppEntry {
-                entry_def_index,
-                visibility,
-                entry,
-            }) => (entry_def_index.into(), visibility, Entry::App(entry)),
-            RecordBuilder::CounterSign(
-                s,
-                AppEntry {
-                    entry_def_index,
-                    visibility,
-                    entry,
-                },
-            ) => (
-                entry_def_index.into(),
-                visibility,
-                Entry::CounterSign(s, entry),
-            ),
-            RecordBuilder::CapClaim(c) => (
-                EntryDefLocation::Agent,
-                EntryVisibility::Private,
-                Entry::CapClaim(c),
-            ),
-            RecordBuilder::CapGrant(g) => (
-                EntryDefLocation::Agent,
-                EntryVisibility::Private,
-                Entry::CapGrant(g),
-            ),
-        }
     }
 }
 

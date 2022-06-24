@@ -28,7 +28,7 @@ use holochain_zome_types::AgentActivity;
 use std::sync::Arc;
 use unwrap_to::unwrap_to;
 
-use super::CreateInputBuilder;
+use super::CreateInputExt;
 
 // Commit entry types //
 // Useful for when you want to commit something

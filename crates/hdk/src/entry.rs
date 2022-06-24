@@ -68,7 +68,7 @@ where
 /// See [`get`] and [`get_details`] for more information on CRUD.
 pub fn create_entry<I, E>(input: I) -> ExternResult<ActionHash>
 where
-    RecordBuilder: TryFrom<I, Error = E>,
+    EntryInput: TryFrom<I, Error = E>,
     WasmError: From<E>,
 {
     let create_input = CreateInput::new(input, ChainTopOrdering::default())?;

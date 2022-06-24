@@ -175,15 +175,15 @@ pub fn build(_attrs: TokenStream, input: TokenStream) -> TokenStream {
             }
         }
 
-        impl TryFrom<&#ident> for RecordBuilder {
+        impl TryFrom<&#ident> for EntryInput {
             type Error = WasmError;
 
             fn try_from(value: &#ident) -> Result<Self, Self::Error> {
-                Ok(RecordBuilder::App(value.try_into()?))
+                Ok(EntryInput::App(value.try_into()?))
             }
         }
 
-        impl TryFrom<#ident> for RecordBuilder {
+        impl TryFrom<#ident> for EntryInput {
             type Error = WasmError;
 
             fn try_from(value: #ident) -> Result<Self, Self::Error> {

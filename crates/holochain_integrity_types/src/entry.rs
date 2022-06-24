@@ -50,7 +50,7 @@ impl From<EntryHashed> for Entry {
 pub type Entry = EntryImpl<AppEntryBytes>;
 
 /// Data for building a [`Record`](crate::record::Record).
-pub type RecordBuilder = EntryImpl<AppEntry>;
+pub type EntryInput = EntryImpl<AppEntry>;
 
 /// Inner implementation of an [`Entry`].
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
@@ -91,7 +91,7 @@ impl AppEntryData for AppEntry {}
 impl sealed::Sealed for AppEntry {}
 
 #[derive(PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize)]
-/// The data needed to build an [`Entry`] and it's [`Header`](crate::header::Header).
+/// The data needed to build an [`Entry`] and it's [`Action`](crate::action::Action).
 pub struct AppEntry {
     /// The global zome type identifier for this entry.
     pub entry_def_index: EntryDefIndex,
@@ -211,8 +211,8 @@ impl MustGetActionInput {
     }
 }
 
-impl From<RecordBuilder> for Entry {
-    fn from(b: RecordBuilder) -> Self {
+impl From<EntryInput> for Entry {
+    fn from(b: EntryInput) -> Self {
         match b {
             EntryImpl::Agent(a) => Entry::Agent(a),
             EntryImpl::App(a) => Entry::App(a.entry),

@@ -193,7 +193,7 @@ async fn sharded_consistency() {
 async fn private_entries_dont_leak() {
     use holochain::sweettest::SweetEasyInline;
     use holochain::test_utils::consistency_10s;
-    use holochain::test_utils::CreateInputBuilder;
+    use holochain::test_utils::CreateInputExt;
     use holochain_types::inline_zome::InlineZomeSet;
 
     let _g = observability::test_run().ok();

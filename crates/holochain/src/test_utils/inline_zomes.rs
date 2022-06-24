@@ -5,7 +5,7 @@ use holochain_types::inline_zome::InlineEntryTypes;
 use holochain_types::inline_zome::InlineZomeSet;
 use holochain_zome_types::prelude::*;
 
-use super::CreateInputBuilder;
+use super::CreateInputExt;
 
 /// An InlineZome with simple Create and Read operations
 pub fn simple_create_read_zome() -> InlineZomeSet {

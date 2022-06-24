@@ -23,7 +23,7 @@ fn create_countersigned(
         EntryTypes::Thing(t) => t,
     };
 
-    let entry = RecordBuilder::CounterSign(
+    let entry = EntryInput::CounterSign(
         Box::new(
             CounterSigningSessionData::try_from_responses(responses).map_err(
                 |countersigning_error| {

@@ -25,7 +25,7 @@ fn create_entry(_: ()) -> ExternResult<ActionHash> {
     let entry = post.try_into().unwrap();
     HDK.with(|h| {
         h.borrow().create(CreateInput {
-            builder: RecordBuilder::App(AppEntry {
+            input: EntryInput::App(AppEntry {
                 entry_def_index: index,
                 visibility: vis,
                 entry,

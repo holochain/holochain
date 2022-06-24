@@ -138,7 +138,7 @@ pub mod tests {
     use crate::fixt::MetaLairClientFixturator;
     use crate::sweettest::*;
     use crate::test_utils::fake_genesis;
-    use crate::test_utils::CreateInputBuilder;
+    use crate::test_utils::CreateInputExt;
     use ::fixt::prelude::*;
     use fixt::Unpredictable;
     use holochain_p2p::HolochainP2pDnaFixturator;

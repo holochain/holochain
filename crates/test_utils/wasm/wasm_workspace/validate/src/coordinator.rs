@@ -5,7 +5,7 @@ impl TryFrom<&ThisWasmEntry> for CreateInput {
     type Error = WasmError;
     fn try_from(this_wasm_entry: &ThisWasmEntry) -> Result<Self, Self::Error> {
         Self::new(
-            RecordBuilder::App(AppEntry {
+            EntryInput::App(AppEntry {
                 entry_def_index: EntryDefIndex::try_from(this_wasm_entry)?,
                 visibility: EntryVisibility::Public,
                 entry: AppEntryBytes::try_from(this_wasm_entry)?,

@@ -820,7 +820,7 @@ pub async fn force_publish_dht_ops(
 }
 
 /// Helper trait for building [`CreateInput`] for tests.
-pub trait CreateInputBuilder {
+pub trait CreateInputExt {
     /// Create an app entry create input.
     fn app_entry(
         entry_def_index: EntryDefIndex,
@@ -828,8 +828,8 @@ pub trait CreateInputBuilder {
         entry: Entry,
         chain_top_ordering: ChainTopOrdering,
     ) -> CreateInput {
-        let builder = match entry {
-            Entry::App(entry) => RecordBuilder::App(AppEntry {
+        let input = match entry {
+            Entry::App(entry) => EntryInput::App(AppEntry {
                 entry_def_index,
                 entry,
                 visibility,
@@ -837,7 +837,7 @@ pub trait CreateInputBuilder {
             _ => panic!("Tried to construct an app entry CreateInput with mismatching entry"),
         };
         CreateInput {
-            builder,
+            input,
             chain_top_ordering,
         }
     }
@@ -845,15 +845,15 @@ pub trait CreateInputBuilder {
     /// Create an cap create input.
     fn cap(entry: Entry) -> CreateInput {
         let builder = match entry {
-            Entry::CapClaim(c) => RecordBuilder::CapClaim(c),
-            Entry::CapGrant(g) => RecordBuilder::CapGrant(g),
+            Entry::CapClaim(c) => EntryInput::CapClaim(c),
+            Entry::CapGrant(g) => EntryInput::CapGrant(g),
             _ => panic!("Tried to construct an cap entryCreateInput with mismatching entry"),
         };
         CreateInput {
-            builder,
+            input: builder,
             chain_top_ordering: ChainTopOrdering::Strict,
         }
     }
 }
 
-impl CreateInputBuilder for CreateInput {}
+impl CreateInputExt for CreateInput {}

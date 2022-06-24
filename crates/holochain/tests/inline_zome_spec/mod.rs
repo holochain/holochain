@@ -5,7 +5,7 @@ use hdk::prelude::*;
 use holochain::{
     conductor::api::error::ConductorApiResult,
     sweettest::{SweetAgents, SweetConductor, SweetDnaFile, SweetEasyInline},
-    test_utils::CreateInputBuilder,
+    test_utils::CreateInputExt,
 };
 use holochain::{
     conductor::{api::error::ConductorApiError, CellError},

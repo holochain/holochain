@@ -101,7 +101,7 @@ pub enum GetStrategy {
 #[derive(PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct CreateInput {
     /// The data for creating this element.
-    pub builder: RecordBuilder,
+    pub input: EntryInput,
     /// ChainTopBehaviour for the write.
     pub chain_top_ordering: ChainTopOrdering,
 }
@@ -109,21 +109,21 @@ pub struct CreateInput {
 impl CreateInput {
     /// Constructor.
     pub fn new<E>(
-        builder: impl TryInto<RecordBuilder, Error = E>,
+        input: impl TryInto<EntryInput, Error = E>,
         chain_top_ordering: ChainTopOrdering,
     ) -> Result<Self, WasmError>
     where
         WasmError: From<E>,
     {
         Ok(Self {
-            builder: builder.try_into()?,
+            input: input.try_into()?,
             chain_top_ordering,
         })
     }
 
     /// Consume into an Entry.
     pub fn into_entry(self) -> Entry {
-        self.builder.into()
+        self.input.into()
     }
 
     /// Accessor.

@@ -20,11 +20,11 @@ pub fn create<'a>(
             ..
         } => {
             let CreateInput {
-                builder,
+                input,
                 chain_top_ordering,
             } = input;
 
-            let (entry_location, entry_visibility, entry) = builder.build();
+            let (entry_location, entry_visibility, entry) = unpack_entry_input(input);
 
             // Countersigned entries have different action handling.
             match entry {
@@ -97,6 +97,43 @@ pub fn create<'a>(
     }
 }
 
+fn unpack_entry_input(entry_input: EntryInput) -> (EntryDefLocation, EntryVisibility, Entry) {
+    use holochain_zome_types::entry::AppEntry;
+    match entry_input {
+        EntryInput::Agent(a) => (
+            EntryDefLocation::Agent,
+            EntryVisibility::Public,
+            Entry::Agent(a),
+        ),
+        EntryInput::App(AppEntry {
+            entry_def_index,
+            visibility,
+            entry,
+        }) => (entry_def_index.into(), visibility, Entry::App(entry)),
+        EntryInput::CounterSign(
+            s,
+            AppEntry {
+                entry_def_index,
+                visibility,
+                entry,
+            },
+        ) => (
+            entry_def_index.into(),
+            visibility,
+            Entry::CounterSign(s, entry),
+        ),
+        EntryInput::CapClaim(c) => (
+            EntryDefLocation::Agent,
+            EntryVisibility::Private,
+            Entry::CapClaim(c),
+        ),
+        EntryInput::CapGrant(g) => (
+            EntryDefLocation::Agent,
+            EntryVisibility::Private,
+            Entry::CapGrant(g),
+        ),
+    }
+}
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
@@ -104,7 +141,7 @@ pub mod wasm_test {
     use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use crate::fixt::*;
     use crate::sweettest::*;
-    use crate::test_utils::CreateInputBuilder;
+    use crate::test_utils::CreateInputExt;
     use ::fixt::prelude::*;
     use hdk::prelude::*;
     use holo_hash::AnyDhtHash;

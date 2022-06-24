@@ -13,7 +13,7 @@ use holochain_zome_types::{
 use crate::{
     core::ribosome::guest_callback::validate::ValidateResult,
     sweettest::*,
-    test_utils::{consistency_10s, CreateInputBuilder},
+    test_utils::{consistency_10s, CreateInputExt},
 };
 
 const ZOME_A_0: &'static str = "ZOME_A_0";
