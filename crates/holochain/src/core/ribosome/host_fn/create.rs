@@ -128,12 +128,12 @@ fn unpack_entry_input(entry_input: EntryInput) -> (EntryDefLocation, EntryVisibi
             Entry::CounterSign(s, entry),
         ),
         EntryInput::CapClaim(c) => (
-            EntryDefLocation::Agent,
+            EntryDefLocation::CapClaim,
             EntryVisibility::Private,
             Entry::CapClaim(c),
         ),
         EntryInput::CapGrant(g) => (
-            EntryDefLocation::Agent,
+            EntryDefLocation::CapGrant,
             EntryVisibility::Private,
             Entry::CapGrant(g),
         ),
