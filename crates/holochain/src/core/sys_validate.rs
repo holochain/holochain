@@ -60,8 +60,12 @@ pub fn check_countersigning_session_data_contains_action(
     session_data: &CounterSigningSessionData,
     action: NewEntryActionRef<'_>,
 ) -> SysValidationResult<()> {
+    let weight = match action {
+        NewEntryActionRef::Create(h) => h.weight.clone(),
+        NewEntryActionRef::Update(h) => h.weight.clone(),
+    };
     let action_is_in_session = session_data
-        .build_action_set(entry_hash)
+        .build_action_set(entry_hash, weight)
         .map_err(SysValidationError::from)?
         .iter()
         .any(|session_action| match (&action, session_action) {

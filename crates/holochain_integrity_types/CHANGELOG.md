@@ -4,6 +4,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- In preparation for rate limiting, the inner Action structs which support app-defined "weights", viz. `Create`, `Update`, `Delete`, and `CreateLink`, now have a `weight` field. This is currently set to a default value of "no weight", but will later be used to store the app-defined weight.
+  - A bit of deeper detail on this change: each of these action structs is now generic over the weight field, to allow "weighed" and "unweighed" versions of that header. This is necessary to be able to express these actions both before and after they have undergone the weighing process.
+
+## 0.0.9
+
 - Countersigning now accepts optional additional signers but the first must be the enzyme [\#1394](https://github.com/holochain/holochain/pull/1394)
 - The first agent in countersigning is always the enzyme if enzymatic [\#1394](https://github.com/holochain/holochain/pull/1394)
 

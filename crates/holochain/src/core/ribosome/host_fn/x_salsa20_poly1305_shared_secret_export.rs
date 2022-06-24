@@ -1,9 +1,8 @@
+use super::*;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
-use holochain_types::prelude::*;
-use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 
 pub fn x_salsa20_poly1305_shared_secret_export(
@@ -17,21 +16,17 @@ pub fn x_salsa20_poly1305_shared_secret_export(
             ..
         } => {
             tokio_helper::block_forever_on(async move {
+                let tag = input.as_key_ref_ref().to_tag();
+
                 let mut s_pk: [u8; 32] = [0; 32];
                 s_pk.copy_from_slice(input.as_sender_ref().as_ref());
                 let mut r_pk: [u8; 32] = [0; 32];
                 r_pk.copy_from_slice(input.as_recipient_ref().as_ref());
 
-                // TODO - once we actually implement this in lair,
-                //        look up the actual secret using the key ref
-                //        rather than encrypting the key_ref itself
-                //        as we're doing here
-                let data = input.as_key_ref_ref().as_ref().to_vec();
-
                 let (nonce, cipher) = call_context
                     .host_context
                     .keystore()
-                    .crypto_box_xsalsa(s_pk.into(), r_pk.into(), data.into())
+                    .shared_secret_export(tag, s_pk.into(), r_pk.into())
                     .await?;
 
                 holochain_keystore::LairResult::Ok(XSalsa20Poly1305EncryptedData::new(
@@ -51,3 +46,5 @@ pub fn x_salsa20_poly1305_shared_secret_export(
         )).into()),
     }
 }
+
+// Tests for the shared secret round trip are in xsalsa20_poly1305_encrypt.
