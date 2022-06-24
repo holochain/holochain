@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use holochain_integrity_types::LinkTypeFilter;
 use holochain_wasmer_guest::WasmError;
 
@@ -29,25 +31,20 @@ where
     WasmError: From<E>,
 {
     fn try_into_filter(self) -> Result<LinkTypeFilter, WasmError> {
-        let mut vec = self
+        // Collect into a 2d vector of where `LinkType`s are collected
+        // into their common `ZomeId`s.
+        let vec = self
             .into_iter()
-            .map(TryInto::<ScopedLinkType>::try_into)
-            .collect::<Result<Vec<_>, _>>()?;
-        vec.sort_unstable();
-        let vec = vec.into_iter().fold(
-            Vec::new(),
-            |mut out: Vec<(ZomeId, Vec<LinkType>)>,
-             ScopedZomeType {
-                 zome_id,
-                 zome_type: link_type,
-             }| {
-                match out.last_mut() {
-                    Some(l) if l.0 == zome_id => l.1.push(link_type),
-                    _ => out.push((zome_id, vec![link_type])),
-                }
-                out
-            },
-        );
+            .try_fold(HashMap::new(), |mut map: HashMap<_, Vec<_>>, t| {
+                let scoped = TryInto::<ScopedLinkType>::try_into(t)?;
+                map.entry(scoped.zome_id)
+                    .or_default()
+                    .push(scoped.zome_type);
+                Ok(map)
+            })?
+            .into_iter()
+            .collect::<Vec<(_, Vec<_>)>>();
+
         Ok(LinkTypeFilter::Types(vec))
     }
 }

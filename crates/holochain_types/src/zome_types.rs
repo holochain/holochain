@@ -13,7 +13,7 @@ mod error;
 #[cfg(test)]
 mod test;
 
-/// TODO
+/// The number of types of a given type per zome.
 pub type NumZomeTypes = u8;
 /// Zome types at the global scope for a DNA.
 #[derive(Clone, Debug, PartialEq, Default)]
