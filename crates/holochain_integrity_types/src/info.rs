@@ -62,16 +62,11 @@ pub struct DnaInfo {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, PartialEq, Default)]
-/// The set of entry and link [`GlobalZomeTypeId`]s in scope for the calling zome.
-///
-/// This allows the caller to convert from [`LocalZomeTypeId`] to [`GlobalZomeTypeId`]
-/// and back again.
+/// The set of [`EntryDefIndex`] and [`LinkType`]s in scope for the calling zome.
 pub struct ScopedZomeTypesSet {
-    /// All the entry [`GlobalZomeTypeId`]s in scope for this zome.
-    /// Converts from [`EntryDefIndex`](crate::action::EntryDefIndex) to [`LocalZomeTypeId`].
+    /// All the entry [`EntryDefIndex`]s in scope for this zome.
     pub entries: ScopedZomeTypes<EntryDefIndex>,
-    /// All the link [`GlobalZomeTypeId`]s in scope for this zome.
-    /// Converts from [`LinkType`](crate::link::LinkType) to [`LocalZomeTypeId`].
+    /// All the entry [`LinkType`]s in scope for this zome.
     pub links: ScopedZomeTypes<LinkType>,
 }
 
