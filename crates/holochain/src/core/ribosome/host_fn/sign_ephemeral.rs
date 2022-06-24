@@ -4,10 +4,6 @@ use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
-use ring::rand::SecureRandom;
-use ring::rand::SystemRandom;
-use ring::signature::Ed25519KeyPair;
-use ring::signature::KeyPair;
 use std::sync::Arc;
 
 pub fn sign_ephemeral(
@@ -19,30 +15,33 @@ pub fn sign_ephemeral(
         HostFnAccess {
             keystore: Permission::Allow,
             ..
-        } => {
-            let rng = SystemRandom::new();
-            let mut seed = [0; 32];
-            rng.fill(&mut seed).map_err(|e| -> RuntimeError {
-                wasm_error!(WasmErrorInner::Guest(e.to_string())).into()
-            })?;
-            let ephemeral_keypair =
-                Ed25519KeyPair::from_seed_unchecked(&seed).map_err(|e| -> RuntimeError {
-                    wasm_error!(WasmErrorInner::Host(e.to_string())).into()
-                })?;
+        } => tokio_helper::block_forever_on(async move {
+            let pk = sodoken::BufWriteSized::new_no_lock();
+            let sk = sodoken::BufWriteSized::new_mem_locked()?;
+            sodoken::sign::keypair(pk.clone(), sk.clone()).await?;
+            let pk = pk.read_lock_sized().to_vec();
+            let sk = sk.to_read_sized();
 
-            let signatures: Result<Vec<Signature>, _> = input
-                .into_inner()
-                .into_iter()
-                .map(|data| ephemeral_keypair.sign(&data).as_ref().try_into())
-                .collect();
+            let mut signatures = Vec::new();
 
-            Ok(EphemeralSignatures {
-                signatures: signatures.map_err(|e| -> RuntimeError {
-                    wasm_error!(WasmErrorInner::Host(e.to_string())).into()
-                })?,
-                key: AgentPubKey::from_raw_32(ephemeral_keypair.public_key().as_ref().to_vec()),
+            let sig = sodoken::BufWriteSized::new_no_lock();
+            for data in input.into_inner().into_iter() {
+                sodoken::sign::detached(
+                    sig.clone(),
+                    data.to_vec(),
+                    sk.clone(),
+                ).await?;
+                signatures.push((*sig.read_lock_sized()).into());
+            }
+
+            sodoken::SodokenResult::Ok(EphemeralSignatures {
+                signatures,
+                key: AgentPubKey::from_raw_32(pk),
             })
-        }
+        })
+        .map_err(|error| -> RuntimeError {
+            wasm_error!(WasmErrorInner::Host(error.to_string())).into()
+        }),
         _ => Err(wasm_error!(WasmErrorInner::Host(
             RibosomeError::HostFnPermissions(
                 call_context.zome.zome_name().clone(),
