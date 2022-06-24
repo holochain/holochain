@@ -275,7 +275,7 @@ pub fn get_details<H: Into<AnyDhtHash>>(
 /// impls are just a loose set of conventions.
 ///
 /// It's actually entirely possible to interact with core directly without any of these.
-/// e.g. [`create_entry`] is just building a tuple of [`EntryDefId`] and [`Entry::App`] under the hood.
+/// e.g. [`create_entry`] is just building a tuple of [`EntryDefId`] and [`Entry::App`](EntryImpl::App) under the hood.
 ///
 /// This requires that TryFrom and TryInto [`derive@SerializedBytes`] is implemented for the entry type,
 /// which implies that [`serde::Serialize`] and [`serde::Deserialize`] is also implemented.

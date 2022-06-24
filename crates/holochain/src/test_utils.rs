@@ -844,13 +844,15 @@ pub trait CreateInputExt {
 
     /// Create an cap create input.
     fn cap(entry: Entry) -> CreateInput {
-        let builder = match entry {
+        let input = match entry {
             Entry::CapClaim(c) => EntryInput::CapClaim(c),
             Entry::CapGrant(g) => EntryInput::CapGrant(g),
-            _ => panic!("Tried to construct an cap entryCreateInput with mismatching entry"),
+            _ => {
+                panic!("Tried to construct an cap grant / claim CreateInput with mismatching entry")
+            }
         };
         CreateInput {
-            input: builder,
+            input,
             chain_top_ordering: ChainTopOrdering::Strict,
         }
     }

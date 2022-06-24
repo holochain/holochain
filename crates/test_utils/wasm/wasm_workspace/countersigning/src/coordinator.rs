@@ -37,7 +37,7 @@ fn create_countersigned(
     );
     HDK.with(|h| {
         h.borrow().create(CreateInput {
-            builder: entry,
+            input: entry,
             // Countersigned entries MUST have strict ordering.
             chain_top_ordering: ChainTopOrdering::Strict,
         })

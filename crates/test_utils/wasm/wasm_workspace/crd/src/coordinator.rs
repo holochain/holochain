@@ -44,8 +44,11 @@ pub mod test {
         mock_hdk
             .expect_create()
             .with(hdk::prelude::mockall::predicate::eq(CreateInput {
-                entry_def_id: thing.entry_def_id(),
-                entry: thing.try_into().unwrap(),
+                input: EntryInput::App(AppEntry {
+                    entry_def_index: ScopedEntryDefIndex::try_from(thing).unwrap(),
+                    visibility: EntryVisibility::Public,
+                    entry: thing.try_into().unwrap(),
+                }),
                 chain_top_ordering: Default::default(),
             }))
             .times(1)
