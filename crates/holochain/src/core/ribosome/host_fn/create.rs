@@ -50,9 +50,12 @@ pub fn create<'a>(
                     // extract the entry defs for a zome
                     let entry_type = match entry_location {
                         EntryDefLocation::Agent => EntryType::AgentPubKey,
-                        EntryDefLocation::App(entry_def_index) => {
+                        EntryDefLocation::App(AppEntryDefLocation {
+                            zome_id,
+                            entry_def_index,
+                        }) => {
                             let app_entry_type =
-                                AppEntryType::new(entry_def_index, entry_visibility);
+                                AppEntryType::new(entry_def_index, zome_id, entry_visibility);
                             EntryType::App(app_entry_type)
                         }
                         EntryDefLocation::CapGrant => EntryType::CapGrant,
@@ -171,7 +174,7 @@ pub mod wasm_test {
         call_context.host_context = host_access.into();
         let app_entry = EntryFixturator::new(AppEntry).next().unwrap();
         let input = CreateInput::app_entry(
-            0.into(),
+            ScopedEntryDefIndex::new(0.into(), 0.into()),
             EntryVisibility::Public,
             app_entry.clone(),
             ChainTopOrdering::default(),

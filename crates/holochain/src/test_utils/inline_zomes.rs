@@ -18,7 +18,7 @@ pub fn simple_create_read_zome() -> InlineZomeSet {
     .callback("simple", "create", move |api, ()| {
         let entry = Entry::app(().try_into().unwrap()).unwrap();
         let hash = api.create(CreateInput::app_entry(
-            InlineZomeSet::get_entry_type(&api, InlineEntryTypes::A),
+            InlineZomeSet::get_entry_location(&api, InlineEntryTypes::A),
             EntryVisibility::Public,
             entry,
             ChainTopOrdering::default(),

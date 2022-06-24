@@ -10,7 +10,6 @@
 //!     SomeOtherLinkType,
 //! }
 //! assert_eq!(__num_link_types(), 2);
-//! assert_eq!(LocalZomeTypeId::from(SomeLinkTypes::SomeLinkType), LocalZomeTypeId(0));
 //! ```
 use crate::prelude::*;
 

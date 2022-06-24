@@ -37,10 +37,10 @@ async fn authored_test() {
     let entry_hash = EntryHash::with_data_sync(&Entry::try_from(entry.clone()).unwrap());
     // 3
     let h = alice_call_data.get_api(TestWasm::Create);
-    let entry_index = h.get_entry_type(TestWasm::Create, POST_INDEX);
+    let scoped_type = h.get_entry_type(TestWasm::Create, POST_INDEX);
     h.commit_entry(
         entry.clone().try_into().unwrap(),
-        entry_index,
+        scoped_type,
         EntryVisibility::Public,
     )
     .await;
@@ -111,10 +111,10 @@ async fn authored_test() {
 
     // Now bob commits the entry
     let h = bob_call_data.get_api(TestWasm::Create);
-    let entry_index = h.get_entry_type(TestWasm::Create, POST_INDEX);
+    let scoped_type = h.get_entry_type(TestWasm::Create, POST_INDEX);
     h.commit_entry(
         entry.clone().try_into().unwrap(),
-        entry_index,
+        scoped_type,
         EntryVisibility::Public,
     )
     .await;

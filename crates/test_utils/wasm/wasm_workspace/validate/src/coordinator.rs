@@ -6,7 +6,7 @@ impl TryFrom<&ThisWasmEntry> for CreateInput {
     fn try_from(this_wasm_entry: &ThisWasmEntry) -> Result<Self, Self::Error> {
         Self::new(
             EntryInput::App(AppEntry {
-                entry_def_index: EntryDefIndex::try_from(this_wasm_entry)?,
+                entry_def_index: ScopedEntryDefIndex::try_from(this_wasm_entry)?,
                 visibility: EntryVisibility::Public,
                 entry: AppEntryBytes::try_from(this_wasm_entry)?,
             }),

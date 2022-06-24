@@ -44,42 +44,11 @@ fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     {
         if let Some(AppEntryType {
             id: entry_def_index,
+            zome_id,
             ..
         }) = action.app_entry_type()
         {
-            match zome_info()?
-                .zome_types
-                .entries
-                .to_local_scope(*entry_def_index)
-            {
-                Some(local_type_index) => {
-                    match EntryTypes::try_from_local_type(local_type_index, &entry)? {
-                        Some(EntryTypes::Post(_)) => (),
-                        Some(EntryTypes::Msg(_)) => (),
-                        Some(EntryTypes::PrivMsg(_)) => (),
-                        None => (),
-                    }
-                }
-                None => (),
-            }
-            match zome_info()?
-                .zome_types
-                .entries
-                .to_local_scope(*entry_def_index)
-            {
-                Some(local_index) => match local_index.try_into() {
-                    Ok(UnitEntryTypes::Post) => (),
-                    _ => (),
-                },
-                None => (),
-            }
-            match EntryTypes::try_from_global_type(*entry_def_index, &entry)? {
-                Some(EntryTypes::Post(_)) => (),
-                Some(EntryTypes::Msg(_)) => (),
-                Some(EntryTypes::PrivMsg(_)) => (),
-                None => (),
-            }
-            match EntryTypes::try_from_local_type(UnitEntryTypes::Post, &entry)? {
+            match EntryTypes::deserialize_from_type(*zome_id, *entry_def_index, &entry)? {
                 Some(EntryTypes::Post(_)) => (),
                 Some(EntryTypes::Msg(_)) => (),
                 Some(EntryTypes::PrivMsg(_)) => (),

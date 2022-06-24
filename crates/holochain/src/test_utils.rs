@@ -823,7 +823,7 @@ pub async fn force_publish_dht_ops(
 pub trait CreateInputExt {
     /// Create an app entry create input.
     fn app_entry(
-        entry_def_index: EntryDefIndex,
+        entry_def_index: ScopedEntryDefIndex,
         visibility: EntryVisibility,
         entry: Entry,
         chain_top_ordering: ChainTopOrdering,

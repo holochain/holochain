@@ -4,6 +4,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- `EntryTypesHelper`: `try_from_local_type` is removed and `try_from_global_type` becomes `deserialize_from_type`.
+- `LinkTypesHelper` is removed.
+- `LinkTypeFilterExt` is added to allow extra types to convert to `LinkTypeFilter`.
+
 ## 0.0.10
 
 ## 0.0.9

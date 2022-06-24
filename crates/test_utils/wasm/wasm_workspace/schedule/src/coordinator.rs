@@ -7,7 +7,7 @@ fn scheduled_fn(_: Option<Schedule>) -> Option<Schedule> {
         .with(|h| {
             h.borrow().create(CreateInput {
                 input: EntryInput::App(AppEntry {
-                    entry_def_index: EntryDefIndex::try_from(EntryTypesUnit::Tick)?,
+                    entry_def_index: ScopedEntryDefIndex::try_from(EntryTypesUnit::Tick)?,
                     visibility: EntryVisibility::Public,
                     entry: Tick.try_into().unwrap(),
                 }),
@@ -37,7 +37,7 @@ fn cron_scheduled_fn(_: Option<Schedule>) -> Option<Schedule> {
     HDK.with(|h| {
         h.borrow().create(CreateInput::new(
             EntryInput::App(AppEntry {
-                entry_def_index: EntryDefIndex::try_from(EntryTypesUnit::Tock)?,
+                entry_def_index: ScopedEntryDefIndex::try_from(EntryTypesUnit::Tock)?,
                 visibility: EntryVisibility::Public,
                 entry: Tock.try_into().unwrap(),
             }),

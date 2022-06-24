@@ -9,8 +9,8 @@ use crate::capability::CapClaim;
 use crate::capability::CapGrant;
 use crate::capability::ZomeCallCapGrant;
 use crate::countersigning::CounterSigningSessionData;
-use crate::EntryDefIndex;
 use crate::EntryVisibility;
+use crate::ScopedEntryDefIndex;
 use holo_hash::hash_type;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
@@ -94,7 +94,7 @@ impl sealed::Sealed for AppEntry {}
 /// The data needed to build an [`Entry`] and it's [`Action`](crate::action::Action).
 pub struct AppEntry {
     /// The global zome type identifier for this entry.
-    pub entry_def_index: EntryDefIndex,
+    pub entry_def_index: ScopedEntryDefIndex,
     /// The visibility for this entry.
     pub visibility: EntryVisibility,
     /// The actual data for this entry.

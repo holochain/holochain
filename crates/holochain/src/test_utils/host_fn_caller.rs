@@ -24,6 +24,7 @@ use holochain_p2p::HolochainP2pDna;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::prelude::*;
+use holochain_wasm_test_utils::TestWasmPair;
 use holochain_zome_types::AgentActivity;
 use std::sync::Arc;
 use unwrap_to::unwrap_to;
@@ -34,9 +35,9 @@ use super::CreateInputExt;
 // Useful for when you want to commit something
 // that will match entry defs
 pub const POST_ID: &str = "post";
-pub const POST_INDEX: LocalZomeTypeId = LocalZomeTypeId(0);
+pub const POST_INDEX: EntryDefIndex = EntryDefIndex(0);
 pub const MSG_ID: &str = "msg";
-pub const MSG_INDEX: LocalZomeTypeId = LocalZomeTypeId(1);
+pub const MSG_INDEX: EntryDefIndex = EntryDefIndex(1);
 pub const VALID_ID: &str = "always_validates";
 pub const INVALID_ID: &str = "never_validates";
 
@@ -210,39 +211,55 @@ impl HostFnCaller {
 impl HostFnCaller {
     pub fn get_entry_type(
         &self,
-        zome: impl Into<ZomeName>,
-        local_index: impl Into<LocalZomeTypeId>,
-    ) -> EntryDefIndex {
-        let zome_dependencies = self.ribosome.get_zome_dependencies(&zome.into()).unwrap();
+        zome: impl Into<TestWasmPair<ZomeName>>,
+        index: impl Into<EntryDefIndex>,
+    ) -> ScopedEntryDefIndex {
+        let TestWasmPair { integrity, .. } = zome.into();
+        let zome_id = self
+            .ribosome
+            .dna_def()
+            .integrity_zomes
+            .iter()
+            .position(|(z, _)| *z == integrity)
+            .unwrap();
         let zome_types = self
             .ribosome
             .zome_types()
-            .re_scope(zome_dependencies)
-            .unwrap();
+            .re_scope(&[ZomeId(zome_id as u8)]);
         zome_types
             .entries
-            .to_global_scope(local_index)
+            .get(ZomeTypesKey {
+                zome_index: 0.into(),
+                type_index: index.into(),
+            })
             .unwrap()
-            .into()
     }
-    pub fn get_link_type(
+    pub fn get_entry_link(
         &self,
-        zome: impl Into<ZomeName>,
-        local_index: impl Into<LocalZomeTypeId>,
-    ) -> LinkType {
-        let zome_dependencies = self.ribosome.get_zome_dependencies(&zome.into()).unwrap();
+        zome: impl Into<TestWasmPair<ZomeName>>,
+        index: impl Into<LinkType>,
+    ) -> ScopedLinkType {
+        let TestWasmPair { integrity, .. } = zome.into();
+        let zome_id = self
+            .ribosome
+            .dna_def()
+            .integrity_zomes
+            .iter()
+            .position(|(z, _)| *z == integrity)
+            .unwrap();
         let zome_types = self
             .ribosome
             .zome_types()
-            .re_scope(zome_dependencies)
-            .unwrap();
+            .re_scope(&[ZomeId(zome_id as u8)]);
         zome_types
             .links
-            .to_global_scope(local_index)
+            .get(ZomeTypesKey {
+                zome_index: 0.into(),
+                type_index: index.into(),
+            })
             .unwrap()
-            .into()
     }
-    pub async fn commit_entry<E: Into<EntryDefIndex>>(
+    pub async fn commit_entry<E: Into<ScopedEntryDefIndex>>(
         &self,
         entry: Entry,
         entry_def_id: E,
@@ -320,6 +337,7 @@ impl HostFnCaller {
         &self,
         base: AnyLinkableHash,
         target: AnyLinkableHash,
+        zome_id: impl Into<ZomeId>,
         link_type: impl Into<LinkType>,
         link_tag: LinkTag,
     ) -> ActionHash {
@@ -327,6 +345,7 @@ impl HostFnCaller {
         let input = CreateLinkInput::new(
             base,
             target,
+            zome_id.into(),
             link_type.into(),
             link_tag,
             ChainTopOrdering::default(),
@@ -359,7 +378,7 @@ impl HostFnCaller {
     pub async fn get_links<'env>(
         &self,
         base: AnyLinkableHash,
-        type_query: LinkTypeRanges,
+        type_query: LinkTypeFilter,
         link_tag: Option<LinkTag>,
         _options: GetLinksOptions,
     ) -> Vec<Link> {
@@ -382,7 +401,7 @@ impl HostFnCaller {
     pub async fn get_link_details<'env>(
         &self,
         base: AnyLinkableHash,
-        type_query: LinkTypeRanges,
+        type_query: LinkTypeFilter,
         tag: LinkTag,
         _options: GetLinksOptions,
     ) -> Vec<(SignedActionHashed, Vec<SignedActionHashed>)> {

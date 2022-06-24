@@ -1419,6 +1419,7 @@ pub mod tests {
         let create = builder::Create {
             entry_type: EntryType::App(AppEntryType::new(
                 EntryDefIndex(0),
+                0.into(),
                 EntryVisibility::Private,
             )),
             entry_hash: eh2.clone(),
