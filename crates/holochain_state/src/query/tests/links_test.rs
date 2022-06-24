@@ -38,6 +38,7 @@ fn fixtures(env: DbWrite<DbKindDht>, n: usize) -> Vec<TestData> {
         let link_add = KnownCreateLink {
             base_address: base_address.clone().into(),
             target_address: target_address.clone().into(),
+            zome_id,
             link_type,
             tag: tag.clone(),
         };
@@ -683,13 +684,16 @@ async fn links_on_same_tag() {
     let mut td = fixtures(arc.clone(), 10);
     let base_hash = td[0].base_hash.clone();
     let link_type = td[0].link_type;
+    let zome_id = td[0].zome_id;
     let tag = td[0].tag.clone();
 
     for d in td.iter_mut() {
         d.base_hash = base_hash.clone();
+        d.zome_id = zome_id;
         d.link_type = link_type;
         d.tag = tag.clone();
         d.link_add.base_address = base_hash.clone().into();
+        d.link_add.zome_id = zome_id;
         d.link_add.link_type = link_type;
         d.link_add.tag = tag.clone();
         d.link_remove.base_address = base_hash.clone().into();

@@ -109,6 +109,7 @@ pub struct KnownCreateLink {
     pub base_address: AnyLinkableHash,
     pub target_address: AnyLinkableHash,
     pub tag: LinkTag,
+    pub zome_id: ZomeId,
     pub link_type: LinkType,
 }
 
@@ -124,6 +125,7 @@ impl Iterator for CreateLinkFixturator<KnownCreateLink> {
         f.base_address = self.0.curve.base_address.clone();
         f.target_address = self.0.curve.target_address.clone();
         f.tag = self.0.curve.tag.clone();
+        f.zome_id = self.0.curve.zome_id;
         f.link_type = self.0.curve.link_type;
         Some(f)
     }
