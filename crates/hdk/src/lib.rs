@@ -4,9 +4,8 @@
 //! One or multiple zomes are compiled into a WebAssembly (WASM) binary, referred to as a DNA. All of the DNAs of an application are bundled to a hApp.
 //! In short, that structure is __hApp -> DNA -> zome -> function__.
 //!
-//! hApps are required to produce and validate data deterministically. All data is stored in a content-addressable manner, retrieved by hash value.
-//! There's a data model and a domain logic part to each hApp. In Holochain, the data model is defined in integrity zomes and the domain logic is
-//! written in coordinator zomes. See Coordinator zomes further down and
+//! hApps are required to produce and validate data deterministically. There's a data model and a domain logic part to each hApp. In Holochain, the
+//! data model is defined in integrity zomes and the domain logic is written in coordinator zomes. See Coordinator zomes further down and
 //! [Holochain Deterministic Integrity](holochain_deterministic_integrity) for more information.
 //!
 //! Since hApps are run as a binary on the hosting system, they must be sandboxed to prevent execution of insecure commands.
