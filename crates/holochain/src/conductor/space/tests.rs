@@ -6,6 +6,7 @@ use holo_hash::HasHash;
 use holochain_cascade::test_utils::fill_db;
 use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_p2p::dht::hash::RegionHash;
+use holochain_p2p::dht::prelude::Dimension;
 use holochain_p2p::dht::region::RegionData;
 use holochain_p2p::dht_arc::DhtArcSet;
 use holochain_types::dht_op::facts::valid_dht_op;
@@ -41,16 +42,20 @@ async fn test_region_queries() {
     let agent = keystore.new_sign_keypair_random().await.unwrap();
 
     let mut dna_def = DnaDef::arbitrary(&mut u).unwrap();
-    let topo = dna_def.topology(Duration::ZERO);
-    let tq = Duration::from_micros(topo.time.quantum as u64);
-    let tq5 = Duration::from_micros(topo.time.quantum as u64 * 5);
-    dbg!(&tq, &topo);
-
+    let q_us = Dimension::standard_time().quantum as u64;
+    let tq = Duration::from_micros(q_us);
+    let tq5 = Duration::from_micros(q_us * 5);
     let five_quanta_ago = (Timestamp::now() - tq5).unwrap();
     let tq_ms = tq.as_millis() as u64;
 
     // - The origin time is five time quanta ago
     dna_def.origin_time = five_quanta_ago.clone();
+
+    // Cutoff duration is 2 quanta, meaning historic gossip goes up to 1 quantum ago
+    let cutoff = Duration::from_micros(q_us * 2);
+    let topo = dna_def.topology(cutoff);
+
+    dbg!(&topo, tq_ms);
 
     // Builds an arbitrary valid op at the given timestamp
     let mut arbitrary_valid_op = |timestamp: Timestamp| -> DhtOp {
@@ -100,14 +105,15 @@ async fn test_region_queries() {
         .await
         .unwrap();
 
-    dbg!(&region_set);
-
     // - Check that the aggregate of all region data matches expectations
     let region_sum: RegionData = region_set.regions().map(|r| r.data).sum();
     let hash_sum = ops
         .iter()
         .map(|op| RegionHash::from_vec(op.as_hash().get_raw_39().to_vec()).unwrap())
         .sum();
+
+    // If the left side is greater, then the recent ops are being mistakenly included.
+    // If the right side is greater, then something is wrong with the query.
     assert_eq!(region_sum.count as usize, NUM_OPS);
     assert_eq!(region_sum.hash, hash_sum);
 
@@ -116,7 +122,7 @@ async fn test_region_queries() {
             dna_def.as_hash(),
             region_set
                 .regions()
-                .map(|r| dbg!(r.coords).to_bounds(&topo))
+                .map(|r| r.coords.to_bounds(&topo))
                 .collect(),
         )
         .await

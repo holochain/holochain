@@ -107,14 +107,7 @@ impl KitsuneHost for KitsuneHostImpl {
         async move {
             let topology = self.get_topology(space.clone()).await?;
             let db = self.spaces.authored_db(&dna_hash)?;
-            Ok(query_region_set::query_region_set(
-                db,
-                topology,
-                &self.strat,
-                dht_arc_set,
-                &self.tuning_params,
-            )
-            .await?)
+            Ok(query_region_set::query_region_set(db, topology, &self.strat, dht_arc_set).await?)
         }
         .boxed()
         .into()

@@ -351,7 +351,7 @@ impl Spaces {
                 })
                 .collect(),
         );
-        let times = TelescopingTimes::historical(&topology, self.recent_threshold());
+        let times = TelescopingTimes::historical(&topology);
         let coords = RegionCoordSetLtcs::new(times, arq_set);
         let coords_clone = coords.clone();
         let db = self.dht_db(dna_hash)?;
@@ -574,11 +574,9 @@ impl Spaces {
 
     /// Get the recent_threshold based on the kitsune network config
     pub fn recent_threshold(&self) -> Duration {
-        Duration::from_secs(
-            self.network_config
-                .tuning_params
-                .danger_gossip_recent_threshold_secs,
-        )
+        self.network_config
+            .tuning_params
+            .danger_gossip_recent_threshold()
     }
 }
 
