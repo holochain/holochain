@@ -1,7 +1,5 @@
 //! Defines DnaDef struct
 
-use std::time::Duration;
-
 use super::zome;
 use crate::prelude::*;
 
