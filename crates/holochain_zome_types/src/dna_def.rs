@@ -185,7 +185,7 @@ impl DnaDef {
     }
 
     /// Get the topology to use for kitsune gossip
-    pub fn topology(&self, cutoff: Duration) -> kitsune_p2p_dht::spacetime::Topology {
+    pub fn topology(&self, cutoff: std::time::Duration) -> kitsune_p2p_dht::spacetime::Topology {
         kitsune_p2p_dht::spacetime::Topology::standard(self.origin_time, cutoff)
     }
 }
