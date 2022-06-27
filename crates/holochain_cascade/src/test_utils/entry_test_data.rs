@@ -20,7 +20,7 @@ use holochain_zome_types::EntryType;
 use holochain_zome_types::EntryVisibility;
 use holochain_zome_types::Judged;
 use holochain_zome_types::Link;
-use holochain_zome_types::LinkTypeRange;
+use holochain_zome_types::LinkTypeFilter;
 use holochain_zome_types::SerializedBytes;
 use holochain_zome_types::SignedAction;
 use holochain_zome_types::SignedActionHashed;
@@ -61,6 +61,7 @@ impl EntryTestData {
         let mut delete = fixt!(Delete);
 
         let mut create_link = fixt!(CreateLink);
+        create_link.zome_id = 0.into();
         let mut delete_link = fixt!(DeleteLink);
 
         let entry: AppEntryBytes = SerializedBytes::from(UnsafeBytes::from(vec![3u8]))
@@ -165,12 +166,12 @@ impl EntryTestData {
 
         let link_key = WireLinkKey {
             base: create_link.base_address.clone(),
-            type_query: Some(LinkTypeRange::Full.into()),
+            type_query: LinkTypeFilter::single_dep(0.into()),
             tag: None,
         };
         let link_key_tag = WireLinkKey {
             base: create_link.base_address.clone(),
-            type_query: Some(LinkTypeRange::Full.into()),
+            type_query: LinkTypeFilter::single_dep(0.into()),
             tag: Some(create_link.tag.clone()),
         };
 

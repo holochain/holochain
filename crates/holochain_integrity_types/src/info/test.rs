@@ -1,100 +1,395 @@
 use super::*;
 
-/// Make a new ScopedZomeTypes.
-fn make_scope(ranges: Vec<Range<u8>>) -> ScopedZomeTypes {
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+enum LinkTypes {
+    A,
+    B,
+}
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+enum LinkZomes {
+    A(LinkTypes),
+    B(LinkTypes),
+}
+
+fn make_map(ids: &[(u8, u8)]) -> ScopedZomeTypes<LinkType> {
     ScopedZomeTypes(
-        ranges
-            .into_iter()
-            .map(|r| GlobalZomeTypeId(r.start)..GlobalZomeTypeId(r.end))
+        ids.into_iter()
+            .map(|(zome_id, len)| ((*zome_id).into(), (0..*len).map(|t| t.into()).collect()))
             .collect(),
     )
 }
 
-#[test]
-/// Check that local types can convert to global types.
-fn check_to_global_scope() {
-    let scope = make_scope(vec![5..9, 3..5]);
-    let check = |local: u8, expect: u8| {
-        assert_eq!(
-            scope.to_global_scope(local).unwrap(),
-            GlobalZomeTypeId(expect)
-        );
-    };
-    check(0, 5);
-    check(1, 6);
-    check(2, 7);
-    check(3, 8);
-    check(4, 3);
-    check(5, 4);
-    let check_none = |local: u8| {
-        assert_eq!(scope.to_global_scope(local), None);
-    };
-    check_none(6);
-    check_none(7);
+fn make_entry_map(ids: &[(u8, u8)]) -> ScopedZomeTypes<EntryDefIndex> {
+    ScopedZomeTypes(
+        ids.into_iter()
+            .map(|(zome_id, len)| ((*zome_id).into(), (0..*len).map(|t| t.into()).collect()))
+            .collect(),
+    )
+}
 
-    let scope = make_scope(vec![0..1, 1..2, 2..3, 3..4, 4..5, 6..7, 5..6, 7..10]);
-    let check = |local: u8, expect: u8| {
-        assert_eq!(
-            scope.to_global_scope(local).unwrap(),
-            GlobalZomeTypeId(expect)
-        );
-    };
-    check(0, 0);
-    check(1, 1);
-    check(2, 2);
-    check(3, 3);
-    check(4, 4);
+impl From<LinkTypes> for ZomeLinkTypesKey {
+    fn from(lt: LinkTypes) -> Self {
+        match lt {
+            LinkTypes::A => ZomeTypesKey {
+                zome_index: 0.into(),
+                type_index: 0.into(),
+            },
+            LinkTypes::B => ZomeTypesKey {
+                zome_index: 0.into(),
+                type_index: 1.into(),
+            },
+        }
+    }
+}
 
-    check(5, 6);
-    check(6, 5);
+impl From<LinkZomes> for ZomeLinkTypesKey {
+    fn from(lt: LinkZomes) -> Self {
+        match lt {
+            LinkZomes::A(lt) => ZomeTypesKey {
+                zome_index: 0.into(),
+                type_index: ZomeLinkTypesKey::from(lt).type_index,
+            },
+            LinkZomes::B(lt) => ZomeTypesKey {
+                zome_index: 1.into(),
+                type_index: ZomeLinkTypesKey::from(lt).type_index,
+            },
+        }
+    }
+}
 
-    check(7, 7);
-    check(8, 8);
-    check(8, 8);
+impl LinkTypes {
+    fn iter() -> impl Iterator<Item = Self> {
+        use LinkTypes::*;
+        [A, B].into_iter()
+    }
+}
+
+impl LinkZomes {
+    fn iter() -> impl Iterator<Item = Self> {
+        use LinkZomes::*;
+        LinkTypes::iter().map(A).chain(LinkTypes::iter().map(B))
+    }
 }
 
 #[test]
-/// Check that global types can convert to local types.
-fn check_to_local_scope() {
-    let scope = make_scope(vec![5..9, 3..5]);
-    let check = |global: u8, expect: u8| {
-        assert_eq!(
-            scope.to_local_scope(global).unwrap(),
-            LocalZomeTypeId(expect)
-        );
-    };
-    check(5, 0);
-    check(6, 1);
-    check(7, 2);
-    check(8, 3);
-    check(3, 4);
-    check(4, 5);
-    let check_none = |global: u8| {
-        assert_eq!(scope.to_local_scope(global), None);
-    };
-    check_none(0);
-    check_none(1);
-    check_none(2);
-    check_none(9);
-    check_none(10);
+fn can_map_to_key() {
+    let map = make_map(&[(12, 2)]);
+    assert_eq!(
+        map.get(LinkTypes::A).unwrap(),
+        ScopedLinkType {
+            zome_id: 12.into(),
+            zome_type: 0.into()
+        }
+    );
+    assert_eq!(
+        map.get(LinkTypes::B).unwrap(),
+        ScopedLinkType {
+            zome_id: 12.into(),
+            zome_type: 1.into()
+        }
+    );
 
-    let scope = make_scope(vec![0..1, 1..2, 2..3, 3..4, 4..5, 6..7, 5..6, 7..10]);
-    let check = |global: u8, expect: u8| {
-        assert_eq!(
-            scope.to_local_scope(global).unwrap(),
-            LocalZomeTypeId(expect)
-        );
+    let map = make_map(&[(12, 2), (3, 2)]);
+    assert_eq!(
+        map.get(LinkZomes::A(LinkTypes::A)).unwrap(),
+        ScopedLinkType {
+            zome_id: 12.into(),
+            zome_type: 0.into()
+        }
+    );
+    assert_eq!(
+        map.get(LinkZomes::A(LinkTypes::B)).unwrap(),
+        ScopedLinkType {
+            zome_id: 12.into(),
+            zome_type: 1.into()
+        }
+    );
+    assert_eq!(
+        map.get(LinkZomes::B(LinkTypes::A)).unwrap(),
+        ScopedLinkType {
+            zome_id: 3.into(),
+            zome_type: 0.into()
+        }
+    );
+    assert_eq!(
+        map.get(LinkZomes::B(LinkTypes::B)).unwrap(),
+        ScopedLinkType {
+            zome_id: 3.into(),
+            zome_type: 1.into()
+        }
+    );
+}
+
+#[test]
+fn can_map_from_scoped_type() {
+    let map = make_map(&[(12, 2)]);
+    assert_eq!(
+        map.find(
+            LinkTypes::iter(),
+            ScopedLinkType {
+                zome_id: 12.into(),
+                zome_type: 0.into()
+            }
+        )
+        .unwrap(),
+        LinkTypes::A
+    );
+    assert_eq!(
+        map.find(
+            LinkTypes::iter(),
+            ScopedLinkType {
+                zome_id: 12.into(),
+                zome_type: 1.into()
+            }
+        )
+        .unwrap(),
+        LinkTypes::B
+    );
+    assert_eq!(
+        map.find(
+            LinkTypes::iter(),
+            ScopedLinkType {
+                zome_id: 12.into(),
+                zome_type: 3.into()
+            }
+        ),
+        None
+    );
+    assert_eq!(
+        map.find(
+            LinkTypes::iter(),
+            ScopedLinkType {
+                zome_id: 13.into(),
+                zome_type: 1.into()
+            }
+        ),
+        None
+    );
+
+    let map = make_map(&[(12, 2), (3, 2)]);
+    assert_eq!(
+        map.find(
+            LinkZomes::iter(),
+            ScopedLinkType {
+                zome_id: 12.into(),
+                zome_type: 0.into()
+            }
+        )
+        .unwrap(),
+        LinkZomes::A(LinkTypes::A),
+    );
+    assert_eq!(
+        map.find(
+            LinkZomes::iter(),
+            ScopedLinkType {
+                zome_id: 12.into(),
+                zome_type: 1.into()
+            }
+        )
+        .unwrap(),
+        LinkZomes::A(LinkTypes::B),
+    );
+    assert_eq!(
+        map.find(
+            LinkZomes::iter(),
+            ScopedLinkType {
+                zome_id: 3.into(),
+                zome_type: 0.into()
+            }
+        )
+        .unwrap(),
+        LinkZomes::B(LinkTypes::A),
+    );
+    assert_eq!(
+        map.find(
+            LinkZomes::iter(),
+            ScopedLinkType {
+                zome_id: 3.into(),
+                zome_type: 1.into()
+            }
+        )
+        .unwrap(),
+        LinkZomes::B(LinkTypes::B),
+    );
+    assert_eq!(
+        map.find(
+            LinkZomes::iter(),
+            ScopedLinkType {
+                zome_id: 3.into(),
+                zome_type: 2.into()
+            }
+        ),
+        None
+    );
+    assert_eq!(
+        map.find(
+            LinkZomes::iter(),
+            ScopedLinkType {
+                zome_id: 12.into(),
+                zome_type: 2.into()
+            }
+        ),
+        None
+    );
+    assert_eq!(
+        map.find(
+            LinkZomes::iter(),
+            ScopedLinkType {
+                zome_id: 14.into(),
+                zome_type: 0.into()
+            }
+        ),
+        None
+    );
+}
+
+type Entry = ();
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+struct A;
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+struct B;
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+enum EntryTypes {
+    A(A),
+    B(B),
+}
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+enum EntryZomes {
+    A(EntryTypes),
+    B(EntryTypes),
+}
+
+impl crate::UnitEnum for EntryTypes {
+    type Unit = UnitEntry;
+
+    fn to_unit(&self) -> Self::Unit {
+        match self {
+            EntryTypes::A(_) => Self::Unit::A,
+            EntryTypes::B(_) => Self::Unit::B,
+        }
+    }
+}
+enum UnitEntry {
+    A,
+    B,
+}
+
+impl From<Entry> for A {
+    fn from(_: Entry) -> Self {
+        A {}
+    }
+}
+
+impl From<Entry> for B {
+    fn from(_: Entry) -> Self {
+        B {}
+    }
+}
+
+impl From<(ZomeEntryTypesKey, Entry)> for EntryTypes {
+    fn from((k, entry): (ZomeEntryTypesKey, Entry)) -> Self {
+        match k {
+            ZomeTypesKey {
+                zome_index: ZomeDependencyIndex(0),
+                type_index: EntryDefIndex(0),
+            } => EntryTypes::A(entry.into()),
+            ZomeTypesKey {
+                zome_index: ZomeDependencyIndex(0),
+                type_index: EntryDefIndex(1),
+            } => EntryTypes::B(entry.into()),
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl From<ZomeEntryTypesKey> for UnitEntry {
+    fn from(k: ZomeEntryTypesKey) -> Self {
+        match k {
+            ZomeTypesKey {
+                zome_index: ZomeDependencyIndex(0),
+                type_index: EntryDefIndex(0),
+            } => Self::A,
+            ZomeTypesKey {
+                zome_index: ZomeDependencyIndex(0),
+                type_index: EntryDefIndex(1),
+            } => Self::B,
+            _ => unreachable!(),
+        }
+    }
+}
+impl From<(ZomeEntryTypesKey, Entry)> for EntryZomes {
+    fn from((k, entry): (ZomeEntryTypesKey, Entry)) -> Self {
+        match k {
+            ZomeTypesKey {
+                zome_index: ZomeDependencyIndex(0),
+                type_index,
+            } => {
+                let k = ZomeTypesKey {
+                    zome_index: 0.into(),
+                    type_index,
+                };
+                let unit: <EntryTypes as crate::UnitEnum>::Unit = k.into();
+                let r = match unit {
+                    UnitEntry::A => EntryTypes::A(entry.into()),
+                    UnitEntry::B => EntryTypes::B(entry.into()),
+                };
+                Self::A(r)
+            }
+            ZomeTypesKey {
+                zome_index: ZomeDependencyIndex(1),
+                type_index,
+            } => {
+                let k = ZomeTypesKey {
+                    zome_index: 0.into(),
+                    type_index,
+                };
+                let unit: <EntryTypes as crate::UnitEnum>::Unit = k.into();
+                let r = match unit {
+                    UnitEntry::A => EntryTypes::A(entry.into()),
+                    UnitEntry::B => EntryTypes::B(entry.into()),
+                };
+                Self::B(r)
+            }
+            _ => unreachable!(),
+        }
+    }
+}
+
+#[test]
+fn can_map_entry_from_scoped_type() {
+    let map = make_entry_map(&[(12, 2), (34, 2)]);
+    let find_key = |zome_id: u8, zome_type: u8| {
+        let input = ScopedEntryDefIndex {
+            zome_id: zome_id.into(),
+            zome_type: zome_type.into(),
+        };
+
+        map.find_key(input).unwrap()
     };
-    check(0, 0);
-    check(1, 1);
-    check(2, 2);
-    check(3, 3);
-    check(4, 4);
+    assert_eq!(
+        find_key(12, 0),
+        ZomeEntryTypesKey {
+            zome_index: 0.into(),
+            type_index: 0.into()
+        }
+    );
+    assert_eq!(EntryTypes::from((find_key(12, 0), ())), EntryTypes::A(A {}));
+    assert_eq!(EntryTypes::from((find_key(12, 1), ())), EntryTypes::B(B {}));
 
-    check(6, 5);
-    check(5, 6);
-
-    check(7, 7);
-    check(8, 8);
-    check(8, 8);
+    assert_eq!(
+        EntryZomes::from((find_key(12, 0), ())),
+        EntryZomes::A(EntryTypes::A(A {}))
+    );
+    assert_eq!(
+        EntryZomes::from((find_key(12, 1), ())),
+        EntryZomes::A(EntryTypes::B(B {}))
+    );
+    assert_eq!(
+        EntryZomes::from((find_key(34, 0), ())),
+        EntryZomes::B(EntryTypes::A(A {}))
+    );
+    assert_eq!(
+        EntryZomes::from((find_key(34, 1), ())),
+        EntryZomes::B(EntryTypes::B(B {}))
+    );
 }
