@@ -5,43 +5,35 @@ use kitsune_p2p::agent_store::AgentInfoSigned;
 
 use crate::{FullStateDump, InstalledAppInfo};
 
-/// Represents the available conductor functions to call over an admin interface
-/// and will result in a corresponding [`AdminResponse`] message being sent back over the
-/// interface connection.
+/// Represents the available conductor functions to call over an admin interface.
 ///
 /// Enum variants follow a general convention of `verb_noun` as opposed to
 /// the `noun_verb` of responses.
 ///
-/// Expects a serialized object with any contents of the enum on a key `data`
-/// and the enum variant on a key `type`, e.g.
-/// `{ type: 'enable_app', data: { installed_app_id: 'test_app' } }`
-///
 /// # Errors
 ///
 /// Returns an [`AdminResponse::Error`] with a reason why the request failed.
+// Expects a serialized object with any contents of the enum on a key `data`
+// and the enum variant on a key `type`, e.g.
+// `{ type: 'enable_app', data: { installed_app_id: 'test_app' } }`
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(rename_all = "snake_case", tag = "type", content = "data")]
 pub enum AdminRequest {
     /// Set up and register one or more new admin interfaces
-    /// as specified by a list of configurations. See
-    /// [`AdminInterfaceConfig`] for details on the configuration.
+    /// as specified by a list of configurations.
     ///
     /// # Returns
     ///
     /// [`AdminResponse::AdminInterfacesAdded`]
-    ///
-    /// [`AdminInterfaceConfig`]: super::AdminInterfaceConfig
     AddAdminInterfaces(Vec<crate::config::AdminInterfaceConfig>),
 
-    /// Register a DNA for later use in [`InstallApp`].
+    /// Register a DNA for later app installation.
     ///
     /// Stores the given DNA into the Holochain DNA database and returns the hash of it.
     ///
     /// # Returns
     ///
     /// [`AdminResponse::DnaRegistered`]
-    ///
-    /// [`InstallApp`]: AdminRequest::InstallApp
     RegisterDna(Box<RegisterDnaPayload>),
 
     /// Clone a DNA (in the biological sense), thus creating a new `Cell`.
@@ -238,7 +230,7 @@ pub enum AdminRequest {
     /// Note that the response to this call can be very big, as it's requesting for
     /// the full database of the cell.
     ///
-    /// Also note that while DHT ops about private entries will be returned (like `StoreElement`),
+    /// Also note that while DHT ops about private entries will be returned (like `StoreRecord`),
     /// the entry in itself will be missing, as it's not actually stored publicly in the DHT shard.
     ///
     /// # Returns
@@ -296,50 +288,50 @@ pub enum AdminRequest {
         cell_id: Option<CellId>,
     },
 
-    /// Insert [`Element`]s into the source chain of the [`CellId`].
+    /// Insert [`Record`]s into the source chain of the [`CellId`].
     ///
-    /// All elements must be authored and signed by the same agent.
+    /// All records must be authored and signed by the same agent.
     /// The [`DnaFile`] (but not necessarily the cell) must already be installed
     /// on this conductor.
     ///
     /// Care is needed when using this command as it can result in
     /// an invalid chain.
-    /// Additionally, if conflicting source chain elements are
+    /// Additionally, if conflicting source chain records are
     /// inserted on different nodes, then the chain will be forked.
     ///
     /// If an invalid or forked chain is inserted
     /// and then pushed to the DHT, it can't be undone.
     ///
     /// Note that the cell does not need to exist to run this command.
-    /// It is possible to insert elements into a source chain before
+    /// It is possible to insert records into a source chain before
     /// the cell is created. This can be used to restore from backup.
     ///
     /// If the cell is installed, it is best to call [`AdminRequest::DisableApp`]
     /// before running this command, as otherwise the chain head may move.
     /// If `truncate` is true, the chain head is not checked and any new
-    /// elements will be lost.
+    /// records will be lost.
     ///
     /// # Returns
     ///
-    /// [`AdminResponse::ElementsAdded`]
-    AddElements {
-        /// The cell that the elements are being inserted into.
+    /// [`AdminResponse::RecordsAdded`]
+    AddRecords {
+        /// The cell that the records are being inserted into.
         cell_id: CellId,
-        /// If this is true then all elements in the source chain will be
-        /// removed before the new elements are inserted.
+        /// If this is true then all records in the source chain will be
+        /// removed before the new records are inserted.
         /// **Warning**: this cannot be undone. Use with care!
         ///
-        /// If this is `false`, then the elements will be appended to the end
+        /// If this is `false`, then the records will be appended to the end
         /// of the source chain.
         truncate: bool,
-        /// If this is `true`, then the elements will be validated before insertion.
+        /// If this is `true`, then the records will be validated before insertion.
         /// This is much slower but is useful for verifying the chain is valid.
         ///
-        /// If this is `false`, then elements will be inserted as is.
+        /// If this is `false`, then records will be inserted as is.
         /// This could lead to an invalid chain.
         validate: bool,
-        /// The elements to be inserted into the source chain.
-        elements: Vec<Element>,
+        /// The records to be inserted into the source chain.
+        records: Vec<Record>,
     },
 }
 
@@ -492,8 +484,8 @@ pub enum AdminResponse {
     /// This is all the agent info that was found for the request.
     AgentInfoRequested(Vec<AgentInfoSigned>),
 
-    /// The successful response to an [`AdminRequest::AddElements`].
-    ElementsAdded,
+    /// The successful response to an [`AdminRequest::AddRecords`].
+    RecordsAdded,
 }
 
 /// Error type that goes over the websocket wire.

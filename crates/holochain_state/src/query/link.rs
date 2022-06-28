@@ -1,6 +1,7 @@
 use holo_hash::*;
 use holochain_sqlite::rusqlite::named_params;
 use holochain_types::dht_op::DhtOpType;
+use holochain_types::sql::ToSqlStatement;
 use holochain_zome_types::*;
 use std::fmt::Debug;
 
@@ -14,19 +15,19 @@ pub struct GetLinksQuery {
 #[derive(Debug, Clone)]
 pub struct LinksQuery {
     pub base: Arc<AnyLinkableHash>,
-    pub zome_id: ZomeId,
+    pub type_query: LinkTypeFilter,
     pub tag: Option<String>,
     query: String,
 }
 
 impl LinksQuery {
-    pub fn new(base: AnyLinkableHash, zome_id: ZomeId, tag: Option<LinkTag>) -> Self {
+    pub fn new(base: AnyLinkableHash, type_query: LinkTypeFilter, tag: Option<LinkTag>) -> Self {
         let tag = tag.map(|tag| Self::tag_to_hex(&tag));
-        let create_string = Self::create_query_string(tag.clone());
-        let delete_string = Self::delete_query_string(tag.clone());
+        let create_string = Self::create_query_string(&type_query, tag.clone());
+        let delete_string = Self::delete_query_string(&type_query, tag.clone());
         Self {
             base: Arc::new(base),
-            zome_id,
+            type_query,
             tag,
             query: Self::create_query(create_string, delete_string),
         }
@@ -41,12 +42,8 @@ impl LinksQuery {
         s
     }
 
-    pub fn base(base: AnyLinkableHash, zome_id: ZomeId) -> Self {
-        Self::new(base, zome_id, None)
-    }
-
-    pub fn tag(base: AnyLinkableHash, zome_id: ZomeId, tag: LinkTag) -> Self {
-        Self::new(base, zome_id, Some(tag))
+    pub fn base(base: AnyLinkableHash, dependencies: Vec<ZomeId>) -> Self {
+        Self::new(base, LinkTypeFilter::Dependencies(dependencies), None)
     }
 
     fn create_query(create: String, delete: String) -> String {
@@ -59,55 +56,59 @@ impl LinksQuery {
 
     fn common_query_string() -> &'static str {
         "
-            JOIN Header On DhtOp.header_hash = Header.hash
+            JOIN Action On DhtOp.action_hash = Action.hash
             WHERE DhtOp.type = :create
             AND
-            Header.base_hash = :base_hash
-            AND
-            Header.zome_id = :zome_id
+            Action.base_hash = :base_hash
             AND
             DhtOp.validation_status = :status
             AND DhtOp.when_integrated IS NOT NULL
         "
     }
-    fn create_query_string(tag: Option<String>) -> String {
-        let s = format!(
+    fn create_query_string(type_query: &LinkTypeFilter, tag: Option<String>) -> String {
+        let mut s = format!(
             "
-            SELECT Header.blob AS header_blob FROM DhtOp
+            SELECT Action.blob AS action_blob FROM DhtOp
             {}
             ",
             Self::common_query_string()
         );
+        s = Self::add_type_query(s, type_query);
         Self::add_tag(s, tag)
     }
     fn add_tag(q: String, tag: Option<String>) -> String {
-        if let Some(tag) = tag {
-            format!(
-                "{}
-            AND
-            HEX(Header.tag) like '{}%'",
-                q, tag
-            )
-        } else {
-            q
+        match tag {
+            Some(tag) => {
+                format!(
+                    "{}
+                    AND
+                    HEX(Action.tag) like '{}%'",
+                    q, tag
+                )
+            }
+            None => q,
         }
     }
-    fn delete_query_string(tag: Option<String>) -> String {
-        let sub_create_query = format!(
+    fn add_type_query(q: String, type_query: &LinkTypeFilter) -> String {
+        format!("{} {} ", q, type_query.to_sql_statement())
+    }
+    fn delete_query_string(type_query: &LinkTypeFilter, tag: Option<String>) -> String {
+        let mut sub_create_query = format!(
             "
-            SELECT Header.hash FROM DhtOp
+            SELECT Action.hash FROM DhtOp
             {}
             ",
             Self::common_query_string()
         );
-        let sub_create_query = Self::add_tag(sub_create_query, tag);
+        sub_create_query = Self::add_type_query(sub_create_query, type_query);
+        sub_create_query = Self::add_tag(sub_create_query, tag);
         let delete_query = format!(
             "
-            SELECT Header.blob AS header_blob FROM DhtOp
-            JOIN Header On DhtOp.header_hash = Header.hash
+            SELECT Action.blob AS action_blob FROM DhtOp
+            JOIN Action On DhtOp.action_hash = Action.hash
             WHERE DhtOp.type = :delete
             AND
-            Header.create_link_hash IN ({})
+            Action.create_link_hash IN ({})
             AND
             DhtOp.validation_status = :status
             AND
@@ -123,9 +124,8 @@ impl LinksQuery {
             named_params! {
                 ":create": DhtOpType::RegisterAddLink,
                 ":delete": DhtOpType::RegisterRemoveLink,
-                ":base_hash": self.base,
-                ":zome_id": *self.zome_id,
                 ":status": ValidationStatus::Valid,
+                ":base_hash": self.base,
             }
         }
         .to_vec()
@@ -133,27 +133,21 @@ impl LinksQuery {
 }
 
 impl GetLinksQuery {
-    pub fn new(base: AnyLinkableHash, zome_id: ZomeId, tag: Option<LinkTag>) -> Self {
+    pub fn new(base: AnyLinkableHash, type_query: LinkTypeFilter, tag: Option<LinkTag>) -> Self {
         Self {
-            query: LinksQuery::new(base, zome_id, tag),
+            query: LinksQuery::new(base, type_query, tag),
         }
     }
 
-    pub fn base(base: AnyLinkableHash, zome_id: ZomeId) -> Self {
+    pub fn base(base: AnyLinkableHash, dependencies: Vec<ZomeId>) -> Self {
         Self {
-            query: LinksQuery::base(base, zome_id),
-        }
-    }
-
-    pub fn tag(base: AnyLinkableHash, zome_id: ZomeId, tag: LinkTag) -> Self {
-        Self {
-            query: LinksQuery::tag(base, zome_id, tag),
+            query: LinksQuery::base(base, dependencies),
         }
     }
 }
 
 impl Query for GetLinksQuery {
-    type Item = Judged<SignedHeaderHashed>;
+    type Item = Judged<SignedActionHashed>;
     type State = Maps<Link>;
     type Output = Vec<Link>;
     fn query(&self) -> String {
@@ -169,7 +163,7 @@ impl Query for GetLinksQuery {
     }
 
     fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Item>> {
-        let f = row_blob_to_header("header_blob");
+        let f = row_blob_to_action("action_blob");
         // Data is valid because it is filtered in the sql query.
         Arc::new(move |row| Ok(Judged::valid(f(row)?)))
     }
@@ -177,23 +171,23 @@ impl Query for GetLinksQuery {
     fn as_filter(&self) -> Box<dyn Fn(&QueryData<Self>) -> bool> {
         let query = &self.query;
         let base_filter = query.base.clone();
-        let zome_id_filter = query.zome_id;
+        let type_query_filter = query.type_query.clone();
         let tag_filter = query.tag.clone();
-        let f = move |header: &QueryData<Self>| match header.header() {
-            Header::CreateLink(CreateLink {
+        let f = move |action: &QueryData<Self>| match action.action() {
+            Action::CreateLink(CreateLink {
                 base_address,
-                zome_id,
                 tag,
+                zome_id,
+                link_type,
                 ..
             }) => {
                 *base_address == *base_filter
-                    && *zome_id == zome_id_filter
+                    && type_query_filter.contains(zome_id, link_type)
                     && tag_filter
                         .as_ref()
-                        .map(|t| LinksQuery::tag_to_hex(tag).starts_with(&(**t)))
-                        .unwrap_or(true)
+                        .map_or(true, |t| LinksQuery::tag_to_hex(tag).starts_with(&(**t)))
             }
-            Header::DeleteLink(DeleteLink { base_address, .. }) => *base_address == *base_filter,
+            Action::DeleteLink(DeleteLink { base_address, .. }) => *base_address == *base_filter,
             _ => false,
         };
         Box::new(f)
@@ -201,21 +195,21 @@ impl Query for GetLinksQuery {
 
     fn fold(&self, mut state: Self::State, data: Self::Item) -> StateQueryResult<Self::State> {
         let shh = data.data;
-        let (header, _) = shh.into_inner();
-        let (header, hash) = header.into_inner();
-        match header {
-            Header::CreateLink(create_link) => {
+        let (action, _) = shh.into_inner();
+        let (action, hash) = action.into_inner();
+        match action {
+            Action::CreateLink(create_link) => {
                 if !state.deletes.contains(&hash) {
                     state
                         .creates
-                        .insert(hash, link_from_header(Header::CreateLink(create_link))?);
+                        .insert(hash, link_from_action(Action::CreateLink(create_link))?);
                 }
             }
-            Header::DeleteLink(delete_link) => {
+            Action::DeleteLink(delete_link) => {
                 state.creates.remove(&delete_link.link_add_address);
                 state.deletes.insert(delete_link.link_add_address);
             }
-            _ => return Err(StateQueryError::UnexpectedHeader(header.header_type())),
+            _ => return Err(StateQueryError::UnexpectedAction(action.action_type())),
         }
         Ok(state)
     }
@@ -230,15 +224,15 @@ impl Query for GetLinksQuery {
     }
 }
 
-fn link_from_header(header: Header) -> StateQueryResult<Link> {
-    let hash = HeaderHash::with_data_sync(&header);
-    match header {
-        Header::CreateLink(header) => Ok(Link {
-            target: header.target_address,
-            timestamp: header.timestamp,
-            tag: header.tag,
+fn link_from_action(action: Action) -> StateQueryResult<Link> {
+    let hash = ActionHash::with_data_sync(&action);
+    match action {
+        Action::CreateLink(action) => Ok(Link {
+            target: action.target_address,
+            timestamp: action.timestamp,
+            tag: action.tag,
             create_link_hash: hash,
         }),
-        _ => Err(StateQueryError::UnexpectedHeader(header.header_type())),
+        _ => Err(StateQueryError::UnexpectedAction(action.action_type())),
     }
 }

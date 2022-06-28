@@ -14,9 +14,9 @@ use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCallHostAccess;
 use crate::core::ribosome::ZomeCallInvocation;
 use hdk::prelude::*;
+use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holo_hash::AnyDhtHash;
-use holo_hash::HeaderHash;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::actor::GetLinksOptions;
 use holochain_p2p::actor::HolochainP2pRefToDna;
@@ -24,6 +24,7 @@ use holochain_p2p::HolochainP2pDna;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::prelude::*;
+use holochain_wasm_test_utils::TestWasmPair;
 use holochain_zome_types::AgentActivity;
 use std::sync::Arc;
 use unwrap_to::unwrap_to;
@@ -32,7 +33,9 @@ use unwrap_to::unwrap_to;
 // Useful for when you want to commit something
 // that will match entry defs
 pub const POST_ID: &str = "post";
+pub const POST_INDEX: EntryDefIndex = EntryDefIndex(0);
 pub const MSG_ID: &str = "msg";
+pub const MSG_INDEX: EntryDefIndex = EntryDefIndex(1);
 pub const VALID_ID: &str = "always_validates";
 pub const INVALID_ID: &str = "never_validates";
 
@@ -121,10 +124,16 @@ impl HostFnCaller {
 
         let zome_path = (
             cell_id.clone(),
-            dna_file.dna().zomes.get(zome_index).unwrap().0.clone(),
+            dna_file
+                .dna()
+                .integrity_zomes
+                .get(zome_index)
+                .unwrap()
+                .0
+                .clone(),
         )
             .into();
-        let ribosome = RealRibosome::new(dna_file.clone());
+        let ribosome = handle.get_ribosome(dna_file.dna_hash()).unwrap();
         let signal_tx = handle.signal_broadcaster().await;
         let call_zome_handle =
             CellConductorApi::new(handle.clone(), cell_id.clone()).into_call_zome_handle();
@@ -198,13 +207,69 @@ impl HostFnCaller {
 }
 
 impl HostFnCaller {
-    pub async fn commit_entry<E: Into<entry_def::EntryDefId>>(
+    pub fn get_entry_type(
+        &self,
+        zome: impl Into<TestWasmPair<ZomeName>>,
+        index: impl Into<EntryDefIndex>,
+    ) -> ScopedEntryDefIndex {
+        let TestWasmPair { integrity, .. } = zome.into();
+        let zome_id = self
+            .ribosome
+            .dna_def()
+            .integrity_zomes
+            .iter()
+            .position(|(z, _)| *z == integrity)
+            .unwrap();
+        let zome_types = self
+            .ribosome
+            .zome_types()
+            .in_scope_subset(&[ZomeId(zome_id as u8)]);
+        zome_types
+            .entries
+            .get(ZomeTypesKey {
+                zome_index: 0.into(),
+                type_index: index.into(),
+            })
+            .unwrap()
+    }
+    pub fn get_entry_link(
+        &self,
+        zome: impl Into<TestWasmPair<ZomeName>>,
+        index: impl Into<LinkType>,
+    ) -> ScopedLinkType {
+        let TestWasmPair { integrity, .. } = zome.into();
+        let zome_id = self
+            .ribosome
+            .dna_def()
+            .integrity_zomes
+            .iter()
+            .position(|(z, _)| *z == integrity)
+            .unwrap();
+        let zome_types = self
+            .ribosome
+            .zome_types()
+            .in_scope_subset(&[ZomeId(zome_id as u8)]);
+        zome_types
+            .links
+            .get(ZomeTypesKey {
+                zome_index: 0.into(),
+                type_index: index.into(),
+            })
+            .unwrap()
+    }
+    pub async fn commit_entry<E: Into<EntryDefLocation>>(
         &self,
         entry: Entry,
         entry_def_id: E,
-    ) -> HeaderHash {
+        visibility: EntryVisibility,
+    ) -> ActionHash {
         let (ribosome, call_context, workspace_lock) = self.unpack().await;
-        let input = CreateInput::new(entry_def_id.into(), entry, ChainTopOrdering::default());
+        let input = CreateInput::new(
+            entry_def_id.into(),
+            visibility,
+            entry,
+            ChainTopOrdering::default(),
+        );
         let output = host_fn::create::create(ribosome, call_context, input).unwrap();
 
         // Write
@@ -213,7 +278,7 @@ impl HostFnCaller {
         output
     }
 
-    pub async fn delete_entry<'env>(&self, input: DeleteInput) -> HeaderHash {
+    pub async fn delete_entry<'env>(&self, input: DeleteInput) -> ActionHash {
         let (ribosome, call_context, workspace_lock) = self.unpack().await;
         let output = {
             let r = host_fn::delete::delete(ribosome, call_context, input);
@@ -230,17 +295,18 @@ impl HostFnCaller {
         output
     }
 
-    pub async fn update_entry<'env, E: Into<entry_def::EntryDefId>>(
+    pub async fn update_entry(
         &self,
         entry: Entry,
-        entry_def_id: E,
-        original_header_hash: HeaderHash,
-    ) -> HeaderHash {
+        original_action_address: ActionHash,
+    ) -> ActionHash {
         let (ribosome, call_context, workspace_lock) = self.unpack().await;
-        let input = UpdateInput::new(
-            original_header_hash,
-            CreateInput::new(entry_def_id.into(), entry, ChainTopOrdering::default()),
-        );
+        let input = UpdateInput {
+            original_action_address,
+            entry,
+            chain_top_ordering: Default::default(),
+        };
+
         let output = { host_fn::update::update(ribosome, call_context, input).unwrap() };
 
         // Write
@@ -249,7 +315,7 @@ impl HostFnCaller {
         output
     }
 
-    pub async fn get(&self, entry_hash: AnyDhtHash, options: GetOptions) -> Vec<Option<Element>> {
+    pub async fn get(&self, entry_hash: AnyDhtHash, options: GetOptions) -> Vec<Option<Record>> {
         let (ribosome, call_context, _) = self.unpack().await;
         let input = GetInput::new(entry_hash, options);
         host_fn::get::get(ribosome, call_context, vec![input]).unwrap()
@@ -269,13 +335,16 @@ impl HostFnCaller {
         &self,
         base: AnyLinkableHash,
         target: AnyLinkableHash,
+        zome_id: impl Into<ZomeId>,
+        link_type: impl Into<LinkType>,
         link_tag: LinkTag,
-    ) -> HeaderHash {
+    ) -> ActionHash {
         let (ribosome, call_context, workspace_lock) = self.unpack().await;
         let input = CreateLinkInput::new(
             base,
             target,
-            HdkLinkType::Any.into(),
+            zome_id.into(),
+            link_type.into(),
             link_tag,
             ChainTopOrdering::default(),
         );
@@ -287,7 +356,7 @@ impl HostFnCaller {
         output
     }
 
-    pub async fn delete_link<'env>(&self, link_add_hash: HeaderHash) -> HeaderHash {
+    pub async fn delete_link<'env>(&self, link_add_hash: ActionHash) -> ActionHash {
         let (ribosome, call_context, workspace_lock) = self.unpack().await;
         let output = {
             host_fn::delete_link::delete_link(
@@ -307,11 +376,12 @@ impl HostFnCaller {
     pub async fn get_links<'env>(
         &self,
         base: AnyLinkableHash,
+        type_query: LinkTypeFilter,
         link_tag: Option<LinkTag>,
         _options: GetLinksOptions,
     ) -> Vec<Link> {
         let (ribosome, call_context, workspace_lock) = self.unpack().await;
-        let input = GetLinksInput::new(base, link_tag);
+        let input = GetLinksInput::new(base, type_query, link_tag);
         let output = {
             host_fn::get_links::get_links(ribosome, call_context, vec![input])
                 .unwrap()
@@ -329,11 +399,12 @@ impl HostFnCaller {
     pub async fn get_link_details<'env>(
         &self,
         base: AnyLinkableHash,
+        type_query: LinkTypeFilter,
         tag: LinkTag,
         _options: GetLinksOptions,
-    ) -> Vec<(SignedHeaderHashed, Vec<SignedHeaderHashed>)> {
+    ) -> Vec<(SignedActionHashed, Vec<SignedActionHashed>)> {
         let (ribosome, call_context, workspace_lock) = self.unpack().await;
-        let input = GetLinksInput::new(base, Some(tag));
+        let input = GetLinksInput::new(base, type_query, Some(tag));
         let output = {
             host_fn::get_link_details::get_link_details(ribosome, call_context, vec![input])
                 .unwrap()

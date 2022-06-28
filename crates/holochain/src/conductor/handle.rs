@@ -137,13 +137,21 @@ pub trait ConductorHandleT: Send + Sync {
     /// Install a [`DnaFile`](holochain_types::dna::DnaFile) in this Conductor
     async fn register_dna(&self, dna: DnaFile) -> ConductorResult<()>;
 
+    /// Hot swap coordinator zomes on an existing dna.
+    async fn hot_swap_coordinators(
+        &self,
+        hash: &DnaHash,
+        coordinator_zomes: CoordinatorZomes,
+        wasms: Vec<wasm::DnaWasm>,
+    ) -> ConductorResult<()>;
+
     /// Get the list of hashes of installed Dnas in this Conductor
     fn list_dnas(&self) -> Vec<DnaHash>;
 
-    /// Get a [`DnaDef`](holochain_types::prelude::DnaDef) from the [`DnaStore`](crate::conductor::dna_store::DnaStore)
+    /// Get a [`DnaDef`](holochain_types::prelude::DnaDef) from the [`RibosomeStore`](crate::conductor::ribosome_store::RibosomeStore)
     fn get_dna_def(&self, hash: &DnaHash) -> Option<DnaDef>;
 
-    /// Get a [`DnaFile`](holochain_types::dna::DnaFile) from the [`DnaStore`](crate::conductor::dna_store::DnaStore)
+    /// Get a [`DnaFile`](holochain_types::dna::DnaFile) from the [`RibosomeStore`](crate::conductor::ribosome_store::RibosomeStore)
     fn get_dna_file(&self, hash: &DnaHash) -> Option<DnaFile>;
 
     /// Get an instance of a [`RealRibosome`](crate::core::ribosome::real_ribosome::RealRibosome) for the DnaHash
@@ -337,13 +345,13 @@ pub trait ConductorHandleT: Send + Sync {
     /// allowing individual Cells to be shut down.
     async fn remove_cells(&self, cell_ids: &[CellId]);
 
-    /// Inject elements into a source chain for a cell.
-    async fn insert_elements_into_source_chain(
+    /// Inject records into a source chain for a cell.
+    async fn insert_records_into_source_chain(
         self: Arc<Self>,
         cell_id: CellId,
         truncate: bool,
         validate: bool,
-        elements: Vec<Element>,
+        records: Vec<Record>,
     ) -> ConductorApiResult<()>;
 
     /// Retrieve the authored environment for this dna. FOR TESTING ONLY.
@@ -415,7 +423,7 @@ pub trait ConductorHandleT: Send + Sync {
     // and using generics seems problematic with mockall::automock.
     // Something like this would be desirable, but ultimately doesn't work.
     //
-    // type DS: Send + Sync + DnaStore;
+    // type DS: Send + Sync + RibosomeStore;
     //
     // /// Get immutable access to the inner conductor state via a read lock
     // async fn conductor<F, T>(&self, f: F) -> ConductorApiResult<T>
@@ -556,33 +564,73 @@ impl ConductorHandleT for ConductorHandleImpl {
     }
 
     async fn register_dna(&self, dna: DnaFile) -> ConductorResult<()> {
-        self.register_genotype(dna.clone()).await?;
-        self.conductor.register_phenotype(dna);
+        let ribosome = RealRibosome::new(dna)?;
+        self.register_genotype(ribosome.clone()).await?;
+        self.conductor.register_phenotype(ribosome);
+        Ok(())
+    }
+
+    async fn hot_swap_coordinators(
+        &self,
+        hash: &DnaHash,
+        coordinator_zomes: CoordinatorZomes,
+        wasms: Vec<wasm::DnaWasm>,
+    ) -> ConductorResult<()> {
+        // Note this isn't really concurrent safe. It would be a race condition to hotswap the
+        // same dna concurrently.
+        let mut ribosome =
+            self.conductor
+                .ribosome_store()
+                .share_ref(|d| match d.get_ribosome(hash) {
+                    Some(dna) => Ok(dna),
+                    None => Err(DnaError::DnaMissing(hash.to_owned())),
+                })?;
+        let _old_wasms = ribosome
+            .dna_file
+            .hot_swap_coordinators(coordinator_zomes.clone(), wasms.clone())
+            .await?;
+
+        // Add new wasm code to db.
+        self.conductor
+            .put_wasm_code(
+                ribosome.dna_def().clone(),
+                wasms.into_iter(),
+                Vec::with_capacity(0),
+            )
+            .await?;
+
+        // Update RibosomeStore.
+        self.conductor
+            .ribosome_store()
+            .share_mut(|d| d.add_ribosome(ribosome));
+
+        // TODO: Remove old wasm code? (Maybe this needs to be done on restart as it could be in use).
+
         Ok(())
     }
 
     async fn load_dnas(&self) -> ConductorResult<()> {
-        let (dnas, entry_defs) = self.conductor.load_wasms_into_dna_files().await?;
-        self.conductor.dna_store().share_mut(|ds| {
-            ds.add_dnas(dnas);
+        let (ribosomes, entry_defs) = self.conductor.load_wasms_into_dna_files().await?;
+        self.conductor.ribosome_store().share_mut(|ds| {
+            ds.add_ribosomes(ribosomes);
             ds.add_entry_defs(entry_defs);
         });
         Ok(())
     }
 
     fn list_dnas(&self) -> Vec<DnaHash> {
-        self.conductor.dna_store().share_ref(|ds| ds.list())
+        self.conductor.ribosome_store().share_ref(|ds| ds.list())
     }
 
     fn get_dna_def(&self, hash: &DnaHash) -> Option<DnaDef> {
         self.conductor
-            .dna_store()
+            .ribosome_store()
             .share_ref(|ds| ds.get_dna_def(hash))
     }
 
     fn get_dna_file(&self, hash: &DnaHash) -> Option<DnaFile> {
         self.conductor
-            .dna_store()
+            .ribosome_store()
             .share_ref(|ds| ds.get_dna_file(hash))
     }
 
@@ -592,7 +640,7 @@ impl ConductorHandleT for ConductorHandleImpl {
 
     fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef> {
         self.conductor
-            .dna_store()
+            .ribosome_store()
             .share_ref(|ds| ds.get_entry_def(key))
     }
 
@@ -1228,12 +1276,12 @@ impl ConductorHandleT for ConductorHandleImpl {
         self.conductor.remove_cells(cell_ids.to_vec()).await
     }
 
-    async fn insert_elements_into_source_chain(
+    async fn insert_records_into_source_chain(
         self: Arc<Self>,
         cell_id: CellId,
         truncate: bool,
         validate: bool,
-        elements: Vec<Element>,
+        records: Vec<Record>,
     ) -> ConductorApiResult<()> {
         // Get or create the space for this cell.
         // Note: This doesn't require the cell be installed.
@@ -1255,13 +1303,10 @@ impl ConductorHandleT for ConductorHandleImpl {
             .holochain_p2p()
             .to_dna(cell_id.dna_hash().clone());
 
-        // Validate the elements.
+        // Validate the records.
         if validate {
             // Create the ribosome.
-            let ribosome = self
-                .get_dna_file(cell_id.dna_hash())
-                .map(RealRibosome::new)
-                .ok_or_else(|| DnaError::DnaMissing(cell_id.dna_hash().to_owned()))?;
+            let ribosome = self.get_ribosome(cell_id.dna_hash())?;
 
             // Create a raw source chain to validate against because
             // genesis may not have been run yet.
@@ -1280,18 +1325,17 @@ impl ConductorHandleT for ConductorHandleImpl {
 
             // Validate the chain.
             crate::core::validate_chain(
-                elements.iter().map(|e| e.header_hashed()),
+                records.iter().map(|e| e.action_hashed()),
                 &persisted_chain_head.clone().filter(|_| !truncate),
             )
             .map_err(|e| SourceChainError::InvalidCommit(e.to_string()))?;
 
-            // Add the elements to the source chain so we can validate them.
+            // Add the records to the source chain so we can validate them.
             sc.scratch()
                 .apply(|scratch| {
-                    for el in elements.clone() {
-                        holochain_state::prelude::insert_element_scratch(
+                    for el in records.clone() {
+                        holochain_state::prelude::insert_record_scratch(
                             scratch,
-                            None,
                             el,
                             Default::default(),
                         );
@@ -1299,7 +1343,7 @@ impl ConductorHandleT for ConductorHandleImpl {
                 })
                 .map_err(SourceChainError::from)?;
 
-            // Run the individual element validations.
+            // Run the individual record validations.
             crate::core::workflow::inline_validation(
                 workspace.clone(),
                 network.clone(),
@@ -1312,21 +1356,21 @@ impl ConductorHandleT for ConductorHandleImpl {
         let authored_db = space.authored_db;
         let dht_db = space.dht_db;
 
-        // Produce the op lights for each element.
-        let data = elements
+        // Produce the op lights for each record.
+        let data = records
             .into_iter()
             .map(|el| {
-                let ops = produce_op_lights_from_elements(vec![&el])?;
+                let ops = produce_op_lights_from_records(vec![&el])?;
                 // Check have the same author as cell.
                 let (shh, entry) = el.into_inner();
-                if shh.header().author() != cell_id.agent_pubkey() {
+                if shh.action().author() != cell_id.agent_pubkey() {
                     return Err(StateMutationError::AuthorsMustMatch);
                 }
                 Ok((shh, ops, entry.into_option()))
             })
             .collect::<StateMutationResult<Vec<_>>>()?;
 
-        // Commit the elements to the source chain.
+        // Commit the records to the source chain.
         let ops_to_integrate = authored_db
             .async_commit({
                 let cell_id = cell_id.clone();
@@ -1334,7 +1378,7 @@ impl ConductorHandleT for ConductorHandleImpl {
                     // Truncate the chain if requested.
                     if truncate {
                         txn.execute(
-                            "DELETE FROM Header WHERE author = ?",
+                            "DELETE FROM Action WHERE author = ?",
                             [cell_id.agent_pubkey()],
                         )
                         .map_err(StateMutationError::from)?;
@@ -1357,7 +1401,7 @@ impl ConductorHandleT for ConductorHandleImpl {
                     }
                     let mut ops_to_integrate = Vec::new();
 
-                    // Commit the elements and ops to the authored db.
+                    // Commit the records and ops to the authored db.
                     for (shh, ops, entry) in data {
                         // Clippy is wrong :(
                         #[allow(clippy::needless_collect)]
@@ -1487,8 +1531,8 @@ impl ConductorHandleImpl {
     }
 
     /// Install just the "code parts" (the wasm and entry defs) of a dna
-    async fn register_genotype(&self, dna: DnaFile) -> ConductorResult<()> {
-        let entry_defs = self.conductor.register_dna_wasm(dna).await?;
+    async fn register_genotype(&self, ribosome: RealRibosome) -> ConductorResult<()> {
+        let entry_defs = self.conductor.register_dna_wasm(ribosome).await?;
         self.conductor.register_dna_entry_defs(entry_defs);
         Ok(())
     }

@@ -99,7 +99,7 @@ impl HolochainP2pHandler for StubNetwork {
         agent: AgentPubKey,
         query: ChainQueryFilter,
         options: actor::GetActivityOptions,
-    ) -> HolochainP2pHandlerResult<Vec<AgentActivityResponse<HeaderHash>>> {
+    ) -> HolochainP2pHandlerResult<Vec<AgentActivityResponse<ActionHash>>> {
         Err("stub".into())
     }
     fn handle_send_validation_receipt(
@@ -124,7 +124,7 @@ impl HolochainP2pHandler for StubNetwork {
         &mut self,
         dna_hash: DnaHash,
         agents: Vec<AgentPubKey>,
-        response: Vec<SignedHeader>,
+        response: Vec<SignedAction>,
     ) -> HolochainP2pHandlerResult<()> {
         Err("stub".into())
     }
@@ -378,15 +378,15 @@ mod tests {
         p2p.join(dna.clone(), a2.clone(), None).await.unwrap();
         p2p.join(dna.clone(), a3.clone(), None).await.unwrap();
 
-        let header_hash = holo_hash::AnyDhtHash::from_raw_36_and_type(
+        let action_hash = holo_hash::AnyDhtHash::from_raw_36_and_type(
             b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_vec(),
-            holo_hash::hash_type::AnyDht::Header,
+            holo_hash::hash_type::AnyDht::Action,
         );
 
         // this will fail because we can't reach any remote nodes
         // but, it still published locally, so our test will work
         let _ = p2p
-            .publish(dna, true, false, header_hash, vec![], Some(200))
+            .publish(dna, true, false, action_hash, vec![], Some(200))
             .await;
 
         assert_eq!(3, recv_count.load(std::sync::atomic::Ordering::SeqCst));
@@ -413,14 +413,14 @@ mod tests {
             .await
             .unwrap();
 
-        let test_1 = WireOps::Element(WireElementOps {
-            header: Some(Judged::valid(SignedHeader(fixt!(Header), fixt!(Signature)))),
+        let test_1 = WireOps::Record(WireRecordOps {
+            action: Some(Judged::valid(SignedAction(fixt!(Action), fixt!(Signature)))),
             deletes: vec![],
             updates: vec![],
             entry: None,
         });
-        let test_2 = WireOps::Element(WireElementOps {
-            header: Some(Judged::valid(SignedHeader(fixt!(Header), fixt!(Signature)))),
+        let test_2 = WireOps::Record(WireRecordOps {
+            action: Some(Judged::valid(SignedAction(fixt!(Action), fixt!(Signature)))),
             deletes: vec![],
             updates: vec![],
             entry: None,
@@ -474,7 +474,7 @@ mod tests {
 
         let hash = holo_hash::AnyDhtHash::from_raw_36_and_type(
             b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_vec(),
-            holo_hash::hash_type::AnyDht::Header,
+            holo_hash::hash_type::AnyDht::Action,
         );
 
         tracing::info!("test - get");
@@ -568,7 +568,7 @@ mod tests {
         );
         let link_key = WireLinkKey {
             base: hash.into(),
-            zome_id: 0.into(),
+            type_query: LinkTypeFilter::single_dep(0.into()),
             tag: None,
         };
 

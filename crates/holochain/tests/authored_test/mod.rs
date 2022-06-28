@@ -11,6 +11,8 @@ use holochain_zome_types::Entry;
 use holochain::test_utils::conductor_setup::ConductorTestData;
 use holochain::test_utils::host_fn_caller::*;
 use holochain::test_utils::wait_for_integration;
+use holochain_zome_types::EntryDefLocation;
+use holochain_zome_types::EntryVisibility;
 use rusqlite::named_params;
 
 /// - Alice commits an entry and it is in their authored store
@@ -35,10 +37,14 @@ async fn authored_test() {
     let entry = Post("Hi there".into());
     let entry_hash = EntryHash::with_data_sync(&Entry::try_from(entry.clone()).unwrap());
     // 3
-    alice_call_data
-        .get_api(TestWasm::Create)
-        .commit_entry(entry.clone().try_into().unwrap(), POST_ID)
-        .await;
+    let h = alice_call_data.get_api(TestWasm::Create);
+    let zome_id = h.get_entry_type(TestWasm::Create, POST_INDEX).zome_id;
+    h.commit_entry(
+        entry.clone().try_into().unwrap(),
+        EntryDefLocation::app(zome_id, POST_INDEX),
+        EntryVisibility::Public,
+    )
+    .await;
 
     // publish these commits
     let triggers = handle.get_cell_triggers(&alice_call_data.cell_id).unwrap();
@@ -49,8 +55,8 @@ async fn authored_test() {
         let basis: AnyDhtHash = entry_hash.clone().into();
         let has_authored_entry: bool = txn
             .query_row(
-                "SELECT EXISTS(SELECT 1 FROM DhtOp JOIN Header ON DhtOp.header_hash = Header.hash
-                    WHERE basis_hash = :hash AND Header.author = :author)",
+                "SELECT EXISTS(SELECT 1 FROM DhtOp JOIN Action ON DhtOp.action_hash = Action.hash
+                    WHERE basis_hash = :hash AND Action.author = :author)",
                 named_params! {
                     ":hash": basis,
                     ":author": alice_call_data.cell_id.agent_pubkey(),
@@ -78,8 +84,8 @@ async fn authored_test() {
         let basis: AnyDhtHash = entry_hash.clone().into();
         let has_authored_entry: bool = txn
             .query_row(
-                "SELECT EXISTS(SELECT 1 FROM DhtOp JOIN Header ON DhtOp.header_hash = Header.hash
-                    WHERE basis_hash = :hash AND Header.author = :author)",
+                "SELECT EXISTS(SELECT 1 FROM DhtOp JOIN Action ON DhtOp.action_hash = Action.hash
+                    WHERE basis_hash = :hash AND Action.author = :author)",
                 named_params! {
                     ":hash": basis,
                     ":author": bob_call_data.cell_id.agent_pubkey(),
@@ -105,10 +111,14 @@ async fn authored_test() {
     });
 
     // Now bob commits the entry
-    bob_call_data
-        .get_api(TestWasm::Create)
-        .commit_entry(entry.clone().try_into().unwrap(), POST_ID)
-        .await;
+    let h = bob_call_data.get_api(TestWasm::Create);
+    let zome_id = h.get_entry_type(TestWasm::Create, POST_INDEX).zome_id;
+    h.commit_entry(
+        entry.clone().try_into().unwrap(),
+        EntryDefLocation::app(zome_id, POST_INDEX),
+        EntryVisibility::Public,
+    )
+    .await;
 
     // Produce and publish these commits
     let triggers = handle.get_cell_triggers(&bob_call_data.cell_id).unwrap();
@@ -118,8 +128,8 @@ async fn authored_test() {
         let basis: AnyDhtHash = entry_hash.clone().into();
         let has_authored_entry: bool = txn
             .query_row(
-                "SELECT EXISTS(SELECT 1 FROM DhtOp JOIN Header ON DhtOp.header_hash = Header.hash
-                    WHERE basis_hash = :hash AND Header.author = :author)",
+                "SELECT EXISTS(SELECT 1 FROM DhtOp JOIN Action ON DhtOp.action_hash = Action.hash
+                    WHERE basis_hash = :hash AND Action.author = :author)",
                 named_params! {
                     ":hash": basis,
                     ":author": bob_call_data.cell_id.agent_pubkey(),

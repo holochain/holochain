@@ -1,9 +1,9 @@
 //! Some common testing helpers.
 
 use crate::dna::wasm::DnaWasm;
-use crate::element::SignedHeaderHashedExt;
 use crate::fixt::*;
 use crate::prelude::*;
+use crate::record::SignedActionHashedExt;
 use holochain_keystore::MetaLairClient;
 use std::path::PathBuf;
 
@@ -38,15 +38,22 @@ pub fn fake_dna_zomes_named(uid: &str, name: &str, zomes: Vec<(ZomeName, DnaWasm
             .unwrap(),
         uid: uid.to_string(),
         origin_time: Timestamp::HOLOCHAIN_EPOCH,
-        zomes: Vec::new(),
+        integrity_zomes: Vec::new(),
+        coordinator_zomes: Vec::new(),
     };
     tokio_helper::block_forever_on(async move {
         let mut wasm_code = Vec::new();
         for (zome_name, wasm) in zomes {
             let wasm = crate::dna::wasm::DnaWasmHashed::from_content(wasm).await;
             let (wasm, wasm_hash) = wasm.into_inner();
-            dna.zomes
-                .push((zome_name, ZomeDef::Wasm(WasmZome { wasm_hash })));
+            dna.integrity_zomes.push((
+                zome_name,
+                ZomeDef::Wasm(WasmZome {
+                    wasm_hash,
+                    dependencies: Default::default(),
+                })
+                .into(),
+            ));
             wasm_code.push(wasm);
         }
         DnaFile::new(dna, wasm_code).await
@@ -88,28 +95,30 @@ pub fn fake_cap_secret() -> CapSecret {
     [0; CAP_SECRET_BYTES].into()
 }
 
-/// Create a fake SignedHeaderHashed and EntryHashed pair with random content
-pub async fn fake_unique_element(
+/// Create a fake SignedActionHashed and EntryHashed pair with random content
+pub async fn fake_unique_record(
     keystore: &MetaLairClient,
     agent_key: AgentPubKey,
     visibility: EntryVisibility,
-) -> anyhow::Result<(SignedHeaderHashed, EntryHashed)> {
+) -> anyhow::Result<(SignedActionHashed, EntryHashed)> {
     let content: SerializedBytes =
         UnsafeBytes::from(nanoid::nanoid!().as_bytes().to_owned()).into();
     let entry = Entry::App(content.try_into().unwrap()).into_hashed();
     let app_entry_type = AppEntryTypeFixturator::new(visibility).next().unwrap();
-    let header_1 = Header::Create(Create {
+    let action_1 = Action::Create(Create {
         author: agent_key,
         timestamp: Timestamp::now(),
-        header_seq: 0,
-        prev_header: fake_header_hash(1),
+        action_seq: 0,
+        prev_action: fake_action_hash(1),
 
         entry_type: EntryType::App(app_entry_type),
         entry_hash: entry.as_hash().to_owned(),
+
+        weight: Default::default(),
     });
 
     Ok((
-        SignedHeaderHashed::sign(keystore, header_1.into_hashed()).await?,
+        SignedActionHashed::sign(keystore, action_1.into_hashed()).await?,
         entry,
     ))
 }

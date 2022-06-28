@@ -2,7 +2,7 @@ use holochain_p2p::HolochainP2pDna;
 use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
 use holochain_state::prelude::SourceChainRead;
 use holochain_types::prelude::*;
-use holochain_zome_types::HeaderHashed;
+use holochain_zome_types::ActionHashed;
 
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageHostAccess;
@@ -13,65 +13,61 @@ use crate::core::SourceChainResult;
 use tracing::*;
 
 pub async fn get_as_author_sub_chain(
-    header_seq: u32,
+    action_seq: u32,
     app_entry_type: AppEntryType,
     source_chain: &SourceChainRead,
 ) -> SourceChainResult<ValidationPackage> {
     // Collect and return the sub chain
-    let elements = source_chain
+    let records = source_chain
         .query(
             ChainQueryFilter::default()
                 .include_entries(true)
                 .entry_type(EntryType::App(app_entry_type))
-                .sequence_range(ChainQueryFilterRange::HeaderSeqRange(
+                .sequence_range(ChainQueryFilterRange::ActionSeqRange(
                     0,
-                    header_seq.saturating_sub(1),
+                    action_seq.saturating_sub(1),
                 )),
         )
         .await?;
-    Ok(ValidationPackage::new(elements))
+    Ok(ValidationPackage::new(records))
 }
 
 pub async fn get_as_author_full(
-    header_seq: u32,
+    action_seq: u32,
     source_chain: &SourceChainRead,
 ) -> SourceChainResult<ValidationPackage> {
-    let elements = source_chain
+    let records = source_chain
         .query(
             ChainQueryFilter::default()
                 .include_entries(true)
-                .sequence_range(ChainQueryFilterRange::HeaderSeqRange(
+                .sequence_range(ChainQueryFilterRange::ActionSeqRange(
                     0,
-                    header_seq.saturating_sub(1),
+                    action_seq.saturating_sub(1),
                 )),
         )
         .await?;
-    Ok(ValidationPackage::new(elements))
+    Ok(ValidationPackage::new(records))
 }
 
 pub fn get_as_author_custom(
-    header_hashed: &HeaderHashed,
+    action_hashed: &ActionHashed,
     ribosome: &impl RibosomeT,
     network: &HolochainP2pDna,
     workspace_lock: HostFnWorkspaceRead,
 ) -> RibosomeResult<Option<ValidationPackageResult>> {
-    let header = header_hashed.as_content();
+    let action = action_hashed.as_content();
     let access = ValidationPackageHostAccess::new(workspace_lock, network.clone());
-    let app_entry_type = match header.entry_type() {
+    let app_entry_type = match action.entry_type() {
         Some(EntryType::App(a)) => a.clone(),
         _ => return Ok(None),
     };
 
-    let zome = match ribosome
-        .dna_def()
-        .zomes
-        .get(app_entry_type.zome_id().index())
-    {
-        Some(zome_tuple) => zome_tuple.clone().into(),
+    let zome = match ribosome.get_integrity_zome(&app_entry_type.zome_id()) {
+        Some(zome_tuple) => zome_tuple,
         None => {
             warn!(
-                msg = "Tried to get custom validation package for header with invalid zome_id",
-                ?header
+                msg = "Tried to get custom validation package for action with invalid zome_id",
+                ?action
             );
             return Ok(None);
         }

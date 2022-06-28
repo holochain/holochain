@@ -27,9 +27,10 @@ use crate::prelude::*;
 /// Commits to the grantor's source chain will be signed by the grantor, even if initiated.
 /// by a claimant.
 /// Delegating agency to grantee claimants is a serious responsibility!
-pub fn create_cap_claim(cap_claim_entry: CapClaimEntry) -> ExternResult<HeaderHash> {
+pub fn create_cap_claim(cap_claim_entry: CapClaimEntry) -> ExternResult<ActionHash> {
     create(CreateInput::new(
-        EntryDefId::CapClaim,
+        EntryDefLocation::CapClaim,
+        EntryVisibility::Private,
         Entry::CapClaim(cap_claim_entry),
         ChainTopOrdering::default(),
     ))
@@ -120,9 +121,10 @@ pub fn create_cap_claim(cap_claim_entry: CapClaimEntry) -> ExternResult<HeaderHa
 /// and the secret Bob received from her, then she commits a new CapClaim including the secret that
 /// Bob generated. Now Alice can call `foo` on Bob's machine any time he is online, and because all
 /// the secrets are [`CapAccess::Assigned`] Bob can track and update exactly who has access to his externs.
-pub fn create_cap_grant(cap_grant_entry: CapGrantEntry) -> ExternResult<HeaderHash> {
+pub fn create_cap_grant(cap_grant_entry: CapGrantEntry) -> ExternResult<ActionHash> {
     create(CreateInput::new(
-        EntryDefId::CapGrant,
+        EntryDefLocation::CapGrant,
+        EntryVisibility::Private,
         Entry::CapGrant(cap_grant_entry),
         ChainTopOrdering::default(),
     ))
@@ -140,11 +142,11 @@ pub fn create_cap_grant(cap_grant_entry: CapGrantEntry) -> ExternResult<HeaderHa
 /// There is no `undo` for deletes, a new grant must be created and distributed to reinstate access after a grant deletion.
 /// Immediately means after the wasm successfully completes with no errors or rollbacks as extern calls are transactional/atomic.
 ///
-/// The input to [`delete_cap_grant`] is the [`HeaderHash`] of the [`CapGrant`] element to delete and optionally an argument to
+/// The input to [`delete_cap_grant`] is the [`ActionHash`] of the [`CapGrant`] record to delete and optionally an argument to
 /// specify the [`ChainTopOrdering`]. Refer to [`DeleteInput`] for details.
 ///
 /// Deletes can reference both [`CapGrant`] creates and updates.
-pub fn delete_cap_grant<I, E>(delete_input: I) -> ExternResult<HeaderHash>
+pub fn delete_cap_grant<I, E>(delete_input: I) -> ExternResult<ActionHash>
 where
     DeleteInput: TryFrom<I, Error = E>,
     WasmError: From<E>,
@@ -184,18 +186,15 @@ pub fn generate_cap_secret() -> ExternResult<CapSecret> {
 ///
 /// Capability grant updates work exactly as a delete+create of the old+new grant entries.
 ///
-/// The first argument is the header hash of the old grant being deleted as per [`delete_cap_grant`].
+/// The first argument is the action hash of the old grant being deleted as per [`delete_cap_grant`].
 /// The second argument is the entry value of the new grant to create as per [`create_cap_grant`].
 pub fn update_cap_grant(
-    old_grant_header_hash: HeaderHash,
+    old_grant_action_hash: ActionHash,
     new_grant_value: CapGrantEntry,
-) -> ExternResult<HeaderHash> {
-    update(
-        old_grant_header_hash,
-        CreateInput::new(
-            EntryDefId::CapGrant,
-            Entry::CapGrant(new_grant_value),
-            ChainTopOrdering::default(),
-        ),
-    )
+) -> ExternResult<ActionHash> {
+    update(UpdateInput {
+        original_action_address: old_grant_action_hash,
+        entry: Entry::CapGrant(new_grant_value),
+        chain_top_ordering: ChainTopOrdering::default(),
+    })
 }

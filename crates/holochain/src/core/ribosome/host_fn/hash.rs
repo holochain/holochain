@@ -2,7 +2,7 @@ use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holo_hash::encode::blake2b_n;
 use holo_hash::HasHash;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 use holochain_zome_types::prelude::*;
 use std::sync::Arc;
 use tiny_keccak::{Hasher, Keccak, Sha3};
@@ -11,17 +11,19 @@ pub fn hash(
     _ribosome: Arc<impl RibosomeT>,
     _call_context: Arc<CallContext>,
     input: HashInput,
-) -> Result<HashOutput, WasmError> {
+) -> Result<HashOutput, RuntimeError> {
     Ok(match input {
         HashInput::Entry(entry) => HashOutput::Entry(
             holochain_zome_types::entry::EntryHashed::from_content_sync(entry).into_hash(),
         ),
-        HashInput::Header(header) => HashOutput::Header(
-            holochain_zome_types::header::HeaderHashed::from_content_sync(header).into_hash(),
+        HashInput::Action(action) => HashOutput::Action(
+            holochain_zome_types::action::ActionHashed::from_content_sync(action).into_hash(),
         ),
-        HashInput::Blake2B(data, output_len) => HashOutput::Blake2B(
-            blake2b_n(&data, output_len as usize).map_err(|e| WasmError::Host(e.to_string()))?,
-        ),
+        HashInput::Blake2B(data, output_len) => {
+            HashOutput::Blake2B(blake2b_n(&data, output_len as usize).map_err(
+                |e| -> RuntimeError { wasm_error!(WasmErrorInner::Host(e.to_string())).into() },
+            )?)
+        }
         HashInput::Keccak256(data) => HashOutput::Keccak256({
             let mut output = [0u8; 32];
             let mut hasher = Keccak::v256();
@@ -37,10 +39,11 @@ pub fn hash(
             output.into()
         }),
         _ => {
-            return Err(WasmError::Host(format!(
+            return Err(wasm_error!(WasmErrorInner::Host(format!(
                 "Unimplemented hashing algorithm {:?}",
                 input
             )))
+            .into())
         }
     })
 }
@@ -56,7 +59,6 @@ pub mod wasm_test {
     use crate::fixt::EntryFixturator;
     use crate::fixt::RealRibosomeFixturator;
     use ::fixt::prelude::*;
-    use hdk::hash_path::path::Component;
     use hdk::prelude::*;
     use holo_hash::EntryHash;
     use holochain_wasm_test_utils::TestWasm;
@@ -91,20 +93,20 @@ pub mod wasm_test {
 
         assert_eq!(*entry_output.hash_type(), holo_hash::hash_type::Entry);
 
-        let header_input = HashInput::Header(fixt!(Header));
+        let action_input = HashInput::Action(fixt!(Action));
 
-        let header_output: HeaderHash = match hash(
+        let action_output: ActionHash = match hash(
             Arc::clone(&ribosome),
             Arc::clone(&call_context),
-            header_input,
+            action_input,
         )
         .unwrap()
         {
-            HashOutput::Header(output) => output,
+            HashOutput::Action(output) => output,
             _ => unreachable!(),
         };
 
-        assert_eq!(*header_output.hash_type(), holo_hash::hash_type::Header);
+        assert_eq!(*action_output.hash_type(), holo_hash::hash_type::Action);
 
         let blake2b_input = HashInput::Blake2B(vec![1, 2, 3], 5);
 
@@ -188,31 +190,5 @@ pub mod wasm_test {
             .await;
 
         assert_eq!(entry_hash_output, hash_output);
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    /// the hash path underlying anchors wraps entry_hash
-    async fn ribosome_hash_path_pwd_test() {
-        observability::test_run().ok();
-        let RibosomeTestFixture {
-            conductor, alice, ..
-        } = RibosomeTestFixture::new(TestWasm::HashPath).await;
-        let input = "foo.bar".to_string();
-        let output: EntryHash = conductor.call(&alice, "path_entry_hash", input).await;
-
-        let expected_path =
-            hdk::hash_path::path::Path::from(vec![Component::from("foo"), Component::from("bar")]);
-
-        let path_hash = holochain_zome_types::entry::EntryHashed::from_content_sync(
-            Entry::try_from(expected_path).unwrap(),
-        )
-        .into_hash();
-
-        let path_entry_hash = holochain_zome_types::entry::EntryHashed::from_content_sync(
-            Entry::try_from(PathEntry::new(path_hash)).unwrap(),
-        )
-        .into_hash();
-
-        assert_eq!(path_entry_hash.into_inner(), output.into_inner(),);
     }
 }

@@ -27,30 +27,30 @@ mod error;
 
 #[derive(Debug)]
 pub enum Dependency {
-    Header(HeaderHash),
+    Action(ActionHash),
     Entry(AnyDhtHash),
     Null,
 }
 
-pub fn get_dependency(op_type: DhtOpType, header: &Header) -> Dependency {
+pub fn get_dependency(op_type: DhtOpType, action: &Action) -> Dependency {
     match op_type {
-        DhtOpType::StoreElement | DhtOpType::StoreEntry => Dependency::Null,
-        DhtOpType::RegisterAgentActivity => header
-            .prev_header()
-            .map(|p| Dependency::Header(p.clone()))
+        DhtOpType::StoreRecord | DhtOpType::StoreEntry => Dependency::Null,
+        DhtOpType::RegisterAgentActivity => action
+            .prev_action()
+            .map(|p| Dependency::Action(p.clone()))
             .unwrap_or_else(|| Dependency::Null),
-        DhtOpType::RegisterUpdatedContent | DhtOpType::RegisterUpdatedElement => match header {
-            Header::Update(update) => Dependency::Header(update.original_header_address.clone()),
+        DhtOpType::RegisterUpdatedContent | DhtOpType::RegisterUpdatedRecord => match action {
+            Action::Update(update) => Dependency::Action(update.original_action_address.clone()),
             _ => Dependency::Null,
         },
-        DhtOpType::RegisterDeletedBy | DhtOpType::RegisterDeletedEntryHeader => match header {
-            Header::Delete(delete) => Dependency::Header(delete.deletes_address.clone()),
+        DhtOpType::RegisterDeletedBy | DhtOpType::RegisterDeletedEntryAction => match action {
+            Action::Delete(delete) => Dependency::Action(delete.deletes_address.clone()),
             _ => Dependency::Null,
         },
         DhtOpType::RegisterAddLink => Dependency::Null,
-        DhtOpType::RegisterRemoveLink => match header {
-            Header::DeleteLink(delete_link) => {
-                Dependency::Header(delete_link.link_add_address.clone())
+        DhtOpType::RegisterRemoveLink => match action {
+            Action::DeleteLink(delete_link) => {
+                Dependency::Action(delete_link.link_add_address.clone())
             }
             _ => Dependency::Null,
         },
@@ -91,38 +91,36 @@ macro_rules! dht_op_update {
 /// Insert a [`DhtOp`](holochain_types::dht_op::DhtOp) into the [`Scratch`].
 pub fn insert_op_scratch(
     scratch: &mut Scratch,
-    zome: Option<Zome>,
     op: DhtOpHashed,
     chain_top_ordering: ChainTopOrdering,
 ) -> StateMutationResult<()> {
     let (op, _) = op.into_inner();
     let op_light = op.to_light();
-    let header = op.header();
+    let action = op.action();
     let signature = op.signature().clone();
     if let Some(entry) = op.entry() {
         let entry_hashed = EntryHashed::with_pre_hashed(
             entry.clone(),
-            header
+            action
                 .entry_hash()
-                .ok_or_else(|| DhtOpError::HeaderWithoutEntry(header.clone()))?
+                .ok_or_else(|| DhtOpError::ActionWithoutEntry(action.clone()))?
                 .clone(),
         );
         scratch.add_entry(entry_hashed, chain_top_ordering);
     }
-    let header_hashed = HeaderHashed::with_pre_hashed(header, op_light.header_hash().to_owned());
-    let header_hashed = SignedHeaderHashed::with_presigned(header_hashed, signature);
-    scratch.add_header(zome, header_hashed, chain_top_ordering);
+    let action_hashed = ActionHashed::with_pre_hashed(action, op_light.action_hash().to_owned());
+    let action_hashed = SignedActionHashed::with_presigned(action_hashed, signature);
+    scratch.add_action(action_hashed, chain_top_ordering);
     Ok(())
 }
 
-pub fn insert_element_scratch(
+pub fn insert_record_scratch(
     scratch: &mut Scratch,
-    zome: Option<Zome>,
-    element: Element,
+    record: Record,
     chain_top_ordering: ChainTopOrdering,
 ) {
-    let (header, entry) = element.into_inner();
-    scratch.add_header(zome, header, chain_top_ordering);
+    let (action, entry) = record.into_inner();
+    scratch.add_action(action, chain_top_ordering);
     if let Some(entry) = entry.into_option() {
         scratch.add_entry(EntryHashed::from_content_sync(entry), chain_top_ordering);
     }
@@ -133,21 +131,21 @@ pub fn insert_op(txn: &mut Transaction, op: &DhtOpHashed) -> StateMutationResult
     let hash = op.as_hash();
     let op = op.as_content();
     let op_light = op.to_light();
-    let header = op.header();
-    let timestamp = header.timestamp();
+    let action = op.action();
+    let timestamp = action.timestamp();
     let signature = op.signature().clone();
     if let Some(entry) = op.entry() {
-        let entry_hash = header
+        let entry_hash = action
             .entry_hash()
-            .ok_or_else(|| DhtOpError::HeaderWithoutEntry(header.clone()))?;
+            .ok_or_else(|| DhtOpError::ActionWithoutEntry(action.clone()))?;
 
         insert_entry(txn, entry_hash, entry)?;
     }
-    let dependency = get_dependency(op_light.get_type(), &header);
-    let header_hashed = HeaderHashed::with_pre_hashed(header, op_light.header_hash().to_owned());
-    let header_hashed = SignedHeaderHashed::with_presigned(header_hashed, signature);
-    let op_order = OpOrder::new(op_light.get_type(), header_hashed.header().timestamp());
-    insert_header(txn, &header_hashed)?;
+    let dependency = get_dependency(op_light.get_type(), &action);
+    let action_hashed = ActionHashed::with_pre_hashed(action, op_light.action_hash().to_owned());
+    let action_hashed = SignedActionHashed::with_presigned(action_hashed, signature);
+    let op_order = OpOrder::new(op_light.get_type(), action_hashed.action().timestamp());
+    insert_action(txn, &action_hashed)?;
     insert_op_lite(txn, &op_light, hash, &op_order, &timestamp)?;
     set_dependency(txn, hash, dependency)?;
     Ok(())
@@ -179,7 +177,7 @@ pub fn insert_op_lite(
     order: &OpOrder,
     timestamp: &Timestamp,
 ) -> StateMutationResult<()> {
-    let header_hash = op_lite.header_hash().clone();
+    let action_hash = op_lite.action_hash().clone();
     let basis = op_lite.dht_basis().to_owned();
     sql_insert!(txn, DhtOp, {
         "hash": hash,
@@ -187,7 +185,7 @@ pub fn insert_op_lite(
         "storage_center_loc": basis.get_loc(),
         "authored_timestamp": timestamp,
         "basis_hash": basis,
-        "header_hash": header_hash,
+        "action_hash": action_hash,
         "require_receipt": 0,
         "op_order": order,
     })?;
@@ -277,7 +275,7 @@ pub fn set_dependency(
     dependency: Dependency,
 ) -> StateMutationResult<()> {
     match dependency {
-        Dependency::Header(dep) => {
+        Dependency::Action(dep) => {
             dht_op_update!(txn, hash, {
                 "dependency": dep,
             })?;
@@ -395,104 +393,105 @@ pub fn set_receipts_complete(
     Ok(())
 }
 
-/// Insert a [`Header`] into the database.
-pub fn insert_header(
+/// Insert a [`Action`] into the database.
+pub fn insert_action(
     txn: &mut Transaction,
-    header: &SignedHeaderHashed,
+    action: &SignedActionHashed,
 ) -> StateMutationResult<()> {
     #[derive(Serialize, Debug)]
-    struct SignedHeaderRef<'a>(&'a Header, &'a Signature);
-    let hash = header.as_hash();
-    let signature = header.signature();
-    let header = header.header();
-    let signed_header = SignedHeaderRef(header, signature);
-    let header_type = header.header_type();
-    let header_type = header_type.as_sql();
-    let header_seq = header.header_seq();
-    let author = header.author().clone();
-    let prev_hash = header.prev_header().cloned();
-    let private = match header.entry_type().map(|et| et.visibility()) {
+    struct SignedActionRef<'a>(&'a Action, &'a Signature);
+    let hash = action.as_hash();
+    let signature = action.signature();
+    let action = action.action();
+    let signed_action = SignedActionRef(action, signature);
+    let action_type = action.action_type();
+    let action_type = action_type.as_sql();
+    let action_seq = action.action_seq();
+    let author = action.author().clone();
+    let prev_hash = action.prev_action().cloned();
+    let private = match action.entry_type().map(|et| et.visibility()) {
         Some(EntryVisibility::Private) => true,
         Some(EntryVisibility::Public) => false,
         None => false,
     };
-    match header {
-        Header::CreateLink(create_link) => {
-            sql_insert!(txn, Header, {
+    match action {
+        Action::CreateLink(create_link) => {
+            sql_insert!(txn, Action, {
                 "hash": hash,
-                "type": header_type,
-                "seq": header_seq,
+                "type": action_type,
+                "seq": action_seq,
                 "author": author,
                 "prev_hash": prev_hash,
                 "base_hash": create_link.base_address,
-                "zome_id": create_link.zome_id.index() as u32,
+                "zome_id": create_link.zome_id.0,
+                "link_type": create_link.link_type.0,
                 "tag": create_link.tag.as_sql(),
-                "blob": to_blob(&signed_header)?,
+                "blob": to_blob(&signed_action)?,
             })?;
         }
-        Header::DeleteLink(delete_link) => {
-            sql_insert!(txn, Header, {
+        Action::DeleteLink(delete_link) => {
+            sql_insert!(txn, Action, {
                 "hash": hash,
-                "type": header_type,
-                "seq": header_seq,
+                "type": action_type,
+                "seq": action_seq,
                 "author": author,
                 "prev_hash": prev_hash,
                 "create_link_hash": delete_link.link_add_address,
-                "blob": to_blob(&signed_header)?,
+                "blob": to_blob(&signed_action)?,
             })?;
         }
-        Header::Create(create) => {
-            sql_insert!(txn, Header, {
+        Action::Create(create) => {
+            sql_insert!(txn, Action, {
                 "hash": hash,
-                "type": header_type,
-                "seq": header_seq,
+                "type": action_type,
+                "seq": action_seq,
                 "author": author,
                 "prev_hash": prev_hash,
                 "entry_hash": create.entry_hash,
                 "entry_type": create.entry_type.as_sql(),
                 "private_entry": private,
-                "blob": to_blob(&signed_header)?,
+                "blob": to_blob(&signed_action)?,
             })?;
         }
-        Header::Delete(delete) => {
-            sql_insert!(txn, Header, {
+        Action::Delete(delete) => {
+            sql_insert!(txn, Action, {
                 "hash": hash,
-                "type": header_type,
-                "seq": header_seq,
+                "type": action_type,
+                "seq": action_seq,
                 "author": author,
                 "prev_hash": prev_hash,
                 "deletes_entry_hash": delete.deletes_entry_address,
-                "deletes_header_hash": delete.deletes_address,
-                "blob": to_blob(&signed_header)?,
+                "deletes_action_hash": delete.deletes_address,
+                "blob": to_blob(&signed_action)?,
             })?;
         }
-        Header::Update(update) => {
-            sql_insert!(txn, Header, {
+        Action::Update(update) => {
+            sql_insert!(txn, Action, {
                 "hash": hash,
-                "type": header_type,
-                "seq": header_seq,
+                "type": action_type,
+                "seq": action_seq,
                 "author": author,
                 "prev_hash": prev_hash,
                 "entry_hash": update.entry_hash,
                 "entry_type": update.entry_type.as_sql(),
                 "original_entry_hash": update.original_entry_address,
-                "original_header_hash": update.original_header_address,
+                "original_action_hash": update.original_action_address,
                 "private_entry": private,
-                "blob": to_blob(&signed_header)?,
+                "blob": to_blob(&signed_action)?,
             })?;
         }
-        Header::InitZomesComplete(_)
-        | Header::Dna(_)
-        | Header::AgentValidationPkg(_)
-        | Header::OpenChain(_)
-        | Header::CloseChain(_) => {
-            sql_insert!(txn, Header, {
+        Action::InitZomesComplete(_)
+        | Action::Dna(_)
+        | Action::AgentValidationPkg(_)
+        | Action::OpenChain(_)
+        | Action::CloseChain(_) => {
+            sql_insert!(txn, Action, {
                 "hash": hash,
-                "type": header_type,
-                "seq": header_seq,
+                "type": action_type,
+                "seq": action_seq,
                 "author": author,
                 "prev_hash": prev_hash,
-                "blob": to_blob(&signed_header)?,
+                "blob": to_blob(&signed_action)?,
             })?;
         }
     }
@@ -629,7 +628,7 @@ pub fn reschedule_expired(
             },
             |row| {
                 Ok((
-                    ZomeName(row.get(0)?),
+                    ZomeName(row.get::<_, String>(0)?.into()),
                     FunctionName(row.get(1)?),
                     row.get(2)?,
                 ))

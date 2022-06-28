@@ -6,16 +6,16 @@ use futures::StreamExt;
 use holochain_cascade::Cascade;
 use holochain_p2p::actor::GetLinksOptions;
 use holochain_types::prelude::*;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]
-#[tracing::instrument(skip(ribosome, call_context), fields(?call_context.zome, function = ?call_context.function_name))]
+#[tracing::instrument(skip(_ribosome, call_context), fields(?call_context.zome, function = ?call_context.function_name))]
 pub fn get_links<'a>(
-    ribosome: Arc<impl RibosomeT>,
+    _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     inputs: Vec<GetLinksInput>,
-) -> Result<Vec<Vec<Link>>, WasmError> {
+) -> Result<Vec<Vec<Link>>, RuntimeError> {
     let num_requests = inputs.len();
     tracing::debug!("Starting with {} requests.", num_requests);
     match HostFnAccess::from(&call_context.host_context()) {
@@ -23,38 +23,40 @@ pub fn get_links<'a>(
             read_workspace: Permission::Allow,
             ..
         } => {
-            let results: Vec<Result<Vec<Link>, _>> = tokio_helper::block_forever_on(async move {
-                futures::stream::iter(inputs.into_iter().map(|input| async {
-                    let GetLinksInput {
-                        base_address,
-                        tag_prefix,
-                    } = input;
-                    let zome_id = ribosome
-                        .zome_to_id(&call_context.zome)
-                        .expect("Failed to get ID for current zome.");
-                    let key = WireLinkKey {
-                        base: base_address,
-                        zome_id,
-                        tag: tag_prefix,
-                    };
-                    Cascade::from_workspace_network(
-                        &call_context.host_context.workspace(),
-                        call_context.host_context.network().to_owned(),
-                    )
-                    .dht_get_links(key, GetLinksOptions::default())
+            let results: Vec<Result<Vec<Link>, RibosomeError>> =
+                tokio_helper::block_forever_on(async move {
+                    futures::stream::iter(inputs.into_iter().map(|input| async {
+                        let GetLinksInput {
+                            base_address,
+                            link_type,
+                            tag_prefix,
+                        } = input;
+
+                        let key = WireLinkKey {
+                            base: base_address,
+                            type_query: link_type,
+                            tag: tag_prefix,
+                        };
+                        Ok(Cascade::from_workspace_network(
+                            &call_context.host_context.workspace(),
+                            call_context.host_context.network().to_owned(),
+                        )
+                        .dht_get_links(key, GetLinksOptions::default())
+                        .await?)
+                    }))
+                    // Limit concurrent calls to 10 as each call
+                    // can spawn multiple connections.
+                    .buffered(10)
+                    .collect()
                     .await
-                }))
-                // Limit concurrent calls to 10 as each call
-                // can spawn multiple connections.
-                .buffered(10)
-                .collect()
-                .await
-            });
-            let results: Result<Vec<_>, _> = results
+                });
+            let results: Result<Vec<_>, RuntimeError> = results
                 .into_iter()
                 .map(|result| match result {
                     Ok(links_vec) => Ok(links_vec),
-                    Err(cascade_error) => Err(WasmError::Host(cascade_error.to_string())),
+                    Err(cascade_error) => {
+                        Err(wasm_error!(WasmErrorInner::Host(cascade_error.to_string())).into())
+                    }
                 })
                 .collect();
             let results = results?;
@@ -67,14 +69,15 @@ pub fn get_links<'a>(
             );
             Ok(results)
         }
-        _ => Err(WasmError::Host(
+        _ => Err(wasm_error!(WasmErrorInner::Host(
             RibosomeError::HostFnPermissions(
                 call_context.zome.zome_name().clone(),
                 call_context.function_name().clone(),
                 "get_links".into(),
             )
             .to_string(),
-        )),
+        ))
+        .into()),
     }
 }
 
@@ -141,12 +144,14 @@ pub mod slow_tests {
             )
             .await;
 
+        let expect = Path::from(vec![
+            hdk::hash_path::path::Component::new(hdk::hash_path::anchor::ROOT.to_vec()),
+            hdk::hash_path::path::Component::from("foo".as_bytes().to_vec()),
+            hdk::hash_path::path::Component::from("bar".as_bytes().to_vec()),
+        ]);
         assert_eq!(
-            anchor_address_one.get_raw_32().to_vec(),
-            vec![
-                174, 222, 191, 173, 245, 226, 135, 240, 9, 44, 238, 112, 158, 41, 73, 28, 175, 94,
-                206, 82, 82, 109, 9, 156, 73, 22, 188, 213, 148, 21, 234, 45
-            ],
+            anchor_address_one,
+            EntryHash::with_data_sync(&Entry::App(AppEntryBytes(expect.try_into().unwrap())))
         );
 
         // anchor foo baz
@@ -158,28 +163,29 @@ pub mod slow_tests {
             )
             .await;
 
+        let expect = Path::from(vec![
+            hdk::hash_path::path::Component::new(hdk::hash_path::anchor::ROOT.to_vec()),
+            hdk::hash_path::path::Component::from("foo".as_bytes().to_vec()),
+            hdk::hash_path::path::Component::from("baz".as_bytes().to_vec()),
+        ]);
         assert_eq!(
-            anchor_address_two.get_raw_32().to_vec(),
-            vec![
-                21, 114, 154, 43, 189, 82, 166, 104, 159, 55, 86, 94, 68, 245, 79, 49, 187, 175,
-                236, 67, 38, 216, 232, 239, 18, 83, 98, 200, 136, 198, 232, 117
-            ],
+            anchor_address_two,
+            EntryHash::with_data_sync(&Entry::App(AppEntryBytes(expect.try_into().unwrap())))
         );
 
         let list_anchor_type_addresses_output: EntryHashes = conductor
             .call(&alice, "list_anchor_type_addresses", ())
             .await;
 
+        let expect = Path::from(vec![
+            hdk::hash_path::path::Component::new(hdk::hash_path::anchor::ROOT.to_vec()),
+            hdk::hash_path::path::Component::from("foo".as_bytes().to_vec()),
+        ]);
         // should be 1 anchor type, "foo"
         assert_eq!(list_anchor_type_addresses_output.0.len(), 1,);
         assert_eq!(
-            (list_anchor_type_addresses_output.0)[0]
-                .get_raw_32()
-                .to_vec(),
-            vec![
-                5, 114, 66, 208, 85, 124, 76, 245, 245, 255, 31, 76, 173, 73, 168, 139, 56, 20, 93,
-                162, 167, 43, 203, 164, 172, 158, 29, 43, 74, 254, 81, 241
-            ],
+            (list_anchor_type_addresses_output.0)[0],
+            EntryHash::with_data_sync(&Entry::App(AppEntryBytes(expect.try_into().unwrap())))
         );
 
         let list_anchor_addresses_output: EntryHashes = conductor
@@ -214,16 +220,13 @@ pub mod slow_tests {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::Link).await;
 
-        let header_hash: HeaderHash = conductor.call(&alice, "create_baseless_link", ()).await;
+        let action_hash: ActionHash = conductor.call(&alice, "create_baseless_link", ()).await;
         let links: Vec<Link> = conductor.call(&alice, "get_baseless_links", ()).await;
 
-        assert_eq!(
-            links[0].create_link_hash,
-            header_hash
-        );
+        assert_eq!(links[0].create_link_hash, action_hash);
         assert_eq!(
             links[0].target,
-            EntryHash::from_raw_32([2_u8; 32].to_vec()).into(),
+            EntryHash::from_raw_36([2_u8; 36].to_vec()).into(),
         );
     }
 
@@ -234,13 +237,12 @@ pub mod slow_tests {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::Link).await;
 
-        let header_hash: HeaderHash = conductor.call(&alice, "create_external_base_link", ()).await;
+        let action_hash: ActionHash = conductor
+            .call(&alice, "create_external_base_link", ())
+            .await;
         let links: Vec<Link> = conductor.call(&alice, "get_external_links", ()).await;
 
-        assert_eq!(
-            links[0].create_link_hash,
-            header_hash
-        );
+        assert_eq!(links[0].create_link_hash, action_hash);
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -250,8 +252,8 @@ pub mod slow_tests {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::Link).await;
 
-        let _: HeaderHash = conductor.call(&alice, "create_link", ()).await;
-        let _: HeaderHash = conductor.call(&alice, "create_back_link", ()).await;
+        let _: ActionHash = conductor.call(&alice, "create_link", ()).await;
+        let _: ActionHash = conductor.call(&alice, "create_back_link", ()).await;
         let forward_links: Vec<Link> = conductor.call(&alice, "get_links", ()).await;
         let back_links: Vec<Link> = conductor.call(&alice, "get_back_links", ()).await;
         let links_bidi: Vec<Vec<Link>> = conductor.call(&alice, "get_links_bidi", ()).await;

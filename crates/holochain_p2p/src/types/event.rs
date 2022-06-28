@@ -25,9 +25,9 @@ pub struct GetOptions {
     /// Whether the remote-end should follow redirects or just return the
     /// requested entry.
     pub follow_redirects: bool,
-    /// Return all live headers even if there is deletes.
+    /// Return all live actions even if there is deletes.
     /// Useful for metadata calls.
-    pub all_live_headers_with_metadata: bool,
+    pub all_live_actions_with_metadata: bool,
     /// The type of data this get request requires.
     pub request_type: GetRequest,
 }
@@ -36,7 +36,7 @@ impl From<&actor::GetOptions> for GetOptions {
     fn from(a: &actor::GetOptions) -> Self {
         Self {
             follow_redirects: a.follow_redirects,
-            all_live_headers_with_metadata: a.all_live_headers_with_metadata,
+            all_live_actions_with_metadata: a.all_live_actions_with_metadata,
             request_type: a.request_type.clone(),
         }
     }
@@ -71,13 +71,13 @@ impl From<&actor::GetLinksOptions> for GetLinksOptions {
 /// Get agent activity options help control how the get is processed at various levels.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct GetActivityOptions {
-    /// Include the activity headers in the response
+    /// Include the activity actions in the response
     pub include_valid_activity: bool,
-    /// Include any rejected headers in the response.
+    /// Include any rejected actions in the response.
     pub include_rejected_activity: bool,
-    /// Include the full signed headers and hashes in the response
+    /// Include the full signed actions and hashes in the response
     /// instead of just the hashes.
-    pub include_full_headers: bool,
+    pub include_full_actions: bool,
 }
 
 impl Default for GetActivityOptions {
@@ -85,7 +85,7 @@ impl Default for GetActivityOptions {
         Self {
             include_valid_activity: true,
             include_rejected_activity: false,
-            include_full_headers: false,
+            include_full_actions: false,
         }
     }
 }
@@ -95,7 +95,7 @@ impl From<&actor::GetActivityOptions> for GetActivityOptions {
         Self {
             include_valid_activity: a.include_valid_activity,
             include_rejected_activity: a.include_rejected_activity,
-            include_full_headers: a.include_full_headers,
+            include_full_actions: a.include_full_actions,
         }
     }
 }
@@ -152,7 +152,7 @@ ghost_actor::ghost_chan! {
             dna_hash: DnaHash,
             // The agent_id / agent_pub_key context.
             to_agent: AgentPubKey,
-            header_hash: HeaderHash,
+            action_hash: ActionHash,
         ) -> ValidationPackageResponse;
 
         /// A remote node is requesting entry data from us.
@@ -186,7 +186,7 @@ ghost_actor::ghost_chan! {
             agent: AgentPubKey,
             query: ChainQueryFilter,
             options: GetActivityOptions,
-        ) -> AgentActivityResponse<HeaderHash>;
+        ) -> AgentActivityResponse<ActionHash>;
 
         /// A remote node has sent us a validation receipt.
         fn validation_receipt_received(
@@ -228,7 +228,7 @@ ghost_actor::ghost_chan! {
         fn countersigning_authority_response(
             dna_hash: DnaHash,
             to_agent: AgentPubKey,
-            signed_headers: Vec<SignedHeader>,
+            signed_actions: Vec<SignedAction>,
         ) -> ();
     }
 }

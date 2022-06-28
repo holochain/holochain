@@ -36,6 +36,7 @@ members = [
     "ser_regression",
     "sign",
     "sys_time",
+    "the_incredible_halt",
     "update_entry",
     "validate",
     "validate_invalid",
@@ -43,8 +44,6 @@ members = [
     "validate_link_add_invalid",
     "validate_link_add_valid",
     "validate_valid",
-    "validation_package_fail",
-    "validation_package_success",
     "whoami",
     "zome_info",
 ]

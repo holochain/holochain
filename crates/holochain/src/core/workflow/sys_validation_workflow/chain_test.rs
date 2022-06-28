@@ -14,26 +14,26 @@ async fn sys_validation_agent_activity_test() {
 
     let mut conductors = SweetConductorBatch::from_standard_config(2).await;
 
-    let (dna_file, _) = SweetDnaFile::unique_from_inline_zome("zome1", simple_create_read_zome())
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_create_read_zome())
         .await
         .unwrap();
 
     let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
     let ((cell_1,), (cell_2,)) = apps.into_tuples();
 
-    let a: HeaderHash = conductors[0]
-        .call(&cell_1.zome("zome1"), "create", ())
+    let a: ActionHash = conductors[0]
+        .call(&cell_1.zome("simple"), "create", ())
         .await;
 
-    let b: HeaderHash = conductors[0]
-        .call(&cell_1.zome("zome1"), "create", ())
+    let b: ActionHash = conductors[0]
+        .call(&cell_1.zome("simple"), "create", ())
         .await;
 
     let changed = cell_1
         .dht_db()
         .async_commit(|txn| {
             DatabaseResult::Ok(txn.execute(
-                "UPDATE Header SET seq = 4 WHERE hash = ? OR hash = ?",
+                "UPDATE Action SET seq = 4 WHERE hash = ? OR hash = ?",
                 [a, b],
             )?)
         })

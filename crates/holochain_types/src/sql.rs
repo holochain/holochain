@@ -5,11 +5,22 @@
 use holochain_zome_types::prelude::*;
 use rusqlite::types::ToSqlOutput;
 
+#[cfg(test)]
+mod test;
+
 /// A helper trait for types we can't implement [`rusqlite::ToSql`]
 /// for due to the orphan rule.
 pub trait AsSql<'a> {
     /// Convert this type to sql which might fail.
     fn as_sql(&'a self) -> SqlOutput<'a>;
+}
+
+/// A trait to convert a reference of a
+/// type to a sql statement for use in
+/// [`rusqlite::Connection`] prepare.
+pub trait ToSqlStatement {
+    /// Convert the reference to a statement.
+    fn to_sql_statement(&self) -> String;
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -51,8 +62,8 @@ fn via_display(data: &impl std::fmt::Display) -> SqlOutput {
     SqlOutput(ToSqlOutput::Owned(data.to_string().into()))
 }
 
-impl<'a> From<&'a HeaderType> for SqlOutput<'a> {
-    fn from(d: &'a HeaderType) -> Self {
+impl<'a> From<&'a ActionType> for SqlOutput<'a> {
+    fn from(d: &'a ActionType) -> Self {
         via_display(d)
     }
 }
@@ -72,5 +83,71 @@ impl<'a> From<&'a LinkTag> for SqlOutput<'a> {
 impl<'a, 'b> From<&'b ZomeId> for SqlOutput<'a> {
     fn from(d: &'b ZomeId) -> Self {
         Self(d.0.into())
+    }
+}
+
+impl ToSqlStatement for LinkTypeFilter {
+    fn to_sql_statement(&self) -> String {
+        match self {
+            LinkTypeFilter::Types(types) => {
+                match types
+                    .first()
+                    .filter(|(_, t)| types.len() == 1 && t.len() == 1)
+                    .and_then(|(z, t)| t.first().map(|t| (z, t)))
+                {
+                    Some((zome_id, link_type)) => {
+                        format!(
+                            " AND zome_id = {} AND link_type = {} ",
+                            zome_id.0, link_type.0
+                        )
+                    }
+                    _ => {
+                        let mut out = types
+                            .iter()
+                            .flat_map(|(zome_id, types)| {
+                                let mut types: Vec<String> = types
+                                    .iter()
+                                    .flat_map(|t| {
+                                        [format!(" link_type = {} ", t.0), "OR".to_string()]
+                                    })
+                                    .collect();
+
+                                // Pop last " OR "
+                                types.pop();
+
+                                [
+                                    format!(
+                                        " ( zome_id = {} AND ({}) ) ",
+                                        zome_id.0,
+                                        types.into_iter().collect::<String>()
+                                    ),
+                                    "OR".to_string(),
+                                ]
+                            })
+                            .collect::<Vec<_>>();
+                        // Pop last " OR "
+                        out.pop();
+                        if out.is_empty() {
+                            String::new()
+                        } else {
+                            format!(" AND ({}) ", out.into_iter().collect::<String>())
+                        }
+                    }
+                }
+            }
+            LinkTypeFilter::Dependencies(dependencies) => {
+                let mut out = dependencies
+                    .iter()
+                    .flat_map(|z| [format!(" zome_id = {} ", z.0), "OR".to_string()])
+                    .collect::<Vec<_>>();
+                // Pop last " OR "
+                out.pop();
+                if out.is_empty() {
+                    String::new()
+                } else {
+                    format!(" AND ({}) ", out.into_iter().collect::<String>())
+                }
+            }
+        }
     }
 }

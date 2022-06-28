@@ -14,7 +14,7 @@ use std::convert::TryInto;
 // hCYk 4868 <Buffer 84 26 24>
 // hCck 4996 <Buffer 84 27 24>
 // hCgk 5124 <Buffer 84 28 24>
-// hCkk 5252 <Buffer 84 29 24> * HEADER
+// hCkk 5252 <Buffer 84 29 24> * ACTION
 // hCok 5380 <Buffer 84 2a 24> * WASM
 // hCsk 5508 <Buffer 84 2b 24>
 // hCwk 5636 <Buffer 84 2c 24>
@@ -45,7 +45,7 @@ pub(crate) const ENTRY_PREFIX: &[u8] = &[0x84, 0x21, 0x24]; // uhCEk [132, 33, 3
 pub(crate) const DHTOP_PREFIX: &[u8] = &[0x84, 0x24, 0x24]; // uhCQk [132, 36, 36]
 pub(crate) const DNA_PREFIX: &[u8] = &[0x84, 0x2d, 0x24]; // uhC0k [132, 45, 36]
 pub(crate) const NET_ID_PREFIX: &[u8] = &[0x84, 0x22, 0x24]; // uhCIk [132, 34, 36]
-pub(crate) const HEADER_PREFIX: &[u8] = &[0x84, 0x29, 0x24]; // uhCkk [132, 41, 36]
+pub(crate) const ACTION_PREFIX: &[u8] = &[0x84, 0x29, 0x24]; // uhCkk [132, 41, 36]
 pub(crate) const WASM_PREFIX: &[u8] = &[0x84, 0x2a, 0x24]; // uhCok [132, 42, 36]
 pub(crate) const EXTERNAL_PREFIX: &[u8] = &[0x84, 0x2f, 0x24]; // uhC8k [132, 47, 36]
 
@@ -166,7 +166,7 @@ primitive_hash_type!(Agent, AgentPubKey, AgentVisitor, AGENT_PREFIX);
 primitive_hash_type!(Entry, EntryHash, EntryVisitor, ENTRY_PREFIX);
 primitive_hash_type!(Dna, DnaHash, DnaVisitor, DNA_PREFIX);
 primitive_hash_type!(DhtOp, DhtOpHash, DhtOpVisitor, DHTOP_PREFIX);
-primitive_hash_type!(Header, HeaderHash, HeaderVisitor, HEADER_PREFIX);
+primitive_hash_type!(Action, ActionHash, ActionVisitor, ACTION_PREFIX);
 primitive_hash_type!(NetId, NetIdHash, NetIdVisitor, NET_ID_PREFIX);
 primitive_hash_type!(Wasm, WasmHash, WasmVisitor, WASM_PREFIX);
 primitive_hash_type!(External, ExternalHash, ExternalVisitor, EXTERNAL_PREFIX);
@@ -175,8 +175,8 @@ primitive_hash_type!(External, ExternalHash, ExternalVisitor, EXTERNAL_PREFIX);
 impl HashTypeSync for DhtOp {}
 // Entries are capped at 16MB, which is small enough to hash synchronously
 impl HashTypeSync for Entry {}
-// Headers are only a few hundred bytes at most
-impl HashTypeSync for Header {}
+// Actions are only a few hundred bytes at most
+impl HashTypeSync for Action {}
 // A DnaHash is a hash of the DnaDef, which excludes the wasm bytecode
 impl HashTypeSync for Dna {}
 

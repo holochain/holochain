@@ -3,7 +3,6 @@ use warp::Filter;
 
 pub(crate) fn now() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
     warp::post()
-        .and(warp::header::exact("content-type", "application/octet"))
         .and(warp::header::exact("X-Op", "now"))
         .and_then(time)
 }

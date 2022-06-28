@@ -1,0 +1,5 @@
+error: EntryVisibility can only be `public` or `private`
+ --> tests/macros/entry_def_registration_bad_vis.rs:6:5
+  |
+6 |     A(A),
+  |     ^

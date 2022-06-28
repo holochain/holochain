@@ -1,28 +1,29 @@
+use holo_hash::ActionHash;
 use holo_hash::EntryHash;
-use holo_hash::HeaderHash;
 use holochain_serialized_bytes::UnsafeBytes;
+use holochain_types::action::NewEntryAction;
+use holochain_types::action::WireDelete;
+use holochain_types::action::WireNewEntryAction;
+use holochain_types::action::WireUpdateRelationship;
 use holochain_types::dht_op::DhtOp;
 use holochain_types::dht_op::DhtOpHashed;
-use holochain_types::header::NewEntryHeader;
-use holochain_types::header::WireDelete;
-use holochain_types::header::WireNewEntryHeader;
-use holochain_types::header::WireUpdateRelationship;
 use holochain_types::link::WireCreateLink;
 use holochain_types::link::WireDeleteLink;
 use holochain_types::link::WireLinkKey;
 use holochain_types::prelude::EntryData;
 use holochain_zome_types::fixt::*;
+use holochain_zome_types::Action;
+use holochain_zome_types::ActionHashed;
 use holochain_zome_types::AppEntryBytes;
 use holochain_zome_types::Entry;
 use holochain_zome_types::EntryType;
 use holochain_zome_types::EntryVisibility;
-use holochain_zome_types::Header;
-use holochain_zome_types::HeaderHashed;
 use holochain_zome_types::Judged;
 use holochain_zome_types::Link;
+use holochain_zome_types::LinkTypeFilter;
 use holochain_zome_types::SerializedBytes;
-use holochain_zome_types::SignedHeader;
-use holochain_zome_types::SignedHeaderHashed;
+use holochain_zome_types::SignedAction;
+use holochain_zome_types::SignedActionHashed;
 use holochain_zome_types::ValidationStatus;
 use std::convert::TryInto;
 
@@ -30,14 +31,14 @@ use ::fixt::prelude::*;
 #[derive(Debug)]
 pub struct EntryTestData {
     pub store_entry_op: DhtOpHashed,
-    pub wire_create: Judged<WireNewEntryHeader>,
-    pub create_hash: HeaderHash,
-    pub delete_entry_header_op: DhtOpHashed,
+    pub wire_create: Judged<WireNewEntryAction>,
+    pub create_hash: ActionHash,
+    pub delete_entry_action_op: DhtOpHashed,
     pub wire_delete: Judged<WireDelete>,
-    pub delete_hash: HeaderHash,
+    pub delete_hash: ActionHash,
     pub update_content_op: DhtOpHashed,
     pub wire_update: Judged<WireUpdateRelationship>,
-    pub update_hash: HeaderHash,
+    pub update_hash: ActionHash,
     pub hash: EntryHash,
     pub entry: EntryData,
     // Links
@@ -46,8 +47,8 @@ pub struct EntryTestData {
     pub wire_create_link: WireCreateLink,
     pub wire_create_link_base: WireCreateLink,
     pub wire_delete_link: WireDeleteLink,
-    pub create_link_header: SignedHeaderHashed,
-    pub delete_link_header: SignedHeaderHashed,
+    pub create_link_action: SignedActionHashed,
+    pub delete_link_action: SignedActionHashed,
     pub link_key: WireLinkKey,
     pub link_key_tag: WireLinkKey,
     pub links: Vec<Link>,
@@ -60,6 +61,7 @@ impl EntryTestData {
         let mut delete = fixt!(Delete);
 
         let mut create_link = fixt!(CreateLink);
+        create_link.zome_id = 0.into();
         let mut delete_link = fixt!(DeleteLink);
 
         let entry: AppEntryBytes = SerializedBytes::from(UnsafeBytes::from(vec![3u8]))
@@ -81,42 +83,42 @@ impl EntryTestData {
         update.entry_hash = update_entry_hash;
         update.entry_type = entry_type_fixt.next().unwrap();
 
-        let create_header = Header::Create(create.clone());
-        let create_hash = HeaderHash::with_data_sync(&create_header);
+        let create_action = Action::Create(create.clone());
+        let create_hash = ActionHash::with_data_sync(&create_action);
 
         delete.deletes_entry_address = entry_hash.clone();
         delete.deletes_address = create_hash.clone();
 
         update.original_entry_address = entry_hash.clone();
-        update.original_header_address = create_hash.clone();
+        update.original_action_address = create_hash.clone();
 
         create_link.base_address = entry_hash.clone().into();
         delete_link.base_address = entry_hash.clone().into();
-        let create_link_header = Header::CreateLink(create_link.clone());
-        let delete_header = Header::Delete(delete.clone());
-        let update_header = Header::Update(update.clone());
-        let delete_hash = HeaderHash::with_data_sync(&delete_header);
-        let update_hash = HeaderHash::with_data_sync(&update_header);
+        let create_link_action = Action::CreateLink(create_link.clone());
+        let delete_action = Action::Delete(delete.clone());
+        let update_action = Action::Update(update.clone());
+        let delete_hash = ActionHash::with_data_sync(&delete_action);
+        let update_hash = ActionHash::with_data_sync(&update_action);
 
-        let create_link_hash = HeaderHash::with_data_sync(&create_link_header);
+        let create_link_hash = ActionHash::with_data_sync(&create_link_action);
         delete_link.link_add_address = create_link_hash.clone();
-        let delete_link_header = Header::DeleteLink(delete_link.clone());
+        let delete_link_action = Action::DeleteLink(delete_link.clone());
 
         let signature = fixt!(Signature);
         let store_entry_op = DhtOpHashed::from_content_sync(DhtOp::StoreEntry(
             signature.clone(),
-            NewEntryHeader::Create(create.clone()),
+            NewEntryAction::Create(create.clone()),
             Box::new(entry.clone()),
         ));
 
-        let wire_create = Judged::valid(SignedHeader(create_header, signature).try_into().unwrap());
+        let wire_create = Judged::valid(SignedAction(create_action, signature).try_into().unwrap());
 
         let signature = fixt!(Signature);
-        let delete_entry_header_op = DhtOpHashed::from_content_sync(
-            DhtOp::RegisterDeletedEntryHeader(signature.clone(), delete),
+        let delete_entry_action_op = DhtOpHashed::from_content_sync(
+            DhtOp::RegisterDeletedEntryAction(signature.clone(), delete),
         );
 
-        let wire_delete = Judged::valid(SignedHeader(delete_header, signature).try_into().unwrap());
+        let wire_delete = Judged::valid(SignedAction(delete_action, signature).try_into().unwrap());
 
         let signature = fixt!(Signature);
         let update_content_op = DhtOpHashed::from_content_sync(DhtOp::RegisterUpdatedContent(
@@ -124,7 +126,7 @@ impl EntryTestData {
             update,
             Some(Box::new(update_entry)),
         ));
-        let wire_update = Judged::valid(SignedHeader(update_header, signature).try_into().unwrap());
+        let wire_update = Judged::valid(SignedAction(update_action, signature).try_into().unwrap());
 
         let signature = fixt!(Signature);
         let create_link_op = DhtOpHashed::from_content_sync(DhtOp::RegisterAddLink(
@@ -132,18 +134,18 @@ impl EntryTestData {
             create_link.clone(),
         ));
         let wire_create_link = WireCreateLink::condense(
-            create_link_header.clone().try_into().unwrap(),
+            create_link_action.clone().try_into().unwrap(),
             signature.clone(),
             ValidationStatus::Valid,
         );
         let wire_create_link_base = WireCreateLink::condense(
-            create_link_header.try_into().unwrap(),
+            create_link_action.try_into().unwrap(),
             signature.clone(),
             ValidationStatus::Valid,
         );
 
-        let create_link_header = SignedHeaderHashed::with_presigned(
-            HeaderHashed::from_content_sync(Header::CreateLink(create_link.clone())),
+        let create_link_action = SignedActionHashed::with_presigned(
+            ActionHashed::from_content_sync(Action::CreateLink(create_link.clone())),
             signature,
         );
 
@@ -153,23 +155,23 @@ impl EntryTestData {
             delete_link.clone(),
         ));
         let wire_delete_link = WireDeleteLink::condense(
-            delete_link_header.try_into().unwrap(),
+            delete_link_action.try_into().unwrap(),
             signature.clone(),
             ValidationStatus::Valid,
         );
-        let delete_link_header = SignedHeaderHashed::with_presigned(
-            HeaderHashed::from_content_sync(Header::DeleteLink(delete_link)),
+        let delete_link_action = SignedActionHashed::with_presigned(
+            ActionHashed::from_content_sync(Action::DeleteLink(delete_link)),
             signature,
         );
 
         let link_key = WireLinkKey {
             base: create_link.base_address.clone(),
-            zome_id: create_link.zome_id,
+            type_query: LinkTypeFilter::single_dep(0.into()),
             tag: None,
         };
         let link_key_tag = WireLinkKey {
             base: create_link.base_address.clone(),
-            zome_id: create_link.zome_id,
+            type_query: LinkTypeFilter::single_dep(0.into()),
             tag: Some(create_link.tag.clone()),
         };
 
@@ -187,7 +189,7 @@ impl EntryTestData {
 
         Self {
             store_entry_op,
-            delete_entry_header_op,
+            delete_entry_action_op,
             update_content_op,
             hash: entry_hash,
             entry,
@@ -204,8 +206,8 @@ impl EntryTestData {
             link_key,
             link_key_tag,
             links: vec![link],
-            create_link_header,
-            delete_link_header,
+            create_link_action,
+            delete_link_action,
             wire_create_link_base,
         }
     }

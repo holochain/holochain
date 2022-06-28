@@ -27,6 +27,7 @@ use holochain::conductor::api::AppRequest;
 use holochain::conductor::api::AppResponse;
 use holochain::conductor::api::ZomeCall;
 use holochain::test_utils::setup_app;
+use holochain_wasm_test_utils::TestZomes;
 use tempfile::TempDir;
 
 use super::test_utils::*;
@@ -127,7 +128,8 @@ async fn speed_test(n: Option<usize>) -> Arc<TempDir> {
             uid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
             properties: SerializedBytes::try_from(()).unwrap(),
             origin_time: Timestamp::HOLOCHAIN_EPOCH,
-            zomes: vec![TestWasm::Anchor.into()].into(),
+            integrity_zomes: vec![TestZomes::from(TestWasm::Anchor).integrity.into_inner()],
+            coordinator_zomes: vec![TestZomes::from(TestWasm::Anchor).coordinator.into_inner()],
         },
         vec![TestWasm::Anchor.into()],
     )

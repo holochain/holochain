@@ -1,4 +1,6 @@
+use crate::ZomeId;
 use holochain_serialized_bytes::prelude::*;
+
 #[derive(
     Debug,
     Copy,
@@ -56,6 +58,39 @@ impl LinkTag {
     }
 }
 
+#[derive(PartialEq, Eq, Hash, Clone, Debug, Serialize, Deserialize)]
+/// Filter on a set of [`LinkType`]s.
+pub enum LinkTypeFilter {
+    /// Return links that match any of these types.
+    Types(Vec<(ZomeId, Vec<LinkType>)>),
+    /// Return links that match any types defined
+    /// in any of this zomes dependencies.
+    Dependencies(Vec<ZomeId>),
+}
+
+impl LinkTypeFilter {
+    pub fn zome_for<E>(link_type: impl TryInto<ZomeId, Error = E>) -> Result<Self, E> {
+        link_type.try_into().map(LinkTypeFilter::single_dep)
+    }
+
+    pub fn contains(&self, zome_id: &ZomeId, link_type: &LinkType) -> bool {
+        match self {
+            LinkTypeFilter::Types(types) => types
+                .iter()
+                .any(|(z, types)| z == zome_id && types.contains(link_type)),
+            LinkTypeFilter::Dependencies(deps) => deps.contains(zome_id),
+        }
+    }
+
+    pub fn single_type(zome_id: ZomeId, link_type: LinkType) -> Self {
+        Self::Types(vec![(zome_id, vec![link_type])])
+    }
+
+    pub fn single_dep(zome_id: ZomeId) -> Self {
+        Self::Dependencies(vec![zome_id])
+    }
+}
+
 impl From<Vec<u8>> for LinkTag {
     fn from(b: Vec<u8>) -> Self {
         Self(b)
@@ -71,5 +106,31 @@ impl From<()> for LinkTag {
 impl AsRef<Vec<u8>> for LinkTag {
     fn as_ref(&self) -> &Vec<u8> {
         &self.0
+    }
+}
+
+impl std::ops::Deref for LinkType {
+    type Target = u8;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl From<u8> for LinkType {
+    fn from(t: u8) -> Self {
+        Self(t)
+    }
+}
+
+impl From<(ZomeId, LinkType)> for LinkType {
+    fn from((_, l): (ZomeId, LinkType)) -> Self {
+        l
+    }
+}
+
+impl From<(ZomeId, LinkType)> for ZomeId {
+    fn from((z, _): (ZomeId, LinkType)) -> Self {
+        z
     }
 }

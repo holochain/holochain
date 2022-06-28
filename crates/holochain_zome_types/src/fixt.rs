@@ -1,15 +1,15 @@
 //! Fixturators for zome types
 
+use crate::action::*;
 use crate::capability::*;
 use crate::crdt::CrdtType;
-use crate::element::Element;
-use crate::element::SignedHeaderHashed;
 use crate::entry::AppEntryBytes;
 use crate::entry_def::EntryVisibility;
-use crate::header::*;
 use crate::link::LinkTag;
 use crate::migrate_agent::MigrateAgent;
 use crate::prelude::*;
+use crate::record::Record;
+use crate::record::SignedActionHashed;
 use crate::signature::Signature;
 use crate::timestamp::Timestamp;
 use crate::validate::RequiredValidationType;
@@ -59,7 +59,7 @@ fixturator!(
 
 fixturator!(
     RequiredValidationType;
-    unit variants [ Element SubChain Full ] empty Element;
+    unit variants [ Record SubChain Full ] empty Record;
 );
 
 fixturator!(
@@ -83,18 +83,18 @@ impl Iterator for AppEntryTypeFixturator<EntryVisibility> {
 pub type MaybeMembraneProof = Option<Arc<SerializedBytes>>;
 
 fixturator!(
-    HeaderBuilderCommon;
-    constructor fn new(AgentPubKey, Timestamp, u32, HeaderHash);
+    ActionBuilderCommon;
+    constructor fn new(AgentPubKey, Timestamp, u32, ActionHash);
 );
 
 fixturator!(
     DeleteLink;
-    constructor fn from_builder(HeaderBuilderCommon, HeaderHash, AnyLinkableHash);
+    constructor fn from_builder(ActionBuilderCommon, ActionHash, AnyLinkableHash);
 );
 
 fixturator!(
     CreateLink;
-    constructor fn from_builder(HeaderBuilderCommon, AnyLinkableHash, AnyLinkableHash, u8, LinkType, LinkTag);
+    constructor fn from_builder(ActionBuilderCommon, AnyLinkableHash, AnyLinkableHash, ZomeId, LinkType, LinkTag);
 );
 
 fixturator!(
@@ -110,10 +110,11 @@ pub struct KnownCreateLink {
     pub target_address: AnyLinkableHash,
     pub tag: LinkTag,
     pub zome_id: ZomeId,
+    pub link_type: LinkType,
 }
 
 pub struct KnownDeleteLink {
-    pub link_add_address: holo_hash::HeaderHash,
+    pub link_add_address: holo_hash::ActionHash,
     pub base_address: AnyLinkableHash,
 }
 
@@ -125,6 +126,7 @@ impl Iterator for CreateLinkFixturator<KnownCreateLink> {
         f.target_address = self.0.curve.target_address.clone();
         f.tag = self.0.curve.tag.clone();
         f.zome_id = self.0.curve.zome_id;
+        f.link_type = self.0.curve.link_type;
         Some(f)
     }
 }
@@ -143,7 +145,7 @@ impl Iterator for DeleteLinkFixturator<KnownDeleteLink> {
 #[derive(Clone)]
 pub struct AppEntry;
 
-/// A curve to make headers have public entry types
+/// A curve to make actions have public entry types
 #[derive(Clone)]
 pub struct PublicCurve;
 
@@ -179,8 +181,13 @@ fixturator!(
 );
 
 fixturator!(
+    ScopedZomeTypesSet;
+    constructor fn default();;
+);
+
+fixturator!(
     ZomeInfo;
-    constructor fn new(ZomeName, ZomeId, SerializedBytes, EntryDefs, FunctionNameVec);
+    constructor fn new(ZomeName, ZomeId, SerializedBytes, EntryDefs, FunctionNameVec, ScopedZomeTypesSet);
 );
 
 fixturator!(
@@ -188,17 +195,17 @@ fixturator!(
     curve Empty AgentInfo {
         agent_initial_pubkey: fixt!(AgentPubKey, Empty),
         agent_latest_pubkey: fixt!(AgentPubKey, Empty),
-        chain_head: (fixt!(HeaderHash, Empty), fixt!(u32, Empty), fixt!(Timestamp, Empty)),
+        chain_head: (fixt!(ActionHash, Empty), fixt!(u32, Empty), fixt!(Timestamp, Empty)),
     };
     curve Unpredictable AgentInfo {
         agent_initial_pubkey: fixt!(AgentPubKey, Unpredictable),
         agent_latest_pubkey: fixt!(AgentPubKey, Unpredictable),
-        chain_head: (fixt!(HeaderHash, Unpredictable), fixt!(u32, Unpredictable), fixt!(Timestamp, Unpredictable)),
+        chain_head: (fixt!(ActionHash, Unpredictable), fixt!(u32, Unpredictable), fixt!(Timestamp, Unpredictable)),
     };
     curve Predictable AgentInfo {
         agent_initial_pubkey: fixt!(AgentPubKey, Predictable),
         agent_latest_pubkey: fixt!(AgentPubKey, Predictable),
-        chain_head: (fixt!(HeaderHash, Predictable), fixt!(u32, Predictable), fixt!(Timestamp, Predictable)),
+        chain_head: (fixt!(ActionHash, Predictable), fixt!(u32, Predictable), fixt!(Timestamp, Predictable)),
     };
 );
 
@@ -217,7 +224,7 @@ fixturator!(
         let min_len = 0;
         let max_len = 5;
         let mut rng = rng();
-        let len = rng.gen_range(min_len, max_len);
+        let len = rng.gen_range(min_len..max_len);
         let mut signature_fixturator = SignatureFixturator::new(Unpredictable);
         let mut signatures = vec![];
         for _ in 0..len {
@@ -264,7 +271,7 @@ fixturator!(
     curve Empty CurryPayloads(BTreeMap::new());
     curve Unpredictable {
         let mut rng = rng();
-        let number_of_payloads = rng.gen_range(0, 5);
+        let number_of_payloads = rng.gen_range(0..5);
 
         let mut payloads: BTreeMap<GrantedFunction, SerializedBytes> = BTreeMap::new();
         let mut granted_function_fixturator = GrantedFunctionFixturator::new_indexed(Unpredictable, get_fixt_index!());
@@ -276,7 +283,7 @@ fixturator!(
     };
     curve Predictable {
         let mut rng = rand::thread_rng();
-        let number_of_payloads = rng.gen_range(0, 5);
+        let number_of_payloads = rng.gen_range(0..5);
 
         let mut payloads: BTreeMap<GrantedFunction, SerializedBytes> = BTreeMap::new();
         let mut granted_function_fixturator = GrantedFunctionFixturator::new_indexed(Predictable, get_fixt_index!());
@@ -296,7 +303,7 @@ fixturator!(
             CapAccessFixturator::new(Empty).next().unwrap(),
             {
                 let mut rng = rng();
-                let number_of_zomes = rng.gen_range(0, 5);
+                let number_of_zomes = rng.gen_range(0..5);
 
                 let mut granted_functions: GrantedFunctions = BTreeSet::new();
                 for _ in 0..number_of_zomes {
@@ -312,7 +319,7 @@ fixturator!(
             CapAccessFixturator::new(Unpredictable).next().unwrap(),
             {
                 let mut rng = rand::thread_rng();
-                let number_of_zomes = rng.gen_range(0, 5);
+                let number_of_zomes = rng.gen_range(0..5);
 
                 let mut granted_functions: GrantedFunctions = BTreeSet::new();
                 for _ in 0..number_of_zomes {
@@ -372,7 +379,7 @@ fixturator!(
             },
             CapAccessVariant::Assigned => {
                 let mut rng = rand::thread_rng();
-                let number_of_assigned = rng.gen_range(0, 5);
+                let number_of_assigned = rng.gen_range(0..5);
 
                 CapAccess::from((
                     CapSecretFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap(),
@@ -410,10 +417,10 @@ fixturator!(
     variants [ ChainAuthor(AgentPubKey) RemoteAgent(ZomeCallCapGrant) ];
 );
 
-pub fn element_with_no_entry(signature: Signature, header: Header) -> Element {
+pub fn record_with_no_entry(signature: Signature, action: Action) -> Record {
     let shh =
-        SignedHeaderHashed::with_presigned(HeaderHashed::from_content_sync(header), signature);
-    Element::new(shh, None)
+        SignedActionHashed::with_presigned(ActionHashed::from_content_sync(action), signature);
+    Record::new(shh, None)
 }
 
 fixturator!(
@@ -473,7 +480,7 @@ fixturator!(
 
 fixturator!(
     EntryDef;
-    constructor fn new(EntryDefId, EntryVisibility, RequiredValidations, RequiredValidationType);
+    constructor fn new(EntryDefId, EntryVisibility, RequiredValidations);
 );
 
 fixturator!(
@@ -481,7 +488,7 @@ fixturator!(
     curve Empty Vec::new().into();
     curve Unpredictable {
         let mut rng = rand::thread_rng();
-        let number_of_defs = rng.gen_range(0, 5);
+        let number_of_defs = rng.gen_range(0..5);
 
         let mut defs = vec![];
         let mut entry_def_fixturator = EntryDefFixturator::new(Unpredictable);
@@ -502,7 +509,7 @@ fixturator!(
 
 fixturator!(
     Dna;
-    constructor fn from_builder(DnaHash, HeaderBuilderCommon);
+    constructor fn from_builder(DnaHash, ActionBuilderCommon);
 );
 
 fixturator! {
@@ -543,27 +550,27 @@ fixturator! {
 
 fixturator!(
     AgentValidationPkg;
-    constructor fn from_builder(HeaderBuilderCommon, MaybeMembraneProof);
+    constructor fn from_builder(ActionBuilderCommon, MaybeMembraneProof);
 );
 
 fixturator!(
     InitZomesComplete;
-    constructor fn from_builder(HeaderBuilderCommon);
+    constructor fn from_builder(ActionBuilderCommon);
 );
 
 fixturator!(
     OpenChain;
-    constructor fn from_builder(HeaderBuilderCommon, DnaHash);
+    constructor fn from_builder(ActionBuilderCommon, DnaHash);
 );
 
 fixturator!(
     CloseChain;
-    constructor fn from_builder(HeaderBuilderCommon, DnaHash);
+    constructor fn from_builder(ActionBuilderCommon, DnaHash);
 );
 
 fixturator!(
     Create;
-    constructor fn from_builder(HeaderBuilderCommon, EntryType, EntryHash);
+    constructor fn from_builder(ActionBuilderCommon, EntryType, EntryHash);
 
     curve PublicCurve {
         let mut ec = fixt!(Create);
@@ -590,7 +597,7 @@ type EntryTypeEntryHash = (EntryType, EntryHash);
 
 fixturator!(
     Update;
-    constructor fn from_builder(HeaderBuilderCommon, EntryHash, HeaderHash, EntryType, EntryHash);
+    constructor fn from_builder(ActionBuilderCommon, EntryHash, ActionHash, EntryType, EntryHash);
 
     curve PublicCurve {
         let mut eu = fixt!(Update);
@@ -625,11 +632,11 @@ fixturator!(
 
 fixturator!(
     Delete;
-    constructor fn from_builder(HeaderBuilderCommon, HeaderHash, EntryHash);
+    constructor fn from_builder(ActionBuilderCommon, ActionHash, EntryHash);
 );
 
 fixturator!(
-    Header;
+    Action;
     variants [
         Dna(Dna)
         AgentValidationPkg(AgentValidationPkg)
@@ -644,23 +651,23 @@ fixturator!(
     ];
 
     curve PublicCurve {
-        match fixt!(Header) {
-            Header::Create(_) => Header::Create(fixt!(Create, PublicCurve)),
-            Header::Update(_) => Header::Update(fixt!(Update, PublicCurve)),
+        match fixt!(Action) {
+            Action::Create(_) => Action::Create(fixt!(Create, PublicCurve)),
+            Action::Update(_) => Action::Update(fixt!(Update, PublicCurve)),
             other_type => other_type,
         }
     };
 );
 
 fixturator!(
-    HeaderHashed;
-    constructor fn from_content_sync(Header);
+    ActionHashed;
+    constructor fn from_content_sync(Action);
 );
 
 fixturator!(
     with_vec 0 5;
-    SignedHeaderHashed;
-    constructor fn with_presigned(HeaderHashed, Signature);
+    SignedActionHashed;
+    constructor fn with_presigned(ActionHashed, Signature);
 );
 
 fixturator!(
@@ -669,20 +676,53 @@ fixturator!(
 );
 
 fixturator!(
-    Zomes;
+    IntegrityZome;
+    constructor fn new(ZomeName, IntegrityZomeDef);
+);
+
+fixturator!(
+    IntegrityZomes;
     curve Empty Vec::new();
     curve Unpredictable {
         // @todo implement unpredictable zomes
-        ZomesFixturator::new(Empty).next().unwrap()
+        IntegrityZomesFixturator::new(Empty).next().unwrap()
     };
     curve Predictable {
         // @todo implement predictable zomes
-        ZomesFixturator::new(Empty).next().unwrap()
+        IntegrityZomesFixturator::new(Empty).next().unwrap()
+    };
+);
+
+fixturator!(
+    CoordinatorZome;
+    constructor fn new(ZomeName, CoordinatorZomeDef);
+);
+
+fixturator!(
+    CoordinatorZomes;
+    curve Empty Vec::new();
+    curve Unpredictable {
+        // @todo implement unpredictable zomes
+        CoordinatorZomesFixturator::new(Empty).next().unwrap()
+    };
+    curve Predictable {
+        // @todo implement predictable zomes
+        CoordinatorZomesFixturator::new(Empty).next().unwrap()
     };
 );
 
 fixturator!(
     ZomeDef;
+    constructor fn from_hash(WasmHash);
+);
+
+fixturator!(
+    IntegrityZomeDef;
+    constructor fn from_hash(WasmHash);
+);
+
+fixturator!(
+    CoordinatorZomeDef;
     constructor fn from_hash(WasmHash);
 );
 
@@ -699,7 +739,10 @@ fixturator!(
             .next()
             .unwrap(),
         origin_time: Timestamp::HOLOCHAIN_EPOCH,
-        zomes: ZomesFixturator::new_indexed(Empty, get_fixt_index!())
+        integrity_zomes: IntegrityZomesFixturator::new_indexed(Empty, get_fixt_index!())
+            .next()
+            .unwrap(),
+        coordinator_zomes: CoordinatorZomesFixturator::new_indexed(Empty, get_fixt_index!())
             .next()
             .unwrap(),
     };
@@ -715,7 +758,10 @@ fixturator!(
             .next()
             .unwrap(),
         origin_time: Timestamp::HOLOCHAIN_EPOCH,
-        zomes: ZomesFixturator::new_indexed(Unpredictable, get_fixt_index!())
+        integrity_zomes: IntegrityZomesFixturator::new_indexed(Unpredictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+        coordinator_zomes: CoordinatorZomesFixturator::new_indexed(Empty, get_fixt_index!())
             .next()
             .unwrap(),
     };
@@ -731,7 +777,10 @@ fixturator!(
             .next()
             .unwrap(),
         origin_time: Timestamp::HOLOCHAIN_EPOCH,
-        zomes: ZomesFixturator::new_indexed(Predictable, get_fixt_index!())
+        integrity_zomes: IntegrityZomesFixturator::new_indexed(Predictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+        coordinator_zomes: CoordinatorZomesFixturator::new_indexed(Empty, get_fixt_index!())
             .next()
             .unwrap(),
     };
