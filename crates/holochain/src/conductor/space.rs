@@ -9,6 +9,7 @@ use holochain_p2p::{
     dht::{
         arq::{power_and_count_from_length, ArqBoundsSet},
         hash::RegionHash,
+        prelude::Topology,
         region::{RegionBounds, RegionData},
         region_set::{RegionCoordSetLtcs, RegionSetLtcs},
         spacetime::TelescopingTimes,
@@ -33,7 +34,7 @@ use holochain_types::{
     db_cache::DhtDbQueryCache,
     dht_op::{DhtOp, DhtOpType},
 };
-use holochain_zome_types::{DnaDefHashed, Entry, EntryVisibility, SignedAction, Timestamp};
+use holochain_zome_types::{Entry, EntryVisibility, SignedAction, Timestamp};
 use kitsune_p2p::{
     event::{TimeWindow, TimeWindowInclusive},
     KitsuneP2pConfig,
@@ -328,17 +329,11 @@ impl Spaces {
     /// those ops. Note that when *sending* ops we filter out ops in limbo.
     pub async fn handle_fetch_op_regions(
         &self,
-        dna_def: &DnaDefHashed,
+        dna_hash: &DnaHash,
+        topology: Topology,
         dht_arc_set: DhtArcSet,
     ) -> ConductorResult<RegionSetLtcs> {
-        use holo_hash::HasHash;
-        let dna_hash = dna_def.as_hash();
         let sql = holochain_sqlite::sql::sql_cell::FETCH_OP_REGION;
-        let cutoff = self
-            .network_config
-            .tuning_params
-            .danger_gossip_recent_threshold();
-        let topology = dna_def.topology(cutoff);
         let max_chunks = ArqStrat::default().max_chunks();
         let arq_set = ArqBoundsSet::new(
             dht_arc_set

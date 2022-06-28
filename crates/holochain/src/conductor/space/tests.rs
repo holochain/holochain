@@ -29,6 +29,8 @@ use super::Spaces;
 async fn test_region_queries() {
     const NUM_OPS: usize = 100;
 
+    // let _g = observability::test_run().ok();
+
     let mut u = Unstructured::new(&NOISE);
     let temp_dir = tempfile::TempDir::new().unwrap();
     let path = temp_dir.path().to_path_buf();
@@ -55,8 +57,6 @@ async fn test_region_queries() {
     let cutoff = Duration::from_micros(q_us * 2);
     let topo = dna_def.topology(cutoff);
 
-    dbg!(&topo, tq_ms);
-
     // Builds an arbitrary valid op at the given timestamp
     let mut arbitrary_valid_op = |timestamp: Timestamp| -> DhtOp {
         let mut op = DhtOp::arbitrary(&mut u).unwrap();
@@ -73,14 +73,14 @@ async fn test_region_queries() {
 
     // - Check that we have no ops to begin with
     let region_set = spaces
-        .handle_fetch_op_regions(&dna_def, DhtArcSet::Full)
+        .handle_fetch_op_regions(dna_def.as_hash(), topo.clone(), DhtArcSet::Full)
         .await
         .unwrap();
     let region_sum: RegionData = region_set.regions().map(|r| r.data).sum();
     assert_eq!(region_sum.count as usize, 0);
 
     for _ in 0..NUM_OPS {
-        // timestamp is between 1 and 5 time quanta ago, which is the historical
+        // timestamp is between 1 and 4 time quanta ago, which is the historical
         // window
         let op = arbitrary_valid_op(
             (five_quanta_ago + Duration::from_millis(rand::thread_rng().gen_range(0..tq_ms * 4)))
@@ -94,14 +94,14 @@ async fn test_region_queries() {
         // to test that these ops don't get returned in region queries.
         let op2 = arbitrary_valid_op(
             (five_quanta_ago
-                + Duration::from_millis(rand::thread_rng().gen_range(tq_ms * 4..tq_ms * 5)))
+                + Duration::from_millis(rand::thread_rng().gen_range(tq_ms * 4..=tq_ms * 5)))
             .unwrap(),
         );
         let op2 = DhtOpHashed::from_content_sync(op2);
         fill_db(&db, op2);
     }
     let region_set = spaces
-        .handle_fetch_op_regions(&dna_def, DhtArcSet::Full)
+        .handle_fetch_op_regions(dna_def.as_hash(), topo.clone(), DhtArcSet::Full)
         .await
         .unwrap();
 

@@ -40,7 +40,8 @@ impl TelescopingTimes {
         let threshold = (Timestamp::now() - topo.time_cutoff)
             .expect("The system time is set to something unreasonable");
         let time_quantum = TimeQuantum::from_timestamp(topo, threshold);
-        Self::new(time_quantum)
+        // Add 1 time quantum to "round up" so that the most recent region contains the threshold.
+        Self::new(time_quantum + 1.into())
     }
 
     /// Calculate the exponentially expanding time segments using the binary
