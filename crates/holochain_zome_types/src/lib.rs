@@ -18,6 +18,8 @@ pub mod bytes;
 pub mod call;
 pub mod capability;
 pub mod cell;
+#[allow(missing_docs)]
+pub mod chain;
 pub mod countersigning;
 #[allow(missing_docs)]
 pub mod crdt;
