@@ -163,13 +163,18 @@ impl ShardedGossip {
         gossip_type: GossipType,
         bandwidth: Arc<BandwidthThrottle>,
         metrics: MetricsSync,
-        enable_history: bool,
+        #[cfg(feature = "test")] enable_history: bool,
     ) -> Arc<Self> {
+        #[cfg(feature = "test")]
         let state = if enable_history {
             ShardedGossipState::with_history()
         } else {
             Default::default()
         };
+
+        #[cfg(not(feature = "test"))]
+        let state = Default::default();
+
         let this = Arc::new(Self {
             ep_hnd,
             state: Share::new(state),
@@ -487,6 +492,7 @@ pub(crate) struct ShardedGossipState {
 
 impl ShardedGossipState {
     /// Construct state with history queues
+    #[cfg(feature = "test")]
     pub fn with_history() -> Self {
         Self {
             queues: Default::default(),
@@ -1189,7 +1195,6 @@ impl AsGossipModuleFactory for ShardedRecentGossipFactory {
             GossipType::Recent,
             self.bandwidth.clone(),
             metrics,
-            false,
         ))
     }
 }
@@ -1223,7 +1228,6 @@ impl AsGossipModuleFactory for ShardedHistoricalGossipFactory {
             GossipType::Historical,
             self.bandwidth.clone(),
             metrics,
-            false,
         ))
     }
 }
