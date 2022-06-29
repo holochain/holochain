@@ -341,7 +341,6 @@ impl DhtArcRange<DhtLocation> {
         full_to_half_len(self.length())
     }
 
-    #[cfg(any(test, feature = "test_utils"))]
     /// Handy ascii representation of an arc, especially useful when
     /// looking at several arcs at once to get a sense of their overlap
     pub fn to_ascii(&self, len: usize) -> String {
