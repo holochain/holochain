@@ -27,9 +27,9 @@ members = [
   "crates/hc_bundle",
   "crates/hc_sandbox",
 
+  "crates/kitsune_p2p/bootstrap",
   "crates/kitsune_p2p/dht",
   "crates/kitsune_p2p/dht_arc",
-  "crates/kitsune_p2p/bootstrap",
   "crates/kitsune_p2p/direct",
   "crates/kitsune_p2p/direct_api",
   "crates/kitsune_p2p/direct_test",

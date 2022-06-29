@@ -1,6 +1,24 @@
 use super::*;
 
 impl NewEntryHeader {
+    pub fn author_mut(&mut self) -> &mut AgentPubKey {
+        match self {
+            Self::Create(Create { ref mut author, .. }) => author,
+            Self::Update(Update { ref mut author, .. }) => author,
+        }
+    }
+
+    pub fn timestamp_mut(&mut self) -> &mut Timestamp {
+        match self {
+            Self::Create(Create {
+                ref mut timestamp, ..
+            }) => timestamp,
+            Self::Update(Update {
+                ref mut timestamp, ..
+            }) => timestamp,
+        }
+    }
+
     pub fn header_seq_mut(&mut self) -> &mut u32 {
         match self {
             Self::Create(Create {

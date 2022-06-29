@@ -947,33 +947,10 @@ pub fn get_public_op_from_db(
             ":hash": op_hash,
         },
         |row| {
-            let header = from_blob::<SignedHeader>(row.get("header_blob")?)?;
-            let op_type: DhtOpType = row.get("type")?;
-            if header
-                .0
-                .entry_type()
-                .map_or(false, |et| *et.visibility() == EntryVisibility::Private)
-                && op_type == DhtOpType::StoreEntry
-            {
-                return Ok(None);
-            }
             let hash: DhtOpHash = row.get("hash")?;
-            // Check the entry isn't private before gossiping it.
-            let mut entry: Option<Entry> = None;
-            if header
-                .0
-                .entry_type()
-                .filter(|et| *et.visibility() == EntryVisibility::Public)
-                .is_some()
-            {
-                let e: Option<Vec<u8>> = row.get("entry_blob")?;
-                entry = match e {
-                    Some(entry) => Some(from_blob::<Entry>(entry)?),
-                    None => None,
-                };
-            }
-            let op = DhtOp::from_type(op_type, header, entry)?;
-            StateQueryResult::Ok(Some(DhtOpHashed::with_pre_hashed(op, hash)))
+            let op_hashed =
+                map_sql_dht_op_common(row)?.map(|op| DhtOpHashed::with_pre_hashed(op, hash));
+            StateQueryResult::Ok(op_hashed)
         },
     );
     match result {
@@ -983,4 +960,33 @@ pub fn get_public_op_from_db(
         Err(e) => Err(e),
         Ok(result) => Ok(result),
     }
+}
+
+pub fn map_sql_dht_op_common(row: &Row) -> StateQueryResult<Option<DhtOp>> {
+    let header = from_blob::<SignedHeader>(row.get("header_blob")?)?;
+    let op_type: DhtOpType = row.get("type")?;
+    if header
+        .0
+        .entry_type()
+        .map_or(false, |et| *et.visibility() == EntryVisibility::Private)
+        && op_type == DhtOpType::StoreEntry
+    {
+        return Ok(None);
+    }
+
+    // Check that the entry isn't private before gossiping it.
+    let mut entry: Option<Entry> = None;
+    if header
+        .0
+        .entry_type()
+        .filter(|et| *et.visibility() == EntryVisibility::Public)
+        .is_some()
+    {
+        let e: Option<Vec<u8>> = row.get("entry_blob")?;
+        entry = match e {
+            Some(entry) => Some(from_blob::<Entry>(entry)?),
+            None => None,
+        };
+    }
+    Ok(Some(DhtOp::from_type(op_type, header, entry)?))
 }

@@ -336,6 +336,7 @@ impl HolochainP2pDnaT for HolochainP2pDna {
     }
 }
 
+pub use kitsune_p2p::dht;
 pub use kitsune_p2p::dht_arc;
 
 mod test;

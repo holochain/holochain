@@ -9,6 +9,14 @@ pub fn array_xor<const N: usize>(a: &mut [u8; N], b: &[u8; N]) {
     }
 }
 
+/// Take bitwise XOR of each element of both slices
+pub fn slice_xor(a: &mut [u8], b: &[u8]) {
+    debug_assert_eq!(a.len(), b.len());
+    for i in 0..a.len() {
+        a[i] ^= b[i];
+    }
+}
+
 impl RegionHash {
     /// Any null node hashes just get ignored.
     pub fn xor(&mut self, other: &Self) {

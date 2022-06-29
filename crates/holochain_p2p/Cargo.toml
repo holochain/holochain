@@ -12,6 +12,7 @@ edition = "2021"
 
 [dependencies]
 async-trait = "0.1"
+derive_more = "0.99"
 fixt = { path = "../fixt", version = "0.0.11"}
 futures = "0.3"
 ghost_actor = "=0.3.0-alpha.4"
