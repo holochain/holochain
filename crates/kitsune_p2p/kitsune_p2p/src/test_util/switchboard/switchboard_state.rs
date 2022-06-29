@@ -141,7 +141,6 @@ impl Switchboard {
             self.gossip_type,
             bandwidth,
             Default::default(),
-            true,
         );
         let gossip_module = GossipModule(gossip.clone());
 

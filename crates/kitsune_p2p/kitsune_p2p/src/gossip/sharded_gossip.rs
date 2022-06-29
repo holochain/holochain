@@ -506,6 +506,7 @@ pub(crate) struct ShardedGossipState {
 impl ShardedGossipState {
     /// Construct state with history queues
     #[cfg(feature = "test_utils")]
+    #[allow(dead_code)]
     pub fn with_history() -> Self {
         Self {
             queues: Default::default(),
