@@ -46,7 +46,10 @@
 //! a bounded rectangle of spacetime.
 //!
 
-use std::ops::{AddAssign, Deref};
+use std::{
+    ops::{AddAssign, Deref},
+    time::Duration,
+};
 
 use crate::{
     op::{Loc, Timestamp},

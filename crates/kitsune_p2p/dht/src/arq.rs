@@ -49,6 +49,10 @@ pub trait ArqStart: Sized + Copy + std::fmt::Debug {
     fn to_loc(&self, topo: &Topology, power: u8) -> Loc;
     /// Get the exponential SpaceOffset representation
     fn to_offset(&self, topo: &Topology, power: u8) -> SpaceOffset;
+    /// Requantize to a higher power, using the precalculated multiplicative factor.
+    fn requantize_up(&self, factor: u32) -> Option<Self>;
+    /// Requantize to a lower power, using the precalculated multiplicative factor.
+    fn requantize_down(&self, factor: u32) -> Self;
 }
 
 impl ArqStart for Loc {
@@ -59,6 +63,14 @@ impl ArqStart for Loc {
     fn to_offset(&self, topo: &Topology, power: u8) -> SpaceOffset {
         SpaceOffset::from_absolute_rounded(*self, topo, power)
     }
+
+    fn requantize_up(&self, _factor: u32) -> Option<Self> {
+        Some(*self)
+    }
+
+    fn requantize_down(&self, _factor: u32) -> Self {
+        *self
+    }
 }
 
 impl ArqStart for SpaceOffset {
@@ -68,6 +80,14 @@ impl ArqStart for SpaceOffset {
 
     fn to_offset(&self, _topo: &Topology, _power: u8) -> SpaceOffset {
         *self
+    }
+
+    fn requantize_up(&self, factor: u32) -> Option<Self> {
+        ((**self) % factor == 0).then(|| *self / factor)
+    }
+
+    fn requantize_down(&self, factor: u32) -> Self {
+        *self * factor
     }
 }
 
@@ -197,11 +217,28 @@ impl<S: ArqStart> Arq<S> {
     /// Requantize to a different power. If requantizing to a higher power,
     /// only requantize if there is no information loss due to rounding.
     /// Otherwise, return None.
-    pub fn requantize(&self, power: u8) -> Option<Self> {
-        requantize(self.power, *self.count, power).map(|(power, count)| Self {
-            start: self.start,
+    pub fn requantize(&self, new_power: u8) -> Option<Self> {
+        let old_power = self.power;
+        let old_count = self.count;
+        if old_power < new_power {
+            let factor = 2u32.pow((new_power - old_power) as u32);
+            self.start.requantize_up(factor).and_then(|start| {
+                let new_count = old_count / factor;
+                if old_count == new_count * factor {
+                    Some((start, new_power, new_count))
+                } else {
+                    None
+                }
+            })
+        } else {
+            let factor = 2u32.pow((old_power - new_power) as u32);
+            let new_count = old_count * factor;
+            Some((self.start.requantize_down(factor), new_power, new_count))
+        }
+        .map(|(start, power, count)| Self {
+            start,
             power,
-            count: count.into(),
+            count,
         })
     }
 
@@ -411,22 +448,6 @@ pub fn is_full(topo: &Topology, power: u8, count: u32) -> bool {
         true
     } else {
         count >= pow2(max.saturating_sub(power))
-    }
-}
-
-/// Helper for requantizing arq data
-pub fn requantize(old_power: u8, old_count: u32, new_power: u8) -> Option<(u8, u32)> {
-    if old_power < new_power {
-        let factor = 2u32.pow((new_power - old_power) as u32);
-        let count = old_count / factor;
-        if old_count == count * factor {
-            Some((new_power, count))
-        } else {
-            None
-        }
-    } else {
-        let count = old_count * 2u32.pow((old_power - new_power) as u32);
-        Some((new_power, count))
     }
 }
 

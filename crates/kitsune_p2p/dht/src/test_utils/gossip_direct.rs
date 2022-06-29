@@ -1,6 +1,7 @@
 use crate::{
     error::{GossipError, GossipResult},
     persistence::HostAccessTest,
+    prelude::ArqBoundsSet,
     region::REGION_MASS,
     spacetime::{Quantum, TimeQuantum},
 };
@@ -10,7 +11,7 @@ pub fn gossip_direct_at<Peer: HostAccessTest>(
     left: &mut Peer,
     right: &mut Peer,
     now: TimeQuantum,
-) -> GossipResult<TestNodeGossipRoundStats> {
+) -> GossipResult<TestNodeGossipRoundInfo> {
     gossip_direct((left, now), (right, now))
 }
 
@@ -19,7 +20,7 @@ pub fn gossip_direct_at<Peer: HostAccessTest>(
 pub fn gossip_direct<Peer: HostAccessTest>(
     (left, time_left): (&mut Peer, TimeQuantum),
     (right, time_right): (&mut Peer, TimeQuantum),
-) -> GossipResult<TestNodeGossipRoundStats> {
+) -> GossipResult<TestNodeGossipRoundInfo> {
     let mut stats = TestNodeGossipRoundStats::default();
 
     // - ensure identical topologies (especially the time_origin)
@@ -46,6 +47,8 @@ pub fn gossip_direct<Peer: HostAccessTest>(
         // - calculate common arqset
         let al = left.get_arq_set();
         let ar = right.get_arq_set();
+        al.print_arqs(topo, 64);
+        ar.print_arqs(topo, 64);
         if (al.power() as i8 - ar.power() as i8).abs() as u8
             > u8::min(gpl.max_space_power_offset, gpr.max_space_power_offset)
         {
@@ -63,7 +66,7 @@ pub fn gossip_direct<Peer: HostAccessTest>(
 
         // - calculate regions
         let regions_left = left.region_set(common_arqs.clone(), time_left);
-        let regions_right = right.region_set(common_arqs, time_right);
+        let regions_right = right.region_set(common_arqs.clone(), time_right);
         stats.regions_sent += regions_left.count() as u32;
         stats.regions_rcvd += regions_right.count() as u32;
         (regions_left, regions_right)
@@ -97,7 +100,15 @@ pub fn gossip_direct<Peer: HostAccessTest>(
             right.integrate_op(op);
         }
     }
-    Ok(stats)
+    Ok(TestNodeGossipRoundInfo { common_arqs, stats })
+}
+
+/// Useful data calculated during the test node gossip round
+pub struct TestNodeGossipRoundInfo {
+    /// The common arq set calculated during gossip
+    pub common_arqs: ArqBoundsSet,
+    /// Stats about data transfer during the round
+    pub stats: TestNodeGossipRoundStats,
 }
 
 /// Stats about what was sent and received during the gossip round

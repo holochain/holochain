@@ -65,7 +65,7 @@ impl OpRegion<RegionData> for OpData {
 
     fn region_data(&self) -> RegionData {
         RegionData {
-            hash: self.hash.into(),
+            hash: self.hash.clone().into(),
             size: self.size,
             count: 1,
         }

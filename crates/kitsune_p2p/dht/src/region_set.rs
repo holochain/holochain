@@ -35,13 +35,6 @@ impl<D: RegionDataConstraints> RegionSet<D> {
         }
     }
 
-    /// can be used to pair the generated coords with stored data.
-    pub fn region_coords(&self) -> impl Iterator<Item = RegionCoords> + '_ {
-        match self {
-            Self::Ltcs(set) => set.coords.region_coords_flat().map(|(_, coords)| coords),
-        }
-    }
-
     /// Iterator over all Regions
     pub fn regions(&self) -> impl Iterator<Item = Region<D>> + '_ {
         match self {
@@ -82,6 +75,19 @@ impl<D: RegionDataConstraints> RegionSet<D> {
     }
 }
 
+#[cfg(feature = "test_utils")]
+impl RegionSet {
+    /// Return only the regions which have ops in them. Useful for testing
+    /// sparse scenarios.
+    pub fn nonzero_regions(
+        &self,
+    ) -> impl '_ + Iterator<Item = ((usize, usize, usize), RegionCoords, RegionData)> {
+        match self {
+            Self::Ltcs(set) => set.nonzero_regions(),
+        }
+    }
+}
+
 #[cfg(test)]
 #[cfg(feature = "test_utils")]
 mod tests {
@@ -93,7 +99,7 @@ mod tests {
         persistence::*,
         prelude::{ArqBoundsSet, ArqLocated, ArqStart},
         test_utils::{Op, OpData, OpStore},
-        Arq, Loc,
+        Arq, ArqBounds, Loc,
     };
 
     use super::*;
@@ -130,6 +136,23 @@ mod tests {
     }
 
     #[test]
+    fn test_count() {
+        use num_traits::Zero;
+        let arqs = ArqBoundsSet::new(vec![
+            ArqBounds::new(12, 11.into(), 8.into()),
+            ArqBounds::new(12, 11.into(), 7.into()),
+            ArqBounds::new(12, 11.into(), 5.into()),
+        ]);
+        let tt = TelescopingTimes::new(TimeQuantum::from(11));
+        let nt = tt.segments().len();
+        let expected = (8 + 7 + 5) * nt;
+        let coords = RegionCoordSetLtcs::new(tt, arqs);
+        assert_eq!(coords.count(), expected);
+        let regions = coords.into_region_set_infallible(|_| RegionData::zero());
+        assert_eq!(regions.count(), expected);
+    }
+
+    #[test]
     fn test_regions() {
         let topo = Topology::unit(Timestamp::from_micros(1000));
         let pow = 8;
@@ -159,7 +182,12 @@ mod tests {
         let coords = RegionCoordSetLtcs::new(times, ArqBoundsSet::single(arq.to_bounds(&topo)));
         let rset = RegionSetLtcs::from_store(&store, coords);
         assert_eq!(
-            rset.data.concat().iter().map(|r| r.count).sum::<u32>() as usize,
+            rset.data
+                .concat()
+                .concat()
+                .iter()
+                .map(|r| r.count)
+                .sum::<u32>() as usize,
             nx * nt / 2
         );
     }
@@ -187,6 +215,11 @@ mod tests {
         let coords: Vec<Vec<_>> = rset_a
             .coords
             .region_coords_nested()
+            // The outer layer of iterators corresponds to arqs in the ArqSet.
+            // There is only one arq, so just take the first item.
+            .next()
+            .unwrap()
+            // The other two layers are for space and time segments
             .map(|col| col.collect())
             .collect();
 
@@ -240,11 +273,11 @@ mod tests {
         // of the store which contains the extra ops over the same region
         // TODO: proptest this
         assert_eq!(
-            diff[0].data + extra_ops[0].region_data(),
+            diff[0].data.clone() + extra_ops[0].region_data(),
             store2.query_region_data(&diff[0].coords)
         );
         assert_eq!(
-            diff[1].data + extra_ops[1].region_data(),
+            diff[1].data.clone() + extra_ops[1].region_data(),
             store2.query_region_data(&diff[1].coords)
         );
     }
@@ -302,11 +335,11 @@ mod tests {
         // of the store which contains the extra ops over the same region
         // TODO: proptest this
         assert_eq!(
-            diff[0].data + extra_ops[0].region_data(),
+            diff[0].data.clone() + extra_ops[0].region_data(),
             store2.query_region_data(&diff[0].coords)
         );
         assert_eq!(
-            diff[1].data + extra_ops[1].region_data(),
+            diff[1].data.clone() + extra_ops[1].region_data(),
             store2.query_region_data(&diff[1].coords)
         );
     }

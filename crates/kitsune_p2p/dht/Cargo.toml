@@ -20,8 +20,8 @@ futures = "0.3"
 gcollections = "1.5"
 kitsune_p2p_dht_arc = { path = "../dht_arc"}
 kitsune_p2p_timestamp = { path = "../timestamp", features = ["now"]}
-intervallum = "1.4"
 # kitsune_p2p_types = { path = "../types"}
+intervallum = "1.4"
 must_future = "0.1"
 num-traits = "0.2.14"
 once_cell = "1.8"

@@ -1,3 +1,5 @@
+use num_traits::Zero;
+
 use crate::hash::{OpHash, RegionHash};
 
 /// Take bitwise XOR of each element of both arrays
@@ -33,6 +35,12 @@ impl num_traits::Zero for RegionHash {
     }
 }
 
+impl std::iter::Sum for RegionHash {
+    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
+        iter.reduce(|a, b| a + b).unwrap_or_else(RegionHash::zero)
+    }
+}
+
 impl From<OpHash> for RegionHash {
     fn from(h: OpHash) -> Self {
         Self::new(h.0)
@@ -46,7 +54,7 @@ impl From<OpHash> for RegionHash {
 /// The size and count data can also act as heuristics to help us fine-tune the
 /// gossip algorithm, although currently they are unused (except for the purpose
 /// of disambiguation in the rare case of an XOR hash collision).
-#[derive(Copy, Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(from = "RegionDataCompact")]
 #[serde(into = "RegionDataCompact")]
 pub struct RegionData {
@@ -96,6 +104,12 @@ impl std::ops::Add for RegionData {
     }
 }
 
+impl std::iter::Sum for RegionData {
+    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
+        iter.reduce(|a, b| a + b).unwrap_or_else(RegionData::zero)
+    }
+}
+
 impl std::ops::SubAssign for RegionData {
     fn sub_assign(&mut self, other: Self) {
         // XOR works as both addition and subtraction
@@ -117,7 +131,7 @@ impl std::ops::Sub for RegionData {
 
 /// Tuple-based representation of RegionData, used for sending more compact
 /// wire messages
-#[derive(Copy, Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct RegionDataCompact(RegionHash, u32, u32);
 
 impl From<RegionData> for RegionDataCompact {

@@ -1,6 +1,9 @@
 //! Defines the trait which represents everything Kitsune needs to know about Ops
 
-use crate::spacetime::{SpacetimeQuantumCoords, Topology};
+use crate::{
+    region::RegionData,
+    spacetime::{SpacetimeQuantumCoords, Topology},
+};
 
 pub use kitsune_p2p_dht_arc::DhtLocation as Loc;
 
@@ -8,7 +11,7 @@ pub use kitsune_p2p_timestamp::Timestamp;
 
 /// Everything that Kitsune needs to know about an Op.
 /// Intended to be implemented by the host.
-pub trait OpRegion<D>: PartialOrd + Ord + Send + Sync {
+pub trait OpRegion<D = RegionData>: PartialOrd + Ord + Send + Sync + std::fmt::Debug {
     /// The op's Location
     fn loc(&self) -> Loc;
     /// The op's Timestamp

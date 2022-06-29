@@ -76,6 +76,11 @@ impl Topology {
         ((t / self.time.quantum as i64) as u32).into()
     }
 
+    /// Returns the time quantum which contains this timestamp
+    pub fn time_quantum_duration(&self, d: std::time::Duration) -> TimeQuantum {
+        ((d.as_micros() as i64 / self.time.quantum as i64) as u32).into()
+    }
+
     /// The minimum power to use in "exponentional coordinates".
     pub fn min_space_power(&self) -> u8 {
         // If space.quantum_power is 0, then min has to be at least 1, because
@@ -171,7 +176,7 @@ impl Dimension {
 /// and Arq power level, there will be very little need for reconciliation.
 ///
 /// In networks where nodes are offline for long periods of time, or latency
-/// is very high (sneakernet), it could be helpful to increase these values.
+/// is very high (e.g. sneakernet), it could be helpful to increase these values.
 #[derive(Copy, Clone, Debug, derive_more::Constructor)]
 pub struct GossipParams {
     /// What +/- coordinate offset will you accept for timestamps?
