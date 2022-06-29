@@ -8,7 +8,7 @@ use crate::conductor::error::ConductorResult;
 
 /// The network module needs info about various groupings ("regions") of ops
 pub async fn query_region_set(
-    db: DbWrite<DbKindAuthored>,
+    db: DbWrite<DbKindDht>,
     topology: Topology,
     strat: &ArqStrat,
     dht_arc_set: Arc<DhtArcSet>,

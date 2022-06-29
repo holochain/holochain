@@ -178,8 +178,8 @@ impl<O: Offset> Segment<O> {
         } else {
             let power = self.power - 1;
             Some([
-                Segment::new(power, O::from(*self.offset * 2)),
-                Segment::new(power, O::from(*self.offset * 2 + 1)),
+                Segment::new(power, O::from(*self.offset.wrapping_mul(2))),
+                Segment::new(power, O::from(*self.offset.wrapping_mul(2).wrapping_add(1))),
             ])
         }
     }
