@@ -16,7 +16,7 @@ async fn bloom_windows() {
 
     let r = make_node(1, expected_time.clone())
         .await
-        .generate_ops_blooms_for_time_window(&Arc::new(DhtArcSet::Full), search_window.clone())
+        .generate_op_blooms_for_time_window(&Arc::new(DhtArcSet::Full), search_window.clone())
         .await
         .unwrap();
 
@@ -33,7 +33,7 @@ async fn bloom_windows() {
 
     let r = make_empty_node()
         .await
-        .generate_ops_blooms_for_time_window(&Arc::new(DhtArcSet::Full), search_window.clone())
+        .generate_op_blooms_for_time_window(&Arc::new(DhtArcSet::Full), search_window.clone())
         .await
         .unwrap();
 
@@ -53,7 +53,7 @@ async fn bloom_windows() {
         expected_time.clone(),
     )
     .await
-    .generate_ops_blooms_for_time_window(&Arc::new(DhtArcSet::Full), search_window.clone())
+    .generate_op_blooms_for_time_window(&Arc::new(DhtArcSet::Full), search_window.clone())
     .await
     .unwrap();
 
@@ -73,7 +73,7 @@ async fn bloom_windows() {
         expected_time.clone(),
     )
     .await
-    .generate_ops_blooms_for_time_window(&Arc::new(DhtArcSet::Full), search_window.clone())
+    .generate_op_blooms_for_time_window(&Arc::new(DhtArcSet::Full), search_window.clone())
     .await
     .unwrap();
 
@@ -115,7 +115,7 @@ async fn bloom_windows() {
         expected_time.clone(),
     )
     .await
-    .generate_ops_blooms_for_time_window(&Arc::new(DhtArcSet::Full), search_window.clone())
+    .generate_op_blooms_for_time_window(&Arc::new(DhtArcSet::Full), search_window.clone())
     .await
     .unwrap();
 
@@ -168,7 +168,7 @@ async fn bloom_windows() {
         expected_time.clone(),
     )
     .await
-    .generate_ops_blooms_for_time_window(&Arc::new(DhtArcSet::Full), last_cursor..search_window.end)
+    .generate_op_blooms_for_time_window(&Arc::new(DhtArcSet::Full), last_cursor..search_window.end)
     .await
     .unwrap();
 

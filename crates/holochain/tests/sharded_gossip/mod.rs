@@ -456,7 +456,7 @@ async fn mock_network_sharded_gossip() {
                                                 time_window: window,
                                             }
                                         } else {
-                                            let filter = create_ops_bloom(this_agent_hashes);
+                                            let filter = create_op_bloom(this_agent_hashes);
 
                                             EncodedTimedBloomFilter::HaveHashes {
                                                 time_window: window,
@@ -467,7 +467,7 @@ async fn mock_network_sharded_gossip() {
                                             dna: dna.clone(),
                                             module: module.clone(),
                                             gossip: GossipProtocol::Sharded(
-                                                ShardedGossipWire::op_blooms(filter, true),
+                                                ShardedGossipWire::op_bloom(filter, true),
                                             ),
                                         };
                                         channel.send(msg.addressed((*agent).clone())).await;
@@ -484,9 +484,8 @@ async fn mock_network_sharded_gossip() {
                                             channel.send(msg.addressed((*agent).clone())).await;
                                         }
                                     }
-                                    ShardedGossipWire::OpBlooms(OpBlooms {
-                                        missing_hashes,
-                                        ..
+                                    ShardedGossipWire::OpBloom(OpBloom {
+                                        missing_hashes, ..
                                     }) => {
                                         // We have received an ops bloom so we can respond with any missing
                                         // hashes if there are nay.
@@ -602,7 +601,7 @@ async fn mock_network_sharded_gossip() {
                                     ShardedGossipWire::AlreadyInProgress(_) => (),
                                     ShardedGossipWire::Busy(_) => (),
                                     ShardedGossipWire::Error(_) => (),
-                                    ShardedGossipWire::OpBloomsBatchReceived(_) => (),
+                                    ShardedGossipWire::OpBatchReceived(_) => (),
                                 }
                             }
                         }
@@ -987,7 +986,7 @@ async fn mock_network_sharding() {
                                                 time_window: window,
                                             }
                                         } else {
-                                            let filter = create_ops_bloom(this_agent_hashes);
+                                            let filter = create_op_bloom(this_agent_hashes);
 
                                             EncodedTimedBloomFilter::HaveHashes {
                                                 time_window: window,
@@ -998,7 +997,7 @@ async fn mock_network_sharding() {
                                             dna: dna.clone(),
                                             module: module.clone(),
                                             gossip: GossipProtocol::Sharded(
-                                                ShardedGossipWire::op_blooms(filter, true),
+                                                ShardedGossipWire::op_bloom(filter, true),
                                             ),
                                         };
                                         channel.send(msg.addressed((*agent).clone())).await;
@@ -1019,9 +1018,8 @@ async fn mock_network_sharding() {
                                             channel.send(msg.addressed((*agent).clone())).await;
                                         }
                                     }
-                                    ShardedGossipWire::OpBlooms(OpBlooms {
-                                        missing_hashes,
-                                        ..
+                                    ShardedGossipWire::OpBloom(OpBloom {
+                                        missing_hashes, ..
                                     }) => {
                                         // We have received an ops bloom so we can respond with any missing
                                         // hashes if there are nay.
@@ -1104,7 +1102,7 @@ async fn mock_network_sharding() {
                                     ShardedGossipWire::AlreadyInProgress(_) => (),
                                     ShardedGossipWire::Busy(_) => (),
                                     ShardedGossipWire::Error(_) => (),
-                                    ShardedGossipWire::OpBloomsBatchReceived(_) => (),
+                                    ShardedGossipWire::OpBatchReceived(_) => (),
                                 }
                             }
                         }

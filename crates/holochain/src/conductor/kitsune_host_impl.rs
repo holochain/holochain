@@ -1,6 +1,7 @@
 //! Implementation of the Kitsune Host API
 
 mod query_region_set;
+mod query_size_limited_regions;
 
 use std::sync::Arc;
 
@@ -112,6 +113,25 @@ impl KitsuneHost for KitsuneHostImpl {
                 &self.strat,
                 dht_arc_set,
                 &self.tuning_params,
+            )
+            .await?)
+        }
+        .boxed()
+        .into()
+    }
+
+    fn query_size_limited_regions(
+        &self,
+        space: Arc<kitsune_p2p::KitsuneSpace>,
+        size_limit: u32,
+        regions: Vec<holochain_p2p::dht::region::Region>,
+    ) -> KitsuneHostResult<Vec<holochain_p2p::dht::region::Region>> {
+        let dna_hash = DnaHash::from_kitsune(&space);
+        async move {
+            let topology = self.get_topology(space.clone()).await?;
+            let db = self.spaces.authored_db(&dna_hash)?;
+            Ok(query_size_limited_regions::query_size_limited_regions(
+                db, topology, regions, size_limit,
             )
             .await?)
         }

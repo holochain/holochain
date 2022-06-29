@@ -13,7 +13,6 @@ use governor::state::{InMemoryState, NotKeyed};
 use governor::RateLimiter;
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::codec::Codec;
-use kitsune_p2p_types::combinators::second;
 use kitsune_p2p_types::config::*;
 use kitsune_p2p_types::dht::region_set::RegionSetLtcs;
 use kitsune_p2p_types::dht_arc::{DhtArcRange, DhtArcSet};
@@ -534,10 +533,10 @@ pub struct RoundState {
     common_arc_set: Arc<DhtArcSet>,
     /// Number of ops blooms we have sent for this round, which is also the
     /// number of MissingOps sets we expect in response
-    num_sent_ops_blooms: u8,
+    num_sent_op_blooms: u8,
     /// We've received the last op bloom filter from our partner
     /// (the one with `finished` == true)
-    received_all_incoming_ops_blooms: bool,
+    received_all_incoming_op_blooms: bool,
     /// Received all responses to OpRegions, which is the batched set of Op data
     /// in the diff of regions
     has_pending_historical_op_data: bool,
@@ -553,7 +552,7 @@ pub struct RoundState {
     round_timeout: std::time::Duration,
     /// The RegionSet we will send to our gossip partner during Historical
     /// gossip (will be None for Recent).
-    region_set_sent: Option<RegionSetLtcs>,
+    region_set_sent: Option<Arc<RegionSetLtcs>>,
 }
 
 impl ShardedGossipLocal {
@@ -596,14 +595,14 @@ impl ShardedGossipLocal {
         Ok(RoundState {
             remote_agent_list,
             common_arc_set,
-            num_sent_ops_blooms: 0,
-            received_all_incoming_ops_blooms: false,
+            num_sent_op_blooms: 0,
+            received_all_incoming_op_blooms: false,
             has_pending_historical_op_data: false,
             bloom_batch_cursor: None,
             ops_batch_queue: OpsBatchQueue::new(),
             last_touch: Instant::now(),
             round_timeout: ROUND_TIMEOUT,
-            region_set_sent,
+            region_set_sent: region_set_sent.map(Arc::new),
         })
     }
 
@@ -652,13 +651,16 @@ impl ShardedGossipLocal {
         })
     }
 
-    fn incoming_ops_finished(&self, state_id: &StateKey) -> KitsuneResult<Option<RoundState>> {
+    fn incoming_op_blooms_finished(
+        &self,
+        state_id: &StateKey,
+    ) -> KitsuneResult<Option<RoundState>> {
         self.inner.share_mut(|i, _| {
             let finished = i
                 .round_map
                 .get_mut(state_id)
                 .map(|state| {
-                    state.received_all_incoming_ops_blooms = true;
+                    state.received_all_incoming_op_blooms = true;
                     state.is_finished()
                 })
                 .unwrap_or(true);
@@ -670,11 +672,11 @@ impl ShardedGossipLocal {
         })
     }
 
-    fn decrement_ops_blooms(&self, state_id: &StateKey) -> KitsuneResult<Option<RoundState>> {
+    fn decrement_op_blooms(&self, state_id: &StateKey) -> KitsuneResult<Option<RoundState>> {
         self.inner.share_mut(|i, _| {
             let update_state = |state: &mut RoundState| {
-                let num_ops_blooms = state.num_sent_ops_blooms.saturating_sub(1);
-                state.num_sent_ops_blooms = num_ops_blooms;
+                let num_op_blooms = state.num_sent_op_blooms.saturating_sub(1);
+                state.num_sent_op_blooms = num_op_blooms;
                 // NOTE: there is only ever one "batch" of OpRegions
                 state.has_pending_historical_op_data = false;
                 state.is_finished()
@@ -743,12 +745,12 @@ impl ShardedGossipLocal {
                 }
                 Vec::with_capacity(0)
             }
-            ShardedGossipWire::OpBlooms(OpBlooms {
+            ShardedGossipWire::OpBloom(OpBloom {
                 missing_hashes,
                 finished,
             }) => {
                 let state = if finished {
-                    self.incoming_ops_finished(&cert)?
+                    self.incoming_op_blooms_finished(&cert)?
                 } else {
                     self.get_state(&cert)?
                 };
@@ -760,7 +762,7 @@ impl ShardedGossipLocal {
                                 bloom: None,
                                 time: time_window,
                             };
-                            self.incoming_ops(state, filter, None).await?
+                            self.incoming_op_bloom(state, filter, None).await?
                         }
                         EncodedTimedBloomFilter::HaveHashes {
                             filter,
@@ -770,59 +772,15 @@ impl ShardedGossipLocal {
                                 bloom: Some(decode_bloom_filter(&filter)),
                                 time: time_window,
                             };
-                            self.incoming_ops(state, filter, None).await?
+                            self.incoming_op_bloom(state, filter, None).await?
                         }
                     },
                     None => Vec::with_capacity(0),
                 }
             }
-            ShardedGossipWire::OpBloomsBatchReceived(_) => match self.get_state(&cert)? {
-                Some(state) => {
-                    // The last ops batch has been received by the
-                    // remote node so now send the next batch.
-                    let r = self.next_missing_ops_batch(state.clone()).await?;
-                    if state.is_finished() {
-                        self.remove_state(&cert, false)?;
-                    }
-                    r
-                }
-                None => Vec::with_capacity(0),
-            },
             ShardedGossipWire::OpRegions(OpRegions { region_set }) => {
-                if let Some(state) = self.incoming_ops_finished(&cert)? {
-                    if let Some(sent) = state.region_set_sent.clone() {
-                        let diff_regions = sent.diff(region_set).map_err(KitsuneError::other)?;
-                        let topo = self
-                            .host_api
-                            .get_topology(self.space.clone())
-                            .await
-                            .map_err(KitsuneError::other)?;
-                        let bounds: Vec<_> = diff_regions
-                            .into_iter()
-                            .map(|r| r.coords.to_bounds(&topo))
-                            .collect();
-                        // TODO: make region set diffing more robust to different times (arc power differences are already handled)
-
-                        let ops = self
-                            .evt_sender
-                            .fetch_op_data(FetchOpDataEvt {
-                                space: self.space.clone(),
-                                query: FetchOpDataEvtQuery::Regions(bounds),
-                            })
-                            .await
-                            .map_err(KitsuneError::other)?
-                            .into_iter()
-                            .map(second)
-                            .collect();
-
-                        // FIXME: batching
-                        vec![ShardedGossipWire::missing_ops(ops, 2)]
-                    } else {
-                        tracing::error!(
-                            "We received OpRegions gossip without sending any ourselves"
-                        );
-                        vec![]
-                    }
+                if let Some(state) = self.incoming_op_blooms_finished(&cert)? {
+                    self.queue_incoming_regions(state, region_set).await?
                 } else {
                     vec![]
                 }
@@ -834,10 +792,10 @@ impl ShardedGossipLocal {
                 let state = match finished {
                     // This is a single chunk of ops. No need to reply.
                     MissingOpsStatus::ChunkComplete => self.get_state(&cert)?,
-                    // This is the last chunk in the batch. Reply with [`OpBloomsBatchReceived`]
+                    // This is the last chunk in the batch. Reply with [`OpBatchReceived`]
                     // to get the next batch of missing ops.
                     MissingOpsStatus::BatchComplete => {
-                        gossip = vec![ShardedGossipWire::op_blooms_batch_received()];
+                        gossip = vec![ShardedGossipWire::op_batch_received()];
                         self.get_state(&cert)?
                     }
                     // All the batches of missing ops for the bloom this node sent
@@ -845,14 +803,15 @@ impl ShardedGossipLocal {
                     MissingOpsStatus::AllComplete => {
                         // This node can decrement the number of outstanding ops bloom replies
                         // it is waiting for.
-                        let mut state = self.decrement_ops_blooms(&cert)?;
+                        let mut state = self.decrement_op_blooms(&cert)?;
 
                         // If there are more blooms to send because this node had to batch the blooms
                         // and all the outstanding blooms have been received then this node will send
                         // the next batch of ops blooms starting from the saved cursor.
-                        if let Some(state) = state.as_mut().filter(|s| {
-                            s.bloom_batch_cursor.is_some() && s.num_sent_ops_blooms == 0
-                        }) {
+                        if let Some(state) = state
+                            .as_mut()
+                            .filter(|s| s.bloom_batch_cursor.is_some() && s.num_sent_op_blooms == 0)
+                        {
                             // We will be producing some gossip so we need to allocate.
                             gossip = Vec::new();
                             // Generate the next ops blooms batch.
@@ -874,6 +833,18 @@ impl ShardedGossipLocal {
                 }
                 gossip
             }
+            ShardedGossipWire::OpBatchReceived(_) => match self.get_state(&cert)? {
+                Some(state) => {
+                    // The last ops batch has been received by the
+                    // remote node so now send the next batch.
+                    let r = self.next_missing_ops_batch(state.clone()).await?;
+                    if state.is_finished() {
+                        self.remove_state(&cert, false)?;
+                    }
+                    r
+                }
+                None => Vec::with_capacity(0),
+            },
             ShardedGossipWire::NoAgents(_) => {
                 tracing::warn!("No agents to gossip with on the node {:?}", cert);
                 self.remove_state(&cert, true)?;
@@ -942,9 +913,9 @@ impl ShardedGossipLocal {
 }
 
 impl RoundState {
-    fn increment_sent_ops_blooms(&mut self) -> u8 {
-        self.num_sent_ops_blooms += 1;
-        self.num_sent_ops_blooms
+    fn increment_sent_op_blooms(&mut self) -> u8 {
+        self.num_sent_op_blooms += 1;
+        self.num_sent_op_blooms
     }
 
     /// A round is finished if:
@@ -953,9 +924,9 @@ impl RoundState {
     /// - This node has no saved ops bloom batch cursor.
     /// - This node has no queued missing ops to send to the remote node.
     fn is_finished(&self) -> bool {
-        self.num_sent_ops_blooms == 0
+        self.num_sent_op_blooms == 0
             && !self.has_pending_historical_op_data
-            && self.received_all_incoming_ops_blooms
+            && self.received_all_incoming_op_blooms
             && self.bloom_batch_cursor.is_none()
             && self.ops_batch_queue.is_empty()
     }
@@ -1011,7 +982,7 @@ pub enum MissingOpsStatus {
     /// There are more chunks in this batch to come. No reply is needed.
     ChunkComplete = 0,
     /// This chunk is done but there are more batches
-    /// to come and you should reply with [`OpBloomsBatchReceived`]
+    /// to come and you should reply with [`OpBatchReceived`]
     /// when you are ready to get the next batch.
     BatchComplete = 1,
     /// This is the final batch of missing ops and there
@@ -1054,8 +1025,8 @@ kitsune_p2p_types::write_codec_enum! {
             agents.0: Vec<Arc<AgentInfoSigned>>,
         },
 
-        /// Send Op Bloom filters
-        OpBlooms(0x50) {
+        /// Send Op Bloom filter
+        OpBloom(0x50) {
             /// The bloom filter for op data
             missing_hashes.0: EncodedTimedBloomFilter,
             /// Is this the last bloom to be sent?
@@ -1077,14 +1048,14 @@ kitsune_p2p_types::write_codec_enum! {
             /// If the amount of missing ops is larger then the
             /// [`ShardedGossipLocal::UPPER_BATCH_BOUND`] then the set of
             /// missing ops chunks will be sent in batches.
-            /// Each batch will require a reply message of [`OpBloomsBatchReceived`]
+            /// Each batch will require a reply message of [`OpBatchReceived`]
             /// in order to get the next batch.
             /// This is to prevent overloading the receiver with too much
             /// incoming data.
             ///
             /// 0: There is more chunks in this batch to come. No reply is needed.
             /// 1: This chunk is done but there is more batches
-            /// to come and you should reply with [`OpBloomsBatchReceived`]
+            /// to come and you should reply with [`OpBatchReceived`]
             /// when you are ready to get the next batch.
             /// 2: This is the final missing ops and there
             /// are no more ops to come. No reply is needed.
@@ -1093,32 +1064,33 @@ kitsune_p2p_types::write_codec_enum! {
             finished.1: u8,
         },
 
-        /// The node you are trying to gossip with has no agents anymore.
-        NoAgents(0x80) {
+        /// I have received a complete batch of
+        /// missing ops and I am ready to receive the
+        /// next batch.
+        OpBatchReceived(0x61) {
         },
 
-        /// You have sent a stale initiate to a node
-        /// that already has an active round with you.
-        AlreadyInProgress(0x90) {
+
+        /// The node you are gossiping with has hit an error condition
+        /// and failed to respond to a request.
+        Error(0xa0) {
+            /// The error message.
+            message.0: String,
         },
 
         /// The node currently is gossiping with too many
         /// other nodes and is too busy to accept your initiate.
         /// Please try again later.
-        Busy(0x11) {
+        Busy(0xa1) {
         },
 
-        /// The node you are gossiping with has hit an error condition
-        /// and failed to respond to a request.
-        Error(0x12) {
-            /// The error message.
-            message.0: String,
+        /// The node you are trying to gossip with has no agents anymore.
+        NoAgents(0xa2) {
         },
 
-        /// I have received a complete batch of
-        /// missing ops and I am ready to receive the
-        /// next batch.
-        OpBloomsBatchReceived(0x13) {
+        /// You have sent a stale initiate to a node
+        /// that already has an active round with you.
+        AlreadyInProgress(0xa3) {
         },
     }
 }

@@ -46,7 +46,7 @@ impl ShardedGossipLocal {
     /// No empty bloom filters.
     /// - Bloom has a 1% chance of false positive (which will lead to agents not being sent back).
     /// - Expect this function to complete in an average of 10 ms and worst case 100 ms.
-    pub(super) async fn generate_ops_blooms_for_time_window(
+    pub(super) async fn generate_op_blooms_for_time_window(
         &self,
         common_arc_set: &Arc<DhtArcSet>,
         search_time_window: TimeWindow,
@@ -164,7 +164,7 @@ impl ShardedGossipLocal {
     ///   above criteria and the number of local agents.
     /// - The worst case is maximum amount of ops that could be created for the time period.
     /// - The expected performance per op is average 10ms and worst 100 ms.
-    pub(super) async fn check_ops_bloom(
+    pub(super) async fn check_op_bloom(
         &self,
         common_arc_set: DhtArcSet,
         remote_bloom: &TimedBloomFilter,

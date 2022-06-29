@@ -1,19 +1,41 @@
-use kitsune_p2p_types::combinators::second;
+use kitsune_p2p_types::{combinators::second, dht::region::Region};
 
 use super::*;
 
-#[derive(Clone)]
+#[derive(Clone, derive_more::Deref)]
 /// A queue of missing op hashes that have been batched
 /// for future processing.
 pub struct OpsBatchQueue(Share<OpsBatchQueueInner>);
 
 /// Each queue is associated with a bloom filter that
 /// this node received from the remote node and given an unique id.
-struct OpsBatchQueueInner {
+pub struct OpsBatchQueueInner {
     /// A simple always increasing usize
     /// is used to give the queues unique ids.
     next_id: usize,
     queues: HashMap<usize, VecDeque<QueuedOps>>,
+    region_queue: VecDeque<Region>,
+}
+
+/// Identify the next items to process from the region queue.
+/// Always returns at least one item if the queue is not empty, regardless of size constraints.
+/// The total size of regions returned will be less than the batch size, unless the first item
+/// on its own is larger than the batch size.
+pub fn get_region_queue_batch(queue: &mut VecDeque<Region>, batch_size: u32) -> Vec<Region> {
+    let mut size = 0;
+    let mut to_fetch = vec![];
+    let mut first = true;
+    while let Some(region) = queue.front() {
+        size += region.data.size;
+        if first || size <= batch_size {
+            to_fetch.push(queue.pop_front().unwrap());
+        }
+        first = false;
+        if size > batch_size {
+            break;
+        }
+    }
+    to_fetch
 }
 
 /// Queued missing ops hashes can either
@@ -27,16 +49,13 @@ enum QueuedOps {
     /// A remote nodes bloom filter that has been adjusted
     /// to the remaining time window to fetch the remaining hashes.
     Bloom(TimedBloomFilter),
-    // pair(maackle, freesig): Consider adding a variant like this if implementing
-    // a "cursor" into a partial region query
-    // Regions(RegionSetCursor),
 }
 
 impl ShardedGossipLocal {
     /// Incoming ops bloom.
     /// - Send back chunks of missing ops.
     /// - Don't send a chunk larger then MAX_SEND_BUF_SIZE.
-    pub(super) async fn incoming_ops(
+    pub(super) async fn incoming_op_bloom(
         &self,
         state: RoundState,
         mut remote_bloom: TimedBloomFilter,
@@ -44,7 +63,7 @@ impl ShardedGossipLocal {
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
         // Check which ops are missing.
         let missing_hashes = self
-            .check_ops_bloom((*state.common_arc_set).clone(), &remote_bloom)
+            .check_op_bloom((*state.common_arc_set).clone(), &remote_bloom)
             .await?;
 
         let missing_hashes = match missing_hashes {
@@ -66,8 +85,90 @@ impl ShardedGossipLocal {
             }
         };
 
-        self.batch_missing_ops(state, missing_hashes, queue_id)
+        self.batch_missing_ops_from_bloom(state, missing_hashes, queue_id)
             .await
+    }
+
+    pub(super) async fn queue_incoming_regions(
+        &self,
+        state: RoundState,
+        region_set: RegionSetLtcs,
+    ) -> KitsuneResult<Vec<ShardedGossipWire>> {
+        Ok(
+            if let Some(sent) = state.region_set_sent.as_ref().map(|r| (**r).clone()) {
+                // because of the order of arguments, the diff regions will contain the data
+                // from *our* side, not our partner's.
+                let diff_regions = sent
+                    .diff((region_set).clone())
+                    .map_err(KitsuneError::other)?;
+
+                // subdivide any regions which are too large to fit in a batch.
+                // TODO: PERF: this does a DB query per region, and potentially many more for large
+                // regions which need to be split many times. Check to make sure this
+                // doesn't become a hotspot.
+                let limited_regions = self
+                    .host_api
+                    .query_size_limited_regions(
+                        self.space.clone(),
+                        self.tuning_params.gossip_max_batch_size,
+                        diff_regions,
+                    )
+                    .await
+                    .map_err(KitsuneError::other)?;
+
+                state.ops_batch_queue.0.share_mut(|queue, _| {
+                    for region in limited_regions {
+                        queue.region_queue.push_back(region)
+                    }
+                    Ok(())
+                })?;
+
+                self.process_next_region_batch(state).await?
+            } else {
+                tracing::error!("We received OpRegions gossip without sending any ourselves");
+                vec![]
+            },
+        )
+    }
+
+    pub(super) async fn process_next_region_batch(
+        &self,
+        state: RoundState,
+    ) -> KitsuneResult<Vec<ShardedGossipWire>> {
+        let topo = self
+            .host_api
+            .get_topology(self.space.clone())
+            .await
+            .map_err(KitsuneError::other)?;
+
+        let (to_fetch, finished) = state.ops_batch_queue.share_mut(|queues, _| {
+            let items = get_region_queue_batch(
+                &mut queues.region_queue,
+                self.tuning_params.gossip_max_batch_size,
+            );
+            Ok((items, queues.region_queue.is_empty()))
+        })?;
+
+        let bounds: Vec<_> = to_fetch
+            .into_iter()
+            .map(|r| r.coords.to_bounds(&topo))
+            .collect();
+        // TODO: make region set diffing more robust to different times (arc power differences are already handled)
+
+        let ops = self
+            .evt_sender
+            .fetch_op_data(FetchOpDataEvt {
+                space: self.space.clone(),
+                query: FetchOpDataEvtQuery::Regions(bounds),
+            })
+            .await
+            .map_err(KitsuneError::other)?
+            .into_iter()
+            .map(second)
+            .collect();
+
+        let finished_val = if finished { 2 } else { 1 };
+        Ok(vec![ShardedGossipWire::missing_ops(ops, finished_val)])
     }
 
     /// Generate the next batch of missing ops.
@@ -75,34 +176,40 @@ impl ShardedGossipLocal {
         &self,
         state: RoundState,
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
-        // Pop the next queued batch.
-        let next_batch = state
-            .ops_batch_queue
-            .0
-            .share_mut(|queue, _| Ok(queue.pop_front()))?;
+        match self.gossip_type {
+            GossipType::Historical => self.process_next_region_batch(state).await,
+            GossipType::Recent => {
+                // Pop the next queued batch.
+                let next_batch = state
+                    .ops_batch_queue
+                    .0
+                    .share_mut(|queue, _| Ok(queue.pop_front()))?;
 
-        match next_batch {
-            // The next batch is hashes, batch them into ops using the queue id.
-            Some((queue_id, QueuedOps::Hashes(missing_hashes))) => {
-                self.batch_missing_ops(state, missing_hashes, Some(queue_id))
-                    .await
+                match next_batch {
+                    // The next batch is hashes, batch them into ops using the queue id.
+                    Some((queue_id, QueuedOps::Hashes(missing_hashes))) => {
+                        self.batch_missing_ops_from_bloom(state, missing_hashes, Some(queue_id))
+                            .await
+                    }
+                    // The next batch is a bloom so the hashes need to be fetched before
+                    // fetching the hashes.
+                    Some((queue_id, QueuedOps::Bloom(remote_bloom))) => {
+                        self.incoming_op_bloom(state, remote_bloom, Some(queue_id))
+                            .await
+                    }
+                    // Nothing is queued so this node is done.
+                    None => Ok(vec![ShardedGossipWire::missing_ops(
+                        Vec::with_capacity(0),
+                        MissingOpsStatus::AllComplete as u8,
+                    )]),
+                }
             }
-            // The next batch is a bloom so the hashes need to be fetched before
-            // fetching the hashes.
-            Some((queue_id, QueuedOps::Bloom(remote_bloom))) => {
-                self.incoming_ops(state, remote_bloom, Some(queue_id)).await
-            }
-            // Nothing is queued so this node is done.
-            None => Ok(vec![ShardedGossipWire::missing_ops(
-                Vec::with_capacity(0),
-                MissingOpsStatus::AllComplete as u8,
-            )]),
         }
     }
 
     /// Fetch missing ops into the appropriate size chunks of
     /// and batch for future processing if there is too much data.
-    async fn batch_missing_ops(
+    async fn batch_missing_ops_from_bloom(
         &self,
         state: RoundState,
         mut missing_hashes: Vec<Arc<KitsuneOpHash>>,
@@ -242,18 +349,21 @@ impl OpsBatchQueueInner {
         Self {
             next_id: 0,
             queues: HashMap::new(),
+            region_queue: VecDeque::new(),
         }
+    }
+
+    fn new_id(&mut self) -> usize {
+        let id = self.next_id;
+        self.next_id += 1;
+        id
     }
 
     /// Push some queued missing ops hashes onto the back of a queue.
     /// If a unique id is provided then that queue is used otherwise
     /// a new id is generated.
     fn push_back(&mut self, id: Option<usize>, queued: QueuedOps) -> usize {
-        let id = id.unwrap_or_else(|| {
-            let id = self.next_id;
-            self.next_id += 1;
-            id
-        });
+        let id = id.unwrap_or_else(|| self.new_id());
         {
             let queue = self.queues.entry(id).or_insert_with(VecDeque::new);
             queue.push_back(queued);
