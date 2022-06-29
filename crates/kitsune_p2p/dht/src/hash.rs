@@ -6,11 +6,18 @@
 pub type Hash32 = [u8; 32];
 
 /// Get the 32 byte slice of a larger slice representing hash data
+///
+/// # Panics
+///
+/// Panics if the slice length is not 32, 36, or 39.
 pub fn hash_slice_32(v: &[u8]) -> &[u8] {
-    if v.len() == 36 || v.len() == 39 {
+    let len = v.len();
+    if len == 36 || len == 39 {
         &v[4..36]
+    } else if len == 32 {
+        v
     } else {
-        &v[..]
+        panic!("hash_slice_32 function must only be used with a slice 32, 36, or 39 bytes long")
     }
 }
 
