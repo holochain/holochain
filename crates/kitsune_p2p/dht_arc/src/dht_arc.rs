@@ -152,7 +152,6 @@ impl DhtArc {
         }
     }
 
-    #[cfg(any(test, feature = "test_utils"))]
     pub fn to_ascii(&self, len: usize) -> String {
         let mut s = self.0.to_ascii(len);
         let start = loc_downscale(len, self.start_loc());

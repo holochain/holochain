@@ -1,6 +1,8 @@
-use kitsune_p2p::dht::hash::RegionHash;
-use num_traits::Zero;
-use rusqlite::{functions::*, *};
+use kitsune_p2p::dht::{
+    hash::{hash_slice_32, Hash32},
+    region::slice_xor,
+};
+use rusqlite::{functions::*, types::ValueRef, *};
 
 pub fn add_custom_functions(conn: &Connection) -> Result<()> {
     conn.create_aggregate_function(
@@ -15,16 +17,22 @@ pub fn add_custom_functions(conn: &Connection) -> Result<()> {
 
 pub struct AggregateXor;
 
-impl Aggregate<RegionHash, Vec<u8>> for AggregateXor {
-    fn init(&self, _ctx: &mut Context<'_>) -> Result<RegionHash> {
-        Ok(RegionHash::zero())
+impl Aggregate<Hash32, Vec<u8>> for AggregateXor {
+    fn init(&self, _ctx: &mut Context<'_>) -> Result<Hash32> {
+        Ok([0; 32])
     }
 
-    fn step(&self, ctx: &mut Context<'_>, v: &mut RegionHash) -> Result<()> {
-        let blob: Vec<u8> = ctx.get(0)?;
+    fn step(&self, ctx: &mut Context<'_>, v: &mut Hash32) -> Result<()> {
+        let blob: &[u8] = match ctx.get_raw(0) {
+            ValueRef::Blob(b) => Ok(b),
+            v => Err(rusqlite::Error::InvalidFunctionParameterType(
+                0,
+                v.data_type(),
+            )),
+        }?;
         let len = blob.len();
-        if let Some(a) = RegionHash::from_vec(blob) {
-            v.xor(&a);
+        if len == 39 {
+            slice_xor(v, hash_slice_32(blob));
             Ok(())
         } else {
             Err(Error::UserFunctionError(
@@ -37,7 +45,7 @@ impl Aggregate<RegionHash, Vec<u8>> for AggregateXor {
         }
     }
 
-    fn finalize(&self, _ctx: &mut Context<'_>, v: Option<RegionHash>) -> Result<Vec<u8>> {
-        Ok(v.unwrap_or_else(RegionHash::zero).0.to_vec())
+    fn finalize(&self, _ctx: &mut Context<'_>, v: Option<Hash32>) -> Result<Vec<u8>> {
+        Ok(v.unwrap_or([0; 32]).to_vec())
     }
 }

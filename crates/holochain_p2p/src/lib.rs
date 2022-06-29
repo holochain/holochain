@@ -73,7 +73,7 @@ pub trait HolochainP2pDnaT {
         dht_hash: holo_hash::AnyDhtHash,
         ops: Vec<holochain_types::dht_op::DhtOp>,
         timeout_ms: Option<u64>,
-    ) -> actor::HolochainP2pResult<()>;
+    ) -> actor::HolochainP2pResult<usize>;
 
     /// Request a validation package.
     async fn get_validation_package(
@@ -224,7 +224,7 @@ impl HolochainP2pDnaT for HolochainP2pDna {
         dht_hash: holo_hash::AnyDhtHash,
         ops: Vec<holochain_types::dht_op::DhtOp>,
         timeout_ms: Option<u64>,
-    ) -> actor::HolochainP2pResult<()> {
+    ) -> actor::HolochainP2pResult<usize> {
         self.sender
             .publish(
                 (*self.dna_hash).clone(),

@@ -960,7 +960,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
         dht_hash: holo_hash::AnyDhtHash,
         ops: Vec<holochain_types::dht_op::DhtOp>,
         timeout_ms: Option<u64>,
-    ) -> HolochainP2pHandlerResult<()> {
+    ) -> HolochainP2pHandlerResult<usize> {
         use kitsune_p2p_types::KitsuneTimeout;
 
         let space = dna_hash.into_kitsune();
@@ -977,13 +977,14 @@ impl HolochainP2pHandler for HolochainP2pActor {
             ops,
         )
         .encode()?;
+        let payload_size = payload.len();
 
         let kitsune_p2p = self.kitsune_p2p.clone();
         Ok(async move {
             kitsune_p2p
                 .broadcast(space, basis, timeout, BroadcastTo::Notify, payload)
                 .await?;
-            Ok(())
+            Ok(payload_size)
         }
         .boxed()
         .into())

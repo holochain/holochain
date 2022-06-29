@@ -65,7 +65,7 @@ pub(crate) mod tests;
 /// with the constant in PoolBuf which cannot be set at runtime)
 /// ^^ obviously we're no longer following the above advice..
 ///    in the case of the pool buf management, any gossips larger than
-///    16,000,000 will now be shrunk resulting in additional memory thrashing
+///    16384 will now be shrunk resulting in additional memory thrashing
 const MAX_SEND_BUF_BYTES: usize = 16_000_000;
 
 /// The timeout for a gossip round if there is no contact. One minute.
@@ -220,7 +220,13 @@ impl ShardedGossip {
                 let s = tracing::trace_span!("process_outgoing_historical", cert = ?cert, agents = ?self.gossip.show_local_agents());
                 match &gossip {
                     ShardedGossipWire::MissingOps(MissingOps { ops, finished }) => {
-                        s.in_scope(|| tracing::trace!(num_ops = %ops.len(), ?finished));
+                        s.in_scope(|| {
+                            tracing::trace!(
+                                num_ops = %ops.len(),
+                                total_bytes = ops.iter().map(|op| op.0.len()).sum::<usize>(),
+                                ?finished
+                            )
+                        });
                     }
                     _ => {
                         s.in_scope(|| tracing::trace!(?gossip));
@@ -341,7 +347,14 @@ impl ShardedGossip {
                 .unwrap_or_else(|_| "Queues empty".to_string());
             let _ = self.gossip.inner.share_mut(|i, _| {
                     let s = tracing::trace_span!("gossip_metrics", gossip_type = %self.gossip.gossip_type);
-                    s.in_scope(|| tracing::trace!("{}\nStats over last 5s:\n\tAverage processing time {:?}\n\tIteration count: {}\n\tMax gossip processing time: {:?}\n\t{}", i.metrics, stats.avg_processing_time, stats.count, stats.max_processing_time, lens));
+                    s.in_scope(|| tracing::trace!(
+                        "{}\nStats over last 5s:\n\tAverage processing time {:?}\n\tIteration count: {}\n\tMax gossip processing time: {:?}\n\t{}", 
+                        i.metrics,
+                        stats.avg_processing_time,
+                        stats.count,
+                        stats.max_processing_time,
+                        lens
+                    ));
                     Ok(())
                 });
             *stats = Stats::reset();
@@ -492,7 +505,7 @@ pub(crate) struct ShardedGossipState {
 
 impl ShardedGossipState {
     /// Construct state with history queues
-    #[cfg(feature = "test")]
+    #[cfg(feature = "test_utils")]
     pub fn with_history() -> Self {
         Self {
             queues: Default::default(),
