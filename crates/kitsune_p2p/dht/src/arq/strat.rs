@@ -1,4 +1,4 @@
-use kitsune_p2p_dht_arc::{DhtArc, PeerStratAlpha, PeerStratBeta};
+use kitsune_p2p_dht_arc::DhtArc;
 
 use crate::spacetime::Topology;
 
@@ -8,10 +8,6 @@ use super::{Arq, PeerView, PeerViewQ};
 /// The enum allows us to add new strategies over time.
 #[derive(Debug, Clone, derive_more::From)]
 pub enum PeerStrat {
-    /// The "alpha" peer strat
-    Alpha(PeerStratAlpha),
-    /// The "beta" peer strat
-    Beta(PeerStratBeta),
     /// The quantized peer strat
     Quantized(ArqStrat),
 }
@@ -25,10 +21,8 @@ impl Default for PeerStrat {
 impl PeerStrat {
     /// Generate a view using this strategy.
     /// Ensures that only peers which are visible from `arc` are included.
-    pub fn view(&self, topo: Topology, arc: DhtArc, peers: &[DhtArc]) -> PeerView {
+    pub fn view(&self, topo: Topology, _arc: DhtArc, peers: &[DhtArc]) -> PeerView {
         match self {
-            Self::Alpha(s) => s.view(arc, peers).into(),
-            Self::Beta(s) => s.view(arc, peers).into(),
             Self::Quantized(s) => {
                 let peers = peers
                     .iter()

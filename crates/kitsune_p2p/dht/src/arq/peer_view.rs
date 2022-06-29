@@ -1,4 +1,4 @@
-use kitsune_p2p_dht_arc::{DhtArc, PeerViewAlpha, PeerViewBeta};
+use kitsune_p2p_dht_arc::DhtArc;
 use num_traits::Zero;
 
 use crate::spacetime::{SpaceOffset, Topology};
@@ -14,10 +14,6 @@ use super::{is_full, Arq, ArqStrat};
 /// target arc length) over time.
 #[derive(derive_more::From)]
 pub enum PeerView {
-    /// The "alpha" PeerView
-    Alpha(PeerViewAlpha),
-    /// The "beta" PeerView
-    Beta(PeerViewBeta),
     /// The quantized PeerView
     Quantized(PeerViewQ),
 }
@@ -27,8 +23,6 @@ impl PeerView {
     /// this returns the next step to take in reaching the ideal coverage.
     pub fn update_arc(&self, dht_arc: &mut DhtArc) -> bool {
         match self {
-            Self::Alpha(v) => v.update_arc(dht_arc),
-            Self::Beta(v) => v.update_arc(dht_arc),
             Self::Quantized(v) => {
                 let mut arq = Arq::from_dht_arc_approximate(&v.topo, &v.strat, dht_arc);
                 let updated = v.update_arq(&v.topo, &mut arq);
@@ -226,6 +220,7 @@ impl PeerViewQ {
     ///
     /// More detail on these assumptions here:
     /// <https://hackmd.io/@hololtd/r1IAIbr5Y/https%3A%2F%2Fhackmd.io%2FK_fkBj6XQO2rCUZRRL9n2g>
+    /// TODO: make the above link to something publicly available, preferably in the repo
     pub fn update_arq_with_stats(&self, topo: &Topology, arq: &mut Arq) -> UpdateArqStats {
         let (cov, num_peers) = self.extrapolated_coverage_and_filtered_count(arq);
 

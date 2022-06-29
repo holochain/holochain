@@ -177,7 +177,8 @@ mod tests {
     use ::fixt::prelude::*;
     use futures::future::FutureExt;
     use ghost_actor::GhostControlSender;
-    use kitsune_p2p::dht_arc::PeerStratBeta;
+    use kitsune_p2p::dht::prelude::Topology;
+    use kitsune_p2p::dht::{ArqStrat, PeerView, PeerViewQ};
 
     use crate::HolochainP2pSender;
     use holochain_zome_types::ValidationStatus;
@@ -236,13 +237,7 @@ mod tests {
                         respond.r(Ok(async move { Ok(()) }.boxed().into()));
                     }
                     QueryPeerDensity { respond, .. } => {
-                        let view = kitsune_p2p_types::dht_arc::PeerViewBeta::new(
-                            PeerStratBeta::default(),
-                            dht_arc::DhtArc::full(0.into()),
-                            1.0,
-                            2,
-                        )
-                        .into();
+                        let view = test_peer_view();
                         respond.r(Ok(async move { Ok(view) }.boxed().into()));
                     }
                     _ => {}
@@ -304,13 +299,7 @@ mod tests {
                         respond.r(Ok(async move { Ok(()) }.boxed().into()));
                     }
                     QueryPeerDensity { respond, .. } => {
-                        let view = kitsune_p2p_types::dht_arc::PeerViewBeta::new(
-                            PeerStratBeta::default(),
-                            dht_arc::DhtArc::full(0.into()),
-                            1.0,
-                            2,
-                        )
-                        .into();
+                        let view = test_peer_view();
                         respond.r(Ok(async move { Ok(view) }.boxed().into()));
                     }
                     _ => {}
@@ -363,13 +352,7 @@ mod tests {
                         respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
                     }
                     QueryPeerDensity { respond, .. } => {
-                        let view = kitsune_p2p_types::dht_arc::PeerViewBeta::new(
-                            PeerStratBeta::default(),
-                            dht_arc::DhtArc::full(0.into()),
-                            1.0,
-                            2,
-                        )
-                        .into();
+                        let view = test_peer_view();
                         respond.r(Ok(async move { Ok(view) }.boxed().into()));
                     }
                     _ => {}
@@ -457,13 +440,7 @@ mod tests {
                         respond.r(Ok(async move { Ok(None) }.boxed().into()));
                     }
                     QueryPeerDensity { respond, .. } => {
-                        let view = kitsune_p2p_types::dht_arc::PeerViewBeta::new(
-                            PeerStratBeta::default(),
-                            dht_arc::DhtArc::full(0.into()),
-                            1.0,
-                            2,
-                        )
-                        .into();
+                        let view = test_peer_view();
                         respond.r(Ok(async move { Ok(view) }.boxed().into()));
                     }
                     evt => tracing::trace!("unhandled: {:?}", evt),
@@ -550,13 +527,7 @@ mod tests {
                         respond.r(Ok(async move { Ok(()) }.boxed().into()));
                     }
                     QueryPeerDensity { respond, .. } => {
-                        let view = kitsune_p2p_types::dht_arc::PeerViewBeta::new(
-                            PeerStratBeta::default(),
-                            dht_arc::DhtArc::full(0.into()),
-                            1.0,
-                            2,
-                        )
-                        .into();
+                        let view = test_peer_view();
                         respond.r(Ok(async move { Ok(view) }.boxed().into()));
                     }
                     _ => {}
@@ -590,5 +561,9 @@ mod tests {
 
         p2p.ghost_actor_shutdown().await.unwrap();
         r_task.await.unwrap();
+    }
+
+    fn test_peer_view() -> PeerView {
+        PeerViewQ::new(Topology::standard_epoch(), ArqStrat::default(), vec![]).into()
     }
 }

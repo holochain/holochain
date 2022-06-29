@@ -19,8 +19,9 @@ use holochain_conductor_api::IntegrationStateDump;
 use holochain_conductor_api::IntegrationStateDumps;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::actor::HolochainP2pRefToDna;
-use holochain_p2p::dht_arc::DhtArc;
-use holochain_p2p::dht_arc::PeerViewBeta;
+use holochain_p2p::dht::prelude::Topology;
+use holochain_p2p::dht::ArqStrat;
+use holochain_p2p::dht::PeerViewQ;
 use holochain_p2p::event::HolochainP2pEvent;
 use holochain_p2p::spawn_holochain_p2p;
 use holochain_p2p::HolochainP2pDna;
@@ -213,45 +214,42 @@ where
     )
     .await
     .unwrap();
-    let respond_task =
-        tokio::task::spawn(async move {
-            use futures::future::FutureExt;
-            use tokio_stream::StreamExt;
-            while let Some(evt) = recv.next().await {
-                if let Some((filter, tx)) = &mut events {
-                    if filter(&evt) {
-                        tx.send(evt).await.unwrap();
-                        continue;
-                    }
-                }
-                use holochain_p2p::event::HolochainP2pEvent::*;
-                match evt {
-                    SignNetworkData { respond, .. } => {
-                        respond.r(Ok(async move { Ok([0; 64].into()) }.boxed().into()));
-                    }
-                    PutAgentInfoSigned { respond, .. } => {
-                        respond.r(Ok(async move { Ok(()) }.boxed().into()));
-                    }
-                    QueryAgentInfoSigned { respond, .. } => {
-                        respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
-                    }
-                    QueryPeerDensity { respond, .. } => {
-                        respond.r(Ok(async move {
-                            Ok(PeerViewBeta::new(
-                                Default::default(),
-                                DhtArc::full(0u32.into()),
-                                1.0,
-                                1,
-                            )
-                            .into())
-                        }
-                        .boxed()
-                        .into()));
-                    }
-                    _ => {}
+    let respond_task = tokio::task::spawn(async move {
+        use futures::future::FutureExt;
+        use tokio_stream::StreamExt;
+        while let Some(evt) = recv.next().await {
+            if let Some((filter, tx)) = &mut events {
+                if filter(&evt) {
+                    tx.send(evt).await.unwrap();
+                    continue;
                 }
             }
-        });
+            use holochain_p2p::event::HolochainP2pEvent::*;
+            match evt {
+                SignNetworkData { respond, .. } => {
+                    respond.r(Ok(async move { Ok([0; 64].into()) }.boxed().into()));
+                }
+                PutAgentInfoSigned { respond, .. } => {
+                    respond.r(Ok(async move { Ok(()) }.boxed().into()));
+                }
+                QueryAgentInfoSigned { respond, .. } => {
+                    respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
+                }
+                QueryPeerDensity { respond, .. } => {
+                    respond.r(Ok(async move {
+                        Ok(
+                            PeerViewQ::new(Topology::standard_epoch(), ArqStrat::default(), vec![])
+                                .into(),
+                        )
+                        .into()
+                    }
+                    .boxed()
+                    .into()));
+                }
+                _ => {}
+            }
+        }
+    });
     let dna = dna_hash.unwrap_or_else(|| fixt!(DnaHash));
     let mut key_fixt = AgentPubKeyFixturator::new(Predictable);
     let agent_key = agent_key.unwrap_or_else(|| key_fixt.next().unwrap());

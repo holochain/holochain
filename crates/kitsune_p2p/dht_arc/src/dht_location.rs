@@ -170,14 +170,6 @@ impl From<DhtLocation> for u32 {
     }
 }
 
-/// Finds the distance from `b` to `a` in a circular space
-pub(crate) fn wrapped_distance<A: Into<DhtLocation>, B: Into<DhtLocation>>(a: A, b: B) -> u32 {
-    // Turn into wrapped u32s
-    let a = a.into().0;
-    let b = b.into().0;
-    (b - a).0
-}
-
 /// Scale a number in a smaller space (specified by `len`) up into the `u32` space.
 /// The number to scale can be negative, which is wrapped to a positive value via modulo
 #[cfg(any(test, feature = "test_utils"))]

@@ -9,34 +9,8 @@ pub const DEFAULT_MIN_REDUNDANCY: u32 = (REDUNDANCY_FLOOR as f64 / DEFAULT_UPTIM
 /// Number of copies of a given hash available at any given time.
 pub(crate) const DEFAULT_REDUNDANCY_TARGET: usize = 50;
 
-/// Establish an upper target by adding this value to the lower coverage target.
-/// This creates a target range rather than a single target value, and when an arc
-/// reaches any value in this range, it will stop resizing. This lends stability to the system.
-pub(crate) const DEFAULT_COVERAGE_BUFFER: f64 = 0.05; // 5%
-
-/// The percentage of the total network redundancy coverage we allow
-/// as a buffer before considering there to be not enough coverage.
-/// This helps allow for errors in extrapolation.
-pub(crate) const DEFAULT_TOTAL_COVERAGE_BUFFER: f64 = 0.1; // 10%
-
 /// Default assumed up time for nodes.
 pub(crate) const DEFAULT_UPTIME: f64 = 0.5;
-
-/// Due to estimation noise we don't want a very small difference
-/// between observed coverage and estimated coverage to
-/// amplify when scaled to by the estimated total peers.
-/// This threshold must be reached before an estimated coverage gap
-/// is calculated.
-pub(crate) const DEFAULT_NOISE_THRESHOLD: f64 = 0.01;
-
-/// The amount "change in arc" is scaled to prevent rapid changes.
-/// This also represents the maximum coverage change in a single update
-/// as a difference of 1.0 would scale to 0.2.
-pub(crate) const DEFAULT_DELTA_SCALE: f64 = 0.2;
-
-/// The minimal "change in arc" before we stop scaling.
-/// This prevents never reaching the target arc coverage.
-pub(crate) const DEFAULT_DELTA_THRESHOLD: f64 = 0.01;
 
 /// If the redundancy drops due to inaccurate estimation we can't
 /// go lower then this level of redundancy.
