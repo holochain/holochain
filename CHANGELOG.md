@@ -6,6 +6,73 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20220629.012044
+
+## [holochain\_cli-0.0.44](crates/holochain_cli/CHANGELOG.md#0.0.44)
+
+## [holochain\_cli\_sandbox-0.0.40](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.40)
+
+## [holochain\_cli\_bundle-0.0.40](crates/holochain_cli_bundle/CHANGELOG.md#0.0.40)
+
+## [holochain-0.0.146](crates/holochain/CHANGELOG.md#0.0.146)
+
+## [holochain\_test\_wasm\_common-0.0.40](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.40)
+
+## [holochain\_conductor\_api-0.0.46](crates/holochain_conductor_api/CHANGELOG.md#0.0.46)
+
+## [holochain\_wasm\_test\_utils-0.0.45](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.45)
+
+## [holochain\_cascade-0.0.46](crates/holochain_cascade/CHANGELOG.md#0.0.46)
+
+## [holochain\_state-0.0.46](crates/holochain_state/CHANGELOG.md#0.0.46)
+
+## [holochain\_p2p-0.0.44](crates/holochain_p2p/CHANGELOG.md#0.0.44)
+
+## [holochain\_types-0.0.44](crates/holochain_types/CHANGELOG.md#0.0.44)
+
+## [holochain\_keystore-0.0.44](crates/holochain_keystore/CHANGELOG.md#0.0.44)
+
+## [holochain\_sqlite-0.0.43](crates/holochain_sqlite/CHANGELOG.md#0.0.43)
+
+## [kitsune\_p2p-0.0.38](crates/kitsune_p2p/CHANGELOG.md#0.0.38)
+
+## [kitsune\_p2p\_proxy-0.0.26](crates/kitsune_p2p_proxy/CHANGELOG.md#0.0.26)
+
+## [kitsune\_p2p\_transport\_quic-0.0.26](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.0.26)
+
+## [kitsune\_p2p\_types-0.0.26](crates/kitsune_p2p_types/CHANGELOG.md#0.0.26)
+
+## [hdk-0.0.139](crates/hdk/CHANGELOG.md#0.0.139)
+
+- **BREAKING CHANGE:** Anchor functions, `TypedPath` and `create_link` take `ScopedLinkType: TryFrom<T>` instead of `LinkType: From<T>`.
+- **BREAKING CHANGE:** `create_entry` takes `ScopedEntryDefIndex: TryFrom<T>` instead of `EntryDefIndex: TryFrom<T>`.
+- **BREAKING CHANGE:** `get_links` and `get_link_details` take `impl LinkTypeFilterExt` instead of `TryInto<LinkTypeRanges>`.
+- hdk: **BREAKING CHANGE** `x_salsa20_poly1305_*` functions have been properly implemented. Any previous `KeyRef`s will no longer work. These new functions DO NOT work with legacy lair `v0.0.z`, you must use NEW lair `v0.y.z` (v0.2.0 as of this PR). [\#1446](https://github.com/holochain/holochain/pull/1446)
+
+## [holochain\_zome\_types-0.0.38](crates/holochain_zome_types/CHANGELOG.md#0.0.38)
+
+## [holochain\_deterministic\_integrity-0.0.11](crates/holochain_deterministic_integrity/CHANGELOG.md#0.0.11)
+
+- `EntryTypesHelper`: `try_from_local_type` is removed and `try_from_global_type` becomes `deserialize_from_type`.
+- `LinkTypesHelper` is removed.
+- `LinkTypeFilterExt` is added to allow extra types to convert to `LinkTypeFilter`.
+
+## [hdk\_derive-0.0.38](crates/hdk_derive/CHANGELOG.md#0.0.38)
+
+- `hdk_to_global_types` is removed.
+- `hdk_to_local_types` becomes `hdk_to_coordinates`.
+
+## [holochain\_integrity\_types-0.0.10](crates/holochain_integrity_types/CHANGELOG.md#0.0.10)
+
+- `ZomeId` added back to `CreateLink` and `AppEntryType`.
+- `ScopedZomeTypesSet` has been simplified for easier use. Global and local types have been removed in favor of scoping `EntryDefIndex` and `LinkType` with the `ZomeId` of where they were defined.
+- `LinkTypeRanges` has been removed.
+- `LinkTypeFilter` replaces `LinkTypeRanges` as a more simplified way of filtering on `get_links`. `..` can be used to get all links from a zomes dependencies.
+- `GlobalZomeTypeId` and `LocalZomeTypeId` removed.
+- Links from integrity zomes that are not part of a coordinators dependency list are no longer accessible.
+- In preparation for rate limiting, the inner Action structs which support app-defined “weights”, viz. `Create`, `Update`, `Delete`, and `CreateLink`, now have a `weight` field. This is currently set to a default value of “no weight”, but will later be used to store the app-defined weight.
+  - A bit of deeper detail on this change: each of these action structs is now generic over the weight field, to allow “weighed” and “unweighed” versions of that header. This is necessary to be able to express these actions both before and after they have undergone the weighing process.
+
 # 20220622.133046
 
 ## [holochain\_cli-0.0.43](crates/holochain_cli/CHANGELOG.md#0.0.43)

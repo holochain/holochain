@@ -4,6 +4,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.0.38
+
 - `hdk_to_global_types` is removed.
 - `hdk_to_local_types` becomes `hdk_to_coordinates`.
 
