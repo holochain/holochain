@@ -8,6 +8,7 @@ use crate::ActionWeighed;
 use crate::EntryRateWeight;
 use crate::MembraneProof;
 use crate::RateWeight;
+use crate::ZomeId;
 use action::Dna;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
@@ -234,6 +235,7 @@ builder_variant!(InitZomesComplete {});
 builder_variant!(CreateLink<RateWeight> {
     base_address: AnyLinkableHash,
     target_address: AnyLinkableHash,
+    zome_id: ZomeId,
     link_type: LinkType,
     tag: LinkTag,
 });

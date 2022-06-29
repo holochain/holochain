@@ -206,7 +206,7 @@ async fn private_entries_dont_leak() {
         .callback("create", move |api, _: ()| {
             let entry = Entry::app(PrivateEntry {}.try_into().unwrap()).unwrap();
             let hash = api.create(CreateInput::new(
-                InlineZomeSet::get_entry_location(&api, 0),
+                InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
                 EntryVisibility::Private,
                 entry,
                 ChainTopOrdering::default(),

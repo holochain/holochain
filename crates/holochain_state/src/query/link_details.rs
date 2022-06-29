@@ -11,11 +11,7 @@ pub struct GetLinkDetailsQuery {
 }
 
 impl GetLinkDetailsQuery {
-    pub fn new(
-        base: AnyLinkableHash,
-        type_query: Option<LinkTypeRanges>,
-        tag: Option<LinkTag>,
-    ) -> Self {
+    pub fn new(base: AnyLinkableHash, type_query: LinkTypeFilter, tag: Option<LinkTag>) -> Self {
         Self {
             query: LinksQuery::new(base, type_query, tag),
         }
@@ -53,13 +49,12 @@ impl Query for GetLinkDetailsQuery {
             Action::CreateLink(CreateLink {
                 base_address,
                 tag,
+                zome_id,
                 link_type,
                 ..
             }) => {
                 *base_address == *base_filter
-                    && type_query_filter
-                        .as_ref()
-                        .map_or(true, |z| z.contains(link_type))
+                    && type_query_filter.contains(zome_id, link_type)
                     && tag_filter
                         .as_ref()
                         .map_or(true, |t| LinksQuery::tag_to_hex(tag).starts_with(&(**t)))

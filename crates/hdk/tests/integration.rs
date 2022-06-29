@@ -1,10 +1,32 @@
 #![cfg(feature = "mock")]
-use std::ops::Range;
 
 use hdk::prelude::*;
 use holo_hash::hash_type::AnyLinkable;
 use Compare::*;
 
+fn zome_and_link_type<T>(t: T) -> (u8, u8)
+where
+    T: Copy,
+    ScopedLinkType: TryFrom<T, Error = WasmError>,
+{
+    let t: ScopedLinkType = t.try_into().unwrap();
+    (t.zome_id.0, t.zome_type.0)
+}
+
+fn zome_and_entry_type<T>(t: T) -> (u8, u8)
+where
+    ScopedEntryDefIndex: TryFrom<T, Error = WasmError>,
+{
+    let t: ScopedEntryDefIndex = t.try_into().unwrap();
+    (t.zome_id.0, t.zome_type.0)
+}
+
+fn scoped_link(zome_id: u8, link_type: u8) -> ScopedLinkType {
+    ScopedZomeType {
+        zome_id: zome_id.into(),
+        zome_type: link_type.into(),
+    }
+}
 mod integrity_zomes {
     use holochain_deterministic_integrity::prelude::*;
 
@@ -27,7 +49,7 @@ mod integrity_zomes {
             C(C),
         }
 
-        #[hdk_link_types]
+        #[hdk_link_types(skip_no_mangle = true)]
         pub enum LinkTypes {
             A,
             B,
@@ -46,7 +68,7 @@ mod integrity_zomes {
             C(C),
         }
 
-        #[hdk_link_types]
+        #[hdk_link_types(skip_no_mangle = true)]
         pub enum LinkTypes {
             A,
             B,
@@ -69,67 +91,60 @@ enum LinkZomes {
 
 #[test]
 fn combine_integrity_zomes() {
-    set_zome_types(vec![0..3, 3..6], vec![]);
+    set_zome_types(&[(22, 3), (12, 3)], &[]);
     create_entry(EntryZomes::A(integrity_zomes::integrity_a::EntryTypes::A(
         integrity_zomes::A {},
     )))
     .unwrap();
 
     assert_eq!(
-        EntryDefIndex::try_from(EntryZomes::A(integrity_zomes::integrity_a::EntryTypes::A(
+        zome_and_entry_type(EntryZomes::A(integrity_zomes::integrity_a::EntryTypes::A(
             integrity_zomes::A {},
         ))),
-        Ok(EntryDefIndex(0))
+        (22, 0)
     );
     assert_eq!(
-        EntryDefIndex::try_from(&EntryZomes::A(integrity_zomes::integrity_a::EntryTypes::A(
-            integrity_zomes::A {},
-        ))),
-        Ok(EntryDefIndex(0))
-    );
-    assert_eq!(
-        EntryDefIndex::try_from(EntryZomes::A(integrity_zomes::integrity_a::EntryTypes::B(
+        zome_and_entry_type(EntryZomes::A(integrity_zomes::integrity_a::EntryTypes::B(
             integrity_zomes::B {},
         ))),
-        Ok(EntryDefIndex(1))
+        (22, 1)
     );
     assert_eq!(
-        EntryDefIndex::try_from(EntryZomes::A(integrity_zomes::integrity_a::EntryTypes::C(
+        zome_and_entry_type(EntryZomes::A(integrity_zomes::integrity_a::EntryTypes::C(
             integrity_zomes::C {},
         ))),
-        Ok(EntryDefIndex(2))
+        (22, 2)
     );
-
     assert_eq!(
-        EntryDefIndex::try_from(EntryZomes::B(integrity_zomes::integrity_b::EntryTypes::A(
+        zome_and_entry_type(EntryZomes::B(integrity_zomes::integrity_b::EntryTypes::A(
             integrity_zomes::A {},
         ))),
-        Ok(EntryDefIndex(3))
+        (12, 0)
     );
     assert_eq!(
-        EntryDefIndex::try_from(EntryZomes::B(integrity_zomes::integrity_b::EntryTypes::B(
+        zome_and_entry_type(EntryZomes::B(integrity_zomes::integrity_b::EntryTypes::B(
             integrity_zomes::B {},
         ))),
-        Ok(EntryDefIndex(4))
+        (12, 1)
     );
     assert_eq!(
-        EntryDefIndex::try_from(EntryZomes::B(integrity_zomes::integrity_b::EntryTypes::C(
+        zome_and_entry_type(EntryZomes::B(integrity_zomes::integrity_b::EntryTypes::C(
             integrity_zomes::C {},
         ))),
-        Ok(EntryDefIndex(5))
+        (12, 2)
     );
 
     assert!(matches!(
-        EntryZomes::try_from_global_type(0u8, &Entry::try_from(integrity_zomes::A {}).unwrap()),
-        Ok(Some(EntryZomes::A(
-            integrity_zomes::integrity_a::EntryTypes::A(integrity_zomes::A {})
+        EntryZomes::deserialize_from_type(12, 0, &Entry::try_from(integrity_zomes::A {}).unwrap()),
+        Ok(Some(EntryZomes::B(
+            integrity_zomes::integrity_b::EntryTypes::A(integrity_zomes::A {})
         )))
     ));
 }
 
 #[test]
 fn link_types_create_link() {
-    set_zome_types_and_compare(vec![], vec![12..15], CreateLink(LinkType(12)));
+    set_zome_types_and_compare(&[], &[(3, 3)], CreateLink(ZomeId(3), LinkType(0)));
     create_link(
         base(),
         base(),
@@ -139,60 +154,61 @@ fn link_types_create_link() {
     .unwrap();
 
     assert_eq!(
-        LinkType::try_from(integrity_zomes::integrity_a::LinkTypes::A),
-        Ok(LinkType(12))
+        zome_and_link_type(integrity_zomes::integrity_a::LinkTypes::A),
+        (3, 0)
     );
-
     assert_eq!(
-        LinkType::try_from(integrity_zomes::integrity_a::LinkTypes::B),
-        Ok(LinkType(13))
+        zome_and_link_type(integrity_zomes::integrity_a::LinkTypes::B),
+        (3, 1)
     );
-
     assert_eq!(
-        LinkType::try_from(integrity_zomes::integrity_a::LinkTypes::C),
-        Ok(LinkType(14))
+        zome_and_link_type(integrity_zomes::integrity_a::LinkTypes::C),
+        (3, 2)
     );
 }
 
 #[test]
 fn link_zomes_create_link() {
     use integrity_zomes::*;
-    set_zome_types_and_compare(vec![], vec![12..15, 0..3], CreateLink(LinkType(14)));
+    set_zome_types_and_compare(
+        &[],
+        &[(32, 3), (15, 3)],
+        CreateLink(ZomeId(32), LinkType(2)),
+    );
     create_link(base(), base(), LinkZomes::A(integrity_a::LinkTypes::C), ()).unwrap();
 
-    set_zome_types_and_compare(vec![], vec![12..15, 0..3], CreateLink(LinkType(2)));
+    set_zome_types_and_compare(
+        &[],
+        &[(32, 3), (15, 6)],
+        CreateLink(ZomeId(15), LinkType(2)),
+    );
     create_link(base(), base(), LinkZomes::B(integrity_b::LinkTypes::C), ()).unwrap();
 
-    set_zome_types(vec![], vec![12..15, 0..3]);
+    set_zome_types(&[], &[(3, 3), (2, 6)]);
 
     assert_eq!(
-        LinkType::try_from(LinkZomes::A(integrity_a::LinkTypes::A)),
-        Ok(LinkType(12))
+        zome_and_link_type(LinkZomes::A(integrity_a::LinkTypes::A)),
+        (3, 0)
     );
-
     assert_eq!(
-        LinkType::try_from(LinkZomes::A(integrity_a::LinkTypes::B)),
-        Ok(LinkType(13))
+        zome_and_link_type(LinkZomes::A(integrity_a::LinkTypes::B)),
+        (3, 1)
     );
-
     assert_eq!(
-        LinkType::try_from(LinkZomes::A(integrity_a::LinkTypes::C)),
-        Ok(LinkType(14))
+        zome_and_link_type(LinkZomes::A(integrity_a::LinkTypes::C)),
+        (3, 2)
     );
-
     assert_eq!(
-        LinkType::try_from(LinkZomes::B(integrity_b::LinkTypes::A)),
-        Ok(LinkType(0))
+        zome_and_link_type(LinkZomes::B(integrity_b::LinkTypes::A)),
+        (2, 0)
     );
-
     assert_eq!(
-        LinkType::try_from(LinkZomes::B(integrity_b::LinkTypes::B)),
-        Ok(LinkType(1))
+        zome_and_link_type(LinkZomes::B(integrity_b::LinkTypes::B)),
+        (2, 1)
     );
-
     assert_eq!(
-        LinkType::try_from(LinkZomes::B(integrity_b::LinkTypes::C)),
-        Ok(LinkType(2))
+        zome_and_link_type(LinkZomes::B(integrity_b::LinkTypes::C)),
+        (2, 2)
     );
 }
 
@@ -201,69 +217,54 @@ fn link_types_get_links() {
     use integrity_zomes::integrity_a::LinkTypes;
 
     // Include just `A`
-    set_zome_types_and_compare(vec![], vec![12..15], GetLinks(make_range(vec![12..=12])));
+    set_zome_types_and_compare(&[], &[(1, 3)], GetLinks(make_filter(&[(1, 0..=0)])));
     get_links(base(), LinkTypes::A, None).unwrap();
 
     // Include all links from within this zome.
-    set_zome_types_and_compare(vec![], vec![12..15], GetLinks(make_range(vec![12..=14])));
-    get_links(base(), LinkTypes::range(..), None).unwrap();
-
-    // Include link types from `A` up
-    set_zome_types_and_compare(vec![], vec![12..15], GetLinks(make_range(vec![12..=14])));
-    get_links(base(), LinkTypes::range(LinkTypes::A..), None).unwrap();
-
-    // Include link types from `A` to `C` inclusive.
-    set_zome_types_and_compare(vec![], vec![12..15], GetLinks(make_range(vec![12..=14])));
-    get_links(base(), LinkTypes::range(LinkTypes::A..=LinkTypes::C), None).unwrap();
-
-    // Include no link types (this isn't very useful).
     set_zome_types_and_compare(
-        vec![],
-        vec![12..15],
-        GetLinks(LinkTypeRanges(vec![LinkTypeRange::Empty])),
+        &[],
+        &[(1, 3)],
+        GetLinks(LinkTypeFilter::single_dep(1.into())),
     );
-    get_links(base(), LinkTypes::range(LinkTypes::A..LinkTypes::A), None).unwrap();
+    get_links(base(), .., None).unwrap();
 
     // Include types in this vec.
-    set_zome_types_and_compare(
-        vec![],
-        vec![12..15],
-        GetLinks(make_range(vec![12..=12, 13..=13])),
-    );
+    set_zome_types_and_compare(&[], &[(1, 3)], GetLinks(make_filter(&[(1, 0..=1)])));
     get_links(base(), vec![LinkTypes::A, LinkTypes::B], None).unwrap();
 
     // Include types in this array.
     set_zome_types_and_compare(
-        vec![],
-        vec![12..15],
-        GetLinks(make_range(vec![12..=12, 14..=14])),
+        &[],
+        &[(1, 3)],
+        GetLinks(LinkTypeFilter::Types(vec![(
+            1.into(),
+            vec![0.into(), 2.into()],
+        )])),
     );
     get_links(base(), [LinkTypes::A, LinkTypes::C], None).unwrap();
 
     // Include types in this ref to array.
     set_zome_types_and_compare(
-        vec![],
-        vec![12..15],
-        GetLinks(make_range(vec![14..=14, 13..=13])),
+        &[],
+        &[(1, 3)],
+        GetLinks(LinkTypeFilter::Types(vec![(
+            1.into(),
+            vec![1.into(), 2.into()],
+        )])),
     );
     get_links(base(), &[LinkTypes::C, LinkTypes::B], None).unwrap();
 
     // Include types in this slice.
     let t = [LinkTypes::A, LinkTypes::C];
     set_zome_types_and_compare(
-        vec![],
-        vec![12..15],
-        GetLinks(make_range(vec![12..=12, 14..=14])),
+        &[],
+        &[(1, 3)],
+        GetLinks(LinkTypeFilter::Types(vec![(
+            1.into(),
+            vec![0.into(), 2.into()],
+        )])),
     );
     get_links(base(), &t[..], None).unwrap();
-
-    // Include all link types defined in any zome.
-    set_zome_types_and_compare(
-        vec![],
-        vec![12..15],
-        GetLinks(LinkTypeRanges(vec![LinkTypeRange::Full])),
-    );
-    get_links(base(), .., None).unwrap();
 }
 
 #[test]
@@ -272,76 +273,36 @@ fn link_zomes_get_links() {
 
     // Include just `A(B)`
     set_zome_types_and_compare(
-        vec![],
-        vec![12..15, 5..8],
-        GetLinks(make_range(vec![13..=13])),
+        &[],
+        &[(3, 3), (1, 3)],
+        GetLinks(LinkTypeFilter::Types(vec![(3.into(), vec![1.into()])])),
     );
     get_links(base(), LinkZomes::A(integrity_a::LinkTypes::B), None).unwrap();
 
     // Include just `B(B)`
     set_zome_types_and_compare(
-        vec![],
-        vec![12..15, 5..8],
-        GetLinks(make_range(vec![6..=6])),
+        &[],
+        &[(3, 3), (1, 3)],
+        GetLinks(LinkTypeFilter::Types(vec![(1.into(), vec![1.into()])])),
     );
     get_links(base(), LinkZomes::B(integrity_b::LinkTypes::B), None).unwrap();
 
     // Include all links from within this zome.
     set_zome_types_and_compare(
-        vec![],
-        vec![12..15, 5..8],
-        GetLinks(make_range(vec![12..=14, 5..=7])),
+        &[],
+        &[(3, 3), (1, 3)],
+        GetLinks(LinkTypeFilter::Dependencies(vec![3.into(), 1.into()])),
     );
-    get_links(base(), LinkZomes::range(..), None).unwrap();
-
-    // Include link types from `A(C)` up
-    set_zome_types_and_compare(
-        vec![],
-        vec![12..15, 5..8],
-        GetLinks(make_range(vec![14..=14, 5..=7])),
-    );
-    get_links(
-        base(),
-        LinkZomes::range(LinkZomes::A(integrity_a::LinkTypes::C)..),
-        None,
-    )
-    .unwrap();
-
-    // Include link types from `A(B)` to `B(A)` inclusive.
-    set_zome_types_and_compare(
-        vec![],
-        vec![12..15, 5..8],
-        GetLinks(make_range(vec![13..=14, 5..=5])),
-    );
-    get_links(
-        base(),
-        LinkZomes::range(
-            LinkZomes::A(integrity_a::LinkTypes::B)..=LinkZomes::B(integrity_b::LinkTypes::A),
-        ),
-        None,
-    )
-    .unwrap();
-
-    // Include no link types (this isn't very useful).
-    set_zome_types_and_compare(
-        vec![],
-        vec![12..15, 5..8],
-        GetLinks(LinkTypeRanges(vec![LinkTypeRange::Empty])),
-    );
-    get_links(
-        base(),
-        LinkZomes::range(
-            LinkZomes::A(integrity_a::LinkTypes::A)..LinkZomes::A(integrity_a::LinkTypes::A),
-        ),
-        None,
-    )
-    .unwrap();
+    get_links(base(), .., None).unwrap();
 
     // Include types in this vec.
     set_zome_types_and_compare(
-        vec![],
-        vec![12..15, 5..8],
-        GetLinks(make_range(vec![12..=12, 5..=5, 6..=6, 13..=13])),
+        &[],
+        &[(3, 3), (1, 3)],
+        GetLinks(LinkTypeFilter::Types(vec![
+            (1.into(), vec![0.into(), 1.into()]),
+            (3.into(), vec![0.into(), 1.into()]),
+        ])),
     );
     get_links(
         base(),
@@ -357,9 +318,12 @@ fn link_zomes_get_links() {
 
     // Include types in this array.
     set_zome_types_and_compare(
-        vec![],
-        vec![12..15, 5..8],
-        GetLinks(make_range(vec![5..=5, 14..=14])),
+        &[],
+        &[(3, 3), (1, 3)],
+        GetLinks(LinkTypeFilter::Types(vec![
+            (1.into(), vec![0.into()]),
+            (3.into(), vec![2.into()]),
+        ])),
     );
     get_links(
         base(),
@@ -373,9 +337,12 @@ fn link_zomes_get_links() {
 
     // Include types in this ref to array.
     set_zome_types_and_compare(
-        vec![],
-        vec![12..15, 5..8],
-        GetLinks(make_range(vec![5..=5, 14..=14])),
+        &[],
+        &[(3, 3), (1, 3)],
+        GetLinks(LinkTypeFilter::Types(vec![
+            (1.into(), vec![0.into()]),
+            (3.into(), vec![2.into()]),
+        ])),
     );
     get_links(
         base(),
@@ -393,94 +360,76 @@ fn link_zomes_get_links() {
         LinkZomes::A(integrity_a::LinkTypes::C),
     ];
     set_zome_types_and_compare(
-        vec![],
-        vec![12..15, 5..8],
-        GetLinks(make_range(vec![12..=12, 14..=14])),
+        &[],
+        &[(3, 3), (1, 3)],
+        GetLinks(LinkTypeFilter::Types(vec![(
+            3.into(),
+            vec![0.into(), 2.into()],
+        )])),
     );
     get_links(base(), &t[..], None).unwrap();
-
-    // Include all link types defined in any zome.
-    set_zome_types_and_compare(
-        vec![],
-        vec![12..15, 5..8],
-        GetLinks(LinkTypeRanges(vec![LinkTypeRange::Full])),
-    );
-    get_links(base(), .., None).unwrap();
 }
 
 #[test]
 fn link_zomes_from_action() {
     use integrity_zomes::*;
-    set_zome_types(vec![], vec![50..53, 100..103]);
+    set_zome_types(&[], &[(19, 3), (4, 3)]);
     assert_eq!(
-        LinkZomes::try_from(LocalZomeTypeId(0)),
+        LinkZomes::try_from(scoped_link(19, 0)),
         Ok(LinkZomes::A(integrity_a::LinkTypes::A))
     );
     assert_eq!(
-        LinkZomes::try_from(&LocalZomeTypeId(0)),
-        Ok(LinkZomes::A(integrity_a::LinkTypes::A))
-    );
-    assert_eq!(
-        LinkZomes::try_from(LocalZomeTypeId(1)),
+        LinkZomes::try_from(scoped_link(19, 1)),
         Ok(LinkZomes::A(integrity_a::LinkTypes::B))
     );
     assert_eq!(
-        LinkZomes::try_from(LocalZomeTypeId(2)),
+        LinkZomes::try_from(scoped_link(19, 2)),
         Ok(LinkZomes::A(integrity_a::LinkTypes::C))
     );
     assert_eq!(
-        LinkZomes::try_from(LocalZomeTypeId(3)),
+        LinkZomes::try_from(scoped_link(4, 0)),
         Ok(LinkZomes::B(integrity_b::LinkTypes::A))
     );
     assert_eq!(
-        LinkZomes::try_from(LocalZomeTypeId(4)),
+        LinkZomes::try_from(scoped_link(4, 1)),
         Ok(LinkZomes::B(integrity_b::LinkTypes::B))
     );
     assert_eq!(
-        LinkZomes::try_from(LocalZomeTypeId(5)),
+        LinkZomes::try_from(scoped_link(4, 2)),
         Ok(LinkZomes::B(integrity_b::LinkTypes::C))
     );
 
-    assert!(matches!(LinkZomes::try_from(LocalZomeTypeId(50)), Err(_)));
-
-    assert_eq!(
-        LinkZomes::try_from(LinkType(50)),
-        Ok(LinkZomes::A(integrity_a::LinkTypes::A))
-    );
-    assert_eq!(
-        LinkZomes::try_from(LinkType(51)),
-        Ok(LinkZomes::A(integrity_a::LinkTypes::B))
-    );
-    assert_eq!(
-        LinkZomes::try_from(LinkType(52)),
-        Ok(LinkZomes::A(integrity_a::LinkTypes::C))
-    );
-    assert_eq!(
-        LinkZomes::try_from(LinkType(100)),
-        Ok(LinkZomes::B(integrity_b::LinkTypes::A))
-    );
-    assert_eq!(
-        LinkZomes::try_from(LinkType(101)),
-        Ok(LinkZomes::B(integrity_b::LinkTypes::B))
-    );
-    assert_eq!(
-        LinkZomes::try_from(LinkType(102)),
-        Ok(LinkZomes::B(integrity_b::LinkTypes::C))
-    );
-
-    assert!(matches!(LinkZomes::try_from(LinkType(0)), Err(_)));
+    assert!(matches!(
+        LinkZomes::try_from(ScopedLinkType {
+            zome_id: 4.into(),
+            zome_type: 50.into()
+        }),
+        Err(_)
+    ));
+    assert!(matches!(
+        LinkZomes::try_from(ScopedLinkType {
+            zome_id: 5.into(),
+            zome_type: 2.into()
+        }),
+        Err(_)
+    ));
 }
 
 enum Compare {
-    GetLinks(LinkTypeRanges),
-    CreateLink(LinkType),
+    GetLinks(LinkTypeFilter),
+    CreateLink(ZomeId, LinkType),
     Nothing,
 }
 
-fn make_range(r: Vec<std::ops::RangeInclusive<u8>>) -> LinkTypeRanges {
-    LinkTypeRanges(
-        r.into_iter()
-            .map(|r| LinkTypeRange::Inclusive(LinkType(*r.start())..=LinkType(*r.end())))
+fn make_filter(r: &[(u8, std::ops::RangeInclusive<u8>)]) -> LinkTypeFilter {
+    LinkTypeFilter::Types(
+        r.iter()
+            .map(|(z, r)| {
+                (
+                    ZomeId(*z),
+                    r.clone().map(|t| LinkType(t)).collect::<Vec<_>>(),
+                )
+            })
             .collect(),
     )
 }
@@ -489,25 +438,26 @@ fn base() -> AnyLinkableHash {
     AnyLinkableHash::from_raw_36_and_type(vec![0; 36], AnyLinkable::External)
 }
 
-fn set_zome_types(entries: Vec<Range<u8>>, links: Vec<Range<u8>>) {
+fn set_zome_types(entries: &[(u8, u8)], links: &[(u8, u8)]) {
     set_zome_types_and_compare(entries, links, Compare::Nothing)
 }
-fn set_zome_types_and_compare(entries: Vec<Range<u8>>, links: Vec<Range<u8>>, compare: Compare) {
+
+fn set_zome_types_and_compare(entries: &[(u8, u8)], links: &[(u8, u8)], compare: Compare) {
     let mut mock_hdk = MockHdkT::new();
+    let entries = entries.to_vec();
+    let links = links.to_vec();
     mock_hdk.expect_zome_info().returning(move |_| {
         let zome_types = ScopedZomeTypesSet {
             entries: ScopedZomeTypes(
                 entries
-                    .clone()
-                    .into_iter()
-                    .map(|r| GlobalZomeTypeId(r.start)..GlobalZomeTypeId(r.end))
+                    .iter()
+                    .map(|(z, types)| (ZomeId(*z), (0..*types).map(|t| EntryDefIndex(t)).collect()))
                     .collect(),
             ),
             links: ScopedZomeTypes(
                 links
-                    .clone()
-                    .into_iter()
-                    .map(|r| GlobalZomeTypeId(r.start)..GlobalZomeTypeId(r.end))
+                    .iter()
+                    .map(|(z, types)| (ZomeId(*z), (0..*types).map(|t| LinkType(t)).collect()))
                     .collect(),
             ),
         };
@@ -525,7 +475,7 @@ fn set_zome_types_and_compare(entries: Vec<Range<u8>>, links: Vec<Range<u8>>, co
     mock_hdk
         .expect_create()
         .returning(|_| Ok(ActionHash::from_raw_36(vec![0u8; 36])));
-    if !matches!(compare, Compare::CreateLink(_)) {
+    if !matches!(compare, Compare::CreateLink(_, _)) {
         mock_hdk
             .expect_create_link()
             .returning(|_| Ok(ActionHash::from_raw_36(vec![0u8; 36])));
@@ -558,10 +508,14 @@ fn set_zome_types_and_compare(entries: Vec<Range<u8>>, links: Vec<Range<u8>>, co
                     }]])
                 });
         }
-        Compare::CreateLink(l) => {
+        Compare::CreateLink(z, l) => {
             mock_hdk
                 .expect_create_link()
-                .withf(move |CreateLinkInput { link_type, .. }| *link_type == l)
+                .withf(
+                    move |CreateLinkInput {
+                              link_type, zome_id, ..
+                          }| *link_type == l && *zome_id == z,
+                )
                 .returning(|_| Ok(ActionHash::from_raw_36(vec![0u8; 36])));
         }
         Compare::Nothing => (),

@@ -16,7 +16,7 @@ fn create_countersigned(
     thing: Thing,
 ) -> ExternResult<ActionHash> {
     let thing = EntryTypes::Thing(thing);
-    let entry_def_index = EntryDefIndex::try_from(&thing)?;
+    let entry_def_index = ScopedEntryDefIndex::try_from(&thing)?;
     let visibility = EntryVisibility::from(&thing);
 
     let thing = match thing {

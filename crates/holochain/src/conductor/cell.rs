@@ -699,9 +699,9 @@ impl Cell {
         // If the action has an app entry type get the entry def
         // from the conductor.
         let required_receipt_count = match action.as_ref().and_then(|h| h.0.entry_type()) {
-            Some(EntryType::App(AppEntryType { id, .. })) => {
+            Some(EntryType::App(AppEntryType { zome_id, id, .. })) => {
                 let ribosome = self.conductor_api.get_this_ribosome().map_err(Box::new)?;
-                let zome = ribosome.find_zome_from_entry(id);
+                let zome = ribosome.get_integrity_zome(zome_id);
                 match zome {
                     Some(zome) => self
                         .conductor_api

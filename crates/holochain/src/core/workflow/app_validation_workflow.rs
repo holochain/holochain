@@ -497,10 +497,10 @@ pub fn entry_creation_zomes_to_invoke(
             entry_type: EntryType::App(aet),
             ..
         }) => {
-            let zome = ribosome.find_zome_from_entry(&aet.id()).ok_or_else(|| {
-                Outcome::rejected(&format!("Zome does not exist for {:?}", aet.id()))
+            let zome = ribosome.get_integrity_zome(&aet.zome_id()).ok_or_else(|| {
+                Outcome::rejected(&format!("Zome does not exist for {:?}", aet.zome_id()))
             })?;
-            Ok(ZomesToInvoke::One(zome.erase_type()))
+            Ok(ZomesToInvoke::OneIntegrity(zome))
         }
         _ => Ok(ZomesToInvoke::AllIntegrity),
     }
@@ -511,7 +511,7 @@ fn create_link_zomes_to_invoke(
     ribosome: &impl RibosomeT,
 ) -> AppValidationOutcome<ZomesToInvoke> {
     let zome = ribosome
-        .find_zome_from_link(&create_link.link_type)
+        .get_integrity_zome(&create_link.zome_id)
         .ok_or_else(|| {
             Outcome::rejected(&format!(
                 "Zome does not exist for {:?}",
