@@ -6,6 +6,7 @@ use holo_hash::HasHash;
 use holochain_cascade::test_utils::fill_db;
 use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_p2p::dht::hash::RegionHash;
+use holochain_p2p::dht::prelude::Dimension;
 use holochain_p2p::dht::region::RegionData;
 use holochain_p2p::dht_arc::DhtArcSet;
 use holochain_types::dht_op::facts::valid_dht_op;
@@ -28,6 +29,8 @@ use super::Spaces;
 async fn test_region_queries() {
     const NUM_OPS: usize = 100;
 
+    // let _g = observability::test_run().ok();
+
     let mut u = Unstructured::new(&NOISE);
     let temp_dir = tempfile::TempDir::new().unwrap();
     let path = temp_dir.path().to_path_buf();
@@ -39,11 +42,20 @@ async fn test_region_queries() {
     .unwrap();
     let keystore = test_keystore();
     let agent = keystore.new_sign_keypair_random().await.unwrap();
-    let two_hrs_ago = (Timestamp::now() - Duration::from_secs(60 * 60 * 2)).unwrap();
 
-    // - The origin time is two hours ago
     let mut dna_def = DnaDef::arbitrary(&mut u).unwrap();
-    dna_def.origin_time = two_hrs_ago.clone();
+    let q_us = Dimension::standard_time().quantum as u64;
+    let tq = Duration::from_micros(q_us);
+    let tq5 = Duration::from_micros(q_us * 5);
+    let five_quanta_ago = (Timestamp::now() - tq5).unwrap();
+    let tq_ms = tq.as_millis() as u64;
+
+    // - The origin time is five time quanta ago
+    dna_def.origin_time = five_quanta_ago.clone();
+
+    // Cutoff duration is 2 quanta, meaning historic gossip goes up to 1 quantum ago
+    let cutoff = Duration::from_micros(q_us * 2);
+    let topo = dna_def.topology(cutoff);
 
     // Builds an arbitrary valid op at the given timestamp
     let mut arbitrary_valid_op = |timestamp: Timestamp| -> DhtOp {
@@ -56,26 +68,22 @@ async fn test_region_queries() {
     };
 
     let dna_def = DnaDefHashed::from_content_sync(dna_def);
-    let topo = dna_def.topology();
     let db = spaces.dht_db(dna_def.as_hash()).unwrap();
     let mut ops = vec![];
 
     // - Check that we have no ops to begin with
     let region_set = spaces
-        .handle_fetch_op_regions(&dna_def, DhtArcSet::Full)
+        .handle_fetch_op_regions(dna_def.as_hash(), topo.clone(), DhtArcSet::Full)
         .await
         .unwrap();
     let region_sum: RegionData = region_set.regions().map(|r| r.data).sum();
     assert_eq!(region_sum.count as usize, 0);
 
-    let min_ms = 1000 * 60;
-    let hour_ms = min_ms * 60;
-
     for _ in 0..NUM_OPS {
-        // timestamp is between 1 and 2 hours ago, which is the historical
+        // timestamp is between 1 and 4 time quanta ago, which is the historical
         // window
         let op = arbitrary_valid_op(
-            (two_hrs_ago + Duration::from_millis(rand::thread_rng().gen_range(0, hour_ms)))
+            (five_quanta_ago + Duration::from_millis(rand::thread_rng().gen_range(0..tq_ms * 4)))
                 .unwrap(),
         );
         let op = DhtOpHashed::from_content_sync(op);
@@ -84,20 +92,16 @@ async fn test_region_queries() {
 
         // also construct ops which are in the recent time window,
         // to test that these ops don't get returned in region queries.
-        // There is a 5 min overlap between historical and recent time windows
-        // (1 time quantum) so we make sure to account for that here also.
         let op2 = arbitrary_valid_op(
-            (two_hrs_ago
-                + Duration::from_millis(
-                    hour_ms + rand::thread_rng().gen_range(5 * min_ms, hour_ms),
-                ))
+            (five_quanta_ago
+                + Duration::from_millis(rand::thread_rng().gen_range(tq_ms * 4..=tq_ms * 5)))
             .unwrap(),
         );
         let op2 = DhtOpHashed::from_content_sync(op2);
         fill_db(&db, op2);
     }
     let region_set = spaces
-        .handle_fetch_op_regions(&dna_def, DhtArcSet::Full)
+        .handle_fetch_op_regions(dna_def.as_hash(), topo.clone(), DhtArcSet::Full)
         .await
         .unwrap();
 
@@ -107,6 +111,9 @@ async fn test_region_queries() {
         .iter()
         .map(|op| RegionHash::from_vec(op.as_hash().get_raw_39().to_vec()).unwrap())
         .sum();
+
+    // If the left side is greater, then the recent ops are being mistakenly included.
+    // If the right side is greater, then something is wrong with the query.
     assert_eq!(region_sum.count as usize, NUM_OPS);
     assert_eq!(region_sum.hash, hash_sum);
 

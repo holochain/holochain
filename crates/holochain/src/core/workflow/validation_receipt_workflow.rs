@@ -57,10 +57,10 @@ pub async fn validation_receipt_workflow(
             move |txn| {
                 let mut stmt = txn.prepare(
                     "
-            SELECT Header.author, DhtOp.hash, DhtOp.validation_status,
+            SELECT Action.author, DhtOp.hash, DhtOp.validation_status,
             DhtOp.when_integrated
             From DhtOp
-            JOIN Header ON DhtOp.header_hash = Header.hash
+            JOIN Action ON DhtOp.action_hash = Action.hash
             WHERE
             DhtOp.require_receipt = 1
             AND

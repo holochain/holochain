@@ -8,6 +8,48 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- hdk: **BREAKING CHANGE** `x_salsa20_poly1305_*` functions have been properly implemented. Any previous `KeyRef`s will no longer work. These new functions DO NOT work with legacy lair `v0.0.z`, you must use NEW lair `v0.y.z` (v0.2.0 as of this PR). [\#1446](https://github.com/holochain/holochain/pull/1446)
+
+## 0.0.138
+
+- hdk: Bump rand version + fix getrandom (used by rand\_core and rand) to fetch randomness from host system when compiled to WebAssembly. [\#1445](https://github.com/holochain/holochain/pull/1445)
+
+## 0.0.137
+
+- hdk: Use newest wasmer and introduces `wasm_error!` macro to capture line numbers for wasm errors [\#1380](https://github.com/holochain/holochain/pull/1380)
+- Docs: Restructure main page sections and add several intra-doc lnks [\#1418](https://github.com/holochain/holochain/pull/1418)
+- hdk: Add functional stub for `x_salsa20_poly1305_shared_secret_create_random` [\#1410](https://github.com/holochain/holochain/pull/1410)
+- hdk: Add functional stub for `x_salsa20_poly1305_shared_secret_export` [\#1410](https://github.com/holochain/holochain/pull/1410)
+- hdk: Add functional stub for `x_salsa20_poly1305_shared_secret_ingest` [\#1410](https://github.com/holochain/holochain/pull/1410)
+- Bump wasmer to 0.0.80 [\#1386](https://github.com/holochain/holochain/pull/1386)
+
+### Integrity / Coordinator Changes [\#1325](https://github.com/holochain/holochain/pull/1325)
+
+### Added
+
+- `get_links` and `get_link_details` take a `TryInto<LinkTypesRages>`. See the link test wasm for examples.
+
+### Removed
+
+- `entry_def_index` and `entry_type` macros are no longer needed.
+
+### Changed
+
+- `call` and `call_remote` now take an `Into<ZomeName>` instead of a `ZomeName`.
+- `create_link` takes a `TryInto<LinkType>` instead of an `Into<LinkType>`.
+- `update` takes `UpdateInput` instead of a `HeaderHash` and `CreateInput`.
+- `create_entry` takes a type that can try into an `EntryDefIndex` and `EntryVisibility` instead of implementing `EntryDefRegistration`.
+- `update_entry` takes the previous header hash and a try into `Entry` instead of a `EntryDefRegistration`.
+- `Path` now must be `typed(LinkType)` to use any functionality that creates or gets links.
+
+## 0.0.136
+
+- Docs: Crate README generated from crate level doc comments [\#1392](https://github.com/holochain/holochain/pull/1392).
+
+## 0.0.135
+
+## 0.0.134
+
 ## 0.0.133
 
 ## 0.0.132

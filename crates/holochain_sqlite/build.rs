@@ -47,7 +47,7 @@ fn check_fmt(path: &std::path::Path) {
 
     let opt = sqlformat::FormatOptions {
         indent: sqlformat::Indent::Spaces(2),
-        uppercase: true,
+        uppercase: false,
         lines_between_queries: 1,
     };
 

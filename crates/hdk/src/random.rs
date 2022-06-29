@@ -58,12 +58,3 @@ impl_try_from_random!(
     CapSecret,
     holochain_zome_types::capability::CAP_SECRET_BYTES
 );
-
-// @todo don't generate these in wasm.
-// What we really want to be doing is have secrets generated in lair and then lair passes back an
-// opaque reference to the secret.
-// That is why the struct is is called KeyRef not Key.
-impl_try_from_random!(
-    SecretBoxKeyRef,
-    holochain_zome_types::x_salsa20_poly1305::key_ref::KEY_REF_BYTES
-);

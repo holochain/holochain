@@ -25,7 +25,7 @@ pub enum CellError {
     #[error("Genesis failed: {0}")]
     Genesis(Box<ConductorApiError>),
     #[error(transparent)]
-    HeaderError(#[from] HeaderError),
+    ActionError(#[from] ActionError),
     #[error("This cell has not had a successful genesis and cannot be created")]
     CellWithoutGenesis(CellId),
     #[error(

@@ -12,7 +12,7 @@ use super::query_region_set::query_region_data;
 /// will be fetched from the database. The quadrisecting is recursive until either all
 /// regions are either small enough, or cannot be further subdivided.
 pub async fn query_size_limited_regions(
-    db: DbWrite<DbKindAuthored>,
+    db: DbWrite<DbKindDht>,
     topology: Topology,
     regions: Vec<Region>,
     size_limit: u32,

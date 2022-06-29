@@ -12,12 +12,12 @@ use holochain_types::prelude::*;
 
 #[derive(Clone)]
 pub struct ValidationPackageInvocation {
-    zome: Zome,
+    zome: IntegrityZome,
     app_entry_type: AppEntryType,
 }
 
 impl ValidationPackageInvocation {
-    pub fn new(zome: Zome, app_entry_type: AppEntryType) -> Self {
+    pub fn new(zome: IntegrityZome, app_entry_type: AppEntryType) -> Self {
         Self {
             zome,
             app_entry_type,
@@ -48,16 +48,10 @@ impl From<&ValidationPackageHostAccess> for HostFnAccess {
 
 impl Invocation for ValidationPackageInvocation {
     fn zomes(&self) -> ZomesToInvoke {
-        ZomesToInvoke::One(self.zome.to_owned())
+        ZomesToInvoke::One(self.zome.to_owned().erase_type())
     }
     fn fn_components(&self) -> FnComponents {
-        // @todo zome_id is a u8, is this really an ergonomic way for us to interact with
-        // entry types at the happ code level?
-        vec![
-            "validation_package".into(),
-            format!("{}", self.app_entry_type.zome_id()),
-        ]
-        .into()
+        vec!["validation_package".into()].into()
     }
     fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
         ExternIO::encode(self.app_entry_type)
@@ -159,7 +153,7 @@ mod test {
             results.shuffle(&mut rng);
 
             // number of times a callback result appears should not change the final result
-            let number_of_extras = rng.gen_range(0, 5);
+            let number_of_extras = rng.gen_range(0..5);
             for _ in 0..number_of_extras {
                 let maybe_extra = results.choose(&mut rng).cloned();
                 match maybe_extra {
@@ -204,7 +198,7 @@ mod test {
                 .unwrap();
         let zome = validation_package_invocation.zome.clone();
         assert_eq!(
-            ZomesToInvoke::One(zome),
+            ZomesToInvoke::One(zome.erase_type()),
             validation_package_invocation.zomes(),
         );
     }
@@ -218,10 +212,7 @@ mod test {
 
         let mut expected = vec![
             "validation_package".to_string(),
-            format!(
-                "validation_package_{}",
-                validation_package_invocation.app_entry_type.zome_id()
-            ),
+            format!("validation_package"),
         ];
         for fn_component in validation_package_invocation.fn_components() {
             assert_eq!(fn_component, expected.pop().unwrap(),);
@@ -241,85 +232,5 @@ mod test {
             host_input,
             ExternIO::encode(&validation_package_invocation.app_entry_type).unwrap(),
         );
-    }
-}
-
-#[cfg(test)]
-#[cfg(feature = "slow_tests")]
-mod slow_tests {
-    use super::ValidationPackageResult;
-    use crate::core::ribosome::RibosomeT;
-    use crate::fixt::curve::Zomes;
-    use crate::fixt::RealRibosomeFixturator;
-    use crate::fixt::ValidationPackageHostAccessFixturator;
-    use crate::fixt::ValidationPackageInvocationFixturator;
-    use hdk::prelude::AppEntryType;
-    use hdk::prelude::EntryVisibility;
-    use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::validate::ValidationPackage;
-
-    #[tokio::test(flavor = "multi_thread")]
-    async fn test_validation_package_unimplemented() {
-        let host_access = ValidationPackageHostAccessFixturator::new(::fixt::Unpredictable)
-            .next()
-            .unwrap();
-        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
-            .next()
-            .unwrap();
-        let mut validation_package_invocation =
-            ValidationPackageInvocationFixturator::new(::fixt::Empty)
-                .next()
-                .unwrap();
-        validation_package_invocation.zome = TestWasm::Foo.into();
-
-        let result = ribosome
-            .run_validation_package(host_access, validation_package_invocation)
-            .unwrap();
-        assert_eq!(result, ValidationPackageResult::NotImplemented,);
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    async fn test_validation_package_implemented_success() {
-        let host_access = ValidationPackageHostAccessFixturator::new(::fixt::Unpredictable)
-            .next()
-            .unwrap();
-        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::ValidationPackageSuccess]))
-            .next()
-            .unwrap();
-        let mut validation_package_invocation =
-            ValidationPackageInvocationFixturator::new(::fixt::Empty)
-                .next()
-                .unwrap();
-        validation_package_invocation.zome = TestWasm::ValidationPackageSuccess.into();
-        validation_package_invocation.app_entry_type =
-            AppEntryType::new(3.into(), 0.into(), EntryVisibility::Public);
-
-        let result = ribosome
-            .run_validation_package(host_access, validation_package_invocation)
-            .unwrap();
-        assert_eq!(
-            result,
-            ValidationPackageResult::Success(ValidationPackage(vec![])),
-        );
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    async fn test_validation_package_implemented_fail() {
-        let host_access = ValidationPackageHostAccessFixturator::new(::fixt::Unpredictable)
-            .next()
-            .unwrap();
-        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::ValidationPackageFail]))
-            .next()
-            .unwrap();
-        let mut validation_package_invocation =
-            ValidationPackageInvocationFixturator::new(::fixt::Empty)
-                .next()
-                .unwrap();
-        validation_package_invocation.zome = TestWasm::ValidationPackageFail.into();
-
-        let result = ribosome
-            .run_validation_package(host_access, validation_package_invocation)
-            .unwrap();
-        assert_eq!(result, ValidationPackageResult::Fail("bad package".into()),);
     }
 }

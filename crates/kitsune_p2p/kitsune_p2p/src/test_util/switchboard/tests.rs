@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::{
     config::KitsuneP2pTuningParams, dht::spacetime::Topology, dht_arc::loc8::Loc8,
@@ -14,7 +16,7 @@ use pretty_assertions::assert_eq;
 #[tokio::test(flavor = "multi_thread")]
 async fn fullsync_3way_recent() {
     // observability::test_run().ok();
-    let topo = Topology::standard_epoch();
+    let topo = Topology::standard_epoch_full();
     let sb = Switchboard::new(topo.clone(), GossipType::Recent);
 
     let [n1, n2, n3] = sb.add_nodes(tuning_params()).await;
@@ -61,7 +63,7 @@ async fn fullsync_3way_recent() {
 #[tokio::test(flavor = "multi_thread")]
 async fn sharded_3way_recent() {
     observability::test_run().ok();
-    let topo = Topology::standard_epoch();
+    let topo = Topology::standard_epoch_full();
     let sb = Switchboard::new(topo.clone(), GossipType::Recent);
 
     let [n1, n2, n3] = sb.add_nodes(tuning_params()).await;
@@ -107,7 +109,7 @@ async fn sharded_3way_recent() {
 #[tokio::test(flavor = "multi_thread")]
 async fn transitive_peer_gossip() {
     observability::test_run().ok();
-    let topo = Topology::standard_epoch();
+    let topo = Topology::standard_epoch_full();
     let sb = Switchboard::new(topo.clone(), GossipType::Recent);
 
     let [n1, n2, n3, n4] = sb.add_nodes(tuning_params()).await;
@@ -176,7 +178,7 @@ async fn transitive_peer_gossip() {
 async fn sharded_4way_recent() {
     observability::test_run().ok();
 
-    let topo = Topology::standard_epoch();
+    let topo = Topology::standard_epoch_full();
     let sb = Switchboard::new(topo.clone(), GossipType::Recent);
 
     let [n1, n2, n3, n4] = sb.add_nodes(tuning_params()).await;
@@ -265,7 +267,7 @@ async fn sharded_4way_historical() {
     let now = Timestamp::now().as_micros();
     // 1 year ago
     let then = now - 1_000_000 * 60 * 60 * 24 * 365;
-    let topo = Topology::standard(Timestamp::from_micros(then));
+    let topo = Topology::standard(Timestamp::from_micros(then), Duration::ZERO);
     let sb = Switchboard::new(topo.clone(), GossipType::Historical);
 
     let [n1, n2, n3, n4] = sb.add_nodes(tuning_params()).await;
@@ -281,7 +283,7 @@ async fn sharded_4way_historical() {
         .map(|loc| {
             (
                 loc,
-                Timestamp::from_micros(rand::thread_rng().gen_range(then, now)),
+                Timestamp::from_micros(rand::thread_rng().gen_range(then..now)),
             )
         })
         .collect();

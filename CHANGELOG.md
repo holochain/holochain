@@ -6,6 +6,362 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20220622.133046
+
+## [holochain\_cli-0.0.43](crates/holochain_cli/CHANGELOG.md#0.0.43)
+
+## [holochain\_cli\_sandbox-0.0.39](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.39)
+
+## [holochain\_cli\_bundle-0.0.39](crates/holochain_cli_bundle/CHANGELOG.md#0.0.39)
+
+## [holochain-0.0.145](crates/holochain/CHANGELOG.md#0.0.145)
+
+**MAJOR BREAKING CHANGE\!** This release includes a rename of two Holochain core concepts, which results in a LOT of changes to public APIs and type names:
+
+- “Element” has been renamed to “Record”
+- “Header” has been renamed to “Action”
+
+All names which include these words have also been renamed accordingly.
+
+As Holochain has evolved, the meaning behind these concepts, as well as our understanding of them, has evolved as well, to the point that the original names are no longer adequate descriptors. We chose new names to help better reflect what these concepts mean, to bring more clarity to how we write and talk about Holochain.
+
+## [holochain\_test\_wasm\_common-0.0.39](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.39)
+
+## [holochain\_conductor\_api-0.0.45](crates/holochain_conductor_api/CHANGELOG.md#0.0.45)
+
+## [holochain\_wasm\_test\_utils-0.0.44](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.44)
+
+## [holochain\_cascade-0.0.45](crates/holochain_cascade/CHANGELOG.md#0.0.45)
+
+## [holochain\_state-0.0.45](crates/holochain_state/CHANGELOG.md#0.0.45)
+
+## [holochain\_p2p-0.0.43](crates/holochain_p2p/CHANGELOG.md#0.0.43)
+
+## [holochain\_types-0.0.43](crates/holochain_types/CHANGELOG.md#0.0.43)
+
+## [holochain\_keystore-0.0.43](crates/holochain_keystore/CHANGELOG.md#0.0.43)
+
+## [holochain\_sqlite-0.0.42](crates/holochain_sqlite/CHANGELOG.md#0.0.42)
+
+## [kitsune\_p2p-0.0.37](crates/kitsune_p2p/CHANGELOG.md#0.0.37)
+
+## [kitsune\_p2p\_proxy-0.0.25](crates/kitsune_p2p_proxy/CHANGELOG.md#0.0.25)
+
+## [kitsune\_p2p\_transport\_quic-0.0.25](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.0.25)
+
+## [kitsune\_p2p\_types-0.0.25](crates/kitsune_p2p_types/CHANGELOG.md#0.0.25)
+
+## [hdk-0.0.138](crates/hdk/CHANGELOG.md#0.0.138)
+
+- hdk: Bump rand version + fix getrandom (used by rand\_core and rand) to fetch randomness from host system when compiled to WebAssembly. [\#1445](https://github.com/holochain/holochain/pull/1445)
+
+## [holochain\_zome\_types-0.0.37](crates/holochain_zome_types/CHANGELOG.md#0.0.37)
+
+## [holochain\_deterministic\_integrity-0.0.10](crates/holochain_deterministic_integrity/CHANGELOG.md#0.0.10)
+
+## [hdk\_derive-0.0.37](crates/hdk_derive/CHANGELOG.md#0.0.37)
+
+## [holochain\_integrity\_types-0.0.9](crates/holochain_integrity_types/CHANGELOG.md#0.0.9)
+
+- Countersigning now accepts optional additional signers but the first must be the enzyme [\#1394](https://github.com/holochain/holochain/pull/1394)
+- The first agent in countersigning is always the enzyme if enzymatic [\#1394](https://github.com/holochain/holochain/pull/1394)
+
+## [kitsune\_p2p\_timestamp-0.0.10](crates/kitsune_p2p_timestamp/CHANGELOG.md#0.0.10)
+
+## [holo\_hash-0.0.29](crates/holo_hash/CHANGELOG.md#0.0.29)
+
+## [kitsune\_p2p\_dht\_arc-0.0.12](crates/kitsune_p2p_dht_arc/CHANGELOG.md#0.0.12)
+
+## [fixt-0.0.13](crates/fixt/CHANGELOG.md#0.0.13)
+
+# 20220616.084359
+
+- Docs: Update OS support in repository README and link to developer environment setup.
+
+## [holochain\_cli-0.0.42](crates/holochain_cli/CHANGELOG.md#0.0.42)
+
+## [holochain\_cli\_sandbox-0.0.38](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.38)
+
+## [holochain\_cli\_bundle-0.0.38](crates/holochain_cli_bundle/CHANGELOG.md#0.0.38)
+
+## [holochain-0.0.144](crates/holochain/CHANGELOG.md#0.0.144)
+
+- Add functional stub for `x_salsa20_poly1305_shared_secret_create_random` [\#1410](https://github.com/holochain/holochain/pull/1410)
+- Add functional stub for `x_salsa20_poly1305_shared_secret_export` [\#1410](https://github.com/holochain/holochain/pull/1410)
+- Add functional stub for `x_salsa20_poly1305_shared_secret_ingest` [\#1410](https://github.com/holochain/holochain/pull/1410)
+- Limit conductor calls to `10_000_000_000` Wasm operations [\#1386](https://github.com/holochain/holochain/pull/1386)
+
+## [holochain\_test\_wasm\_common-0.0.38](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.38)
+
+## [holochain\_conductor\_api-0.0.44](crates/holochain_conductor_api/CHANGELOG.md#0.0.44)
+
+## [holochain\_wasm\_test\_utils-0.0.43](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.43)
+
+## [holochain\_cascade-0.0.44](crates/holochain_cascade/CHANGELOG.md#0.0.44)
+
+## [holochain\_state-0.0.44](crates/holochain_state/CHANGELOG.md#0.0.44)
+
+## [holochain\_p2p-0.0.42](crates/holochain_p2p/CHANGELOG.md#0.0.42)
+
+## [holochain\_types-0.0.42](crates/holochain_types/CHANGELOG.md#0.0.42)
+
+### Integrity / Coordinator Changes [\#1325](https://github.com/holochain/holochain/pull/1325)
+
+### Added
+
+- `GlobalZomeTypes` type that holds all a dna’s zome types.
+- `ToSqlStatement` trait for converting a type to a SQL statement.
+- `InlineZomeSet` for creating a set of integrity and coordinator inline zomes.
+- `DnaManifest` takes dependencies for coordinator zomes. These are the names of integrity zomes and must be within the same manifest.
+- `DnaManifest` verifies that all zome names are unique.
+- `DnaManifest` verifies that dependency names exists and are integrity zomes.
+- `DnaFile` can hot swap coordinator zomes. Existing zomes are replaced and new zome names are appended.
+
+### Changed
+
+- `DnaStore` is now a `RibosomeStore`.
+- `DnaManifest` now has an integrity key for all values that will change the dna hash.
+- `DnaManifest` now has an optional coordinator key for adding coordinators zomes on install.
+
+## [holochain\_keystore-0.0.42](crates/holochain_keystore/CHANGELOG.md#0.0.42)
+
+## [holochain\_sqlite-0.0.41](crates/holochain_sqlite/CHANGELOG.md#0.0.41)
+
+## [kitsune\_p2p-0.0.36](crates/kitsune_p2p/CHANGELOG.md#0.0.36)
+
+## [mr\_bundle-0.0.13](crates/mr_bundle/CHANGELOG.md#0.0.13)
+
+## [hdk-0.0.137](crates/hdk/CHANGELOG.md#0.0.137)
+
+- hdk: Use newest wasmer and introduces `wasm_error!` macro to capture line numbers for wasm errors [\#1380](https://github.com/holochain/holochain/pull/1380)
+- Docs: Restructure main page sections and add several intra-doc lnks [\#1418](https://github.com/holochain/holochain/pull/1418)
+- hdk: Add functional stub for `x_salsa20_poly1305_shared_secret_create_random` [\#1410](https://github.com/holochain/holochain/pull/1410)
+- hdk: Add functional stub for `x_salsa20_poly1305_shared_secret_export` [\#1410](https://github.com/holochain/holochain/pull/1410)
+- hdk: Add functional stub for `x_salsa20_poly1305_shared_secret_ingest` [\#1410](https://github.com/holochain/holochain/pull/1410)
+- Bump wasmer to 0.0.80 [\#1386](https://github.com/holochain/holochain/pull/1386)
+
+### Integrity / Coordinator Changes [\#1325](https://github.com/holochain/holochain/pull/1325)
+
+### Added
+
+- `get_links` and `get_link_details` take a `TryInto<LinkTypesRages>`. See the link test wasm for examples.
+
+### Removed
+
+- `entry_def_index` and `entry_type` macros are no longer needed.
+
+### Changed
+
+- `call` and `call_remote` now take an `Into<ZomeName>` instead of a `ZomeName`.
+- `create_link` takes a `TryInto<LinkType>` instead of an `Into<LinkType>`.
+- `update` takes `UpdateInput` instead of a `HeaderHash` and `CreateInput`.
+- `create_entry` takes a type that can try into an `EntryDefIndex` and `EntryVisibility` instead of implementing `EntryDefRegistration`.
+- `update_entry` takes the previous header hash and a try into `Entry` instead of a `EntryDefRegistration`.
+- `Path` now must be `typed(LinkType)` to use any functionality that creates or gets links.
+
+## [holochain\_zome\_types-0.0.36](crates/holochain_zome_types/CHANGELOG.md#0.0.36)
+
+- Bump wasmer to 0.0.80 [\#1386](https://github.com/holochain/holochain/pull/1386)
+
+### Integrity / Coordinator Changes [\#1325](https://github.com/holochain/holochain/pull/1325)
+
+### Added
+
+- `ZomeDef` now holds dependencies for the zome.
+- `EntryDefLocation` is either an `EntryDefIndex` or a `CapClaim` or a `CapGrant`.
+
+### Changed
+
+- Zomes are now generic over integrity and coordinator.
+
+- `ZomeDef` is now wrapped in either `IntegrityZomeDef` or `CoordinatorZomeDef`.
+
+- `GetLinksInput` takes a `LinkTypeRanges` for filtering on `LinkType`.
+
+- `CreateInput` takes an `EntryDefLocation` for and an `EntryVisibility` for the entry.
+
+- `UpdateInput` doesn’t take a `CreateInput` anymore.
+
+- `UpdateInput` takes an `Entry` and `ChainTopOrdering`.
+
+- `DnaDef` has split zomes into integrity and coordinator.
+
+- `DnaDef` coordinator zomes do not change the `DnaHash`.
+
+- Docs: Describe init callback and link to WASM examples [\#1418](https://github.com/holochain/holochain/pull/1418)
+
+## [holochain\_deterministic\_integrity-0.0.9](crates/holochain_deterministic_integrity/CHANGELOG.md#0.0.9)
+
+- Bump wasmer to 0.0.80 [\#1386](https://github.com/holochain/holochain/pull/1386)
+
+### Integrity / Coordinator Changes [\#1325](https://github.com/holochain/holochain/pull/1325)
+
+### Added
+
+- `EntryTypesHelper` helper trait for deserializing to the correct `Entry`.
+- `LinkTypesHelper` helper trait for creating `LinkTypeRanges` that fit the current local scope.
+
+### Removed
+
+- `register_entry!` macro as it is no longer needed. Use `hdk_derive::hdk_entry_defs`.
+
+## [hdk\_derive-0.0.36](crates/hdk_derive/CHANGELOG.md#0.0.36)
+
+## [holochain\_integrity\_types-0.0.8](crates/holochain_integrity_types/CHANGELOG.md#0.0.8)
+
+- KeyRef (opaque reference to a secretbox shared secret) is now an unsized byte slice [\#1410](https://github.com/holochain/holochain/pull/1410)
+
+### Integrity / Coordinator Changes [\#1325](https://github.com/holochain/holochain/pull/1325)
+
+### Added
+
+- `ZomeInfo` now contains the `ScopedZomeTypesSet`. This is all the zome types that are in scope for the calling zome.
+- `LinkTypeRanges` for are used querying of links.
+- `ScopedZomeTypesSet` and `ScopedZomeTypes` for scoping between local and global zome types.
+- `GlobalZomeTypeId` and `LocalZomeTypeId` for identifying zome types within different scopes.
+- `UnitEnum` trait for associating an enum with non-unit variants with an equivalent unit variants.
+- `EntryDefRegistration` for associating entry defs with entry types.
+
+### Removed
+
+- `EntryDefs::entry_def_index_from_id` is removed because it’s no longer possible to go from an `EntryDefId` to a `GlobalZomeTypeId` as `EntryDefId` is not globally unique.
+- `ZomeInfo::matches_entry_def_id` for the same reason as `EntryDefs::entry_def_index_from_id`
+- `require_validation_type` is removed because it is no longer used.
+- `ZomeId` from `CreateLink` as it’s no longer needed because `LinkType` is a `GlobalZomeTypeId`.
+- `ZomeId` from `AppEntryType` as it’s no longer needed because `EntryDefIndex` is a `GlobalZomeTypeId`
+
+### Changed
+
+- ZomeName is now a `Cow<'static, str>` instead of a `String`.
+
+## [holo\_hash-0.0.28](crates/holo_hash/CHANGELOG.md#0.0.28)
+
+## [fixt-0.0.12](crates/fixt/CHANGELOG.md#0.0.12)
+
+# 20220608.011447
+
+## [holochain\_cli-0.0.41](crates/holochain_cli/CHANGELOG.md#0.0.41)
+
+## [holochain\_cli\_sandbox-0.0.37](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.37)
+
+## [holochain\_cli\_bundle-0.0.37](crates/holochain_cli_bundle/CHANGELOG.md#0.0.37)
+
+## [holochain-0.0.143](crates/holochain/CHANGELOG.md#0.0.143)
+
+## [holochain\_test\_wasm\_common-0.0.37](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.37)
+
+## [holochain\_conductor\_api-0.0.43](crates/holochain_conductor_api/CHANGELOG.md#0.0.43)
+
+## [holochain\_wasm\_test\_utils-0.0.42](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.42)
+
+## [holochain\_cascade-0.0.43](crates/holochain_cascade/CHANGELOG.md#0.0.43)
+
+## [holochain\_state-0.0.43](crates/holochain_state/CHANGELOG.md#0.0.43)
+
+## [holochain\_p2p-0.0.41](crates/holochain_p2p/CHANGELOG.md#0.0.41)
+
+## [holochain\_types-0.0.41](crates/holochain_types/CHANGELOG.md#0.0.41)
+
+## [holochain\_keystore-0.0.41](crates/holochain_keystore/CHANGELOG.md#0.0.41)
+
+- Docs: Crate README generated from crate level doc comments [\#1392](https://github.com/holochain/holochain/pull/1392).
+
+## [hdk-0.0.136](crates/hdk/CHANGELOG.md#0.0.136)
+
+- Docs: Crate README generated from crate level doc comments [\#1392](https://github.com/holochain/holochain/pull/1392).
+
+# 20220601.012853
+
+## [holochain\_cli-0.0.40](crates/holochain_cli/CHANGELOG.md#0.0.40)
+
+## [holochain\_cli\_sandbox-0.0.36](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.36)
+
+## [holochain\_cli\_bundle-0.0.36](crates/holochain_cli_bundle/CHANGELOG.md#0.0.36)
+
+## [holochain-0.0.142](crates/holochain/CHANGELOG.md#0.0.142)
+
+## [holochain\_websocket-0.0.39](crates/holochain_websocket/CHANGELOG.md#0.0.39)
+
+## [holochain\_test\_wasm\_common-0.0.36](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.36)
+
+## [holochain\_conductor\_api-0.0.42](crates/holochain_conductor_api/CHANGELOG.md#0.0.42)
+
+## [holochain\_wasm\_test\_utils-0.0.41](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.41)
+
+## [holochain\_cascade-0.0.42](crates/holochain_cascade/CHANGELOG.md#0.0.42)
+
+## [holochain\_state-0.0.42](crates/holochain_state/CHANGELOG.md#0.0.42)
+
+## [holochain\_p2p-0.0.40](crates/holochain_p2p/CHANGELOG.md#0.0.40)
+
+## [holochain\_types-0.0.40](crates/holochain_types/CHANGELOG.md#0.0.40)
+
+## [holochain\_keystore-0.0.40](crates/holochain_keystore/CHANGELOG.md#0.0.40)
+
+## [holochain\_sqlite-0.0.40](crates/holochain_sqlite/CHANGELOG.md#0.0.40)
+
+## [kitsune\_p2p-0.0.35](crates/kitsune_p2p/CHANGELOG.md#0.0.35)
+
+## [hdk-0.0.135](crates/hdk/CHANGELOG.md#0.0.135)
+
+## [holochain\_zome\_types-0.0.35](crates/holochain_zome_types/CHANGELOG.md#0.0.35)
+
+## [holochain\_deterministic\_integrity-0.0.8](crates/holochain_deterministic_integrity/CHANGELOG.md#0.0.8)
+
+## [hdk\_derive-0.0.35](crates/hdk_derive/CHANGELOG.md#0.0.35)
+
+## [holochain\_integrity\_types-0.0.7](crates/holochain_integrity_types/CHANGELOG.md#0.0.7)
+
+## [holo\_hash-0.0.27](crates/holo_hash/CHANGELOG.md#0.0.27)
+
+# 20220525.012131
+
+## [holochain\_cli-0.0.39](crates/holochain_cli/CHANGELOG.md#0.0.39)
+
+## [holochain\_cli\_sandbox-0.0.35](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.35)
+
+## [holochain\_cli\_bundle-0.0.35](crates/holochain_cli_bundle/CHANGELOG.md#0.0.35)
+
+## [holochain-0.0.141](crates/holochain/CHANGELOG.md#0.0.141)
+
+## [holochain\_test\_wasm\_common-0.0.35](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.35)
+
+## [holochain\_conductor\_api-0.0.41](crates/holochain_conductor_api/CHANGELOG.md#0.0.41)
+
+- Docs: Unify and clean up docs for admin and app interface and conductor config. [\#1391](https://github.com/holochain/holochain/pull/1391)
+
+## [holochain\_wasm\_test\_utils-0.0.40](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.40)
+
+## [holochain\_cascade-0.0.41](crates/holochain_cascade/CHANGELOG.md#0.0.41)
+
+## [holochain\_state-0.0.41](crates/holochain_state/CHANGELOG.md#0.0.41)
+
+## [holochain\_p2p-0.0.39](crates/holochain_p2p/CHANGELOG.md#0.0.39)
+
+## [holochain\_types-0.0.39](crates/holochain_types/CHANGELOG.md#0.0.39)
+
+## [holochain\_keystore-0.0.39](crates/holochain_keystore/CHANGELOG.md#0.0.39)
+
+## [holochain\_sqlite-0.0.39](crates/holochain_sqlite/CHANGELOG.md#0.0.39)
+
+## [kitsune\_p2p-0.0.34](crates/kitsune_p2p/CHANGELOG.md#0.0.34)
+
+## [mr\_bundle-0.0.12](crates/mr_bundle/CHANGELOG.md#0.0.12)
+
+## [hdk-0.0.134](crates/hdk/CHANGELOG.md#0.0.134)
+
+## [holochain\_zome\_types-0.0.34](crates/holochain_zome_types/CHANGELOG.md#0.0.34)
+
+## [holochain\_deterministic\_integrity-0.0.7](crates/holochain_deterministic_integrity/CHANGELOG.md#0.0.7)
+
+- Fix broken wasm tracing. [PR](https://github.com/holochain/holochain/pull/1389).
+
+## [hdk\_derive-0.0.34](crates/hdk_derive/CHANGELOG.md#0.0.34)
+
+## [holochain\_integrity\_types-0.0.6](crates/holochain_integrity_types/CHANGELOG.md#0.0.6)
+
+## [holo\_hash-0.0.26](crates/holo_hash/CHANGELOG.md#0.0.26)
+
 # 20220518.010753
 
 ## [holochain\_cli-0.0.38](crates/holochain_cli/CHANGELOG.md#0.0.38)

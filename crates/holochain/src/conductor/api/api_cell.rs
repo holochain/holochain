@@ -7,6 +7,7 @@ use super::error::ConductorApiResult;
 use crate::conductor::interface::SignalBroadcaster;
 use crate::conductor::ConductorHandle;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitArgs;
+use crate::core::ribosome::real_ribosome::RealRibosome;
 use crate::core::workflow::ZomeCallResult;
 use async_trait::async_trait;
 use holo_hash::DnaHash;
@@ -25,8 +26,8 @@ pub struct CellConductorApi {
     cell_id: CellId,
 }
 
-/// A handle that can only call zome functions to avoid
-/// making write lock calls
+/// A minimal set of functionality needed from the conductor by
+/// host functions.
 pub type CellConductorReadHandle = Arc<dyn CellConductorReadHandleT>;
 
 impl CellConductorApi {
@@ -87,6 +88,12 @@ impl CellConductorApiT for CellConductorApi {
             .ok_or_else(|| ConductorApiError::DnaMissing(self.cell_id.dna_hash().clone()))
     }
 
+    fn get_this_ribosome(&self) -> ConductorApiResult<RealRibosome> {
+        Ok(self
+            .conductor_handle
+            .get_ribosome(self.cell_id.dna_hash())?)
+    }
+
     fn get_zome(&self, dna_hash: &DnaHash, zome_name: &ZomeName) -> ConductorApiResult<Zome> {
         Ok(self
             .get_dna(dna_hash)
@@ -134,11 +141,14 @@ pub trait CellConductorApiT: Send + Sync + Sized {
     /// attached app interface
     async fn signal_broadcaster(&self) -> SignalBroadcaster;
 
-    /// Get a [`Dna`](holochain_types::prelude::Dna) from the [`DnaStore`](crate::conductor::dna_store::DnaStore)
+    /// Get a [`Dna`](holochain_types::prelude::Dna) from the [`RibosomeStore`](crate::conductor::ribosome_store::RibosomeStore)
     fn get_dna(&self, dna_hash: &DnaHash) -> Option<DnaFile>;
 
-    /// Get the [`Dna`](holochain_types::prelude::Dna) of this cell from the [`DnaStore`](crate::conductor::dna_store::DnaStore)
+    /// Get the [`Dna`](holochain_types::prelude::Dna) of this cell from the [`RibosomeStore`](crate::conductor::ribosome_store::RibosomeStore)
     fn get_this_dna(&self) -> ConductorApiResult<DnaFile>;
+
+    /// Get the [`RealRibosome`] of this cell from the [`RibosomeStore`](crate::conductor::ribosome_store::RibosomeStore)
+    fn get_this_ribosome(&self) -> ConductorApiResult<RealRibosome>;
 
     /// Get a [`Zome`](holochain_types::prelude::Zome) from this cell's Dna
     fn get_zome(&self, dna_hash: &DnaHash, zome_name: &ZomeName) -> ConductorApiResult<Zome>;
@@ -154,8 +164,8 @@ pub trait CellConductorApiT: Send + Sync + Sized {
 }
 
 #[async_trait]
-/// A handle that cn only call zome functions to avoid
-/// making write lock calls
+/// A minimal set of functionality needed from the conductor by
+/// host functions.
 pub trait CellConductorReadHandleT: Send + Sync {
     /// Get this cell id
     fn cell_id(&self) -> &CellId;
@@ -169,6 +179,9 @@ pub trait CellConductorReadHandleT: Send + Sync {
 
     /// Get a zome from this cell's Dna
     fn get_zome(&self, dna_hash: &DnaHash, zome_name: &ZomeName) -> ConductorApiResult<Zome>;
+
+    /// Get a [`EntryDef`](holochain_zome_types::EntryDef) from the [`EntryDefBufferKey`](holochain_types::dna::EntryDefBufferKey)
+    fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef>;
 }
 
 #[async_trait]
@@ -193,5 +206,9 @@ impl CellConductorReadHandleT for CellConductorApi {
 
     fn get_zome(&self, dna_hash: &DnaHash, zome_name: &ZomeName) -> ConductorApiResult<Zome> {
         CellConductorApiT::get_zome(self, dna_hash, zome_name)
+    }
+
+    fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef> {
+        CellConductorApiT::get_entry_def(self, key)
     }
 }

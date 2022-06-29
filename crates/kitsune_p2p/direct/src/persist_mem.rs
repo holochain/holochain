@@ -388,7 +388,7 @@ impl AsKdPersist for PersistMem {
         root: KdHash,
         dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
     ) -> BoxFuture<'static, KdResult<kitsune_p2p_types::dht::PeerView>> {
-        let topo = Topology::standard_epoch();
+        let topo = Topology::standard_epoch_full();
         let store = self.0.share_mut(move |i, _| match i.agent_info.get(&root) {
             Some(store) => Ok(store.clone()),
             None => Err("root not found".into()),

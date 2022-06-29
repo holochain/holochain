@@ -4,6 +4,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.0.43
+
+## 0.0.42
+
+### Integrity / Coordinator Changes [\#1325](https://github.com/holochain/holochain/pull/1325)
+
+### Added
+
+- `GlobalZomeTypes` type that holds all a dna’s zome types.
+- `ToSqlStatement` trait for converting a type to a SQL statement.
+- `InlineZomeSet` for creating a set of integrity and coordinator inline zomes.
+- `DnaManifest` takes dependencies for coordinator zomes. These are the names of integrity zomes and must be within the same manifest.
+- `DnaManifest` verifies that all zome names are unique.
+- `DnaManifest` verifies that dependency names exists and are integrity zomes.
+- `DnaFile` can hot swap coordinator zomes. Existing zomes are replaced and new zome names are appended.
+
+### Changed
+
+- `RibosomeStore` is now a `RibosomeStore`.
+- `DnaManifest` now has an integrity key for all values that will change the dna hash.
+- `DnaManifest` now has an optional coordinator key for adding coordinators zomes on install.
+
+## 0.0.41
+
+## 0.0.40
+
+## 0.0.39
+
 ## 0.0.38
 
 ## 0.0.37

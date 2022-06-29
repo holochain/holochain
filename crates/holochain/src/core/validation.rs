@@ -37,11 +37,11 @@ macro_rules! from_sub_error {
 pub enum DhtOpOrder {
     RegisterAgentActivity(holochain_zome_types::timestamp::Timestamp),
     StoreEntry(holochain_zome_types::timestamp::Timestamp),
-    StoreElement(holochain_zome_types::timestamp::Timestamp),
+    StoreRecord(holochain_zome_types::timestamp::Timestamp),
     RegisterUpdatedContent(holochain_zome_types::timestamp::Timestamp),
-    RegisterUpdatedElement(holochain_zome_types::timestamp::Timestamp),
+    RegisterUpdatedRecord(holochain_zome_types::timestamp::Timestamp),
     RegisterDeletedBy(holochain_zome_types::timestamp::Timestamp),
-    RegisterDeletedEntryHeader(holochain_zome_types::timestamp::Timestamp),
+    RegisterDeletedEntryAction(holochain_zome_types::timestamp::Timestamp),
     RegisterAddLink(holochain_zome_types::timestamp::Timestamp),
     RegisterRemoveLink(holochain_zome_types::timestamp::Timestamp),
 }
@@ -79,13 +79,13 @@ impl From<&DhtOp> for DhtOpOrder {
     fn from(op: &DhtOp) -> Self {
         use DhtOpOrder::*;
         match op {
-            DhtOp::StoreElement(_, h, _) => StoreElement(h.timestamp()),
+            DhtOp::StoreRecord(_, h, _) => StoreRecord(h.timestamp()),
             DhtOp::StoreEntry(_, h, _) => StoreEntry(h.timestamp()),
             DhtOp::RegisterAgentActivity(_, h) => RegisterAgentActivity(h.timestamp()),
             DhtOp::RegisterUpdatedContent(_, h, _) => RegisterUpdatedContent(h.timestamp),
-            DhtOp::RegisterUpdatedElement(_, h, _) => RegisterUpdatedElement(h.timestamp),
+            DhtOp::RegisterUpdatedRecord(_, h, _) => RegisterUpdatedRecord(h.timestamp),
             DhtOp::RegisterDeletedBy(_, h) => RegisterDeletedBy(h.timestamp),
-            DhtOp::RegisterDeletedEntryHeader(_, h) => RegisterDeletedEntryHeader(h.timestamp),
+            DhtOp::RegisterDeletedEntryAction(_, h) => RegisterDeletedEntryAction(h.timestamp),
             DhtOp::RegisterAddLink(_, h) => RegisterAddLink(h.timestamp),
             DhtOp::RegisterRemoveLink(_, h) => RegisterRemoveLink(h.timestamp),
         }

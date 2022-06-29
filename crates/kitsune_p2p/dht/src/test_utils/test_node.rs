@@ -171,7 +171,7 @@ mod tests {
 
     #[test]
     fn integrate_and_query_ops_standard_topo() {
-        let topo = Topology::standard_epoch();
+        let topo = Topology::standard_epoch_full();
         let gopa = GossipParams::zero();
         let arq = Arq::new(8, 0u32.into(), 4.into());
         let (mut node, _) = TestNode::new_single(topo.clone(), gopa, arq);

@@ -14,7 +14,7 @@ use holochain_p2p::HolochainP2pDna;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_types::prelude::*;
-use holochain_zome_types::header::builder;
+use holochain_zome_types::action::builder;
 use tracing::*;
 
 #[derive(Constructor)]
@@ -48,6 +48,7 @@ where
     Ribosome: RibosomeT + Clone + 'static,
 {
     let conductor_handle = args.conductor_handle.clone();
+    let coordinators = args.ribosome.dna_def().get_all_coordinators();
     let result =
         initialize_zomes_workflow_inner(workspace.clone(), network.clone(), keystore.clone(), args)
             .await?;
@@ -56,15 +57,17 @@ where
 
     // only commit if the result was successful
     if result == InitResult::Pass {
-        let flushed_headers = HostFnWorkspace::from(workspace.clone())
+        let flushed_actions = HostFnWorkspace::from(workspace.clone())
             .flush(&network)
             .await?;
+
         send_post_commit(
             conductor_handle,
             workspace,
             network,
             keystore,
-            flushed_headers,
+            flushed_actions,
+            coordinators,
         )
         .await?;
     }
@@ -109,7 +112,6 @@ where
     tokio::task::spawn(async move {
         ws.source_chain()
             .put(
-                None,
                 builder::InitZomesComplete {},
                 None,
                 ChainTopOrdering::Strict,
@@ -147,7 +149,7 @@ pub mod tests {
     use holochain_types::prelude::DnaDefHashed;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::fake_agent_pubkey_1;
-    use holochain_zome_types::Header;
+    use holochain_zome_types::Action;
     use matches::assert_matches;
 
     async fn get_chain(cell: &SweetCell, keystore: MetaLairClient) -> SourceChain {
@@ -220,15 +222,15 @@ pub mod tests {
         // Check init is added to the workspace
         let scratch = workspace.source_chain().snapshot().unwrap();
         assert_matches!(
-            scratch.headers().next().unwrap().header(),
-            Header::InitZomesComplete(_)
+            scratch.actions().next().unwrap().action(),
+            Action::InitZomesComplete(_)
         );
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn commit_during_init() {
         // SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create, TestWasm::InitFail])
-        let (dna, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create])
+        let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create])
             .await
             .unwrap();
         let mut conductor = SweetConductor::from_standard_config().await;
@@ -248,20 +250,20 @@ pub mod tests {
             3
         );
 
-        let _: HeaderHash = conductor.call(&zome, "create_entry", ()).await;
+        let _: ActionHash = conductor.call(&zome, "create_entry", ()).await;
 
         let source_chain = get_chain(&cell, keystore.clone()).await;
-        // - Ensure that the InitZomesComplete element got committed after the
-        //   element committed during init()
+        // - Ensure that the InitZomesComplete record got committed after the
+        //   record committed during init()
         assert_matches!(
-            source_chain.query(Default::default()).await.unwrap()[4].header(),
-            Header::InitZomesComplete(_)
+            source_chain.query(Default::default()).await.unwrap()[4].action(),
+            Action::InitZomesComplete(_)
         );
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn commit_during_init_one_zome_passes_one_fails() {
-        let (dna, _) =
+        let (dna, _, _) =
             SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create, TestWasm::InitFail])
                 .await
                 .unwrap();
@@ -274,13 +276,13 @@ pub mod tests {
         assert_eq!(get_chain(&cell, keystore.clone()).await.len().unwrap(), 3);
 
         // - Ensure that the chain does not advance due to init failing
-        let r: Result<HeaderHash, _> = conductor.call_fallible(&zome, "create_entry", ()).await;
+        let r: Result<ActionHash, _> = conductor.call_fallible(&zome, "create_entry", ()).await;
         assert!(r.is_err());
         let source_chain = get_chain(&cell, keystore.clone());
         assert_eq!(source_chain.await.len().unwrap(), 3);
 
         // - Ensure idempotence of the above
-        let r: Result<HeaderHash, _> = conductor.call_fallible(&zome, "create_entry", ()).await;
+        let r: Result<ActionHash, _> = conductor.call_fallible(&zome, "create_entry", ()).await;
         assert!(r.is_err());
         let source_chain = get_chain(&cell, keystore.clone());
         assert_eq!(source_chain.await.len().unwrap(), 3);
@@ -288,9 +290,10 @@ pub mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn commit_during_init_one_zome_unimplemented_one_fails() {
-        let zome_fail = InlineZome::new_unique(vec![]).callback("init", |api, _: ()| {
+        let zome_fail = SweetEasyInline::new(vec![], 0).callback("init", |api, _: ()| {
             api.create(CreateInput::new(
-                EntryDefId::CapGrant,
+                EntryDefLocation::CapGrant,
+                EntryVisibility::Private,
                 Entry::CapGrant(CapGrantEntry {
                     tag: "".into(),
                     access: ().into(),
@@ -300,31 +303,27 @@ pub mod tests {
             ))?;
             Ok(InitCallbackResult::Fail("reason".into()))
         });
-        let zome_no_init = crate::conductor::conductor::tests::simple_create_entry_zome();
+        let zomes =
+            crate::conductor::conductor::tests::simple_create_entry_zome().merge(zome_fail.0);
 
-        let (dna, _) = SweetDnaFile::unique_from_inline_zomes(vec![
-            ("no-init", zome_no_init),
-            ("fail", zome_fail),
-        ])
-        .await
-        .unwrap();
+        let (dna, _, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await.unwrap();
 
         let mut conductor = SweetConductor::from_standard_config().await;
         let keystore = conductor.keystore();
         let app = conductor.setup_app("app", &[dna]).await.unwrap();
         let (cell,) = app.into_tuple();
-        let zome = cell.zome("no-init");
+        let zome = cell.zome("create_entry");
 
         assert_eq!(get_chain(&cell, keystore.clone()).await.len().unwrap(), 3);
 
         // - Ensure that the chain does not advance due to init failing
-        let r: Result<HeaderHash, _> = conductor.call_fallible(&zome, "create_entry", ()).await;
+        let r: Result<ActionHash, _> = conductor.call_fallible(&zome, "create_entry", ()).await;
         assert!(r.is_err());
         let source_chain = get_chain(&cell, keystore.clone());
         assert_eq!(source_chain.await.len().unwrap(), 3);
 
         // - Ensure idempotence of the above
-        let r: Result<HeaderHash, _> = conductor.call_fallible(&zome, "create_entry", ()).await;
+        let r: Result<ActionHash, _> = conductor.call_fallible(&zome, "create_entry", ()).await;
         assert!(r.is_err());
         let source_chain = get_chain(&cell, keystore.clone());
         assert_eq!(source_chain.await.len().unwrap(), 3);

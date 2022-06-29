@@ -1,17 +1,24 @@
 [package]
 name = "test_wasm_entry_defs"
 version = "0.0.1"
-authors = [ "thedavidmeister", "thedavidmeister@gmail.com" ]
+authors = ["thedavidmeister", "thedavidmeister@gmail.com"]
 edition = "2021"
 
 [lib]
 name = "test_wasm_entry_defs"
-crate-type = [ "cdylib", "rlib" ]
+crate-type = ["cdylib", "rlib"]
+
+[[example]]
+name = "integrity_test_wasm_entry_defs"
+path = "src/integrity.rs"
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 serde = "1.0"
-hdk = { path = "../../../../hdk" }
+hdk = { path = "../../../../hdk", optional = true }
+holochain_deterministic_integrity = { path = "../../../../holochain_deterministic_integrity" }
 
 [features]
-default = []
+default = ["hdk"]
+integrity = []
 mock = ["hdk/mock"]

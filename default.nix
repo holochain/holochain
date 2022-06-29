@@ -46,7 +46,27 @@ let
         fi
       '';
 
+      rustPlatform = self.makeRustPlatform {
+        rustc = holonix.pkgs.custom_rustc;
+        cargo = holonix.pkgs.custom_rustc;
+      };
+
       crate2nix = import sources.crate2nix.outPath { };
+
+      cargo-nextest = self.rustPlatform.buildRustPackage {
+        name = "cargo-nextest";
+
+        src = sources.nextest.outPath;
+        cargoSha256 = "sha256-E25P/vasIBQp4m3zGii7ZotzJ7b2kT6ma9glvmQXcnM=";
+
+        cargoTestFlags = [
+          # TODO: investigate some more why these tests fail in nix
+          "--"
+          "--skip=tests_integration::test_relocated_run"
+          "--skip=tests_integration::test_run"
+          "--skip=tests_integration::test_run_after_build"
+        ];
+      };
     })
 
   ];

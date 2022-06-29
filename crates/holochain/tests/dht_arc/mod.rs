@@ -39,7 +39,7 @@ async fn test_arc_redundancy() {
                 let p = peers.clone();
                 let mut arc = peers.get_mut(i).unwrap();
                 let view =
-                    PeerStrat::default().view(Topology::standard_epoch(), *arc, p.as_slice());
+                    PeerStrat::default().view(Topology::standard_epoch_full(), *arc, p.as_slice());
                 view.update_arc(&mut arc);
             }
 
@@ -89,8 +89,11 @@ async fn test_join_leave() {
         for i in 0..peers.len() {
             let p = peers.clone();
             let mut arc = peers.get_mut(i).unwrap();
-            let view =
-                PeerStrat::default().view(Topology::standard_epoch(), arc.clone(), p.as_slice());
+            let view = PeerStrat::default().view(
+                Topology::standard_epoch_full(),
+                arc.clone(),
+                p.as_slice(),
+            );
             view.update_arc(&mut arc);
         }
     };

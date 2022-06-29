@@ -222,10 +222,10 @@ async fn publish_loop() {
         .tempdir()
         .unwrap();
     let db = DbWrite::test(tmpdir.path(), kind).expect("Couldn't create test database");
-    let header = Header::arbitrary(&mut u).unwrap();
-    let author = header.author().clone();
+    let action = Action::arbitrary(&mut u).unwrap();
+    let author = action.author().clone();
     let signature = Signature::arbitrary(&mut u).unwrap();
-    let op = DhtOp::RegisterAgentActivity(signature, header);
+    let op = DhtOp::RegisterAgentActivity(signature, action);
     let op = DhtOpHashed::from_content_sync(op);
     let op_hash = op.to_hash();
     db.conn()

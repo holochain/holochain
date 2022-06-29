@@ -75,7 +75,7 @@ macro_rules! meta_mock {
         holochain_state::metadata::MockMetadataBuf::new()
     }};
     ($fun:ident) => {{
-        let d: Vec<holochain_types::metadata::TimedHeaderHash> = Vec::new();
+        let d: Vec<holochain_types::metadata::TimedActionHash> = Vec::new();
         meta_mock!($fun, d)
     }};
     ($fun:ident, $data:expr) => {{
@@ -86,7 +86,7 @@ macro_rules! meta_mock {
                     $data
                         .clone()
                         .into_iter()
-                        .map(holochain_types::metadata::TimedHeaderHash::from)
+                        .map(holochain_types::metadata::TimedActionHash::from)
                         .map(Ok),
                 )))
             }
@@ -102,7 +102,7 @@ macro_rules! meta_mock {
                         $data
                             .clone()
                             .into_iter()
-                            .map(holochain_types::metadata::TimedHeaderHash::from)
+                            .map(holochain_types::metadata::TimedActionHash::from)
                             .map(Ok),
                     )))
                 } else {
@@ -110,7 +110,7 @@ macro_rules! meta_mock {
                     data.clear();
                     Ok(Box::new(fallible_iterator::convert(
                         data.into_iter()
-                            .map(holochain_types::metadata::TimedHeaderHash::from)
+                            .map(holochain_types::metadata::TimedActionHash::from)
                             .map(Ok),
                     )))
                 }
@@ -202,7 +202,9 @@ where
     let mut tuning =
         kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
     tuning.tx2_implicit_timeout_ms = 500;
-    config.tuning_params = std::sync::Arc::new(tuning);
+    let tuning = std::sync::Arc::new(tuning);
+    let cutoff = tuning.danger_gossip_recent_threshold();
+    config.tuning_params = tuning;
 
     let (network, mut recv) = spawn_holochain_p2p(
         config,
@@ -237,11 +239,12 @@ where
                 }
                 QueryPeerDensity { respond, .. } => {
                     respond.r(Ok(async move {
-                        Ok(
-                            PeerViewQ::new(Topology::standard_epoch(), ArqStrat::default(), vec![])
-                                .into(),
+                        Ok(PeerViewQ::new(
+                            Topology::standard_epoch(cutoff),
+                            ArqStrat::default(),
+                            vec![],
                         )
-                        .into()
+                        .into())
                     }
                     .boxed()
                     .into()));
@@ -533,13 +536,13 @@ fn get_published_ops<Db: ReadAccess<DbKindAuthored>>(
         txn.prepare(
             "
             SELECT
-            DhtOp.type, Header.hash, Header.blob
+            DhtOp.type, Action.hash, Action.blob
             FROM DhtOp
             JOIN
-            Header ON DhtOp.header_hash = Header.hash
+            Action ON DhtOp.action_hash = Action.hash
             WHERE
-            Header.author = :author
-            AND (DhtOp.type != :store_entry OR Header.private_entry = 0)
+            Action.author = :author
+            AND (DhtOp.type != :store_entry OR Action.private_entry = 0)
         ",
         )
         .unwrap()
@@ -550,9 +553,9 @@ fn get_published_ops<Db: ReadAccess<DbKindAuthored>>(
             },
             |row| {
                 let op_type: DhtOpType = row.get("type")?;
-                let hash: HeaderHash = row.get("hash")?;
-                let header: SignedHeader = from_blob(row.get("blob")?)?;
-                Ok(DhtOpLight::from_type(op_type, hash, &header.0)?)
+                let hash: ActionHash = row.get("hash")?;
+                let action: SignedAction = from_blob(row.get("blob")?)?;
+                Ok(DhtOpLight::from_type(op_type, hash, &action.0)?)
             },
         )
         .unwrap()
@@ -669,18 +672,18 @@ pub async fn wait_for_integration_with_others<Db: ReadAccess<DbKindDht>>(
 pub fn show_authored<Db: ReadAccess<DbKindAuthored>>(envs: &[&Db]) {
     for (i, &db) in envs.iter().enumerate() {
         fresh_reader_test(db.clone(), |txn| {
-            txn.prepare("SELECT DISTINCT Header.seq, Header.type, Header.entry_hash FROM Header JOIN DhtOp ON Header.hash = DhtOp.hash")
+            txn.prepare("SELECT DISTINCT Action.seq, Action.type, Action.entry_hash FROM Action JOIN DhtOp ON Action.hash = DhtOp.hash")
             .unwrap()
             .query_map([], |row| {
-                let header_type: String = row.get("type")?;
+                let action_type: String = row.get("type")?;
                 let seq: u32 = row.get("seq")?;
                 let entry: Option<EntryHash> = row.get("entry_hash")?;
-                Ok((header_type, seq, entry))
+                Ok((action_type, seq, entry))
             })
             .unwrap()
             .for_each(|r|{
-                let (header_type, seq, entry) = r.unwrap();
-                tracing::debug!(chain = %i, %seq, ?header_type, ?entry);
+                let (action_type, seq, entry) = r.unwrap();
+                tracing::debug!(chain = %i, %seq, ?action_type, ?entry);
             });
         });
     }

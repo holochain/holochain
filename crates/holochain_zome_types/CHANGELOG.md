@@ -4,6 +4,43 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased](https://github.com/holochain/holochain/holochain_zome_types-v0.0.2-alpha.1...HEAD)
 
+## 0.0.37
+
+## 0.0.36
+
+- Bump wasmer to 0.0.80 [\#1386](https://github.com/holochain/holochain/pull/1386)
+
+### Integrity / Coordinator Changes [\#1325](https://github.com/holochain/holochain/pull/1325)
+
+### Added
+
+- `ZomeDef` now holds dependencies for the zome.
+- `EntryDefLocation` is either an `EntryDefIndex` or a `CapClaim` or a `CapGrant`.
+
+### Changed
+
+- Zomes are now generic over integrity and coordinator.
+
+- `ZomeDef` is now wrapped in either `IntegrityZomeDef` or `CoordinatorZomeDef`.
+
+- `GetLinksInput` takes a `LinkTypeRanges` for filtering on `LinkType`.
+
+- `CreateInput` takes an `EntryDefLocation` for and an `EntryVisibility` for the entry.
+
+- `UpdateInput` doesn’t take a `CreateInput` anymore.
+
+- `UpdateInput` takes an `Entry` and `ChainTopOrdering`.
+
+- `DnaDef` has split zomes into integrity and coordinator.
+
+- `DnaDef` coordinator zomes do not change the `DnaHash`.
+
+- Docs: Describe init callback and link to WASM examples [\#1418](https://github.com/holochain/holochain/pull/1418)
+
+## 0.0.35
+
+## 0.0.34
+
 ## 0.0.33
 
 ## 0.0.32

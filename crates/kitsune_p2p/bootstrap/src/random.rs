@@ -8,7 +8,6 @@ pub(crate) fn random(
     store: Store,
 ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
     warp::post()
-        .and(warp::header::exact("content-type", "application/octet"))
         .and(warp::header::exact("X-Op", "random"))
         .and(warp::body::content_length_limit(SIZE_LIMIT))
         .and(warp::body::bytes())

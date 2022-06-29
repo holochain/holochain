@@ -94,45 +94,42 @@ impl ShardedGossipLocal {
         state: RoundState,
         region_set: RegionSetLtcs,
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
-        Ok(
-            if let Some(sent) = state.region_set_sent.as_ref().map(|r| (**r).clone()) {
-                // because of the order of arguments, the diff regions will contain the data
-                // from *our* side, not our partner's.
-                let diff_regions = sent
-                    .diff((region_set).clone())
-                    .map_err(KitsuneError::other)?;
+        if let Some(sent) = state.region_set_sent.as_ref().map(|r| (**r).clone()) {
+            // because of the order of arguments, the diff regions will contain the data
+            // from *our* side, not our partner's.
+            let diff_regions = sent
+                .diff((region_set).clone())
+                .map_err(KitsuneError::other)?;
 
-                // This is a good place to see all the region data go by.
-                // Note, this is a LOT of output!
-                // tracing::info!("region diffs ({}): {:?}", diff_regions.len(), diff_regions);
+            // This is a good place to see all the region data go by.
+            // Note, this is a LOT of output!
+            // tracing::info!("region diffs ({}): {:?}", diff_regions.len(), diff_regions);
 
-                // subdivide any regions which are too large to fit in a batch.
-                // TODO: PERF: this does a DB query per region, and potentially many more for large
-                // regions which need to be split many times. Check to make sure this
-                // doesn't become a hotspot.
-                let limited_regions = self
-                    .host_api
-                    .query_size_limited_regions(
-                        self.space.clone(),
-                        self.tuning_params.gossip_max_batch_size,
-                        diff_regions,
-                    )
-                    .await
-                    .map_err(KitsuneError::other)?;
+            // subdivide any regions which are too large to fit in a batch.
+            // TODO: PERF: this does a DB query per region, and potentially many more for large
+            // regions which need to be split many times. Check to make sure this
+            // doesn't become a hotspot.
+            let limited_regions = self
+                .host_api
+                .query_size_limited_regions(
+                    self.space.clone(),
+                    self.tuning_params.gossip_max_batch_size,
+                    diff_regions,
+                )
+                .await
+                .map_err(KitsuneError::other)?;
 
-                state.ops_batch_queue.0.share_mut(|queue, _| {
-                    for region in limited_regions {
-                        queue.region_queue.push_back(region)
-                    }
-                    Ok(())
-                })?;
+            state.ops_batch_queue.0.share_mut(|queue, _| {
+                for region in limited_regions {
+                    queue.region_queue.push_back(region)
+                }
+                Ok(())
+            })?;
 
-                self.process_next_region_batch(state).await?
-            } else {
-                tracing::error!("We received OpRegions gossip without sending any ourselves");
-                vec![]
-            },
-        )
+            self.process_next_region_batch(state).await
+        } else {
+            Err(KitsuneError::other("We received OpRegions gossip without sending any ourselves. This can only happen if Recent gossip somehow sends an OpRegions message."))
+        }
     }
 
     pub(super) async fn process_next_region_batch(

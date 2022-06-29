@@ -166,7 +166,7 @@ macro_rules! fixturator {
                 curve Unpredictable {
                     let mut index = get_fixt_index!();
                     let mut rng = $crate::rng();
-                    let len = rng.gen_range($min, $max);
+                    let len = rng.gen_range($min..$max);
                     let mut fixturator = [<$type:camel Fixturator>]::new_indexed($crate::prelude::Unpredictable, index);
                     let mut v = vec![];
                     for _ in 0..len {
@@ -627,7 +627,7 @@ macro_rules! newtype_fixturator {
             $outer(vec![]),
             {
                 let mut rng = $crate::rng();
-                let vec_len = rng.gen_range(0, 5);
+                let vec_len = rng.gen_range(0..5);
                 let mut ret = vec![];
                 let mut inner_fixturator =
                     $crate::prelude::paste! { [<$inner:camel Fixturator>]::new_indexed($crate::prelude::Unpredictable, get_fixt_index!()) };
@@ -639,7 +639,7 @@ macro_rules! newtype_fixturator {
             },
             {
                 let mut rng = $crate::rng();
-                let vec_len = rng.gen_range(0, 5);
+                let vec_len = rng.gen_range(0..5);
                 let mut ret = vec![];
                 let mut inner_fixturator =
                     $crate::prelude::paste! { [<$inner:camel Fixturator>]::new_indexed($crate::prelude::Predictable, get_fixt_index!()) };
@@ -839,7 +839,7 @@ mod tests {
             match empty_fixturator.next().unwrap() {
                 VariantFoo::A(s) => assert_eq!(s, ""),
                 VariantFoo::B(n) => assert_eq!(n, 0),
-                VariantFoo::C(b) => assert_eq!(b, false),
+                VariantFoo::C(b) => assert!(!b),
             }
         }
     }

@@ -28,8 +28,8 @@ use std::path::Path;
 /// All the config information for the conductor
 #[derive(Clone, Deserialize, Serialize, Default, Debug, PartialEq)]
 pub struct ConductorConfig {
-    /// The path to the database for this conductor.
-    /// If omitted, chooses a default path.
+    /// The path to the database for this conductor;
+    /// if omitted, chooses a default path.
     pub environment_path: DatabaseRootPath,
 
     /// Define how Holochain conductor will connect to a keystore.
@@ -37,31 +37,33 @@ pub struct ConductorConfig {
     pub keystore: KeystoreConfig,
 
     /// Optional DPKI configuration if conductor is using a DPKI app to initalize and manage
-    /// keys for new instances
+    /// keys for new instances.
     pub dpki: Option<DpkiConfig>,
 
-    /// Setup admin interfaces to control this conductor through a websocket connection
+    /// Setup admin interfaces to control this conductor through a websocket connection.
     pub admin_interfaces: Option<Vec<AdminInterfaceConfig>>,
 
-    /// Config options for the network module. Optional.
+    /// Optional config for the network module.
     pub network: Option<holochain_p2p::kitsune_p2p::KitsuneP2pConfig>,
 
     #[serde(default)]
     /// Override the default database synchronous strategy.
-    /// See [sqlite documentation](https://www.sqlite.org/pragma.html#pragma_synchronous)
-    /// for information about database sync levels.
+    ///
+    /// See [sqlite documentation] for information about database sync levels.
     /// See [`DbSyncStrategy`] for details.
     /// This is best left at its default value unless you know what you
     /// are doing.
+    ///
+    /// [sqlite documentation]: https://www.sqlite.org/pragma.html#pragma_synchronous
     pub db_sync_strategy: DbSyncStrategy,
     //
     //
-    // /// Which signals to emit
+    // Which signals to emit
     // TODO: it's an open question whether signal config is stateful or not, i.e. whether it belongs here.
     // pub signals: SignalConfig,
 }
 
-/// helper fnction function to load a `Config` from a yaml string.
+/// Helper function to load a config from a YAML string.
 fn config_from_yaml<T>(yaml: &str) -> ConductorConfigResult<T>
 where
     T: DeserializeOwned,
@@ -70,7 +72,7 @@ where
 }
 
 impl ConductorConfig {
-    /// create a ConductorConfig struct from a yaml file path
+    /// Create a conductor config from a YAML file path.
     pub fn load_yaml(path: &Path) -> ConductorConfigResult<ConductorConfig> {
         let config_yaml = std::fs::read_to_string(path).map_err(|err| match err {
             e @ std::io::Error { .. } if e.kind() == std::io::ErrorKind::NotFound => {

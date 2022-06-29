@@ -46,8 +46,8 @@ fn prompt_dna_init(root_dir: PathBuf) -> anyhow::Result<DnaBundle> {
         "uid:",
         "00000000-0000-0000-0000-000000000000",
     )?);
-    let manifest = DnaManifest::current(name, uid, None, Timestamp::now().into(), vec![]);
-    Ok(DnaBundle::new(manifest, vec![], root_dir)?)
+    let manifest = DnaManifest::current(name, uid, None, Timestamp::now().into(), vec![], vec![]);
+    Ok(DnaBundle::new(manifest.try_into()?, vec![], root_dir)?)
 }
 
 fn prompt_app_init(root_dir: PathBuf) -> anyhow::Result<AppBundle> {

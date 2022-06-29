@@ -1,7 +1,23 @@
 use super::CallContext;
 use super::RibosomeT;
 use holochain_types::prelude::*;
+use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
+
+/// default size for KeyRefs
+const DEF_REF_SIZE: usize = 32;
+
+pub(crate) trait KeyRefExt: Sized {
+    fn to_tag(&self) -> Arc<str>;
+}
+
+impl KeyRefExt for XSalsa20Poly1305KeyRef {
+    fn to_tag(&self) -> Arc<str> {
+        let tag = subtle_encoding::base64::encode(self);
+        let tag = unsafe { String::from_utf8_unchecked(tag) };
+        tag.into_boxed_str().into()
+    }
+}
 
 pub struct HostFnApi<Ribosome: RibosomeT> {
     ribosome: Arc<Ribosome>,
@@ -70,10 +86,20 @@ host_fn_api_impls! {
     // The EntryDefId determines how a create is handled on the host side.
     // CapGrant and CapClaim are handled natively.
     // App entries are referenced by entry defs then SerializedBytes stuffed into an Entry::App.
-    // Returns HeaderHash of the newly created element.
-    fn create (zt::entry::CreateInput) -> holo_hash::HeaderHash;
+    // Returns ActionHash of the newly created record.
+    fn create (zt::entry::CreateInput) -> holo_hash::ActionHash;
 
-    fn create_x25519_keypair(()) -> holochain_zome_types::x_salsa20_poly1305::x25519::X25519PubKey;
+    fn x_salsa20_poly1305_shared_secret_create_random(
+        Option<zt::x_salsa20_poly1305::key_ref::XSalsa20Poly1305KeyRef>
+    ) -> zt::x_salsa20_poly1305::key_ref::XSalsa20Poly1305KeyRef;
+
+    fn x_salsa20_poly1305_shared_secret_export(
+        zt::x_salsa20_poly1305::XSalsa20Poly1305SharedSecretExport
+    ) -> zt::x_salsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData;
+
+    fn x_salsa20_poly1305_shared_secret_ingest(
+        zt::x_salsa20_poly1305::XSalsa20Poly1305SharedSecretIngest
+    ) -> zt::x_salsa20_poly1305::key_ref::XSalsa20Poly1305KeyRef;
 
     fn x_salsa20_poly1305_encrypt(
         holochain_zome_types::x_salsa20_poly1305::XSalsa20Poly1305Encrypt
@@ -83,6 +109,8 @@ host_fn_api_impls! {
         holochain_zome_types::x_salsa20_poly1305::XSalsa20Poly1305Decrypt
     ) -> Option<holochain_zome_types::x_salsa20_poly1305::data::XSalsa20Poly1305Data>;
 
+    fn create_x25519_keypair(()) -> holochain_zome_types::x_salsa20_poly1305::x25519::X25519PubKey;
+
     // Sender, Recipient, Data.
     fn x_25519_x_salsa20_poly1305_encrypt (holochain_zome_types::x_salsa20_poly1305::X25519XSalsa20Poly1305Encrypt) -> holochain_zome_types::x_salsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData;
 
@@ -90,15 +118,15 @@ host_fn_api_impls! {
     fn x_25519_x_salsa20_poly1305_decrypt (holochain_zome_types::x_salsa20_poly1305::X25519XSalsa20Poly1305Decrypt) -> Option<holochain_zome_types::x_salsa20_poly1305::data::XSalsa20Poly1305Data>;
 
     // Create a link between two entries.
-    fn create_link (zt::link::CreateLinkInput) -> holo_hash::HeaderHash;
+    fn create_link (zt::link::CreateLinkInput) -> holo_hash::ActionHash;
 
     // Delete an entry.
-    fn delete (zt::entry::DeleteInput) -> holo_hash::HeaderHash;
+    fn delete (zt::entry::DeleteInput) -> holo_hash::ActionHash;
 
-    // Delete a CreateLink element.
-    fn delete_link (zt::link::DeleteLinkInput) -> holo_hash::HeaderHash;
+    // Delete a CreateLink record.
+    fn delete_link (zt::link::DeleteLinkInput) -> holo_hash::ActionHash;
 
-    // Header hash of the newly committed element.
+    // Action hash of the newly committed record.
     // Emit a Signal::App to subscribers on the interface
     fn emit_signal (zt::signal::AppSignal) -> ();
 
@@ -107,7 +135,7 @@ host_fn_api_impls! {
     fn trace (zt::trace::TraceMsg) -> ();
 
     // Attempt to get a live entry from the cascade.
-    fn get (Vec<zt::entry::GetInput>) -> Vec<Option<zt::element::Element>>;
+    fn get (Vec<zt::entry::GetInput>) -> Vec<Option<zt::record::Record>>;
 
     fn get_agent_activity (zt::agent_activity::GetAgentActivityInput) -> zt::query::AgentActivity;
 
@@ -121,20 +149,20 @@ host_fn_api_impls! {
     // Hash data on the host.
     fn hash (zt::hash::HashInput) -> zt::hash::HashOutput;
 
-    // Retreive an element from the DHT or short circuit.
-    fn must_get_valid_element (zt::entry::MustGetValidElementInput) -> Element;
+    // Retreive a record from the DHT or short circuit.
+    fn must_get_valid_record (zt::entry::MustGetValidRecordInput) -> Record;
 
     // Retreive a entry from the DHT or short circuit.
     fn must_get_entry (zt::entry::MustGetEntryInput) -> EntryHashed;
 
-    // Retrieve a header from the DHT or short circuit.
-    fn must_get_header (zt::entry::MustGetHeaderInput) -> SignedHeaderHashed;
+    // Retrieve an action from the DHT or short circuit.
+    fn must_get_action (zt::entry::MustGetActionInput) -> SignedActionHashed;
 
     // Attempt to accept a preflight request.
     fn accept_countersigning_preflight_request(zt::countersigning::PreflightRequest) -> zt::countersigning::PreflightRequestAcceptance;
 
     // Query the source chain for data.
-    fn query (zt::query::ChainQueryFilter) -> Vec<Element>;
+    fn query (zt::query::ChainQueryFilter) -> Vec<Record>;
 
     // the length of random bytes to create
     fn random_bytes (u32) -> zt::bytes::Bytes;
@@ -164,8 +192,8 @@ host_fn_api_impls! {
     // Current system time, in the opinion of the host, as a `Duration`.
     fn sys_time (()) -> zt::timestamp::Timestamp;
 
-    // Same as  but also takes the HeaderHash of the updated element.
-    fn update (zt::entry::UpdateInput) -> holo_hash::HeaderHash;
+    // Same as  but also takes the ActionHash of the updated record.
+    fn update (zt::entry::UpdateInput) -> holo_hash::ActionHash;
 
     fn verify_signature (zt::signature::VerifySignature) -> bool;
 

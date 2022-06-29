@@ -20,8 +20,6 @@ mod cell;
 pub mod conductor;
 #[allow(missing_docs)]
 pub mod config;
-#[allow(missing_docs)]
-pub mod dna_store;
 pub mod entry_def_store;
 #[allow(missing_docs)]
 pub mod error;
@@ -32,6 +30,8 @@ pub mod kitsune_host_impl;
 pub mod manager;
 pub mod p2p_agent_store;
 pub mod paths;
+#[allow(missing_docs)]
+pub mod ribosome_store;
 pub mod space;
 pub mod state;
 

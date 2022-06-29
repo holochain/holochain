@@ -6,12 +6,12 @@ pub use holochain_deterministic_integrity::entry::*;
 ///
 /// This is used under the hood by [`create_entry`], [`create_cap_grant`] and [`create_cap_claim`].
 ///
-/// The host builds a [`Create`] header for the passed entry value and commits a new element to the
+/// The host builds a [`Create`] action for the passed entry value and commits a new record to the
 /// chain.
 ///
 /// Usually you don't need to use this function directly; it is the most general way to create an
 /// entry and standardizes the internals of higher level create functions.
-pub fn create(create_input: CreateInput) -> ExternResult<HeaderHash> {
+pub fn create(create_input: CreateInput) -> ExternResult<ActionHash> {
     HDK.with(|h| h.borrow().create(create_input))
 }
 
@@ -21,13 +21,13 @@ pub fn create(create_input: CreateInput) -> ExternResult<HeaderHash> {
 ///
 /// @todo implement update_cap_claim
 ///
-/// The host builds an [`Update`] header for the passed entry value and commits a new update to the
+/// The host builds an [`Update`] action for the passed entry value and commits a new update to the
 /// chain.
 ///
 /// Usually you don't need to use this function directly; it is the most general way to update an
 /// entry and standardizes the internals of higher level update functions.
-pub fn update(hash: HeaderHash, create_input: CreateInput) -> ExternResult<HeaderHash> {
-    HDK.with(|h| h.borrow().update(UpdateInput::new(hash, create_input)))
+pub fn update(input: UpdateInput) -> ExternResult<ActionHash> {
+    HDK.with(|h| h.borrow().update(input))
 }
 
 /// General function that can delete any entry type.
@@ -36,11 +36,11 @@ pub fn update(hash: HeaderHash, create_input: CreateInput) -> ExternResult<Heade
 ///
 /// @todo implement delete_cap_claim
 ///
-/// The host builds a [`Delete`] header for the passed entry and commits a new element to the chain.
+/// The host builds a [`Delete`] action for the passed entry and commits a new record to the chain.
 ///
 /// Usually you don't need to use this function directly; it is the most general way to delete an
 /// entry and standardizes the internals of higher level delete functions.
-pub fn delete<I, E>(delete_input: I) -> ExternResult<HeaderHash>
+pub fn delete<I, E>(delete_input: I) -> ExternResult<ActionHash>
 where
     DeleteInput: TryFrom<I, Error = E>,
     WasmError: From<E>,
@@ -66,33 +66,43 @@ where
 /// ```
 ///
 /// See [`get`] and [`get_details`] for more information on CRUD.
-pub fn create_entry<I, E>(input: I) -> ExternResult<HeaderHash>
+pub fn create_entry<I, E, E2>(input: I) -> ExternResult<ActionHash>
 where
-    I: EntryDefRegistration,
+    EntryDefIndex: for<'a> TryFrom<&'a I, Error = E2>,
+    EntryVisibility: for<'a> From<&'a I>,
     Entry: TryFrom<I, Error = E>,
     WasmError: From<E>,
+    WasmError: From<E2>,
 {
-    create(try_into_create_input(input)?)
+    let entry_def_index = EntryDefIndex::try_from(&input)?;
+    let visibility = EntryVisibility::from(&input);
+    let create_input = CreateInput::new(
+        EntryDefLocation::app(entry_def_index),
+        visibility,
+        input.try_into()?,
+        ChainTopOrdering::default(),
+    );
+    create(create_input)
 }
 
 /// Delete an app entry. Also see [`delete`].
 ///
-/// This function accepts the [`HeaderHash`] of the element to delete and optionally an argument to
+/// This function accepts the [`ActionHash`] of the record to delete and optionally an argument to
 /// specify the [`ChainTopOrdering`]. Refer to [`DeleteInput`] for details.
 ///
 /// ```ignore
 /// #[hdk_entry(id = "foo")]
 /// struct Foo(u32);
 ///
-/// let header_hash = create_entry(Foo(50))?;
-/// let delete_entry_header_hash = delete_entry(header_hash.clone())?;
+/// let action_hash = create_entry(Foo(50))?;
+/// let delete_entry_action_hash = delete_entry(action_hash.clone())?;
 /// ```
 ///
 /// with a specific [`ChainTopOrdering`]:
 /// ```ignore
-/// delete_entry(DeleteInput::new(header_hash.clone(), ChainTopOrdering::Relaxed))?;
+/// delete_entry(DeleteInput::new(action_hash.clone(), ChainTopOrdering::Relaxed))?;
 /// ```
-pub fn delete_entry<I, E>(delete_input: I) -> ExternResult<HeaderHash>
+pub fn delete_entry<I, E>(delete_input: I) -> ExternResult<ActionHash>
 where
     DeleteInput: TryFrom<I, Error = E>,
     WasmError: From<E>,
@@ -102,25 +112,25 @@ where
 
 /// Update an app entry. Also see [`update`].
 ///
-/// The hash is the [`HeaderHash`] of the deleted element, the input is a [`TryInto<CreateInput>`].
+/// The hash is the [`ActionHash`] of the deleted record, the input is a [`TryInto<CreateInput>`].
 ///
-/// Updates can reference Elements which contain Entry data -- namely, Creates and other Updates -- but
-/// not Deletes or system Elements.
+/// Updates can reference Records which contain Entry data -- namely, Creates and other Updates -- but
+/// not Deletes or system Records.
 ///
-/// As updates can reference elements on other agent's source chains across unpredictable network
+/// As updates can reference records on other agent's source chains across unpredictable network
 /// topologies, they are treated as a tree structure.
 ///
 /// Many updates can point to a single create/update and continue to accumulate as long as agents
-/// author them against that element. It is up to happ developers to decide how to ensure the tree
-/// branches are walked appropriately and that updates point to the correct element, whatever that
+/// author them against that record. It is up to happ developers to decide how to ensure the tree
+/// branches are walked appropriately and that updates point to the correct record, whatever that
 /// means for the happ.
 ///
 /// ```ignore
 /// #[hdk_entry(id = "foo")]
 /// struct Foo(u32);
 ///
-/// let foo_zero_header_hash: HeaderHash = commit_entry!(Foo(0))?;
-/// let foo_ten_update_header_hash: HeaderHash = update_entry(foo_zero_header_hash, Foo(10))?;
+/// let foo_zero_action_hash: ActionHash = commit_entry!(Foo(0))?;
+/// let foo_ten_update_action_hash: ActionHash = update_entry(foo_zero_action_hash, Foo(10))?;
 /// ```
 ///
 /// @todo in the future this will be true because we will have the concept of 'redirects':
@@ -129,24 +139,28 @@ where
 /// See [`create_entry`]
 /// See [`update`]
 /// See [`delete_entry`]
-pub fn update_entry<I, E>(hash: HeaderHash, input: I) -> ExternResult<HeaderHash>
+pub fn update_entry<I, E>(hash: ActionHash, input: I) -> ExternResult<ActionHash>
 where
-    I: EntryDefRegistration,
     Entry: TryFrom<I, Error = E>,
     WasmError: From<E>,
 {
-    update(hash, try_into_create_input(input)?)
+    let input = UpdateInput {
+        original_action_address: hash,
+        entry: input.try_into()?,
+        chain_top_ordering: ChainTopOrdering::default(),
+    };
+    update(input)
 }
 
-/// Gets an element for a given entry or header hash.
+/// Gets a record for a given entry or action hash.
 ///
 /// The behaviour of get changes subtly per the _type of the passed hash_.
-/// A header hash returns the element for that header, i.e. header+entry or header+None.
-/// An entry hash returns the "oldest live" element, i.e. header+entry.
+/// An action hash returns the record for that action, i.e. action+entry or action+None.
+/// An entry hash returns the "oldest live" record, i.e. action+entry.
 ///
-/// An element is no longer live once it is referenced by a valid delete element.
-/// An update to an element does not change its liveness.
-/// See [`get_details`] for more information about how CRUD elements reference each other.
+/// An record is no longer live once it is referenced by a valid delete record.
+/// An update to a record does not change its liveness.
+/// See [`get_details`] for more information about how CRUD records reference each other.
 ///
 /// Note: [`get`] __always triggers and blocks on a network call__.
 ///       @todo implement a 'get optimistic' that returns based on the current opinion of the world
@@ -158,14 +172,14 @@ where
 ///
 /// Note: Updates typically point to a different entry hash than what they are updating but not
 ///       always, e.g. consider changing `foo` to `bar` back to `foo`. The entry hashes in a crud
-///       tree can be circular but the header hashes are never circular.
+///       tree can be circular but the action hashes are never circular.
 ///       In this case, deleting the create for foo would make the second update pointing to foo
-///       the "oldest live" element.
+///       the "oldest live" record.
 ///
 /// Note: "oldest live" only relates to disambiguating many creates and updates from many authors
 ///       pointing to a single entry, it is not the "current value" of an entry in a CRUD sense.
 ///       e.g. If "foo" is created then updated to "bar", a [`get`] on the hash of "foo" will return
-///            "foo" as part of an element with the "oldest live" header.
+///            "foo" as part of a record with the "oldest live" action.
 ///            To discover "bar" the agent needs to call `get_details` and decide how it wants to
 ///            collapse many potential creates, updates and deletes down into a single or filtered
 ///            set of updates, to "walk the tree".
@@ -175,15 +189,15 @@ where
 ///            timestamp countersigned by both players represents an opt-in chain of updates with
 ///            support for casual "undo" with player's consent.
 ///       e.g. Domain/user names could be claimed on a "first come, first serve" basis with only
-///            creates and deletes allowed by validation rules, the "oldest live" element _does_
-///            represent the element pointing at the first agent to claim a name, but it could also
+///            creates and deletes allowed by validation rules, the "oldest live" record _does_
+///            represent the record pointing at the first agent to claim a name, but it could also
 ///            be checked manually by the app with `get_details`.
 ///
 /// Note: "oldest live" is only as good as the information available to the authorities the agent
 ///       contacts on their current network partition, there could always be an older live entry
 ///       on another partition, and of course the oldest live entry could be deleted and no longer
 ///       be live.
-pub fn get<H>(hash: H, options: GetOptions) -> ExternResult<Option<Element>>
+pub fn get<H>(hash: H, options: GetOptions) -> ExternResult<Option<Record>>
 where
     AnyDhtHash: From<H>,
 {
@@ -197,50 +211,50 @@ where
         .unwrap())
 }
 
-/// Get an element and its details for the entry or header hash passed in.
-/// Returns [`None`] if the entry/header does not exist.
-/// The details returned are a contextual mix of elements and header hashes.
+/// Get a record and its details for the entry or action hash passed in.
+/// Returns [`None`] if the entry/action does not exist.
+/// The details returned are a contextual mix of records and action hashes.
 ///
 /// Note: The return details will be inferred by the hash type passed in, be careful to pass in the
 ///       correct hash type for the details you want.
 ///
-/// Note: If a header hash is passed in the element returned is the specified element.
-///       If an entry hash is passed in all the headers (so implicitly all the elements) are
+/// Note: If an action hash is passed in the record returned is the specified record.
+///       If an entry hash is passed in all the actions (so implicitly all the records) are
 ///       returned for the entry that matches that hash.
 ///       See [`get`] for more information about what "oldest live" means.
 ///
 /// The details returned include relevant creates, updates and deletes for the hash passed in.
 ///
-/// Creates are initial header/entry combinations (elements) produced by commit_entry! and cannot
-/// reference other headers.
-/// Updates and deletes both reference a specific header+entry combination.
-/// Updates must reference another create or update header+entry.
-/// Deletes must reference a create or update header+entry (nothing can reference a delete).
+/// Creates are initial action/entry combinations (records) produced by commit_entry! and cannot
+/// reference other actions.
+/// Updates and deletes both reference a specific action+entry combination.
+/// Updates must reference another create or update action+entry.
+/// Deletes must reference a create or update action+entry (nothing can reference a delete).
 ///
-/// Full elements are returned for direct references to the passed hash.
-/// Header hashes are returned for references to references to the passed hash.
+/// Full records are returned for direct references to the passed hash.
+/// Action hashes are returned for references to references to the passed hash.
 ///
-/// [`Details`] for a header hash return:
-/// - the element for this header hash if it exists
-/// - all update and delete _elements_ that reference that specified header
+/// [`Details`] for an action hash return:
+/// - the record for this action hash if it exists
+/// - all update and delete _records_ that reference that specified action
 ///
 /// [`Details`] for an entry hash return:
-/// - all creates, updates and delete _elements_ that reference that entry hash
-/// - all update and delete _elements_ that reference the elements that reference the entry hash
+/// - all creates, updates and delete _records_ that reference that entry hash
+/// - all update and delete _records_ that reference the records that reference the entry hash
 ///
-/// Note: Entries are just values, so can be referenced by many CRUD headers by many authors.
-///       e.g. the number 1 or string "foo" can be referenced by anyone publishing CRUD headers at
+/// Note: Entries are just values, so can be referenced by many CRUD actions by many authors.
+///       e.g. the number 1 or string "foo" can be referenced by anyone publishing CRUD actions at
 ///       any time they need to represent 1 or "foo" for a create, update or delete.
 ///       If you need to disambiguate entry values, provide uniqueness in the entry value such as
 ///       a unique hash (e.g. current chain head), timestamp (careful about collisions!), or random
 ///       bytes/uuid (see random_bytes() and the uuid rust crate that supports uuids from bytes).
 ///
-/// Note: There are multiple header types that exist and operate entirely outside of CRUD elements
+/// Note: There are multiple action types that exist and operate entirely outside of CRUD records
 ///       so they cannot reference or be referenced by CRUD, so are immutable or have their own
 ///       mutation logic (e.g. link create/delete) and will not be included in [`get_details`] results
 ///       e.g. the DNA itself, links, migrations, etc.
-///       However the element will still be returned by [`get_details`] if a header hash is passed,
-///       these header-only elements will have [`None`] as the entry value.
+///       However the record will still be returned by [`get_details`] if an action hash is passed,
+///       these non-entry records will have [`None`] as the entry value.
 pub fn get_details<H: Into<AnyDhtHash>>(
     hash: H,
     options: GetOptions,
@@ -299,20 +313,4 @@ macro_rules! entry_def {
         $crate::prelude::holochain_deterministic_integrity::app_entry!($t);
         $crate::prelude::holochain_deterministic_integrity::register_entry!($t $def);
     };
-}
-
-/// Helper to convert a type to [`CreateInput`].
-/// This is needed because [`TryInto`] / [`TryFrom`] cannot be
-/// impl on a generic type.
-fn try_into_create_input<T, E>(t: T) -> Result<CreateInput, WasmError>
-where
-    T: EntryDefRegistration,
-    Entry: TryFrom<T, Error = E>,
-    WasmError: From<E>,
-{
-    Ok(CreateInput::new(
-        T::entry_def_id(),
-        t.try_into()?,
-        ChainTopOrdering::default(),
-    ))
 }

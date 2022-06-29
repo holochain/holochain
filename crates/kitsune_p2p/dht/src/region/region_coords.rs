@@ -43,12 +43,7 @@ impl RegionCoords {
         }?;
         Some(
             ss.into_iter()
-                .flat_map(|s| {
-                    ts.iter().map(move |t| RegionCoords {
-                        space: s.clone(),
-                        time: t.clone(),
-                    })
-                })
+                .flat_map(|space| ts.iter().map(move |&time| RegionCoords { space, time }))
                 .collect(),
         )
     }
@@ -104,7 +99,7 @@ mod tests {
     #[test]
     fn region_bounds_regressions() {
         use std::str::FromStr;
-        let topo = Topology::standard_epoch();
+        let topo = Topology::standard_epoch_full();
         let b =
             RegionCoords::new(SpaceSegment::new(12, 100), TimeSegment::new(4, 12)).to_bounds(&topo);
 

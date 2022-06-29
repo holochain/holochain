@@ -2,24 +2,20 @@ use std::sync::Arc;
 
 use holochain_p2p::{dht::prelude::*, dht_arc::DhtArcSet};
 use holochain_sqlite::prelude::*;
-use kitsune_p2p_types::config::KitsuneP2pTuningParams;
 use rusqlite::named_params;
 
 use crate::conductor::error::ConductorResult;
 
 /// The network module needs info about various groupings ("regions") of ops
 pub async fn query_region_set(
-    db: DbWrite<DbKindAuthored>,
+    db: DbWrite<DbKindDht>,
     topology: Topology,
     strat: &ArqStrat,
     dht_arc_set: Arc<DhtArcSet>,
-    tuning_params: &KitsuneP2pTuningParams,
 ) -> ConductorResult<RegionSetLtcs> {
-    let arq_set = ArqBoundsSet::from_dht_arc_set(&topology, &strat, &dht_arc_set)
+    let arq_set = ArqBoundsSet::from_dht_arc_set(&topology, strat, &dht_arc_set)
         .expect("arc is not quantizable (FIXME: only use quantized arcs)");
-    let recent_threshold =
-        std::time::Duration::from_secs(tuning_params.danger_gossip_recent_threshold_secs);
-    let times = TelescopingTimes::historical(&topology, recent_threshold);
+    let times = TelescopingTimes::historical(&topology);
     let coords = RegionCoordSetLtcs::new(times, arq_set);
 
     let region_set = db
@@ -42,7 +38,7 @@ pub(super) fn query_region_data(
     topology: &Topology,
     coords: RegionCoords,
 ) -> Result<RegionData, DatabaseError> {
-    let bounds = coords.to_bounds(&topology);
+    let bounds = coords.to_bounds(topology);
     let (x0, x1) = bounds.x;
     let (t0, t1) = bounds.t;
     stmt.query_row(

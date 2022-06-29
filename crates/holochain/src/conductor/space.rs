@@ -9,6 +9,7 @@ use holochain_p2p::{
     dht::{
         arq::{power_and_count_from_length, ArqBoundsSet},
         hash::RegionHash,
+        prelude::Topology,
         region::{RegionBounds, RegionData},
         region_set::{RegionCoordSetLtcs, RegionSetLtcs},
         spacetime::TelescopingTimes,
@@ -33,7 +34,7 @@ use holochain_types::{
     db_cache::DhtDbQueryCache,
     dht_op::{DhtOp, DhtOpType},
 };
-use holochain_zome_types::{DnaDefHashed, Entry, EntryVisibility, SignedHeader, Timestamp};
+use holochain_zome_types::{Entry, EntryVisibility, SignedAction, Timestamp};
 use kitsune_p2p::{
     event::{TimeWindow, TimeWindowInclusive},
     KitsuneP2pConfig,
@@ -135,7 +136,7 @@ impl Spaces {
     /// Create a new empty set of [`DnaHash`] spaces.
     pub fn new(config: &ConductorConfig) -> ConductorResult<Self> {
         let root_db_dir = config.environment_path.clone();
-        let db_sync_strategy = config.db_sync_strategy.clone();
+        let db_sync_strategy = config.db_sync_strategy;
         let db_sync_level = match db_sync_strategy {
             DbSyncStrategy::Fast => DbSyncLevel::Off,
             DbSyncStrategy::Resilient => DbSyncLevel::Normal,
@@ -284,8 +285,8 @@ impl Spaces {
         };
         let results = db
             .async_reader(move |txn| {
-                let hashes = txn
-                    .prepare_cached(&sql)?
+                let mut stmt = txn.prepare_cached(&sql)?;
+                let hashes = stmt
                     .query_map(
                         named_params! {
                             ":from": start,
@@ -328,13 +329,11 @@ impl Spaces {
     /// those ops. Note that when *sending* ops we filter out ops in limbo.
     pub async fn handle_fetch_op_regions(
         &self,
-        dna_def: &DnaDefHashed,
+        dna_hash: &DnaHash,
+        topology: Topology,
         dht_arc_set: DhtArcSet,
     ) -> ConductorResult<RegionSetLtcs> {
-        use holo_hash::HasHash;
-        let dna_hash = dna_def.as_hash();
         let sql = holochain_sqlite::sql::sql_cell::FETCH_OP_REGION;
-        let topology = dna_def.topology();
         let max_chunks = ArqStrat::default().max_chunks();
         let arq_set = ArqBoundsSet::new(
             dht_arc_set
@@ -347,7 +346,7 @@ impl Spaces {
                 })
                 .collect(),
         );
-        let times = TelescopingTimes::historical(&topology, self.recent_threshold());
+        let times = TelescopingTimes::historical(&topology);
         let coords = RegionCoordSetLtcs::new(times, arq_set);
         let coords_clone = coords.clone();
         let db = self.dht_db(dna_hash)?;
@@ -435,7 +434,7 @@ impl Spaces {
                         .collect::<Result<Vec<Vec<Option<_>>>, _>>()?
                         .into_iter()
                         .flatten()
-                        .filter_map(|x| x)
+                        .flatten()
                         .collect(),
                 )
             })
@@ -461,11 +460,11 @@ impl Spaces {
                     let r = txn.query_row_and_then(
                         "
                             SELECT DhtOp.hash, DhtOp.type AS dht_type,
-                            Header.blob AS header_blob, Entry.blob AS entry_blob,
-                            LENGTH(Header.blob) as header_size, LENGTH(Entry.blob) as entry_size
+                            Action.blob AS action_blob, Entry.blob AS entry_blob,
+                            LENGTH(Action.blob) as action_size, LENGTH(Entry.blob) as entry_size
                             FROM DHtOp
-                            JOIN Header ON DhtOp.header_hash = Header.hash
-                            LEFT JOIN Entry ON Header.entry_hash = Entry.hash
+                            JOIN Action ON DhtOp.action_hash = Action.hash
+                            LEFT JOIN Entry ON Action.entry_hash = Entry.hash
                             WHERE
                             DhtOp.hash = ?
                             AND
@@ -473,15 +472,15 @@ impl Spaces {
                         ",
                         [hash],
                         |row| {
-                            let header_bytes: Option<usize> = row.get("header_size")?;
+                            let action_bytes: Option<usize> = row.get("action_size")?;
                             let entry_bytes: Option<usize> = row.get("entry_size")?;
-                            let bytes = header_bytes.unwrap_or(0) + entry_bytes.unwrap_or(0);
-                            let header = from_blob::<SignedHeader>(row.get("header_blob")?)?;
+                            let bytes = action_bytes.unwrap_or(0) + entry_bytes.unwrap_or(0);
+                            let action = from_blob::<SignedAction>(row.get("action_blob")?)?;
                             let op_type: DhtOpType = row.get("dht_type")?;
                             let hash: DhtOpHash = row.get("hash")?;
                             // Check the entry isn't private before gossiping it.
                             let mut entry: Option<Entry> = None;
-                            if header
+                            if action
                                 .0
                                 .entry_type()
                                 .filter(|et| *et.visibility() == EntryVisibility::Public)
@@ -493,7 +492,7 @@ impl Spaces {
                                     None => None,
                                 };
                             }
-                            let op = DhtOp::from_type(op_type, header, entry)?;
+                            let op = DhtOp::from_type(op_type, action, entry)?;
                             StateQueryResult::Ok(((hash, op), bytes))
                         },
                     );
@@ -570,11 +569,9 @@ impl Spaces {
 
     /// Get the recent_threshold based on the kitsune network config
     pub fn recent_threshold(&self) -> Duration {
-        Duration::from_secs(
-            self.network_config
-                .tuning_params
-                .danger_gossip_recent_threshold_secs,
-        )
+        self.network_config
+            .tuning_params
+            .danger_gossip_recent_threshold()
     }
 }
 

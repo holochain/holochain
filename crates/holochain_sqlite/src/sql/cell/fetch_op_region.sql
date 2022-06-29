@@ -1,11 +1,11 @@
 SELECT
   COUNT(DhtOp.hash) AS count,
-  TOTAL(LENGTH(Header.blob)) + TOTAL(LENGTH(Entry.blob)) AS total_size,
+  TOTAL(LENGTH(Action.blob)) + TOTAL(LENGTH(Entry.blob)) AS total_size,
   REDUCE_XOR(DhtOp.hash) AS xor_hash
 FROM
   DhtOp
-  JOIN Header ON DhtOp.header_hash = Header.hash
-  LEFT JOIN Entry ON Header.entry_hash = Entry.hash
+  JOIN Action ON DhtOp.action_hash = Action.hash
+  LEFT JOIN Entry ON Action.entry_hash = Entry.hash
 WHERE
   (
     (
