@@ -33,7 +33,7 @@ async fn sharded_sanity_test() {
     )
     .await;
 
-    // - Bob try's to initiate.
+    // - Bob tries to initiate.
     let (_, _, bob_outgoing) = bob.try_initiate().await.unwrap().unwrap();
     let alices_cert = bob
         .inner
@@ -142,12 +142,14 @@ async fn partial_missing_doesnt_finish() {
                 cert.clone() => RoundState {
                     remote_agent_list: vec![],
                     common_arc_set: Arc::new(DhtArcSet::Full),
-                    num_sent_ops_blooms: 1,
-                    received_all_incoming_ops_blooms: true,
+                    num_sent_op_blooms: 1,
+                    received_all_incoming_op_blooms: true,
+                    has_pending_historical_op_data: false,
                     last_touch: Instant::now(),
                     round_timeout: std::time::Duration::MAX,
                     bloom_batch_cursor: None,
                     ops_batch_queue: OpsBatchQueue::new(),
+                    region_set_sent: None,
                 }
             }
             .into(),
@@ -190,12 +192,14 @@ async fn missing_ops_finishes() {
                 cert.clone() => RoundState {
                     remote_agent_list: vec![],
                     common_arc_set: Arc::new(DhtArcSet::Full),
-                    num_sent_ops_blooms: 1,
-                    received_all_incoming_ops_blooms: true,
+                    num_sent_op_blooms: 1,
+                    received_all_incoming_op_blooms: true,
+                    has_pending_historical_op_data: false,
                     last_touch: Instant::now(),
                     round_timeout: std::time::Duration::MAX,
                     bloom_batch_cursor: None,
                     ops_batch_queue: OpsBatchQueue::new(),
+                    region_set_sent: None,
                 }
             }
             .into(),
@@ -239,12 +243,14 @@ async fn missing_ops_doesnt_finish_awaiting_bloom_responses() {
                 cert.clone() => RoundState {
                     remote_agent_list: vec![],
                     common_arc_set: Arc::new(DhtArcSet::Full),
-                    num_sent_ops_blooms: 1,
-                    received_all_incoming_ops_blooms: false,
+                    num_sent_op_blooms: 1,
+                    received_all_incoming_op_blooms: false,
+                    has_pending_historical_op_data: false,
                     last_touch: Instant::now(),
                     round_timeout: std::time::Duration::MAX,
                     bloom_batch_cursor: None,
                     ops_batch_queue: OpsBatchQueue::new(),
+                    region_set_sent: None,
                 }
             }
             .into(),
@@ -288,12 +294,14 @@ async fn bloom_response_finishes() {
                 cert.clone() => RoundState {
                     remote_agent_list: vec![],
                     common_arc_set: Arc::new(DhtArcSet::Full),
-                    num_sent_ops_blooms: 0,
-                    received_all_incoming_ops_blooms: false,
+                    num_sent_op_blooms: 0,
+                    received_all_incoming_op_blooms: false,
+                    has_pending_historical_op_data: false,
                     last_touch: Instant::now(),
                     round_timeout: std::time::Duration::MAX,
                     bloom_batch_cursor: None,
                     ops_batch_queue: OpsBatchQueue::new(),
+                    region_set_sent: None,
                 }
             }
             .into(),
@@ -304,7 +312,7 @@ async fn bloom_response_finishes() {
     .await;
 
     // - Send the final ops bloom message.
-    let incoming = ShardedGossipWire::Ops(Ops {
+    let incoming = ShardedGossipWire::OpBloom(OpBloom {
         missing_hashes: empty_bloom(),
         finished: true,
     });
@@ -337,12 +345,14 @@ async fn bloom_response_doesnt_finish_outstanding_incoming() {
                 cert.clone() => RoundState {
                     remote_agent_list: vec![],
                     common_arc_set: Arc::new(DhtArcSet::Full),
-                    num_sent_ops_blooms: 1,
-                    received_all_incoming_ops_blooms: false,
+                    num_sent_op_blooms: 1,
+                    received_all_incoming_op_blooms: false,
+                    has_pending_historical_op_data: false,
                     last_touch: Instant::now(),
                     round_timeout: std::time::Duration::MAX,
                     bloom_batch_cursor: None,
                     ops_batch_queue: OpsBatchQueue::new(),
+                    region_set_sent: None,
                 }
             }
             .into(),
@@ -353,7 +363,7 @@ async fn bloom_response_doesnt_finish_outstanding_incoming() {
     .await;
 
     // - Send the final ops bloom message.
-    let incoming = ShardedGossipWire::Ops(Ops {
+    let incoming = ShardedGossipWire::OpBloom(OpBloom {
         missing_hashes: empty_bloom(),
         finished: true,
     });
@@ -389,12 +399,14 @@ async fn no_data_still_finishes() {
                 bob_cert.clone() => RoundState {
                     remote_agent_list: vec![],
                     common_arc_set: Arc::new(DhtArcSet::Full),
-                    num_sent_ops_blooms: 0,
-                    received_all_incoming_ops_blooms: false,
+                    num_sent_op_blooms: 0,
+                    received_all_incoming_op_blooms: false,
+                    has_pending_historical_op_data: false,
                     last_touch: Instant::now(),
                     round_timeout: std::time::Duration::MAX,
                     bloom_batch_cursor: None,
                     ops_batch_queue: OpsBatchQueue::new(),
+                    region_set_sent: None,
                 }
             }
             .into(),
@@ -412,12 +424,14 @@ async fn no_data_still_finishes() {
                 alice_cert.clone() => RoundState {
                     remote_agent_list: vec![],
                     common_arc_set: Arc::new(DhtArcSet::Full),
-                    num_sent_ops_blooms: 1,
-                    received_all_incoming_ops_blooms: true,
+                    num_sent_op_blooms: 1,
+                    received_all_incoming_op_blooms: true,
+                    has_pending_historical_op_data: false,
                     last_touch: Instant::now(),
                     round_timeout: std::time::Duration::MAX,
                     bloom_batch_cursor: None,
                     ops_batch_queue: OpsBatchQueue::new(),
+                    region_set_sent: None,
                 }
             }
             .into(),
@@ -428,7 +442,7 @@ async fn no_data_still_finishes() {
     .await;
 
     // - Send the final ops bloom message to alice.
-    let incoming = ShardedGossipWire::Ops(Ops {
+    let incoming = ShardedGossipWire::OpBloom(OpBloom {
         missing_hashes: empty_bloom(),
         finished: true,
     });
@@ -469,8 +483,8 @@ async fn no_data_still_finishes() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-/// This test checks that when two players concurrently
-/// initiate a round it is handle correctly.
+/// This test checks that when two players simultaneously
+/// initiate a round it is handled correctly.
 async fn double_initiate_is_handled() {
     let agents = agents_with_infos(2).await;
     // - Set up two players with themselves as local agents.

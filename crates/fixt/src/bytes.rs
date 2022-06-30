@@ -15,7 +15,7 @@ fixturator!(
     curve Empty vec![];
     curve Unpredictable {
         let mut rng = crate::rng();
-        let len = rng.gen_range(UNPREDICTABLE_MIN_LEN, UNPREDICTABLE_MAX_LEN);
+        let len = rng.gen_range(UNPREDICTABLE_MIN_LEN..UNPREDICTABLE_MAX_LEN);
         let mut u8_fixturator = U8Fixturator::new(Unpredictable);
         let mut bytes = vec![];
         for _ in 0..len {
@@ -45,7 +45,7 @@ fixturator!(
     curve Empty vec![0u8];
     curve Unpredictable {
         let mut rng = crate::rng();
-        let len = rng.gen_range(1, UNPREDICTABLE_MAX_LEN);
+        let len = rng.gen_range(1..UNPREDICTABLE_MAX_LEN);
         let mut u8_fixturator = U8Fixturator::new(Unpredictable);
         let mut bytes = vec![];
         for _ in 0..len {

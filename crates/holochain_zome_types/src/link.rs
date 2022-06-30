@@ -1,6 +1,7 @@
 use crate::record::SignedActionHashed;
 use crate::ChainTopOrdering;
 use holo_hash::ActionHash;
+use holochain_integrity_types::ZomeId;
 use holochain_serialized_bytes::prelude::*;
 
 pub use holochain_integrity_types::link::*;
@@ -33,6 +34,7 @@ pub struct Link {
 pub struct CreateLinkInput {
     pub base_address: holo_hash::AnyLinkableHash,
     pub target_address: holo_hash::AnyLinkableHash,
+    pub zome_id: ZomeId,
     pub link_type: LinkType,
     pub tag: LinkTag,
     pub chain_top_ordering: ChainTopOrdering,
@@ -42,6 +44,7 @@ impl CreateLinkInput {
     pub fn new(
         base_address: holo_hash::AnyLinkableHash,
         target_address: holo_hash::AnyLinkableHash,
+        zome_id: ZomeId,
         link_type: LinkType,
         tag: LinkTag,
         chain_top_ordering: ChainTopOrdering,
@@ -49,6 +52,7 @@ impl CreateLinkInput {
         Self {
             base_address,
             target_address,
+            zome_id,
             link_type,
             tag,
             chain_top_ordering,
@@ -76,15 +80,15 @@ impl DeleteLinkInput {
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub struct GetLinksInput {
     pub base_address: holo_hash::AnyLinkableHash,
-    /// Ranges of links to include in this query.
-    pub link_type: LinkTypeRanges,
+    /// The link types to include in this get.
+    pub link_type: LinkTypeFilter,
     pub tag_prefix: Option<crate::link::LinkTag>,
 }
 
 impl GetLinksInput {
     pub fn new(
         base_address: holo_hash::AnyLinkableHash,
-        link_type: LinkTypeRanges,
+        link_type: LinkTypeFilter,
         tag_prefix: Option<crate::link::LinkTag>,
     ) -> Self {
         Self {

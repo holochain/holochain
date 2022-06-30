@@ -8,6 +8,7 @@ use crate::ActionWeighed;
 use crate::EntryRateWeight;
 use crate::MembraneProof;
 use crate::RateWeight;
+use crate::ZomeId;
 use action::Dna;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
@@ -56,11 +57,6 @@ pub trait ActionBuilder<U: ActionUnweighed>: Sized {
 
 macro_rules! builder_variant {
     ( $name: ident <$weight : ty> { $($field: ident : $t: ty),* $(,)? } ) => {
-        // builder_variant!($name {
-        //     $($field: $t),*
-        //     |
-        //     weight: $weight
-        // });
 
         #[derive(Clone, Debug, PartialEq, Eq)]
         pub struct $name {
@@ -133,13 +129,6 @@ macro_rules! builder_variant {
                 }
             }
         }
-
-
-        // impl From<($name, ActionBuilderCommon)> for action::$name {
-        //     fn from((n, h): ($name, ActionBuilderCommon)) -> action::$name {
-        //         n.build(h)
-        //     }
-        // }
 
         #[cfg(feature = "test_utils")]
         impl action::$name {
@@ -246,6 +235,7 @@ builder_variant!(InitZomesComplete {});
 builder_variant!(CreateLink<RateWeight> {
     base_address: AnyLinkableHash,
     target_address: AnyLinkableHash,
+    zome_id: ZomeId,
     link_type: LinkType,
     tag: LinkTag,
 });

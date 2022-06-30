@@ -20,6 +20,7 @@ use rusqlite::{named_params, Transaction};
 use crate::conductor::interface::SignalBroadcaster;
 use crate::conductor::space::Space;
 use crate::core::queue_consumer::{QueueTriggers, TriggerSender, WorkComplete};
+use crate::core::ribosome::weigh_placeholder;
 
 use super::{error::WorkflowResult, incoming_dht_ops_workflow::incoming_dht_ops_workflow};
 
@@ -67,11 +68,11 @@ pub(crate) fn incoming_countersigning(
             if let Entry::CounterSign(session_data, _) = entry.as_ref() {
                 let entry_hash = EntryHash::with_data_sync(&**entry);
                 // Get the required actions for this session.
-                let weight = todo!("weigh record");
+                let weight = weigh_placeholder();
                 let action_set = session_data.build_action_set(entry_hash, weight)?;
 
                 // Get the expires time for this session.
-                let expires = *session_data.preflight_request().session_times().end();
+                let expires = *session_data.preflight_request().session_times.end();
 
                 // Get the entry hash from an action.
                 // If the actions have different entry hashes they will fail validation.
@@ -227,7 +228,7 @@ pub(crate) async fn countersigning_success(
             if let Some((cs_entry_hash, cs)) = current_countersigning_session(txn, Arc::new(author.clone()))? {
                 // Check we have the right session.
                 if cs_entry_hash == entry_hash {
-                    let weight = todo!("weigh record");
+                    let weight = weigh_placeholder();
                     let stored_actions = cs.build_action_set(entry_hash, weight)?;
                     if stored_actions.len() == incoming_actions.len() {
                         // Check all stored action hashes match an incoming action hash.

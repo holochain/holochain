@@ -1,7 +1,11 @@
 use must_future::MustBoxFuture;
 use std::sync::Arc;
 
-use kitsune_p2p_types::{bin_types::KitsuneSpace, dht_arc::DhtArcSet};
+use kitsune_p2p_types::{
+    bin_types::KitsuneSpace,
+    dht::{region::Region, region_set::RegionSetLtcs, spacetime::Topology},
+    dht_arc::DhtArcSet,
+};
 
 use crate::event::{GetAgentInfoSignedEvt, MetricRecord};
 
@@ -25,12 +29,32 @@ pub trait KitsuneHost: 'static + Send + Sync {
         dht_arc_set: DhtArcSet,
     ) -> KitsuneHostResult<Vec<f64>>;
 
+    /// Query aggregate dht op data to form an LTCS set of region data
+    fn query_region_set(
+        &self,
+        space: Arc<KitsuneSpace>,
+        dht_arc_set: Arc<DhtArcSet>,
+    ) -> KitsuneHostResult<RegionSetLtcs>;
+
+    /// Given an input list of regions, return a list of equal or greater length
+    /// such that each region's size is less than the `size_limit`, by recursively
+    /// subdividing regions which are over the size limit.
+    fn query_size_limited_regions(
+        &self,
+        space: Arc<KitsuneSpace>,
+        size_limit: u32,
+        regions: Vec<Region>,
+    ) -> KitsuneHostResult<Vec<Region>>;
+
     /// Record a set of metric records
     fn record_metrics(
         &self,
         space: Arc<KitsuneSpace>,
         records: Vec<MetricRecord>,
     ) -> KitsuneHostResult<()>;
+
+    /// Get the quantum Topology associated with this Space
+    fn get_topology(&self, space: Arc<KitsuneSpace>) -> KitsuneHostResult<Topology>;
 }
 
 /// Trait object for the host interface

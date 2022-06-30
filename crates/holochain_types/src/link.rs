@@ -43,7 +43,7 @@ pub struct WireLinkKey {
     /// Base the links are on.
     pub base: AnyLinkableHash,
     /// The zome the links are in.
-    pub type_query: Option<LinkTypeRanges>,
+    pub type_query: LinkTypeFilter,
     /// Optionally specify a tag for more specific queries.
     pub tag: Option<LinkTag>,
 }
@@ -86,6 +86,7 @@ pub struct WireCreateLink {
     pub prev_action: ActionHash,
 
     pub target_address: AnyLinkableHash,
+    pub zome_id: ZomeId,
     pub link_type: LinkType,
     pub tag: Option<LinkTag>,
     pub signature: Signature,
@@ -120,6 +121,7 @@ impl WireCreateLink {
             action_seq: h.action_seq,
             prev_action: h.prev_action,
             target_address: h.target_address,
+            zome_id: h.zome_id,
             link_type: h.link_type,
             tag: if tag { Some(h.tag) } else { None },
             signature,
@@ -156,6 +158,7 @@ impl WireCreateLink {
             prev_action: self.prev_action,
             base_address: key.base.clone(),
             target_address: self.target_address,
+            zome_id: self.zome_id,
             link_type: self.link_type,
             weight: self.weight,
             tag,

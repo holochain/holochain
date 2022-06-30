@@ -16,8 +16,7 @@ mod entry_helper;
 mod entry_zomes;
 mod link_types;
 mod link_zomes;
-mod to_global_types;
-mod to_local_types;
+mod to_coordinates;
 mod unit_enum;
 mod util;
 
@@ -240,36 +239,8 @@ pub fn hdk_link_types(attrs: TokenStream, code: TokenStream) -> TokenStream {
 
 #[proc_macro_error]
 #[proc_macro_attribute]
-pub fn hdk_to_local_types(attrs: TokenStream, code: TokenStream) -> TokenStream {
-    to_local_types::build(attrs, code)
-}
-
-/// Implements `impl TryFrom<Self> for GlobalZomeTypeId`
-/// by calling `zome_info` and getting the types in scope
-/// for the calling zome then calling `to_global_scope`.
-///
-/// `Self` must be mapped to a `EntryDefIndex`.
-///
-/// # Attributes
-/// Takes no attributes.
-#[proc_macro_error]
-#[proc_macro_attribute]
-pub fn hdk_to_global_entry_types(attrs: TokenStream, code: TokenStream) -> TokenStream {
-    to_global_types::build_entry(attrs, code)
-}
-
-/// Implements `impl TryFrom<Self> for GlobalZomeTypeId`
-/// by calling `zome_info` and getting the types in scope
-/// for the calling zome then calling `to_global_scope`.
-///
-/// `Self` must be mapped to a `LinkType`.
-///
-/// # Attributes
-/// Takes no attributes.
-#[proc_macro_error]
-#[proc_macro_attribute]
-pub fn hdk_to_global_link_types(attrs: TokenStream, code: TokenStream) -> TokenStream {
-    to_global_types::build_link(attrs, code)
+pub fn hdk_to_coordinates(attrs: TokenStream, code: TokenStream) -> TokenStream {
+    to_coordinates::build(attrs, code)
 }
 
 #[proc_macro_error]

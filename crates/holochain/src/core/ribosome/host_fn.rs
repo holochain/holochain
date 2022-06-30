@@ -1,7 +1,23 @@
 use super::CallContext;
 use super::RibosomeT;
 use holochain_types::prelude::*;
+use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
+
+/// default size for KeyRefs
+const DEF_REF_SIZE: usize = 32;
+
+pub(crate) trait KeyRefExt: Sized {
+    fn to_tag(&self) -> Arc<str>;
+}
+
+impl KeyRefExt for XSalsa20Poly1305KeyRef {
+    fn to_tag(&self) -> Arc<str> {
+        let tag = subtle_encoding::base64::encode(self);
+        let tag = unsafe { String::from_utf8_unchecked(tag) };
+        tag.into_boxed_str().into()
+    }
+}
 
 pub struct HostFnApi<Ribosome: RibosomeT> {
     ribosome: Arc<Ribosome>,

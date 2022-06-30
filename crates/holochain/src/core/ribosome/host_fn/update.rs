@@ -1,4 +1,5 @@
 use super::delete::get_original_entry_data;
+use crate::core::ribosome::weigh_placeholder;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
@@ -29,7 +30,7 @@ pub fn update<'a>(
             let (original_entry_address, entry_type) =
                 get_original_entry_data(call_context.clone(), original_action_address.clone())?;
 
-            let weight = todo!("weigh record");
+            let weight = weigh_placeholder();
 
             // Countersigned entries have different action handling.
             match entry {

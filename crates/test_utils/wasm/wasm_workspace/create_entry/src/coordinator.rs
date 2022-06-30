@@ -23,7 +23,7 @@ fn create_entry(_: ()) -> ExternResult<ActionHash> {
     let post = new_post();
     HDK.with(|h| {
         h.borrow().create(CreateInput::new(
-            EntryDefIndex::try_from(&post)?,
+            ScopedEntryDefIndex::try_from(&post)?,
             EntryVisibility::from(&post),
             post.try_into().unwrap(),
             // This is used to test many conductors thrashing creates between

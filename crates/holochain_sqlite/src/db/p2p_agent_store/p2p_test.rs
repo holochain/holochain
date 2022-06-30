@@ -29,7 +29,7 @@ fn rand_signed_at_ms() -> u64 {
         .unwrap()
         .as_millis() as u64;
 
-    now - rng.gen_range(1000, 2000)
+    now - rng.gen_range(1000..2000)
 }
 
 async fn rand_insert(
@@ -43,16 +43,16 @@ async fn rand_insert(
     let signed_at_ms = rand_signed_at_ms();
 
     let expires_at_ms = if long {
-        signed_at_ms + rng.gen_range(10000, 20000)
+        signed_at_ms + rng.gen_range(10000..20000)
     } else {
-        signed_at_ms + rng.gen_range(100, 200)
+        signed_at_ms + rng.gen_range(100..200)
     };
 
-    let half_len = match rng.gen_range(0_u8, 9_u8) {
+    let half_len = match rng.gen_range(0_u8..9_u8) {
         0 => 0,
         1 => u32::MAX,
-        2 => rng.gen_range(0, u32::MAX / 2),
-        _ => rng.gen_range(0, u32::MAX / 1000),
+        2 => rng.gen_range(0..u32::MAX / 2),
+        _ => rng.gen_range(0..u32::MAX / 1000),
     };
 
     let signed = AgentInfoSigned::sign(

@@ -18,9 +18,6 @@ pub use dht_arc_set::*;
 mod dht_location;
 pub use dht_location::*;
 
-mod peer_view;
-pub use peer_view::*;
-
 #[cfg(any(test, feature = "test_utils"))]
 pub mod loc8;
 

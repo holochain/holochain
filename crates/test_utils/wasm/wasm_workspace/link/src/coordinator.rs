@@ -73,21 +73,7 @@ fn get_links(_: ()) -> ExternResult<Vec<Link>> {
     // Include just `SomeLinks`
     hdk::prelude::get_links(base()?, LinkTypes::SomeLinks, None)?;
     // Include all links from within this zome.
-    hdk::prelude::get_links(base()?, LinkTypes::range(..), None)?;
-    // Include link types from `SomeLinks` up
-    hdk::prelude::get_links(base()?, LinkTypes::range(LinkTypes::SomeLinks..), None)?;
-    // Include link types from `SomeLinks` to `SomeOtherLinks` inclusive.
-    hdk::prelude::get_links(
-        base()?,
-        LinkTypes::range(LinkTypes::SomeLinks..=LinkTypes::SomeOtherLinks),
-        None,
-    )?;
-    // Include no link types (this isn't very useful).
-    hdk::prelude::get_links(
-        base()?,
-        LinkTypes::range(LinkTypes::SomeLinks..LinkTypes::SomeLinks),
-        None,
-    )?;
+    hdk::prelude::get_links(base()?, .., None)?;
     // Include types in this vec.
     hdk::prelude::get_links(
         base()?,
@@ -108,9 +94,7 @@ fn get_links(_: ()) -> ExternResult<Vec<Link>> {
     )?;
     let t = [LinkTypes::SomeLinks, LinkTypes::SomeOtherLinks];
     // Include types in this slice.
-    hdk::prelude::get_links(base()?, &t[..], None)?;
-    // Include all link types defined in any zome.
-    hdk::prelude::get_links(base()?, .., None)
+    hdk::prelude::get_links(base()?, &t[..], None)
 }
 
 #[hdk_extern]
@@ -122,31 +106,7 @@ fn get_links_nested(_: ()) -> ExternResult<Vec<Link>> {
         None,
     )?;
     // Include all links from within this zome.
-    hdk::prelude::get_links(base()?, LinkZomes::range(..), None)?;
-    // Include link types from `SomeLinks` up
-    hdk::prelude::get_links(
-        base()?,
-        LinkZomes::range(LinkZomes::IntegrityLink(LinkTypes::SomeLinks)..),
-        None,
-    )?;
-    // Include link types from `SomeLinks` to `SomeOtherLinks` inclusive.
-    hdk::prelude::get_links(
-        base()?,
-        LinkZomes::range(
-            LinkZomes::IntegrityLink(LinkTypes::SomeLinks)
-                ..=LinkZomes::IntegrityLink(LinkTypes::SomeOtherLinks),
-        ),
-        None,
-    )?;
-    // Include no link types (this isn't very useful).
-    hdk::prelude::get_links(
-        base()?,
-        LinkZomes::range(
-            LinkZomes::IntegrityLink(LinkTypes::SomeLinks)
-                ..LinkZomes::IntegrityLink(LinkTypes::SomeLinks),
-        ),
-        None,
-    )?;
+    hdk::prelude::get_links(base()?, .., None)?;
     // Include types in this vec.
     hdk::prelude::get_links(
         base()?,
@@ -179,9 +139,8 @@ fn get_links_nested(_: ()) -> ExternResult<Vec<Link>> {
         LinkZomes::IntegrityLink(LinkTypes::SomeOtherLinks),
     ];
     // Include types in this slice.
-    hdk::prelude::get_links(base()?, &t[..], None)?;
+    hdk::prelude::get_links(base()?, &t[..], None)
     // Include all link types defined in any zome.
-    hdk::prelude::get_links(base()?, .., None)
 }
 
 #[hdk_extern]
