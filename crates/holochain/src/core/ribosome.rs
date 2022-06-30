@@ -508,9 +508,7 @@ pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
         }
     }
 
-    fn find_zome_from_entry(&self, entry_index: &EntryDefIndex) -> Option<IntegrityZome>;
-
-    fn find_zome_from_link(&self, entry_index: &LinkType) -> Option<IntegrityZome>;
+    fn get_integrity_zome(&self, zome_id: &ZomeId) -> Option<IntegrityZome>;
 
     fn call_iterator<I: Invocation + 'static>(
         &self,
@@ -624,7 +622,7 @@ pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
     ) -> RibosomeResult<EntryCreationAction> {
         // TODO: use serialized entry as input
         let zome = match h.entry_type() {
-            EntryType::App(aet) => self.find_zome_from_entry(&aet.id),
+            EntryType::App(aet) => self.get_integrity_zome(&aet.zome_id),
             _ => None,
         }
         .ok_or_else(|| RibosomeError::NoZomeForEntryType(h.entry_type().clone()))?;
@@ -638,6 +636,11 @@ pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
         let weight = EntryRateWeight::from_weight_and_size(weight, entry_size);
         Ok(h.weighed(weight))
     }
+}
+
+/// Placeholder for weighing. Currently produces zero weight.
+pub fn weigh_placeholder() -> EntryRateWeight {
+    EntryRateWeight::default()
 }
 
 #[cfg(test)]

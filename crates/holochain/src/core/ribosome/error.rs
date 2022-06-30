@@ -47,10 +47,6 @@ pub enum RibosomeError {
     RecordDeps(AnyDhtHash),
 
     /// ident
-    #[error("Unspecified ring error")]
-    RingUnspecified,
-
-    /// ident
     #[error(transparent)]
     KeystoreError(#[from] holochain_keystore::KeystoreError),
 
@@ -107,18 +103,6 @@ pub enum RibosomeError {
 
     #[error(transparent)]
     ZomeTypesError(#[from] holochain_types::zome_types::ZomeTypesError),
-}
-
-impl From<xsalsa20poly1305::aead::Error> for RibosomeError {
-    fn from(error: xsalsa20poly1305::aead::Error) -> Self {
-        Self::Aead(error.to_string())
-    }
-}
-
-impl From<ring::error::Unspecified> for RibosomeError {
-    fn from(_: ring::error::Unspecified) -> Self {
-        Self::RingUnspecified
-    }
 }
 
 /// Type alias

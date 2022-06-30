@@ -25,6 +25,7 @@ pub type Uid = String;
 /// Hence, this type can basically be thought of as a fully validated, normalized
 /// `DnaManifest`
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, SerializedBytes)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "full-dna-def", derive(derive_builder::Builder))]
 #[cfg_attr(feature = "full-dna-def", builder(public))]
 pub struct DnaDef {
@@ -181,6 +182,11 @@ impl DnaDef {
         clone.properties = properties;
         clone.uid = uid;
         clone
+    }
+
+    /// Get the topology to use for kitsune gossip
+    pub fn topology(&self, cutoff: std::time::Duration) -> kitsune_p2p_dht::spacetime::Topology {
+        kitsune_p2p_dht::spacetime::Topology::standard(self.origin_time, cutoff)
     }
 }
 

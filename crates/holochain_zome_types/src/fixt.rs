@@ -64,14 +64,18 @@ fixturator!(
 
 fixturator!(
     AppEntryType;
-    constructor fn new(U8, EntryVisibility);
+    constructor fn new(U8, U8, EntryVisibility);
 );
 
 impl Iterator for AppEntryTypeFixturator<EntryVisibility> {
     type Item = AppEntryType;
     fn next(&mut self) -> Option<Self::Item> {
         let app_entry = AppEntryTypeFixturator::new(Unpredictable).next().unwrap();
-        Some(AppEntryType::new(app_entry.id(), self.0.curve))
+        Some(AppEntryType::new(
+            app_entry.id(),
+            app_entry.zome_id(),
+            self.0.curve,
+        ))
     }
 }
 
@@ -90,7 +94,7 @@ fixturator!(
 
 fixturator!(
     CreateLink;
-    constructor fn from_builder(ActionBuilderCommon, AnyLinkableHash, AnyLinkableHash, LinkType, LinkTag);
+    constructor fn from_builder(ActionBuilderCommon, AnyLinkableHash, AnyLinkableHash, ZomeId, LinkType, LinkTag);
 );
 
 fixturator!(
@@ -105,6 +109,7 @@ pub struct KnownCreateLink {
     pub base_address: AnyLinkableHash,
     pub target_address: AnyLinkableHash,
     pub tag: LinkTag,
+    pub zome_id: ZomeId,
     pub link_type: LinkType,
 }
 
@@ -120,6 +125,7 @@ impl Iterator for CreateLinkFixturator<KnownCreateLink> {
         f.base_address = self.0.curve.base_address.clone();
         f.target_address = self.0.curve.target_address.clone();
         f.tag = self.0.curve.tag.clone();
+        f.zome_id = self.0.curve.zome_id;
         f.link_type = self.0.curve.link_type;
         Some(f)
     }
@@ -218,7 +224,7 @@ fixturator!(
         let min_len = 0;
         let max_len = 5;
         let mut rng = rng();
-        let len = rng.gen_range(min_len, max_len);
+        let len = rng.gen_range(min_len..max_len);
         let mut signature_fixturator = SignatureFixturator::new(Unpredictable);
         let mut signatures = vec![];
         for _ in 0..len {
@@ -265,7 +271,7 @@ fixturator!(
     curve Empty CurryPayloads(BTreeMap::new());
     curve Unpredictable {
         let mut rng = rng();
-        let number_of_payloads = rng.gen_range(0, 5);
+        let number_of_payloads = rng.gen_range(0..5);
 
         let mut payloads: BTreeMap<GrantedFunction, SerializedBytes> = BTreeMap::new();
         let mut granted_function_fixturator = GrantedFunctionFixturator::new_indexed(Unpredictable, get_fixt_index!());
@@ -277,7 +283,7 @@ fixturator!(
     };
     curve Predictable {
         let mut rng = rand::thread_rng();
-        let number_of_payloads = rng.gen_range(0, 5);
+        let number_of_payloads = rng.gen_range(0..5);
 
         let mut payloads: BTreeMap<GrantedFunction, SerializedBytes> = BTreeMap::new();
         let mut granted_function_fixturator = GrantedFunctionFixturator::new_indexed(Predictable, get_fixt_index!());
@@ -297,7 +303,7 @@ fixturator!(
             CapAccessFixturator::new(Empty).next().unwrap(),
             {
                 let mut rng = rng();
-                let number_of_zomes = rng.gen_range(0, 5);
+                let number_of_zomes = rng.gen_range(0..5);
 
                 let mut granted_functions: GrantedFunctions = BTreeSet::new();
                 for _ in 0..number_of_zomes {
@@ -313,7 +319,7 @@ fixturator!(
             CapAccessFixturator::new(Unpredictable).next().unwrap(),
             {
                 let mut rng = rand::thread_rng();
-                let number_of_zomes = rng.gen_range(0, 5);
+                let number_of_zomes = rng.gen_range(0..5);
 
                 let mut granted_functions: GrantedFunctions = BTreeSet::new();
                 for _ in 0..number_of_zomes {
@@ -373,7 +379,7 @@ fixturator!(
             },
             CapAccessVariant::Assigned => {
                 let mut rng = rand::thread_rng();
-                let number_of_assigned = rng.gen_range(0, 5);
+                let number_of_assigned = rng.gen_range(0..5);
 
                 CapAccess::from((
                     CapSecretFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap(),
@@ -482,7 +488,7 @@ fixturator!(
     curve Empty Vec::new().into();
     curve Unpredictable {
         let mut rng = rand::thread_rng();
-        let number_of_defs = rng.gen_range(0, 5);
+        let number_of_defs = rng.gen_range(0..5);
 
         let mut defs = vec![];
         let mut entry_def_fixturator = EntryDefFixturator::new(Unpredictable);
@@ -538,7 +544,7 @@ fixturator! {
     };
     curve PublicCurve {
         let aet = fixt!(AppEntryType);
-        EntryType::App(AppEntryType::new(aet.id(), EntryVisibility::Public))
+        EntryType::App(AppEntryType::new(aet.id(), aet.zome_id(), EntryVisibility::Public))
     };
 }
 

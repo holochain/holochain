@@ -462,8 +462,18 @@ async fn update_arc_length(
     space: Arc<KitsuneSpace>,
     arc: &mut DhtArc,
 ) -> KitsuneP2pResult<()> {
-    let density = evt_sender.query_peer_density(space.clone(), *arc).await?;
-    arc.update_length(density);
+    let view = evt_sender.query_peer_density(space.clone(), *arc).await?;
+
+    let cov_before = arc.coverage() * 100.0;
+    tracing::trace!("Updating arc for space {:?}:", space);
+    tracing::trace!("Before: {:2.1}% |{}|", cov_before, arc.to_ascii(64));
+
+    view.update_arc(arc);
+
+    let cov_after = arc.coverage() * 100.0;
+    tracing::trace!("After:  {:2.1}% |{}|", cov_after, arc.to_ascii(64));
+    tracing::trace!("Diff: {:-2.2}%", cov_after - cov_before);
+
     Ok(())
 }
 
@@ -1129,18 +1139,24 @@ impl Space {
             .gossip_strategy
             .split(',')
             .flat_map(|module| match module {
-                "sharded-gossip" => vec![
-                    (
-                        GossipModuleType::ShardedRecent,
-                        crate::gossip::sharded_gossip::recent_factory(bandwidth_throttles.recent()),
-                    ),
-                    (
+                "sharded-gossip" => {
+                    let mut gossips = vec![];
+                    if config.tuning_params.danger_gossip_recent_threshold_secs > 0 {
+                        gossips.push((
+                            GossipModuleType::ShardedRecent,
+                            crate::gossip::sharded_gossip::recent_factory(
+                                bandwidth_throttles.recent(),
+                            ),
+                        ));
+                    }
+                    gossips.push((
                         GossipModuleType::ShardedHistorical,
                         crate::gossip::sharded_gossip::historical_factory(
                             bandwidth_throttles.historical(),
                         ),
-                    ),
-                ],
+                    ));
+                    gossips
+                }
                 "none" => vec![],
                 _ => {
                     panic!("unknown gossip strategy: {}", module);
@@ -1162,9 +1178,14 @@ impl Space {
             .collect();
 
         let i_s_c = i_s.clone();
+        let agent_info_update_interval_ms =
+            config.tuning_params.gossip_agent_info_update_interval_ms as u64;
         tokio::task::spawn(async move {
             loop {
-                tokio::time::sleep(std::time::Duration::from_secs(5 * 60)).await;
+                tokio::time::sleep(std::time::Duration::from_millis(
+                    agent_info_update_interval_ms,
+                ))
+                .await;
                 if let Err(e) = i_s_c.update_agent_info().await {
                     tracing::error!(failed_to_update_agent_info_for_space = ?e);
                 }

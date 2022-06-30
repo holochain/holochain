@@ -29,14 +29,14 @@ pub struct RateLimitBufferKey {
     /// the dna
     pub dna: DnaHash,
     /// either entry or link id
-    pub zome_id: GlobalZomeTypeId,
+    pub zome_id: ZomeId,
     // /// local, u8, scoped by zome
     // pub local_bucket_id: RateBucketId,
 }
 
 impl RateLimitBufferKey {
     /// Create a new key
-    pub fn new(dna: DnaHash, zome_id: GlobalZomeTypeId) -> Self {
+    pub fn new(dna: DnaHash, zome_id: ZomeId) -> Self {
         Self {
             dna,
             zome_id,

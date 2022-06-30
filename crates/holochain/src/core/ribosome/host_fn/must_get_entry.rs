@@ -134,7 +134,11 @@ pub mod test {
 
         let entry = Entry::try_from(Something(vec![1, 2, 3])).unwrap();
         let action_hash = alice_host_fn_caller
-            .commit_entry(entry.clone(), EntryDefIndex(0), EntryVisibility::Public)
+            .commit_entry(
+                entry.clone(),
+                EntryDefLocation::app(0, EntryDefIndex(0)),
+                EntryVisibility::Public,
+            )
             .await;
 
         let dht_db = conductor

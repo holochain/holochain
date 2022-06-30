@@ -146,10 +146,10 @@ impl NewEntryAction {
     }
 
     /// Get the timestamp of this action
-    pub fn timestamp(&self) -> &holochain_zome_types::timestamp::Timestamp {
+    pub fn timestamp(&self) -> holochain_zome_types::timestamp::Timestamp {
         match self {
             NewEntryAction::Create(Create { timestamp, .. })
-            | NewEntryAction::Update(Update { timestamp, .. }) => timestamp,
+            | NewEntryAction::Update(Update { timestamp, .. }) => *timestamp,
         }
     }
 }
@@ -463,7 +463,7 @@ mod tests {
     use crate::fixt::ActionBuilderCommonFixturator;
     use crate::test_utils::fake_dna_hash;
     use crate::test_utils::fake_entry_hash;
-    use fixt::prelude::Unpredictable;
+    use ::fixt::prelude::Unpredictable;
 
     #[test]
     fn test_action_msgpack_roundtrip() {
@@ -485,7 +485,11 @@ mod tests {
             ActionBuilderCommonFixturator::new(Unpredictable)
                 .next()
                 .unwrap(),
-            EntryType::App(AppEntryType::new(0.into(), EntryVisibility::Public)),
+            EntryType::App(AppEntryType::new(
+                0.into(),
+                0.into(),
+                EntryVisibility::Public,
+            )),
             fake_entry_hash(1).into(),
         )
         .into();
@@ -501,7 +505,11 @@ mod tests {
             ActionBuilderCommonFixturator::new(Unpredictable)
                 .next()
                 .unwrap(),
-            EntryType::App(AppEntryType::new(0.into(), EntryVisibility::Public)),
+            EntryType::App(AppEntryType::new(
+                0.into(),
+                0.into(),
+                EntryVisibility::Public,
+            )),
             fake_entry_hash(1).into(),
         )
         .into();

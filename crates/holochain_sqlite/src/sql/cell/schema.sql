@@ -53,6 +53,7 @@ CREATE TABLE IF NOT EXISTS Action (
     -- NB: basis_hash can't be foreign key, since it could map to either
     --     Entry or Action
     base_hash        BLOB           NULL,
+    zome_id          INTEGER        NULL,
     link_type        INTEGER        NULL,
     tag              BLOB           NULL,
 

@@ -42,6 +42,7 @@ where
         Ok(Self { content, hash })
     }
 }
+
 impl<C> HoloHashed<C>
 where
     C: HashableContent,
@@ -144,5 +145,23 @@ where
 {
     fn hash<StdH: std::hash::Hasher>(&self, state: &mut StdH) {
         std::hash::Hash::hash(&self.hash, state)
+    }
+}
+
+impl<C> std::cmp::PartialOrd for HoloHashed<C>
+where
+    C: HashableContent + PartialOrd,
+{
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.content.partial_cmp(&other.content)
+    }
+}
+
+impl<C> std::cmp::Ord for HoloHashed<C>
+where
+    C: HashableContent + Ord,
+{
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.content.cmp(&other.content)
     }
 }
