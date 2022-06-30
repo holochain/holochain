@@ -222,20 +222,12 @@ pub enum KitsuneErrorKind {
 
 impl PartialEq for KitsuneErrorKind {
     fn eq(&self, oth: &Self) -> bool {
-        match self {
-            Self::TimedOut => {
-                if let Self::TimedOut = oth {
-                    return true;
-                }
-            }
-            Self::Closed => {
-                if let Self::Closed = oth {
-                    return true;
-                }
-            }
-            _ => (),
+        #[allow(clippy::match_like_matches_macro)]
+        match (self, oth) {
+            (Self::TimedOut, Self::TimedOut) => true,
+            (Self::Closed, Self::Closed) => true,
+            _ => false,
         }
-        false
     }
 }
 
@@ -321,6 +313,7 @@ pub mod task_agg;
 pub mod tls;
 pub mod tx2;
 
+pub use kitsune_p2p_dht as dht;
 pub use kitsune_p2p_dht_arc as dht_arc;
 
 use metrics::metric_task;

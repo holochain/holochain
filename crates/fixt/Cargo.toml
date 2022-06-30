@@ -1,6 +1,6 @@
 [package]
 name = "fixt"
-version = "0.0.12"
+version = "0.0.13"
 description = "minimum viable fixtures"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -15,8 +15,8 @@ holochain_serialized_bytes = "=0.0.51"
 lazy_static = "1.4"
 parking_lot = "0.10"
 paste = "=1.0.5"
-rand = "0.7"
-rand_core = "0.5"
+rand = "0.8.5"
+rand_core = "0.6"
 serde = { version = "1.0", features = [ "derive" ] }
 strum = "0.18.0"
 strum_macros = "0.18.0"

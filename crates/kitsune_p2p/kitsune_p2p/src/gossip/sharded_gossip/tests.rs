@@ -9,6 +9,7 @@ use fixt::prelude::*;
 
 mod bloom;
 mod common;
+mod ops;
 mod test_two_nodes;
 
 impl ShardedGossipLocal {
@@ -27,7 +28,7 @@ impl ShardedGossipLocal {
             tuning_params: Default::default(),
             space,
             evt_sender,
-            _host: host,
+            host_api: host,
             inner: Share::new(inner),
             closing: std::sync::atomic::AtomicBool::new(false),
         }

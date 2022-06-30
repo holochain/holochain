@@ -37,7 +37,7 @@ pub fn create_agent_bloom<'a>(
 }
 
 /// Create an ops bloom for testing.
-pub fn create_ops_bloom(ops: Vec<Arc<KitsuneOpHash>>) -> PoolBuf {
+pub fn create_op_bloom(ops: Vec<Arc<KitsuneOpHash>>) -> PoolBuf {
     let len = ops.len();
     let bloom = ops.into_iter().fold(
         bloomfilter::Bloom::new_for_fp_rate(len, 0.01),

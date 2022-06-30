@@ -29,13 +29,13 @@ pub fn accept_countersigning_preflight_request<'a>(
             tokio_helper::block_forever_on(async move {
                 if (holochain_zome_types::Timestamp::now() + SESSION_TIME_FUTURE_MAX)
                     .unwrap_or(Timestamp::MAX)
-                    < *input.session_times().start()
+                    < *input.session_times.start()
                 {
                     return Ok(PreflightRequestAcceptance::UnacceptableFutureStart);
                 }
 
                 let agent_index = match input
-                    .signing_agents()
+                    .signing_agents
                     .iter()
                     .position(|(agent, _)| agent == &author)
                 {

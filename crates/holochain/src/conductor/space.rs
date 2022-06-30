@@ -1,26 +1,44 @@
 //! This module contains data and functions for running operations
 //! at the level of a [`DnaHash`] space.
 //! Multiple [`Cell`](crate::conductor::Cell)'s could share the same space.
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use holo_hash::{DhtOpHash, DnaHash};
-use holochain_conductor_api::conductor::DatabaseRootPath;
-use holochain_p2p::dht_arc::{DhtArcRange, DhtArcSet};
+use holochain_conductor_api::conductor::{ConductorConfig, DatabaseRootPath};
+use holochain_p2p::{
+    dht::{
+        arq::{power_and_count_from_length, ArqBoundsSet},
+        hash::RegionHash,
+        prelude::Topology,
+        region::{RegionBounds, RegionData},
+        region_set::{RegionCoordSetLtcs, RegionSetLtcs},
+        spacetime::TelescopingTimes,
+        ArqBounds, ArqStrat,
+    },
+    dht_arc::{DhtArcRange, DhtArcSet},
+    event::FetchOpDataQuery,
+};
 use holochain_sqlite::{
     conn::{DbSyncLevel, DbSyncStrategy},
     db::{
         DbKindAuthored, DbKindCache, DbKindConductor, DbKindDht, DbKindP2pAgents, DbKindP2pMetrics,
         DbKindWasm, DbWrite, ReadAccess,
     },
-    prelude::DatabaseResult,
+    prelude::{DatabaseError, DatabaseResult},
 };
-use holochain_state::prelude::{from_blob, StateQueryResult};
+use holochain_state::{
+    prelude::{from_blob, StateQueryResult},
+    query::{map_sql_dht_op_common, StateQueryError},
+};
 use holochain_types::{
     db_cache::DhtDbQueryCache,
     dht_op::{DhtOp, DhtOpType},
 };
 use holochain_zome_types::{Entry, EntryVisibility, SignedAction, Timestamp};
-use kitsune_p2p::event::{TimeWindow, TimeWindowInclusive};
+use kitsune_p2p::{
+    event::{TimeWindow, TimeWindowInclusive},
+    KitsuneP2pConfig,
+};
 use rusqlite::named_params;
 use tracing::instrument;
 
@@ -41,6 +59,9 @@ use super::{
 };
 use std::convert::TryInto;
 
+#[cfg(test)]
+mod tests;
+
 #[derive(Clone)]
 /// This is the set of all current
 /// [`DnaHash`] spaces for all cells
@@ -53,6 +74,7 @@ pub struct Spaces {
     pub(crate) queue_consumer_map: QueueConsumerMap,
     pub(crate) conductor_db: DbWrite<DbKindConductor>,
     pub(crate) wasm_db: DbWrite<DbKindWasm>,
+    network_config: KitsuneP2pConfig,
 }
 
 #[derive(Clone)]
@@ -112,10 +134,9 @@ pub struct TestSpace {
 
 impl Spaces {
     /// Create a new empty set of [`DnaHash`] spaces.
-    pub fn new(
-        root_db_dir: DatabaseRootPath,
-        db_sync_strategy: DbSyncStrategy,
-    ) -> ConductorResult<Self> {
+    pub fn new(config: &ConductorConfig) -> ConductorResult<Self> {
+        let root_db_dir = config.environment_path.clone();
+        let db_sync_strategy = config.db_sync_strategy;
         let db_sync_level = match db_sync_strategy {
             DbSyncStrategy::Fast => DbSyncLevel::Off,
             DbSyncStrategy::Resilient => DbSyncLevel::Normal,
@@ -131,6 +152,7 @@ impl Spaces {
             queue_consumer_map: QueueConsumerMap::new(),
             conductor_db,
             wasm_db,
+            network_config: config.network.clone().unwrap_or_default(),
         })
     }
 
@@ -263,8 +285,8 @@ impl Spaces {
         };
         let results = db
             .async_reader(move |txn| {
-                let hashes = txn
-                    .prepare_cached(&sql)?
+                let mut stmt = txn.prepare_cached(&sql)?;
+                let hashes = stmt
                     .query_map(
                         named_params! {
                             ":from": start,
@@ -297,9 +319,131 @@ impl Spaces {
         Ok(results)
     }
 
-    #[instrument(skip(self, op_hashes))]
+    /// The network module needs info about various groupings ("regions") of ops
+    ///
+    /// Note that this always includes all ops regardless of integration status.
+    /// This is to avoid the degenerate case of freshly joining a network, and
+    /// having several new peers gossiping with you at once about the same regions.
+    /// If we calculate our region hash only by integrated ops, we will experience
+    /// mismatches for a large number of ops repeatedly until we have integrated
+    /// those ops. Note that when *sending* ops we filter out ops in limbo.
+    pub async fn handle_fetch_op_regions(
+        &self,
+        dna_hash: &DnaHash,
+        topology: Topology,
+        dht_arc_set: DhtArcSet,
+    ) -> ConductorResult<RegionSetLtcs> {
+        let sql = holochain_sqlite::sql::sql_cell::FETCH_OP_REGION;
+        let max_chunks = ArqStrat::default().max_chunks();
+        let arq_set = ArqBoundsSet::new(
+            dht_arc_set
+                .intervals()
+                .into_iter()
+                .map(|i| {
+                    let len = i.length();
+                    let (pow, _) = power_and_count_from_length(&topology.space, len, max_chunks);
+                    ArqBounds::from_interval_rounded(&topology, pow, i)
+                })
+                .collect(),
+        );
+        let times = TelescopingTimes::historical(&topology);
+        let coords = RegionCoordSetLtcs::new(times, arq_set);
+        let coords_clone = coords.clone();
+        let db = self.dht_db(dna_hash)?;
+        db.async_reader(move |txn| {
+            let mut stmt = txn.prepare_cached(sql).map_err(DatabaseError::from)?;
+            Ok(coords_clone.into_region_set(|(_, coords)| {
+                let bounds = coords.to_bounds(&topology);
+                let (x0, x1) = bounds.x;
+                let (t0, t1) = bounds.t;
+                stmt.query_row(
+                    named_params! {
+                        ":storage_start_loc": x0,
+                        ":storage_end_loc": x1,
+                        ":timestamp_min": t0,
+                        ":timestamp_max": t1,
+                    },
+                    |row| {
+                        let size: f64 = row.get("total_size")?;
+                        Ok(RegionData {
+                            hash: RegionHash::from_vec(row.get("xor_hash")?)
+                                .expect("region hash must be 32 bytes"),
+                            size: size.min(u32::MAX as f64) as u32,
+                            count: row.get("count")?,
+                        })
+                    },
+                )
+            })?)
+        })
+        .await
+    }
+
+    #[instrument(skip(self, query))]
     /// The network module is requesting the content for dht ops
     pub async fn handle_fetch_op_data(
+        &self,
+        dna_hash: &DnaHash,
+        query: FetchOpDataQuery,
+    ) -> ConductorResult<Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>> {
+        match query {
+            FetchOpDataQuery::Hashes(op_hashes) => {
+                self.handle_fetch_op_data_by_hashes(dna_hash, op_hashes)
+                    .await
+            }
+            FetchOpDataQuery::Regions(regions) => {
+                self.handle_fetch_op_data_by_regions(dna_hash, regions)
+                    .await
+            }
+        }
+    }
+
+    #[instrument(skip(self, regions))]
+    /// The network module is requesting the content for dht ops
+    pub async fn handle_fetch_op_data_by_regions(
+        &self,
+        dna_hash: &DnaHash,
+        regions: Vec<RegionBounds>,
+    ) -> ConductorResult<Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>> {
+        let sql = holochain_sqlite::sql::sql_cell::FETCH_OPS_BY_REGION;
+        Ok(self
+            .dht_db(dna_hash)?
+            .async_reader(move |txn| {
+                let mut stmt = txn.prepare_cached(sql).map_err(StateQueryError::from)?;
+                StateQueryResult::Ok(
+                    regions
+                        .into_iter()
+                        .map(|bounds| {
+                            let (x0, x1) = bounds.x;
+                            let (t0, t1) = bounds.t;
+                            stmt.query_and_then(
+                                named_params! {
+                                    ":storage_start_loc": x0,
+                                    ":storage_end_loc": x1,
+                                    ":timestamp_min": t0,
+                                    ":timestamp_max": t1,
+                                },
+                                |row| {
+                                    let hash: DhtOpHash =
+                                        row.get("hash").map_err(StateQueryError::from)?;
+                                    Ok(map_sql_dht_op_common(row)?.map(|op| (hash, op)))
+                                },
+                            )
+                            .map_err(StateQueryError::from)?
+                            .collect::<Result<Vec<Option<_>>, StateQueryError>>()
+                        })
+                        .collect::<Result<Vec<Vec<Option<_>>>, _>>()?
+                        .into_iter()
+                        .flatten()
+                        .flatten()
+                        .collect(),
+                )
+            })
+            .await?)
+    }
+
+    #[instrument(skip(self, op_hashes))]
+    /// The network module is requesting the content for dht ops
+    pub async fn handle_fetch_op_data_by_hashes(
         &self,
         dna_hash: &DnaHash,
         op_hashes: Vec<holo_hash::DhtOpHash>,
@@ -312,6 +456,7 @@ impl Spaces {
                 let mut out = Vec::with_capacity(op_hashes.len());
                 let mut total_bytes = 0;
                 for hash in op_hashes {
+                    // FIXME: cache this query (make prepared statement)
                     let r = txn.query_row_and_then(
                         "
                             SELECT DhtOp.hash, DhtOp.type AS dht_type,
@@ -355,6 +500,7 @@ impl Spaces {
                         Ok((r, bytes)) => {
                             out.push(r);
                             total_bytes += bytes;
+                            // pair(maackle, freesig): be sure to add this limit in the region fetch case too
                             if total_bytes > OPS_IN_MEMORY_BOUND_BYTES {
                                 break;
                             }
@@ -413,12 +559,19 @@ impl Spaces {
             {
                 Some(t) => t,
                 // If the workflow has not been spawned yet we can't handle incoming messages.
-                // Not this is not an error because only a validation receipt is proof of a publish.
+                // Note this is not an error because only a validation receipt is proof of a publish.
                 None => return Ok(()),
             };
             incoming_dht_ops_workflow(&space, trigger, ops, request_validation_receipt).await?;
         }
         Ok(())
+    }
+
+    /// Get the recent_threshold based on the kitsune network config
+    pub fn recent_threshold(&self) -> Duration {
+        self.network_config
+            .tuning_params
+            .danger_gossip_recent_threshold()
     }
 }
 
@@ -507,7 +660,11 @@ impl TestSpaces {
             .prefix("holochain-test-environments")
             .tempdir()
             .unwrap();
-        let spaces = Spaces::new(temp_dir.path().to_path_buf().into(), Default::default()).unwrap();
+        let spaces = Spaces::new(&ConductorConfig {
+            environment_path: temp_dir.path().to_path_buf().into(),
+            ..Default::default()
+        })
+        .unwrap();
         spaces.map.share_mut(|map| {
             map.extend(
                 test_spaces

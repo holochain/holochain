@@ -9,16 +9,36 @@ use holochain::test_utils::network_simulation::{data_zome, generate_test_data};
 use holochain::{
     conductor::ConductorBuilder, test_utils::consistency::local_machine_session_with_hashes,
 };
+use holochain_p2p::*;
+use holochain_sqlite::db::*;
 use kitsune_p2p::agent_store::AgentInfoSigned;
-use kitsune_p2p::gossip::sharded_gossip::test_utils::create_ops_bloom;
 use kitsune_p2p::gossip::sharded_gossip::test_utils::{check_ops_boom, create_agent_bloom};
 use kitsune_p2p::KitsuneP2pConfig;
-use url2::Url2;
+use kitsune_p2p_types::config::RECENT_THRESHOLD_DEFAULT;
 
-#[derive(serde::Serialize, serde::Deserialize, Debug, SerializedBytes, derive_more::From)]
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
 #[serde(transparent)]
 #[repr(transparent)]
 struct AppString(String);
+
+fn make_config(recent_threshold: Option<u64>) -> ConductorConfig {
+    let mut tuning =
+        kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
+    tuning.gossip_strategy = "sharded-gossip".to_string();
+    tuning.danger_gossip_recent_threshold_secs =
+        recent_threshold.unwrap_or(RECENT_THRESHOLD_DEFAULT.as_secs());
+
+    let mut network = KitsuneP2pConfig::default();
+    network.transport_pool = vec![kitsune_p2p::TransportConfig::Quic {
+        bind_to: None,
+        override_host: None,
+        override_port: None,
+    }];
+    network.tuning_params = Arc::new(tuning);
+    let mut config = ConductorConfig::default();
+    config.network = Some(network);
+    config
+}
 
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
@@ -30,21 +50,7 @@ async fn fullsync_sharded_gossip() -> anyhow::Result<()> {
     let _g = observability::test_run().ok();
     const NUM_CONDUCTORS: usize = 2;
 
-    let mut tuning =
-        kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
-    tuning.gossip_strategy = "sharded-gossip".to_string();
-
-    let mut network = KitsuneP2pConfig::default();
-    network.transport_pool = vec![kitsune_p2p::TransportConfig::Quic {
-        bind_to: None,
-        override_host: None,
-        override_port: None,
-    }];
-    network.tuning_params = Arc::new(tuning);
-    let mut config = ConductorConfig::default();
-    config.network = Some(network);
-
-    let mut conductors = SweetConductorBatch::from_config(NUM_CONDUCTORS, config).await;
+    let mut conductors = SweetConductorBatch::from_config(NUM_CONDUCTORS, make_config(None)).await;
     for c in conductors.iter() {
         c.update_dev_settings(DevSettingsDelta {
             publish: Some(false),
@@ -90,6 +96,98 @@ async fn fullsync_sharded_gossip() -> anyhow::Result<()> {
 
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
+async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
+    use holochain::{
+        conductor::handle::DevSettingsDelta, test_utils::inline_zomes::batch_create_zome,
+    };
+
+    // let _g = observability::test_run().ok();
+
+    const NUM_CONDUCTORS: usize = 3;
+    const NUM_OPS: usize = 100;
+
+    let mut conductors =
+        SweetConductorBatch::from_config(NUM_CONDUCTORS, make_config(Some(0))).await;
+    for c in conductors.iter() {
+        c.update_dev_settings(DevSettingsDelta {
+            publish: Some(false),
+            ..Default::default()
+        });
+    }
+
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(batch_create_zome())
+        .await
+        .unwrap();
+
+    let apps = conductors
+        .setup_app("app", &[dna_file.clone()])
+        .await
+        .unwrap();
+    conductors.exchange_peer_info().await;
+
+    let ((alice,), (bobbo,), (carol,)) = apps.into_tuples();
+
+    // Call the "create" zome fn on Alice's app
+    let hashes: Vec<ActionHash> = conductors[0]
+        .call(
+            &alice.zome(holochain::sweettest::SweetEasyInline::COORDINATOR),
+            "create_batch",
+            NUM_OPS,
+        )
+        .await;
+    let all_cells = vec![&alice, &bobbo, &carol];
+
+    // Wait long enough for Bob to receive gossip
+    consistency_10s(&all_cells).await;
+
+    let mut all_op_hashes = vec![];
+
+    for i in 0..NUM_CONDUCTORS {
+        let mut hashes: Vec<_> = conductors[i]
+            .get_spaces()
+            .handle_query_op_hashes(
+                dna_file.dna_hash(),
+                holochain_p2p::dht_arc::DhtArcSet::Full,
+                kitsune_p2p::event::full_time_window(),
+                100000000,
+                true,
+            )
+            .await
+            .unwrap()
+            .unwrap()
+            .0;
+
+        hashes.sort();
+        all_op_hashes.push(hashes);
+    }
+
+    assert_eq!(all_op_hashes[0].len(), all_op_hashes[1].len());
+    assert_eq!(all_op_hashes[0], all_op_hashes[1]);
+    assert_eq!(all_op_hashes[1].len(), all_op_hashes[2].len());
+    assert_eq!(all_op_hashes[1], all_op_hashes[2]);
+
+    // Verify that bobbo can run "read" on his cell and get alice's Action
+    let element: Option<Record> = conductors[1]
+        .call(
+            &bobbo.zome(holochain::sweettest::SweetEasyInline::COORDINATOR),
+            "read",
+            hashes[0].clone(),
+        )
+        .await;
+    let element = element.expect("Record was None: bobbo couldn't `get` it");
+
+    // Assert that the Record bobbo sees matches what alice committed
+    assert_eq!(element.action().author(), alice.agent_pubkey());
+    assert!(matches!(
+        *element.entry(),
+        RecordEntry::Present(Entry::App(_))
+    ));
+
+    Ok(())
+}
+
+#[cfg(feature = "test_utils")]
+#[tokio::test(flavor = "multi_thread")]
 async fn fullsync_sharded_local_gossip() -> anyhow::Result<()> {
     use holochain::{
         conductor::handle::DevSettingsDelta, sweettest::SweetConductor,
@@ -98,21 +196,7 @@ async fn fullsync_sharded_local_gossip() -> anyhow::Result<()> {
 
     let _g = observability::test_run().ok();
 
-    let mut tuning =
-        kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
-    tuning.gossip_strategy = "sharded-gossip".to_string();
-
-    let mut network = KitsuneP2pConfig::default();
-    network.transport_pool = vec![kitsune_p2p::TransportConfig::Quic {
-        bind_to: None,
-        override_host: None,
-        override_port: None,
-    }];
-    network.tuning_params = Arc::new(tuning);
-    let mut config = ConductorConfig::default();
-    config.network = Some(network);
-
-    let mut conductor = SweetConductor::from_config(config).await;
+    let mut conductor = SweetConductor::from_config(make_config(None)).await;
     conductor.update_dev_settings(DevSettingsDelta {
         publish: Some(false),
         ..Default::default()
@@ -169,6 +253,8 @@ async fn fullsync_sharded_local_gossip() -> anyhow::Result<()> {
 async fn mock_network_sharded_gossip() {
     use std::sync::atomic::AtomicUsize;
 
+    use hdk::prelude::*;
+    use holochain_p2p::dht_arc::DhtLocation;
     use holochain_p2p::mock_network::{GossipProtocol, MockScenario};
     use holochain_p2p::{
         dht_arc::DhtArcSet,
@@ -176,9 +262,9 @@ async fn mock_network_sharded_gossip() {
             AddressedHolochainP2pMockMsg, HolochainP2pMockChannel, HolochainP2pMockMsg,
         },
     };
-    use holochain_p2p::{dht_arc::DhtLocation, AgentPubKeyExt};
-    use holochain_sqlite::db::AsP2pStateTxExt;
+    use kitsune_p2p::gossip::sharded_gossip::test_utils::*;
     use kitsune_p2p::TransportConfig;
+    use kitsune_p2p::*;
     use kitsune_p2p_types::tx2::tx2_adapter::AdapterFactory;
 
     // Get the env var settings for number of simulated agents and
@@ -392,7 +478,7 @@ async fn mock_network_sharded_gossip() {
                                                 time_window: window,
                                             }
                                         } else {
-                                            let filter = create_ops_bloom(this_agent_hashes);
+                                            let filter = create_op_bloom(this_agent_hashes);
 
                                             EncodedTimedBloomFilter::HaveHashes {
                                                 time_window: window,
@@ -403,7 +489,7 @@ async fn mock_network_sharded_gossip() {
                                             dna: dna.clone(),
                                             module: module.clone(),
                                             gossip: GossipProtocol::Sharded(
-                                                ShardedGossipWire::ops(filter, true),
+                                                ShardedGossipWire::op_bloom(filter, true),
                                             ),
                                         };
                                         channel.send(msg.addressed((*agent).clone())).await;
@@ -420,7 +506,9 @@ async fn mock_network_sharded_gossip() {
                                             channel.send(msg.addressed((*agent).clone())).await;
                                         }
                                     }
-                                    ShardedGossipWire::Ops(Ops { missing_hashes, .. }) => {
+                                    ShardedGossipWire::OpBloom(OpBloom {
+                                        missing_hashes, ..
+                                    }) => {
                                         // We have received an ops bloom so we can respond with any missing
                                         // hashes if there are nay.
                                         let this_agent_hashes = data.hashes_authority_for(&agent);
@@ -494,16 +582,16 @@ async fn mock_network_sharded_gossip() {
 
                                         // Print out some stats.
                                         debug!(
-                                        "Gossiped with {}, got {} of {} ops, overlap: {:.2}%, max could get {}, {:.2}% done, avg freq of gossip {:?}, est finish in {:?}",
-                                        agent,
-                                        missing_ops.len(),
-                                        num_this_agent_hashes,
-                                        overlap,
-                                        max_could_get,
-                                        p_done,
-                                        avg_gossip_freq,
-                                        time_to_completion
-                                    );
+                                            "Gossiped with {}, got {} of {} ops, overlap: {:.2}%, max could get {}, {:.2}% done, avg freq of gossip {:?}, est finish in {:?}",
+                                            agent,
+                                            missing_ops.len(),
+                                            num_this_agent_hashes,
+                                            overlap,
+                                            max_could_get,
+                                            p_done,
+                                            avg_gossip_freq,
+                                            time_to_completion
+                                        );
                                         let msg = HolochainP2pMockMsg::Gossip {
                                             dna,
                                             module,
@@ -518,16 +606,24 @@ async fn mock_network_sharded_gossip() {
                                     }
                                     ShardedGossipWire::MissingOps(MissingOps { ops, .. }) => {
                                         debug!(
-                                        "Gossiped with {} {} out of {}, who sent {} ops and gossiped with {} nodes outside of arc",
-                                        agent,
-                                        agents_gossiped_with.len(),
-                                        data.num_agents(),
-                                        ops.len(),
-                                        num_missed_gossips
-                                    );
+                                            "Gossiped with {} {} out of {}, who sent {} ops and gossiped with {} nodes outside of arc",
+                                            agent,
+                                            agents_gossiped_with.len(),
+                                            data.num_agents(),
+                                            ops.len(),
+                                            num_missed_gossips
+                                        );
                                     }
-                                    ShardedGossipWire::MissingAgents(MissingAgents { .. }) => {}
-                                    _ => (),
+                                    ShardedGossipWire::OpRegions(_) => todo!("must implement"),
+
+                                    ShardedGossipWire::Agents(_) => {}
+                                    ShardedGossipWire::MissingAgents(_) => {}
+                                    ShardedGossipWire::Accept(_) => (),
+                                    ShardedGossipWire::NoAgents(_) => (),
+                                    ShardedGossipWire::AlreadyInProgress(_) => (),
+                                    ShardedGossipWire::Busy(_) => (),
+                                    ShardedGossipWire::Error(_) => (),
+                                    ShardedGossipWire::OpBatchReceived(_) => (),
                                 }
                             }
                         }
@@ -688,6 +784,7 @@ async fn mock_network_sharded_gossip() {
 async fn mock_network_sharding() {
     use std::sync::atomic::AtomicUsize;
 
+    use hdk::prelude::*;
     use holochain_p2p::mock_network::{
         AddressedHolochainP2pMockMsg, HolochainP2pMockChannel, HolochainP2pMockMsg,
     };
@@ -824,6 +921,7 @@ async fn mock_network_sharding() {
                         }
                     },
                     HolochainP2pMockMsg::CallResp(_) => debug!("CallResp"),
+                    HolochainP2pMockMsg::MetricExchange(_) => debug!("MetricExchange"),
                     HolochainP2pMockMsg::PeerGet(_) => eprintln!("PeerGet"),
                     HolochainP2pMockMsg::PeerGetResp(_) => debug!("PeerGetResp"),
                     HolochainP2pMockMsg::PeerQuery(kitsune_p2p::wire::PeerQuery {
@@ -910,7 +1008,8 @@ async fn mock_network_sharding() {
                                                 time_window: window,
                                             }
                                         } else {
-                                            let filter = create_ops_bloom(this_agent_hashes);
+                                            let filter =
+                                                test_utils::create_op_bloom(this_agent_hashes);
 
                                             EncodedTimedBloomFilter::HaveHashes {
                                                 time_window: window,
@@ -921,7 +1020,7 @@ async fn mock_network_sharding() {
                                             dna: dna.clone(),
                                             module: module.clone(),
                                             gossip: GossipProtocol::Sharded(
-                                                ShardedGossipWire::ops(filter, true),
+                                                ShardedGossipWire::op_bloom(filter, true),
                                             ),
                                         };
                                         channel.send(msg.addressed((*agent).clone())).await;
@@ -942,7 +1041,9 @@ async fn mock_network_sharding() {
                                             channel.send(msg.addressed((*agent).clone())).await;
                                         }
                                     }
-                                    ShardedGossipWire::Ops(Ops { missing_hashes, .. }) => {
+                                    ShardedGossipWire::OpBloom(OpBloom {
+                                        missing_hashes, ..
+                                    }) => {
                                         // We have received an ops bloom so we can respond with any missing
                                         // hashes if there are nay.
                                         let this_agent_hashes = data.hashes_authority_for(&agent);
@@ -1015,14 +1116,21 @@ async fn mock_network_sharding() {
                                         };
                                         channel.send(msg.addressed((*agent).clone())).await;
                                     }
-                                    ShardedGossipWire::MissingAgents(MissingAgents { .. }) => {}
-                                    _ => (),
+                                    ShardedGossipWire::OpRegions(_) => todo!("must implement"),
+
+                                    ShardedGossipWire::MissingAgents(_) => {}
+                                    ShardedGossipWire::Accept(_) => (),
+                                    ShardedGossipWire::MissingOps(_) => (),
+                                    ShardedGossipWire::NoAgents(_) => (),
+                                    ShardedGossipWire::AlreadyInProgress(_) => (),
+                                    ShardedGossipWire::Busy(_) => (),
+                                    ShardedGossipWire::Error(_) => (),
+                                    ShardedGossipWire::OpBatchReceived(_) => (),
                                 }
                             }
                         }
                     }
                     HolochainP2pMockMsg::Failure(reason) => panic!("Failure: {}", reason),
-                    HolochainP2pMockMsg::MetricExchange(_) => (),
                     HolochainP2pMockMsg::PublishedAgentInfo { .. } => todo!(),
                 }
             }
@@ -1120,8 +1228,8 @@ async fn mock_network_sharding() {
 
 #[cfg(feature = "test_utils")]
 async fn run_bootstrap(
-    peer_data: impl Iterator<Item = AgentInfoSigned>,
-) -> (Url2, kitsune_p2p_bootstrap::BootstrapShutdown) {
+    peer_data: impl Iterator<Item = kitsune_p2p::agent_store::AgentInfoSigned>,
+) -> (url2::Url2, kitsune_p2p_bootstrap::BootstrapShutdown) {
     let mut url = url2::url2!("http://127.0.0.1:0");
     let (driver, addr, shutdown) = kitsune_p2p_bootstrap::run(([127, 0, 0, 1], 0), vec![])
         .await

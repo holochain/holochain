@@ -91,7 +91,7 @@ fixturator!(
     curve Empty BTreeMap::new().into();
     curve Unpredictable {
         let mut rng = rand::thread_rng();
-        let number_of_wasms = rng.gen_range(0, 5);
+        let number_of_wasms = rng.gen_range(0..5);
 
         let mut wasms = BTreeMap::new();
         let mut dna_wasm_fixturator = DnaWasmFixturator::new(Unpredictable);
