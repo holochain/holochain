@@ -34,7 +34,11 @@ async fn can_update_state() {
     let holochain_p2p = holochain_p2p::stub_network().await;
     let (post_commit_sender, _post_commit_receiver) =
         tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
-    let spaces = Spaces::new(db_dir.path().to_path_buf().into(), Default::default()).unwrap();
+    let spaces = Spaces::new(&ConductorConfig {
+        environment_path: db_dir.path().to_path_buf().into(),
+        ..Default::default()
+    })
+    .unwrap();
     let conductor = Conductor::new(
         Default::default(),
         ribosome_store,
@@ -82,7 +86,11 @@ async fn can_add_clone_cell_to_app() {
     let ribosome_store = RibosomeStore::new();
     let (post_commit_sender, _post_commit_receiver) =
         tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
-    let spaces = Spaces::new(db_dir.path().to_path_buf().into(), Default::default()).unwrap();
+    let spaces = Spaces::new(&ConductorConfig {
+        environment_path: db_dir.path().to_path_buf().into(),
+        ..Default::default()
+    })
+    .unwrap();
 
     let conductor = Conductor::new(
         Default::default(),
@@ -157,7 +165,11 @@ async fn app_ids_are_unique() {
     let holochain_p2p = holochain_p2p::stub_network().await;
     let (post_commit_sender, _post_commit_receiver) =
         tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
-    let spaces = Spaces::new(db_dir.path().to_path_buf().into(), Default::default()).unwrap();
+    let spaces = Spaces::new(&ConductorConfig {
+        environment_path: db_dir.path().to_path_buf().into(),
+        ..Default::default()
+    })
+    .unwrap();
     let conductor = Conductor::new(
         Default::default(),
         ribosome_store,

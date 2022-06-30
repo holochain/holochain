@@ -1,4 +1,9 @@
-use kitsune_p2p_dht_arc::*;
+#![allow(dead_code)]
+#![cfg(feature = "test_utils")]
+
+use kitsune_p2p_dht::arq::*;
+use kitsune_p2p_dht::spacetime::Topology;
+use kitsune_p2p_dht::test_utils::calc_min_redundancy;
 use rand::prelude::StdRng;
 use rand::thread_rng;
 use rand::Rng;
@@ -7,19 +12,25 @@ use statrs::statistics::*;
 use std::collections::HashSet;
 use std::iter;
 
+use colored::*;
+
 /// Maximum number of iterations. If we iterate this much, we assume the
 /// system is divergent (unable to reach equilibrium).
-const DIVERGENCE_ITERS: usize = 40;
+const DIVERGENCE_ITERS: usize = 60;
 
 /// Number of consecutive rounds of no movement before declaring convergence.
-const CONVERGENCE_WINDOW: usize = 3;
+const CONVERGENCE_WINDOW: usize = 1;
 
 /// Level of detail in reporting.
 pub const DETAIL: u8 = 1;
 
 type DataVec = statrs::statistics::Data<Vec<f64>>;
 
-pub type Peers = Vec<DhtArc>;
+pub type Peers = Vec<Arq>;
+
+fn full_len() -> f64 {
+    2f64.powi(32)
+}
 
 pub fn seeded_rng(seed: Option<u64>) -> StdRng {
     let seed = seed.unwrap_or_else(|| thread_rng().gen());
@@ -92,104 +103,140 @@ where
 /// dynamic_peer_indices: Indices of peers who should be updated. If None, all peers will be updated.
 /// detail: Level of output detail. More is more verbose. detail: u8,
 pub fn run_one_epoch(
-    strat: &PeerStrat,
+    topo: &Topology,
+    strat: &ArqStrat,
     mut peers: Peers,
     dynamic_peer_indices: Option<&HashSet<usize>>,
-    detail: u8,
+    detail: bool,
 ) -> (Peers, EpochStats) {
-    let mut net = 0.0;
-    let mut gross = 0.0;
-    let mut delta_min = FULL_LEN_F;
-    let mut delta_max = -FULL_LEN_F;
-    let mut index_min = peers.len();
-    let mut index_max = peers.len();
+    let mut cov_total = 0.0;
+    let mut cov_min = full_len();
+    let mut cov_max = 0.0;
+    let mut power_min = 32;
+    let mut power_max = 0;
+    let mut power_total = 0.0;
+    let mut delta_net = 0.0;
+    let mut delta_gross = 0.0;
+
+    let mut delta_min = full_len();
+    let mut delta_max = -full_len();
+
+    // TODO: update the continuous test framework to only use one view per epoch
+    let mut view = PeerViewQ::new(topo.clone(), strat.clone(), peers.clone());
+
+    if detail {
+        println!(
+            "|{: ^64}|  {:<3} {:>3} {:>3} {:>3} {:>4} {:>6} {:>3} {:>4}",
+            "<arc>", "idx", "cnt", "pwr", "mp", "Δ", "cov", "#p", "slk",
+        )
+    }
+
     for i in 0..peers.len() {
+        view.skip_index = Some(i);
+
         if let Some(dynamic) = dynamic_peer_indices {
             if !dynamic.contains(&i) {
                 continue;
             }
         }
-        let p = peers.clone();
-        let arc = peers.get_mut(i).unwrap();
-        let view = strat.view(*arc, p.as_slice());
-        let before = arc.length() as f64;
-        arc.update_length(view);
-        let after = arc.length() as f64;
-        let delta = after - before;
-        // dbg!(&before, &after, &delta);
-        net += delta;
-        gross += delta.abs();
+        let mut arq = peers.get_mut(i).unwrap();
+        let before = arq.absolute_length(topo) as f64;
+        let before_pow = arq.power();
+
+        let stats = view.update_arq_with_stats(topo, &mut arq);
+
+        let after = arq.absolute_length(topo) as f64;
+        let delta = (after - before) / topo.space.quantum as f64;
+
+        if detail {
+            let d = delta as i64 / 2i64.pow(before_pow as u32);
+            let delta_str = if d == 0 {
+                "    ".into()
+            } else if d > 0 {
+                format!("{:>+4}", d).green()
+            } else {
+                format!("{:>+4}", d).red()
+            };
+            let delta_str = if d.abs() > strat.max_chunks() as i64 {
+                delta_str.bold()
+            } else {
+                delta_str
+            };
+
+            let cov = view.extrapolated_coverage(&arq);
+            let slack_factor = view.slack_factor(cov, stats.num_peers);
+
+            let slack_str = if slack_factor == 1.0 {
+                "    ".into()
+            } else if slack_factor > 3.0 {
+                format!("{:4.2}", slack_factor).bold()
+            } else {
+                format!("{:4.2}", slack_factor).normal()
+            };
+
+            let cov_str = format!("{: >6.2}", cov);
+
+            let power_str = stats
+                .power
+                .map(|p| format!("{:2}", p.median).normal())
+                .unwrap_or("??".magenta());
+            println!(
+                "|{}| #{:<3} {:>3} {:>3} {:>3} {} {} {: >3} {}",
+                arq.to_dht_arc_range(topo).to_ascii(64),
+                i,
+                arq.count(),
+                arq.power(),
+                power_str,
+                delta_str,
+                cov_str,
+                stats.num_peers,
+                slack_str,
+            );
+        }
+
+        power_total += arq.power() as f64;
+        cov_total += after;
+        delta_net += delta;
+        delta_gross += delta.abs();
+        if after < cov_min {
+            cov_min = after;
+        }
+        if after > cov_max {
+            cov_max = after;
+        }
+
+        if arq.power() > power_max {
+            power_max = arq.power();
+        }
+        if arq.power() < power_min {
+            power_min = arq.power();
+        }
+
         if delta < delta_min {
             delta_min = delta;
-            index_min = i;
         }
         if delta > delta_max {
             delta_max = delta;
-            index_max = i;
         }
-    }
-
-    if detail >= 2 {
-        tracing::info!("min: |{}| {}", peers[index_min].to_ascii(64), index_min);
-        tracing::info!("max: |{}| {}", peers[index_max].to_ascii(64), index_max);
-        tracing::info!("");
-    } else if detail >= 3 {
-        print_arcs(&peers);
-        get_input();
+        view.skip_index = None;
     }
 
     let tot = peers.len() as f64;
-    let min_redundancy = check_redundancy(peers.clone());
+    let min_redundancy = calc_min_redundancy(topo, peers.clone());
     let stats = EpochStats {
-        net_delta_avg: net / tot / FULL_LEN_F,
-        gross_delta_avg: gross / tot / FULL_LEN_F,
-        min_redundancy: min_redundancy,
-        delta_min: delta_min / FULL_LEN_F,
-        delta_max: delta_max / FULL_LEN_F,
+        net_delta_avg: delta_net / tot / full_len(),
+        gross_delta_avg: delta_gross / tot / full_len(),
+        min_redundancy,
+        delta_min: delta_min / full_len(),
+        delta_max: delta_max / full_len(),
+        min_coverage: cov_min / full_len(),
+        max_coverage: cov_max / full_len(),
+        avg_redundancy: cov_total / full_len(),
+        min_power: power_min,
+        max_power: power_max,
+        mean_power: power_total / tot,
     };
     (peers, stats)
-}
-
-/// Generate a list of DhtArcs based on 3 parameters:
-/// N: total # of peers
-/// J: random jitter of peer locations
-/// S: strategy for generating arc lengths
-pub fn simple_parameterized_generator(
-    rng: &mut StdRng,
-    n: usize,
-    j: f64,
-    s: ArcLenStrategy,
-) -> Peers {
-    tracing::info!("N = {}, J = {}", n, j);
-    tracing::info!("Arc len generation: {:?}", s);
-    let halflens = s.gen(rng, n);
-    generate_evenly_spaced_with_half_lens_and_jitter(rng, j, halflens)
-}
-
-/// Define arcs by start location and halflen in the unit interval [0.0, 1.0]
-pub fn unit_arcs<H: Iterator<Item = (f64, f64)>>(arcs: H) -> Peers {
-    let fc = FULL_LEN_F;
-    let fh = MAX_HALF_LENGTH as f64;
-    arcs.map(|(s, h)| {
-        DhtArc::from_start_and_half_len((s * fc).min(u32::MAX as f64) as u32, (h * fh) as u32)
-    })
-    .collect()
-}
-
-/// Each agent is perfect evenly spaced around the DHT,
-/// with the halflens specified by the iterator.
-pub fn generate_evenly_spaced_with_half_lens_and_jitter(
-    rng: &mut StdRng,
-    jitter: f64,
-    hs: Vec<f64>,
-) -> Peers {
-    let n = hs.len() as f64;
-    unit_arcs(hs.into_iter().enumerate().map(|(i, h)| {
-        (
-            (i as f64 / n) + (2.0 * jitter * rng.gen::<f64>()) - jitter,
-            h,
-        )
-    }))
 }
 
 #[derive(Debug)]
@@ -277,7 +324,7 @@ impl RunBatch {
             Vergence::Convergent => RunReportOutcome::Convergent {
                 redundancy_stats: Stats::new(DataVec::new(
                     self.histories()
-                        .map(|hs| hs.last().unwrap().min_redundancy as f64)
+                        .filter_map(|hs| hs.last().map(|h| h.min_redundancy as f64))
                         .collect(),
                 )),
             },
@@ -368,21 +415,33 @@ pub struct EpochStats {
     pub delta_min: f64,
     // pub delta_variance: f64,
     pub min_redundancy: u32,
+    pub min_coverage: f64,
+    pub max_coverage: f64,
+    pub avg_redundancy: f64,
+    pub min_power: u8,
+    pub max_power: u8,
+    pub mean_power: f64,
 }
 
 impl EpochStats {
     pub fn oneline_header() -> String {
-        format!("rdun   net Δ%   gross Δ%   min Δ%   max Δ%")
+        format!(
+            "rdun   net Δ%   gross Δ%   min Δ%   max Δ%   avg cov   min pow   avg pow   max pow"
+        )
     }
 
     pub fn oneline(&self) -> String {
         format!(
-            "{:4}   {:>+6.3}   {:>8.3}   {:>6.3}   {:>6.3}",
+            "{:4}   {:>+6.3}   {:>8.3}   {:>6.3}   {:>6.3}   {:>7.2}   {:>7}   {:>7.2}   {:>7}",
             self.min_redundancy,
             self.net_delta_avg * 100.0,
             self.gross_delta_avg * 100.0,
             self.delta_min * 100.0,
             self.delta_max * 100.0,
+            self.avg_redundancy,
+            self.min_power,
+            self.mean_power,
+            self.max_power,
         )
     }
 }
@@ -391,6 +450,7 @@ impl EpochStats {
 #[derive(Debug, Clone, Copy)]
 pub enum ArcLenStrategy {
     Random,
+    Ideal { target_coverage: f64 },
     Constant(f64),
     HalfAndHalf(f64, f64),
 }
@@ -399,6 +459,11 @@ impl ArcLenStrategy {
     pub fn gen(&self, rng: &mut StdRng, num: usize) -> Vec<f64> {
         match self {
             Self::Random => iter::repeat_with(|| rng.gen()).take(num).collect(),
+            Self::Ideal { target_coverage } => {
+                iter::repeat((target_coverage / num as f64).min(1.0))
+                    .take(num)
+                    .collect()
+            }
             Self::Constant(v) => iter::repeat(*v).take(num).collect(),
             Self::HalfAndHalf(a, b) => iter::repeat(*a)
                 .take(num / 2)
@@ -406,20 +471,4 @@ impl ArcLenStrategy {
                 .collect(),
         }
     }
-}
-
-/// View ascii for all arcs
-pub fn print_arcs(arcs: &Peers) {
-    for (i, arc) in arcs.into_iter().enumerate() {
-        println!("|{}| {}", arc.to_ascii(64), i);
-    }
-}
-
-/// Wait for input, to slow down overwhelmingly large iterations
-pub fn get_input() {
-    let mut input_string = String::new();
-    std::io::stdin()
-        .read_line(&mut input_string)
-        .ok()
-        .expect("Failed to read line");
 }

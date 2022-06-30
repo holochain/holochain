@@ -24,7 +24,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 
-- `DnaStore` is now a `RibosomeStore`.
+- `RibosomeStore` is now a `RibosomeStore`.
 - `DnaManifest` now has an integrity key for all values that will change the dna hash.
 - `DnaManifest` now has an optional coordinator key for adding coordinators zomes on install.
 

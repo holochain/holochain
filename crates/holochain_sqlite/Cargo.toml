@@ -32,6 +32,7 @@ once_cell = "1.4.1"
 must_future = "0.1.1"
 nanoid = "0.3.0"
 num_cpus = "1.13.0"
+num-traits = "0.2"
 page_size = "0.4.2"
 parking_lot = "0.10"
 rand = "0.8.5"
@@ -55,8 +56,8 @@ rusqlite = { version = "0.26", features = [
   "blob",        # better integration with blob types (Read, Write, etc)
   "backup",
   "trace",
+  "functions",   # rust scalar / agg / window functions
   #"chrono",      # integration with chrono crate
-  #"functions",   # rust scalar / agg / window functions
   #"hooks",       # sqlite notification callbacks
   #"serde_json",  # integration with serde_json crate
   #"url",         # integration with url crate

@@ -715,6 +715,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "colored"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b3616f750b84d8f0de8a58bda93e08e2a81ad3f523089b05f1dffecab48c6cbd"
+dependencies = [
+ "atty",
+ "lazy_static",
+ "winapi",
+]
+
+[[package]]
 name = "concurrent-queue"
 version = "1.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1171,6 +1182,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "derivative"
+version = "2.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fcc3dd5e9e9c0b295d6e1e4d811fb6f157d5ffd784b8d202fc62eac8035a770b"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "derive_arbitrary"
 version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1314,7 +1336,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c4d33be9473d06f75f58220f71f7a9317aca647dc061dbd3c361b0bef505fbea"
 dependencies = [
  "byteorder",
- "quick-error",
+ "quick-error 1.2.3",
 ]
 
 [[package]]
@@ -2012,6 +2034,7 @@ dependencies = [
  "byteorder",
  "cfg-if 0.1.10",
  "chrono",
+ "contrafact",
  "criterion",
  "derive_more",
  "directories 2.0.2",
@@ -2273,6 +2296,7 @@ name = "holochain_p2p"
 version = "0.0.44"
 dependencies = [
  "async-trait",
+ "derive_more",
  "fixt",
  "futures",
  "ghost_actor 0.3.0-alpha.4",
@@ -2345,6 +2369,7 @@ dependencies = [
  "lazy_static",
  "must_future",
  "nanoid 0.3.0",
+ "num-traits",
  "num_cpus",
  "observability",
  "once_cell",
@@ -2448,6 +2473,7 @@ dependencies = [
  "holochain_util",
  "holochain_zome_types",
  "itertools 0.10.3",
+ "kitsune_p2p_dht",
  "lazy_static",
  "maplit",
  "matches",
@@ -2594,6 +2620,7 @@ dependencies = [
  "holochain_integrity_types",
  "holochain_serialized_bytes",
  "holochain_wasmer_common",
+ "kitsune_p2p_dht",
  "kitsune_p2p_timestamp",
  "matches",
  "nanoid 0.3.0",
@@ -2896,6 +2923,7 @@ dependencies = [
  "ghost_actor 0.3.0-alpha.4",
  "governor",
  "itertools 0.10.3",
+ "kitsune_p2p",
  "kitsune_p2p_bootstrap",
  "kitsune_p2p_mdns",
  "kitsune_p2p_proxy",
@@ -2945,6 +2973,35 @@ dependencies = [
  "serde_json",
  "tokio",
  "warp",
+]
+
+[[package]]
+name = "kitsune_p2p_dht"
+version = "0.0.1"
+dependencies = [
+ "colored",
+ "derivative",
+ "derive_more",
+ "futures",
+ "gcollections",
+ "holochain_serialized_bytes",
+ "intervallum",
+ "kitsune_p2p_dht",
+ "kitsune_p2p_dht_arc",
+ "kitsune_p2p_timestamp",
+ "maplit",
+ "must_future",
+ "num-traits",
+ "observability",
+ "once_cell",
+ "pretty_assertions 0.7.2",
+ "proptest",
+ "rand 0.8.5",
+ "serde",
+ "statrs",
+ "test-case 1.2.3",
+ "thiserror",
+ "tracing",
 ]
 
 [[package]]
@@ -3062,6 +3119,7 @@ version = "0.0.10"
 dependencies = [
  "arbitrary",
  "chrono",
+ "derive_more",
  "holochain_serialized_bytes",
  "rusqlite",
  "serde",
@@ -3096,6 +3154,7 @@ dependencies = [
  "derive_more",
  "futures",
  "ghost_actor 0.3.0-alpha.4",
+ "kitsune_p2p_dht",
  "kitsune_p2p_dht_arc",
  "lair_keystore_api 0.0.11",
  "lair_keystore_api 0.2.0",
@@ -3268,7 +3327,7 @@ dependencies = [
  "if-addrs 0.6.7",
  "log",
  "multimap",
- "quick-error",
+ "quick-error 1.2.3",
  "rand 0.8.5",
  "socket2 0.3.19",
  "tokio",
@@ -3662,7 +3721,7 @@ dependencies = [
  "log",
  "mime",
  "mime_guess",
- "quick-error",
+ "quick-error 1.2.3",
  "rand 0.8.5",
  "safemem",
  "tempfile",
@@ -4547,6 +4606,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "proptest"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1e0d9cc07f18492d879586c92b485def06bc850da3118075cd45d50e9c95b0e5"
+dependencies = [
+ "bit-set",
+ "bitflags",
+ "byteorder",
+ "lazy_static",
+ "num-traits",
+ "quick-error 2.0.1",
+ "rand 0.8.5",
+ "rand_chacha 0.3.1",
+ "rand_xorshift 0.3.0",
+ "regex-syntax",
+ "rusty-fork",
+ "tempfile",
+]
+
+[[package]]
 name = "ptr_meta"
 version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4581,6 +4660,12 @@ name = "quick-error"
 version = "1.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a1d01941d82fa2ab50be1e79e6714289dd7cde78eba4c074bc5a4374f650dfe0"
+
+[[package]]
+name = "quick-error"
+version = "2.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a993555f31e5a609f617c12db6250dedcac1b0a85076912c436e6fc9b2c8e6a3"
 
 [[package]]
 name = "quick-xml"
@@ -4702,7 +4787,7 @@ dependencies = [
  "rand_jitter",
  "rand_os",
  "rand_pcg 0.1.2",
- "rand_xorshift",
+ "rand_xorshift 0.1.1",
  "winapi",
 ]
 
@@ -4891,6 +4976,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cbf7e9e623549b0e21f6e97cf8ecf247c1a8fd2e8a992ae265314300b2455d5c"
 dependencies = [
  "rand_core 0.3.1",
+]
+
+[[package]]
+name = "rand_xorshift"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d25bf25ec5ae4a3f1b92f929810509a2f53d7dca2f50b794ff57e3face536c8f"
+dependencies = [
+ "rand_core 0.6.3",
 ]
 
 [[package]]
@@ -5291,6 +5385,18 @@ name = "rustversion"
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f2cc38e8fa666e2de3c4aba7edeb5ffc5246c1c2ed0e3d17e560aeeba736b23f"
+
+[[package]]
+name = "rusty-fork"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cb3dcc6e454c328bb824492db107ab7c0ae8fcffe4ad210136ef014458c1bc4f"
+dependencies = [
+ "fnv",
+ "quick-error 1.2.3",
+ "tempfile",
+ "wait-timeout",
+]
 
 [[package]]
 name = "ryu"

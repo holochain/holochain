@@ -736,8 +736,19 @@ impl ConductorHandleT for ConductorHandleImpl {
                 respond,
                 ..
             } => {
+                let cutoff = self
+                    .get_config()
+                    .network
+                    .clone()
+                    .unwrap_or_default()
+                    .tuning_params
+                    .danger_gossip_recent_threshold();
+                let topo = self
+                    .get_dna_def(&dna_hash)
+                    .ok_or_else(|| DnaError::DnaMissing(dna_hash.clone()))?
+                    .topology(cutoff);
                 let db = { self.p2p_agents_db(&dna_hash) };
-                let res = query_peer_density(db.into(), kitsune_space, dht_arc)
+                let res = query_peer_density(db.into(), topo, kitsune_space, dht_arc)
                     .await
                     .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
@@ -790,7 +801,7 @@ impl ConductorHandleT for ConductorHandleImpl {
             }
             FetchOpData {
                 respond,
-                op_hashes,
+                query,
                 dna_hash,
                 ..
             } => {
@@ -798,7 +809,7 @@ impl ConductorHandleT for ConductorHandleImpl {
                     let res = self
                         .conductor
                         .spaces
-                        .handle_fetch_op_data(&dna_hash, op_hashes)
+                        .handle_fetch_op_data(&dna_hash, query)
                         .await
                         .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));

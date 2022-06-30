@@ -30,6 +30,7 @@ holochain_serialized_bytes = "=0.0.51"
 holochain_sqlite = { path = "../holochain_sqlite", version = "0.0.43"}
 holochain_zome_types = { path = "../holochain_zome_types", version = "0.0.38", features = ["full"] }
 itertools = { version = "0.10" }
+kitsune_p2p_dht = { version = "0.0.1", path = "../kitsune_p2p/dht" }
 lazy_static = "1.4.0"
 mockall = "0.10.2"
 mr_bundle = { path = "../mr_bundle", features = ["packing"], version = "0.0.13"}

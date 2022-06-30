@@ -718,7 +718,7 @@ impl Conductor {
         self.cells.share_mut(|cells| {
             for cell in new_cells {
                 let cell_id = cell.id().clone();
-                tracing::info!(?cell_id, "ADD CELL");
+                tracing::debug!(?cell_id, "added cell");
                 cells.insert(
                     cell_id,
                     CellItem {
@@ -1379,6 +1379,8 @@ impl Conductor {
 }
 
 mod builder {
+    use holochain_p2p::dht::ArqStrat;
+
     use super::*;
     use crate::conductor::handle::DevSettings;
     use crate::conductor::kitsune_host_impl::KitsuneHostImpl;
@@ -1474,8 +1476,6 @@ mod builder {
                 }
             };
 
-            let env_path = self.config.environment_path.clone();
-
             let Self {
                 ribosome_store,
                 config,
@@ -1484,10 +1484,7 @@ mod builder {
 
             let ribosome_store = RwShare::new(ribosome_store);
 
-            let network_config = match &config.network {
-                None => holochain_p2p::kitsune_p2p::KitsuneP2pConfig::default(),
-                Some(config) => config.clone(),
-            };
+            let network_config = config.network.clone().unwrap_or_default();
             let (cert_digest, cert, cert_priv_key) =
                 keystore.get_or_create_first_tls_cert().await?;
             let tls_config =
@@ -1496,9 +1493,16 @@ mod builder {
                     cert_priv_key,
                     cert_digest,
                 };
+            let strat =
+                ArqStrat::from_params(network_config.tuning_params.gossip_redundancy_target);
 
-            let spaces = Spaces::new(env_path, config.db_sync_strategy)?;
-            let host = KitsuneHostImpl::new(spaces.clone());
+            let spaces = Spaces::new(&config)?;
+            let host = KitsuneHostImpl::new(
+                spaces.clone(),
+                ribosome_store.clone(),
+                network_config.tuning_params.clone(),
+                strat,
+            );
 
             let (holochain_p2p, p2p_evt) =
                 holochain_p2p::spawn_holochain_p2p(network_config, tls_config, host).await?;
@@ -1655,14 +1659,18 @@ mod builder {
             let keystore = self.keystore.unwrap_or_else(test_keystore);
             self.config.environment_path = env_path.to_path_buf().into();
 
-            let spaces = Spaces::new(
-                self.config.environment_path.clone(),
-                self.config.db_sync_strategy,
-            )?;
-            let host = KitsuneHostImpl::new(spaces.clone());
+            let spaces = Spaces::new(&self.config)?;
+
+            let network_config = self.config.network.clone().unwrap_or_default();
+            let tuning_params = network_config.tuning_params.clone();
+            let strat = ArqStrat::from_params(tuning_params.gossip_redundancy_target);
+
+            let ribosome_store = RwShare::new(self.ribosome_store);
+            let host =
+                KitsuneHostImpl::new(spaces.clone(), ribosome_store.clone(), tuning_params, strat);
 
             let (holochain_p2p, p2p_evt) =
-                holochain_p2p::spawn_holochain_p2p(self.config.network.clone().unwrap_or_default(), holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_types::tls::TlsConfig::new_ephemeral().await.unwrap(), host)
+                holochain_p2p::spawn_holochain_p2p(network_config, holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_types::tls::TlsConfig::new_ephemeral().await.unwrap(), host)
                     .await?;
 
             let (post_commit_sender, post_commit_receiver) =
@@ -1670,7 +1678,7 @@ mod builder {
 
             let conductor = Conductor::new(
                 self.config.clone(),
-                RwShare::new(self.ribosome_store),
+                ribosome_store,
                 keystore,
                 holochain_p2p,
                 spaces,

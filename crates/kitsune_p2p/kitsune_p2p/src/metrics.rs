@@ -140,7 +140,7 @@ pub struct Metrics {
 }
 
 /// Outcome of a gossip round.
-#[derive(PartialOrd, Ord, PartialEq, Eq)]
+#[derive(Debug, PartialOrd, Ord, PartialEq, Eq)]
 pub enum RoundOutcome {
     /// Success outcome
     Success(Instant),
