@@ -1,15 +1,16 @@
 use kitsune_p2p_types::box_fut;
+use kitsune_p2p_types::dht::region_set::RegionSetLtcs;
 
 use super::*;
 
 /// A supertrait of KitsuneHost convenient for defining test handlers.
 /// Allows only specifying the methods you care about, and letting all the rest
 /// throw errors if called
+#[allow(missing_docs)]
 pub trait KitsuneHostDefaultError: KitsuneHost {
     /// Name to be printed out on unimplemented error
     const NAME: &'static str;
 
-    /// We need to get previously stored agent info.
     fn get_agent_info_signed(
         &self,
         _input: GetAgentInfoSignedEvt,
@@ -22,7 +23,6 @@ pub trait KitsuneHostDefaultError: KitsuneHost {
         .into()))
     }
 
-    /// Extrapolated Peer Coverage
     fn peer_extrapolated_coverage(
         &self,
         _space: Arc<KitsuneSpace>,
@@ -36,7 +36,6 @@ pub trait KitsuneHostDefaultError: KitsuneHost {
         .into()))
     }
 
-    /// Record a set of metric records
     fn record_metrics(
         &self,
         _space: Arc<KitsuneSpace>,
@@ -45,6 +44,45 @@ pub trait KitsuneHostDefaultError: KitsuneHost {
         box_fut(Err(format!(
             "error for unimplemented KitsuneHost test behavior: method {} of {}",
             "record_metrics",
+            Self::NAME
+        )
+        .into()))
+    }
+
+    fn query_region_set(
+        &self,
+        _space: Arc<KitsuneSpace>,
+        _dht_arc_set: Arc<DhtArcSet>,
+    ) -> KitsuneHostResult<RegionSetLtcs> {
+        box_fut(Err(format!(
+            "error for unimplemented KitsuneHost test behavior: method {} of {}",
+            "query_region_set",
+            Self::NAME
+        )
+        .into()))
+    }
+
+    /// Given an input list of regions, return a list of equal or greater length
+    /// such that each region's size is less than the `size_limit`, by recursively
+    /// subdividing regions which are over the size limit.
+    fn query_size_limited_regions(
+        &self,
+        _space: Arc<KitsuneSpace>,
+        _size_limit: u32,
+        _regions: Vec<Region>,
+    ) -> KitsuneHostResult<Vec<Region>> {
+        box_fut(Err(format!(
+            "error for unimplemented KitsuneHost test behavior: method {} of {}",
+            "query_size_limited_regions",
+            Self::NAME
+        )
+        .into()))
+    }
+
+    fn get_topology(&self, _space: Arc<KitsuneSpace>) -> KitsuneHostResult<Topology> {
+        box_fut(Err(format!(
+            "error for unimplemented KitsuneHost test behavior: method {} of {}",
+            "get_topology",
             Self::NAME
         )
         .into()))
@@ -73,5 +111,26 @@ impl<T: KitsuneHostDefaultError> KitsuneHost for T {
         records: Vec<MetricRecord>,
     ) -> KitsuneHostResult<()> {
         KitsuneHostDefaultError::record_metrics(self, space, records)
+    }
+
+    fn query_size_limited_regions(
+        &self,
+        space: Arc<KitsuneSpace>,
+        size_limit: u32,
+        regions: Vec<Region>,
+    ) -> crate::KitsuneHostResult<Vec<Region>> {
+        KitsuneHostDefaultError::query_size_limited_regions(self, space, size_limit, regions)
+    }
+
+    fn query_region_set(
+        &self,
+        space: Arc<KitsuneSpace>,
+        dht_arc_set: Arc<DhtArcSet>,
+    ) -> KitsuneHostResult<RegionSetLtcs> {
+        KitsuneHostDefaultError::query_region_set(self, space, dht_arc_set)
+    }
+
+    fn get_topology(&self, space: Arc<KitsuneSpace>) -> KitsuneHostResult<Topology> {
+        KitsuneHostDefaultError::get_topology(self, space)
     }
 }

@@ -641,7 +641,7 @@ impl RibosomeT for RealRibosome {
         // Get the dependencies for this zome.
         let zome_dependencies = self.get_zome_dependencies(zome.zome_name())?;
         // Scope the zome types to these dependencies.
-        let zome_types = self.zome_types.re_scope(zome_dependencies)?;
+        let zome_types = self.zome_types.in_scope_subset(zome_dependencies);
 
         Ok(ZomeInfo {
             name: zome.zome_name().clone(),
@@ -926,30 +926,13 @@ impl RibosomeT for RealRibosome {
         &self.dna_file
     }
 
-    fn find_zome_from_entry(&self, entry_index: &EntryDefIndex) -> Option<IntegrityZome> {
-        self.zome_types
-            .find_zome_id_from_entry(entry_index)
-            .and_then(|zome_id| {
-                self.dna_file
-                    .dna_def()
-                    .integrity_zomes
-                    .get(zome_id.0 as usize)
-                    .cloned()
-                    .map(|(name, def)| IntegrityZome::new(name, def))
-            })
-    }
-
-    fn find_zome_from_link(&self, link_index: &LinkType) -> Option<IntegrityZome> {
-        self.zome_types
-            .find_zome_id_from_link(link_index)
-            .and_then(|zome_id| {
-                self.dna_file
-                    .dna_def()
-                    .integrity_zomes
-                    .get(zome_id.0 as usize)
-                    .cloned()
-                    .map(|(name, def)| IntegrityZome::new(name, def))
-            })
+    fn get_integrity_zome(&self, zome_id: &ZomeId) -> Option<IntegrityZome> {
+        self.dna_file
+            .dna_def()
+            .integrity_zomes
+            .get(zome_id.0 as usize)
+            .cloned()
+            .map(|(name, def)| IntegrityZome::new(name, def))
     }
 }
 

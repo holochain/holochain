@@ -84,7 +84,7 @@ pub async fn check_countersigning_preflight_response_signature(
 ) -> SysValidationResult<()> {
     let signature_is_valid = preflight_response
         .request()
-        .signing_agents()
+        .signing_agents
         .get(*preflight_response.agent_state().agent_index() as usize)
         .ok_or_else(|| {
             SysValidationError::ValidationOutcome(ValidationOutcome::PreflightResponseSignature(
@@ -265,7 +265,7 @@ pub async fn check_app_entry_type(
 
     // Check if the zome is found
     let zome = ribosome
-        .find_zome_from_entry(&entry_type.id())
+        .get_integrity_zome(&entry_type.zome_id())
         .ok_or_else(|| ValidationOutcome::ZomeId(entry_type.clone()))?
         .into_inner()
         .1;
@@ -781,8 +781,14 @@ pub mod test {
         let alice = fixt!(AgentPubKey, Predictable);
         let bob = fixt!(AgentPubKey, Predictable, 1);
 
-        (*preflight_response.request_mut().signing_agents_mut()).push((alice.clone(), vec![]));
-        (*preflight_response.request_mut().signing_agents_mut()).push((bob, vec![]));
+        preflight_response
+            .request_mut()
+            .signing_agents
+            .push((alice.clone(), vec![]));
+        preflight_response
+            .request_mut()
+            .signing_agents
+            .push((bob, vec![]));
 
         *preflight_response.signature_mut() = alice
             .sign_raw(

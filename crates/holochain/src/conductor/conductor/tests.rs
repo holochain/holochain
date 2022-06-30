@@ -34,7 +34,11 @@ async fn can_update_state() {
     let holochain_p2p = holochain_p2p::stub_network().await;
     let (post_commit_sender, _post_commit_receiver) =
         tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
-    let spaces = Spaces::new(db_dir.path().to_path_buf().into(), Default::default()).unwrap();
+    let spaces = Spaces::new(&ConductorConfig {
+        environment_path: db_dir.path().to_path_buf().into(),
+        ..Default::default()
+    })
+    .unwrap();
     let conductor = Conductor::new(
         Default::default(),
         ribosome_store,
@@ -82,7 +86,11 @@ async fn can_add_clone_cell_to_app() {
     let ribosome_store = RibosomeStore::new();
     let (post_commit_sender, _post_commit_receiver) =
         tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
-    let spaces = Spaces::new(db_dir.path().to_path_buf().into(), Default::default()).unwrap();
+    let spaces = Spaces::new(&ConductorConfig {
+        environment_path: db_dir.path().to_path_buf().into(),
+        ..Default::default()
+    })
+    .unwrap();
 
     let conductor = Conductor::new(
         Default::default(),
@@ -157,7 +165,11 @@ async fn app_ids_are_unique() {
     let holochain_p2p = holochain_p2p::stub_network().await;
     let (post_commit_sender, _post_commit_receiver) =
         tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
-    let spaces = Spaces::new(db_dir.path().to_path_buf().into(), Default::default()).unwrap();
+    let spaces = Spaces::new(&ConductorConfig {
+        environment_path: db_dir.path().to_path_buf().into(),
+        ..Default::default()
+    })
+    .unwrap();
     let conductor = Conductor::new(
         Default::default(),
         ribosome_store,
@@ -520,7 +532,7 @@ pub(crate) fn simple_create_entry_zome() -> InlineZomeSet {
     .callback("create_entry", "create", move |api, ()| {
         let entry = Entry::app(().try_into().unwrap()).unwrap();
         let hash = api.create(CreateInput::new(
-            InlineZomeSet::get_entry_location(&api, 0),
+            InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
             EntryVisibility::Public,
             entry,
             ChainTopOrdering::default(),
@@ -651,7 +663,7 @@ async fn test_bad_entry_validation_after_genesis_returns_zome_call_error() {
             .callback("custom", "create", move |api, ()| {
                 let entry = Entry::app(().try_into().unwrap()).unwrap();
                 let hash = api.create(CreateInput::new(
-                    InlineZomeSet::get_entry_location(&api, 0),
+                    InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
                     EntryVisibility::Public,
                     entry,
                     ChainTopOrdering::default(),
@@ -714,7 +726,7 @@ async fn test_apps_disable_on_panic_after_genesis() {
             .callback("custom", "create", move |api, ()| {
                 let entry = Entry::app(().try_into().unwrap()).unwrap();
                 let hash = api.create(CreateInput::new(
-                    InlineZomeSet::get_entry_location(&api, 0),
+                    InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
                     EntryVisibility::Public,
                     entry,
                     ChainTopOrdering::default(),

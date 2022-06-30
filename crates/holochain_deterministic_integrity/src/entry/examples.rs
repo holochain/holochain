@@ -21,7 +21,6 @@
 //! }
 //! # fn main() {
 //! assert_eq!(__num_entry_types(), 3);
-//! assert_eq!(LocalZomeTypeId::from(UnitEntryTypes::Post), LocalZomeTypeId(0));
 //! # }
 //! ```
 

@@ -23,6 +23,34 @@ ghost_actor::ghost_chan! {
     }
 }
 
+pub struct HarnessHost;
+
+impl HarnessHost {
+    pub fn new() -> Arc<Self> {
+        Arc::new(Self)
+    }
+}
+
+impl KitsuneHostDefaultError for HarnessHost {
+    const NAME: &'static str = "HarnessHost";
+
+    fn peer_extrapolated_coverage(
+        &self,
+        _space: Arc<KitsuneSpace>,
+        _dht_arc_set: DhtArcSet,
+    ) -> KitsuneHostResult<Vec<f64>> {
+        box_fut(Ok(vec![]))
+    }
+
+    fn query_region_set(
+        &self,
+        _space: Arc<KitsuneSpace>,
+        _dht_arc_set: Arc<DhtArcSet>,
+    ) -> KitsuneHostResult<RegionSetLtcs> {
+        box_fut(Ok(RegionSetLtcs::empty()))
+    }
+}
+
 pub(crate) async fn spawn_test_agent(
     harness_chan: HarnessEventChannel,
     config: KitsuneP2pConfig,
@@ -34,7 +62,8 @@ pub(crate) async fn spawn_test_agent(
     ),
     KitsuneP2pError,
 > {
-    let host = HostStub::new();
+    let topology = Topology::standard_epoch_full();
+    let host = HarnessHost::new();
     let (p2p, evt) = spawn_kitsune_p2p(
         config,
         kitsune_p2p_types::tls::TlsConfig::new_ephemeral()
@@ -54,7 +83,7 @@ pub(crate) async fn spawn_test_agent(
         .create_channel::<HarnessAgentControl>()
         .await?;
 
-    let harness = AgentHarness::new(harness_chan).await?;
+    let harness = AgentHarness::new(harness_chan, topology).await?;
     let agent = harness.agent.clone();
     tokio::task::spawn(builder.spawn(harness));
 
@@ -62,9 +91,12 @@ pub(crate) async fn spawn_test_agent(
 }
 
 use kitsune_p2p_timestamp::Timestamp;
+use kitsune_p2p_types::box_fut;
 use kitsune_p2p_types::dependencies::lair_keystore_api_0_0;
+use kitsune_p2p_types::dht::prelude::RegionSetLtcs;
+use kitsune_p2p_types::dht::spacetime::Topology;
+use kitsune_p2p_types::dht::PeerStrat;
 use kitsune_p2p_types::dht_arc::DhtArcSet;
-use kitsune_p2p_types::dht_arc::PeerStratBeta;
 use lair_keystore_api_0_0::entry::EntrySignEd25519;
 use lair_keystore_api_0_0::internal::sign_ed25519::*;
 
@@ -74,10 +106,14 @@ struct AgentHarness {
     harness_chan: HarnessEventChannel,
     agent_store: HashMap<Arc<KitsuneAgent>, Arc<AgentInfoSigned>>,
     gossip_store: HashMap<Arc<KitsuneOpHash>, String>,
+    topology: Topology,
 }
 
 impl AgentHarness {
-    pub async fn new(harness_chan: HarnessEventChannel) -> Result<Self, KitsuneP2pError> {
+    pub async fn new(
+        harness_chan: HarnessEventChannel,
+        topology: Topology,
+    ) -> Result<Self, KitsuneP2pError> {
         let EntrySignEd25519 { priv_key, pub_key } = sign_ed25519_keypair_new_from_entropy()
             .await
             .map_err(KitsuneP2pError::other)?;
@@ -89,6 +125,7 @@ impl AgentHarness {
             harness_chan,
             agent_store: HashMap::new(),
             gossip_store: HashMap::new(),
+            topology,
         })
     }
 }
@@ -190,22 +227,12 @@ impl KitsuneP2pEventHandler for AgentHarness {
         &mut self,
         _space: Arc<KitsuneSpace>,
         dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
-    ) -> KitsuneP2pEventHandlerResult<kitsune_p2p_types::dht_arc::PeerViewBeta> {
-        let strat = PeerStratBeta::default();
-        let arcs: Vec<_> = self
-            .agent_store
-            .values()
-            .filter_map(|v| {
-                if dht_arc.contains(v.agent.get_loc()) {
-                    Some(v.storage_arc)
-                } else {
-                    None
-                }
-            })
-            .collect();
+    ) -> KitsuneP2pEventHandlerResult<kitsune_p2p_types::dht::PeerView> {
+        let strat = PeerStrat::default();
+        let arcs: Vec<_> = self.agent_store.values().map(|v| v.storage_arc).collect();
 
         // contains is already checked in the iterator
-        let view = strat.view_unchecked(dht_arc, arcs.as_slice());
+        let view = strat.view(self.topology.clone(), dht_arc, arcs.as_slice());
 
         Ok(async move { Ok(view) }.boxed().into())
     }
@@ -280,11 +307,16 @@ impl KitsuneP2pEventHandler for AgentHarness {
         input: FetchOpDataEvt,
     ) -> KitsuneP2pEventHandlerResult<Vec<(Arc<super::KitsuneOpHash>, KOp)>> {
         let mut out = Vec::new();
-        for hash in input.op_hashes {
-            if let Some(op) = self.gossip_store.get(&hash) {
-                let data = KitsuneOpData::new(op.clone().into_bytes());
-                out.push((hash.clone(), data));
+        match input.query {
+            FetchOpDataEvtQuery::Hashes(hashes) => {
+                for hash in hashes {
+                    if let Some(op) = self.gossip_store.get(&hash) {
+                        let data = KitsuneOpData::new(op.clone().into_bytes());
+                        out.push((hash.clone(), data));
+                    }
+                }
             }
+            FetchOpDataEvtQuery::Regions(_coords) => unimplemented!(),
         }
         Ok(async move { Ok(out) }.boxed().into())
     }

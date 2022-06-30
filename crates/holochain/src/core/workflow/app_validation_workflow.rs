@@ -241,7 +241,7 @@ async fn app_validation_workflow_inner(
             *round_time = std::time::Instant::now();
             let avg_ops_ps = total as f64 / start.elapsed().as_micros() as f64 * 1_000_000.0;
             let ops_ps = t as f64 / round_el.as_micros() as f64 * 1_000_000.0;
-            tracing::info!(
+            tracing::warn!(
                 "App validation is saturated. Util {:.2}%. OPS/s avg {:.2}, this round {:.2}",
                 (start_len - total) as f64 / NUM_CONCURRENT_OPS as f64 * 100.0,
                 avg_ops_ps,
@@ -497,10 +497,10 @@ pub fn entry_creation_zomes_to_invoke(
             entry_type: EntryType::App(aet),
             ..
         }) => {
-            let zome = ribosome.find_zome_from_entry(&aet.id()).ok_or_else(|| {
-                Outcome::rejected(&format!("Zome does not exist for {:?}", aet.id()))
+            let zome = ribosome.get_integrity_zome(&aet.zome_id()).ok_or_else(|| {
+                Outcome::rejected(&format!("Zome does not exist for {:?}", aet.zome_id()))
             })?;
-            Ok(ZomesToInvoke::One(zome.erase_type()))
+            Ok(ZomesToInvoke::OneIntegrity(zome))
         }
         _ => Ok(ZomesToInvoke::AllIntegrity),
     }
@@ -511,7 +511,7 @@ fn create_link_zomes_to_invoke(
     ribosome: &impl RibosomeT,
 ) -> AppValidationOutcome<ZomesToInvoke> {
     let zome = ribosome
-        .find_zome_from_link(&create_link.link_type)
+        .get_integrity_zome(&create_link.zome_id)
         .ok_or_else(|| {
             Outcome::rejected(&format!(
                 "Zome does not exist for {:?}",
