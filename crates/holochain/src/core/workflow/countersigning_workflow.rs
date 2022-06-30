@@ -115,7 +115,20 @@ pub(crate) async fn countersigning_workflow(
 
     // For each complete session send the ops to validation.
     for (agents, ops, actions) in complete_sessions {
-        incoming_dht_ops_workflow(space, sys_validation_trigger.clone(), ops, false).await?;
+        let non_enzymatic_ops: Vec<(HoloHash<DhtOp>, DhtOp)> = ops.filter(|(_hash, dht_op)| match dht_op.entry() {
+            Some(entry) => {
+                match entry {
+                    Entry::CounterSign(session_data, _) => {
+                        !session_data.preflight_request().enzymatic
+                    },
+                    // Not enzymatic because it isn't a countersigning entry.
+                    _ => true,
+                }
+            },
+            // Not enzymatic because it doesn't even have an entry.
+            None => true,
+        }).collect();
+        incoming_dht_ops_workflow(space, sys_validation_trigger.clone(), non_enzymatic_ops, false).await?;
         notify_agents.push((agents, actions));
     }
 
