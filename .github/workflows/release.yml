@@ -374,6 +374,7 @@ jobs:
 
           ${{ matrix.testCommand.run }}
         continue-on-error: ${{ matrix.platform != 'ubuntu-latest' && matrix.testCommand.ignoreErrorOnNonUbuntu == true }}
+        timeout-minutes: 720
 
       - name: ${{ matrix.testCommand.name }} (run)
         if: ${{ needs.vars.outputs.skip_test != 'true' }}
