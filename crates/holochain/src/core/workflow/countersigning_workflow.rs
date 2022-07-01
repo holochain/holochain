@@ -135,7 +135,7 @@ pub(crate) async fn countersigning_workflow(
     // For each complete session notify the agents of success.
     for (agents, actions) in notify_agents {
         if let Err(e) = network
-            .countersigning_authority_response(agents, actions)
+            .countersigning_session_negotiation(agents, CountersigningSessionNegotiationMessage::AuthorityResponse(actions))
             .await
         {
             // This could likely fail if a signer is offline so it's not really an error.

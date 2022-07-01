@@ -290,18 +290,18 @@ impl WrapEvtSender {
         )
     }
 
-    fn countersigning_authority_response(
+    fn countersigning_session_negotiation(
         &self,
         dna_hash: DnaHash,
         to_agent: AgentPubKey,
-        signed_actions: Vec<SignedAction>,
+        message: event::CountersigningSessionNegotiationMessage,
     ) -> impl Future<Output = HolochainP2pResult<()>> + 'static + Send {
         timing_trace!(
             {
                 self.0
-                    .countersigning_authority_response(dna_hash, to_agent, signed_actions)
+                    .countersigning_session_negotiation(dna_hash, to_agent, message)
             },
-            "(hp2p:handle) signed_action"
+            "(hp2p:handle) countersigning_session_negotiation"
         )
     }
 }
@@ -520,16 +520,16 @@ impl HolochainP2pActor {
         .into())
     }
 
-    fn handle_incoming_countersigning_authority_response(
+    fn handle_incoming_countersigning_session_negotiation(
         &mut self,
         dna_hash: DnaHash,
         to_agent: AgentPubKey,
-        signed_actions: Vec<SignedAction>,
+        message: CountersigningSessionNegotiationMessage,
     ) -> kitsune_p2p::actor::KitsuneP2pHandlerResult<()> {
         let evt_sender = self.evt_sender.clone();
         Ok(async move {
             evt_sender
-                .countersigning_authority_response(dna_hash, to_agent, signed_actions)
+                .countersigning_session_negotiation(dna_hash, to_agent, message)
                 .await?;
             Ok(())
         }
@@ -689,9 +689,9 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
                 self.handle_incoming_get_validation_package(space, to_agent, action_hash)
             }
             // holochain_p2p only broadcasts this message.
-            crate::wire::WireMessage::CountersigningAuthorityResponse { .. } => {
+            crate::wire::WireMessage::CountersigningSessionNegotiation { .. } => {
                 Err(HolochainP2pError::invalid_p2p_message(
-                    "invalid: countersigning authority response is a broadcast type, not a request"
+                    "invalid: countersigning session negotation is a broadcast type, not a request"
                         .to_string(),
                 )
                 .into())
@@ -753,8 +753,8 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
                 countersigning_session,
                 ops,
             ),
-            crate::wire::WireMessage::CountersigningAuthorityResponse { signed_actions } => self
-                .handle_incoming_countersigning_authority_response(space, to_agent, signed_actions),
+            crate::wire::WireMessage::CountersigningSessionNegotiation { message } => self
+                .handle_incoming_countersigning_session_negotiation(space, to_agent, message),
         }
     }
 
@@ -1203,11 +1203,11 @@ impl HolochainP2pHandler for HolochainP2pActor {
     }
 
     #[tracing::instrument(skip(self), level = "trace")]
-    fn handle_countersigning_authority_response(
+    fn handle_countersigning_session_negotiation(
         &mut self,
         dna_hash: DnaHash,
         agents: Vec<AgentPubKey>,
-        response: Vec<SignedAction>,
+        message: CountersigningSessionNegotiationMessage,
     ) -> HolochainP2pHandlerResult<()> {
         let space = dna_hash.into_kitsune();
         let agents = agents.into_iter().map(|a| a.into_kitsune()).collect();
@@ -1215,7 +1215,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
         let timeout = self.tuning_params.implicit_timeout();
 
         let payload =
-            crate::wire::WireMessage::countersigning_authority_response(response).encode()?;
+            crate::wire::WireMessage::countersigning_session_negotiation(message).encode()?;
 
         let kitsune_p2p = self.kitsune_p2p.clone();
         Ok(async move {

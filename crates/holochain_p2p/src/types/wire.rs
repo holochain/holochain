@@ -63,8 +63,8 @@ pub enum WireMessage {
     GetValidationPackage {
         action_hash: ActionHash,
     },
-    CountersigningAuthorityResponse {
-        signed_actions: Vec<SignedAction>,
+    CountersigningSessionNegotiation {
+        message: event::CountersigningSessionNegotiationMessage,
     },
 }
 
@@ -144,7 +144,7 @@ impl WireMessage {
         Self::GetValidationPackage { action_hash }
     }
 
-    pub fn countersigning_authority_response(signed_actions: Vec<SignedAction>) -> WireMessage {
-        Self::CountersigningAuthorityResponse { signed_actions }
+    pub fn countersigning_session_negotiation(message: event::CountersigningSessionNegotiationMessage) -> WireMessage {
+        Self::CountersigningSessionNegotiation { message }
     }
 }

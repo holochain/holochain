@@ -497,14 +497,14 @@ impl Cell {
                 .instrument(debug_span!("cell_handle_sign_network_data"))
                 .await;
             }
-            CountersigningAuthorityResponse {
+            CountersigningSessionNegotiation {
                 respond,
-                signed_actions,
+                message,
                 ..
             } => {
                 async {
                     let res = self
-                        .handle_countersigning_authority_response(signed_actions)
+                        .handle_countersigning_session_negotiation(message)
                         .await
                         .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
@@ -518,9 +518,9 @@ impl Cell {
 
     #[instrument(skip(self, signed_actions))]
     /// we are receiving a response from a countersigning authority
-    async fn handle_countersigning_authority_response(
+    async fn handle_countersigning_session_negotiation(
         &self,
-        signed_actions: Vec<SignedAction>,
+        message: CountersigningSessionNegotiation,
     ) -> CellResult<()> {
         Ok(countersigning_success(
             self.space.clone(),

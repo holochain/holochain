@@ -42,6 +42,7 @@ use holochain_zome_types::SignedActionHashed;
 use holochain_zome_types::Timestamp;
 use holochain_zome_types::TryInto;
 use holochain_zome_types::ValidationStatus;
+use holochain_p2p::event::CountersigningSessionNegotiationMessage;
 
 pub use activity_test_data::*;
 pub use entry_test_data::*;
@@ -210,10 +211,10 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         todo!()
     }
 
-    async fn countersigning_authority_response(
+    async fn countersigning_session_negotiation(
         &self,
         _agents: Vec<AgentPubKey>,
-        _response: Vec<holochain_zome_types::SignedAction>,
+        _message: CountersigningSessionNegotiationMessage,
     ) -> actor::HolochainP2pResult<()> {
         todo!()
     }
@@ -388,10 +389,10 @@ impl HolochainP2pDnaT for MockNetwork {
         todo!()
     }
 
-    async fn countersigning_authority_response(
+    async fn countersigning_session_negotiation(
         &self,
         _agents: Vec<AgentPubKey>,
-        _response: Vec<holochain_zome_types::SignedAction>,
+        _message: CountersigningSessionNegotiationMessage,
     ) -> actor::HolochainP2pResult<()> {
         todo!()
     }
