@@ -6,6 +6,60 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20220701.181019
+
+## [holochain\_cli-0.0.45](crates/holochain_cli/CHANGELOG.md#0.0.45)
+
+## [holochain\_cli\_sandbox-0.0.41](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.41)
+
+## [holochain\_cli\_bundle-0.0.41](crates/holochain_cli_bundle/CHANGELOG.md#0.0.41)
+
+## [holochain-0.0.147](crates/holochain/CHANGELOG.md#0.0.147)
+
+## [holochain\_test\_wasm\_common-0.0.41](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.41)
+
+## [holochain\_conductor\_api-0.0.47](crates/holochain_conductor_api/CHANGELOG.md#0.0.47)
+
+## [holochain\_wasm\_test\_utils-0.0.46](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.46)
+
+## [holochain\_cascade-0.0.47](crates/holochain_cascade/CHANGELOG.md#0.0.47)
+
+## [holochain\_state-0.0.47](crates/holochain_state/CHANGELOG.md#0.0.47)
+
+## [holochain\_p2p-0.0.45](crates/holochain_p2p/CHANGELOG.md#0.0.45)
+
+## [holochain\_types-0.0.45](crates/holochain_types/CHANGELOG.md#0.0.45)
+
+## [holochain\_keystore-0.0.45](crates/holochain_keystore/CHANGELOG.md#0.0.45)
+
+## [holochain\_sqlite-0.0.44](crates/holochain_sqlite/CHANGELOG.md#0.0.44)
+
+## [kitsune\_p2p-0.0.39](crates/kitsune_p2p/CHANGELOG.md#0.0.39)
+
+## [kitsune\_p2p\_proxy-0.0.27](crates/kitsune_p2p_proxy/CHANGELOG.md#0.0.27)
+
+## [kitsune\_p2p\_transport\_quic-0.0.27](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.0.27)
+
+## [kitsune\_p2p\_types-0.0.27](crates/kitsune_p2p_types/CHANGELOG.md#0.0.27)
+
+## [hdk-0.0.140](crates/hdk/CHANGELOG.md#0.0.140)
+
+## [holochain\_zome\_types-0.0.39](crates/holochain_zome_types/CHANGELOG.md#0.0.39)
+
+## [kitsune\_p2p\_dht-0.0.1](crates/kitsune_p2p_dht/CHANGELOG.md#0.0.1)
+
+## [holochain\_deterministic\_integrity-0.0.12](crates/holochain_deterministic_integrity/CHANGELOG.md#0.0.12)
+
+## [hdk\_derive-0.0.39](crates/hdk_derive/CHANGELOG.md#0.0.39)
+
+## [holochain\_integrity\_types-0.0.11](crates/holochain_integrity_types/CHANGELOG.md#0.0.11)
+
+## [kitsune\_p2p\_timestamp-0.0.11](crates/kitsune_p2p_timestamp/CHANGELOG.md#0.0.11)
+
+## [holo\_hash-0.0.30](crates/holo_hash/CHANGELOG.md#0.0.30)
+
+## [kitsune\_p2p\_dht\_arc-0.0.13](crates/kitsune_p2p_dht_arc/CHANGELOG.md#0.0.13)
+
 # 20220629.012044
 
 ## [holochain\_cli-0.0.44](crates/holochain_cli/CHANGELOG.md#0.0.44)
