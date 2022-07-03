@@ -4,6 +4,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+Just a changelog entry to trigger a release indicating change.
+
 ## 0.0.147
 
 ## 0.0.146
