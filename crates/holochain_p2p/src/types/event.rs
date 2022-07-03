@@ -108,9 +108,8 @@ pub enum CountersigningSessionNegotiationMessage {
     AuthorityResponse(Vec<SignedAction>),
     /// Counterparties are sending their signed action to an enzyme instead of
     /// authorities as part of an enzymatic session.
-    EnzymePush(SignedAction),
+    EnzymePush(DhtOp),
 }
-
 
 /// Multiple ways to fetch op data
 #[derive(Debug, derive_more::From)]

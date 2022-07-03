@@ -9,6 +9,7 @@ use holo_hash::EntryHash;
 use holo_hash::HasHash;
 use holochain_p2p::actor;
 use holochain_p2p::dht_arc::DhtArc;
+use holochain_p2p::event::CountersigningSessionNegotiationMessage;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_p2p::HolochainP2pError;
 use holochain_p2p::MockHolochainP2pDnaT;
@@ -42,7 +43,6 @@ use holochain_zome_types::SignedActionHashed;
 use holochain_zome_types::Timestamp;
 use holochain_zome_types::TryInto;
 use holochain_zome_types::ValidationStatus;
-use holochain_p2p::event::CountersigningSessionNegotiationMessage;
 
 pub use activity_test_data::*;
 pub use entry_test_data::*;

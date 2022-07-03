@@ -753,8 +753,9 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
                 countersigning_session,
                 ops,
             ),
-            crate::wire::WireMessage::CountersigningSessionNegotiation { message } => self
-                .handle_incoming_countersigning_session_negotiation(space, to_agent, message),
+            crate::wire::WireMessage::CountersigningSessionNegotiation { message } => {
+                self.handle_incoming_countersigning_session_negotiation(space, to_agent, message)
+            }
         }
     }
 

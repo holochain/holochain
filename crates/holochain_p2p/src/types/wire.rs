@@ -144,7 +144,9 @@ impl WireMessage {
         Self::GetValidationPackage { action_hash }
     }
 
-    pub fn countersigning_session_negotiation(message: event::CountersigningSessionNegotiationMessage) -> WireMessage {
+    pub fn countersigning_session_negotiation(
+        message: event::CountersigningSessionNegotiationMessage,
+    ) -> WireMessage {
         Self::CountersigningSessionNegotiation { message }
     }
 }

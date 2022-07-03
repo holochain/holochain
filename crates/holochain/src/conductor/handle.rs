@@ -763,7 +763,7 @@ impl ConductorHandleT for ConductorHandleImpl {
                 respond.respond(Ok(async move { Ok(signature) }.boxed().into()));
             }
             HolochainP2pEvent::CallRemote { .. }
-            | CountersigningSessionNegotation { .. }
+            | CountersigningSessionNegotiation { .. }
             | GetValidationPackage { .. }
             | Get { .. }
             | GetMeta { .. }

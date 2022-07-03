@@ -22,6 +22,8 @@ use crate::conductor::space::Space;
 use crate::core::queue_consumer::{QueueTriggers, TriggerSender, WorkComplete};
 use crate::core::ribosome::weigh_placeholder;
 
+use holochain_p2p::event::CountersigningSessionNegotiationMessage;
+
 use super::{error::WorkflowResult, incoming_dht_ops_workflow::incoming_dht_ops_workflow};
 
 #[derive(Clone)]
@@ -115,27 +117,27 @@ pub(crate) async fn countersigning_workflow(
 
     // For each complete session send the ops to validation.
     for (agents, ops, actions) in complete_sessions {
-        let non_enzymatic_ops: Vec<(HoloHash<DhtOp>, DhtOp)> = ops.filter(|(_hash, dht_op)| match dht_op.entry() {
-            Some(entry) => {
-                match entry {
-                    Entry::CounterSign(session_data, _) => {
-                        !session_data.preflight_request().enzymatic
-                    },
-                    // Not enzymatic because it isn't a countersigning entry.
-                    _ => true,
-                }
-            },
-            // Not enzymatic because it doesn't even have an entry.
-            None => true,
-        }).collect();
-        incoming_dht_ops_workflow(space, sys_validation_trigger.clone(), non_enzymatic_ops, false).await?;
+        let non_enzymatic_ops: Vec<_> = ops
+            .into_iter()
+            .filter(|(_hash, dht_op)| !dht_op.enzymatic_countersigning_enzyme().is_some())
+            .collect();
+        incoming_dht_ops_workflow(
+            space,
+            sys_validation_trigger.clone(),
+            non_enzymatic_ops,
+            false,
+        )
+        .await?;
         notify_agents.push((agents, actions));
     }
 
     // For each complete session notify the agents of success.
     for (agents, actions) in notify_agents {
         if let Err(e) = network
-            .countersigning_session_negotiation(agents, CountersigningSessionNegotiationMessage::AuthorityResponse(actions))
+            .countersigning_session_negotiation(
+                agents,
+                CountersigningSessionNegotiationMessage::AuthorityResponse(actions),
+            )
             .await
         {
             // This could likely fail if a signer is offline so it's not really an error.
@@ -307,14 +309,29 @@ pub async fn countersigning_publish(
     network: &HolochainP2pDna,
     op: DhtOp,
 ) -> Result<(), ZomeCallResponse> {
-    let basis = op.dht_basis();
-    let ops = vec![op];
-    if let Err(e) = network.publish(false, true, basis, ops, None).await {
-        tracing::error!(
-            "Failed to publish to entry authorities for countersigning session because of: {:?}",
-            e
-        );
-        return Err(ZomeCallResponse::CountersigningSession(e.to_string()));
+    if let Some(enzyme) = op.enzymatic_countersigning_enzyme() {
+        if let Err(e) = network
+            .countersigning_session_negotiation(
+                vec![enzyme.clone()],
+                CountersigningSessionNegotiationMessage::EnzymePush(op),
+            )
+            .await {
+                tracing::error!(
+                    "Failed to push countersigning ops to enzyme because of: {:?}",
+                    e
+                );
+                return Err(ZomeCallResponse::CountersigningSession(e.to_string()));
+            }
+    } else {
+        let basis = op.dht_basis();
+        let ops = vec![op];
+        if let Err(e) = network.publish(false, true, basis, ops, None).await {
+            tracing::error!(
+                "Failed to publish to entry authorities for countersigning session because of: {:?}",
+                e
+            );
+            return Err(ZomeCallResponse::CountersigningSession(e.to_string()));
+        }
     }
     Ok(())
 }

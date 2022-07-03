@@ -34,6 +34,7 @@ use hash_type::AnyDht;
 use holo_hash::*;
 use holochain_cascade::authority;
 use holochain_cascade::Cascade;
+use holochain_p2p::event::CountersigningSessionNegotiationMessage;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_sqlite::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
@@ -50,6 +51,7 @@ use std::sync::Arc;
 use tokio::sync;
 use tracing::*;
 use tracing_futures::Instrument;
+use crate::core::workflow::countersigning_workflow::incoming_countersigning;
 
 pub const INIT_MUTEX_TIMEOUT_SECS: u64 = 30;
 
@@ -498,9 +500,7 @@ impl Cell {
                 .await;
             }
             CountersigningSessionNegotiation {
-                respond,
-                message,
-                ..
+                respond, message, ..
             } => {
                 async {
                     let res = self
@@ -516,22 +516,37 @@ impl Cell {
         Ok(())
     }
 
-    #[instrument(skip(self, signed_actions))]
+    #[instrument(skip(self, message))]
     /// we are receiving a response from a countersigning authority
     async fn handle_countersigning_session_negotiation(
         &self,
-        message: CountersigningSessionNegotiation,
+        message: CountersigningSessionNegotiationMessage,
     ) -> CellResult<()> {
-        Ok(countersigning_success(
-            self.space.clone(),
-            &self.holochain_p2p_cell,
-            self.id.agent_pubkey().clone(),
-            signed_actions,
-            self.queue_triggers.clone(),
-            self.conductor_api.signal_broadcaster().await,
-        )
-        .await
-        .map_err(Box::new)?)
+        match message {
+            CountersigningSessionNegotiationMessage::EnzymePush(dht_op) => {
+                use futures::StreamExt;
+                let ops = futures::stream::iter(vec![dht_op].into_iter().map(|op| {
+                    let hash = DhtOpHash::with_data_sync(&op);
+                    (hash, op)
+                }))
+                .collect()
+                .await;
+                incoming_countersigning(ops, &self.space.countersigning_workspace, self.queue_triggers.countersigning.clone()).map_err(Box::new)?;
+                Ok(())
+            },
+            CountersigningSessionNegotiationMessage::AuthorityResponse(signed_actions) => {
+                Ok(countersigning_success(
+                    self.space.clone(),
+                    &self.holochain_p2p_cell,
+                    self.id.agent_pubkey().clone(),
+                    signed_actions,
+                    self.queue_triggers.clone(),
+                    self.conductor_api.signal_broadcaster().await,
+                )
+                .await
+                .map_err(Box::new)?)
+            }
+        }
     }
 
     #[instrument(skip(self))]
