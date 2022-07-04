@@ -231,7 +231,6 @@ pub mod wasm_test {
 
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "slow_tests")]
-    #[ignore = "flakey, line 422 gets 7 instead of 6"]
     async fn lock_chain() {
         observability::test_run().ok();
         let RibosomeTestFixture {
@@ -472,6 +471,140 @@ pub mod wasm_test {
         assert_eq!(
             &bob_activity.valid_activity[4].1,
             countersigned_action_bob.action_address(),
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[cfg(feature = "slow_tests")]
+    async fn enzymatic_session() {
+        observability::test_run().ok();
+        let RibosomeTestFixture {
+            conductor,
+            alice,
+            alice_pubkey,
+            bob,
+            bob_pubkey,
+            ..
+        } = RibosomeTestFixture::new(TestWasm::CounterSigning).await;
+
+        // Start an enzymatic session
+        let preflight_request: PreflightRequest = conductor
+            .call(
+                &alice,
+                "generate_countersigning_preflight_request_enzymatic",
+                vec![
+                    // Alice is enzyme
+                    (alice_pubkey.clone(), vec![Role(0)]),
+                    (bob_pubkey.clone(), vec![]),
+                ],
+            )
+            .await;
+
+        // Alice can accept.
+        let alice_acceptance: PreflightRequestAcceptance = conductor
+            .call(
+                &alice,
+                "accept_countersigning_preflight_request",
+                preflight_request.clone(),
+            )
+            .await;
+        let alice_response =
+            if let PreflightRequestAcceptance::Accepted(ref response) = alice_acceptance {
+                response
+            } else {
+                unreachable!();
+            };
+
+        // Bob can also accept the preflight request.
+        let bob_acceptance: PreflightRequestAcceptance = conductor
+            .call(
+                &bob,
+                "accept_countersigning_preflight_request",
+                preflight_request.clone(),
+            )
+            .await;
+        let bob_response =
+            if let PreflightRequestAcceptance::Accepted(ref response) = bob_acceptance {
+                response
+            } else {
+                unreachable!();
+            };
+
+        // Alice commits the action.
+        let _countersigned_action_hash_alice: ActionHash = conductor
+            .call(
+                &alice,
+                "create_a_countersigned_thing",
+                vec![alice_response.clone(), bob_response.clone()],
+            )
+            .await;
+
+        // The countersigned entry does NOT appear in alice's activity yet.
+        let alice_activity_pre: AgentActivity = conductor
+            .call(
+                &alice,
+                "get_agent_activity",
+                GetAgentActivityInput {
+                    agent_pubkey: alice_pubkey.clone(),
+                    chain_query_filter: ChainQueryFilter::new(),
+                    activity_request: ActivityRequest::Full,
+                },
+            )
+            .await;
+        // Nor bob's.
+        let bob_activity_pre: AgentActivity = conductor
+            .call(
+                &alice,
+                "get_agent_activity",
+                GetAgentActivityInput {
+                    agent_pubkey: bob_pubkey.clone(),
+                    chain_query_filter: ChainQueryFilter::new(),
+                    activity_request: ActivityRequest::Full,
+                },
+            )
+            .await;
+
+        // Bob commits the action also.
+        let _countersigned_action_hash_bob: ActionHash = conductor
+            .call(
+                &bob,
+                "create_a_countersigned_thing",
+                vec![alice_response, bob_response],
+            )
+            .await;
+
+        // Now the action appears in alice's activty.
+        let alice_activity: AgentActivity = conductor
+            .call(
+                &alice,
+                "get_agent_activity",
+                GetAgentActivityInput {
+                    agent_pubkey: alice_pubkey.clone(),
+                    chain_query_filter: ChainQueryFilter::new(),
+                    activity_request: ActivityRequest::Full,
+                },
+            )
+            .await;
+        // And bob's.
+        let bob_activity: AgentActivity = conductor
+            .call(
+                &alice,
+                "get_agent_activity",
+                GetAgentActivityInput {
+                    agent_pubkey: bob_pubkey.clone(),
+                    chain_query_filter: ChainQueryFilter::new(),
+                    activity_request: ActivityRequest::Full,
+                },
+            )
+            .await;
+
+        assert_eq!(
+            alice_activity.valid_activity.len(),
+            alice_activity_pre.valid_activity.len() + 1
+        );
+        assert_eq!(
+            bob_activity.valid_activity.len(),
+            bob_activity_pre.valid_activity.len() + 1
         );
     }
 }

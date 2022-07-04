@@ -317,13 +317,14 @@ pub async fn countersigning_publish(
                 vec![enzyme.clone()],
                 CountersigningSessionNegotiationMessage::EnzymePush(op),
             )
-            .await {
-                tracing::error!(
-                    "Failed to push countersigning ops to enzyme because of: {:?}",
-                    e
-                );
-                return Err(ZomeCallResponse::CountersigningSession(e.to_string()));
-            }
+            .await
+        {
+            tracing::error!(
+                "Failed to push countersigning ops to enzyme because of: {:?}",
+                e
+            );
+            return Err(ZomeCallResponse::CountersigningSession(e.to_string()));
+        }
     } else {
         let basis = op.dht_basis();
         let ops = vec![op];
