@@ -119,15 +119,17 @@ pub(crate) async fn countersigning_workflow(
     for (agents, ops, actions) in complete_sessions {
         let non_enzymatic_ops: Vec<_> = ops
             .into_iter()
-            .filter(|(_hash, dht_op)| !dht_op.enzymatic_countersigning_enzyme().is_some())
+            .filter(|(_hash, dht_op)| dht_op.enzymatic_countersigning_enzyme().is_none())
             .collect();
-        incoming_dht_ops_workflow(
-            space,
-            sys_validation_trigger.clone(),
-            non_enzymatic_ops,
-            false,
-        )
-        .await?;
+        if !non_enzymatic_ops.is_empty() {
+            incoming_dht_ops_workflow(
+                space,
+                sys_validation_trigger.clone(),
+                non_enzymatic_ops,
+                false,
+            )
+            .await?;
+        }
         notify_agents.push((agents, actions));
     }
 

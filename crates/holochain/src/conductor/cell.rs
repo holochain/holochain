@@ -524,13 +524,11 @@ impl Cell {
     ) -> CellResult<()> {
         match message {
             CountersigningSessionNegotiationMessage::EnzymePush(dht_op) => {
-                use futures::StreamExt;
-                let ops = futures::stream::iter(vec![dht_op].into_iter().map(|op| {
+                let ops = vec![dht_op].into_iter().map(|op| {
                     let hash = DhtOpHash::with_data_sync(&op);
                     (hash, op)
-                }))
-                .collect()
-                .await;
+                })
+                .collect();
                 incoming_countersigning(ops, &self.space.countersigning_workspace, self.queue_triggers.countersigning.clone()).map_err(Box::new)?;
                 Ok(())
             },
