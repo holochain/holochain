@@ -28,6 +28,7 @@ struct Event {
     action: ActionLocation,
     op_type: DhtOpType,
     called_zome: &'static str,
+    with_zome_id: Option<ZomeId>,
     with_entry_def_index: Option<EntryDefIndex>,
 }
 
@@ -37,6 +38,7 @@ impl Default for Event {
             action: Default::default(),
             op_type: DhtOpType::RegisterAgentActivity,
             called_zome: Default::default(),
+            with_zome_id: Default::default(),
             with_entry_def_index: Default::default(),
         }
     }
@@ -167,7 +169,7 @@ async fn app_validation_ops() {
         move |api: BoxApi, ()| {
             let entry = Entry::app(().try_into().unwrap()).unwrap();
             let hash = api.create(CreateInput::new(
-                InlineZomeSet::get_entry_location(&api, 0),
+                InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
                 EntryVisibility::Public,
                 entry,
                 ChainTopOrdering::default(),
@@ -179,7 +181,7 @@ async fn app_validation_ops() {
         move |api: BoxApi, ()| {
             let entry = Entry::app(().try_into().unwrap()).unwrap();
             let hash = api.create(CreateInput::new(
-                InlineZomeSet::get_entry_location(&api, 0),
+                InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
                 EntryVisibility::Public,
                 entry,
                 ChainTopOrdering::default(),
@@ -200,18 +202,20 @@ async fn app_validation_ops() {
                         action: ActionLocation::new(record.action().clone(), &agents),
                         op_type: DhtOpType::StoreRecord,
                         called_zome: zome,
+                        with_zome_id: None,
                         with_entry_def_index: None,
                     },
                     Op::StoreEntry { action, .. } => {
-                        let with_entry_def_index =
+                        let (with_entry_def_index, with_zome_id) =
                             match action.hashed.content.app_entry_type().cloned() {
-                                Some(AppEntryType { id, .. }) => Some(id),
-                                _ => None,
+                                Some(AppEntryType { id, zome_id, .. }) => (Some(id), Some(zome_id)),
+                                _ => (None, None),
                             };
                         Event {
                             action: ActionLocation::new(action.hashed.content.clone(), &agents),
                             op_type: DhtOpType::StoreEntry,
                             called_zome: zome,
+                            with_zome_id,
                             with_entry_def_index,
                         }
                     }
@@ -220,14 +224,16 @@ async fn app_validation_ops() {
                         original_action,
                         ..
                     } => {
-                        let with_entry_def_index = match original_action.app_entry_type().cloned() {
-                            Some(AppEntryType { id, .. }) => Some(id),
-                            _ => None,
-                        };
+                        let (with_entry_def_index, with_zome_id) =
+                            match original_action.app_entry_type().cloned() {
+                                Some(AppEntryType { id, zome_id, .. }) => (Some(id), Some(zome_id)),
+                                _ => (None, None),
+                            };
                         Event {
                             action: ActionLocation::new(update.hashed.content.clone(), &agents),
                             op_type: DhtOpType::RegisterUpdatedContent,
                             called_zome: zome,
+                            with_zome_id,
                             with_entry_def_index,
                         }
                     }
@@ -236,14 +242,16 @@ async fn app_validation_ops() {
                         original_action,
                         ..
                     } => {
-                        let with_entry_def_index = match original_action.app_entry_type().cloned() {
-                            Some(AppEntryType { id, .. }) => Some(id),
-                            _ => None,
-                        };
+                        let (with_entry_def_index, with_zome_id) =
+                            match original_action.app_entry_type().cloned() {
+                                Some(AppEntryType { id, zome_id, .. }) => (Some(id), Some(zome_id)),
+                                _ => (None, None),
+                            };
                         Event {
                             action: ActionLocation::new(delete.hashed.content.clone(), &agents),
                             op_type: DhtOpType::RegisterDeletedBy,
                             called_zome: zome,
+                            with_zome_id,
                             with_entry_def_index,
                         }
                     }
@@ -251,18 +259,21 @@ async fn app_validation_ops() {
                         action: ActionLocation::new(action.action().clone(), &agents),
                         op_type: DhtOpType::RegisterAgentActivity,
                         called_zome: zome,
+                        with_zome_id: None,
                         with_entry_def_index: None,
                     },
                     Op::RegisterCreateLink { create_link, .. } => Event {
                         action: ActionLocation::new(create_link.hashed.content.clone(), &agents),
                         op_type: DhtOpType::RegisterAddLink,
                         called_zome: zome,
+                        with_zome_id: None,
                         with_entry_def_index: None,
                     },
                     Op::RegisterDeleteLink { delete_link, .. } => Event {
                         action: ActionLocation::new(delete_link.hashed.content.clone(), &agents),
                         op_type: DhtOpType::RegisterRemoveLink,
                         called_zome: zome,
+                        with_zome_id: None,
                         with_entry_def_index: None,
                     },
                 };
@@ -384,19 +395,10 @@ async fn app_validation_ops() {
     };
     expected.activity_and_record_all_zomes(event.clone());
 
-    let entry_def_id = conductors[0]
-        .get_ribosome(dna_file_a.dna_hash())
-        .unwrap()
-        .zome_types
-        .re_scope(&[ZomeId(0)])
-        .unwrap()
-        .entries
-        .to_global_scope(0)
-        .unwrap();
-
     event.op_type = DhtOpType::StoreEntry;
     event.called_zome = ZOME_A_0;
-    event.with_entry_def_index = Some(entry_def_id.into());
+    event.with_zome_id = Some(ZomeId(0));
+    event.with_entry_def_index = Some(0.into());
     expected.0.insert(event.clone());
 
     event.called_zome = ZOME_B_0;

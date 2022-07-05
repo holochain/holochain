@@ -5,7 +5,7 @@ impl TryFrom<&ThisWasmEntry> for CreateInput {
     type Error = WasmError;
     fn try_from(this_wasm_entry: &ThisWasmEntry) -> Result<Self, Self::Error> {
         Ok(Self::new(
-            EntryDefIndex::try_from(this_wasm_entry)?,
+            ScopedEntryDefIndex::try_from(this_wasm_entry)?,
             EntryVisibility::Public,
             Entry::try_from(this_wasm_entry)?,
             ChainTopOrdering::default(),

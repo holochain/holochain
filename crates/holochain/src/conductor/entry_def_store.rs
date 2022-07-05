@@ -66,13 +66,11 @@ pub(crate) async fn get_entry_defs(
         .map(|(i, (zome_name, zome))| (zome_name, (ZomeId(i as u8), zome)))
         .collect::<HashMap<_, _>>();
 
-    let (ribosome, result) = tokio::task::spawn_blocking(move || {
-        let r = ribosome.run_entry_defs(EntryDefsHostAccess, invocation);
-        (ribosome, r)
+    let result = tokio::task::spawn_blocking(move || {
+        ribosome.run_entry_defs(EntryDefsHostAccess, invocation)
     })
     .await?;
 
-    let zome_types_map = ribosome.zome_types();
     match result? {
         EntryDefsResult::Defs(map) => {
             // Turn the defs map into a vec of keys and entry defs
@@ -82,21 +80,13 @@ pub(crate) async fn get_entry_defs(
                     zomes.get(&zome_name).map(|zome| (zome.clone(), entry_defs))
                 })
                 // Get each entry def and pair with a key
-                .flat_map(|((zome_id, zome), entry_defs)| {
+                .flat_map(|((_id, zome), entry_defs)| {
                     entry_defs
                         .into_iter()
                         .enumerate()
                         .map(move |(local_index, entry_def)| {
                             let entry_def_position = u8::try_from(local_index)
-                                .ok()
-                                .and_then(|local_type_id| {
-                                    zome_types_map
-                                        .re_scope(&[zome_id])
-                                        .ok()?
-                                        .entries
-                                        .to_global_scope(local_type_id)
-                                })
-                                .ok_or(EntryDefStoreError::EntryTypeMissing)?;
+                                .map_err(|_| EntryDefStoreError::EntryTypeMissing)?;
 
                             Ok((
                                 EntryDefBufferKey {

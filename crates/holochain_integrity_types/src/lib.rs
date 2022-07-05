@@ -25,6 +25,7 @@ pub mod info;
 pub mod link;
 pub mod op;
 pub mod prelude;
+pub mod rate_limit;
 pub mod record;
 pub mod signature;
 pub use kitsune_p2p_timestamp as timestamp;

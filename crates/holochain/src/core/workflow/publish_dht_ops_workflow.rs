@@ -42,22 +42,31 @@ pub async fn publish_dht_ops_workflow(
     let to_publish = publish_dht_ops_workflow_inner(db.clone().into(), agent).await?;
 
     // Commit to the network
-    tracing::info!("sending to {} basis locations", to_publish.len());
+    tracing::info!("publishing to {} nodes", to_publish.len());
     let mut success = Vec::new();
+    let mut total_payload = 0;
     for (basis, ops) in to_publish {
         let (hashes, ops): (Vec<_>, Vec<_>) = ops.into_iter().unzip();
-        if let Err(e) = network.publish(true, false, basis, ops, None).await {
-            // If we get a routing error it means the space hasn't started yet and we should try publishing again.
-            if let holochain_p2p::HolochainP2pError::RoutingDnaError(_) = e {
-                complete = WorkComplete::Incomplete;
+        match network.publish(true, false, basis, ops, None).await {
+            Err(e) => {
+                // If we get a routing error it means the space hasn't started yet and we should try publishing again.
+                if let holochain_p2p::HolochainP2pError::RoutingDnaError(_) = e {
+                    complete = WorkComplete::Incomplete;
+                }
+                tracing::warn!(failed_to_send_publish = ?e);
             }
-            tracing::info!(failed_to_send_publish = ?e);
-        } else {
-            success.extend(hashes);
+            Ok(payload_size) => {
+                success.extend(hashes);
+                total_payload += payload_size;
+            }
         }
     }
 
-    tracing::info!("sent {} ops", success.len());
+    tracing::info!(
+        "published {} ops, {} total bytes",
+        success.len(),
+        total_payload
+    );
     let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?;
     let continue_publish = db
         .async_commit(move |writer| {
@@ -75,7 +84,7 @@ pub async fn publish_dht_ops_workflow(
         trigger_self.pause_loop();
     }
 
-    tracing::info!("committed sent ops");
+    tracing::debug!("committed published ops");
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
     Ok(complete)
@@ -413,7 +422,7 @@ mod tests {
                 .unwrap();
                 // Produces 3 ops but minus 1 for store entry so 2 ops.
                 let original_action_address = source_chain
-                    .put(
+                    .put_weightless(
                         builder::Create {
                             entry_type: ec_entry_type,
                             entry_hash: original_entry_hash.clone(),
@@ -426,7 +435,7 @@ mod tests {
 
                 // Produces 5 ops but minus 1 for store entry so 4 ops.
                 let entry_update_hash = source_chain
-                    .put(
+                    .put_weightless(
                         builder::Update {
                             entry_type: eu_entry_type,
                             entry_hash: new_entry_hash,

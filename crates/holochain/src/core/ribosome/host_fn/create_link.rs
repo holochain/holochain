@@ -21,6 +21,7 @@ pub fn create_link<'a>(
             let CreateLinkInput {
                 base_address,
                 target_address,
+                zome_id,
                 link_type,
                 tag,
                 chain_top_ordering,
@@ -28,7 +29,7 @@ pub fn create_link<'a>(
 
             // Construct the link add
             let action_builder =
-                builder::CreateLink::new(base_address, target_address, link_type, tag);
+                builder::CreateLink::new(base_address, target_address, zome_id, link_type, tag);
 
             let action_hash = tokio_helper::block_forever_on(tokio::task::spawn(async move {
                 // push the action into the source chain
@@ -38,7 +39,7 @@ pub fn create_link<'a>(
                     .source_chain()
                     .as_ref()
                     .expect("Must have source chain if write_workspace access is given")
-                    .put(action_builder, None, chain_top_ordering)
+                    .put_weightless(action_builder, None, chain_top_ordering)
                     .await?;
                 Ok::<ActionHash, RibosomeError>(action_hash)
             }))

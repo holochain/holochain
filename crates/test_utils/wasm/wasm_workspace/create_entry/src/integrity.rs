@@ -40,16 +40,15 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     {
         action
             .app_entry_type()
-            .map(|AppEntryType { id, .. }| id)
-            .map_or(
-                Ok(ValidateCallbackResult::Valid),
-                |id| match EntryTypes::try_from_global_type(*id, &entry)? {
+            .map(|AppEntryType { id, zome_id, .. }| (zome_id, id))
+            .map_or(Ok(ValidateCallbackResult::Valid), |(zome_id, id)| {
+                match EntryTypes::deserialize_from_type(*zome_id, *id, &entry)? {
                     Some(EntryTypes::Post(post)) if post.0 == "Banana" => {
                         Ok(ValidateCallbackResult::Invalid("No Bananas!".to_string()))
                     }
                     _ => Ok(ValidateCallbackResult::Valid),
-                },
-            )
+                }
+            })
     } else {
         Ok(ValidateCallbackResult::Valid)
     }

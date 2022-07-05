@@ -246,6 +246,38 @@
 //!
 //! [`hdk_extern!`]: hdk_derive::hdk_extern
 
+#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+const ERAND_INTERNAL: u32 = getrandom::Error::CUSTOM_START + 1;
+
+#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+const ERAND_TOO_LONG: u32 = getrandom::Error::CUSTOM_START + 2;
+
+#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+fn wasm_getrandom(buf: &mut [u8]) -> Result<(), getrandom::Error> {
+    if buf.len() > u32::MAX as usize {
+        let code = core::num::NonZeroU32::new(ERAND_TOO_LONG).unwrap();
+        return Err(getrandom::Error::from(code));
+    }
+    let number_of_bytes = buf.len() as u32;
+    match crate::hdk::HDK.with(|h| h.borrow().random_bytes(number_of_bytes)) {
+        Err(_) => {
+            let code = core::num::NonZeroU32::new(ERAND_INTERNAL).unwrap();
+            return Err(getrandom::Error::from(code));
+        }
+        Ok(bytes) => {
+            if bytes.len() != buf.len() {
+                let code = core::num::NonZeroU32::new(ERAND_INTERNAL).unwrap();
+                return Err(getrandom::Error::from(code));
+            }
+            buf.copy_from_slice(&bytes);
+        }
+    }
+    Ok(())
+}
+
+#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+getrandom::register_custom_getrandom!(wasm_getrandom);
+
 /// Capability claims and grants.
 ///
 /// Every exposed function in Holochain uses capability grants/claims to secure access.

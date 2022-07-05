@@ -20,7 +20,7 @@ fn scheduled_fn(_: Option<Schedule>) -> Option<Schedule> {
     if HDK
         .with(|h| {
             h.borrow().create(CreateInput::new(
-                EntryDefIndex::try_from(EntryTypesUnit::Tick)?,
+                ScopedEntryDefIndex::try_from(EntryTypesUnit::Tick)?,
                 EntryVisibility::Public,
                 Tick.try_into().unwrap(),
                 // This will be running concurrently with cron_scheduled_fn.
@@ -48,7 +48,7 @@ fn scheduled_fn(_: Option<Schedule>) -> Option<Schedule> {
 fn cron_scheduled_fn(_: Option<Schedule>) -> Option<Schedule> {
     HDK.with(|h| {
         h.borrow().create(CreateInput::new(
-            EntryDefIndex::try_from(EntryTypesUnit::Tock)?,
+            ScopedEntryDefIndex::try_from(EntryTypesUnit::Tock)?,
             EntryVisibility::Public,
             Tock.try_into().unwrap(),
             // This will be running concurrently with scheduled_fn.
