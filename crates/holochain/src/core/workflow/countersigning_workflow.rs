@@ -315,7 +315,7 @@ pub async fn countersigning_publish(
         if let Err(e) = network
             .countersigning_session_negotiation(
                 vec![enzyme.clone()],
-                CountersigningSessionNegotiationMessage::EnzymePush(op),
+                CountersigningSessionNegotiationMessage::EnzymePush(Box::new(op)),
             )
             .await
         {
