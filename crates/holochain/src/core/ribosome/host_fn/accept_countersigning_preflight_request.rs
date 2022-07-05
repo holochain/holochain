@@ -887,8 +887,6 @@ pub mod wasm_test {
                     },
                 )
                 .await;
-            dbg!(&alice_activity, &alice_activity_pre);
-
 
             assert_eq!(
                 alice_activity.valid_activity.len(),
