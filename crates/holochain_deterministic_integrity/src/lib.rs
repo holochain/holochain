@@ -30,7 +30,7 @@
 //! * Integrity zomes can be shared among DNAs. Any coordinator zome can import an integrity
 //! zome's data types and implement functions for data manipulation. This composability of
 //! integrity and coordinator zomes allows for a multitude of permutations with shared integrity
-//! zomes, i. e. a shared data model.
+//! zomes, i. e. a shared data model across applications and peer networks.
 //!
 //! # Data validation
 //!
