@@ -647,7 +647,6 @@ pub mod wasm_test {
 
         // NON ENZYMATIC
         {
-
             consistency_10s(&[&alice_cell, &bob_cell, &carol_cell]).await;
 
             // The countersigned entry does NOT appear in alice's activity yet.
@@ -897,7 +896,5 @@ pub mod wasm_test {
                 bob_activity_pre.valid_activity.len()
             );
         }
-
-
     }
 }
