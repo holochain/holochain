@@ -4,7 +4,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
-- Added networking logic for enzymatic countersigning
+- Added networking logic for enzymatic countersigning [\#1472](https://github.com/holochain/holochain/pull/1472)
+- Countersigning authority response network message changed to a session negotiation enum [/#1472](https://github.com/holochain/holochain/pull/1472)
 
 ## 0.0.147
 
