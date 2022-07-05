@@ -5,7 +5,7 @@
 //! # Examples
 //!
 //! ```
-//! use holochain_deterministic_integrity::prelude::*;
+//! use hdi::prelude::*;
 //!
 //! // Create the mock.
 //! let mut mock_hdi = holochain_mock_hdi::MockHdiT::new();
@@ -34,7 +34,7 @@
 //! ));
 //! ```
 
-use holochain_deterministic_integrity::prelude::*;
+use hdi::prelude::*;
 
 ::mockall::mock! {
     pub HdiT {}

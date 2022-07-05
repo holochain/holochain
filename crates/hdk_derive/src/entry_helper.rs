@@ -20,7 +20,7 @@ pub fn build(_attrs: TokenStream, input: TokenStream) -> TokenStream {
         #[derive(Serialize, Deserialize, SerializedBytes, Debug)]
         #input
 
-        holochain_deterministic_integrity::app_entry!(#ident);
+        hdi::app_entry!(#ident);
     };
     output.into()
 }

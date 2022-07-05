@@ -1,4 +1,4 @@
-use hdk::prelude::holochain_deterministic_integrity::prelude::*;
+use hdk::prelude::hdi::prelude::*;
 
 #[derive(UnitEnum)]
 enum Nesting {

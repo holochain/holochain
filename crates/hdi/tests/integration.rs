@@ -1,7 +1,7 @@
 //! Tests for the proc macros defined in [`hdk_derive`] that are
 //! used at the integrity level.
 
-use holochain_deterministic_integrity::prelude::*;
+use hdi::prelude::*;
 
 fn to_coords(t: impl Into<ZomeLinkTypesKey>) -> (u8, u8) {
     let t = t.into();
@@ -159,7 +159,7 @@ fn to_zome_id_test_unit() {
 }
 
 mod entry_defs_to_entry_type_index_test {
-    use holochain_deterministic_integrity::prelude::*;
+    use hdi::prelude::*;
 
     #[hdk_entry_helper]
     pub struct A;

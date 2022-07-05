@@ -668,13 +668,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "hdi"
+version = "0.0.12"
+dependencies = [
+ "hdk_derive",
+ "holo_hash",
+ "holochain_integrity_types",
+ "holochain_wasmer_guest",
+ "paste",
+ "serde",
+ "serde_bytes",
+ "tracing",
+ "tracing-core",
+]
+
+[[package]]
 name = "hdk"
 version = "0.0.140"
 dependencies = [
  "getrandom",
+ "hdi",
  "hdk_derive",
  "holo_hash",
- "holochain_deterministic_integrity",
  "holochain_wasmer_guest",
  "holochain_zome_types",
  "mockall",
@@ -744,21 +759,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "holochain_deterministic_integrity"
-version = "0.0.12"
-dependencies = [
- "hdk_derive",
- "holo_hash",
- "holochain_integrity_types",
- "holochain_wasmer_guest",
- "paste",
- "serde",
- "serde_bytes",
- "tracing",
- "tracing-core",
-]
-
-[[package]]
 name = "holochain_integrity_types"
 version = "0.0.11"
 dependencies = [
@@ -776,7 +776,7 @@ dependencies = [
 name = "holochain_mock_hdi"
 version = "0.0.1"
 dependencies = [
- "holochain_deterministic_integrity",
+ "hdi",
  "mockall",
 ]
 
@@ -1709,8 +1709,8 @@ name = "test_wasm_agent_info"
 version = "0.0.1"
 dependencies = [
  "fixt",
+ "hdi",
  "hdk",
- "holochain_deterministic_integrity",
  "serde",
 ]
 
@@ -1718,8 +1718,8 @@ dependencies = [
 name = "test_wasm_anchor"
 version = "0.0.1"
 dependencies = [
+ "hdi",
  "hdk",
- "holochain_deterministic_integrity",
  "holochain_test_wasm_common",
  "serde",
 ]
@@ -1728,8 +1728,8 @@ dependencies = [
 name = "test_wasm_bench"
 version = "0.0.1"
 dependencies = [
+ "hdi",
  "hdk",
- "holochain_deterministic_integrity",
  "serde",
 ]
 
@@ -1765,8 +1765,8 @@ dependencies = [
 name = "test_wasm_countersigning"
 version = "0.0.1"
 dependencies = [
+ "hdi",
  "hdk",
- "holochain_deterministic_integrity",
  "holochain_test_wasm_common",
  "serde",
 ]
@@ -1776,8 +1776,8 @@ name = "test_wasm_crd"
 version = "0.0.1"
 dependencies = [
  "fixt",
+ "hdi",
  "hdk",
- "holochain_deterministic_integrity",
  "holochain_test_wasm_common",
  "serde",
 ]
@@ -1786,8 +1786,8 @@ dependencies = [
 name = "test_wasm_create_entry"
 version = "0.0.1"
 dependencies = [
+ "hdi",
  "hdk",
- "holochain_deterministic_integrity",
  "holochain_test_wasm_common",
  "serde",
 ]
@@ -1796,8 +1796,8 @@ dependencies = [
 name = "test_wasm_crud"
 version = "0.0.1"
 dependencies = [
+ "hdi",
  "hdk",
- "holochain_deterministic_integrity",
  "holochain_test_wasm_common",
  "serde",
 ]
@@ -1825,8 +1825,8 @@ dependencies = [
 name = "test_wasm_entry_defs"
 version = "0.0.1"
 dependencies = [
+ "hdi",
  "hdk",
- "holochain_deterministic_integrity",
  "serde",
 ]
 
@@ -1843,8 +1843,8 @@ dependencies = [
 name = "test_wasm_genesis_self_check_invalid"
 version = "0.0.1"
 dependencies = [
+ "hdi",
  "hdk",
- "holochain_deterministic_integrity",
  "serde",
 ]
 
@@ -1852,8 +1852,8 @@ dependencies = [
 name = "test_wasm_genesis_self_check_valid"
 version = "0.0.1"
 dependencies = [
+ "hdi",
  "hdk",
- "holochain_deterministic_integrity",
  "serde",
 ]
 
@@ -1862,8 +1862,8 @@ name = "test_wasm_hash_entry"
 version = "0.0.1"
 dependencies = [
  "fixt",
+ "hdi",
  "hdk",
- "holochain_deterministic_integrity",
  "serde",
 ]
 
@@ -1905,7 +1905,7 @@ dependencies = [
 name = "test_wasm_integrity_zome"
 version = "0.0.1"
 dependencies = [
- "holochain_deterministic_integrity",
+ "hdi",
  "holochain_mock_hdi",
  "serde",
 ]
@@ -1914,8 +1914,8 @@ dependencies = [
 name = "test_wasm_link"
 version = "0.0.1"
 dependencies = [
+ "hdi",
  "hdk",
- "holochain_deterministic_integrity",
  "holochain_test_wasm_common",
  "serde",
 ]
@@ -1940,8 +1940,8 @@ dependencies = [
 name = "test_wasm_multiple_calls"
 version = "0.0.1"
 dependencies = [
+ "hdi",
  "hdk",
- "holochain_deterministic_integrity",
  "holochain_test_wasm_common",
  "serde",
 ]
@@ -1950,8 +1950,8 @@ dependencies = [
 name = "test_wasm_must_get"
 version = "0.0.1"
 dependencies = [
+ "hdi",
  "hdk",
- "holochain_deterministic_integrity",
  "holochain_test_wasm_common",
  "serde",
  "thiserror",
@@ -1969,8 +1969,8 @@ dependencies = [
 name = "test_wasm_post_commit_volley"
 version = "0.0.1"
 dependencies = [
+ "hdi",
  "hdk",
- "holochain_deterministic_integrity",
  "serde",
 ]
 
@@ -1998,8 +1998,8 @@ name = "test_wasm_schedule"
 version = "0.0.1"
 dependencies = [
  "fixt",
+ "hdi",
  "hdk",
- "holochain_deterministic_integrity",
  "serde",
 ]
 
@@ -2008,8 +2008,8 @@ name = "test_wasm_ser_regression"
 version = "0.0.1"
 dependencies = [
  "derive_more",
+ "hdi",
  "hdk",
- "holochain_deterministic_integrity",
  "serde",
 ]
 
@@ -2034,8 +2034,8 @@ dependencies = [
 name = "test_wasm_the_incredible_halt"
 version = "0.0.1"
 dependencies = [
+ "hdi",
  "hdk",
- "holochain_deterministic_integrity",
  "serde",
 ]
 
@@ -2043,8 +2043,8 @@ dependencies = [
 name = "test_wasm_update_entry"
 version = "0.0.1"
 dependencies = [
+ "hdi",
  "hdk",
- "holochain_deterministic_integrity",
  "holochain_test_wasm_common",
  "serde",
 ]
@@ -2053,8 +2053,8 @@ dependencies = [
 name = "test_wasm_validate"
 version = "0.0.1"
 dependencies = [
+ "hdi",
  "hdk",
- "holochain_deterministic_integrity",
  "serde",
 ]
 
@@ -2062,8 +2062,8 @@ dependencies = [
 name = "test_wasm_validate_invalid"
 version = "0.0.1"
 dependencies = [
+ "hdi",
  "hdk",
- "holochain_deterministic_integrity",
  "serde",
 ]
 
@@ -2071,8 +2071,8 @@ dependencies = [
 name = "test_wasm_validate_link"
 version = "0.0.1"
 dependencies = [
+ "hdi",
  "hdk",
- "holochain_deterministic_integrity",
  "serde",
 ]
 
@@ -2080,8 +2080,8 @@ dependencies = [
 name = "test_wasm_validate_link_add_invalid"
 version = "0.0.1"
 dependencies = [
+ "hdi",
  "hdk",
- "holochain_deterministic_integrity",
  "serde",
 ]
 
@@ -2089,8 +2089,8 @@ dependencies = [
 name = "test_wasm_validate_link_add_valid"
 version = "0.0.1"
 dependencies = [
+ "hdi",
  "hdk",
- "holochain_deterministic_integrity",
  "serde",
 ]
 
@@ -2098,8 +2098,8 @@ dependencies = [
 name = "test_wasm_validate_valid"
 version = "0.0.1"
 dependencies = [
+ "hdi",
  "hdk",
- "holochain_deterministic_integrity",
  "serde",
 ]
 
@@ -2125,8 +2125,8 @@ name = "test_wasm_zome_info"
 version = "0.0.1"
 dependencies = [
  "fixt",
+ "hdi",
  "hdk",
- "holochain_deterministic_integrity",
  "serde",
  "serde_yaml",
 ]
