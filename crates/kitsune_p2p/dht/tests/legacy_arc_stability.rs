@@ -1,8 +1,12 @@
+#![cfg(feature = "test_utils")]
+#![cfg(feature = "NORUN")]
+
 mod common;
 
 use std::collections::HashSet;
 
-use common::*;
+use common::continuous::*;
+use kitsune_p2p_dht::arq::PeerStrat;
 use kitsune_p2p_dht_arc::*;
 
 fn pass_report(report: &RunReport, redundancy_target: f64) -> bool {
@@ -192,9 +196,11 @@ fn parameterized_stability_test() {
     let peers = simple_parameterized_generator(&mut rng, n, j, s);
     tracing::info!("");
     tracing::debug!("{}", EpochStats::oneline_header());
+    print_arcs(&peers);
     let eq = determine_equilibrium(2, peers, |peers| {
         let (peers, stats) = run_one_epoch(&strat, peers, None, DETAIL);
         tracing::debug!("{}", stats.oneline());
+        print_arcs(&peers);
         (peers, stats)
     });
     let report = eq.report();

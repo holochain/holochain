@@ -225,7 +225,7 @@ impl HostFnCaller {
         let zome_types = self
             .ribosome
             .zome_types()
-            .re_scope(&[ZomeId(zome_id as u8)]);
+            .in_scope_subset(&[ZomeId(zome_id as u8)]);
         zome_types
             .entries
             .get(ZomeTypesKey {
@@ -250,7 +250,7 @@ impl HostFnCaller {
         let zome_types = self
             .ribosome
             .zome_types()
-            .re_scope(&[ZomeId(zome_id as u8)]);
+            .in_scope_subset(&[ZomeId(zome_id as u8)]);
         zome_types
             .links
             .get(ZomeTypesKey {

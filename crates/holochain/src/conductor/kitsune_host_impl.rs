@@ -1,27 +1,46 @@
 //! Implementation of the Kitsune Host API
 
+mod query_region_set;
+mod query_size_limited_regions;
+
 use std::sync::Arc;
 
+use super::{ribosome_store::RibosomeStore, space::Spaces};
 use futures::FutureExt;
 use holo_hash::DnaHash;
-use holochain_p2p::DnaHashExt;
+use holochain_p2p::{
+    dht::{spacetime::Topology, ArqStrat},
+    DnaHashExt,
+};
+use holochain_types::{db::PermittedConn, prelude::DnaError, share::RwShare};
 use kitsune_p2p::{
     agent_store::AgentInfoSigned, event::GetAgentInfoSignedEvt, KitsuneHost, KitsuneHostResult,
 };
-
-use super::space::Spaces;
-use holochain_types::db::PermittedConn;
+use kitsune_p2p_types::config::KitsuneP2pTuningParams;
 
 /// Implementation of the Kitsune Host API.
 /// Lets Kitsune make requests of Holochain
 pub struct KitsuneHostImpl {
     spaces: Spaces,
+    ribosome_store: RwShare<RibosomeStore>,
+    tuning_params: KitsuneP2pTuningParams,
+    strat: ArqStrat,
 }
 
 impl KitsuneHostImpl {
     /// Constructor
-    pub fn new(spaces: Spaces) -> Arc<Self> {
-        Arc::new(Self { spaces })
+    pub fn new(
+        spaces: Spaces,
+        ribosome_store: RwShare<RibosomeStore>,
+        tuning_params: KitsuneP2pTuningParams,
+        strat: ArqStrat,
+    ) -> Arc<Self> {
+        Arc::new(Self {
+            spaces,
+            ribosome_store,
+            tuning_params,
+            strat,
+        })
     }
 }
 
@@ -77,5 +96,51 @@ impl KitsuneHost for KitsuneHostImpl {
         }
         .boxed()
         .into()
+    }
+
+    fn query_region_set(
+        &self,
+        space: Arc<kitsune_p2p::KitsuneSpace>,
+        dht_arc_set: Arc<holochain_p2p::dht_arc::DhtArcSet>,
+    ) -> KitsuneHostResult<holochain_p2p::dht::region_set::RegionSetLtcs> {
+        let dna_hash = DnaHash::from_kitsune(&space);
+        async move {
+            let topology = self.get_topology(space.clone()).await?;
+            let db = self.spaces.dht_db(&dna_hash)?;
+            Ok(query_region_set::query_region_set(db, topology, &self.strat, dht_arc_set).await?)
+        }
+        .boxed()
+        .into()
+    }
+
+    fn query_size_limited_regions(
+        &self,
+        space: Arc<kitsune_p2p::KitsuneSpace>,
+        size_limit: u32,
+        regions: Vec<holochain_p2p::dht::region::Region>,
+    ) -> KitsuneHostResult<Vec<holochain_p2p::dht::region::Region>> {
+        let dna_hash = DnaHash::from_kitsune(&space);
+        async move {
+            let topology = self.get_topology(space.clone()).await?;
+            let db = self.spaces.dht_db(&dna_hash)?;
+            Ok(query_size_limited_regions::query_size_limited_regions(
+                db, topology, regions, size_limit,
+            )
+            .await?)
+        }
+        .boxed()
+        .into()
+    }
+
+    fn get_topology(&self, space: Arc<kitsune_p2p::KitsuneSpace>) -> KitsuneHostResult<Topology> {
+        let dna_hash = DnaHash::from_kitsune(&space);
+        let dna_def = self
+            .ribosome_store
+            .share_mut(|ds| ds.get_dna_def(&dna_hash))
+            .ok_or(DnaError::DnaMissing(dna_hash));
+        let cutoff = self.tuning_params.danger_gossip_recent_threshold();
+        async move { Ok(Topology::standard(dna_def?.origin_time, cutoff)) }
+            .boxed()
+            .into()
     }
 }

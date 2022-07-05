@@ -19,8 +19,9 @@ use holochain_conductor_api::IntegrationStateDump;
 use holochain_conductor_api::IntegrationStateDumps;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::actor::HolochainP2pRefToDna;
-use holochain_p2p::dht_arc::DhtArc;
-use holochain_p2p::dht_arc::PeerViewBeta;
+use holochain_p2p::dht::prelude::Topology;
+use holochain_p2p::dht::ArqStrat;
+use holochain_p2p::dht::PeerViewQ;
 use holochain_p2p::event::HolochainP2pEvent;
 use holochain_p2p::spawn_holochain_p2p;
 use holochain_p2p::HolochainP2pDna;
@@ -202,7 +203,9 @@ where
     let mut tuning =
         kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
     tuning.tx2_implicit_timeout_ms = 500;
-    config.tuning_params = std::sync::Arc::new(tuning);
+    let tuning = std::sync::Arc::new(tuning);
+    let cutoff = tuning.danger_gossip_recent_threshold();
+    config.tuning_params = tuning;
 
     let (network, mut recv) = spawn_holochain_p2p(
         config,
@@ -237,12 +240,12 @@ where
                 }
                 QueryPeerDensity { respond, .. } => {
                     respond.r(Ok(async move {
-                        Ok(PeerViewBeta::new(
-                            Default::default(),
-                            DhtArc::full(0.into()),
-                            1.0,
-                            1,
-                        ))
+                        Ok(PeerViewQ::new(
+                            Topology::standard_epoch(cutoff),
+                            ArqStrat::default(),
+                            vec![],
+                        )
+                        .into())
                     }
                     .boxed()
                     .into()));

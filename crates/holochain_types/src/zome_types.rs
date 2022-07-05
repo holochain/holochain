@@ -55,7 +55,7 @@ impl GlobalZomeTypes {
     }
 
     /// Create a new zome types map within the scope of the given integrity zomes.
-    pub fn re_scope(&self, zomes: &[ZomeId]) -> ScopedZomeTypesSet {
+    pub fn in_scope_subset(&self, zomes: &[ZomeId]) -> ScopedZomeTypesSet {
         let entries = zomes
             .iter()
             .filter_map(|zome_id| self.entries.get_key_value(zome_id).map(|(z, l)| (*z, *l)));
