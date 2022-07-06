@@ -1,6 +1,6 @@
 [package]
 name = "holochain"
-version = "0.0.148-dev.0"
+version = "0.0.148"
 description = "Holochain, a framework for distributed applications"
 license-file = "LICENSE_CAL-1.0"
 homepage = "https://github.com/holochain/holochain"
@@ -24,14 +24,14 @@ futures = "0.3.1"
 getrandom = "0.2.7"
 ghost_actor = "0.3.0-alpha.4"
 holo_hash = { version = "0.0.30", path = "../holo_hash", features = ["full"] }
-holochain_cascade = { version = "0.0.48-dev.0", path = "../holochain_cascade" }
-holochain_conductor_api = { version = "0.0.48-dev.0", path = "../holochain_conductor_api" }
+holochain_cascade = { version = "0.0.48", path = "../holochain_cascade" }
+holochain_conductor_api = { version = "0.0.48", path = "../holochain_conductor_api" }
 holochain_keystore = { version = "0.0.45", path = "../holochain_keystore" }
-holochain_p2p = { version = "0.0.46-dev.0", path = "../holochain_p2p" }
+holochain_p2p = { version = "0.0.46", path = "../holochain_p2p" }
 holochain_sqlite = { version = "0.0.44", path = "../holochain_sqlite" }
 holochain_serialized_bytes = "=0.0.51"
-holochain_state = { version = "0.0.48-dev.0", path = "../holochain_state" }
-holochain_types = { version = "0.0.46-dev.0", path = "../holochain_types" }
+holochain_state = { version = "0.0.48", path = "../holochain_state" }
+holochain_types = { version = "0.0.46", path = "../holochain_types" }
 holochain_wasmer_host = "=0.0.80"
 holochain_websocket = { version = "0.0.39", path = "../holochain_websocket" }
 holochain_zome_types = { version = "0.0.39", path = "../holochain_zome_types", features = ["full"] }
@@ -74,7 +74,7 @@ url = "1.7.2"
 url2 = "0.0.6"
 url_serde = "0.2.0"
 uuid = { version = "0.7", features = [ "serde", "v4" ] }
-holochain_wasm_test_utils = { version = "0.0.47-dev.0", path = "../test_utils/wasm" }
+holochain_wasm_test_utils = { version = "0.0.47", path = "../test_utils/wasm" }
 tiny-keccak = { version = "2.0.2", features = ["keccak", "sha3"] }
 async-recursion = "0.3"
 wasmer-middlewares = "=2.2.0"
