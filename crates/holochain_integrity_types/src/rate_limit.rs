@@ -4,6 +4,11 @@ use holochain_serialized_bytes::prelude::*;
 
 use crate::{Create, CreateLink, Delete, Entry, Update};
 
+mod bucket;
+pub use bucket::*;
+mod error;
+pub use error::*;
+
 /// Input to the `weigh` callback. Includes an "unweighed" action, and Entry
 /// if applicable.
 #[derive(Clone, PartialEq, Serialize, Deserialize, SerializedBytes, Debug)]
