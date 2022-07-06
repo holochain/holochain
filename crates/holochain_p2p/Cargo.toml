@@ -1,6 +1,6 @@
 [package]
 name = "holochain_p2p"
-version = "0.0.45"
+version = "0.0.46-dev.0"
 description = "holochain specific wrapper around more generic p2p module"
 license-file = "LICENSE_CAL-1.0"
 homepage = "https://github.com/holochain/holochain"
@@ -19,7 +19,7 @@ ghost_actor = "=0.3.0-alpha.4"
 holo_hash = { version = "0.0.30", path = "../holo_hash" }
 holochain_keystore = { version = "0.0.45", path = "../holochain_keystore" }
 holochain_serialized_bytes = "=0.0.51"
-holochain_types = { version = "0.0.45", path = "../holochain_types" }
+holochain_types = { version = "0.0.46-dev.0", path = "../holochain_types" }
 holochain_zome_types = { version = "0.0.39", path = "../holochain_zome_types" }
 kitsune_p2p = { version = "0.0.39", path = "../kitsune_p2p/kitsune_p2p" }
 kitsune_p2p_types = { version = "0.0.27", path = "../kitsune_p2p/types" }
