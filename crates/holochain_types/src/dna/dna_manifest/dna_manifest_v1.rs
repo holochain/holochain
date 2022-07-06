@@ -4,13 +4,13 @@ use holochain_zome_types::ZomeName;
 use serde_with::serde_as;
 
 /// The structure of data that goes in the DNA bundle manifest "dna.yaml".
-/// 
+///
 /// Navigating through this structure reveals all configurable DNA properties.
-/// 
+///
 /// # Examples
-/// 
+///
 /// An example "dna.yaml" with 2 integrity and 2 coordinator zomes:
-/// 
+///
 /// ```yaml
 /// manifest_version: "1"
 /// name: multi integrity dna
@@ -35,10 +35,10 @@ use serde_with::serde_as;
 ///         - name: zome1
 ///         - name: zome2
 /// ```
-/// 
+///
 /// When there's only one integrity zome, it will automatically be a dependency
 /// of the coordinator zomes. It doesn't need to be specified explicitly.
-/// 
+///
 /// ```yaml
 /// manifest_version: "1"
 /// name: single integrity dna

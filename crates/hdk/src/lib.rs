@@ -33,12 +33,12 @@
 //!
 //! Each example WASM is a minimal demonstration of specific HDK functionality, such as generating random data, creating entries or defining validation callbacks.
 //! Some of the examples are very contrived, none are intended as production grade hApp examples, but do highlight key functionality.
-//! 
+//!
 //! # Integrity zomes 📐
-//! 
+//!
 //! Integrity zomes describe a hApp's domain model by defining a set of entry and link types and providing a validation callback
 //! function that checks the integrity of any operations that manipulate data of those types.
-//! 
+//!
 //! The wasm workspace contains examples of integrity zomes:
 //! <https://github.com/holochain/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/integrity_zome/src/lib.rs>
 //!
