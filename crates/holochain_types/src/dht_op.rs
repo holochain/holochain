@@ -425,6 +425,26 @@ impl DhtOp {
     fn to_order(&self) -> OpOrder {
         OpOrder::new(self.get_type(), self.timestamp())
     }
+
+    /// Enzymatic countersigning session ops need special handling so that they
+    /// arrive at the enzyme and not elsewhere. If this isn't an enzymatic
+    /// countersigning session then the return will be None so can be used as
+    /// a boolean for filtering with is_some().
+    pub fn enzymatic_countersigning_enzyme(&self) -> Option<&AgentPubKey> {
+        if let Some(Entry::CounterSign(session_data, _)) = self.entry() {
+            if session_data.preflight_request().enzymatic {
+                session_data
+                    .preflight_request()
+                    .signing_agents
+                    .get(0)
+                    .map(|(pubkey, _)| pubkey)
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
 }
 
 impl PartialOrd for DhtOp {
