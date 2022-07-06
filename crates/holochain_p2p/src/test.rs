@@ -120,11 +120,11 @@ impl HolochainP2pHandler for StubNetwork {
     ) -> HolochainP2pHandlerResult<bool> {
         Err("stub".into())
     }
-    fn handle_countersigning_authority_response(
+    fn handle_countersigning_session_negotiation(
         &mut self,
         dna_hash: DnaHash,
         agents: Vec<AgentPubKey>,
-        response: Vec<SignedAction>,
+        message: event::CountersigningSessionNegotiationMessage,
     ) -> HolochainP2pHandlerResult<()> {
         Err("stub".into())
     }
