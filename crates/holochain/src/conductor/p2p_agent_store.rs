@@ -136,6 +136,24 @@ pub async fn exchange_peer_info(envs: Vec<DbWrite<DbKindP2pAgents>>) {
     }
 }
 
+/// Reveal every agent in a single conductor to every agent in another.
+#[cfg(any(test, feature = "test_utils"))]
+pub async fn reveal_peer_info(
+    observer_envs: Vec<DbWrite<DbKindP2pAgents>>,
+    seen_envs: Vec<DbWrite<DbKindP2pAgents>>,
+) {
+    for observer in observer_envs.iter() {
+        for seen in seen_envs.iter() {
+            inject_agent_infos(
+                observer.clone(),
+                all_agent_infos(seen.clone().into()).await.unwrap().iter(),
+            )
+            .await
+            .unwrap();
+        }
+    }
+}
+
 async fn run_query<F, R>(db: DbRead<DbKindP2pAgents>, f: F) -> ConductorResult<R>
 where
     R: Send + 'static,
