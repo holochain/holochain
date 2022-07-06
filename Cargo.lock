@@ -2023,7 +2023,7 @@ dependencies = [
 
 [[package]]
 name = "holochain"
-version = "0.0.147"
+version = "0.0.148"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -2115,7 +2115,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cascade"
-version = "0.0.47"
+version = "0.0.48"
 dependencies = [
  "async-trait",
  "derive_more",
@@ -2148,7 +2148,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli"
-version = "0.0.45"
+version = "0.0.46"
 dependencies = [
  "anyhow",
  "futures",
@@ -2161,7 +2161,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_bundle"
-version = "0.0.41"
+version = "0.0.42"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -2182,7 +2182,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_sandbox"
-version = "0.0.41"
+version = "0.0.42"
 dependencies = [
  "ansi_term 0.12.1",
  "anyhow",
@@ -2208,7 +2208,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_conductor_api"
-version = "0.0.47"
+version = "0.0.48"
 dependencies = [
  "derive_more",
  "directories 2.0.2",
@@ -2293,7 +2293,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_p2p"
-version = "0.0.45"
+version = "0.0.46"
 dependencies = [
  "async-trait",
  "derive_more",
@@ -2396,7 +2396,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_state"
-version = "0.0.47"
+version = "0.0.48"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -2449,7 +2449,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_types"
-version = "0.0.45"
+version = "0.0.46"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -2518,7 +2518,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasm_test_utils"
-version = "0.0.46"
+version = "0.0.47"
 dependencies = [
  "holochain_types",
  "holochain_util",
