@@ -100,6 +100,17 @@ impl From<&actor::GetActivityOptions> for GetActivityOptions {
     }
 }
 
+/// Message between agents actively driving/negotiating a countersigning session.
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub enum CountersigningSessionNegotiationMessage {
+    /// An authority has a complete set of signed actions and is responding with
+    /// them back to the counterparties.
+    AuthorityResponse(Vec<SignedAction>),
+    /// Counterparties are sending their signed action to an enzyme instead of
+    /// authorities as part of an enzymatic session.
+    EnzymePush(Box<DhtOp>),
+}
+
 /// Multiple ways to fetch op data
 #[derive(Debug, derive_more::From)]
 pub enum FetchOpDataQuery {
@@ -247,12 +258,11 @@ ghost_actor::ghost_chan! {
             data: Vec<u8>,
         ) -> Signature;
 
-        /// Response from an authority to agents that are
-        /// part of a session.
-        fn countersigning_authority_response(
+        /// Messages between agents that drive a countersigning session.
+        fn countersigning_session_negotiation(
             dna_hash: DnaHash,
             to_agent: AgentPubKey,
-            signed_actions: Vec<SignedAction>,
+            message: CountersigningSessionNegotiationMessage,
         ) -> ();
     }
 }
@@ -269,7 +279,7 @@ macro_rules! match_p2p_evt {
             HolochainP2pEvent::GetAgentActivity { $i, .. } => { $($t)* }
             HolochainP2pEvent::ValidationReceiptReceived { $i, .. } => { $($t)* }
             HolochainP2pEvent::SignNetworkData { $i, .. } => { $($t)* }
-            HolochainP2pEvent::CountersigningAuthorityResponse { $i, .. } => { $($t)* }
+            HolochainP2pEvent::CountersigningSessionNegotiation { $i, .. } => { $($t)* }
             $($t2)*
         }
     };
