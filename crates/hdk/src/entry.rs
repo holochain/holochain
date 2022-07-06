@@ -54,13 +54,13 @@ where
 /// entry content when committing to the source chain.
 ///
 /// This function accepts any input that implements [`TryInto<CreateInput>`].
-/// The default impls from the `#[hdk_entry( .. )]` and [`entry_def!`] macros include this.
+/// The implementations of the #[hdk_entry_helper] macro includes this.
 ///
 /// With generic type handling it may make sense to directly construct [`CreateInput`] and [`create`].
 ///
 /// e.g.
 /// ```ignore
-/// #[hdk_entry(id = "foo")]
+/// #[hdk_entry_helper]
 /// pub struct Foo(u32);
 /// create_entry(Foo(50))?;
 /// ```
@@ -94,7 +94,7 @@ where
 /// specify the [`ChainTopOrdering`]. Refer to [`DeleteInput`] for details.
 ///
 /// ```ignore
-/// #[hdk_entry(id = "foo")]
+/// #[hdk_entry_helper]
 /// struct Foo(u32);
 ///
 /// let action_hash = create_entry(Foo(50))?;
@@ -129,7 +129,7 @@ where
 /// means for the happ.
 ///
 /// ```ignore
-/// #[hdk_entry(id = "foo")]
+/// #[hdk_entry_helper]
 /// struct Foo(u32);
 ///
 /// let foo_zero_action_hash: ActionHash = commit_entry!(Foo(0))?;
