@@ -2104,6 +2104,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_wasm_weigh"
+version = "0.0.1"
+dependencies = [
+ "hdk",
+ "serde",
+]
+
+[[package]]
 name = "test_wasm_whoami"
 version = "0.0.1"
 dependencies = [

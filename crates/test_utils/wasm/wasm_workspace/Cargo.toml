@@ -44,6 +44,7 @@ members = [
     "validate_link_add_invalid",
     "validate_link_add_valid",
     "validate_valid",
+    "weigh",
     "whoami",
     "zome_info",
 ]

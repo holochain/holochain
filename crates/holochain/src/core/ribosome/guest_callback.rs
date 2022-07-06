@@ -5,6 +5,7 @@ pub mod migrate_agent;
 pub mod post_commit;
 pub mod validate;
 pub mod validation_package;
+pub mod weigh;
 use super::HostContext;
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::FnComponents;
