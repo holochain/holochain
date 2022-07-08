@@ -62,6 +62,11 @@ where
 /// ```ignore
 /// #[hdk_entry_helper]
 /// pub struct Foo(u32);
+///
+/// #[hdk_entry_defs]
+/// pub enum EntryTypes {
+///    Foo(Foo)
+/// }
 /// create_entry(Foo(50))?;
 /// ```
 ///
@@ -97,6 +102,11 @@ where
 /// #[hdk_entry_helper]
 /// struct Foo(u32);
 ///
+/// #[hdk_entry_defs]
+/// pub enum EntryTypes {
+///    Foo(Foo)
+/// }
+///
 /// let action_hash = create_entry(Foo(50))?;
 /// let delete_entry_action_hash = delete_entry(action_hash.clone())?;
 /// ```
@@ -130,7 +140,12 @@ where
 ///
 /// ```ignore
 /// #[hdk_entry_helper]
-/// struct Foo(u32);
+/// pub struct Foo(u32);
+///
+/// #[hdk_entry_defs]
+/// pub enum EntryTypes {
+///    Foo(Foo)
+/// }
 ///
 /// let foo_zero_action_hash: ActionHash = commit_entry!(Foo(0))?;
 /// let foo_ten_update_action_hash: ActionHash = update_entry(foo_zero_action_hash, Foo(10))?;
