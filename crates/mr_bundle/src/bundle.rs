@@ -8,7 +8,7 @@ use holochain_util::ffs;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{
     borrow::Cow,
-    collections::{HashMap, HashSet, BTreeMap},
+    collections::{BTreeMap, HashMap, HashSet},
     path::{Path, PathBuf},
 };
 
