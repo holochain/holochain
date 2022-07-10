@@ -6,6 +6,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20220706.013407
+
+## [holochain\_cli-0.0.46](crates/holochain_cli/CHANGELOG.md#0.0.46)
+
+## [holochain\_cli\_sandbox-0.0.42](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.42)
+
+## [holochain\_cli\_bundle-0.0.42](crates/holochain_cli_bundle/CHANGELOG.md#0.0.42)
+
+## [holochain-0.0.148](crates/holochain/CHANGELOG.md#0.0.148)
+
+- Added networking logic for enzymatic countersigning [\#1472](https://github.com/holochain/holochain/pull/1472)
+- Countersigning authority response network message changed to a session negotiation enum [/\#1472](https://github.com/holochain/holochain/pull/1472)
+
+## [holochain\_conductor\_api-0.0.48](crates/holochain_conductor_api/CHANGELOG.md#0.0.48)
+
+## [holochain\_wasm\_test\_utils-0.0.47](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.47)
+
+## [holochain\_cascade-0.0.48](crates/holochain_cascade/CHANGELOG.md#0.0.48)
+
+## [holochain\_state-0.0.48](crates/holochain_state/CHANGELOG.md#0.0.48)
+
+## [holochain\_p2p-0.0.46](crates/holochain_p2p/CHANGELOG.md#0.0.46)
+
+## [holochain\_types-0.0.46](crates/holochain_types/CHANGELOG.md#0.0.46)
+
 # 20220701.181019
 
 ## [holochain\_cli-0.0.45](crates/holochain_cli/CHANGELOG.md#0.0.45)

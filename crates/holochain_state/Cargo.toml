@@ -1,6 +1,6 @@
 [package]
 name = "holochain_state"
-version = "0.0.47"
+version = "0.0.48"
 description = "TODO minimize deps"
 license-file = "LICENSE_CAL-1.0"
 homepage = "https://github.com/holochain/holochain"
@@ -19,8 +19,8 @@ fallible-iterator = "0.2.0"
 futures = "0.3"
 holochain_keystore = { version = "0.0.45", path = "../holochain_keystore" }
 holochain_serialized_bytes = "=0.0.51"
-holochain_p2p = { version = "0.0.45", path = "../holochain_p2p" }
-holochain_types = { version = "0.0.45", path = "../holochain_types" }
+holochain_p2p = { version = "0.0.46", path = "../holochain_p2p" }
+holochain_types = { version = "0.0.46", path = "../holochain_types" }
 holochain_util = { version = "0.0.10", path = "../holochain_util" }
 holochain_zome_types = { version = "0.0.39", path = "../holochain_zome_types", features = [
     "full",
