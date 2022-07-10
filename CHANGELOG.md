@@ -6,6 +6,50 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20220710.155915
+
+## [holochain\_cli-0.0.47](crates/holochain_cli/CHANGELOG.md#0.0.47)
+
+## [holochain\_cli\_sandbox-0.0.43](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.43)
+
+## [holochain\_cli\_bundle-0.0.43](crates/holochain_cli_bundle/CHANGELOG.md#0.0.43)
+
+## [holochain-0.0.149](crates/holochain/CHANGELOG.md#0.0.149)
+
+## [holochain\_test\_wasm\_common-0.0.42](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.42)
+
+## [holochain\_conductor\_api-0.0.49](crates/holochain_conductor_api/CHANGELOG.md#0.0.49)
+
+## [holochain\_wasm\_test\_utils-0.0.48](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.48)
+
+## [holochain\_cascade-0.0.49](crates/holochain_cascade/CHANGELOG.md#0.0.49)
+
+## [holochain\_state-0.0.49](crates/holochain_state/CHANGELOG.md#0.0.49)
+
+## [holochain\_p2p-0.0.47](crates/holochain_p2p/CHANGELOG.md#0.0.47)
+
+## [holochain\_types-0.0.47](crates/holochain_types/CHANGELOG.md#0.0.47)
+
+## [holochain\_keystore-0.0.46](crates/holochain_keystore/CHANGELOG.md#0.0.46)
+
+## [holochain\_sqlite-0.0.45](crates/holochain_sqlite/CHANGELOG.md#0.0.45)
+
+## [hdk-0.0.141](crates/hdk/CHANGELOG.md#0.0.141)
+
+- Docs: Add section on coordinator zomes and link to HDI crate.
+
+## [holochain\_zome\_types-0.0.40](crates/holochain_zome_types/CHANGELOG.md#0.0.40)
+
+## [holochain\_deterministic\_integrity-0.0.13](crates/holochain_deterministic_integrity/CHANGELOG.md#0.0.13)
+
+- Docs: crate level documentation for `holochain_deterministic_integrity`.
+
+### Added
+
+## [hdk\_derive-0.0.40](crates/hdk_derive/CHANGELOG.md#0.0.40)
+
+## [holochain\_integrity\_types-0.0.12](crates/holochain_integrity_types/CHANGELOG.md#0.0.12)
+
 # 20220706.013407
 
 ## [holochain\_cli-0.0.46](crates/holochain_cli/CHANGELOG.md#0.0.46)
