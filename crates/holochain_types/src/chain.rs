@@ -1,13 +1,15 @@
 //! Types related to an agents for chain activity
 use std::iter::Peekable;
+use std::ops::RangeInclusive;
 
 use crate::activity::AgentActivityResponse;
 use crate::activity::ChainItems;
+use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holochain_zome_types::prelude::ChainStatus;
 use holochain_zome_types::ChainFilter;
 use holochain_zome_types::ChainFilters;
-use holochain_zome_types::RegisterAgentActivityOp;
+use holochain_zome_types::RegisterAgentActivity;
 
 #[cfg(all(test, feature = "test_utils"))]
 mod test;
@@ -31,6 +33,7 @@ impl AgentActivityExt for AgentActivityResponse {}
 
 #[warn(missing_docs)]
 #[must_use = "Iterator doesn't do anything unless consumed."]
+#[derive(Debug)]
 /// Iterate over a source chain and apply the [`ChainFilter`] to each element.
 /// This iterator will:
 /// - Ignore any ops that are not a direct ancestor to the starting position.
@@ -40,21 +43,42 @@ impl AgentActivityExt for AgentActivityResponse {}
 ///
 /// [`take`]: ChainFilter::take
 /// [`until`]: ChainFilter::until
-pub struct ChainFilterIter<I>
-where
-    I: Iterator<Item = RegisterAgentActivityOp>,
-{
+pub struct ChainFilterIter {
     filter: ChainFilter,
-    iter: Peekable<I>,
+    iter: Peekable<std::vec::IntoIter<RegisterAgentActivity>>,
     end: bool,
 }
 
-#[warn(missing_docs)]
-impl<I> ChainFilterIter<I>
-where
-    I: Iterator<Item = RegisterAgentActivityOp>,
-{
-    /// Create an iterator that filters an iterator of [`RegisterAgentActivityOp`]
+#[derive(Debug, Clone, PartialEq, Eq)]
+/// Constraints on a chain filter.
+/// This is used to check the following
+/// invariants are upheld after filtering
+/// a chain.
+/// - The result starts with the position.
+/// - The result ends with minimum of:
+///   - `position - take`.
+///   - minimum of until hashes.
+/// - If there are no filters then the
+/// result should end in 0.
+pub struct ChainFilterConstraints {
+    filter: ChainFilter,
+    highest_until: Option<(ActionHash, u32)>,
+    range: RangeInclusive<u32>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+/// Response to a `must_get_agent_activity` call.
+pub enum MustGetAgentActivityResponse {
+    /// The activity was found.
+    Activity(Vec<RegisterAgentActivity>),
+    /// The requested chain range was incomplete.
+    IncompleteChain,
+    /// The requested position was not found in the chain.
+    PositionNotFound,
+}
+
+impl ChainFilterIter {
+    /// Create an iterator that filters an iterator of [`RegisterAgentActivity`]
     /// with a [`ChainFilter`].
     ///
     /// # Constraints
@@ -63,12 +87,16 @@ where
     /// then this iterator will only work on the first sorted subset.
     /// - If the iterator does not contain the filters starting position
     /// then this will be an empty iterator.
-    pub fn new(
-        filter: ChainFilter,
-        iter: impl IntoIterator<Item = RegisterAgentActivityOp, IntoIter = I>,
-    ) -> Self {
+    pub fn new(filter: ChainFilter, mut chain: Vec<RegisterAgentActivity>) -> Self {
+        // Sort by descending.
+        chain.sort_unstable_by(|a, b| {
+            b.action
+                .action()
+                .action_seq()
+                .cmp(&a.action.action().action_seq())
+        });
         // Create a peekable iterator.
-        let mut iter = iter.into_iter().peekable();
+        let mut iter = chain.into_iter().peekable();
 
         // Discard any ops that are not the starting position.
         let i = iter.by_ref();
@@ -87,11 +115,8 @@ where
     }
 }
 
-impl<I> Iterator for ChainFilterIter<I>
-where
-    I: Iterator<Item = RegisterAgentActivityOp>,
-{
-    type Item = RegisterAgentActivityOp;
+impl Iterator for ChainFilterIter {
+    type Item = RegisterAgentActivity;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.end {
@@ -178,5 +203,68 @@ where
             }
         }
         Some(op)
+    }
+}
+
+impl ChainFilterConstraints {
+    /// Create a new set of constraints for this filter.
+    pub fn new(
+        filter: ChainFilter,
+        hashes: impl IntoIterator<Item = (ActionHash, u32)>,
+        range: RangeInclusive<u32>,
+    ) -> Self {
+        let highest_until = filter.get_until().and_then(|set| {
+            hashes
+                .into_iter()
+                .filter(|h| set.contains(&h.0) && range.contains(&h.1))
+                .max_by_key(|h| h.1)
+        });
+        Self {
+            filter,
+            highest_until,
+            range,
+        }
+    }
+
+    /// Filter the chain items then check the invariants hold.
+    pub fn filter_then_check(
+        self,
+        chain: Vec<RegisterAgentActivity>,
+    ) -> MustGetAgentActivityResponse {
+        let expected_end_seq = match (
+            self.filter.get_take(),
+            self.highest_until.as_ref().map(|(_, s)| *s),
+        ) {
+            (None, None) => 0,
+            (None, Some(s)) => s,
+            // TODO: Do safe subtract
+            // Add one to include the position.
+            (Some(s), None) => (self.range.end() - s) + 1,
+            (Some(a), Some(b)) => a.max(b),
+        };
+        let out: Vec<_> = ChainFilterIter::new(self.filter, chain).collect();
+        if out.first().map_or(true, |first| {
+            first.action.action().action_seq() != *self.range.end()
+        }) {
+            return MustGetAgentActivityResponse::PositionNotFound;
+        }
+        match out.last() {
+            Some(last) => {
+                if last.action.action().action_seq() == expected_end_seq
+                    && self.highest_until.map_or(true, |(h, s)| {
+                        if s == expected_end_seq {
+                            h == *last.action.action_address()
+                        } else {
+                            true
+                        }
+                    })
+                {
+                    MustGetAgentActivityResponse::Activity(out)
+                } else {
+                    MustGetAgentActivityResponse::IncompleteChain
+                }
+            }
+            None => MustGetAgentActivityResponse::Activity(out),
+        }
     }
 }

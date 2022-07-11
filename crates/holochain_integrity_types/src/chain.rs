@@ -78,6 +78,24 @@ impl ChainFilter {
         };
         self
     }
+
+    /// Get the until hashes if there is any.
+    pub fn get_until(&self) -> Option<&HashSet<ActionHash>> {
+        match &self.filters {
+            ChainFilters::Until(u) => Some(u),
+            ChainFilters::Both(_, u) => Some(u),
+            _ => None,
+        }
+    }
+
+    /// Get the take sequence number if there is any.
+    pub fn get_take(&self) -> Option<u32> {
+        match &self.filters {
+            ChainFilters::Take(s) => Some(*s),
+            ChainFilters::Both(s, _) => Some(*s),
+            _ => None,
+        }
+    }
 }
 
 impl Default for ChainFilters {

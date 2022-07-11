@@ -9,6 +9,9 @@ use std::path::PathBuf;
 
 pub use holochain_zome_types::test_utils::*;
 
+#[allow(missing_docs)]
+pub mod chain;
+
 #[derive(Serialize, Deserialize, SerializedBytes, Debug)]
 struct FakeProperties {
     test: String,

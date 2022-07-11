@@ -31,30 +31,53 @@ fn genesis_self_check(data: GenesisSelfCheckData) -> ExternResult<ValidateCallba
 
 #[hdk_extern]
 fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
-    if let Op::StoreEntry(StoreEntry {
-        action:
-            SignedHashed {
-                hashed: HoloHashed {
-                    content: action, ..
+    match op {
+        Op::StoreEntry(StoreEntry {
+            action:
+                SignedHashed {
+                    hashed:
+                        HoloHashed {
+                            content: action, ..
+                        },
+                    ..
                 },
+            entry,
+        }) => {
+            if let Some(AppEntryType {
+                id: entry_def_index,
+                zome_id,
                 ..
-            },
-        entry,
-    }) = op
-    {
-        if let Some(AppEntryType {
-            id: entry_def_index,
-            zome_id,
-            ..
-        }) = action.app_entry_type()
-        {
-            match EntryTypes::deserialize_from_type(*zome_id, *entry_def_index, &entry)? {
-                Some(EntryTypes::Post(_)) => (),
-                Some(EntryTypes::Msg(_)) => (),
-                Some(EntryTypes::PrivMsg(_)) => (),
-                None => (),
+            }) = action.app_entry_type()
+            {
+                match EntryTypes::deserialize_from_type(*zome_id, *entry_def_index, &entry)? {
+                    Some(EntryTypes::Post(_)) => (),
+                    Some(EntryTypes::Msg(_)) => (),
+                    Some(EntryTypes::PrivMsg(_)) => (),
+                    None => (),
+                }
             }
         }
+        Op::StoreRecord(StoreRecord { record }) => match record.action().entry_type() {
+            Some(EntryType::App(AppEntryType {
+                zome_id,
+                id: entry_def_index,
+                ..
+            })) => match &record.entry {
+                RecordEntry::Present(entry) => {
+                    match EntryTypes::deserialize_from_type(*zome_id, *entry_def_index, &entry)? {
+                        Some(EntryTypes::Post(_)) => (),
+                        Some(EntryTypes::Msg(_)) => (),
+                        Some(EntryTypes::PrivMsg(_)) => (),
+                        None => (),
+                    }
+                }
+                RecordEntry::Hidden => todo!(),
+                RecordEntry::NotApplicable => todo!(),
+                RecordEntry::NotStored => todo!(),
+            },
+            _ => todo!(),
+        },
+        _ => (),
     }
     Ok(ValidateCallbackResult::Valid)
 }
