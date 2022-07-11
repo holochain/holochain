@@ -1916,14 +1916,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "hdi"
+version = "0.0.13"
+dependencies = [
+ "fixt",
+ "hdk_derive",
+ "holo_hash",
+ "holochain_integrity_types",
+ "holochain_wasmer_guest",
+ "mockall 0.10.2",
+ "paste",
+ "serde",
+ "serde_bytes",
+ "tracing",
+ "tracing-core",
+]
+
+[[package]]
 name = "hdk"
 version = "0.0.141"
 dependencies = [
  "fixt",
  "getrandom 0.2.7",
+ "hdi",
  "hdk_derive",
  "holo_hash",
- "holochain_deterministic_integrity",
  "holochain_wasmer_guest",
  "holochain_zome_types",
  "mockall 0.11.1",
@@ -2231,23 +2248,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "holochain_deterministic_integrity"
-version = "0.0.13"
-dependencies = [
- "fixt",
- "hdk_derive",
- "holo_hash",
- "holochain_integrity_types",
- "holochain_wasmer_guest",
- "mockall 0.10.2",
- "paste",
- "serde",
- "serde_bytes",
- "tracing",
- "tracing-core",
-]
-
-[[package]]
 name = "holochain_integrity_types"
 version = "0.0.12"
 dependencies = [
@@ -2287,7 +2287,7 @@ dependencies = [
 name = "holochain_mock_hdi"
 version = "0.0.1"
 dependencies = [
- "holochain_deterministic_integrity",
+ "hdi",
  "mockall 0.11.1",
 ]
 

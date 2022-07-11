@@ -1,4 +1,4 @@
-use holochain_deterministic_integrity::prelude::*;
+use hdi::prelude::*;
 
 /// an example inner value that can be serialized into the contents of Entry::App()
 #[derive(Deserialize, Serialize, SerializedBytes, Debug, EntryDefRegistration)]

@@ -1,7 +1,7 @@
-//! For more details see [`holochain_deterministic_integrity::hash`].
+//! For more details see [`hdi::hash`].
 
 #[doc(no_inline)]
-pub use holochain_deterministic_integrity::hash;
+pub use hdi::hash;
 
 #[doc(inline)]
-pub use holochain_deterministic_integrity::hash::*;
+pub use hdi::hash::*;

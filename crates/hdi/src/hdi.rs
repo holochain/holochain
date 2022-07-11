@@ -110,10 +110,10 @@ impl HostHdi {
     }
 }
 
-/// The real holochain_deterministic_integrity implements `host_call` for every holochain_deterministic_integrity function.
+/// The real hdi implements `host_call` for every hdi function.
 /// This is deferring to the standard `holochain_wasmer_guest` crate functionality.
 /// Every function works exactly the same way with the same basic signatures and patterns.
-/// Elsewhere in the holochain_deterministic_integrity are more high level wrappers around this basic trait.
+/// Elsewhere in the hdi are more high level wrappers around this basic trait.
 #[cfg(all(not(feature = "mock"), target_arch = "wasm32"))]
 impl HdiT for HostHdi {
     fn verify_signature(&self, verify_signature: VerifySignature) -> ExternResult<bool> {

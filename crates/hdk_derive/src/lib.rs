@@ -87,7 +87,7 @@ impl quote::ToTokens for EntryDefId {
             holochain_integrity_types::entry_def::EntryDefId::App(s) => {
                 let string: String = s.0.to_string();
                 tokens.append_all(quote::quote! {
-                    holochain_deterministic_integrity::prelude::EntryDefId::App(#string.into())
+                    hdi::prelude::EntryDefId::App(#string.into())
                 });
             }
             _ => unreachable!(),
@@ -99,7 +99,7 @@ impl quote::ToTokens for RequiredValidations {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let u = <u8>::from(self.0);
         tokens.append_all(quote::quote! {
-            holochain_deterministic_integrity::prelude::RequiredValidations::from(#u)
+            hdi::prelude::RequiredValidations::from(#u)
         });
     }
 }
@@ -114,7 +114,7 @@ impl quote::ToTokens for EntryVisibility {
             proc_macro2::Span::call_site(),
         );
         tokens.append_all(quote::quote! {
-            holochain_deterministic_integrity::prelude::EntryVisibility::#variant
+            hdi::prelude::EntryVisibility::#variant
         });
     }
 }
@@ -131,7 +131,7 @@ impl quote::ToTokens for RequiredValidationType {
             proc_macro2::Span::call_site(),
         );
         tokens.append_all(quote::quote! {
-            holochain_deterministic_integrity::prelude::RequiredValidationType::#variant
+            hdi::prelude::RequiredValidationType::#variant
         });
     }
 }
@@ -143,7 +143,7 @@ impl quote::ToTokens for EntryDef {
         let required_validations = RequiredValidations(self.0.required_validations);
 
         tokens.append_all(quote::quote! {
-            holochain_deterministic_integrity::prelude::EntryDef {
+            hdi::prelude::EntryDef {
                 id: #id,
                 visibility: #visibility,
                 required_validations: #required_validations,
@@ -271,7 +271,7 @@ pub fn hdk_dependent_link_types(attrs: TokenStream, code: TokenStream) -> TokenS
 ///
 /// # Implements
 /// - `#[derive(Serialize, Deserialize, SerializedBytes, Debug)]`
-/// - `holochain_deterministic_integrity::app_entry!`
+/// - `hdi::app_entry!`
 ///
 /// # Examples
 /// ```ignore

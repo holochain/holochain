@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use holochain_deterministic_integrity::hdi::HdiT;
+use hdi::hdi::HdiT;
 
 pub const HDK_NOT_REGISTERED: &str = "HDK not registered";
 
@@ -384,7 +384,7 @@ impl HdkT for ErrHdk {
 pub struct HostHdk;
 
 #[cfg(all(not(feature = "mock"), target_arch = "wasm32"))]
-use holochain_deterministic_integrity::hdi::HostHdi;
+use hdi::hdi::HostHdi;
 
 #[cfg(all(not(feature = "mock"), target_arch = "wasm32"))]
 impl HdiT for HostHdk {
@@ -591,7 +591,7 @@ where
     HDK.with(|h| {
         *h.borrow_mut() = hdk2;
     });
-    holochain_deterministic_integrity::hdi::HDI.with(|h| {
+    hdi::hdi::HDI.with(|h| {
         *h.borrow_mut() = hdk;
     });
 }
