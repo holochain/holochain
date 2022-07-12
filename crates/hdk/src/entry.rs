@@ -147,7 +147,7 @@ where
 ///    Foo(Foo)
 /// }
 ///
-/// let foo_zero_action_hash: ActionHash = create_entry!(EntryTypes::Foo(Foo(0)))?;
+/// let foo_zero_action_hash: ActionHash = create_entry(EntryTypes::Foo(Foo(0)))?;
 /// let foo_ten_update_action_hash: ActionHash = update_entry(foo_zero_action_hash, EntryTypes::Foo(Foo(10)))?;
 /// ```
 ///
