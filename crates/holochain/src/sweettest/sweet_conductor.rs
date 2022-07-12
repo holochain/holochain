@@ -71,7 +71,8 @@ pub struct DnaWithRole {
 impl From<DnaFile> for DnaWithRole {
     fn from(dna: DnaFile) -> Self {
         Self {
-            role: "".into(),
+            // Assign a dummy unique throwaway role
+            role: format!("{}", dna.dna_hash()),
             dna,
         }
     }
