@@ -175,8 +175,7 @@ use crate::prelude::*;
 ///
 /// @todo is there any use-case that can't be satisfied by the `action_hashed` approach?
 ///
-/// Anything that is annotated with #[hdk_entry( .. )] or entry_def!( .. ) implements this so is
-/// compatible automatically.
+/// Anything that is annotated with #[hdk_entry_helper] implements this so is compatible automatically.
 ///
 /// [`hash_entry`] is "dumb" in that it doesn't check that the entry is defined, committed, on the DHT or
 /// any other validation, it simply generates the hash for the serialized representation of
@@ -189,7 +188,7 @@ use crate::prelude::*;
 /// different, etc.
 ///
 /// ```ignore
-/// #[hdk_entry(id="foo")]
+/// #[hdk_entry_helper]
 /// struct Foo;
 ///
 /// let foo_hash = hash_entry(Foo)?;
