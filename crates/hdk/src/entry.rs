@@ -1,6 +1,6 @@
 use crate::prelude::*;
 
-pub use holochain_deterministic_integrity::entry::*;
+pub use hdi::entry::*;
 
 /// General function that can create any entry type.
 ///
@@ -328,7 +328,7 @@ pub fn get_details<H: Into<AnyDhtHash>>(
 #[macro_export]
 macro_rules! entry_def {
     ( $t:ident $def:expr ) => {
-        $crate::prelude::holochain_deterministic_integrity::app_entry!($t);
-        $crate::prelude::holochain_deterministic_integrity::register_entry!($t $def);
+        $crate::prelude::hdi::app_entry!($t);
+        $crate::prelude::hdi::register_entry!($t $def);
     };
 }

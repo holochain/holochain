@@ -3,7 +3,7 @@
 //! # Examples
 //!
 //! ```
-//! use holochain_deterministic_integrity::prelude::*;
+//! use hdi::prelude::*;
 //! #[hdk_link_types]
 //! pub enum SomeLinkTypes {
 //!     SomeLinkType,
