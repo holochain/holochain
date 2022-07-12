@@ -6,7 +6,7 @@
 //!
 //! hApps are required to produce and validate data deterministically. There's a data model and a domain logic part to each hApp. In Holochain, the
 //! data model is defined in integrity zomes and the domain logic is written in coordinator zomes. See Integrity zomes and Coordinator zomes further down and
-//! [Holochain Deterministic Integrity](hdi) for more information.
+//! [Holochain Deterministic Integrity (HDI)](hdi) for more information.
 //!
 //! Since hApps are run as a binary on the hosting system, they must be sandboxed to prevent execution of insecure commands.
 //! Instead of writing and maintaining a custom format and specification for these artifacts as well as a runtime environment to execute them,
@@ -28,7 +28,7 @@
 //! The HDK is used in all the WASMs used to test Holochain itself.
 //! As they are used directly by tests in CI they are guaranteed to compile and work for at least the tests we define against them.
 //!
-//! At the time of writing there were about 40 example/test WASMs that can be browsed
+//! There are numerous example/test WASMs on many aspects of hApp development that can be browsed
 //! [on Github](https://github.com/holochain/holochain/tree/develop/crates/test_utils/wasm/wasm_workspace).
 //!
 //! Each example WASM is a minimal demonstration of specific HDK functionality, such as generating random data, creating entries or defining validation callbacks.
@@ -41,6 +41,8 @@
 //!
 //! The wasm workspace contains examples of integrity zomes like this:
 //! <https://github.com/holochain/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/integrity_zome/src/lib.rs>
+//! 
+//! Refer to the [HDI crate](hdi) for more information on the integrity layer.
 //!
 //! # Coordinator zomes 🐜
 //!
