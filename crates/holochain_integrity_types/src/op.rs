@@ -81,77 +81,133 @@ pub enum Op {
     /// This is the act of creating a new [`Action`]
     /// and publishing it to the DHT.
     /// Note that not all [`Action`]s contain an [`Entry`].
-    StoreRecord {
-        /// The [`Record`] to store.
-        record: Record,
-    },
+    StoreRecord(StoreRecord),
     /// Stores a new [`Entry`] in the DHT.
     /// This is the act of creating a either a [`Action::Create`] or
     /// a [`Action::Update`] and publishing it to the DHT.
     /// These actions create a new instance of an [`Entry`].
-    StoreEntry {
-        /// The signed and hashed [`EntryCreationAction`] that creates
-        /// a new instance of the [`Entry`].
-        action: SignedHashed<EntryCreationAction>,
-        /// The new [`Entry`] to store.
-        entry: Entry,
-    },
+    StoreEntry(StoreEntry),
     /// Registers an update from an instance of an [`Entry`] in the DHT.
     /// This is the act of creating a [`Action::Update`] and
     /// publishing it to the DHT.
     /// Note that the [`Action::Update`] stores an new instance
     /// of an [`Entry`] and registers it as an update to the original [`Entry`].
     /// This operation is only concerned with registering the update.
-    RegisterUpdate {
-        /// The signed and hashed [`Action::Update`] that registers the update.
-        update: SignedHashed<Update>,
-        /// The new [`Entry`] that is being updated to.
-        new_entry: Entry,
-        /// The original [`EntryCreationAction`] that created
-        /// the original [`Entry`].
-        /// Note that the update points to a specific instance of the
-        /// of the original [`Entry`].
-        original_action: EntryCreationAction,
-        /// The original [`Entry`] that is being updated from.
-        original_entry: Entry,
-    },
+    RegisterUpdate(RegisterUpdate),
     /// Registers a deletion of an instance of an [`Entry`] in the DHT.
     /// This is the act of creating a [`Action::Delete`] and
     /// publishing it to the DHT.
-    RegisterDelete {
-        /// The signed and hashed [`Action::Delete`] that registers the deletion.
-        delete: SignedHashed<Delete>,
-        /// The original [`EntryCreationAction`] that created
-        /// the original [`Entry`].
-        original_action: EntryCreationAction,
-        /// The original [`Entry`] that is being deleted.
-        original_entry: Entry,
-    },
+    RegisterDelete(RegisterDelete),
     /// Registers a new [`Action`] on an agent source chain.
     /// This is the act of creating any [`Action`] and
     /// publishing it to the DHT.
-    RegisterAgentActivity {
-        /// The signed and hashed [`Action`] that is being registered.
-        action: SignedActionHashed,
-    },
+    RegisterAgentActivity(RegisterAgentActivity),
     /// Registers a link between two [`Entry`]s.
     /// This is the act of creating a [`Action::CreateLink`] and
     /// publishing it to the DHT.
     /// The authority is the entry authority for the base [`Entry`].
-    RegisterCreateLink {
-        /// The signed and hashed [`Action::CreateLink`] that registers the link.
-        create_link: SignedHashed<CreateLink>,
-    },
+    RegisterCreateLink(RegisterCreateLink),
     /// Deletes a link between two [`Entry`]s.
     /// This is the act of creating a [`Action::DeleteLink`] and
     /// publishing it to the DHT.
     /// The delete always references a specific [`Action::CreateLink`].
-    RegisterDeleteLink {
-        /// The signed and hashed [`Action::DeleteLink`] that registers the deletion.
-        delete_link: SignedHashed<DeleteLink>,
-        /// The link that is being deleted.
-        create_link: CreateLink,
-    },
+    RegisterDeleteLink(RegisterDeleteLink),
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
+#[cfg_attr(feature = "test_utils", derive(arbitrary::Arbitrary))]
+/// Stores a new [`Record`] in the DHT.
+/// This is the act of creating a new [`Action`]
+/// and publishing it to the DHT.
+/// Note that not all [`Action`]s contain an [`Entry`].
+pub struct StoreRecord {
+    /// The [`Record`] to store.
+    pub record: Record,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
+#[cfg_attr(feature = "test_utils", derive(arbitrary::Arbitrary))]
+/// Stores a new [`Entry`] in the DHT.
+/// This is the act of creating a either a [`Action::Create`] or
+/// a [`Action::Update`] and publishing it to the DHT.
+/// These actions create a new instance of an [`Entry`].
+pub struct StoreEntry {
+    /// The signed and hashed [`EntryCreationAction`] that creates
+    /// a new instance of the [`Entry`].
+    pub action: SignedHashed<EntryCreationAction>,
+    /// The new [`Entry`] to store.
+    pub entry: Entry,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
+#[cfg_attr(feature = "test_utils", derive(arbitrary::Arbitrary))]
+/// Registers an update from an instance of an [`Entry`] in the DHT.
+/// This is the act of creating a [`Action::Update`] and
+/// publishing it to the DHT.
+/// Note that the [`Action::Update`] stores an new instance
+/// of an [`Entry`] and registers it as an update to the original [`Entry`].
+/// This operation is only concerned with registering the update.
+pub struct RegisterUpdate {
+    /// The signed and hashed [`Action::Update`] that registers the update.
+    pub update: SignedHashed<Update>,
+    /// The new [`Entry`] that is being updated to.
+    pub new_entry: Entry,
+    /// The original [`EntryCreationAction`] that created
+    /// the original [`Entry`].
+    /// Note that the update points to a specific instance of the
+    /// of the original [`Entry`].
+    pub original_action: EntryCreationAction,
+    /// The original [`Entry`] that is being updated from.
+    pub original_entry: Entry,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
+#[cfg_attr(feature = "test_utils", derive(arbitrary::Arbitrary))]
+/// Registers a deletion of an instance of an [`Entry`] in the DHT.
+/// This is the act of creating a [`Action::Delete`] and
+/// publishing it to the DHT.
+pub struct RegisterDelete {
+    /// The signed and hashed [`Action::Delete`] that registers the deletion.
+    pub delete: SignedHashed<Delete>,
+    /// The original [`EntryCreationAction`] that created
+    /// the original [`Entry`].
+    pub original_action: EntryCreationAction,
+    /// The original [`Entry`] that is being deleted.
+    pub original_entry: Entry,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
+#[cfg_attr(feature = "test_utils", derive(arbitrary::Arbitrary))]
+/// Registers a new [`Action`] on an agent source chain.
+/// This is the act of creating any [`Action`] and
+/// publishing it to the DHT.
+pub struct RegisterAgentActivity {
+    /// The signed and hashed [`Action`] that is being registered.
+    pub action: SignedActionHashed,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
+#[cfg_attr(feature = "test_utils", derive(arbitrary::Arbitrary))]
+/// Registers a link between two [`Entry`]s.
+/// This is the act of creating a [`Action::CreateLink`] and
+/// publishing it to the DHT.
+/// The authority is the entry authority for the base [`Entry`].
+pub struct RegisterCreateLink {
+    /// The signed and hashed [`Action::CreateLink`] that registers the link.
+    pub create_link: SignedHashed<CreateLink>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
+#[cfg_attr(feature = "test_utils", derive(arbitrary::Arbitrary))]
+/// Deletes a link between two [`Entry`]s.
+/// This is the act of creating a [`Action::DeleteLink`] and
+/// publishing it to the DHT.
+/// The delete always references a specific [`Action::CreateLink`].
+pub struct RegisterDeleteLink {
+    /// The signed and hashed [`Action::DeleteLink`] that registers the deletion.
+    pub delete_link: SignedHashed<DeleteLink>,
+    /// The link that is being deleted.
+    pub create_link: CreateLink,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]

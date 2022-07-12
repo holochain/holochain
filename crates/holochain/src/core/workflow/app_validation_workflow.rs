@@ -286,27 +286,27 @@ pub async fn record_to_op(
 
 pub fn op_to_record(op: Op, activity_entry: Option<Entry>) -> Record {
     match op {
-        Op::StoreRecord { record } => record,
-        Op::StoreEntry { action, entry } => {
+        Op::StoreRecord(StoreRecord { record }) => record,
+        Op::StoreEntry(StoreEntry { action, entry }) => {
             Record::new(SignedActionHashed::raw_from_same_hash(action), Some(entry))
         }
-        Op::RegisterUpdate {
+        Op::RegisterUpdate(RegisterUpdate {
             update, new_entry, ..
-        } => Record::new(
+        }) => Record::new(
             SignedActionHashed::raw_from_same_hash(update),
             Some(new_entry),
         ),
-        Op::RegisterDelete { delete, .. } => {
+        Op::RegisterDelete(RegisterDelete { delete, .. }) => {
             Record::new(SignedActionHashed::raw_from_same_hash(delete), None)
         }
-        Op::RegisterAgentActivity { action } => Record::new(
+        Op::RegisterAgentActivity(RegisterAgentActivity { action }) => Record::new(
             SignedActionHashed::raw_from_same_hash(action),
             activity_entry,
         ),
-        Op::RegisterCreateLink { create_link, .. } => {
+        Op::RegisterCreateLink(RegisterCreateLink { create_link, .. }) => {
             Record::new(SignedActionHashed::raw_from_same_hash(create_link), None)
         }
-        Op::RegisterDeleteLink { delete_link, .. } => {
+        Op::RegisterDeleteLink(RegisterDeleteLink { delete_link, .. }) => {
             Record::new(SignedActionHashed::raw_from_same_hash(delete_link), None)
         }
     }
@@ -314,7 +314,7 @@ pub fn op_to_record(op: Op, activity_entry: Option<Entry>) -> Record {
 
 async fn dhtop_to_op(op: DhtOp, cascade: &mut Cascade) -> AppValidationOutcome<Op> {
     let op = match op {
-        DhtOp::StoreRecord(signature, action, entry) => Op::StoreRecord {
+        DhtOp::StoreRecord(signature, action, entry) => Op::StoreRecord(StoreRecord {
             record: Record::new(
                 SignedActionHashed::with_presigned(
                     ActionHashed::from_content_sync(action),
@@ -322,17 +322,19 @@ async fn dhtop_to_op(op: DhtOp, cascade: &mut Cascade) -> AppValidationOutcome<O
                 ),
                 entry.map(|e| *e),
             ),
-        },
-        DhtOp::StoreEntry(signature, action, entry) => Op::StoreEntry {
+        }),
+        DhtOp::StoreEntry(signature, action, entry) => Op::StoreEntry(StoreEntry {
             action: SignedHashed::new(action.into(), signature),
             entry: *entry,
-        },
-        DhtOp::RegisterAgentActivity(signature, action) => Op::RegisterAgentActivity {
-            action: SignedActionHashed::with_presigned(
-                ActionHashed::from_content_sync(action),
-                signature,
-            ),
-        },
+        }),
+        DhtOp::RegisterAgentActivity(signature, action) => {
+            Op::RegisterAgentActivity(RegisterAgentActivity {
+                action: SignedActionHashed::with_presigned(
+                    ActionHashed::from_content_sync(action),
+                    signature,
+                ),
+            })
+        }
         DhtOp::RegisterUpdatedContent(signature, update, entry)
         | DhtOp::RegisterUpdatedRecord(signature, update, entry) => {
             let new_entry = match entry {
@@ -359,12 +361,12 @@ async fn dhtop_to_op(op: DhtOp, cascade: &mut Cascade) -> AppValidationOutcome<O
                         .map(|h| h.into())
                 })
                 .ok_or_else(|| Outcome::awaiting(&update.original_action_address))?;
-            Op::RegisterUpdate {
+            Op::RegisterUpdate(RegisterUpdate {
                 update: SignedHashed::new(update, signature),
                 new_entry,
                 original_action,
                 original_entry,
-            }
+            })
         }
         DhtOp::RegisterDeletedBy(signature, delete)
         | DhtOp::RegisterDeletedEntryAction(signature, delete) => {
@@ -383,25 +385,27 @@ async fn dhtop_to_op(op: DhtOp, cascade: &mut Cascade) -> AppValidationOutcome<O
                         .map(|h| h.into())
                 })
                 .ok_or_else(|| Outcome::awaiting(&delete.deletes_address))?;
-            Op::RegisterDelete {
+            Op::RegisterDelete(RegisterDelete {
                 delete: SignedHashed::new(delete, signature),
                 original_action,
                 original_entry,
-            }
+            })
         }
-        DhtOp::RegisterAddLink(signature, create_link) => Op::RegisterCreateLink {
-            create_link: SignedHashed::new(create_link, signature),
-        },
+        DhtOp::RegisterAddLink(signature, create_link) => {
+            Op::RegisterCreateLink(RegisterCreateLink {
+                create_link: SignedHashed::new(create_link, signature),
+            })
+        }
         DhtOp::RegisterRemoveLink(signature, delete_link) => {
             let create_link = cascade
                 .retrieve_action(delete_link.link_add_address.clone(), Default::default())
                 .await?
                 .and_then(|sh| CreateLink::try_from(sh.hashed.content).ok())
                 .ok_or_else(|| Outcome::awaiting(&delete_link.link_add_address))?;
-            Op::RegisterDeleteLink {
+            Op::RegisterDeleteLink(RegisterDeleteLink {
                 delete_link: SignedHashed::new(delete_link, signature),
                 create_link,
-            }
+            })
         }
     };
     Ok(op)
@@ -435,8 +439,9 @@ where
     R: RibosomeT,
 {
     let zomes_to_invoke = match op {
-        Op::RegisterAgentActivity { .. } | Op::StoreRecord { .. } => ZomesToInvoke::AllIntegrity,
-        Op::StoreEntry {
+        Op::RegisterAgentActivity(RegisterAgentActivity { .. })
+        | Op::StoreRecord(StoreRecord { .. }) => ZomesToInvoke::AllIntegrity,
+        Op::StoreEntry(StoreEntry {
             action:
                 SignedHashed {
                     hashed:
@@ -446,14 +451,14 @@ where
                     ..
                 },
             ..
-        } => entry_creation_zomes_to_invoke(action, ribosome)?,
-        Op::RegisterUpdate {
+        }) => entry_creation_zomes_to_invoke(action, ribosome)?,
+        Op::RegisterUpdate(RegisterUpdate {
             original_action, ..
-        }
-        | Op::RegisterDelete {
+        })
+        | Op::RegisterDelete(RegisterDelete {
             original_action, ..
-        } => entry_creation_zomes_to_invoke(original_action, ribosome)?,
-        Op::RegisterCreateLink {
+        }) => entry_creation_zomes_to_invoke(original_action, ribosome)?,
+        Op::RegisterCreateLink(RegisterCreateLink {
             create_link:
                 SignedHashed {
                     hashed:
@@ -463,11 +468,11 @@ where
                     ..
                 },
             ..
-        } => create_link_zomes_to_invoke(action, ribosome)?,
-        Op::RegisterDeleteLink {
+        }) => create_link_zomes_to_invoke(action, ribosome)?,
+        Op::RegisterDeleteLink(RegisterDeleteLink {
             create_link: action,
             ..
-        } => create_link_zomes_to_invoke(action, ribosome)?,
+        }) => create_link_zomes_to_invoke(action, ribosome)?,
     };
 
     let invocation = ValidateInvocation::new(zomes_to_invoke, op)

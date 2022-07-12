@@ -390,10 +390,10 @@ fn simple_validation_zome() -> InlineZomeSet {
         })
         .integrity_callback("validate", |_api, data: Op| {
             let s = match data {
-                Op::StoreEntry {
+                Op::StoreEntry(StoreEntry {
                     entry: Entry::App(bytes),
                     ..
-                } => AppString::try_from(bytes.into_sb()).unwrap(),
+                }) => AppString::try_from(bytes.into_sb()).unwrap(),
                 _ => return Ok(ValidateResult::Valid),
             };
             if &s.0 == "" {

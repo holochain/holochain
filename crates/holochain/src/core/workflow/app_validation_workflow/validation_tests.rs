@@ -6,8 +6,8 @@ use std::{
 use holo_hash::{ActionHash, AgentPubKey};
 use holochain_types::{dht_op::DhtOpType, inline_zome::InlineZomeSet};
 use holochain_zome_types::{
-    Action, ActionType, AppEntryType, BoxApi, ChainTopOrdering, CreateInput, Entry, EntryDef,
-    EntryDefIndex, EntryVisibility, Op, TryInto, ZomeId,
+    op::*, Action, ActionType, AppEntryType, BoxApi, ChainTopOrdering, CreateInput, Entry,
+    EntryDef, EntryDefIndex, EntryVisibility, TryInto, ZomeId,
 };
 
 use crate::{
@@ -198,14 +198,14 @@ async fn app_validation_ops() {
          events: tokio::sync::mpsc::Sender<Event>| {
             move |_api: BoxApi, op: Op| {
                 let event = match op {
-                    Op::StoreRecord { record } => Event {
+                    Op::StoreRecord(StoreRecord { record }) => Event {
                         action: ActionLocation::new(record.action().clone(), &agents),
                         op_type: DhtOpType::StoreRecord,
                         called_zome: zome,
                         with_zome_id: None,
                         with_entry_def_index: None,
                     },
-                    Op::StoreEntry { action, .. } => {
+                    Op::StoreEntry(StoreEntry { action, .. }) => {
                         let (with_entry_def_index, with_zome_id) =
                             match action.hashed.content.app_entry_type().cloned() {
                                 Some(AppEntryType { id, zome_id, .. }) => (Some(id), Some(zome_id)),
@@ -219,11 +219,11 @@ async fn app_validation_ops() {
                             with_entry_def_index,
                         }
                     }
-                    Op::RegisterUpdate {
+                    Op::RegisterUpdate(RegisterUpdate {
                         update,
                         original_action,
                         ..
-                    } => {
+                    }) => {
                         let (with_entry_def_index, with_zome_id) =
                             match original_action.app_entry_type().cloned() {
                                 Some(AppEntryType { id, zome_id, .. }) => (Some(id), Some(zome_id)),
@@ -237,11 +237,11 @@ async fn app_validation_ops() {
                             with_entry_def_index,
                         }
                     }
-                    Op::RegisterDelete {
+                    Op::RegisterDelete(RegisterDelete {
                         delete,
                         original_action,
                         ..
-                    } => {
+                    }) => {
                         let (with_entry_def_index, with_zome_id) =
                             match original_action.app_entry_type().cloned() {
                                 Some(AppEntryType { id, zome_id, .. }) => (Some(id), Some(zome_id)),
@@ -255,21 +255,21 @@ async fn app_validation_ops() {
                             with_entry_def_index,
                         }
                     }
-                    Op::RegisterAgentActivity { action } => Event {
+                    Op::RegisterAgentActivity(RegisterAgentActivity { action }) => Event {
                         action: ActionLocation::new(action.action().clone(), &agents),
                         op_type: DhtOpType::RegisterAgentActivity,
                         called_zome: zome,
                         with_zome_id: None,
                         with_entry_def_index: None,
                     },
-                    Op::RegisterCreateLink { create_link, .. } => Event {
+                    Op::RegisterCreateLink(RegisterCreateLink { create_link, .. }) => Event {
                         action: ActionLocation::new(create_link.hashed.content.clone(), &agents),
                         op_type: DhtOpType::RegisterAddLink,
                         called_zome: zome,
                         with_zome_id: None,
                         with_entry_def_index: None,
                     },
-                    Op::RegisterDeleteLink { delete_link, .. } => Event {
+                    Op::RegisterDeleteLink(RegisterDeleteLink { delete_link, .. }) => Event {
                         action: ActionLocation::new(delete_link.hashed.content.clone(), &agents),
                         op_type: DhtOpType::RegisterRemoveLink,
                         called_zome: zome,
