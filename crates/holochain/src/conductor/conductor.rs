@@ -1035,8 +1035,14 @@ impl Conductor {
             .await?
             .running_apps()
             .find(|(_, running_app)| running_app.all_cells().any(|i| i == cell_id))
-            .and_then(|(_, running_app)| running_app.into_common().role(role_id).ok().map(|role| role.cell_id()).cloned())
-            )
+            .and_then(|(_, running_app)| {
+                running_app
+                    .into_common()
+                    .role(role_id)
+                    .ok()
+                    .map(|role| role.cell_id())
+                    .cloned()
+            }))
     }
 
     pub(super) async fn list_running_apps_for_dna_hash(

@@ -5,9 +5,9 @@ use crate::core::workflow::error::WorkflowError;
 use holochain_conductor_api::conductor::ConductorConfigError;
 use holochain_sqlite::error::DatabaseError;
 use holochain_types::prelude::*;
+use holochain_wasmer_host::prelude::WasmErrorInner;
 use holochain_zome_types::cell::CellId;
 use thiserror::Error;
-use holochain_wasmer_host::prelude::WasmErrorInner;
 
 pub type ConductorResult<T> = Result<T, ConductorError>;
 

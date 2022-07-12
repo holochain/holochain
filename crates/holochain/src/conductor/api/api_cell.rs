@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use super::error::ConductorApiError;
 use super::error::ConductorApiResult;
+use crate::conductor::error::ConductorResult;
 use crate::conductor::interface::SignalBroadcaster;
 use crate::conductor::ConductorHandle;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitArgs;
@@ -18,7 +19,6 @@ use holochain_types::prelude::*;
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::mpsc::OwnedPermit;
 use tracing::*;
-use crate::conductor::error::ConductorResult;
 
 /// The concrete implementation of [`CellConductorApiT`], which is used to give
 /// Cells an API for calling back to their [`Conductor`](crate::conductor::Conductor).
@@ -187,7 +187,11 @@ pub trait CellConductorReadHandleT: Send + Sync {
 
     /// Find the first cell ID across all apps the given cell id is in that
     /// is assigned to the given role.
-    async fn find_cell_with_role_alongside_cell(&self, cell_id: &CellId, role_id: &AppRoleId) -> ConductorResult<Option<CellId>>;
+    async fn find_cell_with_role_alongside_cell(
+        &self,
+        cell_id: &CellId,
+        role_id: &AppRoleId,
+    ) -> ConductorResult<Option<CellId>>;
 }
 
 #[async_trait]
@@ -218,7 +222,13 @@ impl CellConductorReadHandleT for CellConductorApi {
         CellConductorApiT::get_entry_def(self, key)
     }
 
-    async fn find_cell_with_role_alongside_cell(&self, cell_id: &CellId, role_id: &AppRoleId) -> ConductorResult<Option<CellId>> {
-        self.conductor_handle.find_cell_with_role_alongside_cell(cell_id, role_id).await
+    async fn find_cell_with_role_alongside_cell(
+        &self,
+        cell_id: &CellId,
+        role_id: &AppRoleId,
+    ) -> ConductorResult<Option<CellId>> {
+        self.conductor_handle
+            .find_cell_with_role_alongside_cell(cell_id, role_id)
+            .await
     }
 }
