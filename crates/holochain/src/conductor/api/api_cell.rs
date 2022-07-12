@@ -18,6 +18,8 @@ use holochain_types::prelude::*;
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::mpsc::OwnedPermit;
 use tracing::*;
+use crate::conductor::error::ConductorResult;
+
 /// The concrete implementation of [`CellConductorApiT`], which is used to give
 /// Cells an API for calling back to their [`Conductor`](crate::conductor::Conductor).
 #[derive(Clone)]
@@ -182,6 +184,10 @@ pub trait CellConductorReadHandleT: Send + Sync {
 
     /// Get a [`EntryDef`](holochain_zome_types::EntryDef) from the [`EntryDefBufferKey`](holochain_types::dna::EntryDefBufferKey)
     fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef>;
+
+    /// Find the first cell ID across all apps the given cell id is in that
+    /// is assigned to the given role.
+    async fn find_cell_with_role_alongside_cell(&self, cell_id: &CellId, role_id: &AppRoleId) -> ConductorResult<Option<CellId>>;
 }
 
 #[async_trait]
@@ -210,5 +216,9 @@ impl CellConductorReadHandleT for CellConductorApi {
 
     fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef> {
         CellConductorApiT::get_entry_def(self, key)
+    }
+
+    async fn find_cell_with_role_alongside_cell(&self, cell_id: &CellId, role_id: &AppRoleId) -> ConductorResult<Option<CellId>> {
+        self.conductor_handle.find_cell_with_role_alongside_cell(cell_id, role_id).await
     }
 }

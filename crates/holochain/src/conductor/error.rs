@@ -7,6 +7,7 @@ use holochain_sqlite::error::DatabaseError;
 use holochain_types::prelude::*;
 use holochain_zome_types::cell::CellId;
 use thiserror::Error;
+use holochain_wasmer_host::prelude::WasmErrorInner;
 
 pub type ConductorResult<T> = Result<T, ConductorError>;
 
@@ -133,5 +134,11 @@ impl ConductorError {
 impl From<one_err::OneErr> for ConductorError {
     fn from(e: one_err::OneErr) -> Self {
         Self::other(e)
+    }
+}
+
+impl From<ConductorError> for WasmErrorInner {
+    fn from(e: ConductorError) -> Self {
+        Self::Host(e.to_string())
     }
 }

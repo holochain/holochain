@@ -77,45 +77,79 @@ pub fn call(
                                 }
                             }
                             CallTarget::ConductorCell(target_cell) => {
-                                let cell_id = match target_cell {
-                                    CallTargetCell::Other(cell_id) => cell_id,
-                                    CallTargetCell::Local => call_context
+                                let cell_id_result: Result<CellId, RuntimeError> = match target_cell
+                                {
+                                    CallTargetCell::OtherRole(role_id) => {
+                                        let this_cell_id = call_context
+                                            .host_context()
+                                            .call_zome_handle()
+                                            .cell_id().clone();
+                                        match call_context
+                                            .host_context()
+                                            .call_zome_handle()
+                                            .find_cell_with_role_alongside_cell(
+                                                &this_cell_id,
+                                                &role_id,
+                                            )
+                                            .await
+                                            .map_err(|e| -> RuntimeError {
+                                                wasm_error!(e.into()).into()
+                                            }) {
+                                            Ok(Some(cell_id)) => Ok(cell_id),
+                                            Ok(None) => Err(wasm_error!(WasmErrorInner::Host(
+                                                "Role not found.".to_string()
+                                            ))
+                                            .into()),
+                                            Err(e) => Err(e.into()),
+                                        }
+                                    }
+                                    CallTargetCell::OtherCell(cell_id) => Ok(cell_id),
+                                    CallTargetCell::Local => Ok(call_context
                                         .host_context()
                                         .call_zome_handle()
                                         .cell_id()
-                                        .clone(),
+                                        .clone()),
                                 };
-                                let invocation = ZomeCall {
-                                    cell_id,
-                                    zome_name,
-                                    fn_name,
-                                    payload,
-                                    cap_secret,
-                                    provenance,
-                                };
-                                match call_context
-                                    .host_context()
-                                    .call_zome_handle()
-                                    .call_zome(
-                                        invocation,
-                                        call_context
+                                match cell_id_result {
+                                    Ok(cell_id) => {
+                                        let invocation = ZomeCall {
+                                            cell_id,
+                                            zome_name,
+                                            fn_name,
+                                            payload,
+                                            cap_secret,
+                                            provenance,
+                                        };
+                                        match call_context
                                             .host_context()
-                                            .workspace_write()
-                                            .clone()
-                                            .try_into()
-                                            .expect("Must have source chain to make zome call"),
-                                    )
-                                    .await
-                                {
-                                    Ok(Ok(zome_call_response)) => Ok(zome_call_response),
-                                    Ok(Err(ribosome_error)) => Err(wasm_error!(
-                                        WasmErrorInner::Host(ribosome_error.to_string())
-                                    )
-                                    .into()),
-                                    Err(conductor_api_error) => Err(wasm_error!(
-                                        WasmErrorInner::Host(conductor_api_error.to_string())
-                                    )
-                                    .into()),
+                                            .call_zome_handle()
+                                            .call_zome(
+                                                invocation,
+                                                call_context
+                                                    .host_context()
+                                                    .workspace_write()
+                                                    .clone()
+                                                    .try_into()
+                                                    .expect(
+                                                        "Must have source chain to make zome call",
+                                                    ),
+                                            )
+                                            .await
+                                        {
+                                            Ok(Ok(zome_call_response)) => Ok(zome_call_response),
+                                            Ok(Err(ribosome_error)) => Err(wasm_error!(
+                                                WasmErrorInner::Host(ribosome_error.to_string())
+                                            )
+                                            .into()),
+                                            Err(conductor_api_error) => {
+                                                Err(wasm_error!(WasmErrorInner::Host(
+                                                    conductor_api_error.to_string()
+                                                ))
+                                                .into())
+                                            }
+                                        }
+                                    }
+                                    Err(e) => Err(e),
                                 }
                             }
                         };

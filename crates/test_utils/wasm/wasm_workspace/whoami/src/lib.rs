@@ -58,7 +58,7 @@ fn whoarethey(agent_pubkey: AgentPubKey) -> ExternResult<AgentInfo> {
 #[hdk_extern]
 fn who_are_they_local(cell_id: CellId) -> ExternResult<AgentInfo> {
     let zome_call_response: ZomeCallResponse = call(
-        CallTargetCell::Other(cell_id),
+        CallTargetCell::OtherCell(cell_id),
         zome_info()?.name,
         "whoami".to_string().into(),
         None,
@@ -77,7 +77,7 @@ fn who_are_they_local(cell_id: CellId) -> ExternResult<AgentInfo> {
 #[hdk_extern]
 fn call_create_entry(cell_id: CellId) -> ExternResult<ActionHash> {
     let zome_call_response: ZomeCallResponse = call(
-        CallTargetCell::Other(cell_id),
+        CallTargetCell::OtherCell(cell_id),
         Zomes::CreateEntry,
         "create_entry".to_string().into(),
         None,
