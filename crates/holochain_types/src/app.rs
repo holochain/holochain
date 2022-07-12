@@ -170,7 +170,6 @@ impl InstallAppDnaPayload {
 #[derive(Clone, Debug, Into, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct InstalledCell {
     cell_id: CellId,
-    // TODO: rename to role_id
     role_id: AppRoleId,
 }
 

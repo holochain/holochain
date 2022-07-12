@@ -83,8 +83,9 @@ pub fn call(
                                         let this_cell_id = call_context
                                             .host_context()
                                             .call_zome_handle()
-                                            .cell_id().clone();
-                                        match call_context
+                                            .cell_id()
+                                            .clone();
+                                        call_context
                                             .host_context()
                                             .call_zome_handle()
                                             .find_cell_with_role_alongside_cell(
@@ -94,14 +95,14 @@ pub fn call(
                                             .await
                                             .map_err(|e| -> RuntimeError {
                                                 wasm_error!(e.into()).into()
-                                            }) {
-                                            Ok(Some(cell_id)) => Ok(cell_id),
-                                            Ok(None) => Err(wasm_error!(WasmErrorInner::Host(
-                                                "Role not found.".to_string()
-                                            ))
-                                            .into()),
-                                            Err(e) => Err(e.into()),
-                                        }
+                                            })
+                                            .and_then(|c| {
+                                                c.ok_or_else(|| {
+                                                    RuntimeError::from(wasm_error!(WasmErrorInner::Host(
+                                                        "Role not found.".to_string()
+                                                    )))
+                                                })
+                                            })
                                     }
                                     CallTargetCell::OtherCell(cell_id) => Ok(cell_id),
                                     CallTargetCell::Local => Ok(call_context
@@ -193,20 +194,46 @@ pub mod wasm_test {
     #[tokio::test(flavor = "multi_thread")]
     async fn call_test() {
         observability::test_run().ok();
-        let RibosomeTestFixture {
-            conductor,
-            alice,
-            bob,
-            bob_pubkey,
-            ..
-        } = RibosomeTestFixture::new(TestWasm::WhoAmI).await;
+        let test_wasm = TestWasm::WhoAmI;
+        let (dna_file_1, _, _) = SweetDnaFile::unique_from_test_wasms(vec![test_wasm])
+            .await
+            .unwrap();
 
-        let _: () = conductor.call(&bob, "set_access", ()).await;
-        let agent_info: AgentInfo = conductor
-            .call(&alice, "who_are_they_local", bob.cell_id())
-            .await;
-        assert_eq!(agent_info.agent_initial_pubkey, bob_pubkey);
-        assert_eq!(agent_info.agent_latest_pubkey, bob_pubkey);
+        let dna_file_2 = dna_file_1.clone().with_uid("CLONE".to_string()).await.unwrap();
+
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let (alice_pubkey, _) = SweetAgents::alice_and_bob();
+
+        let apps = conductor
+            .setup_app_for_agents(
+                "app-",
+                &[alice_pubkey.clone()],
+                &[("role1".to_string(), dna_file_1), ("role2".to_string(), dna_file_2)],
+            )
+            .await
+            .unwrap();
+
+        let ((cell1, cell2),) = apps.into_tuples();
+
+        let zome1 = cell1.zome(test_wasm);
+        let zome2 = cell2.zome(test_wasm);
+
+        let _: () = conductor.call(&zome2, "set_access", ()).await;
+        
+        {
+            let agent_info: AgentInfo = conductor
+                .call(&zome1, "who_are_they_local", cell2.cell_id())
+                .await;
+            assert_eq!(agent_info.agent_initial_pubkey, alice_pubkey);
+            assert_eq!(agent_info.agent_latest_pubkey, alice_pubkey);
+        }
+        {
+            let agent_info: AgentInfo = conductor
+                .call(&zome1, "who_are_they_role", "role2")
+                .await;
+            assert_eq!(agent_info.agent_initial_pubkey, alice_pubkey);
+            assert_eq!(agent_info.agent_latest_pubkey, alice_pubkey);
+        }
     }
 
     /// When calling the same cell we need to make sure
@@ -251,6 +278,9 @@ pub mod wasm_test {
 
     /// test calling a different zome
     /// in a different cell.
+    // FIXME: we should NOT be able to do a "bridge" call to another cell in a different app, by a different agent!
+    //        Local bridge calls are always within the same app. So this test is testing something that should
+    //        not be supported. 
     #[tokio::test(flavor = "multi_thread")]
     async fn bridge_call() {
         observability::test_run().ok();
@@ -263,7 +293,7 @@ pub mod wasm_test {
         let (alice, bob) = SweetAgents::two(conductor.keystore()).await;
 
         let apps = conductor
-            .setup_app_for_agents("app", &[alice.clone(), bob.clone()], &[dna_file.into()])
+            .setup_app_for_agents("app", &[alice.clone(), bob.clone()], &[dna_file])
             .await
             .unwrap();
         let ((alice,), (_bobbo,)) = apps.into_tuples();
@@ -272,7 +302,7 @@ pub mod wasm_test {
             .await
             .unwrap();
         let apps = conductor
-            .setup_app_for_agents("app2", &[bob.clone()], &[dna_file.into()])
+            .setup_app_for_agents("app2", &[bob.clone()], &[dna_file])
             .await
             .unwrap();
         let ((bobbo2,),) = apps.into_tuples();

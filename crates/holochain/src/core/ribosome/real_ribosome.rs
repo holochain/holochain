@@ -953,7 +953,7 @@ pub mod wasm_test {
             .setup_app_for_agents(
                 "app-",
                 &[alice_pubkey.clone(), bob_pubkey],
-                &[dna_file.into()],
+                [&dna_file],
             )
             .await
             .unwrap();
