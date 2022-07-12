@@ -950,11 +950,7 @@ pub mod wasm_test {
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let apps = conductor
-            .setup_app_for_agents(
-                "app-",
-                &[alice_pubkey.clone(), bob_pubkey],
-                [&dna_file],
-            )
+            .setup_app_for_agents("app-", &[alice_pubkey.clone(), bob_pubkey], [&dna_file])
             .await
             .unwrap();
 

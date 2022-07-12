@@ -64,23 +64,22 @@ pub fn standard_config() -> ConductorConfig {
 
 /// A DnaFile with a role name assigned
 pub struct DnaWithRole {
-    role: AppRoleId, 
-    dna: DnaFile
+    role: AppRoleId,
+    dna: DnaFile,
 }
 
 impl From<DnaFile> for DnaWithRole {
     fn from(dna: DnaFile) -> Self {
         Self {
-            role: "".into(), dna
+            role: "".into(),
+            dna,
         }
     }
 }
 
 impl From<(AppRoleId, DnaFile)> for DnaWithRole {
     fn from((role, dna): (AppRoleId, DnaFile)) -> Self {
-        Self {
-            role, dna
-        }
+        Self { role, dna }
     }
 }
 
