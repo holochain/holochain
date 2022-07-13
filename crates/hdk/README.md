@@ -41,7 +41,7 @@ Some of the examples are very contrived, none are intended as production grade h
 Integrity zomes describe a hApp's domain model by defining a set of entry and link types and providing a validation callback
 function that checks the integrity of any operations that manipulate data of those types.
 
-The wasm workspace contains examples of integrity zomes:
+The wasm workspace contains examples of integrity zomes like this:
 <https://github.com/holochain/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/integrity_zome/src/lib.rs>
 
 ## Coordinator zomes 🐜
