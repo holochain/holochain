@@ -204,8 +204,18 @@ macro_rules! secure_primitive {
 pub trait UnitEnum {
     /// An enum with the same variants as the implementor
     /// but without any data.
-    type Unit;
+    type Unit: core::fmt::Debug
+        + Clone
+        + Copy
+        + PartialEq
+        + Eq
+        + PartialOrd
+        + Ord
+        + core::hash::Hash;
 
     /// Turn this type into it's unit enum.
     fn to_unit(&self) -> Self::Unit;
+
+    /// Iterate over the unit variants.
+    fn unit_iter() -> Box<dyn Iterator<Item = Self::Unit>>;
 }

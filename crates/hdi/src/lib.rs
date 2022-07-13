@@ -181,3 +181,6 @@ pub mod trace;
 pub mod hdi;
 
 pub mod link;
+
+#[warn(missing_docs)]
+pub mod op;

@@ -9,6 +9,8 @@ use crate::capability::CapClaim;
 use crate::capability::CapGrant;
 use crate::capability::ZomeCallCapGrant;
 use crate::countersigning::CounterSigningSessionData;
+use crate::EntryDefIndex;
+use crate::ZomeId;
 use holo_hash::hash_type;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
@@ -37,6 +39,41 @@ pub type CapClaimEntry = CapClaim;
 
 /// An Entry paired with its EntryHash
 pub type EntryHashed = holo_hash::HoloHashed<Entry>;
+
+/// Helper trait for deserializing [`Entry`]s to the correct type.
+///
+/// This is implemented by the [`hdk_entry_defs`] proc_macro.
+pub trait EntryTypesHelper: Sized {
+    /// The error associated with this conversion.
+    type Error;
+    /// Check if the [`ZomeId`] and [`EntryDefIndex`] matches one of the
+    /// `ZomeEntryTypesKey::from(Self::variant)` and if
+    /// it does deserialize the [`Entry`] into that type.
+    fn deserialize_from_type<Z, I>(
+        zome_id: Z,
+        entry_def_index: I,
+        entry: &Entry,
+    ) -> Result<Option<Self>, Self::Error>
+    where
+        Z: Into<ZomeId>,
+        I: Into<EntryDefIndex>;
+}
+
+impl EntryTypesHelper for () {
+    type Error = core::convert::Infallible;
+
+    fn deserialize_from_type<Z, I>(
+        _zome_id: Z,
+        _entry_def_index: I,
+        _entry: &Entry,
+    ) -> Result<Option<Self>, Self::Error>
+    where
+        Z: Into<ZomeId>,
+        I: Into<EntryDefIndex>,
+    {
+        Ok(Some(()))
+    }
+}
 
 impl From<EntryHashed> for Entry {
     fn from(entry_hashed: EntryHashed) -> Self {

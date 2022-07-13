@@ -2,9 +2,10 @@
 
 use crate::{
     Action, ActionRef, AppEntryType, Create, CreateLink, Delete, DeleteLink, Entry, EntryType,
-    Record, SignedActionHashed, SignedHashed, Update,
+    EntryTypesHelper, LinkTag, LinkTypesHelper, Record, SignedActionHashed, SignedHashed, UnitEnum,
+    Update,
 };
-use holo_hash::{ActionHash, AgentPubKey, EntryHash, HashableContent};
+use holo_hash::{ActionHash, AgentPubKey, AnyLinkableHash, EntryHash, HashableContent};
 use holochain_serialized_bytes::prelude::*;
 use kitsune_p2p_timestamp::Timestamp;
 
@@ -287,6 +288,115 @@ impl EntryCreationAction {
     pub fn is_cap_grant_entry_type(&self) -> bool {
         matches!(self.entry_type(), EntryType::CapGrant)
     }
+}
+
+#[warn(missing_docs)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum OpType<ET, LT>
+where
+    ET: UnitEnum,
+{
+    StoreRecord(OpRecord<ET, LT>),
+    StoreEntry(OpEntry<ET>),
+    RegisterCreateLink {
+        base_address: AnyLinkableHash,
+        target_address: AnyLinkableHash,
+        tag: LinkTag,
+        link_type: LT,
+    },
+    RegisterDeleteLink {
+        original_link_hash: ActionHash,
+        base_address: AnyLinkableHash,
+        target_address: AnyLinkableHash,
+        tag: LinkTag,
+        link_type: LT,
+    },
+    RegisterUpdate(OpUpdate<ET>),
+}
+
+#[warn(missing_docs)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum OpRecord<ET, LT>
+where
+    ET: UnitEnum,
+{
+    CreateEntry {
+        entry_hash: EntryHash,
+        entry_type: ET,
+    },
+    CreatePrivateEntry {
+        entry_hash: EntryHash,
+        entry_type: <ET as UnitEnum>::Unit,
+    },
+    CreateAgent(AgentPubKey),
+    UpdateEntry {
+        entry_hash: EntryHash,
+        original_action_hash: ActionHash,
+        original_entry_hash: EntryHash,
+        entry_type: ET,
+    },
+    UpdatePrivateEntry {
+        entry_hash: EntryHash,
+        original_action_hash: ActionHash,
+        original_entry_hash: EntryHash,
+        entry_type: <ET as UnitEnum>::Unit,
+    },
+    UpdateAgent {
+        original_action_hash: ActionHash,
+        original_key: AgentPubKey,
+        new_key: AgentPubKey,
+    },
+    CreateLink {
+        base_address: AnyLinkableHash,
+        target_address: AnyLinkableHash,
+        tag: LinkTag,
+        link_type: LT,
+    },
+    DeleteLink(ActionHash),
+}
+
+#[warn(missing_docs)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum OpEntry<ET>
+where
+    ET: UnitEnum,
+{
+    CreateEntry {
+        entry_hash: EntryHash,
+        entry_type: ET,
+    },
+    CreateAgent(AgentPubKey),
+    UpdateEntry {
+        entry_hash: EntryHash,
+        original_action_hash: ActionHash,
+        original_entry_hash: EntryHash,
+        entry_type: ET,
+    },
+    UpdateAgent {
+        original_action_hash: ActionHash,
+        original_key: AgentPubKey,
+        new_key: AgentPubKey,
+    },
+}
+
+#[warn(missing_docs)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum OpUpdate<ET>
+where
+    ET: UnitEnum,
+{
+    Entry {
+        entry_hash: EntryHash,
+        original_action_hash: ActionHash,
+        original_entry_hash: EntryHash,
+        original_entry_type: ET,
+        new_entry_type: ET,
+    },
+    Agent {
+        original_action_hash: ActionHash,
+        original_key: AgentPubKey,
+        new_key: AgentPubKey,
+    },
 }
 
 /// Allows a [`EntryCreationAction`] to hash the same bytes as

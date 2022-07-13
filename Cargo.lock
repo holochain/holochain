@@ -1919,6 +1919,7 @@ dependencies = [
 name = "hdi"
 version = "0.0.13"
 dependencies = [
+ "arbitrary",
  "fixt",
  "hdk_derive",
  "holo_hash",
@@ -1928,6 +1929,7 @@ dependencies = [
  "paste",
  "serde",
  "serde_bytes",
+ "test-case 2.1.0",
  "tracing",
  "tracing-core",
 ]

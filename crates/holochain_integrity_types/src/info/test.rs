@@ -268,7 +268,12 @@ impl crate::UnitEnum for EntryTypes {
             EntryTypes::B(_) => Self::Unit::B,
         }
     }
+
+    fn unit_iter() -> Box<dyn Iterator<Item = Self::Unit>> {
+        todo!()
+    }
 }
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 enum UnitEntry {
     A,
     B,

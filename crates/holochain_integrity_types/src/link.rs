@@ -68,6 +68,30 @@ pub enum LinkTypeFilter {
     Dependencies(Vec<ZomeId>),
 }
 
+pub trait LinkTypesHelper: Sized {
+    /// The error associated with this conversion.
+    type Error;
+    /// Check if the [`ZomeId`] and [`LinkType`] matches one of the
+    /// `ZomeLinkTypeKey::from(Self::variant)` and if
+    /// it does return that type
+    fn from_type<Z, I>(zome_id: Z, link_type: I) -> Result<Option<Self>, Self::Error>
+    where
+        Z: Into<ZomeId>,
+        I: Into<LinkType>;
+}
+
+impl LinkTypesHelper for () {
+    type Error = core::convert::Infallible;
+
+    fn from_type<Z, I>(_zome_id: Z, _link_type: I) -> Result<Option<Self>, Self::Error>
+    where
+        Z: Into<ZomeId>,
+        I: Into<LinkType>,
+    {
+        Ok(Some(()))
+    }
+}
+
 impl LinkTypeFilter {
     pub fn zome_for<E>(link_type: impl TryInto<ZomeId, Error = E>) -> Result<Self, E> {
         link_type.try_into().map(LinkTypeFilter::single_dep)

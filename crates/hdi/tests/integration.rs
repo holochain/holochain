@@ -1,7 +1,10 @@
 //! Tests for the proc macros defined in [`hdk_derive`] that are
 //! used at the integrity level.
 
+use arbitrary::Arbitrary;
+use arbitrary::Unstructured;
 use hdi::prelude::*;
+use test_case::test_case;
 
 fn to_coords(t: impl Into<ZomeLinkTypesKey>) -> (u8, u8) {
     let t = t.into();
@@ -400,6 +403,503 @@ fn link_types_to_global() {
 
     assert_eq!(__num_link_types(), 3);
 }
+
+mod op_type {
+    use super::*;
+    #[hdk_entry_helper]
+    #[derive(Clone, PartialEq, Eq)]
+    pub struct A;
+    #[hdk_entry_helper]
+    #[derive(Clone, PartialEq, Eq)]
+    pub struct B;
+    #[hdk_entry_helper]
+    #[derive(Clone, PartialEq, Eq)]
+    pub struct C;
+
+    #[hdk_entry_defs(skip_hdk_extern = true)]
+    #[unit_enum(UnitEntryTypes)]
+    #[derive(Clone, PartialEq, Eq)]
+    pub enum EntryTypes {
+        A(A),
+        #[entry_def(visibility = "private")]
+        B(B),
+        C(C),
+    }
+    #[hdk_link_types(skip_no_mangle = true)]
+    pub enum LinkTypes {
+        A,
+        B,
+        C,
+    }
+}
+
+fn eh(i: u8) -> EntryHash {
+    EntryHash::from_raw_36(vec![i; 36])
+}
+
+fn ah(i: u8) -> ActionHash {
+    ActionHash::from_raw_36(vec![i; 36])
+}
+
+fn ak(i: u8) -> AgentPubKey {
+    AgentPubKey::from_raw_36(vec![i; 36])
+}
+
+fn lh(i: u8) -> AnyLinkableHash {
+    AnyLinkableHash::from(EntryHash::from_raw_36(vec![i; 36]))
+}
+
+// Register Agent Activity
+// Store Record
+// Entries
+#[test_case(OpType::StoreRecord(OpRecord::CreateEntry {entry_hash: eh(0), entry_type: op_type::EntryTypes::A(op_type::A{}) }))]
+#[test_case(OpType::StoreRecord(OpRecord::UpdateEntry {entry_hash: eh(0), original_action_hash: ah(1), original_entry_hash: eh(1), entry_type: op_type::EntryTypes::A(op_type::A{}) }))]
+#[test_case(OpType::StoreRecord(OpRecord::CreateEntry {entry_hash: eh(0), entry_type: op_type::EntryTypes::C(op_type::C{}) }))]
+#[test_case(OpType::StoreRecord(OpRecord::UpdateEntry {entry_hash: eh(0), original_action_hash: ah(1), original_entry_hash: eh(1), entry_type: op_type::EntryTypes::C(op_type::C{}) }))]
+#[test_case(OpType::StoreRecord(OpRecord::CreateAgent(ak(4))))]
+#[test_case(OpType::StoreRecord(OpRecord::UpdateAgent { original_key: ak(4), new_key: ak(8), original_action_hash: ah(2) }))]
+#[test_case(OpType::StoreRecord(OpRecord::CreatePrivateEntry {entry_hash: eh(0), entry_type: op_type::UnitEntryTypes::A }))]
+#[test_case(OpType::StoreRecord(OpRecord::UpdatePrivateEntry {entry_hash: eh(0), original_action_hash: ah(1), original_entry_hash: eh(1), entry_type: op_type::UnitEntryTypes::A }))]
+// Links
+#[test_case(OpType::StoreRecord(OpRecord::CreateLink {base_address: lh(0), target_address: lh(2), tag: ().into(), link_type: op_type::LinkTypes::A }))]
+#[test_case(OpType::StoreRecord(OpRecord::DeleteLink(ah(4))))]
+// Store Entry
+#[test_case(OpType::StoreEntry(OpEntry::CreateEntry {entry_hash: eh(0), entry_type: op_type::EntryTypes::A(op_type::A{}) }))]
+#[test_case(OpType::StoreEntry(OpEntry::UpdateEntry {entry_hash: eh(0), original_action_hash: ah(1), original_entry_hash: eh(1), entry_type: op_type::EntryTypes::A(op_type::A{}) }))]
+#[test_case(OpType::StoreEntry(OpEntry::CreateAgent(ak(4))))]
+#[test_case(OpType::StoreEntry(OpEntry::UpdateAgent { original_key: ak(4), new_key: ak(8), original_action_hash: ah(2) }))]
+// Error Cases
+// #[test_case(OpType::StoreEntry(OpEntry::CreateEntry {entry_hash: eh(0), entry_type: op_type::EntryTypes::B(op_type::B{}) }))]
+// Register Update
+#[test_case(OpType::RegisterUpdate(OpUpdate::Entry {entry_hash: eh(0), original_action_hash: ah(1), original_entry_hash: eh(1), new_entry_type: op_type::EntryTypes::A(op_type::A{}), original_entry_type: op_type::EntryTypes::A(op_type::A{}) }))]
+#[test_case(OpType::RegisterUpdate(OpUpdate::Agent { original_key: ak(4), new_key: ak(8), original_action_hash: ah(2) }))]
+// Register Delete
+// Register Create Link
+#[test_case(OpType::RegisterCreateLink {base_address: lh(0), target_address: lh(2), tag: ().into(), link_type: op_type::LinkTypes::A })]
+#[test_case(OpType::RegisterCreateLink {base_address: lh(0), target_address: lh(2), tag: ().into(), link_type: op_type::LinkTypes::B })]
+// Register Delete Link
+#[test_case(OpType::RegisterDeleteLink {original_link_hash: ah(2), base_address: lh(0), target_address: lh(2), tag: ().into(), link_type: op_type::LinkTypes::A })]
+#[test_case(OpType::RegisterDeleteLink {original_link_hash: ah(2), base_address: lh(0), target_address: lh(2), tag: ().into(), link_type: op_type::LinkTypes::C })]
+fn op_into_type(op: OpType<op_type::EntryTypes, op_type::LinkTypes>) {
+    set_zome_types(&[(0, 3)], &[(0, 3)]);
+    let data = vec![0u8; 2000];
+    let mut ud = Unstructured::new(&data);
+    let o = match op.clone() {
+        OpType::StoreRecord(OpRecord::CreateEntry {
+            entry_hash,
+            entry_type: et,
+        }) => {
+            let entry = RecordEntry::Present(Entry::try_from(&et).unwrap());
+            let t = ScopedEntryDefIndex::try_from(&et).unwrap();
+            let c = create((&et).into(), &mut ud, t, entry_hash);
+            let c = Action::Create(c);
+            store_record_entry(c, entry)
+        }
+        OpType::StoreRecord(OpRecord::CreatePrivateEntry {
+            entry_hash,
+            entry_type: et,
+        }) => {
+            let t = ScopedEntryDefIndex::try_from(&et).unwrap();
+            let c = create(EntryVisibility::Private, &mut ud, t, entry_hash);
+            let c = Action::Create(c);
+            store_record_entry(c, RecordEntry::Hidden)
+        }
+        OpType::StoreRecord(OpRecord::CreateAgent(agent)) => {
+            let entry = RecordEntry::Present(Entry::Agent(agent.clone()));
+            let mut c = Create::arbitrary(&mut ud).unwrap();
+            c.entry_type = EntryType::AgentPubKey;
+            c.entry_hash = agent.into();
+            let c = Action::Create(c);
+            store_record_entry(c, entry)
+        }
+        OpType::StoreRecord(OpRecord::CreateLink {
+            link_type: lt,
+            base_address,
+            target_address,
+            tag,
+        }) => {
+            let t = ScopedLinkType::try_from(&lt).unwrap();
+            let mut c = CreateLink::arbitrary(&mut ud).unwrap();
+            c.zome_id = t.zome_id;
+            c.link_type = t.zome_type;
+            c.base_address = base_address;
+            c.target_address = target_address;
+            c.tag = tag;
+            let c = Action::CreateLink(c);
+            Op::StoreRecord(StoreRecord {
+                record: Record {
+                    signed_action: SignedHashed {
+                        hashed: ActionHashed::from_content_sync(c),
+                        signature: Signature::arbitrary(&mut ud).unwrap(),
+                    },
+                    entry: RecordEntry::NotApplicable,
+                },
+            })
+        }
+        OpType::StoreRecord(OpRecord::DeleteLink(link_action_hash)) => {
+            let mut c = DeleteLink::arbitrary(&mut ud).unwrap();
+            c.link_add_address = link_action_hash;
+            let c = Action::DeleteLink(c);
+            Op::StoreRecord(StoreRecord {
+                record: Record {
+                    signed_action: SignedHashed {
+                        hashed: ActionHashed::from_content_sync(c),
+                        signature: Signature::arbitrary(&mut ud).unwrap(),
+                    },
+                    entry: RecordEntry::NotApplicable,
+                },
+            })
+        }
+        OpType::StoreRecord(OpRecord::UpdateEntry {
+            entry_hash,
+            original_action_hash,
+            original_entry_hash,
+            entry_type: et,
+        }) => {
+            let entry = RecordEntry::Present(Entry::try_from(&et).unwrap());
+            let t = ScopedEntryDefIndex::try_from(&et).unwrap();
+            let u = update(
+                (&et).into(),
+                &mut ud,
+                t,
+                entry_hash,
+                original_action_hash,
+                original_entry_hash,
+            );
+            let u = Action::Update(u);
+            store_record_entry(u, entry)
+        }
+        OpType::StoreRecord(OpRecord::UpdatePrivateEntry {
+            entry_hash,
+            original_action_hash,
+            original_entry_hash,
+            entry_type: et,
+        }) => {
+            let t = ScopedEntryDefIndex::try_from(&et).unwrap();
+            let u = update(
+                EntryVisibility::Private,
+                &mut ud,
+                t,
+                entry_hash,
+                original_action_hash,
+                original_entry_hash,
+            );
+            let u = Action::Update(u);
+            store_record_entry(u, RecordEntry::Hidden)
+        }
+        OpType::StoreRecord(OpRecord::UpdateAgent {
+            original_action_hash,
+            original_key,
+            new_key,
+        }) => {
+            let entry = RecordEntry::Present(Entry::Agent(new_key.clone()));
+            let mut u = Update::arbitrary(&mut ud).unwrap();
+            u.entry_type = EntryType::AgentPubKey;
+            u.entry_hash = new_key.into();
+            u.original_action_address = original_action_hash;
+            u.original_entry_address = original_key.into();
+            let u = Action::Update(u);
+            store_record_entry(u, entry)
+        }
+        OpType::StoreEntry(OpEntry::CreateEntry {
+            entry_hash,
+            entry_type: et,
+        }) => {
+            let entry = Entry::try_from(&et).unwrap();
+            let t = ScopedEntryDefIndex::try_from(&et).unwrap();
+            let c = create(EntryVisibility::Public, &mut ud, t, entry_hash);
+            let c = EntryCreationAction::Create(c);
+            store_entry_entry(c, entry)
+        }
+        OpType::StoreEntry(OpEntry::UpdateEntry {
+            entry_hash,
+            original_action_hash,
+            original_entry_hash,
+            entry_type: et,
+        }) => {
+            let entry = Entry::try_from(&et).unwrap();
+            let t = ScopedEntryDefIndex::try_from(&et).unwrap();
+            let u = update(
+                (&et).into(),
+                &mut ud,
+                t,
+                entry_hash,
+                original_action_hash,
+                original_entry_hash,
+            );
+            let u = EntryCreationAction::Update(u);
+            store_entry_entry(u, entry)
+        }
+        OpType::StoreEntry(OpEntry::CreateAgent(agent)) => {
+            let entry = Entry::Agent(agent.clone());
+            let mut c = Create::arbitrary(&mut ud).unwrap();
+            c.entry_type = EntryType::AgentPubKey;
+            c.entry_hash = agent.into();
+            let c = EntryCreationAction::Create(c);
+            store_entry_entry(c, entry)
+        }
+        OpType::StoreEntry(OpEntry::UpdateAgent {
+            original_action_hash,
+            original_key,
+            new_key,
+        }) => {
+            let entry = Entry::Agent(new_key.clone());
+            let mut u = Update::arbitrary(&mut ud).unwrap();
+            u.entry_type = EntryType::AgentPubKey;
+            u.entry_hash = new_key.into();
+            u.original_action_address = original_action_hash;
+            u.original_entry_address = original_key.into();
+            let u = EntryCreationAction::Update(u);
+            store_entry_entry(u, entry)
+        }
+        OpType::RegisterCreateLink {
+            link_type: lt,
+            base_address,
+            target_address,
+            tag,
+        } => {
+            let t = ScopedLinkType::try_from(&lt).unwrap();
+            let mut c = CreateLink::arbitrary(&mut ud).unwrap();
+            c.zome_id = t.zome_id;
+            c.link_type = t.zome_type;
+            c.base_address = base_address;
+            c.target_address = target_address;
+            c.tag = tag;
+            Op::RegisterCreateLink(RegisterCreateLink {
+                create_link: SignedHashed {
+                    hashed: HoloHashed::from_content_sync(c),
+                    signature: Signature::arbitrary(&mut ud).unwrap(),
+                },
+            })
+        }
+        OpType::RegisterDeleteLink {
+            original_link_hash,
+            link_type: lt,
+            base_address,
+            target_address,
+            tag,
+        } => {
+            let t = ScopedLinkType::try_from(&lt).unwrap();
+            let mut c = CreateLink::arbitrary(&mut ud).unwrap();
+            let mut d = DeleteLink::arbitrary(&mut ud).unwrap();
+            d.link_add_address = original_link_hash;
+            c.zome_id = t.zome_id;
+            c.link_type = t.zome_type;
+            c.base_address = base_address;
+            c.target_address = target_address;
+            c.tag = tag;
+            Op::RegisterDeleteLink(RegisterDeleteLink {
+                delete_link: SignedHashed {
+                    hashed: HoloHashed::from_content_sync(d),
+                    signature: Signature::arbitrary(&mut ud).unwrap(),
+                },
+                create_link: c,
+            })
+        }
+        OpType::RegisterUpdate(OpUpdate::Entry {
+            entry_hash,
+            original_action_hash,
+            original_entry_hash,
+            original_entry_type: original_et,
+            new_entry_type: et,
+        }) => {
+            let original_entry = Entry::try_from(&original_et).unwrap();
+            let entry = Entry::try_from(&et).unwrap();
+            let t = ScopedEntryDefIndex::try_from(&et).unwrap();
+            let original_action = update(
+                (&original_et).into(),
+                &mut ud,
+                t,
+                entry_hash.clone(),
+                original_action_hash.clone(),
+                original_entry_hash.clone(),
+            );
+            let original_action = EntryCreationAction::Update(original_action);
+            let u = update(
+                (&et).into(),
+                &mut ud,
+                t,
+                entry_hash,
+                original_action_hash,
+                original_entry_hash,
+            );
+            Op::RegisterUpdate(RegisterUpdate {
+                update: SignedHashed {
+                    hashed: HoloHashed::from_content_sync(u),
+                    signature: Signature::arbitrary(&mut ud).unwrap(),
+                },
+                new_entry: entry,
+                original_action,
+                original_entry,
+            })
+        }
+        OpType::RegisterUpdate(OpUpdate::Agent {
+            original_action_hash,
+            original_key,
+            new_key,
+        }) => {
+            let entry = Entry::Agent(new_key.clone());
+            let original_entry = Entry::Agent(original_key.clone());
+            let mut u = Update::arbitrary(&mut ud).unwrap();
+            let c = Create::arbitrary(&mut ud).unwrap();
+            u.entry_type = EntryType::AgentPubKey;
+            u.entry_hash = new_key.into();
+            u.original_action_address = original_action_hash;
+            u.original_entry_address = original_key.into();
+            let original_action = EntryCreationAction::Create(c);
+            Op::RegisterUpdate(RegisterUpdate {
+                update: SignedHashed {
+                    hashed: HoloHashed::from_content_sync(u),
+                    signature: Signature::arbitrary(&mut ud).unwrap(),
+                },
+                new_entry: entry,
+                original_action,
+                original_entry,
+            })
+        }
+    };
+    assert_eq!(o.into_type().unwrap(), op);
+}
+
+fn store_record_entry(action: Action, entry: RecordEntry) -> Op {
+    Op::StoreRecord(StoreRecord {
+        record: Record {
+            signed_action: SignedHashed {
+                hashed: ActionHashed::from_content_sync(action),
+                signature: Signature([0u8; 64]),
+            },
+            entry,
+        },
+    })
+}
+fn store_entry_entry(action: EntryCreationAction, entry: Entry) -> Op {
+    Op::StoreEntry(StoreEntry {
+        action: SignedHashed {
+            hashed: HoloHashed::from_content_sync(action),
+            signature: Signature([0u8; 64]),
+        },
+        entry,
+    })
+}
+
+fn create(
+    visibility: EntryVisibility,
+    ud: &mut Unstructured,
+    t: ScopedEntryDefIndex,
+    entry_hash: EntryHash,
+) -> Create {
+    let mut c = Create::arbitrary(ud).unwrap();
+    c.entry_type = EntryType::App(AppEntryType {
+        id: t.zome_type,
+        zome_id: t.zome_id,
+        visibility,
+    });
+    c.entry_hash = entry_hash;
+    c
+}
+fn update(
+    visibility: EntryVisibility,
+    ud: &mut Unstructured,
+    t: ScopedEntryDefIndex,
+    entry_hash: EntryHash,
+    original_action_hash: ActionHash,
+    original_entry_hash: EntryHash,
+) -> Update {
+    let mut u = Update::arbitrary(ud).unwrap();
+    u.entry_type = EntryType::App(AppEntryType {
+        id: t.zome_type,
+        zome_id: t.zome_id,
+        visibility,
+    });
+    u.entry_hash = entry_hash;
+    u.original_action_address = original_action_hash;
+    u.original_entry_address = original_entry_hash;
+    u
+}
+// #[test]
+// fn op_into_type() {
+//     fn empty_create() -> Create {
+//         Create {
+//             author: AgentPubKey::from_raw_36(vec![0u8; 36]),
+//             timestamp: Timestamp(0),
+//             action_seq: 1,
+//             prev_action: ActionHash::from_raw_36(vec![0u8; 36]),
+//             entry_type: EntryType::App(AppEntryType {
+//                 id: 0.into(),
+//                 zome_id: 0.into(),
+//                 visibility: EntryVisibility::Public,
+//             }),
+//             entry_hash: EntryHash::from_raw_36(vec![0u8; 36]),
+//             weight: Default::default(),
+//         }
+//     }
+//     let op = Op::StoreRecord(StoreRecord {
+//         record: Record {
+//             signed_action: SignedHashed {
+//                 hashed: ActionHashed {
+//                     content: Action::Create(Create {
+//                         entry_type: EntryType::App(AppEntryType {
+//                             id: 0.into(),
+//                             zome_id: 0.into(),
+//                             visibility: EntryVisibility::Public,
+//                         }),
+//                         ..empty_create()
+//                     }),
+//                     hash: ActionHash::from_raw_36(vec![1u8; 36]),
+//                 },
+//                 signature: Signature([0u8; 64]),
+//             },
+//             entry: RecordEntry::Present(EntryTypes::A(A {}).try_into().unwrap()),
+//         },
+//     });
+//     eprintln!("{}", serde_yaml::to_string(&op).unwrap());
+//     set_zome_types(&[(0, 3)], &[(0, 3)]);
+// match op.as_type().unwrap() {
+//     OpType::StoreRecord(OpRecord::CreateEntry {
+//         entry_hash,
+//         entry_type: EntryTypes::A(_),
+//     }) => {
+//         op.action().timestamp()
+//     },
+//     OpType::StoreRecord(OpRecord::CreatePrivateEntry {
+//         entry_hash,
+//         entry_type: UnitEntryTypes::A,
+//     }) => {
+//         op.action().timestamp()
+//     },
+//     OpType::StoreRecord(OpRecord::UpdateEntry {
+//         entry_hash,
+//         original_action_hash,
+//         entry_type: EntryTypes::A(_),
+//     }) => {
+//         op.action().timestamp()
+//         op.action().prev_action()
+//     },
+//     OpType::StoreRecord(OpRecord::CreateEntry(EntryTypes::B(_))) => (),
+//     OpType::StoreRecord(OpRecord::CreateEntry(EntryTypes::C(_))) => (),
+//     OpType::StoreRecord(OpRecord::CreateHiddenEntry) => (),
+//     OpType::StoreRecord(OpRecord::CreateEntryNotStored) => (),
+//     OpType::StoreRecord(OpRecord::AgentPubKey(_)) => (),
+//     OpType::StoreRecord(OpRecord::CreateLink(LinkTypes::A)) => (),
+//     OpType::StoreRecord(OpRecord::CreateLink(LinkTypes::B)) => (),
+//     OpType::StoreRecord(OpRecord::CreateLink(LinkTypes::C)) => (),
+//     OpType::Link(LinkTypes::A) => todo!(),
+//     OpType::Link(LinkTypes::B) => todo!(),
+//     OpType::Link(LinkTypes::C) => todo!(),
+// }
+//     match op.into_type::<_, ()>().unwrap() {
+//         OpType::StoreRecord(OpRecord::CreateEntry(EntryTypes::A(_))) => (),
+//         _ => (),
+//     }
+//     match op.into_type::<(), _>().unwrap() {
+//         OpType::StoreRecord(OpRecord::CreateLink(LinkTypes::A)) => (),
+//         _ => (),
+//     }
+//     match op.into_type::<(), ()>().unwrap() {
+//         OpType::StoreRecord(_) => (),
+//         _ => (),
+//     }
+// }
 
 fn set_zome_types(entries: &[(u8, u8)], links: &[(u8, u8)]) {
     struct TestHdi(ScopedZomeTypesSet);

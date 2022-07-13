@@ -18,7 +18,9 @@ path = "src/lib.rs"
 default = []
 trace = ["tracing", "tracing-core", "holochain_integrity_types/tracing"]
 mock = ["hdk_derive/mock", "mockall"]
-test_utils = []
+test_utils = [
+    "holochain_integrity_types/test_utils"
+]
 
 [dependencies]
 hdk_derive = { version = "0.0.40", path = "../hdk_derive" }
@@ -38,3 +40,5 @@ mockall = { version = "0.10.2", optional = true }
 
 [dev-dependencies]
 fixt = { path = "../fixt" }
+test-case = "2.1"
+arbitrary = { version = "1.0", features = ["derive"] }
