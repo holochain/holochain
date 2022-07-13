@@ -258,11 +258,11 @@ async fn test_list_running_apps_for_cell_id() {
     let mut conductor = SweetConductor::from_standard_config().await;
     let alice = SweetAgents::one(conductor.keystore()).await;
     let app1 = conductor
-        .setup_app_for_agent("app1", alice.clone(), &[dna1.clone(), dna2])
+        .setup_app_for_agent("app1", alice.clone(), [&dna1, &dna2])
         .await
         .unwrap();
     let app2 = conductor
-        .setup_app_for_agent("app2", alice.clone(), &[dna1, dna3])
+        .setup_app_for_agent("app2", alice.clone(), [&dna1, &dna3])
         .await
         .unwrap();
 
