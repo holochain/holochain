@@ -9,13 +9,13 @@ use crate::prelude::*;
 pub mod examples;
 
 /// An extension to obtain a link type filter.
-/// 
+///
 /// Allows for single link types as well as a range or vector of link types to be passed in.
-/// To include all link types - not filter out any link type - the full range operator `..`
+/// To include all link types, i. e. not filter out any link type, the full range operator `..`
 /// can be used: `get_links(base, .., None)`.
-/// 
+///
 /// Refer to the `get_links` function in
-/// ]this coordinator zome](https://github.com/holochain/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/link/src/coordinator.rs)
+/// [this coordinator zome](https://github.com/holochain/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/link/src/coordinator.rs)
 /// for several examples.
 pub trait LinkTypeFilterExt {
     fn try_into_filter(self) -> Result<LinkTypeFilter, WasmError>;

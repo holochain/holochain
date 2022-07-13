@@ -49,7 +49,7 @@
 //! that can be performed on the data, a validation rule can be specified. Both data types and data
 //! values can be validated. All of these validation rules are written in a central callback
 //! which is called by the Holochain engine for each operation.
-//! 
+//!
 //! See an example of the `validate` callback in an integrity zome in the WASM workspace:
 //! <https://github.com/holochain/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/validate/src/integrity.rs>.
 //! Many more validation examples can be browsed in that very workspace.

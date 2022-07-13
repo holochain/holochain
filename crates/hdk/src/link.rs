@@ -21,7 +21,7 @@ pub use hdi::link::*;
 ///
 /// Note: There is a hard limit of 1kb of data for the tag.
 ///
-/// Crud:
+/// CRUD:
 ///
 /// - creates reference a single entry
 /// - updates and deletes reference create/update records by both their entry+action
@@ -118,7 +118,7 @@ pub fn delete_link(address: ActionHash) -> ExternResult<ActionHash> {
 /// Type can be filtered by providing a variant of the link types, or a range of them. To get links of
 /// all types, the full range operator can be used: `get_links(base, .., None)`. Furthermore, vectors of
 /// link types can be passed in to specify multiple types. Refer to the `get_links` function in
-/// ]this coordinator zome](https://github.com/holochain/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/link/src/coordinator.rs)
+/// [this coordinator zome](https://github.com/holochain/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/link/src/coordinator.rs)
 /// for several examples.
 ///
 /// Tag filtering is a simple bytes prefix.
@@ -159,7 +159,7 @@ pub fn get_links(
 /// Type can be filtered by providing a variant of the link types, or a range of them. To get links of
 /// all types, the full range operator can be used: `get_links(base, .., None)`. Furthermore, vectors of
 /// link types can be passed in to specify multiple types. Refer to the `get_links` function in
-/// ]this coordinator zome](https://github.com/holochain/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/link/src/coordinator.rs)
+/// [this coordinator zome](https://github.com/holochain/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/link/src/coordinator.rs)
 /// for several examples.
 ///
 /// Tag filtering is a simple bytes prefix.
