@@ -6,7 +6,7 @@
 //!
 //! hApps are required to produce and validate data deterministically. There's a data model and a domain logic part to each hApp. In Holochain, the
 //! data model is defined in integrity zomes and the domain logic is written in coordinator zomes. See Integrity zomes and Coordinator zomes further down and
-//! [Holochain Deterministic Integrity](holochain_deterministic_integrity) for more information.
+//! [Holochain Deterministic Integrity](hdi) for more information.
 //!
 //! Since hApps are run as a binary on the hosting system, they must be sandboxed to prevent execution of insecure commands.
 //! Instead of writing and maintaining a custom format and specification for these artifacts as well as a runtime environment to execute them,
@@ -39,7 +39,7 @@
 //! Integrity zomes describe a hApp's domain model by defining a set of entry and link types and providing a validation callback
 //! function that checks the integrity of any operations that manipulate data of those types.
 //!
-//! The wasm workspace contains examples of integrity zomes:
+//! The wasm workspace contains examples of integrity zomes like this:
 //! <https://github.com/holochain/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/integrity_zome/src/lib.rs>
 //!
 //! # Coordinator zomes 🐜
@@ -56,7 +56,7 @@
 //!
 //! - Base HDKT trait for standardisation, mocking, unit testing support: [`hdk`] module
 //! - Capabilities and function level access control: [`capability`] module
-//! - [Holochain Deterministic Integrity (HDI)](holochain_deterministic_integrity)
+//! - [Holochain Deterministic Integrity (HDI)](hdi)
 //! - Application data and entry definitions for the source chain and DHT: [`entry`] module and [`entry_defs`] callback
 //! - Referencing/linking entries on the DHT together into a graph structure: [`link`] module
 //! - Defining tree-like structures out of links and entries for discoverability and scalability: [`hash_path`] module
@@ -167,7 +167,7 @@
 //!   - Allows the guest to pass/fail/retry any operation.
 //!   - Only the originating zome is called.
 //!   - Failure overrides retry.
-//!   - See [`validate`](holochain_deterministic_integrity::prelude::validate) for more details.
+//!   - See [`validate`](hdi::prelude::validate) for more details.
 //!
 //! # HDK has layers 🧅
 //!
@@ -331,7 +331,17 @@ pub mod countersigning;
 /// Most Holochain applications will define their own app entry types.
 ///
 /// App entries are all entries that are not system entries.
-/// They are defined in the `entry_defs` callback and then the application can call CRUD functions with them.
+/// Definitions of entry types belong in the integrity zomes of a DNA. In contrast, operations
+/// for manipulating entries go into coordinator zomes.
+///
+/// # Examples
+///
+/// Refer to the WASM workspace in the Holochain repository for examples.
+/// Here's a simple example of an entry definition:
+/// <https://github.com/holochain/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/entry_defs/src/integrity.rs>
+///
+/// An example of a coordinator zome with functions to manipulate entries:
+/// <https://github.com/holochain/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/coordinator_zome/src/lib.rs>
 ///
 /// CRUD in Holochain is represented as a graph/tree of Records referencing each other (via Action hashes) representing new states of a shared identity.
 /// Because the network is always subject to the possibility of partitions, there is no way to assert an objective truth about the 'current' or 'real' value that all participants will agree on.
@@ -349,8 +359,8 @@ pub mod countersigning;
 /// For example, an agent could choose to 'block' another agent and ignore all their updates.
 pub mod entry;
 
-pub use holochain_deterministic_integrity;
-pub use holochain_deterministic_integrity::entry_defs;
+pub use hdi;
+pub use hdi::entry_defs;
 
 pub mod hash;
 

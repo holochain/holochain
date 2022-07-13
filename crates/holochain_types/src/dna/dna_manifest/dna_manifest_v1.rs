@@ -73,11 +73,14 @@ pub struct DnaManifestV1 {
     /// The friendly "name" of a Holochain DNA.
     pub name: String,
 
+    /// Specification of integrity zomes and properties.
+    ///
     /// Only this affects the [`DnaHash`].
     pub integrity: IntegrityManifest,
 
     #[serde(default)]
     /// Coordinator zomes to install with this DNA.
+    ///
     /// Does not affect the [`DnaHash`].
     pub coordinator: CoordinatorManifest,
 }

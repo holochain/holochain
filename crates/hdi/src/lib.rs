@@ -60,7 +60,17 @@ pub use hdk_derive::hdk_link_types;
 /// Most Holochain applications will define their own app entry types.
 ///
 /// App entries are all entries that are not system entries.
-/// They are defined in the `entry_defs` callback and then the application can call CRUD functions with them.
+/// Definitions of entry types belong in the integrity zomes of a DNA. In contrast, operations
+/// for manipulating entries go into coordinator zomes.
+///
+/// # Examples
+///
+/// Refer to the WASM workspace in the Holochain repository for examples.
+/// Here's a simple example of an entry definition:
+/// <https://github.com/holochain/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/entry_defs/src/integrity.rs>
+///
+/// An example of a coordinator zome with functions to manipulate entries:
+/// <https://github.com/holochain/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/coordinator_zome/src/lib.rs>
 ///
 /// CRUD in Holochain is represented as a graph/tree of Records referencing each other (via Action hashes) representing new states of a shared identity.
 /// Because the network is always subject to the possibility of partitions, there is no way to assert an objective truth about the 'current' or 'real' value that all participants will agree on.
