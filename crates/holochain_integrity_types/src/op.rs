@@ -2,10 +2,9 @@
 
 use crate::{
     Action, ActionRef, AppEntryType, Create, CreateLink, Delete, DeleteLink, Entry, EntryType,
-    EntryTypesHelper, LinkTag, LinkTypesHelper, Record, SignedActionHashed, SignedHashed, UnitEnum,
-    Update,
+    LinkTag, MembraneProof, Record, SignedActionHashed, SignedHashed, UnitEnum, Update,
 };
-use holo_hash::{ActionHash, AgentPubKey, AnyLinkableHash, EntryHash, HashableContent};
+use holo_hash::{ActionHash, AgentPubKey, AnyLinkableHash, DnaHash, EntryHash, HashableContent};
 use holochain_serialized_bytes::prelude::*;
 use kitsune_p2p_timestamp::Timestamp;
 
@@ -152,14 +151,14 @@ pub struct RegisterUpdate {
     /// The signed and hashed [`Action::Update`] that registers the update.
     pub update: SignedHashed<Update>,
     /// The new [`Entry`] that is being updated to.
-    pub new_entry: Entry,
+    pub new_entry: Option<Entry>,
     /// The original [`EntryCreationAction`] that created
     /// the original [`Entry`].
     /// Note that the update points to a specific instance of the
     /// of the original [`Entry`].
     pub original_action: EntryCreationAction,
     /// The original [`Entry`] that is being updated from.
-    pub original_entry: Entry,
+    pub original_entry: Option<Entry>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
@@ -174,7 +173,7 @@ pub struct RegisterDelete {
     /// the original [`Entry`].
     pub original_action: EntryCreationAction,
     /// The original [`Entry`] that is being deleted.
-    pub original_entry: Entry,
+    pub original_entry: Option<Entry>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
@@ -290,7 +289,7 @@ impl EntryCreationAction {
     }
 }
 
-#[warn(missing_docs)]
+#[allow(missing_docs)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum OpType<ET, LT>
 where
@@ -298,6 +297,7 @@ where
 {
     StoreRecord(OpRecord<ET, LT>),
     StoreEntry(OpEntry<ET>),
+    RegisterAgentActivity(OpActivity<<ET as UnitEnum>::Unit, LT>),
     RegisterCreateLink {
         base_address: AnyLinkableHash,
         target_address: AnyLinkableHash,
@@ -312,9 +312,10 @@ where
         link_type: LT,
     },
     RegisterUpdate(OpUpdate<ET>),
+    RegisterDelete(OpDelete<ET>),
 }
 
-#[warn(missing_docs)]
+#[allow(missing_docs)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum OpRecord<ET, LT>
 where
@@ -329,6 +330,8 @@ where
         entry_type: <ET as UnitEnum>::Unit,
     },
     CreateAgent(AgentPubKey),
+    CreateCapClaim(EntryHash),
+    CreateCapGrant(EntryHash),
     UpdateEntry {
         entry_hash: EntryHash,
         original_action_hash: ActionHash,
@@ -346,6 +349,20 @@ where
         original_key: AgentPubKey,
         new_key: AgentPubKey,
     },
+    UpdateCapClaim {
+        entry_hash: EntryHash,
+        original_action_hash: ActionHash,
+        original_entry_hash: EntryHash,
+    },
+    UpdateCapGrant {
+        entry_hash: EntryHash,
+        original_action_hash: ActionHash,
+        original_entry_hash: EntryHash,
+    },
+    DeleteEntry {
+        original_action_hash: ActionHash,
+        original_entry_hash: EntryHash,
+    },
     CreateLink {
         base_address: AnyLinkableHash,
         target_address: AnyLinkableHash,
@@ -353,9 +370,73 @@ where
         link_type: LT,
     },
     DeleteLink(ActionHash),
+    Dna(DnaHash),
+    OpenChain(DnaHash),
+    CloseChain(DnaHash),
+    AgentValidationPkg(Option<MembraneProof>),
+    InitZomesComplete,
 }
 
-#[warn(missing_docs)]
+#[allow(missing_docs)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum OpActivity<UnitType, LT> {
+    CreateEntry {
+        entry_hash: EntryHash,
+        entry_type: Option<UnitType>,
+    },
+    CreatePrivateEntry {
+        entry_hash: EntryHash,
+        entry_type: Option<UnitType>,
+    },
+    CreateAgent(AgentPubKey),
+    CreateCapClaim(EntryHash),
+    CreateCapGrant(EntryHash),
+    UpdateEntry {
+        entry_hash: EntryHash,
+        original_action_hash: ActionHash,
+        original_entry_hash: EntryHash,
+        entry_type: Option<UnitType>,
+    },
+    UpdatePrivateEntry {
+        entry_hash: EntryHash,
+        original_action_hash: ActionHash,
+        original_entry_hash: EntryHash,
+        entry_type: Option<UnitType>,
+    },
+    UpdateAgent {
+        original_action_hash: ActionHash,
+        original_key: AgentPubKey,
+        new_key: AgentPubKey,
+    },
+    UpdateCapClaim {
+        entry_hash: EntryHash,
+        original_action_hash: ActionHash,
+        original_entry_hash: EntryHash,
+    },
+    UpdateCapGrant {
+        entry_hash: EntryHash,
+        original_action_hash: ActionHash,
+        original_entry_hash: EntryHash,
+    },
+    DeleteEntry {
+        original_action_hash: ActionHash,
+        original_entry_hash: EntryHash,
+    },
+    CreateLink {
+        base_address: AnyLinkableHash,
+        target_address: AnyLinkableHash,
+        tag: LinkTag,
+        link_type: Option<LT>,
+    },
+    DeleteLink(ActionHash),
+    Dna(DnaHash),
+    OpenChain(DnaHash),
+    CloseChain(DnaHash),
+    AgentValidationPkg(Option<MembraneProof>),
+    InitZomesComplete,
+}
+
+#[allow(missing_docs)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum OpEntry<ET>
 where
@@ -379,7 +460,7 @@ where
     },
 }
 
-#[warn(missing_docs)]
+#[allow(missing_docs)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum OpUpdate<ET>
 where
@@ -392,10 +473,57 @@ where
         original_entry_type: ET,
         new_entry_type: ET,
     },
+    PrivateEntry {
+        entry_hash: EntryHash,
+        original_action_hash: ActionHash,
+        original_entry_hash: EntryHash,
+        original_entry_type: <ET as UnitEnum>::Unit,
+        new_entry_type: <ET as UnitEnum>::Unit,
+    },
     Agent {
         original_action_hash: ActionHash,
         original_key: AgentPubKey,
         new_key: AgentPubKey,
+    },
+    CapClaim {
+        entry_hash: EntryHash,
+        original_action_hash: ActionHash,
+        original_entry_hash: EntryHash,
+    },
+    CapGrant {
+        entry_hash: EntryHash,
+        original_action_hash: ActionHash,
+        original_entry_hash: EntryHash,
+    },
+}
+
+#[allow(missing_docs)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum OpDelete<ET>
+where
+    ET: UnitEnum,
+{
+    Entry {
+        original_action_hash: ActionHash,
+        original_entry_hash: EntryHash,
+        original_entry_type: ET,
+    },
+    PrivateEntry {
+        original_action_hash: ActionHash,
+        original_entry_hash: EntryHash,
+        original_entry_type: <ET as UnitEnum>::Unit,
+    },
+    Agent {
+        original_action_hash: ActionHash,
+        original_key: AgentPubKey,
+    },
+    CapClaim {
+        original_action_hash: ActionHash,
+        original_entry_hash: EntryHash,
+    },
+    CapGrant {
+        original_action_hash: ActionHash,
+        original_entry_hash: EntryHash,
     },
 }
 

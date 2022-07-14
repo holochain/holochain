@@ -337,20 +337,25 @@ async fn dhtop_to_op(op: DhtOp, cascade: &mut Cascade) -> AppValidationOutcome<O
         }
         DhtOp::RegisterUpdatedContent(signature, update, entry)
         | DhtOp::RegisterUpdatedRecord(signature, update, entry) => {
-            let new_entry = match entry {
-                Some(entry) => *entry,
-                None => cascade
-                    .retrieve_entry(update.entry_hash.clone(), Default::default())
-                    .await?
-                    .map(|e| e.into_content())
-                    .ok_or_else(|| Outcome::awaiting(&update.entry_hash))?,
-            };
+            let new_entry = matches!(update.entry_type.visibility(), EntryVisibility::Public)
+                .then(|| {
+                    cascade
+                        .retrieve_entry(update.entry_hash.clone(), Default::default())
+                        .await?
+                        .map(|e| e.into_content())
+                        .ok_or_else(|| Outcome::awaiting(&update.entry_hash))
+                })
+                .transpose()?;
 
-            let original_entry = cascade
-                .retrieve_entry(update.original_entry_address.clone(), Default::default())
-                .await?
-                .map(|e| e.into_content())
-                .ok_or_else(|| Outcome::awaiting(&update.original_entry_address))?;
+            let original_entry = matches!(update.entry_type.visibility(), EntryVisibility::Public)
+                .then(|| {
+                    cascade
+                        .retrieve_entry(update.original_entry_address.clone(), Default::default())
+                        .await?
+                        .map(|e| e.into_content())
+                        .ok_or_else(|| Outcome::awaiting(&update.original_entry_address))
+                })
+                .transpose()?;
 
             let original_action = cascade
                 .retrieve_action(update.original_action_address.clone(), Default::default())
@@ -370,12 +375,6 @@ async fn dhtop_to_op(op: DhtOp, cascade: &mut Cascade) -> AppValidationOutcome<O
         }
         DhtOp::RegisterDeletedBy(signature, delete)
         | DhtOp::RegisterDeletedEntryAction(signature, delete) => {
-            let original_entry = cascade
-                .retrieve_entry(delete.deletes_entry_address.clone(), Default::default())
-                .await?
-                .map(|e| e.into_content())
-                .ok_or_else(|| Outcome::awaiting(&delete.deletes_entry_address))?;
-
             let original_action = cascade
                 .retrieve_action(delete.deletes_address.clone(), Default::default())
                 .await?
@@ -385,6 +384,19 @@ async fn dhtop_to_op(op: DhtOp, cascade: &mut Cascade) -> AppValidationOutcome<O
                         .map(|h| h.into())
                 })
                 .ok_or_else(|| Outcome::awaiting(&delete.deletes_address))?;
+
+            let original_entry = matches!(
+                original_action.entry_type.visibility(),
+                EntryVisibility::Public
+            )
+            .then(|| {
+                cascade
+                    .retrieve_entry(delete.deletes_entry_address.clone(), Default::default())
+                    .await?
+                    .map(|e| e.into_content())
+                    .ok_or_else(|| Outcome::awaiting(&delete.deletes_entry_address))
+            })
+            .transpose()?;
             Op::RegisterDelete(RegisterDelete {
                 delete: SignedHashed::new(delete, signature),
                 original_action,
