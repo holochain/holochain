@@ -292,10 +292,7 @@ pub fn op_to_record(op: Op, activity_entry: Option<Entry>) -> Record {
         }
         Op::RegisterUpdate(RegisterUpdate {
             update, new_entry, ..
-        }) => Record::new(
-            SignedActionHashed::raw_from_same_hash(update),
-            Some(new_entry),
-        ),
+        }) => Record::new(SignedActionHashed::raw_from_same_hash(update), new_entry),
         Op::RegisterDelete(RegisterDelete { delete, .. }) => {
             Record::new(SignedActionHashed::raw_from_same_hash(delete), None)
         }
@@ -337,25 +334,30 @@ async fn dhtop_to_op(op: DhtOp, cascade: &mut Cascade) -> AppValidationOutcome<O
         }
         DhtOp::RegisterUpdatedContent(signature, update, entry)
         | DhtOp::RegisterUpdatedRecord(signature, update, entry) => {
-            let new_entry = matches!(update.entry_type.visibility(), EntryVisibility::Public)
-                .then(|| {
-                    cascade
-                        .retrieve_entry(update.entry_hash.clone(), Default::default())
-                        .await?
-                        .map(|e| e.into_content())
-                        .ok_or_else(|| Outcome::awaiting(&update.entry_hash))
-                })
-                .transpose()?;
-
-            let original_entry = matches!(update.entry_type.visibility(), EntryVisibility::Public)
-                .then(|| {
+            let new_entry = match update.entry_type.visibility() {
+                EntryVisibility::Public => match entry {
+                    Some(entry) => Some(*entry),
+                    None => Some(
+                        cascade
+                            .retrieve_entry(update.entry_hash.clone(), Default::default())
+                            .await?
+                            .map(|e| e.into_content())
+                            .ok_or_else(|| Outcome::awaiting(&update.entry_hash))?,
+                    ),
+                },
+                _ => None,
+            };
+            let original_entry = if let EntryVisibility::Public = update.entry_type.visibility() {
+                Some(
                     cascade
                         .retrieve_entry(update.original_entry_address.clone(), Default::default())
                         .await?
                         .map(|e| e.into_content())
-                        .ok_or_else(|| Outcome::awaiting(&update.original_entry_address))
-                })
-                .transpose()?;
+                        .ok_or_else(|| Outcome::awaiting(&update.original_entry_address))?,
+                )
+            } else {
+                None
+            };
 
             let original_action = cascade
                 .retrieve_action(update.original_action_address.clone(), Default::default())
@@ -375,7 +377,7 @@ async fn dhtop_to_op(op: DhtOp, cascade: &mut Cascade) -> AppValidationOutcome<O
         }
         DhtOp::RegisterDeletedBy(signature, delete)
         | DhtOp::RegisterDeletedEntryAction(signature, delete) => {
-            let original_action = cascade
+            let original_action: EntryCreationAction = cascade
                 .retrieve_action(delete.deletes_address.clone(), Default::default())
                 .await?
                 .and_then(|sh| {
@@ -385,18 +387,19 @@ async fn dhtop_to_op(op: DhtOp, cascade: &mut Cascade) -> AppValidationOutcome<O
                 })
                 .ok_or_else(|| Outcome::awaiting(&delete.deletes_address))?;
 
-            let original_entry = matches!(
-                original_action.entry_type.visibility(),
-                EntryVisibility::Public
-            )
-            .then(|| {
-                cascade
-                    .retrieve_entry(delete.deletes_entry_address.clone(), Default::default())
-                    .await?
-                    .map(|e| e.into_content())
-                    .ok_or_else(|| Outcome::awaiting(&delete.deletes_entry_address))
-            })
-            .transpose()?;
+            let original_entry = if let EntryVisibility::Public =
+                original_action.entry_type().visibility()
+            {
+                Some(
+                    cascade
+                        .retrieve_entry(delete.deletes_entry_address.clone(), Default::default())
+                        .await?
+                        .map(|e| e.into_content())
+                        .ok_or_else(|| Outcome::awaiting(&delete.deletes_entry_address))?,
+                )
+            } else {
+                None
+            };
             Op::RegisterDelete(RegisterDelete {
                 delete: SignedHashed::new(delete, signature),
                 original_action,
@@ -451,8 +454,10 @@ where
     R: RibosomeT,
 {
     let zomes_to_invoke = match op {
-        Op::RegisterAgentActivity(RegisterAgentActivity { .. })
-        | Op::StoreRecord(StoreRecord { .. }) => ZomesToInvoke::AllIntegrity,
+        Op::RegisterAgentActivity(RegisterAgentActivity { .. }) => ZomesToInvoke::AllIntegrity,
+        Op::StoreRecord(StoreRecord { record }) => {
+            store_record_zomes_to_invoke(record.action(), ribosome)?
+        }
         Op::StoreEntry(StoreEntry {
             action:
                 SignedHashed {
@@ -536,6 +541,30 @@ fn create_link_zomes_to_invoke(
             ))
         })?;
     Ok(ZomesToInvoke::One(zome.erase_type()))
+}
+
+pub fn store_record_zomes_to_invoke(
+    action: &Action,
+    ribosome: &impl RibosomeT,
+) -> AppValidationOutcome<ZomesToInvoke> {
+    match action {
+        Action::CreateLink(create_link) => create_link_zomes_to_invoke(create_link, ribosome),
+        Action::Create(Create {
+            entry_type: EntryType::App(AppEntryType { zome_id, .. }),
+            ..
+        })
+        | Action::Update(Update {
+            entry_type: EntryType::App(AppEntryType { zome_id, .. }),
+            ..
+        }) => {
+            let zome = ribosome.get_integrity_zome(zome_id).ok_or_else(|| {
+                Outcome::rejected(&format!("Zome does not exist for {:?}", zome_id))
+            })?;
+            Ok(ZomesToInvoke::OneIntegrity(zome))
+        }
+        Action::Update(_) => todo!(),
+        _ => Ok(ZomesToInvoke::AllIntegrity),
+    }
 }
 
 #[async_recursion::async_recursion]
