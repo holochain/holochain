@@ -22,7 +22,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **BREAKING CHANGE:** `create_entry` takes `ScopedEntryDefIndex: TryFrom<T>` instead of `EntryDefIndex: TryFrom<T>`.
 - **BREAKING CHANGE:** `get_links` and `get_link_details` take `impl LinkTypeFilterExt` instead of `TryInto<LinkTypeRanges>`.
 - hdk: **BREAKING CHANGE** `x_salsa20_poly1305_*` functions have been properly implemented. Any previous `KeyRef`s will no longer work. These new functions DO NOT work with legacy lair `v0.0.z`, you must use NEW lair `v0.y.z` (v0.2.0 as of this PR). [\#1446](https://github.com/holochain/holochain/pull/1446)
-- Fixed `hdk::query`, which was showing some incorrect behavior:
+- Fixed `hdk::query`, which was showing some incorrect behavior [\#1402](https://github.com/holochain/holochain/pull/1402):
   - When using `ChainQueryFilterRange::ActionHashRange`, extraneous elements from other authors could be returned.
   - Certain combinations of filters, like hash-bounded ranges and header type filters, are currently implemented incorrectly and lead to undefined behavior. Filter combinations which are unsupported now result in `SourceChainError::UnsupportedQuery`.
 
