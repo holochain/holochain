@@ -73,7 +73,7 @@ pub trait HolochainP2pDnaT {
         dht_hash: holo_hash::AnyDhtHash,
         ops: Vec<holochain_types::dht_op::DhtOp>,
         timeout_ms: Option<u64>,
-    ) -> actor::HolochainP2pResult<()>;
+    ) -> actor::HolochainP2pResult<usize>;
 
     /// Request a validation package.
     async fn get_validation_package(
@@ -124,12 +124,11 @@ pub trait HolochainP2pDnaT {
         dht_hash: holo_hash::AnyDhtHash,
     ) -> actor::HolochainP2pResult<bool>;
 
-    /// Response from an authority to agents that are
-    /// part of a session.
-    async fn countersigning_authority_response(
+    /// Messages between agents driving a countersigning session.
+    async fn countersigning_session_negotiation(
         &self,
         agents: Vec<AgentPubKey>,
-        response: Vec<SignedAction>,
+        message: event::CountersigningSessionNegotiationMessage,
     ) -> actor::HolochainP2pResult<()>;
 
     /// New data has been integrated and is ready for gossiping.
@@ -224,7 +223,7 @@ impl HolochainP2pDnaT for HolochainP2pDna {
         dht_hash: holo_hash::AnyDhtHash,
         ops: Vec<holochain_types::dht_op::DhtOp>,
         timeout_ms: Option<u64>,
-    ) -> actor::HolochainP2pResult<()> {
+    ) -> actor::HolochainP2pResult<usize> {
         self.sender
             .publish(
                 (*self.dna_hash).clone(),
@@ -319,13 +318,13 @@ impl HolochainP2pDnaT for HolochainP2pDna {
             .await
     }
 
-    async fn countersigning_authority_response(
+    async fn countersigning_session_negotiation(
         &self,
         agents: Vec<AgentPubKey>,
-        response: Vec<SignedAction>,
+        message: event::CountersigningSessionNegotiationMessage,
     ) -> actor::HolochainP2pResult<()> {
         self.sender
-            .countersigning_authority_response((*self.dna_hash).clone(), agents, response)
+            .countersigning_session_negotiation((*self.dna_hash).clone(), agents, message)
             .await
     }
 
@@ -336,6 +335,7 @@ impl HolochainP2pDnaT for HolochainP2pDna {
     }
 }
 
+pub use kitsune_p2p::dht;
 pub use kitsune_p2p::dht_arc;
 
 mod test;

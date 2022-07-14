@@ -5,6 +5,7 @@ use crate::core::workflow::error::WorkflowError;
 use holochain_conductor_api::conductor::ConductorConfigError;
 use holochain_sqlite::error::DatabaseError;
 use holochain_types::prelude::*;
+use holochain_wasmer_host::prelude::WasmErrorInner;
 use holochain_zome_types::cell::CellId;
 use thiserror::Error;
 
@@ -133,5 +134,11 @@ impl ConductorError {
 impl From<one_err::OneErr> for ConductorError {
     fn from(e: one_err::OneErr) -> Self {
         Self::other(e)
+    }
+}
+
+impl From<ConductorError> for WasmErrorInner {
+    fn from(e: ConductorError) -> Self {
+        Self::Host(e.to_string())
     }
 }

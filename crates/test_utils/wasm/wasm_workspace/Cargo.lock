@@ -424,9 +424,9 @@ checksum = "1435fa1053d8b2fbbe9be7e97eca7f33d37b28409959813daefc1446a14247f1"
 
 [[package]]
 name = "either"
-version = "1.6.1"
+version = "1.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e78d4f1cc4ae33bbfc157ed5d5a5ef3bc29227303d595861deb238fcec4e9457"
+checksum = "3f107b87b6afc2a64fd13cac55fe06d6c8859f12d4b14cbcdd2c67d0976781be"
 
 [[package]]
 name = "enum-iterator"
@@ -668,13 +668,28 @@ dependencies = [
 ]
 
 [[package]]
-name = "hdk"
-version = "0.0.138"
+name = "hdi"
+version = "0.0.14"
 dependencies = [
- "getrandom",
  "hdk_derive",
  "holo_hash",
- "holochain_deterministic_integrity",
+ "holochain_integrity_types",
+ "holochain_wasmer_guest",
+ "paste",
+ "serde",
+ "serde_bytes",
+ "tracing",
+ "tracing-core",
+]
+
+[[package]]
+name = "hdk"
+version = "0.0.142"
+dependencies = [
+ "getrandom",
+ "hdi",
+ "hdk_derive",
+ "holo_hash",
  "holochain_wasmer_guest",
  "holochain_zome_types",
  "mockall",
@@ -688,7 +703,7 @@ dependencies = [
 
 [[package]]
 name = "hdk_derive"
-version = "0.0.37"
+version = "0.0.41"
 dependencies = [
  "darling 0.14.1",
  "heck 0.4.0",
@@ -726,7 +741,7 @@ dependencies = [
 
 [[package]]
 name = "holo_hash"
-version = "0.0.29"
+version = "0.0.30"
 dependencies = [
  "arbitrary",
  "base64",
@@ -744,23 +759,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "holochain_deterministic_integrity"
-version = "0.0.10"
-dependencies = [
- "hdk_derive",
- "holo_hash",
- "holochain_integrity_types",
- "holochain_wasmer_guest",
- "paste",
- "serde",
- "serde_bytes",
- "tracing",
- "tracing-core",
-]
-
-[[package]]
 name = "holochain_integrity_types"
-version = "0.0.9"
+version = "0.0.12"
 dependencies = [
  "arbitrary",
  "holo_hash",
@@ -776,7 +776,7 @@ dependencies = [
 name = "holochain_mock_hdi"
 version = "0.0.1"
 dependencies = [
- "holochain_deterministic_integrity",
+ "hdi",
  "mockall",
 ]
 
@@ -808,7 +808,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_test_wasm_common"
-version = "0.0.39"
+version = "0.0.43"
 dependencies = [
  "hdk",
  "serde",
@@ -843,7 +843,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_zome_types"
-version = "0.0.37"
+version = "0.0.41"
 dependencies = [
  "fixt",
  "holo_hash",
@@ -927,7 +927,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_dht_arc"
-version = "0.0.12"
+version = "0.0.13"
 dependencies = [
  "derive_more",
  "gcollections",
@@ -938,10 +938,11 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_timestamp"
-version = "0.0.10"
+version = "0.0.11"
 dependencies = [
  "arbitrary",
  "chrono",
+ "derive_more",
  "serde",
 ]
 
@@ -1162,9 +1163,9 @@ dependencies = [
 
 [[package]]
 name = "once_cell"
-version = "1.12.0"
+version = "1.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7709cef83f0c1f58f666e746a08b21e0085f7440fa6a29cc194d68aac97a4225"
+checksum = "ac8b1a9b2518dc799a2271eff1688707eb315f0d4697aa6b0871369ca4c4da55"
 
 [[package]]
 name = "parking_lot"
@@ -1552,15 +1553,15 @@ checksum = "1c107b6f4780854c8b126e228ea8869f4d7b71260f962fefb57b996b8959ba6b"
 
 [[package]]
 name = "semver"
-version = "1.0.10"
+version = "1.0.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a41d061efea015927ac527063765e73601444cdc344ba855bc7bd44578b25e1c"
+checksum = "a2333e6df6d6598f2b1974829f853c2b4c5f4a6e503c10af918081aa6f8564e1"
 
 [[package]]
 name = "serde"
-version = "1.0.137"
+version = "1.0.138"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "61ea8d54c77f8315140a05f4c7237403bf38b72704d031543aa1d16abbf517d1"
+checksum = "1578c6245786b9d168c5447eeacfb96856573ca56c9d68fdcf394be134882a47"
 dependencies = [
  "serde_derive",
 ]
@@ -1585,9 +1586,9 @@ dependencies = [
 
 [[package]]
 name = "serde_derive"
-version = "1.0.137"
+version = "1.0.138"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1f26faba0c3959972377d3b2d306ee9f71faee9714294e41bb777f83f88578be"
+checksum = "023e9b1467aef8a10fb88f25611870ada9800ef7e22afce356bb0d2387b6f27c"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1596,9 +1597,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.81"
+version = "1.0.82"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9b7ce2b32a1aed03c558dc61a5cd328f15aff2dbc17daad8fb8af04d2100e15c"
+checksum = "82c2c1fdcd807d1098552c5b9a36e425e42e9fbd7c6a37a8425f390f781f7fa7"
 dependencies = [
  "indexmap",
  "itoa",
@@ -1626,9 +1627,9 @@ checksum = "eb703cfe953bccee95685111adeedb76fabe4e97549a58d16f03ea7b9367bb32"
 
 [[package]]
 name = "smallvec"
-version = "1.8.1"
+version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cc88c725d61fc6c3132893370cac4a0200e3fedf5da8331c570664b1987f5ca2"
+checksum = "2fd0db749597d91ff862fd1d55ea87f7855a744a8425a64695b6fca237d1dad1"
 
 [[package]]
 name = "stable_deref_trait"
@@ -1708,8 +1709,8 @@ name = "test_wasm_agent_info"
 version = "0.0.1"
 dependencies = [
  "fixt",
+ "hdi",
  "hdk",
- "holochain_deterministic_integrity",
  "serde",
 ]
 
@@ -1717,8 +1718,8 @@ dependencies = [
 name = "test_wasm_anchor"
 version = "0.0.1"
 dependencies = [
+ "hdi",
  "hdk",
- "holochain_deterministic_integrity",
  "holochain_test_wasm_common",
  "serde",
 ]
@@ -1727,8 +1728,8 @@ dependencies = [
 name = "test_wasm_bench"
 version = "0.0.1"
 dependencies = [
+ "hdi",
  "hdk",
- "holochain_deterministic_integrity",
  "serde",
 ]
 
@@ -1764,8 +1765,8 @@ dependencies = [
 name = "test_wasm_countersigning"
 version = "0.0.1"
 dependencies = [
+ "hdi",
  "hdk",
- "holochain_deterministic_integrity",
  "holochain_test_wasm_common",
  "serde",
 ]
@@ -1775,8 +1776,8 @@ name = "test_wasm_crd"
 version = "0.0.1"
 dependencies = [
  "fixt",
+ "hdi",
  "hdk",
- "holochain_deterministic_integrity",
  "holochain_test_wasm_common",
  "serde",
 ]
@@ -1785,8 +1786,8 @@ dependencies = [
 name = "test_wasm_create_entry"
 version = "0.0.1"
 dependencies = [
+ "hdi",
  "hdk",
- "holochain_deterministic_integrity",
  "holochain_test_wasm_common",
  "serde",
 ]
@@ -1795,8 +1796,8 @@ dependencies = [
 name = "test_wasm_crud"
 version = "0.0.1"
 dependencies = [
+ "hdi",
  "hdk",
- "holochain_deterministic_integrity",
  "holochain_test_wasm_common",
  "serde",
 ]
@@ -1824,8 +1825,8 @@ dependencies = [
 name = "test_wasm_entry_defs"
 version = "0.0.1"
 dependencies = [
+ "hdi",
  "hdk",
- "holochain_deterministic_integrity",
  "serde",
 ]
 
@@ -1842,8 +1843,8 @@ dependencies = [
 name = "test_wasm_genesis_self_check_invalid"
 version = "0.0.1"
 dependencies = [
+ "hdi",
  "hdk",
- "holochain_deterministic_integrity",
  "serde",
 ]
 
@@ -1851,8 +1852,8 @@ dependencies = [
 name = "test_wasm_genesis_self_check_valid"
 version = "0.0.1"
 dependencies = [
+ "hdi",
  "hdk",
- "holochain_deterministic_integrity",
  "serde",
 ]
 
@@ -1861,8 +1862,8 @@ name = "test_wasm_hash_entry"
 version = "0.0.1"
 dependencies = [
  "fixt",
+ "hdi",
  "hdk",
- "holochain_deterministic_integrity",
  "serde",
 ]
 
@@ -1904,7 +1905,7 @@ dependencies = [
 name = "test_wasm_integrity_zome"
 version = "0.0.1"
 dependencies = [
- "holochain_deterministic_integrity",
+ "hdi",
  "holochain_mock_hdi",
  "serde",
 ]
@@ -1913,8 +1914,8 @@ dependencies = [
 name = "test_wasm_link"
 version = "0.0.1"
 dependencies = [
+ "hdi",
  "hdk",
- "holochain_deterministic_integrity",
  "holochain_test_wasm_common",
  "serde",
 ]
@@ -1939,8 +1940,8 @@ dependencies = [
 name = "test_wasm_multiple_calls"
 version = "0.0.1"
 dependencies = [
+ "hdi",
  "hdk",
- "holochain_deterministic_integrity",
  "holochain_test_wasm_common",
  "serde",
 ]
@@ -1949,8 +1950,8 @@ dependencies = [
 name = "test_wasm_must_get"
 version = "0.0.1"
 dependencies = [
+ "hdi",
  "hdk",
- "holochain_deterministic_integrity",
  "holochain_test_wasm_common",
  "serde",
  "thiserror",
@@ -1968,8 +1969,8 @@ dependencies = [
 name = "test_wasm_post_commit_volley"
 version = "0.0.1"
 dependencies = [
+ "hdi",
  "hdk",
- "holochain_deterministic_integrity",
  "serde",
 ]
 
@@ -1997,8 +1998,8 @@ name = "test_wasm_schedule"
 version = "0.0.1"
 dependencies = [
  "fixt",
+ "hdi",
  "hdk",
- "holochain_deterministic_integrity",
  "serde",
 ]
 
@@ -2007,8 +2008,8 @@ name = "test_wasm_ser_regression"
 version = "0.0.1"
 dependencies = [
  "derive_more",
+ "hdi",
  "hdk",
- "holochain_deterministic_integrity",
  "serde",
 ]
 
@@ -2033,8 +2034,8 @@ dependencies = [
 name = "test_wasm_the_incredible_halt"
 version = "0.0.1"
 dependencies = [
+ "hdi",
  "hdk",
- "holochain_deterministic_integrity",
  "serde",
 ]
 
@@ -2042,8 +2043,8 @@ dependencies = [
 name = "test_wasm_update_entry"
 version = "0.0.1"
 dependencies = [
+ "hdi",
  "hdk",
- "holochain_deterministic_integrity",
  "holochain_test_wasm_common",
  "serde",
 ]
@@ -2052,8 +2053,8 @@ dependencies = [
 name = "test_wasm_validate"
 version = "0.0.1"
 dependencies = [
+ "hdi",
  "hdk",
- "holochain_deterministic_integrity",
  "serde",
 ]
 
@@ -2061,8 +2062,8 @@ dependencies = [
 name = "test_wasm_validate_invalid"
 version = "0.0.1"
 dependencies = [
+ "hdi",
  "hdk",
- "holochain_deterministic_integrity",
  "serde",
 ]
 
@@ -2070,8 +2071,8 @@ dependencies = [
 name = "test_wasm_validate_link"
 version = "0.0.1"
 dependencies = [
+ "hdi",
  "hdk",
- "holochain_deterministic_integrity",
  "serde",
 ]
 
@@ -2079,8 +2080,8 @@ dependencies = [
 name = "test_wasm_validate_link_add_invalid"
 version = "0.0.1"
 dependencies = [
+ "hdi",
  "hdk",
- "holochain_deterministic_integrity",
  "serde",
 ]
 
@@ -2088,8 +2089,8 @@ dependencies = [
 name = "test_wasm_validate_link_add_valid"
 version = "0.0.1"
 dependencies = [
+ "hdi",
  "hdk",
- "holochain_deterministic_integrity",
  "serde",
 ]
 
@@ -2097,8 +2098,8 @@ dependencies = [
 name = "test_wasm_validate_valid"
 version = "0.0.1"
 dependencies = [
+ "hdi",
  "hdk",
- "holochain_deterministic_integrity",
  "serde",
 ]
 
@@ -2124,8 +2125,8 @@ name = "test_wasm_zome_info"
 version = "0.0.1"
 dependencies = [
  "fixt",
+ "hdi",
  "hdk",
- "holochain_deterministic_integrity",
  "serde",
  "serde_yaml",
 ]
@@ -2176,9 +2177,9 @@ dependencies = [
 
 [[package]]
 name = "tracing-attributes"
-version = "0.1.21"
+version = "0.1.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cc6b8ad3567499f98a1db7a752b07a7c8c7c7c34c332ec00effb2b0027974b7c"
+checksum = "11c75893af559bc8e10716548bdef5cb2b983f8e637db9d0e15126b61b484ee2"
 dependencies = [
  "proc-macro2",
  "quote",

@@ -1,6 +1,6 @@
 use crate::prelude::*;
 
-pub use holochain_deterministic_integrity::ed25519::*;
+pub use hdi::ed25519::*;
 
 /// Sign something that is serializable using the private key for the passed public key.
 ///
