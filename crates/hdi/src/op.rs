@@ -1,6 +1,7 @@
 use crate::prelude::*;
 
 pub trait OpHelper {
+    /// TODO: Talk about costs of using this call.
     fn into_type<ET, LT>(&self) -> Result<OpType<ET, LT>, WasmError>
     where
         ET: EntryTypesHelper + UnitEnum,
@@ -23,9 +24,11 @@ impl OpHelper for Op {
         match self {
             Op::StoreRecord(StoreRecord { record }) => {
                 let r = match record.action() {
-                    Action::Dna(_) => todo!(),
-                    Action::AgentValidationPkg(_) => todo!(),
-                    Action::InitZomesComplete(_) => todo!(),
+                    Action::Dna(Dna { hash, .. }) => OpRecord::Dna(hash.clone()),
+                    Action::AgentValidationPkg(AgentValidationPkg { membrane_proof, .. }) => {
+                        OpRecord::AgentValidationPkg(membrane_proof.clone())
+                    }
+                    Action::InitZomesComplete(_) => OpRecord::InitZomesComplete,
                     Action::CreateLink(CreateLink {
                         zome_id,
                         link_type,
@@ -45,8 +48,12 @@ impl OpHelper for Op {
                     Action::DeleteLink(DeleteLink {
                         link_add_address, ..
                     }) => OpRecord::DeleteLink(link_add_address.clone()),
-                    Action::OpenChain(_) => todo!(),
-                    Action::CloseChain(_) => todo!(),
+                    Action::OpenChain(OpenChain { prev_dna_hash, .. }) => {
+                        OpRecord::OpenChain(prev_dna_hash.clone())
+                    }
+                    Action::CloseChain(CloseChain { new_dna_hash, .. }) => {
+                        OpRecord::CloseChain(new_dna_hash.clone())
+                    }
                     Action::Create(Create {
                         entry_type,
                         entry_hash,
@@ -176,11 +183,17 @@ impl OpHelper for Op {
             }
             Op::RegisterAgentActivity(RegisterAgentActivity { action }) => {
                 let r = match &action.hashed.content {
-                    Action::Dna(_) => todo!(),
-                    Action::AgentValidationPkg(_) => todo!(),
-                    Action::InitZomesComplete(_) => todo!(),
-                    Action::OpenChain(_) => todo!(),
-                    Action::CloseChain(_) => todo!(),
+                    Action::Dna(Dna { hash, .. }) => OpActivity::Dna(hash.clone()),
+                    Action::AgentValidationPkg(AgentValidationPkg { membrane_proof, .. }) => {
+                        OpActivity::AgentValidationPkg(membrane_proof.clone())
+                    }
+                    Action::InitZomesComplete(_) => OpActivity::InitZomesComplete,
+                    Action::OpenChain(OpenChain { prev_dna_hash, .. }) => {
+                        OpActivity::OpenChain(prev_dna_hash.clone())
+                    }
+                    Action::CloseChain(CloseChain { new_dna_hash, .. }) => {
+                        OpActivity::CloseChain(new_dna_hash.clone())
+                    }
                     Action::CreateLink(CreateLink {
                         base_address,
                         target_address,

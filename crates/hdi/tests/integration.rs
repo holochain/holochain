@@ -4,6 +4,7 @@
 use arbitrary::Arbitrary;
 use arbitrary::Unstructured;
 use hdi::prelude::*;
+use holo_hash::DnaHash;
 use test_case::test_case;
 
 fn to_coords(t: impl Into<ZomeLinkTypesKey>) -> (u8, u8) {
@@ -449,6 +450,10 @@ fn lh(i: u8) -> AnyLinkableHash {
     AnyLinkableHash::from(EntryHash::from_raw_36(vec![i; 36]))
 }
 
+fn dh(i: u8) -> DnaHash {
+    DnaHash::from_raw_36(vec![i; 36])
+}
+
 // Register Agent Activity
 #[test_case(OpType::RegisterAgentActivity(OpActivity::CreateEntry { entry_hash: eh(0), entry_type: Some(op_type::UnitEntryTypes::A) }))]
 #[test_case(OpType::RegisterAgentActivity(OpActivity::CreateEntry { entry_hash: eh(0), entry_type: None }))]
@@ -464,6 +469,12 @@ fn lh(i: u8) -> AnyLinkableHash {
 #[test_case(OpType::RegisterAgentActivity(OpActivity::CreateLink {base_address: lh(0), target_address: lh(2), tag: ().into(), link_type: Some(op_type::LinkTypes::A) }))]
 #[test_case(OpType::RegisterAgentActivity(OpActivity::CreateLink {base_address: lh(0), target_address: lh(2), tag: ().into(), link_type: None }))]
 #[test_case(OpType::RegisterAgentActivity(OpActivity::DeleteLink(ah(4))))]
+// Action's without entries
+#[test_case(OpType::RegisterAgentActivity(OpActivity::Dna(dh(0))))]
+#[test_case(OpType::RegisterAgentActivity(OpActivity::OpenChain(dh(0))))]
+#[test_case(OpType::RegisterAgentActivity(OpActivity::CloseChain(dh(0))))]
+#[test_case(OpType::RegisterAgentActivity(OpActivity::InitZomesComplete))]
+#[test_case(OpType::RegisterAgentActivity(OpActivity::AgentValidationPkg(None)))]
 // Store Record
 // Entries
 // App Entries
@@ -481,6 +492,12 @@ fn lh(i: u8) -> AnyLinkableHash {
 // Links
 #[test_case(OpType::StoreRecord(OpRecord::CreateLink {base_address: lh(0), target_address: lh(2), tag: ().into(), link_type: op_type::LinkTypes::A }))]
 #[test_case(OpType::StoreRecord(OpRecord::DeleteLink(ah(4))))]
+// Action's without entries
+#[test_case(OpType::StoreRecord(OpRecord::Dna(dh(0))))]
+#[test_case(OpType::StoreRecord(OpRecord::OpenChain(dh(0))))]
+#[test_case(OpType::StoreRecord(OpRecord::CloseChain(dh(0))))]
+#[test_case(OpType::StoreRecord(OpRecord::InitZomesComplete))]
+#[test_case(OpType::StoreRecord(OpRecord::AgentValidationPkg(None)))]
 // Store Entry
 #[test_case(OpType::StoreEntry(OpEntry::CreateEntry {entry_hash: eh(0), entry_type: op_type::EntryTypes::A(op_type::A{}) }))]
 #[test_case(OpType::StoreEntry(OpEntry::UpdateEntry {entry_hash: eh(0), original_action_hash: ah(1), original_entry_hash: eh(1), entry_type: op_type::EntryTypes::A(op_type::A{}) }))]
@@ -490,6 +507,7 @@ fn lh(i: u8) -> AnyLinkableHash {
 // #[test_case(OpType::StoreEntry(OpEntry::CreateEntry {entry_hash: eh(0), entry_type: op_type::EntryTypes::B(op_type::B{}) }))]
 // Register Update
 #[test_case(OpType::RegisterUpdate(OpUpdate::Entry { entry_hash: eh(0), original_action_hash: ah(1), original_entry_hash: eh(1), new_entry_type: op_type::EntryTypes::A(op_type::A{}), original_entry_type: op_type::EntryTypes::A(op_type::A{}) }))]
+#[test_case(OpType::RegisterUpdate(OpUpdate::PrivateEntry { entry_hash: eh(0), original_action_hash: ah(1), original_entry_hash: eh(1), new_entry_type: op_type::UnitEntryTypes::A, original_entry_type: op_type::UnitEntryTypes::A }))]
 #[test_case(OpType::RegisterUpdate(OpUpdate::Agent { original_key: ak(4), new_key: ak(8), original_action_hash: ah(2) }))]
 // Register Delete
 #[test_case(OpType::RegisterDelete(OpDelete::Entry { original_action_hash: ah(1), original_entry_hash: eh(1), original_entry_type: op_type::EntryTypes::A(op_type::A{}) }))]
