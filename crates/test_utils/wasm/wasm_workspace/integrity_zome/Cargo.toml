@@ -10,7 +10,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 serde = "1.0"
-holochain_deterministic_integrity = { path = "../../../../holochain_deterministic_integrity" }
+hdi = { path = "../../../../hdi" }
 holochain_mock_hdi = { path = "../../../../mock_hdi", optional = true }
 
 [features]

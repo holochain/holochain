@@ -6,6 +6,115 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20220713.013021
+
+- **BREAKING**: the `holochain_deterministic_integrity` crate has been renamed to `hdi`
+
+## [holochain\_cli-0.0.48](crates/holochain_cli/CHANGELOG.md#0.0.48)
+
+## [holochain\_cli\_sandbox-0.0.44](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.44)
+
+## [holochain\_cli\_bundle-0.0.44](crates/holochain_cli_bundle/CHANGELOG.md#0.0.44)
+
+## [holochain-0.0.150](crates/holochain/CHANGELOG.md#0.0.150)
+
+## [holochain\_test\_wasm\_common-0.0.43](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.43)
+
+## [holochain\_conductor\_api-0.0.50](crates/holochain_conductor_api/CHANGELOG.md#0.0.50)
+
+## [holochain\_wasm\_test\_utils-0.0.49](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.49)
+
+## [holochain\_cascade-0.0.50](crates/holochain_cascade/CHANGELOG.md#0.0.50)
+
+## [holochain\_state-0.0.50](crates/holochain_state/CHANGELOG.md#0.0.50)
+
+## [holochain\_p2p-0.0.48](crates/holochain_p2p/CHANGELOG.md#0.0.48)
+
+## [holochain\_types-0.0.48](crates/holochain_types/CHANGELOG.md#0.0.48)
+
+## [holochain\_keystore-0.0.47](crates/holochain_keystore/CHANGELOG.md#0.0.47)
+
+## [holochain\_sqlite-0.0.46](crates/holochain_sqlite/CHANGELOG.md#0.0.46)
+
+## [hdk-0.0.142](crates/hdk/CHANGELOG.md#0.0.142)
+
+## [holochain\_zome\_types-0.0.41](crates/holochain_zome_types/CHANGELOG.md#0.0.41)
+
+## [hdi-0.0.14](crates/hdi/CHANGELOG.md#0.0.14)
+
+- Docs: replace occurrences of `hdk_entry_def` and `entry_def!` with `hdk_entry_helper`.
+
+## [hdk\_derive-0.0.41](crates/hdk_derive/CHANGELOG.md#0.0.41)
+
+# 20220710.155915
+
+## [holochain\_cli-0.0.47](crates/holochain_cli/CHANGELOG.md#0.0.47)
+
+## [holochain\_cli\_sandbox-0.0.43](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.43)
+
+## [holochain\_cli\_bundle-0.0.43](crates/holochain_cli_bundle/CHANGELOG.md#0.0.43)
+
+## [holochain-0.0.149](crates/holochain/CHANGELOG.md#0.0.149)
+
+## [holochain\_test\_wasm\_common-0.0.42](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.42)
+
+## [holochain\_conductor\_api-0.0.49](crates/holochain_conductor_api/CHANGELOG.md#0.0.49)
+
+## [holochain\_wasm\_test\_utils-0.0.48](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.48)
+
+## [holochain\_cascade-0.0.49](crates/holochain_cascade/CHANGELOG.md#0.0.49)
+
+## [holochain\_state-0.0.49](crates/holochain_state/CHANGELOG.md#0.0.49)
+
+## [holochain\_p2p-0.0.47](crates/holochain_p2p/CHANGELOG.md#0.0.47)
+
+## [holochain\_types-0.0.47](crates/holochain_types/CHANGELOG.md#0.0.47)
+
+## [holochain\_keystore-0.0.46](crates/holochain_keystore/CHANGELOG.md#0.0.46)
+
+## [holochain\_sqlite-0.0.45](crates/holochain_sqlite/CHANGELOG.md#0.0.45)
+
+## [hdk-0.0.141](crates/hdk/CHANGELOG.md#0.0.141)
+
+- Docs: Add section on coordinator zomes and link to HDI crate.
+
+## [holochain\_zome\_types-0.0.40](crates/holochain_zome_types/CHANGELOG.md#0.0.40)
+
+## [holochain\_deterministic\_integrity-0.0.13](crates/hdi/CHANGELOG.md#0.0.13)
+
+- Docs: crate level documentation for `holochain_deterministic_integrity`.
+
+### Added
+
+## [hdk\_derive-0.0.40](crates/hdk_derive/CHANGELOG.md#0.0.40)
+
+## [holochain\_integrity\_types-0.0.12](crates/holochain_integrity_types/CHANGELOG.md#0.0.12)
+
+# 20220706.013407
+
+## [holochain\_cli-0.0.46](crates/holochain_cli/CHANGELOG.md#0.0.46)
+
+## [holochain\_cli\_sandbox-0.0.42](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.42)
+
+## [holochain\_cli\_bundle-0.0.42](crates/holochain_cli_bundle/CHANGELOG.md#0.0.42)
+
+## [holochain-0.0.148](crates/holochain/CHANGELOG.md#0.0.148)
+
+- Added networking logic for enzymatic countersigning [\#1472](https://github.com/holochain/holochain/pull/1472)
+- Countersigning authority response network message changed to a session negotiation enum [/\#1472](https://github.com/holochain/holochain/pull/1472)
+
+## [holochain\_conductor\_api-0.0.48](crates/holochain_conductor_api/CHANGELOG.md#0.0.48)
+
+## [holochain\_wasm\_test\_utils-0.0.47](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.47)
+
+## [holochain\_cascade-0.0.48](crates/holochain_cascade/CHANGELOG.md#0.0.48)
+
+## [holochain\_state-0.0.48](crates/holochain_state/CHANGELOG.md#0.0.48)
+
+## [holochain\_p2p-0.0.46](crates/holochain_p2p/CHANGELOG.md#0.0.46)
+
+## [holochain\_types-0.0.46](crates/holochain_types/CHANGELOG.md#0.0.46)
+
 # 20220701.181019
 
 ## [holochain\_cli-0.0.45](crates/holochain_cli/CHANGELOG.md#0.0.45)
@@ -48,7 +157,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [kitsune\_p2p\_dht-0.0.1](crates/kitsune_p2p_dht/CHANGELOG.md#0.0.1)
 
-## [holochain\_deterministic\_integrity-0.0.12](crates/holochain_deterministic_integrity/CHANGELOG.md#0.0.12)
+## [holochain\_deterministic\_integrity-0.0.12](crates/hdi/CHANGELOG.md#0.0.12)
 
 ## [hdk\_derive-0.0.39](crates/hdk_derive/CHANGELOG.md#0.0.39)
 
@@ -105,7 +214,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [holochain\_zome\_types-0.0.38](crates/holochain_zome_types/CHANGELOG.md#0.0.38)
 
-## [holochain\_deterministic\_integrity-0.0.11](crates/holochain_deterministic_integrity/CHANGELOG.md#0.0.11)
+## [holochain\_deterministic\_integrity-0.0.11](crates/hdi/CHANGELOG.md#0.0.11)
 
 - `EntryTypesHelper`: `try_from_local_type` is removed and `try_from_global_type` becomes `deserialize_from_type`.
 - `LinkTypesHelper` is removed.
@@ -178,7 +287,7 @@ As Holochain has evolved, the meaning behind these concepts, as well as our unde
 
 ## [holochain\_zome\_types-0.0.37](crates/holochain_zome_types/CHANGELOG.md#0.0.37)
 
-## [holochain\_deterministic\_integrity-0.0.10](crates/holochain_deterministic_integrity/CHANGELOG.md#0.0.10)
+## [holochain\_deterministic\_integrity-0.0.10](crates/hdi/CHANGELOG.md#0.0.10)
 
 ## [hdk\_derive-0.0.37](crates/hdk_derive/CHANGELOG.md#0.0.37)
 
@@ -311,7 +420,7 @@ As Holochain has evolved, the meaning behind these concepts, as well as our unde
 
 - Docs: Describe init callback and link to WASM examples [\#1418](https://github.com/holochain/holochain/pull/1418)
 
-## [holochain\_deterministic\_integrity-0.0.9](crates/holochain_deterministic_integrity/CHANGELOG.md#0.0.9)
+## [holochain\_deterministic\_integrity-0.0.9](crates/hdi/CHANGELOG.md#0.0.9)
 
 - Bump wasmer to 0.0.80 [\#1386](https://github.com/holochain/holochain/pull/1386)
 
@@ -427,7 +536,7 @@ As Holochain has evolved, the meaning behind these concepts, as well as our unde
 
 ## [holochain\_zome\_types-0.0.35](crates/holochain_zome_types/CHANGELOG.md#0.0.35)
 
-## [holochain\_deterministic\_integrity-0.0.8](crates/holochain_deterministic_integrity/CHANGELOG.md#0.0.8)
+## [holochain\_deterministic\_integrity-0.0.8](crates/hdi/CHANGELOG.md#0.0.8)
 
 ## [hdk\_derive-0.0.35](crates/hdk_derive/CHANGELOG.md#0.0.35)
 
@@ -473,7 +582,7 @@ As Holochain has evolved, the meaning behind these concepts, as well as our unde
 
 ## [holochain\_zome\_types-0.0.34](crates/holochain_zome_types/CHANGELOG.md#0.0.34)
 
-## [holochain\_deterministic\_integrity-0.0.7](crates/holochain_deterministic_integrity/CHANGELOG.md#0.0.7)
+## [holochain\_deterministic\_integrity-0.0.7](crates/hdi/CHANGELOG.md#0.0.7)
 
 - Fix broken wasm tracing. [PR](https://github.com/holochain/holochain/pull/1389).
 
@@ -517,7 +626,7 @@ As Holochain has evolved, the meaning behind these concepts, as well as our unde
 
 ## [hdk-0.0.133](crates/hdk/CHANGELOG.md#0.0.133)
 
-## [holochain\_deterministic\_integrity-0.0.6](crates/holochain_deterministic_integrity/CHANGELOG.md#0.0.6)
+## [holochain\_deterministic\_integrity-0.0.6](crates/hdi/CHANGELOG.md#0.0.6)
 
 # 20220511.012519
 
@@ -567,7 +676,7 @@ As Holochain has evolved, the meaning behind these concepts, as well as our unde
 
 ## [holochain\_zome\_types-0.0.33](crates/holochain_zome_types/CHANGELOG.md#0.0.33)
 
-## [holochain\_deterministic\_integrity-0.0.5](crates/holochain_deterministic_integrity/CHANGELOG.md#0.0.5)
+## [holochain\_deterministic\_integrity-0.0.5](crates/hdi/CHANGELOG.md#0.0.5)
 
 ## [hdk\_derive-0.0.33](crates/hdk_derive/CHANGELOG.md#0.0.33)
 
@@ -663,7 +772,7 @@ As Holochain has evolved, the meaning behind these concepts, as well as our unde
 
 - Docs: Fix intra-doc links in all crates [\#1323](https://github.com/holochain/holochain/pull/1323)
 
-## [holochain\_deterministic\_integrity-0.0.4](crates/holochain_deterministic_integrity/CHANGELOG.md#0.0.4)
+## [holochain\_deterministic\_integrity-0.0.4](crates/hdi/CHANGELOG.md#0.0.4)
 
 ## [hdk\_derive-0.0.32](crates/hdk_derive/CHANGELOG.md#0.0.32)
 
@@ -713,7 +822,7 @@ As Holochain has evolved, the meaning behind these concepts, as well as our unde
 
 ## [holochain\_zome\_types-0.0.31](crates/holochain_zome_types/CHANGELOG.md#0.0.31)
 
-## [holochain\_deterministic\_integrity-0.0.3](crates/holochain_deterministic_integrity/CHANGELOG.md#0.0.3)
+## [holochain\_deterministic\_integrity-0.0.3](crates/hdi/CHANGELOG.md#0.0.3)
 
 ## [hdk\_derive-0.0.31](crates/hdk_derive/CHANGELOG.md#0.0.31)
 
@@ -737,7 +846,7 @@ As Holochain has evolved, the meaning behind these concepts, as well as our unde
 
 ## [hdk-0.0.129](crates/hdk/CHANGELOG.md#0.0.129)
 
-## [holochain\_deterministic\_integrity-0.0.2](crates/holochain_deterministic_integrity/CHANGELOG.md#0.0.2)
+## [holochain\_deterministic\_integrity-0.0.2](crates/hdi/CHANGELOG.md#0.0.2)
 
 # 20220413.011152
 
@@ -786,7 +895,7 @@ As Holochain has evolved, the meaning behind these concepts, as well as our unde
 
 ## [holochain\_zome\_types-0.0.30](crates/holochain_zome_types/CHANGELOG.md#0.0.30)
 
-## [holochain\_deterministic\_integrity-0.0.1](crates/holochain_deterministic_integrity/CHANGELOG.md#0.0.1)
+## [holochain\_deterministic\_integrity-0.0.1](crates/hdi/CHANGELOG.md#0.0.1)
 
 ## [hdk\_derive-0.0.30](crates/hdk_derive/CHANGELOG.md#0.0.30)
 

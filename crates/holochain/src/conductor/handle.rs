@@ -131,7 +131,7 @@ pub trait ConductorHandleT: Send + Sync {
     /// Add an app interface
     async fn add_app_interface(self: Arc<Self>, port: u16) -> ConductorResult<u16>;
 
-    /// List the app interfaces currently install.
+    /// List the app interfaces currently installed.
     async fn list_app_interfaces(&self) -> ConductorResult<Vec<u16>>;
 
     /// Install a [`DnaFile`](holochain_types::dna::DnaFile) in this Conductor
@@ -299,6 +299,13 @@ pub trait ConductorHandleT: Send + Sync {
         &self,
         cell_id: &CellId,
     ) -> ConductorResult<HashSet<InstalledAppId>>;
+
+    /// Find the ID of the first active installed App which uses this Cell
+    async fn find_cell_with_role_alongside_cell(
+        &self,
+        cell_id: &CellId,
+        role_id: &AppRoleId,
+    ) -> ConductorResult<Option<CellId>>;
 
     /// Get the IDs of all active installed Apps which use this Dna
     async fn list_running_apps_for_required_dna_hash(
@@ -763,7 +770,7 @@ impl ConductorHandleT for ConductorHandleImpl {
                 respond.respond(Ok(async move { Ok(signature) }.boxed().into()));
             }
             HolochainP2pEvent::CallRemote { .. }
-            | CountersigningAuthorityResponse { .. }
+            | CountersigningSessionNegotiation { .. }
             | GetValidationPackage { .. }
             | Get { .. }
             | GetMeta { .. }
@@ -1152,6 +1159,16 @@ impl ConductorHandleT for ConductorHandleImpl {
         cell_id: &CellId,
     ) -> ConductorResult<HashSet<InstalledAppId>> {
         self.conductor.list_running_apps_for_cell_id(cell_id).await
+    }
+
+    async fn find_cell_with_role_alongside_cell(
+        &self,
+        cell_id: &CellId,
+        role_id: &AppRoleId,
+    ) -> ConductorResult<Option<CellId>> {
+        self.conductor
+            .find_cell_with_role_alongside_cell(cell_id, role_id)
+            .await
     }
 
     async fn list_running_apps_for_required_dna_hash(

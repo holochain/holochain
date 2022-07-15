@@ -401,8 +401,8 @@ async fn mock_network_sharded_gossip() {
                         holochain_p2p::WireMessage::GetValidationPackage { .. } => {
                             debug!("get_validation_package")
                         }
-                        holochain_p2p::WireMessage::CountersigningAuthorityResponse { .. } => {
-                            debug!("countersigning_authority_response")
+                        holochain_p2p::WireMessage::CountersigningSessionNegotiation { .. } => {
+                            debug!("countersigning_session_negotiation")
                         }
                     },
                     HolochainP2pMockMsg::CallResp(_) => debug!("CallResp"),
@@ -916,8 +916,8 @@ async fn mock_network_sharding() {
                         holochain_p2p::WireMessage::GetValidationPackage { .. } => {
                             debug!("get_validation_package")
                         }
-                        holochain_p2p::WireMessage::CountersigningAuthorityResponse { .. } => {
-                            debug!("countersigning_authority_response")
+                        holochain_p2p::WireMessage::CountersigningSessionNegotiation { .. } => {
+                            debug!("countersigning_session_negotiation")
                         }
                     },
                     HolochainP2pMockMsg::CallResp(_) => debug!("CallResp"),

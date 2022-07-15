@@ -32,9 +32,6 @@ use self::error::{AppError, AppResult};
 /// The unique identifier for an installed app in this conductor
 pub type InstalledAppId = String;
 
-/// Identifier for an App Role, a foundational concept in the App manifest.
-pub type AppRoleId = String;
-
 /// The source of the DNA to be installed, either as binary data, or from a path
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -173,7 +170,6 @@ impl InstallAppDnaPayload {
 #[derive(Clone, Debug, Into, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct InstalledCell {
     cell_id: CellId,
-    // TODO: rename to role_id
     role_id: AppRoleId,
 }
 

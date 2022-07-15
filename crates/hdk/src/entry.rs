@@ -1,6 +1,6 @@
 use crate::prelude::*;
 
-pub use holochain_deterministic_integrity::entry::*;
+pub use hdi::entry::*;
 
 /// General function that can create any entry type.
 ///
@@ -54,15 +54,20 @@ where
 /// entry content when committing to the source chain.
 ///
 /// This function accepts any input that implements [`TryInto<CreateInput>`].
-/// The default impls from the `#[hdk_entry( .. )]` and [`entry_def!`] macros include this.
+/// The implementations of the #[hdk_entry_helper] macro includes this.
 ///
 /// With generic type handling it may make sense to directly construct [`CreateInput`] and [`create`].
 ///
 /// e.g.
 /// ```ignore
-/// #[hdk_entry(id = "foo")]
+/// #[hdk_entry_helper]
 /// pub struct Foo(u32);
-/// create_entry(Foo(50))?;
+///
+/// #[hdk_entry_defs]
+/// pub enum EntryTypes {
+///    Foo(Foo)
+/// }
+/// create_entry(EntryTypes::Foo(Foo(50)))?;
 /// ```
 ///
 /// See [`get`] and [`get_details`] for more information on CRUD.
@@ -94,10 +99,15 @@ where
 /// specify the [`ChainTopOrdering`]. Refer to [`DeleteInput`] for details.
 ///
 /// ```ignore
-/// #[hdk_entry(id = "foo")]
+/// #[hdk_entry_helper]
 /// struct Foo(u32);
 ///
-/// let action_hash = create_entry(Foo(50))?;
+/// #[hdk_entry_defs]
+/// pub enum EntryTypes {
+///    Foo(Foo)
+/// }
+///
+/// let action_hash = create_entry(EntryTypes::Foo(Foo(50)))?;
 /// let delete_entry_action_hash = delete_entry(action_hash.clone())?;
 /// ```
 ///
@@ -129,11 +139,16 @@ where
 /// means for the happ.
 ///
 /// ```ignore
-/// #[hdk_entry(id = "foo")]
-/// struct Foo(u32);
+/// #[hdk_entry_helper]
+/// pub struct Foo(u32);
 ///
-/// let foo_zero_action_hash: ActionHash = commit_entry!(Foo(0))?;
-/// let foo_ten_update_action_hash: ActionHash = update_entry(foo_zero_action_hash, Foo(10))?;
+/// #[hdk_entry_defs]
+/// pub enum EntryTypes {
+///    Foo(Foo)
+/// }
+///
+/// let foo_zero_action_hash: ActionHash = create_entry(EntryTypes::Foo(Foo(0)))?;
+/// let foo_ten_update_action_hash: ActionHash = update_entry(foo_zero_action_hash, EntryTypes::Foo(Foo(10)))?;
 /// ```
 ///
 /// @todo in the future this will be true because we will have the concept of 'redirects':
@@ -228,7 +243,7 @@ where
 ///
 /// The details returned include relevant creates, updates and deletes for the hash passed in.
 ///
-/// Creates are initial action/entry combinations (records) produced by commit_entry! and cannot
+/// Creates are initial action/entry combinations (records) produced by create_entry and cannot
 /// reference other actions.
 /// Updates and deletes both reference a specific action+entry combination.
 /// Updates must reference another create or update action+entry.
@@ -313,7 +328,7 @@ pub fn get_details<H: Into<AnyDhtHash>>(
 #[macro_export]
 macro_rules! entry_def {
     ( $t:ident $def:expr ) => {
-        $crate::prelude::holochain_deterministic_integrity::app_entry!($t);
-        $crate::prelude::holochain_deterministic_integrity::register_entry!($t $def);
+        $crate::prelude::hdi::app_entry!($t);
+        $crate::prelude::hdi::register_entry!($t $def);
     };
 }

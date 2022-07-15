@@ -4,6 +4,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.0.14
+
+- Docs: replace occurrences of `hdk_entry_def` and `entry_def!` with `hdk_entry_helper`.
+
+## 0.0.13
+
+- Docs: crate level documentation for `hdi`.
+
+### Added
+
 ## 0.0.12
 
 ## 0.0.11

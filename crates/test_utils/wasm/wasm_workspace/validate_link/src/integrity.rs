@@ -1,4 +1,4 @@
-use holochain_deterministic_integrity::prelude::*;
+use hdi::prelude::*;
 
 #[derive(Clone, Copy)]
 #[hdk_entry_helper]

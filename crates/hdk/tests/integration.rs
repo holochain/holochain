@@ -28,7 +28,7 @@ fn scoped_link(zome_id: u8, link_type: u8) -> ScopedLinkType {
     }
 }
 mod integrity_zomes {
-    use holochain_deterministic_integrity::prelude::*;
+    use hdi::prelude::*;
 
     #[hdk_entry_helper]
     pub struct A;
