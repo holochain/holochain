@@ -4,6 +4,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+- Fix inconsistent bundle writting due to unordered map of bundle resources
+
 ## 0.0.13
 
 ## 0.0.12
