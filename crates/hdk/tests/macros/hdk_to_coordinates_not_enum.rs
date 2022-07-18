@@ -1,5 +1,4 @@
-
-use hdk::prelude::holochain_deterministic_integrity::prelude::*;
+use hdk::prelude::hdi::prelude::*;
 
 #[hdk_to_coordinates]
 struct Foo;

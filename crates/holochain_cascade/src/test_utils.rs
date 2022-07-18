@@ -9,6 +9,7 @@ use holo_hash::EntryHash;
 use holo_hash::HasHash;
 use holochain_p2p::actor;
 use holochain_p2p::dht_arc::DhtArc;
+use holochain_p2p::event::CountersigningSessionNegotiationMessage;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_p2p::HolochainP2pError;
 use holochain_p2p::MockHolochainP2pDnaT;
@@ -198,7 +199,7 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         _dht_hash: holo_hash::AnyDhtHash,
         _ops: Vec<holochain_types::dht_op::DhtOp>,
         _timeout_ms: Option<u64>,
-    ) -> actor::HolochainP2pResult<()> {
+    ) -> actor::HolochainP2pResult<usize> {
         todo!()
     }
 
@@ -210,10 +211,10 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         todo!()
     }
 
-    async fn countersigning_authority_response(
+    async fn countersigning_session_negotiation(
         &self,
         _agents: Vec<AgentPubKey>,
-        _response: Vec<holochain_zome_types::SignedAction>,
+        _message: CountersigningSessionNegotiationMessage,
     ) -> actor::HolochainP2pResult<()> {
         todo!()
     }
@@ -376,7 +377,7 @@ impl HolochainP2pDnaT for MockNetwork {
         _dht_hash: holo_hash::AnyDhtHash,
         _ops: Vec<holochain_types::dht_op::DhtOp>,
         _timeout_ms: Option<u64>,
-    ) -> actor::HolochainP2pResult<()> {
+    ) -> actor::HolochainP2pResult<usize> {
         todo!()
     }
 
@@ -388,10 +389,10 @@ impl HolochainP2pDnaT for MockNetwork {
         todo!()
     }
 
-    async fn countersigning_authority_response(
+    async fn countersigning_session_negotiation(
         &self,
         _agents: Vec<AgentPubKey>,
-        _response: Vec<holochain_zome_types::SignedAction>,
+        _message: CountersigningSessionNegotiationMessage,
     ) -> actor::HolochainP2pResult<()> {
         todo!()
     }

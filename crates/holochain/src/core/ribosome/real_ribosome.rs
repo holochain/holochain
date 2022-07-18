@@ -637,7 +637,7 @@ impl RibosomeT for RealRibosome {
         // Get the dependencies for this zome.
         let zome_dependencies = self.get_zome_dependencies(zome.zome_name())?;
         // Scope the zome types to these dependencies.
-        let zome_types = self.zome_types.re_scope(zome_dependencies);
+        let zome_types = self.zome_types.in_scope_subset(zome_dependencies);
 
         Ok(ZomeInfo {
             name: zome.zome_name().clone(),
@@ -950,11 +950,7 @@ pub mod wasm_test {
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let apps = conductor
-            .setup_app_for_agents(
-                "app-",
-                &[alice_pubkey.clone(), bob_pubkey],
-                &[dna_file.into()],
-            )
+            .setup_app_for_agents("app-", &[alice_pubkey.clone(), bob_pubkey], [&dna_file])
             .await
             .unwrap();
 

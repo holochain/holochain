@@ -1,4 +1,4 @@
-use holochain_deterministic_integrity::prelude::*;
+use hdi::prelude::*;
 
 #[hdk_extern]
 fn validate(_: Op) -> ExternResult<ValidateCallbackResult> {

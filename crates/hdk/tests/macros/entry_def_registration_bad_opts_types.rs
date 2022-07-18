@@ -1,10 +1,10 @@
-use hdk::prelude::holochain_deterministic_integrity::prelude::*;
+use hdk::prelude::hdi::prelude::*;
 
 #[derive(EntryDefRegistration)]
 enum Nesting {
     #[entry_def(name = 55)]
     A(A),
-    B(B)
+    B(B),
 }
 
 enum A {

@@ -90,7 +90,7 @@ fn construction_is_deterministic() {
 #[test_case(make_set(&[(0, 20), (1, 10), (2, 15)], &[(0, 5), (1, 10), (2, 3)]), &[1, 2] => make_scope(&[(1, 10), (2, 15)], &[(1, 10), (2, 3)]))]
 #[test_case(make_set(&[(0, 20), (1, 10), (2, 15)], &[(0, 5), (1, 10), (2, 3)]), &[2, 1] => make_scope(&[(2, 15), (1, 10)], &[(2, 3), (1, 10)]))]
 #[test_case(make_set(&[(0, 20), (1, 10), (2, 15)], &[(0, 5), (1, 10), (2, 3)]), &[0, 2] => make_scope(&[(0, 20), (2, 15)], &[(0, 5), (2, 3)]))]
-fn test_re_scope(set: GlobalZomeTypes, zomes: &[u8]) -> ScopedZomeTypesSet {
+fn test_in_scope_subset(set: GlobalZomeTypes, zomes: &[u8]) -> ScopedZomeTypesSet {
     let zomes = zomes.iter().map(|z| ZomeId(*z)).collect::<Vec<_>>();
-    set.re_scope(&zomes[..])
+    set.in_scope_subset(&zomes[..])
 }

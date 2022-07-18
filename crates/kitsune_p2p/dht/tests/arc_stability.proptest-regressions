@@ -1,0 +1,11 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc cae5edf9ef853466f36d60db25aac7876ff4770f5b76dd550ce5b161228bb9f6 # shrinks to num_peers = 169, min_coverage = 5.217987342470106, j = 0.6050556078416869
+cc 6303700e80b02a015a9407a3c1ff81baf2c6fcf07f8fe545ddac6dfd25d7f77c # shrinks to num_peers = 178, min_coverage = 39.85385430206192, j = 0.9042918388873882
+cc 9860586077761354c04d518cfc0a5ac143a9aab8d1117ed21f0c0cf55a21e074 # shrinks to num_peers = 252, min_coverage = 83.5397361841111, j = 0.6320501880340919
+cc cab2a01968f25e90e0fd0b6cdca2b142284f62170aa9dc7d9319d4d014921f5f # shrinks to num_peers = 100, min_coverage = 50.0, j = 0.63266649805623
+cc ab2e7ff50d481f96e51c0417d6a676692d5990e25e348d4ea52968d0d0557dcd # shrinks to num_peers = 183, min_coverage = 64.8751034867194, j = 0.23164834987464333
