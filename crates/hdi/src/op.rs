@@ -2,7 +2,7 @@ use crate::prelude::*;
 
 pub trait OpHelper {
     /// TODO: Talk about costs of using this call.
-    fn into_type<ET, LT>(&self) -> Result<OpType<ET, LT>, WasmError>
+    fn to_type<ET, LT>(&self) -> Result<OpType<ET, LT>, WasmError>
     where
         ET: EntryTypesHelper + UnitEnum,
         <ET as UnitEnum>::Unit: Into<ZomeEntryTypesKey>,
@@ -13,7 +13,7 @@ pub trait OpHelper {
 
 impl OpHelper for Op {
     /// TODO
-    fn into_type<ET, LT>(&self) -> Result<OpType<ET, LT>, WasmError>
+    fn to_type<ET, LT>(&self) -> Result<OpType<ET, LT>, WasmError>
     where
         ET: EntryTypesHelper + UnitEnum,
         <ET as UnitEnum>::Unit: Into<ZomeEntryTypesKey>,
@@ -43,7 +43,7 @@ impl OpHelper for Op {
                             tag: tag.clone(),
                             link_type,
                         },
-                        _ => todo!(),
+                        _ => todo!("Host error as this zome should not be called when this is out of scope"),
                     },
                     Action::DeleteLink(DeleteLink {
                         link_add_address, ..
@@ -90,6 +90,16 @@ impl OpHelper for Op {
                                 original_key: original_entry_hash.clone().into(),
                                 original_action_hash: original_action_hash.clone(),
                                 new_key,
+                            },
+                            OpRecord::CreateCapClaim(entry_hash) => OpRecord::UpdateCapClaim {
+                                entry_hash,
+                                original_action_hash: original_action_hash.clone(),
+                                original_entry_hash: original_entry_hash.clone(),
+                            },
+                            OpRecord::CreateCapGrant(entry_hash) => OpRecord::UpdateCapGrant {
+                                entry_hash,
+                                original_action_hash: original_action_hash.clone(),
+                                original_entry_hash: original_entry_hash.clone(),
                             },
                             _ => unreachable!("This record is never created in this arm"),
                         }
@@ -169,9 +179,30 @@ impl OpHelper for Op {
                             _ => None,
                         }
                     }
-                    OriginalEntry::PrivateApp(_) => todo!(),
-                    OriginalEntry::CapClaim => todo!(),
-                    OriginalEntry::CapGrant => todo!(),
+                    OriginalEntry::PrivateApp(new_entry_type) => {
+                        match original_entry::<ET>(entry_type, &entry_hash, orig_entry.as_ref())? {
+                            OriginalEntry::PrivateApp(original_entry_type) => {
+                                Some(OpUpdate::PrivateEntry {
+                                    entry_hash: entry_hash.clone(),
+                                    original_action_hash: original_action_hash.clone(),
+                                    original_entry_hash: original_entry_hash.clone(),
+                                    new_entry_type,
+                                    original_entry_type,
+                                })
+                            }
+                            _ => None,
+                        }
+                    }
+                    OriginalEntry::CapClaim => Some(OpUpdate::CapClaim {
+                        entry_hash: entry_hash.clone(),
+                        original_action_hash: original_action_hash.clone(),
+                        original_entry_hash: original_entry_hash.clone(),
+                    }),
+                    OriginalEntry::CapGrant => Some(OpUpdate::CapGrant {
+                        entry_hash: entry_hash.clone(),
+                        original_action_hash: original_action_hash.clone(),
+                        original_entry_hash: original_entry_hash.clone(),
+                    }),
                     OriginalEntry::OutOfScope => {
                         todo!("Host error as this should not be called out of scope")
                     }
@@ -248,6 +279,16 @@ impl OpHelper for Op {
                             original_key: original_entry_address.clone().into(),
                             new_key,
                         },
+                        OpActivity::CreateCapClaim(entry_hash) => OpActivity::UpdateCapClaim {
+                            entry_hash,
+                            original_action_hash: original_action_address.clone(),
+                            original_entry_hash: original_entry_address.clone(),
+                        },
+                        OpActivity::CreateCapGrant(entry_hash) => OpActivity::UpdateCapGrant {
+                            entry_hash,
+                            original_action_hash: original_action_address.clone(),
+                            original_entry_hash: original_entry_address.clone(),
+                        },
                         _ => unreachable!("This action is never created in this arm"),
                     },
                     Action::Delete(Delete {
@@ -277,7 +318,7 @@ impl OpHelper for Op {
                         tag: tag.clone(),
                         link_type,
                     }),
-                    _ => todo!(),
+                    _ => todo!("host error as this op should not be called for zome where the link type was not defined"),
                 }
             }
             Op::RegisterDeleteLink(RegisterDeleteLink {
@@ -300,7 +341,7 @@ impl OpHelper for Op {
                         tag: tag.clone(),
                         link_type,
                     }),
-                    _ => todo!(),
+                    _ => todo!("host error as this op should not be called for zome where the link type was not defined"),
                 }
             }
             Op::RegisterDelete(RegisterDelete {
@@ -327,10 +368,22 @@ impl OpHelper for Op {
                         original_entry_hash: original_entry_hash.clone(),
                         original_entry_type,
                     },
-                    OriginalEntry::PrivateApp(_) => todo!(),
-                    OriginalEntry::CapClaim => todo!(),
-                    OriginalEntry::CapGrant => todo!(),
-                    OriginalEntry::OutOfScope => todo!(),
+                    OriginalEntry::PrivateApp(original_entry_type) => OpDelete::PrivateEntry {
+                        original_action_hash: original_action_hash.clone(),
+                        original_entry_hash: original_entry_hash.clone(),
+                        original_entry_type,
+                    },
+                    OriginalEntry::CapClaim => OpDelete::CapClaim {
+                        original_action_hash: original_action_hash.clone(),
+                        original_entry_hash: original_entry_hash.clone(),
+                    },
+                    OriginalEntry::CapGrant => OpDelete::CapGrant {
+                        original_action_hash: original_action_hash.clone(),
+                        original_entry_hash: original_entry_hash.clone(),
+                    },
+                    OriginalEntry::OutOfScope => {
+                        todo!("Host error as this should not be called out of scope")
+                    }
                 };
                 Ok(OpType::RegisterDelete(r))
             }
@@ -355,8 +408,14 @@ where
             EntryType::App(AppEntryType {
                 zome_id,
                 id: entry_def_index,
+                visibility: EntryVisibility::Public,
                 ..
             }) => {
+                if !matches!(entry, Entry::App(_)) {
+                    return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                        "Entry type is App but Entry is not App"
+                    ))));
+                }
                 let entry_type = <ET as EntryTypesHelper>::deserialize_from_type(
                     *zome_id,
                     *entry_def_index,
@@ -364,13 +423,23 @@ where
                 )?;
                 match entry_type {
                     Some(entry_type) => Ok(OpRecord::CreateEntry{entry_hash: entry_hash.clone(), entry_type}),
-                    None => todo!("Make into wasm host error as this should never be called with the wrong zome id"),
+                    None => Err(wasm_error!(WasmErrorInner::Host(format!(
+                        "StoreRecord should not be called with the wrong ZomeId {}. This is a holochain bug",
+                        zome_id
+                    )))),
                 }
             }
-            EntryType::AgentPubKey => Ok(OpRecord::CreateAgent(entry_hash.clone().into())),
-            EntryType::CapClaim | EntryType::CapGrant => {
-                todo!("Make guest error because this is malformed")
+            EntryType::AgentPubKey => {
+                if !matches!(entry, Entry::Agent(_)) {
+                    return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                        "Entry type is AgentPubKey but Entry is not AgentPubKey"
+                    ))));
+                }
+                Ok(OpRecord::CreateAgent(entry_hash.clone().into()))
             }
+            _ => Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Entry type is a capability and should be private but there is an entry present"
+            )))),
         },
         RecordEntry::Hidden => match entry_type {
             EntryType::App(AppEntryType {
@@ -389,12 +458,18 @@ where
                     entry_type: unit,
                 })
             }
-            EntryType::AgentPubKey | EntryType::CapClaim | EntryType::CapGrant => {
-                todo!("Make guest error because this is malformed")
-            }
+            EntryType::CapClaim => Ok(OpRecord::CreateCapClaim(entry_hash.clone())),
+            EntryType::CapGrant => Ok(OpRecord::CreateCapGrant(entry_hash.clone())),
+            EntryType::AgentPubKey => Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Entry type AgentPubKey is missing entry."
+            )))),
         },
-        RecordEntry::NotApplicable => todo!("Guest error as malformed Record"),
-        RecordEntry::NotStored => todo!("Host error as this should be stored"),
+        RecordEntry::NotApplicable => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Has Entry type but entry is marked not applicable"
+        )))),
+        RecordEntry::NotStored => Err(wasm_error!(WasmErrorInner::Host(format!(
+            "Has Entry type but the entry is not currently stored."
+        )))),
     }
 }
 

@@ -219,3 +219,16 @@ pub trait UnitEnum {
     /// Iterate over the unit variants.
     fn unit_iter() -> Box<dyn Iterator<Item = Self::Unit>>;
 }
+
+/// Needed as a base case for ignoring types.
+impl UnitEnum for () {
+    type Unit = ();
+
+    fn to_unit(&self) -> Self::Unit {
+        ()
+    }
+
+    fn unit_iter() -> Box<dyn Iterator<Item = Self::Unit>> {
+        Box::new([].into_iter())
+    }
+}

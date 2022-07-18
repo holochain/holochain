@@ -454,8 +454,10 @@ where
     R: RibosomeT,
 {
     let zomes_to_invoke = match op {
-        Op::RegisterAgentActivity(RegisterAgentActivity { .. })
-        | Op::StoreRecord(StoreRecord { .. }) => ZomesToInvoke::AllIntegrity,
+        Op::RegisterAgentActivity(RegisterAgentActivity { .. }) => ZomesToInvoke::AllIntegrity,
+        Op::StoreRecord(StoreRecord { record }) => {
+            store_record_zomes_to_invoke(record.action(), ribosome)?
+        }
         Op::StoreEntry(StoreEntry {
             action:
                 SignedHashed {
@@ -539,6 +541,30 @@ fn create_link_zomes_to_invoke(
             ))
         })?;
     Ok(ZomesToInvoke::One(zome.erase_type()))
+}
+
+pub fn store_record_zomes_to_invoke(
+    action: &Action,
+    ribosome: &impl RibosomeT,
+) -> AppValidationOutcome<ZomesToInvoke> {
+    match action {
+        Action::CreateLink(create_link) => create_link_zomes_to_invoke(create_link, ribosome),
+        Action::Create(Create {
+            entry_type: EntryType::App(AppEntryType { zome_id, .. }),
+            ..
+        })
+        | Action::Update(Update {
+            entry_type: EntryType::App(AppEntryType { zome_id, .. }),
+            ..
+        }) => {
+            let zome = ribosome.get_integrity_zome(zome_id).ok_or_else(|| {
+                Outcome::rejected(&format!("Zome does not exist for {:?}", zome_id))
+            })?;
+            Ok(ZomesToInvoke::OneIntegrity(zome))
+        }
+        Action::Update(_) => todo!(),
+        _ => Ok(ZomesToInvoke::AllIntegrity),
+    }
 }
 
 #[async_recursion::async_recursion]
