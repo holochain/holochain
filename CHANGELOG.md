@@ -6,7 +6,45 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
-* **BREAKING**: the `holochain_deterministic_integrity` crate has been renamed to `hdi`
+# 20220713.013021
+
+- **BREAKING**: the `holochain_deterministic_integrity` crate has been renamed to `hdi`
+
+## [holochain\_cli-0.0.48](crates/holochain_cli/CHANGELOG.md#0.0.48)
+
+## [holochain\_cli\_sandbox-0.0.44](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.44)
+
+## [holochain\_cli\_bundle-0.0.44](crates/holochain_cli_bundle/CHANGELOG.md#0.0.44)
+
+## [holochain-0.0.150](crates/holochain/CHANGELOG.md#0.0.150)
+
+## [holochain\_test\_wasm\_common-0.0.43](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.43)
+
+## [holochain\_conductor\_api-0.0.50](crates/holochain_conductor_api/CHANGELOG.md#0.0.50)
+
+## [holochain\_wasm\_test\_utils-0.0.49](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.49)
+
+## [holochain\_cascade-0.0.50](crates/holochain_cascade/CHANGELOG.md#0.0.50)
+
+## [holochain\_state-0.0.50](crates/holochain_state/CHANGELOG.md#0.0.50)
+
+## [holochain\_p2p-0.0.48](crates/holochain_p2p/CHANGELOG.md#0.0.48)
+
+## [holochain\_types-0.0.48](crates/holochain_types/CHANGELOG.md#0.0.48)
+
+## [holochain\_keystore-0.0.47](crates/holochain_keystore/CHANGELOG.md#0.0.47)
+
+## [holochain\_sqlite-0.0.46](crates/holochain_sqlite/CHANGELOG.md#0.0.46)
+
+## [hdk-0.0.142](crates/hdk/CHANGELOG.md#0.0.142)
+
+## [holochain\_zome\_types-0.0.41](crates/holochain_zome_types/CHANGELOG.md#0.0.41)
+
+## [hdi-0.0.14](crates/hdi/CHANGELOG.md#0.0.14)
+
+- Docs: replace occurrences of `hdk_entry_def` and `entry_def!` with `hdk_entry_helper`.
+
+## [hdk\_derive-0.0.41](crates/hdk_derive/CHANGELOG.md#0.0.41)
 
 # 20220710.155915
 
@@ -1794,7 +1832,7 @@ network:
 - **BREAKING CHANGE** `entry_defs` added to `zome_info` and referenced by macros [PR1055](https://github.com/holochain/holochain/pull/1055)
 
 - **BREAKING CHANGE**: The notion of “cell nicknames” (“nicks”) and “app slots” has been unified into the notion of “app roles”. This introduces several breaking changes. In general, you will need to rebuild any app bundles you are using, and potentially update some usages of the admin interface. In particular:
-
+  
   - The `slots` field in App manifests is now called `roles`
   - The `InstallApp` admin method now takes a `role_id` field instead of a `nick` field
   - In the return value for any admin method which lists installed apps, e.g. `ListEnabledApps`, any reference to `"slots"` is now named `"roles"`
@@ -1948,7 +1986,7 @@ network:
 - `call_info` is now implemented [1047](https://github.com/holochain/holochain/pull/1047)
 
 - `dna_info` now returns `DnaInfo` correctly [\#1044](https://github.com/holochain/holochain/pull/1044)
-
+  
   - `ZomeInfo` no longer includes what is now on `DnaInfo`
   - `ZomeInfo` renames `zome_name` and `zome_id` to `name` and `id`
   - `DnaInfo` includes `name`, `hash`, `properties`
@@ -2557,14 +2595,14 @@ passphrase_service:
 - hdk: Now supports deserializing countersigned entries in app entry `try_from`
 
 - hdk: implements multi-call for:
-
+  
   - `remote_call`
   - `call`
   - `get`
   - `get_details`
   - `get_links`
   - `get_link_details`
-
+  
   We strictly only needed `remote_call` for countersigning, but feedback from the community was that having to sequentially loop over these common HDK functions is a pain point, so we enabled all of them to be async over a vector of inputs.
 
 ## [hdk\_derive-0.0.5](crates/hdk_derive/CHANGELOG.md#0.0.5)

@@ -4,6 +4,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Allow deterministic bindings (dna_info() & zome_info()) to the genesis self check [\#1491](https://github.com/holochain/holochain/pull/1491).
+
+
+## 0.0.150
+
 ## 0.0.149
 
 ## 0.0.148
