@@ -10,7 +10,7 @@ pub mod examples;
 
 /// An extension to obtain a link type filter.
 ///
-/// Allows for single link types as well as a range or vector of link types to be passed in.
+/// Allows for single link types as well as the full range of link types to be passed in.
 /// To include all link types, i. e. not filter out any link type, the full range operator `..`
 /// can be used: `get_links(base, .., None)`.
 ///
