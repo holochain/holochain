@@ -301,7 +301,13 @@ async fn conductors_gossip_inner(
 
     shutdown(handles).await;
 
-    let third_handles = setup(zomes.clone(), Some(network.clone()), new_conductors, network_seed).await;
+    let third_handles = setup(
+        zomes.clone(),
+        Some(network.clone()),
+        new_conductors,
+        network_seed,
+    )
+    .await;
 
     let mut envs = Vec::with_capacity(third_handles.len() + second_handles.len());
     for h in third_handles.iter().chain(second_handles.iter()) {

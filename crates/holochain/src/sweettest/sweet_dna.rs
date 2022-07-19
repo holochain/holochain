@@ -131,7 +131,14 @@ impl SweetDnaFile {
             })
             .collect();
 
-        Self::from_zomes(network_seed, integrity_zomes, coordinator_zomes, wasms, properties).await
+        Self::from_zomes(
+            network_seed,
+            integrity_zomes,
+            coordinator_zomes,
+            wasms,
+            properties,
+        )
+        .await
     }
 
     /// Create a DnaFile from a collection of TestWasm
@@ -144,8 +151,12 @@ impl SweetDnaFile {
             + Into<TestWasmPair<wasm::DnaWasm>>
             + Clone,
     {
-        let (dna, integrity_zomes, coordinator_zomes) =
-            Self::from_test_wasms(random_network_seed(), test_wasms, SerializedBytes::default()).await?;
+        let (dna, integrity_zomes, coordinator_zomes) = Self::from_test_wasms(
+            random_network_seed(),
+            test_wasms,
+            SerializedBytes::default(),
+        )
+        .await?;
         Ok((dna, integrity_zomes, coordinator_zomes))
     }
 

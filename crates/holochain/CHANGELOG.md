@@ -4,8 +4,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Refactor: rename UID to network seed [\#1493](https://github.com/holochain/holochain/pull/1493)
 - Allow deterministic bindings (dna_info() & zome_info()) to the genesis self check [\#1491](https://github.com/holochain/holochain/pull/1491).
-
 
 ## 0.0.150
 

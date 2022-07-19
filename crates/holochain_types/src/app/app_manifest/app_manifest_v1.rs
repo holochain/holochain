@@ -409,11 +409,23 @@ roles:
         manifest.set_network_seed(network_seed.clone());
 
         // - The Create roles have the network seed rewritten.
-        assert_eq!(manifest.roles[0].dna.network_seed.as_ref(), Some(&network_seed));
-        assert_eq!(manifest.roles[1].dna.network_seed.as_ref(), Some(&network_seed));
+        assert_eq!(
+            manifest.roles[0].dna.network_seed.as_ref(),
+            Some(&network_seed)
+        );
+        assert_eq!(
+            manifest.roles[1].dna.network_seed.as_ref(),
+            Some(&network_seed)
+        );
 
         // - The others do not.
-        assert_ne!(manifest.roles[2].dna.network_seed.as_ref(), Some(&network_seed));
-        assert_ne!(manifest.roles[3].dna.network_seed.as_ref(), Some(&network_seed));
+        assert_ne!(
+            manifest.roles[2].dna.network_seed.as_ref(),
+            Some(&network_seed)
+        );
+        assert_ne!(
+            manifest.roles[3].dna.network_seed.as_ref(),
+            Some(&network_seed)
+        );
     }
 }

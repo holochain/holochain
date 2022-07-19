@@ -188,7 +188,8 @@ impl AppBundle {
     ) -> AppBundleResult<CellProvisioningOp> {
         let bytes = self.resolve(location).await?;
         let dna_bundle: DnaBundle = mr_bundle::Bundle::decode(&bytes)?.into();
-        let (dna_file, original_dna_hash) = dna_bundle.into_dna_file(network_seed, properties).await?;
+        let (dna_file, original_dna_hash) =
+            dna_bundle.into_dna_file(network_seed, properties).await?;
         if let Some(spec) = version {
             if !spec.matches(original_dna_hash) {
                 return Ok(CellProvisioningOp::NoMatch);

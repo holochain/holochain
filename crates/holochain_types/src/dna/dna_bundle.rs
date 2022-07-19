@@ -42,7 +42,8 @@ impl DnaBundle {
         properties: Option<YamlProperties>,
     ) -> DnaResult<(DnaFile, DnaHash)> {
         let (integrity, coordinator, wasms) = self.inner_maps().await?;
-        let (dna_def, original_hash) = self.to_dna_def(integrity, coordinator, network_seed, properties)?;
+        let (dna_def, original_hash) =
+            self.to_dna_def(integrity, coordinator, network_seed, properties)?;
 
         Ok((DnaFile::from_parts(dna_def, wasms), original_hash))
     }

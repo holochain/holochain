@@ -30,7 +30,11 @@ pub fn fake_dna_zomes(network_seed: &str, zomes: Vec<(ZomeName, DnaWasm)>) -> Dn
 }
 
 /// A named dna for unit testing.
-pub fn fake_dna_zomes_named(network_seed: &str, name: &str, zomes: Vec<(ZomeName, DnaWasm)>) -> DnaFile {
+pub fn fake_dna_zomes_named(
+    network_seed: &str,
+    name: &str,
+    zomes: Vec<(ZomeName, DnaWasm)>,
+) -> DnaFile {
     let mut dna = DnaDef {
         name: name.to_string(),
         properties: YamlProperties::new(serde_yaml::from_str("p: hi").unwrap())
