@@ -1,10 +1,15 @@
+//! Helper types for working with [`Op`]s
+
 use crate::prelude::*;
 
 #[cfg(test)]
 mod test;
 
+/// This trait provides a conversion to a convenience type [`OpType`]
+/// for use in the validation call back.
 pub trait OpHelper {
-    /// TODO: Talk about costs of using this call.
+    /// Converts an [`Op`] to an [`OpType`] without consuming it.
+    /// This will clone the required internal data.
     fn to_type<ET, LT>(&self) -> Result<OpType<ET, LT>, WasmError>
     where
         ET: EntryTypesHelper + UnitEnum,
@@ -51,7 +56,6 @@ enum ActivityEntry<Unit> {
 }
 
 impl OpHelper for Op {
-    /// TODO
     fn to_type<ET, LT>(&self) -> Result<OpType<ET, LT>, WasmError>
     where
         ET: EntryTypesHelper + UnitEnum,

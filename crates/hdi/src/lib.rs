@@ -192,7 +192,7 @@ pub mod hdi;
 
 pub mod link;
 
-#[warn(missing_docs)]
+#[deny(missing_docs)]
 pub mod op;
 
 #[cfg(any(feature = "test_utils", test))]
