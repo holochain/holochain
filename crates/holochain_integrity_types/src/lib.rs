@@ -224,9 +224,7 @@ pub trait UnitEnum {
 impl UnitEnum for () {
     type Unit = ();
 
-    fn to_unit(&self) -> Self::Unit {
-        ()
-    }
+    fn to_unit(&self) -> Self::Unit {}
 
     fn unit_iter() -> Box<dyn Iterator<Item = Self::Unit>> {
         Box::new([].into_iter())

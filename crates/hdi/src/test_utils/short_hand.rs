@@ -1,26 +1,32 @@
 use crate::prelude::*;
 
+/// Create [`EntryHash`].
 pub fn eh(i: u8) -> EntryHash {
     EntryHash::from_raw_36(vec![i; 36])
 }
 
+/// Create [`ActionHash`].
 pub fn ah(i: u8) -> ActionHash {
     ActionHash::from_raw_36(vec![i; 36])
 }
 
+/// Create [`AgentPubKey`].
 pub fn ak(i: u8) -> AgentPubKey {
     AgentPubKey::from_raw_36(vec![i; 36])
 }
 
+/// Create [`AnyLinkableHash`].
 pub fn lh(i: u8) -> AnyLinkableHash {
     AnyLinkableHash::from(EntryHash::from_raw_36(vec![i; 36]))
 }
 
+/// Create [`DnaHash`].
 pub fn dh(i: u8) -> DnaHash {
     DnaHash::from_raw_36(vec![i; 36])
 }
 
-pub fn activity(action: Action) -> Op {
+/// Create [`Op::RegisterAgentActivity`].
+pub fn r_activity(action: Action) -> Op {
     Op::RegisterAgentActivity(RegisterAgentActivity {
         action: SignedHashed {
             hashed: HoloHashed {
@@ -32,7 +38,8 @@ pub fn activity(action: Action) -> Op {
     })
 }
 
-pub fn record(action: Action, entry: RecordEntry) -> Op {
+/// Create [`Op::StoreRecord`].
+pub fn s_record(action: Action, entry: RecordEntry) -> Op {
     Op::StoreRecord(StoreRecord {
         record: Record {
             signed_action: SignedHashed {
@@ -47,7 +54,8 @@ pub fn record(action: Action, entry: RecordEntry) -> Op {
     })
 }
 
-pub fn entry(action: EntryCreationAction, entry: Entry) -> Op {
+/// Create [`Op::StoreEntry`].
+pub fn s_entry(action: EntryCreationAction, entry: Entry) -> Op {
     Op::StoreEntry(StoreEntry {
         action: SignedHashed {
             hashed: HoloHashed {
@@ -60,6 +68,7 @@ pub fn entry(action: EntryCreationAction, entry: Entry) -> Op {
     })
 }
 
+/// Create [`Op::RegisterUpdate`].
 pub fn r_update(
     original_action: EntryCreationAction,
     original_entry: Option<Entry>,
@@ -80,6 +89,7 @@ pub fn r_update(
     })
 }
 
+/// Create [`Op::RegisterDelete`].
 pub fn r_delete(original_entry_type: EntryType, original_entry: Option<Entry>) -> Op {
     Op::RegisterDelete(RegisterDelete {
         delete: SignedHashed {
@@ -102,6 +112,7 @@ pub fn r_delete(original_entry_type: EntryType, original_entry: Option<Entry>) -
     })
 }
 
+/// Create [`Op::RegisterCreateLink`].
 pub fn r_create_link(zome_id: u8, link_type: u8) -> Op {
     Op::RegisterCreateLink(RegisterCreateLink {
         create_link: SignedHashed {
@@ -114,6 +125,7 @@ pub fn r_create_link(zome_id: u8, link_type: u8) -> Op {
     })
 }
 
+/// Create [`Op::RegisterDeleteLink`].
 pub fn r_delete_link(zome_id: u8, link_type: u8) -> Op {
     Op::RegisterDeleteLink(RegisterDeleteLink {
         delete_link: SignedHashed {
@@ -134,6 +146,7 @@ pub fn r_delete_link(zome_id: u8, link_type: u8) -> Op {
     })
 }
 
+/// Create [`Create`].
 pub fn c(entry_type: EntryType) -> Create {
     Create {
         author: ak(0),
@@ -146,6 +159,7 @@ pub fn c(entry_type: EntryType) -> Create {
     }
 }
 
+/// Create [`Update`].
 pub fn u(entry_type: EntryType) -> Update {
     Update {
         author: ak(0),
@@ -160,6 +174,7 @@ pub fn u(entry_type: EntryType) -> Update {
     }
 }
 
+/// Create [`CreateLink`].
 pub fn cl(zome_id: u8, link_type: u8) -> CreateLink {
     CreateLink {
         author: ak(0),
@@ -175,6 +190,7 @@ pub fn cl(zome_id: u8, link_type: u8) -> CreateLink {
     }
 }
 
+/// Create public app [`Action::Create`].
 pub fn create_entry(z: u8, et: u8) -> Action {
     Action::Create(c(EntryType::App(AppEntryType {
         id: et.into(),
@@ -183,6 +199,7 @@ pub fn create_entry(z: u8, et: u8) -> Action {
     })))
 }
 
+/// Create private app [`Action::Create`].
 pub fn create_hidden_entry(z: u8, et: u8) -> Action {
     Action::Create(c(EntryType::App(AppEntryType {
         id: et.into(),
@@ -191,10 +208,12 @@ pub fn create_hidden_entry(z: u8, et: u8) -> Action {
     })))
 }
 
+/// Create [`Action::CreateLink`].
 pub fn create_link(z: u8, lt: u8) -> Action {
     Action::CreateLink(cl(z, lt))
 }
 
+/// Create [`Entry`].
 pub fn e(e: impl TryInto<Entry>) -> Entry {
     match e.try_into() {
         Ok(e) => e,
@@ -202,6 +221,7 @@ pub fn e(e: impl TryInto<Entry>) -> Entry {
     }
 }
 
+/// Create public [`AppEntryType`].
 pub fn public_aet(z: u8, et: u8) -> AppEntryType {
     AppEntryType {
         id: et.into(),
@@ -210,6 +230,7 @@ pub fn public_aet(z: u8, et: u8) -> AppEntryType {
     }
 }
 
+/// Create private [`AppEntryType`].
 pub fn private_aet(z: u8, et: u8) -> AppEntryType {
     AppEntryType {
         id: et.into(),

@@ -1025,7 +1025,7 @@ where
 }
 
 #[test]
-fn op_match() {
+fn op_match_sanity() {
     fn empty_create() -> Create {
         Create {
             author: AgentPubKey::from_raw_36(vec![0u8; 36]),

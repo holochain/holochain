@@ -20,6 +20,8 @@ pub trait OpHelper {
 }
 
 #[derive(Debug)]
+/// All the possible variants for entries
+/// that are in scope for a zome.
 enum InScopeEntry<ET>
 where
     ET: UnitEnum,
@@ -31,6 +33,7 @@ where
     CapGrant,
 }
 
+/// [`RecordEntry`]s that takes a reference.
 enum RecordEntryRef<'a> {
     Present(&'a Entry),
     Hidden,
@@ -219,7 +222,7 @@ impl OpHelper for Op {
                         new_key,
                     }),
                     InScopeEntry::App(new_entry_type) => {
-                        match map_entry::<ET>(entry_type, &entry_hash, original_entry)? {
+                        match map_entry::<ET>(entry_type, entry_hash, original_entry)? {
                             InScopeEntry::App(original_entry_type) => Some(OpUpdate::Entry {
                                 entry_hash: entry_hash.clone(),
                                 original_action_hash: original_action_hash.clone(),
@@ -231,7 +234,7 @@ impl OpHelper for Op {
                         }
                     }
                     InScopeEntry::PrivateApp(new_entry_type) => {
-                        match map_entry::<ET>(entry_type, &entry_hash, original_entry)? {
+                        match map_entry::<ET>(entry_type, entry_hash, original_entry)? {
                             InScopeEntry::PrivateApp(original_entry_type) => {
                                 Some(OpUpdate::PrivateEntry {
                                     entry_hash: entry_hash.clone(),
@@ -449,12 +452,16 @@ where
             entry_type,
         }),
         InScopeEntry::Agent(agent_key) => Ok(OpEntry::CreateAgent(agent_key)),
-        _ => Err(wasm_error!(WasmErrorInner::Guest(format!(
-            "StoreEntry should not exist for private entries Id",
-        )))),
+        _ => Err(wasm_error!(WasmErrorInner::Guest(
+            "StoreEntry should not exist for private entries Id".to_string()
+        ))),
     }
 }
 
+/// Maps an entry type and entry to an
+/// [`InScopeEntry`]. This will return a guest error
+/// an invalidate the op if the zome id is this zome but
+/// entry type is not in scope.
 fn map_entry<ET>(
     entry_type: &EntryType,
     entry_hash: &EntryHash,
@@ -474,9 +481,9 @@ where
                 ..
             }) => {
                 if !matches!(entry, Entry::App(_)) {
-                    return Err(wasm_error!(WasmErrorInner::Guest(format!(
-                        "Entry type is App but Entry is not App"
-                    ))));
+                    return Err(wasm_error!(WasmErrorInner::Guest(
+                        "Entry type is App but Entry is not App".to_string()
+                    )));
                 }
                 let entry_type = <ET as EntryTypesHelper>::deserialize_from_type(
                     *zome_id,
@@ -485,20 +492,21 @@ where
                 )?;
                 match entry_type {
                     Some(entry_type) => Ok(InScopeEntry::App(entry_type)),
-                    None => return Err(deny_other_zome()),
+                    None => Err(deny_other_zome()),
                 }
             }
             EntryType::AgentPubKey => {
                 if !matches!(entry, Entry::Agent(_)) {
-                    return Err(wasm_error!(WasmErrorInner::Guest(format!(
-                        "Entry type is AgentPubKey but Entry is not AgentPubKey"
-                    ))));
+                    return Err(wasm_error!(WasmErrorInner::Guest(
+                        "Entry type is AgentPubKey but Entry is not AgentPubKey".to_string()
+                    )));
                 }
                 Ok(InScopeEntry::Agent(entry_hash.clone().into()))
             }
-            _ => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            _ => Err(wasm_error!(WasmErrorInner::Guest(
                 "Entry type is a capability and should be private but there is an entry present"
-            )))),
+                    .to_string()
+            ))),
         },
         RecordEntryRef::Hidden => match entry_type {
             EntryType::App(AppEntryType {
@@ -507,30 +515,30 @@ where
                 visibility: EntryVisibility::Private,
             }) => match get_unit_entry_type::<ET>(*zome_id, *entry_def_index)? {
                 Some(unit) => Ok(InScopeEntry::PrivateApp(unit)),
-                None => return Err(deny_other_zome()),
+                None => Err(deny_other_zome()),
             },
             EntryType::App(AppEntryType {
                 visibility: EntryVisibility::Public,
                 ..
-            }) => Err(wasm_error!(WasmErrorInner::Guest(format!(
-                "Entry type is public but entry is hidden"
-            )))),
+            }) => Err(wasm_error!(WasmErrorInner::Guest(
+                "Entry type is public but entry is hidden".to_string()
+            ))),
             EntryType::CapClaim => Ok(InScopeEntry::CapClaim),
             EntryType::CapGrant => Ok(InScopeEntry::CapGrant),
-            EntryType::AgentPubKey => Err(wasm_error!(WasmErrorInner::Guest(format!(
-                "Entry type AgentPubKey is missing entry."
-            )))),
+            EntryType::AgentPubKey => Err(wasm_error!(WasmErrorInner::Guest(
+                "Entry type AgentPubKey is missing entry.".to_string()
+            ))),
         },
-        RecordEntryRef::NotApplicable => Err(wasm_error!(WasmErrorInner::Guest(format!(
-            "Has Entry type but entry is marked not applicable"
-        )))),
+        RecordEntryRef::NotApplicable => Err(wasm_error!(WasmErrorInner::Guest(
+            "Has Entry type but entry is marked not applicable".to_string()
+        ))),
         RecordEntryRef::NotStored => match entry_type {
             EntryType::CapClaim | EntryType::CapGrant => Err(wasm_error!(WasmErrorInner::Guest(
-                format!("Capability tokens are never publicly stored.")
+                "Capability tokens are never publicly stored.".to_string()
             ))),
-            _ => Err(wasm_error!(WasmErrorInner::Host(format!(
-                "Has Entry type but the entry is not currently stored."
-            )))),
+            _ => Err(wasm_error!(WasmErrorInner::Host(
+                "Has Entry type but the entry is not currently stored.".to_string()
+            ))),
         },
     }
 }
@@ -633,9 +641,9 @@ where
 /// should never be called with a zome id
 /// that is not a dependency.
 fn deny_other_zome() -> WasmError {
-    wasm_error!(WasmErrorInner::Host(format!(
-        "Op called for zome it was not defined in. This is a Holochain bug"
-    )))
+    wasm_error!(WasmErrorInner::Host(
+        "Op called for zome it was not defined in. This is a Holochain bug".to_string()
+    ))
 }
 
 impl<ET> InScopeEntry<ET>

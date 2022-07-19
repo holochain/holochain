@@ -1,4 +1,5 @@
 use crate::*;
+use std::fmt::Write;
 
 /// When sampling a section of the arc we can
 /// collect all the other peer [`DhtArc`]s into a
@@ -36,7 +37,7 @@ impl DhtArcBucket {
         for a in &self.arcs {
             buf += &a.to_ascii(len);
         }
-        buf += &format!("{} <- Bucket arc", self.filter.to_ascii(len));
+        let _ = write!(buf, "{} <- Bucket arc", self.filter.to_ascii(len));
         buf
     }
 }
