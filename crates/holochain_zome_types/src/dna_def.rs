@@ -14,8 +14,8 @@ pub type IntegrityZomes = Vec<(ZomeName, zome::IntegrityZomeDef)>;
 /// Ordered list of coordinator zomes in this DNA.
 pub type CoordinatorZomes = Vec<(ZomeName, zome::CoordinatorZomeDef)>;
 
-/// Placeholder for a real UID type
-pub type Uid = String;
+/// Placeholder for a real network seed type
+pub type NetworkSeed = String;
 
 /// The definition of a DNA: the hash of this data is what produces the DnaHash.
 ///
@@ -36,9 +36,9 @@ pub struct DnaDef {
     )]
     pub name: String,
 
-    /// A UID for uniquifying this Dna.
+    /// A network seed for uniquifying this DNA.
     // TODO: consider Vec<u8> instead (https://github.com/holochain/holochain/pull/86#discussion_r412689085)
-    pub uid: String,
+    pub network_seed: String,
 
     /// Any arbitrary application properties can be included in this object.
     #[cfg_attr(feature = "full-dna-def", builder(default = "().try_into().unwrap()"))]
@@ -62,14 +62,14 @@ pub struct DnaDef {
 /// A reference to for creating the hash for [`DnaDef`].
 struct DnaDefHash<'a> {
     name: &'a String,
-    uid: &'a String,
+    network_seed: &'a String,
     properties: &'a SerializedBytes,
     integrity_zomes: &'a IntegrityZomes,
 }
 
 #[cfg(feature = "test_utils")]
 impl DnaDef {
-    /// Create a DnaDef with a random UID, useful for testing
+    /// Create a DnaDef with a random network seed, useful for testing
     pub fn unique_from_zomes(
         integrity: Vec<IntegrityZome>,
         coordinator: Vec<CoordinatorZome>,
@@ -79,7 +79,7 @@ impl DnaDef {
         DnaDefBuilder::default()
             .integrity_zomes(integrity)
             .coordinator_zomes(coordinator)
-            .random_uid()
+            .random_network_seed()
             .build()
             .unwrap()
     }
@@ -175,12 +175,12 @@ impl DnaDef {
             })
     }
 
-    /// Change the "phenotype" of this DNA -- the UID and properties -- while
+    /// Change the "phenotype" of this DNA -- the network seed and properties -- while
     /// leaving the "genotype" of actual DNA code intact
-    pub fn modify_phenotype(&self, uid: Uid, properties: SerializedBytes) -> Self {
+    pub fn modify_phenotype(&self, network_seed: NetworkSeed, properties: SerializedBytes) -> Self {
         let mut clone = self.clone();
         clone.properties = properties;
-        clone.uid = uid;
+        clone.network_seed = network_seed;
         clone
     }
 
@@ -190,17 +190,17 @@ impl DnaDef {
     }
 }
 
-/// Get a random UID
+/// Get a random network seed
 #[cfg(feature = "full-dna-def")]
-pub fn random_uid() -> String {
+pub fn random_network_seed() -> String {
     nanoid::nanoid!()
 }
 
 #[cfg(feature = "full-dna-def")]
 impl DnaDefBuilder {
-    /// Provide a random UID
-    pub fn random_uid(&mut self) -> &mut Self {
-        self.uid = Some(random_uid());
+    /// Provide a random network seed
+    pub fn random_network_seed(&mut self) -> &mut Self {
+        self.network_seed = Some(random_network_seed());
         self
     }
 }
@@ -220,7 +220,7 @@ impl HashableContent for DnaDef {
     fn hashable_content(&self) -> HashableContentBytes {
         let hash = DnaDefHash {
             name: &self.name,
-            uid: &self.uid,
+            network_seed: &self.network_seed,
             properties: &self.properties,
             integrity_zomes: &self.integrity_zomes,
         };

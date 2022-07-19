@@ -44,7 +44,7 @@ async fn provisioning_1_create() {
 
     // Apply the phenotype overrides specified in the manifest fixture
     let dna = dna
-        .with_uid("uid".to_string())
+        .with_network_seed("network_seed".to_string())
         .await
         .unwrap()
         .with_properties(SerializedBytes::try_from(app_manifest_properties_fixture()).unwrap())

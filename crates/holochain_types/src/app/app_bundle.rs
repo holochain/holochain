@@ -118,11 +118,17 @@ impl AppBundle {
                 version,
                 clone_limit,
                 properties,
-                uid,
+                network_seed,
                 deferred: _,
             } => {
-                self.resolve_cell_create(&location, version.as_ref(), clone_limit, uid, properties)
-                    .await?
+                self.resolve_cell_create(
+                    &location,
+                    version.as_ref(),
+                    clone_limit,
+                    network_seed,
+                    properties,
+                )
+                .await?
             }
 
             AppRoleManifestValidated::CreateClone { .. } => {
@@ -138,7 +144,7 @@ impl AppBundle {
                 version,
                 clone_limit,
                 properties,
-                uid,
+                network_seed,
                 deferred: _,
             } => match self.resolve_cell_existing(&version, clone_limit) {
                 op @ CellProvisioningOp::Existing(_, _) => op,
@@ -147,7 +153,7 @@ impl AppBundle {
                         &location,
                         Some(&version),
                         clone_limit,
-                        uid,
+                        network_seed,
                         properties,
                     )
                     .await?
@@ -177,12 +183,12 @@ impl AppBundle {
         location: &mr_bundle::Location,
         version: Option<&DnaVersionSpec>,
         clone_limit: u32,
-        uid: Option<Uid>,
+        network_seed: Option<NetworkSeed>,
         properties: Option<YamlProperties>,
     ) -> AppBundleResult<CellProvisioningOp> {
         let bytes = self.resolve(location).await?;
         let dna_bundle: DnaBundle = mr_bundle::Bundle::decode(&bytes)?.into();
-        let (dna_file, original_dna_hash) = dna_bundle.into_dna_file(uid, properties).await?;
+        let (dna_file, original_dna_hash) = dna_bundle.into_dna_file(network_seed, properties).await?;
         if let Some(spec) = version {
             if !spec.matches(original_dna_hash) {
                 return Ok(CellProvisioningOp::NoMatch);

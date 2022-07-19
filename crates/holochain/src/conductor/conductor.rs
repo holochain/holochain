@@ -774,7 +774,7 @@ impl Conductor {
         let child_dna = ribosome_store.share_ref(|ds| {
             ds.get_dna_file(&parent_dna_hash)
                 .ok_or(DnaError::DnaMissing(parent_dna_hash))?
-                .modify_phenotype(random_uid(), properties)
+                .modify_phenotype(random_network_seed(), properties)
         })?;
         let child_dna_hash = child_dna.dna_hash().to_owned();
         let child_ribosome = RealRibosome::new(child_dna)?;

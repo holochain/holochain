@@ -42,11 +42,11 @@ fn prompt_required(prompt: &str) -> io::Result<String> {
 
 fn prompt_dna_init(root_dir: PathBuf) -> anyhow::Result<DnaBundle> {
     let name = prompt_required("name:")?;
-    let uid = Some(prompt_default(
-        "uid:",
+    let network_seed = Some(prompt_default(
+        "network_seed:",
         "00000000-0000-0000-0000-000000000000",
     )?);
-    let manifest = DnaManifest::current(name, uid, None, Timestamp::now().into(), vec![], vec![]);
+    let manifest = DnaManifest::current(name, network_seed, None, Timestamp::now().into(), vec![], vec![]);
     Ok(DnaBundle::new(manifest.try_into()?, vec![], root_dir)?)
 }
 
