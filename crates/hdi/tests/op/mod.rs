@@ -2,6 +2,7 @@ use super::set_zome_types;
 use arbitrary::Arbitrary;
 use arbitrary::Unstructured;
 use hdi::prelude::*;
+use hdi::test_utils::short_hand::*;
 use holo_hash::*;
 use test_case::test_case;
 
@@ -38,111 +39,14 @@ pub enum LinkTypes {
     C,
 }
 
-fn eh(i: u8) -> EntryHash {
-    EntryHash::from_raw_36(vec![i; 36])
-}
-
-fn ah(i: u8) -> ActionHash {
-    ActionHash::from_raw_36(vec![i; 36])
-}
-
-fn ak(i: u8) -> AgentPubKey {
-    AgentPubKey::from_raw_36(vec![i; 36])
-}
-
-fn lh(i: u8) -> AnyLinkableHash {
-    AnyLinkableHash::from(EntryHash::from_raw_36(vec![i; 36]))
-}
-
-fn dh(i: u8) -> DnaHash {
-    DnaHash::from_raw_36(vec![i; 36])
-}
-
-fn activity(action: Action) -> Op {
-    Op::RegisterAgentActivity(RegisterAgentActivity {
-        action: SignedHashed {
-            hashed: HoloHashed {
-                content: action,
-                hash: ah(0),
-            },
-            signature: Signature([0u8; 64]),
-        },
-    })
-}
-
-fn record(action: Action, entry: RecordEntry) -> Op {
-    Op::StoreRecord(StoreRecord {
-        record: Record {
-            signed_action: SignedHashed {
-                hashed: HoloHashed {
-                    content: action,
-                    hash: ah(0),
-                },
-                signature: Signature([0u8; 64]),
-            },
-            entry,
-        },
-    })
-}
-
-fn c(entry_type: EntryType) -> Create {
-    Create {
-        author: ak(0),
-        timestamp: Timestamp(0),
-        action_seq: 1,
-        prev_action: ah(0),
-        entry_hash: eh(0),
-        entry_type,
-        weight: Default::default(),
-    }
-}
-
-fn cl(zome_id: u8, link_type: u8) -> CreateLink {
-    CreateLink {
-        author: ak(0),
-        timestamp: Timestamp(0),
-        action_seq: 1,
-        prev_action: ah(0),
-        zome_id: zome_id.into(),
-        link_type: link_type.into(),
-        weight: Default::default(),
-        base_address: eh(0).into(),
-        target_address: eh(1).into(),
-        tag: ().into(),
-    }
-}
-
-fn create_entry(z: u8, et: u8) -> Action {
-    Action::Create(c(EntryType::App(AppEntryType {
-        id: et.into(),
-        zome_id: z.into(),
-        visibility: EntryVisibility::Public,
-    })))
-}
-
-fn create_hidden_entry(z: u8, et: u8) -> Action {
-    Action::Create(c(EntryType::App(AppEntryType {
-        id: et.into(),
-        zome_id: z.into(),
-        visibility: EntryVisibility::Private,
-    })))
-}
-
-fn create_link(z: u8, lt: u8) -> Action {
-    Action::CreateLink(cl(z, lt))
-}
-
-fn e(e: impl TryInto<Entry>) -> Entry {
-    match e.try_into() {
-        Ok(e) => e,
-        Err(_) => todo!(),
-    }
-}
-
+// Register Agent Activity
 #[test_case(activity(create_entry(0, 100)) => matches WasmErrorInner::Guest(_))]
 #[test_case(activity(create_link(0, 100)) => matches WasmErrorInner::Guest(_))]
-#[test_case(record(create_entry(0, 100), RecordEntry::Hidden) => matches WasmErrorInner::Guest(_))]
-#[test_case(record(create_entry(100, 0), RecordEntry::Hidden) => matches WasmErrorInner::Host(_))]
+// Store Record
+#[test_case(record(create_hidden_entry(0, 100), RecordEntry::Hidden) => matches WasmErrorInner::Guest(_))]
+#[test_case(record(
+    create_hidden_entry(100, 0),
+    RecordEntry::Hidden) => matches WasmErrorInner::Host(_) ; "Store Record: with hidden entry and zome out of scope")]
 #[test_case(record(create_entry(0, 0), RecordEntry::Present(e(D::default()))) => matches WasmErrorInner::Serialize(_))]
 #[test_case(record(create_entry(0, 100), RecordEntry::Present(e(A{}))) => matches WasmErrorInner::Guest(_))]
 #[test_case(record(create_entry(100, 0), RecordEntry::Present(e(A{}))) => matches WasmErrorInner::Host(_))]
@@ -151,7 +55,9 @@ fn e(e: impl TryInto<Entry>) -> Entry {
 #[test_case(record(create_hidden_entry(0, 0), RecordEntry::Present(e(A{}))) => matches WasmErrorInner::Guest(_))]
 #[test_case(record(create_hidden_entry(0, 100), RecordEntry::NotApplicable) => matches WasmErrorInner::Guest(_))]
 #[test_case(record(Action::Create(c(EntryType::AgentPubKey)), RecordEntry::Hidden) => matches WasmErrorInner::Guest(_))]
-#[test_case(record(Action::Create(c(EntryType::AgentPubKey)), RecordEntry::NotApplicable) => matches WasmErrorInner::Guest(_))]
+#[test_case(record(
+    Action::Create(c(EntryType::AgentPubKey)),
+    RecordEntry::NotApplicable) => matches WasmErrorInner::Guest(_) ; "Store Record: Agent key with not applicable")]
 #[test_case(record(Action::Create(c(EntryType::AgentPubKey)), RecordEntry::NotStored) => matches WasmErrorInner::Host(_))]
 #[test_case(record(Action::Create(c(EntryType::CapClaim)), RecordEntry::Present(e(A{}))) => matches WasmErrorInner::Guest(_))]
 #[test_case(record(Action::Create(c(EntryType::CapClaim)), RecordEntry::NotApplicable) => matches WasmErrorInner::Guest(_))]
@@ -159,6 +65,68 @@ fn e(e: impl TryInto<Entry>) -> Entry {
 #[test_case(record(Action::Create(c(EntryType::CapGrant)), RecordEntry::Present(e(A{}))) => matches WasmErrorInner::Guest(_))]
 #[test_case(record(Action::Create(c(EntryType::CapGrant)), RecordEntry::NotApplicable) => matches WasmErrorInner::Guest(_))]
 #[test_case(record(Action::Create(c(EntryType::CapGrant)), RecordEntry::NotStored) => matches WasmErrorInner::Host(_))]
+#[test_case(record(create_link(0, 100), RecordEntry::NotApplicable) => matches WasmErrorInner::Guest(_))]
+#[test_case(record(create_link(100, 0), RecordEntry::NotApplicable) => matches WasmErrorInner::Host(_))]
+// Store Entry
+#[test_case(entry(c(EntryType::App(public_aet(0, 100))).into(), e(A{})) => matches WasmErrorInner::Guest(_))]
+#[test_case(entry(c(EntryType::App(public_aet(100, 0))).into(), e(A{})) => matches WasmErrorInner::Host(_))]
+#[test_case(entry(c(EntryType::App(public_aet(0, 0))).into(), e(D::default())) => matches WasmErrorInner::Serialize(_))]
+#[test_case(entry(c(EntryType::App(private_aet(0, 0))).into(), e(A{})) => matches WasmErrorInner::Guest(_))]
+#[test_case(entry(c(EntryType::CapClaim).into(), e(A{})) => matches WasmErrorInner::Guest(_))]
+#[test_case(entry(c(EntryType::CapGrant).into(), e(A{})) => matches WasmErrorInner::Guest(_))]
+// RegisterUpdate
+#[test_case(r_update(
+    c(EntryType::App(public_aet(0, 0))).into(), Some(e(D::default())),
+    u(EntryType::App(public_aet(0, 0))), Some(e(A{})))
+    => matches WasmErrorInner::Serialize(_) ; "Register Update: original entry fails to deserialize")]
+#[test_case(r_update(
+    c(EntryType::App(public_aet(0, 0))).into(), Some(e(A{})),
+    u(EntryType::App(public_aet(0, 0))), Some(e(D::default())))
+    => matches WasmErrorInner::Serialize(_) ; "Register Update: new entry fails to deserialize")]
+#[test_case(r_update(
+    c(EntryType::App(public_aet(0, 0))).into(), None,
+    u(EntryType::App(public_aet(0, 0))), Some(e(A{})))
+    => matches WasmErrorInner::Guest(_) ; "Register Update: original entry is missing")]
+#[test_case(r_update(
+    c(EntryType::App(public_aet(0, 0))).into(), Some(e(A{})),
+    u(EntryType::App(public_aet(0, 0))), None)
+    => matches WasmErrorInner::Guest(_) ; "Register Update: new entry is missing")]
+#[test_case(r_update(
+    c(EntryType::App(private_aet(0, 0))).into(), Some(e(A{})),
+    u(EntryType::App(private_aet(0, 0))), None)
+    => matches WasmErrorInner::Guest(_) ; "Register Update: original entry is private but also present")]
+#[test_case(r_update(
+    c(EntryType::App(private_aet(0, 0))).into(), None,
+    u(EntryType::App(private_aet(0, 0))), Some(e(A{})))
+    => matches WasmErrorInner::Guest(_) ; "Register Update: new entry is private but also present")]
+#[test_case(r_update(
+    c(EntryType::App(public_aet(0, 100))).into(), Some(e(A{})),
+    u(EntryType::App(public_aet(0, 100))), Some(e(A{})))
+    => matches WasmErrorInner::Guest(_) ; "Register Update: entry type is out of range")]
+#[test_case(r_update(
+    c(EntryType::App(public_aet(100, 0))).into(), Some(e(A{})),
+    u(EntryType::App(public_aet(100, 0))), Some(e(A{})))
+    => matches WasmErrorInner::Host(_) ; "Register Update: zome id is out of range")]
+#[test_case(r_update(
+    c(EntryType::App(public_aet(0, 0))).into(), Some(e(A{})),
+    u(EntryType::App(private_aet(0, 0))), None)
+    => matches WasmErrorInner::Guest(_) ; "Register Update: public to private type mismatch")]
+#[test_case(r_update(
+    c(EntryType::App(private_aet(0, 0))).into(), None,
+    u(EntryType::App(public_aet(0, 0))), Some(e(A{})))
+    => matches WasmErrorInner::Guest(_) ; "Register Update: private to public type mismatch")]
+#[test_case(r_update(
+    c(EntryType::AgentPubKey).into(), Some(e(A{})),
+    u(EntryType::App(public_aet(0, 0))), Some(e(A{})))
+    => matches WasmErrorInner::Guest(_) ; "Register Update: agent to app mismatch")]
+#[test_case(r_update(
+    c(EntryType::App(public_aet(0, 1))).into(), None,
+    u(EntryType::App(public_aet(0, 0))), Some(e(A{})))
+    => matches WasmErrorInner::Guest(_) ; "Register Update: entry type mismatch")]
+#[test_case(r_create_link(0, 100) => matches WasmErrorInner::Guest(_) ; "Register Create Link: link type out of range")]
+#[test_case(r_create_link(100, 0) => matches WasmErrorInner::Host(_) ; "Register Create Link: zome id out of range")]
+#[test_case(r_delete_link(0, 100) => matches WasmErrorInner::Guest(_) ; "Register Delete Link: link type out of range")]
+#[test_case(r_delete_link(100, 0) => matches WasmErrorInner::Host(_) ; "Register Delete Link: zome id out of range")]
 fn op_errors(op: Op) -> WasmErrorInner {
     set_zome_types(&[(0, 3)], &[(0, 3)]);
     op.to_type::<EntryTypes, LinkTypes>().unwrap_err().error

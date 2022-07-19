@@ -1,8 +1,8 @@
 //! # Dht Operational Transforms
 
 use crate::{
-    Action, ActionRef, AppEntryType, Create, CreateLink, Delete, DeleteLink, Entry, EntryType,
-    LinkTag, MembraneProof, Record, SignedActionHashed, SignedHashed, UnitEnum, Update,
+    Action, ActionRef, ActionType, AppEntryType, Create, CreateLink, Delete, DeleteLink, Entry,
+    EntryType, LinkTag, MembraneProof, Record, SignedActionHashed, SignedHashed, UnitEnum, Update,
 };
 use holo_hash::{ActionHash, AgentPubKey, AnyLinkableHash, DnaHash, EntryHash, HashableContent};
 use holochain_serialized_bytes::prelude::*;
@@ -221,6 +221,93 @@ pub enum EntryCreationAction {
     Update(Update),
 }
 
+impl Op {
+    /// Get the [`AgentPubKey`] for the author of this op.
+    pub fn author(&self) -> &AgentPubKey {
+        match self {
+            Op::StoreRecord(StoreRecord { record }) => record.action().author(),
+            Op::StoreEntry(StoreEntry { action, .. }) => action.hashed.author(),
+            Op::RegisterUpdate(RegisterUpdate { update, .. }) => &update.hashed.author,
+            Op::RegisterDelete(RegisterDelete { delete, .. }) => &delete.hashed.author,
+            Op::RegisterAgentActivity(RegisterAgentActivity { action }) => action.hashed.author(),
+            Op::RegisterCreateLink(RegisterCreateLink { create_link }) => {
+                &create_link.hashed.author
+            }
+            Op::RegisterDeleteLink(RegisterDeleteLink { delete_link, .. }) => {
+                &delete_link.hashed.author
+            }
+        }
+    }
+    /// Get the [`Timestamp`] for when this op was created.
+    pub fn timestamp(&self) -> Timestamp {
+        match self {
+            Op::StoreRecord(StoreRecord { record }) => record.action().timestamp(),
+            Op::StoreEntry(StoreEntry { action, .. }) => *action.hashed.timestamp(),
+            Op::RegisterUpdate(RegisterUpdate { update, .. }) => update.hashed.timestamp,
+            Op::RegisterDelete(RegisterDelete { delete, .. }) => delete.hashed.timestamp,
+            Op::RegisterAgentActivity(RegisterAgentActivity { action }) => {
+                action.hashed.timestamp()
+            }
+            Op::RegisterCreateLink(RegisterCreateLink { create_link }) => {
+                create_link.hashed.timestamp
+            }
+            Op::RegisterDeleteLink(RegisterDeleteLink { delete_link, .. }) => {
+                delete_link.hashed.timestamp
+            }
+        }
+    }
+    /// Get the action sequence this op.
+    pub fn action_seq(&self) -> u32 {
+        match self {
+            Op::StoreRecord(StoreRecord { record }) => record.action().action_seq(),
+            Op::StoreEntry(StoreEntry { action, .. }) => *action.hashed.action_seq(),
+            Op::RegisterUpdate(RegisterUpdate { update, .. }) => update.hashed.action_seq,
+            Op::RegisterDelete(RegisterDelete { delete, .. }) => delete.hashed.action_seq,
+            Op::RegisterAgentActivity(RegisterAgentActivity { action }) => {
+                action.hashed.action_seq()
+            }
+            Op::RegisterCreateLink(RegisterCreateLink { create_link }) => {
+                create_link.hashed.action_seq
+            }
+            Op::RegisterDeleteLink(RegisterDeleteLink { delete_link, .. }) => {
+                delete_link.hashed.action_seq
+            }
+        }
+    }
+    /// Get the [`ActionHash`] for the the previous action from this op if there is one.
+    pub fn prev_action(&self) -> Option<&ActionHash> {
+        match self {
+            Op::StoreRecord(StoreRecord { record }) => record.action().prev_action(),
+            Op::StoreEntry(StoreEntry { action, .. }) => Some(action.hashed.prev_action()),
+            Op::RegisterUpdate(RegisterUpdate { update, .. }) => Some(&update.hashed.prev_action),
+            Op::RegisterDelete(RegisterDelete { delete, .. }) => Some(&delete.hashed.prev_action),
+            Op::RegisterAgentActivity(RegisterAgentActivity { action }) => {
+                action.hashed.prev_action()
+            }
+            Op::RegisterCreateLink(RegisterCreateLink { create_link }) => {
+                Some(&create_link.hashed.prev_action)
+            }
+            Op::RegisterDeleteLink(RegisterDeleteLink { delete_link, .. }) => {
+                Some(&delete_link.hashed.prev_action)
+            }
+        }
+    }
+    /// Get the [`ActionType`] of this op.
+    pub fn action_type(&self) -> ActionType {
+        match self {
+            Op::StoreRecord(StoreRecord { record }) => record.action().action_type(),
+            Op::StoreEntry(StoreEntry { action, .. }) => action.hashed.action_type(),
+            Op::RegisterUpdate(RegisterUpdate { .. }) => ActionType::Update,
+            Op::RegisterDelete(RegisterDelete { .. }) => ActionType::Delete,
+            Op::RegisterAgentActivity(RegisterAgentActivity { action }) => {
+                action.hashed.action_type()
+            }
+            Op::RegisterCreateLink(RegisterCreateLink { .. }) => ActionType::CreateLink,
+            Op::RegisterDeleteLink(RegisterDeleteLink { .. }) => ActionType::DeleteLink,
+        }
+    }
+}
+
 impl EntryCreationAction {
     /// The author of this action.
     pub fn author(&self) -> &AgentPubKey {
@@ -286,6 +373,14 @@ impl EntryCreationAction {
     /// Returns `true` if this action creates an [`EntryType::CapGrant`] [`Entry`].
     pub fn is_cap_grant_entry_type(&self) -> bool {
         matches!(self.entry_type(), EntryType::CapGrant)
+    }
+
+    /// Get the [`ActionType`] for this.
+    pub fn action_type(&self) -> ActionType {
+        match self {
+            EntryCreationAction::Create(_) => ActionType::Create,
+            EntryCreationAction::Update(_) => ActionType::Update,
+        }
     }
 }
 
