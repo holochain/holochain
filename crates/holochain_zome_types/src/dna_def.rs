@@ -36,7 +36,11 @@ pub struct DnaDef {
     )]
     pub name: String,
 
-    /// A network seed for uniquifying this DNA.
+    /// The network seed of a DNA is included in the computation of the DNA hash.
+    /// The DNA hash in turn determines the network peers and the DHT, meaning
+    /// that only peers with the same DNA hash of a shared DNA participate in the
+    /// same network and co-create the DHT. To create a separate DHT for the DNA,
+    /// a unique network seed can be specified.
     // TODO: consider Vec<u8> instead (https://github.com/holochain/holochain/pull/86#discussion_r412689085)
     pub network_seed: String,
 
