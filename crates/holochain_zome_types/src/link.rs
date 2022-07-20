@@ -23,6 +23,10 @@ pub struct Link {
     pub target: holo_hash::AnyLinkableHash,
     /// When the link was added
     pub timestamp: crate::Timestamp,
+    /// The [`ZomeId`] for where this link is defined.
+    pub zome_id: ZomeId,
+    /// The [`LinkType`] for this link.
+    pub link_type: LinkType,
     /// A tag used to find this link
     pub tag: LinkTag,
     /// The hash of this link's create action
