@@ -606,7 +606,7 @@ where
     /// chains's [`DnaHash`].
     CloseChain(DnaHash),
     /// This operation stores the [`Record`] for an
-    /// [`Action::AgentValidationPackage`] and contains
+    /// [`Action::AgentValidationPkg`] and contains
     /// the membrane proof ig there is one.
     AgentValidationPkg(Option<MembraneProof>),
     /// This operation stores the [`Record`] for an
