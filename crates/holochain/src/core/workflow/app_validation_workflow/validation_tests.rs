@@ -109,6 +109,11 @@ impl Expected {
         self.all_zomes(event.clone());
     }
 
+    fn activity_all_zomes(&mut self, mut event: Event) {
+        event.op_type = DhtOpType::RegisterAgentActivity;
+        self.all_zomes(event.clone());
+    }
+
     fn zomes(&mut self, mut event: Event, zomes: &[&'static str]) {
         for zome in zomes {
             event.called_zome = *zome;
@@ -121,6 +126,12 @@ impl Expected {
 
         self.zomes(event.clone(), zomes);
 
+        event.op_type = DhtOpType::StoreRecord;
+
+        self.zomes(event.clone(), zomes);
+    }
+
+    fn record_for_zomes(&mut self, mut event: Event, zomes: &[&'static str]) {
         event.op_type = DhtOpType::StoreRecord;
 
         self.zomes(event.clone(), zomes);
@@ -393,7 +404,8 @@ async fn app_validation_ops() {
         action: ActionLocation::expected(ALICE, ActionType::Create, 4),
         ..Default::default()
     };
-    expected.activity_and_record_all_zomes(event.clone());
+    expected.activity_all_zomes(event.clone());
+    expected.record_for_zomes(event.clone(), &[ZOME_A_0, ZOME_B_0]);
 
     event.op_type = DhtOpType::StoreEntry;
     event.called_zome = ZOME_A_0;

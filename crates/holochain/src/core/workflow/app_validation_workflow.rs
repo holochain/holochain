@@ -543,7 +543,8 @@ fn create_link_zomes_to_invoke(
     Ok(ZomesToInvoke::One(zome.erase_type()))
 }
 
-pub fn store_record_zomes_to_invoke(
+/// Get the zomes to invoke for an [`Op::StoreRecord`].
+fn store_record_zomes_to_invoke(
     action: &Action,
     ribosome: &impl RibosomeT,
 ) -> AppValidationOutcome<ZomesToInvoke> {
@@ -562,7 +563,6 @@ pub fn store_record_zomes_to_invoke(
             })?;
             Ok(ZomesToInvoke::OneIntegrity(zome))
         }
-        Action::Update(_) => todo!(),
         _ => Ok(ZomesToInvoke::AllIntegrity),
     }
 }

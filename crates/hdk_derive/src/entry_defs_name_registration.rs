@@ -243,7 +243,10 @@ pub fn build(attrs: TokenStream, input: TokenStream) -> TokenStream {
                     }
                     None => if entries.dependencies().any(|z| z == s.zome_id) {
                         Err(wasm_error!(WasmErrorInner::Guest(format!(
-                            "Entry type: {:?} is out of range for this zome.",
+                            "Entry type: {:?} is out of range for this zome. \
+                            This happens when an Action is created with a ZomeId for a dependency \
+                            of this zome and an EntryDefIndex that is out of range of all the \
+                            app defined entry types.",
                             s
                         ))))
                     } else {

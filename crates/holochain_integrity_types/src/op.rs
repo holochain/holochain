@@ -151,6 +151,8 @@ pub struct RegisterUpdate {
     /// The signed and hashed [`Action::Update`] that registers the update.
     pub update: SignedHashed<Update>,
     /// The new [`Entry`] that is being updated to.
+    /// This will be [`None`] when the [`Entry`] being
+    /// created is [`EntryVisibility::Private`](crate::entry_def::EntryVisibility::Private).
     pub new_entry: Option<Entry>,
     /// The original [`EntryCreationAction`] that created
     /// the original [`Entry`].
@@ -158,6 +160,8 @@ pub struct RegisterUpdate {
     /// of the original [`Entry`].
     pub original_action: EntryCreationAction,
     /// The original [`Entry`] that is being updated from.
+    /// This will be [`None`] when the [`Entry`] being
+    /// updated is [`EntryVisibility::Private`](crate::entry_def::EntryVisibility::Private).
     pub original_entry: Option<Entry>,
 }
 
@@ -173,6 +177,8 @@ pub struct RegisterDelete {
     /// the original [`Entry`].
     pub original_action: EntryCreationAction,
     /// The original [`Entry`] that is being deleted.
+    /// This will be [`None`] when the [`Entry`] being
+    /// deleted is [`EntryVisibility::Private`](crate::entry_def::EntryVisibility::Private).
     pub original_entry: Option<Entry>,
 }
 

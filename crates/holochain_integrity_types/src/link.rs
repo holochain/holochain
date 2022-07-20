@@ -68,12 +68,22 @@ pub enum LinkTypeFilter {
     Dependencies(Vec<ZomeId>),
 }
 
+/// A helper trait for finding the app defined link type
+/// from a [`ZomeId`] and [`LinkType`].
+///
+/// If the zome id is a dependency of the calling zome and
+/// the link type is out of range (greater than the number of defined
+/// link types) then a guest error is return (which will invalidate an op
+/// if used in the validation callback).
+///
+/// If the zome id is **not** a dependency of the calling zome then
+/// this will return [`None`].
 pub trait LinkTypesHelper: Sized {
     /// The error associated with this conversion.
     type Error;
     /// Check if the [`ZomeId`] and [`LinkType`] matches one of the
     /// `ZomeLinkTypeKey::from(Self::variant)` and if
-    /// it does return that type
+    /// it does return that type.
     fn from_type<Z, I>(zome_id: Z, link_type: I) -> Result<Option<Self>, Self::Error>
     where
         Z: Into<ZomeId>,

@@ -7,6 +7,17 @@ mod test;
 
 /// This trait provides a conversion to a convenience type [`OpType`]
 /// for use in the validation call back.
+///
+/// Not all data is available in the [`OpType`]. This is why the [`Op`]
+/// is not taken by value and can still be used after this conversion.
+///
+/// There is data that is common to all ops and can be accessed via helpers on
+/// the op.
+/// - Get the [`Op::author()`] of the op.
+/// - Get the [`Op::timestamp()`] for when the op was created.
+/// - Get the [`Op::action_seq()`] of the op.
+/// - Get the [`Op::prev_action()`] of the op.
+/// - Get the [`Op::action_type()`] of the op.
 pub trait OpHelper {
     /// Converts an [`Op`] to an [`OpType`] without consuming it.
     /// This will clone the required internal data.
@@ -460,7 +471,7 @@ where
 
 /// Maps an entry type and entry to an
 /// [`InScopeEntry`]. This will return a guest error
-/// an invalidate the op if the zome id is this zome but
+/// and invalidate the op if the zome id is this zome but
 /// entry type is not in scope.
 fn map_entry<ET>(
     entry_type: &EntryType,
