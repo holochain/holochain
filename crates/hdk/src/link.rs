@@ -119,7 +119,7 @@ pub fn delete_link(address: ActionHash) -> ExternResult<ActionHash> {
 /// all types like this: `get_links(base, .., None)`. Refer to the `get_links` function in
 /// [this coordinator zome](https://github.com/holochain/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/link/src/coordinator.rs)
 /// for examples.
-/// 
+///
 /// _Note this will only get links that are defined in dependent integrity zomes._
 ///
 /// Tag filtering is a simple bytes prefix.
