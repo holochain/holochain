@@ -178,6 +178,8 @@ impl EntryTestData {
         let link = Link {
             target: create_link.target_address.clone(),
             timestamp: create_link.timestamp,
+            zome_id: create_link.zome_id,
+            link_type: create_link.link_type,
             tag: create_link.tag,
             create_link_hash,
         };
