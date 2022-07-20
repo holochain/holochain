@@ -413,7 +413,7 @@ async fn data_map_get(
         .evt_sender
         .fetch_op_data(FetchOpDataEvt {
             space,
-            op_hashes: vec![op_key],
+            query: vec![op_key].into(),
         })
         .await
     {

@@ -205,8 +205,7 @@ async fn conductor_handle_from_config_path(opt: &Opt) -> ConductorHandle {
         load_config(&config_path, config_path_default)
     };
 
-    // read the passphrase to prepare for usage,
-    // but we don't have any keystore config types that use this yet.
+    // read the passphrase to prepare for usage
     let passphrase = match &config.keystore {
         KeystoreConfig::DangerTestKeystoreLegacyDeprecated => None,
         KeystoreConfig::LairServerLegacyDeprecated { .. } => None,

@@ -1,5 +1,5 @@
 use crate::prelude::*;
-pub use holochain_deterministic_integrity::x_salsa20_poly1305::*;
+pub use hdi::x_salsa20_poly1305::*;
 
 // -- secretbox encryption -- //
 

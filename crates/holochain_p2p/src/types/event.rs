@@ -3,7 +3,7 @@
 
 use crate::*;
 use holochain_zome_types::signature::Signature;
-use kitsune_p2p::{agent_store::AgentInfoSigned, event::*};
+use kitsune_p2p::{agent_store::AgentInfoSigned, dht::region::RegionBounds, event::*};
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 /// The data required for a get request.
@@ -100,6 +100,41 @@ impl From<&actor::GetActivityOptions> for GetActivityOptions {
     }
 }
 
+/// Message between agents actively driving/negotiating a countersigning session.
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub enum CountersigningSessionNegotiationMessage {
+    /// An authority has a complete set of signed actions and is responding with
+    /// them back to the counterparties.
+    AuthorityResponse(Vec<SignedAction>),
+    /// Counterparties are sending their signed action to an enzyme instead of
+    /// authorities as part of an enzymatic session.
+    EnzymePush(Box<DhtOp>),
+}
+
+/// Multiple ways to fetch op data
+#[derive(Debug, derive_more::From)]
+pub enum FetchOpDataQuery {
+    /// Fetch all ops with the hashes specified
+    Hashes(Vec<holo_hash::DhtOpHash>),
+    /// Fetch all ops within the time and space bounds specified
+    Regions(Vec<RegionBounds>),
+}
+
+impl FetchOpDataQuery {
+    /// Convert from the kitsune form of this query
+    pub fn from_kitsune(kit: FetchOpDataEvtQuery) -> Self {
+        match kit {
+            FetchOpDataEvtQuery::Hashes(hashes) => Self::Hashes(
+                hashes
+                    .into_iter()
+                    .map(|h| DhtOpHash::from_kitsune(&h))
+                    .collect::<Vec<_>>(),
+            ),
+            FetchOpDataEvtQuery::Regions(coords) => Self::Regions(coords),
+        }
+    }
+}
+
 ghost_actor::ghost_chan! {
     /// The HolochainP2pEvent stream allows handling events generated from
     /// the HolochainP2p actor.
@@ -125,7 +160,7 @@ ghost_actor::ghost_chan! {
         fn query_agent_info_signed_near_basis(dna_hash: DnaHash, kitsune_space: Arc<kitsune_p2p::KitsuneSpace>, basis_loc: u32, limit: u32) -> Vec<AgentInfoSigned>;
 
         /// Query the peer density of a space for a given [`DhtArc`].
-        fn query_peer_density(dna_hash: DnaHash, kitsune_space: Arc<kitsune_p2p::KitsuneSpace>, dht_arc: kitsune_p2p_types::dht_arc::DhtArc) -> kitsune_p2p_types::dht_arc::PeerViewBeta;
+        fn query_peer_density(dna_hash: DnaHash, kitsune_space: Arc<kitsune_p2p::KitsuneSpace>, dht_arc: kitsune_p2p_types::dht_arc::DhtArc) -> kitsune_p2p_types::dht::PeerView;
 
         /// A remote node is attempting to make a remote call on us.
         fn call_remote(
@@ -210,7 +245,7 @@ ghost_actor::ghost_chan! {
         /// The p2p module needs access to the content for a given set of DhtOpHashes.
         fn fetch_op_data(
             dna_hash: DnaHash,
-            op_hashes: Vec<holo_hash::DhtOpHash>,
+            query: FetchOpDataQuery,
         ) -> Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>;
 
         /// P2p operations require cryptographic signatures and validation.
@@ -223,12 +258,11 @@ ghost_actor::ghost_chan! {
             data: Vec<u8>,
         ) -> Signature;
 
-        /// Response from an authority to agents that are
-        /// part of a session.
-        fn countersigning_authority_response(
+        /// Messages between agents that drive a countersigning session.
+        fn countersigning_session_negotiation(
             dna_hash: DnaHash,
             to_agent: AgentPubKey,
-            signed_actions: Vec<SignedAction>,
+            message: CountersigningSessionNegotiationMessage,
         ) -> ();
     }
 }
@@ -245,7 +279,7 @@ macro_rules! match_p2p_evt {
             HolochainP2pEvent::GetAgentActivity { $i, .. } => { $($t)* }
             HolochainP2pEvent::ValidationReceiptReceived { $i, .. } => { $($t)* }
             HolochainP2pEvent::SignNetworkData { $i, .. } => { $($t)* }
-            HolochainP2pEvent::CountersigningAuthorityResponse { $i, .. } => { $($t)* }
+            HolochainP2pEvent::CountersigningSessionNegotiation { $i, .. } => { $($t)* }
             $($t2)*
         }
     };

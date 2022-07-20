@@ -1,4 +1,4 @@
-use holochain_deterministic_integrity::prelude::*;
+use hdi::prelude::*;
 
 #[hdk_entry_helper]
 pub struct Post(pub String);
@@ -122,11 +122,11 @@ fn call_x_25519_x_salsa20_poly1305_decrypt(
 
 #[cfg(all(test, feature = "mock"))]
 pub mod test {
-    use holochain_deterministic_integrity::prelude::holo_hash::DnaHash;
+    use hdi::prelude::holo_hash::DnaHash;
 
     use super::*;
     #[test]
-    fn test_all_holochain_deterministic_integrity() {
+    fn test_all_hdi() {
         let mut mock_hdi = holochain_mock_hdi::MockHdiT::new();
         let empty_agent_key = AgentPubKey::from_raw_36(vec![0u8; 36]);
         let empty_action_hash = ActionHash::from_raw_36(vec![0u8; 36]);

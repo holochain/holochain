@@ -694,6 +694,14 @@ where
     /// used by the `query` host function, which crosses the wasm boundary
     // FIXME: This query needs to be tested.
     pub async fn query(&self, query: QueryFilter) -> SourceChainResult<Vec<Record>> {
+        if query.sequence_range != ChainQueryFilterRange::Unbounded
+            && (query.action_type.is_some()
+                || query.entry_type.is_some()
+                || query.entry_hashes.is_some()
+                || query.include_entries)
+        {
+            return Err(SourceChainError::UnsupportedQuery(query));
+        }
         let author = self.author.clone();
         let public_only = self.public_only;
         let mut records = self
@@ -731,7 +739,8 @@ where
                 WHERE
                 Action.author = :author
                 AND
-                (:range_start IS NULL AND :range_end IS NULL AND :range_start_hash IS NULL AND :range_end_hash IS NULL AND :range_prior_count IS NULL)
+                (
+                    (:range_start IS NULL AND :range_end IS NULL AND :range_start_hash IS NULL AND :range_end_hash IS NULL AND :range_prior_count IS NULL)
                 ",
                     );
                     sql.push_str(match query.sequence_range {
@@ -741,20 +750,21 @@ where
                         ChainQueryFilterRange::ActionHashRange(_, _) => "
                         OR (
                             Action.seq BETWEEN
-                            (SELECT Action.seq WHERE Action.hash = :range_start_hash)
+                            (SELECT Action.seq from Action WHERE Action.hash = :range_start_hash)
                             AND
-                            (SELECT Action.seq WHERE Action.hash = :range_end_hash)
+                            (SELECT Action.seq from Action WHERE Action.hash = :range_end_hash)
                         )",
                         ChainQueryFilterRange::ActionHashTerminated(_, _) => "
                         OR (
                             Action.seq BETWEEN
-                            (SELECT Action.seq WHERE Action.hash = :range_end_hash) - :range_prior_count
+                            (SELECT Action.seq from Action WHERE Action.hash = :range_end_hash) - :range_prior_count
                             AND
-                            (SELECT Action.seq WHERE Action.hash = :range_end_hash)
+                            (SELECT Action.seq from Action WHERE Action.hash = :range_end_hash)
                         )",
                     });
                     sql.push_str(
                         "
+                )
                 AND
                 (:entry_type IS NULL OR Action.entry_type = :entry_type)
                 AND
@@ -1890,5 +1900,128 @@ pub mod tests {
         );
 
         Ok(())
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn source_chain_query() {
+        let test_db = test_authored_db();
+        let dht_db = test_dht_db();
+        let dht_db_cache = DhtDbQueryCache::new(dht_db.to_db().into());
+        let keystore = test_keystore();
+        let vault = test_db.to_db();
+        let alice = keystore.new_sign_keypair_random().await.unwrap();
+        let bob = keystore.new_sign_keypair_random().await.unwrap();
+        let dna_hash = fixt!(DnaHash);
+
+        genesis(
+            vault.clone().into(),
+            dht_db.to_db(),
+            &dht_db_cache,
+            keystore.clone(),
+            dna_hash.clone(),
+            alice.clone(),
+            None,
+        )
+        .await
+        .unwrap();
+
+        genesis(
+            vault.clone().into(),
+            dht_db.to_db(),
+            &dht_db_cache,
+            keystore.clone(),
+            dna_hash.clone(),
+            bob.clone(),
+            None,
+        )
+        .await
+        .unwrap();
+
+        test_db.dump_tmp();
+
+        let chain = SourceChain::new(vault, dht_db.to_db(), dht_db_cache, keystore, alice.clone())
+            .await
+            .unwrap();
+
+        let elements = chain.query(ChainQueryFilter::default()).await.unwrap();
+
+        // All of the range queries which should return a full set of elements
+        let full_ranges = [
+            ChainQueryFilterRange::Unbounded,
+            ChainQueryFilterRange::ActionSeqRange(0, 2),
+            ChainQueryFilterRange::ActionHashRange(
+                elements[0].action_address().clone(),
+                elements[2].action_address().clone(),
+            ),
+            ChainQueryFilterRange::ActionHashTerminated(elements[2].action_address().clone(), 2),
+        ];
+
+        // A variety of combinations of query parameters
+        let cases = [
+            ((None, None, vec![], false), 3),
+            ((None, None, vec![], true), 3),
+            ((Some(ActionType::Dna), None, vec![], false), 1),
+            ((None, Some(EntryType::AgentPubKey), vec![], false), 1),
+            ((None, Some(EntryType::AgentPubKey), vec![], true), 1),
+            ((Some(ActionType::Create), None, vec![], false), 1),
+            ((Some(ActionType::Create), None, vec![], true), 1),
+            (
+                (
+                    Some(ActionType::Create),
+                    Some(EntryType::AgentPubKey),
+                    vec![],
+                    false,
+                ),
+                1,
+            ),
+            (
+                (
+                    Some(ActionType::Create),
+                    Some(EntryType::AgentPubKey),
+                    vec![elements[2].action().entry_hash().unwrap().clone()],
+                    true,
+                ),
+                1,
+            ),
+        ];
+
+        // Test all permutations of cases defined with all full range queries,
+        // and both boolean values of `include_entries`.
+        for ((action_type, entry_type, entry_hashes, include_entries), num_expected) in cases {
+            let entry_hashes = if entry_hashes.is_empty() {
+                None
+            } else {
+                Some(entry_hashes.into_iter().collect())
+            };
+            for sequence_range in full_ranges.clone() {
+                let query = ChainQueryFilter {
+                    sequence_range: sequence_range.clone(),
+                    action_type: action_type.clone(),
+                    entry_type: entry_type.clone(),
+                    entry_hashes: entry_hashes.clone(),
+                    include_entries,
+                };
+                if sequence_range != ChainQueryFilterRange::Unbounded
+                    && (action_type.is_some()
+                        || entry_type.is_some()
+                        || entry_hashes.is_some()
+                        || include_entries)
+                {
+                    assert!(matches!(
+                        chain.query(query.clone()).await,
+                        Err(SourceChainError::UnsupportedQuery(_))
+                    ));
+                } else {
+                    let queried = chain.query(query.clone()).await.unwrap();
+                    let actual = queried.len();
+                    assert!(queried.iter().all(|e| e.action().author() == &alice));
+                    assert_eq!(
+                        num_expected, actual,
+                        "Expected {} items but got {} with filter {:?}",
+                        num_expected, actual, query
+                    );
+                }
+            }
+        }
     }
 }

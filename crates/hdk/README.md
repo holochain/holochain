@@ -4,8 +4,12 @@ The Holochain Development Kit (HDK) provides high and low level functions for wr
 
 Functions of a Holochain application (hApp) can be organized into reusable components. In Holochain terminology these components are called "zomes".
 One or multiple zomes are compiled into a WebAssembly (WASM) binary, referred to as a DNA. All of the DNAs of an application are bundled to a hApp.
+In short, that structure is __hApp -> DNA -> zome -> function__.
 
-hApps are required to produce and validate data deterministically, which is stored in a content-addressable manner retrieved by hash value.
+hApps are required to produce and validate data deterministically. There's a data model and a domain logic part to each hApp. In Holochain, the
+data model is defined in integrity zomes and the domain logic is written in coordinator zomes. See Integrity zomes and Coordinator zomes further down and
+[Holochain Deterministic Integrity](hdi) for more information.
+
 Since hApps are run as a binary on the hosting system, they must be sandboxed to prevent execution of insecure commands.
 Instead of writing and maintaining a custom format and specification for these artifacts as well as a runtime environment to execute them,
 Holochain makes use of WASM as the format of its applications. WASM binaries meet the aforementioned requirements as per the
@@ -13,7 +17,7 @@ Holochain makes use of WASM as the format of its applications. WASM binaries mee
 
 hApps can be installed on a device that's running a so-called conductor, Holochain's runtime. Clients can then call each zome's functions via Remote Procedure Calls (RPC).
 Holochain employs websocket ports for these RPCs, served by the conductor. Calls are made either from a client on localhost or from other nodes on the network.
-The zome function to be executed must be specified in each call. Every zome function in turn defines the response it returns to the client as part of a zome's code.
+The zome function to be executed must be specified in each call. Every zome function defines the response it returns to the client.
 [More info on Holochain's architecture](https://developer.holochain.org/concepts/2_application_architecture)
 
 Low-level communication between the conductor and WASM binaries, like typing and serialization of data, is encapsulated by the HDK.
@@ -26,11 +30,27 @@ See the [Holochain Learning Resources](https://developer.holochain.org/learning)
 The HDK is used in all the WASMs used to test Holochain itself.
 As they are used directly by tests in CI they are guaranteed to compile and work for at least the tests we define against them.
 
-At the time of writing there were about 40 example/test WASMs that can be browsed [on Github](https://github.com/holochain/holochain/tree/develop/crates/test_utils/wasm/wasm_workspace).
+At the time of writing there were about 40 example/test WASMs that can be browsed
+[on Github](https://github.com/holochain/holochain/tree/develop/crates/test_utils/wasm/wasm_workspace).
 
 Each example WASM is a minimal demonstration of specific HDK functionality, such as generating random data, creating entries or defining validation callbacks.
 Some of the examples are very contrived, none are intended as production grade hApp examples, but do highlight key functionality.
 
+## Integrity zomes 📐
+
+Integrity zomes describe a hApp's domain model by defining a set of entry and link types and providing a validation callback
+function that checks the integrity of any operations that manipulate data of those types.
+
+The wasm workspace contains examples of integrity zomes like this:
+<https://github.com/holochain/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/integrity_zome/src/lib.rs>
+
+## Coordinator zomes 🐜
+
+Coordinator zomes are the counterpart of integrity zomes in a DNA. They contain the domain logic of how data is read and written.
+Whereas data is defined and validated in integrity zomes, functions to manipulate data are implemented in coordinator zomes.
+
+An example coordinator zome can be found in the wasm workspace of the Holochain repository:
+<https://github.com/holochain/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/coordinator_zome/src/lib.rs>.
 
 ## HDK structure 🧱
 
@@ -38,6 +58,7 @@ HDK implements several key features:
 
 - Base HDKT trait for standardisation, mocking, unit testing support: [`hdk`] module
 - Capabilities and function level access control: [`capability`] module
+- [Holochain Deterministic Integrity (HDI)](hdi)
 - Application data and entry definitions for the source chain and DHT: [`entry`] module and [`entry_defs`] callback
 - Referencing/linking entries on the DHT together into a graph structure: [`link`] module
 - Defining tree-like structures out of links and entries for discoverability and scalability: [`hash_path`] module
@@ -144,17 +165,11 @@ The callbacks are:
 - `fn validate_delete_link(delete_link_data: ValidateDeleteLinkData) -> ExternResult<ValidateLinkCallbackResult>`:
   - Allows the guest to pass/fail/retry link deletion validation.
   - Only the zome that deleted the link is called.
-- `fn validate_{{ create|update|delete }}_{{ agent|entry }}_{{ <entry_id> }}(validate_data: ValidateData) -> ExternResult<ValidateCallbackResult>`:
-  - Allows the guest to pass/fail/retry entry validation.
-  - <entry_id> is the entry id defined by entry defs e.g. "comment".
+- `fn validate(op: Op) -> ExternResult<ValidateCallbackResult>`:
+  - Allows the guest to pass/fail/retry any operation.
   - Only the originating zome is called.
   - Failure overrides retry.
-- `fn validation_package_{{ <entry_id> }}(entry_type: AppEntryType) -> ExternResult<ValidationPackageCallbackResult>`:
-  - Allows the guest to build a validation package for the given entry type.
-  - Can pass/retry/fail/not-implemented in reverse override order.
-  - <entry_id> is the entry id defined by entry defs e.g. "comment".
-  - Only the originating zome is called.
-
+  - See [`validate`](hdi::prelude::validate) for more details.
 
 ## HDK has layers 🧅
 

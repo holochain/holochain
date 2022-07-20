@@ -1,4 +1,4 @@
-use holochain_deterministic_integrity::prelude::*;
+use hdi::prelude::*;
 
 #[hdk_extern]
 fn genesis_self_check(_: GenesisSelfCheckData) -> ExternResult<ValidateCallbackResult> {
