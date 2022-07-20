@@ -485,6 +485,8 @@ fn set_zome_types_and_compare(entries: &[(u8, u8)], links: &[(u8, u8)], compare:
             Ok(vec![vec![Link {
                 target: base(),
                 timestamp: Timestamp(0),
+                zome_id: 0.into(),
+                link_type: 0.into(),
                 tag: ().into(),
                 create_link_hash: ActionHash::from_raw_36(vec![0u8; 36]),
             }]])
@@ -503,6 +505,8 @@ fn set_zome_types_and_compare(entries: &[(u8, u8)], links: &[(u8, u8)], compare:
                     Ok(vec![vec![Link {
                         target: base(),
                         timestamp: Timestamp(0),
+                        zome_id: 0.into(),
+                        link_type: 0.into(),
                         tag: ().into(),
                         create_link_hash: ActionHash::from_raw_36(vec![0u8; 36]),
                     }]])

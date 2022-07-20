@@ -6,7 +6,7 @@
 //!
 //! hApps are required to produce and validate data deterministically. There's a data model and a domain logic part to each hApp. In Holochain, the
 //! data model is defined in integrity zomes and the domain logic is written in coordinator zomes. See Integrity zomes and Coordinator zomes further down and
-//! [Holochain Deterministic Integrity](hdi) for more information.
+//! [Holochain Deterministic Integrity (HDI)](hdi) for more information.
 //!
 //! Since hApps are run as a binary on the hosting system, they must be sandboxed to prevent execution of insecure commands.
 //! Instead of writing and maintaining a custom format and specification for these artifacts as well as a runtime environment to execute them,
@@ -28,7 +28,7 @@
 //! The HDK is used in all the WASMs used to test Holochain itself.
 //! As they are used directly by tests in CI they are guaranteed to compile and work for at least the tests we define against them.
 //!
-//! At the time of writing there were about 40 example/test WASMs that can be browsed
+//! There are numerous example/test WASMs on many aspects of hApp development that can be browsed
 //! [on Github](https://github.com/holochain/holochain/tree/develop/crates/test_utils/wasm/wasm_workspace).
 //!
 //! Each example WASM is a minimal demonstration of specific HDK functionality, such as generating random data, creating entries or defining validation callbacks.
@@ -41,6 +41,8 @@
 //!
 //! The wasm workspace contains examples of integrity zomes like this:
 //! <https://github.com/holochain/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/integrity_zome/src/lib.rs>
+//!
+//! Refer to the [HDI crate](hdi) for more information on the integrity layer.
 //!
 //! # Coordinator zomes 🐜
 //!
@@ -102,7 +104,9 @@
 //! - The function must return an `ExternResult` where the success value implements `serde::Serialize + std::fmt::Debug`
 //! - The function must have a unique name across all externs as they share a global namespace in WASM
 //! - Everything inside the function is Rust-as-usual including `?` to interact with `ExternResult` that fails as `WasmError`
-//! - Use the `WasmErrorInner::Guest` variant for failure conditions that the host or external processes needs to be aware of
+//! - Use the [`wasm_error!`](holochain_wasmer_guest::wasm_error) macro along with the
+//! [`WasmErrorInner::Guest`](holochain_wasmer_guest::WasmErrorInner::Guest) variant for failure conditions that the host or
+//! external processes need to be aware of
 //! - Externed functions can be called as normal by other functions inside the same WASM
 //!
 //! For example:
@@ -233,7 +237,7 @@
 //!
 //! All the basic tracing macros `trace!`, `debug!`, `warn!`, `error!` are implemented.
 //!
-//! However, tracing spans currently do _not_ work, if you attempt to `#[instrument]` you will likely panic your WASM.
+//! However, tracing spans currently do _not_ work, if you attempt to `#[instrument]`, you will likely panic your WASM.
 //!
 //! WASM tracing can be filtered at runtime using the `WASM_LOG` environment variable that works exactly as `RUST_LOG` does for the Holochain conductor and other Rust binaries.
 //!
@@ -246,11 +250,12 @@
 //!
 //! There are many other possibilities for failure, such as a corrupt database or attempting cryptographic operations without a key.
 //!
-//! When the host encounters a failure `Result` it will __serialize the error and pass it back to the WASM guest__.
-//! The __guest must handle this error__ and either return it back to the host which _then_ rolls back writes (see above) or implement some kind of graceful failure or retry logic.
+//! When the host encounters a failure `Result`, it will __serialize the error and pass it back to the WASM guest__.
+//! The __guest must handle this error__ and either return it back to the host which _then_ rolls back writes (see above), or implement some kind of graceful failure or retry logic.
 //!
 //! The `Result` from the host in the case of host calls indicates whether the execution _completed_ successfully and is _in addition to_ other Result-like enums.
-//! For example, a remote call can be `Ok` from the host's perspective but contain an [ `crate::prelude::ZomeCallResponse::Unauthorized` ] "failure" enum variant from the remote agent, both need to be handled in context.
+//! For example, a remote call can be `Ok` from the host's perspective but contain an [ `crate::prelude::ZomeCallResponse::Unauthorized` ] "failure" enum variant from the remote agent.
+//! Both need to be handled in context.
 //!
 //! [`hdk_extern!`]: hdk_derive::hdk_extern
 
