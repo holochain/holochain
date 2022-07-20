@@ -109,7 +109,7 @@ impl DnaManifestV1 {
 #[serde(rename_all = "snake_case")]
 /// Manifest for all items that will change the [`DnaHash`].
 pub struct IntegrityManifest {
-    /// A network seed for uniquifying this DNA.
+    /// A network seed for uniquifying this DNA. See [`DnaDef`].
     // TODO: consider Vec<u8> instead (https://github.com/holochain/holochain/pull/86#discussion_r412689085)
     pub network_seed: Option<String>,
 

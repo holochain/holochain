@@ -14,7 +14,7 @@ pub type IntegrityZomes = Vec<(ZomeName, zome::IntegrityZomeDef)>;
 /// Ordered list of coordinator zomes in this DNA.
 pub type CoordinatorZomes = Vec<(ZomeName, zome::CoordinatorZomeDef)>;
 
-/// Placeholder for a real network seed type
+/// Placeholder for a real network seed type. See [`DnaDef`].
 pub type NetworkSeed = String;
 
 /// The definition of a DNA: the hash of this data is what produces the DnaHash.
