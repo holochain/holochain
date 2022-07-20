@@ -200,17 +200,18 @@ pub fn derive_to_unit_enum(input: TokenStream) -> TokenStream {
     unit_enum::derive(input)
 }
 
-/// Declares your integrity zomes entry types.
+/// Declares the integrity zome's entry types.
 ///
 /// # Attributes
-/// - `unit_enum(TypeName)`: Defines the unit version of this enum.
+/// - `unit_enum(TypeName)`: Defines the unit version of this enum. The resulting enum contains all
+/// entry types defined in the integrity zome. It can be used to refer to a type when needed.
 /// - `entry_def(name: String, required_validations: u8, visibility: String)`: Defines an entry type.
 ///   - name: The name of the entry definition (optional).
 ///     Defaults to the name of the enum variant.
 ///   - required_validations: The number of validations required before this entry
 ///     will not be published anymore (optional). Defaults to 5.
-///   - visibility: The visibility of this entry.
-///     ["public" | "private"] Default is "public".
+///   - visibility: The visibility of this entry. [`public` | `private`].
+///     Default is `public`.
 ///
 /// # Examples
 /// ```ignore
