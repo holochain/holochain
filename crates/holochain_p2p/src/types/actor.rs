@@ -217,6 +217,7 @@ ghost_actor::ghost_chan! {
         fn call_remote(
             dna_hash: DnaHash,
             from_agent: AgentPubKey,
+            from_signature: Signature,
             to_agent: AgentPubKey,
             zome_name: ZomeName,
             fn_name: FunctionName,

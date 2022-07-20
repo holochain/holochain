@@ -895,6 +895,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
         &mut self,
         dna_hash: DnaHash,
         from_agent: AgentPubKey,
+        from_signature: Signature,
         to_agent: AgentPubKey,
         zome_name: ZomeName,
         fn_name: FunctionName,

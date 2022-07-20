@@ -333,7 +333,9 @@ impl ZomeCallInvocation {
             .valid_cap_grant(check_function, check_agent, check_secret)
             .await?;
 
-        Ok(maybe_grant.is_some())
+        let check_call_unsigned: ZomeCallUnsigned = self.into();
+
+        Ok(maybe_grant.is_some() && check_agent.verify_signature(&self.signature, check_call_unsigned).await)
     }
 }
 
@@ -347,6 +349,19 @@ mockall::mock! {
     }
     trait Clone {
         fn clone(&self) -> Self;
+    }
+}
+
+impl From<ZomeCallInvocation> for ZomeCallUnsigned {
+    fn from(zome_call_invocation: ZomeCallInvocation) -> Self {
+        Self {
+            cell_id: zome_call_invocation.cell_id.clone(),
+            zome: zome_call_invocation.zome.name.clone(),
+            cap_secret: zome_call_invocation.cap_secret.clone(),
+            fn_name: zome_call_invocation.fn_name.clone(),
+            payload: zome_call_invocation.payload.clone(),
+            provenance: zome_call_invocation.provenance.clone(),
+        }
     }
 }
 
@@ -370,6 +385,9 @@ pub struct ZomeCallInvocation {
     /// The provenance of the call. Provenance means the 'source'
     /// so this expects the `AgentPubKey` of the agent calling the Zome function
     pub provenance: AgentPubKey,
+    /// The signature of the call from the provenance of the call.
+    /// Everything except the signature itself is signed.
+    pub signature: Signature,
 }
 
 impl Invocation for ZomeCallInvocation {
@@ -400,6 +418,7 @@ impl ZomeCallInvocation {
             cap_secret,
             payload,
             provenance,
+            signature,
         } = call;
         let zome = conductor_api
             .get_zome(cell_id.dna_hash(), &zome_name)
@@ -411,6 +430,7 @@ impl ZomeCallInvocation {
             fn_name,
             payload,
             provenance,
+            signature,
         })
     }
 }

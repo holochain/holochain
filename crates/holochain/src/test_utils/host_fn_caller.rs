@@ -28,6 +28,7 @@ use holochain_wasm_test_utils::TestWasmPair;
 use holochain_zome_types::AgentActivity;
 use std::sync::Arc;
 use unwrap_to::unwrap_to;
+use crate::core::workflow::call_zome_function_authorized;
 
 // Commit entry types //
 // Useful for when you want to commit something
@@ -436,7 +437,7 @@ impl HostFnCaller {
         let output = {
             let host_access = call_context.host_context();
             let zcha = unwrap_to!(host_access => HostContext::ZomeCall).clone();
-            ribosome.call_zome_function(zcha, invocation).unwrap()
+            call_zome_function_authorized(ribosome, zcha, invocation).unwrap()
         };
 
         // Write

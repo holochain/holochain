@@ -43,6 +43,7 @@ pub trait HolochainP2pDnaT {
     async fn call_remote(
         &self,
         from_agent: AgentPubKey,
+        from_signature: Signature,
         to_agent: AgentPubKey,
         zome_name: ZomeName,
         fn_name: FunctionName,
@@ -170,6 +171,7 @@ impl HolochainP2pDnaT for HolochainP2pDna {
     async fn call_remote(
         &self,
         from_agent: AgentPubKey,
+        from_signature: Signature,
         to_agent: AgentPubKey,
         zome_name: ZomeName,
         fn_name: FunctionName,
@@ -180,6 +182,7 @@ impl HolochainP2pDnaT for HolochainP2pDna {
             .call_remote(
                 (*self.dna_hash).clone(),
                 from_agent,
+                from_signature,
                 to_agent,
                 zome_name,
                 fn_name,

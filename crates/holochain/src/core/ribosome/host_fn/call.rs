@@ -54,6 +54,15 @@ pub fn call(
                             .agent_pubkey()
                             .clone();
 
+
+
+                        let signature = call_context
+                .host_context
+                .keystore()
+                .sign(provenance, input.data.into_vec().into())
+                .await.map_err(|e| -> RuntimeError { wasm_error!(e.into()).into() })?;
+
+
                         let result: Result<ZomeCallResponse, RuntimeError> = match target {
                             CallTarget::NetworkAgent(target_agent) => {
                                 match call_context
@@ -61,6 +70,7 @@ pub fn call(
                                     .network()
                                     .call_remote(
                                         provenance,
+                                        signature,
                                         target_agent,
                                         zome_name,
                                         fn_name,
@@ -120,6 +130,7 @@ pub fn call(
                                             payload,
                                             cap_secret,
                                             provenance,
+                                            signature,
                                         };
                                         match call_context
                                             .host_context()
@@ -219,7 +230,7 @@ pub mod wasm_test {
         let zome2 = cell2.zome(test_wasm);
 
         let _: () = conductor.call(&zome2, "set_access", ()).await;
-        
+
         {
             let agent_info: AgentInfo = conductor
                 .call(&zome1, "who_are_they_local", cell2.cell_id())
@@ -280,7 +291,7 @@ pub mod wasm_test {
     /// in a different cell.
     // FIXME: we should NOT be able to do a "bridge" call to another cell in a different app, by a different agent!
     //        Local bridge calls are always within the same app. So this test is testing something that should
-    //        not be supported. 
+    //        not be supported.
     #[tokio::test(flavor = "multi_thread")]
     async fn bridge_call() {
         observability::test_run().ok();

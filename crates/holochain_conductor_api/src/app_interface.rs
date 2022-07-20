@@ -1,6 +1,8 @@
 use crate::{signal_subscription::SignalSubscription, ExternalApiWireError};
 use holo_hash::AgentPubKey;
 use holochain_types::prelude::*;
+use holochain_keystore::MetaLairClient;
+use holochain_keystore::LairResult;
 
 /// Represents the available conductor functions to call over an app interface
 /// and will result in a corresponding [`AppResponse`] message being sent back over the
@@ -92,11 +94,37 @@ pub struct ZomeCall {
     /// via a `CapGrant`. Otherwise it will be necessary to provide a `CapSecret` for every call.
     pub cap_secret: Option<CapSecret>,
     /// The provenance (source) of the call
-    ///
-    /// NB: **This will be removed** as soon as Holochain has a way of determining who
-    /// is making this zome call over this interface. Until we do, the caller simply
-    /// provides this data and Holochain trusts them.
+    /// MUST match the signature.
     pub provenance: AgentPubKey,
+    pub signature: Signature,
+}
+
+impl From<ZomeCall> for ZomeCallUnsigned {
+    fn from(zome_call: ZomeCall) -> Self {
+        Self {
+            cell_id: zome_call.cell_id.clone(),
+            zome_name: zome_call.zome_name.clone(),
+            fn_name: zome_call.fn_name.clone(),
+            payload: zome_call.payload.clone(),
+            cap_secret: zome_call.cap_secret.clone(),
+            provenance: zome_call.provenance.clone(),
+        }
+    }
+}
+
+impl ZomeCall {
+    pub async fn try_from_unsigned_zome_call(keystore: &MetaLairClient, unsigned_zome_call: ZomeCallUnsigned) -> LairResult<Self> {
+        let signature = unsigned_zome_call.provenance.sign(&keystore, &unsigned_zome_call).await?;
+        Ok(Self {
+            cell_id: unsigned_zome_call.cell_id,
+            zome_name: unsigned_zome_call.zome_name,
+            fn_name: unsigned_zome_call.fn_name,
+            payload: unsigned_zome_call.payload,
+            cap_secret: unsigned_zome_call.cap_secret,
+            provenance: unsigned_zome_call.provenance,
+            signature,
+        })
+    }
 }
 
 #[allow(missing_docs)]

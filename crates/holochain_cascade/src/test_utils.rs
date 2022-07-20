@@ -43,6 +43,7 @@ use holochain_zome_types::SignedActionHashed;
 use holochain_zome_types::Timestamp;
 use holochain_zome_types::TryInto;
 use holochain_zome_types::ValidationStatus;
+use holochain_zome_types::Signature;
 
 pub use activity_test_data::*;
 pub use entry_test_data::*;
@@ -238,6 +239,7 @@ impl HolochainP2pDnaT for PassThroughNetwork {
     async fn call_remote(
         &self,
         _from_agent: AgentPubKey,
+        _from_signature: Signature,
         _to_agent: AgentPubKey,
         _zome_name: holochain_zome_types::ZomeName,
         _fn_name: holochain_zome_types::FunctionName,
@@ -416,6 +418,7 @@ impl HolochainP2pDnaT for MockNetwork {
     async fn call_remote(
         &self,
         _from_agent: AgentPubKey,
+        _from_signature: Signature,
         _to_agent: AgentPubKey,
         _zome_name: holochain_zome_types::ZomeName,
         _fn_name: holochain_zome_types::FunctionName,

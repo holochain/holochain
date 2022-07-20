@@ -29,6 +29,7 @@ pub use crate::record::error::*;
 pub use crate::record::*;
 pub use crate::signal::*;
 pub use crate::validate::*;
+pub use crate::zome_call::*;
 
 pub use crate::fixt::TimestampFixturator;
 #[cfg(feature = "fixturators")]

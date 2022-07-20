@@ -285,14 +285,15 @@ impl Cell {
                             continue;
                         }
                     };
-                    let invocation = ZomeCall {
+                    let unsigned_zome_call = ZomeCallUnsigned {
+                        provenance: self.id.agent_pubkey().clone(),
                         cell_id: self.id.clone(),
                         zome_name: scheduled_fn.zome_name().clone(),
+                        fn_name: scheduled_fn.fn_name().clone(),
                         cap_secret: None,
                         payload,
-                        provenance: self.id.agent_pubkey().clone(),
-                        fn_name: scheduled_fn.fn_name().clone(),
                     };
+                    let invocation = ZomeCall::try_from_unsigned_zome_call(self.conductor_handle.keystore(), unsigned_zome_call).await?;
                     tasks.push(self.call_zome(invocation, None));
                 }
                 let results: Vec<CellResult<ZomeCallResult>> =
