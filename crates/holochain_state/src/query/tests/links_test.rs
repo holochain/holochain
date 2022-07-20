@@ -705,6 +705,8 @@ async fn links_on_same_tag() {
             ActionHashed::from_content_sync(Action::CreateLink(d.link_add.clone())).into();
         d.expected_link.create_link_hash = link_add_hash.clone();
         d.expected_link.tag = tag.clone();
+        d.expected_link.zome_id = zome_id;
+        d.expected_link.link_type = link_type;
         d.link_remove.link_add_address = link_add_hash;
 
         d.query = GetLinksQuery::new(
@@ -766,6 +768,7 @@ async fn links_on_same_type() {
         let (_, link_add_hash): (_, ActionHash) =
             ActionHashed::from_content_sync(Action::CreateLink(d.link_add.clone())).into();
         d.expected_link.create_link_hash = link_add_hash.clone();
+        d.expected_link.link_type = link_type;
     }
 
     for d in &mut td {
