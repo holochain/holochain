@@ -195,3 +195,9 @@ pub mod trace;
 pub mod hdi;
 
 pub mod link;
+
+#[deny(missing_docs)]
+pub mod op;
+
+#[cfg(any(feature = "test_utils", test))]
+pub mod test_utils;

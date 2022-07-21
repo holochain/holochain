@@ -1618,7 +1618,7 @@ mod builder {
                 .clone()
                 .start_scheduler(holochain_zome_types::schedule::SCHEDULER_INTERVAL);
 
-            let _ = Self::spawn_post_commit(handle.clone(), post_commit_receiver);
+            Self::spawn_post_commit(handle.clone(), post_commit_receiver);
 
             let configs = conductor_config.admin_interfaces.unwrap_or_default();
             let cell_startup_errors = handle.clone().initialize_conductor(configs).await?;

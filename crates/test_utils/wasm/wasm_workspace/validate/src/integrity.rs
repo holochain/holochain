@@ -85,7 +85,7 @@ pub fn __num_link_types() -> u8 {
 #[hdk_extern]
 fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op {
-        Op::StoreEntry {
+        Op::StoreEntry(StoreEntry {
             action:
                 SignedHashed {
                     hashed:
@@ -95,7 +95,7 @@ fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     ..
                 },
             entry,
-        } => match action.app_entry_type() {
+        }) => match action.app_entry_type() {
             Some(AppEntryType { id, zome_id, .. }) => {
                 if zome_info()?
                     .zome_types
