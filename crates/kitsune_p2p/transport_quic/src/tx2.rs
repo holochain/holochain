@@ -222,7 +222,7 @@ impl QuicConRecvAdapt {
             fn drop(&mut self) {
                 let f = self.0.close(500, "listener closed");
                 tokio::task::spawn(async move {
-                    let _ = f.await;
+                    f.await;
                 });
             }
         }

@@ -31,7 +31,7 @@ fn genesis_self_check(data: GenesisSelfCheckData) -> ExternResult<ValidateCallba
 
 #[hdk_extern]
 fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
-    if let Op::StoreEntry {
+    if let Op::StoreEntry(StoreEntry {
         action:
             SignedHashed {
                 hashed: HoloHashed {
@@ -40,7 +40,7 @@ fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 ..
             },
         entry,
-    } = op
+    }) = op
     {
         if let Some(AppEntryType {
             id: entry_def_index,
