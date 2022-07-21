@@ -769,8 +769,11 @@ where
 }
 
 /// A fixture example dna for unit testing.
-pub fn fake_valid_dna_file(uid: &str) -> DnaFile {
-    fake_dna_zomes(uid, vec![(TestWasm::Foo.into(), TestWasm::Foo.into())])
+pub fn fake_valid_dna_file(network_seed: &str) -> DnaFile {
+    fake_dna_zomes(
+        network_seed,
+        vec![(TestWasm::Foo.into(), TestWasm::Foo.into())],
+    )
 }
 
 /// Run genesis on the source chain for testing.
