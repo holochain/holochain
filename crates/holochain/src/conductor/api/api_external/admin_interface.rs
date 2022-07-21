@@ -55,7 +55,8 @@ pub struct RealAdminInterfaceApi {
 }
 
 impl RealAdminInterfaceApi {
-    pub(crate) fn new(conductor_handle: ConductorHandle) -> Self {
+    /// Create an admin interface api.
+    pub fn new(conductor_handle: ConductorHandle) -> Self {
         RealAdminInterfaceApi { conductor_handle }
     }
 }
@@ -128,6 +129,23 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     self.conductor_handle.register_dna(dna).await?;
                 }
                 Ok(AdminResponse::DnaRegistered(hash))
+            }
+            HotSwapCoordinators(payload) => {
+                let HotSwapCoordinatorsPayload { dna_hash, source } = *payload;
+                let (coordinator_zomes, wasms) = match source {
+                    CoordinatorSource::Path(ref path) => {
+                        let bundle = Bundle::read_from_file(path).await?;
+                        let bundle: CoordinatorBundle = bundle.into();
+                        bundle.into_zomes().await?
+                    }
+                    CoordinatorSource::Bundle(bundle) => bundle.into_zomes().await?,
+                };
+
+                self.conductor_handle
+                    .hot_swap_coordinators(&dna_hash, coordinator_zomes, wasms)
+                    .await?;
+
+                Ok(AdminResponse::CoordinatorsHotSwapped)
             }
             CreateCloneCell(payload) => {
                 let cell_id = payload.cell_id();

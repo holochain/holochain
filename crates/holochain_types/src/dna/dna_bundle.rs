@@ -238,7 +238,7 @@ impl DnaBundle {
     }
 }
 
-async fn hash_bytes(
+pub(super) async fn hash_bytes(
     zomes: impl Iterator<Item = ZomeManifest>,
     resources: &mut HashMap<Location, ResourceBytes>,
 ) -> DnaResult<Vec<(ZomeName, WasmHash, DnaWasm, Vec<ZomeName>)>> {

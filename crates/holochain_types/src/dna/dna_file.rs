@@ -92,6 +92,18 @@ impl DnaFile {
         coordinator_zomes: CoordinatorZomes,
         wasms: Vec<wasm::DnaWasm>,
     ) -> Result<Vec<WasmHash>, DnaError> {
+        let dangling_dep = coordinator_zomes.iter().find_map(|(coord_name, def)| {
+            def.as_any_zome_def()
+                .dependencies()
+                .iter()
+                .find_map(|zome_name| {
+                    (!self.dna.is_integrity_zome(zome_name))
+                        .then(|| (zome_name.to_string(), coord_name.to_string()))
+                })
+        });
+        if let Some((dangling_dep, zome_name)) = dangling_dep {
+            return Err(DnaError::DanglingZomeDependency(dangling_dep, zome_name));
+        }
         // Get the previous coordinators.
         let previous_coordinators = std::mem::replace(
             &mut self.dna.content.coordinator_zomes,

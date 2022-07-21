@@ -11,7 +11,7 @@ mod app_bundle;
 mod app_manifest;
 mod dna_gamut;
 pub mod error;
-use crate::dna::DnaBundle;
+use crate::{dna::DnaBundle, prelude::CoordinatorBundle};
 pub use app_bundle::*;
 pub use app_manifest::app_manifest_validated::*;
 pub use app_manifest::*;
@@ -44,6 +44,16 @@ pub enum DnaSource {
     Hash(DnaHash),
 }
 
+/// The source of coordinators to be installed, either as binary data, or from a path
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CoordinatorSource {
+    /// Coordinators loaded from a bundle file on disk
+    Path(PathBuf),
+    /// Coordinators provided in the [`CoordinatorBundle`] data structure
+    Bundle(Box<CoordinatorBundle>),
+}
+
 /// The instructions on how to get the DNA to be registered
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct RegisterDnaPayload {
@@ -54,6 +64,16 @@ pub struct RegisterDnaPayload {
     /// Where to find the DNA
     #[serde(flatten)]
     pub source: DnaSource,
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+/// The instructions on how to hot swap coordinators for a dna file.
+pub struct HotSwapCoordinatorsPayload {
+    /// The hash of the dna to swap coordinators for.
+    pub dna_hash: DnaHash,
+    /// Where to find the coordinators.
+    #[serde(flatten)]
+    pub source: CoordinatorSource,
 }
 
 /// The instructions on how to get the DNA to be registered
