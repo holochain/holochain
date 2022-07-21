@@ -114,6 +114,8 @@ impl LinkTestData {
             target: target_hash.clone().into(),
             timestamp: create_link.timestamp,
             tag: create_link.tag.clone(),
+            zome_id: create_link.zome_id,
+            link_type: create_link.link_type,
             create_link_hash: create_link_hash.clone(),
         };
 
@@ -121,6 +123,8 @@ impl LinkTestData {
             target: target_hash.clone().into(),
             timestamp: later_create_link.timestamp,
             tag: later_create_link.tag.clone(),
+            zome_id: later_create_link.zome_id,
+            link_type: later_create_link.link_type,
             create_link_hash: later_create_link_hash.clone(),
         };
 

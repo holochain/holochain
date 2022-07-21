@@ -230,6 +230,8 @@ fn link_from_action(action: Action) -> StateQueryResult<Link> {
         Action::CreateLink(action) => Ok(Link {
             target: action.target_address,
             timestamp: action.timestamp,
+            zome_id: action.zome_id,
+            link_type: action.link_type,
             tag: action.tag,
             create_link_hash: hash,
         }),
