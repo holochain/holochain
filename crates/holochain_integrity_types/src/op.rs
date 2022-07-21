@@ -607,7 +607,7 @@ where
     CloseChain(DnaHash),
     /// This operation stores the [`Record`] for an
     /// [`Action::AgentValidationPkg`] and contains
-    /// the membrane proof ig there is one.
+    /// the membrane proof if there is one.
     AgentValidationPkg(Option<MembraneProof>),
     /// This operation stores the [`Record`] for an
     /// [`Action::InitZomesComplete`].
