@@ -74,7 +74,7 @@ pub fn forked_chain(ranges: &[Range<u8>]) -> Vec<ChainItem> {
                     let prev = n.checked_sub(1).map(|n_sub_1| action_hash(&[n_sub_1]));
                     ChainItem {
                         action_seq: n as u32,
-                        hash: action_hash(&[n as u8]),
+                        hash: action_hash(&[n as u8, i as u8]),
                         prev_action: prev,
                     }
                 } else {

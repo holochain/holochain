@@ -50,6 +50,33 @@ pub struct ChainFilterIter {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+/// A [`ChainFilter`] with the action sequences for the
+/// starting position and any `until` hashes.
+pub struct ChainFilterRange {
+    /// The filter for for this chain.
+    filter: ChainFilter,
+    /// The start of this range is the end of
+    /// the filter iterator.
+    /// The end of this range is the sequence of
+    /// the starting position hash.
+    range: RangeInclusive<u32>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+/// Outcome of trying to find the action sequences in a filter.
+pub enum Sequences {
+    /// Found all action sequences
+    Found(ChainFilterRange),
+    /// The following action was not found.
+    ActionNotFound(ActionHash),
+    /// The starting position is not the highest
+    /// sequence in the filter.
+    PositionNotHighest,
+    /// The filter produces an empty range.
+    EmptyRange,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 /// Constraints on a chain filter.
 /// This is used to check the following
 /// invariants are upheld after filtering
@@ -59,11 +86,20 @@ pub struct ChainFilterIter {
 ///   - `position - take`.
 ///   - minimum of until hashes.
 /// - If there are no filters then the
-/// result should end in 0.
+/// result should end in 0 (genesis).
 pub struct ChainFilterConstraints {
     filter: ChainFilter,
-    highest_until: Option<(ActionHash, u32)>,
+    until: Option<UntilConstraint>,
     range: RangeInclusive<u32>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+/// The chain must end with this `until` hash.
+pub struct UntilConstraint {
+    /// The "until" hash with the highest action sequence.
+    pub hash: ActionHash,
+    /// The sequence of the above hash.
+    pub action_seq: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -73,8 +109,13 @@ pub enum MustGetAgentActivityResponse {
     Activity(Vec<RegisterAgentActivity>),
     /// The requested chain range was incomplete.
     IncompleteChain,
-    /// The requested position was not found in the chain.
-    PositionNotFound,
+    /// The requested action was not found in the chain.
+    ActionNotFound(ActionHash),
+    /// The starting position is not the highest
+    /// sequence in the filter.
+    PositionNotHighest,
+    /// The filter produces an empty range.
+    EmptyRange,
 }
 
 impl ChainFilterIter {
@@ -206,65 +247,136 @@ impl Iterator for ChainFilterIter {
     }
 }
 
-impl ChainFilterConstraints {
-    /// Create a new set of constraints for this filter.
-    pub fn new(
-        filter: ChainFilter,
-        hashes: impl IntoIterator<Item = (ActionHash, u32)>,
-        range: RangeInclusive<u32>,
-    ) -> Self {
-        let highest_until = filter.get_until().and_then(|set| {
-            hashes
-                .into_iter()
-                .filter(|h| set.contains(&h.0) && range.contains(&h.1))
-                .max_by_key(|h| h.1)
-        });
-        Self {
+impl Sequences {
+    /// Find the action sequences for all hashes in the filter.
+    pub fn find_sequences<F, E>(filter: ChainFilter, mut get_seq: F) -> Result<Self, E>
+    where
+        F: FnMut(&ActionHash) -> Result<Option<u32>, E>,
+    {
+        let position = match get_seq(&filter.position)? {
+            Some(seq) => seq,
+            None => return Ok(Self::ActionNotFound(filter.position)),
+        };
+        let distance = match filter.get_until() {
+            Some(until_hashes) => {
+                let mut max = 0;
+                for hash in until_hashes {
+                    match get_seq(hash)? {
+                        Some(seq) => {
+                            if seq > position {
+                                return Ok(Self::PositionNotHighest);
+                            }
+                            max = max.max(seq);
+                        }
+                        None => return Ok(Self::ActionNotFound(hash.clone())),
+                    }
+                }
+                position - max
+            }
+            None => position,
+        };
+        let start = match filter.get_take() {
+            Some(take) => {
+                if take == 0 {
+                    return Ok(Self::EmptyRange);
+                } else if take <= distance {
+                    // Add one to include the "position" in the number of
+                    // "take". This matches the rust iterator "take".
+                    position.saturating_sub(take).saturating_add(1)
+                } else {
+                    position - distance
+                }
+            }
+            None => position - distance,
+        };
+        Ok(Self::Found(ChainFilterRange {
             filter,
-            highest_until,
-            range,
-        }
+            range: start..=position,
+        }))
     }
+}
 
+impl ChainFilterRange {
+    /// Get the range of action sequences for this filter.
+    pub fn range(&self) -> &RangeInclusive<u32> {
+        &self.range
+    }
     /// Filter the chain items then check the invariants hold.
     pub fn filter_then_check(
         self,
         chain: Vec<RegisterAgentActivity>,
     ) -> MustGetAgentActivityResponse {
-        let expected_end_seq = match (
-            self.filter.get_take(),
-            self.highest_until.as_ref().map(|(_, s)| *s),
-        ) {
-            (None, None) => 0,
-            (None, Some(s)) => s,
-            // TODO: Do safe subtract
-            // Add one to include the position.
-            (Some(s), None) => (self.range.end() - s) + 1,
-            (Some(a), Some(b)) => a.max(b),
-        };
         let out: Vec<_> = ChainFilterIter::new(self.filter, chain).collect();
-        if out.first().map_or(true, |first| {
-            first.action.action().action_seq() != *self.range.end()
+        // eprintln!("{:?}", out.iter().map(|i| (i.action.action().action_seq(), i.action.action_address().get_raw_32()[0..2].to_vec(), i.action.action().prev_action().as_ref().map(|h| h.get_raw_32()[0..2].to_vec()))).collect::<Vec<_>>());
+        match out.last().and_then(|lowest| {
+            Some(lowest.action.action().action_seq()..=out.first()?.action.action().action_seq())
         }) {
-            return MustGetAgentActivityResponse::PositionNotFound;
-        }
-        match out.last() {
-            Some(last) => {
-                if last.action.action().action_seq() == expected_end_seq
-                    && self.highest_until.map_or(true, |(h, s)| {
-                        if s == expected_end_seq {
-                            h == *last.action.action_address()
-                        } else {
-                            true
-                        }
-                    })
-                {
-                    MustGetAgentActivityResponse::Activity(out)
-                } else {
-                    MustGetAgentActivityResponse::IncompleteChain
-                }
-            }
-            None => MustGetAgentActivityResponse::Activity(out),
+            Some(got) if got == self.range => MustGetAgentActivityResponse::Activity(out),
+            _ => MustGetAgentActivityResponse::IncompleteChain,
         }
     }
+    // /// Create a new set of constraints for this filter.
+    // pub fn new<I>(
+    //     filter: ChainFilter,
+    //     hashes: impl Iterator<Item = (ActionHash, u32)>,
+    //     range: RangeInclusive<u32>,
+    // ) -> Self
+    // where
+    // I: Iterator<Result<
+    // {
+    //     let highest_until = filter.get_until().and_then(|set| {
+    //         hashes
+    //             .into_iter()
+    //             .filter(|h| set.contains(&h.0) && range.contains(&h.1))
+    //             .max_by_key(|h| h.1)
+    //     });
+    //     Self {
+    //         filter,
+    //         highest_until,
+    //         range,
+    //     }
+    // }
+
+    // /// Filter the chain items then check the invariants hold.
+    // pub fn filter_then_check(
+    //     self,
+    //     chain: Vec<RegisterAgentActivity>,
+    // ) -> MustGetAgentActivityResponse {
+    //     let expected_end_seq = match (
+    //         self.filter.get_take(),
+    //         self.highest_until.as_ref().map(|(_, s)| *s),
+    //     ) {
+    //         (None, None) => 0,
+    //         (None, Some(s)) => s,
+    //         // TODO: Do safe subtract
+    //         // Add one to include the position.
+    //         (Some(s), None) => (self.range.end() - s) + 1,
+    //         (Some(a), Some(b)) => a.max(b),
+    //     };
+    //     let out: Vec<_> = ChainFilterIter::new(self.filter, chain).collect();
+    //     eprintln!("{:?}", out);
+    //     if out.first().map_or(true, |first| {
+    //         dbg!(first.action.action().action_seq()) != dbg!(*self.range.end())
+    //     }) {
+    //         return MustGetAgentActivityResponse::PositionNotFound;
+    //     }
+    //     match out.last() {
+    //         Some(last) => {
+    //             if last.action.action().action_seq() == expected_end_seq
+    //                 && self.highest_until.map_or(true, |(h, s)| {
+    //                     if s == expected_end_seq {
+    //                         h == *last.action.action_address()
+    //                     } else {
+    //                         true
+    //                     }
+    //                 })
+    //             {
+    //                 MustGetAgentActivityResponse::Activity(out)
+    //             } else {
+    //                 MustGetAgentActivityResponse::IncompleteChain
+    //             }
+    //         }
+    //         None => MustGetAgentActivityResponse::Activity(out),
+    //     }
+    // }
 }

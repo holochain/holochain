@@ -15,10 +15,11 @@ use holochain_state::prelude::StateQueryResult;
 use holochain_types::chain::ChainFilterConstraints;
 use holochain_types::chain::ChainFilterIter;
 use holochain_types::chain::MustGetAgentActivityResponse;
+use holochain_types::chain::Sequences;
 use holochain_types::dht_op::DhtOpType;
 use holochain_zome_types::ActionHashed;
 use holochain_zome_types::ChainFilter;
-use holochain_zome_types::RegisterAgentActivityOp;
+use holochain_zome_types::RegisterAgentActivity;
 use holochain_zome_types::SignedAction;
 use holochain_zome_types::SignedActionHashed;
 
@@ -31,18 +32,32 @@ pub async fn must_get_agent_activity(
     filter: ChainFilter,
 ) -> StateQueryResult<MustGetAgentActivityResponse> {
     let result = env
-        .async_reader(move |mut txn| {
-            let (range, hashes) = match find_bounds(&mut txn, &author, &filter)? {
-                Some(r) => r,
-                None => return Ok(None),
-            };
-            let constraints = ChainFilterConstraints::new(filter, hashes, range.clone());
-            get_activity(&mut txn, &author, &range).map(|a| Some((a, constraints)))
-        })
+        .async_reader(
+            move |mut txn| match find_bounds(&mut txn, &author, filter)? {
+                Sequences::Found(filter_range) => {
+                    get_activity(&mut txn, &author, filter_range.range()).map(|a| {
+                        ((
+                            MustGetAgentActivityResponse::Activity(a),
+                            Some(filter_range),
+                        ))
+                    })
+                }
+                Sequences::ActionNotFound(a) => {
+                    Ok((MustGetAgentActivityResponse::ActionNotFound(a), None))
+                }
+                Sequences::PositionNotHighest => {
+                    Ok((MustGetAgentActivityResponse::PositionNotHighest, None))
+                }
+                Sequences::EmptyRange => Ok((MustGetAgentActivityResponse::EmptyRange, None)),
+            },
+        )
         .await?;
     match result {
-        Some((activity, constraints)) => Ok(constraints.filter_then_check(activity)),
-        None => Ok(MustGetAgentActivityResponse::PositionNotFound),
+        (MustGetAgentActivityResponse::Activity(activity), Some(filter_range)) => {
+            Ok(filter_range.filter_then_check(activity))
+        }
+        (MustGetAgentActivityResponse::Activity(_), None) => unreachable!(),
+        (r, _) => Ok(r),
     }
 }
 
@@ -52,7 +67,7 @@ fn hash_to_seq(
     author: &AgentPubKey,
 ) -> StateQueryResult<Option<u32>> {
     Ok(statement
-        .query_row(named_params! {"hash": hash, "author": author}, |row| {
+        .query_row(named_params! {"hash": hash, "author": author, "activity": DhtOpType::RegisterAgentActivity}, |row| {
             row.get(0)
         })
         .optional()?)
@@ -61,31 +76,12 @@ fn hash_to_seq(
 fn find_bounds(
     txn: &mut Transaction,
     author: &AgentPubKey,
-    filter: &ChainFilter,
-) -> StateQueryResult<Option<(RangeInclusive<u32>, HashMap<ActionHash, u32>)>> {
+    filter: ChainFilter,
+) -> StateQueryResult<Sequences> {
     let mut statement = txn.prepare(ACTION_HASH_TO_SEQ)?;
-    let upper_seq = match hash_to_seq(&mut statement, &filter.position, author)? {
-        Some(u) => u,
-        None => return Ok(None),
-    };
-    let hashes = match filter.get_until() {
-        Some(hashes) => {
-            let hashes = hashes
-                .iter()
-                .filter_map(|hash| match hash_to_seq(&mut statement, hash, author) {
-                    Ok(seq) => Some(Ok((hash.clone(), seq?))),
-                    Err(e) => Some(Err(e)),
-                })
-                .collect::<Result<HashMap<_, _>, _>>()?;
-            Some(hashes)
-        }
-        None => None,
-    };
-    let lower_seq: u32 = hashes
-        .as_ref()
-        .and_then(|h| h.values().min().copied())
-        .unwrap_or_default();
-    Ok(Some((lower_seq..=upper_seq, hashes.unwrap_or_default())))
+
+    let get_seq = move |hash: &ActionHash| hash_to_seq(&mut statement, hash, author);
+    Ok(Sequences::find_sequences(filter, get_seq)?)
 }
 
 // fn unique_seq_count(
@@ -108,7 +104,7 @@ fn get_activity(
     txn: &mut Transaction,
     author: &AgentPubKey,
     range: &RangeInclusive<u32>,
-) -> StateQueryResult<Vec<RegisterAgentActivityOp>> {
+) -> StateQueryResult<Vec<RegisterAgentActivity>> {
     txn.prepare(MUST_GET_AGENT_ACTIVITY)?
         .query_and_then(
             named_params! {
@@ -123,7 +119,7 @@ fn get_activity(
                 let hash: ActionHash = row.get("hash")?;
                 let hashed = ActionHashed::with_pre_hashed(action, hash);
                 let action = SignedActionHashed::with_presigned(hashed, signature);
-                Ok(RegisterAgentActivityOp { action })
+                Ok(RegisterAgentActivity { action })
             },
         )?
         .collect::<Result<Vec<_>, _>>()
