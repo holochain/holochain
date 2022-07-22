@@ -201,7 +201,7 @@ async fn run_test(
     let delay_per_attempt = Duration::from_millis(100);
 
     let invocation =
-        new_zome_call(&bob_cell_id, "always_validates", (), TestWasm::Validate).unwrap();
+        new_zome_call(conductors[1].handle().keystore(), &bob_cell_id, "always_validates", (), TestWasm::Validate).await.unwrap();
     conductors[1].call_zome(invocation).await.unwrap().unwrap();
 
     // Integration should have 3 ops in it
@@ -247,7 +247,7 @@ async fn run_test(
     });
 
     let invocation =
-        new_zome_call(&bob_cell_id, "add_valid_link", (), TestWasm::ValidateLink).unwrap();
+        new_zome_call(conductors[1].handle().keystore(), &bob_cell_id, "add_valid_link", (), TestWasm::ValidateLink).await.unwrap();
     conductors[1].call_zome(invocation).await.unwrap().unwrap();
 
     // Integration should have 6 ops in it
@@ -270,11 +270,12 @@ async fn run_test(
     });
 
     let invocation = new_invocation(
+        conductors[1].handle().keystore(),
         &bob_cell_id,
         "add_invalid_link",
         (),
         TestWasm::ValidateLink.coordinator_zome(),
-    )
+    ).await
     .unwrap();
     let invalid_link_hash: ActionHash =
         call_zome_directly(&bob_cell_id, &conductors[1].handle(), dna_file, invocation)
@@ -303,11 +304,12 @@ async fn run_test(
     });
 
     let invocation = new_invocation(
+        conductors[1].handle().keystore(),
         &bob_cell_id,
         "remove_valid_link",
         (),
         TestWasm::ValidateLink.coordinator_zome(),
-    )
+    ).await
     .unwrap();
     call_zome_directly(&bob_cell_id, &conductors[1].handle(), dna_file, invocation).await;
 
@@ -332,11 +334,12 @@ async fn run_test(
     });
 
     let invocation = new_invocation(
+        conductors[1].handle().keystore(),
         &bob_cell_id,
         "remove_invalid_link",
         (),
         TestWasm::ValidateLink.coordinator_zome(),
-    )
+    ).await
     .unwrap();
     let invalid_remove_hash: ActionHash =
         call_zome_directly(&bob_cell_id, &conductors[1].handle(), dna_file, invocation)

@@ -3,8 +3,6 @@
 //! It combines an AgentPubKey with a Dna to create a SourceChain, upon which
 //! Records can be added. A constructed Cell is guaranteed to have a valid
 //! SourceChain which has already undergone Genesis.
-
-use super::api::ZomeCall;
 use super::interface::SignalBroadcaster;
 use super::manager::ManagedTaskAdd;
 use super::space::Space;
@@ -35,6 +33,7 @@ use hash_type::AnyDht;
 use holo_hash::*;
 use holochain_cascade::authority;
 use holochain_cascade::Cascade;
+use holochain_conductor_api::ZomeCall;
 use holochain_p2p::event::CountersigningSessionNegotiationMessage;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_sqlite::prelude::*;
@@ -293,8 +292,24 @@ impl Cell {
                         cap_secret: None,
                         payload,
                     };
-                    let invocation = ZomeCall::try_from_unsigned_zome_call(self.conductor_handle.keystore(), unsigned_zome_call).await?;
-                    tasks.push(self.call_zome(invocation, None));
+
+                    tasks.push(
+                        self.call_zome(
+                            match ZomeCall::try_from_unsigned_zome_call(
+                                self.conductor_handle.keystore(),
+                                unsigned_zome_call,
+                            )
+                            .await
+                            {
+                                Ok(zome_call) => zome_call,
+                                Err(e) => {
+                                    error!("{}", e.to_string());
+                                    continue;
+                                }
+                            },
+                            None,
+                        ),
+                    );
                 }
                 let results: Vec<CellResult<ZomeCallResult>> =
                     futures::future::join_all(tasks).await;
@@ -364,6 +379,7 @@ impl Cell {
             CallRemote {
                 span_context: _,
                 from_agent,
+                from_signature,
                 zome_name,
                 fn_name,
                 cap_secret,
@@ -373,7 +389,7 @@ impl Cell {
             } => {
                 async {
                     let res = self
-                        .handle_call_remote(from_agent, zome_name, fn_name, cap_secret, payload)
+                        .handle_call_remote(from_agent, from_signature, zome_name, fn_name, cap_secret, payload)
                         .await
                         .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
@@ -775,6 +791,7 @@ impl Cell {
     async fn handle_call_remote(
         &self,
         from_agent: AgentPubKey,
+        from_signature: Signature,
         zome_name: ZomeName,
         fn_name: FunctionName,
         cap_secret: Option<CapSecret>,
@@ -786,6 +803,7 @@ impl Cell {
             cap_secret,
             payload,
             provenance: from_agent,
+            signature: from_signature,
             fn_name,
         };
         // double ? because

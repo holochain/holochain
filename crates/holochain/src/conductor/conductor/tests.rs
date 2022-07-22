@@ -426,16 +426,16 @@ async fn test_signing_error_during_genesis() {
     }
 }
 
-async fn make_signing_call(client: &mut WebsocketSender, cell: &SweetCell) -> AppResponse {
+async fn make_signing_call(client: &mut WebsocketSender, keystore: &MetaLairClient, cell: &SweetCell) -> AppResponse {
     client
-        .request(AppRequest::ZomeCall(Box::new(ZomeCall {
+        .request(AppRequest::ZomeCall(Box::new(ZomeCall::try_from_unsigned_zome_call( keystore, ZomeCallUnsigned {
             cell_id: cell.cell_id().clone(),
             zome_name: "sign".into(),
             fn_name: "sign_ephemeral".into(),
             payload: ExternIO::encode(()).unwrap(),
             cap_secret: None,
             provenance: cell.agent_pubkey().clone(),
-        })))
+        }).await.unwrap())))
         .await
         .unwrap()
 }
@@ -507,17 +507,17 @@ async fn test_signing_error_during_genesis_doesnt_bork_interfaces() {
         .unwrap();
 
     assert_matches!(response, AdminResponse::Error(_));
-    let response = make_signing_call(&mut app_client, &cell2).await;
+    let response = make_signing_call(&mut app_client, conductor.handle().keystore(), &cell2).await;
 
     assert_matches!(response, AppResponse::Error(_));
 
     // Go back to the good keystore, see if we can proceed
     keystore_control.use_real();
 
-    let response = make_signing_call(&mut app_client, &cell2).await;
+    let response = make_signing_call(&mut app_client, conductor.handle().keystore(), &cell2).await;
     assert_matches!(response, AppResponse::ZomeCall(_));
 
-    let response = make_signing_call(&mut app_client, &cell1).await;
+    let response = make_signing_call(&mut app_client, conductor.handle().keystore(), &cell1).await;
     assert_matches!(response, AppResponse::ZomeCall(_));
 }
 

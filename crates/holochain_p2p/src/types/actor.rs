@@ -232,6 +232,7 @@ ghost_actor::ghost_chan! {
         fn remote_signal(
             dna_hash: DnaHash,
             from_agent: AgentPubKey,
+            from_signature: Signature,
             to_agent_list: Vec<AgentPubKey>,
             zome_name: ZomeName,
             fn_name: FunctionName,

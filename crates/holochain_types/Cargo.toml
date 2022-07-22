@@ -24,6 +24,7 @@ either = "1.5"
 fixt = { path = "../fixt", version = "0.0.13"}
 flate2 = "1.0.14"
 futures = "0.3"
+one_err = "0.0.5"
 holo_hash = { version = "0.0.30", path = "../holo_hash", features = ["encoding"] }
 holochain_keystore = { version = "0.0.47", path = "../holochain_keystore" }
 holochain_serialized_bytes = "=0.0.51"

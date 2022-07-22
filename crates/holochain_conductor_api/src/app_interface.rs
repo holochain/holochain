@@ -114,7 +114,7 @@ impl From<ZomeCall> for ZomeCallUnsigned {
 
 impl ZomeCall {
     pub async fn try_from_unsigned_zome_call(keystore: &MetaLairClient, unsigned_zome_call: ZomeCallUnsigned) -> LairResult<Self> {
-        let signature = unsigned_zome_call.provenance.sign(&keystore, &unsigned_zome_call).await?;
+        let signature = unsigned_zome_call.sign(&keystore).await?;
         Ok(Self {
             cell_id: unsigned_zome_call.cell_id,
             zome_name: unsigned_zome_call.zome_name,

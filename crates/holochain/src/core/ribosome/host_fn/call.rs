@@ -10,7 +10,7 @@ use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 
 pub fn call(
-    _ribosome: Arc<impl RibosomeT>,
+    ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     inputs: Vec<Call>,
 ) -> Result<Vec<ZomeCallResponse>, RuntimeError> {
@@ -54,28 +54,32 @@ pub fn call(
                             .agent_pubkey()
                             .clone();
 
-
-
-                        let signature = call_context
-                .host_context
-                .keystore()
-                .sign(provenance, input.data.into_vec().into())
-                .await.map_err(|e| -> RuntimeError { wasm_error!(e.into()).into() })?;
-
-
                         let result: Result<ZomeCallResponse, RuntimeError> = match target {
                             CallTarget::NetworkAgent(target_agent) => {
+                                let zome_call_unsigned = ZomeCallUnsigned {
+                                    provenance,
+                                    cell_id: CellId::new(
+                                        ribosome.dna_def().as_hash().clone(),
+                                        target_agent,
+                                    ),
+                                    zome_name,
+                                    fn_name,
+                                    cap_secret,
+                                    payload,
+                                };
                                 match call_context
                                     .host_context()
                                     .network()
                                     .call_remote(
                                         provenance,
-                                        signature,
+                                        zome_call_unsigned
+                                            .sign(call_context.host_context.keystore())
+                                            .await?,
                                         target_agent,
-                                        zome_name,
-                                        fn_name,
-                                        cap_secret,
-                                        payload,
+                                        zome_call_unsigned.zome_name,
+                                        zome_call_unsigned.fn_name,
+                                        zome_call_unsigned.cap_secret,
+                                        zome_call_unsigned.payload,
                                     )
                                     .await
                                 {
@@ -108,9 +112,11 @@ pub fn call(
                                             })
                                             .and_then(|c| {
                                                 c.ok_or_else(|| {
-                                                    RuntimeError::from(wasm_error!(WasmErrorInner::Host(
-                                                        "Role not found.".to_string()
-                                                    )))
+                                                    RuntimeError::from(wasm_error!(
+                                                        WasmErrorInner::Host(
+                                                            "Role not found.".to_string()
+                                                        )
+                                                    ))
                                                 })
                                             })
                                     }
@@ -123,20 +129,24 @@ pub fn call(
                                 };
                                 match cell_id_result {
                                     Ok(cell_id) => {
-                                        let invocation = ZomeCall {
+                                        let zome_call_unsigned = ZomeCallUnsigned {
                                             cell_id,
                                             zome_name,
                                             fn_name,
                                             payload,
                                             cap_secret,
                                             provenance,
-                                            signature,
                                         };
+                                        let call = ZomeCall::try_from_unsigned_zome_call(
+                                            call_context.host_context.keystore(),
+                                            zome_call_unsigned,
+                                        )
+                                        .await?;
                                         match call_context
                                             .host_context()
                                             .call_zome_handle()
                                             .call_zome(
-                                                invocation,
+                                                call,
                                                 call_context
                                                     .host_context()
                                                     .workspace_write()
@@ -196,11 +206,11 @@ pub mod wasm_test {
     use matches::assert_matches;
     use rusqlite::named_params;
 
+    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use crate::sweettest::SweetAgents;
     use crate::test_utils::conductor_setup::ConductorTestData;
-    use crate::test_utils::new_zome_call;
-
-    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
+    use crate::test_utils::new_zome_call_unsigned;
+    use holochain_conductor_api::ZomeCall;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn call_test() {
@@ -210,7 +220,11 @@ pub mod wasm_test {
             .await
             .unwrap();
 
-        let dna_file_2 = dna_file_1.clone().with_uid("CLONE".to_string()).await.unwrap();
+        let dna_file_2 = dna_file_1
+            .clone()
+            .with_uid("CLONE".to_string())
+            .await
+            .unwrap();
 
         let mut conductor = SweetConductor::from_standard_config().await;
         let (alice_pubkey, _) = SweetAgents::alice_and_bob();
@@ -219,7 +233,10 @@ pub mod wasm_test {
             .setup_app_for_agents(
                 "app-",
                 &[alice_pubkey.clone()],
-                &[("role1".to_string(), dna_file_1), ("role2".to_string(), dna_file_2)],
+                &[
+                    ("role1".to_string(), dna_file_1),
+                    ("role2".to_string(), dna_file_2),
+                ],
             )
             .await
             .unwrap();
@@ -239,9 +256,7 @@ pub mod wasm_test {
             assert_eq!(agent_info.agent_latest_pubkey, alice_pubkey);
         }
         {
-            let agent_info: AgentInfo = conductor
-                .call(&zome1, "who_are_they_role", "role2")
-                .await;
+            let agent_info: AgentInfo = conductor.call(&zome1, "who_are_they_role", "role2").await;
             assert_eq!(agent_info.agent_initial_pubkey, alice_pubkey);
             assert_eq!(agent_info.agent_latest_pubkey, alice_pubkey);
         }
@@ -260,9 +275,12 @@ pub mod wasm_test {
         let alice_call_data = conductor_test.alice_call_data();
         let alice_cell_id = &alice_call_data.cell_id;
 
-        let invocation =
-            new_zome_call(&alice_cell_id, "call_create_entry", (), TestWasm::Create).unwrap();
-        let result = handle.call_zome(invocation).await;
+        let zome_call_unsigned =
+            new_zome_call_unsigned(&alice_cell_id, "call_create_entry", (), TestWasm::Create)
+                .unwrap();
+        let zome_call =
+            ZomeCall::try_from_unsigned_zome_call(handle.keystore(), zome_call_unsigned);
+        let result = handle.call_zome(zome_call).await;
         assert_matches!(result, Ok(Ok(ZomeCallResponse::Ok(_))));
 
         // Get the action hash of that entry

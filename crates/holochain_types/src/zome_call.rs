@@ -1,10 +1,12 @@
 //! Data needed to make zome calls.
-use holochain_serialized_bytes::prelude::*;
 use crate::prelude::*;
+use std::sync::Arc;
+use holochain_keystore::MetaLairClient;
+use holochain_keystore::LairResult;
 
 /// Zome calls need to be signed regardless of how they are called.
 /// This defines exactly what needs to be signed.
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct ZomeCallUnsigned {
     /// Provenance to sign.
     pub provenance: AgentPubKey,
@@ -18,4 +20,19 @@ pub struct ZomeCallUnsigned {
     pub cap_secret: Option<CapSecret>,
     /// Payload to sign.
     pub payload: ExternIO,
+}
+
+impl ZomeCallUnsigned {
+    /// Prepare the canonical bytes for an unsigned zome call so that it is
+    /// always signed and verified in the same way.
+    pub fn data_to_sign(&self) -> Result<Arc<[u8]>, SerializedBytesError> {
+        Ok(
+            holochain_serialized_bytes::encode(&self)?.into(),
+        )
+    }
+
+    /// Sign the unsigned zome call in a canonical way to produce a signature.
+    pub async fn sign(&self, keystore: &MetaLairClient) -> LairResult<Signature> {
+        Ok(self.provenance.sign(keystore, self.data_to_sign().map_err(|e| one_err::OneErr::new(e.to_string()))?).await?)
+    }
 }

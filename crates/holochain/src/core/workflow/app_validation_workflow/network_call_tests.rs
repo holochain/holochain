@@ -15,7 +15,7 @@ use crate::conductor::ConductorHandle;
 use crate::test_utils::conductor_setup::CellHostFnCaller;
 use crate::test_utils::conductor_setup::ConductorTestData;
 use crate::test_utils::host_fn_caller::Post;
-use crate::test_utils::new_zome_call;
+use crate::test_utils::new_zome_call_unsigned;
 use crate::test_utils::wait_for_integration;
 use holochain_cascade::Cascade;
 use holochain_cascade::DbPair;

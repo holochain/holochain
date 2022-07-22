@@ -342,12 +342,13 @@ async fn init_all(handles: &[TestHandle]) -> Vec<ActionHash> {
         let f = async move {
             let large_msg = std::iter::repeat(b"a"[0]).take(20_000).collect::<Vec<_>>();
             let invocation = new_zome_call(
+                h.keystore(),
                 &h.cell_id,
                 "create_post",
                 Post(format!("{}{}", i, String::from_utf8_lossy(&large_msg))),
                 TestWasm::Create,
             )
-            .unwrap();
+            .await.unwrap();
             h.call_zome(invocation).await.unwrap().unwrap()
         };
         let f = tokio::task::spawn(f);
@@ -393,7 +394,7 @@ async fn check_gossip(
     .await;
     for hash in posts {
         let invocation =
-            new_zome_call(&handle.cell_id, "get_post", hash, TestWasm::Create).unwrap();
+            new_zome_call(handle.keystore(), &handle.cell_id, "get_post", hash, TestWasm::Create).await.unwrap();
         let result = handle.call_zome(invocation).await.unwrap().unwrap();
         let result: Option<Record> = unwrap_to::unwrap_to!(result => ZomeCallResponse::Ok)
             .decode()

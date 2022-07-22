@@ -45,6 +45,7 @@ impl HolochainP2pHandler for StubNetwork {
         &mut self,
         dna_hash: DnaHash,
         from_agent: AgentPubKey,
+        from_signature: Signature,
         to_agent_list: Vec<AgentPubKey>,
         zome_name: ZomeName,
         fn_name: FunctionName,

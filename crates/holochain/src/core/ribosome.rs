@@ -312,6 +312,13 @@ pub trait Invocation: Clone {
 }
 
 impl ZomeCallInvocation {
+    pub async fn verify_signature(&self) -> RibosomeResult<bool> {
+        Ok(self
+            .provenance
+            .verify_signature_raw(&self.signature, ZomeCallUnsigned::from(ZomeCall::from(self.clone())).data_to_sign()?)
+            .await)
+    }
+
     /// to decide if a zome call is authorized:
     /// - we need to find a live (committed and not deleted) cap grant that matches the secret
     /// - if the live cap grant is for the current author the call is ALWAYS authorized ELSE
@@ -333,9 +340,7 @@ impl ZomeCallInvocation {
             .valid_cap_grant(check_function, check_agent, check_secret)
             .await?;
 
-        let check_call_unsigned: ZomeCallUnsigned = self.into();
-
-        Ok(maybe_grant.is_some() && check_agent.verify_signature(&self.signature, check_call_unsigned).await)
+        Ok(maybe_grant.is_some() && self.verify_signature().await?)
     }
 }
 
@@ -349,19 +354,6 @@ mockall::mock! {
     }
     trait Clone {
         fn clone(&self) -> Self;
-    }
-}
-
-impl From<ZomeCallInvocation> for ZomeCallUnsigned {
-    fn from(zome_call_invocation: ZomeCallInvocation) -> Self {
-        Self {
-            cell_id: zome_call_invocation.cell_id.clone(),
-            zome: zome_call_invocation.zome.name.clone(),
-            cap_secret: zome_call_invocation.cap_secret.clone(),
-            fn_name: zome_call_invocation.fn_name.clone(),
-            payload: zome_call_invocation.payload.clone(),
-            provenance: zome_call_invocation.provenance.clone(),
-        }
     }
 }
 
@@ -444,6 +436,7 @@ impl From<ZomeCallInvocation> for ZomeCall {
             cap_secret,
             payload,
             provenance,
+            signature,
         } = inv;
         Self {
             cell_id,
@@ -452,6 +445,7 @@ impl From<ZomeCallInvocation> for ZomeCall {
             cap_secret,
             payload,
             provenance,
+            signature,
         }
     }
 }

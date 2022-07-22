@@ -434,15 +434,15 @@ impl HostFnCaller {
     pub async fn call_zome_direct(&self, invocation: ZomeCallInvocation) -> ExternIO {
         let (ribosome, call_context, workspace_lock) = self.unpack().await;
 
-        let output = {
+        let (_, output) = {
             let host_access = call_context.host_context();
             let zcha = unwrap_to!(host_access => HostContext::ZomeCall).clone();
-            call_zome_function_authorized(ribosome, zcha, invocation).unwrap()
+            call_zome_function_authorized((*ribosome).clone(), zcha, invocation).await.unwrap()
         };
 
         // Write
         workspace_lock.flush(&self.network).await.unwrap();
-        unwrap_to!(output => ZomeCallResponse::Ok).to_owned()
+        unwrap_to!(output.unwrap() => ZomeCallResponse::Ok).to_owned()
     }
 }
 

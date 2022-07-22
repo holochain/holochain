@@ -934,6 +934,7 @@ pub mod wasm_test {
     use hdk::prelude::*;
     use holochain_types::prelude::AgentPubKeyFixturator;
     use holochain_wasm_test_utils::TestWasm;
+    use holochain_types::zome_call::ZomeCallUnsigned;
 
     #[tokio::test(flavor = "multi_thread")]
     /// Basic checks that we can call externs internally and externally the way we want using the
@@ -967,14 +968,21 @@ pub mod wasm_test {
 
         let infallible_result = conductor
             .handle()
-            .call_zome(ZomeCall {
-                cell_id: alice.cell_id().clone(),
-                zome_name: alice.name().clone(),
-                fn_name: "infallible".into(),
-                cap_secret: None,
-                provenance: alice_pubkey.clone(),
-                payload: ExternIO::encode(()).unwrap(),
-            })
+            .call_zome(
+                ZomeCall::try_from_unsigned_zome_call(
+                    conductor.keystore(),
+                    ZomeCallUnsigned {
+                        cell_id: alice.cell_id().clone(),
+                        zome_name: alice.name().clone(),
+                        fn_name: "infallible".into(),
+                        cap_secret: None,
+                        provenance: alice_pubkey.clone(),
+                        payload: ExternIO::encode(()).unwrap(),
+                    },
+                )
+                .await
+                .unwrap(),
+            )
             .await
             .unwrap()
             .unwrap();
