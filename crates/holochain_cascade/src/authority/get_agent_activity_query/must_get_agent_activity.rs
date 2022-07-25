@@ -95,7 +95,7 @@ fn find_bounds(
     let get_seq = move |hash: &ActionHash| hash_to_seq(&mut statement, hash, author);
 
     // For all the hashes in the filter, get their sequences.
-    Ok(Sequences::find_sequences(filter, get_seq)?)
+    Sequences::find_sequences(filter, get_seq)
 }
 
 /// Get the agent activity for a given range of actions

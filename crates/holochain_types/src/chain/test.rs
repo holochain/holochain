@@ -12,7 +12,7 @@ fn hash(i: u8) -> ActionHash {
     action_hash(&[i])
 }
 
-/// Build a chain of RegisterAgentActivityOp and then run them through the
+/// Build a chain of RegisterAgentActivity and then run them through the
 /// chain filter.
 fn build_chain(c: Vec<ChainItem>, filter: ChainFilter) -> Vec<ChainItem> {
     let data = chain_to_ops(c);
