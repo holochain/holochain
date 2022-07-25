@@ -15,28 +15,32 @@ struct FakeProperties {
 }
 
 /// A fixture example dna for unit testing.
-pub fn fake_dna_file(uid: &str) -> DnaFile {
-    fake_dna_file_named(uid, "test")
+pub fn fake_dna_file(network_seed: &str) -> DnaFile {
+    fake_dna_file_named(network_seed, "test")
 }
 
 /// A named dna for unit testing.
-pub fn fake_dna_file_named(uid: &str, name: &str) -> DnaFile {
-    fake_dna_zomes_named(uid, name, vec![(name.into(), vec![].into())])
+pub fn fake_dna_file_named(network_seed: &str, name: &str) -> DnaFile {
+    fake_dna_zomes_named(network_seed, name, vec![(name.into(), vec![].into())])
 }
 
 /// A fixture example dna for unit testing.
-pub fn fake_dna_zomes(uid: &str, zomes: Vec<(ZomeName, DnaWasm)>) -> DnaFile {
-    fake_dna_zomes_named(uid, "test", zomes)
+pub fn fake_dna_zomes(network_seed: &str, zomes: Vec<(ZomeName, DnaWasm)>) -> DnaFile {
+    fake_dna_zomes_named(network_seed, "test", zomes)
 }
 
 /// A named dna for unit testing.
-pub fn fake_dna_zomes_named(uid: &str, name: &str, zomes: Vec<(ZomeName, DnaWasm)>) -> DnaFile {
+pub fn fake_dna_zomes_named(
+    network_seed: &str,
+    name: &str,
+    zomes: Vec<(ZomeName, DnaWasm)>,
+) -> DnaFile {
     let mut dna = DnaDef {
         name: name.to_string(),
         properties: YamlProperties::new(serde_yaml::from_str("p: hi").unwrap())
             .try_into()
             .unwrap(),
-        uid: uid.to_string(),
+        network_seed: network_seed.to_string(),
         origin_time: Timestamp::HOLOCHAIN_EPOCH,
         integrity_zomes: Vec::new(),
         coordinator_zomes: Vec::new(),

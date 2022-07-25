@@ -47,9 +47,9 @@ pub enum DnaSource {
 /// The instructions on how to get the DNA to be registered
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct RegisterDnaPayload {
-    /// UID to override when installing this Dna
-    pub uid: Option<String>,
-    /// Properties to override when installing this Dna
+    /// Network seed to override when installing this DNA
+    pub network_seed: Option<String>,
+    /// Properties to override when installing this DNA
     pub properties: Option<YamlProperties>,
     /// Where to find the DNA
     #[serde(flatten)]
@@ -59,7 +59,7 @@ pub struct RegisterDnaPayload {
 /// The instructions on how to get the DNA to be registered
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct CreateCloneCellPayload {
-    /// Properties to override when installing this Dna
+    /// Properties to override when installing this DNA
     pub properties: Option<YamlProperties>,
     /// The DNA to clone
     pub dna_hash: DnaHash,
@@ -91,7 +91,7 @@ pub struct InstallAppPayload {
     /// The agent to use when creating Cells for this App
     pub agent_key: AgentPubKey,
 
-    /// The Dna paths in this app
+    /// The DNA paths in this app
     pub dnas: Vec<InstallAppDnaPayload>,
 }
 
@@ -113,10 +113,10 @@ pub struct InstallAppBundlePayload {
     /// keyed by the AppRoleId specified in the app bundle manifest.
     pub membrane_proofs: HashMap<AppRoleId, MembraneProof>,
 
-    /// Optional: overwrites all UIDs for all DNAs of Cells created by this app.
+    /// Optional: overwrites all network seeds for all DNAs of Cells created by this app.
     /// The app can still use existing Cells, i.e. this does not require that
     /// all Cells have DNAs with the same overridden DNA.
-    pub uid: Option<Uid>,
+    pub network_seed: Option<NetworkSeed>,
 }
 
 /// The possible locations of an AppBundle
@@ -142,12 +142,12 @@ impl AppBundleSource {
     }
 }
 
-/// Information needed to specify a Dna as part of an App
+/// Information needed to specify a DNA as part of an App
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct InstallAppDnaPayload {
     /// The hash of the DNA
     pub hash: DnaHash,
-    /// The AppRoleId which will be assigned to this Dna when installed
+    /// The AppRoleId which will be assigned to this DNA when installed
     pub role_id: AppRoleId,
     /// App-specific proof-of-membrane-membership, if required by this app
     pub membrane_proof: Option<MembraneProof>,
