@@ -723,7 +723,7 @@ macro_rules! enum_fixturator {
         fixturator!(
             $enum,
             $empty,
-            { $enum::iter().choose(&mut crate::rng()).unwrap() },
+            { $enum::iter().choose(&mut $crate::rng()).unwrap() },
             {
                 let ret = $enum::iter().cycle().nth(self.0.index).unwrap();
                 set_fixt_index!(get_fixt_index!() + 1);

@@ -597,11 +597,11 @@ pub mod test {
         shutdown.await.unwrap().unwrap();
     }
 
-    async fn make_dna(uid: &str, zomes: Vec<TestWasm>) -> DnaFile {
+    async fn make_dna(network_seed: &str, zomes: Vec<TestWasm>) -> DnaFile {
         DnaFile::new(
             DnaDef {
                 name: "conductor_test".to_string(),
-                uid: uid.to_string(),
+                network_seed: network_seed.to_string(),
                 properties: SerializedBytes::try_from(()).unwrap(),
                 origin_time: Timestamp::HOLOCHAIN_EPOCH,
                 integrity_zomes: zomes

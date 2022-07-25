@@ -7,7 +7,7 @@ fn can_deserialize_dna_manifest_integrity_zomes() {
 manifest_version: "1"
 name: test_dna
 integrity:
-  uid: blablabla
+  network_seed: blablabla
   origin_time: 2022-02-11T23:29:00.789576Z
   properties: ~
   zomes:
@@ -29,7 +29,7 @@ fn can_deserialize_dna_manifest_all_zomes() {
 manifest_version: "1"
 name: test_dna
 integrity:
-  uid: blablabla
+  network_seed: blablabla
   origin_time: 2022-02-11T23:29:00.789576Z
   properties: ~
   zomes:
@@ -57,7 +57,7 @@ fn deserialize_dna_manifest_coordinator_only() {
 manifest_version: "1"
 name: test_dna
 integrity: 
-  uid: blablabla
+  network_seed: blablabla
   origin_time: 2022-02-11T23:29:00.789576Z
   properties: ~
   zomes: ~
