@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::ops::RangeInclusive;
 
 use holo_hash::ActionHash;
@@ -12,8 +11,6 @@ use holochain_sqlite::rusqlite::Transaction;
 use holochain_sqlite::sql::sql_cell::must_get_agent_activity::*;
 use holochain_state::prelude::from_blob;
 use holochain_state::prelude::StateQueryResult;
-use holochain_types::chain::ChainFilterConstraints;
-use holochain_types::chain::ChainFilterIter;
 use holochain_types::chain::MustGetAgentActivityResponse;
 use holochain_types::chain::Sequences;
 use holochain_types::dht_op::DhtOpType;

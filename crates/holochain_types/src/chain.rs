@@ -92,32 +92,6 @@ pub enum Sequences {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-/// Constraints on a chain filter.
-/// This is used to check the following
-/// invariants are upheld after filtering
-/// a chain.
-/// - The result starts with the position.
-/// - The result ends with minimum of:
-///   - `position - take`.
-///   - minimum of until hashes.
-/// - If there are no filters then the
-/// result should end in 0 (genesis).
-pub struct ChainFilterConstraints {
-    filter: ChainFilter,
-    until: Option<UntilConstraint>,
-    range: RangeInclusive<u32>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-/// The chain must end with this `until` hash.
-pub struct UntilConstraint {
-    /// The "until" hash with the highest action sequence.
-    pub hash: ActionHash,
-    /// The sequence of the above hash.
-    pub action_seq: u32,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
 /// Response to a `must_get_agent_activity` call.
 pub enum MustGetAgentActivityResponse {
     /// The activity was found.
