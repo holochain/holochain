@@ -11,7 +11,7 @@ roles:
       deferred: false
     dna:
       bundled: dnas/dna1/a dna.dna
-      uid: 0123456
+      network_seed: 0123456
       properties: ~
       clone_limit: 0
   - id: role-2
@@ -20,7 +20,7 @@ roles:
       deferred: true
     dna:
       bundled: dnas/dna2/another dna.dna
-      uid: ~
+      network_seed: ~
       properties:
         foo: 1111
         bar: it could be anything

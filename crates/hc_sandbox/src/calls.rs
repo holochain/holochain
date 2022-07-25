@@ -23,7 +23,7 @@ use holochain_types::prelude::RegisterDnaPayload;
 use holochain_types::prelude::YamlProperties;
 use holochain_types::prelude::{AgentPubKey, AppBundleSource};
 use holochain_types::prelude::{CellId, InstallAppBundlePayload};
-use holochain_types::prelude::{DnaSource, Uid};
+use holochain_types::prelude::{DnaSource, NetworkSeed};
 use std::convert::TryFrom;
 
 use crate::cmds::Existing;
@@ -103,8 +103,8 @@ pub struct AddAppWs {
 /// and registers a Dna. You can only use a path or a hash not both.
 pub struct RegisterDna {
     #[structopt(short, long)]
-    /// UID to override when installing this Dna
-    pub uid: Option<String>,
+    /// Network seed to override when installing this Dna
+    pub network_seed: Option<String>,
     #[structopt(short, long)]
     /// Properties to override when installing this Dna
     pub properties: Option<PathBuf>,
@@ -159,8 +159,8 @@ pub struct InstallAppBundle {
     /// Location of the *.happ bundle file to install.
     pub path: PathBuf,
 
-    /// Optional UID override for every DNA in this app
-    pub uid: Option<Uid>,
+    /// Optional network seed override for every DNA in this app
+    pub network_seed: Option<NetworkSeed>,
 }
 
 #[derive(Debug, StructOpt, Clone)]
@@ -415,7 +415,7 @@ pub async fn add_admin_interface(cmd: &mut CmdRunner, args: AddAdminWs) -> anyho
 /// Calls [`AdminRequest::RegisterDna`] and registers dna.
 pub async fn register_dna(cmd: &mut CmdRunner, args: RegisterDna) -> anyhow::Result<DnaHash> {
     let RegisterDna {
-        uid,
+        network_seed,
         properties,
         path,
         hash,
@@ -432,7 +432,7 @@ pub async fn register_dna(cmd: &mut CmdRunner, args: RegisterDna) -> anyhow::Res
         _ => unreachable!("Can't have hash and path for dna source"),
     };
     let dna = RegisterDnaPayload {
-        uid,
+        network_seed,
         properties,
         source,
     };
@@ -496,7 +496,7 @@ pub async fn install_app_bundle(
         app_id,
         agent_key,
         path,
-        uid,
+        network_seed,
     } = args;
 
     let agent_key = match agent_key {
@@ -509,7 +509,7 @@ pub async fn install_app_bundle(
         agent_key,
         source: AppBundleSource::Path(path),
         membrane_proofs: Default::default(),
-        uid,
+        network_seed,
     };
 
     let r = AdminRequest::InstallAppBundle(Box::new(payload));
