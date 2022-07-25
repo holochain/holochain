@@ -14,15 +14,34 @@ use holochain_zome_types::ChainFilter;
 use holochain_zome_types::Timestamp;
 use test_case::test_case;
 
-#[test_case(agent_chain(&[(0, 0..10)]), agent_hash(&[0]), ChainFilter::new(action_hash(&[9])) => agent_chain(&[(0, 0..10)]))]
-#[test_case(agent_chain(&[(0, 0..10)]), agent_hash(&[0]), ChainFilter::new(action_hash(&[9])).take(2) => agent_chain(&[(0, 8..10)]))]
-#[test_case(agent_chain(&[(0, 0..10)]), agent_hash(&[0]), ChainFilter::new(action_hash(&[9])).take(2).until(action_hash(&[3])) => agent_chain(&[(0, 8..10)]))]
-#[test_case(agent_chain(&[(0, 0..10)]), agent_hash(&[0]), ChainFilter::new(action_hash(&[9])).take(2).until(action_hash(&[9])) => agent_chain(&[(0, 9..10)]))]
-#[test_case(agent_chain(&[(0, 0..10)]), agent_hash(&[0]), ChainFilter::new(action_hash(&[9])).take(2).until(action_hash(&[8])) => agent_chain(&[(0, 8..10)]))]
-#[test_case(agent_chain(&[(0, 0..10)]), agent_hash(&[0]), ChainFilter::new(action_hash(&[9])).take(5).until(action_hash(&[8])) => agent_chain(&[(0, 8..10)]))]
-#[test_case(agent_chain(&[(0, 0..10)]), agent_hash(&[0]), ChainFilter::new(action_hash(&[9])).until(action_hash(&[7])).until(action_hash(&[8])) => agent_chain(&[(0, 8..10)]))]
+#[test_case(
+    agent_chain(&[(0, 0..10)]), agent_hash(&[0]), ChainFilter::new(action_hash(&[8]))
+    => agent_chain(&[(0, 0..9)]) ; "Extract full chain")]
+#[test_case(
+    agent_chain(&[(0, 0..10)]), agent_hash(&[0]), ChainFilter::new(action_hash(&[8])).take(2)
+    => agent_chain(&[(0, 7..9)]) ; "Take 2")]
+#[test_case(
+    agent_chain(&[(0, 0..10)]), agent_hash(&[0]),
+    ChainFilter::new(action_hash(&[8])).until(action_hash(&[2]))
+    => agent_chain(&[(0, 2..9)]) ; "Until 2")]
+#[test_case(
+    agent_chain(&[(0, 0..10)]), agent_hash(&[0]),
+    ChainFilter::new(action_hash(&[8])).until(action_hash(&[2])).until(action_hash(&[4]))
+    => agent_chain(&[(0, 4..9)]) ; "Until 2 Until 4")]
+#[test_case(
+    agent_chain(&[(0, 0..10)]), agent_hash(&[0]),
+    ChainFilter::new(action_hash(&[8])).until(action_hash(&[2])).until(action_hash(&[4])).take(3)
+    => agent_chain(&[(0, 6..9)]) ; "Until 2 Until 4 take 3")]
+#[test_case(
+    agent_chain(&[(0, 0..10)]), agent_hash(&[0]),
+    ChainFilter::new(action_hash(&[8])).until(action_hash(&[2])).until(action_hash(&[4])).take(1)
+    => agent_chain(&[(0, 8..9)]) ; "Until 2 Until 4 take 1")]
+#[test_case(
+    agent_chain(&[(0, 0..10)]), agent_hash(&[0]),
+    ChainFilter::new(action_hash(&[8])).until(action_hash(&[8])).until(action_hash(&[4])).take(3)
+    => agent_chain(&[(0, 8..9)]) ; "Until 8 Until 4 take 3")]
 #[tokio::test(flavor = "multi_thread")]
-/// Extracts the largest range from the chain filter
+/// Extracts the smallest range from the chain filter
 /// and then returns all actions within that range
 async fn returns_full_sequence_from_filter(
     chain: Vec<(AgentPubKey, Vec<ChainItem>)>,
@@ -47,9 +66,31 @@ async fn returns_full_sequence_from_filter(
     vec![(agent, data)]
 }
 
-#[test_case(agent_chain(&[(0, 0..3), (0, 5..10)]), agent_hash(&[0]), ChainFilter::new(action_hash(&[9])) => MustGetAgentActivityResponse::IncompleteChain)]
-#[test_case(agent_chain(&[(0, 0..3), (0, 5..10)]), agent_hash(&[0]), ChainFilter::new(action_hash(&[4])) => MustGetAgentActivityResponse::PositionNotFound)]
-#[test_case(agent_chain(&[(0, 0..10)]), agent_hash(&[1]), ChainFilter::new(action_hash(&[4, 1])) => MustGetAgentActivityResponse::PositionNotFound)]
+#[test_case(
+    agent_chain(&[(0, 0..3), (0, 5..10)]), agent_hash(&[0]), ChainFilter::new(action_hash(&[8]))
+    => MustGetAgentActivityResponse::IncompleteChain ; "8 to genesis with 0 till 2 and 5 till 9")]
+#[test_case(
+    agent_chain(&[(0, 0..10)]), agent_hash(&[1]), ChainFilter::new(action_hash(&[8]))
+    => MustGetAgentActivityResponse::ActionNotFound(action_hash(&[8])) ; "Different agent")]
+#[test_case(
+    agent_chain(&[(0, 0..10)]), agent_hash(&[0]), ChainFilter::new(action_hash(&[15]))
+    => MustGetAgentActivityResponse::ActionNotFound(action_hash(&[15])) ; "Starting position not found")]
+#[test_case(
+    vec![(agent_hash(&[0]), forked_chain(&[0..6, 3..8]))], agent_hash(&[0]), ChainFilter::new(action_hash(&[7, 1])).take(7)
+    => matches MustGetAgentActivityResponse::Activity(a) if a.len() == 7 ; "Handles forks")]
+#[test_case(
+    agent_chain(&[(0, 0..5)]), agent_hash(&[0]), ChainFilter::new(action_hash(&[4])).until(action_hash(&[2, 1]))
+    => MustGetAgentActivityResponse::ActionNotFound(action_hash(&[2, 1])) ; "Until hash not found")]
+#[test_case(
+    vec![(agent_hash(&[0]), forked_chain(&[0..6, 3..8]))], agent_hash(&[0]),
+    ChainFilter::new(action_hash(&[5, 0])).until(action_hash(&[4, 1]))
+    => MustGetAgentActivityResponse::IncompleteChain ; "Unit hash on fork")]
+#[test_case(
+    agent_chain(&[(0, 0..10)]), agent_hash(&[0]), ChainFilter::new(action_hash(&[8])).until(action_hash(&[9]))
+    => MustGetAgentActivityResponse::PositionNotHighest ; "Until is higher then position")]
+#[test_case(
+    agent_chain(&[(0, 0..2)]), agent_hash(&[0]), ChainFilter::new(action_hash(&[1])).take(0)
+    => MustGetAgentActivityResponse::EmptyRange; "Take nothing produces an empty range")]
 #[tokio::test(flavor = "multi_thread")]
 /// Check the query returns the appropriate responses.
 async fn test_responses(

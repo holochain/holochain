@@ -113,24 +113,14 @@ fn matches_chain(a: &Vec<RegisterAgentActivity>, seq: &[u32]) -> bool {
 #[test_case(
     forked_chain(&[0..6, 3..8]), ChainFilter::new(action_hash(&[7, 1])).take(8), |_| Some(7)
     => matches MustGetAgentActivityResponse::Activity(a) if matches_chain(&a, &[7, 6, 5, 4, 3, 2, 1, 0]) ; "position (7,1) take 8 chain 0 to 5 and 3 to 7")]
+#[test_case(
+    forked_chain(&[4..6, 3..8]), ChainFilter::new(action_hash(&[5, 0])).until(action_hash(&[4, 1])), |h| if *h == action_hash(&[5, 0]) { Some(5) } else { Some(4) }
+    => matches MustGetAgentActivityResponse::IncompleteChain ; "position (5,0) until (4,1) chain (0,0) to (5,0) and (3,1) to (7,1)")]
 fn test_filter_then_check(
     chain: Vec<ChainItem>,
     filter: ChainFilter,
     mut f: impl FnMut(&ActionHash) -> Option<u32>,
 ) -> MustGetAgentActivityResponse {
-    eprintln!(
-        "{:?}",
-        chain
-            .iter()
-            .map(|i| (
-                i.action_seq,
-                i.hash.get_raw_32()[0..2].to_vec(),
-                i.prev_action
-                    .as_ref()
-                    .map(|h| h.get_raw_32()[0..2].to_vec())
-            ))
-            .collect::<Vec<_>>()
-    );
     let chain = chain_to_ops(chain);
     match Sequences::find_sequences::<_, ()>(filter, |a| Ok(f(a))) {
         Ok(Sequences::Found(s)) => s.filter_then_check(chain),

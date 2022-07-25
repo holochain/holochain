@@ -36,10 +36,10 @@ pub async fn must_get_agent_activity(
             move |mut txn| match find_bounds(&mut txn, &author, filter)? {
                 Sequences::Found(filter_range) => {
                     get_activity(&mut txn, &author, filter_range.range()).map(|a| {
-                        ((
+                        (
                             MustGetAgentActivityResponse::Activity(a),
                             Some(filter_range),
-                        ))
+                        )
                     })
                 }
                 Sequences::ActionNotFound(a) => {
@@ -67,7 +67,7 @@ fn hash_to_seq(
     author: &AgentPubKey,
 ) -> StateQueryResult<Option<u32>> {
     Ok(statement
-        .query_row(named_params! {"hash": hash, "author": author, "activity": DhtOpType::RegisterAgentActivity}, |row| {
+        .query_row(named_params! {":hash": hash, ":author": author, ":activity": DhtOpType::RegisterAgentActivity}, |row| {
             row.get(0)
         })
         .optional()?)
@@ -83,22 +83,6 @@ fn find_bounds(
     let get_seq = move |hash: &ActionHash| hash_to_seq(&mut statement, hash, author);
     Ok(Sequences::find_sequences(filter, get_seq)?)
 }
-
-// fn unique_seq_count(
-//     txn: &mut Transaction,
-//     author: &AgentPubKey,
-//     range: &RangeInclusive<u32>,
-// ) -> StateQueryResult<u32> {
-//     Ok(txn.prepare(MUST_GET_AGENT_ACTIVITY_COUNT)?.query_row(
-//         named_params! {
-//                  ":author": author,
-//                  ":op_type": DhtOpType::RegisterAgentActivity,
-//                  ":lower_seq": range.start(),
-//                  ":upper_seq": range.end(),
-//         },
-//         |row| row.get("unique_seq"),
-//     )?)
-// }
 
 fn get_activity(
     txn: &mut Transaction,
