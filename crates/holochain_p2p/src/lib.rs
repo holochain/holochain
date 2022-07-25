@@ -58,8 +58,7 @@ pub trait HolochainP2pDnaT {
     async fn remote_signal(
         &self,
         from_agent: AgentPubKey,
-        from_signature: Signature,
-        to_agent_list: Vec<AgentPubKey>,
+        to_agent_list: Vec<(Signature, AgentPubKey)>,
         zome_name: ZomeName,
         fn_name: FunctionName,
         cap: Option<CapSecret>,
@@ -200,8 +199,7 @@ impl HolochainP2pDnaT for HolochainP2pDna {
     async fn remote_signal(
         &self,
         from_agent: AgentPubKey,
-        from_signature: Signature,
-        to_agent_list: Vec<AgentPubKey>,
+        to_agent_list: Vec<(Signature, AgentPubKey)>,
         zome_name: ZomeName,
         fn_name: FunctionName,
         cap: Option<CapSecret>,
@@ -211,7 +209,6 @@ impl HolochainP2pDnaT for HolochainP2pDna {
             .remote_signal(
                 (*self.dna_hash).clone(),
                 from_agent,
-                from_signature,
                 to_agent_list,
                 zome_name,
                 fn_name,

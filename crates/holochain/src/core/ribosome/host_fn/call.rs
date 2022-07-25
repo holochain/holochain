@@ -74,7 +74,11 @@ pub fn call(
                                         provenance,
                                         zome_call_unsigned
                                             .sign(call_context.host_context.keystore())
-                                            .await?,
+                                            .await
+                                            .map_err(|e| -> RuntimeError {
+                                                wasm_error!(WasmErrorInner::Host(e.to_string()))
+                                                    .into()
+                                            })?,
                                         target_agent,
                                         zome_call_unsigned.zome_name,
                                         zome_call_unsigned.fn_name,
@@ -141,7 +145,10 @@ pub fn call(
                                             call_context.host_context.keystore(),
                                             zome_call_unsigned,
                                         )
-                                        .await?;
+                                        .await
+                                        .map_err(|e| -> RuntimeError {
+                                            wasm_error!(WasmErrorInner::Host(e.to_string())).into()
+                                        })?;
                                         match call_context
                                             .host_context()
                                             .call_zome_handle()
@@ -220,7 +227,11 @@ pub mod wasm_test {
             .await
             .unwrap();
 
-        let dna_file_2 = dna_file_1.clone().with_network_seed("CLONE".to_string()).await.unwrap();
+        let dna_file_2 = dna_file_1
+            .clone()
+            .with_network_seed("CLONE".to_string())
+            .await
+            .unwrap();
 
         let mut conductor = SweetConductor::from_standard_config().await;
         let (alice_pubkey, _) = SweetAgents::alice_and_bob();

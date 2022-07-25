@@ -29,7 +29,17 @@ pub enum WireMessage {
         zome_name: ZomeName,
         fn_name: FunctionName,
         from_agent: holo_hash::AgentPubKey,
-        from_signature: Signature,
+        signature: Signature,
+        to_agent: AgentPubKey,
+        cap_secret: Option<CapSecret>,
+        #[serde(with = "serde_bytes")]
+        data: Vec<u8>,
+    },
+    CallRemoteMulti {
+        zome_name: ZomeName,
+        fn_name: FunctionName,
+        from_agent: holo_hash::AgentPubKey,
+        to_agents: Vec<(Signature, holo_hash::AgentPubKey)>,
         cap_secret: Option<CapSecret>,
         #[serde(with = "serde_bytes")]
         data: Vec<u8>,
@@ -83,7 +93,8 @@ impl WireMessage {
         zome_name: ZomeName,
         fn_name: FunctionName,
         from_agent: holo_hash::AgentPubKey,
-        from_signature: Signature,
+        signature: Signature,
+        to_agent: holo_hash::AgentPubKey,
         cap_secret: Option<CapSecret>,
         payload: ExternIO,
     ) -> WireMessage {
@@ -91,7 +102,26 @@ impl WireMessage {
             zome_name,
             fn_name,
             from_agent,
-            from_signature,
+            to_agent,
+            signature,
+            cap_secret,
+            data: payload.into_vec(),
+        }
+    }
+
+    pub fn call_remote_multi(
+        zome_name: ZomeName,
+        fn_name: FunctionName,
+        from_agent: holo_hash::AgentPubKey,
+        to_agents: Vec<(Signature, holo_hash::AgentPubKey)>,
+        cap_secret: Option<CapSecret>,
+        payload: ExternIO,
+    ) -> WireMessage {
+        Self::CallRemoteMulti {
+            zome_name,
+            fn_name,
+            from_agent,
+            to_agents,
             cap_secret,
             data: payload.into_vec(),
         }

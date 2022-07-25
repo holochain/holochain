@@ -217,7 +217,7 @@ ghost_actor::ghost_chan! {
         fn call_remote(
             dna_hash: DnaHash,
             from_agent: AgentPubKey,
-            from_signature: Signature,
+            signature: Signature,
             to_agent: AgentPubKey,
             zome_name: ZomeName,
             fn_name: FunctionName,
@@ -232,8 +232,7 @@ ghost_actor::ghost_chan! {
         fn remote_signal(
             dna_hash: DnaHash,
             from_agent: AgentPubKey,
-            from_signature: Signature,
-            to_agent_list: Vec<AgentPubKey>,
+            to_agent_list: Vec<(Signature, AgentPubKey)>,
             zome_name: ZomeName,
             fn_name: FunctionName,
             cap: Option<CapSecret>,

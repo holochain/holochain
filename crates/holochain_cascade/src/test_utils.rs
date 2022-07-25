@@ -184,8 +184,7 @@ impl HolochainP2pDnaT for PassThroughNetwork {
     async fn remote_signal(
         &self,
         _from_agent: AgentPubKey,
-        _from_signature: Signature,
-        _to_agent_list: Vec<AgentPubKey>,
+        _to_agent_list: Vec<(Signature, AgentPubKey)>,
         _zome_name: holochain_zome_types::ZomeName,
         _fn_name: holochain_zome_types::FunctionName,
         _cap: Option<holochain_zome_types::CapSecret>,
@@ -364,8 +363,7 @@ impl HolochainP2pDnaT for MockNetwork {
     async fn remote_signal(
         &self,
         _from_agent: AgentPubKey,
-        _from_signature: Signature,
-        _to_agent_list: Vec<AgentPubKey>,
+        _to_agent_list: Vec<(Signature, AgentPubKey)>,
         _zome_name: holochain_zome_types::ZomeName,
         _fn_name: holochain_zome_types::FunctionName,
         _cap: Option<holochain_zome_types::CapSecret>,
