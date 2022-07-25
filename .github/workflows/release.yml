@@ -188,6 +188,7 @@ jobs:
               nix-shell \
                 --keep CARGO_NEXTEST_ARGS \
                 --keep CARGO_TEST_ARGS \
+                --keep CARGO_BUILD_JOBS \
                 --fallback --pure --argstr flavor "coreDev" --run hc-test-standard-nextest
 
           - name: cargo-test-slow
@@ -203,6 +204,7 @@ jobs:
               nix-shell \
               --keep CARGO_NEXTEST_ARGS \
               --keep CARGO_TEST_ARGS \
+              --keep CARGO_BUILD_JOBS \
               --fallback --pure --argstr flavor "coreDev" --run hc-test-slow-nextest
 
           - name: cargo-test-static
@@ -216,6 +218,7 @@ jobs:
             run: |
               nix-shell \
                 --keep CARGO_TEST_ARGS \
+                --keep CARGO_BUILD_JOBS \
                 --fallback --pure --argstr flavor "coreDev" --run hc-static-checks
 
           - name: cargo-test-wasm
@@ -229,6 +232,7 @@ jobs:
             run: |
               nix-shell \
                 --keep CARGO_TEST_ARGS \
+                --keep CARGO_BUILD_JOBS \
                 --fallback --pure --argstr flavor "coreDev" --run hc-test-wasm
 
           - name: nix-test
@@ -364,7 +368,8 @@ jobs:
         if: ${{ matrix.testCommand.restoresCargoCache == true && needs.vars.outputs.skip_test != 'true' }}
         env:
           CARGO_TEST_ARGS: "--no-run"
-          CARGO_NEXTEST_ARGS: "list"
+          CARGO_NEXTEST_ARGS: "list --build-jobs=1"
+          CARGO_BUILD_JOBS: "1"
         run: |
           set -e
           source "${HOLOCHAIN_RELEASE_SH}"
