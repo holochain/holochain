@@ -112,9 +112,6 @@ impl ChainFilterIter {
     /// with a [`ChainFilter`].
     ///
     /// # Constraints
-    /// - The input iterator **must** be sorted by action sequence from highest to lowest.
-    /// - If the input iterator is not sorted by action sequence
-    /// then this iterator will only work on the first sorted subset.
     /// - If the iterator does not contain the filters starting position
     /// then this will be an empty iterator.
     pub fn new(filter: ChainFilter, mut chain: Vec<RegisterAgentActivity>) -> Self {
@@ -242,18 +239,34 @@ impl Sequences {
     where
         F: FnMut(&ActionHash) -> Result<Option<u32>, E>,
     {
+        // Get the end of the ranges position sequence.
+        // This is the highest sequence number and also the
+        // start of the iterator.
         let position = match get_seq(&filter.position)? {
             Some(seq) => seq,
             None => return Ok(Self::ActionNotFound(filter.position)),
         };
+
+        // Track why the sequence start of the range was chosen.
         let mut range_start_type = RangeStartType::Genesis;
+
+        // If their are any until hashes in the filter,
+        // then find the highest sequence of the set
+        // and find the distance from the position.
         let distance = match filter.get_until() {
             Some(until_hashes) => {
+                // There is at least one until hash in the filter so
+                // the range start will be an until hash and not genesis.
                 range_start_type = RangeStartType::Until;
+
+                // Track the highest sequence of the until hashes.
                 let mut max = 0;
+
+                // Find the highest sequence of the until hashes.
                 for hash in until_hashes {
                     match get_seq(hash)? {
                         Some(seq) => {
+                            // Check no until hash has a sequence higher than the position.
                             if seq > position {
                                 return Ok(Self::PositionNotHighest);
                             }
@@ -262,23 +275,37 @@ impl Sequences {
                         None => return Ok(Self::ActionNotFound(hash.clone())),
                     }
                 }
+
+                // The distance from the position to highest until hash.
+                // Note this cannot be an overflow due to the check above.
                 position - max
             }
+            // If there is no until hashes then the distance is the position
+            // to genesis (or just the position).
             None => position,
         };
+
+        // Check if there is a take filter and if that
+        // will be reached before any until hashes or genesis.
         let start = match filter.get_take() {
             Some(take) => {
+                // A take of zero will produce an empty range.
                 if take == 0 {
                     return Ok(Self::EmptyRange);
                 } else if take <= distance {
+                    // The take will be reached before genesis or until hashes.
                     range_start_type = RangeStartType::Take;
                     // Add one to include the "position" in the number of
                     // "take". This matches the rust iterator "take".
                     position.saturating_sub(take).saturating_add(1)
                 } else {
+                    // The range spans from the position for the distance
+                    // that was determined earlier.
                     position - distance
                 }
             }
+            // The range spans from the position for the distance
+            // that was determined earlier.
             None => position - distance,
         };
         Ok(Self::Found(ChainFilterRange {
@@ -300,14 +327,19 @@ impl ChainFilterRange {
         chain: Vec<RegisterAgentActivity>,
     ) -> MustGetAgentActivityResponse {
         let until_hashes = self.filter.get_until().cloned();
+
+        // Create the filter iterator and collect the filtered actions.
         let out: Vec<_> = ChainFilterIter::new(self.filter, chain).collect();
+
+        // Check the invariants hold.
         match out.last().zip(out.first()) {
+            // The actual results after the filter must match the range.
             Some((lowest, highest))
                 if (lowest.action.action().action_seq()..=highest.action.action().action_seq())
                     == self.range =>
             {
-                // Check if the range start is an until action sequence that it is
-                // actually an until hash.
+                // If the range start was an until hash then the first action must
+                // actually be an action from the until set.
                 if let Some(hashes) = until_hashes {
                     if matches!(self.range_start_type, RangeStartType::Until)
                         && !hashes.contains(lowest.action.action_address())
@@ -315,8 +347,11 @@ impl ChainFilterRange {
                         return MustGetAgentActivityResponse::IncompleteChain;
                     }
                 }
+
+                // The constraints are met the activity can be returned.
                 MustGetAgentActivityResponse::Activity(out)
             }
+            // The constraints are not met so the chain is not complete.
             _ => MustGetAgentActivityResponse::IncompleteChain,
         }
     }

@@ -23,6 +23,10 @@ use holochain_zome_types::SignedActionHashed;
 #[cfg(test)]
 mod test;
 
+/// Get the agent activity for a given agent and
+/// hash bounded range of actions.
+///
+/// The full range must exist or this will return [`MustGetAgentActivityResponse::IncompleteChain`].
 pub async fn must_get_agent_activity(
     env: DbRead<DbKindDht>,
     author: AgentPubKey,
@@ -30,8 +34,10 @@ pub async fn must_get_agent_activity(
 ) -> StateQueryResult<MustGetAgentActivityResponse> {
     let result = env
         .async_reader(
+            // Find the bounds of the range specified in the filter.
             move |mut txn| match find_bounds(&mut txn, &author, filter)? {
                 Sequences::Found(filter_range) => {
+                    // Get the full range of actions from the database.
                     get_activity(&mut txn, &author, filter_range.range()).map(|a| {
                         (
                             MustGetAgentActivityResponse::Activity(a),
@@ -39,18 +45,24 @@ pub async fn must_get_agent_activity(
                         )
                     })
                 }
+                // One of the actions specified in the filter does not exist in the database.
                 Sequences::ActionNotFound(a) => {
                     Ok((MustGetAgentActivityResponse::ActionNotFound(a), None))
                 }
+                // The filter specifies starting position that has a lower
+                // action sequence than another action in the filter.
                 Sequences::PositionNotHighest => {
                     Ok((MustGetAgentActivityResponse::PositionNotHighest, None))
                 }
+                // The filter specifies a range that is empty.
                 Sequences::EmptyRange => Ok((MustGetAgentActivityResponse::EmptyRange, None)),
             },
         )
         .await?;
     match result {
         (MustGetAgentActivityResponse::Activity(activity), Some(filter_range)) => {
+            // Filter the activity from the database and check the invariants of the
+            // filter still hold.
             Ok(filter_range.filter_then_check(activity))
         }
         (MustGetAgentActivityResponse::Activity(_), None) => unreachable!(),
@@ -58,6 +70,7 @@ pub async fn must_get_agent_activity(
     }
 }
 
+/// Get the action sequence for a given action hash.
 fn hash_to_seq(
     statement: &mut Statement,
     hash: &ActionHash,
@@ -70,6 +83,7 @@ fn hash_to_seq(
         .optional()?)
 }
 
+/// Find the filters sequence bounds.
 fn find_bounds(
     txn: &mut Transaction,
     author: &AgentPubKey,
@@ -77,10 +91,15 @@ fn find_bounds(
 ) -> StateQueryResult<Sequences> {
     let mut statement = txn.prepare(ACTION_HASH_TO_SEQ)?;
 
+    // Map an action hash to its sequence.
     let get_seq = move |hash: &ActionHash| hash_to_seq(&mut statement, hash, author);
+
+    // For all the hashes in the filter, get their sequences.
     Ok(Sequences::find_sequences(filter, get_seq)?)
 }
 
+/// Get the agent activity for a given range of actions
+/// from the database.
 fn get_activity(
     txn: &mut Transaction,
     author: &AgentPubKey,

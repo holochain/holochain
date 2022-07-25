@@ -26,8 +26,6 @@ pub mod sql_cell {
     pub const FETCH_OP: &str = include_str!("sql/cell/fetch_op.sql");
 
     pub mod must_get_agent_activity {
-        pub const MUST_GET_AGENT_ACTIVITY_COUNT: &str =
-            include_str!("sql/cell/agent_activity/must_get_agent_activity_count.sql");
         pub const MUST_GET_AGENT_ACTIVITY: &str =
             include_str!("sql/cell/agent_activity/must_get_agent_activity.sql");
         pub const ACTION_HASH_TO_SEQ: &str =
