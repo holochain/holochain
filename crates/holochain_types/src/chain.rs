@@ -31,7 +31,6 @@ pub trait AgentActivityExt {
 
 impl AgentActivityExt for AgentActivityResponse {}
 
-#[warn(missing_docs)]
 #[must_use = "Iterator doesn't do anything unless consumed."]
 #[derive(Debug)]
 /// Iterate over a source chain and apply the [`ChainFilter`] to each element.
