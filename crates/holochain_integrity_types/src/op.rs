@@ -182,7 +182,7 @@ pub struct RegisterDelete {
     pub original_entry: Option<Entry>,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
 #[cfg_attr(feature = "test_utils", derive(arbitrary::Arbitrary))]
 /// Registers a new [`Action`] on an agent source chain.
 /// This is the act of creating any [`Action`] and
