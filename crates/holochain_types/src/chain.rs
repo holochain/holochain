@@ -7,7 +7,7 @@ use holo_hash::AgentPubKey;
 use holochain_zome_types::prelude::ChainStatus;
 use holochain_zome_types::ChainFilter;
 use holochain_zome_types::ChainFilters;
-use holochain_zome_types::RegisterAgentActivityOp;
+use holochain_zome_types::RegisterAgentActivity;
 
 #[cfg(all(test, feature = "test_utils"))]
 mod test;
@@ -42,7 +42,7 @@ impl AgentActivityExt for AgentActivityResponse {}
 /// [`until`]: ChainFilter::until
 pub struct ChainFilterIter<I>
 where
-    I: Iterator<Item = RegisterAgentActivityOp>,
+    I: Iterator<Item = RegisterAgentActivity>,
 {
     filter: ChainFilter,
     iter: Peekable<I>,
@@ -52,9 +52,9 @@ where
 #[warn(missing_docs)]
 impl<I> ChainFilterIter<I>
 where
-    I: Iterator<Item = RegisterAgentActivityOp>,
+    I: Iterator<Item = RegisterAgentActivity>,
 {
-    /// Create an iterator that filters an iterator of [`RegisterAgentActivityOp`]
+    /// Create an iterator that filters an iterator of [`RegisterAgentActivity`]
     /// with a [`ChainFilter`].
     ///
     /// # Constraints
@@ -65,7 +65,7 @@ where
     /// then this will be an empty iterator.
     pub fn new(
         filter: ChainFilter,
-        iter: impl IntoIterator<Item = RegisterAgentActivityOp, IntoIter = I>,
+        iter: impl IntoIterator<Item = RegisterAgentActivity, IntoIter = I>,
     ) -> Self {
         // Create a peekable iterator.
         let mut iter = iter.into_iter().peekable();
@@ -89,9 +89,9 @@ where
 
 impl<I> Iterator for ChainFilterIter<I>
 where
-    I: Iterator<Item = RegisterAgentActivityOp>,
+    I: Iterator<Item = RegisterAgentActivity>,
 {
-    type Item = RegisterAgentActivityOp;
+    type Item = RegisterAgentActivity;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.end {

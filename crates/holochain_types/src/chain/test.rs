@@ -6,7 +6,7 @@ use holochain_zome_types::Create;
 use std::ops::Range;
 use test_case::test_case;
 
-use holochain_zome_types::RegisterAgentActivityOp;
+use holochain_zome_types::RegisterAgentActivity;
 
 use super::*;
 
@@ -80,7 +80,7 @@ fn gap_chain(ranges: &[Range<u8>]) -> Vec<(u32, ActionHash, PrevHash)> {
         .collect()
 }
 
-/// Build a chain of RegisterAgentActivityOp and then run them through the
+/// Build a chain of RegisterAgentActivity and then run them through the
 /// chain filter.
 fn build_chain(
     c: Vec<(u32, ActionHash, PrevHash)>,
@@ -88,7 +88,7 @@ fn build_chain(
 ) -> Vec<(u32, ActionHash, PrevHash)> {
     let mut u = Unstructured::new(&holochain_zome_types::NOISE);
     let data = c.into_iter().map(|(seq, action_hash, prev_hash)| {
-        let mut op = RegisterAgentActivityOp::arbitrary(&mut u).unwrap();
+        let mut op = RegisterAgentActivity::arbitrary(&mut u).unwrap();
         let mut create = Create::arbitrary(&mut u).unwrap();
         create.action_seq = seq;
         create.prev_action = prev_hash;
