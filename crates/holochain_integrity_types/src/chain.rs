@@ -31,7 +31,7 @@ pub enum ChainFilters {
     ToGenesis,
     /// Take this many (inclusive of the starting position).
     Take(u32),
-    /// Continue until this hash is found.
+    /// Continue until one of these hashes is found.
     Until(HashSet<ActionHash>),
     /// Combination of both take and until.
     /// Whichever is the smaller set.
