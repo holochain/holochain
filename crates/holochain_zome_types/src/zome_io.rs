@@ -105,6 +105,8 @@ wasm_io_types! {
 
     // Retrieve an action from the DHT or short circuit.
     fn must_get_action (zt::entry::MustGetActionInput) -> zt::SignedActionHashed;
+    
+    fn must_get_agent_activity (zt::chain::MustGetAgentActivityInput) -> Vec<zt::op::RegisterAgentActivity>;
 
     // Query the source chain for data.
     fn query (zt::query::ChainQueryFilter) -> Vec<crate::Record>;

@@ -158,6 +158,8 @@ host_fn_api_impls! {
     // Retrieve an action from the DHT or short circuit.
     fn must_get_action (zt::entry::MustGetActionInput) -> SignedActionHashed;
 
+    fn must_get_agent_activity (zt::chain::MustGetAgentActivityInput) -> Vec<zt::op::RegisterAgentActivity>;
+
     // Attempt to accept a preflight request.
     fn accept_countersigning_preflight_request(zt::countersigning::PreflightRequest) -> zt::countersigning::PreflightRequestAcceptance;
 

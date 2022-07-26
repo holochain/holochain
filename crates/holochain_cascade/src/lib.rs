@@ -738,6 +738,14 @@ where
         let results = self.cascading(query).await?;
         Ok(results)
     }
+    
+    pub async fn must_get_agent_activity(
+        &mut self,
+        author: AgentPubKey,
+        query: ChainFilter,
+    ) -> CascadeResult<MustGetAgentActivityResponse> {
+        todo!()
+    }
 
     #[instrument(skip(self, agent, query, options))]
     /// Get agent activity from agent activity authorities.

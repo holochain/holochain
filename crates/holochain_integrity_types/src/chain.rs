@@ -4,6 +4,7 @@
 use std::collections::HashSet;
 
 use holo_hash::ActionHash;
+use holo_hash::AgentPubKey;
 use holochain_serialized_bytes::prelude::*;
 
 #[cfg(test)]
@@ -36,6 +37,16 @@ pub enum ChainFilters {
     /// Combination of both take and until.
     /// Whichever is the smaller set.
     Both(u32, HashSet<ActionHash>),
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+/// Input to the `must_get_agent_activity` call.
+pub struct MustGetAgentActivityInput {
+    /// The author of the chain that you are requesting
+    /// activity from.
+    pub author: AgentPubKey,
+    /// The filter on the chains activity.
+    pub chain_filter: ChainFilter,
 }
 
 impl ChainFilter {
