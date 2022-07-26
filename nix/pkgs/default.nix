@@ -17,6 +17,7 @@ let
 
     binary=$(cargo build \
       --locked \
+      ''${EXTRA_CARGO_BUILD_ARGS:-} \
       --target-dir=''${NIX_ENV_PREFIX:-?}/target \
       --manifest-path=${hcToplevelDir}/crates/$crate/Cargo.toml \
       --bin=$crate --message-format=json | \
@@ -47,7 +48,8 @@ let
       )
   '';
 
-  mkHolochainBinaryScript = crate: writeShellScriptBin (builtins.replaceStrings ["_"] ["-"] crate) ''
+  mkHolochainBinaryScript = crate: build_args: writeShellScriptBin (builtins.replaceStrings [ "_" ] [ "-" ] crate) ''
+    export EXTRA_CARGO_BUILD_ARGS="${build_args}"
     exec ${hcRunCrate}/bin/hc-run-crate ${crate} $@
   '';
 
@@ -56,15 +58,16 @@ let
   '';
 
   ci = callPackage ./ci.nix { };
-  core = callPackage ./core.nix {
-    inherit hcToplevelDir;
-    releaseAutomation = "${hcReleaseAutomation}/bin/hc-ra";
-  } // {
+  core = callPackage ./core.nix
+    {
+      inherit hcToplevelDir;
+      releaseAutomation = "${hcReleaseAutomation}/bin/hc-ra";
+    } // {
     inherit hcReleaseAutomation;
   };
   happ = {
-    holochain = mkHolochainBinaryScript "holochain";
-    hc = mkHolochainBinaryScript "hc";
+    holochain = mkHolochainBinaryScript "holochain" "";
+    hc = mkHolochainBinaryScript "hc" "--release";
   };
 
   all = {
@@ -75,6 +78,9 @@ let
       ;
   };
 
-in builtins.mapAttrs (k: v:
-  builtins.removeAttrs v [ "override" "overrideDerivation" ]
-) all
+in
+builtins.mapAttrs
+  (k: v:
+    builtins.removeAttrs v [ "override" "overrideDerivation" ]
+  )
+  all
