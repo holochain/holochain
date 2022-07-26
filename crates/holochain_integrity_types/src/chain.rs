@@ -62,7 +62,10 @@ impl ChainFilter {
     }
 
     /// Take all actions until this action hash is found.
-    /// If the hash is not found this is equivalent to [`ChainFilters::ToGenesis`].
+    /// Note that all actions specified as `until` hashes must be
+    /// found so this filter can produce deterministic results.
+    /// It is invalid to specify an until hash that is on a different
+    /// fork then the starting position.
     pub fn until(mut self, action_hash: ActionHash) -> Self {
         self.filters = match self.filters {
             ChainFilters::ToGenesis => ChainFilters::Until(Some(action_hash).into_iter().collect()),
@@ -77,6 +80,24 @@ impl ChainFilter {
             }
         };
         self
+    }
+
+    /// Get the until hashes if there are any.
+    pub fn get_until(&self) -> Option<&HashSet<ActionHash>> {
+        match &self.filters {
+            ChainFilters::Until(u) => Some(u),
+            ChainFilters::Both(_, u) => Some(u),
+            _ => None,
+        }
+    }
+
+    /// Get the take number if there is one.
+    pub fn get_take(&self) -> Option<u32> {
+        match &self.filters {
+            ChainFilters::Take(s) => Some(*s),
+            ChainFilters::Both(s, _) => Some(*s),
+            _ => None,
+        }
     }
 }
 

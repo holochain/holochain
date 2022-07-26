@@ -29,8 +29,8 @@ pub trait AgentActivityExt {
 
 impl AgentActivityExt for AgentActivityResponse {}
 
-#[warn(missing_docs)]
 #[must_use = "Iterator doesn't do anything unless consumed."]
+#[derive(Debug)]
 /// Iterate over a source chain and apply the [`ChainFilter`] to each element.
 /// This iterator will:
 /// - Ignore any ops that are not a direct ancestor to the starting position.
@@ -40,35 +40,29 @@ impl AgentActivityExt for AgentActivityResponse {}
 ///
 /// [`take`]: ChainFilter::take
 /// [`until`]: ChainFilter::until
-pub struct ChainFilterIter<I>
-where
-    I: Iterator<Item = RegisterAgentActivity>,
-{
+pub struct ChainFilterIter {
     filter: ChainFilter,
-    iter: Peekable<I>,
+    iter: Peekable<std::vec::IntoIter<RegisterAgentActivity>>,
     end: bool,
 }
 
-#[warn(missing_docs)]
-impl<I> ChainFilterIter<I>
-where
-    I: Iterator<Item = RegisterAgentActivity>,
-{
+impl ChainFilterIter {
     /// Create an iterator that filters an iterator of [`RegisterAgentActivity`]
     /// with a [`ChainFilter`].
     ///
     /// # Constraints
-    /// - The input iterator **must** be sorted by action sequence from highest to lowest.
-    /// - If the input iterator is not sorted by action sequence
-    /// then this iterator will only work on the first sorted subset.
     /// - If the iterator does not contain the filters starting position
     /// then this will be an empty iterator.
-    pub fn new(
-        filter: ChainFilter,
-        iter: impl IntoIterator<Item = RegisterAgentActivity, IntoIter = I>,
-    ) -> Self {
+    pub fn new(filter: ChainFilter, mut chain: Vec<RegisterAgentActivity>) -> Self {
+        // Sort by descending.
+        chain.sort_unstable_by(|a, b| {
+            b.action
+                .action()
+                .action_seq()
+                .cmp(&a.action.action().action_seq())
+        });
         // Create a peekable iterator.
-        let mut iter = iter.into_iter().peekable();
+        let mut iter = chain.into_iter().peekable();
 
         // Discard any ops that are not the starting position.
         let i = iter.by_ref();
@@ -87,10 +81,7 @@ where
     }
 }
 
-impl<I> Iterator for ChainFilterIter<I>
-where
-    I: Iterator<Item = RegisterAgentActivity>,
-{
+impl Iterator for ChainFilterIter {
     type Item = RegisterAgentActivity;
 
     fn next(&mut self) -> Option<Self::Item> {
