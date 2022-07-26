@@ -15,7 +15,7 @@ use serde_with::serde_as;
 /// manifest_version: "1"
 /// name: multi integrity dna
 /// integrity:
-///   uid: 00000000-0000-0000-0000-000000000000
+///   network_seed: 00000000-0000-0000-0000-000000000000
 ///   properties: ~
 ///   origin_time: 2022-02-11T23:05:19.470323Z
 ///   zomes:
@@ -43,7 +43,7 @@ use serde_with::serde_as;
 /// manifest_version: "1"
 /// name: single integrity dna
 /// integrity:
-///   uid: 00000000-0000-0000-0000-000000000000
+///   network_seed: 00000000-0000-0000-0000-000000000000
 ///   properties: ~
 ///   origin_time: 2022-02-11T23:05:19.470323Z
 ///   zomes:
@@ -109,9 +109,9 @@ impl DnaManifestV1 {
 #[serde(rename_all = "snake_case")]
 /// Manifest for all items that will change the [`DnaHash`].
 pub struct IntegrityManifest {
-    /// A UID for uniquifying this Dna.
+    /// A network seed for uniquifying this DNA. See [`DnaDef`].
     // TODO: consider Vec<u8> instead (https://github.com/holochain/holochain/pull/86#discussion_r412689085)
-    pub uid: Option<String>,
+    pub network_seed: Option<String>,
 
     /// Any arbitrary application properties can be included in this object.
     pub properties: Option<YamlProperties>,

@@ -9,7 +9,7 @@ use super::{
 };
 use crate::prelude::{AppRoleId, YamlProperties};
 use holo_hash::{DnaHash, DnaHashB64};
-use holochain_zome_types::Uid;
+use holochain_zome_types::NetworkSeed;
 use std::collections::HashMap;
 
 /// Version 1 of the App manifest schema
@@ -77,8 +77,8 @@ pub struct AppRoleDnaManifest {
     /// Optional default properties. May be overridden during installation.
     pub properties: Option<YamlProperties>,
 
-    /// Optional fixed UID. May be overridden during installation.
-    pub uid: Option<Uid>,
+    /// Optional fixed network seed. May be overridden during installation.
+    pub network_seed: Option<NetworkSeed>,
 
     /// The versioning constraints for the DNA. Ensures that only a DNA that
     /// matches the version spec will be used.
@@ -100,7 +100,7 @@ impl AppRoleDnaManifest {
                 "./path/to/my/dnabundle.dna".into(),
             )),
             properties: None,
-            uid: None,
+            network_seed: None,
             version: None,
             clone_limit: 0,
         }
@@ -169,7 +169,7 @@ pub enum CellProvisioning {
     /// Always create a new Cell when installing this App
     Create { deferred: bool },
     /// Always create a new Cell when installing the App,
-    /// and use a unique UID to ensure a distinct DHT network
+    /// and use a unique network seed to ensure a distinct DHT network
     CreateClone { deferred: bool },
     /// Require that a Cell is already installed which matches the DNA version
     /// spec, and which has an Agent that's associated with this App's agent
@@ -189,17 +189,17 @@ impl Default for CellProvisioning {
 }
 
 impl AppManifestV1 {
-    /// Update the UID for all DNAs used in Create-provisioned Cells.
+    /// Update the network seed for all DNAs used in Create-provisioned Cells.
     /// Cells with other provisioning strategies are not affected.
     ///
     // TODO: it probably makes sense to do this for CreateIfNotExists cells
     // too, in the Create case, but we would have to do that during installation
     // rather than simply updating the manifest. Let's hold off on that until
     // we know we need it, since this way is substantially simpler.
-    pub fn set_uid(&mut self, uid: Uid) {
+    pub fn set_network_seed(&mut self, network_seed: NetworkSeed) {
         for mut role in self.roles.iter_mut() {
             if matches!(role.provisioning, Some(CellProvisioning::Create { .. })) {
-                role.dna.uid = Some(uid.clone());
+                role.dna.network_seed = Some(network_seed.clone());
             }
         }
     }
@@ -223,7 +223,7 @@ impl AppManifestV1 {
                         location,
                         properties,
                         version,
-                        uid,
+                        network_seed,
                         clone_limit,
                     } = dna;
                     // Go from "flexible" enum into proper DnaVersionSpec.
@@ -234,7 +234,7 @@ impl AppManifestV1 {
                             clone_limit,
                             location: Self::require(location, "roles.dna.(path|url)")?,
                             properties,
-                            uid,
+                            network_seed,
                             version,
                         },
                         CellProvisioning::CreateClone { deferred } => {
@@ -260,7 +260,7 @@ impl AppManifestV1 {
                                 location: Self::require(location, "roles.dna.(path|url)")?,
                                 version: Self::require(version, "roles.dna.version")?,
                                 properties,
-                                uid,
+                                network_seed,
                             }
                         }
                         CellProvisioning::Disabled => AppRoleManifestValidated::Disabled {
@@ -324,7 +324,7 @@ pub mod tests {
             dna: AppRoleDnaManifest {
                 location,
                 properties: Some(app_manifest_properties_fixture()),
-                uid: Some("uid".into()),
+                network_seed: Some("network_seed".into()),
                 version: Some(version),
                 clone_limit: 50,
             },
@@ -365,7 +365,7 @@ roles:
         - {}
         - {}
       clone_limit: 50
-      uid: uid
+      network_seed: network_seed
       properties:
         salad: "bar"
 
@@ -390,7 +390,7 @@ roles:
     }
 
     #[tokio::test]
-    async fn manifest_v1_set_uid() {
+    async fn manifest_v1_set_network_seed() {
         let mut u = arbitrary::Unstructured::new(&[0]);
         let mut manifest = AppManifestV1::arbitrary(&mut u).unwrap();
         manifest.roles = vec![
@@ -405,15 +405,27 @@ roles:
         manifest.roles[3].provisioning =
             Some(CellProvisioning::CreateIfNotExists { deferred: false });
 
-        let uid = Uid::from("blabla");
-        manifest.set_uid(uid.clone());
+        let network_seed = NetworkSeed::from("blabla");
+        manifest.set_network_seed(network_seed.clone());
 
-        // - The Create roles have the UID rewritten.
-        assert_eq!(manifest.roles[0].dna.uid.as_ref(), Some(&uid));
-        assert_eq!(manifest.roles[1].dna.uid.as_ref(), Some(&uid));
+        // - The Create roles have the network seed rewritten.
+        assert_eq!(
+            manifest.roles[0].dna.network_seed.as_ref(),
+            Some(&network_seed)
+        );
+        assert_eq!(
+            manifest.roles[1].dna.network_seed.as_ref(),
+            Some(&network_seed)
+        );
 
         // - The others do not.
-        assert_ne!(manifest.roles[2].dna.uid.as_ref(), Some(&uid));
-        assert_ne!(manifest.roles[3].dna.uid.as_ref(), Some(&uid));
+        assert_ne!(
+            manifest.roles[2].dna.network_seed.as_ref(),
+            Some(&network_seed)
+        );
+        assert_ne!(
+            manifest.roles[3].dna.network_seed.as_ref(),
+            Some(&network_seed)
+        );
     }
 }

@@ -253,3 +253,9 @@ impl From<u8> for ZomeDependencyIndex {
         Self(v)
     }
 }
+
+impl From<()> for ZomeEntryTypesKey {
+    fn from(_: ()) -> Self {
+        unimplemented!("Should not ever be used")
+    }
+}

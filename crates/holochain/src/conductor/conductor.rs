@@ -774,7 +774,7 @@ impl Conductor {
         let child_dna = ribosome_store.share_ref(|ds| {
             ds.get_dna_file(&parent_dna_hash)
                 .ok_or(DnaError::DnaMissing(parent_dna_hash))?
-                .modify_phenotype(random_uid(), properties)
+                .modify_phenotype(random_network_seed(), properties)
         })?;
         let child_dna_hash = child_dna.dna_hash().to_owned();
         let child_ribosome = RealRibosome::new(child_dna)?;
@@ -1618,7 +1618,7 @@ mod builder {
                 .clone()
                 .start_scheduler(holochain_zome_types::schedule::SCHEDULER_INTERVAL);
 
-            let _ = Self::spawn_post_commit(handle.clone(), post_commit_receiver);
+            Self::spawn_post_commit(handle.clone(), post_commit_receiver);
 
             let configs = conductor_config.admin_interfaces.unwrap_or_default();
             let cell_startup_errors = handle.clone().initialize_conductor(configs).await?;

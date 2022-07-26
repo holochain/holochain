@@ -199,7 +199,7 @@ pub mod wasm_test {
             .await
             .unwrap();
 
-        let dna_file_2 = dna_file_1.clone().with_uid("CLONE".to_string()).await.unwrap();
+        let dna_file_2 = dna_file_1.clone().with_network_seed("CLONE".to_string()).await.unwrap();
 
         let mut conductor = SweetConductor::from_standard_config().await;
         let (alice_pubkey, _) = SweetAgents::alice_and_bob();

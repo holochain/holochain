@@ -145,11 +145,12 @@ pub fn build(_attrs: TokenStream, input: TokenStream) -> TokenStream {
         }
 
         impl EntryTypesHelper for #ident {
+            type Error = WasmError;
             fn deserialize_from_type<Z, I>(
                 zome_id: Z,
                 entry_def_index: I,
                 entry: &Entry,
-            ) -> Result<Option<Self>, WasmError>
+            ) -> Result<Option<Self>, Self::Error>
             where
                 Z: Into<ZomeId>,
                 I: Into<EntryDefIndex>
@@ -158,14 +159,22 @@ pub fn build(_attrs: TokenStream, input: TokenStream) -> TokenStream {
                     zome_id: zome_id.into(),
                     zome_type: entry_def_index.into(),
                 };
-                match zome_info()?.zome_types.entries.find_key(scoped_type) {
+                let entries = zome_info()?.zome_types.entries;
+                match entries.find_key(scoped_type) {
                     Some(key) => {
                         match key {
                             #key_to_variant
                             _ => Ok(None),
                         }
                     }
-                    _ => Ok(None),
+                    None => if entries.dependencies().any(|z| z == scoped_type.zome_id) {
+                        Err(wasm_error!(WasmErrorInner::Guest(format!(
+                            "Entry type: {:?} is out of range for this zome.",
+                            scoped_type
+                        ))))
+                    } else {
+                        Ok(None)
+                    }
                 }
             }
         }

@@ -92,6 +92,11 @@ pub fn derive(input: TokenStream) -> TokenStream {
                     #units_match
                 }
             }
+
+            fn unit_iter() -> Box<dyn Iterator<Item = Self::Unit>>
+            {
+                Box::new(#unit_ident::iter())
+            }
         }
 
         // Add the forwarded attributes and

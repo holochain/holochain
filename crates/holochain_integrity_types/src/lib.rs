@@ -13,6 +13,7 @@
 #[allow(missing_docs)]
 pub mod action;
 pub mod capability;
+pub mod chain;
 pub mod countersigning;
 pub mod entry;
 #[allow(missing_docs)]
@@ -204,8 +205,29 @@ macro_rules! secure_primitive {
 pub trait UnitEnum {
     /// An enum with the same variants as the implementor
     /// but without any data.
-    type Unit;
+    type Unit: core::fmt::Debug
+        + Clone
+        + Copy
+        + PartialEq
+        + Eq
+        + PartialOrd
+        + Ord
+        + core::hash::Hash;
 
     /// Turn this type into it's unit enum.
     fn to_unit(&self) -> Self::Unit;
+
+    /// Iterate over the unit variants.
+    fn unit_iter() -> Box<dyn Iterator<Item = Self::Unit>>;
+}
+
+/// Needed as a base case for ignoring types.
+impl UnitEnum for () {
+    type Unit = ();
+
+    fn to_unit(&self) -> Self::Unit {}
+
+    fn unit_iter() -> Box<dyn Iterator<Item = Self::Unit>> {
+        Box::new([].into_iter())
+    }
 }
