@@ -970,7 +970,7 @@ pub mod wasm_test {
             .handle()
             .call_zome(
                 ZomeCall::try_from_unsigned_zome_call(
-                    conductor.keystore(),
+                    conductor.handle().keystore(),
                     ZomeCallUnsigned {
                         cell_id: alice.cell_id().clone(),
                         zome_name: alice.name().clone(),

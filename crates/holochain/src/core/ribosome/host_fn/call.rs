@@ -57,10 +57,10 @@ pub fn call(
                         let result: Result<ZomeCallResponse, RuntimeError> = match target {
                             CallTarget::NetworkAgent(target_agent) => {
                                 let zome_call_unsigned = ZomeCallUnsigned {
-                                    provenance,
+                                    provenance: provenance.clone(),
                                     cell_id: CellId::new(
                                         ribosome.dna_def().as_hash().clone(),
-                                        target_agent,
+                                        target_agent.clone(),
                                     ),
                                     zome_name,
                                     fn_name,
@@ -71,7 +71,7 @@ pub fn call(
                                     .host_context()
                                     .network()
                                     .call_remote(
-                                        provenance,
+                                        provenance.clone(),
                                         zome_call_unsigned
                                             .sign(call_context.host_context.keystore())
                                             .await
@@ -286,7 +286,7 @@ pub mod wasm_test {
             new_zome_call_unsigned(&alice_cell_id, "call_create_entry", (), TestWasm::Create)
                 .unwrap();
         let zome_call =
-            ZomeCall::try_from_unsigned_zome_call(handle.keystore(), zome_call_unsigned);
+            ZomeCall::try_from_unsigned_zome_call(handle.keystore(), zome_call_unsigned).await.unwrap();
         let result = handle.call_zome(zome_call).await;
         assert_matches!(result, Ok(Ok(ZomeCallResponse::Ok(_))));
 

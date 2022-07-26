@@ -11,6 +11,8 @@ use std::sync::Arc;
 use tracing::Instrument;
 use holochain_types::prelude::Signature;
 use holochain_types::zome_call::ZomeCallUnsigned;
+use holochain_types::prelude::CellId;
+use holochain_types::prelude::AgentPubKey;
 
 #[tracing::instrument(skip(_ribosome, call_context, input))]
 pub fn remote_signal(
@@ -33,25 +35,30 @@ pub fn remote_signal(
             let RemoteSignal { agents, signal } = input;
             let zome_name = call_context.zome().zome_name().clone();
             let fn_name: FunctionName = FN_NAME.into();
-}
+
             tokio::task::spawn(
                 async move {
-                    let mut to_agent_list: Vec<Signature> = Vec::new();
+                    let mut to_agent_list: Vec<(Signature, AgentPubKey)> = Vec::new();
                     for agent in agents {
-                        signatures.push((ZomeCallUnsigned {
+                        let potentially_signature = ZomeCallUnsigned {
                             provenance: from_agent.clone(),
-                            cell_id: CellId::new((*network.dna_hash).clone(), agent.clone()),
+                            cell_id: CellId::new(network.dna_hash(), agent.clone()),
                             zome_name: zome_name.clone(),
                             fn_name: fn_name.clone(),
                             cap_secret: None,
                             payload: signal.clone(),
-                        }.sign(call_context.host_context.keystore()).await.map_err(|e| -> RuntimeError {
-                            wasm_error!(WasmErrorInner::Host(e.to_string())).into()
-                        })?, agent));
+                        }.sign(call_context.host_context.keystore()).await;
+                        match potentially_signature {
+                            Ok(signature) => to_agent_list.push((signature, agent)),
+                            Err(e) => {
+                                tracing::info!("Failed to sign and send remote signals because of {:?}", e);
+                                return ();
+                            }
+                        }
                     }
 
                     if let Err(e) = network
-                        .remote_signal(from_agent, signatures, agents, zome_name, fn_name, None, signal)
+                        .remote_signal(from_agent, to_agent_list, zome_name, fn_name, None, signal)
                         .await
                     {
                         tracing::info!("Failed to send remote signals because of {:?}", e);

@@ -379,7 +379,7 @@ impl Cell {
             CallRemote {
                 span_context: _,
                 from_agent,
-                from_signature,
+                signature,
                 zome_name,
                 fn_name,
                 cap_secret,
@@ -389,7 +389,7 @@ impl Cell {
             } => {
                 async {
                     let res = self
-                        .handle_call_remote(from_agent, from_signature, zome_name, fn_name, cap_secret, payload)
+                        .handle_call_remote(from_agent, signature, zome_name, fn_name, cap_secret, payload)
                         .await
                         .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));

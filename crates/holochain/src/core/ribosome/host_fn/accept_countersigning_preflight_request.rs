@@ -116,13 +116,14 @@ pub mod wasm_test {
     use crate::core::ribosome::error::RibosomeError;
     use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use crate::core::workflow::error::WorkflowError;
+    use crate::sweettest::SweetConductorBatch;
+    use crate::sweettest::SweetDnaFile;
     use crate::test_utils::consistency_10s;
     use hdk::prelude::*;
     use holochain_state::source_chain::SourceChainError;
+    use holochain_types::zome_call::ZomeCallUnsigned;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_wasmer_host::prelude::*;
-    use crate::sweettest::SweetConductorBatch;
-    use crate::sweettest::SweetDnaFile;
 
     /// Allow ChainLocked error, panic on anything else
     fn expect_chain_locked(
@@ -202,14 +203,21 @@ pub mod wasm_test {
         // With an accepted preflight creations must fail for alice.
         let thing_fail_create_alice = conductor
             .handle()
-            .call_zome(ZomeCall {
-                cell_id: alice.cell_id().clone(),
-                zome_name: alice.name().clone(),
-                fn_name: "create_a_thing".into(),
-                cap_secret: None,
-                provenance: alice_pubkey.clone(),
-                payload: ExternIO::encode(()).unwrap(),
-            })
+            .call_zome(
+                ZomeCall::try_from_unsigned_zome_call(
+                    conductor.handle().keystore(),
+                    ZomeCallUnsigned {
+                        cell_id: alice.cell_id().clone(),
+                        zome_name: alice.name().clone(),
+                        fn_name: "create_a_thing".into(),
+                        cap_secret: None,
+                        provenance: alice_pubkey.clone(),
+                        payload: ExternIO::encode(()).unwrap(),
+                    },
+                )
+                .await
+                .unwrap(),
+            )
             .await;
 
         expect_chain_locked(thing_fail_create_alice);
@@ -218,15 +226,25 @@ pub mod wasm_test {
         // the chain.
         let countersign_fail_create_alice = conductor
             .handle()
-            .call_zome(ZomeCall {
-                cell_id: alice.cell_id().clone(),
-                zome_name: alice.name().clone(),
-                fn_name: "create_an_invalid_countersigned_thing".into(),
-                cap_secret: None,
-                provenance: alice_pubkey.clone(),
-                payload: ExternIO::encode(vec![alice_response.clone(), bob_response.clone()])
-                    .unwrap(),
-            })
+            .call_zome(
+                ZomeCall::try_from_unsigned_zome_call(
+                    conductor.handle().keystore(),
+                    ZomeCallUnsigned {
+                        cell_id: alice.cell_id().clone(),
+                        zome_name: alice.name().clone(),
+                        fn_name: "create_an_invalid_countersigned_thing".into(),
+                        cap_secret: None,
+                        provenance: alice_pubkey.clone(),
+                        payload: ExternIO::encode(vec![
+                            alice_response.clone(),
+                            bob_response.clone(),
+                        ])
+                        .unwrap(),
+                    },
+                )
+                .await
+                .unwrap(),
+            )
             .await;
         assert!(matches!(countersign_fail_create_alice, Err(_)));
         let _: ActionHash = conductor.call(&alice, "create_a_thing", ()).await;
@@ -293,14 +311,21 @@ pub mod wasm_test {
         // Can't accept a second preflight request while the first is active.
         let preflight_acceptance_fail = conductor
             .handle()
-            .call_zome(ZomeCall {
-                cell_id: alice.cell_id().clone(),
-                zome_name: alice.name().clone(),
-                fn_name: "accept_countersigning_preflight_request".into(),
-                cap_secret: None,
-                provenance: alice_pubkey.clone(),
-                payload: ExternIO::encode(&preflight_request_2).unwrap(),
-            })
+            .call_zome(
+                ZomeCall::try_from_unsigned_zome_call(
+                    conductor.handle().keystore(),
+                    ZomeCallUnsigned {
+                        cell_id: alice.cell_id().clone(),
+                        zome_name: alice.name().clone(),
+                        fn_name: "accept_countersigning_preflight_request".into(),
+                        cap_secret: None,
+                        provenance: alice_pubkey.clone(),
+                        payload: ExternIO::encode(&preflight_request_2).unwrap(),
+                    },
+                )
+                .await
+                .unwrap(),
+            )
             .await;
         assert!(matches!(
             preflight_acceptance_fail,
@@ -325,27 +350,41 @@ pub mod wasm_test {
         // With an accepted preflight creations must fail for alice.
         let thing_fail_create_alice = conductor
             .handle()
-            .call_zome(ZomeCall {
-                cell_id: alice.cell_id().clone(),
-                zome_name: alice.name().clone(),
-                fn_name: "create_a_thing".into(),
-                cap_secret: None,
-                provenance: alice_pubkey.clone(),
-                payload: ExternIO::encode(()).unwrap(),
-            })
+            .call_zome(
+                ZomeCall::try_from_unsigned_zome_call(
+                    conductor.handle().keystore(),
+                    ZomeCallUnsigned {
+                        cell_id: alice.cell_id().clone(),
+                        zome_name: alice.name().clone(),
+                        fn_name: "create_a_thing".into(),
+                        cap_secret: None,
+                        provenance: alice_pubkey.clone(),
+                        payload: ExternIO::encode(()).unwrap(),
+                    },
+                )
+                .await
+                .unwrap(),
+            )
             .await;
         expect_chain_locked(thing_fail_create_alice);
 
         let thing_fail_create_bob = conductor
             .handle()
-            .call_zome(ZomeCall {
-                cell_id: bob.cell_id().clone(),
-                zome_name: bob.name().clone(),
-                fn_name: "create_a_thing".into(),
-                cap_secret: None,
-                provenance: bob_pubkey.clone(),
-                payload: ExternIO::encode(()).unwrap(),
-            })
+            .call_zome(
+                ZomeCall::try_from_unsigned_zome_call(
+                    conductor.handle().keystore(),
+                    ZomeCallUnsigned {
+                        cell_id: bob.cell_id().clone(),
+                        zome_name: bob.name().clone(),
+                        fn_name: "create_a_thing".into(),
+                        cap_secret: None,
+                        provenance: bob_pubkey.clone(),
+                        payload: ExternIO::encode(()).unwrap(),
+                    },
+                )
+                .await
+                .unwrap(),
+            )
             .await;
         expect_chain_locked(thing_fail_create_bob);
 
@@ -360,14 +399,21 @@ pub mod wasm_test {
             .await;
         let thing_fail_create_alice = conductor
             .handle()
-            .call_zome(ZomeCall {
-                cell_id: alice.cell_id().clone(),
-                zome_name: alice.name().clone(),
-                fn_name: "create_a_thing".into(),
-                cap_secret: None,
-                provenance: alice_pubkey.clone(),
-                payload: ExternIO::encode(()).unwrap(),
-            })
+            .call_zome(
+                ZomeCall::try_from_unsigned_zome_call(
+                    conductor.handle().keystore(),
+                    ZomeCallUnsigned {
+                        cell_id: alice.cell_id().clone(),
+                        zome_name: alice.name().clone(),
+                        fn_name: "create_a_thing".into(),
+                        cap_secret: None,
+                        provenance: alice_pubkey.clone(),
+                        payload: ExternIO::encode(()).unwrap(),
+                    },
+                )
+                .await
+                .unwrap(),
+            )
             .await;
 
         tokio::time::sleep(std::time::Duration::from_millis(500)).await;
@@ -391,14 +437,21 @@ pub mod wasm_test {
         // Creation will still fail for bob.
         let thing_fail_create_bob = conductor
             .handle()
-            .call_zome(ZomeCall {
-                cell_id: bob.cell_id().clone(),
-                zome_name: bob.name().clone(),
-                fn_name: "create_a_thing".into(),
-                cap_secret: None,
-                provenance: bob_pubkey.clone(),
-                payload: ExternIO::encode(()).unwrap(),
-            })
+            .call_zome(
+                ZomeCall::try_from_unsigned_zome_call(
+                    conductor.handle().keystore(),
+                    ZomeCallUnsigned {
+                        cell_id: bob.cell_id().clone(),
+                        zome_name: bob.name().clone(),
+                        fn_name: "create_a_thing".into(),
+                        cap_secret: None,
+                        provenance: bob_pubkey.clone(),
+                        payload: ExternIO::encode(()).unwrap(),
+                    },
+                )
+                .await
+                .unwrap(),
+            )
             .await;
         expect_chain_locked(thing_fail_create_bob);
 
@@ -623,11 +676,14 @@ pub mod wasm_test {
         observability::test_run().ok();
 
         let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning])
-        .await
-        .unwrap();
+            .await
+            .unwrap();
 
         let mut conductors = SweetConductorBatch::from_standard_config(3).await;
-        let apps = conductors.setup_app("countersigning", &[dna_file.clone()]).await.unwrap();
+        let apps = conductors
+            .setup_app("countersigning", &[dna_file.clone()])
+            .await
+            .unwrap();
 
         let ((alice_cell,), (bob_cell,), (carol_cell,)) = apps.into_tuples();
 

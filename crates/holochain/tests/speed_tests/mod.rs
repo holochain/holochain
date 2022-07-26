@@ -195,11 +195,11 @@ async fn speed_test(n: Option<usize>) -> Arc<TempDir> {
         cell_id: CellId,
         func: &str,
         payload: P,
-    ) -> Result<ZomeCall, SerializedBytesError>
+    ) -> Result<ZomeCallUnsigned, SerializedBytesError>
     where
         P: serde::Serialize + std::fmt::Debug,
     {
-        Ok(ZomeCall {
+        Ok(ZomeCallUnsigned {
             cell_id: cell_id.clone(),
             zome_name: TestWasm::Anchor.into(),
             cap_secret: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
@@ -226,10 +226,24 @@ async fn speed_test(n: Option<usize>) -> Arc<TempDir> {
 
     for i in 0..num {
         let invocation = anchor_invocation("alice", alice_cell_id.clone(), i).unwrap();
-        let response = call(&mut app_interface, invocation).await.unwrap();
+        let response = call(
+            &mut app_interface,
+            ZomeCall::try_from_unsigned_zome_call(handle.keystore(), invocation)
+                .await
+                .unwrap(),
+        )
+        .await
+        .unwrap();
         assert_matches!(response, AppResponse::ZomeCall(_));
         let invocation = anchor_invocation("bobbo", bob_cell_id.clone(), i).unwrap();
-        let response = call(&mut app_interface, invocation).await.unwrap();
+        let response = call(
+            &mut app_interface,
+            ZomeCall::try_from_unsigned_zome_call(handle.keystore(), invocation)
+                .await
+                .unwrap(),
+        )
+        .await
+        .unwrap();
         assert_matches!(response, AppResponse::ZomeCall(_));
     }
 
@@ -246,7 +260,14 @@ async fn speed_test(n: Option<usize>) -> Arc<TempDir> {
                 "bobbo".to_string(),
             )
             .unwrap();
-            let response = call(&mut app_interface, invocation).await.unwrap();
+            let response = call(
+                &mut app_interface,
+                ZomeCall::try_from_unsigned_zome_call(handle.keystore(), invocation)
+                    .await
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
             let hashes: EntryHashes = match response {
                 AppResponse::ZomeCall(r) => r.decode().unwrap(),
                 _ => unreachable!(),
@@ -262,7 +283,14 @@ async fn speed_test(n: Option<usize>) -> Arc<TempDir> {
                 "alice".to_string(),
             )
             .unwrap();
-            let response = call(&mut app_interface, invocation).await.unwrap();
+            let response = call(
+                &mut app_interface,
+                ZomeCall::try_from_unsigned_zome_call(handle.keystore(), invocation)
+                    .await
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
             let hashes: EntryHashes = match response {
                 AppResponse::ZomeCall(r) => r.decode().unwrap(),
                 _ => unreachable!(),
