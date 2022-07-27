@@ -7,6 +7,7 @@ pub use crate::bytes::*;
 pub use crate::call::*;
 pub use crate::capability::*;
 pub use crate::cell::*;
+pub use crate::chain::*;
 pub use crate::countersigning::*;
 pub use crate::crdt::*;
 pub use crate::dna_def::*;
