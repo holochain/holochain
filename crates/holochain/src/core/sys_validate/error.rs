@@ -154,8 +154,8 @@ impl ValidationOutcome {
 
 #[derive(Error, Debug)]
 pub enum PrevActionError {
-    #[error("The previous action in the source chain doesn't match the next action")]
-    HashMismatch,
+    #[error("The previous action hash specified in an action doesn't match the actual previous action. Seq: {0}")]
+    HashMismatch(u32),
     #[error("Root of source chain must be Dna")]
     InvalidRoot,
     #[error("Root of source chain must have a timestamp greater than the Dna's origin_time")]

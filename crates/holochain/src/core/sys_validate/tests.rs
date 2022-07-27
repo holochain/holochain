@@ -520,7 +520,7 @@ fn valid_chain_test() {
     assert!(matches!(
         err,
         SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(
-            PrevActionError::HashMismatch
+            PrevActionError::HashMismatch(_)
         ))
     ));
 
@@ -604,7 +604,7 @@ fn valid_chain_test() {
     assert!(matches!(
         err,
         SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(
-            PrevActionError::HashMismatch
+            PrevActionError::HashMismatch(_)
         ))
     ));
 }

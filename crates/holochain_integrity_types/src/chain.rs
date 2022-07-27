@@ -3,8 +3,10 @@
 
 use std::collections::HashSet;
 
-use holo_hash::ActionHash;
+use holo_hash::{ActionHash, HasHash};
 use holochain_serialized_bytes::prelude::*;
+
+use crate::{SignedActionHashed, ActionHashed};
 
 #[cfg(test)]
 mod test;
@@ -104,5 +106,54 @@ impl ChainFilter {
 impl Default for ChainFilters {
     fn default() -> Self {
         Self::ToGenesis
+    }
+}
+
+/// Abstraction over an item in a chain.
+// Alternate implementations are only used for testing, so this should not
+// add a large monomorphization overhead
+pub trait ChainItem: Clone + PartialEq + Eq + std::fmt::Debug {
+    /// The type used to represent a hash of this item
+    type Hash: Clone + PartialEq + Eq + std::fmt::Debug;
+
+    /// The sequence in the chain
+    fn seq(&self) -> u32;
+
+    /// The hash of this item
+    fn get_hash(&self) -> &Self::Hash;
+
+    /// The hash of the previous item
+    fn prev_hash(&self) -> Option<&Self::Hash>;
+}
+
+impl ChainItem for ActionHashed {
+    type Hash = ActionHash;
+
+    fn seq(&self) -> u32 {
+        self.action_seq()
+    }
+
+    fn get_hash(&self) -> &Self::Hash {
+        self.as_hash()
+    }
+
+    fn prev_hash(&self) -> Option<&Self::Hash> {
+        self.prev_action()
+    }
+}
+
+impl ChainItem for SignedActionHashed {
+    type Hash = ActionHash;
+
+    fn seq(&self) -> u32 {
+        self.hashed.seq()
+    }
+
+    fn get_hash(&self) -> &Self::Hash {
+        self.hashed.get_hash()
+    }
+
+    fn prev_hash(&self) -> Option<&Self::Hash> {
+        self.hashed.prev_hash()
     }
 }

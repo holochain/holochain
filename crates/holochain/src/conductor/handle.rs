@@ -1353,7 +1353,7 @@ impl ConductorHandleT for ConductorHandleImpl {
 
             // Validate the chain.
             crate::core::validate_chain(
-                records.iter().map(|e| e.action_hashed()),
+                records.iter().map(|e| e.signed_action()),
                 &persisted_chain_head.clone().filter(|_| !truncate),
             )
             .map_err(|e| SourceChainError::InvalidCommit(e.to_string()))?;
