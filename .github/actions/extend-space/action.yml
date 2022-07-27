@@ -16,6 +16,8 @@ runs:
         remove-android: true
         remove-haskell: true
         build-mount-path: /mnt/extended
+        root-reserve-mb: 512
+        swap-size-mb: 1024
 
     # after we've got the extended space mounted, we can use overlayfs and bind
     # mounts as appropriate to make this space available to all paths that are
