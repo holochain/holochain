@@ -72,7 +72,7 @@ jobs:
         uses: ./.github/actions/extend-space
 
       - name: Install nix
-        uses: cachix/install-nix-action@v16
+        uses: cachix/install-nix-action@v17
       - name: Setup cachix
         uses: cachix/cachix-action@v10
         continue-on-error: ${{ github.event_name != 'pull_request' }}
