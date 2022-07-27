@@ -68,3 +68,71 @@ pub fn batch_create_zome() -> InlineZomeSet {
         })
         .0
 }
+
+#[derive(
+    Debug,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    serde::Serialize,
+    serde::Deserialize,
+    SerializedBytes,
+    derive_more::From,
+)]
+#[serde(transparent)]
+#[repr(transparent)]
+/// Newtype for simple_crud_zome entry type
+pub struct AppString(pub String);
+
+impl AppString {
+    /// Constructor
+    pub fn new<S: Into<String>>(s: S) -> Self {
+        AppString(s.into())
+    }
+}
+
+/// An InlineZome with simple Create and Read operations
+pub fn simple_crud_zome() -> InlineZomeSet {
+    let string_entry_def = EntryDef::default_with_id("string");
+    let unit_entry_def = EntryDef::default_with_id("unit");
+
+    SweetEasyInline::new(vec![string_entry_def.clone(), unit_entry_def.clone()], 0)
+        .callback("create_string", move |api, s: AppString| {
+            let entry = Entry::app(AppString::from(s).try_into().unwrap()).unwrap();
+            let hash = api.create(CreateInput::new(
+                InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
+                EntryVisibility::Public,
+                entry,
+                ChainTopOrdering::default(),
+            ))?;
+            Ok(hash)
+        })
+        .callback("create_unit", move |api, ()| {
+            let entry = Entry::app(().try_into().unwrap()).unwrap();
+            let hash = api.create(CreateInput::new(
+                InlineZomeSet::get_entry_location(&api, EntryDefIndex(1)),
+                EntryVisibility::Public,
+                entry,
+                ChainTopOrdering::default(),
+            ))?;
+            Ok(hash)
+        })
+        .callback("delete", move |api, action_hash: ActionHash| {
+            let hash = api.delete(DeleteInput::new(action_hash, ChainTopOrdering::default()))?;
+            Ok(hash)
+        })
+        .callback("read", |api, hash: ActionHash| {
+            api.get(vec![GetInput::new(hash.into(), GetOptions::default())])
+                .map_err(Into::into)
+        })
+        .callback("read_entry", |api, hash: EntryHash| {
+            api.get(vec![GetInput::new(hash.into(), GetOptions::default())])
+                .map_err(Into::into)
+        })
+        .callback("emit_signal", |api, ()| {
+            api.emit_signal(AppSignal::new(ExternIO::encode(()).unwrap()))
+                .map_err(Into::into)
+        })
+        .0
+}
