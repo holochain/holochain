@@ -156,7 +156,7 @@ macro_rules! secure_primitive {
         impl std::fmt::Debug for $t {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 f.write_str(stringify!($t))?;
-                f.write_str("(0x"))?;
+                f.write_str("(0x")?;
                 for byte in &self.0 {
                     f.write_fmt(format_args!("{:02x}", byte))?;
                 }
