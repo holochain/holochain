@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+- nix-shell: exclude most holonix components by default to reduce shell size [\#1498](https://github.com/holochain/holochain/pull/1498)
+
 # 20220713.013021
 
 - **BREAKING**: the `holochain_deterministic_integrity` crate has been renamed to `hdi`
