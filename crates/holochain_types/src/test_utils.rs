@@ -144,3 +144,34 @@ pub fn test_keystore() -> holochain_keystore::MetaLairClient {
     )
     .expect("timeout elapsed")
 }
+
+/// A test implementation of a minimal ChainItem which uses simple numbers for hashes
+/// and always points back to the previous number
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TestChainItem {
+    seq: u32,
+    prev: Option<u32>,
+}
+
+impl TestChainItem {
+    /// Constructor
+    pub fn new(seq: u32) -> Self {
+        Self { seq, prev: seq.checked_sub(1) }
+    }
+}
+
+impl ChainItem for TestChainItem {
+    type Hash = u32;
+
+    fn seq(&self) -> u32 {
+        self.seq
+    }
+
+    fn get_hash(&self) -> &Self::Hash {
+        &self.seq
+    }
+
+    fn prev_hash(&self) -> Option<&Self::Hash> {
+        self.prev.as_ref()
+    }
+}
