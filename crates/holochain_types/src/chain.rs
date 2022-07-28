@@ -4,10 +4,11 @@ use std::iter::Peekable;
 use crate::activity::AgentActivityResponse;
 use crate::activity::ChainItems;
 use holo_hash::AgentPubKey;
+use holochain_zome_types::ChainItem;
+use holochain_zome_types::SignedActionHashed;
 use holochain_zome_types::prelude::ChainStatus;
 use holochain_zome_types::ChainFilter;
 use holochain_zome_types::ChainFilters;
-use holochain_zome_types::RegisterAgentActivity;
 
 #[cfg(all(test, feature = "test_utils"))]
 mod test;
@@ -40,26 +41,24 @@ impl AgentActivityExt for AgentActivityResponse {}
 ///
 /// [`take`]: ChainFilter::take
 /// [`until`]: ChainFilter::until
-pub struct ChainFilterIter {
-    filter: ChainFilter,
-    iter: Peekable<std::vec::IntoIter<RegisterAgentActivity>>,
+pub struct ChainFilterIter<I: AsRef<A>, A: ChainItem = SignedActionHashed> {
+    filter: ChainFilter<A::Hash>,
+    iter: Peekable<std::vec::IntoIter<I>>,
     end: bool,
 }
 
-impl ChainFilterIter {
+impl<I: AsRef<A>, A: ChainItem> ChainFilterIter<I, A> {
     /// Create an iterator that filters an iterator of [`RegisterAgentActivity`]
     /// with a [`ChainFilter`].
     ///
     /// # Constraints
     /// - If the iterator does not contain the filters starting position
     /// then this will be an empty iterator.
-    pub fn new(filter: ChainFilter, mut chain: Vec<RegisterAgentActivity>) -> Self {
+    pub fn new(filter: ChainFilter<A::Hash>, mut chain: Vec<I>) -> Self {
         // Sort by descending.
         chain.sort_unstable_by(|a, b| {
-            b.action
-                .action()
-                .action_seq()
-                .cmp(&a.action.action().action_seq())
+            b.as_ref().seq()
+                .cmp(&a.as_ref().seq())
         });
         // Create a peekable iterator.
         let mut iter = chain.into_iter().peekable();
@@ -67,7 +66,7 @@ impl ChainFilterIter {
         // Discard any ops that are not the starting position.
         let i = iter.by_ref();
         while let Some(op) = i.peek() {
-            if *op.action.action_address() == filter.position {
+            if *op.as_ref().get_hash() == filter.position {
                 break;
             }
             i.next();
@@ -81,8 +80,8 @@ impl ChainFilterIter {
     }
 }
 
-impl Iterator for ChainFilterIter {
-    type Item = RegisterAgentActivity;
+impl<I: AsRef<A>, A: ChainItem> Iterator for ChainFilterIter<I, A> {
+    type Item = I;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.end {
@@ -96,9 +95,9 @@ impl Iterator for ChainFilterIter {
             // Check the next sequence number
             match parent {
                 Some(parent) => {
-                    let child_seq = op.action.hashed.action_seq();
-                    let parent_seq = parent.action.hashed.action_seq();
-                    match (child_seq.cmp(&parent_seq), op.action.hashed.prev_action()) {
+                    let child_seq = op.as_ref().seq();
+                    let parent_seq = parent.as_ref().seq();
+                    match (child_seq.cmp(&parent_seq), op.as_ref().prev_hash()) {
                         (std::cmp::Ordering::Less, _) => {
                             // The chain is out of order so we must end here.
                             self.end = true;
@@ -129,7 +128,7 @@ impl Iterator for ChainFilterIter {
                             break op;
                         }
                         (std::cmp::Ordering::Greater, Some(prev_hash))
-                            if prev_hash != parent.action.action_address() =>
+                            if prev_hash != parent.as_ref().get_hash() =>
                         {
                             // Not the parent of this child.
                             // Discard this parent.
@@ -152,7 +151,7 @@ impl Iterator for ChainFilterIter {
             ChainFilters::Take(n) => *n = n.checked_sub(1)?,
             // Check if the `until` hash has been found.
             ChainFilters::Until(until_hashes) => {
-                if until_hashes.contains(op.action.action_address()) {
+                if until_hashes.contains(op.as_ref().get_hash()) {
                     // If it has, include it and return on the next call to `next`.
                     self.end = true;
                 }
@@ -163,7 +162,7 @@ impl Iterator for ChainFilterIter {
             ChainFilters::Both(n, until_hashes) => {
                 *n = n.checked_sub(1)?;
 
-                if until_hashes.contains(op.action.action_address()) {
+                if until_hashes.contains(op.as_ref().get_hash()) {
                     self.end = true;
                 }
             }

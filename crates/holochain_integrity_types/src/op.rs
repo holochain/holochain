@@ -1,5 +1,7 @@
 //! # Dht Operational Transforms
 
+use std::ops::Deref;
+
 use crate::{
     Action, ActionRef, ActionType, AppEntryType, Create, CreateLink, Delete, DeleteLink, Entry,
     EntryType, LinkTag, MembraneProof, Record, SignedActionHashed, SignedHashed, UnitEnum, Update,
@@ -190,6 +192,14 @@ pub struct RegisterDelete {
 pub struct RegisterAgentActivity {
     /// The signed and hashed [`Action`] that is being registered.
     pub action: SignedActionHashed,
+}
+
+impl Deref for RegisterAgentActivity {
+    type Target = SignedActionHashed;
+
+    fn deref(&self) -> &Self::Target {
+        &self.action
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
