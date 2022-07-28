@@ -19,15 +19,15 @@
 //! not contain functions to manipulate the data. Therefore a hApp's data model is encapsulated
 //! and completely independent of the domain logic, which is encoded in coordinator zomes.
 //!
-//!  The MVC (model, view, controller) design pattern can be used as an analogy. _The
-//! application’s integrity zomes comprise its model layer_ — everything that defines the shape
+//! The MVC (model, view, controller) design pattern can be used as an analogy. **The
+//! application’s integrity zomes comprise its model layer** — everything that defines the shape
 //! of the data. In practice, this means three things:
 //! - entry type definitions
 //! - link type definitions
 //! - a validation callback that constrains the kinds of data that can validly be called entries
 //! and links of those types (see also [`validate`](prelude::validate)).
 //!
-//! _The coordination zomes comprise the application's controller layer_ — the code that actually
+//! **The coordination zomes comprise the application's controller layer** — the code that actually
 //! writes and retrieves data, handles countersigning sessions and sends and receives messages
 //! between peers or between a cell and its UI. In other words, all the zome functions, `init`
 //! functions, remote signal receivers, and scheduler callbacks will all live in coordinator zomes.
