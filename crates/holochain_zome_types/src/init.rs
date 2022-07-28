@@ -1,7 +1,7 @@
 //! Items related to the DNA initialization callback.
 
 use crate::CallbackResult;
-use holo_hash::AnyDhtHash;
+use holochain_integrity_types::UnresolvedDependencies;
 use holochain_serialized_bytes::prelude::*;
 use holochain_wasmer_common::*;
 
@@ -20,7 +20,7 @@ use holochain_wasmer_common::*;
 pub enum InitCallbackResult {
     Pass,
     Fail(String),
-    UnresolvedDependencies(Vec<AnyDhtHash>),
+    UnresolvedDependencies(UnresolvedDependencies),
 }
 
 impl CallbackResult for InitCallbackResult {

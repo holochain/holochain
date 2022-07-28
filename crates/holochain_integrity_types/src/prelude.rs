@@ -5,6 +5,7 @@ pub use crate::action::*;
 pub use crate::capability::*;
 pub use crate::countersigning::*;
 pub use crate::entry::*;
+pub use crate::chain::*;
 pub use crate::entry_def::*;
 pub use crate::genesis::*;
 pub use crate::hash::*;

@@ -18,7 +18,7 @@ impl EntryDefsInvocation {
     }
 }
 
-#[derive(Clone, Constructor)]
+#[derive(Clone, Constructor, Debug)]
 pub struct EntryDefsHostAccess;
 
 impl From<&HostContext> for EntryDefsHostAccess {

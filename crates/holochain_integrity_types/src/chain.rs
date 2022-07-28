@@ -10,7 +10,7 @@ use holochain_serialized_bytes::prelude::*;
 #[cfg(test)]
 mod test;
 
-#[derive(Serialize, Deserialize, SerializedBytes, Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize, SerializedBytes, Debug, PartialEq, Eq, Hash, Clone)]
 /// Filter source chain items.
 /// Starting from some chain position given as an [`ActionHash`]
 /// the chain is walked backwards to genesis.
@@ -37,6 +37,28 @@ pub enum ChainFilters {
     /// Combination of both take and until.
     /// Whichever is the smaller set.
     Both(u32, HashSet<ActionHash>),
+}
+
+/// Create a deterministic hash to compare filters.
+impl core::hash::Hash for ChainFilters {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        core::mem::discriminant(self).hash(state);
+        match self {
+            ChainFilters::ToGenesis => (),
+            ChainFilters::Take(t) => t.hash(state),
+            ChainFilters::Until(u) => {
+                let mut u: Vec<_> = u.iter().collect();
+                u.sort_unstable();
+                u.hash(state);
+            }
+            ChainFilters::Both(t, u) => {
+                let mut u: Vec<_> = u.iter().collect();
+                u.sort_unstable();
+                u.hash(state);
+                t.hash(state);
+            }
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]

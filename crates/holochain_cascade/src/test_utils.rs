@@ -28,7 +28,9 @@ use holochain_state::prelude::insert_op_lite;
 use holochain_state::prelude::test_in_mem_db;
 use holochain_state::prelude::Query;
 use holochain_state::prelude::Txn;
+use holochain_state::scratch::SyncScratch;
 use holochain_types::activity::AgentActivityResponse;
+use holochain_types::chain::MustGetAgentActivityResponse;
 use holochain_types::db::DbRead;
 use holochain_types::db::DbWrite;
 use holochain_types::dht_op::DhtOpHashed;
@@ -169,6 +171,25 @@ impl HolochainP2pDnaT for PassThroughNetwork {
                 agent.clone(),
                 query.clone(),
                 (&options).into(),
+            )
+            .await
+            .map_err(|e| HolochainP2pError::Other(e.into()))?;
+            out.push(r);
+        }
+        Ok(out)
+    }
+
+    async fn must_get_agent_activity(
+        &self,
+        agent: AgentPubKey,
+        filter: holochain_zome_types::chain::ChainFilter,
+    ) -> actor::HolochainP2pResult<Vec<MustGetAgentActivityResponse>> {
+        let mut out = Vec::new();
+        for env in &self.envs {
+            let r = authority::handle_must_get_agent_activity(
+                env.clone(),
+                agent.clone(),
+                filter.clone(),
             )
             .await
             .map_err(|e| HolochainP2pError::Other(e.into()))?;
@@ -355,6 +376,18 @@ impl HolochainP2pDnaT for MockNetwork {
             .await
     }
 
+    async fn must_get_agent_activity(
+        &self,
+        agent: AgentPubKey,
+        filter: holochain_zome_types::chain::ChainFilter,
+    ) -> actor::HolochainP2pResult<Vec<MustGetAgentActivityResponse>> {
+        self.0
+            .lock()
+            .await
+            .must_get_agent_activity(agent, filter)
+            .await
+    }
+
     async fn authority_for_hash(
         &self,
         dht_hash: holo_hash::AnyDhtHash,
@@ -490,13 +523,13 @@ pub fn commit_chain<Kind: DbKindT>(
                     op
                 })
                 .collect::<Vec<_>>();
-            (a, d)
+            d
         })
         .collect();
     let db = test_in_mem_db(db_kind);
 
     db.test_commit(|txn| {
-        for (_, data) in &data {
+        for data in &data {
             for op in data {
                 let op_light = DhtOpLight::RegisterAgentActivity(
                     op.action.action_address().clone(),
@@ -528,4 +561,27 @@ pub fn commit_chain<Kind: DbKindT>(
         }
     });
     db
+}
+
+pub fn commit_scratch(scratch: SyncScratch, chain: Vec<(AgentPubKey, Vec<ChainItem>)>) {
+    let data = chain.into_iter().map(|(a, c)| {
+        let d = chain_to_ops(c)
+            .into_iter()
+            .map(|mut op| {
+                *op.action.hashed.content.author_mut() = a.clone();
+                op
+            })
+            .collect::<Vec<_>>();
+        d
+    });
+
+    scratch
+        .apply(|scratch| {
+            for data in data {
+                for op in data {
+                    scratch.add_action(op.action, Default::default());
+                }
+            }
+        })
+        .unwrap();
 }

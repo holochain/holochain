@@ -5,11 +5,12 @@ use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
 use holochain_cascade::test_utils::*;
 use holochain_cascade::Cascade;
+use holochain_sqlite::db::DbKindAuthored;
 use holochain_sqlite::db::DbKindCache;
 use holochain_sqlite::db::DbKindDht;
 use holochain_state::prelude::test_cache_db;
 use holochain_state::prelude::test_dht_db;
-use holochain_state::prelude::test_in_mem_db;
+use holochain_state::scratch::Scratch;
 use holochain_types::activity::*;
 use holochain_types::chain::MustGetAgentActivityResponse;
 use holochain_types::test_utils::chain::*;
@@ -66,22 +67,61 @@ async fn get_activity() {
     assert_eq!(r, expected);
 }
 
+#[derive(Default)]
+struct Data {
+    scratch: Vec<(AgentPubKey, Vec<ChainItem>)>,
+    authored: Vec<(AgentPubKey, Vec<ChainItem>)>,
+    cache: Vec<(AgentPubKey, Vec<ChainItem>)>,
+    authority: Vec<(AgentPubKey, Vec<ChainItem>)>,
+}
+
 #[test_case(
-    agent_chain(&[(0, 0..3), (0, 5..10)]), agent_hash(&[0]), ChainFilter::new(action_hash(&[8]))
-    => MustGetAgentActivityResponse::IncompleteChain ; "8 to genesis with 0 till 2 and 5 till 9")]
+    Data { authority: agent_chain(&[(0, 0..3)]), ..Default::default() },
+    agent_hash(&[0]), ChainFilter::new(action_hash(&[1]))
+    => matches MustGetAgentActivityResponse::Activity(a) if a.len() == 2; "1 to genesis with authority 0 till 2")]
+#[test_case(
+    Data { cache: agent_chain(&[(0, 0..3)]), ..Default::default() },
+    agent_hash(&[0]), ChainFilter::new(action_hash(&[1]))
+    => matches MustGetAgentActivityResponse::Activity(a) if a.len() == 2; "1 to genesis with cache 0 till 2")]
+#[test_case(
+    Data { scratch: agent_chain(&[(0, 0..3)]), ..Default::default() },
+    agent_hash(&[0]), ChainFilter::new(action_hash(&[1]))
+    => matches MustGetAgentActivityResponse::Activity(a) if a.len() == 2; "1 to genesis with scratch 0 till 2")]
+#[test_case(
+    Data { authored: agent_chain(&[(0, 0..3)]), scratch: agent_chain(&[(0, 3..6)]), ..Default::default() },
+    agent_hash(&[0]), ChainFilter::new(action_hash(&[4])).take(4).until(action_hash(&[0]))
+    => matches MustGetAgentActivityResponse::Activity(a) if a.len() == 4; "4 take 4 until 0 with authored 0 till 2 and scratch 3 till 5")]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_must_get_agent_activity(
-    chain: Vec<(AgentPubKey, Vec<ChainItem>)>,
+    data: Data,
     author: AgentPubKey,
     filter: ChainFilter,
 ) -> MustGetAgentActivityResponse {
+    let Data {
+        scratch,
+        authored,
+        cache,
+        authority,
+    } = data;
     let authority = commit_chain(
         DbKindDht(Arc::new(DnaHash::from_raw_36(vec![0; 36]))),
-        chain,
+        authority,
     );
-    let cache = test_in_mem_db(DbKindCache(Arc::new(DnaHash::from_raw_36(vec![0; 36]))));
+    let cache = commit_chain(
+        DbKindCache(Arc::new(DnaHash::from_raw_36(vec![0; 36]))),
+        cache,
+    );
+    let authored = commit_chain(
+        DbKindAuthored(Arc::new(DnaHash::from_raw_36(vec![0; 36]))),
+        authored,
+    );
+    let sync_scratch = Scratch::new().into_sync();
+    commit_scratch(sync_scratch.clone(), scratch);
     let network = PassThroughNetwork::authority_for_nothing(vec![authority.into()]);
-    let mut cascade = Cascade::empty().with_network(network, cache);
+    let mut cascade = Cascade::empty()
+        .with_scratch(sync_scratch)
+        .with_authored(authored.into())
+        .with_network(network, cache);
     cascade
         .must_get_agent_activity(author, filter)
         .await
