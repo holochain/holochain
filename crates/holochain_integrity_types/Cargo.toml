@@ -1,6 +1,6 @@
 [package]
 name = "holochain_integrity_types"
-version = "0.0.13-dev.0"
+version = "0.0.13"
 description = "Holochain integrity types"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -10,7 +10,7 @@ authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2021"
 
 [dependencies]
-holo_hash = { version = "0.0.31-dev.0", path = "../holo_hash" }
+holo_hash = { version = "0.0.31", path = "../holo_hash" }
 holochain_serialized_bytes = "=0.0.51"
 serde = { version = "1.0", features = ["derive", "rc"] }
 serde_bytes = "0.11"
