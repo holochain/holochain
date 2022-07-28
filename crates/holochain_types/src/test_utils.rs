@@ -146,7 +146,24 @@ pub fn test_keystore() -> holochain_keystore::MetaLairClient {
 }
 
 /// The hash type for a [`TestChainItem`]
-pub type TestChainHash = Vec<u8>;
+#[derive(
+    Copy,
+    Clone,
+    Debug,
+    PartialEq,
+    Eq,
+    Hash,
+    derive_more::From,
+    derive_more::Deref,
+    derive_more::Into,
+)]
+pub struct TestChainHash(u32);
+
+impl From<u8> for TestChainHash {
+    fn from(u: u8) -> Self {
+        Self(u as u32)
+    }
+}
 
 /// A test implementation of a minimal ChainItem which uses simple numbers for hashes
 /// and always points back to the previous number
@@ -162,11 +179,11 @@ pub struct TestChainItem {
 
 impl TestChainItem {
     /// Constructor for happy-path chains with no forking
-    pub fn new(seq: u8) -> Self {
+    pub fn new(seq: u32) -> Self {
         Self {
-            seq: seq as u32,
-            hash: vec![seq],
-            prev: seq.checked_sub(1).map(|p| vec![p]),
+            seq: seq,
+            hash: TestChainHash(seq),
+            prev: seq.checked_sub(1).map(TestChainHash),
         }
     }
 }

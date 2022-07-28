@@ -5,9 +5,9 @@ use crate::{prelude::TestChainItem, test_utils::chain::*};
 
 use super::*;
 
-/// Create a hash from a u8.
-fn hash(i: u8) -> TestHash {
-    vec![i]
+/// Create a hash from a u32.
+fn hash(i: u32) -> TestHash {
+    i.into()
 }
 
 pub type TestHash = <TestChainItem as ChainItem>::Hash;
@@ -32,7 +32,7 @@ fn pretty(expected: Vec<TestChainItem>) -> impl Fn(Vec<TestChainItem>) {
 #[test_case(2, 1, 10 => chain(0..2))]
 #[test_case(10, 9, 10 => chain(0..10))]
 /// Check taking n items works.
-fn can_take_n(len: u8, position: u8, take: u32) -> Vec<TestChainItem> {
+fn can_take_n(len: u32, position: u32, take: u32) -> Vec<TestChainItem> {
     let filter = TestFilter::new(hash(position)).take(take);
     build_chain(chain(0..len), filter)
 }
@@ -43,7 +43,7 @@ fn can_take_n(len: u8, position: u8, take: u32) -> Vec<TestChainItem> {
 #[test_case(10, 5, hash(1) => using pretty(chain(1..6)))]
 #[test_case(10, 9, hash(0) => using pretty(chain(0..10)))]
 /// Check taking until some hash works.
-fn can_until_hash(len: u8, position: u8, until: TestHash) -> Vec<TestChainItem> {
+fn can_until_hash(len: u32, position: u32, until: TestHash) -> Vec<TestChainItem> {
     let filter = TestFilter::new(hash(position)).until(until);
     build_chain(chain(0..len), filter)
 }
@@ -54,7 +54,7 @@ fn can_until_hash(len: u8, position: u8, until: TestHash) -> Vec<TestChainItem> 
 #[test_case(10, TestFilter::new(hash(9)).take(20).take(2).until(hash(4)).until(hash(9)) => chain(9..10))]
 /// Check take and until can be combined and the first to be
 /// reached ends the iterator.
-fn can_combine(len: u8, filter: TestFilter) -> Vec<TestChainItem> {
+fn can_combine(len: u32, filter: TestFilter) -> Vec<TestChainItem> {
     build_chain(chain(0..len), filter)
 }
 
@@ -71,6 +71,6 @@ fn can_ignore_forks(ranges: &[Range<u8>], filter: TestFilter) -> Vec<TestChainIt
 #[test_case(&[0..5, 6..7, 8..10], TestFilter::new(hash(9)).take(10).until(hash(4)) => chain(8..10))]
 #[test_case(&[0..5, 6..7, 8..10], TestFilter::new(hash(9)).take(3).until(hash(4)) => chain(8..10))]
 /// Check the iterator will stop at a gap in the chain.
-fn stop_at_gap(ranges: &[Range<u8>], filter: TestFilter) -> Vec<TestChainItem> {
+fn stop_at_gap(ranges: &[Range<u32>], filter: TestFilter) -> Vec<TestChainItem> {
     build_chain(gap_chain(ranges), filter)
 }
