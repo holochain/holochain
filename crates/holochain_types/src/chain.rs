@@ -4,11 +4,11 @@ use std::iter::Peekable;
 use crate::activity::AgentActivityResponse;
 use crate::activity::ChainItems;
 use holo_hash::AgentPubKey;
-use holochain_zome_types::ChainItem;
-use holochain_zome_types::SignedActionHashed;
 use holochain_zome_types::prelude::ChainStatus;
 use holochain_zome_types::ChainFilter;
 use holochain_zome_types::ChainFilters;
+use holochain_zome_types::ChainItem;
+use holochain_zome_types::SignedActionHashed;
 
 #[cfg(all(test, feature = "test_utils"))]
 mod test;
@@ -56,10 +56,7 @@ impl<I: AsRef<A>, A: ChainItem> ChainFilterIter<I, A> {
     /// then this will be an empty iterator.
     pub fn new(filter: ChainFilter<A::Hash>, mut chain: Vec<I>) -> Self {
         // Sort by descending.
-        chain.sort_unstable_by(|a, b| {
-            b.as_ref().seq()
-                .cmp(&a.as_ref().seq())
-        });
+        chain.sort_unstable_by(|a, b| b.as_ref().seq().cmp(&a.as_ref().seq()));
         // Create a peekable iterator.
         let mut iter = chain.into_iter().peekable();
 

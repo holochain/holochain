@@ -534,8 +534,7 @@ fn valid_chain_test() {
     );
 
     // Test if there is a existing head that a dna in the new chain is rejected.
-    let err =
-        validate_chain(actions.iter(), &Some((vec![123], 0))).expect_err("Dna not at root");
+    let err = validate_chain(actions.iter(), &Some((vec![123], 0))).expect_err("Dna not at root");
     assert_matches!(
         err,
         SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(
@@ -567,8 +566,7 @@ fn valid_chain_test() {
     )
     .expect("Correct seq");
 
-    let err = validate_chain(correct_seq.iter(), &Some((vec![234], 0)))
-        .expect_err("Hash is wrong");
+    let err = validate_chain(correct_seq.iter(), &Some((vec![234], 0))).expect_err("Hash is wrong");
     assert_matches!(
         err,
         SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(

@@ -1,7 +1,7 @@
 use std::ops::Range;
 use test_case::test_case;
 
-use crate::{test_utils::chain::*, prelude::TestChainItem};
+use crate::{prelude::TestChainItem, test_utils::chain::*};
 
 use super::*;
 
@@ -16,8 +16,7 @@ pub type TestFilter = ChainFilter<TestHash>;
 /// Build a chain of RegisterAgentActivity and then run them through the
 /// chain filter.
 fn build_chain(c: Vec<TestChainItem>, filter: TestFilter) -> Vec<TestChainItem> {
-    ChainFilterIter::new(filter, c).into_iter()
-        .collect()
+    ChainFilterIter::new(filter, c).into_iter().collect()
 }
 
 #[test_case(1, 0, 0 => chain(0..0))]

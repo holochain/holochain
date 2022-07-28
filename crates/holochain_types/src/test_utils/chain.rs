@@ -1,8 +1,7 @@
 use std::ops::Range;
 
-use super::TestChainItem;
 use super::TestChainHash;
-
+use super::TestChainItem;
 
 fn forked_hash(n: u8, i: u8) -> TestChainHash {
     if i == 0 {
@@ -23,12 +22,7 @@ pub fn agent_chain(ranges: &[(u8, Range<u8>)]) -> Vec<(TestChainHash, Vec<TestCh
 /// Create a chain from a range where the first chain items
 /// previous hash == that items hash.
 pub fn chain(range: Range<u8>) -> Vec<TestChainItem> {
-    range
-        .map(|i| {
-            TestChainItem::new(i)
-        })
-        .rev()
-        .collect()
+    range.map(|i| TestChainItem::new(i)).rev().collect()
 }
 
 /// Create a set of chains with forks where the first range

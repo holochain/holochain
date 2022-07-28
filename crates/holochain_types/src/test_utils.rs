@@ -163,8 +163,12 @@ pub struct TestChainItem {
 impl TestChainItem {
     /// Constructor for happy-path chains with no forking
     pub fn new(seq: u8) -> Self {
-        Self { seq: seq as u32, hash: vec![seq], prev: seq.checked_sub(1).map(|p| vec![p]) }
-    }    
+        Self {
+            seq: seq as u32,
+            hash: vec![seq],
+            prev: seq.checked_sub(1).map(|p| vec![p]),
+        }
+    }
 }
 
 impl ChainItem for TestChainItem {

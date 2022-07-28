@@ -6,7 +6,7 @@ use std::collections::HashSet;
 use holo_hash::{ActionHash, HasHash};
 use holochain_serialized_bytes::prelude::*;
 
-use crate::{SignedActionHashed, ActionHashed};
+use crate::{ActionHashed, SignedActionHashed};
 
 #[cfg(test)]
 mod test;

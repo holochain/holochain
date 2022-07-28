@@ -409,8 +409,8 @@ fn check_prev_action_chain<A: ChainItem>(
     if action.prev_hash().is_none() {
         Err(PrevActionError::MissingPrev)
     } else if action.prev_hash().map_or(true, |p| p != prev_action_hash) {
-    // Check the prev hash matches.
-    Err(PrevActionError::HashMismatch(action.seq()))
+        // Check the prev hash matches.
+        Err(PrevActionError::HashMismatch(action.seq()))
     } else if action
         .seq()
         .checked_sub(1)
