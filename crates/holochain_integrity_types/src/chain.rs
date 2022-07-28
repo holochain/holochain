@@ -24,7 +24,7 @@ pub struct ChainFilter {
     pub filters: ChainFilters,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize, Debug, Eq, Clone)]
 /// Specify which [`Action`](crate::action::Action)s to allow through
 /// this filter.
 pub enum ChainFilters {
@@ -57,6 +57,30 @@ impl core::hash::Hash for ChainFilters {
                 u.hash(state);
                 t.hash(state);
             }
+        }
+    }
+}
+
+/// Implement a deterministic partial eq to compare ChainFilters.
+impl core::cmp::PartialEq for ChainFilters {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Take(l0), Self::Take(r0)) => l0 == r0,
+            (Self::Until(a), Self::Until(b)) => {
+                let mut a: Vec<_> = a.iter().collect();
+                let mut b: Vec<_> = b.iter().collect();
+                a.sort_unstable();
+                b.sort_unstable();
+                a == b
+            }
+            (Self::Both(l0, a), Self::Both(r0, b)) => {
+                let mut a: Vec<_> = a.iter().collect();
+                let mut b: Vec<_> = b.iter().collect();
+                a.sort_unstable();
+                b.sort_unstable();
+                l0 == r0 && a == b
+            }
+            _ => core::mem::discriminant(self) == core::mem::discriminant(other),
         }
     }
 }

@@ -49,10 +49,10 @@ pub fn get_bounded_activity(
     filter: ChainFilter,
 ) -> StateQueryResult<(MustGetAgentActivityResponse, Option<ChainFilterRange>)> {
     // Find the bounds of the range specified in the filter.
-    match find_bounds(txn, scratch, &author, filter)? {
+    match find_bounds(txn, scratch, author, filter)? {
         Sequences::Found(filter_range) => {
             // Get the full range of actions from the database.
-            get_activity(txn, scratch, &author, filter_range.range()).map(|a| {
+            get_activity(txn, scratch, author, filter_range.range()).map(|a| {
                 (
                     MustGetAgentActivityResponse::Activity(a),
                     Some(filter_range),

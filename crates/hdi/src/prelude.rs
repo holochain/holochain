@@ -1,10 +1,10 @@
 pub use crate::app_entry;
+pub use crate::chain::must_get_agent_activity;
 pub use crate::ed25519::verify_signature;
 pub use crate::ed25519::verify_signature_raw;
 pub use crate::entry::must_get_action;
 pub use crate::entry::must_get_entry;
 pub use crate::entry::must_get_valid_record;
-pub use crate::chain::must_get_agent_activity;
 pub use crate::entry_defs;
 pub use crate::hash::*;
 pub use crate::hdi::*;

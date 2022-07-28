@@ -516,14 +516,13 @@ pub fn commit_chain<Kind: DbKindT>(
     let data: Vec<_> = chain
         .into_iter()
         .map(|(a, c)| {
-            let d = chain_to_ops(c)
+            chain_to_ops(c)
                 .into_iter()
                 .map(|mut op| {
                     *op.action.hashed.content.author_mut() = a.clone();
                     op
                 })
-                .collect::<Vec<_>>();
-            d
+                .collect::<Vec<_>>()
         })
         .collect();
     let db = test_in_mem_db(db_kind);
@@ -565,14 +564,13 @@ pub fn commit_chain<Kind: DbKindT>(
 
 pub fn commit_scratch(scratch: SyncScratch, chain: Vec<(AgentPubKey, Vec<ChainItem>)>) {
     let data = chain.into_iter().map(|(a, c)| {
-        let d = chain_to_ops(c)
+        chain_to_ops(c)
             .into_iter()
             .map(|mut op| {
                 *op.action.hashed.content.author_mut() = a.clone();
                 op
             })
-            .collect::<Vec<_>>();
-        d
+            .collect::<Vec<_>>()
     });
 
     scratch
