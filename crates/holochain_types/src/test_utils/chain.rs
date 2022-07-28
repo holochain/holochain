@@ -22,7 +22,7 @@ pub fn agent_chain(ranges: &[(u8, Range<u8>)]) -> Vec<(TestChainHash, Vec<TestCh
 /// Create a chain from a range where the first chain items
 /// previous hash == that items hash.
 pub fn chain(range: Range<u8>) -> Vec<TestChainItem> {
-    range.map(|i| TestChainItem::new(i)).rev().collect()
+    range.map(TestChainItem::new).rev().collect()
 }
 
 /// Create a set of chains with forks where the first range

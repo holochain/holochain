@@ -97,9 +97,9 @@ pub fn simple_crud_zome() -> InlineZomeSet {
     let string_entry_def = EntryDef::default_with_id("string");
     let unit_entry_def = EntryDef::default_with_id("unit");
 
-    SweetEasyInline::new(vec![string_entry_def.clone(), unit_entry_def.clone()], 0)
+    SweetEasyInline::new(vec![string_entry_def, unit_entry_def], 0)
         .callback("create_string", move |api, s: AppString| {
-            let entry = Entry::app(AppString::from(s).try_into().unwrap()).unwrap();
+            let entry = Entry::app(s.try_into().unwrap()).unwrap();
             let hash = api.create(CreateInput::new(
                 InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
                 EntryVisibility::Public,
