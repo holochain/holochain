@@ -19,6 +19,12 @@ fn build_chain(c: Vec<TestChainItem>, filter: TestFilter) -> Vec<TestChainItem> 
     ChainFilterIter::new(filter, c).into_iter().collect()
 }
 
+/// Useful for displaying diff of test_case failure.
+/// See <https://github.com/frondeus/test-case/wiki/Syntax#function-validator>
+fn pretty(expected: Vec<TestChainItem>) -> impl Fn(Vec<TestChainItem>) {
+    move |actual: Vec<TestChainItem>| pretty_assertions::assert_eq!(actual, expected)
+}
+
 #[test_case(1, 0, 0 => chain(0..0))]
 #[test_case(1, 0, 1 => chain(0..1))]
 #[test_case(1, 0, 10 => chain(0..1))]
@@ -34,8 +40,8 @@ fn can_take_n(len: u8, position: u8, take: u32) -> Vec<TestChainItem> {
 #[test_case(1, 0, hash(0) => chain(0..1))]
 #[test_case(1, 0, hash(1) => chain(0..1))]
 #[test_case(2, 1, hash(1) => chain(1..2))]
-#[test_case(10, 5, hash(1) => chain(1..6))]
-#[test_case(10, 9, hash(0) => chain(0..10))]
+#[test_case(10, 5, hash(1) => using pretty(chain(1..6)))]
+#[test_case(10, 9, hash(0) => using pretty(chain(0..10)))]
 /// Check taking until some hash works.
 fn can_until_hash(len: u8, position: u8, until: TestHash) -> Vec<TestChainItem> {
     let filter = TestFilter::new(hash(position)).until(until);

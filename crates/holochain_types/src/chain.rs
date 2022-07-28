@@ -48,7 +48,7 @@ pub struct ChainFilterIter<I: AsRef<A>, A: ChainItem = SignedActionHashed> {
 }
 
 impl<I: AsRef<A>, A: ChainItem> ChainFilterIter<I, A> {
-    /// Create an iterator that filters an iterator of [`RegisterAgentActivity`]
+    /// Create an iterator that filters an iterator of actions
     /// with a [`ChainFilter`].
     ///
     /// # Constraints
@@ -56,7 +56,7 @@ impl<I: AsRef<A>, A: ChainItem> ChainFilterIter<I, A> {
     /// then this will be an empty iterator.
     pub fn new(filter: ChainFilter<A::Hash>, mut chain: Vec<I>) -> Self {
         // Sort by descending.
-        chain.sort_unstable_by_key(|a| a.as_ref().seq());
+        chain.sort_unstable_by_key(|a| u32::MAX - a.as_ref().seq());
         // Create a peekable iterator.
         let mut iter = chain.into_iter().peekable();
 

@@ -65,6 +65,7 @@ contrafact = { version = "0.1.0-dev.1", optional = true }
 arbitrary = "1.0"
 maplit = "1"
 matches = "0.1"
+pretty_assertions = "0"
 serde_json = "1"
 test-case = "2.1.0"
 tokio = { version = "1.11", features = [ "full" ] }
