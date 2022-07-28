@@ -165,6 +165,12 @@ impl From<u8> for TestChainHash {
     }
 }
 
+impl From<i32> for TestChainHash {
+    fn from(u: i32) -> Self {
+        Self(u as u32)
+    }
+}
+
 /// A test implementation of a minimal ChainItem which uses simple numbers for hashes
 /// and always points back to the previous number
 #[derive(Clone, Debug, PartialEq, Eq)]

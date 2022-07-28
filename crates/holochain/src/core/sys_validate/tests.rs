@@ -489,8 +489,8 @@ fn valid_chain_test() {
     let mut fork = actions.clone();
     fork.push(TestChainItem {
         seq: 1,
-        hash: vec![111],
-        prev: Some(vec![0]),
+        hash: 111.into(),
+        prev: Some(0.into()),
     });
     let err = validate_chain(fork.iter(), &None).expect_err("Forked chain");
     assert_matches!(
@@ -513,7 +513,7 @@ fn valid_chain_test() {
 
     // Test a wrong root gets rejected.
     let mut wrong_root = actions.clone();
-    wrong_root[0].prev = Some(vec![0]);
+    wrong_root[0].prev = Some(0.into());
     let err = validate_chain(wrong_root.iter(), &None).expect_err("Wrong root");
     assert_matches!(
         err,
@@ -534,7 +534,7 @@ fn valid_chain_test() {
     );
 
     // Test if there is a existing head that a dna in the new chain is rejected.
-    let err = validate_chain(actions.iter(), &Some((vec![123], 0))).expect_err("Dna not at root");
+    let err = validate_chain(actions.iter(), &Some((123.into(), 0))).expect_err("Dna not at root");
     assert_matches!(
         err,
         SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(
@@ -566,7 +566,8 @@ fn valid_chain_test() {
     )
     .expect("Correct seq");
 
-    let err = validate_chain(correct_seq.iter(), &Some((vec![234], 0))).expect_err("Hash is wrong");
+    let err =
+        validate_chain(correct_seq.iter(), &Some((234.into(), 0))).expect_err("Hash is wrong");
     assert_matches!(
         err,
         SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(
