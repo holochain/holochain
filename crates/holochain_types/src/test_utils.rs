@@ -149,15 +149,19 @@ pub fn test_keystore() -> holochain_keystore::MetaLairClient {
 /// and always points back to the previous number
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TestChainItem {
-    seq: u32,
-    prev: Option<u32>,
+    /// The sequence number
+    pub seq: u32,
+    /// The hash
+    pub hash: u32,
+    /// The previous hash, unless this is the first item
+    pub prev: Option<u32>,
 }
 
 impl TestChainItem {
-    /// Constructor
+    /// Constructor for happy-path chains with no forking
     pub fn new(seq: u32) -> Self {
-        Self { seq, prev: seq.checked_sub(1) }
-    }
+        Self { seq, hash: seq, prev: seq.checked_sub(1) }
+    }    
 }
 
 impl ChainItem for TestChainItem {

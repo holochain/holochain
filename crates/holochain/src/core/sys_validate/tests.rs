@@ -476,135 +476,103 @@ async fn incoming_ops_filters_private_entry() {
 #[test]
 /// Test the chain validation works.
 fn valid_chain_test() {
-    let author = fixt!(AgentPubKey);
     // Create a valid chain.
-    let mut actions = vec![];
-    actions.push(ActionHashed::from_content_sync(Action::Dna(Dna {
-        author: author.clone(),
-        timestamp: Timestamp::from_micros(0),
-        hash: fixt!(DnaHash),
-    })));
-    actions.push(ActionHashed::from_content_sync(Action::Create(Create {
-        author: author.clone(),
-        timestamp: Timestamp::from_micros(1),
-        action_seq: 1,
-        prev_action: actions[0].to_hash(),
-        entry_type: fixt!(EntryType),
-        entry_hash: fixt!(EntryHash),
-        weight: Default::default(),
-    })));
-    actions.push(ActionHashed::from_content_sync(Action::Create(Create {
-        author: author.clone(),
-        timestamp: Timestamp::from_micros(2),
-        action_seq: 2,
-        prev_action: actions[1].to_hash(),
-        entry_type: fixt!(EntryType),
-        entry_hash: fixt!(EntryHash),
-        weight: Default::default(),
-    })));
+    let actions = vec![
+        TestChainItem::new(0),
+        TestChainItem::new(1),
+        TestChainItem::new(2),
+    ];
     // Valid chain passes.
     validate_chain(actions.iter(), &None).expect("Valid chain");
 
     // Create a forked chain.
     let mut fork = actions.clone();
-    fork.push(ActionHashed::from_content_sync(Action::Create(Create {
-        author: author.clone(),
-        timestamp: Timestamp::from_micros(10),
-        action_seq: 1,
-        prev_action: actions[0].to_hash(),
-        entry_type: fixt!(EntryType),
-        entry_hash: fixt!(EntryHash),
-        weight: Default::default(),
-    })));
+    fork.push(TestChainItem {
+        seq: 1,
+        hash: 111,
+        prev: Some(0),
+    });
     let err = validate_chain(fork.iter(), &None).expect_err("Forked chain");
-    assert!(matches!(
+    assert_matches!(
         err,
         SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(
             PrevActionError::HashMismatch(_)
         ))
-    ));
+    );
 
     // Test a chain with the wrong seq.
     let mut wrong_seq = actions.clone();
-    *wrong_seq[2].as_content_mut().action_seq_mut().unwrap() = 3;
+    wrong_seq[2].seq = 3;
     let err = validate_chain(wrong_seq.iter(), &None).expect_err("Wrong seq");
-    assert!(matches!(
+    assert_matches!(
         err,
         SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(
             PrevActionError::InvalidSeq(_, _)
         ))
-    ));
+    );
 
     // Test a wrong root gets rejected.
     let mut wrong_root = actions.clone();
-    wrong_root[0] = ActionHashed::from_content_sync(Action::Create(Create {
-        author: author.clone(),
-        timestamp: Timestamp::from_micros(0),
-        action_seq: 0,
-        prev_action: actions[0].to_hash(),
-        entry_type: fixt!(EntryType),
-        entry_hash: fixt!(EntryHash),
-        weight: Default::default(),
-    }));
+    wrong_root[0].prev = Some(0);
     let err = validate_chain(wrong_root.iter(), &None).expect_err("Wrong root");
-    assert!(matches!(
+    assert_matches!(
         err,
         SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(
             PrevActionError::InvalidRoot
         ))
-    ));
+    );
 
     // Test without dna at root gets rejected.
     let mut dna_not_at_root = actions.clone();
     dna_not_at_root.push(actions[0].clone());
     let err = validate_chain(dna_not_at_root.iter(), &None).expect_err("Dna not at root");
-    assert!(matches!(
+    assert_matches!(
         err,
         SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(
-            PrevActionError::InvalidRoot
+            PrevActionError::MissingPrev
         ))
-    ));
+    );
 
     // Test if there is a existing head that a dna in the new chain is rejected.
     let err =
-        validate_chain(actions.iter(), &Some((fixt!(ActionHash), 0))).expect_err("Dna not at root");
-    assert!(matches!(
+        validate_chain(actions.iter(), &Some((123, 0))).expect_err("Dna not at root");
+    assert_matches!(
         err,
         SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(
-            PrevActionError::InvalidRoot
+            PrevActionError::MissingPrev
         ))
-    ));
+    );
 
     // Check a sequence that is broken gets rejected.
     let mut wrong_seq = actions[1..].to_vec();
-    *wrong_seq[0].as_content_mut().action_seq_mut().unwrap() = 3;
-    *wrong_seq[1].as_content_mut().action_seq_mut().unwrap() = 4;
+    wrong_seq[0].seq = 3;
+    wrong_seq[1].seq = 4;
     let err = validate_chain(
         wrong_seq.iter(),
-        &Some((wrong_seq[0].prev_action().unwrap().clone(), 0)),
+        &Some((wrong_seq[0].prev.unwrap(), 0)),
     )
     .expect_err("Wrong seq");
-    assert!(matches!(
+    assert_matches!(
         err,
         SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(
             PrevActionError::InvalidSeq(_, _)
         ))
-    ));
+    );
 
     // Check the correct sequence gets accepted with a root.
     let correct_seq = actions[1..].to_vec();
     validate_chain(
         correct_seq.iter(),
-        &Some((correct_seq[0].prev_action().unwrap().clone(), 0)),
+        &Some((correct_seq[0].prev.unwrap(), 0)),
     )
     .expect("Correct seq");
 
-    let err = validate_chain(correct_seq.iter(), &Some((fixt!(ActionHash), 0)))
+    let err = validate_chain(correct_seq.iter(), &Some((456, 0)))
         .expect_err("Hash is wrong");
-    assert!(matches!(
+    assert_matches!(
         err,
         SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(
             PrevActionError::HashMismatch(_)
         ))
-    ));
+    );
 }
