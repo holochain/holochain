@@ -23,7 +23,7 @@ use thiserror::Error;
 /// It is a lot cleaner to express this using
 /// ? try's unfortunately try for custom types is
 /// unstable but when it lands we should use:
-/// https://docs.rs/try-guard/0.2.0/try_guard/
+/// <https://docs.rs/try-guard/0.2.0/try_guard/>
 #[derive(Error, Debug)]
 pub enum SysValidationError {
     #[error(transparent)]

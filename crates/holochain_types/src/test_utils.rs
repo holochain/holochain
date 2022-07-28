@@ -181,7 +181,7 @@ impl TestChainItem {
     /// Constructor for happy-path chains with no forking
     pub fn new(seq: u32) -> Self {
         Self {
-            seq: seq,
+            seq,
             hash: TestChainHash(seq),
             prev: seq.checked_sub(1).map(TestChainHash),
         }
