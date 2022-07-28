@@ -405,9 +405,12 @@ fn check_prev_action_chain<A: ChainItem>(
     prev_action_seq: u32,
     action: &A,
 ) -> Result<(), PrevActionError> {
-    if action.prev_hash().map_or(true, |p| p != prev_action_hash) {
-        // Check the prev hash matches.
-        Err(PrevActionError::HashMismatch(action.seq()))
+    // The root cannot appear later in the chain
+    if action.prev_hash().is_none() {
+        Err(PrevActionError::MissingPrev)
+    } else if action.prev_hash().map_or(true, |p| p != prev_action_hash) {
+    // Check the prev hash matches.
+    Err(PrevActionError::HashMismatch(action.seq()))
     } else if action
         .seq()
         .checked_sub(1)
