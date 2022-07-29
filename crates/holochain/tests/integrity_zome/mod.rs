@@ -228,7 +228,16 @@ async fn test_update_admin_interface() {
 
     let dna_hash = dna.dna_hash().clone();
 
-    let _app = conductor.setup_app("app", &[dna]).await.unwrap();
+    let app = conductor.setup_app("app", &[dna]).await.unwrap();
+    let cells = app.into_cells();
+
+    let hash: ActionHash = conductor
+        .call(
+            &cells[0].zome(TestCoordinatorWasm::CoordinatorZome),
+            "create_entry",
+            (),
+        )
+        .await;
 
     let admin_api = RealAdminInterfaceApi::new(conductor.clone());
 
@@ -265,4 +274,14 @@ async fn test_update_admin_interface() {
     let req = AdminRequest::UpdateCoordinators(Box::new(req));
     let r = admin_api.handle_admin_request(req).await;
     assert!(matches!(r, AdminResponse::CoordinatorsUpdated));
+
+    let record: Option<Record> = conductor
+        .call(
+            &cells[0].zome(TestCoordinatorWasm::CoordinatorZomeUpdate),
+            "get_entry",
+            hash,
+        )
+        .await;
+
+    assert!(record.is_some());
 }
