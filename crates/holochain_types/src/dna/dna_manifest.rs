@@ -48,7 +48,7 @@ impl DnaManifest {
     /// Be sure to update this function when creating a new version.
     pub fn current(
         name: String,
-        uid: Option<String>,
+        network_seed: Option<String>,
         properties: Option<YamlProperties>,
         origin_time: HumanTimestamp,
         integrity_zomes: Vec<ZomeManifest>,
@@ -56,7 +56,7 @@ impl DnaManifest {
     ) -> Self {
         DnaManifestCurrent::new(
             name,
-            IntegrityManifest::new(uid, properties, origin_time, integrity_zomes),
+            IntegrityManifest::new(network_seed, properties, origin_time, integrity_zomes),
             CoordinatorManifest {
                 zomes: coordinator_zomes,
             },
@@ -71,10 +71,10 @@ impl DnaManifest {
         }
     }
 
-    /// Getter for uid
-    pub fn uid(&self) -> Option<String> {
+    /// Getter for network_seed
+    pub fn network_seed(&self) -> Option<String> {
         match self {
-            DnaManifest::V1(manifest) => manifest.integrity.uid.clone(),
+            DnaManifest::V1(manifest) => manifest.integrity.network_seed.clone(),
         }
     }
 

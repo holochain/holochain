@@ -6,8 +6,8 @@ use std::{
 use holo_hash::{ActionHash, AgentPubKey};
 use holochain_types::{dht_op::DhtOpType, inline_zome::InlineZomeSet};
 use holochain_zome_types::{
-    Action, ActionType, AppEntryType, BoxApi, ChainTopOrdering, CreateInput, Entry, EntryDef,
-    EntryDefIndex, EntryVisibility, Op, TryInto, ZomeId,
+    op::*, Action, ActionType, AppEntryType, BoxApi, ChainTopOrdering, CreateInput, Entry,
+    EntryDef, EntryDefIndex, EntryVisibility, TryInto, ZomeId,
 };
 
 use crate::{
@@ -109,6 +109,11 @@ impl Expected {
         self.all_zomes(event.clone());
     }
 
+    fn activity_all_zomes(&mut self, mut event: Event) {
+        event.op_type = DhtOpType::RegisterAgentActivity;
+        self.all_zomes(event.clone());
+    }
+
     fn zomes(&mut self, mut event: Event, zomes: &[&'static str]) {
         for zome in zomes {
             event.called_zome = *zome;
@@ -121,6 +126,12 @@ impl Expected {
 
         self.zomes(event.clone(), zomes);
 
+        event.op_type = DhtOpType::StoreRecord;
+
+        self.zomes(event.clone(), zomes);
+    }
+
+    fn record_for_zomes(&mut self, mut event: Event, zomes: &[&'static str]) {
         event.op_type = DhtOpType::StoreRecord;
 
         self.zomes(event.clone(), zomes);
@@ -198,14 +209,14 @@ async fn app_validation_ops() {
          events: tokio::sync::mpsc::Sender<Event>| {
             move |_api: BoxApi, op: Op| {
                 let event = match op {
-                    Op::StoreRecord { record } => Event {
+                    Op::StoreRecord(StoreRecord { record }) => Event {
                         action: ActionLocation::new(record.action().clone(), &agents),
                         op_type: DhtOpType::StoreRecord,
                         called_zome: zome,
                         with_zome_id: None,
                         with_entry_def_index: None,
                     },
-                    Op::StoreEntry { action, .. } => {
+                    Op::StoreEntry(StoreEntry { action, .. }) => {
                         let (with_entry_def_index, with_zome_id) =
                             match action.hashed.content.app_entry_type().cloned() {
                                 Some(AppEntryType { id, zome_id, .. }) => (Some(id), Some(zome_id)),
@@ -219,11 +230,11 @@ async fn app_validation_ops() {
                             with_entry_def_index,
                         }
                     }
-                    Op::RegisterUpdate {
+                    Op::RegisterUpdate(RegisterUpdate {
                         update,
                         original_action,
                         ..
-                    } => {
+                    }) => {
                         let (with_entry_def_index, with_zome_id) =
                             match original_action.app_entry_type().cloned() {
                                 Some(AppEntryType { id, zome_id, .. }) => (Some(id), Some(zome_id)),
@@ -237,11 +248,11 @@ async fn app_validation_ops() {
                             with_entry_def_index,
                         }
                     }
-                    Op::RegisterDelete {
+                    Op::RegisterDelete(RegisterDelete {
                         delete,
                         original_action,
                         ..
-                    } => {
+                    }) => {
                         let (with_entry_def_index, with_zome_id) =
                             match original_action.app_entry_type().cloned() {
                                 Some(AppEntryType { id, zome_id, .. }) => (Some(id), Some(zome_id)),
@@ -255,21 +266,21 @@ async fn app_validation_ops() {
                             with_entry_def_index,
                         }
                     }
-                    Op::RegisterAgentActivity { action } => Event {
+                    Op::RegisterAgentActivity(RegisterAgentActivity { action }) => Event {
                         action: ActionLocation::new(action.action().clone(), &agents),
                         op_type: DhtOpType::RegisterAgentActivity,
                         called_zome: zome,
                         with_zome_id: None,
                         with_entry_def_index: None,
                     },
-                    Op::RegisterCreateLink { create_link, .. } => Event {
+                    Op::RegisterCreateLink(RegisterCreateLink { create_link, .. }) => Event {
                         action: ActionLocation::new(create_link.hashed.content.clone(), &agents),
                         op_type: DhtOpType::RegisterAddLink,
                         called_zome: zome,
                         with_zome_id: None,
                         with_entry_def_index: None,
                     },
-                    Op::RegisterDeleteLink { delete_link, .. } => Event {
+                    Op::RegisterDeleteLink(RegisterDeleteLink { delete_link, .. }) => Event {
                         action: ActionLocation::new(delete_link.hashed.content.clone(), &agents),
                         op_type: DhtOpType::RegisterRemoveLink,
                         called_zome: zome,
@@ -393,7 +404,8 @@ async fn app_validation_ops() {
         action: ActionLocation::expected(ALICE, ActionType::Create, 4),
         ..Default::default()
     };
-    expected.activity_and_record_all_zomes(event.clone());
+    expected.activity_all_zomes(event.clone());
+    expected.record_for_zomes(event.clone(), &[ZOME_A_0, ZOME_B_0]);
 
     event.op_type = DhtOpType::StoreEntry;
     event.called_zome = ZOME_A_0;

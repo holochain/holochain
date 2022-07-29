@@ -129,6 +129,33 @@ pub fn build(attrs: TokenStream, input: TokenStream) -> TokenStream {
                 [#units].into_iter()
             }
         }
+
+        impl LinkTypesHelper for #ident {
+            type Error = WasmError;
+
+            fn from_type<Z, I>(zome_id: Z, link_type: I) -> Result<Option<Self>, Self::Error>
+            where
+                Z: Into<ZomeId>,
+                I: Into<LinkType>
+            {
+                let link_type = ScopedLinkType {
+                    zome_id: zome_id.into(),
+                    zome_type: link_type.into(),
+                };
+                let links = zome_info()?.zome_types.links;
+                match links.find(#ident::iter(), link_type) {
+                    Some(l) => Ok(Some(l)),
+                    None => if links.dependencies().any(|z| z == link_type.zome_id) {
+                        Err(wasm_error!(WasmErrorInner::Guest(format!(
+                            "Link type: {:?} is out of range for this zome.",
+                            link_type
+                        ))))
+                    } else {
+                        Ok(None)
+                    }
+                }
+            }
+        }
     };
     output.into()
 }

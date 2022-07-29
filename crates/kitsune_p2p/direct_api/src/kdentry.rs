@@ -219,7 +219,6 @@ impl KdEntrySigned {
         let hash = *arrayref::array_ref![parsed.hash, 0, 39];
         let hash = KdHash::from_bytes(hash);
         let binary_len = parsed.binary_len;
-        drop(parsed);
         let wire_data = wire.into();
         Ok(Self(Arc::new(KdEntrySignedInner {
             content,

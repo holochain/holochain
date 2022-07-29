@@ -79,16 +79,16 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
             RegisterDna(payload) => {
                 trace!(register_dna_payload = ?payload);
                 let RegisterDnaPayload {
-                    uid,
+                    network_seed,
                     properties,
                     source,
                 } = *payload;
-                // uid and properties from the register call will override any in the bundle
+                // network seed and properties from the register call will override any in the bundle
                 let dna = match source {
                     DnaSource::Hash(ref hash) => {
-                        if properties.is_none() && uid.is_none() {
+                        if properties.is_none() && network_seed.is_none() {
                             return Err(ConductorApiError::DnaReadError(
-                                "Hash Dna source requires properties or uid to create a derived Dna"
+                                "Hash Dna source requires properties or network seed to create a derived Dna"
                                     .to_string(),
                             ));
                         }
@@ -104,8 +104,8 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                                 .map_err(SerializationError::from)?;
                             dna = dna.with_properties(properties).await?;
                         }
-                        if let Some(uid) = uid {
-                            dna = dna.with_uid(uid).await?;
+                        if let Some(network_seed) = network_seed {
+                            dna = dna.with_network_seed(network_seed).await?;
                         }
                         dna
                     }
@@ -113,12 +113,12 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                         let bundle = Bundle::read_from_file(path).await?;
                         let bundle: DnaBundle = bundle.into();
                         let (dna_file, _original_hash) =
-                            bundle.into_dna_file(uid, properties).await?;
+                            bundle.into_dna_file(network_seed, properties).await?;
                         dna_file
                     }
                     DnaSource::Bundle(bundle) => {
                         let (dna_file, _original_hash) =
-                            bundle.into_dna_file(uid, properties).await?;
+                            bundle.into_dna_file(network_seed, properties).await?;
                         dna_file
                     }
                 };
@@ -374,22 +374,22 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
 /// overrides
 fn _resolve_phenotype(
     manifest: &DnaManifest,
-    payload_uid: Option<&Uid>,
+    payload_network_seed: Option<&NetworkSeed>,
     payload_properties: Option<&YamlProperties>,
-) -> (Option<Uid>, Option<YamlProperties>) {
-    let bundle_uid = manifest.uid();
+) -> (Option<NetworkSeed>, Option<YamlProperties>) {
+    let bundle_network_seed = manifest.network_seed();
     let bundle_properties = manifest.properties();
     let properties = if payload_properties.is_some() {
         payload_properties.cloned()
     } else {
         bundle_properties
     };
-    let uid = if payload_uid.is_some() {
-        payload_uid.cloned()
+    let network_seed = if payload_network_seed.is_some() {
+        payload_network_seed.cloned()
     } else {
-        bundle_uid
+        bundle_network_seed
     };
-    (uid, properties)
+    (network_seed, properties)
 }
 
 #[async_trait::async_trait]
@@ -437,15 +437,15 @@ mod test {
         let handle = Conductor::builder().test(env_dir.path(), &[]).await?;
         let shutdown = handle.take_shutdown_handle().unwrap();
         let admin_api = RealAdminInterfaceApi::new(handle.clone());
-        let uid = Uuid::new_v4();
+        let network_seed = Uuid::new_v4();
         let dna = fake_dna_zomes(
-            &uid.to_string(),
+            &network_seed.to_string(),
             vec![(TestWasm::Foo.into(), TestWasm::Foo.into())],
         );
         let dna_hash = dna.dna_hash().clone();
         let (dna_path, _tempdir) = write_fake_dna_file(dna.clone()).await.unwrap();
         let path_payload = RegisterDnaPayload {
-            uid: None,
+            network_seed: None,
             properties: None,
             source: DnaSource::Path(dna_path.clone()),
         };
@@ -459,7 +459,7 @@ mod test {
 
         // re-register idempotent
         let path_payload = RegisterDnaPayload {
-            uid: None,
+            network_seed: None,
             properties: None,
             source: DnaSource::Path(dna_path.clone()),
         };
@@ -477,24 +477,24 @@ mod test {
 
         // register by hash
         let hash_payload = RegisterDnaPayload {
-            uid: None,
+            network_seed: None,
             properties: None,
             source: DnaSource::Hash(dna_hash.clone()),
         };
 
-        // without properties or uid should throw error
+        // without properties or network seed should throw error
         let hash_install_response = admin_api
             .handle_admin_request(AdminRequest::RegisterDna(Box::new(hash_payload)))
             .await;
         assert_matches!(
             hash_install_response,
-            AdminResponse::Error(ExternalApiWireError::DnaReadError(e)) if e == String::from("Hash Dna source requires properties or uid to create a derived Dna")
+            AdminResponse::Error(ExternalApiWireError::DnaReadError(e)) if e == String::from("Hash Dna source requires properties or network seed to create a derived Dna")
         );
 
         // with a property should install and produce a different hash
         let json: serde_yaml::Value = serde_yaml::from_str("some prop: \"foo\"").unwrap();
         let hash_payload = RegisterDnaPayload {
-            uid: None,
+            network_seed: None,
             properties: Some(YamlProperties::new(json.clone())),
             source: DnaSource::Hash(dna_hash.clone()),
         };
@@ -506,9 +506,9 @@ mod test {
             AdminResponse::DnaRegistered(hash) if hash != dna_hash
         );
 
-        // with a uid should install and produce a different hash
+        // with a network seed should install and produce a different hash
         let hash_payload = RegisterDnaPayload {
-            uid: Some(String::from("12345678900000000000000")),
+            network_seed: Some(String::from("12345678900000000000000")),
             properties: None,
             source: DnaSource::Hash(dna_hash.clone()),
         };
@@ -527,9 +527,9 @@ mod test {
             AdminResponse::DnaRegistered(hash) if hash != dna_hash
         );
 
-        // from a path with a same uid should return the already registered hash so it's idempotent
+        // from a path with a same network seed should return the already registered hash so it's idempotent
         let path_payload = RegisterDnaPayload {
-            uid: Some(String::from("12345678900000000000000")),
+            network_seed: Some(String::from("12345678900000000000000")),
             properties: None,
             source: DnaSource::Path(dna_path.clone()),
         };
@@ -541,9 +541,9 @@ mod test {
             AdminResponse::DnaRegistered(hash) if hash == new_hash
         );
 
-        // from a path with different uid should produce different hash
+        // from a path with different network seed should produce different hash
         let path_payload = RegisterDnaPayload {
-            uid: Some(String::from("foo")),
+            network_seed: Some(String::from("foo")),
             properties: None,
             source: DnaSource::Path(dna_path),
         };
@@ -569,9 +569,9 @@ mod test {
         let handle = Conductor::builder().test(db_dir.path(), &[]).await.unwrap();
         let shutdown = handle.take_shutdown_handle().unwrap();
         let admin_api = RealAdminInterfaceApi::new(handle.clone());
-        let uid = Uuid::new_v4();
+        let network_seed = Uuid::new_v4();
         let dna = fake_dna_zomes(
-            &uid.to_string(),
+            &network_seed.to_string(),
             vec![(TestWasm::Foo.into(), TestWasm::Foo.into())],
         );
         let (dna_path, _tempdir) = write_fake_dna_file(dna.clone()).await.unwrap();
@@ -597,7 +597,7 @@ mod test {
 
         // now register a DNA
         let path_payload = RegisterDnaPayload {
-            uid: None,
+            network_seed: None,
             properties: None,
             source: DnaSource::Path(dna_path),
         };

@@ -278,7 +278,7 @@ mod slow_tests {
         action.entry_type = EntryType::AgentPubKey;
         action.entry_hash = EntryHash::with_data_sync(&entry);
 
-        let op = Op::StoreRecord {
+        let op = Op::StoreRecord(StoreRecord {
             record: Record::new(
                 SignedActionHashed::with_presigned(
                     ActionHashed::from_content_sync(action.into()),
@@ -286,7 +286,7 @@ mod slow_tests {
                 ),
                 Some(entry),
             ),
-        };
+        });
 
         let zomes_to_invoke =
             ZomesToInvoke::One(IntegrityZome::from(TestWasm::ValidateInvalid).erase_type());

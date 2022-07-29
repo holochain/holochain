@@ -38,7 +38,7 @@ pub fn gossip_direct<Peer: HostAccessTest>(
         // - ensure compatible as-at timestamps
         let tl = time_left.inner() as i64;
         let tr = time_right.inner() as i64;
-        if (tl - tr).abs() as u32
+        if (tl - tr).unsigned_abs() as u32
             > u32::min(gpl.max_time_offset.inner(), gpr.max_time_offset.inner())
         {
             return Err(GossipError::TimesOutOfSync);
@@ -49,7 +49,7 @@ pub fn gossip_direct<Peer: HostAccessTest>(
         let ar = right.get_arq_set();
         al.print_arqs(topo, 64);
         ar.print_arqs(topo, 64);
-        if (al.power() as i8 - ar.power() as i8).abs() as u8
+        if (al.power() as i8 - ar.power() as i8).unsigned_abs()
             > u8::min(gpl.max_space_power_offset, gpr.max_space_power_offset)
         {
             return Err(GossipError::ArqPowerDiffTooLarge);

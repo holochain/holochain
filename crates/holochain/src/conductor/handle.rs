@@ -953,14 +953,14 @@ impl ConductorHandleT for ConductorHandleImpl {
             agent_key,
             installed_app_id,
             membrane_proofs,
-            uid,
+            network_seed,
         } = payload;
 
         let bundle: AppBundle = {
             let original_bundle = source.resolve().await?;
-            if let Some(uid) = uid {
+            if let Some(network_seed) = network_seed {
                 let mut manifest = original_bundle.manifest().to_owned();
-                manifest.set_uid(uid);
+                manifest.set_network_seed(network_seed);
                 AppBundle::from(original_bundle.into_inner().update_manifest(manifest)?)
             } else {
                 original_bundle
