@@ -23,10 +23,6 @@ rec {
     set -euxo pipefail
     export RUST_BACKTRACE=1
 
-    # limit parallel jobs to reduce memory consumption
-    export NUM_JOBS=''${NUM_JOBS:-8}
-    export CARGO_BUILD_JOBS=''${CARGO_BUILD_JOBS:-8}
-
     # run all the non-slow cargo tests
     cargo build --features 'build' -p holochain_wasm_test_utils
     cargo test ''${CARGO_TEST_ARGS:-} --workspace --exclude holochain --lib --tests --profile fast-test -- --nocapture
@@ -35,10 +31,6 @@ rec {
   hcStandardTestsNextest = writeShellScriptBin "hc-test-standard-nextest" ''
     set -euxo pipefail
     export RUST_BACKTRACE=1
-
-    # limit parallel jobs to reduce memory consumption
-    export NUM_JOBS=''${NUM_JOBS:-8}
-    export CARGO_BUILD_JOBS=''${CARGO_BUILD_JOBS:-8}
 
     # run all the non-slow cargo tests
     cargo build --features 'build' -p holochain_wasm_test_utils
@@ -49,10 +41,6 @@ rec {
     set -euxo pipefail
     export RUST_BACKTRACE=1
 
-    # limit parallel jobs to reduce memory consumption
-    export NUM_JOBS=''${NUM_JOBS:-8}
-    export CARGO_BUILD_JOBS=''${CARGO_BUILD_JOBS:-8}
-
     # alas, we cannot specify --features in the virtual workspace
     # run the specific slow tests in the holochain crate
     cargo test ''${CARGO_TEST_ARGS:-} -p holochain --features slow_tests,test_utils,build_wasms,db-encryption --profile fast-test -- --nocapture
@@ -61,10 +49,6 @@ rec {
   hcSlowTestsNextest = writeShellScriptBin "hc-test-slow-nextest" ''
     set -euxo pipefail
     export RUST_BACKTRACE=1
-
-    # limit parallel jobs to reduce memory consumption
-    export NUM_JOBS=''${NUM_JOBS:-8}
-    export CARGO_BUILD_JOBS=''${CARGO_BUILD_JOBS:-8}
 
     # alas, we cannot specify --features in the virtual workspace
     # run the specific slow tests in the holochain crate
@@ -84,10 +68,6 @@ rec {
   hcWasmTests = writeShellScriptBin "hc-test-wasm" ''
     set -euxo pipefail
     export RUST_BACKTRACE=1
-
-    # limit parallel jobs to reduce memory consumption
-    export NUM_JOBS=''${NUM_JOBS:-8}
-    export CARGO_BUILD_JOBS=''${CARGO_BUILD_JOBS:-8}
 
     # run all the wasm tests (within wasm) with the conductor mocked
     cargo test ''${CARGO_TEST_ARGS:-} --lib --manifest-path=crates/test_utils/wasm/wasm_workspace/Cargo.toml --all-features -- --nocapture
@@ -179,10 +159,6 @@ rec {
   hcReleaseTest = writeShellScriptBin "hc-test-release" ''
     set -euxo pipefail
     export RUST_BACKTRACE=1
-
-    # limit parallel jobs to reduce memory consumption
-    export NUM_JOBS=8
-    export CARGO_BUILD_JOBS=8
 
     ${hcReleaseAutomationTest}/bin/hc-test-release-automation
     ${hcReleaseAutomationTestRepo}/bin/hc-test-release-automation-repo

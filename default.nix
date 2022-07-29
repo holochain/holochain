@@ -4,9 +4,7 @@
     version = "1.60.0";
   }
 
-, holonixArgs ? {
-    inherit rustVersion;
-  }
+, holonixArgs ? { }
 }:
 
 # This is an example of what downstream consumers of holonix should do
@@ -20,7 +18,7 @@ let
 
   # START HOLONIX IMPORT BOILERPLATE
   holonixPath = config.holonix.pathFn { };
-  holonix = config.holonix.importFn holonixArgs;
+  holonix = config.holonix.importFn ({ inherit rustVersion; } // holonixArgs);
   # END HOLONIX IMPORT BOILERPLATE
 
   overlays = [
