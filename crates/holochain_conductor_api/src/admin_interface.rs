@@ -44,7 +44,7 @@ pub enum AdminRequest {
     ///
     /// # Returns
     ///
-    /// [`AdminResponse::CoordinatorUpdated`]
+    /// [`AdminResponse::CoordinatorsUpdated`]
     UpdateCoordinators(Box<UpdateCoordinatorsPayload>),
 
     /// Clone a DNA (in the biological sense), thus creating a new `Cell`.

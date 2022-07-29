@@ -245,7 +245,7 @@ async fn test_hot_swap_checks_deps() {
     dna_def
         .integrity_zomes(init_integrity.clone())
         .coordinator_zomes(init_coordinators.clone())
-        .uid("00000000-0000-0000-0000-000000000000".into());
+        .network_seed("00000000-0000-0000-0000-000000000000".into());
     let dna_def = dna_def.build().unwrap();
     let mut dna = DnaFile::new(dna_def.clone(), dna_wasms.clone())
         .await
