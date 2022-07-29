@@ -4,6 +4,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Adds `must_get_agent_activity` which allows depending on an agents source chain by using a deterministic hash bounded range query. [#1503](https://github.com/holochain/holochain/pull/1502)
+
 ## 0.0.18
 
 ## 0.0.17
@@ -11,6 +13,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## 0.0.16
 
 - Docs: Add `OpType` helper example to HDI validation section [\#1505](https://github.com/holochain/holochain/pull/1505)
+
+## 0.0.18
+
+## 0.0.17
+
+## 0.0.16
+
+- Docs: Add `OpType` helper example to HDI validation section [\#1505](https://github.com/holochain/holochain/pull/1505)
+
+- Adds `must_get_agent_activity` which allows depending on an agents source chain by using a deterministic hash bounded range query. [#1503](https://github.com/holochain/holochain/pull/1502)
 
 ## 0.0.15
 
