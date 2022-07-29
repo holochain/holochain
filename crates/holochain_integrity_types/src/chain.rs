@@ -17,7 +17,7 @@ mod test;
 /// chain items to take and / or an [`ActionHash`] to consume until.
 pub struct ChainFilter {
     /// The starting position of the filter.
-    pub position: ActionHash,
+    pub chain_top: ActionHash,
     /// The filters that have been applied.
     /// Defaults to [`ChainFilters::ToGenesis`].
     pub filters: ChainFilters,
@@ -42,9 +42,9 @@ impl ChainFilter {
     /// Create a new filter using this [`ActionHash`] as
     /// the starting position and walking the chain
     /// towards the genesis [`Action`](crate::action::Action).
-    pub fn new(position: ActionHash) -> Self {
+    pub fn new(chain_top: ActionHash) -> Self {
         Self {
-            position,
+            chain_top,
             filters: Default::default(),
         }
     }

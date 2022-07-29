@@ -32,8 +32,8 @@ fn build_chain(c: Vec<ChainItem>, filter: ChainFilter) -> Vec<ChainItem> {
 #[test_case(2, 1, 10 => chain(0..2))]
 #[test_case(10, 9, 10 => chain(0..10))]
 /// Check taking n items works.
-fn can_take_n(len: u8, position: u8, take: u32) -> Vec<ChainItem> {
-    let filter = ChainFilter::new(hash(position)).take(take);
+fn can_take_n(len: u8, chain_top: u8, take: u32) -> Vec<ChainItem> {
+    let filter = ChainFilter::new(hash(chain_top)).take(take);
     build_chain(chain(0..len), filter)
 }
 
@@ -43,8 +43,8 @@ fn can_take_n(len: u8, position: u8, take: u32) -> Vec<ChainItem> {
 #[test_case(10, 5, hash(1) => chain(1..6))]
 #[test_case(10, 9, hash(0) => chain(0..10))]
 /// Check taking until some hash works.
-fn can_until_hash(len: u8, position: u8, until: ActionHash) -> Vec<ChainItem> {
-    let filter = ChainFilter::new(hash(position)).until(until);
+fn can_until_hash(len: u8, chain_top: u8, until: ActionHash) -> Vec<ChainItem> {
+    let filter = ChainFilter::new(hash(chain_top)).until(until);
     build_chain(chain(0..len), filter)
 }
 
@@ -85,37 +85,37 @@ fn matches_chain(a: &Vec<RegisterAgentActivity>, seq: &[u32]) -> bool {
 
 #[test_case(
     chain(0..3), ChainFilter::new(action_hash(&[1])), hash_to_seq(&[1])
-    => matches MustGetAgentActivityResponse::Activity(a) if matches_chain(&a, &[1, 0]) ; "position 1 chain 0 to 3")]
+    => matches MustGetAgentActivityResponse::Activity(a) if matches_chain(&a, &[1, 0]) ; "chain_top 1 chain 0 to 3")]
 #[test_case(
     chain(10..20), ChainFilter::new(action_hash(&[15])).until(action_hash(&[10])), hash_to_seq(&[10, 15])
-    => matches MustGetAgentActivityResponse::Activity(a) if matches_chain(&a, &[15, 14, 13, 12, 11, 10]) ; "position 15 until 10 chain 10 to 20")]
+    => matches MustGetAgentActivityResponse::Activity(a) if matches_chain(&a, &[15, 14, 13, 12, 11, 10]) ; "chain_top 15 until 10 chain 10 to 20")]
 #[test_case(
     chain(10..16), ChainFilter::new(action_hash(&[15])).until(action_hash(&[10])).take(2), hash_to_seq(&[10, 15])
-    => matches MustGetAgentActivityResponse::Activity(a) if matches_chain(&a, &[15, 14]) ; "position 15 until 10 take 2 chain 10 to 15")]
+    => matches MustGetAgentActivityResponse::Activity(a) if matches_chain(&a, &[15, 14]) ; "chain_top 15 until 10 take 2 chain 10 to 15")]
 #[test_case(
     chain(1..6), ChainFilter::new(action_hash(&[5])).until(action_hash(&[0])).take(6), hash_to_seq(&[0, 5])
-    => matches MustGetAgentActivityResponse::IncompleteChain ; "position 5 until 0 take 6 chain 1 to 5")]
+    => matches MustGetAgentActivityResponse::IncompleteChain ; "chain_top 5 until 0 take 6 chain 1 to 5")]
 #[test_case(
     chain(0..5), ChainFilter::new(action_hash(&[5])).until(action_hash(&[0])).take(6), hash_to_seq(&[0, 5])
-    => matches MustGetAgentActivityResponse::IncompleteChain ; "position 5 until 0 take 6 chain 0 to 4")]
+    => matches MustGetAgentActivityResponse::IncompleteChain ; "chain_top 5 until 0 take 6 chain 0 to 4")]
 #[test_case(
     gap_chain(&[0..4, 5..10]), ChainFilter::new(action_hash(&[7])).until(action_hash(&[0])).take(8), hash_to_seq(&[0, 7])
-    => matches MustGetAgentActivityResponse::IncompleteChain ; "position 7 until 0 take 8 chain 0 to 3 then 5 to 10")]
+    => matches MustGetAgentActivityResponse::IncompleteChain ; "chain_top 7 until 0 take 8 chain 0 to 3 then 5 to 10")]
 #[test_case(
     gap_chain(&[0..4, 5..10]), ChainFilter::new(action_hash(&[7])).until(action_hash(&[5])).take(8), hash_to_seq(&[5, 7])
-    => matches MustGetAgentActivityResponse::Activity(a) if matches_chain(&a, &[7, 6, 5]) ; "position 7 until 5 take 8 chain 0 to 3 then 5 to 10")]
+    => matches MustGetAgentActivityResponse::Activity(a) if matches_chain(&a, &[7, 6, 5]) ; "chain_top 7 until 5 take 8 chain 0 to 3 then 5 to 10")]
 #[test_case(
     gap_chain(&[0..4, 5..10]), ChainFilter::new(action_hash(&[7])).until(action_hash(&[0])).take(3), hash_to_seq(&[0, 7])
-    => matches MustGetAgentActivityResponse::Activity(a) if matches_chain(&a, &[7, 6, 5]) ; "position 7 until 0 take 3 chain 0 to 3 then 5 to 10")]
+    => matches MustGetAgentActivityResponse::Activity(a) if matches_chain(&a, &[7, 6, 5]) ; "chain_top 7 until 0 take 3 chain 0 to 3 then 5 to 10")]
 #[test_case(
     forked_chain(&[0..6, 3..8]), ChainFilter::new(action_hash(&[5])).until(action_hash(&[0])).take(8), hash_to_seq(&[0, 5])
-    => matches MustGetAgentActivityResponse::Activity(a) if matches_chain(&a, &[5, 4, 3, 2, 1, 0]) ; "position 5 until 0 take 8 chain 0 to 5 and 3 to 7")]
+    => matches MustGetAgentActivityResponse::Activity(a) if matches_chain(&a, &[5, 4, 3, 2, 1, 0]) ; "chain_top 5 until 0 take 8 chain 0 to 5 and 3 to 7")]
 #[test_case(
     forked_chain(&[0..6, 3..8]), ChainFilter::new(action_hash(&[7, 1])).take(8), |_| Some(7)
-    => matches MustGetAgentActivityResponse::Activity(a) if matches_chain(&a, &[7, 6, 5, 4, 3, 2, 1, 0]) ; "position (7,1) take 8 chain 0 to 5 and 3 to 7")]
+    => matches MustGetAgentActivityResponse::Activity(a) if matches_chain(&a, &[7, 6, 5, 4, 3, 2, 1, 0]) ; "chain_top (7,1) take 8 chain 0 to 5 and 3 to 7")]
 #[test_case(
     forked_chain(&[4..6, 3..8]), ChainFilter::new(action_hash(&[5, 0])).until(action_hash(&[4, 1])), |h| if *h == action_hash(&[5, 0]) { Some(5) } else { Some(4) }
-    => matches MustGetAgentActivityResponse::IncompleteChain ; "position (5,0) until (4,1) chain (0,0) to (5,0) and (3,1) to (7,1)")]
+    => matches MustGetAgentActivityResponse::IncompleteChain ; "chain_top (5,0) until (4,1) chain (0,0) to (5,0) and (3,1) to (7,1)")]
 fn test_filter_then_check(
     chain: Vec<ChainItem>,
     filter: ChainFilter,
@@ -130,76 +130,76 @@ fn test_filter_then_check(
 
 #[test_case(
     ChainFilter::new(action_hash(&[1])), |_| Some(0)
-    => matches Sequences::Found(s) if *s.range() == (0..=0) ; "Can find position 0")]
+    => matches Sequences::Found(s) if *s.range() == (0..=0) ; "Can find chain_top 0")]
 #[test_case(
     ChainFilter::new(action_hash(&[1])), |_| Some(1)
-    => matches Sequences::Found(s) if *s.range() == (0..=1) ; "Can find position 1")]
+    => matches Sequences::Found(s) if *s.range() == (0..=1) ; "Can find chain_top 1")]
 #[test_case(
     ChainFilter::new(action_hash(&[1])), |_| None
-    => matches Sequences::ActionNotFound(_); "position missing")]
+    => matches Sequences::ChainTopNotFound(_); "chain_top missing")]
 #[test_case(
     ChainFilter::new(action_hash(&[1])), |_| Some(u32::MAX)
-    => matches Sequences::Found(s) if *s.range() == (0..=u32::MAX) ; "Can find position max")]
+    => matches Sequences::Found(s) if *s.range() == (0..=u32::MAX) ; "Can find chain_top max")]
 #[test_case(
     ChainFilter::new(action_hash(&[1])).take(0), |_| Some(0)
-    => matches Sequences::EmptyRange; "position 0 take 0")]
+    => matches Sequences::EmptyRange; "chain_top 0 take 0")]
 #[test_case(
     ChainFilter::new(action_hash(&[1])).take(0), |_| Some(100)
-    => matches Sequences::EmptyRange; "position 100 take 0")]
+    => matches Sequences::EmptyRange; "chain_top 100 take 0")]
 #[test_case(
     ChainFilter::new(action_hash(&[1])).take(1), |_| Some(0)
-    => matches Sequences::Found(s) if *s.range() == (0..=0) ; "position 0 take 1")]
+    => matches Sequences::Found(s) if *s.range() == (0..=0) ; "chain_top 0 take 1")]
 #[test_case(
     ChainFilter::new(action_hash(&[1])).take(1), |_| Some(1)
-    => matches Sequences::Found(s) if *s.range() == (1..=1) ; "position 1 take 1")]
+    => matches Sequences::Found(s) if *s.range() == (1..=1) ; "chain_top 1 take 1")]
 #[test_case(
     ChainFilter::new(action_hash(&[1])).take(u32::MAX), |_| Some(u32::MAX)
-    => matches Sequences::Found(s) if *s.range() == (1..=u32::MAX) ; "position max take max")]
+    => matches Sequences::Found(s) if *s.range() == (1..=u32::MAX) ; "chain_top max take max")]
 #[test_case(
     ChainFilter::new(action_hash(&[10])).take(5), |_| Some(10)
-    => matches Sequences::Found(s) if *s.range() == (6..=10) ; "position 10 take 5")]
+    => matches Sequences::Found(s) if *s.range() == (6..=10) ; "chain_top 10 take 5")]
 #[test_case(
     ChainFilter::new(action_hash(&[1])).take(u32::MAX), |_| Some(1)
-    => matches Sequences::Found(s) if *s.range() == (0..=1) ; "position 1 take max")]
+    => matches Sequences::Found(s) if *s.range() == (0..=1) ; "chain_top 1 take max")]
 #[test_case(
     ChainFilter::new(action_hash(&[1])).until(action_hash(&[1])), hash_to_seq(&[1])
-    => matches Sequences::Found(s) if *s.range() == (1..=1) ; "position 1 until 1")]
+    => matches Sequences::Found(s) if *s.range() == (1..=1) ; "chain_top 1 until 1")]
 #[test_case(
     ChainFilter::new(action_hash(&[1])).until(action_hash(&[0])), hash_to_seq(&[0, 1])
-    => matches Sequences::Found(s) if *s.range() == (0..=1) ; "position 1 until 0")]
+    => matches Sequences::Found(s) if *s.range() == (0..=1) ; "chain_top 1 until 0")]
 #[test_case(
     ChainFilter::new(action_hash(&u32::MAX.to_le_bytes())).until(action_hash(&[0])), hash_to_seq(&[0, u32::MAX])
-    => matches Sequences::Found(s) if *s.range() == (0..=u32::MAX) ; "position max until 0")]
+    => matches Sequences::Found(s) if *s.range() == (0..=u32::MAX) ; "chain_top max until 0")]
 #[test_case(
     ChainFilter::new(action_hash(&u32::MAX.to_le_bytes())).until(action_hash(&u32::MAX.to_le_bytes())), hash_to_seq(&[u32::MAX])
-    => matches Sequences::Found(s) if *s.range() == (u32::MAX..=u32::MAX) ; "position max until max")]
+    => matches Sequences::Found(s) if *s.range() == (u32::MAX..=u32::MAX) ; "chain_top max until max")]
 #[test_case(
     ChainFilter::new(action_hash(&[10])).until(action_hash(&[5])), hash_to_seq(&[5, 10])
-    => matches Sequences::Found(s) if *s.range() == (5..=10) ; "position 10 until 5")]
+    => matches Sequences::Found(s) if *s.range() == (5..=10) ; "chain_top 10 until 5")]
 #[test_case(
     ChainFilter::new(action_hash(&[10])).until(action_hash(&[5])).until(action_hash(&[8])), hash_to_seq(&[5, 8, 10])
-    => matches Sequences::Found(s) if *s.range() == (8..=10) ; "position 10 until 5 until 8")]
+    => matches Sequences::Found(s) if *s.range() == (8..=10) ; "chain_top 10 until 5 until 8")]
 #[test_case(
     ChainFilter::new(action_hash(&[10])).until(action_hash(&[8])).until(action_hash(&[5])), hash_to_seq(&[5, 8, 10])
-    => matches Sequences::Found(s) if *s.range() == (8..=10) ; "position 10 until 8 until 5")]
+    => matches Sequences::Found(s) if *s.range() == (8..=10) ; "chain_top 10 until 8 until 5")]
 #[test_case(
     ChainFilter::new(action_hash(&[10])).until(action_hash(&[5])), hash_to_seq(&[10])
-    => matches Sequences::ActionNotFound(_) ; "missing until")]
+    => matches Sequences::Found(s) if *s.range() == (0..=10); "missing until")]
 #[test_case(
     ChainFilter::new(action_hash(&[10])).until(action_hash(&[5])).until(action_hash(&[8])), hash_to_seq(&[5, 10])
-    => matches Sequences::ActionNotFound(_) ; "missing and present until")]
+    => matches Sequences::Found(s) if *s.range() == (5..=10); "missing and present until")]
 #[test_case(
     ChainFilter::new(action_hash(&[5])).until(action_hash(&[10])), hash_to_seq(&[5, 10])
-    => matches Sequences::PositionNotHighest ; "position less than until")]
+    => matches Sequences::Found(s) if *s.range() == (0..=5); "chain top less than until")]
 #[test_case(
     ChainFilter::new(action_hash(&[6])).until(action_hash(&[5])).until(action_hash(&[8])), hash_to_seq(&[5, 8, 6])
-    => matches Sequences::PositionNotHighest ; "position greater than and less than until")]
+    => matches Sequences::Found(s) if *s.range() == (5..=6); "chain top greater than and less than until")]
 #[test_case(
     ChainFilter::new(action_hash(&[10])).until(action_hash(&[8])).take(5), hash_to_seq(&[8, 10])
-    => matches Sequences::Found(s) if *s.range() == (8..=10) ; "position 10 until 8 take 5")]
+    => matches Sequences::Found(s) if *s.range() == (8..=10) ; "chain_top 10 until 8 take 5")]
 #[test_case(
     ChainFilter::new(action_hash(&[10])).until(action_hash(&[2])).take(5), hash_to_seq(&[2, 10])
-    => matches Sequences::Found(s) if *s.range() == (6..=10) ; "position 10 until 2 take 5")]
+    => matches Sequences::Found(s) if *s.range() == (6..=10) ; "chain_top 10 until 2 take 5")]
 fn test_find_sequences(
     filter: ChainFilter,
     mut f: impl FnMut(&ActionHash) -> Option<u32>,

@@ -46,13 +46,8 @@ pub async fn must_get_agent_activity(
                     })
                 }
                 // One of the actions specified in the filter does not exist in the database.
-                Sequences::ActionNotFound(a) => {
-                    Ok((MustGetAgentActivityResponse::ActionNotFound(a), None))
-                }
-                // The filter specifies starting position that has a lower
-                // action sequence than another action in the filter.
-                Sequences::PositionNotHighest => {
-                    Ok((MustGetAgentActivityResponse::PositionNotHighest, None))
+                Sequences::ChainTopNotFound(a) => {
+                    Ok((MustGetAgentActivityResponse::ChainTopNotFound(a), None))
                 }
                 // The filter specifies a range that is empty.
                 Sequences::EmptyRange => Ok((MustGetAgentActivityResponse::EmptyRange, None)),
