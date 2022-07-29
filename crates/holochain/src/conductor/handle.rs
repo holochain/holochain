@@ -138,7 +138,7 @@ pub trait ConductorHandleT: Send + Sync {
     async fn register_dna(&self, dna: DnaFile) -> ConductorResult<()>;
 
     /// Hot swap coordinator zomes on an existing dna.
-    async fn hot_swap_coordinators(
+    async fn update_coordinators(
         &self,
         hash: &DnaHash,
         coordinator_zomes: CoordinatorZomes,
@@ -577,13 +577,13 @@ impl ConductorHandleT for ConductorHandleImpl {
         Ok(())
     }
 
-    async fn hot_swap_coordinators(
+    async fn update_coordinators(
         &self,
         hash: &DnaHash,
         coordinator_zomes: CoordinatorZomes,
         wasms: Vec<wasm::DnaWasm>,
     ) -> ConductorResult<()> {
-        // Note this isn't really concurrent safe. It would be a race condition to hotswap the
+        // Note this isn't really concurrent safe. It would be a race condition to update the
         // same dna concurrently.
         let mut ribosome =
             self.conductor
@@ -594,7 +594,7 @@ impl ConductorHandleT for ConductorHandleImpl {
                 })?;
         let _old_wasms = ribosome
             .dna_file
-            .hot_swap_coordinators(coordinator_zomes.clone(), wasms.clone())
+            .update_coordinators(coordinator_zomes.clone(), wasms.clone())
             .await?;
 
         // Add new wasm code to db.

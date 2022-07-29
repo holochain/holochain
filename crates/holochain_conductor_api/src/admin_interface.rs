@@ -36,7 +36,7 @@ pub enum AdminRequest {
     /// [`AdminResponse::DnaRegistered`]
     RegisterDna(Box<RegisterDnaPayload>),
 
-    /// Hot swap coordinator zomes for an already installed DNA.
+    /// Update coordinator zomes for an already installed DNA.
     ///
     /// Replaces any installed coordinator zomes with the same zome name.
     /// If the zome name doesn't exist then the coordinator zome is appended
@@ -44,8 +44,8 @@ pub enum AdminRequest {
     ///
     /// # Returns
     ///
-    /// [`AdminResponse::DnaRegistered`]
-    HotSwapCoordinators(Box<HotSwapCoordinatorsPayload>),
+    /// [`AdminResponse::CoordinatorUpdated`]
+    UpdateCoordinators(Box<UpdateCoordinatorsPayload>),
 
     /// Clone a DNA (in the biological sense), thus creating a new `Cell`.
     ///
@@ -365,8 +365,8 @@ pub enum AdminResponse {
     /// The successful response to an [`AdminRequest::RegisterDna`]
     DnaRegistered(DnaHash),
 
-    /// The successful response to an [`AdminRequest::HotSwapCoordinators`]
-    CoordinatorsHotSwapped,
+    /// The successful response to an [`AdminRequest::UpdateCoordinators`]
+    CoordinatorsUpdated,
 
     /// The successful response to an [`AdminRequest::InstallApp`].
     ///

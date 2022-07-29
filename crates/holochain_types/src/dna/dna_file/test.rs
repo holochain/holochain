@@ -3,7 +3,7 @@ use std::sync::Arc;
 use super::*;
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_hotswap() {
+async fn test_update_coordinators() {
     let dna_wasms = vec![
         DnaWasm {
             code: Arc::new(Box::new([0])),
@@ -68,7 +68,7 @@ async fn test_hotswap() {
         })),
     )];
     let old_wasm = dna
-        .hot_swap_coordinators(new_coordinators.clone(), new_dna_wasms.clone())
+        .update_coordinators(new_coordinators.clone(), new_dna_wasms.clone())
         .await
         .unwrap();
 
@@ -101,7 +101,7 @@ async fn test_hotswap() {
         })),
     )];
     let old_wasm = dna
-        .hot_swap_coordinators(new_coordinators.clone(), new_dna_wasms.clone())
+        .update_coordinators(new_coordinators.clone(), new_dna_wasms.clone())
         .await
         .unwrap();
 
@@ -164,7 +164,7 @@ async fn test_hotswap() {
         ),
     ];
     let old_wasm = dna
-        .hot_swap_coordinators(new_coordinators.clone(), new_dna_wasms.clone())
+        .update_coordinators(new_coordinators.clone(), new_dna_wasms.clone())
         .await
         .unwrap();
 
@@ -263,9 +263,9 @@ async fn test_hot_swap_checks_deps() {
         })),
     )];
     let err = dna
-        .hot_swap_coordinators(new_coordinators.clone(), new_dna_wasms.clone())
+        .update_coordinators(new_coordinators.clone(), new_dna_wasms.clone())
         .await
-        .expect_err("Hot swap didn't catch dangling dependency");
+        .expect_err("Update didn't catch dangling dependency");
 
     assert!(matches!(err, DnaError::DanglingZomeDependency(_, _)));
 
@@ -281,7 +281,7 @@ async fn test_hot_swap_checks_deps() {
         })),
     )];
     let err = dna
-        .hot_swap_coordinators(new_coordinators.clone(), new_dna_wasms.clone())
+        .update_coordinators(new_coordinators.clone(), new_dna_wasms.clone())
         .await
         .expect_err("Hot swap didn't catch dangling dependency");
 

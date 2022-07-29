@@ -4,7 +4,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
-- Adds `AdminRequest::HotSwapCoordinators` that allows swapping coordinator zomes for a running happ.
+- Adds `AdminRequest::UpdateCoordinators` that allows swapping coordinator zomes for a running happ.
 - Allow deterministic bindings (dna_info() & zome_info()) to the genesis self check [\#1491](https://github.com/holochain/holochain/pull/1491).
 
 

@@ -32,11 +32,11 @@ impl Manifest for CoordinatorManifest {
     }
 
     fn path() -> std::path::PathBuf {
-        "coords.yaml".into()
+        "coordinators.yaml".into()
     }
 
     fn bundle_extension() -> &'static str {
-        "coords"
+        "coordinators"
     }
 }
 

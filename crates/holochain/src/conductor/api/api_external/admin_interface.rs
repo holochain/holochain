@@ -130,8 +130,8 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 }
                 Ok(AdminResponse::DnaRegistered(hash))
             }
-            HotSwapCoordinators(payload) => {
-                let HotSwapCoordinatorsPayload { dna_hash, source } = *payload;
+            UpdateCoordinators(payload) => {
+                let UpdateCoordinatorsPayload { dna_hash, source } = *payload;
                 let (coordinator_zomes, wasms) = match source {
                     CoordinatorSource::Path(ref path) => {
                         let bundle = Bundle::read_from_file(path).await?;
@@ -142,10 +142,10 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 };
 
                 self.conductor_handle
-                    .hot_swap_coordinators(&dna_hash, coordinator_zomes, wasms)
+                    .update_coordinators(&dna_hash, coordinator_zomes, wasms)
                     .await?;
 
-                Ok(AdminResponse::CoordinatorsHotSwapped)
+                Ok(AdminResponse::CoordinatorsUpdated)
             }
             CreateCloneCell(payload) => {
                 let cell_id = payload.cell_id();

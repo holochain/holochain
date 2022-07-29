@@ -87,7 +87,7 @@ impl DnaFile {
     }
 
     /// Hot swap coordinator zomes for this dna.
-    pub async fn hot_swap_coordinators(
+    pub async fn update_coordinators(
         &mut self,
         coordinator_zomes: CoordinatorZomes,
         wasms: Vec<wasm::DnaWasm>,

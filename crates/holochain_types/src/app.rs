@@ -67,8 +67,8 @@ pub struct RegisterDnaPayload {
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
-/// The instructions on how to hot swap coordinators for a dna file.
-pub struct HotSwapCoordinatorsPayload {
+/// The instructions on how to update coordinators for a dna file.
+pub struct UpdateCoordinatorsPayload {
     /// The hash of the dna to swap coordinators for.
     pub dna_hash: DnaHash,
     /// Where to find the coordinators.
