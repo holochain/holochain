@@ -50,6 +50,24 @@
 //! values can be validated. All of these validation rules are written in a central callback
 //! which is called by the Holochain engine for each operation.
 //!
+//! There's a helper type called [`OpType`](holochain_integrity_types::OpType) available for easy
+//! access to all link and entry variants when validating an operation.
+//! ```ignore
+//! let op_type: OpType<EntryTypes, LinkTypes> = op.to_type()?;
+//! match op_type {
+//!     OpType::RegisterCreateLink {
+//!         base_address,
+//!         target_address,
+//!         tag,
+//!         link_type,
+//!     } => match link_type {
+//!         LinkTypes::MyLink1 => Ok(ValidateCallbackResult::Valid),
+//!         _ => Ok(ValidateCallbackResult::Invalid("wrong link type".to_string()))
+//!     },
+//!     ...
+//! }
+//! ```
+//!
 //! See an example of the `validate` callback in an integrity zome in the WASM workspace:
 //! <https://github.com/holochain/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/validate/src/integrity.rs>.
 //! Many more validation examples can be browsed in that very workspace.
