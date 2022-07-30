@@ -4,7 +4,7 @@ use hdi::prelude::*;
 pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op {
         // This is a pretty pointless example as everything is valid.
-        Op::RegisterCreateLink { .. } => Ok(ValidateCallbackResult::Valid),
+        Op::RegisterCreateLink(RegisterCreateLink {  ..  }) => Ok(ValidateCallbackResult::Valid),
         _ => Ok(ValidateCallbackResult::Valid),
     }
 }

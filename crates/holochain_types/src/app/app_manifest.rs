@@ -2,7 +2,7 @@
 
 //! Defines the hApp Manifest YAML format, including validation.
 
-use holochain_zome_types::Uid;
+use holochain_zome_types::NetworkSeed;
 use mr_bundle::{Location, Manifest};
 use std::path::PathBuf;
 
@@ -62,11 +62,11 @@ impl AppManifest {
         }
     }
 
-    /// Update the UID for all DNAs used in Create-provisioned Cells.
+    /// Update the network seed for all DNAs used in Create-provisioned Cells.
     /// Cells with other provisioning strategies are not affected.
-    pub fn set_uid(&mut self, uid: Uid) {
+    pub fn set_network_seed(&mut self, network_seed: NetworkSeed) {
         match self {
-            Self::V1(manifest) => manifest.set_uid(uid),
+            Self::V1(manifest) => manifest.set_network_seed(network_seed),
         }
     }
 

@@ -6,6 +6,87 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20220728.122329
+
+- nix-shell: exclude most holonix components by default to reduce shell size [\#1498](https://github.com/holochain/holochain/pull/1498)
+
+## [holochain\_cli-0.0.49](crates/holochain_cli/CHANGELOG.md#0.0.49)
+
+## [holochain\_cli\_sandbox-0.0.45](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.45)
+
+- BREAKING CHANGE - Refactor: Property `integrity.uid` of DNA Yaml files renamed to `integrity.network_seed`. Functionality has not changed. [\#1493](https://github.com/holochain/holochain/pull/1493)
+
+## [holochain\_cli\_bundle-0.0.45](crates/holochain_cli_bundle/CHANGELOG.md#0.0.45)
+
+- BREAKING CHANGE - Refactor: Property `integrity.uid` of DNA Yaml files renamed to `integrity.network_seed`. Functionality has not changed. [\#1493](https://github.com/holochain/holochain/pull/1493)
+
+## [holochain-0.0.151](crates/holochain/CHANGELOG.md#0.0.151)
+
+- BREAKING CHANGE - Refactor: Property `integrity.uid` of DNA Yaml files renamed to `integrity.network_seed`. Functionality has not changed. [\#1493](https://github.com/holochain/holochain/pull/1493)
+- Allow deterministic bindings (dna\_info() & zome\_info()) to the genesis self check [\#1491](https://github.com/holochain/holochain/pull/1491).
+
+## [holochain\_test\_wasm\_common-0.0.44](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.44)
+
+## [holochain\_conductor\_api-0.0.51](crates/holochain_conductor_api/CHANGELOG.md#0.0.51)
+
+## [holochain\_wasm\_test\_utils-0.0.50](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.50)
+
+## [holochain\_cascade-0.0.51](crates/holochain_cascade/CHANGELOG.md#0.0.51)
+
+## [holochain\_state-0.0.51](crates/holochain_state/CHANGELOG.md#0.0.51)
+
+## [holochain\_p2p-0.0.49](crates/holochain_p2p/CHANGELOG.md#0.0.49)
+
+## [holochain\_types-0.0.49](crates/holochain_types/CHANGELOG.md#0.0.49)
+
+- BREAKING CHANGE - Refactor: Property `integrity.uid` of DNA Yaml files renamed to `integrity.network_seed`. Functionality has not changed. [\#1493](https://github.com/holochain/holochain/pull/1493)
+
+## [holochain\_keystore-0.0.48](crates/holochain_keystore/CHANGELOG.md#0.0.48)
+
+## [holochain\_sqlite-0.0.47](crates/holochain_sqlite/CHANGELOG.md#0.0.47)
+
+## [kitsune\_p2p-0.0.40](crates/kitsune_p2p/CHANGELOG.md#0.0.40)
+
+## [kitsune\_p2p\_proxy-0.0.28](crates/kitsune_p2p_proxy/CHANGELOG.md#0.0.28)
+
+## [kitsune\_p2p\_transport\_quic-0.0.28](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.0.28)
+
+## [kitsune\_p2p\_types-0.0.28](crates/kitsune_p2p_types/CHANGELOG.md#0.0.28)
+
+## [mr\_bundle-0.0.14](crates/mr_bundle/CHANGELOG.md#0.0.14)
+
+- Fix inconsistent bundle writting due to unordered map of bundle resources
+
+## [hdk-0.0.143](crates/hdk/CHANGELOG.md#0.0.143)
+
+- Docs: Add documentation on `get_links` argument `link_type`. [\#1486](https://github.com/holochain/holochain/pull/1486)
+- Docs: Intra-link to `wasm_error` and `WasmErrorInner`. [\#1486](https://github.com/holochain/holochain/pull/1486)
+
+## [holochain\_zome\_types-0.0.42](crates/holochain_zome_types/CHANGELOG.md#0.0.42)
+
+- BREAKING CHANGE - Refactor: Property `integrity.uid` of DNA Yaml files renamed to `integrity.network_seed`. Functionality has not changed. [\#1493](https://github.com/holochain/holochain/pull/1493)
+
+## [kitsune\_p2p\_dht-0.0.2](crates/kitsune_p2p_dht/CHANGELOG.md#0.0.2)
+
+## [hdi-0.0.15](crates/hdi/CHANGELOG.md#0.0.15)
+
+- Adds the `OpHelper` trait to create the `OpType` convenience type to help with writing validation code. [\#1488](https://github.com/holochain/holochain/pull/1488)
+- Docs: Add documentation on `LinkTypeFilterExt`. [\#1486](https://github.com/holochain/holochain/pull/1486)
+
+## [hdk\_derive-0.0.42](crates/hdk_derive/CHANGELOG.md#0.0.42)
+
+## [holochain\_integrity\_types-0.0.13](crates/holochain_integrity_types/CHANGELOG.md#0.0.13)
+
+- BREAKING CHANGE - Refactor: Property `integrity.uid` of DNA Yaml files renamed to `integrity.network_seed`. Functionality has not changed. [\#1493](https://github.com/holochain/holochain/pull/1493)
+
+## [holo\_hash-0.0.31](crates/holo_hash/CHANGELOG.md#0.0.31)
+
+- BREAKING CHANGE - Refactor: Property `integrity.uid` of DNA Yaml files renamed to `integrity.network_seed`. Functionality has not changed. [\#1493](https://github.com/holochain/holochain/pull/1493)
+
+## [kitsune\_p2p\_dht\_arc-0.0.14](crates/kitsune_p2p_dht_arc/CHANGELOG.md#0.0.14)
+
+## [fixt-0.0.14](crates/fixt/CHANGELOG.md#0.0.14)
+
 # 20220713.013021
 
 - **BREAKING**: the `holochain_deterministic_integrity` crate has been renamed to `hdi`

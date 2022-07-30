@@ -10,6 +10,10 @@
     includeHolochainBinaries = false;
     includeScaffolding = false;
     includeTest = false;
+    includeNode = false;
+    includeDocs = false;
+    includeHapps = false;
+    includeRelease = false;
 
     # configuration for when use-github = false
     local = {
@@ -27,6 +31,11 @@
         scaffolding = args.include.scaffolding or includeScaffolding;
         test = args.include.test or includeTest;
         holochainBinaries = args.include.holochainBinaries or includeHolochainBinaries;
+
+        node = args.include.node or includeScaffolding;
+        docs = args.include.docs or includeDocs;
+        happs = args.include.happs or includeHapps;
+        release = args.include.release or includeRelease;
       };
     }));
   };

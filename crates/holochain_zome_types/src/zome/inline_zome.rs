@@ -29,7 +29,7 @@ pub type InlineCoordinatorZome = InlineZome<CoordinatorZomeMarker>;
 pub struct InlineZome<T> {
     /// Inline zome type marker.
     _t: PhantomData<T>,
-    /// Since closures cannot be serialized, we include a UID which
+    /// Since closures cannot be serialized, we include a network seed which
     /// is the only part of an InlineZome that gets serialized.
     /// This uuid becomes part of the determination of the DnaHash
     /// that it is a part of.
@@ -108,7 +108,7 @@ impl<T> InlineZome<T> {
 }
 
 impl InlineIntegrityZome {
-    /// Create a new integrity zome with the given UID
+    /// Create a new integrity zome with the given network seed
     pub fn new<S: Into<String>>(uuid: S, entry_defs: Vec<EntryDef>, num_link_types: u8) -> Self {
         let num_entry_types = entry_defs.len();
         let entry_defs_callback =
@@ -118,18 +118,18 @@ impl InlineIntegrityZome {
             .set_global("__num_entry_types", num_entry_types.try_into().unwrap())
             .set_global("__num_link_types", num_link_types)
     }
-    /// Create a new integrity zome with a unique random UID
+    /// Create a new integrity zome with a unique random network seed
     pub fn new_unique(entry_defs: Vec<EntryDef>, num_link_types: u8) -> Self {
         Self::new(nanoid::nanoid!(), entry_defs, num_link_types)
     }
 }
 
 impl InlineCoordinatorZome {
-    /// Create a new coordinator zome with the given UID
+    /// Create a new coordinator zome with the given network seed
     pub fn new<S: Into<String>>(uuid: S) -> Self {
         Self::new_inner(uuid)
     }
-    /// Create a new coordinator zome with a unique random UID
+    /// Create a new coordinator zome with a unique random network seed
     pub fn new_unique() -> Self {
         Self::new(nanoid::nanoid!())
     }

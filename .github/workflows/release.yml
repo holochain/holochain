@@ -145,7 +145,7 @@ jobs:
 
           echo "::set-output name=HOLOCHAIN_REPO::/tmp/holochain_repo"
           echo "::set-output name=HOLOCHAIN_RELEASE_SH::/tmp/holochain_release.sh"
-          echo "::set-output name=CACHIX_REV::master"
+          echo "::set-output name=CACHIX_REV::v0.8.1"
   prepare:
     needs: [vars]
     uses: ./.github/workflows/release-prepare.yml
@@ -188,6 +188,7 @@ jobs:
               nix-shell \
                 --keep CARGO_NEXTEST_ARGS \
                 --keep CARGO_TEST_ARGS \
+                --keep CARGO_BUILD_JOBS \
                 --fallback --pure --argstr flavor "coreDev" --run hc-test-standard-nextest
 
           - name: cargo-test-slow
@@ -203,6 +204,7 @@ jobs:
               nix-shell \
               --keep CARGO_NEXTEST_ARGS \
               --keep CARGO_TEST_ARGS \
+              --keep CARGO_BUILD_JOBS \
               --fallback --pure --argstr flavor "coreDev" --run hc-test-slow-nextest
 
           - name: cargo-test-static
@@ -216,6 +218,7 @@ jobs:
             run: |
               nix-shell \
                 --keep CARGO_TEST_ARGS \
+                --keep CARGO_BUILD_JOBS \
                 --fallback --pure --argstr flavor "coreDev" --run hc-static-checks
 
           - name: cargo-test-wasm
@@ -229,6 +232,7 @@ jobs:
             run: |
               nix-shell \
                 --keep CARGO_TEST_ARGS \
+                --keep CARGO_BUILD_JOBS \
                 --fallback --pure --argstr flavor "coreDev" --run hc-test-wasm
 
           - name: nix-test
@@ -302,7 +306,7 @@ jobs:
         if: ${{ matrix.platform == 'ubuntu-latest' && matrix.testCommand.maxBuildSpace == true && needs.vars.outputs.skip_test != 'true' }}
 
       - name: Install nix
-        uses: cachix/install-nix-action@v16
+        uses: cachix/install-nix-action@v17
       - name: Setup cachix
         uses: cachix/cachix-action@v10
         continue-on-error: ${{ github.event_name != 'pull_request' }}
@@ -364,7 +368,8 @@ jobs:
         if: ${{ matrix.testCommand.restoresCargoCache == true && needs.vars.outputs.skip_test != 'true' }}
         env:
           CARGO_TEST_ARGS: "--no-run"
-          CARGO_NEXTEST_ARGS: "list"
+          CARGO_NEXTEST_ARGS: "list --build-jobs=1"
+          CARGO_BUILD_JOBS: "1"
         run: |
           set -e
           source "${HOLOCHAIN_RELEASE_SH}"
@@ -438,7 +443,7 @@ jobs:
       - name: Extend space
         uses: ./.github/actions/extend-space
       - name: Install nix
-        uses: cachix/install-nix-action@v16
+        uses: cachix/install-nix-action@v17
       - name: Setup cachix
         uses: cachix/cachix-action@v10
         with:
