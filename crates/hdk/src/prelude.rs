@@ -33,6 +33,7 @@ pub use crate::hash_path::anchor::list_anchor_tags;
 pub use crate::hash_path::anchor::list_anchor_type_addresses;
 pub use crate::hash_path::anchor::Anchor;
 pub use crate::hash_path::path::Path;
+pub use crate::hash_path::path::TypedPath;
 pub use crate::hdk::*;
 pub use crate::info::agent_info;
 pub use crate::info::call_info;
