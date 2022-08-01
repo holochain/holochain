@@ -161,15 +161,20 @@ pub async fn check_countersigning_session_data(
 /// - All other actions must have prev_action, and seq > 0.
 pub fn check_prev_action(action: &Action) -> SysValidationResult<()> {
     let is_dna = matches!(action, Action::Dna(_));
-    match (
-        is_dna,
-        action.action_seq() > 0,
-        action.prev_action().is_some(),
-    ) {
-        (true, false, false) => Ok(()),
-        (true, _, _) => Err(PrevActionError::InvalidRoot),
-        (false, true, true) => Ok(()),
-        (false, _, _) => Err(PrevActionError::MissingPrev),
+    let has_prev = action.prev_action().is_some();
+    let is_first = action.action_seq() == 0;
+    if is_first {
+        if is_dna && !has_prev {
+            Ok(())
+        } else {
+            Err(PrevActionError::InvalidRoot)
+        }
+    } else {
+        if !is_dna && has_prev {
+            Ok(())
+        } else {
+            Err(PrevActionError::MissingPrev)
+        }
     }
     .map_err(|e| ValidationOutcome::from(e).into())
 }
