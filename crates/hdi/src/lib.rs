@@ -51,7 +51,7 @@
 //! which is called by the Holochain engine for each operation.
 //!
 //! There's a helper type called [`OpType`](holochain_integrity_types::OpType) available for easy
-//! access to all link and entry variants when validating an operation. In many cases, this type can 
+//! access to all link and entry variants when validating an operation. In many cases, this type can
 //! be easier to work with than the bare [`Op`](holochain_integrity_types::Op), which contains the
 //! same information as `OpType`, but the former has a flatter data structure, whereas the latter has
 //! a deeply nested structure.
