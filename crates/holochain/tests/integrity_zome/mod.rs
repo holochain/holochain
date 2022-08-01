@@ -66,7 +66,7 @@ async fn test_coordinator_zome_update() {
     assert!(record.is_some());
     println!("Success!");
 
-    println!("Hot swap the coordinator zomes for a totally different coordinator zome (conductor is still running)");
+    println!("Update the coordinator zomes for a totally different coordinator zome (conductor is still running)");
     conductor
         .update_coordinators(
             &dna_hash,

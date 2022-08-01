@@ -137,7 +137,7 @@ pub trait ConductorHandleT: Send + Sync {
     /// Install a [`DnaFile`](holochain_types::dna::DnaFile) in this Conductor
     async fn register_dna(&self, dna: DnaFile) -> ConductorResult<()>;
 
-    /// Hot swap coordinator zomes on an existing dna.
+    /// Update coordinator zomes on an existing dna.
     async fn update_coordinators(
         &self,
         hash: &DnaHash,

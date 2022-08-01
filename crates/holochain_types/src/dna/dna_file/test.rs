@@ -200,7 +200,7 @@ async fn test_update_coordinators() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_hot_swap_checks_deps() {
+async fn test_update_coordinators_checks_deps() {
     let dna_wasms = vec![
         DnaWasm {
             code: Arc::new(Box::new([0])),
@@ -283,7 +283,7 @@ async fn test_hot_swap_checks_deps() {
     let err = dna
         .update_coordinators(new_coordinators.clone(), new_dna_wasms.clone())
         .await
-        .expect_err("Hot swap didn't catch dangling dependency");
+        .expect_err("Update coordinators didn't catch dangling dependency");
 
     assert!(matches!(err, DnaError::DanglingZomeDependency(_, _)));
 }
