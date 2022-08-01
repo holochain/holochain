@@ -156,25 +156,22 @@ pub async fn check_countersigning_session_data(
     }
 }
 
-/// Check that previous action makes sense
-/// for this action.
-/// If not Dna then cannot be root of chain
-/// and must have previous action
+/// Check that the correct actions have the correct setting for prev_action:
+/// - Dna can never have a prev_action, and must have seq == 0.
+/// - All other actions must have prev_action, and seq > 0.
 pub fn check_prev_action(action: &Action) -> SysValidationResult<()> {
-    match &action {
-        Action::Dna(_) => Ok(()),
-        _ => {
-            if action.action_seq() > 0 {
-                action
-                    .prev_action()
-                    .ok_or(PrevActionError::MissingPrev)
-                    .map_err(ValidationOutcome::from)?;
-                Ok(())
-            } else {
-                Err(PrevActionError::InvalidRoot).map_err(|e| ValidationOutcome::from(e).into())
-            }
-        }
+    let is_dna = matches!(action, Action::Dna(_));
+    match (
+        is_dna,
+        action.action_seq() > 0,
+        action.prev_action().is_some(),
+    ) {
+        (true, false, false) => Ok(()),
+        (true, _, _) => Err(PrevActionError::InvalidRoot),
+        (false, true, true) => Ok(()),
+        (false, _, _) => Err(PrevActionError::MissingPrev),
     }
+    .map_err(|e| ValidationOutcome::from(e).into())
 }
 
 /// Check that Dna actions are only added to empty source chains
