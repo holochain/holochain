@@ -143,13 +143,15 @@ impl TryFrom<&Component> for String {
     }
 }
 
-/// A [ `Path` ] is a vector of [ `Component` ].
+/// A [`Path`] is a vector of [`Component`]s.
+///
 /// It represents a single traversal of a tree structure down to some arbitrary point.
 /// The main intent is that we can recursively walk back up the tree, hashing, committing and
 /// linking each sub-path along the way until we reach the root.
-/// At this point it is possible to follow DHT links from the root back up the path.
+///
+/// At this point it is possible to follow DHT links from the root back up the path,
 /// i.e. the ahead-of-time predictability of the hashes of a given path allows us to travel "up"
-/// the tree and the linking functionality of the holochain DHT allows us to travel "down" the tree
+/// the tree and the linking functionality of the Holochain DHT allows us to travel "down" the tree
 /// after at least one DHT participant has followed the path "up".
 #[derive(
     Clone, Debug, PartialEq, Default, serde::Deserialize, serde::Serialize, SerializedBytes,
@@ -159,11 +161,15 @@ pub struct Path(Vec<Component>);
 
 #[derive(Clone, Debug, PartialEq, serde::Deserialize, serde::Serialize, SerializedBytes)]
 /// A [`LinkType`] applied to a [`Path`].
-/// All links committed from this path will
-/// have this link type.
+///
+/// All links committed from this path will have this link type.
+///
+/// Get a typed path from a path and a link type:
+/// ```ignore
+/// let typed_path = path.typed(LinkTypes::MyLink)?;
+/// ```
 pub struct TypedPath {
-    /// The zome that defines this link type.
-    /// The [`LinkType`] applied to this [`Path`].
+    /// The [`LinkType`] within the scope of the zome where it's defined.
     pub link_type: ScopedLinkType,
     /// The [`Path`] that is using this [`LinkType`].
     pub path: Path,

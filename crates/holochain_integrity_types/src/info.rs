@@ -110,9 +110,9 @@ pub struct ScopedZomeType<T> {
     pub zome_type: T,
 }
 
-/// An [`EntryDefIndex`] with the [`ZomeId`] that defines it.
+/// An [`EntryDefIndex`] within the scope of the zome where it's defined.
 pub type ScopedEntryDefIndex = ScopedZomeType<EntryDefIndex>;
-/// An [`LinkType`] with the [`ZomeId`] that defines it.
+/// A [`LinkType`] within the scope of the zome where it's defined.
 pub type ScopedLinkType = ScopedZomeType<LinkType>;
 
 impl<T> ScopedZomeTypes<T>

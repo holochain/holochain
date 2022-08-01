@@ -21,7 +21,7 @@ use tracing::*;
 pub use holochain_conductor_api::*;
 
 /// A trait for the interface that a Conductor exposes to the outside world to use for administering the conductor.
-/// This trait has a one mock implementation and one "Real" implementation
+/// This trait has one mock implementation and one "real" implementation
 #[async_trait::async_trait]
 pub trait AdminInterfaceApi: 'static + Send + Sync + Clone {
     /// Call an admin function to modify this Conductor's behavior
