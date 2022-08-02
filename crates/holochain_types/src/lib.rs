@@ -38,8 +38,8 @@ pub mod signal;
 pub mod sql;
 pub mod validate;
 pub mod web_app;
-pub mod zome_types;
 pub mod zome_call;
+pub mod zome_types;
 
 pub mod test_utils;
 

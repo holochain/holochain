@@ -40,6 +40,7 @@ pub trait HolochainP2pDnaT {
     async fn leave(&self, agent: AgentPubKey) -> actor::HolochainP2pResult<()>;
 
     /// Invoke a zome function on a remote node (if you have been granted the capability).
+    #[allow(clippy::too_many_arguments)]
     async fn call_remote(
         &self,
         from_agent: AgentPubKey,

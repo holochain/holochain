@@ -933,8 +933,8 @@ pub mod wasm_test {
     use ::fixt::prelude::*;
     use hdk::prelude::*;
     use holochain_types::prelude::AgentPubKeyFixturator;
-    use holochain_wasm_test_utils::TestWasm;
     use holochain_types::zome_call::ZomeCallUnsigned;
+    use holochain_wasm_test_utils::TestWasm;
 
     #[tokio::test(flavor = "multi_thread")]
     /// Basic checks that we can call externs internally and externally the way we want using the

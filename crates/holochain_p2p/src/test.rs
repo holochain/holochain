@@ -182,6 +182,8 @@ mod tests {
     use kitsune_p2p::dht::{ArqStrat, PeerView, PeerViewQ};
 
     use crate::HolochainP2pSender;
+    use holochain_types::prelude::AgentPubKeyExt;
+    use holochain_types::zome_call::ZomeCallUnsigned;
     use holochain_zome_types::ValidationStatus;
     use kitsune_p2p::dependencies::kitsune_p2p_types::tls::TlsConfig;
     use kitsune_p2p::KitsuneP2pConfig;
@@ -201,7 +203,7 @@ mod tests {
         observability::test_run().unwrap();
         (
             newhash!(DnaHash, 's'),
-            newhash!(AgentPubKey, '1'),
+            fixt!(AgentPubKey, Predictable, 0),
             newhash!(AgentPubKey, '2'),
             newhash!(AgentPubKey, '3'),
         )
@@ -210,6 +212,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn test_call_remote_workflow() {
         let (dna, a1, a2, _) = test_setup();
+        let keystore = test_keystore();
 
         let (p2p, mut evt) = spawn_holochain_p2p(
             KitsuneP2pConfig::default(),
@@ -249,16 +252,30 @@ mod tests {
         p2p.join(dna.clone(), a1.clone(), None).await.unwrap();
         p2p.join(dna.clone(), a2.clone(), None).await.unwrap();
 
-        let res = p2p
-            .call_remote(
-                dna,
-                a1,
-                a2,
-                "".into(),
-                "".into(),
-                None,
-                ExternIO::encode(b"yippo").unwrap(),
+        let zome_name: ZomeName = "".into();
+        let fn_name: FunctionName = "".into();
+        let cap_secret = None;
+        let payload = ExternIO::encode(b"yippo").unwrap();
+
+        let signature = a1
+            .sign_raw(
+                &keystore,
+                ZomeCallUnsigned {
+                    provenance: a1.clone(),
+                    cell_id: CellId::new(dna.clone(), a2.clone()),
+                    zome_name: zome_name.clone(),
+                    fn_name: fn_name.clone(),
+                    cap_secret: cap_secret.clone(),
+                    payload: payload.clone(),
+                }
+                .data_to_sign()
+                .unwrap(),
             )
+            .await
+            .unwrap();
+
+        let res = p2p
+            .call_remote(dna, a1, signature, a2, zome_name, fn_name, None, payload)
             .await
             .unwrap();
         let res: Vec<u8> = UnsafeBytes::from(res).into();

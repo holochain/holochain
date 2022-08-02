@@ -62,13 +62,21 @@ async fn run_test(alice_cell_id: CellId, handle: ConductorHandle) {
         "update_entry",
         (),
         TestWasm::Update,
-    ).await
+    )
+    .await
     .unwrap();
     handle.call_zome(invocation).await.unwrap().unwrap();
 
     // Invalid update should fail work
-    let invocation =
-        new_zome_call(handle.keystore(), &alice_cell_id, "invalid_update_entry", (), TestWasm::Update).await.unwrap();
+    let invocation = new_zome_call(
+        handle.keystore(),
+        &alice_cell_id,
+        "invalid_update_entry",
+        (),
+        TestWasm::Update,
+    )
+    .await
+    .unwrap();
     let result = handle.call_zome(invocation).await;
     match &result {
         Err(ConductorApiError::CellError(CellError::WorkflowError(wfe))) => match **wfe {

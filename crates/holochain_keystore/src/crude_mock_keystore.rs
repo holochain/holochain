@@ -75,6 +75,11 @@ impl MockLairControl {
     pub fn use_real(&self) {
         self.0.store(false, std::sync::atomic::Ordering::SeqCst);
     }
+
+    /// Is the keystore using the mock?
+    pub fn using_mock(&self) -> bool {
+        self.0.load(std::sync::atomic::Ordering::SeqCst)
+    }
 }
 /// A keystore which always returns the same LairError for every call.
 struct CrudeLegacyMockKeystore(Box<dyn Fn() -> LairError + Send + 'static>);

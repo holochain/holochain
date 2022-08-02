@@ -315,7 +315,10 @@ impl ZomeCallInvocation {
     pub async fn verify_signature(&self) -> RibosomeResult<bool> {
         Ok(self
             .provenance
-            .verify_signature_raw(&self.signature, ZomeCallUnsigned::from(ZomeCall::from(self.clone())).data_to_sign()?)
+            .verify_signature_raw(
+                &self.signature,
+                ZomeCallUnsigned::from(ZomeCall::from(self.clone())).data_to_sign()?,
+            )
             .await)
     }
 

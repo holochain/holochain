@@ -739,10 +739,11 @@ where
     P: serde::Serialize + std::fmt::Debug,
 {
     let zome_call_unsigned = new_zome_call_unsigned(cell_id, func, payload, zome)?;
-    Ok(ZomeCall::try_from_unsigned_zome_call(
-        keystore,
-        zome_call_unsigned,
-    ).await.unwrap())
+    Ok(
+        ZomeCall::try_from_unsigned_zome_call(keystore, zome_call_unsigned)
+            .await
+            .unwrap(),
+    )
 }
 
 /// Helper to create an unsigned zome invocation for tests
@@ -776,7 +777,7 @@ pub async fn new_invocation<P, Z: Into<Zome> + Clone>(
 where
     P: serde::Serialize + std::fmt::Debug,
 {
-    let ZomeCall{
+    let ZomeCall {
         cell_id,
         cap_secret,
         fn_name,

@@ -52,7 +52,7 @@ pub fn remote_signal(
                             Ok(signature) => to_agent_list.push((signature, agent)),
                             Err(e) => {
                                 tracing::info!("Failed to sign and send remote signals because of {:?}", e);
-                                return ();
+                                return;
                             }
                         }
                     }

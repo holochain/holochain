@@ -13,6 +13,7 @@ use crate::core::ribosome::InvocationAuth;
 use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCallHostAccess;
 use crate::core::ribosome::ZomeCallInvocation;
+use crate::core::workflow::call_zome_function_authorized;
 use hdk::prelude::*;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
@@ -28,7 +29,6 @@ use holochain_wasm_test_utils::TestWasmPair;
 use holochain_zome_types::AgentActivity;
 use std::sync::Arc;
 use unwrap_to::unwrap_to;
-use crate::core::workflow::call_zome_function_authorized;
 
 // Commit entry types //
 // Useful for when you want to commit something
@@ -437,7 +437,9 @@ impl HostFnCaller {
         let (_, output) = {
             let host_access = call_context.host_context();
             let zcha = unwrap_to!(host_access => HostContext::ZomeCall).clone();
-            call_zome_function_authorized((*ribosome).clone(), zcha, invocation).await.unwrap()
+            call_zome_function_authorized((*ribosome).clone(), zcha, invocation)
+                .await
+                .unwrap()
         };
 
         // Write

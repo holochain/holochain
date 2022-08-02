@@ -38,12 +38,12 @@ use holochain_types::prelude::WireEntryOps;
 use holochain_types::record::WireRecordOps;
 use holochain_zome_types::ActionHashed;
 use holochain_zome_types::QueryFilter;
+use holochain_zome_types::Signature;
 use holochain_zome_types::SignedAction;
 use holochain_zome_types::SignedActionHashed;
 use holochain_zome_types::Timestamp;
 use holochain_zome_types::TryInto;
 use holochain_zome_types::ValidationStatus;
-use holochain_zome_types::Signature;
 
 pub use activity_test_data::*;
 pub use entry_test_data::*;

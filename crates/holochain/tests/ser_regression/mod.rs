@@ -106,14 +106,19 @@ async fn ser_regression_test() {
 
     let channel = ChannelName("hello world".into());
 
-    let invocation = ZomeCall::try_from_unsigned_zome_call(handle.keystore(), ZomeCallUnsigned {
-        cell_id: alice_cell_id.clone(),
-        zome_name: TestWasm::SerRegression.into(),
-        cap_secret: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
-        fn_name: "create_channel".into(),
-        payload: ExternIO::encode(channel).unwrap(),
-        provenance: alice_agent_id.clone(),
-    }).await.unwrap();
+    let invocation = ZomeCall::try_from_unsigned_zome_call(
+        handle.keystore(),
+        ZomeCallUnsigned {
+            cell_id: alice_cell_id.clone(),
+            zome_name: TestWasm::SerRegression.into(),
+            cap_secret: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
+            fn_name: "create_channel".into(),
+            payload: ExternIO::encode(channel).unwrap(),
+            provenance: alice_agent_id.clone(),
+        },
+    )
+    .await
+    .unwrap();
 
     let request = Box::new(invocation.clone());
     let request = AppRequest::ZomeCall(request).try_into().unwrap();
@@ -135,14 +140,19 @@ async fn ser_regression_test() {
         channel_hash,
         content: "Hello from alice :)".into(),
     };
-    let invocation = ZomeCall::try_from_unsigned_zome_call(handle.keystore(), ZomeCallUnsigned{
-        cell_id: alice_cell_id.clone(),
-        zome_name: TestWasm::SerRegression.into(),
-        cap_secret: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
-        fn_name: "create_message".into(),
-        payload: ExternIO::encode(message).unwrap(),
-        provenance: alice_agent_id.clone(),
-    }).await.unwrap();
+    let invocation = ZomeCall::try_from_unsigned_zome_call(
+        handle.keystore(),
+        ZomeCallUnsigned {
+            cell_id: alice_cell_id.clone(),
+            zome_name: TestWasm::SerRegression.into(),
+            cap_secret: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
+            fn_name: "create_message".into(),
+            payload: ExternIO::encode(message).unwrap(),
+            provenance: alice_agent_id.clone(),
+        },
+    )
+    .await
+    .unwrap();
 
     let request = Box::new(invocation.clone());
     let request = AppRequest::ZomeCall(request).try_into().unwrap();
