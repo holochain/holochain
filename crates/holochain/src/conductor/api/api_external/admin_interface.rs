@@ -21,7 +21,7 @@ use tracing::*;
 pub use holochain_conductor_api::*;
 
 /// A trait for the interface that a Conductor exposes to the outside world to use for administering the conductor.
-/// This trait has a one mock implementation and one "Real" implementation
+/// This trait has one mock implementation and one "real" implementation
 #[async_trait::async_trait]
 pub trait AdminInterfaceApi: 'static + Send + Sync + Clone {
     /// Call an admin function to modify this Conductor's behavior
@@ -55,7 +55,8 @@ pub struct RealAdminInterfaceApi {
 }
 
 impl RealAdminInterfaceApi {
-    pub(crate) fn new(conductor_handle: ConductorHandle) -> Self {
+    /// Create an admin interface api.
+    pub fn new(conductor_handle: ConductorHandle) -> Self {
         RealAdminInterfaceApi { conductor_handle }
     }
 }
@@ -128,6 +129,23 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     self.conductor_handle.register_dna(dna).await?;
                 }
                 Ok(AdminResponse::DnaRegistered(hash))
+            }
+            UpdateCoordinators(payload) => {
+                let UpdateCoordinatorsPayload { dna_hash, source } = *payload;
+                let (coordinator_zomes, wasms) = match source {
+                    CoordinatorSource::Path(ref path) => {
+                        let bundle = Bundle::read_from_file(path).await?;
+                        let bundle: CoordinatorBundle = bundle.into();
+                        bundle.into_zomes().await?
+                    }
+                    CoordinatorSource::Bundle(bundle) => bundle.into_zomes().await?,
+                };
+
+                self.conductor_handle
+                    .update_coordinators(&dna_hash, coordinator_zomes, wasms)
+                    .await?;
+
+                Ok(AdminResponse::CoordinatorsUpdated)
             }
             CreateCloneCell(payload) => {
                 let cell_id = payload.cell_id();

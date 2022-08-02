@@ -3,7 +3,7 @@ use std::sync::Arc;
 use super::*;
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_hotswap() {
+async fn test_update_coordinators() {
     let dna_wasms = vec![
         DnaWasm {
             code: Arc::new(Box::new([0])),
@@ -68,7 +68,7 @@ async fn test_hotswap() {
         })),
     )];
     let old_wasm = dna
-        .hot_swap_coordinators(new_coordinators.clone(), new_dna_wasms.clone())
+        .update_coordinators(new_coordinators.clone(), new_dna_wasms.clone())
         .await
         .unwrap();
 
@@ -89,7 +89,7 @@ async fn test_hotswap() {
 
     assert_eq!(expect, dna);
 
-    // Add new coordinator "e".
+    // Add new coordinator "e"
     let new_dna_wasms = vec![DnaWasm {
         code: Arc::new(Box::new([6])),
     }];
@@ -101,7 +101,7 @@ async fn test_hotswap() {
         })),
     )];
     let old_wasm = dna
-        .hot_swap_coordinators(new_coordinators.clone(), new_dna_wasms.clone())
+        .update_coordinators(new_coordinators.clone(), new_dna_wasms.clone())
         .await
         .unwrap();
 
@@ -164,7 +164,7 @@ async fn test_hotswap() {
         ),
     ];
     let old_wasm = dna
-        .hot_swap_coordinators(new_coordinators.clone(), new_dna_wasms.clone())
+        .update_coordinators(new_coordinators.clone(), new_dna_wasms.clone())
         .await
         .unwrap();
 
@@ -197,4 +197,93 @@ async fn test_hotswap() {
     let expect = DnaFile::new(expect_def, expect_wasms).await.unwrap();
 
     assert_eq!(expect, dna);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_update_coordinators_checks_deps() {
+    let dna_wasms = vec![
+        DnaWasm {
+            code: Arc::new(Box::new([0])),
+        },
+        DnaWasm {
+            code: Arc::new(Box::new([1])),
+        },
+        DnaWasm {
+            code: Arc::new(Box::new([2])),
+        },
+        DnaWasm {
+            code: Arc::new(Box::new([3])),
+        },
+    ];
+    let init_integrity = vec![
+        (
+            "a".into(),
+            IntegrityZomeDef::from_hash(WasmHash::with_data(&dna_wasms[0]).await),
+        ),
+        (
+            "b".into(),
+            IntegrityZomeDef::from_hash(WasmHash::with_data(&dna_wasms[1]).await),
+        ),
+    ];
+    let init_coordinators = vec![
+        (
+            "c".into(),
+            CoordinatorZomeDef::from(ZomeDef::Wasm(WasmZome {
+                wasm_hash: WasmHash::with_data(&dna_wasms[2]).await,
+                dependencies: vec!["b".into()],
+            })),
+        ),
+        (
+            "d".into(),
+            CoordinatorZomeDef::from(ZomeDef::Wasm(WasmZome {
+                wasm_hash: WasmHash::with_data(&dna_wasms[3]).await,
+                dependencies: vec!["b".into(), "a".into()],
+            })),
+        ),
+    ];
+    let mut dna_def = DnaDefBuilder::default();
+    dna_def
+        .integrity_zomes(init_integrity.clone())
+        .coordinator_zomes(init_coordinators.clone())
+        .network_seed("00000000-0000-0000-0000-000000000000".into());
+    let dna_def = dna_def.build().unwrap();
+    let mut dna = DnaFile::new(dna_def.clone(), dna_wasms.clone())
+        .await
+        .unwrap();
+
+    // Replace coordinator "c" with coordinator that has a dangling reference.
+    let new_dna_wasms = vec![DnaWasm {
+        code: Arc::new(Box::new([4])),
+    }];
+    let new_coordinators = vec![(
+        "c".into(),
+        CoordinatorZomeDef::from(ZomeDef::Wasm(WasmZome {
+            wasm_hash: WasmHash::with_data(&new_dna_wasms[0]).await,
+            dependencies: vec!["z".into()],
+        })),
+    )];
+    let err = dna
+        .update_coordinators(new_coordinators.clone(), new_dna_wasms.clone())
+        .await
+        .expect_err("Update didn't catch dangling dependency");
+
+    assert!(matches!(err, DnaError::DanglingZomeDependency(_, _)));
+
+    // Add new coordinator "e" with coordinator that has a dangling reference.
+    let new_dna_wasms = vec![DnaWasm {
+        code: Arc::new(Box::new([5])),
+    }];
+    let new_coordinators = vec![(
+        "e".into(),
+        CoordinatorZomeDef::from(ZomeDef::Wasm(WasmZome {
+            wasm_hash: WasmHash::with_data(&new_dna_wasms[0]).await,
+            dependencies: vec!["z".into()],
+        })),
+    )];
+    let err = dna
+        .update_coordinators(new_coordinators.clone(), new_dna_wasms.clone())
+        .await
+        .expect_err("Update coordinators didn't catch dangling dependency");
+
+    assert!(matches!(err, DnaError::DanglingZomeDependency(_, _)));
 }

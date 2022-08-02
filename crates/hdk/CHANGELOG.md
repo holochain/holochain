@@ -8,6 +8,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Docs: Add example how to get a typed path from a path to `path` module [\#1505](https://github.com/holochain/holochain/pull/1505)
+- Exposed `TypedPath` type in the hdk prelude for easy access from zomes.
+
+## 0.0.143
+
 - Docs: Add documentation on `get_links` argument `link_type`. [\#1486](https://github.com/holochain/holochain/pull/1486)
 - Docs: Intra-link to `wasm_error` and `WasmErrorInner`. [\#1486](https://github.com/holochain/holochain/pull/1486)
 
@@ -179,14 +184,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - hdk: Now supports deserializing countersigned entries in app entry `try_from`
 
 - hdk: implements multi-call for:
-
+  
   - `remote_call`
   - `call`
   - `get`
   - `get_details`
   - `get_links`
   - `get_link_details`
-
+  
   We strictly only needed `remote_call` for countersigning, but feedback from the community was that having to sequentially loop over these common HDK functions is a pain point, so we enabled all of them to be async over a vector of inputs.
 
 ## 0.0.102
