@@ -157,7 +157,7 @@ pub fn test_keystore() -> holochain_keystore::MetaLairClient {
     derive_more::Deref,
     derive_more::Into,
 )]
-pub struct TestChainHash(u32);
+pub struct TestChainHash(pub u32);
 
 impl From<u8> for TestChainHash {
     fn from(u: u8) -> Self {
@@ -168,6 +168,13 @@ impl From<u8> for TestChainHash {
 impl From<i32> for TestChainHash {
     fn from(u: i32) -> Self {
         Self(u as u32)
+    }
+}
+
+impl From<TestChainHash> for ActionHash {
+    fn from(h: TestChainHash) -> Self {
+        let bytes: Vec<u8> = h.0.to_le_bytes().iter().cycle().take(32).copied().collect();
+        ActionHash::from_raw_32(bytes)
     }
 }
 

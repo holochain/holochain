@@ -1,5 +1,10 @@
 use std::ops::Range;
 
+use arbitrary::Arbitrary;
+use arbitrary::Unstructured;
+use holo_hash::ActionHash;
+use holochain_zome_types::*;
+
 use super::TestChainHash;
 use super::TestChainItem;
 
@@ -58,5 +63,34 @@ pub fn gap_chain(ranges: &[Range<u32>]) -> Vec<TestChainItem> {
     chain(min..max)
         .into_iter()
         .filter(|i| ranges.iter().any(|r| r.contains(&i.seq)))
+        .collect()
+}
+
+pub fn chain_to_ops(chain: Vec<impl ChainItem>) -> Vec<RegisterAgentActivity> {
+    let mut u = Unstructured::new(&holochain_zome_types::NOISE);
+    chain
+        .into_iter()
+        .map(|i| {
+            let action_seq = i.seq();
+            let prev_action = i.prev_hash().cloned().map(Into::into);
+            let hash: ActionHash = i.get_hash().clone().into();
+            let mut op = RegisterAgentActivity::arbitrary(&mut u).unwrap();
+            match (action_seq, prev_action) {
+                (0, _) => {
+                    let dna = Dna::arbitrary(&mut u).unwrap();
+                    op.action.hashed.content = Action::Dna(dna);
+                    op.action.hashed.hash = hash;
+                }
+                (action_seq, Some(prev_action)) => {
+                    let mut create = Create::arbitrary(&mut u).unwrap();
+                    create.action_seq = action_seq;
+                    create.prev_action = prev_action;
+                    op.action.hashed.content = Action::Create(create);
+                    op.action.hashed.hash = hash;
+                }
+                _ => unreachable!(),
+            }
+            op
+        })
         .collect()
 }

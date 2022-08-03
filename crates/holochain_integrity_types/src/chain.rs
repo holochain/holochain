@@ -114,7 +114,14 @@ impl<H: Eq + std::hash::Hash> Default for ChainFilters<H> {
 // add a large monomorphization overhead
 pub trait ChainItem: Clone + PartialEq + Eq + std::fmt::Debug {
     /// The type used to represent a hash of this item
-    type Hash: Clone + PartialEq + Eq + std::hash::Hash + std::fmt::Debug;
+    type Hash: Clone
+        + PartialEq
+        + Eq
+        + std::hash::Hash
+        + std::fmt::Debug
+        + Send
+        + Sync
+        + Into<ActionHash>;
 
     /// The sequence in the chain
     fn seq(&self) -> u32;
