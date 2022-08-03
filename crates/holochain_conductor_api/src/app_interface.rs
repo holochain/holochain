@@ -97,6 +97,7 @@ pub struct ZomeCall {
     /// MUST match the signature.
     pub provenance: AgentPubKey,
     pub signature: Signature,
+    pub nonce: IntNonce,
 }
 
 impl From<ZomeCall> for ZomeCallUnsigned {
@@ -108,6 +109,7 @@ impl From<ZomeCall> for ZomeCallUnsigned {
             payload: zome_call.payload,
             cap_secret: zome_call.cap_secret,
             provenance: zome_call.provenance,
+            nonce: zome_call.nonce,
         }
     }
 }
@@ -125,6 +127,7 @@ impl ZomeCall {
             payload: unsigned_zome_call.payload,
             cap_secret: unsigned_zome_call.cap_secret,
             provenance: unsigned_zome_call.provenance,
+            nonce: unsigned_zome_call.nonce,
             signature,
         })
     }
@@ -141,6 +144,7 @@ impl ZomeCall {
             fn_name: self.fn_name,
             cap_secret: self.cap_secret,
             payload: self.payload,
+            nonce: self.nonce,
         };
         ZomeCall::try_from_unsigned_zome_call(keystore, zome_call_unsigned).await
     }

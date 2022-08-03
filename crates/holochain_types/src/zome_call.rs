@@ -20,6 +20,8 @@ pub struct ZomeCallUnsigned {
     pub cap_secret: Option<CapSecret>,
     /// Payload to sign.
     pub payload: ExternIO,
+    /// Nonce to sign.
+    pub nonce: IntNonce,
 }
 
 impl ZomeCallUnsigned {

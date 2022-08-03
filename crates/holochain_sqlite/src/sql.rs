@@ -49,8 +49,10 @@ pub(crate) mod sql_conductor {
     pub(crate) const SCHEMA: &str = include_str!("sql/conductor/schema.sql");
 }
 
-pub(crate) mod sql_wasm {
-    pub(crate) const SCHEMA: &str = include_str!("sql/wasm/schema.sql");
+pub(crate) mod sql_nonce {
+    pub(crate) const SCHEMA: &str = include_str!("sql/nonce/schema.sql");
+    pub(crate) const INSERT: &str = include_str!("sql/nonce/insert.sql");
+    pub(crate) const SELECT: &str = include_str!("sql/nonce/select.sql");
 }
 
 pub(crate) mod sql_p2p_agent_store {
@@ -70,4 +72,8 @@ pub(crate) mod sql_p2p_metrics {
     pub(crate) const SCHEMA: &str = include_str!("sql/p2p_metrics/schema.sql");
     pub(crate) const INSERT: &str = include_str!("sql/p2p_metrics/insert.sql");
     pub(crate) const PRUNE: &str = include_str!("sql/p2p_metrics/prune.sql");
+}
+
+pub(crate) mod sql_wasm {
+    pub(crate) const SCHEMA: &str = include_str!("sql/wasm/schema.sql");
 }

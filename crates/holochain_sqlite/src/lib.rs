@@ -11,6 +11,7 @@ pub mod exports;
 pub mod fatal;
 pub mod functions;
 pub mod prelude;
+pub mod nonce;
 pub mod schema;
 pub mod sql;
 pub mod swansong;

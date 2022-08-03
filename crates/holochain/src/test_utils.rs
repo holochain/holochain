@@ -784,6 +784,7 @@ where
         payload,
         provenance,
         signature,
+        nonce,
         ..
     } = new_zome_call(keystore, cell_id, func, payload, zome.clone().into()).await?;
     Ok(ZomeCallInvocation {
@@ -794,6 +795,7 @@ where
         payload,
         provenance,
         signature,
+        nonce
     })
 }
 

@@ -51,6 +51,7 @@ use std::sync::Arc;
 use tokio::sync;
 use tracing::*;
 use tracing_futures::Instrument;
+use holochain_sqlite::nonce::fresh_nonce;
 
 pub const INIT_MUTEX_TIMEOUT_SECS: u64 = 30;
 
@@ -284,13 +285,16 @@ impl Cell {
                             continue;
                         }
                     };
+                    let provenance = self.id.agent_pubkey().clone();
+                    let nonce = fresh_nonce(self.space.nonces, &provenance)?;
                     let unsigned_zome_call = ZomeCallUnsigned {
-                        provenance: self.id.agent_pubkey().clone(),
+                        provenance,
                         cell_id: self.id.clone(),
                         zome_name: scheduled_fn.zome_name().clone(),
                         fn_name: scheduled_fn.fn_name().clone(),
                         cap_secret: None,
                         payload,
+                        nonce
                     };
 
                     tasks.push(
@@ -851,6 +855,7 @@ impl Cell {
                     self.dht_db().clone(),
                     self.space.dht_query_cache.clone(),
                     self.cache().clone(),
+                    self.nonces().clone(),
                     keystore.clone(),
                     self.id.agent_pubkey().clone(),
                     Arc::new(dna_def),
@@ -906,6 +911,7 @@ impl Cell {
             self.dht_db().clone(),
             self.space.dht_query_cache.clone(),
             self.cache().clone(),
+            self.nonces().clone(),
             keystore.clone(),
             id.agent_pubkey().clone(),
             Arc::new(dna_def.into_content()),
@@ -984,6 +990,10 @@ impl Cell {
 
     pub(crate) fn cache(&self) -> &DbWrite<DbKindCache> {
         &self.space.cache_db
+    }
+
+    pub(crate) fn nonces(&self) -> &DbWrite<DbKindNonce> {
+        &self.space.nonces_db
     }
 
     #[cfg(any(test, feature = "test_utils"))]

@@ -2,7 +2,7 @@
 //! at the level of a [`DnaHash`] space.
 //! Multiple [`Cell`](crate::conductor::Cell)'s could share the same space.
 use std::{collections::HashMap, sync::Arc, time::Duration};
-
+use holochain_sqlite::prelude::DbKindNonce;
 use holo_hash::{DhtOpHash, DnaHash};
 use holochain_conductor_api::conductor::{ConductorConfig, DatabaseRootPath};
 use holochain_p2p::{
@@ -89,6 +89,9 @@ pub struct Space {
     /// The caches databases. These are shared across cells.
     /// There is one per unique Dna.
     pub cache_db: DbWrite<DbKindCache>,
+
+    /// The nonces database. These are shared across cells.
+    pub nonces: DbWrite<DbKindNonce>,
 
     /// The authored databases. These are shared across cells.
     /// There is one per unique Dna.
