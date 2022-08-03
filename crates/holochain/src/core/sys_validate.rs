@@ -163,6 +163,7 @@ pub fn check_prev_action(action: &Action) -> SysValidationResult<()> {
     let is_dna = matches!(action, Action::Dna(_));
     let has_prev = action.prev_action().is_some();
     let is_first = action.action_seq() == 0;
+    #[allow(clippy::collapsible_else_if)]
     if is_first {
         if is_dna && !has_prev {
             Ok(())
