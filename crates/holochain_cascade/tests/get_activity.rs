@@ -4,6 +4,7 @@ use holochain_cascade::Cascade;
 use holochain_state::prelude::test_cache_db;
 use holochain_state::prelude::test_dht_db;
 use holochain_types::activity::*;
+use holochain_zome_types::ChainQueryFilter;
 use holochain_zome_types::ChainStatus;
 use pretty_assertions::assert_eq;
 
@@ -42,7 +43,7 @@ async fn get_activity() {
     let mut cascade = Cascade::empty().with_network(network, cache.to_db());
 
     let r = cascade
-        .get_agent_activity(td.agent.clone(), td.query_filter.clone(), options)
+        .get_agent_activity(td.agent.clone(), ChainQueryFilter::new(), options)
         .await
         .unwrap();
 

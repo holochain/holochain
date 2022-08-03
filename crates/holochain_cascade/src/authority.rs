@@ -1,3 +1,5 @@
+//! Functions for the various authorities to handle queries
+
 use self::get_agent_activity_query::hashes::GetAgentActivityQuery;
 use self::get_entry_ops_query::GetEntryOpsQuery;
 use self::get_links_ops_query::GetLinksOpsQuery;
@@ -23,6 +25,7 @@ pub(crate) mod get_entry_ops_query;
 pub(crate) mod get_links_ops_query;
 pub(crate) mod get_record_query;
 
+/// Handler for get_entry query to an Entry authority
 #[instrument(skip(db))]
 pub async fn handle_get_entry(
     db: DbRead<DbKindDht>,
@@ -36,6 +39,7 @@ pub async fn handle_get_entry(
     Ok(results)
 }
 
+/// Handler for get_record query to a Record authority
 #[tracing::instrument(skip(env))]
 pub async fn handle_get_record(
     env: DbRead<DbKindDht>,
@@ -49,6 +53,7 @@ pub async fn handle_get_record(
     Ok(results)
 }
 
+/// Handler for get_agent_activity query to an Activity authority
 #[instrument(skip(env))]
 pub async fn handle_get_agent_activity(
     env: DbRead<DbKindDht>,
@@ -63,6 +68,7 @@ pub async fn handle_get_agent_activity(
     Ok(results)
 }
 
+/// Handler for get_agent_activity_deterministic query to an Activity authority
 #[instrument(skip(env))]
 pub async fn handle_get_agent_activity_deterministic(
     env: DbRead<DbKindDht>,
@@ -77,6 +83,7 @@ pub async fn handle_get_agent_activity_deterministic(
     Ok(results)
 }
 
+/// Handler for get_links query to a Record/Entry authority
 #[instrument(skip(env, _options))]
 pub async fn handle_get_links(
     env: DbRead<DbKindDht>,

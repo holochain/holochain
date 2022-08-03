@@ -1,3 +1,5 @@
+//! Test utils for holochain_cascade
+
 use crate::authority;
 use crate::authority::get_entry_ops_query::GetEntryOpsQuery;
 use crate::authority::get_record_query::GetRecordOpsQuery;
@@ -36,12 +38,8 @@ use holochain_types::metadata::MetadataSet;
 use holochain_types::prelude::ValidationPackageResponse;
 use holochain_types::prelude::WireEntryOps;
 use holochain_types::record::WireRecordOps;
-use holochain_zome_types::ActionHashed;
 use holochain_zome_types::QueryFilter;
-use holochain_zome_types::SignedAction;
-use holochain_zome_types::SignedActionHashed;
 use holochain_zome_types::Timestamp;
-use holochain_zome_types::TryInto;
 use holochain_zome_types::ValidationStatus;
 
 pub use activity_test_data::*;
@@ -52,6 +50,8 @@ mod activity_test_data;
 mod entry_test_data;
 mod record_test_data;
 
+/// A network implementation which routes to the local databases,
+/// and can declare itself an authority either for all ops, or for no ops.
 #[derive(Clone)]
 pub struct PassThroughNetwork {
     envs: Vec<DbRead<DbKindDht>>,
@@ -59,6 +59,7 @@ pub struct PassThroughNetwork {
 }
 
 impl PassThroughNetwork {
+    /// Declare that this node has full coverage
     pub fn authority_for_all(envs: Vec<DbRead<DbKindDht>>) -> Self {
         Self {
             envs,
@@ -66,6 +67,7 @@ impl PassThroughNetwork {
         }
     }
 
+    /// Declare that this node has zero coverage
     pub fn authority_for_nothing(envs: Vec<DbRead<DbKindDht>>) -> Self {
         Self {
             envs,
@@ -74,10 +76,12 @@ impl PassThroughNetwork {
     }
 }
 
+/// A mutex-guarded [`MockHolochainP2pDnaT`]
 #[derive(Clone)]
 pub struct MockNetwork(std::sync::Arc<tokio::sync::Mutex<MockHolochainP2pDnaT>>);
 
 impl MockNetwork {
+    /// Constructor
     pub fn new(mock: MockHolochainP2pDnaT) -> Self {
         Self(std::sync::Arc::new(tokio::sync::Mutex::new(mock)))
     }
@@ -127,6 +131,7 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         }
         Ok(out)
     }
+
     async fn get_meta(
         &self,
         _dht_hash: holo_hash::AnyDhtHash,
@@ -134,6 +139,7 @@ impl HolochainP2pDnaT for PassThroughNetwork {
     ) -> actor::HolochainP2pResult<Vec<MetadataSet>> {
         todo!()
     }
+
     async fn get_links(
         &self,
         link_key: WireLinkKey,
@@ -148,6 +154,7 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         }
         Ok(out)
     }
+
     async fn get_agent_activity(
         &self,
         agent: AgentPubKey,
@@ -248,6 +255,7 @@ impl HolochainP2pDnaT for PassThroughNetwork {
     }
 }
 
+/// Insert ops directly into the database and mark integrated as valid
 pub fn fill_db<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: DhtOpHashed) {
     env.conn()
         .unwrap()
@@ -261,6 +269,7 @@ pub fn fill_db<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: DhtOpHashed) {
         .unwrap();
 }
 
+/// Insert ops directly into the database and mark integrated as rejected
 pub fn fill_db_rejected<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: DhtOpHashed) {
     env.conn()
         .unwrap()
@@ -274,6 +283,7 @@ pub fn fill_db_rejected<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: DhtOpHash
         .unwrap();
 }
 
+/// Insert ops directly into the database and mark valid and pending integration
 pub fn fill_db_pending<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: DhtOpHashed) {
     env.conn()
         .unwrap()
@@ -286,6 +296,7 @@ pub fn fill_db_pending<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: DhtOpHashe
         .unwrap();
 }
 
+/// Insert ops into the authored database
 pub fn fill_db_as_author(env: &DbWrite<DbKindAuthored>, op: DhtOpHashed) {
     env.conn()
         .unwrap()
@@ -423,16 +434,6 @@ impl HolochainP2pDnaT for MockNetwork {
         _payload: holochain_zome_types::ExternIO,
     ) -> actor::HolochainP2pResult<holochain_serialized_bytes::SerializedBytes> {
         todo!()
-    }
-}
-
-pub fn wire_to_shh<T: TryInto<SignedAction> + Clone>(op: &T) -> SignedActionHashed {
-    let r = op.clone().try_into();
-    match r {
-        Ok(SignedAction(action, signature)) => {
-            SignedActionHashed::with_presigned(ActionHashed::from_content_sync(action), signature)
-        }
-        Err(_) => unreachable!(),
     }
 }
 
