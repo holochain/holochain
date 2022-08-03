@@ -6,6 +6,51 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20220803.124141
+
+## [holochain\_cli-0.0.50](crates/holochain_cli/CHANGELOG.md#0.0.50)
+
+## [holochain\_cli\_sandbox-0.0.46](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.46)
+
+## [holochain\_cli\_bundle-0.0.46](crates/holochain_cli_bundle/CHANGELOG.md#0.0.46)
+
+## [holochain-0.0.152](crates/holochain/CHANGELOG.md#0.0.152)
+
+- Adds `AdminRequest::UpdateCoordinators` that allows swapping coordinator zomes for a running happ.
+
+## [holochain\_test\_wasm\_common-0.0.45](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.45)
+
+## [holochain\_conductor\_api-0.0.52](crates/holochain_conductor_api/CHANGELOG.md#0.0.52)
+
+## [holochain\_wasm\_test\_utils-0.0.51](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.51)
+
+## [holochain\_cascade-0.0.52](crates/holochain_cascade/CHANGELOG.md#0.0.52)
+
+## [holochain\_state-0.0.52](crates/holochain_state/CHANGELOG.md#0.0.52)
+
+## [holochain\_p2p-0.0.50](crates/holochain_p2p/CHANGELOG.md#0.0.50)
+
+## [holochain\_types-0.0.50](crates/holochain_types/CHANGELOG.md#0.0.50)
+
+## [holochain\_keystore-0.0.49](crates/holochain_keystore/CHANGELOG.md#0.0.49)
+
+## [holochain\_sqlite-0.0.48](crates/holochain_sqlite/CHANGELOG.md#0.0.48)
+
+## [hdk-0.0.144](crates/hdk/CHANGELOG.md#0.0.144)
+
+- Docs: Add example how to get a typed path from a path to `path` module [\#1505](https://github.com/holochain/holochain/pull/1505)
+- Exposed `TypedPath` type in the hdk prelude for easy access from zomes.
+
+## [holochain\_zome\_types-0.0.43](crates/holochain_zome_types/CHANGELOG.md#0.0.43)
+
+## [hdi-0.0.16](crates/hdi/CHANGELOG.md#0.0.16)
+
+- Docs: Add `OpType` helper example to HDI validation section [\#1505](https://github.com/holochain/holochain/pull/1505)
+
+## [hdk\_derive-0.0.43](crates/hdk_derive/CHANGELOG.md#0.0.43)
+
+## [holochain\_integrity\_types-0.0.14](crates/holochain_integrity_types/CHANGELOG.md#0.0.14)
+
 # 20220728.122329
 
 - nix-shell: exclude most holonix components by default to reduce shell size [\#1498](https://github.com/holochain/holochain/pull/1498)
