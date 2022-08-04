@@ -38,6 +38,11 @@ pub enum LinkTypes {
     C,
 }
 
+#[test]
+fn panicker() {
+    panic!("I hope I see this panic in CI!")
+}
+
 // Register Agent Activity
 #[test_case(r_activity(create_entry(0, 100)) => matches WasmErrorInner::Guest(_))]
 #[test_case(r_activity(create_link(0, 100)) => matches WasmErrorInner::Guest(_))]
