@@ -47,12 +47,8 @@ pub mod sql_cell {
 
 pub(crate) mod sql_conductor {
     pub(crate) const SCHEMA: &str = include_str!("sql/conductor/schema.sql");
-}
-
-pub(crate) mod sql_nonce {
-    pub(crate) const SCHEMA: &str = include_str!("sql/nonce/schema.sql");
-    pub(crate) const INSERT: &str = include_str!("sql/nonce/insert.sql");
-    pub(crate) const SELECT: &str = include_str!("sql/nonce/select.sql");
+    pub(crate) const SELECT_NONCE: &str = include_str!("sql/conductor/select_nonce.sql");
+    pub(crate) const INSERT_NONCE: &str = include_str!("sql/conductor/insert_nonce.sql");
 }
 
 pub(crate) mod sql_p2p_agent_store {
