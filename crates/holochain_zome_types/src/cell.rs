@@ -23,6 +23,25 @@ use std::fmt;
 )]
 pub struct CellId(DnaHash, AgentPubKey);
 
+/// Identifier of a clone cell, composed of the DNA's role id and the index
+/// of the clone, starting at 0.
+///
+/// `{role_id}.{clone_index}`
+///
+/// Example: `profiles.0`
+pub type CloneId = String;
+
+/// Delimiter in a clone id that separates the original cell's role id from the
+/// clone index.
+pub const CLONE_ID_DELIMITER: &str = ".";
+
+// impl CloneId {
+//     pub fn as_clone_index(&self) -> u32 {
+//         let (_, clone_index) = self.split_once(CLONE_ID_DELIMITER).unwrap();
+//         return clone_index.parse().unwrap();
+//     }
+// }
+
 impl fmt::Display for CellId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Cell({}, {})", self.dna_hash(), self.agent_pubkey())
