@@ -37,6 +37,9 @@ pub enum ConductorError {
     #[error("Cell was referenced, but is missing from the conductor. CellId: {0:?}")]
     CellMissing(CellId),
 
+    #[error("Error while cloning cell: {0}")]
+    CloneCellError(String),
+
     #[error(transparent)]
     ConductorConfigError(#[from] ConductorConfigError),
 
