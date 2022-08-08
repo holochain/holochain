@@ -39,6 +39,7 @@ use super::api::error::ConductorApiResult;
 use super::api::ZomeCall;
 use super::conductor::CellStatus;
 use super::config::AdminInterfaceConfig;
+use super::error::ConductorError;
 use super::error::ConductorResult;
 use super::interface::SignalBroadcaster;
 use super::manager::spawn_task_manager;
@@ -212,7 +213,7 @@ pub trait ConductorHandleT: Send + Sync {
     async fn create_clone_cell(
         self: Arc<Self>,
         payload: CreateCloneCellPayload,
-    ) -> ConductorResult<CellId>;
+    ) -> ConductorResult<CloneId>;
 
     /// Destroy a cloned Cell
     async fn destroy_clone_cell(self: Arc<Self>, cell_id: CellId) -> ConductorResult<()>;
@@ -893,27 +894,86 @@ impl ConductorHandleT for ConductorHandleImpl {
     async fn create_clone_cell(
         self: Arc<Self>,
         payload: CreateCloneCellPayload,
-    ) -> ConductorResult<CellId> {
-        let CreateCloneCellPayload {
-            properties,
-            dna_hash,
-            installed_app_id,
-            agent_key,
-            role_id,
-            membrane_proof,
-        } = payload;
-        let cell_id = CellId::new(dna_hash, agent_key);
-        let cells = vec![(cell_id.clone(), membrane_proof)];
+    ) -> ConductorResult<CloneId> {
+        if payload.network_seed == None && payload.properties == None {
+            return Err(ConductorError::CloneCellError(
+                "neither network_seed nor properties provided for cloning the cell".to_string(),
+            ));
+        }
+        let app = self.get_app_info(&payload.app_id).await?;
+        match app {
+            None => {
+                return Err(ConductorError::CloneCellError(
+                    "no app found for provided app id".to_string(),
+                ))
+            }
+            Some(a) => {
+                println!("app {:?}", a);
+                let original_cell = a
+                    .cell_data
+                    .iter()
+                    .find(|cell| cell.as_role_id().eq(&payload.role_id));
+                match original_cell {
+                    None => {
+                        return Err(ConductorError::CloneCellError(
+                            "no cell found for provided role id".to_string(),
+                        ))
+                    }
+                    Some(c) => {
+                        let original_cell_role_id = c.as_role_id();
+                        let max_clone_index_cell = a
+                            .cell_data
+                            .iter()
+                            .filter(|cell| {
+                                cell.as_role_id().starts_with(&payload.role_id)
+                                    && cell.as_role_id().contains(CLONE_ID_DELIMITER)
+                            })
+                            .max_by_key(|x| {
+                                let (_, clone_index) =
+                                    x.as_role_id().split_once(CLONE_ID_DELIMITER).unwrap();
+                                return clone_index.parse::<u32>().unwrap();
+                            });
+                        println!("max clone index {:?}", max_clone_index_cell);
+                        let next_clone_index = match max_clone_index_cell {
+                            None => 0,
+                            Some(cell) => {
+                                let (_, clone_index) =
+                                    cell.as_role_id().split_once(CLONE_ID_DELIMITER).unwrap();
+                                let clone_index = clone_index.parse::<u32>().unwrap();
+                                clone_index + 1
+                            }
+                        };
+                        println!("next clone index {}", next_clone_index);
+                        let clone_id = CloneId::from(format!(
+                            "{}.{}",
+                            original_cell_role_id, next_clone_index
+                        ));
+                        Ok(clone_id)
+                    }
+                }
+            }
+        }
+        // let CreateCloneCellPayload {
+        //     properties,
+        //     // dna_hash,
+        //     // installed_app_id,
+        //     // agent_key,
+        //     role_id,
+
+        //     // membrane_proof,
+        // } = payload;
+        // let cell_id = CellId::new(dna_hash, agent_key);
+        // let cells = vec![(cell_id.clone(), membrane_proof)];
 
         // Run genesis on cells.
-        crate::conductor::conductor::genesis_cells(&self.conductor, cells, self.clone()).await?;
+        // crate::conductor::conductor::genesis_cells(&self.conductor, cells, self.clone()).await?;
 
-        let properties = properties.unwrap_or_else(|| ().into());
-        let cell_id = self
-            .conductor
-            .add_clone_cell_to_app(installed_app_id, role_id, properties)
-            .await?;
-        Ok(cell_id)
+        // let properties = properties.unwrap_or_else(|| ().into());
+        // let cell_id = self
+        // .conductor
+        // .add_clone_cell_to_app(installed_app_id, role_id, properties)
+        // .await?;
+        // Ok(cell_id)
     }
 
     async fn destroy_clone_cell(self: Arc<Self>, _cell_id: CellId) -> ConductorResult<()> {
