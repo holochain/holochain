@@ -79,28 +79,36 @@ pub struct UpdateCoordinatorsPayload {
 /// The instructions on how to get the DNA to be registered
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct CreateCloneCellPayload {
-    /// Properties to override when installing this DNA
-    pub properties: Option<YamlProperties>,
+    /// The app ID that the DNA to clone belongs to
+    pub app_id: InstalledAppId,
     /// The DNA to clone
-    pub dna_hash: DnaHash,
-    /// The Agent key with which to create this Cell
-    /// (TODO: should this be derived from the App?)
-    pub agent_key: AgentPubKey,
-    /// The App with which to associate the newly created Cell
-    pub installed_app_id: InstalledAppId,
     /// The Role ID under which to create this clone
     /// (needed to track cloning permissions and `clone_count`)
     pub role_id: AppRoleId,
-    /// Proof-of-membership, if required by this DNA
-    pub membrane_proof: Option<MembraneProof>,
+    /// Properties to override when installing this DNA
+    pub properties: Option<YamlProperties>,
+    /// to optionally change the NetworkSeed of the new Cell
+    pub network_seed: Option<NetworkSeed>,
+    /// to optionally set a new origin time of the new Cell
+    pub origin_time: Option<Timestamp>,
+    /// optionally a name for the DNA clone
+    pub name: Option<String>,
+    // pub dna_hash: DnaHash,
+    // The Agent key with which to create this Cell
+    // (TODO: should this be derived from the App?)
+    // pub agent_key: AgentPubKey,
+    // The App with which to associate the newly created Cell
+    // pub installed_app_id: InstalledAppId,
+    // Proof-of-membership, if required by this DNA
+    // pub membrane_proof: Option<MembraneProof>
 }
 
-impl CreateCloneCellPayload {
-    /// Get the CellId of the to-be-created clone cell
-    pub fn cell_id(&self) -> CellId {
-        CellId::new(self.dna_hash.clone(), self.agent_key.clone())
-    }
-}
+// impl CreateCloneCellPayload {
+//     /// Get the CellId of the to-be-created clone cell
+//     pub fn cell_id(&self) -> CellId {
+//         CellId::new(self., self.agent_key.clone())
+//     }
+// }
 
 /// A collection of [DnaHash]es paired with an [AgentPubKey] and an app id
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
