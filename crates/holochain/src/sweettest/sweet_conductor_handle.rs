@@ -2,6 +2,7 @@ use super::SweetZome;
 use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::{api::error::ConductorApiResult, ConductorHandle};
 use holochain_conductor_api::ZomeCall;
+use holochain_sqlite::nonce::fresh_nonce;
 use holochain_types::prelude::*;
 use unwrap_to::unwrap_to;
 
@@ -84,6 +85,11 @@ impl SweetConductorHandle {
             cap_secret,
             provenance: provenance.clone(),
             payload,
+            nonce: fresh_nonce(
+                &self.0.get_spaces().conductor_db.clone(),
+                provenance.clone(),
+            )
+            .await?,
         };
         let call = ZomeCall::try_from_unsigned_zome_call(self.keystore(), call_unsigned).await?;
         match self.handle().call_zome(call).await {

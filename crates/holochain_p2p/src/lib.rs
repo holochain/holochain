@@ -50,6 +50,7 @@ pub trait HolochainP2pDnaT {
         fn_name: FunctionName,
         cap_secret: Option<CapSecret>,
         payload: ExternIO,
+        nonce: IntNonce,
     ) -> actor::HolochainP2pResult<SerializedBytes>;
 
     /// Invoke a zome function on a remote node (if you have been granted the capability).
@@ -64,6 +65,7 @@ pub trait HolochainP2pDnaT {
         fn_name: FunctionName,
         cap: Option<CapSecret>,
         payload: ExternIO,
+        nonce: IntNonce,
     ) -> actor::HolochainP2pResult<()>;
 
     /// Publish data to the correct neighborhood.
@@ -178,6 +180,7 @@ impl HolochainP2pDnaT for HolochainP2pDna {
         fn_name: FunctionName,
         cap_secret: Option<CapSecret>,
         payload: ExternIO,
+        nonce: IntNonce,
     ) -> actor::HolochainP2pResult<SerializedBytes> {
         self.sender
             .call_remote(
@@ -189,6 +192,7 @@ impl HolochainP2pDnaT for HolochainP2pDna {
                 fn_name,
                 cap_secret,
                 payload,
+                nonce,
             )
             .await
     }
@@ -205,6 +209,7 @@ impl HolochainP2pDnaT for HolochainP2pDna {
         fn_name: FunctionName,
         cap: Option<CapSecret>,
         payload: ExternIO,
+        nonce: IntNonce,
     ) -> actor::HolochainP2pResult<()> {
         self.sender
             .remote_signal(
@@ -215,6 +220,7 @@ impl HolochainP2pDnaT for HolochainP2pDna {
                 fn_name,
                 cap,
                 payload,
+                nonce,
             )
             .await
     }

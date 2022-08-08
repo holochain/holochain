@@ -28,6 +28,8 @@ impl HolochainP2pHandler for StubNetwork {
     ) -> HolochainP2pHandlerResult<()> {
         Err("stub".into())
     }
+
+    /// Stub outgoing remote calls.
     fn handle_call_remote(
         &mut self,
         dna_hash: DnaHash,
@@ -38,9 +40,12 @@ impl HolochainP2pHandler for StubNetwork {
         fn_name: FunctionName,
         cap_secret: Option<CapSecret>,
         payload: ExternIO,
+        nonce: IntNonce,
     ) -> HolochainP2pHandlerResult<SerializedBytes> {
         Err("stub".into())
     }
+
+    /// Stub outgoing remote signals.
     fn handle_remote_signal(
         &mut self,
         dna_hash: DnaHash,
@@ -50,6 +55,7 @@ impl HolochainP2pHandler for StubNetwork {
         fn_name: FunctionName,
         cap: Option<CapSecret>,
         payload: ExternIO,
+        nonce: IntNonce,
     ) -> HolochainP2pHandlerResult<()> {
         Err("stub".into())
     }
@@ -254,6 +260,7 @@ mod tests {
 
         let zome_name: ZomeName = "".into();
         let fn_name: FunctionName = "".into();
+        let nonce = 1;
         let cap_secret = None;
         let payload = ExternIO::encode(b"yippo").unwrap();
 
@@ -267,6 +274,7 @@ mod tests {
                     fn_name: fn_name.clone(),
                     cap_secret: cap_secret.clone(),
                     payload: payload.clone(),
+                    nonce,
                 }
                 .data_to_sign()
                 .unwrap(),
@@ -275,7 +283,9 @@ mod tests {
             .unwrap();
 
         let res = p2p
-            .call_remote(dna, a1, signature, a2, zome_name, fn_name, None, payload)
+            .call_remote(
+                dna, a1, signature, a2, zome_name, fn_name, None, payload, nonce,
+            )
             .await
             .unwrap();
         let res: Vec<u8> = UnsafeBytes::from(res).into();

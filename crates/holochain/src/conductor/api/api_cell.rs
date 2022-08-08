@@ -14,6 +14,7 @@ use async_trait::async_trait;
 use holo_hash::DnaHash;
 use holochain_conductor_api::ZomeCall;
 use holochain_keystore::MetaLairClient;
+use holochain_sqlite::nonce::WitnessNonceResult;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_types::prelude::*;
 use tokio::sync::mpsc::error::SendError;
@@ -185,6 +186,17 @@ pub trait CellConductorReadHandleT: Send + Sync {
     /// Get a [`EntryDef`](holochain_zome_types::EntryDef) from the [`EntryDefBufferKey`](holochain_types::dna::EntryDefBufferKey)
     fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef>;
 
+    /// Try to get a new nonce for a local agent. Fails if the local agent can't sign some data.
+    async fn fresh_nonce_for_local_agent(&self, agent: AgentPubKey)
+        -> ConductorApiResult<IntNonce>;
+
+    /// Try to put the nonce from a calling agent in the db. Fails with a stale result if a newer nonce exists.
+    async fn witness_nonce_from_calling_agent(
+        &self,
+        agent: AgentPubKey,
+        nonce: IntNonce,
+    ) -> ConductorApiResult<WitnessNonceResult>;
+
     /// Find the first cell ID across all apps the given cell id is in that
     /// is assigned to the given role.
     async fn find_cell_with_role_alongside_cell(
@@ -220,6 +232,27 @@ impl CellConductorReadHandleT for CellConductorApi {
 
     fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef> {
         CellConductorApiT::get_entry_def(self, key)
+    }
+
+    async fn fresh_nonce_for_local_agent(
+        &self,
+        agent: AgentPubKey,
+    ) -> ConductorApiResult<IntNonce> {
+        Ok(self
+            .conductor_handle
+            .fresh_nonce_for_local_agent(agent)
+            .await?)
+    }
+
+    async fn witness_nonce_from_calling_agent(
+        &self,
+        agent: AgentPubKey,
+        nonce: IntNonce,
+    ) -> ConductorApiResult<WitnessNonceResult> {
+        Ok(self
+            .conductor_handle
+            .witness_nonce_from_calling_agent(agent, nonce)
+            .await?)
     }
 
     async fn find_cell_with_role_alongside_cell(

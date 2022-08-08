@@ -342,10 +342,14 @@ impl ZomeCallInvocation {
     }
 
     pub async fn verify_nonce(&self, host_access: &ZomeCallHostAccess) -> RibosomeResult<bool> {
-        matches!(
-            witness_nonce(host_access.workspace.nonces(), self.provenance, self.nonce)?,
+        Ok(matches!(
+            host_access
+                .call_zome_handle
+                .witness_nonce_from_calling_agent(self.provenance.clone(), self.nonce)
+                .await
+                .map_err(Box::new)?,
             WitnessNonceResult::Fresh
-        )
+        ))
     }
 
     /// to verify if the zome call crypto is authorized:
@@ -436,6 +440,7 @@ impl ZomeCallInvocation {
             payload,
             provenance,
             signature,
+            nonce,
         } = call;
         let zome = conductor_api
             .get_zome(cell_id.dna_hash(), &zome_name)
@@ -448,6 +453,7 @@ impl ZomeCallInvocation {
             payload,
             provenance,
             signature,
+            nonce,
         })
     }
 }
@@ -462,6 +468,7 @@ impl From<ZomeCallInvocation> for ZomeCall {
             payload,
             provenance,
             signature,
+            nonce,
         } = inv;
         Self {
             cell_id,
@@ -471,6 +478,7 @@ impl From<ZomeCallInvocation> for ZomeCall {
             payload,
             provenance,
             signature,
+            nonce,
         }
     }
 }

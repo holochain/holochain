@@ -763,6 +763,8 @@ where
         fn_name: func.into(),
         payload: ExternIO::encode(payload)?,
         provenance: cell_id.agent_pubkey().clone(),
+        // This will produce duplicate nonces, the caller MUST handle that.
+        nonce: I64Fixturator::new(Predictable).next().unwrap(),
     })
 }
 
@@ -795,7 +797,7 @@ where
         payload,
         provenance,
         signature,
-        nonce
+        nonce,
     })
 }
 

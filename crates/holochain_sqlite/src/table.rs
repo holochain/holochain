@@ -16,9 +16,6 @@ pub(crate) fn initialize_database(conn: &mut Connection, db_kind: DbKind) -> rus
         DbKind::Conductor => {
             crate::schema::SCHEMA_CONDUCTOR.initialize(conn, Some(db_kind))?;
         }
-        DbKind::Nonce => {
-            crate::schema::SCHEMA_NONCE.initialize(conn, Some(db_kind))?;
-        }
         DbKind::Wasm => {
             crate::schema::SCHEMA_WASM.initialize(conn, Some(db_kind))?;
         }

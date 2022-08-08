@@ -1,7 +1,10 @@
 use super::SweetZome;
 use hdk::prelude::*;
 use holo_hash::DnaHash;
-use holochain_sqlite::db::{DbKindAuthored, DbKindDht};
+use holochain_sqlite::{
+    db::{DbKindAuthored, DbKindDht},
+    prelude::DbKindConductor,
+};
 use holochain_types::db::DbWrite;
 /// A reference to a Cell created by a SweetConductor installation function.
 /// It has very concise methods for calling a zome on this cell
@@ -10,6 +13,7 @@ pub struct SweetCell {
     pub(super) cell_id: CellId,
     pub(super) cell_authored_db: DbWrite<DbKindAuthored>,
     pub(super) cell_dht_db: DbWrite<DbKindDht>,
+    pub(super) cell_conductor_db: DbWrite<DbKindConductor>,
 }
 
 impl SweetCell {
@@ -26,6 +30,11 @@ impl SweetCell {
     /// Get the dht environment for this cell
     pub fn dht_db(&self) -> &DbWrite<DbKindDht> {
         &self.cell_dht_db
+    }
+
+    /// Get the conductor environment for this cell
+    pub fn conductor_db(&self) -> &DbWrite<DbKindConductor> {
+        &self.cell_conductor_db
     }
 
     /// Accessor for AgentPubKey

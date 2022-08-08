@@ -124,6 +124,7 @@ pub mod wasm_test {
     use holochain_types::zome_call::ZomeCallUnsigned;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_wasmer_host::prelude::*;
+    use holochain_sqlite::nonce::fresh_nonce;
 
     /// Allow ChainLocked error, panic on anything else
     fn expect_chain_locked(
@@ -213,6 +214,7 @@ pub mod wasm_test {
                         cap_secret: None,
                         provenance: alice_pubkey.clone(),
                         payload: ExternIO::encode(()).unwrap(),
+                        nonce: fresh_nonce(&conductor.get_spaces().conductor_db, alice_pubkey.clone()).await.unwrap()
                     },
                 )
                 .await
@@ -240,6 +242,7 @@ pub mod wasm_test {
                             bob_response.clone(),
                         ])
                         .unwrap(),
+                        nonce: fresh_nonce(&conductor.spaces.conductor_db, alice_pubkey.clone()).await.unwrap(),
                     },
                 )
                 .await
@@ -321,6 +324,7 @@ pub mod wasm_test {
                         cap_secret: None,
                         provenance: alice_pubkey.clone(),
                         payload: ExternIO::encode(&preflight_request_2).unwrap(),
+                        nonce: fresh_nonce(&conductor.spaces.conductor_db, alice_pubkey.clone()).await.unwrap(),
                     },
                 )
                 .await
@@ -360,6 +364,7 @@ pub mod wasm_test {
                         cap_secret: None,
                         provenance: alice_pubkey.clone(),
                         payload: ExternIO::encode(()).unwrap(),
+                        nonce: fresh_nonce(&conductor.spaces.conductor_db, alice_pubkey.clone()).await.unwrap(),
                     },
                 )
                 .await
@@ -380,6 +385,7 @@ pub mod wasm_test {
                         cap_secret: None,
                         provenance: bob_pubkey.clone(),
                         payload: ExternIO::encode(()).unwrap(),
+                        nonce: fresh_nonce(&conductor.spaces.conductor_db, bob_pubkey.clone()).await.unwrap(),
                     },
                 )
                 .await
@@ -409,6 +415,7 @@ pub mod wasm_test {
                         cap_secret: None,
                         provenance: alice_pubkey.clone(),
                         payload: ExternIO::encode(()).unwrap(),
+                        nonce: fresh_nonce(&conductor.spaces.conductor_db, alice_pubkey.clone()).await.unwrap(),
                     },
                 )
                 .await
@@ -447,6 +454,7 @@ pub mod wasm_test {
                         cap_secret: None,
                         provenance: bob_pubkey.clone(),
                         payload: ExternIO::encode(()).unwrap(),
+                        nonce: fresh_nonce(&conductor.spaces.conductor_db, bob_pubkey.clone()).await.unwrap(),
                     },
                 )
                 .await

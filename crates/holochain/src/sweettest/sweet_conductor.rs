@@ -262,11 +262,14 @@ impl SweetConductor {
             // Create the SweetCell
             let cell_authored_db = self.handle().0.get_authored_db(&dna_hash)?;
             let cell_dht_db = self.handle().0.get_dht_db(&dna_hash)?;
+            let cell_conductor_db: DbWrite<DbKindConductor> =
+                self.handle().0.get_spaces().conductor_db.clone();
             let cell_id = CellId::new(dna_hash, agent.clone());
             let cell = SweetCell {
                 cell_id,
                 cell_authored_db,
                 cell_dht_db,
+                cell_conductor_db,
             };
             sweet_cells.push(cell);
         }

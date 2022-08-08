@@ -932,6 +932,7 @@ pub mod wasm_test {
     use crate::sweettest::SweetDnaFile;
     use ::fixt::prelude::*;
     use hdk::prelude::*;
+    use holochain_sqlite::nonce::fresh_nonce;
     use holochain_types::prelude::AgentPubKeyFixturator;
     use holochain_types::zome_call::ZomeCallUnsigned;
     use holochain_wasm_test_utils::TestWasm;
@@ -978,6 +979,9 @@ pub mod wasm_test {
                         cap_secret: None,
                         provenance: alice_pubkey.clone(),
                         payload: ExternIO::encode(()).unwrap(),
+                        nonce: fresh_nonce(&conductor.spaces.conductor_db, alice_pubkey.clone())
+                            .await
+                            .unwrap(),
                     },
                 )
                 .await

@@ -172,6 +172,7 @@ ghost_actor::ghost_chan! {
             fn_name: FunctionName,
             cap_secret: Option<CapSecret>,
             payload: ExternIO,
+            nonce: IntNonce,
         ) -> SerializedBytes;
 
         /// A remote node is publishing data in a range we claim to be holding.

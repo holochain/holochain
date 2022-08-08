@@ -12,7 +12,6 @@ use holochain_types::db::DbWrite;
 use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_zome_types::DnaDef;
 use holochain_zome_types::SignedActionHashed;
-use holochain_sqlite::prelude::DbKindNonce;
 
 use crate::prelude::SourceChain;
 use crate::prelude::SourceChainError;
@@ -28,7 +27,6 @@ pub struct HostFnWorkspace<
     authored: DbRead<DbKindAuthored>,
     dht: DbRead<DbKindDht>,
     cache: DbWrite<DbKindCache>,
-    nonces: DbWrite<DbKindNonce>,
     dna_def: Arc<DnaDef>,
     /// Did the root call that started this call chain
     /// come from an init callback.
@@ -68,10 +66,6 @@ impl HostFnWorkspace {
     pub fn dna_def(&self) -> Arc<DnaDef> {
         self.dna_def.clone()
     }
-
-    pub fn nonces(&self) -> &DbWrite<DbKindNonce> {
-        &self.nonces
-    }
 }
 
 impl SourceChainWorkspace {
@@ -80,7 +74,6 @@ impl SourceChainWorkspace {
         dht: DbWrite<DbKindDht>,
         dht_db_cache: DhtDbQueryCache,
         cache: DbWrite<DbKindCache>,
-        nonces: DbWrite<DbKindNonce>,
         keystore: MetaLairClient,
         author: AgentPubKey,
         dna_def: Arc<DnaDef>,
@@ -93,7 +86,7 @@ impl SourceChainWorkspace {
             author,
         )
         .await?;
-        Self::new_inner(authored, dht, cache, nonces, source_chain, dna_def, false).await
+        Self::new_inner(authored, dht, cache, source_chain, dna_def, false).await
     }
 
     /// Create a source chain workspace where the root caller is the init callback.
@@ -102,7 +95,6 @@ impl SourceChainWorkspace {
         dht: DbWrite<DbKindDht>,
         dht_db_cache: DhtDbQueryCache,
         cache: DbWrite<DbKindCache>,
-        nonces: DbWrite<DbKindNonce>,
         keystore: MetaLairClient,
         author: AgentPubKey,
         dna_def: Arc<DnaDef>,
@@ -115,7 +107,7 @@ impl SourceChainWorkspace {
             author,
         )
         .await?;
-        Self::new_inner(authored, dht, cache, nonces, source_chain, dna_def, true).await
+        Self::new_inner(authored, dht, cache, source_chain, dna_def, true).await
     }
 
     /// Create a source chain with a blank chain head.
@@ -127,7 +119,6 @@ impl SourceChainWorkspace {
         dht: DbWrite<DbKindDht>,
         dht_db_cache: DhtDbQueryCache,
         cache: DbWrite<DbKindCache>,
-        nonces: DbWrite<DbKindNonce>,
         keystore: MetaLairClient,
         author: AgentPubKey,
         dna_def: Arc<DnaDef>,
@@ -140,14 +131,13 @@ impl SourceChainWorkspace {
             author,
         )
         .await?;
-        Self::new_inner(authored, dht, cache, nonces, source_chain, dna_def, false).await
+        Self::new_inner(authored, dht, cache, source_chain, dna_def, false).await
     }
 
     async fn new_inner(
         authored: DbWrite<DbKindAuthored>,
         dht: DbWrite<DbKindDht>,
         cache: DbWrite<DbKindCache>,
-        nonces: DbWrite<DbKindNonce>,
         source_chain: SourceChain,
         dna_def: Arc<DnaDef>,
         init_is_root: bool,
@@ -159,7 +149,6 @@ impl SourceChainWorkspace {
                 dht: dht.into(),
                 dna_def,
                 cache,
-                nonces,
                 init_is_root,
             },
             source_chain,
@@ -183,7 +172,6 @@ where
         dht: SourceChainDht,
         dht_db_cache: DhtDbQueryCache,
         cache: DbWrite<DbKindCache>,
-        nonces: DbWrite<DbKindNonce>,
         keystore: MetaLairClient,
         author: Option<AgentPubKey>,
         dna_def: Arc<DnaDef>,
@@ -206,7 +194,6 @@ where
             authored: authored.into(),
             dht: dht.into(),
             cache,
-            nonces,
             dna_def,
             init_is_root: false,
         })
@@ -252,7 +239,6 @@ impl From<HostFnWorkspace> for HostFnWorkspaceRead {
             authored: workspace.authored,
             dht: workspace.dht,
             cache: workspace.cache,
-            nonces: workspace.nonces,
             dna_def: workspace.dna_def,
             init_is_root: workspace.init_is_root,
         }
@@ -272,7 +258,6 @@ impl From<SourceChainWorkspace> for HostFnWorkspaceRead {
             authored: workspace.inner.authored,
             dht: workspace.inner.dht,
             cache: workspace.inner.cache,
-            nonces: workspace.inner.nonces,
             dna_def: workspace.inner.dna_def,
             init_is_root: workspace.inner.init_is_root,
         }

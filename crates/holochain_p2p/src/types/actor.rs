@@ -223,6 +223,7 @@ ghost_actor::ghost_chan! {
             fn_name: FunctionName,
             cap_secret: Option<CapSecret>,
             payload: ExternIO,
+            nonce: IntNonce,
         ) -> SerializedBytes;
 
         /// Invoke a zome function on a remote node (if you have been granted the capability).
@@ -237,6 +238,7 @@ ghost_actor::ghost_chan! {
             fn_name: FunctionName,
             cap: Option<CapSecret>,
             payload: ExternIO,
+            nonce: IntNonce,
         ) -> ();
 
         /// Publish data to the correct neighborhood.

@@ -17,6 +17,7 @@ use holochain_conductor_api::{AdminRequest, AdminResponse, AppRequest, AppRespon
 use holochain_keystore::crude_mock_keystore::spawn_crude_mock_keystore;
 use holochain_keystore::crude_mock_keystore::spawn_real_or_mock_keystore;
 use holochain_keystore::crude_mock_keystore::MockLairControl;
+use holochain_sqlite::nonce::fresh_nonce;
 use holochain_state::prelude::{test_keystore, *};
 use holochain_types::inline_zome::InlineZomeSet;
 use holochain_types::test_utils::fake_cell_id;
@@ -447,6 +448,9 @@ async fn make_signing_call(
                 payload: ExternIO::encode(()).unwrap(),
                 cap_secret: None,
                 provenance: cell.agent_pubkey().clone(),
+                nonce: fresh_nonce(cell.conductor_db(), cell.agent_pubkey().clone())
+                    .await
+                    .unwrap(),
             },
         )
         .await

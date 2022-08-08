@@ -321,7 +321,7 @@ fixturator!(
                 cache.to_db(),
                 keystore,
                 Some(fixt!(AgentPubKey, Predictable, get_fixt_index!())),
-                Arc::new(fixt!(DnaDef))
+                Arc::new(fixt!(DnaDef)),
             ).await.unwrap()
         })
     };
@@ -454,6 +454,7 @@ fixturator!(
         payload: ExternIoFixturator::new(Empty).next().unwrap(),
         provenance: AgentPubKeyFixturator::new(Empty).next().unwrap(),
         signature: SignatureFixturator::new(Empty).next().unwrap(),
+        nonce: I64Fixturator::new(Empty).next().unwrap(),
     };
     curve Unpredictable ZomeCallInvocation {
         cell_id: CellIdFixturator::new(Unpredictable).next().unwrap(),
@@ -463,6 +464,7 @@ fixturator!(
         payload: ExternIoFixturator::new(Unpredictable).next().unwrap(),
         provenance: AgentPubKeyFixturator::new(Unpredictable).next().unwrap(),
         signature: SignatureFixturator::new(Unpredictable).next().unwrap(),
+        nonce: I64Fixturator::new(Unpredictable).next().unwrap(),
     };
     curve Predictable ZomeCallInvocation {
         cell_id: CellIdFixturator::new_indexed(Predictable, get_fixt_index!())
@@ -484,6 +486,7 @@ fixturator!(
             .next()
             .unwrap(),
         signature: SignatureFixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap(),
+        nonce: I64Fixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap(),
     };
 );
 

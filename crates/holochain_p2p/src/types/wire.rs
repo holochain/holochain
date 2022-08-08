@@ -34,6 +34,7 @@ pub enum WireMessage {
         cap_secret: Option<CapSecret>,
         #[serde(with = "serde_bytes")]
         data: Vec<u8>,
+        nonce: IntNonce,
     },
     CallRemoteMulti {
         zome_name: ZomeName,
@@ -43,6 +44,7 @@ pub enum WireMessage {
         cap_secret: Option<CapSecret>,
         #[serde(with = "serde_bytes")]
         data: Vec<u8>,
+        nonce: IntNonce,
     },
     Publish {
         request_validation_receipt: bool,
@@ -89,6 +91,7 @@ impl WireMessage {
         holochain_serialized_bytes::decode(&data)
     }
 
+    /// For an outgoing remote call.
     pub fn call_remote(
         zome_name: ZomeName,
         fn_name: FunctionName,
@@ -97,6 +100,7 @@ impl WireMessage {
         to_agent: holo_hash::AgentPubKey,
         cap_secret: Option<CapSecret>,
         payload: ExternIO,
+        nonce: IntNonce,
     ) -> WireMessage {
         Self::CallRemote {
             zome_name,
@@ -106,6 +110,7 @@ impl WireMessage {
             signature,
             cap_secret,
             data: payload.into_vec(),
+            nonce,
         }
     }
 
@@ -116,6 +121,7 @@ impl WireMessage {
         to_agents: Vec<(Signature, holo_hash::AgentPubKey)>,
         cap_secret: Option<CapSecret>,
         payload: ExternIO,
+        nonce: IntNonce,
     ) -> WireMessage {
         Self::CallRemoteMulti {
             zome_name,
@@ -124,6 +130,7 @@ impl WireMessage {
             to_agents,
             cap_secret,
             data: payload.into_vec(),
+            nonce,
         }
     }
 

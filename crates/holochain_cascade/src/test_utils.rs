@@ -18,6 +18,7 @@ use holochain_sqlite::db::DbKindDht;
 use holochain_sqlite::db::DbKindOp;
 use holochain_sqlite::db::DbKindT;
 use holochain_sqlite::db::WriteManager;
+use holochain_sqlite::nonce::IntNonce;
 use holochain_sqlite::prelude::DatabaseResult;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_state::mutations::insert_op;
@@ -189,6 +190,7 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         _fn_name: holochain_zome_types::FunctionName,
         _cap: Option<holochain_zome_types::CapSecret>,
         _payload: holochain_zome_types::ExternIO,
+        _nonce: IntNonce,
     ) -> actor::HolochainP2pResult<()> {
         todo!()
     }
@@ -245,6 +247,7 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         _fn_name: holochain_zome_types::FunctionName,
         _cap: Option<holochain_zome_types::CapSecret>,
         _payload: holochain_zome_types::ExternIO,
+        _nonce: IntNonce,
     ) -> actor::HolochainP2pResult<holochain_serialized_bytes::SerializedBytes> {
         todo!()
     }
@@ -368,6 +371,7 @@ impl HolochainP2pDnaT for MockNetwork {
         _fn_name: holochain_zome_types::FunctionName,
         _cap: Option<holochain_zome_types::CapSecret>,
         _payload: holochain_zome_types::ExternIO,
+        _nonce: IntNonce,
     ) -> actor::HolochainP2pResult<()> {
         todo!()
     }
@@ -424,6 +428,7 @@ impl HolochainP2pDnaT for MockNetwork {
         _fn_name: holochain_zome_types::FunctionName,
         _cap: Option<holochain_zome_types::CapSecret>,
         _payload: holochain_zome_types::ExternIO,
+        _nonce: IntNonce,
     ) -> actor::HolochainP2pResult<holochain_serialized_bytes::SerializedBytes> {
         todo!()
     }

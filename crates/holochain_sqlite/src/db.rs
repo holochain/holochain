@@ -404,8 +404,6 @@ pub enum DbKind {
     Conductor,
     /// Specifies the environment used to save wasm
     Wasm,
-    /// Specifies the environment used to save nonces
-    Nonce,
     /// State of the p2p network (one per space).
     P2pAgentStore(Arc<KitsuneSpace>),
     /// Metrics for peers on p2p network (one per space).
@@ -551,22 +549,6 @@ impl DbKindT for DbKindConductor {
 
     fn if_corrupt_wipe(&self) -> bool {
         false
-    }
-}
-
-impl DbKindOp for DbKindNonce {}
-
-impl DbKindT for DbKindNonce {
-    fn kind(&self) -> DbKind {
-        DbKind::Nonce
-    }
-
-    fn filename_inner(&self) -> PathBuf {
-        ["nonce", "nonce"].iter().collect()
-    }
-
-    fn if_corrupt_wipe(&self) -> bool {
-        true
     }
 }
 

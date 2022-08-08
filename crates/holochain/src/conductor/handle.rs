@@ -76,6 +76,7 @@ use holochain_p2p::event::HolochainP2pEvent;
 use holochain_p2p::event::HolochainP2pEvent::*;
 use holochain_p2p::DnaHashExt;
 use holochain_p2p::HolochainP2pDnaT;
+use holochain_sqlite::nonce::WitnessNonceResult;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_state::prelude::SourceChainError;
 use holochain_state::prelude::SourceChainResult;
@@ -424,6 +425,16 @@ pub trait ConductorHandleT: Send + Sync {
         app_id: InstalledAppId,
         transition: AppStatusTransition,
     ) -> ConductorResult<(InstalledApp, AppStatusFx)>;
+
+    /// Try to get a new nonce for a local agent. Fails if the local agent can't sign some data.
+    async fn fresh_nonce_for_local_agent(&self, agent: AgentPubKey) -> ConductorResult<IntNonce>;
+
+    /// Try to put the nonce from a calling agent in the db. Fails with a stale result if a newer nonce exists.
+    async fn witness_nonce_from_calling_agent(
+        &self,
+        agent: AgentPubKey,
+        nonce: IntNonce,
+    ) -> ConductorResult<WitnessNonceResult>;
 
     // MAYBE: would be nice to have methods for accessing the underlying Conductor,
     // but this trait doesn't know the concrete type of underlying Conductor,
@@ -1549,6 +1560,20 @@ impl ConductorHandleT for ConductorHandleImpl {
     ) -> ConductorResult<(InstalledApp, AppStatusFx)> {
         self.conductor
             .transition_app_status(app_id, transition)
+            .await
+    }
+
+    async fn fresh_nonce_for_local_agent(&self, agent: AgentPubKey) -> ConductorResult<IntNonce> {
+        self.conductor.fresh_nonce_for_local_agent(agent).await
+    }
+
+    async fn witness_nonce_from_calling_agent(
+        &self,
+        agent: AgentPubKey,
+        nonce: IntNonce,
+    ) -> ConductorResult<WitnessNonceResult> {
+        self.conductor
+            .witness_nonce_from_calling_agent(agent, nonce)
             .await
     }
 }

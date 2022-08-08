@@ -1,8 +1,6 @@
 //! This module contains data and functions for running operations
 //! at the level of a [`DnaHash`] space.
 //! Multiple [`Cell`](crate::conductor::Cell)'s could share the same space.
-use std::{collections::HashMap, sync::Arc, time::Duration};
-use holochain_sqlite::prelude::DbKindNonce;
 use holo_hash::{DhtOpHash, DnaHash};
 use holochain_conductor_api::conductor::{ConductorConfig, DatabaseRootPath};
 use holochain_p2p::{
@@ -40,6 +38,7 @@ use kitsune_p2p::{
     KitsuneP2pConfig,
 };
 use rusqlite::named_params;
+use std::{collections::HashMap, sync::Arc, time::Duration};
 use tracing::instrument;
 
 use crate::core::{
@@ -90,8 +89,8 @@ pub struct Space {
     /// There is one per unique Dna.
     pub cache_db: DbWrite<DbKindCache>,
 
-    /// The nonces database. These are shared across cells.
-    pub nonces: DbWrite<DbKindNonce>,
+    /// The conductor database. There is only one of these.
+    pub conductor_db: DbWrite<DbKindConductor>,
 
     /// The authored databases. These are shared across cells.
     /// There is one per unique Dna.
@@ -615,6 +614,8 @@ impl Space {
             DbKindP2pMetrics(space),
             db_sync_level,
         )?;
+        let conductor_db: DbWrite<DbKindConductor> =
+            DbWrite::open_with_sync_level(root_db_dir.as_ref(), DbKindConductor, db_sync_level)?;
 
         let (tx, rx) = tokio::sync::mpsc::channel(100);
         tokio::spawn(p2p_agent_store::p2p_put_all_batch(
@@ -639,6 +640,7 @@ impl Space {
             incoming_op_hashes,
             incoming_ops_batch,
             dht_query_cache,
+            conductor_db,
         };
         Ok(r)
     }

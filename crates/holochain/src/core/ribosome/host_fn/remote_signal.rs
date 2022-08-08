@@ -39,6 +39,15 @@ pub fn remote_signal(
             tokio::task::spawn(
                 async move {
                     let mut to_agent_list: Vec<(Signature, AgentPubKey)> = Vec::new();
+
+                    let nonce = match call_context.host_context.call_zome_handle().fresh_nonce_for_local_agent(from_agent.clone()).await {
+                        Ok(nonce) => nonce,
+                        Err(e) => {
+                            tracing::info!("Failed to get a fresh nonce because of {:?}", e);
+                            return;
+                        }
+                    };
+
                     for agent in agents {
                         let potentially_signature = ZomeCallUnsigned {
                             provenance: from_agent.clone(),
@@ -47,7 +56,9 @@ pub fn remote_signal(
                             fn_name: fn_name.clone(),
                             cap_secret: None,
                             payload: signal.clone(),
+                            nonce
                         }.sign(call_context.host_context.keystore()).await;
+
                         match potentially_signature {
                             Ok(signature) => to_agent_list.push((signature, agent)),
                             Err(e) => {
@@ -58,7 +69,7 @@ pub fn remote_signal(
                     }
 
                     if let Err(e) = network
-                        .remote_signal(from_agent, to_agent_list, zome_name, fn_name, None, signal)
+                        .remote_signal(from_agent, to_agent_list, zome_name, fn_name, None, signal, nonce)
                         .await
                     {
                         tracing::info!("Failed to send remote signals because of {:?}", e);
