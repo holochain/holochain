@@ -9,6 +9,9 @@ use std::path::PathBuf;
 
 pub use holochain_zome_types::test_utils::*;
 
+use self::chain::chain_item_to_action;
+use self::chain::chain_to_ops;
+
 #[allow(missing_docs)]
 pub mod chain;
 
@@ -180,7 +183,7 @@ impl From<TestChainHash> for ActionHash {
 
 /// A test implementation of a minimal ChainItem which uses simple numbers for hashes
 /// and always points back to the previous number
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct TestChainItem {
     /// The sequence number
     pub seq: u32,

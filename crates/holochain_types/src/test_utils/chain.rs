@@ -66,30 +66,36 @@ pub fn gap_chain(ranges: &[Range<u32>]) -> Vec<TestChainItem> {
         .collect()
 }
 
+pub fn chain_item_to_action(u: &mut Unstructured, i: &impl ChainItem) -> SignedActionHashed {
+    let action_seq = i.seq();
+    let prev_action = i.prev_hash().cloned().map(Into::into);
+    let hash: ActionHash = i.get_hash().clone().into();
+    let mut action = SignedActionHashed::arbitrary(u).unwrap();
+    match (action_seq, prev_action) {
+        (0, _) => {
+            let dna = Dna::arbitrary(u).unwrap();
+            action.hashed.content = Action::Dna(dna);
+            action.hashed.hash = hash;
+        }
+        (action_seq, Some(prev_action)) => {
+            let mut create = Create::arbitrary(u).unwrap();
+            create.action_seq = action_seq;
+            create.prev_action = prev_action;
+            action.hashed.content = Action::Create(create);
+            action.hashed.hash = hash;
+        }
+        _ => unreachable!(),
+    }
+    action
+}
+
 pub fn chain_to_ops(chain: Vec<impl ChainItem>) -> Vec<RegisterAgentActivity> {
     let mut u = Unstructured::new(&holochain_zome_types::NOISE);
     chain
         .into_iter()
         .map(|i| {
-            let action_seq = i.seq();
-            let prev_action = i.prev_hash().cloned().map(Into::into);
-            let hash: ActionHash = i.get_hash().clone().into();
             let mut op = RegisterAgentActivity::arbitrary(&mut u).unwrap();
-            match (action_seq, prev_action) {
-                (0, _) => {
-                    let dna = Dna::arbitrary(&mut u).unwrap();
-                    op.action.hashed.content = Action::Dna(dna);
-                    op.action.hashed.hash = hash;
-                }
-                (action_seq, Some(prev_action)) => {
-                    let mut create = Create::arbitrary(&mut u).unwrap();
-                    create.action_seq = action_seq;
-                    create.prev_action = prev_action;
-                    op.action.hashed.content = Action::Create(create);
-                    op.action.hashed.hash = hash;
-                }
-                _ => unreachable!(),
-            }
+            op.action = chain_item_to_action(&mut u, &i);
             op
         })
         .collect()
