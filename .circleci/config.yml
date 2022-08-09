@@ -130,52 +130,6 @@ jobs:
               command: $(nix-build . --fallback --no-link -A pkgs.ci.ciCachixPush)/bin/hc-ci-cachix-push.sh || true
               when: always
 
-   slow-test:
-      docker:
-         - image: holochain/holochain:circle.build.develop
-           auth:
-              username: $DOCKER_USER
-              password: $DOCKER_PASS
-      resource_class: xlarge
-      environment:
-         CACHIX_NAME: holochain-ci
-         NIXPKGS_ALLOW_UNFREE: 1
-      steps:
-         - checkout
-         - run: git config --global --unset url.ssh://git@github.com.insteadof
-         - run:
-              name: Set up Nix cache
-              command: $(nix-build . --fallback --no-link -A pkgs.ci.ciSetupNixConf)/bin/hc-ci-setup-nix-conf.sh
-         - run:
-              name: Run the slow tests
-              no_output_timeout: 30m
-              command: nix-shell --fallback --pure --argstr flavor "coreDev" --run hc-test-slow
-
-   slow-test-nextest:
-      docker:
-         - image: holochain/holochain:circle.build.develop
-           auth:
-              username: $DOCKER_USER
-              password: $DOCKER_PASS
-      resource_class: xlarge
-      environment:
-         CACHIX_NAME: holochain-ci
-         NIXPKGS_ALLOW_UNFREE: 1
-      steps:
-         - checkout
-         - run: git config --global --unset url.ssh://git@github.com.insteadof
-         - run:
-              name: Set up Nix cache
-              command: $(nix-build . --fallback --no-link -A pkgs.ci.ciSetupNixConf)/bin/hc-ci-setup-nix-conf.sh
-         - run:
-              name: Run the slow tests (nextest)
-              no_output_timeout: 30m
-              command: nix-shell --fallback --pure --argstr flavor "coreDev" --run hc-test-slow-nextest
-         - run:
-              name: push to cachix
-              command: $(nix-build . --fallback --no-link -A pkgs.ci.ciCachixPush)/bin/hc-ci-cachix-push.sh || true
-              when: always
-
    wasm-test:
       docker:
          - image: holochain/holochain:circle.build.develop
@@ -250,7 +204,6 @@ workflows:
          - standard-test-nextest
          - rustdoc-build-test
          - hc-static-checks
-         - slow-test-nextest
          - wasm-test
          # - merge-test-mac
 
@@ -262,7 +215,6 @@ workflows:
                  - standard-test-nextest
                  - rustdoc-build-test
                  - hc-static-checks
-                 - slow-test-nextest
                  - wasm-test
                  - merge-release-test
 
