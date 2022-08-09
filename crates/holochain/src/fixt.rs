@@ -455,6 +455,7 @@ fixturator!(
         provenance: AgentPubKeyFixturator::new(Empty).next().unwrap(),
         signature: SignatureFixturator::new(Empty).next().unwrap(),
         nonce: I64Fixturator::new(Empty).next().unwrap(),
+        expires_at: TimestampFixturator::new(Empty).next().unwrap(),
     };
     curve Unpredictable ZomeCallInvocation {
         cell_id: CellIdFixturator::new(Unpredictable).next().unwrap(),
@@ -465,6 +466,7 @@ fixturator!(
         provenance: AgentPubKeyFixturator::new(Unpredictable).next().unwrap(),
         signature: SignatureFixturator::new(Unpredictable).next().unwrap(),
         nonce: I64Fixturator::new(Unpredictable).next().unwrap(),
+        expires_at: TimestampFixturator::new(Unpredictable).next().unwrap(),
     };
     curve Predictable ZomeCallInvocation {
         cell_id: CellIdFixturator::new_indexed(Predictable, get_fixt_index!())
@@ -487,6 +489,7 @@ fixturator!(
             .unwrap(),
         signature: SignatureFixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap(),
         nonce: I64Fixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap(),
+        expires_at: TimestampFixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap(),
     };
 );
 

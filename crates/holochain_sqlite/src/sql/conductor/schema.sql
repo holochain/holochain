@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS ConductorState (
 
 CREATE TABLE IF NOT EXISTS Nonce (
     -- Primary key
-    agent            BLOB      PRIMARY KEY ON CONFLICT REPLACE,
-    nonce            INTEGER           NOT NULL
+    agent BLOB PRIMARY KEY ON CONFLICT REPLACE,
+    nonce INTEGER NOT NULL,
+    expires INTEGER NOT NULL
 );

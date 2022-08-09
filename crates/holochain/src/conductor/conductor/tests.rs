@@ -17,7 +17,6 @@ use holochain_conductor_api::{AdminRequest, AdminResponse, AppRequest, AppRespon
 use holochain_keystore::crude_mock_keystore::spawn_crude_mock_keystore;
 use holochain_keystore::crude_mock_keystore::spawn_real_or_mock_keystore;
 use holochain_keystore::crude_mock_keystore::MockLairControl;
-use holochain_sqlite::nonce::fresh_nonce;
 use holochain_state::prelude::{test_keystore, *};
 use holochain_types::inline_zome::InlineZomeSet;
 use holochain_types::test_utils::fake_cell_id;
@@ -429,8 +428,8 @@ async fn test_signing_error_during_genesis() {
 }
 
 async fn make_signing_call(
+    conductor: &SweetConductor,
     client: &mut WebsocketSender,
-    keystore: &MetaLairClient,
     keystore_control: &MockLairControl,
     cell: &SweetCell,
 ) -> AppResponse {
@@ -438,9 +437,13 @@ async fn make_signing_call(
     if reinstate_mock {
         keystore_control.use_real();
     }
+    let (nonce, expires_at) = conductor.inner_handle()
+        .fresh_nonce_for_local_agent(cell.agent_pubkey().clone(), Timestamp::now())
+        .await
+        .unwrap();
     let request = AppRequest::ZomeCall(Box::new(
         ZomeCall::try_from_unsigned_zome_call(
-            keystore,
+            conductor.inner_handle().keystore(),
             ZomeCallUnsigned {
                 cell_id: cell.cell_id().clone(),
                 zome_name: "sign".into(),
@@ -448,9 +451,8 @@ async fn make_signing_call(
                 payload: ExternIO::encode(()).unwrap(),
                 cap_secret: None,
                 provenance: cell.agent_pubkey().clone(),
-                nonce: fresh_nonce(cell.conductor_db(), cell.agent_pubkey().clone())
-                    .await
-                    .unwrap(),
+                nonce,
+                expires_at,
             },
         )
         .await
@@ -529,17 +531,17 @@ async fn test_signing_error_during_genesis_doesnt_bork_interfaces() {
         .unwrap();
 
     assert_matches!(response, AdminResponse::Error(_));
-    let response = make_signing_call(&mut app_client, &keystore, &keystore_control, &cell2).await;
+    let response = make_signing_call(&conductor, &mut app_client, &keystore_control, &cell2).await;
 
     assert_matches!(response, AppResponse::Error(_));
 
     // Go back to the good keystore, see if we can proceed
     keystore_control.use_real();
 
-    let response = make_signing_call(&mut app_client, &keystore, &keystore_control, &cell2).await;
+    let response = make_signing_call(&conductor, &mut app_client, &keystore_control, &cell2).await;
     assert_matches!(response, AppResponse::ZomeCall(_));
 
-    let response = make_signing_call(&mut app_client, &keystore, &keystore_control, &cell1).await;
+    let response = make_signing_call(&conductor, &mut app_client, &keystore_control, &cell1).await;
     assert_matches!(response, AppResponse::ZomeCall(_));
 }
 

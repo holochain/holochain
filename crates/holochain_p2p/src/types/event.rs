@@ -173,6 +173,7 @@ ghost_actor::ghost_chan! {
             cap_secret: Option<CapSecret>,
             payload: ExternIO,
             nonce: IntNonce,
+            expires_at: Timestamp,
         ) -> SerializedBytes;
 
         /// A remote node is publishing data in a range we claim to be holding.

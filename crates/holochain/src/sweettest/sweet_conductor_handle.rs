@@ -2,7 +2,6 @@ use super::SweetZome;
 use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::{api::error::ConductorApiResult, ConductorHandle};
 use holochain_conductor_api::ZomeCall;
-use holochain_sqlite::nonce::fresh_nonce;
 use holochain_types::prelude::*;
 use unwrap_to::unwrap_to;
 
@@ -78,6 +77,10 @@ impl SweetConductorHandle {
         O: serde::de::DeserializeOwned + std::fmt::Debug,
     {
         let payload = ExternIO::encode(payload).expect("Couldn't serialize payload");
+        let (nonce, expires_at) = self
+            .handle()
+            .fresh_nonce_for_local_agent(provenance.clone(), Timestamp::now())
+            .await?;
         let call_unsigned = ZomeCallUnsigned {
             cell_id: zome.cell_id().clone(),
             zome_name: zome.name().clone(),
@@ -85,11 +88,8 @@ impl SweetConductorHandle {
             cap_secret,
             provenance: provenance.clone(),
             payload,
-            nonce: fresh_nonce(
-                &self.0.get_spaces().conductor_db.clone(),
-                provenance.clone(),
-            )
-            .await?,
+            nonce,
+            expires_at,
         };
         let call = ZomeCall::try_from_unsigned_zome_call(self.keystore(), call_unsigned).await?;
         match self.handle().call_zome(call).await {

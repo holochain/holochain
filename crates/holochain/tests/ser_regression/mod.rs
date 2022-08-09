@@ -38,6 +38,7 @@ async fn ser_entry_hash_test() {
 /// we can call a fn on a remote
 async fn ser_regression_test() {
     observability::test_run().ok();
+    let now = Timestamp::now();
     // ////////////
     // START DNA
     // ////////////
@@ -106,6 +107,7 @@ async fn ser_regression_test() {
 
     let channel = ChannelName("hello world".into());
 
+    let (nonce, expires_at) = handle.fresh_nonce_for_local_agent(alice_agent_id.clone(), now).await.unwrap();
     let invocation = ZomeCall::try_from_unsigned_zome_call(
         handle.keystore(),
         ZomeCallUnsigned {
@@ -115,6 +117,7 @@ async fn ser_regression_test() {
             fn_name: "create_channel".into(),
             payload: ExternIO::encode(channel).unwrap(),
             provenance: alice_agent_id.clone(),
+            nonce, expires_at,
         },
     )
     .await
@@ -140,6 +143,7 @@ async fn ser_regression_test() {
         channel_hash,
         content: "Hello from alice :)".into(),
     };
+    let (nonce, expires_at) = handle.fresh_nonce_for_local_agent(alice_agent_id.clone(), now).await.unwrap();
     let invocation = ZomeCall::try_from_unsigned_zome_call(
         handle.keystore(),
         ZomeCallUnsigned {
@@ -149,6 +153,7 @@ async fn ser_regression_test() {
             fn_name: "create_message".into(),
             payload: ExternIO::encode(message).unwrap(),
             provenance: alice_agent_id.clone(),
+            nonce, expires_at,
         },
     )
     .await

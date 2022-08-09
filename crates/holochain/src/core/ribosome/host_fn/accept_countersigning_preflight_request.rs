@@ -124,7 +124,6 @@ pub mod wasm_test {
     use holochain_types::zome_call::ZomeCallUnsigned;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_wasmer_host::prelude::*;
-    use holochain_sqlite::nonce::fresh_nonce;
 
     /// Allow ChainLocked error, panic on anything else
     fn expect_chain_locked(
@@ -153,6 +152,7 @@ pub mod wasm_test {
             bob_pubkey,
             ..
         } = RibosomeTestFixture::new(TestWasm::CounterSigning).await;
+        let now = Timestamp::now();
 
         // Before preflight Alice can commit
         let _: ActionHash = conductor.call(&alice, "create_a_thing", ()).await;
@@ -201,6 +201,8 @@ pub mod wasm_test {
                 unreachable!();
             };
 
+        let (nonce, expires_at) = conductor.inner_handle().fresh_nonce_for_local_agent(alice_pubkey.clone(), now).await.unwrap();
+
         // With an accepted preflight creations must fail for alice.
         let thing_fail_create_alice = conductor
             .handle()
@@ -214,7 +216,8 @@ pub mod wasm_test {
                         cap_secret: None,
                         provenance: alice_pubkey.clone(),
                         payload: ExternIO::encode(()).unwrap(),
-                        nonce: fresh_nonce(&conductor.get_spaces().conductor_db, alice_pubkey.clone()).await.unwrap()
+                        nonce,
+                        expires_at,
                     },
                 )
                 .await
@@ -224,6 +227,8 @@ pub mod wasm_test {
 
         expect_chain_locked(thing_fail_create_alice);
 
+        let (nonce, expires_at) = conductor.inner_handle().fresh_nonce_for_local_agent(alice_pubkey.clone(), now).await.unwrap();
+    
         // Creating the INCORRECT countersigned entry WILL immediately unlock
         // the chain.
         let countersign_fail_create_alice = conductor
@@ -242,7 +247,8 @@ pub mod wasm_test {
                             bob_response.clone(),
                         ])
                         .unwrap(),
-                        nonce: fresh_nonce(&conductor.spaces.conductor_db, alice_pubkey.clone()).await.unwrap(),
+                        nonce,
+                        expires_at,
                     },
                 )
                 .await
@@ -267,7 +273,7 @@ pub mod wasm_test {
             bob_pubkey,
             ..
         } = RibosomeTestFixture::new(TestWasm::CounterSigning).await;
-
+        let now = Timestamp::now();
         // Before the preflight creation of things should work.
         let _: ActionHash = conductor.call(&alice, "create_a_thing", ()).await;
 
@@ -311,6 +317,8 @@ pub mod wasm_test {
                 unreachable!();
             };
 
+        let (nonce, expires_at) = conductor.inner_handle().fresh_nonce_for_local_agent(alice_pubkey.clone(), now).await.unwrap();
+        
         // Can't accept a second preflight request while the first is active.
         let preflight_acceptance_fail = conductor
             .handle()
@@ -324,7 +332,8 @@ pub mod wasm_test {
                         cap_secret: None,
                         provenance: alice_pubkey.clone(),
                         payload: ExternIO::encode(&preflight_request_2).unwrap(),
-                        nonce: fresh_nonce(&conductor.spaces.conductor_db, alice_pubkey.clone()).await.unwrap(),
+                        nonce,
+                        expires_at,
                     },
                 )
                 .await
@@ -351,6 +360,8 @@ pub mod wasm_test {
                 unreachable!();
             };
 
+        let (nonce, expires_at) = conductor.inner_handle().fresh_nonce_for_local_agent(alice_pubkey.clone(), now).await.unwrap();
+        
         // With an accepted preflight creations must fail for alice.
         let thing_fail_create_alice = conductor
             .handle()
@@ -364,7 +375,8 @@ pub mod wasm_test {
                         cap_secret: None,
                         provenance: alice_pubkey.clone(),
                         payload: ExternIO::encode(()).unwrap(),
-                        nonce: fresh_nonce(&conductor.spaces.conductor_db, alice_pubkey.clone()).await.unwrap(),
+                        nonce,
+                        expires_at,
                     },
                 )
                 .await
@@ -372,6 +384,8 @@ pub mod wasm_test {
             )
             .await;
         expect_chain_locked(thing_fail_create_alice);
+
+        let (nonce, expires_at) = conductor.inner_handle().fresh_nonce_for_local_agent(bob_pubkey.clone(), now).await.unwrap();
 
         let thing_fail_create_bob = conductor
             .handle()
@@ -385,7 +399,8 @@ pub mod wasm_test {
                         cap_secret: None,
                         provenance: bob_pubkey.clone(),
                         payload: ExternIO::encode(()).unwrap(),
-                        nonce: fresh_nonce(&conductor.spaces.conductor_db, bob_pubkey.clone()).await.unwrap(),
+                        nonce,
+                        expires_at,
                     },
                 )
                 .await
@@ -403,6 +418,8 @@ pub mod wasm_test {
                 vec![alice_response.clone(), bob_response.clone()],
             )
             .await;
+        let (nonce, expires_at) = conductor.inner_handle().fresh_nonce_for_local_agent(alice_pubkey.clone(), now).await.unwrap();
+
         let thing_fail_create_alice = conductor
             .handle()
             .call_zome(
@@ -415,7 +432,8 @@ pub mod wasm_test {
                         cap_secret: None,
                         provenance: alice_pubkey.clone(),
                         payload: ExternIO::encode(()).unwrap(),
-                        nonce: fresh_nonce(&conductor.spaces.conductor_db, alice_pubkey.clone()).await.unwrap(),
+                        nonce,
+                        expires_at,
                     },
                 )
                 .await
@@ -441,6 +459,8 @@ pub mod wasm_test {
             .await;
         assert_eq!(alice_activity_pre.valid_activity.len(), 6);
 
+        let (nonce, expires_at) = conductor.inner_handle().fresh_nonce_for_local_agent(bob_pubkey.clone(), now).await.unwrap();
+
         // Creation will still fail for bob.
         let thing_fail_create_bob = conductor
             .handle()
@@ -454,7 +474,8 @@ pub mod wasm_test {
                         cap_secret: None,
                         provenance: bob_pubkey.clone(),
                         payload: ExternIO::encode(()).unwrap(),
-                        nonce: fresh_nonce(&conductor.spaces.conductor_db, bob_pubkey.clone()).await.unwrap(),
+                        nonce,
+                        expires_at,
                     },
                 )
                 .await

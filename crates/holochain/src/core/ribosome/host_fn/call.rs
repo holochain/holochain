@@ -53,7 +53,7 @@ pub fn call(
                             .expect("Must have source chain to know provenance")
                             .agent_pubkey()
                             .clone();
-                        let nonce = call_context.host_context.call_zome_handle().fresh_nonce_for_local_agent(provenance.clone()).await.map_err(|e| -> RuntimeError {
+                        let (nonce, expires_at) = call_context.host_context.call_zome_handle().fresh_nonce_for_local_agent(provenance.clone(), Timestamp::now()).await.map_err(|e| -> RuntimeError {
                             wasm_error!(WasmErrorInner::Host(e.to_string())).into()
                         })?;
 
@@ -70,6 +70,7 @@ pub fn call(
                                     cap_secret,
                                     payload,
                                     nonce,
+                                    expires_at,
                                 };
                                 match call_context
                                     .host_context()
@@ -89,6 +90,7 @@ pub fn call(
                                         zome_call_unsigned.cap_secret,
                                         zome_call_unsigned.payload,
                                         zome_call_unsigned.nonce,
+                                        zome_call_unsigned.expires_at,
                                     )
                                     .await
                                 {
@@ -146,6 +148,7 @@ pub fn call(
                                             cap_secret,
                                             provenance,
                                             nonce,
+                                            expires_at,
                                         };
                                         let call = ZomeCall::try_from_unsigned_zome_call(
                                             call_context.host_context.keystore(),

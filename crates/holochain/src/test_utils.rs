@@ -28,6 +28,7 @@ use holochain_p2p::HolochainP2pRef;
 use holochain_p2p::HolochainP2pSender;
 use holochain_serialized_bytes::SerializedBytesError;
 use holochain_sqlite::prelude::DatabaseResult;
+use holochain_state::nonce::FRESH_NONCE_EXPIRES_AFTER;
 use holochain_state::prelude::from_blob;
 use holochain_state::prelude::test_db_dir;
 use holochain_state::prelude::SourceChainResult;
@@ -765,6 +766,7 @@ where
         provenance: cell_id.agent_pubkey().clone(),
         // This will produce duplicate nonces, the caller MUST handle that.
         nonce: I64Fixturator::new(Predictable).next().unwrap(),
+        expires_at: (Timestamp::now() + FRESH_NONCE_EXPIRES_AFTER).unwrap(),
     })
 }
 
@@ -787,6 +789,7 @@ where
         provenance,
         signature,
         nonce,
+        expires_at,
         ..
     } = new_zome_call(keystore, cell_id, func, payload, zome.clone().into()).await?;
     Ok(ZomeCallInvocation {
@@ -798,6 +801,7 @@ where
         provenance,
         signature,
         nonce,
+        expires_at,
     })
 }
 

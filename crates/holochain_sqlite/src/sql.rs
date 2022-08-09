@@ -45,10 +45,10 @@ pub mod sql_cell {
     }
 }
 
-pub(crate) mod sql_conductor {
+pub mod sql_conductor {
     pub(crate) const SCHEMA: &str = include_str!("sql/conductor/schema.sql");
     pub(crate) const SELECT_NONCE: &str = include_str!("sql/conductor/select_nonce.sql");
-    pub(crate) const INSERT_NONCE: &str = include_str!("sql/conductor/insert_nonce.sql");
+    pub const DELETE_EXPIRED_NONCE: &str = include_str!("sql/conductor/delete_expired_nonce.sql");
 }
 
 pub(crate) mod sql_p2p_agent_store {

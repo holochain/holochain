@@ -4,4 +4,6 @@ SELECT
 FROM
   nonce
 WHERE
-  agent = :agent;
+  agent = :agent
+  AND nonce = :nonce
+  AND expires > :now

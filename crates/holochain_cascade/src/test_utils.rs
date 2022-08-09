@@ -191,6 +191,7 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         _cap: Option<holochain_zome_types::CapSecret>,
         _payload: holochain_zome_types::ExternIO,
         _nonce: IntNonce,
+        _expires_at: Timestamp,
     ) -> actor::HolochainP2pResult<()> {
         todo!()
     }
@@ -248,6 +249,7 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         _cap: Option<holochain_zome_types::CapSecret>,
         _payload: holochain_zome_types::ExternIO,
         _nonce: IntNonce,
+        _expires_at: Timestamp,
     ) -> actor::HolochainP2pResult<holochain_serialized_bytes::SerializedBytes> {
         todo!()
     }
@@ -372,6 +374,7 @@ impl HolochainP2pDnaT for MockNetwork {
         _cap: Option<holochain_zome_types::CapSecret>,
         _payload: holochain_zome_types::ExternIO,
         _nonce: IntNonce,
+        _expires_at: Timestamp,
     ) -> actor::HolochainP2pResult<()> {
         todo!()
     }
@@ -429,6 +432,7 @@ impl HolochainP2pDnaT for MockNetwork {
         _cap: Option<holochain_zome_types::CapSecret>,
         _payload: holochain_zome_types::ExternIO,
         _nonce: IntNonce,
+        _expires_at: Timestamp,
     ) -> actor::HolochainP2pResult<holochain_serialized_bytes::SerializedBytes> {
         todo!()
     }

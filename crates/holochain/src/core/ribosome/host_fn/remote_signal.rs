@@ -13,6 +13,7 @@ use holochain_types::prelude::Signature;
 use holochain_types::zome_call::ZomeCallUnsigned;
 use holochain_types::prelude::CellId;
 use holochain_types::prelude::AgentPubKey;
+use holochain_zome_types::Timestamp;
 
 #[tracing::instrument(skip(_ribosome, call_context, input))]
 pub fn remote_signal(
@@ -40,7 +41,7 @@ pub fn remote_signal(
                 async move {
                     let mut to_agent_list: Vec<(Signature, AgentPubKey)> = Vec::new();
 
-                    let nonce = match call_context.host_context.call_zome_handle().fresh_nonce_for_local_agent(from_agent.clone()).await {
+                    let (nonce, expires_at) = match call_context.host_context.call_zome_handle().fresh_nonce_for_local_agent(from_agent.clone(), Timestamp::now()).await {
                         Ok(nonce) => nonce,
                         Err(e) => {
                             tracing::info!("Failed to get a fresh nonce because of {:?}", e);
@@ -56,7 +57,8 @@ pub fn remote_signal(
                             fn_name: fn_name.clone(),
                             cap_secret: None,
                             payload: signal.clone(),
-                            nonce
+                            nonce,
+                            expires_at,
                         }.sign(call_context.host_context.keystore()).await;
 
                         match potentially_signature {
@@ -69,7 +71,7 @@ pub fn remote_signal(
                     }
 
                     if let Err(e) = network
-                        .remote_signal(from_agent, to_agent_list, zome_name, fn_name, None, signal, nonce)
+                        .remote_signal(from_agent, to_agent_list, zome_name, fn_name, None, signal, nonce, expires_at)
                         .await
                     {
                         tracing::info!("Failed to send remote signals because of {:?}", e);

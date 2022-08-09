@@ -22,6 +22,8 @@ pub struct ZomeCallUnsigned {
     pub payload: ExternIO,
     /// Nonce to sign.
     pub nonce: IntNonce,
+    /// Time after which this zome call MUST NOT be accepted.
+    pub expires_at: Timestamp,
 }
 
 impl ZomeCallUnsigned {

@@ -36,7 +36,6 @@ use holochain_cascade::Cascade;
 use holochain_conductor_api::ZomeCall;
 use holochain_p2p::event::CountersigningSessionNegotiationMessage;
 use holochain_serialized_bytes::SerializedBytes;
-use holochain_sqlite::nonce::fresh_nonce;
 use holochain_sqlite::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
@@ -286,14 +285,17 @@ impl Cell {
                         }
                     };
                     let provenance = self.id.agent_pubkey().clone();
-                    let nonce =
-                        match fresh_nonce(&self.space.conductor_db, provenance.clone()).await {
-                            Ok(nonce) => nonce,
-                            Err(e) => {
-                                error!("{}", e.to_string());
-                                continue;
-                            }
-                        };
+                    let (nonce, expires_at) = match self
+                        .conductor_handle
+                        .fresh_nonce_for_local_agent(provenance.clone(), now)
+                        .await
+                    {
+                        Ok(v) => v,
+                        Err(e) => {
+                            error!("{}", e.to_string());
+                            continue;
+                        }
+                    };
                     let unsigned_zome_call = ZomeCallUnsigned {
                         provenance,
                         cell_id: self.id.clone(),
@@ -302,6 +304,7 @@ impl Cell {
                         cap_secret: None,
                         payload,
                         nonce,
+                        expires_at,
                     };
 
                     tasks.push(
@@ -397,12 +400,14 @@ impl Cell {
                 respond,
                 payload,
                 nonce,
+                expires_at,
                 ..
             } => {
                 async {
                     let res = self
                         .handle_call_remote(
                             from_agent, signature, zome_name, fn_name, cap_secret, payload, nonce,
+                            expires_at,
                         )
                         .await
                         .map_err(holochain_p2p::HolochainP2pError::other);
@@ -811,6 +816,7 @@ impl Cell {
         cap_secret: Option<CapSecret>,
         payload: ExternIO,
         nonce: IntNonce,
+        expires_at: Timestamp,
     ) -> CellResult<SerializedBytes> {
         let invocation = ZomeCall {
             cell_id: self.id.clone(),
@@ -821,6 +827,7 @@ impl Cell {
             signature: from_signature,
             fn_name,
             nonce,
+            expires_at,
         };
         // double ? because
         // - ConductorApiResult

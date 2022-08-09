@@ -41,6 +41,7 @@ impl HolochainP2pHandler for StubNetwork {
         cap_secret: Option<CapSecret>,
         payload: ExternIO,
         nonce: IntNonce,
+        expires_at: Timestamp,
     ) -> HolochainP2pHandlerResult<SerializedBytes> {
         Err("stub".into())
     }
@@ -56,6 +57,7 @@ impl HolochainP2pHandler for StubNetwork {
         cap: Option<CapSecret>,
         payload: ExternIO,
         nonce: IntNonce,
+        expires_at: Timestamp,
     ) -> HolochainP2pHandlerResult<()> {
         Err("stub".into())
     }

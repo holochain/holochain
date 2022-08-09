@@ -42,6 +42,7 @@ pub mod entry_def;
 pub mod host_fn_workspace;
 pub mod integrate;
 pub mod mutations;
+pub mod nonce;
 #[allow(missing_docs)]
 pub mod prelude;
 pub mod query;

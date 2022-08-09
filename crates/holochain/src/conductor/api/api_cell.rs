@@ -14,8 +14,8 @@ use async_trait::async_trait;
 use holo_hash::DnaHash;
 use holochain_conductor_api::ZomeCall;
 use holochain_keystore::MetaLairClient;
-use holochain_sqlite::nonce::WitnessNonceResult;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
+use holochain_state::nonce::WitnessNonceResult;
 use holochain_types::prelude::*;
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::mpsc::OwnedPermit;
@@ -187,14 +187,18 @@ pub trait CellConductorReadHandleT: Send + Sync {
     fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef>;
 
     /// Try to get a new nonce for a local agent. Fails if the local agent can't sign some data.
-    async fn fresh_nonce_for_local_agent(&self, agent: AgentPubKey)
-        -> ConductorApiResult<IntNonce>;
+    async fn fresh_nonce_for_local_agent(
+        &self,
+        agent: AgentPubKey,
+        now: Timestamp,
+    ) -> ConductorApiResult<(IntNonce, Timestamp)>;
 
     /// Try to put the nonce from a calling agent in the db. Fails with a stale result if a newer nonce exists.
     async fn witness_nonce_from_calling_agent(
         &self,
         agent: AgentPubKey,
         nonce: IntNonce,
+        expires: Timestamp,
     ) -> ConductorApiResult<WitnessNonceResult>;
 
     /// Find the first cell ID across all apps the given cell id is in that
@@ -237,10 +241,11 @@ impl CellConductorReadHandleT for CellConductorApi {
     async fn fresh_nonce_for_local_agent(
         &self,
         agent: AgentPubKey,
-    ) -> ConductorApiResult<IntNonce> {
+        now: Timestamp,
+    ) -> ConductorApiResult<(IntNonce, Timestamp)> {
         Ok(self
             .conductor_handle
-            .fresh_nonce_for_local_agent(agent)
+            .fresh_nonce_for_local_agent(agent, now)
             .await?)
     }
 
@@ -248,10 +253,11 @@ impl CellConductorReadHandleT for CellConductorApi {
         &self,
         agent: AgentPubKey,
         nonce: IntNonce,
+        expires: Timestamp,
     ) -> ConductorApiResult<WitnessNonceResult> {
         Ok(self
             .conductor_handle
-            .witness_nonce_from_calling_agent(agent, nonce)
+            .witness_nonce_from_calling_agent(agent, nonce, expires)
             .await?)
     }
 

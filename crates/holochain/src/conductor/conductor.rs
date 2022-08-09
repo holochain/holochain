@@ -64,12 +64,12 @@ use holochain_keystore::lair_keystore::spawn_new_lair_keystore;
 use holochain_keystore::test_keystore::spawn_legacy_test_keystore;
 use holochain_keystore::test_keystore::spawn_test_keystore;
 use holochain_keystore::MetaLairClient;
-use holochain_sqlite::nonce::fresh_nonce;
-use holochain_sqlite::nonce::witness_nonce;
-use holochain_sqlite::nonce::WitnessNonceResult;
 use holochain_sqlite::prelude::*;
 use holochain_sqlite::sql::sql_cell::state_dump;
 use holochain_state::mutations;
+use holochain_state::nonce::fresh_nonce;
+use holochain_state::nonce::witness_nonce;
+use holochain_state::nonce::WitnessNonceResult;
 use holochain_state::prelude::from_blob;
 use holochain_state::prelude::StateMutationResult;
 use holochain_state::prelude::StateQueryResult;
@@ -197,18 +197,27 @@ impl Conductor {
     pub(super) async fn fresh_nonce_for_local_agent(
         &self,
         agent: AgentPubKey,
-    ) -> ConductorResult<IntNonce> {
+        now: Timestamp,
+    ) -> ConductorResult<(IntNonce, Timestamp)> {
         // Do a throwaway signature here so that if the agent can't sign we don't consume a nonce for them.
         agent.sign(&self.keystore, ()).await?;
-        Ok(fresh_nonce(&self.spaces.conductor_db, agent).await?)
+        Ok(fresh_nonce(&self.spaces.conductor_db, agent, now).await?)
     }
 
     pub(super) async fn witness_nonce_from_calling_agent(
         &self,
         agent: AgentPubKey,
         nonce: IntNonce,
+        expires: Timestamp,
     ) -> ConductorResult<WitnessNonceResult> {
-        Ok(witness_nonce(&self.spaces.conductor_db, agent, nonce).await?)
+        Ok(witness_nonce(
+            &self.spaces.conductor_db,
+            agent,
+            nonce,
+            Timestamp::now(),
+            expires,
+        )
+        .await?)
     }
 
     pub(super) fn cell_by_id(&self, cell_id: &CellId) -> ConductorResult<Arc<Cell>> {

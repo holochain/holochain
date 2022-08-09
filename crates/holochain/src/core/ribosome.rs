@@ -40,9 +40,9 @@ use holo_hash::AgentPubKey;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::HolochainP2pDna;
 use holochain_serialized_bytes::prelude::*;
-use holochain_sqlite::nonce::*;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
+use holochain_state::nonce::*;
 use holochain_types::prelude::*;
 use holochain_types::zome_types::GlobalZomeTypes;
 use mockall::automock;
@@ -345,7 +345,11 @@ impl ZomeCallInvocation {
         Ok(matches!(
             host_access
                 .call_zome_handle
-                .witness_nonce_from_calling_agent(self.provenance.clone(), self.nonce)
+                .witness_nonce_from_calling_agent(
+                    self.provenance.clone(),
+                    self.nonce,
+                    self.expires_at
+                )
                 .await
                 .map_err(Box::new)?,
             WitnessNonceResult::Fresh
@@ -409,6 +413,8 @@ pub struct ZomeCallInvocation {
     /// The nonce of the call. Must be unique and monotonic.
     /// If a higher nonce has been seen then older zome calls will be discarded.
     pub nonce: IntNonce,
+    /// This call MUST NOT be respected after this time, in the opinion of the callee.
+    pub expires_at: Timestamp,
 }
 
 impl Invocation for ZomeCallInvocation {
@@ -441,6 +447,7 @@ impl ZomeCallInvocation {
             provenance,
             signature,
             nonce,
+            expires_at,
         } = call;
         let zome = conductor_api
             .get_zome(cell_id.dna_hash(), &zome_name)
@@ -454,6 +461,7 @@ impl ZomeCallInvocation {
             provenance,
             signature,
             nonce,
+            expires_at,
         })
     }
 }
@@ -469,6 +477,7 @@ impl From<ZomeCallInvocation> for ZomeCall {
             provenance,
             signature,
             nonce,
+            expires_at,
         } = inv;
         Self {
             cell_id,
@@ -479,6 +488,7 @@ impl From<ZomeCallInvocation> for ZomeCall {
             provenance,
             signature,
             nonce,
+            expires_at,
         }
     }
 }

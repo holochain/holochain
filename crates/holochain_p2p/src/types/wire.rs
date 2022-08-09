@@ -35,6 +35,7 @@ pub enum WireMessage {
         #[serde(with = "serde_bytes")]
         data: Vec<u8>,
         nonce: IntNonce,
+        expires_at: Timestamp,
     },
     CallRemoteMulti {
         zome_name: ZomeName,
@@ -45,6 +46,7 @@ pub enum WireMessage {
         #[serde(with = "serde_bytes")]
         data: Vec<u8>,
         nonce: IntNonce,
+        expires_at: Timestamp,
     },
     Publish {
         request_validation_receipt: bool,
@@ -101,6 +103,7 @@ impl WireMessage {
         cap_secret: Option<CapSecret>,
         payload: ExternIO,
         nonce: IntNonce,
+        expires_at: Timestamp,
     ) -> WireMessage {
         Self::CallRemote {
             zome_name,
@@ -111,6 +114,7 @@ impl WireMessage {
             cap_secret,
             data: payload.into_vec(),
             nonce,
+            expires_at,
         }
     }
 
@@ -122,6 +126,7 @@ impl WireMessage {
         cap_secret: Option<CapSecret>,
         payload: ExternIO,
         nonce: IntNonce,
+        expires_at: Timestamp,
     ) -> WireMessage {
         Self::CallRemoteMulti {
             zome_name,
@@ -131,6 +136,7 @@ impl WireMessage {
             cap_secret,
             data: payload.into_vec(),
             nonce,
+            expires_at,
         }
     }
 
