@@ -16,6 +16,7 @@ use holochain_types::prelude::DnaWasm;
 use holochain_types::prelude::UpdateCoordinatorsPayload;
 use holochain_wasm_test_utils::TestCoordinatorWasm;
 use holochain_wasm_test_utils::TestIntegrityWasm;
+use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::CoordinatorZome;
 use holochain_zome_types::CoordinatorZomeDef;
 use holochain_zome_types::IntegrityZome;
@@ -24,6 +25,7 @@ use holochain_zome_types::WasmZome;
 use holochain_zome_types::Zome;
 use holochain_zome_types::ZomeDef;
 use mr_bundle::Bundle;
+use serde::Serialize;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_coordinator_zome_update() {
@@ -284,4 +286,31 @@ async fn test_update_admin_interface() {
         .await;
 
     assert!(record.is_some());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_wasm_memory() {
+    let mut conductor = SweetConductor::from_config(Default::default()).await;
+    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create])
+        .await
+        .unwrap();
+
+    let app = conductor.setup_app("app", &[dna]).await.unwrap();
+    let cells = app.into_cells();
+
+    #[derive(Debug, Serialize)]
+    struct Post(String);
+
+    let data = String::from_utf8(vec![0u8; 15_000_000]).unwrap();
+
+    for i in 0..1000 {
+        eprintln!("committing {}", i);
+        let _hash: ActionHash = conductor
+            .call(
+                &cells[0].zome(TestWasm::Create),
+                "create_post",
+                Post(data.clone()),
+            )
+            .await;
+    }
 }
