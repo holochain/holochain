@@ -64,7 +64,7 @@ pub fn build(_attrs: TokenStream, input: TokenStream) -> TokenStream {
 
             #iter
 
-            let arr: [_; LinkZomes::len() as usize] = vec
+            let arr: [_; #ident::len() as usize] = vec
                 .try_into()
                 .expect("This can't fail unless the const generics are wrong");
             arr.into_iter()

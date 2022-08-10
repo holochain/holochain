@@ -1,21 +1,19 @@
 [package]
-name = "test_wasm_integrity_zome"
+name = "test_wasm_music_integrity_zome"
 version = "0.0.1"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2021"
 
 [lib]
-name = "test_wasm_integrity_zome"
+name = "test_wasm_music_integrity_zome"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 serde = "1.0"
 hdi = { path = "../../../../hdi" }
-holochain_mock_hdi = { path = "../../../../mock_hdi", optional = true }
 
 [features]
 default = []
 # Disable externs for this zome.
 # This is useful when importing this zome as a rust dependency.
 no-externs = []
-mock = ["holochain_mock_hdi"]

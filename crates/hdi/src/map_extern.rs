@@ -78,7 +78,7 @@ macro_rules! map_extern {
             mod [< __ $name _extern >] {
                 use super::*;
 
-                #[no_mangle]
+                #[cfg_attr(not(feature = "no-externs"), no_mangle)]
                 pub extern "C" fn $name(guest_ptr: $crate::prelude::GuestPtr, len: $crate::prelude::Len) -> $crate::prelude::GuestPtrLen {
                     $crate::map_extern_preamble!(guest_ptr, len, inner, $input, $output);
                     match super::$f(inner) {
@@ -99,7 +99,7 @@ macro_rules! map_extern_infallible {
             mod [< __ $name _extern >] {
                 use super::*;
 
-                #[no_mangle]
+                #[cfg_attr(not(feature = "no-externs"), no_mangle)]
                 pub extern "C" fn $name(guest_ptr: $crate::prelude::GuestPtr, len: $crate::prelude::Len) -> $crate::prelude::GuestPtrLen {
                     $crate::map_extern_preamble!(guest_ptr, len, inner, $input, $output);
                     $crate::map_extern::encode_to_guestptrlen(super::$f(inner))

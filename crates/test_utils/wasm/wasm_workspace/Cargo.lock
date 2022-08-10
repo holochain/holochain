@@ -1759,6 +1759,7 @@ dependencies = [
  "holochain_test_wasm_common",
  "serde",
  "test_wasm_integrity_zome",
+ "test_wasm_music_integrity_zome",
 ]
 
 [[package]]
@@ -1943,6 +1944,14 @@ dependencies = [
  "hdi",
  "hdk",
  "holochain_test_wasm_common",
+ "serde",
+]
+
+[[package]]
+name = "test_wasm_music_integrity_zome"
+version = "0.0.1"
+dependencies = [
+ "hdi",
  "serde",
 ]
 

@@ -9,6 +9,7 @@ const WASM_WORKSPACE_TARGET: &str = "wasm_workspace/target";
 #[derive(EnumIter, Clone, Copy)]
 pub enum TestIntegrityWasm {
     IntegrityZome,
+    MusicIntegrityZome,
 }
 
 #[derive(EnumIter, Clone, Copy)]
@@ -99,6 +100,7 @@ impl From<TestIntegrityWasm> for ZomeName {
     fn from(test_wasm: TestIntegrityWasm) -> ZomeName {
         ZomeName::from(match test_wasm {
             TestIntegrityWasm::IntegrityZome => "integrity_zome",
+            TestIntegrityWasm::MusicIntegrityZome => "music_integrity_zome",
         })
     }
 }
@@ -322,6 +324,9 @@ impl From<TestIntegrityWasm> for PathBuf {
         PathBuf::from(match t {
             TestIntegrityWasm::IntegrityZome => {
                 "wasm32-unknown-unknown/release/test_wasm_integrity_zome.wasm"
+            }
+            TestIntegrityWasm::MusicIntegrityZome => {
+                "wasm32-unknown-unknown/release/test_wasm_music_integrity_zome.wasm"
             }
         })
     }

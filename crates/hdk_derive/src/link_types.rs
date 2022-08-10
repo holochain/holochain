@@ -48,7 +48,7 @@ pub fn build(attrs: TokenStream, input: TokenStream) -> TokenStream {
     let no_mangle = if skip_no_mangle {
         quote::quote! {}
     } else {
-        quote::quote! {#[no_mangle]}
+        quote::quote! {#[cfg_attr(not(feature = "no-externs"), no_mangle)]}
     };
 
     let output = quote::quote! {
@@ -59,7 +59,7 @@ pub fn build(attrs: TokenStream, input: TokenStream) -> TokenStream {
 
         // Add the extern function that says how many links this zome has.
         #no_mangle
-        pub fn __num_link_types() -> u8 { #ident::len() }
+        pub extern "C" fn __num_link_types() -> u8 { #ident::len() }
 
         impl TryFrom<&#ident> for ScopedLinkType {
             type Error = WasmError;

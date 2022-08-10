@@ -22,6 +22,7 @@ members = [
     "init_fail",
     "init_pass",
     "integrity_zome",
+    "music_integrity_zome",
     "link",
     "migrate_agent_fail",
     "migrate_agent_pass",

@@ -50,13 +50,13 @@ pub fn build(attrs: TokenStream, input: TokenStream) -> TokenStream {
     let hdk_extern = if skip_hdk_extern {
         quote::quote! {}
     } else {
-        quote::quote! {#[hdk_extern]}
+        quote::quote! {#[cfg_attr(not(feature = "no-externs"), hdk_extern)]}
     };
 
     let no_mangle = if skip_hdk_extern {
         quote::quote! {}
     } else {
-        quote::quote! {#[no_mangle]}
+        quote::quote! {#[cfg_attr(not(feature = "no-externs"), no_mangle)]}
     };
 
     let output = quote::quote! {
@@ -65,7 +65,7 @@ pub fn build(attrs: TokenStream, input: TokenStream) -> TokenStream {
         #input
 
         #hdk_extern
-        pub fn entry_defs(_: ()) -> ExternResult<EntryDefsCallbackResult> {
+        pub extern "C" fn entry_defs(_: ()) -> ExternResult<EntryDefsCallbackResult> {
             let defs: Vec<EntryDef> = #ident::ENTRY_DEFS
                     .iter()
                     .map(|a| EntryDef::from(a.clone()))
@@ -74,7 +74,7 @@ pub fn build(attrs: TokenStream, input: TokenStream) -> TokenStream {
         }
 
         #no_mangle
-        pub fn __num_entry_types() -> u8 { #unit_ident::len() }
+        pub extern "C" fn __num_entry_types() -> u8 { #unit_ident::len() }
 
         impl TryFrom<&#unit_ident> for ScopedEntryDefIndex {
             type Error = WasmError;

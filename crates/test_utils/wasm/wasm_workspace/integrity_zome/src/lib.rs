@@ -19,6 +19,11 @@ pub enum EntryTypes {
     PrivMsg(PrivMsg),
 }
 
+#[hdk_link_types]
+pub enum LinkTypes {
+    A,
+}
+
 #[hdk_extern]
 fn genesis_self_check(data: GenesisSelfCheckData) -> ExternResult<ValidateCallbackResult> {
     let GenesisSelfCheckData {
