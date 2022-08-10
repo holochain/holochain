@@ -10,6 +10,7 @@ use tokio::sync::oneshot;
 use crate::calls::attach_app_interface;
 use crate::calls::AddAppWs;
 use crate::config::*;
+use crate::passphrase::*;
 use crate::ports::random_admin_port;
 use crate::ports::set_admin_port;
 use crate::CmdRunner;
@@ -29,7 +30,7 @@ pub async fn run(
     app_ports: Vec<u16>,
     force_admin_port: Option<u16>,
 ) -> anyhow::Result<()> {
-    let (port, mut holochain) =
+    let (port, mut holochain, mut lair) =
         run_async(holochain_path, sandbox_path.clone(), force_admin_port).await?;
     msg!("Running conductor on admin port {}", port);
     for app_port in app_ports {
@@ -49,6 +50,9 @@ pub async fn run(
     let e = format!("Failed to run holochain at {}", sandbox_path.display());
 
     holochain.wait().await.expect(&e);
+    let _ = lair.kill().await;
+    lair.wait().await.expect("Failed to wait on lair-keystore");
+
     Ok(())
 }
 
@@ -63,10 +67,10 @@ pub async fn run_async(
     holochain_path: &Path,
     sandbox_path: PathBuf,
     force_admin_port: Option<u16>,
-) -> anyhow::Result<(u16, Child)> {
+) -> anyhow::Result<(u16, Child, Child)> {
     let mut config = match read_config(sandbox_path.clone())? {
         Some(c) => c,
-        None => create_config(sandbox_path.clone()),
+        None => panic!("invalid sandbox path {:?}", sandbox_path),
     };
     match force_admin_port {
         Some(port) => {
@@ -76,33 +80,89 @@ pub async fn run_async(
     }
     let config_path = write_config(sandbox_path.clone(), &config);
     let (tx_config, rx_config) = oneshot::channel();
-    let mut child = start_holochain(holochain_path, config_path, tx_config).await;
+    let (mut child, lair) = start_holochain(holochain_path, config_path, tx_config).await?;
     check_started(&mut child).await;
     let port = rx_config
         .await
         .expect("Failed to get admin port from conductor");
-    Ok((port, child))
+    Ok((port, child, lair))
 }
 
 async fn start_holochain(
     holochain_path: &Path,
     config_path: PathBuf,
     tx_config: oneshot::Sender<u16>,
-) -> Child {
+) -> anyhow::Result<(Child, Child)> {
+    use tokio::io::AsyncWriteExt;
+    let passphrase = get_passphrase()?.read_lock().to_vec();
+
+    let mut lair_path = config_path.clone();
+    lair_path.pop();
+    lair_path.push("keystore");
+
+    tracing::info!("\n\n----\nstarting lair\n----\n\n");
+    let mut cmd = Command::new("lair-keystore");
+    cmd.arg("--lair-root")
+        .arg(lair_path)
+        .arg("server")
+        .arg("--piped")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit())
+        .kill_on_drop(true);
+
+    msg!("{:?}", cmd);
+
+    let mut lair = cmd.spawn().expect("Failed to spawn lair-keystore");
+
+    let mut stdin = lair.stdin.take().unwrap();
+    stdin.write_all(&passphrase).await?;
+    stdin.shutdown().await?;
+    drop(stdin);
+
+    check_lair_running(lair.stdout.take().unwrap()).await;
+
     tracing::info!("\n\n----\nstarting holochain\n----\n\n");
     let mut cmd = Command::new(holochain_path);
     cmd.arg("--structured")
         // .env("RUST_LOG", "trace")
+        .arg("--piped")
         .arg("--config-path")
         .arg(config_path)
+        .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .kill_on_drop(true);
 
+    msg!("{:?}", cmd);
+
     let mut holochain = cmd.spawn().expect("Failed to spawn holochain");
+
+    let mut stdin = holochain.stdin.take().unwrap();
+    stdin.write_all(&passphrase).await?;
+    stdin.shutdown().await?;
+    drop(stdin);
+
     // TODO: Allow redirecting output per conductor.
     spawn_output(&mut holochain, tx_config);
-    holochain
+    Ok((holochain, lair))
+}
+
+async fn check_lair_running(stdout: tokio::process::ChildStdout) {
+    let (s, r) = tokio::sync::oneshot::channel();
+    let mut s = Some(s);
+    tokio::task::spawn(async move {
+        let mut lines = BufReader::new(stdout).lines();
+        while let Ok(Some(line)) = lines.next_line().await {
+            println!("{}", line);
+            if line == "# lair-keystore running #" {
+                if let Some(s) = s.take() {
+                    let _ = s.send(());
+                }
+            }
+        }
+    });
+    let _ = r.await;
 }
 
 // TODO: Find a better way to confirm the child is running.

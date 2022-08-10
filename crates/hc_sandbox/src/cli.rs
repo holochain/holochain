@@ -1,5 +1,6 @@
 //! Definitions of StructOpt options for use in the CLI
 
+use super::passphrase::*;
 use crate::cmds::*;
 use holochain_types::prelude::InstalledAppId;
 use std::path::Path;
@@ -18,6 +19,10 @@ const DEFAULT_APP_ID: &str = "test-app";
 pub struct HcSandbox {
     #[structopt(subcommand)]
     command: HcSandboxSubcommand,
+    /// Instead of the normal "interactive" passphrase mode,
+    /// collect the passphrase by reading stdin to the end.
+    #[structopt(long)]
+    piped: bool,
     /// Force the admin port that hc uses to talk to holochain to a specific value.
     /// For example `hc -f=9000,9001 run`
     /// This must be set on each run or the port will change if it's in use.
@@ -101,6 +106,7 @@ pub struct Run {
 impl HcSandbox {
     /// Run this command
     pub async fn run(self) -> anyhow::Result<()> {
+        set_piped(self.piped);
         match self.command {
             HcSandboxSubcommand::Generate {
                 app_id,
