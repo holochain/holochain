@@ -1,6 +1,5 @@
 //! Definitions of StructOpt options for use in the CLI
 
-use super::passphrase::*;
 use crate::cmds::*;
 use holochain_types::prelude::InstalledAppId;
 use std::path::Path;
@@ -106,7 +105,7 @@ pub struct Run {
 impl HcSandbox {
     /// Run this command
     pub async fn run(self) -> anyhow::Result<()> {
-        set_piped(self.piped);
+        holochain_util::pw::pw_set_piped(self.piped);
         match self.command {
             HcSandboxSubcommand::Generate {
                 app_id,

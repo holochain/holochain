@@ -241,15 +241,15 @@ pub async fn call(holochain_path: &Path, req: Call) -> anyhow::Result<()> {
         let mut cmds = Vec::with_capacity(ports.len());
         for (port, path) in ports.into_iter().zip(paths.into_iter()) {
             match CmdRunner::try_new(port).await {
-                Ok(cmd) => cmds.push((cmd, None)),
+                Ok(cmd) => cmds.push((cmd, None, None)),
                 Err(e) => {
                     if let holochain_websocket::WebsocketError::Io(e) = &e {
                         if let std::io::ErrorKind::ConnectionRefused
                         | std::io::ErrorKind::AddrNotAvailable = e.kind()
                         {
-                            let (port, holochain, _lair) =
+                            let (port, holochain, lair) =
                                 run_async(holochain_path, path, None).await?;
-                            cmds.push((CmdRunner::new(port).await, Some(holochain)));
+                            cmds.push((CmdRunner::new(port).await, Some(holochain), Some(lair)));
                             continue;
                         }
                     }
@@ -264,7 +264,7 @@ pub async fn call(holochain_path: &Path, req: Call) -> anyhow::Result<()> {
     } else {
         let mut cmds = Vec::with_capacity(running.len());
         for port in running {
-            cmds.push((CmdRunner::new(port).await, None));
+            cmds.push((CmdRunner::new(port).await, None, None));
         }
         cmds
     };

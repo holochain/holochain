@@ -8,7 +8,6 @@ use holochain_p2p::kitsune_p2p::KitsuneP2pConfig;
 
 use crate::config::create_config;
 use crate::config::write_config;
-use crate::passphrase::*;
 use crate::ports::random_admin_port;
 
 /// Generate a new sandbox.
@@ -52,10 +51,13 @@ pub fn generate_with_config(
     directory: Option<PathBuf>,
 ) -> anyhow::Result<PathBuf> {
     let (dir, con_url) = generate_directory(root, directory)?;
-    let mut config = config.unwrap_or_else(|| create_config(dir.clone(), con_url.clone()));
-    config.keystore = KeystoreConfig::LairServer {
-        connection_url: con_url,
-    };
+    let config = config.unwrap_or_else(|| {
+        let mut config = create_config(dir.clone(), con_url.clone());
+        config.keystore = KeystoreConfig::LairServer {
+            connection_url: con_url,
+        };
+        config
+    });
     write_config(dir.clone(), &config);
     Ok(dir)
 }
@@ -65,7 +67,7 @@ pub fn generate_directory(
     root: Option<PathBuf>,
     directory: Option<PathBuf>,
 ) -> anyhow::Result<(PathBuf, url2::Url2)> {
-    let passphrase = get_passphrase()?;
+    let passphrase = holochain_util::pw::pw_get()?;
 
     let mut dir = root.unwrap_or_else(std::env::temp_dir);
     let directory = directory.unwrap_or_else(|| nanoid::nanoid!().into());

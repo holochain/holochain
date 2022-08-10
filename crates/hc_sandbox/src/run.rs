@@ -10,7 +10,6 @@ use tokio::sync::oneshot;
 use crate::calls::attach_app_interface;
 use crate::calls::AddAppWs;
 use crate::config::*;
-use crate::passphrase::*;
 use crate::ports::random_admin_port;
 use crate::ports::set_admin_port;
 use crate::CmdRunner;
@@ -94,7 +93,7 @@ async fn start_holochain(
     tx_config: oneshot::Sender<u16>,
 ) -> anyhow::Result<(Child, Child)> {
     use tokio::io::AsyncWriteExt;
-    let passphrase = get_passphrase()?.read_lock().to_vec();
+    let passphrase = holochain_util::pw::pw_get()?.read_lock().to_vec();
 
     let mut lair_path = config_path.clone();
     lair_path.pop();
