@@ -21,7 +21,7 @@ let
 
       {
         shellHook = ''
-          echo Using "$NIX_ENV_PREFIX" as target prefix...
+          >&2 echo Using "$NIX_ENV_PREFIX" as target prefix...
 
           export HC_TEST_WASM_DIR="$CARGO_TARGET_DIR/.wasm_target"
           mkdir -p $HC_TEST_WASM_DIR
