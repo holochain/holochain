@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20220810.012252
+
+## [holochain-0.0.153](crates/holochain/CHANGELOG.md#0.0.153)
+
+- Add the `hdi_version_req` key:value field to the output of the `--build-info` argument
+
+## [holochain\_test\_wasm\_common-0.0.46](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.46)
+
+## [holochain\_wasm\_test\_utils-0.0.52](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.52)
+
+## [holochain\_cascade-0.0.53](crates/holochain_cascade/CHANGELOG.md#0.0.53)
+
+## [hdk-0.0.145](crates/hdk/CHANGELOG.md#0.0.145)
+
+## [hdi-0.0.17](crates/hdi/CHANGELOG.md#0.0.17)
+
 # 20220803.124141
 
 ## [holochain\_cli-0.0.50](crates/holochain_cli/CHANGELOG.md#0.0.50)
