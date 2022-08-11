@@ -6,7 +6,6 @@ pub mod dependencies {
     pub use ::futures;
     pub use ::ghost_actor;
     pub use ::lair_keystore_api;
-    pub use ::lair_keystore_api_0_0;
     pub use ::observability;
     pub use ::paste;
     pub use ::rustls;
@@ -62,12 +61,19 @@ pub fn box_fut<'a, R: Send + 'a>(result: R) -> MustBoxFuture<'a, R> {
 use ::ghost_actor::dependencies::tracing;
 use ghost_actor::dependencies::must_future::MustBoxFuture;
 
-pub use ::lair_keystore_api_0_0::actor::CertDigest;
+/// 32 byte binary TLS certificate digest.
+pub type CertDigest = lair_keystore_api::encoding_types::BinDataSized<32>;
 
 /// Wrapper around CertDigest that provides some additional debugging helpers.
 #[derive(Clone)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct Tx2Cert(pub Arc<(CertDigest, String, String)>);
+
+#[cfg(feature = "arbitrary")]
+impl<'a> arbitrary::Arbitrary<'a> for Tx2Cert {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        Ok(Self::from(u.bytes(32)?.to_vec()))
+    }
+}
 
 impl Tx2Cert {
     /// get the tls cert digest
@@ -142,7 +148,7 @@ impl std::convert::AsRef<CertDigest> for Tx2Cert {
 
 impl std::convert::AsRef<[u8]> for Tx2Cert {
     fn as_ref(&self) -> &[u8] {
-        &self.0 .0
+        &*self.0 .0
     }
 }
 
@@ -154,21 +160,21 @@ impl std::convert::AsRef<str> for Tx2Cert {
 
 impl From<Vec<u8>> for Tx2Cert {
     fn from(v: Vec<u8>) -> Self {
-        let d: CertDigest = v.into();
-        d.into()
+        Arc::new(v).into()
     }
 }
 
 impl From<Arc<Vec<u8>>> for Tx2Cert {
     fn from(v: Arc<Vec<u8>>) -> Self {
-        let d: CertDigest = v.into();
-        d.into()
+        let mut data = [0; 32];
+        data.copy_from_slice(&v);
+        <lair_keystore_api::encoding_types::BinDataSized<32>>::from(data).into()
     }
 }
 
 impl From<CertDigest> for Tx2Cert {
     fn from(c: CertDigest) -> Self {
-        let b64 = base64::encode_config(&**c, base64::URL_SAFE_NO_PAD);
+        let b64 = base64::encode_config(&*c, base64::URL_SAFE_NO_PAD);
         let nick = {
             let (start, _) = b64.split_at(6);
             let (_, end) = b64.split_at(b64.len() - 6);
