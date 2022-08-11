@@ -13,6 +13,7 @@ use holochain_state::prelude::test_authored_db;
 use holochain_state::prelude::test_cache_db;
 use holochain_state::prelude::test_dht_db;
 use holochain_types::db_cache::DhtDbQueryCache;
+use holochain_types::test_utils::chain::TestChainItem;
 use holochain_wasm_test_utils::*;
 use holochain_zome_types::Action;
 use matches::assert_matches;

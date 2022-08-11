@@ -5,8 +5,85 @@ use arbitrary::Unstructured;
 use holo_hash::ActionHash;
 use holochain_zome_types::*;
 
-use super::TestChainHash;
-use super::TestChainItem;
+use crate::prelude::ChainItem;
+
+/// The hash type for a [`TestChainItem`]
+#[derive(
+    Copy,
+    Clone,
+    Debug,
+    PartialEq,
+    Eq,
+    Hash,
+    derive_more::From,
+    derive_more::Deref,
+    derive_more::Into,
+)]
+pub struct TestChainHash(pub u32);
+
+impl From<u8> for TestChainHash {
+    fn from(u: u8) -> Self {
+        Self(u as u32)
+    }
+}
+
+impl From<i32> for TestChainHash {
+    fn from(u: i32) -> Self {
+        Self(u as u32)
+    }
+}
+
+impl From<TestChainHash> for ActionHash {
+    fn from(h: TestChainHash) -> Self {
+        let bytes: Vec<u8> = h.0.to_le_bytes().iter().cycle().take(32).copied().collect();
+        ActionHash::from_raw_32(bytes)
+    }
+}
+
+/// A test implementation of a minimal ChainItem which uses simple numbers for hashes
+/// and always points back to the previous number
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct TestChainItem {
+    /// The sequence number
+    pub seq: u32,
+    /// The hash
+    pub hash: TestChainHash,
+    /// The previous hash, unless this is the first item
+    pub prev: Option<TestChainHash>,
+}
+
+impl TestChainItem {
+    /// Constructor for happy-path chains with no forking
+    pub fn new(seq: u32) -> Self {
+        Self {
+            seq,
+            hash: TestChainHash(seq),
+            prev: seq.checked_sub(1).map(TestChainHash),
+        }
+    }
+}
+
+impl ChainItem for TestChainItem {
+    type Hash = TestChainHash;
+
+    fn seq(&self) -> u32 {
+        self.seq
+    }
+
+    fn get_hash(&self) -> &Self::Hash {
+        &self.hash
+    }
+
+    fn prev_hash(&self) -> Option<&Self::Hash> {
+        self.prev.as_ref()
+    }
+}
+
+impl AsRef<Self> for TestChainItem {
+    fn as_ref(&self) -> &Self {
+        self
+    }
+}
 
 fn forked_hash(n: u8, i: u8) -> TestChainHash {
     TestChainHash(n as u32 + (i as u32) * 256)

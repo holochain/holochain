@@ -1,7 +1,7 @@
 use std::ops::Range;
 use test_case::test_case;
 
-use crate::{prelude::TestChainItem, test_utils::chain::*};
+use crate::test_utils::chain::*;
 
 use super::*;
 

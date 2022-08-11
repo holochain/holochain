@@ -2474,6 +2474,7 @@ dependencies = [
  "holochain_sqlite",
  "holochain_util",
  "holochain_zome_types",
+ "isotest",
  "itertools 0.10.3",
  "kitsune_p2p_dht",
  "lazy_static",
@@ -2870,6 +2871,11 @@ name = "ipnet"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "879d54834c8c76457ef4293a689b2a8c59b076067ad77b15efafbb05f92a592b"
+
+[[package]]
+name = "isotest"
+version = "0.1.0"
+source = "git+https://github.com/maackle/isotest-rust#56993c757fd9944a86bf38b3a87483854dbfa823"
 
 [[package]]
 name = "itertools"

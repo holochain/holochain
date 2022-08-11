@@ -63,6 +63,7 @@ contrafact = { version = "0.1.0-dev.1", optional = true }
 
 [dev-dependencies]
 arbitrary = "1.0"
+isotest = { git = "https://github.com/maackle/isotest-rust" }
 maplit = "1"
 matches = "0.1"
 pretty_assertions = "0"
