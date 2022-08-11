@@ -8,7 +8,7 @@ In short, that structure is __hApp -> DNA -> zome -> function__.
 
 hApps are required to produce and validate data deterministically. There's a data model and a domain logic part to each hApp. In Holochain, the
 data model is defined in integrity zomes and the domain logic is written in coordinator zomes. See Integrity zomes and Coordinator zomes further down and
-[Holochain Deterministic Integrity (HDI)](hdi) for more information.
+[Holochain Deterministic Integrity (HDI)](../hdi) for more information.
 
 Since hApps are run as a binary on the hosting system, they must be sandboxed to prevent execution of insecure commands.
 Instead of writing and maintaining a custom format and specification for these artifacts as well as a runtime environment to execute them,
@@ -44,7 +44,7 @@ function that checks the integrity of any operations that manipulate data of tho
 The wasm workspace contains examples of integrity zomes like this:
 <https://github.com/holochain/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/integrity_zome/src/lib.rs>
 
-Refer to the [HDI crate](hdi) for more information on the integrity layer.
+Refer to the [HDI crate](../hdi) for more information on the integrity layer.
 
 ## Coordinator zomes 🐜
 
@@ -60,7 +60,7 @@ HDK implements several key features:
 
 - Base HDKT trait for standardisation, mocking, unit testing support: [`hdk`] module
 - Capabilities and function level access control: [`capability`] module
-- [Holochain Deterministic Integrity (HDI)](hdi)
+- [Holochain Deterministic Integrity (HDI)](../hdi)
 - Application data and entry definitions for the source chain and DHT: [`entry`] module and [`entry_defs`] callback
 - Referencing/linking entries on the DHT together into a graph structure: [`link`] module
 - Defining tree-like structures out of links and entries for discoverability and scalability: [`hash_path`] module
