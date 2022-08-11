@@ -1,3 +1,6 @@
+//! Implements TestChainItem, a type used with isotest
+
+use isotest::Iso;
 use std::ops::Range;
 
 use arbitrary::Arbitrary;
@@ -33,11 +36,12 @@ impl From<i32> for TestChainHash {
     }
 }
 
-impl From<TestChainHash> for ActionHash {
-    fn from(h: TestChainHash) -> Self {
+isotest::iso! {
+    TestChainHash => |h| {
         let bytes: Vec<u8> = h.0.to_le_bytes().iter().cycle().take(32).copied().collect();
         ActionHash::from_raw_32(bytes)
-    }
+    },
+    ActionHash => |h| Self(u32::from_le_bytes(h.get_raw_32()[0..4].try_into().unwrap()))
 }
 
 /// A test implementation of a minimal ChainItem which uses simple numbers for hashes
@@ -149,7 +153,7 @@ pub fn chain_item_to_action(u: &mut Unstructured, i: &impl ChainItem) -> SignedA
     let hash: ActionHash = i.get_hash().clone().into();
     let mut action = SignedActionHashed::arbitrary(u).unwrap();
     match (action_seq, prev_action) {
-        (0, _) => {
+        (_, None) => {
             let dna = Dna::arbitrary(u).unwrap();
             action.hashed.content = Action::Dna(dna);
             action.hashed.hash = hash;
@@ -161,7 +165,6 @@ pub fn chain_item_to_action(u: &mut Unstructured, i: &impl ChainItem) -> SignedA
             action.hashed.content = Action::Create(create);
             action.hashed.hash = hash;
         }
-        _ => unreachable!(),
     }
     action
 }
@@ -176,4 +179,43 @@ pub fn chain_to_ops(chain: Vec<impl ChainItem>) -> Vec<RegisterAgentActivity> {
             op
         })
         .collect()
+}
+
+isotest::iso! {
+    TestChainItem => |i| {
+        let mut u = Unstructured::new(&holochain_zome_types::NOISE);
+        chain_item_to_action(&mut u, &i)
+    },
+    SignedActionHashed => |a| {
+        TestChainItem {
+            seq: a.seq(),
+            hash: TestChainHash::test(a.get_hash()),
+            prev: a.prev_hash().map(TestChainHash::test),
+        }
+    }
+}
+
+#[cfg(test)]
+#[test_case::test_case(0)]
+#[test_case::test_case(65536)]
+fn test_hash_roundtrips(u: u32) {
+    let h1 = TestChainHash(u);
+    let h2 = ActionHash::from_raw_32(u.to_le_bytes().iter().cycle().take(32).copied().collect());
+    isotest::test_iso_invariants(h1, h2);
+}
+
+#[cfg(test)]
+#[test_case::test_case(0, 0, None)]
+#[test_case::test_case(0, 0, Some(0))]
+#[test_case::test_case(1, 1, None)]
+#[test_case::test_case(1, 1, Some(0) => panics)]
+fn test_chain_item_roundtrips(seq: u32, hash: u32, prev: Option<u32>) {
+    use ::fixt::prelude::*;
+    let item = TestChainItem {
+        seq,
+        hash: hash.into(),
+        prev: prev.map(Into::into),
+    };
+    let action = fixt!(SignedActionHashed);
+    isotest::test_iso_invariants(item, action);
 }

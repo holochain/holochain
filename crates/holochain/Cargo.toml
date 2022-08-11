@@ -95,6 +95,7 @@ anyhow = "1.0.26"
 assert_cmd = "1.0.1"
 contrafact = "0.1.0-dev.1"
 criterion = { version = "0.3", features = [ "async_tokio" ] }
+isotest = { git = "https://github.com/maackle/isotest-rust" }
 kitsune_p2p_bootstrap = { path = "../kitsune_p2p/bootstrap" }
 maplit = "1"
 pretty_assertions = "0.6.1"

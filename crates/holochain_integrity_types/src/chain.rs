@@ -3,10 +3,8 @@
 
 use std::collections::HashSet;
 
-use holo_hash::{ActionHash, HasHash};
+use holo_hash::{ActionHash};
 use holochain_serialized_bytes::prelude::*;
-
-use crate::{ActionHashed, SignedActionHashed};
 
 #[cfg(test)]
 mod test;
