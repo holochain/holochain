@@ -4,6 +4,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+- **BREAKING CHANGE** - `hc sandbox` updated to use new (0.y.z) lair api. Any old sandboxes will no longer function. To manually update them, run `lair-keystore init` in the `[sandbox]/keystore` directory and update the keystore section of the holochain conductor config. [\#1515](https://github.com/holochain/holochain/pull/1515)
+
 ## 0.0.46
 
 ## 0.0.45
