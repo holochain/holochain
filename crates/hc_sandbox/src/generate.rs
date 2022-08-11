@@ -82,7 +82,10 @@ pub fn generate_directory(
     Ok((dir, con_url))
 }
 
-fn init_lair(dir: &std::path::Path, passphrase: sodoken::BufRead) -> anyhow::Result<url2::Url2> {
+pub(crate) fn init_lair(
+    dir: &std::path::Path,
+    passphrase: sodoken::BufRead,
+) -> anyhow::Result<url2::Url2> {
     let mut cmd = std::process::Command::new("lair-keystore");
 
     cmd.args(["init", "--piped"])

@@ -69,7 +69,13 @@ pub async fn run_async(
 ) -> anyhow::Result<(u16, Child, Child)> {
     let mut config = match read_config(sandbox_path.clone())? {
         Some(c) => c,
-        None => panic!("invalid sandbox path {:?}", sandbox_path),
+        None => {
+            let mut keystore_dir = sandbox_path.clone();
+            keystore_dir.push("keystore");
+            let passphrase = holochain_util::pw::pw_get()?;
+            let con_url = crate::generate::init_lair(&keystore_dir, passphrase)?;
+            create_config(sandbox_path.clone(), con_url)
+        }
     };
     match force_admin_port {
         Some(port) => {
