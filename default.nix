@@ -18,7 +18,9 @@ let
 
   # START HOLONIX IMPORT BOILERPLATE
   holonixPath = config.holonix.pathFn { };
-  holonix = config.holonix.importFn ({ inherit rustVersion; } // holonixArgs);
+  holonix = config.holonix.importFn ({ inherit rustVersion; } // holonixArgs // { include = {
+    niv = false;
+  };});
   # END HOLONIX IMPORT BOILERPLATE
 
   overlays = [
@@ -55,7 +57,7 @@ let
         name = "cargo-nextest";
 
         src = sources.nextest.outPath;
-        cargoSha256 = "sha256-E25P/vasIBQp4m3zGii7ZotzJ7b2kT6ma9glvmQXcnM=";
+        cargoSha256 = "sha256-IEXBvaMk8FnpfqRY2k/ycTmtCitDksZMb3n4fEszigI=";
 
         cargoTestFlags = [
           # TODO: investigate some more why these tests fail in nix
