@@ -4,6 +4,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- **BREAKING CHANGE** - Removes legacy lair. You must now use lair-keystore >= 0.2.0 with holochain. [\#1518](https://github.com/holochain/holochain/pull/1518)
+
 ## 0.0.153
 
 - Add the `hdi_version_req` key:value field to the output of the `--build-info` argument
