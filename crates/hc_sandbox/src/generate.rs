@@ -86,6 +86,20 @@ pub(crate) fn init_lair(
     dir: &std::path::Path,
     passphrase: sodoken::BufRead,
 ) -> anyhow::Result<url2::Url2> {
+    match init_lair_inner(dir, passphrase) {
+        Err(err) => Err(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            format!("Failed to execute 'lair-keystore init': {:?}", err),
+        )
+        .into()),
+        Ok(url) => Ok(url),
+    }
+}
+
+pub(crate) fn init_lair_inner(
+    dir: &std::path::Path,
+    passphrase: sodoken::BufRead,
+) -> anyhow::Result<url2::Url2> {
     let mut cmd = std::process::Command::new("lair-keystore");
 
     cmd.args(["init", "--piped"])
