@@ -1321,7 +1321,8 @@ impl Conductor {
     }
 
     pub(super) async fn get_state(&self) -> ConductorResult<ConductorState> {
-        self.spaces
+        let state = self
+            .spaces
             .conductor_db
             .async_reader(|txn| {
                 let state = txn
@@ -1329,13 +1330,20 @@ impl Conductor {
                         row.get("blob")
                     })
                     .optional()?;
-                let state = match state {
-                    Some(state) => from_blob(state)?,
-                    None => ConductorState::default(),
-                };
-                Ok(state)
+                match state {
+                    Some(state) => ConductorResult::Ok(Some(from_blob(state)?)),
+                    None => ConductorResult::Ok(None),
+                }
             })
-            .await
+            .await?;
+
+        match state {
+            Some(state) => Ok(state),
+            // update_state will again try to read the state. It's a little
+            // inefficient in the infrequent case where we haven't saved the
+            // state yet, but more atomic, so worth it.
+            None => self.update_state(Ok).await,
+        }
     }
 
     /// Update the internal state with a pure function mapping old state to new
