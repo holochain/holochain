@@ -1,6 +1,6 @@
 [package]
 name = "holochain_cascade"
-version = "0.0.53"
+version = "0.0.54-dev.0"
 description = "Logic for cascading updates to Holochain state and network interaction"
 license-file = "LICENSE_CAL-1.0"
 homepage = "https://github.com/holochain/holochain"
@@ -15,8 +15,8 @@ fallible-iterator = "0.2"
 fixt = { version = "0.0.14", path = "../fixt" }
 futures = "0.3"
 ghost_actor = "=0.3.0-alpha.4"
-hdk = { version = "0.0.145", path = "../hdk" }
-hdk_derive = { version = "0.0.43", path = "../hdk_derive" }
+hdk = { version = "0.0.146-dev.0", path = "../hdk" }
+hdk_derive = { version = "0.0.44-dev.0", path = "../hdk_derive" }
 holo_hash = { version = "0.0.31", path = "../holo_hash", features = ["full"] }
 holochain_sqlite = { version = "0.0.48", path = "../holochain_sqlite" }
 holochain_p2p = { version = "0.0.50", path = "../holochain_p2p" }
