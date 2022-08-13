@@ -4,6 +4,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.0.154
+
 ## 0.0.153
 
 - Add the `hdi_version_req` key:value field to the output of the `--build-info` argument

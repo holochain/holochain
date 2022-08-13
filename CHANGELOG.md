@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20220813.133608
+
+## [holochain-0.0.154](crates/holochain/CHANGELOG.md#0.0.154)
+
+## [holochain\_test\_wasm\_common-0.0.47](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.47)
+
+## [holochain\_wasm\_test\_utils-0.0.53](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.53)
+
+## [holochain\_cascade-0.0.54](crates/holochain_cascade/CHANGELOG.md#0.0.54)
+
+## [hdk-0.0.146](crates/hdk/CHANGELOG.md#0.0.146)
+
+## [hdi-0.0.18](crates/hdi/CHANGELOG.md#0.0.18)
+
+## [hdk\_derive-0.0.44](crates/hdk_derive/CHANGELOG.md#0.0.44)
+
 # 20220810.012252
 
 ## [holochain-0.0.153](crates/holochain/CHANGELOG.md#0.0.153)
