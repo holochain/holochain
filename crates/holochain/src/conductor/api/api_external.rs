@@ -19,6 +19,3 @@ pub trait InterfaceApi: 'static + Send + Sync + Clone {
         request: Result<Self::ApiRequest, SerializedBytesError>,
     ) -> InterfaceResult<Self::ApiResponse>;
 }
-
-#[cfg(test)]
-mod tests;
