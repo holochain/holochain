@@ -14,6 +14,12 @@ use crate::ports::random_admin_port;
 use crate::ports::set_admin_port;
 use crate::CmdRunner;
 
+// MAYBE: Export these strings from their respective repos
+//        so that we can be sure to keep them in sync.
+const LAIR_START: &str = "# lair-keystore running #";
+const HC_START_1: &str = "HOLOCHAIN_SANDBOX";
+const HC_START_2: &str = "HOLOCHAIN_SANDBOX_END";
+
 /// Run a conductor and wait for it to finish.
 /// Use [`run_async`] to run in the background.
 /// Requires the holochain binary is available
@@ -160,7 +166,7 @@ async fn check_lair_running(stdout: tokio::process::ChildStdout) {
         let mut lines = BufReader::new(stdout).lines();
         while let Ok(Some(line)) = lines.next_line().await {
             println!("{}", line);
-            if line == "# lair-keystore running #" {
+            if line == LAIR_START {
                 if let Some(s) = s.take() {
                     let _ = s.send(());
                 }
@@ -220,8 +226,8 @@ fn check_sandbox(line: &str, needs_setup: &mut bool) -> (bool, Option<u16>) {
     if let Some(line) = line.strip_prefix("###") {
         if let Some(line) = line.strip_suffix("###") {
             match line {
-                "HOLOCHAIN_SANDBOX" => tracing::info!("Found config"),
-                "HOLOCHAIN_SANDBOX_END" => *needs_setup = false,
+                HC_START_1 => tracing::info!("Found config"),
+                HC_START_2 => *needs_setup = false,
                 _ => {
                     if let Some(v) = line.strip_prefix("ADMIN_PORT:") {
                         if let Ok(port) = v.parse::<u16>() {
