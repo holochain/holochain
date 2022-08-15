@@ -44,6 +44,11 @@ let
         fi
       '';
 
+        niv =
+    self.haskell.lib.compose.overrideCabal
+      (drv: { enableSeparateBinOutput = false; })
+      super.haskellPackages.niv;
+
       rustPlatform = self.makeRustPlatform {
         rustc = holonix.pkgs.custom_rustc;
         cargo = holonix.pkgs.custom_rustc;
