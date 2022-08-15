@@ -5,6 +5,15 @@
 // We have a lot of usages of type aliases to `&String`, which clippy objects to.
 #![allow(clippy::ptr_arg)]
 
+#[cfg(feature = "hdk")]
+pub use hdk::HDI_VERSION;
+
+#[cfg(feature = "hdk")]
+pub use hdk::HDK_VERSION;
+
+/// Current Holochain Conductor rust crate version.
+pub const HC_VERSION: &str = env!("CARGO_PKG_VERSION");
+
 pub mod conductor;
 #[allow(missing_docs)]
 pub mod core;

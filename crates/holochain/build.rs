@@ -6,8 +6,9 @@ mod version_info {
     #[derive(Serialize, Debug)]
     struct BuildInfo {
         git_info: Option<GitInfo>,
-        cargo_pkg_version: String,
-        hdk_version_req: String,
+        cargo_pkg_version: &'static str,
+        hdk_version_req: &'static str,
+        hdi_version_req: &'static str,
 
         timestamp: DateTime<Utc>,
         hostname: String,
@@ -67,30 +68,6 @@ mod version_info {
         }
     }
 
-    fn hdk_version_req() -> String {
-        use std::str::FromStr;
-        use toml::Value;
-
-        let manifest_path =
-            std::path::PathBuf::from_str(option_env!("CARGO_MANIFEST_DIR").unwrap_or("."))
-                .unwrap()
-                .join("Cargo.toml");
-        let manifest = std::fs::read_to_string(&manifest_path)
-            .unwrap_or_else(|e| panic!("reading {:?}: {}", &manifest_path, e));
-
-        let manifest_toml = Value::from_str(&manifest).expect("parsing manifest");
-
-        let table = manifest_toml.as_table().unwrap();
-        let hdk_dep = &table["dependencies"]["hdk"];
-
-        match hdk_dep {
-            Value::Table(hdk) => hdk["version"].to_string(),
-            Value::String(hdk_version) => hdk_version.to_string(),
-            other => panic!("unexpected hdk_dep {:?}", other),
-        }
-        .replace('"', "")
-    }
-
     impl BuildInfo {
         fn retrieve() -> Self {
             let rustc_version = Command::new(option_env!("RUSTC").unwrap_or("rustc"))
@@ -105,9 +82,10 @@ mod version_info {
                 .to_string();
 
             BuildInfo {
-                cargo_pkg_version: std::env::var("CARGO_PKG_VERSION").unwrap_or_default(),
+                cargo_pkg_version: env!("CARGO_PKG_VERSION"),
                 git_info: GitInfo::maybe_retrieve(),
-                hdk_version_req: hdk_version_req(),
+                hdk_version_req: hdk::HDK_VERSION,
+                hdi_version_req: hdk::HDI_VERSION,
 
                 timestamp: SystemTime::now().into(),
                 hostname,
@@ -131,10 +109,9 @@ mod version_info {
     /// This will be used populate the VERSION_INFO environment variable,
     /// which will be displayed as JSON when `holochain --version-info` is called.
     pub(crate) fn populate_env() {
-        println!(
-            "cargo:rustc-env=BUILD_INFO={}",
-            BuildInfo::retrieve().as_json_string()
-        );
+        let json = BuildInfo::retrieve().as_json_string();
+        println!("cargo:rustc-env=BUILD_INFO={}", json);
+        //println!("cargo:warning={}", json);
     }
 }
 
