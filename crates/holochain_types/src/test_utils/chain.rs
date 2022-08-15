@@ -1,6 +1,5 @@
 //! Implements TestChainItem, a type used with isotest
 
-use isotest::Iso;
 use std::ops::Range;
 
 use arbitrary::Arbitrary;
@@ -147,6 +146,10 @@ pub fn gap_chain(ranges: &[Range<u32>]) -> Vec<TestChainItem> {
         .collect()
 }
 
+/// Produce an arbitrary SignedActionHashed from any ChainItem.
+///
+/// The SignedActionHashed will not be valid in any sense other than the
+/// fields relevant to ChainItem.
 pub fn chain_item_to_action(u: &mut Unstructured, i: &impl ChainItem) -> SignedActionHashed {
     let action_seq = i.seq();
     let prev_action = i.prev_hash().cloned().map(Into::into);
@@ -169,6 +172,7 @@ pub fn chain_item_to_action(u: &mut Unstructured, i: &impl ChainItem) -> SignedA
     action
 }
 
+/// Produce a sequence of AgentActivity ops from a Vec of ChainItems
 pub fn chain_to_ops(chain: Vec<impl ChainItem>) -> Vec<RegisterAgentActivity> {
     let mut u = Unstructured::new(&holochain_zome_types::NOISE);
     chain
