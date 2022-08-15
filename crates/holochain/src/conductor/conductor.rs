@@ -750,7 +750,9 @@ impl Conductor {
         &self,
         app_id: InstalledAppId,
         role_id: AppRoleId,
+        network_seed: NetworkSeed,
         properties: YamlProperties,
+        clone_id: CloneId,
     ) -> ConductorResult<CellId> {
         let ribosome_store = &self.ribosome_store;
         let (_, parent_dna_hash) = self
@@ -774,7 +776,7 @@ impl Conductor {
         let child_dna = ribosome_store.share_ref(|ds| {
             ds.get_dna_file(&parent_dna_hash)
                 .ok_or(DnaError::DnaMissing(parent_dna_hash))?
-                .modify_phenotype(random_network_seed(), properties)
+                .modify_phenotype(network_seed, properties)
         })?;
         let child_dna_hash = child_dna.dna_hash().to_owned();
         let child_ribosome = RealRibosome::new(child_dna)?;
@@ -784,7 +786,7 @@ impl Conductor {
                 if let Some(app) = state.installed_apps_mut().get_mut(&app_id) {
                     let agent_key = app.role(&role_id)?.agent_key().to_owned();
                     let cell_id = CellId::new(child_dna_hash, agent_key);
-                    app.add_clone(&role_id, cell_id.clone())?;
+                    app.add_clone(&role_id, clone_id, cell_id.clone())?;
                     Ok((state, cell_id))
                 } else {
                     Err(ConductorError::AppNotRunning(app_id.clone()))

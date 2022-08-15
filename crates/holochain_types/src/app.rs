@@ -22,10 +22,7 @@ use holochain_serialized_bytes::prelude::*;
 use holochain_util::ffs;
 use holochain_zome_types::prelude::*;
 use itertools::Itertools;
-use std::{
-    collections::{HashMap, HashSet},
-    path::PathBuf,
-};
+use std::{collections::HashMap, path::PathBuf};
 
 use self::error::{AppError, AppResult};
 
@@ -85,22 +82,16 @@ pub struct CreateCloneCellPayload {
     /// The Role ID under which to create this clone
     /// (needed to track cloning permissions and `clone_count`)
     pub role_id: AppRoleId,
-    /// Properties to override when installing this DNA
+    /// Properties to override for the new cell
     pub properties: Option<YamlProperties>,
-    /// to optionally change the NetworkSeed of the new Cell
+    /// Optionally set the network seed for the new cell
     pub network_seed: Option<NetworkSeed>,
-    /// to optionally set a new origin time of the new Cell
+    /// Optionally set a proof of membership for the new cell
+    pub membrane_proof: Option<MembraneProof>,
+    /// Optionally set a new origin time of the new cell
     pub origin_time: Option<Timestamp>,
-    /// optionally a name for the DNA clone
+    /// Optionally a name for the DNA clone
     pub name: Option<String>,
-    // pub dna_hash: DnaHash,
-    // The Agent key with which to create this Cell
-    // (TODO: should this be derived from the App?)
-    // pub agent_key: AgentPubKey,
-    // The App with which to associate the newly created Cell
-    // pub installed_app_id: InstalledAppId,
-    // Proof-of-membership, if required by this DNA
-    // pub membrane_proof: Option<MembraneProof>
 }
 
 // impl CreateCloneCellPayload {
@@ -445,17 +436,33 @@ impl InstalledAppCommon {
     }
 
     /// Accessor
-    pub fn cloned_cells(&self) -> impl Iterator<Item = &CellId> {
-        self.role_assignments
-            .iter()
-            .flat_map(|(_, role)| &role.clones)
+    pub fn cloned_cells(&self) -> impl Iterator<Item = &HashMap<CloneId, CellId>> {
+        self.role_assignments.iter().map(|(_, role)| &role.clones)
+    }
+
+    /// Accessor
+    pub fn cloned_cells_for_role_id(
+        &self,
+        role_id: &AppRoleId,
+    ) -> Option<&HashMap<CloneId, CellId>> {
+        match self.role_assignments.get(role_id) {
+            None => None,
+            Some(role_assignments) => Some(&role_assignments.clones),
+        }
+    }
+
+    /// Accessor
+    pub fn cloned_cell_ids(&self) -> impl Iterator<Item = &CellId> {
+        self.cloned_cells()
+            .map(|app_role_assignment| app_role_assignment.values())
+            .flatten()
     }
 
     /// Iterator of all cells, both provisioned and cloned
     pub fn all_cells(&self) -> impl Iterator<Item = &CellId> {
         self.provisioned_cells()
             .map(|(_, c)| c)
-            .chain(self.cloned_cells())
+            .chain(self.cloned_cell_ids())
     }
 
     /// Iterator of all "required" cells, meaning Cells which must be running
@@ -484,24 +491,36 @@ impl InstalledAppCommon {
     }
 
     /// Add a cloned cell
-    pub fn add_clone(&mut self, role_id: &AppRoleId, cell_id: CellId) -> AppResult<()> {
-        let role = self.role_mut(role_id)?;
+    pub fn add_clone(
+        &mut self,
+        role_id: &AppRoleId,
+        clone_id: CloneId,
+        cell_id: CellId,
+    ) -> AppResult<()> {
+        let app_role_assignment = self.role_mut(role_id)?;
         assert_eq!(
             cell_id.agent_pubkey(),
-            role.agent_key(),
+            app_role_assignment.agent_key(),
             "A clone cell must use the same agent key as the role it is added to"
         );
-        if role.clones.len() as u32 >= role.clone_limit {
-            return Err(AppError::CloneLimitExceeded(role.clone_limit, role.clone()));
+        if app_role_assignment.clones.len() as u32 >= app_role_assignment.clone_limit {
+            return Err(AppError::CloneLimitExceeded(
+                app_role_assignment.clone_limit,
+                app_role_assignment.clone(),
+            ));
         }
-        let _ = role.clones.insert(cell_id);
+        let cell_inserted = app_role_assignment
+            .clones
+            .insert(clone_id, cell_id)
+            .is_none();
+        assert!(cell_inserted, "clone id is not unique");
         Ok(())
     }
 
     /// Remove a cloned cell
-    pub fn remove_clone(&mut self, role_id: &AppRoleId, cell_id: &CellId) -> AppResult<bool> {
+    pub fn remove_clone(&mut self, role_id: &AppRoleId, clone_id: &CloneId) -> AppResult<bool> {
         let role = self.role_mut(role_id)?;
-        Ok(role.clones.remove(cell_id))
+        Ok(role.clones.remove(clone_id).is_some())
     }
 
     /// Accessor
@@ -510,7 +529,7 @@ impl InstalledAppCommon {
     }
 
     /// Constructor for apps not using a manifest.
-    /// Disables cloning, and implies immediate provisioning.
+    /// Allows for cloning up to 2^8-1 times and implies immediate provisioning.
     pub fn new_legacy<S: ToString, I: IntoIterator<Item = InstalledCell>>(
         installed_app_id: S,
         installed_cells: I,
@@ -556,8 +575,8 @@ impl InstalledAppCommon {
                 let role = AppRoleAssignment {
                     base_cell_id: cell_id,
                     is_provisioned: true,
-                    clones: HashSet::new(),
-                    clone_limit: 0,
+                    clones: HashMap::new(),
+                    clone_limit: 255,
                 };
                 (role_id, role)
             })
@@ -786,7 +805,7 @@ pub struct AppRoleAssignment {
     clone_limit: u32,
     /// Cells which were cloned at runtime. The length cannot grow beyond
     /// `clone_limit`
-    clones: HashSet<CellId>,
+    clones: HashMap<CloneId, CellId>,
 }
 
 impl AppRoleAssignment {
@@ -796,7 +815,7 @@ impl AppRoleAssignment {
             base_cell_id,
             is_provisioned,
             clone_limit,
-            clones: HashSet::new(),
+            clones: HashMap::new(),
         }
     }
 
@@ -824,6 +843,11 @@ impl AppRoleAssignment {
         }
     }
 
+    /// Accessor
+    pub fn clone_ids(&self) -> impl Iterator<Item = &CloneId> {
+        self.clones.iter().map(|(clone_id, _)| clone_id)
+    }
+
     /// Transformer
     pub fn into_provisioned_cell(self) -> Option<CellId> {
         if self.is_provisioned {
@@ -846,7 +870,8 @@ mod tests {
         let base_cell_id = fixt!(CellId);
         let agent = base_cell_id.agent_pubkey().clone();
         let new_clone = || CellId::new(fixt!(DnaHash), agent.clone());
-        let role1 = AppRoleAssignment::new(base_cell_id, false, 3);
+        let clone_limit = 3;
+        let role1 = AppRoleAssignment::new(base_cell_id, false, clone_limit);
         let agent = fixt!(AgentPubKey);
         let role_id: AppRoleId = "role_id".into();
         let mut app: RunningApp =
@@ -854,37 +879,80 @@ mod tests {
 
         // Can add clones up to the limit
         let clones: Vec<_> = vec![new_clone(), new_clone(), new_clone()];
-        app.add_clone(&role_id, clones[0].clone()).unwrap();
-        app.add_clone(&role_id, clones[1].clone()).unwrap();
-        app.add_clone(&role_id, clones[2].clone()).unwrap();
+        app.add_clone(
+            &role_id,
+            format!("{}{}{}", role_id.clone(), CLONE_ID_DELIMITER, 0),
+            clones[0].clone(),
+        )
+        .unwrap();
+        app.add_clone(
+            &role_id,
+            format!("{}{}{}", role_id.clone(), CLONE_ID_DELIMITER, 1),
+            clones[1].clone(),
+        )
+        .unwrap();
+        app.add_clone(
+            &role_id,
+            format!("{}{}{}", role_id.clone(), CLONE_ID_DELIMITER, 2),
+            clones[2].clone(),
+        )
+        .unwrap();
 
         // Adding a clone beyond the clone_limit is an error
         matches::assert_matches!(
-            app.add_clone(&role_id, new_clone()),
+            app.add_clone(
+                &role_id,
+                format!(
+                    "{}{}{}",
+                    role_id.clone(),
+                    CLONE_ID_DELIMITER,
+                    clone_limit + 1
+                ),
+                new_clone()
+            ),
             Err(AppError::CloneLimitExceeded(3, _))
         );
 
         assert_eq!(
-            app.cloned_cells().collect::<HashSet<_>>(),
+            app.cloned_cell_ids().collect::<HashSet<_>>(),
             maplit::hashset! { &clones[0], &clones[1], &clones[2] }
         );
 
-        assert_eq!(app.remove_clone(&role_id, &clones[1]).unwrap(), true);
-        assert_eq!(app.remove_clone(&role_id, &clones[1]).unwrap(), false);
+        assert_eq!(
+            app.remove_clone(
+                &role_id,
+                &format!("{}{}{}", role_id.clone(), CLONE_ID_DELIMITER, 0)
+            )
+            .unwrap(),
+            true
+        );
+        assert_eq!(
+            app.remove_clone(
+                &role_id,
+                &format!("{}{}{}", role_id.clone(), CLONE_ID_DELIMITER, 1)
+            )
+            .unwrap(),
+            false
+        );
 
         assert_eq!(
-            app.cloned_cells().collect::<HashSet<_>>(),
+            app.cloned_cell_ids().collect::<HashSet<_>>(),
             maplit::hashset! { &clones[0], &clones[2] }
         );
 
         // Adding the same clone twice should probably be a panic, but if this
         // line is still here, I never got around to making it panic...
-        app.add_clone(&role_id, clones[0].clone()).unwrap();
+        app.add_clone(
+            &role_id,
+            format!("{}{}{}", role_id.clone(), CLONE_ID_DELIMITER, 0),
+            clones[0].clone(),
+        )
+        .unwrap();
 
         assert_eq!(app.cloned_cells().count(), 2);
 
         assert_eq!(
-            app.cloned_cells().collect::<HashSet<_>>(),
+            app.cloned_cell_ids().collect::<HashSet<_>>(),
             app.all_cells().collect::<HashSet<_>>()
         );
     }

@@ -35,13 +35,6 @@ pub type CloneId = String;
 /// clone index.
 pub const CLONE_ID_DELIMITER: &str = ".";
 
-// impl CloneId {
-//     pub fn as_clone_index(&self) -> u32 {
-//         let (_, clone_index) = self.split_once(CLONE_ID_DELIMITER).unwrap();
-//         return clone_index.parse().unwrap();
-//     }
-// }
-
 impl fmt::Display for CellId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Cell({}, {})", self.dna_hash(), self.agent_pubkey())

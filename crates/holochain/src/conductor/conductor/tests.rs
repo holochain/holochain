@@ -104,7 +104,8 @@ async fn can_add_clone_cell_to_app() {
     .unwrap();
 
     let installed_cell = InstalledCell::new(cell_id.clone(), "role_id".to_string());
-    let role = AppRoleAssignment::new(cell_id.clone(), true, 1);
+    let clone_limit = 1;
+    let role = AppRoleAssignment::new(cell_id.clone(), true, clone_limit);
     let app1 = InstalledAppCommon::new_legacy("no clone", vec![installed_cell.clone()]).unwrap();
     let app2 = InstalledAppCommon::new("yes clone", agent, vec![("role_id".into(), role.clone())]);
     assert_eq!(
@@ -132,13 +133,26 @@ async fn can_add_clone_cell_to_app() {
 
     matches::assert_matches!(
         conductor
-            .add_clone_cell_to_app("no clone".to_string(), "role_id".to_string(), ().into())
+            .add_clone_cell_to_app(
+                "no clone".to_string(),
+                "role_id".to_string(),
+                "seed".to_string(),
+                ().into(),
+                format!("{}{}{}", "role_id".to_string(), CLONE_ID_DELIMITER, 0),
+            )
             .await,
         Err(ConductorError::AppError(AppError::CloneLimitExceeded(0, _)))
     );
 
     let cloned_cell_id = conductor
-        .add_clone_cell_to_app("yes clone".to_string(), "role_id".to_string(), ().into())
+        .add_clone_cell_to_app(
+            "yes clone".to_string(),
+            "role_id".to_string(),
+            "seed".to_string(),
+            ().into(),
+            format!("{}{}{}", "role_id".to_string(), CLONE_ID_DELIMITER, 0),
+
+        )
         .await
         .unwrap();
 
@@ -149,7 +163,7 @@ async fn can_add_clone_cell_to_app() {
             .find(|(id, _)| &id[..] == "yes clone")
             .unwrap()
             .1
-            .cloned_cells()
+            .cloned_cell_ids()
             .cloned()
             .collect::<Vec<CellId>>(),
         vec![cloned_cell_id]
