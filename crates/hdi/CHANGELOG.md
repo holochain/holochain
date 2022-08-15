@@ -4,6 +4,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Adds the ability to enable the feature flag `no-externs` on any zome to disable all exported functions. This is useful for importing a zome into another zome as a rust dependency without getting linker symbol collisions. If the feature flag `no-externs` is enabled on a zome then all exports will be disabled. The functions will still exist though and if they are not marked `pub` will given unused warnings. To fix this, make the functions `pub`.
+
 ## 0.0.17
 
 ## 0.0.16
