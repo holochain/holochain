@@ -3,7 +3,7 @@
 
 use std::collections::HashSet;
 
-use holo_hash::{ActionHash};
+use holo_hash::ActionHash;
 use holochain_serialized_bytes::prelude::*;
 
 #[cfg(test)]
