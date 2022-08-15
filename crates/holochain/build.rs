@@ -8,7 +8,6 @@ mod version_info {
         git_info: Option<GitInfo>,
         cargo_pkg_version: String,
         hdk_version_req: String,
-        hdi_version_req: String,
 
         timestamp: DateTime<Utc>,
         hostname: String,
@@ -68,16 +67,13 @@ mod version_info {
         }
     }
 
-    fn dep_version_req(crt: &str, name: &str) -> String {
+    fn hdk_version_req() -> String {
         use std::str::FromStr;
         use toml::Value;
 
         let manifest_path =
             std::path::PathBuf::from_str(option_env!("CARGO_MANIFEST_DIR").unwrap_or("."))
                 .unwrap()
-                .parent()
-                .unwrap()
-                .join(crt)
                 .join("Cargo.toml");
         let manifest = std::fs::read_to_string(&manifest_path)
             .unwrap_or_else(|e| panic!("reading {:?}: {}", &manifest_path, e));
@@ -85,12 +81,12 @@ mod version_info {
         let manifest_toml = Value::from_str(&manifest).expect("parsing manifest");
 
         let table = manifest_toml.as_table().unwrap();
-        let dep = &table["dependencies"][name];
+        let hdk_dep = &table["dependencies"]["hdk"];
 
-        match dep {
-            Value::Table(vt) => vt["version"].to_string(),
-            Value::String(vs) => vs.to_string(),
-            other => panic!("unexpected dep {:?}", other),
+        match hdk_dep {
+            Value::Table(hdk) => hdk["version"].to_string(),
+            Value::String(hdk_version) => hdk_version.to_string(),
+            other => panic!("unexpected hdk_dep {:?}", other),
         }
         .replace('"', "")
     }
@@ -111,8 +107,7 @@ mod version_info {
             BuildInfo {
                 cargo_pkg_version: std::env::var("CARGO_PKG_VERSION").unwrap_or_default(),
                 git_info: GitInfo::maybe_retrieve(),
-                hdk_version_req: dep_version_req("holochain", "hdk"),
-                hdi_version_req: dep_version_req("hdk", "hdi"),
+                hdk_version_req: hdk_version_req(),
 
                 timestamp: SystemTime::now().into(),
                 hostname,
