@@ -3,7 +3,6 @@ use arbitrary::Arbitrary;
 use arbitrary::Unstructured;
 use hdi::prelude::*;
 use hdi::test_utils::short_hand::*;
-use holo_hash::*;
 use test_case::test_case;
 
 #[hdk_entry_helper]
@@ -40,40 +39,40 @@ pub enum LinkTypes {
 }
 
 // Register Agent Activity
-#[test_case(activity(create_entry(0, 100)) => matches WasmErrorInner::Guest(_))]
-#[test_case(activity(create_link(0, 100)) => matches WasmErrorInner::Guest(_))]
+#[test_case(r_activity(create_entry(0, 100)) => matches WasmErrorInner::Guest(_))]
+#[test_case(r_activity(create_link(0, 100)) => matches WasmErrorInner::Guest(_))]
 // Store Record
-#[test_case(record(create_hidden_entry(0, 100), RecordEntry::Hidden) => matches WasmErrorInner::Guest(_))]
-#[test_case(record(
+#[test_case(s_record(create_hidden_entry(0, 100), RecordEntry::Hidden) => matches WasmErrorInner::Guest(_))]
+#[test_case(s_record(
     create_hidden_entry(100, 0),
     RecordEntry::Hidden) => matches WasmErrorInner::Host(_) ; "Store Record: with hidden entry and zome out of scope")]
-#[test_case(record(create_entry(0, 0), RecordEntry::Present(e(D::default()))) => matches WasmErrorInner::Serialize(_))]
-#[test_case(record(create_entry(0, 100), RecordEntry::Present(e(A{}))) => matches WasmErrorInner::Guest(_))]
-#[test_case(record(create_entry(100, 0), RecordEntry::Present(e(A{}))) => matches WasmErrorInner::Host(_))]
-#[test_case(record(Action::Create(c(EntryType::AgentPubKey)), RecordEntry::Present(e(A{}))) => matches WasmErrorInner::Guest(_))]
-#[test_case(record(create_entry(0, 0), RecordEntry::Present(Entry::Agent(ak(0)))) => matches WasmErrorInner::Guest(_))]
-#[test_case(record(create_hidden_entry(0, 0), RecordEntry::Present(e(A{}))) => matches WasmErrorInner::Guest(_))]
-#[test_case(record(create_hidden_entry(0, 100), RecordEntry::NotApplicable) => matches WasmErrorInner::Guest(_))]
-#[test_case(record(Action::Create(c(EntryType::AgentPubKey)), RecordEntry::Hidden) => matches WasmErrorInner::Guest(_))]
-#[test_case(record(
+#[test_case(s_record(create_entry(0, 0), RecordEntry::Present(e(D::default()))) => matches WasmErrorInner::Serialize(_))]
+#[test_case(s_record(create_entry(0, 100), RecordEntry::Present(e(A{}))) => matches WasmErrorInner::Guest(_))]
+#[test_case(s_record(create_entry(100, 0), RecordEntry::Present(e(A{}))) => matches WasmErrorInner::Host(_))]
+#[test_case(s_record(Action::Create(c(EntryType::AgentPubKey)), RecordEntry::Present(e(A{}))) => matches WasmErrorInner::Guest(_))]
+#[test_case(s_record(create_entry(0, 0), RecordEntry::Present(Entry::Agent(ak(0)))) => matches WasmErrorInner::Guest(_))]
+#[test_case(s_record(create_hidden_entry(0, 0), RecordEntry::Present(e(A{}))) => matches WasmErrorInner::Guest(_))]
+#[test_case(s_record(create_hidden_entry(0, 100), RecordEntry::NotApplicable) => matches WasmErrorInner::Guest(_))]
+#[test_case(s_record(Action::Create(c(EntryType::AgentPubKey)), RecordEntry::Hidden) => matches WasmErrorInner::Guest(_))]
+#[test_case(s_record(
     Action::Create(c(EntryType::AgentPubKey)),
     RecordEntry::NotApplicable) => matches WasmErrorInner::Guest(_) ; "Store Record: Agent key with not applicable")]
-#[test_case(record(Action::Create(c(EntryType::AgentPubKey)), RecordEntry::NotStored) => matches WasmErrorInner::Host(_))]
-#[test_case(record(Action::Create(c(EntryType::CapClaim)), RecordEntry::Present(e(A{}))) => matches WasmErrorInner::Guest(_))]
-#[test_case(record(Action::Create(c(EntryType::CapClaim)), RecordEntry::NotApplicable) => matches WasmErrorInner::Guest(_))]
-#[test_case(record(Action::Create(c(EntryType::CapClaim)), RecordEntry::NotStored) => matches WasmErrorInner::Host(_))]
-#[test_case(record(Action::Create(c(EntryType::CapGrant)), RecordEntry::Present(e(A{}))) => matches WasmErrorInner::Guest(_))]
-#[test_case(record(Action::Create(c(EntryType::CapGrant)), RecordEntry::NotApplicable) => matches WasmErrorInner::Guest(_))]
-#[test_case(record(Action::Create(c(EntryType::CapGrant)), RecordEntry::NotStored) => matches WasmErrorInner::Host(_))]
-#[test_case(record(create_link(0, 100), RecordEntry::NotApplicable) => matches WasmErrorInner::Guest(_))]
-#[test_case(record(create_link(100, 0), RecordEntry::NotApplicable) => matches WasmErrorInner::Host(_))]
+#[test_case(s_record(Action::Create(c(EntryType::AgentPubKey)), RecordEntry::NotStored) => matches WasmErrorInner::Host(_))]
+#[test_case(s_record(Action::Create(c(EntryType::CapClaim)), RecordEntry::Present(e(A{}))) => matches WasmErrorInner::Guest(_))]
+#[test_case(s_record(Action::Create(c(EntryType::CapClaim)), RecordEntry::NotApplicable) => matches WasmErrorInner::Guest(_))]
+#[test_case(s_record(Action::Create(c(EntryType::CapClaim)), RecordEntry::NotStored) => matches WasmErrorInner::Host(_))]
+#[test_case(s_record(Action::Create(c(EntryType::CapGrant)), RecordEntry::Present(e(A{}))) => matches WasmErrorInner::Guest(_))]
+#[test_case(s_record(Action::Create(c(EntryType::CapGrant)), RecordEntry::NotApplicable) => matches WasmErrorInner::Guest(_))]
+#[test_case(s_record(Action::Create(c(EntryType::CapGrant)), RecordEntry::NotStored) => matches WasmErrorInner::Host(_))]
+#[test_case(s_record(create_link(0, 100), RecordEntry::NotApplicable) => matches WasmErrorInner::Guest(_))]
+#[test_case(s_record(create_link(100, 0), RecordEntry::NotApplicable) => matches WasmErrorInner::Host(_))]
 // Store Entry
-#[test_case(entry(c(EntryType::App(public_aet(0, 100))).into(), e(A{})) => matches WasmErrorInner::Guest(_))]
-#[test_case(entry(c(EntryType::App(public_aet(100, 0))).into(), e(A{})) => matches WasmErrorInner::Host(_))]
-#[test_case(entry(c(EntryType::App(public_aet(0, 0))).into(), e(D::default())) => matches WasmErrorInner::Serialize(_))]
-#[test_case(entry(c(EntryType::App(private_aet(0, 0))).into(), e(A{})) => matches WasmErrorInner::Guest(_))]
-#[test_case(entry(c(EntryType::CapClaim).into(), e(A{})) => matches WasmErrorInner::Guest(_))]
-#[test_case(entry(c(EntryType::CapGrant).into(), e(A{})) => matches WasmErrorInner::Guest(_))]
+#[test_case(s_entry(c(EntryType::App(public_aet(0, 100))).into(), e(A{})) => matches WasmErrorInner::Guest(_))]
+#[test_case(s_entry(c(EntryType::App(public_aet(100, 0))).into(), e(A{})) => matches WasmErrorInner::Host(_))]
+#[test_case(s_entry(c(EntryType::App(public_aet(0, 0))).into(), e(D::default())) => matches WasmErrorInner::Serialize(_))]
+#[test_case(s_entry(c(EntryType::App(private_aet(0, 0))).into(), e(A{})) => matches WasmErrorInner::Guest(_))]
+#[test_case(s_entry(c(EntryType::CapClaim).into(), e(A{})) => matches WasmErrorInner::Guest(_))]
+#[test_case(s_entry(c(EntryType::CapGrant).into(), e(A{})) => matches WasmErrorInner::Guest(_))]
 // RegisterUpdate
 #[test_case(r_update(
     c(EntryType::App(public_aet(0, 0))).into(), Some(e(D::default())),
