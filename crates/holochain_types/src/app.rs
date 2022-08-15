@@ -529,7 +529,7 @@ impl InstalledAppCommon {
     }
 
     /// Constructor for apps not using a manifest.
-    /// Allows for cloning up to 2^8-1 times and implies immediate provisioning.
+    /// Allows for cloning up to 256 times and implies immediate provisioning.
     pub fn new_legacy<S: ToString, I: IntoIterator<Item = InstalledCell>>(
         installed_app_id: S,
         installed_cells: I,
@@ -545,6 +545,14 @@ impl InstalledAppCommon {
             .cell_id
             .agent_pubkey()
             .to_owned();
+
+        // ensure no role id contains a clone id delimiter
+        if let Some(illegal_cell) = installed_cells
+            .iter()
+            .find(|c| c.role_id.contains(CLONE_ID_DELIMITER))
+        {
+            return Err(AppError::IllegalRoleId(illegal_cell.role_id.clone()));
+        }
 
         // ensure all cells use the same agent key
         if installed_cells
@@ -576,7 +584,7 @@ impl InstalledAppCommon {
                     base_cell_id: cell_id,
                     is_provisioned: true,
                     clones: HashMap::new(),
-                    clone_limit: 255,
+                    clone_limit: 256,
                 };
                 (role_id, role)
             })
@@ -864,6 +872,19 @@ mod tests {
     use crate::prelude::*;
     use ::fixt::prelude::*;
     use std::collections::HashSet;
+
+    #[test]
+    fn illegal_role_id_is_rejected() {
+        let result = InstalledAppCommon::new_legacy(
+            "test_app",
+            vec![InstalledCell {
+                role_id: CLONE_ID_DELIMITER.to_string(),
+                cell_id: CellId::new(fixt!(DnaHash), fixt!(AgentPubKey)),
+            }],
+        );
+        println!("{:?}", result);
+        assert!(result.is_err());
+    }
 
     #[test]
     fn clone_management() {
