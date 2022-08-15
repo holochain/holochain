@@ -887,6 +887,7 @@ mod tests {
     }
 
     #[test]
+    #[should_panic(expected = "clone id is not unique")]
     fn clone_management() {
         let base_cell_id = fixt!(CellId);
         let agent = base_cell_id.agent_pubkey().clone();
@@ -942,7 +943,7 @@ mod tests {
         assert_eq!(
             app.remove_clone(
                 &role_id,
-                &format!("{}{}{}", role_id.clone(), CLONE_ID_DELIMITER, 0)
+                &format!("{}{}{}", role_id.clone(), CLONE_ID_DELIMITER, 1)
             )
             .unwrap(),
             true
@@ -963,7 +964,7 @@ mod tests {
 
         // Adding the same clone twice should probably be a panic, but if this
         // line is still here, I never got around to making it panic...
-        app.add_clone(
+         app.add_clone(
             &role_id,
             format!("{}{}{}", role_id.clone(), CLONE_ID_DELIMITER, 0),
             clones[0].clone(),
