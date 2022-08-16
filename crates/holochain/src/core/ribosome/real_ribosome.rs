@@ -401,6 +401,13 @@ impl RealRibosome {
         Ok(())
     }
 
+    pub fn do_not_cache_instance(
+        &self,
+        context_key: u64
+    ) {
+        CONTEXT_MAP.lock().remove(&context_key);
+    }
+
     pub fn instance(
         &self,
         call_context: CallContext,
@@ -725,6 +732,8 @@ impl RibosomeT for RealRibosome {
                     // because it builds guards against memory leaks and handles imports correctly
                     let (instance, context_key) = self.instance(call_context)?;
 
+                    dbg!("start call", to_call.as_ref());
+                    dbg!(Timestamp::now());
                     let result: Result<ExternIO, RuntimeError> = holochain_wasmer_host::guest::call(
                         instance.clone(),
                         to_call.as_ref(),
@@ -733,9 +742,17 @@ impl RibosomeT for RealRibosome {
                         // @todo - is this a problem for large payloads like entries?
                         invocation.to_owned().host_input()?,
                     );
+                    dbg!(Timestamp::now());
+                    dbg!("end call");
+
+                    dbg!(&result.is_ok());
+                    // if !result.is_ok() {
+                    //     dbg!(invocation.clone().host_input().unwrap());
+                    // }
 
                     // Cache this instance.
                     self.cache_instance(context_key, instance, zome.zome_name())?;
+                    // self.do_not_cache_instance(context_key);
 
                     Ok(Some(result?))
                 } else {
