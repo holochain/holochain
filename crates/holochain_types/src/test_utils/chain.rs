@@ -211,8 +211,8 @@ fn test_hash_roundtrips(u: u32) {
 #[cfg(test)]
 #[test_case::test_case(0, 0, None)]
 #[test_case::test_case(0, 0, Some(0))]
-#[test_case::test_case(1, 1, None)]
-#[test_case::test_case(1, 1, Some(0) => panics)]
+#[test_case::test_case(1, 1, Some(0))]
+#[test_case::test_case(1, 1, None => ignore)] // this case is unrepresentable with these types
 fn test_chain_item_roundtrips(seq: u32, hash: u32, prev: Option<u32>) {
     use ::fixt::prelude::*;
     let item = TestChainItem {
