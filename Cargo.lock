@@ -2170,6 +2170,7 @@ dependencies = [
  "pretty_assertions 0.7.2",
  "serde",
  "serde_derive",
+ "test-case 2.1.0",
  "thiserror",
  "tokio",
  "tracing",
