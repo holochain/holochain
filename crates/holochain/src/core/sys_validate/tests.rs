@@ -477,19 +477,19 @@ async fn incoming_ops_filters_private_entry() {
 #[test]
 /// Test the chain validation works.
 fn valid_chain_test() {
-    isotest::isotest!(|iso| {
+    isotest::isotest!(TestChainItem, TestChainHash => |iso_a, iso_h| {
         // Create a valid chain.
         let actions = vec![
-            iso.create(TestChainItem::new(0)),
-            iso.create(TestChainItem::new(1)),
-            iso.create(TestChainItem::new(2)),
+            iso_a.create(TestChainItem::new(0)),
+            iso_a.create(TestChainItem::new(1)),
+            iso_a.create(TestChainItem::new(2)),
         ];
         // Valid chain passes.
         validate_chain(actions.iter(), &None).expect("Valid chain");
 
         // Create a forked chain.
         let mut fork = actions.clone();
-        fork.push(iso.create(TestChainItem {
+        fork.push(iso_a.create(TestChainItem {
             seq: 1,
             hash: 111.into(),
             prev: Some(0.into()),
@@ -504,7 +504,7 @@ fn valid_chain_test() {
 
         // Test a chain with the wrong seq.
         let mut wrong_seq = actions.clone();
-        iso.mutate::<TestChainItem, _>(&mut wrong_seq[2], |s| s.seq = 3);
+        iso_a.mutate(&mut wrong_seq[2], |s| s.seq = 3);
         let err = validate_chain(wrong_seq.iter(), &None).expect_err("Wrong seq");
         assert_matches!(
             err,
@@ -515,7 +515,7 @@ fn valid_chain_test() {
 
         // Test a wrong root gets rejected.
         let mut wrong_root = actions.clone();
-        iso.mutate::<TestChainItem, _>(&mut wrong_root[0], |a| {
+        iso_a.mutate(&mut wrong_root[0], |a| {
             a.prev = Some(0.into());
         });
 
@@ -539,7 +539,7 @@ fn valid_chain_test() {
         );
 
         // Test if there is a existing head that a dna in the new chain is rejected.
-        let hash = iso.create(TestChainHash(123));
+        let hash = iso_h.create(TestChainHash(123));
         let err = validate_chain(actions.iter(), &Some((hash, 0))).expect_err("Dna not at root");
         assert_matches!(
             err,
@@ -550,8 +550,8 @@ fn valid_chain_test() {
 
         // Check a sequence that is broken gets rejected.
         let mut wrong_seq = actions[1..].to_vec();
-        iso.mutate::<TestChainItem, _>(&mut wrong_seq[0], |s| s.seq = 3);
-        iso.mutate::<TestChainItem, _>(&mut wrong_seq[1], |s| s.seq = 4);
+        iso_a.mutate(&mut wrong_seq[0], |s| s.seq = 3);
+        iso_a.mutate(&mut wrong_seq[1], |s| s.seq = 4);
 
         let err = validate_chain(
             wrong_seq.iter(),
@@ -573,7 +573,7 @@ fn valid_chain_test() {
         )
         .expect("Correct seq");
 
-        let hash = iso.create(TestChainHash(234));
+        let hash = iso_h.create(TestChainHash(234));
         let err = validate_chain(correct_seq.iter(), &Some((hash, 0))).expect_err("Hash is wrong");
         assert_matches!(
             err,

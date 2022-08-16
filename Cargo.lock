@@ -2897,8 +2897,12 @@ checksum = "879d54834c8c76457ef4293a689b2a8c59b076067ad77b15efafbb05f92a592b"
 
 [[package]]
 name = "isotest"
-version = "0.1.0"
-source = "git+https://github.com/maackle/isotest-rust#314b3fa3755ed6710e3558fab07c56f28e14bd51"
+version = "0.1.0-dev.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bd6250b593b9410fe34cf5f2392f0c3e64db49a342b797e2bcd4306df278222c"
+dependencies = [
+ "futures",
+]
 
 [[package]]
 name = "itertools"
