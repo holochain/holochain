@@ -23,7 +23,7 @@ pub enum LinkTypes {
 /// that successfully match and deserialize to the entry types
 /// or link types defined within this zome.
 /// All other ops are allowed.
-fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
+pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op.to_type()? {
         OpType::StoreEntry(OpEntry::CreateEntry { entry_type, .. }) => match entry_type {
             MusicTypes::Artist(_) => Ok(ValidateCallbackResult::Valid),
