@@ -1917,7 +1917,7 @@ dependencies = [
 
 [[package]]
 name = "hdi"
-version = "0.0.15"
+version = "0.0.17"
 dependencies = [
  "arbitrary",
  "fixt",
@@ -1936,7 +1936,7 @@ dependencies = [
 
 [[package]]
 name = "hdk"
-version = "0.0.143"
+version = "0.0.145"
 dependencies = [
  "fixt",
  "getrandom 0.2.7",
@@ -1957,7 +1957,7 @@ dependencies = [
 
 [[package]]
 name = "hdk_derive"
-version = "0.0.42"
+version = "0.0.43"
 dependencies = [
  "darling 0.14.1",
  "heck 0.4.0",
@@ -2042,7 +2042,7 @@ dependencies = [
 
 [[package]]
 name = "holochain"
-version = "0.0.151"
+version = "0.0.153"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -2102,7 +2102,7 @@ dependencies = [
  "rand 0.8.5",
  "rand-utf8",
  "reqwest",
- "rpassword",
+ "rpassword 5.0.1",
  "rusqlite",
  "sd-notify",
  "serde",
@@ -2134,7 +2134,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cascade"
-version = "0.0.51"
+version = "0.0.53"
 dependencies = [
  "async-trait",
  "derive_more",
@@ -2168,7 +2168,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli"
-version = "0.0.49"
+version = "0.0.50"
 dependencies = [
  "anyhow",
  "futures",
@@ -2181,7 +2181,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_bundle"
-version = "0.0.45"
+version = "0.0.46"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -2202,7 +2202,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_sandbox"
-version = "0.0.45"
+version = "0.0.46"
 dependencies = [
  "ansi_term 0.12.1",
  "anyhow",
@@ -2212,13 +2212,16 @@ dependencies = [
  "holochain_conductor_api",
  "holochain_p2p",
  "holochain_types",
+ "holochain_util",
  "holochain_websocket",
- "lazy_static",
  "matches",
  "nanoid 0.3.0",
  "observability",
+ "once_cell",
  "portpicker",
+ "serde",
  "serde_yaml",
+ "sodoken",
  "structopt",
  "tokio",
  "tracing",
@@ -2228,7 +2231,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_conductor_api"
-version = "0.0.51"
+version = "0.0.52"
 dependencies = [
  "derive_more",
  "directories 2.0.2",
@@ -2252,7 +2255,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_integrity_types"
-version = "0.0.13"
+version = "0.0.14"
 dependencies = [
  "arbitrary",
  "holo_hash",
@@ -2266,7 +2269,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_keystore"
-version = "0.0.48"
+version = "0.0.49"
 dependencies = [
  "base64",
  "ghost_actor 0.3.0-alpha.4",
@@ -2296,7 +2299,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_p2p"
-version = "0.0.49"
+version = "0.0.50"
 dependencies = [
  "async-trait",
  "derive_more",
@@ -2350,7 +2353,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_sqlite"
-version = "0.0.47"
+version = "0.0.48"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2399,7 +2402,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_state"
-version = "0.0.51"
+version = "0.0.52"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -2444,7 +2447,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_test_wasm_common"
-version = "0.0.44"
+version = "0.0.46"
 dependencies = [
  "hdk",
  "serde",
@@ -2452,7 +2455,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_types"
-version = "0.0.49"
+version = "0.0.50"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -2516,12 +2519,14 @@ dependencies = [
  "futures",
  "num_cpus",
  "once_cell",
+ "rpassword 7.0.0",
+ "sodoken",
  "tokio",
 ]
 
 [[package]]
 name = "holochain_wasm_test_utils"
-version = "0.0.50"
+version = "0.0.52"
 dependencies = [
  "holochain_types",
  "holochain_util",
@@ -2613,7 +2618,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_zome_types"
-version = "0.0.42"
+version = "0.0.43"
 dependencies = [
  "arbitrary",
  "contrafact",
@@ -4059,9 +4064,9 @@ dependencies = [
 
 [[package]]
 name = "once_cell"
-version = "1.12.0"
+version = "1.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7709cef83f0c1f58f666e746a08b21e0085f7440fa6a29cc194d68aac97a4225"
+checksum = "18a6dbe30758c9f83eb00cbea4ac95966305f5a7772f3f42ebfc7fc7eddbd8e1"
 
 [[package]]
 name = "one_err"
@@ -5288,6 +5293,16 @@ name = "rpassword"
 version = "5.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ffc936cf8a7ea60c58f030fd36a612a48f440610214dc54bc36431f9ea0c3efb"
+dependencies = [
+ "libc",
+ "winapi",
+]
+
+[[package]]
+name = "rpassword"
+version = "7.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "26b763cb66df1c928432cc35053f8bd4cec3335d8559fc16010017d16b3c1680"
 dependencies = [
  "libc",
  "winapi",

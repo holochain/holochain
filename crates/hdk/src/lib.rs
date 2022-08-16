@@ -139,7 +139,7 @@
 //!
 //! The callbacks are:
 //!
-//! - [`fn entry_defs(_: ()) -> ExternResult<EntryDefs>`](entry_defs):
+//! - `fn entry_defs(_: ()) -> ExternResult<EntryDefs>`:
 //!   - `EntryDefs` is a vector defining all entries used by this app.
 //!   - All zomes in a DNA define all their entries at the same time for the host.
 //!   - All entry defs are combined into a single ordered list per zome and exposed to tooling such as DNA generation.
