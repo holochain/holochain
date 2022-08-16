@@ -5,7 +5,7 @@ description = "Logic for cascading updates to Holochain state and network intera
 license-file = "LICENSE_CAL-1.0"
 homepage = "https://github.com/holochain/holochain"
 documentation = "https://docs.rs/holochain_cascade"
-authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
+authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2021"
 
 [dependencies]
@@ -28,7 +28,7 @@ observability = "0.1.3"
 kitsune_p2p = { version = "0.0.40", path = "../kitsune_p2p/kitsune_p2p" }
 serde = { version = "1.0", features = [ "derive" ] }
 serde_derive = "1.0"
-tokio = { version = "1.11", features = [ "full" ] }
+tokio = { version = "1.11", features = ["full"] }
 thiserror = "1.0"
 tracing = "0.1"
 tracing-futures = "0.2"
@@ -39,11 +39,9 @@ mockall = { version = "0.10.2", optional = true }
 [dev-dependencies]
 matches = "0.1"
 pretty_assertions = "0.7.2"
+test-case = "2.1"
 
 [features]
 default = ["test_utils"]
 
-test_utils = [
-    "async-trait",
-    "mockall"
-]
+test_utils = ["async-trait", "mockall", "holochain_types/test_utils"]
