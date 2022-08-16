@@ -179,6 +179,9 @@ pub async fn proxy_list(url: Url2) -> KitsuneP2pResult<Vec<Url2>> {
 
 #[cfg(test)]
 mod tests {
+    // Leaving these tests that no longer compile in so that they may be re-written in the future.
+    // Rather than directly testing against the cloudflare service, we should spin up a local rust
+    // bootstrap instance to test against.
     /*
     use super::*;
     use crate::fixt::*;
