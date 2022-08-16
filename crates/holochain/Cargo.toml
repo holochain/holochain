@@ -65,7 +65,7 @@ tempfile = "3.3"
 thiserror = "1.0.22"
 tokio = { version = "1.11", features = [ "full"] }
 tokio-stream = { version = "0.1", features = [ "sync", "net" ] }
-holochain_util = { version = "0.0.10", path = "../holochain_util" }
+holochain_util = { version = "0.0.10", path = "../holochain_util", features = [ "pw" ] }
 toml = "0.5.6"
 tracing = "0.1.26"
 tracing-futures = "0.2.5"
