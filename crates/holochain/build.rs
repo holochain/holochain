@@ -111,6 +111,8 @@ mod version_info {
     pub(crate) fn populate_env() {
         let json = BuildInfo::retrieve().as_json_string();
         println!("cargo:rustc-env=BUILD_INFO={}", json);
+
+        // incase you want to debug the output:
         //println!("cargo:warning={}", json);
     }
 }
