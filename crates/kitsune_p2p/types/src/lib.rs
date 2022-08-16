@@ -64,6 +64,20 @@ use ghost_actor::dependencies::must_future::MustBoxFuture;
 /// 32 byte binary TLS certificate digest.
 pub type CertDigest = lair_keystore_api::encoding_types::BinDataSized<32>;
 
+/// Extension trait for working with CertDigests.
+pub trait CertDigestExt {
+    /// Construct from a slice. Panicks if `slice.len() != 32`.
+    fn from_slice(slice: &[u8]) -> Self;
+}
+
+impl CertDigestExt for CertDigest {
+    fn from_slice(slice: &[u8]) -> Self {
+        let mut out = [0; 32];
+        out.copy_from_slice(slice);
+        out.into()
+    }
+}
+
 /// Wrapper around CertDigest that provides some additional debugging helpers.
 #[derive(Clone)]
 pub struct Tx2Cert(pub Arc<(CertDigest, String, String)>);
@@ -166,9 +180,7 @@ impl From<Vec<u8>> for Tx2Cert {
 
 impl From<Arc<Vec<u8>>> for Tx2Cert {
     fn from(v: Arc<Vec<u8>>) -> Self {
-        let mut data = [0; 32];
-        data.copy_from_slice(&v);
-        <lair_keystore_api::encoding_types::BinDataSized<32>>::from(data).into()
+        CertDigest::from_slice(&v).into()
     }
 }
 
