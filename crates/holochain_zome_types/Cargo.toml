@@ -1,6 +1,6 @@
 [package]
 name = "holochain_zome_types"
-version = "0.0.44-dev.0"
+version = "0.0.44"
 description = "Holochain zome types"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -12,8 +12,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-kitsune_p2p_timestamp = { version = "0.0.12-dev.0", path = "../kitsune_p2p/timestamp" }
-holochain_integrity_types = { version = "0.0.15-dev.0", path = "../holochain_integrity_types", features = ["tracing"] }
+kitsune_p2p_timestamp = { version = "0.0.12", path = "../kitsune_p2p/timestamp" }
+holochain_integrity_types = { version = "0.0.15", path = "../holochain_integrity_types", features = ["tracing"] }
 holo_hash = { version = "0.0.31", path = "../holo_hash" }
 holochain_serialized_bytes = "=0.0.51"
 paste = "=1.0.5"
@@ -36,7 +36,7 @@ num_enum = { version = "0.5", optional = true }
 
 # full-dna-def dependencies
 derive_builder = { version = "0.9", optional = true }
-kitsune_p2p_dht = { version = "0.0.3-dev.0", path = "../kitsune_p2p/dht", optional = true }
+kitsune_p2p_dht = { version = "0.0.3", path = "../kitsune_p2p/dht", optional = true }
 nanoid = { version = "0.3", optional = true }
 shrinkwraprs = { version = "0.3", optional = true }
 
