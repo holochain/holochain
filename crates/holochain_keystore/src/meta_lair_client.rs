@@ -229,20 +229,17 @@ impl MetaLairClient {
         }
     }
 
-    /// Get a single tls cert from lair for use in conductor
-    /// NOTE: once we delete the deprecated legacy lair api
-    /// we can support multiple conductors using the same lair
-    /// by tagging the tls certs / remembering the tag.
-    pub fn get_or_create_first_tls_cert(
+    /// Get a tls cert from lair for use in conductor
+    pub fn get_or_create_tls_cert_by_tag(
         &self,
+        tag: Arc<str>,
     ) -> impl Future<Output = LairResult<(CertDigest, Arc<[u8]>, sodoken::BufRead)>> + 'static + Send
     {
         let this = self.clone();
         async move {
             match this {
                 Self::Lair(client) => {
-                    const ONE_CERT: &str = "SingleHcTlsWkaCert";
-                    let info = match client.get_entry(ONE_CERT.into()).await {
+                    let info = match client.get_entry(tag.clone()).await {
                         Ok(info) => match info {
                             LairEntryInfo::WkaTlsCert { cert_info, .. } => cert_info,
                             oth => {
@@ -253,9 +250,9 @@ impl MetaLairClient {
                                 .into())
                             }
                         },
-                        Err(_) => client.new_wka_tls_cert(ONE_CERT.into()).await?,
+                        Err(_) => client.new_wka_tls_cert(tag.clone()).await?,
                     };
-                    let pk = client.get_wka_tls_cert_priv_key(ONE_CERT.into()).await?;
+                    let pk = client.get_wka_tls_cert_priv_key(tag).await?;
 
                     Ok((info.digest, info.cert.to_vec().into(), pk))
                 }
