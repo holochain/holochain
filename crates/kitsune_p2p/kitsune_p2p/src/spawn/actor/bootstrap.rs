@@ -179,9 +179,6 @@ pub async fn proxy_list(url: Url2) -> KitsuneP2pResult<Vec<Url2>> {
 
 #[cfg(test)]
 mod tests {
-    // Leaving these tests that no longer compile in so that they may be re-written in the future.
-    // Rather than directly testing against the cloudflare service, we should spin up a local rust
-    // bootstrap instance to test against.
     use super::*;
     use crate::fixt::*;
     use crate::types::KitsuneAgent;
@@ -208,6 +205,10 @@ mod tests {
     async fn sign_ed25519_keypair_new_from_entropy() -> Result<Keypair, std::io::Error> {
         todo!()
     }
+
+    // TODO - FIXME - davidb
+    // I'm disabling all these tests that depend on outside systems
+    // we need local testing to prove these out in a ci environment.
 
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "flaky"]
