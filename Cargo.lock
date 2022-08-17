@@ -50,6 +50,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "android_system_properties"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d7ed72e1635e121ca3e79420540282af22da58be50de153d36f81ddc6b83aa9e"
+dependencies = [
+ "libc",
+]
+
+[[package]]
 name = "ansi_term"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -586,15 +595,17 @@ dependencies = [
 
 [[package]]
 name = "chrono"
-version = "0.4.19"
+version = "0.4.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "670ad68c9088c2a963aaa298cb369688cf3f9465ce5e2d4ca10e6e0098a1ce73"
+checksum = "bfd4d1b31faaa3a89d7934dbded3111da0d2ef28e3ebccdb4f0179f5929d1ef1"
 dependencies = [
- "libc",
+ "iana-time-zone",
+ "js-sys",
  "num-integer",
  "num-traits",
  "serde",
  "time 0.1.44",
+ "wasm-bindgen",
  "winapi",
 ]
 
@@ -1828,7 +1839,7 @@ dependencies = [
 
 [[package]]
 name = "hdi"
-version = "0.0.17"
+version = "0.0.18"
 dependencies = [
  "arbitrary",
  "fixt",
@@ -1847,7 +1858,7 @@ dependencies = [
 
 [[package]]
 name = "hdk"
-version = "0.0.145"
+version = "0.0.146"
 dependencies = [
  "fixt",
  "getrandom 0.2.7",
@@ -1868,7 +1879,7 @@ dependencies = [
 
 [[package]]
 name = "hdk_derive"
-version = "0.0.43"
+version = "0.0.44"
 dependencies = [
  "darling 0.14.1",
  "heck 0.4.0",
@@ -1953,7 +1964,7 @@ dependencies = [
 
 [[package]]
 name = "holochain"
-version = "0.0.153"
+version = "0.0.154"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -2045,7 +2056,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cascade"
-version = "0.0.53"
+version = "0.0.54"
 dependencies = [
  "async-trait",
  "derive_more",
@@ -2079,7 +2090,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli"
-version = "0.0.50"
+version = "0.0.51"
 dependencies = [
  "anyhow",
  "futures",
@@ -2092,7 +2103,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_bundle"
-version = "0.0.46"
+version = "0.0.47"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -2113,7 +2124,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_sandbox"
-version = "0.0.46"
+version = "0.0.47"
 dependencies = [
  "ansi_term 0.12.1",
  "anyhow",
@@ -2142,7 +2153,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_conductor_api"
-version = "0.0.52"
+version = "0.0.53"
 dependencies = [
  "derive_more",
  "directories",
@@ -2166,7 +2177,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_integrity_types"
-version = "0.0.14"
+version = "0.0.15"
 dependencies = [
  "arbitrary",
  "holo_hash",
@@ -2180,7 +2191,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_keystore"
-version = "0.0.49"
+version = "0.0.50"
 dependencies = [
  "base64",
  "ghost_actor 0.3.0-alpha.4",
@@ -2209,7 +2220,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_p2p"
-version = "0.0.50"
+version = "0.0.51"
 dependencies = [
  "async-trait",
  "derive_more",
@@ -2263,7 +2274,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_sqlite"
-version = "0.0.48"
+version = "0.0.49"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2312,7 +2323,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_state"
-version = "0.0.52"
+version = "0.0.53"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -2357,7 +2368,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_test_wasm_common"
-version = "0.0.46"
+version = "0.0.47"
 dependencies = [
  "hdk",
  "serde",
@@ -2365,7 +2376,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_types"
-version = "0.0.50"
+version = "0.0.51"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -2420,7 +2431,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_util"
-version = "0.0.10"
+version = "0.0.11"
 dependencies = [
  "backtrace",
  "cfg-if 0.1.10",
@@ -2436,7 +2447,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasm_test_utils"
-version = "0.0.52"
+version = "0.0.53"
 dependencies = [
  "holochain_types",
  "holochain_util",
@@ -2528,7 +2539,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_zome_types"
-version = "0.0.43"
+version = "0.0.44"
 dependencies = [
  "arbitrary",
  "contrafact",
@@ -2653,6 +2664,19 @@ dependencies = [
  "native-tls",
  "tokio",
  "tokio-native-tls",
+]
+
+[[package]]
+name = "iana-time-zone"
+version = "0.1.44"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "808cf7d67cf4a22adc5be66e75ebdf769b3f2ea032041437a7061f97a63dad4b"
+dependencies = [
+ "android_system_properties",
+ "core-foundation-sys",
+ "js-sys",
+ "wasm-bindgen",
+ "winapi",
 ]
 
 [[package]]
@@ -2827,7 +2851,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p"
-version = "0.0.40"
+version = "0.0.41"
 dependencies = [
  "arbitrary",
  "arrayref",
@@ -2895,7 +2919,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_dht"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "colored",
  "derivative",
@@ -3008,7 +3032,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_proxy"
-version = "0.0.28"
+version = "0.0.29"
 dependencies = [
  "base64",
  "blake2b_simd 0.5.11",
@@ -3033,7 +3057,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_timestamp"
-version = "0.0.11"
+version = "0.0.12"
 dependencies = [
  "arbitrary",
  "chrono",
@@ -3046,7 +3070,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_transport_quic"
-version = "0.0.28"
+version = "0.0.29"
 dependencies = [
  "blake2b_simd 1.0.0",
  "futures",
@@ -3064,7 +3088,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_types"
-version = "0.0.28"
+version = "0.0.29"
 dependencies = [
  "arbitrary",
  "base64",
@@ -3548,7 +3572,7 @@ dependencies = [
 
 [[package]]
 name = "mr_bundle"
-version = "0.0.14"
+version = "0.0.15"
 dependencies = [
  "anyhow",
  "arbitrary",
