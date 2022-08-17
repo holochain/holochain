@@ -18,7 +18,9 @@ pub async fn spawn_crude_mock_keystore<F>(err_fn: F) -> MetaLairClient
 where
     F: Fn() -> one_err::OneErr + Send + Sync + 'static,
 {
-    MetaLairClient::Lair(LairClient(Arc::new(CrudeMockKeystore(Arc::new(err_fn)))))
+    MetaLairClient(Arc::new(parking_lot::Mutex::new(LairClient(Arc::new(
+        CrudeMockKeystore(Arc::new(err_fn)),
+    )))))
 }
 
 /// Spawn a test keystore that can switch between mocked and real.
@@ -40,7 +42,12 @@ where
 
     let control = MockLairControl(use_mock);
 
-    Ok((MetaLairClient::Lair(LairClient(Arc::new(mock))), control))
+    Ok((
+        MetaLairClient(Arc::new(parking_lot::Mutex::new(LairClient(Arc::new(
+            mock,
+        ))))),
+        control,
+    ))
 }
 /// A keystore which always returns the same LairError for every call.
 struct RealOrMockKeystore {
@@ -94,23 +101,17 @@ impl AsLairClient for CrudeMockKeystore {
 
 impl AsLairClient for RealOrMockKeystore {
     fn get_enc_ctx_key(&self) -> sodoken::BufReadSized<32> {
-        match &self.real {
-            MetaLairClient::Lair(client) => client.get_enc_ctx_key(),
-        }
+        self.real.cli().get_enc_ctx_key()
     }
 
     fn get_dec_ctx_key(&self) -> sodoken::BufReadSized<32> {
-        match &self.real {
-            MetaLairClient::Lair(client) => client.get_dec_ctx_key(),
-        }
+        self.real.cli().get_dec_ctx_key()
     }
 
     fn shutdown(
         &self,
     ) -> ghost_actor::dependencies::futures::future::BoxFuture<'static, LairResult<()>> {
-        match &self.real {
-            MetaLairClient::Lair(client) => client.shutdown().boxed(),
-        }
+        self.real.cli().shutdown().boxed()
     }
 
     fn request(
@@ -122,9 +123,7 @@ impl AsLairClient for RealOrMockKeystore {
             let r = (self.mock)(request);
             async move { r }.boxed()
         } else {
-            match &self.real {
-                MetaLairClient::Lair(client) => client.0.request(request),
-            }
+            AsLairClient::request(&*self.real.cli().0, request)
         }
     }
 }

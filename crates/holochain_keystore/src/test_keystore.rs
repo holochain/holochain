@@ -72,5 +72,5 @@ pub async fn spawn_test_keystore() -> LairResult<MetaLairClient> {
 
     // return the client
     let client = keystore.new_client().await?;
-    Ok(MetaLairClient::Lair(client))
+    Ok(MetaLairClient(Arc::new(parking_lot::Mutex::new(client))))
 }

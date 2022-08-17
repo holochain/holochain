@@ -1,6 +1,7 @@
 use holochain_zome_types::Signature;
-use kitsune_p2p_types::dependencies::lair_keystore_api;
+use kitsune_p2p_types::dependencies::{lair_keystore_api, url2};
 use lair_keystore_api::prelude::*;
+use parking_lot::Mutex;
 use std::future::Future;
 use std::sync::Arc;
 
@@ -8,37 +9,43 @@ pub use kitsune_p2p_types::dependencies::lair_keystore_api::LairResult;
 
 /// Abstraction around runtime switching/upgrade of lair keystore / client.
 #[derive(Clone)]
-pub enum MetaLairClient {
-    /// lair keystore api client
-    Lair(LairClient),
-}
+pub struct MetaLairClient(pub(crate) Arc<Mutex<LairClient>>);
 
 impl MetaLairClient {
+    pub(crate) async fn new(
+        connection_url: url2::Url2,
+        passphrase: sodoken::BufRead,
+    ) -> LairResult<Self> {
+        use lair_keystore_api::ipc_keystore::*;
+        let opts = IpcKeystoreClientOptions {
+            connection_url: connection_url.into(),
+            passphrase,
+            exact_client_server_version_match: true,
+        };
+        let client = ipc_keystore_connect_options(opts).await?;
+        Ok(MetaLairClient(Arc::new(Mutex::new(client))))
+    }
+
+    pub(crate) fn cli(&self) -> LairClient {
+        self.0.lock().clone()
+    }
+
     /// Shutdown this keystore client
     pub fn shutdown(&self) -> impl Future<Output = LairResult<()>> + 'static + Send {
-        let this = self.clone();
-        async move {
-            match this {
-                Self::Lair(client) => client.shutdown().await,
-            }
-        }
+        let client = self.cli();
+        async move { client.shutdown().await }
     }
 
     /// Construct a new randomized signature keypair
     pub fn new_sign_keypair_random(
         &self,
     ) -> impl Future<Output = LairResult<holo_hash::AgentPubKey>> + 'static + Send {
-        let this = self.clone();
+        let client = self.cli();
         async move {
-            match this {
-                Self::Lair(client) => {
-                    let tag = nanoid::nanoid!();
-                    let info = client.new_seed(tag.into(), None, false).await?;
-                    let pub_key =
-                        holo_hash::AgentPubKey::from_raw_32(info.ed25519_pub_key.0.to_vec());
-                    Ok(pub_key)
-                }
-            }
+            let tag = nanoid::nanoid!();
+            let info = client.new_seed(tag.into(), None, false).await?;
+            let pub_key = holo_hash::AgentPubKey::from_raw_32(info.ed25519_pub_key.0.to_vec());
+            Ok(pub_key)
         }
     }
 
@@ -48,17 +55,13 @@ impl MetaLairClient {
         pub_key: holo_hash::AgentPubKey,
         data: Arc<[u8]>,
     ) -> impl Future<Output = LairResult<Signature>> + 'static + Send {
-        let this = self.clone();
+        let client = self.cli();
         async move {
             tokio::time::timeout(std::time::Duration::from_secs(30), async move {
-                match this {
-                    Self::Lair(client) => {
-                        let mut pub_key_2 = [0; 32];
-                        pub_key_2.copy_from_slice(pub_key.get_raw_32());
-                        let sig = client.sign_by_pub_key(pub_key_2.into(), None, data).await?;
-                        Ok(Signature(*sig.0))
-                    }
-                }
+                let mut pub_key_2 = [0; 32];
+                pub_key_2.copy_from_slice(pub_key.get_raw_32());
+                let sig = client.sign_by_pub_key(pub_key_2.into(), None, data).await?;
+                Ok(Signature(*sig.0))
             })
             .await
             .map_err(one_err::OneErr::new)?
@@ -70,17 +73,13 @@ impl MetaLairClient {
         &self,
         tag: Arc<str>,
     ) -> impl Future<Output = LairResult<()>> + 'static + Send {
-        let this = self.clone();
+        let client = self.cli();
         async move {
-            match this {
-                Self::Lair(client) => {
-                    // shared secrets are exportable
-                    // (it's hard to make them useful otherwise : )
-                    let exportable = true;
-                    let _info = client.new_seed(tag, None, exportable).await?;
-                    Ok(())
-                }
-            }
+            // shared secrets are exportable
+            // (it's hard to make them useful otherwise : )
+            let exportable = true;
+            let _info = client.new_seed(tag, None, exportable).await?;
+            Ok(())
         }
     }
 
@@ -91,13 +90,11 @@ impl MetaLairClient {
         sender_pub_key: X25519PubKey,
         recipient_pub_key: X25519PubKey,
     ) -> impl Future<Output = LairResult<([u8; 24], Arc<[u8]>)>> + 'static + Send {
-        let this = self.clone();
+        let client = self.cli();
         async move {
-            match this {
-                Self::Lair(client) => Ok(client
-                    .export_seed_by_tag(tag, sender_pub_key, recipient_pub_key, None)
-                    .await?),
-            }
+            client
+                .export_seed_by_tag(tag, sender_pub_key, recipient_pub_key, None)
+                .await
         }
     }
 
@@ -110,27 +107,23 @@ impl MetaLairClient {
         cipher: Arc<[u8]>,
         tag: Arc<str>,
     ) -> impl Future<Output = LairResult<()>> + 'static + Send {
-        let this = self.clone();
+        let client = self.cli();
         async move {
-            match this {
-                Self::Lair(client) => {
-                    // shared secrets are exportable
-                    // (it's hard to make them useful otherwise : )
-                    let exportable = true;
-                    let _info = client
-                        .import_seed(
-                            sender_pub_key,
-                            recipient_pub_key,
-                            None,
-                            nonce,
-                            cipher,
-                            tag,
-                            exportable,
-                        )
-                        .await?;
-                    Ok(())
-                }
-            }
+            // shared secrets are exportable
+            // (it's hard to make them useful otherwise : )
+            let exportable = true;
+            let _info = client
+                .import_seed(
+                    sender_pub_key,
+                    recipient_pub_key,
+                    None,
+                    nonce,
+                    cipher,
+                    tag,
+                    exportable,
+                )
+                .await?;
+            Ok(())
         }
     }
 
@@ -140,12 +133,8 @@ impl MetaLairClient {
         tag: Arc<str>,
         data: Arc<[u8]>,
     ) -> impl Future<Output = LairResult<([u8; 24], Arc<[u8]>)>> + 'static + Send {
-        let this = self.clone();
-        async move {
-            match this {
-                Self::Lair(client) => client.secretbox_xsalsa_by_tag(tag, None, data).await,
-            }
-        }
+        let client = self.cli();
+        async move { client.secretbox_xsalsa_by_tag(tag, None, data).await }
     }
 
     /// Decrypt using a shared secret / xsalsa20poly1305 secretbox.
@@ -155,15 +144,11 @@ impl MetaLairClient {
         nonce: [u8; 24],
         cipher: Arc<[u8]>,
     ) -> impl Future<Output = LairResult<Arc<[u8]>>> + 'static + Send {
-        let this = self.clone();
+        let client = self.cli();
         async move {
-            match this {
-                Self::Lair(client) => {
-                    client
-                        .secretbox_xsalsa_open_by_tag(tag, None, nonce, cipher)
-                        .await
-                }
-            }
+            client
+                .secretbox_xsalsa_open_by_tag(tag, None, nonce, cipher)
+                .await
         }
     }
 
@@ -171,16 +156,12 @@ impl MetaLairClient {
     pub fn new_x25519_keypair_random(
         &self,
     ) -> impl Future<Output = LairResult<X25519PubKey>> + 'static + Send {
-        let this = self.clone();
+        let client = self.cli();
         async move {
-            match this {
-                Self::Lair(client) => {
-                    let tag = nanoid::nanoid!();
-                    let info = client.new_seed(tag.into(), None, false).await?;
-                    let pub_key = info.x25519_pub_key;
-                    Ok(pub_key)
-                }
-            }
+            let tag = nanoid::nanoid!();
+            let info = client.new_seed(tag.into(), None, false).await?;
+            let pub_key = info.x25519_pub_key;
+            Ok(pub_key)
         }
     }
 
@@ -191,15 +172,11 @@ impl MetaLairClient {
         recipient_pub_key: X25519PubKey,
         data: Arc<[u8]>,
     ) -> impl Future<Output = LairResult<([u8; 24], Arc<[u8]>)>> + 'static + Send {
-        let this = self.clone();
+        let client = self.cli();
         async move {
-            match this {
-                Self::Lair(client) => {
-                    client
-                        .crypto_box_xsalsa_by_pub_key(sender_pub_key, recipient_pub_key, None, data)
-                        .await
-                }
-            }
+            client
+                .crypto_box_xsalsa_by_pub_key(sender_pub_key, recipient_pub_key, None, data)
+                .await
         }
     }
 
@@ -211,21 +188,17 @@ impl MetaLairClient {
         nonce: [u8; 24],
         data: Arc<[u8]>,
     ) -> impl Future<Output = LairResult<Arc<[u8]>>> + 'static + Send {
-        let this = self.clone();
+        let client = self.cli();
         async move {
-            match this {
-                Self::Lair(client) => {
-                    client
-                        .crypto_box_xsalsa_open_by_pub_key(
-                            sender_pub_key,
-                            recipient_pub_key,
-                            None,
-                            nonce,
-                            data,
-                        )
-                        .await
-                }
-            }
+            client
+                .crypto_box_xsalsa_open_by_pub_key(
+                    sender_pub_key,
+                    recipient_pub_key,
+                    None,
+                    nonce,
+                    data,
+                )
+                .await
         }
     }
 
@@ -235,28 +208,24 @@ impl MetaLairClient {
         tag: Arc<str>,
     ) -> impl Future<Output = LairResult<(CertDigest, Arc<[u8]>, sodoken::BufRead)>> + 'static + Send
     {
-        let this = self.clone();
+        let client = self.cli();
         async move {
-            match this {
-                Self::Lair(client) => {
-                    let info = match client.get_entry(tag.clone()).await {
-                        Ok(info) => match info {
-                            LairEntryInfo::WkaTlsCert { cert_info, .. } => cert_info,
-                            oth => {
-                                return Err(format!(
-                                    "invalid entry type, expecting wka tls cert: {:?}",
-                                    oth
-                                )
-                                .into())
-                            }
-                        },
-                        Err(_) => client.new_wka_tls_cert(tag.clone()).await?,
-                    };
-                    let pk = client.get_wka_tls_cert_priv_key(tag).await?;
+            let info = match client.get_entry(tag.clone()).await {
+                Ok(info) => match info {
+                    LairEntryInfo::WkaTlsCert { cert_info, .. } => cert_info,
+                    oth => {
+                        return Err(format!(
+                            "invalid entry type, expecting wka tls cert: {:?}",
+                            oth
+                        )
+                        .into())
+                    }
+                },
+                Err(_) => client.new_wka_tls_cert(tag.clone()).await?,
+            };
+            let pk = client.get_wka_tls_cert_priv_key(tag).await?;
 
-                    Ok((info.digest, info.cert.to_vec().into(), pk))
-                }
-            }
+            Ok((info.digest, info.cert.to_vec().into(), pk))
         }
     }
 }

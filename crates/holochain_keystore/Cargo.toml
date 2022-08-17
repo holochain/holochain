@@ -19,6 +19,7 @@ holochain_zome_types = { path = "../holochain_zome_types", version = "0.0.44"}
 kitsune_p2p_types = { version = "0.0.29", path = "../kitsune_p2p/types" }
 nanoid = "0.4.0"
 one_err = "0.0.5"
+parking_lot = "0.11"
 serde = { version = "1.0", features = [ "derive" ] }
 serde_bytes = "0.11"
 sodoken = "=0.0.4"
