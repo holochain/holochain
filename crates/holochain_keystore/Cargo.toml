@@ -15,8 +15,6 @@ base64 = "0.13.0"
 ghost_actor = "=0.3.0-alpha.4"
 holo_hash = { version = "0.0.31", path = "../holo_hash", features = ["full"] }
 holochain_serialized_bytes = "=0.0.51"
-holochain_zome_types = { path = "../holochain_zome_types", version = "0.0.43"}
-kitsune_p2p_types = { version = "0.0.28", path = "../kitsune_p2p/types" }
 holochain_zome_types = { path = "../holochain_zome_types", version = "0.0.44"}
 kitsune_p2p_types = { version = "0.0.29", path = "../kitsune_p2p/types" }
 nanoid = "0.4.0"
