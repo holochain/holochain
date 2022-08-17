@@ -1,6 +1,6 @@
 [package]
 name = "hdk_derive"
-version = "0.0.43"
+version = "0.0.44"
 description = "derive macros for the holochain hdk"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -22,7 +22,7 @@ darling = "0.14.1"
 heck = "0.4"
 # it's important that we depend on holochain_zome_types with no default
 # features, both here AND in hdi, to reduce code bloat
-holochain_integrity_types = { version = "0.0.14", path = "../holochain_integrity_types", default-features = false }
+holochain_integrity_types = { version = "0.0.15", path = "../holochain_integrity_types", default-features = false }
 proc-macro-error = "1.0.4"
 
 [features]
