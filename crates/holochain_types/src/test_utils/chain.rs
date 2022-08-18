@@ -36,10 +36,7 @@ impl From<i32> for TestChainHash {
 }
 
 isotest::iso! {
-    TestChainHash => |h| {
-        let bytes: Vec<u8> = h.0.to_le_bytes().iter().cycle().take(32).copied().collect();
-        ActionHash::from_raw_32(bytes)
-    },
+    TestChainHash => |h| hash_from_u32(*h),
     ActionHash => |h| Self(u32::from_le_bytes(h.get_raw_32()[0..4].try_into().unwrap()))
 }
 
@@ -89,7 +86,7 @@ impl AsRef<Self> for TestChainItem {
 }
 
 fn forked_hash(n: u8, i: u8) -> TestChainHash {
-    TestChainHash(n as u32 + (i as u32) * 256)
+    TestChainHash(u32::from_le_bytes([n, i, 0, 0]))
 }
 
 /// Create a hash from a slice by repeating the slice to fill out the array.
@@ -98,6 +95,16 @@ fn hash(i: &[u8]) -> Vec<u8> {
     let num_needed = 36 - i.len();
     i.extend(std::iter::repeat(0).take(num_needed));
     i
+}
+
+/// Canonical way to construct a hash from a u32.
+/// This is used in various places in our test code, and each must match.
+pub fn hash_from_u32(i: u32) -> ActionHash {
+    if i > u8::MAX as u32 {
+        action_hash(&i.to_le_bytes())
+    } else {
+        action_hash(&[i as u8])
+    }
 }
 
 /// Create a hash from a slice by repeating the slice to fill out the array
