@@ -4,7 +4,7 @@ use std::ops::Range;
 
 use arbitrary::Arbitrary;
 use arbitrary::Unstructured;
-use holo_hash::ActionHash;
+use holo_hash::*;
 use holochain_zome_types::*;
 
 use crate::prelude::ChainItem;
@@ -90,6 +90,34 @@ impl AsRef<Self> for TestChainItem {
 
 fn forked_hash(n: u8, i: u8) -> TestChainHash {
     TestChainHash(n as u32 + (i as u32) * 256)
+}
+
+pub type TestHash = <TestChainItem as ChainItem>::Hash;
+pub type TestFilter = ChainFilter<TestHash>;
+
+/// Create a hash from a u32.
+fn hash(i: u32) -> TestHash {
+    i.into()
+}
+
+pub fn action_hash(i: &[u8]) -> ActionHash {
+    ActionHash::from_raw_36(hash(i))
+}
+
+pub fn agent_hash(i: &[u8]) -> AgentPubKey {
+    AgentPubKey::from_raw_36(hash(i))
+}
+
+pub fn entry_hash(i: &[u8]) -> EntryHash {
+    EntryHash::from_raw_36(hash(i))
+}
+
+/// Create a chain per agent
+pub fn agent_chain(ranges: &[(u8, Range<u8>)]) -> Vec<(AgentPubKey, Vec<ChainItem>)> {
+    ranges
+        .iter()
+        .map(|(a, range)| (agent_hash(&[*a]), chain(range.clone())))
+        .collect()
 }
 
 /// Create a chain from a range where the first chain items

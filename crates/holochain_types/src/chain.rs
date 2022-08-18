@@ -15,7 +15,7 @@ use holochain_zome_types::RegisterAgentActivity;
 use holochain_zome_types::SignedActionHashed;
 
 #[cfg(all(test, feature = "test_utils"))]
-mod test;
+pub mod test;
 
 /// Helpers for constructing AgentActivity
 pub trait AgentActivityExt {

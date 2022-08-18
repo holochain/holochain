@@ -5,6 +5,7 @@ use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
 use holochain_sqlite::db::DbKindDht;
 use holochain_state::prelude::*;
+use holochain_types::chain::test::*;
 use holochain_types::dht_op::DhtOpLight;
 use holochain_types::dht_op::OpOrder;
 use holochain_types::dht_op::UniqueForm;
