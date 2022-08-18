@@ -191,22 +191,6 @@ jobs:
                 --keep CARGO_BUILD_JOBS \
                 --fallback --pure --argstr flavor "coreDev" --run hc-test-standard-nextest
 
-          - name: cargo-test-slow
-            restoresCargoCache: true
-            savesCargoCache: true
-            ignoreErrorOnNonUbuntu: true
-            maxBuildSpace: true
-            timeout_minutes: 20
-            max_attempts:
-              ubuntu-latest: 2
-              macos-latest: 2
-            run: |
-              nix-shell \
-              --keep CARGO_NEXTEST_ARGS \
-              --keep CARGO_TEST_ARGS \
-              --keep CARGO_BUILD_JOBS \
-              --fallback --pure --argstr flavor "coreDev" --run hc-test-slow-nextest
-
           - name: cargo-test-static
             restoresCargoCache: true
             savesCargoCache: true

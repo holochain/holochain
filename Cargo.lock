@@ -24,15 +24,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "aae1277d39aeec15cb388266ecc24b11c80469deae6067e17a1a7aa9e5c1f234"
 
 [[package]]
-name = "aead"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7fc95d1bdb8e6666b2b217308eeeb09f2d6728d104be3e31916cc74d15420331"
-dependencies = [
- "generic-array",
-]
-
-[[package]]
 name = "ahash"
 version = "0.3.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -468,12 +459,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "block-padding"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8d696c370c750c948ada61c69a0ee2cbbb9c50b1019ddb86d9317157a99c2cae"
-
-[[package]]
 name = "blocking"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -596,29 +581,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
-name = "chacha20"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ed8738f14471a99f0e316c327e68fc82a3611cc2895fcb604b89eedaf8f39d95"
-dependencies = [
- "cipher",
- "zeroize",
-]
-
-[[package]]
-name = "chacha20poly1305"
-version = "0.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "af1fc18e6d90c40164bf6c317476f2a98f04661e310e79830366b7e914c58a8e"
-dependencies = [
- "aead",
- "chacha20",
- "cipher",
- "poly1305",
- "zeroize",
-]
-
-[[package]]
 name = "chashmap"
 version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -649,15 +611,6 @@ name = "chunked_transfer"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fff857943da45f546682664a79488be82e69e43c1a7a2307679ab9afb3a66d2e"
-
-[[package]]
-name = "cipher"
-version = "0.2.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "12f8e7987cbd042a63249497f41aed09f8e65add917ea6566effbc56578d6801"
-dependencies = [
- "generic-array",
-]
 
 [[package]]
 name = "clap"
@@ -792,12 +745,6 @@ checksum = "59a6001667ab124aebae2a495118e11d30984c3a653e99d86d58971708cf5e4b"
 dependencies = [
  "libc",
 ]
-
-[[package]]
-name = "cpuid-bool"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dcb25d077389e53838a8158c8e99174c5a9d902dee4904320db714f3c653ffba"
 
 [[package]]
 name = "cranelift-bforest"
@@ -1004,20 +951,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "crypto_box"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "42152c7961cd7af77bfe71c2cb0cf893b0a8939e9510d0c4db9b8d9027fea7e4"
-dependencies = [
- "chacha20poly1305",
- "rand_core 0.5.1",
- "salsa20",
- "x25519-dalek",
- "xsalsa20poly1305",
- "zeroize",
-]
-
-[[package]]
 name = "csv"
 version = "1.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1047,19 +980,6 @@ checksum = "cdffe87e1d521a10f9696f833fe502293ea446d7f256c06128293a4119bdf4cb"
 dependencies = [
  "quote",
  "syn",
-]
-
-[[package]]
-name = "curve25519-dalek"
-version = "3.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "90f9d052967f590a76e62eb387bd0bbb1b000182c3cefe5364db6b7211651bc0"
-dependencies = [
- "byteorder",
- "digest 0.9.0",
- "rand_core 0.5.1",
- "subtle",
- "zeroize",
 ]
 
 [[package]]
@@ -1293,15 +1213,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "551a778172a450d7fc12e629ca3b0428d00f6afa9a43da1b630d54604e97371c"
 dependencies = [
  "cfg-if 0.1.10",
- "dirs-sys",
-]
-
-[[package]]
-name = "directories"
-version = "3.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e69600ff1703123957937708eb27f7a564e48885c537782722ed0ba3189ce1d7"
-dependencies = [
  "dirs-sys",
 ]
 
@@ -1925,7 +1836,7 @@ dependencies = [
 
 [[package]]
 name = "hdi"
-version = "0.0.16"
+version = "0.0.18"
 dependencies = [
  "arbitrary",
  "fixt",
@@ -1944,7 +1855,7 @@ dependencies = [
 
 [[package]]
 name = "hdk"
-version = "0.0.144"
+version = "0.0.146"
 dependencies = [
  "fixt",
  "getrandom 0.2.7",
@@ -1965,7 +1876,7 @@ dependencies = [
 
 [[package]]
 name = "hdk_derive"
-version = "0.0.43"
+version = "0.0.44"
 dependencies = [
  "darling 0.14.1",
  "heck 0.4.0",
@@ -2050,7 +1961,7 @@ dependencies = [
 
 [[package]]
 name = "holochain"
-version = "0.0.152"
+version = "0.0.154"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -2064,7 +1975,7 @@ dependencies = [
  "contrafact",
  "criterion",
  "derive_more",
- "directories 2.0.2",
+ "directories",
  "either",
  "fallible-iterator",
  "fixt",
@@ -2111,7 +2022,7 @@ dependencies = [
  "rand 0.8.5",
  "rand-utf8",
  "reqwest",
- "rpassword",
+ "rpassword 5.0.1",
  "rusqlite",
  "sd-notify",
  "serde",
@@ -2143,7 +2054,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cascade"
-version = "0.0.52"
+version = "0.0.54"
 dependencies = [
  "async-trait",
  "derive_more",
@@ -2168,6 +2079,7 @@ dependencies = [
  "pretty_assertions 0.7.2",
  "serde",
  "serde_derive",
+ "test-case 2.2.1",
  "thiserror",
  "tokio",
  "tracing",
@@ -2176,7 +2088,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli"
-version = "0.0.50"
+version = "0.0.51"
 dependencies = [
  "anyhow",
  "futures",
@@ -2189,7 +2101,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_bundle"
-version = "0.0.46"
+version = "0.0.47"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -2210,7 +2122,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_sandbox"
-version = "0.0.46"
+version = "0.0.47"
 dependencies = [
  "ansi_term 0.12.1",
  "anyhow",
@@ -2220,13 +2132,16 @@ dependencies = [
  "holochain_conductor_api",
  "holochain_p2p",
  "holochain_types",
+ "holochain_util",
  "holochain_websocket",
- "lazy_static",
  "matches",
  "nanoid 0.3.0",
  "observability",
+ "once_cell",
  "portpicker",
+ "serde",
  "serde_yaml",
+ "sodoken",
  "structopt",
  "tokio",
  "tracing",
@@ -2236,10 +2151,10 @@ dependencies = [
 
 [[package]]
 name = "holochain_conductor_api"
-version = "0.0.52"
+version = "0.0.53"
 dependencies = [
  "derive_more",
- "directories 2.0.2",
+ "directories",
  "holo_hash",
  "holochain_p2p",
  "holochain_serialized_bytes",
@@ -2260,7 +2175,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_integrity_types"
-version = "0.0.14"
+version = "0.0.15"
 dependencies = [
  "arbitrary",
  "holo_hash",
@@ -2274,7 +2189,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_keystore"
-version = "0.0.49"
+version = "0.0.50"
 dependencies = [
  "base64",
  "ghost_actor 0.3.0-alpha.4",
@@ -2283,7 +2198,6 @@ dependencies = [
  "holochain_sqlite",
  "holochain_zome_types",
  "kitsune_p2p_types",
- "lair_keystore_client",
  "nanoid 0.4.0",
  "one_err",
  "serde",
@@ -2304,7 +2218,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_p2p"
-version = "0.0.50"
+version = "0.0.51"
 dependencies = [
  "async-trait",
  "derive_more",
@@ -2358,7 +2272,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_sqlite"
-version = "0.0.48"
+version = "0.0.49"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2407,7 +2321,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_state"
-version = "0.0.52"
+version = "0.0.53"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -2452,7 +2366,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_test_wasm_common"
-version = "0.0.45"
+version = "0.0.47"
 dependencies = [
  "hdk",
  "serde",
@@ -2460,7 +2374,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_types"
-version = "0.0.50"
+version = "0.0.51"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -2518,7 +2432,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_util"
-version = "0.0.10"
+version = "0.0.11"
 dependencies = [
  "backtrace",
  "cfg-if 0.1.10",
@@ -2527,12 +2441,14 @@ dependencies = [
  "futures",
  "num_cpus",
  "once_cell",
+ "rpassword 7.0.0",
+ "sodoken",
  "tokio",
 ]
 
 [[package]]
 name = "holochain_wasm_test_utils"
-version = "0.0.51"
+version = "0.0.53"
 dependencies = [
  "holochain_types",
  "holochain_util",
@@ -2624,7 +2540,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_zome_types"
-version = "0.0.43"
+version = "0.0.44"
 dependencies = [
  "arbitrary",
  "contrafact",
@@ -2945,7 +2861,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p"
-version = "0.0.40"
+version = "0.0.41"
 dependencies = [
  "arbitrary",
  "arrayref",
@@ -3013,7 +2929,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_dht"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "colored",
  "derivative",
@@ -3126,7 +3042,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_proxy"
-version = "0.0.28"
+version = "0.0.29"
 dependencies = [
  "base64",
  "blake2b_simd 0.5.11",
@@ -3151,7 +3067,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_timestamp"
-version = "0.0.11"
+version = "0.0.12"
 dependencies = [
  "arbitrary",
  "chrono",
@@ -3164,7 +3080,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_transport_quic"
-version = "0.0.28"
+version = "0.0.29"
 dependencies = [
  "blake2b_simd 1.0.0",
  "futures",
@@ -3182,7 +3098,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_types"
-version = "0.0.28"
+version = "0.0.29"
 dependencies = [
  "arbitrary",
  "base64",
@@ -3192,8 +3108,7 @@ dependencies = [
  "ghost_actor 0.3.0-alpha.4",
  "kitsune_p2p_dht",
  "kitsune_p2p_dht_arc",
- "lair_keystore_api 0.0.11",
- "lair_keystore_api 0.2.0",
+ "lair_keystore_api",
  "lru",
  "mockall 0.10.2",
  "nanoid 0.3.0",
@@ -3228,38 +3143,6 @@ dependencies = [
 
 [[package]]
 name = "lair_keystore_api"
-version = "0.0.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7d3f2fb64691f81c33a26276c8f11ccc6ab10ade5afca45df8629331b9f6a7a0"
-dependencies = [
- "arbitrary",
- "blake2b_simd 0.5.11",
- "block-padding",
- "byteorder",
- "crypto_box",
- "derive_more",
- "directories 3.0.2",
- "futures",
- "ghost_actor 0.3.0-alpha.4",
- "nanoid 0.3.0",
- "num_cpus",
- "once_cell",
- "one_err",
- "parking_lot 0.11.2",
- "rand 0.7.3",
- "rayon",
- "rcgen 0.8.13",
- "ring",
- "sodoken",
- "subtle",
- "thiserror",
- "tokio",
- "toml",
- "winapi",
-]
-
-[[package]]
-name = "lair_keystore_api"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1a8a748c7ae6b0449263239f09038f1541874a1d0053d923dc9fa7a6621dd634"
@@ -3280,21 +3163,6 @@ dependencies = [
  "tracing",
  "url 2.2.2",
  "winapi",
-]
-
-[[package]]
-name = "lair_keystore_client"
-version = "0.0.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "06b1591a47f5db62e30b11a5b83fd9d8194a6c3ef3ab6a160d9333092319b2a2"
-dependencies = [
- "futures",
- "ghost_actor 0.3.0-alpha.4",
- "lair_keystore_api 0.0.11",
- "sodoken",
- "tempfile",
- "tokio",
- "tracing",
 ]
 
 [[package]]
@@ -3714,7 +3582,7 @@ dependencies = [
 
 [[package]]
 name = "mr_bundle"
-version = "0.0.14"
+version = "0.0.15"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -4513,16 +4381,6 @@ dependencies = [
  "log",
  "wepoll-ffi",
  "winapi",
-]
-
-[[package]]
-name = "poly1305"
-version = "0.6.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4b7456bc1ad2d4cf82b3a016be4c2ac48daf11bf990c1603ebd447fe6f30fca8"
-dependencies = [
- "cpuid-bool",
- "universal-hash",
 ]
 
 [[package]]
@@ -5337,6 +5195,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "rpassword"
+version = "7.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "26b763cb66df1c928432cc35053f8bd4cec3335d8559fc16010017d16b3c1680"
+dependencies = [
+ "libc",
+ "winapi",
+]
+
+[[package]]
 name = "rusqlite"
 version = "0.26.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5455,16 +5323,6 @@ name = "safemem"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ef703b7cb59335eae2eb93ceb664c0eb7ea6bf567079d843e09420219668e072"
-
-[[package]]
-name = "salsa20"
-version = "0.7.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "399f290ffc409596022fce5ea5d4138184be4784f2b28c62c59f0d8389059a15"
-dependencies = [
- "cipher",
- "zeroize",
-]
 
 [[package]]
 name = "same-file"
@@ -6619,16 +6477,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39ec24b3121d976906ece63c9daad25b85969647682eee313cb5779fdd69e14e"
 
 [[package]]
-name = "universal-hash"
-version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9f214e8f697e925001e66ec2c6e37a4ef93f0f78c2eed7814394e10c62025b05"
-dependencies = [
- "generic-array",
- "subtle",
-]
-
-[[package]]
 name = "untrusted"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7293,37 +7141,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "x25519-dalek"
-version = "1.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2392b6b94a576b4e2bf3c5b2757d63f10ada8020a2e4d08ac849ebcf6ea8e077"
-dependencies = [
- "curve25519-dalek",
- "rand_core 0.5.1",
- "zeroize",
-]
-
-[[package]]
 name = "xattr"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6d1526bbe5aaeb5eb06885f4d987bcdfa5e23187055de9b83fe00156a821fabc"
 dependencies = [
  "libc",
-]
-
-[[package]]
-name = "xsalsa20poly1305"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0304c336e98d753428f7b3d8899d60b8a87a961ef50bdfc44af0c1bea2651ce5"
-dependencies = [
- "aead",
- "poly1305",
- "rand_core 0.5.1",
- "salsa20",
- "subtle",
- "zeroize",
 ]
 
 [[package]]
@@ -7358,21 +7181,6 @@ name = "zeroize"
 version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4756f7db3f7b5574938c3eb1c117038b8e07f95ee6718c0efad4ac21508f1efd"
-dependencies = [
- "zeroize_derive",
-]
-
-[[package]]
-name = "zeroize_derive"
-version = "1.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f8f187641dad4f680d25c4bfc4225b418165984179f26ca76ec4fb6441d3a17"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
- "synstructure",
-]
 
 [[package]]
 name = "zip"

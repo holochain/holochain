@@ -230,7 +230,7 @@ pub fn build(attrs: TokenStream, input: TokenStream) -> TokenStream {
                 zome_id: Z,
                 entry_def_index: I,
                 entry: &Entry,
-            ) -> Result<Option<Self>, Self::Error>
+            ) -> std::result::Result<Option<Self>, Self::Error>
             where
                 Z: Into<ZomeId>,
                 I: Into<EntryDefIndex>
