@@ -6,6 +6,66 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20220817.013233
+
+## [holochain\_cli-0.0.51](crates/holochain_cli/CHANGELOG.md#0.0.51)
+
+## [holochain\_cli\_sandbox-0.0.47](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.47)
+
+- **BREAKING CHANGE** - `hc sandbox` updated to use new (0.y.z) lair api. Any old sandboxes will no longer function. It is recommended to create new sandboxes, as there is not a straight forward migration path. To migrate: [dump the old keys](https://github.com/holochain/lair/blob/v0.0.11/crates/lair_keystore/src/bin/lair-keystore/main.rs#L38) -\> [write a utility to re-encode them](https://github.com/holochain/lair/tree/hc_seed_bundle-v0.1.2/crates/hc_seed_bundle) -\> [then import them to the new lair](https://github.com/holochain/lair/tree/lair_keystore-v0.2.0/crates/lair_keystore#lair-keystore-import-seed---help) – [\#1515](https://github.com/holochain/holochain/pull/1515)
+
+## [holochain\_cli\_bundle-0.0.47](crates/holochain_cli_bundle/CHANGELOG.md#0.0.47)
+
+## [holochain-0.0.154](crates/holochain/CHANGELOG.md#0.0.154)
+
+- Revert: “Add the `hdi_version_req` key:value field to the output of the `--build-info` argument” because it broke. [\#1521](https://github.com/holochain/holochain/pull/1521)
+  
+  Reason: it causes a build failure of the *holochain*  crate on crates.io
+
+## [holochain\_test\_wasm\_common-0.0.47](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.47)
+
+## [holochain\_conductor\_api-0.0.53](crates/holochain_conductor_api/CHANGELOG.md#0.0.53)
+
+## [holochain\_wasm\_test\_utils-0.0.53](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.53)
+
+## [holochain\_cascade-0.0.54](crates/holochain_cascade/CHANGELOG.md#0.0.54)
+
+## [holochain\_state-0.0.53](crates/holochain_state/CHANGELOG.md#0.0.53)
+
+## [holochain\_p2p-0.0.51](crates/holochain_p2p/CHANGELOG.md#0.0.51)
+
+## [holochain\_types-0.0.51](crates/holochain_types/CHANGELOG.md#0.0.51)
+
+## [holochain\_keystore-0.0.50](crates/holochain_keystore/CHANGELOG.md#0.0.50)
+
+## [holochain\_sqlite-0.0.49](crates/holochain_sqlite/CHANGELOG.md#0.0.49)
+
+## [kitsune\_p2p-0.0.41](crates/kitsune_p2p/CHANGELOG.md#0.0.41)
+
+## [kitsune\_p2p\_proxy-0.0.29](crates/kitsune_p2p_proxy/CHANGELOG.md#0.0.29)
+
+## [kitsune\_p2p\_transport\_quic-0.0.29](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.0.29)
+
+## [kitsune\_p2p\_types-0.0.29](crates/kitsune_p2p_types/CHANGELOG.md#0.0.29)
+
+## [mr\_bundle-0.0.15](crates/mr_bundle/CHANGELOG.md#0.0.15)
+
+## [holochain\_util-0.0.11](crates/holochain_util/CHANGELOG.md#0.0.11)
+
+## [hdk-0.0.146](crates/hdk/CHANGELOG.md#0.0.146)
+
+## [holochain\_zome\_types-0.0.44](crates/holochain_zome_types/CHANGELOG.md#0.0.44)
+
+## [kitsune\_p2p\_dht-0.0.3](crates/kitsune_p2p_dht/CHANGELOG.md#0.0.3)
+
+## [hdi-0.0.18](crates/hdi/CHANGELOG.md#0.0.18)
+
+## [hdk\_derive-0.0.44](crates/hdk_derive/CHANGELOG.md#0.0.44)
+
+## [holochain\_integrity\_types-0.0.15](crates/holochain_integrity_types/CHANGELOG.md#0.0.15)
+
+## [kitsune\_p2p\_timestamp-0.0.12](crates/kitsune_p2p_timestamp/CHANGELOG.md#0.0.12)
+
 # 20220810.012252
 
 ## [holochain-0.0.153](crates/holochain/CHANGELOG.md#0.0.153)
