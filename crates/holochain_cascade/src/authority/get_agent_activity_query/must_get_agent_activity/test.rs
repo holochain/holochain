@@ -5,7 +5,6 @@ use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
 use holochain_sqlite::db::DbKindDht;
 use holochain_state::prelude::*;
-use holochain_types::chain::test::*;
 use holochain_types::dht_op::DhtOpLight;
 use holochain_types::dht_op::OpOrder;
 use holochain_types::dht_op::UniqueForm;
@@ -45,10 +44,11 @@ use test_case::test_case;
 /// Extracts the smallest range from the chain filter
 /// and then returns all actions within that range
 async fn returns_full_sequence_from_filter(
-    chain: Vec<(AgentPubKey, Vec<ChainItem>)>,
+    chain: Vec<(AgentPubKey, Vec<TestChainItem>)>,
     agent: AgentPubKey,
     filter: ChainFilter,
-) -> Vec<(AgentPubKey, Vec<ChainItem>)> {
+) -> Vec<(AgentPubKey, Vec<TestChainItem>)> {
+    use isotest::Iso;
     let db = commit_chain(chain);
     let data = must_get_agent_activity(db.clone().into(), agent.clone(), filter)
         .await
@@ -56,10 +56,10 @@ async fn returns_full_sequence_from_filter(
     let data = match data {
         MustGetAgentActivityResponse::Activity(activity) => activity
             .into_iter()
-            .map(|RegisterAgentActivity { action: a }| ChainItem {
-                action_seq: a.hashed.action_seq(),
-                hash: a.as_hash().clone(),
-                prev_action: a.hashed.prev_action().cloned(),
+            .map(|RegisterAgentActivity { action: a }| TestChainItem {
+                seq: a.hashed.action_seq(),
+                hash: TestChainHash::test(a.as_hash()),
+                prev: a.hashed.prev_action().map(TestChainHash::test),
             })
             .collect(),
         d @ _ => unreachable!("{:?}", d),
@@ -95,7 +95,7 @@ async fn returns_full_sequence_from_filter(
 #[tokio::test(flavor = "multi_thread")]
 /// Check the query returns the appropriate responses.
 async fn test_responses(
-    chain: Vec<(AgentPubKey, Vec<ChainItem>)>,
+    chain: Vec<(AgentPubKey, Vec<TestChainItem>)>,
     agent: AgentPubKey,
     filter: ChainFilter,
 ) -> MustGetAgentActivityResponse {
@@ -105,7 +105,7 @@ async fn test_responses(
         .unwrap()
 }
 
-fn commit_chain(chain: Vec<(AgentPubKey, Vec<ChainItem>)>) -> DbWrite<DbKindDht> {
+fn commit_chain(chain: Vec<(AgentPubKey, Vec<TestChainItem>)>) -> DbWrite<DbKindDht> {
     let data: Vec<_> = chain
         .into_iter()
         .map(|(a, c)| {
