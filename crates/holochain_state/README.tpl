@@ -7,8 +7,8 @@
 
 [![Twitter Follow](https://img.shields.io/twitter/follow/holochain.svg?style=social&label=Follow)](https://twitter.com/holochain)
 
-[![Crate](https://img.shields.io/crates/v/holochain.svg)](https://crates.io/crates/holochain_state)
-[![API Docs](https://docs.rs/holochain/badge.svg)](https://docs.rs/holochain_state)
+[![Crate](https://img.shields.io/crates/v/holochain_state.svg)](https://crates.io/crates/holochain_state)
+[![API Docs](https://docs.rs/holochain_state/badge.svg)](https://docs.rs/holochain_state)
 
 {{readme}}
 
