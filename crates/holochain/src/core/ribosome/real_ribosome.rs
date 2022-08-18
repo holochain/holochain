@@ -88,6 +88,8 @@ use std::collections::HashMap;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 
+const WASM_METERING_LIMIT: u64 = 10_000_000_000;
+
 /// The only RealRibosome is a Wasm ribosome.
 /// note that this is cloned on every invocation so keep clones cheap!
 #[derive(Clone, Debug)]
@@ -380,6 +382,11 @@ impl RealRibosome {
         zome_name: &ZomeName,
     ) -> RibosomeResult<()> {
         use holochain_wasmer_host::module::PlruCache;
+        {
+            let instance = instance.lock();
+            wasmer_middlewares::metering::set_remaining_points(&instance, WASM_METERING_LIMIT);
+        }
+
         // Clear the context as the call is done.
         {
             CONTEXT_MAP.lock().remove(&context_key);
@@ -401,10 +408,7 @@ impl RealRibosome {
         Ok(())
     }
 
-    pub fn do_not_cache_instance(
-        &self,
-        context_key: u64
-    ) {
+    pub fn do_not_cache_instance(&self, context_key: u64) {
         CONTEXT_MAP.lock().remove(&context_key);
     }
 
@@ -488,7 +492,7 @@ impl RealRibosome {
         let cost_function = |_operator: &WasmOperator| -> u64 { 1 };
         // @todo 10 giga-ops is totally arbitrary cutoff so we probably
         // want to make the limit configurable somehow.
-        let metering = Arc::new(Metering::new(10_000_000_000, cost_function));
+        let metering = Arc::new(Metering::new(WASM_METERING_LIMIT, cost_function));
         let mut cranelift = Cranelift::default();
         cranelift.canonicalize_nans(true).push_middleware(metering);
         cranelift
@@ -732,8 +736,6 @@ impl RibosomeT for RealRibosome {
                     // because it builds guards against memory leaks and handles imports correctly
                     let (instance, context_key) = self.instance(call_context)?;
 
-                    dbg!("start call", to_call.as_ref());
-                    dbg!(Timestamp::now());
                     let result: Result<ExternIO, RuntimeError> = holochain_wasmer_host::guest::call(
                         instance.clone(),
                         to_call.as_ref(),
@@ -742,17 +744,9 @@ impl RibosomeT for RealRibosome {
                         // @todo - is this a problem for large payloads like entries?
                         invocation.to_owned().host_input()?,
                     );
-                    dbg!(Timestamp::now());
-                    dbg!("end call");
-
-                    dbg!(&result.is_ok());
-                    // if !result.is_ok() {
-                    //     dbg!(invocation.clone().host_input().unwrap());
-                    // }
 
                     // Cache this instance.
                     self.cache_instance(context_key, instance, zome.zome_name())?;
-                    // self.do_not_cache_instance(context_key);
 
                     Ok(Some(result?))
                 } else {

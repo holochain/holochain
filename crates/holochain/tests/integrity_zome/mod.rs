@@ -21,6 +21,7 @@ use holochain_zome_types::CoordinatorZome;
 use holochain_zome_types::CoordinatorZomeDef;
 use holochain_zome_types::IntegrityZome;
 use holochain_zome_types::Record;
+use holochain_zome_types::Timestamp;
 use holochain_zome_types::WasmZome;
 use holochain_zome_types::Zome;
 use holochain_zome_types::ZomeDef;
@@ -304,10 +305,9 @@ async fn test_wasm_memory() {
     let data = String::from_utf8(vec![0u8; 10_000_000]).unwrap();
 
     let mut cum = 0;
-    for i in 0..1000 {
+    for i in 0..100 {
         cum += data.len();
-        eprintln!("committing {} {}", i, cum);
-        dbg!(data.len());
+        eprintln!("committing {} {} {:?}", i, cum, Timestamp::now());
         let _hash: ActionHash = conductor
             .call(
                 &cells[0].zome(TestWasm::Create),
