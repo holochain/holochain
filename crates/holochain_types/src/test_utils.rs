@@ -172,15 +172,14 @@ impl From<i32> for TestChainHash {
 }
 
 impl From<TestChainHash> for ActionHash {
-    fn from(h: TestChainHash) -> Self {
-        let bytes: Vec<u8> = h.0.to_le_bytes().iter().cycle().take(32).copied().collect();
-        ActionHash::from_raw_32(bytes)
+    fn from(_: TestChainHash) -> Self {
+        todo!("remove when isotest is merged")
     }
 }
 
 /// A test implementation of a minimal ChainItem which uses simple numbers for hashes
 /// and always points back to the previous number
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct TestChainItem {
     /// The sequence number
     pub seq: u32,

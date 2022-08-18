@@ -2411,7 +2411,7 @@ dependencies = [
  "nanoid 0.3.0",
  "observability",
  "parking_lot 0.10.2",
- "pretty_assertions 0.6.1",
+ "pretty_assertions 0.7.2",
  "rand 0.8.5",
  "regex",
  "rusqlite",
@@ -2811,6 +2811,16 @@ name = "ipnet"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "879d54834c8c76457ef4293a689b2a8c59b076067ad77b15efafbb05f92a592b"
+
+[[package]]
+name = "isotest"
+version = "0.1.0-dev.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "35af8270f9d46608680c394324bc37b692b1327d07497fbb76eba0dd6cd4d9dd"
+dependencies = [
+ "futures",
+ "paste",
+]
 
 [[package]]
 name = "itertools"

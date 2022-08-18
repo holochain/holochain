@@ -9,6 +9,7 @@ use holochain_types::dht_op::DhtOpLight;
 use holochain_types::dht_op::OpOrder;
 use holochain_types::dht_op::UniqueForm;
 use holochain_types::test_utils::chain::*;
+use holochain_types::test_utils::TestChainItem;
 use holochain_zome_types::ActionRefMut;
 use holochain_zome_types::ChainFilter;
 use holochain_zome_types::Timestamp;
@@ -48,7 +49,6 @@ async fn returns_full_sequence_from_filter(
     agent: AgentPubKey,
     filter: ChainFilter,
 ) -> Vec<(AgentPubKey, Vec<TestChainItem>)> {
-    use isotest::Iso;
     let db = commit_chain(chain);
     let data = must_get_agent_activity(db.clone().into(), agent.clone(), filter)
         .await
@@ -58,8 +58,11 @@ async fn returns_full_sequence_from_filter(
             .into_iter()
             .map(|RegisterAgentActivity { action: a }| TestChainItem {
                 seq: a.hashed.action_seq(),
-                hash: TestChainHash::test(a.as_hash()),
-                prev: a.hashed.prev_action().map(TestChainHash::test),
+                hash: todo!("fix in isotest merge"),
+                prev: a
+                    .hashed
+                    .prev_action()
+                    .map(|_| todo!("fix in isotest merge")),
             })
             .collect(),
         d @ _ => unreachable!("{:?}", d),

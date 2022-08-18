@@ -10,6 +10,7 @@ use holochain_zome_types::prelude::ChainStatus;
 use holochain_zome_types::ChainFilter;
 use holochain_zome_types::ChainFilters;
 use holochain_zome_types::ChainItem;
+use holochain_zome_types::RegisterAgentActivity;
 use holochain_zome_types::SignedActionHashed;
 
 #[cfg(all(test, feature = "test_utils"))]

@@ -215,11 +215,7 @@ fn hash_to_seq(hashes: &[u32]) -> impl FnMut(&ActionHash) -> Option<u32> {
     let map = hashes
         .iter()
         .map(|i| {
-            let hash = if *i > u8::MAX as u32 {
-                action_hash(&i.to_le_bytes())
-            } else {
-                action_hash(&[*i as u8])
-            };
+            let hash = hash_from_u32(*i);
             (hash, *i)
         })
         .collect::<HashMap<_, _>>();
