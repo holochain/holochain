@@ -12,8 +12,6 @@ use holochain_state::prelude::from_blob;
 use holochain_state::prelude::StateQueryResult;
 use holochain_state::scratch::Scratch;
 use holochain_types::chain::ChainFilterRange;
-use holochain_state::scratch::Scratch;
-use holochain_types::chain::ChainFilterRange;
 use holochain_types::chain::MustGetAgentActivityResponse;
 use holochain_types::chain::Sequences;
 use holochain_types::dht_op::DhtOpType;
@@ -59,7 +57,9 @@ pub fn get_bounded_activity(
             })
         }
         // One of the actions specified in the filter does not exist in the database.
-        Sequences::ChainTopNotFound(a) => Ok((MustGetAgentActivityResponse::ChainTopNotFound(a), None)),
+        Sequences::ChainTopNotFound(a) => {
+            Ok((MustGetAgentActivityResponse::ChainTopNotFound(a), None))
+        }
         // The filter specifies a range that is empty.
         Sequences::EmptyRange => Ok((MustGetAgentActivityResponse::EmptyRange, None)),
     }

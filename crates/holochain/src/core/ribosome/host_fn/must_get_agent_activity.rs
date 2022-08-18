@@ -44,7 +44,7 @@ pub fn must_get_agent_activity(
 
                 let result: Result<_, RuntimeError> = match (result, &call_context.host_context) {
                     (Activity(activity), _) => Ok(activity),
-                    (IncompleteChain | ActionNotFound(_), HostContext::Init(_)) => {
+                    (IncompleteChain | ChainTopNotFound(_), HostContext::Init(_)) => {
                         Err(wasm_error!(WasmErrorInner::HostShortCircuit(
                             holochain_serialized_bytes::encode(
                                 &ExternIO::encode(InitCallbackResult::UnresolvedDependencies(
@@ -56,7 +56,7 @@ pub fn must_get_agent_activity(
                         ))
                         .into())
                     }
-                    (IncompleteChain | ActionNotFound(_), HostContext::Validate(_)) => {
+                    (IncompleteChain | ChainTopNotFound(_), HostContext::Validate(_)) => {
                         Err(wasm_error!(WasmErrorInner::HostShortCircuit(
                             holochain_serialized_bytes::encode(
                                 &ExternIO::encode(ValidateCallbackResult::UnresolvedDependencies(
@@ -73,14 +73,9 @@ pub fn must_get_agent_activity(
                         author, chain_filter
                     )))
                     .into()),
-                    (ActionNotFound(missing_action), _) => Err(wasm_error!(WasmErrorInner::Host(format!(
+                    (ChainTopNotFound(missing_action), _) => Err(wasm_error!(WasmErrorInner::Host(format!(
                         "must_get_agent_activity is missing action {} for author {} and filter {:?}",
                         missing_action, author, chain_filter
-                    )))
-                    .into()),
-                    (PositionNotHighest, _) => Err(wasm_error!(WasmErrorInner::Host(format!(
-                        "must_get_agent_activity chain has produced an invalid range because the top of the chain is not the highest action sequence for author {} and filter {:?}",
-                        author, chain_filter
                     )))
                     .into()),
                     (EmptyRange, _) => Err(wasm_error!(WasmErrorInner::Host(format!(
