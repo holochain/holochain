@@ -18,9 +18,13 @@ pub async fn spawn_crude_mock_keystore<F>(err_fn: F) -> MetaLairClient
 where
     F: Fn() -> one_err::OneErr + Send + Sync + 'static,
 {
-    MetaLairClient(Arc::new(parking_lot::Mutex::new(LairClient(Arc::new(
-        CrudeMockKeystore(Arc::new(err_fn)),
-    )))))
+    let (s, _) = tokio::sync::mpsc::unbounded_channel();
+    MetaLairClient(
+        Arc::new(parking_lot::Mutex::new(LairClient(Arc::new(
+            CrudeMockKeystore(Arc::new(err_fn)),
+        )))),
+        s,
+    )
 }
 
 /// Spawn a test keystore that can switch between mocked and real.
@@ -42,10 +46,12 @@ where
 
     let control = MockLairControl(use_mock);
 
+    let (s, _) = tokio::sync::mpsc::unbounded_channel();
     Ok((
-        MetaLairClient(Arc::new(parking_lot::Mutex::new(LairClient(Arc::new(
-            mock,
-        ))))),
+        MetaLairClient(
+            Arc::new(parking_lot::Mutex::new(LairClient(Arc::new(mock)))),
+            s,
+        ),
         control,
     ))
 }
@@ -101,17 +107,17 @@ impl AsLairClient for CrudeMockKeystore {
 
 impl AsLairClient for RealOrMockKeystore {
     fn get_enc_ctx_key(&self) -> sodoken::BufReadSized<32> {
-        self.real.cli().get_enc_ctx_key()
+        self.real.cli().0.get_enc_ctx_key()
     }
 
     fn get_dec_ctx_key(&self) -> sodoken::BufReadSized<32> {
-        self.real.cli().get_dec_ctx_key()
+        self.real.cli().0.get_dec_ctx_key()
     }
 
     fn shutdown(
         &self,
     ) -> ghost_actor::dependencies::futures::future::BoxFuture<'static, LairResult<()>> {
-        self.real.cli().shutdown().boxed()
+        self.real.cli().0.shutdown().boxed()
     }
 
     fn request(
@@ -123,7 +129,7 @@ impl AsLairClient for RealOrMockKeystore {
             let r = (self.mock)(request);
             async move { r }.boxed()
         } else {
-            AsLairClient::request(&*self.real.cli().0, request)
+            AsLairClient::request(&*self.real.cli().0 .0, request)
         }
     }
 }
