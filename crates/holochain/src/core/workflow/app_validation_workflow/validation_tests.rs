@@ -266,7 +266,7 @@ async fn app_validation_ops() {
                             with_entry_def_index,
                         }
                     }
-                    Op::RegisterAgentActivity(RegisterAgentActivity { action }) => Event {
+                    Op::RegisterAgentActivity(RegisterAgentActivity { action, .. }) => Event {
                         action: ActionLocation::new(action.action().clone(), &agents),
                         op_type: DhtOpType::RegisterAgentActivity,
                         called_zome: zome,

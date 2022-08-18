@@ -54,7 +54,7 @@ async fn returns_full_sequence_from_filter(
     let data = match data {
         MustGetAgentActivityResponse::Activity(activity) => activity
             .into_iter()
-            .map(|RegisterAgentActivity { action: a }| ChainItem {
+            .map(|RegisterAgentActivity { action: a, .. }| ChainItem {
                 action_seq: a.hashed.action_seq(),
                 hash: a.as_hash().clone(),
                 prev_action: a.hashed.prev_action().cloned(),
