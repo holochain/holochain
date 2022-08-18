@@ -1,25 +1,16 @@
-use crate::*;
 use holochain_zome_types::Signature;
 use kitsune_p2p_types::dependencies::lair_keystore_api;
 use lair_keystore_api::prelude::*;
-use lair_keystore_api_0_0::actor::Cert as LegacyCert;
-use lair_keystore_api_0_0::actor::CertDigest as LegacyCertDigest;
-use lair_keystore_api_0_0::actor::CertPrivKey as LegacyCertPrivKey;
-use lair_keystore_api_0_0::actor::LairClientApiSender;
 use std::future::Future;
 use std::sync::Arc;
 
 pub use kitsune_p2p_types::dependencies::lair_keystore_api::LairResult;
 
 /// Abstraction around runtime switching/upgrade of lair keystore / client.
-/// Can delete this when we finally delete deprecated legacy lair option.
 #[derive(Clone)]
 pub enum MetaLairClient {
-    /// oldschool deprecated lair keystore client
-    Legacy(KeystoreSender),
-
-    /// new lair keystore api client
-    NewLair(LairClient),
+    /// lair keystore api client
+    Lair(LairClient),
 }
 
 impl MetaLairClient {
@@ -28,14 +19,7 @@ impl MetaLairClient {
         let this = self.clone();
         async move {
             match this {
-                Self::Legacy(client) => {
-                    use ghost_actor::GhostControlSender;
-                    client
-                        .ghost_actor_shutdown_immediate()
-                        .await
-                        .map_err(one_err::OneErr::new)
-                }
-                Self::NewLair(client) => client.shutdown().await,
+                Self::Lair(client) => client.shutdown().await,
             }
         }
     }
@@ -47,14 +31,7 @@ impl MetaLairClient {
         let this = self.clone();
         async move {
             match this {
-                Self::Legacy(client) => {
-                    let (_, pk) = client
-                        .sign_ed25519_new_from_entropy()
-                        .await
-                        .map_err(one_err::OneErr::new)?;
-                    Ok(holo_hash::AgentPubKey::from_raw_32(pk.to_vec()))
-                }
-                Self::NewLair(client) => {
+                Self::Lair(client) => {
                     let tag = nanoid::nanoid!();
                     let info = client.new_seed(tag.into(), None, false).await?;
                     let pub_key =
@@ -75,17 +52,7 @@ impl MetaLairClient {
         async move {
             tokio::time::timeout(std::time::Duration::from_secs(30), async move {
                 match this {
-                    Self::Legacy(client) => {
-                        let pk = pub_key.get_raw_32();
-                        let sig = client
-                            .sign_ed25519_sign_by_pub_key(pk.to_vec().into(), data.to_vec().into())
-                            .await
-                            .map_err(one_err::OneErr::new)?;
-                        let sig = Signature::try_from(sig.to_vec().as_ref())
-                            .map_err(one_err::OneErr::new)?;
-                        Ok(sig)
-                    }
-                    Self::NewLair(client) => {
+                    Self::Lair(client) => {
                         let mut pub_key_2 = [0; 32];
                         pub_key_2.copy_from_slice(pub_key.get_raw_32());
                         let sig = client.sign_by_pub_key(pub_key_2.into(), None, data).await?;
@@ -106,8 +73,7 @@ impl MetaLairClient {
         let this = self.clone();
         async move {
             match this {
-                Self::Legacy(_) => Err("LegacyLairDoesNotSupportSharedSecrets".into()),
-                Self::NewLair(client) => {
+                Self::Lair(client) => {
                     // shared secrets are exportable
                     // (it's hard to make them useful otherwise : )
                     let exportable = true;
@@ -128,8 +94,7 @@ impl MetaLairClient {
         let this = self.clone();
         async move {
             match this {
-                Self::Legacy(_) => Err("LegacyLairDoesNotSupportSharedSecrets".into()),
-                Self::NewLair(client) => Ok(client
+                Self::Lair(client) => Ok(client
                     .export_seed_by_tag(tag, sender_pub_key, recipient_pub_key, None)
                     .await?),
             }
@@ -148,8 +113,7 @@ impl MetaLairClient {
         let this = self.clone();
         async move {
             match this {
-                Self::Legacy(_) => Err("LegacyLairDoesNotSupportSharedSecrets".into()),
-                Self::NewLair(client) => {
+                Self::Lair(client) => {
                     // shared secrets are exportable
                     // (it's hard to make them useful otherwise : )
                     let exportable = true;
@@ -179,8 +143,7 @@ impl MetaLairClient {
         let this = self.clone();
         async move {
             match this {
-                Self::Legacy(_) => Err("LegacyLairDoesNotSupportSharedSecrets".into()),
-                Self::NewLair(client) => client.secretbox_xsalsa_by_tag(tag, None, data).await,
+                Self::Lair(client) => client.secretbox_xsalsa_by_tag(tag, None, data).await,
             }
         }
     }
@@ -195,8 +158,7 @@ impl MetaLairClient {
         let this = self.clone();
         async move {
             match this {
-                Self::Legacy(_) => Err("LegacyLairDoesNotSupportSharedSecrets".into()),
-                Self::NewLair(client) => {
+                Self::Lair(client) => {
                     client
                         .secretbox_xsalsa_open_by_tag(tag, None, nonce, cipher)
                         .await
@@ -212,14 +174,7 @@ impl MetaLairClient {
         let this = self.clone();
         async move {
             match this {
-                Self::Legacy(client) => {
-                    let (_, pk) = client
-                        .x25519_new_from_entropy()
-                        .await
-                        .map_err(one_err::OneErr::new)?;
-                    Ok(pk.to_bytes().into())
-                }
-                Self::NewLair(client) => {
+                Self::Lair(client) => {
                     let tag = nanoid::nanoid!();
                     let info = client.new_seed(tag.into(), None, false).await?;
                     let pub_key = info.x25519_pub_key;
@@ -239,21 +194,7 @@ impl MetaLairClient {
         let this = self.clone();
         async move {
             match this {
-                Self::Legacy(client) => {
-                    let res = client
-                        .crypto_box_by_pub_key(
-                            (*sender_pub_key).into(),
-                            (*recipient_pub_key).into(),
-                            lair_keystore_api_0_0::internal::crypto_box::CryptoBoxData {
-                                data: data.to_vec().into(),
-                            }
-                            .into(),
-                        )
-                        .await
-                        .map_err(one_err::OneErr::new)?;
-                    Ok((*res.nonce.as_ref(), res.encrypted_data.to_vec().into()))
-                }
-                Self::NewLair(client) => {
+                Self::Lair(client) => {
                     client
                         .crypto_box_xsalsa_by_pub_key(sender_pub_key, recipient_pub_key, None, data)
                         .await
@@ -273,27 +214,7 @@ impl MetaLairClient {
         let this = self.clone();
         async move {
             match this {
-                Self::Legacy(client) => {
-                    let res = client
-                        .crypto_box_open_by_pub_key(
-                            (*sender_pub_key).into(),
-                            (*recipient_pub_key).into(),
-                            lair_keystore_api_0_0::internal::crypto_box::CryptoBoxEncryptedData {
-                                nonce: nonce.into(),
-                                encrypted_data: data.to_vec().into(),
-                            }
-                            .into(),
-                        )
-                        .await
-                        .map_err(one_err::OneErr::new)?;
-                    let res = res.ok_or_else(|| {
-                        one_err::OneErr::new(
-                            "None returned from crypto_box_open--why is that an Option??",
-                        )
-                    })?;
-                    Ok(res.data.to_vec().into())
-                }
-                Self::NewLair(client) => {
+                Self::Lair(client) => {
                     client
                         .crypto_box_xsalsa_open_by_pub_key(
                             sender_pub_key,
@@ -314,17 +235,12 @@ impl MetaLairClient {
     /// by tagging the tls certs / remembering the tag.
     pub fn get_or_create_first_tls_cert(
         &self,
-    ) -> impl Future<Output = LairResult<(LegacyCertDigest, LegacyCert, LegacyCertPrivKey)>>
-           + 'static
-           + Send {
+    ) -> impl Future<Output = LairResult<(CertDigest, Arc<[u8]>, sodoken::BufRead)>> + 'static + Send
+    {
         let this = self.clone();
         async move {
             match this {
-                Self::Legacy(client) => client
-                    .get_or_create_first_tls_cert()
-                    .await
-                    .map_err(one_err::OneErr::new),
-                Self::NewLair(client) => {
+                Self::Lair(client) => {
                     const ONE_CERT: &str = "SingleHcTlsWkaCert";
                     let info = match client.get_entry(ONE_CERT.into()).await {
                         Ok(info) => match info {
@@ -341,14 +257,7 @@ impl MetaLairClient {
                     };
                     let pk = client.get_wka_tls_cert_priv_key(ONE_CERT.into()).await?;
 
-                    let digest: LegacyCertDigest = info.digest.to_vec().into();
-                    let cert: LegacyCert = info.cert.to_vec().into();
-
-                    // is it worth trying to keep this safe longer?
-                    // i doubt our tls lib safes this in-memory...
-                    let pk: LegacyCertPrivKey = pk.read_lock().to_vec().into();
-
-                    Ok((digest, cert, pk))
+                    Ok((info.digest, info.cert.to_vec().into(), pk))
                 }
             }
         }

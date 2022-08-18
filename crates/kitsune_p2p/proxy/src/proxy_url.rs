@@ -134,7 +134,7 @@ impl ProxyUrl {
     pub fn digest(&self) -> CertDigest {
         let digest =
             base64::decode_config(self.full.host_str().unwrap(), base64::URL_SAFE_NO_PAD).unwrap();
-        digest.into()
+        CertDigest::from_slice(&digest)
     }
 
     /// Get a short-hash / first six characters of tls digest for logging
@@ -225,7 +225,8 @@ mod tests {
     #[test]
     fn proxy_url_from_base() {
         let cert_digest = base64::decode_config(TEST_CERT, base64::URL_SAFE_NO_PAD).unwrap();
-        let u = ProxyUrl::new(TEST_BASE, cert_digest.into()).unwrap();
+        let digest = CertDigest::from_slice(&cert_digest);
+        let u = ProxyUrl::new(TEST_BASE, digest.into()).unwrap();
         assert_eq!(TEST_FULL, u.as_full_str());
         assert_eq!(TEST_BASE, u.as_base_str());
     }
