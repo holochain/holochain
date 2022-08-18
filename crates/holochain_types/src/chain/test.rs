@@ -1,4 +1,4 @@
-use holo_hash::{ActionHash, EntryHash};
+use holo_hash::*;
 use std::collections::HashMap;
 use std::ops::Range;
 use test_case::test_case;
@@ -6,6 +6,14 @@ use test_case::test_case;
 use crate::{prelude::TestChainItem, test_utils::chain::*};
 
 use super::*;
+
+type TestHash = <TestChainItem as ChainItem>::Hash;
+type TestFilter = ChainFilter<TestHash>;
+
+/// Create a hash from a u32.
+fn hash(i: u32) -> TestHash {
+    i.into()
+}
 
 /// Build a chain of RegisterAgentActivity and then run them through the
 /// chain filter.
@@ -18,7 +26,6 @@ fn build_chain(c: Vec<TestChainItem>, filter: TestFilter) -> Vec<TestChainItem> 
 fn pretty(expected: Vec<TestChainItem>) -> impl Fn(Vec<TestChainItem>) {
     move |actual: Vec<TestChainItem>| pretty_assertions::assert_eq!(actual, expected)
 }
-
 #[test_case(1, 0, 0 => chain(0..0))]
 #[test_case(1, 0, 1 => chain(0..1))]
 #[test_case(1, 0, 10 => chain(0..1))]
@@ -111,7 +118,7 @@ fn matches_chain(a: &Vec<RegisterAgentActivity>, seq: &[u32]) -> bool {
     forked_chain(&[4..6, 3..8]), ChainFilter::new(action_hash(&[5, 0])).until(action_hash(&[4, 1])), |h| if *h == action_hash(&[5, 0]) { Some(5) } else { Some(4) }
     => matches MustGetAgentActivityResponse::IncompleteChain ; "chain_top (5,0) until (4,1) chain (0,0) to (5,0) and (3,1) to (7,1)")]
 fn test_filter_then_check(
-    chain: Vec<ChainItem>,
+    chain: Vec<TestChainItem>,
     filter: ChainFilter,
     mut f: impl FnMut(&ActionHash) -> Option<u32>,
 ) -> MustGetAgentActivityResponse {

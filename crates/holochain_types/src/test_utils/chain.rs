@@ -12,28 +12,31 @@ fn forked_hash(n: u8, i: u8) -> TestChainHash {
     TestChainHash(n as u32 + (i as u32) * 256)
 }
 
-pub type TestHash = <TestChainItem as ChainItem>::Hash;
-pub type TestFilter = ChainFilter<TestHash>;
-
-/// Create a hash from a u32.
-fn hash(i: u32) -> TestHash {
-    i.into()
+/// Create a hash from a slice by repeating the slice to fill out the array.
+fn hash(i: &[u8]) -> Vec<u8> {
+    let mut i = i.iter().copied().take(36).collect::<Vec<_>>();
+    let num_needed = 36 - i.len();
+    i.extend(std::iter::repeat(0).take(num_needed));
+    i
 }
 
+/// Create a hash from a slice by repeating the slice to fill out the array
 pub fn action_hash(i: &[u8]) -> ActionHash {
     ActionHash::from_raw_36(hash(i))
 }
 
+/// Create a hash from a slice by repeating the slice to fill out the array
 pub fn agent_hash(i: &[u8]) -> AgentPubKey {
     AgentPubKey::from_raw_36(hash(i))
 }
 
+/// Create a hash from a slice by repeating the slice to fill out the array
 pub fn entry_hash(i: &[u8]) -> EntryHash {
     EntryHash::from_raw_36(hash(i))
 }
 
 /// Create a chain per agent
-pub fn agent_chain(ranges: &[(u8, Range<u8>)]) -> Vec<(AgentPubKey, Vec<ChainItem>)> {
+pub fn agent_chain(ranges: &[(u8, Range<u32>)]) -> Vec<(AgentPubKey, Vec<TestChainItem>)> {
     ranges
         .iter()
         .map(|(a, range)| (agent_hash(&[*a]), chain(range.clone())))
