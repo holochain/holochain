@@ -1,4 +1,4 @@
-use holo_hash::ActionHash;
+use holo_hash::{ActionHash, EntryHash};
 use std::collections::HashMap;
 use std::ops::Range;
 use test_case::test_case;
@@ -6,14 +6,6 @@ use test_case::test_case;
 use crate::{prelude::TestChainItem, test_utils::chain::*};
 
 use super::*;
-
-/// Create a hash from a u32.
-fn hash(i: u32) -> TestHash {
-    i.into()
-}
-
-pub type TestHash = <TestChainItem as ChainItem>::Hash;
-pub type TestFilter = ChainFilter<TestHash>;
 
 /// Build a chain of RegisterAgentActivity and then run them through the
 /// chain filter.
