@@ -18,7 +18,7 @@ pub enum ValidateCallbackResult {
 /// or an agent activity query.
 pub enum UnresolvedDependencies {
     Hashes(Vec<AnyDhtHash>),
-    Activity(AgentPubKey, ChainFilter),
+    AgentActivity(AgentPubKey, ChainFilter),
 }
 
 /// The level of validation package required by

@@ -6,7 +6,6 @@ use holochain_sqlite::db::DbKindDht;
 use holochain_sqlite::db::DbRead;
 use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::OptionalExtension;
-use holochain_sqlite::rusqlite::Statement;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_sqlite::sql::sql_cell::must_get_agent_activity::*;
 use holochain_state::prelude::from_blob;
@@ -80,19 +79,6 @@ pub fn filter_then_check(
     }
 }
 
-/// Get the action sequence for a given action hash.
-fn hash_to_seq(
-    statement: &mut Statement,
-    hash: &ActionHash,
-    author: &AgentPubKey,
-) -> StateQueryResult<Option<u32>> {
-    Ok(statement
-        .query_row(named_params! {":hash": hash, ":author": author, ":activity": DhtOpType::RegisterAgentActivity}, |row| {
-            row.get(0)
-        })
-        .optional()?)
-}
-
 /// Find the filters sequence bounds.
 fn find_bounds(
     txn: &mut Transaction,
@@ -109,7 +95,12 @@ fn find_bounds(
                 return Ok(Some(action.action().action_seq()));
             }
         }
-        hash_to_seq(&mut statement, hash, author)
+        let result = statement
+                .query_row(named_params! {":hash": hash, ":author": author, ":activity": DhtOpType::RegisterAgentActivity}, |row| {
+                    row.get(0)
+                })
+                .optional()?;
+        Ok(result)
     };
 
     // For all the hashes in the filter, get their sequences.

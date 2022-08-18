@@ -48,7 +48,7 @@ pub fn must_get_agent_activity(
                         Err(wasm_error!(WasmErrorInner::HostShortCircuit(
                             holochain_serialized_bytes::encode(
                                 &ExternIO::encode(InitCallbackResult::UnresolvedDependencies(
-                                    UnresolvedDependencies::Activity(author, chain_filter)
+                                    UnresolvedDependencies::AgentActivity(author, chain_filter)
                                 ))
                                 .map_err(|e| -> RuntimeError { wasm_error!(e.into()).into() })?,
                             )
@@ -60,7 +60,7 @@ pub fn must_get_agent_activity(
                         Err(wasm_error!(WasmErrorInner::HostShortCircuit(
                             holochain_serialized_bytes::encode(
                                 &ExternIO::encode(ValidateCallbackResult::UnresolvedDependencies(
-                                    UnresolvedDependencies::Activity(author, chain_filter)
+                                    UnresolvedDependencies::AgentActivity(author, chain_filter)
                                 ))
                                 .map_err(|e| -> RuntimeError { wasm_error!(e.into()).into() })?,
                             )

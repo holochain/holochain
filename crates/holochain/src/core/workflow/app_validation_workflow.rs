@@ -626,7 +626,7 @@ where
                 .await
             }
         }
-        ValidateResult::UnresolvedDependencies(UnresolvedDependencies::Activity(
+        ValidateResult::UnresolvedDependencies(UnresolvedDependencies::AgentActivity(
             author,
             filter,
         )) => {

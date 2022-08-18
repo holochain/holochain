@@ -841,7 +841,7 @@ where
         author: AgentPubKey,
         filter: ChainFilter,
     ) -> CascadeResult<MustGetAgentActivityResponse> {
-        // Get tha available databases.
+        // Get the available databases.
         let conns = self.get_databases().await;
         let scratch = self.scratch.clone();
 
@@ -884,6 +884,8 @@ where
         // If we are the authority then don't go to the network.
         let i_am_authority = self.am_i_an_authority(author.clone().into()).await?;
         if i_am_authority {
+            // If I am an authority and I didn't get a result before
+            // this point then the chain is incomplete for this request.
             Ok(MustGetAgentActivityResponse::IncompleteChain)
         } else {
             self.fetch_must_get_agent_activity(author.clone(), filter)
