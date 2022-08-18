@@ -14,7 +14,7 @@ async-trait = "0.1"
 base64 = "0.13"
 byteorder = "1.3.4"
 cfg-if = "0.1"
-chrono = "0.4.6"
+chrono = { version = "0.4.22", default-features = false, features = ["clock", "std", "oldtime", "serde"] }
 derive_more = "0.99.3"
 directories = "2.0.2"
 either = "1.5.0"
