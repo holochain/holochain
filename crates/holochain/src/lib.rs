@@ -12,7 +12,7 @@ pub use hdk::HDI_VERSION;
 pub use hdk::HDK_VERSION;
 
 /// Current Holochain Conductor rust crate version.
-pub const HC_VERSION: &str = env!("CARGO_PKG_VERSION");
+pub const HOLOCHAIN_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub mod conductor;
 #[allow(missing_docs)]
