@@ -18,7 +18,7 @@ automap = { version = "0.1", features = ["serde"] }
 backtrace = "0.3.27"
 base64 = "0.13"
 cfg-if = "0.1"
-chrono = "0.4.6"
+chrono = { version = "0.4.22", default-features = false, features = ["clock", "std", "oldtime", "serde"] }
 derive_more = "0.99.3"
 either = "1.5"
 fixt = { path = "../fixt", version = "0.0.14"}
