@@ -114,11 +114,20 @@ impl MetaLairClient {
                             exact_client_server_version_match: true,
                         };
 
+                        tracing::warn!("lair connection lost, attempting reconnect");
+
                         let client = match ipc_keystore_connect_options(opts).await {
-                            Err(_) => continue 'reconnect,
+                            Err(err) => {
+                                tracing::error!(?err, "lair connect error");
+                                continue 'reconnect;
+                            }
                             Ok(client) => client,
                         };
+
                         *inner.lock() = client;
+
+                        tracing::info!("lair reconnect success");
+
                         break 'reconnect;
                     }
                 }

@@ -5,7 +5,7 @@
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
-use ghost_actor::dependencies::futures::FutureExt;
+use futures::FutureExt;
 use kitsune_p2p_types::dependencies::lair_keystore_api::lair_client::traits::AsLairClient;
 use kitsune_p2p_types::dependencies::lair_keystore_api::prelude::{LairApiEnum, LairClient};
 use kitsune_p2p_types::dependencies::lair_keystore_api::LairResult;
@@ -89,17 +89,14 @@ impl AsLairClient for CrudeMockKeystore {
         unimplemented!()
     }
 
-    fn shutdown(
-        &self,
-    ) -> ghost_actor::dependencies::futures::future::BoxFuture<'static, LairResult<()>> {
+    fn shutdown(&self) -> futures::future::BoxFuture<'static, LairResult<()>> {
         unimplemented!()
     }
 
     fn request(
         &self,
         _request: LairApiEnum,
-    ) -> ghost_actor::dependencies::futures::future::BoxFuture<'static, LairResult<LairApiEnum>>
-    {
+    ) -> futures::future::BoxFuture<'static, LairResult<LairApiEnum>> {
         let err = (self.0)();
         async move { Err(err) }.boxed()
     }
@@ -114,17 +111,14 @@ impl AsLairClient for RealOrMockKeystore {
         self.real.cli().0.get_dec_ctx_key()
     }
 
-    fn shutdown(
-        &self,
-    ) -> ghost_actor::dependencies::futures::future::BoxFuture<'static, LairResult<()>> {
+    fn shutdown(&self) -> futures::future::BoxFuture<'static, LairResult<()>> {
         self.real.cli().0.shutdown().boxed()
     }
 
     fn request(
         &self,
         request: LairApiEnum,
-    ) -> ghost_actor::dependencies::futures::future::BoxFuture<'static, LairResult<LairApiEnum>>
-    {
+    ) -> futures::future::BoxFuture<'static, LairResult<LairApiEnum>> {
         if self.use_mock.load(std::sync::atomic::Ordering::SeqCst) {
             let r = (self.mock)(request);
             async move { r }.boxed()
