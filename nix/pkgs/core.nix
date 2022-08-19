@@ -25,44 +25,16 @@ rec {
 
     # run all the non-slow cargo tests
     cargo build --features 'build' -p holochain_wasm_test_utils
-    cargo test ''${CARGO_TEST_ARGS:-} --workspace --exclude holochain --lib --tests --profile fast-test -- --nocapture
+    cargo test ''${CARGO_TEST_ARGS:-} --workspace --features slow_tests,test_utils,build_wasms,db-encryption --lib --tests --profile fast-test -- --nocapture
   '';
 
   hcStandardTestsNextest = writeShellScriptBin "hc-test-standard-nextest" ''
     set -euxo pipefail
     export RUST_BACKTRACE=1
 
-    # run all the non-slow cargo tests
+    # run all the cargo tests
     cargo build --features 'build' -p holochain_wasm_test_utils
-    cargo nextest ''${CARGO_NEXTEST_ARGS:-run --test-threads=2} --workspace --exclude holochain --lib --tests --cargo-profile fast-test
-  '';
-
-  hcSlowTests = writeShellScriptBin "hc-test-slow" ''
-    set -euxo pipefail
-    export RUST_BACKTRACE=1
-
-    # alas, we cannot specify --features in the virtual workspace
-    # run the specific slow tests in the holochain crate
-    cargo test ''${CARGO_TEST_ARGS:-} -p holochain --features slow_tests,test_utils,build_wasms,db-encryption --profile fast-test -- --nocapture
-  '';
-
-  hcSlowTestsNextest = writeShellScriptBin "hc-test-slow-nextest" ''
-    set -euxo pipefail
-    export RUST_BACKTRACE=1
-
-    # alas, we cannot specify --features in the virtual workspace
-    # run the specific slow tests in the holochain crate
-    cargo nextest ''${CARGO_NEXTEST_ARGS:-run --test-threads=2} -p holochain --features slow_tests,test_utils,build_wasms,db-encryption --cargo-profile fast-test
-  '';
-
-  hcSlowTestsIter = writeShellScriptBin "hc-test-slow-iter" ''
-    set -euo pipefail
-    export RUST_BACKTRACE=1
-
-    for i in `seq 1 ''${1}`; do
-      echo -n "$i: "
-      time env RUST_TEST_THREADS=$i hc-test-slow > /dev/null 2>&1
-    done
+    cargo nextest ''${CARGO_NEXTEST_ARGS:-run --test-threads=2} --workspace --features slow_tests,test_utils,build_wasms,db-encryption --lib --tests --cargo-profile fast-test
   '';
 
   hcWasmTests = writeShellScriptBin "hc-test-wasm" ''
