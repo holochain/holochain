@@ -16,7 +16,7 @@ cfg-if = "0.1"
 # pinned here with = to fix a compilation issue in a dependent crate.
 # feel free to drop the = if it causes problems in the future.
 chashmap = "=2.2.0"
-chrono = "0.4.6"
+chrono = { version = "0.4.22", default-features = false, features = ["clock", "std", "oldtime", "serde"] }
 derive_more = "0.99.3"
 either = "1.5.0"
 fallible-iterator = "0.2.0"
