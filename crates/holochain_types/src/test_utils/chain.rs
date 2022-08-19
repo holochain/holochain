@@ -37,7 +37,16 @@ impl From<i32> for TestChainHash {
 
 isotest::iso! {
     TestChainHash => |h| hash_from_u32(*h),
-    ActionHash => |h| Self(u32::from_le_bytes(h.get_raw_32()[0..4].try_into().unwrap()))
+    ActionHash => |h| Self(u32::from_le_bytes(h.get_raw_32()[0..4].try_into().unwrap())),
+    test_cases: [
+        TestChainHash(0),
+        TestChainHash(256),
+        TestChainHash(u32::MAX)
+    ],
+    real_cases: [
+        ActionHash::from_raw_32(vec![0; 32]),
+        ActionHash::from_raw_32(vec![255; 32])
+    ],
 }
 
 /// A test implementation of a minimal ChainItem which uses simple numbers for hashes
@@ -234,30 +243,28 @@ isotest::iso! {
             hash: TestChainHash::test(a.get_hash()),
             prev: a.prev_hash().map(TestChainHash::test),
         }
-    }
-}
-
-#[cfg(test)]
-#[test_case::test_case(0)]
-#[test_case::test_case(65536)]
-fn test_hash_roundtrips(u: u32) {
-    let h1 = TestChainHash(u);
-    let h2 = ActionHash::from_raw_32(u.to_le_bytes().iter().cycle().take(32).copied().collect());
-    isotest::test_iso_invariants(h1, h2);
-}
-
-#[cfg(test)]
-#[test_case::test_case(0, 0, None)]
-#[test_case::test_case(0, 0, Some(0))]
-#[test_case::test_case(1, 1, Some(0))]
-#[test_case::test_case(1, 1, None => ignore)] // this case is unrepresentable with these types
-fn test_chain_item_roundtrips(seq: u32, hash: u32, prev: Option<u32>) {
-    use ::fixt::prelude::*;
-    let item = TestChainItem {
-        seq,
-        hash: hash.into(),
-        prev: prev.map(Into::into),
-    };
-    let action = fixt!(SignedActionHashed);
-    isotest::test_iso_invariants(item, action);
+    },
+    test_cases: [
+        TestChainItem {
+            seq: 0,
+            hash: 0.into(),
+            prev: None,
+        },
+        TestChainItem {
+            seq: 0,
+            hash: 0.into(),
+            prev: Some(0.into()),
+        },
+        TestChainItem {
+            seq: 1,
+            hash: 1.into(),
+            prev: Some(1.into()),
+        },
+        TestChainItem {
+            seq: 1,
+            hash: 1.into(),
+            prev: None,
+        },
+    ],
+    real_cases: [::fixt::fixt!(SignedActionHashed)]
 }
