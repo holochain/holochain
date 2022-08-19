@@ -260,11 +260,13 @@ isotest::iso! {
             hash: 1.into(),
             prev: Some(1.into()),
         },
-        TestChainItem {
-            seq: 1,
-            hash: 1.into(),
-            prev: None,
-        },
+        // This value has no equivalent representation as an Action,
+        // since a Dna Action cannot specify a seq number other than 0.
+        // TestChainItem {
+        //     seq: 1,
+        //     hash: 1.into(),
+        //     prev: None,
+        // },
     ],
     real_cases: [::fixt::fixt!(SignedActionHashed)]
 }
