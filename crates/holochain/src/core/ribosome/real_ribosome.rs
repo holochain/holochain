@@ -408,10 +408,6 @@ impl RealRibosome {
         Ok(())
     }
 
-    pub fn do_not_cache_instance(&self, context_key: u64) {
-        CONTEXT_MAP.lock().remove(&context_key);
-    }
-
     pub fn instance(
         &self,
         call_context: CallContext,
