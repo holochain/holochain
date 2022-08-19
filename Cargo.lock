@@ -2815,8 +2815,9 @@ checksum = "879d54834c8c76457ef4293a689b2a8c59b076067ad77b15efafbb05f92a592b"
 
 [[package]]
 name = "isotest"
-version = "0.1.0-dev.3"
-source = "git+https://github.com/maackle/isotest-rs.git#66a576c40c0b073abe173d2a6a452aef062363b9"
+version = "0.1.0-dev.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "35af8270f9d46608680c394324bc37b692b1327d07497fbb76eba0dd6cd4d9dd"
 dependencies = [
  "futures",
  "paste",
