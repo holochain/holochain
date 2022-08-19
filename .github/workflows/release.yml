@@ -180,7 +180,7 @@ jobs:
             savesCargoCache: true
             ignoreErrorOnNonUbuntu: true
             maxBuildSpace: true
-            timeout_minutes: 20
+            timeout_minutes: 30
             max_attempts:
               ubuntu-latest: 2
               macos-latest: 2
