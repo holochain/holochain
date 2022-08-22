@@ -9,6 +9,7 @@ use holochain_types::prelude::AgentPubKey;
 use holochain_types::prelude::DbKindConductor;
 use holochain_zome_types::Timestamp;
 use std::time::Duration;
+use rand::Rng;
 
 /// Rather arbitrary but we expire nonces after 5 mins.
 pub const FRESH_NONCE_EXPIRES_AFTER: Duration = Duration::from_secs(60 * 5);
@@ -46,15 +47,10 @@ pub async fn witness_nonce(
 }
 
 pub async fn fresh_nonce(
-    db: &DbWrite<DbKindConductor>,
-    agent: AgentPubKey,
     now: Timestamp,
 ) -> DatabaseResult<(IntNonce, Timestamp)> {
-    let mut nonce = Timestamp::now().0;
+    // very unlikely to get a collision, we assume impossible.
+    let nonce = rand::thread_rng().gen();
     let expires: Timestamp = (now + FRESH_NONCE_EXPIRES_AFTER)?;
-    while witness_nonce(db, agent.clone(), nonce, now, expires).await? == WitnessNonceResult::Stale
-    {
-        nonce = Timestamp::now().0;
-    }
     Ok((nonce, expires))
 }

@@ -180,6 +180,24 @@ pub enum HostFnApiError {
     RibosomeError(Box<dyn std::error::Error + Send + Sync>),
 }
 
+#[derive(PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub enum ZomeCallAuthorization {
+    Authorized,
+    BadSignature,
+    BadCapGrant,
+    BadNonce,
+}
+
+impl ZomeCallAuthorization {
+    pub fn and(self, other: ZomeCallAuthorization) -> ZomeCallAuthorization {
+        if self != ZomeCallAuthorization::Authorized {
+            self
+        } else {
+            other
+        }
+    }
+}
+
 /// Response to a zome call.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes, PartialEq)]
 pub enum ZomeCallResponse {
@@ -188,7 +206,7 @@ pub enum ZomeCallResponse {
     Ok(crate::ExternIO),
     /// Cap grant failure.
     /// Something like a 401 http response.
-    Unauthorized(CellId, ZomeName, FunctionName, AgentPubKey),
+    Unauthorized(ZomeCallAuthorization, CellId, ZomeName, FunctionName, AgentPubKey),
     /// This was a zome call made remotely but
     /// something has failed on the network
     NetworkError(String),

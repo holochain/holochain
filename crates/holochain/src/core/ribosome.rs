@@ -313,21 +313,25 @@ pub trait Invocation: Clone {
 }
 
 impl ZomeCallInvocation {
-    pub async fn verify_signature(&self) -> RibosomeResult<bool> {
-        Ok(self
+    pub async fn verify_signature(&self) -> RibosomeResult<ZomeCallAuthorization> {
+        Ok(if self
             .provenance
             .verify_signature_raw(
                 &self.signature,
                 ZomeCallUnsigned::from(ZomeCall::from(self.clone())).data_to_sign()?,
             )
-            .await)
+            .await {
+                ZomeCallAuthorization::Authorized
+            } else {
+                ZomeCallAuthorization::BadSignature
+            })
     }
 
     /// to decide if a zome call grant is authorized:
     /// - we need to find a live (committed and not deleted) cap grant that matches the secret
     /// - if the live cap grant is for the current author the call is ALWAYS authorized ELSE
     /// - the live cap grant needs to include the invocation's provenance AND zome/function name
-    pub async fn verify_grant(&self, host_access: &ZomeCallHostAccess) -> RibosomeResult<bool> {
+    pub async fn verify_grant(&self, host_access: &ZomeCallHostAccess) -> RibosomeResult<ZomeCallAuthorization> {
         let check_function = (self.zome.zome_name().clone(), self.fn_name.clone());
         let check_agent = self.provenance.clone();
         let check_secret = self.cap_secret;
@@ -338,11 +342,15 @@ impl ZomeCallInvocation {
             .expect("Must have source chain to make zome calls")
             .valid_cap_grant(check_function, check_agent, check_secret)
             .await?;
-        Ok(maybe_grant.is_some())
+        Ok(if maybe_grant.is_some() {
+            ZomeCallAuthorization::Authorized
+        } else {
+            ZomeCallAuthorization::BadCapGrant
+        })
     }
 
-    pub async fn verify_nonce(&self, host_access: &ZomeCallHostAccess) -> RibosomeResult<bool> {
-        Ok(matches!(
+    pub async fn verify_nonce(&self, host_access: &ZomeCallHostAccess) -> RibosomeResult<ZomeCallAuthorization> {
+        Ok(if matches!(
             host_access
                 .call_zome_handle
                 .witness_nonce_from_calling_agent(
@@ -353,7 +361,11 @@ impl ZomeCallInvocation {
                 .await
                 .map_err(Box::new)?,
             WitnessNonceResult::Fresh
-        ))
+        ) {
+            ZomeCallAuthorization::Authorized
+        } else {
+            ZomeCallAuthorization::BadNonce
+        })
     }
 
     /// to verify if the zome call crypto is authorized:
@@ -361,16 +373,16 @@ impl ZomeCallInvocation {
     /// - the nonce must not have already been seen
     /// the checks MUST be done in this order as witnessing the nonce is a write
     /// and so we MUST NOT write nonces until after we verify the signature.
-    pub async fn verify_crypto(&self, host_access: &ZomeCallHostAccess) -> RibosomeResult<bool> {
-        Ok(self.verify_signature().await? && self.verify_nonce(host_access).await?)
+    pub async fn verify_crypto(&self, host_access: &ZomeCallHostAccess) -> RibosomeResult<ZomeCallAuthorization> {
+        Ok(self.verify_signature().await?.and(self.verify_nonce(host_access).await?))
     }
 
     #[allow(clippy::extra_unused_lifetimes)]
     pub async fn is_authorized<'a>(
         &self,
         host_access: &ZomeCallHostAccess,
-    ) -> RibosomeResult<bool> {
-        Ok(self.verify_grant(host_access).await? && self.verify_crypto(host_access).await?)
+    ) -> RibosomeResult<ZomeCallAuthorization> {
+        Ok(self.verify_grant(host_access).await?.and(self.verify_crypto(host_access).await?))
     }
 }
 

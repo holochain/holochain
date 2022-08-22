@@ -77,9 +77,10 @@ impl SweetConductorHandle {
         O: serde::de::DeserializeOwned + std::fmt::Debug,
     {
         let payload = ExternIO::encode(payload).expect("Couldn't serialize payload");
+        let now = Timestamp::now();
         let (nonce, expires_at) = self
             .handle()
-            .fresh_nonce_for_local_agent(provenance.clone(), Timestamp::now())
+            .fresh_nonce_for_local_agent(provenance.clone(), now)
             .await?;
         let call_unsigned = ZomeCallUnsigned {
             cell_id: zome.cell_id().clone(),
@@ -92,7 +93,8 @@ impl SweetConductorHandle {
             expires_at,
         };
         let call = ZomeCall::try_from_unsigned_zome_call(self.keystore(), call_unsigned).await?;
-        match self.handle().call_zome(call).await {
+        let response = self.handle().call_zome(call).await;
+        match response {
             Ok(Ok(response)) => Ok(unwrap_to!(response => ZomeCallResponse::Ok)
                 .decode()
                 .expect("Couldn't deserialize zome call output")),

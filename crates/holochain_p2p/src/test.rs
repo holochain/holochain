@@ -265,6 +265,7 @@ mod tests {
         let nonce = 1;
         let cap_secret = None;
         let payload = ExternIO::encode(b"yippo").unwrap();
+        let expires_at = (Timestamp::now() + std::time::Duration::from_secs(10)).unwrap();
 
         let signature = a1
             .sign_raw(
@@ -277,6 +278,7 @@ mod tests {
                     cap_secret: cap_secret.clone(),
                     payload: payload.clone(),
                     nonce,
+                    expires_at: expires_at.clone(),
                 }
                 .data_to_sign()
                 .unwrap(),
@@ -286,7 +288,7 @@ mod tests {
 
         let res = p2p
             .call_remote(
-                dna, a1, signature, a2, zome_name, fn_name, None, payload, nonce,
+                dna, a1, signature, a2, zome_name, fn_name, None, payload, nonce, expires_at
             )
             .await
             .unwrap();

@@ -199,7 +199,7 @@ impl Conductor {
     ) -> ConductorResult<(IntNonce, Timestamp)> {
         // Do a throwaway signature here so that if the agent can't sign we don't consume a nonce for them.
         agent.sign(&self.keystore, ()).await?;
-        Ok(fresh_nonce(&self.spaces.conductor_db, agent, now).await?)
+        Ok(fresh_nonce(now).await?)
     }
 
     pub(super) async fn witness_nonce_from_calling_agent(
