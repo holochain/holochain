@@ -27,6 +27,7 @@ use holochain::conductor::api::AppRequest;
 use holochain::conductor::api::AppResponse;
 use holochain::conductor::api::ZomeCall;
 use holochain::test_utils::setup_app;
+use holochain_state::nonce::fresh_nonce;
 use holochain_wasm_test_utils::TestZomes;
 use tempfile::TempDir;
 
@@ -41,7 +42,6 @@ use matches::assert_matches;
 use observability;
 use test_case::test_case;
 use tracing::instrument;
-use holochain::conductor::handle::ConductorHandleT;
 
 const DEFAULT_NUM: usize = 2000;
 
@@ -193,7 +193,6 @@ async fn speed_test(n: Option<usize>) -> Arc<TempDir> {
     // ALICE DOING A CALL
 
     async fn new_zome_call<P>(
-        handle: Arc<dyn ConductorHandleT>,
         cell_id: CellId,
         fn_name: FunctionName,
         payload: P,
@@ -201,7 +200,7 @@ async fn speed_test(n: Option<usize>) -> Arc<TempDir> {
     where
         P: serde::Serialize + std::fmt::Debug,
     {
-        let (nonce, expires_at) = handle.fresh_nonce_for_local_agent(cell_id.agent_pubkey().clone(), Timestamp::now()).await.unwrap();
+        let (nonce, expires_at) = fresh_nonce(Timestamp::now()).unwrap();
         Ok(ZomeCallUnsigned {
             cell_id: cell_id.clone(),
             zome_name: TestWasm::Anchor.into(),
@@ -213,9 +212,9 @@ async fn speed_test(n: Option<usize>) -> Arc<TempDir> {
         })
     }
 
-    let anchor_invocation = |handle: Arc<dyn ConductorHandleT>, anchor: String, cell_id, i: usize| async move {
+    let anchor_invocation = |anchor: String, cell_id, i: usize| async move {
         let anchor = AnchorInput(anchor.clone(), i.to_string());
-        new_zome_call(handle, cell_id, "anchor".into(), anchor).await
+        new_zome_call( cell_id, "anchor".into(), anchor).await
     };
 
     async fn call(
@@ -229,7 +228,7 @@ async fn speed_test(n: Option<usize>) -> Arc<TempDir> {
     let timer = std::time::Instant::now();
 
     for i in 0..num {
-        let invocation = anchor_invocation(handle.clone(), "alice".to_string(), alice_cell_id.clone(), i).await.unwrap();
+        let invocation = anchor_invocation("alice".to_string(), alice_cell_id.clone(), i).await.unwrap();
         let response = call(
             &mut app_interface,
             ZomeCall::try_from_unsigned_zome_call(handle.keystore(), invocation)
@@ -239,7 +238,7 @@ async fn speed_test(n: Option<usize>) -> Arc<TempDir> {
         .await
         .unwrap();
         assert_matches!(response, AppResponse::ZomeCall(_));
-        let invocation = anchor_invocation(handle.clone(), "bobbo".to_string(), bob_cell_id.clone(), i).await.unwrap();
+        let invocation = anchor_invocation("bobbo".to_string(), bob_cell_id.clone(), i).await.unwrap();
         let response = call(
             &mut app_interface,
             ZomeCall::try_from_unsigned_zome_call(handle.keystore(), invocation)
@@ -259,7 +258,6 @@ async fn speed_test(n: Option<usize>) -> Arc<TempDir> {
         if !bobbo_done {
             bobbo_attempts += 1;
             let invocation = new_zome_call(
-                handle.clone(),
                 alice_cell_id.clone(),
                 "list_anchor_addresses".into(),
                 "bobbo".to_string(),
@@ -284,7 +282,6 @@ async fn speed_test(n: Option<usize>) -> Arc<TempDir> {
         if !alice_done {
             alice_attempts += 1;
             let invocation = new_zome_call(
-                handle.clone(),
                 bob_cell_id.clone(),
                 "list_anchor_addresses".into(),
                 "alice".to_string(),

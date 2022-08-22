@@ -39,6 +39,7 @@ use holochain_serialized_bytes::SerializedBytes;
 use holochain_sqlite::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
+use holochain_state::nonce::fresh_nonce;
 use holochain_state::prelude::*;
 use holochain_state::schedule::live_scheduled_fns;
 use holochain_types::db_cache::DhtDbQueryCache;
@@ -285,10 +286,8 @@ impl Cell {
                         }
                     };
                     let provenance = self.id.agent_pubkey().clone();
-                    let (nonce, expires_at) = match self
-                        .conductor_handle
-                        .fresh_nonce_for_local_agent(provenance.clone(), now)
-                        .await
+                    let (nonce, expires_at) = match
+                        fresh_nonce(now)
                     {
                         Ok(v) => v,
                         Err(e) => {

@@ -5,6 +5,7 @@ use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCall;
 use futures::future::join_all;
 use holochain_p2p::HolochainP2pDnaT;
+use holochain_state::nonce::fresh_nonce;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
@@ -53,7 +54,7 @@ pub fn call(
                             .expect("Must have source chain to know provenance")
                             .agent_pubkey()
                             .clone();
-                        let (nonce, expires_at) = call_context.host_context.call_zome_handle().fresh_nonce_for_local_agent(provenance.clone(), Timestamp::now()).await.map_err(|e| -> RuntimeError {
+                        let (nonce, expires_at) = fresh_nonce(Timestamp::now()).map_err(|e| -> RuntimeError {
                             wasm_error!(WasmErrorInner::Host(e.to_string())).into()
                         })?;
 

@@ -65,7 +65,6 @@ use holochain_keystore::MetaLairClient;
 use holochain_sqlite::prelude::*;
 use holochain_sqlite::sql::sql_cell::state_dump;
 use holochain_state::mutations;
-use holochain_state::nonce::fresh_nonce;
 use holochain_state::nonce::witness_nonce;
 use holochain_state::nonce::WitnessNonceResult;
 use holochain_state::prelude::from_blob;
@@ -192,16 +191,6 @@ impl Conductor {
 /// Methods used by the [ConductorHandle]
 //-----------------------------------------------------------------------------
 impl Conductor {
-    pub(super) async fn fresh_nonce_for_local_agent(
-        &self,
-        agent: AgentPubKey,
-        now: Timestamp,
-    ) -> ConductorResult<(IntNonce, Timestamp)> {
-        // Do a throwaway signature here so that if the agent can't sign we don't consume a nonce for them.
-        agent.sign(&self.keystore, ()).await?;
-        Ok(fresh_nonce(now).await?)
-    }
-
     pub(super) async fn witness_nonce_from_calling_agent(
         &self,
         agent: AgentPubKey,

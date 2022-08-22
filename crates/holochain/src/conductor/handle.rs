@@ -426,13 +426,6 @@ pub trait ConductorHandleT: Send + Sync {
         transition: AppStatusTransition,
     ) -> ConductorResult<(InstalledApp, AppStatusFx)>;
 
-    /// Try to get a new nonce for a local agent. Fails if the local agent can't sign some data.
-    async fn fresh_nonce_for_local_agent(
-        &self,
-        agent: AgentPubKey,
-        now: Timestamp,
-    ) -> ConductorResult<(IntNonce, Timestamp)>;
-
     /// Try to put the nonce from a calling agent in the db. Fails with a stale result if a newer nonce exists.
     async fn witness_nonce_from_calling_agent(
         &self,
@@ -1566,14 +1559,6 @@ impl ConductorHandleT for ConductorHandleImpl {
         self.conductor
             .transition_app_status(app_id, transition)
             .await
-    }
-
-    async fn fresh_nonce_for_local_agent(
-        &self,
-        agent: AgentPubKey,
-        now: Timestamp,
-    ) -> ConductorResult<(IntNonce, Timestamp)> {
-        self.conductor.fresh_nonce_for_local_agent(agent, now).await
     }
 
     async fn witness_nonce_from_calling_agent(

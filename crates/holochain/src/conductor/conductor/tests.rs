@@ -15,6 +15,7 @@ use ::fixt::prelude::*;
 use holochain_conductor_api::InstalledAppInfoStatus;
 use holochain_conductor_api::{AdminRequest, AdminResponse, AppRequest, AppResponse, ZomeCall};
 use holochain_keystore::crude_mock_keystore::*;
+use holochain_state::nonce::fresh_nonce;
 use holochain_state::prelude::{test_keystore, *};
 use holochain_types::inline_zome::InlineZomeSet;
 use holochain_types::test_utils::fake_cell_id;
@@ -432,9 +433,8 @@ async fn make_signing_call(
     if reinstate_mock {
         keystore_control.use_real();
     }
-    let (nonce, expires_at) = conductor.inner_handle()
-        .fresh_nonce_for_local_agent(cell.agent_pubkey().clone(), Timestamp::now())
-        .await
+    let (nonce, expires_at) = 
+        fresh_nonce(Timestamp::now())
         .unwrap();
     let request = AppRequest::ZomeCall(Box::new(
         ZomeCall::try_from_unsigned_zome_call(

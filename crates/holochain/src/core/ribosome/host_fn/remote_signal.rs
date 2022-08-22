@@ -3,6 +3,7 @@ use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
 use holochain_p2p::HolochainP2pDnaT;
+use holochain_state::nonce::fresh_nonce;
 use holochain_types::access::Permission;
 use holochain_wasmer_host::prelude::*;
 use holochain_zome_types::signal::RemoteSignal;
@@ -41,7 +42,7 @@ pub fn remote_signal(
                 async move {
                     let mut to_agent_list: Vec<(Signature, AgentPubKey)> = Vec::new();
 
-                    let (nonce, expires_at) = match call_context.host_context.call_zome_handle().fresh_nonce_for_local_agent(from_agent.clone(), Timestamp::now()).await {
+                    let (nonce, expires_at) = match fresh_nonce(Timestamp::now()) {
                         Ok(nonce) => nonce,
                         Err(e) => {
                             tracing::info!("Failed to get a fresh nonce because of {:?}", e);

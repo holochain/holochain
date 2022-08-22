@@ -939,6 +939,7 @@ pub mod wasm_test {
     use crate::sweettest::SweetDnaFile;
     use ::fixt::prelude::*;
     use hdk::prelude::*;
+    use holochain_state::nonce::fresh_nonce;
     use holochain_types::prelude::AgentPubKeyFixturator;
     use holochain_types::zome_call::ZomeCallUnsigned;
     use holochain_wasm_test_utils::TestWasm;
@@ -974,10 +975,7 @@ pub mod wasm_test {
         assert_eq!("foobar", &bar_result);
 
         let now = Timestamp::now();
-        let (nonce, expires_at) = conductor
-            .inner_handle()
-            .fresh_nonce_for_local_agent(alice_pubkey.clone(), now)
-            .await
+        let (nonce, expires_at) = fresh_nonce(now)
             .unwrap();
 
         let infallible_result = conductor

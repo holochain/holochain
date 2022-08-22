@@ -8,6 +8,7 @@ use holochain::conductor::api::AppRequest;
 use holochain::conductor::api::AppResponse;
 use holochain::conductor::api::ZomeCall;
 use holochain::test_utils::setup_app;
+use holochain_state::nonce::fresh_nonce;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_wasm_test_utils::TestZomes;
@@ -107,7 +108,7 @@ async fn ser_regression_test() {
 
     let channel = ChannelName("hello world".into());
 
-    let (nonce, expires_at) = handle.fresh_nonce_for_local_agent(alice_agent_id.clone(), now).await.unwrap();
+    let (nonce, expires_at) = fresh_nonce(now).unwrap();
     let invocation = ZomeCall::try_from_unsigned_zome_call(
         handle.keystore(),
         ZomeCallUnsigned {
@@ -143,7 +144,7 @@ async fn ser_regression_test() {
         channel_hash,
         content: "Hello from alice :)".into(),
     };
-    let (nonce, expires_at) = handle.fresh_nonce_for_local_agent(alice_agent_id.clone(), now).await.unwrap();
+    let (nonce, expires_at) = fresh_nonce(now).unwrap();
     let invocation = ZomeCall::try_from_unsigned_zome_call(
         handle.keystore(),
         ZomeCallUnsigned {

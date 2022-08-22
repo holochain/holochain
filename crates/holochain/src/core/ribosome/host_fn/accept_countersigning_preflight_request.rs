@@ -143,6 +143,8 @@ pub mod wasm_test {
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "slow_tests")]
     async fn unlock_invalid_session() {
+        use holochain_state::nonce::fresh_nonce;
+
         observability::test_run().ok();
         let RibosomeTestFixture {
             conductor,
@@ -201,7 +203,7 @@ pub mod wasm_test {
                 unreachable!();
             };
 
-        let (nonce, expires_at) = conductor.inner_handle().fresh_nonce_for_local_agent(alice_pubkey.clone(), now).await.unwrap();
+        let (nonce, expires_at) = fresh_nonce(now).unwrap();
 
         // With an accepted preflight creations must fail for alice.
         let thing_fail_create_alice = conductor
@@ -227,7 +229,7 @@ pub mod wasm_test {
 
         expect_chain_locked(thing_fail_create_alice);
 
-        let (nonce, expires_at) = conductor.inner_handle().fresh_nonce_for_local_agent(alice_pubkey.clone(), now).await.unwrap();
+        let (nonce, expires_at) = fresh_nonce(now).unwrap();
     
         // Creating the INCORRECT countersigned entry WILL immediately unlock
         // the chain.
@@ -262,6 +264,8 @@ pub mod wasm_test {
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "slow_tests")]
     async fn lock_chain() {
+        use holochain_state::nonce::fresh_nonce;
+
         observability::test_run().ok();
         let RibosomeTestFixture {
             conductor,
@@ -317,7 +321,7 @@ pub mod wasm_test {
                 unreachable!();
             };
 
-        let (nonce, expires_at) = conductor.inner_handle().fresh_nonce_for_local_agent(alice_pubkey.clone(), now).await.unwrap();
+        let (nonce, expires_at) = fresh_nonce(now).unwrap();
         
         // Can't accept a second preflight request while the first is active.
         let preflight_acceptance_fail = conductor
@@ -360,7 +364,7 @@ pub mod wasm_test {
                 unreachable!();
             };
 
-        let (nonce, expires_at) = conductor.inner_handle().fresh_nonce_for_local_agent(alice_pubkey.clone(), now).await.unwrap();
+        let (nonce, expires_at) = fresh_nonce(now).unwrap();
         
         // With an accepted preflight creations must fail for alice.
         let thing_fail_create_alice = conductor
@@ -385,7 +389,7 @@ pub mod wasm_test {
             .await;
         expect_chain_locked(thing_fail_create_alice);
 
-        let (nonce, expires_at) = conductor.inner_handle().fresh_nonce_for_local_agent(bob_pubkey.clone(), now).await.unwrap();
+        let (nonce, expires_at) = fresh_nonce(now).unwrap();
 
         let thing_fail_create_bob = conductor
             .handle()
@@ -418,7 +422,7 @@ pub mod wasm_test {
                 vec![alice_response.clone(), bob_response.clone()],
             )
             .await;
-        let (nonce, expires_at) = conductor.inner_handle().fresh_nonce_for_local_agent(alice_pubkey.clone(), now).await.unwrap();
+        let (nonce, expires_at) = fresh_nonce(now).unwrap();
 
         let thing_fail_create_alice = conductor
             .handle()
@@ -459,7 +463,7 @@ pub mod wasm_test {
             .await;
         assert_eq!(alice_activity_pre.valid_activity.len(), 6);
 
-        let (nonce, expires_at) = conductor.inner_handle().fresh_nonce_for_local_agent(bob_pubkey.clone(), now).await.unwrap();
+        let (nonce, expires_at) = fresh_nonce(now).unwrap();
 
         // Creation will still fail for bob.
         let thing_fail_create_bob = conductor
