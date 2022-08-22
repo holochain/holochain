@@ -21,6 +21,7 @@ use holo_hash::{AgentPubKey, DnaHash};
 use holochain_serialized_bytes::prelude::*;
 use holochain_util::ffs;
 use holochain_zome_types::prelude::*;
+use holochain_zome_types::cell::{CLONE_ID_DELIMITER, CloneId};
 use itertools::Itertools;
 use std::{collections::HashMap, path::PathBuf};
 
@@ -78,9 +79,8 @@ pub struct UpdateCoordinatorsPayload {
 pub struct CreateCloneCellPayload {
     /// The app ID that the DNA to clone belongs to
     pub app_id: InstalledAppId,
-    /// The DNA to clone
+    /// The DNA's role ID to clone
     /// The Role ID under which to create this clone
-    /// (needed to track cloning permissions and `clone_count`)
     pub role_id: AppRoleId,
     /// Properties to override for the new cell
     pub properties: Option<YamlProperties>,
@@ -93,13 +93,6 @@ pub struct CreateCloneCellPayload {
     /// Optionally a name for the DNA clone
     pub name: Option<String>,
 }
-
-// impl CreateCloneCellPayload {
-//     /// Get the CellId of the to-be-created clone cell
-//     pub fn cell_id(&self) -> CellId {
-//         CellId::new(self., self.agent_key.clone())
-//     }
-// }
 
 /// A collection of [DnaHash]es paired with an [AgentPubKey] and an app id
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -409,10 +402,17 @@ impl InstalledAppCommon {
         _agent_key: AgentPubKey,
         role_assignments: I,
     ) -> Self {
+        let mut role_assignments = role_assignments.into_iter();
+        // ensure no role id contains a clone id delimiter
+        if let Some((illegal_role_id, _)) = role_assignments
+            .find(|(role_id, _)| role_id.contains(CLONE_ID_DELIMITER))
+        {
+            panic!("{}", AppError::IllegalRoleId(illegal_role_id.clone()));
+        }
         InstalledAppCommon {
             installed_app_id: installed_app_id.to_string(),
             _agent_key,
-            role_assignments: role_assignments.into_iter().collect(),
+            role_assignments: role_assignments.collect(),
         }
     }
 
@@ -545,14 +545,6 @@ impl InstalledAppCommon {
             .cell_id
             .agent_pubkey()
             .to_owned();
-
-        // ensure no role id contains a clone id delimiter
-        if let Some(illegal_cell) = installed_cells
-            .iter()
-            .find(|c| c.role_id.contains(CLONE_ID_DELIMITER))
-        {
-            return Err(AppError::IllegalRoleId(illegal_cell.role_id.clone()));
-        }
 
         // ensure all cells use the same agent key
         if installed_cells
@@ -871,19 +863,24 @@ mod tests {
     use super::{AppRoleAssignment, RunningApp};
     use crate::prelude::*;
     use ::fixt::prelude::*;
-    use std::collections::HashSet;
+    use std::collections::{HashMap, HashSet};
 
     #[test]
+    #[should_panic(expected = "")]
     fn illegal_role_id_is_rejected() {
-        let result = InstalledAppCommon::new_legacy(
+        InstalledAppCommon::new(
             "test_app",
-            vec![InstalledCell {
-                role_id: CLONE_ID_DELIMITER.to_string(),
-                cell_id: CellId::new(fixt!(DnaHash), fixt!(AgentPubKey)),
-            }],
+            fixt!(AgentPubKey),
+            vec![(
+                CLONE_ID_DELIMITER.into(),
+                AppRoleAssignment {
+                    base_cell_id: fixt!(CellId),
+                    clone_limit: 0,
+                    clones: HashMap::new(),
+                    is_provisioned: true,
+                },
+            )],
         );
-        println!("{:?}", result);
-        assert!(result.is_err());
     }
 
     #[test]
@@ -964,7 +961,7 @@ mod tests {
 
         // Adding the same clone twice should probably be a panic, but if this
         // line is still here, I never got around to making it panic...
-         app.add_clone(
+        app.add_clone(
             &role_id,
             format!("{}{}{}", role_id.clone(), CLONE_ID_DELIMITER, 0),
             clones[0].clone(),
