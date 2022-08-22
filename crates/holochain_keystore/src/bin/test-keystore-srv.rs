@@ -1,7 +1,7 @@
 use kitsune_p2p_types::dependencies::lair_keystore_api;
-use lair_keystore_api::prelude::*;
-use lair_keystore_api::ipc_keystore::*;
 use lair_keystore_api::dependencies::hc_seed_bundle;
+use lair_keystore_api::ipc_keystore::*;
+use lair_keystore_api::prelude::*;
 use std::sync::Arc;
 
 #[tokio::main(flavor = "multi_thread")]
@@ -16,12 +16,7 @@ async fn main() {
     // create the config for the test server
     let config = Arc::new(
         hc_seed_bundle::PwHashLimits::Minimum
-            .with_exec(|| {
-                LairServerConfigInner::new(
-                    &path,
-                    passphrase.clone(),
-                )
-            })
+            .with_exec(|| LairServerConfigInner::new(&path, passphrase.clone()))
             .await
             .unwrap(),
     );
