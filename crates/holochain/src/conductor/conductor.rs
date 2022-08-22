@@ -60,8 +60,6 @@ use holochain_conductor_api::FullIntegrationStateDump;
 use holochain_conductor_api::InstalledAppInfo;
 use holochain_conductor_api::IntegrationStateDump;
 use holochain_keystore::lair_keystore::spawn_lair_keystore;
-use holochain_keystore::lair_keystore::spawn_new_lair_keystore;
-use holochain_keystore::test_keystore::spawn_legacy_test_keystore;
 use holochain_keystore::test_keystore::spawn_test_keystore;
 use holochain_keystore::MetaLairClient;
 use holochain_sqlite::prelude::*;
@@ -1493,21 +1491,6 @@ mod builder {
                 keystore
             } else {
                 match &self.config.keystore {
-                    KeystoreConfig::DangerTestKeystoreLegacyDeprecated => {
-                        tracing::warn!("Using DEPRECATED legacy lair api.");
-                        spawn_legacy_test_keystore().await?
-                    }
-                    KeystoreConfig::LairServerLegacyDeprecated {
-                        keystore_path,
-                        danger_passphrase_insecure_from_config,
-                    } => {
-                        tracing::warn!("Using DEPRECATED legacy lair api.");
-                        tracing::warn!("USING INSECURE PASSPHRASE FROM CONFIG--This defeats the whole purpose of having a passphrase.");
-                        let passphrase = sodoken::BufRead::new_no_lock(
-                            danger_passphrase_insecure_from_config.as_bytes(),
-                        );
-                        spawn_lair_keystore(keystore_path.as_deref(), passphrase).await?
-                    }
                     KeystoreConfig::DangerTestKeystore => spawn_test_keystore().await?,
                     KeystoreConfig::LairServer { connection_url } => {
                         let passphrase = match self.passphrase {
@@ -1519,7 +1502,7 @@ mod builder {
                             }
                             Some(p) => p,
                         };
-                        spawn_new_lair_keystore(connection_url.clone(), passphrase).await?
+                        spawn_lair_keystore(connection_url.clone(), passphrase).await?
                     }
                     oth => unimplemented!("unimplemented keystore config: {:?}", oth),
                 }

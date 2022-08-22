@@ -105,10 +105,10 @@ pub struct RegisterDna {
     #[structopt(short, long)]
     /// Network seed to override when installing this Dna
     pub network_seed: Option<String>,
-    #[structopt(short, long)]
+    #[structopt(long)]
     /// Properties to override when installing this Dna
     pub properties: Option<PathBuf>,
-    #[structopt(short, long, conflicts_with = "hash", required_unless = "hash")]
+    #[structopt(long, conflicts_with = "hash", required_unless = "hash")]
     /// Path to a DnaBundle file.
     pub path: Option<PathBuf>,
     #[structopt(short, long, parse(try_from_str = parse_dna_hash), required_unless = "path")]
@@ -145,11 +145,11 @@ pub struct InstallApp {
 /// yet supported.
 /// AppRoleIds are set to `my-app-0`, `my-app-1` etc.
 pub struct InstallAppBundle {
-    #[structopt(short, long)]
+    #[structopt(long)]
     /// Sets the InstalledAppId.
     pub app_id: Option<String>,
 
-    #[structopt(short, long, parse(try_from_str = parse_agent_key))]
+    #[structopt(long, parse(try_from_str = parse_agent_key))]
     /// If not set then a key will be generated.
     /// Agent key is Base64 (same format that is used in logs).
     /// e.g. `uhCAk71wNXTv7lstvi4PfUr_JDvxLucF9WzUgWPNIEZIoPGMF4b_o`
@@ -241,14 +241,15 @@ pub async fn call(holochain_path: &Path, req: Call) -> anyhow::Result<()> {
         let mut cmds = Vec::with_capacity(ports.len());
         for (port, path) in ports.into_iter().zip(paths.into_iter()) {
             match CmdRunner::try_new(port).await {
-                Ok(cmd) => cmds.push((cmd, None)),
+                Ok(cmd) => cmds.push((cmd, None, None)),
                 Err(e) => {
                     if let holochain_websocket::WebsocketError::Io(e) = &e {
                         if let std::io::ErrorKind::ConnectionRefused
                         | std::io::ErrorKind::AddrNotAvailable = e.kind()
                         {
-                            let (port, holochain) = run_async(holochain_path, path, None).await?;
-                            cmds.push((CmdRunner::new(port).await, Some(holochain)));
+                            let (port, holochain, lair) =
+                                run_async(holochain_path, path, None).await?;
+                            cmds.push((CmdRunner::new(port).await, Some(holochain), Some(lair)));
                             continue;
                         }
                     }
@@ -263,7 +264,7 @@ pub async fn call(holochain_path: &Path, req: Call) -> anyhow::Result<()> {
     } else {
         let mut cmds = Vec::with_capacity(running.len());
         for port in running {
-            cmds.push((CmdRunner::new(port).await, None));
+            cmds.push((CmdRunner::new(port).await, None, None));
         }
         cmds
     };

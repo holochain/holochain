@@ -1,7 +1,6 @@
 //! reexport some common things
 
 pub use holochain_keystore::AgentPubKeyExt;
-pub use holochain_keystore::KeystoreSender;
 pub use holochain_serialized_bytes::prelude::*;
 pub use holochain_sqlite::nonce::IntNonce;
 pub use holochain_zome_types::prelude::*;
