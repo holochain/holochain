@@ -142,6 +142,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "assert_cmd"
+version = "2.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "93ae1ddd39efd67689deb1979d80bad3bf7f2b09c6e6117c8d1f2443b5e2f83e"
+dependencies = [
+ "bstr",
+ "doc-comment",
+ "predicates 2.1.1",
+ "predicates-core",
+ "predicates-tree",
+ "wait-timeout",
+]
+
+[[package]]
 name = "async-attributes"
 version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1968,7 +1982,7 @@ version = "0.0.155"
 dependencies = [
  "anyhow",
  "arbitrary",
- "assert_cmd",
+ "assert_cmd 1.0.8",
  "async-recursion",
  "async-trait",
  "base64",
@@ -2029,7 +2043,7 @@ dependencies = [
  "sd-notify",
  "serde",
  "serde_json",
- "serde_yaml",
+ "serde_yaml 0.8.24",
  "serial_test",
  "shrinkwraprs",
  "sodoken",
@@ -2106,7 +2120,7 @@ name = "holochain_cli_bundle"
 version = "0.0.48"
 dependencies = [
  "anyhow",
- "assert_cmd",
+ "assert_cmd 1.0.8",
  "holochain_serialized_bytes",
  "holochain_types",
  "holochain_util",
@@ -2115,7 +2129,7 @@ dependencies = [
  "predicates 1.0.8",
  "serde",
  "serde_bytes",
- "serde_yaml",
+ "serde_yaml 0.8.24",
  "structopt",
  "tempfile",
  "thiserror",
@@ -2128,7 +2142,7 @@ version = "0.0.48"
 dependencies = [
  "ansi_term 0.12.1",
  "anyhow",
- "assert_cmd",
+ "assert_cmd 1.0.8",
  "chrono",
  "futures",
  "holochain_conductor_api",
@@ -2142,7 +2156,7 @@ dependencies = [
  "once_cell",
  "portpicker",
  "serde",
- "serde_yaml",
+ "serde_yaml 0.8.24",
  "sodoken",
  "structopt",
  "tokio",
@@ -2168,7 +2182,7 @@ dependencies = [
  "observability",
  "serde",
  "serde_derive",
- "serde_yaml",
+ "serde_yaml 0.8.24",
  "structopt",
  "thiserror",
  "tracing",
@@ -2193,6 +2207,7 @@ dependencies = [
 name = "holochain_keystore"
 version = "0.0.51"
 dependencies = [
+ "assert_cmd 2.0.4",
  "base64",
  "futures",
  "holo_hash",
@@ -2206,6 +2221,7 @@ dependencies = [
  "parking_lot 0.11.2",
  "serde",
  "serde_bytes",
+ "serde_yaml 0.9.10",
  "sodoken",
  "tempdir",
  "thiserror",
@@ -2421,7 +2437,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "serde_with",
- "serde_yaml",
+ "serde_yaml 0.8.24",
  "shrinkwraprs",
  "strum",
  "strum_macros",
@@ -2563,7 +2579,7 @@ dependencies = [
  "rusqlite",
  "serde",
  "serde_bytes",
- "serde_yaml",
+ "serde_yaml 0.8.24",
  "shrinkwraprs",
  "strum",
  "subtle",
@@ -3068,7 +3084,7 @@ dependencies = [
  "holochain_serialized_bytes",
  "rusqlite",
  "serde",
- "serde_yaml",
+ "serde_yaml 0.8.24",
 ]
 
 [[package]]
@@ -3150,7 +3166,7 @@ dependencies = [
  "rcgen 0.8.13",
  "serde",
  "serde_json",
- "serde_yaml",
+ "serde_yaml 0.8.24",
  "tokio",
  "toml",
  "tracing",
@@ -3592,7 +3608,7 @@ dependencies = [
  "serde",
  "serde_bytes",
  "serde_derive",
- "serde_yaml",
+ "serde_yaml 0.8.24",
  "tempfile",
  "thiserror",
  "tokio",
@@ -5400,9 +5416,9 @@ checksum = "a41d061efea015927ac527063765e73601444cdc344ba855bc7bd44578b25e1c"
 
 [[package]]
 name = "serde"
-version = "1.0.137"
+version = "1.0.144"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "61ea8d54c77f8315140a05f4c7237403bf38b72704d031543aa1d16abbf517d1"
+checksum = "0f747710de3dcd43b88c9168773254e809d8ddbdf9653b84e2554ab219f17860"
 dependencies = [
  "serde_derive",
 ]
@@ -5437,9 +5453,9 @@ dependencies = [
 
 [[package]]
 name = "serde_derive"
-version = "1.0.137"
+version = "1.0.144"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1f26faba0c3959972377d3b2d306ee9f71faee9714294e41bb777f83f88578be"
+checksum = "94ed3a816fb1d101812f83e789f888322c34e291f894f19590dc310963e87a00"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -5502,6 +5518,19 @@ dependencies = [
  "ryu",
  "serde",
  "yaml-rust",
+]
+
+[[package]]
+name = "serde_yaml"
+version = "0.9.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7a09f551ccc8210268ef848f0bab37b306e87b85b2e017b899e7fb815f5aed62"
+dependencies = [
+ "indexmap",
+ "itoa 1.0.2",
+ "ryu",
+ "serde",
+ "unsafe-libyaml",
 ]
 
 [[package]]
@@ -6464,6 +6493,12 @@ name = "unicode_categories"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39ec24b3121d976906ece63c9daad25b85969647682eee313cb5779fdd69e14e"
+
+[[package]]
+name = "unsafe-libyaml"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "931179334a56395bcf64ba5e0ff56781381c1a5832178280c7d7f91d1679aeb0"
 
 [[package]]
 name = "untrusted"
