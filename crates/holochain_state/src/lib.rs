@@ -14,15 +14,15 @@
 //! The [`mutations`] module is the complete set of functions
 //! for writing data to sqlite in holochain.
 //!
-//! ## In Memory
+//! ## In-memory
 //! The [`scratch`] module provides the [`Scratch`](scratch::Scratch) type for
 //! reading and writing data in memory that is not visible anywhere else.
 //!
-//! The SourceChain type uses the Scratch for in memory operations which
+//! The SourceChain type uses the Scratch for in-memory operations which
 //! can be flushed to the database.
 //!
-//! The Query trait allows combining arbitrary database sql queries with
-//! the scratch space so reads can union across the database and in memory data.
+//! The Query trait allows combining arbitrary database SQL queries with
+//! the scratch space so reads can union across the database and in-memory data.
 
 #![allow(deprecated)]
 
