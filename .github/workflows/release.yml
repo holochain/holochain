@@ -180,7 +180,7 @@ jobs:
             savesCargoCache: true
             ignoreErrorOnNonUbuntu: true
             maxBuildSpace: true
-            timeout_minutes: 20
+            timeout_minutes: 30
             max_attempts:
               ubuntu-latest: 2
               macos-latest: 2
@@ -190,22 +190,6 @@ jobs:
                 --keep CARGO_TEST_ARGS \
                 --keep CARGO_BUILD_JOBS \
                 --fallback --pure --argstr flavor "coreDev" --run hc-test-standard-nextest
-
-          - name: cargo-test-slow
-            restoresCargoCache: true
-            savesCargoCache: true
-            ignoreErrorOnNonUbuntu: true
-            maxBuildSpace: true
-            timeout_minutes: 20
-            max_attempts:
-              ubuntu-latest: 2
-              macos-latest: 2
-            run: |
-              nix-shell \
-              --keep CARGO_NEXTEST_ARGS \
-              --keep CARGO_TEST_ARGS \
-              --keep CARGO_BUILD_JOBS \
-              --fallback --pure --argstr flavor "coreDev" --run hc-test-slow-nextest
 
           - name: cargo-test-static
             restoresCargoCache: true
@@ -263,12 +247,12 @@ jobs:
                 git -C "${HOLOCHAIN_REPO}" tag "${TAG}"
               fi
 
+              # TODO: use a util from the holochain-nixpkgs repo to make this change as this can get out of sync
               cat <<EOF >> packages/holochain/versions/update_config.toml
 
               [${VERSION_COMPAT}]
               git-src = "revision:${TAG}"
               git-repo = "git://localhost/"
-              lair-version-req = "~0.0"
               EOF
 
               # regenerate the nix sources

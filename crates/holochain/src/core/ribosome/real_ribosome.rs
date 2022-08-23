@@ -88,6 +88,8 @@ use std::collections::HashMap;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 
+const WASM_METERING_LIMIT: u64 = 10_000_000_000;
+
 /// The only RealRibosome is a Wasm ribosome.
 /// note that this is cloned on every invocation so keep clones cheap!
 #[derive(Clone, Debug)]
@@ -380,6 +382,11 @@ impl RealRibosome {
         zome_name: &ZomeName,
     ) -> RibosomeResult<()> {
         use holochain_wasmer_host::module::PlruCache;
+        {
+            let instance = instance.lock();
+            wasmer_middlewares::metering::set_remaining_points(&instance, WASM_METERING_LIMIT);
+        }
+
         // Clear the context as the call is done.
         {
             CONTEXT_MAP.lock().remove(&context_key);
@@ -478,10 +485,10 @@ impl RealRibosome {
     }
 
     pub fn cranelift() -> Cranelift {
-        let cost_function = |_operator: &WasmOperator| -> u64 { 1 };
+        let cost_function = |_operator: &WasmOperator| -> u64 { 0 };
         // @todo 10 giga-ops is totally arbitrary cutoff so we probably
         // want to make the limit configurable somehow.
-        let metering = Arc::new(Metering::new(10_000_000_000, cost_function));
+        let metering = Arc::new(Metering::new(WASM_METERING_LIMIT, cost_function));
         let mut cranelift = Cranelift::default();
         cranelift.canonicalize_nans(true).push_middleware(metering);
         cranelift
@@ -986,6 +993,7 @@ pub mod wasm_test {
         }
     }
 
+    #[ignore = "turn this back on when we set the cost_function to return non-0"]
     #[tokio::test(flavor = "multi_thread")]
     async fn the_incredible_halt_test() {
         observability::test_run().ok();
