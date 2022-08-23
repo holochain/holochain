@@ -14,15 +14,13 @@ use crate::{
 use ::fixt::prelude::*;
 use holochain_conductor_api::InstalledAppInfoStatus;
 use holochain_conductor_api::{AdminRequest, AdminResponse, AppRequest, AppResponse, ZomeCall};
-use holochain_keystore::crude_mock_keystore::spawn_crude_mock_keystore;
-use holochain_keystore::crude_mock_keystore::spawn_real_or_mock_keystore;
+use holochain_keystore::crude_mock_keystore::*;
 use holochain_state::prelude::{test_keystore, *};
 use holochain_types::inline_zome::InlineZomeSet;
 use holochain_types::test_utils::fake_cell_id;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::WebsocketSender;
 use holochain_zome_types::op::Op;
-use kitsune_p2p_types::dependencies::lair_keystore_api_0_0::LairError;
 use maplit::hashset;
 use matches::assert_matches;
 
@@ -389,9 +387,7 @@ async fn test_reconciliation_idempotency() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_signing_error_during_genesis() {
     observability::test_run().ok();
-    let bad_keystore = spawn_crude_mock_keystore(|| LairError::other("test error"))
-        .await
-        .unwrap();
+    let bad_keystore = spawn_crude_mock_keystore(|| "test error".into()).await;
 
     let db_dir = test_db_dir();
     let config = ConductorConfig::default();

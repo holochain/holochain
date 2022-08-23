@@ -92,17 +92,15 @@ pub(crate) async fn spawn_test_agent(
 
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::box_fut;
-use kitsune_p2p_types::dependencies::lair_keystore_api_0_0;
+use kitsune_p2p_types::dependencies::lair_keystore_api::dependencies::sodoken;
 use kitsune_p2p_types::dht::prelude::RegionSetLtcs;
 use kitsune_p2p_types::dht::spacetime::Topology;
 use kitsune_p2p_types::dht::PeerStrat;
 use kitsune_p2p_types::dht_arc::DhtArcSet;
-use lair_keystore_api_0_0::entry::EntrySignEd25519;
-use lair_keystore_api_0_0::internal::sign_ed25519::*;
 
 struct AgentHarness {
     agent: Arc<KitsuneAgent>,
-    priv_key: SignEd25519PrivKey,
+    priv_key: sodoken::BufReadSized<{ sodoken::sign::SECRETKEYBYTES }>,
     harness_chan: HarnessEventChannel,
     agent_store: HashMap<Arc<KitsuneAgent>, Arc<AgentInfoSigned>>,
     gossip_store: HashMap<Arc<KitsuneOpHash>, String>,
@@ -114,14 +112,17 @@ impl AgentHarness {
         harness_chan: HarnessEventChannel,
         topology: Topology,
     ) -> Result<Self, KitsuneP2pError> {
-        let EntrySignEd25519 { priv_key, pub_key } = sign_ed25519_keypair_new_from_entropy()
+        let pub_key = sodoken::BufWriteSized::new_no_lock();
+        let priv_key = sodoken::BufWriteSized::new_no_lock();
+        sodoken::sign::keypair(pub_key.clone(), priv_key.clone())
             .await
             .map_err(KitsuneP2pError::other)?;
-        let pub_key = (**pub_key).clone();
+
+        let pub_key = pub_key.read_lock().to_vec();
         let agent: Arc<KitsuneAgent> = Arc::new(KitsuneAgent::new(pub_key));
         Ok(Self {
             agent,
-            priv_key,
+            priv_key: priv_key.to_read_sized(),
             harness_chan,
             agent_store: HashMap::new(),
             gossip_store: HashMap::new(),
@@ -325,10 +326,11 @@ impl KitsuneP2pEventHandler for AgentHarness {
         &mut self,
         input: SignNetworkDataEvt,
     ) -> KitsuneP2pEventHandlerResult<KitsuneSignature> {
-        let sig = sign_ed25519(self.priv_key.clone(), input.data);
+        let sig = sodoken::BufWriteSized::new_no_lock();
+        let fut = sodoken::sign::detached(sig.clone(), input.data.to_vec(), self.priv_key.clone());
         Ok(async move {
-            let sig = sig.await.map_err(KitsuneP2pError::other)?;
-            let sig: Vec<u8> = (**sig).clone();
+            fut.await.map_err(KitsuneP2pError::other)?;
+            let sig = sig.read_lock().to_vec();
             Ok(sig.into())
         }
         .boxed()
