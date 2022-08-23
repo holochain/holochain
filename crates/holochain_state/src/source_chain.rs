@@ -2001,6 +2001,7 @@ pub mod tests {
                     entry_type: entry_type.clone(),
                     entry_hashes: entry_hashes.clone(),
                     include_entries,
+                    descending: false,
                 };
                 if sequence_range != ChainQueryFilterRange::Unbounded
                     && (action_type.is_some()
