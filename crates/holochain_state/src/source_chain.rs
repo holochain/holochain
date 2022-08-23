@@ -764,14 +764,15 @@ where
                     });
                     sql.push_str(
                         "
-                )
-                AND
-                (:entry_type IS NULL OR Action.entry_type = :entry_type)
-                AND
-                (:action_type IS NULL OR Action.type = :action_type)
-                ORDER BY Action.seq ASC
-                ",
+                        )
+                        AND
+                        (:entry_type IS NULL OR Action.entry_type = :entry_type)
+                        AND
+                        (:action_type IS NULL OR Action.type = :action_type)
+                        ORDER BY Action.seq 
+                        ",
                     );
+                    sql.push_str(if query.descending {" DESC"} else {" ASC"});
                     let mut stmt = txn.prepare(&sql)?;
                     let records = stmt
                         .query_and_then(
