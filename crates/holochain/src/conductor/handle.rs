@@ -96,6 +96,8 @@ use super::state::ConductorState;
 #[cfg(any(test, feature = "test_utils"))]
 use crate::core::queue_consumer::QueueTriggers;
 
+mod insert_records_into_source_chain;
+
 /// A handle to the Conductor that can easily be passed around and cheaply cloned
 pub type ConductorHandle = Arc<dyn ConductorHandleT>;
 

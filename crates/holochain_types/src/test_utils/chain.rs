@@ -35,6 +35,12 @@ impl From<i32> for TestChainHash {
     }
 }
 
+impl TestChainHash {
+    fn forked(n: u8, i: u8) -> TestChainHash {
+        TestChainHash(u32::from_le_bytes([n, i, 0, 0]))
+    }
+}
+
 isotest::iso! {
     TestChainHash => |h| hash_from_u32(*h),
     ActionHash => |h| Self(u32::from_le_bytes(h.get_raw_32()[0..4].try_into().unwrap())),
@@ -70,6 +76,17 @@ impl TestChainItem {
             prev: seq.checked_sub(1).map(TestChainHash),
         }
     }
+
+    /// Constructor chains with forks, with `i` representing a fork index
+    pub fn forked(seq: u8, new_fork: u8, prev_fork: u8) -> Self {
+        Self {
+            seq: seq.into(),
+            hash: TestChainHash::forked(seq, new_fork),
+            prev: seq
+                .checked_sub(1)
+                .map(|s| TestChainHash::forked(s, prev_fork)),
+        }
+    }
 }
 
 impl ChainItem for TestChainItem {
@@ -92,10 +109,6 @@ impl AsRef<Self> for TestChainItem {
     fn as_ref(&self) -> &Self {
         self
     }
-}
-
-fn forked_hash(n: u8, i: u8) -> TestChainHash {
-    TestChainHash(u32::from_le_bytes([n, i, 0, 0]))
 }
 
 /// Create a hash from a slice by repeating the slice to fill out the array.
@@ -160,16 +173,16 @@ pub fn forked_chain(ranges: &[Range<u8>]) -> Vec<TestChainItem> {
                     let prev = n.checked_sub(1).map(Into::into);
                     TestChainItem {
                         seq: n as u32,
-                        hash: forked_hash(n as u8, i as u8),
+                        hash: TestChainHash::forked(n as u8, i as u8),
                         prev,
                     }
                 } else {
                     let prev = n
                         .checked_sub(1)
-                        .map(|n_sub_1| forked_hash(n_sub_1, i as u8));
+                        .map(|n_sub_1| TestChainHash::forked(n_sub_1, i as u8));
                     TestChainItem {
                         seq: n as u32,
-                        hash: forked_hash(n, i as u8),
+                        hash: TestChainHash::forked(n, i as u8),
                         prev,
                     }
                 }
