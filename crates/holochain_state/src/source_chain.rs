@@ -764,14 +764,15 @@ where
                     });
                     sql.push_str(
                         "
-                )
-                AND
-                (:entry_type IS NULL OR Action.entry_type = :entry_type)
-                AND
-                (:action_type IS NULL OR Action.type = :action_type)
-                ORDER BY Action.seq ASC
-                ",
+                        )
+                        AND
+                        (:entry_type IS NULL OR Action.entry_type = :entry_type)
+                        AND
+                        (:action_type IS NULL OR Action.type = :action_type)
+                        ORDER BY Action.seq 
+                        ",
                     );
+                    sql.push_str(if query.descending {" DESC"} else {" ASC"});
                     let mut stmt = txn.prepare(&sql)?;
                     let records = stmt
                         .query_and_then(
@@ -2000,6 +2001,7 @@ pub mod tests {
                     entry_type: entry_type.clone(),
                     entry_hashes: entry_hashes.clone(),
                     include_entries,
+                    descending: false,
                 };
                 if sequence_range != ChainQueryFilterRange::Unbounded
                     && (action_type.is_some()

@@ -78,6 +78,8 @@ pub struct ChainQueryFilter {
     pub action_type: Option<ActionType>,
     /// Include the entries in the records
     pub include_entries: bool,
+    /// The query should be ordered in descending order (default is ascending)
+    pub descending: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
@@ -204,6 +206,18 @@ impl ChainQueryFilter {
     /// Include the entries in the RecordsVec that is returned.
     pub fn include_entries(mut self, include_entries: bool) -> Self {
         self.include_entries = include_entries;
+        self
+    }
+
+    /// Set the order to ascending.
+    pub fn ascending(mut self) -> Self {
+        self.descending = false;
+        self
+    }
+
+    /// Set the order to ascending.
+    pub fn descending(mut self) -> Self {
+        self.descending = true;
         self
     }
 
@@ -400,6 +414,13 @@ mod tests {
         assert_eq!(
             map_query(&query_2, &actions),
             [false, true, false, true, false, false, false].to_vec()
+        );
+        assert_eq!(
+            map_query(&query_2.descending(), &actions),
+            [false, true, false, true, false, false, false]
+                .into_iter()
+                .rev()
+                .collect::<Vec<_>>()
         );
     }
 
