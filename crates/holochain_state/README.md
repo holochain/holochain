@@ -7,8 +7,8 @@
 
 [![Twitter Follow](https://img.shields.io/twitter/follow/holochain.svg?style=social&label=Follow)](https://twitter.com/holochain)
 
-[![Crate](https://img.shields.io/crates/v/holochain.svg)](https://crates.io/crates/holochain_state)
-[![API Docs](https://docs.rs/holochain/badge.svg)](https://docs.rs/holochain_state)
+[![Crate](https://img.shields.io/crates/v/holochain_state.svg)](https://crates.io/crates/holochain_state)
+[![API Docs](https://docs.rs/holochain_state/badge.svg)](https://docs.rs/holochain_state)
 
 The holochain state crate provides helpers and abstractions for working
 with the `holochain_sqlite` crate.
@@ -26,15 +26,15 @@ The [`host_fn_workspace`] module provides abstractions for reading data during w
 The [`mutations`] module is the complete set of functions
 for writing data to sqlite in holochain.
 
-### In Memory
+### In-memory
 The [`scratch`] module provides the [`Scratch`](scratch::Scratch) type for
 reading and writing data in memory that is not visible anywhere else.
 
-The SourceChain type uses the Scratch for in memory operations which
+The SourceChain type uses the Scratch for in-memory operations which
 can be flushed to the database.
 
-The Query trait allows combining arbitrary database sql queries with
-the scratch space so reads can union across the database and in memory data.
+The Query trait allows combining arbitrary database SQL queries with
+the scratch space so reads can union across the database and in-memory data.
 
 ## License
  [![License: CAL 1.0](https://img.shields.io/badge/License-CAL-1.0-blue.svg)](https://github.com/holochain/cryptographic-autonomy-license)
