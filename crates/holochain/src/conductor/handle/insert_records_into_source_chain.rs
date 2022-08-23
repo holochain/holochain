@@ -131,11 +131,12 @@ impl<A: ChainItem> ChainGraft<A> {
 mod tests {
     use holochain_types::test_utils::chain::{self as tu, TestChainItem};
     use pretty_assertions::assert_eq;
+    use test_case::test_case;
 
     use super::*;
 
     #[test]
-    fn test_pivot() {
+    fn test_pivot_and_rebalance() {
         isotest::isotest!(TestChainItem => |iso| {
             let chain = |r| tu::chain(r).into_iter().map(|a| iso.create(a)).collect::<Vec<_>>();
             let forked_chain = |r| tu::forked_chain(r).into_iter().map(|a| iso.create(a)).collect::<Vec<_>>();
@@ -143,74 +144,38 @@ mod tests {
 
             let case = ChainGraft::new(chain(0..3), chain(3..6));
             assert_eq!(case.pivot_and_overlap(), (Some(0), 0));
-            assert_eq!(
-                case.clone().rebalance().incoming,
-                case.clone().rebalance().rebalance().incoming
-            );
             assert_eq!(case.rebalance(), ChainGraft::new(chain(0..3), chain(3..6)));
 
             let case = ChainGraft::new(chain(0..4), chain(3..6));
             assert_eq!(case.pivot_and_overlap(), (Some(1), 1));
-            assert_eq!(
-                case.clone().rebalance().incoming,
-                case.clone().rebalance().rebalance().incoming
-            );
             assert_eq!(case.rebalance(), ChainGraft::new(chain(0..4), chain(4..6)));
 
             let case = ChainGraft::new(chain(0..3), chain(1..4));
             assert_eq!(case.pivot_and_overlap(), (Some(2), 2));
-            assert_eq!(
-                case.clone().rebalance().incoming,
-                case.clone().rebalance().rebalance().incoming
-            );
             assert_eq!(case.rebalance(), ChainGraft::new(chain(0..3), chain(3..4)));
 
             let case = ChainGraft::new(chain(0..3), chain(0..4));
             assert_eq!(case.pivot_and_overlap(), (Some(3), 3));
-            assert_eq!(
-                case.clone().rebalance().incoming,
-                case.clone().rebalance().rebalance().incoming
-            );
             assert_eq!(case.rebalance(), ChainGraft::new(chain(0..3), chain(3..4)));
 
             let case = ChainGraft::new(chain(0..5), chain(0..3));
             assert_eq!(case.pivot_and_overlap(), (Some(5), 3));
-            assert_eq!(
-                case.clone().rebalance().incoming,
-                case.clone().rebalance().rebalance().incoming
-            );
             assert_eq!(case.rebalance(), ChainGraft::new(chain(0..3), vec![]));
 
             let case = ChainGraft::new(chain(0..2), chain(3..6));
             assert_eq!(case.pivot_and_overlap(), (None, 0));
-            assert_eq!(
-                case.clone().rebalance().incoming,
-                case.clone().rebalance().rebalance().incoming
-            );
             assert_eq!(case.rebalance(), ChainGraft::new(vec![], chain(3..6)));
 
             let case = ChainGraft::new(chain(0..2), vec![]);
             assert_eq!(case.pivot_and_overlap(), (None, 0));
-            assert_eq!(
-                case.clone().rebalance().incoming,
-                case.clone().rebalance().rebalance().incoming
-            );
             assert_eq!(case.rebalance(), ChainGraft::new(vec![], vec![]));
 
             let case = ChainGraft::new(vec![], chain(0..5));
             assert_eq!(case.pivot_and_overlap(), (Some(0), 0));
-            assert_eq!(
-                case.clone().rebalance().incoming,
-                case.clone().rebalance().rebalance().incoming
-            );
             assert_eq!(case.rebalance(), ChainGraft::new(vec![], chain(0..5)));
 
             let case = ChainGraft::new(chain(0..3), forked_chain(&[0..0, 3..6]));
             assert_eq!(case.pivot_and_overlap(), (Some(0), 0));
-            assert_eq!(
-                case.clone().rebalance().incoming,
-                case.clone().rebalance().rebalance().incoming
-            );
             assert_eq!(
                 case.rebalance(),
                 ChainGraft::new(chain(0..3), forked_chain(&[0..0, 3..6])),
@@ -219,21 +184,41 @@ mod tests {
             let case = ChainGraft::new(chain(0..3), forked_chain(&[0..0, 4..6]));
             assert_eq!(case.pivot_and_overlap(), (None, 0));
             assert_eq!(
-                case.clone().rebalance().incoming,
-                case.clone().rebalance().rebalance().incoming
-            );
-            assert_eq!(
                 case.rebalance(),
                 ChainGraft::new(vec![], forked_chain(&[0..0, 4..6])),
             );
 
             let case = ChainGraft::new(forked_chain(&[0..3, 3..6]), chain(2..6));
             assert_eq!(case.pivot_and_overlap(), (Some(4), 1));
-            assert_eq!(
-                case.clone().rebalance().incoming,
-                case.clone().rebalance().rebalance().incoming
-            );
+            assert_eq!(case.rebalance(), ChainGraft::new(chain(0..3), chain(3..6)),);
+
+            let case = ChainGraft::new(gap_chain(&[0..3, 6..9]), chain(3..6));
+            assert_eq!(case.pivot_and_overlap(), (Some(3), 0));
+            assert_eq!(case.rebalance(), ChainGraft::new(chain(0..3), chain(3..6)),);
+
+            let case = ChainGraft::new(chain(0..6), gap_chain(&[0..3, 6..9]));
+            assert_eq!(case.pivot_and_overlap(), (Some(0), 0));
             assert_eq!(case.rebalance(), ChainGraft::new(chain(0..3), chain(3..6)),);
         });
+    }
+
+    #[test_case(ChainGraft::new(tu::chain(0..3), tu::chain(3..6)))]
+    #[test_case(ChainGraft::new(tu::chain(0..4), tu::chain(3..6)))]
+    #[test_case(ChainGraft::new(tu::chain(0..3), tu::chain(1..4)))]
+    #[test_case(ChainGraft::new(tu::chain(0..3), tu::chain(0..4)))]
+    #[test_case(ChainGraft::new(tu::chain(0..5), tu::chain(0..3)))]
+    #[test_case(ChainGraft::new(tu::chain(0..2), tu::chain(3..6)))]
+    #[test_case(ChainGraft::new(tu::chain(0..2), vec![]))]
+    #[test_case(ChainGraft::new(vec![], tu::chain(0..5)))]
+    #[test_case(ChainGraft::new(tu::chain(0..3), tu::forked_chain(&[0..0, 3..6])))]
+    #[test_case(ChainGraft::new(tu::chain(0..3), tu::forked_chain(&[0..0, 4..6])))]
+    #[test_case(ChainGraft::new(tu::forked_chain(&[0..3, 3..6]), tu::chain(2..6)))]
+    #[test_case(ChainGraft::new(tu::gap_chain(&[0..3, 6..9]), tu::chain(3..6)))]
+    #[test_case(ChainGraft::new(tu::chain(0..6), tu::gap_chain(&[0..3, 6..9])))]
+    fn test_incoming_idempotence(case: ChainGraft<TestChainItem>) {
+        pretty_assertions::assert_eq!(
+            case.clone().rebalance().incoming,
+            case.clone().rebalance().rebalance().incoming
+        );
     }
 }
