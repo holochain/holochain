@@ -131,6 +131,9 @@
 //! <https://github.com/holochain/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/validate/src/integrity.rs>.
 //! Many more validation examples can be browsed in that very workspace.
 
+/// Current HDI rust crate version.
+pub const HDI_VERSION: &str = env!("CARGO_PKG_VERSION");
+
 pub use hdk_derive::hdk_entry_defs;
 pub use hdk_derive::hdk_entry_helper;
 pub use hdk_derive::hdk_extern;

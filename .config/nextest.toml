@@ -10,7 +10,7 @@ status-level = "all"
 # Treat a test that takes longer than this period as slow, and print a message.
 # Given a non-zero positive integer, shutdown the tests when the number periods
 # have passed.
-slow-timeout = { period = "30s", terminate-after = 2 }
+slow-timeout = { period = "30s", terminate-after = 4 }
 
 # * "immediate-final": output failures as soon as they happen and at the end of
 #   the test run
