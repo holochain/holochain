@@ -3,8 +3,9 @@
 //! Multiple [`Cell`](crate::conductor::Cell)'s could share the same space.
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
-use holo_hash::{DhtOpHash, DnaHash};
+use holo_hash::{AgentPubKey, DhtOpHash, DnaHash};
 use holochain_conductor_api::conductor::{ConductorConfig, DatabaseRootPath};
+use holochain_keystore::MetaLairClient;
 use holochain_p2p::{
     dht::{
         arq::{power_and_count_from_length, ArqBoundsSet},
@@ -29,6 +30,7 @@ use holochain_sqlite::{
 use holochain_state::{
     prelude::{from_blob, StateQueryResult},
     query::{map_sql_dht_op_common, StateQueryError},
+    source_chain::SourceChain,
 };
 use holochain_types::{
     db_cache::DhtDbQueryCache,
@@ -638,6 +640,21 @@ impl Space {
             dht_query_cache,
         };
         Ok(r)
+    }
+
+    pub async fn source_chain(
+        &self,
+        keystore: MetaLairClient,
+        author: AgentPubKey,
+    ) -> SourceChainResult<SourceChain> {
+        SourceChain::new(
+            self.authored_db.clone(),
+            self.dht_db.clone(),
+            self.dht_query_cache.clone(),
+            keystore,
+            author,
+        )
+        .await
     }
 }
 

@@ -18,13 +18,93 @@ pub enum InsertRecordsMethod {
 }
 
 pub(crate) async fn insert_records_into_source_chain(
-    _handle: Arc<ConductorHandleImpl>,
-    _cell_id: CellId,
-    _truncate: bool,
-    _validate: bool,
-    _records: Vec<Record>,
-) -> ConductorApiResult<()> {
-    todo!("move function defined on handle into here")
+    handle: Arc<ConductorHandleImpl>,
+    cell_id: CellId,
+    method: InsertRecordsMethod,
+    validate: bool,
+    records: Vec<Record>,
+) -> SourceChainResult<()> {
+    // Get or create the space for this cell.
+    // Note: This doesn't require the cell be installed.
+    let space = handle.conductor.get_or_create_space(cell_id.dna_hash())?;
+
+    let network = handle
+        .conductor
+        .holochain_p2p()
+        .to_dna(cell_id.dna_hash().clone());
+
+    let source_chain = space
+        .source_chain(handle.keystore().clone(), cell_id.agent_pubkey().clone())
+        .await?;
+
+    let existing_actions: Vec<SignedActionHashed> = source_chain
+        .query(ChainQueryFilter::new())
+        .await?
+        .into_iter()
+        .map(|r| r.signed_action)
+        .collect();
+
+    if validate {
+        validate_records(handle.clone(), &cell_id, records.clone()).await?;
+    }
+
+    todo!()
+}
+
+async fn validate_records(
+    handle: Arc<ConductorHandleImpl>,
+    cell_id: &CellId,
+    records: Vec<Record>,
+) -> SourceChainResult<()> {
+    let space = handle.conductor.get_or_create_space(cell_id.dna_hash())?;
+    let ribosome = handle.get_ribosome(cell_id.dna_hash())?;
+    let network = handle
+        .conductor
+        .holochain_p2p()
+        .to_dna(cell_id.dna_hash().clone());
+
+    // Create a raw source chain to validate against because
+    // genesis may not have been run yet.
+    let workspace = SourceChainWorkspace::raw_empty(
+        space.authored_db.clone(),
+        space.dht_db.clone(),
+        space.dht_query_cache.clone(),
+        space.cache_db.clone(),
+        handle.conductor.keystore().clone(),
+        cell_id.agent_pubkey().clone(),
+        Arc::new(ribosome.dna_def().as_content().clone()),
+    )
+    .await?;
+
+    let sc = workspace.source_chain();
+
+    // Validate the chain.
+    crate::core::validate_chain(
+        records.iter().map(|e| e.signed_action()),
+        &persisted_chain_head.clone().filter(|_| !truncate),
+    )
+    .map_err(|e| SourceChainError::InvalidCommit(e.to_string()))?;
+
+    // Add the records to the source chain so we can validate them.
+    sc.scratch()
+        .apply(|scratch| {
+            for el in records {
+                holochain_state::prelude::insert_record_scratch(scratch, el, Default::default());
+            }
+        })
+        .map_err(SourceChainError::from)?;
+
+    // Run the individual record validations.
+    crate::core::workflow::inline_validation(
+        workspace.clone(),
+        network.clone(),
+        handle.clone(),
+        ribosome,
+    )
+    .await
+    .map_err(Box::new)?;
+
+    Ok(())
 }
 
 /// Specifies a set of existing actions forming a chain, and a set of incoming actions
@@ -51,15 +131,19 @@ impl<A: ChainItem> ChainGraft<A> {
         Self { existing, incoming }
     }
 
-    /// Given a set of incoming records, find the maximal set of existing hashes
-    /// which can be preserved, and the minimal set of incoming records to be committed,
-    /// such that the new source chain will include all of the incoming records, all of
-    /// the existing hashes returned, and none of the records which fall outside of
+    /// Given a set of incoming actions, find the maximal set of existing hashes
+    /// which can be preserved, and the minimal set of incoming actions to be committed,
+    /// such that the new source chain will include all of the incoming actions, all of
+    /// the existing hashes returned, and none of the actions which fall outside of
     /// either group.
     ///
-    /// This has the effect of attempting to "graft" the incoming records onto the existing
+    /// Assumptions:
+    /// - The existing actions form a chain. The existence of a fork means UB.
+    /// - The incoming actions form a chain. The existence of a fork means UB.
+    ///
+    /// This has the effect of attempting to "graft" the incoming actions onto the existing
     /// source chain (which may be a tree), and afterwards removing all other forks.
-    /// If there is no place to graft the incoming records, then the incoming records list entirely
+    /// If there is no place to graft the incoming actions, then the incoming actions list entirely
     /// specifies the new chain.
     ///
     /// If the first incoming record's previous hash matches the last existing hash,
@@ -71,7 +155,7 @@ impl<A: ChainItem> ChainGraft<A> {
     /// If the first incoming record's previous hash matches one of the existing hashes
     /// other than the existing top, then:
     /// - from the first existing hash to match, walk forwards, checking if existing
-    ///   hashes match the incoming records. For each existing record which matches a incoming
+    ///   hashes match the incoming actions. For each existing record which matches a incoming
     ///   record, keep that hash in the existing list and remove it from the incoming list,
     ///   so that it doesn't get committed twice.
     pub fn rebalance(self) -> Self {
@@ -197,8 +281,8 @@ mod tests {
             assert_eq!(case.rebalance(), ChainGraft::new(chain(0..3), chain(3..6)),);
 
             let case = ChainGraft::new(chain(0..6), gap_chain(&[0..3, 6..9]));
-            assert_eq!(case.pivot_and_overlap(), (Some(0), 0));
-            assert_eq!(case.rebalance(), ChainGraft::new(chain(0..3), chain(3..6)),);
+            assert_eq!(case.pivot_and_overlap(), (Some(6), 3));
+            assert_eq!(case.rebalance(), ChainGraft::new(chain(0..3), chain(6..9)),);
         });
     }
 
