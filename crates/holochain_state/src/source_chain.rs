@@ -772,7 +772,7 @@ where
                         ORDER BY Action.seq 
                         ",
                     );
-                    sql.push_str(if query.descending {" DESC"} else {" ASC"});
+                    sql.push_str(if query.order_descending {" DESC"} else {" ASC"});
                     let mut stmt = txn.prepare(&sql)?;
                     let records = stmt
                         .query_and_then(
@@ -2001,7 +2001,7 @@ pub mod tests {
                     entry_type: entry_type.clone(),
                     entry_hashes: entry_hashes.clone(),
                     include_entries,
-                    descending: false,
+                    order_descending: false,
                 };
                 if sequence_range != ChainQueryFilterRange::Unbounded
                     && (action_type.is_some()

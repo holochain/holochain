@@ -79,7 +79,7 @@ pub struct ChainQueryFilter {
     /// Include the entries in the records
     pub include_entries: bool,
     /// The query should be ordered in descending order (default is ascending)
-    pub descending: bool,
+    pub order_descending: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
@@ -211,13 +211,13 @@ impl ChainQueryFilter {
 
     /// Set the order to ascending.
     pub fn ascending(mut self) -> Self {
-        self.descending = false;
+        self.order_descending = false;
         self
     }
 
     /// Set the order to ascending.
     pub fn descending(mut self) -> Self {
-        self.descending = true;
+        self.order_descending = true;
         self
     }
 
