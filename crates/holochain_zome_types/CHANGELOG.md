@@ -4,6 +4,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased](https://github.com/holochain/holochain/holochain_zome_types-v0.0.2-alpha.1...HEAD)
 
+`ChainQueryFilter` has a `descending()` function which will cause the query results to be returned in descending order. This can be reversed by calling `ascending()`. The default order is still ascending. [\#1539](https://github.com/holochain/holochain/pull/1539)
+
 ## 0.0.44
 
 ## 0.0.43
