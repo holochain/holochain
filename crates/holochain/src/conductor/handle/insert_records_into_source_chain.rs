@@ -129,105 +129,111 @@ impl<A: ChainItem> ChainGraft<A> {
 
 #[cfg(test)]
 mod tests {
-    use holochain_types::test_utils::chain::*;
+    use holochain_types::test_utils::chain::{self as tu, TestChainItem};
     use pretty_assertions::assert_eq;
 
     use super::*;
 
     #[test]
     fn test_pivot() {
-        let case = ChainGraft::new(chain(0..3), chain(3..6));
-        assert_eq!(case.pivot_and_overlap(), (Some(0), 0));
-        assert_eq!(
-            case.clone().rebalance().incoming,
-            case.clone().rebalance().rebalance().incoming
-        );
-        assert_eq!(case.rebalance(), ChainGraft::new(chain(0..3), chain(3..6)));
+        isotest::isotest!(TestChainItem => |iso| {
+            let chain = |r| tu::chain(r).into_iter().map(|a| iso.create(a)).collect::<Vec<_>>();
+            let forked_chain = |r| tu::forked_chain(r).into_iter().map(|a| iso.create(a)).collect::<Vec<_>>();
+            let gap_chain = |r| tu::gap_chain(r).into_iter().map(|a| iso.create(a)).collect::<Vec<_>>();
 
-        let case = ChainGraft::new(chain(0..4), chain(3..6));
-        assert_eq!(case.pivot_and_overlap(), (Some(1), 1));
-        assert_eq!(
-            case.clone().rebalance().incoming,
-            case.clone().rebalance().rebalance().incoming
-        );
-        assert_eq!(case.rebalance(), ChainGraft::new(chain(0..4), chain(4..6)));
+            let case = ChainGraft::new(chain(0..3), chain(3..6));
+            assert_eq!(case.pivot_and_overlap(), (Some(0), 0));
+            assert_eq!(
+                case.clone().rebalance().incoming,
+                case.clone().rebalance().rebalance().incoming
+            );
+            assert_eq!(case.rebalance(), ChainGraft::new(chain(0..3), chain(3..6)));
 
-        let case = ChainGraft::new(chain(0..3), chain(1..4));
-        assert_eq!(case.pivot_and_overlap(), (Some(2), 2));
-        assert_eq!(
-            case.clone().rebalance().incoming,
-            case.clone().rebalance().rebalance().incoming
-        );
-        assert_eq!(case.rebalance(), ChainGraft::new(chain(0..3), chain(3..4)));
+            let case = ChainGraft::new(chain(0..4), chain(3..6));
+            assert_eq!(case.pivot_and_overlap(), (Some(1), 1));
+            assert_eq!(
+                case.clone().rebalance().incoming,
+                case.clone().rebalance().rebalance().incoming
+            );
+            assert_eq!(case.rebalance(), ChainGraft::new(chain(0..4), chain(4..6)));
 
-        let case = ChainGraft::new(chain(0..3), chain(0..4));
-        assert_eq!(case.pivot_and_overlap(), (Some(3), 3));
-        assert_eq!(
-            case.clone().rebalance().incoming,
-            case.clone().rebalance().rebalance().incoming
-        );
-        assert_eq!(case.rebalance(), ChainGraft::new(chain(0..3), chain(3..4)));
+            let case = ChainGraft::new(chain(0..3), chain(1..4));
+            assert_eq!(case.pivot_and_overlap(), (Some(2), 2));
+            assert_eq!(
+                case.clone().rebalance().incoming,
+                case.clone().rebalance().rebalance().incoming
+            );
+            assert_eq!(case.rebalance(), ChainGraft::new(chain(0..3), chain(3..4)));
 
-        let case = ChainGraft::new(chain(0..5), chain(0..3));
-        assert_eq!(case.pivot_and_overlap(), (Some(5), 3));
-        assert_eq!(
-            case.clone().rebalance().incoming,
-            case.clone().rebalance().rebalance().incoming
-        );
-        assert_eq!(case.rebalance(), ChainGraft::new(chain(0..3), vec![]));
+            let case = ChainGraft::new(chain(0..3), chain(0..4));
+            assert_eq!(case.pivot_and_overlap(), (Some(3), 3));
+            assert_eq!(
+                case.clone().rebalance().incoming,
+                case.clone().rebalance().rebalance().incoming
+            );
+            assert_eq!(case.rebalance(), ChainGraft::new(chain(0..3), chain(3..4)));
 
-        let case = ChainGraft::new(chain(0..2), chain(3..6));
-        assert_eq!(case.pivot_and_overlap(), (None, 0));
-        assert_eq!(
-            case.clone().rebalance().incoming,
-            case.clone().rebalance().rebalance().incoming
-        );
-        assert_eq!(case.rebalance(), ChainGraft::new(vec![], chain(3..6)));
+            let case = ChainGraft::new(chain(0..5), chain(0..3));
+            assert_eq!(case.pivot_and_overlap(), (Some(5), 3));
+            assert_eq!(
+                case.clone().rebalance().incoming,
+                case.clone().rebalance().rebalance().incoming
+            );
+            assert_eq!(case.rebalance(), ChainGraft::new(chain(0..3), vec![]));
 
-        let case = ChainGraft::new(chain(0..2), vec![]);
-        assert_eq!(case.pivot_and_overlap(), (None, 0));
-        assert_eq!(
-            case.clone().rebalance().incoming,
-            case.clone().rebalance().rebalance().incoming
-        );
-        assert_eq!(case.rebalance(), ChainGraft::new(vec![], vec![]));
+            let case = ChainGraft::new(chain(0..2), chain(3..6));
+            assert_eq!(case.pivot_and_overlap(), (None, 0));
+            assert_eq!(
+                case.clone().rebalance().incoming,
+                case.clone().rebalance().rebalance().incoming
+            );
+            assert_eq!(case.rebalance(), ChainGraft::new(vec![], chain(3..6)));
 
-        let case = ChainGraft::new(vec![], chain(0..5));
-        assert_eq!(case.pivot_and_overlap(), (Some(0), 0));
-        assert_eq!(
-            case.clone().rebalance().incoming,
-            case.clone().rebalance().rebalance().incoming
-        );
-        assert_eq!(case.rebalance(), ChainGraft::new(vec![], chain(0..5)));
+            let case = ChainGraft::new(chain(0..2), vec![]);
+            assert_eq!(case.pivot_and_overlap(), (None, 0));
+            assert_eq!(
+                case.clone().rebalance().incoming,
+                case.clone().rebalance().rebalance().incoming
+            );
+            assert_eq!(case.rebalance(), ChainGraft::new(vec![], vec![]));
 
-        let case = ChainGraft::new(chain(0..3), forked_chain(&[0..0, 3..6]));
-        assert_eq!(case.pivot_and_overlap(), (Some(0), 0));
-        assert_eq!(
-            case.clone().rebalance().incoming,
-            case.clone().rebalance().rebalance().incoming
-        );
-        assert_eq!(
-            case.rebalance(),
-            ChainGraft::new(chain(0..3), forked_chain(&[0..0, 3..6])),
-        );
+            let case = ChainGraft::new(vec![], chain(0..5));
+            assert_eq!(case.pivot_and_overlap(), (Some(0), 0));
+            assert_eq!(
+                case.clone().rebalance().incoming,
+                case.clone().rebalance().rebalance().incoming
+            );
+            assert_eq!(case.rebalance(), ChainGraft::new(vec![], chain(0..5)));
 
-        let case = ChainGraft::new(chain(0..3), forked_chain(&[0..0, 4..6]));
-        assert_eq!(case.pivot_and_overlap(), (None, 0));
-        assert_eq!(
-            case.clone().rebalance().incoming,
-            case.clone().rebalance().rebalance().incoming
-        );
-        assert_eq!(
-            case.rebalance(),
-            ChainGraft::new(vec![], forked_chain(&[0..0, 4..6])),
-        );
+            let case = ChainGraft::new(chain(0..3), forked_chain(&[0..0, 3..6]));
+            assert_eq!(case.pivot_and_overlap(), (Some(0), 0));
+            assert_eq!(
+                case.clone().rebalance().incoming,
+                case.clone().rebalance().rebalance().incoming
+            );
+            assert_eq!(
+                case.rebalance(),
+                ChainGraft::new(chain(0..3), forked_chain(&[0..0, 3..6])),
+            );
 
-        let case = ChainGraft::new(forked_chain(&[0..3, 3..6]), chain(2..6));
-        assert_eq!(case.pivot_and_overlap(), (Some(4), 1));
-        assert_eq!(
-            case.clone().rebalance().incoming,
-            case.clone().rebalance().rebalance().incoming
-        );
-        assert_eq!(case.rebalance(), ChainGraft::new(chain(0..3), chain(3..6)),);
+            let case = ChainGraft::new(chain(0..3), forked_chain(&[0..0, 4..6]));
+            assert_eq!(case.pivot_and_overlap(), (None, 0));
+            assert_eq!(
+                case.clone().rebalance().incoming,
+                case.clone().rebalance().rebalance().incoming
+            );
+            assert_eq!(
+                case.rebalance(),
+                ChainGraft::new(vec![], forked_chain(&[0..0, 4..6])),
+            );
+
+            let case = ChainGraft::new(forked_chain(&[0..3, 3..6]), chain(2..6));
+            assert_eq!(case.pivot_and_overlap(), (Some(4), 1));
+            assert_eq!(
+                case.clone().rebalance().incoming,
+                case.clone().rebalance().rebalance().incoming
+            );
+            assert_eq!(case.rebalance(), ChainGraft::new(chain(0..3), chain(3..6)),);
+        });
     }
 }
