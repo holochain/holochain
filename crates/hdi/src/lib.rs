@@ -56,8 +56,12 @@
 //! same information as `OpType`, but the former has a flatter data structure, whereas the latter has
 //! a deeply nested structure.
 //!
-#![cfg_attr(not(feature = "test_utils"), doc = "//!```no_run")]
-#![cfg_attr(feature = "test_utils", doc = "//!```")]
+//! ```
+//! # #[cfg(not(feature = "test_utils"))]
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! # Ok(())
+//! # }
+//! # #[cfg(feature = "test_utils")]
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! # use hdi::prelude::*;
 //! # #[hdk_entry_helper]
@@ -99,7 +103,7 @@
 //! # );
 //! # #[cfg(feature = "test_utils")]
 //! # hdi::test_utils::set_zome_types(&[(0, 2)], &[(0, 2)]);
-//! # let result: Result<hdi::prelude::ValidateCallbackResult, Box<dyn std::error::Error>> = 
+//! # let result: Result<hdi::prelude::ValidateCallbackResult, Box<dyn std::error::Error>> =
 //! match op.to_type()? {
 //!     OpType::StoreEntry(OpEntry::CreateEntry { entry_type, .. }) => match entry_type {
 //!         EntryTypes::A(_) => Ok(ValidateCallbackResult::Valid),
