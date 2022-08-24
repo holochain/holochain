@@ -94,6 +94,7 @@ impl WireMessage {
     }
 
     /// For an outgoing remote call.
+    #[allow(clippy::too_many_arguments)]
     pub fn call_remote(
         zome_name: ZomeName,
         fn_name: FunctionName,
@@ -118,6 +119,7 @@ impl WireMessage {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn call_remote_multi(
         zome_name: ZomeName,
         fn_name: FunctionName,

@@ -803,6 +803,7 @@ impl Cell {
     }
 
     #[instrument(skip(self, from_agent, fn_name, cap_secret, payload))]
+    #[allow(clippy::too_many_arguments)]
     /// a remote agent is attempting a "call_remote" on this cell.
     async fn handle_call_remote(
         &self,

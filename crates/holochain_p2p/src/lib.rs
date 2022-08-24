@@ -22,6 +22,7 @@ pub use test::HolochainP2pDnaFixturator;
 pub use kitsune_p2p;
 
 #[mockall::automock]
+#[allow(clippy::too_many_arguments)]
 #[async_trait::async_trait]
 /// A wrapper around HolochainP2pSender that partially applies the dna_hash / agent_pub_key.
 /// I.e. a sender that is tied to a specific cell.
