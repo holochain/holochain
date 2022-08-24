@@ -30,7 +30,7 @@ impl ZomeCallUnsigned {
     /// Prepare the canonical bytes for an unsigned zome call so that it is
     /// always signed and verified in the same way.
     pub fn data_to_sign(&self) -> Result<Arc<[u8]>, SerializedBytesError> {
-        Ok(holochain_serialized_bytes::encode(&self)?.into())
+        Ok(holo_hash::encode::blake2b_256(&holochain_serialized_bytes::encode(&self)?).into())
     }
 
     /// Sign the unsigned zome call in a canonical way to produce a signature.
