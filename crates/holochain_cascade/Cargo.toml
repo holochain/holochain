@@ -1,6 +1,6 @@
 [package]
 name = "holochain_cascade"
-version = "0.0.56-dev.0"
+version = "0.0.56"
 description = "Logic for cascading updates to Holochain state and network interaction"
 license-file = "LICENSE_CAL-1.0"
 homepage = "https://github.com/holochain/holochain"
@@ -21,7 +21,7 @@ holo_hash = { version = "0.0.31", path = "../holo_hash", features = ["full"] }
 holochain_sqlite = { version = "0.0.50", path = "../holochain_sqlite" }
 holochain_p2p = { version = "0.0.52", path = "../holochain_p2p" }
 holochain_serialized_bytes = "=0.0.51"
-holochain_state = { version = "0.0.55-dev.0", path = "../holochain_state" }
+holochain_state = { version = "0.0.55", path = "../holochain_state" }
 holochain_types = { version = "0.0.52", path = "../holochain_types" }
 holochain_zome_types = { version = "0.0.44", path = "../holochain_zome_types" }
 observability = "0.1.3"
