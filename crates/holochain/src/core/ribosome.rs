@@ -377,9 +377,9 @@ impl ZomeCallInvocation {
     }
 
     /// to verify if the zome call is authorized:
-    /// - the grant must be valid
     /// - the signature must be valid
     /// - the nonce must not have already been seen
+    /// - the grant must be valid
     /// the checks MUST be done in this order as witnessing the nonce is a write
     /// and so we MUST NOT write nonces until after we verify the signature.
     #[allow(clippy::extra_unused_lifetimes)]
@@ -387,19 +387,13 @@ impl ZomeCallInvocation {
         &self,
         host_access: &ZomeCallHostAccess,
     ) -> RibosomeResult<ZomeCallAuthorization> {
-        Ok(match self
-            .verify_grant(host_access)
-            .await? {
-                ZomeCallAuthorization::Authorized => {
-                    match self.verify_signature().await? {
-                        ZomeCallAuthorization::Authorized => {
-                            self.verify_nonce(host_access).await?
-                        },
-                        unauthorized => unauthorized,
-                    }
-                },
+        Ok(match self.verify_signature().await? {
+            ZomeCallAuthorization::Authorized => match self.verify_nonce(host_access).await? {
+                ZomeCallAuthorization::Authorized => self.verify_grant(host_access).await?,
                 unauthorized => unauthorized,
-            })
+            },
+            unauthorized => unauthorized,
+        })
     }
 }
 
@@ -688,6 +682,7 @@ pub fn weigh_placeholder() -> EntryRateWeight {
 #[cfg(test)]
 pub mod wasm_test {
     use crate::core::ribosome::FnComponents;
+    use crate::core::ribosome::ZomeCall;
     use crate::sweettest::SweetAgents;
     use crate::sweettest::SweetCell;
     use crate::sweettest::SweetConductor;
@@ -695,13 +690,12 @@ pub mod wasm_test {
     use crate::sweettest::SweetZome;
     use crate::test_utils::host_fn_caller::HostFnCaller;
     use core::time::Duration;
+    use hdk::prelude::*;
     use holo_hash::AgentPubKey;
     use holochain_keystore::AgentPubKeyExt;
     use holochain_state::nonce::fresh_nonce;
-    use holochain_wasm_test_utils::TestWasm;
     use holochain_types::zome_call::ZomeCallUnsigned;
-    use hdk::prelude::*;
-    use crate::core::ribosome::ZomeCall;
+    use holochain_wasm_test_utils::TestWasm;
 
     pub fn now() -> Duration {
         std::time::SystemTime::now()
@@ -732,26 +726,41 @@ pub mod wasm_test {
             nonce,
             expires_at,
         };
-        let alice_signed_zome_call = ZomeCall::try_from_unsigned_zome_call(&conductor.keystore(), alice_unsigned_zome_call.clone()).await.unwrap();
+        let alice_signed_zome_call = ZomeCall::try_from_unsigned_zome_call(
+            &conductor.keystore(),
+            alice_unsigned_zome_call.clone(),
+        )
+        .await
+        .unwrap();
 
         // Bob observes or forges a valid zome call from alice.
         // He removes Alice's signature but leaves her provenance and adds his own signature.
         let mut bob_signed_zome_call = alice_signed_zome_call.clone();
-        bob_signed_zome_call.signature = bob_pubkey.sign_raw(&conductor.keystore(), alice_unsigned_zome_call.data_to_sign().unwrap()).await.unwrap();
+        bob_signed_zome_call.signature = bob_pubkey
+            .sign_raw(
+                &conductor.keystore(),
+                alice_unsigned_zome_call.data_to_sign().unwrap(),
+            )
+            .await
+            .unwrap();
 
         // The call should fail for bob.
         let bob_call_result = conductor.handle().call_zome(bob_signed_zome_call).await;
 
         match bob_call_result {
-            Ok(Ok(ZomeCallResponse::Unauthorized(_, _, _, _, _))) => { /* (☞ ͡° ͜ʖ ͡°)☞ */ },
+            Ok(Ok(ZomeCallResponse::Unauthorized(_, _, _, _, _))) => { /* (☞ ͡° ͜ʖ ͡°)☞ */
+            }
             _ => panic!("{:?}", bob_call_result),
         }
 
         // The call should NOT fail for alice (e.g. bob's forgery should not consume alice's nonce).
-        let alice_call_result_0 = conductor.handle().call_zome(alice_signed_zome_call.clone()).await;
+        let alice_call_result_0 = conductor
+            .handle()
+            .call_zome(alice_signed_zome_call.clone())
+            .await;
 
         match alice_call_result_0 {
-            Ok(Ok(ZomeCallResponse::Ok(_))) => { /* ಥ‿ಥ */ },
+            Ok(Ok(ZomeCallResponse::Ok(_))) => { /* ಥ‿ಥ */ }
             _ => panic!("{:?}", alice_call_result_0),
         }
 
@@ -759,7 +768,7 @@ pub mod wasm_test {
         let alice_call_result_1 = conductor.handle().call_zome(alice_signed_zome_call).await;
 
         match alice_call_result_1 {
-            Ok(Ok(ZomeCallResponse::Unauthorized(_, _, _, _, _))) => { /* ☜(ﾟヮﾟ☜) */ },
+            Ok(Ok(ZomeCallResponse::Unauthorized(_, _, _, _, _))) => { /* ☜(ﾟヮﾟ☜) */ }
             _ => panic!("{:?}", bob_call_result),
         }
     }
