@@ -188,6 +188,12 @@ pub enum ZomeCallAuthorization {
     BadNonce(String),
 }
 
+impl std::fmt::Display for ZomeCallAuthorization {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
 impl ZomeCallAuthorization {
     pub fn and(self, other: ZomeCallAuthorization) -> ZomeCallAuthorization {
         if self != ZomeCallAuthorization::Authorized {
