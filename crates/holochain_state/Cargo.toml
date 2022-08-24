@@ -1,6 +1,6 @@
 [package]
 name = "holochain_state"
-version = "0.0.54"
+version = "0.0.55-dev.0"
 description = "TODO minimize deps"
 license-file = "LICENSE_CAL-1.0"
 homepage = "https://github.com/holochain/holochain"
