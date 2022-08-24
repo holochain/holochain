@@ -485,7 +485,7 @@ impl RealRibosome {
     }
 
     pub fn cranelift() -> Cranelift {
-        let cost_function = |_operator: &WasmOperator| -> u64 { 1 };
+        let cost_function = |_operator: &WasmOperator| -> u64 { 0 };
         // @todo 10 giga-ops is totally arbitrary cutoff so we probably
         // want to make the limit configurable somehow.
         let metering = Arc::new(Metering::new(WASM_METERING_LIMIT, cost_function));
@@ -1007,6 +1007,7 @@ pub mod wasm_test {
         }
     }
 
+    #[ignore = "turn this back on when we set the cost_function to return non-0"]
     #[tokio::test(flavor = "multi_thread")]
     async fn the_incredible_halt_test() {
         observability::test_run().ok();

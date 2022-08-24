@@ -6,6 +6,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20220824.014353
+
+## [holochain\_cli-0.0.53](crates/holochain_cli/CHANGELOG.md#0.0.53)
+
+## [holochain\_cli\_sandbox-0.0.49](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.49)
+
+## [holochain-0.0.157](crates/holochain/CHANGELOG.md#0.0.157)
+
+## [holochain\_conductor\_api-0.0.55](crates/holochain_conductor_api/CHANGELOG.md#0.0.55)
+
+## [holochain\_cascade-0.0.56](crates/holochain_cascade/CHANGELOG.md#0.0.56)
+
+## [holochain\_state-0.0.55](crates/holochain_state/CHANGELOG.md#0.0.55)
+
+# 20220823.103320
+
+## [holochain-0.0.156](crates/holochain/CHANGELOG.md#0.0.156)
+
+- Effectively disable Wasm metering by setting the cranelift cost\_function to always return 0. This is meant as a temporary stop-gap and give us time to figure out a configurable approach. [\#1535](https://github.com/holochain/holochain/pull/1535)
+
 # 20220820.111904
 
 ## [holochain\_cli-0.0.52](crates/holochain_cli/CHANGELOG.md#0.0.52)
