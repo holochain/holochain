@@ -1324,8 +1324,7 @@ impl ConductorHandleT for ConductorHandleImpl {
                 let author = Arc::new(cell_id.agent_pubkey().clone());
                 move |txn| holochain_state::prelude::chain_head_db(&txn, author)
             })
-            .await
-            .ok()
+            .await?
             .map(|c| (c.0, c.1));
 
         let network = self
@@ -1412,15 +1411,14 @@ impl ConductorHandleT for ConductorHandleImpl {
                             [cell_id.agent_pubkey()],
                         )
                         .map_err(StateMutationError::from)?;
-                    } else if let Some((hash, _)) = persisted_chain_head {
+                    } else {
                         // If we have a persisted chain head, check if it has moved.
                         let latest_chain_head = holochain_state::prelude::chain_head_db(
                             txn,
                             Arc::new(cell_id.agent_pubkey().clone()),
-                        )?
-                        .0;
+                        )?.map(|(hash, seq, _)| (hash, seq));
 
-                        if hash != latest_chain_head {
+                        if persisted_chain_head != latest_chain_head {
                             return Err(SourceChainError::HeadMoved(
                                 Vec::with_capacity(0),
                                 Vec::with_capacity(0),
