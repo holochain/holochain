@@ -1,29 +1,32 @@
 #![allow(missing_docs)]
 #![allow(dead_code)]
 
+use holochain_state::source_chain::SourceChain;
 use holochain_types::prelude::ChainItem;
 
 use super::*;
 
 /// Specify the method to use when inserting records into the source chain
-pub enum InsertRecordsMethod {
-    /// Simply add the new records
-    AppendOnly,
+pub enum InsertionMethod {
+    /// Simply add the new records on top of the existing ones
+    Append,
     /// Remove all existing records before adding the new ones
-    Truncate,
+    Reset,
     /// Find which existing records can remain which still constitute a valid
     /// chain after the new records are inserted, keeping those and discarding
     /// the rest.
     Graft,
 }
 
-pub(crate) async fn insert_records_into_source_chain(
+pub type ChainHead = Option<(ActionHash, u32)>;
+
+pub(crate) async fn graft_records_onto_source_chain(
     handle: Arc<ConductorHandleImpl>,
     cell_id: CellId,
-    method: InsertRecordsMethod,
+    method: InsertionMethod,
     validate: bool,
     records: Vec<Record>,
-) -> SourceChainResult<()> {
+) -> ConductorResult<()> {
     // Get or create the space for this cell.
     // Note: This doesn't require the cell be installed.
     let space = handle.conductor.get_or_create_space(cell_id.dna_hash())?;
@@ -33,29 +36,111 @@ pub(crate) async fn insert_records_into_source_chain(
         .holochain_p2p()
         .to_dna(cell_id.dna_hash().clone());
 
-    let source_chain = space
+    let source_chain: SourceChain = space
         .source_chain(handle.keystore().clone(), cell_id.agent_pubkey().clone())
         .await?;
 
-    let existing_actions: Vec<SignedActionHashed> = source_chain
-        .query(ChainQueryFilter::new())
+    let existing = source_chain
+        .query(ChainQueryFilter::new().descending())
         .await?
         .into_iter()
         .map(|r| r.signed_action)
-        .collect();
+        .collect::<Vec<SignedActionHashed>>();
+
+    let graft = ChainGraft::new(existing, records).rebalance();
+    let chain_top = graft.existing_chain_top();
 
     if validate {
-        validate_records(handle.clone(), &cell_id, records.clone()).await?;
+        validate_records(handle.clone(), &cell_id, chain_top, graft.incoming()).await?;
     }
 
-    todo!()
+    // Produce the op lights for each record.
+    let data = records
+        .into_iter()
+        .map(|el| {
+            let ops = produce_op_lights_from_records(vec![&el])?;
+            // Check have the same author as cell.
+            let (shh, entry) = el.into_inner();
+            if shh.action().author() != cell_id.agent_pubkey() {
+                return Err(StateMutationError::AuthorsMustMatch);
+            }
+            Ok((shh, ops, entry.into_option()))
+        })
+        .collect::<StateMutationResult<Vec<_>>>()?;
+
+    // Commit the records to the source chain.
+    let ops_to_integrate = space
+        .authored_db
+        .async_commit({
+            let cell_id = cell_id.clone();
+            move |txn| {
+                // If we have a persisted chain head, check if it has moved.
+                let (hash, seq, _) = holochain_state::prelude::chain_head_db(
+                    txn,
+                    Arc::new(cell_id.agent_pubkey().clone()),
+                )?;
+
+                if chain_top != Some((hash, seq)) {
+                    return Err(SourceChainError::HeadMoved(
+                        Vec::with_capacity(0),
+                        Vec::with_capacity(0),
+                        None,
+                        None,
+                    ));
+                }
+
+                // Remove records above the grafting position.
+                txn.execute(
+                    "DELETE FROM Action WHERE author = ? AND action_seq > ?",
+                    [cell_id.agent_pubkey(), chain_top.1],
+                )
+                .map_err(StateMutationError::from)?;
+
+                let mut ops_to_integrate = Vec::new();
+
+                // Commit the records and ops to the authored db.
+                for (shh, ops, entry) in data {
+                    // Clippy is wrong :(
+                    #[allow(clippy::needless_collect)]
+                    let basis = ops
+                        .iter()
+                        .map(|op| op.dht_basis().clone())
+                        .collect::<Vec<_>>();
+                    ops_to_integrate.extend(
+                        source_chain::put_raw(txn, shh, ops, entry)?
+                            .into_iter()
+                            .zip(basis.into_iter()),
+                    );
+                }
+                SourceChainResult::Ok(ops_to_integrate)
+            }
+        })
+        .await?;
+
+    // Check which ops need to be integrated.
+    // Only integrated if a cell is installed.
+    if handle
+        .list_cell_ids(Some(CellStatus::Joined))
+        .contains(&cell_id)
+    {
+        holochain_state::integrate::authored_ops_to_dht_db(
+            &network,
+            ops_to_integrate,
+            &space.authored_db,
+            &space.dht_db,
+            &space.dht_query_cache,
+        )
+        .await?;
+    }
+    Ok(())
 }
 
 async fn validate_records(
     handle: Arc<ConductorHandleImpl>,
     cell_id: &CellId,
-    records: Vec<Record>,
-) -> SourceChainResult<()> {
+    chain_top: Option<(ActionHash, u32)>,
+    records: &[Record],
+) -> ConductorResult<()> {
     let space = handle.conductor.get_or_create_space(cell_id.dna_hash())?;
     let ribosome = handle.get_ribosome(cell_id.dna_hash())?;
     let network = handle
@@ -79,17 +164,18 @@ async fn validate_records(
     let sc = workspace.source_chain();
 
     // Validate the chain.
-    crate::core::validate_chain(
-        records.iter().map(|e| e.signed_action()),
-        &persisted_chain_head.clone().filter(|_| !truncate),
-    )
-    .map_err(|e| SourceChainError::InvalidCommit(e.to_string()))?;
+    crate::core::validate_chain(records.iter().map(|e| e.signed_action()), &chain_top)
+        .map_err(|e| SourceChainError::InvalidCommit(e.to_string()))?;
 
     // Add the records to the source chain so we can validate them.
     sc.scratch()
         .apply(|scratch| {
-            for el in records {
-                holochain_state::prelude::insert_record_scratch(scratch, el, Default::default());
+            for r in records {
+                holochain_state::prelude::insert_record_scratch(
+                    scratch,
+                    r.clone(),
+                    Default::default(),
+                );
             }
         })
         .map_err(SourceChainError::from)?;
@@ -101,8 +187,7 @@ async fn validate_records(
         handle.clone(),
         ribosome,
     )
-    .await
-    .map_err(Box::new)?;
+    .await?;
 
     Ok(())
 }
@@ -112,9 +197,9 @@ async fn validate_records(
 /// The existing actions are guaranteed to be ordered in descending sequence order,
 /// and the incoming actions are guaranteed to be ordered in increasing sequence order.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ChainGraft<A> {
+pub struct ChainGraft<A, B> {
     existing: Vec<A>,
-    incoming: Vec<A>,
+    incoming: Vec<B>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -124,11 +209,17 @@ enum Pivot {
     Index(usize),
 }
 
-impl<A: ChainItem> ChainGraft<A> {
-    pub fn new(mut existing: Vec<A>, mut incoming: Vec<A>) -> Self {
+impl<A: ChainItem, B: Clone + AsRef<A>> ChainGraft<A, B> {
+    pub fn new(mut existing: Vec<A>, mut incoming: Vec<B>) -> Self {
         existing.sort_unstable_by_key(|r| u32::MAX - r.seq());
-        incoming.sort_unstable_by_key(|r| r.seq());
+        incoming.sort_unstable_by_key(|r| r.as_ref().seq());
         Self { existing, incoming }
+    }
+
+    pub fn existing_chain_top(&self) -> Option<(A::Hash, u32)> {
+        self.existing
+            .first()
+            .map(|a| (a.get_hash().clone(), a.seq()))
     }
 
     /// Given a set of incoming actions, find the maximal set of existing hashes
@@ -175,7 +266,7 @@ impl<A: ChainItem> ChainGraft<A> {
 
     fn pivot(&self) -> Pivot {
         if let Some(first) = self.incoming.first() {
-            if first.prev_hash().is_none() {
+            if first.as_ref().prev_hash().is_none() {
                 // If the first incoming item is a root item, return a special "pivot" beyond
                 // the last existing item (the existing root). This works out mathematically.
                 Pivot::NewRoot
@@ -183,7 +274,8 @@ impl<A: ChainItem> ChainGraft<A> {
                 self.existing
                     .iter()
                     .position(|e| {
-                        Some(e.get_hash()) == first.prev_hash() && e.seq() + 1 == first.seq()
+                        Some(e.get_hash()) == first.as_ref().prev_hash()
+                            && e.seq() + 1 == first.as_ref().seq()
                     })
                     .map(Pivot::Index)
                     .unwrap_or(Pivot::None)
@@ -205,15 +297,23 @@ impl<A: ChainItem> ChainGraft<A> {
             .take(take)
             .rev()
             .zip(self.incoming.iter())
-            .position(|(e, n)| e != n)
+            .position(|(e, n)| e != n.as_ref())
             .unwrap_or_else(|| take.min(self.incoming.len()));
         (Some(take), overlap)
+    }
+
+    pub fn existing(&self) -> &[A] {
+        self.existing.as_ref()
+    }
+
+    pub fn incoming(&self) -> &[B] {
+        self.incoming.as_ref()
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use holochain_types::test_utils::chain::{self as tu, TestChainItem};
+    use holochain_types::test_utils::chain::{self as tu, TestChainHash, TestChainItem};
     use pretty_assertions::assert_eq;
     use test_case::test_case;
 
@@ -221,18 +321,22 @@ mod tests {
 
     #[test]
     fn test_pivot_and_rebalance() {
-        isotest::isotest!(TestChainItem => |iso| {
-            let chain = |r| tu::chain(r).into_iter().map(|a| iso.create(a)).collect::<Vec<_>>();
-            let forked_chain = |r| tu::forked_chain(r).into_iter().map(|a| iso.create(a)).collect::<Vec<_>>();
-            let gap_chain = |r| tu::gap_chain(r).into_iter().map(|a| iso.create(a)).collect::<Vec<_>>();
+        isotest::isotest!(TestChainItem, TestChainHash => |iso_a, iso_h| {
+            let chain = |r| tu::chain(r).into_iter().map(|a| iso_a.create(a)).collect::<Vec<_>>();
+            let forked_chain = |r| tu::forked_chain(r).into_iter().map(|a| iso_a.create(a)).collect::<Vec<_>>();
+            let gap_chain = |r| tu::gap_chain(r).into_iter().map(|a| iso_a.create(a)).collect::<Vec<_>>();
+            let empty = || Vec::<TestChainItem>::new().into_iter().map(|a| iso_a.create(a)).collect::<Vec<_>>();
+            let top = |h| (iso_h.create(TestChainHash(h)), h);
 
             let case = ChainGraft::new(chain(0..3), chain(3..6));
             assert_eq!(case.pivot_and_overlap(), (Some(0), 0));
-            assert_eq!(case.rebalance(), ChainGraft::new(chain(0..3), chain(3..6)));
+            assert_eq!(case.clone().rebalance(), ChainGraft::new(chain(0..3), chain(3..6)));
+            assert_eq!(case.rebalance().existing_chain_top(), Some(top(2)));
 
             let case = ChainGraft::new(chain(0..4), chain(3..6));
             assert_eq!(case.pivot_and_overlap(), (Some(1), 1));
-            assert_eq!(case.rebalance(), ChainGraft::new(chain(0..4), chain(4..6)));
+            assert_eq!(case.clone().rebalance(), ChainGraft::new(chain(0..4), chain(4..6)));
+            assert_eq!(case.rebalance().existing_chain_top(), Some(top(3)));
 
             let case = ChainGraft::new(chain(0..3), chain(1..4));
             assert_eq!(case.pivot_and_overlap(), (Some(2), 2));
@@ -244,19 +348,19 @@ mod tests {
 
             let case = ChainGraft::new(chain(0..5), chain(0..3));
             assert_eq!(case.pivot_and_overlap(), (Some(5), 3));
-            assert_eq!(case.rebalance(), ChainGraft::new(chain(0..3), vec![]));
+            assert_eq!(case.rebalance(), ChainGraft::new(chain(0..3), empty()));
 
             let case = ChainGraft::new(chain(0..2), chain(3..6));
             assert_eq!(case.pivot_and_overlap(), (None, 0));
-            assert_eq!(case.rebalance(), ChainGraft::new(vec![], chain(3..6)));
+            assert_eq!(case.rebalance(), ChainGraft::new(empty(), chain(3..6)));
 
-            let case = ChainGraft::new(chain(0..2), vec![]);
+            let case = ChainGraft::new(chain(0..2), empty());
             assert_eq!(case.pivot_and_overlap(), (None, 0));
-            assert_eq!(case.rebalance(), ChainGraft::new(vec![], vec![]));
+            assert_eq!(case.rebalance(), ChainGraft::new(empty(), empty()));
 
-            let case = ChainGraft::new(vec![], chain(0..5));
+            let case = ChainGraft::new(empty(), chain(0..5));
             assert_eq!(case.pivot_and_overlap(), (Some(0), 0));
-            assert_eq!(case.rebalance(), ChainGraft::new(vec![], chain(0..5)));
+            assert_eq!(case.rebalance(), ChainGraft::new(empty(), chain(0..5)));
 
             let case = ChainGraft::new(chain(0..3), forked_chain(&[0..0, 3..6]));
             assert_eq!(case.pivot_and_overlap(), (Some(0), 0));
@@ -269,7 +373,7 @@ mod tests {
             assert_eq!(case.pivot_and_overlap(), (None, 0));
             assert_eq!(
                 case.rebalance(),
-                ChainGraft::new(vec![], forked_chain(&[0..0, 4..6])),
+                ChainGraft::new(empty(), forked_chain(&[0..0, 4..6])),
             );
 
             let case = ChainGraft::new(forked_chain(&[0..3, 3..6]), chain(2..6));
@@ -299,7 +403,7 @@ mod tests {
     #[test_case(ChainGraft::new(tu::forked_chain(&[0..3, 3..6]), tu::chain(2..6)))]
     #[test_case(ChainGraft::new(tu::gap_chain(&[0..3, 6..9]), tu::chain(3..6)))]
     #[test_case(ChainGraft::new(tu::chain(0..6), tu::gap_chain(&[0..3, 6..9])))]
-    fn test_incoming_idempotence(case: ChainGraft<TestChainItem>) {
+    fn test_incoming_idempotence(case: ChainGraft<TestChainItem, TestChainItem>) {
         pretty_assertions::assert_eq!(
             case.clone().rebalance().incoming,
             case.clone().rebalance().rebalance().incoming

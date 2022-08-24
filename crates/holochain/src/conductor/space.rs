@@ -30,7 +30,7 @@ use holochain_sqlite::{
 use holochain_state::{
     prelude::{from_blob, StateQueryResult},
     query::{map_sql_dht_op_common, StateQueryError},
-    source_chain::SourceChain,
+    source_chain::{SourceChain, SourceChainResult},
 };
 use holochain_types::{
     db_cache::DhtDbQueryCache,
@@ -642,6 +642,7 @@ impl Space {
         Ok(r)
     }
 
+    /// Construct a SourceChain for an author in this Space
     pub async fn source_chain(
         &self,
         keystore: MetaLairClient,

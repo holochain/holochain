@@ -26,6 +26,12 @@ pub struct Record<A = SignedActionHashed> {
     pub entry: RecordEntry,
 }
 
+impl<A> AsRef<A> for Record<A> {
+    fn as_ref(&self) -> &A {
+        &self.signed_action
+    }
+}
+
 /// Represents the different ways the entry_address reference within an action
 /// can be intepreted
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
@@ -46,6 +52,12 @@ pub enum RecordEntry {
 
 /// The hashed action and the signature that signed it
 pub type SignedActionHashed = SignedHashed<Action>;
+
+impl AsRef<SignedActionHashed> for SignedActionHashed {
+    fn as_ref(&self) -> &SignedActionHashed {
+        self
+    }
+}
 
 #[derive(Clone, Debug, Eq, Serialize, Deserialize)]
 /// Any content that has been hashed and signed.
