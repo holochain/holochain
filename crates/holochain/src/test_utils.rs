@@ -28,7 +28,7 @@ use holochain_p2p::HolochainP2pRef;
 use holochain_p2p::HolochainP2pSender;
 use holochain_serialized_bytes::SerializedBytesError;
 use holochain_sqlite::prelude::DatabaseResult;
-use holochain_state::nonce::FRESH_NONCE_EXPIRES_AFTER;
+use holochain_state::nonce::fresh_nonce;
 use holochain_state::prelude::from_blob;
 use holochain_state::prelude::test_db_dir;
 use holochain_state::prelude::SourceChainResult;
@@ -757,6 +757,7 @@ pub fn new_zome_call_unsigned<P, Z: Into<ZomeName>>(
 where
     P: serde::Serialize + std::fmt::Debug,
 {
+    let (nonce, expires_at) = fresh_nonce(Timestamp::now()).unwrap();
     Ok(ZomeCallUnsigned {
         cell_id: cell_id.clone(),
         zome_name: zome.into(),
@@ -764,9 +765,8 @@ where
         fn_name: func.into(),
         payload: ExternIO::encode(payload)?,
         provenance: cell_id.agent_pubkey().clone(),
-        // This will produce duplicate nonces, the caller MUST handle that.
-        nonce: I64Fixturator::new(Predictable).next().unwrap(),
-        expires_at: (Timestamp::now() + FRESH_NONCE_EXPIRES_AFTER).unwrap(),
+        nonce,
+        expires_at,
     })
 }
 
