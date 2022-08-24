@@ -195,12 +195,8 @@ impl std::fmt::Display for ZomeCallAuthorization {
 }
 
 impl ZomeCallAuthorization {
-    pub fn and(self, other: ZomeCallAuthorization) -> ZomeCallAuthorization {
-        if self != ZomeCallAuthorization::Authorized {
-            self
-        } else {
-            other
-        }
+    pub fn is_authorized(&self) -> bool {
+        matches!(self, ZomeCallAuthorization::Authorized)
     }
 }
 

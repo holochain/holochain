@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 /// Zome calls need to be signed regardless of how they are called.
 /// This defines exactly what needs to be signed.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ZomeCallUnsigned {
     /// Provenance to sign.
     pub provenance: AgentPubKey,
