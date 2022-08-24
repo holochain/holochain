@@ -433,9 +433,7 @@ async fn make_signing_call(
     if reinstate_mock {
         keystore_control.use_real();
     }
-    let (nonce, expires_at) = 
-        fresh_nonce(Timestamp::now())
-        .unwrap();
+    let (nonce, expires_at) = fresh_nonce(Timestamp::now()).unwrap();
     let request = AppRequest::ZomeCall(Box::new(
         ZomeCall::try_from_unsigned_zome_call(
             conductor.inner_handle().keystore(),

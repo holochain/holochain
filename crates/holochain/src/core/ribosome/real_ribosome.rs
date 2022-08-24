@@ -975,8 +975,7 @@ pub mod wasm_test {
         assert_eq!("foobar", &bar_result);
 
         let now = Timestamp::now();
-        let (nonce, expires_at) = fresh_nonce(now)
-            .unwrap();
+        let (nonce, expires_at) = fresh_nonce(now).unwrap();
 
         let infallible_result = conductor
             .handle()

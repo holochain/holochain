@@ -673,7 +673,8 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
                 nonce,
                 expires_at,
             } => self.handle_incoming_call_remote(
-                space, from_agent, signature, to_agent, zome_name, fn_name, cap_secret, data, nonce, expires_at,
+                space, from_agent, signature, to_agent, zome_name, fn_name, cap_secret, data,
+                nonce, expires_at,
             ),
             crate::wire::WireMessage::CallRemoteMulti {
                 zome_name,

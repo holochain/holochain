@@ -193,19 +193,17 @@ where
                 Ok((ribosome, r))
             })
             .await?
-        },
-        not_authorized_reason => {
-            Ok((
-                ribosome,
-                Ok(ZomeCallResponse::Unauthorized(
-                    not_authorized_reason,
-                    invocation.cell_id.clone(),
-                    invocation.zome.zome_name().clone(),
-                    invocation.fn_name.clone(),
-                    invocation.provenance.clone(),
-                )),
-            ))
-        },
+        }
+        not_authorized_reason => Ok((
+            ribosome,
+            Ok(ZomeCallResponse::Unauthorized(
+                not_authorized_reason,
+                invocation.cell_id.clone(),
+                invocation.zome.zome_name().clone(),
+                invocation.fn_name.clone(),
+                invocation.provenance.clone(),
+            )),
+        )),
     }
 }
 /// Run validation inline and wait for the result.

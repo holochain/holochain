@@ -118,7 +118,8 @@ async fn ser_regression_test() {
             fn_name: "create_channel".into(),
             payload: ExternIO::encode(channel).unwrap(),
             provenance: alice_agent_id.clone(),
-            nonce, expires_at,
+            nonce,
+            expires_at,
         },
     )
     .await
@@ -154,7 +155,8 @@ async fn ser_regression_test() {
             fn_name: "create_message".into(),
             payload: ExternIO::encode(message).unwrap(),
             provenance: alice_agent_id.clone(),
-            nonce, expires_at,
+            nonce,
+            expires_at,
         },
     )
     .await

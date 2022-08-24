@@ -79,8 +79,7 @@ impl SweetConductorHandle {
     {
         let payload = ExternIO::encode(payload).expect("Couldn't serialize payload");
         let now = Timestamp::now();
-        let (nonce, expires_at) = fresh_nonce(now)
-            ?;
+        let (nonce, expires_at) = fresh_nonce(now)?;
         let call_unsigned = ZomeCallUnsigned {
             cell_id: zome.cell_id().clone(),
             zome_name: zome.name().clone(),

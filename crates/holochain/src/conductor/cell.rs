@@ -286,9 +286,7 @@ impl Cell {
                         }
                     };
                     let provenance = self.id.agent_pubkey().clone();
-                    let (nonce, expires_at) = match
-                        fresh_nonce(now)
-                    {
+                    let (nonce, expires_at) = match fresh_nonce(now) {
                         Ok(v) => v,
                         Err(e) => {
                             error!("{}", e.to_string());

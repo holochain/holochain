@@ -466,7 +466,8 @@ fixturator!(
         provenance: AgentPubKeyFixturator::new(Unpredictable).next().unwrap(),
         signature: SignatureFixturator::new(Unpredictable).next().unwrap(),
         nonce: I64Fixturator::new(Unpredictable).next().unwrap(),
-        expires_at: TimestampFixturator::new(Unpredictable).next().unwrap(),
+        // @todo should this be less predictable?
+        expires_at: (Timestamp::now() + std::time::Duration::from_secs(10)).unwrap(),
     };
     curve Predictable ZomeCallInvocation {
         cell_id: CellIdFixturator::new_indexed(Predictable, get_fixt_index!())
@@ -489,7 +490,8 @@ fixturator!(
             .unwrap(),
         signature: SignatureFixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap(),
         nonce: I64Fixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap(),
-        expires_at: TimestampFixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap(),
+        // @todo should this be more predictable?
+        expires_at: (Timestamp::now() + std::time::Duration::from_secs(10)).unwrap(),
     };
 );
 

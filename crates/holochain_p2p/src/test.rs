@@ -288,7 +288,7 @@ mod tests {
 
         let res = p2p
             .call_remote(
-                dna, a1, signature, a2, zome_name, fn_name, None, payload, nonce, expires_at
+                dna, a1, signature, a2, zome_name, fn_name, None, payload, nonce, expires_at,
             )
             .await
             .unwrap();

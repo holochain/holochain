@@ -208,13 +208,14 @@ async fn speed_test(n: Option<usize>) -> Arc<TempDir> {
             fn_name,
             payload: ExternIO::encode(payload)?,
             provenance: cell_id.agent_pubkey().clone(),
-            nonce, expires_at,
+            nonce,
+            expires_at,
         })
     }
 
     let anchor_invocation = |anchor: String, cell_id, i: usize| async move {
         let anchor = AnchorInput(anchor.clone(), i.to_string());
-        new_zome_call( cell_id, "anchor".into(), anchor).await
+        new_zome_call(cell_id, "anchor".into(), anchor).await
     };
 
     async fn call(
@@ -228,7 +229,9 @@ async fn speed_test(n: Option<usize>) -> Arc<TempDir> {
     let timer = std::time::Instant::now();
 
     for i in 0..num {
-        let invocation = anchor_invocation("alice".to_string(), alice_cell_id.clone(), i).await.unwrap();
+        let invocation = anchor_invocation("alice".to_string(), alice_cell_id.clone(), i)
+            .await
+            .unwrap();
         let response = call(
             &mut app_interface,
             ZomeCall::try_from_unsigned_zome_call(handle.keystore(), invocation)
@@ -238,7 +241,9 @@ async fn speed_test(n: Option<usize>) -> Arc<TempDir> {
         .await
         .unwrap();
         assert_matches!(response, AppResponse::ZomeCall(_));
-        let invocation = anchor_invocation("bobbo".to_string(), bob_cell_id.clone(), i).await.unwrap();
+        let invocation = anchor_invocation("bobbo".to_string(), bob_cell_id.clone(), i)
+            .await
+            .unwrap();
         let response = call(
             &mut app_interface,
             ZomeCall::try_from_unsigned_zome_call(handle.keystore(), invocation)

@@ -185,7 +185,7 @@ pub enum ZomeCallAuthorization {
     Authorized,
     BadSignature,
     BadCapGrant,
-    BadNonce,
+    BadNonce(String),
 }
 
 impl ZomeCallAuthorization {
@@ -206,7 +206,13 @@ pub enum ZomeCallResponse {
     Ok(crate::ExternIO),
     /// Cap grant failure.
     /// Something like a 401 http response.
-    Unauthorized(ZomeCallAuthorization, CellId, ZomeName, FunctionName, AgentPubKey),
+    Unauthorized(
+        ZomeCallAuthorization,
+        CellId,
+        ZomeName,
+        FunctionName,
+        AgentPubKey,
+    ),
     /// This was a zome call made remotely but
     /// something has failed on the network
     NetworkError(String),
