@@ -96,7 +96,7 @@ use super::state::ConductorState;
 #[cfg(any(test, feature = "test_utils"))]
 use crate::core::queue_consumer::QueueTriggers;
 
-mod insert_records_into_source_chain;
+mod graft_records_onto_source_chain;
 
 /// A handle to the Conductor that can easily be passed around and cheaply cloned
 pub type ConductorHandle = Arc<dyn ConductorHandleT>;
@@ -355,10 +355,11 @@ pub trait ConductorHandleT: Send + Sync {
     async fn remove_cells(&self, cell_ids: &[CellId]);
 
     /// Inject records into a source chain for a cell.
-    async fn insert_records_into_source_chain(
+    /// If the records form a chain segment that can be "grafted" onto the existing chain, it will be.
+    /// Otherwise, a new chain will be formed using the specified records.
+    async fn graft_records_onto_source_chain(
         self: Arc<Self>,
         cell_id: CellId,
-        truncate: bool,
         validate: bool,
         records: Vec<Record>,
     ) -> ConductorApiResult<()>;
@@ -1306,164 +1307,18 @@ impl ConductorHandleT for ConductorHandleImpl {
         self.conductor.remove_cells(cell_ids.to_vec()).await
     }
 
-    async fn insert_records_into_source_chain(
+    async fn graft_records_onto_source_chain(
         self: Arc<Self>,
         cell_id: CellId,
-        truncate: bool,
         validate: bool,
         records: Vec<Record>,
     ) -> ConductorApiResult<()> {
-        // Get or create the space for this cell.
-        // Note: This doesn't require the cell be installed.
-        let space = self.conductor.get_or_create_space(cell_id.dna_hash())?;
-
-        // Get the chain head if there is one.
-        let persisted_chain_head = space
-            .authored_db
-            .async_reader({
-                let author = Arc::new(cell_id.agent_pubkey().clone());
-                move |txn| holochain_state::prelude::chain_head_db(&txn, author)
-            })
-            .await?
-            .map(|c| (c.0, c.1));
-
-        let network = self
-            .conductor
-            .holochain_p2p()
-            .to_dna(cell_id.dna_hash().clone());
-
-        // Validate the records.
-        if validate {
-            // Create the ribosome.
-            let ribosome = self.get_ribosome(cell_id.dna_hash())?;
-
-            // Create a raw source chain to validate against because
-            // genesis may not have been run yet.
-            let workspace = SourceChainWorkspace::raw_empty(
-                space.authored_db.clone(),
-                space.dht_db.clone(),
-                space.dht_query_cache.clone(),
-                space.cache_db.clone(),
-                self.conductor.keystore().clone(),
-                cell_id.agent_pubkey().clone(),
-                Arc::new(ribosome.dna_def().as_content().clone()),
+        Ok(
+            graft_records_onto_source_chain::graft_records_onto_source_chain(
+                self, cell_id, validate, records,
             )
-            .await?;
-
-            let sc = workspace.source_chain();
-
-            // Validate the chain.
-            crate::core::validate_chain(
-                records.iter().map(|e| e.signed_action()),
-                &persisted_chain_head.clone().filter(|_| !truncate),
-            )
-            .map_err(|e| SourceChainError::InvalidCommit(e.to_string()))?;
-
-            // Add the records to the source chain so we can validate them.
-            sc.scratch()
-                .apply(|scratch| {
-                    for el in records.clone() {
-                        holochain_state::prelude::insert_record_scratch(
-                            scratch,
-                            el,
-                            Default::default(),
-                        );
-                    }
-                })
-                .map_err(SourceChainError::from)?;
-
-            // Run the individual record validations.
-            crate::core::workflow::inline_validation(
-                workspace.clone(),
-                network.clone(),
-                self.clone(),
-                ribosome,
-            )
-            .await
-            .map_err(Box::new)?;
-        }
-        let authored_db = space.authored_db;
-        let dht_db = space.dht_db;
-
-        // Produce the op lights for each record.
-        let data = records
-            .into_iter()
-            .map(|el| {
-                let ops = produce_op_lights_from_records(vec![&el])?;
-                // Check have the same author as cell.
-                let (shh, entry) = el.into_inner();
-                if shh.action().author() != cell_id.agent_pubkey() {
-                    return Err(StateMutationError::AuthorsMustMatch);
-                }
-                Ok((shh, ops, entry.into_option()))
-            })
-            .collect::<StateMutationResult<Vec<_>>>()?;
-
-        // Commit the records to the source chain.
-        let ops_to_integrate = authored_db
-            .async_commit({
-                let cell_id = cell_id.clone();
-                move |txn| {
-                    // Truncate the chain if requested.
-                    if truncate {
-                        txn.execute(
-                            "DELETE FROM Action WHERE author = ?",
-                            [cell_id.agent_pubkey()],
-                        )
-                        .map_err(StateMutationError::from)?;
-                    } else {
-                        // If we have a persisted chain head, check if it has moved.
-                        let latest_chain_head = holochain_state::prelude::chain_head_db(
-                            txn,
-                            Arc::new(cell_id.agent_pubkey().clone()),
-                        )?.map(|(hash, seq, _)| (hash, seq));
-
-                        if persisted_chain_head != latest_chain_head {
-                            return Err(SourceChainError::HeadMoved(
-                                Vec::with_capacity(0),
-                                Vec::with_capacity(0),
-                                None,
-                                None,
-                            ));
-                        }
-                    }
-                    let mut ops_to_integrate = Vec::new();
-
-                    // Commit the records and ops to the authored db.
-                    for (shh, ops, entry) in data {
-                        // Clippy is wrong :(
-                        #[allow(clippy::needless_collect)]
-                        let basis = ops
-                            .iter()
-                            .map(|op| op.dht_basis().clone())
-                            .collect::<Vec<_>>();
-                        ops_to_integrate.extend(
-                            source_chain::put_raw(txn, shh, ops, entry)?
-                                .into_iter()
-                                .zip(basis.into_iter()),
-                        );
-                    }
-                    SourceChainResult::Ok(ops_to_integrate)
-                }
-            })
-            .await?;
-
-        // Check which ops need to be integrated.
-        // Only integrated if a cell is installed.
-        if self
-            .list_cell_ids(Some(CellStatus::Joined))
-            .contains(&cell_id)
-        {
-            holochain_state::integrate::authored_ops_to_dht_db(
-                &network,
-                ops_to_integrate,
-                &authored_db,
-                &dht_db,
-                &space.dht_query_cache,
-            )
-            .await?;
-        }
-        Ok(())
+            .await?,
+        )
     }
 
     #[cfg(any(test, feature = "test_utils"))]

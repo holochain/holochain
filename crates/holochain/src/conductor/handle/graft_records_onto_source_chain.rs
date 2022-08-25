@@ -23,10 +23,9 @@ pub type ChainHead = Option<(ActionHash, u32)>;
 pub(crate) async fn graft_records_onto_source_chain(
     handle: Arc<ConductorHandleImpl>,
     cell_id: CellId,
-    method: InsertionMethod,
     validate: bool,
     records: Vec<Record>,
-) -> ConductorResult<()> {
+) -> ConductorApiResult<()> {
     // Get or create the space for this cell.
     // Note: This doesn't require the cell be installed.
     let space = handle.conductor.get_or_create_space(cell_id.dna_hash())?;
@@ -51,11 +50,12 @@ pub(crate) async fn graft_records_onto_source_chain(
     let chain_top = graft.existing_chain_top();
 
     if validate {
-        validate_records(handle.clone(), &cell_id, chain_top, graft.incoming()).await?;
+        validate_records(handle.clone(), &cell_id, &chain_top, graft.incoming()).await?;
     }
 
     // Produce the op lights for each record.
-    let data = records
+    let data = graft
+        .incoming
         .into_iter()
         .map(|el| {
             let ops = produce_op_lights_from_records(vec![&el])?;
@@ -74,27 +74,22 @@ pub(crate) async fn graft_records_onto_source_chain(
         .async_commit({
             let cell_id = cell_id.clone();
             move |txn| {
-                // If we have a persisted chain head, check if it has moved.
-                let (hash, seq, _) = holochain_state::prelude::chain_head_db(
-                    txn,
-                    Arc::new(cell_id.agent_pubkey().clone()),
-                )?;
-
-                if chain_top != Some((hash, seq)) {
-                    return Err(SourceChainError::HeadMoved(
-                        Vec::with_capacity(0),
-                        Vec::with_capacity(0),
-                        None,
-                        None,
-                    ));
+                if let Some((_, seq)) = chain_top {
+                    // Remove records above the grafting position.
+                    //
+                    // NOTES:
+                    // - the chain top may have moved since the grafting call began,
+                    //   but it doesn't really matter, since we explicitly want to
+                    //   clobber anything beyond the grafting point anyway.
+                    // - if there is an existing fork, there may still be a fork after the
+                    //   grafting. A more rigorous approach would thin out the existing
+                    //   actions until a single fork is obtained.
+                    txn.execute(
+                        "DELETE FROM Action WHERE author = ? AND seq > ?",
+                        rusqlite::params![cell_id.agent_pubkey(), seq],
+                    )
+                    .map_err(StateMutationError::from)?;
                 }
-
-                // Remove records above the grafting position.
-                txn.execute(
-                    "DELETE FROM Action WHERE author = ? AND action_seq > ?",
-                    [cell_id.agent_pubkey(), chain_top.1],
-                )
-                .map_err(StateMutationError::from)?;
 
                 let mut ops_to_integrate = Vec::new();
 
@@ -138,9 +133,9 @@ pub(crate) async fn graft_records_onto_source_chain(
 async fn validate_records(
     handle: Arc<ConductorHandleImpl>,
     cell_id: &CellId,
-    chain_top: Option<(ActionHash, u32)>,
+    chain_top: &Option<(ActionHash, u32)>,
     records: &[Record],
-) -> ConductorResult<()> {
+) -> ConductorApiResult<()> {
     let space = handle.conductor.get_or_create_space(cell_id.dna_hash())?;
     let ribosome = handle.get_ribosome(cell_id.dna_hash())?;
     let network = handle
@@ -187,7 +182,8 @@ async fn validate_records(
         handle.clone(),
         ribosome,
     )
-    .await?;
+    .await
+    .map_err(Box::new)?;
 
     Ok(())
 }
