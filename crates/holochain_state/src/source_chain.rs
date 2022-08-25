@@ -1094,7 +1094,7 @@ pub fn chain_head_db_nonempty(
     txn: &Transaction,
     author: Arc<AgentPubKey>,
 ) -> SourceChainResult<(ActionHash, u32, Timestamp)> {
-    Ok(chain_head_db(txn, author)?.ok_or(SourceChainError::ChainEmpty)?)
+    chain_head_db(txn, author)?.ok_or(SourceChainError::ChainEmpty)
 }
 
 /// Check if there is a current countersigning session and if so, return the

@@ -503,7 +503,7 @@ pub enum AdminResponse {
     /// This is all the agent info that was found for the request.
     AgentInfoRequested(Vec<AgentInfoSigned>),
 
-    /// The successful response to an [`AdminRequest::AddRecords`].
+    /// The successful response to an [`AdminRequest::GraftRecords`].
     RecordsGrafted,
 }
 
