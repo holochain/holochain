@@ -352,8 +352,8 @@ jobs:
         if: ${{ matrix.testCommand.restoresCargoCache == true && needs.vars.outputs.skip_test != 'true' }}
         env:
           CARGO_TEST_ARGS: "--no-run"
-          CARGO_NEXTEST_ARGS: "list --build-jobs=1"
-          CARGO_BUILD_JOBS: "1"
+          CARGO_NEXTEST_ARGS: "list --build-jobs=2"
+          CARGO_BUILD_JOBS: "2"
         run: |
           set -e
           source "${HOLOCHAIN_RELEASE_SH}"
