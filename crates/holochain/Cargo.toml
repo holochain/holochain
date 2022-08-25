@@ -1,6 +1,6 @@
 [package]
 name = "holochain"
-version = "0.0.156"
+version = "0.0.157"
 description = "Holochain, a framework for distributed applications"
 license-file = "LICENSE_CAL-1.0"
 homepage = "https://github.com/holochain/holochain"
@@ -24,13 +24,13 @@ futures = "0.3.1"
 getrandom = "0.2.7"
 ghost_actor = "0.3.0-alpha.4"
 holo_hash = { version = "0.0.31", path = "../holo_hash", features = ["full"] }
-holochain_cascade = { version = "0.0.55", path = "../holochain_cascade" }
-holochain_conductor_api = { version = "0.0.54", path = "../holochain_conductor_api" }
+holochain_cascade = { version = "0.0.56", path = "../holochain_cascade" }
+holochain_conductor_api = { version = "0.0.55", path = "../holochain_conductor_api" }
 holochain_keystore = { version = "0.0.51", path = "../holochain_keystore" }
 holochain_p2p = { version = "0.0.52", path = "../holochain_p2p" }
 holochain_sqlite = { version = "0.0.50", path = "../holochain_sqlite" }
 holochain_serialized_bytes = "=0.0.51"
-holochain_state = { version = "0.0.54", path = "../holochain_state" }
+holochain_state = { version = "0.0.55", path = "../holochain_state" }
 holochain_types = { version = "0.0.52", path = "../holochain_types" }
 holochain_wasmer_host = "=0.0.80"
 holochain_websocket = { version = "0.0.39", path = "../holochain_websocket" }
