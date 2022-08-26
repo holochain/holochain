@@ -87,22 +87,22 @@ pub mod tuning_params_struct {
         gossip_loop_iteration_delay_ms: u32 = 1000,
 
         /// The gossip loop will attempt to rate-limit output
-        /// to this count mega bits per second. [Default: 0.5]
-        gossip_outbound_target_mbps: f64 = 0.5,
+        /// to this count mega bits per second. [Default: 100.0]
+        gossip_outbound_target_mbps: f64 = 100.0,
 
         /// The gossip loop will attempt to rate-limit input
-        /// to this count mega bits per second. [Default: 0.5]
-        gossip_inbound_target_mbps: f64 = 0.5,
+        /// to this count mega bits per second. [Default: 100.0]
+        gossip_inbound_target_mbps: f64 = 100.0,
 
         /// The gossip loop will attempt to rate-limit outbound
         /// traffic for the historic loop (if there is one)
-        /// to this count mega bits per second. [Default: 0.1]
-        gossip_historic_outbound_target_mbps: f64 = 0.1,
+        /// to this count mega bits per second. [Default: 100.0]
+        gossip_historic_outbound_target_mbps: f64 = 100.0,
 
         /// The gossip loop will attempt to rate-limit inbound
         /// traffic for the historic loop (if there is one)
-        /// to this count mega bits per second. [Default: 0.1]
-        gossip_historic_inbound_target_mbps: f64 = 0.1,
+        /// to this count mega bits per second. [Default: 100.0]
+        gossip_historic_inbound_target_mbps: f64 = 100.0,
 
         /// How long should we hold off talking to a peer
         /// we've previously spoken successfully to.
