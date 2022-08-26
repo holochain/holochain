@@ -20,8 +20,8 @@ pub use dna_gamut::*;
 use holo_hash::{AgentPubKey, DnaHash};
 use holochain_serialized_bytes::prelude::*;
 use holochain_util::ffs;
+use holochain_zome_types::cell::{CloneId, CLONE_ID_DELIMITER};
 use holochain_zome_types::prelude::*;
-use holochain_zome_types::cell::{CLONE_ID_DELIMITER, CloneId};
 use itertools::Itertools;
 use std::{collections::HashMap, path::PathBuf};
 
@@ -391,7 +391,7 @@ pub struct InstalledAppCommon {
     /// but I'm leaving it here as a placeholder in case we ever want it to
     /// have formal significance.
     _agent_key: AgentPubKey,
-    /// The assignments of the roles as specified in the AppManifest
+    /// Assignments of DNA roles to cells and their clones, as specified in the AppManifest
     role_assignments: HashMap<AppRoleId, AppRoleAssignment>,
 }
 
@@ -402,13 +402,13 @@ impl InstalledAppCommon {
         _agent_key: AgentPubKey,
         role_assignments: I,
     ) -> Self {
-        let mut role_assignments = role_assignments.into_iter();
+        let role_assignments = role_assignments.into_iter();
         // ensure no role id contains a clone id delimiter
-        if let Some((illegal_role_id, _)) = role_assignments
-            .find(|(role_id, _)| role_id.contains(CLONE_ID_DELIMITER))
-        {
-            panic!("{}", AppError::IllegalRoleId(illegal_role_id.clone()));
-        }
+        // if let Some((illegal_role_id, _)) =
+        //     role_assignments.find(|(role_id, _)| role_id.contains(CLONE_ID_DELIMITER))
+        // {
+        //     panic!("{}", AppError::IllegalRoleId(illegal_role_id.clone()));
+        // }
         InstalledAppCommon {
             installed_app_id: installed_app_id.to_string(),
             _agent_key,
@@ -490,14 +490,33 @@ impl InstalledAppCommon {
         &self.role_assignments
     }
 
+    /// Get the next clone index for a role id, based on existing clones
+    pub fn next_clone_index(&self, role_id: &String) -> u32 {
+        match self.cloned_cells_for_role_id(&role_id) {
+            None => 0,
+            Some(cloned_cells) => match cloned_cells
+                .into_iter()
+                .map(|(clone_id, _)| {
+                    let (_, clone_index) = clone_id.split_once(CLONE_ID_DELIMITER).unwrap();
+                    let clone_index = clone_index.parse::<u32>().unwrap();
+                    clone_index
+                })
+                .max()
+            {
+                None => 0,
+                Some(max) => max + 1,
+            },
+        }
+    }
+
     /// Add a cloned cell
     pub fn add_clone(
         &mut self,
         role_id: &AppRoleId,
-        clone_id: CloneId,
-        cell_id: CellId,
+        clone_id: &CloneId,
+        cell_id: &CellId,
     ) -> AppResult<()> {
-        let app_role_assignment = self.role_mut(role_id)?;
+        let app_role_assignment = self.role_mut(&role_id)?;
         assert_eq!(
             cell_id.agent_pubkey(),
             app_role_assignment.agent_key(),
@@ -511,7 +530,7 @@ impl InstalledAppCommon {
         }
         let cell_inserted = app_role_assignment
             .clones
-            .insert(clone_id, cell_id)
+            .insert(clone_id.clone(), cell_id.clone())
             .is_none();
         assert!(cell_inserted, "clone id is not unique");
         Ok(())
@@ -801,10 +820,10 @@ pub struct AppRoleAssignment {
     /// If false, then `base_cell_id` is just recording what that cell will be
     /// called in the future.
     is_provisioned: bool,
-    /// The number of cloned cells allowed
+    /// The number of allowed cloned cells.
     clone_limit: u32,
     /// Cells which were cloned at runtime. The length cannot grow beyond
-    /// `clone_limit`
+    /// `clone_limit`.
     clones: HashMap<CloneId, CellId>,
 }
 
@@ -866,7 +885,49 @@ mod tests {
     use std::collections::{HashMap, HashSet};
 
     #[test]
-    #[should_panic(expected = "")]
+    fn next_clone_index_for_role_id_returns_correct_clone_index() {
+        let base_cell_id = fixt!(CellId);
+        let agent = base_cell_id.agent_pubkey().clone();
+        let app_role_assignment = AppRoleAssignment::new(base_cell_id, false, 10);
+        let role_id: AppRoleId = "role_id".into();
+        let app = InstalledAppCommon::new(
+            "app",
+            agent.clone(),
+            vec![(role_id.clone(), app_role_assignment)],
+        );
+
+        let next_clone_index = app.next_clone_index(&role_id);
+
+        assert_eq!(next_clone_index, 0); // clone index starts at 0
+    }
+
+    #[test]
+    fn next_clone_index_for_role_id_returns_2_correct_clone_indexes() {
+        let base_cell_id = fixt!(CellId);
+        let agent = base_cell_id.agent_pubkey().clone();
+        let app_role_assignment = AppRoleAssignment::new(base_cell_id.clone(), false, 2);
+        let role_id: AppRoleId = "role_id".into();
+        let role_assignments = vec![(role_id.clone(), app_role_assignment)];
+        println!("app role assignments {:?}", role_assignments);
+        let mut a = InstalledAppCommon {
+            _agent_key: agent.clone(),
+            installed_app_id: "dee".to_string(),
+            role_assignments: role_assignments.into_iter().collect(),
+        };
+
+        let next_clone_index = a.next_clone_index(&role_id);
+        assert_eq!(next_clone_index, 0);
+
+        let clone_id = format!("{}{}{}", role_id, CLONE_ID_DELIMITER, next_clone_index);
+        a.add_clone(&role_id, &clone_id, &base_cell_id)
+            .expect("adding clone failed");
+
+        let next_clone_index = a.next_clone_index(&role_id);
+        assert_eq!(next_clone_index, 1);
+    }
+
+    #[test]
+    #[should_panic]
     fn illegal_role_id_is_rejected() {
         InstalledAppCommon::new(
             "test_app",
@@ -877,7 +938,7 @@ mod tests {
                     base_cell_id: fixt!(CellId),
                     clone_limit: 0,
                     clones: HashMap::new(),
-                    is_provisioned: true,
+                    is_provisioned: false,
                 },
             )],
         );
@@ -900,20 +961,20 @@ mod tests {
         let clones: Vec<_> = vec![new_clone(), new_clone(), new_clone()];
         app.add_clone(
             &role_id,
-            format!("{}{}{}", role_id.clone(), CLONE_ID_DELIMITER, 0),
-            clones[0].clone(),
+            &get_clone_id(&role_id, 0),
+            &clones[0],
         )
         .unwrap();
         app.add_clone(
             &role_id,
-            format!("{}{}{}", role_id.clone(), CLONE_ID_DELIMITER, 1),
-            clones[1].clone(),
+            &format!("{}{}{}", role_id, CLONE_ID_DELIMITER, 1),
+            &clones[1],
         )
         .unwrap();
         app.add_clone(
             &role_id,
-            format!("{}{}{}", role_id.clone(), CLONE_ID_DELIMITER, 2),
-            clones[2].clone(),
+            &format!("{}{}{}", role_id, CLONE_ID_DELIMITER, 2),
+            &clones[2],
         )
         .unwrap();
 
@@ -921,13 +982,8 @@ mod tests {
         matches::assert_matches!(
             app.add_clone(
                 &role_id,
-                format!(
-                    "{}{}{}",
-                    role_id.clone(),
-                    CLONE_ID_DELIMITER,
-                    clone_limit + 1
-                ),
-                new_clone()
+                &get_clone_id(&role_id, clone_limit + 1),
+                &new_clone()
             ),
             Err(AppError::CloneLimitExceeded(3, _))
         );
@@ -940,7 +996,7 @@ mod tests {
         assert_eq!(
             app.remove_clone(
                 &role_id,
-                &format!("{}{}{}", role_id.clone(), CLONE_ID_DELIMITER, 1)
+                &get_clone_id(&role_id, 1)
             )
             .unwrap(),
             true
@@ -948,7 +1004,7 @@ mod tests {
         assert_eq!(
             app.remove_clone(
                 &role_id,
-                &format!("{}{}{}", role_id.clone(), CLONE_ID_DELIMITER, 1)
+                &get_clone_id(&role_id, 1)
             )
             .unwrap(),
             false
@@ -959,12 +1015,11 @@ mod tests {
             maplit::hashset! { &clones[0], &clones[2] }
         );
 
-        // Adding the same clone twice should probably be a panic, but if this
-        // line is still here, I never got around to making it panic...
+        // Adding the same clone twice should panic
         app.add_clone(
             &role_id,
-            format!("{}{}{}", role_id.clone(), CLONE_ID_DELIMITER, 0),
-            clones[0].clone(),
+           &get_clone_id(&role_id, 0),
+            &clones[0],
         )
         .unwrap();
 

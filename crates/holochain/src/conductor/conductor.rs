@@ -786,7 +786,7 @@ impl Conductor {
                 if let Some(app) = state.installed_apps_mut().get_mut(&app_id) {
                     let agent_key = app.role(&role_id)?.agent_key().to_owned();
                     let cell_id = CellId::new(child_dna_hash, agent_key);
-                    app.add_clone(&role_id, clone_id, cell_id.clone())?;
+                    app.add_clone(&role_id, &clone_id, &cell_id)?;
                     Ok((state, cell_id))
                 } else {
                     Err(ConductorError::AppNotRunning(app_id.clone()))

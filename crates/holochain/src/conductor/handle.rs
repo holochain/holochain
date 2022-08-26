@@ -908,13 +908,13 @@ impl ConductorHandleT for ConductorHandleImpl {
                 "neither network_seed nor properties provided for cloning the cell".to_string(),
             ));
         }
-        let app = self
+        let app_info = self
             .get_app_info(&app_id)
             .await?
             .ok_or(ConductorError::CloneCellError(
                 "no app found for provided app id".to_string(),
             ))?;
-        let original_cell = app
+        let original_cell = app_info
             .cell_data
             .iter()
             .find(|cell| cell.as_role_id().eq(&role_id))
@@ -922,28 +922,11 @@ impl ConductorHandleT for ConductorHandleImpl {
                 "no cell found for provided role id".to_string(),
             ))?;
 
-        let original_cell_role_id = original_cell.as_role_id();
-        let conductor_state = self.get_state_from_handle().await.unwrap();
-        let app = conductor_state.installed_apps().get(&app_id).unwrap();
-        let next_clone_index = match app.cloned_cells_for_role_id(&role_id) {
-            None => 0,
-            Some(cloned_cells) => match cloned_cells
-                .into_iter()
-                .map(|(clone_id, _)| {
-                    let (_, clone_index) = clone_id.split_once(CLONE_ID_DELIMITER).unwrap();
-                    let clone_index = clone_index.parse::<u8>().unwrap();
-                    clone_index
-                })
-                .max()
-            {
-                None => 0,
-                Some(max) => max + 1,
-            },
-        };
-        let clone_id = format!(
-            "{}{}{}",
-            original_cell_role_id, CLONE_ID_DELIMITER, next_clone_index
-        );
+        let base_cell_role_id = original_cell.as_role_id();
+        let conductor_state = self.conductor.get_state().await.unwrap();
+        let app = conductor_state.get_app(&app_id)?;
+        let next_clone_index = app.next_clone_index(&role_id);
+        let clone_id = get_clone_id(base_cell_role_id, next_clone_index);
 
         // create cell
         let network_seed = network_seed.unwrap_or_else(|| random_network_seed());

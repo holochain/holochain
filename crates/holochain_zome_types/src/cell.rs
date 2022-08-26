@@ -6,6 +6,8 @@ use holo_hash::DnaHash;
 use holochain_serialized_bytes::prelude::*;
 use std::fmt;
 
+use crate::AppRoleId;
+
 /// The unique identifier for a Cell.
 /// Cells are uniquely determined by this pair - this pair is necessary
 /// and sufficient to refer to a cell in a conductor
@@ -34,6 +36,11 @@ pub type CloneId = String;
 /// Delimiter in a clone id that separates the original cell's role id from the
 /// clone index.
 pub const CLONE_ID_DELIMITER: &str = ".";
+
+/// Helper function to construct a clone id from role id and clone index.
+pub fn get_clone_id(role_id: &AppRoleId, clone_index: u32) -> CloneId {
+    format!("{}{}{}", role_id, CLONE_ID_DELIMITER, clone_index)
+}
 
 impl fmt::Display for CellId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
