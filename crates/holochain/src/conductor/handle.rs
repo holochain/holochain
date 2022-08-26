@@ -213,7 +213,7 @@ pub trait ConductorHandleT: Send + Sync {
     async fn create_clone_cell(
         self: Arc<Self>,
         payload: CreateCloneCellPayload,
-    ) -> ConductorResult<CloneId>;
+    ) -> ConductorResult<InstalledCell>;
 
     /// Destroy a cloned Cell
     async fn destroy_clone_cell(self: Arc<Self>, cell_id: CellId) -> ConductorResult<()>;
@@ -894,14 +894,15 @@ impl ConductorHandleT for ConductorHandleImpl {
     async fn create_clone_cell(
         self: Arc<Self>,
         payload: CreateCloneCellPayload,
-    ) -> ConductorResult<CloneId> {
+    ) -> ConductorResult<InstalledCell> {
         let CreateCloneCellPayload {
             app_id,
             role_id,
             properties,
             network_seed,
-            // membrane_proof,
-            ..
+            membrane_proof,
+            origin_time,
+            name,
         } = payload;
         if network_seed == None && properties == None {
             return Err(ConductorError::CloneCellError(
@@ -943,10 +944,11 @@ impl ConductorHandleT for ConductorHandleImpl {
             .await?;
 
         // run genesis on cloned cell
-        let cells = vec![(cell_id.clone(), None)];
+        let cells = vec![(cell_id.clone(), membrane_proof)];
         crate::conductor::conductor::genesis_cells(&self.conductor, cells, self.clone()).await?;
 
-        Ok(clone_id)
+        let installed_clone_cell = InstalledCell::new(cell_id, clone_id);
+        Ok(installed_clone_cell)
     }
 
     async fn destroy_clone_cell(self: Arc<Self>, _cell_id: CellId) -> ConductorResult<()> {

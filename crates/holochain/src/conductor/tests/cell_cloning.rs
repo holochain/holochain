@@ -119,7 +119,7 @@ async fn create_clone_cell_returns_clone_id_with_correct_role_id() {
         .await
         .unwrap();
 
-    let clone_id = conductor
+    let installed_clone_cell = conductor
         .clone()
         .create_clone_cell(CreateCloneCellPayload {
             app_id: app.installed_app_id().clone(),
@@ -132,7 +132,7 @@ async fn create_clone_cell_returns_clone_id_with_correct_role_id() {
         })
         .await
         .unwrap();
-    assert_eq!(clone_id, get_clone_id(&role_id, 0)); // clone index starts at 0
+    assert_eq!(installed_clone_cell.into_role_id(), get_clone_id(&role_id, 0)); // clone index starts at 0
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -148,7 +148,7 @@ async fn create_clone_cell_run_twice_returns_correct_clone_indexes() {
         .await
         .unwrap();
 
-    let clone_id_0 = conductor
+    let installed_clone_cell_0 = conductor
         .clone()
         .create_clone_cell(CreateCloneCellPayload {
             app_id: app.installed_app_id().clone(),
@@ -161,9 +161,9 @@ async fn create_clone_cell_run_twice_returns_correct_clone_indexes() {
         })
         .await
         .unwrap();
-    assert_eq!(clone_id_0, get_clone_id(&role_id, 0)); // clone index starts at 0
+    assert_eq!(installed_clone_cell_0.into_role_id(), get_clone_id(&role_id, 0)); // clone index starts at 0
 
-    let clone_id_1 = conductor
+    let installed_clone_cell_1 = conductor
         .clone()
         .create_clone_cell(CreateCloneCellPayload {
             app_id: app.installed_app_id().clone(),
@@ -176,5 +176,5 @@ async fn create_clone_cell_run_twice_returns_correct_clone_indexes() {
         })
         .await
         .unwrap();
-    assert_eq!(clone_id_1, get_clone_id(&role_id, 1));
+    assert_eq!(installed_clone_cell_1.into_role_id(), get_clone_id(&role_id, 1));
 }

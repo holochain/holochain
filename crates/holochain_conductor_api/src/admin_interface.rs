@@ -389,8 +389,9 @@ pub enum AdminResponse {
 
     /// The successful response to an [`AdminRequest::CreateCloneCell`].
     ///
-    /// The response contains the [`CloneId`] of the newly created clone.
-    CloneCellCreated(CloneId),
+    /// The response contains an [`InstalledCell`] with the created clone
+    /// cell's [`CloneId`] and [`CellId`].
+    CloneCellCreated(InstalledCell),
 
     /// The successful response to an [`AdminRequest::AddAdminInterfaces`].
     ///
