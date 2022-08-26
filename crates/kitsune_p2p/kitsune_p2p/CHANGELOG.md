@@ -4,6 +4,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+- 
+Adds `gossip_burst_ratio` to `KitsuneTuningParams`, allowing 
+
 ## 0.0.42
 
 ## 0.0.41

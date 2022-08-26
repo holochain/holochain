@@ -257,9 +257,12 @@ mod tests {
 
     #[tokio::test(flavor = "current_thread", start_paused = true)]
     async fn test_limiter() {
+        observability::test_run().ok();
         let clock = governor::clock::FakeRelativeClock::default();
-        let burst = MAX_SEND_BUF_BYTES as f64 / 0.1;
-        let bandwidth = BandwidthThrottle::test(0.1, 0.1, burst, clock.clone());
+        // max * 2 * 8 = 0.1 * 1_000_000 * burst_ratio => burst_ratio = max * 2 * 8 / 0.1 / 1_000_000
+        let burst_ratio = MAX_SEND_BUF_BYTES as f64 * 2.0 * 8.0 / 1_000_000.0 / 0.1;
+        assert_eq!(burst_ratio, 2560.0);
+        let bandwidth = BandwidthThrottle::test(0.1, 0.1, burst_ratio, clock.clone());
         let bytes = MAX_SEND_BUF_BYTES;
         // Hit the burst limit.
         bandwidth.outgoing_bytes(MAX_SEND_BUF_BYTES).await;
@@ -276,7 +279,7 @@ mod tests {
             clock.advance(advance_by);
             let r = tokio::time::timeout(Duration::from_secs(10), bandwidth.outgoing_bytes(bytes))
                 .await;
-            // When we advance the clock 1 second less then the required time
+            // When we advance the clock 1 second less than the required time
             // the outgoing bytes times out because the clock is set to just before
             // enough time to send the bytes
             assert!(r.is_err());
