@@ -402,17 +402,17 @@ impl InstalledAppCommon {
         _agent_key: AgentPubKey,
         role_assignments: I,
     ) -> Self {
-        let role_assignments = role_assignments.into_iter();
+        let role_assignments: HashMap<_, _> = role_assignments.into_iter().collect();
         // ensure no role id contains a clone id delimiter
-        // if let Some((illegal_role_id, _)) =
-        //     role_assignments.find(|(role_id, _)| role_id.contains(CLONE_ID_DELIMITER))
-        // {
-        //     panic!("{}", AppError::IllegalRoleId(illegal_role_id.clone()));
-        // }
+        if let Some((illegal_role_id, _)) =
+            role_assignments.iter().find(|(role_id, _)| role_id.contains(CLONE_ID_DELIMITER))
+        {
+            panic!("{}", AppError::IllegalRoleId(illegal_role_id.clone()));
+        }
         InstalledAppCommon {
             installed_app_id: installed_app_id.to_string(),
             _agent_key,
-            role_assignments: role_assignments.collect(),
+            role_assignments,
         }
     }
 
