@@ -307,7 +307,7 @@ impl ShardedGossip {
                     Ok(())
                 }) {
                     tracing::error!(
-                        "Gossip failed to get share nut when trying to initiate with {:?}",
+                        "Gossip failed to get share mut when trying to initiate with {:?}",
                         err
                     );
                 }

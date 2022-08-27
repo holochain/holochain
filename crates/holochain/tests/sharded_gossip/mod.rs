@@ -212,8 +212,8 @@ async fn large_entry_test() {
 
     // let size = 1_000;
     // let size = 10_000;
-    let size = 100_000;
-    // let size = 1_000_000;
+    // let size = 100_000;
+    let size = 1_000_000;
     // let size = 10_000_000;
     // let size = 15_000_000;
     let num = 10;

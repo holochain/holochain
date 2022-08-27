@@ -255,6 +255,7 @@ impl SourceChain {
     }
 
     #[async_recursion]
+    #[tracing::instrument(skip(self, network))]
     pub async fn flush(
         &self,
         network: &(dyn HolochainP2pDnaT + Send + Sync),
@@ -331,13 +332,16 @@ impl SourceChain {
                     }
                 }
 
+                tracing::debug!("Inserting entry");
                 for entry in entries {
                     insert_entry(txn, entry.as_hash(), entry.as_content())?;
                 }
+                tracing::debug!("Inserting action");
                 for shh in actions.iter() {
                     insert_action(txn, shh)?;
                 }
                 for (op, op_hash, op_order, timestamp, _) in &ops {
+                    tracing::debug!("Inserting op_lite");
                     insert_op_lite_into_authored(txn, op, op_hash, op_order, timestamp)?;
                     // If this is a countersigning session we want to withhold
                     // publishing the ops until the session is successful.
