@@ -901,8 +901,7 @@ impl ConductorHandleT for ConductorHandleImpl {
             properties,
             network_seed,
             membrane_proof,
-            origin_time,
-            name,
+            ..
         } = payload;
         if network_seed == None && properties == None {
             return Err(ConductorError::CloneCellError(
@@ -946,6 +945,8 @@ impl ConductorHandleT for ConductorHandleImpl {
         // run genesis on cloned cell
         let cells = vec![(cell_id.clone(), membrane_proof)];
         crate::conductor::conductor::genesis_cells(&self.conductor, cells, self.clone()).await?;
+
+        self.create_and_add_initialized_cells_for_running_apps(self.clone()).await?;
 
         let installed_clone_cell = InstalledCell::new(cell_id, clone_id);
         Ok(installed_clone_cell)

@@ -755,6 +755,7 @@ impl Conductor {
         clone_id: CloneId,
     ) -> ConductorResult<CellId> {
         let ribosome_store = &self.ribosome_store;
+        // retrieve parent cell DNA hash from conductor
         let (_, parent_dna_hash) = self
             .update_state_prime({
                 let app_id = app_id.clone();
