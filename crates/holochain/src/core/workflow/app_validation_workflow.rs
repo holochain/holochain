@@ -500,6 +500,7 @@ where
         workspace,
         network.clone(),
         (HashSet::<AnyDhtHash>::new(), 0),
+        HashSet::new(),
     )
     .await?;
 
@@ -574,6 +575,7 @@ async fn run_validation_callback_inner<R>(
     workspace_read: HostFnWorkspaceRead,
     network: HolochainP2pDna,
     (mut fetched_deps, recursion_depth): (HashSet<AnyDhtHash>, usize),
+    mut visited_activity: HashSet<ChainFilter>,
 ) -> AppValidationResult<Outcome>
 where
     R: RibosomeT,
@@ -585,14 +587,14 @@ where
     match validate_result {
         ValidateResult::Valid => Ok(Outcome::Accepted),
         ValidateResult::Invalid(reason) => Ok(Outcome::Rejected(reason)),
-        ValidateResult::UnresolvedDependencies(hashes) => {
+        ValidateResult::UnresolvedDependencies(UnresolvedDependencies::Hashes(hashes)) => {
             // This is the base case where we've been recursing and start seeing
             // all the same hashes unresolved that we already tried to fetch.
             // At this point we should just give up on the inline recursing and
             // let some future background task attempt to fetch these hashes
             // again. Hopefully by then the hashes are fetchable.
             // 20 is a completely arbitrary max recursion depth.
-            if recursion_depth < 20 || hashes.iter().all(|hash| fetched_deps.contains(hash)) {
+            if recursion_depth > 20 || hashes.iter().all(|hash| fetched_deps.contains(hash)) {
                 Ok(Outcome::AwaitingDeps(hashes))
             } else {
                 let in_flight = hashes.into_iter().map(|hash| async {
@@ -619,6 +621,32 @@ where
                     workspace_read,
                     network,
                     (fetched_deps, recursion_depth + 1),
+                    visited_activity,
+                )
+                .await
+            }
+        }
+        ValidateResult::UnresolvedDependencies(UnresolvedDependencies::AgentActivity(
+            author,
+            filter,
+        )) => {
+            if recursion_depth > 20 || visited_activity.contains(&filter) {
+                Ok(Outcome::AwaitingDeps(vec![author.into()]))
+            } else {
+                let cascade_workspace = workspace_read.clone();
+                let mut cascade =
+                    Cascade::from_workspace_network(&cascade_workspace, network.clone());
+                cascade
+                    .must_get_agent_activity(author.clone(), filter.clone())
+                    .await?;
+                visited_activity.insert(filter);
+                run_validation_callback_inner(
+                    invocation,
+                    ribosome,
+                    workspace_read,
+                    network,
+                    (fetched_deps, recursion_depth + 1),
+                    visited_activity,
                 )
                 .await
             }
