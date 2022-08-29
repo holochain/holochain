@@ -25,21 +25,51 @@ use crate::AppRoleId;
 )]
 pub struct CellId(DnaHash, AgentPubKey);
 
-/// Identifier of a clone cell, composed of the DNA's role id and the index
-/// of the clone, starting at 0.
-///
-/// `{role_id}.{clone_index}`
-///
-/// Example: `profiles.0`
-pub type CloneId = String;
-
-/// Delimiter in a clone id that separates the original cell's role id from the
+/// Delimiter in a clone id that separates the base cell's role id from the
 /// clone index.
 pub const CLONE_ID_DELIMITER: &str = ".";
 
-/// Helper function to construct a clone id from role id and clone index.
-pub fn get_clone_id(role_id: &AppRoleId, clone_index: u32) -> CloneId {
-    format!("{}{}{}", role_id, CLONE_ID_DELIMITER, clone_index)
+/// Identifier of a clone cell, composed of the DNA's role id and the index
+/// of the clone, starting at 0.
+///
+/// Example: `profiles.0`
+#[derive(Clone, Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct CloneId(String);
+
+impl CloneId {
+    /// Construct a clone id from role id and clone index.
+    pub fn new(role_id: &AppRoleId, clone_index: u32) -> Self {
+        CloneId(format!("{}{}{}", role_id, CLONE_ID_DELIMITER, clone_index))
+    }
+
+    /// Get the clone's base cell's role id.
+    pub fn as_base_role_id(&self) -> AppRoleId {
+        let (role_id, _) = self.0.split_once(CLONE_ID_DELIMITER).unwrap();
+        role_id.into()
+    }
+
+    /// Get the index of the clone cell.
+    pub fn as_clone_index(&self) -> u32 {
+        let (_, clone_index) = self.0.split_once(CLONE_ID_DELIMITER).unwrap();
+        clone_index.parse::<u32>().unwrap()
+    }
+
+    /// Get an app role id representation of the clone id.
+    pub fn as_app_role_id(&self) -> AppRoleId {
+        self.0.clone().into()
+    }
+}
+
+impl fmt::Display for CloneId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}{}{}",
+            self.as_base_role_id(),
+            CLONE_ID_DELIMITER,
+            self.as_clone_index()
+        )
+    }
 }
 
 impl fmt::Display for CellId {

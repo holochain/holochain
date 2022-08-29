@@ -138,7 +138,7 @@ async fn can_add_clone_cell_to_app() {
                 "role_id".to_string(),
                 "seed".to_string(),
                 ().into(),
-                format!("{}{}{}", "role_id".to_string(), CLONE_ID_DELIMITER, 0),
+                CloneId::new(&"role_id".to_string(), 0),
             )
             .await,
         Err(ConductorError::AppError(AppError::CloneLimitExceeded(0, _)))
@@ -150,7 +150,7 @@ async fn can_add_clone_cell_to_app() {
             "role_id".to_string(),
             "seed".to_string(),
             ().into(),
-            format!("{}{}{}", "role_id".to_string(), CLONE_ID_DELIMITER, 0),
+            CloneId::new(&"role_id".to_string(), 0),
 
         )
         .await

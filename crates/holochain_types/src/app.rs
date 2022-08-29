@@ -20,7 +20,7 @@ pub use dna_gamut::*;
 use holo_hash::{AgentPubKey, DnaHash};
 use holochain_serialized_bytes::prelude::*;
 use holochain_util::ffs;
-use holochain_zome_types::cell::{CloneId, CLONE_ID_DELIMITER};
+use holochain_zome_types::cell::CloneId;
 use holochain_zome_types::prelude::*;
 use itertools::Itertools;
 use std::{collections::HashMap, path::PathBuf};
@@ -404,8 +404,9 @@ impl InstalledAppCommon {
     ) -> Self {
         let role_assignments: HashMap<_, _> = role_assignments.into_iter().collect();
         // ensure no role id contains a clone id delimiter
-        if let Some((illegal_role_id, _)) =
-            role_assignments.iter().find(|(role_id, _)| role_id.contains(CLONE_ID_DELIMITER))
+        if let Some((illegal_role_id, _)) = role_assignments
+            .iter()
+            .find(|(role_id, _)| role_id.contains(CLONE_ID_DELIMITER))
         {
             panic!("{}", AppError::IllegalRoleId(illegal_role_id.clone()));
         }
@@ -496,11 +497,7 @@ impl InstalledAppCommon {
             None => 0,
             Some(cloned_cells) => match cloned_cells
                 .into_iter()
-                .map(|(clone_id, _)| {
-                    let (_, clone_index) = clone_id.split_once(CLONE_ID_DELIMITER).unwrap();
-                    let clone_index = clone_index.parse::<u32>().unwrap();
-                    clone_index
-                })
+                .map(|(clone_id, _)| clone_id.as_clone_index())
                 .max()
             {
                 None => 0,
@@ -918,7 +915,7 @@ mod tests {
         let next_clone_index = a.next_clone_index(&role_id);
         assert_eq!(next_clone_index, 0);
 
-        let clone_id = format!("{}{}{}", role_id, CLONE_ID_DELIMITER, next_clone_index);
+        let clone_id = CloneId::new(&role_id, next_clone_index);
         a.add_clone(&role_id, &clone_id, &base_cell_id)
             .expect("adding clone failed");
 
@@ -959,21 +956,17 @@ mod tests {
 
         // Can add clones up to the limit
         let clones: Vec<_> = vec![new_clone(), new_clone(), new_clone()];
+        app.add_clone(&role_id, &CloneId::new(&role_id, 0), &clones[0])
+            .unwrap();
         app.add_clone(
             &role_id,
-            &get_clone_id(&role_id, 0),
-            &clones[0],
-        )
-        .unwrap();
-        app.add_clone(
-            &role_id,
-            &format!("{}{}{}", role_id, CLONE_ID_DELIMITER, 1),
+            &CloneId::new(&role_id, 1),
             &clones[1],
         )
         .unwrap();
         app.add_clone(
             &role_id,
-            &format!("{}{}{}", role_id, CLONE_ID_DELIMITER, 2),
+            &CloneId::new(&role_id, 2),
             &clones[2],
         )
         .unwrap();
@@ -982,7 +975,7 @@ mod tests {
         matches::assert_matches!(
             app.add_clone(
                 &role_id,
-                &get_clone_id(&role_id, clone_limit + 1),
+                &CloneId::new(&role_id, clone_limit + 1),
                 &new_clone()
             ),
             Err(AppError::CloneLimitExceeded(3, _))
@@ -994,19 +987,13 @@ mod tests {
         );
 
         assert_eq!(
-            app.remove_clone(
-                &role_id,
-                &get_clone_id(&role_id, 1)
-            )
-            .unwrap(),
+            app.remove_clone(&role_id, &CloneId::new(&role_id, 1))
+                .unwrap(),
             true
         );
         assert_eq!(
-            app.remove_clone(
-                &role_id,
-                &get_clone_id(&role_id, 1)
-            )
-            .unwrap(),
+            app.remove_clone(&role_id, &CloneId::new(&role_id, 1))
+                .unwrap(),
             false
         );
 
@@ -1016,12 +1003,8 @@ mod tests {
         );
 
         // Adding the same clone twice should panic
-        app.add_clone(
-            &role_id,
-           &get_clone_id(&role_id, 0),
-            &clones[0],
-        )
-        .unwrap();
+        app.add_clone(&role_id, &CloneId::new(&role_id, 0), &clones[0])
+            .unwrap();
 
         assert_eq!(app.cloned_cells().count(), 2);
 

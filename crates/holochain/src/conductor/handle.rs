@@ -926,7 +926,7 @@ impl ConductorHandleT for ConductorHandleImpl {
         let conductor_state = self.conductor.get_state().await.unwrap();
         let app = conductor_state.get_app(&app_id)?;
         let next_clone_index = app.next_clone_index(&role_id);
-        let clone_id = get_clone_id(base_cell_role_id, next_clone_index);
+        let clone_id = CloneId::new(base_cell_role_id, next_clone_index);
 
         // create cell
         let network_seed = network_seed.unwrap_or_else(|| random_network_seed());
@@ -948,7 +948,7 @@ impl ConductorHandleT for ConductorHandleImpl {
 
         self.create_and_add_initialized_cells_for_running_apps(self.clone()).await?;
 
-        let installed_clone_cell = InstalledCell::new(cell_id, clone_id);
+        let installed_clone_cell = InstalledCell::new(cell_id, clone_id.as_app_role_id());
         Ok(installed_clone_cell)
     }
 

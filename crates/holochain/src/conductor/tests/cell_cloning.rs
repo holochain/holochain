@@ -2,7 +2,7 @@ use crate::sweettest::*;
 use holo_hash::ActionHash;
 use holochain_types::app::CreateCloneCellPayload;
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::{get_clone_id, AppRoleId};
+use holochain_zome_types::{AppRoleId, CloneId};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn create_clone_cell_without_network_seed_or_properties_fails() {
@@ -142,7 +142,7 @@ async fn create_clone_cell_returns_clone_id_with_correct_role_id() {
         .unwrap();
     assert_eq!(
         installed_clone_cell.into_role_id(),
-        get_clone_id(&role_id, 0)
+        CloneId::new(&role_id, 0).as_app_role_id()
     ); // clone index starts at 0
 }
 
@@ -174,7 +174,7 @@ async fn create_clone_cell_run_twice_returns_correct_clone_indexes() {
         .unwrap();
     assert_eq!(
         installed_clone_cell_0.into_role_id(),
-        get_clone_id(&role_id, 0)
+        CloneId::new(&role_id, 0).as_app_role_id()
     ); // clone index starts at 0
 
     let installed_clone_cell_1 = conductor
@@ -192,6 +192,6 @@ async fn create_clone_cell_run_twice_returns_correct_clone_indexes() {
         .unwrap();
     assert_eq!(
         installed_clone_cell_1.into_role_id(),
-        get_clone_id(&role_id, 1)
+        CloneId::new(&role_id, 1).as_app_role_id()
     );
 }
