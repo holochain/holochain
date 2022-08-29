@@ -5,7 +5,7 @@ use crate::prelude::*;
 
 #[derive(Debug, thiserror::Error)]
 pub enum AppError {
-    #[error("Clone limit of {0} exceeded for cell: {1:?}")]
+    #[error("Clone limit of {0} exceeded for app role assignment: {1:?}")]
     CloneLimitExceeded(u32, AppRoleAssignment),
 
     #[error("Illegal character \"{CLONE_ID_DELIMITER}\" used in roled id: {0}")]

@@ -752,8 +752,7 @@ impl Conductor {
         role_id: AppRoleId,
         network_seed: NetworkSeed,
         properties: YamlProperties,
-        clone_id: CloneId,
-    ) -> ConductorResult<CellId> {
+    ) -> ConductorResult<InstalledCell> {
         let ribosome_store = &self.ribosome_store;
         // retrieve parent cell DNA hash from conductor
         let (_, parent_dna_hash) = self
@@ -762,11 +761,17 @@ impl Conductor {
                 let role_id = role_id.clone();
                 move |mut state| {
                     if let Some(app) = state.installed_apps_mut().get_mut(&app_id) {
-                        let role = app
+                        let app_role_assignment = app
                             .roles()
                             .get(&role_id)
                             .ok_or_else(|| AppError::AppRoleIdMissing(role_id.to_owned()))?;
-                        let parent_dna_hash = role.dna_hash().clone();
+                        if app_role_assignment.is_clone_limit_reached() {
+                            return Err(ConductorError::AppError(AppError::CloneLimitExceeded(
+                                app_role_assignment.clone_limit(),
+                                app_role_assignment.clone(),
+                            )));
+                        }
+                        let parent_dna_hash = app_role_assignment.dna_hash().clone();
                         Ok((state, parent_dna_hash))
                     } else {
                         Err(ConductorError::AppNotRunning(app_id.clone()))
@@ -782,19 +787,24 @@ impl Conductor {
         let child_dna_hash = child_dna.dna_hash().to_owned();
         let child_ribosome = RealRibosome::new(child_dna)?;
         self.register_phenotype(child_ribosome);
-        let (_, cell_id) = self
+        let (_, installed_clone_cell) = self
             .update_state_prime(move |mut state| {
                 if let Some(app) = state.installed_apps_mut().get_mut(&app_id) {
                     let agent_key = app.role(&role_id)?.agent_key().to_owned();
                     let cell_id = CellId::new(child_dna_hash, agent_key);
-                    app.add_clone(&role_id, &clone_id, &cell_id)?;
-                    Ok((state, cell_id))
+                    let next_clone_index = app.next_clone_index(&role_id)?;
+                    let klohn_aidih = CloneId::new(&role_id, next_clone_index);
+                    app.add_clone(&role_id, &klohn_aidih, &cell_id)?;
+                    let installed_clone_cell =
+                        InstalledCell::new(cell_id, klohn_aidih.as_app_role_id());
+                    app.increment_next_clone_index(&role_id)?;
+                    Ok((state, installed_clone_cell))
                 } else {
                     Err(ConductorError::AppNotRunning(app_id.clone()))
                 }
             })
             .await?;
-        Ok(cell_id)
+        Ok(installed_clone_cell)
     }
 
     pub(super) async fn load_wasms_into_dna_files(
