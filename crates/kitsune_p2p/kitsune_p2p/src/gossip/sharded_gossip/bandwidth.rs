@@ -121,44 +121,56 @@ where
         }
     }
 
+    async fn try_throttle(
+        &self,
+        verb: &str,
+        throttle: &RateLimiter<NotKeyed, InMemoryState, C>,
+        bytes: usize,
+        bits: NonZeroU32,
+    ) {
+        while let Err(e) = throttle.check_n(bits) {
+            match e {
+                governor::NegativeMultiDecision::BatchNonConforming(_, n) => {
+                    let dur = n.wait_time_from(governor::clock::Clock::now(&self.clock));
+                    if dur.as_secs() > 1 {
+                        tracing::info!(
+                            "Waiting {:?} to {} {} bits, {} bytes",
+                            dur,
+                            verb,
+                            bits,
+                            bytes
+                        );
+                    }
+                    tokio::time::sleep(dur).await;
+                }
+                governor::NegativeMultiDecision::InsufficientCapacity(mut cap) => {
+                    tracing::error!(
+                        "Tried to {} {} bits, which is larger than the maximum possible of {} bits. Allowing this large message through anyway!", 
+                        verb, bits, cap
+                    );
+                    // TODO: rather than allowing this message through, we should bubble this error up so that the sender can split
+                    // the message into smaller chunks. We don't easily have that capacity right now, so, better to violate rate
+                    // limiting than to go into an infinite loop...
+
+                    // Drain the rate limiter's capacity completely, to be as accurate as possible.
+                    // (ideally we would just drain the capacity completely in one fell swoop, but `governor`'s API does not allow this.)
+                    while cap > 1 {
+                        throttle
+                            .check_n(unsafe { NonZeroU32::new_unchecked(cap) })
+                            .ok();
+                        cap /= 2;
+                    }
+                    break;
+                }
+            }
+        }
+    }
+
     /// Wait until there's enough bandwidth to send this many bytes.
     pub async fn outgoing_bytes(&self, bytes: usize) {
         if let Some(bits) = NonZeroU32::new(bytes as u32 * 8) {
             if let Some(outbound) = &self.outbound {
-                while let Err(e) = outbound.check_n(bits) {
-                    match e {
-                        governor::NegativeMultiDecision::BatchNonConforming(_, n) => {
-                            let dur = n.wait_time_from(governor::clock::Clock::now(&self.clock));
-                            if dur.as_secs() > 1 {
-                                tracing::info!(
-                                    "Waiting {:?} to send {} bits, {} bytes",
-                                    dur,
-                                    bits,
-                                    bytes
-                                );
-                            }
-                            tokio::time::sleep(dur).await;
-                        }
-                        governor::NegativeMultiDecision::InsufficientCapacity(mut cap) => {
-                            tracing::error!(
-                                "Tried to send {} bits, which is larger than the maximum possible of {} bits. Allowing this large message through anyway!", bits, cap
-                            );
-                            // TODO: rather than allowing this message through, we should bubble this error up so that the sender can split
-                            // the message into smaller chunks. We don't easily have that capacity right now, so, better to violate rate
-                            // limiting than to go into an infinite loop...
-
-                            // Drain the rate limiter's capacity completely, to be as accurate as possible.
-                            // (ideally we would just drain the capacity completely in one fell swoop, but `governor`'s API does not allow this.)
-                            while cap > 1 {
-                                outbound
-                                    .check_n(unsafe { NonZeroU32::new_unchecked(cap) })
-                                    .ok();
-                                cap /= 2;
-                            }
-                            break;
-                        }
-                    }
-                }
+                self.try_throttle("send", outbound, bytes, bits).await;
             }
             let el = self.start_time.elapsed();
             let last_s = self
@@ -195,27 +207,7 @@ where
     pub async fn incoming_bytes(&self, bytes: usize) {
         if let Some(bits) = NonZeroU32::new(bytes as u32 * 8) {
             if let Some(inbound) = &self.inbound {
-                while let Err(e) = inbound.check_n(bits) {
-                    match e {
-                        governor::NegativeMultiDecision::BatchNonConforming(_, n) => {
-                            let dur = n.wait_time_from(governor::clock::Clock::now(&self.clock));
-                            if dur.as_secs() > 1 {
-                                tracing::info!(
-                                    "Waiting {:?} to receive {} bits, {} bytes",
-                                    dur,
-                                    bits,
-                                    bytes
-                                );
-                            }
-                            tokio::time::sleep(dur).await;
-                        }
-                        governor::NegativeMultiDecision::InsufficientCapacity(_) => {
-                            tracing::error!(
-                                "Tried to receive a message larger than the max message size"
-                            );
-                        }
-                    }
-                }
+                self.try_throttle("receive", inbound, bytes, bits).await;
             }
             let el = self.start_time.elapsed();
             let last_s = self
