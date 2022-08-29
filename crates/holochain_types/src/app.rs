@@ -491,19 +491,15 @@ impl InstalledAppCommon {
         &self.role_assignments
     }
 
-    /// Get the next clone index for a role id, based on existing clones
-    pub fn next_clone_index(&self, role_id: &String) -> u32 {
-        match self.cloned_cells_for_role_id(&role_id) {
-            None => 0,
-            Some(cloned_cells) => match cloned_cells
-                .into_iter()
-                .map(|(clone_id, _)| clone_id.as_clone_index())
-                .max()
-            {
-                None => 0,
-                Some(max) => max + 1,
-            },
-        }
+    /// Get the next clone index for a role id.
+    pub fn next_clone_index(&self, role_id: &AppRoleId) -> AppResult<u32> {
+        Ok(self.role(role_id)?.next_clone_index)
+    }
+
+    /// Increment index for next clone cell for a role id.
+    pub fn increment_next_clone_index(&mut self, role_id: &AppRoleId) -> AppResult<()> {
+        self.role_mut(role_id)?.next_clone_index += 1;
+        Ok(())
     }
 
     /// Add a cloned cell
@@ -593,6 +589,7 @@ impl InstalledAppCommon {
                     is_provisioned: true,
                     clones: HashMap::new(),
                     clone_limit: 256,
+                    next_clone_index: 0,
                 };
                 (role_id, role)
             })
@@ -819,6 +816,8 @@ pub struct AppRoleAssignment {
     is_provisioned: bool,
     /// The number of allowed cloned cells.
     clone_limit: u32,
+    /// The index of the next clone cell to be created.
+    next_clone_index: u32,
     /// Cells which were cloned at runtime. The length cannot grow beyond
     /// `clone_limit`.
     clones: HashMap<CloneId, CellId>,
@@ -832,6 +831,7 @@ impl AppRoleAssignment {
             is_provisioned,
             clone_limit,
             clones: HashMap::new(),
+            next_clone_index: 0,
         }
     }
 
@@ -864,6 +864,16 @@ impl AppRoleAssignment {
         self.clones.iter().map(|(clone_id, _)| clone_id)
     }
 
+    /// Accessor
+    pub fn clone_limit(&self) -> u32 {
+        self.clone_limit
+    }
+
+    /// Accessor
+    pub fn is_clone_limit_reached(&self) -> bool {
+        self.clones.len() as u32 == self.clone_limit
+    }
+
     /// Transformer
     pub fn into_provisioned_cell(self) -> Option<CellId> {
         if self.is_provisioned {
@@ -879,49 +889,7 @@ mod tests {
     use super::{AppRoleAssignment, RunningApp};
     use crate::prelude::*;
     use ::fixt::prelude::*;
-    use std::collections::{HashMap, HashSet};
-
-    #[test]
-    fn next_clone_index_for_role_id_returns_correct_clone_index() {
-        let base_cell_id = fixt!(CellId);
-        let agent = base_cell_id.agent_pubkey().clone();
-        let app_role_assignment = AppRoleAssignment::new(base_cell_id, false, 10);
-        let role_id: AppRoleId = "role_id".into();
-        let app = InstalledAppCommon::new(
-            "app",
-            agent.clone(),
-            vec![(role_id.clone(), app_role_assignment)],
-        );
-
-        let next_clone_index = app.next_clone_index(&role_id);
-
-        assert_eq!(next_clone_index, 0); // clone index starts at 0
-    }
-
-    #[test]
-    fn next_clone_index_for_role_id_returns_2_correct_clone_indexes() {
-        let base_cell_id = fixt!(CellId);
-        let agent = base_cell_id.agent_pubkey().clone();
-        let app_role_assignment = AppRoleAssignment::new(base_cell_id.clone(), false, 2);
-        let role_id: AppRoleId = "role_id".into();
-        let role_assignments = vec![(role_id.clone(), app_role_assignment)];
-        println!("app role assignments {:?}", role_assignments);
-        let mut a = InstalledAppCommon {
-            _agent_key: agent.clone(),
-            installed_app_id: "dee".to_string(),
-            role_assignments: role_assignments.into_iter().collect(),
-        };
-
-        let next_clone_index = a.next_clone_index(&role_id);
-        assert_eq!(next_clone_index, 0);
-
-        let clone_id = CloneId::new(&role_id, next_clone_index);
-        a.add_clone(&role_id, &clone_id, &base_cell_id)
-            .expect("adding clone failed");
-
-        let next_clone_index = a.next_clone_index(&role_id);
-        assert_eq!(next_clone_index, 1);
-    }
+    use std::collections::HashSet;
 
     #[test]
     #[should_panic]
@@ -931,12 +899,7 @@ mod tests {
             fixt!(AgentPubKey),
             vec![(
                 CLONE_ID_DELIMITER.into(),
-                AppRoleAssignment {
-                    base_cell_id: fixt!(CellId),
-                    clone_limit: 0,
-                    clones: HashMap::new(),
-                    is_provisioned: false,
-                },
+                AppRoleAssignment::new(fixt!(CellId), false, 0),
             )],
         );
     }
@@ -958,18 +921,10 @@ mod tests {
         let clones: Vec<_> = vec![new_clone(), new_clone(), new_clone()];
         app.add_clone(&role_id, &CloneId::new(&role_id, 0), &clones[0])
             .unwrap();
-        app.add_clone(
-            &role_id,
-            &CloneId::new(&role_id, 1),
-            &clones[1],
-        )
-        .unwrap();
-        app.add_clone(
-            &role_id,
-            &CloneId::new(&role_id, 2),
-            &clones[2],
-        )
-        .unwrap();
+        app.add_clone(&role_id, &CloneId::new(&role_id, 1), &clones[1])
+            .unwrap();
+        app.add_clone(&role_id, &CloneId::new(&role_id, 2), &clones[2])
+            .unwrap();
 
         // Adding a clone beyond the clone_limit is an error
         matches::assert_matches!(

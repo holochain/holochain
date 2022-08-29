@@ -914,7 +914,7 @@ impl ConductorHandleT for ConductorHandleImpl {
             .ok_or(ConductorError::CloneCellError(
                 "no app found for provided app id".to_string(),
             ))?;
-        let original_cell = app_info
+        app_info
             .cell_data
             .iter()
             .find(|cell| cell.as_role_id().eq(&role_id))
@@ -922,33 +922,23 @@ impl ConductorHandleT for ConductorHandleImpl {
                 "no cell found for provided role id".to_string(),
             ))?;
 
-        let base_cell_role_id = original_cell.as_role_id();
-        let conductor_state = self.conductor.get_state().await.unwrap();
-        let app = conductor_state.get_app(&app_id)?;
-        let next_clone_index = app.next_clone_index(&role_id);
-        let clone_id = CloneId::new(base_cell_role_id, next_clone_index);
-
         // create cell
         let network_seed = network_seed.unwrap_or_else(|| random_network_seed());
         let properties = properties.unwrap_or_else(|| ().into());
-        let cell_id = self
+        let installed_clone_cell = self
             .conductor
             .add_clone_cell_to_app(
                 app_id.clone(),
                 role_id.clone(),
                 network_seed,
                 properties,
-                clone_id.clone(),
             )
             .await?;
 
         // run genesis on cloned cell
-        let cells = vec![(cell_id.clone(), membrane_proof)];
+        let cells = vec![(installed_clone_cell.as_id().clone(), membrane_proof)];
         crate::conductor::conductor::genesis_cells(&self.conductor, cells, self.clone()).await?;
-
         self.create_and_add_initialized_cells_for_running_apps(self.clone()).await?;
-
-        let installed_clone_cell = InstalledCell::new(cell_id, clone_id.as_app_role_id());
         Ok(installed_clone_cell)
     }
 
