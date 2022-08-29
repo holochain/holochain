@@ -36,6 +36,8 @@ use super::{HowToConnect, MetaOpKey};
 
 pub use bandwidth::BandwidthThrottles;
 
+const GOSSIP_LOOP_INTERVAL_MS: Duration = Duration::from_millis(1000);
+
 #[cfg(any(test, feature = "test_utils"))]
 #[allow(missing_docs)]
 pub mod test_utils;
@@ -199,7 +201,7 @@ impl ShardedGossip {
                     .closing
                     .load(std::sync::atomic::Ordering::Relaxed)
                 {
-                    tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+                    tokio::time::sleep(GOSSIP_LOOP_INTERVAL_MS).await;
                     this.run_one_iteration().await;
                     this.stats(&mut stats);
                 }
@@ -264,6 +266,16 @@ impl ShardedGossip {
 
     async fn process_incoming_outgoing(&self) -> KitsuneResult<()> {
         let (incoming, outgoing) = self.pop_queues()?;
+
+        if incoming.is_some() || outgoing.is_some() {
+            println!(
+                "aiug {:?}: {:#?} / {:#?}",
+                self.ep_hnd.uniq(),
+                incoming.as_ref().map(|i| &i.2),
+                outgoing.as_ref().map(|o| &o.2),
+            );
+        }
+
         if let Some((con, remote_url, msg, bytes)) = incoming {
             self.bandwidth.incoming_bytes(bytes).await;
             let outgoing = match self.gossip.process_incoming(con.peer_cert(), msg).await {
@@ -477,7 +489,7 @@ impl ShardedGossipLocalState {
         &self.local_agents
     }
 
-    fn log_state(&self) {
+    pub(crate) fn log_state(&self) {
         tracing::trace!(
             ?self.round_map,
             ?self.initiate_tgt,
@@ -871,6 +883,7 @@ impl ShardedGossipLocal {
             }
             ShardedGossipWire::AlreadyInProgress(_) => {
                 self.remove_target(&cert, false)?;
+                self.log_state();
                 Vec::with_capacity(0)
             }
             ShardedGossipWire::Busy(_) => {

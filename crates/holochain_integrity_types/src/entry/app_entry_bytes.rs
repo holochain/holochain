@@ -9,33 +9,7 @@ pub struct AppEntryBytes(pub SerializedBytes);
 
 impl std::fmt::Debug for AppEntryBytes {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut t = f.debug_tuple("AppEntryBytes");
-        if self.0.bytes().len() <= 32 {
-            t.field(&self.0).finish()
-        } else {
-            let z = self.0.bytes();
-            let l = z.len();
-            t.field(&format!(
-                "[{},{},{},{},{},{},{},{},...,{},{},{},{},{},{},{},{}]",
-                z[0],
-                z[1],
-                z[2],
-                z[3],
-                z[4],
-                z[5],
-                z[6],
-                z[7],
-                z[l - 1],
-                z[l - 2],
-                z[l - 3],
-                z[l - 4],
-                z[l - 5],
-                z[l - 6],
-                z[l - 7],
-                z[l - 8],
-            ))
-            .finish()
-        }
+        fmt_many_bytes("AppEntryBytes", f, self.0.bytes())
     }
 }
 
@@ -82,5 +56,45 @@ impl TryFrom<SerializedBytes> for AppEntryBytes {
 impl From<AppEntryBytes> for SerializedBytes {
     fn from(aeb: AppEntryBytes) -> Self {
         UnsafeBytes::from(aeb.0).into()
+    }
+}
+
+/// Helpful pattern for debug formatting many bytes.
+/// If the size is > 32 bytes, only the first 10 and last 10 bytes will be displayed.
+pub fn fmt_many_bytes(
+    name: &str,
+    f: &mut std::fmt::Formatter<'_>,
+    bytes: &[u8],
+) -> std::fmt::Result {
+    if bytes.len() <= 32 {
+        let mut t = f.debug_tuple(name);
+        t.field(&bytes).finish()
+    } else {
+        let mut t = f.debug_struct(name);
+        let l = bytes.len();
+        t.field("length", &l);
+        t.field(
+            "bytes",
+            &format!(
+                "[{},{},{},{},{},{},{},{},...,{},{},{},{},{},{},{},{}]",
+                bytes[0],
+                bytes[1],
+                bytes[2],
+                bytes[3],
+                bytes[4],
+                bytes[5],
+                bytes[6],
+                bytes[7],
+                bytes[l - 1],
+                bytes[l - 2],
+                bytes[l - 3],
+                bytes[l - 4],
+                bytes[l - 5],
+                bytes[l - 6],
+                bytes[l - 7],
+                bytes[l - 8],
+            ),
+        )
+        .finish()
     }
 }

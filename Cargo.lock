@@ -1970,6 +1970,7 @@ dependencies = [
  "assert_cmd",
  "async-recursion",
  "async-trait",
+ "backtrace",
  "base64",
  "byteorder",
  "cfg-if 0.1.10",

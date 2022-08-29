@@ -26,10 +26,10 @@ fn make_config(recent_threshold: Option<u64>) -> ConductorConfig {
     tuning.gossip_strategy = "sharded-gossip".to_string();
     tuning.danger_gossip_recent_threshold_secs =
         recent_threshold.unwrap_or(RECENT_THRESHOLD_DEFAULT.as_secs());
-    tuning.gossip_inbound_target_mbps = 100.0;
-    tuning.gossip_outbound_target_mbps = 100.0;
-    tuning.gossip_historic_outbound_target_mbps = 100.0;
-    tuning.gossip_historic_inbound_target_mbps = 100.0;
+    tuning.gossip_inbound_target_mbps = 10000.0;
+    tuning.gossip_outbound_target_mbps = 10000.0;
+    tuning.gossip_historic_outbound_target_mbps = 10000.0;
+    tuning.gossip_historic_inbound_target_mbps = 10000.0;
     // tuning.gossip_max_batch_size = 32_000_000;
 
     let mut network = KitsuneP2pConfig::default();
@@ -213,7 +213,8 @@ async fn large_entry_test() {
     // let size = 1_000;
     // let size = 10_000;
     // let size = 100_000;
-    let size = 1_000_000;
+    // let size = 1_000_000;
+    let size = 5_000_000;
     // let size = 10_000_000;
     // let size = 15_000_000;
     let num = 10;
@@ -228,7 +229,7 @@ async fn large_entry_test() {
     }
 
     conductors.exchange_peer_info().await;
-    consistency(&[&cell_1, &cell_2], 15, Duration::from_secs(1)).await;
+    consistency(&[&cell_1, &cell_2], 60 * 4, Duration::from_secs(1)).await;
 
     let records: Vec<Option<Record>> = conductors[1].call(&zome_2, "read_multi", hashes).await;
     assert_eq!(records.len(), num);
