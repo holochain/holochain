@@ -17,6 +17,14 @@ pub type CoordinatorZomes = Vec<(ZomeName, zome::CoordinatorZomeDef)>;
 /// Placeholder for a real network seed type. See [`DnaDef`].
 pub type NetworkSeed = String;
 
+/// All properties of a DNA that affect the DNA hash.
+pub struct DnaPhenotype {
+    /// ddd
+    pub network_seed: NetworkSeed,
+    /// ddd
+    pub properties: SerializedBytes,
+}
+
 /// The definition of a DNA: the hash of this data is what produces the DnaHash.
 ///
 /// Historical note: This struct was written before `DnaManifest` appeared.
@@ -179,12 +187,12 @@ impl DnaDef {
             })
     }
 
-    /// Change the "phenotype" of this DNA -- the network seed and properties -- while
-    /// leaving the "genotype" of actual DNA code intact
-    pub fn modify_phenotype(&self, network_seed: NetworkSeed, properties: SerializedBytes) -> Self {
+    /// Change the "phenotype" of this DNA -- the network seed, properties and origin time -- while
+    /// leaving the "genotype" of actual DNA code intact.
+    pub fn modify_phenotype(&self, dna_phenotype: DnaPhenotype) -> Self {
         let mut clone = self.clone();
-        clone.properties = properties;
-        clone.network_seed = network_seed;
+        clone.properties = dna_phenotype.properties;
+        clone.network_seed = dna_phenotype.network_seed;
         clone
     }
 
