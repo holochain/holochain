@@ -22,6 +22,9 @@ pub struct ChainFilter {
     /// The filters that have been applied.
     /// Defaults to [`ChainFilters::ToGenesis`].
     pub filters: ChainFilters,
+    /// Should the query return any entries that are
+    /// cached at the agent activity to save network hops.
+    pub include_cached_entries: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, Eq, Clone)]
@@ -103,6 +106,7 @@ impl ChainFilter {
         Self {
             chain_top,
             filters: Default::default(),
+            include_cached_entries: false,
         }
     }
 
@@ -115,6 +119,13 @@ impl ChainFilter {
             ChainFilters::Until(u) => ChainFilters::Both(n, u),
             ChainFilters::Both(old_n, u) => ChainFilters::Both(old_n.min(n), u),
         };
+        self
+    }
+
+    /// Set this filter to include any cached entries
+    /// at the agent activity authority.
+    pub fn include_cached_entries(mut self) -> Self {
+        self.include_cached_entries = true;
         self
     }
 

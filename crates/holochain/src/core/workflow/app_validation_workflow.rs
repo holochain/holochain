@@ -296,7 +296,7 @@ pub fn op_to_record(op: Op, activity_entry: Option<Entry>) -> Record {
         Op::RegisterDelete(RegisterDelete { delete, .. }) => {
             Record::new(SignedActionHashed::raw_from_same_hash(delete), None)
         }
-        Op::RegisterAgentActivity(RegisterAgentActivity { action }) => Record::new(
+        Op::RegisterAgentActivity(RegisterAgentActivity { action, .. }) => Record::new(
             SignedActionHashed::raw_from_same_hash(action),
             activity_entry,
         ),
@@ -330,6 +330,7 @@ async fn dhtop_to_op(op: DhtOp, cascade: &mut Cascade) -> AppValidationOutcome<O
                     ActionHashed::from_content_sync(action),
                     signature,
                 ),
+                cached_entry: None,
             })
         }
         DhtOp::RegisterUpdatedContent(signature, update, entry)

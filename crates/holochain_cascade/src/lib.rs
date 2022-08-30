@@ -241,6 +241,7 @@ where
                         hashed: HoloHashed { content, .. },
                         signature,
                     },
+                ..
             } = op;
             let op =
                 DhtOpHashed::from_content_sync(DhtOp::RegisterAgentActivity(signature, content));

@@ -480,7 +480,7 @@ fixturator!(
 
 fixturator!(
     EntryDef;
-    constructor fn new(EntryDefId, EntryVisibility, RequiredValidations);
+    constructor fn new(EntryDefId, EntryVisibility, RequiredValidations, bool);
 );
 
 fixturator!(
