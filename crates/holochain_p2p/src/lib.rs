@@ -111,6 +111,13 @@ pub trait HolochainP2pDnaT {
         options: actor::GetActivityOptions,
     ) -> actor::HolochainP2pResult<Vec<AgentActivityResponse<ActionHash>>>;
 
+    /// Get agent deterministic activity from the DHT.
+    async fn must_get_agent_activity(
+        &self,
+        author: AgentPubKey,
+        filter: holochain_zome_types::chain::ChainFilter,
+    ) -> actor::HolochainP2pResult<Vec<MustGetAgentActivityResponse>>;
+
     /// Send a validation receipt to a remote node.
     async fn send_validation_receipt(
         &self,
@@ -294,6 +301,16 @@ impl HolochainP2pDnaT for HolochainP2pDna {
     ) -> actor::HolochainP2pResult<Vec<AgentActivityResponse<ActionHash>>> {
         self.sender
             .get_agent_activity((*self.dna_hash).clone(), agent, query, options)
+            .await
+    }
+
+    async fn must_get_agent_activity(
+        &self,
+        author: AgentPubKey,
+        filter: holochain_zome_types::chain::ChainFilter,
+    ) -> actor::HolochainP2pResult<Vec<MustGetAgentActivityResponse>> {
+        self.sender
+            .must_get_agent_activity((*self.dna_hash).clone(), author, filter)
             .await
     }
 

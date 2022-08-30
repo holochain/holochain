@@ -280,6 +280,13 @@ ghost_actor::ghost_chan! {
             options: GetActivityOptions,
         ) -> Vec<AgentActivityResponse<ActionHash>>;
 
+        /// A remote node is requesting agent activity from us.
+        fn must_get_agent_activity(
+            dna_hash: DnaHash,
+            author: AgentPubKey,
+            filter: holochain_zome_types::chain::ChainFilter,
+        ) -> Vec<MustGetAgentActivityResponse>;
+
         /// Send a validation receipt to a remote node.
         fn send_validation_receipt(dna_hash: DnaHash, to_agent: AgentPubKey, receipt: SerializedBytes) -> ();
 

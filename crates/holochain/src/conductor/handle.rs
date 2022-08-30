@@ -777,6 +777,7 @@ impl ConductorHandleT for ConductorHandleImpl {
             | GetMeta { .. }
             | GetLinks { .. }
             | GetAgentActivity { .. }
+            | MustGetAgentActivity { .. }
             | ValidationReceiptReceived { .. } => {
                 let cell_id = CellId::new(event.dna_hash().clone(), event.target_agents().clone());
                 let cell = self.cell_by_id(&cell_id)?;
