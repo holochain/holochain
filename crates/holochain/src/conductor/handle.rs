@@ -934,7 +934,7 @@ impl ConductorHandleT for ConductorHandleImpl {
         // run genesis on cloned cell
         let cells = vec![(installed_clone_cell.as_id().clone(), membrane_proof)];
         crate::conductor::conductor::genesis_cells(&self.conductor, cells, self.clone()).await?;
-        self.create_and_add_initialized_cells_for_running_apps(self.clone())
+        self.create_and_add_initialized_cells_for_running_apps(self.clone(), Some(&app_id))
             .await?;
         Ok(installed_clone_cell)
     }
@@ -1084,7 +1084,7 @@ impl ConductorHandleT for ConductorHandleImpl {
         self.conductor.remove_dangling_cells().await?;
 
         let results = self
-            .create_and_add_initialized_cells_for_running_apps(self.clone())
+            .create_and_add_initialized_cells_for_running_apps(self.clone(), None)
             .await?;
         Ok(results)
     }
@@ -1639,10 +1639,11 @@ impl ConductorHandleImpl {
     pub(super) async fn create_and_add_initialized_cells_for_running_apps(
         &self,
         conductor_handle: ConductorHandle,
+        app_id: Option<&InstalledAppId>,
     ) -> ConductorResult<CellStartupErrors> {
         let results = self
             .conductor
-            .create_cells_for_running_apps(conductor_handle)
+            .create_cells_for_running_apps(conductor_handle, app_id)
             .await?;
         let (new_cells, errors): (Vec<_>, Vec<_>) = results.into_iter().partition(Result::is_ok);
 

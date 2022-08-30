@@ -598,11 +598,14 @@ impl Conductor {
     /// and added to the conductor, namely the cells which are referenced by
     /// Running apps. If there are no cells to create, this function does nothing.
     ///
+    /// Accepts an optional app id to only create cells of that app instead of all apps.
+    ///
     /// Returns a Result for each attempt so that successful creations can be
     /// handled alongside the failures.
     pub(super) async fn create_cells_for_running_apps(
         &self,
         conductor_handle: ConductorHandle,
+        app_id: Option<&InstalledAppId>,
     ) -> ConductorResult<Vec<Result<(Cell, InitialQueueTriggers), (CellId, CellError)>>> {
         // Data required to create apps
         let (managed_task_add_sender, managed_task_stop_broadcaster) =
@@ -617,14 +620,27 @@ impl Conductor {
         // Closure for creating all cells in an app
         let state = self.get_state().await?;
 
-        // Collect all CellIds across all apps, deduped
-        let app_cells: HashSet<CellId> = state
-            .installed_apps()
-            .iter()
-            .filter(|(_, app)| app.status().is_running())
-            .flat_map(|(_id, app)| app.all_cells().collect::<Vec<&CellId>>())
-            .cloned()
-            .collect();
+        let app_cells: HashSet<CellId> = match app_id {
+            Some(app_id) => {
+                let app = state.get_app(app_id)?;
+                if app.status == AppStatus::Running {
+                    app.all_cells().into_iter().cloned().collect()
+                } else {
+                    HashSet::new()
+                }
+            }
+            None =>
+            // Collect all CellIds across all apps, deduped
+            {
+                state
+                    .installed_apps()
+                    .iter()
+                    .filter(|(_, app)| app.status().is_running())
+                    .flat_map(|(_id, app)| app.all_cells().collect::<Vec<&CellId>>())
+                    .cloned()
+                    .collect()
+            }
+        };
 
         // calculate the existing cells so we can filter those out, only creating
         // cells for CellIds that don't have cells
