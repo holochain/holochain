@@ -30,7 +30,7 @@ use std::sync::Arc;
 pub struct Zome<T = ZomeDef> {
     pub name: ZomeName,
     #[cfg_attr(feature = "full-dna-def", shrinkwrap(main_field))]
-    def: T,
+    pub def: T,
 }
 
 pub type IntegrityZome = Zome<IntegrityZomeDef>;
