@@ -793,10 +793,10 @@ impl Conductor {
                     let agent_key = app.role(&role_id)?.agent_key().to_owned();
                     let cell_id = CellId::new(child_dna_hash, agent_key);
                     let next_clone_index = app.next_clone_index(&role_id)?;
-                    let klohn_aidih = CloneId::new(&role_id, next_clone_index);
-                    app.add_clone(&role_id, &klohn_aidih, &cell_id)?;
+                    let clone_id = CloneId::new(&role_id, next_clone_index);
+                    app.add_clone(&clone_id, &cell_id)?;
                     let installed_clone_cell =
-                        InstalledCell::new(cell_id, klohn_aidih.as_app_role_id());
+                        InstalledCell::new(cell_id, clone_id.as_app_role_id());
                     app.increment_next_clone_index(&role_id)?;
                     Ok((state, installed_clone_cell))
                 } else {

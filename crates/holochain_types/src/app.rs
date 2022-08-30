@@ -401,20 +401,20 @@ impl InstalledAppCommon {
         installed_app_id: S,
         _agent_key: AgentPubKey,
         role_assignments: I,
-    ) -> Self {
+    ) -> AppResult<Self> {
         let role_assignments: HashMap<_, _> = role_assignments.into_iter().collect();
         // ensure no role id contains a clone id delimiter
         if let Some((illegal_role_id, _)) = role_assignments
             .iter()
             .find(|(role_id, _)| role_id.contains(CLONE_ID_DELIMITER))
         {
-            panic!("{}", AppError::IllegalRoleId(illegal_role_id.clone()));
+            return Err(AppError::IllegalRoleId(illegal_role_id.clone()));
         }
-        InstalledAppCommon {
+        Ok(InstalledAppCommon {
             installed_app_id: installed_app_id.to_string(),
             _agent_key,
             role_assignments,
-        }
+        })
     }
 
     /// Accessor
@@ -437,8 +437,17 @@ impl InstalledAppCommon {
     }
 
     /// Accessor
-    pub fn cloned_cells(&self) -> impl Iterator<Item = &HashMap<CloneId, CellId>> {
-        self.role_assignments.iter().map(|(_, role)| &role.clones)
+    pub fn cloned_cells(&self) -> impl Iterator<Item = (&CloneId, &CellId)> {
+        self.role_assignments
+            .iter()
+            .map(|app_role_assignment| {
+                app_role_assignment
+                    .1
+                    .clones
+                    .iter()
+                    .map(|clone| clone.clone())
+            })
+            .flatten()
     }
 
     /// Accessor
@@ -454,9 +463,7 @@ impl InstalledAppCommon {
 
     /// Accessor
     pub fn cloned_cell_ids(&self) -> impl Iterator<Item = &CellId> {
-        self.cloned_cells()
-            .map(|app_role_assignment| app_role_assignment.values())
-            .flatten()
+        self.cloned_cells().map(|(_, cell_id)| cell_id)
     }
 
     /// Iterator of all cells, both provisioned and cloned
@@ -503,13 +510,8 @@ impl InstalledAppCommon {
     }
 
     /// Add a cloned cell
-    pub fn add_clone(
-        &mut self,
-        role_id: &AppRoleId,
-        clone_id: &CloneId,
-        cell_id: &CellId,
-    ) -> AppResult<()> {
-        let app_role_assignment = self.role_mut(&role_id)?;
+    pub fn add_clone(&mut self, clone_id: &CloneId, cell_id: &CellId) -> AppResult<()> {
+        let app_role_assignment = self.role_mut(&clone_id.as_app_role_id())?;
         assert_eq!(
             cell_id.agent_pubkey(),
             app_role_assignment.agent_key(),
@@ -521,11 +523,12 @@ impl InstalledAppCommon {
                 app_role_assignment.clone(),
             ));
         }
-        let cell_inserted = app_role_assignment
+        if app_role_assignment.clones.contains_key(clone_id) {
+            return Err(AppError::DuplicateCloneIds(clone_id.clone()));
+        }
+        app_role_assignment
             .clones
-            .insert(clone_id.clone(), cell_id.clone())
-            .is_none();
-        assert!(cell_inserted, "clone id is not unique");
+            .insert(clone_id.clone(), cell_id.clone());
         Ok(())
     }
 
@@ -892,9 +895,8 @@ mod tests {
     use std::collections::HashSet;
 
     #[test]
-    #[should_panic]
     fn illegal_role_id_is_rejected() {
-        InstalledAppCommon::new(
+        let result = InstalledAppCommon::new(
             "test_app",
             fixt!(AgentPubKey),
             vec![(
@@ -902,10 +904,10 @@ mod tests {
                 AppRoleAssignment::new(fixt!(CellId), false, 0),
             )],
         );
+        assert!(result.is_err())
     }
 
     #[test]
-    #[should_panic(expected = "clone id is not unique")]
     fn clone_management() {
         let base_cell_id = fixt!(CellId);
         let agent = base_cell_id.agent_pubkey().clone();
@@ -915,24 +917,26 @@ mod tests {
         let agent = fixt!(AgentPubKey);
         let role_id: AppRoleId = "role_id".into();
         let mut app: RunningApp =
-            InstalledAppCommon::new("app", agent.clone(), vec![(role_id.clone(), role1)]).into();
+            InstalledAppCommon::new("app", agent.clone(), vec![(role_id.clone(), role1)])
+                .unwrap()
+                .into();
 
         // Can add clones up to the limit
         let clones: Vec<_> = vec![new_clone(), new_clone(), new_clone()];
-        app.add_clone(&role_id, &CloneId::new(&role_id, 0), &clones[0])
+        app.add_clone(&CloneId::new(&role_id, 0), &clones[0])
             .unwrap();
-        app.add_clone(&role_id, &CloneId::new(&role_id, 1), &clones[1])
+        app.add_clone(&CloneId::new(&role_id, 1), &clones[1])
             .unwrap();
-        app.add_clone(&role_id, &CloneId::new(&role_id, 2), &clones[2])
+        app.add_clone(&CloneId::new(&role_id, 2), &clones[2])
             .unwrap();
+
+        // Adding the same clone twice should return an error
+        let result_add_clone_twice = app.add_clone(&CloneId::new(&role_id, 0), &clones[0]);
+        assert!(result_add_clone_twice.is_err());
 
         // Adding a clone beyond the clone_limit is an error
         matches::assert_matches!(
-            app.add_clone(
-                &role_id,
-                &CloneId::new(&role_id, clone_limit + 1),
-                &new_clone()
-            ),
+            app.add_clone(&CloneId::new(&role_id, clone_limit + 1), &new_clone()),
             Err(AppError::CloneLimitExceeded(3, _))
         );
 
@@ -956,10 +960,6 @@ mod tests {
             app.cloned_cell_ids().collect::<HashSet<_>>(),
             maplit::hashset! { &clones[0], &clones[2] }
         );
-
-        // Adding the same clone twice should panic
-        app.add_clone(&role_id, &CloneId::new(&role_id, 0), &clones[0])
-            .unwrap();
 
         assert_eq!(app.cloned_cells().count(), 2);
 

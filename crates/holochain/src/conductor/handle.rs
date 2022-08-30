@@ -927,18 +927,14 @@ impl ConductorHandleT for ConductorHandleImpl {
         let properties = properties.unwrap_or_else(|| ().into());
         let installed_clone_cell = self
             .conductor
-            .add_clone_cell_to_app(
-                app_id.clone(),
-                role_id.clone(),
-                network_seed,
-                properties,
-            )
+            .add_clone_cell_to_app(app_id.clone(), role_id.clone(), network_seed, properties)
             .await?;
 
         // run genesis on cloned cell
         let cells = vec![(installed_clone_cell.as_id().clone(), membrane_proof)];
         crate::conductor::conductor::genesis_cells(&self.conductor, cells, self.clone()).await?;
-        self.create_and_add_initialized_cells_for_running_apps(self.clone()).await?;
+        self.create_and_add_initialized_cells_for_running_apps(self.clone())
+            .await?;
         Ok(installed_clone_cell)
     }
 
@@ -1009,7 +1005,7 @@ impl ConductorHandleT for ConductorHandleImpl {
             .await?;
 
         let roles = ops.role_assignments;
-        let app = InstalledAppCommon::new(installed_app_id, agent_key, roles);
+        let app = InstalledAppCommon::new(installed_app_id, agent_key, roles).unwrap();
 
         // Update the db
         let stopped_app = self.conductor.add_disabled_app_to_db(app).await?;
