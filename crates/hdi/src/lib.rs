@@ -55,25 +55,84 @@
 //! be easier to work with than the bare [`Op`](holochain_integrity_types::Op), which contains the
 //! same information as `OpType`, but the former has a flatter data structure, whereas the latter has
 //! a deeply nested structure.
-//! ```ignore
-//! let op_type: OpType<EntryTypes, LinkTypes> = op.to_type()?;
-//! match op_type {
+//!
+//! ```
+//! # #[cfg(not(feature = "test_utils"))]
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! # Ok(())
+//! # }
+//! # #[cfg(feature = "test_utils")]
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! # use hdi::prelude::*;
+//! # #[hdk_entry_helper]
+//! # pub struct A;
+//! # #[hdk_entry_helper]
+//! # pub struct B;
+//! # #[hdk_entry_defs(skip_hdk_extern = true)]
+//! # #[unit_enum(UnitEntryTypes)]
+//! # pub enum EntryTypes {
+//! #     A(A),
+//! #     B(B),
+//! # }
+//! # #[hdk_link_types(skip_no_mangle = true)]
+//! # pub enum LinkTypes {
+//! #   A,
+//! #   B,
+//! # }
+//! # let op = holochain_integrity_types::Op::RegisterCreateLink(
+//! # holochain_integrity_types::RegisterCreateLink {
+//! #     create_link: holochain_integrity_types::SignedHashed {
+//! #         hashed: holo_hash::HoloHashed {
+//! #             content: holochain_integrity_types::CreateLink {
+//! #                 author: AgentPubKey::from_raw_36(vec![0u8; 36]),
+//! #                 timestamp: Timestamp(0),
+//! #                 action_seq: 1,
+//! #                 prev_action: ActionHash::from_raw_36(vec![0u8; 36]),
+//! #                 base_address: EntryHash::from_raw_36(vec![0u8; 36]).into(),
+//! #                 target_address: EntryHash::from_raw_36(vec![0u8; 36]).into(),
+//! #                 zome_id: 0.into(),
+//! #                 link_type: 0.into(),
+//! #                 tag: ().into(),
+//! #                 weight: Default::default(),
+//! #             },
+//! #             hash: ActionHash::from_raw_36(vec![0u8; 36]),
+//! #         },
+//! #         signature: Signature([0u8; 64]),
+//! #     },
+//! # },
+//! # );
+//! # #[cfg(feature = "test_utils")]
+//! # hdi::test_utils::set_zome_types(&[(0, 2)], &[(0, 2)]);
+//! # let result: Result<hdi::prelude::ValidateCallbackResult, Box<dyn std::error::Error>> =
+//! match op.to_type()? {
+//!     OpType::StoreEntry(OpEntry::CreateEntry { entry_type, .. }) => match entry_type {
+//!         EntryTypes::A(_) => Ok(ValidateCallbackResult::Valid),
+//!         EntryTypes::B(_) => Ok(ValidateCallbackResult::Invalid(
+//!             "No Bs allowed in this app".to_string(),
+//!         )),
+//!     },
 //!     OpType::RegisterCreateLink {
-//!         base_address,
-//!         target_address,
-//!         tag,
+//!         base_address: _,
+//!         target_address: _,
+//!         tag: _,
 //!         link_type,
 //!     } => match link_type {
-//!         LinkTypes::MyLink1 => Ok(ValidateCallbackResult::Valid),
-//!         _ => Ok(ValidateCallbackResult::Invalid("wrong link type".to_string()))
+//!         LinkTypes::A => Ok(ValidateCallbackResult::Valid),
+//!         LinkTypes::B => Ok(ValidateCallbackResult::Invalid(
+//!             "No Bs allowed in this app".to_string(),
+//!         )),
 //!     },
-//!     ...
-//! }
+//!     _ => Ok(ValidateCallbackResult::Valid),
+//! };
+//! # Ok(())
+//! # }
 //! ```
-//!
 //! See an example of the `validate` callback in an integrity zome in the WASM workspace:
 //! <https://github.com/holochain/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/validate/src/integrity.rs>.
 //! Many more validation examples can be browsed in that very workspace.
+
+/// Current HDI rust crate version.
+pub const HDI_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub use hdk_derive::hdk_entry_defs;
 pub use hdk_derive::hdk_entry_helper;
