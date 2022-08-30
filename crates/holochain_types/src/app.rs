@@ -511,7 +511,7 @@ impl InstalledAppCommon {
 
     /// Add a cloned cell
     pub fn add_clone(&mut self, clone_id: &CloneId, cell_id: &CellId) -> AppResult<()> {
-        let app_role_assignment = self.role_mut(&clone_id.as_app_role_id())?;
+        let app_role_assignment = self.role_mut(&clone_id.as_base_role_id())?;
         assert_eq!(
             cell_id.agent_pubkey(),
             app_role_assignment.agent_key(),
