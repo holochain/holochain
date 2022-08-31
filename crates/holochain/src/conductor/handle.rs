@@ -903,31 +903,28 @@ impl ConductorHandleT for ConductorHandleImpl {
             network_seed,
             membrane_proof,
             origin_time,
-            ..
+            name,
         } = payload;
         if network_seed == None && properties == None {
             return Err(ConductorError::CloneCellError(
                 "neither network_seed nor properties provided for cloning the cell".to_string(),
             ));
         }
-        let app_info = self
-            .get_app_info(&app_id)
-            .await?
-            .ok_or(ConductorError::CloneCellError(
-                "no app found for provided app id".to_string(),
-            ))?;
+        let app_info = self.get_app_info(&app_id).await?.ok_or_else(|| {
+            ConductorError::CloneCellError("no app found for provided app id".to_string())
+        })?;
         app_info
             .cell_data
             .iter()
             .find(|cell| cell.as_role_id().eq(&role_id))
-            .ok_or(ConductorError::CloneCellError(
-                "no cell found for provided role id".to_string(),
-            ))?;
+            .ok_or_else(|| {
+                ConductorError::CloneCellError("no cell found for provided role id".to_string())
+            })?;
 
         // create cell
-        let network_seed = network_seed.unwrap_or_else(|| random_network_seed());
+        let network_seed = network_seed.unwrap_or_else(random_network_seed);
         let properties = (properties.unwrap_or_else(|| ().into())).try_into()?;
-        let origin_time = origin_time.unwrap_or_else(|| Timestamp::now());
+        let origin_time = origin_time.unwrap_or_else(Timestamp::now);
         let dna_phenotype = DnaPhenotype {
             network_seed,
             origin_time,
@@ -935,7 +932,7 @@ impl ConductorHandleT for ConductorHandleImpl {
         };
         let installed_clone_cell = self
             .conductor
-            .add_clone_cell_to_app(app_id.clone(), role_id.clone(), dna_phenotype)
+            .add_clone_cell_to_app(app_id.clone(), role_id.clone(), dna_phenotype, name)
             .await?;
 
         // run genesis on cloned cell
