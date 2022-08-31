@@ -926,6 +926,7 @@ fn op_to_type(op: OpType<EntryTypes, LinkTypes>) {
                 }
             };
             let r = RegisterAgentActivity {
+                cached_entry: None,
                 action: SignedHashed {
                     hashed: HoloHashed::from_content_sync(r),
                     signature: Signature::arbitrary(&mut ud).unwrap(),

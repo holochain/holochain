@@ -130,7 +130,11 @@ fn get_activity(
                 let hash: ActionHash = row.get("hash")?;
                 let hashed = ActionHashed::with_pre_hashed(action, hash);
                 let action = SignedActionHashed::with_presigned(hashed, signature);
-                StateQueryResult::Ok(RegisterAgentActivity { action })
+                StateQueryResult::Ok(RegisterAgentActivity {
+                    action,
+                    // TODO: Implement getting the cached entries.
+                    cached_entry: None,
+                })
             },
         )?
         .collect::<Result<Vec<_>, _>>()?;
@@ -145,6 +149,8 @@ fn get_activity(
             })
             .map(|action| RegisterAgentActivity {
                 action: action.clone(),
+                // TODO: Implement getting the cached entries.
+                cached_entry: None,
             });
         out.extend(iter);
     }
