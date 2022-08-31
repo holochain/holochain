@@ -192,6 +192,13 @@ impl DnaDef {
             })
     }
 
+    /// Set the DNA's name.
+    pub fn set_name(&self, name: String) -> Self {
+        let mut clone = self.clone();
+        clone.name = name;
+        clone
+    }
+
     /// Change the "phenotype" of this DNA -- the network seed, properties and origin time -- while
     /// leaving the "genotype" of actual DNA code intact.
     pub fn modify_phenotype(&self, dna_phenotype: DnaPhenotype) -> Self {

@@ -248,12 +248,19 @@ impl DnaFile {
         .expect("blocking thread panic!d - panicing here too")
     }
 
+    /// Set the DNA's name.
+    pub fn set_name(&self, name: String) -> Self {
+        let mut clone = self.clone();
+        clone.dna = DnaDefHashed::from_content_sync(clone.dna.set_name(name));
+        clone
+    }
+
     /// Change the "phenotype" of this DNA -- the network seed, origin time and properties -- while
     /// leaving the "genotype" of actual DNA code intact.
-    pub fn modify_phenotype(&self, dna_phenotype: DnaPhenotype) -> DnaResult<Self> {
+    pub fn modify_phenotype(&self, dna_phenotype: DnaPhenotype) -> Self {
         let mut clone = self.clone();
         clone.dna = DnaDefHashed::from_content_sync(clone.dna.modify_phenotype(dna_phenotype));
-        Ok(clone)
+        clone
     }
 }
 

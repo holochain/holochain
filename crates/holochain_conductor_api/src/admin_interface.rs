@@ -58,6 +58,20 @@ pub enum AdminRequest {
     /// [`AdminResponse::CloneCellCreated`]
     CreateCloneCell(Box<CreateCloneCellPayload>),
 
+    /// Mark a cloned cell for deletion.
+    ///
+    /// Providing a [`CloneId`] or [`CellId`], mark an existing clone cell for
+    /// deletion. When the clone cell exists, it's marked for deletion and can
+    /// not be called any longer. If it doesn't exist, nothing happens.
+    ///
+    /// # Returns
+    ///
+    /// [`AdminResponse::CloneCellDeleted`] when the clone cell existed and was
+    /// marked for deletion.
+    /// [`AdminResponse::CloneCellNotFound`] when the clone cell could not be
+    /// found by the provided clone or cell id.
+    DeleteCloneCell(Box<CreateCloneCellPayload>),
+
     /// Install an app from a list of DNA paths.
     ///
     /// Triggers genesis to be run on all cells and to be stored.
@@ -392,6 +406,12 @@ pub enum AdminResponse {
     /// The response contains an [`InstalledCell`] with the created clone
     /// cell's [`CloneId`] and [`CellId`].
     CloneCellCreated(InstalledCell),
+
+    /// An existing clone cell has been marked for deletion.
+    CloneCellDeleted,
+
+    /// A clone cell that was supposed to be marked for deletion could not be found.
+    CloneCellNotFound,
 
     /// The successful response to an [`AdminRequest::AddAdminInterfaces`].
     ///

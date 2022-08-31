@@ -765,6 +765,7 @@ impl Conductor {
         app_id: InstalledAppId,
         role_id: AppRoleId,
         dna_phenotype: DnaPhenotype,
+        name: Option<String>,
     ) -> ConductorResult<InstalledCell> {
         let ribosome_store = &self.ribosome_store;
         // retrieve parent cell DNA hash from conductor
@@ -793,9 +794,14 @@ impl Conductor {
             })
             .await?;
         let child_dna = ribosome_store.share_ref(|ds| {
-            ds.get_dna_file(&parent_dna_hash)
+            let mut dna_file = ds
+                .get_dna_file(&parent_dna_hash)
                 .ok_or(DnaError::DnaMissing(parent_dna_hash))?
-                .modify_phenotype(dna_phenotype)
+                .modify_phenotype(dna_phenotype);
+            if let Some(name) = name {
+                dna_file = dna_file.set_name(name);
+            }
+            Ok::<_, DnaError>(dna_file)
         })?;
         let child_dna_hash = child_dna.dna_hash().to_owned();
         let child_ribosome = RealRibosome::new(child_dna)?;
