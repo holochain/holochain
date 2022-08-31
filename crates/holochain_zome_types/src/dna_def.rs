@@ -35,6 +35,12 @@ pub struct DnaPhenotype {
     /// Any arbitrary application properties can be included in this object.
     #[cfg_attr(feature = "full-dna-def", builder(default = "().try_into().unwrap()"))]
     pub properties: SerializedBytes,
+
+    /// The time used to denote the origin of the network, used to calculate
+    /// time windows during gossip.
+    /// All Action timestamps must come after this time.
+    #[cfg_attr(feature = "full-dna-def", builder(default = "Timestamp::now()"))]
+    pub origin_time: Timestamp,
 }
 
 /// The definition of a DNA: the hash of this data is what produces the DnaHash.
@@ -61,12 +67,6 @@ pub struct DnaDef {
     /// included in the DNA hash computation.
     #[serde(flatten)]
     pub phenotype: DnaPhenotype,
-
-    /// The time used to denote the origin of the network, used to calculate
-    /// time windows during gossip.
-    /// All Action timestamps must come after this time.
-    #[cfg_attr(feature = "full-dna-def", builder(default = "Timestamp::now()"))]
-    pub origin_time: Timestamp,
 
     /// A vector of zomes associated with your DNA.
     pub integrity_zomes: IntegrityZomes,
@@ -202,7 +202,7 @@ impl DnaDef {
 
     /// Get the topology to use for kitsune gossip
     pub fn topology(&self, cutoff: std::time::Duration) -> kitsune_p2p_dht::spacetime::Topology {
-        kitsune_p2p_dht::spacetime::Topology::standard(self.origin_time, cutoff)
+        kitsune_p2p_dht::spacetime::Topology::standard(self.phenotype.origin_time, cutoff)
     }
 }
 
@@ -219,6 +219,7 @@ impl DnaDefBuilder {
         self.phenotype = Some(DnaPhenotype {
             network_seed: random_network_seed(),
             properties: SerializedBytes::try_from(()).unwrap(),
+            origin_time: Timestamp::now(),
         });
         self
     }

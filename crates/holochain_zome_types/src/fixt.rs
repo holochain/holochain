@@ -739,8 +739,8 @@ fixturator!(
             properties: SerializedBytesFixturator::new_indexed(Empty, get_fixt_index!())
                 .next()
                 .unwrap(),
+            origin_time: Timestamp::HOLOCHAIN_EPOCH,
         },
-        origin_time: Timestamp::HOLOCHAIN_EPOCH,
         integrity_zomes: IntegrityZomesFixturator::new_indexed(Empty, get_fixt_index!())
             .next()
             .unwrap(),
@@ -759,9 +759,9 @@ fixturator!(
                 .unwrap(),
             properties: SerializedBytesFixturator::new_indexed(Unpredictable, get_fixt_index!())
                 .next()
-                .unwrap()
+                .unwrap(),
+            origin_time: Timestamp::HOLOCHAIN_EPOCH,
         },
-        origin_time: Timestamp::HOLOCHAIN_EPOCH,
         integrity_zomes: IntegrityZomesFixturator::new_indexed(Unpredictable, get_fixt_index!())
             .next()
             .unwrap(),
@@ -780,9 +780,9 @@ fixturator!(
                 .unwrap(),
             properties: SerializedBytesFixturator::new_indexed(Predictable, get_fixt_index!())
                 .next()
-                .unwrap()
+                .unwrap(),
+            origin_time: Timestamp::HOLOCHAIN_EPOCH,
         },
-        origin_time: Timestamp::HOLOCHAIN_EPOCH,
         integrity_zomes: IntegrityZomesFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap(),

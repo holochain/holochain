@@ -186,7 +186,7 @@ pub async fn check_valid_if_dna(
         Action::Dna(_) => {
             if !workspace.is_chain_empty(action.author()).await? {
                 Err(PrevActionError::InvalidRoot).map_err(|e| ValidationOutcome::from(e).into())
-            } else if action.timestamp() < workspace.dna_def().origin_time {
+            } else if action.timestamp() < workspace.dna_def().phenotype.origin_time {
                 // If the Dna timestamp is ahead of the origin time, every other action
                 // will be inductively so also due to the prev_action check
                 Err(PrevActionError::InvalidRootOriginTime)

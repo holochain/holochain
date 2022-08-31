@@ -45,8 +45,8 @@ pub fn fake_dna_zomes_named(
                 .try_into()
                 .unwrap(),
             network_seed: network_seed.to_string(),
+            origin_time: Timestamp::HOLOCHAIN_EPOCH,
         },
-        origin_time: Timestamp::HOLOCHAIN_EPOCH,
         integrity_zomes: Vec::new(),
         coordinator_zomes: Vec::new(),
     };

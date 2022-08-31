@@ -71,7 +71,7 @@ async fn check_valid_if_dna_test() {
     let _activity_return = vec![fixt!(ActionHash)];
 
     let mut dna_def = fixt!(DnaDef);
-    dna_def.origin_time = Timestamp::MIN;
+    dna_def.phenotype.origin_time = Timestamp::MIN;
 
     // Empty store not dna
     let action = fixt!(CreateLink);
@@ -97,7 +97,7 @@ async fn check_valid_if_dna_test() {
 
     // - Test that an origin_time in the future leads to invalid Dna action commit
     let dna_def_original = workspace.dna_def();
-    dna_def.origin_time = Timestamp::MAX;
+    dna_def.phenotype.origin_time = Timestamp::MAX;
     workspace.dna_def = Arc::new(dna_def);
     assert_matches!(
         check_valid_if_dna(&action.clone().into(), &workspace).await,
@@ -331,8 +331,8 @@ async fn check_app_entry_type_test() {
             phenotype: DnaPhenotype {
                 network_seed: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
                 properties: SerializedBytes::try_from(()).unwrap(),
+                origin_time: Timestamp::HOLOCHAIN_EPOCH,
             },
-            origin_time: Timestamp::HOLOCHAIN_EPOCH,
             integrity_zomes: vec![TestZomes::from(TestWasm::EntryDefs).integrity.into_inner()],
             coordinator_zomes: vec![TestZomes::from(TestWasm::EntryDefs)
                 .coordinator

@@ -129,8 +129,8 @@ impl DnaBundle {
                         properties: SerializedBytes::try_from(
                             manifest.integrity.properties.clone().unwrap_or_default(),
                         )?,
+                        origin_time: manifest.integrity.origin_time.into(),
                     },
-                    origin_time: manifest.integrity.origin_time.into(),
                     integrity_zomes,
                     coordinator_zomes,
                 };
@@ -232,7 +232,7 @@ impl DnaBundle {
                         e
                     ))
                 })?),
-                origin_time: dna_def.origin_time.into(),
+                origin_time: dna_def.phenotype.origin_time.into(),
                 zomes: integrity,
             },
             coordinator: CoordinatorManifest { zomes: coordinator },
@@ -349,9 +349,12 @@ mod tests {
             .await
             .unwrap()
             .0;
-        assert_eq!(dna_file.dna.network_seed, "network_seed".to_string());
         assert_eq!(
-            dna_file.dna.properties,
+            dna_file.dna.phenotype.network_seed,
+            "network_seed".to_string()
+        );
+        assert_eq!(
+            dna_file.dna.phenotype.properties,
             SerializedBytes::try_from(properties).unwrap()
         );
     }

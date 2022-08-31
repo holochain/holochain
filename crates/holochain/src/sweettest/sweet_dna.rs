@@ -66,10 +66,10 @@ impl SweetDnaFile {
             .phenotype(DnaPhenotype {
                 network_seed,
                 properties: properties.clone(),
+                origin_time: Timestamp::HOLOCHAIN_EPOCH,
             })
             .integrity_zomes(iz)
             .coordinator_zomes(cz)
-            .origin_time(Timestamp::HOLOCHAIN_EPOCH)
             .build()
             .unwrap();
 

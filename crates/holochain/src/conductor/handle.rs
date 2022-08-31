@@ -930,7 +930,7 @@ impl ConductorHandleT for ConductorHandleImpl {
         let origin_time = origin_time.unwrap_or_else(|| Timestamp::now());
         let dna_phenotype = DnaPhenotype {
             network_seed,
-            // origin_time,
+            origin_time,
             properties,
         };
         let installed_clone_cell = self

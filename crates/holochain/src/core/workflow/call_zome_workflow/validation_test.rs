@@ -27,8 +27,8 @@ async fn direct_validation_test() {
             phenotype: DnaPhenotype {
                 network_seed: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
                 properties: SerializedBytes::try_from(()).unwrap(),
+                origin_time: Timestamp::HOLOCHAIN_EPOCH,
             },
-            origin_time: Timestamp::HOLOCHAIN_EPOCH,
             integrity_zomes: vec![TestZomes::from(TestWasm::Update).integrity.into_inner()],
             coordinator_zomes: vec![TestZomes::from(TestWasm::Update).coordinator.into_inner()],
         },

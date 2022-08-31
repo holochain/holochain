@@ -459,8 +459,8 @@ async fn setup(
             phenotype: DnaPhenotype {
                 network_seed,
                 properties: SerializedBytes::try_from(()).unwrap(),
+                origin_time: Timestamp::HOLOCHAIN_EPOCH,
             },
-            origin_time: Timestamp::HOLOCHAIN_EPOCH,
             integrity_zomes: zomes
                 .clone()
                 .into_iter()
