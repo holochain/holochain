@@ -1,6 +1,6 @@
 #!/bin/bash
 
-crates_to_document=("hdk" "holochain_keystore")
+crates_to_document=("hdi" "hdk" "holochain_keystore" "holochain_state")
 
 for crate in "${crates_to_document[@]}"; do
     echo 'generating README for crate' "$crate";
@@ -12,7 +12,7 @@ git diff --exit-code --quiet
 readmes_updated=$?
 if [[ "$readmes_updated" == 1 ]]; then
     echo 'READMEs have been updated, committing changes'
-    git config user.name release-ci
-    git config user.email ci@holo.host
-    git commit -am "docs(crate-level): generate READMEs from doc comments"
+    # git config user.name release-ci
+    # git config user.email ci@holo.host
+    # git commit -am "docs(crate-level): generate READMEs from doc comments"
 fi

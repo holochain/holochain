@@ -133,11 +133,13 @@ mod tests {
             id: "post".into(),
             visibility: EntryVisibility::Public,
             required_validations: 5.into(),
+            ..Default::default()
         };
         let comment_def = EntryDef {
             id: "comment".into(),
             visibility: EntryVisibility::Private,
             required_validations: 5.into(),
+            ..Default::default()
         };
         let dna_wasm = DnaWasmHashed::from_content(TestWasm::EntryDefs.into())
             .await

@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - Add lair disconnect detection / reconnect loop with backoff for keystore resiliency. [\#1529](https://github.com/holochain/holochain/pull/1529)
 
+## 0.0.52
+
 ## 0.0.51
 
 ## 0.0.50

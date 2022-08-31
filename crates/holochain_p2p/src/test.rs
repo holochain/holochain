@@ -102,6 +102,14 @@ impl HolochainP2pHandler for StubNetwork {
     ) -> HolochainP2pHandlerResult<Vec<AgentActivityResponse<ActionHash>>> {
         Err("stub".into())
     }
+    fn handle_must_get_agent_activity(
+        &mut self,
+        dna_hash: DnaHash,
+        agent: AgentPubKey,
+        filter: holochain_zome_types::chain::ChainFilter,
+    ) -> HolochainP2pHandlerResult<Vec<MustGetAgentActivityResponse>> {
+        Err("stub".into())
+    }
     fn handle_send_validation_receipt(
         &mut self,
         dna_hash: DnaHash,

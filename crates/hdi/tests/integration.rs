@@ -211,7 +211,7 @@ mod entry_defs_overrides_mod {
         A(A),
         #[entry_def(visibility = "private")]
         B(A),
-        #[entry_def(required_validations = 10)]
+        #[entry_def(required_validations = 10, cache_at_agent_activity = true)]
         C(A),
     }
 }
@@ -225,16 +225,19 @@ fn entry_defs_overrides() {
                 id: "hey".into(),
                 visibility: Default::default(),
                 required_validations: Default::default(),
+                ..Default::default()
             },
             EntryDef {
                 id: "b".into(),
                 visibility: EntryVisibility::Private,
                 required_validations: Default::default(),
+                ..Default::default()
             },
             EntryDef {
                 id: "c".into(),
                 visibility: Default::default(),
                 required_validations: RequiredValidations(10),
+                cache_at_agent_activity: true,
             },
         ]))
     );
@@ -262,16 +265,19 @@ fn entry_defs_default() {
                 id: "a".into(),
                 visibility: Default::default(),
                 required_validations: Default::default(),
+                ..Default::default()
             },
             EntryDef {
                 id: "b".into(),
                 visibility: Default::default(),
                 required_validations: Default::default(),
+                ..Default::default()
             },
             EntryDef {
                 id: "c".into(),
                 visibility: Default::default(),
                 required_validations: Default::default(),
+                ..Default::default()
             },
         ]))
     );

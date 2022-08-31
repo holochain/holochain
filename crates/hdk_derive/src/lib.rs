@@ -77,6 +77,7 @@ impl Parse for EntryDef {
             id,
             visibility,
             required_validations,
+            cache_at_agent_activity: false,
         }))
     }
 }

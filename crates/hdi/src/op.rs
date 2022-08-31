@@ -274,7 +274,7 @@ impl OpHelper for Op {
                     None => unreachable!("As entry types are already checked to match"),
                 }
             }
-            Op::RegisterAgentActivity(RegisterAgentActivity { action }) => {
+            Op::RegisterAgentActivity(RegisterAgentActivity { action, .. }) => {
                 let r = match &action.hashed.content {
                     Action::Dna(Dna { hash, .. }) => OpActivity::Dna(hash.clone()),
                     Action::AgentValidationPkg(AgentValidationPkg { membrane_proof, .. }) => {

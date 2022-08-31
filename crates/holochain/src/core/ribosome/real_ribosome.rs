@@ -45,6 +45,7 @@ use crate::core::ribosome::host_fn::get_link_details::get_link_details;
 use crate::core::ribosome::host_fn::get_links::get_links;
 use crate::core::ribosome::host_fn::hash::hash;
 use crate::core::ribosome::host_fn::must_get_action::must_get_action;
+use crate::core::ribosome::host_fn::must_get_agent_activity::must_get_agent_activity;
 use crate::core::ribosome::host_fn::must_get_entry::must_get_entry;
 use crate::core::ribosome::host_fn::must_get_valid_record::must_get_valid_record;
 use crate::core::ribosome::host_fn::query::query;
@@ -485,7 +486,7 @@ impl RealRibosome {
     }
 
     pub fn cranelift() -> Cranelift {
-        let cost_function = |_operator: &WasmOperator| -> u64 { 1 };
+        let cost_function = |_operator: &WasmOperator| -> u64 { 0 };
         // @todo 10 giga-ops is totally arbitrary cutoff so we probably
         // want to make the limit configurable somehow.
         let metering = Arc::new(Metering::new(WASM_METERING_LIMIT, cost_function));
@@ -570,6 +571,11 @@ impl RealRibosome {
             .with_host_function(&mut ns, "__must_get_entry", must_get_entry)
             .with_host_function(&mut ns, "__must_get_action", must_get_action)
             .with_host_function(&mut ns, "__must_get_valid_record", must_get_valid_record)
+            .with_host_function(
+                &mut ns,
+                "__must_get_agent_activity",
+                must_get_agent_activity,
+            )
             .with_host_function(
                 &mut ns,
                 "__accept_countersigning_preflight_request",
@@ -993,6 +999,7 @@ pub mod wasm_test {
         }
     }
 
+    #[ignore = "turn this back on when we set the cost_function to return non-0"]
     #[tokio::test(flavor = "multi_thread")]
     async fn the_incredible_halt_test() {
         observability::test_run().ok();
