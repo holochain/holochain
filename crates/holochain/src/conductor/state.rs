@@ -17,7 +17,7 @@ use super::error::{ConductorError, ConductorResult};
 #[serde(transparent)]
 pub struct ConductorStateTag(pub Arc<str>);
 
-impl Default for Tag {
+impl Default for ConductorStateTag {
     fn default() -> Self {
         Self(nanoid::nanoid!().into())
     }
@@ -33,7 +33,7 @@ impl Default for Tag {
 pub struct ConductorState {
     /// Unique conductor tag / identifier.
     #[serde(default)]
-    tag: Tag,
+    tag: ConductorStateTag,
     /// Apps that have been installed, regardless of status.
     #[serde(default)]
     installed_apps: InstalledAppMap,
@@ -76,12 +76,12 @@ impl AppInterfaceId {
 
 impl ConductorState {
     /// A unique identifier for this conductor
-    pub fn tag(&self) -> &Tag {
+    pub fn tag(&self) -> &ConductorStateTag {
         &self.tag
     }
 
     #[cfg(test)]
-    pub fn set_tag(&mut self, tag: Tag) {
+    pub fn set_tag(&mut self, tag: ConductorStateTag) {
         self.tag = tag;
     }
 
