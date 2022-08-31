@@ -15,7 +15,7 @@ use super::error::{ConductorError, ConductorResult};
 #[derive(Clone, Deserialize, Serialize, Debug, SerializedBytes)]
 #[cfg_attr(test, derive(PartialEq))]
 #[serde(transparent)]
-pub struct Tag(pub Arc<str>);
+pub struct ConductorStateTag(pub Arc<str>);
 
 impl Default for Tag {
     fn default() -> Self {
