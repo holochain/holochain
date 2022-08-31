@@ -48,7 +48,9 @@ async fn can_update_state() {
     .await
     .unwrap();
     let state = conductor.get_state().await.unwrap();
-    assert_eq!(state, ConductorState::default());
+    let mut expect_state = ConductorState::default();
+    expect_state.set_tag(state.tag().clone());
+    assert_eq!(state, expect_state);
 
     let cell_id = fake_cell_id(1);
     let installed_cell = InstalledCell::new(cell_id.clone(), "role_id".to_string());
