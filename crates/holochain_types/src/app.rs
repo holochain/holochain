@@ -440,12 +440,7 @@ impl InstalledAppCommon {
     pub fn cloned_cells(&self) -> impl Iterator<Item = (&CloneId, &CellId)> {
         self.role_assignments
             .iter()
-            .flat_map(|app_role_assignment| {
-                app_role_assignment
-                    .1
-                    .clones
-                    .iter()
-            })
+            .flat_map(|app_role_assignment| app_role_assignment.1.clones.iter())
     }
 
     /// Accessor
