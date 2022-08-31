@@ -465,6 +465,23 @@ impl Cell {
                 .instrument(debug_span!("cell_handle_get_agent_activity"))
                 .await;
             }
+            MustGetAgentActivity {
+                span_context: _,
+                respond,
+                author,
+                filter,
+                ..
+            } => {
+                async {
+                    let res = self
+                        .handle_must_get_agent_activity(author, filter)
+                        .await
+                        .map_err(holochain_p2p::HolochainP2pError::other);
+                    respond.respond(Ok(async move { res }.boxed().into()));
+                }
+                .instrument(debug_span!("cell_handle_must_get_agent_activity"))
+                .await;
+            }
             ValidationReceiptReceived {
                 span_context: _,
                 respond,
@@ -681,6 +698,18 @@ impl Cell {
     ) -> CellResult<AgentActivityResponse<ActionHash>> {
         let db = self.space.dht_db.clone();
         authority::handle_get_agent_activity(db.into(), agent, query, options)
+            .await
+            .map_err(Into::into)
+    }
+
+    #[instrument(skip(self))]
+    async fn handle_must_get_agent_activity(
+        &self,
+        author: AgentPubKey,
+        filter: holochain_zome_types::chain::ChainFilter,
+    ) -> CellResult<MustGetAgentActivityResponse> {
+        let db = self.space.dht_db.clone();
+        authority::handle_must_get_agent_activity(db.into(), author, filter)
             .await
             .map_err(Into::into)
     }

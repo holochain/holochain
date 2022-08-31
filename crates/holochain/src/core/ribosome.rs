@@ -96,7 +96,7 @@ impl CallContext {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum HostContext {
     EntryDefs(EntryDefsHostAccess),
     GenesisSelfCheck(GenesisSelfCheckHostAccess),
@@ -443,6 +443,12 @@ pub struct ZomeCallHostAccess {
     pub network: HolochainP2pDna,
     pub signal_tx: SignalBroadcaster,
     pub call_zome_handle: CellConductorReadHandle,
+}
+
+impl std::fmt::Debug for ZomeCallHostAccess {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ZomeCallHostAccess").finish()
+    }
 }
 
 impl From<ZomeCallHostAccess> for HostContext {
