@@ -12,13 +12,14 @@ edition = "2021"
 
 [features]
 default = []
-mock = ["hdk_derive/mock", "mockall"]
+mock = ["hdk_derive/mock", "mockall", "hdi/mock"]
 encoding = ["holo_hash/encoding"]
 fixturators = ["holochain_zome_types/fixturators", "holo_hash/fixturators"]
 test_utils = [
     "fixturators",
     "holochain_zome_types/test_utils",
     "holo_hash/test_utils",
+    "hdi/test_utils"
 ]
 properties = ["holochain_zome_types/properties"]
 
