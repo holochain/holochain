@@ -152,6 +152,8 @@ pub fn test_keystore() -> holochain_keystore::MetaLairClient {
     Debug,
     PartialEq,
     Eq,
+    PartialOrd,
+    Ord,
     Hash,
     derive_more::From,
     derive_more::Deref,
@@ -179,7 +181,7 @@ impl From<TestChainHash> for ActionHash {
 
 /// A test implementation of a minimal ChainItem which uses simple numbers for hashes
 /// and always points back to the previous number
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct TestChainItem {
     /// The sequence number
     pub seq: u32,

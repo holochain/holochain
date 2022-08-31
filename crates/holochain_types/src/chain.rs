@@ -6,6 +6,7 @@ use crate::activity::AgentActivityResponse;
 use crate::activity::ChainItems;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
+use holochain_serialized_bytes::prelude::*;
 use holochain_zome_types::prelude::ChainStatus;
 use holochain_zome_types::ChainFilter;
 use holochain_zome_types::ChainFilters;
@@ -89,7 +90,7 @@ pub enum Sequences {
     EmptyRange,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, SerializedBytes, Serialize, Deserialize)]
 /// Response to a `must_get_agent_activity` call.
 pub enum MustGetAgentActivityResponse {
     /// The activity was found.

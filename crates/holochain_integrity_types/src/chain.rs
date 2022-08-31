@@ -3,6 +3,7 @@
 
 use std::collections::HashSet;
 
+use holo_hash::AgentPubKey;
 use holo_hash::{ActionHash, HasHash};
 use holochain_serialized_bytes::prelude::*;
 
@@ -11,24 +12,27 @@ use crate::{ActionHashed, SignedActionHashed};
 #[cfg(test)]
 mod test;
 
-#[derive(Serialize, Deserialize, SerializedBytes, Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize, SerializedBytes, Debug, PartialEq, Eq, Hash, Clone)]
 /// Filter source chain items.
 /// Starting from some chain position given as an [`ActionHash`]
 /// the chain is walked backwards to genesis.
 /// The filter can stop early by specifying the number of
 /// chain items to take and / or an [`ActionHash`] to consume until.
-pub struct ChainFilter<H: Eq + std::hash::Hash = ActionHash> {
+pub struct ChainFilter<H: Eq + Ord + std::hash::Hash = ActionHash> {
     /// The starting position of the filter.
     pub chain_top: H,
     /// The filters that have been applied.
     /// Defaults to [`ChainFilters::ToGenesis`].
     pub filters: ChainFilters<H>,
+    /// Should the query return any entries that are
+    /// cached at the agent activity to save network hops.
+    pub include_cached_entries: bool,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize, Debug, Eq, Clone)]
 /// Specify which [`Action`](crate::action::Action)s to allow through
 /// this filter.
-pub enum ChainFilters<H: Eq + std::hash::Hash = ActionHash> {
+pub enum ChainFilters<H: Eq + Ord + std::hash::Hash = ActionHash> {
     /// Allow all up to genesis.
     ToGenesis,
     /// Take this many (inclusive of the starting position).
@@ -40,7 +44,63 @@ pub enum ChainFilters<H: Eq + std::hash::Hash = ActionHash> {
     Both(u32, HashSet<H>),
 }
 
-impl<H: Eq + std::hash::Hash> ChainFilter<H> {
+/// Create a deterministic hash to compare filters.
+impl<H: Eq + Ord + std::hash::Hash> core::hash::Hash for ChainFilters<H> {
+    fn hash<HH: std::hash::Hasher>(&self, state: &mut HH) {
+        core::mem::discriminant(self).hash(state);
+        match self {
+            ChainFilters::ToGenesis => (),
+            ChainFilters::Take(t) => t.hash(state),
+            ChainFilters::Until(u) => {
+                let mut u: Vec<_> = u.iter().collect();
+                u.sort_unstable();
+                u.hash(state);
+            }
+            ChainFilters::Both(t, u) => {
+                let mut u: Vec<_> = u.iter().collect();
+                u.sort_unstable();
+                u.hash(state);
+                t.hash(state);
+            }
+        }
+    }
+}
+
+/// Implement a deterministic partial eq to compare ChainFilters.
+impl<H: Eq + Ord + std::hash::Hash> core::cmp::PartialEq for ChainFilters<H> {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Take(l0), Self::Take(r0)) => l0 == r0,
+            (Self::Until(a), Self::Until(b)) => {
+                let mut a: Vec<_> = a.iter().collect();
+                let mut b: Vec<_> = b.iter().collect();
+                a.sort_unstable();
+                b.sort_unstable();
+                a == b
+            }
+            (Self::Both(l0, a), Self::Both(r0, b)) => {
+                let mut a: Vec<_> = a.iter().collect();
+                let mut b: Vec<_> = b.iter().collect();
+                a.sort_unstable();
+                b.sort_unstable();
+                l0 == r0 && a == b
+            }
+            _ => core::mem::discriminant(self) == core::mem::discriminant(other),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+/// Input to the `must_get_agent_activity` call.
+pub struct MustGetAgentActivityInput {
+    /// The author of the chain that you are requesting
+    /// activity from.
+    pub author: AgentPubKey,
+    /// The filter on the chains activity.
+    pub chain_filter: ChainFilter,
+}
+
+impl<H: Eq + Ord + std::hash::Hash> ChainFilter<H> {
     /// Create a new filter using this [`ActionHash`] as
     /// the starting position and walking the chain
     /// towards the genesis [`Action`](crate::action::Action).
@@ -48,6 +108,7 @@ impl<H: Eq + std::hash::Hash> ChainFilter<H> {
         Self {
             chain_top,
             filters: Default::default(),
+            include_cached_entries: false,
         }
     }
 
@@ -60,6 +121,13 @@ impl<H: Eq + std::hash::Hash> ChainFilter<H> {
             ChainFilters::Until(u) => ChainFilters::Both(n, u),
             ChainFilters::Both(old_n, u) => ChainFilters::Both(old_n.min(n), u),
         };
+        self
+    }
+
+    /// Set this filter to include any cached entries
+    /// at the agent activity authority.
+    pub fn include_cached_entries(mut self) -> Self {
+        self.include_cached_entries = true;
         self
     }
 
@@ -103,7 +171,7 @@ impl<H: Eq + std::hash::Hash> ChainFilter<H> {
     }
 }
 
-impl<H: Eq + std::hash::Hash> Default for ChainFilters<H> {
+impl<H: Eq + Ord + std::hash::Hash> Default for ChainFilters<H> {
     fn default() -> Self {
         Self::ToGenesis
     }
@@ -117,6 +185,7 @@ pub trait ChainItem: Clone + PartialEq + Eq + std::fmt::Debug {
     type Hash: Clone
         + PartialEq
         + Eq
+        + Ord
         + std::hash::Hash
         + std::fmt::Debug
         + Send
