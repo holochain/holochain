@@ -125,9 +125,11 @@ async fn speed_test(n: Option<usize>) -> Arc<TempDir> {
     let dna_file = DnaFile::new(
         DnaDef {
             name: "need_for_speed_test".to_string(),
-            network_seed: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
-            properties: SerializedBytes::try_from(()).unwrap(),
-            origin_time: Timestamp::HOLOCHAIN_EPOCH,
+            phenotype: DnaPhenotype {
+                network_seed: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
+                properties: SerializedBytes::try_from(()).unwrap(),
+                origin_time: Timestamp::HOLOCHAIN_EPOCH,
+            },
             integrity_zomes: vec![TestZomes::from(TestWasm::Anchor).integrity.into_inner()],
             coordinator_zomes: vec![TestZomes::from(TestWasm::Anchor).coordinator.into_inner()],
         },
