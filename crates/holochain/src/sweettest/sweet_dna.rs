@@ -63,10 +63,12 @@ impl SweetDnaFile {
             .map(CoordinatorZome::into_inner)
             .collect();
         let dna_def = DnaDefBuilder::default()
-            .network_seed(network_seed)
+            .phenotype(DnaPhenotype {
+                network_seed,
+                properties: properties.clone(),
+            })
             .integrity_zomes(iz)
             .coordinator_zomes(cz)
-            .properties(properties.clone())
             .origin_time(Timestamp::HOLOCHAIN_EPOCH)
             .build()
             .unwrap();

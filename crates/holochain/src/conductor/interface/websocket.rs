@@ -601,8 +601,10 @@ pub mod test {
         DnaFile::new(
             DnaDef {
                 name: "conductor_test".to_string(),
-                network_seed: network_seed.to_string(),
-                properties: SerializedBytes::try_from(()).unwrap(),
+                phenotype: DnaPhenotype {
+                    network_seed: network_seed.to_string(),
+                    properties: SerializedBytes::try_from(()).unwrap(),
+                },
                 origin_time: Timestamp::HOLOCHAIN_EPOCH,
                 integrity_zomes: zomes
                     .clone()

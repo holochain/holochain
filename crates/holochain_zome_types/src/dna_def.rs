@@ -17,11 +17,23 @@ pub type CoordinatorZomes = Vec<(ZomeName, zome::CoordinatorZomeDef)>;
 /// Placeholder for a real network seed type. See [`DnaDef`].
 pub type NetworkSeed = String;
 
-/// All properties of a DNA that affect the DNA hash.
+/// "Phenotype" of this DNA - the network seed, properties and origin time - as
+/// opposed to its "genotype" - the actual DNA code. The phenotype fields are
+/// included in the DNA hash computation.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "full-dna-def", derive(derive_builder::Builder))]
 pub struct DnaPhenotype {
-    /// ddd
+    /// The network seed of a DNA is included in the computation of the DNA hash.
+    /// The DNA hash in turn determines the network peers and the DHT, meaning
+    /// that only peers with the same DNA hash of a shared DNA participate in the
+    /// same network and co-create the DHT. To create a separate DHT for the DNA,
+    /// a unique network seed can be specified.
+    // TODO: consider Vec<u8> instead (https://github.com/holochain/holochain/pull/86#discussion_r412689085)
     pub network_seed: NetworkSeed,
-    /// ddd
+
+    /// Any arbitrary application properties can be included in this object.
+    #[cfg_attr(feature = "full-dna-def", builder(default = "().try_into().unwrap()"))]
     pub properties: SerializedBytes,
 }
 
@@ -44,17 +56,11 @@ pub struct DnaDef {
     )]
     pub name: String,
 
-    /// The network seed of a DNA is included in the computation of the DNA hash.
-    /// The DNA hash in turn determines the network peers and the DHT, meaning
-    /// that only peers with the same DNA hash of a shared DNA participate in the
-    /// same network and co-create the DHT. To create a separate DHT for the DNA,
-    /// a unique network seed can be specified.
-    // TODO: consider Vec<u8> instead (https://github.com/holochain/holochain/pull/86#discussion_r412689085)
-    pub network_seed: String,
-
-    /// Any arbitrary application properties can be included in this object.
-    #[cfg_attr(feature = "full-dna-def", builder(default = "().try_into().unwrap()"))]
-    pub properties: SerializedBytes,
+    /// "Phenotype" of this DNA - the network seed, properties and origin time - as
+    /// opposed to its "genotype" - the actual DNA code. The phenotype fields are
+    /// included in the DNA hash computation.
+    #[serde(flatten)]
+    pub phenotype: DnaPhenotype,
 
     /// The time used to denote the origin of the network, used to calculate
     /// time windows during gossip.
@@ -74,8 +80,7 @@ pub struct DnaDef {
 /// A reference to for creating the hash for [`DnaDef`].
 struct DnaDefHash<'a> {
     name: &'a String,
-    network_seed: &'a String,
-    properties: &'a SerializedBytes,
+    phenotype: &'a DnaPhenotype,
     integrity_zomes: &'a IntegrityZomes,
 }
 
@@ -191,8 +196,7 @@ impl DnaDef {
     /// leaving the "genotype" of actual DNA code intact.
     pub fn modify_phenotype(&self, dna_phenotype: DnaPhenotype) -> Self {
         let mut clone = self.clone();
-        clone.properties = dna_phenotype.properties;
-        clone.network_seed = dna_phenotype.network_seed;
+        clone.phenotype = dna_phenotype;
         clone
     }
 
@@ -212,7 +216,10 @@ pub fn random_network_seed() -> String {
 impl DnaDefBuilder {
     /// Provide a random network seed
     pub fn random_network_seed(&mut self) -> &mut Self {
-        self.network_seed = Some(random_network_seed());
+        self.phenotype = Some(DnaPhenotype {
+            network_seed: random_network_seed(),
+            properties: SerializedBytes::try_from(()).unwrap(),
+        });
         self
     }
 }
@@ -232,8 +239,7 @@ impl HashableContent for DnaDef {
     fn hashable_content(&self) -> HashableContentBytes {
         let hash = DnaDefHash {
             name: &self.name,
-            network_seed: &self.network_seed,
-            properties: &self.properties,
+            phenotype: &self.phenotype,
             integrity_zomes: &self.integrity_zomes,
         };
         HashableContentBytes::Content(

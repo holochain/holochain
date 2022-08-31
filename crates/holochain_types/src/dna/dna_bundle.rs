@@ -124,10 +124,12 @@ impl DnaBundle {
             DnaManifest::V1(manifest) => {
                 let mut dna_def = DnaDef {
                     name: manifest.name.clone(),
-                    network_seed: manifest.integrity.network_seed.clone().unwrap_or_default(),
-                    properties: SerializedBytes::try_from(
-                        manifest.integrity.properties.clone().unwrap_or_default(),
-                    )?,
+                    phenotype: DnaPhenotype {
+                        network_seed: manifest.integrity.network_seed.clone().unwrap_or_default(),
+                        properties: SerializedBytes::try_from(
+                            manifest.integrity.properties.clone().unwrap_or_default(),
+                        )?,
+                    },
                     origin_time: manifest.integrity.origin_time.into(),
                     integrity_zomes,
                     coordinator_zomes,
@@ -152,8 +154,8 @@ impl DnaBundle {
                         .or_else(|| manifest.integrity.network_seed.clone())
                         .unwrap_or_default();
 
-                    dna_def.network_seed = network_seed;
-                    dna_def.properties = properties;
+                    dna_def.phenotype.network_seed = network_seed;
+                    dna_def.phenotype.properties = properties;
                     Ok((DnaDefHashed::from_content_sync(dna_def), original_hash))
                 }
             }
@@ -223,8 +225,8 @@ impl DnaBundle {
         Ok(DnaManifestCurrent {
             name: dna_def.name,
             integrity: IntegrityManifest {
-                network_seed: Some(dna_def.network_seed),
-                properties: Some(dna_def.properties.try_into().map_err(|e| {
+                network_seed: Some(dna_def.phenotype.network_seed),
+                properties: Some(dna_def.phenotype.properties.try_into().map_err(|e| {
                     DnaError::DnaFileToBundleConversionError(format!(
                         "DnaDef properties were not YAML-deserializable: {}",
                         e

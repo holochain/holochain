@@ -70,7 +70,7 @@ where
     let dna_hash = ribosome.dna_def().to_hash();
     let DnaDef {
         name,
-        properties,
+        phenotype: DnaPhenotype { properties, .. },
         integrity_zomes,
         ..
     } = &ribosome.dna_def().content;

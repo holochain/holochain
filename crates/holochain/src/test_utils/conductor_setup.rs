@@ -176,8 +176,10 @@ impl ConductorTestData {
         let dna_file = DnaFile::new(
             DnaDef {
                 name: "conductor_test".to_string(),
-                network_seed: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
-                properties: SerializedBytes::try_from(()).unwrap(),
+                phenotype: DnaPhenotype {
+                    network_seed: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
+                    properties: SerializedBytes::try_from(()).unwrap(),
+                },
                 origin_time: Timestamp::HOLOCHAIN_EPOCH,
                 integrity_zomes: zomes
                     .clone()

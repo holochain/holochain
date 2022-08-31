@@ -207,7 +207,7 @@ impl DnaFile {
     /// and, hence, a different DnaHash.
     pub async fn with_properties(self, properties: SerializedBytes) -> Result<Self, DnaError> {
         let (mut dna, wasm): (DnaDef, Vec<wasm::DnaWasm>) = self.into();
-        dna.properties = properties;
+        dna.phenotype.properties = properties;
         DnaFile::new(dna, wasm).await
     }
 
@@ -215,7 +215,7 @@ impl DnaFile {
     /// and, hence, a different DnaHash.
     pub async fn with_network_seed(self, network_seed: NetworkSeed) -> Result<Self, DnaError> {
         let (mut dna, wasm): (DnaDef, Vec<wasm::DnaWasm>) = self.into();
-        dna.network_seed = network_seed;
+        dna.phenotype.network_seed = network_seed;
         DnaFile::new(dna, wasm).await
     }
 

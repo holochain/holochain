@@ -40,10 +40,12 @@ pub fn fake_dna_zomes_named(
 ) -> DnaFile {
     let mut dna = DnaDef {
         name: name.to_string(),
-        properties: YamlProperties::new(serde_yaml::from_str("p: hi").unwrap())
-            .try_into()
-            .unwrap(),
-        network_seed: network_seed.to_string(),
+        phenotype: DnaPhenotype {
+            properties: YamlProperties::new(serde_yaml::from_str("p: hi").unwrap())
+                .try_into()
+                .unwrap(),
+            network_seed: network_seed.to_string(),
+        },
         origin_time: Timestamp::HOLOCHAIN_EPOCH,
         integrity_zomes: Vec::new(),
         coordinator_zomes: Vec::new(),
