@@ -34,7 +34,7 @@ pub const CLONE_ID_DELIMITER: &str = ".";
 ///
 /// Example: `profiles.0`
 #[derive(Clone, Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct CloneId(String);
+pub struct CloneId(pub String);
 
 impl CloneId {
     /// Construct a clone id from role id and clone index.
@@ -69,6 +69,32 @@ impl fmt::Display for CloneId {
             CLONE_ID_DELIMITER,
             self.as_clone_index()
         )
+    }
+}
+
+/// Errors during conversion from [`AppRoleId`] to [`CloneId`].
+#[derive(Debug, thiserror::Error)]
+pub enum CloneIdError {
+    /// Multiple clone id delimiters found in app role id. There must only be one delimiter.
+    #[error("Multiple occurrences of reserved character '{CLONE_ID_DELIMITER}' found in app role id: {0}")]
+    MultipleDelimiters(AppRoleId),
+    /// The clone index could not be parsed into a u32.
+    #[error("Malformed clone index in app role id: {0}")]
+    MalformedCloneIndex(AppRoleId),
+}
+
+impl TryFrom<AppRoleId> for CloneId {
+    type Error = CloneIdError;
+    fn try_from(value: AppRoleId) -> Result<Self, Self::Error> {
+        let parts: Vec<&str> = value.split(CLONE_ID_DELIMITER).collect();
+        if parts.len() > 2 {
+            return Err(CloneIdError::MultipleDelimiters(value));
+        }
+        let role_id = parts[0];
+        let clone_index = parts[1]
+            .parse::<u32>()
+            .map_err(|_| CloneIdError::MalformedCloneIndex(value.clone()))?;
+        Ok(Self::new(&role_id.into(), clone_index))
     }
 }
 
