@@ -3,8 +3,60 @@ use holo_hash::*;
 use holochain_zome_types::ZomeName;
 use serde_with::serde_as;
 
-/// The structure of data that goes in the DNA bundle manifest,
-/// i.e. "dna.yaml"
+/// The structure of data that goes in the DNA bundle manifest "dna.yaml".
+///
+/// Navigating through this structure reveals all configurable DNA properties.
+///
+/// # Examples
+///
+/// An example "dna.yaml" with 2 integrity and 2 coordinator zomes:
+///
+/// ```yaml
+/// manifest_version: "1"
+/// name: multi integrity dna
+/// integrity:
+///   network_seed: 00000000-0000-0000-0000-000000000000
+///   properties: ~
+///   origin_time: 2022-02-11T23:05:19.470323Z
+///   zomes:
+///     - name: zome1
+///       bundled: ../dna1/zomes/zome1.wasm
+///     - name: zome2
+///       bundled: ../dna2/zomes/zome1.wasm
+/// coordinator:
+///   zomes:
+///     - name: zome3
+///       bundled: ../dna1/zomes/zome2.wasm
+///       dependencies:
+///         - name: zome1
+///     - name: zome4
+///       bundled: ../dna2/zomes/zome2.wasm
+///       dependencies:
+///         - name: zome1
+///         - name: zome2
+/// ```
+///
+/// When there's only one integrity zome, it will automatically be a dependency
+/// of the coordinator zomes. It doesn't need to be specified explicitly.
+///
+/// ```yaml
+/// manifest_version: "1"
+/// name: single integrity dna
+/// integrity:
+///   network_seed: 00000000-0000-0000-0000-000000000000
+///   properties: ~
+///   origin_time: 2022-02-11T23:05:19.470323Z
+///   zomes:
+///     - name: zome1
+///       bundled: ../dna1/zomes/zome1.wasm
+/// coordinator:
+///   zomes:
+///     - name: zome3
+///       bundled: ../dna1/zomes/zome2.wasm
+///     - name: zome4
+///       bundled: ../dna2/zomes/zome2.wasm
+/// ```
+
 #[serde_as]
 #[derive(
     Serialize,
@@ -21,12 +73,15 @@ pub struct DnaManifestV1 {
     /// The friendly "name" of a Holochain DNA.
     pub name: String,
 
-    /// Only this affects the hash.
+    /// Specification of integrity zomes and properties.
+    ///
+    /// Only this affects the [`DnaHash`].
     pub integrity: IntegrityManifest,
 
     #[serde(default)]
-    /// Coordinator zomes to install with this dna.
-    /// Doesn't not affect the [`DnaHash`].
+    /// Coordinator zomes to install with this DNA.
+    ///
+    /// Does not affect the [`DnaHash`].
     pub coordinator: CoordinatorManifest,
 }
 
@@ -54,9 +109,9 @@ impl DnaManifestV1 {
 #[serde(rename_all = "snake_case")]
 /// Manifest for all items that will change the [`DnaHash`].
 pub struct IntegrityManifest {
-    /// A UID for uniquifying this Dna.
+    /// A network seed for uniquifying this DNA. See [`DnaDef`].
     // TODO: consider Vec<u8> instead (https://github.com/holochain/holochain/pull/86#discussion_r412689085)
-    pub uid: Option<String>,
+    pub network_seed: Option<String>,
 
     /// Any arbitrary application properties can be included in this object.
     pub properties: Option<YamlProperties>,

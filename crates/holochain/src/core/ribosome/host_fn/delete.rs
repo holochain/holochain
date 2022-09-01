@@ -43,7 +43,7 @@ pub fn delete<'a>(
                     deletes_entry_address,
                 };
                 let action_hash = source_chain
-                    .put(action_builder, None, chain_top_ordering)
+                    .put_weightless(action_builder, None, chain_top_ordering)
                     .await
                     .map_err(|source_chain_error| {
                         wasm_error!(WasmErrorInner::Host(source_chain_error.to_string()))

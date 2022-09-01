@@ -4,6 +4,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.0.46
+
+## 0.0.45
+
+## 0.0.44
+
+## 0.0.43
+
+## 0.0.42
+
+## 0.0.41
+
+## 0.0.40
+
+## 0.0.39
+
+## 0.0.38
+
+- `hdk_to_global_types` is removed.
+- `hdk_to_local_types` becomes `hdk_to_coordinates`.
+
+## 0.0.37
+
 ## 0.0.36
 
 ## 0.0.35

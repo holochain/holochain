@@ -5,7 +5,6 @@ use crate::test_utils::consistency_10s;
 use crate::test_utils::inline_zomes::simple_create_read_zome;
 use hdk::prelude::*;
 use holochain_sqlite::prelude::*;
-use holochain_state::prelude::dump_tmp;
 use holochain_state::prelude::fresh_reader_test;
 use holochain_test_wasm_common::AnchorInput;
 use holochain_wasm_test_utils::TestWasm;
@@ -36,7 +35,6 @@ async fn gossip_test() {
         .await;
 
     consistency_10s(&[&cell_1, &cell_2]).await;
-    dump_tmp(cell_1.dht_db());
 
     let hashes: EntryHashes = conductors[1]
         .call(

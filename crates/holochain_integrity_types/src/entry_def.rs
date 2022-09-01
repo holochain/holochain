@@ -50,6 +50,11 @@ pub struct EntryDef {
     pub visibility: EntryVisibility,
     /// how many validations to receive before considered "network saturated" (MAX value of 50?)
     pub required_validations: RequiredValidations,
+    /// Should this entry be cached with agent activity authorities
+    /// for reduced networked hops when using `must_get_agent_activity`.
+    /// Note this will result in more storage being used on the DHT.
+    /// Defaults to false.
+    pub cache_at_agent_activity: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -127,17 +132,22 @@ impl EntryDef {
         id: EntryDefId,
         visibility: EntryVisibility,
         required_validations: RequiredValidations,
+        cache_at_agent_activity: bool,
     ) -> Self {
         Self {
             id,
             visibility,
             required_validations,
+            cache_at_agent_activity,
         }
     }
 
     #[cfg(any(test, feature = "test_utils"))]
     pub fn default_with_id<I: Into<EntryDefId>>(id: I) -> Self {
-        EntryDef::new(id.into(), Default::default(), Default::default())
+        EntryDef {
+            id: id.into(),
+            ..Default::default()
+        }
     }
 }
 
@@ -217,6 +227,7 @@ impl Default for EntryDef {
             id: EntryDefId::App(AppEntryDefName(Default::default())),
             visibility: Default::default(),
             required_validations: Default::default(),
+            cache_at_agent_activity: false,
         }
     }
 }

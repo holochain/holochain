@@ -16,8 +16,7 @@ mod entry_helper;
 mod entry_zomes;
 mod link_types;
 mod link_zomes;
-mod to_global_types;
-mod to_local_types;
+mod to_coordinates;
 mod unit_enum;
 mod util;
 
@@ -78,6 +77,7 @@ impl Parse for EntryDef {
             id,
             visibility,
             required_validations,
+            cache_at_agent_activity: false,
         }))
     }
 }
@@ -88,7 +88,7 @@ impl quote::ToTokens for EntryDefId {
             holochain_integrity_types::entry_def::EntryDefId::App(s) => {
                 let string: String = s.0.to_string();
                 tokens.append_all(quote::quote! {
-                    holochain_deterministic_integrity::prelude::EntryDefId::App(#string.into())
+                    hdi::prelude::EntryDefId::App(#string.into())
                 });
             }
             _ => unreachable!(),
@@ -100,7 +100,7 @@ impl quote::ToTokens for RequiredValidations {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let u = <u8>::from(self.0);
         tokens.append_all(quote::quote! {
-            holochain_deterministic_integrity::prelude::RequiredValidations::from(#u)
+            hdi::prelude::RequiredValidations::from(#u)
         });
     }
 }
@@ -115,7 +115,7 @@ impl quote::ToTokens for EntryVisibility {
             proc_macro2::Span::call_site(),
         );
         tokens.append_all(quote::quote! {
-            holochain_deterministic_integrity::prelude::EntryVisibility::#variant
+            hdi::prelude::EntryVisibility::#variant
         });
     }
 }
@@ -132,7 +132,7 @@ impl quote::ToTokens for RequiredValidationType {
             proc_macro2::Span::call_site(),
         );
         tokens.append_all(quote::quote! {
-            holochain_deterministic_integrity::prelude::RequiredValidationType::#variant
+            hdi::prelude::RequiredValidationType::#variant
         });
     }
 }
@@ -144,7 +144,7 @@ impl quote::ToTokens for EntryDef {
         let required_validations = RequiredValidations(self.0.required_validations);
 
         tokens.append_all(quote::quote! {
-            holochain_deterministic_integrity::prelude::EntryDef {
+            hdi::prelude::EntryDef {
                 id: #id,
                 visibility: #visibility,
                 required_validations: #required_validations,
@@ -201,17 +201,18 @@ pub fn derive_to_unit_enum(input: TokenStream) -> TokenStream {
     unit_enum::derive(input)
 }
 
-/// Declares your integrity zomes entry types.
+/// Declares the integrity zome's entry types.
 ///
 /// # Attributes
-/// - `unit_enum(TypeName)`: Defines the unit version of this enum.
+/// - `unit_enum(TypeName)`: Defines the unit version of this enum. The resulting enum contains all
+/// entry types defined in the integrity zome. It can be used to refer to a type when needed.
 /// - `entry_def(name: String, required_validations: u8, visibility: String)`: Defines an entry type.
 ///   - name: The name of the entry definition (optional).
 ///     Defaults to the name of the enum variant.
 ///   - required_validations: The number of validations required before this entry
 ///     will not be published anymore (optional). Defaults to 5.
-///   - visibility: The visibility of this entry.
-///     ["public" | "private"] Default is "public".
+///   - visibility: The visibility of this entry. [`public` | `private`].
+///     Default is `public`.
 ///
 /// # Examples
 /// ```ignore
@@ -240,36 +241,8 @@ pub fn hdk_link_types(attrs: TokenStream, code: TokenStream) -> TokenStream {
 
 #[proc_macro_error]
 #[proc_macro_attribute]
-pub fn hdk_to_local_types(attrs: TokenStream, code: TokenStream) -> TokenStream {
-    to_local_types::build(attrs, code)
-}
-
-/// Implements `impl TryFrom<Self> for GlobalZomeTypeId`
-/// by calling `zome_info` and getting the types in scope
-/// for the calling zome then calling `to_global_scope`.
-///
-/// `Self` must be mapped to a `EntryDefIndex`.
-///
-/// # Attributes
-/// Takes no attributes.
-#[proc_macro_error]
-#[proc_macro_attribute]
-pub fn hdk_to_global_entry_types(attrs: TokenStream, code: TokenStream) -> TokenStream {
-    to_global_types::build_entry(attrs, code)
-}
-
-/// Implements `impl TryFrom<Self> for GlobalZomeTypeId`
-/// by calling `zome_info` and getting the types in scope
-/// for the calling zome then calling `to_global_scope`.
-///
-/// `Self` must be mapped to a `LinkType`.
-///
-/// # Attributes
-/// Takes no attributes.
-#[proc_macro_error]
-#[proc_macro_attribute]
-pub fn hdk_to_global_link_types(attrs: TokenStream, code: TokenStream) -> TokenStream {
-    to_global_types::build_link(attrs, code)
+pub fn hdk_to_coordinates(attrs: TokenStream, code: TokenStream) -> TokenStream {
+    to_coordinates::build(attrs, code)
 }
 
 #[proc_macro_error]
@@ -300,7 +273,7 @@ pub fn hdk_dependent_link_types(attrs: TokenStream, code: TokenStream) -> TokenS
 ///
 /// # Implements
 /// - `#[derive(Serialize, Deserialize, SerializedBytes, Debug)]`
-/// - `holochain_deterministic_integrity::app_entry!`
+/// - `hdi::app_entry!`
 ///
 /// # Examples
 /// ```ignore

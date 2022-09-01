@@ -52,7 +52,7 @@ impl From<TlsConfig> for TlsFileCert {
     fn from(f: TlsConfig) -> Self {
         Self {
             cert: f.cert.to_vec(),
-            priv_key: f.cert_priv_key.to_vec(),
+            priv_key: f.cert_priv_key.read_lock().to_vec(),
             digest: f.cert_digest.to_vec(),
         }
     }
@@ -63,7 +63,7 @@ impl From<TlsFileCert> for TlsConfig {
         Self {
             cert: f.cert.into(),
             cert_priv_key: f.priv_key.into(),
-            cert_digest: f.digest.into(),
+            cert_digest: CertDigest::from_slice(&f.digest),
         }
     }
 }

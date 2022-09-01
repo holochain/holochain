@@ -1,4 +1,3 @@
-use darling::util::PathList;
 use proc_macro::TokenStream;
 
 use darling::FromDeriveInput;
@@ -24,7 +23,7 @@ struct Opts {
     attrs: Vec<syn::Attribute>,
     data: darling::ast::Data<VarOpts, darling::util::Ignored>,
     #[darling(default)]
-    forward: PathList,
+    forward: Option<syn::Meta>,
 }
 
 pub fn derive(input: TokenStream) -> TokenStream {
@@ -76,11 +75,12 @@ pub fn derive(input: TokenStream) -> TokenStream {
         .collect();
 
     // Forward any attributes that are meant for the unit enum.
-    let unit_attrs: proc_macro2::TokenStream = forward
-        .iter()
-        .cloned()
-        .map(|a| quote::quote! {#[#a] })
-        .collect();
+    let unit_attrs: proc_macro2::TokenStream = match forward {
+        Some(syn::Meta::List(syn::MetaList { nested, .. })) => {
+            nested.iter().map(|a| quote::quote! {#[#a]}).collect()
+        }
+        _ => quote::quote! {},
+    };
 
     let output = quote::quote! {
         // Impl the UnitEnum for Self
@@ -91,6 +91,11 @@ pub fn derive(input: TokenStream) -> TokenStream {
                 match self {
                     #units_match
                 }
+            }
+
+            fn unit_iter() -> Box<dyn Iterator<Item = Self::Unit>>
+            {
+                Box::new(#unit_ident::iter())
             }
         }
 

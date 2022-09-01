@@ -31,6 +31,12 @@ pub struct ValidationPackageHostAccess {
     pub network: HolochainP2pDna,
 }
 
+impl std::fmt::Debug for ValidationPackageHostAccess {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ValidationPackageHostAccess").finish()
+    }
+}
+
 impl From<ValidationPackageHostAccess> for HostContext {
     fn from(validation_package_host_access: ValidationPackageHostAccess) -> Self {
         Self::ValidationPackage(validation_package_host_access)
@@ -153,7 +159,7 @@ mod test {
             results.shuffle(&mut rng);
 
             // number of times a callback result appears should not change the final result
-            let number_of_extras = rng.gen_range(0, 5);
+            let number_of_extras = rng.gen_range(0..5);
             for _ in 0..number_of_extras {
                 let maybe_extra = results.choose(&mut rng).cloned();
                 match maybe_extra {

@@ -150,7 +150,7 @@ impl ShardedGossipLocal {
 
         // Generate the bloom filters and new state.
         let state = self
-            .generate_blooms(
+            .generate_blooms_or_regions(
                 remote_agent_list.clone(),
                 local_arcs,
                 remote_arc_set,
@@ -190,7 +190,7 @@ impl ShardedGossipLocal {
     /// - Agent bloom is only generated if this is a `Recent` gossip type.
     /// - Empty blooms are not created.
     /// - A new state is created for this round.
-    pub(super) async fn generate_blooms(
+    pub(super) async fn generate_blooms_or_regions(
         &self,
         remote_agent_list: Vec<AgentInfoSigned>,
         local_arcs: Vec<DhtArcRange>,
@@ -202,8 +202,21 @@ impl ShardedGossipLocal {
         let remote_arc_set: DhtArcSet = remote_arc_set.into();
         let common_arc_set = Arc::new(arc_set.intersection(&remote_arc_set));
 
+        let region_set = if let GossipType::Historical = self.gossip_type {
+            let region_set = store::query_region_set(
+                self.host_api.clone(),
+                self.space.clone(),
+                common_arc_set.clone(),
+            )
+            .await?;
+            gossip.push(ShardedGossipWire::op_regions(region_set.clone()));
+            Some(region_set)
+        } else {
+            None
+        };
+
         // Generate the new state.
-        let state = self.new_state(remote_agent_list, common_arc_set)?;
+        let mut state = self.new_state(remote_agent_list, common_arc_set, region_set)?;
 
         // Generate the agent bloom.
         if let GossipType::Recent = self.gossip_type {
@@ -212,9 +225,14 @@ impl ShardedGossipLocal {
                 let bloom = encode_bloom_filter(&bloom);
                 gossip.push(ShardedGossipWire::agents(bloom));
             }
+            self.next_bloom_batch(state, gossip).await
+        } else {
+            // Everything has already been taken care of for Historical
+            // gossip already. Just mark this true so that the state will not
+            // be considered "finished" until all op data is received.
+            state.has_pending_historical_op_data = true;
+            Ok(state)
         }
-
-        self.next_bloom_batch(state, gossip).await
     }
 
     /// Generate the next batch of blooms from this state.
@@ -236,7 +254,7 @@ impl ShardedGossipLocal {
             window.start = cursor;
         }
         let blooms = self
-            .generate_ops_blooms_for_time_window(&state.common_arc_set, window)
+            .generate_op_blooms_for_time_window(&state.common_arc_set, window)
             .await?;
 
         let blooms = match blooms {
@@ -251,7 +269,7 @@ impl ShardedGossipLocal {
         // If no blooms were found for this time window then return a no overlap.
         if blooms.is_empty() {
             // Check if this is the final time window.
-            gossip.push(ShardedGossipWire::ops(
+            gossip.push(ShardedGossipWire::op_bloom(
                 EncodedTimedBloomFilter::NoOverlap,
                 true,
             ));
@@ -275,13 +293,13 @@ impl ShardedGossipLocal {
                 // that hold the arc so request all the ops the remote holds.
                 None => EncodedTimedBloomFilter::MissingAllHashes { time_window },
             };
-            state.increment_sent_ops_blooms();
+            state.increment_sent_op_blooms();
 
             // Check if this is the final time window and the final bloom for this window.
             if i == len - 1 && state.bloom_batch_cursor.is_none() {
-                gossip.push(ShardedGossipWire::ops(bloom, true));
+                gossip.push(ShardedGossipWire::op_bloom(bloom, true));
             } else {
-                gossip.push(ShardedGossipWire::ops(bloom, false));
+                gossip.push(ShardedGossipWire::op_bloom(bloom, false));
             }
         }
 

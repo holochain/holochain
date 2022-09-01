@@ -17,7 +17,7 @@ impl SweetDnaFile {
     /// "phenotype" overrides
     pub async fn from_bundle_with_overrides<P>(
         path: &Path,
-        uid: Option<Uid>,
+        network_seed: Option<NetworkSeed>,
         props: Option<P>,
     ) -> DnaResult<DnaFile>
     where
@@ -30,14 +30,14 @@ impl SweetDnaFile {
         };
         Ok(DnaBundle::read_from_file(path)
             .await?
-            .into_dna_file(uid, props)
+            .into_dna_file(network_seed, props)
             .await?
             .0)
     }
 
     /// Create a DnaFile from a collection of Zomes
     pub async fn from_zomes<I, C, D>(
-        uid: String,
+        network_seed: String,
         integrity_zomes: Vec<I>,
         coordinator_zomes: Vec<C>,
         wasms: Vec<D>,
@@ -63,7 +63,7 @@ impl SweetDnaFile {
             .map(CoordinatorZome::into_inner)
             .collect();
         let dna_def = DnaDefBuilder::default()
-            .uid(uid)
+            .network_seed(network_seed)
             .integrity_zomes(iz)
             .coordinator_zomes(cz)
             .properties(properties.clone())
@@ -76,7 +76,7 @@ impl SweetDnaFile {
     }
 
     /// Create a DnaFile from a collection of Zomes,
-    /// with a random UID
+    /// with a random network seed
     pub async fn unique_from_zomes<I, C, D>(
         integrity_zomes: Vec<I>,
         coordinator_zomes: Vec<C>,
@@ -88,7 +88,7 @@ impl SweetDnaFile {
         D: Into<wasm::DnaWasm>,
     {
         Self::from_zomes(
-            random_uid(),
+            random_network_seed(),
             integrity_zomes,
             coordinator_zomes,
             wasms,
@@ -99,7 +99,7 @@ impl SweetDnaFile {
 
     /// Create a DnaFile from a collection of TestWasm
     pub async fn from_test_wasms<W>(
-        uid: String,
+        network_seed: String,
         wasms: Vec<W>,
         properties: SerializedBytes,
     ) -> DnaResult<(DnaFile, Vec<IntegrityZome>, Vec<CoordinatorZome>)>
@@ -131,11 +131,18 @@ impl SweetDnaFile {
             })
             .collect();
 
-        Self::from_zomes(uid, integrity_zomes, coordinator_zomes, wasms, properties).await
+        Self::from_zomes(
+            network_seed,
+            integrity_zomes,
+            coordinator_zomes,
+            wasms,
+            properties,
+        )
+        .await
     }
 
     /// Create a DnaFile from a collection of TestWasm
-    /// with a random UID
+    /// with a random network seed
     pub async fn unique_from_test_wasms<W>(
         test_wasms: Vec<W>,
     ) -> DnaResult<(DnaFile, Vec<IntegrityZome>, Vec<CoordinatorZome>)>
@@ -144,14 +151,18 @@ impl SweetDnaFile {
             + Into<TestWasmPair<wasm::DnaWasm>>
             + Clone,
     {
-        let (dna, integrity_zomes, coordinator_zomes) =
-            Self::from_test_wasms(random_uid(), test_wasms, SerializedBytes::default()).await?;
+        let (dna, integrity_zomes, coordinator_zomes) = Self::from_test_wasms(
+            random_network_seed(),
+            test_wasms,
+            SerializedBytes::default(),
+        )
+        .await?;
         Ok((dna, integrity_zomes, coordinator_zomes))
     }
 
     /// Create a DnaFile from a collection of InlineZomes (no Wasm)
     pub async fn from_inline_zomes(
-        uid: String,
+        network_seed: String,
         mut zomes: InlineZomeSet,
     ) -> DnaResult<(DnaFile, Vec<IntegrityZome>, Vec<CoordinatorZome>)> {
         let coordinator_zomes: Vec<CoordinatorZome> = zomes
@@ -168,7 +179,7 @@ impl SweetDnaFile {
             })
             .collect();
         Self::from_zomes(
-            uid,
+            network_seed,
             zomes
                 .integrity_order
                 .into_iter()
@@ -183,11 +194,11 @@ impl SweetDnaFile {
     }
 
     /// Create a DnaFile from a collection of InlineZomes (no Wasm),
-    /// with a random UID
+    /// with a random network seed
     pub async fn unique_from_inline_zomes(
         zomes: InlineZomeSet,
     ) -> DnaResult<(DnaFile, Vec<IntegrityZome>, Vec<CoordinatorZome>)> {
-        Self::from_inline_zomes(random_uid(), zomes).await
+        Self::from_inline_zomes(random_network_seed(), zomes).await
     }
 }
 
@@ -195,7 +206,7 @@ impl SweetDnaFile {
 pub struct SweetDnaDef;
 
 impl SweetDnaDef {
-    /// Create a DnaDef with a random UID, useful for testing
+    /// Create a DnaDef with a random network seed, useful for testing
     // TODO: move fully into sweettest when possible
     pub fn unique_from_zomes(
         integrity_zomes: Vec<IntegrityZome>,

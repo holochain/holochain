@@ -2,8 +2,12 @@
 //!
 //! Functions of a Holochain application (hApp) can be organized into reusable components. In Holochain terminology these components are called "zomes".
 //! One or multiple zomes are compiled into a WebAssembly (WASM) binary, referred to as a DNA. All of the DNAs of an application are bundled to a hApp.
+//! In short, that structure is __hApp -> DNA -> zome -> function__.
 //!
-//! hApps are required to produce and validate data deterministically, which is stored in a content-addressable manner retrieved by hash value.
+//! hApps are required to produce and validate data deterministically. There's a data model and a domain logic part to each hApp. In Holochain, the
+//! data model is defined in integrity zomes and the domain logic is written in coordinator zomes. See Integrity zomes and Coordinator zomes further down and
+//! [Holochain Deterministic Integrity (HDI)](hdi) for more information.
+//!
 //! Since hApps are run as a binary on the hosting system, they must be sandboxed to prevent execution of insecure commands.
 //! Instead of writing and maintaining a custom format and specification for these artifacts as well as a runtime environment to execute them,
 //! Holochain makes use of WASM as the format of its applications. WASM binaries meet the aforementioned requirements as per the
@@ -11,7 +15,7 @@
 //!
 //! hApps can be installed on a device that's running a so-called conductor, Holochain's runtime. Clients can then call each zome's functions via Remote Procedure Calls (RPC).
 //! Holochain employs websocket ports for these RPCs, served by the conductor. Calls are made either from a client on localhost or from other nodes on the network.
-//! The zome function to be executed must be specified in each call. Every zome function in turn defines the response it returns to the client as part of a zome's code.
+//! The zome function to be executed must be specified in each call. Every zome function defines the response it returns to the client.
 //! [More info on Holochain's architecture](https://developer.holochain.org/concepts/2_application_architecture)
 //!
 //! Low-level communication between the conductor and WASM binaries, like typing and serialization of data, is encapsulated by the HDK.
@@ -24,11 +28,29 @@
 //! The HDK is used in all the WASMs used to test Holochain itself.
 //! As they are used directly by tests in CI they are guaranteed to compile and work for at least the tests we define against them.
 //!
-//! At the time of writing there were about 40 example/test WASMs that can be browsed [on Github](https://github.com/holochain/holochain/tree/develop/crates/test_utils/wasm/wasm_workspace).
+//! There are numerous example/test WASMs on many aspects of hApp development that can be browsed
+//! [on Github](https://github.com/holochain/holochain/tree/develop/crates/test_utils/wasm/wasm_workspace).
 //!
 //! Each example WASM is a minimal demonstration of specific HDK functionality, such as generating random data, creating entries or defining validation callbacks.
 //! Some of the examples are very contrived, none are intended as production grade hApp examples, but do highlight key functionality.
 //!
+//! # Integrity zomes 📐
+//!
+//! Integrity zomes describe a hApp's domain model by defining a set of entry and link types and providing a validation callback
+//! function that checks the integrity of any operations that manipulate data of those types.
+//!
+//! The wasm workspace contains examples of integrity zomes like this:
+//! <https://github.com/holochain/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/integrity_zome/src/lib.rs>
+//!
+//! Refer to the [HDI crate](hdi) for more information on the integrity layer.
+//!
+//! # Coordinator zomes 🐜
+//!
+//! Coordinator zomes are the counterpart of integrity zomes in a DNA. They contain the domain logic of how data is read and written.
+//! Whereas data is defined and validated in integrity zomes, functions to manipulate data are implemented in coordinator zomes.
+//!
+//! An example coordinator zome can be found in the wasm workspace of the Holochain repository:
+//! <https://github.com/holochain/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/coordinator_zome/src/lib.rs>.
 //!
 //! # HDK structure 🧱
 //!
@@ -36,6 +58,7 @@
 //!
 //! - Base HDKT trait for standardisation, mocking, unit testing support: [`hdk`] module
 //! - Capabilities and function level access control: [`capability`] module
+//! - [Holochain Deterministic Integrity (HDI)](hdi)
 //! - Application data and entry definitions for the source chain and DHT: [`entry`] module and [`entry_defs`] callback
 //! - Referencing/linking entries on the DHT together into a graph structure: [`link`] module
 //! - Defining tree-like structures out of links and entries for discoverability and scalability: [`hash_path`] module
@@ -81,7 +104,9 @@
 //! - The function must return an `ExternResult` where the success value implements `serde::Serialize + std::fmt::Debug`
 //! - The function must have a unique name across all externs as they share a global namespace in WASM
 //! - Everything inside the function is Rust-as-usual including `?` to interact with `ExternResult` that fails as `WasmError`
-//! - Use the `WasmErrorInner::Guest` variant for failure conditions that the host or external processes needs to be aware of
+//! - Use the [`wasm_error!`](holochain_wasmer_guest::wasm_error) macro along with the
+//! [`WasmErrorInner::Guest`](holochain_wasmer_guest::WasmErrorInner::Guest) variant for failure conditions that the host or
+//! external processes need to be aware of
 //! - Externed functions can be called as normal by other functions inside the same WASM
 //!
 //! For example:
@@ -114,7 +139,7 @@
 //!
 //! The callbacks are:
 //!
-//! - [`fn entry_defs(_: ()) -> ExternResult<EntryDefs>`](entry_defs):
+//! - `fn entry_defs(_: ()) -> ExternResult<EntryDefs>`:
 //!   - `EntryDefs` is a vector defining all entries used by this app.
 //!   - All zomes in a DNA define all their entries at the same time for the host.
 //!   - All entry defs are combined into a single ordered list per zome and exposed to tooling such as DNA generation.
@@ -142,17 +167,11 @@
 //! - `fn validate_delete_link(delete_link_data: ValidateDeleteLinkData) -> ExternResult<ValidateLinkCallbackResult>`:
 //!   - Allows the guest to pass/fail/retry link deletion validation.
 //!   - Only the zome that deleted the link is called.
-//! - `fn validate_{{ create|update|delete }}_{{ agent|entry }}_{{ <entry_id> }}(validate_data: ValidateData) -> ExternResult<ValidateCallbackResult>`:
-//!   - Allows the guest to pass/fail/retry entry validation.
-//!   - <entry_id> is the entry id defined by entry defs e.g. "comment".
+//! - `fn validate(op: Op) -> ExternResult<ValidateCallbackResult>`:
+//!   - Allows the guest to pass/fail/retry any operation.
 //!   - Only the originating zome is called.
 //!   - Failure overrides retry.
-//! - `fn validation_package_{{ <entry_id> }}(entry_type: AppEntryType) -> ExternResult<ValidationPackageCallbackResult>`:
-//!   - Allows the guest to build a validation package for the given entry type.
-//!   - Can pass/retry/fail/not-implemented in reverse override order.
-//!   - <entry_id> is the entry id defined by entry defs e.g. "comment".
-//!   - Only the originating zome is called.
-//!
+//!   - See [`validate`](hdi::prelude::validate) for more details.
 //!
 //! # HDK has layers 🧅
 //!
@@ -218,7 +237,7 @@
 //!
 //! All the basic tracing macros `trace!`, `debug!`, `warn!`, `error!` are implemented.
 //!
-//! However, tracing spans currently do _not_ work, if you attempt to `#[instrument]` you will likely panic your WASM.
+//! However, tracing spans currently do _not_ work, if you attempt to `#[instrument]`, you will likely panic your WASM.
 //!
 //! WASM tracing can be filtered at runtime using the `WASM_LOG` environment variable that works exactly as `RUST_LOG` does for the Holochain conductor and other Rust binaries.
 //!
@@ -231,13 +250,51 @@
 //!
 //! There are many other possibilities for failure, such as a corrupt database or attempting cryptographic operations without a key.
 //!
-//! When the host encounters a failure `Result` it will __serialize the error and pass it back to the WASM guest__.
-//! The __guest must handle this error__ and either return it back to the host which _then_ rolls back writes (see above) or implement some kind of graceful failure or retry logic.
+//! When the host encounters a failure `Result`, it will __serialize the error and pass it back to the WASM guest__.
+//! The __guest must handle this error__ and either return it back to the host which _then_ rolls back writes (see above), or implement some kind of graceful failure or retry logic.
 //!
 //! The `Result` from the host in the case of host calls indicates whether the execution _completed_ successfully and is _in addition to_ other Result-like enums.
-//! For example, a remote call can be `Ok` from the host's perspective but contain an [ `crate::prelude::ZomeCallResponse::Unauthorized` ] "failure" enum variant from the remote agent, both need to be handled in context.
+//! For example, a remote call can be `Ok` from the host's perspective but contain an [ `crate::prelude::ZomeCallResponse::Unauthorized` ] "failure" enum variant from the remote agent.
+//! Both need to be handled in context.
 //!
 //! [`hdk_extern!`]: hdk_derive::hdk_extern
+
+pub use hdi::HDI_VERSION;
+
+/// Current HDK rust crate version.
+pub const HDK_VERSION: &str = env!("CARGO_PKG_VERSION");
+
+#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+const ERAND_INTERNAL: u32 = getrandom::Error::CUSTOM_START + 1;
+
+#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+const ERAND_TOO_LONG: u32 = getrandom::Error::CUSTOM_START + 2;
+
+#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+fn wasm_getrandom(buf: &mut [u8]) -> Result<(), getrandom::Error> {
+    if buf.len() > u32::MAX as usize {
+        let code = core::num::NonZeroU32::new(ERAND_TOO_LONG).unwrap();
+        return Err(getrandom::Error::from(code));
+    }
+    let number_of_bytes = buf.len() as u32;
+    match crate::hdk::HDK.with(|h| h.borrow().random_bytes(number_of_bytes)) {
+        Err(_) => {
+            let code = core::num::NonZeroU32::new(ERAND_INTERNAL).unwrap();
+            return Err(getrandom::Error::from(code));
+        }
+        Ok(bytes) => {
+            if bytes.len() != buf.len() {
+                let code = core::num::NonZeroU32::new(ERAND_INTERNAL).unwrap();
+                return Err(getrandom::Error::from(code));
+            }
+            buf.copy_from_slice(&bytes);
+        }
+    }
+    Ok(())
+}
+
+#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+getrandom::register_custom_getrandom!(wasm_getrandom);
 
 /// Capability claims and grants.
 ///
@@ -284,7 +341,17 @@ pub mod countersigning;
 /// Most Holochain applications will define their own app entry types.
 ///
 /// App entries are all entries that are not system entries.
-/// They are defined in the `entry_defs` callback and then the application can call CRUD functions with them.
+/// Definitions of entry types belong in the integrity zomes of a DNA. In contrast, operations
+/// for manipulating entries go into coordinator zomes.
+///
+/// # Examples
+///
+/// Refer to the WASM workspace in the Holochain repository for examples.
+/// Here's a simple example of an entry definition:
+/// <https://github.com/holochain/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/entry_defs/src/integrity.rs>
+///
+/// An example of a coordinator zome with functions to manipulate entries:
+/// <https://github.com/holochain/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/coordinator_zome/src/lib.rs>
 ///
 /// CRUD in Holochain is represented as a graph/tree of Records referencing each other (via Action hashes) representing new states of a shared identity.
 /// Because the network is always subject to the possibility of partitions, there is no way to assert an objective truth about the 'current' or 'real' value that all participants will agree on.
@@ -302,7 +369,8 @@ pub mod countersigning;
 /// For example, an agent could choose to 'block' another agent and ignore all their updates.
 pub mod entry;
 
-pub use holochain_deterministic_integrity::entry_defs;
+pub use hdi;
+pub use hdi::entry_defs;
 
 pub mod hash;
 

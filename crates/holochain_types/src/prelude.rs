@@ -1,7 +1,6 @@
 //! reexport some common things
 
 pub use holochain_keystore::AgentPubKeyExt;
-pub use holochain_keystore::KeystoreSender;
 pub use holochain_serialized_bytes::prelude::*;
 pub use holochain_zome_types::prelude::*;
 pub use std::convert::TryFrom;
@@ -24,6 +23,7 @@ pub use crate::dna::*;
 pub use crate::entry::*;
 pub use crate::link::*;
 pub use crate::metadata::*;
+pub use crate::rate_limit::*;
 pub use crate::record::error::*;
 pub use crate::record::*;
 pub use crate::signal::*;

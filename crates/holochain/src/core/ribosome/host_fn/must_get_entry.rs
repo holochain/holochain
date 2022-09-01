@@ -49,7 +49,7 @@ pub fn must_get_entry<'a>(
                         HostContext::Init(_) => Err(wasm_error!(WasmErrorInner::HostShortCircuit(
                             holochain_serialized_bytes::encode(
                                 &ExternIO::encode(InitCallbackResult::UnresolvedDependencies(
-                                    vec![entry_hash.into()],
+                                    UnresolvedDependencies::Hashes(vec![entry_hash.into()],)
                                 ))
                                 .map_err(|e| -> RuntimeError { wasm_error!(e.into()).into() })?,
                             )
@@ -60,9 +60,11 @@ pub fn must_get_entry<'a>(
                             Err(wasm_error!(WasmErrorInner::HostShortCircuit(
                                 holochain_serialized_bytes::encode(
                                     &ExternIO::encode(
-                                        &ValidateCallbackResult::UnresolvedDependencies(vec![
-                                            entry_hash.into(),
-                                        ]),
+                                        &ValidateCallbackResult::UnresolvedDependencies(
+                                            UnresolvedDependencies::Hashes(
+                                                vec![entry_hash.into(),]
+                                            )
+                                        ),
                                     )
                                     .map_err(
                                         |e| -> RuntimeError { wasm_error!(e.into()).into() }
@@ -132,7 +134,11 @@ pub mod test {
 
         let entry = Entry::try_from(Something(vec![1, 2, 3])).unwrap();
         let action_hash = alice_host_fn_caller
-            .commit_entry(entry.clone(), EntryDefIndex(0), EntryVisibility::Public)
+            .commit_entry(
+                entry.clone(),
+                EntryDefLocation::app(0, EntryDefIndex(0)),
+                EntryVisibility::Public,
+            )
             .await;
 
         let dht_db = conductor

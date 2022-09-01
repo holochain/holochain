@@ -137,6 +137,7 @@ where
         }
     }
 }
+
 impl Cascade<HolochainP2pDna> {
     /// Constructs an empty [Cascade].
     pub fn empty() -> Self {
@@ -228,6 +229,30 @@ where
         Ok(())
     }
 
+    /// Insert a set of agent activity into the Cache.
+    fn insert_activity(
+        txn: &mut Transaction,
+        ops: Vec<RegisterAgentActivity>,
+    ) -> CascadeResult<()> {
+        for op in ops {
+            let RegisterAgentActivity {
+                action:
+                    SignedHashed {
+                        hashed: HoloHashed { content, .. },
+                        signature,
+                    },
+                ..
+            } = op;
+            let op =
+                DhtOpHashed::from_content_sync(DhtOp::RegisterAgentActivity(signature, content));
+            insert_op(txn, &op)?;
+            // We set the integrated to for the cache so it can match the
+            // same query as the vault. This can also be used for garbage collection.
+            set_when_integrated(txn, op.as_hash(), Timestamp::now())?;
+        }
+        Ok(())
+    }
+
     async fn merge_ops_into_cache(&mut self, responses: Vec<WireOps>) -> CascadeResult<()> {
         let cache = ok_or_return!(self.cache.as_mut());
         cache
@@ -258,6 +283,56 @@ where
             })
             .await?;
         Ok(())
+    }
+
+    /// Add new activity to the Cache.
+    async fn add_activity_into_cache(
+        &mut self,
+        responses: Vec<MustGetAgentActivityResponse>,
+    ) -> CascadeResult<MustGetAgentActivityResponse> {
+        // Choose a response from all the responses.
+        let response = if responses
+            .iter()
+            .zip(responses.iter().skip(1))
+            .all(|(a, b)| a == b)
+        {
+            // All responses are the same so we can just use the first one.
+            responses.into_iter().next()
+        } else {
+            tracing::info!(
+                "Got different must_get_agent_activity responses from different authorities"
+            );
+            // TODO: Handle conflict.
+            // For now try to find one that has got the activity.
+            responses
+                .into_iter()
+                .find(|a| matches!(a, MustGetAgentActivityResponse::Activity(_)))
+        };
+
+        let cache = ok_or_return!(
+            self.cache.as_mut(),
+            response.unwrap_or(MustGetAgentActivityResponse::IncompleteChain)
+        );
+
+        // Commit the activity to the chain.
+        match response {
+            Some(MustGetAgentActivityResponse::Activity(activity)) => {
+                // TODO: Avoid this clone by committing the ops as references to the db.
+                cache
+                    .async_commit({
+                        let activity = activity.clone();
+                        move |txn| {
+                            Self::insert_activity(txn, activity)?;
+                            CascadeResult::Ok(())
+                        }
+                    })
+                    .await?;
+                Ok(MustGetAgentActivityResponse::Activity(activity))
+            }
+            Some(response) => Ok(response),
+            // Got no responses so the chain is incomplete.
+            None => Ok(MustGetAgentActivityResponse::IncompleteChain),
+        }
     }
 
     #[instrument(skip(self, options))]
@@ -301,11 +376,24 @@ where
         Ok(network.get_agent_activity(agent, query, options).await?)
     }
 
-    async fn cascading<Q>(&mut self, query: Q) -> CascadeResult<Q::Output>
-    where
-        Q: Query<Item = Judged<SignedActionHashed>> + Send + 'static,
-        <Q as holochain_state::prelude::Query>::Output: Send + 'static,
-    {
+    #[instrument(skip(self))]
+    /// Fetch hash bounded agent activity from the network.
+    async fn fetch_must_get_agent_activity(
+        &mut self,
+        author: AgentPubKey,
+        filter: holochain_zome_types::chain::ChainFilter,
+    ) -> CascadeResult<MustGetAgentActivityResponse> {
+        let network = ok_or_return!(
+            self.network.as_mut(),
+            MustGetAgentActivityResponse::IncompleteChain
+        );
+        let results = network.must_get_agent_activity(author, filter).await?;
+
+        self.add_activity_into_cache(results).await
+    }
+
+    /// Get all available databases.
+    async fn get_databases(&self) -> Vec<(PConnPermit, Box<dyn PermittedConn + Send>)> {
         let mut conns: Vec<(_, Box<dyn PermittedConn + Send>)> = Vec::with_capacity(3);
         if let Some(cache) = self.cache.clone() {
             conns.push((cache.conn_permit().await, Box::new(cache)));
@@ -316,6 +404,15 @@ where
         if let Some(authored) = self.authored.clone() {
             conns.push((authored.conn_permit().await, Box::new(authored)));
         }
+        conns
+    }
+
+    async fn cascading<Q>(&mut self, query: Q) -> CascadeResult<Q::Output>
+    where
+        Q: Query<Item = Judged<SignedActionHashed>> + Send + 'static,
+        <Q as holochain_state::prelude::Query>::Output: Send + 'static,
+    {
+        let conns = self.get_databases().await;
         let scratch = self.scratch.clone();
         let results = tokio::task::spawn_blocking(move || {
             let mut conns = conns
@@ -737,6 +834,64 @@ where
         let query = GetLinkDetailsQuery::new(key.base, key.type_query, key.tag);
         let results = self.cascading(query).await?;
         Ok(results)
+    }
+
+    /// Request a hash bounded chain query.
+    pub async fn must_get_agent_activity(
+        &mut self,
+        author: AgentPubKey,
+        filter: ChainFilter,
+    ) -> CascadeResult<MustGetAgentActivityResponse> {
+        // Get the available databases.
+        let conns = self.get_databases().await;
+        let scratch = self.scratch.clone();
+
+        // For each store try to get the bounded activity.
+        let results = tokio::task::spawn_blocking({
+            let author = author.clone();
+            let filter = filter.clone();
+            move || {
+                let mut results = Vec::with_capacity(conns.len() + 1);
+                for (permit, conn) in conns {
+                    let mut conn = conn.with_permit(permit)?;
+                    let mut txn = conn.transaction().map_err(StateQueryError::from)?;
+                    let r = match &scratch {
+                        Some(scratch) => {
+                            scratch.apply_and_then(|scratch| {
+                                authority::get_agent_activity_query::must_get_agent_activity::get_bounded_activity(&mut txn, Some(scratch), &author, filter.clone())
+                            })?
+                        },
+                        None => authority::get_agent_activity_query::must_get_agent_activity::get_bounded_activity(&mut txn, None, &author, filter.clone())?
+                    };
+                    results.push(r);
+                }
+            CascadeResult::Ok(results)
+        }})
+        .await??;
+
+        // For each response run the chain filter and check the invariants hold.
+        for response in results {
+            let result =
+                authority::get_agent_activity_query::must_get_agent_activity::filter_then_check(
+                    response,
+                )?;
+
+            // Short circuit if we have a result.
+            if matches!(result, MustGetAgentActivityResponse::Activity(_)) {
+                return Ok(result);
+            }
+        }
+
+        // If we are the authority then don't go to the network.
+        let i_am_authority = self.am_i_an_authority(author.clone().into()).await?;
+        if i_am_authority {
+            // If I am an authority and I didn't get a result before
+            // this point then the chain is incomplete for this request.
+            Ok(MustGetAgentActivityResponse::IncompleteChain)
+        } else {
+            self.fetch_must_get_agent_activity(author.clone(), filter)
+                .await
+        }
     }
 
     #[instrument(skip(self, agent, query, options))]

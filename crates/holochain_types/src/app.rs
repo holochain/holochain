@@ -11,7 +11,7 @@ mod app_bundle;
 mod app_manifest;
 mod dna_gamut;
 pub mod error;
-use crate::dna::DnaBundle;
+use crate::{dna::DnaBundle, prelude::CoordinatorBundle};
 pub use app_bundle::*;
 pub use app_manifest::app_manifest_validated::*;
 pub use app_manifest::*;
@@ -32,9 +32,6 @@ use self::error::{AppError, AppResult};
 /// The unique identifier for an installed app in this conductor
 pub type InstalledAppId = String;
 
-/// Identifier for an App Role, a foundational concept in the App manifest.
-pub type AppRoleId = String;
-
 /// The source of the DNA to be installed, either as binary data, or from a path
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -47,22 +44,42 @@ pub enum DnaSource {
     Hash(DnaHash),
 }
 
+/// The source of coordinators to be installed, either as binary data, or from a path
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CoordinatorSource {
+    /// Coordinators loaded from a bundle file on disk
+    Path(PathBuf),
+    /// Coordinators provided in the [`CoordinatorBundle`] data structure
+    Bundle(Box<CoordinatorBundle>),
+}
+
 /// The instructions on how to get the DNA to be registered
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct RegisterDnaPayload {
-    /// UID to override when installing this Dna
-    pub uid: Option<String>,
-    /// Properties to override when installing this Dna
+    /// Network seed to override when installing this DNA
+    pub network_seed: Option<String>,
+    /// Properties to override when installing this DNA
     pub properties: Option<YamlProperties>,
     /// Where to find the DNA
     #[serde(flatten)]
     pub source: DnaSource,
 }
 
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+/// The instructions on how to update coordinators for a dna file.
+pub struct UpdateCoordinatorsPayload {
+    /// The hash of the dna to swap coordinators for.
+    pub dna_hash: DnaHash,
+    /// Where to find the coordinators.
+    #[serde(flatten)]
+    pub source: CoordinatorSource,
+}
+
 /// The instructions on how to get the DNA to be registered
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct CreateCloneCellPayload {
-    /// Properties to override when installing this Dna
+    /// Properties to override when installing this DNA
     pub properties: Option<YamlProperties>,
     /// The DNA to clone
     pub dna_hash: DnaHash,
@@ -94,7 +111,7 @@ pub struct InstallAppPayload {
     /// The agent to use when creating Cells for this App
     pub agent_key: AgentPubKey,
 
-    /// The Dna paths in this app
+    /// The DNA paths in this app
     pub dnas: Vec<InstallAppDnaPayload>,
 }
 
@@ -116,10 +133,10 @@ pub struct InstallAppBundlePayload {
     /// keyed by the AppRoleId specified in the app bundle manifest.
     pub membrane_proofs: HashMap<AppRoleId, MembraneProof>,
 
-    /// Optional: overwrites all UIDs for all DNAs of Cells created by this app.
+    /// Optional: overwrites all network seeds for all DNAs of Cells created by this app.
     /// The app can still use existing Cells, i.e. this does not require that
     /// all Cells have DNAs with the same overridden DNA.
-    pub uid: Option<Uid>,
+    pub network_seed: Option<NetworkSeed>,
 }
 
 /// The possible locations of an AppBundle
@@ -145,12 +162,12 @@ impl AppBundleSource {
     }
 }
 
-/// Information needed to specify a Dna as part of an App
+/// Information needed to specify a DNA as part of an App
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct InstallAppDnaPayload {
     /// The hash of the DNA
     pub hash: DnaHash,
-    /// The AppRoleId which will be assigned to this Dna when installed
+    /// The AppRoleId which will be assigned to this DNA when installed
     pub role_id: AppRoleId,
     /// App-specific proof-of-membrane-membership, if required by this app
     pub membrane_proof: Option<MembraneProof>,
@@ -173,7 +190,6 @@ impl InstallAppDnaPayload {
 #[derive(Clone, Debug, Into, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct InstalledCell {
     cell_id: CellId,
-    // TODO: rename to role_id
     role_id: AppRoleId,
 }
 
