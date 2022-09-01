@@ -60,19 +60,16 @@ use holochain_conductor_api::FullIntegrationStateDump;
 use holochain_conductor_api::InstalledAppInfo;
 use holochain_conductor_api::IntegrationStateDump;
 use holochain_keystore::lair_keystore::spawn_lair_keystore;
-use holochain_keystore::lair_keystore::spawn_new_lair_keystore;
-use holochain_keystore::test_keystore::spawn_legacy_test_keystore;
 use holochain_keystore::test_keystore::spawn_test_keystore;
 use holochain_keystore::MetaLairClient;
 use holochain_sqlite::prelude::*;
 use holochain_sqlite::sql::sql_cell::state_dump;
-use holochain_state::mutations;
 use holochain_state::prelude::from_blob;
 use holochain_state::prelude::StateMutationResult;
 use holochain_state::prelude::StateQueryResult;
 use holochain_types::prelude::*;
 pub use holochain_types::share;
-use rusqlite::{OptionalExtension, Transaction};
+use rusqlite::Transaction;
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
@@ -718,7 +715,7 @@ impl Conductor {
         self.cells.share_mut(|cells| {
             for cell in new_cells {
                 let cell_id = cell.id().clone();
-                tracing::info!(?cell_id, "ADD CELL");
+                tracing::debug!(?cell_id, "added cell");
                 cells.insert(
                     cell_id,
                     CellItem {
@@ -774,7 +771,7 @@ impl Conductor {
         let child_dna = ribosome_store.share_ref(|ds| {
             ds.get_dna_file(&parent_dna_hash)
                 .ok_or(DnaError::DnaMissing(parent_dna_hash))?
-                .modify_phenotype(random_uid(), properties)
+                .modify_phenotype(random_network_seed(), properties)
         })?;
         let child_dna_hash = child_dna.dna_hash().to_owned();
         let child_ribosome = RealRibosome::new(child_dna)?;
@@ -1023,6 +1020,26 @@ impl Conductor {
             .map(|(k, _)| k)
             .cloned()
             .collect())
+    }
+
+    pub(super) async fn find_cell_with_role_alongside_cell(
+        &self,
+        cell_id: &CellId,
+        role_id: &AppRoleId,
+    ) -> ConductorResult<Option<CellId>> {
+        Ok(self
+            .get_state()
+            .await?
+            .running_apps()
+            .find(|(_, running_app)| running_app.all_cells().any(|i| i == cell_id))
+            .and_then(|(_, running_app)| {
+                running_app
+                    .into_common()
+                    .role(role_id)
+                    .ok()
+                    .map(|role| role.cell_id())
+                    .cloned()
+            }))
     }
 
     pub(super) async fn list_running_apps_for_dna_hash(
@@ -1303,21 +1320,7 @@ impl Conductor {
     }
 
     pub(super) async fn get_state(&self) -> ConductorResult<ConductorState> {
-        self.spaces
-            .conductor_db
-            .async_reader(|txn| {
-                let state = txn
-                    .query_row("SELECT blob FROM ConductorState WHERE id = 1", [], |row| {
-                        row.get("blob")
-                    })
-                    .optional()?;
-                let state = match state {
-                    Some(state) => from_blob(state)?,
-                    None => ConductorState::default(),
-                };
-                Ok(state)
-            })
-            .await
+        self.spaces.get_state().await
     }
 
     /// Update the internal state with a pure function mapping old state to new
@@ -1325,8 +1328,7 @@ impl Conductor {
     where
         F: FnOnce(ConductorState) -> ConductorResult<ConductorState> + 'static,
     {
-        let (state, _) = self.update_state_prime(|s| Ok((f(s)?, ()))).await?;
-        Ok(state)
+        self.spaces.update_state(f).await
     }
 
     /// Update the internal state with a pure function mapping old state to new,
@@ -1338,25 +1340,7 @@ impl Conductor {
         O: Send + 'static,
     {
         self.check_running()?;
-        let output = self
-            .spaces
-            .conductor_db
-            .async_commit(move |txn| {
-                let state = txn
-                    .query_row("SELECT blob FROM ConductorState WHERE id = 1", [], |row| {
-                        row.get("blob")
-                    })
-                    .optional()?;
-                let state = match state {
-                    Some(state) => from_blob(state)?,
-                    None => ConductorState::default(),
-                };
-                let (new_state, output) = f(state)?;
-                mutations::insert_conductor_state(txn, (&new_state).try_into()?)?;
-                Result::<_, ConductorError>::Ok((new_state, output))
-            })
-            .await?;
-        Ok(output)
+        self.spaces.update_state_prime(f).await
     }
 
     fn add_admin_port(&self, port: u16) {
@@ -1379,6 +1363,8 @@ impl Conductor {
 }
 
 mod builder {
+    use holochain_p2p::dht::ArqStrat;
+
     use super::*;
     use crate::conductor::handle::DevSettings;
     use crate::conductor::kitsune_host_impl::KitsuneHostImpl;
@@ -1442,21 +1428,6 @@ mod builder {
                 keystore
             } else {
                 match &self.config.keystore {
-                    KeystoreConfig::DangerTestKeystoreLegacyDeprecated => {
-                        tracing::warn!("Using DEPRECATED legacy lair api.");
-                        spawn_legacy_test_keystore().await?
-                    }
-                    KeystoreConfig::LairServerLegacyDeprecated {
-                        keystore_path,
-                        danger_passphrase_insecure_from_config,
-                    } => {
-                        tracing::warn!("Using DEPRECATED legacy lair api.");
-                        tracing::warn!("USING INSECURE PASSPHRASE FROM CONFIG--This defeats the whole purpose of having a passphrase.");
-                        let passphrase = sodoken::BufRead::new_no_lock(
-                            danger_passphrase_insecure_from_config.as_bytes(),
-                        );
-                        spawn_lair_keystore(keystore_path.as_deref(), passphrase).await?
-                    }
                     KeystoreConfig::DangerTestKeystore => spawn_test_keystore().await?,
                     KeystoreConfig::LairServer { connection_url } => {
                         let passphrase = match self.passphrase {
@@ -1468,13 +1439,11 @@ mod builder {
                             }
                             Some(p) => p,
                         };
-                        spawn_new_lair_keystore(connection_url.clone(), passphrase).await?
+                        spawn_lair_keystore(connection_url.clone(), passphrase).await?
                     }
                     oth => unimplemented!("unimplemented keystore config: {:?}", oth),
                 }
             };
-
-            let env_path = self.config.environment_path.clone();
 
             let Self {
                 ribosome_store,
@@ -1484,21 +1453,27 @@ mod builder {
 
             let ribosome_store = RwShare::new(ribosome_store);
 
-            let network_config = match &config.network {
-                None => holochain_p2p::kitsune_p2p::KitsuneP2pConfig::default(),
-                Some(config) => config.clone(),
-            };
+            let spaces = Spaces::new(&config)?;
+            let tag = spaces.get_state().await?.tag().clone();
+
+            let network_config = config.network.clone().unwrap_or_default();
             let (cert_digest, cert, cert_priv_key) =
-                keystore.get_or_create_first_tls_cert().await?;
+                keystore.get_or_create_tls_cert_by_tag(tag.0).await?;
             let tls_config =
                 holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_types::tls::TlsConfig {
                     cert,
                     cert_priv_key,
                     cert_digest,
                 };
+            let strat =
+                ArqStrat::from_params(network_config.tuning_params.gossip_redundancy_target);
 
-            let spaces = Spaces::new(env_path, config.db_sync_strategy)?;
-            let host = KitsuneHostImpl::new(spaces.clone());
+            let host = KitsuneHostImpl::new(
+                spaces.clone(),
+                ribosome_store.clone(),
+                network_config.tuning_params.clone(),
+                strat,
+            );
 
             let (holochain_p2p, p2p_evt) =
                 holochain_p2p::spawn_holochain_p2p(network_config, tls_config, host).await?;
@@ -1594,7 +1569,7 @@ mod builder {
                 .clone()
                 .start_scheduler(holochain_zome_types::schedule::SCHEDULER_INTERVAL);
 
-            let _ = Self::spawn_post_commit(handle.clone(), post_commit_receiver);
+            Self::spawn_post_commit(handle.clone(), post_commit_receiver);
 
             let configs = conductor_config.admin_interfaces.unwrap_or_default();
             let cell_startup_errors = handle.clone().initialize_conductor(configs).await?;
@@ -1655,14 +1630,18 @@ mod builder {
             let keystore = self.keystore.unwrap_or_else(test_keystore);
             self.config.environment_path = env_path.to_path_buf().into();
 
-            let spaces = Spaces::new(
-                self.config.environment_path.clone(),
-                self.config.db_sync_strategy,
-            )?;
-            let host = KitsuneHostImpl::new(spaces.clone());
+            let spaces = Spaces::new(&self.config)?;
+
+            let network_config = self.config.network.clone().unwrap_or_default();
+            let tuning_params = network_config.tuning_params.clone();
+            let strat = ArqStrat::from_params(tuning_params.gossip_redundancy_target);
+
+            let ribosome_store = RwShare::new(self.ribosome_store);
+            let host =
+                KitsuneHostImpl::new(spaces.clone(), ribosome_store.clone(), tuning_params, strat);
 
             let (holochain_p2p, p2p_evt) =
-                holochain_p2p::spawn_holochain_p2p(self.config.network.clone().unwrap_or_default(), holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_types::tls::TlsConfig::new_ephemeral().await.unwrap(), host)
+                holochain_p2p::spawn_holochain_p2p(network_config, holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_types::tls::TlsConfig::new_ephemeral().await.unwrap(), host)
                     .await?;
 
             let (post_commit_sender, post_commit_receiver) =
@@ -1670,7 +1649,7 @@ mod builder {
 
             let conductor = Conductor::new(
                 self.config.clone(),
-                RwShare::new(self.ribosome_store),
+                ribosome_store,
                 keystore,
                 holochain_p2p,
                 spaces,

@@ -420,7 +420,9 @@ async fn create_test_data(
     for (i, cell) in cells.iter().enumerate() {
         eprintln!("Calling {}", i);
         let e = entries.take(approx_num_ops_held).collect::<Vec<_>>();
-        let _: () = conductor.call(&cell.zome("zome1"), "create_many", e).await;
+        conductor
+            .call::<_, (), _>(&cell.zome("zome1"), "create_many", e)
+            .await;
     }
     let mut authored = HashMap::new();
     let mut ops = HashMap::new();

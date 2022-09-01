@@ -1,4 +1,5 @@
 use self::get_agent_activity_query::hashes::GetAgentActivityQuery;
+use self::get_agent_activity_query::must_get_agent_activity::must_get_agent_activity;
 use self::get_entry_ops_query::GetEntryOpsQuery;
 use self::get_links_ops_query::GetLinksOpsQuery;
 use self::{
@@ -61,6 +62,15 @@ pub async fn handle_get_agent_activity(
         .async_reader(move |txn| query.run(Txn::from(&txn)))
         .await?;
     Ok(results)
+}
+
+#[instrument(skip(env))]
+pub async fn handle_must_get_agent_activity(
+    env: DbRead<DbKindDht>,
+    author: AgentPubKey,
+    filter: ChainFilter,
+) -> CascadeResult<MustGetAgentActivityResponse> {
+    Ok(must_get_agent_activity(env, author, filter).await?)
 }
 
 #[instrument(skip(env))]

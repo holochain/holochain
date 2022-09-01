@@ -4,8 +4,9 @@ use crate::entry_def::EntryVisibility;
 use crate::link::LinkTag;
 use crate::link::LinkType;
 use crate::timestamp::Timestamp;
-use crate::GlobalZomeTypeId;
+use crate::EntryRateWeight;
 use crate::MembraneProof;
+use crate::RateWeight;
 use holo_hash::impl_hashable_content;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
@@ -70,14 +71,7 @@ pub type ActionHashed = HoloHashed<Action>;
 
 /// a utility wrapper to write intos for our data types
 macro_rules! write_into_action {
-    ($($n:ident),*,) => {
-        $(
-            impl ActionInner for $n {
-                fn into_action(self) -> Action {
-                    Action::$n(self)
-                }
-            }
-        )*
+    ($($n:ident $(<$w : ty>)?),*,) => {
 
         /// A unit enum which just maps onto the different Action variants,
         /// without containing any extra data
@@ -111,13 +105,51 @@ macro_rules! write_into_action {
     };
 }
 
-/// A trait to specify the common parts of an action
-pub trait ActionInner {
-    /// Get a full action from the subset
+/// A trait to unify the "inner" parts of an Action, i.e. the structs inside
+/// the Action enum's variants. This trait is used for the "weighed" version
+/// of each struct, i.e. the version without weight information erased.
+///
+/// Action types with no weight are considered "weighed" and "unweighed" at the
+/// same time, but types with weight have distinct types for the weighed and
+/// unweighed versions.
+pub trait ActionWeighed {
+    type Unweighed: ActionUnweighed;
+    type Weight: Default;
+
+    /// Construct the full Action enum with this variant.
     fn into_action(self) -> Action;
+
+    /// Erase the rate limiting weight info, creating an "unweighed" version
+    /// of this action. This is used primarily by validators who need to run the
+    /// `weigh` callback on an action they received, and want to make sure their
+    /// callback is not using the predefined weight to influence the result.
+    fn unweighed(self) -> Self::Unweighed;
 }
 
-impl<I: ActionInner> From<I> for Action {
+/// A trait to unify the "inner" parts of an Action, i.e. the structs inside
+/// the Action enum's variants. This trait is used for the "unweighed" version
+/// of each struct, i.e. the version with weight information erased.
+///
+/// Action types with no weight are considered "weighed" and "unweighed" at the
+/// same time, but types with weight have distinct types for the weighed and
+/// unweighed versions.
+pub trait ActionUnweighed: Sized {
+    type Weighed: ActionWeighed;
+    type Weight: Default;
+
+    /// Add a weight to this unweighed action, making it "weighed".
+    /// The weight is determined by the `weigh` callback, which is run on the
+    /// unweighed version of this action.
+    fn weighed(self, weight: Self::Weight) -> Self::Weighed;
+
+    /// Add zero weight to this unweighed action, making it "weighed".
+    #[cfg(feature = "test_utils")]
+    fn weightless(self) -> Self::Weighed {
+        self.weighed(Default::default())
+    }
+}
+
+impl<I: ActionWeighed> From<I> for Action {
     fn from(i: I) -> Self {
         i.into_action()
     }
@@ -127,13 +159,15 @@ write_into_action! {
     Dna,
     AgentValidationPkg,
     InitZomesComplete,
-    CreateLink,
-    DeleteLink,
     OpenChain,
     CloseChain,
-    Create,
-    Update,
-    Delete,
+
+    Create<EntryRateWeight>,
+    Update<EntryRateWeight>,
+    Delete<RateWeight>,
+
+    CreateLink<RateWeight>,
+    DeleteLink,
 }
 
 /// a utility macro just to not have to type in the match statement everywhere.
@@ -249,6 +283,43 @@ impl Action {
     pub fn is_genesis(&self) -> bool {
         self.action_seq() < POST_GENESIS_SEQ_THRESHOLD
     }
+
+    pub fn rate_data(&self) -> RateWeight {
+        match self {
+            Self::CreateLink(CreateLink { weight, .. }) => weight.clone(),
+            Self::Delete(Delete { weight, .. }) => weight.clone(),
+            Self::Create(Create { weight, .. }) => weight.clone().into(),
+            Self::Update(Update { weight, .. }) => weight.clone().into(),
+
+            // all others are weightless
+            Self::Dna(Dna { .. })
+            | Self::AgentValidationPkg(AgentValidationPkg { .. })
+            | Self::InitZomesComplete(InitZomesComplete { .. })
+            | Self::DeleteLink(DeleteLink { .. })
+            | Self::CloseChain(CloseChain { .. })
+            | Self::OpenChain(OpenChain { .. }) => RateWeight::default(),
+        }
+    }
+
+    pub fn entry_rate_data(&self) -> Option<EntryRateWeight> {
+        match self {
+            Self::Create(Create { weight, .. }) => Some(weight.clone()),
+            Self::Update(Update { weight, .. }) => Some(weight.clone()),
+
+            // There is a weight, but it doesn't have the extra info that
+            // Entry rate data has, so return None
+            Self::CreateLink(CreateLink { .. }) => None,
+            Self::Delete(Delete { .. }) => None,
+
+            // all others are weightless, so return zero weight
+            Self::Dna(Dna { .. })
+            | Self::AgentValidationPkg(AgentValidationPkg { .. })
+            | Self::InitZomesComplete(InitZomesComplete { .. })
+            | Self::DeleteLink(DeleteLink { .. })
+            | Self::CloseChain(CloseChain { .. })
+            | Self::OpenChain(OpenChain { .. }) => Some(EntryRateWeight::default()),
+        }
+    }
 }
 
 impl_hashable_content!(Action, Action);
@@ -352,7 +423,7 @@ pub struct AgentValidationPkg {
     pub membrane_proof: Option<MembraneProof>,
 }
 
-/// An action which declares that all zome init functions have successfully
+/// A action which declares that all zome init functions have successfully
 /// completed, and the chain is ready for commits. Contains no explicit data.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
@@ -366,7 +437,7 @@ pub struct InitZomesComplete {
 /// Declares that a metadata Link should be made between two EntryHashes
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-pub struct CreateLink {
+pub struct CreateLink<W = RateWeight> {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
     pub action_seq: u32,
@@ -374,8 +445,11 @@ pub struct CreateLink {
 
     pub base_address: AnyLinkableHash,
     pub target_address: AnyLinkableHash,
+    pub zome_id: ZomeId,
     pub link_type: LinkType,
     pub tag: LinkTag,
+
+    pub weight: W,
 }
 
 /// Declares that a previously made Link should be nullified and considered removed.
@@ -421,11 +495,11 @@ pub struct CloseChain {
     pub new_dna_hash: DnaHash,
 }
 
-/// An action which "speaks" Entry content into being. The same content can be
+/// A action which "speaks" Entry content into being. The same content can be
 /// referenced by multiple such actions.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-pub struct Create {
+pub struct Create<W = EntryRateWeight> {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
     pub action_seq: u32,
@@ -433,9 +507,11 @@ pub struct Create {
 
     pub entry_type: EntryType,
     pub entry_hash: EntryHash,
+
+    pub weight: W,
 }
 
-/// An action which specifies that some new Entry content is intended to be an
+/// A action which specifies that some new Entry content is intended to be an
 /// update to some old Entry.
 ///
 /// This action semantically updates an entry to a new entry.
@@ -449,7 +525,7 @@ pub struct Create {
 /// or how to break the loop.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-pub struct Update {
+pub struct Update<W = EntryRateWeight> {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
     pub action_seq: u32,
@@ -460,6 +536,8 @@ pub struct Update {
 
     pub entry_type: EntryType,
     pub entry_hash: EntryHash,
+
+    pub weight: W,
 }
 
 /// Declare that a previously published Action should be nullified and
@@ -470,7 +548,7 @@ pub struct Update {
 /// Actions are marked deleted.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-pub struct Delete {
+pub struct Delete<W = RateWeight> {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
     pub action_seq: u32,
@@ -479,6 +557,8 @@ pub struct Delete {
     /// Address of the Record being deleted
     pub deletes_address: ActionHash,
     pub deletes_entry_address: EntryHash,
+
+    pub weight: W,
 }
 
 /// Placeholder for future when we want to have updates on actions
@@ -550,22 +630,30 @@ impl std::fmt::Display for EntryType {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct AppEntryType {
-    /// u8 identifier of what entry type this is
-    /// this is a unique global identifier across the
-    /// DNA for this type. It is a [`GlobalZomeTypeId`].
+    /// A unique u8 identifier within a zome for this
+    /// entry type.
     pub id: EntryDefIndex,
+    /// The id of the zome that defines this entry type.
+    pub zome_id: ZomeId,
     // @todo don't do this, use entry defs instead
     /// The visibility of this app entry.
     pub visibility: EntryVisibility,
 }
 
 impl AppEntryType {
-    pub fn new(id: EntryDefIndex, visibility: EntryVisibility) -> Self {
-        Self { id, visibility }
+    pub fn new(id: EntryDefIndex, zome_id: ZomeId, visibility: EntryVisibility) -> Self {
+        Self {
+            id,
+            zome_id,
+            visibility,
+        }
     }
 
     pub fn id(&self) -> EntryDefIndex {
         self.id
+    }
+    pub fn zome_id(&self) -> ZomeId {
+        self.zome_id
     }
     pub fn visibility(&self) -> &EntryVisibility {
         &self.visibility
@@ -596,17 +684,5 @@ impl std::ops::Deref for ZomeId {
 impl Borrow<u8> for ZomeId {
     fn borrow(&self) -> &u8 {
         &self.0
-    }
-}
-
-impl From<EntryDefIndex> for GlobalZomeTypeId {
-    fn from(v: EntryDefIndex) -> Self {
-        Self(v.0)
-    }
-}
-
-impl From<GlobalZomeTypeId> for EntryDefIndex {
-    fn from(v: GlobalZomeTypeId) -> Self {
-        Self(v.0)
     }
 }

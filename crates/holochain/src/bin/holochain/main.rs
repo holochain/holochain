@@ -7,7 +7,6 @@ use holochain::conductor::ConductorHandle;
 use holochain_conductor_api::conductor::ConductorConfigError;
 use holochain_conductor_api::config::conductor::KeystoreConfig;
 use holochain_util::tokio_helper;
-use kitsune_p2p_types::dependencies::lair_keystore_api::LairResult;
 use observability::Output;
 #[cfg(unix)]
 use sd_notify::{notify, NotifyState};
@@ -114,79 +113,6 @@ async fn async_main() {
     // conductor.kill().await
 }
 
-fn vec_to_locked(mut pass_tmp: Vec<u8>) -> LairResult<sodoken::BufRead> {
-    match sodoken::BufWrite::new_mem_locked(pass_tmp.len()) {
-        Err(e) => {
-            pass_tmp.fill(0);
-            Err(e)
-        }
-        Ok(p) => {
-            {
-                let mut lock = p.write_lock();
-                lock.copy_from_slice(&pass_tmp);
-                pass_tmp.fill(0);
-            }
-            Ok(p.to_read())
-        }
-    }
-}
-
-async fn read_interactive_passphrase(prompt: &str) -> LairResult<sodoken::BufRead> {
-    let prompt = prompt.to_owned();
-    let pass_tmp = tokio::task::spawn_blocking(move || {
-        LairResult::Ok(
-            rpassword::read_password_from_tty(Some(&prompt))
-                .map_err(one_err::OneErr::new)?
-                .into_bytes(),
-        )
-    })
-    .await
-    .map_err(one_err::OneErr::new)??;
-
-    vec_to_locked(pass_tmp)
-}
-
-async fn read_piped_passphrase() -> LairResult<sodoken::BufRead> {
-    use std::io::Read;
-    Ok(tokio::task::spawn_blocking(move || {
-        let stdin = std::io::stdin();
-        let mut stdin = stdin.lock();
-        let passphrase = <sodoken::BufWriteSized<512>>::new_mem_locked()?;
-        let mut next_char = 0;
-        loop {
-            let mut lock = passphrase.write_lock();
-            let done = match stdin.read_exact(&mut lock[next_char..next_char + 1]) {
-                Ok(_) => {
-                    if lock[next_char] == 10 {
-                        true
-                    } else {
-                        next_char += 1;
-                        false
-                    }
-                }
-                Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => true,
-                Err(e) => return Err(e),
-            };
-            if done {
-                if next_char == 0 {
-                    return Ok(sodoken::BufWrite::new_no_lock(0).to_read());
-                }
-                if lock[next_char - 1] == 13 {
-                    next_char -= 1;
-                }
-                let out = sodoken::BufWrite::new_mem_locked(next_char)?;
-                {
-                    let mut out_lock = out.write_lock();
-                    out_lock.copy_from_slice(&lock[..next_char]);
-                }
-                return Ok(out.to_read());
-            }
-        }
-    })
-    .await
-    .map_err(one_err::OneErr::new)??)
-}
-
 async fn conductor_handle_from_config_path(opt: &Opt) -> ConductorHandle {
     let config_path = opt.config_path.clone();
     let config_path_default = config_path.is_none();
@@ -205,21 +131,16 @@ async fn conductor_handle_from_config_path(opt: &Opt) -> ConductorHandle {
         load_config(&config_path, config_path_default)
     };
 
-    // read the passphrase to prepare for usage,
-    // but we don't have any keystore config types that use this yet.
+    // read the passphrase to prepare for usage
     let passphrase = match &config.keystore {
         KeystoreConfig::DangerTestKeystoreLegacyDeprecated => None,
         KeystoreConfig::LairServerLegacyDeprecated { .. } => None,
         _ => {
             if opt.piped {
-                Some(read_piped_passphrase().await.unwrap())
-            } else {
-                Some(
-                    read_interactive_passphrase("\n# passphrase> ")
-                        .await
-                        .unwrap(),
-                )
+                holochain_util::pw::pw_set_piped(true);
             }
+
+            Some(holochain_util::pw::pw_get().unwrap())
         }
     };
 

@@ -16,6 +16,8 @@ use holochain_sqlite::rusqlite::types::FromSql;
 use holochain_sqlite::rusqlite::ToSql;
 use holochain_zome_types::action;
 use holochain_zome_types::prelude::*;
+use kitsune_p2p_dht::region::RegionData;
+use kitsune_p2p_dht::Loc;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -109,6 +111,24 @@ pub enum DhtOp {
     #[display(fmt = "RegisterRemoveLink")]
     /// Op for removing a link
     RegisterRemoveLink(Signature, action::DeleteLink),
+}
+
+impl kitsune_p2p_dht::prelude::OpRegion for DhtOp {
+    fn loc(&self) -> Loc {
+        self.dht_basis().get_loc()
+    }
+
+    fn timestamp(&self) -> Timestamp {
+        self.timestamp()
+    }
+
+    fn region_data(&self) -> RegionData {
+        unimplemented!()
+    }
+
+    fn bound(_timestamp: Timestamp, _loc: kitsune_p2p_dht::Loc) -> Self {
+        unimplemented!()
+    }
 }
 
 /// Show that this type is used as the basis
@@ -400,6 +420,42 @@ impl DhtOp {
             }
         };
         Ok(r)
+    }
+
+    fn to_order(&self) -> OpOrder {
+        OpOrder::new(self.get_type(), self.timestamp())
+    }
+
+    /// Enzymatic countersigning session ops need special handling so that they
+    /// arrive at the enzyme and not elsewhere. If this isn't an enzymatic
+    /// countersigning session then the return will be None so can be used as
+    /// a boolean for filtering with is_some().
+    pub fn enzymatic_countersigning_enzyme(&self) -> Option<&AgentPubKey> {
+        if let Some(Entry::CounterSign(session_data, _)) = self.entry() {
+            if session_data.preflight_request().enzymatic {
+                session_data
+                    .preflight_request()
+                    .signing_agents
+                    .get(0)
+                    .map(|(pubkey, _)| pubkey)
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+}
+
+impl PartialOrd for DhtOp {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for DhtOp {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.to_order().cmp(&other.to_order())
     }
 }
 

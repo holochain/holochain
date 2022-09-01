@@ -131,14 +131,14 @@ pub trait ConductorHandleT: Send + Sync {
     /// Add an app interface
     async fn add_app_interface(self: Arc<Self>, port: u16) -> ConductorResult<u16>;
 
-    /// List the app interfaces currently install.
+    /// List the app interfaces currently installed.
     async fn list_app_interfaces(&self) -> ConductorResult<Vec<u16>>;
 
     /// Install a [`DnaFile`](holochain_types::dna::DnaFile) in this Conductor
     async fn register_dna(&self, dna: DnaFile) -> ConductorResult<()>;
 
-    /// Hot swap coordinator zomes on an existing dna.
-    async fn hot_swap_coordinators(
+    /// Update coordinator zomes on an existing dna.
+    async fn update_coordinators(
         &self,
         hash: &DnaHash,
         coordinator_zomes: CoordinatorZomes,
@@ -299,6 +299,13 @@ pub trait ConductorHandleT: Send + Sync {
         &self,
         cell_id: &CellId,
     ) -> ConductorResult<HashSet<InstalledAppId>>;
+
+    /// Find the ID of the first active installed App which uses this Cell
+    async fn find_cell_with_role_alongside_cell(
+        &self,
+        cell_id: &CellId,
+        role_id: &AppRoleId,
+    ) -> ConductorResult<Option<CellId>>;
 
     /// Get the IDs of all active installed Apps which use this Dna
     async fn list_running_apps_for_required_dna_hash(
@@ -570,13 +577,13 @@ impl ConductorHandleT for ConductorHandleImpl {
         Ok(())
     }
 
-    async fn hot_swap_coordinators(
+    async fn update_coordinators(
         &self,
         hash: &DnaHash,
         coordinator_zomes: CoordinatorZomes,
         wasms: Vec<wasm::DnaWasm>,
     ) -> ConductorResult<()> {
-        // Note this isn't really concurrent safe. It would be a race condition to hotswap the
+        // Note this isn't really concurrent safe. It would be a race condition to update the
         // same dna concurrently.
         let mut ribosome =
             self.conductor
@@ -587,7 +594,7 @@ impl ConductorHandleT for ConductorHandleImpl {
                 })?;
         let _old_wasms = ribosome
             .dna_file
-            .hot_swap_coordinators(coordinator_zomes.clone(), wasms.clone())
+            .update_coordinators(coordinator_zomes.clone(), wasms.clone())
             .await?;
 
         // Add new wasm code to db.
@@ -736,8 +743,19 @@ impl ConductorHandleT for ConductorHandleImpl {
                 respond,
                 ..
             } => {
+                let cutoff = self
+                    .get_config()
+                    .network
+                    .clone()
+                    .unwrap_or_default()
+                    .tuning_params
+                    .danger_gossip_recent_threshold();
+                let topo = self
+                    .get_dna_def(&dna_hash)
+                    .ok_or_else(|| DnaError::DnaMissing(dna_hash.clone()))?
+                    .topology(cutoff);
                 let db = { self.p2p_agents_db(&dna_hash) };
-                let res = query_peer_density(db.into(), kitsune_space, dht_arc)
+                let res = query_peer_density(db.into(), topo, kitsune_space, dht_arc)
                     .await
                     .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
@@ -752,12 +770,13 @@ impl ConductorHandleT for ConductorHandleImpl {
                 respond.respond(Ok(async move { Ok(signature) }.boxed().into()));
             }
             HolochainP2pEvent::CallRemote { .. }
-            | CountersigningAuthorityResponse { .. }
+            | CountersigningSessionNegotiation { .. }
             | GetValidationPackage { .. }
             | Get { .. }
             | GetMeta { .. }
             | GetLinks { .. }
             | GetAgentActivity { .. }
+            | MustGetAgentActivity { .. }
             | ValidationReceiptReceived { .. } => {
                 let cell_id = CellId::new(event.dna_hash().clone(), event.target_agents().clone());
                 let cell = self.cell_by_id(&cell_id)?;
@@ -790,7 +809,7 @@ impl ConductorHandleT for ConductorHandleImpl {
             }
             FetchOpData {
                 respond,
-                op_hashes,
+                query,
                 dna_hash,
                 ..
             } => {
@@ -798,7 +817,7 @@ impl ConductorHandleT for ConductorHandleImpl {
                     let res = self
                         .conductor
                         .spaces
-                        .handle_fetch_op_data(&dna_hash, op_hashes)
+                        .handle_fetch_op_data(&dna_hash, query)
                         .await
                         .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
@@ -935,14 +954,14 @@ impl ConductorHandleT for ConductorHandleImpl {
             agent_key,
             installed_app_id,
             membrane_proofs,
-            uid,
+            network_seed,
         } = payload;
 
         let bundle: AppBundle = {
             let original_bundle = source.resolve().await?;
-            if let Some(uid) = uid {
+            if let Some(network_seed) = network_seed {
                 let mut manifest = original_bundle.manifest().to_owned();
-                manifest.set_uid(uid);
+                manifest.set_network_seed(network_seed);
                 AppBundle::from(original_bundle.into_inner().update_manifest(manifest)?)
             } else {
                 original_bundle
@@ -1141,6 +1160,16 @@ impl ConductorHandleT for ConductorHandleImpl {
         cell_id: &CellId,
     ) -> ConductorResult<HashSet<InstalledAppId>> {
         self.conductor.list_running_apps_for_cell_id(cell_id).await
+    }
+
+    async fn find_cell_with_role_alongside_cell(
+        &self,
+        cell_id: &CellId,
+        role_id: &AppRoleId,
+    ) -> ConductorResult<Option<CellId>> {
+        self.conductor
+            .find_cell_with_role_alongside_cell(cell_id, role_id)
+            .await
     }
 
     async fn list_running_apps_for_required_dna_hash(

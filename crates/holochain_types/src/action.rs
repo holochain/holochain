@@ -22,11 +22,11 @@ pub mod facts;
     Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash, derive_more::From,
 )]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-/// An action of one of the two types that create a new entry.
+/// A action of one of the two types that create a new entry.
 pub enum NewEntryAction {
-    /// An action which simply creates a new entry
+    /// A action which simply creates a new entry
     Create(Create),
-    /// An action which creates a new entry that is semantically related to a
+    /// A action which creates a new entry that is semantically related to a
     /// previously created entry or action
     Update(Update),
 }
@@ -40,7 +40,7 @@ pub enum NewEntryActionRef<'a> {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Ord, PartialOrd)]
-/// An action of one of the two types that create a new entry.
+/// A action of one of the two types that create a new entry.
 pub enum WireNewEntryAction {
     Create(WireCreate),
     Update(WireUpdate),
@@ -49,7 +49,7 @@ pub enum WireNewEntryAction {
 #[derive(
     Debug, Clone, derive_more::Constructor, Serialize, Deserialize, PartialEq, Eq, Ord, PartialOrd,
 )]
-/// An action of one of the two types that create a new entry.
+/// A action of one of the two types that create a new entry.
 pub struct WireActionStatus<W> {
     /// Skinny action for sending over the wire.
     pub action: W,
@@ -68,6 +68,7 @@ pub struct WireCreate {
     pub action_seq: u32,
     pub prev_action: ActionHash,
     pub signature: Signature,
+    pub weight: EntryRateWeight,
 }
 
 /// The minimum unique data for Update actions
@@ -83,6 +84,7 @@ pub struct WireUpdate {
     pub original_entry_address: EntryHash,
     pub original_action_address: ActionHash,
     pub signature: Signature,
+    pub weight: EntryRateWeight,
 }
 
 /// This type is used when sending updates from the
@@ -109,6 +111,7 @@ pub struct WireUpdateRelationship {
     /// The entry type of the entry that this action created
     pub new_entry_type: EntryType,
     pub signature: Signature,
+    pub weight: EntryRateWeight,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
@@ -143,10 +146,10 @@ impl NewEntryAction {
     }
 
     /// Get the timestamp of this action
-    pub fn timestamp(&self) -> &holochain_zome_types::timestamp::Timestamp {
+    pub fn timestamp(&self) -> holochain_zome_types::timestamp::Timestamp {
         match self {
             NewEntryAction::Create(Create { timestamp, .. })
-            | NewEntryAction::Update(Update { timestamp, .. }) => timestamp,
+            | NewEntryAction::Update(Update { timestamp, .. }) => *timestamp,
         }
     }
 }
@@ -177,6 +180,7 @@ impl From<(Create, Signature)> for WireCreate {
             action_seq: ec.action_seq,
             prev_action: ec.prev_action,
             signature,
+            weight: ec.weight,
         }
     }
 }
@@ -191,6 +195,7 @@ impl From<(Update, Signature)> for WireUpdate {
             original_entry_address: eu.original_entry_address,
             original_action_address: eu.original_action_address,
             signature,
+            weight: eu.weight,
         }
     }
 }
@@ -225,6 +230,7 @@ impl WireUpdateRelationship {
             original_entry_address,
             entry_type: self.new_entry_type,
             entry_hash: self.new_entry_address,
+            weight: self.weight,
         };
         SignedAction(Action::Update(eu), self.signature)
     }
@@ -286,6 +292,7 @@ impl TryFrom<SignedActionHashed> for WireUpdate {
             prev_action: d.prev_action,
             original_entry_address: d.original_entry_address,
             original_action_address: d.original_action_address,
+            weight: d.weight,
         })
     }
 }
@@ -312,6 +319,7 @@ impl TryFrom<SignedAction> for WireUpdateRelationship {
             original_action_address: d.original_action_address,
             new_entry_address: d.entry_hash,
             new_entry_type: d.entry_type,
+            weight: d.weight,
         })
     }
 }
@@ -335,6 +343,7 @@ impl WireNewEntryAction {
                     timestamp: ec.timestamp,
                     action_seq: ec.action_seq,
                     prev_action: ec.prev_action,
+                    weight: ec.weight,
                     entry_type,
                     entry_hash,
                 };
@@ -349,6 +358,7 @@ impl WireNewEntryAction {
                     prev_action: eu.prev_action,
                     original_entry_address: eu.original_entry_address,
                     original_action_address: eu.original_action_address,
+                    weight: eu.weight,
                     entry_type,
                     entry_hash,
                 };
@@ -475,7 +485,11 @@ mod tests {
             ActionBuilderCommonFixturator::new(Unpredictable)
                 .next()
                 .unwrap(),
-            EntryType::App(AppEntryType::new(0.into(), EntryVisibility::Public)),
+            EntryType::App(AppEntryType::new(
+                0.into(),
+                0.into(),
+                EntryVisibility::Public,
+            )),
             fake_entry_hash(1).into(),
         )
         .into();
@@ -491,7 +505,11 @@ mod tests {
             ActionBuilderCommonFixturator::new(Unpredictable)
                 .next()
                 .unwrap(),
-            EntryType::App(AppEntryType::new(0.into(), EntryVisibility::Public)),
+            EntryType::App(AppEntryType::new(
+                0.into(),
+                0.into(),
+                EntryVisibility::Public,
+            )),
             fake_entry_hash(1).into(),
         )
         .into();

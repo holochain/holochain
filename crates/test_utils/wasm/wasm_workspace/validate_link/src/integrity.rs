@@ -1,4 +1,4 @@
-use holochain_deterministic_integrity::prelude::*;
+use hdi::prelude::*;
 
 #[derive(Clone, Copy)]
 #[hdk_entry_helper]
@@ -22,7 +22,7 @@ pub enum LinkTypes {
 pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op {
         // This is a pretty pointless example as everything is valid.
-        Op::RegisterCreateLink { create_link } => {
+        Op::RegisterCreateLink(RegisterCreateLink {  create_link  }) => {
             let base: MaybeLinkable =
                 must_get_entry(create_link.hashed.content.base_address.into())?.try_into()?;
             let target: MaybeLinkable =
@@ -35,7 +35,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 _ => ValidateCallbackResult::Invalid("base never validates".to_string()),
             })
         }
-        Op::RegisterDeleteLink { create_link, .. } => {
+        Op::RegisterDeleteLink(RegisterDeleteLink {  create_link, ..  }) => {
             let base: MaybeLinkable =
                 must_get_entry(create_link.base_address.into())?.try_into()?;
             Ok(match base {

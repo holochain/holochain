@@ -53,7 +53,7 @@ fn simple_crud_zome() -> InlineZomeSet {
         .callback("create_string", move |api, s: AppString| {
             let entry = Entry::app(AppString::from(s).try_into().unwrap()).unwrap();
             let hash = api.create(CreateInput::new(
-                InlineZomeSet::get_entry_location(&api, 0),
+                InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
                 EntryVisibility::Public,
                 entry,
                 ChainTopOrdering::default(),
@@ -63,7 +63,7 @@ fn simple_crud_zome() -> InlineZomeSet {
         .callback("create_unit", move |api, ()| {
             let entry = Entry::app(().try_into().unwrap()).unwrap();
             let hash = api.create(CreateInput::new(
-                InlineZomeSet::get_entry_location(&api, 1),
+                InlineZomeSet::get_entry_location(&api, EntryDefIndex(1)),
                 EntryVisibility::Public,
                 entry,
                 ChainTopOrdering::default(),
@@ -377,7 +377,7 @@ fn simple_validation_zome() -> InlineZomeSet {
         .callback("create", move |api, s: AppString| {
             let entry = Entry::app(s.try_into().unwrap()).unwrap();
             let hash = api.create(CreateInput::new(
-                InlineZomeSet::get_entry_location(&api, 0),
+                InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
                 EntryVisibility::Public,
                 entry,
                 ChainTopOrdering::default(),
@@ -390,10 +390,10 @@ fn simple_validation_zome() -> InlineZomeSet {
         })
         .integrity_callback("validate", |_api, data: Op| {
             let s = match data {
-                Op::StoreEntry {
+                Op::StoreEntry(StoreEntry {
                     entry: Entry::App(bytes),
                     ..
-                } => AppString::try_from(bytes.into_sb()).unwrap(),
+                }) => AppString::try_from(bytes.into_sb()).unwrap(),
                 _ => return Ok(ValidateResult::Valid),
             };
             if &s.0 == "" {
@@ -543,8 +543,13 @@ async fn insert_source_chain() {
         timestamp: Timestamp::now(),
         action_seq: 4,
         prev_action: chain.last().unwrap().0.clone(),
-        entry_type: EntryType::App(AppEntryType::new(1.into(), EntryVisibility::Public)),
+        entry_type: EntryType::App(AppEntryType::new(
+            1.into(),
+            0.into(),
+            EntryVisibility::Public,
+        )),
         entry_hash: EntryHash::with_data_sync(&entry),
+        weight: Default::default(),
     };
     let shh = SignedActionHashed::with_presigned(
         ActionHashed::from_content_sync(action.clone().into()),

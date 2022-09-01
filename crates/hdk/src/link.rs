@@ -1,6 +1,6 @@
 use crate::prelude::*;
 
-pub use holochain_deterministic_integrity::link::*;
+pub use hdi::link::*;
 
 /// Create a link from a base entry to a target entry, with an optional tag.
 ///
@@ -21,7 +21,7 @@ pub use holochain_deterministic_integrity::link::*;
 ///
 /// Note: There is a hard limit of 1kb of data for the tag.
 ///
-/// Crud:
+/// CRUD:
 ///
 /// - creates reference a single entry
 /// - updates and deletes reference create/update records by both their entry+action
@@ -57,20 +57,25 @@ pub use holochain_deterministic_integrity::link::*;
 /// If you have the hash of the identity entry you can get all the links, if you have the entry or
 /// action hash for any of the creates or updates you can lookup the identity entry hash out of the
 /// body of the create/update entry.
-pub fn create_link<E>(
+pub fn create_link<T, E>(
     base_address: impl Into<AnyLinkableHash>,
     target_address: impl Into<AnyLinkableHash>,
-    link_type: impl TryInto<LinkType, Error = E>,
+    link_type: T,
     tag: impl Into<LinkTag>,
 ) -> ExternResult<ActionHash>
 where
+    ScopedLinkType: TryFrom<T, Error = E>,
     WasmError: From<E>,
 {
-    let link_type = link_type.try_into()?;
+    let ScopedLinkType {
+        zome_id,
+        zome_type: link_type,
+    } = link_type.try_into()?;
     HDK.with(|h| {
         h.borrow().create_link(CreateLinkInput::new(
             base_address.into(),
             target_address.into(),
+            zome_id,
             link_type,
             tag.into(),
             ChainTopOrdering::default(),
@@ -108,7 +113,14 @@ pub fn delete_link(address: ActionHash) -> ExternResult<ActionHash> {
     })
 }
 
-/// Returns all links that reference a base entry hash, optionally filtered by tag.
+/// Returns all links that reference a base entry hash, optionally filtered by link type and tag.
+///
+/// Type can be filtered by providing a variant of the link types or the full range operator. Get links of
+/// all types like this: `get_links(base, .., None)`. Refer to the `get_links` function in
+/// [this coordinator zome](https://github.com/holochain/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/link/src/coordinator.rs)
+/// for examples.
+///
+/// _Note this will only get links that are defined in dependent integrity zomes._
 ///
 /// Tag filtering is a simple bytes prefix.
 ///
@@ -127,15 +139,12 @@ pub fn delete_link(address: ActionHash) -> ExternResult<ActionHash> {
 /// deleted c.f. get_link_details that returns all the creates and all the deletes together.
 ///
 /// See [ `get_link_details` ].
-pub fn get_links<E>(
+pub fn get_links(
     base: impl Into<AnyLinkableHash>,
-    link_type: impl TryInto<LinkTypeRanges, Error = E>,
+    link_type: impl LinkTypeFilterExt,
     link_tag: Option<LinkTag>,
-) -> ExternResult<Vec<Link>>
-where
-    WasmError: From<E>,
-{
-    let link_type = link_type.try_into()?;
+) -> ExternResult<Vec<Link>> {
+    let link_type = link_type.try_into_filter()?;
     Ok(HDK
         .with(|h| {
             h.borrow()
@@ -146,7 +155,13 @@ where
         .unwrap())
 }
 
-/// Get all link creates and deletes that reference a base entry hash, optionally filtered by tag
+/// Get all link creates and deletes that reference a base entry hash, optionally filtered by type or tag.
+///
+/// Type can be filtered by providing a variant of the link types, or a range of them. To get links of
+/// all types, the full range operator can be used: `get_links(base, .., None)`. Furthermore, vectors of
+/// link types can be passed in to specify multiple types. Refer to the `get_links` function in
+/// [this coordinator zome](https://github.com/holochain/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/link/src/coordinator.rs)
+/// for several examples.
 ///
 /// Tag filtering is a simple bytes prefix.
 ///
@@ -165,15 +180,12 @@ where
 /// c.f. get_links that returns only the creates that have not been deleted.
 ///
 /// See [ `get_links` ].
-pub fn get_link_details<E>(
+pub fn get_link_details(
     base: impl Into<AnyLinkableHash>,
-    link_type: impl TryInto<LinkTypeRanges, Error = E>,
+    link_type: impl LinkTypeFilterExt,
     link_tag: Option<LinkTag>,
-) -> ExternResult<LinkDetails>
-where
-    WasmError: From<E>,
-{
-    let link_type = link_type.try_into()?;
+) -> ExternResult<LinkDetails> {
+    let link_type = link_type.try_into_filter()?;
     Ok(HDK
         .with(|h| {
             h.borrow()

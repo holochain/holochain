@@ -57,11 +57,13 @@ pub mod test {
                     id: "post".into(),
                     visibility: Default::default(),
                     required_validations: Default::default(),
+                    ..Default::default()
                 },
                 EntryDef {
                     id: "comment".into(),
                     visibility: EntryVisibility::Private,
                     required_validations: Default::default(),
+                    ..Default::default()
                 }
             ]
             .into(),
@@ -72,6 +74,7 @@ pub mod test {
                 FunctionName::new("__allocate"),
                 FunctionName::new("__data_end"),
                 FunctionName::new("__deallocate"),
+                FunctionName::new("__getrandom_custom"),
                 FunctionName::new("__heap_base"),
                 FunctionName::new("assert_indexes"),
                 FunctionName::new("entry_defs"),
@@ -81,11 +84,13 @@ pub mod test {
                 FunctionName::new("zome_info"),
             ],
         );
+        let entries = vec![(ZomeId(0), vec![EntryDefIndex(0), EntryDefIndex(1)])];
+        let links = vec![(ZomeId(0), vec![])];
         assert_eq!(
             zome_info.zome_types,
             ScopedZomeTypesSet {
-                entries: ScopedZomeTypes(vec![GlobalZomeTypeId(0)..GlobalZomeTypeId(2)]),
-                links: ScopedZomeTypes(vec![GlobalZomeTypeId(0)..GlobalZomeTypeId(0)]),
+                entries: ScopedZomeTypes(entries),
+                links: ScopedZomeTypes(links),
             }
         );
     }

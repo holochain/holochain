@@ -250,14 +250,14 @@ async fn conductors_gossip_inner(
     share_peers: bool,
 ) {
     observability::test_run().ok();
-    let uid = nanoid::nanoid!().to_string();
+    let network_seed = nanoid::nanoid!().to_string();
 
     let zomes = vec![TestWasm::Create];
     let handles = setup(
         zomes.clone(),
         Some(network.clone()),
         num_committers,
-        uid.clone(),
+        network_seed.clone(),
     )
     .await;
 
@@ -267,7 +267,7 @@ async fn conductors_gossip_inner(
         zomes.clone(),
         Some(network.clone()),
         num_conductors,
-        uid.clone(),
+        network_seed.clone(),
     )
     .await;
 
@@ -301,7 +301,13 @@ async fn conductors_gossip_inner(
 
     shutdown(handles).await;
 
-    let third_handles = setup(zomes.clone(), Some(network.clone()), new_conductors, uid).await;
+    let third_handles = setup(
+        zomes.clone(),
+        Some(network.clone()),
+        new_conductors,
+        network_seed,
+    )
+    .await;
 
     let mut envs = Vec::with_capacity(third_handles.len() + second_handles.len());
     for h in third_handles.iter().chain(second_handles.iter()) {
@@ -445,12 +451,12 @@ async fn setup(
     zomes: Vec<TestWasm>,
     network: Option<KitsuneP2pConfig>,
     num_conductors: usize,
-    uid: String,
+    network_seed: NetworkSeed,
 ) -> Vec<TestHandle> {
     let dna_file = DnaFile::new(
         DnaDef {
             name: "conductor_test".to_string(),
-            uid,
+            network_seed,
             properties: SerializedBytes::try_from(()).unwrap(),
             origin_time: Timestamp::HOLOCHAIN_EPOCH,
             integrity_zomes: zomes

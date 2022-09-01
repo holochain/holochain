@@ -2,17 +2,16 @@
 
 use crate::config::*;
 use crate::*;
-use lair_keystore_api_0_0::actor::*;
 use once_cell::sync::Lazy;
 
 /// Tls Configuration.
 #[derive(Clone)]
 pub struct TlsConfig {
     /// Cert
-    pub cert: Cert,
+    pub cert: Arc<[u8]>,
 
     /// Cert Priv Key
-    pub cert_priv_key: CertPrivKey,
+    pub cert_priv_key: lair_keystore_api::dependencies::sodoken::BufRead,
 
     /// Cert Digest
     pub cert_digest: CertDigest,
@@ -21,16 +20,14 @@ pub struct TlsConfig {
 impl TlsConfig {
     /// Create a new ephemeral tls certificate that will not be persisted.
     pub async fn new_ephemeral() -> KitsuneResult<Self> {
-        let mut options = lair_keystore_api_0_0::actor::TlsCertOptions::default();
-        options.alg = lair_keystore_api_0_0::actor::TlsCertAlg::PkcsEcdsaP256Sha256;
-        let cert =
-            lair_keystore_api_0_0::internal::tls::tls_cert_self_signed_new_from_entropy(options)
-                .await
-                .map_err(KitsuneError::other)?;
+        let cert = lair_keystore_api::internal::tls::tls_cert_self_signed_new()
+            .await
+            .map_err(KitsuneError::other)?;
+
         Ok(Self {
-            cert: cert.cert_der,
-            cert_priv_key: cert.priv_key_der,
-            cert_digest: cert.cert_digest,
+            cert: cert.cert,
+            cert_priv_key: cert.priv_key,
+            cert_digest: cert.digest.into(),
         })
     }
 }
@@ -51,11 +48,10 @@ pub fn gen_tls_configs(
     tls: &TlsConfig,
     tuning_params: KitsuneP2pTuningParams,
 ) -> KitsuneResult<(Arc<rustls::ServerConfig>, Arc<rustls::ClientConfig>)> {
-    let cert = rustls::Certificate(tls.cert.0.to_vec());
-    let cert_priv_key = rustls::PrivateKey(tls.cert_priv_key.0.to_vec());
+    let cert = rustls::Certificate(tls.cert.to_vec());
+    let cert_priv_key = rustls::PrivateKey(tls.cert_priv_key.read_lock().to_vec());
 
-    let root_cert =
-        rustls::Certificate(lair_keystore_api_0_0::internal::tls::WK_CA_CERT_DER.to_vec());
+    let root_cert = rustls::Certificate(lair_keystore_api::internal::tls::WK_CA_CERT_DER.to_vec());
     let mut root_store = rustls::RootCertStore::empty();
     root_store.add(&root_cert).unwrap();
 

@@ -28,9 +28,9 @@ use std::sync::Arc;
 #[cfg_attr(feature = "full-dna-def", derive(shrinkwraprs::Shrinkwrap))]
 #[cfg_attr(feature = "test_utils", derive(arbitrary::Arbitrary))]
 pub struct Zome<T = ZomeDef> {
-    name: ZomeName,
+    pub name: ZomeName,
     #[cfg_attr(feature = "full-dna-def", shrinkwrap(main_field))]
-    def: T,
+    pub def: T,
 }
 
 pub type IntegrityZome = Zome<IntegrityZomeDef>;
@@ -138,7 +138,7 @@ impl From<CoordinatorZome> for CoordinatorZomeDef {
 /// NB: Only Wasm Zomes are valid to pass through round-trip serialization,
 /// because Rust functions are not serializable. Hence, this enum serializes
 /// as if it were a bare WasmZome, and when deserializing, only Wasm zomes
-/// can be produced. InlineZomes are serialized as their UID, so that a
+/// can be produced. InlineZomes are serialized as their network seed, so that a
 /// hash can be computed, but it is invalid to attempt to deserialize them
 /// again.
 ///
@@ -166,7 +166,7 @@ pub struct IntegrityZomeDef(ZomeDef);
 pub struct CoordinatorZomeDef(ZomeDef);
 
 /// The serialized form of a ZomeDef, which is identical for Wasm zomes, but
-/// unwraps InlineZomes to just a bare UID.
+/// unwraps InlineZomes to just a bare network seed.
 #[derive(Serialize)]
 #[serde(untagged)]
 enum ZomeDefSerialized {

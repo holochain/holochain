@@ -17,7 +17,7 @@ fixturator!(
     curve Empty vec![];
     curve Unpredictable {
         let mut rng = ::fixt::rng();
-        let vec_len = rng.gen_range(0, 5);
+        let vec_len = rng.gen_range(0..5);
         let mut ret = vec![];
 
         for _ in 0..vec_len {
@@ -27,7 +27,7 @@ fixturator!(
     };
     curve Predictable {
         let mut rng = ::fixt::rng();
-        let vec_len = rng.gen_range(0, 5);
+        let vec_len = rng.gen_range(0..5);
         let mut ret = vec![];
 
         for _ in 0..vec_len {

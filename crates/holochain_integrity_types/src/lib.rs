@@ -5,7 +5,7 @@
 //! typically included as a dependency in Holochain Zomes, which are
 //! distributed as chunks of Wasm.
 //!
-//! This crate is also designed to be deterministic and more stable then
+//! This crate is also designed to be deterministic and more stable than
 //! the higher level crates.
 
 #![deny(missing_docs)]
@@ -13,6 +13,7 @@
 #[allow(missing_docs)]
 pub mod action;
 pub mod capability;
+pub mod chain;
 pub mod countersigning;
 pub mod entry;
 #[allow(missing_docs)]
@@ -25,6 +26,7 @@ pub mod info;
 pub mod link;
 pub mod op;
 pub mod prelude;
+pub mod rate_limit;
 pub mod record;
 pub mod signature;
 pub use kitsune_p2p_timestamp as timestamp;
@@ -152,12 +154,15 @@ macro_rules! secure_primitive {
         /// Also, encodings like base64 are not constant time so debugging could open some weird
         /// side channel issue trying to be 'human friendly'.
         /// It seems better to never try to encode secrets.
-        ///
-        /// @todo maybe we want something like **HIDDEN** by default and putting the actual bytes
-        ///       behind a feature flag?
         impl std::fmt::Debug for $t {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                std::fmt::Debug::fmt(&self.0.to_vec(), f)
+                f.write_str(stringify!($t))?;
+                f.write_str("(0x")?;
+                for byte in &self.0 {
+                    f.write_fmt(format_args!("{:02x}", byte))?;
+                }
+                f.write_str(")")?;
+                Ok(())
             }
         }
 
@@ -203,8 +208,29 @@ macro_rules! secure_primitive {
 pub trait UnitEnum {
     /// An enum with the same variants as the implementor
     /// but without any data.
-    type Unit;
+    type Unit: core::fmt::Debug
+        + Clone
+        + Copy
+        + PartialEq
+        + Eq
+        + PartialOrd
+        + Ord
+        + core::hash::Hash;
 
     /// Turn this type into it's unit enum.
     fn to_unit(&self) -> Self::Unit;
+
+    /// Iterate over the unit variants.
+    fn unit_iter() -> Box<dyn Iterator<Item = Self::Unit>>;
+}
+
+/// Needed as a base case for ignoring types.
+impl UnitEnum for () {
+    type Unit = ();
+
+    fn to_unit(&self) -> Self::Unit {}
+
+    fn unit_iter() -> Box<dyn Iterator<Item = Self::Unit>> {
+        Box::new([].into_iter())
+    }
 }

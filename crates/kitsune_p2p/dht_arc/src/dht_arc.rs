@@ -96,15 +96,6 @@ impl DhtArc {
         }
     }
 
-    /// Update the half length based on a PeerView reading.
-    /// This will converge on a new target instead of jumping directly
-    /// to the new target and is designed to be called at a given rate
-    /// with more recent peer views.
-    pub fn update_length<V: Into<PeerView>>(&mut self, view: V) {
-        let new_length = (U32_LEN as f64 * view.into().next_coverage(self.coverage())) as u64;
-        *self = Self::from_start_and_len(self.start_loc(), new_length)
-    }
-
     pub fn inner(self) -> DhtArcRange {
         self.0
     }
@@ -138,6 +129,10 @@ impl DhtArc {
         Self::from_parts(a, start)
     }
 
+    pub fn update_length(&mut self, new_length: u64) {
+        *self = Self::from_start_and_len(self.start_loc(), new_length)
+    }
+
     /// Get the range of the arc
     pub fn range(&self) -> ArcRange {
         match (self.0, self.1) {
@@ -157,7 +152,6 @@ impl DhtArc {
         }
     }
 
-    #[cfg(any(test, feature = "test_utils"))]
     pub fn to_ascii(&self, len: usize) -> String {
         let mut s = self.0.to_ascii(len);
         let start = loc_downscale(len, self.start_loc());
@@ -347,7 +341,6 @@ impl DhtArcRange<DhtLocation> {
         full_to_half_len(self.length())
     }
 
-    #[cfg(any(test, feature = "test_utils"))]
     /// Handy ascii representation of an arc, especially useful when
     /// looking at several arcs at once to get a sense of their overlap
     pub fn to_ascii(&self, len: usize) -> String {
@@ -453,7 +446,7 @@ pub fn full_to_half_len(full_len: u64) -> u32 {
 pub fn half_to_full_len(half_len: u32) -> u64 {
     if half_len == 0 {
         0
-    } else if half_len == MAX_HALF_LENGTH {
+    } else if half_len >= MAX_HALF_LENGTH {
         U32_LEN
     } else {
         (half_len as u64 * 2).wrapping_sub(1)

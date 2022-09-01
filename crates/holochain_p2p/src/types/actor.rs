@@ -246,7 +246,7 @@ ghost_actor::ghost_chan! {
             dht_hash: holo_hash::AnyDhtHash,
             ops: Vec<holochain_types::dht_op::DhtOp>,
             timeout_ms: Option<u64>,
-        ) -> ();
+        ) -> usize;
 
         /// Request a validation package.
         fn get_validation_package(input: GetValidationPackage) -> ValidationPackageResponse;
@@ -280,6 +280,13 @@ ghost_actor::ghost_chan! {
             options: GetActivityOptions,
         ) -> Vec<AgentActivityResponse<ActionHash>>;
 
+        /// A remote node is requesting agent activity from us.
+        fn must_get_agent_activity(
+            dna_hash: DnaHash,
+            author: AgentPubKey,
+            filter: holochain_zome_types::chain::ChainFilter,
+        ) -> Vec<MustGetAgentActivityResponse>;
+
         /// Send a validation receipt to a remote node.
         fn send_validation_receipt(dna_hash: DnaHash, to_agent: AgentPubKey, receipt: SerializedBytes) -> ();
 
@@ -289,12 +296,11 @@ ghost_actor::ghost_chan! {
         /// Check if any local agent in this space is an authority for a hash.
         fn authority_for_hash(dna_hash: DnaHash, dht_hash: AnyDhtHash) -> bool;
 
-        /// Response from an authority to agents that are
-        /// part of a session.
-        fn countersigning_authority_response(
+        /// Messages between agents negotiation a countersigning session.
+        fn countersigning_session_negotiation(
             dna_hash: DnaHash,
             agents: Vec<AgentPubKey>,
-            signed_actions: Vec<SignedAction>,
+            message: event::CountersigningSessionNegotiationMessage,
         ) -> ();
 
         /// Dump network metrics.

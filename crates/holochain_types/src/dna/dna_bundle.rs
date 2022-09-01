@@ -38,11 +38,12 @@ impl DnaBundle {
     /// been without the provided phenotype overrides
     pub async fn into_dna_file(
         self,
-        uid: Option<Uid>,
+        network_seed: Option<NetworkSeed>,
         properties: Option<YamlProperties>,
     ) -> DnaResult<(DnaFile, DnaHash)> {
         let (integrity, coordinator, wasms) = self.inner_maps().await?;
-        let (dna_def, original_hash) = self.to_dna_def(integrity, coordinator, uid, properties)?;
+        let (dna_def, original_hash) =
+            self.to_dna_def(integrity, coordinator, network_seed, properties)?;
 
         Ok((DnaFile::from_parts(dna_def, wasms), original_hash))
     }
@@ -116,14 +117,14 @@ impl DnaBundle {
         &self,
         integrity_zomes: IntegrityZomes,
         coordinator_zomes: CoordinatorZomes,
-        uid: Option<Uid>,
+        network_seed: Option<NetworkSeed>,
         properties: Option<YamlProperties>,
     ) -> DnaResult<(DnaDefHashed, DnaHash)> {
         match &self.manifest().0 {
             DnaManifest::V1(manifest) => {
                 let mut dna_def = DnaDef {
                     name: manifest.name.clone(),
-                    uid: manifest.integrity.uid.clone().unwrap_or_default(),
+                    network_seed: manifest.integrity.network_seed.clone().unwrap_or_default(),
                     properties: SerializedBytes::try_from(
                         manifest.integrity.properties.clone().unwrap_or_default(),
                     )?,
@@ -132,7 +133,7 @@ impl DnaBundle {
                     coordinator_zomes,
                 };
 
-                if uid.is_none() && properties.is_none() {
+                if network_seed.is_none() && properties.is_none() {
                     // If no phenotype overrides, then the original hash is the same as the current hash
                     let ddh = DnaDefHashed::from_content_sync(dna_def);
                     let original_hash = ddh.as_hash().clone();
@@ -147,11 +148,11 @@ impl DnaBundle {
                         .or(props)
                         .map(SerializedBytes::try_from)
                         .unwrap_or_else(|| SerializedBytes::try_from(()))?;
-                    let uid = uid
-                        .or_else(|| manifest.integrity.uid.clone())
+                    let network_seed = network_seed
+                        .or_else(|| manifest.integrity.network_seed.clone())
                         .unwrap_or_default();
 
-                    dna_def.uid = uid;
+                    dna_def.network_seed = network_seed;
                     dna_def.properties = properties;
                     Ok((DnaDefHashed::from_content_sync(dna_def), original_hash))
                 }
@@ -222,7 +223,7 @@ impl DnaBundle {
         Ok(DnaManifestCurrent {
             name: dna_def.name,
             integrity: IntegrityManifest {
-                uid: Some(dna_def.uid),
+                network_seed: Some(dna_def.network_seed),
                 properties: Some(dna_def.properties.try_into().map_err(|e| {
                     DnaError::DnaFileToBundleConversionError(format!(
                         "DnaDef properties were not YAML-deserializable: {}",
@@ -238,7 +239,7 @@ impl DnaBundle {
     }
 }
 
-async fn hash_bytes(
+pub(super) async fn hash_bytes(
     zomes: impl Iterator<Item = ZomeManifest>,
     resources: &mut HashMap<Location, ResourceBytes>,
 ) -> DnaResult<Vec<(ZomeName, WasmHash, DnaWasm, Vec<ZomeName>)>> {
@@ -287,7 +288,7 @@ mod tests {
         let mut manifest = DnaManifestCurrent {
             name: "name".into(),
             integrity: IntegrityManifest {
-                uid: Some("original uid".to_string()),
+                network_seed: Some("original network seed".to_string()),
                 properties: Some(serde_yaml::Value::Null.into()),
                 origin_time: Timestamp::HOLOCHAIN_EPOCH.into(),
                 zomes: vec![
@@ -342,11 +343,11 @@ mod tests {
                 .unwrap()
                 .into();
         let dna_file: DnaFile = bundle
-            .into_dna_file(Some("uid".into()), Some(properties.clone()))
+            .into_dna_file(Some("network_seed".into()), Some(properties.clone()))
             .await
             .unwrap()
             .0;
-        assert_eq!(dna_file.dna.uid, "uid".to_string());
+        assert_eq!(dna_file.dna.network_seed, "network_seed".to_string());
         assert_eq!(
             dna_file.dna.properties,
             SerializedBytes::try_from(properties).unwrap()

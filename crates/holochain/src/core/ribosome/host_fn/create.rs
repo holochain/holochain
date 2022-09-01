@@ -1,3 +1,4 @@
+use crate::core::ribosome::weigh_placeholder;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
@@ -26,6 +27,8 @@ pub fn create<'a>(
                 chain_top_ordering,
             } = input;
 
+            let weight = weigh_placeholder();
+
             // Countersigned entries have different action handling.
             match entry {
                 Entry::CounterSign(_, _) => tokio_helper::block_forever_on(async move {
@@ -35,7 +38,7 @@ pub fn create<'a>(
                         .source_chain()
                         .as_ref()
                         .expect("Must have source chain if write_workspace access is given")
-                        .put_countersigned(entry, chain_top_ordering)
+                        .put_countersigned(entry, chain_top_ordering, weight)
                         .await
                         .map_err(|source_chain_error| -> RuntimeError {
                             wasm_error!(WasmErrorInner::Host(source_chain_error.to_string())).into()
@@ -47,9 +50,12 @@ pub fn create<'a>(
 
                     // extract the entry defs for a zome
                     let entry_type = match entry_location {
-                        EntryDefLocation::App(entry_def_index) => {
+                        EntryDefLocation::App(AppEntryDefLocation {
+                            zome_id,
+                            entry_def_index,
+                        }) => {
                             let app_entry_type =
-                                AppEntryType::new(entry_def_index, entry_visibility);
+                                AppEntryType::new(entry_def_index, zome_id, entry_visibility);
                             EntryType::App(app_entry_type)
                         }
                         EntryDefLocation::CapGrant => EntryType::CapGrant,
@@ -74,7 +80,7 @@ pub fn create<'a>(
                             .source_chain()
                             .as_ref()
                             .expect("Must have source chain if write_workspace access is given")
-                            .put(action_builder, Some(entry), chain_top_ordering)
+                            .put_weightless(action_builder, Some(entry), chain_top_ordering)
                             .await
                             .map_err(|source_chain_error| -> RuntimeError {
                                 wasm_error!(WasmErrorInner::Host(source_chain_error.to_string()))
@@ -130,7 +136,7 @@ pub mod wasm_test {
         call_context.host_context = host_access.into();
         let app_entry = EntryFixturator::new(AppEntry).next().unwrap();
         let input = CreateInput::new(
-            EntryDefLocation::app(0),
+            EntryDefLocation::app(0, 0),
             EntryVisibility::Public,
             app_entry.clone(),
             ChainTopOrdering::default(),

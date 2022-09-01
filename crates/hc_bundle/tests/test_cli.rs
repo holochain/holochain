@@ -54,6 +54,33 @@ async fn roundtrip() {
 }
 
 #[tokio::test]
+async fn test_packed_hash_consistency() {
+    let mut i = 0;
+    let mut hash = None;
+    while i < 5 {
+        let mut cmd = Command::cargo_bin("hc-dna").unwrap();
+        let cmd = cmd.args(&["pack", "tests/fixtures/my-app/dnas/dna1"]);
+        cmd.assert().success();
+
+        let cmd = Command::new("sha256sum")
+            .args([r"./tests/fixtures/my-app/dnas/dna1/a dna.dna"])
+            .unwrap();
+        let sha_result = std::str::from_utf8(&cmd.stdout).unwrap().to_string();
+        let sha_result = sha_result.split(" ").collect::<Vec<_>>();
+        let new_hash = sha_result.first().unwrap().to_owned().to_owned();
+
+        match hash {
+            Some(prev_hash) => {
+                assert_eq!(prev_hash, new_hash);
+                hash = Some(new_hash)
+            }
+            None => hash = Some(new_hash),
+        }
+        i += 1;
+    }
+}
+
+#[tokio::test]
 async fn test_integrity() {
     let pack_dna = |path| async move {
         let mut cmd = Command::cargo_bin("hc-dna").unwrap();
@@ -149,7 +176,7 @@ async fn test_multi_integrity() {
     let origin_time = Timestamp::from_str(s).unwrap();
     let expected = DnaDef {
         name: "multi integrity dna".into(),
-        uid: "00000000-0000-0000-0000-000000000000".into(),
+        network_seed: "00000000-0000-0000-0000-000000000000".into(),
         properties: ().try_into().unwrap(),
         origin_time,
         integrity_zomes: vec![
