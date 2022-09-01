@@ -4,9 +4,9 @@ pub use holochain_integrity_types::x_salsa20_poly1305::*;
 
 #[derive(PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct XSalsa20Poly1305SharedSecretExport {
-    sender: X25519PubKey,
-    recipient: X25519PubKey,
-    key_ref: crate::x_salsa20_poly1305::key_ref::XSalsa20Poly1305KeyRef,
+    pub sender: X25519PubKey,
+    pub recipient: X25519PubKey,
+    pub key_ref: crate::x_salsa20_poly1305::key_ref::XSalsa20Poly1305KeyRef,
 }
 
 impl XSalsa20Poly1305SharedSecretExport {
@@ -37,10 +37,10 @@ impl XSalsa20Poly1305SharedSecretExport {
 
 #[derive(PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct XSalsa20Poly1305SharedSecretIngest {
-    recipient: X25519PubKey,
-    sender: X25519PubKey,
-    encrypted_data: crate::x_salsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData,
-    key_ref: Option<crate::x_salsa20_poly1305::key_ref::XSalsa20Poly1305KeyRef>,
+    pub recipient: X25519PubKey,
+    pub sender: X25519PubKey,
+    pub encrypted_data: crate::x_salsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData,
+    pub key_ref: Option<crate::x_salsa20_poly1305::key_ref::XSalsa20Poly1305KeyRef>,
 }
 
 impl XSalsa20Poly1305SharedSecretIngest {
@@ -81,8 +81,8 @@ impl XSalsa20Poly1305SharedSecretIngest {
 
 #[derive(PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct XSalsa20Poly1305Encrypt {
-    key_ref: crate::x_salsa20_poly1305::key_ref::XSalsa20Poly1305KeyRef,
-    data: crate::x_salsa20_poly1305::data::XSalsa20Poly1305Data,
+    pub key_ref: crate::x_salsa20_poly1305::key_ref::XSalsa20Poly1305KeyRef,
+    pub data: crate::x_salsa20_poly1305::data::XSalsa20Poly1305Data,
 }
 
 impl XSalsa20Poly1305Encrypt {
@@ -104,9 +104,9 @@ impl XSalsa20Poly1305Encrypt {
 
 #[derive(PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct X25519XSalsa20Poly1305Encrypt {
-    sender: X25519PubKey,
-    recipient: X25519PubKey,
-    data: crate::x_salsa20_poly1305::data::XSalsa20Poly1305Data,
+    pub sender: X25519PubKey,
+    pub recipient: X25519PubKey,
+    pub data: crate::x_salsa20_poly1305::data::XSalsa20Poly1305Data,
 }
 
 impl X25519XSalsa20Poly1305Encrypt {
