@@ -4,6 +4,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased](https://github.com/holochain/holochain/holochain_zome_types-v0.0.2-alpha.1...HEAD)
 
+## 0.0.45
+
+## 0.0.44
+
+## 0.0.43
+
+## 0.0.42
+
+- BREAKING CHANGE - Refactor: Property `integrity.uid` of DNA Yaml files renamed to `integrity.network_seed`. Functionality has not changed. [\#1493](https://github.com/holochain/holochain/pull/1493)
+
+## 0.0.41
+
+## 0.0.40
+
+## 0.0.39
+
+## 0.0.38
+
 ## 0.0.37
 
 ## 0.0.36

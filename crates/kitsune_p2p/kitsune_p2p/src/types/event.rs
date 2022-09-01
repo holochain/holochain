@@ -4,6 +4,7 @@ use crate::types::agent_store::AgentInfoSigned;
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::{
     bin_types::KOp,
+    dht::region::RegionBounds,
     dht_arc::{DhtArcSet, DhtLocation},
 };
 use std::{collections::HashSet, sync::Arc};
@@ -30,8 +31,17 @@ pub struct QueryOpHashesEvt {
 pub struct FetchOpDataEvt {
     /// The "space" context.
     pub space: KSpace,
-    /// The op-hashes to fetch
-    pub op_hashes: Vec<KOpHash>,
+    /// The criteria to query by
+    pub query: FetchOpDataEvtQuery,
+}
+
+/// Multiple ways to fetch op data
+#[derive(Debug, derive_more::From)]
+pub enum FetchOpDataEvtQuery {
+    /// Fetch all ops with the hashes specified
+    Hashes(Vec<KOpHash>),
+    /// Fetch all ops within the time and space bounds specified
+    Regions(Vec<RegionBounds>),
 }
 
 /// Request that our implementor sign some data on behalf of an agent.
@@ -228,7 +238,7 @@ ghost_actor::ghost_chan! {
         fn query_agents(input: QueryAgentsEvt) -> Vec<crate::types::agent_store::AgentInfoSigned>;
 
         /// Query the peer density of a space for a given [`DhtArc`].
-        fn query_peer_density(space: KSpace, dht_arc: kitsune_p2p_types::dht_arc::DhtArc) -> kitsune_p2p_types::dht_arc::PeerViewBeta;
+        fn query_peer_density(space: KSpace, dht_arc: kitsune_p2p_types::dht_arc::DhtArc) -> kitsune_p2p_types::dht::PeerView;
 
         /// We are receiving a request from a remote node.
         fn call(space: KSpace, to_agent: KAgent, payload: Payload) -> Vec<u8>;

@@ -80,7 +80,7 @@ impl From<&DhtOp> for DhtOpOrder {
         use DhtOpOrder::*;
         match op {
             DhtOp::StoreRecord(_, h, _) => StoreRecord(h.timestamp()),
-            DhtOp::StoreEntry(_, h, _) => StoreEntry(*h.timestamp()),
+            DhtOp::StoreEntry(_, h, _) => StoreEntry(h.timestamp()),
             DhtOp::RegisterAgentActivity(_, h) => RegisterAgentActivity(h.timestamp()),
             DhtOp::RegisterUpdatedContent(_, h, _) => RegisterUpdatedContent(h.timestamp),
             DhtOp::RegisterUpdatedRecord(_, h, _) => RegisterUpdatedRecord(h.timestamp),

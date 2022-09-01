@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use holochain_deterministic_integrity::hdi::HdiT;
+use hdi::hdi::HdiT;
 
 pub const HDK_NOT_REGISTERED: &str = "HDK not registered";
 
@@ -169,6 +169,10 @@ mockall::mock! {
             &self,
             must_get_valid_record_input: MustGetValidRecordInput,
         ) -> ExternResult<Record>;
+        fn must_get_agent_activity(
+            &self,
+            must_get_agent_activity_input: MustGetAgentActivityInput,
+        ) -> ExternResult<Vec<RegisterAgentActivity>>;
         // Info
         fn dna_info(&self, dna_info_input: ()) -> ExternResult<DnaInfo>;
         fn zome_info(&self, zome_info_input: ()) -> ExternResult<ZomeInfo>;
@@ -227,6 +231,13 @@ impl HdiT for ErrHdk {
         &self,
         _must_get_valid_record_input: MustGetValidRecordInput,
     ) -> ExternResult<Record> {
+        Self::err()
+    }
+
+    fn must_get_agent_activity(
+        &self,
+        _: MustGetAgentActivityInput,
+    ) -> ExternResult<Vec<RegisterAgentActivity>> {
         Self::err()
     }
 
@@ -384,7 +395,7 @@ impl HdkT for ErrHdk {
 pub struct HostHdk;
 
 #[cfg(all(not(feature = "mock"), target_arch = "wasm32"))]
-use holochain_deterministic_integrity::hdi::HostHdi;
+use hdi::hdi::HostHdi;
 
 #[cfg(all(not(feature = "mock"), target_arch = "wasm32"))]
 impl HdiT for HostHdk {
@@ -408,6 +419,12 @@ impl HdiT for HostHdk {
         must_get_valid_record_input: MustGetValidRecordInput,
     ) -> ExternResult<Record> {
         HostHdi::new().must_get_valid_record(must_get_valid_record_input)
+    }
+    fn must_get_agent_activity(
+        &self,
+        must_get_agent_activity_input: MustGetAgentActivityInput,
+    ) -> ExternResult<Vec<RegisterAgentActivity>> {
+        HostHdi::new().must_get_agent_activity(must_get_agent_activity_input)
     }
     fn dna_info(&self, _: ()) -> ExternResult<DnaInfo> {
         HostHdi::new().dna_info(())
@@ -591,7 +608,7 @@ where
     HDK.with(|h| {
         *h.borrow_mut() = hdk2;
     });
-    holochain_deterministic_integrity::hdi::HDI.with(|h| {
+    hdi::hdi::HDI.with(|h| {
         *h.borrow_mut() = hdk;
     });
 }

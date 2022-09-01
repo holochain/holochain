@@ -76,13 +76,13 @@ pub struct Quic {
     /// To which network interface / port should we bind?
     /// Default: "kitsune-quic://0.0.0.0:0".
     pub bind_to: Option<Url2>,
-    #[structopt(short, long)]
+    #[structopt(long)]
     /// If you have port-forwarding set up,
     /// or wish to apply a vanity domain name,
     /// you may need to override the local NIC ip.
     /// Default: None = use NIC ip.
     pub override_host: Option<String>,
-    #[structopt(short, long)]
+    #[structopt(long)]
     /// If you have port-forwarding set up,
     /// you may need to override the local NIC port.
     /// Default: None = use NIC port.

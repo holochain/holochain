@@ -17,7 +17,7 @@ crate-type = ["cdylib", "rlib"]
 hdk = { path = "../../../../hdk", features = ["properties"] }
 serde = "1.0"
 serde_yaml = "0.8"
-holochain_deterministic_integrity = { path = "../../../../holochain_deterministic_integrity" }
+hdi = { path = "../../../../hdi" }
 
 [dev-dependencies]
 hdk = { path = "../../../../hdk", features = ["fixturators", "properties"] }

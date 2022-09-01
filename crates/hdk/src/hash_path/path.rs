@@ -143,13 +143,15 @@ impl TryFrom<&Component> for String {
     }
 }
 
-/// A [ `Path` ] is a vector of [ `Component` ].
+/// A [`Path`] is a vector of [`Component`]s.
+///
 /// It represents a single traversal of a tree structure down to some arbitrary point.
 /// The main intent is that we can recursively walk back up the tree, hashing, committing and
 /// linking each sub-path along the way until we reach the root.
-/// At this point it is possible to follow DHT links from the root back up the path.
+///
+/// At this point it is possible to follow DHT links from the root back up the path,
 /// i.e. the ahead-of-time predictability of the hashes of a given path allows us to travel "up"
-/// the tree and the linking functionality of the holochain DHT allows us to travel "down" the tree
+/// the tree and the linking functionality of the Holochain DHT allows us to travel "down" the tree
 /// after at least one DHT participant has followed the path "up".
 #[derive(
     Clone, Debug, PartialEq, Default, serde::Deserialize, serde::Serialize, SerializedBytes,
@@ -159,11 +161,16 @@ pub struct Path(Vec<Component>);
 
 #[derive(Clone, Debug, PartialEq, serde::Deserialize, serde::Serialize, SerializedBytes)]
 /// A [`LinkType`] applied to a [`Path`].
-/// All links committed from this path will
-/// have this link type.
+///
+/// All links committed from this path will have this link type.
+///
+/// Get a typed path from a path and a link type:
+/// ```ignore
+/// let typed_path = path.typed(LinkTypes::MyLink)?;
+/// ```
 pub struct TypedPath {
-    /// The [`LinkType`] applied to this [`Path`].
-    pub link_type: LinkType,
+    /// The [`LinkType`] within the scope of the zome where it's defined.
+    pub link_type: ScopedLinkType,
     /// The [`Path`] that is using this [`LinkType`].
     pub path: Path,
 }
@@ -254,7 +261,7 @@ impl From<String> for Path {
 impl Path {
     /// Attach a [`LinkType`] to this path
     /// so its type is known for [`create_link`] and [`get_links`].
-    pub fn into_typed(self, link_type: impl Into<LinkType>) -> TypedPath {
+    pub fn into_typed(self, link_type: impl Into<ScopedLinkType>) -> TypedPath {
         TypedPath::new(link_type, self)
     }
 
@@ -262,10 +269,10 @@ impl Path {
     /// so its type is known for [`create_link`] and [`get_links`].
     pub fn typed<TY, E>(self, link_type: TY) -> Result<TypedPath, WasmError>
     where
-        LinkType: TryFrom<TY, Error = E>,
+        ScopedLinkType: TryFrom<TY, Error = E>,
         WasmError: From<E>,
     {
-        Ok(TypedPath::new(LinkType::try_from(link_type)?, self))
+        Ok(TypedPath::new(ScopedLinkType::try_from(link_type)?, self))
     }
     /// What is the hash for the current [ `Path` ]?
     pub fn path_entry_hash(&self) -> ExternResult<holo_hash::EntryHash> {
@@ -304,8 +311,8 @@ impl Path {
 }
 
 impl TypedPath {
-    /// CReate a new [`TypedPath`] by attaching [`LinkType`] to a [`Path`].
-    pub fn new(link_type: impl Into<LinkType>, path: Path) -> Self {
+    /// Create a new [`TypedPath`] by attaching a [`ZomeId`] and [`LinkType`] to a [`Path`].
+    pub fn new(link_type: impl Into<ScopedLinkType>, path: Path) -> Self {
         Self {
             link_type: link_type.into(),
             path,
@@ -317,9 +324,13 @@ impl TypedPath {
             Ok(false)
         } else if self.is_root() {
             let this_paths_hash: AnyLinkableHash = self.path_entry_hash()?.into();
-            let exists = get_links(root_hash()?, self.link_type, Some(self.make_tag()?))?
-                .iter()
-                .any(|Link { target, .. }| *target == this_paths_hash);
+            let exists = get_links(
+                root_hash()?,
+                LinkTypeFilter::single_type(self.link_type.zome_id, self.link_type.zome_type),
+                Some(self.make_tag()?),
+            )?
+            .iter()
+            .any(|Link { target, .. }| *target == this_paths_hash);
             Ok(exists)
         } else {
             let parent = self
@@ -328,7 +339,7 @@ impl TypedPath {
             let this_paths_hash: AnyLinkableHash = self.path_entry_hash()?.into();
             let exists = get_links(
                 parent.path_entry_hash()?,
-                self.link_type,
+                LinkTypeFilter::single_type(self.link_type.zome_id, self.link_type.zome_type),
                 Some(self.make_tag()?),
             )?
             .iter()
@@ -375,7 +386,11 @@ impl TypedPath {
     /// Only returns links between paths, not to other entries that might have their own links.
     pub fn children(&self) -> ExternResult<Vec<holochain_zome_types::link::Link>> {
         Self::ensure(self)?;
-        let mut unwrapped = get_links(self.path_entry_hash()?, self.link_type, None)?;
+        let mut unwrapped = get_links(
+            self.path_entry_hash()?,
+            LinkTypeFilter::single_type(self.link_type.zome_id, self.link_type.zome_type),
+            None,
+        )?;
         // Only need one of each hash to build the tree.
         unwrapped.sort_unstable_by(|a, b| a.tag.cmp(&b.tag));
         unwrapped.dedup_by(|a, b| a.tag.eq(&b.tag));
@@ -422,7 +437,7 @@ impl TypedPath {
         Self::ensure(self)?;
         get_link_details(
             self.path_entry_hash()?,
-            self.link_type,
+            LinkTypeFilter::single_type(self.link_type.zome_id, self.link_type.zome_type),
             Some(holochain_zome_types::link::LinkTag::new([])),
         )
     }

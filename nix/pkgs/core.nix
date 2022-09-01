@@ -23,71 +23,23 @@ rec {
     set -euxo pipefail
     export RUST_BACKTRACE=1
 
-    # limit parallel jobs to reduce memory consumption
-    export NUM_JOBS=''${NUM_JOBS:-8}
-    export CARGO_BUILD_JOBS=''${CARGO_BUILD_JOBS:-8}
-
     # run all the non-slow cargo tests
     cargo build --features 'build' -p holochain_wasm_test_utils
-    cargo test ''${CARGO_TEST_ARGS:-} --workspace --exclude holochain --lib --tests --profile fast-test -- --nocapture
+    cargo test ''${CARGO_TEST_ARGS:-} --workspace --features slow_tests,test_utils,build_wasms,db-encryption --lib --tests --profile fast-test -- --nocapture
   '';
 
   hcStandardTestsNextest = writeShellScriptBin "hc-test-standard-nextest" ''
     set -euxo pipefail
     export RUST_BACKTRACE=1
 
-    # limit parallel jobs to reduce memory consumption
-    export NUM_JOBS=''${NUM_JOBS:-8}
-    export CARGO_BUILD_JOBS=''${CARGO_BUILD_JOBS:-8}
-
-    # run all the non-slow cargo tests
+    # run all the cargo tests
     cargo build --features 'build' -p holochain_wasm_test_utils
-    cargo nextest ''${CARGO_NEXTEST_ARGS:-run --test-threads=2} --workspace --exclude holochain --lib --tests --cargo-profile fast-test
-  '';
-
-  hcSlowTests = writeShellScriptBin "hc-test-slow" ''
-    set -euxo pipefail
-    export RUST_BACKTRACE=1
-
-    # limit parallel jobs to reduce memory consumption
-    export NUM_JOBS=''${NUM_JOBS:-8}
-    export CARGO_BUILD_JOBS=''${CARGO_BUILD_JOBS:-8}
-
-    # alas, we cannot specify --features in the virtual workspace
-    # run the specific slow tests in the holochain crate
-    cargo test ''${CARGO_TEST_ARGS:-} -p holochain --features slow_tests,test_utils,build_wasms,db-encryption --profile fast-test -- --nocapture
-  '';
-
-  hcSlowTestsNextest = writeShellScriptBin "hc-test-slow-nextest" ''
-    set -euxo pipefail
-    export RUST_BACKTRACE=1
-
-    # limit parallel jobs to reduce memory consumption
-    export NUM_JOBS=''${NUM_JOBS:-8}
-    export CARGO_BUILD_JOBS=''${CARGO_BUILD_JOBS:-8}
-
-    # alas, we cannot specify --features in the virtual workspace
-    # run the specific slow tests in the holochain crate
-    cargo nextest ''${CARGO_NEXTEST_ARGS:-run --test-threads=2} -p holochain --features slow_tests,test_utils,build_wasms,db-encryption --cargo-profile fast-test
-  '';
-
-  hcSlowTestsIter = writeShellScriptBin "hc-test-slow-iter" ''
-    set -euo pipefail
-    export RUST_BACKTRACE=1
-
-    for i in `seq 1 ''${1}`; do
-      echo -n "$i: "
-      time env RUST_TEST_THREADS=$i hc-test-slow > /dev/null 2>&1
-    done
+    cargo nextest ''${CARGO_NEXTEST_ARGS:-run --test-threads=2} --workspace --features slow_tests,test_utils,build_wasms,db-encryption --lib --tests --cargo-profile fast-test
   '';
 
   hcWasmTests = writeShellScriptBin "hc-test-wasm" ''
     set -euxo pipefail
     export RUST_BACKTRACE=1
-
-    # limit parallel jobs to reduce memory consumption
-    export NUM_JOBS=''${NUM_JOBS:-8}
-    export CARGO_BUILD_JOBS=''${CARGO_BUILD_JOBS:-8}
 
     # run all the wasm tests (within wasm) with the conductor mocked
     cargo test ''${CARGO_TEST_ARGS:-} --lib --manifest-path=crates/test_utils/wasm/wasm_workspace/Cargo.toml --all-features -- --nocapture
@@ -179,10 +131,6 @@ rec {
   hcReleaseTest = writeShellScriptBin "hc-test-release" ''
     set -euxo pipefail
     export RUST_BACKTRACE=1
-
-    # limit parallel jobs to reduce memory consumption
-    export NUM_JOBS=8
-    export CARGO_BUILD_JOBS=8
 
     ${hcReleaseAutomationTest}/bin/hc-test-release-automation
     ${hcReleaseAutomationTestRepo}/bin/hc-test-release-automation-repo

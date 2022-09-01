@@ -20,6 +20,7 @@ use crate::core::ribosome::real_ribosome::RealRibosome;
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::workflow::call_zome_workflow;
 use crate::core::workflow::countersigning_workflow::countersigning_success;
+use crate::core::workflow::countersigning_workflow::incoming_countersigning;
 use crate::core::workflow::genesis_workflow::genesis_workflow;
 use crate::core::workflow::initialize_zomes_workflow;
 use crate::core::workflow::CallZomeWorkflowArgs;
@@ -34,6 +35,7 @@ use hash_type::AnyDht;
 use holo_hash::*;
 use holochain_cascade::authority;
 use holochain_cascade::Cascade;
+use holochain_p2p::event::CountersigningSessionNegotiationMessage;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_sqlite::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
@@ -463,6 +465,23 @@ impl Cell {
                 .instrument(debug_span!("cell_handle_get_agent_activity"))
                 .await;
             }
+            MustGetAgentActivity {
+                span_context: _,
+                respond,
+                author,
+                filter,
+                ..
+            } => {
+                async {
+                    let res = self
+                        .handle_must_get_agent_activity(author, filter)
+                        .await
+                        .map_err(holochain_p2p::HolochainP2pError::other);
+                    respond.respond(Ok(async move { res }.boxed().into()));
+                }
+                .instrument(debug_span!("cell_handle_must_get_agent_activity"))
+                .await;
+            }
             ValidationReceiptReceived {
                 span_context: _,
                 respond,
@@ -497,14 +516,12 @@ impl Cell {
                 .instrument(debug_span!("cell_handle_sign_network_data"))
                 .await;
             }
-            CountersigningAuthorityResponse {
-                respond,
-                signed_actions,
-                ..
+            CountersigningSessionNegotiation {
+                respond, message, ..
             } => {
                 async {
                     let res = self
-                        .handle_countersigning_authority_response(signed_actions)
+                        .handle_countersigning_session_negotiation(message)
                         .await
                         .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
@@ -516,22 +533,42 @@ impl Cell {
         Ok(())
     }
 
-    #[instrument(skip(self, signed_actions))]
+    #[instrument(skip(self, message))]
     /// we are receiving a response from a countersigning authority
-    async fn handle_countersigning_authority_response(
+    async fn handle_countersigning_session_negotiation(
         &self,
-        signed_actions: Vec<SignedAction>,
+        message: CountersigningSessionNegotiationMessage,
     ) -> CellResult<()> {
-        Ok(countersigning_success(
-            self.space.clone(),
-            &self.holochain_p2p_cell,
-            self.id.agent_pubkey().clone(),
-            signed_actions,
-            self.queue_triggers.clone(),
-            self.conductor_api.signal_broadcaster().await,
-        )
-        .await
-        .map_err(Box::new)?)
+        match message {
+            CountersigningSessionNegotiationMessage::EnzymePush(dht_op) => {
+                let ops = vec![*dht_op]
+                    .into_iter()
+                    .map(|op| {
+                        let hash = DhtOpHash::with_data_sync(&op);
+                        (hash, op)
+                    })
+                    .collect();
+                incoming_countersigning(
+                    ops,
+                    &self.space.countersigning_workspace,
+                    self.queue_triggers.countersigning.clone(),
+                )
+                .map_err(Box::new)?;
+                Ok(())
+            }
+            CountersigningSessionNegotiationMessage::AuthorityResponse(signed_actions) => {
+                Ok(countersigning_success(
+                    self.space.clone(),
+                    &self.holochain_p2p_cell,
+                    self.id.agent_pubkey().clone(),
+                    signed_actions,
+                    self.queue_triggers.clone(),
+                    self.conductor_api.signal_broadcaster().await,
+                )
+                .await
+                .map_err(Box::new)?)
+            }
+        }
     }
 
     #[instrument(skip(self))]
@@ -665,6 +702,18 @@ impl Cell {
             .map_err(Into::into)
     }
 
+    #[instrument(skip(self))]
+    async fn handle_must_get_agent_activity(
+        &self,
+        author: AgentPubKey,
+        filter: holochain_zome_types::chain::ChainFilter,
+    ) -> CellResult<MustGetAgentActivityResponse> {
+        let db = self.space.dht_db.clone();
+        authority::handle_must_get_agent_activity(db.into(), author, filter)
+            .await
+            .map_err(Into::into)
+    }
+
     /// a remote agent is sending us a validation receipt.
     #[tracing::instrument(skip(self, receipt))]
     async fn handle_validation_receipt(&self, receipt: SerializedBytes) -> CellResult<()> {
@@ -699,9 +748,9 @@ impl Cell {
         // If the action has an app entry type get the entry def
         // from the conductor.
         let required_receipt_count = match action.as_ref().and_then(|h| h.0.entry_type()) {
-            Some(EntryType::App(AppEntryType { id, .. })) => {
+            Some(EntryType::App(AppEntryType { zome_id, id, .. })) => {
                 let ribosome = self.conductor_api.get_this_ribosome().map_err(Box::new)?;
-                let zome = ribosome.find_zome_from_entry(id);
+                let zome = ribosome.get_integrity_zome(zome_id);
                 match zome {
                     Some(zome) => self
                         .conductor_api

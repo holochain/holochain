@@ -65,7 +65,7 @@ impl tracing_core::Subscriber for WasmSubscriber {
 
         // The event is pushed to the host to be picked up by the subscriber on that side.
         // The visitor is dropped.
-        holochain_deterministic_integrity::hdi::HDI.with(|h| {
+        hdi::hdi::HDI.with(|h| {
             h.borrow()
                 .trace(TraceMsg {
                     level: event.metadata().level().into(),

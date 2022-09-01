@@ -21,3 +21,5 @@ test_cert
 
 .vscode
 .my-shell.nix
+.DS_Store
+.cov

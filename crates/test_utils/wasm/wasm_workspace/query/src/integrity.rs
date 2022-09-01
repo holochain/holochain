@@ -1,4 +1,4 @@
-use hdk::prelude::holochain_deterministic_integrity::prelude::*;
+use hdk::prelude::hdi::prelude::*;
 
 #[hdk_link_types]
 pub enum LinkTypes {

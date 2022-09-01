@@ -96,7 +96,7 @@ impl CallContext {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum HostContext {
     EntryDefs(EntryDefsHostAccess),
     GenesisSelfCheck(GenesisSelfCheckHostAccess),
@@ -445,6 +445,12 @@ pub struct ZomeCallHostAccess {
     pub call_zome_handle: CellConductorReadHandle,
 }
 
+impl std::fmt::Debug for ZomeCallHostAccess {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ZomeCallHostAccess").finish()
+    }
+}
+
 impl From<ZomeCallHostAccess> for HostContext {
     fn from(zome_call_host_access: ZomeCallHostAccess) -> Self {
         Self::ZomeCall(zome_call_host_access)
@@ -499,9 +505,7 @@ pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
         }
     }
 
-    fn find_zome_from_entry(&self, entry_index: &EntryDefIndex) -> Option<IntegrityZome>;
-
-    fn find_zome_from_link(&self, entry_index: &LinkType) -> Option<IntegrityZome>;
+    fn get_integrity_zome(&self, zome_id: &ZomeId) -> Option<IntegrityZome>;
 
     fn call_iterator<I: Invocation + 'static>(
         &self,
@@ -596,6 +600,11 @@ pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
     fn zome_types(&self) -> &Arc<GlobalZomeTypes>;
 }
 
+/// Placeholder for weighing. Currently produces zero weight.
+pub fn weigh_placeholder() -> EntryRateWeight {
+    EntryRateWeight::default()
+}
+
 #[cfg(test)]
 pub mod wasm_test {
     use crate::core::ribosome::FnComponents;
@@ -648,7 +657,7 @@ pub mod wasm_test {
                 .setup_app_for_agents(
                     "app-",
                     &[alice_pubkey.clone(), bob_pubkey.clone()],
-                    &[dna_file.clone().into()],
+                    [&dna_file],
                 )
                 .await
                 .unwrap();

@@ -1,4 +1,4 @@
-use holochain_deterministic_integrity::prelude::*;
+use hdi::prelude::*;
 
 #[hdk_entry_helper]
 pub struct Post(pub String);
@@ -26,11 +26,12 @@ pub fn msg() -> EntryTypes {
 #[hdk_extern]
 fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op {
-        Op::StoreEntry { action, entry } => match action.hashed.app_entry_type() {
+        Op::StoreEntry(StoreEntry{ action, entry }) => match action.hashed.app_entry_type() {
             Some(AppEntryType {
                 id: entry_def_index,
+                zome_id,
                 ..
-            }) => match EntryTypes::try_from_global_type(*entry_def_index, &entry)? {
+            }) => match EntryTypes::deserialize_from_type(*zome_id, *entry_def_index, &entry)? {
                 Some(EntryTypes::Post(Post(p))) => {
                     if p != "foo" {
                         return Ok(ValidateCallbackResult::Invalid("because".into()));

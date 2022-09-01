@@ -52,7 +52,7 @@ pub mod test {
 
     async fn test_conductor(properties: SerializedBytes) -> (SweetConductor, SweetZome) {
         let (dna_file, _, _) =
-            SweetDnaFile::from_test_wasms(random_uid(), vec![TestWasm::ZomeInfo], properties)
+            SweetDnaFile::from_test_wasms(random_network_seed(), vec![TestWasm::ZomeInfo], properties)
                 .await
                 .unwrap();
 
@@ -64,7 +64,7 @@ pub mod test {
             .setup_app_for_agents(
                 "app-",
                 &[alice_pubkey.clone(), bob_pubkey.clone()],
-                &[dna_file.into()],
+                &[dna_file],
             )
             .await
             .unwrap();

@@ -86,12 +86,24 @@ impl DnaFile {
         })
     }
 
-    /// Hot swap coordinator zomes for this dna.
-    pub async fn hot_swap_coordinators(
+    /// Update coordinator zomes for this dna.
+    pub async fn update_coordinators(
         &mut self,
         coordinator_zomes: CoordinatorZomes,
         wasms: Vec<wasm::DnaWasm>,
     ) -> Result<Vec<WasmHash>, DnaError> {
+        let dangling_dep = coordinator_zomes.iter().find_map(|(coord_name, def)| {
+            def.as_any_zome_def()
+                .dependencies()
+                .iter()
+                .find_map(|zome_name| {
+                    (!self.dna.is_integrity_zome(zome_name))
+                        .then(|| (zome_name.to_string(), coord_name.to_string()))
+                })
+        });
+        if let Some((dangling_dep, zome_name)) = dangling_dep {
+            return Err(DnaError::DanglingZomeDependency(dangling_dep, zome_name));
+        }
         // Get the previous coordinators.
         let previous_coordinators = std::mem::replace(
             &mut self.dna.content.coordinator_zomes,
@@ -199,11 +211,11 @@ impl DnaFile {
         DnaFile::new(dna, wasm).await
     }
 
-    /// Transform this DnaFile into a new DnaFile with a different UID
+    /// Transform this DnaFile into a new DnaFile with a different network seed
     /// and, hence, a different DnaHash.
-    pub async fn with_uid(self, uid: String) -> Result<Self, DnaError> {
+    pub async fn with_network_seed(self, network_seed: NetworkSeed) -> Result<Self, DnaError> {
         let (mut dna, wasm): (DnaDef, Vec<wasm::DnaWasm>) = self.into();
-        dna.uid = uid;
+        dna.network_seed = network_seed;
         DnaFile::new(dna, wasm).await
     }
 
@@ -236,12 +248,18 @@ impl DnaFile {
         .expect("blocking thread panic!d - panicing here too")
     }
 
-    /// Change the "phenotype" of this DNA -- the UID and properties -- while
+    /// Change the "phenotype" of this DNA -- the network seed and properties -- while
     /// leaving the "genotype" of actual DNA code intact
-    pub fn modify_phenotype(&self, uid: Uid, properties: YamlProperties) -> DnaResult<Self> {
+    pub fn modify_phenotype(
+        &self,
+        network_seed: NetworkSeed,
+        properties: YamlProperties,
+    ) -> DnaResult<Self> {
         let mut clone = self.clone();
         clone.dna = DnaDefHashed::from_content_sync(
-            clone.dna.modify_phenotype(uid, properties.try_into()?),
+            clone
+                .dna
+                .modify_phenotype(network_seed, properties.try_into()?),
         );
         Ok(clone)
     }

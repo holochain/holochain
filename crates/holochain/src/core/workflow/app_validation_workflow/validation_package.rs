@@ -62,7 +62,7 @@ pub fn get_as_author_custom(
         _ => return Ok(None),
     };
 
-    let zome = match ribosome.find_zome_from_entry(&app_entry_type.id()) {
+    let zome = match ribosome.get_integrity_zome(&app_entry_type.zome_id()) {
         Some(zome_tuple) => zome_tuple,
         None => {
             warn!(

@@ -8,11 +8,11 @@ use holochain_util::ffs;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{
     borrow::Cow,
-    collections::{HashMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     path::{Path, PathBuf},
 };
 
-pub type ResourceMap = HashMap<PathBuf, ResourceBytes>;
+pub type ResourceMap = BTreeMap<PathBuf, ResourceBytes>;
 
 /// A Manifest bundled together, optionally, with the Resources that it describes.
 /// This is meant to be serialized for standalone distribution, and deserialized

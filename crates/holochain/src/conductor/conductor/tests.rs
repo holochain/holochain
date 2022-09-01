@@ -14,15 +14,13 @@ use crate::{
 use ::fixt::prelude::*;
 use holochain_conductor_api::InstalledAppInfoStatus;
 use holochain_conductor_api::{AdminRequest, AdminResponse, AppRequest, AppResponse, ZomeCall};
-use holochain_keystore::crude_mock_keystore::spawn_crude_mock_keystore;
-use holochain_keystore::crude_mock_keystore::spawn_real_or_mock_keystore;
+use holochain_keystore::crude_mock_keystore::*;
 use holochain_state::prelude::{test_keystore, *};
 use holochain_types::inline_zome::InlineZomeSet;
 use holochain_types::test_utils::fake_cell_id;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::WebsocketSender;
 use holochain_zome_types::op::Op;
-use kitsune_p2p_types::dependencies::lair_keystore_api_0_0::LairError;
 use maplit::hashset;
 use matches::assert_matches;
 
@@ -34,7 +32,11 @@ async fn can_update_state() {
     let holochain_p2p = holochain_p2p::stub_network().await;
     let (post_commit_sender, _post_commit_receiver) =
         tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
-    let spaces = Spaces::new(db_dir.path().to_path_buf().into(), Default::default()).unwrap();
+    let spaces = Spaces::new(&ConductorConfig {
+        environment_path: db_dir.path().to_path_buf().into(),
+        ..Default::default()
+    })
+    .unwrap();
     let conductor = Conductor::new(
         Default::default(),
         ribosome_store,
@@ -46,7 +48,9 @@ async fn can_update_state() {
     .await
     .unwrap();
     let state = conductor.get_state().await.unwrap();
-    assert_eq!(state, ConductorState::default());
+    let mut expect_state = ConductorState::default();
+    expect_state.set_tag(state.tag().clone());
+    assert_eq!(state, expect_state);
 
     let cell_id = fake_cell_id(1);
     let installed_cell = InstalledCell::new(cell_id.clone(), "role_id".to_string());
@@ -82,7 +86,11 @@ async fn can_add_clone_cell_to_app() {
     let ribosome_store = RibosomeStore::new();
     let (post_commit_sender, _post_commit_receiver) =
         tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
-    let spaces = Spaces::new(db_dir.path().to_path_buf().into(), Default::default()).unwrap();
+    let spaces = Spaces::new(&ConductorConfig {
+        environment_path: db_dir.path().to_path_buf().into(),
+        ..Default::default()
+    })
+    .unwrap();
 
     let conductor = Conductor::new(
         Default::default(),
@@ -157,7 +165,11 @@ async fn app_ids_are_unique() {
     let holochain_p2p = holochain_p2p::stub_network().await;
     let (post_commit_sender, _post_commit_receiver) =
         tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
-    let spaces = Spaces::new(db_dir.path().to_path_buf().into(), Default::default()).unwrap();
+    let spaces = Spaces::new(&ConductorConfig {
+        environment_path: db_dir.path().to_path_buf().into(),
+        ..Default::default()
+    })
+    .unwrap();
     let conductor = Conductor::new(
         Default::default(),
         ribosome_store,
@@ -246,11 +258,11 @@ async fn test_list_running_apps_for_cell_id() {
     let mut conductor = SweetConductor::from_standard_config().await;
     let alice = SweetAgents::one(conductor.keystore()).await;
     let app1 = conductor
-        .setup_app_for_agent("app1", alice.clone(), &[dna1.clone(), dna2])
+        .setup_app_for_agent("app1", alice.clone(), [&dna1, &dna2])
         .await
         .unwrap();
     let app2 = conductor
-        .setup_app_for_agent("app2", alice.clone(), &[dna1, dna3])
+        .setup_app_for_agent("app2", alice.clone(), [&dna1, &dna3])
         .await
         .unwrap();
 
@@ -377,9 +389,7 @@ async fn test_reconciliation_idempotency() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_signing_error_during_genesis() {
     observability::test_run().ok();
-    let bad_keystore = spawn_crude_mock_keystore(|| LairError::other("test error"))
-        .await
-        .unwrap();
+    let bad_keystore = spawn_crude_mock_keystore(|| "test error".into()).await;
 
     let db_dir = test_db_dir();
     let config = ConductorConfig::default();
@@ -520,7 +530,7 @@ pub(crate) fn simple_create_entry_zome() -> InlineZomeSet {
     .callback("create_entry", "create", move |api, ()| {
         let entry = Entry::app(().try_into().unwrap()).unwrap();
         let hash = api.create(CreateInput::new(
-            InlineZomeSet::get_entry_location(&api, 0),
+            InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
             EntryVisibility::Public,
             entry,
             ChainTopOrdering::default(),
@@ -639,7 +649,7 @@ async fn test_bad_entry_validation_after_genesis_returns_zome_call_error() {
     let bad_zome =
         InlineZomeSet::new_unique_single("integrity", "custom", vec![unit_entry_def.clone()], 0)
             .callback("integrity", "validate", |_api, op: Op| match op {
-                Op::StoreEntry { action, .. }
+                Op::StoreEntry(StoreEntry { action, .. })
                     if action.hashed.content.app_entry_type().is_some() =>
                 {
                     Ok(ValidateResult::Invalid(
@@ -651,7 +661,7 @@ async fn test_bad_entry_validation_after_genesis_returns_zome_call_error() {
             .callback("custom", "create", move |api, ()| {
                 let entry = Entry::app(().try_into().unwrap()).unwrap();
                 let hash = api.create(CreateInput::new(
-                    InlineZomeSet::get_entry_location(&api, 0),
+                    InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
                     EntryVisibility::Public,
                     entry,
                     ChainTopOrdering::default(),
@@ -701,7 +711,7 @@ async fn test_apps_disable_on_panic_after_genesis() {
             // so we can cause failure in it. But it must also be after genesis.
             .callback("integrity", "validate", |_api, op: Op| {
                 match op {
-                    Op::StoreEntry { action, .. }
+                    Op::StoreEntry(StoreEntry { action, .. })
                         if action.hashed.content.app_entry_type().is_some() =>
                     {
                         // Trigger a deserialization error
@@ -714,7 +724,7 @@ async fn test_apps_disable_on_panic_after_genesis() {
             .callback("custom", "create", move |api, ()| {
                 let entry = Entry::app(().try_into().unwrap()).unwrap();
                 let hash = api.create(CreateInput::new(
-                    InlineZomeSet::get_entry_location(&api, 0),
+                    InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
                     EntryVisibility::Public,
                     entry,
                     ChainTopOrdering::default(),

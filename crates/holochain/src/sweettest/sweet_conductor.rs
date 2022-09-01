@@ -62,6 +62,28 @@ pub fn standard_config() -> ConductorConfig {
     }
 }
 
+/// A DnaFile with a role name assigned
+pub struct DnaWithRole {
+    role: AppRoleId,
+    dna: DnaFile,
+}
+
+impl From<DnaFile> for DnaWithRole {
+    fn from(dna: DnaFile) -> Self {
+        Self {
+            // Assign a dummy unique throwaway role
+            role: format!("{}", dna.dna_hash()),
+            dna,
+        }
+    }
+}
+
+impl From<(AppRoleId, DnaFile)> for DnaWithRole {
+    fn from((role, dna): (AppRoleId, DnaFile)) -> Self {
+        Self { role, dna }
+    }
+}
+
 impl SweetConductor {
     /// Create a SweetConductor from an already-built ConductorHandle and environments
     /// RibosomeStore
@@ -87,7 +109,11 @@ impl SweetConductor {
         // to actually access those databases.
         // As a TODO, we can remove the need for TestEnvs in sweettest or have
         // some other better integration between the two.
-        let spaces = Spaces::new(env_dir.path().to_path_buf().into(), Default::default()).unwrap();
+        let spaces = Spaces::new(&ConductorConfig {
+            environment_path: env_dir.path().to_path_buf().into(),
+            ..Default::default()
+        })
+        .unwrap();
 
         let keystore = handle.keystore().clone();
 
@@ -196,16 +222,15 @@ impl SweetConductor {
         &mut self,
         installed_app_id: &str,
         agent: AgentPubKey,
-        dna_files: &[&DnaFile],
+        roles: &[DnaWithRole],
     ) -> ConductorApiResult<()> {
         let installed_app_id = installed_app_id.to_string();
 
-        let installed_cells = dna_files
+        let installed_cells = roles
             .iter()
-            .map(|&dna| {
-                let cell_handle = format!("{}", dna.dna_hash());
-                let cell_id = CellId::new(dna.dna_hash().clone(), agent.clone());
-                (InstalledCell::new(cell_id, cell_handle), None)
+            .map(|r| {
+                let cell_id = CellId::new(r.dna.dna_hash().clone(), agent.clone());
+                (InstalledCell::new(cell_id, r.role.clone()), None)
             })
             .collect();
         self.handle()
@@ -251,18 +276,20 @@ impl SweetConductor {
 
     /// Opinionated app setup.
     /// Creates an app for the given agent, using the given DnaFiles, with no extra configuration.
-    pub async fn setup_app_for_agent<'a, D>(
+    pub async fn setup_app_for_agent<'a, R, D>(
         &mut self,
         installed_app_id: &str,
         agent: AgentPubKey,
-        dna_files: D,
+        roles: D,
     ) -> ConductorApiResult<SweetApp>
     where
-        D: IntoIterator<Item = &'a DnaFile>,
+        R: Into<DnaWithRole> + Clone + 'a,
+        D: IntoIterator<Item = &'a R>,
     {
-        let dna_files: Vec<_> = dna_files.into_iter().collect();
-        self.setup_app_1_register_dna(dna_files.as_slice()).await?;
-        self.setup_app_2_install_and_enable(installed_app_id, agent.clone(), dna_files.as_slice())
+        let roles: Vec<DnaWithRole> = roles.into_iter().cloned().map(Into::into).collect();
+        let dnas = roles.iter().map(|r| &r.dna).collect::<Vec<_>>();
+        self.setup_app_1_register_dna(&dnas).await?;
+        self.setup_app_2_install_and_enable(installed_app_id, agent.clone(), roles.as_slice())
             .await?;
 
         self.handle()
@@ -271,24 +298,25 @@ impl SweetConductor {
             .reconcile_cell_status_with_app_status()
             .await?;
 
-        let dna_files = dna_files.iter().map(|d| d.dna_hash().clone());
-        self.setup_app_3_create_sweet_app(installed_app_id, agent, dna_files)
+        let dna_hashes = roles.iter().map(|r| r.dna.dna_hash().clone());
+        self.setup_app_3_create_sweet_app(installed_app_id, agent, dna_hashes)
             .await
     }
 
     /// Opinionated app setup.
     /// Creates an app using the given DnaFiles, with no extra configuration.
     /// An AgentPubKey will be generated, and is accessible via the returned SweetApp.
-    pub async fn setup_app<'a, D>(
+    pub async fn setup_app<'a, R, D>(
         &mut self,
         installed_app_id: &str,
-        dna_files: D,
+        dnas: D,
     ) -> ConductorApiResult<SweetApp>
     where
-        D: IntoIterator<Item = &'a DnaFile>,
+        R: Into<DnaWithRole> + Clone + 'a,
+        D: IntoIterator<Item = &'a R> + Clone,
     {
         let agent = SweetAgents::one(self.keystore()).await;
-        self.setup_app_for_agent(installed_app_id, agent, dna_files)
+        self.setup_app_for_agent(installed_app_id, agent, dnas.clone())
             .await
     }
 
@@ -301,25 +329,27 @@ impl SweetConductor {
     /// - AppRoleId: {dna_hash}
     ///
     /// Returns a batch of SweetApps, sorted in the same order as Agents passed in.
-    pub async fn setup_app_for_agents<'a, A, D>(
+    pub async fn setup_app_for_agents<'a, A, R, D>(
         &mut self,
         app_id_prefix: &str,
         agents: A,
-        dna_files: D,
+        roles: D,
     ) -> ConductorApiResult<SweetAppBatch>
     where
         A: IntoIterator<Item = &'a AgentPubKey>,
-        D: IntoIterator<Item = &'a DnaFile>,
+        R: Into<DnaWithRole> + Clone + 'a,
+        D: IntoIterator<Item = &'a R>,
     {
         let agents: Vec<_> = agents.into_iter().collect();
-        let dna_files: Vec<_> = dna_files.into_iter().collect();
-        self.setup_app_1_register_dna(dna_files.as_slice()).await?;
+        let roles: Vec<DnaWithRole> = roles.into_iter().cloned().map(Into::into).collect();
+        let dnas: Vec<&DnaFile> = roles.iter().map(|r| &r.dna).collect();
+        self.setup_app_1_register_dna(dnas.as_slice()).await?;
         for &agent in agents.iter() {
             let installed_app_id = format!("{}{}", app_id_prefix, agent);
             self.setup_app_2_install_and_enable(
                 &installed_app_id,
                 agent.to_owned(),
-                dna_files.as_slice(),
+                roles.as_slice(),
             )
             .await?;
         }
@@ -337,7 +367,7 @@ impl SweetConductor {
                 self.setup_app_3_create_sweet_app(
                     &installed_app_id,
                     agent.clone(),
-                    dna_files.iter().map(|d| d.dna_hash().clone()),
+                    roles.iter().map(|r| r.dna.dna_hash().clone()),
                 )
                 .await?,
             );

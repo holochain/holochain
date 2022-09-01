@@ -60,8 +60,12 @@ pub fn check_countersigning_session_data_contains_action(
     session_data: &CounterSigningSessionData,
     action: NewEntryActionRef<'_>,
 ) -> SysValidationResult<()> {
+    let weight = match action {
+        NewEntryActionRef::Create(h) => h.weight.clone(),
+        NewEntryActionRef::Update(h) => h.weight.clone(),
+    };
     let action_is_in_session = session_data
-        .build_action_set(entry_hash)
+        .build_action_set(entry_hash, weight)
         .map_err(SysValidationError::from)?
         .iter()
         .any(|session_action| match (&action, session_action) {
@@ -272,7 +276,7 @@ pub async fn check_app_entry_type(
 
     // Check if the zome is found
     let zome = ribosome
-        .find_zome_from_entry(&entry_type.id())
+        .get_integrity_zome(&entry_type.zome_id())
         .ok_or_else(|| ValidationOutcome::ZomeId(entry_type.clone()))?
         .into_inner()
         .1;

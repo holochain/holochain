@@ -31,7 +31,7 @@ use holochain_zome_types::ActionBuilder;
 use holochain_zome_types::ActionBuilderCommon;
 use holochain_zome_types::ActionExt;
 use holochain_zome_types::ActionHashed;
-use holochain_zome_types::ActionInner;
+use holochain_zome_types::ActionUnweighed;
 use holochain_zome_types::CapAccess;
 use holochain_zome_types::CapGrant;
 use holochain_zome_types::CapSecret;
@@ -40,6 +40,7 @@ use holochain_zome_types::ChainTopOrdering;
 use holochain_zome_types::CounterSigningAgentState;
 use holochain_zome_types::CounterSigningSessionData;
 use holochain_zome_types::Entry;
+use holochain_zome_types::EntryRateWeight;
 use holochain_zome_types::EntryVisibility;
 use holochain_zome_types::GrantedFunction;
 use holochain_zome_types::MembraneProof;
@@ -165,11 +166,17 @@ impl SourceChain {
         &self,
         entry: Entry,
         chain_top_ordering: ChainTopOrdering,
+        weight: EntryRateWeight,
     ) -> SourceChainResult<ActionHash> {
         let entry_hash = EntryHash::with_data_sync(&entry);
         if let Entry::CounterSign(ref session_data, _) = entry {
             self.put_with_action(
-                Action::from_countersigning_data(entry_hash, session_data, (*self.author).clone())?,
+                Action::from_countersigning_data(
+                    entry_hash,
+                    session_data,
+                    (*self.author).clone(),
+                    weight,
+                )?,
                 Some(entry),
                 chain_top_ordering,
             )
@@ -180,11 +187,28 @@ impl SourceChain {
         }
     }
 
-    pub async fn put<H: ActionInner, B: ActionBuilder<H>>(
+    /// Put a new record at the end of the source chain, using a ActionBuilder
+    /// for an action type which has no weight data.
+    /// If needing to `put` an action with weight data, use
+    /// [`SourceChain::put_weighed`] instead.
+    pub async fn put<U: ActionUnweighed<Weight = ()>, B: ActionBuilder<U>>(
         &self,
         action_builder: B,
         maybe_entry: Option<Entry>,
         chain_top_ordering: ChainTopOrdering,
+    ) -> SourceChainResult<ActionHash> {
+        self.put_weighed(action_builder, maybe_entry, chain_top_ordering, ())
+            .await
+    }
+
+    /// Put a new record at the end of the source chain, using a ActionBuilder
+    /// and the specified weight for rate limiting.
+    pub async fn put_weighed<W, U: ActionUnweighed<Weight = W>, B: ActionBuilder<U>>(
+        &self,
+        action_builder: B,
+        maybe_entry: Option<Entry>,
+        chain_top_ordering: ChainTopOrdering,
+        weight: W,
     ) -> SourceChainResult<ActionHash> {
         let (prev_action, chain_head_seq, chain_head_timestamp) = self.chain_head()?;
         let action_seq = chain_head_seq + 1;
@@ -207,9 +231,25 @@ impl SourceChain {
             prev_action,
         };
         self.put_with_action(
-            action_builder.build(common).into(),
+            action_builder.build(common).weighed(weight).into(),
             maybe_entry,
             chain_top_ordering,
+        )
+        .await
+    }
+
+    #[cfg(feature = "test_utils")]
+    pub async fn put_weightless<W: Default, U: ActionUnweighed<Weight = W>, B: ActionBuilder<U>>(
+        &self,
+        action_builder: B,
+        maybe_entry: Option<Entry>,
+        chain_top_ordering: ChainTopOrdering,
+    ) -> SourceChainResult<ActionHash> {
+        self.put_weighed(
+            action_builder,
+            maybe_entry,
+            chain_top_ordering,
+            Default::default(),
         )
         .await
     }
@@ -654,6 +694,14 @@ where
     /// used by the `query` host function, which crosses the wasm boundary
     // FIXME: This query needs to be tested.
     pub async fn query(&self, query: QueryFilter) -> SourceChainResult<Vec<Record>> {
+        if query.sequence_range != ChainQueryFilterRange::Unbounded
+            && (query.action_type.is_some()
+                || query.entry_type.is_some()
+                || query.entry_hashes.is_some()
+                || query.include_entries)
+        {
+            return Err(SourceChainError::UnsupportedQuery(query));
+        }
         let author = self.author.clone();
         let public_only = self.public_only;
         let mut records = self
@@ -691,7 +739,8 @@ where
                 WHERE
                 Action.author = :author
                 AND
-                (:range_start IS NULL AND :range_end IS NULL AND :range_start_hash IS NULL AND :range_end_hash IS NULL AND :range_prior_count IS NULL)
+                (
+                    (:range_start IS NULL AND :range_end IS NULL AND :range_start_hash IS NULL AND :range_end_hash IS NULL AND :range_prior_count IS NULL)
                 ",
                     );
                     sql.push_str(match query.sequence_range {
@@ -701,20 +750,21 @@ where
                         ChainQueryFilterRange::ActionHashRange(_, _) => "
                         OR (
                             Action.seq BETWEEN
-                            (SELECT Action.seq WHERE Action.hash = :range_start_hash)
+                            (SELECT Action.seq from Action WHERE Action.hash = :range_start_hash)
                             AND
-                            (SELECT Action.seq WHERE Action.hash = :range_end_hash)
+                            (SELECT Action.seq from Action WHERE Action.hash = :range_end_hash)
                         )",
                         ChainQueryFilterRange::ActionHashTerminated(_, _) => "
                         OR (
                             Action.seq BETWEEN
-                            (SELECT Action.seq WHERE Action.hash = :range_end_hash) - :range_prior_count
+                            (SELECT Action.seq from Action WHERE Action.hash = :range_end_hash) - :range_prior_count
                             AND
-                            (SELECT Action.seq WHERE Action.hash = :range_end_hash)
+                            (SELECT Action.seq from Action WHERE Action.hash = :range_end_hash)
                         )",
                     });
                     sql.push_str(
                         "
+                )
                 AND
                 (:entry_type IS NULL OR Action.entry_type = :entry_type)
                 AND
@@ -957,6 +1007,8 @@ pub async fn genesis(
         prev_action: avh_addr,
         entry_type: action::EntryType::AgentPubKey,
         entry_hash: agent_pubkey.clone().into(),
+        // AgentPubKey is weightless
+        weight: Default::default(),
     });
     let agent_action = ActionHashed::from_content_sync(agent_action);
     let agent_action = SignedActionHashed::sign(&keystore, agent_action).await?;
@@ -1071,7 +1123,7 @@ pub fn current_countersigning_session(
 }
 
 #[cfg(test)]
-async fn _put_db<H: ActionInner, B: ActionBuilder<H>>(
+async fn _put_db<H: holochain_zome_types::ActionUnweighed, B: ActionBuilder<H>>(
     vault: holochain_types::db::DbWrite<DbKindAuthored>,
     keystore: &MetaLairClient,
     author: Arc<AgentPubKey>,
@@ -1088,7 +1140,7 @@ async fn _put_db<H: ActionInner, B: ActionBuilder<H>>(
         action_seq,
         prev_action: prev_action.clone(),
     };
-    let action = action_builder.build(common).into();
+    let action = action_builder.build(common).weightless().into();
     let action = ActionHashed::from_content_sync(action);
     let action = SignedActionHashed::sign(keystore, action).await?;
     let record = Record::new(action, maybe_entry);
@@ -1357,7 +1409,7 @@ pub mod tests {
             entry_hash: eh1.clone(),
         };
         let h1 = chain_1
-            .put(create, Some(entry_1.clone()), ChainTopOrdering::Strict)
+            .put_weightless(create, Some(entry_1.clone()), ChainTopOrdering::Strict)
             .await
             .unwrap();
 
@@ -1368,7 +1420,7 @@ pub mod tests {
             entry_hash: entry_hash_err.clone(),
         };
         chain_2
-            .put(create, Some(entry_err.clone()), ChainTopOrdering::Strict)
+            .put_weightless(create, Some(entry_err.clone()), ChainTopOrdering::Strict)
             .await
             .unwrap();
 
@@ -1377,12 +1429,13 @@ pub mod tests {
         let create = builder::Create {
             entry_type: EntryType::App(AppEntryType::new(
                 EntryDefIndex(0),
+                0.into(),
                 EntryVisibility::Private,
             )),
             entry_hash: eh2.clone(),
         };
         let old_h2 = chain_3
-            .put(create, Some(entry_2.clone()), ChainTopOrdering::Relaxed)
+            .put_weightless(create, Some(entry_2.clone()), ChainTopOrdering::Relaxed)
             .await
             .unwrap();
 
@@ -1505,7 +1558,7 @@ pub mod tests {
                 entry_hash: entry_hash.clone(),
             };
             let action = chain
-                .put(action_builder, Some(entry), ChainTopOrdering::default())
+                .put_weightless(action_builder, Some(entry), ChainTopOrdering::default())
                 .await?;
 
             chain.flush(&mock).await.unwrap();
@@ -1566,7 +1619,7 @@ pub mod tests {
                 original_entry_address,
             };
             let action = chain
-                .put(action_builder, Some(entry), ChainTopOrdering::default())
+                .put_weightless(action_builder, Some(entry), ChainTopOrdering::default())
                 .await?;
 
             chain.flush(&mock).await.unwrap();
@@ -1627,7 +1680,7 @@ pub mod tests {
                 deletes_entry_address: updated_entry_hash,
             };
             chain
-                .put(action_builder, None, ChainTopOrdering::default())
+                .put_weightless(action_builder, None, ChainTopOrdering::default())
                 .await?;
 
             chain.flush(&mock).await.unwrap();
@@ -1763,7 +1816,7 @@ pub mod tests {
             entry_hash: EntryHash::with_data_sync(&entry),
         };
         let h1 = source_chain
-            .put(create, Some(entry), ChainTopOrdering::default())
+            .put_weightless(create, Some(entry), ChainTopOrdering::default())
             .await
             .unwrap();
         let entry = Entry::App(fixt!(AppEntryBytes));
@@ -1772,7 +1825,7 @@ pub mod tests {
             entry_hash: EntryHash::with_data_sync(&entry),
         };
         let h2 = source_chain
-            .put(create, Some(entry), ChainTopOrdering::default())
+            .put_weightless(create, Some(entry), ChainTopOrdering::default())
             .await
             .unwrap();
         source_chain.flush(&mock).await.unwrap();
@@ -1847,5 +1900,128 @@ pub mod tests {
         );
 
         Ok(())
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn source_chain_query() {
+        let test_db = test_authored_db();
+        let dht_db = test_dht_db();
+        let dht_db_cache = DhtDbQueryCache::new(dht_db.to_db().into());
+        let keystore = test_keystore();
+        let vault = test_db.to_db();
+        let alice = keystore.new_sign_keypair_random().await.unwrap();
+        let bob = keystore.new_sign_keypair_random().await.unwrap();
+        let dna_hash = fixt!(DnaHash);
+
+        genesis(
+            vault.clone().into(),
+            dht_db.to_db(),
+            &dht_db_cache,
+            keystore.clone(),
+            dna_hash.clone(),
+            alice.clone(),
+            None,
+        )
+        .await
+        .unwrap();
+
+        genesis(
+            vault.clone().into(),
+            dht_db.to_db(),
+            &dht_db_cache,
+            keystore.clone(),
+            dna_hash.clone(),
+            bob.clone(),
+            None,
+        )
+        .await
+        .unwrap();
+
+        test_db.dump_tmp();
+
+        let chain = SourceChain::new(vault, dht_db.to_db(), dht_db_cache, keystore, alice.clone())
+            .await
+            .unwrap();
+
+        let elements = chain.query(ChainQueryFilter::default()).await.unwrap();
+
+        // All of the range queries which should return a full set of elements
+        let full_ranges = [
+            ChainQueryFilterRange::Unbounded,
+            ChainQueryFilterRange::ActionSeqRange(0, 2),
+            ChainQueryFilterRange::ActionHashRange(
+                elements[0].action_address().clone(),
+                elements[2].action_address().clone(),
+            ),
+            ChainQueryFilterRange::ActionHashTerminated(elements[2].action_address().clone(), 2),
+        ];
+
+        // A variety of combinations of query parameters
+        let cases = [
+            ((None, None, vec![], false), 3),
+            ((None, None, vec![], true), 3),
+            ((Some(ActionType::Dna), None, vec![], false), 1),
+            ((None, Some(EntryType::AgentPubKey), vec![], false), 1),
+            ((None, Some(EntryType::AgentPubKey), vec![], true), 1),
+            ((Some(ActionType::Create), None, vec![], false), 1),
+            ((Some(ActionType::Create), None, vec![], true), 1),
+            (
+                (
+                    Some(ActionType::Create),
+                    Some(EntryType::AgentPubKey),
+                    vec![],
+                    false,
+                ),
+                1,
+            ),
+            (
+                (
+                    Some(ActionType::Create),
+                    Some(EntryType::AgentPubKey),
+                    vec![elements[2].action().entry_hash().unwrap().clone()],
+                    true,
+                ),
+                1,
+            ),
+        ];
+
+        // Test all permutations of cases defined with all full range queries,
+        // and both boolean values of `include_entries`.
+        for ((action_type, entry_type, entry_hashes, include_entries), num_expected) in cases {
+            let entry_hashes = if entry_hashes.is_empty() {
+                None
+            } else {
+                Some(entry_hashes.into_iter().collect())
+            };
+            for sequence_range in full_ranges.clone() {
+                let query = ChainQueryFilter {
+                    sequence_range: sequence_range.clone(),
+                    action_type: action_type.clone(),
+                    entry_type: entry_type.clone(),
+                    entry_hashes: entry_hashes.clone(),
+                    include_entries,
+                };
+                if sequence_range != ChainQueryFilterRange::Unbounded
+                    && (action_type.is_some()
+                        || entry_type.is_some()
+                        || entry_hashes.is_some()
+                        || include_entries)
+                {
+                    assert!(matches!(
+                        chain.query(query.clone()).await,
+                        Err(SourceChainError::UnsupportedQuery(_))
+                    ));
+                } else {
+                    let queried = chain.query(query.clone()).await.unwrap();
+                    let actual = queried.len();
+                    assert!(queried.iter().all(|e| e.action().author() == &alice));
+                    assert_eq!(
+                        num_expected, actual,
+                        "Expected {} items but got {} with filter {:?}",
+                        num_expected, actual, query
+                    );
+                }
+            }
+        }
     }
 }

@@ -14,7 +14,7 @@ pub struct GenesisSelfCheckInvocation {
     pub payload: Arc<GenesisSelfCheckData>,
 }
 
-#[derive(Clone, Constructor)]
+#[derive(Clone, Constructor, Debug)]
 pub struct GenesisSelfCheckHostAccess;
 
 impl From<GenesisSelfCheckHostAccess> for HostContext {
@@ -27,6 +27,7 @@ impl From<&GenesisSelfCheckHostAccess> for HostFnAccess {
     fn from(_: &GenesisSelfCheckHostAccess) -> Self {
         let mut access = Self::none();
         access.keystore_deterministic = Permission::Allow;
+        access.bindings_deterministic = Permission::Allow;
         access
     }
 }

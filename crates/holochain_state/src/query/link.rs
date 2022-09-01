@@ -15,17 +15,13 @@ pub struct GetLinksQuery {
 #[derive(Debug, Clone)]
 pub struct LinksQuery {
     pub base: Arc<AnyLinkableHash>,
-    pub type_query: Option<LinkTypeRanges>,
+    pub type_query: LinkTypeFilter,
     pub tag: Option<String>,
     query: String,
 }
 
 impl LinksQuery {
-    pub fn new(
-        base: AnyLinkableHash,
-        type_query: Option<LinkTypeRanges>,
-        tag: Option<LinkTag>,
-    ) -> Self {
+    pub fn new(base: AnyLinkableHash, type_query: LinkTypeFilter, tag: Option<LinkTag>) -> Self {
         let tag = tag.map(|tag| Self::tag_to_hex(&tag));
         let create_string = Self::create_query_string(&type_query, tag.clone());
         let delete_string = Self::delete_query_string(&type_query, tag.clone());
@@ -46,8 +42,8 @@ impl LinksQuery {
         s
     }
 
-    pub fn base(base: AnyLinkableHash) -> Self {
-        Self::new(base, None, None)
+    pub fn base(base: AnyLinkableHash, dependencies: Vec<ZomeId>) -> Self {
+        Self::new(base, LinkTypeFilter::Dependencies(dependencies), None)
     }
 
     fn create_query(create: String, delete: String) -> String {
@@ -69,7 +65,7 @@ impl LinksQuery {
             AND DhtOp.when_integrated IS NOT NULL
         "
     }
-    fn create_query_string(type_query: &Option<LinkTypeRanges>, tag: Option<String>) -> String {
+    fn create_query_string(type_query: &LinkTypeFilter, tag: Option<String>) -> String {
         let mut s = format!(
             "
             SELECT Action.blob AS action_blob FROM DhtOp
@@ -93,15 +89,10 @@ impl LinksQuery {
             None => q,
         }
     }
-    fn add_type_query(q: String, type_query: &Option<LinkTypeRanges>) -> String {
-        match type_query {
-            Some(link_type) => {
-                format!("{} {} ", q, link_type.to_sql_statement())
-            }
-            _ => q,
-        }
+    fn add_type_query(q: String, type_query: &LinkTypeFilter) -> String {
+        format!("{} {} ", q, type_query.to_sql_statement())
     }
-    fn delete_query_string(type_query: &Option<LinkTypeRanges>, tag: Option<String>) -> String {
+    fn delete_query_string(type_query: &LinkTypeFilter, tag: Option<String>) -> String {
         let mut sub_create_query = format!(
             "
             SELECT Action.hash FROM DhtOp
@@ -142,19 +133,15 @@ impl LinksQuery {
 }
 
 impl GetLinksQuery {
-    pub fn new(
-        base: AnyLinkableHash,
-        type_query: Option<LinkTypeRanges>,
-        tag: Option<LinkTag>,
-    ) -> Self {
+    pub fn new(base: AnyLinkableHash, type_query: LinkTypeFilter, tag: Option<LinkTag>) -> Self {
         Self {
             query: LinksQuery::new(base, type_query, tag),
         }
     }
 
-    pub fn base(base: AnyLinkableHash) -> Self {
+    pub fn base(base: AnyLinkableHash, dependencies: Vec<ZomeId>) -> Self {
         Self {
-            query: LinksQuery::base(base),
+            query: LinksQuery::base(base, dependencies),
         }
     }
 }
@@ -190,13 +177,12 @@ impl Query for GetLinksQuery {
             Action::CreateLink(CreateLink {
                 base_address,
                 tag,
+                zome_id,
                 link_type,
                 ..
             }) => {
                 *base_address == *base_filter
-                    && type_query_filter
-                        .as_ref()
-                        .map_or(true, |z| z.contains(link_type))
+                    && type_query_filter.contains(zome_id, link_type)
                     && tag_filter
                         .as_ref()
                         .map_or(true, |t| LinksQuery::tag_to_hex(tag).starts_with(&(**t)))
@@ -244,6 +230,8 @@ fn link_from_action(action: Action) -> StateQueryResult<Link> {
         Action::CreateLink(action) => Ok(Link {
             target: action.target_address,
             timestamp: action.timestamp,
+            zome_id: action.zome_id,
+            link_type: action.link_type,
             tag: action.tag,
             create_link_hash: hash,
         }),
