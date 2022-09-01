@@ -94,7 +94,7 @@ mod tests {
 manifest_version: "1"
 name: test_dna
 integrity:
-    uid: blablabla
+    network_seed: blablabla
     origin_time: 2022-02-11T23:29:00.789576Z
     properties:
       some: 42

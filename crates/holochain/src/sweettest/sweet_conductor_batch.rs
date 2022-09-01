@@ -42,6 +42,11 @@ impl SweetConductorBatch {
         self.0
     }
 
+    /// Get on inner.
+    pub fn get(&self, i: usize) -> Option<&SweetConductor> {
+        self.0.get(i)
+    }
+
     /// Opinionated app setup.
     /// Creates one app on each Conductor in this batch, creating a new AgentPubKey for each.
     /// The created AgentPubKeys can be retrieved via each SweetApp.
@@ -114,6 +119,29 @@ impl SweetConductorBatch {
             }
         }
         crate::conductor::p2p_agent_store::exchange_peer_info(all).await;
+    }
+
+    /// Let a conductor know about all agents on some other conductor.
+    pub async fn reveal_peer_info(&self, observer: usize, seen: usize) {
+        let observer_conductor = &self.0[observer];
+        let mut observer_envs = Vec::new();
+        for env in observer_conductor
+            .spaces
+            .get_from_spaces(|s| s.p2p_agents_db.clone())
+        {
+            observer_envs.push(env.clone());
+        }
+
+        let seen_conductor = &self.0[seen];
+        let mut seen_envs = Vec::new();
+        for env in seen_conductor
+            .spaces
+            .get_from_spaces(|s| s.p2p_agents_db.clone())
+        {
+            seen_envs.push(env.clone());
+        }
+
+        crate::conductor::p2p_agent_store::reveal_peer_info(observer_envs, seen_envs).await;
     }
 
     /// Force trigger all dht ops that haven't received

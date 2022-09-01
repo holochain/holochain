@@ -45,6 +45,7 @@ use crate::core::ribosome::host_fn::get_link_details::get_link_details;
 use crate::core::ribosome::host_fn::get_links::get_links;
 use crate::core::ribosome::host_fn::hash::hash;
 use crate::core::ribosome::host_fn::must_get_action::must_get_action;
+use crate::core::ribosome::host_fn::must_get_agent_activity::must_get_agent_activity;
 use crate::core::ribosome::host_fn::must_get_entry::must_get_entry;
 use crate::core::ribosome::host_fn::must_get_valid_record::must_get_valid_record;
 use crate::core::ribosome::host_fn::query::query;
@@ -87,6 +88,8 @@ use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
+
+const WASM_METERING_LIMIT: u64 = 10_000_000_000;
 
 /// The only RealRibosome is a Wasm ribosome.
 /// note that this is cloned on every invocation so keep clones cheap!
@@ -380,6 +383,11 @@ impl RealRibosome {
         zome_name: &ZomeName,
     ) -> RibosomeResult<()> {
         use holochain_wasmer_host::module::PlruCache;
+        {
+            let instance = instance.lock();
+            wasmer_middlewares::metering::set_remaining_points(&instance, WASM_METERING_LIMIT);
+        }
+
         // Clear the context as the call is done.
         {
             CONTEXT_MAP.lock().remove(&context_key);
@@ -478,10 +486,10 @@ impl RealRibosome {
     }
 
     pub fn cranelift() -> Cranelift {
-        let cost_function = |_operator: &WasmOperator| -> u64 { 1 };
+        let cost_function = |_operator: &WasmOperator| -> u64 { 0 };
         // @todo 10 giga-ops is totally arbitrary cutoff so we probably
         // want to make the limit configurable somehow.
-        let metering = Arc::new(Metering::new(10_000_000_000, cost_function));
+        let metering = Arc::new(Metering::new(WASM_METERING_LIMIT, cost_function));
         let mut cranelift = Cranelift::default();
         cranelift.canonicalize_nans(true).push_middleware(metering);
         cranelift
@@ -565,6 +573,11 @@ impl RealRibosome {
             .with_host_function(&mut ns, "__must_get_valid_record", must_get_valid_record)
             .with_host_function(
                 &mut ns,
+                "__must_get_agent_activity",
+                must_get_agent_activity,
+            )
+            .with_host_function(
+                &mut ns,
                 "__accept_countersigning_preflight_request",
                 accept_countersigning_preflight_request,
             )
@@ -637,7 +650,7 @@ impl RibosomeT for RealRibosome {
         // Get the dependencies for this zome.
         let zome_dependencies = self.get_zome_dependencies(zome.zome_name())?;
         // Scope the zome types to these dependencies.
-        let zome_types = self.zome_types.re_scope(zome_dependencies)?;
+        let zome_types = self.zome_types.in_scope_subset(zome_dependencies);
 
         Ok(ZomeInfo {
             name: zome.zome_name().clone(),
@@ -913,30 +926,13 @@ impl RibosomeT for RealRibosome {
         &self.dna_file
     }
 
-    fn find_zome_from_entry(&self, entry_index: &EntryDefIndex) -> Option<IntegrityZome> {
-        self.zome_types
-            .find_zome_id_from_entry(entry_index)
-            .and_then(|zome_id| {
-                self.dna_file
-                    .dna_def()
-                    .integrity_zomes
-                    .get(zome_id.0 as usize)
-                    .cloned()
-                    .map(|(name, def)| IntegrityZome::new(name, def))
-            })
-    }
-
-    fn find_zome_from_link(&self, link_index: &LinkType) -> Option<IntegrityZome> {
-        self.zome_types
-            .find_zome_id_from_link(link_index)
-            .and_then(|zome_id| {
-                self.dna_file
-                    .dna_def()
-                    .integrity_zomes
-                    .get(zome_id.0 as usize)
-                    .cloned()
-                    .map(|(name, def)| IntegrityZome::new(name, def))
-            })
+    fn get_integrity_zome(&self, zome_id: &ZomeId) -> Option<IntegrityZome> {
+        self.dna_file
+            .dna_def()
+            .integrity_zomes
+            .get(zome_id.0 as usize)
+            .cloned()
+            .map(|(name, def)| IntegrityZome::new(name, def))
     }
 }
 
@@ -967,11 +963,7 @@ pub mod wasm_test {
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let apps = conductor
-            .setup_app_for_agents(
-                "app-",
-                &[alice_pubkey.clone(), bob_pubkey],
-                &[dna_file.into()],
-            )
+            .setup_app_for_agents("app-", &[alice_pubkey.clone(), bob_pubkey], [&dna_file])
             .await
             .unwrap();
 
@@ -1007,6 +999,7 @@ pub mod wasm_test {
         }
     }
 
+    #[ignore = "turn this back on when we set the cost_function to return non-0"]
     #[tokio::test(flavor = "multi_thread")]
     async fn the_incredible_halt_test() {
         observability::test_run().ok();

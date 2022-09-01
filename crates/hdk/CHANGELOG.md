@@ -8,6 +8,42 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.0.148
+
+## 0.0.147
+
+## 0.0.146
+
+## 0.0.145
+
+## 0.0.144
+
+- Docs: Add example how to get a typed path from a path to `path` module [\#1505](https://github.com/holochain/holochain/pull/1505)
+- Exposed `TypedPath` type in the hdk prelude for easy access from zomes.
+
+## 0.0.143
+
+- Docs: Add documentation on `get_links` argument `link_type`. [\#1486](https://github.com/holochain/holochain/pull/1486)
+- Docs: Intra-link to `wasm_error` and `WasmErrorInner`. [\#1486](https://github.com/holochain/holochain/pull/1486)
+
+## 0.0.142
+
+## 0.0.141
+
+- Docs: Add section on coordinator zomes and link to HDI crate.
+
+## 0.0.140
+
+## 0.0.139
+
+- **BREAKING CHANGE:** Anchor functions, `TypedPath` and `create_link` take `ScopedLinkType: TryFrom<T>` instead of `LinkType: From<T>`.
+- **BREAKING CHANGE:** `create_entry` takes `ScopedEntryDefIndex: TryFrom<T>` instead of `EntryDefIndex: TryFrom<T>`.
+- **BREAKING CHANGE:** `get_links` and `get_link_details` take `impl LinkTypeFilterExt` instead of `TryInto<LinkTypeRanges>`.
+- hdk: **BREAKING CHANGE** `x_salsa20_poly1305_*` functions have been properly implemented. Any previous `KeyRef`s will no longer work. These new functions DO NOT work with legacy lair `v0.0.z`, you must use NEW lair `v0.y.z` (v0.2.0 as of this PR). [\#1446](https://github.com/holochain/holochain/pull/1446)
+- Fixed `hdk::query`, which was showing some incorrect behavior [\#1402](https://github.com/holochain/holochain/pull/1402):
+  - When using `ChainQueryFilterRange::ActionHashRange`, extraneous elements from other authors could be returned.
+  - Certain combinations of filters, like hash-bounded ranges and header type filters, are currently implemented incorrectly and lead to undefined behavior. Filter combinations which are unsupported now result in `SourceChainError::UnsupportedQuery`.
+
 ## 0.0.138
 
 - hdk: Bump rand version + fix getrandom (used by rand\_core and rand) to fetch randomness from host system when compiled to WebAssembly. [\#1445](https://github.com/holochain/holochain/pull/1445)

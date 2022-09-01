@@ -47,6 +47,8 @@ pub enum SysValidationError {
     WorkspaceError(#[from] WorkspaceError),
     #[error(transparent)]
     ConductorApiError(#[from] Box<ConductorApiError>),
+    #[error("Expected Entry-based Action, but got: {0:?}")]
+    NonEntryAction(Action),
 }
 
 impl From<CounterSigningError> for SysValidationError {

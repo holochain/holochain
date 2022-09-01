@@ -110,6 +110,11 @@ pub enum SourceChainError {
     #[error("The source chain was missing for a host call that requires it.")]
     SourceChainMissing,
 
+    #[error("The supplied query parameters contains filters that are mutually incompatible.
+             In particular, `sequence_range` cannot currently be used with any other filter.
+             In the future, all filters will be compatible with each other and this will not be an error.")]
+    UnsupportedQuery(ChainQueryFilter),
+
     /// Other
     #[error("Other: {0}")]
     Other(Box<dyn std::error::Error + Send + Sync>),

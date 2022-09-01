@@ -1,0 +1,55 @@
+name: "Extend space"
+description: "Teases out as much free space as possible"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Create mountpoint for extended space
+      shell: "bash"
+      run: sudo mkdir /mnt/extended
+
+    - name: Maximize build space
+      uses: easimon/maximize-build-space@v6
+      # uses: AdityaGarg8/remove-unwanted-software@v1
+      with:
+        remove-dotnet: true
+        remove-android: true
+        remove-haskell: true
+        build-mount-path: /mnt/extended
+        root-reserve-mb: 512
+        swap-size-mb: 1024
+
+    # after we've got the extended space mounted, we can use overlayfs and bind
+    # mounts as appropriate to make this space available to all paths that are
+    # expected to be written to.
+    #
+    # for new directories (such as /nix), a bind mount is enough for existing
+    # directories (such as $HOME and /tmp), we use an overlay to preserve access
+    # to the existing files, while redirecting changes to the extended space.
+    - name: Use extended space for /nix, /tmp, and $HOME
+      shell: "bash"
+      run: |
+        export EXTENDED_PATH=/mnt/extended
+        sudo mkdir $EXTENDED_PATH/{tmp,nix,home}
+
+        sudo mkdir $EXTENDED_PATH/tmp/{upper,work}
+        sudo mv /tmp{,_lower}
+        sudo mkdir /tmp
+        sudo mount -t overlay overlay \
+          -o lowerdir=/tmp_lower,upperdir=$EXTENDED_PATH/tmp/upper,workdir=$EXTENDED_PATH/tmp/work \
+          /tmp
+        sudo chown $(id -u):$(id -g) /tmp
+
+        sudo mkdir /nix
+        sudo mount -o bind $EXTENDED_PATH/nix /nix
+
+        sudo mkdir $EXTENDED_PATH/home/{upper,work}
+        sudo mv ${HOME} ${HOME}_lower
+        sudo mkdir ${HOME}
+        sudo chown $(id -u):$(id -g) $HOME
+        sudo mount -t overlay overlay \
+          -o lowerdir=${HOME}_lower,upperdir=$EXTENDED_PATH/home/upper,workdir=$EXTENDED_PATH/home/work \
+          $HOME
+        sudo chown $(id -u):$(id -g) $HOME
+
+        df -h

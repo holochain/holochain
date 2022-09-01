@@ -1,4 +1,4 @@
-use holochain_deterministic_integrity::prelude::*;
+use hdi::prelude::*;
 
 /// an example inner value that can be serialized into the contents of Entry::App()
 #[derive(Deserialize, Serialize, SerializedBytes, Debug, EntryDefRegistration)]
@@ -46,21 +46,17 @@ impl TryFrom<&ThisWasmEntry> for Entry {
     }
 }
 
-impl From<&ThisWasmEntry> for LocalZomeTypeId {
-    fn from(_: &ThisWasmEntry) -> Self {
-        Self(0)
-    }
-}
-
-impl TryFrom<&ThisWasmEntry> for EntryDefIndex {
+impl TryFrom<&ThisWasmEntry> for ScopedEntryDefIndex {
     type Error = WasmError;
 
-    fn try_from(value: &ThisWasmEntry) -> Result<Self, Self::Error> {
+    fn try_from(_: &ThisWasmEntry) -> Result<Self, Self::Error> {
         zome_info()?
             .zome_types
             .entries
-            .to_global_scope(value)
-            .map(Self::from)
+            .get(ZomeTypesKey {
+                zome_index: 0.into(),
+                type_index: 0.into(),
+            })
             .ok_or_else(|| {
                 wasm_error!(WasmErrorInner::Guest(
                     "ThisWasmEntry did not map to an EntryDefIndex within this scope".to_string(),
@@ -89,7 +85,7 @@ pub fn __num_link_types() -> u8 {
 #[hdk_extern]
 fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op {
-        Op::StoreEntry {
+        Op::StoreEntry(StoreEntry {
             action:
                 SignedHashed {
                     hashed:
@@ -99,13 +95,15 @@ fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     ..
                 },
             entry,
-        } => match action.app_entry_type() {
-            Some(AppEntryType { id, .. }) => {
+        }) => match action.app_entry_type() {
+            Some(AppEntryType { id, zome_id, .. }) => {
                 if zome_info()?
                     .zome_types
                     .entries
-                    .to_local_scope(*id)
-                    .filter(|l| l.0 == 0)
+                    .find_key(ScopedZomeType {
+                        zome_id: *zome_id,
+                        zome_type: *id,
+                    })
                     .is_some()
                 {
                     let entry = ThisWasmEntry::try_from(&entry)?;

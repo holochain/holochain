@@ -1,4 +1,4 @@
-use holochain_deterministic_integrity::prelude::*;
+use hdi::prelude::*;
 
 #[hdk_entry_helper]
 pub struct Post(pub String);
@@ -31,7 +31,7 @@ fn genesis_self_check(data: GenesisSelfCheckData) -> ExternResult<ValidateCallba
 
 #[hdk_extern]
 fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
-    if let Op::StoreEntry {
+    if let Op::StoreEntry(StoreEntry {
         action:
             SignedHashed {
                 hashed: HoloHashed {
@@ -40,46 +40,15 @@ fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 ..
             },
         entry,
-    } = op
+    }) = op
     {
         if let Some(AppEntryType {
             id: entry_def_index,
+            zome_id,
             ..
         }) = action.app_entry_type()
         {
-            match zome_info()?
-                .zome_types
-                .entries
-                .to_local_scope(*entry_def_index)
-            {
-                Some(local_type_index) => {
-                    match EntryTypes::try_from_local_type(local_type_index, &entry)? {
-                        Some(EntryTypes::Post(_)) => (),
-                        Some(EntryTypes::Msg(_)) => (),
-                        Some(EntryTypes::PrivMsg(_)) => (),
-                        None => (),
-                    }
-                }
-                None => (),
-            }
-            match zome_info()?
-                .zome_types
-                .entries
-                .to_local_scope(*entry_def_index)
-            {
-                Some(local_index) => match local_index.try_into() {
-                    Ok(UnitEntryTypes::Post) => (),
-                    _ => (),
-                },
-                None => (),
-            }
-            match EntryTypes::try_from_global_type(*entry_def_index, &entry)? {
-                Some(EntryTypes::Post(_)) => (),
-                Some(EntryTypes::Msg(_)) => (),
-                Some(EntryTypes::PrivMsg(_)) => (),
-                None => (),
-            }
-            match EntryTypes::try_from_local_type(UnitEntryTypes::Post, &entry)? {
+            match EntryTypes::deserialize_from_type(*zome_id, *entry_def_index, &entry)? {
                 Some(EntryTypes::Post(_)) => (),
                 Some(EntryTypes::Msg(_)) => (),
                 Some(EntryTypes::PrivMsg(_)) => (),
@@ -153,11 +122,11 @@ fn call_x_25519_x_salsa20_poly1305_decrypt(
 
 #[cfg(all(test, feature = "mock"))]
 pub mod test {
-    use holochain_deterministic_integrity::prelude::holo_hash::DnaHash;
+    use hdi::prelude::holo_hash::DnaHash;
 
     use super::*;
     #[test]
-    fn test_all_holochain_deterministic_integrity() {
+    fn test_all_hdi() {
         let mut mock_hdi = holochain_mock_hdi::MockHdiT::new();
         let empty_agent_key = AgentPubKey::from_raw_36(vec![0u8; 36]);
         let empty_action_hash = ActionHash::from_raw_36(vec![0u8; 36]);

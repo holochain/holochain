@@ -20,7 +20,17 @@ pub mod sql_cell {
     pub const FETCH_OP_HASHES_P2: &str =
         include_str!("sql/cell/fetch_hashes/fetch_op_hashes_p2.sql");
 
+    pub const FETCH_OP_REGION: &str = include_str!("sql/cell/fetch_op_region.sql");
+    pub const FETCH_OPS_BY_REGION: &str = include_str!("sql/cell/fetch_ops_by_region.sql");
+
     pub const FETCH_OP: &str = include_str!("sql/cell/fetch_op.sql");
+
+    pub mod must_get_agent_activity {
+        pub const MUST_GET_AGENT_ACTIVITY: &str =
+            include_str!("sql/cell/agent_activity/must_get_agent_activity.sql");
+        pub const ACTION_HASH_TO_SEQ: &str =
+            include_str!("sql/cell/agent_activity/action_hash_to_seq.sql");
+    }
 
     pub mod schedule {
         pub const UPDATE: &str = include_str!("sql/cell/schedule/update.sql");

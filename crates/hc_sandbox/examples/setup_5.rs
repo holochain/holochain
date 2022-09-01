@@ -54,7 +54,7 @@ async fn main() -> anyhow::Result<()> {
             agent_key,
             source: AppBundleSource::Bundle(bundle),
             membrane_proofs: Default::default(),
-            uid: None,
+            network_seed: None,
         };
 
         let r = AdminRequest::InstallAppBundle(Box::new(payload));

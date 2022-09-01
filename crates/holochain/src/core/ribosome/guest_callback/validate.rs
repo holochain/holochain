@@ -4,7 +4,6 @@ use crate::core::ribosome::Invocation;
 use crate::core::ribosome::InvocationAuth;
 use crate::core::ribosome::ZomesToInvoke;
 use derive_more::Constructor;
-use holo_hash::AnyDhtHash;
 use holochain_p2p::HolochainP2pDna;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
@@ -35,6 +34,12 @@ impl ValidateInvocation {
 pub struct ValidateHostAccess {
     pub workspace: HostFnWorkspaceRead,
     pub network: HolochainP2pDna,
+}
+
+impl std::fmt::Debug for ValidateHostAccess {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ValidateHostAccess").finish()
+    }
 }
 
 impl From<ValidateHostAccess> for HostContext {
@@ -76,7 +81,7 @@ pub enum ValidateResult {
     Invalid(String),
     /// subconscious needs to map this to either pending or abandoned based on context that the
     /// wasm can't possibly have
-    UnresolvedDependencies(Vec<AnyDhtHash>),
+    UnresolvedDependencies(UnresolvedDependencies),
 }
 
 impl From<Vec<(ZomeName, ValidateCallbackResult)>> for ValidateResult {
@@ -137,11 +142,14 @@ mod test {
         let mut rng = ::fixt::rng();
 
         let result_valid = || ValidateResult::Valid;
-        let result_ud = || ValidateResult::UnresolvedDependencies(vec![]);
+        let result_ud =
+            || ValidateResult::UnresolvedDependencies(UnresolvedDependencies::Hashes(vec![]));
         let result_invalid = || ValidateResult::Invalid("".into());
 
         let cb_valid = || ValidateCallbackResult::Valid;
-        let cb_ud = || ValidateCallbackResult::UnresolvedDependencies(vec![]);
+        let cb_ud = || {
+            ValidateCallbackResult::UnresolvedDependencies(UnresolvedDependencies::Hashes(vec![]))
+        };
         let cb_invalid = || ValidateCallbackResult::Invalid("".into());
 
         for (mut results, expected) in vec![
@@ -278,7 +286,7 @@ mod slow_tests {
         action.entry_type = EntryType::AgentPubKey;
         action.entry_hash = EntryHash::with_data_sync(&entry);
 
-        let op = Op::StoreRecord {
+        let op = Op::StoreRecord(StoreRecord {
             record: Record::new(
                 SignedActionHashed::with_presigned(
                     ActionHashed::from_content_sync(action.into()),
@@ -286,7 +294,7 @@ mod slow_tests {
                 ),
                 Some(entry),
             ),
-        };
+        });
 
         let zomes_to_invoke =
             ZomesToInvoke::One(IntegrityZome::from(TestWasm::ValidateInvalid).erase_type());

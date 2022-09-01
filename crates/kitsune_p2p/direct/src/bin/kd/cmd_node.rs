@@ -28,7 +28,7 @@ pub(crate) async fn run(opt: KdOptNode) -> KdResult<()> {
     let _root = mk_demo(&kd).await?;
 
     println!("http://{}", ui_addr);
-    let _ = done_r.await.map_err(KdError::other)?;
+    done_r.await.map_err(KdError::other)?;
 
     Ok(())
 }

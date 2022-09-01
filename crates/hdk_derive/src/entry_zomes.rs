@@ -17,18 +17,36 @@ pub fn build(_attrs: TokenStream, input: TokenStream) -> TokenStream {
         _ => abort!(input, "hdk_dependent_entry_types can only be used on Enums"),
     };
 
-    let index_to_variant: proc_macro2::TokenStream = variants
+    let key_to_variant: proc_macro2::TokenStream = variants
         .iter()
         .enumerate()
-        .map(|(i, v)|(index_to_u8(i), v))
-        .map(|(i, syn::Variant { ident: v_ident, fields, .. })| {
-            let ty = &get_single_tuple_variant(v_ident, fields).ty;
-            quote::quote! {
-                if ((<#ident as EnumVariantLen<#i>>::ENUM_VARIANT_START)..(<#ident as EnumVariantLen<#i>>::ENUM_VARIANT_LEN)).contains(&value) {
-                    return Ok(#ty::try_from_local_type::<LocalZomeTypeId>(LocalZomeTypeId(value), entry)?.map(Self::#v_ident));
+        .map(|(i, v)| (index_to_u8(i), v))
+        .map(
+            |(
+                i,
+                syn::Variant {
+                    ident: v_ident,
+                    fields,
+                    ..
+                },
+            )| {
+                let ty = &get_single_tuple_variant(v_ident, fields).ty;
+                quote::quote! {
+                    ZomeTypesKey {
+                        zome_index: ZomeDependencyIndex(#i),
+                        type_index,
+                    } => {
+                        let key = ZomeTypesKey {
+                            zome_index: 0.into(),
+                            type_index,
+                        };
+                        <#ty as UnitEnum>::Unit::iter()
+                            .find_map(|unit| (ZomeEntryTypesKey::from(unit) == key).then(|| unit))
+                            .map_or(Ok(None), |unit| Ok(Some(Self::#v_ident(#ty::try_from((unit, entry))?))))
+                    }
                 }
-            }
-        })
+            },
+        )
         .collect();
 
     let try_into_entry: proc_macro2::TokenStream = variants
@@ -60,8 +78,7 @@ pub fn build(_attrs: TokenStream, input: TokenStream) -> TokenStream {
         .collect();
 
     let output = quote::quote! {
-        #[hdk_to_global_entry_types]
-        #[hdk_to_local_types(nested = true)]
+        #[hdk_to_coordinates(nested = true, entry = true)]
         #[derive(Debug)]
         #input
 
@@ -83,15 +100,21 @@ pub fn build(_attrs: TokenStream, input: TokenStream) -> TokenStream {
             }
         }
 
-        impl TryFrom<&#ident> for EntryDefIndex {
+        impl TryFrom<&#ident> for ScopedEntryDefIndex {
             type Error = WasmError;
 
             fn try_from(value: &#ident) -> Result<Self, Self::Error> {
-                Ok(Self(GlobalZomeTypeId::try_from(value)?.0))
+                match zome_info()?.zome_types.entries.get(value) {
+                    Some(t) => Ok(t),
+                    _ => Err(wasm_error!(WasmErrorInner::Guest(format!(
+                        "{:?} does not map to any ZomeId and EntryDefIndex that is in scope for this zome.",
+                        value
+                    )))),
+                }
             }
         }
 
-        impl TryFrom<#ident> for EntryDefIndex {
+        impl TryFrom<#ident> for ScopedEntryDefIndex {
             type Error = WasmError;
 
             fn try_from(value: #ident) -> Result<Self, Self::Error> {
@@ -99,7 +122,7 @@ pub fn build(_attrs: TokenStream, input: TokenStream) -> TokenStream {
             }
         }
 
-        impl TryFrom<&&#ident> for EntryDefIndex {
+        impl TryFrom<&&#ident> for ScopedEntryDefIndex {
             type Error = WasmError;
 
             fn try_from(value: &&#ident) -> Result<Self, Self::Error> {
@@ -122,29 +145,36 @@ pub fn build(_attrs: TokenStream, input: TokenStream) -> TokenStream {
         }
 
         impl EntryTypesHelper for #ident {
-            fn try_from_local_type<I>(type_index: I, entry: &Entry) -> Result<Option<Self>, WasmError>
+            type Error = WasmError;
+            fn deserialize_from_type<Z, I>(
+                zome_id: Z,
+                entry_def_index: I,
+                entry: &Entry,
+            ) -> Result<Option<Self>, Self::Error>
             where
-                LocalZomeTypeId: From<I>,
+                Z: Into<ZomeId>,
+                I: Into<EntryDefIndex>
             {
-                let value = LocalZomeTypeId::from(type_index).0;
-                #index_to_variant
-
-                Err(wasm_error!(WasmErrorInner::Guest(format!(
-                    "local type index {} does not map to any the entry types for this zome",
-                    value
-                ))))
-            }
-            fn try_from_global_type<I>(type_index: I, entry: &Entry) -> Result<Option<Self>, WasmError>
-            where
-                GlobalZomeTypeId: From<I>,
-            {
-                let index: GlobalZomeTypeId = type_index.into();
-                match zome_info()?.zome_types.entries.to_local_scope(index) {
-                    Some(local_index) => Self::try_from_local_type(local_index, &entry),
-                    _ => Err(wasm_error!(WasmErrorInner::Guest(format!(
-                        "global index {} does not map to any local scope for this zome",
-                        index.0
-                    )))),
+                let scoped_type = ScopedEntryDefIndex {
+                    zome_id: zome_id.into(),
+                    zome_type: entry_def_index.into(),
+                };
+                let entries = zome_info()?.zome_types.entries;
+                match entries.find_key(scoped_type) {
+                    Some(key) => {
+                        match key {
+                            #key_to_variant
+                            _ => Ok(None),
+                        }
+                    }
+                    None => if entries.dependencies().any(|z| z == scoped_type.zome_id) {
+                        Err(wasm_error!(WasmErrorInner::Guest(format!(
+                            "Entry type: {:?} is out of range for this zome.",
+                            scoped_type
+                        ))))
+                    } else {
+                        Ok(None)
+                    }
                 }
             }
         }

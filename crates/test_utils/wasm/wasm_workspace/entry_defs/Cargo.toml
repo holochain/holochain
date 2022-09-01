@@ -16,7 +16,7 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 serde = "1.0"
 hdk = { path = "../../../../hdk", optional = true }
-holochain_deterministic_integrity = { path = "../../../../holochain_deterministic_integrity" }
+hdi = { path = "../../../../hdi" }
 
 [features]
 default = ["hdk"]

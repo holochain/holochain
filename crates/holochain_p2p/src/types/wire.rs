@@ -60,11 +60,15 @@ pub enum WireMessage {
         query: ChainQueryFilter,
         options: event::GetActivityOptions,
     },
+    MustGetAgentActivity {
+        agent: AgentPubKey,
+        filter: holochain_zome_types::chain::ChainFilter,
+    },
     GetValidationPackage {
         action_hash: ActionHash,
     },
-    CountersigningAuthorityResponse {
-        signed_actions: Vec<SignedAction>,
+    CountersigningSessionNegotiation {
+        message: event::CountersigningSessionNegotiationMessage,
     },
 }
 
@@ -140,11 +144,21 @@ impl WireMessage {
             options,
         }
     }
+
+    pub fn must_get_agent_activity(
+        agent: AgentPubKey,
+        filter: holochain_zome_types::chain::ChainFilter,
+    ) -> WireMessage {
+        Self::MustGetAgentActivity { agent, filter }
+    }
+
     pub fn get_validation_package(action_hash: ActionHash) -> WireMessage {
         Self::GetValidationPackage { action_hash }
     }
 
-    pub fn countersigning_authority_response(signed_actions: Vec<SignedAction>) -> WireMessage {
-        Self::CountersigningAuthorityResponse { signed_actions }
+    pub fn countersigning_session_negotiation(
+        message: event::CountersigningSessionNegotiationMessage,
+    ) -> WireMessage {
+        Self::CountersigningSessionNegotiation { message }
     }
 }

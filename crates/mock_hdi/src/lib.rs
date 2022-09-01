@@ -5,7 +5,7 @@
 //! # Examples
 //!
 //! ```
-//! use holochain_deterministic_integrity::prelude::*;
+//! use hdi::prelude::*;
 //!
 //! // Create the mock.
 //! let mut mock_hdi = holochain_mock_hdi::MockHdiT::new();
@@ -34,7 +34,7 @@
 //! ));
 //! ```
 
-use holochain_deterministic_integrity::prelude::*;
+use hdi::prelude::*;
 
 ::mockall::mock! {
     pub HdiT {}
@@ -50,6 +50,10 @@ use holochain_deterministic_integrity::prelude::*;
             &self,
             must_get_valid_record_input: MustGetValidRecordInput,
         ) -> ExternResult<Record>;
+        fn must_get_agent_activity(
+            &self,
+            input: MustGetAgentActivityInput,
+        ) -> ExternResult<Vec<RegisterAgentActivity>>;
         // Info
         fn dna_info(&self, dna_info_input: ()) -> ExternResult<DnaInfo>;
         fn zome_info(&self, zome_info_input: ()) -> ExternResult<ZomeInfo>;

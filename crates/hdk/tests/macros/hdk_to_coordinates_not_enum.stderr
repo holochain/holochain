@@ -1,0 +1,8 @@
+error: The `hdk_to_coordinates` macro can only be used on enums.
+
+         = help: Make this an enum.
+
+ --> tests/macros/hdk_to_coordinates_not_enum.rs:4:1
+  |
+4 | struct Foo;
+  | ^^^^^^^^^^^

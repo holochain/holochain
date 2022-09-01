@@ -33,7 +33,7 @@ env_logger = "0.8"
 fancy-regex = "0.6"
 enumflags2 = "0.7"
 enum-utils = "0.1"
-chrono = "0.4"
+chrono = { version = "0.4.22", default-features = false, features = ["clock", "std", "oldtime", "serde"] }
 cargo-next = "0.1"
 toml_edit = "0.2"
 thiserror = "1"

@@ -52,11 +52,11 @@ pub enum AppRoleManifestValidated {
         deferred: bool,
         location: DnaLocation,
         properties: Option<YamlProperties>,
-        uid: Option<String>,
+        network_seed: Option<String>,
         version: Option<DnaVersionSpec>,
     },
     /// Always create a new Cell when installing the App,
-    /// and use a unique UID to ensure a distinct DHT network
+    /// and use a unique network seed to ensure a distinct DHT network
     CreateClone {
         clone_limit: u32,
         deferred: bool,
@@ -78,7 +78,7 @@ pub enum AppRoleManifestValidated {
         deferred: bool,
         location: DnaLocation,
         properties: Option<YamlProperties>,
-        uid: Option<String>,
+        network_seed: Option<String>,
         version: DnaVersionSpec,
     },
     /// Disallow provisioning altogether. In this case, we expect
