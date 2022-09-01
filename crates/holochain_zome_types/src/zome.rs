@@ -28,9 +28,9 @@ use std::sync::Arc;
 #[cfg_attr(feature = "full-dna-def", derive(shrinkwraprs::Shrinkwrap))]
 #[cfg_attr(feature = "test_utils", derive(arbitrary::Arbitrary))]
 pub struct Zome<T = ZomeDef> {
-    name: ZomeName,
+    pub name: ZomeName,
     #[cfg_attr(feature = "full-dna-def", shrinkwrap(main_field))]
-    def: T,
+    pub def: T,
 }
 
 pub type IntegrityZome = Zome<IntegrityZomeDef>;
