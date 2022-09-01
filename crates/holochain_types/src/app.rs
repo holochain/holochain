@@ -525,7 +525,13 @@ impl InstalledAppCommon {
         Ok(())
     }
 
-    /// Remove a cloned cell
+    /// Get a clone cell by its clone id.
+    pub fn get_clone_cell_id(&self, clone_id: &CloneId) -> AppResult<&CellId> {
+        self.role(&clone_id.as_base_role_id())?
+            .clones
+            .get(clone_id)
+            .ok_or_else(|| AppError::CloneCellNotFound(clone_id.clone()))
+    }
     pub fn remove_clone(&mut self, role_id: &AppRoleId, clone_id: &CloneId) -> AppResult<bool> {
         let role = self.role_mut(role_id)?;
         Ok(role.clones.remove(clone_id).is_some())
