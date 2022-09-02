@@ -917,17 +917,20 @@ impl ConductorHandleT for ConductorHandleImpl {
                 "neither network_seed nor properties provided for cloning the cell".to_string(),
             ));
         }
-        let app_info = self
-            .get_app_info(&app_id)
-            .await?
-            .ok_or_else(|| ConductorError::AppNotInstalled(app_id.clone()))?;
-        app_info
-            .cell_data
-            .iter()
-            .find(|cell| cell.as_role_id().eq(&role_id))
+        let state = self.conductor.get_state().await?;
+        let app = state.get_app(&app_id)?;
+        app.provisioned_cells()
+            .find(|(app_role_id, _)| *app_role_id.clone() == role_id)
             .ok_or_else(|| {
                 ConductorError::CloneCellError("no cell found for provided role id".to_string())
             })?;
+        let role = app.role(&role_id)?;
+        if role.is_clone_limit_reached() == true {
+            return Err(ConductorError::AppError(AppError::CloneLimitExceeded(
+                role.clone_limit(),
+                role.clone(),
+            )));
+        }
 
         // create cell
         let network_seed = network_seed.unwrap_or_else(random_network_seed);

@@ -26,14 +26,14 @@ async fn create_clone_cell_without_network_seed_or_properties_fails() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn create_clone_cell_with_wrong_app_id_fails() {
+async fn create_clone_cell_with_wrong_app_or_role_id_fails() {
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create])
         .await
         .unwrap();
     let role_id: AppRoleId = "dna_1".to_string();
     let mut conductor = SweetConductor::from_standard_config().await;
     let alice = SweetAgents::one(conductor.keystore()).await;
-    conductor
+    let app = conductor
         .setup_app_for_agent("app", alice.clone(), [&(role_id.clone(), dna)])
         .await
         .unwrap();
@@ -51,20 +51,6 @@ async fn create_clone_cell_with_wrong_app_id_fails() {
         })
         .await;
     assert!(result.is_err());
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn create_clone_cell_with_wrong_role_id_fails() {
-    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create])
-        .await
-        .unwrap();
-    let role_id: AppRoleId = "dna_1".to_string();
-    let mut conductor = SweetConductor::from_standard_config().await;
-    let alice = SweetAgents::one(conductor.keystore()).await;
-    let app = conductor
-        .setup_app_for_agent("app", alice.clone(), [&(role_id.clone(), dna)])
-        .await
-        .unwrap();
 
     let result = conductor
         .clone()
