@@ -173,10 +173,12 @@ impl AsFramedReader for FramedReader {
             };
 
             let out = match timeout
-                .mix(async {
+                .mix("FramedReader::read", async {
+                    let start = std::time::Instant::now();
                     let mut read = 0;
-
-                    while read < MSG_SIZE_BYTES + MSG_ID_BYTES {
+                    let want = MSG_SIZE_BYTES + MSG_ID_BYTES;
+                    dbg!(want);
+                    while read < want {
                         let sub_read = inner
                             .sub
                             .read(&mut inner.local_buf[read..MSG_SIZE_BYTES + MSG_ID_BYTES])
@@ -187,6 +189,7 @@ impl AsFramedReader for FramedReader {
                         }
                         read += sub_read;
                     }
+                    println!("laksdgj {} : {:?}", read, start.elapsed());
 
                     let want_size = read_size(&inner.local_buf[..MSG_SIZE_BYTES])
                         - MSG_SIZE_BYTES
@@ -197,7 +200,7 @@ impl AsFramedReader for FramedReader {
 
                     let mut buf = PoolBuf::new();
                     buf.reserve(want_size);
-
+                    dbg!(want_size);
                     while buf.len() < want_size {
                         let to_read = std::cmp::min(inner.local_buf.len(), want_size - buf.len());
                         read = match inner
@@ -214,6 +217,7 @@ impl AsFramedReader for FramedReader {
                         }
                         buf.extend_from_slice(&inner.local_buf[..read]);
                     }
+                    println!("adih {} : {:?}", buf.len(), start.elapsed());
 
                     Ok((msg_id, buf))
                 })
@@ -277,7 +281,7 @@ impl AsFramedWriter for FramedWriter {
             };
 
             if let Err(e) = timeout
-                .mix(async {
+                .mix("FramedWriter::write", async {
                     let total = (data.len() + MSG_SIZE_BYTES + MSG_ID_BYTES) as u32;
 
                     data.reserve_front(MSG_SIZE_BYTES + MSG_ID_BYTES);
@@ -294,6 +298,7 @@ impl AsFramedWriter for FramedWriter {
                 })
                 .await
             {
+                tracing::error!(?e, "writer closing due to error");
                 let _ = inner.sub.close().await;
                 return Err(e);
             }

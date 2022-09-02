@@ -157,7 +157,7 @@ impl ConAdapt for QuicConAdapt {
     fn out_chan(&self, timeout: KitsuneTimeout) -> OutChanFut {
         let maybe_out_fut = self.0.share_mut(|i, _| Ok(i.con.open_uni()));
         timeout
-            .mix(async move {
+            .mix("QuicConAdapt::out_chan", async move {
                 let out = maybe_out_fut?.await.map_err(KitsuneError::other)?;
                 let out: OutChan = Box::new(FramedWriter::new(Box::new(out)));
                 Ok(out)
@@ -338,7 +338,7 @@ impl EndpointAdapt for QuicEndpointAdapt {
             .0
             .share_mut(|i, _| Ok((i.ep.clone(), i.local_cert.clone())));
         timeout
-            .mix(async move {
+            .mix("QuicEndpointAdapt::connect", async move {
                 let (ep, local_cert) = maybe_ep?;
                 let addr = crate::url_to_addr(url.as_url2(), crate::SCHEME)
                     .await
@@ -436,7 +436,7 @@ impl BindAdapt for QuicBackendAdapt {
         let quic_srv = self.quic_srv.clone();
         let quic_cli = self.quic_cli.clone();
         timeout
-            .mix(async move {
+            .mix("QuicBackendAdapt::bind", async move {
                 let addr = crate::url_to_addr(url.as_url2(), crate::SCHEME)
                     .await
                     .map_err(KitsuneError::other)?;

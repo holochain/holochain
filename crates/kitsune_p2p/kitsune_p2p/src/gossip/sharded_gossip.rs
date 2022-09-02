@@ -36,7 +36,7 @@ use super::{HowToConnect, MetaOpKey};
 
 pub use bandwidth::BandwidthThrottles;
 
-const GOSSIP_LOOP_INTERVAL_MS: Duration = Duration::from_millis(1000);
+const GOSSIP_LOOP_INTERVAL_MS: Duration = Duration::from_millis(100);
 
 #[cfg(any(test, feature = "test_utils"))]
 #[allow(missing_docs)]

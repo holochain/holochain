@@ -445,7 +445,7 @@ impl ConItem {
         remote: TxUrl,
         timeout: KitsuneTimeout,
     ) -> impl std::future::Future<Output = KitsuneResult<Self>> {
-        timeout.mix(async move {
+        timeout.mix("ConItem::inner_con_inner", async move {
             let permit = con_limit
                 .acquire_owned()
                 .await
@@ -838,7 +838,7 @@ impl AsEpFactory for PromoteFactory {
         let con_limit = Arc::new(Semaphore::new(max_cons));
         let pair_fut = self.adapter.bind(bind_spec, timeout);
         timeout
-            .mix(async move {
+            .mix("PromoteFactory::bind", async move {
                 let pair = pair_fut.await?;
                 let ep = PromoteEp::new(tuning_params, max_cons, con_limit, pair).await?;
                 let ep: Ep = Box::new(ep);
