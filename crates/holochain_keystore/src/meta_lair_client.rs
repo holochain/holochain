@@ -18,6 +18,9 @@ type Esnd = tokio::sync::mpsc::UnboundedSender<()>;
 #[derive(Clone)]
 pub struct MetaLairClient(pub(crate) Arc<Mutex<LairClient>>, pub(crate) Esnd);
 
+/// A lair error could indicate a connection problem or user error.
+/// If we get any error state, we send a signal to our connection validation
+/// task indicating it should check our connection health.
 macro_rules! echk {
     ($esnd:ident, $code:expr) => {{
         match $code {
