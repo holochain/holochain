@@ -209,14 +209,21 @@ pub trait ConductorHandleT: Send + Sync {
     /// Prune expired agent_infos from the p2p agents database
     async fn prune_p2p_agents_db(&self) -> ConductorResult<()>;
 
-    /// Create a new Cell in an existing App based on an existing DNA
+    /// Create a new cell in an existing app based on an existing DNA.
+    ///
+    /// # Returns
+    ///
+    /// An struct with the created cell's clone id and cell id.
     async fn create_clone_cell(
         self: Arc<Self>,
         payload: CreateCloneCellPayload,
     ) -> ConductorResult<InstalledCell>;
 
     /// Destroy a cloned Cell
-    async fn destroy_clone_cell(self: Arc<Self>, cell_id: CellId) -> ConductorResult<()>;
+    async fn destroy_clone_cell(
+        self: Arc<Self>,
+        payload: DeleteCloneCellPayload,
+    ) -> ConductorResult<bool>;
 
     /// Install Cells into ConductorState based on installation info, and run
     /// genesis on all new source chains
@@ -910,9 +917,10 @@ impl ConductorHandleT for ConductorHandleImpl {
                 "neither network_seed nor properties provided for cloning the cell".to_string(),
             ));
         }
-        let app_info = self.get_app_info(&app_id).await?.ok_or_else(|| {
-            ConductorError::CloneCellError("no app found for provided app id".to_string())
-        })?;
+        let app_info = self
+            .get_app_info(&app_id)
+            .await?
+            .ok_or_else(|| ConductorError::AppNotInstalled(app_id.clone()))?;
         app_info
             .cell_data
             .iter()
@@ -943,8 +951,19 @@ impl ConductorHandleT for ConductorHandleImpl {
         Ok(installed_clone_cell)
     }
 
-    async fn destroy_clone_cell(self: Arc<Self>, _cell_id: CellId) -> ConductorResult<()> {
-        todo!()
+    async fn destroy_clone_cell(
+        self: Arc<Self>,
+        payload: DeleteCloneCellPayload,
+    ) -> ConductorResult<bool> {
+        let DeleteCloneCellPayload {
+            app_id,
+            clone_cell_id,
+        } = payload;
+        let cell_destroyed = self
+            .conductor
+            .remove_clone_cell_from_app(&app_id, &clone_cell_id)
+            .await?;
+        Ok(cell_destroyed)
     }
 
     async fn install_app(

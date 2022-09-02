@@ -69,16 +69,16 @@ pub enum AdminRequest {
     /// [`AdminResponse::CloneCellDeleted`] when the clone cell existed and was
     /// marked for deletion.
     /// [`AdminResponse::CloneCellNotFound`] when the clone cell could not be
-    /// found by the provided clone or cell id.
-    DeleteCloneCell(Box<CreateCloneCellPayload>),
+    /// found.
+    DeleteCloneCell(Box<DeleteCloneCellPayload>),
 
     /// Install an app from a list of DNA paths.
     ///
     /// Triggers genesis to be run on all cells and to be stored.
-    /// An app is intended for use by
-    /// one and only one agent and for that reason it takes an `AgentPubKey` and
-    /// installs all the DNAs with that `AgentPubKey` forming new Cells.
-    /// See [`InstallAppPayload`] for full details on the configuration.
+    /// An app is intended for use by one and only one agent and for that reason
+    /// it takes an `AgentPubKey` and installs all the DNAs with that `AgentPubKey`
+    /// forming new Cells. See [`InstallAppPayload`] for full details on the
+    /// configuration.  
     ///
     /// Note that the new app will not be enabled automatically after installation
     /// and can be enabled by calling [`EnableApp`].

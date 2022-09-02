@@ -122,6 +122,13 @@ impl ConductorState {
             .ok_or_else(|| ConductorError::AppNotInstalled(id.clone()))
     }
 
+    /// Getter for a mutable reference to a single app. Returns error if app missing.
+    pub fn get_app_mut(&mut self, id: &InstalledAppId) -> ConductorResult<&mut InstalledApp> {
+        self.installed_apps
+            .get_mut(id)
+            .ok_or_else(|| ConductorError::AppNotInstalled(id.clone()))
+    }
+
     /// Getter for a single app. Returns error if app missing.
     pub fn remove_app(&mut self, id: &InstalledAppId) -> ConductorResult<InstalledApp> {
         self.installed_apps

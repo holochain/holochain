@@ -15,6 +15,7 @@ use crate::{dna::DnaBundle, prelude::CoordinatorBundle};
 pub use app_bundle::*;
 pub use app_manifest::app_manifest_validated::*;
 pub use app_manifest::*;
+use core::fmt;
 use derive_more::Into;
 pub use dna_gamut::*;
 use holo_hash::{AgentPubKey, DnaHash};
@@ -74,13 +75,13 @@ pub struct UpdateCoordinatorsPayload {
     pub source: CoordinatorSource,
 }
 
-/// The instructions on how to get the DNA to be registered
+/// The arguments to create a clone of an existing cell.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct CreateCloneCellPayload {
-    /// The app ID that the DNA to clone belongs to
+    /// The app id that the DNA to clone belongs to
     pub app_id: InstalledAppId,
-    /// The DNA's role ID to clone
-    /// The Role ID under which to create this clone
+    /// The DNA's role id to clone
+    /// The Role id under which to create this clone
     pub role_id: AppRoleId,
     /// Properties to override for the new cell
     pub properties: Option<YamlProperties>,
@@ -92,6 +93,34 @@ pub struct CreateCloneCellPayload {
     pub origin_time: Option<Timestamp>,
     /// Optionally a name for the DNA clone
     pub name: Option<String>,
+}
+
+/// Ways of identifying a clone cell.
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[serde(untagged)]
+pub enum CloneCellId {
+    /// Clone id consisting of role id and clone index.
+    CloneId(CloneId),
+    /// Cell id consisting of DNA hash and agent pub key.
+    CellId(CellId),
+}
+
+impl fmt::Display for CloneCellId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            CloneCellId::CellId(id) => CellId::fmt(id, f),
+            CloneCellId::CloneId(id) => CloneId::fmt(id, f),
+        }
+    }
+}
+
+/// Arguments to identify the clone cell to be deleted.
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct DeleteCloneCellPayload {
+    /// The app id that the clone cell belongs to
+    pub app_id: InstalledAppId,
+    /// The Role ID under which to create this clone
+    pub clone_cell_id: CloneCellId,
 }
 
 /// A collection of [DnaHash]es paired with an [AgentPubKey] and an app id
@@ -502,7 +531,7 @@ impl InstalledAppCommon {
         Ok(())
     }
 
-    /// Add a cloned cell
+    /// Add a cloned cell.
     pub fn add_clone(&mut self, clone_id: &CloneId, cell_id: &CellId) -> AppResult<()> {
         let app_role_assignment = self.role_mut(&clone_id.as_base_role_id())?;
         assert_eq!(
@@ -525,15 +554,28 @@ impl InstalledAppCommon {
         Ok(())
     }
 
-    /// Get a clone cell by its clone id.
+    /// Get a clone cell id from its clone id.
     pub fn get_clone_cell_id(&self, clone_id: &CloneId) -> AppResult<&CellId> {
         self.role(&clone_id.as_base_role_id())?
             .clones
             .get(clone_id)
-            .ok_or_else(|| AppError::CloneCellNotFound(clone_id.clone()))
+            .ok_or_else(|| AppError::CloneCellNotFound(CloneCellId::CloneId(clone_id.clone())))
     }
-    pub fn remove_clone(&mut self, role_id: &AppRoleId, clone_id: &CloneId) -> AppResult<bool> {
-        let role = self.role_mut(role_id)?;
+
+    /// Remove a cloned cell.
+    pub fn remove_clone(&mut self, clone_cell_id: &CloneCellId) -> AppResult<bool> {
+        let clone = self.clone();
+        let clone_id = match clone_cell_id {
+            CloneCellId::CloneId(id) => id,
+            CloneCellId::CellId(id) => {
+                clone
+                    .cloned_cells()
+                    .find(|(_, cell_id)| *cell_id == id)
+                    .ok_or_else(|| AppError::CloneCellNotFound(CloneCellId::CellId(id.clone())))?
+                    .0
+            }
+        };
+        let role = self.role_mut(&clone_id.as_base_role_id())?;
         Ok(role.clones.remove(clone_id).is_some())
     }
 
@@ -945,12 +987,12 @@ mod tests {
         );
 
         assert_eq!(
-            app.remove_clone(&role_id, &CloneId::new(&role_id, 1))
+            app.remove_clone(&CloneCellId::CloneId(CloneId::new(&role_id, 1)))
                 .unwrap(),
             true
         );
         assert_eq!(
-            app.remove_clone(&role_id, &CloneId::new(&role_id, 1))
+            app.remove_clone(&CloneCellId::CloneId(CloneId::new(&role_id, 1)))
                 .unwrap(),
             false
         );

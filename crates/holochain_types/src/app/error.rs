@@ -12,7 +12,7 @@ pub enum AppError {
     DuplicateCloneIds(CloneId),
 
     #[error("Could not find clone cell with id '{0}'")]
-    CloneCellNotFound(CloneId),
+    CloneCellNotFound(CloneCellId),
 
     #[error("Illegal character '{CLONE_ID_DELIMITER}' used in roled id: {0}")]
     IllegalRoleId(AppRoleId),

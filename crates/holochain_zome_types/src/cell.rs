@@ -34,7 +34,7 @@ pub const CLONE_ID_DELIMITER: &str = ".";
 ///
 /// Example: `profiles.0`
 #[derive(Clone, Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct CloneId(pub String);
+pub struct CloneId(pub AppRoleId);
 
 impl CloneId {
     /// Construct a clone id from role id and clone index.
