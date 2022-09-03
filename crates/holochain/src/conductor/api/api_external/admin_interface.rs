@@ -147,28 +147,6 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
 
                 Ok(AdminResponse::CoordinatorsUpdated)
             }
-            CreateCloneCell(payload) => {
-                let installed_clone_cell = self
-                    .conductor_handle
-                    .clone()
-                    .create_clone_cell(*payload)
-                    .await?;
-                Ok(AdminResponse::CloneCellCreated(installed_clone_cell))
-            }
-            DeleteCloneCell(payload) => {
-                let cell_removed = self
-                    .conductor_handle
-                    .clone()
-                    .destroy_clone_cell(*payload.clone())
-                    .await?;
-                if cell_removed == true {
-                    Ok(AdminResponse::CloneCellDeleted)
-                } else {
-                    Err(ConductorApiError::AppError(AppError::CloneCellNotFound(
-                        payload.clone_cell_id,
-                    )))
-                }
-            }
             InstallApp(payload) => {
                 trace!(?payload.dnas);
                 let InstallAppPayload {

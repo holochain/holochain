@@ -36,6 +36,31 @@ pub enum AppRequest {
     /// [`AppResponse::ZomeCall`]
     ZomeCall(Box<ZomeCall>),
 
+    /// Clone a DNA (in the biological sense), thus creating a new `Cell`.
+    ///
+    /// Using the provided, already-registered DNA, create a new DNA with a unique
+    /// ID and the specified properties, create a new cell from this cloned DNA,
+    /// and add the cell to the specified app.
+    ///
+    /// # Returns
+    ///
+    /// [`AdminResponse::CloneCellCreated`]
+    CreateCloneCell(Box<CreateCloneCellPayload>),
+
+    /// Mark a cloned cell for deletion.
+    ///
+    /// Providing a [`CloneId`] or [`CellId`], mark an existing clone cell for
+    /// deletion. When the clone cell exists, it's marked for deletion and can
+    /// not be called any longer. If it doesn't exist, nothing happens.
+    ///
+    /// # Returns
+    ///
+    /// [`AdminResponse::CloneCellDeleted`] when the clone cell existed and was
+    /// marked for deletion.
+    /// [`AdminResponse::CloneCellNotFound`] when the clone cell could not be
+    /// found.
+    DeleteCloneCell(Box<DeleteCloneCellPayload>),
+
     #[deprecated = "use ZomeCall"]
     ZomeCallInvocation(Box<ZomeCall>),
 
@@ -69,6 +94,18 @@ pub enum AppResponse {
     ///
     /// [msgpack]: https://msgpack.org/
     ZomeCall(Box<ExternIO>),
+
+    /// The successful response to an [`AdminRequest::CreateCloneCell`].
+    ///
+    /// The response contains an [`InstalledCell`] with the created clone
+    /// cell's [`CloneId`] and [`CellId`].
+    CloneCellCreated(InstalledCell),
+
+    /// An existing clone cell has been marked for deletion.
+    CloneCellDeleted,
+
+    /// A clone cell that was supposed to be marked for deletion could not be found.
+    CloneCellNotFound,
 
     #[deprecated = "use ZomeCall"]
     ZomeCallInvocation(Box<ExternIO>),

@@ -1,4 +1,5 @@
 use super::InterfaceApi;
+use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::api::error::ConductorApiResult;
 use crate::conductor::api::error::ExternalApiWireError;
 use crate::conductor::api::error::SerializationError;
@@ -98,6 +99,28 @@ impl AppInterfaceApi for RealAppInterfaceApi {
                         )),
                     )),
                     Err(e) => Ok(AppResponse::Error(e.into())),
+                }
+            }
+            AppRequest::CreateCloneCell(payload) => {
+                let installed_clone_cell = self
+                    .conductor_handle
+                    .clone()
+                    .create_clone_cell(*payload)
+                    .await?;
+                Ok(AppResponse::CloneCellCreated(installed_clone_cell))
+            }
+            AppRequest::DeleteCloneCell(payload) => {
+                let cell_removed = self
+                    .conductor_handle
+                    .clone()
+                    .destroy_clone_cell(*payload.clone())
+                    .await?;
+                if cell_removed == true {
+                    Ok(AppResponse::CloneCellDeleted)
+                } else {
+                    Err(ConductorApiError::AppError(AppError::CloneCellNotFound(
+                        payload.clone_cell_id,
+                    )))
                 }
             }
             AppRequest::SignalSubscription(_) => Ok(AppResponse::Unimplemented(request)),
