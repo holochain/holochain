@@ -971,6 +971,8 @@ mod tests {
         app.add_clone(&CloneId::new(&role_id, 2), &clones[2])
             .unwrap();
 
+        assert_eq!(app.cloned_cells().count(), 3);
+
         // Adding the same clone twice should return an error
         let result_add_clone_twice = app.add_clone(&CloneId::new(&role_id, 0), &clones[0]);
         assert!(result_add_clone_twice.is_err());

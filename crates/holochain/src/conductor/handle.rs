@@ -914,7 +914,7 @@ impl ConductorHandleT for ConductorHandleImpl {
         } = payload;
         if network_seed == None && properties == None {
             return Err(ConductorError::CloneCellError(
-                "neither network_seed nor properties provided for cloning the cell".to_string(),
+                "neither network_seed nor properties provided for clone cell".to_string(),
             ));
         }
         let state = self.conductor.get_state().await?;
@@ -922,7 +922,9 @@ impl ConductorHandleT for ConductorHandleImpl {
         app.provisioned_cells()
             .find(|(app_role_id, _)| *app_role_id.clone() == role_id)
             .ok_or_else(|| {
-                ConductorError::CloneCellError("no cell found for provided role id".to_string())
+                ConductorError::CloneCellError(
+                    "no base cell found for provided role id".to_string(),
+                )
             })?;
         let role = app.role(&role_id)?;
         if role.is_clone_limit_reached() == true {
@@ -965,6 +967,8 @@ impl ConductorHandleT for ConductorHandleImpl {
         let cell_destroyed = self
             .conductor
             .remove_clone_cell_from_app(&app_id, &clone_cell_id)
+            .await?;
+        self.create_and_add_initialized_cells_for_running_apps(self.clone(), Some(&app_id))
             .await?;
         Ok(cell_destroyed)
     }

@@ -774,8 +774,7 @@ impl Conductor {
                 let app_id = app_id.clone();
                 let role_id = role_id.clone();
                 move |mut state| {
-                    let app = state
-                        .get_app_mut(&app_id)?;
+                    let app = state.get_app_mut(&app_id)?;
                     let app_role_assignment = app
                         .roles()
                         .get(&role_id)
@@ -808,8 +807,7 @@ impl Conductor {
         // add clone cell to app and increment clone index
         let (_, installed_clone_cell) = self
             .update_state_prime(move |mut state| {
-                let app = state
-                    .get_app_mut(&app_id)?;
+                let app = state.get_app_mut(&app_id)?;
                 let agent_key = app.role(&role_id)?.agent_key().to_owned();
                 let cell_id = CellId::new(child_dna_hash, agent_key);
                 let next_clone_index = app.next_clone_index(&role_id)?;
@@ -831,15 +829,16 @@ impl Conductor {
     ) -> ConductorResult<bool> {
         let (_, cell_removed) = self
             .update_state_prime({
-                let a = app_id.clone();
-                let b = clone_cell_id.clone();
+                let app_id = app_id.clone();
+                let clone_cell_id = clone_cell_id.clone();
                 move |mut state| {
-                    let app = state.get_app_mut(&a)?;
-                    let cell_removed = app.remove_clone(&b)?;
+                    let app = state.get_app_mut(&app_id)?;
+                    let cell_removed = app.remove_clone(&clone_cell_id)?;
                     Ok((state, cell_removed))
                 }
             })
             .await?;
+        self.remove_dangling_cells().await?;
         Ok(cell_removed)
     }
 

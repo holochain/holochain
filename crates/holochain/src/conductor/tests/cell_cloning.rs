@@ -68,38 +68,6 @@ async fn create_clone_cell_with_wrong_app_or_role_id_fails() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn create_clone_cell_returns_clone_id_with_correct_role_id() {
-    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create])
-        .await
-        .unwrap();
-    let role_id: AppRoleId = "dna_1".to_string();
-    let mut conductor = SweetConductor::from_standard_config().await;
-    let alice = SweetAgents::one(conductor.keystore()).await;
-    let app = conductor
-        .setup_app_for_agent("app", alice.clone(), [&(role_id.clone(), dna)])
-        .await
-        .unwrap();
-
-    let installed_clone_cell = conductor
-        .clone()
-        .create_clone_cell(CreateCloneCellPayload {
-            app_id: app.installed_app_id().clone(),
-            role_id: role_id.clone(),
-            network_seed: Some("seed".to_string()),
-            properties: None,
-            membrane_proof: None,
-            name: Some("peter".to_string()),
-            origin_time: None,
-        })
-        .await
-        .unwrap();
-    assert_eq!(
-        installed_clone_cell.into_role_id(),
-        CloneId::new(&role_id, 0).as_app_role_id()
-    ); // clone index starts at 0
-}
-
-#[tokio::test(flavor = "multi_thread")]
 async fn create_clone_cell_run_twice_returns_correct_clone_indexes() {
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create])
         .await
@@ -186,7 +154,7 @@ async fn create_clone_cell_creates_callable_cell() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn delete_clone_cell_by_clone_id_marks_clone_cell_deleted() {
+async fn calling_a_deleted_clone_cell_fails() {
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create])
         .await
         .unwrap();
@@ -210,6 +178,16 @@ async fn delete_clone_cell_by_clone_id_marks_clone_cell_deleted() {
         })
         .await
         .unwrap();
+
+    let zome = SweetZome::new(
+        installed_clone_cell.as_id().clone(),
+        TestWasm::Create.coordinator_zome_name(),
+    );
+    let zome_call_response: Result<ActionHash, _> = conductor
+        .call_fallible(&zome, "call_create_entry", ())
+        .await;
+    assert!(zome_call_response.is_ok());
+
     let result = conductor
         .clone()
         .destroy_clone_cell(DeleteCloneCellPayload {
@@ -221,4 +199,10 @@ async fn delete_clone_cell_by_clone_id_marks_clone_cell_deleted() {
         .await
         .unwrap();
     assert_eq!(result, true);
+
+    let zome_call_response: Result<ActionHash, _> = conductor
+        .call_fallible(&zome, "call_create_entry", ())
+        .await;
+    println!("zome call after deletion {:?}", zome_call_response);
+    assert!(zome_call_response.is_err());
 }
