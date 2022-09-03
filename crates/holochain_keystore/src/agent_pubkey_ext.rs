@@ -1,8 +1,8 @@
 use crate::*;
-use ghost_actor::dependencies::must_future::MustBoxFuture;
 use holochain_zome_types::prelude::*;
 use kitsune_p2p_types::dependencies::lair_keystore_api;
 use lair_keystore_api::LairResult;
+use must_future::MustBoxFuture;
 use std::sync::Arc;
 
 /// Extend holo_hash::AgentPubKey with additional signature functionality
@@ -40,7 +40,7 @@ pub trait AgentPubKeyExt {
     where
         S: Serialize + std::fmt::Debug,
     {
-        use ghost_actor::dependencies::futures::future::FutureExt;
+        use futures::future::FutureExt;
 
         let data = match holochain_serialized_bytes::encode(&input) {
             Err(e) => {
@@ -57,7 +57,7 @@ pub trait AgentPubKeyExt {
     where
         D: TryInto<SerializedBytes, Error = SerializedBytesError>,
     {
-        use ghost_actor::dependencies::futures::future::FutureExt;
+        use futures::future::FutureExt;
 
         let data = match data.try_into() {
             Err(e) => {
