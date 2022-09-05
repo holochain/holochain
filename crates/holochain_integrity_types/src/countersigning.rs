@@ -472,14 +472,9 @@ impl Action {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct CounterSigningSessionData {
-<<<<<<< HEAD
     pub preflight_request: PreflightRequest,
     pub responses: Vec<(CounterSigningAgentState, Signature)>,
-=======
-    preflight_request: PreflightRequest,
-    responses: Vec<(CounterSigningAgentState, Signature)>,
-    optional_responses: Vec<(CounterSigningAgentState, Signature)>,
->>>>>>> 7051a99332a25602b1724a0f8df0e6ec7e1b6b1f
+    pub optional_responses: Vec<(CounterSigningAgentState, Signature)>,
 }
 
 impl CounterSigningSessionData {
