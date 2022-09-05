@@ -30,7 +30,9 @@ mod error;
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct CounterSigningSessionTimes {
+    /// The earliest allowable time for countersigning session responses to be valid.
     pub start: Timestamp,
+    /// The latest allowable time for countersigning session responses to be valid.
     pub end: Timestamp,
 }
 
@@ -254,6 +256,7 @@ pub struct PreflightResponse {
     pub request: PreflightRequest,
     /// The agent must provide their current chain state, state their position in the preflight and sign everything.
     pub agent_state: CounterSigningAgentState,
+    /// The signature of the preflight resonse.
     pub signature: Signature,
 }
 
@@ -429,8 +432,11 @@ impl CreateBase {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct UpdateBase {
+    /// The original action being updated.
     pub original_action_address: ActionHash,
+    /// The original entry being updated.
     pub original_entry_address: EntryHash,
+    /// The entry type of the update.
     pub entry_type: EntryType,
 }
 
@@ -472,8 +478,11 @@ impl Action {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct CounterSigningSessionData {
+    /// The preflight request that was agreed upon by all parties for the session.
     pub preflight_request: PreflightRequest,
+    /// All the required responses from each party.
     pub responses: Vec<(CounterSigningAgentState, Signature)>,
+    /// Any optional responses if allowed for by the preflight request.
     pub optional_responses: Vec<(CounterSigningAgentState, Signature)>,
 }
 
