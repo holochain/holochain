@@ -76,6 +76,7 @@ pub enum AppResponse {
 
 /// The data provided over an app interface in order to make a zome call
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub struct ZomeCall {
     /// The ID of the cell containing the zome to be called
     pub cell_id: CellId,
@@ -109,6 +110,7 @@ pub enum CryptoRequest {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[serde(rename_all = "snake_case")]
 /// Info about an installed app, returned as part of [`AppResponse::AppInfo`]
 pub struct InstalledAppInfo {
     /// The unique identifier for an installed app in this conductor
