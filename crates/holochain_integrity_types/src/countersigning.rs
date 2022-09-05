@@ -113,11 +113,6 @@ pub struct PreflightRequest {
     pub app_entry_hash: EntryHash,
     /// The agents that are participating in this countersignature session.
     pub signing_agents: CounterSigningAgents,
-<<<<<<< HEAD
-    /// The agent that must receive and include all other actions in their own action.
-    /// @todo implement enzymes
-    pub enzyme_index: Option<u8>,
-=======
     /// The optional additional M of N signers.
     /// If there are additional signers then M MUST be the majority of N.
     /// If there are additional signers then the enzyme MUST be used and is the
@@ -130,7 +125,6 @@ pub struct PreflightRequest {
     /// If true AND optional_signing_agents are set then the first agent MUST
     /// be the same in both signing_agents and optional_signing_agents.
     pub enzymatic: bool,
->>>>>>> 7051a99332a25602b1724a0f8df0e6ec7e1b6b1f
     /// The session times.
     /// Session actions must all have the same timestamp, which is the session offset.
     pub session_times: CounterSigningSessionTimes,
