@@ -336,6 +336,8 @@ pub(crate) fn example_workspace_1<'a>() -> Fallible<WorkspaceMocker> {
                 indoc::indoc!(
                     r#"
                     ---
+                    semver_increment_mode: minor
+                    default_semver_increment_mode: patch
                     ---
                     # Changelog
 
@@ -373,6 +375,8 @@ pub(crate) fn example_workspace_1<'a>() -> Fallible<WorkspaceMocker> {
             ty: workspace_mocker::MockProjectType::Lib,
             changelog: Some(indoc::formatdoc!(
                 r#"
+                ---
+                ---
                 # Changelog
                 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
                 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -444,7 +448,7 @@ pub(crate) fn example_workspace_1<'a>() -> Fallible<WorkspaceMocker> {
         },
         MockProject {
             name: "crate_f".to_string(),
-            version: "0.1.0".to_string(),
+            version: "0.2.0".to_string(),
             dependencies: vec![],
             excluded: false,
             ty: workspace_mocker::MockProjectType::Lib,

@@ -1,3 +1,4 @@
+use crate::common::SemverIncrementMode;
 use crate::crate_selection::Crate;
 use crate::release::ReleaseWorkspace;
 use crate::Fallible;
@@ -7,24 +8,57 @@ use comrak::nodes::{AstNode, NodeValue};
 use comrak::{format_commonmark, parse_document, Arena, ComrakOptions};
 use log::{debug, trace, warn};
 use once_cell::unsync::OnceCell;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
+use serde_with::skip_serializing_none;
 use std::io::Write;
 use std::ops::Add;
 use std::path::{Path, PathBuf};
 use std::{cell::RefCell, convert::TryFrom};
 use std::{collections::HashSet, convert::TryInto};
 
-#[derive(Default, Debug, PartialEq, Deserialize)]
+#[derive(Clone, Default, Debug, PartialEq, Deserialize, Serialize)]
 pub(crate) struct Frontmatter {
+    #[serde(skip_serializing_if = "Option::is_none")]
     unreleasable: Option<bool>,
-
+    #[serde(skip_serializing_if = "Option::is_none")]
     default_unreleasable: Option<bool>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    semver_increment_mode: Option<SemverIncrementMode>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    default_semver_increment_mode: Option<SemverIncrementMode>,
 }
 
 impl Frontmatter {
     pub(crate) fn unreleasable(&self) -> bool {
         self.unreleasable
             .unwrap_or_else(|| self.default_unreleasable.unwrap_or_default())
+    }
+
+    pub(crate) fn semver_increment_mode(&self) -> SemverIncrementMode {
+        self.semver_increment_mode.clone().unwrap_or_else(|| {
+            self.default_semver_increment_mode
+                .clone()
+                .unwrap_or_default()
+        })
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.unreleasable.is_none()
+            && self.default_unreleasable.is_none()
+            && self.semver_increment_mode.is_none()
+            && self.default_semver_increment_mode.is_none()
+    }
+
+    /// Remove any non-default values in the frontmatter.
+    pub(crate) fn reset_to_defaults(&mut self) {
+        if self.unreleasable.is_some() {
+            self.unreleasable = None;
+        }
+
+        if self.semver_increment_mode.is_some() {
+            self.semver_increment_mode = None;
+        }
     }
 }
 
@@ -424,6 +458,59 @@ impl<'a> ChangelogT<'a, CrateChangelog> {
         format_commonmark(root, self.options(), &mut buf).unwrap();
         let mut output_file = std::fs::File::create(&self.path())?;
         output_file.write_all(&buf)?;
+        output_file.flush()?;
+
+        Ok(())
+    }
+
+    fn erase_front_matter(&'a self, write_file: bool) -> Fallible<String> {
+        let frontmatter_re = regex::Regex::new(r"(?ms)^---$.*^---$\w*").unwrap();
+        let cl = sanitize(std::fs::read_to_string(self.path())?);
+
+        let cl_edited = sanitize(frontmatter_re.replace(&cl, "").to_string());
+
+        if write_file {
+            std::fs::File::create(&self.path())?.write_all(cl_edited.as_bytes())?;
+        }
+
+        trace!("changelog without fm:\n{}", cl_edited);
+
+        Ok(cl_edited)
+    }
+
+    /// Writes the given Frontmatter back to the changelog file
+    fn set_front_matter(&'a self, fm: &Frontmatter) -> Fallible<()> {
+        let cl_str = if self.front_matter()?.is_some() {
+            self.erase_front_matter(false)?
+        } else {
+            std::fs::read_to_string(self.path())?
+        };
+
+        let cl_final = sanitize(if fm.is_empty() {
+            cl_str
+        } else {
+            let fm_str = serde_yaml::to_string(&fm)?;
+            trace!("new frontmatter:\n{}", fm_str);
+            indoc::formatdoc!("---\n{}---\n\n{}", fm_str, cl_str)
+        });
+
+        trace!("new changelog:\n{}", cl_final);
+
+        std::fs::File::create(&self.path())?.write_all(cl_final.as_bytes())?;
+
+        Ok(())
+    }
+
+    /// Calls `Frontmatter::reset_to_defaults`
+    pub(crate) fn reset_front_matter_to_defaults(&'a self) -> Fallible<()> {
+        if let Some(fm) = self.front_matter()? {
+            let mut fm_reset = fm.clone();
+            fm_reset.reset_to_defaults();
+
+            if fm != fm_reset {
+                return self.set_front_matter(&fm_reset);
+            }
+        }
 
         Ok(())
     }
@@ -1079,7 +1166,7 @@ mod tests {
     fn empty_frontmatter() {
         let workspace_mocker = example_workspace_1().unwrap();
         let changelog = ChangelogT::<WorkspaceChangelog>::at_path(
-            &workspace_mocker.root().join("crates/crate_a/CHANGELOG.md"),
+            &workspace_mocker.root().join("crates/crate_b/CHANGELOG.md"),
         );
         let fm: Result<Option<Frontmatter>, String> =
             changelog.front_matter().map_err(|e| e.to_string());
@@ -1091,7 +1178,7 @@ mod tests {
     fn no_frontmatter() {
         let workspace_mocker = example_workspace_1().unwrap();
         let changelog = ChangelogT::<WorkspaceChangelog>::at_path(
-            &workspace_mocker.root().join("crates/crate_b/CHANGELOG.md"),
+            &workspace_mocker.root().join("crates/crate_e/CHANGELOG.md"),
         );
         let fm: Result<Option<Frontmatter>, String> =
             changelog.front_matter().map_err(|e| e.to_string());
@@ -1112,6 +1199,7 @@ mod tests {
             Ok(Some(Frontmatter {
                 unreleasable: Some(true),
                 default_unreleasable: Some(true),
+                ..Default::default()
             })),
             fm
         );
@@ -1140,7 +1228,7 @@ mod tests {
         );
     }
 
-    /// mock a release for crate_e and crate_f and the workspace, we expect these
+    /// mock a release for crate_c and crate_e and the workspace, we expect the releasable
     /// crates to be removed from the Unreleased heading when aggregating the
     /// changelog.
     #[test]
@@ -1357,5 +1445,46 @@ mod tests {
             ],
             changes
         );
+    }
+
+    use test_case::test_case;
+
+    #[test_case(Frontmatter::default(), SemverIncrementMode::default())]
+    #[test_case(Frontmatter{ semver_increment_mode: None, ..Default::default()}, SemverIncrementMode::default())]
+    #[test_case(Frontmatter{ semver_increment_mode: Some(SemverIncrementMode::Minor), ..Default::default()}, SemverIncrementMode::Minor)]
+    #[test_case(Frontmatter{ default_semver_increment_mode: Some(SemverIncrementMode::Minor), ..Default::default()}, SemverIncrementMode::Minor)]
+    fn semver_increment_mode_getter(fm: Frontmatter, expected: SemverIncrementMode) {
+        assert_eq!(fm.semver_increment_mode(), expected)
+    }
+
+    #[test]
+    fn crate_changelog_reset_front_matter() {
+        let workspace_mocker = example_workspace_1().unwrap();
+
+        let read_changelog = move || -> ChangelogT<CrateChangelog> {
+            ChangelogT::<CrateChangelog>::at_path(
+                &workspace_mocker.root().join("crates/crate_a/CHANGELOG.md"),
+            )
+        };
+
+        let cl = read_changelog();
+        let fm_orig = cl.front_matter().unwrap().expect("expected fm initially");
+
+        assert!(
+            fm_orig.semver_increment_mode.is_some(),
+            "expect semver_increment_mode initially"
+        );
+
+        cl.reset_front_matter_to_defaults().unwrap();
+
+        let cl = read_changelog();
+        let fm_new_readback = cl.front_matter().unwrap().unwrap();
+
+        let fm_new_expected = Frontmatter {
+            semver_increment_mode: None,
+
+            ..fm_orig
+        };
+        assert_eq!(fm_new_expected, fm_new_readback);
     }
 }
