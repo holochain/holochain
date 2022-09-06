@@ -8,6 +8,7 @@ use holo_hash::DnaHash;
 use holochain_sqlite::db::DbKindDht;
 use holochain_types::test_utils::chain::*;
 use holochain_zome_types::ChainFilter;
+use isotest::Iso;
 use test_case::test_case;
 
 #[test_case(
@@ -40,10 +41,10 @@ use test_case::test_case;
 /// Extracts the smallest range from the chain filter
 /// and then returns all actions within that range
 async fn returns_full_sequence_from_filter(
-    chain: Vec<(AgentPubKey, Vec<ChainItem>)>,
+    chain: Vec<(AgentPubKey, Vec<TestChainItem>)>,
     agent: AgentPubKey,
     filter: ChainFilter,
-) -> Vec<(AgentPubKey, Vec<ChainItem>)> {
+) -> Vec<(AgentPubKey, Vec<TestChainItem>)> {
     let db = commit_chain(
         DbKindDht(Arc::new(DnaHash::from_raw_36(vec![0; 36]))),
         chain,
@@ -54,11 +55,16 @@ async fn returns_full_sequence_from_filter(
     let data = match data {
         MustGetAgentActivityResponse::Activity(activity) => activity
             .into_iter()
-            .map(|RegisterAgentActivity { action: a, .. }| ChainItem {
-                action_seq: a.hashed.action_seq(),
-                hash: a.as_hash().clone(),
-                prev_action: a.hashed.prev_action().cloned(),
-            })
+            .map(
+                |RegisterAgentActivity {
+                     action: a,
+                     cached_entry: _,
+                 }| TestChainItem {
+                    seq: a.hashed.action_seq(),
+                    hash: TestChainHash::test(a.as_hash()),
+                    prev: a.hashed.prev_action().map(TestChainHash::test),
+                },
+            )
             .collect(),
         d @ _ => unreachable!("{:?}", d),
     };
@@ -93,7 +99,7 @@ async fn returns_full_sequence_from_filter(
 #[tokio::test(flavor = "multi_thread")]
 /// Check the query returns the appropriate responses.
 async fn test_responses(
-    chain: Vec<(AgentPubKey, Vec<ChainItem>)>,
+    chain: Vec<(AgentPubKey, Vec<TestChainItem>)>,
     agent: AgentPubKey,
     filter: ChainFilter,
 ) -> MustGetAgentActivityResponse {

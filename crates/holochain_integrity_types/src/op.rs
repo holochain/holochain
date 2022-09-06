@@ -197,6 +197,12 @@ pub struct RegisterAgentActivity {
     pub cached_entry: Option<Entry>,
 }
 
+impl AsRef<SignedActionHashed> for RegisterAgentActivity {
+    fn as_ref(&self) -> &SignedActionHashed {
+        &self.action
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
 #[cfg_attr(feature = "test_utils", derive(arbitrary::Arbitrary))]
 /// Registers a link between two [`Entry`]s.
