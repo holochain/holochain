@@ -4,6 +4,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Initial minor version bump. This indicates our impression that we have made significant progress towards stabilizing the detereministic integrity layer's API. [\#1550](https://github.com/holochain/holochain/pull/1550)
+
 ## 0.0.20
 
 - Adds `must_get_agent_activity` which allows depending on an agents source chain by using a deterministic hash bounded range query. [\#1502](https://github.com/holochain/holochain/pull/1502)
