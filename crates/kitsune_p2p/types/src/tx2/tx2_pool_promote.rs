@@ -282,11 +282,13 @@ impl AsConHnd for ConItem {
         timeout: KitsuneTimeout,
     ) -> BoxFuture<'static, KitsuneResult<()>> {
         let this = self.clone();
+        dbg!(&msg_id);
         async move {
             let this = &this;
             let logic = move || async move {
                 let len = data.len();
 
+                dbg!(&msg_id);
                 let (local_cert, peer_cert, writer_fut) = this.item.share_mut(|i, _| {
                     Ok((
                         i.local_cert.clone(),
@@ -294,15 +296,19 @@ impl AsConHnd for ConItem {
                         i.writer_bucket.acquire(Some(timeout)),
                     ))
                 })?;
+                dbg!(&msg_id);
 
                 let mut writer = writer_fut.await?;
+                dbg!(&msg_id);
 
                 writer.writer.write(msg_id, data, timeout).await?;
+                dbg!(&msg_id);
 
                 let res = this.item.share_mut(move |i, _| {
                     i.writer_bucket.release(writer);
                     Ok(())
                 });
+                dbg!(&msg_id);
 
                 tracing::trace!(
                     ?local_cert,
@@ -318,6 +324,7 @@ impl AsConHnd for ConItem {
 
             if let Err(e) = logic().await {
                 let reason = format!("{:?}", e);
+                tracing::error!(?e, "Closing writer");
                 this.close(INTERNAL_ERR, &reason).await;
                 return Err(e);
             }

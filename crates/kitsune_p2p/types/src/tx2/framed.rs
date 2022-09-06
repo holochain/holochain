@@ -189,7 +189,6 @@ impl AsFramedReader for FramedReader {
                         }
                         read += sub_read;
                     }
-                    println!("laksdgj {} : {:?}", read, start.elapsed());
 
                     let want_size = read_size(&inner.local_buf[..MSG_SIZE_BYTES])
                         - MSG_SIZE_BYTES
@@ -197,6 +196,7 @@ impl AsFramedReader for FramedReader {
                     let msg_id = read_msg_id(
                         &inner.local_buf[MSG_SIZE_BYTES..MSG_SIZE_BYTES + MSG_ID_BYTES],
                     );
+                    println!("laksdgj MsgId: {:?} : {:?}", msg_id, start.elapsed());
 
                     let mut buf = PoolBuf::new();
                     buf.reserve(want_size);
