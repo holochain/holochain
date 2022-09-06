@@ -159,7 +159,7 @@ async fn app_info_includes_cloned_cells() {
     let mut conductor = SweetConductor::from_standard_config().await;
     let alice = SweetAgents::one(conductor.keystore()).await;
     let app_id = "app";
-    let app = conductor
+    conductor
         .setup_app_for_agent(app_id, alice.clone(), [&(role_id.clone(), dna)])
         .await
         .unwrap();
@@ -184,11 +184,4 @@ async fn app_info_includes_cloned_cells() {
         .unwrap();
     assert_eq!(app_info.cell_data.len(), 2);
     assert!(app_info.cell_data.contains(&installed_clone_cell));
-}
-
-    let zome_call_response: Result<ActionHash, _> = conductor
-        .call_fallible(&zome, "call_create_entry", ())
-        .await;
-    println!("zome call after deletion {:?}", zome_call_response);
-    assert!(zome_call_response.is_err());
 }
