@@ -6,6 +6,48 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20220831.015922
+
+## [holochain\_cli-0.0.54](crates/holochain_cli/CHANGELOG.md#0.0.54)
+
+## [holochain\_cli\_sandbox-0.0.50](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.50)
+
+## [holochain\_cli\_bundle-0.0.49](crates/holochain_cli_bundle/CHANGELOG.md#0.0.49)
+
+## [holochain-0.0.158](crates/holochain/CHANGELOG.md#0.0.158)
+
+## [holochain\_test\_wasm\_common-0.0.49](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.49)
+
+## [holochain\_conductor\_api-0.0.56](crates/holochain_conductor_api/CHANGELOG.md#0.0.56)
+
+## [holochain\_wasm\_test\_utils-0.0.55](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.55)
+
+## [holochain\_cascade-0.0.57](crates/holochain_cascade/CHANGELOG.md#0.0.57)
+
+## [holochain\_state-0.0.56](crates/holochain_state/CHANGELOG.md#0.0.56)
+
+## [holochain\_p2p-0.0.53](crates/holochain_p2p/CHANGELOG.md#0.0.53)
+
+## [holochain\_types-0.0.53](crates/holochain_types/CHANGELOG.md#0.0.53)
+
+## [holochain\_keystore-0.0.52](crates/holochain_keystore/CHANGELOG.md#0.0.52)
+
+## [holochain\_sqlite-0.0.51](crates/holochain_sqlite/CHANGELOG.md#0.0.51)
+
+## [hdk-0.0.148](crates/hdk/CHANGELOG.md#0.0.148)
+
+## [holochain\_zome\_types-0.0.45](crates/holochain_zome_types/CHANGELOG.md#0.0.45)
+
+## [hdi-0.0.20](crates/hdi/CHANGELOG.md#0.0.20)
+
+- Adds `must_get_agent_activity` which allows depending on an agents source chain by using a deterministic hash bounded range query. [\#1502](https://github.com/holochain/holochain/pull/1502)
+
+## [hdk\_derive-0.0.46](crates/hdk_derive/CHANGELOG.md#0.0.46)
+
+## [holochain\_integrity\_types-0.0.16](crates/holochain_integrity_types/CHANGELOG.md#0.0.16)
+
+- Adds `ChainFilter` type for use in `must_get_agent_activity`. This allows specifying a chain top hash to start from and then creates a range either to genesis or `unit` a given hash or after `take`ing a number of actions. The range iterates backwards from the given chain top till it reaches on of the above possible chain bottoms. For this reason it will never contain forks. [\#1502](https://github.com/holochain/holochain/pull/1502)
+
 # 20220824.014353
 
 ## [holochain\_cli-0.0.53](crates/holochain_cli/CHANGELOG.md#0.0.53)
