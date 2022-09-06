@@ -60,6 +60,10 @@ pub enum WireMessage {
         query: ChainQueryFilter,
         options: event::GetActivityOptions,
     },
+    MustGetAgentActivity {
+        agent: AgentPubKey,
+        filter: holochain_zome_types::chain::ChainFilter,
+    },
     GetValidationPackage {
         action_hash: ActionHash,
     },
@@ -140,6 +144,14 @@ impl WireMessage {
             options,
         }
     }
+
+    pub fn must_get_agent_activity(
+        agent: AgentPubKey,
+        filter: holochain_zome_types::chain::ChainFilter,
+    ) -> WireMessage {
+        Self::MustGetAgentActivity { agent, filter }
+    }
+
     pub fn get_validation_package(action_hash: ActionHash) -> WireMessage {
         Self::GetValidationPackage { action_hash }
     }

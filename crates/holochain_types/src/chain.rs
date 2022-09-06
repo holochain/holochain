@@ -7,6 +7,7 @@ use crate::activity::ChainItems;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holo_hash::HasHash;
+use holochain_serialized_bytes::prelude::*;
 use holochain_zome_types::prelude::ChainStatus;
 use holochain_zome_types::ActionHashed;
 use holochain_zome_types::ChainFilter;
@@ -42,6 +43,7 @@ pub trait ChainItem: Clone + PartialEq + Eq + std::fmt::Debug {
     type Hash: Clone
         + PartialEq
         + Eq
+        + Ord
         + std::hash::Hash
         + std::fmt::Debug
         + Send
@@ -146,7 +148,7 @@ pub enum Sequences {
     EmptyRange,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, SerializedBytes, Serialize, Deserialize)]
 /// Response to a `must_get_agent_activity` call.
 pub enum MustGetAgentActivityResponse {
     /// The activity was found.
