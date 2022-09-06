@@ -152,8 +152,8 @@ impl<D: RegionDataConstraints> RegionSetLtcs<D> {
     pub fn from_data(coords: RegionCoordSetLtcs, data: Vec<Vec<Vec<D>>>) -> Self {
         Self {
             coords,
-            _region_coords: OnceCell::new(),
             data,
+            _region_coords: OnceCell::new(),
         }
     }
 

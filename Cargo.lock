@@ -1984,7 +1984,6 @@ dependencies = [
  "assert_cmd 1.0.8",
  "async-recursion",
  "async-trait",
- "backtrace",
  "base64",
  "byteorder",
  "cfg-if 0.1.10",

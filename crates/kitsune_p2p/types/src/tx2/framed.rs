@@ -174,10 +174,8 @@ impl AsFramedReader for FramedReader {
 
             let out = match timeout
                 .mix("FramedReader::read", async {
-                    let start = std::time::Instant::now();
                     let mut read = 0;
                     let want = MSG_SIZE_BYTES + MSG_ID_BYTES;
-                    dbg!(want);
                     while read < want {
                         let sub_read = inner
                             .sub
@@ -196,11 +194,9 @@ impl AsFramedReader for FramedReader {
                     let msg_id = read_msg_id(
                         &inner.local_buf[MSG_SIZE_BYTES..MSG_SIZE_BYTES + MSG_ID_BYTES],
                     );
-                    println!("laksdgj MsgId: {:?} : {:?}", msg_id, start.elapsed());
 
                     let mut buf = PoolBuf::new();
                     buf.reserve(want_size);
-                    dbg!(want_size);
                     while buf.len() < want_size {
                         let to_read = std::cmp::min(inner.local_buf.len(), want_size - buf.len());
                         read = match inner
@@ -217,7 +213,6 @@ impl AsFramedReader for FramedReader {
                         }
                         buf.extend_from_slice(&inner.local_buf[..read]);
                     }
-                    println!("adih {} : {:?}", buf.len(), start.elapsed());
 
                     Ok((msg_id, buf))
                 })

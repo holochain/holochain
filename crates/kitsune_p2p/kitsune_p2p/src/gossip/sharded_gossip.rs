@@ -36,7 +36,13 @@ use super::{HowToConnect, MetaOpKey};
 
 pub use bandwidth::BandwidthThrottles;
 
-const GOSSIP_LOOP_INTERVAL_MS: Duration = Duration::from_millis(100);
+/// How quickly to run a gossip iteration which attempts to initiate
+/// with a new target.
+///
+/// Ideally we want this to be as low as 10ms, but currently we have a
+/// database query for fetching the list of agents that runs on every
+/// loop, so we shouldn't run it too many times per second.
+const GOSSIP_LOOP_INTERVAL_MS: Duration = Duration::from_millis(250);
 
 #[cfg(any(test, feature = "test_utils"))]
 #[allow(missing_docs)]
@@ -268,10 +274,9 @@ impl ShardedGossip {
         let (incoming, outgoing) = self.pop_queues()?;
 
         if outgoing.is_some() {
-            tracing::info!(
-                "aiug {:?} {:#?}",
+            tracing::debug!(
+                "OUTGOING GOSSIP {:?} {:#?}",
                 self.ep_hnd.uniq(),
-                // incoming.as_ref().map(|i| (&i.1, &i.2)),
                 outgoing.as_ref().map(|o| (&o.1, &o.2)),
             );
         }
@@ -883,7 +888,6 @@ impl ShardedGossipLocal {
             }
             ShardedGossipWire::AlreadyInProgress(_) => {
                 self.remove_target(&cert, false)?;
-                self.log_state();
                 Vec::with_capacity(0)
             }
             ShardedGossipWire::Busy(_) => {
