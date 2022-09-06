@@ -44,7 +44,7 @@ pub enum AppRequest {
     ///
     /// # Returns
     ///
-    /// [`AdminResponse::CloneCellCreated`]
+    /// [`AppResponse::CloneCellCreated`]
     CreateCloneCell(Box<CreateCloneCellPayload>),
 
     #[deprecated = "use ZomeCall"]
@@ -81,7 +81,7 @@ pub enum AppResponse {
     /// [msgpack]: https://msgpack.org/
     ZomeCall(Box<ExternIO>),
 
-    /// The successful response to an [`AdminRequest::CreateCloneCell`].
+    /// The successful response to an [`AppRequest::CreateCloneCell`].
     ///
     /// The response contains an [`InstalledCell`] with the created clone
     /// cell's [`CloneId`] and [`CellId`].

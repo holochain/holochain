@@ -920,14 +920,14 @@ impl ConductorHandleT for ConductorHandleImpl {
         let state = self.conductor.get_state().await?;
         let app = state.get_app(&app_id)?;
         app.provisioned_cells()
-            .find(|(app_role_id, _)| *app_role_id.clone() == role_id)
+            .find(|(app_role_id, _)| **app_role_id == role_id)
             .ok_or_else(|| {
                 ConductorError::CloneCellError(
                     "no base cell found for provided role id".to_string(),
                 )
             })?;
         let role = app.role(&role_id)?;
-        if role.is_clone_limit_reached() == true {
+        if role.is_clone_limit_reached() {
             return Err(ConductorError::AppError(AppError::CloneLimitExceeded(
                 role.clone_limit(),
                 role.clone(),
