@@ -23,12 +23,12 @@ test_utils = [
 ]
 
 [dependencies]
-hdk_derive = { version = "0.0.47-dev.0", path = "../hdk_derive" }
+hdk_derive = { version = "0.0.47", path = "../hdk_derive" }
 holo_hash = { version = "0.0.31", path = "../holo_hash" }
 holochain_wasmer_guest = "=0.0.80"
 # it's important that we depend on holochain_integrity_types with no default
 # features, both here AND in hdk_derive, to reduce code bloat
-holochain_integrity_types = { version = "0.0.17-dev.0", path = "../holochain_integrity_types", default-features = false }
+holochain_integrity_types = { version = "0.0.17", path = "../holochain_integrity_types", default-features = false }
 paste = "=1.0.5"
 serde = "1.0"
 serde_bytes = "0.11"
