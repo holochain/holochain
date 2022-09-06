@@ -321,7 +321,7 @@ jobs:
 
       - name: Restore cargo related state and build files
         uses: steveeJ-forks/actions-cache/restore@main
-        if: ${{ matrix.testCommand.restoresCargoCache == true }}
+        if: ${{ matrix.testCommand.restoresCargoCache == true && needs.vars.outputs.skip_test != 'true' }}
         with:
           path: |
             /tmp/holochain_repo/.cargo/bin/
