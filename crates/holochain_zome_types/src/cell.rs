@@ -55,8 +55,8 @@ impl CloneId {
     }
 
     /// Get an app role id representation of the clone id.
-    pub fn as_app_role_id(&self) -> AppRoleId {
-        self.0.clone()
+    pub fn as_app_role_id(&self) -> &AppRoleId {
+        &self.0
     }
 }
 
