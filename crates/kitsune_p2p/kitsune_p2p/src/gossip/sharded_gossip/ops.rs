@@ -29,6 +29,14 @@ pub fn get_region_queue_batch(queue: &mut VecDeque<Region>, batch_size: u32) -> 
         size += region.data.size;
         if first || size <= batch_size {
             to_fetch.push(queue.pop_front().unwrap());
+            if size > batch_size {
+                // TODO: we should split this Region up into smaller chunks
+                tracing::warn!(
+                    "Including a region of size {}, which is larger than the batch size of {}",
+                    size,
+                    batch_size
+                );
+            }
         }
         first = false;
         if size > batch_size {
@@ -38,13 +46,13 @@ pub fn get_region_queue_batch(queue: &mut VecDeque<Region>, batch_size: u32) -> 
     to_fetch
 }
 
-/// Queued missing ops hashes can either
+/// Queued MissingOps hashes can either
 /// be saved as the remaining hashes or if this
 /// is too large the bloom filter is saved so the
 /// remaining hashes can be generated in the future.
 enum QueuedOps {
     /// Hashes that need to be fetched and returned
-    /// as missing ops to a remote node.
+    /// as MissingOps to a remote node.
     Hashes(Vec<Arc<KitsuneOpHash>>),
     /// A remote nodes bloom filter that has been adjusted
     /// to the remaining time window to fetch the remaining hashes.

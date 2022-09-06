@@ -511,7 +511,7 @@ pub fn handle_get_txn(
 
 pub fn commit_chain<Kind: DbKindT>(
     db_kind: Kind,
-    chain: Vec<(AgentPubKey, Vec<ChainItem>)>,
+    chain: Vec<(AgentPubKey, Vec<TestChainItem>)>,
 ) -> DbWrite<Kind> {
     let data: Vec<_> = chain
         .into_iter()
@@ -562,7 +562,7 @@ pub fn commit_chain<Kind: DbKindT>(
     db
 }
 
-pub fn commit_scratch(scratch: SyncScratch, chain: Vec<(AgentPubKey, Vec<ChainItem>)>) {
+pub fn commit_scratch(scratch: SyncScratch, chain: Vec<(AgentPubKey, Vec<TestChainItem>)>) {
     let data = chain.into_iter().map(|(a, c)| {
         chain_to_ops(c)
             .into_iter()

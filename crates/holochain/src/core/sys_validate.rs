@@ -15,7 +15,7 @@ use holochain_zome_types::countersigning::CounterSigningSessionData;
 use std::convert::TryInto;
 use std::sync::Arc;
 
-pub(super) use error::*;
+pub use error::*;
 pub use holo_hash::*;
 pub use holochain_state::source_chain::SourceChainError;
 pub use holochain_state::source_chain::SourceChainResult;
@@ -156,25 +156,28 @@ pub async fn check_countersigning_session_data(
     }
 }
 
-/// Check that previous action makes sense
-/// for this action.
-/// If not Dna then cannot be root of chain
-/// and must have previous action
+/// Check that the correct actions have the correct setting for prev_action:
+/// - Dna can never have a prev_action, and must have seq == 0.
+/// - All other actions must have prev_action, and seq > 0.
 pub fn check_prev_action(action: &Action) -> SysValidationResult<()> {
-    match &action {
-        Action::Dna(_) => Ok(()),
-        _ => {
-            if action.action_seq() > 0 {
-                action
-                    .prev_action()
-                    .ok_or(PrevActionError::MissingPrev)
-                    .map_err(ValidationOutcome::from)?;
-                Ok(())
-            } else {
-                Err(PrevActionError::InvalidRoot).map_err(|e| ValidationOutcome::from(e).into())
-            }
+    let is_dna = matches!(action, Action::Dna(_));
+    let has_prev = action.prev_action().is_some();
+    let is_first = action.action_seq() == 0;
+    #[allow(clippy::collapsible_else_if)]
+    if is_first {
+        if is_dna && !has_prev {
+            Ok(())
+        } else {
+            Err(PrevActionError::InvalidRoot)
+        }
+    } else {
+        if !is_dna && has_prev {
+            Ok(())
+        } else {
+            Err(PrevActionError::MissingPrev)
         }
     }
+    .map_err(|e| ValidationOutcome::from(e).into())
 }
 
 /// Check that Dna actions are only added to empty source chains
@@ -366,70 +369,58 @@ pub fn check_update_reference(
 }
 
 /// Validate a chain of actions with an optional starting point.
-pub fn validate_chain<'iter>(
-    mut actions: impl Iterator<Item = &'iter ActionHashed>,
-    persisted_chain_head: &Option<(ActionHash, u32)>,
+pub fn validate_chain<'iter, A: 'iter + ChainItem>(
+    mut actions: impl Iterator<Item = &'iter A>,
+    persisted_chain_head: &Option<(A::Hash, u32)>,
 ) -> SysValidationResult<()> {
     // Check the chain starts in a valid way.
     let mut last_item = match actions.next() {
-        Some(ActionHashed {
-            hash,
-            content: action,
-        }) => {
+        Some(item) => {
             match persisted_chain_head {
                 Some((prev_hash, prev_seq)) => {
-                    check_prev_action_chain(prev_hash, *prev_seq, action)
+                    check_prev_action_chain(prev_hash, *prev_seq, item)
                         .map_err(ValidationOutcome::from)?;
                 }
                 None => {
                     // If there's no persisted chain head, then the first action
-                    // must be a DNA.
-                    if !matches!(action, Action::Dna(_)) {
+                    // must have no parent.
+                    if item.prev_hash().is_some() {
                         return Err(ValidationOutcome::from(PrevActionError::InvalidRoot).into());
                     }
                 }
             }
-            let seq = action.action_seq();
-            (hash, seq)
+            (item.get_hash(), item.seq())
         }
         None => return Ok(()),
     };
 
-    for ActionHashed {
-        hash,
-        content: action,
-    } in actions
-    {
+    for item in actions {
         // Check each item of the chain is valid.
-        check_prev_action_chain(last_item.0, last_item.1, action)
-            .map_err(ValidationOutcome::from)?;
-        last_item = (hash, action.action_seq());
+        check_prev_action_chain(last_item.0, last_item.1, item).map_err(ValidationOutcome::from)?;
+        last_item = (item.get_hash(), item.seq());
     }
     Ok(())
 }
 
 // Check the action is valid for the previous action.
-fn check_prev_action_chain(
-    prev_action_hash: &ActionHash,
+fn check_prev_action_chain<A: ChainItem>(
+    prev_action_hash: &A::Hash,
     prev_action_seq: u32,
-    action: &Action,
+    action: &A,
 ) -> Result<(), PrevActionError> {
-    // DNA cannot appear later in the chain.
-    if matches!(action, Action::Dna(_)) {
-        Err(PrevActionError::InvalidRoot)
-    } else if action.prev_action().map_or(true, |p| p != prev_action_hash) {
+    // The root cannot appear later in the chain
+    if action.prev_hash().is_none() {
+        Err(PrevActionError::MissingPrev)
+    } else if action.prev_hash().map_or(true, |p| p != prev_action_hash) {
         // Check the prev hash matches.
-        Err(PrevActionError::HashMismatch)
+        Err(PrevActionError::HashMismatch(action.seq()))
     } else if action
-        .action_seq()
+        .seq()
         .checked_sub(1)
         .map_or(true, |s| prev_action_seq != s)
     {
         // Check the prev seq is one less.
-        Err(PrevActionError::InvalidSeq(
-            action.action_seq(),
-            prev_action_seq,
-        ))
+        Err(PrevActionError::InvalidSeq(action.seq(), prev_action_seq))
     } else {
         Ok(())
     }

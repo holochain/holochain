@@ -69,10 +69,10 @@ async fn get_activity() {
 
 #[derive(Default)]
 struct Data {
-    scratch: Option<Vec<(AgentPubKey, Vec<ChainItem>)>>,
-    authored: Vec<(AgentPubKey, Vec<ChainItem>)>,
-    cache: Vec<(AgentPubKey, Vec<ChainItem>)>,
-    authority: Vec<(AgentPubKey, Vec<ChainItem>)>,
+    scratch: Option<Vec<(AgentPubKey, Vec<TestChainItem>)>>,
+    authored: Vec<(AgentPubKey, Vec<TestChainItem>)>,
+    cache: Vec<(AgentPubKey, Vec<TestChainItem>)>,
+    authority: Vec<(AgentPubKey, Vec<TestChainItem>)>,
 }
 
 #[test_case(

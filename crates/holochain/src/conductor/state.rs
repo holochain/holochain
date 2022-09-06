@@ -7,8 +7,21 @@ use holochain_types::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use super::error::{ConductorError, ConductorResult};
+
+/// Unique conductor tag / identifier.
+#[derive(Clone, Deserialize, Serialize, Debug, SerializedBytes)]
+#[cfg_attr(test, derive(PartialEq))]
+#[serde(transparent)]
+pub struct ConductorStateTag(pub Arc<str>);
+
+impl Default for ConductorStateTag {
+    fn default() -> Self {
+        Self(nanoid::nanoid!().into())
+    }
+}
 
 /// Mutable conductor state, stored in a DB and writable only via Admin interface.
 ///
@@ -18,7 +31,10 @@ use super::error::{ConductorError, ConductorResult};
 #[derive(Clone, Deserialize, Serialize, Default, Debug, SerializedBytes)]
 #[cfg_attr(test, derive(PartialEq))]
 pub struct ConductorState {
-    /// Apps that have been installed, regardless of status
+    /// Unique conductor tag / identifier.
+    #[serde(default)]
+    tag: ConductorStateTag,
+    /// Apps that have been installed, regardless of status.
     #[serde(default)]
     installed_apps: InstalledAppMap,
     /// List of interfaces any UI can use to access zome functions.
@@ -59,6 +75,16 @@ impl AppInterfaceId {
 }
 
 impl ConductorState {
+    /// A unique identifier for this conductor
+    pub fn tag(&self) -> &ConductorStateTag {
+        &self.tag
+    }
+
+    #[cfg(test)]
+    pub fn set_tag(&mut self, tag: ConductorStateTag) {
+        self.tag = tag;
+    }
+
     /// Immutable access to the inner collection of all apps
     pub fn installed_apps(&self) -> &InstalledAppMap {
         &self.installed_apps

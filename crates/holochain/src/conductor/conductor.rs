@@ -64,13 +64,12 @@ use holochain_keystore::test_keystore::spawn_test_keystore;
 use holochain_keystore::MetaLairClient;
 use holochain_sqlite::prelude::*;
 use holochain_sqlite::sql::sql_cell::state_dump;
-use holochain_state::mutations;
 use holochain_state::prelude::from_blob;
 use holochain_state::prelude::StateMutationResult;
 use holochain_state::prelude::StateQueryResult;
 use holochain_types::prelude::*;
 pub use holochain_types::share;
-use rusqlite::{OptionalExtension, Transaction};
+use rusqlite::Transaction;
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
@@ -1371,21 +1370,7 @@ impl Conductor {
     }
 
     pub(super) async fn get_state(&self) -> ConductorResult<ConductorState> {
-        self.spaces
-            .conductor_db
-            .async_reader(|txn| {
-                let state = txn
-                    .query_row("SELECT blob FROM ConductorState WHERE id = 1", [], |row| {
-                        row.get("blob")
-                    })
-                    .optional()?;
-                let state = match state {
-                    Some(state) => from_blob(state)?,
-                    None => ConductorState::default(),
-                };
-                Ok(state)
-            })
-            .await
+        self.spaces.get_state().await
     }
 
     /// Update the internal state with a pure function mapping old state to new
@@ -1393,8 +1378,7 @@ impl Conductor {
     where
         F: FnOnce(ConductorState) -> ConductorResult<ConductorState> + 'static,
     {
-        let (state, _) = self.update_state_prime(|s| Ok((f(s)?, ()))).await?;
-        Ok(state)
+        self.spaces.update_state(f).await
     }
 
     /// Update the internal state with a pure function mapping old state to new,
@@ -1406,25 +1390,7 @@ impl Conductor {
         O: Send + 'static,
     {
         self.check_running()?;
-        let output = self
-            .spaces
-            .conductor_db
-            .async_commit(move |txn| {
-                let state = txn
-                    .query_row("SELECT blob FROM ConductorState WHERE id = 1", [], |row| {
-                        row.get("blob")
-                    })
-                    .optional()?;
-                let state = match state {
-                    Some(state) => from_blob(state)?,
-                    None => ConductorState::default(),
-                };
-                let (new_state, output) = f(state)?;
-                mutations::insert_conductor_state(txn, (&new_state).try_into()?)?;
-                Result::<_, ConductorError>::Ok((new_state, output))
-            })
-            .await?;
-        Ok(output)
+        self.spaces.update_state_prime(f).await
     }
 
     fn add_admin_port(&self, port: u16) {
@@ -1537,9 +1503,12 @@ mod builder {
 
             let ribosome_store = RwShare::new(ribosome_store);
 
+            let spaces = Spaces::new(&config)?;
+            let tag = spaces.get_state().await?.tag().clone();
+
             let network_config = config.network.clone().unwrap_or_default();
             let (cert_digest, cert, cert_priv_key) =
-                keystore.get_or_create_first_tls_cert().await?;
+                keystore.get_or_create_tls_cert_by_tag(tag.0).await?;
             let tls_config =
                 holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_types::tls::TlsConfig {
                     cert,
@@ -1549,7 +1518,6 @@ mod builder {
             let strat =
                 ArqStrat::from_params(network_config.tuning_params.gossip_redundancy_target);
 
-            let spaces = Spaces::new(&config)?;
             let host = KitsuneHostImpl::new(
                 spaces.clone(),
                 ribosome_store.clone(),
