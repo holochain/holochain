@@ -14,7 +14,6 @@ use holochain_state::scratch::Scratch;
 use holochain_types::activity::*;
 use holochain_types::chain::MustGetAgentActivityResponse;
 use holochain_types::test_utils::chain::*;
-use holochain_types::test_utils::TestChainItem;
 use holochain_zome_types::ChainFilter;
 use holochain_zome_types::ChainStatus;
 use test_case::test_case;

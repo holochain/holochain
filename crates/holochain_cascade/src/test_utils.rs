@@ -45,7 +45,6 @@ use holochain_types::prelude::ValidationPackageResponse;
 use holochain_types::prelude::WireEntryOps;
 use holochain_types::record::WireRecordOps;
 use holochain_types::test_utils::chain::*;
-use holochain_types::test_utils::TestChainItem;
 use holochain_zome_types::ActionHashed;
 use holochain_zome_types::ActionRefMut;
 use holochain_zome_types::QueryFilter;

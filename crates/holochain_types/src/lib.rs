@@ -40,6 +40,7 @@ pub mod validate;
 pub mod web_app;
 pub mod zome_types;
 
+#[cfg(feature = "test_utils")]
 pub mod test_utils;
 
 pub use holochain_zome_types::entry::EntryHashed;

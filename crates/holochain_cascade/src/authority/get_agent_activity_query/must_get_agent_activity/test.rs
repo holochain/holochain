@@ -7,8 +7,8 @@ use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
 use holochain_sqlite::db::DbKindDht;
 use holochain_types::test_utils::chain::*;
-use holochain_types::test_utils::TestChainItem;
 use holochain_zome_types::ChainFilter;
+use isotest::Iso;
 use test_case::test_case;
 
 #[test_case(
@@ -61,11 +61,8 @@ async fn returns_full_sequence_from_filter(
                      cached_entry: _,
                  }| TestChainItem {
                     seq: a.hashed.action_seq(),
-                    hash: todo!("fix in isotest merge"),
-                    prev: a
-                        .hashed
-                        .prev_action()
-                        .map(|_| todo!("fix in isotest merge")),
+                    hash: TestChainHash::test(a.as_hash()),
+                    prev: a.hashed.prev_action().map(TestChainHash::test),
                 },
             )
             .collect(),
