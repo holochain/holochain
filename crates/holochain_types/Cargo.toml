@@ -57,7 +57,7 @@ tracing = "0.1.26"
 derive_builder = "0.9.0"
 
 arbitrary = { version = "1.0", features = ["derive"], optional = true}
-isotest = { version = "0.1.0-dev.4", optional = true }
+isotest = { version = "0", optional = true }
 
 # contrafact
 contrafact = { version = "0.1.0-dev.1", optional = true }
@@ -66,7 +66,7 @@ contrafact = { version = "0.1.0-dev.1", optional = true }
 holochain_types = { path = ".", features = ["test_utils"]}
 
 arbitrary = "1.0"
-isotest = { version = "0.1.0-dev.4" }
+isotest = { version = "0" }
 maplit = "1"
 matches = "0.1"
 pretty_assertions = "0"

@@ -37,7 +37,7 @@ async-trait = { version = "0.1", optional = true }
 mockall = { version = "0.10.2", optional = true }
 
 [dev-dependencies]
-isotest = "0.1.0-dev.4"
+isotest = "0"
 matches = "0.1"
 pretty_assertions = "0.7.2"
 test-case = "2.1"
