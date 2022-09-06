@@ -267,12 +267,12 @@ impl ShardedGossip {
     async fn process_incoming_outgoing(&self) -> KitsuneResult<()> {
         let (incoming, outgoing) = self.pop_queues()?;
 
-        if incoming.is_some() || outgoing.is_some() {
-            println!(
-                "aiug {:?}: {:#?} / {:#?}",
+        if outgoing.is_some() {
+            tracing::info!(
+                "aiug {:?} {:#?}",
                 self.ep_hnd.uniq(),
-                incoming.as_ref().map(|i| &i.2),
-                outgoing.as_ref().map(|o| &o.2),
+                // incoming.as_ref().map(|i| (&i.1, &i.2)),
+                outgoing.as_ref().map(|o| (&o.1, &o.2)),
             );
         }
 

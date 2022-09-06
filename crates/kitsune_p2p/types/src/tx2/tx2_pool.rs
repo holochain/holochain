@@ -78,7 +78,6 @@ pub trait AsEpHnd: 'static + Send + Sync + Unpin {
         data: PoolBuf,
         timeout: KitsuneTimeout,
     ) -> BoxFuture<'static, KitsuneResult<()>> {
-        dbg!(&msg_id);
         let con_fut = self.get_connection(remote, timeout);
         futures::future::FutureExt::boxed(async move {
             con_fut.await?.write(msg_id, data, timeout).await
