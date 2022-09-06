@@ -4,6 +4,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+- Replace individual phenotype fields with new struct `DnaPhenotype`. [\#1547](https://github.com/holochain/holochain/pull/1547)
+- Add function to add a clone cell to an app. [\#1547](https://github.com/holochain/holochain/pull/1547)
+
 ## 0.0.53
 
 ## 0.0.52
