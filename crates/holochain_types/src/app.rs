@@ -83,14 +83,12 @@ pub struct CreateCloneCellPayload {
     /// The DNA's role id to clone
     /// The Role id under which to create this clone
     pub role_id: AppRoleId,
-    /// Properties to override for the new cell
-    pub properties: Option<YamlProperties>,
-    /// Optionally set the network seed for the new cell
-    pub network_seed: Option<NetworkSeed>,
+    /// Phenotype options to set for the new cell.
+    /// At least one of the options must be set to obtain a distinct hash for
+    /// the clone cell's DNA.
+    pub phenotype: DnaPhenotypeOption,
     /// Optionally set a proof of membership for the new cell
     pub membrane_proof: Option<MembraneProof>,
-    /// Optionally set a new origin time of the new cell
-    pub origin_time: Option<Timestamp>,
     /// Optionally a name for the DNA clone
     pub name: Option<String>,
 }

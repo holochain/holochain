@@ -903,15 +903,13 @@ impl ConductorHandleT for ConductorHandleImpl {
         let CreateCloneCellPayload {
             app_id,
             role_id,
-            properties,
-            network_seed,
+            phenotype,
             membrane_proof,
-            origin_time,
             name,
         } = payload;
-        if network_seed == None && properties == None {
+        if !phenotype.has_some_option_set() {
             return Err(ConductorError::CloneCellError(
-                "neither network_seed nor properties provided for clone cell".to_string(),
+                "neither network_seed nor properties nor origin_time provided for clone cell".to_string(),
             ));
         }
         let state = self.conductor.get_state().await?;
@@ -932,14 +930,15 @@ impl ConductorHandleT for ConductorHandleImpl {
         }
 
         // create cell
-        let network_seed = network_seed.unwrap_or_else(random_network_seed);
-        let properties = (properties.unwrap_or_else(|| ().into())).try_into()?;
-        let origin_time = origin_time.unwrap_or_else(Timestamp::now);
+        let network_seed = phenotype.network_seed.unwrap_or_else(random_network_seed);
+        let properties = phenotype.properties.unwrap_or_else(SerializedBytes::default);
+        let origin_time = phenotype.origin_time.unwrap_or_else(Timestamp::now);
         let dna_phenotype = DnaPhenotype {
             network_seed,
             origin_time,
             properties,
         };
+        // add cell to app
         let installed_clone_cell = self
             .conductor
             .add_clone_cell_to_app(app_id.clone(), role_id.clone(), dna_phenotype, name)
