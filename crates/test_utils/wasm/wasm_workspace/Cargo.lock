@@ -684,7 +684,7 @@ dependencies = [
 
 [[package]]
 name = "hdi"
-version = "0.0.20"
+version = "0.0.21"
 dependencies = [
  "hdk_derive",
  "holo_hash",
@@ -699,7 +699,7 @@ dependencies = [
 
 [[package]]
 name = "hdk"
-version = "0.0.148"
+version = "0.0.149"
 dependencies = [
  "getrandom",
  "hdi",
@@ -718,7 +718,7 @@ dependencies = [
 
 [[package]]
 name = "hdk_derive"
-version = "0.0.46"
+version = "0.0.47"
 dependencies = [
  "darling 0.14.1",
  "heck 0.4.0",
@@ -775,7 +775,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_integrity_types"
-version = "0.0.16"
+version = "0.0.17"
 dependencies = [
  "arbitrary",
  "holo_hash",
@@ -823,7 +823,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_test_wasm_common"
-version = "0.0.49"
+version = "0.0.50"
 dependencies = [
  "hdk",
  "serde",
@@ -858,7 +858,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_zome_types"
-version = "0.0.45"
+version = "0.0.46"
 dependencies = [
  "fixt",
  "holo_hash",
@@ -966,7 +966,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_timestamp"
-version = "0.0.12"
+version = "0.0.13"
 dependencies = [
  "arbitrary",
  "chrono",
