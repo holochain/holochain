@@ -757,14 +757,21 @@ async fn test_app_status_states() {
     observability::test_run().ok();
     let zome = simple_create_entry_zome();
     let mut conductor = SweetConductor::from_standard_config().await;
-    common_genesis_test_app(&mut conductor, zome).await.unwrap();
+    let app = common_genesis_test_app(&mut conductor, zome).await.unwrap();
+    let zome = app.cells()[1].zome("create_entry");
 
     let all_apps = conductor.list_apps(None).await.unwrap();
     assert_eq!(all_apps.len(), 1);
 
     let get_status = || async { conductor.list_apps(None).await.unwrap()[0].status.clone() };
+    let make_call = || async {
+        let result: Result<ActionHash, _> = conductor.call_fallible(&zome, "create", ()).await;
+        result
+    };
 
-    // RUNNING -pause-> PAUSED
+    assert!(make_call().await.is_ok());
+
+    // RUNNING --pause--> PAUSED
 
     conductor
         .pause_app("app".to_string(), PausedAppReason::Error("because".into()))
@@ -772,25 +779,32 @@ async fn test_app_status_states() {
         .unwrap();
     assert_matches!(get_status().await, InstalledAppInfoStatus::Paused { .. });
 
-    // PAUSED  --start->  RUNNING
+    // TODO: Paused apps should not be callable! But currently they are, because the Cell is not
+    //       removed when paused, and there is no check for cell status when calling a zome in a cell.
+    //       This line should be added in when paused cells are no longer callable.
+    // assert!(make_call().await.is_err());
+
+    // PAUSED  --start-->  RUNNING
 
     conductor.start_app("app".to_string()).await.unwrap();
     assert_matches!(get_status().await, InstalledAppInfoStatus::Running);
+    assert!(make_call().await.is_ok());
 
-    // RUNNING  --disable->  DISABLED
+    // RUNNING  --disable-->  DISABLED
 
     conductor
         .disable_app("app".to_string(), DisabledAppReason::User)
         .await
         .unwrap();
     assert_matches!(get_status().await, InstalledAppInfoStatus::Disabled { .. });
+    assert!(make_call().await.is_err());
 
-    // DISABLED  --start->  DISABLED
+    // DISABLED  --start-->  DISABLED
 
     conductor.start_app("app".to_string()).await.unwrap();
     assert_matches!(get_status().await, InstalledAppInfoStatus::Disabled { .. });
 
-    // DISABLED  --pause->  DISABLED
+    // DISABLED  --pause-->  DISABLED
 
     conductor
         .pause_app("app".to_string(), PausedAppReason::Error("because".into()))
@@ -798,12 +812,12 @@ async fn test_app_status_states() {
         .unwrap();
     assert_matches!(get_status().await, InstalledAppInfoStatus::Disabled { .. });
 
-    // DISABLED  --enable->  ENABLED
+    // DISABLED  --enable-->  ENABLED
 
     conductor.enable_app("app".to_string()).await.unwrap();
     assert_matches!(get_status().await, InstalledAppInfoStatus::Running);
 
-    // RUNNING  --pause->  PAUSED
+    // RUNNING  --pause-->  PAUSED
 
     conductor
         .pause_app("app".to_string(), PausedAppReason::Error("because".into()))
@@ -811,10 +825,11 @@ async fn test_app_status_states() {
         .unwrap();
     assert_matches!(get_status().await, InstalledAppInfoStatus::Paused { .. });
 
-    // PAUSED  --enable->  RUNNING
+    // PAUSED  --enable-->  RUNNING
 
     conductor.enable_app("app".to_string()).await.unwrap();
     assert_matches!(get_status().await, InstalledAppInfoStatus::Running);
+    assert!(make_call().await.is_ok());
 }
 
 #[tokio::test(flavor = "multi_thread")]
