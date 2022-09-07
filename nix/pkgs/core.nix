@@ -255,6 +255,15 @@ rec {
   hcRegenReadmes = writeShellScriptBin "hc-regen-readmes" ''
     cargo-readme readme --project-root=crates/release-automation/ --output=README.md;
   '';
+
+  hcRegenNixExpressions = writeShellScriptBin "hc-regen-nix-expressions" ''
+    set -xe
+    pushd ${hcToplevelDir}
+    crate2nix generate \
+        -f crates/release-automation/Cargo.toml \
+        -o crates/release-automation/Cargo.nix
+    git commit crates/release-automation/Cargo.nix -m "chore: hc-regen-nix-expressions"
+  '';
 } // (if stdenv.isLinux then {
   hcCoverageTest = writeShellScriptBin "hc-coverage-test" ''
     set -euxo pipefail

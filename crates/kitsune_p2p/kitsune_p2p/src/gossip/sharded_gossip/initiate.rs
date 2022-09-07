@@ -38,42 +38,40 @@ impl ShardedGossipLocal {
             .find_remote_agent_within_arcset(Arc::new(intervals.clone().into()), &local_agents)
             .await?;
 
-        let id = rand::thread_rng().gen();
+        let maybe_gossip = if let Some(next_target::Node {
+            agent_info_list,
+            cert,
+            url,
+        }) = remote_agent
+        {
+            let id = rand::thread_rng().gen();
 
-        let agent_list = self
-            .evt_sender
-            .query_agents(
-                QueryAgentsEvt::new(self.space.clone()).by_agents(local_agents.iter().cloned()),
-            )
-            .await
-            .map_err(KitsuneError::other)?;
+            let agent_list = self
+                .evt_sender
+                .query_agents(
+                    QueryAgentsEvt::new(self.space.clone()).by_agents(local_agents.iter().cloned()),
+                )
+                .await
+                .map_err(KitsuneError::other)?;
 
-        let maybe_gossip = self.inner.share_mut(|inner, _| {
-            Ok(
-                if let Some(next_target::Node {
-                    agent_info_list,
-                    cert,
-                    url,
-                }) = remote_agent
-                {
-                    let gossip = ShardedGossipWire::initiate(intervals, id, agent_list);
+            let gossip = ShardedGossipWire::initiate(intervals, id, agent_list);
 
-                    let tgt = ShardedGossipTarget {
-                        remote_agent_list: agent_info_list,
-                        cert: cert.clone(),
-                        tie_break: id,
-                        when_initiated: Some(Instant::now()),
-                        url: url.clone(),
-                    };
+            let tgt = ShardedGossipTarget {
+                remote_agent_list: agent_info_list,
+                cert: cert.clone(),
+                tie_break: id,
+                when_initiated: Some(Instant::now()),
+                url: url.clone(),
+            };
 
-                    inner.initiate_tgt = Some(tgt);
-
-                    Some((cert, HowToConnect::Url(url), gossip))
-                } else {
-                    None
-                },
-            )
-        })?;
+            self.inner.share_mut(|inner, _| {
+                inner.initiate_tgt = Some(tgt);
+                Ok(())
+            })?;
+            Some((cert, HowToConnect::Url(url), gossip))
+        } else {
+            None
+        };
         Ok(maybe_gossip)
     }
 
