@@ -1852,7 +1852,7 @@ dependencies = [
 
 [[package]]
 name = "hdi"
-version = "0.0.21"
+version = "0.1.0"
 dependencies = [
  "arbitrary",
  "fixt",
@@ -1871,7 +1871,7 @@ dependencies = [
 
 [[package]]
 name = "hdk"
-version = "0.0.149"
+version = "0.0.150"
 dependencies = [
  "fixt",
  "getrandom 0.2.7",
@@ -1977,7 +1977,7 @@ dependencies = [
 
 [[package]]
 name = "holochain"
-version = "0.0.159"
+version = "0.0.160"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -2070,7 +2070,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cascade"
-version = "0.0.58"
+version = "0.0.59"
 dependencies = [
  "async-trait",
  "derive_more",
@@ -2388,7 +2388,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_test_wasm_common"
-version = "0.0.50"
+version = "0.0.51"
 dependencies = [
  "hdk",
  "serde",
