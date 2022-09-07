@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20220907.063222
+
+## [holochain-0.0.160](crates/holochain/CHANGELOG.md#0.0.160)
+
+## [holochain\_test\_wasm\_common-0.0.51](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.51)
+
+## [holochain\_cascade-0.0.59](crates/holochain_cascade/CHANGELOG.md#0.0.59)
+
+## [hdk-0.0.150](crates/hdk/CHANGELOG.md#0.0.150)
+
+## [hdi-0.1.0](crates/hdi/CHANGELOG.md#0.1.0)
+
+- Initial minor version bump. This indicates our impression that we have made significant progress towards stabilizing the detereministic integrity layer’s API. [\#1550](https://github.com/holochain/holochain/pull/1550)
+
 # 20220907.014838
 
 ## [holochain\_cli-0.0.55](crates/holochain_cli/CHANGELOG.md#0.0.55)
