@@ -821,27 +821,6 @@ impl Conductor {
         Ok(installed_clone_cell)
     }
 
-    /// Remove a clone cell from an app.
-    pub(super) async fn remove_clone_cell_from_app(
-        &self,
-        app_id: &InstalledAppId,
-        clone_cell_id: &CloneCellId,
-    ) -> ConductorResult<bool> {
-        let (_, cell_removed) = self
-            .update_state_prime({
-                let app_id = app_id.clone();
-                let clone_cell_id = clone_cell_id.clone();
-                move |mut state| {
-                    let app = state.get_app_mut(&app_id)?;
-                    let cell_removed = app.remove_clone(&clone_cell_id)?;
-                    Ok((state, cell_removed))
-                }
-            })
-            .await?;
-        self.remove_dangling_cells().await?;
-        Ok(cell_removed)
-    }
-
     pub(super) async fn load_wasms_into_dna_files(
         &self,
     ) -> ConductorResult<(
