@@ -213,17 +213,14 @@ pub trait ConductorHandleT: Send + Sync {
     ///
     /// # Returns
     ///
-    /// An struct with the created cell's clone id and cell id.
+    /// A struct with the created cell's clone id and cell id.
     async fn create_clone_cell(
         self: Arc<Self>,
         payload: CreateCloneCellPayload,
     ) -> ConductorResult<InstalledCell>;
 
     /// Destroy a cloned Cell
-    async fn destroy_clone_cell(
-        self: Arc<Self>,
-        payload: DeleteCloneCellPayload,
-    ) -> ConductorResult<bool>;
+    async fn destroy_clone_cell(self: Arc<Self>, cell_id: CellId) -> ConductorResult<()>;
 
     /// Install Cells into ConductorState based on installation info, and run
     /// genesis on all new source chains
@@ -956,21 +953,8 @@ impl ConductorHandleT for ConductorHandleImpl {
         Ok(installed_clone_cell)
     }
 
-    async fn destroy_clone_cell(
-        self: Arc<Self>,
-        payload: DeleteCloneCellPayload,
-    ) -> ConductorResult<bool> {
-        let DeleteCloneCellPayload {
-            app_id,
-            clone_cell_id,
-        } = payload;
-        let cell_destroyed = self
-            .conductor
-            .remove_clone_cell_from_app(&app_id, &clone_cell_id)
-            .await?;
-        self.create_and_add_initialized_cells_for_running_apps(self.clone(), Some(&app_id))
-            .await?;
-        Ok(cell_destroyed)
+    async fn destroy_clone_cell(self: Arc<Self>, _cell_id: CellId) -> ConductorResult<()> {
+        todo!()
     }
 
     async fn install_app(
