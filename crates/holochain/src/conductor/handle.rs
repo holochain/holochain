@@ -932,9 +932,7 @@ impl ConductorHandleT for ConductorHandleImpl {
 
         // create cell
         let network_seed = phenotype.network_seed.unwrap_or_else(random_network_seed);
-        let properties = phenotype
-            .properties
-            .unwrap_or_else(SerializedBytes::default);
+        let properties = phenotype.properties.unwrap_or_default();
         let origin_time = phenotype.origin_time.unwrap_or_else(Timestamp::now);
         let dna_phenotype = DnaPhenotype {
             network_seed,
