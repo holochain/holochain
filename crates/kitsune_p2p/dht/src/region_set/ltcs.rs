@@ -227,8 +227,15 @@ impl<D: RegionDataConstraints> RegionSetLtcs<D> {
         self.coords
             .region_coords_flat()
             .filter_map(|((a, x, y), c)| {
-                let d = &self.data[a][x][y];
-                (d.count() > 0).then(|| ((a, x, y), c, d.clone()))
+                let d = &self
+                    .data
+                    .get(a)
+                    .map(|d| d.get(x))
+                    .flatten()
+                    .map(|d| d.get(y))
+                    .flatten();
+                d.filter(|d| d.count() > 0)
+                    .map(|d| ((a, x, y), c, d.clone()))
             })
     }
 }
