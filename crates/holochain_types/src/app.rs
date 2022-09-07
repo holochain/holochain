@@ -15,8 +15,7 @@ use crate::{dna::DnaBundle, prelude::CoordinatorBundle};
 pub use app_bundle::*;
 pub use app_manifest::app_manifest_validated::*;
 pub use app_manifest::*;
-use core::fmt;
-use derive_more::Into;
+use derive_more::{Display, Into};
 pub use dna_gamut::*;
 use holo_hash::{AgentPubKey, DnaHash};
 use holochain_serialized_bytes::prelude::*;
@@ -94,22 +93,13 @@ pub struct CreateCloneCellPayload {
 }
 
 /// Ways of identifying a clone cell.
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Display, serde::Serialize, serde::Deserialize)]
 #[serde(untagged)]
 pub enum CloneCellId {
     /// Clone id consisting of role id and clone index.
     CloneId(CloneId),
     /// Cell id consisting of DNA hash and agent pub key.
     CellId(CellId),
-}
-
-impl fmt::Display for CloneCellId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            CloneCellId::CellId(id) => CellId::fmt(id, f),
-            CloneCellId::CloneId(id) => CloneId::fmt(id, f),
-        }
-    }
 }
 
 /// Arguments to identify the clone cell to be deleted.
