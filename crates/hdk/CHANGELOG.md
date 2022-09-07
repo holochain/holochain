@@ -1,6 +1,5 @@
 ---
 unreleasable: false
-default_unreleasable: true
 ---
 # Changelog
 
