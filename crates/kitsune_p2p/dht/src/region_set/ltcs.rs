@@ -230,10 +230,8 @@ impl<D: RegionDataConstraints> RegionSetLtcs<D> {
                 let d = &self
                     .data
                     .get(a)
-                    .map(|d| d.get(x))
-                    .flatten()
-                    .map(|d| d.get(y))
-                    .flatten();
+                    .and_then(|d| d.get(x))
+                    .and_then(|d| d.get(y));
                 d.filter(|d| d.count() > 0)
                     .map(|d| ((a, x, y), c, d.clone()))
             })
