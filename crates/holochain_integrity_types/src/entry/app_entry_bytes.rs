@@ -60,7 +60,7 @@ impl From<AppEntryBytes> for SerializedBytes {
 }
 
 /// Helpful pattern for debug formatting many bytes.
-/// If the size is > 32 bytes, only the first 10 and last 10 bytes will be displayed.
+/// If the size is > 32 bytes, only the first 8 and last 8 bytes will be displayed.
 pub fn fmt_many_bytes(
     name: &str,
     f: &mut std::fmt::Formatter<'_>,

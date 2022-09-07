@@ -318,7 +318,7 @@ impl AsConHnd for ConItem {
 
             if let Err(e) = logic().await {
                 let reason = format!("{:?}", e);
-                tracing::error!(?e, "Closing writer");
+                tracing::warn!(?e, "Closing writer");
                 this.close(INTERNAL_ERR, &reason).await;
                 return Err(e);
             }
