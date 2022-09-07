@@ -1082,8 +1082,8 @@ impl<'a> ReleaseWorkspace<'a> {
                     vec![
                         vec!["fetch", "--verbose", "--manifest-path", mp],
                         vec![
-                            vec!["update", "--offline", "--verbose", "--manifest-path", mp],
-                            vec![if dry_run { "--dry-run" } else { "" }],
+                            vec!["update", "--workspace", "--offline", "--verbose", "--manifest-path", mp],
+                            if dry_run { vec!["--dry-run"] } else { vec![] }
                         ]
                         .concat(),
                     ]
