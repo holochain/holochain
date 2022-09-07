@@ -125,19 +125,18 @@ fn bump_versions_on_selection() {
             "--cargo-target-dir={}",
             workspace.root().join("target").display()
         ),
-        "--disallowed-version-reqs=>=0.1",
+        "--disallowed-version-reqs=>=0.2",
         "--allowed-matched-blockers=UnreleasableViaChangelogFrontmatter,DisallowedVersionReqViolated",
         "--steps=CreateReleaseBranch,BumpReleaseVersions",
         "--allowed-missing-dependencies=crate_b",
-    ])
-    ;
+    ]);
 
     let output = assert_cmd_success!(cmd);
     println!("stderr:\n'{}'\n---\nstdout:\n'{}'\n---", output.0, output.1,);
 
     // set expectations
     let expected_crates = vec!["crate_b", "crate_a", "crate_e"];
-    let expected_release_versions = vec!["0.0.1", "0.0.2", "0.0.1"];
+    let expected_release_versions = vec!["0.0.1", "0.1.0", "0.0.1"];
 
     // check manifests for new release headings
     assert_eq!(
@@ -242,7 +241,7 @@ fn bump_versions_on_selection() {
 
         Awesome changes\!
 
-        ## [crate_a-0.0.2](crates/crate_a/CHANGELOG.md#0.0.2)
+        ## [crate_a-0.1.0](crates/crate_a/CHANGELOG.md#0.1.0)
 
         ### Added
 
@@ -303,7 +302,7 @@ fn bump_versions_on_selection() {
         the following crates are part of this release:
 
         - crate_b-0.0.1
-        - crate_a-0.0.2
+        - crate_a-0.1.0
         - crate_e-0.0.1
         "#,
             topmost_workspace_release
@@ -505,7 +504,7 @@ fn multiple_subsequent_releases() {
         (
             // bump the first time as they're initially released
             // vec!["0.0.2-dev.0", "0.0.3-dev.0", "0.0.2-dev.0"],
-            vec!["0.0.1", "0.0.2", "0.0.1"],
+            vec!["0.0.1", "0.1.0", "0.0.1"],
             vec!["crate_b", "crate_a", "crate_e"],
             // allowed missing dependencies
             Vec::<&str>::new(),
@@ -515,7 +514,7 @@ fn multiple_subsequent_releases() {
         (
             // should not bump the second time without making any changes
             // vec!["0.0.2-dev.0", "0.0.3-dev.0", "0.0.2-dev.0"],
-            vec!["0.0.1", "0.0.2", "0.0.1"],
+            vec!["0.0.1", "0.1.0", "0.0.1"],
             vec!["crate_b", "crate_a", "crate_e"],
             // allowed missing dependencies
             Vec::<&str>::new(),
@@ -524,7 +523,7 @@ fn multiple_subsequent_releases() {
         ),
         (
             // only crate_a and crate_e have changed, expect these to be bumped
-            vec!["0.0.1", "0.0.3", "0.0.2"],
+            vec!["0.0.1", "0.1.1", "0.0.2"],
             vec!["crate_b", "crate_a", "crate_e"],
             // crate_b won't be part of the release so we allow it to be missing as we're not publishing
             vec!["crate_b"],
@@ -550,7 +549,7 @@ fn multiple_subsequent_releases() {
         ),
         (
             // change crate_b, and as crate_a depends on crate_b it'll be bumped as well
-            vec!["0.0.2", "0.0.4", "0.0.2"],
+            vec!["0.0.2", "0.1.2", "0.0.2"],
             vec!["crate_b", "crate_a", "crate_e"],
             // allowed missing dependencies
             vec![],
@@ -612,16 +611,22 @@ fn multiple_subsequent_releases() {
             let mut cmd = assert_cmd::Command::cargo_bin("release-automation").unwrap();
             let cmd = cmd.args(&[
                 &format!("--workspace-path={}", workspace.root().display()),
-                "--log-level=debug",
+                "--log-level=trace",
                 "release",
-                &format!("--cargo-target-dir={}", workspace.root().join("target").display()),
-                "--disallowed-version-reqs=>=0.1",
-                "--allowed-matched-blockers=UnreleasableViaChangelogFrontmatter,DisallowedVersionReqViolated",
+                &format!(
+                    "--cargo-target-dir={}",
+                    workspace.root().join("target").display()
+                ),
+                "--disallowed-version-reqs=>=0.2",
+                "--match-filter=crate_(a|b|e)",
+                "--allowed-matched-blockers=UnreleasableViaChangelogFrontmatter",
                 "--steps=CreateReleaseBranch,BumpReleaseVersions",
                 &format!(
                     "--allowed-missing-dependencies={}",
-                    allowed_missing_dependencies.iter().fold("".to_string(), |acc, cur|{ acc + "," + *cur })
-                )
+                    allowed_missing_dependencies
+                        .iter()
+                        .fold("".to_string(), |acc, cur| { acc + "," + *cur })
+                ),
             ]);
             let output = assert_cmd_success!(cmd);
             println!("stderr:\n'{}'\n---\nstdout:\n'{}'\n---", output.0, output.1,);
@@ -698,6 +703,10 @@ fn multiple_subsequent_releases() {
         // sleep so the time based branch name is unique
         // todo: change to other branch name generator?
         std::thread::sleep(std::time::Duration::new(1, 0));
+    }
+
+    if matches!(option_env!("FAIL_CLI_RELEASE_TEST"), Some(_)) {
+        panic!("workspace root: {:?}", workspace_mocker.root());
     }
 }
 
