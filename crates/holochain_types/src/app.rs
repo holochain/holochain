@@ -15,8 +15,7 @@ use crate::{dna::DnaBundle, prelude::CoordinatorBundle};
 pub use app_bundle::*;
 pub use app_manifest::app_manifest_validated::*;
 pub use app_manifest::*;
-use core::fmt;
-use derive_more::Into;
+use derive_more::{Display, Into};
 pub use dna_gamut::*;
 use holo_hash::{AgentPubKey, DnaHash};
 use holochain_serialized_bytes::prelude::*;
@@ -83,35 +82,24 @@ pub struct CreateCloneCellPayload {
     /// The DNA's role id to clone
     /// The Role id under which to create this clone
     pub role_id: AppRoleId,
-    /// Properties to override for the new cell
-    pub properties: Option<YamlProperties>,
-    /// Optionally set the network seed for the new cell
-    pub network_seed: Option<NetworkSeed>,
+    /// Phenotype options to set for the new cell.
+    /// At least one of the options must be set to obtain a distinct hash for
+    /// the clone cell's DNA.
+    pub phenotype: DnaPhenotypeOption,
     /// Optionally set a proof of membership for the new cell
     pub membrane_proof: Option<MembraneProof>,
-    /// Optionally set a new origin time of the new cell
-    pub origin_time: Option<Timestamp>,
     /// Optionally a name for the DNA clone
     pub name: Option<String>,
 }
 
 /// Ways of identifying a clone cell.
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Display, serde::Serialize, serde::Deserialize)]
 #[serde(untagged)]
 pub enum CloneCellId {
     /// Clone id consisting of role id and clone index.
     CloneId(CloneId),
     /// Cell id consisting of DNA hash and agent pub key.
     CellId(CellId),
-}
-
-impl fmt::Display for CloneCellId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            CloneCellId::CellId(id) => CellId::fmt(id, f),
-            CloneCellId::CloneId(id) => CloneId::fmt(id, f),
-        }
-    }
 }
 
 /// Arguments to identify the clone cell to be deleted.

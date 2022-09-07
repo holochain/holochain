@@ -43,6 +43,24 @@ pub struct DnaPhenotype {
     pub origin_time: Timestamp,
 }
 
+/// [`DnaPhenotype`] options of which all are optional.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct DnaPhenotypeOption {
+    /// see [`DnaPhenotype`]
+    pub network_seed: Option<NetworkSeed>,
+    /// see [`DnaPhenotype`]
+    pub properties: Option<SerializedBytes>,
+    /// see [`DnaPhenotype`]
+    pub origin_time: Option<Timestamp>,
+}
+
+impl DnaPhenotypeOption {
+    /// Check if at least one of the options is set.
+    pub fn has_some_option_set(&self) -> bool {
+        self.network_seed.is_some() || self.properties.is_some() || self.origin_time.is_some()
+    }
+}
+
 /// The definition of a DNA: the hash of this data is what produces the DnaHash.
 ///
 /// Historical note: This struct was written before `DnaManifest` appeared.

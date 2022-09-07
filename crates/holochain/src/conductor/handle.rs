@@ -213,17 +213,14 @@ pub trait ConductorHandleT: Send + Sync {
     ///
     /// # Returns
     ///
-    /// An struct with the created cell's clone id and cell id.
+    /// A struct with the created cell's clone id and cell id.
     async fn create_clone_cell(
         self: Arc<Self>,
         payload: CreateCloneCellPayload,
     ) -> ConductorResult<InstalledCell>;
 
     /// Destroy a cloned Cell
-    async fn destroy_clone_cell(
-        self: Arc<Self>,
-        payload: DeleteCloneCellPayload,
-    ) -> ConductorResult<bool>;
+    async fn destroy_clone_cell(self: Arc<Self>, cell_id: CellId) -> ConductorResult<()>;
 
     /// Install Cells into ConductorState based on installation info, and run
     /// genesis on all new source chains
@@ -906,15 +903,14 @@ impl ConductorHandleT for ConductorHandleImpl {
         let CreateCloneCellPayload {
             app_id,
             role_id,
-            properties,
-            network_seed,
+            phenotype,
             membrane_proof,
-            origin_time,
             name,
         } = payload;
-        if network_seed == None && properties == None {
+        if !phenotype.has_some_option_set() {
             return Err(ConductorError::CloneCellError(
-                "neither network_seed nor properties provided for clone cell".to_string(),
+                "neither network_seed nor properties nor origin_time provided for clone cell"
+                    .to_string(),
             ));
         }
         let state = self.conductor.get_state().await?;
@@ -935,14 +931,17 @@ impl ConductorHandleT for ConductorHandleImpl {
         }
 
         // create cell
-        let network_seed = network_seed.unwrap_or_else(random_network_seed);
-        let properties = (properties.unwrap_or_else(|| ().into())).try_into()?;
-        let origin_time = origin_time.unwrap_or_else(Timestamp::now);
+        let network_seed = phenotype.network_seed.unwrap_or_else(random_network_seed);
+        let properties = phenotype
+            .properties
+            .unwrap_or_else(SerializedBytes::default);
+        let origin_time = phenotype.origin_time.unwrap_or_else(Timestamp::now);
         let dna_phenotype = DnaPhenotype {
             network_seed,
             origin_time,
             properties,
         };
+        // add cell to app
         let installed_clone_cell = self
             .conductor
             .add_clone_cell_to_app(app_id.clone(), role_id.clone(), dna_phenotype, name)
@@ -956,21 +955,8 @@ impl ConductorHandleT for ConductorHandleImpl {
         Ok(installed_clone_cell)
     }
 
-    async fn destroy_clone_cell(
-        self: Arc<Self>,
-        payload: DeleteCloneCellPayload,
-    ) -> ConductorResult<bool> {
-        let DeleteCloneCellPayload {
-            app_id,
-            clone_cell_id,
-        } = payload;
-        let cell_destroyed = self
-            .conductor
-            .remove_clone_cell_from_app(&app_id, &clone_cell_id)
-            .await?;
-        self.create_and_add_initialized_cells_for_running_apps(self.clone(), Some(&app_id))
-            .await?;
-        Ok(cell_destroyed)
+    async fn destroy_clone_cell(self: Arc<Self>, _cell_id: CellId) -> ConductorResult<()> {
+        todo!()
     }
 
     async fn install_app(
@@ -1036,7 +1022,7 @@ impl ConductorHandleT for ConductorHandleImpl {
             .await?;
 
         let roles = ops.role_assignments;
-        let app = InstalledAppCommon::new(installed_app_id, agent_key, roles).unwrap();
+        let app = InstalledAppCommon::new(installed_app_id, agent_key, roles)?;
 
         // Update the db
         let stopped_app = self.conductor.add_disabled_app_to_db(app).await?;
