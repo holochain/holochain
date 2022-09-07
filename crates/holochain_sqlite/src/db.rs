@@ -132,7 +132,6 @@ impl<Kind: DbKindT> PermittedConn for DbWrite<Kind> {
 
 impl<Kind: DbKindT> DbRead<Kind> {
     pub fn conn(&self) -> DatabaseResult<PConn> {
-        // TODO: track why so many connections are being opened.
         self.connection_pooled()
     }
 
