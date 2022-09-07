@@ -1019,7 +1019,7 @@ impl ConductorHandleT for ConductorHandleImpl {
             .await?;
 
         let roles = ops.role_assignments;
-        let app = InstalledAppCommon::new(installed_app_id, agent_key, roles).unwrap();
+        let app = InstalledAppCommon::new(installed_app_id, agent_key, roles)?;
 
         // Update the db
         let stopped_app = self.conductor.add_disabled_app_to_db(app).await?;
