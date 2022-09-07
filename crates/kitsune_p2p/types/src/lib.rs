@@ -227,7 +227,7 @@ pub enum KitsuneErrorKind {
 
     /// The operation timed out.
     #[error("Operation timed out")]
-    TimedOut,
+    TimedOut(String),
 
     /// This object is closed, calls on it are invalid.
     #[error("This object is closed, calls on it are invalid.")]
@@ -242,7 +242,7 @@ impl PartialEq for KitsuneErrorKind {
     fn eq(&self, oth: &Self) -> bool {
         #[allow(clippy::match_like_matches_macro)]
         match (self, oth) {
-            (Self::TimedOut, Self::TimedOut) => true,
+            (Self::TimedOut(a), Self::TimedOut(b)) => a == b,
             (Self::Closed, Self::Closed) => true,
             _ => false,
         }

@@ -347,7 +347,7 @@ impl OpsBatchQueue {
         self.0
             .share_mut(|i, _| {
                 i.queues.retain(|_, q| !q.is_empty());
-                Ok(i.queues.is_empty())
+                Ok(i.queues.is_empty() && i.region_queue.is_empty())
             })
             .unwrap_or(true)
     }
