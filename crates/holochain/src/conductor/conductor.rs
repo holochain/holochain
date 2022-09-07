@@ -622,7 +622,7 @@ impl Conductor {
         let app_cells: HashSet<CellId> = match app_id {
             Some(app_id) => {
                 let app = state.get_app(app_id)?;
-                if app.status == AppStatus::Running {
+                if app.status().is_running() {
                     app.all_cells().into_iter().cloned().collect()
                 } else {
                     HashSet::new()
