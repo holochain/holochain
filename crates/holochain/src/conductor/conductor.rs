@@ -803,16 +803,16 @@ impl Conductor {
         let clone_dna_hash = clone_dna.dna_hash().to_owned();
         // add clone cell to app and instantiate resulting clone cell
         let (_, installed_clone_cell) = self
-        .update_state_prime(move |mut state| {
-            let app = state.get_app_mut(&app_id)?;
-            let agent_key = app.role(&role_id)?.agent_key().to_owned();
-            let cell_id = CellId::new(clone_dna_hash, agent_key);
-            let clone_id = app.add_clone(&role_id, &cell_id)?;
-            let installed_clone_cell =
-            InstalledCell::new(cell_id, clone_id.as_app_role_id().clone());
-            Ok((state, installed_clone_cell))
-        })
-        .await?;
+            .update_state_prime(move |mut state| {
+                let app = state.get_app_mut(&app_id)?;
+                let agent_key = app.role(&role_id)?.agent_key().to_owned();
+                let cell_id = CellId::new(clone_dna_hash, agent_key);
+                let clone_id = app.add_clone(&role_id, &cell_id)?;
+                let installed_clone_cell =
+                    InstalledCell::new(cell_id, clone_id.as_app_role_id().clone());
+                Ok((state, installed_clone_cell))
+            })
+            .await?;
         // register clone cell dna in ribosome store
         let clone_ribosome = RealRibosome::new(clone_dna)?;
         self.register_phenotype(clone_ribosome);
