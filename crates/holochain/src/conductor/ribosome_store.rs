@@ -38,6 +38,10 @@ impl RibosomeStore {
         self.ribosomes.extend(ribosomes);
     }
 
+    pub fn remove_ribosome(&mut self, dna_hash: &DnaHash) {
+        self.ribosomes.remove(dna_hash);
+    }
+
     #[instrument]
     pub fn list(&self) -> Vec<DnaHash> {
         self.ribosomes.keys().cloned().collect()
