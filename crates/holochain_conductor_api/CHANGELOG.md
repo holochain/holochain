@@ -4,15 +4,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
-<<<<<<< HEAD
 The `AddRecords` admin api method has been changed to `GraftRecords`, and the functionality has changed accordingly. See the docs for that method to understand the changes.
-=======
+
 ## 0.0.58
 
 ## 0.0.57
 
 ## 0.0.56
->>>>>>> origin/develop
 
 ## 0.0.55
 

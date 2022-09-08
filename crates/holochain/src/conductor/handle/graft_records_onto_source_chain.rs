@@ -386,6 +386,7 @@ mod tests {
         });
     }
 
+    /// Rebalancing an already-balanced set of incoming records is a no-op
     #[test_case(ChainGraft::new(tu::chain(0..3), tu::chain(3..6)))]
     #[test_case(ChainGraft::new(tu::chain(0..4), tu::chain(3..6)))]
     #[test_case(ChainGraft::new(tu::chain(0..3), tu::chain(1..4)))]
@@ -399,7 +400,7 @@ mod tests {
     #[test_case(ChainGraft::new(tu::forked_chain(&[0..3, 3..6]), tu::chain(2..6)))]
     #[test_case(ChainGraft::new(tu::gap_chain(&[0..3, 6..9]), tu::chain(3..6)))]
     #[test_case(ChainGraft::new(tu::chain(0..6), tu::gap_chain(&[0..3, 6..9])))]
-    fn test_incoming_idempotence(case: ChainGraft<TestChainItem, TestChainItem>) {
+    fn test_incoming_rebalance_idempotence(case: ChainGraft<TestChainItem, TestChainItem>) {
         pretty_assertions::assert_eq!(
             case.clone().rebalance().incoming,
             case.clone().rebalance().rebalance().incoming
