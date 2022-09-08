@@ -2432,7 +2432,7 @@ dependencies = [
  "nanoid 0.3.0",
  "observability",
  "parking_lot 0.10.2",
- "pretty_assertions 0.6.1",
+ "pretty_assertions 0.7.2",
  "rand 0.8.5",
  "regex",
  "rusqlite",
@@ -3133,7 +3133,7 @@ dependencies = [
  "kitsune_p2p_dht",
  "kitsune_p2p_dht_arc",
  "lair_keystore_api",
- "lru",
+ "lru 0.7.1",
  "mockall 0.10.2",
  "nanoid 0.3.0",
  "observability",
@@ -3174,7 +3174,7 @@ dependencies = [
  "base64",
  "dunce",
  "hc_seed_bundle",
- "lru",
+ "lru 0.6.6",
  "nanoid 0.4.0",
  "once_cell",
  "parking_lot 0.11.2",
@@ -3362,6 +3362,15 @@ name = "lru"
 version = "0.6.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7ea2d928b485416e8908cff2d97d621db22b27f7b3b6729e438bcf42c671ba91"
+dependencies = [
+ "hashbrown 0.11.2",
+]
+
+[[package]]
+name = "lru"
+version = "0.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "469898e909a1774d844793b347135a0cd344ca2f69d082013ecb8061a2229a3a"
 dependencies = [
  "hashbrown 0.11.2",
 ]
