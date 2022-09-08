@@ -4,8 +4,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
-- Replace individual phenotype fields with new struct `DnaPhenotype`. [\#1547](https://github.com/holochain/holochain/pull/1547)
 - Add function to set DNA name. [\#1547](https://github.com/holochain/holochain/pull/1547)
+
+`ChainQueryFilter` has a `descending()` function which will cause the query results to be returned in descending order. This can be reversed by calling `ascending()`. The default order is still ascending. [\#1539](https://github.com/holochain/holochain/pull/1539)
 
 ## 0.0.47
 
