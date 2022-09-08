@@ -255,6 +255,7 @@ impl SourceChain {
     }
 
     #[async_recursion]
+    #[tracing::instrument(skip(self, network))]
     pub async fn flush(
         &self,
         network: &(dyn HolochainP2pDnaT + Send + Sync),

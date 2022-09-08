@@ -34,6 +34,12 @@ pub struct PostCommitHostAccess {
     pub network: HolochainP2pDna,
 }
 
+impl std::fmt::Debug for PostCommitHostAccess {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PostCommitHostAccess").finish()
+    }
+}
+
 impl From<PostCommitHostAccess> for HostContext {
     fn from(post_commit_host_access: PostCommitHostAccess) -> Self {
         Self::PostCommit(post_commit_host_access)

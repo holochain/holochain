@@ -4,10 +4,6 @@ use holochain_zome_types::signature::Signature;
 /// Keystore Error Type.
 #[derive(Debug, thiserror::Error)]
 pub enum KeystoreError {
-    /// An error generated from the GhostActor system.
-    #[error("GhostError: {0}")]
-    GhostError(#[from] ghost_actor::GhostError),
-
     /// Error serializing data.
     #[error("SerializedBytesError: {0}")]
     SerializedBytesError(#[from] SerializedBytesError),

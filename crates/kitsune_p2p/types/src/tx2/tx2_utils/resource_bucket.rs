@@ -86,7 +86,7 @@ impl<T: 'static + Send> ResourceBucket<T> {
                 match timeout {
                     Some(timeout) => {
                         timeout
-                            .mix(async move {
+                            .mix("ResourceBucket::acquire", async move {
                                 n.await;
                                 Ok(())
                             })

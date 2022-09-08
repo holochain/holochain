@@ -9,6 +9,7 @@ use std::collections::{HashMap, HashSet};
 use structopt::StructOpt;
 
 use crate::{
+    common::{increment_semver, SemverIncrementMode},
     crate_selection::Crate,
     release::{crates_index_helper, ReleaseWorkspace},
     CommandResult, Fallible,
@@ -399,7 +400,7 @@ pub(crate) fn apply_dev_vesrions_to_selection<'a>(
             continue;
         }
 
-        increment_patch(&mut version);
+        increment_semver(&mut version, SemverIncrementMode::Patch);
         version = semver::Version::parse(&format!("{}-{}", version, dev_suffix))?;
 
         debug!(
@@ -424,12 +425,6 @@ pub(crate) fn apply_dev_vesrions_to_selection<'a>(
     }
 
     Ok(msg)
-}
-
-pub(crate) fn increment_patch(v: &mut semver::Version) {
-    v.patch += 1;
-    v.pre = semver::Prerelease::EMPTY;
-    v.build = semver::BuildMetadata::EMPTY;
 }
 
 pub(crate) fn fixup_unpublished_releases<'a>(

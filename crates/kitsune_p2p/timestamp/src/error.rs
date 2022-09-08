@@ -1,7 +1,7 @@
 #[cfg(feature = "chrono")]
 use chrono::ParseError;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TimestampError {
     Overflow,
     #[cfg(feature = "chrono")]

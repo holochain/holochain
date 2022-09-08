@@ -190,6 +190,17 @@ pub struct RegisterDelete {
 pub struct RegisterAgentActivity {
     /// The signed and hashed [`Action`] that is being registered.
     pub action: SignedActionHashed,
+    /// Entries can be cached with agent authorities if
+    /// `cached_at_agent_activity` is set to true for an entries
+    /// definitions.
+    /// If it is cached for this action then this will be some.
+    pub cached_entry: Option<Entry>,
+}
+
+impl AsRef<SignedActionHashed> for RegisterAgentActivity {
+    fn as_ref(&self) -> &SignedActionHashed {
+        &self.action
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
@@ -235,7 +246,9 @@ impl Op {
             Op::StoreEntry(StoreEntry { action, .. }) => action.hashed.author(),
             Op::RegisterUpdate(RegisterUpdate { update, .. }) => &update.hashed.author,
             Op::RegisterDelete(RegisterDelete { delete, .. }) => &delete.hashed.author,
-            Op::RegisterAgentActivity(RegisterAgentActivity { action }) => action.hashed.author(),
+            Op::RegisterAgentActivity(RegisterAgentActivity { action, .. }) => {
+                action.hashed.author()
+            }
             Op::RegisterCreateLink(RegisterCreateLink { create_link }) => {
                 &create_link.hashed.author
             }
@@ -251,7 +264,7 @@ impl Op {
             Op::StoreEntry(StoreEntry { action, .. }) => *action.hashed.timestamp(),
             Op::RegisterUpdate(RegisterUpdate { update, .. }) => update.hashed.timestamp,
             Op::RegisterDelete(RegisterDelete { delete, .. }) => delete.hashed.timestamp,
-            Op::RegisterAgentActivity(RegisterAgentActivity { action }) => {
+            Op::RegisterAgentActivity(RegisterAgentActivity { action, .. }) => {
                 action.hashed.timestamp()
             }
             Op::RegisterCreateLink(RegisterCreateLink { create_link }) => {
@@ -269,7 +282,7 @@ impl Op {
             Op::StoreEntry(StoreEntry { action, .. }) => *action.hashed.action_seq(),
             Op::RegisterUpdate(RegisterUpdate { update, .. }) => update.hashed.action_seq,
             Op::RegisterDelete(RegisterDelete { delete, .. }) => delete.hashed.action_seq,
-            Op::RegisterAgentActivity(RegisterAgentActivity { action }) => {
+            Op::RegisterAgentActivity(RegisterAgentActivity { action, .. }) => {
                 action.hashed.action_seq()
             }
             Op::RegisterCreateLink(RegisterCreateLink { create_link }) => {
@@ -287,7 +300,7 @@ impl Op {
             Op::StoreEntry(StoreEntry { action, .. }) => Some(action.hashed.prev_action()),
             Op::RegisterUpdate(RegisterUpdate { update, .. }) => Some(&update.hashed.prev_action),
             Op::RegisterDelete(RegisterDelete { delete, .. }) => Some(&delete.hashed.prev_action),
-            Op::RegisterAgentActivity(RegisterAgentActivity { action }) => {
+            Op::RegisterAgentActivity(RegisterAgentActivity { action, .. }) => {
                 action.hashed.prev_action()
             }
             Op::RegisterCreateLink(RegisterCreateLink { create_link }) => {
@@ -305,7 +318,7 @@ impl Op {
             Op::StoreEntry(StoreEntry { action, .. }) => action.hashed.action_type(),
             Op::RegisterUpdate(RegisterUpdate { .. }) => ActionType::Update,
             Op::RegisterDelete(RegisterDelete { .. }) => ActionType::Delete,
-            Op::RegisterAgentActivity(RegisterAgentActivity { action }) => {
+            Op::RegisterAgentActivity(RegisterAgentActivity { action, .. }) => {
                 action.hashed.action_type()
             }
             Op::RegisterCreateLink(RegisterCreateLink { .. }) => ActionType::CreateLink,

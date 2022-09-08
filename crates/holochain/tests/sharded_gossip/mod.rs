@@ -1,11 +1,15 @@
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use hdk::prelude::*;
 use holo_hash::DhtOpHash;
 use holochain::conductor::config::ConductorConfig;
-use holochain::sweettest::{SweetConductor, SweetConductorBatch, SweetDnaFile};
-use holochain::test_utils::consistency_10s;
+use holochain::conductor::handle::DevSettingsDelta;
+use holochain::sweettest::{SweetConductor, SweetConductorBatch, SweetDnaFile, SweetEasyInline};
+use holochain::test_utils::inline_zomes::{batch_create_zome, simple_crud_zome};
+use holochain::test_utils::inline_zomes::{simple_create_read_zome, AppString};
 use holochain::test_utils::network_simulation::{data_zome, generate_test_data};
+use holochain::test_utils::{consistency, consistency_10s};
 use holochain::{
     conductor::ConductorBuilder, test_utils::consistency::local_machine_session_with_hashes,
 };
@@ -16,17 +20,17 @@ use kitsune_p2p::gossip::sharded_gossip::test_utils::{check_ops_boom, create_age
 use kitsune_p2p::KitsuneP2pConfig;
 use kitsune_p2p_types::config::RECENT_THRESHOLD_DEFAULT;
 
-#[derive(serde::Serialize, serde::Deserialize, Debug)]
-#[serde(transparent)]
-#[repr(transparent)]
-struct AppString(String);
-
 fn make_config(recent_threshold: Option<u64>) -> ConductorConfig {
     let mut tuning =
         kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
     tuning.gossip_strategy = "sharded-gossip".to_string();
     tuning.danger_gossip_recent_threshold_secs =
         recent_threshold.unwrap_or(RECENT_THRESHOLD_DEFAULT.as_secs());
+    tuning.gossip_inbound_target_mbps = 10000.0;
+    tuning.gossip_outbound_target_mbps = 10000.0;
+    tuning.gossip_historic_outbound_target_mbps = 10000.0;
+    tuning.gossip_historic_inbound_target_mbps = 10000.0;
+    // tuning.gossip_max_batch_size = 32_000_000;
 
     let mut network = KitsuneP2pConfig::default();
     network.transport_pool = vec![kitsune_p2p::TransportConfig::Quic {
@@ -43,10 +47,6 @@ fn make_config(recent_threshold: Option<u64>) -> ConductorConfig {
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
 async fn fullsync_sharded_gossip() -> anyhow::Result<()> {
-    use holochain::{
-        conductor::handle::DevSettingsDelta, test_utils::inline_zomes::simple_create_read_zome,
-    };
-
     let _g = observability::test_run().ok();
     const NUM_CONDUCTORS: usize = 2;
 
@@ -97,10 +97,6 @@ async fn fullsync_sharded_gossip() -> anyhow::Result<()> {
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
 async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
-    use holochain::{
-        conductor::handle::DevSettingsDelta, test_utils::inline_zomes::batch_create_zome,
-    };
-
     // let _g = observability::test_run().ok();
 
     const NUM_CONDUCTORS: usize = 3;
@@ -184,6 +180,69 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
     ));
 
     Ok(())
+}
+
+#[cfg(feature = "slow_tests")]
+#[tokio::test(flavor = "multi_thread")]
+async fn large_entry_test() {
+    observability::test_run().ok();
+    let mut conductors = SweetConductorBatch::from_config(2, make_config(Some(0))).await;
+    let start = Instant::now();
+    dbg!(start.elapsed());
+
+    for c in conductors.iter() {
+        c.update_dev_settings(DevSettingsDelta {
+            publish: Some(false),
+            ..Default::default()
+        });
+    }
+
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome())
+        .await
+        .unwrap();
+
+    let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
+    let ((cell_1,), (cell_2,)) = apps.into_tuples();
+
+    let zome_1 = cell_1.zome(SweetEasyInline::COORDINATOR);
+    let zome_2 = cell_2.zome(SweetEasyInline::COORDINATOR);
+
+    // TODO: we should be able to get up to multiple entries each 10MB or more being gossiped
+    // in a reasonable time, but right now we can only handle about 1MB in a timely fashion.
+
+    // let size = 1_000;
+    // let size = 10_000;
+    // let size = 100_000;
+    // let size = 1_000_000;
+    let size = 5_000_000;
+    // let size = 10_000_000;
+    // let size = 15_000_000;
+    let num = 10;
+    let mut hashes = vec![];
+    for i in 0..num {
+        let app_string = AppString(String::from_utf8(vec![42u8 + i as u8; size]).unwrap());
+        let hash: ActionHash = conductors[0]
+            .call(&zome_1, "create_string", app_string.clone())
+            .await;
+        hashes.push(hash);
+        dbg!(start.elapsed());
+    }
+
+    conductors.exchange_peer_info().await;
+    consistency(&[&cell_1, &cell_2], 60 * 4, Duration::from_secs(1)).await;
+
+    let records: Vec<Option<Record>> = conductors[1].call(&zome_2, "read_multi", hashes).await;
+    assert_eq!(records.len(), num);
+    assert_eq!(
+        records.iter().filter(|r| r.is_some()).count(),
+        num,
+        "couldn't get records at positions: {:?}",
+        records
+            .iter()
+            .enumerate()
+            .filter_map(|(i, r)| r.is_none().then(|| i))
+            .collect::<Vec<_>>()
+    );
 }
 
 #[cfg(feature = "test_utils")]
@@ -397,6 +456,9 @@ async fn mock_network_sharded_gossip() {
                         holochain_p2p::WireMessage::GetLinks { .. } => debug!("get_links"),
                         holochain_p2p::WireMessage::GetAgentActivity { .. } => {
                             debug!("get_agent_activity")
+                        }
+                        holochain_p2p::WireMessage::MustGetAgentActivity { .. } => {
+                            debug!("must_get_agent_activity")
                         }
                         holochain_p2p::WireMessage::GetValidationPackage { .. } => {
                             debug!("get_validation_package")
@@ -912,6 +974,9 @@ async fn mock_network_sharding() {
                         holochain_p2p::WireMessage::GetLinks { .. } => debug!("get_links"),
                         holochain_p2p::WireMessage::GetAgentActivity { .. } => {
                             debug!("get_agent_activity")
+                        }
+                        holochain_p2p::WireMessage::MustGetAgentActivity { .. } => {
+                            debug!("must_get_agent_activity")
                         }
                         holochain_p2p::WireMessage::GetValidationPackage { .. } => {
                             debug!("get_validation_package")

@@ -1,4 +1,4 @@
-use holo_hash::ActionHash;
+use holo_hash::*;
 use std::collections::HashMap;
 use std::ops::Range;
 use test_case::test_case;
@@ -7,24 +7,25 @@ use crate::test_utils::chain::*;
 
 use super::*;
 
-/// Create a hash from a u8.
-fn hash(i: u8) -> ActionHash {
-    action_hash(&[i])
+type TestHash = <TestChainItem as ChainItem>::Hash;
+type TestFilter = ChainFilter<TestHash>;
+
+/// Create a hash from a u32.
+fn hash(i: u32) -> TestHash {
+    i.into()
 }
 
 /// Build a chain of RegisterAgentActivity and then run them through the
 /// chain filter.
-fn build_chain(c: Vec<ChainItem>, filter: ChainFilter) -> Vec<ChainItem> {
-    let data = chain_to_ops(c);
-    ChainFilterIter::new(filter, data)
-        .map(|op| ChainItem {
-            action_seq: op.action.hashed.action_seq(),
-            hash: op.action.action_address().clone(),
-            prev_action: op.action.hashed.prev_action().cloned(),
-        })
-        .collect()
+fn build_chain(c: Vec<TestChainItem>, filter: TestFilter) -> Vec<TestChainItem> {
+    ChainFilterIter::new(filter, c).into_iter().collect()
 }
 
+/// Useful for displaying diff of test_case failure.
+/// See <https://github.com/frondeus/test-case/wiki/Syntax#function-validator>
+fn pretty(expected: Vec<TestChainItem>) -> impl Fn(Vec<TestChainItem>) {
+    move |actual: Vec<TestChainItem>| pretty_assertions::assert_eq!(actual, expected)
+}
 #[test_case(1, 0, 0 => chain(0..0))]
 #[test_case(1, 0, 1 => chain(0..1))]
 #[test_case(1, 0, 10 => chain(0..1))]
@@ -32,46 +33,46 @@ fn build_chain(c: Vec<ChainItem>, filter: ChainFilter) -> Vec<ChainItem> {
 #[test_case(2, 1, 10 => chain(0..2))]
 #[test_case(10, 9, 10 => chain(0..10))]
 /// Check taking n items works.
-fn can_take_n(len: u8, chain_top: u8, take: u32) -> Vec<ChainItem> {
-    let filter = ChainFilter::new(hash(chain_top)).take(take);
+fn can_take_n(len: u32, chain_top: u32, take: u32) -> Vec<TestChainItem> {
+    let filter = TestFilter::new(hash(chain_top)).take(take);
     build_chain(chain(0..len), filter)
 }
 
 #[test_case(1, 0, hash(0) => chain(0..1))]
 #[test_case(1, 0, hash(1) => chain(0..1))]
 #[test_case(2, 1, hash(1) => chain(1..2))]
-#[test_case(10, 5, hash(1) => chain(1..6))]
-#[test_case(10, 9, hash(0) => chain(0..10))]
+#[test_case(10, 5, hash(1) => using pretty(chain(1..6)))]
+#[test_case(10, 9, hash(0) => using pretty(chain(0..10)))]
 /// Check taking until some hash works.
-fn can_until_hash(len: u8, chain_top: u8, until: ActionHash) -> Vec<ChainItem> {
-    let filter = ChainFilter::new(hash(chain_top)).until(until);
+fn can_until_hash(len: u32, chain_top: u32, until: TestHash) -> Vec<TestChainItem> {
+    let filter = TestFilter::new(hash(chain_top)).until(until);
     build_chain(chain(0..len), filter)
 }
 
-#[test_case(10, ChainFilter::new(hash(9)).take(10).until(hash(4)) => chain(4..10))]
-#[test_case(10, ChainFilter::new(hash(9)).take(2).until(hash(4)) => chain(8..10))]
-#[test_case(10, ChainFilter::new(hash(9)).take(20).take(2).until(hash(4)) => chain(8..10))]
-#[test_case(10, ChainFilter::new(hash(9)).take(20).take(2).until(hash(4)).until(hash(9)) => chain(9..10))]
+#[test_case(10, TestFilter::new(hash(9)).take(10).until(hash(4)) => chain(4..10))]
+#[test_case(10, TestFilter::new(hash(9)).take(2).until(hash(4)) => chain(8..10))]
+#[test_case(10, TestFilter::new(hash(9)).take(20).take(2).until(hash(4)) => chain(8..10))]
+#[test_case(10, TestFilter::new(hash(9)).take(20).take(2).until(hash(4)).until(hash(9)) => chain(9..10))]
 /// Check take and until can be combined and the first to be
 /// reached ends the iterator.
-fn can_combine(len: u8, filter: ChainFilter) -> Vec<ChainItem> {
+fn can_combine(len: u32, filter: TestFilter) -> Vec<TestChainItem> {
     build_chain(chain(0..len), filter)
 }
 
-#[test_case(&[0..10], ChainFilter::new(hash(9)).take(10).until(hash(4)) => chain(4..10))]
-#[test_case(&[0..10, 7..10], ChainFilter::new(hash(9)).take(10).until(hash(4)) => chain(4..10))]
-#[test_case(&[0..10, 7..10, 5..8, 3..7], ChainFilter::new(hash(9)).take(10).until(hash(4)) => chain(4..10))]
+#[test_case(&[0..10], TestFilter::new(hash(9)).take(10).until(hash(4)) => chain(4..10))]
+#[test_case(&[0..10, 7..10], TestFilter::new(hash(9)).take(10).until(hash(4)) => chain(4..10))]
+#[test_case(&[0..10, 7..10, 5..8, 3..7], TestFilter::new(hash(9)).take(10).until(hash(4)) => chain(4..10))]
 /// Check that forked chains are ignored.
-fn can_ignore_forks(ranges: &[Range<u8>], filter: ChainFilter) -> Vec<ChainItem> {
+fn can_ignore_forks(ranges: &[Range<u8>], filter: TestFilter) -> Vec<TestChainItem> {
     build_chain(forked_chain(ranges), filter)
 }
 
-#[test_case(&[0..10], ChainFilter::new(hash(9)).take(10).until(hash(4)) => chain(4..10))]
-#[test_case(&[0..5, 6..10], ChainFilter::new(hash(9)).take(10).until(hash(4)) => chain(6..10))]
-#[test_case(&[0..5, 6..7, 8..10], ChainFilter::new(hash(9)).take(10).until(hash(4)) => chain(8..10))]
-#[test_case(&[0..5, 6..7, 8..10], ChainFilter::new(hash(9)).take(3).until(hash(4)) => chain(8..10))]
+#[test_case(&[0..10], TestFilter::new(hash(9)).take(10).until(hash(4)) => chain(4..10))]
+#[test_case(&[0..5, 6..10], TestFilter::new(hash(9)).take(10).until(hash(4)) => chain(6..10))]
+#[test_case(&[0..5, 6..7, 8..10], TestFilter::new(hash(9)).take(10).until(hash(4)) => chain(8..10))]
+#[test_case(&[0..5, 6..7, 8..10], TestFilter::new(hash(9)).take(3).until(hash(4)) => chain(8..10))]
 /// Check the iterator will stop at a gap in the chain.
-fn stop_at_gap(ranges: &[Range<u8>], filter: ChainFilter) -> Vec<ChainItem> {
+fn stop_at_gap(ranges: &[Range<u32>], filter: TestFilter) -> Vec<TestChainItem> {
     build_chain(gap_chain(ranges), filter)
 }
 
@@ -117,7 +118,7 @@ fn matches_chain(a: &Vec<RegisterAgentActivity>, seq: &[u32]) -> bool {
     forked_chain(&[4..6, 3..8]), ChainFilter::new(action_hash(&[5, 0])).until(action_hash(&[4, 1])), |h| if *h == action_hash(&[5, 0]) { Some(5) } else { Some(4) }
     => matches MustGetAgentActivityResponse::IncompleteChain ; "chain_top (5,0) until (4,1) chain (0,0) to (5,0) and (3,1) to (7,1)")]
 fn test_filter_then_check(
-    chain: Vec<ChainItem>,
+    chain: Vec<TestChainItem>,
     filter: ChainFilter,
     mut f: impl FnMut(&ActionHash) -> Option<u32>,
 ) -> MustGetAgentActivityResponse {
@@ -214,11 +215,7 @@ fn hash_to_seq(hashes: &[u32]) -> impl FnMut(&ActionHash) -> Option<u32> {
     let map = hashes
         .iter()
         .map(|i| {
-            let hash = if *i > u8::MAX as u32 {
-                action_hash(&i.to_le_bytes())
-            } else {
-                action_hash(&[*i as u8])
-            };
+            let hash = hash_from_u32(*i);
             (hash, *i)
         })
         .collect::<HashMap<_, _>>();

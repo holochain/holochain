@@ -223,6 +223,14 @@ ghost_actor::ghost_chan! {
             options: GetActivityOptions,
         ) -> AgentActivityResponse<ActionHash>;
 
+        /// A remote node is requesting agent activity from us.
+        fn must_get_agent_activity(
+            dna_hash: DnaHash,
+            to_agent: AgentPubKey,
+            author: AgentPubKey,
+            filter: holochain_zome_types::chain::ChainFilter,
+        ) -> MustGetAgentActivityResponse;
+
         /// A remote node has sent us a validation receipt.
         fn validation_receipt_received(
             dna_hash: DnaHash,
@@ -277,6 +285,7 @@ macro_rules! match_p2p_evt {
             HolochainP2pEvent::GetMeta { $i, .. } => { $($t)* }
             HolochainP2pEvent::GetLinks { $i, .. } => { $($t)* }
             HolochainP2pEvent::GetAgentActivity { $i, .. } => { $($t)* }
+            HolochainP2pEvent::MustGetAgentActivity { $i, .. } => { $($t)* }
             HolochainP2pEvent::ValidationReceiptReceived { $i, .. } => { $($t)* }
             HolochainP2pEvent::SignNetworkData { $i, .. } => { $($t)* }
             HolochainP2pEvent::CountersigningSessionNegotiation { $i, .. } => { $($t)* }

@@ -14,7 +14,7 @@ pub struct GenesisSelfCheckInvocation {
     pub payload: Arc<GenesisSelfCheckData>,
 }
 
-#[derive(Clone, Constructor)]
+#[derive(Clone, Constructor, Debug)]
 pub struct GenesisSelfCheckHostAccess;
 
 impl From<GenesisSelfCheckHostAccess> for HostContext {

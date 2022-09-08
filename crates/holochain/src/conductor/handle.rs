@@ -776,6 +776,7 @@ impl ConductorHandleT for ConductorHandleImpl {
             | GetMeta { .. }
             | GetLinks { .. }
             | GetAgentActivity { .. }
+            | MustGetAgentActivity { .. }
             | ValidationReceiptReceived { .. } => {
                 let cell_id = CellId::new(event.dna_hash().clone(), event.target_agents().clone());
                 let cell = self.cell_by_id(&cell_id)?;
@@ -1353,7 +1354,7 @@ impl ConductorHandleT for ConductorHandleImpl {
 
             // Validate the chain.
             crate::core::validate_chain(
-                records.iter().map(|e| e.action_hashed()),
+                records.iter().map(|e| e.signed_action()),
                 &persisted_chain_head.clone().filter(|_| !truncate),
             )
             .map_err(|e| SourceChainError::InvalidCommit(e.to_string()))?;

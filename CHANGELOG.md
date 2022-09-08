@@ -6,6 +6,184 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20220908.155008
+
+## [holochain\_cli-0.0.56](crates/holochain_cli/CHANGELOG.md#0.0.56)
+
+## [holochain\_cli\_sandbox-0.0.52](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.52)
+
+## [holochain\_cli\_bundle-0.0.51](crates/holochain_cli_bundle/CHANGELOG.md#0.0.51)
+
+## [holochain-0.0.161](crates/holochain/CHANGELOG.md#0.0.161)
+
+## [holochain\_test\_wasm\_common-0.0.52](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.52)
+
+## [holochain\_conductor\_api-0.0.58](crates/holochain_conductor_api/CHANGELOG.md#0.0.58)
+
+## [holochain\_wasm\_test\_utils-0.0.57](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.57)
+
+## [holochain\_cascade-0.0.60](crates/holochain_cascade/CHANGELOG.md#0.0.60)
+
+## [holochain\_state-0.0.58](crates/holochain_state/CHANGELOG.md#0.0.58)
+
+## [holochain\_p2p-0.0.55](crates/holochain_p2p/CHANGELOG.md#0.0.55)
+
+## [holochain\_types-0.0.55](crates/holochain_types/CHANGELOG.md#0.0.55)
+
+## [holochain\_keystore-0.0.54](crates/holochain_keystore/CHANGELOG.md#0.0.54)
+
+## [holochain\_sqlite-0.0.53](crates/holochain_sqlite/CHANGELOG.md#0.0.53)
+
+## [kitsune\_p2p-0.0.44](crates/kitsune_p2p/CHANGELOG.md#0.0.44)
+
+- Fixes a regression where a node can prematurely end a gossip round if their partner signals that they are done sending data, even if the node itself still has more data to send, which can lead to persistent timeouts between the two nodes. [\#1553](https://github.com/holochain/holochain/pull/1553)
+
+## [kitsune\_p2p\_proxy-0.0.32](crates/kitsune_p2p_proxy/CHANGELOG.md#0.0.32)
+
+## [kitsune\_p2p\_transport\_quic-0.0.32](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.0.32)
+
+## [kitsune\_p2p\_types-0.0.32](crates/kitsune_p2p_types/CHANGELOG.md#0.0.32)
+
+## [hdk-0.0.151](crates/hdk/CHANGELOG.md#0.0.151)
+
+## [holochain\_zome\_types-0.0.47](crates/holochain_zome_types/CHANGELOG.md#0.0.47)
+
+## [kitsune\_p2p\_dht-0.0.5](crates/kitsune_p2p_dht/CHANGELOG.md#0.0.5)
+
+## [hdi-0.1.1](crates/hdi/CHANGELOG.md#0.1.1)
+
+## [hdk\_derive-0.0.48](crates/hdk_derive/CHANGELOG.md#0.0.48)
+
+## [holochain\_integrity\_types-0.0.18](crates/holochain_integrity_types/CHANGELOG.md#0.0.18)
+
+# 20220907.100911
+
+## [holochain-0.0.160](crates/holochain/CHANGELOG.md#0.0.160)
+
+## [holochain\_test\_wasm\_common-0.0.51](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.51)
+
+## [holochain\_cascade-0.0.59](crates/holochain_cascade/CHANGELOG.md#0.0.59)
+
+## [hdk-0.0.150](crates/hdk/CHANGELOG.md#0.0.150)
+
+## [hdi-0.1.0](crates/hdi/CHANGELOG.md#0.1.0)
+
+- Initial minor version bump. This indicates our impression that we have made significant progress towards stabilizing the detereministic integrity layer’s API. [\#1550](https://github.com/holochain/holochain/pull/1550)
+
+# 20220907.014838
+
+## [holochain\_cli-0.0.55](crates/holochain_cli/CHANGELOG.md#0.0.55)
+
+## [holochain\_cli\_sandbox-0.0.51](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.51)
+
+## [holochain\_cli\_bundle-0.0.50](crates/holochain_cli_bundle/CHANGELOG.md#0.0.50)
+
+## [holochain-0.0.159](crates/holochain/CHANGELOG.md#0.0.159)
+
+- Updates TLS certificate handling so that multiple conductors can share the same lair, but use different TLS certificates by storing a “tag” in the conductor state database. This should not be a breaking change, but *will* result in a new TLS certificate being used per conductor. [\#1519](https://github.com/holochain/holochain/pull/1519)
+
+## [holochain\_test\_wasm\_common-0.0.50](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.50)
+
+## [holochain\_conductor\_api-0.0.57](crates/holochain_conductor_api/CHANGELOG.md#0.0.57)
+
+## [holochain\_wasm\_test\_utils-0.0.56](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.56)
+
+## [holochain\_cascade-0.0.58](crates/holochain_cascade/CHANGELOG.md#0.0.58)
+
+## [holochain\_state-0.0.57](crates/holochain_state/CHANGELOG.md#0.0.57)
+
+## [holochain\_p2p-0.0.54](crates/holochain_p2p/CHANGELOG.md#0.0.54)
+
+## [holochain\_types-0.0.54](crates/holochain_types/CHANGELOG.md#0.0.54)
+
+## [holochain\_keystore-0.0.53](crates/holochain_keystore/CHANGELOG.md#0.0.53)
+
+- Add lair disconnect detection / reconnect loop with backoff for keystore resiliency. [\#1529](https://github.com/holochain/holochain/pull/1529)
+
+## [holochain\_sqlite-0.0.52](crates/holochain_sqlite/CHANGELOG.md#0.0.52)
+
+## [kitsune\_p2p-0.0.43](crates/kitsune_p2p/CHANGELOG.md#0.0.43)
+
+- Increases all gossip bandwidth rate limits to 10mbps, up from 0.1mbps, allowing for gossip of larger entries
+- Adds `gossip_burst_ratio` to `KitsuneTuningParams`, allowing tuning of bandwidth bursts
+- Fixes a bug where a too-large gossip payload could put the rate limiter into an infinite loop
+
+## [kitsune\_p2p\_proxy-0.0.31](crates/kitsune_p2p_proxy/CHANGELOG.md#0.0.31)
+
+## [kitsune\_p2p\_transport\_quic-0.0.31](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.0.31)
+
+## [kitsune\_p2p\_types-0.0.31](crates/kitsune_p2p_types/CHANGELOG.md#0.0.31)
+
+## [hdk-0.0.149](crates/hdk/CHANGELOG.md#0.0.149)
+
+## [holochain\_zome\_types-0.0.46](crates/holochain_zome_types/CHANGELOG.md#0.0.46)
+
+## [kitsune\_p2p\_dht-0.0.4](crates/kitsune_p2p_dht/CHANGELOG.md#0.0.4)
+
+## [hdi-0.0.21](crates/hdi/CHANGELOG.md#0.0.21)
+
+## [hdk\_derive-0.0.47](crates/hdk_derive/CHANGELOG.md#0.0.47)
+
+## [holochain\_integrity\_types-0.0.17](crates/holochain_integrity_types/CHANGELOG.md#0.0.17)
+
+## [kitsune\_p2p\_timestamp-0.0.13](crates/kitsune_p2p_timestamp/CHANGELOG.md#0.0.13)
+
+# 20220831.015922
+
+## [holochain\_cli-0.0.54](crates/holochain_cli/CHANGELOG.md#0.0.54)
+
+## [holochain\_cli\_sandbox-0.0.50](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.50)
+
+## [holochain\_cli\_bundle-0.0.49](crates/holochain_cli_bundle/CHANGELOG.md#0.0.49)
+
+## [holochain-0.0.158](crates/holochain/CHANGELOG.md#0.0.158)
+
+## [holochain\_test\_wasm\_common-0.0.49](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.49)
+
+## [holochain\_conductor\_api-0.0.56](crates/holochain_conductor_api/CHANGELOG.md#0.0.56)
+
+## [holochain\_wasm\_test\_utils-0.0.55](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.55)
+
+## [holochain\_cascade-0.0.57](crates/holochain_cascade/CHANGELOG.md#0.0.57)
+
+## [holochain\_state-0.0.56](crates/holochain_state/CHANGELOG.md#0.0.56)
+
+## [holochain\_p2p-0.0.53](crates/holochain_p2p/CHANGELOG.md#0.0.53)
+
+## [holochain\_types-0.0.53](crates/holochain_types/CHANGELOG.md#0.0.53)
+
+## [holochain\_keystore-0.0.52](crates/holochain_keystore/CHANGELOG.md#0.0.52)
+
+## [holochain\_sqlite-0.0.51](crates/holochain_sqlite/CHANGELOG.md#0.0.51)
+
+## [hdk-0.0.148](crates/hdk/CHANGELOG.md#0.0.148)
+
+## [holochain\_zome\_types-0.0.45](crates/holochain_zome_types/CHANGELOG.md#0.0.45)
+
+## [hdi-0.0.20](crates/hdi/CHANGELOG.md#0.0.20)
+
+- Adds `must_get_agent_activity` which allows depending on an agents source chain by using a deterministic hash bounded range query. [\#1502](https://github.com/holochain/holochain/pull/1502)
+
+## [hdk\_derive-0.0.46](crates/hdk_derive/CHANGELOG.md#0.0.46)
+
+## [holochain\_integrity\_types-0.0.16](crates/holochain_integrity_types/CHANGELOG.md#0.0.16)
+
+- Adds `ChainFilter` type for use in `must_get_agent_activity`. This allows specifying a chain top hash to start from and then creates a range either to genesis or `unit` a given hash or after `take`ing a number of actions. The range iterates backwards from the given chain top till it reaches on of the above possible chain bottoms. For this reason it will never contain forks. [\#1502](https://github.com/holochain/holochain/pull/1502)
+
+# 20220824.014353
+
+## [holochain\_cli-0.0.53](crates/holochain_cli/CHANGELOG.md#0.0.53)
+
+## [holochain\_cli\_sandbox-0.0.49](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.49)
+
+## [holochain-0.0.157](crates/holochain/CHANGELOG.md#0.0.157)
+
+## [holochain\_conductor\_api-0.0.55](crates/holochain_conductor_api/CHANGELOG.md#0.0.55)
+
+## [holochain\_cascade-0.0.56](crates/holochain_cascade/CHANGELOG.md#0.0.56)
+
+## [holochain\_state-0.0.55](crates/holochain_state/CHANGELOG.md#0.0.55)
+
 # 20220823.103320
 
 ## [holochain-0.0.156](crates/holochain/CHANGELOG.md#0.0.156)
