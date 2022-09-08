@@ -1798,7 +1798,7 @@ pub mod tests {
         fresh_reader_test!(vault, |txn| {
             assert_matches!(
                 chain_head_db(&txn, author.clone()),
-                Err(SourceChainError::ChainEmpty)
+                Ok(None)
             );
         });
         genesis(
