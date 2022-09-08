@@ -922,13 +922,6 @@ impl ConductorHandleT for ConductorHandleImpl {
                     "no base cell found for provided role id".to_string(),
                 )
             })?;
-        let role = app.role(&role_id)?;
-        if role.is_clone_limit_reached() {
-            return Err(ConductorError::AppError(AppError::CloneLimitExceeded(
-                role.clone_limit(),
-                role.clone(),
-            )));
-        }
 
         // create cell
         let network_seed = phenotype.network_seed.unwrap_or_else(random_network_seed);
