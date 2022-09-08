@@ -32,6 +32,10 @@ pub trait HdiT: Send + Sync {
         &self,
         must_get_valid_record_input: MustGetValidRecordInput,
     ) -> ExternResult<Record>;
+    fn must_get_agent_activity(
+        &self,
+        must_get_agent_activity_input: MustGetAgentActivityInput,
+    ) -> ExternResult<Vec<RegisterAgentActivity>>;
     // Info
     fn dna_info(&self, dna_info_input: ()) -> ExternResult<DnaInfo>;
     fn zome_info(&self, zome_info_input: ()) -> ExternResult<ZomeInfo>;
@@ -75,6 +79,12 @@ impl HdiT for ErrHdi {
         Self::err()
     }
     fn must_get_valid_record(&self, _: MustGetValidRecordInput) -> ExternResult<Record> {
+        Self::err()
+    }
+    fn must_get_agent_activity(
+        &self,
+        _: MustGetAgentActivityInput,
+    ) -> ExternResult<Vec<RegisterAgentActivity>> {
         Self::err()
     }
     fn dna_info(&self, _: ()) -> ExternResult<DnaInfo> {
@@ -141,6 +151,15 @@ impl HdiT for HostHdi {
         host_call::<MustGetValidRecordInput, Record>(
             __must_get_valid_record,
             must_get_valid_record_input,
+        )
+    }
+    fn must_get_agent_activity(
+        &self,
+        must_get_agent_activity_input: MustGetAgentActivityInput,
+    ) -> ExternResult<Vec<RegisterAgentActivity>> {
+        host_call::<MustGetAgentActivityInput, Vec<RegisterAgentActivity>>(
+            __must_get_agent_activity,
+            must_get_agent_activity_input,
         )
     }
     fn dna_info(&self, _: ()) -> ExternResult<DnaInfo> {

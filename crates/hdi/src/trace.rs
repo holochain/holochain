@@ -5,7 +5,7 @@ use std::sync::atomic::Ordering;
 
 #[derive(Default)]
 pub struct WasmSubscriber {
-    ids: AtomicUsize,
+    pub ids: AtomicUsize,
 }
 
 /// Very basic struct to hold strings that can be written to by the tracing crate and sent to the host when complete.

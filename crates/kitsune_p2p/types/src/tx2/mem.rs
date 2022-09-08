@@ -355,6 +355,7 @@ impl EndpointAdapt for MemEndpointAdapt {
             use futures::future::TryFutureExt;
             if timeout
                 .mix(
+                    "MemEndpointAdapt::connect",
                     c_send
                         .send((oth_con, oth_chan_recv))
                         .map_err(|_| KitsuneError::from(KitsuneErrorKind::Closed)),
@@ -404,7 +405,7 @@ impl BindAdapt for MemBackendAdapt {
     fn bind(&self, _url: TxUrl, timeout: KitsuneTimeout) -> EndpointFut {
         let local_cert = self.0.clone();
         timeout
-            .mix(async move {
+            .mix("MemBackendAdapt::bind", async move {
                 let id = NEXT_MEM_ID.fetch_add(1, atomic::Ordering::SeqCst);
                 let (c_send, c_recv) = t_chan(32);
                 let (ep, ep_active) = MemEndpointAdapt::new(c_send.clone(), id, local_cert.clone());

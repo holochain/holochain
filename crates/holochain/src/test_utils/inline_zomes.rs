@@ -71,6 +71,7 @@ pub fn batch_create_zome() -> InlineZomeSet {
 
 #[derive(
     Debug,
+    Clone,
     PartialEq,
     Eq,
     PartialOrd,
@@ -125,6 +126,13 @@ pub fn simple_crud_zome() -> InlineZomeSet {
         .callback("read", |api, hash: ActionHash| {
             api.get(vec![GetInput::new(hash.into(), GetOptions::default())])
                 .map_err(Into::into)
+        })
+        .callback("read_multi", |api, hashes: Vec<ActionHash>| {
+            let gets = hashes
+                .iter()
+                .map(|h| GetInput::new(h.clone().into(), GetOptions::default()))
+                .collect();
+            api.get(gets).map_err(Into::into)
         })
         .callback("read_entry", |api, hash: EntryHash| {
             api.get(vec![GetInput::new(hash.into(), GetOptions::default())])

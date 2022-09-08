@@ -16,6 +16,8 @@ use crate::prelude::ChainItem;
     Debug,
     PartialEq,
     Eq,
+    PartialOrd,
+    Ord,
     Hash,
     derive_more::From,
     derive_more::Deref,

@@ -35,6 +35,7 @@ pub fn r_activity(action: Action) -> Op {
             },
             signature: Signature([0u8; 64]),
         },
+        cached_entry: None,
     })
 }
 

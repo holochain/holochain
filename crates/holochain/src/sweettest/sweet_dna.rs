@@ -62,12 +62,14 @@ impl SweetDnaFile {
             .into_iter()
             .map(CoordinatorZome::into_inner)
             .collect();
+        let one_hour_ago =
+            Timestamp::from_micros(Timestamp::now().as_micros() - (1_000_000 * 60 * 60));
         let dna_def = DnaDefBuilder::default()
             .network_seed(network_seed)
             .integrity_zomes(iz)
             .coordinator_zomes(cz)
             .properties(properties.clone())
-            .origin_time(Timestamp::HOLOCHAIN_EPOCH)
+            .origin_time(one_hour_ago)
             .build()
             .unwrap();
 
