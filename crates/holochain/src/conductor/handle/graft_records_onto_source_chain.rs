@@ -1,24 +1,7 @@
-#![allow(missing_docs)]
-#![allow(dead_code)]
-
 use holochain_state::source_chain::SourceChain;
 use holochain_types::prelude::ChainItem;
 
 use super::*;
-
-/// Specify the method to use when inserting records into the source chain
-pub enum InsertionMethod {
-    /// Simply add the new records on top of the existing ones
-    Append,
-    /// Remove all existing records before adding the new ones
-    Reset,
-    /// Find which existing records can remain which still constitute a valid
-    /// chain after the new records are inserted, keeping those and discarding
-    /// the rest.
-    Graft,
-}
-
-pub type ChainHead = Option<(ActionHash, u32)>;
 
 pub(crate) async fn graft_records_onto_source_chain(
     handle: Arc<ConductorHandleImpl>,
@@ -190,8 +173,10 @@ async fn validate_records(
 
 /// Specifies a set of existing actions forming a chain, and a set of incoming actions
 /// to attempt to "graft" onto the existing chain.
+///
 /// The existing actions are guaranteed to be ordered in descending sequence order,
 /// and the incoming actions are guaranteed to be ordered in increasing sequence order.
+/// This is just easier for implementation purposes.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ChainGraft<A, B> {
     existing: Vec<A>,
@@ -206,6 +191,8 @@ enum Pivot {
 }
 
 impl<A: ChainItem, B: Clone + AsRef<A>> ChainGraft<A, B> {
+    /// Constructor, ensuring that existing items are sorted descending,
+    /// and incoming items are sorted ascending.
     pub fn new(mut existing: Vec<A>, mut incoming: Vec<B>) -> Self {
         existing.sort_unstable_by_key(|r| u32::MAX - r.seq());
         incoming.sort_unstable_by_key(|r| r.as_ref().seq());
@@ -298,6 +285,7 @@ impl<A: ChainItem, B: Clone + AsRef<A>> ChainGraft<A, B> {
         (Some(take), overlap)
     }
 
+    #[allow(dead_code)]
     pub fn existing(&self) -> &[A] {
         self.existing.as_ref()
     }

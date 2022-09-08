@@ -1796,10 +1796,7 @@ pub mod tests {
         let author = Arc::new(keystore.new_sign_keypair_random().await.unwrap());
 
         fresh_reader_test!(vault, |txn| {
-            assert_matches!(
-                chain_head_db(&txn, author.clone()),
-                Ok(None)
-            );
+            assert_matches!(chain_head_db(&txn, author.clone()), Ok(None));
         });
         genesis(
             vault.clone().into(),
