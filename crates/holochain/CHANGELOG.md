@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - Implement App API call `CreateCloneCell`. [\#1547](https://github.com/holochain/holochain/pull/1547)
 
+## 0.0.161
+
 ## 0.0.160
 
 ## 0.0.159

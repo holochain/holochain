@@ -520,26 +520,31 @@ impl InstalledAppCommon {
     }
 
     /// Add a cloned cell.
-    pub fn add_clone(&mut self, clone_id: &CloneId, cell_id: &CellId) -> AppResult<()> {
-        let app_role_assignment = self.role_mut(&clone_id.as_base_role_id())?;
+    pub fn add_clone(&mut self, role_id: &AppRoleId, cell_id: &CellId) -> AppResult<CloneId> {
+        let app_role_assignment = self.role_mut(role_id)?;
         assert_eq!(
             cell_id.agent_pubkey(),
             app_role_assignment.agent_key(),
             "A clone cell must use the same agent key as the role it is added to"
         );
-        if app_role_assignment.clones.len() as u32 >= app_role_assignment.clone_limit {
+        if app_role_assignment.is_clone_limit_reached() {
             return Err(AppError::CloneLimitExceeded(
                 app_role_assignment.clone_limit,
                 app_role_assignment.clone(),
             ));
         }
-        if app_role_assignment.clones.contains_key(clone_id) {
-            return Err(AppError::DuplicateCloneIds(clone_id.clone()));
+        let clone_id = CloneId::new(role_id, app_role_assignment.next_clone_index);
+        if app_role_assignment.clones.contains_key(&clone_id) {
+            return Err(AppError::DuplicateCloneIds(clone_id));
         }
+
+        // add clone
         app_role_assignment
             .clones
             .insert(clone_id.clone(), cell_id.clone());
-        Ok(())
+        // increment next clone index
+        app_role_assignment.next_clone_index += 1;
+        Ok(clone_id)
     }
 
     /// Get a clone cell id from its clone id.
@@ -952,22 +957,23 @@ mod tests {
 
         // Can add clones up to the limit
         let clones: Vec<_> = vec![new_clone(), new_clone(), new_clone()];
-        app.add_clone(&CloneId::new(&role_id, 0), &clones[0])
-            .unwrap();
-        app.add_clone(&CloneId::new(&role_id, 1), &clones[1])
-            .unwrap();
-        app.add_clone(&CloneId::new(&role_id, 2), &clones[2])
-            .unwrap();
+        let clone_id_0 = app.add_clone(&role_id, &clones[0]).unwrap();
+        let clone_id_1 = app.add_clone(&role_id, &clones[1]).unwrap();
+        let clone_id_2 = app.add_clone(&role_id, &clones[2]).unwrap();
+
+        assert_eq!(clone_id_0, CloneId::new(&role_id, 0));
+        assert_eq!(clone_id_1, CloneId::new(&role_id, 1));
+        assert_eq!(clone_id_2, CloneId::new(&role_id, 2));
 
         assert_eq!(app.cloned_cells().count(), 3);
 
         // Adding the same clone twice should return an error
-        let result_add_clone_twice = app.add_clone(&CloneId::new(&role_id, 0), &clones[0]);
+        let result_add_clone_twice = app.add_clone(&role_id, &clones[0]);
         assert!(result_add_clone_twice.is_err());
 
         // Adding a clone beyond the clone_limit is an error
         matches::assert_matches!(
-            app.add_clone(&CloneId::new(&role_id, clone_limit + 1), &new_clone()),
+            app.add_clone(&role_id, &new_clone()),
             Err(AppError::CloneLimitExceeded(3, _))
         );
 
