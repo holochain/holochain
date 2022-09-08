@@ -57,7 +57,10 @@ impl Default for ChainQueryFilterRange {
     }
 }
 
-/// Query arguments
+/// Specifies arguments to a query of the source chain, including ordering and filtering.
+///
+/// This struct is used to construct an actual SQL query on the database, and also has methods
+/// to allow filtering in-memory.
 #[derive(
     serde::Serialize, serde::Deserialize, SerializedBytes, Default, PartialEq, Clone, Debug,
 )]
@@ -78,7 +81,8 @@ pub struct ChainQueryFilter {
     pub action_type: Option<ActionType>,
     /// Include the entries in the records
     pub include_entries: bool,
-    /// The query should be ordered in descending order (default is ascending)
+    /// The query should be ordered in descending order (default is ascending),
+    /// when run as a database query. There is no provisioning for in-memory ordering.
     pub order_descending: bool,
 }
 
@@ -414,13 +418,6 @@ mod tests {
         assert_eq!(
             map_query(&query_2, &actions),
             [false, true, false, true, false, false, false].to_vec()
-        );
-        assert_eq!(
-            map_query(&query_2.descending(), &actions),
-            [false, true, false, true, false, false, false]
-                .into_iter()
-                .rev()
-                .collect::<Vec<_>>()
         );
     }
 
