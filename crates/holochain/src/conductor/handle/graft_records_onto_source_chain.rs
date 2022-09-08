@@ -142,7 +142,7 @@ async fn validate_records(
     let sc = workspace.source_chain();
 
     // Validate the chain.
-    crate::core::validate_chain(records.iter().map(|e| e.signed_action()), &chain_top)
+    crate::core::validate_chain(records.iter().map(|e| e.signed_action()), chain_top)
         .map_err(|e| SourceChainError::InvalidCommit(e.to_string()))?;
 
     // Add the records to the source chain so we can validate them.
