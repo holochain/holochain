@@ -535,7 +535,7 @@ impl InstalledAppCommon {
         }
         let clone_id = CloneId::new(role_id, app_role_assignment.next_clone_index);
         if app_role_assignment.clones.contains_key(&clone_id) {
-            return Err(AppError::DuplicateCloneIds(clone_id.clone()));
+            return Err(AppError::DuplicateCloneIds(clone_id));
         }
 
         // add clone
