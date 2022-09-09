@@ -89,8 +89,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                                     .to_string(),
                             ));
                         }
-                        let dna = self
-                            .conductor_handle
+                        self.conductor_handle
                             .get_dna_file(hash)
                             .ok_or_else(|| {
                                 ConductorApiError::DnaReadError(format!(
@@ -98,8 +97,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                                     hash
                                 ))
                             })?
-                            .modify_phenotype(phenotype);
-                        dna
+                            .modify_phenotype(phenotype)
                     }
                     DnaSource::Path(ref path) => {
                         let bundle = Bundle::read_from_file(path).await?;
