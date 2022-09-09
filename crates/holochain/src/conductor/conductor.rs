@@ -763,7 +763,7 @@ impl Conductor {
         &self,
         app_id: InstalledAppId,
         role_id: AppRoleId,
-        dna_phenotype: DnaPhenotypeOption,
+        dna_phenotype: DnaPhenotypeOpt,
         name: Option<String>,
     ) -> ConductorResult<InstalledCell> {
         let ribosome_store = &self.ribosome_store;

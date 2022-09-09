@@ -1,3 +1,4 @@
+use holochain_serialized_bytes::SerializedBytesError;
 use thiserror::Error;
 
 use crate::prelude::AppRoleId;
@@ -10,6 +11,9 @@ pub enum AppManifestError {
 
     #[error("Invalid manifest for app role '{0}': Using strategy 'disabled' with clone_limit == 0 is pointless")]
     InvalidStrategyDisabled(AppRoleId),
+
+    #[error(transparent)]
+    SerializationError(#[from] SerializedBytesError),
 }
 
 pub type AppManifestResult<T> = Result<T, AppManifestError>;

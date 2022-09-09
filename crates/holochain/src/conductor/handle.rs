@@ -926,7 +926,12 @@ impl ConductorHandleT for ConductorHandleImpl {
         // add cell to app
         let installed_clone_cell = self
             .conductor
-            .add_clone_cell_to_app(app_id.clone(), role_id.clone(), phenotype, name)
+            .add_clone_cell_to_app(
+                app_id.clone(),
+                role_id.clone(),
+                phenotype.serialized()?,
+                name,
+            )
             .await?;
 
         // run genesis on cloned cell

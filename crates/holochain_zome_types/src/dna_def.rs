@@ -46,7 +46,7 @@ pub struct DnaPhenotype {
 impl DnaPhenotype {
     /// Replace fields in the phenotype with any Some fields in the argument.
     /// None fields remain unchanged.
-    pub fn update(mut self, phenotype: DnaPhenotypeOption) -> DnaPhenotype {
+    pub fn update(mut self, phenotype: DnaPhenotypeOpt) -> DnaPhenotype {
         self.network_seed = phenotype.network_seed.unwrap_or_else(|| self.network_seed);
         self.properties = phenotype.properties.unwrap_or_else(|| self.properties);
         self.origin_time = phenotype.origin_time.unwrap_or_else(|| self.origin_time);
@@ -55,17 +55,72 @@ impl DnaPhenotype {
 }
 
 /// [`DnaPhenotype`] options of which all are optional.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct DnaPhenotypeOption {
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+pub struct DnaPhenotypeOpt<P = SerializedBytes> {
     /// see [`DnaPhenotype`]
     pub network_seed: Option<NetworkSeed>,
     /// see [`DnaPhenotype`]
-    pub properties: Option<SerializedBytes>,
+    pub properties: Option<P>,
     /// see [`DnaPhenotype`]
     pub origin_time: Option<Timestamp>,
 }
 
-impl DnaPhenotypeOption {
+impl<P: TryInto<SerializedBytes, Error = E>, E: Into<SerializedBytesError>> Default
+    for DnaPhenotypeOpt<P>
+{
+    fn default() -> Self {
+        Self::none()
+    }
+}
+
+impl<P: TryInto<SerializedBytes, Error = E>, E: Into<SerializedBytesError>> DnaPhenotypeOpt<P> {
+    /// Constructor with all fields set to `None`
+    pub fn none() -> Self {
+        Self {
+            network_seed: None,
+            properties: None,
+            origin_time: None,
+        }
+    }
+
+    /// Serialize the properties field into SerializedBytes
+    pub fn serialized(self) -> Result<DnaPhenotypeOpt<SerializedBytes>, E> {
+        let Self {
+            network_seed,
+            properties,
+            origin_time,
+        } = self;
+        let properties = if let Some(p) = properties {
+            Some(p.try_into()?)
+        } else {
+            None
+        };
+        Ok(DnaPhenotypeOpt {
+            network_seed,
+            properties,
+            origin_time,
+        })
+    }
+
+    /// Return a modified form with the `network_seed` field set
+    pub fn with_network_seed(mut self, network_seed: NetworkSeed) -> Self {
+        self.network_seed = Some(network_seed);
+        self
+    }
+
+    /// Return a modified form with the `properties` field set
+    pub fn with_properties(mut self, properties: P) -> Self {
+        self.properties = Some(properties);
+        self
+    }
+
+    /// Return a modified form with the `origin_time` field set
+    pub fn with_origin_time(mut self, origin_time: Timestamp) -> Self {
+        self.origin_time = Some(origin_time);
+        self
+    }
+
     /// Check if at least one of the options is set.
     pub fn has_some_option_set(&self) -> bool {
         self.network_seed.is_some() || self.properties.is_some() || self.origin_time.is_some()
@@ -230,7 +285,7 @@ impl DnaDef {
 
     /// Change the "phenotype" of this DNA -- the network seed, properties and origin time -- while
     /// leaving the "genotype" of actual DNA code intact.
-    pub fn modify_phenotype(&self, dna_phenotype: DnaPhenotypeOption) -> Self {
+    pub fn modify_phenotype(&self, dna_phenotype: DnaPhenotypeOpt) -> Self {
         let mut clone = self.clone();
         clone.phenotype = clone.phenotype.update(dna_phenotype);
         clone
