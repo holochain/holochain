@@ -508,17 +508,6 @@ impl InstalledAppCommon {
         &self.role_assignments
     }
 
-    /// Get the next clone index for a role id.
-    pub fn next_clone_index(&self, role_id: &AppRoleId) -> AppResult<u32> {
-        Ok(self.role(role_id)?.next_clone_index)
-    }
-
-    /// Increment index for next clone cell for a role id.
-    pub fn increment_next_clone_index(&mut self, role_id: &AppRoleId) -> AppResult<()> {
-        self.role_mut(role_id)?.next_clone_index += 1;
-        Ok(())
-    }
-
     /// Add a cloned cell.
     pub fn add_clone(&mut self, role_id: &AppRoleId, cell_id: &CellId) -> AppResult<CloneId> {
         let app_role_assignment = self.role_mut(role_id)?;
