@@ -17,6 +17,50 @@ pub type CoordinatorZomes = Vec<(ZomeName, zome::CoordinatorZomeDef)>;
 /// Placeholder for a real network seed type. See [`DnaDef`].
 pub type NetworkSeed = String;
 
+/// "Phenotype" of this DNA - the network seed, properties and origin time - as
+/// opposed to its "genotype" - the actual DNA code. The phenotype fields are
+/// included in the DNA hash computation.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "full-dna-def", derive(derive_builder::Builder))]
+pub struct DnaPhenotype {
+    /// The network seed of a DNA is included in the computation of the DNA hash.
+    /// The DNA hash in turn determines the network peers and the DHT, meaning
+    /// that only peers with the same DNA hash of a shared DNA participate in the
+    /// same network and co-create the DHT. To create a separate DHT for the DNA,
+    /// a unique network seed can be specified.
+    // TODO: consider Vec<u8> instead (https://github.com/holochain/holochain/pull/86#discussion_r412689085)
+    pub network_seed: NetworkSeed,
+
+    /// Any arbitrary application properties can be included in this object.
+    #[cfg_attr(feature = "full-dna-def", builder(default = "().try_into().unwrap()"))]
+    pub properties: SerializedBytes,
+
+    /// The time used to denote the origin of the network, used to calculate
+    /// time windows during gossip.
+    /// All Action timestamps must come after this time.
+    #[cfg_attr(feature = "full-dna-def", builder(default = "Timestamp::now()"))]
+    pub origin_time: Timestamp,
+}
+
+/// [`DnaPhenotype`] options of which all are optional.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct DnaPhenotypeOption {
+    /// see [`DnaPhenotype`]
+    pub network_seed: Option<NetworkSeed>,
+    /// see [`DnaPhenotype`]
+    pub properties: Option<SerializedBytes>,
+    /// see [`DnaPhenotype`]
+    pub origin_time: Option<Timestamp>,
+}
+
+impl DnaPhenotypeOption {
+    /// Check if at least one of the options is set.
+    pub fn has_some_option_set(&self) -> bool {
+        self.network_seed.is_some() || self.properties.is_some() || self.origin_time.is_some()
+    }
+}
+
 /// The definition of a DNA: the hash of this data is what produces the DnaHash.
 ///
 /// Historical note: This struct was written before `DnaManifest` appeared.
@@ -36,23 +80,11 @@ pub struct DnaDef {
     )]
     pub name: String,
 
-    /// The network seed of a DNA is included in the computation of the DNA hash.
-    /// The DNA hash in turn determines the network peers and the DHT, meaning
-    /// that only peers with the same DNA hash of a shared DNA participate in the
-    /// same network and co-create the DHT. To create a separate DHT for the DNA,
-    /// a unique network seed can be specified.
-    // TODO: consider Vec<u8> instead (https://github.com/holochain/holochain/pull/86#discussion_r412689085)
-    pub network_seed: String,
-
-    /// Any arbitrary application properties can be included in this object.
-    #[cfg_attr(feature = "full-dna-def", builder(default = "().try_into().unwrap()"))]
-    pub properties: SerializedBytes,
-
-    /// The time used to denote the origin of the network, used to calculate
-    /// time windows during gossip.
-    /// All Action timestamps must come after this time.
-    #[cfg_attr(feature = "full-dna-def", builder(default = "Timestamp::now()"))]
-    pub origin_time: Timestamp,
+    /// "Phenotype" of this DNA - the network seed, properties and origin time - as
+    /// opposed to its "genotype" - the actual DNA code. The phenotype fields are
+    /// included in the DNA hash computation.
+    #[serde(flatten)]
+    pub phenotype: DnaPhenotype,
 
     /// A vector of zomes associated with your DNA.
     pub integrity_zomes: IntegrityZomes,
@@ -66,8 +98,7 @@ pub struct DnaDef {
 /// A reference to for creating the hash for [`DnaDef`].
 struct DnaDefHash<'a> {
     name: &'a String,
-    network_seed: &'a String,
-    properties: &'a SerializedBytes,
+    phenotype: &'a DnaPhenotype,
     integrity_zomes: &'a IntegrityZomes,
 }
 
@@ -179,18 +210,24 @@ impl DnaDef {
             })
     }
 
-    /// Change the "phenotype" of this DNA -- the network seed and properties -- while
-    /// leaving the "genotype" of actual DNA code intact
-    pub fn modify_phenotype(&self, network_seed: NetworkSeed, properties: SerializedBytes) -> Self {
+    /// Set the DNA's name.
+    pub fn set_name(&self, name: String) -> Self {
         let mut clone = self.clone();
-        clone.properties = properties;
-        clone.network_seed = network_seed;
+        clone.name = name;
+        clone
+    }
+
+    /// Change the "phenotype" of this DNA -- the network seed, properties and origin time -- while
+    /// leaving the "genotype" of actual DNA code intact.
+    pub fn modify_phenotype(&self, dna_phenotype: DnaPhenotype) -> Self {
+        let mut clone = self.clone();
+        clone.phenotype = dna_phenotype;
         clone
     }
 
     /// Get the topology to use for kitsune gossip
     pub fn topology(&self, cutoff: std::time::Duration) -> kitsune_p2p_dht::spacetime::Topology {
-        kitsune_p2p_dht::spacetime::Topology::standard(self.origin_time, cutoff)
+        kitsune_p2p_dht::spacetime::Topology::standard(self.phenotype.origin_time, cutoff)
     }
 }
 
@@ -204,7 +241,11 @@ pub fn random_network_seed() -> String {
 impl DnaDefBuilder {
     /// Provide a random network seed
     pub fn random_network_seed(&mut self) -> &mut Self {
-        self.network_seed = Some(random_network_seed());
+        self.phenotype = Some(DnaPhenotype {
+            network_seed: random_network_seed(),
+            properties: SerializedBytes::try_from(()).unwrap(),
+            origin_time: Timestamp::now(),
+        });
         self
     }
 }
@@ -224,8 +265,7 @@ impl HashableContent for DnaDef {
     fn hashable_content(&self) -> HashableContentBytes {
         let hash = DnaDefHash {
             name: &self.name,
-            network_seed: &self.network_seed,
-            properties: &self.properties,
+            phenotype: &self.phenotype,
             integrity_zomes: &self.integrity_zomes,
         };
         HashableContentBytes::Content(

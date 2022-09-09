@@ -100,6 +100,14 @@ impl AppInterfaceApi for RealAppInterfaceApi {
                     Err(e) => Ok(AppResponse::Error(e.into())),
                 }
             }
+            AppRequest::CreateCloneCell(payload) => {
+                let installed_clone_cell = self
+                    .conductor_handle
+                    .clone()
+                    .create_clone_cell(*payload)
+                    .await?;
+                Ok(AppResponse::CloneCellCreated(installed_clone_cell))
+            }
             AppRequest::SignalSubscription(_) => Ok(AppResponse::Unimplemented(request)),
             AppRequest::Crypto(_) => Ok(AppResponse::Unimplemented(request)),
         }

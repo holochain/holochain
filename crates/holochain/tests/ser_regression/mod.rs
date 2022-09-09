@@ -45,9 +45,11 @@ async fn ser_regression_test() {
     let dna_file = DnaFile::new(
         DnaDef {
             name: "ser_regression_test".to_string(),
-            network_seed: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
-            properties: SerializedBytes::try_from(()).unwrap(),
-            origin_time: Timestamp::HOLOCHAIN_EPOCH,
+            phenotype: DnaPhenotype {
+                network_seed: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
+                properties: SerializedBytes::try_from(()).unwrap(),
+                origin_time: Timestamp::HOLOCHAIN_EPOCH,
+            },
             integrity_zomes: vec![TestZomes::from(TestWasm::SerRegression)
                 .integrity
                 .into_inner()],

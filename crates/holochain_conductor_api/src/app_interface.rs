@@ -36,6 +36,17 @@ pub enum AppRequest {
     /// [`AppResponse::ZomeCall`]
     ZomeCall(Box<ZomeCall>),
 
+    /// Clone a DNA (in the biological sense), thus creating a new `Cell`.
+    ///
+    /// Using the provided, already-registered DNA, create a new DNA with a unique
+    /// ID and the specified properties, create a new cell from this cloned DNA,
+    /// and add the cell to the specified app.
+    ///
+    /// # Returns
+    ///
+    /// [`AppResponse::CloneCellCreated`]
+    CreateCloneCell(Box<CreateCloneCellPayload>),
+
     #[deprecated = "use ZomeCall"]
     ZomeCallInvocation(Box<ZomeCall>),
 
@@ -69,6 +80,12 @@ pub enum AppResponse {
     ///
     /// [msgpack]: https://msgpack.org/
     ZomeCall(Box<ExternIO>),
+
+    /// The successful response to an [`AppRequest::CreateCloneCell`].
+    ///
+    /// The response contains an [`InstalledCell`] with the created clone
+    /// cell's [`CloneId`] and [`CellId`].
+    CloneCellCreated(InstalledCell),
 
     #[deprecated = "use ZomeCall"]
     ZomeCallInvocation(Box<ExternIO>),
@@ -123,8 +140,11 @@ impl InstalledAppInfo {
     pub fn from_installed_app(app: &InstalledApp) -> Self {
         let installed_app_id = app.id().clone();
         let status = app.status().clone().into();
-        let cell_data = app
-            .provisioned_cells()
+        let clone_cells = app
+            .cloned_cells()
+            .map(|cell| (cell.0.as_app_role_id(), cell.1));
+        let cells = app.provisioned_cells().chain(clone_cells);
+        let cell_data = cells
             .map(|(role_id, id)| InstalledCell::new(id.clone(), role_id.clone()))
             .collect();
         Self {

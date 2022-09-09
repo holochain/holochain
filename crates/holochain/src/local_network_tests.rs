@@ -456,9 +456,11 @@ async fn setup(
     let dna_file = DnaFile::new(
         DnaDef {
             name: "conductor_test".to_string(),
-            network_seed,
-            properties: SerializedBytes::try_from(()).unwrap(),
-            origin_time: Timestamp::HOLOCHAIN_EPOCH,
+            phenotype: DnaPhenotype {
+                network_seed,
+                properties: SerializedBytes::try_from(()).unwrap(),
+                origin_time: Timestamp::HOLOCHAIN_EPOCH,
+            },
             integrity_zomes: zomes
                 .clone()
                 .into_iter()

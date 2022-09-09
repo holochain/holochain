@@ -5,8 +5,17 @@ use crate::prelude::*;
 
 #[derive(Debug, thiserror::Error)]
 pub enum AppError {
-    #[error("Clone limit of {0} exceeded for cell: {1:?}")]
+    #[error("Clone limit of {0} exceeded for app role assignment: {1:?}")]
     CloneLimitExceeded(u32, AppRoleAssignment),
+
+    #[error("Tried to create a clone cell with existing clone cell id '{0}'")]
+    DuplicateCloneIds(CloneId),
+
+    #[error("Could not find clone cell with id '{0}'")]
+    CloneCellNotFound(CloneCellId),
+
+    #[error("Illegal character '{CLONE_ID_DELIMITER}' used in role id: {0}")]
+    IllegalRoleId(AppRoleId),
 
     #[error("Tried to access missing role id: '{0}'")]
     AppRoleIdMissing(AppRoleId),
