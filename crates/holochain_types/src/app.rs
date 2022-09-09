@@ -193,9 +193,7 @@ impl InstallAppDnaPayload {
     }
 }
 
-/// Data about an installed Cell. It's deprecated because it is not used in
-/// the new installation scheme using AppBundles.
-#[deprecated = "can be removed after the old way of installing apps (`InstallApp`) is phased out"]
+/// Data about an installed Cell.
 #[derive(Clone, Debug, Into, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct InstalledCell {
     cell_id: CellId,
