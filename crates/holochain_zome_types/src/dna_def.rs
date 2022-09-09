@@ -43,6 +43,17 @@ pub struct DnaPhenotype {
     pub origin_time: Timestamp,
 }
 
+impl DnaPhenotype {
+    /// Replace fields in the phenotype with any Some fields in the argument.
+    /// None fields remain unchanged.
+    pub fn update(mut self, phenotype: DnaPhenotypeOption) -> DnaPhenotype {
+        self.network_seed = phenotype.network_seed.unwrap_or_else(|| self.network_seed);
+        self.properties = phenotype.properties.unwrap_or_else(|| self.properties);
+        self.origin_time = phenotype.origin_time.unwrap_or_else(|| self.origin_time);
+        self
+    }
+}
+
 /// [`DnaPhenotype`] options of which all are optional.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DnaPhenotypeOption {
@@ -219,9 +230,9 @@ impl DnaDef {
 
     /// Change the "phenotype" of this DNA -- the network seed, properties and origin time -- while
     /// leaving the "genotype" of actual DNA code intact.
-    pub fn modify_phenotype(&self, dna_phenotype: DnaPhenotype) -> Self {
+    pub fn modify_phenotype(&self, dna_phenotype: DnaPhenotypeOption) -> Self {
         let mut clone = self.clone();
-        clone.phenotype = dna_phenotype;
+        clone.phenotype = clone.phenotype.update(dna_phenotype);
         clone
     }
 

@@ -923,19 +923,10 @@ impl ConductorHandleT for ConductorHandleImpl {
                 )
             })?;
 
-        // create cell
-        let network_seed = phenotype.network_seed.unwrap_or_else(random_network_seed);
-        let properties = phenotype.properties.unwrap_or_default();
-        let origin_time = phenotype.origin_time.unwrap_or_else(Timestamp::now);
-        let dna_phenotype = DnaPhenotype {
-            network_seed,
-            origin_time,
-            properties,
-        };
         // add cell to app
         let installed_clone_cell = self
             .conductor
-            .add_clone_cell_to_app(app_id.clone(), role_id.clone(), dna_phenotype, name)
+            .add_clone_cell_to_app(app_id.clone(), role_id.clone(), phenotype, name)
             .await?;
 
         // run genesis on cloned cell
