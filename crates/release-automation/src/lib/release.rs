@@ -219,7 +219,7 @@ fn bump_release_versions<'a>(
                 bail!("previously documented release version '{}' is greater than this release version '{}'", previous_release_version, current_version);
             }
 
-            increment_semver(&mut previous_release_version, semver_increment_mode);
+            increment_semver(&mut previous_release_version, semver_increment_mode)?;
 
             previous_release_version
         } else {
@@ -227,7 +227,7 @@ fn bump_release_versions<'a>(
             let mut new_version = current_version.clone();
 
             if new_version.is_prerelease() {
-                increment_semver(&mut new_version, semver_increment_mode);
+                increment_semver(&mut new_version, semver_increment_mode)?;
             }
 
             new_version
