@@ -147,14 +147,6 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
 
                 Ok(AdminResponse::CoordinatorsUpdated)
             }
-            CreateCloneCell(payload) => {
-                let cell_id = payload.cell_id();
-                self.conductor_handle
-                    .clone()
-                    .create_clone_cell(*payload)
-                    .await?;
-                Ok(AdminResponse::CloneCellCreated(cell_id))
-            }
             InstallApp(payload) => {
                 trace!(?payload.dnas);
                 let InstallAppPayload {

@@ -47,24 +47,13 @@ pub enum AdminRequest {
     /// [`AdminResponse::CoordinatorsUpdated`]
     UpdateCoordinators(Box<UpdateCoordinatorsPayload>),
 
-    /// Clone a DNA (in the biological sense), thus creating a new `Cell`.
-    ///
-    /// Using the provided, already-registered DNA, create a new DNA with a unique
-    /// ID and the specified properties, create a new cell from this cloned DNA,
-    /// and add the cell to the specified app.
-    ///
-    /// # Returns
-    ///
-    /// [`AdminResponse::CloneCellCreated`]
-    CreateCloneCell(Box<CreateCloneCellPayload>),
-
     /// Install an app from a list of DNA paths.
     ///
     /// Triggers genesis to be run on all cells and to be stored.
-    /// An app is intended for use by
-    /// one and only one agent and for that reason it takes an `AgentPubKey` and
-    /// installs all the DNAs with that `AgentPubKey` forming new Cells.
-    /// See [`InstallAppPayload`] for full details on the configuration.
+    /// An app is intended for use by one and only one agent and for that reason
+    /// it takes an `AgentPubKey` and installs all the DNAs with that `AgentPubKey`
+    /// forming new Cells. See [`InstallAppPayload`] for full details on the
+    /// configuration.  
     ///
     /// Note that the new app will not be enabled automatically after installation
     /// and can be enabled by calling [`EnableApp`].
@@ -386,11 +375,6 @@ pub enum AdminResponse {
     ///
     /// It means the app was uninstalled successfully.
     AppUninstalled,
-
-    /// The successful response to an [`AdminRequest::CreateCloneCell`].
-    ///
-    /// The response contains the [`CellId`] of the newly created clone.
-    CloneCellCreated(CellId),
 
     /// The successful response to an [`AdminRequest::AddAdminInterfaces`].
     ///

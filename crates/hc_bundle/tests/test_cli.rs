@@ -176,9 +176,11 @@ async fn test_multi_integrity() {
     let origin_time = Timestamp::from_str(s).unwrap();
     let expected = DnaDef {
         name: "multi integrity dna".into(),
-        network_seed: "00000000-0000-0000-0000-000000000000".into(),
-        properties: ().try_into().unwrap(),
-        origin_time,
+        phenotype: DnaPhenotype {
+            network_seed: "00000000-0000-0000-0000-000000000000".into(),
+            properties: ().try_into().unwrap(),
+            origin_time,
+        },
         integrity_zomes: vec![
             (
                 "zome1".into(),

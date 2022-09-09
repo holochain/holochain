@@ -4,6 +4,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+- Add function to add a clone cell to an app. [\#1547](https://github.com/holochain/holochain/pull/1547)
+
 ## 0.0.55
 
 ## 0.0.54
