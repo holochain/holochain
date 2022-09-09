@@ -47,9 +47,9 @@ impl DnaPhenotype {
     /// Replace fields in the phenotype with any Some fields in the argument.
     /// None fields remain unchanged.
     pub fn update(mut self, phenotype: DnaPhenotypeOpt) -> DnaPhenotype {
-        self.network_seed = phenotype.network_seed.unwrap_or_else(|| self.network_seed);
-        self.properties = phenotype.properties.unwrap_or_else(|| self.properties);
-        self.origin_time = phenotype.origin_time.unwrap_or_else(|| self.origin_time);
+        self.network_seed = phenotype.network_seed.unwrap_or(self.network_seed);
+        self.properties = phenotype.properties.unwrap_or(self.properties);
+        self.origin_time = phenotype.origin_time.unwrap_or(self.origin_time);
         self
     }
 }
