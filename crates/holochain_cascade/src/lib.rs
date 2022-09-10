@@ -1,6 +1,7 @@
 //! The Cascade is a multi-tiered accessor for Holochain DHT data.
 //!
-//! It is named "the Cascade" because it performs "cascading" gets across multiple sources:
+//! It is named "the Cascade" because it performs "cascading" gets across multiple sources.
+//! In general (but not in all cases), the flow is something like:
 //! - First attempts to read the local storage
 //! - If that fails, attempt to read data from the network cache
 //! - If that fails, do a network request for the data, caching it if found
@@ -10,11 +11,12 @@
 //! There are two words used in cascade functions: "get", and "retrieve".
 //! They mean distinct things:
 //!
-//! - "get" checks CRUD metadata before returning the data, so for instance, Deletes
+//! - "get" ignores invalid data, and sometimes takes into account CRUD metadata
+//!     before returning the data, so for instance, Deletes
 //!     are allowed to annihilate Creates so that neither is returned. This is a more
-//!     "refined" form of fetching data
-//! - "retrieve" only checks that the data is valid from the vantage point of the
-//!     authority returning the data. This is a more "raw" form of fetching data.
+//!     "refined" form of fetching data.
+//! - "retrieve" only fetches the data if it exists, without regard to validation status.
+//!     This is a more "raw" form of fetching data.
 //!
 #![warn(missing_docs)]
 
@@ -676,7 +678,8 @@ where
     }
 
     /// Perform a concurrent `get` on multiple hashes simultaneously, returning
-    /// the resulting list of Records in the same order as requested.
+    /// the resulting list of Records in the order that they come in
+    /// (NOT the order in which they were requested!).
     pub async fn get_concurrent<I: IntoIterator<Item = AnyDhtHash>>(
         &mut self,
         hashes: I,
