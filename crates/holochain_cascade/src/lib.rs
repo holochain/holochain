@@ -1,5 +1,8 @@
 //! The Cascade is a multi-tiered accessor for Holochain DHT data.
 //!
+//! Note that the docs for this crate are admittedly a bit *loose and imprecise*,
+//! but they are not expected to be *incorrect*.
+//!
 //! It is named "the Cascade" because it performs "cascading" gets across multiple sources.
 //! In general (but not in all cases), the flow is something like:
 //! - First attempts to read the local storage
