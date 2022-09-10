@@ -85,7 +85,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     DnaSource::Hash(ref hash) => {
                         if !phenotype.has_some_option_set() {
                             return Err(ConductorApiError::DnaReadError(
-                                "Hash Dna source requires properties or network seed or origin_time to create a derived Dna"
+                                "DnaSource::Hash requires `properties` or `network_seed` or `origin_time` to create a derived Dna"
                                     .to_string(),
                             ));
                         }
@@ -437,13 +437,13 @@ mod test {
             source: DnaSource::Hash(dna_hash.clone()),
         };
 
-        // without properties or network seed should throw error
+        // without phenotype seed should throw error
         let hash_install_response = admin_api
             .handle_admin_request(AdminRequest::RegisterDna(Box::new(hash_payload)))
             .await;
         assert_matches!(
             hash_install_response,
-            AdminResponse::Error(ExternalApiWireError::DnaReadError(e)) if e == String::from("Hash Dna source requires properties or network seed to create a derived Dna")
+            AdminResponse::Error(ExternalApiWireError::DnaReadError(e)) if e == String::from("DnaSource::Hash requires `properties` or `network_seed` or `origin_time` to create a derived Dna")
         );
 
         // with a property should install and produce a different hash
