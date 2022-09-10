@@ -428,10 +428,9 @@ pub async fn register_dna(cmd: &mut CmdRunner, args: RegisterDna) -> anyhow::Res
         hash,
     } = args;
     let properties = match properties {
-        Some(path) => Some(
-            YamlProperties::new(serde_yaml::from_str(&std::fs::read_to_string(path)?)?)
-                .try_into()?,
-        ),
+        Some(path) => Some(YamlProperties::new(serde_yaml::from_str(
+            &std::fs::read_to_string(path)?,
+        )?)),
         None => None,
     };
     let source = match (path, hash) {
