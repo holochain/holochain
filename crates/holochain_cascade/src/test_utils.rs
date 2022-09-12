@@ -43,7 +43,6 @@ use holochain_types::dht_op::WireOps;
 use holochain_types::link::WireLinkKey;
 use holochain_types::link::WireLinkOps;
 use holochain_types::metadata::MetadataSet;
-use holochain_types::prelude::ValidationPackageResponse;
 use holochain_types::prelude::WireEntryOps;
 use holochain_types::record::WireRecordOps;
 use holochain_types::test_utils::chain::*;
@@ -99,14 +98,6 @@ impl MockNetwork {
 
 #[async_trait::async_trait]
 impl HolochainP2pDnaT for PassThroughNetwork {
-    async fn get_validation_package(
-        &self,
-        _request_from: AgentPubKey,
-        _action_hash: ActionHash,
-    ) -> actor::HolochainP2pResult<ValidationPackageResponse> {
-        todo!()
-    }
-
     async fn get(
         &self,
         dht_hash: holo_hash::AnyDhtHash,
@@ -338,18 +329,6 @@ pub fn fill_db_as_author(env: &DbWrite<DbKindAuthored>, op: DhtOpHashed) {
 
 #[async_trait::async_trait]
 impl HolochainP2pDnaT for MockNetwork {
-    async fn get_validation_package(
-        &self,
-        request_from: AgentPubKey,
-        action_hash: ActionHash,
-    ) -> actor::HolochainP2pResult<ValidationPackageResponse> {
-        self.0
-            .lock()
-            .await
-            .get_validation_package(request_from, action_hash)
-            .await
-    }
-
     async fn get(
         &self,
         dht_hash: holo_hash::AnyDhtHash,

@@ -779,7 +779,6 @@ impl ConductorHandleT for ConductorHandleImpl {
             }
             HolochainP2pEvent::CallRemote { .. }
             | CountersigningSessionNegotiation { .. }
-            | GetValidationPackage { .. }
             | Get { .. }
             | GetMeta { .. }
             | GetLinks { .. }

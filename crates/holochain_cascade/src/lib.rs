@@ -1052,24 +1052,6 @@ where
         Ok(r)
     }
 
-    /// Get the validation package if it is cached without going to the network
-    pub fn get_validation_package_local(
-        &self,
-        _hash: &ActionHash,
-    ) -> CascadeResult<Option<Vec<Record>>> {
-        Ok(None)
-    }
-
-    #[deprecated = "The notion of validation package is being reworked, this is likely not to be used"]
-    #[allow(missing_docs)]
-    pub async fn get_validation_package(
-        &mut self,
-        _agent: AgentPubKey,
-        _action: &ActionHashed,
-    ) -> CascadeResult<Option<ValidationPackage>> {
-        Ok(None)
-    }
-
     fn am_i_authoring(&mut self, hash: &AnyDhtHash) -> CascadeResult<bool> {
         let scratch = some_or_return!(self.scratch.as_ref(), false);
         Ok(scratch.apply_and_then(|scratch| scratch.contains_hash(hash))?)
