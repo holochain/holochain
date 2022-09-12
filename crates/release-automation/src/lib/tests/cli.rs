@@ -1,13 +1,15 @@
 use std::path::PathBuf;
 
-use crate::changelog::sanitize;
+use crate::changelog::{sanitize, Frontmatter};
 use crate::changelog::{ChangelogT, CrateChangelog, WorkspaceChangelog};
+use crate::common::SemverIncrementMode;
 use crate::crate_selection::ReleaseWorkspace;
 use crate::tests::workspace_mocker::{
     example_workspace_1, example_workspace_1_aggregated_changelog, example_workspace_4,
 };
 use anyhow::Context;
 use predicates::prelude::*;
+use serde::Deserialize;
 use std::io::Write;
 
 #[test]
@@ -562,7 +564,138 @@ fn multiple_subsequent_releases() {
                         .append(true)
                         .open(root.join(format!("crates/{}/README.md", crt)))
                         .unwrap();
+                    writeln!(readme, "A new line!").unwrap();
+                }
 
+                ReleaseWorkspace::try_new(root)
+                    .unwrap()
+                    .git_add_all_and_commit("some chnages", None)
+                    .unwrap();
+            }) as F,
+        ),
+        (
+            // add a pre-release for crate_b
+            vec!["1.0.0-rc.0", "0.1.3", "0.0.2"],
+            vec!["crate_b", "crate_a", "crate_e"],
+            // allowed missing dependencies
+            vec![],
+            true,
+            Box::new(|args: A| {
+                let root = args.0;
+
+                for crt in &["crate_b"] {
+                    let mut readme = std::fs::OpenOptions::new()
+                        .write(true)
+                        .append(true)
+                        .open(root.join(format!("crates/{}/README.md", crt)))
+                        .unwrap();
+                    writeln!(readme, "A new line!").unwrap();
+
+                    ChangelogT::<CrateChangelog>::at_path(
+                        &root.join(format!("crates/{}/CHANGELOG.md", crt)),
+                    )
+                    .set_front_matter(
+                        &serde_yaml::from_str(
+                            indoc::formatdoc!(
+                                r#"
+                                default_semver_increment_mode: !pre_major rc
+                                "#
+                            )
+                            .as_str(),
+                        )
+                        .unwrap(),
+                    )
+                    .unwrap();
+                }
+
+                ReleaseWorkspace::try_new(root)
+                    .unwrap()
+                    .git_add_all_and_commit("some chnages", None)
+                    .unwrap();
+            }) as F,
+        ),
+        (
+            // do another pre-release for crate_b
+            vec!["1.0.0-rc.1", "0.1.4", "0.0.2"],
+            vec!["crate_b", "crate_a", "crate_e"],
+            // allowed missing dependencies
+            vec![],
+            true,
+            Box::new(|args: A| {
+                let root = args.0;
+
+                for crt in &["crate_b"] {
+                    let mut readme = std::fs::OpenOptions::new()
+                        .write(true)
+                        .append(true)
+                        .open(root.join(format!("crates/{}/README.md", crt)))
+                        .unwrap();
+                    writeln!(readme, "A new line!").unwrap();
+                }
+
+                ReleaseWorkspace::try_new(root)
+                    .unwrap()
+                    .git_add_all_and_commit("some chnages", None)
+                    .unwrap();
+            }) as F,
+        ),
+        (
+            // do major release for crate_b
+            vec!["1.0.0", "0.1.5", "0.0.2"],
+            vec!["crate_b", "crate_a", "crate_e"],
+            // allowed missing dependencies
+            vec![],
+            true,
+            Box::new(|args: A| {
+                let root = args.0;
+
+                for crt in &["crate_b"] {
+                    let mut readme = std::fs::OpenOptions::new()
+                        .write(true)
+                        .append(true)
+                        .open(root.join(format!("crates/{}/README.md", crt)))
+                        .unwrap();
+                    writeln!(readme, "A new line!").unwrap();
+
+                    ChangelogT::<CrateChangelog>::at_path(
+                        &root.join(format!("crates/{}/CHANGELOG.md", crt)),
+                    )
+                    .set_front_matter(
+                        &serde_yaml::from_str(
+                            indoc::formatdoc!(
+                                r#"
+                                semver_increment_mode: major
+                                "#
+                            )
+                            .as_str(),
+                        )
+                        .unwrap(),
+                    )
+                    .unwrap();
+                }
+
+                ReleaseWorkspace::try_new(root)
+                    .unwrap()
+                    .git_add_all_and_commit("some chnages", None)
+                    .unwrap();
+            }) as F,
+        ),
+        (
+            // and a default patch release for crate_b again
+            vec!["1.0.1", "0.1.6", "0.0.2"],
+            vec!["crate_b", "crate_a", "crate_e"],
+            // allowed missing dependencies
+            vec![],
+            true,
+            Box::new(|args: A| {
+                let root = args.0;
+
+                for crt in &["crate_b"] {
+                    let mut readme = std::fs::OpenOptions::new()
+                        .write(true)
+                        .append(true)
+                        .open(root.join(format!("crates/{}/README.md", crt)))
+                        .unwrap();
                     writeln!(readme, "A new line!").unwrap();
                 }
 
@@ -616,7 +749,6 @@ fn multiple_subsequent_releases() {
                     "--cargo-target-dir={}",
                     workspace.root().join("target").display()
                 ),
-                "--disallowed-version-reqs=>=0.2",
                 "--match-filter=crate_(a|b|e)",
                 "--allowed-matched-blockers=UnreleasableViaChangelogFrontmatter",
                 "--steps=CreateReleaseBranch,BumpReleaseVersions",
