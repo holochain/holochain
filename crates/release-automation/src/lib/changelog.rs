@@ -16,6 +16,9 @@ use std::path::{Path, PathBuf};
 use std::{cell::RefCell, convert::TryFrom};
 use std::{collections::HashSet, convert::TryInto};
 
+/// This data structure helps implement the YAML-type frontmatter for `ChangelogT`.
+/// Please see the [serde_yaml docs](https://docs.rs/serde_yaml/0.9.11/serde_yaml/index.html#using-serde-derive)
+/// for several syntax examples.
 #[derive(Clone, Default, Debug, PartialEq, Deserialize, Serialize)]
 pub(crate) struct Frontmatter {
     #[serde(skip_serializing_if = "Option::is_none")]
