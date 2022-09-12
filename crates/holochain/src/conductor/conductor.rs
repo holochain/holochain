@@ -60,19 +60,16 @@ use holochain_conductor_api::FullIntegrationStateDump;
 use holochain_conductor_api::InstalledAppInfo;
 use holochain_conductor_api::IntegrationStateDump;
 use holochain_keystore::lair_keystore::spawn_lair_keystore;
-use holochain_keystore::lair_keystore::spawn_new_lair_keystore;
-use holochain_keystore::test_keystore::spawn_legacy_test_keystore;
 use holochain_keystore::test_keystore::spawn_test_keystore;
 use holochain_keystore::MetaLairClient;
 use holochain_sqlite::prelude::*;
 use holochain_sqlite::sql::sql_cell::state_dump;
-use holochain_state::mutations;
 use holochain_state::prelude::from_blob;
 use holochain_state::prelude::StateMutationResult;
 use holochain_state::prelude::StateQueryResult;
 use holochain_types::prelude::*;
 pub use holochain_types::share;
-use rusqlite::{OptionalExtension, Transaction};
+use rusqlite::Transaction;
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
@@ -600,11 +597,14 @@ impl Conductor {
     /// and added to the conductor, namely the cells which are referenced by
     /// Running apps. If there are no cells to create, this function does nothing.
     ///
+    /// Accepts an optional app id to only create cells of that app instead of all apps.
+    ///
     /// Returns a Result for each attempt so that successful creations can be
     /// handled alongside the failures.
     pub(super) async fn create_cells_for_running_apps(
         &self,
         conductor_handle: ConductorHandle,
+        app_id: Option<&InstalledAppId>,
     ) -> ConductorResult<Vec<Result<(Cell, InitialQueueTriggers), (CellId, CellError)>>> {
         // Data required to create apps
         let (managed_task_add_sender, managed_task_stop_broadcaster) =
@@ -619,14 +619,27 @@ impl Conductor {
         // Closure for creating all cells in an app
         let state = self.get_state().await?;
 
-        // Collect all CellIds across all apps, deduped
-        let app_cells: HashSet<CellId> = state
-            .installed_apps()
-            .iter()
-            .filter(|(_, app)| app.status().is_running())
-            .flat_map(|(_id, app)| app.all_cells().collect::<Vec<&CellId>>())
-            .cloned()
-            .collect();
+        let app_cells: HashSet<CellId> = match app_id {
+            Some(app_id) => {
+                let app = state.get_app(app_id)?;
+                if app.status().is_running() {
+                    app.all_cells().into_iter().cloned().collect()
+                } else {
+                    HashSet::new()
+                }
+            }
+            None =>
+            // Collect all CellIds across all apps, deduped
+            {
+                state
+                    .installed_apps()
+                    .iter()
+                    .filter(|(_, app)| app.status().is_running())
+                    .flat_map(|(_id, app)| app.all_cells().collect::<Vec<&CellId>>())
+                    .cloned()
+                    .collect()
+            }
+        };
 
         // calculate the existing cells so we can filter those out, only creating
         // cells for CellIds that don't have cells
@@ -745,53 +758,65 @@ impl Conductor {
         }
     }
 
-    /// Associate a Cell with an existing App
+    /// Associate a new clone cell with an existing app.
     pub(super) async fn add_clone_cell_to_app(
         &self,
         app_id: InstalledAppId,
         role_id: AppRoleId,
-        properties: YamlProperties,
-    ) -> ConductorResult<CellId> {
+        dna_phenotype: DnaPhenotype,
+        name: Option<String>,
+    ) -> ConductorResult<InstalledCell> {
         let ribosome_store = &self.ribosome_store;
-        let (_, parent_dna_hash) = self
+        // retrieve base cell DNA hash from conductor
+        let (_, base_cell_dna_hash) = self
             .update_state_prime({
                 let app_id = app_id.clone();
                 let role_id = role_id.clone();
                 move |mut state| {
-                    if let Some(app) = state.installed_apps_mut().get_mut(&app_id) {
-                        let role = app
-                            .roles()
-                            .get(&role_id)
-                            .ok_or_else(|| AppError::AppRoleIdMissing(role_id.to_owned()))?;
-                        let parent_dna_hash = role.dna_hash().clone();
-                        Ok((state, parent_dna_hash))
-                    } else {
-                        Err(ConductorError::AppNotRunning(app_id.clone()))
+                    let app = state.get_app_mut(&app_id)?;
+                    let app_role_assignment = app
+                        .roles()
+                        .get(&role_id)
+                        .ok_or_else(|| AppError::AppRoleIdMissing(role_id.to_owned()))?;
+                    if app_role_assignment.is_clone_limit_reached() {
+                        return Err(ConductorError::AppError(AppError::CloneLimitExceeded(
+                            app_role_assignment.clone_limit(),
+                            app_role_assignment.clone(),
+                        )));
                     }
+                    let parent_dna_hash = app_role_assignment.dna_hash().clone();
+                    Ok((state, parent_dna_hash))
                 }
             })
             .await?;
-        let child_dna = ribosome_store.share_ref(|ds| {
-            ds.get_dna_file(&parent_dna_hash)
-                .ok_or(DnaError::DnaMissing(parent_dna_hash))?
-                .modify_phenotype(random_network_seed(), properties)
+        // clone cell from base cell DNA
+        let clone_dna = ribosome_store.share_ref(|ds| {
+            let mut dna_file = ds
+                .get_dna_file(&base_cell_dna_hash)
+                .ok_or(DnaError::DnaMissing(base_cell_dna_hash))?
+                .modify_phenotype(dna_phenotype);
+            if let Some(name) = name {
+                dna_file = dna_file.set_name(name);
+            }
+            Ok::<_, DnaError>(dna_file)
         })?;
-        let child_dna_hash = child_dna.dna_hash().to_owned();
-        let child_ribosome = RealRibosome::new(child_dna)?;
-        self.register_phenotype(child_ribosome);
-        let (_, cell_id) = self
+        let clone_dna_hash = clone_dna.dna_hash().to_owned();
+        // add clone cell to app and instantiate resulting clone cell
+        let (_, installed_clone_cell) = self
             .update_state_prime(move |mut state| {
-                if let Some(app) = state.installed_apps_mut().get_mut(&app_id) {
-                    let agent_key = app.role(&role_id)?.agent_key().to_owned();
-                    let cell_id = CellId::new(child_dna_hash, agent_key);
-                    app.add_clone(&role_id, cell_id.clone())?;
-                    Ok((state, cell_id))
-                } else {
-                    Err(ConductorError::AppNotRunning(app_id.clone()))
-                }
+                let app = state.get_app_mut(&app_id)?;
+                let agent_key = app.role(&role_id)?.agent_key().to_owned();
+                let cell_id = CellId::new(clone_dna_hash, agent_key);
+                let clone_id = app.add_clone(&role_id, &cell_id)?;
+                let installed_clone_cell =
+                    InstalledCell::new(cell_id, clone_id.as_app_role_id().clone());
+                Ok((state, installed_clone_cell))
             })
             .await?;
-        Ok(cell_id)
+        // register clone cell dna in ribosome store
+        let clone_ribosome = RealRibosome::new(clone_dna)?;
+        self.register_phenotype(clone_ribosome);
+        Ok(installed_clone_cell)
     }
 
     pub(super) async fn load_wasms_into_dna_files(
@@ -1323,21 +1348,7 @@ impl Conductor {
     }
 
     pub(super) async fn get_state(&self) -> ConductorResult<ConductorState> {
-        self.spaces
-            .conductor_db
-            .async_reader(|txn| {
-                let state = txn
-                    .query_row("SELECT blob FROM ConductorState WHERE id = 1", [], |row| {
-                        row.get("blob")
-                    })
-                    .optional()?;
-                let state = match state {
-                    Some(state) => from_blob(state)?,
-                    None => ConductorState::default(),
-                };
-                Ok(state)
-            })
-            .await
+        self.spaces.get_state().await
     }
 
     /// Update the internal state with a pure function mapping old state to new
@@ -1345,8 +1356,7 @@ impl Conductor {
     where
         F: FnOnce(ConductorState) -> ConductorResult<ConductorState> + 'static,
     {
-        let (state, _) = self.update_state_prime(|s| Ok((f(s)?, ()))).await?;
-        Ok(state)
+        self.spaces.update_state(f).await
     }
 
     /// Update the internal state with a pure function mapping old state to new,
@@ -1358,25 +1368,7 @@ impl Conductor {
         O: Send + 'static,
     {
         self.check_running()?;
-        let output = self
-            .spaces
-            .conductor_db
-            .async_commit(move |txn| {
-                let state = txn
-                    .query_row("SELECT blob FROM ConductorState WHERE id = 1", [], |row| {
-                        row.get("blob")
-                    })
-                    .optional()?;
-                let state = match state {
-                    Some(state) => from_blob(state)?,
-                    None => ConductorState::default(),
-                };
-                let (new_state, output) = f(state)?;
-                mutations::insert_conductor_state(txn, (&new_state).try_into()?)?;
-                Result::<_, ConductorError>::Ok((new_state, output))
-            })
-            .await?;
-        Ok(output)
+        self.spaces.update_state_prime(f).await
     }
 
     fn add_admin_port(&self, port: u16) {
@@ -1464,21 +1456,6 @@ mod builder {
                 keystore
             } else {
                 match &self.config.keystore {
-                    KeystoreConfig::DangerTestKeystoreLegacyDeprecated => {
-                        tracing::warn!("Using DEPRECATED legacy lair api.");
-                        spawn_legacy_test_keystore().await?
-                    }
-                    KeystoreConfig::LairServerLegacyDeprecated {
-                        keystore_path,
-                        danger_passphrase_insecure_from_config,
-                    } => {
-                        tracing::warn!("Using DEPRECATED legacy lair api.");
-                        tracing::warn!("USING INSECURE PASSPHRASE FROM CONFIG--This defeats the whole purpose of having a passphrase.");
-                        let passphrase = sodoken::BufRead::new_no_lock(
-                            danger_passphrase_insecure_from_config.as_bytes(),
-                        );
-                        spawn_lair_keystore(keystore_path.as_deref(), passphrase).await?
-                    }
                     KeystoreConfig::DangerTestKeystore => spawn_test_keystore().await?,
                     KeystoreConfig::LairServer { connection_url } => {
                         let passphrase = match self.passphrase {
@@ -1490,7 +1467,7 @@ mod builder {
                             }
                             Some(p) => p,
                         };
-                        spawn_new_lair_keystore(connection_url.clone(), passphrase).await?
+                        spawn_lair_keystore(connection_url.clone(), passphrase).await?
                     }
                     oth => unimplemented!("unimplemented keystore config: {:?}", oth),
                 }
@@ -1504,9 +1481,12 @@ mod builder {
 
             let ribosome_store = RwShare::new(ribosome_store);
 
+            let spaces = Spaces::new(&config)?;
+            let tag = spaces.get_state().await?.tag().clone();
+
             let network_config = config.network.clone().unwrap_or_default();
             let (cert_digest, cert, cert_priv_key) =
-                keystore.get_or_create_first_tls_cert().await?;
+                keystore.get_or_create_tls_cert_by_tag(tag.0).await?;
             let tls_config =
                 holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_types::tls::TlsConfig {
                     cert,
@@ -1516,7 +1496,6 @@ mod builder {
             let strat =
                 ArqStrat::from_params(network_config.tuning_params.gossip_redundancy_target);
 
-            let spaces = Spaces::new(&config)?;
             let host = KitsuneHostImpl::new(
                 spaces.clone(),
                 ribosome_store.clone(),

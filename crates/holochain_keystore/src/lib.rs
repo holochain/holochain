@@ -24,27 +24,18 @@
 //!
 //!         let signature = agent_pubkey.sign(&keystore, &my_data_1).await.unwrap();
 //!
-//!         /*
-//!         assert!(agent_pubkey.verify_signature(&signature, &my_data_1).await.unwrap());
-//!         */
+//!         assert!(agent_pubkey.verify_signature(&signature, &my_data_1).await);
 //!     }).await.unwrap();
 //! }
 //! ```
 
 use holochain_serialized_bytes::prelude::*;
 
-use kitsune_p2p_types::dependencies::lair_keystore_api_0_0;
-
 mod error;
 pub use error::*;
 
 mod meta_lair_client;
 pub use meta_lair_client::*;
-
-pub mod keystore_actor;
-pub use keystore_actor::KeystoreSender;
-pub use keystore_actor::KeystoreSenderExt;
-use keystore_actor::*;
 
 mod agent_pubkey_ext;
 pub use agent_pubkey_ext::*;

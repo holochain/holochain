@@ -207,7 +207,7 @@ impl DnaFile {
     /// and, hence, a different DnaHash.
     pub async fn with_properties(self, properties: SerializedBytes) -> Result<Self, DnaError> {
         let (mut dna, wasm): (DnaDef, Vec<wasm::DnaWasm>) = self.into();
-        dna.properties = properties;
+        dna.phenotype.properties = properties;
         DnaFile::new(dna, wasm).await
     }
 
@@ -215,7 +215,7 @@ impl DnaFile {
     /// and, hence, a different DnaHash.
     pub async fn with_network_seed(self, network_seed: NetworkSeed) -> Result<Self, DnaError> {
         let (mut dna, wasm): (DnaDef, Vec<wasm::DnaWasm>) = self.into();
-        dna.network_seed = network_seed;
+        dna.phenotype.network_seed = network_seed;
         DnaFile::new(dna, wasm).await
     }
 
@@ -248,20 +248,19 @@ impl DnaFile {
         .expect("blocking thread panic!d - panicing here too")
     }
 
-    /// Change the "phenotype" of this DNA -- the network seed and properties -- while
-    /// leaving the "genotype" of actual DNA code intact
-    pub fn modify_phenotype(
-        &self,
-        network_seed: NetworkSeed,
-        properties: YamlProperties,
-    ) -> DnaResult<Self> {
+    /// Set the DNA's name.
+    pub fn set_name(&self, name: String) -> Self {
         let mut clone = self.clone();
-        clone.dna = DnaDefHashed::from_content_sync(
-            clone
-                .dna
-                .modify_phenotype(network_seed, properties.try_into()?),
-        );
-        Ok(clone)
+        clone.dna = DnaDefHashed::from_content_sync(clone.dna.set_name(name));
+        clone
+    }
+
+    /// Change the "phenotype" of this DNA -- the network seed, origin time and properties -- while
+    /// leaving the "genotype" of actual DNA code intact.
+    pub fn modify_phenotype(&self, dna_phenotype: DnaPhenotype) -> Self {
+        let mut clone = self.clone();
+        clone.dna = DnaDefHashed::from_content_sync(clone.dna.modify_phenotype(dna_phenotype));
+        clone
     }
 }
 

@@ -51,7 +51,7 @@ pub fn must_get_entry<'a>(
                         HostContext::Init(_) => Err(wasm_error!(WasmErrorInner::HostShortCircuit(
                             holochain_serialized_bytes::encode(
                                 &ExternIO::encode(InitCallbackResult::UnresolvedDependencies(
-                                    vec![entry_hash.into()],
+                                    UnresolvedDependencies::Hashes(vec![entry_hash.into()],)
                                 ))
                                 .map_err(|e| -> RuntimeError { wasm_error!(e.into()).into() })?,
                             )
@@ -62,9 +62,11 @@ pub fn must_get_entry<'a>(
                             Err(wasm_error!(WasmErrorInner::HostShortCircuit(
                                 holochain_serialized_bytes::encode(
                                     &ExternIO::encode(
-                                        &ValidateCallbackResult::UnresolvedDependencies(vec![
-                                            entry_hash.into(),
-                                        ]),
+                                        &ValidateCallbackResult::UnresolvedDependencies(
+                                            UnresolvedDependencies::Hashes(
+                                                vec![entry_hash.into(),]
+                                            )
+                                        ),
                                     )
                                     .map_err(
                                         |e| -> RuntimeError { wasm_error!(e.into()).into() }

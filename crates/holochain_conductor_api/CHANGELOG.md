@@ -4,6 +4,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+- Include cloned cells in App API call `AppInfo`. [\#1547](https://github.com/holochain/holochain/pull/1547)
+
+## 0.0.58
+
+## 0.0.57
+
+## 0.0.56
+
+## 0.0.55
+
+## 0.0.54
+
+## 0.0.53
+
+## 0.0.52
+
 ## 0.0.51
 
 ## 0.0.50

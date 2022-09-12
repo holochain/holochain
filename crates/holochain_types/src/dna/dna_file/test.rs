@@ -44,11 +44,13 @@ async fn test_update_coordinators() {
             })),
         ),
     ];
+    let mut dna_phenotype = DnaPhenotypeBuilder::default();
+    dna_phenotype.network_seed("00000000-0000-0000-0000-000000000000".into());
     let mut dna_def = DnaDefBuilder::default();
     dna_def
         .integrity_zomes(init_integrity.clone())
         .coordinator_zomes(init_coordinators.clone())
-        .network_seed("00000000-0000-0000-0000-000000000000".into());
+        .phenotype(dna_phenotype.build().unwrap());
     let dna_def = dna_def.build().unwrap();
     let mut dna = DnaFile::new(dna_def.clone(), dna_wasms.clone())
         .await
@@ -241,11 +243,13 @@ async fn test_update_coordinators_checks_deps() {
             })),
         ),
     ];
+    let mut dna_phenotype = DnaPhenotypeBuilder::default();
+    dna_phenotype.network_seed("00000000-0000-0000-0000-000000000000".into());
     let mut dna_def = DnaDefBuilder::default();
     dna_def
         .integrity_zomes(init_integrity.clone())
         .coordinator_zomes(init_coordinators.clone())
-        .network_seed("00000000-0000-0000-0000-000000000000".into());
+        .phenotype(dna_phenotype.build().unwrap());
     let dna_def = dna_def.build().unwrap();
     let mut dna = DnaFile::new(dna_def.clone(), dna_wasms.clone())
         .await

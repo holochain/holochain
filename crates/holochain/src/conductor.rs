@@ -41,3 +41,6 @@ pub use conductor::Conductor;
 pub use conductor::ConductorBuilder;
 pub use conductor::{full_integration_dump, integration_dump};
 pub use handle::ConductorHandle;
+
+#[cfg(test)]
+mod tests;

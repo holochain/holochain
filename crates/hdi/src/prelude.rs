@@ -1,4 +1,5 @@
 pub use crate::app_entry;
+pub use crate::chain::must_get_agent_activity;
 pub use crate::ed25519::verify_signature;
 pub use crate::ed25519::verify_signature_raw;
 pub use crate::entry::must_get_action;
@@ -79,6 +80,7 @@ macro_rules! holochain_externs {
             __must_get_entry,
             __must_get_valid_record,
             __must_get_action,
+            __must_get_agent_activity,
             __x_salsa20_poly1305_decrypt,
             __x_25519_x_salsa20_poly1305_decrypt
         );

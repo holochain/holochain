@@ -130,7 +130,7 @@ impl Switchboard {
         let host_api = Arc::new(evt_handler.clone());
         let (evt_sender, handler_task) = spawn_handler(evt_handler.clone()).await;
 
-        let bandwidth = Arc::new(BandwidthThrottle::new(1000.0, 1000.0));
+        let bandwidth = Arc::new(BandwidthThrottle::new(1000.0, 1000.0, 10.0));
 
         let gossip = ShardedGossip::new(
             tuning_params,

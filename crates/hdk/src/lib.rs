@@ -259,6 +259,11 @@
 //!
 //! [`hdk_extern!`]: hdk_derive::hdk_extern
 
+pub use hdi::HDI_VERSION;
+
+/// Current HDK rust crate version.
+pub const HDK_VERSION: &str = env!("CARGO_PKG_VERSION");
+
 #[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
 const ERAND_INTERNAL: u32 = getrandom::Error::CUSTOM_START + 1;
 

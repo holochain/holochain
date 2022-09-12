@@ -180,7 +180,7 @@ jobs:
             savesCargoCache: true
             ignoreErrorOnNonUbuntu: true
             maxBuildSpace: true
-            timeout_minutes: 20
+            timeout_minutes: 30
             max_attempts:
               ubuntu-latest: 2
               macos-latest: 2
@@ -190,22 +190,6 @@ jobs:
                 --keep CARGO_TEST_ARGS \
                 --keep CARGO_BUILD_JOBS \
                 --fallback --pure --argstr flavor "coreDev" --run hc-test-standard-nextest
-
-          - name: cargo-test-slow
-            restoresCargoCache: true
-            savesCargoCache: true
-            ignoreErrorOnNonUbuntu: true
-            maxBuildSpace: true
-            timeout_minutes: 20
-            max_attempts:
-              ubuntu-latest: 2
-              macos-latest: 2
-            run: |
-              nix-shell \
-              --keep CARGO_NEXTEST_ARGS \
-              --keep CARGO_TEST_ARGS \
-              --keep CARGO_BUILD_JOBS \
-              --fallback --pure --argstr flavor "coreDev" --run hc-test-slow-nextest
 
           - name: cargo-test-static
             restoresCargoCache: true
@@ -263,12 +247,12 @@ jobs:
                 git -C "${HOLOCHAIN_REPO}" tag "${TAG}"
               fi
 
+              # TODO: use a util from the holochain-nixpkgs repo to make this change as this can get out of sync
               cat <<EOF >> packages/holochain/versions/update_config.toml
 
               [${VERSION_COMPAT}]
               git-src = "revision:${TAG}"
               git-repo = "git://localhost/"
-              lair-version-req = "~0.0"
               EOF
 
               # regenerate the nix sources
@@ -337,7 +321,7 @@ jobs:
 
       - name: Restore cargo related state and build files
         uses: steveeJ-forks/actions-cache/restore@main
-        if: ${{ matrix.testCommand.restoresCargoCache == true }}
+        if: ${{ matrix.testCommand.restoresCargoCache == true && needs.vars.outputs.skip_test != 'true' }}
         with:
           path: |
             /tmp/holochain_repo/.cargo/bin/
@@ -368,8 +352,8 @@ jobs:
         if: ${{ matrix.testCommand.restoresCargoCache == true && needs.vars.outputs.skip_test != 'true' }}
         env:
           CARGO_TEST_ARGS: "--no-run"
-          CARGO_NEXTEST_ARGS: "list --build-jobs=1"
-          CARGO_BUILD_JOBS: "1"
+          CARGO_NEXTEST_ARGS: "list --build-jobs=2"
+          CARGO_BUILD_JOBS: "2"
         run: |
           set -e
           source "${HOLOCHAIN_RELEASE_SH}"

@@ -36,6 +36,15 @@ use super::{HowToConnect, MetaOpKey};
 
 pub use bandwidth::BandwidthThrottles;
 
+/// How quickly to run a gossip iteration which attempts to initiate
+/// with a new target.
+///
+/// TODO: Currently our gossip loop does a database query for remote nodes
+/// on every iteration. We should add a longer interval for refreshing this
+/// list (perhaps once per second), and use a cached value for other iterations,
+/// so as not to do hundreds of DB queries per second.
+const GOSSIP_LOOP_INTERVAL_MS: Duration = Duration::from_millis(10);
+
 #[cfg(any(test, feature = "test_utils"))]
 #[allow(missing_docs)]
 pub mod test_utils;
@@ -199,7 +208,7 @@ impl ShardedGossip {
                     .closing
                     .load(std::sync::atomic::Ordering::Relaxed)
                 {
-                    tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+                    tokio::time::sleep(GOSSIP_LOOP_INTERVAL_MS).await;
                     this.run_one_iteration().await;
                     this.stats(&mut stats);
                 }
@@ -264,6 +273,15 @@ impl ShardedGossip {
 
     async fn process_incoming_outgoing(&self) -> KitsuneResult<()> {
         let (incoming, outgoing) = self.pop_queues()?;
+
+        if outgoing.is_some() {
+            tracing::debug!(
+                "OUTGOING GOSSIP {:?} {:#?}",
+                self.ep_hnd.uniq(),
+                outgoing.as_ref().map(|o| (&o.1, &o.2)),
+            );
+        }
+
         if let Some((con, remote_url, msg, bytes)) = incoming {
             self.bandwidth.incoming_bytes(bytes).await;
             let outgoing = match self.gossip.process_incoming(con.peer_cert(), msg).await {
@@ -307,7 +325,7 @@ impl ShardedGossip {
                     Ok(())
                 }) {
                     tracing::error!(
-                        "Gossip failed to get share nut when trying to initiate with {:?}",
+                        "Gossip failed to get share mut when trying to initiate with {:?}",
                         err
                     );
                 }
@@ -477,7 +495,7 @@ impl ShardedGossipLocalState {
         &self.local_agents
     }
 
-    fn log_state(&self) {
+    pub(crate) fn log_state(&self) {
         tracing::trace!(
             ?self.round_map,
             ?self.initiate_tgt,

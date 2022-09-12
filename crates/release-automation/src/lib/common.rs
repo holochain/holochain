@@ -4,6 +4,7 @@ use std::{
 };
 
 use semver::VersionReq;
+use serde::{Deserialize, Serialize};
 
 use super::*;
 
@@ -136,4 +137,69 @@ fn load_from_file(path: &Path) -> Fallible<String> {
     let mut s = String::new();
     file.read_to_string(&mut s)?;
     Ok(s)
+}
+
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub(crate) enum SemverIncrementMode {
+    Major,
+    Minor,
+    Patch,
+}
+
+impl Default for SemverIncrementMode {
+    fn default() -> Self {
+        Self::Patch
+    }
+}
+
+/// Increment the given Version according to the given `SemVerIncrementMode`.
+pub(crate) fn increment_semver(v: &mut semver::Version, mode: SemverIncrementMode) {
+    match mode {
+        SemverIncrementMode::Major => {
+            v.major += 1;
+            v.minor = 0;
+            v.patch = 0;
+        }
+        SemverIncrementMode::Minor => {
+            v.minor += 1;
+            v.patch = 0;
+        }
+        SemverIncrementMode::Patch => {
+            v.patch += 1;
+        }
+    }
+
+    v.pre = semver::Prerelease::EMPTY;
+    v.build = semver::BuildMetadata::EMPTY;
+}
+
+#[cfg(test)]
+mod test {
+    use test_case::test_case;
+
+    use crate::common::{
+        increment_semver,
+        SemverIncrementMode::{self, *},
+    };
+
+    #[test_case("0.0.1", "0.0.2", Patch; "patch version bump")]
+    #[test_case("0.0.1", "0.1.0", Minor; "minor version bump")]
+    #[test_case("0.0.1", "1.0.0", Major; "major version bump")]
+    #[test_case("0.0.1-dev.0", "0.0.2", Patch; "patch version bump from pre-release")]
+    #[test_case("0.0.1-dev.0", "0.1.0", Minor; "minor version bump from pre-release")]
+    #[test_case("0.0.1-dev.0", "1.0.0", Major; "major version bump from pre-release")]
+    #[test_case("0.1.1-dev.0", "0.2.0", Minor; "non-zero minor version bump from pre-release")]
+    #[test_case("1.0.1-dev.0", "2.0.0", Major; "non-zero major version bump from pre-release")]
+    fn increment_semver_consistency(
+        input_version: &str,
+        expected_version: &str,
+        increment_mode: SemverIncrementMode,
+    ) {
+        let mut working_version = semver::Version::parse(input_version).unwrap();
+        increment_semver(&mut working_version, increment_mode);
+
+        let expected_version = semver::Version::parse(expected_version).unwrap();
+        assert_eq!(expected_version, working_version);
+    }
 }

@@ -60,10 +60,10 @@ pub enum LinkTypes {
 #[test_case(s_record(Action::Create(c(EntryType::AgentPubKey)), RecordEntry::NotStored) => matches WasmErrorInner::Host(_))]
 #[test_case(s_record(Action::Create(c(EntryType::CapClaim)), RecordEntry::Present(e(A{}))) => matches WasmErrorInner::Guest(_))]
 #[test_case(s_record(Action::Create(c(EntryType::CapClaim)), RecordEntry::NotApplicable) => matches WasmErrorInner::Guest(_))]
-#[test_case(s_record(Action::Create(c(EntryType::CapClaim)), RecordEntry::NotStored) => matches WasmErrorInner::Host(_))]
+#[test_case(s_record(Action::Create(c(EntryType::CapClaim)), RecordEntry::NotStored) => matches WasmErrorInner::Guest(_))]
 #[test_case(s_record(Action::Create(c(EntryType::CapGrant)), RecordEntry::Present(e(A{}))) => matches WasmErrorInner::Guest(_))]
 #[test_case(s_record(Action::Create(c(EntryType::CapGrant)), RecordEntry::NotApplicable) => matches WasmErrorInner::Guest(_))]
-#[test_case(s_record(Action::Create(c(EntryType::CapGrant)), RecordEntry::NotStored) => matches WasmErrorInner::Host(_))]
+#[test_case(s_record(Action::Create(c(EntryType::CapGrant)), RecordEntry::NotStored) => matches WasmErrorInner::Guest(_))]
 #[test_case(s_record(create_link(0, 100), RecordEntry::NotApplicable) => matches WasmErrorInner::Guest(_))]
 #[test_case(s_record(create_link(100, 0), RecordEntry::NotApplicable) => matches WasmErrorInner::Host(_))]
 // Store Entry
@@ -924,6 +924,7 @@ fn op_to_type(op: OpType<EntryTypes, LinkTypes>) {
                 }
             };
             let r = RegisterAgentActivity {
+                cached_entry: None,
                 action: SignedHashed {
                     hashed: HoloHashed::from_content_sync(r),
                     signature: Signature::arbitrary(&mut ud).unwrap(),

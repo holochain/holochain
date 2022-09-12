@@ -23,7 +23,7 @@ use thiserror::Error;
 /// It is a lot cleaner to express this using
 /// ? try's unfortunately try for custom types is
 /// unstable but when it lands we should use:
-/// https://docs.rs/try-guard/0.2.0/try_guard/
+/// <https://docs.rs/try-guard/0.2.0/try_guard/>
 #[derive(Error, Debug)]
 pub enum SysValidationError {
     #[error(transparent)]
@@ -154,8 +154,8 @@ impl ValidationOutcome {
 
 #[derive(Error, Debug)]
 pub enum PrevActionError {
-    #[error("The previous action in the source chain doesn't match the next action")]
-    HashMismatch,
+    #[error("The previous action hash specified in an action doesn't match the actual previous action. Seq: {0}")]
+    HashMismatch(u32),
     #[error("Root of source chain must be Dna")]
     InvalidRoot,
     #[error("Root of source chain must have a timestamp greater than the Dna's origin_time")]

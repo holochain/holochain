@@ -7,22 +7,19 @@ use super::*;
 use crate::conductor::api::error::ConductorApiError;
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
 use crate::sweettest::*;
-use crate::test_utils::fake_valid_dna_file;
 use crate::{
     assert_eq_retry_10s, core::ribosome::guest_callback::genesis_self_check::GenesisSelfCheckResult,
 };
 use ::fixt::prelude::*;
 use holochain_conductor_api::InstalledAppInfoStatus;
 use holochain_conductor_api::{AdminRequest, AdminResponse, AppRequest, AppResponse, ZomeCall};
-use holochain_keystore::crude_mock_keystore::spawn_crude_mock_keystore;
-use holochain_keystore::crude_mock_keystore::spawn_real_or_mock_keystore;
+use holochain_keystore::crude_mock_keystore::*;
 use holochain_state::prelude::{test_keystore, *};
 use holochain_types::inline_zome::InlineZomeSet;
 use holochain_types::test_utils::fake_cell_id;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::WebsocketSender;
 use holochain_zome_types::op::Op;
-use kitsune_p2p_types::dependencies::lair_keystore_api_0_0::LairError;
 use maplit::hashset;
 use matches::assert_matches;
 
@@ -50,7 +47,9 @@ async fn can_update_state() {
     .await
     .unwrap();
     let state = conductor.get_state().await.unwrap();
-    assert_eq!(state, ConductorState::default());
+    let mut expect_state = ConductorState::default();
+    expect_state.set_tag(state.tag().clone());
+    assert_eq!(state, expect_state);
 
     let cell_id = fake_cell_id(1);
     let installed_cell = InstalledCell::new(cell_id.clone(), "role_id".to_string());
@@ -70,89 +69,6 @@ async fn can_update_state() {
             .collect::<Vec<_>>()
             .as_slice(),
         &[&cell_id]
-    );
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn can_add_clone_cell_to_app() {
-    let db_dir = test_db_dir();
-    let keystore = test_keystore();
-    let holochain_p2p = holochain_p2p::stub_network().await;
-
-    let agent = fixt!(AgentPubKey);
-    let dna = fake_valid_dna_file("");
-    let cell_id = CellId::new(dna.dna_hash().to_owned(), agent.clone());
-
-    let ribosome_store = RibosomeStore::new();
-    let (post_commit_sender, _post_commit_receiver) =
-        tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
-    let spaces = Spaces::new(&ConductorConfig {
-        environment_path: db_dir.path().to_path_buf().into(),
-        ..Default::default()
-    })
-    .unwrap();
-
-    let conductor = Conductor::new(
-        Default::default(),
-        ribosome_store,
-        keystore,
-        holochain_p2p,
-        spaces,
-        post_commit_sender,
-    )
-    .await
-    .unwrap();
-
-    let installed_cell = InstalledCell::new(cell_id.clone(), "role_id".to_string());
-    let role = AppRoleAssignment::new(cell_id.clone(), true, 1);
-    let app1 = InstalledAppCommon::new_legacy("no clone", vec![installed_cell.clone()]).unwrap();
-    let app2 = InstalledAppCommon::new("yes clone", agent, vec![("role_id".into(), role.clone())]);
-    assert_eq!(
-        app1.roles().keys().collect::<Vec<_>>(),
-        vec![&"role_id".to_string()]
-    );
-    assert_eq!(
-        app2.roles().keys().collect::<Vec<_>>(),
-        vec![&"role_id".to_string()]
-    );
-
-    conductor.register_phenotype(RealRibosome::empty(dna));
-    conductor
-        .update_state(move |mut state| {
-            state
-                .installed_apps_mut()
-                .insert(RunningApp::from(app1.clone()).into());
-            state
-                .installed_apps_mut()
-                .insert(RunningApp::from(app2.clone()).into());
-            Ok(state)
-        })
-        .await
-        .unwrap();
-
-    matches::assert_matches!(
-        conductor
-            .add_clone_cell_to_app("no clone".to_string(), "role_id".to_string(), ().into())
-            .await,
-        Err(ConductorError::AppError(AppError::CloneLimitExceeded(0, _)))
-    );
-
-    let cloned_cell_id = conductor
-        .add_clone_cell_to_app("yes clone".to_string(), "role_id".to_string(), ().into())
-        .await
-        .unwrap();
-
-    let state = conductor.get_state().await.unwrap();
-    assert_eq!(
-        state
-            .running_apps()
-            .find(|(id, _)| &id[..] == "yes clone")
-            .unwrap()
-            .1
-            .cloned_cells()
-            .cloned()
-            .collect::<Vec<CellId>>(),
-        vec![cloned_cell_id]
     );
 }
 
@@ -389,9 +305,7 @@ async fn test_reconciliation_idempotency() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_signing_error_during_genesis() {
     observability::test_run().ok();
-    let bad_keystore = spawn_crude_mock_keystore(|| LairError::other("test error"))
-        .await
-        .unwrap();
+    let bad_keystore = spawn_crude_mock_keystore(|| "test error".into()).await;
 
     let db_dir = test_db_dir();
     let config = ConductorConfig::default();

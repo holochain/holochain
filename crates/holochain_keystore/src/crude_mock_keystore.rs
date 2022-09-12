@@ -5,32 +5,26 @@
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
-use ghost_actor::dependencies::futures::FutureExt;
+use futures::FutureExt;
 use kitsune_p2p_types::dependencies::lair_keystore_api::lair_client::traits::AsLairClient;
 use kitsune_p2p_types::dependencies::lair_keystore_api::prelude::{LairApiEnum, LairClient};
 use kitsune_p2p_types::dependencies::lair_keystore_api::LairResult;
-
-use crate::keystore_actor::KeystoreApiResult;
-use crate::lair_keystore_api_0_0::{actor::*, internal::*, *};
 
 use crate::test_keystore::spawn_test_keystore;
 use crate::MetaLairClient;
 
 /// Spawn a test keystore which always returns the same LairError for every call.
-pub async fn spawn_crude_mock_keystore<F>(err_fn: F) -> KeystoreApiResult<MetaLairClient>
+pub async fn spawn_crude_mock_keystore<F>(err_fn: F) -> MetaLairClient
 where
-    F: Fn() -> LairError + Send + 'static,
+    F: Fn() -> one_err::OneErr + Send + Sync + 'static,
 {
-    let builder = ghost_actor::actor_builder::GhostActorBuilder::new();
-
-    let sender = builder
-        .channel_factory()
-        .create_channel::<LairClientApi>()
-        .await?;
-
-    tokio::task::spawn(builder.spawn(CrudeLegacyMockKeystore(Box::new(err_fn))));
-
-    Ok(MetaLairClient::Legacy(sender))
+    let (s, _) = tokio::sync::mpsc::unbounded_channel();
+    MetaLairClient(
+        Arc::new(parking_lot::Mutex::new(LairClient(Arc::new(
+            CrudeMockKeystore(Arc::new(err_fn)),
+        )))),
+        s,
+    )
 }
 
 /// Spawn a test keystore that can switch between mocked and real.
@@ -52,7 +46,14 @@ where
 
     let control = MockLairControl(use_mock);
 
-    Ok((MetaLairClient::NewLair(LairClient(Arc::new(mock))), control))
+    let (s, _) = tokio::sync::mpsc::unbounded_channel();
+    Ok((
+        MetaLairClient(
+            Arc::new(parking_lot::Mutex::new(LairClient(Arc::new(mock)))),
+            s,
+        ),
+        control,
+    ))
 }
 /// A keystore which always returns the same LairError for every call.
 struct RealOrMockKeystore {
@@ -77,200 +78,53 @@ impl MockLairControl {
     }
 }
 /// A keystore which always returns the same LairError for every call.
-struct CrudeLegacyMockKeystore(Box<dyn Fn() -> LairError + Send + 'static>);
+struct CrudeMockKeystore(Arc<dyn Fn() -> one_err::OneErr + Send + Sync + 'static>);
 
-impl AsLairClient for RealOrMockKeystore {
+impl AsLairClient for CrudeMockKeystore {
     fn get_enc_ctx_key(&self) -> sodoken::BufReadSized<32> {
-        match &self.real {
-            MetaLairClient::NewLair(client) => client.get_enc_ctx_key(),
-            MetaLairClient::Legacy(_) => unreachable!(),
-        }
+        unimplemented!()
     }
 
     fn get_dec_ctx_key(&self) -> sodoken::BufReadSized<32> {
-        match &self.real {
-            MetaLairClient::NewLair(client) => client.get_dec_ctx_key(),
-            MetaLairClient::Legacy(_) => unreachable!(),
-        }
+        unimplemented!()
     }
 
-    fn shutdown(
+    fn shutdown(&self) -> futures::future::BoxFuture<'static, LairResult<()>> {
+        unimplemented!()
+    }
+
+    fn request(
         &self,
-    ) -> ghost_actor::dependencies::futures::future::BoxFuture<'static, LairResult<()>> {
-        match &self.real {
-            MetaLairClient::NewLair(client) => client.shutdown().boxed(),
-            MetaLairClient::Legacy(_) => unreachable!(),
-        }
+        _request: LairApiEnum,
+    ) -> futures::future::BoxFuture<'static, LairResult<LairApiEnum>> {
+        let err = (self.0)();
+        async move { Err(err) }.boxed()
+    }
+}
+
+impl AsLairClient for RealOrMockKeystore {
+    fn get_enc_ctx_key(&self) -> sodoken::BufReadSized<32> {
+        self.real.cli().0.get_enc_ctx_key()
+    }
+
+    fn get_dec_ctx_key(&self) -> sodoken::BufReadSized<32> {
+        self.real.cli().0.get_dec_ctx_key()
+    }
+
+    fn shutdown(&self) -> futures::future::BoxFuture<'static, LairResult<()>> {
+        self.real.cli().0.shutdown().boxed()
     }
 
     fn request(
         &self,
         request: LairApiEnum,
-    ) -> ghost_actor::dependencies::futures::future::BoxFuture<'static, LairResult<LairApiEnum>>
-    {
+    ) -> futures::future::BoxFuture<'static, LairResult<LairApiEnum>> {
         if self.use_mock.load(std::sync::atomic::Ordering::SeqCst) {
             let r = (self.mock)(request);
             async move { r }.boxed()
         } else {
-            match &self.real {
-                MetaLairClient::NewLair(client) => client.0.request(request),
-                MetaLairClient::Legacy(_) => unreachable!(),
-            }
+            AsLairClient::request(&*self.real.cli().0 .0, request)
         }
-    }
-}
-
-impl ghost_actor::GhostControlHandler for CrudeLegacyMockKeystore {}
-impl ghost_actor::GhostHandler<LairClientApi> for CrudeLegacyMockKeystore {}
-
-impl LairClientApiHandler for CrudeLegacyMockKeystore {
-    fn handle_lair_get_server_info(&mut self) -> LairClientApiHandlerResult<LairServerInfo> {
-        Err(self.0())
-    }
-
-    fn handle_lair_get_last_entry_index(&mut self) -> LairClientApiHandlerResult<KeystoreIndex> {
-        Err(self.0())
-    }
-
-    fn handle_lair_get_entry_type(
-        &mut self,
-        _keystore_index: KeystoreIndex,
-    ) -> LairClientApiHandlerResult<LairEntryType> {
-        Err(self.0())
-    }
-
-    fn handle_tls_cert_new_self_signed_from_entropy(
-        &mut self,
-        _options: TlsCertOptions,
-    ) -> LairClientApiHandlerResult<(KeystoreIndex, CertSni, CertDigest)> {
-        Err(self.0())
-    }
-
-    fn handle_tls_cert_get(
-        &mut self,
-        _keystore_index: KeystoreIndex,
-    ) -> LairClientApiHandlerResult<(CertSni, CertDigest)> {
-        Err(self.0())
-    }
-
-    fn handle_tls_cert_get_cert_by_index(
-        &mut self,
-        _keystore_index: KeystoreIndex,
-    ) -> LairClientApiHandlerResult<Cert> {
-        Err(self.0())
-    }
-
-    fn handle_tls_cert_get_cert_by_digest(
-        &mut self,
-        _cert_digest: CertDigest,
-    ) -> LairClientApiHandlerResult<Cert> {
-        Err(self.0())
-    }
-
-    fn handle_tls_cert_get_cert_by_sni(
-        &mut self,
-        _cert_sni: CertSni,
-    ) -> LairClientApiHandlerResult<Cert> {
-        Err(self.0())
-    }
-
-    fn handle_tls_cert_get_priv_key_by_index(
-        &mut self,
-        _keystore_index: KeystoreIndex,
-    ) -> LairClientApiHandlerResult<CertPrivKey> {
-        Err(self.0())
-    }
-
-    fn handle_tls_cert_get_priv_key_by_digest(
-        &mut self,
-        _cert_digest: CertDigest,
-    ) -> LairClientApiHandlerResult<CertPrivKey> {
-        Err(self.0())
-    }
-
-    fn handle_tls_cert_get_priv_key_by_sni(
-        &mut self,
-        _cert_sni: CertSni,
-    ) -> LairClientApiHandlerResult<CertPrivKey> {
-        Err(self.0())
-    }
-
-    fn handle_sign_ed25519_new_from_entropy(
-        &mut self,
-    ) -> LairClientApiHandlerResult<(KeystoreIndex, sign_ed25519::SignEd25519PubKey)> {
-        Err(self.0())
-    }
-
-    fn handle_sign_ed25519_get(
-        &mut self,
-        _keystore_index: KeystoreIndex,
-    ) -> LairClientApiHandlerResult<sign_ed25519::SignEd25519PubKey> {
-        Err(self.0())
-    }
-
-    fn handle_sign_ed25519_sign_by_index(
-        &mut self,
-        _keystore_index: KeystoreIndex,
-        _message: Arc<Vec<u8>>,
-    ) -> LairClientApiHandlerResult<sign_ed25519::SignEd25519Signature> {
-        Err(self.0())
-    }
-
-    fn handle_sign_ed25519_sign_by_pub_key(
-        &mut self,
-        _pub_key: sign_ed25519::SignEd25519PubKey,
-        _message: Arc<Vec<u8>>,
-    ) -> LairClientApiHandlerResult<sign_ed25519::SignEd25519Signature> {
-        Err(self.0())
-    }
-
-    fn handle_x25519_new_from_entropy(
-        &mut self,
-    ) -> LairClientApiHandlerResult<(KeystoreIndex, x25519::X25519PubKey)> {
-        Err(self.0())
-    }
-
-    fn handle_x25519_get(
-        &mut self,
-        _keystore_index: KeystoreIndex,
-    ) -> LairClientApiHandlerResult<x25519::X25519PubKey> {
-        Err(self.0())
-    }
-
-    fn handle_crypto_box_by_index(
-        &mut self,
-        _keystore_index: KeystoreIndex,
-        _recipient: x25519::X25519PubKey,
-        _data: Arc<crypto_box::CryptoBoxData>,
-    ) -> LairClientApiHandlerResult<crypto_box::CryptoBoxEncryptedData> {
-        Err(self.0())
-    }
-
-    fn handle_crypto_box_by_pub_key(
-        &mut self,
-        _pub_key: x25519::X25519PubKey,
-        _recipient: x25519::X25519PubKey,
-        _data: Arc<crypto_box::CryptoBoxData>,
-    ) -> LairClientApiHandlerResult<crypto_box::CryptoBoxEncryptedData> {
-        Err(self.0())
-    }
-
-    fn handle_crypto_box_open_by_index(
-        &mut self,
-        _keystore_index: KeystoreIndex,
-        _sender: x25519::X25519PubKey,
-        _encrypted_data: Arc<crypto_box::CryptoBoxEncryptedData>,
-    ) -> LairClientApiHandlerResult<Option<crypto_box::CryptoBoxData>> {
-        Err(self.0())
-    }
-
-    fn handle_crypto_box_open_by_pub_key(
-        &mut self,
-        _pub_key: x25519::X25519PubKey,
-        _sender: x25519::X25519PubKey,
-        _encrypted_data: Arc<crypto_box::CryptoBoxEncryptedData>,
-    ) -> LairClientApiHandlerResult<Option<crypto_box::CryptoBoxData>> {
-        Err(self.0())
     }
 }
 
@@ -282,9 +136,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn test_crude_mock_keystore() {
         tokio::task::spawn(async move {
-            let keystore = spawn_crude_mock_keystore(|| LairError::other("err"))
-                .await
-                .unwrap();
+            let keystore = spawn_crude_mock_keystore(|| "err".into()).await;
 
             assert_eq!(
                 holo_hash::AgentPubKey::new_random(&keystore).await,

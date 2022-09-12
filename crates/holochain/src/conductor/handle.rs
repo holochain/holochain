@@ -39,6 +39,7 @@ use super::api::error::ConductorApiResult;
 use super::api::ZomeCall;
 use super::conductor::CellStatus;
 use super::config::AdminInterfaceConfig;
+use super::error::ConductorError;
 use super::error::ConductorResult;
 use super::interface::SignalBroadcaster;
 use super::manager::spawn_task_manager;
@@ -208,11 +209,15 @@ pub trait ConductorHandleT: Send + Sync {
     /// Prune expired agent_infos from the p2p agents database
     async fn prune_p2p_agents_db(&self) -> ConductorResult<()>;
 
-    /// Create a new Cell in an existing App based on an existing DNA
+    /// Create a new cell in an existing app based on an existing DNA.
+    ///
+    /// # Returns
+    ///
+    /// A struct with the created cell's clone id and cell id.
     async fn create_clone_cell(
         self: Arc<Self>,
         payload: CreateCloneCellPayload,
-    ) -> ConductorResult<CellId>;
+    ) -> ConductorResult<InstalledCell>;
 
     /// Destroy a cloned Cell
     async fn destroy_clone_cell(self: Arc<Self>, cell_id: CellId) -> ConductorResult<()>;
@@ -776,6 +781,7 @@ impl ConductorHandleT for ConductorHandleImpl {
             | GetMeta { .. }
             | GetLinks { .. }
             | GetAgentActivity { .. }
+            | MustGetAgentActivity { .. }
             | ValidationReceiptReceived { .. } => {
                 let cell_id = CellId::new(event.dna_hash().clone(), event.target_agents().clone());
                 let cell = self.cell_by_id(&cell_id)?;
@@ -893,27 +899,51 @@ impl ConductorHandleT for ConductorHandleImpl {
     async fn create_clone_cell(
         self: Arc<Self>,
         payload: CreateCloneCellPayload,
-    ) -> ConductorResult<CellId> {
+    ) -> ConductorResult<InstalledCell> {
         let CreateCloneCellPayload {
-            properties,
-            dna_hash,
-            installed_app_id,
-            agent_key,
+            app_id,
             role_id,
+            phenotype,
             membrane_proof,
+            name,
         } = payload;
-        let cell_id = CellId::new(dna_hash, agent_key);
-        let cells = vec![(cell_id.clone(), membrane_proof)];
+        if !phenotype.has_some_option_set() {
+            return Err(ConductorError::CloneCellError(
+                "neither network_seed nor properties nor origin_time provided for clone cell"
+                    .to_string(),
+            ));
+        }
+        let state = self.conductor.get_state().await?;
+        let app = state.get_app(&app_id)?;
+        app.provisioned_cells()
+            .find(|(app_role_id, _)| **app_role_id == role_id)
+            .ok_or_else(|| {
+                ConductorError::CloneCellError(
+                    "no base cell found for provided role id".to_string(),
+                )
+            })?;
 
-        // Run genesis on cells.
-        crate::conductor::conductor::genesis_cells(&self.conductor, cells, self.clone()).await?;
-
-        let properties = properties.unwrap_or_else(|| ().into());
-        let cell_id = self
+        // create cell
+        let network_seed = phenotype.network_seed.unwrap_or_else(random_network_seed);
+        let properties = phenotype.properties.unwrap_or_default();
+        let origin_time = phenotype.origin_time.unwrap_or_else(Timestamp::now);
+        let dna_phenotype = DnaPhenotype {
+            network_seed,
+            origin_time,
+            properties,
+        };
+        // add cell to app
+        let installed_clone_cell = self
             .conductor
-            .add_clone_cell_to_app(installed_app_id, role_id, properties)
+            .add_clone_cell_to_app(app_id.clone(), role_id.clone(), dna_phenotype, name)
             .await?;
-        Ok(cell_id)
+
+        // run genesis on cloned cell
+        let cells = vec![(installed_clone_cell.as_id().clone(), membrane_proof)];
+        crate::conductor::conductor::genesis_cells(&self.conductor, cells, self.clone()).await?;
+        self.create_and_add_initialized_cells_for_running_apps(self.clone(), Some(&app_id))
+            .await?;
+        Ok(installed_clone_cell)
     }
 
     async fn destroy_clone_cell(self: Arc<Self>, _cell_id: CellId) -> ConductorResult<()> {
@@ -983,7 +1013,7 @@ impl ConductorHandleT for ConductorHandleImpl {
             .await?;
 
         let roles = ops.role_assignments;
-        let app = InstalledAppCommon::new(installed_app_id, agent_key, roles);
+        let app = InstalledAppCommon::new(installed_app_id, agent_key, roles)?;
 
         // Update the db
         let stopped_app = self.conductor.add_disabled_app_to_db(app).await?;
@@ -1061,7 +1091,7 @@ impl ConductorHandleT for ConductorHandleImpl {
         self.conductor.remove_dangling_cells().await?;
 
         let results = self
-            .create_and_add_initialized_cells_for_running_apps(self.clone())
+            .create_and_add_initialized_cells_for_running_apps(self.clone(), None)
             .await?;
         Ok(results)
     }
@@ -1353,7 +1383,7 @@ impl ConductorHandleT for ConductorHandleImpl {
 
             // Validate the chain.
             crate::core::validate_chain(
-                records.iter().map(|e| e.action_hashed()),
+                records.iter().map(|e| e.signed_action()),
                 &persisted_chain_head.clone().filter(|_| !truncate),
             )
             .map_err(|e| SourceChainError::InvalidCommit(e.to_string()))?;
@@ -1616,10 +1646,11 @@ impl ConductorHandleImpl {
     pub(super) async fn create_and_add_initialized_cells_for_running_apps(
         &self,
         conductor_handle: ConductorHandle,
+        app_id: Option<&InstalledAppId>,
     ) -> ConductorResult<CellStartupErrors> {
         let results = self
             .conductor
-            .create_cells_for_running_apps(conductor_handle)
+            .create_cells_for_running_apps(conductor_handle, app_id)
             .await?;
         let (new_cells, errors): (Vec<_>, Vec<_>) = results.into_iter().partition(Result::is_ok);
 

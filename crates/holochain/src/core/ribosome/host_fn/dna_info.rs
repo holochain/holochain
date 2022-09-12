@@ -1,12 +1,12 @@
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
+use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
 use holo_hash::HasHash;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use holochain_zome_types::info::DnaInfo;
 use std::sync::Arc;
-use crate::core::ribosome::RibosomeError;
 
 pub fn dna_info(
     ribosome: Arc<impl RibosomeT>,
@@ -20,7 +20,7 @@ pub fn dna_info(
         } => Ok(DnaInfo {
             name: ribosome.dna_def().name.clone(),
             hash: ribosome.dna_def().as_hash().clone(),
-            properties: ribosome.dna_def().properties.clone(),
+            properties: ribosome.dna_def().phenotype.properties.clone(),
             zome_names: ribosome
                 .dna_def()
                 .integrity_zomes
@@ -51,10 +51,13 @@ pub mod test {
     use holochain_zome_types::prelude::*;
 
     async fn test_conductor(properties: SerializedBytes) -> (SweetConductor, SweetZome) {
-        let (dna_file, _, _) =
-            SweetDnaFile::from_test_wasms(random_network_seed(), vec![TestWasm::ZomeInfo], properties)
-                .await
-                .unwrap();
+        let (dna_file, _, _) = SweetDnaFile::from_test_wasms(
+            random_network_seed(),
+            vec![TestWasm::ZomeInfo],
+            properties,
+        )
+        .await
+        .unwrap();
 
         let alice_pubkey = fixt!(AgentPubKey, Predictable, 0);
         let bob_pubkey = fixt!(AgentPubKey, Predictable, 1);

@@ -255,6 +255,7 @@ impl SourceChain {
     }
 
     #[async_recursion]
+    #[tracing::instrument(skip(self, network))]
     pub async fn flush(
         &self,
         network: &(dyn HolochainP2pDnaT + Send + Sync),
@@ -764,14 +765,15 @@ where
                     });
                     sql.push_str(
                         "
-                )
-                AND
-                (:entry_type IS NULL OR Action.entry_type = :entry_type)
-                AND
-                (:action_type IS NULL OR Action.type = :action_type)
-                ORDER BY Action.seq ASC
-                ",
+                        )
+                        AND
+                        (:entry_type IS NULL OR Action.entry_type = :entry_type)
+                        AND
+                        (:action_type IS NULL OR Action.type = :action_type)
+                        ORDER BY Action.seq 
+                        ",
                     );
+                    sql.push_str(if query.order_descending {" DESC"} else {" ASC"});
                     let mut stmt = txn.prepare(&sql)?;
                     let records = stmt
                         .query_and_then(
@@ -1937,23 +1939,23 @@ pub mod tests {
         .await
         .unwrap();
 
-        test_db.dump_tmp();
+        // test_db.dump_tmp();
 
         let chain = SourceChain::new(vault, dht_db.to_db(), dht_db_cache, keystore, alice.clone())
             .await
             .unwrap();
 
-        let elements = chain.query(ChainQueryFilter::default()).await.unwrap();
+        let records = chain.query(ChainQueryFilter::default()).await.unwrap();
 
-        // All of the range queries which should return a full set of elements
+        // All of the range queries which should return a full set of records
         let full_ranges = [
             ChainQueryFilterRange::Unbounded,
             ChainQueryFilterRange::ActionSeqRange(0, 2),
             ChainQueryFilterRange::ActionHashRange(
-                elements[0].action_address().clone(),
-                elements[2].action_address().clone(),
+                records[0].action_address().clone(),
+                records[2].action_address().clone(),
             ),
-            ChainQueryFilterRange::ActionHashTerminated(elements[2].action_address().clone(), 2),
+            ChainQueryFilterRange::ActionHashTerminated(records[2].action_address().clone(), 2),
         ];
 
         // A variety of combinations of query parameters
@@ -1978,7 +1980,7 @@ pub mod tests {
                 (
                     Some(ActionType::Create),
                     Some(EntryType::AgentPubKey),
-                    vec![elements[2].action().entry_hash().unwrap().clone()],
+                    vec![records[2].action().entry_hash().unwrap().clone()],
                     true,
                 ),
                 1,
@@ -2000,6 +2002,7 @@ pub mod tests {
                     entry_type: entry_type.clone(),
                     entry_hashes: entry_hashes.clone(),
                     include_entries,
+                    order_descending: false,
                 };
                 if sequence_range != ChainQueryFilterRange::Unbounded
                     && (action_type.is_some()
@@ -2023,5 +2026,45 @@ pub mod tests {
                 }
             }
         }
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn source_chain_query_ordering() {
+        let test_db = test_authored_db();
+        let dht_db = test_dht_db();
+        let dht_db_cache = DhtDbQueryCache::new(dht_db.to_db().into());
+        let keystore = test_keystore();
+        let vault = test_db.to_db();
+        let alice = keystore.new_sign_keypair_random().await.unwrap();
+        let dna_hash = fixt!(DnaHash);
+
+        genesis(
+            vault.clone().into(),
+            dht_db.to_db(),
+            &dht_db_cache,
+            keystore.clone(),
+            dna_hash.clone(),
+            alice.clone(),
+            None,
+        )
+        .await
+        .unwrap();
+
+        let chain = SourceChain::new(vault, dht_db.to_db(), dht_db_cache, keystore, alice.clone())
+            .await
+            .unwrap();
+
+        let asc = chain.query(ChainQueryFilter::default()).await.unwrap();
+        let desc = chain
+            .query(ChainQueryFilter::default().descending())
+            .await
+            .unwrap();
+
+        assert_eq!(asc.len(), 3);
+        assert_ne!(asc, desc);
+
+        let mut desc_sorted = desc;
+        desc_sorted.sort_by_key(|r| r.signed_action.action().action_seq());
+        assert_eq!(asc, desc_sorted);
     }
 }
