@@ -68,8 +68,11 @@ pub(crate) async fn graft_records_onto_source_chain(
                     //   grafting. A more rigorous approach would thin out the existing
                     //   actions until a single fork is obtained.
                     txn.execute(
-                        "DELETE FROM Action WHERE author = ? AND seq > ?",
-                        rusqlite::params![cell_id.agent_pubkey(), seq],
+                        holochain_sqlite::sql::sql_cell::DELETE_ACTIONS_AFTER_SEQ,
+                        rusqlite::named_params! {
+                            ":author": cell_id.agent_pubkey(),
+                            ":seq": seq
+                        },
                     )
                     .map_err(StateMutationError::from)?;
                 }
