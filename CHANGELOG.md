@@ -6,6 +6,48 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20220912.144242
+
+## [holochain\_cli-0.0.57](crates/holochain_cli/CHANGELOG.md#0.0.57)
+
+## [holochain\_cli\_sandbox-0.0.53](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.53)
+
+## [holochain\_cli\_bundle-0.0.52](crates/holochain_cli_bundle/CHANGELOG.md#0.0.52)
+
+## [holochain-0.0.162](crates/holochain/CHANGELOG.md#0.0.162)
+
+- Implement App API call `CreateCloneCell`. [\#1547](https://github.com/holochain/holochain/pull/1547)
+
+## [holochain\_test\_wasm\_common-0.0.53](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.53)
+
+## [holochain\_conductor\_api-0.0.59](crates/holochain_conductor_api/CHANGELOG.md#0.0.59)
+
+- Include cloned cells in App API call `AppInfo`. [\#1547](https://github.com/holochain/holochain/pull/1547)
+
+## [holochain\_wasm\_test\_utils-0.0.58](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.58)
+
+## [holochain\_cascade-0.0.61](crates/holochain_cascade/CHANGELOG.md#0.0.61)
+
+## [holochain\_state-0.0.59](crates/holochain_state/CHANGELOG.md#0.0.59)
+
+## [holochain\_p2p-0.0.56](crates/holochain_p2p/CHANGELOG.md#0.0.56)
+
+## [holochain\_types-0.0.56](crates/holochain_types/CHANGELOG.md#0.0.56)
+
+- Add function to add a clone cell to an app. [\#1547](https://github.com/holochain/holochain/pull/1547)
+
+## [holochain\_keystore-0.0.55](crates/holochain_keystore/CHANGELOG.md#0.0.55)
+
+## [holochain\_sqlite-0.0.54](crates/holochain_sqlite/CHANGELOG.md#0.0.54)
+
+## [hdk-0.1.0-alpha.0](crates/hdk/CHANGELOG.md#0.1.0-alpha.0)
+
+## [holochain\_zome\_types-0.0.48](crates/holochain_zome_types/CHANGELOG.md#0.0.48)
+
+- Add function to set DNA name. [\#1547](https://github.com/holochain/holochain/pull/1547)
+
+`ChainQueryFilter` has a `descending()` function which will cause the query results to be returned in descending order. This can be reversed by calling `ascending()`. The default order is still ascending. [\#1539](https://github.com/holochain/holochain/pull/1539)
+
 # 20220908.155008
 
 ## [holochain\_cli-0.0.56](crates/holochain_cli/CHANGELOG.md#0.0.56)
