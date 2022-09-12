@@ -649,9 +649,10 @@ impl Conductor {
             let conductor_handle = conductor_handle.clone();
             let managed_task_add_sender = managed_task_add_sender.clone();
             let managed_task_stop_broadcaster = managed_task_stop_broadcaster.clone();
+            let chc = conductor_handle.chc(cell_id);
             async move {
                 use holochain_p2p::actor::HolochainP2pRefToDna;
-                let holochain_p2p_cell = self.holochain_p2p.to_dna(cell_id.dna_hash().clone());
+                let holochain_p2p_cell = self.holochain_p2p.to_dna(cell_id.dna_hash().clone(), chc);
 
                 let space = self
                     .get_or_create_space(cell_id.dna_hash())
@@ -1146,6 +1147,7 @@ pub(super) async fn genesis_cells(
             let dht_db = space.dht_db;
             let dht_db_cache = space.dht_query_cache;
             let conductor_handle = conductor_handle.clone();
+            let chc = conductor_handle.chc(&cell_id);
             let cell_id_inner = cell_id.clone();
             let ribosome = conductor_handle
                 .get_ribosome(cell_id.dna_hash())
@@ -1159,6 +1161,7 @@ pub(super) async fn genesis_cells(
                     dht_db_cache,
                     ribosome,
                     proof,
+                    chc,
                 )
                 .await
             })
@@ -1252,7 +1255,9 @@ pub async fn full_integration_dump(
                 dht_ops_cursor,
             )?;
 
-            let dht_ops_cursor = txn.query_row(state_dump::DHT_OPS_ROW_ID, [], |row| row.get(0))?;
+            let dht_ops_cursor = txn
+                .query_row(state_dump::DHT_OPS_ROW_ID, [], |row| row.get(0))
+                .unwrap_or(0);
 
             ConductorApiResult::Ok(FullIntegrationStateDump {
                 validation_limbo,

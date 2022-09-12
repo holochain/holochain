@@ -47,7 +47,7 @@ pub fn records_from_actions_and_entries(
         } else {
             None
         };
-        let record = Record::create(action, entry);
+        let record = Record::new(action, entry);
         records.push(record);
     }
     Ok(records)

@@ -11,8 +11,10 @@ use holo_hash::DhtOpHash;
 use holo_hash::DnaHash;
 use holo_hash::HasHash;
 use holochain_keystore::MetaLairClient;
+use holochain_p2p::ChcImpl;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_sqlite::rusqlite::Transaction;
+use holochain_types::chc::ChcError;
 use holochain_types::db::DbRead;
 use holochain_types::db::DbWrite;
 use holochain_types::db_cache::DhtDbQueryCache;
@@ -24,6 +26,7 @@ use holochain_types::dht_op::OpOrder;
 use holochain_types::dht_op::UniqueForm;
 use holochain_types::record::SignedActionHashedExt;
 use holochain_types::sql::AsSql;
+use holochain_types::EntryHashed;
 use holochain_zome_types::action;
 use holochain_zome_types::query::ChainQueryFilterRange;
 use holochain_zome_types::Action;
@@ -262,6 +265,7 @@ impl SourceChain {
         network: &(dyn HolochainP2pDnaT + Send + Sync),
     ) -> SourceChainResult<Vec<SignedActionHashed>> {
         // Nothing to write
+
         if self.scratch.apply(|s| s.is_empty())? {
             return Ok(Vec::new());
         }
@@ -274,6 +278,20 @@ impl SourceChain {
             let scheduled_fns = scratch.drain_scheduled_fns().collect::<Vec<_>>();
             SourceChainResult::Ok((scheduled_fns, actions, ops, entries))
         })?;
+
+        // Sync with CHC, if CHC is present
+        if let Some(chc) = network.chc() {
+            chc.add_entries(entries.clone())
+                .await
+                .map_err(SourceChainError::other)?;
+            if let Err(err @ ChcError::InvalidChain(_, _)) = chc.add_actions(actions.clone()).await
+            {
+                return Err(SourceChainError::ChcHeadMoved(
+                    "SourceChain::flush".into(),
+                    err,
+                ));
+            }
+        }
 
         let maybe_countersigned_entry = entries
             .iter()
@@ -305,18 +323,19 @@ impl SourceChain {
                     schedule_fn(txn, author.as_ref(), scheduled_fn, None, now)?;
                 }
                 // As at check.
-                let (new_persisted_head, new_head_seq, new_timestamp) =
+                let (latest_head, latest_head_seq, new_timestamp) =
                     chain_head_db_nonempty(txn, author.clone())?;
                 if actions.last().is_none() {
                     // Nothing to write
                     return Ok(Vec::new());
                 }
-                if persisted_head != new_persisted_head {
+
+                if persisted_head != latest_head {
                     return Err(SourceChainError::HeadMoved(
                         actions,
                         entries,
                         Some(persisted_head),
-                        Some((new_persisted_head, new_head_seq, new_timestamp)),
+                        Some((latest_head, latest_head_seq, new_timestamp)),
                     ));
                 }
 
@@ -355,7 +374,7 @@ impl SourceChain {
                 actions,
                 entries,
                 old_head,
-                Some((new_persisted_head, new_head_seq, new_timestamp)),
+                Some((new_persisted_head, latest_head_seq, new_timestamp)),
             )) => {
                 let is_relaxed =
                     self.scratch
@@ -378,7 +397,7 @@ impl SourceChain {
                         &keystore,
                         actions,
                         new_persisted_head,
-                        new_head_seq,
+                        latest_head_seq,
                         new_timestamp,
                     )
                     .await?;
@@ -396,7 +415,7 @@ impl SourceChain {
                         actions,
                         entries,
                         old_head,
-                        Some((new_persisted_head, new_head_seq, new_timestamp)),
+                        Some((new_persisted_head, latest_head_seq, new_timestamp)),
                     ))
                 }
             }
@@ -973,6 +992,7 @@ pub async fn genesis(
     dna_hash: DnaHash,
     agent_pubkey: AgentPubKey,
     membrane_proof: Option<MembraneProof>,
+    chc: Option<ChcImpl>,
 ) -> SourceChainResult<()> {
     let dna_action = Action::Dna(action::Dna {
         author: agent_pubkey.clone(),
@@ -1015,12 +1035,33 @@ pub async fn genesis(
     });
     let agent_action = ActionHashed::from_content_sync(agent_action);
     let agent_action = SignedActionHashed::sign(&keystore, agent_action).await?;
-    let record = Record::new(agent_action, Some(Entry::Agent(agent_pubkey)));
+    let record = Record::new(agent_action, Some(Entry::Agent(agent_pubkey.clone())));
     let agent_ops = produce_op_lights_from_records(vec![&record])?;
     let (agent_action, agent_entry) = record.into_inner();
     let agent_entry = agent_entry.into_option();
 
     let mut ops_to_integrate = Vec::new();
+
+    if let Some(chc) = chc {
+        chc.add_entries(vec![EntryHashed::from_content_sync(Entry::Agent(
+            agent_pubkey,
+        ))])
+        .await
+        .map_err(SourceChainError::other)?;
+        match chc
+            .add_actions(vec![
+                dna_action.clone(),
+                agent_validation_action.clone(),
+                agent_action.clone(),
+            ])
+            .await
+        {
+            Err(e @ ChcError::InvalidChain(_, _)) => {
+                Err(SourceChainError::ChcHeadMoved("genesis".into(), e))
+            }
+            e => e.map_err(SourceChainError::other),
+        }?;
+    }
 
     let ops_to_integrate = authored
         .async_commit(move |txn| {
@@ -1295,6 +1336,7 @@ pub mod tests {
             fake_dna_hash(1),
             alice.clone(),
             None,
+            None,
         )
         .await
         .unwrap();
@@ -1382,6 +1424,7 @@ pub mod tests {
             keystore.clone(),
             fake_dna_hash(1),
             alice.clone(),
+            None,
             None,
         )
         .await
@@ -1524,6 +1567,7 @@ pub mod tests {
             keystore.clone(),
             fake_dna_hash(1),
             alice.clone(),
+            None,
             None,
         )
         .await
@@ -1806,6 +1850,7 @@ pub mod tests {
             fixt!(DnaHash),
             (*author).clone(),
             None,
+            None,
         )
         .await
         .unwrap();
@@ -1889,6 +1934,7 @@ pub mod tests {
             fixt!(DnaHash),
             author.clone(),
             None,
+            None,
         )
         .await
         .unwrap();
@@ -1930,6 +1976,7 @@ pub mod tests {
             dna_hash.clone(),
             alice.clone(),
             None,
+            None,
         )
         .await
         .unwrap();
@@ -1941,6 +1988,7 @@ pub mod tests {
             keystore.clone(),
             dna_hash.clone(),
             bob.clone(),
+            None,
             None,
         )
         .await
@@ -2052,6 +2100,7 @@ pub mod tests {
             keystore.clone(),
             dna_hash.clone(),
             alice.clone(),
+            None,
             None,
         )
         .await

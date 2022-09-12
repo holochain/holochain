@@ -46,7 +46,10 @@ pub struct ConductorConfig {
     /// Optional config for the network module.
     pub network: Option<holochain_p2p::kitsune_p2p::KitsuneP2pConfig>,
 
-    #[serde(default)]
+    /// Optional specification of the Cloudflare namespace to use in Centralized Chain Coordination 
+    /// service URLs
+    pub chc_namespace: Option<String>,
+
     /// Override the default database synchronous strategy.
     ///
     /// See [sqlite documentation] for information about database sync levels.
@@ -55,6 +58,7 @@ pub struct ConductorConfig {
     /// are doing.
     ///
     /// [sqlite documentation]: https://www.sqlite.org/pragma.html#pragma_synchronous
+    #[serde(default)]
     pub db_sync_strategy: DbSyncStrategy,
     //
     //
@@ -127,6 +131,7 @@ pub mod tests {
                 keystore: KeystoreConfig::DangerTestKeystoreLegacyDeprecated,
                 admin_interfaces: None,
                 db_sync_strategy: DbSyncStrategy::default(),
+                chc_namespace: None,
             }
         );
     }
@@ -221,6 +226,7 @@ pub mod tests {
                 }]),
                 network: Some(network_config),
                 db_sync_strategy: DbSyncStrategy::Fast,
+                chc_namespace: None,
             }
         );
     }

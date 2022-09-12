@@ -86,11 +86,17 @@ holochain_test_wasm_common = { version = "0.0.52", path = "../test_utils/wasm_co
 unwrap_to = { version = "0.1.0", optional = true }
 itertools = { version = "0.10", optional = false }
 
+# chc deps
+bytes = { version = "1", optional = true }
+reqwest = { version = "0.11.2", optional = true }
+
 [target.'cfg(unix)'.dependencies]
 sd-notify = "0.3.0"
 
 
 [dev-dependencies]
+holochain = { path = ".", features = ["test_utils"] }
+
 anyhow = "1.0.26"
 assert_cmd = "1.0.1"
 contrafact = "0.1.0-dev.1"
@@ -171,3 +177,9 @@ no-deps = ['holochain_sqlite/no-deps']
 
 # Extremely verbose wasm memory read/write logging
 wasmer_debug_memory = ["holochain_wasmer_host/debug_memory"]
+
+# Enable chain head coordination
+chc = [
+  "bytes",
+  "reqwest"
+]
