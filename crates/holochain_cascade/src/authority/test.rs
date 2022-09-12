@@ -213,7 +213,7 @@ async fn get_agent_activity() {
     let result = handle_get_agent_activity(
         db.to_db().into(),
         td.agent.clone(),
-        td.query_filter.clone(),
+        QueryFilter::new(),
         (&options).into(),
     )
     .await
@@ -232,9 +232,7 @@ async fn get_agent_activity() {
         _ => unreachable!(),
     };
 
-    let filter = td
-        .query_filter
-        .sequence_range(ChainQueryFilterRange::ActionSeqRange(0, 19));
+    let filter = QueryFilter::new().sequence_range(ChainQueryFilterRange::ActionSeqRange(0, 19));
     let result = handle_get_agent_activity(
         db.to_db().into(),
         td.agent.clone(),

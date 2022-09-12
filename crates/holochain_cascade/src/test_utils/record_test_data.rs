@@ -22,7 +22,10 @@ use holochain_zome_types::Update;
 use std::convert::TryInto;
 
 use fixt::prelude::*;
+
+/// A collection of fixtures for use in Cascade tests
 #[derive(Debug)]
+#[allow(missing_docs)]
 pub struct RecordTestData {
     pub store_record_op: DhtOpHashed,
     pub wire_create: Judged<SignedAction>,
@@ -35,15 +38,22 @@ pub struct RecordTestData {
     pub update_hash: ActionHash,
     pub hash: EntryHash,
     pub entry: Entry,
+    /// An Op from any_record
     pub any_store_record_op: DhtOpHashed,
+    /// An arbitrary Action
     pub any_action: Judged<SignedAction>,
+    /// The hash of any_action
     pub any_action_hash: ActionHash,
+    /// The entry to go with any_action
     pub any_entry: Option<Entry>,
+    /// The hash of any_entry
     pub any_entry_hash: Option<EntryHash>,
+    /// A Record constructed from any_action
     pub any_record: Record,
 }
 
 impl RecordTestData {
+    /// Constructor
     pub fn create() -> Self {
         let mut create = fixt!(Create);
         let mut update = fixt!(Update);

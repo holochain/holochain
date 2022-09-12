@@ -601,7 +601,7 @@ where
                 let in_flight = hashes.into_iter().map(|hash| async {
                     let cascade_workspace = workspace_read.clone();
                     let mut cascade =
-                        Cascade::from_workspace_network(&cascade_workspace, network.clone());
+                        Cascade::from_workspace_and_network(&cascade_workspace, network.clone());
                     cascade
                         .fetch_record(hash.clone(), NetworkGetOptions::must_get_options())
                         .await?;
@@ -636,7 +636,7 @@ where
             } else {
                 let cascade_workspace = workspace_read.clone();
                 let mut cascade =
-                    Cascade::from_workspace_network(&cascade_workspace, network.clone());
+                    Cascade::from_workspace_and_network(&cascade_workspace, network.clone());
                 cascade
                     .must_get_agent_activity(author.clone(), filter.clone())
                     .await?;

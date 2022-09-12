@@ -28,7 +28,10 @@ use holochain_zome_types::ValidationStatus;
 use std::convert::TryInto;
 
 use ::fixt::prelude::*;
+
+/// A collection of test fixtures used to test entry-related cascade functionality
 #[derive(Debug)]
+#[allow(missing_docs)]
 pub struct EntryTestData {
     pub store_entry_op: DhtOpHashed,
     pub wire_create: Judged<WireNewEntryAction>,
@@ -55,6 +58,7 @@ pub struct EntryTestData {
 }
 
 impl EntryTestData {
+    /// Create the test fixtures
     pub fn create() -> Self {
         let mut create = fixt!(Create);
         let mut update = fixt!(Update);
