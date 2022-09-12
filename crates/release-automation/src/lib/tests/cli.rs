@@ -136,7 +136,7 @@ fn bump_versions_on_selection() {
 
     // set expectations
     let expected_crates = vec!["crate_b", "crate_a", "crate_e"];
-    let expected_release_versions = vec!["0.0.1", "0.1.0", "0.0.1"];
+    let expected_release_versions = vec!["0.0.0", "0.1.0", "0.0.1"];
 
     // check manifests for new release headings
     assert_eq!(
@@ -147,7 +147,7 @@ fn bump_versions_on_selection() {
     // ensure dependants were updated
     // todo: ensure *all* dependants were updated
     assert_eq!(
-        "0.0.1",
+        "0.0.0",
         crate::common::get_dependency_version(
             &workspace
                 .root()
@@ -253,12 +253,11 @@ fn bump_versions_on_selection() {
         - BREAKING:  `InstallAppDnaPayload`
         - BREAKING: `DnaSource(Path)`
 
-        ## [crate_b-0.0.1](crates/crate_b/CHANGELOG.md#0.0.1)
+        ## [crate_b-0.0.0](crates/crate_b/CHANGELOG.md#0.0.0)
 
         ### Changed
 
         - `Signature` is a 64 byte ‘secure primitive’
-
 
         # \[20210304.120604\]
 
@@ -301,7 +300,7 @@ fn bump_versions_on_selection() {
 
         the following crates are part of this release:
 
-        - crate_b-0.0.1
+        - crate_b-0.0.0
         - crate_a-0.1.0
         - crate_e-0.0.1
         "#,
@@ -312,7 +311,7 @@ fn bump_versions_on_selection() {
 
     // TODO: tag creation has been moved to publishing, test it there
     // ensure the git tags for the crate releases were created
-    // for expected_tag in &["crate_b-0.0.1", "crate_a-0.0.2", "crate_e-0.0.1"] {
+    // for expected_tag in &["crate_b-0.0.0", "crate_a-0.0.2", "crate_e-0.0.1"] {
     //     crate::crate_selection::git_lookup_tag(workspace.git_repo(), &expected_tag)
     //         .expect(&format!("git tag '{}' not found", &expected_tag));
     // }
@@ -504,7 +503,7 @@ fn multiple_subsequent_releases() {
         (
             // bump the first time as they're initially released
             // vec!["0.0.2-dev.0", "0.0.3-dev.0", "0.0.2-dev.0"],
-            vec!["0.0.1", "0.1.0", "0.0.1"],
+            vec!["0.0.0", "0.1.0", "0.0.1"],
             vec!["crate_b", "crate_a", "crate_e"],
             // allowed missing dependencies
             Vec::<&str>::new(),
@@ -514,7 +513,7 @@ fn multiple_subsequent_releases() {
         (
             // should not bump the second time without making any changes
             // vec!["0.0.2-dev.0", "0.0.3-dev.0", "0.0.2-dev.0"],
-            vec!["0.0.1", "0.1.0", "0.0.1"],
+            vec!["0.0.0", "0.1.0", "0.0.1"],
             vec!["crate_b", "crate_a", "crate_e"],
             // allowed missing dependencies
             Vec::<&str>::new(),
@@ -523,7 +522,7 @@ fn multiple_subsequent_releases() {
         ),
         (
             // only crate_a and crate_e have changed, expect these to be bumped
-            vec!["0.0.1", "0.1.1", "0.0.2"],
+            vec!["0.0.0", "0.1.1", "0.0.2"],
             vec!["crate_b", "crate_a", "crate_e"],
             // crate_b won't be part of the release so we allow it to be missing as we're not publishing
             vec!["crate_b"],
@@ -549,7 +548,7 @@ fn multiple_subsequent_releases() {
         ),
         (
             // change crate_b, and as crate_a depends on crate_b it'll be bumped as well
-            vec!["0.0.2", "0.1.2", "0.0.2"],
+            vec!["0.0.1", "0.1.2", "0.0.2"],
             vec!["crate_b", "crate_a", "crate_e"],
             // allowed missing dependencies
             vec![],

@@ -1403,12 +1403,7 @@ mod tests {
             (
                 "crate_b",
                 workspace_mocker.root().join("crates/crate_b/CHANGELOG.md"),
-                vec![
-                    ChangeT::Unreleased,
-                    ChangeT::Release(ReleaseChange::CrateReleaseChange(
-                        "0.0.0-alpha.1".to_string(),
-                    )),
-                ],
+                vec![ChangeT::Unreleased],
             ),
             (
                 "crate_c",
