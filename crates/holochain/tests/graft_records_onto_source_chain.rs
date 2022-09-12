@@ -76,11 +76,11 @@ async fn grafting() {
         entry_hash: EntryHash::with_data_sync(&entry),
         weight: Default::default(),
     };
-    let shh = SignedActionHashed::with_presigned(
+    let sah = SignedActionHashed::with_presigned(
         ActionHashed::from_content_sync(action.clone().into()),
         fixt!(Signature),
     );
-    let record = Record::new(shh, Some(entry.clone()));
+    let record = Record::new(sah, Some(entry.clone()));
     let result = conductor
         .clone()
         .graft_records_onto_source_chain(alice.cell_id().clone(), false, vec![record])
@@ -130,7 +130,7 @@ async fn grafting() {
     // The new action will be in the chain
     assert!(chain.iter().any(|i| i.0 == hash));
 
-    // Insert with truncation on.
+    // Graft records.
     let result = conductor
         .clone()
         .graft_records_onto_source_chain(alice.cell_id().clone(), false, vec![record.clone()])
@@ -173,6 +173,7 @@ async fn grafting() {
     assert!(dbg!(result).is_err());
 
     // Restore and validate the original records
+    // (there has been no change at this point, but it helps for clarity to reset the chain anyway)
     conductor
         .clone()
         .graft_records_onto_source_chain(alice.cell_id().clone(), true, original_records.clone())
@@ -207,12 +208,12 @@ async fn grafting() {
 }
 
 async fn make_record(keystore: &MetaLairClient, action: Action) -> Record {
-    let shh = SignedActionHashed::sign(
+    let sah = SignedActionHashed::sign(
         keystore,
         ActionHashed::from_content_sync(action.clone().into()),
     )
     .await
     .unwrap();
     let entry = Entry::app(().try_into().unwrap()).unwrap();
-    Record::new(shh, Some(entry.clone()))
+    Record::new(sah, Some(entry.clone()))
 }

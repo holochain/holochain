@@ -293,13 +293,13 @@ pub enum AdminRequest {
     /// The records must form a valid chain segment (ascending sequence numbers,
     /// and valid `prev_action` references). If the first record contains a `prev_action`
     /// which matches the existing records, then the new records will be "grafted" onto
-    /// the existing chain at that point, and any other records above that one which do
+    /// the existing chain at that point, and any other records following that point which do
     /// not match the new records will be removed.
     ///
     /// If this operation is called when there are no forks, the final state will also have
     /// no forks.
     ///
-    /// **BEWARE** that this may result in the deletion of data! Any records which form
+    /// **BEWARE** that this may result in the deletion of data! Any existing records which form
     /// a fork with respect to the new records will be deleted.
     ///
     /// All records must be authored and signed by the same agent.
