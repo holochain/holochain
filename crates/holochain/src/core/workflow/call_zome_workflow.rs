@@ -233,7 +233,7 @@ where
     };
 
     let mut cascade =
-        holochain_cascade::Cascade::from_workspace_network(&workspace, network.clone());
+        holochain_cascade::Cascade::from_workspace_and_network(&workspace, network.clone());
     for mut chain_record in to_app_validate {
         for op_type in action_to_op_types(chain_record.action()) {
             let op =

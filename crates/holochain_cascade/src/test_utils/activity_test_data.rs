@@ -8,20 +8,29 @@ use holochain_types::dht_op::DhtOpHashed;
 
 use holochain_zome_types::*;
 
+/// A collection of fixtures used to create scenarios for testing the Cascade
 #[derive(Debug)]
 pub struct ActivityTestData {
+    /// AgentActivity ops to expect being able to get
     pub hash_ops: Vec<DhtOpHashed>,
+    /// "Noise", to ensure that the query filter is doing its job
     pub noise_ops: Vec<DhtOpHashed>,
+    /// StoreRecord ops to expect being able to get
     pub store_ops: Vec<DhtOpHashed>,
+    /// The author of the chain
     pub agent: AgentPubKey,
-    pub query_filter: ChainQueryFilter,
+    /// The expected hash return values
     pub valid_hashes: ChainItems<ActionHash>,
+    /// The expected record return values
     pub valid_records: ChainItems<Record>,
+    /// The head of the chain produced
     pub chain_head: ChainHead,
+    /// Same as the chain_head
     pub highest_observed: HighestObserved,
 }
 
 impl ActivityTestData {
+    /// Construct a set of test fixtures representing a valid source chain
     pub fn valid_chain_scenario() -> Self {
         // The agent we are querying.
         let agent = fixt!(AgentPubKey);
@@ -118,9 +127,6 @@ impl ActivityTestData {
             hash: vec![last.1.clone()],
         };
 
-        // We just want a simple query filter to get back the full chain.
-        let query_filter = QueryFilter::new();
-
         // Finally add some random noise so we know we are getting the correct items.
         let noise_ops = ActionFixturator::new(Unpredictable)
             .take(50)
@@ -130,7 +136,6 @@ impl ActivityTestData {
         Self {
             hash_ops,
             agent,
-            query_filter,
             valid_hashes: ChainItems::Hashes(valid_hashes),
             highest_observed,
             chain_head,
