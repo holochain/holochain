@@ -75,13 +75,6 @@ pub trait HolochainP2pDnaT {
         timeout_ms: Option<u64>,
     ) -> actor::HolochainP2pResult<usize>;
 
-    /// Request a validation package.
-    async fn get_validation_package(
-        &self,
-        request_from: AgentPubKey,
-        action_hash: ActionHash,
-    ) -> actor::HolochainP2pResult<ValidationPackageResponse>;
-
     /// Get an entry from the DHT.
     async fn get(
         &self,
@@ -240,21 +233,6 @@ impl HolochainP2pDnaT for HolochainP2pDna {
                 ops,
                 timeout_ms,
             )
-            .await
-    }
-
-    /// Request a validation package.
-    async fn get_validation_package(
-        &self,
-        request_from: AgentPubKey,
-        action_hash: ActionHash,
-    ) -> actor::HolochainP2pResult<ValidationPackageResponse> {
-        self.sender
-            .get_validation_package(actor::GetValidationPackage {
-                dna_hash: (*self.dna_hash).clone(),
-                request_from,
-                action_hash,
-            })
             .await
     }
 

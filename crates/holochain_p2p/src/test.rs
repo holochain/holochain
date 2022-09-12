@@ -21,6 +21,7 @@ impl HolochainP2pHandler for StubNetwork {
     ) -> HolochainP2pHandlerResult<()> {
         Err("stub".into())
     }
+
     fn handle_leave(
         &mut self,
         dna_hash: DnaHash,
@@ -28,6 +29,7 @@ impl HolochainP2pHandler for StubNetwork {
     ) -> HolochainP2pHandlerResult<()> {
         Err("stub".into())
     }
+
     fn handle_call_remote(
         &mut self,
         dna_hash: DnaHash,
@@ -40,6 +42,7 @@ impl HolochainP2pHandler for StubNetwork {
     ) -> HolochainP2pHandlerResult<SerializedBytes> {
         Err("stub".into())
     }
+
     fn handle_remote_signal(
         &mut self,
         dna_hash: DnaHash,
@@ -52,6 +55,7 @@ impl HolochainP2pHandler for StubNetwork {
     ) -> HolochainP2pHandlerResult<()> {
         Err("stub".into())
     }
+
     fn handle_publish(
         &mut self,
         dna_hash: DnaHash,
@@ -63,12 +67,7 @@ impl HolochainP2pHandler for StubNetwork {
     ) -> HolochainP2pHandlerResult<usize> {
         Err("stub".into())
     }
-    fn handle_get_validation_package(
-        &mut self,
-        input: actor::GetValidationPackage,
-    ) -> HolochainP2pHandlerResult<ValidationPackageResponse> {
-        Err("stub".into())
-    }
+
     fn handle_get(
         &mut self,
         dna_hash: DnaHash,
@@ -77,6 +76,7 @@ impl HolochainP2pHandler for StubNetwork {
     ) -> HolochainP2pHandlerResult<Vec<WireOps>> {
         Err("stub".into())
     }
+
     fn handle_get_meta(
         &mut self,
         dna_hash: DnaHash,
@@ -85,6 +85,7 @@ impl HolochainP2pHandler for StubNetwork {
     ) -> HolochainP2pHandlerResult<Vec<MetadataSet>> {
         Err("stub".into())
     }
+
     fn handle_get_links(
         &mut self,
         dna_hash: DnaHash,
@@ -93,6 +94,7 @@ impl HolochainP2pHandler for StubNetwork {
     ) -> HolochainP2pHandlerResult<Vec<WireLinkOps>> {
         Err("stub".into())
     }
+
     fn handle_get_agent_activity(
         &mut self,
         dna_hash: DnaHash,
@@ -102,6 +104,7 @@ impl HolochainP2pHandler for StubNetwork {
     ) -> HolochainP2pHandlerResult<Vec<AgentActivityResponse<ActionHash>>> {
         Err("stub".into())
     }
+
     fn handle_must_get_agent_activity(
         &mut self,
         dna_hash: DnaHash,
@@ -110,6 +113,7 @@ impl HolochainP2pHandler for StubNetwork {
     ) -> HolochainP2pHandlerResult<Vec<MustGetAgentActivityResponse>> {
         Err("stub".into())
     }
+
     fn handle_send_validation_receipt(
         &mut self,
         dna_hash: DnaHash,
@@ -118,9 +122,11 @@ impl HolochainP2pHandler for StubNetwork {
     ) -> HolochainP2pHandlerResult<()> {
         Err("stub".into())
     }
+
     fn handle_new_integrated_data(&mut self, dna_hash: DnaHash) -> HolochainP2pHandlerResult<()> {
         Err("stub".into())
     }
+
     fn handle_authority_for_hash(
         &mut self,
         dna_hash: DnaHash,
@@ -136,6 +142,7 @@ impl HolochainP2pHandler for StubNetwork {
     ) -> HolochainP2pHandlerResult<()> {
         Err("stub".into())
     }
+
     fn handle_dump_network_metrics(
         &mut self,
         dna_hash: Option<DnaHash>,
