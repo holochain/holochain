@@ -297,7 +297,7 @@ impl<A: ChainItem, B: Clone + AsRef<A>> ChainGraft<A, B> {
 
 #[cfg(test)]
 mod tests {
-    use holochain_types::test_utils::chain::{self as tu, TestChainHash, TestChainItem};
+    use holochain_types::test_utils::chain::{self as tu, TestChainItem};
     use test_case::test_case;
 
     use super::*;
