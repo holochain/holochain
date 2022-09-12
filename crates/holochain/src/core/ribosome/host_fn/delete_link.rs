@@ -37,7 +37,7 @@ pub fn delete_link<'a>(
                 tokio_helper::block_forever_on(async move {
                     let workspace = call_context_2.host_context.workspace();
                     CascadeResult::Ok(
-                        Cascade::from_workspace_network(&workspace, network)
+                        Cascade::from_workspace_and_network(&workspace, network)
                             .dht_get(address_2.into(), GetOptions::content())
                             .await?
                             .map(|el| el.into_inner().0),

@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 use holo_hash::{ActionHash, AnyDhtHash};
 use holochain_p2p::HolochainP2pError;
 use holochain_serialized_bytes::SerializedBytesError;
