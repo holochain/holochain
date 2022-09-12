@@ -1469,7 +1469,14 @@ mod builder {
                         };
                         spawn_lair_keystore(connection_url.clone(), passphrase).await?
                     }
-                    oth => unimplemented!("unimplemented keystore config: {:?}", oth),
+                    KeystoreConfig::LairServerInProc { lair_root } => {
+                        let mut keystore_config_path = lair_root
+                            .clone()
+                            .unwrap_or_else(|| self.config.environment_path.clone().into());
+                        keystore_config_path.push("lair-keystore-config.yaml");
+                        println!("LAIR_ROOT: {:?}", keystore_config_path);
+                        todo!()
+                    }
                 }
             };
 

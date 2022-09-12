@@ -37,8 +37,7 @@ page_size = "0.4.2"
 parking_lot = "0.10"
 rand = "0.8.5"
 r2d2 = "0.8"
-# neonphog fork for updated rusqlite dependency
-r2d2_sqlite = { version = "0.18", package = "r2d2_sqlite_neonphog" }
+r2d2_sqlite = "0.21"
 rmp-serde = "0.15"
 scheduled-thread-pool = "0.2"
 serde = "1.0"
@@ -52,7 +51,7 @@ holochain_util = { version = "0.0.11", path = "../holochain_util" }
 tracing = "0.1.18"
 tracing-futures = "0.2"
 
-rusqlite = { version = "0.26", features = [
+rusqlite = { version = "0.28", features = [
   "blob",        # better integration with blob types (Read, Write, etc)
   "backup",
   "trace",
