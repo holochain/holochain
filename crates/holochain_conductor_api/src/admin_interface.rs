@@ -288,7 +288,19 @@ pub enum AdminRequest {
         cell_id: Option<CellId>,
     },
 
-    /// Insert [`Record`]s into the source chain of the [`CellId`].
+    /// "Graft" [`Record`]s onto the source chain of the specified [`CellId`].
+    ///
+    /// The records must form a valid chain segment (ascending sequence numbers,
+    /// and valid `prev_action` references). If the first record contains a `prev_action`
+    /// which matches the existing records, then the new records will be "grafted" onto
+    /// the existing chain at that point, and any other records following that point which do
+    /// not match the new records will be removed.
+    ///
+    /// If this operation is called when there are no forks, the final state will also have
+    /// no forks.
+    ///
+    /// **BEWARE** that this may result in the deletion of data! Any existing records which form
+    /// a fork with respect to the new records will be deleted.
     ///
     /// All records must be authored and signed by the same agent.
     /// The [`DnaFile`] (but not necessarily the cell) must already be installed
@@ -313,17 +325,10 @@ pub enum AdminRequest {
     ///
     /// # Returns
     ///
-    /// [`AdminResponse::RecordsAdded`]
-    AddRecords {
+    /// [`AdminResponse::RecordsGrafted`]
+    GraftRecords {
         /// The cell that the records are being inserted into.
         cell_id: CellId,
-        /// If this is true then all records in the source chain will be
-        /// removed before the new records are inserted.
-        /// **Warning**: this cannot be undone. Use with care!
-        ///
-        /// If this is `false`, then the records will be appended to the end
-        /// of the source chain.
-        truncate: bool,
         /// If this is `true`, then the records will be validated before insertion.
         /// This is much slower but is useful for verifying the chain is valid.
         ///
@@ -482,8 +487,8 @@ pub enum AdminResponse {
     /// This is all the agent info that was found for the request.
     AgentInfoRequested(Vec<AgentInfoSigned>),
 
-    /// The successful response to an [`AdminRequest::AddRecords`].
-    RecordsAdded,
+    /// The successful response to an [`AdminRequest::GraftRecords`].
+    RecordsGrafted,
 }
 
 /// Error type that goes over the websocket wire.

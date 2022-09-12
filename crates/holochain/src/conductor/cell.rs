@@ -34,11 +34,9 @@ use futures::future::FutureExt;
 use hash_type::AnyDht;
 use holo_hash::*;
 use holochain_cascade::authority;
-use holochain_cascade::Cascade;
 use holochain_p2p::event::CountersigningSessionNegotiationMessage;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_sqlite::prelude::*;
-use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_state::prelude::*;
 use holochain_state::schedule::live_scheduled_fns;
@@ -54,8 +52,6 @@ use tracing::*;
 use tracing_futures::Instrument;
 
 pub const INIT_MUTEX_TIMEOUT_SECS: u64 = 30;
-
-mod validation_package;
 
 #[allow(missing_docs)]
 pub mod error;
@@ -360,6 +356,7 @@ impl Cell {
                 // These events are aggregated over a set of cells, so need to be handled at the conductor level.
                 unreachable!()
             }
+
             CallRemote {
                 span_context: _,
                 from_agent,
@@ -380,22 +377,7 @@ impl Cell {
                 .instrument(debug_span!("call_remote"))
                 .await;
             }
-            GetValidationPackage {
-                span_context: _,
-                respond,
-                action_hash,
-                ..
-            } => {
-                async {
-                    let res = self
-                        .handle_get_validation_package(action_hash)
-                        .await
-                        .map_err(holochain_p2p::HolochainP2pError::other);
-                    respond.respond(Ok(async move { res }.boxed().into()));
-                }
-                .instrument(debug_span!("cell_handle_get_validation_package"))
-                .await;
-            }
+
             Get {
                 span_context: _,
                 respond,
@@ -413,6 +395,7 @@ impl Cell {
                 .instrument(debug_span!("cell_handle_get"))
                 .await;
             }
+
             GetMeta {
                 span_context: _,
                 respond,
@@ -430,6 +413,7 @@ impl Cell {
                 .instrument(debug_span!("cell_handle_get_meta"))
                 .await;
             }
+
             GetLinks {
                 span_context: _,
                 respond,
@@ -447,6 +431,7 @@ impl Cell {
                 .instrument(debug_span!("cell_handle_get_links"))
                 .await;
             }
+
             GetAgentActivity {
                 span_context: _,
                 respond,
@@ -465,6 +450,7 @@ impl Cell {
                 .instrument(debug_span!("cell_handle_get_agent_activity"))
                 .await;
             }
+
             MustGetAgentActivity {
                 span_context: _,
                 respond,
@@ -482,6 +468,7 @@ impl Cell {
                 .instrument(debug_span!("cell_handle_must_get_agent_activity"))
                 .await;
             }
+
             ValidationReceiptReceived {
                 span_context: _,
                 respond,
@@ -501,6 +488,7 @@ impl Cell {
                 // and should reset the publish back off loop to its minimum.
                 self.queue_triggers.publish_dht_ops.reset_back_off();
             }
+
             SignNetworkData {
                 span_context: _,
                 respond,
@@ -516,6 +504,7 @@ impl Cell {
                 .instrument(debug_span!("cell_handle_sign_network_data"))
                 .await;
             }
+
             CountersigningSessionNegotiation {
                 respond, message, ..
             } => {
@@ -568,45 +557,6 @@ impl Cell {
                 .await
                 .map_err(Box::new)?)
             }
-        }
-    }
-
-    #[instrument(skip(self))]
-    /// a remote node is attempting to retrieve a validation package
-    #[tracing::instrument(skip(self), level = "trace")]
-    async fn handle_get_validation_package(
-        &self,
-        action_hash: ActionHash,
-    ) -> CellResult<ValidationPackageResponse> {
-        let db: DbRead<DbKindDht> = self.dht_db().clone().into();
-
-        // Get the action
-        let mut cascade = Cascade::empty().with_dht(db.clone());
-        let action = match cascade
-            .retrieve_action(action_hash, Default::default())
-            .await?
-        {
-            Some(shh) => shh.hashed,
-            None => return Ok(None.into()),
-        };
-
-        let ribosome = self.get_ribosome()?;
-
-        // This agent is the author so get the validation package from the source chain
-        if action.author() == self.id.agent_pubkey() {
-            validation_package::get_as_author(
-                action,
-                self.space.authored_db.clone().into(),
-                self.dht_db().clone().into(),
-                self.space.dht_query_cache.clone(),
-                self.space.cache_db.clone(),
-                &ribosome,
-                &(*self.conductor_handle),
-                &self.holochain_p2p_cell,
-            )
-            .await
-        } else {
-            validation_package::get_as_authority(action, db).await
         }
     }
 

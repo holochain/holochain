@@ -248,9 +248,6 @@ ghost_actor::ghost_chan! {
             timeout_ms: Option<u64>,
         ) -> usize;
 
-        /// Request a validation package.
-        fn get_validation_package(input: GetValidationPackage) -> ValidationPackageResponse;
-
         /// Get an entry from the DHT.
         fn get(
             dna_hash: DnaHash,

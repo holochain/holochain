@@ -34,7 +34,7 @@ pub fn get_link_details<'a>(
                             type_query: link_type,
                             tag: tag_prefix,
                         };
-                        Ok(Cascade::from_workspace_network(
+                        Ok(Cascade::from_workspace_and_network(
                             &call_context.host_context.workspace(),
                             call_context.host_context.network().to_owned(),
                         )
