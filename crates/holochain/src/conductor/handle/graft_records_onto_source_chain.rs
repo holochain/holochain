@@ -43,11 +43,11 @@ pub(crate) async fn graft_records_onto_source_chain(
         .map(|el| {
             let ops = produce_op_lights_from_records(vec![&el])?;
             // Check have the same author as cell.
-            let (shh, entry) = el.into_inner();
-            if shh.action().author() != cell_id.agent_pubkey() {
+            let (sah, entry) = el.into_inner();
+            if sah.action().author() != cell_id.agent_pubkey() {
                 return Err(StateMutationError::AuthorsMustMatch);
             }
-            Ok((shh, ops, entry.into_option()))
+            Ok((sah, ops, entry.into_option()))
         })
         .collect::<StateMutationResult<Vec<_>>>()?;
 
@@ -77,7 +77,7 @@ pub(crate) async fn graft_records_onto_source_chain(
                 let mut ops_to_integrate = Vec::new();
 
                 // Commit the records and ops to the authored db.
-                for (shh, ops, entry) in data {
+                for (sah, ops, entry) in data {
                     // Clippy is wrong :(
                     #[allow(clippy::needless_collect)]
                     let basis = ops
@@ -85,7 +85,7 @@ pub(crate) async fn graft_records_onto_source_chain(
                         .map(|op| op.dht_basis().clone())
                         .collect::<Vec<_>>();
                     ops_to_integrate.extend(
-                        source_chain::put_raw(txn, shh, ops, entry)?
+                        source_chain::put_raw(txn, sah, ops, entry)?
                             .into_iter()
                             .zip(basis.into_iter()),
                     );
@@ -212,24 +212,24 @@ impl<A: ChainItem, B: Clone + AsRef<A>> ChainGraft<A, B> {
     /// either group.
     ///
     /// Assumptions:
-    /// - The existing actions form a chain. The existence of a fork means UB.
-    /// - The incoming actions form a chain. The existence of a fork means UB.
+    /// - The existing actions form a chain, with no forks.
+    /// - The incoming actions form a chain, with no forks.
     ///
     /// This has the effect of attempting to "graft" the incoming actions onto the existing
-    /// source chain (which may be a tree), and afterwards removing all other forks.
+    /// source chain. If the grafting causes a fork, then the existing items after the fork
+    /// point get deleted, so that there remains a single unforked chain containing the incoming items.
+    ///
     /// If there is no place to graft the incoming actions, then the incoming actions list entirely
-    /// specifies the new chain.
+    /// specifies the new chain. i.e., if the first incoming record's previous hash matches none of
+    /// the existing hashes, then return an empty existing list and the full incoming list.
     ///
     /// If the first incoming record's previous hash matches the last existing hash,
     /// then we return both lists unchanged.
     ///
-    /// If the first incoming record's previous hash matches none of the existing hashes,
-    /// then return an emtpy existing list and the full incoming list.
-    ///
     /// If the first incoming record's previous hash matches one of the existing hashes
     /// other than the existing top, then:
     /// - from the first existing hash to match, walk forwards, checking if existing
-    ///   hashes match the incoming actions. For each existing record which matches a incoming
+    ///   hashes match the incoming actions. For each existing record which matches an incoming
     ///   record, keep that hash in the existing list and remove it from the incoming list,
     ///   so that it doesn't get committed twice.
     pub fn rebalance(self) -> Self {
@@ -250,8 +250,8 @@ impl<A: ChainItem, B: Clone + AsRef<A>> ChainGraft<A, B> {
     fn pivot(&self) -> Pivot {
         if let Some(first) = self.incoming.first() {
             if first.as_ref().prev_hash().is_none() {
-                // If the first incoming item is a root item, return a special "pivot" beyond
-                // the last existing item (the existing root). This works out mathematically.
+                // If the first incoming item is a root item, then there is no existing
+                // item to use as the pivot, therefore we need to handle that case separately
                 Pivot::NewRoot
             } else {
                 self.existing
@@ -298,97 +298,94 @@ impl<A: ChainItem, B: Clone + AsRef<A>> ChainGraft<A, B> {
 #[cfg(test)]
 mod tests {
     use holochain_types::test_utils::chain::{self as tu, TestChainHash, TestChainItem};
-    use pretty_assertions::assert_eq;
     use test_case::test_case;
 
     use super::*;
 
-    #[test]
-    fn test_pivot_and_rebalance() {
-        isotest::isotest!(TestChainItem, TestChainHash => |iso_a, iso_h| {
-            let chain = |r| tu::chain(r).into_iter().map(|a| iso_a.create(a)).collect::<Vec<_>>();
-            let forked_chain = |r| tu::forked_chain(r).into_iter().map(|a| iso_a.create(a)).collect::<Vec<_>>();
-            let gap_chain = |r| tu::gap_chain(r).into_iter().map(|a| iso_a.create(a)).collect::<Vec<_>>();
-            let empty = || Vec::<TestChainItem>::new().into_iter().map(|a| iso_a.create(a)).collect::<Vec<_>>();
-            let top = |h| (iso_h.create(TestChainHash(h)), h);
+    impl<A: ChainItem, B: Clone + AsRef<A>> ChainGraft<A, B> {
+        pub fn map<T>(&self, f: impl Fn(A) -> T + Clone) -> ChainGraft<T, T> {
+            ChainGraft {
+                existing: self.existing.clone().into_iter().map(f.clone()).collect(),
+                incoming: self
+                    .incoming
+                    .iter()
+                    .map(AsRef::as_ref)
+                    .cloned()
+                    .map(f)
+                    .collect(),
+            }
+        }
+    }
 
-            let case = ChainGraft::new(chain(0..3), chain(3..6));
-            assert_eq!(case.pivot_and_overlap(), (Some(0), 0));
-            assert_eq!(case.clone().rebalance(), ChainGraft::new(chain(0..3), chain(3..6)));
-            assert_eq!(case.rebalance().existing_chain_top(), Some(top(2)));
-
-            let case = ChainGraft::new(chain(0..4), chain(3..6));
-            assert_eq!(case.pivot_and_overlap(), (Some(1), 1));
-            assert_eq!(case.clone().rebalance(), ChainGraft::new(chain(0..4), chain(4..6)));
-            assert_eq!(case.rebalance().existing_chain_top(), Some(top(3)));
-
-            let case = ChainGraft::new(chain(0..3), chain(1..4));
-            assert_eq!(case.pivot_and_overlap(), (Some(2), 2));
-            assert_eq!(case.rebalance(), ChainGraft::new(chain(0..3), chain(3..4)));
-
-            let case = ChainGraft::new(chain(0..3), chain(0..4));
-            assert_eq!(case.pivot_and_overlap(), (Some(3), 3));
-            assert_eq!(case.rebalance(), ChainGraft::new(chain(0..3), chain(3..4)));
-
-            let case = ChainGraft::new(chain(0..5), chain(0..3));
-            assert_eq!(case.pivot_and_overlap(), (Some(5), 3));
-            assert_eq!(case.rebalance(), ChainGraft::new(chain(0..3), empty()));
-
-            let case = ChainGraft::new(chain(0..2), chain(3..6));
-            assert_eq!(case.pivot_and_overlap(), (None, 0));
-            assert_eq!(case.rebalance(), ChainGraft::new(empty(), chain(3..6)));
-
-            let case = ChainGraft::new(chain(0..2), empty());
-            assert_eq!(case.pivot_and_overlap(), (None, 0));
-            assert_eq!(case.rebalance(), ChainGraft::new(empty(), empty()));
-
-            let case = ChainGraft::new(empty(), chain(0..5));
-            assert_eq!(case.pivot_and_overlap(), (Some(0), 0));
-            assert_eq!(case.rebalance(), ChainGraft::new(empty(), chain(0..5)));
-
-            let case = ChainGraft::new(chain(0..3), forked_chain(&[0..0, 3..6]));
-            assert_eq!(case.pivot_and_overlap(), (Some(0), 0));
-            assert_eq!(
-                case.rebalance(),
-                ChainGraft::new(chain(0..3), forked_chain(&[0..0, 3..6])),
-            );
-
-            let case = ChainGraft::new(chain(0..3), forked_chain(&[0..0, 4..6]));
-            assert_eq!(case.pivot_and_overlap(), (None, 0));
-            assert_eq!(
-                case.rebalance(),
-                ChainGraft::new(empty(), forked_chain(&[0..0, 4..6])),
-            );
-
-            let case = ChainGraft::new(forked_chain(&[0..3, 3..6]), chain(2..6));
-            assert_eq!(case.pivot_and_overlap(), (Some(4), 1));
-            assert_eq!(case.rebalance(), ChainGraft::new(chain(0..3), chain(3..6)),);
-
-            let case = ChainGraft::new(gap_chain(&[0..3, 6..9]), chain(3..6));
-            assert_eq!(case.pivot_and_overlap(), (Some(3), 0));
-            assert_eq!(case.rebalance(), ChainGraft::new(chain(0..3), chain(3..6)),);
-
-            let case = ChainGraft::new(chain(0..6), gap_chain(&[0..3, 6..9]));
-            assert_eq!(case.pivot_and_overlap(), (Some(6), 3));
-            assert_eq!(case.rebalance(), ChainGraft::new(chain(0..3), chain(6..9)),);
-        });
+    #[derive(PartialEq, Eq)]
+    struct Answer {
+        pivot: (Option<usize>, usize),
+        rebalanced: ChainGraft<TestChainItem, TestChainItem>,
     }
 
     /// Rebalancing an already-balanced set of incoming records is a no-op
-    #[test_case(ChainGraft::new(tu::chain(0..3), tu::chain(3..6)))]
-    #[test_case(ChainGraft::new(tu::chain(0..4), tu::chain(3..6)))]
-    #[test_case(ChainGraft::new(tu::chain(0..3), tu::chain(1..4)))]
-    #[test_case(ChainGraft::new(tu::chain(0..3), tu::chain(0..4)))]
-    #[test_case(ChainGraft::new(tu::chain(0..5), tu::chain(0..3)))]
-    #[test_case(ChainGraft::new(tu::chain(0..2), tu::chain(3..6)))]
-    #[test_case(ChainGraft::new(tu::chain(0..2), vec![]))]
-    #[test_case(ChainGraft::new(vec![], tu::chain(0..5)))]
-    #[test_case(ChainGraft::new(tu::chain(0..3), tu::forked_chain(&[0..0, 3..6])))]
-    #[test_case(ChainGraft::new(tu::chain(0..3), tu::forked_chain(&[0..0, 4..6])))]
-    #[test_case(ChainGraft::new(tu::forked_chain(&[0..3, 3..6]), tu::chain(2..6)))]
-    #[test_case(ChainGraft::new(tu::gap_chain(&[0..3, 6..9]), tu::chain(3..6)))]
-    #[test_case(ChainGraft::new(tu::chain(0..6), tu::gap_chain(&[0..3, 6..9])))]
-    fn test_incoming_rebalance_idempotence(case: ChainGraft<TestChainItem, TestChainItem>) {
+    #[test_case(ChainGraft::new(tu::chain(0..3), tu::chain(3..6)), Answer {
+        pivot: (Some(0), 0),
+        rebalanced: ChainGraft::new(tu::chain(0..3), tu::chain(3..6)),
+    } ; "1")]
+    #[test_case(ChainGraft::new(tu::chain(0..4), tu::chain(3..6)), Answer {
+        pivot: (Some(1), 1),
+        rebalanced: ChainGraft::new(tu::chain(0..4), tu::chain(4..6)),
+    } ; "2")]
+    #[test_case(ChainGraft::new(tu::chain(0..3), tu::chain(1..4)), Answer {
+        pivot: (Some(2), 2),
+        rebalanced: ChainGraft::new(tu::chain(0..3), tu::chain(3..4)),
+    } ; "3")]
+    #[test_case(ChainGraft::new(tu::chain(0..3), tu::chain(0..4)), Answer {
+        pivot: (Some(3), 3),
+        rebalanced: ChainGraft::new(tu::chain(0..3), tu::chain(3..4)),
+    } ; "4")]
+    #[test_case(ChainGraft::new(tu::chain(0..5), tu::chain(0..3)), Answer {
+        pivot: (Some(5), 3),
+        rebalanced: ChainGraft::new(tu::chain(0..3), vec![]),
+    } ; "5")]
+    #[test_case(ChainGraft::new(tu::chain(0..2), tu::chain(3..6)), Answer {
+        pivot: (None, 0),
+        rebalanced: ChainGraft::new(vec![], tu::chain(3..6)),
+    } ; "6")]
+    #[test_case(ChainGraft::new(tu::chain(0..2), vec![]), Answer {
+        pivot: (None, 0),
+        rebalanced: ChainGraft::new(vec![], vec![]),
+    } ; "7")]
+    #[test_case(ChainGraft::new(vec![], tu::chain(0..5)), Answer {
+        pivot: (Some(0), 0),
+        rebalanced: ChainGraft::new(vec![], tu::chain(0..5)),
+    } ; "8")]
+    #[test_case(ChainGraft::new(tu::chain(0..3), tu::forked_chain(&[0..0, 3..6])), Answer {
+        pivot: (Some(0), 0),
+        rebalanced: ChainGraft::new(tu::chain(0..3), tu::forked_chain(&[0..0, 3..6])),
+    } ; "9")]
+    #[test_case(ChainGraft::new(tu::chain(0..3), tu::forked_chain(&[0..0, 4..6])), Answer {
+        pivot: (None, 0),
+        rebalanced: ChainGraft::new(vec![], tu::forked_chain(&[0..0, 4..6])),
+    } ; "10")]
+    #[test_case(ChainGraft::new(tu::forked_chain(&[0..3, 3..6]), tu::chain(2..6)), Answer {
+        pivot: (Some(4), 1),
+        rebalanced: ChainGraft::new(tu::chain(0..3), tu::chain(3..6)),
+    } ; "11")]
+    #[test_case(ChainGraft::new(tu::gap_chain(&[0..3, 6..9]), tu::chain(3..6)), Answer {
+        pivot: (Some(3), 0),
+        rebalanced: ChainGraft::new(tu::chain(0..3), tu::chain(3..6)),
+    } ; "12")]
+    #[test_case(ChainGraft::new(tu::chain(0..6), tu::gap_chain(&[0..3, 6..9])), Answer {
+        pivot: (Some(6), 3),
+        rebalanced: ChainGraft::new(tu::chain(0..3), tu::chain(6..9)),
+    } ; "13")]
+    fn test_incoming_rebalance_idempotence(
+        case: ChainGraft<TestChainItem, TestChainItem>,
+        answer: Answer,
+    ) {
+        isotest::isotest!(TestChainItem => |iso_a| {
+            let case = case.map(|a| iso_a.create(a));
+            pretty_assertions::assert_eq!(case.pivot_and_overlap(), answer.pivot);
+            pretty_assertions::assert_eq!(case.rebalance(), answer.rebalanced.map(|a| iso_a.create(a)));
+        });
+
         pretty_assertions::assert_eq!(
             case.clone().rebalance().incoming,
             case.clone().rebalance().rebalance().incoming
