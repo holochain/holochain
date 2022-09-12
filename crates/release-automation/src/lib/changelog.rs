@@ -343,10 +343,8 @@ where
 
             // we're only interested in the frontmatter here
             if let NodeValue::FrontMatter(ref fm) = &mut node.data.borrow_mut().value {
-                let fm_str = String::from_utf8(fm.to_vec())?
-                    .replace("---", "")
-                    .trim()
-                    .to_owned();
+                let fm_str_raw = String::from_utf8(fm.to_vec())?;
+                let fm_str = fm_str_raw.replace("---", "").trim().to_owned();
 
                 let fm: Frontmatter = if fm_str.is_empty() {
                     Frontmatter::default()
@@ -358,7 +356,7 @@ where
                     "[{}] found a YAML front matter: {:#?}\nsource string: \n'{}'",
                     i,
                     fm,
-                    fm_str
+                    fm_str_raw
                 );
 
                 return Ok(Some(fm));
