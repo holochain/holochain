@@ -461,7 +461,7 @@ impl<'a> ChangelogT<'a, CrateChangelog> {
         Ok(())
     }
 
-    fn erase_front_matter(&'a self, write_file: bool) -> Fallible<String> {
+    pub(crate) fn erase_front_matter(&'a self, write_file: bool) -> Fallible<String> {
         let frontmatter_re = regex::Regex::new(r"(?ms)^---$.*^---$\w*").unwrap();
         let cl = sanitize(std::fs::read_to_string(self.path())?);
 
@@ -477,7 +477,7 @@ impl<'a> ChangelogT<'a, CrateChangelog> {
     }
 
     /// Writes the given Frontmatter back to the changelog file
-    fn set_front_matter(&'a self, fm: &Frontmatter) -> Fallible<()> {
+    pub(crate) fn set_front_matter(&'a self, fm: &Frontmatter) -> Fallible<()> {
         let cl_str = if self.front_matter()?.is_some() {
             self.erase_front_matter(false)?
         } else {
