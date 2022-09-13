@@ -209,14 +209,12 @@ mod tests {
                 .dump_full_cell_state(&cell_id, None)
                 .await
                 .unwrap();
-            dbg!(&dump.source_chain_dump);
             assert_eq!(dump.source_chain_dump.records.len(), 3);
             dump.source_chain_dump.records.pop().unwrap().action_address
         };
 
         let new_entry = EntryHashed::from_content_sync(fixt!(Entry));
         let new_entry_hash = new_entry.as_hash().clone();
-        dbg!(&new_entry_hash);
         let create = Create {
             author: agent.clone(),
             timestamp: Timestamp::now(),
@@ -252,7 +250,6 @@ mod tests {
             .dump_full_cell_state(&cell_id, None)
             .await
             .unwrap();
-        dbg!(&dump);
         assert_eq!(dump.source_chain_dump.records.len(), 4);
     }
 
@@ -314,14 +311,14 @@ mod tests {
             .dump_full_cell_state(&cell_id, None)
             .await
             .unwrap();
-        dbg!(&dump1);
+
         assert_eq!(dump1.source_chain_dump.records.len(), 3);
 
-        let install_result_1 = conductors[1]
+        let _apps1 = conductors[1]
             .setup_app_for_agent("app", agent.clone(), [&dna_file])
             .await
             .unwrap();
-        let install_result_2 = conductors[2]
+        let _apps2 = conductors[2]
             .setup_app_for_agent("app", agent.clone(), [&dna_file])
             .await
             .unwrap();
@@ -346,10 +343,9 @@ mod tests {
             )
             .await;
 
-        assert_matches!(
-            hash1,
-            Err(ConductorApiError::SourceChainError(SourceChainError::ChcHeadMoved(_, ChcError::InvalidChain(seq, _))))
-            if seq == Some(0)
+        assert_eq!(
+            format!("{:?}", hash1),
+            r#"Err(CellError(WorkflowError(SourceChainError(ChcHeadMoved("SourceChain::flush", InvalidChain(Some(4), "The previous action hash specified in an action doesn't match the actual previous action. Seq: 3"))))))"#
         );
 
         // This should trigger a CHC sync
@@ -361,10 +357,6 @@ mod tests {
             )
             .await;
 
-        assert_matches!(
-            hash2,
-            Err(ConductorApiError::SourceChainError(SourceChainError::ChcHeadMoved(_, ChcError::InvalidChain(seq, _))))
-            if seq == Some(0)
-        );
+        assert_eq!(format!("{:?}", hash1), format!("{:?}", hash2));
     }
 }
