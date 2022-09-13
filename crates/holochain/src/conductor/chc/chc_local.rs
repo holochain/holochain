@@ -185,7 +185,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn simple_chc_sync() {
-        use holochain::test_utils::inline_zomes::{simple_crud_zome};
+        use holochain::test_utils::inline_zomes::simple_crud_zome;
 
         let mut config = ConductorConfig::default();
         config.chc_namespace = Some("#LOCAL#".to_string());
@@ -219,7 +219,7 @@ mod tests {
         dbg!(&new_entry_hash);
         let create = Create {
             author: agent.clone(),
-            timestamp: Timestamp::from_micros(9999999999),
+            timestamp: Timestamp::now(),
             action_seq: 3,
             prev_action: top_hash,
             entry_type: fixt!(EntryType),
@@ -227,10 +227,6 @@ mod tests {
             weight: EntryRateWeight::default(),
         };
         let new_action = ActionHashed::from_content_sync(Action::Create(create));
-        // *new_action.prev_action_mut().unwrap() = top_hash;
-        // *new_action.action_seq_mut().unwrap() = 3;
-        // *new_action.author_mut() = agent.clone();
-        // *new_action.entry_data_mut().unwrap().0 = new_entry.as_hash().clone();
         let new_action = SignedActionHashed::sign(&conductor.keystore(), new_action)
             .await
             .unwrap();

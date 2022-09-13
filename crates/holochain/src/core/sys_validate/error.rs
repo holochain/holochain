@@ -166,6 +166,6 @@ pub enum PrevActionError {
     MissingMeta(ActionHash),
     #[error("Action is not the first, so needs previous action")]
     MissingPrev,
-    #[error("The previous action's timestamp is not before the current action's timestamp")]
-    Timestamp,
+    #[error("The previous action's timestamp is not before the current action's timestamp: {0:?} >= {1:?}")]
+    Timestamp(Timestamp, Timestamp),
 }

@@ -150,7 +150,7 @@ async fn check_previous_timestamp() {
     assert_matches!(
         r,
         Err(SysValidationError::ValidationOutcome(
-            ValidationOutcome::PrevActionError(PrevActionError::Timestamp)
+            ValidationOutcome::PrevActionError(PrevActionError::Timestamp(_, _))
         ))
     );
 }

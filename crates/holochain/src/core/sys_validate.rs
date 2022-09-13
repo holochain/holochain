@@ -233,10 +233,12 @@ pub async fn check_spam(_action: &Action) -> SysValidationResult<()> {
 
 /// Check previous action timestamp is before this action
 pub fn check_prev_timestamp(action: &Action, prev_action: &Action) -> SysValidationResult<()> {
-    if action.timestamp() > prev_action.timestamp() {
+    let t1 = prev_action.timestamp();
+    let t2 = action.timestamp();
+    if t2 > t1 {
         Ok(())
     } else {
-        Err(PrevActionError::Timestamp).map_err(|e| ValidationOutcome::from(e).into())
+        Err(PrevActionError::Timestamp(t1, t2)).map_err(|e| ValidationOutcome::from(e).into())
     }
 }
 
