@@ -199,6 +199,13 @@ pub trait ConductorHandleT: Send + Sync {
 
     /// Make the source chain for the given Cell match the chain data in the CHC for this Cell,
     /// if applicable.
+    /// 
+    /// **NOTE**: this function is contingent on the the actual future CHC API and implementation,
+    /// which is not yet solidified. In particular, this function assumes that it is possible to 
+    /// reconstruct a full set of Records from a single CHC call. If that is not possible, then
+    /// this function cannot exist as-is. Specifically, there may need to be a separate
+    /// step to fetch entries from the DHT, to be assembled into Records and passed back to the
+    /// conductor via [`holochain_conductor_api::AdminRequest::GraftRecordsOntoSourceChain`].
     ///
     /// If an app id is passed, enable that app after syncing the cell, since
     /// it is likely that this sync was prompted by a failed commit, which would cause the
