@@ -10,6 +10,12 @@ keywords = [ "holochain", "holo", "nacl", "libsodium", "cryptography" ]
 categories = [ "cryptography" ]
 edition = "2021"
 
+[features]
+default = [ "no-deps" ]
+
+db-encryption = [ "lair_keystore/rusqlite-bundled-sqlcipher-vendored-openssl" ]
+no-deps = [ "lair_keystore/rusqlite-bundled" ]
+
 [dependencies]
 base64 = "0.13.0"
 futures = "0.3.23"
@@ -17,13 +23,14 @@ holo_hash = { version = "0.0.31", path = "../holo_hash", features = ["full"] }
 holochain_serialized_bytes = "=0.0.51"
 holochain_zome_types = { path = "../holochain_zome_types", version = "0.0.47"}
 kitsune_p2p_types = { version = "0.0.32", path = "../kitsune_p2p/types" }
+lair_keystore = { version = "0.2.1", default-features = false }
 must_future = "0.1.2"
 nanoid = "0.4.0"
-one_err = "0.0.5"
+one_err = "0.0.6"
 parking_lot = "0.11"
 serde = { version = "1.0", features = [ "derive" ] }
 serde_bytes = "0.11"
-sodoken = "=0.0.4"
+sodoken = "=0.0.5"
 thiserror = "1.0.22"
 tokio = { version = "1.11", features = [ "full" ] }
 tracing = "0.1"
