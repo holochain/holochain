@@ -98,26 +98,14 @@ impl<A: ChainItem> ChainHeadCoordinator for ChcLocal<A> {
 #[cfg(test)]
 mod tests {
     use futures::FutureExt;
-    use holochain_state::prelude::SourceChainError;
-    use matches::assert_matches;
-
     use holochain_conductor_api::conductor::ConductorConfig;
 
-    use crate::{
-        conductor::{
-            api::error::ConductorApiError, chc::CHC_LOCAL_MAP, error::ConductorError, CellError,
-        },
-        core::workflow::error::WorkflowError,
-        sweettest::*,
-    };
+    use crate::{conductor::chc::CHC_LOCAL_MAP, sweettest::*};
 
     use super::*;
 
     use ::fixt::prelude::*;
-    use holochain_types::{
-        fixt::*,
-        test_utils::chain::{TestChainHash, TestChainItem},
-    };
+    use holochain_types::test_utils::chain::{TestChainHash, TestChainItem};
 
     use pretty_assertions::assert_eq;
 
@@ -326,7 +314,7 @@ mod tests {
         let c1: SweetCell = conductors[1].get_sweet_cell(cell_id.clone()).unwrap();
         let c2: SweetCell = conductors[2].get_sweet_cell(cell_id.clone()).unwrap();
 
-        let hash0: ActionHash = conductors[0]
+        let _: ActionHash = conductors[0]
             .call(
                 &c0.zome(SweetEasyInline::COORDINATOR),
                 "create_string",
@@ -358,5 +346,40 @@ mod tests {
             .await;
 
         assert_eq!(format!("{:?}", hash1), format!("{:?}", hash2));
+
+        conductors[1]
+            .inner_handle()
+            .chc_sync(cell_id.clone(), None)
+            .await
+            .unwrap();
+
+        conductors[2]
+            .inner_handle()
+            .chc_sync(cell_id.clone(), None)
+            .await
+            .unwrap();
+
+        let dump0 = conductors[0]
+            .dump_full_cell_state(&cell_id, None)
+            .await
+            .unwrap();
+        let dump1 = conductors[1]
+            .dump_full_cell_state(&cell_id, None)
+            .await
+            .unwrap();
+        let dump2 = conductors[2]
+            .dump_full_cell_state(&cell_id, None)
+            .await
+            .unwrap();
+
+        assert_eq!(dump0.source_chain_dump.records.len(), 5);
+        assert_eq!(
+            dump0.source_chain_dump.records,
+            dump1.source_chain_dump.records
+        );
+        assert_eq!(
+            dump1.source_chain_dump.records,
+            dump2.source_chain_dump.records
+        );
     }
 }

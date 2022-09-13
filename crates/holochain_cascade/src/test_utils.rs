@@ -9,10 +9,10 @@ use holo_hash::AgentPubKey;
 use holo_hash::AnyDhtHash;
 use holo_hash::EntryHash;
 use holo_hash::HasHash;
-use holochain_p2p::ChcImpl;
 use holochain_p2p::actor;
 use holochain_p2p::dht_arc::DhtArc;
 use holochain_p2p::event::CountersigningSessionNegotiationMessage;
+use holochain_p2p::ChcImpl;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_p2p::HolochainP2pError;
 use holochain_p2p::MockHolochainP2pDnaT;
@@ -275,9 +275,7 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         todo!()
     }
 
-    fn chc(
-        &self,
-    ) -> Option<ChcImpl> {
+    fn chc(&self) -> Option<ChcImpl> {
         unimplemented!()
     }
 }

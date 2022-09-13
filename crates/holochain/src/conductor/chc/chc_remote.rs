@@ -50,8 +50,8 @@ impl ChainHeadCoordinator for ChcRemote {
 
 impl ChcRemote {
     /// Constructor
-    pub fn new(namespace: &str, cell_id: &CellId) -> Self {
-        todo!()
+    pub fn new(_namespace: &str, _cell_id: &CellId) -> Self {
+        todo!("Implement remote CHC client")
     }
 }
 
@@ -79,7 +79,7 @@ impl ChcRemoteClient {
     async fn post(&self, path: &str, body: Vec<u8>) -> ChcResult<Bytes> {
         let client = reqwest::Client::new();
         let response = client
-            .post(self.url("/add_actions"))
+            .post(self.url(path))
             .body(body)
             .send()
             .await
