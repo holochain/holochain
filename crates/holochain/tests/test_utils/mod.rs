@@ -276,7 +276,7 @@ pub fn create_config(port: u16, environment_path: PathBuf) -> ConductorConfig {
         environment_path: environment_path.into(),
         network: None,
         dpki: None,
-        keystore: KeystoreConfig::DangerTestKeystoreLegacyDeprecated,
+        keystore: KeystoreConfig::DangerTestKeystore,
         db_sync_strategy: DbSyncStrategy::default(),
     }
 }

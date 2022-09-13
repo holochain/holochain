@@ -11,7 +11,7 @@ categories = [ "network-programming" ]
 edition = "2021"
 
 [dependencies]
-lair_keystore_api = "=0.2.0"
+lair_keystore_api = "=0.2.1"
 base64 = "0.13"
 derive_more = "0.99.7"
 futures = "0.3"
