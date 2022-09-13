@@ -2,7 +2,7 @@ use crate::sweettest::*;
 use holo_hash::ActionHash;
 use holochain_types::app::CreateCloneCellPayload;
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::{AppRoleId, CloneId, DnaPhenotypeOption};
+use holochain_zome_types::{AppRoleId, CloneId, DnaPhenotypeOpt};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn create_clone_cell_without_phenotype_options_fails() {
@@ -12,7 +12,7 @@ async fn create_clone_cell_without_phenotype_options_fails() {
         .create_clone_cell(CreateCloneCellPayload {
             app_id: "".to_string(),
             role_id: "".to_string(),
-            phenotype: DnaPhenotypeOption {
+            phenotype: DnaPhenotypeOpt {
                 network_seed: None,
                 properties: None,
                 origin_time: None,
@@ -42,7 +42,7 @@ async fn create_clone_cell_with_wrong_app_or_role_id_fails() {
         .create_clone_cell(CreateCloneCellPayload {
             app_id: "wrong_app_id".to_string(),
             role_id: role_id.clone(),
-            phenotype: DnaPhenotypeOption {
+            phenotype: DnaPhenotypeOpt {
                 network_seed: Some("seed".to_string()),
                 properties: None,
                 origin_time: None,
@@ -58,7 +58,7 @@ async fn create_clone_cell_with_wrong_app_or_role_id_fails() {
         .create_clone_cell(CreateCloneCellPayload {
             app_id: app.installed_app_id().clone(),
             role_id: "wrong_role_id".to_string(),
-            phenotype: DnaPhenotypeOption {
+            phenotype: DnaPhenotypeOpt {
                 network_seed: Some("seed".to_string()),
                 properties: None,
                 origin_time: None,
@@ -88,7 +88,7 @@ async fn create_clone_cell_run_twice_returns_correct_clone_indexes() {
         .create_clone_cell(CreateCloneCellPayload {
             app_id: app.installed_app_id().clone(),
             role_id: role_id.clone(),
-            phenotype: DnaPhenotypeOption {
+            phenotype: DnaPhenotypeOpt {
                 network_seed: Some("seed_1".to_string()),
                 properties: None,
                 origin_time: None,
@@ -108,7 +108,7 @@ async fn create_clone_cell_run_twice_returns_correct_clone_indexes() {
         .create_clone_cell(CreateCloneCellPayload {
             app_id: app.installed_app_id().clone(),
             role_id: role_id.clone(),
-            phenotype: DnaPhenotypeOption {
+            phenotype: DnaPhenotypeOpt {
                 network_seed: Some("seed_2".to_string()),
                 properties: None,
                 origin_time: None,
@@ -142,7 +142,7 @@ async fn create_clone_cell_creates_callable_cell() {
         .create_clone_cell(CreateCloneCellPayload {
             app_id: app.installed_app_id().clone(),
             role_id: role_id.clone(),
-            phenotype: DnaPhenotypeOption {
+            phenotype: DnaPhenotypeOpt {
                 network_seed: Some("seed".to_string()),
                 properties: None,
                 origin_time: None,
@@ -180,7 +180,7 @@ async fn app_info_includes_cloned_cells() {
         .create_clone_cell(CreateCloneCellPayload {
             app_id: app_id.to_string(),
             role_id: role_id.clone(),
-            phenotype: DnaPhenotypeOption {
+            phenotype: DnaPhenotypeOpt {
                 network_seed: Some("seed_1".to_string()),
                 properties: None,
                 origin_time: None,

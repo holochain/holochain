@@ -78,47 +78,35 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
             }
             RegisterDna(payload) => {
                 trace!(register_dna_payload = ?payload);
-                let RegisterDnaPayload {
-                    network_seed,
-                    properties,
-                    source,
-                } = *payload;
+                let RegisterDnaPayload { phenotype, source } = *payload;
+                let phenotype = phenotype.serialized().map_err(SerializationError::Bytes)?;
                 // network seed and properties from the register call will override any in the bundle
                 let dna = match source {
                     DnaSource::Hash(ref hash) => {
-                        if properties.is_none() && network_seed.is_none() {
+                        if !phenotype.has_some_option_set() {
                             return Err(ConductorApiError::DnaReadError(
-                                "Hash Dna source requires properties or network seed to create a derived Dna"
+                                "DnaSource::Hash requires `properties` or `network_seed` or `origin_time` to create a derived Dna"
                                     .to_string(),
                             ));
                         }
-                        let mut dna =
-                            self.conductor_handle.get_dna_file(hash).ok_or_else(|| {
+                        self.conductor_handle
+                            .get_dna_file(hash)
+                            .ok_or_else(|| {
                                 ConductorApiError::DnaReadError(format!(
                                     "Unable to create derived Dna: {} not registered",
                                     hash
                                 ))
-                            })?;
-                        if let Some(props) = properties {
-                            let properties = SerializedBytes::try_from(props)
-                                .map_err(SerializationError::from)?;
-                            dna = dna.with_properties(properties).await?;
-                        }
-                        if let Some(network_seed) = network_seed {
-                            dna = dna.with_network_seed(network_seed).await?;
-                        }
-                        dna
+                            })?
+                            .modify_phenotype(phenotype)
                     }
                     DnaSource::Path(ref path) => {
                         let bundle = Bundle::read_from_file(path).await?;
                         let bundle: DnaBundle = bundle.into();
-                        let (dna_file, _original_hash) =
-                            bundle.into_dna_file(network_seed, properties).await?;
+                        let (dna_file, _original_hash) = bundle.into_dna_file(phenotype).await?;
                         dna_file
                     }
                     DnaSource::Bundle(bundle) => {
-                        let (dna_file, _original_hash) =
-                            bundle.into_dna_file(network_seed, properties).await?;
+                        let (dna_file, _original_hash) = bundle.into_dna_file(phenotype).await?;
                         dna_file
                     }
                 };
@@ -361,28 +349,6 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
     }
 }
 
-/// Return the proper phenotype for a Dna, given a manifest and some optional
-/// overrides
-fn _resolve_phenotype(
-    manifest: &DnaManifest,
-    payload_network_seed: Option<&NetworkSeed>,
-    payload_properties: Option<&YamlProperties>,
-) -> (Option<NetworkSeed>, Option<YamlProperties>) {
-    let bundle_network_seed = manifest.network_seed();
-    let bundle_properties = manifest.properties();
-    let properties = if payload_properties.is_some() {
-        payload_properties.cloned()
-    } else {
-        bundle_properties
-    };
-    let network_seed = if payload_network_seed.is_some() {
-        payload_network_seed.cloned()
-    } else {
-        bundle_network_seed
-    };
-    (network_seed, properties)
-}
-
 #[async_trait::async_trait]
 impl InterfaceApi for RealAdminInterfaceApi {
     type ApiRequest = AdminRequest;
@@ -436,8 +402,7 @@ mod test {
         let dna_hash = dna.dna_hash().clone();
         let (dna_path, _tempdir) = write_fake_dna_file(dna.clone()).await.unwrap();
         let path_payload = RegisterDnaPayload {
-            network_seed: None,
-            properties: None,
+            phenotype: DnaPhenotypeOpt::none(),
             source: DnaSource::Path(dna_path.clone()),
         };
         let path_install_response = admin_api
@@ -450,8 +415,7 @@ mod test {
 
         // re-register idempotent
         let path_payload = RegisterDnaPayload {
-            network_seed: None,
-            properties: None,
+            phenotype: DnaPhenotypeOpt::none(),
             source: DnaSource::Path(dna_path.clone()),
         };
         let path1_install_response = admin_api
@@ -468,25 +432,23 @@ mod test {
 
         // register by hash
         let hash_payload = RegisterDnaPayload {
-            network_seed: None,
-            properties: None,
+            phenotype: DnaPhenotypeOpt::none(),
             source: DnaSource::Hash(dna_hash.clone()),
         };
 
-        // without properties or network seed should throw error
+        // without phenotype seed should throw error
         let hash_install_response = admin_api
             .handle_admin_request(AdminRequest::RegisterDna(Box::new(hash_payload)))
             .await;
         assert_matches!(
             hash_install_response,
-            AdminResponse::Error(ExternalApiWireError::DnaReadError(e)) if e == String::from("Hash Dna source requires properties or network seed to create a derived Dna")
+            AdminResponse::Error(ExternalApiWireError::DnaReadError(e)) if e == String::from("DnaSource::Hash requires `properties` or `network_seed` or `origin_time` to create a derived Dna")
         );
 
         // with a property should install and produce a different hash
         let json: serde_yaml::Value = serde_yaml::from_str("some prop: \"foo\"").unwrap();
         let hash_payload = RegisterDnaPayload {
-            network_seed: None,
-            properties: Some(YamlProperties::new(json.clone())),
+            phenotype: DnaPhenotypeOpt::none().with_properties(YamlProperties::new(json.clone())),
             source: DnaSource::Hash(dna_hash.clone()),
         };
         let install_response = admin_api
@@ -499,8 +461,8 @@ mod test {
 
         // with a network seed should install and produce a different hash
         let hash_payload = RegisterDnaPayload {
-            network_seed: Some(String::from("12345678900000000000000")),
-            properties: None,
+            phenotype: DnaPhenotypeOpt::none()
+                .with_network_seed(String::from("12345678900000000000000")),
             source: DnaSource::Hash(dna_hash.clone()),
         };
         let hash2_install_response = admin_api
@@ -520,8 +482,8 @@ mod test {
 
         // from a path with a same network seed should return the already registered hash so it's idempotent
         let path_payload = RegisterDnaPayload {
-            network_seed: Some(String::from("12345678900000000000000")),
-            properties: None,
+            phenotype: DnaPhenotypeOpt::none()
+                .with_network_seed(String::from("12345678900000000000000")),
             source: DnaSource::Path(dna_path.clone()),
         };
         let path2_install_response = admin_api
@@ -534,8 +496,7 @@ mod test {
 
         // from a path with different network seed should produce different hash
         let path_payload = RegisterDnaPayload {
-            network_seed: Some(String::from("foo")),
-            properties: None,
+            phenotype: DnaPhenotypeOpt::none().with_network_seed(String::from("foo")),
             source: DnaSource::Path(dna_path),
         };
         let path3_install_response = admin_api
@@ -588,8 +549,7 @@ mod test {
 
         // now register a DNA
         let path_payload = RegisterDnaPayload {
-            network_seed: None,
-            properties: None,
+            phenotype: DnaPhenotypeOpt::none(),
             source: DnaSource::Path(dna_path),
         };
         let path_install_response = admin_api
