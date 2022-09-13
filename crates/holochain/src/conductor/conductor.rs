@@ -60,6 +60,7 @@ use holochain_conductor_api::FullIntegrationStateDump;
 use holochain_conductor_api::InstalledAppInfo;
 use holochain_conductor_api::IntegrationStateDump;
 use holochain_keystore::lair_keystore::spawn_lair_keystore;
+use holochain_keystore::lair_keystore::spawn_lair_keystore_in_proc;
 use holochain_keystore::test_keystore::spawn_test_keystore;
 use holochain_keystore::MetaLairClient;
 use holochain_sqlite::prelude::*;
@@ -1455,27 +1456,42 @@ mod builder {
             let keystore = if let Some(keystore) = self.keystore {
                 keystore
             } else {
+                fn warn_no_encryption() {
+                    #[cfg(not(feature = "db-encryption"))]
+                    {
+                        const MSG: &str = "WARNING: running without local db encryption";
+                        eprintln!("{}", MSG);
+                        println!("{}", MSG);
+                        tracing::warn!("{}", MSG);
+                    }
+                }
+                let get_passphrase = || -> ConductorResult<sodoken::BufRead> {
+                    match self.passphrase {
+                        None => Err(one_err::OneErr::new(
+                            "passphrase required for lair keystore api",
+                        )
+                        .into()),
+                        Some(p) => Ok(p),
+                    }
+                };
                 match &self.config.keystore {
                     KeystoreConfig::DangerTestKeystore => spawn_test_keystore().await?,
                     KeystoreConfig::LairServer { connection_url } => {
-                        let passphrase = match self.passphrase {
-                            None => {
-                                return Err(one_err::OneErr::new(
-                                    "passphrase required for new lair keystore api",
-                                )
-                                .into())
-                            }
-                            Some(p) => p,
-                        };
+                        warn_no_encryption();
+                        let passphrase = get_passphrase()?;
                         spawn_lair_keystore(connection_url.clone(), passphrase).await?
                     }
                     KeystoreConfig::LairServerInProc { lair_root } => {
-                        let mut keystore_config_path = lair_root
-                            .clone()
-                            .unwrap_or_else(|| self.config.environment_path.clone().into());
+                        warn_no_encryption();
+                        let mut keystore_config_path = lair_root.clone().unwrap_or_else(|| {
+                            let mut p: std::path::PathBuf =
+                                self.config.environment_path.clone().into();
+                            p.push("keystore");
+                            p
+                        });
                         keystore_config_path.push("lair-keystore-config.yaml");
-                        println!("LAIR_ROOT: {:?}", keystore_config_path);
-                        todo!()
+                        let passphrase = get_passphrase()?;
+                        spawn_lair_keystore_in_proc(keystore_config_path, passphrase).await?
                     }
                 }
             };

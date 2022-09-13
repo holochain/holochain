@@ -28,7 +28,7 @@ pub enum KeystoreConfig {
         /// The "lair_root" path, i.e. the directory containing the
         /// "lair-keystore-config.yaml" file.
         /// If not specified, will default to the ConductorConfig
-        /// `environment_path`.
+        /// `[environment_path]/keystore`.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         lair_root: Option<std::path::PathBuf>,
     },
@@ -36,8 +36,6 @@ pub enum KeystoreConfig {
 
 impl Default for KeystoreConfig {
     fn default() -> KeystoreConfig {
-        KeystoreConfig::LairServerInProc {
-            lair_root: None,
-        }
+        KeystoreConfig::LairServerInProc { lair_root: None }
     }
 }
