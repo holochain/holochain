@@ -18,12 +18,18 @@ use holochain_serialized_bytes::prelude::*;
 /// entry if the action type has one.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-pub struct Record {
+pub struct Record<A = SignedActionHashed> {
     /// The signed action for this record
-    pub signed_action: SignedActionHashed,
+    pub signed_action: A,
     /// If there is an entry associated with this action it will be here.
     /// If not, there will be an enum variant explaining the reason.
     pub entry: RecordEntry,
+}
+
+impl<A> AsRef<A> for Record<A> {
+    fn as_ref(&self) -> &A {
+        &self.signed_action
+    }
 }
 
 /// Represents the different ways the entry_address reference within an action
@@ -47,6 +53,12 @@ pub enum RecordEntry {
 /// The hashed action and the signature that signed it
 pub type SignedActionHashed = SignedHashed<Action>;
 
+impl AsRef<SignedActionHashed> for SignedActionHashed {
+    fn as_ref(&self) -> &SignedActionHashed {
+        self
+    }
+}
+
 #[derive(Clone, Debug, Eq, Serialize, Deserialize)]
 /// Any content that has been hashed and signed.
 pub struct SignedHashed<T>
@@ -60,24 +72,6 @@ where
 }
 
 impl Record {
-    /// Mutable reference to the Action content.
-    /// This is useless and dangerous in production usage.
-    /// Guaranteed to make hashes and signatures mismatch whatever the Action is mutated to (at least).
-    /// This may be useful for tests that rely heavily on mocked and fixturated data.
-    #[cfg(feature = "test_utils")]
-    pub fn as_action_mut(&mut self) -> &mut Action {
-        &mut self.signed_action.hashed.content
-    }
-
-    /// Mutable reference to the RecordEntry.
-    /// This is useless and dangerous in production usage.
-    /// Guaranteed to make hashes and signatures mismatch whatever the RecordEntry is mutated to (at least).
-    /// This may be useful for tests that rely heavily on mocked and fixturated data.
-    #[cfg(feature = "test_utils")]
-    pub fn as_entry_mut(&mut self) -> &mut RecordEntry {
-        &mut self.entry
-    }
-
     /// Raw record constructor.  Used only when we know that the values are valid.
     pub fn new(signed_action: SignedActionHashed, maybe_entry: Option<Entry>) -> Self {
         let maybe_visibility = signed_action
@@ -97,6 +91,20 @@ impl Record {
             signed_action,
             entry,
         }
+    }
+
+    /// Access the signature from this record's signed action
+    pub fn signature(&self) -> &Signature {
+        self.signed_action.signature()
+    }
+
+    /// Mutable reference to the Action content.
+    /// This is useless and dangerous in production usage.
+    /// Guaranteed to make hashes and signatures mismatch whatever the Action is mutated to (at least).
+    /// This may be useful for tests that rely heavily on mocked and fixturated data.
+    #[cfg(feature = "test_utils")]
+    pub fn as_action_mut(&mut self) -> &mut Action {
+        &mut self.signed_action.hashed.content
     }
 
     /// If the Record contains private entry data, set the RecordEntry
@@ -121,21 +129,6 @@ impl Record {
         }
     }
 
-    /// Break this record into its components
-    pub fn into_inner(self) -> (SignedActionHashed, RecordEntry) {
-        (self.signed_action, self.entry)
-    }
-
-    /// The inner signed-action
-    pub fn signed_action(&self) -> &SignedActionHashed {
-        &self.signed_action
-    }
-
-    /// Access the signature from this record's signed action
-    pub fn signature(&self) -> &Signature {
-        self.signed_action.signature()
-    }
-
     /// Access the action address from this record's signed action
     pub fn action_address(&self) -> &ActionHash {
         self.signed_action.action_address()
@@ -155,6 +148,27 @@ impl Record {
     /// which includes the context around the presence or absence of the entry.
     pub fn entry(&self) -> &RecordEntry {
         &self.entry
+    }
+}
+
+impl<A> Record<A> {
+    /// Mutable reference to the RecordEntry.
+    /// This is useless and dangerous in production usage.
+    /// Guaranteed to make hashes and signatures mismatch whatever the RecordEntry is mutated to (at least).
+    /// This may be useful for tests that rely heavily on mocked and fixturated data.
+    #[cfg(feature = "test_utils")]
+    pub fn as_entry_mut(&mut self) -> &mut RecordEntry {
+        &mut self.entry
+    }
+
+    /// Break this record into its components
+    pub fn into_inner(self) -> (A, RecordEntry) {
+        (self.signed_action, self.entry)
+    }
+
+    /// The inner signed-action
+    pub fn signed_action(&self) -> &A {
+        &self.signed_action
     }
 }
 

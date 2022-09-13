@@ -17,11 +17,11 @@ pub use holochain_integrity_types::validate::*;
 #[cfg_attr(feature = "full", derive(num_enum::TryFromPrimitive))]
 #[cfg_attr(feature = "full", repr(i32))]
 pub enum ValidationStatus {
-    /// all implemented validation callbacks found all dependencies and passed validation
+    /// All dependencies were found and validation passed
     Valid = 0,
-    /// some implemented validation callback definitively failed validation
+    /// Item was rejected by validation
     Rejected = 1,
-    /// the subconscious has decided to never again attempt a conscious validation
+    /// Holochain has decided to never again attempt validation,
     /// commonly due to missing validation dependencies remaining missing for "too long"
     Abandoned = 2,
 }
