@@ -133,9 +133,8 @@ async fn conductor_handle_from_config_path(opt: &Opt) -> ConductorHandle {
 
     // read the passphrase to prepare for usage
     let passphrase = match &config.keystore {
-        KeystoreConfig::DangerTestKeystoreLegacyDeprecated => None,
-        KeystoreConfig::LairServerLegacyDeprecated { .. } => None,
-        _ => {
+        KeystoreConfig::DangerTestKeystore => None,
+        KeystoreConfig::LairServer { .. } | KeystoreConfig::LairServerInProc { .. } => {
             if opt.piped {
                 holochain_util::pw::pw_set_piped(true);
             }

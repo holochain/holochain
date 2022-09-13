@@ -68,6 +68,7 @@ codegen-units = 16
 # ghost_actor = { path = "../ghost_actor/crates/ghost_actor" }
 # ghost_actor = { git = "https://github.com/holochain/ghost_actor.git", branch = "add_observability" }
 #lair_keystore_api = { path = "../lair/crates/lair_keystore_api" }
+#lair_keystore = { path = "../lair/crates/lair_keystore" }
 #lair_keystore_api_0_0 = { path = "../lair_0_0/crates/lair_keystore_api", package = "lair_keystore_api" }
 #lair_keystore_client_0_0 = { path = "../lair_0_0/crates/lair_keystore_client", package = "lair_keystore_client" }
 #lair_keystore_api = { git = "https://github.com/holochain/lair.git", branch = "secretbox" }
