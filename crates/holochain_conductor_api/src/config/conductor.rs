@@ -249,6 +249,7 @@ pub mod tests {
                 },
                 admin_interfaces: None,
                 db_sync_strategy: DbSyncStrategy::Fast,
+                chc_namespace: None,
             }
         );
     }

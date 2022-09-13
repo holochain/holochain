@@ -1,4 +1,7 @@
-#![allow(missing_docs)]
+//! Defines the Chain Head Coordination API.
+//!
+//! **NOTE** this API is not set in stone. Do not design a CHC against this API yet,
+//! as it will change!
 
 use std::{
     collections::{HashMap, HashSet},
@@ -11,27 +14,40 @@ use holochain_zome_types::prelude::*;
 
 use crate::chain::{ChainItem, ChainItemHash};
 
+/// The API which a Chain Head Coordinator service must implement.
+///
+/// **NOTE** this API is currently loosely defined and will certainly change
+/// in the future. Do not write a real CHC according to this spec!
 #[async_trait::async_trait]
 pub trait ChainHeadCoordinator {
+    /// The item which the chain is made of.
     type Item: ChainItem;
 
+    /// Get just the head of the chain as recorded by the CHC.
     async fn head(&self) -> ChcResult<Option<ChainItemHash<Self::Item>>>;
 
+    /// Add items to be appended to the CHC's chain.
     async fn add_actions(&self, actions: Vec<Self::Item>) -> ChcResult<()>;
 
+    /// Add entries to the entry storage service.
     async fn add_entries(&self, entries: Vec<EntryHashed>) -> ChcResult<()>;
 
+    /// Get actions including and beyond the given hash.
     async fn get_actions_since_hash(
         &self,
         hash: Option<ChainItemHash<Self::Item>>,
     ) -> ChcResult<Vec<Self::Item>>;
 
+    /// Get entries with the given hashes. If any entries cannot be retrieved,
+    /// an error will be returned. Otherwise, the hashmap will pair Entries with
+    /// each hash requested.
     async fn get_entries(
         &self,
         hashes: HashSet<&EntryHash>,
     ) -> ChcResult<HashMap<EntryHash, Entry>>;
 }
 
+/// Assemble records from a list of Actions and a map of Entries
 pub fn records_from_actions_and_entries(
     actions: Vec<SignedActionHashed>,
     mut entries: HashMap<EntryHash, Entry>,
@@ -53,6 +69,7 @@ pub fn records_from_actions_and_entries(
     Ok(records)
 }
 
+#[allow(missing_docs)]
 #[derive(Debug, thiserror::Error)]
 pub enum ChcError {
     #[error(transparent)]
@@ -71,4 +88,5 @@ pub enum ChcError {
     ServiceUnreachable(String),
 }
 
+#[allow(missing_docs)]
 pub type ChcResult<T> = Result<T, ChcError>;

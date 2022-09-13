@@ -271,7 +271,7 @@ impl SweetConductor {
         let (dna_hash, agent) = cell_id.into_dna_and_agent();
         let cell_authored_db = self.handle().0.get_authored_db(&dna_hash)?;
         let cell_dht_db = self.handle().0.get_dht_db(&dna_hash)?;
-        let cell_id = CellId::new(dna_hash, agent.clone());
+        let cell_id = CellId::new(dna_hash, agent);
         Ok(SweetCell {
             cell_id,
             cell_authored_db,

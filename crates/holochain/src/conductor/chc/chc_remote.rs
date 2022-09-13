@@ -1,3 +1,8 @@
+//! Defines a client for use with a remote HTTP-based CHC.
+//!
+//! **NOTE** this API is not set in stone. Do not design a CHC against this API yet,
+//! as it will change!
+
 use std::collections::{HashMap, HashSet};
 
 use ::bytes::Bytes;

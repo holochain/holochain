@@ -984,6 +984,7 @@ async fn rebase_actions_on(
     Ok(actions)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn genesis(
     authored: DbWrite<DbKindAuthored>,
     dht_db: DbWrite<DbKindDht>,

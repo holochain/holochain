@@ -164,6 +164,7 @@ impl Cell {
     /// Performs the Genesis workflow the Cell, ensuring that its initial
     /// records are committed. This is a prerequisite for any other interaction
     /// with the SourceChain
+    #[allow(clippy::too_many_arguments)]
     pub async fn genesis<Ribosome>(
         id: CellId,
         conductor_handle: ConductorHandle,

@@ -687,6 +687,7 @@ impl ConductorHandleT for ConductorHandleImpl {
         &self.conductor.config
     }
 
+    #[allow(unused_variables)]
     fn chc(&self, cell_id: &CellId) -> Option<ChcImpl> {
         cfg_if::cfg_if! {
             if #[cfg(feature = "chc")] {
