@@ -221,8 +221,11 @@ pub trait ConductorHandleT: Send + Sync {
         payload: CreateCloneCellPayload,
     ) -> ConductorResult<InstalledCell>;
 
-    /// Destroy a cloned Cell
-    async fn destroy_clone_cell(self: Arc<Self>, cell_id: CellId) -> ConductorResult<()>;
+    /// Mark a clone cell for deletion.
+    async fn mark_clone_cell_for_deletion(
+        self: Arc<Self>,
+        payload: MarkCloneCellForDeletionPayload,
+    ) -> ConductorResult<()>;
 
     /// Install Cells into ConductorState based on installation info, and run
     /// genesis on all new source chains
@@ -944,8 +947,18 @@ impl ConductorHandleT for ConductorHandleImpl {
         Ok(installed_clone_cell)
     }
 
-    async fn destroy_clone_cell(self: Arc<Self>, _cell_id: CellId) -> ConductorResult<()> {
-        todo!()
+    async fn mark_clone_cell_for_deletion(
+        self: Arc<Self>,
+        payload: MarkCloneCellForDeletionPayload,
+    ) -> ConductorResult<()> {
+        let MarkCloneCellForDeletionPayload {
+            app_id,
+            clone_cell_id,
+        } = payload;
+        self.conductor
+            .mark_clone_cell_for_deletion(&app_id, &clone_cell_id)
+            .await?;
+        Ok(())
     }
 
     async fn install_app(

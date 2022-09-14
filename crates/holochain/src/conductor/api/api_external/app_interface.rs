@@ -108,6 +108,13 @@ impl AppInterfaceApi for RealAppInterfaceApi {
                     .await?;
                 Ok(AppResponse::CloneCellCreated(installed_clone_cell))
             }
+            AppRequest::MarkCloneCellForDeletion(payload) => {
+                self.conductor_handle
+                    .clone()
+                    .mark_clone_cell_for_deletion(*payload.clone())
+                    .await?;
+                Ok(AppResponse::CloneCellMarkedForDeletion)
+            }
             AppRequest::SignalSubscription(_) => Ok(AppResponse::Unimplemented(request)),
             AppRequest::Crypto(_) => Ok(AppResponse::Unimplemented(request)),
         }
