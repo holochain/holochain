@@ -17,13 +17,23 @@ We are committed to foster a vibrant thriving community, including growing a cul
 
 Please make use of these resources to support your contributions, or simply to contribute your voice.
 
-## Pull requests
+## Git Hygiene
+This section describes our practices and guidelines for using git and making changes to the repo.
+
+* We use Github's pull requests as our code review tool
+* We encourage any dev to comment on pull requests and we think of the pull request not as a "please approve my code" but as a space for co-developing, i.e. asynchronous "pair-coding" of a sort.
+* We develop features on separate branches
+* We use merge (not rebase) so that commits related to a ticket can be retroactively explored.
+* In most repos development happens on a `develop` branch which gets merged to `main` when there's a release.
+
+### Pull requests
 
 We warmly welcome pull requests for bug fixes, bug reproductions, documentation improvements, and any other "obviously good" enhancements to the codebase. If you are unsure if an enhancement is "obviously good", please coordinate with us first through a GitHub issue, or through our forums or Discord channel. We reserve the right to close any PR which doesn't fit our overall development trajectory, but we will gladly review any PRs and work with authors who have taken the time to identify a real problem or need and take steps to address it.
 
 To open a PR, fork our Github repo, create a branch whose name describes your fix, and base your pull request on our `develop` branch.
 
 If you add or change functionality, be sure to add both unit tests and integration tests to show that it works. Pull requests without tests will most likely not be accepted!
+
 
 ## Bug reports
 
@@ -37,15 +47,15 @@ The end goal of addressing any bug is to have a test written in our codebase to 
 
 To write a minimal reproduction of a problem discovered "in the wild", we recommend you to write a sample zome, DNA, or hApp which demonstrates the problem, and open a PR with your failing test. We have a library called [`sweettest`](https://docs.rs/holochain/latest/holochain/sweettest/index.html) which is well-suited to the task of testing the behavior of Holochain applications. 
 
-When writing your reproduction PR, you can recreate the problematic part of your app in one of two ways:
+When writing your reproduction PR, you can recreate the problematic part of your app in one of two ways: "inline zomes", or "test wasms".
 
-### Create "inline zomes"
+### How to create "inline zomes"
 
 The quickest, most preferable way to reproduce a problem is through "inline zomes". Inline zomes are written in terms of a collection of functions, like normal Wasm zomes, but they don't get compiled to wasm, and instead are run inline by Rust directly. This lightweight approach to writing zomes is well suited for quick test cases, or for cases that require a multitude of zomes in order to reproduce a problem.
 
 To create a test based on inline zomes, see existing tests using `InlineZomeSet` or `SweetInlineZomes` for guidance. Just put your test in a place that feels appropriate.
 
-### Create a "test wasm"
+### How to create a "test wasm"
 
 Holochain has many "test wasms", which are sample zomes written to demonstrate specific functionality. These
 
@@ -98,20 +108,13 @@ Run the formatter with:
 nix-shell --run hc-rust-fmt
 ```
 
-or
+or, if you have a version of `cargo` locally installed which matches the version used in the nix-shell:
 
 ```shell
-. docker/run-fmt
-```
-or
-
-``` shell
-make fmt
+cargo fmt
 ```
 
-## Continuous Integration
-
-### CI configuration changes
+## Continuous Integration changes
 
 Please also be aware that extending/changing the CI configuration can be very time consuming. Seemingly minor changes can have large downstream impact.
 
@@ -132,47 +135,6 @@ If you have a proposal to improve our CI config, that's great! Please open a ded
 It is NOT OK to change the behaviour of tests/CI in otherwise unrelated PRs. SOMETIMES it MAY be OK to change CI in a related PR, e.g. adding a new lib that your code requires. DO expect that a change like this will probably attract additional scrutiny during the PR review process, which is unfortunate but important.
 
 Use your best judgement and respect that other people, across all timezones, rely on this repository remaining a productive working environment 24/7/365.
-
-### Updating the CI Environment
-
-The continuous integration (CI) suite executes the same `. docker/run-test` command that developers are encouraged to run.
-
-What happens if I need to change that environment? E.g. what if I need a new system library dependency installed?
-
-- Step 1 - Add the dependency to `docker/Dockerfile.ubuntu`
-
-```dockerfile
-RUN apt-get update && apt-get install --yes\
-  # ... snip ...
-  my-new-lib-here
-```
-
-- Step 2 - Build it
-
-```shell
-. docker/build-ubuntu
-```
-
-- Step 3 - Test it out
-
-```shell
-. docker/run-test
-```
-
-- Step 4 - Wait a minute! The CI environment is still using the old Dockerfile!
-
-If your changes do not break the current environment, you can submit a separate Pull Request first, and once it is merged, the CI environment should be up-to-date for your code change Pull Request.
-
-Otherwise, you will need to speak to an admin who can force merge your full changes after testing locally.
-
-## Git Hygiene
-This section describes our practices and guidelines for using git and making changes to the repo.
-
-* We use Github's pull requests as our code review tool
-* We encourage any dev to comment on pull requests and we think of the pull request not as a "please approve my code" but as a space for co-developing, i.e. asynchronous "pair-coding" of a sort.
-* We develop features on separate branches
-* We use merge (not rebase) so that commits related to a ticket can be retroactively explored.
-* In most repos development happens on a `develop` branch which gets merged to `main` when there's a release.
 
 ## License
 Holochain is licensed under the Cryptographic Autonomy License [![License: CAL v1](https://img.shields.io/badge/License-CAL%201.0-blue.svg)](https://github.com/holochain/cryptographic-autonomy-license) which is the first [Open Source Initiative approved](https://opensource.org/licenses/CAL-1.0) license designed for distributed software. As such it is designed to protect the rights of end-users of applications built on Holochain to own their own data and cryptographic keys. See [this article](https://medium.com/holochain/understanding-the-cryptographic-autonomy-license-172ac920966d) for more detail about licensing requirements of P2P software.
