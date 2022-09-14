@@ -51,7 +51,8 @@ pub fn remote_signal(
                 "remote_signal".into(),
             )
             .to_string(),
-        )).into()),
+        ))
+        .into()),
     }
 }
 

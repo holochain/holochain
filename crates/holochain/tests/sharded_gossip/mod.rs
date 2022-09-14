@@ -186,9 +186,8 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
 #[tokio::test(flavor = "multi_thread")]
 async fn large_entry_test() {
     observability::test_run().ok();
-    let mut conductors = SweetConductorBatch::from_config(2, make_config(Some(0))).await;
+    let mut conductors = SweetConductorBatch::from_config(3, make_config(Some(0))).await;
     let start = Instant::now();
-    dbg!(start.elapsed());
 
     for c in conductors.iter() {
         c.update_dev_settings(DevSettingsDelta {
@@ -202,47 +201,60 @@ async fn large_entry_test() {
         .unwrap();
 
     let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
-    let ((cell_1,), (cell_2,)) = apps.into_tuples();
+    let ((cell_0,), (cell_1,), (cell_2,)) = apps.into_tuples();
 
+    // Conductor 2 starts shutdown so it won't receive gossip.
+    conductors[2].shutdown().await;
+
+    let zome_0 = cell_0.zome(SweetEasyInline::COORDINATOR);
     let zome_1 = cell_1.zome(SweetEasyInline::COORDINATOR);
     let zome_2 = cell_2.zome(SweetEasyInline::COORDINATOR);
 
-    // TODO: we should be able to get up to multiple entries each 10MB or more being gossiped
-    // in a reasonable time, but right now we can only handle about 1MB in a timely fashion.
+    let size = 15_000_000;
+    let num = 2;
 
-    // let size = 1_000;
-    // let size = 10_000;
-    // let size = 100_000;
-    // let size = 1_000_000;
-    let size = 5_000_000;
-    // let size = 10_000_000;
-    // let size = 15_000_000;
-    let num = 10;
     let mut hashes = vec![];
     for i in 0..num {
         let app_string = AppString(String::from_utf8(vec![42u8 + i as u8; size]).unwrap());
         let hash: ActionHash = conductors[0]
-            .call(&zome_1, "create_string", app_string.clone())
+            .call(&zome_0, "create_string", app_string.clone())
             .await;
         hashes.push(hash);
         dbg!(start.elapsed());
     }
 
     conductors.exchange_peer_info().await;
-    consistency(&[&cell_1, &cell_2], 60 * 4, Duration::from_secs(1)).await;
+    consistency(&[&cell_0, &cell_1], 60 * 4, Duration::from_secs(1)).await;
+    dbg!(start.elapsed());
 
-    let records: Vec<Option<Record>> = conductors[1].call(&zome_2, "read_multi", hashes).await;
-    assert_eq!(records.len(), num);
+    let records_1: Vec<Option<Record>> = conductors[1]
+        .call(&zome_1, "read_multi", hashes.clone())
+        .await;
+    assert_eq!(records_1.len(), num);
     assert_eq!(
-        records.iter().filter(|r| r.is_some()).count(),
+        records_1.iter().filter(|r| r.is_some()).count(),
         num,
         "couldn't get records at positions: {:?}",
-        records
+        records_1
             .iter()
             .enumerate()
             .filter_map(|(i, r)| r.is_none().then(|| i))
             .collect::<Vec<_>>()
     );
+
+    // Shut down conductor 0 and start up conductor 2, so that conductor 2 has to receive
+    // all data from conductor 1.
+    dbg!(start.elapsed());
+    conductors[0].shutdown().await;
+    conductors[2].startup().await;
+    dbg!(start.elapsed());
+
+    consistency(&[&cell_1, &cell_2], 60 * 4, Duration::from_secs(1)).await;
+
+    dbg!(start.elapsed());
+
+    let records_2: Vec<Option<Record>> = conductors[2].call(&zome_2, "read_multi", hashes).await;
+    assert_eq!(records_2, records_1);
 }
 
 #[cfg(feature = "test_utils")]
