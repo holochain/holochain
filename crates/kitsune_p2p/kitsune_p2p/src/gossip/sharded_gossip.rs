@@ -274,12 +274,14 @@ impl ShardedGossip {
     async fn process_incoming_outgoing(&self) -> KitsuneResult<()> {
         let (incoming, outgoing) = self.pop_queues()?;
 
-        if outgoing.is_some() {
+        if let Some(msg) = outgoing.as_ref() {
             tracing::debug!(
-                "OUTGOING GOSSIP {:?} {:#?}",
+                "OUTGOING GOSSIP - {:8?} ({:10}) {:20}",
                 self.ep_hnd.uniq(),
-                outgoing.as_ref().map(|o| (&o.1, &o.2)),
+                msg.2.encode_vec().expect("can't encode msg").len(),
+                msg.2.variant_type(),
             );
+            tracing::debug!("url + message: {:?} {:#?}", &msg.1, &msg.2);
         }
 
         if let Some((con, remote_url, msg, bytes)) = incoming {
