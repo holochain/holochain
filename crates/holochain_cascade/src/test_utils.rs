@@ -276,7 +276,7 @@ impl HolochainP2pDnaT for PassThroughNetwork {
     }
 
     fn chc(&self) -> Option<ChcImpl> {
-        unimplemented!()
+        None
     }
 }
 
@@ -462,7 +462,7 @@ impl HolochainP2pDnaT for MockNetwork {
     }
 
     fn chc(&self) -> Option<ChcImpl> {
-        unimplemented!()
+        None
     }
 }
 
