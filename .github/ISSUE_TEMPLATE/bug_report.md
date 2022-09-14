@@ -21,14 +21,13 @@ A clear and concise description of what you expected to happen.
  from the nix shell and paste output)
 
 **Steps to reproduce**
-For isolating the bug, it is helpful to see a failing test or a repo that
-reproduces the bug in a fresh hApp. Some suggestions for methods
-of writing a reproduction of a bug:
+Detailed, specific, steps which will reliably reproduce this bug.
 
-- Write a failing test with [Sweettest](https://docs.rs/holochain/latest/holochain/sweettest/index.html)
-- Write a failing test with [Tryorama](https://github.com/holochain/tryorama/)
-- Create a minimal reproduction project using `hn-init` and add the code that
-produces the bug.
+If you have the means to do so, it would be extremely helpful to create a minimal reproduction of the problem.
+The most helpful form of reproduction is to add a test directly to our existing codebase via a pull request,
+so that we have a regression test for that bug. Please read the section in our 
+[CONTRIBUTING.md](https://github.com/holochain/holochain/blob/develop/CONTRIBUTING.md) titled "Bug fixes and minimal reproductions"
+for instructions on the best way to create a PR with a failing test.
 
 **Screenshots**
 If applicable, add screenshots to help explain your problem.
