@@ -1,6 +1,6 @@
 [package]
 name = "mr_bundle"
-version = "0.0.16-dev.0"
+version = "0.0.16"
 authors = ["Michael Dougherty <maackle.d@gmail.com>"]
 edition = "2021"
 description = "Implements the un-/packing of bundles that either embed or reference a set of resources"
@@ -13,7 +13,7 @@ bytes = "1.0"
 derive_more = "0.99"
 either = "1.5"
 flate2 = "1.0"
-holochain_util = { path = "../holochain_util", version = "0.0.12-dev.0"}
+holochain_util = { path = "../holochain_util", version = "0.0.12"}
 futures = "0.3"
 reqwest = "0.11"
 rmp-serde = "0.15"
