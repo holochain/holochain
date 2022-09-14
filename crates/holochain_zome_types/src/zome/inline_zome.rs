@@ -40,7 +40,7 @@ pub struct InlineZome<T> {
     // /// which will be automatically provided
     // pub(super) entry_defs: EntryDefs,
     /// The collection of closures which define this zome.
-    /// These callbacks are directly called by the Ribosome.
+    /// These functions are directly called by the Ribosome.
     pub(super) functions: HashMap<FunctionName, InlineZomeFn>,
 
     /// Global values for this zome.
@@ -143,8 +143,8 @@ pub trait InlineZomeT: std::fmt::Debug {
     /// Get the functions for this [`InlineZome`].
     fn functions(&self) -> Vec<FunctionName>;
 
-    /// Make a call to an inline zome callback.
-    /// If the callback doesn't exist, return None.
+    /// Make a call to an inline zome function.
+    /// If the function doesn't exist, return None.
     fn maybe_call(
         &self,
         api: BoxApi,
