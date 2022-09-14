@@ -6,6 +6,77 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20220914.013149
+
+## [holochain\_cli-0.0.57](crates/holochain_cli/CHANGELOG.md#0.0.57)
+
+## [holochain\_cli\_sandbox-0.0.53](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.53)
+
+## [holochain\_cli\_bundle-0.0.52](crates/holochain_cli_bundle/CHANGELOG.md#0.0.52)
+
+## [holochain-0.0.162](crates/holochain/CHANGELOG.md#0.0.162)
+
+- Implement App API call `CreateCloneCell`. [\#1547](https://github.com/holochain/holochain/pull/1547)
+- Remove conductor config legacy keystore config options. These config options have been broken since we removed legacy lair in \#1518, hence this fix itself is not a breaking change. Also adds the `lair_server_in_proc` keystore config option as the new default to run an embedded lair server inside the conductor process, no longer requiring a separate system process. [\#1571](https://github.com/holochain/holochain/pull/1571)
+
+## [holochain\_test\_wasm\_common-0.0.53](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.53)
+
+## [holochain\_conductor\_api-0.0.59](crates/holochain_conductor_api/CHANGELOG.md#0.0.59)
+
+- Include cloned cells in App API call `AppInfo`. [\#1547](https://github.com/holochain/holochain/pull/1547)
+- **BREAKING CHANGE:** The `AddRecords` admin api method has been changed to `GraftRecords`, and the functionality has changed accordingly. See the docs for that method to understand the changes.
+  - In short, the `truncate` parameter has been removed. If you desire that functionality, simply pass a fully valid chain in for “grafting”, which will have the effect of removing all existing records. If you just want to append records to the existing chain, just pass in a collection of new records, with the first one pointing to the last existing record.
+
+## [holochain\_wasm\_test\_utils-0.0.58](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.58)
+
+## [holochain\_cascade-0.0.61](crates/holochain_cascade/CHANGELOG.md#0.0.61)
+
+## [holochain\_state-0.0.59](crates/holochain_state/CHANGELOG.md#0.0.59)
+
+## [holochain\_p2p-0.0.56](crates/holochain_p2p/CHANGELOG.md#0.0.56)
+
+## [holochain\_types-0.0.56](crates/holochain_types/CHANGELOG.md#0.0.56)
+
+- Add function to add a clone cell to an app. [\#1547](https://github.com/holochain/holochain/pull/1547)
+
+## [holochain\_keystore-0.0.55](crates/holochain_keystore/CHANGELOG.md#0.0.55)
+
+## [holochain\_sqlite-0.0.54](crates/holochain_sqlite/CHANGELOG.md#0.0.54)
+
+## [kitsune\_p2p-0.0.45](crates/kitsune_p2p/CHANGELOG.md#0.0.45)
+
+## [kitsune\_p2p\_proxy-0.0.33](crates/kitsune_p2p_proxy/CHANGELOG.md#0.0.33)
+
+## [kitsune\_p2p\_transport\_quic-0.0.33](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.0.33)
+
+## [kitsune\_p2p\_types-0.0.33](crates/kitsune_p2p_types/CHANGELOG.md#0.0.33)
+
+## [mr\_bundle-0.0.16](crates/mr_bundle/CHANGELOG.md#0.0.16)
+
+## [holochain\_util-0.0.12](crates/holochain_util/CHANGELOG.md#0.0.12)
+
+## [hdk-0.0.152](crates/hdk/CHANGELOG.md#0.0.152)
+
+## [holochain\_zome\_types-0.0.48](crates/holochain_zome_types/CHANGELOG.md#0.0.48)
+
+- Add function to set DNA name. [\#1547](https://github.com/holochain/holochain/pull/1547)
+
+`ChainQueryFilter` has a `descending()` function which will cause the query results to be returned in descending order. This can be reversed by calling `ascending()`. The default order is still ascending. [\#1539](https://github.com/holochain/holochain/pull/1539)
+
+## [kitsune\_p2p\_dht-0.0.6](crates/kitsune_p2p_dht/CHANGELOG.md#0.0.6)
+
+## [hdi-0.1.2](crates/hdi/CHANGELOG.md#0.1.2)
+
+## [hdk\_derive-0.0.49](crates/hdk_derive/CHANGELOG.md#0.0.49)
+
+## [holochain\_integrity\_types-0.0.19](crates/holochain_integrity_types/CHANGELOG.md#0.0.19)
+
+## [kitsune\_p2p\_timestamp-0.0.14](crates/kitsune_p2p_timestamp/CHANGELOG.md#0.0.14)
+
+## [holo\_hash-0.0.32](crates/holo_hash/CHANGELOG.md#0.0.32)
+
+## [kitsune\_p2p\_dht\_arc-0.0.15](crates/kitsune_p2p_dht_arc/CHANGELOG.md#0.0.15)
+
 # 20220908.155008
 
 ## [holochain\_cli-0.0.56](crates/holochain_cli/CHANGELOG.md#0.0.56)
