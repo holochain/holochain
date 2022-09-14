@@ -36,14 +36,9 @@ impl DnaBundle {
 
     /// Convert to a DnaFile, and return what the hash of the Dna *would* have
     /// been without the provided phenotype overrides
-    pub async fn into_dna_file(
-        self,
-        network_seed: Option<NetworkSeed>,
-        properties: Option<YamlProperties>,
-    ) -> DnaResult<(DnaFile, DnaHash)> {
+    pub async fn into_dna_file(self, phenotype: DnaPhenotypeOpt) -> DnaResult<(DnaFile, DnaHash)> {
         let (integrity, coordinator, wasms) = self.inner_maps().await?;
-        let (dna_def, original_hash) =
-            self.to_dna_def(integrity, coordinator, network_seed, properties)?;
+        let (dna_def, original_hash) = self.to_dna_def(integrity, coordinator, phenotype)?;
 
         Ok((DnaFile::from_parts(dna_def, wasms), original_hash))
     }
@@ -117,12 +112,11 @@ impl DnaBundle {
         &self,
         integrity_zomes: IntegrityZomes,
         coordinator_zomes: CoordinatorZomes,
-        network_seed: Option<NetworkSeed>,
-        properties: Option<YamlProperties>,
+        phenotype: DnaPhenotypeOpt,
     ) -> DnaResult<(DnaDefHashed, DnaHash)> {
         match &self.manifest().0 {
             DnaManifest::V1(manifest) => {
-                let mut dna_def = DnaDef {
+                let dna_def = DnaDef {
                     name: manifest.name.clone(),
                     phenotype: DnaPhenotype {
                         network_seed: manifest.integrity.network_seed.clone().unwrap_or_default(),
@@ -135,29 +129,9 @@ impl DnaBundle {
                     coordinator_zomes,
                 };
 
-                if network_seed.is_none() && properties.is_none() {
-                    // If no phenotype overrides, then the original hash is the same as the current hash
-                    let ddh = DnaDefHashed::from_content_sync(dna_def);
-                    let original_hash = ddh.as_hash().clone();
-                    Ok((ddh, original_hash))
-                } else {
-                    // Otherwise, record the original hash first, for version comparisons.
-                    let original_hash = DnaHash::with_data_sync(&dna_def);
-
-                    let props = manifest.integrity.properties.as_ref();
-                    let properties: SerializedBytes = properties
-                        .as_ref()
-                        .or(props)
-                        .map(SerializedBytes::try_from)
-                        .unwrap_or_else(|| SerializedBytes::try_from(()))?;
-                    let network_seed = network_seed
-                        .or_else(|| manifest.integrity.network_seed.clone())
-                        .unwrap_or_default();
-
-                    dna_def.phenotype.network_seed = network_seed;
-                    dna_def.phenotype.properties = properties;
-                    Ok((DnaDefHashed::from_content_sync(dna_def), original_hash))
-                }
+                let original_hash = DnaHash::with_data_sync(&dna_def);
+                let ddh = DnaDefHashed::from_content_sync(dna_def.modify_phenotype(phenotype));
+                Ok((ddh, original_hash))
             }
         }
     }
@@ -321,7 +295,7 @@ mod tests {
         .unwrap()
         .into();
         matches::assert_matches!(
-            bad_bundle.into_dna_file(None, None).await,
+            bad_bundle.into_dna_file(DnaPhenotypeOpt::none()).await,
             Err(DnaError::WasmHashMismatch(h1, h2))
             if h1 == hash1 && h2 == hash2
         );
@@ -334,7 +308,11 @@ mod tests {
         )
         .unwrap()
         .into();
-        let dna_file: DnaFile = bundle.into_dna_file(None, None).await.unwrap().0;
+        let dna_file: DnaFile = bundle
+            .into_dna_file(DnaPhenotypeOpt::none())
+            .await
+            .unwrap()
+            .0;
         assert_eq!(dna_file.dna_def().integrity_zomes.len(), 2);
         assert_eq!(dna_file.code().len(), 2);
 
@@ -345,7 +323,13 @@ mod tests {
                 .unwrap()
                 .into();
         let dna_file: DnaFile = bundle
-            .into_dna_file(Some("network_seed".into()), Some(properties.clone()))
+            .into_dna_file(
+                DnaPhenotypeOpt::none()
+                    .with_network_seed("network_seed".into())
+                    .with_properties(properties.clone())
+                    .serialized()
+                    .unwrap(),
+            )
             .await
             .unwrap()
             .0;

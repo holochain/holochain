@@ -189,8 +189,10 @@ pub async fn register_and_install_dna_named(
     timeout: u64,
 ) -> DnaHash {
     let register_payload = RegisterDnaPayload {
-        network_seed: None,
-        properties,
+        phenotype: DnaPhenotypeOpt {
+            properties,
+            ..Default::default()
+        },
         source: DnaSource::Path(dna_path),
     };
     let request = AdminRequest::RegisterDna(Box::new(register_payload));
@@ -276,7 +278,7 @@ pub fn create_config(port: u16, environment_path: PathBuf) -> ConductorConfig {
         environment_path: environment_path.into(),
         network: None,
         dpki: None,
-        keystore: KeystoreConfig::DangerTestKeystoreLegacyDeprecated,
+        keystore: KeystoreConfig::DangerTestKeystore,
         db_sync_strategy: DbSyncStrategy::default(),
     }
 }

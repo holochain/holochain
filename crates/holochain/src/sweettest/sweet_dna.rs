@@ -10,27 +10,22 @@ pub struct SweetDnaFile(DnaFile);
 impl SweetDnaFile {
     /// Create a DnaFile from a path to a *.dna bundle
     pub async fn from_bundle(path: &Path) -> DnaResult<DnaFile> {
-        Self::from_bundle_with_overrides(path, None, Option::<()>::None).await
+        Self::from_bundle_with_overrides(path, DnaPhenotypeOpt::<SerializedBytes>::none()).await
     }
 
     /// Create a DnaFile from a path to a *.dna bundle, applying the specified
     /// "phenotype" overrides
-    pub async fn from_bundle_with_overrides<P>(
+    pub async fn from_bundle_with_overrides<P, E>(
         path: &Path,
-        network_seed: Option<NetworkSeed>,
-        props: Option<P>,
+        phenotype: DnaPhenotypeOpt<P>,
     ) -> DnaResult<DnaFile>
     where
-        P: Serialize,
+        P: TryInto<SerializedBytes, Error = E>,
+        SerializedBytesError: From<E>,
     {
-        let props = if let Some(p) = props {
-            Some(YamlProperties::from(serde_yaml::to_value(p)?))
-        } else {
-            None
-        };
         Ok(DnaBundle::read_from_file(path)
             .await?
-            .into_dna_file(network_seed, props)
+            .into_dna_file(phenotype.serialized().map_err(SerializedBytesError::from)?)
             .await?
             .0)
     }

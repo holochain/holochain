@@ -132,7 +132,8 @@ impl SourceChain {
                 if is_chain_locked(txn, &hashed_preflight_request, author.as_ref())? {
                     return Err(SourceChainError::ChainLocked);
                 }
-                let (persisted_head, persisted_seq, _) = chain_head_db(txn, author.clone())?;
+                let (persisted_head, persisted_seq, _) =
+                    chain_head_db_nonempty(txn, author.clone())?;
                 let countersigning_agent_state =
                     CounterSigningAgentState::new(agent_index, persisted_head, persisted_seq);
                 lock_chain(
@@ -305,7 +306,7 @@ impl SourceChain {
                 }
                 // As at check.
                 let (new_persisted_head, new_head_seq, new_timestamp) =
-                    chain_head_db(txn, author.clone())?;
+                    chain_head_db_nonempty(txn, author.clone())?;
                 if actions.last().is_none() {
                     // Nothing to write
                     return Ok(Vec::new());
@@ -432,7 +433,7 @@ where
         let (persisted_head, persisted_seq, persisted_timestamp) = vault
             .async_reader({
                 let author = author.clone();
-                move |txn| chain_head_db(&txn, author)
+                move |txn| chain_head_db_nonempty(&txn, author)
             })
             .await?;
         Ok(Self {
@@ -467,8 +468,8 @@ where
                 let author = author.clone();
                 move |txn| chain_head_db(&txn, author)
             })
-            .await
-            .unwrap_or_else(|_| {
+            .await?
+            .unwrap_or_else(|| {
                 (
                     ActionHash::from_raw_32(vec![0u8; 32]),
                     0,
@@ -1079,16 +1080,22 @@ pub fn put_raw(
     Ok(ops_to_integrate)
 }
 
-/// Get the current chain head of the database.
+/// Get the current chain head of the database, if the chain is nonempty.
 pub fn chain_head_db(
     txn: &Transaction,
     author: Arc<AgentPubKey>,
-) -> SourceChainResult<(ActionHash, u32, Timestamp)> {
+) -> SourceChainResult<Option<(ActionHash, u32, Timestamp)>> {
     let chain_head = ChainHeadQuery::new(author);
-    let (prev_action, last_action_seq, last_action_timestamp) = chain_head
-        .run(Txn::from(txn))?
-        .ok_or(SourceChainError::ChainEmpty)?;
-    Ok((prev_action, last_action_seq, last_action_timestamp))
+    Ok(chain_head.run(Txn::from(txn))?)
+}
+
+/// Get the current chain head of the database.
+/// Error if the chain is empty.
+pub fn chain_head_db_nonempty(
+    txn: &Transaction,
+    author: Arc<AgentPubKey>,
+) -> SourceChainResult<(ActionHash, u32, Timestamp)> {
+    chain_head_db(txn, author)?.ok_or(SourceChainError::ChainEmpty)
 }
 
 /// Check if there is a current countersigning session and if so, return the
@@ -1101,9 +1108,9 @@ pub fn current_countersigning_session(
     if is_chain_locked(txn, &[], author.as_ref())? {
         match chain_head_db(txn, author) {
             // We haven't done genesis so no session can be active.
-            Err(SourceChainError::ChainEmpty) => Ok(None),
             Err(e) => Err(e),
-            Ok((hash, _, _)) => {
+            Ok(None) => Ok(None),
+            Ok(Some((hash, _, _))) => {
                 let txn: Txn = txn.into();
                 // Get the session data from the database.
                 let record = match txn.get_record(&hash.into())? {
@@ -1132,8 +1139,9 @@ async fn _put_db<H: holochain_zome_types::ActionUnweighed, B: ActionBuilder<H>>(
     action_builder: B,
     maybe_entry: Option<Entry>,
 ) -> SourceChainResult<ActionHash> {
-    let (prev_action, last_action_seq, _) =
-        fresh_reader_test!(vault, |txn| { chain_head_db(&txn, author.clone()) })?;
+    let (prev_action, last_action_seq, _) = fresh_reader_test!(vault, |txn| {
+        chain_head_db_nonempty(&txn, author.clone())
+    })?;
     let action_seq = last_action_seq + 1;
 
     let common = ActionBuilderCommon {
@@ -1151,7 +1159,7 @@ async fn _put_db<H: holochain_zome_types::ActionUnweighed, B: ActionBuilder<H>>(
     let entry = entry.into_option();
     let hash = action.as_hash().clone();
     vault.conn()?.with_commit_sync(|txn: &mut Transaction| {
-        let (new_head, new_seq, new_timestamp) = chain_head_db(txn, author.clone())?;
+        let (new_head, new_seq, new_timestamp) = chain_head_db_nonempty(txn, author.clone())?;
         if new_head != prev_action {
             let entries = match (entry, action.action().entry_hash()) {
                 (Some(e), Some(entry_hash)) => {
@@ -1332,7 +1340,7 @@ pub mod tests {
         chain_1.flush(&mock).await?;
         let author_1 = Arc::clone(&author);
         let (_, seq, _) = db
-            .async_commit(move |txn: &mut Transaction| chain_head_db(&txn, author_1))
+            .async_commit(move |txn: &mut Transaction| chain_head_db_nonempty(&txn, author_1))
             .await?;
         assert_eq!(seq, 3);
 
@@ -1342,14 +1350,14 @@ pub mod tests {
         ));
         let author_2 = Arc::clone(&author);
         let (_, seq, _) = db
-            .async_commit(move |txn: &mut Transaction| chain_head_db(&txn, author_2))
+            .async_commit(move |txn: &mut Transaction| chain_head_db_nonempty(&txn, author_2))
             .await?;
         assert_eq!(seq, 3);
 
         chain_3.flush(&mock).await?;
         let author_3 = Arc::clone(&author);
         let (_, seq, _) = db
-            .async_commit(move |txn: &mut Transaction| chain_head_db(&txn, author_3))
+            .async_commit(move |txn: &mut Transaction| chain_head_db_nonempty(&txn, author_3))
             .await?;
         assert_eq!(seq, 4);
 
@@ -1445,7 +1453,7 @@ pub mod tests {
         chain_1.flush(&mock).await?;
         let author_1 = Arc::clone(&author);
         let (_, seq, _) = db
-            .async_commit(move |txn: &mut Transaction| chain_head_db(&txn, author_1))
+            .async_commit(move |txn: &mut Transaction| chain_head_db_nonempty(&txn, author_1))
             .await?;
         assert_eq!(seq, 3);
 
@@ -1457,7 +1465,9 @@ pub mod tests {
         chain_3.flush(&mock).await?;
         let author_2 = Arc::clone(&author);
         let (h2, seq, _) = db
-            .async_commit(move |txn: &mut Transaction| chain_head_db(&txn, author_2.clone()))
+            .async_commit(move |txn: &mut Transaction| {
+                chain_head_db_nonempty(&txn, author_2.clone())
+            })
             .await?;
 
         // not equal since action hash change due to rebasing
@@ -1786,10 +1796,7 @@ pub mod tests {
         let author = Arc::new(keystore.new_sign_keypair_random().await.unwrap());
 
         fresh_reader_test!(vault, |txn| {
-            assert_matches!(
-                chain_head_db(&txn, author.clone()),
-                Err(SourceChainError::ChainEmpty)
-            );
+            assert_matches!(chain_head_db(&txn, author.clone()), Ok(None));
         });
         genesis(
             vault.clone().into(),
@@ -1833,7 +1840,7 @@ pub mod tests {
         source_chain.flush(&mock).await.unwrap();
 
         fresh_reader_test!(vault, |txn| {
-            assert_eq!(chain_head_db(&txn, author.clone()).unwrap().0, h2);
+            assert_eq!(chain_head_db_nonempty(&txn, author.clone()).unwrap().0, h2);
             // get the full record
             let store = Txn::from(&txn);
             let h1_record_fetched = store

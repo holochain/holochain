@@ -64,9 +64,6 @@ pub enum WireMessage {
         agent: AgentPubKey,
         filter: holochain_zome_types::chain::ChainFilter,
     },
-    GetValidationPackage {
-        action_hash: ActionHash,
-    },
     CountersigningSessionNegotiation {
         message: event::CountersigningSessionNegotiationMessage,
     },
@@ -150,10 +147,6 @@ impl WireMessage {
         filter: holochain_zome_types::chain::ChainFilter,
     ) -> WireMessage {
         Self::MustGetAgentActivity { agent, filter }
-    }
-
-    pub fn get_validation_package(action_hash: ActionHash) -> WireMessage {
-        Self::GetValidationPackage { action_hash }
     }
 
     pub fn countersigning_session_negotiation(

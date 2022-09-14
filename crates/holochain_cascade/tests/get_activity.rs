@@ -15,6 +15,7 @@ use holochain_types::activity::*;
 use holochain_types::chain::MustGetAgentActivityResponse;
 use holochain_types::test_utils::chain::*;
 use holochain_zome_types::ChainFilter;
+use holochain_zome_types::ChainQueryFilter;
 use holochain_zome_types::ChainStatus;
 use test_case::test_case;
 
@@ -53,7 +54,7 @@ async fn get_activity() {
     let mut cascade = Cascade::empty().with_network(network, cache.to_db());
 
     let r = cascade
-        .get_agent_activity(td.agent.clone(), td.query_filter.clone(), options)
+        .get_agent_activity(td.agent.clone(), ChainQueryFilter::new(), options)
         .await
         .unwrap();
 

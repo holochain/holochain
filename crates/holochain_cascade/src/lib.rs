@@ -1,8 +1,27 @@
-//! # Cascade
+//! The Cascade is a multi-tiered accessor for Holochain DHT data.
+//!
+//! Note that the docs for this crate are admittedly a bit *loose and imprecise*,
+//! but they are not expected to be *incorrect*.
+//!
+//! It is named "the Cascade" because it performs "cascading" gets across multiple sources.
+//! In general (but not in all cases), the flow is something like:
+//! - First attempts to read the local storage
+//! - If that fails, attempt to read data from the network cache
+//! - If that fails, do a network request for the data, caching it if found
+//!
 //! ## Retrieve vs Get
-//! Get checks CRUD metadata before returning an the data
-//! where as retrieve only checks that where the data was found
-//! the appropriate validation has been run.
+//!
+//! There are two words used in cascade functions: "get", and "retrieve".
+//! They mean distinct things:
+//!
+//! - "get" ignores invalid data, and sometimes takes into account CRUD metadata
+//!     before returning the data, so for instance, Deletes
+//!     are allowed to annihilate Creates so that neither is returned. This is a more
+//!     "refined" form of fetching data.
+//! - "retrieve" only fetches the data if it exists, without regard to validation status.
+//!     This is a more "raw" form of fetching data.
+//!
+#![warn(missing_docs)]
 
 use std::sync::Arc;
 
@@ -46,13 +65,9 @@ mod agent_activity;
 #[cfg(any(test, feature = "test_utils"))]
 pub mod test_utils;
 
-/////////////////
-// Helper macros
-/////////////////
-
 /// Get an item from an option
 /// or return early from the function
-macro_rules! ok_or_return {
+macro_rules! some_or_return {
     ($n:expr) => {
         match $n {
             Some(n) => n,
@@ -67,6 +82,9 @@ macro_rules! ok_or_return {
     };
 }
 
+/// The Cascade is a multi-tiered accessor for Holochain DHT data.
+///
+/// See the module-level docs for more info.
 #[derive(Clone)]
 pub struct Cascade<Network = HolochainP2pDna> {
     authored: Option<DbRead<DbKindAuthored>>,
@@ -151,7 +169,8 @@ impl Cascade<HolochainP2pDna> {
         }
     }
 
-    pub fn from_workspace_network<N, AuthorDb, DhtDb>(
+    /// Construct a [Cascade] with network access
+    pub fn from_workspace_and_network<N, AuthorDb, DhtDb>(
         workspace: &HostFnWorkspace<AuthorDb, DhtDb>,
         network: N,
     ) -> Cascade<N>
@@ -176,7 +195,9 @@ impl Cascade<HolochainP2pDna> {
             network: Some(network),
         }
     }
-    pub fn from_workspace(stores: HostFnStores, author: Option<Arc<AgentPubKey>>) -> Self {
+
+    /// Construct a [Cascade] with local-only access to the provided stores
+    pub fn from_workspace_stores(stores: HostFnStores, author: Option<Arc<AgentPubKey>>) -> Self {
         let HostFnStores {
             authored,
             dht,
@@ -254,7 +275,7 @@ where
     }
 
     async fn merge_ops_into_cache(&mut self, responses: Vec<WireOps>) -> CascadeResult<()> {
-        let cache = ok_or_return!(self.cache.as_mut());
+        let cache = some_or_return!(self.cache.as_mut());
         cache
             .async_commit(|txn| {
                 for response in responses {
@@ -272,7 +293,7 @@ where
         responses: Vec<WireLinkOps>,
         key: WireLinkKey,
     ) -> CascadeResult<()> {
-        let cache = ok_or_return!(self.cache.as_mut());
+        let cache = some_or_return!(self.cache.as_mut());
         cache
             .async_commit(move |txn| {
                 for response in responses {
@@ -309,7 +330,7 @@ where
                 .find(|a| matches!(a, MustGetAgentActivityResponse::Activity(_)))
         };
 
-        let cache = ok_or_return!(
+        let cache = some_or_return!(
             self.cache.as_mut(),
             response.unwrap_or(MustGetAgentActivityResponse::IncompleteChain)
         );
@@ -335,13 +356,14 @@ where
         }
     }
 
+    /// Fetch a Record from the network, caching and returning the results
     #[instrument(skip(self, options))]
     pub async fn fetch_record(
         &mut self,
         hash: AnyDhtHash,
         options: NetworkGetOptions,
     ) -> CascadeResult<()> {
-        let network = ok_or_return!(self.network.as_mut());
+        let network = some_or_return!(self.network.as_mut());
         let results = network
             .get(hash, options.clone())
             .instrument(debug_span!("fetch_record::network_get"))
@@ -357,7 +379,7 @@ where
         link_key: WireLinkKey,
         options: GetLinksOptions,
     ) -> CascadeResult<()> {
-        let network = ok_or_return!(self.network.as_mut());
+        let network = some_or_return!(self.network.as_mut());
         let results = network.get_links(link_key.clone(), options).await?;
 
         self.merge_link_ops_into_cache(results, link_key.clone())
@@ -372,7 +394,7 @@ where
         query: ChainQueryFilter,
         options: GetActivityOptions,
     ) -> CascadeResult<Vec<AgentActivityResponse<ActionHash>>> {
-        let network = ok_or_return!(self.network.as_mut(), Vec::with_capacity(0));
+        let network = some_or_return!(self.network.as_mut(), Vec::with_capacity(0));
         Ok(network.get_agent_activity(agent, query, options).await?)
     }
 
@@ -383,7 +405,7 @@ where
         author: AgentPubKey,
         filter: holochain_zome_types::chain::ChainFilter,
     ) -> CascadeResult<MustGetAgentActivityResponse> {
-        let network = ok_or_return!(
+        let network = some_or_return!(
             self.network.as_mut(),
             MustGetAgentActivityResponse::IncompleteChain
         );
@@ -591,6 +613,9 @@ where
         Ok(result)
     }
 
+    /// Get Entry data along with all CRUD actions associated with it.
+    ///
+    /// Also returns Rejected actions, which may affect the interpreted validity status of this Entry.
     #[instrument(skip(self, options))]
     pub async fn get_entry_details(
         &mut self,
@@ -626,8 +651,11 @@ where
         Ok(results)
     }
 
+    /// Get the specified Record along with all Updates and Deletes associated with it.
+    ///
+    /// Can return a Rejected Record.
     #[instrument(skip(self, options))]
-    pub async fn get_action_details(
+    pub async fn get_record_details(
         &mut self,
         action_hash: ActionHash,
         options: GetOptions,
@@ -748,6 +776,9 @@ where
         Ok(results)
     }
 
+    /// Perform a concurrent `get` on multiple hashes simultaneously, returning
+    /// the resulting list of Records in the order that they come in
+    /// (NOT the order in which they were requested!).
     pub async fn get_concurrent<I: IntoIterator<Item = AnyDhtHash>>(
         &mut self,
         hashes: I,
@@ -784,6 +815,7 @@ where
         }
     }
 
+    /// Get either [`EntryDetails`] or [`RecordDetails`], depending on the hash provided
     #[instrument(skip(self))]
     pub async fn get_details(
         &mut self,
@@ -796,7 +828,7 @@ where
                 .await?
                 .map(Details::Entry)),
             AnyDht::Action => Ok(self
-                .get_action_details(hash.into(), options)
+                .get_record_details(hash.into(), options)
                 .await?
                 .map(Details::Record)),
         }
@@ -1020,29 +1052,13 @@ where
         Ok(r)
     }
 
-    /// Get the validation package if it is cached without going to the network
-    pub fn get_validation_package_local(
-        &self,
-        _hash: &ActionHash,
-    ) -> CascadeResult<Option<Vec<Record>>> {
-        Ok(None)
-    }
-
-    pub async fn get_validation_package(
-        &mut self,
-        _agent: AgentPubKey,
-        _action: &ActionHashed,
-    ) -> CascadeResult<Option<ValidationPackage>> {
-        Ok(None)
-    }
-
     fn am_i_authoring(&mut self, hash: &AnyDhtHash) -> CascadeResult<bool> {
-        let scratch = ok_or_return!(self.scratch.as_ref(), false);
+        let scratch = some_or_return!(self.scratch.as_ref(), false);
         Ok(scratch.apply_and_then(|scratch| scratch.contains_hash(hash))?)
     }
 
     async fn am_i_an_authority(&mut self, hash: AnyDhtHash) -> CascadeResult<bool> {
-        let network = ok_or_return!(self.network.as_mut(), false);
+        let network = some_or_return!(self.network.as_mut(), false);
 
         Ok(network.authority_for_hash(hash).await?)
     }
