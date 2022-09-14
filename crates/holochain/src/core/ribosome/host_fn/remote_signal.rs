@@ -71,7 +71,7 @@ mod tests {
         let entry_def = EntryDef::default_with_id("entrydef");
 
         SweetInlineZomes::new(vec![entry_def.clone()], 0)
-            .callback("signal_others", move |api, ()| {
+            .function("signal_others", move |api, ()| {
                 let signal = ExternIO::encode("Hey").unwrap();
                 let signal = RemoteSignal {
                     agents: agents.clone(),
@@ -81,12 +81,12 @@ mod tests {
                 api.remote_signal(signal)?;
                 Ok(())
             })
-            .callback("recv_remote_signal", move |api, signal: ExternIO| {
+            .function("recv_remote_signal", move |api, signal: ExternIO| {
                 tracing::debug!("remote signal");
                 num_signals.fetch_add(1, Ordering::SeqCst);
                 api.emit_signal(AppSignal::new(signal)).map_err(Into::into)
             })
-            .callback("init", move |api, ()| {
+            .function("init", move |api, ()| {
                 let mut functions: GrantedFunctions = BTreeSet::new();
                 functions.insert((api.zome_info(()).unwrap().name, "recv_remote_signal".into()));
                 let cap_grant_entry = CapGrantEntry {

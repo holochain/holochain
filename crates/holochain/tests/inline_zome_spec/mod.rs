@@ -314,7 +314,7 @@ fn simple_validation_zome() -> InlineZomeSet {
     let entry_def = EntryDef::default_with_id("string");
 
     SweetInlineZomes::new(vec![entry_def.clone()], 0)
-        .callback("create", move |api, s: AppString| {
+        .function("create", move |api, s: AppString| {
             let entry = Entry::app(s.try_into().unwrap()).unwrap();
             let hash = api.create(CreateInput::new(
                 InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
@@ -324,7 +324,7 @@ fn simple_validation_zome() -> InlineZomeSet {
             ))?;
             Ok(hash)
         })
-        .callback("read", |api, hash: ActionHash| {
+        .function("read", |api, hash: ActionHash| {
             api.get(vec![GetInput::new(hash.into(), GetOptions::default())])
                 .map_err(Into::into)
         })

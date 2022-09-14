@@ -203,7 +203,7 @@ async fn private_entries_dont_leak() {
     struct PrivateEntry;
 
     let zome = SweetInlineZomes::new(vec![entry_def.clone()], 0)
-        .callback("create", move |api, _: ()| {
+        .function("create", move |api, _: ()| {
             let entry = Entry::app(PrivateEntry {}.try_into().unwrap()).unwrap();
             let hash = api.create(CreateInput::new(
                 InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
@@ -213,11 +213,11 @@ async fn private_entries_dont_leak() {
             ))?;
             Ok(hash)
         })
-        .callback("get", |api, hash: AnyDhtHash| {
+        .function("get", |api, hash: AnyDhtHash| {
             api.get(vec![GetInput::new(hash, GetOptions::default())])
                 .map_err(Into::into)
         })
-        .callback("get_details", |api, hash: AnyDhtHash| {
+        .function("get_details", |api, hash: AnyDhtHash| {
             api.get_details(vec![GetInput::new(hash, GetOptions::default())])
                 .map_err(Into::into)
         });

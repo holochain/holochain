@@ -15,7 +15,7 @@ pub fn simple_create_read_zome() -> InlineZomeSet {
         InlineEntryTypes::entry_defs(),
         0,
     )
-    .callback("simple", "create", move |api, ()| {
+    .function("simple", "create", move |api, ()| {
         let entry = Entry::app(().try_into().unwrap()).unwrap();
         let hash = api.create(CreateInput::new(
             InlineZomeSet::get_entry_location(&api, InlineEntryTypes::A),
@@ -25,7 +25,7 @@ pub fn simple_create_read_zome() -> InlineZomeSet {
         ))?;
         Ok(hash)
     })
-    .callback("simple", "read", |api, hash: ActionHash| {
+    .function("simple", "read", |api, hash: ActionHash| {
         api.get(vec![GetInput::new(hash.into(), GetOptions::default())])
             .map(|e| e.into_iter().next().unwrap())
             .map_err(Into::into)
@@ -47,7 +47,7 @@ pub fn batch_create_zome() -> InlineZomeSet {
     }
 
     SweetInlineZomes::new(InlineEntryTypes::entry_defs(), 0)
-        .callback("create_batch", move |api, num: usize| {
+        .function("create_batch", move |api, num: usize| {
             let hashes = std::iter::repeat_with(|| {
                 api.create(CreateInput::new(
                     InlineZomeSet::get_entry_location(&api, InlineEntryTypes::A),
@@ -61,7 +61,7 @@ pub fn batch_create_zome() -> InlineZomeSet {
             .collect::<Vec<_>>();
             Ok(hashes)
         })
-        .callback("read", |api, hash: ActionHash| {
+        .function("read", |api, hash: ActionHash| {
             api.get(vec![GetInput::new(hash.into(), GetOptions::default())])
                 .map(|e| e.into_iter().next().unwrap())
                 .map_err(Into::into)
@@ -99,7 +99,7 @@ pub fn simple_crud_zome() -> InlineZomeSet {
     let unit_entry_def = EntryDef::default_with_id("unit");
 
     SweetInlineZomes::new(vec![string_entry_def, unit_entry_def], 0)
-        .callback("create_string", move |api, s: AppString| {
+        .function("create_string", move |api, s: AppString| {
             let entry = Entry::app(s.try_into().unwrap()).unwrap();
             let hash = api.create(CreateInput::new(
                 InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
@@ -109,7 +109,7 @@ pub fn simple_crud_zome() -> InlineZomeSet {
             ))?;
             Ok(hash)
         })
-        .callback("create_unit", move |api, ()| {
+        .function("create_unit", move |api, ()| {
             let entry = Entry::app(().try_into().unwrap()).unwrap();
             let hash = api.create(CreateInput::new(
                 InlineZomeSet::get_entry_location(&api, EntryDefIndex(1)),
@@ -119,26 +119,26 @@ pub fn simple_crud_zome() -> InlineZomeSet {
             ))?;
             Ok(hash)
         })
-        .callback("delete", move |api, action_hash: ActionHash| {
+        .function("delete", move |api, action_hash: ActionHash| {
             let hash = api.delete(DeleteInput::new(action_hash, ChainTopOrdering::default()))?;
             Ok(hash)
         })
-        .callback("read", |api, hash: ActionHash| {
+        .function("read", |api, hash: ActionHash| {
             api.get(vec![GetInput::new(hash.into(), GetOptions::default())])
                 .map_err(Into::into)
         })
-        .callback("read_multi", |api, hashes: Vec<ActionHash>| {
+        .function("read_multi", |api, hashes: Vec<ActionHash>| {
             let gets = hashes
                 .iter()
                 .map(|h| GetInput::new(h.clone().into(), GetOptions::default()))
                 .collect();
             api.get(gets).map_err(Into::into)
         })
-        .callback("read_entry", |api, hash: EntryHash| {
+        .function("read_entry", |api, hash: EntryHash| {
             api.get(vec![GetInput::new(hash.into(), GetOptions::default())])
                 .map_err(Into::into)
         })
-        .callback("emit_signal", |api, ()| {
+        .function("emit_signal", |api, ()| {
             api.emit_signal(AppSignal::new(ExternIO::encode(()).unwrap()))
                 .map_err(Into::into)
         })

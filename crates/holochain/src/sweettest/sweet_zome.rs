@@ -51,17 +51,17 @@ impl SweetInlineZomes {
         I: DeserializeOwned + std::fmt::Debug,
         O: Serialize + std::fmt::Debug,
     {
-        Self(self.0.callback(Self::INTEGRITY, name, f))
+        Self(self.0.function(Self::INTEGRITY, name, f))
     }
 
     /// Add a callback to the coordinator_zome.
-    pub fn callback<F, I, O>(self, name: &str, f: F) -> Self
+    pub fn function<F, I, O>(self, name: &str, f: F) -> Self
     where
         F: Fn(BoxApi, I) -> InlineZomeResult<O> + 'static + Send + Sync,
         I: DeserializeOwned + std::fmt::Debug,
         O: Serialize + std::fmt::Debug,
     {
-        Self(self.0.callback(Self::COORDINATOR, name, f))
+        Self(self.0.function(Self::COORDINATOR, name, f))
     }
 }
 

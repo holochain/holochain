@@ -15,7 +15,7 @@ struct BaseTarget(AnyLinkableHash, AnyLinkableHash);
 
 fn links_zome() -> InlineZomeSet {
     InlineZomeSet::new_unique([("integrity_links", vec![], 1)], ["links"])
-        .callback(
+        .function(
             "links",
             "create_link",
             move |api, base_target: BaseTarget| {
@@ -30,7 +30,7 @@ fn links_zome() -> InlineZomeSet {
                 Ok(hash)
             },
         )
-        .callback(
+        .function(
             "links",
             "get_links",
             move |api: BoxApi, base: AnyLinkableHash| -> InlineZomeResult<Vec<Vec<Link>>> {

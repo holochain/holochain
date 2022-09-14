@@ -556,7 +556,7 @@ pub async fn data_zome(integrity_uuid: String, coordinator_uuid: String) -> DnaF
         )],
         [(coordinator_zome_name, coordinator_uuid)],
     )
-    .callback(
+    .function(
         coordinator_zome_name,
         "create_many",
         move |api, entries: Vec<Entry>| {
@@ -571,7 +571,7 @@ pub async fn data_zome(integrity_uuid: String, coordinator_uuid: String) -> DnaF
             Ok(())
         },
     )
-    .callback(coordinator_zome_name, "read", |api, hash: ActionHash| {
+    .function(coordinator_zome_name, "read", |api, hash: ActionHash| {
         api.get(vec![GetInput::new(hash.into(), GetOptions::default())])
             .map(|e| e.into_iter().next().unwrap())
             .map_err(Into::into)
