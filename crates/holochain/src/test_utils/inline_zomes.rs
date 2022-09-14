@@ -5,7 +5,7 @@ use holochain_types::inline_zome::InlineEntryTypes;
 use holochain_types::inline_zome::InlineZomeSet;
 use holochain_zome_types::prelude::*;
 
-use crate::sweettest::SweetEasyInline;
+use crate::sweettest::SweetInlineZomes;
 
 /// An InlineZome with simple Create and Read operations
 pub fn simple_create_read_zome() -> InlineZomeSet {
@@ -46,7 +46,7 @@ pub fn batch_create_zome() -> InlineZomeSet {
         }
     }
 
-    SweetEasyInline::new(InlineEntryTypes::entry_defs(), 0)
+    SweetInlineZomes::new(InlineEntryTypes::entry_defs(), 0)
         .callback("create_batch", move |api, num: usize| {
             let hashes = std::iter::repeat_with(|| {
                 api.create(CreateInput::new(
@@ -98,7 +98,7 @@ pub fn simple_crud_zome() -> InlineZomeSet {
     let string_entry_def = EntryDef::default_with_id("string");
     let unit_entry_def = EntryDef::default_with_id("unit");
 
-    SweetEasyInline::new(vec![string_entry_def, unit_entry_def], 0)
+    SweetInlineZomes::new(vec![string_entry_def, unit_entry_def], 0)
         .callback("create_string", move |api, s: AppString| {
             let entry = Entry::app(s.try_into().unwrap()).unwrap();
             let hash = api.create(CreateInput::new(

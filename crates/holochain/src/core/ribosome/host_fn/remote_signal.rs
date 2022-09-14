@@ -51,7 +51,8 @@ pub fn remote_signal(
                 "remote_signal".into(),
             )
             .to_string(),
-        )).into()),
+        ))
+        .into()),
     }
 }
 
@@ -69,7 +70,7 @@ mod tests {
     fn zome(agents: Vec<AgentPubKey>, num_signals: Arc<AtomicUsize>) -> InlineZomeSet {
         let entry_def = EntryDef::default_with_id("entrydef");
 
-        SweetEasyInline::new(vec![entry_def.clone()], 0)
+        SweetInlineZomes::new(vec![entry_def.clone()], 0)
             .callback("signal_others", move |api, ()| {
                 let signal = ExternIO::encode("Hey").unwrap();
                 let signal = RemoteSignal {
@@ -142,7 +143,7 @@ mod tests {
 
         let _: () = conductors[0]
             .call(
-                &cells[0].zome(SweetEasyInline::COORDINATOR),
+                &cells[0].zome(SweetInlineZomes::COORDINATOR),
                 "signal_others",
                 (),
             )

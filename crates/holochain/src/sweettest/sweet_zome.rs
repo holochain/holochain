@@ -24,9 +24,9 @@ impl SweetZome {
 
 #[derive(Default)]
 /// A helper for creating [`InlineZomeSet`]
-pub struct SweetEasyInline(pub InlineZomeSet);
+pub struct SweetInlineZomes(pub InlineZomeSet);
 
-impl SweetEasyInline {
+impl SweetInlineZomes {
     /// Zome name for the integrity zome.
     pub const INTEGRITY: &'static str = "integrity";
     /// Zome name for the coordinator zome.
@@ -65,8 +65,8 @@ impl SweetEasyInline {
     }
 }
 
-impl From<SweetEasyInline> for InlineZomeSet {
-    fn from(s: SweetEasyInline) -> Self {
+impl From<SweetInlineZomes> for InlineZomeSet {
+    fn from(s: SweetInlineZomes) -> Self {
         s.0
     }
 }
