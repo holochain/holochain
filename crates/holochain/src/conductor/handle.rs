@@ -205,7 +205,7 @@ pub trait ConductorHandleT: Send + Sync {
     /// reconstruct a full set of Records from a single CHC call. If that is not possible, then
     /// this function cannot exist as-is. Specifically, there may need to be a separate
     /// step to fetch entries from the DHT, to be assembled into Records and passed back to the
-    /// conductor via [`holochain_conductor_api::AdminRequest::GraftRecordsOntoSourceChain`].
+    /// conductor via [`holochain_conductor_api::AdminRequest::GraftRecords`].
     ///
     /// If an app id is passed, enable that app after syncing the cell, since
     /// it is likely that this sync was prompted by a failed commit, which would cause the
