@@ -200,15 +200,22 @@ async fn large_entry_test() {
         .await
         .unwrap();
 
-    let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
-    let ((cell_0,), (cell_1,), (cell_2,)) = apps.into_tuples();
-
-    // Conductor 2 starts shutdown so it won't receive gossip.
+    // Conductor 2 begins in shutdown state so it won't receive gossip.
     conductors[2].shutdown().await;
+
+    let (cell_0,) = conductors[0]
+        .setup_app("app", [&dna_file])
+        .await
+        .unwrap()
+        .into_tuple();
+    let (cell_1,) = conductors[1]
+        .setup_app("app", [&dna_file])
+        .await
+        .unwrap()
+        .into_tuple();
 
     let zome_0 = cell_0.zome(SweetEasyInline::COORDINATOR);
     let zome_1 = cell_1.zome(SweetEasyInline::COORDINATOR);
-    let zome_2 = cell_2.zome(SweetEasyInline::COORDINATOR);
 
     let size = 15_000_000;
     let num = 2;
@@ -241,13 +248,19 @@ async fn large_entry_test() {
             .filter_map(|(i, r)| r.is_none().then(|| i))
             .collect::<Vec<_>>()
     );
+    dbg!(start.elapsed());
 
     // Shut down conductor 0 and start up conductor 2, so that conductor 2 has to receive
     // all data from conductor 1.
-    dbg!(start.elapsed());
     conductors[0].shutdown().await;
     conductors[2].startup().await;
-    dbg!(start.elapsed());
+    let (cell_2,) = conductors[2]
+        .setup_app("app", &[dna_file])
+        .await
+        .unwrap()
+        .into_tuple();
+
+    let zome_2 = cell_2.zome(SweetEasyInline::COORDINATOR);
 
     consistency(&[&cell_1, &cell_2], 60 * 4, Duration::from_secs(1)).await;
 

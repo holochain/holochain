@@ -183,14 +183,6 @@ macro_rules! write_codec_enum {
                         })
                     }
                 )*
-
-                fn encode_vec(&self) -> ::std::io::Result<Vec<u8>>
-                {
-                    let mut v = vec![];
-                    self.encode(&mut v)?;
-                    Ok(v)
-                }
-
             }
 
             impl $crate::codec::Codec for [< $codec_name:camel >] {
