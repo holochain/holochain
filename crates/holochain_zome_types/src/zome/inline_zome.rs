@@ -80,6 +80,17 @@ impl<T> InlineZome<T> {
         self
     }
 
+    /// Alias for `function`
+    #[deprecated = "Alias for `function`"]
+    pub fn callback<F, I, O>(self, name: &str, f: F) -> Self
+    where
+        F: Fn(BoxApi, I) -> InlineZomeResult<O> + 'static + Send + Sync,
+        I: DeserializeOwned + std::fmt::Debug,
+        O: Serialize + std::fmt::Debug,
+    {
+        self.function(name, f)
+    }
+
     /// Make a call to an inline zome callback.
     /// If the callback doesn't exist, return None.
     pub fn maybe_call(
