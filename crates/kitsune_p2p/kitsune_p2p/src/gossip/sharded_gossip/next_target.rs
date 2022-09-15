@@ -131,6 +131,8 @@ fn next_remote_node(
         }
     });
 
+    let forced_initate = metrics.read().forced_initiate();
+
     remote_nodes
         .into_iter()
         // Don't initiate with nodes we are currently gossiping with.
@@ -139,7 +141,7 @@ fn next_remote_node(
             match metrics.read().last_outcome(&n.agent_info_list) {
                 Some(RoundOutcome::Success(when)) => {
                     // If we should force initiate then we don't need to wait for the delay.
-                    metrics.read().forced_initiate()
+                    forced_initate
                         || when.elapsed().as_millis() as u32
                             >= tuning_params.gossip_peer_on_success_next_gossip_delay_ms
                 }
