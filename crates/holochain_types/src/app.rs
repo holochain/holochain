@@ -579,7 +579,7 @@ impl InstalledAppCommon {
     pub fn archive_clone_cell(&mut self, clone_id: &CloneId) -> AppResult<()> {
         let app_role_assignment = self.role_mut(&clone_id.as_base_role_id())?;
         // remove clone from role's clones map
-        match app_role_assignment.clones.remove(&clone_id) {
+        match app_role_assignment.clones.remove(clone_id) {
             None => Err(AppError::CloneCellNotFound(CloneCellId::CloneId(
                 clone_id.to_owned(),
             ))),
@@ -587,7 +587,7 @@ impl InstalledAppCommon {
                 // insert clone into archived clones map
                 let insert_result = app_role_assignment
                     .archived_clones
-                    .insert(clone_id.to_owned(), cell_id.to_owned());
+                    .insert(clone_id.to_owned(), cell_id);
                 assert!(
                     insert_result.is_none(),
                     "archive: clone cell is already archived"
@@ -608,7 +608,7 @@ impl InstalledAppCommon {
     pub fn restore_clone_cell(&mut self, clone_id: &CloneId) -> AppResult<InstalledCell> {
         let app_role_assignment = self.role_mut(&clone_id.as_base_role_id())?;
         // remove clone from archived clones map
-        match app_role_assignment.archived_clones.remove(&clone_id) {
+        match app_role_assignment.archived_clones.remove(clone_id) {
             None => Err(AppError::CloneCellNotFound(CloneCellId::CloneId(
                 clone_id.to_owned(),
             ))),
@@ -623,7 +623,7 @@ impl InstalledAppCommon {
                 );
                 Ok(InstalledCell {
                     role_id: clone_id.as_app_role_id().to_owned(),
-                    cell_id: cell_id.to_owned(),
+                    cell_id: cell_id,
                 })
             }
         }
@@ -632,7 +632,8 @@ impl InstalledAppCommon {
     /// Delete all archived clone cells.
     pub fn delete_archived_clone_cells_for_role(&mut self, role_id: &AppRoleId) -> AppResult<()> {
         let app_role_assignment = self.role_mut(role_id)?;
-        Ok(app_role_assignment.archived_clones.clear())
+        app_role_assignment.archived_clones.clear();
+        Ok(())
     }
 
     /// Accessor
