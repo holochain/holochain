@@ -578,13 +578,20 @@ impl InstalledAppCommon {
     /// longer.
     pub fn archive_clone_cell(&mut self, clone_id: &CloneId) -> AppResult<()> {
         let app_role_assignment = self.role_mut(&clone_id.as_base_role_id())?;
-        match app_role_assignment.archive_clone_cell(clone_id) {
-            false => Err(AppError::CloneCellNotFound(CloneCellId::CloneId(
+        // remove clone from role's clones map
+        match app_role_assignment.clones.remove(&clone_id) {
+            None => Err(AppError::CloneCellNotFound(CloneCellId::CloneId(
                 clone_id.to_owned(),
             ))),
-            true => {
-                // the clone cell must be included in `clones` due to the previous statement, so unwrapping is possible
-                app_role_assignment.clones.remove(&clone_id).unwrap();
+            Some(cell_id) => {
+                // insert clone into archived clones map
+                let insert_result = app_role_assignment
+                    .archived_clones
+                    .insert(clone_id.to_owned(), cell_id.to_owned());
+                assert!(
+                    insert_result.is_none(),
+                    "archive: clone cell is already archived"
+                );
                 Ok(())
             }
         }
@@ -592,7 +599,7 @@ impl InstalledAppCommon {
 
     /// Transformer
     /// Restore an archived clone cell.
-    /// 
+    ///
     /// The clone cell is added back to the list of clones and can be accessed
     /// again.
     ///
@@ -600,19 +607,24 @@ impl InstalledAppCommon {
     /// The restored clone cell.
     pub fn restore_clone_cell(&mut self, clone_id: &CloneId) -> AppResult<InstalledCell> {
         let app_role_assignment = self.role_mut(&clone_id.as_base_role_id())?;
-        match app_role_assignment.restore_clone_cell(clone_id) {
+        // remove clone from archived clones map
+        match app_role_assignment.archived_clones.remove(&clone_id) {
             None => Err(AppError::CloneCellNotFound(CloneCellId::CloneId(
                 clone_id.to_owned(),
             ))),
-            Some(installed_cell) => {
+            Some(cell_id) => {
+                // insert clone back into role's clones map
                 let insert_result = app_role_assignment
                     .clones
-                    .insert(clone_id.to_owned(), installed_cell.cell_id.clone());
+                    .insert(clone_id.to_owned(), cell_id.clone());
                 assert!(
                     insert_result.is_none(),
                     "restore: clone cell already exists"
                 );
-                Ok(installed_cell)
+                Ok(InstalledCell {
+                    role_id: clone_id.as_app_role_id().to_owned(),
+                    cell_id: cell_id.to_owned(),
+                })
             }
         }
     }
@@ -974,38 +986,6 @@ impl AppRoleAssignment {
             Some(self.base_cell_id)
         } else {
             None
-        }
-    }
-
-    /// Transformer
-    /// Archive a clone cell.
-    ///
-    /// # Returns
-    /// `true` if the clone cell was found and archived.
-    /// `false` if the clone cell was not found.
-    pub fn archive_clone_cell(&mut self, clone_id: &CloneId) -> bool {
-        match self.clones.get(clone_id) {
-            None => false,
-            Some(cell_id) => {
-                self.archived_clones
-                    .insert(clone_id.to_owned(), cell_id.to_owned());
-                true
-            }
-        }
-    }
-
-    /// Transformer
-    /// Restore an archived clone cell.
-    ///
-    /// # Returns
-    /// The restored clone cell.
-    pub fn restore_clone_cell(&mut self, clone_id: &CloneId) -> Option<InstalledCell> {
-        match self.archived_clones.remove(&clone_id.to_owned()) {
-            None => None,
-            Some(cell_id) => Some(InstalledCell {
-                role_id: clone_id.as_app_role_id().to_owned(),
-                cell_id: cell_id.to_owned(),
-            }),
         }
     }
 }
