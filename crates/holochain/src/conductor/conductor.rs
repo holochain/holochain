@@ -849,16 +849,18 @@ impl Conductor {
         app_id: &InstalledAppId,
         clone_cell_id: &CloneCellId,
     ) -> ConductorResult<InstalledCell> {
-        let (_, restored_cell) = self.update_state_prime({
-            let app_id = app_id.to_owned();
-            let clone_cell_id = clone_cell_id.to_owned();
-            move |mut state| {
-                let app = state.get_app_mut(&app_id)?;
-                let clone_id = app.get_clone_id(&clone_cell_id)?;
-                let restored_cell = app.restore_clone_cell(&clone_id)?;
-                Ok((state, restored_cell))
-            }
-        }).await?;
+        let (_, restored_cell) = self
+            .update_state_prime({
+                let app_id = app_id.to_owned();
+                let clone_cell_id = clone_cell_id.to_owned();
+                move |mut state| {
+                    let app = state.get_app_mut(&app_id)?;
+                    let clone_id = app.get_clone_id(&clone_cell_id)?;
+                    let restored_cell = app.restore_clone_cell(&clone_id)?;
+                    Ok((state, restored_cell))
+                }
+            })
+            .await?;
         Ok(restored_cell)
     }
 
@@ -868,17 +870,16 @@ impl Conductor {
         app_id: &InstalledAppId,
         role_id: &AppRoleId,
     ) -> ConductorResult<()> {
-        self
-            .update_state_prime({
-                let app_id = app_id.clone();
-                let role_id = role_id.clone();
-                move |mut state| {
-                    let app = state.get_app_mut(&app_id)?;
-                    app.delete_archived_clone_cells_for_role(&role_id)?;
-                    Ok((state, ()))
-                }
-            })
-            .await?;
+        self.update_state_prime({
+            let app_id = app_id.clone();
+            let role_id = role_id.clone();
+            move |mut state| {
+                let app = state.get_app_mut(&app_id)?;
+                app.delete_archived_clone_cells_for_role(&role_id)?;
+                Ok((state, ()))
+            }
+        })
+        .await?;
         self.remove_dangling_cells().await?;
         Ok(())
     }
