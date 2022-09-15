@@ -221,17 +221,20 @@ pub trait ConductorHandleT: Send + Sync {
         payload: CreateCloneCellPayload,
     ) -> ConductorResult<InstalledCell>;
 
-    /// Mark a clone cell for deletion.
-    async fn mark_clone_cell_for_deletion(
-        self: Arc<Self>,
-        payload: MarkCloneCellForDeletionPayload,
-    ) -> ConductorResult<()>;
+    /// Archive a clone cell for deletion.
+    async fn archive_clone_cell(self: Arc<Self>, payload: CloneCellPayload) -> ConductorResult<()>;
 
-    /// Restore a clone cell marked for deletion.
-    async fn restore_deleted_clone_cell(
+    /// Restore an archived clone cell.
+    async fn restore_archived_clone_cell(
         self: Arc<Self>,
-        payload: MarkCloneCellForDeletionPayload,
+        payload: CloneCellPayload,
     ) -> ConductorResult<InstalledCell>;
+
+    /// Destroy all clone cells marked for deletion.
+    async fn delete_archived_clone_cells(
+        self: Arc<Self>,
+        payload: DeleteArchivedCloneCellsPayload,
+    ) -> ConductorResult<()>;
 
     /// Install Cells into ConductorState based on installation info, and run
     /// genesis on all new source chains
@@ -953,32 +956,43 @@ impl ConductorHandleT for ConductorHandleImpl {
         Ok(installed_clone_cell)
     }
 
-    async fn mark_clone_cell_for_deletion(
-        self: Arc<Self>,
-        payload: MarkCloneCellForDeletionPayload,
-    ) -> ConductorResult<()> {
-        let MarkCloneCellForDeletionPayload {
+    async fn archive_clone_cell(self: Arc<Self>, payload: CloneCellPayload) -> ConductorResult<()> {
+        let CloneCellPayload {
             app_id,
             clone_cell_id,
         } = payload;
         self.conductor
-            .mark_clone_cell_for_deletion(&app_id, &clone_cell_id)
+            .archive_clone_cell(&app_id, &clone_cell_id)
             .await?;
         Ok(())
     }
 
-    async fn restore_deleted_clone_cell(
+    async fn restore_archived_clone_cell(
         self: Arc<Self>,
-        payload: MarkCloneCellForDeletionPayload,
+        payload: CloneCellPayload,
     ) -> ConductorResult<InstalledCell> {
-        let MarkCloneCellForDeletionPayload {
+        let CloneCellPayload {
             app_id,
             clone_cell_id,
         } = payload;
-        let restored_cell = self.conductor.restore_clone_cell(&app_id, &clone_cell_id).await?;
+        let restored_cell = self
+            .conductor
+            .restore_clone_cell(&app_id, &clone_cell_id)
+            .await?;
         self.create_and_add_initialized_cells_for_running_apps(self.clone(), Some(&app_id))
             .await?;
         Ok(restored_cell)
+    }
+
+    async fn delete_archived_clone_cells(
+        self: Arc<Self>,
+        payload: DeleteArchivedCloneCellsPayload,
+    ) -> ConductorResult<()> {
+        let DeleteArchivedCloneCellsPayload { app_id, role_id } = payload;
+        self.conductor
+            .delete_archived_clone_cells(&app_id, &role_id)
+            .await?;
+        Ok(())
     }
 
     async fn install_app(

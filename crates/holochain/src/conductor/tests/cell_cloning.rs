@@ -2,7 +2,7 @@ use crate::sweettest::*;
 use holo_hash::ActionHash;
 use holochain_types::{
     app::CreateCloneCellPayload,
-    prelude::{CloneCellId, CloneCellPayload},
+    prelude::{CloneCellId, CloneCellPayload, DeleteArchivedCloneCellsPayload},
 };
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::{AppRoleId, CloneId, DnaPhenotypeOpt};
@@ -221,7 +221,7 @@ async fn clone_cell_deletion() {
         .unwrap();
     assert_eq!(app_info.cell_data.contains(&installed_clone_cell), false);
 
-    // calling the cell after archiving should fail
+    // calling the cell after archiving fails
     let zome = SweetZome::new(
         installed_clone_cell.as_id().clone(),
         TestWasm::Create.coordinator_zome_name(),
@@ -234,8 +234,8 @@ async fn clone_cell_deletion() {
     // restore the archived clone cell
     let restored_cell = conductor
         .inner_handle()
-        .restore_deleted_clone_cell(CloneCellPayload {
-            app_id: app_id.to_string(),
+        .restore_archived_clone_cell(CloneCellPayload {
+            app_id: app_id.into(),
             clone_cell_id: CloneCellId::CloneId(
                 CloneId::try_from(installed_clone_cell.clone().into_role_id()).unwrap(),
             ),
@@ -254,7 +254,7 @@ async fn clone_cell_deletion() {
         .unwrap();
     assert_eq!(app_info.cell_data.contains(&installed_clone_cell), true);
 
-    // calling the cell after deletion should succeed
+    // calling the cell after restoring succeeds
     let zome = SweetZome::new(
         installed_clone_cell.as_id().clone(),
         TestWasm::Create.coordinator_zome_name(),
@@ -264,10 +264,34 @@ async fn clone_cell_deletion() {
         .await;
     assert!(zome_call_response.is_ok());
 
-    // // destroy clone cell that is marked for deletion
-    // conductor
-    //     .inner_handle()
-    //     .destroy_clone_cells_marked_for_deletion()
-    //     .await
-    //     .unwrap();
+    // archive and delete clone cell
+    conductor
+        .inner_handle()
+        .archive_clone_cell(CloneCellPayload {
+            app_id: app_id.to_string(),
+            clone_cell_id: CloneCellId::CloneId(
+                CloneId::try_from(installed_clone_cell.clone().into_role_id()).unwrap(),
+            ),
+        })
+        .await
+        .unwrap();
+    conductor
+        .inner_handle()
+        .delete_archived_clone_cells(DeleteArchivedCloneCellsPayload {
+            app_id: app_id.into(),
+            role_id: role_id.clone(),
+        })
+        .await
+        .unwrap();
+    // Assert the deleted cell cannot be restored
+    let restore_result = conductor
+        .inner_handle()
+        .restore_archived_clone_cell(CloneCellPayload {
+            app_id: app_id.into(),
+            clone_cell_id: CloneCellId::CloneId(
+                CloneId::try_from(installed_clone_cell.clone().into_role_id()).unwrap(),
+            ),
+        })
+        .await;
+    assert!(restore_result.is_err());
 }
