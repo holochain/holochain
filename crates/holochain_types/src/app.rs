@@ -623,7 +623,7 @@ impl InstalledAppCommon {
                 );
                 Ok(InstalledCell {
                     role_id: clone_id.as_app_role_id().to_owned(),
-                    cell_id: cell_id,
+                    cell_id,
                 })
             }
         }
