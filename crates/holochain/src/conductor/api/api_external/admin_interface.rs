@@ -345,6 +345,10 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .await?;
                 Ok(AdminResponse::RecordsGrafted)
             }
+            RestoreCloneCell(payload) => {
+                let restored_cell = self.conductor_handle.clone().restore_deleted_clone_cell(*payload).await?;
+                Ok(AdminResponse::CloneCellRestored(restored_cell))
+            },
         }
     }
 }

@@ -820,8 +820,8 @@ impl Conductor {
         Ok(installed_clone_cell)
     }
 
-    /// Mark a clone cell for future deletion from app.
-    pub(super) async fn mark_clone_cell_for_deletion(
+    /// Archive a clone cell for future deletion from the app.
+    pub(super) async fn archive_clone_cell(
         &self,
         app_id: &InstalledAppId,
         clone_cell_id: &CloneCellId,
@@ -834,13 +834,32 @@ impl Conductor {
                     let app = state.get_app_mut(&app_id)?;
                     let clone_id = app.get_clone_id(&clone_cell_id)?;
                     let cell_id = app.get_clone_cell_id(&clone_cell_id)?;
-                    app.mark_clone_cell_for_deletion(&clone_id)?;
+                    app.archive_clone_cell(&clone_id)?;
                     Ok((state, cell_id))
                 }
             })
             .await?;
         self.remove_cells(vec![removed_cell_id]).await;
         Ok(())
+    }
+
+    /// Restore an archived clone cell for an app.
+    pub(super) async fn restore_clone_cell(
+        &self,
+        app_id: &InstalledAppId,
+        clone_cell_id: &CloneCellId,
+    ) -> ConductorResult<InstalledCell> {
+        let (_, restored_cell) = self.update_state_prime({
+            let app_id = app_id.to_owned();
+            let clone_cell_id = clone_cell_id.to_owned();
+            move |mut state| {
+                let app = state.get_app_mut(&app_id)?;
+                let clone_id = app.get_clone_id(&clone_cell_id)?;
+                let restored_cell = app.restore_clone_cell(&clone_id)?;
+                Ok((state, restored_cell))
+            }
+        }).await?;
+        Ok(restored_cell)
     }
 
     pub(super) async fn load_wasms_into_dna_files(

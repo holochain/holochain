@@ -2,7 +2,7 @@ use crate::sweettest::*;
 use holo_hash::ActionHash;
 use holochain_types::{
     app::CreateCloneCellPayload,
-    prelude::{CloneCellId, MarkCloneCellForDeletionPayload},
+    prelude::{CloneCellId, CloneCellPayload},
 };
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::{AppRoleId, CloneId, DnaPhenotypeOpt};
@@ -201,10 +201,10 @@ async fn clone_cell_deletion() {
         .await
         .unwrap();
 
-    // mark a clone cell deleted
+    // archive clone cell
     conductor
-        .clone()
-        .mark_clone_cell_for_deletion(MarkCloneCellForDeletionPayload {
+        .inner_handle()
+        .archive_clone_cell(CloneCellPayload {
             app_id: app_id.to_string(),
             clone_cell_id: CloneCellId::CloneId(
                 CloneId::try_from(installed_clone_cell.clone().into_role_id()).unwrap(),
@@ -221,7 +221,7 @@ async fn clone_cell_deletion() {
         .unwrap();
     assert_eq!(app_info.cell_data.contains(&installed_clone_cell), false);
 
-    // calling the cell after deletion should fail
+    // calling the cell after archiving should fail
     let zome = SweetZome::new(
         installed_clone_cell.as_id().clone(),
         TestWasm::Create.coordinator_zome_name(),
@@ -230,4 +230,44 @@ async fn clone_cell_deletion() {
         .call_fallible(&zome, "call_create_entry", ())
         .await;
     assert!(zome_call_response.is_err());
+
+    // restore the archived clone cell
+    let restored_cell = conductor
+        .inner_handle()
+        .restore_deleted_clone_cell(CloneCellPayload {
+            app_id: app_id.to_string(),
+            clone_cell_id: CloneCellId::CloneId(
+                CloneId::try_from(installed_clone_cell.clone().into_role_id()).unwrap(),
+            ),
+        })
+        .await
+        .unwrap();
+
+    // assert the restored clone cell is the previously created clone cell
+    assert_eq!(restored_cell, installed_clone_cell);
+
+    // assert that the cell appears in app info's cell data again
+    let app_info = conductor
+        .get_app_info(&app_id.to_string())
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(app_info.cell_data.contains(&installed_clone_cell), true);
+
+    // calling the cell after deletion should succeed
+    let zome = SweetZome::new(
+        installed_clone_cell.as_id().clone(),
+        TestWasm::Create.coordinator_zome_name(),
+    );
+    let zome_call_response: Result<ActionHash, _> = conductor
+        .call_fallible(&zome, "call_create_entry", ())
+        .await;
+    assert!(zome_call_response.is_ok());
+
+    // // destroy clone cell that is marked for deletion
+    // conductor
+    //     .inner_handle()
+    //     .destroy_clone_cells_marked_for_deletion()
+    //     .await
+    //     .unwrap();
 }

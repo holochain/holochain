@@ -47,17 +47,17 @@ pub enum AppRequest {
     /// [`AppResponse::CloneCellCreated`]
     CreateCloneCell(Box<CreateCloneCellPayload>),
 
-    /// Mark a clone cell for deletion.
+    /// Archive a clone cell.
     ///
-    /// Providing a [`CloneId`] or [`CellId`], mark an existing clone cell for
-    /// deletion. When the clone cell exists, it's marked for deletion and can
-    /// not be called any longer. If it doesn't exist, the call is a no-op.
+    /// Providing a [`CloneId`] or [`CellId`], archive an existing clone cell
+    /// When the clone cell exists, it's marked for deletion and can not be
+    /// called any longer. If it doesn't exist, the call is a no-op.
     ///
     /// # Returns
     ///
-    /// [`AppResponse::CloneCellMarkedForDeletion`] when the clone cell existed and was
-    /// marked for deletion.
-    MarkCloneCellForDeletion(Box<MarkCloneCellForDeletionPayload>),
+    /// [`AppResponse::CloneCellArchived`] when the clone cell existed
+    /// and was archived.
+    ArchiveCloneCell(Box<CloneCellPayload>),
 
     #[deprecated = "use ZomeCall"]
     ZomeCallInvocation(Box<ZomeCall>),
@@ -99,8 +99,8 @@ pub enum AppResponse {
     /// cell's [`CloneId`] and [`CellId`].
     CloneCellCreated(InstalledCell),
 
-    /// An existing clone cell has been marked for deletion.
-    CloneCellMarkedForDeletion,
+    /// An existing clone cell has been archived.
+    CloneCellArchived,
 
     #[deprecated = "use ZomeCall"]
     ZomeCallInvocation(Box<ExternIO>),
