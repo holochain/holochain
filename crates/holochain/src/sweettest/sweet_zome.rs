@@ -22,6 +22,10 @@ impl SweetZome {
     }
 }
 
+#[deprecated = "alias for SweetInlineZomes"]
+/// Alias for SweetInlineZomes
+pub type SweetEasyInline = SweetInlineZomes;
+
 #[derive(Default)]
 /// A helper for creating [`InlineZomeSet`]
 pub struct SweetInlineZomes(pub InlineZomeSet);
