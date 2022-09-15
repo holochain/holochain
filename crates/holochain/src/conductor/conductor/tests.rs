@@ -443,7 +443,7 @@ pub(crate) fn simple_create_entry_zome() -> InlineZomeSet {
         vec![unit_entry_def.clone()],
         0,
     )
-    .callback("create_entry", "create", move |api, ()| {
+    .function("create_entry", "create", move |api, ()| {
         let entry = Entry::app(().try_into().unwrap()).unwrap();
         let hash = api.create(CreateInput::new(
             InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
@@ -534,7 +534,7 @@ async fn test_reenable_app() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_installation_fails_if_genesis_self_check_is_invalid() {
     observability::test_run().ok();
-    let bad_zome = InlineZomeSet::new_unique_single("integrity", "custom", Vec::new(), 0).callback(
+    let bad_zome = InlineZomeSet::new_unique_single("integrity", "custom", Vec::new(), 0).function(
         "integrity",
         "genesis_self_check",
         |_api, _data: GenesisSelfCheckData| {
@@ -564,7 +564,7 @@ async fn test_bad_entry_validation_after_genesis_returns_zome_call_error() {
     let unit_entry_def = EntryDef::default_with_id("unit");
     let bad_zome =
         InlineZomeSet::new_unique_single("integrity", "custom", vec![unit_entry_def.clone()], 0)
-            .callback("integrity", "validate", |_api, op: Op| match op {
+            .function("integrity", "validate", |_api, op: Op| match op {
                 Op::StoreEntry(StoreEntry { action, .. })
                     if action.hashed.content.app_entry_type().is_some() =>
                 {
@@ -574,7 +574,7 @@ async fn test_bad_entry_validation_after_genesis_returns_zome_call_error() {
                 }
                 _ => Ok(ValidateResult::Valid),
             })
-            .callback("custom", "create", move |api, ()| {
+            .function("custom", "create", move |api, ()| {
                 let entry = Entry::app(().try_into().unwrap()).unwrap();
                 let hash = api.create(CreateInput::new(
                     InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
@@ -625,7 +625,7 @@ async fn test_apps_disable_on_panic_after_genesis() {
         InlineZomeSet::new_unique_single("integrity", "custom", vec![unit_entry_def.clone()], 0)
             // We need a different validation callback that doesn't happen inline
             // so we can cause failure in it. But it must also be after genesis.
-            .callback("integrity", "validate", |_api, op: Op| {
+            .function("integrity", "validate", |_api, op: Op| {
                 match op {
                     Op::StoreEntry(StoreEntry { action, .. })
                         if action.hashed.content.app_entry_type().is_some() =>
@@ -637,7 +637,7 @@ async fn test_apps_disable_on_panic_after_genesis() {
                     _ => Ok(ValidateResult::Valid),
                 }
             })
-            .callback("custom", "create", move |api, ()| {
+            .function("custom", "create", move |api, ()| {
                 let entry = Entry::app(().try_into().unwrap()).unwrap();
                 let hash = api.create(CreateInput::new(
                     InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
@@ -891,11 +891,11 @@ async fn test_init_concurrency() {
     let num_calls_clone = num_calls.clone();
 
     let zome = InlineZomeSet::new_unique_single("integrity", "zome", vec![], 0)
-        .callback("zome", "init", move |_, ()| {
+        .function("zome", "init", move |_, ()| {
             num_inits.clone().fetch_add(1, Ordering::SeqCst);
             Ok(InitCallbackResult::Pass)
         })
-        .callback("zome", "zomefunc", move |_, ()| {
+        .function("zome", "zomefunc", move |_, ()| {
             std::thread::sleep(std::time::Duration::from_millis(5));
             num_calls.clone().fetch_add(1, Ordering::SeqCst);
             Ok(())

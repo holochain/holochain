@@ -191,7 +191,7 @@ async fn sharded_consistency() {
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
 async fn private_entries_dont_leak() {
-    use holochain::sweettest::SweetEasyInline;
+    use holochain::sweettest::SweetInlineZomes;
     use holochain::test_utils::consistency_10s;
     use holochain_types::inline_zome::InlineZomeSet;
 
@@ -202,8 +202,8 @@ async fn private_entries_dont_leak() {
     #[derive(Serialize, Deserialize, Debug, SerializedBytes)]
     struct PrivateEntry;
 
-    let zome = SweetEasyInline::new(vec![entry_def.clone()], 0)
-        .callback("create", move |api, _: ()| {
+    let zome = SweetInlineZomes::new(vec![entry_def.clone()], 0)
+        .function("create", move |api, _: ()| {
             let entry = Entry::app(PrivateEntry {}.try_into().unwrap()).unwrap();
             let hash = api.create(CreateInput::new(
                 InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
@@ -213,11 +213,11 @@ async fn private_entries_dont_leak() {
             ))?;
             Ok(hash)
         })
-        .callback("get", |api, hash: AnyDhtHash| {
+        .function("get", |api, hash: AnyDhtHash| {
             api.get(vec![GetInput::new(hash, GetOptions::default())])
                 .map_err(Into::into)
         })
-        .callback("get_details", |api, hash: AnyDhtHash| {
+        .function("get_details", |api, hash: AnyDhtHash| {
             api.get_details(vec![GetInput::new(hash, GetOptions::default())])
                 .map_err(Into::into)
         });
@@ -236,7 +236,7 @@ async fn private_entries_dont_leak() {
     conductors.exchange_peer_info().await;
     // Call the "create" zome fn on Alice's app
     let hash: ActionHash = conductors[0]
-        .call(&alice.zome(SweetEasyInline::COORDINATOR), "create", ())
+        .call(&alice.zome(SweetInlineZomes::COORDINATOR), "create", ())
         .await;
 
     consistency_10s(&[&alice, &bobbo]).await;
@@ -246,14 +246,14 @@ async fn private_entries_dont_leak() {
 
     check_all_gets_for_private_entry(
         &conductors[0],
-        &alice.zome(SweetEasyInline::COORDINATOR),
+        &alice.zome(SweetInlineZomes::COORDINATOR),
         hash.clone(),
         entry_hash.clone(),
     )
     .await;
     check_all_gets_for_private_entry(
         &conductors[1],
-        &bobbo.zome(SweetEasyInline::COORDINATOR),
+        &bobbo.zome(SweetInlineZomes::COORDINATOR),
         hash.clone(),
         entry_hash.clone(),
     )
@@ -261,20 +261,20 @@ async fn private_entries_dont_leak() {
 
     // Bobbo creates the same private entry.
     let bob_hash: ActionHash = conductors[1]
-        .call(&bobbo.zome(SweetEasyInline::COORDINATOR), "create", ())
+        .call(&bobbo.zome(SweetInlineZomes::COORDINATOR), "create", ())
         .await;
     consistency_10s(&[&alice, &bobbo]).await;
 
     check_all_gets_for_private_entry(
         &conductors[0],
-        &alice.zome(SweetEasyInline::COORDINATOR),
+        &alice.zome(SweetInlineZomes::COORDINATOR),
         hash.clone(),
         entry_hash.clone(),
     )
     .await;
     check_all_gets_for_private_entry(
         &conductors[1],
-        &bobbo.zome(SweetEasyInline::COORDINATOR),
+        &bobbo.zome(SweetInlineZomes::COORDINATOR),
         hash.clone(),
         entry_hash.clone(),
     )
@@ -282,14 +282,14 @@ async fn private_entries_dont_leak() {
 
     check_all_gets_for_private_entry(
         &conductors[0],
-        &alice.zome(SweetEasyInline::COORDINATOR),
+        &alice.zome(SweetInlineZomes::COORDINATOR),
         bob_hash.clone(),
         entry_hash.clone(),
     )
     .await;
     check_all_gets_for_private_entry(
         &conductors[1],
-        &bobbo.zome(SweetEasyInline::COORDINATOR),
+        &bobbo.zome(SweetInlineZomes::COORDINATOR),
         bob_hash.clone(),
         entry_hash.clone(),
     )

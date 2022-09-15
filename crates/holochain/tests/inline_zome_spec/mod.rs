@@ -4,7 +4,7 @@ use hdk::prelude::*;
 use holochain::test_utils::inline_zomes::{simple_crud_zome, AppString};
 use holochain::{
     conductor::api::error::ConductorApiResult,
-    sweettest::{SweetAgents, SweetConductor, SweetDnaFile, SweetEasyInline},
+    sweettest::{SweetAgents, SweetConductor, SweetDnaFile, SweetInlineZomes},
 };
 use holochain::{
     conductor::{api::error::ConductorApiError, CellError},
@@ -44,7 +44,11 @@ async fn inline_zome_2_agents_1_dna() -> anyhow::Result<()> {
 
     // Call the "create" zome fn on Alice's app
     let hash: ActionHash = conductor
-        .call(&alice.zome(SweetEasyInline::COORDINATOR), "create_unit", ())
+        .call(
+            &alice.zome(SweetInlineZomes::COORDINATOR),
+            "create_unit",
+            (),
+        )
         .await;
 
     // Wait long enough for Bob to receive gossip
@@ -56,7 +60,7 @@ async fn inline_zome_2_agents_1_dna() -> anyhow::Result<()> {
 
     // Verify that bobbo can run "read" on his cell and get alice's Action
     let records: Vec<Option<Record>> = conductor
-        .call(&bobbo.zome(SweetEasyInline::COORDINATOR), "read", hash)
+        .call(&bobbo.zome(SweetInlineZomes::COORDINATOR), "read", hash)
         .await;
     let record = records
         .into_iter()
@@ -103,14 +107,14 @@ async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
 
     let hash_foo: ActionHash = conductor
         .call(
-            &alice_foo.zome(SweetEasyInline::COORDINATOR),
+            &alice_foo.zome(SweetInlineZomes::COORDINATOR),
             "create_unit",
             (),
         )
         .await;
     let hash_bar: ActionHash = conductor
         .call(
-            &alice_bar.zome(SweetEasyInline::COORDINATOR),
+            &alice_bar.zome(SweetInlineZomes::COORDINATOR),
             "create_unit",
             (),
         )
@@ -132,7 +136,7 @@ async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
     // on the "foo" DNA
     let records: Vec<Option<Record>> = conductor
         .call(
-            &bobbo_foo.zome(SweetEasyInline::COORDINATOR),
+            &bobbo_foo.zome(SweetInlineZomes::COORDINATOR),
             "read",
             hash_foo,
         )
@@ -153,7 +157,7 @@ async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
     // Let's do it with the SweetZome instead of the SweetCell too, for fun
     let records: Vec<Option<Record>> = conductor
         .call(
-            &carol_bar.zome(SweetEasyInline::COORDINATOR),
+            &carol_bar.zome(SweetInlineZomes::COORDINATOR),
             "read",
             hash_bar,
         )
@@ -227,7 +231,11 @@ async fn get_deleted() -> anyhow::Result<()> {
 
     // Call the "create" zome fn on Alice's app
     let hash: ActionHash = conductor
-        .call(&alice.zome(SweetEasyInline::COORDINATOR), "create_unit", ())
+        .call(
+            &alice.zome(SweetInlineZomes::COORDINATOR),
+            "create_unit",
+            (),
+        )
         .await;
     let mut expected_count = WaitOps::start() + WaitOps::ENTRY;
 
@@ -235,7 +243,7 @@ async fn get_deleted() -> anyhow::Result<()> {
 
     let records: Vec<Option<Record>> = conductor
         .call(
-            &alice.zome(SweetEasyInline::COORDINATOR),
+            &alice.zome(SweetInlineZomes::COORDINATOR),
             "read",
             hash.clone(),
         )
@@ -255,7 +263,7 @@ async fn get_deleted() -> anyhow::Result<()> {
 
     let _: ActionHash = conductor
         .call(
-            &alice.zome(SweetEasyInline::COORDINATOR),
+            &alice.zome(SweetInlineZomes::COORDINATOR),
             "delete",
             hash.clone(),
         )
@@ -266,7 +274,7 @@ async fn get_deleted() -> anyhow::Result<()> {
 
     let records: Vec<Option<Record>> = conductor
         .call(
-            &alice.zome(SweetEasyInline::COORDINATOR),
+            &alice.zome(SweetInlineZomes::COORDINATOR),
             "read_entry",
             entry_hash,
         )
@@ -287,7 +295,7 @@ async fn signal_subscription() {
         .unwrap();
     let mut conductor = SweetConductor::from_config(Default::default()).await;
     let app = conductor.setup_app("app", &[dna_file]).await.unwrap();
-    let zome = &app.cells()[0].zome(SweetEasyInline::COORDINATOR);
+    let zome = &app.cells()[0].zome(SweetInlineZomes::COORDINATOR);
 
     let signals = conductor.signals().take(N);
 
@@ -305,8 +313,8 @@ async fn signal_subscription() {
 fn simple_validation_zome() -> InlineZomeSet {
     let entry_def = EntryDef::default_with_id("string");
 
-    SweetEasyInline::new(vec![entry_def.clone()], 0)
-        .callback("create", move |api, s: AppString| {
+    SweetInlineZomes::new(vec![entry_def.clone()], 0)
+        .function("create", move |api, s: AppString| {
             let entry = Entry::app(s.try_into().unwrap()).unwrap();
             let hash = api.create(CreateInput::new(
                 InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
@@ -316,11 +324,11 @@ fn simple_validation_zome() -> InlineZomeSet {
             ))?;
             Ok(hash)
         })
-        .callback("read", |api, hash: ActionHash| {
+        .function("read", |api, hash: ActionHash| {
             api.get(vec![GetInput::new(hash.into(), GetOptions::default())])
                 .map_err(Into::into)
         })
-        .integrity_callback("validate", |_api, data: Op| {
+        .integrity_function("validate", |_api, data: Op| {
             let s = match data {
                 Op::StoreEntry(StoreEntry {
                     entry: Entry::App(bytes),
@@ -348,7 +356,7 @@ async fn simple_validation() -> anyhow::Result<()> {
         .unwrap();
     let ((alice,), (_bobbo,)) = apps.into_tuples();
 
-    let alice = alice.zome(SweetEasyInline::COORDINATOR);
+    let alice = alice.zome(SweetInlineZomes::COORDINATOR);
 
     // This call passes validation
     let h1: ActionHash = conductor.call(&alice, "create", AppString::new("A")).await;
@@ -407,7 +415,7 @@ async fn can_call_real_zomes_too() {
     let (cell,) = app.into_tuple();
 
     let hash: ActionHash = conductor
-        .call(&cell.zome(SweetEasyInline::COORDINATOR), "create_unit", ())
+        .call(&cell.zome(SweetInlineZomes::COORDINATOR), "create_unit", ())
         .await;
 
     let el: Option<Record> = conductor

@@ -130,7 +130,7 @@ impl InlineZomeSet {
     /// # Panics
     ///
     /// Panics if the zome_name doesn't exist for a zome in either set.
-    pub fn callback<F, I, O>(self, zome_name: &'static str, name: &str, f: F) -> Self
+    pub fn function<F, I, O>(self, zome_name: &'static str, name: &str, f: F) -> Self
     where
         F: Fn(BoxApi, I) -> InlineZomeResult<O> + 'static + Send + Sync,
         I: DeserializeOwned + std::fmt::Debug,
@@ -145,11 +145,11 @@ impl InlineZomeSet {
 
         match integrity_zomes.remove_entry(zome_name) {
             Some((k, v)) => {
-                integrity_zomes.insert(k, v.callback(name, f));
+                integrity_zomes.insert(k, v.function(name, f));
             }
             None => {
                 let (k, v) = coordinator_zomes.remove_entry(zome_name).unwrap();
-                coordinator_zomes.insert(k, v.callback(name, f));
+                coordinator_zomes.insert(k, v.function(name, f));
             }
         }
 
@@ -159,6 +159,17 @@ impl InlineZomeSet {
             coordinator_zomes,
             dependencies,
         }
+    }
+
+    /// Alias for `function`
+    #[deprecated = "Alias for `function`"]
+    pub fn callback<F, I, O>(self, zome_name: &'static str, name: &str, f: F) -> Self
+    where
+        F: Fn(BoxApi, I) -> InlineZomeResult<O> + 'static + Send + Sync,
+        I: DeserializeOwned + std::fmt::Debug,
+        O: Serialize + std::fmt::Debug,
+    {
+        self.function(zome_name, name, f)
     }
 
     /// Merge two inline zome sets together.
