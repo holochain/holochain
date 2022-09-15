@@ -3,7 +3,7 @@
 use ::fixt::prelude::*;
 use hdk::prelude::*;
 use holochain::conductor::api::error::ConductorApiError;
-use holochain::sweettest::{SweetConductor, SweetDnaFile, SweetEasyInline};
+use holochain::sweettest::{SweetConductor, SweetDnaFile, SweetInlineZomes};
 use holochain::test_utils::inline_zomes::simple_crud_zome;
 use holochain_keystore::MetaLairClient;
 use holochain_state::prelude::{fresh_reader_test, StateMutationError, Store, Txn};
@@ -22,7 +22,7 @@ async fn grafting() {
         .unwrap();
     let (alice,) = apps.into_tuple();
 
-    let zome = alice.zome(SweetEasyInline::COORDINATOR);
+    let zome = alice.zome(SweetInlineZomes::COORDINATOR);
 
     // Trigger init.
     let _: Vec<Option<Record>> = conductor

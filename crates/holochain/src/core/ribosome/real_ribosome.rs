@@ -705,7 +705,7 @@ impl RibosomeT for RealRibosome {
                         extern_fns.sort();
                         extern_fns
                     }
-                    ZomeDef::Inline { inline_zome, .. } => inline_zome.0.callbacks(),
+                    ZomeDef::Inline { inline_zome, .. } => inline_zome.0.functions(),
                 }
             },
             zome_types,

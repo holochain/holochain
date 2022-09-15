@@ -5,7 +5,7 @@ use hdk::prelude::*;
 use holo_hash::DhtOpHash;
 use holochain::conductor::config::ConductorConfig;
 use holochain::conductor::handle::DevSettingsDelta;
-use holochain::sweettest::{SweetConductor, SweetConductorBatch, SweetDnaFile, SweetEasyInline};
+use holochain::sweettest::{SweetConductor, SweetConductorBatch, SweetDnaFile, SweetInlineZomes};
 use holochain::test_utils::inline_zomes::{batch_create_zome, simple_crud_zome};
 use holochain::test_utils::inline_zomes::{simple_create_read_zome, AppString};
 use holochain::test_utils::network_simulation::{data_zome, generate_test_data};
@@ -126,7 +126,7 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
     // Call the "create" zome fn on Alice's app
     let hashes: Vec<ActionHash> = conductors[0]
         .call(
-            &alice.zome(holochain::sweettest::SweetEasyInline::COORDINATOR),
+            &alice.zome(holochain::sweettest::SweetInlineZomes::COORDINATOR),
             "create_batch",
             NUM_OPS,
         )
@@ -165,7 +165,7 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
     // Verify that bobbo can run "read" on his cell and get alice's Action
     let element: Option<Record> = conductors[1]
         .call(
-            &bobbo.zome(holochain::sweettest::SweetEasyInline::COORDINATOR),
+            &bobbo.zome(holochain::sweettest::SweetInlineZomes::COORDINATOR),
             "read",
             hashes[0].clone(),
         )
@@ -204,8 +204,8 @@ async fn large_entry_test() {
     let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
     let ((cell_1,), (cell_2,)) = apps.into_tuples();
 
-    let zome_1 = cell_1.zome(SweetEasyInline::COORDINATOR);
-    let zome_2 = cell_2.zome(SweetEasyInline::COORDINATOR);
+    let zome_1 = cell_1.zome(SweetInlineZomes::COORDINATOR);
+    let zome_2 = cell_2.zome(SweetInlineZomes::COORDINATOR);
 
     // TODO: we should be able to get up to multiple entries each 10MB or more being gossiped
     // in a reasonable time, but right now we can only handle about 1MB in a timely fashion.
