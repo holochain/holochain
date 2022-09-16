@@ -145,7 +145,7 @@ pub enum AdminRequest {
     ///
     /// It is likely to want to call this after calling [`AdminRequest::InstallApp`], since a freshly
     /// installed app is not enabled automatically. Once the app is enabled,
-    /// zomes can be immediately called and it will also be loaded and available on any reboot of the conductor.
+    /// zomes can be immediately called and it will also be loaded and enabled automatically on any reboot of the conductor.
     ///
     /// # Returns
     ///
