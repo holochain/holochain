@@ -217,7 +217,7 @@ async fn large_entry_test() {
     let zome_0 = cell_0.zome(SweetEasyInline::COORDINATOR);
     let zome_1 = cell_1.zome(SweetEasyInline::COORDINATOR);
 
-    let size = 15_000_000;
+    let size = 15_000;
     let num = 2;
 
     let mut hashes = vec![];
