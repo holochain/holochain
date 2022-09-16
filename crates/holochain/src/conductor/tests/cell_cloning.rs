@@ -2,7 +2,7 @@ use crate::sweettest::*;
 use holo_hash::ActionHash;
 use holochain_types::{
     app::CreateCloneCellPayload,
-    prelude::{CloneCellId, ArchiveCloneCellPayload, DeleteArchivedCloneCellsPayload},
+    prelude::{ArchiveCloneCellPayload, CloneCellId, DeleteArchivedCloneCellsPayload},
 };
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::{AppRoleId, CloneId, DnaPhenotypeOpt};
