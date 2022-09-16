@@ -222,12 +222,15 @@ pub trait ConductorHandleT: Send + Sync {
     ) -> ConductorResult<InstalledCell>;
 
     /// Archive a clone cell for deletion.
-    async fn archive_clone_cell(self: Arc<Self>, payload: CloneCellPayload) -> ConductorResult<()>;
+    async fn archive_clone_cell(
+        self: Arc<Self>,
+        payload: ArchiveCloneCellPayload,
+    ) -> ConductorResult<()>;
 
     /// Restore an archived clone cell.
     async fn restore_archived_clone_cell(
         self: Arc<Self>,
-        payload: CloneCellPayload,
+        payload: ArchiveCloneCellPayload,
     ) -> ConductorResult<InstalledCell>;
 
     /// Destroy all clone cells marked for deletion.
@@ -956,8 +959,11 @@ impl ConductorHandleT for ConductorHandleImpl {
         Ok(installed_clone_cell)
     }
 
-    async fn archive_clone_cell(self: Arc<Self>, payload: CloneCellPayload) -> ConductorResult<()> {
-        let CloneCellPayload {
+    async fn archive_clone_cell(
+        self: Arc<Self>,
+        payload: ArchiveCloneCellPayload,
+    ) -> ConductorResult<()> {
+        let ArchiveCloneCellPayload {
             app_id,
             clone_cell_id,
         } = payload;
@@ -969,9 +975,9 @@ impl ConductorHandleT for ConductorHandleImpl {
 
     async fn restore_archived_clone_cell(
         self: Arc<Self>,
-        payload: CloneCellPayload,
+        payload: ArchiveCloneCellPayload,
     ) -> ConductorResult<InstalledCell> {
-        let CloneCellPayload {
+        let ArchiveCloneCellPayload {
             app_id,
             clone_cell_id,
         } = payload;

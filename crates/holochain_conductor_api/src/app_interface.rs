@@ -57,7 +57,7 @@ pub enum AppRequest {
     ///
     /// [`AppResponse::CloneCellArchived`] if the clone cell existed
     /// and was archived.
-    ArchiveCloneCell(Box<CloneCellPayload>),
+    ArchiveCloneCell(Box<ArchiveCloneCellPayload>),
 
     #[deprecated = "use ZomeCall"]
     ZomeCallInvocation(Box<ZomeCall>),

@@ -80,7 +80,7 @@ pub struct CreateCloneCellPayload {
     pub app_id: InstalledAppId,
     /// The DNA's role id to clone
     pub role_id: AppRoleId,
-    /// Phenotype options to set for the new cell.
+    /// Phenotype options to set for the new cell
     /// At least one of the options must be set to obtain a distinct hash for
     /// the clone cell's DNA.
     #[serde(flatten)]
@@ -91,7 +91,7 @@ pub struct CreateCloneCellPayload {
     pub name: Option<String>,
 }
 
-/// Ways of identifying a clone cell.
+/// Ways of specifying a clone cell.
 #[derive(Clone, Debug, Display, serde::Serialize, serde::Deserialize)]
 #[serde(untagged)]
 pub enum CloneCellId {
@@ -101,14 +101,17 @@ pub enum CloneCellId {
     CellId(CellId),
 }
 
-/// Arguments to identify a clone cell.
+/// Arguments to specify the clone cell to be archived.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct CloneCellPayload {
+pub struct ArchiveCloneCellPayload {
     /// The app id that the clone cell belongs to
     pub app_id: InstalledAppId,
     /// The clone id or cell id of the clone cell
     pub clone_cell_id: CloneCellId,
 }
+
+/// Argumtents to specify the clone cell to be restored.
+pub type RestoreCloneCellPayload = ArchiveCloneCellPayload;
 
 /// Arguments to delete archived clone cells of an app.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
