@@ -340,9 +340,17 @@ pub enum AdminRequest {
     },
 
     /// Restore a clone cell that was previously archived.
+    ///
+    /// # Returns
+    ///
+    /// [`AdminResponse::CloneCellRestored`]
     RestoreCloneCell(Box<CloneCellPayload>),
 
     /// Delete all clone cells that were previously archived.
+    ///
+    /// # Returns
+    ///
+    /// [`AdminResponse::ArchivedCloneCellsDeleted`]
     DeleteArchivedCloneCells(Box<DeleteArchivedCloneCellsPayload>),
 }
 

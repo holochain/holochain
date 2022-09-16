@@ -55,7 +55,7 @@ pub enum AppRequest {
     ///
     /// # Returns
     ///
-    /// [`AppResponse::CloneCellArchived`] when the clone cell existed
+    /// [`AppResponse::CloneCellArchived`] if the clone cell existed
     /// and was archived.
     ArchiveCloneCell(Box<CloneCellPayload>),
 
