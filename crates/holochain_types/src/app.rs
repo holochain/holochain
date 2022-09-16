@@ -79,7 +79,6 @@ pub struct CreateCloneCellPayload {
     /// The app id that the DNA to clone belongs to
     pub app_id: InstalledAppId,
     /// The DNA's role id to clone
-    /// The Role id under which to create this clone
     pub role_id: AppRoleId,
     /// Phenotype options to set for the new cell.
     /// At least one of the options must be set to obtain a distinct hash for
