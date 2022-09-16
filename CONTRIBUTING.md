@@ -30,9 +30,9 @@ This section describes our practices and guidelines for using git and making cha
 
 We warmly welcome pull requests for bug fixes, bug reproductions, documentation improvements, and any other "obviously good" enhancements to the codebase. If you are unsure if an enhancement is "obviously good", please coordinate with us first through a GitHub issue, or through our forums or Discord channel. We reserve the right to close any PR which doesn't fit our overall development trajectory, but we will gladly review any PRs and work with authors who have taken the time to identify a real problem or need and take steps to address it.
 
-To open a PR, fork our Github repo, create a branch whose name describes your fix, and base your pull request on our `develop` branch.
+To open a PR, fork our Github repo, create a branch whose name describes your fix, and set our `develop` branch as the base branch for your PR.
 
-If you add or change functionality, be sure to add or update both unit tests and integration tests to show that it works. Pull requests without tests compromise the code quality and can not be accepted.
+If you add or change functionality, be sure to add or update both unit tests and integration tests to show that it works. Pull requests without tests compromise our code's quality and cannot be accepted.
 
 
 ## Bug reports
