@@ -328,7 +328,7 @@ fn simple_validation_zome() -> InlineZomeSet {
             api.get(vec![GetInput::new(hash.into(), GetOptions::default())])
                 .map_err(Into::into)
         })
-        .integrity_callback("validate", |_api, data: Op| {
+        .integrity_function("validate", |_api, data: Op| {
             let s = match data {
                 Op::StoreEntry(StoreEntry {
                     entry: Entry::App(bytes),

@@ -161,6 +161,17 @@ impl InlineZomeSet {
         }
     }
 
+    /// Alias for `function`
+    #[deprecated = "Alias for `function`"]
+    pub fn callback<F, I, O>(self, zome_name: &'static str, name: &str, f: F) -> Self
+    where
+        F: Fn(BoxApi, I) -> InlineZomeResult<O> + 'static + Send + Sync,
+        I: DeserializeOwned + std::fmt::Debug,
+        O: Serialize + std::fmt::Debug,
+    {
+        self.function(zome_name, name, f)
+    }
+
     /// Merge two inline zome sets together.
     ///
     /// # Panics
