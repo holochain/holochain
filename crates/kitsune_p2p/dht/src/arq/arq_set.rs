@@ -135,7 +135,7 @@ impl<S: ArqStart> ArqSetImpl<S> {
 
 impl ArqBoundsSet {
     /// Convert back from a continuous arc set to a quantized one.
-    /// If any information is lost, return None.
+    /// If any information is lost (the match is not exact), return None.
     pub fn from_dht_arc_set(
         topo: &Topology,
         strat: &ArqStrat,
@@ -153,6 +153,31 @@ impl ArqBoundsSet {
                 })
                 .collect::<Option<Vec<_>>>()?,
         ))
+    }
+
+    /// Convert back from a continuous arc set to a quantized one.
+    /// If the match is not exact, return the nearest possible quantized arc.
+    pub fn from_dht_arc_set_rounded(
+        topo: &Topology,
+        strat: &ArqStrat,
+        dht_arc_set: &DhtArcSet,
+    ) -> (Self, bool) {
+        let max_chunks = strat.max_chunks();
+        let mut rounded = false;
+        let arqs = dht_arc_set
+            .intervals()
+            .into_iter()
+            .map(|i| {
+                let len = i.length();
+                let (pow, _) = power_and_count_from_length(&topo.space, len, max_chunks);
+                let (a, r) = ArqBounds::from_interval_rounded(topo, pow, i);
+                if r {
+                    rounded = true;
+                }
+                a
+            })
+            .collect::<Vec<_>>();
+        (Self::new(arqs), rounded)
     }
 }
 
