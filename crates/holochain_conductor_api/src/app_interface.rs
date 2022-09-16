@@ -49,9 +49,9 @@ pub enum AppRequest {
 
     /// Archive a clone cell.
     ///
-    /// Providing a [`CloneId`] or [`CellId`], archive an existing clone cell
-    /// When the clone cell exists, it's marked for deletion and can not be
-    /// called any longer. If it doesn't exist, the call is a no-op.
+    /// Providing a [`CloneId`] or [`CellId`], archive an existing clone cell.
+    /// When the clone cell exists, it is archived and can not be called any
+    /// longer. If it doesn't exist, the call is a no-op.
     ///
     /// # Returns
     ///

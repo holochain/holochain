@@ -283,7 +283,7 @@ async fn clone_cell_deletion() {
         })
         .await
         .unwrap();
-    // Assert the deleted cell cannot be restored
+    // assert the deleted cell cannot be restored
     let restore_result = conductor
         .inner_handle()
         .restore_archived_clone_cell(CloneCellPayload {
