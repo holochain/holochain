@@ -21,12 +21,12 @@ A clear and concise description of what you expected to happen.
  from the nix shell and paste output)
 
 **Steps to reproduce**
-Detailed, specific, steps which will reliably reproduce this bug.
+Detailed, specific steps which will reliably reproduce this bug.
 
 If you have the means to do so, it would be extremely helpful to create a minimal reproduction of the problem.
 The most helpful form of reproduction is to add a test directly to our existing codebase via a pull request,
 so that we have a regression test for that bug. Please read the section in our 
-[CONTRIBUTING.md](https://github.com/holochain/holochain/blob/develop/CONTRIBUTING.md) titled "Bug fixes and minimal reproductions"
+[CONTRIBUTING.md](https://github.com/holochain/holochain/blob/develop/CONTRIBUTING.md) guide titled "Bug fixes and minimal reproductions"
 for instructions on the best way to create a PR with a failing test.
 
 **Screenshots**

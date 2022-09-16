@@ -32,12 +32,12 @@ We warmly welcome pull requests for bug fixes, bug reproductions, documentation 
 
 To open a PR, fork our Github repo, create a branch whose name describes your fix, and base your pull request on our `develop` branch.
 
-If you add or change functionality, be sure to add both unit tests and integration tests to show that it works. Pull requests without tests will most likely not be accepted!
+If you add or change functionality, be sure to add or update both unit tests and integration tests to show that it works. Pull requests without tests compromise the code quality and can not be accepted.
 
 
 ## Bug reports
 
-The simplest way to report a bug is via [Github Issues](https://github.com/holochain/holochain/issues/new/choose) by selecting the Bug Report issue type. Please fill out all relevant areas of the bug report, including steps to reproduce. If your report is not specific enough, we will have a hard time addressing it without further followup.
+The simplest way to report a bug is via [Github Issues](https://github.com/holochain/holochain/issues/new/choose) by selecting the Bug Report issue type. Please fill out all relevant areas of the bug report, including steps to reproduce. If your report is not specific enough, we will have a hard time addressing it without further follow-up.
 
 ## Bug fixes and minimal reproductions
 
@@ -57,7 +57,7 @@ To create a test based on inline zomes, see existing tests using `InlineZomeSet`
 
 ### How to create a "test wasm"
 
-Holochain has many "test wasms", which are sample zomes written to demonstrate specific functionality. These
+Holochain has many "test wasms", which are sample zomes written to demonstrate specific functionality.
 
 It may be necessary to write a test wasm if the problem you've encountered has to do with the actual machinery of executing Wasm code. It may also be a good option if you discovered a problem while writing a zome yourself, in which case you can simply copy and paste the offending code into a new test wasm.
 
@@ -72,7 +72,7 @@ To create a test wasm:
 3. Add your test wasm's crate name to the `[workspace]` section of `crates/test_utils/wasm/wasm_workspace/Cargo.toml`.
 4. Build your test wasm (and all others) with `cargo build --features 'build_wasms' --manifest-path=crates/holochain/Cargo.toml`.
 
-To write a test using your test wasm, you can use `sweettest::SweetDnaFile::unique_from_test_wasms(vec![TestWasm::YourWasm])` to set up your DNA. See existing tests which use this function to inspiration. [Here is a simple example](https://github.com/holochain/holochain/blob/1a9d85d79a900ad153843a851797f8d46d6ec0e1/crates/holochain/tests/agent_scaling/mod.rs#L101-L134) to follow for guidance.
+To write a test using your test wasm, you can use `sweettest::SweetDnaFile::unique_from_test_wasms(vec![TestWasm::YourWasm])` to set up your DNA. See existing tests which use this function for inspiration. [Here is a simple example](https://github.com/holochain/holochain/blob/1a9d85d79a900ad153843a851797f8d46d6ec0e1/crates/holochain/tests/agent_scaling/mod.rs#L101-L134) to follow for guidance.
 
 ## Compiler warnings
 
