@@ -1,3 +1,5 @@
+#![allow(deprecated)]
+
 use crate::{signal_subscription::SignalSubscription, ExternalApiWireError};
 use holo_hash::AgentPubKey;
 use holochain_types::prelude::*;

@@ -108,8 +108,6 @@
 //! ```
 //! and the examples.
 
-#![allow(deprecated)]
-
 use std::path::Path;
 use std::path::PathBuf;
 

@@ -1,3 +1,5 @@
+#![allow(deprecated)]
+
 use holo_hash::*;
 use holochain_types::prelude::*;
 use holochain_zome_types::cell::CellId;

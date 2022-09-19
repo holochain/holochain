@@ -193,7 +193,6 @@ impl AppBundle {
 
 /// This function is called in places where it will be necessary to rework that
 /// area after use_existing has been implemented
-#[deprecated = "Raising visibility into a change that needs to happen after `use_existing` is implemented"]
 pub fn we_must_remember_to_rework_cell_panic_handling_after_implementing_use_existing_cell_resolution(
 ) {
 }

@@ -318,22 +318,6 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 let r = self.conductor_handle.get_agent_infos(cell_id).await?;
                 Ok(AdminResponse::AgentInfoRequested(r))
             }
-
-            // deprecated aliases
-            ListActiveApps => {
-                tracing::warn!("Admin method ListActiveApps is deprecated: use ListApps instead.");
-                self.handle_admin_request_inner(ListEnabledApps).await
-            }
-            ActivateApp { installed_app_id } => {
-                tracing::warn!("Admin method ActivateApp is deprecated: use EnableApp instead (functionality is identical).");
-                self.handle_admin_request_inner(EnableApp { installed_app_id })
-                    .await
-            }
-            DeactivateApp { installed_app_id } => {
-                tracing::warn!("Admin method DeactivateApp is deprecated: use DisableApp instead (functionality is identical).");
-                self.handle_admin_request_inner(DisableApp { installed_app_id })
-                    .await
-            }
             GraftRecords {
                 cell_id,
                 validate,
@@ -344,6 +328,25 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .graft_records_onto_source_chain(cell_id, validate, records)
                     .await?;
                 Ok(AdminResponse::RecordsGrafted)
+            }
+
+            // deprecated aliases
+            #[allow(deprecated)]
+            ListActiveApps => {
+                tracing::warn!("Admin method ListActiveApps is deprecated: use ListApps instead.");
+                self.handle_admin_request_inner(ListEnabledApps).await
+            }
+            #[allow(deprecated)]
+            ActivateApp { installed_app_id } => {
+                tracing::warn!("Admin method ActivateApp is deprecated: use EnableApp instead (functionality is identical).");
+                self.handle_admin_request_inner(EnableApp { installed_app_id })
+                    .await
+            }
+            #[allow(deprecated)]
+            DeactivateApp { installed_app_id } => {
+                tracing::warn!("Admin method DeactivateApp is deprecated: use DisableApp instead (functionality is identical).");
+                self.handle_admin_request_inner(DisableApp { installed_app_id })
+                    .await
             }
         }
     }
