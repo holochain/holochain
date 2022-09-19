@@ -13,8 +13,17 @@ pub async fn query_region_set(
     strat: &ArqStrat,
     dht_arc_set: Arc<DhtArcSet>,
 ) -> ConductorResult<RegionSetLtcs> {
-    let arq_set = ArqBoundsSet::from_dht_arc_set(&topology, strat, &dht_arc_set)
-        .expect("arc is not quantizable (FIXME: only use quantized arcs)");
+    let (arq_set, rounded) = ArqBoundsSet::from_dht_arc_set_rounded(&topology, strat, &dht_arc_set);
+    if rounded {
+        tracing::warn!(
+            "A continuous arc set could not be properly quantized.
+        Original:  {:?}
+        Quantized: {:?}",
+            dht_arc_set,
+            arq_set
+        );
+    }
+
     let times = TelescopingTimes::historical(&topology);
     let coords = RegionCoordSetLtcs::new(times, arq_set);
 

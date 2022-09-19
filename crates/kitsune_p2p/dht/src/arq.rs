@@ -346,13 +346,17 @@ impl ArqBounds {
     }
 
     /// Return the ArqBounds which most closely matches the given [`DhtArcRange`]
-    pub fn from_interval_rounded(topo: &Topology, power: u8, interval: DhtArcRange) -> Self {
+    pub fn from_interval_rounded(
+        topo: &Topology,
+        power: u8,
+        interval: DhtArcRange,
+    ) -> (Self, bool) {
         Self::from_interval_inner(&topo.space, power, interval, true).unwrap()
     }
 
     /// Return the ArqBounds which is equivalent to the given [`DhtArcRange`] if it exists.
     pub fn from_interval(topo: &Topology, power: u8, interval: DhtArcRange) -> Option<Self> {
-        Self::from_interval_inner(&topo.space, power, interval, false)
+        Self::from_interval_inner(&topo.space, power, interval, false).map(|(a, _)| a)
     }
 
     /// Upcast this ArqBounds to an Arq that has knowledge of its [`Loc`]
@@ -375,21 +379,27 @@ impl ArqBounds {
         power: u8,
         interval: DhtArcRange,
         rounded: bool,
-    ) -> Option<Self> {
+    ) -> Option<(Self, bool)> {
         match interval {
-            DhtArcRange::Empty => Some(Self {
-                start: 0.into(),
-                power,
-                count: 0.into(),
-            }),
+            DhtArcRange::Empty => Some((
+                Self {
+                    start: 0.into(),
+                    power,
+                    count: 0.into(),
+                },
+                false,
+            )),
             DhtArcRange::Full => {
                 assert!(power > 0);
                 let full_count = 2u32.pow(32 - power as u32 - dim.quantum_power as u32);
-                Some(Self {
-                    start: 0.into(),
-                    power,
-                    count: full_count.into(),
-                })
+                Some((
+                    Self {
+                        start: 0.into(),
+                        power,
+                        count: full_count.into(),
+                    },
+                    false,
+                ))
             }
             DhtArcRange::Bounded(lo, hi) => {
                 let lo = lo.as_u32();
@@ -406,11 +416,14 @@ impl ArqBounds {
                 // XXX: this is kinda wrong. The right bound of the interval
                 // should be 1 less, but we'll accept if it bleeds over by 1 too.
                 if rounded || lo == offset * s && (len % s <= 1) {
-                    Some(Self {
-                        start: offset.into(),
-                        power,
-                        count: count.into(),
-                    })
+                    Some((
+                        Self {
+                            start: offset.into(),
+                            power,
+                            count: count.into(),
+                        },
+                        rounded,
+                    ))
                 } else {
                     tracing::warn!("{} =?= {} == {} * {}", lo, offset * s, offset, s);
                     tracing::warn!("{} =?= {} == {} * {}", len, count * s, count, s);

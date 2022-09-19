@@ -4,6 +4,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Fixed rare "arc is not quantizable" panic, issuing a warning instead. [\#1577](https://github.com/holochain/holochain/pull/1577)
+
 ## 0.0.162
 
 - Implement App API call `CreateCloneCell`. [\#1547](https://github.com/holochain/holochain/pull/1547)
