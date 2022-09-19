@@ -182,9 +182,92 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Test that a gossip payload larger than the max frame size does not
+/// cause problems
 #[cfg(feature = "slow_tests")]
 #[tokio::test(flavor = "multi_thread")]
 async fn large_entry_test() {
+    observability::test_run().ok();
+    let mut conductors = SweetConductorBatch::from_config(2, make_config(Some(0))).await;
+    let start = Instant::now();
+
+    for c in conductors.iter() {
+        c.update_dev_settings(DevSettingsDelta {
+            publish: Some(false),
+            ..Default::default()
+        });
+    }
+
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome())
+        .await
+        .unwrap();
+
+    let (cell_0,) = conductors[0]
+        .setup_app("app", [&dna_file])
+        .await
+        .unwrap()
+        .into_tuple();
+    let (cell_1,) = conductors[1]
+        .setup_app("app", [&dna_file])
+        .await
+        .unwrap()
+        .into_tuple();
+
+    let zome_0 = cell_0.zome(SweetInlineZomes::COORDINATOR);
+    let zome_1 = cell_1.zome(SweetInlineZomes::COORDINATOR);
+
+    let size = 15_000_000;
+    let num = 2;
+
+    let mut hashes = vec![];
+    for i in 0..num {
+        let app_string = AppString(String::from_utf8(vec![42u8 + i as u8; size]).unwrap());
+        let hash: ActionHash = conductors[0]
+            .call(&zome_0, "create_string", app_string.clone())
+            .await;
+        hashes.push(hash);
+        dbg!(start.elapsed());
+    }
+
+    conductors.exchange_peer_info().await;
+    consistency(&[&cell_0, &cell_1], 60 * 4, Duration::from_secs(1)).await;
+    tracing::info!(
+        "CONSISTENCY REACHED between first two nodes in {:?}",
+        start.elapsed()
+    );
+    dbg!(start.elapsed());
+
+    let records_1: Vec<Option<Record>> = conductors[1]
+        .call(&zome_1, "read_multi", hashes.clone())
+        .await;
+    assert_eq!(records_1.len(), num);
+    assert_eq!(
+        records_1.iter().filter(|r| r.is_some()).count(),
+        num,
+        "couldn't get records at positions: {:?}",
+        records_1
+            .iter()
+            .enumerate()
+            .filter_map(|(i, r)| r.is_none().then(|| i))
+            .collect::<Vec<_>>()
+    );
+    dbg!(start.elapsed());
+}
+
+#[cfg(feature = "slow_tests")]
+#[tokio::test(flavor = "multi_thread")]
+async fn three_way_gossip() {
+    // Current findings, all pertaining to 3 conductors being started at the beginning,
+    // and regardless of file size:
+    // - When all 3 conductors stay running, the test passes quickly
+    // - When the third conductor is shut down at the start and never restarted, the test passes quickly
+    // - When the first conductor is shut down, the test still ends
+    // FAILURES:
+    // - When the third conductor is shut down and then restarted after the first two reach
+    //     consistency, are there timeouts. Doesn't matter if the first is stopped or not.
+    // - When all 3 conductors are started, but the third only has its app setup after the first
+    //     two reach consistency, then timeouts occur
+
     observability::test_run().ok();
     let mut conductors = SweetConductorBatch::from_config(3, make_config(Some(0))).await;
     let start = Instant::now();
@@ -201,21 +284,28 @@ async fn large_entry_test() {
         .unwrap();
 
     // Conductor 2 begins in shutdown state so it won't receive gossip.
-    conductors[2].shutdown().await;
+    // conductors[2].shutdown().await;
 
     let (cell_0,) = conductors[0]
         .setup_app("app", [&dna_file])
         .await
         .unwrap()
         .into_tuple();
+    let zome_0 = cell_0.zome(SweetEasyInline::COORDINATOR);
+
     let (cell_1,) = conductors[1]
         .setup_app("app", [&dna_file])
         .await
         .unwrap()
         .into_tuple();
+    let zome_1 = cell_1.zome(SweetEasyInline::COORDINATOR);
 
-    let zome_0 = cell_0.zome(SweetInlineZomes::COORDINATOR);
-    let zome_1 = cell_1.zome(SweetInlineZomes::COORDINATOR);
+    let (cell_2,) = conductors[2]
+        .setup_app("app", &[dna_file])
+        .await
+        .unwrap()
+        .into_tuple();
+    let zome_2 = cell_2.zome(SweetEasyInline::COORDINATOR);
 
     let size = 15_000;
     let num = 2;
@@ -232,6 +322,10 @@ async fn large_entry_test() {
 
     conductors.exchange_peer_info().await;
     consistency(&[&cell_0, &cell_1], 60 * 4, Duration::from_secs(1)).await;
+    tracing::info!(
+        "CONSISTENCY REACHED between first two nodes in {:?}",
+        start.elapsed()
+    );
     dbg!(start.elapsed());
 
     let records_1: Vec<Option<Record>> = conductors[1]
@@ -253,14 +347,7 @@ async fn large_entry_test() {
     // Shut down conductor 0 and start up conductor 2, so that conductor 2 has to receive
     // all data from conductor 1.
     conductors[0].shutdown().await;
-    conductors[2].startup().await;
-    let (cell_2,) = conductors[2]
-        .setup_app("app", &[dna_file])
-        .await
-        .unwrap()
-        .into_tuple();
-
-    let zome_2 = cell_2.zome(SweetEasyInline::COORDINATOR);
+    // conductors[2].startup().await;
 
     consistency(&[&cell_1, &cell_2], 60 * 4, Duration::from_secs(1)).await;
 
