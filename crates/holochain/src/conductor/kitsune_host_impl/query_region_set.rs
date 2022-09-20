@@ -37,8 +37,10 @@ pub async fn query_region_set(
                     dht_arc_set,
                     arq_set
                 );
+                Some(now.as_millis())
+            } else {
+                None
             }
-            it_is_time.then(|| now.as_millis())
         });
     }
 
