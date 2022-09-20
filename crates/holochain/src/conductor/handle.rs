@@ -1025,6 +1025,7 @@ impl ConductorHandleT for ConductorHandleImpl {
     /// - Add an interval that runs IN ADDITION to previous invocations
     /// So ideally this would be called ONCE per conductor lifecyle ONLY.
     async fn start_scheduler(self: Arc<Self>, interval_period: std::time::Duration) {
+        tracing::warn!("start_scheduler");
         // Clear all ephemeral cruft in all cells before starting a scheduler.
         let cell_arcs = {
             let mut cell_arcs = vec![];
@@ -1052,6 +1053,7 @@ impl ConductorHandleT for ConductorHandleImpl {
 
     /// The scheduler wants to dispatch any functions that are due.
     async fn dispatch_scheduled_fns(self: Arc<Self>) {
+        tracing::warn!("dispatch_scheduled_fns");
         let cell_arcs = {
             let mut cell_arcs = vec![];
             for cell_id in self.conductor.running_cell_ids() {
