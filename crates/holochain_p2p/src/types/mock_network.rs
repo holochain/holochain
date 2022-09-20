@@ -134,9 +134,6 @@ pub enum HolochainP2pMockMsg {
 #[derive(Debug)]
 /// The type of protocol for the gossip wire message.
 pub enum GossipProtocol {
-    /// Simple bloom gossip wire protocol.
-    // TODO: Implement this.
-    Simple,
     /// Sharded gossip wire protocol.
     Sharded(kitsune_p2p::gossip::sharded_gossip::ShardedGossipWire),
 }
@@ -411,7 +408,6 @@ impl HolochainP2pMockMsg {
                 use kitsune_p2p_types::codec::Codec;
                 let space = dna.to_kitsune();
                 let data = match gossip {
-                    GossipProtocol::Simple => todo!(),
                     GossipProtocol::Sharded(gossip) => gossip.encode_vec().unwrap().into(),
                 };
                 kwire::Wire::Gossip(kwire::Gossip {
@@ -491,7 +487,6 @@ impl HolochainP2pMockMsg {
                 use kitsune_p2p::gossip::sharded_gossip::*;
                 use kitsune_p2p_types::codec::Codec;
                 let gossip = match module {
-                    GossipModuleType::Simple => todo!(),
                     GossipModuleType::ShardedRecent | GossipModuleType::ShardedHistorical => {
                         GossipProtocol::Sharded(
                             ShardedGossipWire::decode_ref(data.as_ref()).unwrap().1,
