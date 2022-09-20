@@ -3,7 +3,7 @@ use rand::Rng;
 
 use super::*;
 
-impl ShardedGossipLocal {
+impl<T: GossipKind> ShardedGossipLocal<T> {
     /// Try to initiate gossip if we don't currently
     /// have an outgoing gossip.
     pub(super) async fn try_initiate(&self) -> KitsuneResult<Option<Outgoing>> {
@@ -200,7 +200,7 @@ impl ShardedGossipLocal {
         let remote_arc_set: DhtArcSet = remote_arc_set.into();
         let common_arc_set = Arc::new(arc_set.intersection(&remote_arc_set));
 
-        let region_set = if let GossipType::Historical = self.gossip_type {
+        let region_set = if let GossipType::Historical = T::gossip_type() {
             let region_set = store::query_region_set(
                 self.host_api.clone(),
                 self.space.clone(),
@@ -217,7 +217,7 @@ impl ShardedGossipLocal {
         let mut state = self.new_state(remote_agent_list, common_arc_set, region_set)?;
 
         // Generate the agent bloom.
-        if let GossipType::Recent = self.gossip_type {
+        if let GossipType::Recent = T::gossip_type() {
             let bloom = self.generate_agent_bloom(state.clone()).await?;
             if let Some(bloom) = bloom {
                 let bloom = encode_bloom_filter(&bloom);

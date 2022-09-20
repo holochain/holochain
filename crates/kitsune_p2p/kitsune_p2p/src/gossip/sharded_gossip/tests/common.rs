@@ -156,26 +156,26 @@ pub async fn setup_player(
     state: ShardedGossipLocalState,
     agents: Vec<(Arc<KitsuneAgent>, AgentInfoSigned)>,
     with_data: bool,
-) -> ShardedGossipLocal {
+) -> ShardedGossipLocal<Historical> {
     let (evt_handler, host_api) = standard_responses(agents, with_data).await;
     let (evt_sender, _) = spawn_handler(evt_handler).await;
-    ShardedGossipLocal::test(GossipType::Historical, evt_sender, host_api, state)
+    ShardedGossipLocal::test(evt_sender, host_api, state)
 }
 
 pub async fn setup_standard_player(
     state: ShardedGossipLocalState,
     agents: Vec<(Arc<KitsuneAgent>, AgentInfoSigned)>,
-) -> ShardedGossipLocal {
+) -> ShardedGossipLocal<Historical> {
     setup_player(state, agents, true).await
 }
 
 pub async fn setup_empty_player(
     state: ShardedGossipLocalState,
     agents: Vec<(Arc<KitsuneAgent>, AgentInfoSigned)>,
-) -> ShardedGossipLocal {
+) -> ShardedGossipLocal<Historical> {
     let (evt_handler, host_api) = standard_responses(agents, false).await;
     let (evt_sender, _) = spawn_handler(evt_handler).await;
-    ShardedGossipLocal::test(GossipType::Historical, evt_sender, host_api, state)
+    ShardedGossipLocal::test(evt_sender, host_api, state)
 }
 
 pub async fn agents_with_infos(num_agents: usize) -> Vec<(Arc<KitsuneAgent>, AgentInfoSigned)> {

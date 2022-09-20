@@ -7,7 +7,8 @@ use kitsune_p2p_types::{
 use rand::Rng;
 
 use crate::{
-    gossip::sharded_gossip::GossipType, test_util::switchboard::switchboard_state::SwitchboardAgent,
+    gossip::sharded_gossip::kind::{Historical, Recent},
+    test_util::switchboard::switchboard_state::SwitchboardAgent,
 };
 
 use super::super::switchboard_state::Switchboard;
@@ -17,7 +18,7 @@ use pretty_assertions::assert_eq;
 async fn fullsync_3way_recent() {
     // observability::test_run().ok();
     let topo = Topology::standard_epoch_full();
-    let sb = Switchboard::new(topo.clone(), GossipType::Recent);
+    let sb = Switchboard::<Recent>::new(topo.clone());
 
     let [n1, n2, n3] = sb.add_nodes(tuning_params()).await;
 
@@ -64,7 +65,7 @@ async fn fullsync_3way_recent() {
 async fn sharded_3way_recent() {
     observability::test_run().ok();
     let topo = Topology::standard_epoch_full();
-    let sb = Switchboard::new(topo.clone(), GossipType::Recent);
+    let sb = Switchboard::<Recent>::new(topo.clone());
 
     let [n1, n2, n3] = sb.add_nodes(tuning_params()).await;
 
@@ -110,7 +111,7 @@ async fn sharded_3way_recent() {
 async fn transitive_peer_gossip() {
     observability::test_run().ok();
     let topo = Topology::standard_epoch_full();
-    let sb = Switchboard::new(topo.clone(), GossipType::Recent);
+    let sb = Switchboard::<Recent>::new(topo.clone());
 
     let [n1, n2, n3, n4] = sb.add_nodes(tuning_params()).await;
 
@@ -179,7 +180,7 @@ async fn sharded_4way_recent() {
     observability::test_run().ok();
 
     let topo = Topology::standard_epoch_full();
-    let sb = Switchboard::new(topo.clone(), GossipType::Recent);
+    let sb = Switchboard::<Recent>::new(topo.clone());
 
     let [n1, n2, n3, n4] = sb.add_nodes(tuning_params()).await;
 
@@ -268,7 +269,7 @@ async fn sharded_4way_historical() {
     // 1 year ago
     let then = now - 1_000_000 * 60 * 60 * 24 * 365;
     let topo = Topology::standard(Timestamp::from_micros(then), Duration::ZERO);
-    let sb = Switchboard::new(topo.clone(), GossipType::Historical);
+    let sb = Switchboard::<Historical>::new(topo.clone());
 
     let [n1, n2, n3, n4] = sb.add_nodes(tuning_params()).await;
 

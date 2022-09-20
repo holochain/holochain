@@ -1,6 +1,6 @@
 use super::*;
 
-impl ShardedGossipLocal {
+impl<T: GossipKind> ShardedGossipLocal<T> {
     /// Incoming accept gossip round message.
     /// - Send back the agent bloom and ops bloom gossip messages.
     /// - Only send the agent bloom if this is a recent gossip type.

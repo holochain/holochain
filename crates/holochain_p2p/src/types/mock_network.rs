@@ -487,7 +487,7 @@ impl HolochainP2pMockMsg {
                 use kitsune_p2p::gossip::sharded_gossip::*;
                 use kitsune_p2p_types::codec::Codec;
                 let gossip = match module {
-                    GossipModuleType::ShardedRecent | GossipModuleType::ShardedHistorical => {
+                    GossipModuleType::Recent | GossipModuleType::Historical => {
                         GossipProtocol::Sharded(
                             ShardedGossipWire::decode_ref(data.as_ref()).unwrap().1,
                         )

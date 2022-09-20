@@ -49,7 +49,7 @@ async fn bloom_windows() {
     }
 
     let r = make_node(
-        ShardedGossipLocal::UPPER_HASHES_BOUND - 1,
+        ShardedGossipLocal::<Historical>::UPPER_HASHES_BOUND - 1,
         expected_time.clone(),
     )
     .await
@@ -69,7 +69,7 @@ async fn bloom_windows() {
     }
 
     let r = make_node(
-        ShardedGossipLocal::UPPER_HASHES_BOUND,
+        ShardedGossipLocal::<Historical>::UPPER_HASHES_BOUND,
         expected_time.clone(),
     )
     .await
@@ -87,9 +87,9 @@ async fn bloom_windows() {
                 *time,
                 search_window.start
                     ..get_time_bounds(
-                        ShardedGossipLocal::UPPER_HASHES_BOUND as u32,
+                        ShardedGossipLocal::<Historical>::UPPER_HASHES_BOUND as u32,
                         expected_time.clone(),
-                        ..ShardedGossipLocal::UPPER_HASHES_BOUND
+                        ..ShardedGossipLocal::<Historical>::UPPER_HASHES_BOUND
                     )
                     .end
             );
@@ -99,10 +99,10 @@ async fn bloom_windows() {
             assert_eq!(
                 *time,
                 get_time_bounds(
-                    ShardedGossipLocal::UPPER_HASHES_BOUND as u32,
+                    ShardedGossipLocal::<Historical>::UPPER_HASHES_BOUND as u32,
                     expected_time.clone(),
-                    (ShardedGossipLocal::UPPER_HASHES_BOUND - 1)
-                        ..ShardedGossipLocal::UPPER_HASHES_BOUND
+                    (ShardedGossipLocal::<Historical>::UPPER_HASHES_BOUND - 1)
+                        ..ShardedGossipLocal::<Historical>::UPPER_HASHES_BOUND
                 )
                 .start..search_window.end
             );
@@ -111,7 +111,8 @@ async fn bloom_windows() {
     }
 
     let r = make_node(
-        ShardedGossipLocal::UPPER_HASHES_BOUND * ShardedGossipLocal::UPPER_BLOOM_BOUND,
+        ShardedGossipLocal::<Historical>::UPPER_HASHES_BOUND
+            * ShardedGossipLocal::<Historical>::UPPER_BLOOM_BOUND,
         expected_time.clone(),
     )
     .await
@@ -122,16 +123,16 @@ async fn bloom_windows() {
     let last_cursor;
     match r {
         Batch::Partial { data: v, cursor } => {
-            assert_eq!(v.len(), ShardedGossipLocal::UPPER_BLOOM_BOUND);
-            let total =
-                ShardedGossipLocal::UPPER_HASHES_BOUND * ShardedGossipLocal::UPPER_BLOOM_BOUND;
+            assert_eq!(v.len(), ShardedGossipLocal::<Historical>::UPPER_BLOOM_BOUND);
+            let total = ShardedGossipLocal::<Historical>::UPPER_HASHES_BOUND
+                * ShardedGossipLocal::<Historical>::UPPER_BLOOM_BOUND;
             // We use the same timestamp from the end of the last bloom as the beginning of the
             // next bloom incase there are multiple hashes with the same timestamp.
             // So we expect the cursor to land on the time for the last hash - 1 * UPPER_BLOOM_BOUND.
             let end_of_blooms_time = (get_time_bounds(
                 total as u32,
                 expected_time.clone(),
-                ..=(total - ShardedGossipLocal::UPPER_BLOOM_BOUND),
+                ..=(total - ShardedGossipLocal::<Historical>::UPPER_BLOOM_BOUND),
             )
             // Take off the micro second that is added to make the bounds exclusive
             // because the cursor is the actual time of the last hash seen.
@@ -147,8 +148,8 @@ async fn bloom_windows() {
                 expected_window.end = get_time_bounds(
                     total as u32,
                     expected_time.clone(),
-                    ..ShardedGossipLocal::UPPER_HASHES_BOUND
-                        + i * ShardedGossipLocal::UPPER_HASHES_BOUND
+                    ..ShardedGossipLocal::<Historical>::UPPER_HASHES_BOUND
+                        + i * ShardedGossipLocal::<Historical>::UPPER_HASHES_BOUND
                         - i,
                 )
                 .end;
@@ -164,7 +165,8 @@ async fn bloom_windows() {
     }
 
     let r = make_node(
-        ShardedGossipLocal::UPPER_HASHES_BOUND * ShardedGossipLocal::UPPER_BLOOM_BOUND,
+        ShardedGossipLocal::<Historical>::UPPER_HASHES_BOUND
+            * ShardedGossipLocal::<Historical>::UPPER_BLOOM_BOUND,
         expected_time.clone(),
     )
     .await
@@ -184,15 +186,15 @@ async fn bloom_windows() {
     }
 }
 
-async fn make_node(num: usize, window: TimeWindow) -> ShardedGossipLocal {
+async fn make_node(num: usize, window: TimeWindow) -> ShardedGossipLocal<Historical> {
     make_node_inner(Some((num, window))).await
 }
 
-async fn make_empty_node() -> ShardedGossipLocal {
+async fn make_empty_node() -> ShardedGossipLocal<Historical> {
     make_node_inner(None).await
 }
 
-async fn make_node_inner(data: Option<(usize, TimeWindow)>) -> ShardedGossipLocal {
+async fn make_node_inner(data: Option<(usize, TimeWindow)>) -> ShardedGossipLocal<Historical> {
     let mut evt_handler = MockKitsuneP2pEventHandler::new();
     let data = data.map(|(n, time)| {
         let len = time.end - time.start;
@@ -237,12 +239,7 @@ async fn make_node_inner(data: Option<(usize, TimeWindow)>) -> ShardedGossipLoca
     let (evt_sender, _) = spawn_handler(evt_handler).await;
     let host = HostStub::new();
 
-    ShardedGossipLocal::test(
-        GossipType::Historical,
-        evt_sender,
-        host,
-        ShardedGossipLocalState::default(),
-    )
+    ShardedGossipLocal::test(evt_sender, host, ShardedGossipLocalState::default())
 }
 
 fn get_time_bounds(

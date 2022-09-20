@@ -1143,14 +1143,14 @@ impl Space {
                     let mut gossips = vec![];
                     if config.tuning_params.danger_gossip_recent_threshold_secs > 0 {
                         gossips.push((
-                            GossipModuleType::ShardedRecent,
+                            GossipModuleType::Recent,
                             crate::gossip::sharded_gossip::recent_factory(
                                 bandwidth_throttles.recent(),
                             ),
                         ));
                     }
                     gossips.push((
-                        GossipModuleType::ShardedHistorical,
+                        GossipModuleType::Historical,
                         crate::gossip::sharded_gossip::historical_factory(
                             bandwidth_throttles.historical(),
                         ),

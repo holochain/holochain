@@ -1,6 +1,6 @@
 //! An in-memory network for sharded kitsune tests.
 
-use crate::gossip::sharded_gossip::{BandwidthThrottle, GossipType, ShardedGossip};
+use crate::gossip::sharded_gossip::{kind::GossipKind, BandwidthThrottle, ShardedGossip};
 use crate::test_util::spawn_handler;
 use crate::types::gossip::*;
 use crate::types::wire;
@@ -55,14 +55,13 @@ static ZERO_SPACE: once_cell::sync::Lazy<Arc<KitsuneSpace>> =
 /// task is spawned which handles the events received, mutating the state
 /// in the process.
 #[derive(Clone)]
-pub struct Switchboard {
+pub struct Switchboard<T: GossipKind> {
     pub(super) strat: ArqStrat,
     pub(super) topology: Topology,
-    inner: Share<SwitchboardState>,
-    gossip_type: GossipType,
+    inner: Share<SwitchboardState<T>>,
 }
 
-impl Switchboard {
+impl<T: GossipKind> Switchboard<T> {
     /// Constructor. Only works for one GossipType at a time.
     // MAYBE: if it's desirable to test multiple gossip loops running at the
     //   same time on the same state, another method could be exposed to take
@@ -70,12 +69,11 @@ impl Switchboard {
     //   both gossip loops to share the same state.
     //   Or, this could be modified to take a list of GossipTypes, so that
     //   multiple loops will be created internally.
-    pub fn new(topology: Topology, gossip_type: GossipType) -> Self {
+    pub fn new(topology: Topology) -> Self {
         Self {
             strat: ArqStrat::default(),
             topology,
             inner: Share::new(SwitchboardState::default()),
-            gossip_type,
         }
     }
 
@@ -83,7 +81,7 @@ impl Switchboard {
     /// for tests.
     pub fn share<R, F>(&self, f: F) -> R
     where
-        F: FnOnce(&mut SwitchboardState) -> R,
+        F: FnOnce(&mut SwitchboardState<T>) -> R,
     {
         self.inner.share_mut(|sb, _| Ok(f(sb))).unwrap()
     }
@@ -138,7 +136,6 @@ impl Switchboard {
             ep_hnd.clone(),
             evt_sender,
             host_api,
-            self.gossip_type,
             bandwidth,
             Default::default(),
         );
@@ -197,15 +194,15 @@ impl Switchboard {
 /// getting a lock on the state via `Switchboard::share`. This same state is
 /// modified directly by an actively running GossipModule which is processing
 /// messages from other nodes.
-pub struct SwitchboardState {
+pub struct SwitchboardState<T: GossipKind> {
     space: KSpace,
-    pub(super) nodes: HashMap<NodeEp, NodeEntry>,
+    pub(super) nodes: HashMap<NodeEp, NodeEntry<T>>,
     pub(super) ops: HashMap<Loc8, OpEntry>,
     metric_tasks: Vec<JoinHandle<KitsuneResult<()>>>,
     handler_tasks: Vec<JoinHandle<ghost_actor::GhostResult<()>>>,
 }
 
-impl Default for SwitchboardState {
+impl<T: GossipKind> Default for SwitchboardState<T> {
     fn default() -> Self {
         Self {
             space: ZERO_SPACE.clone(),
@@ -217,7 +214,7 @@ impl Default for SwitchboardState {
     }
 }
 
-impl SwitchboardState {
+impl<T: GossipKind> SwitchboardState<T> {
     /// Add a local agent to the specified node.
     pub fn add_local_agent(&mut self, node_ep: &NodeEp, agent: &SwitchboardAgent) {
         let SwitchboardAgent {
@@ -461,13 +458,16 @@ impl SwitchboardState {
             .collect()
     }
 
-    pub(super) fn node_for_local_agent_loc8(&self, loc8: Loc8) -> Option<&NodeEntry> {
+    pub(super) fn node_for_local_agent_loc8(&self, loc8: Loc8) -> Option<&NodeEntry<T>> {
         self.nodes
             .values()
             .find(|n| n.local_agents.keys().contains(&loc8))
     }
 
-    pub(super) fn node_for_local_agent_loc8_mut(&mut self, loc8: Loc8) -> Option<&mut NodeEntry> {
+    pub(super) fn node_for_local_agent_loc8_mut(
+        &mut self,
+        loc8: Loc8,
+    ) -> Option<&mut NodeEntry<T>> {
         self.nodes
             .values_mut()
             .find(|n| n.local_agents.keys().contains(&loc8))
@@ -476,7 +476,7 @@ impl SwitchboardState {
     pub(super) fn node_for_local_agent_hash_mut(
         &mut self,
         hash: &KitsuneAgent,
-    ) -> Option<&mut NodeEntry> {
+    ) -> Option<&mut NodeEntry<T>> {
         let agent_loc8 = hash.get_loc().as_loc8();
         self.node_for_local_agent_loc8_mut(agent_loc8)
     }
@@ -586,8 +586,8 @@ impl SwitchboardAgent {
 
 /// The value of the Switchboard::spaces hashmap
 #[allow(clippy::type_complexity)]
-pub struct SpaceEntry {
-    state: Share<SwitchboardState>,
+pub struct SpaceEntry<T: GossipKind> {
+    state: Share<SwitchboardState<T>>,
     tasks: Vec<(
         tokio::task::JoinHandle<GhostResult<()>>,
         tokio::task::JoinHandle<KitsuneResult<()>>,
@@ -596,16 +596,16 @@ pub struct SpaceEntry {
 
 /// The value of the SwitchboardSpace::nodes hashmap
 #[derive(Debug)]
-pub struct NodeEntry {
+pub struct NodeEntry<T: GossipKind> {
     pub(super) local_agents: HashMap<Loc8, AgentEntry>,
     pub(super) remote_agents: HashMap<Loc8, AgentInfoSigned>,
     /// The ops held by this node.
     /// Other data for this op can be found in SwitchboardSpace::ops
     pub(super) ops: HashMap<Loc8, NodeOpEntry>,
-    pub(super) gossip: Arc<ShardedGossip>,
+    pub(super) gossip: Arc<ShardedGossip<T>>,
 }
 
-impl NodeEntry {
+impl<T: GossipKind> NodeEntry<T> {
     pub(super) fn local_agent_by_loc8(&self, loc8: Loc8) -> Option<&AgentEntry> {
         self.local_agents.get(&loc8)
     }

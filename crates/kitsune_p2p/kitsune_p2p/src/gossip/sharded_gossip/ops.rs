@@ -59,7 +59,7 @@ enum QueuedOps {
     Bloom(TimedBloomFilter),
 }
 
-impl ShardedGossipLocal {
+impl<T: GossipKind> ShardedGossipLocal<T> {
     /// Incoming ops bloom.
     /// - Send back chunks of missing ops.
     /// - Don't send a chunk larger then MAX_SEND_BUF_SIZE.
@@ -185,7 +185,7 @@ impl ShardedGossipLocal {
         &self,
         state: RoundState,
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
-        match self.gossip_type {
+        match T::gossip_type() {
             GossipType::Historical => self.process_next_region_batch(state).await,
             GossipType::Recent => {
                 // Pop the next queued batch.

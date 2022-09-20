@@ -22,12 +22,14 @@ use kitsune_p2p_types::tx2::tx2_utils::*;
 use kitsune_p2p_types::*;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::convert::{TryFrom, TryInto};
+use std::marker::PhantomData;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tokio::time::Instant;
 
 pub use self::bandwidth::BandwidthThrottle;
+use self::kind::*;
 use self::ops::OpsBatchQueue;
 use self::state_map::RoundStateMap;
 use crate::metrics::MetricsSync;
@@ -53,6 +55,7 @@ mod accept;
 mod agents;
 mod bloom;
 mod initiate;
+pub mod kind;
 mod ops;
 mod state_map;
 mod store;
@@ -93,28 +96,14 @@ struct TimedBloomFilter {
     time: TimeWindow,
 }
 
-/// Gossip has two distinct variants which share a lot of similarities but
-/// are fundamentally different and serve different purposes
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum GossipType {
-    /// The Recent gossip type is aimed at rapidly syncing the most recent
-    /// data. It runs frequently and expects frequent diffs at each round.
-    Recent,
-    /// The Historical gossip type is aimed at comprehensively syncing the
-    /// entire common history of two nodes, filling in gaps in the historical
-    /// data. It runs less frequently, and expects diffs to be infrequent
-    /// at each round.
-    Historical,
-}
-
 /// The entry point for the sharded gossip strategy.
 ///
 /// This struct encapsulates the network communication concerns, mainly
 /// managing the incoming and outgoing gossip queues. It contains a struct
 /// which handles all other (local) aspects of gossip.
-pub struct ShardedGossip {
+pub struct ShardedGossip<T: GossipKind> {
     /// ShardedGossipLocal handles the non-networking concerns of gossip
-    gossip: ShardedGossipLocal,
+    gossip: ShardedGossipLocal<T>,
     // The endpoint to use for all outgoing comms
     ep_hnd: Tx2EpHnd<wire::Wire>,
     /// The internal mutable state
@@ -123,7 +112,12 @@ pub struct ShardedGossip {
     bandwidth: Arc<BandwidthThrottle>,
 }
 
-impl std::fmt::Debug for ShardedGossip {
+/// Alias for recent gossip
+pub type ShardedGossipRecent = ShardedGossip<Recent>;
+/// Alias for historical gossip
+pub type ShardedGossipHistorical = ShardedGossip<Historical>;
+
+impl<T: GossipKind> std::fmt::Debug for ShardedGossip<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ShardedGossip{...}").finish()
     }
@@ -136,15 +130,6 @@ struct Stats {
     avg_processing_time: std::time::Duration,
     max_processing_time: std::time::Duration,
     count: u32,
-}
-
-impl std::fmt::Display for GossipType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            GossipType::Recent => write!(f, "recent"),
-            GossipType::Historical => write!(f, "historical"),
-        }
-    }
 }
 
 impl Stats {
@@ -160,7 +145,7 @@ impl Stats {
     }
 }
 
-impl ShardedGossip {
+impl<T: GossipKind> ShardedGossip<T> {
     /// Constructor
     #[allow(clippy::too_many_arguments)]
     pub fn new(
@@ -169,7 +154,6 @@ impl ShardedGossip {
         ep_hnd: Tx2EpHnd<wire::Wire>,
         evt_sender: EventSender,
         host_api: HostApi,
-        gossip_type: GossipType,
         bandwidth: Arc<BandwidthThrottle>,
         metrics: MetricsSync,
         #[cfg(feature = "test")] enable_history: bool,
@@ -193,8 +177,8 @@ impl ShardedGossip {
                 evt_sender,
                 host_api,
                 inner: Share::new(ShardedGossipLocalState::new(metrics)),
-                gossip_type,
                 closing: AtomicBool::new(false),
+                gossip_type: PhantomData,
             },
             bandwidth,
         });
@@ -220,7 +204,8 @@ impl ShardedGossip {
 
     async fn process_outgoing(&self, outgoing: Outgoing) -> KitsuneResult<()> {
         let (cert, how, gossip) = outgoing;
-        match self.gossip.gossip_type {
+
+        match T::gossip_type() {
             GossipType::Recent => {
                 let s = tracing::trace_span!("process_outgoing_recent", cert = ?cert, agents = ?self.gossip.show_local_agents());
                 s.in_scope(|| tracing::trace!(?gossip));
@@ -242,14 +227,11 @@ impl ShardedGossip {
                     }
                 }
             }
-        };
+        }
+
         let gossip = gossip.encode_vec().map_err(KitsuneError::other)?;
         let bytes = gossip.len();
-        let gossip = wire::Wire::gossip(
-            self.gossip.space.clone(),
-            gossip.into(),
-            self.gossip.gossip_type.into(),
-        );
+        let gossip = wire::Wire::gossip(self.gossip.space.clone(), gossip.into(), T::gossip_type());
 
         let timeout = self.gossip.tuning_params.implicit_timeout();
 
@@ -364,7 +346,7 @@ impl ShardedGossip {
                 .map(|(i, o)| format!("Queues: Incoming: {}, Outgoing {}", i, o))
                 .unwrap_or_else(|_| "Queues empty".to_string());
             let _ = self.gossip.inner.share_mut(|i, _| {
-                    let s = tracing::trace_span!("gossip_metrics", gossip_type = %self.gossip.gossip_type);
+                    let s = tracing::trace_span!("gossip_metrics", gossip_type = %T::gossip_type());
                     s.in_scope(|| tracing::trace!(
                         "{}\nStats over last 5s:\n\tAverage processing time {:?}\n\tIteration count: {}\n\tMax gossip processing time: {:?}\n\t{}", 
                         i.metrics,
@@ -385,14 +367,14 @@ impl ShardedGossip {
 /// - making requests to the local backend
 /// - processing incoming messages to produce outgoing messages (which actually)
 ///     get sent by the enclosing `ShardedGossip`
-pub struct ShardedGossipLocal {
-    gossip_type: GossipType,
+pub struct ShardedGossipLocal<T: GossipKind> {
     tuning_params: KitsuneP2pTuningParams,
     space: Arc<KitsuneSpace>,
     evt_sender: EventSender,
     host_api: HostApi,
     inner: Share<ShardedGossipLocalState>,
     closing: AtomicBool,
+    gossip_type: PhantomData<T>,
 }
 
 /// Incoming gossip.
@@ -592,7 +574,7 @@ pub struct RoundState {
     region_set_sent: Option<Arc<RegionSetLtcs>>,
 }
 
-impl ShardedGossipLocal {
+impl<T: GossipKind> ShardedGossipLocal<T> {
     const TGT_FP: f64 = 0.01;
     /// This should give us just under 1.6MB for the bloom filter.
     /// Based on a compression of 75%.
@@ -605,7 +587,7 @@ impl ShardedGossipLocal {
     fn calculate_time_range(&self) -> TimeWindow {
         const NOW: Duration = Duration::from_secs(0);
         let threshold = Duration::from_secs(self.tuning_params.danger_gossip_recent_threshold_secs);
-        match self.gossip_type {
+        match T::gossip_type() {
             GossipType::Recent => time_range(threshold, NOW),
             GossipType::Historical => {
                 let one_hour_ago = std::time::UNIX_EPOCH
@@ -735,7 +717,7 @@ impl ShardedGossipLocal {
         cert: Tx2Cert,
         msg: ShardedGossipWire,
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
-        let s = match self.gossip_type {
+        let s = match T::gossip_type() {
             GossipType::Recent => {
                 let s = tracing::trace_span!("process_incoming_recent", ?cert, agents = ?self.show_local_agents(), ?msg);
                 s.in_scope(|| self.log_state());
@@ -863,7 +845,7 @@ impl ShardedGossipLocal {
                 // TODO: come back to this later after implementing batching for
                 //      region gossip, for now I just don't care about the state,
                 //      and just want to handle the incoming ops.
-                if (self.gossip_type == GossipType::Historical || state.is_some())
+                if (T::gossip_type() == GossipType::Historical || state.is_some())
                     && !ops.is_empty()
                 {
                     self.incoming_missing_ops(ops).await?;
@@ -1132,7 +1114,7 @@ kitsune_p2p_types::write_codec_enum! {
     }
 }
 
-impl AsGossipModule for ShardedGossip {
+impl<T: GossipKind + 'static> AsGossipModule for ShardedGossip<T> {
     fn incoming_gossip(
         &self,
         con: Tx2ConHnd<wire::Wire>,
@@ -1218,13 +1200,12 @@ impl AsGossipModuleFactory for ShardedRecentGossipFactory {
         host: HostApi,
         metrics: MetricsSync,
     ) -> GossipModule {
-        GossipModule(ShardedGossip::new(
+        GossipModule(ShardedGossipRecent::new(
             tuning_params,
             space,
             ep_hnd,
             evt_sender,
             host,
-            GossipType::Recent,
             self.bandwidth.clone(),
             metrics,
         ))
@@ -1251,13 +1232,12 @@ impl AsGossipModuleFactory for ShardedHistoricalGossipFactory {
         host: HostApi,
         metrics: MetricsSync,
     ) -> GossipModule {
-        GossipModule(ShardedGossip::new(
+        GossipModule(ShardedGossipHistorical::new(
             tuning_params,
             space,
             ep_hnd,
             evt_sender,
             host,
-            GossipType::Historical,
             self.bandwidth.clone(),
             metrics,
         ))
@@ -1280,15 +1260,6 @@ fn clamp64(u: u64) -> i64 {
         i64::MAX
     } else {
         u as i64
-    }
-}
-
-impl From<GossipType> for GossipModuleType {
-    fn from(g: GossipType) -> Self {
-        match g {
-            GossipType::Recent => GossipModuleType::ShardedRecent,
-            GossipType::Historical => GossipModuleType::ShardedHistorical,
-        }
     }
 }
 

@@ -2,7 +2,7 @@ use crate::gossip::sharded_gossip::store::TimeChunk;
 
 use super::*;
 
-impl ShardedGossipLocal {
+impl<T: GossipKind> ShardedGossipLocal<T> {
     /// Generate a bloom filter of all agents.
     /// - Agents are only included if they are within the common arc set.
     /// - The bloom is `KitsuneAgent` + `signed_at_ms`. So multiple agent infos could

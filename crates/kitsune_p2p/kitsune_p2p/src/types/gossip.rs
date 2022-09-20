@@ -7,14 +7,12 @@ use kitsune_p2p_types::tx2::tx2_utils::TxUrl;
 use kitsune_p2p_types::*;
 use std::sync::Arc;
 
-#[derive(Clone, Debug, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
 /// The type of gossip module running this gossip.
-pub enum GossipModuleType {
-    /// Recent sharded gossip.
-    ShardedRecent,
-    /// Historical sharded gossip.
-    ShardedHistorical,
-}
+///
+/// Currently the only possible gossip modules are
+/// the one available via GossipType, but this could be
+/// expanded to its own enum in the future.
+pub type GossipModuleType = crate::gossip::sharded_gossip::kind::GossipType;
 
 /// Represents an interchangeable gossip strategy module
 pub trait AsGossipModule: 'static + Send + Sync {

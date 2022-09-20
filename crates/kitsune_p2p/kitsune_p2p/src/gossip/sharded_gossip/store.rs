@@ -18,7 +18,7 @@ use kitsune_p2p_types::{
     KitsuneError, KitsuneResult,
 };
 
-use super::{EventSender, ShardedGossipLocal};
+use super::{EventSender, Recent, ShardedGossipLocal};
 
 /// Get all agent info signed for a space.
 pub(super) async fn all_agent_info(
@@ -188,7 +188,7 @@ pub(super) fn hash_chunks_query(
                     &space,
                     common_arc_set.clone(),
                     search_time_window.clone(),
-                    ShardedGossipLocal::UPPER_HASHES_BOUND,
+                    ShardedGossipLocal::<Recent>::UPPER_HASHES_BOUND,
                     include_limbo,
                 )
                 .await?;
@@ -215,7 +215,7 @@ pub(super) fn hash_chunks_query(
                 let cursor = *found_time_window.end();
 
                 // If we found the upper hashes bound then we are not done.
-                if num_found >= ShardedGossipLocal::UPPER_HASHES_BOUND {
+                if num_found >= ShardedGossipLocal::<Recent>::UPPER_HASHES_BOUND {
                     // The time window is the searches start to the found windows
                     // end.
                     // Because this window needs to be exclusive a micro second (the smallest

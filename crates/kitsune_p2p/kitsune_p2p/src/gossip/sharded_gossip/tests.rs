@@ -12,19 +12,14 @@ mod common;
 mod ops;
 mod test_two_nodes;
 
-impl ShardedGossipLocal {
+impl<T: GossipKind> ShardedGossipLocal<T> {
     /// Create an instance suitable for testing
-    pub fn test(
-        gossip_type: GossipType,
-        evt_sender: EventSender,
-        host: HostApi,
-        inner: ShardedGossipLocalState,
-    ) -> Self {
+    pub fn test(evt_sender: EventSender, host: HostApi, inner: ShardedGossipLocalState) -> Self {
         let mut u = arbitrary::Unstructured::new(&NOISE);
         let space = KitsuneSpace::arbitrary(&mut u).unwrap();
         let space = Arc::new(space);
         Self {
-            gossip_type,
+            gossip_type: PhantomData,
             tuning_params: Default::default(),
             space,
             evt_sender,

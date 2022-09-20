@@ -4,6 +4,7 @@
 
 use std::sync::Arc;
 
+use crate::gossip::sharded_gossip::kind::GossipKind;
 use crate::types::event::{KitsuneP2pEvent, KitsuneP2pEventHandler, KitsuneP2pEventHandlerResult};
 use crate::{event::*, KitsuneHost};
 use futures::FutureExt;
@@ -30,22 +31,25 @@ type KOpHash = Arc<KitsuneOpHash>;
 /// to what a Kitsune implementor like Holochain would implement.
 /// It's used to implement nodes in the Switchboard.
 #[derive(Clone)]
-pub struct SwitchboardEventHandler {
+pub struct SwitchboardEventHandler<T: GossipKind> {
     node: NodeEp,
-    sb: Switchboard,
+    sb: Switchboard<T>,
 }
 
-impl SwitchboardEventHandler {
+impl<T: GossipKind> SwitchboardEventHandler<T> {
     /// Constructor
-    pub fn new(node: NodeEp, sb: Switchboard) -> Self {
+    pub fn new(node: NodeEp, sb: Switchboard<T>) -> Self {
         Self { node, sb }
     }
 }
 
-impl ghost_actor::GhostHandler<KitsuneP2pEvent> for SwitchboardEventHandler {}
-impl ghost_actor::GhostControlHandler for SwitchboardEventHandler {}
+impl<T: GossipKind + 'static> ghost_actor::GhostHandler<KitsuneP2pEvent>
+    for SwitchboardEventHandler<T>
+{
+}
+impl<T: GossipKind + 'static> ghost_actor::GhostControlHandler for SwitchboardEventHandler<T> {}
 
-impl KitsuneHost for SwitchboardEventHandler {
+impl<T: GossipKind + 'static> KitsuneHost for SwitchboardEventHandler<T> {
     fn get_agent_info_signed(
         &self,
         GetAgentInfoSignedEvt { agent, space: _ }: GetAgentInfoSignedEvt,
@@ -168,7 +172,7 @@ impl KitsuneHost for SwitchboardEventHandler {
 }
 
 #[allow(warnings)]
-impl KitsuneP2pEventHandler for SwitchboardEventHandler {
+impl<T: GossipKind + 'static> KitsuneP2pEventHandler for SwitchboardEventHandler<T> {
     fn handle_put_agent_info_signed(
         &mut self,
         PutAgentInfoSignedEvt { space, peer_data }: PutAgentInfoSignedEvt,

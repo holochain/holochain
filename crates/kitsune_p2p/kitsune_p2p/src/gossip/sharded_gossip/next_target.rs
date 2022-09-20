@@ -12,7 +12,7 @@ pub(crate) struct Node {
     pub(crate) url: TxUrl,
 }
 
-impl ShardedGossipLocal {
+impl<T: GossipKind> ShardedGossipLocal<T> {
     /// Find a remote endpoint from agents within arc set.
     pub(super) async fn find_remote_agent_within_arcset(
         &self,
