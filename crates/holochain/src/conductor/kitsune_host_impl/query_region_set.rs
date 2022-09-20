@@ -25,18 +25,21 @@ pub async fn query_region_set(
         // so we don't get slammed.
         let _ = LAST_LOG_MS.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |t| {
             let now = Timestamp::now();
-            now.checked_difference_signed(&Timestamp::from_micros(t * 1000))
+            let it_is_time = now
+                .checked_difference_signed(&Timestamp::from_micros(t * 1000))
                 .map(|d| d > chrono::Duration::milliseconds(LOG_RATE_MS))
-                .unwrap_or(false)
-                .then(|| now.as_millis())
+                .unwrap_or(false);
+            if it_is_time {
+                tracing::warn!(
+                    "A continuous arc set could not be properly quantized.
+                Original:  {:?}
+                Quantized: {:?}",
+                    dht_arc_set,
+                    arq_set
+                );
+            }
+            it_is_time.then(|| now.as_millis())
         });
-        tracing::warn!(
-            "A continuous arc set could not be properly quantized.
-        Original:  {:?}
-        Quantized: {:?}",
-            dht_arc_set,
-            arq_set
-        );
     }
 
     let times = TelescopingTimes::historical(&topology);
