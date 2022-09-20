@@ -7,8 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## 0.0.48
 
 - Add function to set DNA name. [\#1547](https://github.com/holochain/holochain/pull/1547)
-
-`ChainQueryFilter` has a `descending()` function which will cause the query results to be returned in descending order. This can be reversed by calling `ascending()`. The default order is still ascending. [\#1539](https://github.com/holochain/holochain/pull/1539)
+- **BREAKING CHANGE** - `ChainQueryFilter` gets a new field, which may cause DNAs built with prior versions to break due to a deserialization error. Rebuild your DNA if so.
+- There is now a `ChainQueryFilter::descending()` function which will cause the query results to be returned in descending order. This can be reversed by calling `ChainQueryFilter::ascending()`. The default order is still ascending. [\#1539](https://github.com/holochain/holochain/pull/1539)
 
 ## 0.0.47
 
