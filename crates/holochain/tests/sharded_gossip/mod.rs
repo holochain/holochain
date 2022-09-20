@@ -476,171 +476,164 @@ async fn mock_network_sharded_gossip() {
                         gossip,
                     } => {
                         if let kitsune_p2p::GossipModuleType::ShardedRecent = module {
-                            if let GossipProtocol::Sharded(gossip) = gossip {
-                                use kitsune_p2p::gossip::sharded_gossip::*;
-                                match gossip {
-                                    ShardedGossipWire::Initiate(Initiate { intervals, .. }) => {
-                                        // Capture the intervals from alice.
-                                        // This works because alice will only initiate with one simulated
-                                        // agent at a time.
-                                        last_intervals = Some(intervals);
-                                        let arc = data.agent_to_arc[&agent];
-                                        let agent_info = data.agent_to_info[&agent].clone();
-                                        let interval = arc;
+                            let GossipProtocol::Sharded(gossip) = gossip;
 
-                                        // If we have info for alice check the overlap.
-                                        if let Some(alice) = &alice {
-                                            let a = alice.storage_arc;
-                                            let b = interval.clone();
-                                            debug!("{}\n{}", a.to_ascii(10), b.to_ascii(10));
-                                            let a: DhtArcSet = a.inner().into();
-                                            let b: DhtArcSet = b.inner().into();
-                                            if !a.overlap(&b) {
-                                                num_missed_gossips += 1;
-                                            }
-                                        }
+                            use kitsune_p2p::gossip::sharded_gossip::*;
+                            match gossip {
+                                ShardedGossipWire::Initiate(Initiate { intervals, .. }) => {
+                                    // Capture the intervals from alice.
+                                    // This works because alice will only initiate with one simulated
+                                    // agent at a time.
+                                    last_intervals = Some(intervals);
+                                    let arc = data.agent_to_arc[&agent];
+                                    let agent_info = data.agent_to_info[&agent].clone();
+                                    let interval = arc;
 
-                                        // Record that this simulated agent was initiated with.
-                                        agents_gossiped_with.insert(agent.clone());
-                                        agents_gossiped_with_tx
-                                            .send(agents_gossiped_with.clone())
-                                            .unwrap();
-
-                                        // Accept the initiate.
-                                        let msg = HolochainP2pMockMsg::Gossip {
-                                            dna: dna.clone(),
-                                            module: module.clone(),
-                                            gossip: GossipProtocol::Sharded(
-                                                ShardedGossipWire::accept(
-                                                    vec![interval.into()],
-                                                    vec![agent_info],
-                                                ),
-                                            ),
-                                        };
-                                        channel.send(msg.addressed((*agent).clone())).await;
-
-                                        // Create an ops bloom and send it back.
-                                        let window = (Timestamp::now()
-                                            - std::time::Duration::from_secs(60 * 60))
-                                        .unwrap()
-                                            ..Timestamp::now();
-                                        let this_agent_hashes: Vec<_> = data
-                                            .hashes_authority_for(&agent)
-                                            .into_iter()
-                                            .filter(|h| {
-                                                window.contains(&data.ops[h].action().timestamp())
-                                            })
-                                            .map(|k| data.op_hash_to_kit[&k].clone())
-                                            .collect();
-                                        let filter = if this_agent_hashes.is_empty() {
-                                            EncodedTimedBloomFilter::MissingAllHashes {
-                                                time_window: window,
-                                            }
-                                        } else {
-                                            let filter = create_op_bloom(this_agent_hashes);
-
-                                            EncodedTimedBloomFilter::HaveHashes {
-                                                time_window: window,
-                                                filter,
-                                            }
-                                        };
-                                        let msg = HolochainP2pMockMsg::Gossip {
-                                            dna: dna.clone(),
-                                            module: module.clone(),
-                                            gossip: GossipProtocol::Sharded(
-                                                ShardedGossipWire::op_bloom(filter, true),
-                                            ),
-                                        };
-                                        channel.send(msg.addressed((*agent).clone())).await;
-
-                                        // Create an agent bloom and send it.
-                                        if let Some(ref agent_bloom) = agent_bloom {
-                                            let msg = HolochainP2pMockMsg::Gossip {
-                                                dna: dna.clone(),
-                                                module: module.clone(),
-                                                gossip: GossipProtocol::Sharded(
-                                                    ShardedGossipWire::agents(agent_bloom.clone()),
-                                                ),
-                                            };
-                                            channel.send(msg.addressed((*agent).clone())).await;
+                                    // If we have info for alice check the overlap.
+                                    if let Some(alice) = &alice {
+                                        let a = alice.storage_arc;
+                                        let b = interval.clone();
+                                        debug!("{}\n{}", a.to_ascii(10), b.to_ascii(10));
+                                        let a: DhtArcSet = a.inner().into();
+                                        let b: DhtArcSet = b.inner().into();
+                                        if !a.overlap(&b) {
+                                            num_missed_gossips += 1;
                                         }
                                     }
-                                    ShardedGossipWire::OpBloom(OpBloom {
-                                        missing_hashes, ..
-                                    }) => {
-                                        // We have received an ops bloom so we can respond with any missing
-                                        // hashes if there are nay.
-                                        let this_agent_hashes = data.hashes_authority_for(&agent);
-                                        let num_this_agent_hashes = this_agent_hashes.len();
-                                        let hashes = this_agent_hashes.iter().map(|h| {
-                                            (
-                                                data.ops[h].action().timestamp(),
-                                                &data.op_hash_to_kit[h],
-                                            )
-                                        });
 
-                                        let missing_hashes = check_ops_boom(hashes, missing_hashes);
-                                        let missing_hashes = match &last_intervals {
-                                            Some(intervals) => missing_hashes
-                                                .into_iter()
-                                                .filter(|hash| {
-                                                    intervals[0].contains(
-                                                        data.op_to_loc[&data.op_kit_to_hash[*hash]],
-                                                    )
-                                                })
-                                                .collect(),
-                                            None => vec![],
+                                    // Record that this simulated agent was initiated with.
+                                    agents_gossiped_with.insert(agent.clone());
+                                    agents_gossiped_with_tx
+                                        .send(agents_gossiped_with.clone())
+                                        .unwrap();
+
+                                    // Accept the initiate.
+                                    let msg = HolochainP2pMockMsg::Gossip {
+                                        dna: dna.clone(),
+                                        module: module.clone(),
+                                        gossip: GossipProtocol::Sharded(ShardedGossipWire::accept(
+                                            vec![interval.into()],
+                                            vec![agent_info],
+                                        )),
+                                    };
+                                    channel.send(msg.addressed((*agent).clone())).await;
+
+                                    // Create an ops bloom and send it back.
+                                    let window = (Timestamp::now()
+                                        - std::time::Duration::from_secs(60 * 60))
+                                    .unwrap()
+                                        ..Timestamp::now();
+                                    let this_agent_hashes: Vec<_> = data
+                                        .hashes_authority_for(&agent)
+                                        .into_iter()
+                                        .filter(|h| {
+                                            window.contains(&data.ops[h].action().timestamp())
+                                        })
+                                        .map(|k| data.op_hash_to_kit[&k].clone())
+                                        .collect();
+                                    let filter = if this_agent_hashes.is_empty() {
+                                        EncodedTimedBloomFilter::MissingAllHashes {
+                                            time_window: window,
+                                        }
+                                    } else {
+                                        let filter = create_op_bloom(this_agent_hashes);
+
+                                        EncodedTimedBloomFilter::HaveHashes {
+                                            time_window: window,
+                                            filter,
+                                        }
+                                    };
+                                    let msg = HolochainP2pMockMsg::Gossip {
+                                        dna: dna.clone(),
+                                        module: module.clone(),
+                                        gossip: GossipProtocol::Sharded(
+                                            ShardedGossipWire::op_bloom(filter, true),
+                                        ),
+                                    };
+                                    channel.send(msg.addressed((*agent).clone())).await;
+
+                                    // Create an agent bloom and send it.
+                                    if let Some(ref agent_bloom) = agent_bloom {
+                                        let msg = HolochainP2pMockMsg::Gossip {
+                                            dna: dna.clone(),
+                                            module: module.clone(),
+                                            gossip: GossipProtocol::Sharded(
+                                                ShardedGossipWire::agents(agent_bloom.clone()),
+                                            ),
                                         };
-                                        gossiped_ops.extend(missing_hashes.iter().cloned());
+                                        channel.send(msg.addressed((*agent).clone())).await;
+                                    }
+                                }
+                                ShardedGossipWire::OpBloom(OpBloom { missing_hashes, .. }) => {
+                                    // We have received an ops bloom so we can respond with any missing
+                                    // hashes if there are nay.
+                                    let this_agent_hashes = data.hashes_authority_for(&agent);
+                                    let num_this_agent_hashes = this_agent_hashes.len();
+                                    let hashes = this_agent_hashes.iter().map(|h| {
+                                        (data.ops[h].action().timestamp(), &data.op_hash_to_kit[h])
+                                    });
 
-                                        let missing_ops: Vec<_> = missing_hashes
+                                    let missing_hashes = check_ops_boom(hashes, missing_hashes);
+                                    let missing_hashes = match &last_intervals {
+                                        Some(intervals) => missing_hashes
                                             .into_iter()
-                                            .map(|h| data.ops[&data.op_kit_to_hash[h]].clone())
-                                            .map(|op| {
-                                                kitsune_p2p::KitsuneOpData::new(
-                                                    holochain_p2p::WireDhtOpData {
-                                                        op_data: op.into_content(),
-                                                    }
-                                                    .encode()
-                                                    .unwrap(),
+                                            .filter(|hash| {
+                                                intervals[0].contains(
+                                                    data.op_to_loc[&data.op_kit_to_hash[*hash]],
                                                 )
                                             })
-                                            .collect();
-                                        let num_gossiped = gossiped_ops.len();
-                                        let p_done = num_gossiped as f64
-                                            / num_hashes_alice_should_hold as f64
-                                            * 100.0;
-                                        let avg_gossip_freq = start_time
-                                            .elapsed()
-                                            .checked_div(agents_gossiped_with.len() as u32)
-                                            .unwrap_or_default();
-                                        let avg_gossip_size =
-                                            num_gossiped / agents_gossiped_with.len();
-                                        let time_to_completion = num_hashes_alice_should_hold
-                                            .checked_sub(num_gossiped)
-                                            .and_then(|n| n.checked_div(avg_gossip_size))
-                                            .unwrap_or_default()
-                                            as u32
-                                            * avg_gossip_freq;
-                                        let (overlap, max_could_get) = alice
-                                            .as_ref()
-                                            .map(|alice| {
-                                                let arc = data.agent_to_arc[&agent];
-                                                let a = alice.storage_arc;
-                                                let b = arc;
-                                                let num_should_hold = this_agent_hashes
-                                                    .iter()
-                                                    .filter(|hash| {
-                                                        let loc = data.op_to_loc[*hash];
-                                                        alice.storage_arc.contains(loc)
-                                                    })
-                                                    .count();
-                                                (a.overlap_coverage(&b) * 100.0, num_should_hold)
-                                            })
-                                            .unwrap_or((0.0, 0));
+                                            .collect(),
+                                        None => vec![],
+                                    };
+                                    gossiped_ops.extend(missing_hashes.iter().cloned());
 
-                                        // Print out some stats.
-                                        debug!(
+                                    let missing_ops: Vec<_> = missing_hashes
+                                        .into_iter()
+                                        .map(|h| data.ops[&data.op_kit_to_hash[h]].clone())
+                                        .map(|op| {
+                                            kitsune_p2p::KitsuneOpData::new(
+                                                holochain_p2p::WireDhtOpData {
+                                                    op_data: op.into_content(),
+                                                }
+                                                .encode()
+                                                .unwrap(),
+                                            )
+                                        })
+                                        .collect();
+                                    let num_gossiped = gossiped_ops.len();
+                                    let p_done = num_gossiped as f64
+                                        / num_hashes_alice_should_hold as f64
+                                        * 100.0;
+                                    let avg_gossip_freq = start_time
+                                        .elapsed()
+                                        .checked_div(agents_gossiped_with.len() as u32)
+                                        .unwrap_or_default();
+                                    let avg_gossip_size = num_gossiped / agents_gossiped_with.len();
+                                    let time_to_completion = num_hashes_alice_should_hold
+                                        .checked_sub(num_gossiped)
+                                        .and_then(|n| n.checked_div(avg_gossip_size))
+                                        .unwrap_or_default()
+                                        as u32
+                                        * avg_gossip_freq;
+                                    let (overlap, max_could_get) = alice
+                                        .as_ref()
+                                        .map(|alice| {
+                                            let arc = data.agent_to_arc[&agent];
+                                            let a = alice.storage_arc;
+                                            let b = arc;
+                                            let num_should_hold = this_agent_hashes
+                                                .iter()
+                                                .filter(|hash| {
+                                                    let loc = data.op_to_loc[*hash];
+                                                    alice.storage_arc.contains(loc)
+                                                })
+                                                .count();
+                                            (a.overlap_coverage(&b) * 100.0, num_should_hold)
+                                        })
+                                        .unwrap_or((0.0, 0));
+
+                                    // Print out some stats.
+                                    debug!(
                                             "Gossiped with {}, got {} of {} ops, overlap: {:.2}%, max could get {}, {:.2}% done, avg freq of gossip {:?}, est finish in {:?}",
                                             agent,
                                             missing_ops.len(),
@@ -651,20 +644,20 @@ async fn mock_network_sharded_gossip() {
                                             avg_gossip_freq,
                                             time_to_completion
                                         );
-                                        let msg = HolochainP2pMockMsg::Gossip {
-                                            dna,
-                                            module,
-                                            gossip: GossipProtocol::Sharded(
-                                                ShardedGossipWire::missing_ops(
-                                                    missing_ops,
-                                                    MissingOpsStatus::AllComplete as u8,
-                                                ),
+                                    let msg = HolochainP2pMockMsg::Gossip {
+                                        dna,
+                                        module,
+                                        gossip: GossipProtocol::Sharded(
+                                            ShardedGossipWire::missing_ops(
+                                                missing_ops,
+                                                MissingOpsStatus::AllComplete as u8,
                                             ),
-                                        };
-                                        channel.send(msg.addressed((*agent).clone())).await;
-                                    }
-                                    ShardedGossipWire::MissingOps(MissingOps { ops, .. }) => {
-                                        debug!(
+                                        ),
+                                    };
+                                    channel.send(msg.addressed((*agent).clone())).await;
+                                }
+                                ShardedGossipWire::MissingOps(MissingOps { ops, .. }) => {
+                                    debug!(
                                             "Gossiped with {} {} out of {}, who sent {} ops and gossiped with {} nodes outside of arc",
                                             agent,
                                             agents_gossiped_with.len(),
@@ -672,18 +665,17 @@ async fn mock_network_sharded_gossip() {
                                             ops.len(),
                                             num_missed_gossips
                                         );
-                                    }
-                                    ShardedGossipWire::OpRegions(_) => todo!("must implement"),
-
-                                    ShardedGossipWire::Agents(_) => {}
-                                    ShardedGossipWire::MissingAgents(_) => {}
-                                    ShardedGossipWire::Accept(_) => (),
-                                    ShardedGossipWire::NoAgents(_) => (),
-                                    ShardedGossipWire::AlreadyInProgress(_) => (),
-                                    ShardedGossipWire::Busy(_) => (),
-                                    ShardedGossipWire::Error(_) => (),
-                                    ShardedGossipWire::OpBatchReceived(_) => (),
                                 }
+                                ShardedGossipWire::OpRegions(_) => todo!("must implement"),
+
+                                ShardedGossipWire::Agents(_) => {}
+                                ShardedGossipWire::MissingAgents(_) => {}
+                                ShardedGossipWire::Accept(_) => (),
+                                ShardedGossipWire::NoAgents(_) => (),
+                                ShardedGossipWire::AlreadyInProgress(_) => (),
+                                ShardedGossipWire::Busy(_) => (),
+                                ShardedGossipWire::Error(_) => (),
+                                ShardedGossipWire::OpBatchReceived(_) => (),
                             }
                         }
                     }
@@ -1024,168 +1016,160 @@ async fn mock_network_sharding() {
                         gossip,
                     } => {
                         if let kitsune_p2p::GossipModuleType::ShardedRecent = module {
-                            if let GossipProtocol::Sharded(gossip) = gossip {
-                                use kitsune_p2p::gossip::sharded_gossip::*;
-                                match gossip {
-                                    ShardedGossipWire::Initiate(Initiate { intervals, .. }) => {
-                                        // Capture the intervals from alice.
-                                        // This works because alice will only initiate with one simulated
-                                        // agent at a time.
-                                        last_intervals = Some(intervals);
-                                        let arc = data.agent_to_arc[&agent];
-                                        let agent_info = data.agent_to_info[&agent].clone();
-                                        let interval = arc;
+                            let GossipProtocol::Sharded(gossip) = gossip;
 
-                                        // Accept the initiate.
-                                        let msg = HolochainP2pMockMsg::Gossip {
-                                            dna: dna.clone(),
-                                            module: module.clone(),
-                                            gossip: GossipProtocol::Sharded(
-                                                ShardedGossipWire::accept(
-                                                    vec![interval.into()],
-                                                    vec![agent_info],
-                                                ),
-                                            ),
-                                        };
-                                        channel.send(msg.addressed((*agent).clone())).await;
+                            use kitsune_p2p::gossip::sharded_gossip::*;
+                            match gossip {
+                                ShardedGossipWire::Initiate(Initiate { intervals, .. }) => {
+                                    // Capture the intervals from alice.
+                                    // This works because alice will only initiate with one simulated
+                                    // agent at a time.
+                                    last_intervals = Some(intervals);
+                                    let arc = data.agent_to_arc[&agent];
+                                    let agent_info = data.agent_to_info[&agent].clone();
+                                    let interval = arc;
 
-                                        // Create an ops bloom and send it back.
-                                        let window = (Timestamp::now()
-                                            - std::time::Duration::from_secs(60 * 60))
-                                        .unwrap()
-                                            ..Timestamp::now();
-                                        let this_agent_hashes: Vec<_> = data
-                                            .hashes_authority_for(&agent)
-                                            .into_iter()
-                                            .filter(|h| {
-                                                window.contains(&data.ops[h].action().timestamp())
-                                            })
-                                            .map(|k| data.op_hash_to_kit[&k].clone())
-                                            .collect();
-                                        let filter = if this_agent_hashes.is_empty() {
-                                            EncodedTimedBloomFilter::MissingAllHashes {
-                                                time_window: window,
-                                            }
-                                        } else {
-                                            let filter =
-                                                test_utils::create_op_bloom(this_agent_hashes);
+                                    // Accept the initiate.
+                                    let msg = HolochainP2pMockMsg::Gossip {
+                                        dna: dna.clone(),
+                                        module: module.clone(),
+                                        gossip: GossipProtocol::Sharded(ShardedGossipWire::accept(
+                                            vec![interval.into()],
+                                            vec![agent_info],
+                                        )),
+                                    };
+                                    channel.send(msg.addressed((*agent).clone())).await;
 
-                                            EncodedTimedBloomFilter::HaveHashes {
-                                                time_window: window,
-                                                filter,
-                                            }
-                                        };
-                                        let msg = HolochainP2pMockMsg::Gossip {
-                                            dna: dna.clone(),
-                                            module: module.clone(),
-                                            gossip: GossipProtocol::Sharded(
-                                                ShardedGossipWire::op_bloom(filter, true),
-                                            ),
-                                        };
-                                        channel.send(msg.addressed((*agent).clone())).await;
-
-                                        // Create an agent bloom and send it.
-                                        let agent_bloom = create_agent_bloom(
-                                            data.agent_info(),
-                                            Some(&data.agent_to_info[&agent]),
-                                        );
-                                        if let Some(agent_bloom) = agent_bloom {
-                                            let msg = HolochainP2pMockMsg::Gossip {
-                                                dna: dna.clone(),
-                                                module: module.clone(),
-                                                gossip: GossipProtocol::Sharded(
-                                                    ShardedGossipWire::agents(agent_bloom),
-                                                ),
-                                            };
-                                            channel.send(msg.addressed((*agent).clone())).await;
+                                    // Create an ops bloom and send it back.
+                                    let window = (Timestamp::now()
+                                        - std::time::Duration::from_secs(60 * 60))
+                                    .unwrap()
+                                        ..Timestamp::now();
+                                    let this_agent_hashes: Vec<_> = data
+                                        .hashes_authority_for(&agent)
+                                        .into_iter()
+                                        .filter(|h| {
+                                            window.contains(&data.ops[h].action().timestamp())
+                                        })
+                                        .map(|k| data.op_hash_to_kit[&k].clone())
+                                        .collect();
+                                    let filter = if this_agent_hashes.is_empty() {
+                                        EncodedTimedBloomFilter::MissingAllHashes {
+                                            time_window: window,
                                         }
-                                    }
-                                    ShardedGossipWire::OpBloom(OpBloom {
-                                        missing_hashes, ..
-                                    }) => {
-                                        // We have received an ops bloom so we can respond with any missing
-                                        // hashes if there are nay.
-                                        let this_agent_hashes = data.hashes_authority_for(&agent);
-                                        let hashes = this_agent_hashes.iter().map(|h| {
-                                            (
-                                                data.ops[h].action().timestamp(),
-                                                &data.op_hash_to_kit[h],
-                                            )
-                                        });
+                                    } else {
+                                        let filter = test_utils::create_op_bloom(this_agent_hashes);
 
-                                        let missing_hashes = check_ops_boom(hashes, missing_hashes);
-                                        let missing_hashes = match &last_intervals {
-                                            Some(intervals) => missing_hashes
-                                                .into_iter()
-                                                .filter(|hash| {
-                                                    intervals[0].contains(
-                                                        data.op_to_loc[&data.op_kit_to_hash[*hash]],
-                                                    )
-                                                })
-                                                .collect(),
-                                            None => vec![],
-                                        };
+                                        EncodedTimedBloomFilter::HaveHashes {
+                                            time_window: window,
+                                            filter,
+                                        }
+                                    };
+                                    let msg = HolochainP2pMockMsg::Gossip {
+                                        dna: dna.clone(),
+                                        module: module.clone(),
+                                        gossip: GossipProtocol::Sharded(
+                                            ShardedGossipWire::op_bloom(filter, true),
+                                        ),
+                                    };
+                                    channel.send(msg.addressed((*agent).clone())).await;
 
-                                        let missing_ops: Vec<_> = missing_hashes
-                                            .into_iter()
-                                            .map(|h| data.ops[&data.op_kit_to_hash[h]].clone())
-                                            .map(|op| {
-                                                kitsune_p2p::KitsuneOpData::new(
-                                                    holochain_p2p::WireDhtOpData {
-                                                        op_data: op.into_content(),
-                                                    }
-                                                    .encode()
-                                                    .unwrap(),
-                                                )
-                                            })
-                                            .collect();
-
+                                    // Create an agent bloom and send it.
+                                    let agent_bloom = create_agent_bloom(
+                                        data.agent_info(),
+                                        Some(&data.agent_to_info[&agent]),
+                                    );
+                                    if let Some(agent_bloom) = agent_bloom {
                                         let msg = HolochainP2pMockMsg::Gossip {
-                                            dna,
-                                            module,
+                                            dna: dna.clone(),
+                                            module: module.clone(),
                                             gossip: GossipProtocol::Sharded(
-                                                ShardedGossipWire::missing_ops(missing_ops, 2),
+                                                ShardedGossipWire::agents(agent_bloom),
                                             ),
                                         };
                                         channel.send(msg.addressed((*agent).clone())).await;
                                     }
-                                    ShardedGossipWire::Agents(Agents { filter }) => {
-                                        let this_agent_arc = &data.agent_to_arc[&agent];
-                                        let iter = data
-                                            .agent_to_info
-                                            .iter()
-                                            .filter(|(a, _)| this_agent_arc.contains(a.get_loc()))
-                                            .map(|(a, info)| (&data.agent_hash_to_kit[a], info));
-                                        let agents = check_agent_boom(iter, &filter);
-                                        let peer_data = agents
-                                            .into_iter()
-                                            .map(|a| {
-                                                Arc::new(
-                                                    data.agent_to_info[&data.agent_kit_to_hash[a]]
-                                                        .clone(),
-                                                )
-                                            })
-                                            .collect();
-                                        let msg = HolochainP2pMockMsg::Gossip {
-                                            dna,
-                                            module,
-                                            gossip: GossipProtocol::Sharded(
-                                                ShardedGossipWire::missing_agents(peer_data),
-                                            ),
-                                        };
-                                        channel.send(msg.addressed((*agent).clone())).await;
-                                    }
-                                    ShardedGossipWire::OpRegions(_) => todo!("must implement"),
-
-                                    ShardedGossipWire::MissingAgents(_) => {}
-                                    ShardedGossipWire::Accept(_) => (),
-                                    ShardedGossipWire::MissingOps(_) => (),
-                                    ShardedGossipWire::NoAgents(_) => (),
-                                    ShardedGossipWire::AlreadyInProgress(_) => (),
-                                    ShardedGossipWire::Busy(_) => (),
-                                    ShardedGossipWire::Error(_) => (),
-                                    ShardedGossipWire::OpBatchReceived(_) => (),
                                 }
+                                ShardedGossipWire::OpBloom(OpBloom { missing_hashes, .. }) => {
+                                    // We have received an ops bloom so we can respond with any missing
+                                    // hashes if there are nay.
+                                    let this_agent_hashes = data.hashes_authority_for(&agent);
+                                    let hashes = this_agent_hashes.iter().map(|h| {
+                                        (data.ops[h].action().timestamp(), &data.op_hash_to_kit[h])
+                                    });
+
+                                    let missing_hashes = check_ops_boom(hashes, missing_hashes);
+                                    let missing_hashes = match &last_intervals {
+                                        Some(intervals) => missing_hashes
+                                            .into_iter()
+                                            .filter(|hash| {
+                                                intervals[0].contains(
+                                                    data.op_to_loc[&data.op_kit_to_hash[*hash]],
+                                                )
+                                            })
+                                            .collect(),
+                                        None => vec![],
+                                    };
+
+                                    let missing_ops: Vec<_> = missing_hashes
+                                        .into_iter()
+                                        .map(|h| data.ops[&data.op_kit_to_hash[h]].clone())
+                                        .map(|op| {
+                                            kitsune_p2p::KitsuneOpData::new(
+                                                holochain_p2p::WireDhtOpData {
+                                                    op_data: op.into_content(),
+                                                }
+                                                .encode()
+                                                .unwrap(),
+                                            )
+                                        })
+                                        .collect();
+
+                                    let msg = HolochainP2pMockMsg::Gossip {
+                                        dna,
+                                        module,
+                                        gossip: GossipProtocol::Sharded(
+                                            ShardedGossipWire::missing_ops(missing_ops, 2),
+                                        ),
+                                    };
+                                    channel.send(msg.addressed((*agent).clone())).await;
+                                }
+                                ShardedGossipWire::Agents(Agents { filter }) => {
+                                    let this_agent_arc = &data.agent_to_arc[&agent];
+                                    let iter = data
+                                        .agent_to_info
+                                        .iter()
+                                        .filter(|(a, _)| this_agent_arc.contains(a.get_loc()))
+                                        .map(|(a, info)| (&data.agent_hash_to_kit[a], info));
+                                    let agents = check_agent_boom(iter, &filter);
+                                    let peer_data = agents
+                                        .into_iter()
+                                        .map(|a| {
+                                            Arc::new(
+                                                data.agent_to_info[&data.agent_kit_to_hash[a]]
+                                                    .clone(),
+                                            )
+                                        })
+                                        .collect();
+                                    let msg = HolochainP2pMockMsg::Gossip {
+                                        dna,
+                                        module,
+                                        gossip: GossipProtocol::Sharded(
+                                            ShardedGossipWire::missing_agents(peer_data),
+                                        ),
+                                    };
+                                    channel.send(msg.addressed((*agent).clone())).await;
+                                }
+                                ShardedGossipWire::OpRegions(_) => todo!("must implement"),
+
+                                ShardedGossipWire::MissingAgents(_) => {}
+                                ShardedGossipWire::Accept(_) => (),
+                                ShardedGossipWire::MissingOps(_) => (),
+                                ShardedGossipWire::NoAgents(_) => (),
+                                ShardedGossipWire::AlreadyInProgress(_) => (),
+                                ShardedGossipWire::Busy(_) => (),
+                                ShardedGossipWire::Error(_) => (),
+                                ShardedGossipWire::OpBatchReceived(_) => (),
                             }
                         }
                     }
