@@ -23,25 +23,27 @@ pub async fn query_region_set(
     if rounded {
         // If an arq was rounded, emit a warning, but throttle it to once every LOG_RATE_MS
         // so we don't get slammed.
-        let _ = LAST_LOG_MS.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |t| {
-            let now = Timestamp::now();
-            let it_is_time = now
-                .checked_difference_signed(&Timestamp::from_micros(t * 1000))
-                .map(|d| d > chrono::Duration::milliseconds(LOG_RATE_MS))
-                .unwrap_or(false);
-            if it_is_time {
-                tracing::warn!(
-                    "A continuous arc set could not be properly quantized.
-                Original:  {:?}
-                Quantized: {:?}",
-                    dht_arc_set,
-                    arq_set
-                );
-                Some(now.as_millis())
-            } else {
-                None
-            }
-        });
+        let it_is_time = LAST_LOG_MS
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |t| {
+                let now = Timestamp::now();
+                // If the difference is greater than the logging interval,
+                // produce a Some so that the atomic val gets updated, which
+                // will trigger a log after the update.
+                now.checked_difference_signed(&Timestamp::from_micros(t * 1000))
+                    .map(|d| d > chrono::Duration::milliseconds(LOG_RATE_MS))
+                    .unwrap_or(false)
+                    .then(|| now.as_millis())
+            })
+            .is_ok();
+        if it_is_time {
+            tracing::warn!(
+                "A continuous arc set could not be properly quantized.
+            Original:  {:?}
+            Quantized: {:?}",
+                dht_arc_set,
+                arq_set
+            );
+        }
     }
 
     let times = TelescopingTimes::historical(&topology);
