@@ -48,12 +48,10 @@ pub enum ConductorApiError {
     DatabaseError(#[from] DatabaseError),
 
     /// Workspace error.
-    // TODO: Can be avoided if we can move workspace creation into the workflow
     #[error(transparent)]
     WorkspaceError(#[from] WorkspaceError),
 
     /// Workflow error.
-    // TODO: perhaps this Box can be avoided with further reorganization
     #[error(transparent)]
     WorkflowError(#[from] WorkflowError),
 

@@ -582,6 +582,10 @@ where
         })?)
     }
 
+    // FIXME: the SourceChain was originally designed to only be initializable if genesis has been run,
+    //   i.e. it can't be empty. However, now we have a `raw_empty` function which initializes an empty
+    //   chain with a persisted_seq of 0, which is wrong. That will lead to a len() of 1 even for an empty
+    //   chain. This needs to be fixed.
     #[allow(clippy::len_without_is_empty)]
     pub fn len(&self) -> SourceChainResult<u32> {
         Ok(self.scratch.apply(|scratch| {
@@ -1416,6 +1420,7 @@ pub mod tests {
 
         let mut mock = MockHolochainP2pDnaT::new();
         mock.expect_authority_for_hash().returning(|_| Ok(false));
+        mock.expect_chc().return_const(None);
         let dht_db_cache = DhtDbQueryCache::new(dht_db.to_db().into());
 
         source_chain::genesis(

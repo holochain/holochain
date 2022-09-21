@@ -100,7 +100,10 @@ mod tests {
     use futures::FutureExt;
     use holochain_conductor_api::conductor::ConductorConfig;
 
-    use crate::{conductor::chc::CHC_LOCAL_MAP, sweettest::*};
+    use crate::{
+        conductor::chc::{CHC_LOCAL_MAGIC_STRING, CHC_LOCAL_MAP},
+        sweettest::*,
+    };
 
     use super::*;
 
@@ -176,7 +179,7 @@ mod tests {
         use holochain::test_utils::inline_zomes::simple_crud_zome;
 
         let mut config = ConductorConfig::default();
-        config.chc_namespace = Some("#LOCAL#".to_string());
+        config.chc_namespace = Some(CHC_LOCAL_MAGIC_STRING.to_string());
         let mut conductor = SweetConductor::from_config(config).await;
 
         let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome())
@@ -216,6 +219,7 @@ mod tests {
         let new_action = SignedActionHashed::sign(&conductor.keystore(), new_action)
             .await
             .unwrap();
+        let new_action_hash = new_action.action_address().clone();
 
         {
             // add some data to the local CHC
@@ -239,6 +243,14 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(dump.source_chain_dump.records.len(), 4);
+        assert_eq!(
+            dump.source_chain_dump
+                .records
+                .last()
+                .unwrap()
+                .action_address,
+            new_action_hash,
+        );
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -246,7 +258,7 @@ mod tests {
         use holochain::test_utils::inline_zomes::{simple_crud_zome, AppString};
 
         let mut config = ConductorConfig::default();
-        config.chc_namespace = Some("#LOCAL#".to_string());
+        config.chc_namespace = Some(CHC_LOCAL_MAGIC_STRING.to_string());
         let mut conductors =
             SweetConductorBatch::from_configs([config.clone(), config.clone(), config.clone()])
                 .await;
