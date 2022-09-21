@@ -320,16 +320,16 @@ async fn app_validation_ops() {
     )
     .with_dependency("zome1", "integrity_zome1")
     .with_dependency("zome2", "integrity_zome2")
-    .callback("zome1", "create_a", call_back_a("integrity_zome1"))
-    .callback("zome1", "create_b", call_back_b("integrity_zome1"))
-    .callback(
+    .function("zome1", "create_a", call_back_a("integrity_zome1"))
+    .function("zome1", "create_b", call_back_b("integrity_zome1"))
+    .function(
         "integrity_zome1",
         "validate",
         validation_callback(ZOME_A_0, agents.clone(), events_tx.clone()),
     )
-    .callback("zome2", "create_a", call_back_a("integrity_zome2"))
-    .callback("zome2", "create_b", call_back_b("integrity_zome2"))
-    .callback(
+    .function("zome2", "create_a", call_back_a("integrity_zome2"))
+    .function("zome2", "create_b", call_back_b("integrity_zome2"))
+    .function(
         "integrity_zome2",
         "validate",
         validation_callback(ZOME_A_1, agents.clone(), events_tx.clone()),
@@ -357,16 +357,16 @@ async fn app_validation_ops() {
     )
     .with_dependency("zome1", "integrity_zome1")
     .with_dependency("zome2", "integrity_zome2")
-    .callback("zome1", "create_a", call_back_a("integrity_zome1"))
-    .callback("zome1", "create_b", call_back_b("integrity_zome2"))
-    .callback(
+    .function("zome1", "create_a", call_back_a("integrity_zome1"))
+    .function("zome1", "create_b", call_back_b("integrity_zome2"))
+    .function(
         "integrity_zome1",
         "validate",
         validation_callback(ZOME_B_0, agents.clone(), events_tx.clone()),
     )
-    .callback("zome2", "create_a", call_back_a("integrity_zome2"))
-    .callback("zome2", "create_b", call_back_b("integrity_zome2"))
-    .callback(
+    .function("zome2", "create_a", call_back_a("integrity_zome2"))
+    .function("zome2", "create_b", call_back_b("integrity_zome2"))
+    .function(
         "integrity_zome2",
         "validate",
         validation_callback(ZOME_B_1, agents.clone(), events_tx.clone()),

@@ -4,6 +4,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.0.57
+
+- Renamed `SweetEasyInline` to `SweetInlineZomes`
+- Renamed `InlineZome::callback` to `InlineZome::function`
+
+## 0.0.56
+
 - Add function to add a clone cell to an app. [\#1547](https://github.com/holochain/holochain/pull/1547)
 
 ## 0.0.55
