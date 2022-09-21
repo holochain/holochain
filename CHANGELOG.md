@@ -6,6 +6,53 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20220921.145054
+
+## [holochain\_cli-0.0.58](crates/holochain_cli/CHANGELOG.md#0.0.58)
+
+## [holochain\_cli\_sandbox-0.0.54](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.54)
+
+## [holochain\_cli\_bundle-0.0.53](crates/holochain_cli_bundle/CHANGELOG.md#0.0.53)
+
+## [holochain-0.0.163](crates/holochain/CHANGELOG.md#0.0.163)
+
+- Fixed rare “arc is not quantizable” panic, issuing a warning instead. [\#1577](https://github.com/holochain/holochain/pull/1577)
+
+## [holochain\_test\_wasm\_common-0.0.54](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.54)
+
+## [holochain\_conductor\_api-0.0.60](crates/holochain_conductor_api/CHANGELOG.md#0.0.60)
+
+## [holochain\_wasm\_test\_utils-0.0.59](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.59)
+
+## [holochain\_cascade-0.0.62](crates/holochain_cascade/CHANGELOG.md#0.0.62)
+
+## [holochain\_state-0.0.60](crates/holochain_state/CHANGELOG.md#0.0.60)
+
+## [holochain\_p2p-0.0.57](crates/holochain_p2p/CHANGELOG.md#0.0.57)
+
+## [holochain\_types-0.0.57](crates/holochain_types/CHANGELOG.md#0.0.57)
+
+- Renamed `SweetEasyInline` to `SweetInlineZomes`
+- Renamed `InlineZome::callback` to `InlineZome::function`
+
+## [holochain\_keystore-0.0.56](crates/holochain_keystore/CHANGELOG.md#0.0.56)
+
+## [holochain\_sqlite-0.0.55](crates/holochain_sqlite/CHANGELOG.md#0.0.55)
+
+## [kitsune\_p2p-0.0.46](crates/kitsune_p2p/CHANGELOG.md#0.0.46)
+
+## [kitsune\_p2p\_proxy-0.0.34](crates/kitsune_p2p_proxy/CHANGELOG.md#0.0.34)
+
+## [kitsune\_p2p\_transport\_quic-0.0.34](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.0.34)
+
+## [kitsune\_p2p\_types-0.0.34](crates/kitsune_p2p_types/CHANGELOG.md#0.0.34)
+
+## [hdk-0.0.153](crates/hdk/CHANGELOG.md#0.0.153)
+
+## [holochain\_zome\_types-0.0.49](crates/holochain_zome_types/CHANGELOG.md#0.0.49)
+
+## [kitsune\_p2p\_dht-0.0.7](crates/kitsune_p2p_dht/CHANGELOG.md#0.0.7)
+
 # 20220914.013149
 
 ## [holochain\_cli-0.0.57](crates/holochain_cli/CHANGELOG.md#0.0.57)

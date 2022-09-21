@@ -1871,7 +1871,7 @@ dependencies = [
 
 [[package]]
 name = "hdk"
-version = "0.0.152"
+version = "0.0.153"
 dependencies = [
  "fixt",
  "getrandom 0.2.7",
@@ -1977,7 +1977,7 @@ dependencies = [
 
 [[package]]
 name = "holochain"
-version = "0.0.162"
+version = "0.0.163"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -2070,7 +2070,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cascade"
-version = "0.0.61"
+version = "0.0.62"
 dependencies = [
  "async-trait",
  "derive_more",
@@ -2105,7 +2105,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli"
-version = "0.0.57"
+version = "0.0.58"
 dependencies = [
  "anyhow",
  "futures",
@@ -2118,7 +2118,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_bundle"
-version = "0.0.52"
+version = "0.0.53"
 dependencies = [
  "anyhow",
  "assert_cmd 1.0.8",
@@ -2139,7 +2139,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_sandbox"
-version = "0.0.53"
+version = "0.0.54"
 dependencies = [
  "ansi_term 0.12.1",
  "anyhow",
@@ -2168,7 +2168,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_conductor_api"
-version = "0.0.59"
+version = "0.0.60"
 dependencies = [
  "derive_more",
  "directories",
@@ -2206,7 +2206,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_keystore"
-version = "0.0.55"
+version = "0.0.56"
 dependencies = [
  "assert_cmd 2.0.4",
  "base64",
@@ -2241,7 +2241,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_p2p"
-version = "0.0.56"
+version = "0.0.57"
 dependencies = [
  "async-trait",
  "derive_more",
@@ -2295,7 +2295,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_sqlite"
-version = "0.0.54"
+version = "0.0.55"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2344,7 +2344,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_state"
-version = "0.0.59"
+version = "0.0.60"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -2389,7 +2389,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_test_wasm_common"
-version = "0.0.53"
+version = "0.0.54"
 dependencies = [
  "hdk",
  "serde",
@@ -2397,7 +2397,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_types"
-version = "0.0.56"
+version = "0.0.57"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -2471,7 +2471,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasm_test_utils"
-version = "0.0.58"
+version = "0.0.59"
 dependencies = [
  "holochain_types",
  "holochain_util",
@@ -2563,7 +2563,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_zome_types"
-version = "0.0.48"
+version = "0.0.49"
 dependencies = [
  "arbitrary",
  "contrafact",
@@ -2886,7 +2886,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p"
-version = "0.0.45"
+version = "0.0.46"
 dependencies = [
  "arbitrary",
  "arrayref",
@@ -2954,7 +2954,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_dht"
-version = "0.0.6"
+version = "0.0.7"
 dependencies = [
  "colored",
  "derivative",
@@ -3067,7 +3067,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_proxy"
-version = "0.0.33"
+version = "0.0.34"
 dependencies = [
  "base64",
  "blake2b_simd 0.5.11",
@@ -3105,7 +3105,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_transport_quic"
-version = "0.0.33"
+version = "0.0.34"
 dependencies = [
  "blake2b_simd 1.0.0",
  "futures",
@@ -3123,7 +3123,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_types"
-version = "0.0.33"
+version = "0.0.34"
 dependencies = [
  "arbitrary",
  "base64",
