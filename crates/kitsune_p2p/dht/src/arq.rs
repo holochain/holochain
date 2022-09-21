@@ -160,7 +160,7 @@ impl<S: ArqStart> Arq<S> {
             .min(u32::MAX / 2);
         // this really shouldn't ever be larger than MAX / 8
         debug_assert!(
-            len < u32::MAX / 4,
+            len <= u32::MAX / 4 + 2,
             "chunk width is much larger than expected: {}",
             len
         );
@@ -291,7 +291,7 @@ impl Arq<Loc> {
     }
 
     /// Convert to the [`ArqBounds`] representation, which forgets about the
-    /// [`Loc`] associate with this arq.
+    /// [`Loc`] associated with this arq.
     pub fn to_bounds(&self, topo: &Topology) -> ArqBounds {
         ArqBounds {
             start: SpaceOffset::from(self.start.as_u32() / self.absolute_chunk_width(topo)),
@@ -378,7 +378,7 @@ impl ArqBounds {
         dim: &Dimension,
         power: u8,
         interval: DhtArcRange,
-        rounded: bool,
+        always_round: bool,
     ) -> Option<(Self, bool)> {
         match interval {
             DhtArcRange::Empty => Some((
@@ -415,14 +415,17 @@ impl ArqBounds {
                 let count = len / s;
                 // XXX: this is kinda wrong. The right bound of the interval
                 // should be 1 less, but we'll accept if it bleeds over by 1 too.
-                if rounded || lo == offset * s && (len % s <= 1) {
+                let rem = len % s;
+                let diff = rem.min(s - rem);
+                let lossless = lo == offset * s && (diff <= 1);
+                if always_round || lossless {
                     Some((
                         Self {
                             start: offset.into(),
                             power,
                             count: count.into(),
                         },
-                        rounded,
+                        !lossless,
                     ))
                 } else {
                     tracing::warn!("{} =?= {} == {} * {}", lo, offset * s, offset, s);
