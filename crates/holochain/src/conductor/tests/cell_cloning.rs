@@ -255,10 +255,6 @@ async fn clone_cell_deletion() {
     assert_eq!(app_info.cell_data.contains(&installed_clone_cell), true);
 
     // calling the cell after restoring succeeds
-    let zome = SweetZome::new(
-        installed_clone_cell.as_id().clone(),
-        TestWasm::Create.coordinator_zome_name(),
-    );
     let zome_call_response: Result<ActionHash, _> = conductor
         .call_fallible(&zome, "call_create_entry", ())
         .await;
