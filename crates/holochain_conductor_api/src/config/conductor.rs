@@ -46,8 +46,10 @@ pub struct ConductorConfig {
     /// Optional config for the network module.
     pub network: Option<holochain_p2p::kitsune_p2p::KitsuneP2pConfig>,
 
-    /// Optional specification of the Cloudflare namespace to use in Centralized Chain Coordination
-    /// service URLs
+    /// **PLACEHOLDER**: Optional specification of the Cloudflare namespace to use in Chain Head Coordination
+    /// service URLs. This is a placeholder for future work and may even go away.
+    /// Setting this to anything other than `None` will surely lead to no good.
+    #[serde(default)]
     pub chc_namespace: Option<String>,
 
     /// Override the default database synchronous strategy.
