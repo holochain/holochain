@@ -55,7 +55,7 @@ pub enum CoordinatorSource {
 /// The instructions on how to get the DNA to be registered
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct RegisterDnaPayload {
-    /// Modifiers overrides
+    /// Modifier overrides
     pub modifiers: DnaModifiersOpt<YamlProperties>,
     /// Where to find the DNA
     #[serde(flatten)]

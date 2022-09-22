@@ -35,7 +35,7 @@ impl DnaBundle {
     }
 
     /// Convert to a DnaFile, and return what the hash of the Dna *would* have
-    /// been without the provided modifiers overrides
+    /// been without the provided modifier overrides
     pub async fn into_dna_file(self, modifiers: DnaModifiersOpt) -> DnaResult<(DnaFile, DnaHash)> {
         let (integrity, coordinator, wasms) = self.inner_maps().await?;
         let (dna_def, original_hash) = self.to_dna_def(integrity, coordinator, modifiers)?;

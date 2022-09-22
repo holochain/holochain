@@ -14,7 +14,7 @@ impl SweetDnaFile {
     }
 
     /// Create a DnaFile from a path to a *.dna bundle, applying the specified
-    /// modifiers overrides
+    /// modifier overrides
     pub async fn from_bundle_with_overrides<P, E>(
         path: &Path,
         modifiers: DnaModifiersOpt<P>,
