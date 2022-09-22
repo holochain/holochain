@@ -5,6 +5,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## \[Unreleased\]
 
 - Add functions to archive/restore/delete clone cells of an app. [\#1578](https://github.com/holochain/holochain/pull/1578)
+
+## 0.0.57
+
 - Renamed `SweetEasyInline` to `SweetInlineZomes`
 - Renamed `InlineZome::callback` to `InlineZome::function`
 
