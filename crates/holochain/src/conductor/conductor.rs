@@ -437,7 +437,7 @@ impl Conductor {
             .share_mut(|d| d.add_entry_defs(entry_defs));
     }
 
-    pub(super) fn register_phenotype(&self, ribosome: RealRibosome) {
+    pub(super) fn add_ribosome_to_store(&self, ribosome: RealRibosome) {
         self.ribosome_store.share_mut(|d| d.add_ribosome(ribosome));
     }
 
@@ -764,7 +764,7 @@ impl Conductor {
         &self,
         app_id: InstalledAppId,
         role_id: AppRoleId,
-        dna_phenotype: DnaPhenotypeOpt,
+        dna_modifiers: DnaModifiersOpt,
         name: Option<String>,
     ) -> ConductorResult<InstalledCell> {
         let ribosome_store = &self.ribosome_store;
@@ -795,7 +795,7 @@ impl Conductor {
             let mut dna_file = ds
                 .get_dna_file(&base_cell_dna_hash)
                 .ok_or(DnaError::DnaMissing(base_cell_dna_hash))?
-                .modify_phenotype(dna_phenotype);
+                .update_modifiers(dna_modifiers);
             if let Some(name) = name {
                 dna_file = dna_file.set_name(name);
             }
@@ -816,7 +816,7 @@ impl Conductor {
             .await?;
         // register clone cell dna in ribosome store
         let clone_ribosome = RealRibosome::new(clone_dna)?;
-        self.register_phenotype(clone_ribosome);
+        self.add_ribosome_to_store(clone_ribosome);
         Ok(installed_clone_cell)
     }
 

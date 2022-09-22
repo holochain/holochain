@@ -596,7 +596,7 @@ impl ConductorHandleT for ConductorHandleImpl {
     async fn register_dna(&self, dna: DnaFile) -> ConductorResult<()> {
         let ribosome = RealRibosome::new(dna)?;
         self.register_genotype(ribosome.clone()).await?;
-        self.conductor.register_phenotype(ribosome);
+        self.conductor.add_ribosome_to_store(ribosome);
         Ok(())
     }
 
@@ -920,11 +920,11 @@ impl ConductorHandleT for ConductorHandleImpl {
         let CreateCloneCellPayload {
             app_id,
             role_id,
-            phenotype,
+            modifiers,
             membrane_proof,
             name,
         } = payload;
-        if !phenotype.has_some_option_set() {
+        if !modifiers.has_some_option_set() {
             return Err(ConductorError::CloneCellError(
                 "neither network_seed nor properties nor origin_time provided for clone cell"
                     .to_string(),
@@ -946,7 +946,7 @@ impl ConductorHandleT for ConductorHandleImpl {
             .add_clone_cell_to_app(
                 app_id.clone(),
                 role_id.clone(),
-                phenotype.serialized()?,
+                modifiers.serialized()?,
                 name,
             )
             .await?;

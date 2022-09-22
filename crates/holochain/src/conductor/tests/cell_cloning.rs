@@ -5,17 +5,17 @@ use holochain_types::{
     prelude::{ArchiveCloneCellPayload, CloneCellId, DeleteArchivedCloneCellsPayload},
 };
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::{AppRoleId, CloneId, DnaPhenotypeOpt};
+use holochain_zome_types::{AppRoleId, CloneId, DnaModifiersOpt};
 
 #[tokio::test(flavor = "multi_thread")]
-async fn create_clone_cell_without_phenotype_options_fails() {
+async fn create_clone_cell_without_modifiers_fails() {
     let conductor = SweetConductor::from_standard_config().await;
     let result = conductor
         .clone()
         .create_clone_cell(CreateCloneCellPayload {
             app_id: "".to_string(),
             role_id: "".to_string(),
-            phenotype: DnaPhenotypeOpt::none(),
+            modifiers: DnaModifiersOpt::none(),
             membrane_proof: None,
             name: None,
         })
@@ -41,7 +41,7 @@ async fn create_clone_cell_with_wrong_app_or_role_id_fails() {
         .create_clone_cell(CreateCloneCellPayload {
             app_id: "wrong_app_id".to_string(),
             role_id: role_id.clone(),
-            phenotype: DnaPhenotypeOpt::none().with_network_seed("seed".to_string()),
+            modifiers: DnaModifiersOpt::none().with_network_seed("seed".to_string()),
             membrane_proof: None,
             name: None,
         })
@@ -53,7 +53,7 @@ async fn create_clone_cell_with_wrong_app_or_role_id_fails() {
         .create_clone_cell(CreateCloneCellPayload {
             app_id: app.installed_app_id().clone(),
             role_id: "wrong_role_id".to_string(),
-            phenotype: DnaPhenotypeOpt::none().with_network_seed("seed".to_string()),
+            modifiers: DnaModifiersOpt::none().with_network_seed("seed".to_string()),
             membrane_proof: None,
             name: None,
         })
@@ -79,7 +79,7 @@ async fn create_clone_cell_run_twice_returns_correct_clone_indexes() {
         .create_clone_cell(CreateCloneCellPayload {
             app_id: app.installed_app_id().clone(),
             role_id: role_id.clone(),
-            phenotype: DnaPhenotypeOpt::none().with_network_seed("seed_1".to_string()),
+            modifiers: DnaModifiersOpt::none().with_network_seed("seed_1".to_string()),
             membrane_proof: None,
             name: None,
         })
@@ -95,7 +95,7 @@ async fn create_clone_cell_run_twice_returns_correct_clone_indexes() {
         .create_clone_cell(CreateCloneCellPayload {
             app_id: app.installed_app_id().clone(),
             role_id: role_id.clone(),
-            phenotype: DnaPhenotypeOpt::none().with_network_seed("seed_2".to_string()),
+            modifiers: DnaModifiersOpt::none().with_network_seed("seed_2".to_string()),
             membrane_proof: None,
             name: None,
         })
@@ -125,7 +125,7 @@ async fn create_clone_cell_creates_callable_cell() {
         .create_clone_cell(CreateCloneCellPayload {
             app_id: app.installed_app_id().clone(),
             role_id: role_id.clone(),
-            phenotype: DnaPhenotypeOpt::none().with_network_seed("seed".to_string()),
+            modifiers: DnaModifiersOpt::none().with_network_seed("seed".to_string()),
             membrane_proof: None,
             name: None,
         })
@@ -159,7 +159,7 @@ async fn app_info_includes_cloned_cells() {
         .create_clone_cell(CreateCloneCellPayload {
             app_id: app_id.to_string(),
             role_id: role_id.clone(),
-            phenotype: DnaPhenotypeOpt::none().with_network_seed("seed_1".to_string()),
+            modifiers: DnaModifiersOpt::none().with_network_seed("seed_1".to_string()),
             membrane_proof: None,
             name: None,
         })
@@ -194,7 +194,7 @@ async fn clone_cell_deletion() {
         .create_clone_cell(CreateCloneCellPayload {
             app_id: app_id.to_string(),
             role_id: role_id.clone(),
-            phenotype: DnaPhenotypeOpt::none().with_network_seed("seed_1".to_string()),
+            modifiers: DnaModifiersOpt::none().with_network_seed("seed_1".to_string()),
             membrane_proof: None,
             name: None,
         })

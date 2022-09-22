@@ -78,12 +78,12 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
             }
             RegisterDna(payload) => {
                 trace!(register_dna_payload = ?payload);
-                let RegisterDnaPayload { phenotype, source } = *payload;
-                let phenotype = phenotype.serialized().map_err(SerializationError::Bytes)?;
+                let RegisterDnaPayload { modifiers, source } = *payload;
+                let modifiers = modifiers.serialized().map_err(SerializationError::Bytes)?;
                 // network seed and properties from the register call will override any in the bundle
                 let dna = match source {
                     DnaSource::Hash(ref hash) => {
-                        if !phenotype.has_some_option_set() {
+                        if !modifiers.has_some_option_set() {
                             return Err(ConductorApiError::DnaReadError(
                                 "DnaSource::Hash requires `properties` or `network_seed` or `origin_time` to create a derived Dna"
                                     .to_string(),
@@ -97,16 +97,16 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                                     hash
                                 ))
                             })?
-                            .modify_phenotype(phenotype)
+                            .update_modifiers(modifiers)
                     }
                     DnaSource::Path(ref path) => {
                         let bundle = Bundle::read_from_file(path).await?;
                         let bundle: DnaBundle = bundle.into();
-                        let (dna_file, _original_hash) = bundle.into_dna_file(phenotype).await?;
+                        let (dna_file, _original_hash) = bundle.into_dna_file(modifiers).await?;
                         dna_file
                     }
                     DnaSource::Bundle(bundle) => {
-                        let (dna_file, _original_hash) = bundle.into_dna_file(phenotype).await?;
+                        let (dna_file, _original_hash) = bundle.into_dna_file(modifiers).await?;
                         dna_file
                     }
                 };
@@ -417,7 +417,7 @@ mod test {
         let dna_hash = dna.dna_hash().clone();
         let (dna_path, _tempdir) = write_fake_dna_file(dna.clone()).await.unwrap();
         let path_payload = RegisterDnaPayload {
-            phenotype: DnaPhenotypeOpt::none(),
+            modifiers: DnaModifiersOpt::none(),
             source: DnaSource::Path(dna_path.clone()),
         };
         let path_install_response = admin_api
@@ -430,7 +430,7 @@ mod test {
 
         // re-register idempotent
         let path_payload = RegisterDnaPayload {
-            phenotype: DnaPhenotypeOpt::none(),
+            modifiers: DnaModifiersOpt::none(),
             source: DnaSource::Path(dna_path.clone()),
         };
         let path1_install_response = admin_api
@@ -447,11 +447,11 @@ mod test {
 
         // register by hash
         let hash_payload = RegisterDnaPayload {
-            phenotype: DnaPhenotypeOpt::none(),
+            modifiers: DnaModifiersOpt::none(),
             source: DnaSource::Hash(dna_hash.clone()),
         };
 
-        // without phenotype seed should throw error
+        // without modifiers seed should throw error
         let hash_install_response = admin_api
             .handle_admin_request(AdminRequest::RegisterDna(Box::new(hash_payload)))
             .await;
@@ -463,7 +463,7 @@ mod test {
         // with a property should install and produce a different hash
         let json: serde_yaml::Value = serde_yaml::from_str("some prop: \"foo\"").unwrap();
         let hash_payload = RegisterDnaPayload {
-            phenotype: DnaPhenotypeOpt::none().with_properties(YamlProperties::new(json.clone())),
+            modifiers: DnaModifiersOpt::none().with_properties(YamlProperties::new(json.clone())),
             source: DnaSource::Hash(dna_hash.clone()),
         };
         let install_response = admin_api
@@ -476,7 +476,7 @@ mod test {
 
         // with a network seed should install and produce a different hash
         let hash_payload = RegisterDnaPayload {
-            phenotype: DnaPhenotypeOpt::none()
+            modifiers: DnaModifiersOpt::none()
                 .with_network_seed(String::from("12345678900000000000000")),
             source: DnaSource::Hash(dna_hash.clone()),
         };
@@ -497,7 +497,7 @@ mod test {
 
         // from a path with a same network seed should return the already registered hash so it's idempotent
         let path_payload = RegisterDnaPayload {
-            phenotype: DnaPhenotypeOpt::none()
+            modifiers: DnaModifiersOpt::none()
                 .with_network_seed(String::from("12345678900000000000000")),
             source: DnaSource::Path(dna_path.clone()),
         };
@@ -511,7 +511,7 @@ mod test {
 
         // from a path with different network seed should produce different hash
         let path_payload = RegisterDnaPayload {
-            phenotype: DnaPhenotypeOpt::none().with_network_seed(String::from("foo")),
+            modifiers: DnaModifiersOpt::none().with_network_seed(String::from("foo")),
             source: DnaSource::Path(dna_path),
         };
         let path3_install_response = admin_api
@@ -564,7 +564,7 @@ mod test {
 
         // now register a DNA
         let path_payload = RegisterDnaPayload {
-            phenotype: DnaPhenotypeOpt::none(),
+            modifiers: DnaModifiersOpt::none(),
             source: DnaSource::Path(dna_path),
         };
         let path_install_response = admin_api

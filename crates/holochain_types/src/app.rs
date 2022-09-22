@@ -55,9 +55,8 @@ pub enum CoordinatorSource {
 /// The instructions on how to get the DNA to be registered
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct RegisterDnaPayload {
-    /// Phenotype overrides
-    #[serde(flatten)]
-    pub phenotype: DnaPhenotypeOpt<YamlProperties>,
+    /// Modifiers overrides
+    pub modifiers: DnaModifiersOpt<YamlProperties>,
     /// Where to find the DNA
     #[serde(flatten)]
     pub source: DnaSource,
@@ -80,12 +79,11 @@ pub struct CreateCloneCellPayload {
     pub app_id: InstalledAppId,
     /// The DNA's role id to clone
     pub role_id: AppRoleId,
-    /// Phenotype options to set for the new cell
-    /// At least one of the options must be set to obtain a distinct hash for
+    /// Modifiers to set for the new cell.
+    /// At least one of the modifiers must be set to obtain a distinct hash for
     /// the clone cell's DNA.
-    #[serde(flatten)]
-    pub phenotype: DnaPhenotypeOpt<YamlProperties>,
-    /// Optionally set a proof of membership for the new cell
+    pub modifiers: DnaModifiersOpt<YamlProperties>,
+    /// Optionally set a proof of membership for the clone cell
     pub membrane_proof: Option<MembraneProof>,
     /// Optionally a name for the DNA clone
     pub name: Option<String>,
