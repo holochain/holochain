@@ -601,7 +601,7 @@ pub mod test {
         DnaFile::new(
             DnaDef {
                 name: "conductor_test".to_string(),
-                phenotype: DnaPhenotype {
+                modifiers: DnaModifiers {
                     network_seed: network_seed.to_string(),
                     properties: SerializedBytes::try_from(()).unwrap(),
                     origin_time: Timestamp::HOLOCHAIN_EPOCH,
