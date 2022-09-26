@@ -269,7 +269,7 @@ async fn three_way_gossip() {
     //     two reach consistency, then timeouts occur
 
     observability::test_run().ok();
-    let mut conductors = SweetConductorBatch::from_config(3, make_config(Some(0))).await;
+    let mut conductors = SweetConductorBatch::from_config(3, make_config(Some(1000))).await;
     let start = Instant::now();
 
     for c in conductors.iter() {
@@ -286,26 +286,16 @@ async fn three_way_gossip() {
     // Conductor 2 begins in shutdown state so it won't receive gossip.
     // conductors[2].shutdown().await;
 
-    let (cell_0,) = conductors[0]
-        .setup_app("app", [&dna_file])
-        .await
-        .unwrap()
-        .into_tuple();
-    let zome_0 = cell_0.zome(SweetEasyInline::COORDINATOR);
+    let cells: Vec<_> = futures::future::join_all(conductors.iter_mut().map(|c| async {
+        let (cell,) = c.setup_app("app", [&dna_file]).await.unwrap().into_tuple();
+        cell
+    }))
+    .await;
 
-    let (cell_1,) = conductors[1]
-        .setup_app("app", [&dna_file])
-        .await
-        .unwrap()
-        .into_tuple();
-    let zome_1 = cell_1.zome(SweetEasyInline::COORDINATOR);
-
-    let (cell_2,) = conductors[2]
-        .setup_app("app", &[dna_file])
-        .await
-        .unwrap()
-        .into_tuple();
-    let zome_2 = cell_2.zome(SweetEasyInline::COORDINATOR);
+    let zomes: Vec<_> = cells
+        .iter()
+        .map(|c| c.zome(SweetInlineZomes::COORDINATOR))
+        .collect();
 
     let size = 15_000;
     let num = 2;
@@ -314,14 +304,14 @@ async fn three_way_gossip() {
     for i in 0..num {
         let app_string = AppString(String::from_utf8(vec![42u8 + i as u8; size]).unwrap());
         let hash: ActionHash = conductors[0]
-            .call(&zome_0, "create_string", app_string.clone())
+            .call(&zomes[0], "create_string", app_string.clone())
             .await;
         hashes.push(hash);
         dbg!(start.elapsed());
     }
 
     conductors.exchange_peer_info().await;
-    consistency(&[&cell_0, &cell_1], 60 * 4, Duration::from_secs(1)).await;
+    consistency(&[&cells[0], &cells[1]], 60 * 4, Duration::from_secs(1)).await;
     tracing::info!(
         "CONSISTENCY REACHED between first two nodes in {:?}",
         start.elapsed()
@@ -329,7 +319,7 @@ async fn three_way_gossip() {
     dbg!(start.elapsed());
 
     let records_1: Vec<Option<Record>> = conductors[1]
-        .call(&zome_1, "read_multi", hashes.clone())
+        .call(&zomes[1], "read_multi", hashes.clone())
         .await;
     assert_eq!(records_1.len(), num);
     assert_eq!(
@@ -349,11 +339,11 @@ async fn three_way_gossip() {
     conductors[0].shutdown().await;
     // conductors[2].startup().await;
 
-    consistency(&[&cell_1, &cell_2], 60 * 4, Duration::from_secs(1)).await;
+    consistency(&[&cells[0], &cells[2]], 60 * 4, Duration::from_secs(1)).await;
 
     dbg!(start.elapsed());
 
-    let records_2: Vec<Option<Record>> = conductors[2].call(&zome_2, "read_multi", hashes).await;
+    let records_2: Vec<Option<Record>> = conductors[2].call(&zomes[2], "read_multi", hashes).await;
     assert_eq!(records_2, records_1);
 }
 
