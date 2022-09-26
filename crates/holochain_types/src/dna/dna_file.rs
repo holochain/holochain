@@ -207,7 +207,7 @@ impl DnaFile {
     /// and, hence, a different DnaHash.
     pub async fn with_properties(self, properties: SerializedBytes) -> Result<Self, DnaError> {
         let (mut dna, wasm): (DnaDef, Vec<wasm::DnaWasm>) = self.into();
-        dna.phenotype.properties = properties;
+        dna.modifiers.properties = properties;
         DnaFile::new(dna, wasm).await
     }
 
@@ -215,7 +215,7 @@ impl DnaFile {
     /// and, hence, a different DnaHash.
     pub async fn with_network_seed(self, network_seed: NetworkSeed) -> Result<Self, DnaError> {
         let (mut dna, wasm): (DnaDef, Vec<wasm::DnaWasm>) = self.into();
-        dna.phenotype.network_seed = network_seed;
+        dna.modifiers.network_seed = network_seed;
         DnaFile::new(dna, wasm).await
     }
 
@@ -255,11 +255,11 @@ impl DnaFile {
         clone
     }
 
-    /// Change the "phenotype" of this DNA -- the network seed, origin time and properties -- while
-    /// leaving the "genotype" of actual DNA code intact.
-    pub fn modify_phenotype(&self, dna_phenotype: DnaPhenotypeOpt) -> Self {
+    /// Change the DNA modifiers -- the network seed, origin time and properties -- while
+    /// leaving the actual DNA code intact.
+    pub fn update_modifiers(&self, dna_modifiers: DnaModifiersOpt) -> Self {
         let mut clone = self.clone();
-        clone.dna = DnaDefHashed::from_content_sync(clone.dna.modify_phenotype(dna_phenotype));
+        clone.dna = DnaDefHashed::from_content_sync(clone.dna.update_modifiers(dna_modifiers));
         clone
     }
 }

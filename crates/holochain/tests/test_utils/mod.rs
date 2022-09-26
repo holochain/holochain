@@ -189,7 +189,7 @@ pub async fn register_and_install_dna_named(
     timeout: u64,
 ) -> DnaHash {
     let register_payload = RegisterDnaPayload {
-        phenotype: DnaPhenotypeOpt {
+        modifiers: DnaModifiersOpt {
             properties,
             ..Default::default()
         },

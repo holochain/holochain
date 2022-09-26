@@ -117,10 +117,10 @@ impl AppBundle {
                 location,
                 version,
                 clone_limit,
-                phenotype,
+                modifiers,
                 deferred: _,
             } => {
-                self.resolve_cell_create(&location, version.as_ref(), clone_limit, phenotype)
+                self.resolve_cell_create(&location, version.as_ref(), clone_limit, modifiers)
                     .await?
             }
 
@@ -136,12 +136,12 @@ impl AppBundle {
                 location,
                 version,
                 clone_limit,
-                phenotype,
+                modifiers,
                 deferred: _,
             } => match self.resolve_cell_existing(&version, clone_limit) {
                 op @ CellProvisioningOp::Existing(_, _) => op,
                 CellProvisioningOp::NoMatch => {
-                    self.resolve_cell_create(&location, Some(&version), clone_limit, phenotype)
+                    self.resolve_cell_create(&location, Some(&version), clone_limit, modifiers)
                         .await?
                 }
                 CellProvisioningOp::Conflict(_) => {
@@ -169,11 +169,11 @@ impl AppBundle {
         location: &mr_bundle::Location,
         version: Option<&DnaVersionSpec>,
         clone_limit: u32,
-        phenotype: DnaPhenotypeOpt,
+        modifiers: DnaModifiersOpt,
     ) -> AppBundleResult<CellProvisioningOp> {
         let bytes = self.resolve(location).await?;
         let dna_bundle: DnaBundle = mr_bundle::Bundle::decode(&bytes)?.into();
-        let (dna_file, original_dna_hash) = dna_bundle.into_dna_file(phenotype).await?;
+        let (dna_file, original_dna_hash) = dna_bundle.into_dna_file(modifiers).await?;
         if let Some(spec) = version {
             if !spec.matches(original_dna_hash) {
                 return Ok(CellProvisioningOp::NoMatch);

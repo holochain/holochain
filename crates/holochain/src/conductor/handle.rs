@@ -245,8 +245,23 @@ pub trait ConductorHandleT: Send + Sync {
         payload: CreateCloneCellPayload,
     ) -> ConductorResult<InstalledCell>;
 
-    /// Destroy a cloned Cell
-    async fn destroy_clone_cell(self: Arc<Self>, cell_id: CellId) -> ConductorResult<()>;
+    /// Archive a clone cell for deletion.
+    async fn archive_clone_cell(
+        self: Arc<Self>,
+        payload: ArchiveCloneCellPayload,
+    ) -> ConductorResult<()>;
+
+    /// Restore an archived clone cell.
+    async fn restore_archived_clone_cell(
+        self: Arc<Self>,
+        payload: ArchiveCloneCellPayload,
+    ) -> ConductorResult<InstalledCell>;
+
+    /// Destroy all clone cells marked for deletion.
+    async fn delete_archived_clone_cells(
+        self: Arc<Self>,
+        payload: DeleteArchivedCloneCellsPayload,
+    ) -> ConductorResult<()>;
 
     /// Install Cells into ConductorState based on installation info, and run
     /// genesis on all new source chains
@@ -605,7 +620,7 @@ impl ConductorHandleT for ConductorHandleImpl {
     async fn register_dna(&self, dna: DnaFile) -> ConductorResult<()> {
         let ribosome = RealRibosome::new(dna)?;
         self.register_genotype(ribosome.clone()).await?;
-        self.conductor.register_phenotype(ribosome);
+        self.conductor.add_ribosome_to_store(ribosome);
         Ok(())
     }
 
@@ -976,11 +991,11 @@ impl ConductorHandleT for ConductorHandleImpl {
         let CreateCloneCellPayload {
             app_id,
             role_id,
-            phenotype,
+            modifiers,
             membrane_proof,
             name,
         } = payload;
-        if !phenotype.has_some_option_set() {
+        if !modifiers.has_some_option_set() {
             return Err(ConductorError::CloneCellError(
                 "neither network_seed nor properties nor origin_time provided for clone cell"
                     .to_string(),
@@ -1002,7 +1017,7 @@ impl ConductorHandleT for ConductorHandleImpl {
             .add_clone_cell_to_app(
                 app_id.clone(),
                 role_id.clone(),
-                phenotype.serialized()?,
+                modifiers.serialized()?,
                 name,
             )
             .await?;
@@ -1015,8 +1030,46 @@ impl ConductorHandleT for ConductorHandleImpl {
         Ok(installed_clone_cell)
     }
 
-    async fn destroy_clone_cell(self: Arc<Self>, _cell_id: CellId) -> ConductorResult<()> {
-        todo!()
+    async fn archive_clone_cell(
+        self: Arc<Self>,
+        payload: ArchiveCloneCellPayload,
+    ) -> ConductorResult<()> {
+        let ArchiveCloneCellPayload {
+            app_id,
+            clone_cell_id,
+        } = payload;
+        self.conductor
+            .archive_clone_cell(&app_id, &clone_cell_id)
+            .await?;
+        Ok(())
+    }
+
+    async fn restore_archived_clone_cell(
+        self: Arc<Self>,
+        payload: ArchiveCloneCellPayload,
+    ) -> ConductorResult<InstalledCell> {
+        let ArchiveCloneCellPayload {
+            app_id,
+            clone_cell_id,
+        } = payload;
+        let restored_cell = self
+            .conductor
+            .restore_clone_cell(&app_id, &clone_cell_id)
+            .await?;
+        self.create_and_add_initialized_cells_for_running_apps(self.clone(), Some(&app_id))
+            .await?;
+        Ok(restored_cell)
+    }
+
+    async fn delete_archived_clone_cells(
+        self: Arc<Self>,
+        payload: DeleteArchivedCloneCellsPayload,
+    ) -> ConductorResult<()> {
+        let DeleteArchivedCloneCellsPayload { app_id, role_id } = payload;
+        self.conductor
+            .delete_archived_clone_cells(&app_id, &role_id)
+            .await?;
+        Ok(())
     }
 
     async fn install_app(
