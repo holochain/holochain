@@ -255,6 +255,12 @@ impl Conductor {
     /// To actually wait for these tasks to complete, be sure to
     /// `take_shutdown_handle` to await for completion.
     pub(super) fn shutdown(&self) {
+        tracing::warn!(
+            "The gossip loops are not shut down.
+        If this shutdown is due to the conductor process being stopped, then this is no problem,
+        but if the conductor was running alongside others in the same process, then do not
+        expect a full shutdown. This will be fixed eventually."
+        );
         self.shutting_down
             .store(true, std::sync::atomic::Ordering::Relaxed);
         self.task_manager.share_ref(|tm| {

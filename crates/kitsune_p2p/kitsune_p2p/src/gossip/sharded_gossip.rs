@@ -273,10 +273,15 @@ impl ShardedGossip {
 
     async fn process_incoming_outgoing(&self) -> KitsuneResult<()> {
         let (incoming, outgoing) = self.pop_queues()?;
+        let gossip_type_char = match self.gossip.gossip_type {
+            GossipType::Recent => 'R',
+            GossipType::Historical => 'H',
+        };
 
         if let Some(msg) = outgoing.as_ref() {
             tracing::debug!(
-                "OUTGOING GOSSIP  => {:16} ({:10}) : {:?} -> {:?} [{}]",
+                "OUTGOING GOSSIP [{}]  => {:16} ({:10}) : {:?} -> {:?} [{}]",
+                gossip_type_char,
                 msg.2
                     .variant_type()
                     .to_string()
@@ -302,7 +307,8 @@ impl ShardedGossip {
             let outgoing = match self.gossip.process_incoming(con.peer_cert(), msg).await {
                 Ok(r) => {
                     tracing::debug!(
-                        "INCOMING GOSSIP <=  {:16} ({:10}) : {:?} -> {:?} [{}]",
+                        "INCOMING GOSSIP [{}] <=  {:16} ({:10}) : {:?} -> {:?} [{}]",
+                        gossip_type_char,
                         variant_type,
                         len,
                         con.peer_cert(),

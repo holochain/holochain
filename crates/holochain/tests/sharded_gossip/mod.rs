@@ -20,10 +20,12 @@ use kitsune_p2p::gossip::sharded_gossip::test_utils::{check_ops_boom, create_age
 use kitsune_p2p::KitsuneP2pConfig;
 use kitsune_p2p_types::config::RECENT_THRESHOLD_DEFAULT;
 
-fn make_config(recent_threshold: Option<u64>) -> ConductorConfig {
+fn make_config(recent: bool, historical: bool, recent_threshold: Option<u64>) -> ConductorConfig {
     let mut tuning =
         kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
     tuning.gossip_strategy = "sharded-gossip".to_string();
+    tuning.disable_recent_gossip = !recent;
+    tuning.disable_historical_gossip = !historical;
     tuning.danger_gossip_recent_threshold_secs =
         recent_threshold.unwrap_or(RECENT_THRESHOLD_DEFAULT.as_secs());
     tuning.gossip_inbound_target_mbps = 10000.0;
@@ -50,7 +52,8 @@ async fn fullsync_sharded_gossip() -> anyhow::Result<()> {
     let _g = observability::test_run().ok();
     const NUM_CONDUCTORS: usize = 2;
 
-    let mut conductors = SweetConductorBatch::from_config(NUM_CONDUCTORS, make_config(None)).await;
+    let mut conductors =
+        SweetConductorBatch::from_config(NUM_CONDUCTORS, make_config(true, true, None)).await;
     for c in conductors.iter() {
         c.update_dev_settings(DevSettingsDelta {
             publish: Some(false),
@@ -103,7 +106,7 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
     const NUM_OPS: usize = 100;
 
     let mut conductors =
-        SweetConductorBatch::from_config(NUM_CONDUCTORS, make_config(Some(0))).await;
+        SweetConductorBatch::from_config(NUM_CONDUCTORS, make_config(false, true, Some(0))).await;
     for c in conductors.iter() {
         c.update_dev_settings(DevSettingsDelta {
             publish: Some(false),
@@ -188,7 +191,8 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
 #[tokio::test(flavor = "multi_thread")]
 async fn large_entry_test() {
     observability::test_run().ok();
-    let mut conductors = SweetConductorBatch::from_config(2, make_config(Some(0))).await;
+    let mut conductors =
+        SweetConductorBatch::from_config(2, make_config(false, true, Some(0))).await;
     let start = Instant::now();
 
     for c in conductors.iter() {
@@ -269,7 +273,7 @@ async fn three_way_gossip() {
     //     two reach consistency, then timeouts occur
 
     observability::test_run().ok();
-    let mut conductors = SweetConductorBatch::from_config(3, make_config(Some(1000))).await;
+    let mut conductors = SweetConductorBatch::from_config(10, make_config(true, false, None)).await;
     let start = Instant::now();
 
     for c in conductors.iter() {
@@ -283,9 +287,6 @@ async fn three_way_gossip() {
         .await
         .unwrap();
 
-    // Conductor 2 begins in shutdown state so it won't receive gossip.
-    // conductors[2].shutdown().await;
-
     let cells: Vec<_> = futures::future::join_all(conductors.iter_mut().map(|c| async {
         let (cell,) = c.setup_app("app", [&dna_file]).await.unwrap().into_tuple();
         cell
@@ -296,6 +297,9 @@ async fn three_way_gossip() {
         .iter()
         .map(|c| c.zome(SweetInlineZomes::COORDINATOR))
         .collect();
+
+    // Conductor 2 begins in shutdown state so it won't receive gossip.
+    conductors[2].shutdown().await;
 
     let size = 15_000;
     let num = 2;
@@ -311,7 +315,7 @@ async fn three_way_gossip() {
     }
 
     conductors.exchange_peer_info().await;
-    consistency(&[&cells[0], &cells[1]], 60 * 4, Duration::from_secs(1)).await;
+    consistency(&[&cells[0], &cells[1]], 5, Duration::from_secs(1)).await;
     tracing::info!(
         "CONSISTENCY REACHED between first two nodes in {:?}",
         start.elapsed()
@@ -337,9 +341,15 @@ async fn three_way_gossip() {
     // Shut down conductor 0 and start up conductor 2, so that conductor 2 has to receive
     // all data from conductor 1.
     conductors[0].shutdown().await;
-    // conductors[2].startup().await;
+    conductors[1].shutdown().await;
+    conductors[2].startup().await;
 
-    consistency(&[&cells[0], &cells[2]], 60 * 4, Duration::from_secs(1)).await;
+    consistency(
+        &[&cells[0], &cells[1], &cells[2]],
+        5,
+        Duration::from_secs(1),
+    )
+    .await;
 
     dbg!(start.elapsed());
 
@@ -357,7 +367,7 @@ async fn fullsync_sharded_local_gossip() -> anyhow::Result<()> {
 
     let _g = observability::test_run().ok();
 
-    let mut conductor = SweetConductor::from_config(make_config(None)).await;
+    let mut conductor = SweetConductor::from_config(make_config(true, true, None)).await;
     conductor.update_dev_settings(DevSettingsDelta {
         publish: Some(false),
         ..Default::default()

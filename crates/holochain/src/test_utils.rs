@@ -583,7 +583,11 @@ pub async fn wait_for_integration<Db: ReadAccess<DbKindDht>>(
 ) {
     for i in 0..num_attempts {
         let count = display_integration(db).await;
-        if count == expected_count {
+        if count >= expected_count {
+            if count > expected_count {
+                tracing::warn!("count > expected_count, meaning you may not be accounting for all nodes in this test.
+                Consistency may not be complete.")
+            }
             return;
         } else {
             let total_time_waited = delay * i as u32;
@@ -638,7 +642,11 @@ pub async fn wait_for_integration_with_others<Db: ReadAccess<DbKindDht>>(
         };
         let change = total.checked_sub(last_total).expect("LOST A VALUE");
         last_total = total;
-        if count.integrated == expected_count {
+        if count.integrated >= expected_count {
+            if count.integrated > expected_count {
+                tracing::warn!("count > expected_count, meaning you may not be accounting for all nodes in this test.
+                Consistency may not be complete.")
+            }
             return;
         } else {
             let time_waited = this_start.elapsed().as_secs();
