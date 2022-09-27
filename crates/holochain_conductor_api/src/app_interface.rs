@@ -47,6 +47,18 @@ pub enum AppRequest {
     /// [`AppResponse::CloneCellCreated`]
     CreateCloneCell(Box<CreateCloneCellPayload>),
 
+    /// Archive a clone cell.
+    ///
+    /// Providing a [`CloneId`] or [`CellId`], archive an existing clone cell.
+    /// When the clone cell exists, it is archived and can not be called any
+    /// longer. If it doesn't exist, the call is a no-op.
+    ///
+    /// # Returns
+    ///
+    /// [`AppResponse::CloneCellArchived`] if the clone cell existed
+    /// and was archived.
+    ArchiveCloneCell(Box<ArchiveCloneCellPayload>),
+
     #[deprecated = "use ZomeCall"]
     ZomeCallInvocation(Box<ZomeCall>),
 
@@ -86,6 +98,9 @@ pub enum AppResponse {
     /// The response contains an [`InstalledCell`] with the created clone
     /// cell's [`CloneId`] and [`CellId`].
     CloneCellCreated(InstalledCell),
+
+    /// An existing clone cell has been archived.
+    CloneCellArchived,
 
     #[deprecated = "use ZomeCall"]
     ZomeCallInvocation(Box<ExternIO>),
@@ -141,7 +156,7 @@ impl InstalledAppInfo {
         let installed_app_id = app.id().clone();
         let status = app.status().clone().into();
         let clone_cells = app
-            .cloned_cells()
+            .clone_cells()
             .map(|cell| (cell.0.as_app_role_id(), cell.1));
         let cells = app.provisioned_cells().chain(clone_cells);
         let cell_data = cells

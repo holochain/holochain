@@ -13,10 +13,11 @@ pub(crate) async fn graft_records_onto_source_chain(
     // Note: This doesn't require the cell be installed.
     let space = handle.conductor.get_or_create_space(cell_id.dna_hash())?;
 
+    let chc = None;
     let network = handle
         .conductor
         .holochain_p2p()
-        .to_dna(cell_id.dna_hash().clone());
+        .to_dna(cell_id.dna_hash().clone(), chc);
 
     let source_chain: SourceChain = space
         .source_chain(handle.keystore().clone(), cell_id.agent_pubkey().clone())
@@ -124,10 +125,11 @@ async fn validate_records(
 ) -> ConductorApiResult<()> {
     let space = handle.conductor.get_or_create_space(cell_id.dna_hash())?;
     let ribosome = handle.get_ribosome(cell_id.dna_hash())?;
+    let chc = None;
     let network = handle
         .conductor
         .holochain_p2p()
-        .to_dna(cell_id.dna_hash().clone());
+        .to_dna(cell_id.dna_hash().clone(), chc);
 
     // Create a raw source chain to validate against because
     // genesis may not have been run yet.
@@ -168,8 +170,7 @@ async fn validate_records(
         handle.clone(),
         ribosome,
     )
-    .await
-    .map_err(Box::new)?;
+    .await?;
 
     Ok(())
 }

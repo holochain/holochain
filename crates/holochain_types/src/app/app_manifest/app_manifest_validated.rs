@@ -5,7 +5,7 @@
 //! may contain various invalid combinations of data. In contrast, these types
 //! are structured to ensure validity, and are used internally by Holochain.
 
-use holochain_zome_types::DnaPhenotypeOpt;
+use holochain_zome_types::DnaModifiersOpt;
 
 use super::error::{AppManifestError, AppManifestResult};
 use crate::app::app_manifest::current::{DnaLocation, DnaVersionSpec};
@@ -53,7 +53,7 @@ pub enum AppRoleManifestValidated {
         clone_limit: u32,
         deferred: bool,
         location: DnaLocation,
-        phenotype: DnaPhenotypeOpt,
+        modifiers: DnaModifiersOpt,
         version: Option<DnaVersionSpec>,
     },
     /// Always create a new Cell when installing the App,
@@ -62,7 +62,7 @@ pub enum AppRoleManifestValidated {
         clone_limit: u32,
         deferred: bool,
         location: DnaLocation,
-        phenotype: DnaPhenotypeOpt,
+        modifiers: DnaModifiersOpt,
         version: Option<DnaVersionSpec>,
     },
     /// Require that a Cell is already installed which matches the DNA version
@@ -78,7 +78,7 @@ pub enum AppRoleManifestValidated {
         clone_limit: u32,
         deferred: bool,
         location: DnaLocation,
-        phenotype: DnaPhenotypeOpt,
+        modifiers: DnaModifiersOpt,
         version: DnaVersionSpec,
     },
     /// Disallow provisioning altogether. In this case, we expect

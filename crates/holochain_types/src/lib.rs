@@ -18,6 +18,7 @@ pub mod activity;
 pub mod app;
 pub mod autonomic;
 pub mod chain;
+pub mod chc;
 pub mod combinators;
 pub mod db;
 pub mod db_cache;

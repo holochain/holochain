@@ -732,7 +732,7 @@ fixturator!(
         name: StringFixturator::new_indexed(Empty, get_fixt_index!())
             .next()
             .unwrap(),
-        phenotype: DnaPhenotype {
+        modifiers: DnaModifiers {
             network_seed: StringFixturator::new_indexed(Empty, get_fixt_index!())
                 .next()
                 .unwrap(),
@@ -753,7 +753,7 @@ fixturator!(
         name: StringFixturator::new_indexed(Unpredictable, get_fixt_index!())
             .next()
             .unwrap(),
-        phenotype: DnaPhenotype {
+        modifiers: DnaModifiers {
             network_seed: StringFixturator::new_indexed(Unpredictable, get_fixt_index!())
                 .next()
                 .unwrap(),
@@ -774,7 +774,7 @@ fixturator!(
         name: StringFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap(),
-        phenotype: DnaPhenotype {
+        modifiers: DnaModifiers {
             network_seed: StringFixturator::new_indexed(Predictable, get_fixt_index!())
                 .next()
                 .unwrap(),

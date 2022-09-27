@@ -107,8 +107,8 @@ impl Query for GetAgentActivityQuery {
                     if let Some(fork) = fork {
                         state.status = Some(ChainStatus::Forked(ChainFork {
                             fork_seq: seq,
-                            first_action: action.as_hash().clone(),
-                            second_action: fork.as_hash().clone(),
+                            first_action: action.get_hash().clone(),
+                            second_action: fork.get_hash().clone(),
                         }));
                     }
                 }
@@ -119,7 +119,7 @@ impl Query for GetAgentActivityQuery {
                 if state.status.is_none() {
                     state.status = Some(ChainStatus::Invalid(ChainHead {
                         action_seq: action.action_seq(),
-                        hash: action.as_hash().clone(),
+                        hash: action.get_hash().clone(),
                     }));
                 }
                 state.rejected.push(action);
@@ -180,7 +180,7 @@ fn compute_chain_status(state: &State) -> ChainStatus {
             let last = state.valid.last().expect("Safe due to is_empty check");
             ChainStatus::Valid(ChainHead {
                 action_seq: last.action_seq(),
-                hash: last.as_hash().clone(),
+                hash: last.get_hash().clone(),
             })
         }
     })
@@ -209,13 +209,13 @@ fn compute_highest_observed(state: &State) -> Option<HighestObserved> {
         }
     };
     if let Some(valid) = state.valid.last() {
-        check_highest(valid.action_seq(), valid.as_hash());
+        check_highest(valid.action_seq(), valid.get_hash());
     }
     if let Some(rejected) = state.rejected.last() {
-        check_highest(rejected.action_seq(), rejected.as_hash());
+        check_highest(rejected.action_seq(), rejected.get_hash());
     }
     if let Some(pending) = state.pending.last() {
-        check_highest(pending.action_seq(), pending.as_hash());
+        check_highest(pending.action_seq(), pending.get_hash());
     }
     highest_observed.map(|action_seq| HighestObserved {
         action_seq,

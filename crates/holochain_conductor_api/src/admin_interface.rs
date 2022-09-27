@@ -338,6 +338,20 @@ pub enum AdminRequest {
         /// The records to be inserted into the source chain.
         records: Vec<Record>,
     },
+
+    /// Restore a clone cell that was previously archived.
+    ///
+    /// # Returns
+    ///
+    /// [`AdminResponse::CloneCellRestored`]
+    RestoreCloneCell(Box<RestoreCloneCellPayload>),
+
+    /// Delete all clone cells that were previously archived.
+    ///
+    /// # Returns
+    ///
+    /// [`AdminResponse::ArchivedCloneCellsDeleted`]
+    DeleteArchivedCloneCells(Box<DeleteArchivedCloneCellsPayload>),
 }
 
 /// Represents the possible responses to an [`AdminRequest`]
@@ -489,6 +503,12 @@ pub enum AdminResponse {
 
     /// The successful response to an [`AdminRequest::GraftRecords`].
     RecordsGrafted,
+
+    // The successful response to an [`AdminRequest::RestoreCloneCell`].
+    CloneCellRestored(InstalledCell),
+
+    /// The successful response to an [`AdminRequest::DeleteArchivedCloneCells`].
+    ArchivedCloneCellsDeleted,
 }
 
 /// Error type that goes over the websocket wire.

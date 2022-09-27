@@ -14,6 +14,7 @@ use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::actor::HolochainP2pRefToDna;
+use holochain_p2p::ChcImpl;
 use holochain_p2p::HolochainP2pDna;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::prelude::test_db_dir;
@@ -43,13 +44,20 @@ pub struct CellHostFnCaller {
 }
 
 impl CellHostFnCaller {
-    pub async fn new(cell_id: &CellId, handle: &ConductorHandle, dna_file: &DnaFile) -> Self {
+    pub async fn new(
+        cell_id: &CellId,
+        handle: &ConductorHandle,
+        dna_file: &DnaFile,
+        chc: Option<ChcImpl>,
+    ) -> Self {
         let authored_db = handle.get_authored_db(cell_id.dna_hash()).unwrap();
         let dht_db = handle.get_dht_db(cell_id.dna_hash()).unwrap();
         let dht_db_cache = handle.get_dht_db_cache(cell_id.dna_hash()).unwrap();
         let cache = handle.get_cache_db(cell_id).unwrap();
         let keystore = handle.keystore().clone();
-        let network = handle.holochain_p2p().to_dna(cell_id.dna_hash().clone());
+        let network = handle
+            .holochain_p2p()
+            .to_dna(cell_id.dna_hash().clone(), chc);
         let triggers = handle.get_cell_triggers(cell_id).unwrap();
         let cell_conductor_api = CellConductorApi::new(handle.clone(), cell_id.clone());
 
@@ -136,7 +144,7 @@ impl ConductorTestData {
             for cell_id in cell_ids {
                 cell_apis.insert(
                     cell_id.clone(),
-                    CellHostFnCaller::new(cell_id, &handle, dna_file).await,
+                    CellHostFnCaller::new(cell_id, &handle, dna_file, None).await,
                 );
             }
         }
@@ -176,7 +184,7 @@ impl ConductorTestData {
         let dna_file = DnaFile::new(
             DnaDef {
                 name: "conductor_test".to_string(),
-                phenotype: DnaPhenotype {
+                modifiers: DnaModifiers {
                     network_seed: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
                     properties: SerializedBytes::try_from(()).unwrap(),
                     origin_time: Timestamp::HOLOCHAIN_EPOCH,
@@ -233,7 +241,7 @@ impl ConductorTestData {
             install_app("bob_app", cell_data, vec![dna_file.clone()], self.handle()).await;
             self.cell_apis.insert(
                 bob_cell_id.clone(),
-                CellHostFnCaller::new(&bob_cell_id, &self.handle(), &dna_file).await,
+                CellHostFnCaller::new(&bob_cell_id, &self.handle(), &dna_file, None).await,
             );
         }
     }

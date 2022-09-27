@@ -456,7 +456,7 @@ async fn setup(
     let dna_file = DnaFile::new(
         DnaDef {
             name: "conductor_test".to_string(),
-            phenotype: DnaPhenotype {
+            modifiers: DnaModifiers {
                 network_seed,
                 properties: SerializedBytes::try_from(()).unwrap(),
                 origin_time: Timestamp::HOLOCHAIN_EPOCH,

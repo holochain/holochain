@@ -35,6 +35,7 @@ use hash_type::AnyDht;
 use holo_hash::*;
 use holochain_cascade::authority;
 use holochain_p2p::event::CountersigningSessionNegotiationMessage;
+use holochain_p2p::ChcImpl;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_sqlite::prelude::*;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
@@ -163,6 +164,7 @@ impl Cell {
     /// Performs the Genesis workflow the Cell, ensuring that its initial
     /// records are committed. This is a prerequisite for any other interaction
     /// with the SourceChain
+    #[allow(clippy::too_many_arguments)]
     pub async fn genesis<Ribosome>(
         id: CellId,
         conductor_handle: ConductorHandle,
@@ -171,6 +173,7 @@ impl Cell {
         dht_db_cache: DhtDbQueryCache,
         ribosome: Ribosome,
         membrane_proof: Option<MembraneProof>,
+        chc: Option<ChcImpl>,
     ) -> CellResult<()>
     where
         Ribosome: RibosomeT + 'static,
@@ -187,17 +190,22 @@ impl Cell {
             .map_err(ConductorApiError::from)
             .map_err(Box::new)?;
 
+        // exit early if genesis has already run
+        if workspace.has_genesis(id.agent_pubkey().clone()).await? {
+            return Ok(());
+        }
+
         let args = GenesisWorkflowArgs::new(
             dna_file,
             id.agent_pubkey().clone(),
             membrane_proof,
             ribosome,
             dht_db_cache,
+            chc,
         );
 
         genesis_workflow(workspace, conductor_api, args)
             .await
-            .map_err(Box::new)
             .map_err(ConductorApiError::from)
             .map_err(Box::new)?;
 
