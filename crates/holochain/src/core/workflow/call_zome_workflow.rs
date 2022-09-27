@@ -75,38 +75,48 @@ where
     if should_write {
         let is_empty = workspace.source_chain().is_empty()?;
         let countersigning_op = workspace.source_chain().countersigning_op()?;
-        let flushed_actions: Vec<SignedActionHashed> = HostFnWorkspace::from(workspace.clone())
+        match HostFnWorkspace::from(workspace.clone())
             .flush(&network)
-            .await?;
-        if !is_empty {
-            match countersigning_op {
-                Some(op) => {
-                    if let Err(error_response) =
-                        super::countersigning_workflow::countersigning_publish(&network, op).await
-                    {
-                        return Ok(Ok(error_response));
+            .await
+        {
+            Ok(flushed_actions) => {
+                // Q: what is the purpose of checking for an empty chain? When would this ever happen? The chain should
+                //    be genesis'd by now, right?
+                if !is_empty {
+                    match countersigning_op {
+                        Some(op) => {
+                            if let Err(error_response) =
+                                super::countersigning_workflow::countersigning_publish(&network, op)
+                                    .await
+                            {
+                                return Ok(Ok(error_response));
+                            }
+                        }
+                        None => {
+                            trigger_publish_dht_ops.trigger(&"trigger_publish_dht_ops");
+                            trigger_integrate_dht_ops.trigger(&"trigger_integrate_dht_ops");
+                        }
                     }
                 }
-                None => {
-                    trigger_publish_dht_ops.trigger(&"trigger_publish_dht_ops");
-                    trigger_integrate_dht_ops.trigger(&"trigger_integrate_dht_ops");
+
+                // Only send post commit if this is a coordinator zome.
+                if let Some(coordinator_zome) = coordinator_zome {
+                    send_post_commit(
+                        conductor_handle,
+                        workspace,
+                        network,
+                        keystore,
+                        flushed_actions,
+                        vec![coordinator_zome],
+                    )
+                    .await?;
                 }
             }
+            err => {
+                err?;
+            }
         }
-
-        // Only send post commit if this is a coordinator zome.
-        if let Some(coordinator_zome) = coordinator_zome {
-            send_post_commit(
-                conductor_handle,
-                workspace,
-                network,
-                keystore,
-                flushed_actions,
-                vec![coordinator_zome],
-            )
-            .await?;
-        }
-    }
+    };
 
     Ok(result)
 }

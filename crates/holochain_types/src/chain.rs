@@ -38,17 +38,17 @@ impl AgentActivityExt for AgentActivityResponse {}
 /// Abstraction over an item in a chain.
 // Alternate implementations are only used for testing, so this should not
 // add a large monomorphization overhead
-pub trait ChainItem: Clone + PartialEq + Eq + std::fmt::Debug {
+pub trait ChainItem: Clone + PartialEq + Eq + std::fmt::Debug + Send + Sync {
     /// The type used to represent a hash of this item
-    type Hash: Clone
+    type Hash: Into<ActionHash>
+        + Clone
         + PartialEq
         + Eq
         + Ord
         + std::hash::Hash
         + std::fmt::Debug
         + Send
-        + Sync
-        + Into<ActionHash>;
+        + Sync;
 
     /// The sequence in the chain
     fn seq(&self) -> u32;
@@ -59,6 +59,9 @@ pub trait ChainItem: Clone + PartialEq + Eq + std::fmt::Debug {
     /// The hash of the previous item
     fn prev_hash(&self) -> Option<&Self::Hash>;
 }
+
+/// Alias for getting the associated hash type of a ChainItem
+pub type ChainItemHash<I> = <I as ChainItem>::Hash;
 
 impl ChainItem for ActionHashed {
     type Hash = ActionHash;

@@ -42,7 +42,7 @@ async fn provisioning_1_create() {
     let agent = fixt!(AgentPubKey);
     let (bundle, dna) = app_bundle_fixture().await;
 
-    // Apply the phenotype overrides specified in the manifest fixture
+    // Apply the modifier overrides specified in the manifest fixture
     let dna = dna
         .with_network_seed("network_seed".to_string())
         .await

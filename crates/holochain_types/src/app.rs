@@ -55,9 +55,8 @@ pub enum CoordinatorSource {
 /// The instructions on how to get the DNA to be registered
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct RegisterDnaPayload {
-    /// Phenotype overrides
-    #[serde(flatten)]
-    pub phenotype: DnaPhenotypeOpt<YamlProperties>,
+    /// Modifier overrides
+    pub modifiers: DnaModifiersOpt<YamlProperties>,
     /// Where to find the DNA
     #[serde(flatten)]
     pub source: DnaSource,
@@ -79,20 +78,18 @@ pub struct CreateCloneCellPayload {
     /// The app id that the DNA to clone belongs to
     pub app_id: InstalledAppId,
     /// The DNA's role id to clone
-    /// The Role id under which to create this clone
     pub role_id: AppRoleId,
-    /// Phenotype options to set for the new cell.
-    /// At least one of the options must be set to obtain a distinct hash for
+    /// Modifiers to set for the new cell.
+    /// At least one of the modifiers must be set to obtain a distinct hash for
     /// the clone cell's DNA.
-    #[serde(flatten)]
-    pub phenotype: DnaPhenotypeOpt<YamlProperties>,
-    /// Optionally set a proof of membership for the new cell
+    pub modifiers: DnaModifiersOpt<YamlProperties>,
+    /// Optionally set a proof of membership for the clone cell
     pub membrane_proof: Option<MembraneProof>,
     /// Optionally a name for the DNA clone
     pub name: Option<String>,
 }
 
-/// Ways of identifying a clone cell.
+/// Ways of specifying a clone cell.
 #[derive(Clone, Debug, Display, serde::Serialize, serde::Deserialize)]
 #[serde(untagged)]
 pub enum CloneCellId {
@@ -102,13 +99,25 @@ pub enum CloneCellId {
     CellId(CellId),
 }
 
-/// Arguments to identify the clone cell to be deleted.
+/// Arguments to specify the clone cell to be archived.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct DeleteCloneCellPayload {
+pub struct ArchiveCloneCellPayload {
     /// The app id that the clone cell belongs to
     pub app_id: InstalledAppId,
-    /// The Role ID under which to create this clone
+    /// The clone id or cell id of the clone cell
     pub clone_cell_id: CloneCellId,
+}
+
+/// Argumtents to specify the clone cell to be restored.
+pub type RestoreCloneCellPayload = ArchiveCloneCellPayload;
+
+/// Arguments to delete archived clone cells of an app.
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct DeleteArchivedCloneCellsPayload {
+    /// The app id that the clone cells belong to
+    pub app_id: InstalledAppId,
+    /// The role id that the clone cells belong to
+    pub role_id: AppRoleId,
 }
 
 /// A collection of [DnaHash]es paired with an [AgentPubKey] and an app id
@@ -452,14 +461,14 @@ impl InstalledAppCommon {
     }
 
     /// Accessor
-    pub fn cloned_cells(&self) -> impl Iterator<Item = (&CloneId, &CellId)> {
+    pub fn clone_cells(&self) -> impl Iterator<Item = (&CloneId, &CellId)> {
         self.role_assignments
             .iter()
             .flat_map(|app_role_assignment| app_role_assignment.1.clones.iter())
     }
 
     /// Accessor
-    pub fn cloned_cells_for_role_id(
+    pub fn clone_cells_for_role_id(
         &self,
         role_id: &AppRoleId,
     ) -> Option<&HashMap<CloneId, CellId>> {
@@ -470,15 +479,15 @@ impl InstalledAppCommon {
     }
 
     /// Accessor
-    pub fn cloned_cell_ids(&self) -> impl Iterator<Item = &CellId> {
-        self.cloned_cells().map(|(_, cell_id)| cell_id)
+    pub fn clone_cell_ids(&self) -> impl Iterator<Item = &CellId> {
+        self.clone_cells().map(|(_, cell_id)| cell_id)
     }
 
     /// Iterator of all cells, both provisioned and cloned
     pub fn all_cells(&self) -> impl Iterator<Item = &CellId> {
         self.provisioned_cells()
             .map(|(_, c)| c)
-            .chain(self.cloned_cell_ids())
+            .chain(self.clone_cell_ids())
     }
 
     /// Iterator of all "required" cells, meaning Cells which must be running
@@ -506,7 +515,7 @@ impl InstalledAppCommon {
         &self.role_assignments
     }
 
-    /// Add a cloned cell.
+    /// Add a clone cell.
     pub fn add_clone(&mut self, role_id: &AppRoleId, cell_id: &CellId) -> AppResult<CloneId> {
         let app_role_assignment = self.role_mut(role_id)?;
         assert_eq!(
@@ -535,28 +544,96 @@ impl InstalledAppCommon {
     }
 
     /// Get a clone cell id from its clone id.
-    pub fn get_clone_cell_id(&self, clone_id: &CloneId) -> AppResult<&CellId> {
-        self.role(&clone_id.as_base_role_id())?
-            .clones
-            .get(clone_id)
-            .ok_or_else(|| AppError::CloneCellNotFound(CloneCellId::CloneId(clone_id.clone())))
+    pub fn get_clone_cell_id(&self, clone_cell_id: &CloneCellId) -> AppResult<CellId> {
+        let cell_id = match clone_cell_id {
+            CloneCellId::CellId(cell_id) => cell_id,
+            CloneCellId::CloneId(clone_id) => self
+                .role(&clone_id.as_base_role_id())?
+                .clones
+                .get(clone_id)
+                .ok_or_else(|| {
+                    AppError::CloneCellNotFound(CloneCellId::CloneId(clone_id.clone()))
+                })?,
+        };
+        Ok(cell_id.clone())
     }
 
-    /// Remove a cloned cell.
-    pub fn remove_clone(&mut self, clone_cell_id: &CloneCellId) -> AppResult<bool> {
-        let clone = self.clone();
+    /// Get the clone id from either clone or cell id.
+    pub fn get_clone_id(&self, clone_cell_id: &CloneCellId) -> AppResult<CloneId> {
         let clone_id = match clone_cell_id {
             CloneCellId::CloneId(id) => id,
             CloneCellId::CellId(id) => {
-                clone
-                    .cloned_cells()
+                self.clone_cells()
                     .find(|(_, cell_id)| *cell_id == id)
                     .ok_or_else(|| AppError::CloneCellNotFound(CloneCellId::CellId(id.clone())))?
                     .0
             }
         };
-        let role = self.role_mut(&clone_id.as_base_role_id())?;
-        Ok(role.clones.remove(clone_id).is_some())
+        Ok(clone_id.clone())
+    }
+
+    /// Archive a clone cell.
+    ///
+    /// Removes the cell from the list of clones and it is not accessible any
+    /// longer.
+    pub fn archive_clone_cell(&mut self, clone_id: &CloneId) -> AppResult<()> {
+        let app_role_assignment = self.role_mut(&clone_id.as_base_role_id())?;
+        // remove clone from role's clones map
+        match app_role_assignment.clones.remove(clone_id) {
+            None => Err(AppError::CloneCellNotFound(CloneCellId::CloneId(
+                clone_id.to_owned(),
+            ))),
+            Some(cell_id) => {
+                // insert clone into archived clones map
+                let insert_result = app_role_assignment
+                    .archived_clones
+                    .insert(clone_id.to_owned(), cell_id);
+                assert!(
+                    insert_result.is_none(),
+                    "archive: clone cell is already archived"
+                );
+                Ok(())
+            }
+        }
+    }
+
+    /// Transformer
+    /// Restore an archived clone cell.
+    ///
+    /// The clone cell is added back to the list of clones and can be accessed
+    /// again.
+    ///
+    /// # Returns
+    /// The restored clone cell.
+    pub fn restore_clone_cell(&mut self, clone_id: &CloneId) -> AppResult<InstalledCell> {
+        let app_role_assignment = self.role_mut(&clone_id.as_base_role_id())?;
+        // remove clone from archived clones map
+        match app_role_assignment.archived_clones.remove(clone_id) {
+            None => Err(AppError::CloneCellNotFound(CloneCellId::CloneId(
+                clone_id.to_owned(),
+            ))),
+            Some(cell_id) => {
+                // insert clone back into role's clones map
+                let insert_result = app_role_assignment
+                    .clones
+                    .insert(clone_id.to_owned(), cell_id.clone());
+                assert!(
+                    insert_result.is_none(),
+                    "restore: clone cell already exists"
+                );
+                Ok(InstalledCell {
+                    role_id: clone_id.as_app_role_id().to_owned(),
+                    cell_id,
+                })
+            }
+        }
+    }
+
+    /// Delete all archived clone cells.
+    pub fn delete_archived_clone_cells_for_role(&mut self, role_id: &AppRoleId) -> AppResult<()> {
+        let app_role_assignment = self.role_mut(role_id)?;
+        app_role_assignment.archived_clones.clear();
+        Ok(())
     }
 
     /// Accessor
@@ -614,6 +691,7 @@ impl InstalledAppCommon {
                     clones: HashMap::new(),
                     clone_limit: 256,
                     next_clone_index: 0,
+                    archived_clones: HashMap::new(),
                 };
                 (role_id, role)
             })
@@ -838,13 +916,17 @@ pub struct AppRoleAssignment {
     /// If false, then `base_cell_id` is just recording what that cell will be
     /// called in the future.
     is_provisioned: bool,
-    /// The number of allowed cloned cells.
+    /// The number of allowed clone cells.
     clone_limit: u32,
     /// The index of the next clone cell to be created.
     next_clone_index: u32,
     /// Cells which were cloned at runtime. The length cannot grow beyond
     /// `clone_limit`.
     clones: HashMap<CloneId, CellId>,
+    /// Clone cells that have been archived. These cells cannot be called
+    /// any longer and are not returned as part of the app info either.
+    /// Archived clone cells can be deleted through the Admin API.
+    archived_clones: HashMap<CloneId, CellId>,
 }
 
 impl AppRoleAssignment {
@@ -856,6 +938,7 @@ impl AppRoleAssignment {
             clone_limit,
             clones: HashMap::new(),
             next_clone_index: 0,
+            archived_clones: HashMap::new(),
         }
     }
 
@@ -952,7 +1035,11 @@ mod tests {
         assert_eq!(clone_id_1, CloneId::new(&role_id, 1));
         assert_eq!(clone_id_2, CloneId::new(&role_id, 2));
 
-        assert_eq!(app.cloned_cells().count(), 3);
+        assert_eq!(
+            app.clone_cell_ids().collect::<HashSet<_>>(),
+            maplit::hashset! { &clones[0], &clones[1], &clones[2] }
+        );
+        assert_eq!(app.clone_cells().count(), 3);
 
         // Adding the same clone twice should return an error
         let result_add_clone_twice = app.add_clone(&role_id, &clones[0]);
@@ -964,32 +1051,40 @@ mod tests {
             Err(AppError::CloneLimitExceeded(3, _))
         );
 
+        // Archive a clone cell
+        app.archive_clone_cell(&clone_id_0).unwrap();
+        // Assert it is not accessible from the app any longer
+        assert!(app
+            .clone_cells()
+            .find(|(clone_id, _)| **clone_id == clone_id_0)
+            .is_none());
+        assert_eq!(app.clone_cells().count(), 2);
         assert_eq!(
-            app.cloned_cell_ids().collect::<HashSet<_>>(),
-            maplit::hashset! { &clones[0], &clones[1], &clones[2] }
-        );
-
-        assert_eq!(
-            app.remove_clone(&CloneCellId::CloneId(CloneId::new(&role_id, 1)))
-                .unwrap(),
-            true
-        );
-        assert_eq!(
-            app.remove_clone(&CloneCellId::CloneId(CloneId::new(&role_id, 1)))
-                .unwrap(),
-            false
-        );
-
-        assert_eq!(
-            app.cloned_cell_ids().collect::<HashSet<_>>(),
-            maplit::hashset! { &clones[0], &clones[2] }
-        );
-
-        assert_eq!(app.cloned_cells().count(), 2);
-
-        assert_eq!(
-            app.cloned_cell_ids().collect::<HashSet<_>>(),
+            app.clone_cell_ids().collect::<HashSet<_>>(),
             app.all_cells().collect::<HashSet<_>>()
         );
+
+        // Restore an archived clone cell
+        let restored_cell = app.restore_clone_cell(&clone_id_0).unwrap();
+        assert_eq!(
+            restored_cell.role_id,
+            clone_id_0.as_app_role_id().to_owned()
+        );
+        // Assert it is accessible from the app again
+        assert!(app
+            .clone_cells()
+            .find(|(clone_id, _)| **clone_id == clone_id_0)
+            .is_some());
+        assert_eq!(
+            app.clone_cell_ids().collect::<HashSet<_>>(),
+            maplit::hashset! { &clones[0], &clones[1], &clones[2] }
+        );
+        assert_eq!(app.clone_cells().count(), 3);
+
+        // Archive and delete a clone cell
+        app.archive_clone_cell(&clone_id_0).unwrap();
+        app.delete_archived_clone_cells_for_role(&role_id).unwrap();
+        // Assert the deleted cell cannot be restored
+        assert!(app.restore_clone_cell(&clone_id_0).is_err());
     }
 }
