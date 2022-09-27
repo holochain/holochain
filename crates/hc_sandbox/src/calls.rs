@@ -579,8 +579,8 @@ pub async fn list_cell_ids(cmd: &mut CmdRunner) -> anyhow::Result<Vec<CellId>> {
 
 /// Calls [`AdminRequest::ListActiveApps`].
 pub async fn list_running_apps(cmd: &mut CmdRunner) -> anyhow::Result<Vec<String>> {
-    let resp = cmd.command(AdminRequest::ListActiveApps).await?;
-    Ok(expect_match!(resp => AdminResponse::ActiveAppsListed, "Failed to list active apps"))
+    let resp = cmd.command(AdminRequest::ListEnabledApps).await?;
+    Ok(expect_match!(resp => AdminResponse::EnabledAppsListed, "Failed to list active apps"))
 }
 
 /// Calls [`AdminRequest::ListApps`].

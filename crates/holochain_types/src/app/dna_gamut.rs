@@ -46,7 +46,6 @@ impl DnaGamut {
         Self(map)
     }
 
-    #[deprecated = "Stop using the placeholder"]
     #[allow(missing_docs)]
     pub fn placeholder() -> Self {
         Self::new(std::iter::empty())

@@ -145,7 +145,7 @@ impl MockNetworkData {
 
     /// Hashes that an agent is an authority for.
     pub fn hashes_authority_for(&self, agent: &AgentPubKey) -> Vec<Arc<DhtOpHash>> {
-        let arc = self.agent_to_arc[agent].interval();
+        let arc = self.agent_to_arc[agent].inner();
         match arc {
             DhtArcRange::Empty => Vec::with_capacity(0),
             DhtArcRange::Full => self.ops_by_loc.values().flatten().cloned().collect(),

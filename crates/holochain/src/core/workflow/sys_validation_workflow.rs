@@ -1,5 +1,4 @@
 //! The workflow and queue consumer for sys validation
-#![allow(deprecated)]
 
 use super::*;
 use crate::conductor::handle::ConductorHandleT;
