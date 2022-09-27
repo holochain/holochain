@@ -184,6 +184,49 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
 
 #[cfg(feature = "slow_tests")]
 #[tokio::test(flavor = "multi_thread")]
+async fn test_gossip_shutdown() {
+    observability::test_run().ok();
+    let mut conductors = SweetConductorBatch::from_config(2, make_config(Some(0))).await;
+
+    for c in conductors.iter() {
+        c.update_dev_settings(DevSettingsDelta {
+            publish: Some(false),
+            ..Default::default()
+        });
+    }
+
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome())
+        .await
+        .unwrap();
+
+    let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
+    let ((cell_0,), (cell_1,)) = apps.into_tuples();
+    let zome_0 = cell_0.zome(SweetInlineZomes::COORDINATOR);
+    let zome_1 = cell_1.zome(SweetInlineZomes::COORDINATOR);
+
+    let hash: ActionHash = conductors[0]
+        .call(&zome_0, "create_string", "hi".to_string())
+        .await;
+
+    // Test that gossip doesn't happen within 3 seconds (assuming it will never happen)
+    conductors[0].shutdown().await;
+
+    conductors.exchange_peer_info().await;
+    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+
+    let record: Option<Record> = conductors[1].call(&zome_1, "read", hash.clone()).await;
+    assert!(record.is_none());
+
+    // Ensure that gossip loops resume upon startup
+    conductors[0].startup().await;
+
+    consistency_10s(&[&cell_0, &cell_1]).await;
+    let record: Option<Record> = conductors[1].call(&zome_1, "read", hash.clone()).await;
+    assert_eq!(record.unwrap().action_address(), &hash);
+}
+
+#[cfg(feature = "slow_tests")]
+#[tokio::test(flavor = "multi_thread")]
 async fn large_entry_test() {
     observability::test_run().ok();
     let mut conductors = SweetConductorBatch::from_config(2, make_config(Some(0))).await;
