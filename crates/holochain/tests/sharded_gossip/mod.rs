@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use hdk::prelude::*;
 use holo_hash::DhtOpHash;
@@ -9,9 +9,7 @@ use holochain::sweettest::{SweetConductor, SweetConductorBatch, SweetDnaFile, Sw
 use holochain::test_utils::inline_zomes::{batch_create_zome, simple_crud_zome};
 use holochain::test_utils::inline_zomes::{simple_create_read_zome, AppString};
 use holochain::test_utils::network_simulation::{data_zome, generate_test_data};
-use holochain::test_utils::{
-    consistency, consistency_10s, consistency_10s_advanced, consistency_60s,
-};
+use holochain::test_utils::{consistency_10s, consistency_60s, consistency_60s_advanced};
 use holochain::{
     conductor::ConductorBuilder, test_utils::consistency::local_machine_session_with_hashes,
 };
@@ -234,85 +232,25 @@ async fn test_gossip_shutdown() {
 
 #[cfg(feature = "slow_tests")]
 #[tokio::test(flavor = "multi_thread")]
-async fn large_entry_test() {
+async fn three_way_gossip_recent() {
     observability::test_run().ok();
-    let mut conductors =
-        SweetConductorBatch::from_config(2, make_config(false, true, Some(0))).await;
-    let start = Instant::now();
+    let config = make_config(true, false, None);
+    three_way_gossip(config).await;
+}
 
-    for c in conductors.iter() {
-        c.update_dev_settings(DevSettingsDelta {
-            publish: Some(false),
-            ..Default::default()
-        });
-    }
-
-    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome())
-        .await
-        .unwrap();
-
-    let (cell_0,) = conductors[0]
-        .setup_app("app", [&dna_file])
-        .await
-        .unwrap()
-        .into_tuple();
-    let (cell_1,) = conductors[1]
-        .setup_app("app", [&dna_file])
-        .await
-        .unwrap()
-        .into_tuple();
-
-    let zome_0 = cell_0.zome(SweetInlineZomes::COORDINATOR);
-    let zome_1 = cell_1.zome(SweetInlineZomes::COORDINATOR);
-
-    let size = 15_000_000;
-    let num = 2;
-
-    let mut hashes = vec![];
-    for i in 0..num {
-        let app_string = AppString(String::from_utf8(vec![42u8 + i as u8; size]).unwrap());
-        let hash: ActionHash = conductors[0]
-            .call(&zome_0, "create_string", app_string.clone())
-            .await;
-        hashes.push(hash);
-        dbg!(start.elapsed());
-    }
-
-    conductors.exchange_peer_info().await;
-    consistency([&cell_0, &cell_1], 60 * 4, Duration::from_secs(1)).await;
-    tracing::info!(
-        "CONSISTENCY REACHED between first two nodes in {:?}",
-        start.elapsed()
-    );
-    dbg!(start.elapsed());
-
-    let records_1: Vec<Option<Record>> = conductors[1]
-        .call(&zome_1, "read_multi", hashes.clone())
-        .await;
-    assert_eq!(records_1.len(), num);
-    assert_eq!(
-        records_1.iter().filter(|r| r.is_some()).count(),
-        num,
-        "couldn't get records at positions: {:?}",
-        records_1
-            .iter()
-            .enumerate()
-            .filter_map(|(i, r)| r.is_none().then(|| i))
-            .collect::<Vec<_>>()
-    );
-    dbg!(start.elapsed());
+#[cfg(feature = "slow_tests")]
+#[tokio::test(flavor = "multi_thread")]
+async fn three_way_gossip_historical() {
+    observability::test_run().ok();
+    let config = make_config(false, true, Some(0));
+    three_way_gossip(config).await;
 }
 
 /// Test that:
 /// - 30MB of data can pass from node A to B,
 /// - then A can shut down and C and start up,
 /// - and then that same data passes from B to C.
-/// TODO: this needs to be completed once we have the ability to shut down gossip
-#[cfg(feature = "slow_tests")]
-#[tokio::test(flavor = "multi_thread")]
-async fn three_way_gossip() {
-    observability::test_run().ok();
-    let config = make_config(true, false, None);
+async fn three_way_gossip(config: ConductorConfig) {
     let mut conductors = SweetConductorBatch::from_config(2, config.clone()).await;
     let start = Instant::now();
 
@@ -392,7 +330,7 @@ async fn three_way_gossip() {
     conductors.add_conductor(conductor);
     conductors.exchange_peer_info().await;
 
-    consistency_10s_advanced(&[(&cells[0], false), (&cells[1], true), (&cell, true)]).await;
+    consistency_60s_advanced(&[(&cells[0], false), (&cells[1], true), (&cell, true)]).await;
 
     dbg!(start.elapsed());
 

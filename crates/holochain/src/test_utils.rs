@@ -460,6 +460,14 @@ pub async fn consistency_60s(all_cells: &[&SweetCell]) {
     consistency(all_cells.to_vec(), NUM_ATTEMPTS, DELAY_PER_ATTEMPT).await
 }
 
+/// Wait for all cells to reach consistency for 60 seconds,
+/// with the option to specify that some cells are offline.
+pub async fn consistency_60s_advanced(all_cells: &[(&SweetCell, bool)]) {
+    const NUM_ATTEMPTS: usize = 60;
+    const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_secs(1);
+    consistency_advanced(all_cells.to_vec(), NUM_ATTEMPTS, DELAY_PER_ATTEMPT).await
+}
+
 /// Wait for all cells to reach consistency
 #[tracing::instrument(skip(all_cells))]
 pub async fn consistency<'a, I: IntoIterator<Item = &'a SweetCell>>(
