@@ -333,6 +333,8 @@ async fn three_way_gossip() {
     assert_eq!(records_0, records_1);
     dbg!(start.elapsed());
 
+    todo!("shut down conductor_0's gossip loop once we have that ability.");
+
     // Bring a third conductor online
     let mut conductor = SweetConductor::from_config(config).await;
     let (cell,) = conductor
