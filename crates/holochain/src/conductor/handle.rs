@@ -75,9 +75,11 @@ use holochain_keystore::MetaLairClient;
 use holochain_p2p::actor::HolochainP2pRefToDna;
 use holochain_p2p::event::HolochainP2pEvent;
 use holochain_p2p::event::HolochainP2pEvent::*;
+use holochain_p2p::ChcImpl;
 use holochain_p2p::DnaHashExt;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
+use holochain_state::prelude::chain_head_db;
 use holochain_state::prelude::SourceChainError;
 use holochain_state::prelude::SourceChainResult;
 use holochain_state::prelude::StateMutationError;
@@ -192,6 +194,28 @@ pub trait ConductorHandleT: Send + Sync {
     /// Get the conductor config
     fn get_config(&self) -> &ConductorConfig;
 
+    /// Build a ChainHeadCoordinator impl based on the conductor config
+    fn chc(&self, cell_id: &CellId) -> Option<ChcImpl>;
+
+    /// Make the source chain for the given Cell match the chain data in the CHC for this Cell,
+    /// if applicable.
+    ///
+    /// **NOTE**: this function is contingent on the the actual future CHC API and implementation,
+    /// which is not yet solidified. In particular, this function assumes that it is possible to
+    /// reconstruct a full set of Records from a single CHC call. If that is not possible, then
+    /// this function cannot exist as-is. Specifically, there may need to be a separate
+    /// step to fetch entries from the DHT, to be assembled into Records and passed back to the
+    /// conductor via [`holochain_conductor_api::AdminRequest::GraftRecords`].
+    ///
+    /// If an app id is passed, enable that app after syncing the cell, since
+    /// it is likely that this sync was prompted by a failed commit, which would cause the
+    /// app to become disabled
+    async fn chc_sync(
+        self: Arc<Self>,
+        cell_id: CellId,
+        enable_app: Option<InstalledAppId>,
+    ) -> ConductorApiResult<()>;
+
     /// Return the JoinHandle for all managed tasks, which when resolved will
     /// signal that the Conductor has completely shut down.
     ///
@@ -221,8 +245,23 @@ pub trait ConductorHandleT: Send + Sync {
         payload: CreateCloneCellPayload,
     ) -> ConductorResult<InstalledCell>;
 
-    /// Destroy a cloned Cell
-    async fn destroy_clone_cell(self: Arc<Self>, cell_id: CellId) -> ConductorResult<()>;
+    /// Archive a clone cell for deletion.
+    async fn archive_clone_cell(
+        self: Arc<Self>,
+        payload: ArchiveCloneCellPayload,
+    ) -> ConductorResult<()>;
+
+    /// Restore an archived clone cell.
+    async fn restore_archived_clone_cell(
+        self: Arc<Self>,
+        payload: ArchiveCloneCellPayload,
+    ) -> ConductorResult<InstalledCell>;
+
+    /// Destroy all clone cells marked for deletion.
+    async fn delete_archived_clone_cells(
+        self: Arc<Self>,
+        payload: DeleteArchivedCloneCellsPayload,
+    ) -> ConductorResult<()>;
 
     /// Install Cells into ConductorState based on installation info, and run
     /// genesis on all new source chains
@@ -371,11 +410,11 @@ pub trait ConductorHandleT: Send + Sync {
 
     /// Retrieve the authored environment for this dna. FOR TESTING ONLY.
     #[cfg(any(test, feature = "test_utils"))]
-    fn get_authored_db(&self, cell_id: &DnaHash) -> ConductorApiResult<DbWrite<DbKindAuthored>>;
+    fn get_authored_db(&self, dna_hash: &DnaHash) -> ConductorApiResult<DbWrite<DbKindAuthored>>;
 
     /// Retrieve the dht environment for this dna. FOR TESTING ONLY.
     #[cfg(any(test, feature = "test_utils"))]
-    fn get_dht_db(&self, cell_id: &DnaHash) -> ConductorApiResult<DbWrite<DbKindDht>>;
+    fn get_dht_db(&self, dna_hash: &DnaHash) -> ConductorApiResult<DbWrite<DbKindDht>>;
 
     /// Retrieve the dht environment for this dna. FOR TESTING ONLY.
     #[cfg(any(test, feature = "test_utils"))]
@@ -581,7 +620,7 @@ impl ConductorHandleT for ConductorHandleImpl {
     async fn register_dna(&self, dna: DnaFile) -> ConductorResult<()> {
         let ribosome = RealRibosome::new(dna)?;
         self.register_genotype(ribosome.clone()).await?;
-        self.conductor.register_phenotype(ribosome);
+        self.conductor.add_ribosome_to_store(ribosome);
         Ok(())
     }
 
@@ -661,6 +700,53 @@ impl ConductorHandleT for ConductorHandleImpl {
 
     fn get_config(&self) -> &ConductorConfig {
         &self.conductor.config
+    }
+
+    #[allow(unused_variables)]
+    fn chc(&self, cell_id: &CellId) -> Option<ChcImpl> {
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "chc")] {
+                super::chc::build_chc(self.conductor.config.chc_namespace.as_ref(), cell_id)
+            } else {
+                None
+            }
+        }
+    }
+
+    async fn chc_sync(
+        self: Arc<Self>,
+        cell_id: CellId,
+        enable_app: Option<InstalledAppId>,
+    ) -> ConductorApiResult<()> {
+        if let Some(chc) = self.chc(&cell_id) {
+            let db = self.get_authored_db(cell_id.dna_hash())?;
+            let author = cell_id.agent_pubkey().clone();
+            let top_hash = db
+                .async_reader(move |txn| {
+                    SourceChainResult::Ok(
+                        chain_head_db(&txn, Arc::new(author))?.map(|(top_hash, _, _)| top_hash),
+                    )
+                })
+                .await?;
+            let actions = chc.get_actions_since_hash(top_hash).await?;
+            let entry_hashes: HashSet<&EntryHash> = actions
+                .iter()
+                .filter_map(|a| a.hashed.entry_hash())
+                .collect();
+            dbg!(&actions, &entry_hashes);
+            let entries = chc.get_entries(entry_hashes).await?;
+            dbg!(&entries);
+            let records = records_from_actions_and_entries(actions, entries)?;
+            dbg!(&records);
+
+            self.clone()
+                .graft_records_onto_source_chain(cell_id, true, records)
+                .await?;
+            if let Some(app_id) = enable_app {
+                self.enable_app(app_id).await?;
+            }
+        }
+        Ok(())
     }
 
     #[instrument(skip(self))]
@@ -905,11 +991,11 @@ impl ConductorHandleT for ConductorHandleImpl {
         let CreateCloneCellPayload {
             app_id,
             role_id,
-            phenotype,
+            modifiers,
             membrane_proof,
             name,
         } = payload;
-        if !phenotype.has_some_option_set() {
+        if !modifiers.has_some_option_set() {
             return Err(ConductorError::CloneCellError(
                 "neither network_seed nor properties nor origin_time provided for clone cell"
                     .to_string(),
@@ -931,7 +1017,7 @@ impl ConductorHandleT for ConductorHandleImpl {
             .add_clone_cell_to_app(
                 app_id.clone(),
                 role_id.clone(),
-                phenotype.serialized()?,
+                modifiers.serialized()?,
                 name,
             )
             .await?;
@@ -944,8 +1030,46 @@ impl ConductorHandleT for ConductorHandleImpl {
         Ok(installed_clone_cell)
     }
 
-    async fn destroy_clone_cell(self: Arc<Self>, _cell_id: CellId) -> ConductorResult<()> {
-        todo!()
+    async fn archive_clone_cell(
+        self: Arc<Self>,
+        payload: ArchiveCloneCellPayload,
+    ) -> ConductorResult<()> {
+        let ArchiveCloneCellPayload {
+            app_id,
+            clone_cell_id,
+        } = payload;
+        self.conductor
+            .archive_clone_cell(&app_id, &clone_cell_id)
+            .await?;
+        Ok(())
+    }
+
+    async fn restore_archived_clone_cell(
+        self: Arc<Self>,
+        payload: ArchiveCloneCellPayload,
+    ) -> ConductorResult<InstalledCell> {
+        let ArchiveCloneCellPayload {
+            app_id,
+            clone_cell_id,
+        } = payload;
+        let restored_cell = self
+            .conductor
+            .restore_clone_cell(&app_id, &clone_cell_id)
+            .await?;
+        self.create_and_add_initialized_cells_for_running_apps(self.clone(), Some(&app_id))
+            .await?;
+        Ok(restored_cell)
+    }
+
+    async fn delete_archived_clone_cells(
+        self: Arc<Self>,
+        payload: DeleteArchivedCloneCellsPayload,
+    ) -> ConductorResult<()> {
+        let DeleteArchivedCloneCellsPayload { app_id, role_id } = payload;
+        self.conductor
+            .delete_archived_clone_cells(&app_id, &role_id)
+            .await?;
+        Ok(())
     }
 
     async fn install_app(

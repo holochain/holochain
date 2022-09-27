@@ -17,7 +17,7 @@ use holochain_conductor_api::InterfaceDriver;
 use holochain_conductor_api::{AdminInterfaceConfig, InstalledAppInfo};
 use holochain_p2p::kitsune_p2p::agent_store::AgentInfoSigned;
 use holochain_types::prelude::DnaHash;
-use holochain_types::prelude::DnaPhenotypeOpt;
+use holochain_types::prelude::DnaModifiersOpt;
 use holochain_types::prelude::InstallAppDnaPayload;
 use holochain_types::prelude::InstallAppPayload;
 use holochain_types::prelude::RegisterDnaPayload;
@@ -439,7 +439,7 @@ pub async fn register_dna(cmd: &mut CmdRunner, args: RegisterDna) -> anyhow::Res
         _ => unreachable!("Can't have hash and path for dna source"),
     };
     let dna = RegisterDnaPayload {
-        phenotype: DnaPhenotypeOpt {
+        modifiers: DnaModifiersOpt {
             properties,
             network_seed,
             origin_time,

@@ -12,6 +12,7 @@ use holo_hash::HasHash;
 use holochain_p2p::actor;
 use holochain_p2p::dht_arc::DhtArc;
 use holochain_p2p::event::CountersigningSessionNegotiationMessage;
+use holochain_p2p::ChcImpl;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_p2p::HolochainP2pError;
 use holochain_p2p::MockHolochainP2pDnaT;
@@ -273,6 +274,10 @@ impl HolochainP2pDnaT for PassThroughNetwork {
     ) -> actor::HolochainP2pResult<holochain_serialized_bytes::SerializedBytes> {
         todo!()
     }
+
+    fn chc(&self) -> Option<ChcImpl> {
+        None
+    }
 }
 
 /// Insert ops directly into the database and mark integrated as valid
@@ -454,6 +459,10 @@ impl HolochainP2pDnaT for MockNetwork {
         _payload: holochain_zome_types::ExternIO,
     ) -> actor::HolochainP2pResult<holochain_serialized_bytes::SerializedBytes> {
         todo!()
+    }
+
+    fn chc(&self) -> Option<ChcImpl> {
+        None
     }
 }
 

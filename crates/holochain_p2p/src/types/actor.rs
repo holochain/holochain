@@ -314,22 +314,23 @@ pub type HolochainP2pRef = ghost_actor::GhostSender<HolochainP2p>;
 pub trait HolochainP2pRefToDna {
     /// Partially apply dna_hash && agent_pub_key to this sender,
     /// binding it to a specific dna context.
-    fn into_dna(self, dna_hash: DnaHash) -> crate::HolochainP2pDna;
+    fn into_dna(self, dna_hash: DnaHash, chc: Option<ChcImpl>) -> crate::HolochainP2pDna;
 
     /// Clone and partially apply dna_hash && agent_pub_key to this sender,
     /// binding it to a specific dna context.
-    fn to_dna(&self, dna_hash: DnaHash) -> crate::HolochainP2pDna;
+    fn to_dna(&self, dna_hash: DnaHash, chc: Option<ChcImpl>) -> crate::HolochainP2pDna;
 }
 
 impl HolochainP2pRefToDna for HolochainP2pRef {
-    fn into_dna(self, dna_hash: DnaHash) -> crate::HolochainP2pDna {
+    fn into_dna(self, dna_hash: DnaHash, chc: Option<ChcImpl>) -> crate::HolochainP2pDna {
         crate::HolochainP2pDna {
             sender: self,
             dna_hash: Arc::new(dna_hash),
+            chc,
         }
     }
 
-    fn to_dna(&self, dna_hash: DnaHash) -> crate::HolochainP2pDna {
-        self.clone().into_dna(dna_hash)
+    fn to_dna(&self, dna_hash: DnaHash, chc: Option<ChcImpl>) -> crate::HolochainP2pDna {
+        self.clone().into_dna(dna_hash, chc)
     }
 }
