@@ -1844,6 +1844,7 @@ pub mod tests {
         let vault = test_db.to_db();
         let mut mock = MockHolochainP2pDnaT::new();
         mock.expect_authority_for_hash().returning(|_| Ok(false));
+        mock.expect_chc().return_const(None);
 
         let author = Arc::new(keystore.new_sign_keypair_random().await.unwrap());
 
