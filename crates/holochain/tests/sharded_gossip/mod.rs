@@ -258,20 +258,14 @@ async fn large_entry_test() {
     dbg!(start.elapsed());
 }
 
+/// Test that:
+/// - 30MB of data can pass from node A to B,
+/// - then A can shut down and C and start up,
+/// - and then that same data passes from B to C.
+/// TODO: this needs to be completed once we have the ability to shut down gossip
 #[cfg(feature = "slow_tests")]
 #[tokio::test(flavor = "multi_thread")]
 async fn three_way_gossip() {
-    // Current findings, all pertaining to 3 conductors being started at the beginning,
-    // and regardless of file size:
-    // - When all 3 conductors stay running, the test passes quickly
-    // - When the third conductor is shut down at the start and never restarted, the test passes quickly
-    // - When the first conductor is shut down, the test still ends
-    // FAILURES:
-    // - When the third conductor is shut down and then restarted after the first two reach
-    //     consistency, are there timeouts. Doesn't matter if the first is stopped or not.
-    // - When all 3 conductors are started, but the third only has its app setup after the first
-    //     two reach consistency, then timeouts occur
-
     observability::test_run().ok();
     let config = make_config(true, false, None);
     let mut conductors = SweetConductorBatch::from_config(2, config.clone()).await;
@@ -338,8 +332,6 @@ async fn three_way_gossip() {
     );
     assert_eq!(records_0, records_1);
     dbg!(start.elapsed());
-
-    todo!("shut down conductor_0's gossip loop once we have that ability.");
 
     // Bring a third conductor online
     let mut conductor = SweetConductor::from_config(config).await;
