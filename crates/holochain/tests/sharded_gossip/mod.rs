@@ -9,7 +9,9 @@ use holochain::sweettest::{SweetConductor, SweetConductorBatch, SweetDnaFile, Sw
 use holochain::test_utils::inline_zomes::{batch_create_zome, simple_crud_zome};
 use holochain::test_utils::inline_zomes::{simple_create_read_zome, AppString};
 use holochain::test_utils::network_simulation::{data_zome, generate_test_data};
-use holochain::test_utils::{consistency, consistency_10s};
+use holochain::test_utils::{
+    consistency, consistency_10s, consistency_10s_advanced, consistency_60s,
+};
 use holochain::{
     conductor::ConductorBuilder, test_utils::consistency::local_machine_session_with_hashes,
 };
@@ -191,7 +193,7 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_gossip_shutdown() {
     observability::test_run().ok();
-    let mut conductors = SweetConductorBatch::from_config(2, make_config(Some(0))).await;
+    let mut conductors = SweetConductorBatch::from_config(2, make_config(true, true, None)).await;
 
     for c in conductors.iter() {
         c.update_dev_settings(DevSettingsDelta {
@@ -277,7 +279,7 @@ async fn large_entry_test() {
     }
 
     conductors.exchange_peer_info().await;
-    consistency(&[&cell_0, &cell_1], 60 * 4, Duration::from_secs(1)).await;
+    consistency([&cell_0, &cell_1], 60 * 4, Duration::from_secs(1)).await;
     tracing::info!(
         "CONSISTENCY REACHED between first two nodes in {:?}",
         start.elapsed()
@@ -350,12 +352,12 @@ async fn three_way_gossip() {
     }
 
     conductors.exchange_peer_info().await;
-    consistency_10s(&[&cells[0], &cells[1]]).await;
+    consistency_60s(&[&cells[0], &cells[1]]).await;
+
     tracing::info!(
         "CONSISTENCY REACHED between first two nodes in {:?}",
         start.elapsed()
     );
-    dbg!(start.elapsed());
 
     let records_0: Vec<Option<Record>> = conductors[0]
         .call(&zomes[0], "read_multi", hashes.clone())
@@ -376,7 +378,7 @@ async fn three_way_gossip() {
     assert_eq!(records_0, records_1);
     dbg!(start.elapsed());
 
-    todo!("shut down conductor_0's gossip loop once we have that ability.");
+    conductors[0].shutdown().await;
 
     // Bring a third conductor online
     let mut conductor = SweetConductor::from_config(config).await;
@@ -390,7 +392,7 @@ async fn three_way_gossip() {
     conductors.add_conductor(conductor);
     conductors.exchange_peer_info().await;
 
-    consistency(&[&cells[0], &cells[1], &cell], 60, Duration::from_secs(1)).await;
+    consistency_10s_advanced(&[(&cells[0], false), (&cells[1], true), (&cell, true)]).await;
 
     dbg!(start.elapsed());
 
