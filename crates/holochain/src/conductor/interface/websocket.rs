@@ -397,11 +397,11 @@ pub mod test {
             .unwrap()
             .into();
         request.cell_id = cell_id;
-        let msg = AppRequest::ZomeCallInvocation(Box::new(request));
+        let msg = AppRequest::ZomeCall(Box::new(request));
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
             let response: AppResponse = bytes.try_into().unwrap();
-            assert_matches!(response, AppResponse::ZomeCallInvocation { .. });
+            assert_matches!(response, AppResponse::ZomeCall { .. });
             async { Ok(()) }.boxed().into()
         };
         let respond = Respond::Request(Box::new(respond));
@@ -494,7 +494,7 @@ pub mod test {
         }
 
         // Now deactivate app
-        let msg = AdminRequest::DeactivateApp {
+        let msg = AdminRequest::DisableApp {
             installed_app_id: app_id.clone(),
         };
         let msg = msg.try_into().unwrap();

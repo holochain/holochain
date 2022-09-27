@@ -5,7 +5,7 @@ use itertools::traits::HomogeneousTuple;
 use itertools::Itertools;
 
 /// An installed app, with prebuilt SweetCells
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct SweetApp {
     installed_app_id: InstalledAppId,
     cells: Vec<SweetCell>,

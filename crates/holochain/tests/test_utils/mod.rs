@@ -280,6 +280,7 @@ pub fn create_config(port: u16, environment_path: PathBuf) -> ConductorConfig {
         dpki: None,
         keystore: KeystoreConfig::DangerTestKeystore,
         db_sync_strategy: DbSyncStrategy::default(),
+        chc_namespace: None,
     }
 }
 

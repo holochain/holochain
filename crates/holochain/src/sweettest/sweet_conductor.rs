@@ -259,19 +259,24 @@ impl SweetConductor {
             // Initialize per-space databases
             let _space = self.spaces.get_or_create_space(&dna_hash)?;
 
-            // Create the SweetCell
-            let cell_authored_db = self.handle().0.get_authored_db(&dna_hash)?;
-            let cell_dht_db = self.handle().0.get_dht_db(&dna_hash)?;
-            let cell_id = CellId::new(dna_hash, agent.clone());
-            let cell = SweetCell {
-                cell_id,
-                cell_authored_db,
-                cell_dht_db,
-            };
-            sweet_cells.push(cell);
+            // Create and add the SweetCell
+            sweet_cells.push(self.get_sweet_cell(CellId::new(dna_hash, agent.clone()))?);
         }
 
         Ok(SweetApp::new(installed_app_id.into(), sweet_cells))
+    }
+
+    /// Construct a SweetCell for a cell which has already been created
+    pub fn get_sweet_cell(&self, cell_id: CellId) -> ConductorApiResult<SweetCell> {
+        let (dna_hash, agent) = cell_id.into_dna_and_agent();
+        let cell_authored_db = self.handle().0.get_authored_db(&dna_hash)?;
+        let cell_dht_db = self.handle().0.get_dht_db(&dna_hash)?;
+        let cell_id = CellId::new(dna_hash, agent);
+        Ok(SweetCell {
+            cell_id,
+            cell_authored_db,
+            cell_dht_db,
+        })
     }
 
     /// Opinionated app setup.

@@ -33,7 +33,7 @@ pub enum ConductorApiError {
 
     /// Conductor threw an error during API call.
     #[error("Conductor returned an error while using a ConductorApi: {0:?}")]
-    ConductorError(#[from] Box<ConductorError>),
+    ConductorError(#[from] ConductorError),
 
     /// Io error.
     #[error("Io error while using a Interface Api: {0:?}")]
@@ -48,14 +48,12 @@ pub enum ConductorApiError {
     DatabaseError(#[from] DatabaseError),
 
     /// Workspace error.
-    // TODO: Can be avoided if we can move workspace creation into the workflow
     #[error(transparent)]
     WorkspaceError(#[from] WorkspaceError),
 
     /// Workflow error.
-    // TODO: perhaps this Box can be avoided with further reorganization
     #[error(transparent)]
-    WorkflowError(#[from] Box<WorkflowError>),
+    WorkflowError(#[from] WorkflowError),
 
     /// ZomeError
     #[error("ZomeError: {0}")]
@@ -106,6 +104,9 @@ pub enum ConductorApiError {
     #[error(transparent)]
     RusqliteError(#[from] rusqlite::Error),
 
+    #[error(transparent)]
+    ChcError(#[from] ChcError),
+
     /// Other
     #[error("Other: {0}")]
     Other(Box<dyn std::error::Error + Send + Sync>),
@@ -115,12 +116,6 @@ impl ConductorApiError {
     /// promote a custom error type to a KitsuneP2pError
     pub fn other(e: impl Into<Box<dyn std::error::Error + Send + Sync>>) -> Self {
         Self::Other(e.into())
-    }
-}
-
-impl From<ConductorError> for ConductorApiError {
-    fn from(conductor_api_error: ConductorError) -> Self {
-        Self::from(Box::new(conductor_api_error))
     }
 }
 

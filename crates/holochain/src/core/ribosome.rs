@@ -339,13 +339,13 @@ impl ZomeCallInvocation {
 
 mockall::mock! {
     Invocation {}
-    trait Invocation {
+    impl Invocation for Invocation {
         fn zomes(&self) -> ZomesToInvoke;
         fn fn_components(&self) -> FnComponents;
         fn host_input(self) -> Result<ExternIO, SerializedBytesError>;
         fn auth(&self) -> InvocationAuth;
     }
-    trait Clone {
+    impl Clone for Invocation {
         fn clone(&self) -> Self;
     }
 }

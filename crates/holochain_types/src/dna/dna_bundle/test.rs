@@ -1,5 +1,5 @@
-use matches::assert_matches;
 use super::*;
+use matches::assert_matches;
 
 #[test]
 fn missing_origin_time_is_an_error() {

@@ -1,5 +1,3 @@
-#![allow(deprecated)]
-
 use ::fixt::prelude::*;
 use hdk::prelude::*;
 
