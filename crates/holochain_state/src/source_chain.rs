@@ -1557,6 +1557,7 @@ pub mod tests {
         let access = CapAccess::from(secret.unwrap());
         let mut mock = MockHolochainP2pDnaT::new();
         mock.expect_authority_for_hash().returning(|_| Ok(false));
+        mock.expect_chc().return_const(None);
 
         // @todo curry
         let _curry = CurryPayloadsFixturator::new(Empty).next().unwrap();
