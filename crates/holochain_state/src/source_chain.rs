@@ -1331,6 +1331,7 @@ pub mod tests {
 
         let mut mock = MockHolochainP2pDnaT::new();
         mock.expect_authority_for_hash().returning(|_| Ok(false));
+        mock.expect_chc().return_const(None);
         let dht_db_cache = DhtDbQueryCache::new(dht_db.to_db().into());
 
         source_chain::genesis(
