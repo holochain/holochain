@@ -119,7 +119,6 @@ pub struct IntegrityManifest {
     /// The time used to denote the origin of the network, used to calculate
     /// time windows during gossip.
     /// All Action timestamps must come after this time.
-    #[serde(default = "default_origin_time")]
     pub origin_time: HumanTimestamp,
 
     /// An array of zomes associated with your DNA.
@@ -134,11 +133,6 @@ pub struct IntegrityManifest {
 pub struct CoordinatorManifest {
     /// Coordinator zomes to install with this dna.
     pub zomes: Vec<ZomeManifest>,
-}
-
-fn default_origin_time() -> HumanTimestamp {
-    // Jan 1, 2022, 12:00:00 AM UTC
-    Timestamp::HOLOCHAIN_EPOCH.into()
 }
 
 /// Manifest for an individual Zome
