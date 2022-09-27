@@ -522,6 +522,7 @@ impl Conductor {
         let running_cells: HashSet<CellId> = self.running_cell_ids();
         let (_, delta) = self
             .update_state_prime(move |mut state| {
+                #[allow(deprecated)]
                 let apps = state.installed_apps_mut().iter_mut().filter(|(id, _)| {
                     app_ids
                         .as_ref()

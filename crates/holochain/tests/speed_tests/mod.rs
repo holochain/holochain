@@ -15,8 +15,6 @@
 //! hard to automate piping from tests stderr.
 //!
 
-#![allow(deprecated)]
-
 use std::sync::Arc;
 
 use ::fixt::prelude::*;

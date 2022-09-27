@@ -2,7 +2,6 @@
 
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
-use holo_hash::AnyDhtHash;
 use holo_hash::AnyLinkableHash;
 use holo_hash::EntryHash;
 use holochain_serialized_bytes::prelude::*;
@@ -21,20 +20,6 @@ pub struct Link {
     base: EntryHash,
     target: EntryHash,
     tag: LinkTag,
-}
-
-/// Owned link key for sending across networks
-#[deprecated = "This is being replaced by WireLinkKey"]
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
-pub enum WireLinkMetaKey {
-    /// Search for all links on a base
-    Base(EntryHash),
-    /// Search for all links on a base, for a zome
-    BaseZome(EntryHash, ZomeId),
-    /// Search for all links on a base, for a zome and with a tag
-    BaseZomeTag(EntryHash, ZomeId, LinkTag),
-    /// This will match only the link created with a certain [CreateLink] hash
-    Full(EntryHash, ZomeId, LinkTag, ActionHash),
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
@@ -221,16 +206,6 @@ pub struct GetLinksResponse {
     pub link_adds: Vec<(CreateLink, Signature)>,
     /// All the link removes on the key you searched for
     pub link_removes: Vec<(DeleteLink, Signature)>,
-}
-
-impl WireLinkMetaKey {
-    /// Get the basis of this key
-    pub fn basis(&self) -> AnyDhtHash {
-        use WireLinkMetaKey::*;
-        match self {
-            Base(b) | BaseZome(b, _) | BaseZomeTag(b, _, _) | Full(b, _, _, _) => b.clone().into(),
-        }
-    }
 }
 
 impl Link {
