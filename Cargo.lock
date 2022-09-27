@@ -1986,6 +1986,7 @@ dependencies = [
  "async-trait",
  "base64",
  "byteorder",
+ "bytes",
  "cfg-if 0.1.10",
  "chrono",
  "contrafact",
@@ -2000,6 +2001,7 @@ dependencies = [
  "ghost_actor 0.3.0-alpha.4",
  "hdk",
  "holo_hash",
+ "holochain",
  "holochain_cascade",
  "holochain_conductor_api",
  "holochain_keystore",
@@ -2223,7 +2225,7 @@ dependencies = [
  "parking_lot 0.11.2",
  "serde",
  "serde_bytes",
- "serde_yaml 0.9.10",
+ "serde_yaml 0.9.11",
  "sodoken",
  "tempdir",
  "thiserror",
@@ -2351,6 +2353,7 @@ dependencies = [
  "async-recursion",
  "base64",
  "byteorder",
+ "cfg-if 0.1.10",
  "chrono",
  "contrafact",
  "cron",
@@ -3198,7 +3201,7 @@ dependencies = [
  "rcgen",
  "serde",
  "serde_json",
- "serde_yaml 0.9.10",
+ "serde_yaml 0.9.11",
  "tokio",
  "toml",
  "tracing",
@@ -5584,9 +5587,9 @@ dependencies = [
 
 [[package]]
 name = "serde_yaml"
-version = "0.9.10"
+version = "0.9.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7a09f551ccc8210268ef848f0bab37b306e87b85b2e017b899e7fb815f5aed62"
+checksum = "89f31df3f50926cdf2855da5fd8812295c34752cb20438dae42a67f79e021ac3"
 dependencies = [
  "indexmap",
  "itoa 1.0.3",

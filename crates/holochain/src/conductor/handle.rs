@@ -75,9 +75,11 @@ use holochain_keystore::MetaLairClient;
 use holochain_p2p::actor::HolochainP2pRefToDna;
 use holochain_p2p::event::HolochainP2pEvent;
 use holochain_p2p::event::HolochainP2pEvent::*;
+use holochain_p2p::ChcImpl;
 use holochain_p2p::DnaHashExt;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
+use holochain_state::prelude::chain_head_db;
 use holochain_state::prelude::SourceChainError;
 use holochain_state::prelude::SourceChainResult;
 use holochain_state::prelude::StateMutationError;
@@ -191,6 +193,28 @@ pub trait ConductorHandleT: Send + Sync {
 
     /// Get the conductor config
     fn get_config(&self) -> &ConductorConfig;
+
+    /// Build a ChainHeadCoordinator impl based on the conductor config
+    fn chc(&self, cell_id: &CellId) -> Option<ChcImpl>;
+
+    /// Make the source chain for the given Cell match the chain data in the CHC for this Cell,
+    /// if applicable.
+    ///
+    /// **NOTE**: this function is contingent on the the actual future CHC API and implementation,
+    /// which is not yet solidified. In particular, this function assumes that it is possible to
+    /// reconstruct a full set of Records from a single CHC call. If that is not possible, then
+    /// this function cannot exist as-is. Specifically, there may need to be a separate
+    /// step to fetch entries from the DHT, to be assembled into Records and passed back to the
+    /// conductor via [`holochain_conductor_api::AdminRequest::GraftRecords`].
+    ///
+    /// If an app id is passed, enable that app after syncing the cell, since
+    /// it is likely that this sync was prompted by a failed commit, which would cause the
+    /// app to become disabled
+    async fn chc_sync(
+        self: Arc<Self>,
+        cell_id: CellId,
+        enable_app: Option<InstalledAppId>,
+    ) -> ConductorApiResult<()>;
 
     /// Return the JoinHandle for all managed tasks, which when resolved will
     /// signal that the Conductor has completely shut down.
@@ -386,11 +410,11 @@ pub trait ConductorHandleT: Send + Sync {
 
     /// Retrieve the authored environment for this dna. FOR TESTING ONLY.
     #[cfg(any(test, feature = "test_utils"))]
-    fn get_authored_db(&self, cell_id: &DnaHash) -> ConductorApiResult<DbWrite<DbKindAuthored>>;
+    fn get_authored_db(&self, dna_hash: &DnaHash) -> ConductorApiResult<DbWrite<DbKindAuthored>>;
 
     /// Retrieve the dht environment for this dna. FOR TESTING ONLY.
     #[cfg(any(test, feature = "test_utils"))]
-    fn get_dht_db(&self, cell_id: &DnaHash) -> ConductorApiResult<DbWrite<DbKindDht>>;
+    fn get_dht_db(&self, dna_hash: &DnaHash) -> ConductorApiResult<DbWrite<DbKindDht>>;
 
     /// Retrieve the dht environment for this dna. FOR TESTING ONLY.
     #[cfg(any(test, feature = "test_utils"))]
@@ -676,6 +700,53 @@ impl ConductorHandleT for ConductorHandleImpl {
 
     fn get_config(&self) -> &ConductorConfig {
         &self.conductor.config
+    }
+
+    #[allow(unused_variables)]
+    fn chc(&self, cell_id: &CellId) -> Option<ChcImpl> {
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "chc")] {
+                super::chc::build_chc(self.conductor.config.chc_namespace.as_ref(), cell_id)
+            } else {
+                None
+            }
+        }
+    }
+
+    async fn chc_sync(
+        self: Arc<Self>,
+        cell_id: CellId,
+        enable_app: Option<InstalledAppId>,
+    ) -> ConductorApiResult<()> {
+        if let Some(chc) = self.chc(&cell_id) {
+            let db = self.get_authored_db(cell_id.dna_hash())?;
+            let author = cell_id.agent_pubkey().clone();
+            let top_hash = db
+                .async_reader(move |txn| {
+                    SourceChainResult::Ok(
+                        chain_head_db(&txn, Arc::new(author))?.map(|(top_hash, _, _)| top_hash),
+                    )
+                })
+                .await?;
+            let actions = chc.get_actions_since_hash(top_hash).await?;
+            let entry_hashes: HashSet<&EntryHash> = actions
+                .iter()
+                .filter_map(|a| a.hashed.entry_hash())
+                .collect();
+            dbg!(&actions, &entry_hashes);
+            let entries = chc.get_entries(entry_hashes).await?;
+            dbg!(&entries);
+            let records = records_from_actions_and_entries(actions, entries)?;
+            dbg!(&records);
+
+            self.clone()
+                .graft_records_onto_source_chain(cell_id, true, records)
+                .await?;
+            if let Some(app_id) = enable_app {
+                self.enable_app(app_id).await?;
+            }
+        }
+        Ok(())
     }
 
     #[instrument(skip(self))]
