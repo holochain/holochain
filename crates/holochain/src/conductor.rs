@@ -15,6 +15,8 @@
 
 pub mod api;
 mod cell;
+#[cfg(feature = "chc")]
+pub mod chc;
 #[allow(clippy::module_inception)]
 #[allow(missing_docs)]
 pub mod conductor;

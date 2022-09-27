@@ -189,7 +189,7 @@ pub async fn register_and_install_dna_named(
     timeout: u64,
 ) -> DnaHash {
     let register_payload = RegisterDnaPayload {
-        phenotype: DnaPhenotypeOpt {
+        modifiers: DnaModifiersOpt {
             properties,
             ..Default::default()
         },
@@ -280,6 +280,7 @@ pub fn create_config(port: u16, environment_path: PathBuf) -> ConductorConfig {
         dpki: None,
         keystore: KeystoreConfig::DangerTestKeystore,
         db_sync_strategy: DbSyncStrategy::default(),
+        chc_namespace: None,
     }
 }
 

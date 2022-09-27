@@ -256,7 +256,7 @@ where
     let dna = dna_hash.unwrap_or_else(|| fixt!(DnaHash));
     let mut key_fixt = AgentPubKeyFixturator::new(Predictable);
     let agent_key = agent_key.unwrap_or_else(|| key_fixt.next().unwrap());
-    let dna_network = network.to_dna(dna.clone());
+    let dna_network = network.to_dna(dna.clone(), None);
     network.join(dna.clone(), agent_key, None).await.unwrap();
     TestNetwork::new(network, respond_task, dna_network)
 }
@@ -810,6 +810,7 @@ pub async fn fake_genesis_for_agent(
         keystore,
         dna_hash,
         agent,
+        None,
         None,
     )
     .await
