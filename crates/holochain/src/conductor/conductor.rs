@@ -257,6 +257,11 @@ impl Conductor {
     pub(super) fn shutdown(&self) {
         self.shutting_down
             .store(true, std::sync::atomic::Ordering::Relaxed);
+
+        use ghost_actor::GhostControlSender;
+        let fut = self.holochain_p2p.ghost_actor_shutdown_immediate();
+        tokio::task::spawn(fut);
+
         self.task_manager.share_ref(|tm| {
             if let Some(manager) = tm {
                 tracing::info!(
