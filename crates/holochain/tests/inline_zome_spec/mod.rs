@@ -134,18 +134,14 @@ async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
 
     // Verify that bobbo can run "read" on his cell and get alice's Action
     // on the "foo" DNA
-    let records: Vec<Option<Record>> = conductor
+    let record: Option<Record> = conductor
         .call(
             &bobbo_foo.zome(SweetInlineZomes::COORDINATOR),
             "read",
             hash_foo,
         )
         .await;
-    let record = records
-        .into_iter()
-        .next()
-        .unwrap()
-        .expect("Record was None: bobbo couldn't `get` it");
+    let record = record.expect("Record was None: bobbo couldn't `get` it");
     assert_eq!(record.action().author(), alice_foo.agent_pubkey());
     assert_eq!(
         *record.entry(),
@@ -155,18 +151,14 @@ async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
     // Verify that carol can run "read" on her cell and get alice's Action
     // on the "bar" DNA
     // Let's do it with the SweetZome instead of the SweetCell too, for fun
-    let records: Vec<Option<Record>> = conductor
+    let record: Option<Record> = conductor
         .call(
             &carol_bar.zome(SweetInlineZomes::COORDINATOR),
             "read",
             hash_bar,
         )
         .await;
-    let record = records
-        .into_iter()
-        .next()
-        .unwrap()
-        .expect("Record was None: carol couldn't `get` it");
+    let record = record.expect("Record was None: carol couldn't `get` it");
     assert_eq!(record.action().author(), alice_bar.agent_pubkey());
     assert_eq!(
         *record.entry(),
