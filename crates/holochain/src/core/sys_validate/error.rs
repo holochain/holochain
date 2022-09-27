@@ -59,7 +59,7 @@ impl From<CounterSigningError> for SysValidationError {
     }
 }
 
-#[deprecated = "This will be replaced with SysValidationOutcome as we shouldn't treat outcomes as errors"]
+// #[deprecated = "This will be replaced with SysValidationOutcome as we shouldn't treat outcomes as errors"]
 pub type SysValidationResult<T> = Result<T, SysValidationError>;
 
 /// Return either:
