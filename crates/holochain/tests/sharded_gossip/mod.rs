@@ -61,9 +61,10 @@ async fn fullsync_sharded_gossip() -> anyhow::Result<()> {
         });
     }
 
-    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_create_read_zome())
-        .await
-        .unwrap();
+    let (dna_file, _, _) =
+        SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome()))
+            .await
+            .unwrap();
 
     let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
     conductors.exchange_peer_info().await;
@@ -114,7 +115,7 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
         });
     }
 
-    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(batch_create_zome())
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(("zome", batch_create_zome()))
         .await
         .unwrap();
 
@@ -128,11 +129,7 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
 
     // Call the "create" zome fn on Alice's app
     let hashes: Vec<ActionHash> = conductors[0]
-        .call(
-            &alice.zome(holochain::sweettest::SweetInlineZomes::COORDINATOR),
-            "create_batch",
-            NUM_OPS,
-        )
+        .call(&alice.zome("zome"), "create_batch", NUM_OPS)
         .await;
     let all_cells = vec![&alice, &bobbo, &carol];
 
@@ -167,11 +164,7 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
 
     // Verify that bobbo can run "read" on his cell and get alice's Action
     let element: Option<Record> = conductors[1]
-        .call(
-            &bobbo.zome(holochain::sweettest::SweetInlineZomes::COORDINATOR),
-            "read",
-            hashes[0].clone(),
-        )
+        .call(&bobbo.zome("zome"), "read", hashes[0].clone())
         .await;
     let element = element.expect("Record was None: bobbo couldn't `get` it");
 
@@ -354,9 +347,10 @@ async fn fullsync_sharded_local_gossip() -> anyhow::Result<()> {
         ..Default::default()
     });
 
-    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_create_read_zome())
-        .await
-        .unwrap();
+    let (dna_file, _, _) =
+        SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome()))
+            .await
+            .unwrap();
 
     let alice = conductor
         .setup_app("app", &[dna_file.clone()])
