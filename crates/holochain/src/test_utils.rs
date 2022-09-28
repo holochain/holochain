@@ -486,7 +486,7 @@ pub async fn consistency<'a, I: IntoIterator<Item = &'a SweetCell>>(
 /// Wait for all cells to reach consistency,
 /// with the option to specify that some cells are offline.
 ///
-/// Cells paired with a `false` value with have their authored ops counted towards the total,
+/// Cells paired with a `false` value will have their authored ops counted towards the total,
 /// but not their integrated ops (since they are not online to integrate things).
 /// This is useful for tests where nodes go offline.
 #[tracing::instrument(skip(all_cells))]
