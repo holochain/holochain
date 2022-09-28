@@ -207,7 +207,7 @@ pub mod tests {
         } = RibosomeTestFixture::new(TestWasm::Schedule).await;
 
         // Let's just drive alice to exhaust all ticks.
-        // let _schedule: () = conductor.call(&alice, "schedule", ()).await;
+        let _schedule: () = conductor.call(&alice, "schedule", ()).await;
         let mut i: usize = 0;
         while i < 10 {
             tokio::time::sleep(std::time::Duration::from_millis(2)).await;
