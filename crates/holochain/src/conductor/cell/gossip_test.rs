@@ -21,9 +21,7 @@ async fn gossip_test() {
             ..Default::default()
         });
     }
-    let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Anchor])
-        .await
-        .unwrap();
+    let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Anchor]).await;
 
     let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
     let ((cell_1,), (cell_2,)) = apps.into_tuples();
@@ -72,9 +70,7 @@ async fn agent_info_test() {
         });
     }
     let (dna_file, _, _) =
-        SweetDnaFile::unique_from_inline_zomes(("zome", simple_create_read_zome()))
-            .await
-            .unwrap();
+        SweetDnaFile::unique_from_inline_zomes(("zome", simple_create_read_zome())).await;
 
     let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
     let ((cell_1,), (cell_2,)) = apps.into_tuples();

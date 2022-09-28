@@ -37,9 +37,7 @@ async fn test_publish() -> anyhow::Result<()> {
     let mut conductors = SweetConductorBatch::from_config(NUM_CONDUCTORS, config).await;
 
     let (dna_file, _, _) =
-        SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome()))
-            .await
-            .unwrap();
+        SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome())).await;
 
     let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
     conductors.exchange_peer_info().await;
@@ -81,9 +79,7 @@ async fn multi_conductor() -> anyhow::Result<()> {
     let mut conductors = SweetConductorBatch::from_standard_config(NUM_CONDUCTORS).await;
 
     let (dna_file, _, _) =
-        SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome()))
-            .await
-            .unwrap();
+        SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome())).await;
 
     let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
     conductors.exchange_peer_info().await;
@@ -155,9 +151,7 @@ async fn sharded_consistency() {
     let mut conductors = SweetConductorBatch::from_config(NUM_CONDUCTORS, config).await;
 
     let (dna_file, _, _) =
-        SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome()))
-            .await
-            .unwrap();
+        SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome())).await;
     let dnas = vec![dna_file];
 
     let apps = conductors.setup_app("app", &dnas).await.unwrap();
@@ -199,7 +193,7 @@ async fn private_entries_dont_leak() {
     use holochain_types::inline_zome::InlineZomeSet;
 
     let _g = observability::test_run().ok();
-    let mut entry_def = EntryDef::default_with_id("entrydef");
+    let mut entry_def = EntryDef::from_id("entrydef");
     entry_def.visibility = EntryVisibility::Private;
 
     #[derive(Serialize, Deserialize, Debug, SerializedBytes)]
@@ -227,9 +221,7 @@ async fn private_entries_dont_leak() {
 
     let mut conductors = SweetConductorBatch::from_standard_config(2).await;
 
-    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(zome.0)
-        .await
-        .unwrap();
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(zome.0).await;
     let dnas = vec![dna_file];
 
     let apps = conductors.setup_app("app", &dnas).await.unwrap();

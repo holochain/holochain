@@ -27,9 +27,7 @@ use std::time::Duration;
 async fn sys_validation_workflow_test() {
     observability::test_run().ok();
 
-    let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create])
-        .await
-        .unwrap();
+    let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
 
     let mut conductors = SweetConductorBatch::from_standard_config(2).await;
     let apps = conductors

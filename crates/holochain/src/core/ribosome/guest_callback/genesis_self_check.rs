@@ -162,8 +162,7 @@ mod slow_tests {
             Vec::<TestCoordinatorWasm>::new(),
             vec![TestIntegrityWasm::IntegrityZome],
         )
-        .await
-        .unwrap();
+        .await;
 
         let app = conductor.setup_app("app", &[dna]).await.unwrap();
         let cells = app.into_cells();

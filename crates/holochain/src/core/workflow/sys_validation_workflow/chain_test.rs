@@ -15,9 +15,7 @@ async fn sys_validation_agent_activity_test() {
     let mut conductors = SweetConductorBatch::from_standard_config(2).await;
 
     let (dna_file, _, _) =
-        SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome()))
-            .await
-            .unwrap();
+        SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome())).await;
 
     let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
     let ((cell_1,), (cell_2,)) = apps.into_tuples();

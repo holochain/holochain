@@ -68,7 +68,7 @@ mod tests {
     use holochain_types::inline_zome::InlineZomeSet;
 
     fn zome(agents: Vec<AgentPubKey>, num_signals: Arc<AtomicUsize>) -> InlineZomeSet {
-        let entry_def = EntryDef::default_with_id("entrydef");
+        let entry_def = EntryDef::from_id("entrydef");
 
         SweetInlineZomes::new(vec![entry_def.clone()], 0)
             .function("signal_others", move |api, ()| {
@@ -122,9 +122,7 @@ mod tests {
             future::join_all(conductors.iter().map(|c| SweetAgents::one(c.keystore()))).await;
 
         let (dna_file, _, _) =
-            SweetDnaFile::unique_from_inline_zomes(zome(agents.clone(), num_signals.clone()))
-                .await
-                .unwrap();
+            SweetDnaFile::unique_from_inline_zomes(zome(agents.clone(), num_signals.clone())).await;
 
         let apps = conductors
             .setup_app_for_zipped_agents("app", &agents, &[dna_file.clone().into()])

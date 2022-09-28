@@ -62,9 +62,7 @@ async fn fullsync_sharded_gossip() -> anyhow::Result<()> {
     }
 
     let (dna_file, _, _) =
-        SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome()))
-            .await
-            .unwrap();
+        SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome())).await;
 
     let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
     conductors.exchange_peer_info().await;
@@ -115,9 +113,8 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
         });
     }
 
-    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(("zome", batch_create_zome()))
-        .await
-        .unwrap();
+    let (dna_file, _, _) =
+        SweetDnaFile::unique_from_inline_zomes(("zome", batch_create_zome())).await;
 
     let apps = conductors
         .setup_app("app", &[dna_file.clone()])
@@ -193,9 +190,7 @@ async fn test_gossip_shutdown() {
         });
     }
 
-    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome())
-        .await
-        .unwrap();
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
 
     let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
     let ((cell_0,), (cell_1,)) = apps.into_tuples();
@@ -254,9 +249,7 @@ async fn three_way_gossip(config: ConductorConfig) {
         });
     }
 
-    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome())
-        .await
-        .unwrap();
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
 
     let cells: Vec<_> = futures::future::join_all(conductors.iter_mut().map(|c| async {
         let (cell,) = c.setup_app("app", [&dna_file]).await.unwrap().into_tuple();
@@ -348,9 +341,7 @@ async fn fullsync_sharded_local_gossip() -> anyhow::Result<()> {
     });
 
     let (dna_file, _, _) =
-        SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome()))
-            .await
-            .unwrap();
+        SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome())).await;
 
     let alice = conductor
         .setup_app("app", &[dna_file.clone()])

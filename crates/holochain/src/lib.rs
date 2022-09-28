@@ -34,3 +34,8 @@ pub use tracing;
 // we work out the test utils stuff
 #[cfg(test)]
 mod local_network_tests;
+
+pub mod prelude {
+    pub use holochain_types::inline_zome::*;
+    pub use holochain_types::prelude::*;
+}

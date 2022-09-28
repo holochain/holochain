@@ -166,9 +166,7 @@ impl Consumer {
 
 async fn setup() -> (Producer, Consumer, Others) {
     let (tx, rx) = tokio::sync::mpsc::channel(1);
-    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Anchor])
-        .await
-        .unwrap();
+    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Anchor]).await;
     let config = || {
         let mut tuning =
             kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();

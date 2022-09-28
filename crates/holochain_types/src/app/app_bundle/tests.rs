@@ -16,8 +16,8 @@ async fn app_bundle_fixture() -> (AppBundle, DnaFile) {
     let dna_def_1 = DnaDef::unique_from_zomes(fake_zomes.clone(), vec![]);
     let dna_def_2 = DnaDef::unique_from_zomes(fake_zomes, vec![]);
 
-    let dna1 = DnaFile::new(dna_def_1, fake_wasms.clone()).await.unwrap();
-    let dna2 = DnaFile::new(dna_def_2, fake_wasms.clone()).await.unwrap();
+    let dna1 = DnaFile::new(dna_def_1, fake_wasms.clone()).await;
+    let dna2 = DnaFile::new(dna_def_2, fake_wasms.clone()).await;
 
     let path1 = PathBuf::from(format!("{}", dna1.dna_hash()));
 
@@ -46,10 +46,8 @@ async fn provisioning_1_create() {
     let dna = dna
         .with_network_seed("network_seed".to_string())
         .await
-        .unwrap()
         .with_properties(SerializedBytes::try_from(app_manifest_properties_fixture()).unwrap())
-        .await
-        .unwrap();
+        .await;
 
     let cell_id = CellId::new(dna.dna_hash().to_owned(), agent.clone());
 

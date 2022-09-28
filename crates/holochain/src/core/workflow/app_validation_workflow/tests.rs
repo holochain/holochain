@@ -32,8 +32,7 @@ async fn app_validation_workflow_test() {
         TestWasm::ValidateLink,
         TestWasm::Create,
     ])
-    .await
-    .unwrap();
+    .await;
 
     let mut conductors = SweetConductorBatch::from_standard_config(2).await;
     let apps = conductors

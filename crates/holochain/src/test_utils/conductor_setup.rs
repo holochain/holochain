@@ -204,8 +204,7 @@ impl ConductorTestData {
             },
             zomes.into_iter().flat_map(Vec::<DnaWasm>::from),
         )
-        .await
-        .unwrap();
+        .await;
 
         let mut agents = vec![fake_agent_pubkey_1()];
         if with_bob {

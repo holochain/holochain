@@ -646,9 +646,7 @@ pub mod wasm_test {
 
     impl RibosomeTestFixture {
         pub async fn new(test_wasm: TestWasm) -> Self {
-            let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![test_wasm])
-                .await
-                .unwrap();
+            let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![test_wasm]).await;
 
             let mut conductor = SweetConductor::from_standard_config().await;
             let (alice_pubkey, bob_pubkey) = SweetAgents::alice_and_bob();

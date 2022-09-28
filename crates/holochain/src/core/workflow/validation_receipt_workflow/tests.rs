@@ -18,9 +18,7 @@ async fn test_validation_receipt() {
     let mut conductors = SweetConductorBatch::from_standard_config(NUM_CONDUCTORS).await;
 
     let (dna_file, _, _) =
-        SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome()))
-            .await
-            .unwrap();
+        SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome())).await;
 
     let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
     conductors.exchange_peer_info().await;

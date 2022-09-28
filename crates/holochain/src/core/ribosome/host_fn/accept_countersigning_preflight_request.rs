@@ -116,13 +116,13 @@ pub mod wasm_test {
     use crate::core::ribosome::error::RibosomeError;
     use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use crate::core::workflow::error::WorkflowError;
+    use crate::sweettest::SweetConductorBatch;
+    use crate::sweettest::SweetDnaFile;
     use crate::test_utils::consistency_10s;
     use hdk::prelude::*;
     use holochain_state::source_chain::SourceChainError;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_wasmer_host::prelude::*;
-    use crate::sweettest::SweetConductorBatch;
-    use crate::sweettest::SweetDnaFile;
 
     /// Allow ChainLocked error, panic on anything else
     fn expect_chain_locked(
@@ -622,12 +622,14 @@ pub mod wasm_test {
     async fn enzymatic_session_fail() {
         observability::test_run().ok();
 
-        let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning])
-        .await
-        .unwrap();
+        let (dna_file, _, _) =
+            SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning]).await;
 
         let mut conductors = SweetConductorBatch::from_standard_config(3).await;
-        let apps = conductors.setup_app("countersigning", &[dna_file.clone()]).await.unwrap();
+        let apps = conductors
+            .setup_app("countersigning", &[dna_file.clone()])
+            .await
+            .unwrap();
 
         let ((alice_cell,), (bob_cell,), (carol_cell,)) = apps.into_tuples();
 

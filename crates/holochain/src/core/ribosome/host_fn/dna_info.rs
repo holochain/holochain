@@ -56,8 +56,7 @@ pub mod test {
             vec![TestWasm::ZomeInfo],
             properties,
         )
-        .await
-        .unwrap();
+        .await;
 
         let alice_pubkey = fixt!(AgentPubKey, Predictable, 0);
         let bob_pubkey = fixt!(AgentPubKey, Predictable, 1);

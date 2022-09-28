@@ -576,8 +576,6 @@ pub async fn data_zome(integrity_uuid: String, coordinator_uuid: String) -> DnaF
             .map(|e| e.into_iter().next().unwrap())
             .map_err(Into::into)
     });
-    let (dna_file, _, _) = SweetDnaFile::from_inline_zomes(integrity_uuid, zomes)
-        .await
-        .unwrap();
+    let (dna_file, _, _) = SweetDnaFile::from_inline_zomes(integrity_uuid, zomes).await;
     dna_file
 }

@@ -938,7 +938,7 @@ impl Conductor {
                         });
                         let wasms = wasms.collect::<Vec<_>>();
                         async move {
-                            let dna_file = DnaFile::new(dna_def.into_content(), wasms).await?;
+                            let dna_file = DnaFile::new(dna_def.into_content(), wasms).await;
                             let ribosome = RealRibosome::new(dna_file)?;
                             ConductorResult::Ok((ribosome.dna_hash().clone(), ribosome))
                         }

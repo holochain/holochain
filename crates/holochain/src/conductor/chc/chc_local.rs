@@ -182,9 +182,7 @@ mod tests {
         config.chc_namespace = Some(CHC_LOCAL_MAGIC_STRING.to_string());
         let mut conductor = SweetConductor::from_config(config).await;
 
-        let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome())
-            .await
-            .unwrap();
+        let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
         let (agent, _) = SweetAgents::alice_and_bob();
 
         let (cell,) = conductor
@@ -263,9 +261,7 @@ mod tests {
             SweetConductorBatch::from_configs([config.clone(), config.clone(), config.clone()])
                 .await;
 
-        let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome())
-            .await
-            .unwrap();
+        let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
         let (agent, _) = SweetAgents::alice_and_bob();
 
         let (c0,) = conductors[0]

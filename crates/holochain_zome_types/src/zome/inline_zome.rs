@@ -12,6 +12,7 @@ use std::marker::PhantomData;
 use std::sync::Arc;
 
 pub mod error;
+pub mod patterns;
 
 pub type BoxApi = Box<dyn HostFnApiT>;
 
@@ -118,7 +119,12 @@ impl<T> InlineZome<T> {
 
 impl InlineIntegrityZome {
     /// Create a new integrity zome with the given network seed
-    pub fn new<S: Into<String>>(uuid: S, entry_defs: Vec<EntryDef>, num_link_types: u8) -> Self {
+    pub fn new<S: Into<String>, E: IntoIterator<Item = EntryDef>>(
+        uuid: S,
+        entry_defs: E,
+        num_link_types: u8,
+    ) -> Self {
+        let entry_defs = entry_defs.into_iter().collect::<Vec<_>>();
         let num_entry_types = entry_defs.len();
         let entry_defs_callback =
             move |_, _: ()| Ok(EntryDefsCallbackResult::Defs(entry_defs.clone().into()));
@@ -128,7 +134,7 @@ impl InlineIntegrityZome {
             .set_global("__num_link_types", num_link_types)
     }
     /// Create a new integrity zome with a unique random network seed
-    pub fn new_unique(entry_defs: Vec<EntryDef>, num_link_types: u8) -> Self {
+    pub fn new_unique<E: IntoIterator<Item = EntryDef>>(entry_defs: E, num_link_types: u8) -> Self {
         Self::new(nanoid::nanoid!(), entry_defs, num_link_types)
     }
 }
