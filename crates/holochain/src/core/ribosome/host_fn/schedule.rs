@@ -195,7 +195,7 @@ pub mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    #[ignore = "flakey. Sometimes fails the last assert with 3 instead of 5"]
+    // #[ignore = "flakey. Sometimes fails the last assert with 3 instead of 5"]
     #[cfg(feature = "test_utils")]
     async fn schedule_test() -> anyhow::Result<()> {
         observability::test_run().ok();
@@ -207,7 +207,7 @@ pub mod tests {
         } = RibosomeTestFixture::new(TestWasm::Schedule).await;
 
         // Let's just drive alice to exhaust all ticks.
-        let _schedule: () = conductor.call(&alice, "schedule", ()).await;
+        // let _schedule: () = conductor.call(&alice, "schedule", ()).await;
         let mut i: usize = 0;
         while i < 10 {
             tokio::time::sleep(std::time::Duration::from_millis(2)).await;
