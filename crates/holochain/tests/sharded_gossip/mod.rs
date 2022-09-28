@@ -519,6 +519,7 @@ async fn mock_network_sharded_gossip() {
                         gossip,
                     } => {
                         if let kitsune_p2p::GossipModuleType::ShardedRecent = module {
+                            #[allow(irrefutable_let_patterns)]
                             if let GossipProtocol::Sharded(gossip) = gossip {
                                 use kitsune_p2p::gossip::sharded_gossip::*;
                                 match gossip {
@@ -1067,6 +1068,7 @@ async fn mock_network_sharding() {
                         gossip,
                     } => {
                         if let kitsune_p2p::GossipModuleType::ShardedRecent = module {
+                            #[allow(irrefutable_let_patterns)]
                             if let GossipProtocol::Sharded(gossip) = gossip {
                                 use kitsune_p2p::gossip::sharded_gossip::*;
                                 match gossip {
