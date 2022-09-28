@@ -2193,6 +2193,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "holochain_diagnostics"
+version = "0.0.1"
+dependencies = [
+ "holochain",
+]
+
+[[package]]
 name = "holochain_integrity_types"
 version = "0.0.20"
 dependencies = [

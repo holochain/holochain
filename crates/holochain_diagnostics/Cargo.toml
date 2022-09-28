@@ -1,0 +1,14 @@
+[package]
+name = "holochain_diagnostics"
+version = "0.0.1"
+description = "Tools and patterns for writing Holochain diagnostic tests"
+license = "Apache-2.0"
+homepage = "https://github.com/holochain/holochain"
+documentation = "https://docs.rs/holochain_diagnostics"
+authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
+keywords = [ "holochain", "holo" ]
+edition = "2021"
+
+
+[dependencies]
+holochain = { path = "../holochain", version = "0.0.164" }
