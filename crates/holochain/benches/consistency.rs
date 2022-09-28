@@ -48,7 +48,7 @@ fn consistency(bench: &mut Criterion) {
                 .and_then(|s| s.to_string_lossy().parse::<usize>().ok())
                 .unwrap_or(100);
             holochain::test_utils::consistency(
-                &cells,
+                cells,
                 num_tries,
                 std::time::Duration::from_millis(500),
             )
@@ -148,7 +148,7 @@ impl Consumer {
             if start.elapsed().as_secs() > 1 {
                 for cell in cells {
                     holochain::test_utils::consistency(
-                        &[cell],
+                        [cell],
                         1,
                         std::time::Duration::from_millis(10),
                     )

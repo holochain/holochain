@@ -42,9 +42,14 @@ impl SweetConductorBatch {
         self.0
     }
 
-    /// Get on inner.
+    /// Get the conductor at an index.
     pub fn get(&self, i: usize) -> Option<&SweetConductor> {
         self.0.get(i)
+    }
+
+    /// Add an existing conductor to this batch
+    pub fn add_conductor(&mut self, c: SweetConductor) {
+        self.0.push(c);
     }
 
     /// Opinionated app setup.
