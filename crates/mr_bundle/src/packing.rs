@@ -66,7 +66,7 @@ impl<M: serde::Serialize> RawBundle<M> {
         unpack_yaml(
             &self.manifest,
             &self.resources,
-            &base_path,
+            base_path,
             manifest_path,
             force,
         )
