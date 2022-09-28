@@ -328,7 +328,7 @@ mod tests {
 
         let _: ActionHash = conductors[0]
             .call(
-                &c0.zome(SweetEasyInline::COORDINATOR),
+                &c0.zome(SweetInlineZomes::COORDINATOR),
                 "create_string",
                 AppString::new("zero"),
             )
@@ -337,7 +337,7 @@ mod tests {
         // This should fail and require triggering a CHC sync
         let hash1: Result<ActionHash, _> = conductors[1]
             .call_fallible(
-                &c1.zome(SweetEasyInline::COORDINATOR),
+                &c1.zome(SweetInlineZomes::COORDINATOR),
                 "create_string",
                 AppString::new("one"),
             )
@@ -351,7 +351,7 @@ mod tests {
         // This should trigger a CHC sync
         let hash2: Result<ActionHash, _> = conductors[2]
             .call_fallible(
-                &c2.zome(SweetEasyInline::COORDINATOR),
+                &c2.zome(SweetInlineZomes::COORDINATOR),
                 "create_string",
                 AppString::new("two"),
             )

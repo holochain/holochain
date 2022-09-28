@@ -314,7 +314,18 @@ pub(crate) struct HolochainP2pActor {
     kitsune_p2p: ghost_actor::GhostSender<kitsune_p2p::actor::KitsuneP2p>,
 }
 
-impl ghost_actor::GhostControlHandler for HolochainP2pActor {}
+impl ghost_actor::GhostControlHandler for HolochainP2pActor {
+    fn handle_ghost_actor_shutdown(
+        self,
+    ) -> ghost_actor::dependencies::must_future::MustBoxFuture<'static, ()> {
+        use ghost_actor::GhostControlSender;
+        async move {
+            let _ = self.kitsune_p2p.ghost_actor_shutdown_immediate().await;
+        }
+        .boxed()
+        .into()
+    }
+}
 
 impl HolochainP2pActor {
     /// constructor
