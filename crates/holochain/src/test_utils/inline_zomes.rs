@@ -125,6 +125,7 @@ pub fn simple_crud_zome() -> InlineZomeSet {
         })
         .function("read", |api, hash: ActionHash| {
             api.get(vec![GetInput::new(hash.into(), GetOptions::default())])
+                .map(|e| e.into_iter().next().unwrap())
                 .map_err(Into::into)
         })
         .function("read_multi", |api, hashes: Vec<ActionHash>| {
