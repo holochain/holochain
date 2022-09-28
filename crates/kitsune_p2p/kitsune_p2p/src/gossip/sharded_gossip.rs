@@ -1062,7 +1062,7 @@ pub enum MissingOpsStatus {
 }
 
 kitsune_p2p_types::write_codec_enum! {
-    /// SimpleBloom Gossip Wire Protocol Codec
+    /// ShardedGossip Wire Protocol Codec
     codec ShardedGossipWire {
         /// Initiate a round of gossip with a remote node
         Initiate(0x10) {

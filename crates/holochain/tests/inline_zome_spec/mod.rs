@@ -59,14 +59,10 @@ async fn inline_zome_2_agents_1_dna() -> anyhow::Result<()> {
     .await;
 
     // Verify that bobbo can run "read" on his cell and get alice's Action
-    let records: Vec<Option<Record>> = conductor
+    let records: Option<Record> = conductor
         .call(&bobbo.zome(SweetInlineZomes::COORDINATOR), "read", hash)
         .await;
-    let record = records
-        .into_iter()
-        .next()
-        .unwrap()
-        .expect("Record was None: bobbo couldn't `get` it");
+    let record = records.expect("Record was None: bobbo couldn't `get` it");
 
     // Assert that the Record bobbo sees matches what alice committed
     assert_eq!(record.action().author(), alice.agent_pubkey());
@@ -233,18 +229,14 @@ async fn get_deleted() -> anyhow::Result<()> {
 
     wait_for_integration_1m(alice.dht_db(), expected_count).await;
 
-    let records: Vec<Option<Record>> = conductor
+    let records: Option<Record> = conductor
         .call(
             &alice.zome(SweetInlineZomes::COORDINATOR),
             "read",
             hash.clone(),
         )
         .await;
-    let record = records
-        .into_iter()
-        .next()
-        .unwrap()
-        .expect("Record was None: bobbo couldn't `get` it");
+    let record = records.expect("Record was None: bobbo couldn't `get` it");
 
     assert_eq!(record.action().author(), alice.agent_pubkey());
     assert_eq!(
