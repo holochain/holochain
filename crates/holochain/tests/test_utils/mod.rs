@@ -189,10 +189,10 @@ pub async fn register_and_install_dna_named(
     timeout: u64,
 ) -> DnaHash {
     let register_payload = RegisterDnaPayload {
-        modifiers: DnaModifiersOpt {
+        modifiers: Some(DnaModifiersOpt {
             properties,
             ..Default::default()
-        },
+        }),
         source: DnaSource::Path(dna_path),
     };
     let request = AdminRequest::RegisterDna(Box::new(register_payload));
