@@ -75,7 +75,8 @@ pub struct AppRoleDnaManifest {
     pub location: Option<mr_bundle::Location>,
 
     /// Optional default modifier values. May be overridden during installation.
-    pub modifiers: Option<DnaModifiersOpt<YamlProperties>>,
+    #[serde(default)]
+    pub modifiers: DnaModifiersOpt<YamlProperties>,
 
     /// The versioning constraints for the DNA. Ensures that only a DNA that
     /// matches the version spec will be used.
@@ -96,7 +97,7 @@ impl AppRoleDnaManifest {
             location: Some(mr_bundle::Location::Bundled(
                 "./path/to/my/dnabundle.dna".into(),
             )),
-            modifiers: Some(DnaModifiersOpt::none()),
+            modifiers: DnaModifiersOpt::none(),
             version: None,
             clone_limit: 0,
         }
@@ -195,8 +196,7 @@ impl AppManifestV1 {
     pub fn set_network_seed(&mut self, network_seed: NetworkSeed) {
         for mut role in self.roles.iter_mut() {
             if matches!(role.provisioning, Some(CellProvisioning::Create { .. })) {
-                role.dna.modifiers =
-                    Some(DnaModifiersOpt::none().with_network_seed(network_seed.clone()));
+                role.dna.modifiers.network_seed = Some(network_seed.clone());
             }
         }
     }
@@ -222,9 +222,7 @@ impl AppManifestV1 {
                         clone_limit,
                         modifiers,
                     } = dna;
-                    let modifiers = modifiers
-                        .unwrap_or_else(DnaModifiersOpt::none)
-                        .serialized()?;
+                    let modifiers = modifiers.serialized()?;
                     // Go from "flexible" enum into proper DnaVersionSpec.
                     let version = version.map(Into::into);
                     let validated = match provisioning.unwrap_or_default() {
@@ -325,7 +323,7 @@ pub mod tests {
             id: "role_id".into(),
             dna: AppRoleDnaManifest {
                 location,
-                modifiers: Some(modifiers),
+                modifiers,
                 version: Some(version),
                 clone_limit: 50,
             },
@@ -411,45 +409,21 @@ roles:
 
         // - The Create roles have the network seed rewritten.
         assert_eq!(
-            manifest.roles[0]
-                .dna
-                .modifiers
-                .clone()
-                .unwrap_or_default()
-                .network_seed
-                .as_ref(),
+            manifest.roles[0].dna.modifiers.network_seed.as_ref(),
             Some(&network_seed)
         );
         assert_eq!(
-            manifest.roles[1]
-                .dna
-                .modifiers
-                .clone()
-                .unwrap_or_default()
-                .network_seed
-                .as_ref(),
+            manifest.roles[1].dna.modifiers.network_seed.as_ref(),
             Some(&network_seed)
         );
 
         // - The others do not.
         assert_ne!(
-            manifest.roles[2]
-                .dna
-                .modifiers
-                .clone()
-                .unwrap_or_default()
-                .network_seed
-                .as_ref(),
+            manifest.roles[2].dna.modifiers.network_seed.as_ref(),
             Some(&network_seed)
         );
         assert_ne!(
-            manifest.roles[3]
-                .dna
-                .modifiers
-                .clone()
-                .unwrap_or_default()
-                .network_seed
-                .as_ref(),
+            manifest.roles[3].dna.modifiers.network_seed.as_ref(),
             Some(&network_seed)
         );
     }

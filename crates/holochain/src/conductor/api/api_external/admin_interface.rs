@@ -79,10 +79,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
             RegisterDna(payload) => {
                 trace!(register_dna_payload = ?payload);
                 let RegisterDnaPayload { modifiers, source } = *payload;
-                let modifiers = modifiers
-                    .unwrap_or_default()
-                    .serialized()
-                    .map_err(SerializationError::Bytes)?;
+                let modifiers = modifiers.serialized().map_err(SerializationError::Bytes)?;
                 // network seed and properties from the register call will override any in the bundle
                 let dna = match source {
                     DnaSource::Hash(ref hash) => {
@@ -423,7 +420,7 @@ mod test {
         let dna_hash = dna.dna_hash().clone();
         let (dna_path, _tempdir) = write_fake_dna_file(dna.clone()).await.unwrap();
         let path_payload = RegisterDnaPayload {
-            modifiers: Some(DnaModifiersOpt::none()),
+            modifiers: DnaModifiersOpt::none(),
             source: DnaSource::Path(dna_path.clone()),
         };
         let path_install_response = admin_api
@@ -436,7 +433,7 @@ mod test {
 
         // re-register idempotent
         let path_payload = RegisterDnaPayload {
-            modifiers: Some(DnaModifiersOpt::none()),
+            modifiers: DnaModifiersOpt::none(),
             source: DnaSource::Path(dna_path.clone()),
         };
         let path1_install_response = admin_api
@@ -453,7 +450,7 @@ mod test {
 
         // register by hash
         let hash_payload = RegisterDnaPayload {
-            modifiers: Some(DnaModifiersOpt::none()),
+            modifiers: DnaModifiersOpt::none(),
             source: DnaSource::Hash(dna_hash.clone()),
         };
 
@@ -469,9 +466,7 @@ mod test {
         // with a property should install and produce a different hash
         let json: serde_yaml::Value = serde_yaml::from_str("some prop: \"foo\"").unwrap();
         let hash_payload = RegisterDnaPayload {
-            modifiers: Some(
-                DnaModifiersOpt::none().with_properties(YamlProperties::new(json.clone())),
-            ),
+            modifiers: DnaModifiersOpt::none().with_properties(YamlProperties::new(json.clone())),
             source: DnaSource::Hash(dna_hash.clone()),
         };
         let install_response = admin_api
@@ -484,9 +479,8 @@ mod test {
 
         // with a network seed should install and produce a different hash
         let hash_payload = RegisterDnaPayload {
-            modifiers: Some(
-                DnaModifiersOpt::none().with_network_seed(String::from("12345678900000000000000")),
-            ),
+            modifiers: DnaModifiersOpt::none()
+                .with_network_seed(String::from("12345678900000000000000")),
             source: DnaSource::Hash(dna_hash.clone()),
         };
         let hash2_install_response = admin_api
@@ -506,9 +500,8 @@ mod test {
 
         // from a path with a same network seed should return the already registered hash so it's idempotent
         let path_payload = RegisterDnaPayload {
-            modifiers: Some(
-                DnaModifiersOpt::none().with_network_seed(String::from("12345678900000000000000")),
-            ),
+            modifiers: DnaModifiersOpt::none()
+                .with_network_seed(String::from("12345678900000000000000")),
             source: DnaSource::Path(dna_path.clone()),
         };
         let path2_install_response = admin_api
@@ -521,7 +514,7 @@ mod test {
 
         // from a path with different network seed should produce different hash
         let path_payload = RegisterDnaPayload {
-            modifiers: Some(DnaModifiersOpt::none().with_network_seed(String::from("foo"))),
+            modifiers: DnaModifiersOpt::none().with_network_seed(String::from("foo")),
             source: DnaSource::Path(dna_path),
         };
         let path3_install_response = admin_api
@@ -574,7 +567,7 @@ mod test {
 
         // now register a DNA
         let path_payload = RegisterDnaPayload {
-            modifiers: Some(DnaModifiersOpt::none()),
+            modifiers: DnaModifiersOpt::none(),
             source: DnaSource::Path(dna_path),
         };
         let path_install_response = admin_api

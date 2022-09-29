@@ -439,11 +439,11 @@ pub async fn register_dna(cmd: &mut CmdRunner, args: RegisterDna) -> anyhow::Res
         _ => unreachable!("Can't have hash and path for dna source"),
     };
     let dna = RegisterDnaPayload {
-        modifiers: Some(DnaModifiersOpt {
+        modifiers: DnaModifiersOpt {
             properties,
             network_seed,
             origin_time,
-        }),
+        },
         source,
     };
 
