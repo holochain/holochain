@@ -4,6 +4,11 @@
 //! and prints out how many they got vs how many are expected.
 //! After a certain number of links, the link creation stops to let
 //! gossip catch up. The test continues indefinitely.
+//!
+//! TODOs:
+//! - split the create and get loops
+//! - do a get for all nodes every x seconds and display all values in a row
+//! - also display peer discovery progress
 
 use std::io::Write;
 use std::time::{Duration, Instant};
@@ -16,15 +21,15 @@ use holochain_diagnostics::*;
 
 #[tokio::main]
 async fn main() {
-    let num_nodes = 120;
-    let entry_size = 10_000;
+    let num_nodes = 20;
+    let entry_size_bytes = 100_000;
     let max_links = 300;
     let loop_interval = Duration::from_millis(100);
-    let get_interval = Duration::from_secs(5);
+    let get_interval = Duration::from_secs(1);
 
     let start = Instant::now();
-    // let config = standard_config();
-    let config = config_historical_and_agent_gossip_only();
+    let config = standard_config();
+    // let config = config_historical_and_agent_gossip_only();
 
     let mut conductors = SweetConductorBatch::from_config(num_nodes, config).await;
     println!("Conductors created (t={:3.1?}).", start.elapsed());
@@ -43,7 +48,7 @@ async fn main() {
 
     let content = |rng: &mut StdRng| {
         std::iter::repeat_with(|| rng.gen())
-            .take(entry_size)
+            .take(entry_size_bytes)
             .collect::<Vec<u8>>()
     };
 
@@ -145,7 +150,21 @@ fn basic_zome() -> InlineIntegrityZome {
                     None,
                 )])
                 .unwrap();
-            Ok(links.first().unwrap().len())
+            let links = links.first().unwrap();
+            let gets = links
+                .iter()
+                .map(|l| {
+                    let target = l.target.clone().retype(holo_hash::hash_type::Action);
+                    GetInput::new(target.into(), Default::default())
+                })
+                .collect();
+            let somes = api
+                .get(gets)
+                .unwrap()
+                .into_iter()
+                .filter(|e| e.is_some())
+                .count();
+            Ok(somes)
         })
         .function("validate", |_api, _op: Op| {
             Ok(ValidateCallbackResult::Valid)

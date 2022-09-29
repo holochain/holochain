@@ -8,5 +8,6 @@ edition = "2021"
 [dependencies]
 chashmap = "2.2"
 colored = "2"
+holo_hash = { path = "../holo_hash" }
 holochain_diagnostics = { path = "../holochain_diagnostics" }
 tokio = { version = "1.11", features = ["full"] }
