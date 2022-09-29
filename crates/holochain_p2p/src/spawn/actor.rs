@@ -1077,7 +1077,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
         options: actor::GetLinksOptions,
     ) -> HolochainP2pHandlerResult<Vec<WireLinkOps>> {
         let space = dna_hash.into_kitsune();
-        let basis = link_key.base.clone().to_kitsune();
+        let basis = link_key.base.to_kitsune();
         let r_options: event::GetLinksOptions = (&options).into();
 
         let payload = crate::wire::WireMessage::get_links(link_key, r_options).encode()?;

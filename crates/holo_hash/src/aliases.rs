@@ -138,7 +138,7 @@ impl AnyDhtHash {
 
 impl From<AnyDhtHash> for AnyLinkableHash {
     fn from(hash: AnyDhtHash) -> Self {
-        let t = hash.hash_type().clone().into();
+        let t = (*hash.hash_type()).into();
         hash.retype(t)
     }
 }

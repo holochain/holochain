@@ -609,8 +609,8 @@ impl<'a> UniqueForm<'a> {
             UniqueForm::RegisterDeletedEntryAction(action) => {
                 action.deletes_entry_address.clone().into()
             }
-            UniqueForm::RegisterAddLink(action) => action.base_address.clone().into(),
-            UniqueForm::RegisterRemoveLink(action) => action.base_address.clone().into(),
+            UniqueForm::RegisterAddLink(action) => action.base_address.clone(),
+            UniqueForm::RegisterRemoveLink(action) => action.base_address.clone(),
         }
     }
 

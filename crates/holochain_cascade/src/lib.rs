@@ -1060,7 +1060,7 @@ where
     async fn am_i_an_authority(&mut self, hash: OpBasis) -> CascadeResult<bool> {
         let network = some_or_return!(self.network.as_mut(), false);
 
-        Ok(network.authority_for_hash(hash.into()).await?)
+        Ok(network.authority_for_hash(hash).await?)
     }
 
     /// Construct a query with private data access if this cascade has been
