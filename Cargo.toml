@@ -28,6 +28,8 @@ members = [
   "crates/hc_bundle",
   "crates/hc_sandbox",
 
+  # "crates/diagnostic_tests",
+
   "crates/kitsune_p2p/bootstrap",
   "crates/kitsune_p2p/dht",
   "crates/kitsune_p2p/dht_arc",

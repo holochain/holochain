@@ -2197,6 +2197,8 @@ name = "holochain_diagnostics"
 version = "0.0.1"
 dependencies = [
  "holochain",
+ "rand 0.8.5",
+ "tracing",
 ]
 
 [[package]]

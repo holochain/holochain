@@ -1,0 +1,12 @@
+[package]
+name = "diagnostic_tests"
+version = "0.1.0"
+edition = "2021"
+
+[workspace]
+
+[dependencies]
+chashmap = "2.2"
+colored = "2"
+holochain_diagnostics = { path = "../holochain_diagnostics" }
+tokio = { version = "1.11", features = ["full"] }
