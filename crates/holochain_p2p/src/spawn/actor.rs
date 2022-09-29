@@ -758,7 +758,7 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
             crate::wire::WireMessage::Publish {
                 request_validation_receipt,
                 countersigning_session,
-                dht_hash: _,
+                basis_hash: _,
                 ops,
             } => self.handle_incoming_publish(
                 space,
@@ -971,14 +971,14 @@ impl HolochainP2pHandler for HolochainP2pActor {
         dna_hash: DnaHash,
         request_validation_receipt: bool,
         countersigning_session: bool,
-        dht_hash: holo_hash::AnyDhtHash,
+        basis_hash: holo_hash::OpBasis,
         ops: Vec<holochain_types::dht_op::DhtOp>,
         timeout_ms: Option<u64>,
     ) -> HolochainP2pHandlerResult<usize> {
         use kitsune_p2p_types::KitsuneTimeout;
 
         let space = dna_hash.into_kitsune();
-        let basis = dht_hash.to_kitsune();
+        let basis = basis_hash.to_kitsune();
         let timeout = match timeout_ms {
             Some(ms) => KitsuneTimeout::from_millis(ms),
             None => self.tuning_params.implicit_timeout(),
@@ -987,7 +987,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
         let payload = crate::wire::WireMessage::publish(
             request_validation_receipt,
             countersigning_session,
-            dht_hash,
+            basis_hash,
             ops,
         )
         .encode()?;
@@ -1077,7 +1077,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
         options: actor::GetLinksOptions,
     ) -> HolochainP2pHandlerResult<Vec<WireLinkOps>> {
         let space = dna_hash.into_kitsune();
-        let basis = AnyDhtHash::from(link_key.base.clone()).to_kitsune();
+        let basis = link_key.base.clone().to_kitsune();
         let r_options: event::GetLinksOptions = (&options).into();
 
         let payload = crate::wire::WireMessage::get_links(link_key, r_options).encode()?;
@@ -1221,10 +1221,10 @@ impl HolochainP2pHandler for HolochainP2pActor {
     fn handle_authority_for_hash(
         &mut self,
         dna_hash: DnaHash,
-        dht_hash: AnyDhtHash,
+        basis_hash: OpBasis,
     ) -> HolochainP2pHandlerResult<bool> {
         let space = dna_hash.into_kitsune();
-        let basis = dht_hash.to_kitsune();
+        let basis = basis_hash.to_kitsune();
 
         let kitsune_p2p = self.kitsune_p2p.clone();
         Ok(

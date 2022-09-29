@@ -199,7 +199,7 @@ impl HolochainP2pDnaT for PassThroughNetwork {
 
     async fn authority_for_hash(
         &self,
-        _dht_hash: holo_hash::AnyDhtHash,
+        _dht_hash: holo_hash::OpBasis,
     ) -> actor::HolochainP2pResult<bool> {
         Ok(self.authority)
     }
@@ -224,7 +224,7 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         &self,
         _request_validation_receipt: bool,
         _countersigning_session: bool,
-        _dht_hash: holo_hash::AnyDhtHash,
+        _basis_hash: holo_hash::OpBasis,
         _ops: Vec<holochain_types::dht_op::DhtOp>,
         _timeout_ms: Option<u64>,
     ) -> actor::HolochainP2pResult<usize> {
@@ -385,7 +385,7 @@ impl HolochainP2pDnaT for MockNetwork {
 
     async fn authority_for_hash(
         &self,
-        dht_hash: holo_hash::AnyDhtHash,
+        dht_hash: holo_hash::OpBasis,
     ) -> actor::HolochainP2pResult<bool> {
         self.0.lock().await.authority_for_hash(dht_hash).await
     }
@@ -410,7 +410,7 @@ impl HolochainP2pDnaT for MockNetwork {
         &self,
         _request_validation_receipt: bool,
         _countersigning_session: bool,
-        _dht_hash: holo_hash::AnyDhtHash,
+        _basis_hash: holo_hash::OpBasis,
         _ops: Vec<holochain_types::dht_op::DhtOp>,
         _timeout_ms: Option<u64>,
     ) -> actor::HolochainP2pResult<usize> {

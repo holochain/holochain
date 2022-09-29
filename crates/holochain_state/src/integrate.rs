@@ -1,4 +1,4 @@
-use holo_hash::{AnyDhtHash, DhtOpHash, HasHash};
+use holo_hash::{AnyLinkableHash, DhtOpHash, HasHash};
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_types::{
@@ -16,7 +16,7 @@ use crate::{prelude::*, query::get_public_op_from_db};
 /// of any local agents.
 pub async fn authored_ops_to_dht_db(
     network: &(dyn HolochainP2pDnaT + Send + Sync),
-    hashes: Vec<(DhtOpHash, AnyDhtHash)>,
+    hashes: Vec<(DhtOpHash, AnyLinkableHash)>,
     authored_db: &DbRead<DbKindAuthored>,
     dht_db: &DbWrite<DbKindDht>,
     dht_db_cache: &DhtDbQueryCache,
