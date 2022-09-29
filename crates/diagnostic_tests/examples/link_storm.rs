@@ -11,21 +11,28 @@ use std::time::{Duration, Instant};
 use chashmap::CHashMap;
 use colored::*;
 use holochain_diagnostics::holochain::prelude::*;
-use holochain_diagnostics::holochain::sweettest::{SweetConductorBatch, SweetDnaFile};
+use holochain_diagnostics::holochain::sweettest::{self, SweetConductorBatch, SweetDnaFile};
 use holochain_diagnostics::*;
 
 #[tokio::main]
 async fn main() {
-    let num_nodes = 25;
-    let entry_size = 100_000;
+    let num_nodes = 120;
+    let entry_size = 10_000;
     let max_links = 300;
-    let loop_interval = Duration::from_millis(10);
+    let loop_interval = Duration::from_millis(100);
     let get_interval = Duration::from_secs(5);
 
-    let mut conductors = SweetConductorBatch::from_standard_config(num_nodes).await;
+    let start = Instant::now();
+    // let config = standard_config();
+    let config = config_historical_and_agent_gossip_only();
+
+    let mut conductors = SweetConductorBatch::from_config(num_nodes, config).await;
+    println!("Conductors created (t={:3.1?}).", start.elapsed());
+
     let (dna, _, _) = SweetDnaFile::unique_from_inline_zomes(("zome", basic_zome())).await;
     let apps = conductors.setup_app("basic", &[dna]).await.unwrap();
     let cells = apps.cells_flattened();
+    println!("Apps setup (t={:3.1?}).", start.elapsed());
 
     let mut rng = seeded_rng(None);
 
@@ -40,7 +47,14 @@ async fn main() {
             .collect::<Vec<u8>>()
     };
 
-    conductors.exchange_peer_info().await;
+    // TODO: write a "sparse" exchange of peer info, because 100x100 is too much.
+    //       the fn can ensure that total connectedness is achieved. agent gossip can fill
+    //       in the gaps.
+    conductors.exchange_peer_info_sampled(&mut rng, 10).await;
+    println!("Peer info exchanged (t={:3.1?}).", start.elapsed());
+
+    drop(start);
+    let start = Instant::now();
 
     let mut links = 0;
     let mut last_get = Instant::now();
@@ -65,8 +79,12 @@ async fn main() {
             };
             println!();
             print!(
-                "# links: {:>4} | {:>3} get {:<3} | {} ",
-                links, i, j, inequality
+                "t={:6.1?} #={:>4} | {:>3} get {:<3} | {} ",
+                start.elapsed(),
+                links,
+                i,
+                j,
+                inequality
             );
             std::io::stdout().flush().ok();
             last_get = Instant::now();

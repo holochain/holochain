@@ -1141,9 +1141,7 @@ impl Space {
             .flat_map(|module| match module {
                 "sharded-gossip" => {
                     let mut gossips = vec![];
-                    if !config.tuning_params.disable_recent_gossip
-                        && config.tuning_params.danger_gossip_recent_threshold_secs > 0
-                    {
+                    if !config.tuning_params.disable_recent_gossip {
                         gossips.push((
                             GossipModuleType::ShardedRecent,
                             crate::gossip::sharded_gossip::recent_factory(
