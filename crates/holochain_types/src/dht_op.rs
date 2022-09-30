@@ -131,32 +131,29 @@ impl kitsune_p2p_dht::prelude::OpRegion for DhtOp {
     }
 }
 
-/// Show that this type is used as the basis
-type DhtBasis = AnyDhtHash;
-
 /// A type for storing in databases that don't need the actual
 /// data. Everything is a hash of the type except the signatures.
 #[allow(missing_docs)]
 #[derive(Clone, Debug, Serialize, Deserialize, derive_more::Display)]
 pub enum DhtOpLight {
     #[display(fmt = "StoreRecord")]
-    StoreRecord(ActionHash, Option<EntryHash>, DhtBasis),
+    StoreRecord(ActionHash, Option<EntryHash>, OpBasis),
     #[display(fmt = "StoreEntry")]
-    StoreEntry(ActionHash, EntryHash, DhtBasis),
+    StoreEntry(ActionHash, EntryHash, OpBasis),
     #[display(fmt = "RegisterAgentActivity")]
-    RegisterAgentActivity(ActionHash, DhtBasis),
+    RegisterAgentActivity(ActionHash, OpBasis),
     #[display(fmt = "RegisterUpdatedContent")]
-    RegisterUpdatedContent(ActionHash, EntryHash, DhtBasis),
+    RegisterUpdatedContent(ActionHash, EntryHash, OpBasis),
     #[display(fmt = "RegisterUpdatedRecord")]
-    RegisterUpdatedRecord(ActionHash, EntryHash, DhtBasis),
+    RegisterUpdatedRecord(ActionHash, EntryHash, OpBasis),
     #[display(fmt = "RegisterDeletedBy")]
-    RegisterDeletedBy(ActionHash, DhtBasis),
+    RegisterDeletedBy(ActionHash, OpBasis),
     #[display(fmt = "RegisterDeletedEntryAction")]
-    RegisterDeletedEntryAction(ActionHash, DhtBasis),
+    RegisterDeletedEntryAction(ActionHash, OpBasis),
     #[display(fmt = "RegisterAddLink")]
-    RegisterAddLink(ActionHash, DhtBasis),
+    RegisterAddLink(ActionHash, OpBasis),
     #[display(fmt = "RegisterRemoveLink")]
-    RegisterRemoveLink(ActionHash, DhtBasis),
+    RegisterRemoveLink(ActionHash, OpBasis),
 }
 
 impl PartialEq for DhtOpLight {
@@ -253,7 +250,7 @@ impl DhtOp {
     }
 
     /// Returns the basis hash which determines which agents will receive this DhtOp
-    pub fn dht_basis(&self) -> AnyDhtHash {
+    pub fn dht_basis(&self) -> OpBasis {
         self.as_unique_form().basis()
     }
 
@@ -461,7 +458,7 @@ impl Ord for DhtOp {
 
 impl DhtOpLight {
     /// Get the dht basis for where to send this op
-    pub fn dht_basis(&self) -> &AnyDhtHash {
+    pub fn dht_basis(&self) -> &OpBasis {
         match self {
             DhtOpLight::StoreRecord(_, _, b)
             | DhtOpLight::StoreEntry(_, _, b)
@@ -566,14 +563,14 @@ impl DhtOpLight {
                     Action::CreateLink(create_link) => create_link.base_address.clone(),
                     _ => return Err(DhtOpError::OpActionMismatch(op_type, action.action_type())),
                 };
-                Self::RegisterAddLink(action_hash, basis.into())
+                Self::RegisterAddLink(action_hash, basis)
             }
             DhtOpType::RegisterRemoveLink => {
                 let basis = match action {
                     Action::DeleteLink(delete_link) => delete_link.base_address.clone(),
                     _ => return Err(DhtOpError::OpActionMismatch(op_type, action.action_type())),
                 };
-                Self::RegisterRemoveLink(action_hash, basis.into())
+                Self::RegisterRemoveLink(action_hash, basis)
             }
         };
         Ok(op)
@@ -597,7 +594,7 @@ pub enum UniqueForm<'a> {
 }
 
 impl<'a> UniqueForm<'a> {
-    fn basis(&'a self) -> AnyDhtHash {
+    fn basis(&'a self) -> OpBasis {
         match self {
             UniqueForm::StoreRecord(action) => ActionHash::with_data_sync(*action).into(),
             UniqueForm::StoreEntry(action) => action.entry().clone().into(),
@@ -612,8 +609,8 @@ impl<'a> UniqueForm<'a> {
             UniqueForm::RegisterDeletedEntryAction(action) => {
                 action.deletes_entry_address.clone().into()
             }
-            UniqueForm::RegisterAddLink(action) => action.base_address.clone().into(),
-            UniqueForm::RegisterRemoveLink(action) => action.base_address.clone().into(),
+            UniqueForm::RegisterAddLink(action) => action.base_address.clone(),
+            UniqueForm::RegisterRemoveLink(action) => action.base_address.clone(),
         }
     }
 

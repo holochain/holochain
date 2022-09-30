@@ -1,8 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use holo_hash::{ActionHash, AgentPubKey, DhtOpHash};
-use holo_hash::{AnyDhtHash, EntryHash};
+use holo_hash::{ActionHash, AgentPubKey, DhtOpHash, EntryHash, OpBasis};
 use holochain_keystore::AgentPubKeyExt;
 use holochain_p2p::{HolochainP2pDna, HolochainP2pDnaT};
 use holochain_state::integrate::authored_ops_to_dht_db;
@@ -205,7 +204,7 @@ pub(crate) async fn countersigning_success(
                             },
                             |row| {
                                 let hash: DhtOpHash = row.get("hash")?;
-                                let basis: AnyDhtHash = row.get("basis_hash")?;
+                                let basis: OpBasis = row.get("basis_hash")?;
                                 Ok((hash, basis))
                             },
                         )?
@@ -216,7 +215,7 @@ pub(crate) async fn countersigning_success(
             StateMutationResult::Ok(Vec::with_capacity(0))
         }
     };
-    let this_cell_actions_op_basis_hashes: Vec<(DhtOpHash, AnyDhtHash)> =
+    let this_cell_actions_op_basis_hashes: Vec<(DhtOpHash, OpBasis)> =
         authored_db.async_reader(reader_closure).await?;
 
     // If there is no active session then we can short circuit.

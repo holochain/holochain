@@ -198,4 +198,5 @@ macro_rules! to_kitsune {
 
 to_kitsune! {
     AnyDhtHashExt<holo_hash::AnyDhtHash> -> kitsune_p2p::KitsuneBasis,
+    AnyLinkableHashExt<holo_hash::AnyLinkableHash> -> kitsune_p2p::KitsuneBasis,
 }
