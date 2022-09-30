@@ -75,6 +75,7 @@ pub struct AppRoleDnaManifest {
     pub location: Option<mr_bundle::Location>,
 
     /// Optional default modifier values. May be overridden during installation.
+    #[serde(default)]
     pub modifiers: DnaModifiersOpt<YamlProperties>,
 
     /// The versioning constraints for the DNA. Ensures that only a DNA that

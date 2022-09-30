@@ -13,7 +13,7 @@ This requires you have GitHub credentials with appropriate permissions.
 5. Optional: to set up a debug SSH session for debugging failure scenarios change the field to _true_
 6. Confirm by clicking on "Run workflow"
 
-## (Permanently) Marking A Crate for Major/Minor/Patch Version Bumps
+## (Permanently) Marking A Crate for Major/Minor/Patch/Pre Version Bumps
 
 The _release-automation_ tool parses **each crate**'s _CHANGELOG.md_ file to read these two attributes from the frontmatter:
 
@@ -24,17 +24,27 @@ The _release-automation_ tool parses **each crate**'s _CHANGELOG.md_ file to rea
 
     This attribute will be retained, and can thus be used to define a permanent (per-crate) configuration.
 
-Both of these can be set to either of _major_, _minor_, _patch_.
 If both of them are missing from the frontmatter, [_patch_ is used as the default](https://github.com/holochain/holochain/blob/bc621e3e06e998d35750b2bac6b0e1f0d371c2a2/crates/release-automation/src/lib/common.rs#L150-L154).
 
-### Format
+For both, this is the complete list of valid variants:
+* _major_
+* _minor_
+* _patch_
+* _!pre \<pre-release-suffix\>_ (e.g. `!pre dev`)
+* _!pre\_major \<pre-release-suffix\>_ (e.g. `!pre_patch rc`)
+* _!pre\_minor \<pre-release-suffix\>_ (e.g. `!pre_patch beta`)
+* _!pre\_patch \<pre-release-suffix\>_ (e.g. `!pre_patch alpha`)
+
+**The exclamation mark is required for the values that take a pre-release-suffix**, as the parser relies on [YAML tags for explicit type hints](https://yaml.org/spec/1.2.2/#tags).*
+
+### Syntax
 The frontmatter is parsed as YAML and expects a `key: value` attribute format.
 
 Example:
 
 ```markdown
 ---
-semver_increment_mode: minor
+semver_increment_mode: !pre\_minor "rc"
 ---
 
 # Changelog
@@ -52,8 +62,42 @@ not given | not given | fallback to _patch_
 not given | given | $default_semver_increment_mode
 given | *ignored* | $semver_increment_mode
 
+### Pre-Release-Suffix Handling
+For any of the _pre_ modes, if at the time of release a pre-release suffix is found in the version, the outcome depends on the existing suffix:
+* if the version **does not already** have a pre-release suffix: bump version according to the requested level, and append `-<pre-release-suffix>.0`
+* if the version **does already** have a pre-release suffix:
+    * if the **existing suffix is the same** as the requested one:
+        * if **it is followed** by a dot and an integer: the integer will be incremented by 1
+        * if **it is not followed** by a dot and an integer: ".0" will be added to the suffix
+    * if the **existing suffix is different** than the requested one: replace it with `-<pre-release-suffix>.0`
 
-### Example: hdi 0.1 minor bump
+### Artifical examples of consecutive releases
+
+For an almost exhaustive list of tested transition cases look at the `fn increment_semver_consistency` test in [../../crates/release-automation/src/lib/common.rs](../../crates/release-automation/src/lib/common.rs).
+
+#### Setting without and with `default_`
+
+The _pre-release-suffix_ pertains no special meaning and is parsed as an arbitrary string.
+However, it will have an incremental number >= 0 maintained on each consecutive release within the same pre-release-suffix.
+
+Without `default_`:
+
+* _0.0.1_
+    * setting `semver_increment_mode: !pre_patch lorem` in the changelog here
+    * the tooling will remove the setting in the changelog in the release process, and subsequently default back to `patch`
+* _0.0.2-lorem.0_
+* _0.0.2_
+* _0.0.3_
+
+With
+
+* _0.0.1_
+    * setting `default_semver_increment_mode: !pre_patch lorem` here
+* _0.0.2-lorem.0_
+* _0.0.2-lorem.1_
+* _0.0.2-lorem.2_
+
+### Real world example: hdi 0.1 minor bump
 
 1. Before the next release: [hdi: mark for minor version bump #1550](https://github.com/holochain/holochain/pull/1550/commits)
 

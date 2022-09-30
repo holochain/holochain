@@ -1,6 +1,6 @@
 [package]
 name = "holochain"
-version = "0.0.164"
+version = "0.0.165"
 description = "Holochain, a framework for distributed applications"
 license-file = "LICENSE_CAL-1.0"
 homepage = "https://github.com/holochain/holochain"
@@ -24,20 +24,20 @@ futures = "0.3.1"
 getrandom = "0.2.7"
 ghost_actor = "0.3.0-alpha.4"
 holo_hash = { version = "0.0.33", path = "../holo_hash", features = ["full"] }
-holochain_cascade = { version = "0.0.63", path = "../holochain_cascade" }
-holochain_conductor_api = { version = "0.0.61", path = "../holochain_conductor_api" }
-holochain_keystore = { version = "0.0.57", path = "../holochain_keystore", default-features = false }
-holochain_p2p = { version = "0.0.58", path = "../holochain_p2p" }
-holochain_sqlite = { version = "0.0.56", path = "../holochain_sqlite" }
+holochain_cascade = { version = "0.0.64", path = "../holochain_cascade" }
+holochain_conductor_api = { version = "0.0.62", path = "../holochain_conductor_api" }
+holochain_keystore = { version = "0.0.58", path = "../holochain_keystore", default-features = false }
+holochain_p2p = { version = "0.0.59", path = "../holochain_p2p" }
+holochain_sqlite = { version = "0.0.57", path = "../holochain_sqlite" }
 holochain_serialized_bytes = "=0.0.51"
-holochain_state = { version = "0.0.61", path = "../holochain_state" }
-holochain_types = { version = "0.0.58", path = "../holochain_types" }
+holochain_state = { version = "0.0.62", path = "../holochain_state" }
+holochain_types = { version = "0.0.59", path = "../holochain_types" }
 holochain_wasmer_host = "=0.0.80"
 holochain_websocket = { version = "0.0.39", path = "../holochain_websocket" }
 holochain_zome_types = { version = "0.0.50", path = "../holochain_zome_types", features = ["full"] }
 human-panic = "1.0.3"
-kitsune_p2p = { version = "0.0.47", path = "../kitsune_p2p/kitsune_p2p" }
-kitsune_p2p_types = { version = "0.0.35", path = "../kitsune_p2p/types" }
+kitsune_p2p = { version = "0.0.48", path = "../kitsune_p2p/kitsune_p2p" }
+kitsune_p2p_types = { version = "0.0.36", path = "../kitsune_p2p/types" }
 lazy_static = "1.4.0"
 mockall = "0.10.2"
 mr_bundle = { version = "0.0.16", path = "../mr_bundle" }
@@ -74,7 +74,7 @@ url = "1.7.2"
 url2 = "0.0.6"
 url_serde = "0.2.0"
 uuid = { version = "0.7", features = [ "serde", "v4" ] }
-holochain_wasm_test_utils = { version = "0.0.60", path = "../test_utils/wasm" }
+holochain_wasm_test_utils = { version = "0.0.61", path = "../test_utils/wasm" }
 tiny-keccak = { version = "2.0.2", features = ["keccak", "sha3"] }
 async-recursion = "0.3"
 wasmer-middlewares = "=2.2.0"
