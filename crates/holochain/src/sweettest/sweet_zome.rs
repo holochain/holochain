@@ -27,7 +27,8 @@ impl SweetZome {
 pub type SweetEasyInline = SweetInlineZomes;
 
 #[derive(Default)]
-/// A helper for creating [`InlineZomeSet`]
+/// A helper for creating an [`InlineZomeSet`] consisting of a single
+/// integrity zome and a single coordinator zome.
 pub struct SweetInlineZomes(pub InlineZomeSet);
 
 impl SweetInlineZomes {
