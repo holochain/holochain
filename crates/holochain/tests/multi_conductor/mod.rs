@@ -36,9 +36,10 @@ async fn test_publish() -> anyhow::Result<()> {
     config.network = Some(network);
     let mut conductors = SweetConductorBatch::from_config(NUM_CONDUCTORS, config).await;
 
-    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_create_read_zome())
-        .await
-        .unwrap();
+    let (dna_file, _, _) =
+        SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome()))
+            .await
+            .unwrap();
 
     let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
     conductors.exchange_peer_info().await;
@@ -79,9 +80,10 @@ async fn multi_conductor() -> anyhow::Result<()> {
 
     let mut conductors = SweetConductorBatch::from_standard_config(NUM_CONDUCTORS).await;
 
-    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_create_read_zome())
-        .await
-        .unwrap();
+    let (dna_file, _, _) =
+        SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome()))
+            .await
+            .unwrap();
 
     let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
     conductors.exchange_peer_info().await;
@@ -152,9 +154,10 @@ async fn sharded_consistency() {
     };
     let mut conductors = SweetConductorBatch::from_config(NUM_CONDUCTORS, config).await;
 
-    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_create_read_zome())
-        .await
-        .unwrap();
+    let (dna_file, _, _) =
+        SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome()))
+            .await
+            .unwrap();
     let dnas = vec![dna_file];
 
     let apps = conductors.setup_app("app", &dnas).await.unwrap();

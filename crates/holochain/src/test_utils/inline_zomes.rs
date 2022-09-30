@@ -8,33 +8,28 @@ use holochain_zome_types::prelude::*;
 use crate::sweettest::SweetInlineZomes;
 
 /// An InlineZome with simple Create and Read operations
-pub fn simple_create_read_zome() -> InlineZomeSet {
-    InlineZomeSet::new_unique_single(
-        "simple",
-        "integrity_simple",
-        InlineEntryTypes::entry_defs(),
-        0,
-    )
-    .function("simple", "create", move |api, ()| {
-        let entry = Entry::app(().try_into().unwrap()).unwrap();
-        let hash = api.create(CreateInput::new(
-            InlineZomeSet::get_entry_location(&api, InlineEntryTypes::A),
-            EntryVisibility::Public,
-            entry,
-            ChainTopOrdering::default(),
-        ))?;
-        Ok(hash)
-    })
-    .function("simple", "read", |api, hash: ActionHash| {
-        api.get(vec![GetInput::new(hash.into(), GetOptions::default())])
-            .map(|e| e.into_iter().next().unwrap())
-            .map_err(Into::into)
-    })
+pub fn simple_create_read_zome() -> InlineIntegrityZome {
+    InlineIntegrityZome::new_unique(InlineEntryTypes::entry_defs(), 0)
+        .function("create", move |api, ()| {
+            let entry = Entry::app(().try_into().unwrap()).unwrap();
+            let hash = api.create(CreateInput::new(
+                InlineZomeSet::get_entry_location(&api, InlineEntryTypes::A),
+                EntryVisibility::Public,
+                entry,
+                ChainTopOrdering::default(),
+            ))?;
+            Ok(hash)
+        })
+        .function("read", |api, hash: ActionHash| {
+            api.get(vec![GetInput::new(hash.into(), GetOptions::default())])
+                .map(|e| e.into_iter().next().unwrap())
+                .map_err(Into::into)
+        })
 }
 
 /// An InlineZome with a function to create many random entries at once,
 /// and a function to read the entry at a hash
-pub fn batch_create_zome() -> InlineZomeSet {
+pub fn batch_create_zome() -> InlineIntegrityZome {
     use rand::Rng;
 
     #[derive(Copy, Clone, Debug, Serialize, Deserialize, SerializedBytes)]
@@ -46,7 +41,7 @@ pub fn batch_create_zome() -> InlineZomeSet {
         }
     }
 
-    SweetInlineZomes::new(InlineEntryTypes::entry_defs(), 0)
+    InlineIntegrityZome::new_unique(InlineEntryTypes::entry_defs(), 0)
         .function("create_batch", move |api, num: usize| {
             let hashes = std::iter::repeat_with(|| {
                 api.create(CreateInput::new(
@@ -66,7 +61,6 @@ pub fn batch_create_zome() -> InlineZomeSet {
                 .map(|e| e.into_iter().next().unwrap())
                 .map_err(Into::into)
         })
-        .0
 }
 
 #[derive(

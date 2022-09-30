@@ -160,8 +160,9 @@ impl SweetDnaFile {
     /// Create a DnaFile from a collection of InlineZomes (no Wasm)
     pub async fn from_inline_zomes(
         network_seed: String,
-        mut zomes: InlineZomeSet,
+        zomes: impl Into<InlineZomeSet>,
     ) -> DnaResult<(DnaFile, Vec<IntegrityZome>, Vec<CoordinatorZome>)> {
+        let mut zomes = zomes.into();
         let coordinator_zomes: Vec<CoordinatorZome> = zomes
             .coordinator_zomes
             .into_iter()
@@ -193,7 +194,7 @@ impl SweetDnaFile {
     /// Create a DnaFile from a collection of InlineZomes (no Wasm),
     /// with a random network seed
     pub async fn unique_from_inline_zomes(
-        zomes: InlineZomeSet,
+        zomes: impl Into<InlineZomeSet>,
     ) -> DnaResult<(DnaFile, Vec<IntegrityZome>, Vec<CoordinatorZome>)> {
         Self::from_inline_zomes(random_network_seed(), zomes).await
     }
