@@ -5,9 +5,14 @@ edition = "2021"
 
 [workspace]
 
+[profile.release]
+debug = true
+
 [dependencies]
 chashmap = "2.2"
 colored = "2"
 holo_hash = { path = "../holo_hash" }
 holochain_diagnostics = { path = "../holochain_diagnostics" }
+observability = "0.1"
 tokio = { version = "1.11", features = ["full"] }
+

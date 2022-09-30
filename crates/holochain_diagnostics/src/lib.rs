@@ -1,6 +1,9 @@
 pub use holochain;
+pub use holochain::prelude::*;
 
 use holochain::conductor::config::ConductorConfig;
+use rand::distributions::Standard;
+use rand::prelude::Distribution;
 pub use rand::rngs::StdRng;
 pub use rand::Rng;
 use rand::*;
@@ -12,10 +15,36 @@ pub fn seeded_rng(seed: Option<u64>) -> StdRng {
     StdRng::seed_from_u64(seed)
 }
 
+pub fn random_iter<T>(rng: &mut StdRng) -> impl Iterator<Item = T> + '_
+where
+    Standard: Distribution<T>,
+{
+    std::iter::repeat_with(|| rng.gen::<T>())
+}
+
+pub fn random_vec<T>(rng: &mut StdRng, num: usize) -> Vec<T>
+where
+    Standard: Distribution<T>,
+{
+    random_iter(rng).take(num).collect()
+}
+
 pub fn standard_config() -> ConductorConfig {
     holochain::sweettest::standard_config()
 }
 
+pub fn config_no_networking() -> ConductorConfig {
+    let mut config = standard_config();
+    config.network.as_mut().map(|c| {
+        *c = c.clone().tune(|mut tp| {
+            tp.disable_publish = true;
+            tp.disable_recent_gossip = true;
+            tp.disable_historical_gossip = true;
+            tp
+        });
+    });
+    config
+}
 pub fn config_no_publish() -> ConductorConfig {
     let mut config = standard_config();
     config.network.as_mut().map(|c| {

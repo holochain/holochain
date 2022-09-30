@@ -10,6 +10,8 @@
 //! - do a get for all nodes every x seconds and display all values in a row
 //! - also display peer discovery progress
 
+#![allow(unused_imports)]
+
 use std::io::Write;
 use std::time::{Duration, Instant};
 
@@ -22,7 +24,7 @@ use holochain_diagnostics::*;
 #[tokio::main]
 async fn main() {
     let num_nodes = 20;
-    let entry_size_bytes = 100_000;
+    let entry_size_bytes = 1_000_000;
     let max_links = 300;
     let loop_interval = Duration::from_millis(100);
     let get_interval = Duration::from_secs(1);
@@ -46,11 +48,7 @@ async fn main() {
         .map(|c| (c.agent_pubkey().clone(), 0))
         .collect();
 
-    let content = |rng: &mut StdRng| {
-        std::iter::repeat_with(|| rng.gen())
-            .take(entry_size_bytes)
-            .collect::<Vec<u8>>()
-    };
+    let content = |rng: &mut StdRng| random_vec::<u8>(rng, entry_size_bytes);
 
     // TODO: write a "sparse" exchange of peer info, because 100x100 is too much.
     //       the fn can ensure that total connectedness is achieved. agent gossip can fill

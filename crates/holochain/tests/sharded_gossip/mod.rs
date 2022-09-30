@@ -267,10 +267,8 @@ async fn three_way_gossip(config: ConductorConfig) {
 
     let mut hashes = vec![];
     for i in 0..num {
-        let app_string = AppString(String::from_utf8(vec![42u8 + i as u8; size]).unwrap());
-        let hash: ActionHash = conductors[0]
-            .call(&zomes[0], "create_string", app_string.clone())
-            .await;
+        let bytes = vec![42u8 + i as u8; size];
+        let hash: ActionHash = conductors[0].call(&zomes[0], "create_bytes", bytes).await;
         hashes.push(hash);
         dbg!(start.elapsed());
     }
