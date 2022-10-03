@@ -75,34 +75,24 @@ async fn setup_app() -> App {
     assert!(BASES <= NODES);
     let config = standard_config();
 
-    let start = Instant::now();
-
-    let mut conductors = SweetConductorBatch::from_config(NODES, config).await;
-    println!("Conductors created (t={:3.1?}).", start.elapsed());
-
-    let (dna, _, _) =
-        SweetDnaFile::unique_from_inline_zomes(("zome", diagnostic_tests::basic_zome())).await;
-    let apps = conductors.setup_app("basic", &[dna]).await.unwrap();
-    let cells = apps.cells_flattened().clone();
-    println!("Apps setup (t={:3.1?}).", start.elapsed());
-
-    let zomes = cells
-        .iter()
-        .map(|c| c.zome("zome"))
-        .collect::<Vec<_>>()
-        .try_into()
-        .unwrap();
+    let (conductors, zomes) = diagnostic_tests::setup_conductors_single_zome(
+        NODES,
+        config,
+        diagnostic_tests::basic_zome(),
+    )
+    .await;
 
     let now = Instant::now();
     let commits = [0; BASES];
     let counts = [[(0, now); BASES]; NODES];
-    let bases = cells
+    let bases = zomes
         .iter()
         .take(BASES)
-        .map(|c| c.agent_pubkey().clone().into())
+        .map(|z| z.cell_id().agent_pubkey().clone().into())
         .collect::<Vec<_>>()
         .try_into()
         .unwrap();
+    let zomes = zomes.try_into().unwrap();
 
     conductors.exchange_peer_info().await;
     println!("Peer info exchanged. Starting UI.");
