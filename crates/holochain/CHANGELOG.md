@@ -4,6 +4,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Fix restore clone cell by cell id. This used to fail with a "CloneCellNotFound" error. [\#1603](https://github.com/holochain/holochain/pull/1603)
+
 ## 0.0.165
 
 ## 0.0.164
