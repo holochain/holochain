@@ -6,28 +6,31 @@ use holochain_diagnostics::holochain::prelude::*;
 
 pub fn basic_zome() -> InlineIntegrityZome {
     InlineIntegrityZome::new_unique([EntryDef::from_id("a")], 1)
-        .function("create", |api, (agent, bytes): (AgentPubKey, Vec<u8>)| {
-            let entry: SerializedBytes = UnsafeBytes::from(bytes).try_into().unwrap();
-            let hash = api.create(CreateInput::new(
-                InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
-                EntryVisibility::Public,
-                Entry::App(AppEntryBytes(entry)),
-                ChainTopOrdering::default(),
-            ))?;
-            let _ = api.create_link(CreateLinkInput::new(
-                agent.into(),
-                hash.clone().into(),
-                ZomeId(0),
-                LinkType::new(0),
-                ().into(),
-                ChainTopOrdering::default(),
-            ))?;
-            Ok(hash)
-        })
-        .function("link_count", |api, agent: AgentPubKey| {
+        .function(
+            "create",
+            |api, (base, bytes): (AnyLinkableHash, Vec<u8>)| {
+                let entry: SerializedBytes = UnsafeBytes::from(bytes).try_into().unwrap();
+                let hash = api.create(CreateInput::new(
+                    InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
+                    EntryVisibility::Public,
+                    Entry::App(AppEntryBytes(entry)),
+                    ChainTopOrdering::default(),
+                ))?;
+                let _ = api.create_link(CreateLinkInput::new(
+                    base,
+                    hash.clone().into(),
+                    ZomeId(0),
+                    LinkType::new(0),
+                    ().into(),
+                    ChainTopOrdering::default(),
+                ))?;
+                Ok(hash)
+            },
+        )
+        .function("link_count", |api, base: AnyLinkableHash| {
             let links = api
                 .get_links(vec![GetLinksInput::new(
-                    agent.into(),
+                    base,
                     LinkTypeFilter::single_dep(0.into()),
                     None,
                 )])

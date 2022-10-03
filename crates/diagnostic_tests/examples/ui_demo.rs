@@ -36,27 +36,30 @@ async fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-const N: usize = 10;
+const NODES: usize = 10;
+const BASES: usize = 4;
 static FLUSH: AtomicBool = AtomicBool::new(true);
 
 #[derive(Clone)]
 struct App {
     state: RwShare<State>,
     conductors: Arc<SweetConductorBatch>,
-    zomes: Vec<SweetZome>,
+    zomes: [SweetZome; NODES],
+    bases: [AnyLinkableHash; BASES],
 }
 
 struct State {
-    commits: Vec<usize>,
-    counts: Vec<Vec<(usize, Instant)>>,
+    commits: [usize; BASES],
+    counts: [[(usize, Instant); BASES]; NODES],
 }
 
 async fn setup_app() -> App {
+    assert!(BASES <= NODES);
     let config = standard_config();
 
     let start = Instant::now();
 
-    let mut conductors = SweetConductorBatch::from_config(N, config).await;
+    let mut conductors = SweetConductorBatch::from_config(NODES, config).await;
     println!("Conductors created (t={:3.1?}).", start.elapsed());
 
     let (dna, _, _) =
@@ -65,22 +68,35 @@ async fn setup_app() -> App {
     let cells = apps.cells_flattened().clone();
     println!("Apps setup (t={:3.1?}).", start.elapsed());
 
-    let zomes = cells.iter().map(|c| c.zome("zome")).collect();
+    let zomes = cells
+        .iter()
+        .map(|c| c.zome("zome"))
+        .collect::<Vec<_>>()
+        .try_into()
+        .unwrap();
 
     let now = Instant::now();
-    let commits = vec![0; N];
-    let counts = vec![vec![(0, now); N]; N];
+    let commits = [0; BASES];
+    let counts = [[(0, now); BASES]; NODES];
+    let bases = cells
+        .iter()
+        .take(BASES)
+        .map(|c| c.agent_pubkey().clone().into())
+        .collect::<Vec<_>>()
+        .try_into()
+        .unwrap();
 
     App {
         conductors: Arc::new(conductors),
         zomes,
+        bases,
         state: RwShare::new(State { commits, counts }),
     }
 }
 
-// fn task_get() -> tokio::task::JoinHandle<()> {
-//     todo!()
-// }
+fn task_get() -> tokio::task::JoinHandle<()> {
+    todo!()
+}
 
 fn task_commit(app: App) -> tokio::task::JoinHandle<()> {
     let entry_size = 10_000;
@@ -90,20 +106,20 @@ fn task_commit(app: App) -> tokio::task::JoinHandle<()> {
         let mut rng = seeded_rng(None);
 
         loop {
-            let i = rng.gen_range(0..N);
-            let j = rng.gen_range(0..N);
+            let n = rng.gen_range(0..NODES);
+            let b = rng.gen_range(0..BASES);
 
-            let base = app.zomes[j].cell_id().agent_pubkey();
-            let _: ActionHash = app.conductors[i]
+            let base = app.bases[b].clone();
+            let _: ActionHash = app.conductors[n]
                 .call(
-                    &app.zomes[i],
+                    &app.zomes[n],
                     "create",
-                    (base.clone(), random_vec::<u8>(&mut rng, entry_size)),
+                    (base, random_vec::<u8>(&mut rng, entry_size)),
                 )
                 .await;
 
             let done = app.state.share_mut(|state| {
-                state.commits[j] += 1;
+                state.commits[b] += 1;
                 // state.counts[i][j].1 =Instant::now();
 
                 state.commits.iter().sum::<usize>() > max_commits
@@ -179,7 +195,7 @@ fn ui<B: Backend>(f: &mut Frame<B>, state: &State) {
     });
     let widths: Vec<_> = [Constraint::Length(4)]
         .into_iter()
-        .chain([Constraint::Min(1); N].into_iter())
+        .chain([Constraint::Min(1); NODES].into_iter())
         .collect();
     let table = Table::new(rows)
         .header(header)
