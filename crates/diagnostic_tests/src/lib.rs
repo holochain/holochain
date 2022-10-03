@@ -1,7 +1,3 @@
-fn main() {
-    println!("Hello, world!");
-}
-
 use holochain_diagnostics::holochain::prelude::*;
 
 pub fn basic_zome() -> InlineIntegrityZome {

@@ -1,177 +1,265 @@
-// //! Create a new entry and add a link to it, repeatedly, as fast as possible.
-// //! The link's base is one of the agent's pubkeys, selected randomly.
-// //! Every once in a while, a random agent gets links on another agent's base,
-// //! and prints out how many they got vs how many are expected.
-// //! After a certain number of links, the link creation stops to let
-// //! gossip catch up. The test continues indefinitely.
-// //!
-// //! TODOs:
-// //! - split the create and get loops
-// //! - do a get for all nodes every x seconds and display all values in a row
-// //! - also display peer discovery progress
+use crossterm::event::{self, Event, KeyCode};
+use holochain_diagnostics::{
+    holo_hash::ActionHash,
+    holochain::{conductor::conductor::RwShare, sweettest::SweetConductorBatch, sweettest::*},
+    seeded_rng, standard_config, tui_crossterm_setup, Rng, *,
+};
+use std::{
+    error::Error,
+    io::{self},
+    sync::Arc,
+    time::{Duration, Instant},
+};
+use tui::{
+    backend::Backend,
+    layout::{Constraint, Direction, Layout},
+    style::{Color, Modifier, Style},
+    widgets::{Cell, List, ListItem, Row, Table},
+    Frame, Terminal,
+};
 
-// #![allow(unused_imports)]
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn Error>> {
+    let app = setup_app().await;
 
-// use std::io::Write;
-// use std::sync::Arc;
-// use std::time::{Duration, Instant};
+    task_commit(app.clone());
+    task_get(app.clone());
 
-// use chashmap::CHashMap;
-// use colored::*;
-// use holochain_diagnostics::holochain::prelude::*;
-// use holochain_diagnostics::holochain::sweettest::{self, SweetConductorBatch, SweetDnaFile};
-// use holochain_diagnostics::*;
+    tui_crossterm_setup(|t| run_app(t, app))?;
 
-fn main() {}
+    Ok(())
+}
 
-// #[tokio::main]
-// async fn main() {
-//     let num_nodes = 20;
-//     let entry_size_bytes = 1_000_000;
-//     let max_links = 300;
-//     let loop_interval = Duration::from_millis(100);
-//     let get_interval = Duration::from_secs(1);
+const NODES: usize = 30;
+const BASES: usize = 4;
 
-//     let start = Instant::now();
-//     let config = standard_config();
-//     // let config = config_historical_and_agent_gossip_only();
+const ENTRY_SIZE: usize = 1_000_000;
+const MAX_COMMITS: usize = 100;
 
-//     let mut conductors = SweetConductorBatch::from_config(num_nodes, config).await;
-//     println!("Conductors created (t={:3.1?}).", start.elapsed());
+const APP_REFRESH_RATE: Duration = Duration::from_millis(50);
+const COMMIT_RATE: Duration = Duration::from_millis(100);
+const GET_RATE: Duration = Duration::from_millis(5);
 
-//     let (dna, _, _) = SweetDnaFile::unique_from_inline_zomes(("zome", basic_zome())).await;
-//     let apps = conductors.setup_app("basic", &[dna]).await.unwrap();
-//     let cells = apps.cells_flattened();
-//     println!("Apps setup (t={:3.1?}).", start.elapsed());
+#[derive(Clone)]
+struct App {
+    state: RwShare<State>,
+    start_time: Instant,
+    conductors: Arc<SweetConductorBatch>,
+    zomes: [SweetZome; NODES],
+    bases: [AnyLinkableHash; BASES],
+}
 
-//     let mut rng = seeded_rng(None);
+struct State {
+    commits: [usize; BASES],
+    counts: [[(usize, Instant); BASES]; NODES],
+}
 
-//     let counts: CHashMap<_, _> = cells
-//         .iter()
-//         .map(|c| (c.agent_pubkey().clone(), 0))
-//         .collect();
+impl State {
+    fn done_committing(&self) -> bool {
+        self.commits.iter().sum::<usize>() >= MAX_COMMITS
+    }
 
-//     let content = |rng: &mut StdRng| random_vec::<u8>(rng, entry_size_bytes);
+    fn total_commits(&self) -> usize {
+        self.commits.iter().sum()
+    }
 
-//     // TODO: write a "sparse" exchange of peer info, because 100x100 is too much.
-//     //       the fn can ensure that total connectedness is achieved. agent gossip can fill
-//     //       in the gaps.
-//     conductors.exchange_peer_info_sampled(&mut rng, 10).await;
-//     println!("Peer info exchanged (t={:3.1?}).", start.elapsed());
+    fn total_discrepancy(&self) -> usize {
+        self.counts
+            .iter()
+            .map(|r| r.iter().map(|(c, _)| c).copied().sum::<usize>())
+            .sum()
+    }
+}
 
-//     // Put conductors into Arcs so they may be shared across threads
-//     let conductors: Vec<_> = conductors.into_inner().into_iter().map(Arc::new).collect();
+async fn setup_app() -> App {
+    assert!(BASES <= NODES);
+    let config = standard_config();
 
-//     drop(start);
-//     let start = Instant::now();
+    let start = Instant::now();
 
-//     let get_task = tokio::spawn(async {
-//         let agent = cells[j].agent_pubkey();
-//         let expected_count = *counts.get(agent).unwrap();
-//         let actual_count: usize = conductors[i]
-//             .call(&cells[i].zome("zome"), "link_count", agent.clone())
-//             .await;
-//         let inequality = if actual_count < expected_count {
-//             format!("{:>4} < {:<4}", actual_count, expected_count).red()
-//         } else if actual_count == expected_count {
-//             format!("{:>4} = {:<4}", actual_count, expected_count).green()
-//         } else {
-//             panic!("actual > expected");
-//         };
-//         println!();
-//         print!(
-//             "t={:6.1?} #={:>4} | {:>3} get {:<3} | {} ",
-//             start.elapsed(),
-//             links,
-//             i,
-//             j,
-//             inequality
-//         );
-//         std::io::stdout().flush().ok();
-//     });
+    let mut conductors = SweetConductorBatch::from_config(NODES, config).await;
+    println!("Conductors created (t={:3.1?}).", start.elapsed());
 
-//     let commit_task = tokio::spawn(async {
-//         let mut links = 0;
+    let (dna, _, _) =
+        SweetDnaFile::unique_from_inline_zomes(("zome", diagnostic_tests::basic_zome())).await;
+    let apps = conductors.setup_app("basic", &[dna]).await.unwrap();
+    let cells = apps.cells_flattened().clone();
+    println!("Apps setup (t={:3.1?}).", start.elapsed());
 
-//         // add a link for the first N steps
-//         while links < max_links {
-//             let base = cells[j].agent_pubkey();
-//             let mut count = counts.get_mut(base).unwrap();
+    let zomes = cells
+        .iter()
+        .map(|c| c.zome("zome"))
+        .collect::<Vec<_>>()
+        .try_into()
+        .unwrap();
 
-//             let _: ActionHash = conductors[i]
-//                 .call(
-//                     &cells[i].zome("zome"),
-//                     "create",
-//                     (base.clone(), content(&mut rng)),
-//                 )
-//                 .await;
-//             *count += 1;
-//             links += 1;
-//             print!(".");
-//             std::io::stdout().flush().ok();
-//         }
+    let now = Instant::now();
+    let commits = [0; BASES];
+    let counts = [[(0, now); BASES]; NODES];
+    let bases = cells
+        .iter()
+        .take(BASES)
+        .map(|c| c.agent_pubkey().clone().into())
+        .collect::<Vec<_>>()
+        .try_into()
+        .unwrap();
 
-//         println!("\nNo more links will be created after this point.");
-//     });
+    conductors.exchange_peer_info().await;
+    println!("Peer info exchanged. Starting UI.");
 
-//     loop {
-//         let i = rng.gen_range(0..cells.len());
-//         let j = rng.gen_range(0..cells.len());
+    App {
+        conductors: Arc::new(conductors),
+        zomes,
+        bases,
+        start_time: Instant::now(),
+        state: RwShare::new(State { commits, counts }),
+    }
+}
 
-//         // get links and print out actual vs expected count
-//         if last_get.elapsed() > get_interval {
-//             last_get = Instant::now();
-//         }
+fn task_get(app: App) -> tokio::task::JoinHandle<()> {
+    tokio::spawn(async move {
+        let mut i = 0;
+        let mut last_zero = None;
 
-//         tokio::time::sleep(loop_interval).await;
-//     }
-// }
+        loop {
+            let n = (i / BASES) % NODES;
+            let b = i % BASES;
 
-// fn basic_zome() -> InlineIntegrityZome {
-//     InlineIntegrityZome::new_unique([EntryDef::from_id("a")], 1)
-//         .function("create", |api, (agent, bytes): (AgentPubKey, Vec<u8>)| {
-//             let entry: SerializedBytes = UnsafeBytes::from(bytes).try_into().unwrap();
-//             let hash = api.create(CreateInput::new(
-//                 InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
-//                 EntryVisibility::Public,
-//                 Entry::App(AppEntryBytes(entry)),
-//                 ChainTopOrdering::default(),
-//             ))?;
-//             let _ = api.create_link(CreateLinkInput::new(
-//                 agent.into(),
-//                 hash.clone().into(),
-//                 ZomeId(0),
-//                 LinkType::new(0),
-//                 ().into(),
-//                 ChainTopOrdering::default(),
-//             ))?;
-//             Ok(hash)
-//         })
-//         .function("link_count", |api, agent: AgentPubKey| {
-//             let links = api
-//                 .get_links(vec![GetLinksInput::new(
-//                     agent.into(),
-//                     LinkTypeFilter::single_dep(0.into()),
-//                     None,
-//                 )])
-//                 .unwrap();
-//             let links = links.first().unwrap();
-//             let gets = links
-//                 .iter()
-//                 .map(|l| {
-//                     let target = l.target.clone().retype(holo_hash::hash_type::Action);
-//                     GetInput::new(target.into(), Default::default())
-//                 })
-//                 .collect();
-//             let somes = api
-//                 .get(gets)
-//                 .unwrap()
-//                 .into_iter()
-//                 .filter(|e| e.is_some())
-//                 .count();
-//             Ok(somes)
-//         })
-//         .function("validate", |_api, _op: Op| {
-//             Ok(ValidateCallbackResult::Valid)
-//         })
-// }
+            let base = app.bases[b].clone();
+            let links: usize = app.conductors[n]
+                .call(&app.zomes[n], "link_count", base)
+                .await;
+
+            let is_zero = app.state.share_mut(|state| {
+                let val = state.commits[b] - links;
+                state.counts[n][b].0 = val;
+                state.counts[n][b].1 = Instant::now();
+                val == 0
+            });
+
+            if is_zero {
+                if let Some(last) = last_zero {
+                    if i - last > NODES * BASES * 2 {
+                        // If we've gone through two cycles of consistent zeros, then we can stop running get.
+                        break;
+                    }
+                } else {
+                    last_zero = Some(i);
+                }
+            } else {
+                last_zero = None;
+            }
+
+            i += 1;
+
+            tokio::time::sleep(GET_RATE).await;
+        }
+    })
+}
+
+fn task_commit(app: App) -> tokio::task::JoinHandle<()> {
+    tokio::spawn(async move {
+        let mut rng = seeded_rng(None);
+
+        loop {
+            let n = rng.gen_range(0..NODES);
+            let b = rng.gen_range(0..BASES);
+
+            let base = app.bases[b].clone();
+            let _: ActionHash = app.conductors[n]
+                .call(
+                    &app.zomes[n],
+                    "create",
+                    (base, random_vec::<u8>(&mut rng, ENTRY_SIZE)),
+                )
+                .await;
+
+            let done = app.state.share_mut(|state| {
+                state.commits[b] += 1;
+                state.done_committing()
+            });
+            if done {
+                break;
+            }
+            tokio::time::sleep(COMMIT_RATE).await;
+        }
+    })
+}
+
+fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: App) -> io::Result<()> {
+    loop {
+        terminal.draw(|f| ui(f, &app)).unwrap();
+        if event::poll(APP_REFRESH_RATE)? {
+            if let Event::Key(key) = event::read()? {
+                if let KeyCode::Char('q') = key.code {
+                    return Ok(());
+                }
+            }
+        }
+    }
+}
+
+fn ui<B: Backend>(f: &mut Frame<B>, app: &App) {
+    let table_len = BASES as u16 * 2 + 5 + 2;
+    let chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Length(table_len), Constraint::Min(20)].as_ref())
+        .split(f.size());
+
+    // let header = Row::new(
+    //     ["exp:".to_string()]
+    //         .into_iter()
+    //         .chain(state.commits.iter().map(|c| c.to_string())),
+    // )
+    // .style(
+    //     Style::default()
+    //         .fg(Color::Cyan)
+    //         .add_modifier(Modifier::UNDERLINED),
+    // );
+
+    app.state.share_ref(|state| {
+        let rows = state.counts.iter().enumerate().map(|(i, r)| {
+            let cells = r.into_iter().enumerate().map(|(_, (c, t))| {
+                let val = (*c).min(15);
+                let mut style = if val == 0 {
+                    Style::default().fg(Color::Green)
+                } else if val < 3 {
+                    Style::default().fg(Color::Yellow)
+                } else if val < 15 {
+                    Style::default().fg(Color::Red)
+                } else {
+                    Style::default().fg(Color::Magenta)
+                };
+                if t.elapsed() < GET_RATE * BASES as u32 {
+                    style = style.add_modifier(Modifier::UNDERLINED);
+                }
+                Cell::from(format!("{:1x}", val)).style(style)
+            });
+            let front = Cell::from(format!("C{:<2}:", i));
+            let row = [front].into_iter().chain(cells);
+            Row::new(row)
+        });
+        let widths: Vec<_> = [Constraint::Length(4)]
+            .into_iter()
+            .chain([Constraint::Min(1); NODES].into_iter())
+            .collect();
+        let table = Table::new(rows)
+            // .header(header)
+            // .block(Block::default().borders(Borders::ALL).title("Table"))
+            .widths(&widths);
+
+        let list = List::new(
+            [
+                format!("T:           {:<.2?}", app.start_time.elapsed()),
+                format!("Commits:     {}", state.total_commits()),
+                format!("Discrepancy: {}", state.total_discrepancy()),
+            ]
+            .into_iter()
+            .map(ListItem::new)
+            .collect::<Vec<_>>(),
+        );
+
+        f.render_widget(table, chunks[0]);
+        f.render_widget(list, chunks[1]);
+    });
+}
