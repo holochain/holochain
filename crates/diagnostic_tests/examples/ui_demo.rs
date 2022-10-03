@@ -16,9 +16,9 @@ use std::{
 };
 use tui::{
     backend::Backend,
-    layout::Constraint,
+    layout::{Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
-    widgets::{Cell, Row, Table},
+    widgets::{Cell, List, ListItem, Row, Table},
     Frame, Terminal,
 };
 
@@ -27,22 +27,27 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let app = setup_app().await;
 
     task_commit(app.clone());
+    task_get(app.clone());
 
     tui_crossterm_setup(|t| run_app(t, app))?;
-
-    // // let get_task = task_get();
-    // let commit_task = task_commit();
 
     Ok(())
 }
 
-const NODES: usize = 10;
+const NODES: usize = 30;
 const BASES: usize = 4;
-static FLUSH: AtomicBool = AtomicBool::new(true);
+
+const ENTRY_SIZE: usize = 1_000_000;
+const MAX_COMMITS: usize = 100;
+
+const APP_REFRESH_RATE: Duration = Duration::from_millis(50);
+const COMMIT_RATE: Duration = Duration::from_millis(100);
+const GET_RATE: Duration = Duration::from_millis(5);
 
 #[derive(Clone)]
 struct App {
     state: RwShare<State>,
+    start_time: Instant,
     conductors: Arc<SweetConductorBatch>,
     zomes: [SweetZome; NODES],
     bases: [AnyLinkableHash; BASES],
@@ -51,6 +56,23 @@ struct App {
 struct State {
     commits: [usize; BASES],
     counts: [[(usize, Instant); BASES]; NODES],
+}
+
+impl State {
+    fn done_committing(&self) -> bool {
+        self.commits.iter().sum::<usize>() >= MAX_COMMITS
+    }
+
+    fn total_commits(&self) -> usize {
+        self.commits.iter().sum()
+    }
+
+    fn total_discrepancy(&self) -> usize {
+        self.counts
+            .iter()
+            .map(|r| r.iter().map(|(c, _)| c).copied().sum::<usize>())
+            .sum()
+    }
 }
 
 async fn setup_app() -> App {
@@ -86,22 +108,59 @@ async fn setup_app() -> App {
         .try_into()
         .unwrap();
 
+    conductors.exchange_peer_info().await;
+
     App {
         conductors: Arc::new(conductors),
         zomes,
         bases,
+        start_time: Instant::now(),
         state: RwShare::new(State { commits, counts }),
     }
 }
 
-fn task_get() -> tokio::task::JoinHandle<()> {
-    todo!()
+fn task_get(app: App) -> tokio::task::JoinHandle<()> {
+    tokio::spawn(async move {
+        let mut i = 0;
+        let mut last_zero = None;
+
+        loop {
+            let n = (i / BASES) % NODES;
+            let b = i % BASES;
+
+            let base = app.bases[b].clone();
+            let links: usize = app.conductors[n]
+                .call(&app.zomes[n], "link_count", base)
+                .await;
+
+            let is_zero = app.state.share_mut(|state| {
+                let val = state.commits[b] - links;
+                state.counts[n][b].0 = val;
+                state.counts[n][b].1 = Instant::now();
+                val == 0
+            });
+
+            if is_zero {
+                if let Some(last) = last_zero {
+                    if i - last > NODES * BASES * 2 {
+                        // If we've gone through two cycles of consistent zeros, then we can stop running get.
+                        break;
+                    }
+                } else {
+                    last_zero = Some(i);
+                }
+            } else {
+                last_zero = None;
+            }
+
+            i += 1;
+
+            tokio::time::sleep(GET_RATE).await;
+        }
+    })
 }
 
 fn task_commit(app: App) -> tokio::task::JoinHandle<()> {
-    let entry_size = 10_000;
-    let max_commits: usize = 100;
-
     tokio::spawn(async move {
         let mut rng = seeded_rng(None);
 
@@ -114,35 +173,26 @@ fn task_commit(app: App) -> tokio::task::JoinHandle<()> {
                 .call(
                     &app.zomes[n],
                     "create",
-                    (base, random_vec::<u8>(&mut rng, entry_size)),
+                    (base, random_vec::<u8>(&mut rng, ENTRY_SIZE)),
                 )
                 .await;
 
             let done = app.state.share_mut(|state| {
                 state.commits[b] += 1;
-                // state.counts[i][j].1 =Instant::now();
-
-                state.commits.iter().sum::<usize>() > max_commits
+                state.done_committing()
             });
-
             if done {
-                println!("\nNo more links will be created after this point.");
                 break;
             }
-            tokio::time::sleep(Duration::from_secs(1)).await;
+            tokio::time::sleep(COMMIT_RATE).await;
         }
     })
 }
 
 fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: App) -> io::Result<()> {
     loop {
-        if true || FLUSH.load(Ordering::Relaxed) {
-            app.state.share_ref(|state| {
-                terminal.draw(|f| ui(f, &state)).unwrap();
-            });
-            FLUSH.swap(false, Ordering::Relaxed);
-        }
-        if event::poll(Duration::from_millis(200))? {
+        terminal.draw(|f| ui(f, &app)).unwrap();
+        if event::poll(APP_REFRESH_RATE)? {
             if let Event::Key(key) = event::read()? {
                 if let KeyCode::Char('q') = key.code {
                     return Ok(());
@@ -152,114 +202,67 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: App) -> io::Result<()> {
     }
 }
 
-fn ui<B: Backend>(f: &mut Frame<B>, state: &State) {
-    // fn cell(s: &str) -> Cell {
-    //     let mut cell = Cell::default();
-    //     cell.set_symbol(s);
-    //     cell
-    // }
+fn ui<B: Backend>(f: &mut Frame<B>, app: &App) {
+    let table_len = BASES as u16 * 2 + 5 + 2;
+    let chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Length(table_len), Constraint::Min(20)].as_ref())
+        .split(f.size());
 
-    // Wrapping block for a group
-    // Just draw the block and the group on the same area and build the group
-    // with at least a margin of 1
-    let size = f.size();
+    // let header = Row::new(
+    //     ["exp:".to_string()]
+    //         .into_iter()
+    //         .chain(state.commits.iter().map(|c| c.to_string())),
+    // )
+    // .style(
+    //     Style::default()
+    //         .fg(Color::Cyan)
+    //         .add_modifier(Modifier::UNDERLINED),
+    // );
 
-    let header = Row::new(
-        ["exp:".to_string()]
-            .into_iter()
-            .chain(state.commits.iter().map(|c| c.to_string())),
-    )
-    .style(
-        Style::default()
-            .fg(Color::Cyan)
-            .add_modifier(Modifier::UNDERLINED),
-    );
-    let rows = state.counts.iter().enumerate().map(|(i, r)| {
-        let cells = r.into_iter().enumerate().map(|(j, (c, t))| {
-            let val = (state.commits[j].saturating_sub(*c)).min(15);
-            let mut style = if val == 0 {
-                Style::default().fg(Color::Green)
-            } else if val < 3 {
-                Style::default().fg(Color::Yellow)
-            } else {
-                Style::default().fg(Color::Red)
-            };
-            if t.elapsed() < Duration::from_secs(3) {
-                style = style.add_modifier(Modifier::RAPID_BLINK);
-            }
-            Cell::from(format!("{:1x}", val)).style(style)
+    app.state.share_ref(|state| {
+        let rows = state.counts.iter().enumerate().map(|(i, r)| {
+            let cells = r.into_iter().enumerate().map(|(_, (c, t))| {
+                let val = (*c).min(15);
+                let mut style = if val == 0 {
+                    Style::default().fg(Color::Green)
+                } else if val < 3 {
+                    Style::default().fg(Color::Yellow)
+                } else if val < 15 {
+                    Style::default().fg(Color::Red)
+                } else {
+                    Style::default().fg(Color::Magenta)
+                };
+                if t.elapsed() < GET_RATE * BASES as u32 {
+                    style = style.add_modifier(Modifier::UNDERLINED);
+                }
+                Cell::from(format!("{:1x}", val)).style(style)
+            });
+            let front = Cell::from(format!("C{:<2}:", i));
+            let row = [front].into_iter().chain(cells);
+            Row::new(row)
         });
-        let front = Cell::from(format!("C{:<2}:", i));
-        let row = [front].into_iter().chain(cells);
-        Row::new(row)
+        let widths: Vec<_> = [Constraint::Length(4)]
+            .into_iter()
+            .chain([Constraint::Min(1); NODES].into_iter())
+            .collect();
+        let table = Table::new(rows)
+            // .header(header)
+            // .block(Block::default().borders(Borders::ALL).title("Table"))
+            .widths(&widths);
+
+        let list = List::new(
+            [
+                format!("T:           {:<.1?}", app.start_time.elapsed()),
+                format!("Commits:     {}", state.total_commits()),
+                format!("Discrepancy: {}", state.total_discrepancy()),
+            ]
+            .into_iter()
+            .map(ListItem::new)
+            .collect::<Vec<_>>(),
+        );
+
+        f.render_widget(table, chunks[0]);
+        f.render_widget(list, chunks[1]);
     });
-    let widths: Vec<_> = [Constraint::Length(4)]
-        .into_iter()
-        .chain([Constraint::Min(1); NODES].into_iter())
-        .collect();
-    let table = Table::new(rows)
-        .header(header)
-        // .block(Block::default().borders(Borders::ALL).title("Table"))
-        .widths(&widths);
-
-    f.render_widget(table, size);
-
-    // // Surrounding block
-    // let block = Block::default()
-    //     .borders(Borders::ALL)
-    //     .title("Main block with round corners")
-    //     .title_alignment(Alignment::Center)
-    //     .border_type(BorderType::Rounded);
-    // f.render_widget(block, size);
-
-    // let chunks = Layout::default()
-    //     .direction(Direction::Vertical)
-    //     .margin(4)
-    //     .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
-    //     .split(f.size());
-
-    // // Top two inner blocks
-    // let top_chunks = Layout::default()
-    //     .direction(Direction::Horizontal)
-    //     .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
-    //     .split(chunks[0]);
-
-    // // Top left inner block with green background
-    // let block = Block::default()
-    //     .title(vec![
-    //         Span::styled("With", Style::default().fg(Color::Yellow)),
-    //         Span::from(" background"),
-    //     ])
-    //     .style(Style::default().bg(Color::Green));
-    // f.render_widget(block, top_chunks[0]);
-
-    // // Top right inner block with styled title aligned to the right
-    // let block = Block::default()
-    //     .title(Span::styled(
-    //         "Styled title",
-    //         Style::default()
-    //             .fg(Color::White)
-    //             .bg(Color::Red)
-    //             .add_modifier(Modifier::BOLD),
-    //     ))
-    //     .title_alignment(Alignment::Right);
-    // f.render_widget(block, top_chunks[1]);
-
-    // // Bottom two inner blocks
-    // let bottom_chunks = Layout::default()
-    //     .direction(Direction::Horizontal)
-    //     .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
-    //     .split(chunks[1]);
-
-    // // Bottom left block with all default borders
-    // let block = Block::default().title("With borders").borders(Borders::ALL);
-    // f.render_widget(block, bottom_chunks[0]);
-
-    // // Bottom right block with styled left and right border
-    // let block = Block::default()
-    //     .title("With styled borders and doubled borders")
-    //     .border_style(Style::default().fg(Color::Cyan))
-    //     .borders(Borders::LEFT | Borders::RIGHT)
-    //     .border_type(BorderType::Double);
-    // f.render_widget(block, bottom_chunks[1]);
 }
