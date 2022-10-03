@@ -8,6 +8,9 @@ pub use rand::rngs::StdRng;
 pub use rand::Rng;
 use rand::*;
 
+mod terminal;
+pub use terminal::*;
+
 /// A RNG suitable for testing, if no seed is passed, uses standard random seed.
 pub fn seeded_rng(seed: Option<u64>) -> StdRng {
     let seed = seed.unwrap_or_else(|| thread_rng().gen());

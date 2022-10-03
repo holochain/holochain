@@ -15,3 +15,6 @@ arbitrary = { version = "=1.0.0" }
 holochain = { path = "../holochain", version = "0.0.164" }
 rand = "0.8"
 tracing = "0.1"
+
+crossterm = "*"
+tui = "*"

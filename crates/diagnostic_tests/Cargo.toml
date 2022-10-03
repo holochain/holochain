@@ -16,3 +16,5 @@ holochain_diagnostics = { path = "../holochain_diagnostics" }
 observability = "0.1"
 tokio = { version = "1.11", features = ["full"] }
 
+crossterm = "*"
+tui = "*"
