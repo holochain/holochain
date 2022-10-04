@@ -6,7 +6,7 @@ use holochain_zome_types::NetworkSeed;
 use mr_bundle::{Location, Manifest};
 use std::path::PathBuf;
 
-pub(crate) mod app_manifest_v1;
+pub mod app_manifest_v1;
 pub mod app_manifest_validated;
 mod current;
 mod error;
