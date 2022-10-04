@@ -4,10 +4,14 @@ use std::{sync::Arc, time::Duration};
 
 use diagnostic_tests::{setup_conductors_single_zome, syn_zome};
 use holo_hash::AgentPubKey;
-use holochain_diagnostics::{holochain::sweettest::*, Signal};
+use holochain_diagnostics::{holochain::sweettest::*, random_vec, seeded_rng, Signal};
 use tokio_stream::{Stream, StreamExt, StreamMap};
 
 const NODES: usize = 5;
+const COMMIT_SIZE: usize = 1_000_000;
+
+const SEND_RATE: Duration = Duration::from_millis(2000);
+const COMMIT_RATE: Duration = Duration::from_millis(2000);
 
 #[tokio::main]
 async fn main() {
@@ -16,6 +20,7 @@ async fn main() {
     let mut handles = vec![];
     handles.push(task_signal_handler(app.clone(), signal_rxs));
     handles.push(task_signal_sender(app.clone()));
+    handles.push(task_commit(app.clone()));
 
     futures::future::join_all(handles).await;
 }
@@ -48,24 +53,46 @@ impl App {
 }
 
 fn task_commit(app: App) -> tokio::task::JoinHandle<()> {
-    tokio::spawn(async move {})
+    let mut rng = seeded_rng(None);
+    tokio::spawn(async move {
+        let mut n = 0;
+        loop {
+            let node: &Node = &app.nodes[n % NODES];
+            let data = random_vec::<u8>(&mut rng, COMMIT_SIZE);
+            let _: () = node.conductor.call(&node.zome, "commit", data).await;
+
+            println!("committed.");
+
+            n += 1;
+            tokio::time::sleep(COMMIT_RATE).await;
+        }
+    })
 }
 
 fn task_signal_sender(app: App) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
+        let mut n = 0;
+        let agents: Vec<_> = app
+            .nodes
+            .iter()
+            .map(|n| n.zome.cell_id().agent_pubkey().clone())
+            .collect();
         loop {
-            let n = &app.nodes[0];
-            let ps: Vec<AgentPubKey> = (0..NODES)
-                .into_iter()
-                .map(|p| app.nodes[p].zome.cell_id().agent_pubkey().clone())
+            let node: &Node = &app.nodes[n % NODES];
+            let ps: Vec<AgentPubKey> = agents
+                .iter()
+                .enumerate()
+                .filter(|(i, _)| *i != n)
+                .map(|(_, p)| p.clone())
                 .collect();
-            println!("sending message to {} agents", ps.len());
 
-            let _: () = n
+            let _: () = node
                 .conductor
-                .call(&n.zome, "send_message", (vec![123], ps))
+                .call(&node.zome, "send_message", (vec![123], ps))
                 .await;
-            tokio::time::sleep(Duration::from_secs(1)).await;
+
+            n += 1;
+            tokio::time::sleep(SEND_RATE).await;
         }
     })
 }
@@ -77,11 +104,11 @@ fn task_signal_handler(app: App, signal_rxs: Vec<SignalStream>) -> tokio::task::
             streams.insert(i, s);
         }
         loop {
-            println!("awaiting signal");
             if let Some((i, signal)) = streams.next().await {
-                println!("got signal: {} {:?}", i, signal);
+                println!("got signal from {}", i);
             } else {
-                tokio::time::sleep(Duration::from_secs(1)).await;
+                println!("No signal. Closing handler loop.");
+                break;
             }
         }
     })
